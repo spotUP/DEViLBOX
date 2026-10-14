@@ -7,8 +7,8 @@ import { resolve } from 'path';
 import { isIffSmusFormat, parseIffSmusFile } from '../formats/IffSmusParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const IS_DIR = resolve(REF, 'IFF-SMUS/- unknown');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const IS_DIR = resolve(REF, 'iff-smus/- unknown');
 const FILE1 = resolve(IS_DIR, 'alex/alex.smus');
 const FILE2 = resolve(IS_DIR, 'Amanda/Amanda.smus');
 const YESSONIX_DIR = resolve(IS_DIR, 'yessonix');

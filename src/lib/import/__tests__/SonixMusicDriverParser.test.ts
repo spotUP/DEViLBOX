@@ -18,8 +18,8 @@ import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 // ── Reference Music paths ──────────────────────────────────────────────────
 
-const REF    = resolve(import.meta.dirname, '../../../../Reference Music');
-const SMUS_FILE = resolve(REF, 'IFF-SMUS/- unknown/yessonix/yessonix.smus');
+const REF    = resolve(import.meta.dirname, '../../../../public/data/songs');
+const SMUS_FILE = resolve(REF, 'iff-smus/- unknown/yessonix/yessonix.smus');
 
 function loadBuf(path: string): ArrayBuffer {
   const b = readFileSync(path);
@@ -196,10 +196,9 @@ describe('parseSonixFile — SNX synthetic', () => {
 // ── parseSonixFile — TINY throws ──────────────────────────────────────────
 
 describe('parseSonixFile — TINY', () => {
-  it('throws because external instrument files are required', async () => {
-    await expect(
-      parseSonixFile(makeTinyBuffer(), 'tiny.test'),
-    ).rejects.toThrow(/external instrument files/i);
+  it('parses a TINY buffer into a song (editable grid; no external instrument files needed since da26c2361)', async () => {
+    const song = await parseSonixFile(makeTinyBuffer(), 'tiny.test');
+    expect(song.name).toContain('[TINY]');
   });
 });
 
@@ -229,7 +228,7 @@ describe('parseSonixFile — yessonix.smus', () => {
 // ── Companion file pipeline — yessonix folder ─────────────────────────────
 
 describe('companion file pipeline — yessonix folder', () => {
-  const YESSONIX_DIR = resolve(REF, 'IFF-SMUS/- unknown/yessonix');
+  const YESSONIX_DIR = resolve(REF, 'iff-smus/- unknown/yessonix');
   // Read all files from the folder (simulates what GlobalDragDropHandler does)
   function enumerateFolder(): { mainFile: string; companions: string[] } {
     const fs = require('fs');

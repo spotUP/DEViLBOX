@@ -7,10 +7,9 @@ import { resolve } from 'path';
 import { isJesperOlsenFormat, parseJesperOlsenFile } from '../formats/JesperOlsenParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const JO_DIR = resolve(REF, 'Jesper Olsen/Jesper Olsen');
-const FILE1 = resolve(JO_DIR, 'georgglaxo ingame.jo');
-const FILE2 = resolve(JO_DIR, 'georgglaxo title.jo');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'jesper-olsen/georg glaxo/JO.GeorgGlaxo title');
+const FILE2 = resolve(REF, 'jesper-olsen/lollypop-subgame 01.jo');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

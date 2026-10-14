@@ -3,13 +3,13 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { isGraoumfTracker2Format, parseGraoumfTracker2File } from '../formats/GraoumfTracker2Parser';
 
-const BITTERSWEET = resolve(
+const LIVING_ON_VIDEO = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/Graoumf Tracker 2/Speechless/bittersweet.gt2'
+  '../../../../public/data/songs/graoumf-tracker-2/living-on-video.gt2'
 );
-const BOUND = resolve(
+const GIMMEKUH = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/Graoumf Tracker 2/Speechless/bound.gt2'
+  '../../../../public/data/songs/formats/gimmekuh.gt2'
 );
 
 function loadFile(path: string): Uint8Array {
@@ -28,30 +28,30 @@ describe('isGraoumfTracker2Format', () => {
     expect(isGraoumfTracker2Format(buf)).toBe(false);
   });
 
-  it('rejects GT2 files with invalid year field (real files, strict validation)', () => {
-    // These GT2 files have "GT2" magic but fail the parser's year validation check
-    // (year field at offset 203 is outside 1980-9999 range in these files).
-    // The parser mirrors OpenMPT's strict GT2FileHeader::Validate() behaviour.
-    const bytes = loadFile(BITTERSWEET);
+  it('accepts real GT2 files whose year field is in range', () => {
+    // Year u16BE at offset 202: living-on-video.gt2 = 0x07ce (1998), gimmekuh.gt2 = 0x0802 (2050)
+    expect(isGraoumfTracker2Format(loadFile(LIVING_ON_VIDEO))).toBe(true);
+    expect(isGraoumfTracker2Format(loadFile(GIMMEKUH))).toBe(true);
+  });
+
+  it('rejects a real GT2 file once its year field is outside 1980-9999 (strict validation)', () => {
+    // The parser mirrors OpenMPT's strict GT2FileHeader::Validate(): year must be 1980..9999.
+    const bytes = loadFile(LIVING_ON_VIDEO);
+    bytes[202] = 0x07; bytes[203] = 0xab; // 1963
     expect(isGraoumfTracker2Format(bytes)).toBe(false);
+    expect(parseGraoumfTracker2File(bytes, 'living-on-video.gt2')).toBeNull();
   });
 });
 
-describe('parseGraoumfTracker2File — bittersweet.gt2 (Speechless)', () => {
-  it('returns null due to year validation failure', () => {
-    // bittersweet.gt2 has "GT2" magic and version 4, but its year field (offset 203,
-    // uint16BE) is outside the valid 1980-9999 range, so the parser returns null.
-    const bytes = loadFile(BITTERSWEET);
-    const song = parseGraoumfTracker2File(bytes, 'bittersweet.gt2');
-    expect(song).toBeNull();
+describe('parseGraoumfTracker2File — real files', () => {
+  it('parses living-on-video.gt2', () => {
+    const song = parseGraoumfTracker2File(loadFile(LIVING_ON_VIDEO), 'living-on-video.gt2');
+    expect(song).not.toBeNull();
+    expect(song!.name).toBe('living-on-video');
   });
-});
 
-describe('parseGraoumfTracker2File — bound.gt2 (Speechless)', () => {
-  it('returns null due to year validation failure', () => {
-    // bound.gt2 has the same year validation issue as bittersweet.gt2.
-    const bytes = loadFile(BOUND);
-    const song = parseGraoumfTracker2File(bytes, 'bound.gt2');
-    expect(song).toBeNull();
+  it('parses gimmekuh.gt2', () => {
+    const song = parseGraoumfTracker2File(loadFile(GIMMEKUH), 'gimmekuh.gt2');
+    expect(song).not.toBeNull();
   });
 });

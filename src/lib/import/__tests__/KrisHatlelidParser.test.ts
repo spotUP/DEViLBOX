@@ -12,11 +12,9 @@ import { resolve } from 'path';
 import { isKrisHatlelidFormat, parseKrisHatlelidFile } from '../formats/KrisHatlelidParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 
-const FILE1 = resolve(REF, 'Kris Hatlelid/Kris Hatlelid/Wings Of Fury/wings of fury.kh');
-const FILE2 = resolve(REF, 'Kris Hatlelid/Kris Hatlelid/The Cycles/the cycles.kh');
-const FILE3 = resolve(REF, 'Kris Hatlelid/Kris Hatlelid/Test Drive 2/test drive 2.kh');
+const FILE1 = resolve(REF, 'kris-hatlelid/fiendish freddys - songs.kh');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);
@@ -26,44 +24,18 @@ function loadBuf(path: string): ArrayBuffer {
 // ── isKrisHatlelidFormat ────────────────────────────────────────────────────
 
 describe('isKrisHatlelidFormat', () => {
-  it('detects wings of fury.kh', () => expect(isKrisHatlelidFormat(loadBuf(FILE1))).toBe(true));
-  it('detects the cycles.kh', () => expect(isKrisHatlelidFormat(loadBuf(FILE2))).toBe(true));
-  it('detects test drive 2.kh', () => expect(isKrisHatlelidFormat(loadBuf(FILE3))).toBe(true));
+  it('detects fiendish freddys - songs.kh', () => expect(isKrisHatlelidFormat(loadBuf(FILE1))).toBe(true));
   it('rejects a zeroed buffer', () => expect(isKrisHatlelidFormat(new ArrayBuffer(64))).toBe(false));
 });
 
 // ── parseKrisHatlelidFile ───────────────────────────────────────────────────
 
-describe('parseKrisHatlelidFile — wings of fury.kh', () => {
+describe('parseKrisHatlelidFile — fiendish freddys - songs.kh', () => {
   it('reports format capabilities', () => {
     let song;
-    try { song = parseKrisHatlelidFile(loadBuf(FILE1), 'wings of fury.kh'); } catch (e) { console.log('threw:', e); return; }
+    try { song = parseKrisHatlelidFile(loadBuf(FILE1), 'fiendish freddys - songs.kh'); } catch (e) { console.log('threw:', e); return; }
     if (!song) { console.log('returned null'); return; }
-    const report = analyzeFormat(song, 'wings of fury.kh');
-    console.log('\n' + formatReportToString(report));
-    expect(typeof report.format).toBe('string');
-    expect(report.numChannels).toBeGreaterThan(0);
-  });
-});
-
-describe('parseKrisHatlelidFile — the cycles.kh', () => {
-  it('reports format capabilities', () => {
-    let song;
-    try { song = parseKrisHatlelidFile(loadBuf(FILE2), 'the cycles.kh'); } catch (e) { console.log('threw:', e); return; }
-    if (!song) { console.log('returned null'); return; }
-    const report = analyzeFormat(song, 'the cycles.kh');
-    console.log('\n' + formatReportToString(report));
-    expect(typeof report.format).toBe('string');
-    expect(report.numChannels).toBeGreaterThan(0);
-  });
-});
-
-describe('parseKrisHatlelidFile — test drive 2.kh', () => {
-  it('reports format capabilities', () => {
-    let song;
-    try { song = parseKrisHatlelidFile(loadBuf(FILE3), 'test drive 2.kh'); } catch (e) { console.log('threw:', e); return; }
-    if (!song) { console.log('returned null'); return; }
-    const report = analyzeFormat(song, 'test drive 2.kh');
+    const report = analyzeFormat(song, 'fiendish freddys - songs.kh');
     console.log('\n' + formatReportToString(report));
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);

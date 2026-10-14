@@ -16,9 +16,9 @@ import { resolve } from 'path';
 import { isUADEFormat } from '../formats/UADEParser';
 import { tryExtractInstrumentNames } from '../formats/UADEParser';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music/Delitracker Custom');
-const CUS_FILE   = resolve(REF, 'Raymond Tobey/Skyfox.cus');
-const CUST_FILE  = resolve(REF, 'The Psychos/TJC-MusicInvasion1-intro.cust');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const CUS_FILE   = resolve(REF, 'delitracker-custom/skyfox2.cus');
+const CUST_FILE  = resolve(REF, 'delitracker-custom/bards tale.cus');
 
 function loadBuf(path: string): ArrayBuffer {
   const b = readFileSync(path);

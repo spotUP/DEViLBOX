@@ -2,19 +2,13 @@
  * DaveLoweParser Tests - Format capability analysis
  */
 import { describe, it, expect } from 'vitest';
-import { existsSync, readFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { isDaveLoweFormat, parseDaveLoweFile } from '../formats/DaveLoweParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-// Reference Music is a local-only corpus (gitignored, absent from a clean checkout): skip, do not fail.
-const HAS_CORPUS = existsSync(REF);
-const DL_DIR = resolve(REF, 'Dave Lowe/Dave Lowe');
-const FILE1 = resolve(DL_DIR, 'afterburner.dl');
-const FILE2 = resolve(DL_DIR, 'altered beast.dl');
-const FILE_BANGKOK = resolve(DL_DIR, 'bangkok knights.dl');
-const FILE_GHOSTBUSTERS = resolve(DL_DIR, 'ghostbusters2 jingle.dl');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'dave-lowe/incredibleshrinkingsphere.dl');
 
 function loadBytes(p: string): Uint8Array {
   return new Uint8Array(readFileSync(p));
@@ -25,76 +19,47 @@ function loadBuf(p: string): ArrayBuffer {
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
 }
 
-describe.skipIf(!HAS_CORPUS)('isDaveLoweFormat', () => {
-  it('detects afterburner.dl', () => {
+describe('isDaveLoweFormat', () => {
+  it('detects incredibleshrinkingsphere.dl', () => {
     expect(isDaveLoweFormat(loadBytes(FILE1))).toBe(true);
-  });
-  it('detects altered beast.dl', () => {
-    expect(isDaveLoweFormat(loadBytes(FILE2))).toBe(true);
   });
   it('rejects zeroed buffer', () => {
     expect(isDaveLoweFormat(new Uint8Array(64))).toBe(false);
   });
 });
 
-describe.skipIf(!HAS_CORPUS)('parseDaveLoweFile — afterburner.dl', () => {
+describe('parseDaveLoweFile — incredibleshrinkingsphere.dl', () => {
   it('parses without throwing', async () => {
-    await expect(parseDaveLoweFile(loadBuf(FILE1), 'afterburner.dl')).resolves.toBeDefined();
+    await expect(parseDaveLoweFile(loadBuf(FILE1), 'incredibleshrinkingsphere.dl')).resolves.toBeDefined();
   });
   it('reports format capabilities', async () => {
-    const song = await parseDaveLoweFile(loadBuf(FILE1), 'afterburner.dl');
-    const report = analyzeFormat(song, 'afterburner.dl');
+    const song = await parseDaveLoweFile(loadBuf(FILE1), 'incredibleshrinkingsphere.dl');
+    const report = analyzeFormat(song, 'incredibleshrinkingsphere.dl');
     console.log('\n' + formatReportToString(report));
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
   });
 
-  it('extracts embedded title "After Burner" from offset 0x70', async () => {
-    const song = await parseDaveLoweFile(loadBuf(FILE1), 'afterburner.dl');
-    // Embedded title at 0x70 should override the filename-derived name
-    expect(song.name).toContain('After Burner');
+  it('extracts the embedded title "Incredible Shrinking Sphere" from offset 0x70', async () => {
+    const song = await parseDaveLoweFile(loadBuf(FILE1), 'incredibleshrinkingsphere.dl');
+    // Title string sits at file offset 0x70 (read from the header bytes with xxd)
+    expect(song.name).toContain('Incredible Shrinking Sphere');
   });
 
-  it('creates 8 placeholder instruments', async () => {
-    const song = await parseDaveLoweFile(loadBuf(FILE1), 'afterburner.dl');
-    expect(song.instruments).toHaveLength(8);
+  it('creates one instrument per 14-byte sample descriptor (19 in this file)', async () => {
+    const song = await parseDaveLoweFile(loadBuf(FILE1), 'incredibleshrinkingsphere.dl');
+    // Header longwords at 0x40 (SampleInfo=0x2220) and 0x44 (EndSampleInfo=0x232a): (0x232a-0x2220)/14 = 19
+    expect(song.instruments).toHaveLength(19);
   });
 
-  it('leaves instruments unnamed (the format stores no names) and keeps every slot', async () => {
-    const song = await parseDaveLoweFile(loadBuf(FILE1), 'afterburner.dl');
-    expect(song.instruments[0].name).toBe('');
-    expect(song.instruments[7].name).toBe('');
+  it('names instruments after the embedded author string "Dave Lowe" (offset 0x8c) and nothing else', async () => {
+    const song = await parseDaveLoweFile(loadBuf(FILE1), 'incredibleshrinkingsphere.dl');
+    expect(song.instruments[0].name).toBe('Dave Lowe 1');
+    expect(song.instruments[18].name).toBe('Dave Lowe 19');
   });
 
   it('has 4 channels', async () => {
-    const song = await parseDaveLoweFile(loadBuf(FILE1), 'afterburner.dl');
+    const song = await parseDaveLoweFile(loadBuf(FILE1), 'incredibleshrinkingsphere.dl');
     expect(song.numChannels).toBe(4);
-  });
-});
-
-describe.skipIf(!HAS_CORPUS)('parseDaveLoweFile — altered beast.dl', () => {
-  it('parses without throwing', async () => {
-    await expect(parseDaveLoweFile(loadBuf(FILE2), 'altered beast.dl')).resolves.toBeDefined();
-  });
-  it('reports format capabilities', async () => {
-    const song = await parseDaveLoweFile(loadBuf(FILE2), 'altered beast.dl');
-    const report = analyzeFormat(song, 'altered beast.dl');
-    console.log('\n' + formatReportToString(report));
-    expect(typeof report.format).toBe('string');
-    expect(report.numChannels).toBeGreaterThan(0);
-  });
-});
-
-describe.skipIf(!HAS_CORPUS)('parseDaveLoweFile — bangkok knights.dl', () => {
-  it('extracts embedded title "Bangkok Knights"', async () => {
-    const song = await parseDaveLoweFile(loadBuf(FILE_BANGKOK), 'bangkok knights.dl');
-    expect(song.name).toContain('Bangkok Knights');
-  });
-});
-
-describe.skipIf(!HAS_CORPUS)('parseDaveLoweFile — ghostbusters2 jingle.dl', () => {
-  it('extracts embedded title "Ghostbusters II jingle"', async () => {
-    const song = await parseDaveLoweFile(loadBuf(FILE_GHOSTBUSTERS), 'ghostbusters2 jingle.dl');
-    expect(song.name).toContain('Ghostbusters II jingle');
   });
 });

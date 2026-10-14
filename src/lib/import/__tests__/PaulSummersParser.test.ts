@@ -5,7 +5,7 @@
  *      parsePaulSummersFile(buffer: ArrayBuffer, filename: string): TrackerSong  (sync, never null)
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 import {
   isPaulSummersFormat,
@@ -17,6 +17,10 @@ const REF = resolve(import.meta.dirname, "../../../../Reference Music");
 const FILE1 = resolve(REF, "Paul Summers/Mick Chilton/p-47thefreedomfighter.snk");
 const FILE2 = resolve(REF, "Paul Summers/Paul Summers/fightingsoccer.snk");
 
+// Local-only corpus: no tracked song in public/data/songs carries the Paul Summers magic (0x46FC2700 within the first
+// 700 bytes; the one tracked .snk is a different format), so these suites run only where Reference Music is present.
+const HAS_CORPUS = existsSync(FILE1) && existsSync(FILE2);
+
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);
   return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
@@ -24,7 +28,7 @@ function loadBuf(p: string): ArrayBuffer {
 
 // ── Detection ─────────────────────────────────────────────────────────────────
 
-describe("isPaulSummersFormat", () => {
+describe.skipIf(!HAS_CORPUS)("isPaulSummersFormat", () => {
   it("detects p-47thefreedomfighter.snk", () => {
     expect(isPaulSummersFormat(loadBuf(FILE1))).toBe(true);
   });
@@ -38,7 +42,7 @@ describe("isPaulSummersFormat", () => {
 
 // ── Parse FILE1 ───────────────────────────────────────────────────────────────
 
-describe("parsePaulSummersFile — p-47thefreedomfighter.snk", () => {
+describe.skipIf(!HAS_CORPUS)("parsePaulSummersFile — p-47thefreedomfighter.snk", () => {
   it("parses without throwing", () => {
     expect(() =>
       parsePaulSummersFile(loadBuf(FILE1), "p-47thefreedomfighter.snk")
@@ -58,7 +62,7 @@ describe("parsePaulSummersFile — p-47thefreedomfighter.snk", () => {
 
 // ── Parse FILE2 ───────────────────────────────────────────────────────────────
 
-describe("parsePaulSummersFile — fightingsoccer.snk", () => {
+describe.skipIf(!HAS_CORPUS)("parsePaulSummersFile — fightingsoccer.snk", () => {
   it("parses without throwing", () => {
     expect(() =>
       parsePaulSummersFile(loadBuf(FILE2), "fightingsoccer.snk")
