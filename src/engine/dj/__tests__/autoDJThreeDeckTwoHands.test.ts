@@ -10,7 +10,6 @@
  *    Deck C plays its routine is released with the two-hands reason, it never completes (sentinel: the routine
  *    count 1). Fake timers, fake decks, no audio.
  */
-import { scratchTempoFold } from '../scratch/scratchTempo';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import fixture from '../scratch/__tests__/fixtures/three_deck_two_hands.json';
 
@@ -48,7 +47,7 @@ vi.mock('../DJPerSongFx', () => ({ applyPerSongMasterFx: () => {} }));
 import { DJScratchDJ, scratchDJStats } from '../scratch/DJScratchDJ';
 import { THREE_DECK_JUGGLE_JL_MIN } from '../scratch/scratchDemoRoutines';
 import { HANDS_BUDGET } from '../autodj/performanceBudget';
-import { corpusAnalysisTwice } from '../autodj/testing/corpus';
+import { corpusAnalysis } from '../autodj/testing/corpus';
 import { timeAtBeat, barStartBeat } from '../autodj/beatGrid';
 import { getAutoDJ } from '../DJAutoDJ';
 import type { AutoDJInternals } from './juggleTransitionHarness';
@@ -69,8 +68,7 @@ describe('C15: the A/B decks juggle only while Deck C is out (three-deck routine
     expect(THREE_DECK_JUGGLE_JL_MIN).toBe(fixture.juggle_jl_min);
     // the demo plans its A/B events by the same rule: a hand-juggle exactly in the bars _section_juggles allows
     expect(fixture.hand).toEqual(fixture.juggles);
-    // the drops arrangement twice: the routine plays half-time over its 130 BPM (scratchTempoFold), 64 of its bars
-    const track = corpusAnalysisTwice('drops');
+    const track = corpusAnalysis('drops');
     const scheduled: ScratchEvent[] = [];
     const ctrl = new DJScratchDJ({ seed: 3, executorFor: () => ({ schedule: (e: ScratchEvent) => { scheduled.push(e); return {}; }, cancel: () => {}, active: 0 }) });
     const barT = (b: number) => timeAtBeat(track.beatGrid, barStartBeat(track.downbeats, b)) + 0.05;
@@ -83,10 +81,8 @@ describe('C15: the A/B decks juggle only while Deck C is out (three-deck routine
     }
     expect(start).toBeGreaterThan(0);
     const holds: number[] = [], hands: number[] = [];
-    // a routine bar at a time: half-time over the 130 BPM drops track, each routine bar two of the set's (scratchTempoFold)
-    const fold = scratchTempoFold(track.bpm);
     for (let k = 0; k < 32; k++) {
-      for (let f = 0; f < fold; f++) tick(start + k * fold + f);
+      tick(start + k);
       holds.push(ctrl.deckCHoldsTheJuggle() ? 1 : 0);
       hands.push(ctrl.handsInUse());
     }
@@ -95,7 +91,7 @@ describe('C15: the A/B decks juggle only while Deck C is out (three-deck routine
     // Deck C scratches only in the bars the demo gives it (never while the decks juggle)
     const startBeat = barStartBeat(track.downbeats, start);
     const busy = new Set(scheduled.filter((e) => e.gesture !== 'needleDrop' && e.gesture !== 'needleLift' && e.executeAtBeat >= startBeat)
-      .map((e) => Math.floor((e.executeAtBeat - startBeat) / 4 / fold)).filter((b) => b < 32));
+      .map((e) => Math.floor((e.executeAtBeat - startBeat) / 4)).filter((b) => b < 32));
     for (const b of busy) expect(fixture.deck_c[b], `bar ${b}`).toBe(1);
     expect(fixture.juggles.every((j, b) => !(j && busy.has(b)))).toBe(true);
   });

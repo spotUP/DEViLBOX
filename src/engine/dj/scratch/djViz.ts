@@ -195,14 +195,15 @@ export function upfaderCFromActive(deckActive: ArrayLike<number>): Uint8Array {
 }
 
 /** `_gesture_id_stream` (D1): the Deck C gesture sounding at each tick (0 = none). */
-export function gestureIdStream(events: readonly VizScratchEvent[], bpm: number, rate: number, nTicks: number): Uint8Array {
+export function gestureIdStream(events: readonly VizScratchEvent[], bpm: number, rate: number, nTicks: number, fold = 1): Uint8Array {
   const out = new Uint8Array(nTicks);
   const step = vizStepSamples(bpm, rate), bar = step * 16;
   for (const [b, st, , gesture] of events) {
     const gid = DJ_VIZ_GESTURE_IDS[gesture] ?? 0;
     if (gid === 0) continue;
     const start = sampleToTick(b * bar + st * step, rate);
-    const dur = DJ_VIZ_GESTURE_STEPS[gesture] ?? 2;
+    // a gesture over a fast set lasts twice its 16ths (scratch_fold: scratch.routine_tempo_fold)
+    const dur = (DJ_VIZ_GESTURE_STEPS[gesture] ?? 2) * fold;
     const end = Math.max(sampleToTick(b * bar + (st + dur) * step, rate), start + 1);
     const s0 = Math.max(0, start), s1 = Math.min(nTicks, end);
     if (s1 > s0) out.fill(gid, s0, s1);
@@ -285,6 +286,8 @@ export interface DjVizInput {
   beatmix?: ArrayLike<number> | null;
   arcEnergy?: ReadonlyArray<readonly [number, number, number]> | null;
   juggleArc?: ReadonlyArray<readonly [number, number, number]> | null;
+  /** The set's 16ths per routine 16th (`scratch_fold`, scratchTempoFold). Omitted: 1. */
+  scratchFold?: number;
 }
 
 /** Reachability sentinel: performances quantized. */
@@ -303,7 +306,7 @@ export function quantize(i: DjVizInput): DjVizStreams {
   [s.upfader_a, s.upfader_b] = upfadersFromJuggle(i.juggleEvents, bpm, rate, nTicks);
   s.deck_active = deckActiveStream(i.deckActiveSections, bpm, rate, nTicks);
   s.upfader_c = upfaderCFromActive(s.deck_active);
-  s.gesture_id = gestureIdStream(i.scratchEvents, bpm, rate, nTicks);
+  s.gesture_id = gestureIdStream(i.scratchEvents, bpm, rate, nTicks, i.scratchFold ?? 1);
   s.scratch_intensity = intensityStream(i.slipC, nTicks, rate);
   s.tonearm_a = positionToBytes(i.platterAngles.a ?? zero, nTicks, rate);
   s.tonearm_b = positionToBytes(i.platterAngles.b ?? zero, nTicks, rate);

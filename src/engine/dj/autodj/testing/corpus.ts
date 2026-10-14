@@ -126,23 +126,6 @@ export function corpusAnalysis(id: CorpusId): DJTrackAnalysis {
   return a;
 }
 
-/**
- * A corpus track played twice through (its arrangement repeated): long enough for a routine that plays half-time
- * over its tempo (a 32-bar routine spans 64 of a 130 BPM track's bars, scratchTempoFold). Same analysis path.
- */
-export function corpusAnalysisTwice(id: CorpusId): DJTrackAnalysis {
-  const key = `${id}:twice`;
-  let a = twiceCache.get(key);
-  if (a) return a;
-  const spec = CORPUS_SPECS[id];
-  const track = renderSyntheticTrack({ ...spec, sections: [...spec.sections, ...spec.sections] });
-  const extended = computeExtendedAnalysis(track.pcm, track.sampleRate, { beats: track.beats });
-  a = buildDJTrackAnalysis({ id: key, durationSec: track.durationSec, analysis: corpusPipelineAnalysis(track), extended: { ...extended }, song: null });
-  twiceCache.set(key, a);
-  return a;
-}
-const twiceCache = new Map<string, DJTrackAnalysis>();
-
 export function corpusSummary(id: CorpusId): DJTrackSummary {
   return summarizeTrack(corpusAnalysis(id));
 }

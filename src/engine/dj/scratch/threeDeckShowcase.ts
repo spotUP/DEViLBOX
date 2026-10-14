@@ -15,6 +15,7 @@
  * juggle pushes and rewinds - D5) quantized to dj_viz's 50 Hz streams (`djViz.ts`: D1, D3, D4, D6).
  */
 
+import { roundHalfEven, scratchTempoFold } from './scratchTempo';
 import {
   buildJuggleBus, buildJuggleEvents, hiphopRecord, juggleStep, makeBreak, readFloatWav, DECK_A,
   JUGGLE_RATE, THREE_DECK_RECORDS, type JuggleEvent, type JuggleSource,
@@ -116,7 +117,9 @@ export async function renderThreeDeckShowcase(io: ShowcaseRenderIO, params: Part
   for (let i = 0; i < juggle.length; i++) juggle[i] = juggle[i]! + p.juggleReverbMix * room[i]!;
 
   // --- Deck C: the routine on the crate, three_deck's grid, the worklet chain offline ---
-  const events = buildThreeDeckRoutine(seed, { budget: p.budget });
+  // the routine half-time over a fast set (three_deck.render: routine_tempo_fold, gestures r_step long)
+  const fold = scratchTempoFold(bpm);
+  const events = buildThreeDeckRoutine(seed, { budget: p.budget, fold });
   const specs = demoRoutineRenderSpecs(events, seed, 'threeDeck');
   const busLen = juggle.length + Math.trunc(0.6 * rate);
   const rvC = new Float64Array(busLen).fill(1), slipC = new Float64Array(busLen), faderC = new Float64Array(busLen);
@@ -124,13 +127,13 @@ export async function renderThreeDeckShowcase(io: ShowcaseRenderIO, params: Part
   const off = io.offline(juggle.length, rate);
   const bus = await createDeckCBus(off, off.destination, { chain: 'threeDeck', tap: DECK_C_TAPS.tail, planned: true });
   for (let k = 0; k < events.length; k++) {
-    const e = events[k]!, spec = { ...specs[k]!, stepSamples: step };
+    const e = events[k]!, spec = { ...specs[k]!, stepSamples: step, ...(fold !== 1 ? { tempoFold: fold } : {}) };
     const gesture = getGesture(e.gesture);
     const record = e.record ? getScratchRecord(e.record) ?? null : null;
     const r = await io.strokes.renderStrokeViz(gesture, record, spec, bpm, e.velocity);
     if (!r) continue;
     showcaseStats.strokes++;
-    let o = e.bar * barLen + e.step * step;
+    let o = e.bar * barLen + roundHalfEven(e.step * step);
     if (!gesture.needle) o = Math.max(0, o + spec.humanizeSamples);
     bus.stroke(o, r.out);
     placed.push({ start: o, length: r.out.length, viz: r.viz });
@@ -189,7 +192,7 @@ export async function renderThreeDeckShowcase(io: ShowcaseRenderIO, params: Part
   const streams = quantize({
     platterAngles: { a: viz.angleA, b: viz.angleB, c: viz.angleC }, faderC: viz.faderC, slipC: viz.slipC,
     scratchEvents, juggleEvents: jev as unknown as VizJuggleEvent[], deckActiveSections: deckActiveSections(p.budget),
-    beatmix: juggle.subarray(0, n), bpm, rate, nTicks,
+    beatmix: juggle.subarray(0, n), bpm, rate, nTicks, scratchFold: fold,
     arcEnergy: THREE_DECK_ARC.map(([, b0, bars], i) => [b0, bars, THREE_DECK_ENERGY[i]!] as const),
     juggleArc: THREE_DECK_ARC.map(([, b0, bars, jl]) => [b0, bars, jl / 4.0] as const),
   });

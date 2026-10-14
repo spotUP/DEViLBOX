@@ -188,7 +188,8 @@ interface PerformedWindow {
   intent: PhraseDecision;
   /** The performer entered the window's state (on its first bar). */
   started: boolean;
-  /** The set's bars per routine bar (`scratchTempoFold`; a half-time routine's bar is two of the set's). */
+  /** The set's bars per arc bar: scratch_dj's half-time routine spans two of the set's a bar (`scratchTempoFold`);
+   *  three_deck folds inside its sections and keeps the set's bars (1). */
   fold?: number;
 }
 
@@ -436,7 +437,11 @@ export class DJScratchDJ {
     // features on top of it in PERFORMER / BATTLE (a 32-bar arc is the routine modes' alone)
     const render = input.render ?? 'section';
     const routineRender = render === 'three_deck' || render === 'dj_routine';
-    const fold = routineRender ? scratchTempoFold(ctx.bpm) : 1;
+    // the routine's tempo over the set (scratchTempo): half-time over a fast set. three_deck folds inside each
+    // section of its 32 set bars (three_deck.py build_scratch_events); scratch_dj's routine spans fold x 32 of the
+    // set's bars (scratch_dj.render's routine_step_samples); the overlay folds each section (render_scratch_section)
+    const fold = scratchTempoFold(ctx.bpm);
+    const stretch = render === 'dj_routine' ? fold : 1;
     if (routineRender && !onPhrase) {
       // Deck C waits for the phrase: the routine's needle drops on its first downbeat
       this.plannedThroughBar = toBar;
@@ -464,13 +469,15 @@ export class DJScratchDJ {
       const opts: ScratchPlanOptions = {
         mode: input.mode, seed, fromBar: from, bars, vocalByBar, genre: input.genre, densityShift,
         sectionAt: (bar) => overlaySectionAt(track, bar), profile: input.profile, routine: input.routine ?? null, records: input.records ?? true, extras,
+        // the overlay at the demo's tempo too: half-time over a fast set, on the set's grid (SCRATCH-FOLD-OVERLAY)
+        tempoFold: scratchTempoFold(ctx.bpm),
       };
       return planScratch(ctx, opts);
     };
     if (wantsFeature) {
       arc = routineRender ? (render === 'dj_routine' ? SCRATCH_DJ_TEMPLATE : THREE_DECK_TEMPLATE) : shape.template!;
-      // a routine plays at the demo's tempo over the set: half-time over a fast set, its 32 bars then span 64 (scratchTempo)
-      toBar = fromBar + Math.max(1, Math.round(arc.bars * fold));
+      // scratch_dj's routine at its own tempo spans fold x its bars; three_deck keeps the set's 32 (scratchTempo)
+      toBar = fromBar + Math.max(1, Math.round(arc.bars * stretch));
       this.budget.feature();
       const perm = performancePermissions({ setPhase, budgetTotal: this.budget.total, mode: input.mode });
       this.lastPeak = perm.peak;
@@ -495,9 +502,9 @@ export class DJScratchDJ {
           : emphasis
             ? { pools: { HOME: [emphasis], SECONDARY: [emphasis], ACCENT: [emphasis], FX: [emphasis] }, phraseEmphasis: true }
             : picked.length ? { pools: cuePoolsFor(picked) } : {};
-        const demo = battle ? buildScratchDjRoutine(ctx.style, seed + fromBar) : buildThreeDeckRoutine(seed + fromBar, threeDeckOpts);
+        const demo = battle ? buildScratchDjRoutine(ctx.style, seed + fromBar) : buildThreeDeckRoutine(seed + fromBar, { ...threeDeckOpts, fold });
         // every stroke rendered as the demo renders it, on the routine's own bus (scratch null test)
-        const events = demoRoutineToPlaced(demo, fromBar, ctx.meter, demoRoutineRenderSpecs(demo, seed + fromBar, battle ? 'scratchDj' : 'threeDeck'), fold).map((e) => ({ ...e, layer: 'demo' as const }));
+        const events = demoRoutineToPlaced(demo, fromBar, ctx.meter, demoRoutineRenderSpecs(demo, seed + fromBar, battle ? 'scratchDj' : 'threeDeck'), fold, battle ? 'routine' : 'set').map((e) => ({ ...e, layer: 'demo' as const }));
         plan = {
           mode: input.mode, events, bars: Array.from({ length: toBar - fromBar }, (_, k) => events.filter((e) => e.bar === fromBar + k)),
           rests: [], issues: battle ? validateScratchDjRoutine(demo) : [], routine: battle ? 'scratchDj' : 'threeDeck',
@@ -604,7 +611,7 @@ export class DJScratchDJ {
       this.memory.record({ bar: p.bar, gesture: e.gesture, sourceKey, intensity: e.intensity, transitionType: ctx.transitionType, section: ctx.sectionName, nextSection: ctx.nextSection?.kind, routine: plan.routine });
       this.budget.add('scratch', BUDGET_PER_EVENT);
     });
-    this.windows.push({ fromBar, toBar, entries, arc, energyBefore: ctx.energy, setEnergyBefore: input.perf.setEnergy, plan, intent, started: false, fold });
+    this.windows.push({ fromBar, toBar, entries, arc, energyBefore: ctx.energy, setEnergyBefore: input.perf.setEnergy, plan, intent, started: false, fold: stretch });
     scratchDJStats.scheduled += entries.length;
     // the routine's level (three_deck's, and its duck): the routine is planned whole, so its layer is known before
     // it plays - the demo levels a routine over its whole render. scratch_dj's routine too: levelled by the bus's
