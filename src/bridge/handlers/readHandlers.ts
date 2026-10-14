@@ -525,6 +525,69 @@ export async function getAudioWorkletProfile(params: Record<string, unknown>): P
   return { installed: true, windowMs, totalMsPerSecond: +total.toFixed(1), processors: entries, nodes: readNodeCensus(), pull: readPullCensus() };
 }
 
+// ─── Final output (what the destination actually plays) ───────────────────────
+
+/**
+ * Level at the true final output: the sum of EVERY node connected to an
+ * AudioContext destination, left and right, plus each feeder alone - not the
+ * single Tone-destination tap get_audio_level reads. Also reports Tone's
+ * destination mute/volume and each context's state and output device.
+ */
+export async function getFinalOutputLevel(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const durationMs = typeof params.durationMs === 'number' ? Math.min(10000, Math.max(100, params.durationMs)) : 2000;
+  const { destinationFeeders, createFinalOutputProbe } = await import('../../engine/audio/destinationFeeders');
+  const Tone = await import('tone');
+  const { getNativeAudioNode } = await import('../../utils/audio-context');
+  const { nodeCreatorOf } = await import('../../engine/audio/workletProfiler');
+  const toneDest = Tone.getDestination();
+  const toneOut = getNativeAudioNode((toneDest as unknown as { output: unknown }).output);
+  // Offline contexts render to a buffer, not the speakers.
+  const groups = destinationFeeders().filter((g) => typeof OfflineAudioContext === 'undefined' || !(g.destination.context instanceof OfflineAudioContext));
+  // Tone's own output edge is recorded only if the feeder census loaded
+  // before Tone's context; make sure the tap the meters read is always in.
+  if (toneOut && !groups.some((g) => g.nodes.some((n) => n.node === toneOut))) {
+    const dest = toneOut.context.destination;
+    const g = groups.find((x) => x.destination === dest);
+    if (g) g.nodes.push({ node: toneOut, output: 0 });
+    else groups.push({ destination: dest, nodes: [{ node: toneOut, output: 0 }] });
+  }
+  const probes = groups.map((g) => ({ g, probe: createFinalOutputProbe(g.destination.context, g.nodes) }));
+  const acc = probes.map((p) => ({ l: 0, r: 0, f: p.g.nodes.map(() => 0), n: 0 }));
+  const start = performance.now();
+  while (performance.now() - start < durationMs) {
+    await new Promise((r) => setTimeout(r, 40));
+    probes.forEach((p, i) => {
+      const x = p.probe.read();
+      acc[i].l += x.leftRms * x.leftRms; acc[i].r += x.rightRms * x.rightRms;
+      x.feederRms.forEach((v, j) => { acc[i].f[j] += v * v; });
+      acc[i].n++;
+    });
+  }
+  probes.forEach((p) => p.probe.dispose());
+  const db = (v: number) => (v > 0 ? +(20 * Math.log10(v)).toFixed(1) : -200);
+  const contexts = probes.map((p, i) => {
+    const n = Math.max(1, acc[i].n);
+    const ctx = p.g.destination.context as AudioContext;
+    return {
+      state: ctx.state,
+      sinkId: (ctx as unknown as { sinkId?: unknown }).sinkId ?? null,
+      sampleRate: ctx.sampleRate,
+      finalLeftDb: db(Math.sqrt(acc[i].l / n)),
+      finalRightDb: db(Math.sqrt(acc[i].r / n)),
+      feeders: p.g.nodes.map((f, j) => ({
+        node: f.node === toneOut ? 'tone-destination (get_audio_level tap)' : (nodeCreatorOf(f.node) ?? f.node.constructor.name),
+        db: db(Math.sqrt(acc[i].f[j] / n)),
+      })),
+    };
+  });
+  return {
+    durationMs,
+    toneDestination: { mute: toneDest.mute, volumeDb: +toneDest.volume.value.toFixed(1) },
+    contexts,
+    silentAtSpeakers: contexts.every((c) => Math.max(c.finalLeftDb, c.finalRightDb) < -60),
+  };
+}
+
 // ─── Oscilloscope Data ─────────────────────────────────────────────────────────
 
 export function getOscilloscopeInfo(): Record<string, unknown> {

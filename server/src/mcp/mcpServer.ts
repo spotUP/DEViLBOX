@@ -1174,6 +1174,13 @@ export function createMcpServer(): McpServer {
     ({ windowMs }) => call('get_audio_worklet_profile', { windowMs }),
   );
 
+  server.tool(
+    'get_final_output_level',
+    'Level at the TRUE final output: rebuilds the sum of every node connected to each AudioContext destination (left/right dB) and measures each feeder alone, plus Tone destination mute/volume and each context state and sinkId. get_audio_level reads one tap (Tone destination); a second feeder, an inverted copy or another context is invisible to it. Use when the app is silent to the ear but get_audio_level reads a level.',
+    { durationMs: z.number().optional().describe('Measurement window in ms (100-10000, default 2000)') },
+    ({ durationMs }) => call('get_final_output_level', { durationMs }),
+  );
+
   // ═══════════════════════════════════════════════════════════════════════════════
   // COMMAND REGISTRY (Escape Hatch)
   // ═══════════════════════════════════════════════════════════════════════════════

@@ -89,6 +89,11 @@ function installEdgeCensus(): void {
   };
 }
 
+/** Who created `n` (type and first project source file), when the census saw it made. */
+export function nodeCreatorOf(n: object): string | undefined {
+  return nodeKey.get(n);
+}
+
 function upstream(from: AudioNode, into: Set<AudioNode>): void {
   const stack = [from];
   while (stack.length) {
