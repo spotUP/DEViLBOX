@@ -233,12 +233,11 @@ export interface FaderPatternOptions {
   seed?: number;
 }
 
-export function faderFromPattern(pattern: ReadonlyArray<readonly [number, number]>, n: number, rate: number, opts: FaderPatternOptions = {}): Float64Array {
-  let g = new Float64Array(n);
+/** The open spans of a fader pattern in samples (hamster / left deck inverted, the cut offset applied) and the
+ *  click-safe ramp `r`: the one window resolution the gain and the hand position are both built from. */
+function faderSpans(pattern: ReadonlyArray<readonly [number, number]>, n: number, rate: number, opts: FaderPatternOptions): { spans: Array<[number, number]>; r: number } {
   const off = Math.trunc((opts.offsetMs ?? 0) * 1e-3 * rate);
   const r = Math.max(1, Math.trunc((opts.rampMs ?? 1.0) * 1e-3 * rate));
-  const bounce = opts.contactBounce ?? 0;
-  const rng = bounce > 0 ? new NumpyRandomState((opts.seed ?? 0) >>> 0) : null;
   // left-deck assignment (s.43): the open side flips
   const hamster = opts.deck === 'left' ? !opts.hamster : !!opts.hamster;
   let windows: ReadonlyArray<readonly [number, number]> = pattern;
@@ -253,11 +252,55 @@ export function faderFromPattern(pattern: ReadonlyArray<readonly [number, number
     windows = comp;
   }
   const clip01 = (v: number) => Math.min(Math.max(v, 0), 1);
+  const spans: Array<[number, number]> = [];
   for (const [a, b] of windows) {
     let s = Math.trunc(clip01(a) * n) + off;
     let e = Math.trunc(clip01(b) * n) + off;
     s = Math.max(0, Math.min(n, s)); e = Math.max(0, Math.min(n, e));
-    if (e <= s) continue;
+    if (e > s) spans.push([s, e]);
+  }
+  return { spans, r };
+}
+
+/**
+ * The hand's fader travel for one full throw, in samples (owner 2026-10-14: "hard jumps to the edges - not humanly
+ * possible"). A battle fader's gain switches inside its cut-in zone (`faderCurve` cut-in 0.03; physics manual
+ * "closed zone 0-3%"), and the demo's click-safe ramp (`rampMs`, 1 + 2 (1 - v) ms) is the time the hand takes to
+ * cross that zone. The hand keeps that speed over the whole throw: full throw = ramp / cut-in, 33 ms at v = 1 to
+ * 100 ms at v = 0.
+ */
+export function faderTravelSamples(rampSamples: number, cutIn = 0.03): number {
+  return Math.max(1, rampSamples) / cutIn;
+}
+
+/**
+ * The fader's position (0 closed .. 1 fully open) the hand moves through a pattern, beside `faderFromPattern`'s
+ * gain from the same spans: it leaves the closed edge as a window opens, crosses the cut-in zone while the gain
+ * ramps, travels at most one throw per `faderTravelSamples` and is back at the closed edge as the window ends.
+ * A window too short to reach the far edge is a short tap (the hand turns around part way). The Deck C fader lane
+ * draws this, never the gain.
+ */
+export function faderPositionFromPattern(pattern: ReadonlyArray<readonly [number, number]>, n: number, rate: number, opts: FaderPatternOptions = {}): Float64Array {
+  const { spans, r } = faderSpans(pattern, n, rate, opts);
+  const travel = faderTravelSamples(r);
+  const L = (opts.lagMs ?? 0) > 0 ? Math.max(1, Math.trunc(opts.lagMs! * 1e-3 * rate)) : 0;
+  const pos = new Float64Array(n);
+  for (const [s, e] of spans) {
+    for (let i = s; i < e; i++) {
+      const j = i + L;
+      if (j >= n) break;
+      pos[j] = Math.max(pos[j]!, Math.min(1, Math.min(i - s, e - 1 - i) / travel));
+    }
+  }
+  return pos;
+}
+
+export function faderFromPattern(pattern: ReadonlyArray<readonly [number, number]>, n: number, rate: number, opts: FaderPatternOptions = {}): Float64Array {
+  let g = new Float64Array(n);
+  const bounce = opts.contactBounce ?? 0;
+  const rng = bounce > 0 ? new NumpyRandomState((opts.seed ?? 0) >>> 0) : null;
+  const { spans, r } = faderSpans(pattern, n, rate, opts);
+  for (const [s, e] of spans) {
     for (let i = s; i < e; i++) g[i] = 1.0;
     const rr = Math.min(r, Math.floor((e - s) / 2)) || 1;
     const up = linspace(0, 1, rr), down = linspace(1, 0, rr);
@@ -326,7 +369,13 @@ export const scratchRenderStats = { gestures: 0 };
 
 /** One stroke's stages (the null test's taps). */
 /** The demo's `collect_viz` capture of a stroke (scratch.render_gesture): the record velocity, the slip, the fader, at audio rate. */
-export interface GestureViz { recordVel: Float64Array; slipVel: Float64Array; fade: Float64Array }
+export interface GestureViz {
+  recordVel: Float64Array; slipVel: Float64Array;
+  /** The fader gain (the demo's capture, parity with three_deck's fader track). */
+  fade: Float64Array;
+  /** The fader's position under the hand (`faderPositionFromPattern`): what the fader lane draws. */
+  position: Float64Array;
+}
 export interface RenderedGesture { out: Float64Array; recordVel?: Float64Array; fade?: Float64Array; viz: GestureViz }
 
 /** scratch.py `_viz_resize(a, n)`: np.interp onto n points. */
@@ -355,7 +404,7 @@ export function renderGesture(source: DemoSource, name: string | DemoGesture, du
     const out = renderFromMotion(source.sig, source.anchor, source.safe, vel);
     const k = 0.7 + 0.4 * velocity;
     for (let i = 0; i < out.length; i++) out[i] = out[i]! * k;
-    return { out, recordVel: vel, viz: { recordVel: vizResize(vel, out.length), slipVel: new Float64Array(out.length), fade: new Float64Array(out.length).fill(1) } };
+    return { out, recordVel: vel, viz: { recordVel: vizResize(vel, out.length), slipVel: new Float64Array(out.length), fade: new Float64Array(out.length).fill(1), position: faderPositionFromPattern([[0, 1]], out.length, rate) } };
   }
   const amp = vc.amp_base + vc.amp_span * velocity;
   if (g.play) {
@@ -374,7 +423,7 @@ export function renderGesture(source: DemoSource, name: string | DemoGesture, du
     const gain = 0.8 + 0.4 * velocity;
     for (let i = 0; i < out.length; i++) out[i] = out[i]! * fade[i]! * gain;
     // the viz: the word plays forward, fader open
-    return { out, recordVel: vel, fade, viz: { recordVel: new Float64Array(out.length).fill(1), slipVel: new Float64Array(out.length), fade: new Float64Array(out.length).fill(1) } };
+    return { out, recordVel: vel, fade, viz: { recordVel: new Float64Array(out.length).fill(1), slipVel: new Float64Array(out.length), fade: new Float64Array(out.length).fill(1), position: faderPositionFromPattern([[0, 1]], out.length, rate) } };
   }
   let hand: TtHandPoint[];
   if (g.glide && g.glideProfile) {
@@ -406,7 +455,9 @@ export function renderGesture(source: DemoSource, name: string | DemoGesture, du
   for (let i = 0; i < plat.length; i++) plat[i] = plat[i]! + noise[i]!;
   const fw = typeof g.fader === 'string' || g.fader === undefined ? cutPattern(g.fader ?? 'open', g.cuts ?? 4) : g.fader;
   const sharp = 1.0 + 2.0 * (1.0 - velocity);
-  const fade = faderFromPattern(fw, plat.length, rate, { curve: g.curve ?? 'battle', hamster: g.hamster ?? false, rampMs: sharp, offsetMs: g.off ?? 0.0 });
+  const faderOpts: FaderPatternOptions = { curve: g.curve ?? 'battle', hamster: g.hamster ?? false, rampMs: sharp, offsetMs: g.off ?? 0.0 };
+  const fade = faderFromPattern(fw, plat.length, rate, faderOpts);
+  const position = faderPositionFromPattern(fw, plat.length, rate, faderOpts);
   const gain = vc.gain_base + vc.gain_span * velocity;
   let out: Float64Array = new Float64Array(plat.length);
   for (let i = 0; i < out.length; i++) out[i] = plat[i]! * fade[i]! * gain;
@@ -417,7 +468,7 @@ export function renderGesture(source: DemoSource, name: string | DemoGesture, du
   }
   if (g.fx) out = applyFx(out, rate, g.fx);
   // the real two-body motion (collect_viz)
-  return { out, recordVel, fade, viz: { recordVel: vizResize(recordVel, out.length), slipVel: vizResize(slipVel, out.length), fade: vizResize(fade, out.length) } };
+  return { out, recordVel, fade, viz: { recordVel: vizResize(recordVel, out.length), slipVel: vizResize(slipVel, out.length), fade: vizResize(fade, out.length), position: vizResize(position, out.length) } };
 }
 
 // ─── The macro language (scratch.py `parse_macro` / `render_macro`, crossfader s.40; ledger G11) ───

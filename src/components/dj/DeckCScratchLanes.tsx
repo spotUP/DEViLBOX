@@ -19,7 +19,8 @@ export const DeckCScratchLanes: React.FC = () => {
     let raf = 0;
     const tick = () => {
       const m = deckCMotionNow(Tone.getContext().rawContext.currentTime);
-      const fade = m ? m.fade : 0;
+      // the hand's fader position (travels at hand speed), never the gain (which cuts inside the cut-in zone)
+      const fade = m ? m.position : 0;
       const slip = m ? Math.max(-1, Math.min(1, m.slip / SLIP_REF)) : 0;
       if (faderRef.current) faderRef.current.style.left = `${(fade * 100).toFixed(2)}%`;
       if (slipRef.current) {
