@@ -4,8 +4,8 @@
  *
  * nw_render() mixes the stereo output and fills one mono buffer per voice. The voice buffers feed the per-channel dub
  * sends and isolation slots (worklets/channel-outputs.js) and the scopes (worklets/channel-stream.js). A voice that is
- * muted or isolated leaves the main mix inside the shim (nw_set_mute_mask); its buffer stays full for the scopes, and a
- * muted one is kept off the isolation slots and dub sends here.
+ * muted or isolated leaves the main mix inside the shim (nw_set_mute_mask); its buffer stays full out of the shim, and a
+ * muted one is kept off the isolation slots and dub sends, drawn flat on its scope and read as silence on its meter here.
  */
 
 const MAX_VOICES = 64;
@@ -376,8 +376,8 @@ class NuadeProcessor extends AudioWorkletProcessor {
     const m = this.module;
     const n = m._nw_vu(this.vuPtr, this.voices);
     const levels = Array.from(new Float32Array(m.HEAPU8.buffer, this.vuPtr, n));
-    // A muted (or not soloed) voice reads silence on its meter, like every other engine; its buffer stays full for the scopes.
-    const mask = this.appliedMask === -1 ? this.userMask >>> 0 : this.appliedMask >>> 0;
+    // A muted (or not soloed) voice reads silence on its meter, like every other engine; its scope draws flat too.
+    const mask = this.userMask >>> 0;
     for (let v = 0; v < levels.length && v < 32; v++) if (!((mask >>> v) & 1)) levels[v] = 0;
     this.port.postMessage({ type: 'vu', levels });
   }
@@ -415,7 +415,10 @@ class NuadeProcessor extends AudioWorkletProcessor {
     // Every sample of each voice, for the oscilloscopes and per-channel role classifiers (worklets/channel-stream.js).
     if (globalThis.DevilboxChannelStream && rendered > 0) {
       this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
-      this._stream.writeFloat32(voices, rendered);
+      // A muted (or not soloed) voice draws flat on its scope, from the same mask as its meter (postVu).
+      const um = this.userMask >>> 0;
+      const flat = um === 0xFFFFFFFF ? voices : voices.map((b, v) => (v < 32 && !((um >>> v) & 1) ? new Float32Array(rendered) : b));
+      this._stream.writeFloat32(flat, rendered);
     }
     if (rendered > 0) this.postPosition();
     if ((++this.quanta % VU_EVERY) === 0) this.postVu();
