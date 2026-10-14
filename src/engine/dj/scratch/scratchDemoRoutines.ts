@@ -23,7 +23,7 @@ import type { ScratchRenderSpec } from './scratchTypes';
 import { pickRoutineGesture, DJ_ROUTINE_LEVELS } from './scratchRoutines';
 import { SCRATCH_STYLES } from './scratchStyles';
 import { CLEAN_CRATE_POOL, CUE_ROLE_POOLS, CUE_ROLE_RECORD, type CueRole } from './scratchCatalogue';
-import { getGesture } from './scratchGestureCatalog';
+import { getGesture, gestureBeats } from './scratchGestureCatalog';
 import { stepToBeat } from './scratchAnchor';
 import type { PlacedScratch, PlacementRole } from './scratchPlacement';
 import type { ArcTemplate } from './scratchArc';
@@ -292,12 +292,21 @@ const isNeedle = (g: ScratchGestureId): boolean => g === 'needleDrop' || g === '
 export const CUE_ROLE_SCRATCH_ROLE: Readonly<Record<CueRole, ScratchRole>> = { HOME: 'THEME', SECONDARY: 'FEATURE', ACCENT: 'ACCENT', FX: 'FILL' };
 
 /** A demo routine laid from `startBar` as placed events the executor plays (needles open / close it). */
-export function demoRoutineToPlaced(events: readonly DemoRoutineEvent[], startBar: number, beatsPerBar = 4, render?: readonly ScratchRenderSpec[]): PlacedScratch[] {
+export function demoRoutineToPlaced(events: readonly DemoRoutineEvent[], startBar: number, beatsPerBar = 4, render?: readonly ScratchRenderSpec[], tempoFold = 1): PlacedScratch[] {
+  const stepsPerBar = beatsPerBar * 4;
   return events.map((e, i) => {
-    const bar = startBar + e.bar;
+    // the routine's 16th on the set's grid: tempoFold of the set's 16ths per routine 16th (`scratchTempoFold`)
+    const at = (e.bar * 16 + e.step) * tempoFold;
+    const bar = tempoFold === 1 ? startBar + e.bar : startBar + Math.floor(at / stepsPerBar);
+    const step = tempoFold === 1 ? e.step : at - Math.floor(at / stepsPerBar) * stepsPerBar;
     const placementRole: PlacementRole = e.step >= 15 ? 'turnaround' : e.step >= 6 && e.step <= 8 ? 'answer' : 'accent';
     const role: ScratchRole = e.gesture === 'needleDrop' ? 'INTRO' : e.gesture === 'needleLift' ? 'OUTRO' : e.gesture === 'drop' ? 'INTRO' : CUE_ROLE_SCRATCH_ROLE[e.cueRole];
-    return { bar, step: e.step, beat: stepToBeat({ bar, step: e.step }, '1/16', beatsPerBar), gesture: e.gesture, velocity: e.velocity, placementRole, role, ...(e.record ? { record: e.record } : {}), ...(render?.[i] ? { render: render[i] } : {}) };
+    const spec = render?.[i] ? (tempoFold !== 1 ? { ...render[i]!, tempoFold } : render[i]!) : undefined;
+    return {
+      bar, step, beat: stepToBeat({ bar, step }, '1/16', beatsPerBar), gesture: e.gesture, velocity: e.velocity, placementRole, role,
+      ...(tempoFold !== 1 ? { beats: gestureBeats(e.gesture) * tempoFold } : {}),
+      ...(e.record ? { record: e.record } : {}), ...(spec ? { render: spec } : {}),
+    };
   });
 }
 

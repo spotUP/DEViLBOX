@@ -4,6 +4,7 @@
  * drop_phrase, from its first sample), its last word chopped (ACCENT) - every stroke scheduled is the demo's event
  * (`build_scratch_events(phrase_emphasis=True)`) on that record with its slice; any other selection keeps the rotation.
  */
+import { scratchTempoFold } from '../scratch/scratchTempo';
 import { describe, it, expect } from 'vitest';
 import { DJScratchDJ } from '../scratch/DJScratchDJ';
 import { buildThreeDeckRoutine, demoRoutineStats } from '../scratch/scratchDemoRoutines';
@@ -41,7 +42,9 @@ describe('statement and chop through the controller (C16)', () => {
     const demo = buildThreeDeckRoutine(5 + fromBar, { pools: { HOME: [PHRASE], SECONDARY: [PHRASE], ACCENT: [PHRASE], FX: [PHRASE] }, phraseEmphasis: true });
     const strokes = events.filter((e) => e.gesture !== 'needleDrop' && e.gesture !== 'needleLift');
     const want = demo.filter((e) => e.gesture !== 'needleDrop' && e.gesture !== 'needleLift');
-    expect(strokes.map((e) => [e.executeAtBeat, e.gesture])).toEqual(want.map((e) => [barStartBeat(track.downbeats, fromBar + e.bar) + e.step / 4, e.gesture]));
+    // the routine's 16ths on the set's grid, half-time over a fast set (scratchTempoFold)
+    const fold = scratchTempoFold(track.bpm);
+    expect(strokes.map((e) => [e.executeAtBeat, e.gesture])).toEqual(want.map((e) => [barStartBeat(track.downbeats, fromBar) + (e.bar * 16 + e.step) * fold / 4, e.gesture]));
     for (const e of strokes) {
       expect(e.source.type === 'CRATE' && e.source.recordId).toBe(PHRASE);
       expect(e.render?.slice).toBe(e.gesture === 'dropPhrase' ? 'phrase' : 'word');

@@ -202,6 +202,8 @@ export class ScratchVoicePool {
       const w = lastWordSlice(record, DEMO_RATE);
       if (w) source = { sig: sig.slice(w.start, w.end), anchor: w.vowel, safe: [0, w.end - w.start - 1] };
     }
+    // the routine's own tempo: the set's folded into the demo's range (a half-time routine's step is two of the set's)
+    bpm /= spec.tempoFold ?? 1;
     const stepSec = spec.chain === 'threeDeck' ? 60.0 / (bpm * 4) : demoStepSamples(bpm) / DEMO_RATE;
     const steps = name ? demoGestureSteps(name) : gesture.durationSteps;
     // three_deck.render: `steps * step / rate` (whole samples a step, the product first)

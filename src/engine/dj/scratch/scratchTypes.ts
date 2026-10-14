@@ -219,6 +219,9 @@ export interface ScratchRenderSpec {
   /** three_deck.render's own grid (the Three Deck Showcase): a gesture lasts steps x int(rate x 60 / (bpm x 4))
    *  samples. Omitted: the chain's rule (the live three-deck routine on the track's float step). */
   stepSamples?: number;
+  /** The set's beats per routine beat (`scratchTempoFold`): the stroke renders at the set's tempo / this, so a
+   *  routine over a 176 BPM set plays half-time at 88. Omitted: 1. */
+  tempoFold?: number;
 }
 
 /** The slice of a crate record the gesture compatibility rule needs

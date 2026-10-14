@@ -11,6 +11,7 @@
  * executor speaks the master deck's beat clock; nothing here touches an engine.
  */
 
+import { scratchTempoFold } from './scratchTempo';
 import { barStartBeat, timeAtBeat, timelineAt } from '../autodj/beatGrid';
 import type { DJPerformanceContext, DJTrackAnalysis } from '../autodj/types';
 import { buildScratchContext, scratchSectionFor, type ScratchPerformanceContext } from './scratchContext';
@@ -187,7 +188,12 @@ interface PerformedWindow {
   intent: PhraseDecision;
   /** The performer entered the window's state (on its first bar). */
   started: boolean;
+  /** The set's bars per routine bar (`scratchTempoFold`; a half-time routine's bar is two of the set's). */
+  fold?: number;
 }
+
+/** The routine's own bar at the set's `bar` (a half-time routine's bar spans two of the set's). */
+const routineBar = (w: PerformedWindow, bar: number): number => Math.floor((bar - w.fromBar) / (w.fold ?? 1));
 
 /** What the debug view and the decision log read (section 64; P9.5 builds the full record). */
 export interface ScratchDJTelemetry {
@@ -282,7 +288,7 @@ export class DJScratchDJ {
   private twoHands(): boolean | null {
     const w = this.threeDeckWindow();
     if (!w) return null;
-    const allowed = threeDeckJuggleAllowed(this.lastBar - w.fromBar);
+    const allowed = threeDeckJuggleAllowed(routineBar(w, this.lastBar));
     return allowed === null ? null : !allowed;
   }
 
@@ -292,7 +298,7 @@ export class DJScratchDJ {
    */
   deckCHoldsTheJuggle(): string | null {
     const w = this.threeDeckWindow();
-    return w && this.twoHands() ? `two hands: Deck C plays the three-deck routine (bar ${this.lastBar - w.fromBar + 1} of 32)` : null;
+    return w && this.twoHands() ? `two hands: Deck C plays the three-deck routine (bar ${routineBar(w, this.lastBar) + 1} of 32)` : null;
   }
 
   telemetry(): ScratchDJTelemetry {
@@ -361,7 +367,7 @@ export class DJScratchDJ {
     }
     const w = this.windows.find((x) => ctx.masterBar >= x.fromBar && ctx.masterBar < x.toBar);
     if (w?.arc) {
-      const phase = phaseAt(w.arc, ctx.masterBar - w.fromBar);
+      const phase = phaseAt(w.arc, routineBar(w, ctx.masterBar));
       this.currentArcPhase = phase?.name ?? null;
       if (phase) this.arcPhases.push(phase.name);
     } else {
@@ -430,6 +436,7 @@ export class DJScratchDJ {
     // features on top of it in PERFORMER / BATTLE (a 32-bar arc is the routine modes' alone)
     const render = input.render ?? 'section';
     const routineRender = render === 'three_deck' || render === 'dj_routine';
+    const fold = routineRender ? scratchTempoFold(ctx.bpm) : 1;
     if (routineRender && !onPhrase) {
       // Deck C waits for the phrase: the routine's needle drops on its first downbeat
       this.plannedThroughBar = toBar;
@@ -462,7 +469,8 @@ export class DJScratchDJ {
     };
     if (wantsFeature) {
       arc = routineRender ? (render === 'dj_routine' ? SCRATCH_DJ_TEMPLATE : THREE_DECK_TEMPLATE) : shape.template!;
-      toBar = fromBar + arc.bars;
+      // a routine plays at the demo's tempo over the set: half-time over a fast set, its 32 bars then span 64 (scratchTempo)
+      toBar = fromBar + Math.max(1, Math.round(arc.bars * fold));
       this.budget.feature();
       const perm = performancePermissions({ setPhase, budgetTotal: this.budget.total, mode: input.mode });
       this.lastPeak = perm.peak;
@@ -489,9 +497,9 @@ export class DJScratchDJ {
             : picked.length ? { pools: cuePoolsFor(picked) } : {};
         const demo = battle ? buildScratchDjRoutine(ctx.style, seed + fromBar) : buildThreeDeckRoutine(seed + fromBar, threeDeckOpts);
         // every stroke rendered as the demo renders it, on the routine's own bus (scratch null test)
-        const events = demoRoutineToPlaced(demo, fromBar, ctx.meter, demoRoutineRenderSpecs(demo, seed + fromBar, battle ? 'scratchDj' : 'threeDeck')).map((e) => ({ ...e, layer: 'demo' as const }));
+        const events = demoRoutineToPlaced(demo, fromBar, ctx.meter, demoRoutineRenderSpecs(demo, seed + fromBar, battle ? 'scratchDj' : 'threeDeck'), fold).map((e) => ({ ...e, layer: 'demo' as const }));
         plan = {
-          mode: input.mode, events, bars: Array.from({ length: arc.bars }, (_, k) => events.filter((e) => e.bar === fromBar + k)),
+          mode: input.mode, events, bars: Array.from({ length: toBar - fromBar }, (_, k) => events.filter((e) => e.bar === fromBar + k)),
           rests: [], issues: battle ? validateScratchDjRoutine(demo) : [], routine: battle ? 'scratchDj' : 'threeDeck',
           reasons: [`Render ${render}: the demo's ${battle ? 'scratch_dj showcase' : 'three-deck routine'} over 32 bars`, perm.reason],
         };
@@ -596,14 +604,14 @@ export class DJScratchDJ {
       this.memory.record({ bar: p.bar, gesture: e.gesture, sourceKey, intensity: e.intensity, transitionType: ctx.transitionType, section: ctx.sectionName, nextSection: ctx.nextSection?.kind, routine: plan.routine });
       this.budget.add('scratch', BUDGET_PER_EVENT);
     });
-    this.windows.push({ fromBar, toBar, entries, arc, energyBefore: ctx.energy, setEnergyBefore: input.perf.setEnergy, plan, intent, started: false });
+    this.windows.push({ fromBar, toBar, entries, arc, energyBefore: ctx.energy, setEnergyBefore: input.perf.setEnergy, plan, intent, started: false, fold });
     scratchDJStats.scheduled += entries.length;
     // the routine's level (three_deck's, and its duck): the routine is planned whole, so its layer is known before
     // it plays - the demo levels a routine over its whole render. scratch_dj's routine too: levelled by the bus's
     // running estimate instead, its first strokes played up to +13 dB over the rest (AUTO-SCRATCH-LOUD-MOVES)
     const sink = this.sink!.exec;
     if ((plan.routine === 'threeDeck' || plan.routine === 'scratchDj') && this.deps.shapeRoutine && sink.contextTimeAtBeat && sink.clockBpm && entries.length) {
-      const startBeat = barStartBeat(track.downbeats, fromBar), endBeat = barStartBeat(track.downbeats, fromBar + 32);
+      const startBeat = barStartBeat(track.downbeats, fromBar), endBeat = barStartBeat(track.downbeats, toBar);
       this.deps.shapeRoutine({
         deck: input.deck, track, chain: plan.routine, bpm: sink.clockBpm(),
         startSec: sink.contextTimeAtBeat(startBeat), endSec: sink.contextTimeAtBeat(endBeat), trackFromSec: timeAtBeat(track.beatGrid, startBeat),
