@@ -20,8 +20,8 @@
  *
  * The level: the demo's two whole-render gains (peak 0.75 in scratch_channel, the RMS match to the beat)
  * cancel into one, the layer at 0.60 x the beat's RMS. Live (`follow`), the bus hears decks A + B on its
- * input and holds its layer at 0.60 x their RMS (X6), each a mean square since the layer's first stroke,
- * the level gliding over ~1 s; without `follow` it stays at `level` (the null test). A routine planned whole
+ * input and holds its layer at 0.60 x their RMS (X6), the layer measured while it sounds (followLevel),
+ * a needle's noise not counted in it (`unmeasured`), the level gliding over ~1 s; without `follow` it stays at `level` (the null test). A routine planned whole
  * is shaped exactly instead ({ type: 'shape' / 'shapeLevel' }): three_deck's level and its duck on the beat's
  * transients, computed from the planned layer and the decks' audio before it plays.
  *
@@ -30,7 +30,7 @@
  * sums its strokes up to its end and runs its own `apply_fx`, its tail riding under the next section.
  *
  * Messages: { type: 'stroke', start, samples, section? } - a rendered stroke from bus sample `start`
- * (bus sample n = context time n / busRate); { type: 'level', value }; shape / shapeLevel; { type: 'clear' }.
+ * (bus sample n = context time n / busRate; `unmeasured`: not counted in the live level); { type: 'level', value }; shape / shapeLevel; { type: 'clear' }.
  * processorOptions: { busRate, coeffs, mode, eq, room, delayMix, drive, tail, tap, level, follow }.
  */
 
@@ -206,14 +206,18 @@ class ScratchDeckCProcessor extends AudioWorkletProcessor {
     this.tailRoom = new Schroeder(this.busRate, 'room', 0.8);
     this.strokes = [];
     this.sections = new Map();
-    // the live level (X6): 0.60 x rms(decks A + B, the input) / rms(the layer), both since the layer's first stroke
+    // the live level (X6): 0.60 x rms(decks A + B, the input) / rms(the layer while it sounds) - see followLevel
     this.follow = !!o.follow;
     this.beatSum = 0; this.beatN = 0;
+    // the layer as posted (each stroke's own render: its energy and length), the chain's energy gain over it (y / x,
+    // measured over what has played, published when the bus falls idle; 1 until then) and whether a stroke sounds
+    this.dryE = 0; this.dryN = 0;
+    this.chainX = 0; this.chainY = 0; this.chainGain = 1;
+    this.sounding = false; this.soundedN = 0;
+    this.levelSet = false;
     // the demo's whole-render level and duck for a planned span (three_deck.render), when the routine was shaped
     this.shapes = [];
-    this.layerSum = 0; this.layerN = 0;
     this.levelCoef = Math.exp(-1 / (1 * this.busRate));
-    this.started = false;
     // the bus clock: bus sample n is context time n / busRate
     this.bus = -1;
     // the last TAPS bus samples (the upsampler's window), newest at hist[(hi - 1) % TAPS]
@@ -221,6 +225,7 @@ class ScratchDeckCProcessor extends AudioWorkletProcessor {
     this.port.onmessage = (e) => {
       const m = e.data;
       if (m.type === 'stroke') {
+        if (this.follow && !m.unmeasured) { let e = 0; for (let j = 0; j < m.samples.length; j++) e += m.samples[j] * m.samples[j]; this.dryE += e; this.dryN += m.samples.length; }
         if (m.section) {
           let sec = this.sections.get(m.section.key);
           if (!sec) { sec = new Section(this.busRate, m.section); this.sections.set(m.section.key, sec); }
@@ -236,25 +241,26 @@ class ScratchDeckCProcessor extends AudioWorkletProcessor {
 
   /** The overlay: every live section's output summed (a section's tail rides under the next). */
   sectionSample(i) {
-    let x = 0, y = 0;
+    let x = 0, y = 0, covered = false;
     for (const [key, sec] of this.sections) {
       if (i >= sec.life) { this.sections.delete(key); continue; }
       if (i < sec.start) continue;
       const r = sec.step(i);
       x += r.x; y += r.y;
+      if (!covered && i < sec.end) for (const k of sec.strokes) if (i >= k.start && i - k.start < k.samples.length) { covered = true; break; }
     }
     if (this.tap === 0) return x;
     if (this.tap >= 1) return y;
-    return this.follow ? y * this.followLevel(y, x) : y * this.level;
+    return this.follow ? y * this.followLevel(y, x, covered) : y * this.level;
   }
 
   /** One bus sample: the strokes summed in arrival order, through the demo's chain. */
   busSample(i) {
     if (this.mode === 'sections') return this.sectionSample(i);
-    let x = 0;
+    let x = 0, covered = false;
     for (let s = 0; s < this.strokes.length; s++) {
       const k = this.strokes[s], j = i - k.start;
-      if (j >= 0 && j < k.samples.length) x = x + k.samples[j];
+      if (j >= 0 && j < k.samples.length) { x = x + k.samples[j]; covered = true; }
     }
     if (this.strokes.length) this.strokes = this.strokes.filter((k) => i - k.start < k.samples.length - 1);
     const f = this.f, tap = this.tap;
@@ -293,36 +299,47 @@ class ScratchDeckCProcessor extends AudioWorkletProcessor {
     for (let s = this.shapes.length - 1; s >= 0; s--) {
       const sh = this.shapes[s], j = i - sh.start;
       if (j < 0) continue;
-      if (sh.level === null && this.follow) y = y * this.followLevel(y, x);
+      if (sh.level === null && this.follow) y = y * this.followLevel(y, x, covered);
       const g = sh.level !== null ? sh.level : 1;
       return j < sh.duck.length ? y * g * sh.duck[j] : y * g;
     }
-    if (this.follow) return y * this.followLevel(y, x);
+    if (this.follow) return y * this.followLevel(y, x, covered);
     return y * this.level;
   }
 
   /**
-   * three_deck's level, live (X6): 0.60 x rms(decks A + B) / rms(layer), each the mean square since the
-   * layer's first stroke (the demo's whole-render means, as far as the set has played), the level gliding to
-   * the ratio over ~1 s. Decks A + B arrive on the input (their channel outputs summed, a module deck too).
+   * three_deck's level, live (X6): 0.60 x rms(decks A + B) / rms(the layer), the layer measured while it sounds -
+   * the demo measures it over the routine it levels, never over the silence between routines. The layer's mean
+   * square is the posted strokes' own (known before they play, so the first stroke is levelled before its first
+   * sample) times the chain's energy gain over what has played (`chainGain`, 1 until the first stroke is past its
+   * onset). The decks' mean square runs from the
+   * bus's start. The level takes its first value at once, then glides to the ratio over ~1 s.
+   * (AUTO-SCRATCH-LOUD-MOVES 2026-10-14: a mean square since the layer's first stroke counted every idle second as
+   * layer, so a stroke after a rest played up to +26 dB over the routine's, and a new bus's first stroke, measured
+   * on its own attack, up to +13 dB.)
    */
-  followLevel(y, x) {
-    if (!this.started && x !== 0) this.started = true;
-    if (this.started) {
-      this.layerSum += y * y; this.layerN++;
-      const layer = Math.sqrt(this.layerSum / this.layerN);
-      const beat = this.beatN ? Math.sqrt(this.beatSum / this.beatN) : 0;
-      if (layer > 1e-6 && beat > 1e-6) {
-        const target = 0.60 * beat / layer;
-        this.level = this.levelCoef * this.level + (1 - this.levelCoef) * target;
-      }
+  followLevel(y, x, covered) {
+    this.chainX += x * x; this.chainY += y * y;
+    if (covered) { this.sounding = true; this.soundedN++; }
+    // the chain's gain once what played is past its onset (the bus fell idle, or half a second has sounded: the
+    // filters settle in milliseconds, the echo returns at 0.2 s) - never on a stroke's first samples
+    if ((this.sounding && !covered) || this.soundedN >= this.busRate / 2) {
+      if (this.chainX > 1e-12) this.chainGain = this.chainY / this.chainX;
+    }
+    if (!covered) this.sounding = false;
+    const beat = this.beatN ? Math.sqrt(this.beatSum / this.beatN) : 0;
+    const layer = this.dryN ? Math.sqrt(this.chainGain * this.dryE / this.dryN) : 0;
+    if (layer > 1e-6 && beat > 1e-6) {
+      const target = 0.60 * beat / layer;
+      if (!this.levelSet) { this.level = target; this.levelSet = true; }
+      else this.level = this.levelCoef * this.level + (1 - this.levelCoef) * target;
     }
     return this.level;
   }
 
-  /** Decks A + B (the input, mono as the demo reads a beat) into the level's mean square once the layer started. */
+  /** Decks A + B (the input, mono as the demo reads a beat) into the level's mean square from the bus's start. */
   takeBeat(input) {
-    if (!this.follow || !this.started || !input || !input.length || !input[0]) return;
+    if (!this.follow || !input || !input.length || !input[0]) return;
     const nch = input.length, n = input[0].length;
     for (let i = 0; i < n; i++) {
       let m = 0;

@@ -223,7 +223,8 @@ export class ScratchVoicePool {
     if (!n) return null;
     const live = await this.deckCBus(input.chain);
     // the duck needs only the beat: on the bus at once; the level when the planned layer is rendered
-    live.shape(input.spanStart, deckCDuck(input.beat));
+    // three_deck ducks its layer on the beat; scratch_dj does not (an empty duck: the level alone)
+    live.shape(input.spanStart, input.chain === 'threeDeck' ? deckCDuck(input.beat) : new Float32Array(0));
     const off = new OfflineAudioContext(1, n + Math.trunc(0.6 * DEMO_RATE), DEMO_RATE);
     const layerBus = await createDeckCBus(off, off.destination, { chain: input.chain, tap: DECK_C_TAPS.tail, planned: true });
     for (const s of input.strokes) {
@@ -282,10 +283,10 @@ export class ScratchVoicePool {
         const stepSamp = demoStepSamples(opts.bpm);
         const start = at - spec.section.step * stepSamp;
         placed = Math.max(start, at + spec.humanizeSamples);
-        bus.stroke(placed, samples, { key: spec.section.key, start, end: start + spec.section.bars * 16 * stepSamp, fx: spec.section.fx });
+        bus.stroke(placed, samples, { key: spec.section.key, start, end: start + spec.section.bars * 16 * stepSamp, fx: spec.section.fx }, !gesture.needle);
       } else {
         placed = Math.max(0, at + spec.humanizeSamples);
-        bus.stroke(placed, samples);
+        bus.stroke(placed, samples, undefined, !gesture.needle);
       }
       // D1: Deck C's platter, fader and slip follow the same render (three_deck's viz capture)
       if (rendered.viz) getDeckCMotion().addStroke(placed, rendered.viz);
