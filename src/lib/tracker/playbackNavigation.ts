@@ -40,3 +40,43 @@ export function resolveScrollRow(
 export function isManualRowNavAllowed(isPlaying: boolean, followPlayback: boolean): boolean {
   return !isPlaying || !followPlayback;
 }
+
+/**
+ * Inputs for {@link resolveFormatViewRow}. A format editor (PatternEditorCanvas
+ * with formatColumns) gets its play row from its host (`hostRow`) and, for
+ * pattern grids, from the format playback clock (`clockRow`).
+ */
+export interface FormatViewRowInput {
+  /** The editor's rows are SONG POSITIONS (an order/position/track matrix), not pattern rows. */
+  rowsArePositions: boolean;
+  /** The host says its song is playing (the `formatIsPlaying` prop). */
+  hostPlaying: boolean;
+  /** The host's play row: the playing position for a matrix, the pattern row for a grid. */
+  hostRow: number;
+  /** The format playback clock is running (FormatPlaybackState.isPlaying). */
+  clockPlaying: boolean;
+  /** The format playback clock's row - always a PATTERN row. */
+  clockRow: number;
+  /** The edit cursor's row. */
+  cursorRow: number;
+  followPlayback: boolean;
+}
+
+/**
+ * Which row a format editor centres on, and whether it rides the pattern-row
+ * clock (row clock + smooth offset).
+ *
+ * A position matrix (Hively/AHX positions, MusicLine track table, TFMX
+ * tracksteps, SunTronic positions, Klystrack positions, GoatTracker orders)
+ * moves ONE STEP PER PATTERN PLAYED: while playing and following it rides the
+ * host's playing position and never the clock, which counts pattern rows. The
+ * shared edit cursor is no substitute either: follow-playback writes the PATTERN
+ * row into it every row (useTransportStore.setCurrentRow), so a matrix that
+ * showed its cursor while the song played stepped once per pattern row
+ * (PATTERN-MATRIX-SCROLL, owner 2026-10-14).
+ */
+export function resolveFormatViewRow(i: FormatViewRowInput): { row: number; rideClock: boolean } {
+  const rideClock = !i.rowsArePositions && i.hostPlaying && i.clockPlaying;
+  const playRow = rideClock ? i.clockRow : i.hostRow;
+  return { row: resolveScrollRow(i.hostPlaying, i.followPlayback, playRow, i.cursorRow), rideClock };
+}

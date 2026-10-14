@@ -338,6 +338,7 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
           height={matrixCollapsed ? KLYS_MATRIX_COLLAPSED_HEIGHT : POSITION_H}
           nativeData={nativeData}
           currentPosition={activePosition}
+          isPlaying={isPlaying}
           onPositionChange={handlePositionChange}
           collapsed={matrixCollapsed}
           onToggleCollapse={() => setMatrixCollapsed(!matrixCollapsed)}

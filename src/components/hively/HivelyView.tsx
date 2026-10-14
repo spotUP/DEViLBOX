@@ -117,6 +117,7 @@ export const HivelyView: React.FC<{ width?: number; height?: number }> = () => {
           height={positionH}
           nativeData={nativeData}
           currentPosition={activePosition}
+          isPlaying={isPlaying}
           onPositionChange={handlePositionChange}
           collapsed={matrixCollapsed}
           onToggleCollapse={() => setMatrixCollapsed(!matrixCollapsed)}

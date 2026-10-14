@@ -30,6 +30,8 @@ interface TFMXTrackstepMatrixProps {
   height: number;
   native: TFMXNativeData;
   activeStep: number;
+  /** The song is playing: the matrix follows activeStep, one step per trackstep played. */
+  isPlaying: boolean;
   selectedPattern: number;
   onSelectPattern: (patIdx: number) => void;
   onStepChange?: (stepIdx: number) => void;
@@ -38,7 +40,7 @@ interface TFMXTrackstepMatrixProps {
 }
 
 export const TFMXTrackstepMatrix: React.FC<TFMXTrackstepMatrixProps> = ({
-  width, height, native, activeStep, selectedPattern: _selectedPattern,
+  width, height, native, activeStep, isPlaying, selectedPattern: _selectedPattern,
   onSelectPattern, onStepChange: _onStepChange, collapsed, onToggleCollapse,
 }) => {
   const steps = native.tracksteps;
@@ -109,6 +111,7 @@ export const TFMXTrackstepMatrix: React.FC<TFMXTrackstepMatrixProps> = ({
       formatColumns={formatColumns}
       formatChannels={formatChannels}
       currentRow={activeStep}
+      isPlaying={isPlaying}
       onCellChange={handleCellChange}
       collapsed={collapsed}
       onToggleCollapse={onToggleCollapse}

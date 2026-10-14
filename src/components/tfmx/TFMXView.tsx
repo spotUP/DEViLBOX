@@ -242,6 +242,7 @@ export const TFMXView: React.FC<{ width?: number; height?: number }> = () => {
           height={matrixH}
           native={native}
           activeStep={activeStepIdx}
+          isPlaying={isPlaying}
           selectedPattern={selectedPattern}
           onSelectPattern={handleSelectPattern}
           onStepChange={handleStepChange}

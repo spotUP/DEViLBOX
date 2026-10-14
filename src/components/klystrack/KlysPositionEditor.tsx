@@ -58,6 +58,8 @@ interface KlysPositionEditorProps {
   height: number;
   nativeData: KlysNativeData;
   currentPosition: number;
+  /** The song is playing: the matrix follows currentPosition, one step per pattern played. */
+  isPlaying: boolean;
   onPositionChange: (pos: number) => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
@@ -66,7 +68,7 @@ interface KlysPositionEditorProps {
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export const KlysPositionEditor: React.FC<KlysPositionEditorProps> = ({
-  width, height, nativeData, currentPosition, onPositionChange: _onPositionChange,
+  width, height, nativeData, currentPosition, isPlaying, onPositionChange: _onPositionChange,
   collapsed, onToggleCollapse,
 }) => {
   const numChannels = nativeData.channels;
@@ -141,7 +143,8 @@ export const KlysPositionEditor: React.FC<KlysPositionEditorProps> = ({
         formatColumns={formatColumns}
         formatChannels={formatChannels}
         formatCurrentRow={currentPosition}
-        formatIsPlaying={false}
+        formatIsPlaying={isPlaying}
+        formatRowsArePositions
         onFormatCellChange={handleCellChange}
         hideVUMeters={true}
       />
