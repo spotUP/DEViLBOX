@@ -86,3 +86,15 @@ describe('parseBenDaglishFile — mickey_mouse.bd', () => {
     expect(song.instruments).toHaveLength(4);
   });
 });
+
+describe('parseBenDaglishFile — sample table end', () => {
+  it('the walk reads no descriptor past the table end', async () => {
+    // Motorhead's table at 0x12ac has 10 entries (first descriptor offset 0x28 = 10 longwords).
+    // The longword after it is descriptor data. Make it look like a valid offset (0x28):
+    // a walk that only bounds-checks would extract an 11th sample from it.
+    const bytes = new Uint8Array(loadBuf(FILE1).slice(0));
+    new DataView(bytes.buffer).setUint32(0x12ac + 10 * 4, 0x28);
+    const song = await parseBenDaglishFile(bytes.buffer, 'motorhead-titleandingame.bd');
+    expect(song.instruments).toHaveLength(10);
+  });
+});
