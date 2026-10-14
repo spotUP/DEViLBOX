@@ -7,7 +7,7 @@
  * - Ticks 1+: process continuous effects
  */
 
-import { reloadResumePoint } from '@/lib/tracker/playhead';
+import { resumePointAfterReload, tuneIdentity } from '@/lib/tracker/playhead';
 import { masterChainKey } from '@utils/masterChainKey';
 import { useEffect, useMemo, useRef, startTransition } from 'react';
 import { useShallow } from 'zustand/react/shallow';
@@ -110,6 +110,8 @@ export const usePatternPlayback = () => {
 
   // Track if we've started playback
   const hasStartedRef = useRef(false);
+  /** Tune identity (lib/tracker/playhead) the replayer last loaded: a reload onto another tune starts at its start. */
+  const loadedTuneRef = useRef<string | null>(null);
   /** Track whether MusicLine song was loaded into the replayer — persists across stop/play.
    *  Reset when musiclineFileData changes (new song loaded). */
   const mlLoadedRef = useRef(false);
@@ -330,6 +332,7 @@ export const usePatternPlayback = () => {
       if (format === 'JamCracker' && jamCrackerFileData) {
         if (!hasStartedRef.current) {
           hasStartedRef.current = true;
+          loadedTuneRef.current = tuneIdentity(useFormatStore.getState());
           // Build the song config and start the engine via the normal path
           // (loadSong → replayer.play → startNativeEngines → JamCracker loadTune+play)
           const modData = pattern.importMetadata?.modData;
@@ -368,6 +371,7 @@ export const usePatternPlayback = () => {
           // startNativeEngines (that handles loadSong at the engine level).
           if (!mlLoadedRef.current) {
             mlLoadedRef.current = true;
+            loadedTuneRef.current = tuneIdentity(useFormatStore.getState());
             const modData = pattern.importMetadata?.modData;
             replayer.loadSong(liveTrackerSong({
               name: pattern.importMetadata?.sourceFile ?? pattern.name ?? 'Untitled',
@@ -443,6 +447,8 @@ export const usePatternPlayback = () => {
         // engine.ensureWASMSynthsReady(). No need for a duplicate fire-and-forget call here.
 
         // Load song into TrackerReplayer
+        const prevTune = loadedTuneRef.current;
+        loadedTuneRef.current = tuneIdentity(useFormatStore.getState());
         const furnaceData = pattern.importMetadata?.furnaceData;
         replayer.loadSong(liveTrackerSong({
           // Playback's choices over the current song (liveTrackerSong - the
@@ -507,7 +513,7 @@ export const usePatternPlayback = () => {
             // Restore position after structural reload in song mode.
             // If the position is out of bounds (e.g. pattern order shrunk), seekTo handles clamping.
             // (a subsong switch resumes at the start of its tune: lib/tracker/playhead)
-            const resume = reloadResumePoint(currentSongPos, currentRow);
+            const resume = resumePointAfterReload(prevTune, tuneIdentity(useFormatStore.getState()), currentSongPos, currentRow);
             replayer.seekTo(resume.songPos, resume.row);
             seekCinter4(effectiveSongPositions[resume.songPos] ?? resume.songPos, resume.row);
           }
