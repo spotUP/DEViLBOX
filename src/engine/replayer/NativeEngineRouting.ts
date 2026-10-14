@@ -16,6 +16,7 @@ import { getToneEngine } from '../ToneEngine';
 import { getNativeAudioNode } from '@utils/audio-context';
 import { HivelyEngine } from '../hively/HivelyEngine';
 import type { UADEEngine } from '../uade/UADEEngine';
+import { uadeClassicLoad } from '../uade/uadeLoadArgs';
 import { MusicLineEngine } from '../musicline/MusicLineEngine';
 import { C64SIDEngine } from '../C64SIDEngine';
 import { SF2Engine } from '../sf2/SF2Engine';
@@ -428,9 +429,23 @@ export async function previewNativeRow(
     useUIStore.getState().setStatusMessage('Row is not played by the song');
     return 'missed';
   }
-  openEngineOutput(desc, instance, separationInputTone, false, routedNativeEngines);
+  if (desc) openEngineOutput(desc, instance, separationInputTone, false, routedNativeEngines);
+  else await openOpaqueUadeOutput(song, instance);
   instance.playRowClip(result.clip);
   return 'played';
+}
+
+/**
+ * The opaque UADE player (UADESynth) has no registry descriptor: its engine reaches the master through the UADESynth
+ * instrument the song carries (the synth connects the engine's output to its own). Open the engine's output gain, and make
+ * sure that synth exists and has loaded the song, so a clip posted next is not dropped by the load that follows a late init.
+ */
+async function openOpaqueUadeOutput(song: TrackerSong, instance: WASMSingletonEngine): Promise<void> {
+  openEngineOutputGain(instance);
+  const inst = song.instruments.find((i) => i.synthType === 'UADESynth' && i.uade?.fileData);
+  if (!inst) return;
+  const synth = getToneEngine().getInstrument(inst.id, inst) as { ensureInitialized?: () => Promise<void> } | undefined;
+  await synth?.ensureInitialized?.();
 }
 
 /**
@@ -444,11 +459,25 @@ export async function prepareNativeRow(song: TrackerSong, songPos: number, row: 
   await getRowPreviewClient().prepare(prepared.request);
 }
 
-/** The row-preview request for a row of `song`, with the engine that will play it; null when its engine has no row preview. */
+/**
+ * The row-preview request for a row of `song`, with the engine that will play it; null when its engine has no row preview.
+ * `desc` is the registry descriptor, null for the opaque UADE player (it has none: UADESynth plays it).
+ */
 async function nativeRowRequest(song: TrackerSong, songPos: number, row: number) {
-  const desc = WASM_ENGINES.find((d) => shouldActivate(d, song));
-  if (!desc || !rowPreviewSupports(desc.key)) return null;
-  const EngineClass = await resolveEngine(desc);
+  const key = playingEngineFor(song);
+  if (!rowPreviewSupports(key)) return null;
+  const desc = WASM_ENGINES.find((d) => d.key === key) ?? null;
+  let EngineClass: WASMSingletonStatic;
+  let load: { data: ArrayBuffer | Uint8Array; args: unknown[] };
+  if (desc) {
+    EngineClass = await resolveEngine(desc);
+    load = await engineLoadArgs(song, desc, false);
+  } else {
+    const classic = uadeClassicLoad(song);
+    if (!classic) return null;
+    EngineClass = (await import('@/engine/uade/UADEEngine')).UADEEngine as unknown as WASMSingletonStatic;
+    load = { data: classic.data.slice(0), args: classic.args };
+  }
   const instance = EngineClass.getInstance();
   await instance.ready();
   if (!isRowClipPlayer(instance)) return null;
@@ -460,14 +489,14 @@ async function nativeRowRequest(song: TrackerSong, songPos: number, row: number)
     (instance as unknown as { setMuteMask(mask: number): void }).setMuteMask(mixerAudibleMask(mixer.channels, mixer.isSoloing));
   }
 
-  const { data, args } = await engineLoadArgs(song, desc, false);
+  const { data, args } = load;
   return {
     desc,
     instance,
     request: {
-      engineKey: desc.key,
+      engineKey: key,
       data: data instanceof Uint8Array ? data : new Uint8Array(data),
-      args,
+      args: instance.rowLoadArgs ? instance.rowLoadArgs(song as never, args) : args,
       sampleRate: instance.output.context.sampleRate,
       target: instance.targetOf(song as never, songPos, row),
       mask: instance.rowClipMask,
