@@ -635,13 +635,19 @@ export async function parseBenDaglishFile(
 
     if (sampleInfo1Off > 0 && sampleInfo1Off < buf.length) {
       // Read entries: longwords with hi-word=0, terminated by 0 or non-zero hi-word
+      // The descriptors are stored directly after the offset table, so the table
+      // ends where the lowest descriptor offset begins: entry i is only a table
+      // entry while i*4 < min(offsets seen so far). Reading further walks into
+      // the descriptor data itself.
       const sampleDescs: number[] = [];
-      for (let i = 0; i < 64; i++) {
+      let tableEnd = 64 * 4;
+      for (let i = 0; i < 64 && i * 4 < tableEnd; i++) {
         const off = sampleInfo1Off + i * 4;
         if (off + 4 > buf.length) break;
         const v = u32BE(buf, off);
         if (v === 0 || (v >>> 16) !== 0) break;
         sampleDescs.push(v);
+        tableEnd = Math.min(tableEnd, v);
       }
 
       for (let i = 0; i < sampleDescs.length; i++) {
