@@ -263,34 +263,65 @@ function faderSpans(pattern: ReadonlyArray<readonly [number, number]>, n: number
 }
 
 /**
- * The hand's fader travel for one full throw, in samples (owner 2026-10-14: "hard jumps to the edges - not humanly
- * possible"). A battle fader's gain switches inside its cut-in zone (`faderCurve` cut-in 0.03; physics manual
- * "closed zone 0-3%"), and the demo's click-safe ramp (`rampMs`, 1 + 2 (1 - v) ms) is the time the hand takes to
- * cross that zone. The hand keeps that speed over the whole throw: full throw = ramp / cut-in, 33 ms at v = 1 to
- * 100 ms at v = 0.
+ * Peak hand speed on the scratch fader, in fraction of travel per ms: a full throw takes at least 60 ms (owner
+ * 2026-10-14: "moves faster than a human can move it"). No turntablist crossfader measurement exists in the repo
+ * (searched docs/ and thoughts/shared/research/); the value is chosen from a 45 mm battle fader and a fast finger
+ * flick of about 0.75 m/s (45 mm / 60 ms), and it is the hard ceiling of the position track (the old track
+ * crossed the whole throw in 33 ms, 1.8x too fast).
  */
-export function faderTravelSamples(rampSamples: number, cutIn = 0.03): number {
-  return Math.max(1, rampSamples) / cutIn;
+export const FADER_MAX_SPEED_PER_MS = 1 / 60;
+
+/** One full throw at the hand's peak speed, in samples (the needle-drop fallback of `DeckCMotion` travels this). */
+export function faderTravelSamples(rate: number): number {
+  return Math.max(1, Math.round(rate / (1000 * FADER_MAX_SPEED_PER_MS)));
+}
+
+/**
+ * How deep the hand goes for one open span of `lenMs`: a cut is a short tap just past the cut-in edge (owner
+ * 2026-10-14: "a real cut is a tap near the cut-in edge, not an edge-to-edge throw"). 6 % of travel plus 0.1 % per
+ * ms the fader stays open, so a 30 ms click is ~9 %, a 100 ms flare ~16 %, and only a long open hold or fade
+ * (about 940 ms) reaches the far edge.
+ */
+export function faderTapPeak(lenMs: number, cutIn = 0.03): number {
+  return Math.min(1, Math.max(cutIn + 0.02, 0.06 + 0.001 * lenMs));
 }
 
 /**
  * The fader's position (0 closed .. 1 fully open) the hand moves through a pattern, beside `faderFromPattern`'s
- * gain from the same spans: it leaves the closed edge as a window opens, crosses the cut-in zone while the gain
- * ramps, travels at most one throw per `faderTravelSamples` and is back at the closed edge as the window ends.
- * A window too short to reach the far edge is a short tap (the hand turns around part way). The Deck C fader lane
- * draws this, never the gain.
+ * gain from the same spans. Per open span the hand is a triangle at the peak speed limit with a flat top at the
+ * tap depth (`faderTapPeak`): it crosses the cut-in point (3 %) exactly where the gain is fully open (`s + r`,
+ * the end of the opening ramp) and again where the closing ramp starts (`e - r`), so the audio gain timing is
+ * untouched. A ramp shorter than the cut-in zone needs at the speed limit means the hand starts earlier and
+ * leaves later (it plans ahead and never jumps). A 2 ms box smoothing rounds the apex so acceleration stays
+ * finite. The Deck C fader lane draws this, never the gain.
  */
 export function faderPositionFromPattern(pattern: ReadonlyArray<readonly [number, number]>, n: number, rate: number, opts: FaderPatternOptions = {}): Float64Array {
   const { spans, r } = faderSpans(pattern, n, rate, opts);
-  const travel = faderTravelSamples(r);
+  const cutIn = 0.03;
+  const vmax = FADER_MAX_SPEED_PER_MS * 1000 / rate; // travel per sample
   const L = (opts.lagMs ?? 0) > 0 ? Math.max(1, Math.trunc(opts.lagMs! * 1e-3 * rate)) : 0;
-  const pos = new Float64Array(n);
+  const raw = new Float64Array(n);
+  const lead = Math.ceil(cutIn / vmax);
   for (const [s, e] of spans) {
-    for (let i = s; i < e; i++) {
+    const peak = faderTapPeak((e - s) / rate * 1000, cutIn);
+    // a span at the very start / end of the buffer cannot plan ahead: its crossing moves inside by < 1 ms instead of jumping
+    const tUp = Math.max(s + r, lead), tDown = Math.min(e - r, n - 1 - lead);
+    const from = Math.max(0, tUp - lead), to = Math.min(n - 1, tDown + lead);
+    for (let i = from; i <= to; i++) {
       const j = i + L;
       if (j >= n) break;
-      pos[j] = Math.max(pos[j]!, Math.min(1, Math.min(i - s, e - 1 - i) / travel));
+      const v = Math.min(peak, cutIn + vmax * (i - tUp), cutIn + vmax * (tDown - i));
+      if (v > raw[j]!) raw[j] = v;
     }
+  }
+  // 2 ms centred box: rounds the apex and the foot; moves only the corners, the cut-in crossings stay on the slope
+  const w = Math.max(1, Math.round(rate * 0.001));
+  const pos = new Float64Array(n);
+  const acc = new Float64Array(n + 1);
+  for (let i = 0; i < n; i++) acc[i + 1] = acc[i]! + raw[i]!;
+  for (let i = 0; i < n; i++) {
+    const lo = Math.max(0, i - w), hi = Math.min(n, i + w + 1);
+    pos[i] = (acc[hi]! - acc[lo]!) / (hi - lo);
   }
   return pos;
 }
