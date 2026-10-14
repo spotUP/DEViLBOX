@@ -71,3 +71,19 @@ export function tickGridPosition(ticks: number, grid: TickGrid): GridPosition {
 export function playerTickGridPosition(playerTicks: number, grid: TickGrid): GridPosition {
   return tickGridPosition(Math.max(0, playerTicks - 1), grid);
 }
+
+/**
+ * The tick at which grid row (`songPos`, `row`) starts: the inverse of
+ * tickGridPosition for a row inside the song's first pass. An engine that
+ * can only run forward from its first tick seeks a row by running to it.
+ */
+export function gridRowStartTick(grid: TickGrid, songPos: number, row: number): number {
+  const order = grid.songPositions;
+  const lenAt = (pos: number) => Math.max(1, grid.patternLengths[order[pos]] ?? 64);
+  const last = Math.max(0, order.length - 1);
+  const pos = Math.max(0, Math.min(songPos, last));
+  let rows = 0;
+  for (let p = 0; p < pos; p++) rows += lenAt(p);
+  rows += Math.max(0, Math.min(row, lenAt(pos) - 1));
+  return (grid.firstTick ?? 0) + rows * Math.max(1, grid.speed || 1);
+}

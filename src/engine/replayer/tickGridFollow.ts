@@ -3,7 +3,8 @@
  * count, or an order and row - and the song's grid is a view a parser drew. One place turns the report into the
  * `{ songPos, row }` the tracker follows, so no engine carries its own copy of the mapping.
  */
-import { tickGridPosition, type TickGrid, type GridPosition } from '@/lib/tracker/tickGridPosition';
+import { tickGridPosition, gridRowStartTick, type TickGrid, type GridPosition } from '@/lib/tracker/tickGridPosition';
+import type { RowTarget } from '@engine/rowPreview/rowTarget';
 import type { TrackerSong } from '@engine/TrackerReplayer';
 
 /** What a position listener gets: the grid row, plus the player tick it came from (0 when the player reported rows). */
@@ -30,6 +31,16 @@ export class GridFollow {
 
   setGrid(grid: TickGrid | null): void { this.grid = grid; }
   get hasGrid(): boolean { return this.grid !== null; }
+  /**
+   * The inverse of the follow: grid row (`songPos`, `row`) as the player reports it. 'orderRow' players report the
+   * grid's own order and row; 'tick' players report a tick count, the row is `speed` ticks of it.
+   */
+  targetOf(songPos: number, row: number, followBy: 'orderRow' | 'tick'): RowTarget {
+    if (followBy === 'orderRow' || !this.grid) return { kind: 'orderRow', order: songPos, row };
+    const from = gridRowStartTick(this.grid, songPos, row);
+    return { kind: 'ticks', from, to: from + Math.max(1, this.grid.speed || 1) };
+  }
+
   get listenerCount(): number { return this.callbacks.size; }
 
   onPosition(cb: (p: GridFollowPosition) => void): () => void {
