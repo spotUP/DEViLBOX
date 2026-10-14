@@ -9,6 +9,13 @@ import type { PanelType } from '@typedefs/project';
 import type { MainView } from './uiViews';
 import { useSettingsStore } from './useSettingsStore';
 
+/** DJ view debug frame: exact CSS size of the DJ root, optionally CSS-zoomed so a large frame fits the window. */
+export interface DjLayoutFrame {
+  width: number;
+  height: number;
+  zoom?: number;
+}
+
 export type PerformanceQuality = 'high' | 'medium' | 'low';
 
 export type TrackerViewMode = 'tracker' | 'grid' | 'pianoroll' | 'matrix' | 'sunvox' | 'dj' | 'drumpad' | 'vj';
@@ -63,6 +70,8 @@ interface UIStore {
   showMacroSlots: boolean;
   patternEditorScrollLeft: number; // Horizontal scroll offset shared with automation lanes
   sidebarCollapsed: boolean;
+  /** Debug frame (MCP set_dj_layout_frame): the DJ view root renders at exactly this CSS size, zoomed to fit. Not persisted. */
+  djLayoutFrame: DjLayoutFrame | null;
   useHexNumbers: boolean; // Display numbers in hex (true) or decimal (false)
   rowHighlightInterval: number; // Every N rows gets highlight (default 4, FT2 style)
   rowSecondaryHighlightInterval: number; // Every M rows gets stronger highlight (bar, default 16)
@@ -150,6 +159,7 @@ interface UIStore {
   toggleMacroSlots: () => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  setDjLayoutFrame: (frame: DjLayoutFrame | null) => void;
   setUseHexNumbers: (useHex: boolean) => void;
   setRowHighlightInterval: (interval: number) => void;
   toggleBeatLabels: () => void;
@@ -261,6 +271,7 @@ export const useUIStore = create<UIStore>()(
       showMacroSlots: false,
       patternEditorScrollLeft: 0,
       sidebarCollapsed: false,
+      djLayoutFrame: null,
       // Decimal by default (asked for 2026-09-22). FT2 numbers rows and
       // instruments in hex and DEViLBOX followed it, but the row gutter is
       // read as a position in the song far more often than it is used for
@@ -436,6 +447,11 @@ export const useUIStore = create<UIStore>()(
       setSidebarCollapsed: (collapsed) =>
         set((state) => {
           state.sidebarCollapsed = collapsed;
+        }),
+
+      setDjLayoutFrame: (frame) =>
+        set((state) => {
+          state.djLayoutFrame = frame;
         }),
 
       setUseHexNumbers: (useHex) =>

@@ -1223,6 +1223,23 @@ export function setActiveView(params: Record<string, unknown>): Record<string, u
   return { ok: true, activeView: target.activeView, trackerViewMode: target.trackerViewMode ?? null };
 }
 
+/** Render the DJ view root at an exact CSS size (width x height, optional zoom); null clears it. */
+export function setDJLayoutFrame(params: Record<string, unknown>): Record<string, unknown> {
+  const ui = useUIStore.getState();
+  const w = params.width;
+  const h = params.height;
+  if (w === undefined || h === undefined || w === null || h === null) {
+    ui.setDjLayoutFrame(null);
+    return { ok: true, frame: null };
+  }
+  if (typeof w !== 'number' || typeof h !== 'number' || w < 320 || h < 240) {
+    return { error: 'width and height must be numbers (at least 320 x 240), or omit both to clear' };
+  }
+  const zoom = typeof params.zoom === 'number' && params.zoom > 0 ? params.zoom : undefined;
+  ui.setDjLayoutFrame({ width: w, height: h, zoom });
+  return { ok: true, frame: { width: w, height: h, zoom: zoom ?? 1 } };
+}
+
 export function setStatusMessage(params: Record<string, unknown>): Record<string, unknown> {
   useUIStore.getState().setStatusMessage(params.message as string);
   return { ok: true };

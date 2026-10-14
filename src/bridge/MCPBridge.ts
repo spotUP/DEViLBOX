@@ -38,6 +38,7 @@ import {
   getMixerState,
   getChannelState,
   getUIState,
+  getDJLayoutFit,
   getHistoryState,
   getOscilloscopeInfo,
   getAudioWorkletProfile,
@@ -137,6 +138,7 @@ import {
   toggleRecordMode,
   setFollowPlayback,
   setActiveView,
+  setDJLayoutFrame,
   setStatusMessage,
   setTrackerZoom,
   selectInstrument,
@@ -251,6 +253,7 @@ const handlers: Record<string, Handler> = {
   get_mixer_state: getMixerState,
   get_channel_state: getChannelState,
   get_ui_state: getUIState,
+  get_dj_layout_fit: getDJLayoutFit,
   get_history_state: getHistoryState,
   get_oscilloscope_info: getOscilloscopeInfo,
   get_audio_worklet_profile: getAudioWorkletProfile,
@@ -363,6 +366,7 @@ const handlers: Record<string, Handler> = {
 
   // ─── Write: UI ──────────────────────────────────────────────────────────────
   set_active_view: setActiveView,
+  set_dj_layout_frame: setDJLayoutFrame,
   set_status_message: setStatusMessage,
   set_tracker_zoom: setTrackerZoom,
 
