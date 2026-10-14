@@ -96,6 +96,8 @@ interface UIStore {
   // Scratch settings
   scratchEnabled: boolean; // Manual scratch toggle (true = always enabled, false = only during playback)
   scratchAcceleration: boolean; // Scroll acceleration for scratch (true = smoothed, false = raw 1:1)
+  /** True while a scratch is in progress. Transient, never persisted (not in partialize). */
+  scratchActive: boolean;
   platterMass: number; // Turntable platter mass 0-1 (0=CDJ light, 0.5=Technics 1200, 1=heavy)
 
   activeView: MainView;
@@ -187,6 +189,7 @@ interface UIStore {
   // Scratch actions
   setScratchEnabled: (enabled: boolean) => void;
   setScratchAcceleration: (enabled: boolean) => void;
+  setScratchActive: (active: boolean) => void;
   setPlatterMass: (mass: number) => void;
 
   // View switching actions
@@ -301,6 +304,7 @@ export const useUIStore = create<UIStore>()(
       // Scratch settings
       scratchEnabled: false, // Manual toggle off by default (scratch only during playback)
       scratchAcceleration: true, // Acceleration on by default
+      scratchActive: false,
       platterMass: 0.5, // Technics 1200 default
 
       // View switching
@@ -594,6 +598,11 @@ export const useUIStore = create<UIStore>()(
       setScratchAcceleration: (enabled) =>
         set((state) => {
           state.scratchAcceleration = enabled;
+        }),
+
+      setScratchActive: (active) =>
+        set((state) => {
+          state.scratchActive = active;
         }),
 
       setPlatterMass: (mass) =>
