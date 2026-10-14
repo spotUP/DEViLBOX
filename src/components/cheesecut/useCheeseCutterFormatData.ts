@@ -16,6 +16,8 @@ import type { FormatChannel } from '@/components/shared/format-editor-types';
 export interface CheeseCutterFormatData {
   channels: FormatChannel[];
   currentRow: number;
+  /** The order position the pattern editor shows: the playing one while playing, else the order cursor. */
+  currentOrderPos: number;
   isPlaying: boolean;
   handleCellChange: (channelIdx: number, rowIdx: number, columnKey: string, value: number) => void;
 }
@@ -102,5 +104,5 @@ export function useCheeseCutterFormatData(): CheeseCutterFormatData {
     [currentOrderPos],
   );
 
-  return { channels, currentRow: displayRow, isPlaying, handleCellChange };
+  return { channels, currentRow: displayRow, currentOrderPos, isPlaying, handleCellChange };
 }

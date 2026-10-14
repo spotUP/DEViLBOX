@@ -201,4 +201,54 @@ describe('position matrix steps once per pattern played, never per row', () => {
       expect(resolverCalls.some((c) => c.rowsArePositions)).toBe(true); // the matrix rule ran (sentinel)
     }, 60000);
   }
+  // DUP-AUDIT-ORDER-MATRICES: SF2 and CheeseCutter drew their order lists as hand-built DOM click lists, so they
+  // never stepped once per pattern (no canvas at all). They play through their own stores, not the tracker store.
+  const sidSongs: Array<{ path: string; type: string; mode: string; store: 'sf2' | 'cc'; view: () => Promise<React.FC> }> = [
+    { path: 'public/data/songs/sid-factory-2/Driver 11 Test - Filter.sf2', type: 'SF2', mode: 'sidfactory2', store: 'sf2',
+      view: async () => (await import('@/components/sidfactory2/SF2View')).SF2View as React.FC },
+    { path: 'public/data/songs/cheesecutter/abaddon-trouble.ct', type: 'CT', mode: 'cheesecutter', store: 'cc',
+      view: async () => (await import('@/components/cheesecut/CheeseCutterView')).CheeseCutterView as React.FC },
+  ];
+
+  for (const song of sidSongs) {
+    it(`${song.path.split('/').pop()}: the order matrix follows the song position across 3 pattern boundaries`, async () => {
+      await openSong(song.path, song.type);
+      const { useFormatStore } = await import('@stores/useFormatStore');
+      expect(useFormatStore.getState().editorMode).toBe(song.mode);
+      const View = await song.view();
+      render(<div style={{ width: 1200, height: 800 }}><View /></div>);
+      await act(async () => { await new Promise((r) => setTimeout(r, 80)); });
+      act(() => runFrames(2));
+      const posts = matrixPosts();
+
+      const { useSF2Store } = await import('@/stores/useSF2Store');
+      const { useCheeseCutterStore } = await import('@/stores/useCheeseCutterStore');
+      const { useEditorStore } = await import('@stores/useEditorStore');
+      useEditorStore.setState({ followPlayback: true });
+      const listLen = song.store === 'sf2'
+        ? Math.max(...useSF2Store.getState().orderLists.map((o) => o.entries.length))
+        : Math.max(...useCheeseCutterStore.getState().trackLists.map((t) => t.length));
+      const positions = Math.min(4, listLen);
+      expect(positions).toBeGreaterThanOrEqual(2);
+      const trace: { pos: number; row: number; shown: number }[] = [];
+      for (let pos = 0; pos < positions; pos++) {
+        for (let row = 0; row < 8; row++) {
+          act(() => {
+            if (song.store === 'sf2') useSF2Store.setState({ playing: true, playbackPos: { row, songPos: pos } });
+            else useCheeseCutterStore.setState({ playing: true, playbackPos: { row, songPos: pos } });
+            runFrames(1);
+          });
+          act(() => runFrames(1));
+          const last = [...posts].reverse().find((m) => m.type === 'playback')!;
+          trace.push({ pos, row, shown: last.row! });
+        }
+      }
+      act(() => {
+        if (song.store === 'sf2') useSF2Store.setState({ playing: false });
+        else useCheeseCutterStore.setState({ playing: false });
+      });
+      assertOneStepPerPattern(trace, positions);
+      expect(resolverCalls.some((c) => c.rowsArePositions)).toBe(true);
+    }, 60000);
+  }
 });

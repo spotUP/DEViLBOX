@@ -118,6 +118,9 @@ interface PatternEditorCanvasProps {
   onFormatCellChange?: OnCellChange;
   /** Called when the format cursor moves (row/channel/column). Lets parent sync external state. */
   onFormatCursorChange?: (cursor: { channelIndex: number; rowIndex: number; columnIndex: number }) => void;
+  /** Called with the row the user pressed on in THIS canvas. Unlike onFormatCursorChange (the cursor is shared by every
+   *  format canvas on screen) it never fires for a move made in another canvas. A position matrix uses it to seek. */
+  onFormatRowClick?: (row: number) => void;
   /** Hide VU meters (for sub-editors like perf list that aren't main song views) */
   hideVUMeters?: boolean;
   /** Hide automation lanes overlay (for order matrices that reuse PatternEditorCanvas) */
@@ -145,6 +148,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   formatRowsArePositions = false,
   onFormatCellChange,
   onFormatCursorChange,
+  onFormatRowClick,
   hideVUMeters = false,
   hideAutomationLanes: hideAutoLanesProp = false,
   formatChannelOffset = 0,
@@ -283,6 +287,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // Notify parent of cursor changes (so SF2/GT stores stay in sync)
   const onFormatCursorChangeRef = useRef(onFormatCursorChange);
   onFormatCursorChangeRef.current = onFormatCursorChange;
+  const onFormatRowClickRef = useRef(onFormatRowClick);
+  onFormatRowClickRef.current = onFormatRowClick;
   useEffect(() => {
     onFormatCursorChangeRef.current?.(formatCursor);
   }, [formatCursor]);
@@ -818,6 +824,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       }
 
       setFormatCursor({ channelIndex: chIdx, rowIndex: rowIdx, columnIndex: colIdx });
+      onFormatRowClickRef.current?.(rowIdx);
       containerRef.current?.focus({ preventScroll: true });
       return;
     }

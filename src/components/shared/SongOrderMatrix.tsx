@@ -66,6 +66,8 @@ interface SongOrderMatrixProps {
   isPlaying?: boolean;
   /** Cell edit callback */
   onCellChange?: OnCellChange;
+  /** The user pressed on a position row of this matrix (seek there) */
+  onPositionClick?: (position: number) => void;
   /** Collapsed state */
   collapsed?: boolean;
   /** Toggle collapse */
@@ -100,6 +102,7 @@ export const SongOrderMatrix: React.FC<SongOrderMatrixProps> = ({
   currentRow,
   isPlaying = false,
   onCellChange,
+  onPositionClick,
   collapsed = false,
   onToggleCollapse,
   enableBlockSelection = false,
@@ -215,6 +218,7 @@ export const SongOrderMatrix: React.FC<SongOrderMatrixProps> = ({
         formatIsPlaying={isPlaying}
         formatRowsArePositions
         onFormatCellChange={onCellChange}
+        onFormatRowClick={onPositionClick}
         hideVUMeters
         hideAutomationLanes={hideAutomationLanes}
       />
