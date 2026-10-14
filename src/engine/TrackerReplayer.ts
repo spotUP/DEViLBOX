@@ -386,6 +386,8 @@ export interface TrackerSong {
   nuadeFileName?: string;
   /** Subsong to start (0-based), the native subsong model's start field */
   nuadeSubsong?: number;
+  /** What the player says the file holds (asked at import, before any engine loads): the subsong control shows from it. */
+  nuadeSubsongs?: { count: number; defaultSubsong: number };
   /**
    * The fields of the format's own route that held this same module (hippelFileData, uadeEditableFileData ...). playOnNuade
    * takes them off (they would start another engine); the native export puts the module back under them, so the format's

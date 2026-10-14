@@ -186,7 +186,7 @@ class NuadeProcessor extends AudioWorkletProcessor {
       }
       this.port.postMessage({
         type: 'moduleLoaded',
-        voices: this.voices, subsongs, defaultSubsong: def,
+        voices: this.voices, subsongs, defaultSubsong: def, startedSubsong: wanted,
         playerId: m.UTF8ToString(m._nw_player_id()), playerName: m.UTF8ToString(m._nw_player_name()),
         meta, instruments, caps: m._nw_caps(),
       });

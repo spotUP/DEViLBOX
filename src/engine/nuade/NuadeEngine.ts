@@ -34,7 +34,7 @@ export type NuadeFollowBy = 'orderRow' | 'tick';
 
 /** What a load reported: the player that runs and what it knows about the song. */
 export interface NuadeLoaded {
-  voices: number; subsongs: number; defaultSubsong: number;
+  voices: number; subsongs: number; defaultSubsong: number; startedSubsong?: number;
   playerId: string; playerName: string;
   meta: Record<string, string>;
   instruments: { index: number; name: string }[];
@@ -146,8 +146,8 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
         recordNuadePlayerCaps(data.playerId, data.caps);
         this._editPort = createNuadeEditPort(data.caps, (m) => this.post(m));
         useOscilloscopeStore.getState().setChipInfo(data.voices, 0, Array.from({ length: data.voices }, (_, i) => `Voice ${i + 1}`));
-        // nuade subsongs are 0-based already; the file's start subsong is what plays.
-        reportSubsongs('Nuade', data.subsongs, data.defaultSubsong);
+        // nuade subsongs are 0-based already; what plays is the subsong the load started (asked for, else the file's default).
+        reportSubsongs('Nuade', data.subsongs, data.startedSubsong ?? data.defaultSubsong);
         for (const cb of this.loadCallbacks) cb(data);
         break;
       }
@@ -199,7 +199,7 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
     if (!this.workletNode) throw new Error('NuadeEngine not initialized');
     if (!playerId) throw new Error('NuadeEngine: no player id');
     // The node is sized for this song: ask the player how many voices it has before the module goes to the worklet.
-    const voices = await nuadeVoiceCounter()(new Uint8Array(moduleData), fileName || playerId, playerId, companions);
+    const voices = (await nuadeVoiceCounter()(new Uint8Array(moduleData), fileName || playerId, playerId, companions))?.voices ?? null;
     if (voices !== null && voices >= 1 && voices <= NUADE_NODE_VOICES && voices !== this._nodeVoices) await this.resizeNode(voices);
     if (!this.workletNode) throw new Error('NuadeEngine not initialized');
     this._editPort = null;

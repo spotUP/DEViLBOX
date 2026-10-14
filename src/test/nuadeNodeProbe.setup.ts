@@ -22,9 +22,9 @@ setNuadeVoiceCounter(async (bytes, fileName, playerId, companions) => {
     n.clearFiles();
     for (const [name, data] of companions ?? []) n.addFile(name, new Uint8Array(data));
     n.open(bytes, fileName, playerId);
-    const voices = n.voiceCount;
+    const info = { voices: n.voiceCount, subsongs: n.subsongCount, defaultSubsong: n.defaultSubsong };
     n.close();
-    return voices;
+    return info;
   } catch {
     return null;
   }
