@@ -2,7 +2,7 @@
 date: 2026-10-14
 topic: Engine-rendered row preview - Enter on a whole-song-engine song sounds that row as playback renders it, by the engine itself
 tags: [keyboard, row-preview, playback, engines, nuade, uade, eagleplayer, worker]
-status: draft
+status: draft  # wave 0 + 1 implemented 2026-10-14
 ---
 
 # Engine-rendered row preview
@@ -144,7 +144,7 @@ commit hash. Ledger: this file.
 
 ### Wave 0 + 1 (shared pieces, proven by nuade)
 
-- [ ] **RP-1 Row target mapping.** `src/lib/tracker/tickGridPosition.ts`: add `gridRowStartTick(grid, songPos, row)`
+- [x] **RP-1 Row target mapping.** `src/lib/tracker/tickGridPosition.ts`: add `gridRowStartTick(grid, songPos, row)`
   (inverse of `tickGridPosition` inside the first pass; take it from e3b3dd2fa, which has it with
   `playerGridRowStartTick`). `src/engine/replayer/tickGridFollow.ts`: `GridFollow.targetOf(songPos, row, followBy):
   RowTarget` - `'orderRow'` returns `{ kind: 'orderRow', order: songPos, row }`, `'tick'` returns
@@ -154,7 +154,7 @@ commit hash. Ledger: this file.
   with mixed pattern lengths and firstTick 0/5, `tickGridPosition(gridRowStartTick(g, p, r), g)` returns `(p, r)`;
   `targetOf` gives the documented shapes. Added to `test:ci`.
 
-- [ ] **RP-2 One load path, one routing path.** Extract from `startNativeEngines` (NativeEngineRouting.ts:290-420):
+- [x] **RP-2 One load path, one routing path.** Extract from `startNativeEngines` (NativeEngineRouting.ts:290-420):
   `engineLoadArgs(song, desc, isDJDeck): Promise<{ data: ArrayBuffer; args: unknown[] }>` (lines 347-353) and
   `openEngineOutput(desc, instance, separationInputTone)` (the gain restore at :381 plus the direct-routing block). The
   play path calls them; no behaviour change.
@@ -163,7 +163,7 @@ commit hash. Ledger: this file.
   `src/engine/replayer/__tests__/engineLoadArgsAreWhatPlayLoads.test.ts` asserts the bytes and args equal what
   `loadTune` received in a play of the same song (edited grid included).
 
-- [ ] **RP-3 Row render algorithm.** `src/engine/rowPreview/rowPreviewStream.ts` (pure, no DOM/worker imports):
+- [x] **RP-3 Row render algorithm.** `src/engine/rowPreview/rowPreviewStream.ts` (pure, no DOM/worker imports):
   `interface RowRenderAdapter { open(data, args): OpenResult; restart(): void; advanceSilent(toFrame): number;
   renderChunk(frames, mask): Chunk /* stereo, voices|null, pans|null, frames, flags (looped/ended) */;
   positionAt(frame): PlayerPosition | null /* order,row,tick,speed */; }` and `class RowPreviewStream` with
@@ -175,7 +175,7 @@ commit hash. Ledger: this file.
   counter player): tail serve, forward, restart path (call counts of restart/advanceSilent asserted), missed row,
   ticks target spanning rows, fade length = round(0.005 * rate), cap, reopen on changed bytes. Added to `test:ci`.
 
-- [ ] **RP-4 Row-preview worker + client.** `src/workers/rowPreview.worker.ts` (thin glue) over
+- [x] **RP-4 Row-preview worker + client.** `src/workers/rowPreview.worker.ts` (thin glue) over
   `src/engine/rowPreview/rowPreviewHost.ts` (`createRowPreviewHost(loaders)`: one `RowPreviewStream` per engine key,
   latest-wins cancellation per D5, prefetch cache per D12); `src/engine/rowPreview/rowPreviewClient.ts` (one worker,
   request ids, transferable clip buffers; tests construct it over the host in-process). Adapter registry
@@ -183,7 +183,7 @@ commit hash. Ledger: this file.
   Automated: `src/engine/rowPreview/__tests__/rowPreviewHost.test.ts` - second request cancels the first (first resolves
   'cancelled'), prefetch hit returns without calling the adapter again (call count), changed bytes reopen.
 
-- [ ] **RP-5 Entry point.** `src/engine/keyboard/commands/playRow.ts`: `playRow()` asks
+- [x] **RP-5 Entry point.** `src/engine/keyboard/commands/playRow.ts`: `playRow()` asks
   `getTrackerReplayer().previewRow(currentPositionIndex, cursor.rowIndex)` (stores: `useTrackerStore`
   `currentPositionIndex`, `useCursorStore` `cursor.rowIndex`) when `playingEngineFromStores(...)` is not `'tracker'`;
   that returns `'engine' | 'playing' | 'unsupported'`; `'unsupported'` falls through to today's instrument path (D6),
@@ -198,7 +198,7 @@ commit hash. Ledger: this file.
   called, `previewCell` not called; engine song playing -> neither; tracker song -> previewCell; unsupported engine ->
   previewCell.
 
-- [ ] **RP-6 Cursor prefetch (D12).** `src/engine/rowPreview/rowPreviewPrefetch.ts`: subscribes to `useCursorStore`
+- [x] **RP-6 Cursor prefetch (D12).** `src/engine/rowPreview/rowPreviewPrefetch.ts`: subscribes to `useCursorStore`
   row / `useTrackerStore` position while `useTransportStore.isPlaying` is false and the song is engine-played;
   debounced 150 ms; calls the client's `prepare(...)`. Mounted once where the pattern editor mounts its other
   engine-follow subscriptions (the implementer names the file in the commit after reading the mount; no new
@@ -206,7 +206,7 @@ commit hash. Ledger: this file.
   Automated: `src/engine/rowPreview/__tests__/prefetchFollowsTheCursorWhileStopped.test.ts` - fake timers: three
   cursor moves within 150 ms -> one prepare for the last row; while playing -> none.
 
-- [ ] **RP-7 Clip player in the worklet.** `public/worklets/row-clip.js` (`globalThis.DevilboxRowClip`): queue a clip,
+- [x] **RP-7 Clip player in the worklet.** `public/worklets/row-clip.js` (`globalThis.DevilboxRowClip`): queue a clip,
   hand one quantum per `process()` (stereo, voices, pans), 5 ms crossfade-out on replace (D3/D5), post
   `{ type: 'rowClipStarted', frames }` / `{ type: 'rowClipDone' }`. Load it where `channel-outputs.js` and
   `channel-stream.js` are loaded (src/engine/wasm/WASMSingletonBase.ts:120-127) and in the test harness
@@ -214,7 +214,7 @@ commit hash. Ledger: this file.
   Automated: `src/engine/__tests__/rowClipHelper.test.ts` - a 1000-frame clip comes out as 8 quanta, last 240 frames at
   48k faded, replace mid-clip fades the old one over 240 frames then starts the new one.
 
-- [ ] **N1 Nuade adapter.** `src/engine/rowPreview/adapters/nuadeAdapter.ts` over `NuadeDriver`
+- [x] **N1 Nuade adapter.** `src/engine/rowPreview/adapters/nuadeAdapter.ts` over `NuadeDriver`
   (src/engine/nuade/nuadeDriver.ts) loaded with `loadNuadeModuleFromPublic` (nuadeModule.ts:87) in the worker,
   `NuadeHeadless` in Node: `open` = clearFiles + addFile(companions) + open(bytes, fileName, playerId) + start(subsong);
   `restart` = start(subsong); `advanceSilent` = seek; `renderChunk` = setMuteMask + render(n, true) + pans();
@@ -223,7 +223,7 @@ commit hash. Ledger: this file.
   `ivory tover ii.ex`: rows at 10 % / 50 % via the stream (cold) equal the linear NuadeHeadless render at the same
   frames, max diff 0 before the fade; a muted voice is absent (equals the linear render with the same mask).
 
-- [ ] **N2 Nuade worklet plays clips.** `public/nuade/Nuade.worklet.js`: move the output code of `process()` (lines
+- [x] **N2 Nuade worklet plays clips.** `public/nuade/Nuade.worklet.js`: move the output code of `process()` (lines
   ~399-424: copy to outL/outR, `o.write` with pans, `_stream.writeFloat32` with the scope mask, VU) into
   `emit(outputs, stereo, voices, pans, n)`; playback calls it with the main slot's buffers, the clip path with
   `DevilboxRowClip`'s quantum when not playing. Clip meter levels: per-voice peak of the clip quantum, masked exactly
@@ -232,14 +232,14 @@ commit hash. Ledger: this file.
   Automated: extend `src/engine/nuade/__tests__/nuadeWorklet.test.ts`: a posted clip comes out of output 0
   sample-exact, a muted voice's scope stream is flat and its level 0, `play` drops the clip.
 
-- [ ] **N3 NuadeEngine implements the clip player and target.** `src/engine/nuade/NuadeEngine.ts`:
+- [x] **N3 NuadeEngine implements the clip player and target.** `src/engine/nuade/NuadeEngine.ts`:
   `playRowClip(clip)` (posts `{ type: 'playRowClip', ... }` with transfer), `targetOf(songPos, row)` (its
   `GridFollow` + `followBy`; calls `setGrid(song)` first when the grid is unset because the song was never played),
   `muteMask` getter (the `_muteMask` it already stores). Protocol types in `src/engine/nuade/nuadeProtocol.ts`
   (`NuadeIn` / `NuadeOut`). `'vu'` from a clip reaches `meterFeed.report` like playback's.
   Automated: covered by RP-R plus a protocol case in `src/engine/nuade/__tests__/nuadeProtocol.test.ts`.
 
-- [ ] **N4 Corpus gate for nuade (landing reason: claim "every nuade row").** `tools/nuade/rowPreviewGate.ts`
+- [x] **N4 Corpus gate for nuade (landing reason: claim "every nuade row").** `tools/nuade/rowPreviewGate.ts`
   (`npm run nuade-row-preview`): for every nuade corpus song, rows at 10/50/90 % through the stream vs linear render;
   writes one verdict per song to `test-data/nuade-row-preview.json` as it completes, skips recorded songs,
   `--only <song>` and `--failed` re-run options (global 6a). Records cold-seek ms and row frames too (fills the
@@ -247,7 +247,7 @@ commit hash. Ledger: this file.
   Automated: the tool's verdict file has a row for every corpus song with max diff 0; any non-zero row is a bug item
   added here.
 
-- [ ] **RP-R The one reachability test.** `src/hooks/__tests__/enterSoundsTheRowThroughTheSongsEngine.test.tsx`:
+- [x] **RP-R The one reachability test.** `src/hooks/__tests__/enterSoundsTheRowThroughTheSongsEngine.test.tsx`:
   nuade rig (`installNuadeRig`, src/engine/nuade/__tests__/nuadeEngineRig.ts) + row-preview client over the host
   in-process + real `useTrackerInput` with the ProTracker scheme (as rowPreviewMovesTheMeterOfTheChannelItSounds.test.tsx
   sets it up). Load `public/data/songs/wally-beben/wicked.wb` (an instrument-path-silent song) stopped; cursor at
@@ -257,7 +257,7 @@ commit hash. Ledger: this file.
   sink's `triggerChannelMeter` fired for every unmuted channel with a note in that row and never for channel 2;
   (d) channel 2's scope samples are all 0; (e) the cursor moved down by the edit step. Added to `test:ci`.
 
-- [ ] **N5 Type-check + affected tests.** `npm run type-check` clean; run only the tests named in RP-1..RP-7, N1..N3,
+- [x] **N5 Type-check + affected tests.** `npm run type-check` clean; run only the tests named in RP-1..RP-7, N1..N3,
   RP-R.
 
 ### Wave 2 - UADE family
@@ -418,7 +418,7 @@ songs (their instruments are ours).
 
 ## Ledger - wave 0 + 1 (13 items), started 2026-10-14
 
-Running count: 11 of 13. Order: RP-1, RP-2, RP-7, RP-3, N1, RP-4, N2, N3, RP-5, RP-6, N4, RP-R, N5.
+Running count: 13 of 13 (wave 0 + 1 done; wave 2-4 and M1/M2 open). Order: RP-1, RP-2, RP-7, RP-3, N1, RP-4, N2, N3, RP-5, RP-6, N4, RP-R, N5.
 
 | ID | Done | Commit |
 |---|---|---|
@@ -432,9 +432,9 @@ Running count: 11 of 13. Order: RP-1, RP-2, RP-7, RP-3, N1, RP-4, N2, N3, RP-5, 
 | N1 | yes | 901ce669c |
 | N2 | yes | f4c6f5155 |
 | N3 | yes | 64468848b |
-| N4 | yes | PENDING |
+| N4 | yes | c55502c59 |
 | RP-R | yes | 973ffd29f |
-| N5 | yes | PENDING |
+| N5 | yes | c55502c59 (type-check + the named tests, no code) |
 
 Decisions / deviations (append as found):
 
