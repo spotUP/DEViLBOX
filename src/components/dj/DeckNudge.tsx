@@ -29,7 +29,7 @@ export const DeckNudge: React.FC<DeckNudgeProps> = ({ deckId }) => {
   const handleRelease = useCallback(() => releaseNudgeDeck(deckId), [deckId]);
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex flex-1 items-center gap-1">
       {/* Slower (nudge left / minus) */}
       <button
         onPointerDown={(e) => handlePress(-1, e)}
@@ -37,7 +37,7 @@ export const DeckNudge: React.FC<DeckNudgeProps> = ({ deckId }) => {
         onPointerCancel={handleRelease}
         onLostPointerCapture={handleRelease}
         className="
-          flex items-center justify-center w-10 h-10 rounded-lg
+          flex flex-1 items-center justify-center min-w-10 h-10 rounded-lg
           bg-dark-bgTertiary text-text-secondary border border-dark-border
           hover:bg-dark-bgHover hover:text-text-primary
           active:translate-y-[1px]
@@ -55,7 +55,7 @@ export const DeckNudge: React.FC<DeckNudgeProps> = ({ deckId }) => {
         onPointerCancel={handleRelease}
         onLostPointerCapture={handleRelease}
         className="
-          flex items-center justify-center w-10 h-10 rounded-lg
+          flex flex-1 items-center justify-center min-w-10 h-10 rounded-lg
           bg-dark-bgTertiary text-text-secondary border border-dark-border
           hover:bg-dark-bgHover hover:text-text-primary
           active:translate-y-[1px]

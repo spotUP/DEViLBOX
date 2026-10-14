@@ -21,6 +21,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import { fireDjFx, releaseDjFx, type DjFxActionId } from '@/engine/drumpad/DjFxActions';
 import { beatJump } from '@/engine/dj/DJBeatJump';
 import { fire as fireDubMove } from '@/engine/dub/DubRouter';
+import { padColumnSpan } from './padGridSpan';
 import { TabStrip, type TabStripTab } from '@components/ui/TabStrip';
 import { ArrowUp, ArrowDown, RotateCcw, ChevronLeft, ChevronsLeft, ChevronRight, ChevronsRight, type LucideIcon } from 'lucide-react';
 
@@ -184,6 +185,8 @@ const BEAT_JUMPS: Record<string, number> = {
   'jump-fwd-4': 4,
   'jump-fwd-16': 16,
 };
+
+const PAD_COLUMNS = 4;
 
 export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
   const [page, setPage] = useState<PadPage>('fx');
@@ -381,8 +384,8 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
       </div>
 
       {/* Pad grid */}
-      <div className="grid grid-cols-4 gap-1">
-        {pads.map((pad) => {
+      <div className="grid grid-cols-4 gap-1" data-pad-grid>
+        {pads.map((pad, padIndex) => {
           const active = isActive(pad.id);
           const pressed = activePads.has(pad.id);
           // CALM palette: neutral at rest, the one accent while live.
@@ -396,6 +399,7 @@ export const DeckFXPads: React.FC<DeckFXPadsProps> = ({ deckId }) => {
               className="relative flex flex-col items-center justify-center rounded-md select-none touch-none overflow-hidden transform-gpu will-change-transform"
               style={{
                 height: 40,
+                gridColumn: `span ${padColumnSpan(padIndex, pads.length, PAD_COLUMNS)}`,
                 transition: pressed ? 'transform 50ms' : 'transform 120ms ease-out',
                 transform: pressed ? 'scale(0.92)' : 'scale(1)',
                 backgroundColor: look.backgroundColor,
