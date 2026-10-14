@@ -46,6 +46,9 @@ export function playOnNuade(song: TrackerSong, playerId: string, module: ArrayBu
   // The player opens the module (and its companions) by file name: the real one.
   song.nuadeFileName = fileName;
   if (companions && companions.size > 0) song.uadeCompanionFiles = companions;
+  // A command-stream file's tune (lib/import/fileSubsongs) is the tune nuade starts: the player numbers its songs
+  // from 0 like the file's table, and without it nuade would play its default beside a grid of another tune.
+  if (song.fileSubsongs && song.nuadeSubsong === undefined) song.nuadeSubsong = song.fileSubsongs.current;
   delete song.uadeEditableFileData;
   delete song.uadeEditableFileName;
   // Subsongs are the engine's (it reports them on load); the UADE list would send the switch to UADE.

@@ -16,7 +16,9 @@ function loadedBytes(): ArrayBuffer | null {
     const value = store[field];
     if (value instanceof ArrayBuffer) return value;
   }
-  return null;
+  // Played on nuade the format's own field is gone (withNuade.playOnNuade moved the module to nuadeFileData).
+  const nuade = store.nuadeFileData;
+  return nuade instanceof ArrayBuffer ? nuade : null;
 }
 
 /** Open the loaded file again on tune `index` (0-based). */
