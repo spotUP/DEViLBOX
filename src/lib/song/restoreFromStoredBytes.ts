@@ -23,7 +23,8 @@
  *    their edits live in the stored patterns and there is nothing to re-read);
  *  - no baseline (saved before baselines existed: every edit would be
  *    indistinguishable from the old decoder's output);
- *  - several subsongs (the played subsong is not saved);
+ *  - several UADE subsongs (the played subsong is not saved; the engines that do save it - nuade, the
+ *    EaglePlayer runner - are re-decoded and handed their saved subsong back, see CARRIED_START_FIELDS);
  *  - the grid no longer lines up with the baseline or the fresh decode
  *    (patterns added, resized, or the new decoder reads another shape);
  *  - the parse fails.
@@ -66,6 +67,21 @@ export function storedModuleOf(eng: Record<string, unknown>): { bytes?: ArrayBuf
     if (bytes && bytes.byteLength > 0) return { bytes, name: eng[fileName] as string | undefined };
   }
   return {};
+}
+
+/**
+ * The subsong a whole-song engine was playing (the format store's start field, liveSong saves it). A fresh decode starts
+ * the player's default subsong, so the saved one is put back on the fresh song when the same player plays it.
+ */
+const CARRIED_START_FIELDS: [start: string, player: string][] = [
+  ['nuadeSubsong', 'nuadePlayerId'],
+  ['eaglePlayerSubsong', 'eaglePlayerId'],
+];
+
+function carryStartSubsong(saved: Record<string, unknown>, fresh: Record<string, unknown>): void {
+  for (const [start, player] of CARRIED_START_FIELDS) {
+    if (typeof saved[start] === 'number' && fresh[player] && fresh[player] === saved[player]) fresh[start] = saved[start];
+  }
 }
 
 export async function restoreFromStoredBytes(
@@ -118,6 +134,7 @@ export async function restoreFromStoredBytes(
     };
   });
 
+  carryStartSubsong(eng, fresh as unknown as Record<string, unknown>);
   const freshBaseline: GridBaseline = fresh.patterns.map((p) => p.channels.flatMap((ch) => ch.rows.map(hashCell)));
   const useStoredInstruments = song.instruments.length === fresh.instruments.length;
   return {
