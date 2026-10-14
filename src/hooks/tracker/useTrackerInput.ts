@@ -1425,8 +1425,8 @@ export const useTrackerInput = () => {
           e.preventDefault();
           void playRow();
           const step = useEditorStore.getState().editStep || 1;
-          const newRow = Math.min(cursorRef.current.rowIndex + step, pattern.length - 1);
-          moveCursorToRow(newRow);
+          // Wraps to the top of the pattern like every other edit-step advance (pt2 stepPlay: row + step & 63).
+          moveCursorToRow((cursorRef.current.rowIndex + step) % pattern.length);
           return;
         }
       }

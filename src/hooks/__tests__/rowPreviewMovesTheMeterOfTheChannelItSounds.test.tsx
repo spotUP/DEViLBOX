@@ -68,6 +68,16 @@ describe('row preview moves the meter of the channel it sounds, others stay at z
     unmount();
   });
 
+  it('stepping past the last row wraps to the top of the pattern instead of stopping', async () => {
+    const { unmount } = setup();
+    const len = useTrackerStore.getState().patterns[0]!.length;
+    useCursorStore.getState().moveCursorToRow(len - 1);
+    press('Enter');
+    await flush();
+    expect(useCursorStore.getState().cursor.rowIndex).toBe(1); // (len - 1 + 2) % len
+    unmount();
+  });
+
   it('a muted channel stays silent and its meter dark', async () => {
     engine.isChannelMuted.mockImplementation((ch: number) => ch === 2);
     const { unmount } = setup();
