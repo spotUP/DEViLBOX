@@ -14,6 +14,8 @@ import type { FormatChannel } from '@/components/shared/format-editor-types';
 export interface SF2FormatData {
   channels: FormatChannel[];
   currentRow: number;
+  /** The order position the pattern editor shows: the playing one while playing, else the order cursor. */
+  currentOrderPos: number;
   isPlaying: boolean;
   trackCount: number;
   handleCellChange: (channelIdx: number, rowIdx: number, columnKey: string, value: number) => void;
@@ -60,5 +62,5 @@ export function useSF2FormatData(): SF2FormatData {
     [currentOrderPos],
   );
 
-  return { channels, currentRow: displayRow, isPlaying: playing, trackCount, handleCellChange };
+  return { channels, currentRow: displayRow, currentOrderPos, isPlaying: playing, trackCount, handleCellChange };
 }

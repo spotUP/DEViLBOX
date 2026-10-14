@@ -23,13 +23,12 @@ import { useCheeseCutterStore } from '@/stores/useCheeseCutterStore';
 import { useCheeseCutterKeyboardHandler } from './CheeseCutterKeyboardHandler';
 import { useCheeseCutterEngine, useCheeseCutterLiveSync } from '@/hooks/useCheeseCutterEngine';
 import { SIDHardwareToggle } from '@/components/common/SIDHardwareToggle';
-import type { CCTrackListEntry } from '@/stores/useCheeseCutterStore';
+import { CCOrderMatrix } from './CCOrderMatrix';
 
 const TOOLBAR_H = 36;
-const ORDER_MATRIX_W = 150;
 
 export const CheeseCutterView: React.FC = () => {
-  const { channels, currentRow, isPlaying, handleCellChange } = useCheeseCutterFormatData();
+  const { channels, currentRow, currentOrderPos, isPlaying, handleCellChange } = useCheeseCutterFormatData();
   const handleCursorChange = useCallback((cursor: { channelIndex: number; rowIndex: number; columnIndex: number }) => {
     useCheeseCutterStore.getState().setCursor({
       channel: cursor.channelIndex,
@@ -147,8 +146,9 @@ export const CheeseCutterView: React.FC = () => {
         {loaded && trackLists.length > 0 && (
           <CCOrderMatrix
             trackLists={trackLists}
-            orderCursor={orderCursor}
-            onPosClick={handlePosClick}
+            currentPosition={currentOrderPos}
+            isPlaying={isPlaying}
+            onPositionClick={handlePosClick}
           />
         )}
 
@@ -173,81 +173,3 @@ export const CheeseCutterView: React.FC = () => {
     </div>
   );
 };
-
-// -- Order Matrix Component --
-
-const CCOrderMatrix: React.FC<{
-  trackLists: Array<CCTrackListEntry[]>;
-  orderCursor: number;
-  onPosClick: (pos: number) => void;
-}> = React.memo(({ trackLists, orderCursor, onPosClick }) => {
-  const maxLen = Math.max(1, ...trackLists.map(tl => tl.length));
-  const visibleRows = Math.min(maxLen, 256);
-
-  return (
-    <div
-      className="flex-shrink-0 border-r border-dark-border bg-dark-bgSecondary overflow-y-auto"
-      style={{ width: ORDER_MATRIX_W }}
-    >
-      {/* Header */}
-      <div className="sticky top-0 z-10 flex bg-dark-bgTertiary border-b border-dark-border">
-        <div className="w-8 text-center text-[9px] text-text-muted py-0.5 border-r border-dark-border/50">Pos</div>
-        {trackLists.map((_, ch) => (
-          <div key={ch} className="flex-1 text-center text-[9px] text-text-muted py-0.5 border-r border-dark-border/50 last:border-r-0">
-            V{ch + 1}
-          </div>
-        ))}
-      </div>
-
-      {/* Rows */}
-      {Array.from({ length: visibleRows }, (_, pos) => {
-        const isCurrent = pos === orderCursor;
-        return (
-          <div
-            key={pos}
-            className={`flex cursor-pointer hover:bg-dark-bgTertiary transition-colors ${
-              isCurrent ? 'bg-accent-primary/15 border-l-2 border-l-accent-primary' : ''
-            } ${pos % 8 === 0 ? 'border-t border-dark-border/30' : ''}`}
-            onClick={() => onPosClick(pos)}
-          >
-            <div className={`w-8 text-center text-[9px] py-px border-r border-dark-border/50 ${
-              isCurrent ? 'text-accent-primary font-bold' : 'text-text-muted'
-            }`}>
-              {pos.toString(16).toUpperCase().padStart(2, '0')}
-            </div>
-            {trackLists.map((tl, ch) => {
-              const entry = pos < tl.length ? tl[pos] : null;
-              const isEnd = entry === null || entry.isEnd;
-              const seqIdx = entry?.sequence ?? -1;
-              const transpose = entry?.transpose ?? 0;
-              const showTranspose = transpose !== 0;
-              return (
-                <div
-                  key={ch}
-                  className={`flex-1 text-center text-[10px] py-px border-r border-dark-border/50 last:border-r-0 ${
-                    isEnd
-                      ? 'text-text-muted/30'
-                      : isCurrent
-                        ? 'text-accent-primary font-bold'
-                        : 'text-text-secondary'
-                  }`}
-                >
-                  {isEnd ? '..' : (
-                    <>
-                      {showTranspose && (
-                        <span className="text-[8px] text-accent-warning">
-                          {transpose > 0 ? '+' : ''}{transpose}{' '}
-                        </span>
-                      )}
-                      {seqIdx.toString(16).toUpperCase().padStart(2, '0')}
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
-    </div>
-  );
-});

@@ -19,16 +19,16 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { SF2_COLUMNS } from './sf2Adapter';
 import { useSF2FormatData } from './useSF2FormatData';
-import { useSF2Store, type SF2OrderList } from '@/stores/useSF2Store';
+import { useSF2Store } from '@/stores/useSF2Store';
+import { SF2OrderMatrix } from './SF2OrderMatrix';
 import { useSF2KeyboardHandler } from './SF2KeyboardHandler';
 import { useSF2LiveSync, useSF2Engine } from '@/hooks/useSF2Engine';
 import { SIDHardwareToggle } from '@/components/common/SIDHardwareToggle';
 
 const TOOLBAR_H = 36;
-const ORDER_MATRIX_W = 150;
 
 export const SF2View: React.FC = () => {
-  const { channels, currentRow, isPlaying, handleCellChange } = useSF2FormatData();
+  const { channels, currentRow, currentOrderPos, isPlaying, handleCellChange } = useSF2FormatData();
   const handleCursorChange = useCallback((cursor: { channelIndex: number; rowIndex: number; columnIndex: number }) => {
     useSF2Store.getState().setCursor({
       channel: cursor.channelIndex,
@@ -181,8 +181,9 @@ export const SF2View: React.FC = () => {
         {loaded && orderLists.length > 0 && (
           <SF2OrderMatrix
             orderLists={orderLists}
-            orderCursor={orderCursor}
-            onPosClick={handlePosClick}
+            currentPosition={currentOrderPos}
+            isPlaying={isPlaying}
+            onPositionClick={handlePosClick}
           />
         )}
 
@@ -207,86 +208,3 @@ export const SF2View: React.FC = () => {
     </div>
   );
 };
-
-// ── Order Matrix Component ──
-
-const SF2OrderMatrix: React.FC<{
-  orderLists: SF2OrderList[];
-  orderCursor: number;
-  onPosClick: (pos: number) => void;
-}> = React.memo(({ orderLists, orderCursor, onPosClick }) => {
-  const maxLen = Math.max(1, ...orderLists.map(ol => ol.entries.length));
-  const visibleRows = Math.min(maxLen, 256);
-
-  return (
-    <div
-      className="flex-shrink-0 border-r border-dark-border bg-dark-bgSecondary overflow-y-auto"
-      style={{ width: ORDER_MATRIX_W }}
-    >
-      {/* Header */}
-      <div className="sticky top-0 z-10 flex bg-dark-bgTertiary border-b border-dark-border">
-        <div className="w-8 text-center text-[9px] text-text-muted py-0.5 border-r border-dark-border/50">Pos</div>
-        {orderLists.map((_, ch) => (
-          <div key={ch} className="flex-1 text-center text-[9px] text-text-muted py-0.5 border-r border-dark-border/50 last:border-r-0">
-            T{ch + 1}
-          </div>
-        ))}
-      </div>
-
-      {/* Rows */}
-      {Array.from({ length: visibleRows }, (_, pos) => {
-        const isCurrent = pos === orderCursor;
-        return (
-          <div
-            key={pos}
-            className={`flex cursor-pointer hover:bg-dark-bgTertiary transition-colors ${
-              isCurrent ? 'bg-accent-primary/15 border-l-2 border-l-accent-primary' : ''
-            } ${pos % 8 === 0 ? 'border-t border-dark-border/30' : ''}`}
-            onClick={() => onPosClick(pos)}
-          >
-            <div className={`w-8 text-center text-[9px] py-px border-r border-dark-border/50 ${
-              isCurrent ? 'text-accent-primary font-bold' : 'text-text-muted'
-            }`}>
-              {pos.toString(16).toUpperCase().padStart(2, '0')}
-            </div>
-            {orderLists.map((ol, ch) => {
-              const entry = pos < ol.entries.length ? ol.entries[pos] : null;
-              const seqIdx = entry?.seqIdx ?? -1;
-              const isEnd = entry === null || seqIdx < 0;
-              const isLoopPoint = ol.hasLoop && pos === ol.loopIndex;
-              const transpose = entry?.transpose ?? 0xA0;
-              const transposeOffset = transpose - 0xA0;
-              const showTranspose = transposeOffset !== 0;
-              return (
-                <div
-                  key={ch}
-                  className={`flex-1 text-center text-[10px] py-px border-r border-dark-border/50 last:border-r-0 ${
-                    isEnd
-                      ? 'text-text-muted/30'
-                      : isLoopPoint
-                        ? 'text-accent-success font-bold'
-                        : isCurrent
-                          ? 'text-accent-primary font-bold'
-                          : 'text-text-secondary'
-                  }`}
-                >
-                  {isEnd ? '··' : (
-                    <>
-                      {showTranspose && (
-                        <span className="text-[8px] text-accent-warning">
-                          {transposeOffset > 0 ? '+' : ''}{transposeOffset}{' '}
-                        </span>
-                      )}
-                      {seqIdx.toString(16).toUpperCase().padStart(2, '0')}
-                      {isLoopPoint && <span className="text-accent-success text-[8px]"> ↺</span>}
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        );
-      })}
-    </div>
-  );
-});
