@@ -19,6 +19,9 @@ import { advanceNativeSubsong } from '@engine/replayer/nativeSubsongPlayback';
 import type { SubsongPlayer } from '@/lib/tracker/nativeSubsongs';
 import { ChannelMeterFeed } from '@engine/tone/channelMeterFeed';
 import { GridFollow, songTickGrid, type GridFollowPosition, type TickGridSong } from '@engine/replayer/tickGridFollow';
+import { clipTransferables, type RowClip } from '@engine/rowPreview/rowClip';
+import type { RowTarget } from '@engine/rowPreview/rowTarget';
+import type { RowClipPlayer } from '@engine/rowPreview/rowClipPlayer';
 import {
   parseNuadeOut,
   NUADE_NODE_VOICES, type NuadeIn, type NuadeOut, type NuadeVoiceState,
@@ -41,7 +44,7 @@ export interface NuadeLoaded {
   caps: number;
 }
 
-export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlayer {
+export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlayer, RowClipPlayer {
   private static instance: NuadeEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
@@ -113,6 +116,7 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
       try { old.disconnect(); } catch { /* already disconnected */ }
     }
     this.workletNode = null;
+    this.clearIsolationTracking();
     this.markNodeNotReady();
     this._initPromise = new Promise((resolve) => { this._resolveInit = resolve; });
     this._nodeVoices = voices;
@@ -183,6 +187,8 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
         if (data.status < 0) console.warn(`[NuadeEngine] ${data.op} write refused (${data.status})`);
         break;
       case 'stopped':
+      case 'rowClipStarted':
+      case 'rowClipDone':
         break;
       case 'error':
         console.error('[NuadeEngine]', data.message);
@@ -225,6 +231,31 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
   setMuteMask(mask: number): void { this._muteMask = mask; this.post({ type: 'setMuteMask', mask }); }
 
   setStereoSeparation(value: number): void { this.post({ type: 'setStereoSeparation', value }); }
+
+  /**
+   * The mute mask a row clip is rendered with: the mixer's (bit N set = voice N audible) without the voices an isolation
+   * slot took out of the main mix - the mask the worklet gives nw_render in playback.
+   */
+  get rowClipMask(): number { return ((this._muteMask ?? 0xFFFFFFFF) & ~this.isolatedMask) >>> 0; }
+
+  /** Where grid row (songPos, row) of `song` is in the player's terms; the grid is the song as it is now. */
+  targetOf(song: TickGridSong & { nuadePlayerId?: string }, songPos: number, row: number): RowTarget {
+    this.setGrid(song as Parameters<NuadeEngine['setGrid']>[0]);
+    return this.follow.targetOf(songPos, row, this.followBy);
+  }
+
+  /**
+   * Sound a row clip (a grid row rendered by the row-preview worker) through the worklet's own output code while the
+   * song is stopped. The worklet ignores it while the song plays and drops it when a song starts.
+   */
+  playRowClip(clip: RowClip): void {
+    if (!this.workletNode) return;
+    // A song never loaded here has told the scopes nothing about its voices.
+    if (!this._loaded && clip.voices) {
+      useOscilloscopeStore.getState().setChipInfo(clip.voices.length, 0, clip.voices.map((_, i) => `Voice ${i + 1}`));
+    }
+    this.post({ type: 'playRowClip', clip }, clipTransferables(clip));
+  }
 
   /** Move playback to an output frame (restart and silent render up to it). */
   seek(frame: number): void { this.post({ type: 'seek', frame }); }

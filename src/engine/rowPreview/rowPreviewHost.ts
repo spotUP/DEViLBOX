@@ -7,27 +7,13 @@
  * glue: src/workers/rowPreview.worker.ts only wires it to postMessage.
  */
 import { RowPreviewStream, type RowRenderAdapter, type RowPreviewStreamOptions, type RowRequestSignal } from './rowPreviewStream';
-import type { RowClip, RowResult } from './rowClip';
+import { cloneClip, clipTransferables, type RowResult } from './rowClip';
 import type { RowPreviewIn, RowPreviewOut, RowPreviewRequest } from './rowPreviewProtocol';
 
 export type AdapterLoaders = Record<string, (sampleRate: number) => Promise<RowRenderAdapter>>;
 
 interface Entry { stream: RowPreviewStream; sampleRate: number }
 interface Job { signal: RowRequestSignal; prepare: boolean }
-
-/** A copy the caller may transfer: the stream keeps its own clip for repeat presses and prefetch. */
-export function cloneClip(c: RowClip): RowClip {
-  return {
-    ...c,
-    stereo: c.stereo.slice(),
-    voices: c.voices ? c.voices.map((v) => v.slice()) : null,
-    panSteps: c.panSteps.map((p) => ({ at: p.at, pans: p.pans.slice() })),
-  };
-}
-
-export function clipTransferables(c: RowClip): Transferable[] {
-  return [c.stereo.buffer, ...(c.voices ?? []).map((v) => v.buffer), ...c.panSteps.map((p) => p.pans.buffer)];
-}
 
 export interface RowPreviewHost {
   request(req: RowPreviewRequest): Promise<RowResult>;
