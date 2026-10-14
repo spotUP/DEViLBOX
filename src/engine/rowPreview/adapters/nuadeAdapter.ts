@@ -3,8 +3,8 @@
  * Node one in tests) behind RowRenderAdapter. It makes the same nw_* calls as public/nuade/Nuade.worklet.js: open with
  * the companion files, start the subsong, render in 128-frame quanta with the voice buffers and pans.
  */
-import { NuadeDriver } from '@engine/nuade/nuadeDriver';
-import type { NuadeModule } from '@engine/nuade/nuadeModule';
+import { NuadeDriver } from '../../nuade/nuadeDriver';
+import type { NuadeModule } from '../../nuade/nuadeModule';
 import type { PlayerPosition, RowChunk } from '../rowClip';
 import type { RowRenderAdapter } from '../rowPreviewStream';
 

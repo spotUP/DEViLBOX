@@ -185,14 +185,20 @@ export class RowPreviewStream {
   // -- timeline ---------------------------------------------------------------------------------------------------
 
   /** The first frame the player stands inside `target`, or -1 when the stream has not rendered past it. */
-  private startOf(target: RowTarget): number {
-    for (const tr of this.transitions) if (positionIsInTarget(tr.pos, target)) return tr.frame;
+  private startOf(target: RowTarget, fromIndex = 0): number {
+    for (let i = fromIndex; i < this.transitions.length; i++) if (positionIsInTarget(this.transitions[i]!.pos, target)) return this.transitions[i]!.frame;
     return -1;
   }
 
   /** The first frame after `start` the player is outside `target`, or -1 while it has not been seen. */
   private endOf(start: number, target: RowTarget): number {
-    for (const tr of this.transitions) if (tr.frame > start && !positionIsInTarget(tr.pos, target)) return tr.frame;
+    // The transitions are sorted by frame: begin after `start`.
+    let lo = 0, hi = this.transitions.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (this.transitions[mid]!.frame > start) hi = mid; else lo = mid + 1;
+    }
+    for (let i = lo; i < this.transitions.length; i++) if (!positionIsInTarget(this.transitions[i]!.pos, target)) return this.transitions[i]!.frame;
     return -1;
   }
 
@@ -251,8 +257,10 @@ export class RowPreviewStream {
       if (this.finished) return { reason: this.finished };
       if (this.cursor > this.searchLimitFrames) { this.finished = 'limit'; return { reason: 'limit' }; }
       if (!(await slice())) return 'cancelled';
+      // Only what this chunk added: the timeline of a long walk holds thousands of ticks.
+      const seen = this.transitions.length;
       this.renderInto(mask, false);
-      const at = this.startOf(target);
+      const at = this.startOf(target, seen);
       if (at >= 0) return at;
     }
   }
