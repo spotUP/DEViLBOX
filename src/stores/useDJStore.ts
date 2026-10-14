@@ -314,7 +314,8 @@ export type DeckViewMode = 'visualizer' | 'vinyl' | '3d';
 /** The open tab of a deck's lower panel (Pads, Scratch, Loop & Cue, Mix). */
 export type DeckPanelTab = 'pads' | 'scratch' | 'loopcue' | 'mix';
 
-export type AutoDJStatus = 'idle' | 'playing' | 'preloading' | 'preload-failed' | 'transition-pending' | 'transitioning';
+/** 'paused': the Auto DJ is on but holds (its Pause, a deck paused by hand, the Three Deck Showcase holding the set). */
+export type AutoDJStatus = 'idle' | 'playing' | 'paused' | 'preloading' | 'preload-failed' | 'transition-pending' | 'transitioning';
 
 interface DJState {
   // Global
