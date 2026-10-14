@@ -799,7 +799,9 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
   cancelLoad(): void {
     this.scanClient.cancel();
     if (this._rejectLoad) {
-      this._rejectLoad(new Error('Scan cancelled'));
+      const cancelled = new Error('Scan cancelled');
+      cancelled.name = 'AbortError';
+      this._rejectLoad(cancelled);
     }
     this._resolveLoad = null;
     this._rejectLoad = null;

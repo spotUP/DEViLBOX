@@ -21,6 +21,8 @@ import { MusicLineEngine } from '../musicline/MusicLineEngine';
 import { C64SIDEngine } from '../C64SIDEngine';
 import { SF2Engine } from '../sf2/SF2Engine';
 import { SilenceDetector } from './SilenceDetector';
+import { engineStartFailureMessage } from './engineStartFailure';
+import { notify } from '@stores/useNotificationStore';
 import { advanceNativeSubsong } from './nativeSubsongPlayback';
 import { useWasmPositionStore } from '../../stores/useWasmPositionStore';
 import { JamCrackerEngine } from '../jamcracker/JamCrackerEngine';
@@ -732,6 +734,8 @@ export async function startNativeEngines(
       }
     } catch (err) {
       console.error(`[NativeEngineRouting] Failed to start ${desc.key}:`, err);
+      const failure = engineStartFailureMessage(desc.key, err);
+      if (failure) notify.error(failure, 15000);
     }
   }
 

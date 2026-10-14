@@ -51,6 +51,39 @@ def emit_binary_array(out, varname, data):
         out.write(f'    {hex_str},\n')
     out.write('};\n\n')
 
+# Byte patches applied to an eagleplayer as it is embedded. The vendor binary in
+# third-party/ stays as shipped; each patch names the offset, the bytes that
+# must be there (so a different binary fails the build instead of being
+# corrupted) and the bytes that replace them.
+PLAYER_PATCHES = {
+    # Richard Joseph Player_v2.asm, DTP_Check2: after "RJP?" + "SMOD" it also
+    # demands that the first instrument's sample offset (module offset 12) is 0
+    # ("tst.l (A0); bne.b Fault"). InitPlayer and the replay never need that,
+    # and real modules carry other values there: 'aquatic games.sng' has
+    # 0x000A3340 for its one-word dummy sample 0 and was rejected with "module
+    # check failed". The nuade port drops the same test (rjp_module.c rjp_probe,
+    # owner decision 2026-10-11). Patch: bne.b Fault (66 02) -> nop (4E 71).
+    'RichardJoseph_Player': [
+        (936, bytes.fromhex('4a906602'), bytes.fromhex('4a904e71')),
+    ],
+}
+
+
+def apply_player_patches(name, data):
+    patches = PLAYER_PATCHES.get(name)
+    if not patches:
+        return data
+    patched = bytearray(data)
+    for offset, expect, replace in patches:
+        found = bytes(patched[offset:offset + len(expect)])
+        if found != expect:
+            print(f"ERROR: {name} @ {offset}: expected {expect.hex()}, found {found.hex()}", file=sys.stderr)
+            sys.exit(1)
+        patched[offset:offset + len(replace)] = replace
+    print(f"Patched {name}: {len(patches)} patch(es)")
+    return bytes(patched)
+
+
 def generate_player_registry():
     if not os.path.isdir(PLAYERS_DIR):
         print(f"ERROR: Players directory not found: {PLAYERS_DIR}", file=sys.stderr)
@@ -63,7 +96,7 @@ def generate_player_registry():
         if os.path.isfile(path):
             with open(path, 'rb') as f:
                 data = f.read()
-            players.append((name, sanitize_name(name), data))
+            players.append((name, sanitize_name(name), apply_player_patches(name, data)))
 
     print(f"Found {len(players)} eagleplayers in {PLAYERS_DIR}")
 
