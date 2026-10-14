@@ -27,6 +27,8 @@ import { getActiveDubBus } from '../dub/DubBus';
 import { asIsolationCapable, setPlayingIsolationEngine } from '../tone/ChannelRoutedEffects';
 import { needsPaulaOutputStage } from '@engine/paulaOutput';
 import { editedModuleForPlay } from './editedModuleForPlay';
+import { isRowClipPlayer } from '@engine/rowPreview/rowClipPlayer';
+import { rowPreviewSupports } from '@engine/rowPreview/supportedEngines';
 import { WASM_ENGINES, shouldActivate, songFromStores, type NativeEngineDescriptor, type WASMSingletonStatic, type WASMSingletonEngine } from './wasmEngineRegistry';
 
 export { WASM_ENGINES, shouldActivate, playsOnDedicatedEngine } from './wasmEngineRegistry';
@@ -382,6 +384,65 @@ export function openEngineOutput(
 ): void {
   openEngineOutputGain(instance);
   openEngineRouting(desc, instance, separationInputTone, isDJDeck, routedNativeEngines);
+}
+
+/**
+ * Which path Enter takes on the loaded song: 'engine' (a whole-song engine with a row-preview adapter plays it, stopped:
+ * the engine renders the row), 'playing' (such a song is playing: playback already is the grid, nothing sounds), or
+ * 'unsupported' (the instrument path: a tracker-played song, or an engine without a row preview).
+ */
+export function rowPreviewRoute(
+  format: Parameters<typeof playingEngineFromStores>[0],
+  instruments: Parameters<typeof playingEngineFromStores>[1],
+  transportPlaying: boolean,
+): 'engine' | 'playing' | 'unsupported' {
+  const key = playingEngineFromStores(format, instruments);
+  if (key === 'tracker' || !rowPreviewSupports(key)) return 'unsupported';
+  return transportPlaying ? 'playing' : 'engine';
+}
+
+/** What a row preview did: sounded a clip, found the row is never played, or the engine has no row preview. */
+export type NativeRowPreviewOutcome = 'played' | 'missed' | 'cancelled' | 'unsupported';
+
+/**
+ * Sound grid row (`songPos`, `row`) of `song` as the song's whole-song engine renders it: the row-preview worker runs a
+ * private instance of the engine's player on the bytes playback would load (engineLoadArgs), and the clip comes out of
+ * the engine's own output (openEngineOutput routes it as a play does). The stopped song's engine instance is not
+ * touched. Plan: thoughts/shared/plans/2026-10-14-engine-row-preview.md.
+ */
+export async function previewNativeRow(
+  song: TrackerSong,
+  songPos: number,
+  row: number,
+  separationInputTone: Tone.ToneAudioNode,
+  routedNativeEngines: Set<string>,
+): Promise<NativeRowPreviewOutcome> {
+  const desc = WASM_ENGINES.find((d) => shouldActivate(d, song));
+  if (!desc || !rowPreviewSupports(desc.key)) return 'unsupported';
+  const EngineClass = await resolveEngine(desc);
+  const instance = EngineClass.getInstance();
+  await instance.ready();
+  if (!isRowClipPlayer(instance)) return 'unsupported';
+
+  const { data, args } = await engineLoadArgs(song, desc, false);
+  const { getRowPreviewClient } = await import('@engine/rowPreview/rowPreviewClient');
+  const result = await getRowPreviewClient().request({
+    engineKey: desc.key,
+    data: data instanceof Uint8Array ? data : new Uint8Array(data),
+    args,
+    sampleRate: instance.output.context.sampleRate,
+    target: instance.targetOf(song as never, songPos, row),
+    mask: instance.rowClipMask,
+  });
+  if (result.kind === 'cancelled') return 'cancelled';
+  if (result.kind === 'missed') {
+    const { useUIStore } = await import('@stores/useUIStore');
+    useUIStore.getState().setStatusMessage('Row is not played by the song');
+    return 'missed';
+  }
+  openEngineOutput(desc, instance, separationInputTone, false, routedNativeEngines);
+  instance.playRowClip(result.clip);
+  return 'played';
 }
 
 export async function startNativeEngines(
