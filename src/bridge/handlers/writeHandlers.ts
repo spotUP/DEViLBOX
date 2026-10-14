@@ -1890,6 +1890,9 @@ export function getAudioLevel(params: Record<string, unknown>): Promise<Record<s
       let rmsSum = 0;
       let rmsMax = 0;
       let peakMax = 0;
+      let clipSamples = 0;
+      let clickSamples = 0;
+      let waveformSamples = 0;
 
       const startTime = performance.now();
       // bands: mean linear power per FFT bin over the window, reported as dB
@@ -1917,6 +1920,23 @@ export function getAudioLevel(params: Record<string, unknown>): Promise<Record<s
           }
           bandFrames++;
         }
+        // Crackle evidence from the raw waveform snapshot: samples at full
+        // scale (clipping) and clicks - a second difference far above the
+        // snapshot's own (a step the music's spectrum does not explain).
+        const wf = frame.waveform;
+        if (wf && wf.length > 2) {
+          let d2Sum = 0;
+          for (let i = 2; i < wf.length; i++) { const d = wf[i] - 2 * wf[i - 1] + wf[i - 2]; d2Sum += d * d; }
+          const d2Rms = Math.sqrt(d2Sum / (wf.length - 2));
+          for (let i = 0; i < wf.length; i++) {
+            if (Math.abs(wf[i]) >= 0.999) clipSamples++;
+            if (i >= 2) {
+              const d = Math.abs(wf[i] - 2 * wf[i - 1] + wf[i - 2]);
+              if (d > 0.05 && d > 8 * d2Rms) clickSamples++;
+            }
+          }
+          waveformSamples += wf.length;
+        }
         // Guard against NaN from smoothing — NaN poisons rmsSum permanently
         const rms = Number.isFinite(frame.rms) ? frame.rms : 0;
         const peak = Number.isFinite(frame.peak) ? frame.peak : 0;
@@ -1934,6 +1954,9 @@ export function getAudioLevel(params: Record<string, unknown>): Promise<Record<s
             framesAnalyzed,
             durationMs: Math.round(performance.now() - startTime),
             silent: rmsMax < 0.001,
+            // Per million analysed samples (snapshots overlap, so a rate, not a count).
+            clipPerMillion: waveformSamples > 0 ? +(clipSamples * 1e6 / waveformSamples).toFixed(1) : 0,
+            clickPerMillion: waveformSamples > 0 ? +(clickSamples * 1e6 / waveformSamples).toFixed(1) : 0,
           };
           if (wantBands && binPower && bandFrames > 0) {
             const sr = getDevilboxAudioContext().sampleRate;

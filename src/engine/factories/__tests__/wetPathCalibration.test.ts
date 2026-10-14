@@ -64,7 +64,7 @@ describe('wet-path calibration', () => {
  */
 describe('master chain level corrections', () => {
   it('try the wet path first, and scale the whole output only when there is none', () => {
-    const chain = src('engine/tone/MasterEffectsChain.ts');
+    const chain = src('engine/tone/masterFxGraph.ts');
     expect(chain).toMatch(/compLinear !== 1 && applyWetGain\(node, compLinear\) === 'none'/);
   });
 

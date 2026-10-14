@@ -908,8 +908,8 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'set_master_effects',
-    'Replace the master effect chain with the given configs.',
-    { effects: z.array(z.record(z.string(), z.unknown())) },
+    'Replace the master effect chain with the given configs. gainCompensationDb is a preset\'s make-up gain (fxPresets gainCompensationDb); without it the chain plays with none.',
+    { effects: z.array(z.record(z.string(), z.unknown())), gainCompensationDb: z.number().optional() },
     (p) => call('set_master_effects', p),
   );
 

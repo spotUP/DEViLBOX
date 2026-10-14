@@ -3,8 +3,7 @@ import { connectAudio } from './connectAudio';
 import type { EffectConfig } from '@typedefs/instrument';
 import { InstrumentFactory } from '../InstrumentFactory';
 import { getNativeAudioNode } from '@utils/audio-context';
-import { getEffectGainCompensation } from '../factories/effectGainCompensation';
-import { applyWetGain } from '../factories/EffectFactory';
+import { assembleMasterFxGraph } from './masterFxGraph';
 import { refreshChannelIsolation, getChannelIsolationSnapshot } from './ChannelRoutedEffects';
 import { SIDECHAIN_KEY_DRUMS, resolveDrumKeyChannel, channelRoleTargets, onSongChange } from './sidechainKey';
 import { tapWhileSounding } from '../audio/signalPresence';
@@ -340,66 +339,38 @@ export async function rebuildMasterEffects(ctx: MasterEffectsContext, effects: E
     return;
   }
 
-  // Store nodes and configs, interleaving compensation gains for level normalization
-  // Chain: masterEffectsInput → [effect → compGain?] → [effect → compGain?] → [presetCompGain?] → blepInput
-  const chainNodes: Tone.ToneAudioNode[] = [];
   successNodes.forEach((node, index) => {
     const config = successConfigs[index];
     ctx.masterEffectsNodes.push(node);
     ctx.masterEffectConfigs.set(config.id, { node, config });
-    chainNodes.push(node);
 
     // Sidechain source can be at top-level or in parameters (UI stores it in parameters)
     const scSource = config.sidechainSource ?? Number(config.parameters?.sidechainSource);
     if (typeof scSource === 'number' && (scSource >= 0 || scSource === SIDECHAIN_KEY_DRUMS) && !isNaN(scSource)) {
       void wireMasterSidechain(node, scSource);
     }
-
-    // The level correction goes on the effect's WET signal when it has one: a
-    // gain after the effect scaled the dry signal as well, so a preset running
-    // an effect below 100 % wet had its dry cut too - Vox Amp Crunch (WAMVoxAmp,
-    // -13.9 dB, wet 40) played its 60 % dry 13.9 dB down: "low volume and very
-    // thin all bass gone" (2026-09-30). After the effect only when it has no
-    // separate wet path (Buzz machines; mixes done inside the worklet).
-    const compLinear = getEffectGainCompensation(config.type);
-    if (compLinear !== 1 && applyWetGain(node, compLinear) === 'none') {
-      const compGain = new Tone.Gain(compLinear);
-      ctx.masterEffectsNodes.push(compGain); // tracked for disposal
-      chainNodes.push(compGain);
-    }
   });
 
-  // Preset-level gain compensation (measured with full-spectrum test tone).
-  // This corrects the combined volume of the entire preset chain, on top of
-  // the per-effect compensations above.
+  // The chain itself - level calibrations, preset make-up, bass lock - is the
+  // one every view builds (masterFxGraph.ts):
+  //   masterEffectsInput → graph.input → [fx → comp?]… → [presetComp?] → graph.output → blepInput
   const { useAudioStore: getAudioStore } = await import('../../stores/useAudioStore');
   const presetCompDb = getAudioStore.getState().presetGainCompensationDb;
-  if (presetCompDb !== 0) {
-    const presetCompLinear = Math.pow(10, presetCompDb / 20);
-    const presetCompGain = new Tone.Gain(presetCompLinear);
-    ctx.masterEffectsNodes.push(presetCompGain);
-    chainNodes.push(presetCompGain);
-  }
-
-  // Connect chain: masterEffectsInput → chainNodes[0] → ... → blepInput
-  // connectAudio bridges Tone.js, raw Web Audio and native (.input/.output) effects.
   try {
-    connectAudio(ctx.masterEffectsInput, chainNodes[0]);
-
-    for (let i = 0; i < chainNodes.length - 1; i++) {
-      connectAudio(chainNodes[i], chainNodes[i + 1]);
-    }
-
-    connectAudio(chainNodes[chainNodes.length - 1], ctx.blepInput);
+    const graph = assembleMasterFxGraph(
+      successNodes.map((node, i) => ({ node, config: successConfigs[i] })),
+      presetCompDb,
+    );
+    ctx.masterEffectsNodes.push(...graph.owned); // tracked for disposal
+    connectAudio(ctx.masterEffectsInput, graph.input);
+    connectAudio(graph.output, ctx.blepInput);
+    console.log('[MasterEffectsChain] Chain connected:', successConfigs.map(c => c.type).join(' → '),
+      graph.bassLocked ? '(bass lock)' : '');
   } catch (e) {
-    console.error('[MasterEffectsChain] Chain connection failed:', e,
-      'chainNodes:', chainNodes.map(n => n?.name || n?.constructor?.name));
+    console.error('[MasterEffectsChain] Chain connection failed:', e);
     // Fallback: bypass effects entirely
     ctx.masterEffectsInput.connect(ctx.blepInput);
   }
-  // Debug: log chain for diagnosing "effect does nothing" issues
-  console.log('[MasterEffectsChain] ⚡ Chain connected:', successConfigs.map(c => c.type).join(' → '),
-    '| nodes:', chainNodes.map(n => n?.name || n?.constructor?.name).join(' → '));
 
   // Create pre/post AnalyserNode taps for each effect (side-branch, non-destructive)
   const rawCtx = Tone.getContext().rawContext as AudioContext;

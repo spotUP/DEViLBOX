@@ -32,6 +32,7 @@ import { FurnaceSynth } from './FurnaceSynth';
 import { OPL3Synth } from './opl3/OPL3Synth';
 import { normalizeUrl } from '@utils/urlUtils';
 import { getNativeAudioNode, setDevilboxAudioContext, noteToMidi } from '@utils/audio-context';
+import { SAFETY_LIMITER, makeupCancelGain, createToneSafetyLimiter } from './dj/djLimiter';
 import { VinylNoiseEffect } from './effects/VinylNoiseEffect';
 import { TumultEffect } from './effects/TumultEffect';
 import { isEffectBpmSynced, getEffectSyncDivision, computeSyncedValue, SYNCABLE_EFFECT_PARAMS } from './bpmSync';
@@ -216,6 +217,7 @@ export class ToneEngine {
   // 16 channels at unity gain can peak at ±16.0 (~+24 dB), destroying WAV exports
   // and screen recordings. This near-brickwall compressor catches those peaks.
   public safetyLimiter: Tone.Compressor;
+  private safetyLimiterMakeupCancel: Tone.Gain;
   // Post-limiter tap for WAV/MP3 export — captures the limited signal so exports
   // match what the user hears through speakers (post-limiter, pre-master-volume).
   public exportTap: Tone.Gain;
@@ -470,13 +472,11 @@ export class ToneEngine {
     // Without this, 16 channels at 0 dB can produce ±16.0 peaks (+24 dB over full scale),
     // destroying WAV exports and screen recordings while sounding OK through speakers
     // (because the DAC clips inaudibly at moderate volume).
-    this.safetyLimiter = new Tone.Compressor({
-      threshold: -1,    // Only catch peaks near 0 dBFS
-      ratio: 4,         // Gentle limiting — no pumping
-      attack: 0.001,    // 1ms — catch transients without squashing
-      release: 0.1,     // Quick release — transparent on short peaks
-      knee: 6,          // Soft knee — smooth onset, no audible compression
-    });
+    // The DJ path's spec (djLimiter.ts SAFETY_LIMITER): brick-wall above the
+    // threshold, unity below it (the compressor's automatic make-up cancelled).
+    const limiter = createToneSafetyLimiter();
+    this.safetyLimiter = limiter.compressor;
+    this.safetyLimiterMakeupCancel = limiter.makeupCancel;
 
     // Post-limiter export tap — WAV/MP3 captures tap here (post-limiter, pre-master-volume)
     this.exportTap = new Tone.Gain(1);
@@ -497,7 +497,7 @@ export class ToneEngine {
     // blepInput → safetyLimiter is handled by reconnectBlepChain (via BlepManager)
     this.blepInput.connect(this.safetyLimiter);
     // Static tail: safetyLimiter → exportTap → masterChannel (never rebuilt)
-    this.safetyLimiter.connect(this.exportTap);
+    this.safetyLimiterMakeupCancel.connect(this.exportTap);
     this.exportTap.connect(this.masterChannel);
 
     // Synth bus bypasses AmigaFilter for native synths (DB303, Vital, etc.)
@@ -1379,12 +1379,20 @@ export class ToneEngine {
   /** Enable/disable the master safety limiter. When disabled, the limiter
    *  passes audio through unchanged (ratio set to 1:1). */
   public setMasterLimiterEnabled(enabled: boolean): void {
-    this.safetyLimiter.ratio.value = enabled ? 4 : 1;
+    this.safetyLimiter.ratio.value = enabled ? SAFETY_LIMITER.ratio : 1;
+    this.syncLimiterMakeupCancel();
   }
 
   /** Set the master limiter threshold in dB (-24 to 0). */
   public setMasterLimiterThreshold(db: number): void {
     this.safetyLimiter.threshold.value = Math.max(-24, Math.min(0, db));
+    this.syncLimiterMakeupCancel();
+  }
+
+  /** Unity below the threshold at any setting: cancel the compressor's automatic make-up. */
+  private syncLimiterMakeupCancel(): void {
+    this.safetyLimiterMakeupCancel.gain.value = makeupCancelGain(
+      this.safetyLimiter.threshold.value, this.safetyLimiter.ratio.value);
   }
 
   /** Get current limiter gain reduction in dB (0 = no compression, negative = compressing). */
@@ -5323,6 +5331,7 @@ export class ToneEngine {
     this.masterEffectsInput.dispose();
     this.blepInput.dispose();
     this.safetyLimiter.dispose();
+    this.safetyLimiterMakeupCancel.dispose();
     this.exportTap.dispose();
     this.masterInput.dispose();
     this.masterChannel.dispose();

@@ -13,6 +13,11 @@ const toneEngineSrc = readFileSync(
   'utf-8'
 );
 
+const djLimiterSrc = readFileSync(
+  resolve(__dirname, '../../dj/djLimiter.ts'),
+  'utf-8'
+);
+
 const audioStoreSrc = readFileSync(
   resolve(__dirname, '../../../stores/useAudioStore.ts'),
   'utf-8'
@@ -28,15 +33,20 @@ describe('Master Limiter — ToneEngine contract', () => {
   });
 
   it('defaults safetyLimiter threshold to -1 dB', () => {
-    expect(toneEngineSrc).toMatch(/threshold:\s*-1/);
+    expect(djLimiterSrc).toMatch(/DJ_LIMITER_THRESHOLD_DB = -1;/);
+    expect(djLimiterSrc).toMatch(/thresholdDb: DJ_LIMITER_THRESHOLD_DB,/);
   });
 
   it('disables limiter by setting ratio to 1 (transparent passthrough)', () => {
     expect(toneEngineSrc).toMatch(/ratio.*=.*1/);
   });
 
-  it('uses gentle ratio of 4 (not brickwall 20)', () => {
-    expect(toneEngineSrc).toMatch(/ratio:\s*4/);
+  // The soft 4:1 it used to run let a hot master preset through above full
+  // scale (Amiga Bass Cannon clipped in the tracker, held in the DJ view,
+  // 2026-10-14): the tracker master runs the DJ path's limiter spec.
+  it('uses the one safety limiter spec of the DJ path', () => {
+    expect(toneEngineSrc).toMatch(/createToneSafetyLimiter\(\)/);
+    expect(toneEngineSrc).toMatch(/enabled \? SAFETY_LIMITER\.ratio : 1/);
   });
 });
 
