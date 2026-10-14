@@ -417,30 +417,11 @@ export async function previewNativeRow(
   separationInputTone: Tone.ToneAudioNode,
   routedNativeEngines: Set<string>,
 ): Promise<NativeRowPreviewOutcome> {
-  const desc = WASM_ENGINES.find((d) => shouldActivate(d, song));
-  if (!desc || !rowPreviewSupports(desc.key)) return 'unsupported';
-  const EngineClass = await resolveEngine(desc);
-  const instance = EngineClass.getInstance();
-  await instance.ready();
-  if (!isRowClipPlayer(instance)) return 'unsupported';
-
-  // The mixer's mute and solo, handed to the engine as a play hands it (an engine never played has not been told).
-  const { useMixerStore, mixerAudibleMask } = await import('@stores/useMixerStore');
-  const mixer = useMixerStore.getState();
-  if (mixer.channels.length > 0 && typeof (instance as { setMuteMask?: unknown }).setMuteMask === 'function') {
-    (instance as unknown as { setMuteMask(mask: number): void }).setMuteMask(mixerAudibleMask(mixer.channels, mixer.isSoloing));
-  }
-
-  const { data, args } = await engineLoadArgs(song, desc, false);
+  const prepared = await nativeRowRequest(song, songPos, row);
+  if (!prepared) return 'unsupported';
+  const { desc, instance, request } = prepared;
   const { getRowPreviewClient } = await import('@engine/rowPreview/rowPreviewClient');
-  const result = await getRowPreviewClient().request({
-    engineKey: desc.key,
-    data: data instanceof Uint8Array ? data : new Uint8Array(data),
-    args,
-    sampleRate: instance.output.context.sampleRate,
-    target: instance.targetOf(song as never, songPos, row),
-    mask: instance.rowClipMask,
-  });
+  const result = await getRowPreviewClient().request(request);
   if (result.kind === 'cancelled') return 'cancelled';
   if (result.kind === 'missed') {
     const { useUIStore } = await import('@stores/useUIStore');
@@ -450,6 +431,48 @@ export async function previewNativeRow(
   openEngineOutput(desc, instance, separationInputTone, false, routedNativeEngines);
   instance.playRowClip(result.clip);
   return 'played';
+}
+
+/**
+ * Have the row-preview worker render grid row (`songPos`, `row`) ahead of an Enter (cursor prefetch): a following
+ * previewNativeRow for the same row, bytes and mask answers from what was rendered. Sounds nothing.
+ */
+export async function prepareNativeRow(song: TrackerSong, songPos: number, row: number): Promise<void> {
+  const prepared = await nativeRowRequest(song, songPos, row);
+  if (!prepared) return;
+  const { getRowPreviewClient } = await import('@engine/rowPreview/rowPreviewClient');
+  await getRowPreviewClient().prepare(prepared.request);
+}
+
+/** The row-preview request for a row of `song`, with the engine that will play it; null when its engine has no row preview. */
+async function nativeRowRequest(song: TrackerSong, songPos: number, row: number) {
+  const desc = WASM_ENGINES.find((d) => shouldActivate(d, song));
+  if (!desc || !rowPreviewSupports(desc.key)) return null;
+  const EngineClass = await resolveEngine(desc);
+  const instance = EngineClass.getInstance();
+  await instance.ready();
+  if (!isRowClipPlayer(instance)) return null;
+
+  // The mixer's mute and solo, handed to the engine as a play hands it (an engine never played has not been told).
+  const { useMixerStore, mixerAudibleMask } = await import('@stores/useMixerStore');
+  const mixer = useMixerStore.getState();
+  if (mixer.channels.length > 0 && typeof (instance as { setMuteMask?: unknown }).setMuteMask === 'function') {
+    (instance as unknown as { setMuteMask(mask: number): void }).setMuteMask(mixerAudibleMask(mixer.channels, mixer.isSoloing));
+  }
+
+  const { data, args } = await engineLoadArgs(song, desc, false);
+  return {
+    desc,
+    instance,
+    request: {
+      engineKey: desc.key,
+      data: data instanceof Uint8Array ? data : new Uint8Array(data),
+      args,
+      sampleRate: instance.output.context.sampleRate,
+      target: instance.targetOf(song as never, songPos, row),
+      mask: instance.rowClipMask,
+    },
+  };
 }
 
 export async function startNativeEngines(
