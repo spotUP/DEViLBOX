@@ -105,7 +105,7 @@ describe("the mixer's mask (bit set = channel audible) in the worklets that gate
     });
   }
 
-  it('HippelCoSo: the all-on mask renders every player, mask 0 renders none', async () => {
+  it('HippelCoSo: players are slots, not channels - every player renders whatever the channel mask', async () => {
     const p = new (load('public/hippel-coso/HippelCoSo.worklet.js'))();
     const rendered: number[] = [];
     p.initialized = true;
@@ -124,8 +124,8 @@ describe("the mixer's mask (bit set = channel audible) in the worklets that gate
     await post(p, { type: 'setMuteMask', mask: 0xffffffff });
     expect(run()).toEqual([0, 1]);
     await post(p, { type: 'setMuteMask', mask: 0b10 });
-    expect(run()).toEqual([1]);
+    expect(run()).toEqual([0, 1]);                       // RH-PREVIEW-MUTED: a channel mute must not silence a player slot
     await post(p, { type: 'setMuteMask', mask: 0 });
-    expect(run()).toEqual([]);
+    expect(run()).toEqual([0, 1]);
   });
 });

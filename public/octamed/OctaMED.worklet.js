@@ -178,7 +178,7 @@ class OctaMEDProcessor extends AudioWorkletProcessor {
       const heapF32 = this.wasm.HEAPF32;
       for (const h of Object.keys(this.playerOutPtrs)) {
         const hi = parseInt(h);
-        if (!(this.muteMask & (1 << hi))) continue;
+        // A handle is a player slot, not a song channel: the channel mute mask must not gate it (audition voices sound while channels are muted).
         const ptrs = this.playerOutPtrs[hi];
         if (!ptrs) continue;
 
