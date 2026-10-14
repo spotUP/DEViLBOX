@@ -14,7 +14,7 @@
  * Click ALL (channel-less decks only) → in mute mode: enable every channel. In fx mode: clear targets.
  */
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { useDeckVisualizationData } from '@/hooks/dj/useDeckVisualizationData';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
@@ -26,9 +26,22 @@ interface DeckScopesProps {
   size?: number;
 }
 
-/** Each scope's size: `size` up to four channels, then shrunk so n scopes span the width of four. */
-export function deckScopeSize(size: number, channels: number): number {
-  return channels <= 4 ? size : Math.floor((size * 4) / channels);
+const SCOPE_GAP = 4;
+const MODE_CHIP_WIDTH = 36;
+const SCOPE_MIN_SIZE = 8;
+
+/**
+ * Each scope's size: `size` up to four channels, then shrunk so n scopes span the width of four;
+ * and never wider than the row they sit in (`rowWidth`, the deck header's width left of the
+ * turntable) - on a narrow deck (three decks in a small window) every channel stays on screen
+ * instead of the row clipping all but the first.
+ */
+export function deckScopeSize(size: number, channels: number, rowWidth?: number): number {
+  const wanted = channels <= 4 ? size : Math.floor((size * 4) / channels);
+  if (rowWidth === undefined || rowWidth <= 0) return wanted;
+  const n = Math.max(1, channels);
+  const fit = Math.floor((rowWidth - MODE_CHIP_WIDTH - SCOPE_GAP * n) / n);
+  return Math.max(SCOPE_MIN_SIZE, Math.min(wanted, fit));
 }
 
 interface ScopeCanvasProps {
@@ -201,6 +214,18 @@ export const DeckScopes: React.FC<DeckScopesProps> = ({ deckId, size = 64 }) => 
   const mode = useDJStore((s) => s.decks[deckId].channelModeUI);
   const channelScopeCount = useDJStore((s) => s.decks[deckId].channelScopeCount);
 
+  // The row's own width decides how large the scopes can be (deckScopeSize).
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [rowWidth, setRowWidth] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((entries) => setRowWidth(entries[0]?.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const scopeSize = deckScopeSize(size, Math.min(DECK_SCOPE_CHANNELS, channelScopeCount) || 1, rowWidth);
+
   const isChannelEnabled = (index: number): boolean => (channelMask & (1 << index)) !== 0;
   const isFxTargeted = (index: number): boolean => fxTargetChannels.has(index);
 
@@ -244,14 +269,14 @@ export const DeckScopes: React.FC<DeckScopesProps> = ({ deckId, size = 64 }) => 
   const isFxMode = mode === 'fx';
 
   return (
-    <div className="flex items-center gap-1 flex-shrink-0">
+    <div ref={rowRef} className="flex items-center gap-1 w-full min-w-0">
       {/* One scope per channel the deck has a signal for; a deck with none (an audio file, an old cache entry) shows ALL only. */}
       {Array.from({ length: Math.min(DECK_SCOPE_CHANNELS, channelScopeCount) }, (_, i) => (
         <ScopeCanvas
           key={i}
           deckId={deckId}
           channel={i}
-          size={deckScopeSize(size, channelScopeCount)}
+          size={scopeSize}
           muted={!isChannelEnabled(i)}
           fxTargeted={isFxTargeted(i)}
           mode={mode}
@@ -262,7 +287,7 @@ export const DeckScopes: React.FC<DeckScopesProps> = ({ deckId, size = 64 }) => 
         <ScopeCanvas
           deckId={deckId}
           channel={-1}
-          size={size}
+          size={scopeSize}
           muted={false}
           fxTargeted={false}
           mode={mode}
@@ -284,7 +309,7 @@ export const DeckScopes: React.FC<DeckScopesProps> = ({ deckId, size = 64 }) => 
             ? 'bg-accent-primary text-text-inverse border-accent-primary'
             : 'bg-dark-bgTertiary text-text-secondary border-dark-border hover:bg-dark-bgHover'}
         `}
-        style={{ width: 36, height: Math.min(size, 20), fontSize: 9, letterSpacing: '0.05em' }}
+        style={{ width: MODE_CHIP_WIDTH, height: Math.min(scopeSize, 20), fontSize: 9, letterSpacing: '0.05em' }}
         title={`Click-mode: ${isFxMode ? 'FX TARGET (click = pick FX channels)' : 'MUTE (click = mute/unmute)'} — toggle to switch`}
       >
         {isFxMode ? 'FX' : 'Mute'}
