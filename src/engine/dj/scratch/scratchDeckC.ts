@@ -73,8 +73,9 @@ export const deckCStats = { created: 0, strokes: 0, plannedStrokes: 0 };
 
 export interface DeckCBus {
   readonly node: AudioWorkletNode;
-  /** Sum a rendered stroke into the bus from bus sample `start` (an overlay stroke: into its section). */
-  stroke(start: number, samples: Float64Array | Float32Array, section?: DeckCSection): void;
+  /** Sum a rendered stroke into the bus from bus sample `start` (an overlay stroke: into its section). `measured`
+   *  false: the stroke plays at the layer's level without counting in it (a needle's drop / lift: deck noise). */
+  stroke(start: number, samples: Float64Array | Float32Array, section?: DeckCSection, measured?: boolean): void;
   /** The bus sample a context time falls on (trunc, as the demo's int()). */
   busSampleAt(contextSec: number): number;
   setLevel(value: number): void;
@@ -113,10 +114,10 @@ export async function createDeckCBus(ctx: BaseAudioContext, destination: AudioNo
   deckCStats.created++;
   return {
     node,
-    stroke(start, samples, section) {
+    stroke(start, samples, section, measured = true) {
       if (opts.planned) deckCStats.plannedStrokes++; else deckCStats.strokes++;
       const copy = Float64Array.from(samples);
-      node.port.postMessage({ type: 'stroke', start, samples: copy, ...(section ? { section: sectionMessage(section, DEMO_RATE) } : {}) }, [copy.buffer]);
+      node.port.postMessage({ type: 'stroke', start, samples: copy, ...(section ? { section: sectionMessage(section, DEMO_RATE) } : {}), ...(measured ? {} : { unmeasured: true }) }, [copy.buffer]);
     },
     busSampleAt: (sec) => Math.trunc(sec * DEMO_RATE),
     setLevel(value) { node.port.postMessage({ type: 'level', value }); },

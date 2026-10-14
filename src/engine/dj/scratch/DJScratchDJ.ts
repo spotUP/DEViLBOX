@@ -54,7 +54,8 @@ export interface ScratchEventSink {
 export interface ScratchRoutineShape {
   deck: AB;
   track: DJTrackAnalysis;
-  chain: 'threeDeck';
+  /** The routine's bus: three_deck's, or scratch_dj's (Render 'dj_routine'). */
+  chain: 'threeDeck' | 'scratchDj';
   /** Context seconds of the routine's first and last downbeat (32 bars), track seconds of the first. */
   startSec: number;
   endSec: number;
@@ -597,12 +598,14 @@ export class DJScratchDJ {
     });
     this.windows.push({ fromBar, toBar, entries, arc, energyBefore: ctx.energy, setEnergyBefore: input.perf.setEnergy, plan, intent, started: false });
     scratchDJStats.scheduled += entries.length;
-    // three_deck's level and duck: the routine is planned whole, so its layer is known before it plays
+    // the routine's level (three_deck's, and its duck): the routine is planned whole, so its layer is known before
+    // it plays - the demo levels a routine over its whole render. scratch_dj's routine too: levelled by the bus's
+    // running estimate instead, its first strokes played up to +13 dB over the rest (AUTO-SCRATCH-LOUD-MOVES)
     const sink = this.sink!.exec;
-    if (plan.routine === 'threeDeck' && this.deps.shapeRoutine && sink.contextTimeAtBeat && sink.clockBpm && entries.length) {
+    if ((plan.routine === 'threeDeck' || plan.routine === 'scratchDj') && this.deps.shapeRoutine && sink.contextTimeAtBeat && sink.clockBpm && entries.length) {
       const startBeat = barStartBeat(track.downbeats, fromBar), endBeat = barStartBeat(track.downbeats, fromBar + 32);
       this.deps.shapeRoutine({
-        deck: input.deck, track, chain: 'threeDeck', bpm: sink.clockBpm(),
+        deck: input.deck, track, chain: plan.routine, bpm: sink.clockBpm(),
         startSec: sink.contextTimeAtBeat(startBeat), endSec: sink.contextTimeAtBeat(endBeat), trackFromSec: timeAtBeat(track.beatGrid, startBeat),
         strokes: entries.map((x) => ({ at: sink.contextTimeAtBeat!(x.event.executeAtBeat), event: x.event })),
       });
