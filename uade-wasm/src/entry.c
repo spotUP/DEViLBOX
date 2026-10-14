@@ -341,12 +341,25 @@ int uade_wasm_init(int sample_rate) {
     return 0;
 }
 
+/* The per-channel capture (audio.c) is a FIFO that outlives a load and a reset: what the render before left in it would
+ * come out as the first samples of the new song's channels, ahead of the song's own, and the channels would trail the
+ * mix by that much (scopes, dub sends, isolation slots, the row preview's voices). Emptied before every load, so the
+ * audio the load itself produces, which the stereo pipe holds too, stays in step with the mix. */
+extern int uade_audio_read_channel_samples(float *ch0, float *ch1, float *ch2, float *ch3, int max_frames);
+
+static void drain_channel_capture(void) {
+    static float scratch[4][1024];
+    while (uade_audio_read_channel_samples(scratch[0], scratch[1], scratch[2], scratch[3], 1024) > 0) { /* drained */ }
+}
+
 EMSCRIPTEN_KEEPALIVE
 int uade_wasm_load(const uint8_t *data, size_t len, const char *filename_hint) {
     if (!s_state) return -1;
 
     /* Mark as not playing */
     s_playing = 0;
+
+    drain_channel_capture();
 
     /* Reset PCM buffer, frame counter, and tick counter */
     s_pcm_read = 0;
