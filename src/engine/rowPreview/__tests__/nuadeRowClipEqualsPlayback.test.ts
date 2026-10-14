@@ -13,7 +13,7 @@ import { resolve } from 'node:path';
 import { NuadeHeadless } from '@engine/nuade/nuadeHeadless';
 import { NuadeRowAdapter } from '../adapters/nuadeAdapter';
 import { RowPreviewStream } from '../rowPreviewStream';
-import { ROW_CHUNK_FRAMES, type RowClip } from '../rowClip';
+import { ROW_CHUNK_FRAMES, rowClipMinFrames, type RowClip } from '../rowClip';
 import type { RowTarget } from '../rowTarget';
 
 const ROOT = resolve(__dirname, '../../../..');
@@ -94,7 +94,7 @@ describe('the row preview stream renders playback\'s row from a cold seek', () =
         const ref = linear(d, bytes, song, mask, Math.max(...windows.map((w) => w.to)) + ROW_CHUNK_FRAMES, windows);
         clips.forEach((clip, i) => {
           const win = ref.slices.get(String(i))!;
-          expect(clip.frames, 'a row is tens of milliseconds at least').toBeGreaterThan(RATE * 0.02);
+          expect(clip.frames, 'a clip is at least the minimum preview length (a one-tick row is not a click)').toBeGreaterThanOrEqual(rowClipMinFrames(RATE));
           expect(maxDiff(clip.stereo, win.stereo, clip.frames * 2), `${song.name} row ${i} stereo, mask ${mask.toString(16)}`).toBe(0);
           if (mask === ALL) expect(Math.max(...clip.stereo.map(Math.abs)), 'the row sounds').toBeGreaterThan(0.001);
           expect(clip.voices!.length).toBe(win.voices.length);

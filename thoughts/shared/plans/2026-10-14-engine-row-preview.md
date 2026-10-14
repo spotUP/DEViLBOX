@@ -133,6 +133,7 @@ background, so Enter after a cursor jump plays at once instead of waiting 250-50
   helpers extracted from it (RP-2), and leaves them open (the next stop closes them as today).
 - **D11 Worker lifetime.** One row-preview worker for the app, created on the first preview, holding one stream per
   engine key; a song load (new bytes) replaces that engine's stream. WASM in the worker loads on first use.
+- **D13 Minimum clip length (owner, 2026-10-14).** A clip is at least `MIN_ROW_PREVIEW_MS` = 250 ms (`rowClip.ts`, `rowClipMinFrames`), decided once in `RowPreviewStream.request`: a shorter row plays on past its end with the exact playback audio (max diff 0), a longer row keeps its own length (D7 cap still wins), a song that ends sooner ends the clip there. The D3 5 ms fade stays at the clip end. Repeat presses are unchanged (D5): `row-clip.js` fades the sounding clip over 5 ms and holds one pending clip, so presses never pile up. Reason: on tick-grid songs (148 of 187) a row is one 20 ms player tick, a click. Supersedes the 'left as it is' FINDING below.
 - **D12 Prefetch.** While stopped and the pattern editor is the active view, a cursor move (debounced 150 ms) asks
   the worker to prepare that row's clip; Enter on a prepared row plays it without a round trip to the player. A
   prepared clip is dropped on any request for another row, on an edit (D8) and on mute changes (D4).
@@ -435,6 +436,7 @@ Running count: 13 of 13 (wave 0 + 1 done; wave 2-4 and M1/M2 open). Order: RP-1,
 | N4 | yes | c55502c59 |
 | RP-R | yes | 973ffd29f |
 | N5 | yes | c55502c59 (type-check + the named tests, no code) |
+| RP-MIN (D13, 250 ms minimum clip; RP-R / N4 expectations now clip >= 250 ms) | yes | see git log: 'Row preview minimum clip' |
 
 Decisions / deviations (append as found):
 
