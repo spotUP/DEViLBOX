@@ -149,6 +149,10 @@
     {
       "file": "src/engine/__tests__/importWalksRunInWorker.test.ts",
       "ciSeconds": 15
+    },
+    {
+      "file": "src/engine/tone/__tests__/masterPresetParityEveryPreset.test.ts",
+      "ciSeconds": 240
     }
   ]
 }
