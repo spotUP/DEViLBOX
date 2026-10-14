@@ -79,3 +79,10 @@ Needs the owner's call first (UNK):
 - Whether a human may load a real track onto deck C at all. If yes, the removals need to reappear when `decks.C.fileName` is set (conditional layout); if no, block the load (DJModlandBrowser:664, playlist, file browser) and remove the third-deck track path.
 
 Recommended: scratch deck = scratch-only UI (list above), track controls appear only when a track is loaded on C. Cost: one conditional in DJDeck.tsx (`deckId === 'C' && !fileName`); no engine change.
+
+## Implemented 2026-10-14 (owner decisions)
+
+- Deck C with no track (`decks.C.fileName` empty) renders `DeckCScratchOnly`: label, BPM, platter, Scratch Fader / Slip lanes, WAV phrase hint, Record selector + 19 pads, no Fader LFO. One condition in DJDeck.tsx (`scratchOnly`); a track on C brings the deck A/B UI back. Channel volume stays in DJMixer.
+- Pads on deck C fire with `record: decks deckCRecordId` (crate order from `CRATE_LOAD_ORDER`, scratchCatalogue.ts), so they play on `ScratchVoicePool.perform`, not `DeckEngine('C').playPattern`.
+- Decision: with a track loaded on C the pads still scratch the selected record (not the track).
+- Pitch slider, repitch lock and Sync are not rendered in the scratch-only layout; tempo is `followSetTempo` (master deck), which skips only when a track is loaded. Strokes read `decks.C.effectiveBPM` (DjFxActions deckBpm).

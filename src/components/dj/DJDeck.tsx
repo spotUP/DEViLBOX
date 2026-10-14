@@ -27,6 +27,7 @@ import { DeckVisualizer } from './DeckVisualizer';
 import { DeckTurntable } from './DeckTurntable';
 import { DeckCssTurntable } from './DeckCssTurntable';
 import { DeckCScratchLanes } from './DeckCScratchLanes';
+import { DeckCScratchOnly } from './DeckCScratchOnly';
 import { DeckScopes } from './DeckScopes';
 import { DeckBeatGrid } from './DeckBeatGrid';
 import { DeckPanelTabs } from './DeckPanelTabs';
@@ -384,6 +385,8 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
     }
   }, [deckId]);
 
+  // Deck C is the scratch deck until a human loads a track on it (then it is a full track deck)
+  const scratchOnly = deckId === 'C' && !hasFileLoaded;
   const isB = deckId === 'B';
   const deckNum = deckId === 'A' ? '1' : deckId === 'B' ? '2' : '3';
   const deckColor = deckId === 'A' ? 'text-deck-a' : deckId === 'B' ? 'text-deck-b' : 'text-deck-c';
@@ -417,6 +420,10 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
         </div>
       )}
 
+      {scratchOnly ? (
+        <DeckCScratchOnly deckNum={deckNum} deckColor={deckColor} />
+      ) : (
+        <>
       {/* Deck header + scopes + turntable */}
       <div className="flex items-start gap-2">
         <div className="flex-1 min-w-0 overflow-hidden">
@@ -474,6 +481,8 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
 
       {/* Lower panel: Pads | Scratch | Loop & Cue | Mix */}
       <DeckPanelTabs deckId={deckId} />
+        </>
+      )}
     </div>
   );
 };

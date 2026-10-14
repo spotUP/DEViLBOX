@@ -16,6 +16,7 @@ import type { DJTrackAnalysis } from '@/engine/dj/autodj/types';
 import type { AutoDJTelemetry } from '@/engine/dj/autodj/telemetry';
 import type { JuggleTelemetry } from '@/engine/dj/autodj/juggle/juggleTypes';
 import type { ScratchDJTelemetry } from '@/engine/dj/scratch/DJScratchDJ';
+import { CRATE_LOAD_ORDER } from '@/engine/dj/scratch/scratchCatalogue';
 import { DEFAULT_SCRATCH_RENDER } from '@/engine/dj/scratch/scratchStyles';
 import type { ScratchPhrase } from '@/engine/dj/scratch/scratchPhrase';
 
@@ -321,6 +322,8 @@ interface DJState {
   deckViewMode: DeckViewMode;
   /** Open lower-panel tab per deck; survives deck re-renders and view switches. */
   deckPanelTab: Record<'A' | 'B' | 'C', DeckPanelTab>;
+  /** The crate record Deck C's scratch pads play (scratchCatalogue id). */
+  deckCRecordId: string;
   thirdDeckActive: boolean;
   crossfaderPosition: number;
   crossfaderCurve: CrossfaderCurve;
@@ -413,6 +416,7 @@ interface DJActions {
   cycleDeckViewMode: () => void;
   setDeckViewMode: (mode: DeckViewMode) => void;
   setDeckPanelTab: (deck: 'A' | 'B' | 'C', tab: DeckPanelTab) => void;
+  setDeckCRecordId: (id: string) => void;
   setThirdDeckActive: (active: boolean) => void;
   setCrossfader: (position: number) => void;
   setCrossfaderCurve: (curve: CrossfaderCurve) => void;
@@ -516,6 +520,7 @@ export const useDJStore = create<DJStore>()(
     djModeActive: false,
     deckViewMode: 'visualizer' as DeckViewMode,
     deckPanelTab: { A: 'pads', B: 'pads', C: 'pads' } as Record<'A' | 'B' | 'C', DeckPanelTab>,
+    deckCRecordId: CRATE_LOAD_ORDER[0]?.id ?? '',
     thirdDeckActive: false,
     crossfaderPosition: 0.5,
     crossfaderCurve: 'smooth' as CrossfaderCurve,
@@ -595,6 +600,7 @@ export const useDJStore = create<DJStore>()(
         state.deckViewMode = mode;
       }),
 
+    setDeckCRecordId: (id) => set((state) => { state.deckCRecordId = id; }),
     setDeckPanelTab: (deck, tab) =>
       set((state) => {
         state.deckPanelTab[deck] = tab;
