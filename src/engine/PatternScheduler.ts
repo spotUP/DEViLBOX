@@ -179,6 +179,15 @@ export class PatternScheduler {
   }
 
   /**
+   * A new song is loaded: the previous song's Wxx shift goes, the slider stays
+   * and is applied to the engines again.
+   */
+  public clearPatternPitchShift(): void {
+    this.pitchShiftSemitones = 0;
+    this.applyPitchState();
+  }
+
+  /**
    * Re-apply the slider as the store holds it (globalPitch + trackerKeyLock).
    * For an engine that has just loaded a song and starts neutral.
    */
