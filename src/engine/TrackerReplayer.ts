@@ -2519,6 +2519,14 @@ export class TrackerReplayer {
           // Warm the cached reference for zero-latency forcePosition seeks
           getLibopenmptSync();
 
+          // A freshly loaded module starts at tempo/pitch factor 1: give it the
+          // tracker pitch slider (and its Key Lock) as the store holds them.
+          if (!this.isDJDeck) {
+            void import('./PatternScheduler').then(({ getPatternScheduler }) => {
+              if (gen === this._playGeneration) getPatternScheduler().reapplyGlobalPitch();
+            }).catch(() => { /* scheduler not loadable here */ });
+          }
+
           // Wire SynthEffectProcessor for tick-level effects on replaced instruments.
           // Always created (even if no instruments replaced yet) so mid-playback
           // replacements get tick-level effects immediately.

@@ -168,6 +168,19 @@ export class PatternScheduler {
 
     // Pitch: the synth-bus resampler (WASM/native engines and DevilboxSynths)
     engine.setSynthBusPitchRate(pitchRate);
+
+    // LibOpenMPT (MOD/XM/S3M/IT opened from a file) renders the whole song to
+    // the master input, past the resampler, and splits natively:
+    // play.tempo_factor + play.pitch_factor. Lossless, no added latency.
+    applyToLibopenmpt(split.tempoMultiplier * wxxRate, pitchRate);
+  }
+
+  /**
+   * Re-apply the slider as the store holds it (globalPitch + trackerKeyLock).
+   * For an engine that has just loaded a song and starts neutral.
+   */
+  public reapplyGlobalPitch(): void {
+    this.setGlobalPitchOffset(useTransportStore.getState().globalPitch);
   }
 
   /**
@@ -967,6 +980,21 @@ export class PatternScheduler {
     this.clearSchedule();
     this.onRowChange = null;
   }
+}
+
+/** The latest factors for LibOpenMPT. Dynamic imports can settle out of order,
+ *  so each one applies whatever is newest, never the values it was called with. */
+const libopenmptFactors = { tempo: 1, pitch: 1 };
+
+function applyToLibopenmpt(tempoFactor: number, pitchFactor: number): void {
+  libopenmptFactors.tempo = tempoFactor;
+  libopenmptFactors.pitch = pitchFactor;
+  void import('@engine/libopenmpt/LibopenmptEngine').then(({ LibopenmptEngine }) => {
+    if (!LibopenmptEngine.hasInstance()) return;
+    const mpt = LibopenmptEngine.getInstance();
+    mpt.setTempoFactor(libopenmptFactors.tempo);
+    mpt.setPitchFactor(libopenmptFactors.pitch);
+  }).catch(() => { /* engine not loadable here */ });
 }
 
 // Singleton instance

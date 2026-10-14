@@ -17,6 +17,18 @@ const engineState = vi.hoisted(() => ({
   tempoMultiplier: 1,
   updateAllPlaybackRates: 0,
   splitCalls: 0,
+  mptTempo: 1,
+  mptPitch: 1,
+}));
+
+vi.mock('@engine/libopenmpt/LibopenmptEngine', () => ({
+  LibopenmptEngine: {
+    hasInstance: () => true,
+    getInstance: () => ({
+      setTempoFactor: (f: number) => { engineState.mptTempo = f; },
+      setPitchFactor: (f: number) => { engineState.mptPitch = f; },
+    }),
+  },
 }));
 
 vi.mock('@engine/ToneEngine', () => ({
@@ -67,7 +79,7 @@ beforeEach(() => {
   cleanup();
   Object.assign(engineState, {
     globalPlaybackRate: 1, globalDetune: 0, synthBusRate: 1, tempoMultiplier: 1,
-    updateAllPlaybackRates: 0, splitCalls: 0,
+    updateAllPlaybackRates: 0, splitCalls: 0, mptTempo: 1, mptPitch: 1,
   });
   Object.defineProperty(HTMLElement.prototype, 'setPointerCapture', { configurable: true, value() {} });
   Object.defineProperty(HTMLElement.prototype, 'releasePointerCapture', { configurable: true, value() {} });
@@ -77,7 +89,7 @@ beforeEach(() => {
 });
 
 describe('tracker pitch slider Key Lock', () => {
-  it('Key Lock on: the slider moves tempo, sample rate and synth detune stay at the song key', () => {
+  it('Key Lock on: the slider moves tempo, sample rate and synth detune stay at the song key', async () => {
     const { container } = render(<DJPitchSlider />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Key Lock' }));
@@ -94,9 +106,12 @@ describe('tracker pitch slider Key Lock', () => {
     expect(engineState.synthBusRate).toBe(1);                        // WASM/native bus stays in key
     expect(engineState.updateAllPlaybackRates).toBeGreaterThan(0);   // playing samples were re-rated
     expect(useTransportStore.getState().bpm).toBe(140);              // the song's own BPM is kept
+    // LibOpenMPT-rendered songs split natively: tempo factor follows, pitch factor stays 1
+    await vi.waitFor(() => expect(engineState.mptTempo).toBeCloseTo(tempo16, 6), { timeout: 10_000 });
+    expect(engineState.mptPitch).toBe(1);
   });
 
-  it('Key Lock off: the slider is a varispeed, pitch follows the tempo', () => {
+  it('Key Lock off: the slider is a varispeed, pitch follows the tempo', async () => {
     const { container } = render(<DJPitchSlider />);
     dragToTop(container);
 
@@ -105,6 +120,8 @@ describe('tracker pitch slider Key Lock', () => {
     expect(engineState.globalPlaybackRate).toBeCloseTo(tempo16, 6);
     expect(engineState.globalDetune).toBe(1600);
     expect(engineState.synthBusRate).toBeCloseTo(tempo16, 6);
+    await vi.waitFor(() => expect(engineState.mptPitch).toBeCloseTo(tempo16, 6), { timeout: 10_000 });
+    expect(engineState.mptTempo).toBeCloseTo(tempo16, 6);
   });
 
   it('turning Key Lock on while the slider is up returns the pitch to the song key at once', () => {
