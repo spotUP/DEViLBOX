@@ -319,11 +319,24 @@ export abstract class WASMChannelOutputsEngine extends WASMSingletonBase {
     return true;
   }
 
+  /** The mask each isolation slot holds in the worklet, as last posted (a row preview renders without these voices). */
+  private _slotMasks: number[] = [0, 0, 0, 0];
+
+  /** Voices taken out of the main mix by an isolation slot, as the worklet holds them. */
+  get isolatedMask(): number {
+    return this._slotMasks.reduce((a, b) => (a | b) >>> 0, 0) >>> 0;
+  }
+
+  /** A replaced node starts with no isolation: forget what the old one held. */
+  protected clearIsolationTracking(): void { this._slotMasks = [0, 0, 0, 0]; }
+
   addIsolation(slotIndex: number, channelMask: number): void {
+    if (Number.isInteger(slotIndex) && slotIndex >= 0 && slotIndex < this._slotMasks.length) this._slotMasks[slotIndex] = channelMask >>> 0;
     this.workletNode?.port.postMessage({ type: 'addIsolation', slotIndex, channelMask });
   }
 
   removeIsolation(slotIndex: number): void {
+    if (Number.isInteger(slotIndex) && slotIndex >= 0 && slotIndex < this._slotMasks.length) this._slotMasks[slotIndex] = 0;
     this.workletNode?.port.postMessage({ type: 'removeIsolation', slotIndex });
   }
 
