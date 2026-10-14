@@ -30,7 +30,7 @@ import { DeckKeyLock } from './DeckKeyLock';
 import { DeckIsolatorEQ } from './DeckIsolatorEQ';
 import { createSafetyLimiter, type SafetyLimiter } from './djLimiter';
 import { HEARD_DELAY_MAX_SEC, syncHeardDelay, type LatencySource } from '../audioLatency';
-import { computeKeyLockShift } from './computeKeyLockShift';
+import { computeKeyLockShift, computeTempoPitchSplit } from './computeKeyLockShift';
 import { afterPendingMix } from './stopPlayerNow';
 import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';
 import { clearPatternGuard } from '../keyboard/commands/djScratch';
@@ -1057,16 +1057,15 @@ export class DeckEngine {
     // scratch recovery returns to the locked rate, not the fader position.
     if (this._repitchLocked) return;
 
-    const multiplier = Math.pow(2, semitones / 12);
-    this.restMultiplier = multiplier;                // Always track — scratch/pattern restore target
-
     // KEY LOCK: when on, pitch/detune are pinned to neutral so the audible
     // pitch stays at the track's original key. Tempo still follows the fader.
-    //   - Tracker path: native via replayer.setPitchMultiplier(1.0) + setDetuneCents(0)
+    //   - Tracker path: native split from computeTempoPitchSplit() (shared
+    //     with the tracker view's pitch slider)
     //   - Audio (WAV) path: SoundTouch insert applies -semitones compensation
     //     via computeKeyLockShift(), cancelling playbackRate's pitch shift.
-    const pitchMultiplier = this.keyLockEnabled ? 1.0 : multiplier;
-    const detuneCents      = this.keyLockEnabled ? 0   : semitones * 100;
+    const { tempoMultiplier: multiplier, pitchMultiplier, detuneCents } =
+      computeTempoPitchSplit(semitones, this.keyLockEnabled);
+    this.restMultiplier = multiplier;                // Always track — scratch/pattern restore target
 
     if (this._playbackMode === 'audio') {
       this.audioPlayer.setPlaybackRate(multiplier);

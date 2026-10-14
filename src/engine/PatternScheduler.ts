@@ -15,6 +15,7 @@ import { type FormatHandler, type ModuleFormat, type TickResult, type ChannelSta
 import { getAutomationPlayer } from './AutomationPlayer';
 import { getEffectProcessor } from './EffectCommands';
 import { useTransportStore } from '@stores/useTransportStore';
+import { computeTempoPitchSplit } from './dj/computeKeyLockShift';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { notify } from '@stores/useNotificationStore';
@@ -83,7 +84,6 @@ export class PatternScheduler {
   private baseBPM: number = 125; // Base tempo (affected by Fxx effects)
   private pitchShiftSemitones: number = 0; // Pitch shift (affected by Wxx effects)
   private globalPitchOffset: number = 0; // Global pitch offset from DJ slider, etc.
-  private bpmUpdateTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * Track playback errors and notify user if threshold exceeded
@@ -125,44 +125,49 @@ export class PatternScheduler {
   }
 
   /**
-   * Set global pitch offset from external controls (DJ slider, etc.)
-   * This offset is applied on top of pattern effects (Wxx, Fxx)
+   * Set global pitch offset from external controls (the tracker view's pitch
+   * slider). Applied on top of the pattern's Wxx pitch shift.
    */
   public setGlobalPitchOffset(semitones: number): void {
     this.globalPitchOffset = semitones;
-    const playbackRate = Math.pow(2, (this.pitchShiftSemitones + this.globalPitchOffset) / 12);
+    this.applyPitchState();
+  }
 
-    // Update global playback rate field (for new notes)
+  /**
+   * Push the slider offset + Wxx shift to every engine the slider reaches.
+   * The tempo/pitch decision is computeTempoPitchSplit(), the same one a
+   * tracker-mode DJ deck uses: with Key Lock on (useTransportStore
+   * .trackerKeyLock) tempo follows the slider and pitch stays at the song's key.
+   */
+  private applyPitchState(): void {
+    const { trackerKeyLock } = useTransportStore.getState();
+    const split = computeTempoPitchSplit(this.globalPitchOffset, trackerKeyLock);
+    const wxxRate = Math.pow(2, this.pitchShiftSemitones / 12);
+    const pitchRate = split.pitchMultiplier * wxxRate;
+
     const engine = getToneEngine();
-    engine.setGlobalPlaybackRate(playbackRate);
-
-    // CRITICAL: Update already-playing samples immediately
     const replayer = getTrackerReplayer();
+
+    // Tempo: the replayer's tick rate, as on a DJ deck. The song's own BPM
+    // (and every Fxx change of it) stays the song's; the slider scales it.
+    replayer.setTempoMultiplier(split.tempoMultiplier * wxxRate);
+
+    // Pitch: sample playback rate for new notes and the ones already playing
+    engine.setGlobalPlaybackRate(pitchRate);
     replayer.updateAllPlaybackRates();
 
-    // Update synth detune (cents = semitones * 100)
-    engine.setGlobalDetune((this.pitchShiftSemitones + this.globalPitchOffset) * 100);
+    // Pitch: synth detune (cents)
+    engine.setGlobalDetune(this.pitchShiftSemitones * 100 + split.detuneCents);
 
-    // Apply pitch to C64SIDEngine if active (SID playback)
+    // C64 SID: the engine has one speed control (varispeed for CIA-timed
+    // tunes, tempo only for VSync tunes); it follows the tempo.
     const c64Engine = replayer.getC64SIDEngine();
     if (c64Engine) {
-      c64Engine.setPlaybackRate(playbackRate);
+      c64Engine.setPlaybackRate(split.tempoMultiplier * wxxRate);
     }
 
-    // Apply pitch to WASM/native engine bus (Hively, JamCracker, FC, etc.)
-    engine.setSynthBusPitchRate(playbackRate);
-
-    // Debounce BPM updates - only update when slider hasn't moved for 200ms
-    // This prevents scheduler breakage during active drag
-    if (this.bpmUpdateTimer) {
-      clearTimeout(this.bpmUpdateTimer);
-    }
-
-    this.bpmUpdateTimer = setTimeout(() => {
-      const effectiveBPM = Math.round(this.baseBPM * playbackRate * 100) / 100;
-      useTransportStore.getState().setBPM(effectiveBPM);
-      this.bpmUpdateTimer = null;
-    }, 200);
+    // Pitch: the synth-bus resampler (WASM/native engines and DevilboxSynths)
+    engine.setSynthBusPitchRate(pitchRate);
   }
 
   /**
@@ -373,10 +378,9 @@ export class PatternScheduler {
     // Hardware Quirk: apply new BPM/Speed immediately
     if (tickResult.setBPM !== undefined) {
       // Update base BPM (song tempo) and apply pitch shift (Wxx + global offset)
+      // (the pitch slider scales tempo through the replayer's tempo multiplier)
       this.baseBPM = tickResult.setBPM;
-      const playbackRate = Math.pow(2, (this.pitchShiftSemitones + this.globalPitchOffset) / 12);
-      const effectiveBPM = this.baseBPM * playbackRate;
-      engine.setBPM(effectiveBPM);
+      engine.setBPM(this.baseBPM);
     }
     if (tickResult.setSpeed !== undefined) {
       (handler as unknown as { speed: number }).speed = tickResult.setSpeed;
@@ -385,22 +389,7 @@ export class PatternScheduler {
     // Global Pitch Shift (DJ-style): Wxx effect (pattern-based, add to global offset)
     if (tickResult.setGlobalPitchShift !== undefined) {
       this.pitchShiftSemitones = tickResult.setGlobalPitchShift;
-      const playbackRate = Math.pow(2, (this.pitchShiftSemitones + this.globalPitchOffset) / 12);
-
-      // Update global playback rate (affects new notes)
-      engine.setGlobalPlaybackRate(playbackRate);
-
-      // Update already-playing samples immediately
-      const replayer = getTrackerReplayer();
-      replayer.updateAllPlaybackRates();
-
-      // Update synth detune (cents = semitones * 100)
-      engine.setGlobalDetune((this.pitchShiftSemitones + this.globalPitchOffset) * 100);
-
-      // Update BPM (rounded to avoid float noise)
-      const effectiveBPM = Math.round(this.baseBPM * playbackRate * 100) / 100;
-      useTransportStore.getState().setBPM(effectiveBPM);
-      Tone.getTransport().bpm.value = effectiveBPM;
+      this.applyPitchState();
     }
 
     if (tickResult.funkRepeat !== undefined) {
@@ -907,14 +896,8 @@ export class PatternScheduler {
 
     // Reset pitch shift to neutral when clearing schedule (keep global offset)
     this.pitchShiftSemitones = 0;
-    const playbackRate = Math.pow(2, this.globalPitchOffset / 12);
-    const effectiveBPM = this.baseBPM * playbackRate;
-    Tone.getTransport().bpm.value = effectiveBPM;
-    // Also update transport store BPM (for TrackerReplayer sync)
-    useTransportStore.getState().setBPM(effectiveBPM);
-    // Also update sample playback rate
-    const engine = getToneEngine();
-    engine.setGlobalPlaybackRate(playbackRate);
+    Tone.getTransport().bpm.value = this.baseBPM;
+    this.applyPitchState();
 
     if (this.currentPlayback) {
       this.currentPlayback.rowPart.dispose();

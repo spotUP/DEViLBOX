@@ -58,6 +58,8 @@ interface TransportStore extends TransportState {
 
   // Global pitch shift (DJ pitch slider / W effect)
   globalPitch: number; // Semitones (-16 to +16)
+  /** Key Lock for the tracker pitch slider: on = the slider changes tempo only, pitch stays at the song's key. */
+  trackerKeyLock: boolean;
 
   // Count-in feature
   countInEnabled: boolean;
@@ -66,6 +68,7 @@ interface TransportStore extends TransportState {
   // Actions
   setBPM: (bpm: number) => void;
   setGlobalPitch: (pitch: number) => void;
+  setTrackerKeyLock: (enabled: boolean) => void;
   setTimeSignature: (numerator: number, denominator: number) => void;
   setSwing: (swing: number) => void;
   setJitter: (jitter: number) => void;
@@ -185,6 +188,7 @@ export const useTransportStore = create<TransportStore>()(
     isPunchEnabled: false,
     countInEnabled: false,
     globalPitch: 0, // Default to no pitch shift
+    trackerKeyLock: false, // Off: the slider is a varispeed, as before
 
     // Actions
     setBPM: (bpm) => {
@@ -210,6 +214,11 @@ export const useTransportStore = create<TransportStore>()(
     setGlobalPitch: (pitch) =>
       set((state) => {
         state.globalPitch = Math.max(-16, Math.min(16, pitch));
+      }),
+
+    setTrackerKeyLock: (enabled) =>
+      set((state) => {
+        state.trackerKeyLock = enabled;
       }),
 
     setTimeSignature: (numerator, denominator) =>
