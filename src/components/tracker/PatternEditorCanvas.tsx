@@ -3148,6 +3148,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                       const channel = ch.isPatternChannel ? pattern?.channels[idx] : undefined;
                       const isCollapsed = channel?.collapsed;
                       const channelWidth = channelWidths[idx];
+                      if (channelWidth <= 0) return null; // hidden (FormatChannel.hidden)
                       const isActive = idx === activeChannelIndex;
                       const accentColor = channel?.color || 'var(--color-accent)';
                       // Stack box-shadows: left stripe (existing) + bottom border when active
@@ -3323,6 +3324,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 <div className="overflow-hidden flex-1">
                   <div className="flex" style={{ width: totalChannelsWidth - lnwPx, marginLeft: centerPadding }}>
                     {formatChannels.map((ch, chIdx) => {
+                      if (channelWidths[chIdx] <= 0) return null; // hidden (FormatChannel.hidden)
                       const chCols = ch.columns ?? formatColumns;
                       const FORMAT_COL_GAP = 4;
                       let px = 2 * fitScale;

@@ -9,6 +9,8 @@ import React, { useMemo, useCallback } from 'react';
 import type { FurnaceNativeData } from '@/types/tracker';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
+import { useVisibleChannelMask } from '@/hooks/tracker/useVisibleChannelMask';
+import { isChannelVisible } from '@/lib/tracker/visibleChannels';
 
 export const FURNACE_ORDER_MATRIX_HEIGHT = 200;
 export const FURNACE_ORDER_MATRIX_COLLAPSED_HEIGHT = 28;
@@ -56,6 +58,8 @@ export const FurnaceOrderEditor: React.FC<Props> = ({
   }, []);
 
   // Build FormatChannel[] — one channel per Furnace channel
+  // The order matrix shows the channels the pattern grid shows: one list (visibleChannels.ts).
+  const visibleMask = useVisibleChannelMask();
   const formatChannels = useMemo<FormatChannel[]>(() => {
     const channels: FormatChannel[] = [];
     for (let ch = 0; ch < numCh; ch++) {
@@ -71,10 +75,11 @@ export const FurnaceOrderEditor: React.FC<Props> = ({
         patternLength: numPos,
         rows,
         columns: [col],
+        hidden: !isChannelVisible(visibleMask, ch),
       });
     }
     return channels;
-  }, [sub, numCh, numPos]);
+  }, [sub, numCh, numPos, visibleMask]);
 
   const handleCellChange = useCallback<OnCellChange>((channelIdx, rowIdx, _columnKey, value) => {
     onOrderChange(channelIdx, rowIdx, value & 0xFF);

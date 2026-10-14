@@ -75,6 +75,12 @@ export interface FormatChannel {
    * Defaults to false (synthetic/auxiliary channel — label-only header).
    */
   isPatternChannel?: boolean;
+  /**
+   * Not drawn: width 0 in the layout, no header, no column. The channel stays in
+   * the data and keeps its index (an order matrix hides the song channels the
+   * pattern grid hides, visibleChannels.ts).
+   */
+  hidden?: boolean;
 }
 
 /**
