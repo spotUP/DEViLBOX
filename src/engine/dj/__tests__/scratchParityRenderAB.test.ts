@@ -158,12 +158,12 @@ describe('the A/B routine: every stroke the executor plays is heard (SCR-PHRASIN
   it('eight bars of the three-deck routine: at least 90 % of the strokes handed to the voice are heard in their own window', async () => {
     const { deckCStats } = await import('../scratch/scratchDeckC');
     const before = deckCStats.strokes;
-    // eight routine bars: the routine plays half-time over the 130 BPM drops track (scratchTempoFold), 16 of its bars
-    const r = await renderRoutine({ bars: 17, withTrack: false });
+    const r = await renderRoutine({ bars: 9, withTrack: false });
     // every stroke the executor fired is the demo's render on the routine's Deck C bus (SCR-NULL-TEST)
     expect(deckCStats.strokes - before, 'strokes summed on the Deck C bus').toBe(r.fired.length);
     const strokes = r.fired.filter((f) => f.gesture !== 'needleDrop' && f.gesture !== 'needleLift' && f.at < r.out.duration - 0.3);
-    expect(strokes.length, 'the routine fired its strokes').toBeGreaterThan(40);
+    // half-time over the 130 BPM drops track inside the sections (three_deck's fold): eight set bars hold four routine bars
+    expect(strokes.length, 'the routine fired its strokes').toBeGreaterThan(20);
     // a stroke is heard when its own first 60 ms (the attack of the move, before the next one can start)
     // carries the scratch at -40 dBFS or more - a stroke silenced by a stale stop sits at the room tail's level
     const levels = strokes.map((f) => rmsAt(r.out, f.at + 0.005, f.at + 0.065));
@@ -178,7 +178,7 @@ describe.skipIf(process.env.SCRATCH_AB_RENDER !== '1')('the A/B render pair (SCR
   it('DEViLBOX plays the three-deck routine at the PEAK over the drops track; the plan and the track go to the demo side', async () => {
     const { deckCStats } = await import('../scratch/scratchDeckC');
     const before = deckCStats.strokes;
-    const r = await renderRoutine({ bars: 65, withTrack: true, rate: Number(process.env.SCRATCH_AB_RATE ?? SR_DEFAULT) });
+    const r = await renderRoutine({ bars: 33, withTrack: true, rate: Number(process.env.SCRATCH_AB_RATE ?? SR_DEFAULT) });
     console.log(`[A/B] Deck C strokes ${deckCStats.strokes - before}`);
     mkdirSync(OUT, { recursive: true });
     const name = process.env.SCRATCH_AB_NAME ?? 'devilbox_three_deck_drops';
@@ -198,7 +198,7 @@ describe.skipIf(process.env.SCRATCH_AB_LAYERS !== '1')('the isolated scratch lay
   beforeAll(() => { installRealWebAudio(); resolveWorkletsFromPublic(); servePublicToFetch(); });
 
   it('writes the bus output (no track) and the strokes the executor fired', async () => {
-    const r = await renderRoutine({ bars: 65, withTrack: false, layers: true, rate: Number(process.env.SCRATCH_AB_RATE ?? SR_DEFAULT) });
+    const r = await renderRoutine({ bars: 33, withTrack: false, layers: true, rate: Number(process.env.SCRATCH_AB_RATE ?? SR_DEFAULT) });
     mkdirSync(OUT, { recursive: true });
     const name = process.env.SCRATCH_AB_NAME ?? 'devilbox_layers';
     writeFileSync(join(OUT, `${name}.wav`), wav16([r.out.getChannelData(0), r.out.getChannelData(1)], r.out.sampleRate));

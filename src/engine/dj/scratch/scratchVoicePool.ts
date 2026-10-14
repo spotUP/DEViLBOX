@@ -15,6 +15,7 @@
  * caller that performs on it; the pool never decides what to play.
  */
 
+import { foldedStepSamples } from './scratchTempo';
 import * as Tone from 'tone';
 import { getDJEngine } from '../DJEngine';
 import { demoRecordPcm } from './scratchGrit';
@@ -202,16 +203,18 @@ export class ScratchVoicePool {
       const w = lastWordSlice(record, DEMO_RATE);
       if (w) source = { sig: sig.slice(w.start, w.end), anchor: w.vowel, safe: [0, w.end - w.start - 1] };
     }
-    // the routine's own tempo: the set's folded into the demo's range (a half-time routine's step is two of the set's)
-    bpm /= spec.tempoFold ?? 1;
-    const stepSec = spec.chain === 'threeDeck' ? 60.0 / (bpm * 4) : demoStepSamples(bpm) / DEMO_RATE;
+    // the routine's own 16th (scratch.routine_step_samples): the fold times the set's, on the set's grid - a
+    // half-time routine's step is two of the set's
+    const fold = spec.tempoFold ?? 1;
+    const routineStep = foldedStepSamples(demoStepSamples(bpm), fold);
+    const stepSec = spec.chain === 'threeDeck' ? fold * 60.0 / (bpm * 4) : routineStep / DEMO_RATE;
     const steps = name ? demoGestureSteps(name) : gesture.durationSteps;
-    // three_deck.render: `steps * step / rate` (whole samples a step, the product first)
-    const durSec = spec.stepSamples ? steps * spec.stepSamples / DEMO_RATE : steps * stepSec;
+    // three_deck.render: `steps * r_step / rate` (whole samples a step, the product first)
+    const durSec = spec.stepSamples ? steps * foldedStepSamples(spec.stepSamples, fold) / DEMO_RATE : steps * stepSec;
     const r = renderGesture(source, name ?? catalogueDemoGesture(gesture), durSec, DEMO_RATE, {
       velocity: velocity ?? 1.0, profile: DEMO_DECK_PROFILES[spec.deck ?? 'boombap'], seed: spec.seed,
     });
-    const out = spec.ending ? routineEndingDelay(r.out, demoStepSamples(bpm), DEMO_RATE) : r.out;
+    const out = spec.ending ? routineEndingDelay(r.out, routineStep, DEMO_RATE) : r.out;
     return { out, viz: r.viz };
   }
 
@@ -282,7 +285,8 @@ export class ScratchVoicePool {
       if (spec.section) {
         // the overlay: the stroke's section on the demo's grid from the stroke's own step
         // (render_scratch_section: o = max(0, bar x bar_len + step x step_samp + off) from the section's start)
-        const stepSamp = demoStepSamples(opts.bpm);
+        // the section's step at the overlay's own tempo (a half-time overlay's step is two of the set's)
+        const stepSamp = foldedStepSamples(demoStepSamples(opts.bpm), spec.tempoFold ?? 1);
         const start = at - spec.section.step * stepSamp;
         placed = Math.max(start, at + spec.humanizeSamples);
         bus.stroke(placed, samples, { key: spec.section.key, start, end: start + spec.section.bars * 16 * stepSamp, fx: spec.section.fx }, !gesture.needle);

@@ -25,6 +25,7 @@ import { SCRATCH_STYLES } from './scratchStyles';
 import { CLEAN_CRATE_POOL, CUE_ROLE_POOLS, CUE_ROLE_RECORD, type CueRole } from './scratchCatalogue';
 import { getGesture, gestureBeats } from './scratchGestureCatalog';
 import { stepToBeat } from './scratchAnchor';
+import { foldedStep, routineBarsIn } from './scratchTempo';
 import type { PlacedScratch, PlacementRole } from './scratchPlacement';
 import type { ArcTemplate } from './scratchArc';
 import type { ScratchDJStyle, ScratchGestureId, ScratchRole } from './scratchTypes';
@@ -218,11 +219,16 @@ export const scratchPermissionFor = (juggleLevel: number, budget = THREE_DECK_BU
  * phrase throws the whole phrase clean (HOME, drop_phrase), every scratch after it chops ONE word (ACCENT); the
  * record's statement plays from its first sample, the scratches read its last word (`cues_with_word_emphasis`).
  */
-export function buildThreeDeckRoutine(seed: number, opts: { budget?: number; pools?: Readonly<Record<CueRole, readonly string[]>>; phraseEmphasis?: boolean } = {}): DemoRoutineEvent[] {
+export function buildThreeDeckRoutine(seed: number, opts: { budget?: number; pools?: Readonly<Record<CueRole, readonly string[]>>; phraseEmphasis?: boolean; fold?: number } = {}): DemoRoutineEvent[] {
   demoRoutineStats.threeDeck++;
   const budget = opts.budget ?? THREE_DECK_BUDGET;
   const pools = opts.pools ?? CUE_ROLE_POOLS;
   const emphasis = !!opts.phraseEmphasis;
+  // `fold` (scratch.routine_tempo_fold of the set's bpm, three_deck.py build_scratch_events): the phrases are
+  // written in the routine's own bars and 16ths inside each section of the set's 32-bar arc - over a fast set a
+  // 4-bar section holds 2 routine bars, each routine 16th on every other one of the set's - so the arc and the
+  // two-hands rule against the juggle sections stay on the set's bars. 1: the unfolded routine, event for event.
+  const fold = opts.fold ?? 1;
   const rnd: ScratchRandom = lfsr(seed * 71 + 5);
   const ev: Array<Omit<DemoRoutineEvent, 'record'>> = [{ bar: 0, step: 0, cueRole: 'HOME', gesture: 'needleDrop', velocity: 0.6 }];
   let phraseI = 0;
@@ -232,14 +238,24 @@ export function buildThreeDeckRoutine(seed: number, opts: { budget?: number; poo
     const energy = THREE_DECK_ENERGY[si]!;
     const gestures = THREE_DECK_GESTURES[lvl as 1 | 2 | 3 | 4];
     const restProb = (THREE_DECK_REST_PROB[role] ?? THREE_DECK_REST_DEFAULT) * (1.3 - 0.6 * energy);
-    for (let b = 0; b < bars; b++) {
+    const secEnd = (b0 + bars) * 16;
+    // routine (bar in section, 16th) -> the set's (bar, 16th), or null past the section's end (`_at`)
+    const at = (rb: number, rst: number): { bar: number; step: number } | null => {
+      if (fold === 1) return { bar: b0 + rb, step: rst };
+      const p = b0 * 16 + (rb * 16 + rst) * fold;
+      if (p >= secEnd) return null;
+      const sb = Math.floor(p / 16);
+      return { bar: sb, step: p - sb * 16 };
+    };
+    for (let b = 0; b < routineBarsIn(bars, fold); b++) {
       const newPhrase = b % 2 === 0;
       if (newPhrase) phraseI++;
       const phraseCue: CueRole = emphasis ? 'HOME' : CUE_CYCLE[phraseI % CUE_CYCLE.length]!;
       let st = 0;
       if (newPhrase) {
         const g: ScratchGestureId = emphasis ? 'dropPhrase' : 'drop';
-        ev.push({ bar: b0 + b, step: 0, cueRole: phraseCue, gesture: g, velocity: Math.min(1, 0.65 + 0.35 * energy) });
+        const pos = at(b, 0);
+        if (pos) ev.push({ ...pos, cueRole: phraseCue, gesture: g, velocity: Math.min(1, 0.65 + 0.35 * energy) });
         st = getGesture(g).durationSteps;
       }
       while (st < 15) {
@@ -248,7 +264,8 @@ export function buildThreeDeckRoutine(seed: number, opts: { budget?: number; poo
         // chop the word, never the statement; the occasional bark accent draws only in the rotation
         const cue: CueRole = emphasis ? 'ACCENT' : rnd() > 0.78 ? 'ACCENT' : phraseCue;
         const velocity = Math.min(1, 0.55 + 0.4 * energy + 0.12 * (rnd() - 0.5));
-        ev.push({ bar: b0 + b, step: st, cueRole: cue, gesture: g, velocity });
+        const pos = at(b, st);
+        if (pos) ev.push({ ...pos, cueRole: cue, gesture: g, velocity });
         st += getGesture(g).durationSteps;
         if (rnd() < restProb) st += 1;
       }
@@ -291,14 +308,18 @@ const isNeedle = (g: ScratchGestureId): boolean => g === 'needleDrop' || g === '
 /** The plan role a cue role performs as (the executor's role: anchors, the governor's vocal rule). */
 export const CUE_ROLE_SCRATCH_ROLE: Readonly<Record<CueRole, ScratchRole>> = { HOME: 'THEME', SECONDARY: 'FEATURE', ACCENT: 'ACCENT', FX: 'FILL' };
 
-/** A demo routine laid from `startBar` as placed events the executor plays (needles open / close it). */
-export function demoRoutineToPlaced(events: readonly DemoRoutineEvent[], startBar: number, beatsPerBar = 4, render?: readonly ScratchRenderSpec[], tempoFold = 1): PlacedScratch[] {
+/**
+ * A demo routine laid from `startBar` as placed events the executor plays (needles open / close it). `tempoFold`
+ * (`scratchTempoFold`): every gesture lasts its 16ths at the routine's tempo. `grid` 'routine' (scratch_dj.render,
+ * scratch_routine.render_routine): the events are in the routine's 16ths, each `tempoFold` of the set's - the routine
+ * spans tempoFold x its bars; 'set' (three_deck.build_scratch_events): the builder already placed them on the set's grid.
+ */
+export function demoRoutineToPlaced(events: readonly DemoRoutineEvent[], startBar: number, beatsPerBar = 4, render?: readonly ScratchRenderSpec[], tempoFold = 1, grid: 'routine' | 'set' = 'routine'): PlacedScratch[] {
   const stepsPerBar = beatsPerBar * 4;
   return events.map((e, i) => {
-    // the routine's 16th on the set's grid: tempoFold of the set's 16ths per routine 16th (`scratchTempoFold`)
-    const at = (e.bar * 16 + e.step) * tempoFold;
-    const bar = tempoFold === 1 ? startBar + e.bar : startBar + Math.floor(at / stepsPerBar);
-    const step = tempoFold === 1 ? e.step : at - Math.floor(at / stepsPerBar) * stepsPerBar;
+    const folded = tempoFold === 1 || grid === 'set' ? { bar: e.bar, step: e.step } : foldedStep(e.bar * 16 + e.step, tempoFold, stepsPerBar);
+    const bar = startBar + folded.bar;
+    const step = folded.step;
     const placementRole: PlacementRole = e.step >= 15 ? 'turnaround' : e.step >= 6 && e.step <= 8 ? 'answer' : 'accent';
     const role: ScratchRole = e.gesture === 'needleDrop' ? 'INTRO' : e.gesture === 'needleLift' ? 'OUTRO' : e.gesture === 'drop' ? 'INTRO' : CUE_ROLE_SCRATCH_ROLE[e.cueRole];
     const spec = render?.[i] ? (tempoFold !== 1 ? { ...render[i]!, tempoFold } : render[i]!) : undefined;

@@ -50,6 +50,8 @@ vi.mock('../DJPerSongFx', () => ({ applyPerSongMasterFx: () => {} }));
 
 import { useDJStore } from '@/stores/useDJStore';
 import { corpusPipelineAnalysis, corpusTrack, CORPUS_SPECS } from '../autodj/testing/corpus';
+// the demo's overlay folds the section to its routine tempo (render_scratch_section: half-time over this 130 BPM set)
+import { scratchTempoFold } from '../scratch/scratchTempo';
 import { computeExtendedAnalysis } from '../autodj/activityTimelines';
 import { buildDJTrackAnalysis } from '../autodj/trackAnalysis';
 import { barIndexAt, barStartBeat, timeAtBeat } from '../autodj/beatGrid';
@@ -134,7 +136,7 @@ async function tenMinutes(mode: ScratchMode) {
   const ctrl = (rig.dj as unknown as { scratch: { deps: { seed: number } } }).scratch;
   const choice = scratchStyleFor('auto', analysis.genre);
   const ctx = buildScratchContext({ perf: { currentDeck: 'A', currentTrack: analysis, currentPosition: startSec, setEnergy: 0.6, targetEnergy: 0.7 } as unknown as DJPerformanceContext, style: choice.style, scratchPermission: 4 })!;
-  const demoAt = (seed: number) => planScratch(ctx, { mode: mode === 'OFF' ? 'MUSICAL' : mode, seed, fromBar: firstBar, bars, sectionAt: (b) => overlaySectionAt(analysis, b), profile: choice.profile, records: true, extras: false });
+  const demoAt = (seed: number) => planScratch(ctx, { mode: mode === 'OFF' ? 'MUSICAL' : mode, seed, fromBar: firstBar, bars, sectionAt: (b) => overlaySectionAt(analysis, b), profile: choice.profile, records: true, extras: false, tempoFold: scratchTempoFold(BPM) });
   const demo = demoAt(ctrl.deps.seed);
   const demoDuty = new Set(demo.events.map((e) => e.bar)).size / bars;
   // density and repetition (the owner, 2026-10-12: "repetitive sparse boring"): strokes per phrase with a

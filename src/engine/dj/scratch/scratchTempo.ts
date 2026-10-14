@@ -29,3 +29,33 @@ export function scratchTempoFold(bpm: number): number {
   const k = Math.ceil(Math.log2(bpm / SCRATCH_MAX_ROUTINE_BPM) - 1e-9);
   return 2 ** Math.max(-2, Math.min(2, k));
 }
+
+/**
+ * A routine position on the set's grid: the routine's `routineStep` (16ths from its start, `stepsPerBar` a bar)
+ * at `fold` of the set's 16ths each, as the set's bar (from the routine's first) and step in that bar. One rule
+ * for every folded plan: the demo's routines (`demoRoutineToPlaced`) and the section overlay (`planScratch`).
+ */
+export function foldedStep(routineStep: number, fold: number, stepsPerBar: number): { bar: number; step: number } {
+  const at = routineStep * fold;
+  const bar = Math.floor(at / stepsPerBar + 1e-9);
+  return { bar, step: at - bar * stepsPerBar };
+}
+
+/** Python's round(): half to even (the demo's `int(round(x))`). */
+export function roundHalfEven(x: number): number {
+  const r = Math.round(x);
+  return Math.abs(x % 1) === 0.5 && r % 2 !== 0 ? r - 1 : r;
+}
+
+/**
+ * Samples per routine 16th (scratch.routine_step_samples): the fold times the set's own whole-sample 16th, so a
+ * folded routine stays on the set's sample grid (a 16th recomputed at bpm / fold would round differently and drift).
+ */
+export function foldedStepSamples(setStepSamples: number, fold: number): number {
+  return fold === 1 ? setStepSamples : roundHalfEven(setStepSamples * fold);
+}
+
+/** A section's length in routine bars (render_scratch_section's `r_bars`, three_deck's phrase loop). */
+export function routineBarsIn(bars: number, fold: number): number {
+  return fold === 1 ? bars : Math.max(1, roundHalfEven(bars / fold));
+}

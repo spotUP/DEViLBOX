@@ -4,7 +4,6 @@
  * drop_phrase, from its first sample), its last word chopped (ACCENT) - every stroke scheduled is the demo's event
  * (`build_scratch_events(phrase_emphasis=True)`) on that record with its slice; any other selection keeps the rotation.
  */
-import { scratchTempoFold } from '../scratch/scratchTempo';
 import { describe, it, expect } from 'vitest';
 import { DJScratchDJ } from '../scratch/DJScratchDJ';
 import { buildThreeDeckRoutine, demoRoutineStats } from '../scratch/scratchDemoRoutines';
@@ -12,6 +11,7 @@ import { corpusAnalysis } from '../autodj/testing/corpus';
 import { timeAtBeat, barStartBeat } from '../autodj/beatGrid';
 import type { DJPerformanceContext, DJTrackAnalysis } from '../autodj/types';
 import type { ScratchEvent } from '../scratch/scratchTypes';
+import { scratchTempoFold } from '../scratch/scratchTempo';
 
 const PHRASE = 'IF_YOU_REALLY_LIKE_TO_ROCK_THE_FUNKY_BEAT';
 const perfAt = (track: DJTrackAnalysis, t: number): DJPerformanceContext => ({
@@ -39,12 +39,13 @@ describe('statement and chop through the controller (C16)', () => {
     const { events, plan, fromBar, track } = run([PHRASE]);
     expect(plan).not.toBeNull();
     expect(demoRoutineStats.threeDeck - before).toBe(1);
-    const demo = buildThreeDeckRoutine(5 + fromBar, { pools: { HOME: [PHRASE], SECONDARY: [PHRASE], ACCENT: [PHRASE], FX: [PHRASE] }, phraseEmphasis: true });
+    const demo = buildThreeDeckRoutine(5 + fromBar, { pools: { HOME: [PHRASE], SECONDARY: [PHRASE], ACCENT: [PHRASE], FX: [PHRASE] }, phraseEmphasis: true, fold: scratchTempoFold(track.bpm) });
     const strokes = events.filter((e) => e.gesture !== 'needleDrop' && e.gesture !== 'needleLift');
     const want = demo.filter((e) => e.gesture !== 'needleDrop' && e.gesture !== 'needleLift');
-    // the routine's 16ths on the set's grid, half-time over a fast set (scratchTempoFold)
-    const fold = scratchTempoFold(track.bpm);
-    expect(strokes.map((e) => [e.executeAtBeat, e.gesture])).toEqual(want.map((e) => [barStartBeat(track.downbeats, fromBar) + (e.bar * 16 + e.step) * fold / 4, e.gesture]));
+    // three_deck folds inside each section of the set's 32 bars (half-time over the 130 BPM drops track): the
+    // builder places every stroke on the set's grid
+    expect(scratchTempoFold(track.bpm)).toBe(2);
+    expect(strokes.map((e) => [e.executeAtBeat, e.gesture])).toEqual(want.map((e) => [barStartBeat(track.downbeats, fromBar + e.bar) + e.step / 4, e.gesture]));
     for (const e of strokes) {
       expect(e.source.type === 'CRATE' && e.source.recordId).toBe(PHRASE);
       expect(e.render?.slice).toBe(e.gesture === 'dropPhrase' ? 'phrase' : 'word');

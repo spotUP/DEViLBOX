@@ -17,6 +17,7 @@ import { maxLevelFor, PALETTE_PROFILE, SCRATCH_PROFILES, styleVocabulary, type S
 import { getGesture, gestureBeats, SCRATCH_GESTURE_IDS } from './scratchGestureCatalog';
 import { DEFAULT_GRID, STEPS_PER_BEAT, stepToBeat } from './scratchAnchor';
 import { barStartBeat } from '../autodj/beatGrid';
+import { foldedStep, routineBarsIn } from './scratchTempo';
 import { overlayRecord } from './scratchDemoRoutines';
 import type { ScratchPerformanceContext } from './scratchContext';
 import { DEMO_PROFILES, DEMO_RATE, type DemoProfileName } from './scratchRender';
@@ -56,6 +57,10 @@ export interface ScratchPlanOptions {
   vocalByBar?: readonly number[];
   /** Gestures left out of the vocabulary. */
   exclude?: readonly ScratchGestureId[];
+  /** The set's beats per overlay beat (`scratchTempoFold`): the overlay plays each section at the demo's tempo -
+   *  half-time over a fast set, a section of 16 of the set's bars planned as 8 of its own - every stroke on the
+   *  set's grid (SCRATCH-FOLD-OVERLAY). Omitted: 1. */
+  tempoFold?: number;
   /** Steps up (+) or down (-) the density ladder from the section's state, still capped by the mode
    *  (section 52: escalate after a phrase that lifted the energy, resolve after a repeated one). */
   densityShift?: number;
@@ -232,8 +237,38 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
   const vocalAt = (k: number): number => vocalByBar[k] ?? 0;
   const grid = DEFAULT_GRID;
   const bpb = ctx.meter;
+  // the overlay at the demo's tempo (scratchTempo): a section plays `rbars` bars of its own, a set bar holds the
+  // overlay bars `overlayBarsAt` and an overlay (bar, step) lands on the set's grid by `foldedStep`
+  const fold = opts.tempoFold ?? 1;
+  const perBar = bpb * STEPS_PER_BEAT[grid];
+  const overlayBarsAt = (local: number, rbars: number): number[] => {
+    if (fold === 1) return [local];
+    const out: number[] = [];
+    for (let rb = Math.floor(local / fold + 1e-9); rb < Math.min(rbars, Math.ceil((local + 1) / fold - 1e-9)); rb++) out.push(rb);
+    return out;
+  };
+  const onTheSet = (sec: OverlaySection, rb: number, step: number): { bar: number; step: number } => {
+    if (fold === 1) return { bar: sec.startBar + rb, step };
+    const p = foldedStep(rb * perBar + step, fold, perBar);
+    return { bar: sec.startBar + p.bar, step: p.step };
+  };
+  const folded = (spec: ScratchRenderSpec): ScratchRenderSpec => (fold === 1 ? spec : { ...spec, tempoFold: fold });
+  /** A phrase event at the section's overlay bar `rb` placed on the set's grid. */
+  const place = (e: PlacedScratch, sec: OverlaySection, rb: number, render: ScratchRenderSpec, layer: 'demo' | 'extra'): PlacedScratch => {
+    const p = onTheSet(sec, rb, e.step);
+    return { ...e, bar: p.bar, step: p.step, beat: stepToBeat(p, grid, bpb), render: folded(render), layer, ...(fold !== 1 ? { beats: (e.beats ?? gestureBeats(e.gesture)) * fold } : {}) };
+  };
 
-  interface SectionPlan { natural: DensityState; extraState: DensityState; extraRate: number; routineBars: Map<number, PlacedScratch[]>; record?: string; render: OverlayRender }
+  interface SectionPlan {
+    natural: DensityState; extraState: DensityState; extraRate: number;
+    /** The section's length in overlay bars (its set bars / the fold). */
+    rbars: number;
+    /** The routine option's closing bars, by overlay bar, placed on the set's grid. */
+    routineBars: Map<number, PlacedScratch[]>;
+    /** The demo's phrase of an overlay bar, placed once (its human timing is drawn once per slot). */
+    phrases: Map<number, { placed: PlacedScratch[]; steps: Set<number> }>;
+    record?: string; render: OverlayRender;
+  }
   const demoProfile = profile.reference as DemoProfileName;
   const sections = new Map<string, SectionPlan>();
   const sectionPlan = (sec: OverlaySection): SectionPlan => {
@@ -249,33 +284,40 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
     const extraRate = DENSITY_RATE[extraState] * (genre.densityScale ?? 1);
     reasons.push(`${sec.name} (bars ${sec.startBar}-${sec.startBar + sec.bars - 1}): the demo's ${natural}${extrasOn && extraRate > DENSITY_RATE[natural] ? `, extras up to ${extraState}` : ''}`);
     const routineBars = new Map<number, PlacedScratch[]>();
+    // render_scratch_section's r_bars: the section's bars at the routine's tempo
+    const rbars = routineBarsIn(sec.bars, fold);
     // the demo renders the section from its own seed (the track seed + the bars before it)
     const sectionSeed = opts.seed + sec.startBar;
     const demoName = opts.routine ? (opts.routine === 'auto' ? routineFor(profile.id, sec.name) : opts.routine) : null;
-    const demoRb = demoName ? Math.min(SCRATCH_ROUTINES[demoName].bars, sec.bars) : 0;
+    const demoRb = demoName ? Math.min(SCRATCH_ROUTINES[demoName].bars, rbars) : 0;
     const render = overlayRender({
-      key: `${sec.startBar}:${sec.name}`, bars: sec.bars, seed: sectionSeed, profile: demoProfile,
-      demoSteps: (b) => demoPhraseSteps({ style, section: sec.name, bar: b, bars: sec.bars, seed: sectionSeed, gestures: profile.gestures, scale: profile.scale }),
-      routineBars: new Set(Array.from({ length: demoRb }, (_, k) => sec.bars - demoRb + k)),
+      key: `${sec.startBar}:${sec.name}`, bars: rbars, seed: sectionSeed, profile: demoProfile,
+      demoSteps: (b) => demoPhraseSteps({ style, section: sec.name, bar: b, bars: rbars, seed: sectionSeed, gestures: profile.gestures, scale: profile.scale }),
+      routineBars: new Set(Array.from({ length: demoRb }, (_, k) => rbars - demoRb + k)),
     });
     // the demo's routine option: the routine takes the section's closing bars as written; a step past the section is trimmed
     if (demoName) {
       const r = SCRATCH_ROUTINES[demoName];
-      const first = sec.bars - demoRb;
+      const first = rbars - demoRb;
       const placed = r.events.filter((ev) => ev.bar * 16 + ev.step < demoRb * 16).map((ev): PlacedScratch => {
-        const bar = sec.startBar + first + ev.bar + Math.floor(ev.step / 16);
-        const step = ev.step % 16;
+        const rb = first + ev.bar + Math.floor(ev.step / 16);
+        const { bar, step } = onTheSet(sec, rb, ev.step % 16);
         // with a record set each word slot scratches its own record (`_routine_cues`, R12)
         const record = allowed ? routineSlotRecord(ev.sourceRole, allowed) : undefined;
         return {
           bar, step, beat: stepToBeat({ bar, step }, grid, bpb), gesture: ev.gesture, velocity: ev.velocity, placementRole: ev.role === 'ANSWER' ? 'answer' as const : step >= 15 ? 'turnaround' as const : 'accent' as const, role: ev.role,
-          render: render.routine(ev.bar, ev.step, first, ev.tail), routineSlot: ev.sourceRole, layer: 'demo', ...(record ? { record } : {}),
+          render: folded(render.routine(ev.bar, ev.step, first, ev.tail)), routineSlot: ev.sourceRole, layer: 'demo', ...(record ? { record } : {}),
+          ...(fold !== 1 ? { beats: gestureBeats(ev.gesture) * fold } : {}),
         };
       });
-      for (let k = 0; k < demoRb; k++) routineBars.set(sec.startBar + first + k, placed.filter((p) => p.bar === sec.startBar + first + k));
+      // by overlay bar (its strokes on the set's bars it spans)
+      for (let k = 0; k < demoRb; k++) {
+        const from = onTheSet(sec, first + k, 0).bar, to = onTheSet(sec, first + k + 1, 0).bar;
+        routineBars.set(first + k, placed.filter((p) => p.bar >= from && p.bar < Math.max(to, from + 1)));
+      }
       reasons.push(`routine ${demoName} closes ${sec.name} at bar ${sec.startBar + first}`);
     }
-    const plan: SectionPlan = { natural, extraState, extraRate, routineBars, record: pool ? overlayRecord(sec.name, opts.seed + sec.startBar, pool) : undefined, render };
+    const plan: SectionPlan = { natural, extraState, extraRate, rbars, routineBars, phrases: new Map(), record: pool ? overlayRecord(sec.name, opts.seed + sec.startBar, pool) : undefined, render };
     sections.set(key, plan);
     return plan;
   };
@@ -290,16 +332,29 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
     const sp = sectionPlan(sec);
     const local = bar - sec.startBar;
     const vocal = vocalAt(k);
-    const fixed = sp.routineBars.get(bar);
     const withRecord = (e: PlacedScratch): PlacedScratch => (sp.record && !e.record ? { ...e, record: sp.record } : e);
-    let base: PlacedScratch[];
-    if (fixed) {
-      base = fixed;
-      routine = (opts.routine === 'auto' ? routineFor(profile.id, sec.name) : opts.routine) ?? undefined;
-    } else {
+    // the overlay bars this set bar holds (one, unfolded; half of one, half-time)
+    const rbs = overlayBarsAt(local, sp.rbars);
+    const phraseOf = (rb: number): { placed: PlacedScratch[]; steps: Set<number> } => {
+      const known = sp.phrases.get(rb);
+      if (known) return known;
       scratchOverlayStats.sectionBars++;
-      base = planPhrase({ style, section: sec.name, bar: local, bars: sec.bars, seed: opts.seed + sec.startBar, gestures: profile.gestures, scale: profile.scale, density: sp.natural, beatsPerBar: bpb, grid, demo: true })
-        .map((e) => ({ ...e, bar, beat: stepToBeat({ bar, step: e.step }, grid, bpb), render: sp.render.stroke(local, e.step), layer: 'demo' as const }));
+      const raw = planPhrase({ style, section: sec.name, bar: rb, bars: sp.rbars, seed: opts.seed + sec.startBar, gestures: profile.gestures, scale: profile.scale, density: sp.natural, beatsPerBar: bpb, grid, demo: true });
+      const out = { placed: raw.map((e) => place(e, sec, rb, sp.render.stroke(rb, e.step), 'demo')), steps: new Set(raw.map((e) => e.step)) };
+      sp.phrases.set(rb, out);
+      return out;
+    };
+    const base: PlacedScratch[] = [];
+    let fixed = false;
+    for (const rb of rbs) {
+      const closing = sp.routineBars.get(rb);
+      if (closing) {
+        fixed = true;
+        base.push(...closing.filter((e) => e.bar === bar));
+        routine = (opts.routine === 'auto' ? routineFor(profile.id, sec.name) : opts.routine) ?? undefined;
+      } else {
+        base.push(...phraseOf(rb).placed.filter((e) => e.bar === bar));
+      }
     }
     demoEvents.push(...base.map(withRecord));
     if (!extrasOn || fixed || extraVocab.length === 0) continue;
@@ -307,10 +362,13 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
     let extra: PlacedScratch[] = [];
     const rate = sp.extraRate * (1 - Math.max(0, Math.min(1, vocal)));
     if (rate > DENSITY_RATE[sp.natural] + 1e-12) {
-      const taken = new Set(base.map((e) => e.step));
-      extra = planPhrase({ style, section: sec.name, bar: local, bars: sec.bars, seed: opts.seed + sec.startBar, gestures: extraVocab, scale: profile.scale, density: sp.extraState, rateOverride: rate, beatsPerBar: bpb, grid })
-        .filter((e) => !taken.has(e.step))
-        .map((e) => ({ ...e, bar, beat: stepToBeat({ bar, step: e.step }, grid, bpb), render: sp.render.stroke(local, e.step, false), layer: 'extra' as const }));
+      for (const rb of rbs) {
+        const taken = phraseOf(rb).steps;
+        extra.push(...planPhrase({ style, section: sec.name, bar: rb, bars: sp.rbars, seed: opts.seed + sec.startBar, gestures: extraVocab, scale: profile.scale, density: sp.extraState, rateOverride: rate, beatsPerBar: bpb, grid })
+          .filter((e) => !taken.has(e.step))
+          .map((e) => place(e, sec, rb, sp.render.stroke(rb, e.step, false), 'extra'))
+          .filter((e) => e.bar === bar));
+      }
     }
     // section 24: a busy vocal bar keeps only the extras' answers; a vocal call just ended gets an answer
     if (vocal > VOCAL_BUSY && extra.length) {
@@ -323,7 +381,13 @@ export function planScratch(ctx: ScratchPerformanceContext, opts: ScratchPlanOpt
       const rnd = lfsr(barSeed(opts.seed + sec.startBar, local, sec.name) + 0x5a);
       const energy = SECTION_ENERGY[sec.name as ScratchSection] ?? 0.4;
       const g = pickGesture(vocabulary(extraVocab), energy, 'answer', rnd, null);
-      extra.push({ bar, step: 8, beat: stepToBeat({ bar, step: 8 }, grid, bpb), gesture: g, velocity: Math.min(1, PLAN_VEL.base + PLAN_VEL.rand * rnd() + PLAN_VEL.energy * energy), placementRole: 'answer', role: 'ANSWER', render: sp.render.stroke(local, 8, false), layer: 'extra' });
+      // on the set's step 8; rendered at its overlay (bar, step)
+      const at = (local * perBar + 8) / fold;
+      const rb = Math.floor(at / perBar + 1e-9);
+      extra.push({
+        bar, step: 8, beat: stepToBeat({ bar, step: 8 }, grid, bpb), gesture: g, velocity: Math.min(1, PLAN_VEL.base + PLAN_VEL.rand * rnd() + PLAN_VEL.energy * energy), placementRole: 'answer', role: 'ANSWER',
+        render: folded(sp.render.stroke(rb, at - rb * perBar, false)), layer: 'extra', ...(fold !== 1 ? { beats: gestureBeats(g) * fold } : {}),
+      });
     }
     extraEvents.push(...extra.map(withRecord));
   }
