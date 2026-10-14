@@ -64,7 +64,6 @@ import { getBehaviorForScheme } from '@engine/keyboard/EditorBehavior';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 
 const SONG = 'public/data/songs/wally-beben/wicked.wb';
-const SR = 48000;
 const press = (key: string) => window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
 
 describe('Enter sounds the row through the song\'s engine (wicked.wb, stopped, channel 2 muted)', () => {
