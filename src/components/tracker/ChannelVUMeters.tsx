@@ -65,9 +65,15 @@ interface ChannelVUMetersProps {
   channelCount?: number;
   /** Meter this source instead of the tracker's engine (a DJ deck). */
   feed?: ChannelMeterFeed;
+  /**
+   * Scale the pattern text is drawn at (fit all channels). The offsets and
+   * widths are already in px at that scale; the row-number gutter they start
+   * after and the meter's own size shrink with it.
+   */
+  scale?: number;
 }
 
-export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOffsets = [], channelWidths = [], scrollLeft: scrollLeftProp = 0, editRowY: editRowYProp, channelCount, feed }) => {
+export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOffsets = [], channelWidths = [], scrollLeft: scrollLeftProp = 0, editRowY: editRowYProp, channelCount, feed, scale: scaleProp = 1 }) => {
   const { patterns, currentPatternIndex } = useTrackerStore(useShallow(s => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex
@@ -88,6 +94,8 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
   const channelOffsetsRef = useRef(channelOffsets);
   const channelWidthsRef = useRef(channelWidths);
   const editRowYRef = useRef(editRowYProp ?? 0);
+  const scaleRef = useRef(scaleProp);
+  useEffect(() => { scaleRef.current = scaleProp; }, [scaleProp]);
   const feedRef = useRef(feed);
   useEffect(() => { feedRef.current = feed; }, [feed]);
   useEffect(() => { numChannelsRef.current = numChannels; }, [numChannels]);
@@ -174,6 +182,11 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         }
       }
       const sl = scrollLeftRef.current;
+      const sc = scaleRef.current;
+      const gutter = Math.floor(LINE_NUMBER_WIDTH * sc); // as the canvas draws the row numbers
+      const meterW = METER_WIDTH * sc;
+      const segH = SEGMENT_HEIGHT * sc;
+      const segGap = SEGMENT_GAP * sc;
       const offsets = channelOffsetsRef.current;
       const widths = channelWidthsRef.current;
       const isPlaying = fed ? fed.playing : useTransportStore.getState().isPlaying;
@@ -253,15 +266,15 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         // Calculate channel center X
         let centerX: number;
         if (offsets[i] !== undefined && widths[i]) {
-          const offset = offsets[i] - LINE_NUMBER_WIDTH;
+          const offset = offsets[i] - gutter;
           centerX = offset + widths[i] / 2;
         } else {
-          centerX = i * 260 + 130;
+          centerX = (i * 260 + 130) * sc;
         }
 
         // Get channel width for fill style
-        const channelW = widths[i] || 260;
-        const channelX = offsets[i] !== undefined ? offsets[i] - LINE_NUMBER_WIDTH - sl : i * 260 - sl;
+        const channelW = widths[i] || 260 * sc;
+        const channelX = offsets[i] !== undefined ? offsets[i] - gutter - sl : i * 260 * sc - sl;
 
         // Edit row Y — segments extrude from this line, offset up to avoid drawing over the edit bar
         const ery = editRowYRef.current - 12;
@@ -282,12 +295,12 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
           // Segments style: LED-style bars
           // Apply scroll and swing
           const swingPos = swingEnabled && meter.level > 0.02
-            ? Math.sin(performance.now() * SWING_FREQ + i * SWING_PHASE_STEP) * SWING_RANGE
+            ? Math.sin(performance.now() * SWING_FREQ + i * SWING_PHASE_STEP) * SWING_RANGE * sc
             : 0;
-          const meterX = centerX - METER_WIDTH / 2 - sl + swingPos;
+          const meterX = centerX - meterW / 2 - sl + swingPos;
 
           const activeSegments = Math.round(meter.level * NUM_SEGMENTS);
-          const segStep = SEGMENT_HEIGHT + SEGMENT_GAP;
+          const segStep = segH + segGap;
 
           for (let s = 0; s < activeSegments; s++) {
             const ratio = s / (NUM_SEGMENTS - 1);
@@ -305,12 +318,12 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
             ctx.fillStyle = color;
             // Segments grow upward from edit row
             const segYUp = ery - (s + 1) * segStep;
-            ctx.fillRect(Math.round(meterX), Math.round(segYUp), METER_WIDTH, SEGMENT_HEIGHT);
+            ctx.fillRect(Math.round(meterX), Math.round(segYUp), meterW, segH);
 
             if (mirrorEnabled) {
               // Mirrored: segments grow downward from edit row
               const segYDown = ery + s * segStep;
-              ctx.fillRect(Math.round(meterX), Math.round(segYDown), METER_WIDTH, SEGMENT_HEIGHT);
+              ctx.fillRect(Math.round(meterX), Math.round(segYDown), meterW, segH);
             }
           }
         }
