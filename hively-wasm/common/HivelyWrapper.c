@@ -26,6 +26,17 @@ static int16 *g_mixBufL = NULL;
 static int16 *g_mixBufR = NULL;
 static uint32 g_mixBufSize = 0; /* in samples */
 static int g_initialized = 0;
+/* Tempo scale for the song (the tracker pitch slider under Key Lock). Kept
+ * here so it carries over to every tune loaded after it was set. */
+static float64 g_tempoScale = 1.0;
+#define HVL_MIN_TEMPO_SCALE 0.25
+#define HVL_MAX_TEMPO_SCALE 4.0
+
+/* The longest frame a scaled tempo can produce: nominal frame / min scale,
+ * plus one carried sample per chunk. */
+static uint32 max_frame_samples(void) {
+    return (uint32)((float64)(g_sampleRate / 50) / HVL_MIN_TEMPO_SCALE) + 4;
+}
 
 /* ---- Helpers ---- */
 
@@ -63,9 +74,9 @@ int hively_load_tune(uint8 *buf, uint32 len, int32 defstereo) {
         return 0; /* failure */
     }
 
-    /* Allocate mix buffer for one frame: freq/50 samples */
-    uint32 frameSamples = g_sampleRate / 50;
-    ensure_mix_buffer(frameSamples);
+    /* Allocate mix buffer for the longest frame a tempo scale can produce */
+    ensure_mix_buffer(max_frame_samples());
+    g_tune->ht_TempoScale = g_tempoScale;
 
     /* Init first subsong */
     hvl_InitSubsong(g_tune, 0);
@@ -95,15 +106,15 @@ EMSCRIPTEN_KEEPALIVE
 uint32 hively_decode_frame(float *outL, float *outR) {
     if (!g_tune) return 0;
 
-    uint32 frameSamples = g_sampleRate / 50;
-    ensure_mix_buffer(frameSamples);
+    ensure_mix_buffer(max_frame_samples());
 
     /* Clear mix buffers */
-    memset(g_mixBufL, 0, frameSamples * sizeof(int16));
-    memset(g_mixBufR, 0, frameSamples * sizeof(int16));
+    memset(g_mixBufL, 0, g_mixBufSize * sizeof(int16));
+    memset(g_mixBufR, 0, g_mixBufSize * sizeof(int16));
 
-    /* Decode frame - outputs int16 stereo */
+    /* Decode frame - outputs int16 stereo; its length follows the tempo scale */
     hvl_DecodeFrame(g_tune, (int8 *)g_mixBufL, (int8 *)g_mixBufR, 2);
+    uint32 frameSamples = g_tune->ht_FrameSamples;
 
     /* Convert int16 → float32 normalized to [-1, 1] */
     const float scale = 1.0f / 32768.0f;
@@ -118,6 +129,28 @@ uint32 hively_decode_frame(float *outL, float *outR) {
 EMSCRIPTEN_KEEPALIVE
 uint32 hively_get_frame_samples(void) {
     return g_sampleRate / 50;
+}
+
+/* Size of the float buffers hively_decode_frame / hively_render_frame write:
+ * a slowed tempo makes a frame longer than hively_get_frame_samples(). */
+EMSCRIPTEN_KEEPALIVE
+uint32 hively_get_max_frame_samples(void) {
+    return max_frame_samples();
+}
+
+/*
+ * Tempo scale: ticks come `scale` times as fast, pitch untouched (samples per
+ * tick / scale). 1.0 = the song's own tempo. Clamped to 0.25..4. Applies to
+ * the loaded tune and to every tune loaded after.
+ */
+EMSCRIPTEN_KEEPALIVE
+void hively_set_tempo_scale(float scale) {
+    float64 s = (float64)scale;
+    if (!(s > 0.0)) s = 1.0;
+    if (s < HVL_MIN_TEMPO_SCALE) s = HVL_MIN_TEMPO_SCALE;
+    if (s > HVL_MAX_TEMPO_SCALE) s = HVL_MAX_TEMPO_SCALE;
+    g_tempoScale = s;
+    if (g_tune) g_tune->ht_TempoScale = s;
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -161,13 +194,14 @@ EMSCRIPTEN_KEEPALIVE
 uint32 hively_render_frame(float *outL, float *outR) {
     if (!g_tune) return 0;
 
-    uint32 frameSamples = g_sampleRate / 50;
-    ensure_mix_buffer(frameSamples);
+    ensure_mix_buffer(max_frame_samples());
 
-    memset(g_mixBufL, 0, frameSamples * sizeof(int16));
-    memset(g_mixBufR, 0, frameSamples * sizeof(int16));
+    memset(g_mixBufL, 0, g_mixBufSize * sizeof(int16));
+    memset(g_mixBufR, 0, g_mixBufSize * sizeof(int16));
 
     hvl_RenderFrame(g_tune, (int8 *)g_mixBufL, (int8 *)g_mixBufR, 2);
+    /* Planned by hively_tick_frame, so every re-render of a frame is equally long */
+    uint32 frameSamples = g_tune->ht_FrameSamples;
 
     const float scale = 1.0f / 32768.0f;
     for (uint32 i = 0; i < frameSamples; i++) {
@@ -475,6 +509,7 @@ int32 hively_create_player(uint32 sampleRate) {
     ht->ht_InstrumentNr = 1;
     ht->ht_SubsongNr = 0;
     ht->ht_SpeedMultiplier = 1;
+    ht->ht_TempoScale = 1.0;
     ht->ht_Tempo = 6;
     ht->ht_defstereo = 0;
     ht->ht_defpanleft = 128;

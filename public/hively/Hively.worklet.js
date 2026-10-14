@@ -34,6 +34,10 @@ class HivelyProcessor extends AudioWorkletProcessor {
     // one block at a time so a step change does not click.
     this.rateFactor = 1.0;
     this.rateTarget = 1.0;
+    // Tempo scale: ticks this much faster, pitch untouched (the replayer's
+    // samples per tick, hively_set_tempo_scale). The tracker pitch slider
+    // under Key Lock. Kept here so a value sent before init still applies.
+    this.tempoScale = 1.0;
     // Sub-sample read position, kept separately so rounding never accumulates
     // into a drift at 1.0x.
     this.ringReadFrac = 0;
@@ -196,6 +200,15 @@ class HivelyProcessor extends AudioWorkletProcessor {
       case 'setRateFactor': {
         const v = Number(data.value);
         this.rateTarget = Number.isFinite(v) ? Math.min(4, Math.max(0.02, v)) : 1.0;
+        break;
+      }
+
+      // Tempo only, pitch untouched: the replayer's tick length is scaled
+      // (hively_set_tempo_scale clamps to 0.25..4). Lossless, no resampling.
+      case 'setTempoScale': {
+        const v = Number(data.value);
+        this.tempoScale = Number.isFinite(v) && v > 0 ? v : 1.0;
+        if (this.wasm && this.wasm._hively_set_tempo_scale) this.wasm._hively_set_tempo_scale(this.tempoScale);
         break;
       }
 
@@ -383,9 +396,15 @@ class HivelyProcessor extends AudioWorkletProcessor {
       // Initialize replayer
       this.wasm._hively_init(Math.floor(sr));
 
-      // Allocate decode buffers in WASM heap
+      if (this.wasm._hively_set_tempo_scale) this.wasm._hively_set_tempo_scale(this.tempoScale);
+
+      // Allocate decode buffers in WASM heap. A slowed tempo makes a frame
+      // longer than the nominal sr/50, so they hold the longest one.
       this.frameSamples = Math.floor(sr / 50);
-      const floatBytes = this.frameSamples * 4;
+      const maxFrame = this.wasm._hively_get_max_frame_samples
+        ? this.wasm._hively_get_max_frame_samples()
+        : this.frameSamples;
+      const floatBytes = maxFrame * 4;
       this.decodePtrL = this.wasm._malloc(floatBytes);
       this.decodePtrR = this.wasm._malloc(floatBytes);
 

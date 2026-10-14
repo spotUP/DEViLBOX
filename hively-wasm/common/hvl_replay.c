@@ -414,6 +414,8 @@ struct hvl_tune *hvl_load_ahx( uint8 *buf, uint32 buflen, uint32 defstereo, uint
   
   ht->ht_Frequency       = freq;
   ht->ht_FreqF           = (float64)freq;
+  ht->ht_TempoScale      = 1.0;
+  ht->ht_TickSampleAcc   = 0.0;
   
   ht->ht_Positions   = (struct hvl_position *)(&ht[1]);
   ht->ht_Instruments = (struct hvl_instrument *)(&ht->ht_Positions[posn]);
@@ -654,6 +656,8 @@ struct hvl_tune *hvl_reset( uint8 *buf, uint32 buflen, uint32 defstereo, uint32 
   ht->ht_Version         = buf[3]; // 1.5
   ht->ht_Frequency       = freq;
   ht->ht_FreqF           = (float64)freq;
+  ht->ht_TempoScale      = 1.0;
+  ht->ht_TickSampleAcc   = 0.0;
   
   ht->ht_Positions       = (struct hvl_position *)(&ht[1]);
   ht->ht_Instruments     = (struct hvl_instrument *)(&ht->ht_Positions[posn]);
@@ -2040,21 +2044,51 @@ void hvl_mixchunk( struct hvl_tune *ht, uint32 samples, int8 *buf1, int8 *buf2, 
   }
 }
 
+/*
+ * Plan the current frame: how many samples each of its ht_SpeedMultiplier
+ * play_irq chunks renders. The tick length is the tempo; the voices' pitch
+ * comes from ht_Frequency, so scaling the chunk length (ht_TempoScale) moves
+ * the tempo and leaves the pitch alone. At scale 1.0 the song's own integer
+ * division is kept, so unscaled playback is bit-identical to the reference.
+ */
+void hvl_PlanFrame( struct hvl_tune *ht )
+{
+  uint32 i, n, total = 0;
+  uint32 loops = ht->ht_SpeedMultiplier;
+  float64 scale = ht->ht_TempoScale;
+
+  for( i=0; i<loops; i++ )
+  {
+    if( scale <= 0.0 || scale == 1.0 )
+    {
+      n = ht->ht_Frequency/50/ht->ht_SpeedMultiplier;
+    }
+    else
+    {
+      float64 exact = (float64)ht->ht_Frequency/50.0/(float64)ht->ht_SpeedMultiplier/scale + ht->ht_TickSampleAcc;
+      n = (uint32)exact;
+      ht->ht_TickSampleAcc = exact - (float64)n;
+    }
+    ht->ht_ChunkSamples[i] = n;
+    total += n;
+  }
+  ht->ht_FrameSamples = total;
+}
+
 void hvl_DecodeFrame( struct hvl_tune *ht, int8 *buf1, int8 *buf2, int32 bufmod )
 {
-  uint32 samples, loops;
+  uint32 i, samples;
 
-  samples = ht->ht_Frequency/50/ht->ht_SpeedMultiplier;
-  loops   = ht->ht_SpeedMultiplier;
+  hvl_PlanFrame( ht );
 
-  do
+  for( i=0; i<ht->ht_SpeedMultiplier; i++ )
   {
+    samples = ht->ht_ChunkSamples[i];
     hvl_play_irq( ht );
     hvl_mixchunk( ht, samples, buf1, buf2, bufmod );
     buf1 += samples * bufmod;
     buf2 += samples * bufmod;
-    loops--;
-  } while( loops );
+  }
 }
 
 /*
@@ -2062,10 +2096,12 @@ void hvl_DecodeFrame( struct hvl_tune *ht, int8 *buf1, int8 *buf2, int32 bufmod 
  * Call hvl_TickFrame() once, then hvl_RenderFrame() N times with different
  * channel gains. Use hvl_SaveVoicePositions/hvl_RestoreVoicePositions between
  * renders to reset sample positions (since mixchunk advances them).
+ * The frame is planned at the tick, so every re-render has the same length.
  */
 void hvl_TickFrame( struct hvl_tune *ht )
 {
   uint32 loops = ht->ht_SpeedMultiplier;
+  hvl_PlanFrame( ht );
   do
   {
     hvl_play_irq( ht );
@@ -2075,15 +2111,14 @@ void hvl_TickFrame( struct hvl_tune *ht )
 
 void hvl_RenderFrame( struct hvl_tune *ht, int8 *buf1, int8 *buf2, int32 bufmod )
 {
-  uint32 samples = ht->ht_Frequency/50/ht->ht_SpeedMultiplier;
-  uint32 loops = ht->ht_SpeedMultiplier;
-  do
+  uint32 i, samples;
+  for( i=0; i<ht->ht_SpeedMultiplier; i++ )
   {
+    samples = ht->ht_ChunkSamples[i];
     hvl_mixchunk( ht, samples, buf1, buf2, bufmod );
     buf1 += samples * bufmod;
     buf2 += samples * bufmod;
-    loops--;
-  } while( loops );
+  }
 }
 
 void hvl_SaveVoicePositions( struct hvl_tune *ht )
