@@ -8,7 +8,9 @@
  * never reached a restored song (2026-10-06).
  *
  * For a song that carries the bytes the decoder read (uadeEditableFileData and
- * its name - every UADE byte-exact codec, MED, Sound Master, Jesper Olsen ...)
+ * its name - every UADE byte-exact codec, MED, Sound Master, Jesper Olsen ...;
+ * nuadeFileData / eaglePlayerFileData and their names for a song those engines
+ * play, storedModuleOf)
  * the restore runs the same parse a fresh load runs (parseModuleToSong, with
  * the stored companion files) and takes the grid and the engine fields from it.
  * The user's work is kept: a cell whose hash differs from the load-time
@@ -48,6 +50,24 @@ function lineUp(stored: readonly Pattern[], other: readonly Pattern[]): boolean 
   });
 }
 
+/**
+ * The module the decoder read and its file name. A UADE-routed song keeps it in uadeEditableFileData; a song nuade or
+ * the EaglePlayer runner plays keeps it in that engine's field (playOnNuade / playOnEaglePlayer take the UADE field
+ * off). Read from one field family, so bytes and name always belong together.
+ */
+export function storedModuleOf(eng: Record<string, unknown>): { bytes?: ArrayBuffer; name?: string } {
+  const pairs: [string, string][] = [
+    ['uadeEditableFileData', 'uadeEditableFileName'],
+    ['nuadeFileData', 'nuadeFileName'],
+    ['eaglePlayerFileData', 'eaglePlayerFileName'],
+  ];
+  for (const [data, fileName] of pairs) {
+    const bytes = eng[data] as ArrayBuffer | undefined;
+    if (bytes && bytes.byteLength > 0) return { bytes, name: eng[fileName] as string | undefined };
+  }
+  return {};
+}
+
 export async function restoreFromStoredBytes(
   song: SongToApply,
   baseline: GridBaseline | null | undefined,
@@ -55,8 +75,7 @@ export async function restoreFromStoredBytes(
 ): Promise<RestoreOutcome> {
   const kept = (reason: string): RestoreOutcome => ({ song, baseline: baseline ?? null, redecoded: false, reason });
   const eng = song.engine as Record<string, unknown>;
-  const bytes = eng.uadeEditableFileData as ArrayBuffer | undefined;
-  const name = eng.uadeEditableFileName as string | undefined;
+  const { bytes, name } = storedModuleOf(eng);
   if (!bytes || bytes.byteLength === 0 || !name) return kept('no stored module bytes');
   if (!baseline) return kept('saved without a grid baseline');
   if ((eng.uadeEditableSubsongs as { count?: number } | null | undefined)?.count && (eng.uadeEditableSubsongs as { count: number }).count > 1) {
