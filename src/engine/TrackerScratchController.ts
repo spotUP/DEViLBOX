@@ -28,7 +28,6 @@ import { getToneEngine } from './ToneEngine';
 import { getNativeAudioNode } from '@/utils/audio-context';
 import { useUIStore } from '@/stores/useUIStore';
 import { useTransportStore } from '@/stores/useTransportStore';
-import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { SCRATCH_PATTERNS, type ScratchPattern, type ScratchFrame } from './dj/DJScratchEngine';
 import { TurntablePhysics } from './turntable/TurntablePhysics';
@@ -96,8 +95,6 @@ export class TrackerScratchController {
   /** The replayer's original masterGain value before scratch started */
   private originalGainValue = 1;
 
-  /** The transport's original smoothScrolling state before scratch started */
-  private originalSmoothScrolling = false;
 
 
   /** Previous touch Y position for delta calculation (grab mode) */
@@ -542,8 +539,7 @@ export class TrackerScratchController {
     // Reset physics to normal state
     this.physics.reset();
 
-    // Restore original smooth scrolling state
-    useSettingsStore.getState().setSmoothScrolling(this.originalSmoothScrolling);
+    useUIStore.getState().setScratchActive(false);
 
   }
 
@@ -575,12 +571,8 @@ export class TrackerScratchController {
     const patterns = useTrackerStore.getState().patterns;
     this.scratchPatternLength = (patterns && patterns[this.scratchStartPattern]?.length) || 64;
 
-    // Store and enable smooth scrolling for scratch mode
-    const settingsState = useSettingsStore.getState();
-    this.originalSmoothScrolling = settingsState.smoothScrolling;
-    if (!settingsState.smoothScrolling) {
-      settingsState.setSmoothScrolling(true);
-    }
+    // Smooth scrolling during a scratch is a transient override (effectiveSmoothScrolling), never a write to the saved preference
+    useUIStore.getState().setScratchActive(true);
 
     // Sync physics to platter mass setting
     const state = useUIStore.getState();
@@ -723,8 +715,7 @@ export class TrackerScratchController {
     // Reset physics to normal state
     this.physics.reset();
 
-    // Restore original smooth scrolling state
-    useSettingsStore.getState().setSmoothScrolling(this.originalSmoothScrolling);
+    useUIStore.getState().setScratchActive(false);
   }
 
   // ── Physics loop (rAF-driven) ────────────────────────────────────────────
