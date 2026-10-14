@@ -10,7 +10,7 @@ import { useTrackerStore, useCursorStore, useTransportStore, useThemeStore, useE
 import { useMixerStore } from '@stores/useMixerStore';
 import { useChannelTypeStore } from '@stores/useChannelTypeStore';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
-import { channelLayout, notifyChannelLayout, stretchChannelWidths, subscribeChannelLayout, type ChannelLayout } from './channelLayout';
+import { channelLayout, notifyChannelLayout, fitAndStretchChannelWidths, subscribeChannelLayout, type ChannelLayout } from './channelLayout';
 import { resolveWasmPattern } from './wasmPatternHold';
 import { computeChannelFollowScroll, createChannelFollowGate } from '@/lib/tracker/followScroll';
 import { resolveCellColumn } from '@/lib/tracker/cellHitTest';
@@ -392,7 +392,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const globalLaneVisible = showAutomationLanes && !hideAutoLanesProp;
 
   // Channel Metrics: calculate numChannels, offsets, and widths once per pattern/theme change
-  const { numChannels, channelOffsets: rawChannelOffsets, channelWidths, totalChannelsWidth } = useMemo(() => {
+  const fitChannels = useSettingsStore(s => s.fitAllChannelsTracker) && !mobileCanvas;
+  const { numChannels, channelOffsets: rawChannelOffsets, channelWidths, totalChannelsWidth, fitScale } = useMemo(() => {
     // Global lane reserves GLOBAL_LANE_W between LNW (row number gutter) and
     // channel 0. When visible, every channel offset shifts right by that much.
     const globalLaneOffset = globalLaneVisible ? GLOBAL_LANE_W : 0;
@@ -406,6 +407,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         columnGap: mobileCanvas ? Math.round(4 * MOBILE_SCALE) : 4,
         channelPad: mobileCanvas ? Math.round(40 * MOBILE_SCALE) : 40,
         availableWidth: dimensions.width,
+        fit: fitChannels,
       });
     }
 
@@ -413,7 +415,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       numChannels: 0,
       channelOffsets: [],
       channelWidths: [],
-      totalChannelsWidth: 0
+      totalChannelsWidth: 0,
+      fitScale: 1,
     };
 
     const nc = pattern.channels.length;
@@ -455,28 +458,44 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Few channels fill the canvas (scopes, headers, meters and hit-testing all
     // read these widths); many channels keep their minimums and scroll. The
     // mobile canvas scrolls channel by channel, so it keeps minimums.
-    const leftEdge = LNW + globalLaneOffset;
-    const widths = mobileCanvas ? minWidths : stretchChannelWidths(minWidths, leftEdge, dimensions.width);
+    // Fit first (shrink the whole pattern so every channel is on screen), then stretch.
+    const fitted = mobileCanvas
+      ? { scale: 1, leftEdge: LNW + globalLaneOffset, widths: minWidths }
+      : fitAndStretchChannelWidths(minWidths, LNW + globalLaneOffset, dimensions.width, fitChannels);
+    const widths = fitted.widths;
     const offsets: number[] = [];
-    let currentX = leftEdge;
+    let currentX = fitted.leftEdge;
     for (const w of widths) { offsets.push(currentX); currentX += w; }
 
     return {
       numChannels: nc,
       channelOffsets: offsets,
       channelWidths: widths,
-      totalChannelsWidth: currentX - LNW
+      totalChannelsWidth: currentX - Math.floor(LNW * fitted.scale),
+      fitScale: fitted.scale,
     };
-  }, [pattern, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts, globalLaneVisible, dimensions.width]);
+  }, [pattern, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts, globalLaneVisible, dimensions.width, fitChannels]);
+
+  // Row-number gutter and global lane at the fitted scale (canvas px). Everything
+  // the worker draws is scaled by fitScale, so these are what the DOM must match.
+  const lnwPx = Math.floor(LINE_NUMBER_WIDTH * fitScale);
+  const lnwCanvasPx = mobileCanvas ? LNW : lnwPx; // the gutter the canvas itself draws (mobile has its own)
+  const globalLanePx = globalLaneVisible ? (mobileCanvas ? GLOBAL_LANE_W : Math.floor((LINE_NUMBER_WIDTH + GLOBAL_LANE_W) * fitScale) - lnwPx) : 0;
+  const publishFitScale = useUIStore(s => s.setTrackerFitScale);
+  useEffect(() => { publishFitScale(fitScale); return () => publishFitScale(1); }, [fitScale, publishFitScale]);
+  const fitScaleRef = useRef(fitScale);
+  const lnwPxRef = useRef(lnwPx);
+  fitScaleRef.current = fitScale;
+  lnwPxRef.current = lnwPx;
 
   // Center channels horizontally when in fullscreen and channels don't fill the viewport
   const editorFullscreen = useUIStore(s => s.editorFullscreen);
   const centerPadding = useMemo(() => {
     if (!editorFullscreen || numChannels === 0) return 0;
-    const usedWidth = LNW + totalChannelsWidth;
+    const usedWidth = lnwCanvasPx + totalChannelsWidth;
     if (usedWidth >= dimensions.width) return 0;
     return Math.floor((dimensions.width - usedWidth) / 2);
-  }, [editorFullscreen, totalChannelsWidth, dimensions.width, numChannels, LNW]);
+  }, [editorFullscreen, totalChannelsWidth, dimensions.width, numChannels, lnwCanvasPx]);
 
   const channelOffsets = useMemo(
     () => (centerPadding === 0 ? rawChannelOffsets : rawChannelOffsets.map(x => x + centerPadding)),
@@ -498,7 +517,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // Calculate if all channels fit in viewport (for disabling horizontal scroll)
   const allChannelsFit = useMemo(() => {
     if (!pattern || numChannels === 0) return true;
-    return (LNW + totalChannelsWidth) <= dimensions.width;
+    return (lnwCanvasPx + totalChannelsWidth) <= dimensions.width;
   }, [totalChannelsWidth, numChannels, dimensions.width, pattern]);
 
   // Mobile gesture handlers
@@ -605,7 +624,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     }
 
     if (!foundChannel) {
-      if (relativeX < LNW) {
+      if (relativeX < lnwCanvasPx) {
         channelIndex = 0;
       } else {
         return null;
@@ -628,9 +647,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const NOTE_COL_GROUP_W = noteWidth + 4 + CHAR_WIDTH * 2 + 4 + CHAR_WIDTH * 2 + 4;
     const chContentWidth = NOTE_COL_GROUP_W * totalNoteCols + effectCols * (CHAR_WIDTH * 3 + 4)
       + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0) + (hasProb ? CHAR_WIDTH * 2 + 4 : 0);
-    const chW = channelWidths[channelIndex] ?? 0;
+    // The renderer draws at fitScale, so cell geometry is measured in scale-1 px.
+    const chW = (channelWidths[channelIndex] ?? 0) / fitScale;
     const centeringOffset = Math.floor((chW - chContentWidth) / 2);
-    const localX = Math.max(0, relativeX - (channelOffsets[channelIndex] ?? 0) - centeringOffset);
+    const localX = Math.max(0, (relativeX - (channelOffsets[channelIndex] ?? 0)) / fitScale - centeringOffset);
 
     // Pure decider resolves the exact column AND nibble (see cellHitTest.ts).
     const hit = resolveCellColumn({
@@ -649,7 +669,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       columnType: hit.columnType as CursorPosition['columnType'],
       digitIndex: hit.digitIndex,
     };
-  }, [pattern, dimensions.height, scrollLeft, channelOffsets, channelWidths, numChannels]);
+  }, [pattern, dimensions.height, scrollLeft, channelOffsets, channelWidths, numChannels, fitScale]);
 
   const [isDragging, setIsDragging] = useState(false);
   const isScratchDragRef = useRef(false);
@@ -767,7 +787,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       // Find column
       const FORMAT_COL_GAP = 4;
       const chCols = formatChannels[chIdx]?.columns ?? formatColumns;
-      const localX = relX - channelOffsets[chIdx] - 2;
+      const localX = (relX - channelOffsets[chIdx]) / fitScale - 2; // scale-1 px, as the renderer lays columns out
       let colIdx = 0;
       let px = 0;
       for (let ci = 0; ci < chCols.length; ci++) {
@@ -813,7 +833,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     }
 
     setIsDragging(true);
-  }, [isMobile, getCellFromCoords]);
+  }, [isMobile, getCellFromCoords, fitScale]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent | PointerEvent) => {
     // Scratch drag handled by document-level listener (supports dragging outside canvas)
@@ -1135,7 +1155,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     // Calculate channel width - must match render() layout
     const cw = mobileCanvas ? M_CHAR_WIDTH : CHAR_WIDTH;
-    const lnw = mobileCanvas ? M_LINE_NUMBER_WIDTH : LINE_NUMBER_WIDTH;
+    const lnw = mobileCanvas ? M_LINE_NUMBER_WIDTH : lnwPx;
     const noteWidth = cw * 3 + 4;
     const firstCell = pattern.channels[0]?.rows[0];
     const hasAcid = firstCell?.flag1 !== undefined || firstCell?.flag2 !== undefined;
@@ -1417,10 +1437,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     if (ch < 0 || ch >= channelOffsets.length) return;
     if (!followChannelGate(ch)) return;
 
-    const channelLeft = channelOffsets[ch] - LINE_NUMBER_WIDTH;
+    const channelLeft = channelOffsets[ch] - lnwPx;
     const channelWidth = channelWidths[ch] ?? 0;
-    const viewWidth = container.clientWidth - LINE_NUMBER_WIDTH;
-    const maxScroll = Math.max(0, LINE_NUMBER_WIDTH + totalChannelsWidth - container.clientWidth);
+    const viewWidth = container.clientWidth - lnwPx;
+    const maxScroll = Math.max(0, lnwPx + totalChannelsWidth - container.clientWidth);
 
     const next = computeChannelFollowScroll(
       channelLeft,
@@ -1479,7 +1499,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       columnVisibility:   editor.columnVisibility,
       trackerVisualBg:    settings.trackerVisualBg,
       recordMode:         editor.recordMode,
-      rowHeight:          Math.round(24 * (ui.trackerZoom / 100)),
+      rowHeight:          Math.round(24 * (ui.trackerZoom / 100) * ui.trackerFitScale),
       rowHighlightInterval: ui.rowHighlightInterval,
       rowSecondaryHighlightInterval: ui.rowSecondaryHighlightInterval,
       showBeatLabels:     ui.showBeatLabels,
@@ -1961,6 +1981,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             columnTypes:  cursorState.selection.columnTypes,
           } : null),
           channelLayout: snapshotLayout(),
+          scale: fitScaleRef.current,
         },
         [offscreen],
       );
@@ -2067,7 +2088,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const unsubUI = useUIStore.subscribe((s, prev) => {
       if (isFormatModeRef.current) return;
       if (s.useHexNumbers !== prev.useHexNumbers || s.blankEmptyCells !== prev.blankEmptyCells
-          || s.trackerZoom !== prev.trackerZoom || s.rowHighlightInterval !== prev.rowHighlightInterval
+          || s.trackerZoom !== prev.trackerZoom || s.trackerFitScale !== prev.trackerFitScale || s.rowHighlightInterval !== prev.rowHighlightInterval
           || s.showBeatLabels !== prev.showBeatLabels
           || s.showAutomationLanes !== prev.showAutomationLanes || s.showMacroLanes !== prev.showMacroLanes) {
         bridgeRef.current?.post({ type: 'uiState', uiState: snapshotUI() });
@@ -2164,6 +2185,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     let cachedUI: UIStateSnapshot | null = null;
     let prevUIHex: unknown = null;
     let prevUIZoom: unknown = null;
+    let prevUIFit: unknown = null;
     let prevRecordMode: unknown = null;
     let needsRender = true; // Force first frame
 
@@ -2299,8 +2321,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         prevPlayRow = playRow; prevPlaying = isPlaying; needsRender = true;
       }
       if (themeStore !== prevThemeId) { prevThemeId = themeStore; cachedTheme = null; needsRender = true; }
-      if (uiStore.useHexNumbers !== prevUIHex || uiStore.trackerZoom !== prevUIZoom) {
-        prevUIHex = uiStore.useHexNumbers; prevUIZoom = uiStore.trackerZoom;
+      if (uiStore.useHexNumbers !== prevUIHex || uiStore.trackerZoom !== prevUIZoom || uiStore.trackerFitScale !== prevUIFit) {
+        prevUIHex = uiStore.useHexNumbers; prevUIZoom = uiStore.trackerZoom; prevUIFit = uiStore.trackerFitScale;
         cachedUI = null; needsRender = true;
       }
       if (editorState.recordMode !== prevRecordMode) {
@@ -2387,7 +2409,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     layoutOwedRef.current = false;
     if (owed) {
       const container = containerRef.current;
-      const maxScroll = container ? Math.max(0, LNW + totalChannelsWidth - container.clientWidth) : 0;
+      const maxScroll = container ? Math.max(0, lnwCanvasPx + totalChannelsWidth - container.clientWidth) : 0;
       const next = Math.min(scrollLeftRef.current, maxScroll);
       if (next !== scrollLeftRef.current) {
         scrollLeftRef.current = next;
@@ -2593,7 +2615,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           const offsets = channelOffsetsRef.current;
           const widths = channelWidthsRef.current;
           if (offsets.length > 0 && widths.length > 0) {
-            const leftClip = offsets[0] ?? LINE_NUMBER_WIDTH;
+            const leftClip = offsets[0] ?? lnwPxRef.current;
             const lastIdx = offsets.length - 1;
             const rightEdge = (offsets[lastIdx] ?? 0) + (widths[lastIdx] ?? 0);
             const rightClip = Math.max(0, dimensions.width - rightEdge);
@@ -2734,7 +2756,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         const offsets = channelOffsetsRef.current;
         const widths = channelWidthsRef.current;
         if (offsets.length > 0 && widths.length > 0) {
-          const leftClip = offsets[0] ?? LINE_NUMBER_WIDTH;
+          const leftClip = offsets[0] ?? lnwPxRef.current;
           const lastIdx = offsets.length - 1;
           const rightEdge = (offsets[lastIdx] ?? 0) + (widths[lastIdx] ?? 0);
           const rightClip = Math.max(0, dimensions.width - rightEdge);
@@ -2750,7 +2772,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         if (pc.active && pc.patternIndex === curPatIdx && offsets.length > pc.channel) {
           const py = baseY + (pc.row - vStart) * rh;
           // +8 accounts for the internal channel padding before the note column starts
-          const px = offsets[pc.channel] - scrollLeftRef.current + 8;
+          const px = offsets[pc.channel] - scrollLeftRef.current + 8 * fitScaleRef.current;
           peerCursorDivRef.current.style.display = 'block';
           peerCursorDivRef.current.style.transform = `translate(${px}px, ${py}px)`;
         } else {
@@ -2770,7 +2792,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           const startRow = Math.min(ps.startRow, ps.endRow);
           const endRow   = Math.max(ps.startRow, ps.endRow);
           if (offsets.length > endCh) {
-            const left   = offsets[startCh] + LINE_NUMBER_WIDTH - scrollLeftRef.current;
+            const left   = offsets[startCh] + lnwPxRef.current - scrollLeftRef.current;
             const width  = offsets[endCh] + widths[endCh] - offsets[startCh];
             const top    = baseY + (startRow - vStart) * rh;
             const height = (endRow - startRow + 1) * rh;
@@ -2832,6 +2854,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     return () => resizeObserver.disconnect();
   }, []);
+
+  // Tell the worker the pattern scale; it draws the whole pattern at that size.
+  useEffect(() => {
+    bridgeRef.current?.post({ type: 'scale', scale: fitScale });
+  }, [fitScale]);
 
   // Notify worker when dimensions change (worker owns canvas.width/height)
   useEffect(() => {
@@ -2896,7 +2923,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       } else {
         // Horizontal scroll - scroll channels STEPPED (one by one)
         // Use totalChannelsWidth from useMemo for consistency
-        const maxScroll = Math.max(0, LINE_NUMBER_WIDTH + totalChannelsWidth - container.clientWidth);
+        const maxScroll = Math.max(0, lnwPx + totalChannelsWidth - container.clientWidth);
 
         if (maxScroll > 0) {
           // Accumulate scroll delta for resistance
@@ -2915,7 +2942,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             // Find current leftmost visible channel
             let currentCh = 0;
             for (let i = 0; i < channelOffsets.length; i++) {
-              const targetScroll = channelOffsets[i] - LINE_NUMBER_WIDTH;
+              const targetScroll = channelOffsets[i] - lnwPx;
               if (targetScroll <= scrollLeft + 5) { // +5 epsilon
                 currentCh = i;
               } else {
@@ -2926,7 +2953,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             let nextCh = currentCh + direction;
             nextCh = Math.max(0, Math.min(channelOffsets.length - 1, nextCh));
             
-            const newScrollLeft = Math.max(0, Math.min(maxScroll, channelOffsets[nextCh] - LINE_NUMBER_WIDTH));
+            const newScrollLeft = Math.max(0, Math.min(maxScroll, channelOffsets[nextCh] - lnwPx));
 
             // Post directly to worker — no React re-render needed for canvas
             scrollLeftRef.current = newScrollLeft;
@@ -2947,7 +2974,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     container.addEventListener('wheel', handleWheel, { passive: false });
     return () => container.removeEventListener('wheel', handleWheel);
-  }, [scrollLeft, totalChannelsWidth, dimensions.width, channelOffsets]);
+  }, [scrollLeft, totalChannelsWidth, dimensions.width, channelOffsets, lnwPx]);
 
   // Handle header scroll sync — post to worker immediately (no React delay)
   const handleHeaderScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -3060,14 +3087,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             ref={bottomScrollRef}
             onScroll={handleBottomScroll}
             className={`flex-shrink-0 h-3 bg-dark-bgTertiary border-b border-dark-border overflow-x-auto scrollbar-always ${allChannelsFit ? 'hidden' : ''}`}
-            style={{ paddingLeft: LINE_NUMBER_WIDTH }}
+            style={{ paddingLeft: lnwPx }}
           >
             <div style={{ width: totalChannelsWidth, height: 1 }} />
           </div>
 
           {/* Horizontal global lane removed — global FX now lives as a
               vertical column to the left of channel 1 (rendered inside the
-              canvas overlay area). See globalLaneVisible / GLOBAL_LANE_W. */}
+              canvas overlay area). See globalLaneVisible / globalLanePx. */}
 
           {isFormatMode && formatColumns && formatChannels ? (
             <div className="flex-shrink-0 bg-dark-bgTertiary border-b border-dark-border z-20">
@@ -3075,7 +3102,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               <div className="flex h-[28px]">
                 <div
                   className="flex-shrink-0 border-r border-dark-border flex items-center justify-center text-text-muted text-xs font-medium"
-                  style={{ width: LINE_NUMBER_WIDTH }}
+                  style={{ width: lnwPx }}
                 >
                   ROW
                 </div>
@@ -3085,12 +3112,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   className="overflow-x-hidden overflow-y-hidden flex-1"
                   data-vu-scroll
                 >
-                  <div className="flex" style={{ width: totalChannelsWidth - LINE_NUMBER_WIDTH, marginLeft: centerPadding }}>
+                  <div className="flex" style={{ width: totalChannelsWidth - lnwPx, marginLeft: centerPadding }}>
                     {/* GLOBAL FX lane header — sits to the left of channel 1.
                         Bus-wide dub params + song-level transport curves live
                         on this lane (channelIndex = -1). */}
                     {globalLaneVisible && (
-                      <GlobalLaneHeader width={GLOBAL_LANE_W} patternId={pattern?.id} />
+                      <GlobalLaneHeader width={globalLanePx} patternId={pattern?.id} />
                     )}
                     {formatChannels.map((ch, idx) => {
                       const channel = ch.isPatternChannel ? pattern?.channels[idx] : undefined;
@@ -3267,13 +3294,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               </div>
               {/* Row 2: column labels (20px) */}
               <div className="flex h-[20px] border-t border-dark-border">
-                <div className="flex-shrink-0 border-r border-dark-border" style={{ width: LINE_NUMBER_WIDTH }} />
+                <div className="flex-shrink-0 border-r border-dark-border" style={{ width: lnwPx }} />
                 <div className="overflow-hidden flex-1">
-                  <div className="flex" style={{ width: totalChannelsWidth - LINE_NUMBER_WIDTH, marginLeft: centerPadding }}>
+                  <div className="flex" style={{ width: totalChannelsWidth - lnwPx, marginLeft: centerPadding }}>
                     {formatChannels.map((ch, chIdx) => {
                       const chCols = ch.columns ?? formatColumns;
                       const FORMAT_COL_GAP = 4;
-                      let px = 2;
+                      let px = 2 * fitScale;
                       return (
                         <div
                           key={chIdx}
@@ -3282,7 +3309,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                         >
                           {chCols.map((col, ci) => {
                             const colLeft = px;
-                            const colWidth = col.charWidth * CHAR_WIDTH + FORMAT_COL_GAP;
+                            const colWidth = (col.charWidth * CHAR_WIDTH + FORMAT_COL_GAP) * fitScale;
                             px += colWidth;
                             return (
                               <span
@@ -3310,7 +3337,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               <div className="flex h-full">
               {/* Row number column header */}
               <div className="flex-shrink-0 px-2 text-text-muted text-xs font-medium text-center border-r border-dark-border flex items-center justify-center"
-                   style={{ width: LINE_NUMBER_WIDTH }}>
+                   style={{ width: lnwPx }}>
                 ROW
               </div>
 
@@ -3326,7 +3353,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                       Bus-wide dub params + song-level transport curves live
                       on this lane (channelIndex = -1). */}
                   {globalLaneVisible && (
-                    <GlobalLaneHeader width={GLOBAL_LANE_W} patternId={pattern?.id} />
+                    <GlobalLaneHeader width={globalLanePx} patternId={pattern?.id} />
                   )}
                   {(pattern?.channels ?? []).map((channel, idx) => {
                     // Trigger levels are animation-driven via RAF; ChannelVUMeter is disabled
@@ -3518,7 +3545,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         {!hideVUMeters && (
         <div
           className="absolute right-0 pointer-events-none overflow-hidden"
-          style={{ top: 0, left: LNW, bottom: 48, zIndex: 1 }}
+          style={{ top: 0, left: lnwCanvasPx, bottom: 48, zIndex: 1 }}
         >
           <ChannelVUMeters
             channelOffsets={channelOffsets}
@@ -3575,7 +3602,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   // changes pick up new bounds on the next frame.
                 }}
               >
-              {/* GLOBAL FX vertical lane — fills the GLOBAL_LANE_W slot
+              {/* GLOBAL FX vertical lane — fills the globalLanePx slot
                   reserved at the left of channel 0 (see globalLaneVisible).
                   Renders a thin column of step markers for every curve at
                   channelIndex = -1 (bus-wide dub params + song-level
@@ -3586,8 +3613,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                     patternId={pattern.id}
                     patternLength={pattern.length}
                     rowHeight={rowHeight}
-                    laneLeft={LNW}
-                    laneWidth={GLOBAL_LANE_W}
+                    laneLeft={lnwCanvasPx}
+                    laneWidth={globalLanePx}
                   topOffset={prevLen * rowHeight}
                 />
               )}
@@ -3599,7 +3626,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 channelCount={pattern.channels.length}
                 channelOffsets={channelOffsets}
                 channelWidths={channelWidths}
-                rowNumWidth={LINE_NUMBER_WIDTH}
+                rowNumWidth={lnwPx}
                 channelIndexOffset={formatChannelOffset}
                 scrollOffset={0}
                 visibleStart={0}
@@ -3635,7 +3662,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   channelCount={pattern.channels.length}
                   channelOffsets={channelOffsets}
                   channelWidths={channelWidths}
-                  rowNumWidth={LINE_NUMBER_WIDTH}
+                  rowNumWidth={lnwPx}
                 />
               </div>
             )}
@@ -3649,7 +3676,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             position: 'absolute',
             top: 0,
             left: 0,
-            width: CHAR_WIDTH * 3 + 4,
+            width: (CHAR_WIDTH * 3 + 4) * fitScale,
             height: rowHeight,
             display: 'none',
             pointerEvents: 'none',

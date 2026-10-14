@@ -37,6 +37,8 @@ let renderer: TrackerGLRenderer | TrackerCanvas2DRenderer | null = null;
 let width  = 800;
 let height = 600;
 let dpr    = 1;
+/** Pattern scale (fit all channels): the renderer draws in canvas px / scale at dpr * scale. */
+let scale  = 1;
 
 let patterns: PatternSnapshot[] = [];
 let currentPatternIndex = 0;
@@ -91,11 +93,12 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
       cursor   = msg.cursor;
       selection = msg.selection;
       layout   = msg.channelLayout;
+      scale    = msg.scale ?? 1;
 
       let glErr: unknown = null;
       try {
         renderer = new TrackerGLRenderer(msg.canvas);
-        renderer.resize(width, height, dpr);
+        renderer.resize(width / scale, height / scale, dpr * scale);
       } catch (err) {
         glErr = err;
       }
@@ -103,7 +106,7 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
       if (!renderer) {
         try {
           renderer = new TrackerCanvas2DRenderer(msg.canvas);
-          renderer.resize(width, height, dpr);
+          renderer.resize(width / scale, height / scale, dpr * scale);
         } catch (c2dErr) {
           console.error('[TrackerWorker] Canvas2D init also failed:', c2dErr);
           (self as unknown as Worker).postMessage({
@@ -157,7 +160,15 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
       width  = msg.w;
       height = msg.h;
       dpr    = msg.dpr;
-      renderer?.resize(width, height, dpr);
+      renderer?.resize(width / scale, height / scale, dpr * scale);
+      dirty = true;
+      break;
+
+    case 'scale':
+      if (msg.scale !== scale) {
+        scale = msg.scale;
+        renderer?.resize(width / scale, height / scale, dpr * scale);
+      }
       dirty = true;
       break;
 
@@ -228,22 +239,57 @@ function renderFrame(): void {
 
   // Reuse workerPlayback object to avoid per-frame allocation
   workerPlayback.row = playback.row;
-  workerPlayback.smoothOffset = smoothOffset;
+  workerPlayback.smoothOffset = smoothOffset / scale;
   workerPlayback.patternIndex = playback.patternIndex;
   workerPlayback.isPlaying = playback.isPlaying;
 
   renderer.render({
     patterns,
     currentPatternIndex,
-    scrollX,
+    scrollX: scrollX / scale,
     cursor,
     selection,
     playback: workerPlayback,
     theme,
-    ui,
-    layout,
+    ui: scaledUi(),
+    layout: scaledLayout(),
     dragOver,
   });
+}
+
+// ─── Pattern scale ────────────────────────────────────────────────────────────
+// The main thread speaks canvas px; the renderer draws at scale 1 into a canvas
+// 1/scale as large, so px quantities it receives are divided by scale here.
+
+let scaledLayoutSrc: ChannelLayoutSnapshot | null = null;
+let scaledLayoutAt = 1;
+let scaledLayoutOut: ChannelLayoutSnapshot = layout;
+function scaledLayout(): ChannelLayoutSnapshot {
+  if (scale === 1) return layout;
+  if (scaledLayoutSrc !== layout || scaledLayoutAt !== scale) {
+    scaledLayoutSrc = layout;
+    scaledLayoutAt = scale;
+    scaledLayoutOut = {
+      ...layout,
+      offsets: layout.offsets.map(v => v / scale),
+      widths: layout.widths.map(v => v / scale),
+      totalWidth: layout.totalWidth / scale,
+    };
+  }
+  return scaledLayoutOut;
+}
+
+let scaledUiSrc: UIStateSnapshot | null = null;
+let scaledUiAt = 1;
+let scaledUiOut: UIStateSnapshot = ui;
+function scaledUi(): UIStateSnapshot {
+  if (scale === 1) return ui;
+  if (scaledUiSrc !== ui || scaledUiAt !== scale) {
+    scaledUiSrc = ui;
+    scaledUiAt = scale;
+    scaledUiOut = { ...ui, rowHeight: ui.rowHeight / scale };
+  }
+  return scaledUiOut;
 }
 
 // ─── Hit testing (worker → main) ──────────────────────────────────────────────

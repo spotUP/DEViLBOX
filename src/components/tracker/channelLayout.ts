@@ -111,3 +111,55 @@ export function stretchChannelWidths(
   out[out.length - 1] += spare - given;
   return out;
 }
+
+/** Pattern font size at scale 1 (px); the renderers draw at this size. */
+export const PATTERN_FONT_PX = 14;
+/** Smallest pattern font the fit will shrink to (px). Below it the view scrolls sideways. */
+export const FIT_MIN_FONT_PX = 7;
+/** The smallest scale the fit will use: FIT_MIN_FONT_PX / PATTERN_FONT_PX. */
+export const FIT_SCALE_FLOOR = FIT_MIN_FONT_PX / PATTERN_FONT_PX;
+
+/**
+ * The scale (<= 1) at which every channel fits the canvas width. `widths` are
+ * the channels' minimum widths and `leftEdge` the gutter before channel 0, both
+ * at scale 1. Shrink only: channels that already fit return 1 (never enlarge),
+ * and the result never goes below `floor`, where the view scrolls sideways as
+ * before. Unknown width (<= 0) returns 1.
+ */
+export function fitChannelScale(
+  widths: readonly number[],
+  leftEdge: number,
+  availableWidth: number,
+  floor: number = FIT_SCALE_FLOOR,
+): number {
+  const content = leftEdge + widths.reduce((a, b) => a + b, 0);
+  if (availableWidth <= 0 || widths.length === 0 || content <= availableWidth) return 1;
+  return Math.max(floor, availableWidth / content);
+}
+
+export interface FittedChannelWidths {
+  /** Scale the pattern is drawn at; 1 when nothing was shrunk. */
+  scale: number;
+  /** `leftEdge` at the chosen scale, whole canvas px. */
+  leftEdge: number;
+  /** Channel widths in canvas px: shrunk to fit, then spare width stretched. */
+  widths: number[];
+}
+
+/**
+ * Fit first, then stretch: shrink the channels (when `fit` is on) so all of
+ * them fit the canvas, then share any spare width out with stretchChannelWidths.
+ * Shrunk widths are floored so their sum never passes the canvas width.
+ */
+export function fitAndStretchChannelWidths(
+  minWidths: readonly number[],
+  leftEdge: number,
+  availableWidth: number,
+  fit: boolean,
+  floor: number = FIT_SCALE_FLOOR,
+): FittedChannelWidths {
+  const scale = fit ? fitChannelScale(minWidths, leftEdge, availableWidth, floor) : 1;
+  const scaled = scale === 1 ? [...minWidths] : minWidths.map(w => Math.floor(w * scale));
+  const edge = Math.floor(leftEdge * scale);
+  return { scale, leftEdge: edge, widths: stretchChannelWidths(scaled, edge, availableWidth) };
+}

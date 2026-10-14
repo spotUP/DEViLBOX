@@ -98,7 +98,9 @@ export function usePatternEditor() {
   const trackerZoom = useUIStore((s) => s.trackerZoom);
   const trackWidthZoom = useUIStore((s) => s.trackWidthZoom);
   const showAutomationLanes = useUIStore((s) => s.showAutomationLanes);
-  const rowHeight = Math.round(24 * (trackerZoom / 100));
+  // Rows shrink with the pattern when fit all channels scaled it down (PatternEditorCanvas publishes the scale).
+  const trackerFitScale = useUIStore((s) => s.trackerFitScale);
+  const rowHeight = Math.round(24 * (trackerZoom / 100) * trackerFitScale);
 
   // Per-channel automation lane count (for multi-lane width allocation)
   // Counts both explicitly active params AND params with existing curve data

@@ -7,6 +7,7 @@ import { immer } from 'zustand/middleware/immer';
 import { persist } from 'zustand/middleware';
 import type { PanelType } from '@typedefs/project';
 import type { MainView } from './uiViews';
+import { useSettingsStore } from './useSettingsStore';
 
 export type PerformanceQuality = 'high' | 'medium' | 'low';
 
@@ -49,6 +50,8 @@ interface UIStore {
   // State
   visiblePanels: PanelType[];
   trackerZoom: number; // 80-200%
+  /** Scale (0.5-1) the tracker pattern is drawn at so every channel fits the width; 1 = no shrink. Published by PatternEditorCanvas, never persisted. */
+  trackerFitScale: number;
   trackWidthZoom: number; // 0=narrowest (more channels), 6=widest (fewer channels)
   activePanel: PanelType;
   modalOpen: string | null;
@@ -134,6 +137,7 @@ interface UIStore {
   togglePanel: (panel: PanelType) => void;
   setActivePanel: (panel: PanelType) => void;
   setTrackerZoom: (zoom: number) => void;
+  setTrackerFitScale: (scale: number) => void;
   increaseTrackZoom: () => void;
   decreaseTrackZoom: () => void;
   openModal: (modalId: string, data?: Record<string, unknown>) => void;
@@ -245,6 +249,7 @@ export const useUIStore = create<UIStore>()(
       // Initial state
       visiblePanels: ['tracker', 'oscilloscope', 'pattern-list'],
       trackerZoom: 100,
+      trackerFitScale: 1,
       trackWidthZoom: 3,
       activePanel: 'tracker',
       modalOpen: null,
@@ -357,10 +362,22 @@ export const useUIStore = create<UIStore>()(
           }
         }),
 
-      setTrackerZoom: (zoom) =>
+      setTrackerZoom: (zoom) => {
+        const next = Math.max(80, Math.min(200, zoom));
+        // A manual zoom change takes the pattern size into the user's hands: fit
+        // stays off for the tracker until it is switched back on in Settings.
+        if (next !== useUIStore.getState().trackerZoom) {
+          useSettingsStore.getState().setFitAllChannelsTracker(false);
+        }
         set((state) => {
           // Clamp between 80-200%
-          state.trackerZoom = Math.max(80, Math.min(200, zoom));
+          state.trackerZoom = next;
+        });
+      },
+
+      setTrackerFitScale: (scale) =>
+        set((state) => {
+          if (state.trackerFitScale !== scale) state.trackerFitScale = scale;
         }),
 
       increaseTrackZoom: () =>

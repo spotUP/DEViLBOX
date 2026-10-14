@@ -6,9 +6,10 @@
  * headers and columns fill the canvas; the per-channel views (MusicLine,
  * Hippel, Sonix, SunTronic) put one channel in each canvas, and a header
  * that stops two thirds across its column was the owner's F36 (2026-10-04).
- * Content never shrinks: a canvas narrower than the columns scrolls.
+ * With `fit` on, the whole pattern is first shrunk (fitScale, down to the font
+ * floor) so every channel is on screen; below the floor the canvas scrolls.
  */
-import { stretchChannelWidths } from './channelLayout';
+import { fitAndStretchChannelWidths } from './channelLayout';
 import type { ColumnDef, FormatChannel } from '@/components/shared/format-editor-types';
 
 export interface FormatChannelLayout {
@@ -17,6 +18,8 @@ export interface FormatChannelLayout {
   channelWidths: number[];
   /** Right edge of the last channel, from the canvas's left edge. */
   totalChannelsWidth: number;
+  /** Scale the pattern is drawn at (1 unless fit shrank it). */
+  fitScale: number;
 }
 
 export interface FormatChannelLayoutInput {
@@ -30,19 +33,21 @@ export interface FormatChannelLayoutInput {
   channelPad: number;
   /** Canvas width; 0 or less disables the stretch. */
   availableWidth: number;
+  /** Shrink the pattern so every channel fits (fit all channels). */
+  fit?: boolean;
 }
 
 export function formatChannelLayout(input: FormatChannelLayoutInput): FormatChannelLayout {
-  const { formatChannels, formatColumns, charWidth, leftEdge, columnGap, channelPad, availableWidth } = input;
+  const { formatChannels, formatColumns, charWidth, leftEdge, columnGap, channelPad, availableWidth, fit = false } = input;
   const widths: number[] = [];
   for (const channel of formatChannels) {
     const cols = channel.columns ?? formatColumns;
     const contentWidth = cols.reduce((sum, col) => sum + col.charWidth * charWidth + columnGap, 0) - columnGap;
     widths.push(contentWidth + channelPad);
   }
-  const stretched = stretchChannelWidths(widths, leftEdge, availableWidth);
+  const fitted = fitAndStretchChannelWidths(widths, leftEdge, availableWidth, fit);
   const offsets: number[] = [];
-  let x = leftEdge;
-  for (const w of stretched) { offsets.push(x); x += w; }
-  return { numChannels: stretched.length, channelOffsets: offsets, channelWidths: stretched, totalChannelsWidth: x };
+  let x = fitted.leftEdge;
+  for (const w of fitted.widths) { offsets.push(x); x += w; }
+  return { numChannels: fitted.widths.length, channelOffsets: offsets, channelWidths: fitted.widths, totalChannelsWidth: x, fitScale: fitted.scale };
 }

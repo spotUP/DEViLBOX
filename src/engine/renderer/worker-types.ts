@@ -153,6 +153,8 @@ export type TrackerWorkerMsg =
       cursor: CursorSnapshot;
       selection: SelectionSnapshot | null;
       channelLayout: ChannelLayoutSnapshot;
+      /** Pattern scale at init (see the 'scale' message); 1 when absent. */
+      scale?: number;
     }
   | {
       type: 'patterns';
@@ -174,6 +176,8 @@ export type TrackerWorkerMsg =
       songPosition?: number;
     }
   | { type: 'resize'; w: number; h: number; dpr: number }
+  /** Draw the whole pattern at `scale` (<= 1) of its size; every px in the other messages stays in canvas (CSS) px. */
+  | { type: 'scale'; scale: number }
   | { type: 'theme'; theme: ThemeSnapshot }
   | { type: 'uiState'; uiState: UIStateSnapshot }
   | { type: 'channelLayout'; channelLayout: ChannelLayoutSnapshot }

@@ -443,6 +443,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 </div>
               </section>
 
+              {/* Pattern views */}
+              <section>
+                <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">PATTERN VIEWS</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <label className="text-ft2-text text-xs font-mono">Fit all channels in the tracker:</label>
+                      <span className="text-[9px] text-ft2-textDim font-mono">Shrinks the pattern text so every channel fits the width. Changing the zoom turns it off.</span>
+                    </div>
+                    <Toggle label="" value={s.fitAllChannelsTracker} onChange={s.setFitAllChannelsTracker} size="sm" />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <label className="text-ft2-text text-xs font-mono">Fit all channels on the decks:</label>
+                      <span className="text-[9px] text-ft2-textDim font-mono">Same for the DJ deck pattern views.</span>
+                    </div>
+                    <Toggle label="" value={s.fitAllChannelsDeck} onChange={s.setFitAllChannelsDeck} size="sm" />
+                  </div>
+                </div>
+              </section>
+
               {/* Visual Background */}
               <section>
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">VISUAL BACKGROUND</h3>

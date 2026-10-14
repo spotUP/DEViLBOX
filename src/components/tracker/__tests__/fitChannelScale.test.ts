@@ -1,0 +1,48 @@
+import { describe, it, expect } from 'vitest';
+import { fitChannelScale, fitAndStretchChannelWidths, FIT_SCALE_FLOOR } from '../channelLayout';
+
+const LEFT = 40;
+const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
+
+describe('fitChannelScale', () => {
+  it('16 channels that overflow the canvas shrink until they fit', () => {
+    const mins = Array.from({ length: 16 }, () => 200);
+    const s = fitChannelScale(mins, LEFT, 2000);
+    expect(s).toBeLessThan(1);
+    expect(s).toBeCloseTo(2000 / (LEFT + 3200), 6);
+  });
+  it('channels that already fit keep scale 1 (never enlarge)', () => {
+    expect(fitChannelScale([200, 200, 200, 200], LEFT, 3000)).toBe(1);
+    expect(fitChannelScale([200, 200], LEFT, LEFT + 400)).toBe(1);
+  });
+  it('stops at the font floor and leaves the rest to sideways scroll', () => {
+    const mins = Array.from({ length: 64 }, () => 200);
+    expect(fitChannelScale(mins, LEFT, 1000)).toBe(FIT_SCALE_FLOOR);
+    expect(FIT_SCALE_FLOOR * 14).toBe(7);
+  });
+  it('an unknown width or no channels returns 1', () => {
+    expect(fitChannelScale([200], LEFT, 0)).toBe(1);
+    expect(fitChannelScale([], LEFT, 500)).toBe(1);
+  });
+});
+
+describe('fitAndStretchChannelWidths', () => {
+  it('shrunk channels end inside the canvas (no horizontal scroll)', () => {
+    const mins = Array.from({ length: 10 }, (_, i) => 180 + i);
+    const out = fitAndStretchChannelWidths(mins, LEFT, 1500, true);
+    expect(out.scale).toBeLessThan(1);
+    expect(out.leftEdge + sum(out.widths)).toBeLessThanOrEqual(1500);
+    expect(out.leftEdge + sum(out.widths)).toBeGreaterThan(1500 - 20);
+  });
+  it('fit off keeps minimum widths and scrolls, as before', () => {
+    const mins = Array.from({ length: 16 }, () => 200);
+    const out = fitAndStretchChannelWidths(mins, LEFT, 1500, false);
+    expect(out.scale).toBe(1);
+    expect(out.widths).toEqual(mins);
+  });
+  it('few channels keep scale 1 and the spare width is stretched', () => {
+    const out = fitAndStretchChannelWidths([200, 200, 200, 200], LEFT, 1200, true);
+    expect(out.scale).toBe(1);
+    expect(out.leftEdge + sum(out.widths)).toBe(1200);
+  });
+});
