@@ -15,8 +15,10 @@
  * Layout mirrors the GL renderer (TrackerGLRenderer) exactly:
  *   note(charWidth*3+4) | 4px | inst(charWidth*2) | 4px | vol(charWidth*2) | 4px
  * repeated `totalNoteCols` times, then `effectCols` effect cells of
- * (charWidth*3+4) each, then optional acid flags and probability.
+ * (charWidth*3+4) each, then optional acid flags and probability. In Furnace effect
+ * notation an effect cell is 4 glyphs (two type digits, two value digits).
  */
+import { effectCellWidth, effectTypeDigits, type EffectNotation } from './effectNotation';
 
 export type CellColumnType =
   | 'note'
@@ -36,6 +38,8 @@ export interface CellHitInput {
   charWidth: number;
   totalNoteCols: number;
   effectCols: number;
+  /** The channel's effect notation (default 'tracker'). */
+  effectNotation?: EffectNotation;
   hasAcid: boolean;
   hasProb: boolean;
 }
@@ -52,7 +56,8 @@ export function resolveCellColumn(input: CellHitInput): CellHit {
   const instWidth = CW * 2;
   const volWidth = CW * 2;
   const NOTE_COL_GROUP_W = noteWidth + 4 + instWidth + 4 + volWidth + 4;
-  const effWidth = CW * 3 + 4;
+  const effWidth = effectCellWidth(CW, input.effectNotation);
+  const typDigits = effectTypeDigits(input.effectNotation);
   const paramBase = noteWidth + 4; // where the instrument field starts in a group
 
   const localX = Math.max(0, input.localX);
@@ -83,16 +88,17 @@ export function resolveCellColumn(input: CellHitInput): CellHit {
   if (input.effectCols > 0 && xInParams < effectsWidth) {
     const effCol = Math.floor(xInParams / effWidth);
     const xInEff = xInParams - effCol * effWidth;
-    // Glyph 0 = type char, glyphs 1..2 = the two param nibbles.
-    const onType = xInEff < CW;
-    const paramDigit = xInEff < CW * 2 ? 0 : 1;
+    // Glyphs 0..typDigits-1 = the type, the next two = the two param nibbles.
+    const onType = xInEff < CW * typDigits;
+    const typeDigit = nibbleOf(xInEff, typDigits);
+    const paramDigit = nibbleOf(xInEff - CW * typDigits, 2);
     if (effCol === 0) {
       return onType
-        ? { columnType: 'effTyp', noteColumnIndex: 0, digitIndex: 0 }
+        ? { columnType: 'effTyp', noteColumnIndex: 0, digitIndex: typeDigit }
         : { columnType: 'effParam', noteColumnIndex: 0, digitIndex: paramDigit };
     }
     return onType
-      ? { columnType: 'effTyp2', noteColumnIndex: 0, digitIndex: 0 }
+      ? { columnType: 'effTyp2', noteColumnIndex: 0, digitIndex: typeDigit }
       : { columnType: 'effParam2', noteColumnIndex: 0, digitIndex: paramDigit };
   }
 

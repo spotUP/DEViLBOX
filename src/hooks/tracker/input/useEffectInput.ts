@@ -16,6 +16,7 @@ import {
   type TrackerInputRefs,
 } from './inputConstants';
 import { isKeyHandled } from '@lib/tracker/keyHandledSentinel';
+import { effectNotationOf, furnaceEffectTypeAfterDigit } from '@lib/tracker/effectNotation';
 import { applyVolumeHighNibble, applyVolumeLowNibble } from '@lib/tracker/volumeColumnEdit';
 
 export const useEffectInput = (refs: TrackerInputRefs) => {
@@ -100,6 +101,18 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
             return true;
           }
         }
+      }
+
+      // ---------- EFFECT TYPE in Furnace notation: two hex digits (the Furnace code) ----------
+      const typeCol = cursorRef.current.columnType;
+      if ((typeCol === 'effTyp' || typeCol === 'effTyp2') && HEX_DIGITS_ALL.includes(key)
+        && effectNotationOf(pattern.channels[cursorRef.current.channelIndex]?.channelMeta) === 'furnace') {
+        e.preventDefault();
+        const current = (typeCol === 'effTyp' ? currentCell.effTyp : currentCell.effTyp2) || 0;
+        const next = furnaceEffectTypeAfterDigit(current, cursorRef.current.digitIndex, parseInt(key, 16));
+        setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, typeCol === 'effTyp' ? { effTyp: next } : { effTyp2: next });
+        applyEntryAdvance(typeCol, cursorRef.current.digitIndex);
+        return true;
       }
 
       // ---------- EFFECT TYPE (EFX0): FT2 effect command keys (0-9, A-Z) ----------

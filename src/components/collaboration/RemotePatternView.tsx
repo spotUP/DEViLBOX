@@ -13,6 +13,7 @@ import { useEditorStore } from '@stores/useEditorStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { ReadOnlyPatternCanvas } from '@components/tracker/ReadOnlyPatternCanvas';
 import { Users, Lock } from 'lucide-react';
+import { effectCellWidth } from '@/lib/tracker/effectNotation';
 
 const LINE_NUMBER_WIDTH = 40;
 const CHAR_WIDTH = 10;
@@ -60,7 +61,7 @@ export const RemotePatternView: React.FC = () => {
         total += w;
       } else {
         const effectCols = channel?.channelMeta?.effectCols ?? 2;
-        const effectWidth = effectCols * (CHAR_WIDTH * 3 + 4);
+        const effectWidth = effectCols * effectCellWidth(CHAR_WIDTH, channel?.channelMeta?.effectNotation);
         const paramWidth = CHAR_WIDTH * 4 + 8 + effectWidth
           + (showAcid ? CHAR_WIDTH * 2 + 8 : 0)
           + (showProb ? CHAR_WIDTH * 2 + 4 : 0);

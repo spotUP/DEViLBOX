@@ -72,9 +72,12 @@ function subsongToPatterns(
         instrumentId: null,
         color: null,
         rows,
-        ...(channelTypes[ch] >= 0
-          ? { channelMeta: { importedFromMOD: false, furnaceType: channelTypes[ch] } }
-          : {}),
+        // The cells hold Furnace's own effect codes (furnaceRowToTrackerCell), written as Furnace does.
+        channelMeta: {
+          importedFromMOD: false,
+          effectNotation: 'furnace' as const,
+          ...(channelTypes[ch] >= 0 ? { furnaceType: channelTypes[ch] } : {}),
+        },
       };
     });
 

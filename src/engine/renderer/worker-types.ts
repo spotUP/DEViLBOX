@@ -4,6 +4,7 @@
  * the main thread and worker threads.
  */
 
+import type { EffectNotation } from '@/lib/tracker/effectNotation';
 import type { ClockAnchor } from '../audioLatency';
 
 // ─── Theme snapshot ──────────────────────────────────────────────────────────
@@ -64,6 +65,8 @@ export interface ChannelSnapshot {
   solo?: boolean;
   collapsed?: boolean;
   effectCols: number; // from channelMeta.effectCols, default 2
+  /** from channelMeta.effectNotation: 'furnace' draws each effect as 4 hex chars (code + value). */
+  effectNotation?: EffectNotation;
   noteCols?: number;  // from channelMeta.noteCols, default 1
   rows: CellSnapshot[];
   /** Per-channel column specs — overrides global ui.columns when present */

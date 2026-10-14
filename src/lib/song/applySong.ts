@@ -34,6 +34,7 @@ import type { MixerSnapshot } from '@stores/useMixerStore';
 import type { DubBusSettings } from '@/types/dub';
 import { repairStoredDubBusVoicing } from '@/types/dub';
 import { migrateDubLaneEvents } from './migrateDubLaneEvents';
+import { upgradeFurnaceEffectNotation } from '@/lib/import/furnaceEditorCells';
 import { typingOctaveFor } from '@/lib/amiga/periodNotes';
 import { liveSongFormat } from './liveSong';
 import { baselineOf, setGridBaseline, type GridBaseline } from './gridBaseline';
@@ -175,6 +176,9 @@ export async function applySong(song: SongToApply, source: SongSource): Promise<
   if (song.extras) {
     for (const p of song.patterns) migrateDubLaneEvents(p as Parameters<typeof migrateDubLaneEvents>[0]);
   }
+
+  // A Furnace song saved before its cells held Furnace effect codes: re-read them from the native rows.
+  if (song.engine.furnaceNative) upgradeFurnaceEffectNotation(song.patterns, song.order, song.engine.furnaceNative);
 
   const tracker = useTrackerStore.getState();
   useInstrumentStore.getState().loadInstruments(song.instruments, { skipPreload: true, sourceSong: song.metadata.name });
