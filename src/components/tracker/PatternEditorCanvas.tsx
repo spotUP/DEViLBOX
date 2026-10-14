@@ -2107,8 +2107,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     });
 
     // Subscribe to UI store
+    // Format mode needs these too: the worker divides the row height by the scale it is told, so a
+    // zoom change must re-send the row height (PATTERN-MATRIX-ZOOM). snapshotUI reads no pattern data.
     const unsubUI = useUIStore.subscribe((s, prev) => {
-      if (isFormatModeRef.current) return;
       if (s.useHexNumbers !== prev.useHexNumbers || s.blankEmptyCells !== prev.blankEmptyCells
           || s.trackerZoom !== prev.trackerZoom || s.trackerScale !== prev.trackerScale || s.rowHighlightInterval !== prev.rowHighlightInterval
           || s.showBeatLabels !== prev.showBeatLabels
