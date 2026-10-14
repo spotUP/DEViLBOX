@@ -2038,16 +2038,18 @@ export class TrackerReplayer {
     this.pitchMultiplier = 1.0;
     this.deckDetuneCents = 0;
 
-    // For the global tracker replayer, also reset ToneEngine globals
-    // (Wxx effects modify these, and they persist across song loads otherwise)
+    // For the global tracker replayer: the song's BPM, and no Wxx residue.
+    // The pitch slider is the performer's, not the song's: it survives a load,
+    // and above all the reload every Play does (usePatternPlayback). Writing 0
+    // to it here put every song back at its own speed on play after a stop.
+    // The scheduler clears the Wxx shift and re-applies the slider, which also
+    // resets the ToneEngine globals and this replayer's multipliers set above.
     if (!this.isDJDeck) {
-      const engine = getToneEngine();
-      engine.setGlobalPlaybackRate(1.0);
-      engine.setGlobalDetune(0);
-      // Reset Tone.js transport BPM and store display to match the new song
       Tone.getTransport().bpm.value = song.initialBPM;
       useTransportStore.getState().setBPM(song.initialBPM);
-      useTransportStore.getState().setGlobalPitch(0);
+      void import('./PatternScheduler').then(({ getPatternScheduler }) => {
+        getPatternScheduler().clearPatternPitchShift();
+      }).catch(() => { /* scheduler not loadable here */ });
     }
 
     // Clear stale callbacks from previous song
