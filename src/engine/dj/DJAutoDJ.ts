@@ -406,7 +406,8 @@ class DJAutoDJ {
       this.completeTransition();
     }
 
-    useDJStore.getState().setAutoDJStatus('playing'); // keep status visible
+    // 'paused', never 'playing': a held set read as playing with no deck playing (DECK-C-DEMO-TAKEOVER)
+    useDJStore.getState().setAutoDJStatus('paused');
     console.log('[AutoDJ] Paused');
   }
 

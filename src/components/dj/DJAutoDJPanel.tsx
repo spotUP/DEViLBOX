@@ -28,6 +28,7 @@ const JUGGLE_MODE_LABELS: Record<JuggleMode, string> = { OFF: 'Off', SAFE: 'Safe
 const STATUS_LABELS: Record<AutoDJStatus, string> = {
   idle: 'OFF',
   playing: 'Playing',
+  paused: 'Paused',
   preloading: 'Loading next...',
   'preload-failed': 'Load failed',
   'transition-pending': 'Ready to mix',
@@ -37,6 +38,7 @@ const STATUS_LABELS: Record<AutoDJStatus, string> = {
 const STATUS_COLORS: Record<AutoDJStatus, string> = {
   idle: 'bg-dark-bgActive',
   playing: 'bg-accent-primary',
+  paused: 'bg-accent-warning',
   preloading: 'bg-text-muted',
   'preload-failed': 'bg-accent-error',
   'transition-pending': 'bg-accent-primary/50',
@@ -76,7 +78,8 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
 
   const currentTrack = activePlaylist?.tracks[currentIdx];
 
-  const [paused, setPaused] = useState(false);
+  // the store's status is the one truth (a deck paused by hand or the showcase's hold pauses the Auto DJ too)
+  const paused = status === 'paused';
   const [showAnalyzeWarning, setShowAnalyzeWarning] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeProgress, setAnalyzeProgress] = useState<AnalysisProgress | null>(null);
@@ -91,7 +94,6 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
     if (error) {
       notify.error(`Auto DJ: ${error}`);
     } else {
-      setPaused(false);
       onClose?.();
     }
   }, [onClose]);
@@ -113,7 +115,6 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
   const handleToggle = useCallback(async () => {
     if (enabled) {
       disableAutoDJ();
-      setPaused(false);
       return;
     }
     if (activePlaylist && (playlistNeedsAnalysis(activePlaylist) || unanalyzedCount > 0)) {
@@ -158,22 +159,15 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
   }, [actuallyEnable]);
 
   const handlePauseResume = useCallback(() => {
-    if (paused) {
-      resumeAutoDJ();
-      setPaused(false);
-    } else {
-      pauseAutoDJ();
-      setPaused(true);
-    }
+    if (paused) resumeAutoDJ();
+    else pauseAutoDJ();
   }, [paused]);
 
   const handleSkip = useCallback(async () => {
-    setPaused(false);
     await skipAutoDJ();
   }, []);
 
   const handlePlayFromHere = useCallback(async (index: number) => {
-    setPaused(false);
     await playAutoDJFromIndex(index);
   }, []);
 
