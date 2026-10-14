@@ -68,6 +68,7 @@ import { PatternBottomBar } from './PatternBottomBar';
 import { DubDeckStrip } from '@components/dub/DubDeckStrip';
 import { PatternOrderSidebar } from '@components/arrangement/PatternOrderSidebar';
 import { PatternMatrix } from '@components/arrangement/PatternMatrix';
+import { startRowPreviewPrefetch } from '@engine/rowPreview/rowPreviewPrefetch';
 
 interface TrackerViewProps {
   onShowExport?: () => void;
@@ -388,6 +389,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   }, [handleDialogShortcuts]);
 
   // NOTE: usePatternPlayback() is called in App.tsx so it persists across view switches
+
+  // Row preview prefetch: a stopped engine-played song renders the row under the cursor ahead of an Enter.
+  useEffect(() => startRowPreviewPrefetch(), []);
 
   // Randomize handler
   const handleRandomize = useCallback((channelIndex: number) => {
