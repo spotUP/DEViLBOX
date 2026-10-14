@@ -116,6 +116,14 @@ describe('hook snapshot leaves out the paths no test reads', { timeout: 120000 }
     expect(hits).toEqual([]);
   });
 
+  it('keeps every *-wasm engine directory, which tests read by pattern rather than by name', () => {
+    // softwarePaulaSingleCopy lists `git ls-files` and reads every <name>-wasm/**/CMakeLists*.txt, so a skipped engine
+    // directory never shows up as a named path in the census above; skipping juce-wasm failed the pre-push gate with
+    // ENOENT juce-wasm/CMakeLists.txt (2026-10-14).
+    const skipped = bash(`. "${SNAPSHOT_SH}"; printf '%s\\n' "\${SNAPSHOT_SKIPPED_PATHS[@]}"`, ROOT).split('\n').map((p) => p.replace(/^\//, ''));
+    expect(skipped.filter((p) => /^[^/]+-wasm(\/|$)/.test(p))).toEqual([]);
+  });
+
   it('every skipped path is still tracked, so the list cannot rot', () => {
     const skipped = bash(`. "${SNAPSHOT_SH}"; printf '%s\\n' "\${SNAPSHOT_SKIPPED_PATHS[@]}"`, ROOT).split('\n').map((p) => p.replace(/^\//, ''));
     expect(skipped.length).toBeGreaterThan(5);

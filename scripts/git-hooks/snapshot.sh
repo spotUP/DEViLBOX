@@ -40,8 +40,7 @@ in_snapshot() { ( cd "$SNAP" && snapshot_env "$@" ); }
 # for every tracked top-level directory and every public/ subdirectory, grep the
 # whole of src/, vite.config.ts, tools/test-tiers and scripts/git-hooks for the path
 # as a quoted or slash-delimited token, and keep only the entries with ZERO hits in
-# test code (the single hit for juce-wasm and Vestax Mixer is the vite watch-ignore
-# list). The first pass of this census counted one spelling and missed that tests
+# test code (the single hit for Vestax Mixer is the vite watch-ignore list). The first pass of this census counted one spelling and missed that tests
 # read third-party/uade-3.05 and third-party/nuade; the regression test counts
 # every spelling, so the list is held to it. Tests that walk a directory (liveEditHeard, nativeExportReload
 # and exportDialogNativeOption walk public/data/songs; the scratch suites read
@@ -55,7 +54,8 @@ in_snapshot() { ( cd "$SNAP" && snapshot_env "$@" ); }
 #     upstream sources, the build inputs of the *-wasm dirs. The rest of third-party stays:
 #     tests read uade-3.05 (players, eagleplayer.conf, assembler sources), nuade (licence,
 #     pristine-tree check) and aylet-0.5.
-#   juce-wasm           79 MB  JUCE build tree
+#   (juce-wasm, 81 MB, is NOT skipped: softwarePaulaSingleCopy reads every tracked
+#   <name>-wasm/**/CMakeLists*.txt by pattern, which the name census cannot see; 2026-10-14)
 #   Vestax Mixer        50 MB  3D model sources
 #   trace*.json.gz      72 MB  browser traces at the repo root
 #   public/tumult/samples 254 MB  impulse-response samples fetched by the browser
@@ -69,7 +69,6 @@ SNAPSHOT_SKIPPED_PATHS=(
   /third-party/odin2-master/
   /third-party/hivelytracker-master/
   /third-party/musicline_playback-main/
-  /juce-wasm/
   "/Vestax Mixer/"
   /trace*.json.gz
   /public/tumult/samples/
