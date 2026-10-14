@@ -44,7 +44,7 @@ vi.mock('@/utils/audio-context', () => ({
   noteToMidi: (n: string) => (n === 'C4' ? 60 : 36),
 }));
 
-import { HivelySynth } from '../HivelySynth';
+import { HivelySynth, hvlNoteForKey } from '../HivelySynth';
 import type { HivelyConfig } from '@/types/instrument';
 
 const config = {
@@ -100,7 +100,7 @@ describe('HivelySynth: a release cancels an attack still waiting for its player'
     await settle();
 
     expect(noteOns()).toHaveLength(1);
-    expect(noteOns()[0]).toMatchObject({ handle: 0, note: 60 });
+    expect(noteOns()[0]).toMatchObject({ handle: 0, note: hvlNoteForKey(60) }); // C4 as the replayer note
 
     synth.triggerRelease();
     expect(noteOffs()).toHaveLength(1);

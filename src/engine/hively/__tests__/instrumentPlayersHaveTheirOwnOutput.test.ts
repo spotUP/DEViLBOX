@@ -36,9 +36,13 @@ describe('Hively instrument players have their own output', () => {
     expect(1 + 4 + 32).toBe(37);
   });
 
-  it('the synth listens to the instrument output, never the tune', () => {
+  it('the synth listens to the instrument output; the tune reaches it only through the one tune bridge', () => {
     expect(SYNTH).toContain('this.engine.instrumentOutput.connect(this.output);');
     expect(SYNTH).toContain('this.engine.instrumentOutput.disconnect(this.output);');
-    expect(SYNTH).not.toContain('this.engine.output.connect(this.output);');
+    // The tune needs a way into the mixer too (every .ahx played silent without it, 2026-09-24), but through
+    // bridgeTune only: one connection, owned by one live instance, never the instrument path.
+    const bridge = SYNTH.slice(SYNTH.indexOf('private bridgeTune(): void'));
+    expect(SYNTH.split('this.engine.output.connect(this.output);')).toHaveLength(2);
+    expect(bridge.slice(0, bridge.indexOf('\n  }'))).toContain('this.engine.output.connect(this.output);');
   });
 });
