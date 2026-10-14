@@ -418,7 +418,7 @@ songs (their instruments are ours).
 
 ## Ledger - wave 0 + 1 (13 items), started 2026-10-14
 
-Running count: 10 of 13. Order: RP-1, RP-2, RP-7, RP-3, N1, RP-4, N2, N3, RP-5, RP-6, N4, RP-R, N5.
+Running count: 11 of 13. Order: RP-1, RP-2, RP-7, RP-3, N1, RP-4, N2, N3, RP-5, RP-6, N4, RP-R, N5.
 
 | ID | Done | Commit |
 |---|---|---|
@@ -427,13 +427,54 @@ Running count: 10 of 13. Order: RP-1, RP-2, RP-7, RP-3, N1, RP-4, N2, N3, RP-5, 
 | RP-3 | yes | a59f9a19a |
 | RP-4 | yes | fb7edc31c |
 | RP-5 | yes | af888b496 |
-| RP-6 | no | |
+| RP-6 | yes | 614391142 |
 | RP-7 | yes | 5130e60f0 |
 | N1 | yes | 901ce669c |
 | N2 | yes | f4c6f5155 |
 | N3 | yes | 64468848b |
-| N4 | no | |
+| N4 | yes | PENDING |
 | RP-R | yes | 973ffd29f |
-| N5 | no | |
+| N5 | yes | PENDING |
 
 Decisions / deviations (append as found):
+
+- **Fade lives in `row-clip.js`, once.** The stream does not bake the D3 fade: the clip carries `fadeFrames` (= round(0.005 * rate),
+  at most the clip length) and `DevilboxRowClip` applies it to the mix and to every voice buffer. "Before the fade" in RP-R / N1 is
+  `frames - fadeFrames`.
+- **`targetOf(song, songPos, row)`** takes the song (always `setGrid(song)` first: the grid is the song as it is now, edits included).
+- **The decision is one function, `rowPreviewRoute(format, instruments, transportPlaying)`** (NativeEngineRouting.ts), read by
+  `TrackerReplayer.previewRow` (sync: `'engine' | 'playing' | 'unsupported'`) and by the prefetch. Supported keys:
+  `src/engine/rowPreview/supportedEngines.ts`, held equal to `adapters/index.ts` by `rowPreviewHost.test.ts`.
+- **Mixer mask.** The mixer only tells engines that already have an instance, so a mute made before the engine ever played never
+  reached it. `previewNativeRow` hands the engine `mixerAudibleMask(channels, isSoloing)` (extracted from `forwardReplayerMuteMask`, one
+  source) before it asks for the mask. `rowClipMask` = the engine's `_muteMask` without the isolation slots it posted
+  (`WASMChannelOutputsEngine.isolatedMask`, tracked on `addIsolation` / `removeIsolation`, cleared when the node is replaced).
+- **Scope stream.** A clip shorter than one 1024-sample scope chunk (every row of a per-tick grid) never reached the scopes:
+  `DevilboxChannelStream.flush()` is new, the Nuade worklet flushes and `discontinue()`s when a clip ends.
+- **Pans per clip are per 128-frame render chunk**, as rendered from the row's first frame, not aligned to playback's quantum grid. They
+  only place a voice on the isolation slots and dub sends; the main mix comes from nuade and is exact.
+- **A `looped` flag inside the row's last chunk** keeps up to 127 frames of the next loop in the clip (the render does not say where in
+  the chunk it looped).
+- **FINDING - the grid of a tick-followed song is a grid of player ticks.** wicked.wb parses to `initialSpeed` 1 and 45 patterns of 4-8
+  rows: a grid row is ONE player tick (960 frames = 20 ms at 48 kHz), not the 120 ms row the probe table measured. Enter on such a
+  row sounds the voices as they stand in that tick: 20 ms, a click-length sample of sustained voices (148 of the 187 openable nuade
+  corpus songs are tick-followed; row frames over the gate: min 128, median 5759, max 480000 = the 10 s cap). Exactness holds
+  (max diff 0). Whether a 20 ms row is what the owner wants to hear on these songs is a PRODUCT decision, not built: options are a
+  minimum clip length (play on past the row), or the player's own musical row. Left as it is until the owner decides.
+- **RP-R row.** The plan's "position 3, row 8" does not exist in that grid (patterns have 4-8 rows). The test finds, with a scratch
+  stream, the first row from position 3 on where voice 2 (the muted one) and another voice both sound: position 31 row 5, 960 frames
+  from song frame 492459, max diff 0, peak 0.083.
+- **N1 / unit rows** sit at 8 s and 45 s (bounded linear renders), not 10 % / 50 %; the corpus gate (N4) uses 10 / 50 / 90 %.
+- **Search cost.** Walking forward to an unseen row kept re-scanning the whole timeline for the target and its end each chunk (O(n^2));
+  the scan now looks only at what a chunk added and finds the row end by bisection. Corpus gate, cold request time (the max of the
+  three requests per song, the first being a forward walk to 90 %): median 220 ms, p90 927 ms, max 2092 ms on 5 min songs at machine
+  load ~40; before the fix median 344, p90 2943, max 5704.
+- **N4 result** (`npm run nuade-row-preview`, `test-data/nuade-row-preview.json`, gitignored): 211 corpus songs, 187 pass with max diff
+  0 at 10 / 50 / 90 %, 0 fail, 0 missed, 24 `error` = `nuade open failed`: the song's companion files (smp.*, .ins, .AS, songplay, .info,
+  Samples/) are not in the repo, so the same open fails in playback; they are not row-preview results.
+- **test:ci** gained: gridRowStartTickInvertsTheFollow, engineLoadArgsAreWhatPlayLoads, src/engine/rowPreview/__tests__/ (whole
+  directory), rowClipHelper, playRowPicksTheEnginePath, enterSoundsTheRowThroughTheSongsEngine. src/engine/nuade/__tests__/ was
+  already there whole.
+- **Prefetch** is mounted in `TrackerView` (`useEffect(() => startRowPreviewPrefetch(), [])`), no new component.
+- **N5:** `npm run type-check` has one error, in another session's uncommitted WIP (`PatternEditorCanvas.tsx` 484, TS6133 `cwPx`);
+  nothing of this work. 24 test files / 118 tests of the items named above pass.
