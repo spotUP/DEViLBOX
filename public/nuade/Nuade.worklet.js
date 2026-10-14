@@ -375,7 +375,11 @@ class NuadeProcessor extends AudioWorkletProcessor {
   postVu() {
     const m = this.module;
     const n = m._nw_vu(this.vuPtr, this.voices);
-    this.port.postMessage({ type: 'vu', levels: Array.from(new Float32Array(m.HEAPU8.buffer, this.vuPtr, n)) });
+    const levels = Array.from(new Float32Array(m.HEAPU8.buffer, this.vuPtr, n));
+    // A muted (or not soloed) voice reads silence on its meter, like every other engine; its buffer stays full for the scopes.
+    const mask = this.appliedMask === -1 ? this.userMask >>> 0 : this.appliedMask >>> 0;
+    for (let v = 0; v < levels.length && v < 32; v++) if (!((mask >>> v) & 1)) levels[v] = 0;
+    this.port.postMessage({ type: 'vu', levels });
   }
 
   process(inputs, outputs) {
