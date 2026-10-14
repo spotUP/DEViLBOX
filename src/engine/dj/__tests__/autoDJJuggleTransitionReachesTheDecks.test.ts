@@ -94,7 +94,7 @@ describe('R3: Auto DJ plans and performs a juggle transition through the decks',
 
   it('the ladder trades 4-2-1-1 bars into the incoming on the master grid, and the transition completes', async () => {
     holder.incomingPhraseConfidence = 0.9;
-    const { dj, decks, anticipated } = await setupJuggleTransition(holder, { mode: 'PERFORMER' });
+    const { dj, decks, anticipated } = await setupJuggleTransition(holder, { mode: 'PERFORMER', scratchMode: 'OFF' });
     expect(anticipated?.style, `anticipated plan: ${anticipated?.reasons.join(' | ')}`).toBe('juggleTransition');
     expect(anticipated!.juggle).toMatchObject({ ladderBars: [4, 2, 1, 1], tradeBeats: 64 });
     let executedId: string | null = null;
@@ -149,7 +149,7 @@ describe('R3: Auto DJ plans and performs a juggle transition through the decks',
 
   it('phrase-level grids trade no single bars: 4-2-2 in PERFORMER, and the transition completes', async () => {
     holder.incomingGridConfidence = 0.7;
-    const { dj, decks, anticipated } = await setupJuggleTransition(holder, { mode: 'PERFORMER', startSec: 0, outgoingGridConfidence: 0.7 });
+    const { dj, decks, anticipated } = await setupJuggleTransition(holder, { mode: 'PERFORMER', startSec: 0, outgoingGridConfidence: 0.7, scratchMode: 'OFF' });
     expect(anticipated?.juggle, `anticipated plan: ${anticipated?.reasons.join(' | ')}`).toMatchObject({ ladderBars: [4, 2, 2], tradeBeats: 64 });
     // The juggle controller is Auto DJ's own and outlives a test: count from here.
     const j = dj.getJuggle();
@@ -178,7 +178,7 @@ describe('owner plan section 16: the incoming is locked and verified before it i
   it('an incoming 0.9 s off the master\'s bars is re-cued once while silent, and is within 5 ms when its first bar is heard', async () => {
     holder.incomingGridShiftSec = 0.9;
     holder.incomingPhraseConfidence = 0.9;
-    const { dj, decks, anticipated } = await setupJuggleTransition(holder, { mode: 'PERFORMER' });
+    const { dj, decks, anticipated } = await setupJuggleTransition(holder, { mode: 'PERFORMER', scratchMode: 'OFF' });
     expect(anticipated?.style, `anticipated plan: ${anticipated?.reasons.join(' | ')}`).toBe('juggleTransition');
     // Auto DJ's own execution of the anticipated plan (the poll loop's trigger is R3's; this is its trade stage).
     loadIncoming(holder);
@@ -210,7 +210,7 @@ describe('owner plan section 16: an incoming that cannot be put in phase is neve
   it('an incoming 0.9 s off whose re-cue does not land is never answered with a cut onto it: the ladder releases', async () => {
     holder.incomingGridShiftSec = 0.9;
     holder.incomingPhraseConfidence = 0.9;
-    const { dj, decks, anticipated } = await setupJuggleTransition(holder, { mode: 'PERFORMER' });
+    const { dj, decks, anticipated } = await setupJuggleTransition(holder, { mode: 'PERFORMER', scratchMode: 'OFF' });
     expect(anticipated?.style, `anticipated plan: ${anticipated?.reasons.join(' | ')}`).toBe('juggleTransition');
     // A deck that ignores a seek once it plays: the re-cue cannot fix its phase.
     const seek = decks.B.audioPlayer.seek;

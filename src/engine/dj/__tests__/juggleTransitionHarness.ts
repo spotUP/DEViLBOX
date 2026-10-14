@@ -119,7 +119,7 @@ export function loadIncoming(holder: HarnessHolder): boolean {
  * transition from the incoming analysis. Returns the decks and the
  * anticipated plan.
  */
-export async function setupJuggleTransition(holder: HarnessHolder, opts: { mode: JuggleMode; startSec?: number; outgoingGridConfidence?: number }) {
+export async function setupJuggleTransition(holder: HarnessHolder, opts: { mode: JuggleMode; startSec?: number; outgoingGridConfidence?: number; scratchMode?: string }) {
   // Warm the modules the trigger imports dynamically: a cold import takes real time while the fake clock runs on,
   // and the deck would pass the plan's start before the executor got it.
   await import('../DJTrackLoader');
@@ -143,7 +143,10 @@ export async function setupJuggleTransition(holder: HarnessHolder, opts: { mode:
   pl.importPlaylists([{ id, name: 'juggle transition', createdAt: Date.now(), updatedAt: Date.now(), tracks }]);
   pl.setActivePlaylist(id);
   const s = useDJStore.getState();
-  s.setAutoDJConfig({ shuffle: false, style: 'Club', transitionBars: 8, juggleMode: opts.mode, juggleIntensity: -1 });
+  s.setAutoDJConfig({ shuffle: false, style: 'Club', transitionBars: 8, juggleMode: opts.mode, juggleIntensity: -1,
+    // Auto Scratch defaults to MUSICAL + the three-deck routine. A juggle test that is not about the scratch layer
+    // passes scratchMode 'OFF': whether a routine starts mid-test depends on where the poll lands against the bars.
+    ...(opts.scratchMode ? { scratchMode: opts.scratchMode } : {}) });
   s.setDeckState('A', {
     fileName: `${OUTGOING}.wav`, trackName: OUTGOING, isPlaying: true, detectedBPM: BPM, effectiveBPM: BPM, durationMs: 600_000, audioPosition: startSec,
     pitchOffset: 0, trackAnalysis: outgoingAnalysis(opts.outgoingGridConfidence), beatGrid: gridOf(OUTGOING),

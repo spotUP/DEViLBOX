@@ -17,4 +17,11 @@ describe('the test timeout', () => {
     expect(m, 'vite.config.ts sets no testTimeout: vitest falls back to 5 s').not.toBeNull();
     expect(Number(m![1].replace(/_/g, ''))).toBeGreaterThanOrEqual(30_000);
   });
+
+  it('gives setup and teardown hooks the same room (Vitest hook default is 10 s)', () => {
+    const config = readFileSync(join(process.cwd(), 'vite.config.ts'), 'utf8');
+    const m = /hookTimeout:\s*([\d_]+)/.exec(config);
+    expect(m, 'vite.config.ts sets no hookTimeout: a beforeAll that scans src/engine fails at 10 s under load').not.toBeNull();
+    expect(Number(m![1].replace(/_/g, ''))).toBeGreaterThanOrEqual(30_000);
+  });
 });

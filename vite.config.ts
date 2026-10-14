@@ -147,6 +147,8 @@ export default defineConfig({
     // or a registry (mameChipWiring, its file 179 s under load, 2.5 s idle)
     // crossed it. A test that asserts speed says so itself.
     testTimeout: 30_000,
+    // Same for beforeAll/afterAll: the 10 s default failed WASMSingletonBase.lifecycle's source scan in the gate.
+    hookTimeout: 30_000,
     env: {
       // node-web-audio-api runs OfflineAudioContext.suspend() and
       // startRendering() as two futures on its tokio runtime; with several
