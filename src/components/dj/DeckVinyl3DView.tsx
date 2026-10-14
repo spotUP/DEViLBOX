@@ -30,7 +30,7 @@ import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { useGLTF, OrbitControls, View, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDJStore } from '@/stores/useDJStore';
-import { tonearmProgress } from '@/lib/dj/tonearm';
+import { tonearmProgress, armAngle, VINYL3D_ARM_RANGE } from '@/lib/dj/tonearm';
 import { platterPositionSec } from './DeckCssTurntable';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { TurntablePhysics, OMEGA_NORMAL } from '@/engine/turntable/TurntablePhysics';
@@ -53,10 +53,9 @@ const RPS_45 = 45 / 60;
 
 // Tonearm rotation range (radians around Y axis at the Swivle bearing).
 // Rest = tonearm lifted/parked (slightly clockwise of start).
-// The tonearm in the model is at the outer-groove position (TONEARM_ANGLE_START = 0).
+// Start (lead-in groove) and end (run-out groove) are solved from the model
+// geometry in tonearm.ts (VINYL3D_ARM_RANGE), not tuned by eye.
 const TONEARM_ANGLE_REST = 0.30;    // lifted/parked, off the record
-const TONEARM_ANGLE_START = 0.0;    // outer groove (model's default position)
-const TONEARM_ANGLE_END = -0.35;    // inner groove
 
 // Pre-allocated matrices for per-frame rotation (avoids GC pressure)
 const _rotMat = new THREE.Matrix4();
@@ -358,7 +357,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
 
       // Tonearm on record only when playing, otherwise parked at rest
       const targetAngle = (playing && trackName)
-        ? TONEARM_ANGLE_START + progress * (TONEARM_ANGLE_END - TONEARM_ANGLE_START)
+        ? armAngle(VINYL3D_ARM_RANGE, progress)
         : TONEARM_ANGLE_REST;
 
       // Tighter tracking — delta*12 reaches target in ~5 frames at 60fps
@@ -591,7 +590,7 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
     const newProgress = Math.max(0, Math.min(1, pickupDragStartProgressRef.current + progressDelta));
 
     // Move tonearm immediately (visual feedback before audio seeks)
-    tonearmAngleRef.current = TONEARM_ANGLE_START + newProgress * (TONEARM_ANGLE_END - TONEARM_ANGLE_START);
+    tonearmAngleRef.current = armAngle(VINYL3D_ARM_RANGE, newProgress);
 
     try {
       const deck = getDJEngine().getDeck(deckId);
