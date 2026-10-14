@@ -402,6 +402,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // Channel Metrics: calculate numChannels, offsets, and widths once per pattern/theme change
   const fitChannels = useSettingsStore(s => s.fitAllChannelsTracker) && !mobileCanvas;
+  // With fit off the pattern is drawn at the zoom slider's scale; `fitScale` below is the scale in use either way.
+  const manualScale = useUIStore(s => s.trackerZoom) / 100;
   // Channels with no data in any pattern are width 0 (hidden, not deleted): one list for the grid, headers, scopes, meters and the fit scale.
   const visibleMask = useVisibleChannelMask();
   const { numChannels, channelOffsets: rawChannelOffsets, channelWidths, totalChannelsWidth, fitScale } = useMemo(() => {
@@ -419,6 +421,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         channelPad: mobileCanvas ? Math.round(40 * MOBILE_SCALE) : 40,
         availableWidth: dimensions.width,
         fit: fitChannels,
+        manualScale: mobileCanvas ? 1 : manualScale,
       });
     }
 
@@ -474,7 +477,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Fit first (shrink the whole pattern so every channel is on screen), then stretch.
     const fitted = mobileCanvas
       ? { scale: 1, leftEdge: LNW + globalLaneOffset, widths: minWidths }
-      : fitAndStretchChannelWidths(minWidths, LNW + globalLaneOffset, dimensions.width, fitChannels);
+      : fitAndStretchChannelWidths(minWidths, LNW + globalLaneOffset, dimensions.width, fitChannels, undefined, manualScale);
     const widths = fitted.widths;
     const offsets: number[] = [];
     let currentX = fitted.leftEdge;
@@ -487,14 +490,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       totalChannelsWidth: currentX - Math.floor(LNW * fitted.scale),
       fitScale: fitted.scale,
     };
-  }, [pattern, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts, globalLaneVisible, dimensions.width, fitChannels, visibleMask]);
+  }, [pattern, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts, globalLaneVisible, dimensions.width, fitChannels, manualScale, visibleMask]);
 
   // Row-number gutter and global lane at the fitted scale (canvas px). Everything
   // the worker draws is scaled by fitScale, so these are what the DOM must match.
   const lnwPx = Math.floor(LINE_NUMBER_WIDTH * fitScale);
   const lnwCanvasPx = mobileCanvas ? LNW : lnwPx; // the gutter the canvas itself draws (mobile has its own)
   const globalLanePx = globalLaneVisible ? (mobileCanvas ? GLOBAL_LANE_W : Math.floor((LINE_NUMBER_WIDTH + GLOBAL_LANE_W) * fitScale) - lnwPx) : 0;
-  const publishFitScale = useUIStore(s => s.setTrackerFitScale);
+  const publishFitScale = useUIStore(s => s.setTrackerScale);
   useEffect(() => { publishFitScale(fitScale); return () => publishFitScale(1); }, [fitScale, publishFitScale]);
   const fitScaleRef = useRef(fitScale);
   const lnwPxRef = useRef(lnwPx);
@@ -1512,7 +1515,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       columnVisibility:   editor.columnVisibility,
       trackerVisualBg:    settings.trackerVisualBg,
       recordMode:         editor.recordMode,
-      rowHeight:          Math.round(24 * (ui.trackerZoom / 100) * ui.trackerFitScale),
+      rowHeight:          Math.round(24 * ui.trackerScale),
       rowHighlightInterval: ui.rowHighlightInterval,
       rowSecondaryHighlightInterval: ui.rowSecondaryHighlightInterval,
       showBeatLabels:     ui.showBeatLabels,
@@ -2107,7 +2110,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const unsubUI = useUIStore.subscribe((s, prev) => {
       if (isFormatModeRef.current) return;
       if (s.useHexNumbers !== prev.useHexNumbers || s.blankEmptyCells !== prev.blankEmptyCells
-          || s.trackerZoom !== prev.trackerZoom || s.trackerFitScale !== prev.trackerFitScale || s.rowHighlightInterval !== prev.rowHighlightInterval
+          || s.trackerZoom !== prev.trackerZoom || s.trackerScale !== prev.trackerScale || s.rowHighlightInterval !== prev.rowHighlightInterval
           || s.showBeatLabels !== prev.showBeatLabels
           || s.showAutomationLanes !== prev.showAutomationLanes || s.showMacroLanes !== prev.showMacroLanes) {
         bridgeRef.current?.post({ type: 'uiState', uiState: snapshotUI() });
@@ -2346,8 +2349,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         prevPlayRow = playRow; prevPlaying = isPlaying; needsRender = true;
       }
       if (themeStore !== prevThemeId) { prevThemeId = themeStore; cachedTheme = null; needsRender = true; }
-      if (uiStore.useHexNumbers !== prevUIHex || uiStore.trackerZoom !== prevUIZoom || uiStore.trackerFitScale !== prevUIFit) {
-        prevUIHex = uiStore.useHexNumbers; prevUIZoom = uiStore.trackerZoom; prevUIFit = uiStore.trackerFitScale;
+      if (uiStore.useHexNumbers !== prevUIHex || uiStore.trackerZoom !== prevUIZoom || uiStore.trackerScale !== prevUIFit) {
+        prevUIHex = uiStore.useHexNumbers; prevUIZoom = uiStore.trackerZoom; prevUIFit = uiStore.trackerScale;
         cachedUI = null; needsRender = true;
       }
       if (editorState.recordMode !== prevRecordMode) {

@@ -9,6 +9,9 @@ import { useEditorStore, MASK_NOTE, MASK_INSTRUMENT, MASK_VOLUME, MASK_EFFECT, M
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import { DropdownButton, type MenuItemType } from '@components/common/ContextMenu';
 import type { ColumnVisibility } from '@typedefs/tracker';
+import { useUIStore } from '@stores/useUIStore';
+import { useSettingsStore } from '@stores/useSettingsStore';
+import { PatternZoomControl } from './PatternZoomControl';
 
 const COLUMN_TOGGLES: { key: keyof ColumnVisibility; label: string; title: string }[] = [
   { key: 'note', label: 'Not', title: 'Note column' },
@@ -31,6 +34,11 @@ export const PatternBottomBar: React.FC = () => {
   const setPasteMode = useEditorStore(s => s.setPasteMode);
   const pasteMask = useEditorStore(s => s.pasteMask);
   const toggleMaskBit = useEditorStore(s => s.toggleMaskBit);
+  // The scale in use: the fit result while fit is on, else the zoom (published by the pattern canvas).
+  const trackerScale = useUIStore(s => s.trackerScale);
+  const setTrackerZoom = useUIStore(s => s.setTrackerZoom);
+  const fit = useSettingsStore(s => s.fitAllChannelsTracker);
+  const setFit = useSettingsStore(s => s.setFitAllChannelsTracker);
 
   return (
     <div className="flex-shrink-0 flex items-center gap-3 px-2 h-[26px] bg-ft2-bg border-t border-dark-border select-none">
@@ -143,6 +151,8 @@ export const PatternBottomBar: React.FC = () => {
           ))}
         </div>
       </div>
+
+      <PatternZoomControl className="ml-auto" scale={trackerScale} fit={fit} onZoom={setTrackerZoom} onFit={() => setFit(true)} />
     </div>
   );
 };

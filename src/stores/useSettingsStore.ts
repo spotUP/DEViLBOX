@@ -2,6 +2,7 @@
  * Settings Store - Global engine & audio configuration
  */
 
+import { clampZoomPercent } from '@/lib/tracker/patternZoom';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { persist } from 'zustand/middleware';
@@ -57,8 +58,9 @@ interface SettingsStore {
 
   // Visual Settings
   trackerVisualBg: boolean;  // Enable WebGL visual background behind tracker pattern
-  fitAllChannelsTracker: boolean; // Shrink the tracker pattern font so every channel fits the width (floor ~7 px); a manual zoom turns it off
+  fitAllChannelsTracker: boolean; // Shrink the tracker pattern font so every channel fits the width (floor 10 px); a manual zoom turns it off
   fitAllChannelsDeck: boolean;    // Same for the DJ deck pattern views
+  deckPatternZoom: number;        // 50-200: the scale the DJ deck pattern views are drawn at while fit is off; moving the slider turns fit off
   showUnusedChannels: boolean;    // Show channels that hold no data in any pattern (default: hidden, never deleted)
   trackerVisualMode: number; // Current visualizer mode index (0-5)
   channelColorBlend: number; // Channel color background tint opacity (0-100, default 8)
@@ -102,6 +104,7 @@ interface SettingsStore {
   setMidiPolyphonic: (enabled: boolean) => void;
   setTrackerVisualBg: (enabled: boolean) => void;
   setFitAllChannelsTracker: (enabled: boolean) => void;
+  setDeckPatternZoom: (percent: number) => void;
   setFitAllChannelsDeck: (enabled: boolean) => void;
   setShowUnusedChannels: (enabled: boolean) => void;
   setTrackerVisualMode: (mode: number) => void;
@@ -196,6 +199,7 @@ export const useSettingsStore = create<SettingsStore>()(
       trackerVisualBg: false,  // Default: off
       fitAllChannelsTracker: true,
       fitAllChannelsDeck: true,
+      deckPatternZoom: 100,
       showUnusedChannels: false,
       trackerVisualMode: 0,    // Default: spectrum bars
       channelColorBlend: 8,    // Default: 8% opacity for channel color tint
@@ -353,6 +357,12 @@ export const useSettingsStore = create<SettingsStore>()(
       setFitAllChannelsDeck: (enabled) =>
         set((state) => {
           state.fitAllChannelsDeck = enabled;
+        }),
+
+      setDeckPatternZoom: (percent) =>
+        set((state) => {
+          state.deckPatternZoom = clampZoomPercent(percent);
+          state.fitAllChannelsDeck = false;
         }),
 
       setShowUnusedChannels: (enabled) =>
@@ -536,6 +546,8 @@ export const useSettingsStore = create<SettingsStore>()(
         trackerVisualBg: state.trackerVisualBg,
         fitAllChannelsTracker: state.fitAllChannelsTracker,
         fitAllChannelsDeck: state.fitAllChannelsDeck,
+        // Additive: a save without it merges in the default (100), no version bump.
+        deckPatternZoom: state.deckPatternZoom,
         showUnusedChannels: state.showUnusedChannels,
         trackerVisualMode: state.trackerVisualMode,
         channelColorBlend: state.channelColorBlend,

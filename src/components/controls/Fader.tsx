@@ -1,5 +1,5 @@
 /**
- * Fader — vertical linear slider. Dub-desk ergonomics (real mixers have
+ * Fader — linear slider, vertical by default, horizontal with `orientation`. Dub-desk ergonomics (real mixers have
  * faders, not knobs for per-channel send levels). Shares the paramKey
  * imperative-fastpath convention with Knob so a MIDI-driven fader gets
  * audio-rate visual updates without React re-renders.
@@ -32,6 +32,15 @@ interface FaderProps {
    * stopped matching the constant.
    */
   fillHeight?: boolean;
+
+  /**
+   * 'horizontal' lays the same control on its side: the size table's length
+   * becomes the width, the value grows rightwards and a rightward drag raises
+   * it. `fillHeight` does not apply to it.
+   */
+  orientation?: 'vertical' | 'horizontal';
+  /** Horizontal only: the track's length in px (default: the size table's length). */
+  length?: number;
 
   /** Token for the filled-track color (design tokens only). */
   color?: 'accent-primary' | 'accent-secondary' | 'accent-success' | 'accent-warning' | 'accent-error' | 'accent-highlight';
@@ -90,21 +99,24 @@ const COLOR_FILL: Record<NonNullable<FaderProps['color']>, string> = {
 
 export const Fader: React.FC<FaderProps> = React.memo(({
   value, min = 0, max = 1, onChange,
-  size = 'md', color, tone, fillHeight = false,
+  size = 'md', color, tone, fillHeight: fillHeightProp = false, orientation = 'vertical', length,
   label, title, disabled = false,
   formatValue,
   paramKey, imperativeSubscribe,
   doubleClickValue,
 }) => {
-  const { w, h, thumbH } = SIZE_PX[size];
+  const horizontal = orientation === 'horizontal';
+  const { w, h: tableH, thumbH } = SIZE_PX[size];
+  const h = horizontal ? (length ?? tableH) : tableH;
+  const fillHeight = fillHeightProp && !horizontal;
   /** `tone` maps onto the existing token names; neither given means primary. */
   const fillToken = tone ? TONE_TO_FILL[tone] : (color ?? 'accent-primary');
 
-  /** Track height in px, live — `h` is only the fallback before first layout. */
-  const trackHeight = useCallback(
-    () => trackRef.current?.getBoundingClientRect().height || h,
-    [h],
-  );
+  /** Track length along the drag axis in px, live — `h` is only the fallback before first layout. */
+  const trackHeight = useCallback(() => {
+    const r = trackRef.current?.getBoundingClientRect();
+    return (horizontal ? r?.width : r?.height) || h;
+  }, [h, horizontal]);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const thumbRef = useRef<HTMLDivElement | null>(null);
   const fillRef = useRef<HTMLDivElement | null>(null);
@@ -169,9 +181,14 @@ export const Fader: React.FC<FaderProps> = React.memo(({
     const norm = Math.max(0, Math.min(1, (v - min) / (max - min)));
     const availPx = Math.max(1, trackHeight() - thumbH);
     const thumbTop = (1 - norm) * availPx;
+    if (horizontal) {
+      thumb.style.transform = `translateX(${norm * availPx}px)`;
+      fill.style.width = `${norm * 100}%`;
+      return;
+    }
     thumb.style.transform = `translateY(${thumbTop}px)`;
     fill.style.height = `${norm * 100}%`;
-  }, [trackHeight, thumbH, min, max]);
+  }, [trackHeight, thumbH, min, max, horizontal]);
 
   // A stretched fader changes height with its container, and the thumb is
   // positioned in px against that height. Without this it stays where the
@@ -192,9 +209,11 @@ export const Fader: React.FC<FaderProps> = React.memo(({
   const valueFromDrag = useCallback((startValue: number, startY: number, clientY: number): number => {
     const track = trackRef.current;
     if (!track) return startValue;
-    const availPx = Math.max(1, track.getBoundingClientRect().height - thumbH);
-    return faderDragValue(startValue, startY - clientY, availPx, min, max);
-  }, [thumbH, min, max]);
+    const r = track.getBoundingClientRect();
+    const availPx = Math.max(1, (horizontal ? r.width : r.height) - thumbH);
+    // `startY`/`clientY` carry the pointer's X on a horizontal fader; a rightward drag raises it.
+    return faderDragValue(startValue, horizontal ? clientY - startY : startY - clientY, availPx, min, max);
+  }, [thumbH, min, max, horizontal]);
 
   const commit = useCallback((v: number) => {
     const clamped = Math.max(min, Math.min(max, v));
@@ -210,19 +229,19 @@ export const Fader: React.FC<FaderProps> = React.memo(({
     e.stopPropagation();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     draggingRef.current = true;
-    dragStartYRef.current = e.clientY;
+    dragStartYRef.current = horizontal ? e.clientX : e.clientY;
     dragStartValueRef.current = internalRef.current;
     // No jump-to-cursor: the value moves from where it IS by how far the hand
     // moves. Jumping to the click point made every grab start from wherever
     // the pointer landed - "always starts from zero when i pull it up"
     // (owner, 2026-10-02).
-  }, [disabled]);
+  }, [disabled, horizontal]);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     if (!draggingRef.current) return;
     e.preventDefault();
-    commit(valueFromDrag(dragStartValueRef.current, dragStartYRef.current, e.clientY));
-  }, [commit, valueFromDrag]);
+    commit(valueFromDrag(dragStartValueRef.current, dragStartYRef.current, horizontal ? e.clientX : e.clientY));
+  }, [commit, valueFromDrag, horizontal]);
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
     if (!draggingRef.current) return;
@@ -253,7 +272,7 @@ export const Fader: React.FC<FaderProps> = React.memo(({
     // are allowed to overflow this box; they must never set it.
     <div
       className={'flex flex-col items-center gap-0.5 select-none' + (disabled ? ' opacity-40' : '')}
-      style={{ width: `${w}px` }}
+      style={{ width: `${horizontal ? h : w}px` }}
       title={title}
     >
       {label && (
@@ -264,10 +283,12 @@ export const Fader: React.FC<FaderProps> = React.memo(({
       <div
         ref={trackRef}
         className={
-          'relative rounded-sm bg-dark-bgTertiary border border-dark-border cursor-ns-resize' +
+          'relative rounded-sm bg-dark-bgTertiary border border-dark-border ' + (horizontal ? 'cursor-ew-resize' : 'cursor-ns-resize') +
           (disabled ? ' cursor-not-allowed' : ' hover:border-dark-borderLight')
         }
-        style={{ width: `${w}px`, height: fillHeight ? '100%' : `${h}px`, touchAction: 'none' }}
+        style={horizontal
+          ? { width: `${h}px`, height: `${w}px`, touchAction: 'none' }
+          : { width: `${w}px`, height: fillHeight ? '100%' : `${h}px`, touchAction: 'none' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -277,18 +298,20 @@ export const Fader: React.FC<FaderProps> = React.memo(({
         {/* Fill — grows upward from the bottom of the track */}
         <div
           ref={fillRef}
-          className={`absolute bottom-0 left-0 right-0 ${COLOR_FILL[fillToken]} transition-none pointer-events-none`}
-          style={{ height: '0%' }}
+          className={`absolute ${horizontal ? 'top-0 bottom-0 left-0' : 'bottom-0 left-0 right-0'} ${COLOR_FILL[fillToken]} transition-none pointer-events-none`}
+          style={horizontal ? { width: '0%' } : { height: '0%' }}
         />
         {/* Unity tick (only when min=0 / max=1 / default 1 is visible; cosmetic) */}
-        {min === 0 && max === 1 && (
+        {!horizontal && min === 0 && max === 1 && (
           <div className="absolute left-0 right-0 h-px bg-text-muted/30 pointer-events-none" style={{ top: `${thumbH / 2}px` }} />
         )}
         {/* Thumb */}
         <div
           ref={thumbRef}
-          className="absolute left-0 right-0 rounded-sm bg-text-primary border border-dark-border pointer-events-none shadow-sm"
-          style={{ height: `${thumbH}px`, transform: 'translateY(0)', willChange: 'transform' }}
+          className={'absolute rounded-sm bg-text-primary border border-dark-border pointer-events-none shadow-sm ' + (horizontal ? 'top-0 bottom-0' : 'left-0 right-0')}
+          style={horizontal
+            ? { width: `${thumbH}px`, transform: 'translateX(0)', willChange: 'transform' }
+            : { height: `${thumbH}px`, transform: 'translateY(0)', willChange: 'transform' }}
         />
       </div>
       {readoutText && (

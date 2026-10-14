@@ -5,11 +5,11 @@ const LEFT = 40;
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 
 describe('fitChannelScale', () => {
-  it('16 channels that overflow the canvas shrink until they fit', () => {
-    const mins = Array.from({ length: 16 }, () => 200);
+  it('12 channels that overflow the canvas shrink until they fit', () => {
+    const mins = Array.from({ length: 12 }, () => 200);
     const s = fitChannelScale(mins, LEFT, 2000);
     expect(s).toBeLessThan(1);
-    expect(s).toBeCloseTo(2000 / (LEFT + 3200), 6);
+    expect(s).toBeCloseTo(2000 / (LEFT + 2400), 6);
   });
   it('channels that already fit keep scale 1 (never enlarge)', () => {
     expect(fitChannelScale([200, 200, 200, 200], LEFT, 3000)).toBe(1);
@@ -18,7 +18,7 @@ describe('fitChannelScale', () => {
   it('stops at the font floor and leaves the rest to sideways scroll', () => {
     const mins = Array.from({ length: 64 }, () => 200);
     expect(fitChannelScale(mins, LEFT, 1000)).toBe(FIT_SCALE_FLOOR);
-    expect(FIT_SCALE_FLOOR * 14).toBe(7);
+    expect(FIT_SCALE_FLOOR * 14).toBe(10); // the smallest pattern font the fit uses: 10 px (see FIT_MIN_FONT_PX)
   });
   it('an unknown width or no channels returns 1', () => {
     expect(fitChannelScale([200], LEFT, 0)).toBe(1);
@@ -44,5 +44,21 @@ describe('fitAndStretchChannelWidths', () => {
     const out = fitAndStretchChannelWidths([200, 200, 200, 200], LEFT, 1200, true);
     expect(out.scale).toBe(1);
     expect(out.leftEdge + sum(out.widths)).toBe(1200);
+  });
+});
+
+describe('fit off draws at the zoom slider scale', () => {
+  const mins = [200, 200, 200];
+  it('the manual scale sets scale and widths (zoom in grows, zoom out shrinks)', () => {
+    const big = fitAndStretchChannelWidths(mins, LEFT, 0, false, undefined, 1.5);
+    expect(big.scale).toBe(1.5);
+    expect(big.widths.slice(0, 2)).toEqual([300, 300]);
+    const small = fitAndStretchChannelWidths(mins, LEFT, 0, false, undefined, 0.5);
+    expect(small.scale).toBe(0.5);
+  });
+  it('fit on ignores the manual scale', () => {
+    const many = Array.from({ length: 12 }, () => 200);
+    const fitted = fitAndStretchChannelWidths(many, LEFT, 2000, true, undefined, 1.5);
+    expect(fitted.scale).toBeCloseTo(2000 / (LEFT + 2400), 6);
   });
 });

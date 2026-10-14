@@ -9,7 +9,7 @@
  *  - TrackerStore slice (pattern, patterns, actions)
  *  - EditorStore (showGhostPatterns, columnVisibility, recordMode)
  *  - channelMuted / channelSolo derived arrays
- *  - trackerZoom → rowHeight + rowHeightRef
+ *  - trackerScale (fit result or trackerZoom) → rowHeight + rowHeightRef
  *  - Cursor/selection refs (init from useCursorStore.getState())
  *  - Collaboration peer cursor/selection effects (subscribe + broadcast)
  *  - useBDAnimations
@@ -98,9 +98,9 @@ export function usePatternEditor() {
   const trackerZoom = useUIStore((s) => s.trackerZoom);
   const trackWidthZoom = useUIStore((s) => s.trackWidthZoom);
   const showAutomationLanes = useUIStore((s) => s.showAutomationLanes);
-  // Rows shrink with the pattern when fit all channels scaled it down (PatternEditorCanvas publishes the scale).
-  const trackerFitScale = useUIStore((s) => s.trackerFitScale);
-  const rowHeight = Math.round(24 * (trackerZoom / 100) * trackerFitScale);
+  // Rows follow the scale the pattern is drawn at: the fit scale or the zoom (PatternEditorCanvas publishes it).
+  const trackerScale = useUIStore((s) => s.trackerScale);
+  const rowHeight = Math.round(24 * trackerScale);
 
   // Per-channel automation lane count (for multi-lane width allocation)
   // Counts both explicitly active params AND params with existing curve data

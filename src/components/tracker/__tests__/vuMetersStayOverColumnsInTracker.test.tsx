@@ -70,7 +70,7 @@ describe('tracker channel VU meters at a fitted pattern scale', () => {
       disconnect() {}
     } as never;
     useSettingsStore.setState({ fitAllChannelsTracker: true, vuMeterSwing: false, vuMeterStyle: 'segments', vuMeterMirror: false });
-    useUIStore.setState({ trackerZoom: 100, trackerFitScale: 1 });
+    useUIStore.setState({ trackerZoom: 100, trackerScale: 1 });
     frames = []; frameTime = 0; generation = 1; fills.length = 0; posted.length = 0;
     _setSoundingForTest(true);
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { frames.push(cb); return frames.length; });
@@ -89,16 +89,16 @@ describe('tracker channel VU meters at a fitted pattern scale', () => {
     vi.restoreAllMocks();
   });
 
-  it('every meter is centred on its pattern column (within 1 px) when 16 channels are fitted below scale 1', async () => {
-    withChannels(16);
+  it('every meter is centred on its pattern column (within 1 px) when 12 channels are fitted below scale 1', async () => {
+    withChannels(12);
     const view = render(<div style={{ width: WIDTH, height: 600 }}><PatternEditorCanvas /></div>);
     await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
     act(() => runFrames(3));
 
-    const scale = useUIStore.getState().trackerFitScale;
+    const scale = useUIStore.getState().trackerScale;
     expect(scale).toBeLessThan(1); // the case under test: fitted, not full size
     const layout = [...posted].reverse().find((m) => m.channelLayout && m.channelLayout.widths.length > 0)!.channelLayout!;
-    expect(layout.offsets).toHaveLength(16);
+    expect(layout.offsets).toHaveLength(12);
 
     const vu = view.container.querySelector('canvas.vu-meters-canvas') as HTMLCanvasElement;
     expect(vu).not.toBeNull();
@@ -114,6 +114,6 @@ describe('tracker channel VU meters at a fitted pattern scale', () => {
       expect(Math.abs(centre - columnCentres[nearest])).toBeLessThanOrEqual(1);
       covered.add(nearest);
     }
-    expect(covered.size).toBe(16); // one meter per column, none lost
+    expect(covered.size).toBe(12); // one meter per column, none lost
   });
 });
