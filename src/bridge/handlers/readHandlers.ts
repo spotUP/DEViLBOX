@@ -313,7 +313,7 @@ export function getPlaybackState(): Record<string, unknown> {
     metronomeEnabled: transport.metronomeEnabled,
     metronomeVolume: transport.metronomeVolume,
     countInEnabled: transport.countInEnabled,
-    smoothScrolling: transport.smoothScrolling,
+    smoothScrolling: useSettingsStore.getState().smoothScrolling,
     grooveTemplateId: transport.grooveTemplateId,
     grooveSteps: transport.grooveSteps,
     loopStartRow: transport.loopStartRow,

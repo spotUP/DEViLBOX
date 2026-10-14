@@ -8,6 +8,7 @@
 
 import { useCallback } from 'react';
 import { useTrackerStore, useTransportStore, useAudioStore, useUIStore, useEditorStore } from '@stores';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import { formatMaskDisplay } from '@stores/useEditorStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useFPSMonitor } from '@hooks/useFPSMonitor';
@@ -41,12 +42,12 @@ export function useEditorControls(opts?: {
     })),
   );
 
-  const { grooveTemplateId, swing, jitter, smoothScrolling } = useTransportStore(
+  const smoothScrolling = useSettingsStore((s) => s.smoothScrolling);
+  const { grooveTemplateId, swing, jitter } = useTransportStore(
     useShallow((s) => ({
       grooveTemplateId: s.grooveTemplateId,
       swing: s.swing,
       jitter: s.jitter,
-      smoothScrolling: s.smoothScrolling,
     })),
   );
 
@@ -85,7 +86,7 @@ export function useEditorControls(opts?: {
   }, []);
 
   const handleToggleSmooth = useCallback(() => {
-    const s = useTransportStore.getState();
+    const s = useSettingsStore.getState();
     s.setSmoothScrolling(!s.smoothScrolling);
   }, []);
 

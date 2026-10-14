@@ -32,8 +32,6 @@ interface TransportStore extends TransportState {
   currentPatternIndex: number;
   // Loop tracking for smooth scrolling (continuous row counter that doesn't reset on loop)
   continuousRow: number;
-  // Smooth scrolling preference (true = smooth like DAW, false = stepped like classic tracker)
-  smoothScrolling: boolean;
   // Metronome state
   metronomeEnabled: boolean;
   metronomeVolume: number; // 0-100
@@ -82,7 +80,6 @@ interface TransportStore extends TransportState {
   setCurrentRow: (row: number, patternLength?: number) => void;
   setCurrentRowThrottled: (row: number, patternLength?: number, immediate?: boolean) => void; // NEW: Throttled version for playback
   setCurrentPattern: (index: number) => void;
-  setSmoothScrolling: (smooth: boolean) => void;
   setMetronomeEnabled: (enabled: boolean) => void;
   setMetronomeVolume: (volume: number) => void;
   toggleMetronome: () => void;
@@ -172,7 +169,6 @@ export const useTransportStore = create<TransportStore>()(
     currentRow: 0,
     currentPatternIndex: 0,
     continuousRow: 0,
-    smoothScrolling: false, // Default to stepped scrolling (classic tracker feel)
     metronomeEnabled: false,
     metronomeVolume: 75, // Default to 75%
     speed: 6, // Default speed (ticks per row) - ProTracker default
@@ -466,11 +462,6 @@ export const useTransportStore = create<TransportStore>()(
     setCurrentPattern: (index) =>
       set((state) => {
         state.currentPatternIndex = index;
-      }),
-
-    setSmoothScrolling: (smooth) =>
-      set((state) => {
-        state.smoothScrolling = smooth;
       }),
 
     setMetronomeEnabled: (enabled) =>

@@ -28,6 +28,7 @@ import { getToneEngine } from './ToneEngine';
 import { getNativeAudioNode } from '@/utils/audio-context';
 import { useUIStore } from '@/stores/useUIStore';
 import { useTransportStore } from '@/stores/useTransportStore';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { SCRATCH_PATTERNS, type ScratchPattern, type ScratchFrame } from './dj/DJScratchEngine';
 import { TurntablePhysics } from './turntable/TurntablePhysics';
@@ -542,7 +543,7 @@ export class TrackerScratchController {
     this.physics.reset();
 
     // Restore original smooth scrolling state
-    useTransportStore.getState().setSmoothScrolling(this.originalSmoothScrolling);
+    useSettingsStore.getState().setSmoothScrolling(this.originalSmoothScrolling);
 
   }
 
@@ -575,10 +576,10 @@ export class TrackerScratchController {
     this.scratchPatternLength = (patterns && patterns[this.scratchStartPattern]?.length) || 64;
 
     // Store and enable smooth scrolling for scratch mode
-    const transportState = useTransportStore.getState();
-    this.originalSmoothScrolling = transportState.smoothScrolling;
-    if (!transportState.smoothScrolling) {
-      transportState.setSmoothScrolling(true);
+    const settingsState = useSettingsStore.getState();
+    this.originalSmoothScrolling = settingsState.smoothScrolling;
+    if (!settingsState.smoothScrolling) {
+      settingsState.setSmoothScrolling(true);
     }
 
     // Sync physics to platter mass setting
@@ -723,7 +724,7 @@ export class TrackerScratchController {
     this.physics.reset();
 
     // Restore original smooth scrolling state
-    useTransportStore.getState().setSmoothScrolling(this.originalSmoothScrolling);
+    useSettingsStore.getState().setSmoothScrolling(this.originalSmoothScrolling);
   }
 
   // ── Physics loop (rAF-driven) ────────────────────────────────────────────

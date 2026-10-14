@@ -12,7 +12,6 @@ import { useThemeStore } from '@stores/useThemeStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useKeyboardStore } from '@stores/useKeyboardStore';
 import { useEditorStore } from '@stores/useEditorStore';
-import { useTransportStore } from '@stores/useTransportStore';
 import { useAudioStore } from '@stores/useAudioStore';
 import { useDJStore } from '@stores/useDJStore';
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';
@@ -209,8 +208,8 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
   const setShowGhostPatterns = useEditorStore((s) => s.setShowGhostPatterns);
 
   // ── Store: useTransportStore ─────────────────────────────────────────────
-  const smoothScrolling = useTransportStore((s) => s.smoothScrolling);
-  const setSmoothScrolling = useTransportStore((s) => s.setSmoothScrolling);
+  const smoothScrolling = useSettingsStore((s) => s.smoothScrolling);
+  const setSmoothScrolling = useSettingsStore((s) => s.setSmoothScrolling);
 
   // ── Store: useKeyboardStore ──────────────────────────────────────────────
   const activeScheme = useKeyboardStore((s) => s.activeScheme);

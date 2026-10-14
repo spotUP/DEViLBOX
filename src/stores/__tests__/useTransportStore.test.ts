@@ -33,15 +33,6 @@ describe('useTransportStore — clamping and pure state', () => {
     expect(useTransportStore.getState().jitter).toBe(35);
   });
 
-  it('setSmoothScrolling toggles without touching other fields', () => {
-    const bpmBefore = useTransportStore.getState().bpm;
-    useTransportStore.getState().setSmoothScrolling(true);
-    expect(useTransportStore.getState().smoothScrolling).toBe(true);
-    expect(useTransportStore.getState().bpm).toBe(bpmBefore);
-    useTransportStore.getState().setSmoothScrolling(false);
-    expect(useTransportStore.getState().smoothScrolling).toBe(false);
-  });
-
   it('setMetronomeVolume clamps into [0, 100]', () => {
     const { setMetronomeVolume } = useTransportStore.getState();
     setMetronomeVolume(250);
