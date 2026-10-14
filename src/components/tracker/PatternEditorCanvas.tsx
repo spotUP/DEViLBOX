@@ -1579,6 +1579,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     widths:  channelWidths,
     totalWidth: totalChannelsWidth,
   }), [channelOffsets, channelWidths, totalChannelsWidth]);
+  // The worker's init and ready posts are made from callbacks created at mount
+  // (init after a setTimeout, ready after the worker boots), when the canvas had
+  // not been measured yet: they must read the layout of the latest render, or the
+  // columns are drawn at an earlier width's scale while headers and meters use this one.
+  const snapshotLayoutRef = useRef(snapshotLayout);
+  snapshotLayoutRef.current = snapshotLayout;
 
   // Channel context menu handlers — work in both normal and format modes
   const handleFillPattern = useCallback((channelIndex: number, generatorType: GeneratorType) => {
@@ -1894,7 +1900,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         clearTimeout(readyTimeoutId);
         liveness.stop();
         // Worker is ready — send layout so it can start rendering
-        bridge.post({ type: 'channelLayout', channelLayout: snapshotLayout() });
+        bridge.post({ type: 'channelLayout', channelLayout: snapshotLayoutRef.current() });
       },
       onMessage: (msg) => {
         if (msg.type === 'booting') {
@@ -1980,7 +1986,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             endRow:       cursorState.selection.endRow,
             columnTypes:  cursorState.selection.columnTypes,
           } : null),
-          channelLayout: snapshotLayout(),
+          channelLayout: snapshotLayoutRef.current(),
           scale: fitScaleRef.current,
         },
         [offscreen],
