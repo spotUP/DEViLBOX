@@ -206,7 +206,7 @@ class RobHubbardProcessor extends AudioWorkletProcessor {
 
     for (const h of Object.keys(this.players)) {
       const hi = parseInt(h);
-      if (!(this.muteMask & (1 << hi))) continue;
+      // A handle is a player slot, not a song channel: the channel mute mask must not gate it (audition voices sound while channels are muted).
       const ptrs = this.players[hi];
       if (!ptrs) continue;
 

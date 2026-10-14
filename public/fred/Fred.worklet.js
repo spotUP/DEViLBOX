@@ -162,7 +162,7 @@ class FredProcessor extends AudioWorkletProcessor {
     const mixR = new Float32Array(frames);
 
     for (const [handle, p] of this._players) {
-      if (!(this.muteMask & (1 << handle))) continue;
+      // A handle is a player slot, not a song channel: the channel mute mask must not gate it (audition voices sound while channels are muted).
       m._fred_render(handle, p.outPtrL, p.outPtrR, frames);
 
       const srcL = m.HEAPF32.subarray(p.outPtrL >> 2, (p.outPtrL >> 2) + frames);
