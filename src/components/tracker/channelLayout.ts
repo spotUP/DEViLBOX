@@ -68,3 +68,27 @@ export function originShiftFor(strip: HTMLElement, layout: ChannelLayout): numbe
   if (!origin || !origin.isConnected) return 0;
   return origin.getBoundingClientRect().left - strip.getBoundingClientRect().left;
 }
+
+/**
+ * Share spare canvas width out across the channels so a few channels fill the
+ * canvas. `widths` are the minimum widths and are never shrunk: with no spare
+ * width (many channels, a narrow canvas) they come back unchanged and the
+ * canvas scrolls. Each channel grows in proportion to its own minimum width;
+ * the pattern renderer and hit-testing centre the cell text inside the wider
+ * column, so the extra width becomes even padding either side of the notes.
+ * Integer widths, the rounding remainder goes to the last channel so the
+ * channels end exactly at the canvas edge. availableWidth <= 0 disables it.
+ */
+export function stretchChannelWidths(
+  widths: readonly number[],
+  leftEdge: number,
+  availableWidth: number,
+): number[] {
+  const content = widths.reduce((a, b) => a + b, 0);
+  const spare = availableWidth - leftEdge - content;
+  if (availableWidth <= 0 || spare <= 0 || widths.length === 0 || content <= 0) return [...widths];
+  const out = widths.map(w => w + Math.floor((spare * w) / content));
+  const given = out.reduce((a, b) => a + b, 0) - content;
+  out[out.length - 1] += spare - given;
+  return out;
+}

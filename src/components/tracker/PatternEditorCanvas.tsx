@@ -10,7 +10,7 @@ import { useTrackerStore, useCursorStore, useTransportStore, useThemeStore, useE
 import { useMixerStore } from '@stores/useMixerStore';
 import { useChannelTypeStore } from '@stores/useChannelTypeStore';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
-import { channelLayout, notifyChannelLayout, subscribeChannelLayout, type ChannelLayout } from './channelLayout';
+import { channelLayout, notifyChannelLayout, stretchChannelWidths, subscribeChannelLayout, type ChannelLayout } from './channelLayout';
 import { resolveWasmPattern } from './wasmPatternHold';
 import { computeChannelFollowScroll, createChannelFollowGate } from '@/lib/tracker/followScroll';
 import { resolveCellColumn } from '@/lib/tracker/cellHitTest';
@@ -429,20 +429,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         : Math.max(AUTOMATION_LANE_W, lc * AUTOMATION_LANE_MIN + 4);
     };
 
-    // Calculate per-channel widths based on effectCols
-    const offsets: number[] = [];
-    const widths: number[] = [];
-    let currentX = LNW + globalLaneOffset;
+    // Calculate per-channel minimum widths based on effectCols
+    const minWidths: number[] = [];
 
     for (let ch = 0; ch < nc; ch++) {
       const channel = pattern.channels[ch];
       const isCollapsed = channel?.collapsed;
 
       if (isCollapsed) {
-        const collapsedWidth = noteWidth + (mobileCanvas ? 64 : 40) + autoLaneExtra(ch);
-        offsets.push(currentX);
-        widths.push(collapsedWidth);
-        currentX += collapsedWidth;
+        minWidths.push(noteWidth + (mobileCanvas ? 64 : 40) + autoLaneExtra(ch));
       } else {
         const effectCols = channel?.channelMeta?.effectCols ?? 2;
         const effectWidth = effectCols * (CW * 3 + 4);
@@ -453,12 +448,18 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           + extraNoteColWidth
           + (showAcid ? CW * 2 + 8 : 0)
           + (showProb ? CW * 2 + 4 : 0);
-        const chWidth = noteWidth + paramWidth + (mobileCanvas ? 96 : 60) + autoLaneExtra(ch);
-        offsets.push(currentX);
-        widths.push(chWidth);
-        currentX += chWidth;
+        minWidths.push(noteWidth + paramWidth + (mobileCanvas ? 96 : 60) + autoLaneExtra(ch));
       }
     }
+
+    // Few channels fill the canvas (scopes, headers, meters and hit-testing all
+    // read these widths); many channels keep their minimums and scroll. The
+    // mobile canvas scrolls channel by channel, so it keeps minimums.
+    const leftEdge = LNW + globalLaneOffset;
+    const widths = mobileCanvas ? minWidths : stretchChannelWidths(minWidths, leftEdge, dimensions.width);
+    const offsets: number[] = [];
+    let currentX = leftEdge;
+    for (const w of widths) { offsets.push(currentX); currentX += w; }
 
     return {
       numChannels: nc,
