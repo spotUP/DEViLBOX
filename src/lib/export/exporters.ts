@@ -157,8 +157,11 @@ export function getNativeEngineMetaForExport(): Record<string, unknown> | null {
   if (state.nuadePlayerId) result.nuadePlayerId = state.nuadePlayerId;
   if (state.nuadeFileName) result.nuadeFileName = state.nuadeFileName;
   if (state.nuadeModuleFields) result.nuadeModuleFields = state.nuadeModuleFields;
+  // The subsong the player was on (0 is a subsong: not a truthiness test); restoreFromStoredBytes puts it back.
+  if (state.nuadeSubsong != null) result.nuadeSubsong = state.nuadeSubsong;
   if (state.eaglePlayerId) result.eaglePlayerId = state.eaglePlayerId;
   if (state.eaglePlayerFileName) result.eaglePlayerFileName = state.eaglePlayerFileName;
+  if (state.eaglePlayerSubsong != null) result.eaglePlayerSubsong = state.eaglePlayerSubsong;
   if (state.uadeEditableSubsongs) result.uadeEditableSubsongs = state.uadeEditableSubsongs;
   if (state.editorMode !== 'classic') result.editorMode = state.editorMode;
   // The parser's song format (ASAP, MDX, PiyoPiyo...): engines gated on a
