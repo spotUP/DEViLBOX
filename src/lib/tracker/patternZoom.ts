@@ -1,7 +1,7 @@
 /**
  * The pattern zoom: the scale the pattern view is drawn at while fit all
- * channels is off. One range for the tracker (useUIStore.trackerZoom), the DJ
- * decks (useSettingsStore.deckPatternZoom) and the slider that sets them.
+ * channels is off. One range for the tracker (useUIStore.trackerZoom) and the
+ * slider that sets it. The DJ decks have no zoom control: they always fit.
  * It may go below the fit floor: a hand-set size is the user's call.
  */
 export const ZOOM_MIN_PERCENT = 50;
