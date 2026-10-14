@@ -23,7 +23,6 @@ import { BD_EFFECT_GLYPH } from '@/lib/import/formats/benDaglishEffectGlyphs';
 import { RH_EFFECT_GLYPH } from '@/lib/import/formats/robHubbardEffectGlyphs';
 import { FP_EFFECT_GLYPH } from '@/lib/import/formats/fpEffectGlyphs';
 import { MA_EFFECT_GLYPH } from '@/lib/import/formats/maEffectGlyphs';
-import { FURNACE_EFFECT_GLYPH } from '@/lib/import/formats/furnaceEffectGlyphs';
 import { computeCaretRect } from '@/lib/tracker/caretGeometry';
 import { anySoloActive, isChannelDimmed } from '@/lib/tracker/channelDim';
 import { noteValueToPitch, pitchName } from '@/lib/tracker/noteValue';
@@ -910,9 +909,6 @@ export class TrackerGLRenderer {
               } else if (MA_EFFECT_GLYPH[colEffTyp] !== undefined) {
                 // Music Assembler track and position commands (block 0xFB..0xFE)
                 effStr = MA_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
-              } else if (FURNACE_EFFECT_GLYPH[colEffTyp] !== undefined) {
-                // Furnace panning (80xx..8Axx) and sample offset (90xx..92xx) families
-                effStr = FURNACE_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
               } else {
                 effStr = (EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF];
               }
