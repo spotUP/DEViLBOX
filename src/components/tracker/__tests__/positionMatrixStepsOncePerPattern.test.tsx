@@ -251,4 +251,15 @@ describe('position matrix steps once per pattern played, never per row', () => {
       expect(resolverCalls.some((c) => c.rowsArePositions)).toBe(true);
     }, 60000);
   }
+
+  it('the SF2 matrix shows transposition as signed semitones and marks the loop point', async () => {
+    const { SF2_ORDER_COLUMNS, sf2OrderListsToFormatChannels } = await import('@/components/sidfactory2/SF2OrderMatrix');
+    const trn = SF2_ORDER_COLUMNS.find((c) => c.key === 'transpose')!;
+    expect([0xA3, 0x9E, 0xA0].map(trn.formatter)).toEqual(['+3', '-2', '..']);
+    const lp = SF2_ORDER_COLUMNS.find((c) => c.key === 'loop')!;
+    const [ch] = sf2OrderListsToFormatChannels([{ hasLoop: true, loopIndex: 1,
+      entries: [{ seqIdx: 0, transpose: 0xA0 }, { seqIdx: 5, transpose: 0xA3 }] }]);
+    expect(ch.rows.map((r) => lp.formatter(r.loop))).toEqual(['.', 'L']);
+    expect(ch.rows[1]).toMatchObject({ seq: 5, transpose: 0xA3 }); // raw byte kept for editing
+  });
 });

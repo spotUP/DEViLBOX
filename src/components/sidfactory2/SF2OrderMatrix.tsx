@@ -16,16 +16,22 @@ const NO_TRANSPOSE = 0xA0;
 
 const hex2 = (v: number) => v.toString(16).toUpperCase().padStart(2, '0');
 
+/** Raw transposition byte as the signed semitone offset (0xA0 = none); typing still writes the raw byte. */
+export function sf2TransposeToString(raw: number): string {
+  const off = raw - NO_TRANSPOSE;
+  return off === 0 ? '..' : `${off > 0 ? '+' : ''}${off}`;
+}
+
 export const SF2_ORDER_COLUMNS: ColumnDef[] = [
   {
     key: 'seq', label: 'Seq', charWidth: 2, type: 'hex', hexDigits: 2,
-    color: '#e0e0e0', emptyColor: '#444', emptyValue: undefined,
+    color: '#e0e0e0', emptyColor: '#444', emptyValue: -1, // end of list reads dim
     formatter: (v) => (v < 0 ? '..' : hex2(v)),
   },
   {
-    key: 'transpose', label: 'Trn', charWidth: 2, type: 'hex', hexDigits: 2,
-    color: '#ffcc00', emptyColor: '#444', emptyValue: NO_TRANSPOSE,
-    formatter: (v) => (v < 0 ? '..' : hex2(v)),
+    key: 'transpose', label: 'Trn', charWidth: 3, type: 'hex', hexDigits: 2,
+    color: '#ffcc00', emptyColor: '#444', emptyValue: NO_TRANSPOSE, // only a real transposition lights up
+    formatter: sf2TransposeToString,
   },
   {
     key: 'loop', label: 'Lp', charWidth: 1, type: 'hex', hexDigits: 1,
@@ -42,7 +48,7 @@ export function sf2OrderListsToFormatChannels(orderLists: SF2OrderList[]): Forma
     patternLength: numPositions,
     rows: Array.from({ length: numPositions }, (_, pos) => {
       const entry = pos < ol.entries.length ? ol.entries[pos] : null;
-      if (!entry || entry.seqIdx < 0) return { seq: -1, transpose: -1, loop: 0 };
+      if (!entry || entry.seqIdx < 0) return { seq: -1, transpose: NO_TRANSPOSE, loop: 0 };
       return { seq: entry.seqIdx, transpose: entry.transpose, loop: ol.hasLoop && pos === ol.loopIndex ? 1 : 0 };
     }),
   }));
