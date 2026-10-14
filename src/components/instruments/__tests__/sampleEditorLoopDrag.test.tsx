@@ -65,9 +65,11 @@ describe('sample editor loop handles', () => {
     const { container } = render(<Harness id={1} />);
     const canvas = container.querySelector('canvas[width]') as HTMLCanvasElement;
     expect(canvas).toBeTruthy();
-    // wait for the buffer to decode: the loop handle only exists then
+    // wait for the buffer to decode: the loop handle only exists then. The decoded
+    // buffer is what renders the Slicer button, so wait for that, not a fixed delay
+    // (50 ms lost the race on a loaded machine and the drag hit no handle).
     await waitFor(() => expect(fetch).toHaveBeenCalled());
-    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+    await waitFor(() => expect(Array.from(container.querySelectorAll('button')).some((b) => b.textContent?.includes('Slicer'))).toBe(true), { timeout: 10000 });
 
     // loopStart handle sits at 2000/8000 = 0.25 -> x 250 of 1000
     fireEvent.pointerDown(canvas, { clientX: 250, clientY: 75, pointerId: 1 });
