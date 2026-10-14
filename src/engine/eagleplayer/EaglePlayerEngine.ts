@@ -28,6 +28,9 @@ import type { SubsongPlayer } from '@/lib/tracker/nativeSubsongs';
 import type { TickGrid } from '@/lib/tracker/tickGridPosition';
 import { GridFollow, songTickGrid, type GridFollowPosition } from '@engine/replayer/tickGridFollow';
 import type { TrackerSong } from '@engine/TrackerReplayer';
+import { clipTransferables, type RowClip } from '@engine/rowPreview/rowClip';
+import type { RowTarget } from '@engine/rowPreview/rowTarget';
+import type { RowClipPlayer } from '@engine/rowPreview/rowClipPlayer';
 
 /** What the grid follow gets: the order position and row the player is at. */
 export type EaglePlayerPosition = GridFollowPosition;
@@ -37,7 +40,7 @@ export function eaglePlayerGrid(song: Pick<TrackerSong, 'initialSpeed' | 'songPo
   return songTickGrid(song, song.eaglePlayerTickGrid);
 }
 
-export class EaglePlayerEngine extends WASMChannelOutputsEngine implements SubsongPlayer {
+export class EaglePlayerEngine extends WASMChannelOutputsEngine implements SubsongPlayer, RowClipPlayer {
   private static instance: EaglePlayerEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
   /** Player binaries by file name, fetched once per page. */
@@ -48,6 +51,10 @@ export class EaglePlayerEngine extends WASMChannelOutputsEngine implements Subso
   private _follow?: GridFollow;
   private get follow(): GridFollow { return (this._follow ??= new GridFollow()); }
   private readonly subsongRequests = new SubsongRequests();
+  /** The mixer's mute mask as last posted (bit N set = Paula voice N audible). */
+  private _muteMask = 0xF;
+  /** A song loaded here has told the scopes its voices; a row clip played first must tell them. */
+  private _loadedOnce = false;
 
   private constructor() {
     super();
@@ -94,7 +101,11 @@ export class EaglePlayerEngine extends WASMChannelOutputsEngine implements Subso
           this.markNodeReady();
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
+        case 'rowClipStarted':
+        case 'rowClipDone':
+          break;
         case 'moduleLoaded':
+          this._loadedOnce = true;
           useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 1', 'Paula 2', 'Paula 3', 'Paula 4']);
           // The player's DTP_SubSongRange, 0-based for the subsong model.
           reportSubsongs('EaglePlayer', data.subsongMax - data.subsongMin + 1, data.subsongCurrent - data.subsongMin);
@@ -181,7 +192,30 @@ export class EaglePlayerEngine extends WASMChannelOutputsEngine implements Subso
 
   /** Bit N set = Paula voice N audible - the mixer's solo/mute. */
   setMuteMask(mask: number): void {
+    this._muteMask = mask >>> 0;
     this.workletNode?.port.postMessage({ type: 'setMuteMask', mask });
+  }
+
+  /**
+   * The mute mask a row clip is rendered with: the mixer's, as the worklet gives it to ep_wasm_set_voice_mask. A voice in
+   * an isolation slot stays in this mask (its buffer feeds the slot); the worklet's emit() takes it out of the main mix.
+   */
+  get rowClipMask(): number { return this._muteMask; }
+
+  /** Where grid row (songPos, row) of `song` is in the runner's terms: its player ticks (the grid as it is now). */
+  targetOf(song: Pick<TrackerSong, 'initialSpeed' | 'songPositions' | 'patterns' | 'restartPosition' | 'eaglePlayerTickGrid'>, songPos: number, row: number): RowTarget {
+    this.setGrid(song);
+    return this.follow.targetOf(songPos, row, 'tick');
+  }
+
+  /** Sound a row clip (a grid row rendered by the row-preview worker) through the worklet's own output code while stopped. */
+  playRowClip(clip: RowClip): void {
+    if (!this.workletNode) return;
+    // A song never loaded here has told the scopes nothing about its voices.
+    if (!this._loadedOnce && clip.voices) {
+      useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 1', 'Paula 2', 'Paula 3', 'Paula 4']);
+    }
+    this.workletNode.port.postMessage({ type: 'playRowClip', clip }, clipTransferables(clip));
   }
 
   /**
