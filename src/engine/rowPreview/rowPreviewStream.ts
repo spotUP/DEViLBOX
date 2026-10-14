@@ -19,7 +19,7 @@
  */
 import { rowTargetKey, type RowTarget } from './rowTarget';
 import {
-  CHUNK_ENDED, CHUNK_LOOPED, ROW_CHUNK_FRAMES, rowClipFadeFrames, rowClipMaxFrames,
+  CHUNK_ENDED, CHUNK_LOOPED, ROW_CHUNK_FRAMES, rowClipFadeFrames, rowClipMaxFrames, rowClipMinFrames,
   type PlayerPosition, type RowChunk, type RowClip, type RowResult,
 } from './rowClip';
 
@@ -47,6 +47,8 @@ export interface RowPreviewStreamOptions {
   sliceMs?: number;
   /** Give up looking for a row this many seconds into the song (a song that never loops or ends). */
   searchLimitSeconds?: number;
+  /** Override of the minimum clip length in frames (default MIN_ROW_PREVIEW_MS); the scripted-player tests use 0 to measure a row's own length. */
+  minClipFrames?: number;
 }
 
 interface Transition { frame: number; pos: PlayerPosition }
@@ -103,6 +105,7 @@ export class RowPreviewStream {
   private readonly now: () => number;
   private readonly sliceMs: number;
   private readonly searchLimitFrames: number;
+  private readonly minFrames: number;
 
   private readonly adapter: RowRenderAdapter;
 
@@ -111,6 +114,7 @@ export class RowPreviewStream {
     this.yieldNow = opts.yieldNow ?? (() => new Promise((r) => setTimeout(r, 0)));
     this.now = opts.now ?? (() => performance.now());
     this.sliceMs = opts.sliceMs ?? 20;
+    this.minFrames = opts.minClipFrames ?? rowClipMinFrames(adapter.sampleRate);
     this.searchLimitFrames = Math.round((opts.searchLimitSeconds ?? 20 * 60) * adapter.sampleRate);
   }
 
@@ -173,6 +177,13 @@ export class RowPreviewStream {
       end = this.endOf(start, target);
     }
     if (end < 0 || end - start > cap) end = Math.min(this.cursor, start + cap);
+    // A row shorter than the minimum clip plays on past its end (the song cannot give more than it has left).
+    const minEnd = start + Math.min(cap, this.minFrames);
+    while (end < minEnd && !this.finished) {
+      if (!(await slice())) return { kind: 'cancelled' };
+      this.renderInto(mask, true);
+      end = Math.min(minEnd, this.cursor);
+    }
     // The cap can fall before the cursor only; make sure the clip's frames are rendered.
     while (this.cursor < end) this.renderInto(mask, true);
 

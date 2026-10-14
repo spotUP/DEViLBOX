@@ -17,7 +17,7 @@ import { NuadeHeadless } from '../../src/engine/nuade/nuadeHeadless';
 import { NUADE_FORMAT_LIST, type NuadeFormat } from '../../src/engine/nuade/nuadeFormats';
 import { NuadeRowAdapter } from '../../src/engine/rowPreview/adapters/nuadeAdapter';
 import { RowPreviewStream } from '../../src/engine/rowPreview/rowPreviewStream';
-import { ROW_CHUNK_FRAMES } from '../../src/engine/rowPreview/rowClip';
+import { ROW_CHUNK_FRAMES, rowClipMinFrames } from '../../src/engine/rowPreview/rowClip';
 import type { RowTarget } from '../../src/engine/rowPreview/rowTarget';
 
 const ROOT = join(import.meta.dirname, '../..');
@@ -118,6 +118,8 @@ async function gate(nu: NuadeHeadless, row: NuadeFormat, file: string): Promise<
     let d = maxDiff(w.clip.stereo, w.st);
     w.clip.voices?.forEach((v, i) => { d = Math.max(d, maxDiff(v, w.vo[i]!)); });
     worst = Math.max(worst, d);
+    // A clip is at least MIN_ROW_PREVIEW_MS long unless the song ends first.
+    if (w.clip.frames < rowClipMinFrames(RATE) && w.clip.startFrame + w.clip.frames < frames) worst = Infinity;
     rows.push({ pct: w.pct, target: w.target, startFrame: w.clip.startFrame, frames: w.clip.frames, coldMs: w.coldMs, maxDiff: d });
   }
   rows.sort((a, b) => a.pct - b.pct);

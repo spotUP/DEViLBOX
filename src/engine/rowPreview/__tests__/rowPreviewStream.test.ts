@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { RowPreviewStream, type RowRenderAdapter } from '../rowPreviewStream';
-import { CHUNK_ENDED, CHUNK_LOOPED, rowClipFadeFrames, rowClipMaxFrames, type PlayerPosition, type RowChunk } from '../rowClip';
+import { CHUNK_ENDED, CHUNK_LOOPED, rowClipFadeFrames, rowClipMaxFrames, rowClipMinFrames, MIN_ROW_PREVIEW_MS, type PlayerPosition, type RowChunk } from '../rowClip';
 
 const RATE = 48000;
 
@@ -45,7 +45,7 @@ const ALL = 0xffffffff;
 
 async function open(s: Script = SCRIPT) {
   const p = fakePlayer(s);
-  const stream = new RowPreviewStream(p.adapter);
+  const stream = new RowPreviewStream(p.adapter, { minClipFrames: 0 });
   stream.ensureOpen(bytes, ['a']);
   return { ...p, stream };
 }
@@ -162,7 +162,7 @@ describe('RowPreviewStream', () => {
   it('returns cancelled when a newer request replaces a search, and the stream stays usable', async () => {
     const p = fakePlayer({ ...SCRIPT, songFrames: RATE * 600, rowsPerOrder: 64, rowFrames: 4800, tickFrames: 4800 });
     let t = 0;
-    const stream = new RowPreviewStream(p.adapter, { now: () => (t += 30), sliceMs: 20, yieldNow: async () => {} });
+    const stream = new RowPreviewStream(p.adapter, { minClipFrames: 0, now: () => (t += 30), sliceMs: 20, yieldNow: async () => {} });
     stream.ensureOpen(bytes, []);
     const signal = { cancelled: false };
     const pending = stream.request({ kind: 'orderRow', order: 1, row: 5 }, ALL, signal);
@@ -170,5 +170,32 @@ describe('RowPreviewStream', () => {
     expect(await pending).toEqual({ kind: 'cancelled' });
     const clip = clipOf(await stream.request({ kind: 'orderRow', order: 0, row: 3 }, ALL));
     expect(clip.stereo[0]).toBe(3 * 4800);
+  });
+
+  it('Enter on a tick-grid row sounds at least 250 ms, not a 20 ms click, and the rest is the exact playback audio', async () => {
+    // One grid row = one player tick = 960 frames (20 ms at 48 kHz), as in wally-beben/wicked.wb.
+    const p = fakePlayer({ rowFrames: 960, tickFrames: 960, rowsPerOrder: 8, songFrames: RATE * 10 });
+    const stream = new RowPreviewStream(p.adapter);
+    stream.ensureOpen(bytes, []);
+    const clip = clipOf(await stream.request({ kind: 'orderRow', order: 0, row: 3 }, ALL));
+    expect(MIN_ROW_PREVIEW_MS).toBe(250);
+    expect(clip.frames).toBe(rowClipMinFrames(RATE));
+    expect(clip.frames).toBe(12000);
+    expect(clip.startFrame).toBe(3 * 960);
+    // every frame is the song's own frame (the sample encodes its frame number), past the row's end too
+    for (const i of [0, 959, 960, 5000, clip.frames - 1]) expect(clip.stereo[i * 2]).toBe(clip.startFrame + i);
+    expect(clip.fadeFrames).toBe(240);
+  });
+
+  it('keeps a row longer than 250 ms at its own length, and a song that ends sooner ends the clip there', async () => {
+    const { stream } = await open({ ...SCRIPT, rowFrames: 24000, tickFrames: 6000, songFrames: 24000 * 8 * 2 });
+    const long = clipOf(await stream.request({ kind: 'orderRow', order: 0, row: 1 }, ALL));
+    expect(long.frames).toBe(24000);
+    // the default-minimum stream: the song has 5000 frames, the clip stops where the song does
+    const p = fakePlayer({ rowFrames: 960, tickFrames: 960, rowsPerOrder: 8, songFrames: 5000 });
+    const s2 = new RowPreviewStream(p.adapter);
+    s2.ensureOpen(bytes, []);
+    const c = clipOf(await s2.request({ kind: 'orderRow', order: 0, row: 3 }, ALL));
+    expect(c.frames).toBe(5000 - 3 * 960);
   });
 });

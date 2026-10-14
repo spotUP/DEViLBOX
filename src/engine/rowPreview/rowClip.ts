@@ -9,10 +9,16 @@
 export const ROW_CLIP_FADE_SECONDS = 0.005;
 /** A row longer than this is cut here (D7). */
 export const ROW_CLIP_MAX_SECONDS = 10;
+/**
+ * A clip is at least this long (MIN_ROW_PREVIEW_MS, one source): a row shorter than it plays on past the row's end
+ * with the exact playback audio, so a one-tick row of a tick-grid song is not a click. A longer row keeps its length.
+ */
+export const MIN_ROW_PREVIEW_MS = 250;
 /** Frames the render advances per chunk: one audio render quantum. */
 export const ROW_CHUNK_FRAMES = 128;
 
 export const rowClipFadeFrames = (sampleRate: number): number => Math.round(ROW_CLIP_FADE_SECONDS * sampleRate);
+export const rowClipMinFrames = (sampleRate: number): number => Math.round((MIN_ROW_PREVIEW_MS / 1000) * sampleRate);
 export const rowClipMaxFrames = (sampleRate: number): number => Math.round(ROW_CLIP_MAX_SECONDS * sampleRate);
 
 /** Bits of a render's `flags`: the song looped / ended inside the chunk. */
