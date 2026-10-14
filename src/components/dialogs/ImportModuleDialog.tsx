@@ -23,6 +23,7 @@ import { SIDInfoPanel } from './SIDInfoPanel';
 import { getFormatCapabilities, type FormatCapabilityInfo } from '@lib/import/FormatCapabilities';
 import { Info } from 'lucide-react';
 import { useModalClose } from '@hooks/useDialogKeyboard';
+import type { OpenOrigin } from '@/lib/song/openSong';
 import { companionRelativeName } from '@lib/import/companionRelativeName';
 import { useDialogTypingTrap } from '@hooks/useDialogTypingTrap';
 
@@ -36,6 +37,8 @@ export interface ImportOptions {
     velocityToVolume?: boolean;
     defaultPatternLength?: number;
   };
+  /** Who asked. A 'subsong' reopen is a tune switch, not an import: it raises no success toast. */
+  origin?: OpenOrigin;
 }
 
 interface ImportModuleDialogProps {

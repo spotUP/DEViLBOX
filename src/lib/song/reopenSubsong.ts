@@ -35,5 +35,4 @@ export async function reopenAtFileSubsong(index: number): Promise<void> {
     if (!r.cancelled) notify.error(`Could not open subsong ${index + 1}: ${r.error}`);
     return;
   }
-  notify.success(`Subsong ${index + 1}/${tunes.count}`);
 }

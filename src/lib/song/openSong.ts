@@ -222,6 +222,7 @@ async function route(kind: SongKind, file: File, o: OpenOptions, companions?: Ma
     subsong: o.subsong,
     uadeMetadata: o.uadeMetadata,
     midiOptions: o.midiOptions,
+    origin: o.origin,
     companionFiles: companions,
     replacePatterns: o.td3?.replacePatterns,
     preserveInstruments: o.td3?.preserveInstruments,
@@ -234,6 +235,7 @@ async function route(kind: SongKind, file: File, o: OpenOptions, companions?: Ma
     await importModuleFile(file, {
       ...(o.useLibopenmpt === false ? { useLibopenmpt: false } : {}),
       subsong: o.subsong,
+      origin: o.origin,
       companionFiles: companions,
       midiOptions: o.midiOptions,
       ...(prepared?.info

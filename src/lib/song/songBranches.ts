@@ -158,7 +158,10 @@ async function importTrackerModuleUnloaded(
     // Asked not to play through libopenmpt: the parse still carries the bytes.
     engine: useLibopenmpt ? song : { ...song, libopenmptFileData: undefined },
   }, 'import');
-  notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
+  // A subsong switch reopens the file but is not an import: the SUBSONG box shows the tune.
+  if (options.origin !== 'subsong') {
+    notify.success(`Imported "${song.name}" — ${song.patterns.length} patterns, ${song.instruments.length} instruments`);
+  }
   // The "unknown module" contribution prompt is a question; a headless load
   // (MCP, jukebox, tour, embed) never raises one.
   if (useSongLoadStore.getState().interactive) checkModlandFileWithPatternHash(file, null);
@@ -820,6 +823,7 @@ export async function loadSongFile(file: File, options: FileLoadOptions, preRead
         useLibopenmpt: false,
         subsong: options.subsong,
         companionFiles: options.companionFiles,
+        origin: options.origin,
       });
       return { success: true, message: `Loaded ${file.name}` };
     }
