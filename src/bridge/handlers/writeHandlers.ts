@@ -34,6 +34,7 @@ import { getAudioMonitor, disposeAudioMonitor } from '../monitoring/AudioMonitor
 import { isChannelShapeKind } from '../../lib/dub/channelShape';
 import { testAllSynths, testToneSynths, testCustomSynths, testFurnaceSynths, testMAMESynths } from '../../utils/synthTester';
 import { parseNoteName } from '../../lib/tracker/noteValue';
+import { measureDjLayoutNow } from '@/lib/dj/djLayoutFit';
 
 // ─── Note Parsing ──────────────────────────────────────────────────────────────
 
@@ -1224,12 +1225,13 @@ export function setActiveView(params: Record<string, unknown>): Record<string, u
 }
 
 /** Render the DJ view root at an exact CSS size (width x height, optional zoom); null clears it. */
-export function setDJLayoutFrame(params: Record<string, unknown>): Record<string, unknown> {
+export async function setDJLayoutFrame(params: Record<string, unknown>): Promise<Record<string, unknown>> {
   const ui = useUIStore.getState();
   const w = params.width;
   const h = params.height;
   if (w === undefined || h === undefined || w === null || h === null) {
     ui.setDjLayoutFrame(null);
+    await measureDjLayoutNow();
     return { ok: true, frame: null };
   }
   if (typeof w !== 'number' || typeof h !== 'number' || w < 320 || h < 240) {
@@ -1237,6 +1239,7 @@ export function setDJLayoutFrame(params: Record<string, unknown>): Record<string
   }
   const zoom = typeof params.zoom === 'number' && params.zoom > 0 ? params.zoom : undefined;
   ui.setDjLayoutFrame({ width: w, height: h, zoom });
+  await measureDjLayoutNow();
   return { ok: true, frame: { width: w, height: h, zoom: zoom ?? 1 } };
 }
 

@@ -10,12 +10,15 @@ import React, { useCallback } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { useDJStore } from '@/stores/useDJStore';
 import * as DJActions from '@/engine/dj/DJActions';
+import { deckNumber } from '@/lib/deckIdentity';
+import { useDJLayoutContext } from '@/components/dj/DJLayoutContext';
 
 interface MixerFilterProps {
   deckId: 'A' | 'B' | 'C';
 }
 
 export const MixerFilter: React.FC<MixerFilterProps> = ({ deckId }) => {
+  const layout = useDJLayoutContext();
   const filterPosition = useDJStore((s) => s.decks[deckId].filterPosition);
   const filterResonance = useDJStore((s) => s.decks[deckId].filterResonance);
 
@@ -33,7 +36,7 @@ export const MixerFilter: React.FC<MixerFilterProps> = ({ deckId }) => {
     return 'LPF';
   }, []);
 
-  const deckNum = deckId === 'A' ? '1' : '2';
+  const deckNum = deckNumber(deckId);
 
   return (
     <div className="flex flex-col items-center gap-1" title={`Deck ${deckNum} Filter`}>
@@ -44,7 +47,7 @@ export const MixerFilter: React.FC<MixerFilterProps> = ({ deckId }) => {
         onChange={handleFilterChange}
         paramKey={deckId === 'A' ? 'dj.deckA.filter' : 'dj.deckB.filter'}
         label="FILTER"
-        size="sm"
+        size={layout.mixer.knob}
         tone="neutral"
         bipolar
         defaultValue={0}
@@ -58,7 +61,7 @@ export const MixerFilter: React.FC<MixerFilterProps> = ({ deckId }) => {
         onChange={handleQChange}
         paramKey={deckId === 'A' ? 'dj.deckA.filterQ' : 'dj.deckB.filterQ'}
         label="Q"
-        size="sm"
+        size={layout.mixer.knob}
         tone="neutral"
         defaultValue={1}
         formatValue={(v) => v.toFixed(1)}

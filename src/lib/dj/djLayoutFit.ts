@@ -10,6 +10,21 @@
  * never reported as clipped. Exposed over MCP as `get_dj_layout_fit`.
  */
 
+/**
+ * Window event that makes the DJ view re-measure its box now. A hidden browser
+ * tab delivers no ResizeObserver callbacks, so an agent driving a background tab
+ * (set_dj_layout_frame, get_dj_layout_fit) asks for the measurement explicitly.
+ */
+export const DJ_LAYOUT_MEASURE_EVENT = 'devilbox:dj-layout-measure';
+
+/** Ask the DJ view to re-measure and give React a turn to commit the new layout. */
+export async function measureDjLayoutNow(): Promise<void> {
+  // First let React commit whatever the caller just changed (frame, deck count), then measure.
+  await new Promise<void>((resolve) => setTimeout(resolve, 120));
+  window.dispatchEvent(new Event(DJ_LAYOUT_MEASURE_EVENT));
+  await new Promise<void>((resolve) => setTimeout(resolve, 200));
+}
+
 export interface DjFitRegion {
   region: string;
   clientHeight: number;
@@ -29,6 +44,11 @@ export interface DjFitBand {
 export interface DjLayoutFit {
   tier: string | null;
   steps: string[];
+  /** The solver input the DJ view rendered with (width, height, decks, ...); null before it mounts. */
+  solverInput: unknown;
+  /** True when the solver found no fit and the DJ view scrolls (the floor). */
+  floor: boolean;
+  /** Size of the DJ view root. */
   input: { width: number; height: number };
   regions: DjFitRegion[];
   bands: DjFitBand[];
@@ -83,9 +103,11 @@ export function readDjLayoutFit(root: HTMLElement): DjLayoutFit {
   return {
     tier: grid?.dataset.djScale ?? null,
     steps: (grid?.dataset.djSteps ?? '').split(' ').filter(Boolean),
+    solverInput: grid?.dataset.djInput ? JSON.parse(grid.dataset.djInput) : null,
+    floor: grid?.dataset.djFloor === 'true',
     input: { width: root.clientWidth, height: root.clientHeight },
     regions,
     bands,
-    clipped: regions.some((r) => r.clipped),
+    clipped: regions.some((r) => r.clipped) || grid?.dataset.djFloor === 'true',
   };
 }

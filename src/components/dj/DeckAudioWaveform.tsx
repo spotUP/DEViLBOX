@@ -15,6 +15,7 @@ import { seekDeckAudio, startScratch, setScratchVelocity, stopScratch } from '@/
 import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
 import WaveformWorkerFactory from '@/workers/dj-waveform.worker.ts?worker';
 import { markSeek } from './seekGuard';
+import { useDJLayoutContext } from './DJLayoutContext';
 import { deckAccent } from '@lib/deckIdentity';
 import type { WaveformMsg, WaveformOverviewState, DeckColors } from '@engine/renderer/worker-types';
 
@@ -51,6 +52,7 @@ function snapshotOverview(deckId: 'A' | 'B' | 'C', container: HTMLElement): Wave
 }
 
 export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) => {
+  const layout = useDJLayoutContext();
   const canvasRef    = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const bridgeRef    = useRef<OffscreenBridge<WaveformMsg, { type: string }> | null>(null);
@@ -321,8 +323,10 @@ export const DeckAudioWaveform: React.FC<DeckAudioWaveformProps> = ({ deckId }) 
   return (
     <div
       ref={containerRef}
-      className="w-full h-16 shrink-0 bg-dark-bg border border-dark-border rounded-sm overflow-hidden cursor-pointer"
-      style={{ touchAction: 'none' }}
+      className="w-full shrink-0 bg-dark-bg border border-dark-border rounded-sm overflow-hidden cursor-pointer"
+      style={{ touchAction: 'none', height: layout.waveformHeight }}
+      data-dj-band="waveform"
+      data-dj-budget={layout.budgets.waveform}
       onPointerDown={handlePointerDown}
     />
   );

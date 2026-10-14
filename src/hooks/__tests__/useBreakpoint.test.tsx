@@ -332,4 +332,49 @@ describe('breakpoint single source of truth', () => {
         offenders.join('\n')
     ).toEqual([]);
   }, 30_000);
+
+  // DJ view band sizes (DJ-VIEW-RESOLUTIONS DJVR-08): the DJ layout has ONE source,
+  // DJ_SIZES in src/lib/dj/djLayout.ts (measurements) and DJ_LAYOUT_LIMITS in
+  // useBreakpoint.ts (decisions). A literal band height or a DJ size threshold
+  // in a component is how two parts of the DJ view stop agreeing about the row.
+  it('no DJ band size or DJ size threshold is written outside djLayout.ts and useBreakpoint.ts', () => {
+    const djDirs = [
+      join(srcDir, 'components', 'dj'),
+      join(srcDir, 'hooks', 'dj'),
+      join(srcDir, 'lib', 'dj'),
+    ];
+    const layoutModule = ['src', 'lib', 'dj', 'djLayout.ts'].join(sep);
+    const THRESHOLD = /\b[\w$]*(?:[Hh]eight|[Ww]idth|[Rr]ow)\w*\s*[<>]=?\s*\d{3,4}\b/g;
+    // Band constants known by name: the panel body, the waveform strip, the platter.
+    const BAND_LITERALS: ReadonlyArray<{ re: RegExp; only?: string }> = [
+      { re: /\bh-44\b/g },
+      { re: /\bh-16\b/g, only: 'DeckAudioWaveform.tsx' },
+      { re: /\bSIZE = 96\b/g },
+    ];
+    const offenders: string[] = [];
+    for (const dir of djDirs) {
+      for (const file of collectSourceFiles(dir)) {
+        const rel = relative(root, file);
+        if (rel === layoutModule || rel.includes(`${sep}__tests__${sep}`) || rel.includes(`${sep}visualizers${sep}`)) continue;
+        const source = readFileSync(file, 'utf8');
+        const note = (index: number, text: string): void => {
+          offenders.push(`${rel.split(sep).join('/')}:${source.slice(0, index).split('\n').length}  ${text}`);
+        };
+        THRESHOLD.lastIndex = 0;
+        for (let m = THRESHOLD.exec(source); m !== null; m = THRESHOLD.exec(source)) note(m.index, m[0]);
+        for (const { re, only } of BAND_LITERALS) {
+          if (only && !rel.endsWith(only)) continue;
+          re.lastIndex = 0;
+          for (let m = re.exec(source); m !== null; m = re.exec(source)) note(m.index, m[0]);
+        }
+      }
+    }
+    expect(
+      offenders,
+      'A DJ band size was written outside src/lib/dj/djLayout.ts. Put the measurement in DJ_SIZES ' +
+        '(or the decision in DJ_LAYOUT_LIMITS in src/hooks/useBreakpoint.ts) and read the solved ' +
+        'value from useDJLayoutContext():\n' +
+        offenders.join('\n')
+    ).toEqual([]);
+  }, 30_000);
 });

@@ -12,6 +12,7 @@ import { DeckTurntable } from './DeckTurntable';
 import { DeckCssTurntable } from './DeckCssTurntable';
 import { DeckCScratchLanes } from './DeckCScratchLanes';
 import { DeckScratch } from './DeckScratch';
+import { useDJLayoutContext } from './DJLayoutContext';
 
 interface DeckCScratchOnlyProps {
   deckNum: string;
@@ -21,10 +22,11 @@ interface DeckCScratchOnlyProps {
 export const DeckCScratchOnly: React.FC<DeckCScratchOnlyProps> = ({ deckNum, deckColor }) => {
   const bpm = useDJStore((s) => s.decks.C.effectiveBPM);
   const deckViewMode = useDJStore((s) => s.deckViewMode);
+  const layout = useDJLayoutContext();
 
   return (
-    <div className="flex flex-col gap-2 min-w-0 flex-1 min-h-0" data-deck-c-scratch-only>
-      <div className="flex items-start gap-2">
+    <div className="flex flex-col min-w-0 flex-1 min-h-0" style={{ gap: layout.deck.gap }} data-deck-c-scratch-only>
+      <div className="flex items-start gap-2" data-dj-band="header" data-dj-budget={layout.budgets.scratchHeader}>
         <div className="flex-1 min-w-0">
           <div className={`text-xs font-mono font-bold tracking-[0.3em] uppercase ${deckColor} opacity-60 mb-1`}>
             Deck {deckNum}
@@ -35,7 +37,7 @@ export const DeckCScratchOnly: React.FC<DeckCScratchOnlyProps> = ({ deckNum, dec
             </span>
             <span className="text-xs text-text-muted uppercase tracking-wider">BPM</span>
           </div>
-          <div className="text-[10px] font-mono text-text-muted mt-1">Drop a WAV file here to use it as a scratch phrase</div>
+          <div className="text-[10px] font-mono text-text-muted mt-1 truncate" title="Drop a WAV file here to use it as a scratch phrase">Drop a WAV file here to use it as a scratch phrase</div>
         </div>
         {deckViewMode === 'visualizer' && <DeckTurntable deckId="C" />}
       </div>
@@ -44,8 +46,13 @@ export const DeckCScratchOnly: React.FC<DeckCScratchOnlyProps> = ({ deckNum, dec
           <DeckCssTurntable deckId="C" />
         </div>
       )}
-      <DeckCScratchLanes />
-      <DeckScratch deckId="C" />
+      <div data-dj-band="lanes" data-dj-budget={layout.budgets.lanes}>
+        <DeckCScratchLanes />
+      </div>
+      {/* The pad grid is a bounded region that scrolls inside: the deck column itself never scrolls. */}
+      <div className="flex-1 min-h-0 overflow-y-auto" data-dj-scrolls>
+        <DeckScratch deckId="C" />
+      </div>
     </div>
   );
 };

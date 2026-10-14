@@ -29,8 +29,9 @@
   width: 100%;
   height: auto;
   aspect-ratio: 1256 / 1010;
-  max-width: 628px;
-  max-height: calc(628px * 1010 / 1256);
+  /* --tt-max: 628px, or the artwork's own 1256px on a large screen (DJ layout, D4) */
+  max-width: var(--tt-max, 628px);
+  max-height: calc(var(--tt-max, 628px) * 1010 / 1256);
 }
 
 @supports (width: 1cqw) {
@@ -50,7 +51,7 @@
 
 .turntable-css img {
   width: 100%;
-  max-width: 628px;
+  max-width: var(--tt-max, 628px);
 }
 
 .tt-table-bg {

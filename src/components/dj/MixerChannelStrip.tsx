@@ -14,6 +14,7 @@ import React, { useCallback, useRef, useState, useEffect } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { useShallow } from 'zustand/react/shallow';
 import * as DJActions from '@/engine/dj/DJActions';
+import { deckNumber } from '@/lib/deckIdentity';
 
 interface MixerChannelStripProps {
   deckId: 'A' | 'B' | 'C';
@@ -85,7 +86,7 @@ export const MixerChannelStrip: React.FC<MixerChannelStripProps> = ({ deckId, st
     setDragging(false);
   }, []);
 
-  const deckNum = deckId === 'A' ? '1' : '2';
+  const deckNum = deckNumber(deckId);
   const isB = deckId === 'B';
 
   // Thumb Y position: top of track = volume 1, bottom = volume 0.

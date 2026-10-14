@@ -9,41 +9,33 @@
  *   5. Broadcast (collapsed)
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useRef } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { MixerFilterKnob, MixerEQBandKnob } from '@/components/dj/MixerEQ';
 import { MixerVUMeter } from '@/components/dj/MixerVUMeter';
 import { MixerChannelStrip } from '@/components/dj/MixerChannelStrip';
 import { MixerCrossfader } from '@/components/dj/MixerCrossfader';
-import { CamelotWheel } from '@/components/dj/CamelotWheel';
-import { MixerTransition } from '@/components/dj/MixerTransition';
 import { MixerMaster } from '@/components/dj/MixerMaster';
 import { MixerCueSection } from '@/components/dj/MixerCueSection';
-import { DJSetRecordButton } from '@/components/dj/DJSetRecordButton';
-import { DJMicControl } from '@/components/dj/DJMicControl';
-import { DJVideoExport } from '@/components/dj/DJVideoExport';
-import { DJStreamControl } from '@/components/dj/DJStreamControl';
-import { useDrumPadStore } from '@/stores/useDrumPadStore';
+import { Button } from '@components/ui/Button';
+import { AnchoredPopover } from '@components/ui/AnchoredPopover';
+import { useDJLayoutContext } from '@/components/dj/DJLayoutContext';
+import { DJMixerExtras, MixerFxWetRow, MixerCamelotRow, MixerTransitionRow, MixerBroadcastRow } from '@/components/dj/DJMixerExtras';
 
 export const DJMixer: React.FC = () => {
   const thirdDeck = useDJStore((s) => s.thirdDeckActive);
-  const [showBroadcast, setShowBroadcast] = useState(false);
-  const dubBusEnabled = useDrumPadStore((s) => s.dubBus.enabled);
-  const returnGain    = useDrumPadStore((s) => s.dubBus.returnGain);
-
-  const handleReturnGainChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    useDrumPadStore.getState().setDubBus({ returnGain: Number(e.target.value) });
-  }, []);
-
+  const layout = useDJLayoutContext();
+  const popover = layout.mixer.extras === 'popover';
+  const [showExtras, setShowExtras] = useState(false);
+  const moreRef = useRef<HTMLSpanElement>(null);
   return (
     <div
-      className="
-        flex flex-col items-center gap-2 p-2
-        bg-dark-bg border border-dark-border rounded-lg h-full
-      "
+      className={`flex flex-col items-center bg-dark-bg border border-dark-border rounded-lg h-full w-fit ${
+        layout.mixer.compact ? 'gap-1 p-1' : 'gap-2 p-2'
+      }`}
     >
       {/* Row 1: Knob columns | Faders | VUs — knobs horizontal, faders/VUs full height */}
-      <div className="flex items-stretch justify-center gap-1.5 w-full border-b border-dark-border pb-2">
+      <div className="flex items-stretch justify-center gap-1.5 w-full border-b border-dark-border pb-2" data-dj-band="knobs" data-dj-budget={layout.budgets.knobs}>
         {/* Deck A knobs — stacked vertically, kill buttons on outside (left) */}
         <div className="flex flex-col items-center gap-0.5">
           <MixerFilterKnob deckId="A" />
@@ -86,69 +78,44 @@ export const DJMixer: React.FC = () => {
         )}
       </div>
 
-      {/* Row 2: Crossfader (A↔B only; Deck C is thru) */}
-      <div className="w-full border-b border-dark-border pb-2">
-        <MixerCrossfader />
-      </div>
-
-      {/* Row 2.5: Camelot harmonic-mix wheel */}
-      <div className="flex items-center justify-center w-full border-b border-dark-border pb-2">
-        <CamelotWheel />
-      </div>
-
-      {/* Row 3: Transition controls */}
-      <div className="w-full border-b border-dark-border pb-2">
-        <MixerTransition />
-      </div>
-
-      {/* Row 3.5: FX Wet — master dub bus return level, visible when bus is on */}
-      {dubBusEnabled && (
-        <div className="flex items-center gap-2 w-full border-b border-dark-border pb-2">
-          <span className="text-text-muted text-[9px] font-mono shrink-0 w-10 text-right">FX WET</span>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={returnGain}
-            onChange={handleReturnGainChange}
-            className="flex-1 accent-accent-primary cursor-pointer"
-            title={`FX wet level: ${(returnGain * 100).toFixed(0)}%`}
-          />
-          <span className="text-text-secondary text-[9px] font-mono tabular-nums w-7 text-right shrink-0">
-            {(returnGain * 100).toFixed(0)}%
-          </span>
+      {/* Row 2: Crossfader (A-B only; Deck C is thru). Behind a More button the extras open in a popover. */}
+      <div className="flex items-center w-full border-b border-dark-border pb-2" data-dj-band="crossfader" data-dj-budget={layout.budgets.crossfader}>
+        <div className="flex-1 min-w-0">
+          <MixerCrossfader />
         </div>
+        {popover && (
+          <span ref={moreRef} className="shrink-0">
+            <Button variant="ghost" size="sm" onClick={() => setShowExtras((v) => !v)} title="Camelot wheel, transitions and broadcast">
+              More
+            </Button>
+          </span>
+        )}
+      </div>
+
+      {popover ? (
+        <AnchoredPopover open={showExtras} onClose={() => setShowExtras(false)} anchorRef={moreRef} placement="below" className="w-72">
+          <div className="flex flex-col items-center gap-2 p-2 bg-dark-bg border border-dark-border rounded-lg">
+            <DJMixerExtras />
+          </div>
+        </AnchoredPopover>
+      ) : (
+        <>
+          <MixerCamelotRow />
+          <MixerTransitionRow />
+        </>
       )}
 
+      {/* Row 3.5: FX Wet - master dub bus return level, visible when the bus is on (in the popover once the layout is compact) */}
+      {layout.mixer.fxWet === 'inline' && <MixerFxWetRow />}
+
       {/* Row 4: Master + Cue */}
-      <div className="flex items-center justify-center gap-2 w-full">
+      <div className="flex items-center justify-center gap-2 w-full" data-dj-band="masterCue" data-dj-budget={layout.budgets.masterCue}>
         <MixerMaster />
         <div className="w-px bg-dark-borderLight self-stretch" />
         <MixerCueSection />
       </div>
 
-      {/* Row 5: Broadcast toggle — collapsed by default */}
-      <div className="flex items-center justify-center gap-2 w-full pt-2 border-t border-dark-border flex-wrap">
-        <button
-          onClick={() => setShowBroadcast(v => !v)}
-          className={`px-2 py-0.5 text-xs font-mono rounded border transition-colors ${
-            showBroadcast
-              ? 'bg-accent-primary/20 border-accent-primary/60 text-accent-primary'
-              : 'bg-dark-bgSecondary border-dark-border text-text-secondary hover:text-text-primary'
-          }`}
-        >
-          BROADCAST
-        </button>
-        {showBroadcast && (
-          <>
-            <DJSetRecordButton />
-            <DJVideoExport />
-            <DJStreamControl />
-            <DJMicControl />
-          </>
-        )}
-      </div>
+      {!popover && <MixerBroadcastRow />}
     </div>
   );
 };

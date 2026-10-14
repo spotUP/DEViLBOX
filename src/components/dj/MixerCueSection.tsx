@@ -12,6 +12,7 @@ import { Knob } from '@components/controls/Knob';
 import { useDJStore } from '@/stores/useDJStore';
 import { useShallow } from 'zustand/react/shallow';
 import { HeadphoneSetupDialog } from './HeadphoneSetupDialog';
+import { useDJLayoutContext } from '@/components/dj/DJLayoutContext';
 
 interface CueState {
   pflA: boolean;
@@ -21,6 +22,8 @@ interface CueState {
 }
 
 export const MixerCueSection: React.FC = () => {
+  const layout = useDJLayoutContext();
+  const compact = layout.mixer.compact;
   const { pflA, pflB, cueVolume, cueMix, cueDeviceId, cueDeviceName } = useDJStore(
     useShallow((s) => ({
       pflA: s.decks.A.pflEnabled,
@@ -63,23 +66,28 @@ export const MixerCueSection: React.FC = () => {
 
   return (
     <>
-      <div className="flex flex-col items-center gap-1" title="Headphone cue section">
+      <div
+        className={compact ? 'grid grid-cols-[auto_1fr] items-center justify-items-center gap-x-2 gap-y-0.5' : 'flex flex-col items-center gap-1'}
+        title="Headphone cue section"
+      >
         {/* CUE volume knob */}
+        <div className={compact ? 'row-span-2' : ''}>
         <Knob
           value={cueVolume}
           min={0}
           max={1.5}
           onChange={handleCueVolumeChange}
           label="CUE"
-          size="sm"
+          size={layout.mixer.knob}
           tone="neutral"
           defaultValue={1}
           hideValue
           title="Cue volume — headphone pre-fader listen level"
         />
+        </div>
 
         {/* Cue/Master crossfader */}
-        <div className="w-full px-1">
+        <div className={`w-full px-1 ${compact ? 'order-last col-span-2' : ''}`}>
           <div className="flex justify-between text-[7px] font-mono text-text-muted mb-0.5">
             <span>CUE</span>
             <span>MST</span>

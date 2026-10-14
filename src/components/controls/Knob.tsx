@@ -18,7 +18,7 @@ interface KnobProps {
   onChange: (value: number) => void;
   label?: string;
   unit?: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   color?: string;
   /**
    * The control's colour, by NAME.
@@ -149,6 +149,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
 
   // Size configurations
   const sizes = {
+    xs: { knob: 32, fontSize: 9, stroke: 2 },
     sm: { knob: 40, fontSize: 10, stroke: 3 },
     md: { knob: 56, fontSize: 11, stroke: 4 },
     lg: { knob: 72, fontSize: 12, stroke: 5 },
