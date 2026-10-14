@@ -132,6 +132,9 @@ export function getNativeEngineMetaForExport(): Record<string, unknown> | null {
   const state = useFormatStore.getState();
   const result: Record<string, unknown> = {};
   if (state.furnaceNative) result.furnaceNative = state.furnaceNative;
+  // The song's module samples / wavetables: a sample chip (ES5506...) is silent without them.
+  if (state.furnaceSamples) result.furnaceSamples = toTypedJson(state.furnaceSamples);
+  if (state.furnaceWavetables) result.furnaceWavetables = state.furnaceWavetables;
   if (state.hivelyNative) result.hivelyNative = state.hivelyNative;
   if (state.klysNative) result.klysNative = state.klysNative;
   // The native models whose presence picks the editor: a save without them came back classic (U4.3).
@@ -255,7 +258,7 @@ export function decodeNativeEngineFields(
   // Copy JSON-serializable metadata
   if (nativeEngineMeta) {
     for (const [key, val] of Object.entries(nativeEngineMeta)) {
-      if (key === 'sf2StoreData' || key === 'cheeseCutterStoreData') songObj[key] = fromTypedJson(val);
+      if (key === 'sf2StoreData' || key === 'cheeseCutterStoreData' || key === 'furnaceSamples') songObj[key] = fromTypedJson(val);
       else if (key !== 'editorMode') songObj[key] = val;
     }
   }

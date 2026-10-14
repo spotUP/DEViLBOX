@@ -2022,6 +2022,12 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
     if (!opts.song.furnaceNative) {
       return { started: false };
     }
+    // The samples and wavetables uploaded below are the SONG's. They used to be
+    // whatever the last .fur parse had left on this singleton: a song restored
+    // from a save (no parse) played its ES5506 instruments with no sample
+    // memory, 450x quieter than a fresh load (FURNACE-RECOVERY-SILENT).
+    this.setModuleSamples(opts.song.furnaceSamples?.length ? opts.song.furnaceSamples : null);
+    this.setModuleWavetables(opts.song.furnaceWavetables?.length ? opts.song.furnaceWavetables : null);
     const _log = console.log.bind(console);
     _log(`[FurnaceDispatchEngine] startWithCoordinator called: initialized=${this.isInitialized} chips=${this.chips.size} audioRouted=${this._audioRouted}`);
     const cleanups: Array<() => void> = [];

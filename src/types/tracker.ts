@@ -585,6 +585,31 @@ export interface FurnaceNativeData {
   systemPanFR?: number[];  // Per-chip front/rear pan (-1..+1, default 0.0)
 }
 
+/**
+ * A Furnace module's sample (the song's, not an instrument's): a sample chip
+ * (ES5506, SNES, QSound, Amiga...) plays its instruments out of these. Part of
+ * the song - carried by the format store and every save - so a restored song
+ * plays with the samples it was saved with.
+ */
+export interface FurnaceModuleSample {
+  data: Int16Array | Int8Array | Uint8Array;
+  rate: number;
+  depth: number;
+  /** Frame count (compressed depths, uploadModuleSamplesToPlatform). */
+  samples?: number;
+  loopStart: number;
+  loopEnd: number;
+  loopMode: number;
+  name: string;
+}
+
+/** A Furnace module's wavetable (the song's, uploaded to wavetable chips). */
+export interface FurnaceModuleWavetable {
+  data: number[];
+  width: number;
+  height: number;
+}
+
 export interface FurnaceSubsong {
   name: string;
   patLen: number;                    // Rows per pattern (default 64)
