@@ -203,10 +203,17 @@ struct hvl_tune
   uint32                 ht_SavedSamplePos[MAX_CHANNELS];    // Snapshot for isolation re-render
   uint32                 ht_SavedRingSamplePos[MAX_CHANNELS]; // Snapshot for isolation re-render
   uint8                  ht_Version;
+  // Tempo scale (DEViLBOX pitch slider Key Lock): ticks come this much faster,
+  // pitch untouched. 1.0 = the song's own tempo (bit-identical playback).
+  float64                ht_TempoScale;
+  float64                ht_TickSampleAcc;   // Fractional samples carried between scaled ticks
+  uint32                 ht_ChunkSamples[4]; // Samples per play_irq chunk of the current frame
+  uint32                 ht_FrameSamples;    // Samples in the current frame (sum of the chunks)
 };
 
 void hvl_DecodeFrame( struct hvl_tune *ht, int8 *buf1, int8 *buf2, int32 bufmod );
 void hvl_TickFrame( struct hvl_tune *ht );
+void hvl_PlanFrame( struct hvl_tune *ht );
 void hvl_RenderFrame( struct hvl_tune *ht, int8 *buf1, int8 *buf2, int32 bufmod );
 void hvl_SaveVoicePositions( struct hvl_tune *ht );
 void hvl_RestoreVoicePositions( struct hvl_tune *ht );

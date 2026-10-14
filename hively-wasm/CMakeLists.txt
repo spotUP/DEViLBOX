@@ -33,6 +33,8 @@ if(EMSCRIPTEN)
         "_hively_init_subsong"
         "_hively_decode_frame"
         "_hively_get_frame_samples"
+        "_hively_get_max_frame_samples"
+        "_hively_set_tempo_scale"
         "_hively_is_song_end"
         "_hively_get_position"
         "_hively_get_row"
