@@ -39,8 +39,8 @@ export interface DeckCMotionSample {
   active: boolean;
 }
 
-/** A needle flourish's fader throw (a full-velocity stroke's: 1 ms cut-in ramp at the motion rate). */
-const NEEDLE_TRAVEL = faderTravelSamples(Math.trunc(1e-3 * DECK_C_MOTION_RATE));
+/** A needle flourish's fader throw: one full throw at the hand's peak speed limit. */
+const NEEDLE_TRAVEL = faderTravelSamples(DECK_C_MOTION_RATE);
 
 /** Strokes are kept this long after they end (the integral is carried forward past them). */
 const KEEP_SAMPLES = 2 * DECK_C_MOTION_RATE;

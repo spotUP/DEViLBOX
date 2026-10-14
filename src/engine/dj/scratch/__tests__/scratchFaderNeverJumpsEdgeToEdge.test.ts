@@ -9,11 +9,11 @@
  * timeline (`DeckCMotion.sampleAt`, what the fader lane reads every frame).
  */
 import { describe, expect, it } from 'vitest';
-import { DEMO_GESTURES, DEMO_RATE, demoGestureSteps, renderGesture, type DemoSource } from '../scratchRender';
+import { DEMO_GESTURES, DEMO_RATE, FADER_MAX_SPEED_PER_MS, demoGestureSteps, faderPositionFromPattern, renderGesture, type DemoSource } from '../scratchRender';
 import { DeckCMotion } from '../deckCMotion';
 
-/** Fastest human full throw allowed: the velocity-1 hand (1 ms ramp across a 3 % cut-in = 33.3 ms). */
-const MIN_THROW_MS = 33;
+/** Fastest human hand: a full throw takes at least 60 ms (FADER_MAX_SPEED_PER_MS). */
+const MAX_PER_MS = FADER_MAX_SPEED_PER_MS;
 const SAMPLES_PER_MS = DEMO_RATE / 1000;
 
 function source(): DemoSource {
@@ -56,14 +56,38 @@ describe('scratch fader travel', () => {
         if (d > worst.perMs) worst = { name: st.name, perMs: d };
       }
     }
-    expect(worst.perMs, `fastest 1 ms move: ${worst.name}`).toBeLessThanOrEqual(1 / MIN_THROW_MS);
+    expect(worst.perMs, `fastest 1 ms move: ${worst.name}`).toBeLessThanOrEqual(MAX_PER_MS * 1.001);
 
     // the hand still travels: open strokes reach the open edge, and it is at the closed edge wherever the gain is cut
+    const peaks: number[] = [];
     for (const st of strokes) {
       let peak = 0;
       for (let s = st.start; s < st.end; s++) peak = Math.max(peak, lane[s]!);
-      if (st.name.startsWith('baby ') || st.name === 'needle') expect(peak, st.name).toBeGreaterThan(0.99);
+      if (st.name === 'needle') expect(peak, st.name).toBeGreaterThan(0.99);
+      if (peak > 0.03) peaks.push(peak);
     }
+    // a cut is a tap near the cut-in edge: the typical stroke peak stays well under a quarter of the travel
+    peaks.sort((a, b) => a - b);
+    expect(peaks[Math.floor(peaks.length / 2)]!, 'median stroke peak').toBeLessThan(0.25);
     for (let s = 0; s < at; s++) if (gain[s] === 0) expect(lane[s], `sample ${s}`).toBeLessThan(0.05);
   }, 60_000);
+
+  it('hand crosses the cut-in point exactly where the gain edges are, for fast and slow cuts', () => {
+    const n = DEMO_RATE; // 1 s
+    const ms = DEMO_RATE / 1000;
+    for (const cutMs of [8, 20, 60, 250]) {
+      const s0 = 100 * ms, e0 = s0 + cutMs * ms;
+      const pos = faderPositionFromPattern([[s0 / n, e0 / n]], n, DEMO_RATE, { rampMs: 1 });
+      const r = Math.trunc(1 * ms);
+      let up = -1, down = -1;
+      for (let i = 1; i < n; i++) {
+        if (up < 0 && pos[i - 1]! < 0.03 && pos[i]! >= 0.03) up = i;
+        if (pos[i - 1]! >= 0.03 && pos[i]! < 0.03) down = i;
+      }
+      expect(Math.abs(up - (s0 + r)) / ms, `open crossing, ${cutMs} ms cut`).toBeLessThanOrEqual(1);
+      expect(Math.abs(down - (e0 - r)) / ms, `close crossing, ${cutMs} ms cut`).toBeLessThanOrEqual(1);
+      let max = 0; for (let i = 1; i < n; i++) max = Math.max(max, Math.abs(pos[i]! - pos[i - 1]!) * ms);
+      expect(max).toBeLessThanOrEqual(MAX_PER_MS * 1.001);
+    }
+  });
 });
