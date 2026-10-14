@@ -2,7 +2,7 @@
 date: 2026-10-14
 topic: DJ view fits every common resolution - one layout source (DJ-VIEW-RESOLUTIONS phase 2 plan)
 tags: [dj, layout, responsive, resolutions, plan]
-status: draft
+status: implemented
 ---
 
 # DJ view on common resolutions - plan
@@ -80,48 +80,102 @@ only picks the band's mode and base size.
 ## Checklist (32 items) - tick here as they land, report the running count
 
 Phase 0 - calibrate + real-browser instrument
-- [ ] DJVR-01 Calibrate band heights in real Chrome (read-only probe)
-- [ ] DJVR-02 MCP tool `get_dj_layout_fit` (bridge handler + server tool)
-- [ ] DJVR-03 MCP tool `set_dj_layout_frame` (debug frame at an exact size)
-- [ ] DJVR-04 Validate the instrument on a known-clipped and a known-fitting case
+- [x] DJVR-01 Calibrate band heights in real Chrome (read-only probe)  -> (calibration section above; measured 2026-10-14)
+- [x] DJVR-02 MCP tool `get_dj_layout_fit` (bridge handler + server tool)  -> bdaf1d309
+- [x] DJVR-03 MCP tool `set_dj_layout_frame` (debug frame at an exact size)  -> bdaf1d309
+- [x] DJVR-04 Validate the instrument on a known-clipped and a known-fitting case  -> bdaf1d309 (frame 1280x620: mixer clipped 772/561; 2560x1340: nothing clipped)
 
 Phase 1 - the layout source
-- [ ] DJVR-05 `DJ_LAYOUT_LIMITS` in `useBreakpoint.ts`
-- [ ] DJVR-06 `src/lib/dj/djLayout.ts`: `DJ_SIZES`, types, `djLayout()` solver
-- [ ] DJVR-07 Table test: 8 resolutions x 2/3 decks (+ Deck C kinds, dub on/off)
-- [ ] DJVR-08 Guard test extended: DJ size thresholds only in `useBreakpoint.ts`
-- [ ] DJVR-09 `useDJLayout` hook + `DJLayoutContext`
-- [ ] DJVR-10 DJView: root/top-bar refs, provider, grid template from layout, data attrs
-- [ ] DJVR-11 NavBar hidden in DJ view (`AppLayout.tsx:51`)
-- [ ] DJVR-12 Top bar: view switcher, Settings, DJ Sets moved in; `flex-wrap`
-- [ ] DJVR-13 Floor: root `overflow-y-auto` + min height only when `layout.floor`
+- [x] DJVR-05 `DJ_LAYOUT_LIMITS` in `useBreakpoint.ts`  -> b0cfd9082
+- [x] DJVR-06 `src/lib/dj/djLayout.ts`: `DJ_SIZES`, types, `djLayout()` solver  -> b0cfd9082
+- [x] DJVR-07 Table test: 8 resolutions x 2/3 decks (+ Deck C kinds, dub on/off)  -> b0cfd9082
+- [x] DJVR-08 Guard test extended: DJ size thresholds only in `useBreakpoint.ts`  -> b0cfd9082
+- [x] DJVR-09 `useDJLayout` hook + `DJLayoutContext`  -> b0cfd9082
+- [x] DJVR-10 DJView: root/top-bar refs, provider, grid template from layout, data attrs  -> b0cfd9082
+- [x] DJVR-11 NavBar hidden in DJ view (`AppLayout.tsx:51`)  -> b0cfd9082
+- [x] DJVR-12 Top bar: view switcher, Settings, DJ Sets moved in; `flex-wrap`  -> b0cfd9082
+- [x] DJVR-13 Floor: root `overflow-y-auto` + min height only when `layout.floor`  -> b0cfd9082
 
 Phase 2 - mixer
-- [ ] DJVR-14 Mixer column `auto` (content width), DJMixer `w-fit`
-- [ ] DJVR-15 Extract `AnchoredPopover` from the Auto DJ dropdown (`DJView.tsx:494-506`), Auto DJ uses it
-- [ ] DJVR-16 `DJMixerExtras` popover: Camelot, transition, broadcast; trigger in crossfader row
-- [ ] DJVR-17 Knob `xs` size (32 px) + mixer compact spacing
-- [ ] DJVR-18 `deckNumber()` helper; six sites; Deck C tooltips say "Deck 3"
+- [x] DJVR-14 Mixer column `auto` (content width), DJMixer `w-fit`  -> b0cfd9082
+- [x] DJVR-15 Extract `AnchoredPopover` from the Auto DJ dropdown (`DJView.tsx:494-506`), Auto DJ uses it  -> 4185eb6f9
+- [x] DJVR-16 `DJMixerExtras` popover: Camelot, transition, broadcast; trigger in crossfader row  -> b0cfd9082
+- [x] DJVR-17 Knob `xs` size (32 px) + mixer compact spacing  -> b0cfd9082
+- [x] DJVR-18 `deckNumber()` helper; six sites; Deck C tooltips say "Deck 3"  -> b0cfd9082
 
 Phase 3 - decks + waveforms
-- [ ] DJVR-19 Waveform height from layout (`DeckAudioWaveform.tsx:324` `h-16`)
-- [ ] DJVR-20 Deck C waveform in the strip; SYNCED badge on the A/B boundary
-- [ ] DJVR-21 `DeckPanelTabs` mode `docked | onDemand` + `deckPanelOpen` store field
-- [ ] DJVR-22 Compact deck header: platter size prop (`DeckTurntable.tsx:27`, worker `resize`), scope base size
-- [ ] DJVR-23 Compact transport/nudge button size (`DeckTransport.tsx`, `DeckNudge.tsx`)
-- [ ] DJVR-24 Pattern area hidden below `patternMinPx` (no sliver)
-- [ ] DJVR-25 Scratch-only Deck C pad grid as a bounded scrolling region
-- [ ] DJVR-26 Compact deck spacing (`gap-2 p-3` -> layout values)
+- [x] DJVR-19 Waveform height from layout (`DeckAudioWaveform.tsx:324` `h-16`)  -> b0cfd9082
+- [x] DJVR-20 Deck C waveform in the strip; SYNCED badge on the A/B boundary  -> b0cfd9082
+- [x] DJVR-21 `DeckPanelTabs` mode `docked | onDemand` + `deckPanelOpen` store field  -> b0cfd9082
+- [x] DJVR-22 Compact deck header: platter size prop (`DeckTurntable.tsx:27`, worker `resize`), scope base size  -> b0cfd9082
+- [x] DJVR-23 Compact transport/nudge button size (`DeckTransport.tsx`, `DeckNudge.tsx`)  -> b0cfd9082
+- [x] DJVR-24 Pattern area hidden below `patternMinPx` (no sliver)  -> b0cfd9082
+- [x] DJVR-25 Scratch-only Deck C pad grid as a bounded scrolling region  -> b0cfd9082
+- [x] DJVR-26 Compact deck spacing (`gap-2 p-3` -> layout values)  -> b0cfd9082
 
 Phase 4 - large screens (D4)
-- [ ] DJVR-27 `large` tier: platter 144, scopes 96, mixer knobs `md`, waveforms 80, panel body 240, Camelot 140
+- [x] DJVR-27 `large` tier: platter 144, scopes 96, mixer knobs `md`, waveforms 80, panel body 240, Camelot 140  -> b0cfd9082
 
 Phase 5 - reachability + verification
-- [ ] DJVR-28 THE reachability test: DJView mounted at 16 cells
-- [ ] DJVR-29 Real-Chrome sweep of 16 cells via `set_dj_layout_frame` + `get_dj_layout_fit`, verdicts recorded
-- [ ] DJVR-30 Type-check, lint, targeted tests
-- [ ] DJVR-31 Owner manual check list handed over (Blocked on me)
-- [ ] DJVR-32 Research doc + todos ledger updated with outcome and commits
+- [x] DJVR-28 THE reachability test: DJView mounted at 16 cells  -> b0cfd9082
+- [x] DJVR-29 Real-Chrome sweep of 16 cells via `set_dj_layout_frame` + `get_dj_layout_fit`, verdicts recorded  -> a7bd95561; 20 of 20 cells PASS (16 + Deck C track x2 + dub bus on x2), verdicts in test-data/dj-layout-fit.json (gitignored, local); tools/dj-layout-sweep.ts
+- [x] DJVR-30 Type-check, lint, targeted tests  -> type-check clean, eslint clean on touched files, targeted vitest green
+- [x] DJVR-31 Owner manual check list handed over (Blocked on me)  -> in the run report; the checks themselves are the owner's (section 'Manual owner check')
+- [x] DJVR-32 Research doc + todos ledger updated with outcome and commits  -> research doc Outcome section; thoughts/spot/todos.md
+
+## Calibration (DJVR-01, measured in real Chrome 2026-10-14, owner's tab, read-only)
+
+Frame sizes via `set_dj_layout_frame`; every number is a band's `offsetHeight` / region width in CSS px.
+
+| Band | Measured | Plan guess | Note |
+|---|---|---|---|
+| Deck header (title + scopes 64 + track info) | 140 (= 76 + scope) | 178 | platter 96 sits beside it, never drives it |
+| Deck overview bar | 24 | - | hidden when the deck has a waveform |
+| Transport row | 40 (88 wrapped) | 40 | wraps below deck inner width 276 |
+| Tab strip / docked panel (strip + 4 + body 176) | 26 / 206 | 28 / - | |
+| Deck C lanes | 44 | 41 | |
+| Deck C scratch-only header | 71 text column (96 with platter 96) | 95 | hint line truncates now |
+| Mixer knob rows (sm / xs / md) | 245 / 207 / 315 | 228 / 190 / 300 | |
+| Crossfader (stacked / curve beside slider) | 65 / 40 | 62 | compact moves the curve selector beside the slider |
+| Camelot row (108 / 140 wheel) | 148 / 180 | 162 | |
+| Transition | 37 | 33 | |
+| FX WET | 29 | 24 | |
+| Master + Cue (regular / md / compact grid) | 200 / 236 / 89 | 100 | the plan's 100 was not reachable without a compact layout: compact puts Master and Cue in grids |
+| Broadcast | 31 | 30 | |
+| Mixer column width, 2 decks (regular / compact) | 282 / 309 | 400 fixed | `auto` column |
+| Mixer column width, 3 decks (regular / compact) | 416 / 383 | 400 fixed | |
+| Top bar | 43 (>= 1600 wide), 75 (1440-1536), 79 (<= 1366) | 45 / 80 | wraps below ~1580 px |
+
+Deviations recorded while building (all implementation, none an owner decision):
+
+- **Hidden tab.** The owner's tab was in the background for the whole run: a hidden tab delivers
+  no ResizeObserver callbacks. `measureDjLayoutNow()` (`djLayoutFit.ts`) fires a window event the
+  layout hook listens to; `set_dj_layout_frame` and `get_dj_layout_fit` call it. In a visible tab
+  the ResizeObserver does the same job. Components with their own ResizeObserver (DeckScopes row fit,
+  waveform worker) were therefore NOT re-fitted during the sweep.
+- **Frame = the DJ root box.** `set_dj_layout_frame` sets the DJ root to exactly `width x height`; the
+  sweep passes `screen - 100 browser - 30 status bar` itself (the root is measured, not the window).
+- **Waveforms are budgeted for every active deck**, whether or not a track has loaded. Plan: "decks that
+  have peaks". Loading a track must not make the mixer fold its extras away mid-set.
+- **Short waveform 42 px, not 40**: heights include the 1 px border; 42 leaves the 16 px overview plus
+  a 24 px zoom window.
+- **FX WET** joins the extras popover once the layout is `compact` (it stays inline above that): at
+  1280x720 with three decks, dub on, the mixer does not fit otherwise.
+- **Compact mixer** needed three component changes the plan did not list: Master and Cue as grids
+  (`MixerMaster`, `MixerCueSection`), the crossfader curve selector beside the slider
+  (`MixerCrossfader`), and a dense tab strip (`TabStrip dense`).
+- **Settings** is a local modal in the NavBar (no store action to call): the DJ view renders its own
+  `SettingsModal` with its own open flag.
+- Vinyl mode: `--tt-max` (628 px, 1256 px in the large tier) replaces the fixed 628 px cap.
+
+### Ledger: 32 of 32 items done (2026-10-14). Open for the owner only: the manual check below.
+
+Sweep outcome (real Chrome, hidden tab, frame = DJ root box): 1280x720 and 1366x768 -> compact (all four steps);
+1440x900, 1536x864 -> regular or compact depending on decks, popover + short waveforms + panel on demand;
+1512x982, 1728x1117, 1920x1080 -> regular with popover (some short waveforms); 2560x1440 -> large, no steps.
+Dub bus on at 1280x720 (2 and 3 decks) also passes (FX WET moves into the popover in compact).
+Known limit: all sweep cells ran with the owner's tab in the background (see Calibration deviations), so
+DeckScopes row-fit (its own ResizeObserver) was not exercised: owner check 3 covers it.
 
 ## Phase 0 - calibrate and build the real-browser instrument
 
