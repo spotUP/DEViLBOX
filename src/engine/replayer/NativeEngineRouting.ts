@@ -424,6 +424,13 @@ export async function previewNativeRow(
   await instance.ready();
   if (!isRowClipPlayer(instance)) return 'unsupported';
 
+  // The mixer's mute and solo, handed to the engine as a play hands it (an engine never played has not been told).
+  const { useMixerStore, mixerAudibleMask } = await import('@stores/useMixerStore');
+  const mixer = useMixerStore.getState();
+  if (mixer.channels.length > 0 && typeof (instance as { setMuteMask?: unknown }).setMuteMask === 'function') {
+    (instance as unknown as { setMuteMask(mask: number): void }).setMuteMask(mixerAudibleMask(mixer.channels, mixer.isSoloing));
+  }
+
   const { data, args } = await engineLoadArgs(song, desc, false);
   const { getRowPreviewClient } = await import('@engine/rowPreview/rowPreviewClient');
   const result = await getRowPreviewClient().request({

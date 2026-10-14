@@ -349,12 +349,18 @@ void (async () => {
 })();
 
 
-function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boolean): void {
+/** The mute mask the mixer's channel state means for a bitmask engine: bit N set = channel N audible (solo wins over mute). */
+export function mixerAudibleMask(channels: ReadonlyArray<Pick<MixerChannelState, 'muted' | 'soloed'>>, isSoloing: boolean): number {
   let mask = 0;
   for (let i = 0; i < Math.min(channels.length, 32); i++) {
     const effectiveMute = isSoloing ? !channels[i].soloed : channels[i].muted;
     if (!effectiveMute) mask |= (1 << i);
   }
+  return mask;
+}
+
+function forwardReplayerMuteMask(channels: MixerChannelState[], isSoloing: boolean): void {
+  const mask = mixerAudibleMask(channels, isSoloing);
 
   // Forward to TrackerReplayer (affects ToneEngine note triggering)
   if (_trackerReplayerMod) {
