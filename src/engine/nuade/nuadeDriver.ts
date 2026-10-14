@@ -34,6 +34,9 @@ export class NuadeDriver {
   private cstr(s: string): number { return cstr(this.m, s); }
   private bytes(data: Uint8Array): number { return heapBytes(this.m, data); }
 
+  /** Close the song and start the module over at this driver's sample rate (what the worklet's load does first). */
+  reinit(): void { this.m._nw_close(); this.m._nw_init(this.sampleRate); }
+
   clearFiles(): void { this.m._nw_clear_files(); }
   addFile(name: string, data: Uint8Array): void {
     const n = this.cstr(name), p = this.bytes(data);
