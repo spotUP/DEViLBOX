@@ -17,7 +17,6 @@ import { benDaglishEffectToString } from './import/formats/benDaglishEffectGlyph
 import { robHubbardEffectToString } from './import/formats/robHubbardEffectGlyphs';
 import { futurePlayerEffectToString } from './import/formats/fpEffectGlyphs';
 import { musicAssemblerEffectToString } from './import/formats/maEffectGlyphs';
-import { furnaceEffectToString } from './import/formats/furnaceEffectGlyphs';
 import { isDubEffectTypeForDisplay } from '@/engine/dub/moveTable';
 import { isLowOctaveNote, midiToNoteValue, noteValueName, noteValueToMidi, parseNoteName } from '@/lib/tracker/noteValue';
 
@@ -288,10 +287,6 @@ export function xmEffectToString(effTyp: number, eff: number): string {
   // Music Assembler track and position commands (reserved block 0xFB..0xFE).
   const ma = musicAssemblerEffectToString(effTyp, eff);
   if (ma !== null) return ma;
-
-  // Furnace panning and sample-offset families (0x80..0x9F), after every format-owned block.
-  const fur = furnaceEffectToString(effTyp, eff);
-  if (fur !== null) return fur;
 
   const typeChar = EFFECT_CHAR_MAP[effTyp] ?? '0';
   return `${typeChar}${HEX_BYTE[eff] ?? '00'}`;
