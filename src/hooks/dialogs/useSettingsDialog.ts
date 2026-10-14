@@ -164,6 +164,8 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
   const setTrackerVisualBg = useSettingsStore((s) => s.setTrackerVisualBg);
   const setFitAllChannelsTracker = useSettingsStore((s) => s.setFitAllChannelsTracker);
   const setFitAllChannelsDeck = useSettingsStore((s) => s.setFitAllChannelsDeck);
+  const showUnusedChannels = useSettingsStore((s) => s.showUnusedChannels);
+  const setShowUnusedChannels = useSettingsStore((s) => s.setShowUnusedChannels);
   const trackerVisualMode = useSettingsStore((s) => s.trackerVisualMode);
   const setTrackerVisualMode = useSettingsStore((s) => s.setTrackerVisualMode);
   const channelColorBlend = useSettingsStore((s) => s.channelColorBlend);
@@ -359,6 +361,7 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
     vuMeterSwing, setVuMeterSwing, vuMeterMirror, setVuMeterMirror,
     trackerVisualBg, setTrackerVisualBg, trackerVisualMode, setTrackerVisualMode,
     fitAllChannelsTracker, setFitAllChannelsTracker, fitAllChannelsDeck, setFitAllChannelsDeck,
+    showUnusedChannels, setShowUnusedChannels,
     channelColorBlend, setChannelColorBlend,
     sidEngine, setSidEngine,
     asidEnabled, setAsidEnabled, asidDeviceId, setAsidDeviceId,

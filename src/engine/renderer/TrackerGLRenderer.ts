@@ -524,7 +524,7 @@ export class TrackerGLRenderer {
     for (let ch = 0; ch < numChannels; ch++) {
       const colX = channelOffsets[ch] - scrollX;
       const chW  = channelWidths[ch];
-      if (colX + chW < 0 || colX > width) continue;
+      if (chW <= 0 || colX + chW < 0 || colX > width) continue; // width 0 = hidden channel
       const chData = pattern.channels[ch];
 
       // Active channel highlight
@@ -654,7 +654,7 @@ export class TrackerGLRenderer {
     for (let ch = 0; ch < numChannels; ch++) {
       const colX = channelOffsets[ch] - scrollX;
       const chW  = channelWidths[ch];
-      if (colX + chW < 0 || colX > width) continue;
+      if (chW <= 0 || colX + chW < 0 || colX > width) continue; // width 0 = hidden channel
       const chData = pattern.channels[ch];
 
       // Separator
@@ -735,7 +735,7 @@ export class TrackerGLRenderer {
       for (let ch = 0; ch < numChannels; ch++) {
         const colX = channelOffsets[ch] - scrollX;
         const chW  = channelWidths[ch];
-        if (colX + chW < 0 || colX > width) continue;
+        if (chW <= 0 || colX + chW < 0 || colX > width) continue; // width 0 = hidden channel
 
         const chData = sourcePattern.channels[ch];
         if (!chData) continue;

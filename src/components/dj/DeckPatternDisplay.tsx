@@ -10,6 +10,8 @@
  * - Backward phases: visual row offset simulates backward scrolling
  */
 
+import { visibleChannelMask } from '@/lib/tracker/visibleChannels';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import { useDJStore } from '@/stores/useDJStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
@@ -98,7 +100,8 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
     };
   }, [deckId, activePatternName]);
 
-  const { patternData, numChannels, numRows } = useMemo(() => {
+  const showUnused = useSettingsStore((st) => st.showUnusedChannels);
+  const { patternData, numChannels, numRows, channelMask } = useMemo(() => {
     try {
       const engine = getDJEngine();
       const deck = engine.getDeck(deckId);
@@ -109,7 +112,7 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
       // One rule for every deck: the pattern view only for a song with notes,
       // otherwise the oscilloscope (an RSID program parses to an empty song).
       if (!song || !song.songPositions || song.songPositions.length === 0 || !songHasNotes(song)) {
-        return { patternData: null, numChannels: 4, numRows: 64 };
+        return { patternData: null, numChannels: 4, numRows: 64, channelMask: undefined };
       }
       const patternIndex = song.songPositions[songPos] ?? 0;
       const pat = song.patterns[patternIndex] ?? null;
@@ -117,13 +120,15 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
         patternData: pat,
         numChannels: song.numChannels,
         numRows: pat ? pat.length : 64,
+        // The same visible-channel list as the tracker, from every pattern of this deck's song.
+        channelMask: visibleChannelMask(song.patterns, { showUnused }),
       };
     } catch {
-      return { patternData: null, numChannels: 4, numRows: 64 };
+      return { patternData: null, numChannels: 4, numRows: 64, channelMask: undefined };
     }
     // songVersion: the deck took a song (DeckEngine.loadSong) with no other
     // store write the view would re-read on.
-  }, [deckId, songPos, fileName, totalPositions, songVersion]);
+  }, [deckId, songPos, fileName, totalPositions, songVersion, showUnused]);
 
   // Per-channel VU meters: the deck's channel scopes at the heard position (a
   // rendered module's scope track; the replayer's analysers when it plays live).
@@ -219,6 +224,7 @@ export const DeckPatternDisplay: React.FC<DeckPatternDisplayProps> = ({ deckId }
           numChannels={numChannels}
           isPlaying={isPlaying}
           vuFeed={vuFeed}
+          channelMask={channelMask}
         />
       ) : fileName ? (
         <DJOscilloscope />

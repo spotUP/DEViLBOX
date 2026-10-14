@@ -166,6 +166,7 @@ export const MacroLanes: React.FC<MacroLanesProps> = React.memo(({
 
         const colX = channelOffsets[channelIndex];
         const channelWidth = channelWidths[channelIndex];
+        if (channelWidth <= 0) return null; // hidden channel
 
         return parameters.map((param) => {
           const { linePath, points } = generateMacroPaths(channel.rows, param, rowHeight);

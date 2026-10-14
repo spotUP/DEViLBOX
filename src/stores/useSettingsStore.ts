@@ -59,6 +59,7 @@ interface SettingsStore {
   trackerVisualBg: boolean;  // Enable WebGL visual background behind tracker pattern
   fitAllChannelsTracker: boolean; // Shrink the tracker pattern font so every channel fits the width (floor ~7 px); a manual zoom turns it off
   fitAllChannelsDeck: boolean;    // Same for the DJ deck pattern views
+  showUnusedChannels: boolean;    // Show channels that hold no data in any pattern (default: hidden, never deleted)
   trackerVisualMode: number; // Current visualizer mode index (0-5)
   channelColorBlend: number; // Channel color background tint opacity (0-100, default 8)
   vjPatternOverlay: boolean; // Show pattern data overlay on VJ view
@@ -102,6 +103,7 @@ interface SettingsStore {
   setTrackerVisualBg: (enabled: boolean) => void;
   setFitAllChannelsTracker: (enabled: boolean) => void;
   setFitAllChannelsDeck: (enabled: boolean) => void;
+  setShowUnusedChannels: (enabled: boolean) => void;
   setTrackerVisualMode: (mode: number) => void;
   setChannelColorBlend: (blend: number) => void;
   setVjPatternOverlay: (enabled: boolean) => void;
@@ -194,6 +196,7 @@ export const useSettingsStore = create<SettingsStore>()(
       trackerVisualBg: false,  // Default: off
       fitAllChannelsTracker: true,
       fitAllChannelsDeck: true,
+      showUnusedChannels: false,
       trackerVisualMode: 0,    // Default: spectrum bars
       channelColorBlend: 8,    // Default: 8% opacity for channel color tint
       vjPatternOverlay: true, // Default: on — pattern data visible in VJ view
@@ -350,6 +353,11 @@ export const useSettingsStore = create<SettingsStore>()(
       setFitAllChannelsDeck: (enabled) =>
         set((state) => {
           state.fitAllChannelsDeck = enabled;
+        }),
+
+      setShowUnusedChannels: (enabled) =>
+        set((state) => {
+          state.showUnusedChannels = enabled;
         }),
 
       setTrackerVisualBg: (trackerVisualBg) =>
@@ -528,6 +536,7 @@ export const useSettingsStore = create<SettingsStore>()(
         trackerVisualBg: state.trackerVisualBg,
         fitAllChannelsTracker: state.fitAllChannelsTracker,
         fitAllChannelsDeck: state.fitAllChannelsDeck,
+        showUnusedChannels: state.showUnusedChannels,
         trackerVisualMode: state.trackerVisualMode,
         channelColorBlend: state.channelColorBlend,
         vjPatternOverlay: state.vjPatternOverlay,

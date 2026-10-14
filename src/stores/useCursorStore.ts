@@ -21,6 +21,8 @@ import { computeNibbleAdvance } from '@/lib/tracker/nibbleAdvance';
 import type { useTrackerStore as _TrackerStoreType } from './useTrackerStore';
 import type { useEditorStore as _EditorStoreType } from './useEditorStore';
 import { stepRow } from '@/lib/tracker/cursorNavigation';
+import { stepChannel, visibleChannelMask } from '@/lib/tracker/visibleChannels';
+import { useSettingsStore } from './useSettingsStore';
 import {
   getTrackerStoreRef,
   getEditorStoreRef,
@@ -97,6 +99,8 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
     const behavior = getEditorState().activeBehavior;
 
     // Get total note columns for the current channel
+    // Channels with no data in any pattern are hidden (visibleChannels.ts): left/right skip them.
+    const shownChannels = () => visibleChannelMask(ts.patterns, { showUnused: useSettingsStore.getState().showUnusedChannels });
     const getNoteCols = (ch: number) => pattern.channels[ch]?.channelMeta?.noteCols ?? 1;
 
     // Clamp noteColumnIndex to valid range — prevents stale values after note column changes
@@ -144,7 +148,7 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
           digitIndex = nd > 0 ? nd - 1 : 0;
         } else {
           // Wrap to previous channel
-          channelIndex = channelIndex > 0 ? channelIndex - 1 : numChannels - 1;
+          channelIndex = stepChannel(shownChannels(), channelIndex, -1, numChannels);
           // Build cols for new channel's last column
           const prevNoteCols = getNoteCols(channelIndex);
           const prevCols: Array<{ type: CursorPosition['columnType']; nci: number }> = [];
@@ -204,7 +208,7 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
           noteColumnIndex = cols[ci + 1].nci;
           digitIndex = 0;
         } else {
-          channelIndex = channelIndex < numChannels - 1 ? channelIndex + 1 : 0;
+          channelIndex = stepChannel(shownChannels(), channelIndex, 1, numChannels);
           columnType = 'note';
           noteColumnIndex = 0;
           digitIndex = 0;
