@@ -1,6 +1,6 @@
 /**
  * KlysPositionEditor — Editable sequence/position table for klystrack.
- * Uses PatternEditorCanvas in format mode for visual consistency with the pattern editor.
+ * Klystrack data adapter over the shared SongOrderMatrix.
  *
  * Each channel has: pattern (3 decimal digits) + noteOffset (signed 2 hex digits).
  */
@@ -8,7 +8,7 @@
 import React, { useMemo, useCallback } from 'react';
 import type { KlysNativeData } from '@/types/tracker';
 import { useFormatStore } from '@stores';
-import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
+import { SongOrderMatrix } from '@/components/shared/SongOrderMatrix';
 import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
 
 export const KLYS_MATRIX_HEIGHT = 200;
@@ -118,36 +118,18 @@ export const KlysPositionEditor: React.FC<KlysPositionEditorProps> = ({
     }
   }, [setEntry]);
 
-  if (collapsed) {
-    return (
-      <div
-        style={{ height: KLYS_MATRIX_COLLAPSED_HEIGHT, display: 'flex', alignItems: 'center', cursor: 'pointer', paddingLeft: 8, fontSize: 11, color: '#888', background: 'var(--color-bg-secondary)' }}
-        onClick={onToggleCollapse}
-      >
-        SEQUENCE [click to expand]
-      </div>
-    );
-  }
-
   return (
-    <div style={{ width, height, position: 'relative' }}>
-      {onToggleCollapse && (
-        <div
-          style={{ position: 'absolute', top: 0, right: 8, zIndex: 1, cursor: 'pointer', fontSize: 11, color: '#888', lineHeight: '20px' }}
-          onClick={onToggleCollapse}
-        >
-          [collapse]
-        </div>
-      )}
-      <PatternEditorCanvas
-        formatColumns={formatColumns}
-        formatChannels={formatChannels}
-        formatCurrentRow={currentPosition}
-        formatIsPlaying={isPlaying}
-        formatRowsArePositions
-        onFormatCellChange={handleCellChange}
-        hideVUMeters={true}
-      />
-    </div>
+    <SongOrderMatrix
+      label="SEQUENCE"
+      width={width}
+      height={height}
+      formatColumns={formatColumns}
+      formatChannels={formatChannels}
+      currentRow={currentPosition}
+      isPlaying={isPlaying}
+      onCellChange={handleCellChange}
+      collapsed={collapsed}
+      onToggleCollapse={onToggleCollapse}
+    />
   );
 };

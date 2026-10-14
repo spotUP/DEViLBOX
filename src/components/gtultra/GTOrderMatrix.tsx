@@ -1,11 +1,11 @@
 /**
  * GTOrderMatrix — Orders editor panel above the pattern editor.
- * Uses PatternEditorCanvas in format mode for visual consistency with the pattern editor.
+ * GoatTracker data adapter over the shared SongOrderMatrix.
  */
 
 import React, { useMemo, useCallback } from 'react';
 import { useGTUltraStore } from '../../stores/useGTUltraStore';
-import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
+import { SongOrderMatrix } from '@/components/shared/SongOrderMatrix';
 import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
 
 export const GT_ORDER_MATRIX_HEIGHT = 200;
@@ -133,37 +133,19 @@ export const GTOrderMatrix: React.FC<GTOrderMatrixProps> = React.memo(({ width, 
     }
   }, [engine]);
 
-  if (collapsed) {
-    return (
-      <div
-        style={{ height: GT_ORDER_MATRIX_COLLAPSED_HEIGHT, display: 'flex', alignItems: 'center', cursor: 'pointer', paddingLeft: 8, fontSize: 11, color: '#888', background: 'var(--color-bg-secondary)' }}
-        onClick={onToggleCollapse}
-      >
-        ORDERS [click to expand]
-      </div>
-    );
-  }
-
   return (
-    <div style={{ width, height: height ?? '100%', position: 'relative' }}>
-      {onToggleCollapse && (
-        <div
-          style={{ position: 'absolute', top: 0, right: 8, zIndex: 1, cursor: 'pointer', fontSize: 11, color: '#888', lineHeight: '20px' }}
-          onClick={onToggleCollapse}
-        >
-          [collapse]
-        </div>
-      )}
-      <PatternEditorCanvas
-        formatColumns={formatColumns}
-        formatChannels={formatChannels}
-        formatCurrentRow={songPos}
-        formatIsPlaying={playing}
-        formatRowsArePositions
-        onFormatCellChange={handleCellChange}
-        hideVUMeters={true}
-        hideAutomationLanes={true}
-      />
-    </div>
+    <SongOrderMatrix
+      label="ORDERS"
+      width={width}
+      height={height}
+      formatColumns={formatColumns}
+      formatChannels={formatChannels}
+      currentRow={songPos}
+      isPlaying={playing}
+      onCellChange={handleCellChange}
+      collapsed={collapsed}
+      onToggleCollapse={onToggleCollapse}
+      hideAutomationLanes
+    />
   );
 });

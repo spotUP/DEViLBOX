@@ -52,8 +52,10 @@ interface SongOrderMatrixProps {
   label: string;
   /** Container width in pixels */
   width?: number;
-  /** Container height in pixels (expanded state) */
-  height: number;
+  /** Container height in pixels (expanded state); omitted, the matrix fills its parent */
+  height?: number;
+  /** Hide the automation lanes under the matrix (GoatTracker) */
+  hideAutomationLanes?: boolean;
   /** Column definitions for the matrix grid */
   formatColumns: ColumnDef[];
   /** Channel data: one FormatChannel per voice/channel */
@@ -92,6 +94,7 @@ export const SongOrderMatrix: React.FC<SongOrderMatrixProps> = ({
   label,
   width,
   height,
+  hideAutomationLanes = false,
   formatColumns,
   formatChannels,
   currentRow,
@@ -199,7 +202,7 @@ export const SongOrderMatrix: React.FC<SongOrderMatrixProps> = ({
       onKeyDown={enableBlockSelection ? handleKeyDown : undefined}
       style={{
         width: width ?? '100%',
-        height: `${height}px`,
+        height: height === undefined ? '100%' : `${height}px`,
         position: 'relative',
         overflow: 'hidden',
         outline: 'none',
@@ -213,6 +216,7 @@ export const SongOrderMatrix: React.FC<SongOrderMatrixProps> = ({
         formatRowsArePositions
         onFormatCellChange={onCellChange}
         hideVUMeters
+        hideAutomationLanes={hideAutomationLanes}
       />
       {onToggleCollapse && (
         <div

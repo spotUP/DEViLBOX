@@ -1,13 +1,13 @@
 /**
  * FurnaceOrderEditor — Order matrix for Furnace modules.
- * Uses PatternEditorCanvas in format mode for visual consistency with the pattern editor.
+ * Furnace data adapter over the shared SongOrderMatrix (one step per pattern while playing).
  *
  * Grid: rows = order positions, columns = channels, cells = pattern indices (hex 2-digit).
  */
 
 import React, { useMemo, useCallback } from 'react';
 import type { FurnaceNativeData } from '@/types/tracker';
-import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
+import { SongOrderMatrix } from '@/components/shared/SongOrderMatrix';
 import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
 import { useVisibleChannelMask } from '@/hooks/tracker/useVisibleChannelMask';
 import { isChannelVisible } from '@/lib/tracker/visibleChannels';
@@ -38,6 +38,8 @@ interface Props {
   height: number;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  /** The song is playing: the matrix rides `currentPosition`, one step per pattern. */
+  isPlaying?: boolean;
   nativeData: FurnaceNativeData;
   currentPosition: number;
   onPositionChange: (pos: number) => void;
@@ -45,7 +47,7 @@ interface Props {
 }
 
 export const FurnaceOrderEditor: React.FC<Props> = ({
-  width, height, collapsed, onToggleCollapse,
+  width, height, collapsed, onToggleCollapse, isPlaying = false,
   nativeData, currentPosition, onPositionChange: _onPositionChange, onOrderChange,
 }) => {
   const sub = nativeData.subsongs[nativeData.activeSubsong];
@@ -85,35 +87,18 @@ export const FurnaceOrderEditor: React.FC<Props> = ({
     onOrderChange(channelIdx, rowIdx, value & 0xFF);
   }, [onOrderChange]);
 
-  if (collapsed) {
-    return (
-      <div
-        style={{ height: FURNACE_ORDER_MATRIX_COLLAPSED_HEIGHT, display: 'flex', alignItems: 'center', cursor: 'pointer', paddingLeft: 8, fontSize: 11, color: '#888', background: 'var(--color-bg-secondary)' }}
-        onClick={onToggleCollapse}
-      >
-        ORDERS [click to expand]
-      </div>
-    );
-  }
-
   return (
-    <div style={{ width, height, position: 'relative' }}>
-      {onToggleCollapse && (
-        <div
-          style={{ position: 'absolute', top: 0, right: 8, zIndex: 1, cursor: 'pointer', fontSize: 11, color: '#888', lineHeight: '20px' }}
-          onClick={onToggleCollapse}
-        >
-          [collapse]
-        </div>
-      )}
-      <PatternEditorCanvas
-        formatColumns={formatColumns}
-        formatChannels={formatChannels}
-        formatCurrentRow={currentPosition}
-        formatIsPlaying={false}
-        onFormatCellChange={handleCellChange}
-        hideVUMeters={true}
-      />
-    </div>
+    <SongOrderMatrix
+      label="ORDERS"
+      width={width}
+      height={height}
+      formatColumns={formatColumns}
+      formatChannels={formatChannels}
+      currentRow={currentPosition}
+      isPlaying={isPlaying}
+      onCellChange={handleCellChange}
+      collapsed={collapsed}
+      onToggleCollapse={onToggleCollapse}
+    />
   );
 };
