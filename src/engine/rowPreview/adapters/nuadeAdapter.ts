@@ -36,7 +36,8 @@ export class NuadeRowAdapter implements RowRenderAdapter {
 
   restart(): void { this.driver.start(this.subsong); }
 
-  advanceSilent(frame: number): number {
+  advanceSilent(frame: number, _mask: number): number {
+    // nuade applies the mask where it renders a quantum (nw_render): nothing is rendered ahead of what is handed out.
     this.driver.seek(frame);
     return Math.round(this.driver.position);
   }
