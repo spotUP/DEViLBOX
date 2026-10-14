@@ -258,3 +258,11 @@ non-shrinking mixer, fixed 400 px column) instead of hiding them, and the same
   tooltips say "Deck 2".
 - The stacked waveform strip shows A and B only (`DJView.tsx:547-548`); Deck C with a
   track has no waveform.
+
+## Outcome (2026-10-14)
+
+Implemented per `thoughts/shared/plans/2026-10-14-dj-view-resolutions.md` (commits bdaf1d309 MCP fit
+instrument, 4185eb6f9 AnchoredPopover, b0cfd9082 layout source and all consumers, calibration commit
+in the plan ledger). The real-Chrome sweep passes 20 of 20 cells. Measured numbers differ from this
+research's budgets (Master + Cue 200 px, not 100; analysed track header 163 px; Camelot row 164 px):
+see the plan's Calibration section.
