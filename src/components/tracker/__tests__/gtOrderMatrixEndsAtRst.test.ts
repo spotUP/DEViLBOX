@@ -27,7 +27,9 @@ describe('GoatTracker order matrix', () => {
     expect(src).toMatch(/displayRows\[ch\]\[row\] \?\? ORDER_PAST_END/);
     expect(ORDER_PAST_END).toBeGreaterThan(0xff);
     // The matrix is a sub-editor: its canvas keeps its own column layout.
-    expect(src).toMatch(/hideVUMeters=\{true\}/);
+    const shared = readFileSync(resolve(__dirname, '../../shared/SongOrderMatrix.tsx'), 'utf8');
+    expect(src).toMatch(/<SongOrderMatrix/);
+    expect(shared).toMatch(/\bhideVUMeters\b/);
     const canvas = readFileSync(resolve(__dirname, '../PatternEditorCanvas.tsx'), 'utf8');
     expect(canvas).toMatch(/const layoutOut = hideVUMeters \? ownLayoutRef\.current : channelLayout;/);
     expect(canvas).not.toMatch(/\bchannelLayout\.(scrollLeft|offsets|widths|numChannels) = /);

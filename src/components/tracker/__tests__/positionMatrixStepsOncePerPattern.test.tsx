@@ -186,6 +186,9 @@ describe('position matrix steps once per pattern played, never per row', () => {
       view: async () => (await import('@components/hively/HivelyView')).HivelyView as React.FC },
     { path: 'public/data/songs/musicline-editor/drax.ml', type: 'ML', mode: 'musicline',
       view: async () => (await import('@/components/musicline/MusicLineView')).MusicLineView as React.FC },
+    // FURNACE-ORDER-MATRIX-SCROLL: the Furnace order matrix built its own canvas and scrolled per row.
+    { path: 'public/data/songs/furnace/misc/meaningful_connection_es5506.fur', type: 'FUR', mode: 'furnace',
+      view: async () => (await import('@components/furnace/FurnaceView')).FurnaceView as React.FC },
   ];
 
   for (const song of songs) {

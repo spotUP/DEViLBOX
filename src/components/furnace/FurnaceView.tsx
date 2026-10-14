@@ -117,6 +117,7 @@ export const FurnaceView: React.FC<{ width?: number; height?: number }> = () => 
           width={containerWidth}
           height={orderH}
           collapsed={orderCollapsed}
+          isPlaying={isPlaying}
           onToggleCollapse={() => setOrderCollapsed(c => !c)}
           nativeData={nativeData}
           currentPosition={activePosition}
