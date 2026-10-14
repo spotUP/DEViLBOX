@@ -1564,6 +1564,8 @@ export const useTrackerStore = create<TrackerStore>()(
               pan: 0,
               instrumentId: null,
               color: randomColor,
+              // Shown at once although empty: the pattern views hide unused imported channels (visibleChannels.ts).
+              channelMeta: { importedFromMOD: false, addedAfterImport: true },
             });
           }
         });

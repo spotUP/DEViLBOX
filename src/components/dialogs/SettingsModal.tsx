@@ -461,6 +461,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     </div>
                     <Toggle label="" value={s.fitAllChannelsDeck} onChange={s.setFitAllChannelsDeck} size="sm" />
                   </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <label className="text-ft2-text text-xs font-mono">Show unused channels:</label>
+                      <span className="text-[9px] text-ft2-textDim font-mono">Off: channels with no data in any pattern are hidden (never deleted). Moving the cursor right past the last channel shows the next one.</span>
+                    </div>
+                    <Toggle label="" value={s.showUnusedChannels} onChange={s.setShowUnusedChannels} size="sm" />
+                  </div>
                 </div>
               </section>
 

@@ -220,8 +220,8 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         const meter = meterStates.current[i];
         if (!meter) continue;
 
-        // Skip collapsed channels
-        if (widths[i] && widths[i] < 20) continue;
+        // Skip collapsed channels and hidden ones (width 0: no data in any pattern)
+        if (widths[i] !== undefined && widths[i] < 20) continue;
 
         // When playback stops, kill meters instantly (no lingering bounce); a note sounded
         // while stopped (row preview) still moves its meter. A direct-routed WASM engine can

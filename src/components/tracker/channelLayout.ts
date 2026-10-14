@@ -90,7 +90,7 @@ export function originShiftFor(strip: HTMLElement, layout: ChannelLayout): numbe
 
 /**
  * Share spare canvas width out across the channels so a few channels fill the
- * canvas. `widths` are the minimum widths and are never shrunk: with no spare
+ * canvas. `widths` are the minimum widths (0 = a hidden channel, kept 0) and are never shrunk: with no spare
  * width (many channels, a narrow canvas) they come back unchanged and the
  * canvas scrolls. Each channel grows in proportion to its own minimum width;
  * the pattern renderer and hit-testing centre the cell text inside the wider
@@ -108,7 +108,10 @@ export function stretchChannelWidths(
   if (availableWidth <= 0 || spare <= 0 || widths.length === 0 || content <= 0) return [...widths];
   const out = widths.map(w => w + Math.floor((spare * w) / content));
   const given = out.reduce((a, b) => a + b, 0) - content;
-  out[out.length - 1] += spare - given;
+  // The remainder goes to the last SHOWN channel: a hidden channel is width 0 and stays 0.
+  let last = out.length - 1;
+  while (last > 0 && out[last] === 0) last--;
+  out[last] += spare - given;
   return out;
 }
 

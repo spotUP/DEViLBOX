@@ -16,6 +16,8 @@ import { computeChannelFollowScroll, createChannelFollowGate } from '@/lib/track
 import { resolveCellColumn } from '@/lib/tracker/cellHitTest';
 import { resolveScrollRow, resolveFormatViewRow } from '@/lib/tracker/playbackNavigation';
 import { recordModeBorderClass } from '@/lib/tracker/patternEditorChrome';
+import { isChannelVisible } from '@/lib/tracker/visibleChannels';
+import { useVisibleChannelMask } from '@/hooks/tracker/useVisibleChannelMask';
 import { AutomationLanes } from './AutomationLanes';
 import { GlobalLaneCurves } from './GlobalLaneCurves';
 import { GlobalLaneHeader } from './GlobalLaneHeader';
@@ -400,6 +402,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // Channel Metrics: calculate numChannels, offsets, and widths once per pattern/theme change
   const fitChannels = useSettingsStore(s => s.fitAllChannelsTracker) && !mobileCanvas;
+  // Channels with no data in any pattern are width 0 (hidden, not deleted): one list for the grid, headers, scopes, meters and the fit scale.
+  const visibleMask = useVisibleChannelMask();
   const { numChannels, channelOffsets: rawChannelOffsets, channelWidths, totalChannelsWidth, fitScale } = useMemo(() => {
     // Global lane reserves GLOBAL_LANE_W between LNW (row number gutter) and
     // channel 0. When visible, every channel offset shifts right by that much.
@@ -446,7 +450,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const channel = pattern.channels[ch];
       const isCollapsed = channel?.collapsed;
 
-      if (isCollapsed) {
+      if (!isFormatMode && !isChannelVisible(visibleMask, ch)) {
+        minWidths.push(0);
+      } else if (isCollapsed) {
         minWidths.push(noteWidth + (mobileCanvas ? 64 : 40) + autoLaneExtra(ch));
       } else {
         const effectCols = channel?.channelMeta?.effectCols ?? 2;
@@ -481,7 +487,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       totalChannelsWidth: currentX - Math.floor(LNW * fitted.scale),
       fitScale: fitted.scale,
     };
-  }, [pattern, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts, globalLaneVisible, dimensions.width, fitChannels]);
+  }, [pattern, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts, globalLaneVisible, dimensions.width, fitChannels, visibleMask]);
 
   // Row-number gutter and global lane at the fitted scale (canvas px). Everything
   // the worker draws is scaled by fitScale, so these are what the DOM must match.
@@ -3375,6 +3381,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                     // Trigger levels are animation-driven via RAF; ChannelVUMeter is disabled
                     const trigger = { level: 0, triggered: false };
                     const channelWidth = channelWidths[idx];
+                    if (channelWidth <= 0) return null; // hidden: no data in any pattern
 
                     const isCollapsed = channel.collapsed;
                     const isActive = idx === activeChannelIndex;
