@@ -76,7 +76,6 @@ export async function switchSubsong(index: number): Promise<void> {
       // Furnace speed alternation: speed2 is subsong-specific.
       getTrackerReplayer().setSpeed2(sub.speed2 !== undefined && sub.speed2 !== sub.initialSpeed ? sub.speed2 : null);
       fmt.setFurnaceActiveSubsong(index);
-      notify.success(`Switched to: ${sub.name || `Subsong ${index + 1}`}`);
       return;
     }
     case 'uade': {
@@ -100,7 +99,6 @@ export async function switchSubsong(index: number): Promise<void> {
         tracker.setCurrentPattern(order[0]);
         transport.setSpeed(subs.speeds[index] ?? 6);
         if (wasPlaying) await transport.play();
-        notify.success(`Subsong ${index + 1}/${subs.count}`);
         return;
       }
       tracker.setPatternOrder([index]);
@@ -115,7 +113,6 @@ export async function switchSubsong(index: number): Promise<void> {
           engine.play();
         }
       } catch { /* not loaded yet: the next play picks it up */ }
-      notify.success(`Subsong ${index + 1}/${subs.count}`);
       return;
     }
     case 'sid': {
@@ -126,7 +123,6 @@ export async function switchSubsong(index: number): Promise<void> {
         if (engine) {
           engine.setSubsong(index);
           fmt.setSidMetadata({ ...meta, currentSubsong: index });
-          notify.success(`SID Subsong ${index + 1}/${meta.subsongs}`);
         }
       } catch {
         notify.error('Failed to switch SID subsong');
@@ -143,7 +139,6 @@ export async function switchSubsong(index: number): Promise<void> {
           engine.play();
         }
       } catch { /* engine not loaded yet */ }
-      notify.success(`Subsong ${index + 1}/${status.count}`);
       return;
     }
     case 'file': {
