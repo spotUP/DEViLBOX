@@ -587,9 +587,7 @@ export const DJAutoDJPanel: React.FC<DJAutoDJPanelProps> = ({ onClose }) => {
           {showDebug ? 'Hide Debug' : 'Debug'}
         </Button>
       </div>
-      <div className="mt-2">
-        <ThreeDeckShowcasePanel />
-      </div>
+      <ThreeDeckShowcasePanel />
       <Modal isOpen={showDebug} onClose={() => setShowDebug(false)} size="2xl">
         <ModalHeader title="Auto DJ Debug" onClose={() => setShowDebug(false)} />
         <div className="p-3 max-h-[calc(90vh-4rem)] overflow-y-auto" data-testid="autodj-debug-scroll">
