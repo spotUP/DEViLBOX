@@ -4,9 +4,9 @@ import { resolve } from 'path';
 import { isTomyTrackerFormat, parseTomyTrackerFile } from '../formats/TomyTrackerParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FILE_INCONVENIENT = resolve(REF, 'Tomy Tracker/Stargazer/inconvenient intro.sg');
-const FILE_IRREPRESSIBLE = resolve(REF, 'Tomy Tracker/Stargazer/irrepressible intro.sg');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE_INCONVENIENT = resolve(REF, 'tomy-tracker/inconvenient intro.sg');
+const FILE_IRREPRESSIBLE = resolve(REF, 'formats/irrepressible intro.sg');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

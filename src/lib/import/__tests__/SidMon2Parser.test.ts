@@ -4,9 +4,9 @@ import { resolve } from 'path';
 import { isSidMon2Format, parseSidMon2File } from '../formats/SidMon2Parser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FILE_BRUNOTIME = resolve(REF, 'SidMon 2/- unknown/bruno time.sid2');
-const FILE_CARCASS = resolve(REF, 'SidMon 2/- unknown/carcass-demonintro.sid2');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE_BRUNOTIME = resolve(REF, 'formats/bruno_time.sid2');
+const FILE_CARCASS = resolve(REF, 'sidmon-2/ice7-intro.sid2');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

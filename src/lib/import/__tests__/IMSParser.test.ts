@@ -17,9 +17,9 @@ import { resolve } from 'path';
 import { isIMSFormat, parseIMSFile } from '../formats/IMSParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music/Images Music System');
-const FILE1 = resolve(REF, '4-Mat/beast-busters.ims');
-const FILE2 = resolve(REF, '4-Mat/shadow_dancer-am1-3ch.ims');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'images-music-system/chip5.ims');
+const FILE2 = resolve(REF, 'formats/redoctober-sub-docking.ims');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

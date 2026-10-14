@@ -7,10 +7,9 @@ import { resolve } from 'path';
 import { isDaveLoweNewFormat, parseDaveLoweNewFile } from '../formats/DaveLoweNewParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const DLN_DIR = resolve(REF, 'Dave Lowe New/Dave Lowe');
-const FILE1 = resolve(DLN_DIR, 'balrog.dln');
-const FILE2 = resolve(DLN_DIR, 'beneathasteelsky 01.dln');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'dave-lowe-new/m-bison.dln');
+const FILE2 = resolve(REF, 'formats/m-bison.dln');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

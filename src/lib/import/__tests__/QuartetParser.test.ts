@@ -7,10 +7,9 @@ import { resolve } from 'path';
 import { isQuartetFormat, parseQuartetFile } from '../formats/QuartetParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const DIR = resolve(REF, 'Quartet PSG/- unknown');
-const FILE1 = resolve(DIR, 'horror zombies from crypt.sqt');
-const FILE2 = resolve(DIR, 'time machine.sqt');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'quartet-psg/horror zombies from crypt.sqt');
+const FILE2 = resolve(REF, 'formats/warlock_the_avenger.sqt');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

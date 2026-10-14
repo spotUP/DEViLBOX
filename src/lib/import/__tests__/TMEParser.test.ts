@@ -7,10 +7,9 @@ import { resolve } from 'path';
 import { isTMEFormat, parseTMEFile } from '../formats/TMEParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const DIR = resolve(REF, 'The Musical Enlightenment/- unknown');
-const FILE1 = resolve(DIR, 'demo song.tme');
-const FILE2 = resolve(DIR, 'hawkeye.tme');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'the-musical-enlightenment/64 conversion.tme');
+const FILE2 = resolve(REF, 'formats/64_conversion.tme');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

@@ -13,9 +13,9 @@ import {
 } from "../formats/MusicAssemblerParser";
 import { analyzeFormat, formatReportToString } from "./formatAnalysis";
 
-const REF = resolve(import.meta.dirname, "../../../../Reference Music");
-const FILE1 = resolve(REF, "Music Assembler/- unknown/baseheads.ma");
-const FILE2 = resolve(REF, "Music Assembler/- unknown/ik+.ma");
+const REF = resolve(import.meta.dirname, "../../../../public/data/songs");
+const FILE1 = resolve(REF, "formats/baseheads.ma");
+const FILE2 = resolve(REF, "music-assembler/thanatos.ma");
 
 function loadBytes(p: string): Uint8Array {
   return new Uint8Array(readFileSync(p));

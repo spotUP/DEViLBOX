@@ -5,11 +5,11 @@ import { isRTMFormat, parseRTMFile } from '../formats/RTMParser';
 
 const ALFAOMEG = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/Real Tracker/Dr. Bully/alfaomeg.rtm'
+  '../../../../public/data/songs/real-tracker/odyssey.rtm'
 );
 const BRAINSTORM = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/Real Tracker/Dr. Bully/brainstorm.rtm'
+  '../../../../public/data/songs/formats/odyssey.rtm'
 );
 
 function loadFile(path: string): ArrayBuffer {

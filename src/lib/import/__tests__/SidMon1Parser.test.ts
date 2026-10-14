@@ -4,9 +4,9 @@ import { resolve } from 'path';
 import { isSidMon1Format, parseSidMon1File } from '../formats/SidMon1Parser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FILE_ANARCHY = resolve(REF, 'SidMon 1/- unknown/anarchy.sid');
-const FILE_BRAINWAVE = resolve(REF, 'SidMon 1/- unknown/brainwave.sid');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE_ANARCHY = resolve(REF, 'sidmon-1/myfunnymazea.sid');
+const FILE_BRAINWAVE = resolve(REF, 'formats/anarchy.sid1');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

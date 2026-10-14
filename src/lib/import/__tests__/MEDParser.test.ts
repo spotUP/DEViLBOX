@@ -10,9 +10,9 @@ import { resolve } from 'path';
 import { parseMEDFile } from '../formats/MEDParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FILE1 = resolve(REF, 'OctaMED MMD0/Barry Leitch/universal monsters - dracula.mmd0');
-const FILE2 = resolve(REF, 'OctaMED MMD1/Anon/funky nightmare.mmd1');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'formats/universal monsters - dracula.mmd0');
+const FILE2 = resolve(REF, 'octamed-mmd1/funky nightmare.mmd1');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

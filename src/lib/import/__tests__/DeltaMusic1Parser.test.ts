@@ -10,11 +10,10 @@ import { resolve } from 'path';
 import { isDeltaMusic1Format, parseDeltaMusic1File } from '../formats/DeltaMusic1Parser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const DM_DIR = resolve(REF, 'Delta Music/Shogun');
-const FILE1 = resolve(DM_DIR, 'triplex1.dm');
-const FILE2 = resolve(DM_DIR, 'c64style.dm');
-const FILE3 = resolve(DM_DIR, 'sweet dreams.dm');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'delta-music/triplex1.dm');
+const FILE2 = resolve(REF, 'formats/crusaders1.dm');
+const FILE3 = resolve(REF, 'delta-music/triplex1.dm');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

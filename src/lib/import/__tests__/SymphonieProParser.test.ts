@@ -11,9 +11,9 @@ import { resolve } from 'path';
 import { isSymphonieProFormat, parseSymphonieProFile } from '../formats/SymphonieProParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FILE1 = resolve(REF, 'Symphonie/- unknown/acoustic modeling demo.symmod');
-const FILE2 = resolve(REF, 'Symphonie/A. Seidel/2nd one on groove.symmod');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'symphonie/pas 2 jade.symmod');
+const FILE2 = resolve(REF, 'symphonie/pas 2 jade.symmod');
 
 function loadBytes(path: string): Uint8Array {
   return new Uint8Array(readFileSync(path));

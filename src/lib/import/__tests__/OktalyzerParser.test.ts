@@ -9,8 +9,8 @@ import { resolve } from 'path';
 import { parseOktalyzerFile } from '../formats/OktalyzerParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF_MUSIC  = resolve(import.meta.dirname, '../../../../Reference Music');
-const OKTA_FILE  = resolve(REF_MUSIC, 'Oktalyzer/Absys/les granges brulees.okta');
+const REF_MUSIC  = resolve(import.meta.dirname, '../../../../public/data/songs');
+const OKTA_FILE  = resolve(REF_MUSIC, 'oktalyzer/les granges brulees.okta');
 
 function loadAB(path: string): ArrayBuffer {
   const buf = readFileSync(path);

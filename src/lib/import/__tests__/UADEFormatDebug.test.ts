@@ -61,7 +61,7 @@ const ENV_FILE    = process.env.UADE_FILE?.toLowerCase();
 const ENV_MAX     = parseInt(process.env.UADE_MAX ?? '1', 10);
 const VERBOSE     = process.env.UADE_VERBOSE === '1';
 
-const REFERENCE_DIR = join(process.cwd(), 'Reference Music');
+const REFERENCE_DIR = join(process.cwd(), 'public/data/songs');
 
 // ── Debug helpers ─────────────────────────────────────────────────────────────
 
@@ -594,13 +594,13 @@ describe('UADE Format Debug', () => {
   const allFiles = walkDir(REFERENCE_DIR);
 
   if (allFiles.length === 0) {
-    it('no reference files found — put files in Reference Music/', () => {
-      console.log(`Reference Music directory not found or empty: ${REFERENCE_DIR}`);
-      console.log('Download sample files from ftp.modland.com and place them under Reference Music/<FormatName>/');
+    it('no song files found under public/data/songs/', () => {
+      console.log(`Song directory not found or empty: ${REFERENCE_DIR}`);
+      console.log('Tracked songs live in public/data/songs/<format>/');
       console.log('');
       console.log('Expected subdirectories:');
       FORMAT_GROUPS.forEach(g => {
-        console.log(`  Reference Music/${g.name}/  [${g.exts.join(', ')}]`);
+        console.log(`  ${g.name}  [${g.exts.join(', ')}]`);
       });
     });
     return;

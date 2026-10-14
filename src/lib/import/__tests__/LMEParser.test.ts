@@ -7,10 +7,9 @@ import { resolve } from 'path';
 import { isLMEFormat, parseLMEFile } from '../formats/LMEParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const DIR = resolve(REF, 'Leggless Music Editor/Leggless');
-const FILE1 = resolve(DIR, 'ninjaspirit.lme');
-const FILE2 = resolve(DIR, 'ninjaspirit demo.lme');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'leggless-music-editor/the punisher gameover.lme');
+const FILE2 = resolve(REF, 'leggless-music-editor/the punisher gameover.lme');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

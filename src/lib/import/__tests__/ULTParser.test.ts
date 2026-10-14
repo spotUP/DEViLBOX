@@ -5,7 +5,7 @@ import { isULTFormat, parseULTFile } from '../formats/ULTParser';
 
 const ULT_FILE = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/Ultra Tracker/Beavis/coop-DiPo/seasons.ult'
+  '../../../../public/data/songs/formats/seasons.ult'
 );
 
 function loadFile(path: string): ArrayBuffer {

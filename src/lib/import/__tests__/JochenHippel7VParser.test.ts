@@ -7,10 +7,9 @@ import { resolve } from 'path';
 import { isJochenHippel7VFormat, parseJochenHippel7VFile } from '../formats/JochenHippel7VParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const HIP7V_DIR = resolve(REF, 'Hippel 7V/Jochen Hippel');
-const FILE1 = resolve(HIP7V_DIR, 'amberstar-extro.hip7');
-const FILE2 = resolve(HIP7V_DIR, 'amberstar-intro.hip7');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'hippel-7v/lethalxcess-intro.hip7');
+const FILE2 = resolve(REF, 'formats/ghostbattle_gameover.hip7');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

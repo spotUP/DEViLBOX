@@ -7,10 +7,9 @@ import { resolve } from 'path';
 import { isImagesMusicSystemFormat, parseImagesMusicSystemFile } from '../formats/ImagesMusicSystemParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const IMS_DIR = resolve(REF, 'Images Music System/4-Mat');
-const FILE1 = resolve(IMS_DIR, 'beast-busters.ims');
-const FILE2 = resolve(IMS_DIR, 'shadow_dancer-am1-3ch.ims');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'images-music-system/chip5.ims');
+const FILE2 = resolve(REF, 'formats/redoctober-sub-docking.ims');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

@@ -10,11 +10,10 @@ import { resolve } from 'path';
 import { isDeltaMusic2Format, parseDeltaMusic2File } from '../formats/DeltaMusic2Parser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const DM2_DIR = resolve(REF, 'Delta Music 2/Top');
-const FILE1 = resolve(DM2_DIR, 'asperity megademo 3.dm2');
-const FILE2 = resolve(DM2_DIR, 'asperity megademo menu.dm2');
-const FILE3 = resolve(DM2_DIR, 'asperity megademo 4.dm2');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'delta-music-2/asperity megademo 3.dm2');
+const FILE2 = resolve(REF, 'formats/anthrox_intro.dm2');
+const FILE3 = resolve(REF, 'delta-music-2/asperity megademo 3.dm2');
 
 function loadU8(p: string): Uint8Array {
   return new Uint8Array(readFileSync(p));

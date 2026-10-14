@@ -12,10 +12,10 @@ import { resolve } from 'path';
 import { isDigiBoosterProFormat, parseDigiBoosterProFile } from '../formats/DigiBoosterProParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 
-const FILE1 = resolve(REF, 'Digibooster Pro/AceMan/invisibility.dbm');
-const FILE2 = resolve(REF, 'Digibooster Pro/AceMan/tricky reality.dbm');
+const FILE1 = resolve(REF, 'digibooster-pro/invisibility.dbm');
+const FILE2 = resolve(REF, 'formats/invisibility.dbm');
 
 function loadBytes(path: string): Uint8Array {
   return new Uint8Array(readFileSync(path));

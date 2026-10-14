@@ -5,11 +5,11 @@ import { is669Format, parse669File } from '../formats/Format669Parser';
 
 const FONETAG = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/Composer 669/Brother Mike/fonetag.669'
+  '../../../../public/data/songs/formats/fonetag.669'
 );
 const SPEED_FIGHTER = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/Composer 669/Brother Mike/speed fighter.669'
+  '../../../../public/data/songs/composer-669/speed fighter.669'
 );
 
 function loadFile(path: string): ArrayBuffer {

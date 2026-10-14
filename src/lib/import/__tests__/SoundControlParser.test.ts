@@ -4,10 +4,10 @@ import { resolve } from 'path';
 import { isSoundControlFormat, parseSoundControlFile } from '../formats/SoundControlParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 
-const FILE1 = resolve(REF, 'SoundControl/Allan Pedersen/north sea inferno ongame1.sc');
-const FILE2 = resolve(REF, 'SoundControl/Holger Gehrmann/biing-bfanf.sc');
+const FILE1 = resolve(REF, 'soundcontrol/north sea inferno ongame1.sc');
+const FILE2 = resolve(REF, 'formats/north_sea_inferno.sc');
 
 function loadBytes(p: string): Uint8Array {
   return new Uint8Array(readFileSync(p));

@@ -7,10 +7,9 @@ import { resolve } from 'path';
 import { isFredGrayFormat, parseFredGrayFile } from '../formats/FredGrayParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FG_DIR = resolve(REF, 'Fred Gray/Fred Gray');
-const FILE1 = resolve(FG_DIR, 'blacklamp.gray');
-const FILE2 = resolve(FG_DIR, 'eco.gray');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'fred-gray/eco.gray');
+const FILE2 = resolve(REF, 'formats/eco.gray');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

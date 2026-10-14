@@ -7,10 +7,9 @@ import { resolve } from 'path';
 import { isComposer667Format, parseComposer667File } from '../formats/Composer667Parser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const DIR = resolve(REF, 'Composer 669/Brother Mike');
-const FILE1 = resolve(DIR, 'fonetag.669');
-const FILE2 = resolve(DIR, 'speed fighter.669');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'formats/fonetag.669');
+const FILE2 = resolve(REF, 'composer-669/speed fighter.669');
 
 function loadU8(p: string): Uint8Array {
   return new Uint8Array(readFileSync(p));

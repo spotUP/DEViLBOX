@@ -7,11 +7,9 @@ import { resolve } from 'path';
 import { isPT36Format, parsePT36File } from '../formats/PT36Parser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const DIR1 = resolve(REF, 'Pretracker/AceMan');
-const DIR2 = resolve(REF, 'Pretracker/Buzzer');
-const FILE1 = resolve(DIR1, 'a dream of fish.prt');
-const FILE2 = resolve(DIR2, 'leavings.prt');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'pretracker/the little things.prt');
+const FILE2 = resolve(REF, 'pretracker/the little things.prt');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

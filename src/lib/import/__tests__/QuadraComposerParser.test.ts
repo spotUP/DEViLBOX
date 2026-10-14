@@ -11,9 +11,9 @@ import { resolve } from 'path';
 import { isQuadraComposerFormat, parseQuadraComposerFile } from '../formats/QuadraComposerParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FILE1 = resolve(REF, 'Quadra Composer/- unknown/synth corn.emod');
-const FILE2 = resolve(REF, 'Quadra Composer/Blonde Lion/whittakerrhapsody.emod');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'formats/synth_corn.emod');
+const FILE2 = resolve(REF, 'quadra-composer/poison.emod');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

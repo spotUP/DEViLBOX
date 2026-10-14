@@ -9,9 +9,9 @@ import { resolve } from 'path';
 import { isPumaTrackerFormat, parsePumaTrackerFile } from '../formats/PumaTrackerParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF_MUSIC   = resolve(import.meta.dirname, '../../../../Reference Music');
-const PUMA_FILE_1 = resolve(REF_MUSIC, 'Pumatracker/- unknown/muspe1.puma');
-const PUMA_FILE_2 = resolve(REF_MUSIC, 'Pumatracker/Cyfrak/cyf-3-final-2.puma');
+const REF_MUSIC   = resolve(import.meta.dirname, '../../../../public/data/songs');
+const PUMA_FILE_1 = resolve(REF_MUSIC, 'pumatracker/liquid kids - lv1a.puma');
+const PUMA_FILE_2 = resolve(REF_MUSIC, 'pumatracker/liquid kids - lv1a.puma');
 
 function loadAB(path: string): ArrayBuffer {
   const buf = readFileSync(path);

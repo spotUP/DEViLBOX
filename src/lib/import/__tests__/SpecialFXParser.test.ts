@@ -4,10 +4,10 @@ import { resolve } from 'path';
 import { isSpecialFXFormat, parseSpecialFXFile } from '../formats/SpecialFXParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 
-const FILE1 = resolve(REF, 'Special FX/Jonathan Dunn/battlecommand ingame.jd');
-const FILE2 = resolve(REF, 'Special FX/Jonathan Dunn/battlecommand title.jd');
+const FILE1 = resolve(REF, 'special-fx/striker ingame.jd');
+const FILE2 = resolve(REF, 'formats/wildwheels_ingame.jd');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

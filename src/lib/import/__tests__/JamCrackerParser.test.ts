@@ -9,9 +9,9 @@ import { resolve } from 'path';
 import { isJamCrackerFormat, parseJamCrackerFile } from '../formats/JamCrackerParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF_MUSIC  = resolve(import.meta.dirname, '../../../../Reference Music');
-const JAM_FILE_1 = resolve(REF_MUSIC, 'JamCracker/- unknown/genesis (mountains).jam');
-const JAM_FILE_2 = resolve(REF_MUSIC, 'JamCracker/AM-FM/analogue vibes.jam');
+const REF_MUSIC  = resolve(import.meta.dirname, '../../../../public/data/songs');
+const JAM_FILE_1 = resolve(REF_MUSIC, 'jamcracker/freehand-spreadtro.jam');
+const JAM_FILE_2 = resolve(REF_MUSIC, 'formats/analogue_vibes.jam');
 
 function loadAB(path: string): ArrayBuffer {
   const buf = readFileSync(path);

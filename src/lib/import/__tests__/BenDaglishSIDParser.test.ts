@@ -11,10 +11,10 @@ import { resolve } from 'path';
 import { isBenDaglishSIDFormat, parseBenDaglishSIDFile } from '../formats/BenDaglishSIDParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FILE1 = resolve(REF, 'Ben Daglish SID/Ben Daglish/chubbygristle.bds');
-const FILE2 = resolve(REF, 'Ben Daglish SID/Ben Daglish/flintstones.bds');
-const FILE3 = resolve(REF, 'Ben Daglish SID/Ben Daglish/terramex.bds');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'ben-daglish-sid/terramex.bds');
+const FILE2 = resolve(REF, 'formats/terramex.bds');
+const FILE3 = resolve(REF, 'ben-daglish-sid/terramex.bds');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

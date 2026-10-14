@@ -7,10 +7,9 @@ import { resolve } from 'path';
 import { isAshleyHoggFormat, parseAshleyHoggFile } from '../formats/AshleyHoggParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const AH_DIR = resolve(REF, 'Ashley Hogg');
-const FILE1 = resolve(AH_DIR, 'ash.cj in the usa');
-const FILE2 = resolve(AH_DIR, 'ash.cosmic spacehead');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'ashley-hogg/ash.nobby the aardvark');
+const FILE2 = resolve(REF, 'ashley-hogg/ash.nobby the aardvark');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

@@ -11,10 +11,10 @@ import { resolve } from 'path';
 import { isArtOfNoiseFormat, parseArtOfNoiseFile } from '../formats/ArtOfNoiseParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FILE1 = resolve(REF, 'Art Of Noise/Twice/64ergroove.aon');
-const FILE2 = resolve(REF, 'Art Of Noise/Twice/a new decade.aon');
-const FILE3 = resolve(REF, 'Art Of Noise/Twice/cloud 9.aon');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'art-of-noise/inside.blipp.aon');
+const FILE2 = resolve(REF, 'formats/action_section.aon');
+const FILE3 = resolve(REF, 'art-of-noise/inside.blipp.aon');
 
 function loadBytes(path: string): Uint8Array {
   return new Uint8Array(readFileSync(path));

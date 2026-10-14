@@ -7,11 +7,9 @@ import { resolve } from 'path';
 import { isSTKFormat, parseSTKFile } from '../formats/STKParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const DIR1 = resolve(REF, 'Stonetracker/Bosco');
-const DIR2 = resolve(REF, 'Stonetracker/Federal Robotics');
-const FILE1 = resolve(DIR1, 'teinteremix22.sps');
-const FILE2 = resolve(DIR2, 'antarctica.sps');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'stonetracker/hypnosphere.sps');
+const FILE2 = resolve(REF, 'stonetracker/hypnosphere.sps');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

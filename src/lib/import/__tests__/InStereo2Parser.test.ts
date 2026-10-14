@@ -9,11 +9,11 @@ import { resolve } from 'path';
 import { isInStereo2Format, parseInStereo2File } from '../formats/InStereo2Parser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF_MUSIC  = resolve(import.meta.dirname, '../../../../Reference Music');
-const IS2_FILE_1 = resolve(REF_MUSIC, 'InStereo! 2.0/- unknown/firefox ii.is20');
-const IS2_FILE_2 = resolve(REF_MUSIC, 'InStereo! 2.0/- unknown/space blipper.is20');
+const REF_MUSIC  = resolve(import.meta.dirname, '../../../../public/data/songs');
+const IS2_FILE_1 = resolve(REF_MUSIC, 'instereo!-2.0/spaceflight.is20');
+const IS2_FILE_2 = resolve(REF_MUSIC, 'formats/stereo_feeling.is20');
 // IS1 files must NOT be detected as IS2
-const IS1_FILE   = resolve(REF_MUSIC, 'InStereo!/- unknown/cherry moon.is');
+const IS1_FILE   = resolve(REF_MUSIC, 'instereo!/fantasi8.is');
 
 function loadBytes(path: string): Uint8Array {
   const buf = readFileSync(path);

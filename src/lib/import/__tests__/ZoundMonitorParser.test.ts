@@ -4,10 +4,10 @@ import { resolve } from 'path';
 import { isZoundMonitorFormat, parseZoundMonitorFile } from '../formats/ZoundMonitorParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FILE_HITTHEROAD = resolve(REF, 'Zoundmonitor/AJ/hittheroad.sng');
-const FILE_SONJA = resolve(REF, 'Zoundmonitor/AJ/sonjavanveen.sng');
-const FILE_UNIVERSE = resolve(REF, 'Zoundmonitor/Sffen/universe.sng');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE_HITTHEROAD = resolve(REF, 'zoundmonitor/sonjavanveen.sng');
+const FILE_SONJA = resolve(REF, 'zoundmonitor/sonjavanveen.sng');
+const FILE_UNIVERSE = resolve(REF, 'zoundmonitor/sonjavanveen.sng');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

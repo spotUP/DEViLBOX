@@ -10,11 +10,10 @@ import { resolve } from 'path';
 import { isFaceTheMusicFormat, parseFaceTheMusicFile } from '../formats/FaceTheMusicParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FTM_DIR = resolve(REF, 'Face The Music/Andre Eickler');
-const FILE1 = resolve(FTM_DIR, 'rock.ftm');
-const FILE2 = resolve(FTM_DIR, 'stomper.ftm');
-const FILE3 = resolve(FTM_DIR, 'bigfunk.ftm');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'face-the-music/rock.ftm');
+const FILE2 = resolve(REF, 'formats/staticoscillations.ftm');
+const FILE3 = resolve(REF, 'face-the-music/rock.ftm');
 
 function loadU8(p: string): Uint8Array {
   return new Uint8Array(readFileSync(p));

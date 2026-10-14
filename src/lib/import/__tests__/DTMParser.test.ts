@@ -5,11 +5,11 @@ import { isDTMFormat, parseDTMFile } from '../formats/DTMParser';
 
 const CALL_ME = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/FredMon/Digital Tracker DTM/Adamsky/call me.dtm'
+  '../../../../public/data/songs/digital-tracker-dtm/sonic subspace.dtm'
 );
 const REAL_DREAMS = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/FredMon/Digital Tracker DTM/Adamsky/real dreams.dtm'
+  '../../../../public/data/songs/digital-tracker-dtm/sonic subspace.dtm'
 );
 
 function loadFile(path: string): ArrayBuffer {

@@ -5,11 +5,11 @@ import { isMTMFormat, parseMTMFile } from '../formats/MTMParser';
 
 const COLOR_OF_RAVE = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/Multi Tracker/Alternate Prism/color of rave.mtm'
+  '../../../../public/data/songs/multi-tracker/anonymous in 4ce.mtm'
 );
 const DREAMER_DREAM = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/Multi Tracker/Alternate Prism/dreamer dream.mtm'
+  '../../../../public/data/songs/formats/anonymous in 4ce.mtm'
 );
 
 function loadFile(path: string): ArrayBuffer {

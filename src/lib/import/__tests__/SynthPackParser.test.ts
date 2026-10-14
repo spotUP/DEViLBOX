@@ -4,10 +4,10 @@ import { resolve } from 'path';
 import { isSynthPackFormat, parseSynthPackFile } from '../formats/SynthPackParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FILE_ACT01 = resolve(REF, 'Synth Pack/Karsten Obarski/Centerbase/centerbase act01.osp');
-const FILE_ACT02 = resolve(REF, 'Synth Pack/Karsten Obarski/Centerbase/centerbase act02.osp');
-const FILE_DYTER = resolve(REF, 'Synth Pack/Karsten Obarski/Dyter-07/dyter07 hiscore.osp');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE_ACT01 = resolve(REF, 'synth-pack/centerbase soft.osp');
+const FILE_ACT02 = resolve(REF, 'formats/centerbase_soft.osp');
+const FILE_DYTER = resolve(REF, 'synth-pack/centerbase soft.osp');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

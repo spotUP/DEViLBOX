@@ -14,7 +14,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { isUADEFormat, tryExtractInstrumentNames } from '../formats/UADEParser';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 
 describe('isUADEFormat', () => {
   it('detects .sun extension (SunTronic)', () => {
@@ -62,7 +62,7 @@ function loadAB(path: string): ArrayBuffer {
 }
 
 describe('tryExtractInstrumentNames — Oktalyzer (.okta)', () => {
-  const OKTA_FILE = resolve(REF, 'Oktalyzer/Absys/les granges brulees.okta');
+  const OKTA_FILE = resolve(REF, 'oktalyzer/les granges brulees.okta');
 
   it('extracts at least one non-empty sample name', () => {
     const names = tryExtractInstrumentNames(loadAB(OKTA_FILE), 'okta');
@@ -78,7 +78,7 @@ describe('tryExtractInstrumentNames — Oktalyzer (.okta)', () => {
 
 describe('tryExtractInstrumentNames — null guards', () => {
   it('returns null for MaxTrax (.mxtx) — synthesis format', () => {
-    const buf = loadAB(resolve(REF, 'MaxTrax/Steve Hales/antmusic.mxtx'));
+    const buf = loadAB(resolve(REF, 'maxtrax/antmusic.mxtx'));
     expect(tryExtractInstrumentNames(buf, 'mxtx')).toBeNull();
   });
 

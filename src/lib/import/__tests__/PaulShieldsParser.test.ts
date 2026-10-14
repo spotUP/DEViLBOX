@@ -13,9 +13,9 @@ import {
 } from "../formats/PaulShieldsParser";
 import { analyzeFormat, formatReportToString } from "./formatAnalysis";
 
-const REF = resolve(import.meta.dirname, "../../../../Reference Music");
-const FILE1 = resolve(REF, "Paul Shields/Paul Shields/airball-gameover.ps");
-const FILE2 = resolve(REF, "Paul Shields/Paul Shields/airball-ingame.ps");
+const REF = resolve(import.meta.dirname, "../../../../public/data/songs");
+const FILE1 = resolve(REF, "paul-shields/jug-hiscore.ps");
+const FILE2 = resolve(REF, "formats/jug-hiscore.ps");
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

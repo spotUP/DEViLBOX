@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import { extractInstrumentsFromHvl } from '../formats/HivelyParser';
 
-const HVL_DIR = resolve(import.meta.dirname, '../../../../Reference Music/HivelyTracker');
+const HVL_DIR = resolve(import.meta.dirname, '../../../../public/data/songs/hivelytracker');
 
 function firstHvlFile(): string {
   const entries = readdirSync(HVL_DIR, { withFileTypes: true });

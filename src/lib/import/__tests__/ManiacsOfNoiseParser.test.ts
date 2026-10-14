@@ -7,10 +7,9 @@ import { resolve } from 'path';
 import { isManiacsOfNoiseFormat, parseManiacsOfNoiseFile } from '../formats/ManiacsOfNoiseParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const MON_DIR = resolve(REF, 'Maniacs Of Noise/Jeroen Tel');
-const FILE1 = resolve(MON_DIR, 'conspiracy - cracktro.mon');
-const FILE2 = resolve(MON_DIR, 'gyroscope.mon');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'maniacs-of-noise/unreal flying.mon');
+const FILE2 = resolve(REF, 'formats/gyroscope.mon');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

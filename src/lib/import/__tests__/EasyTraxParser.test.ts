@@ -7,10 +7,9 @@ import { resolve } from 'path';
 import { isEasyTraxFormat, parseEasyTraxFile } from '../formats/EasyTraxParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const DIR = resolve(REF, 'EarAche/- unknown');
-const FILE1 = resolve(DIR, 'bladerunner.ea');
-const FILE2 = resolve(DIR, 'skydance.ea');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'earache/bladerunner.ea');
+const FILE2 = resolve(REF, 'formats/skythebest.ea');
 
 function loadU8(p: string): Uint8Array {
   return new Uint8Array(readFileSync(p));

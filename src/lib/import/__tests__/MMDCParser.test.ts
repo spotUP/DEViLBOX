@@ -9,8 +9,8 @@ import { resolve } from 'path';
 import { isMMDCFormat, parseMMDCFile } from '../formats/MMDCParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF_MUSIC  = resolve(import.meta.dirname, '../../../../Reference Music');
-const MMDC_FILE  = resolve(REF_MUSIC, 'OctaMED MMDC/Richard Joseph/knightmare - title.mmdc');
+const REF_MUSIC  = resolve(import.meta.dirname, '../../../../public/data/songs');
+const MMDC_FILE  = resolve(REF_MUSIC, 'octamed-mmdc/knightmare - ingame 3.mmdc');
 
 function loadAB(path: string): ArrayBuffer {
   const buf = readFileSync(path);
