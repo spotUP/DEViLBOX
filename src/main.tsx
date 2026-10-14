@@ -1,5 +1,7 @@
 // Polyfills for older browsers (must be first import)
 import './utils/polyfills'
+// Records every node connected to a destination before Tone makes its context (get_final_output_level).
+import './engine/audio/destinationFeeders'
 import { startConsoleCapture } from './bridge/consoleCapture'
 startConsoleCapture();
 
