@@ -24,6 +24,7 @@ import { RH_EFFECT_GLYPH } from '@/lib/import/formats/robHubbardEffectGlyphs';
 import { FP_EFFECT_GLYPH } from '@/lib/import/formats/fpEffectGlyphs';
 import { MA_EFFECT_GLYPH } from '@/lib/import/formats/maEffectGlyphs';
 import { computeCaretRect } from '@/lib/tracker/caretGeometry';
+import { effectCellWidth, emptyEffectText, furnaceEffectText } from '@/lib/tracker/effectNotation';
 import { anySoloActive, isChannelDimmed } from '@/lib/tracker/channelDim';
 import { noteValueToPitch, pitchName } from '@/lib/tracker/noteValue';
 import type {
@@ -623,9 +624,10 @@ export class TrackerGLRenderer {
       } else {
         // FIXED-COLUMN CURSOR
         const cursorEffectCols = chData?.effectCols ?? 2;
+        const cursorNotation = chData?.effectNotation;
         const cursorNoteCols = chData?.noteCols ?? 1;
         const CURSOR_NOTE_COL_GROUP_W = noteWidth + 4 + CHAR_WIDTH * 2 + 4 + CHAR_WIDTH * 2 + 4;
-        const cursorContentWidth = CURSOR_NOTE_COL_GROUP_W * cursorNoteCols + cursorEffectCols * (CHAR_WIDTH * 3 + 4)
+        const cursorContentWidth = CURSOR_NOTE_COL_GROUP_W * cursorNoteCols + cursorEffectCols * effectCellWidth(CHAR_WIDTH, cursorNotation)
           + (showAcid ? CHAR_WIDTH * 2 + 8 : 0) + (showProb ? CHAR_WIDTH * 2 + 4 : 0);
         cursorX = colX + Math.floor((chW - cursorContentWidth) / 2);
 
@@ -639,6 +641,7 @@ export class TrackerGLRenderer {
           charWidth: CHAR_WIDTH,
           noteCols: cursorNoteCols,
           effectCols: cursorEffectCols,
+          effectNotation: cursorNotation,
           hasAcid: hasAcidC,
         });
         caretOffX = rect.offX;
@@ -748,6 +751,8 @@ export class TrackerGLRenderer {
 
         const isCollapsed = chData.collapsed;
         const effectCols = chData.effectCols ?? 2;
+        const effectNotation = chData.effectNotation;
+        const effCellW = effectCellWidth(CHAR_WIDTH, effectNotation);
         const gy = y + (rowH - atlas.glyphLogicalHeight) / 2;
 
         if (isCollapsed) {
@@ -801,7 +806,7 @@ export class TrackerGLRenderer {
           // FIXED-COLUMN PATH (note/inst/vol/eff) — supports multi-note columns
           const totalNoteCols = chData.noteCols ?? 1;
           const NOTE_COL_GROUP_W = noteWidth + 4 + CHAR_WIDTH * 2 + 4 + CHAR_WIDTH * 2 + 4;
-          const chContentWidth = NOTE_COL_GROUP_W * totalNoteCols + effectCols * (CHAR_WIDTH * 3 + 4)
+          const chContentWidth = NOTE_COL_GROUP_W * totalNoteCols + effectCols * effCellW
             + (showAcid ? CHAR_WIDTH * 2 + 8 : 0) + (showProb ? CHAR_WIDTH * 2 + 4 : 0);
           const x = colX + Math.floor((chW - chContentWidth) / 2);
 
@@ -866,7 +871,10 @@ export class TrackerGLRenderer {
               this.setTmpColor(lerpWhiteRGBA(colors.textEffect, glow), cellAlpha);
               // Symphonie DSP effects: effTyp 0x50-0x54 → type letter + value
               let effStr: string;
-              if (colEffTyp >= 0x50 && colEffTyp <= 0x54) {
+              if (effectNotation === 'furnace') {
+                // Furnace's own notation: code + value, two hex digits each (effectNotation.ts)
+                effStr = furnaceEffectText(colEffTyp, colEff);
+              } else if (colEffTyp >= 0x50 && colEffTyp <= 0x54) {
                 const DSP_CHARS = ['D', 'E', 'C', 'L', 'X'];
                 effStr = (DSP_CHARS[colEffTyp - 0x50] ?? 'D') + HEX_TABLE[colEff & 0xFF];
               } else if (colEffTyp >= 0x30 && colEffTyp <= 0x3F) {
@@ -915,9 +923,9 @@ export class TrackerGLRenderer {
               this.addGlyphString(effStr, px, gy, atlas, this.tmpColor, bold);
             } else if (!ui.blankEmpty) {
               this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), cellAlpha);
-              this.addGlyphString('...', px, gy, atlas, this.tmpColor, false);
+              this.addGlyphString(emptyEffectText(effectNotation), px, gy, atlas, this.tmpColor, false);
             }
-            px += CHAR_WIDTH * 3 + 4;
+            px += effCellW;
           }
 
           // Flag columns

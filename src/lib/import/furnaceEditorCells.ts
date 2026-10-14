@@ -8,10 +8,10 @@
  * native row — the data the sequencer is uploaded from on every Play — and
  * says which sequencer cells to rewrite now.
  *
- * The forward mapping is lossy (a Furnace volume of 0-127 shown on the XM
- * scale, an E5 80 fine-pitch shown as E5 0), so an edit only rewrites the
- * fields the editor actually changed; every other field keeps its native
- * value.
+ * The forward mapping is lossy for volume (a Furnace volume of 0-127 shown
+ * on the XM scale), so an edit only rewrites the fields the editor actually
+ * changed; every other field keeps its native value. Effects are not mapped:
+ * the cell holds Furnace's code and value (effect notation 'furnace').
  */
 import type { TrackerCell, FurnaceRow, FurnaceNativeData } from '@/types/tracker';
 
@@ -51,56 +51,6 @@ export function furnaceVolToXM(vol: number): number {
 }
 
 /**
- * Convert a Furnace effect command to XM effect type.
- * Furnace effects 0x00-0x0F map directly to XM.
- * Higher Furnace effects are passed through for the WASM dispatch router.
- */
-export function mapFurnaceEffectToXM(cmd: number): number {
-  if (cmd < 0) return 0;
-
-  // Standard tracker effects that map directly
-  const mapping: Record<number, number> = {
-    0x00: 0x00, // Arpeggio
-    0x01: 0x01, // Portamento up
-    0x02: 0x02, // Portamento down
-    0x03: 0x03, // Tone portamento
-    0x04: 0x04, // Vibrato
-    0x05: 0x05, // Volslide + tone porta
-    0x06: 0x06, // Volslide + vibrato
-    0x07: 0x07, // Tremolo
-    0x08: 0x08, // Panning
-    0x09: 0x0F, // Set speed (groove)
-    0x0A: 0x0A, // Volume slide
-    0x0B: 0x0B, // Jump to order
-    0x0C: 0x0C, // Set volume
-    0x0D: 0x0D, // Pattern break
-    0x0F: 0x0F, // Set speed
-    0x0E: 0x0E, // Extended effects
-
-    // Furnace extended effects — pass through for WASM dispatch
-    0xE1: 0xE1, // Note slide up
-    0xE2: 0xE2, // Note slide down
-    0xE3: 0xE3, // Vibrato mode
-    0xE4: 0xE4, // Fine vibrato depth
-    0xE5: 0xE5, // Fine pitch
-    0xE6: 0xE6, // Legato mode
-    0xE7: 0xE7, // Samp offs (high byte)
-    0xE8: 0xE8, // Macro release
-    0xE9: 0xE9, // Note retrigger
-    0xEA: 0xEA, // Fine volslide up
-    0xEB: 0xEB, // Fine volslide down
-    0xEC: 0xEC, // Note cut
-    0xED: 0xED, // Note delay
-    0xEE: 0xEE, // Delayed pattern change
-    0xEF: 0xEF, // Set BPM
-  };
-
-  if (cmd in mapping) return mapping[cmd];
-  // All other Furnace-specific effects pass through
-  return cmd;
-}
-
-/**
  * Convert a FurnaceRow to a TrackerCell for the editor UI.
  */
 export function furnaceRowToTrackerCell(row: FurnaceRow): TrackerCell {
@@ -108,18 +58,14 @@ export function furnaceRowToTrackerCell(row: FurnaceRow): TrackerCell {
   const instrument = row.ins >= 0 ? row.ins + 1 : 0;
   const volume = furnaceVolToXM(row.vol);
 
+  // The effect columns keep Furnace's own code and value (the channel is marked
+  // effectNotation 'furnace', so the grid writes them as Furnace does: "8040",
+  // "E580"). No folding into tracker letters: that lost the value's high nibble
+  // of every E1-EF command and let chip codes collide with other formats' glyphs.
   const convertEffect = (i: number) => {
     const fx = row.effects[i];
     if (!fx || (fx.cmd < 0 && fx.val < 0)) return { type: 0, param: 0 };
-    let t = mapFurnaceEffectToXM(fx.cmd < 0 ? 0 : fx.cmd);
-    let p = fx.val >= 0 ? fx.val & 0xFF : 0;
-    // Split composite XM extended effects (E1x-EFx)
-    if (t >= 0xE0 && t <= 0xEF) {
-      const subCmd = t & 0x0F;
-      t = 0x0E;
-      p = (subCmd << 4) | (p & 0x0F);
-    }
-    return { type: t, param: p };
+    return { type: fx.cmd < 0 ? 0 : fx.cmd & 0xFF, param: fx.val >= 0 ? fx.val & 0xFF : 0 };
   };
 
   const e0 = convertEffect(0);
@@ -153,11 +99,10 @@ export function xmVolToFurnace(vol: number): number {
   return Math.min(127, Math.round((Math.min(vol, 0x50) - 0x10) * 127 / 64));
 }
 
-/** Editor effect (type, param) → Furnace effect (cmd, val). Inverse of the forward split of Exy. */
-export function xmEffectToFurnace(type: number, param: number): { cmd: number; val: number } {
+/** Editor effect (type, param) → Furnace effect (cmd, val): the cell holds Furnace's code and value as they are. */
+export function editorEffectToFurnace(type: number, param: number): { cmd: number; val: number } {
   if (type === 0 && param === 0) return { cmd: -1, val: -1 };
-  if (type === 0x0E) return { cmd: 0xE0 | ((param >> 4) & 0x0F), val: param & 0x0F };
-  return { cmd: type, val: param };
+  return { cmd: type & 0xFF, val: param & 0xFF };
 }
 
 /** A write for the WASM sequencer: FurnaceDispatchEngine.seqSetCell(ch, pat, row, col, val). */
@@ -234,7 +179,7 @@ export function applyEditorCellEdit(
     const shownP = (shown[paramKey] as number | undefined) ?? 0;
     const nt = t ?? shownT, np = p ?? shownP;
     if (nt === shownT && np === shownP) return;
-    const e = xmEffectToFurnace(nt, np);
+    const e = editorEffectToFurnace(nt, np);
     while (nat.effects.length <= fx) nat.effects.push({ cmd: -1, val: -1 });
     nat.effects[fx] = e;
     put(3 + fx * 2, e.cmd);
@@ -242,3 +187,55 @@ export function applyEditorCellEdit(
   });
   return writes;
 }
+
+const EFFECT_SLOT_KEYS = ['', '2', '3', '4', '5', '6', '7', '8'] as const;
+
+/**
+ * Bring a Furnace song's cells to Furnace effect notation.
+ *
+ * Until 2026-10-15 the cells held effects folded into tracker letters (Furnace
+ * 09xx shown as Fxx, E5 80 split into E5 0, chip codes in other formats'
+ * glyph blocks). A song saved or autosaved then still carries those cells,
+ * without the channel's `effectNotation` mark. Their effect fields are re-read
+ * from the native rows - the data the sequencer plays and the .fur save
+ * writes - through the same `furnaceRowToTrackerCell` the importer uses, and
+ * the channel is marked. Channels already marked are left alone (an imported
+ * song costs one check per channel). A pattern no song position shows has no
+ * native rows to read and keeps its cells. Mutates `patterns`; call before
+ * they enter the store.
+ */
+export function upgradeFurnaceEffectNotation(
+  patterns: Array<{ channels: Array<{ rows: TrackerCell[]; channelMeta?: ChannelMetaLike }> }>,
+  songPositions: readonly number[],
+  native: FurnaceNativeData,
+): number {
+  const sub = native.subsongs[native.activeSubsong ?? 0];
+  if (!sub) return 0;
+  let upgraded = 0;
+  patterns.forEach((pattern, p) => {
+    const pos = songPositions.indexOf(p);
+    if (pos < 0) return;
+    pattern.channels.forEach((channel, ch) => {
+      if (channel.channelMeta?.effectNotation === 'furnace') return;
+      const pool = sub.channels[ch]?.patterns;
+      const pat = sub.orders[ch]?.[pos];
+      if (!pool || typeof pool.get !== 'function' || pat === undefined) return;
+      const nativeRows = pool.get(pat)?.rows ?? [];
+      channel.rows.forEach((cell, r) => {
+        const shown = furnaceRowToTrackerCell(nativeRows[r] ?? { note: -1, ins: -1, vol: -1, effects: [] });
+        const dst = cell as unknown as Record<string, number | undefined>;
+        const src = shown as unknown as Record<string, number | undefined>;
+        for (const k of EFFECT_SLOT_KEYS) {
+          const t = src[`effTyp${k}`], v = src[`eff${k}`];
+          if (k === '' || k === '2' || t !== undefined) { dst[`effTyp${k}`] = t ?? 0; dst[`eff${k}`] = v ?? 0; }
+          else { delete dst[`effTyp${k}`]; delete dst[`eff${k}`]; }
+        }
+      });
+      channel.channelMeta = { ...channel.channelMeta, importedFromMOD: channel.channelMeta?.importedFromMOD ?? false, effectNotation: 'furnace' };
+      upgraded++;
+    });
+  });
+  return upgraded;
+}
+
+type ChannelMetaLike = NonNullable<import('@/types/tracker').ChannelData['channelMeta']>;

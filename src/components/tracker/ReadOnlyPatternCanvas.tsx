@@ -7,6 +7,7 @@
  */
 
 import { isChannelVisible } from '@/lib/tracker/visibleChannels';
+import { effectCellWidth, type EffectNotation } from '@/lib/tracker/effectNotation';
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import type { Pattern } from '@/types';
 import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
@@ -148,6 +149,7 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
       channels: p.channels.slice(0, nc).map((ch): ChannelSnapshot => ({
         id:         ch.id,
         effectCols: ch.channelMeta?.effectCols ?? 2,
+        effectNotation: ch.channelMeta?.effectNotation,
         color:      ch.color ?? undefined,
         rows: ch.rows.map((cell): CellSnapshot => ({
           note:       cell.note ?? 0,
@@ -174,11 +176,16 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
   maskRef.current = channelMask;
   const maskKey = channelMask ? channelMask.map((v) => (v ? '1' : '0')).join('') : '';
 
+  // Each channel's effect notation (Furnace songs draw 4-char effects): read through a ref like the mask.
+  const notationsRef = useRef<readonly (EffectNotation | undefined)[]>([]);
+  notationsRef.current = pattern?.channels.map((ch) => ch.channelMeta?.effectNotation) ?? [];
+  const notationKey = notationsRef.current.join(',');
+
   const buildLayout = useCallback((w: number, nc: number): ChannelLayoutSnapshot & { scale: number } => {
     const noteWidth   = CHAR_WIDTH * 3 + 4;
-    const paramWidth  = CHAR_WIDTH * 4 + 8 + 2 * (CHAR_WIDTH * 3 + 4);
-    const contentWidth = noteWidth + 4 + paramWidth;
-    const minWidths   = Array.from({ length: nc }, (_, i) => (isChannelVisible(maskRef.current, i) ? contentWidth + 16 : 0));
+    const contentWidth = (i: number) =>
+      noteWidth + 4 + CHAR_WIDTH * 4 + 8 + 2 * effectCellWidth(CHAR_WIDTH, notationsRef.current[i]);
+    const minWidths   = Array.from({ length: nc }, (_, i) => (isChannelVisible(maskRef.current, i) ? contentWidth(i) + 16 : 0));
     const fitted      = fitAndStretchChannelWidths(minWidths, LINE_NUMBER_WIDTH, w, fitDeckRef.current);
     const offsets: number[] = [];
     let x = fitted.leftEdge;
@@ -267,9 +274,9 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
 
   const layoutNow = useMemo(
     () => buildLayout(dimensions.width, numChannels),
-    // fitDeck and the mask are read through refs inside buildLayout; they are dependencies here so a change relays out.
+    // fitDeck, the mask and the effect notations are read through refs inside buildLayout; they are dependencies here so a change relays out.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [buildLayout, dimensions.width, numChannels, fitDeck, maskKey],
+    [buildLayout, dimensions.width, numChannels, fitDeck, maskKey, notationKey],
   );
 
   // The worker owns the canvas size: tell it the canvas at the fitted scale.

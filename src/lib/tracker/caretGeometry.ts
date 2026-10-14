@@ -11,7 +11,9 @@
  * Layout (matches both renderers):
  *   note(cw*3+4) | 4 | inst(cw*2) | 4 | vol(cw*2) | 4   ×noteCols
  *   then effectCols × effect(cw*3+4), then optional acid flags, then probability.
+ * In Furnace effect notation an effect cell is 4 chars (cw*4+4): a 2-digit type, a 2-digit value.
  */
+import { effectCellWidth, effectTypeDigits, type EffectNotation } from './effectNotation';
 
 export interface CaretGeometryInput {
   columnType: string;
@@ -20,6 +22,8 @@ export interface CaretGeometryInput {
   charWidth: number;
   noteCols: number;
   effectCols: number;
+  /** The channel's effect notation (default 'tracker'); 'furnace' widens the type field to 2 digits. */
+  effectNotation?: EffectNotation;
   /** Whether acid-flag columns are present (shifts the probability column). */
   hasAcid: boolean;
 }
@@ -38,7 +42,9 @@ export function computeCaretRect(input: CaretGeometryInput): CaretRect {
   const noteCols = Math.max(1, input.noteCols);
   const noteColOffset = Math.max(0, input.noteColumnIndex) * NOTE_COL_GROUP_W;
   const effBase = noteCols * NOTE_COL_GROUP_W;
-  const acidOff = effBase + input.effectCols * (cw * 3 + 4);
+  const effW = effectCellWidth(cw, input.effectNotation);
+  const typW = effectTypeDigits(input.effectNotation) * cw;
+  const acidOff = effBase + input.effectCols * effW;
   const probOff = acidOff + (input.hasAcid ? cw * 2 + 8 : 0);
   const d = input.digitIndex;
 
@@ -46,10 +52,10 @@ export function computeCaretRect(input: CaretGeometryInput): CaretRect {
     case 'note':       return { offX: noteColOffset, width: noteWidth };
     case 'instrument': return { offX: noteColOffset + paramBase + d * cw, width: cw };
     case 'volume':     return { offX: noteColOffset + paramBase + (cw * 2 + 4) + d * cw, width: cw };
-    case 'effTyp':     return { offX: effBase, width: cw };
-    case 'effParam':   return { offX: effBase + cw + d * cw, width: cw };
-    case 'effTyp2':    return { offX: effBase + (cw * 3 + 4), width: cw };
-    case 'effParam2':  return { offX: effBase + (cw * 3 + 4) + cw + d * cw, width: cw };
+    case 'effTyp':     return { offX: effBase + (typW > cw ? d * cw : 0), width: cw };
+    case 'effParam':   return { offX: effBase + typW + d * cw, width: cw };
+    case 'effTyp2':    return { offX: effBase + effW + (typW > cw ? d * cw : 0), width: cw };
+    case 'effParam2':  return { offX: effBase + effW + typW + d * cw, width: cw };
     case 'flag1':      return { offX: acidOff, width: cw };
     case 'flag2':      return { offX: acidOff + cw + 4, width: cw };
     case 'probability':return { offX: probOff + d * cw, width: cw };

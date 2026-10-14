@@ -5,6 +5,7 @@
  * Returns plain JSON-serializable objects.
  */
 
+import { effectNotationOf, emptyEffectText, furnaceEffectText, type EffectNotation } from '@/lib/tracker/effectNotation';
 import { noteCellsPerPattern } from '@/lib/tracker/patternNoteCells';
 import { noteValueName, pitchName } from '@/lib/tracker/noteValue';
 import { useTrackerStore } from '../../stores/useTrackerStore';
@@ -62,8 +63,10 @@ function formatHex(val: number, digits = 2): string {
 
 const DSP_EFFECT_CHARS = ['D', 'E', 'C', 'L', 'X'];
 
-function effectToString(effTyp: number, eff: number): string {
-  if (effTyp === 0 && eff === 0) return '...';
+function effectToString(effTyp: number, eff: number, notation: EffectNotation = 'tracker'): string {
+  if (effTyp === 0 && eff === 0) return emptyEffectText(notation);
+  // A Furnace song's cells hold Furnace codes: written as Furnace does ("8040").
+  if (notation === 'furnace') return furnaceEffectText(effTyp, eff);
   // Symphonie DSP effects: effTyp 0x50-0x54 → type letter + value
   if (effTyp >= 0x50 && effTyp <= 0x54) {
     return `${DSP_EFFECT_CHARS[effTyp - 0x50] ?? 'D'}${formatHex(eff)}`;
@@ -71,7 +74,7 @@ function effectToString(effTyp: number, eff: number): string {
   return `${formatHex(effTyp, 1)}${formatHex(eff)}`;
 }
 
-function formatCell(cell: { note: number; instrument: number; volume: number; effTyp: number; eff: number; effTyp2?: number; eff2?: number }) {
+function formatCell(cell: { note: number; instrument: number; volume: number; effTyp: number; eff: number; effTyp2?: number; eff2?: number }, notation: EffectNotation = 'tracker') {
   return {
     note: cell.note,
     noteStr: noteToString(cell.note),
@@ -79,9 +82,10 @@ function formatCell(cell: { note: number; instrument: number; volume: number; ef
     volume: cell.volume,
     effTyp: cell.effTyp,
     eff: cell.eff,
-    effStr: effectToString(cell.effTyp, cell.eff),
+    effStr: effectToString(cell.effTyp, cell.eff, notation),
     effTyp2: cell.effTyp2 ?? 0,
     eff2: cell.eff2 ?? 0,
+    effStr2: effectToString(cell.effTyp2 ?? 0, cell.eff2 ?? 0, notation),
   };
 }
 
@@ -155,7 +159,7 @@ export function getPattern(params: Record<string, unknown>): Record<string, unkn
       if (channelFilter && !channelFilter.includes(c)) continue;
       const cell = pattern.channels[c]?.rows[r];
       if (cell) {
-        rowCells.push({ channel: c, ...formatCell(cell) });
+        rowCells.push({ channel: c, ...formatCell(cell, effectNotationOf(pattern.channels[c]?.channelMeta)) });
       }
     }
     rows.push({ row: r, cells: rowCells });
@@ -204,7 +208,7 @@ export function getCell(params: Record<string, unknown>): Record<string, unknown
     channel,
     row,
     patternIndex,
-    ...formatCell(cell),
+    ...formatCell(cell, effectNotationOf(pattern.channels[channel]?.channelMeta)),
     flag1: cell.flag1,
     flag2: cell.flag2,
     probability: cell.probability,
@@ -627,7 +631,7 @@ export function searchPattern(params: Record<string, unknown>): Record<string, u
       if (instrumentFilter !== undefined && cell.instrument === instrumentFilter) match = true;
       if (effectFilter !== undefined && cell.effTyp === effectFilter) match = true;
       if (match) {
-        results.push({ channel: c, row: r, ...formatCell(cell) });
+        results.push({ channel: c, row: r, ...formatCell(cell, effectNotationOf(pattern.channels[c]?.channelMeta)) });
       }
     }
   }
@@ -1750,14 +1754,16 @@ export function renderPatternText(params: Record<string, unknown>): Record<strin
     const cellStrs: string[] = [];
     for (const c of channelIndices) {
       const cell = pattern.channels[c]?.rows[r];
-      if (!cell || (!cell.note && !cell.instrument && !cell.volume && !cell.effTyp && !cell.effTyp2)) {
-        cellStrs.push('--- .. .. ... ...');
+      const notation = effectNotationOf(pattern.channels[c]?.channelMeta);
+      const noEff = emptyEffectText(notation);
+      if (!cell || (!cell.note && !cell.instrument && !cell.volume && !cell.effTyp && !cell.eff && !cell.effTyp2 && !cell.eff2)) {
+        cellStrs.push(`--- .. .. ${noEff} ${noEff}`);
       } else {
         const n = noteToString(cell.note);
         const i = cell.instrument ? formatHex(cell.instrument) : '..';
         const v = cell.volume ? formatHex(cell.volume) : '..';
-        const e1 = effectToString(cell.effTyp, cell.eff);
-        const e2 = (cell.effTyp2 || cell.eff2) ? effectToString(cell.effTyp2 ?? 0, cell.eff2 ?? 0) : '...';
+        const e1 = effectToString(cell.effTyp, cell.eff, notation);
+        const e2 = effectToString(cell.effTyp2 ?? 0, cell.eff2 ?? 0, notation);
         cellStrs.push(`${n} ${i} ${v} ${e1} ${e2}`);
       }
     }

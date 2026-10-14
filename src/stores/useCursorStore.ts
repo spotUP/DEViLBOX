@@ -8,6 +8,7 @@
  * and immer's proxy creation adds measurable overhead at 60 updates/sec.
  */
 
+import { effectNotationOf, effectTypeDigits, type EffectNotation } from '@/lib/tracker/effectNotation';
 import { create } from 'zustand';
 import type { CursorPosition, BlockSelection } from '@typedefs';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
@@ -34,13 +35,11 @@ const COLUMN_ORDER: CursorPosition['columnType'][] = [
   'note', 'instrument', 'volume', 'effTyp', 'effTyp2', 'flag1', 'flag2', 'probability'
 ];
 
-// Map column types to their digit count
+// Map column types to their digit count (the effect TYPE's count depends on the channel: digitCount)
 const DIGIT_COUNTS: Record<string, number> = {
   instrument: 2,
   volume: 2,
-  effTyp: 1,
   effParam: 2,
-  effTyp2: 1,
   effParam2: 2,
   cutoff: 2,
   resonance: 2,
@@ -50,6 +49,12 @@ const DIGIT_COUNTS: Record<string, number> = {
   flag1: 1,
   flag2: 1,
 };
+
+/** Digits of a column in a channel: the effect type has 1 (tracker glyph) or 2 (Furnace code). */
+function digitCount(columnType: string, channel: { channelMeta?: { effectNotation?: EffectNotation } } | undefined): number {
+  if (columnType === 'effTyp' || columnType === 'effTyp2') return effectTypeDigits(effectNotationOf(channel?.channelMeta));
+  return DIGIT_COUNTS[columnType] || 0;
+}
 
 interface CursorStore {
   cursor: CursorPosition;
@@ -95,7 +100,7 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
 
     let { channelIndex, rowIndex, columnType, digitIndex } = cur;
     let noteColumnIndex = cur.noteColumnIndex ?? 0;
-    const currentDigits = DIGIT_COUNTS[columnType] || 0;
+    const currentDigits = digitCount(columnType, pattern.channels[channelIndex]);
     const behavior = getEditorState().activeBehavior;
 
     // Get total note columns for the current channel
@@ -144,7 +149,7 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
         if (ci > 0) {
           columnType = cols[ci - 1].type;
           noteColumnIndex = cols[ci - 1].nci;
-          const nd = DIGIT_COUNTS[columnType] || 0;
+          const nd = digitCount(columnType, pattern.channels[channelIndex]);
           digitIndex = nd > 0 ? nd - 1 : 0;
         } else {
           // Wrap to previous channel
@@ -167,7 +172,7 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
           const last = prevCols[prevCols.length - 1];
           columnType = last.type;
           noteColumnIndex = last.nci;
-          const nd = DIGIT_COUNTS[columnType] || 0;
+          const nd = digitCount(columnType, pattern.channels[channelIndex]);
           digitIndex = nd > 0 ? nd - 1 : 0;
         }
         break;
@@ -195,7 +200,7 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
         if (vis.flag2) cols.push({ type: 'flag2', nci: 0 });
         if (vis.probability) cols.push({ type: 'probability', nci: 0 });
 
-        let ci = cols.findIndex(c => c.type === columnType && c.nci === noteColumnIndex);
+        const ci = cols.findIndex(c => c.type === columnType && c.nci === noteColumnIndex);
         if (ci === -1) {
           // Stale cursor position — snap to first column of current channel
           columnType = cols[0]?.type ?? 'note';
@@ -271,6 +276,7 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
       advanceOnInstrument: behavior.advanceOnInstrument,
       advanceOnVolume: behavior.advanceOnVolume,
       advanceOnEffect: behavior.advanceOnEffect,
+      effectTypeDigits: digitCount(columnType, pattern.channels[cur.channelIndex]),
     });
     switch (adv.kind) {
       case 'nibble':

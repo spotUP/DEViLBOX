@@ -28,6 +28,8 @@ export interface NibbleAdvanceInput {
   advanceOnInstrument: boolean;
   advanceOnVolume: boolean;
   advanceOnEffect: boolean;
+  /** Digits of the effect TYPE field: 1 (tracker glyph, default) or 2 (Furnace code, effectNotation.ts). */
+  effectTypeDigits?: number;
 }
 
 /** Number of editable nibbles/characters in each data column. */
@@ -41,8 +43,6 @@ const NIBBLE_COUNTS: Record<string, number> = {
   resonance: 2,
   envMod: 2,
   pan: 2,
-  effTyp: 1,
-  effTyp2: 1,
   flag1: 1,
   flag2: 1,
 };
@@ -54,9 +54,12 @@ export function computeNibbleAdvance(input: NibbleAdvanceInput): NibbleAdvance {
 
   const { columnType, digitIndex } = input;
 
-  // Effect TYPE char → jump to the param high nibble on the same cell.
-  if (columnType === 'effTyp') return { kind: 'column', columnType: 'effParam' };
-  if (columnType === 'effTyp2') return { kind: 'column', columnType: 'effParam2' };
+  // Effect TYPE: a 2-digit Furnace code moves to its second digit first; the
+  // last type character jumps to the param high nibble on the same cell.
+  if (columnType === 'effTyp' || columnType === 'effTyp2') {
+    if (digitIndex < (input.effectTypeDigits ?? 1) - 1) return { kind: 'nibble', digitIndex: digitIndex + 1 };
+    return { kind: 'column', columnType: columnType === 'effTyp' ? 'effParam' : 'effParam2' };
+  }
 
   const nibbles = NIBBLE_COUNTS[columnType] ?? 1;
 

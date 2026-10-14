@@ -4,6 +4,7 @@
  */
 
 import type { DubLane } from './dub';
+import type { EffectNotation } from '@/lib/tracker/effectNotation';
 
 /**
  * XM-Compatible Note Value
@@ -177,6 +178,8 @@ export interface ChannelData {
     hardwareName?: string; // Hardware-specific channel name
     shortName?: string; // Short display name for channel headers
     effectCols?: number; // Number of effect columns (default 2)
+    /** How the effect columns are written: Furnace codes as 4 hex chars, or the tracker glyph form (default). See lib/tracker/effectNotation. */
+    effectNotation?: EffectNotation;
     noteCols?: number;   // Number of note columns per track (default 1, max 4) — Renoise-style chords
     maxVoices?: number;  // Max simultaneous voices per channel (default unlimited; 1-16)
     systemId?: number | string; // System preset identifier (number for Furnace fileID)

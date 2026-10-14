@@ -34,6 +34,7 @@ import { useTransportStore } from '@stores/useTransportStore';
 import { useCollaborationStore, getCollabClient } from '@stores/useCollaborationStore';
 import { useBDAnimations } from '@hooks/tracker/useBDAnimations';
 import type { CursorPosition, BlockSelection } from '@typedefs';
+import { effectCellWidth } from '@/lib/tracker/effectNotation';
 
 // ─── Layout constants (must match PatternEditorCanvas) ───────────────────────
 const CHAR_WIDTH = 10;
@@ -236,7 +237,7 @@ export function usePatternEditor() {
         currentX += cw;
       } else {
         const effectCols = channel?.channelMeta?.effectCols ?? 2;
-        const effectWidth = Math.round(effectCols * (CHAR_WIDTH * 3 + 4) * zoomFactor);
+        const effectWidth = Math.round(effectCols * effectCellWidth(CHAR_WIDTH, channel?.channelMeta?.effectNotation) * zoomFactor);
         // Extra note columns: each adds note(34) + inst(20) + vol(20) + gaps(12) = 86px
         const extraNoteColWidth = Math.round((noteCols - 1) * (noteWidth + CHAR_WIDTH * 4 + 12));
         const paramWidth = Math.round((CHAR_WIDTH * 4 + 8) * zoomFactor)

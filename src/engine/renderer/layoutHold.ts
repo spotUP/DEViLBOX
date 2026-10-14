@@ -15,7 +15,7 @@
 /** The parts of a channel that decide its column width (see PatternEditorCanvas channel metrics). */
 interface LayoutChannel {
   collapsed?: boolean;
-  channelMeta?: { effectCols?: number; noteCols?: number } | null;
+  channelMeta?: { effectCols?: number; noteCols?: number; effectNotation?: string } | null;
 }
 interface LayoutPattern { channels: LayoutChannel[] }
 
@@ -31,6 +31,7 @@ export function layoutInputsChanged(
     if (!!a[i].collapsed !== !!b[i].collapsed) return true;
     if ((a[i].channelMeta?.effectCols ?? 2) !== (b[i].channelMeta?.effectCols ?? 2)) return true;
     if ((a[i].channelMeta?.noteCols ?? 1) !== (b[i].channelMeta?.noteCols ?? 1)) return true;
+    if ((a[i].channelMeta?.effectNotation ?? 'tracker') !== (b[i].channelMeta?.effectNotation ?? 'tracker')) return true;
   }
   return false;
 }

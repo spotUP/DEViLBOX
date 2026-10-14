@@ -14,6 +14,7 @@ import { channelLayout, notifyChannelLayout, fitAndStretchChannelWidths, subscri
 import { resolveWasmPattern } from './wasmPatternHold';
 import { computeChannelFollowScroll, createChannelFollowGate } from '@/lib/tracker/followScroll';
 import { resolveCellColumn } from '@/lib/tracker/cellHitTest';
+import { effectCellWidth } from '@/lib/tracker/effectNotation';
 import { resolveScrollRow, resolveFormatViewRow } from '@/lib/tracker/playbackNavigation';
 import { recordModeBorderClass } from '@/lib/tracker/patternEditorChrome';
 import { isChannelVisible } from '@/lib/tracker/visibleChannels';
@@ -459,7 +460,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         minWidths.push(noteWidth + (mobileCanvas ? 64 : 40) + autoLaneExtra(ch));
       } else {
         const effectCols = channel?.channelMeta?.effectCols ?? 2;
-        const effectWidth = effectCols * (CW * 3 + 4);
+        const effectWidth = effectCols * effectCellWidth(CW, channel?.channelMeta?.effectNotation);
         const noteCols = channel?.channelMeta?.noteCols ?? 1;
         const extraNoteColWidth = (noteCols - 1) * (noteWidth + CW * 4 + 12);
         const paramWidth = CW * 4 + 8
@@ -661,7 +662,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const totalNoteCols = channel?.channelMeta?.noteCols ?? 1;
     // For multi-note cols: each group = note+inst+vol+gaps
     const NOTE_COL_GROUP_W = noteWidth + 4 + CHAR_WIDTH * 2 + 4 + CHAR_WIDTH * 2 + 4;
-    const chContentWidth = NOTE_COL_GROUP_W * totalNoteCols + effectCols * (CHAR_WIDTH * 3 + 4)
+    const effectNotation = channel?.channelMeta?.effectNotation;
+    const chContentWidth = NOTE_COL_GROUP_W * totalNoteCols + effectCols * effectCellWidth(CHAR_WIDTH, effectNotation)
       + (hasAcid ? CHAR_WIDTH * 2 + 8 : 0) + (hasProb ? CHAR_WIDTH * 2 + 4 : 0);
     // The renderer draws at fitScale, so cell geometry is measured in scale-1 px.
     const chW = (channelWidths[channelIndex] ?? 0) / fitScale;
@@ -674,6 +676,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       charWidth: CHAR_WIDTH,
       totalNoteCols,
       effectCols,
+      effectNotation,
       hasAcid,
       hasProb,
     });
@@ -1548,6 +1551,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           solo: ch.solo,
           collapsed: ch.collapsed,
           effectCols: ch.channelMeta?.effectCols ?? 2,
+          effectNotation: ch.channelMeta?.effectNotation,
           noteCols: ch.channelMeta?.noteCols,
           rows: ch.rows.map((cell): CellSnapshot => ({
             note: cell.note ?? 0,
@@ -2305,6 +2309,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 id: ch.id, name: ch.name, color: ch.color ?? undefined,
                 muted: ch.muted, solo: ch.solo, collapsed: ch.collapsed,
                 effectCols: ch.channelMeta?.effectCols ?? 2,
+                effectNotation: ch.channelMeta?.effectNotation,
                 noteCols: ch.channelMeta?.noteCols,
                 rows: ch.rows.map((cell): CellSnapshot => ({
                   note: cell.note ?? 0, instrument: cell.instrument ?? 0,
