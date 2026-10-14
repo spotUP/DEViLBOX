@@ -305,6 +305,7 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
             editRowY={dimensions.height / 2}
             channelCount={numChannels}
             feed={vuFeed}
+            scale={vuLayout.scale}
           />
         </div>
       )}
