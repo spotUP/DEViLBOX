@@ -8,6 +8,7 @@
  * that stops two thirds across its column was the owner's F36 (2026-10-04).
  * Content never shrinks: a canvas narrower than the columns scrolls.
  */
+import { stretchChannelWidths } from './channelLayout';
 import type { ColumnDef, FormatChannel } from '@/components/shared/format-editor-types';
 
 export interface FormatChannelLayout {
@@ -39,15 +40,9 @@ export function formatChannelLayout(input: FormatChannelLayoutInput): FormatChan
     const contentWidth = cols.reduce((sum, col) => sum + col.charWidth * charWidth + columnGap, 0) - columnGap;
     widths.push(contentWidth + channelPad);
   }
-  const content = widths.reduce((a, b) => a + b, 0);
-  const spare = availableWidth - leftEdge - content;
-  if (spare > 0 && widths.length > 0) {
-    const each = Math.floor(spare / widths.length);
-    for (let i = 0; i < widths.length; i++) widths[i] += each;
-    widths[widths.length - 1] += spare - each * widths.length;
-  }
+  const stretched = stretchChannelWidths(widths, leftEdge, availableWidth);
   const offsets: number[] = [];
   let x = leftEdge;
-  for (const w of widths) { offsets.push(x); x += w; }
-  return { numChannels: widths.length, channelOffsets: offsets, channelWidths: widths, totalChannelsWidth: x };
+  for (const w of stretched) { offsets.push(x); x += w; }
+  return { numChannels: stretched.length, channelOffsets: offsets, channelWidths: stretched, totalChannelsWidth: x };
 }
