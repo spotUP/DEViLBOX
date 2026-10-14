@@ -55,8 +55,9 @@ beforeEach(() => {
 /** `restoreState` is module-private; `addTab` is the product path that runs it. */
 async function newTab(): Promise<void> {
   useTabsStore.getState().addTab();
+  // The first tab open lazy-imports the whole song lifecycle (openSong); cold, that import takes ~2 s, past waitFor's 1 s default.
   // The apply is fire-and-forget so a tab switch never blocks on a worklet.
-  await vi.waitFor(() => expect(useFormatStore.getState().editorMode).toBe('classic'));
+  await vi.waitFor(() => expect(useFormatStore.getState().editorMode).toBe('classic'), { timeout: 15000 });
 }
 
 describe('opening a new tab over an AHX', () => {
