@@ -16,6 +16,7 @@ import { useHistoryStore } from '@stores/useHistoryStore';
 import * as Tone from 'tone';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { playRow } from '@engine/keyboard/commands/playRow';
 import { parseMPTClipboard } from '@lib/import/MPTClipboardParser';
 import { xmNoteToString } from '@lib/xmConversions';
 import { useNoteInput, useEffectInput, useNavigationInput } from './input';
@@ -1419,8 +1420,10 @@ export const useTrackerInput = () => {
       if (key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
         const beh = useEditorStore.getState().activeBehavior;
         if (beh.ptEffectMacros && !isPlaying) {
-          // PT: bare Enter = step play (advance cursor by editstep, preview note if present)
+          // PT: bare Enter = step play: sound the row under the cursor (the one row preview, playRow),
+          // then advance the cursor by the edit step (pt2_keyboard.c Enter -> stepPlay).
           e.preventDefault();
+          void playRow();
           const step = useEditorStore.getState().editStep || 1;
           const newRow = Math.min(cursorRef.current.rowIndex + step, pattern.length - 1);
           moveCursorToRow(newRow);

@@ -49,3 +49,12 @@ export function engineFedMeterTarget(
   if (mode === 'realtime') return level;
   return level - prevLevel > VU_ONSET_RISE ? level : 0;
 }
+
+/**
+ * Whether a meter drops to 0 this frame: on the frame playback stops, so no note scheduled before the stop bounces it
+ * afterwards. A meter that is already stopped keeps running its triggers and fall-off, so a note sounded while stopped
+ * (a row preview stepped with Enter) moves the meter of its channel like a played note.
+ */
+export function meterKilledByStop(playing: boolean, wasPlaying: boolean): boolean {
+  return wasPlaying && !playing;
+}

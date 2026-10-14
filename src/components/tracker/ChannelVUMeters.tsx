@@ -16,7 +16,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useThemeStore } from '@stores/useThemeStore';
 import { liveScopeFrame } from '@stores/useOscilloscopeStore';
-import { waveformVuLevel, engineFedMeterTarget } from './waveformVuLevel';
+import { waveformVuLevel, engineFedMeterTarget, meterKilledByStop } from './waveformVuLevel';
 
 // VU meter timing constants - ProTracker style
 const DECAY_RATE = 0.92;       // per-frame decay at 60fps reference rate
@@ -80,6 +80,7 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
   const lastTickRef = useRef(0);
   const lastGensRef = useRef<number[]>([]);
   const prevSourceRef = useRef<number[]>([]);
+  const wasPlayingRef = useRef(false);
 
   // Refs for values needed inside the animation loop
   const numChannelsRef = useRef(numChannels);
@@ -198,6 +199,10 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         for (let j = 0; j < old.length; j++) lastGensRef.current[j] = old[j];
       }
 
+      const playingNow = isPlaying || !!oscChannelData;
+      const killed = meterKilledByStop(playingNow, wasPlayingRef.current);
+      wasPlayingRef.current = playingNow;
+
       for (let i = 0; i < nc; i++) {
         const meter = meterStates.current[i];
         if (!meter) continue;
@@ -205,10 +210,10 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         // Skip collapsed channels
         if (widths[i] && widths[i] < 20) continue;
 
-        // When playback is stopped, kill meters instantly (no lingering bounce).
-        // A direct-routed WASM engine can play with transport isPlaying still false,
-        // so keep metering while its oscilloscope is active.
-        if (!isPlaying && !oscChannelData) {
+        // When playback stops, kill meters instantly (no lingering bounce); a note sounded
+        // while stopped (row preview) still moves its meter. A direct-routed WASM engine can
+        // play with transport isPlaying still false, so its active oscilloscope counts as playing.
+        if (killed) {
           meter.level = 0;
         } else {
           // Time-based decay — consistent across all frame rates

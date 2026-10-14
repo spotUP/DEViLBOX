@@ -3,64 +3,66 @@ import { useTrackerStore } from '@stores/useTrackerStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { getToneEngine } from '@engine/ToneEngine';
-import { xmNoteToString } from '@/lib/xmConversions';
-import { NOTE_OFF } from '@/types/tracker';
+import { xmNoteToToneJS } from '@/lib/xmConversions';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
+import type { Pattern, TrackerCell } from '@/types/tracker';
+
+/** How long a previewed note sounds before its release (row preview and note-at-cursor preview). */
+export const PREVIEW_HOLD_MS = 500;
 
 /**
- * Play Row (Audition) - Play only the current row
- *
- * Classic tracker command (Keypad Enter in Impulse Tracker).
- * Plays the current row once without starting full pattern playback.
- * Used for quick testing of notes/instruments/effects.
- *
- * Triggers all notes in the current row across all channels.
- *
- * @returns true (always plays row)
+ * The instrument a note in `channel` at `row` plays: its own number, else the last one written above it in the
+ * pattern (a tracker note without an instrument keeps the channel's instrument), else the selected instrument.
  */
-export async function playRow(): Promise<boolean> {
+export function previewInstrumentId(pattern: Pattern, channel: number, row: number): number {
+  const rows = pattern.channels[channel]?.rows;
+  if (rows) for (let r = row; r >= 0; r--) if (rows[r]?.instrument) return rows[r]!.instrument;
+  return useInstrumentStore.getState().currentInstrumentId || 1;
+}
+
+/**
+ * Sound one cell's note on its instrument for PREVIEW_HOLD_MS and flash channel `channelIndex`'s VU meter with it, as
+ * playback does for each note it starts. The one note-preview path: the row preview (playRow) and the note-at-cursor
+ * preview both come here. Returns false when the cell holds no playable note.
+ */
+export function previewCell(cell: TrackerCell | undefined, instrumentId: number, channelIndex: number): boolean {
+  if (!cell || !cell.note) return false;
+  const toneNote = xmNoteToToneJS(cell.note);
+  if (!toneNote) return false;
+  const inst = useInstrumentStore.getState().getInstrument(instrumentId);
+  if (!inst) return false;
+  const velocity = cell.volume ? Math.min(cell.volume / 64, 1) : 0.8;
+  const engine = getToneEngine();
+  void engine.ensureInstrumentReady(inst).then(() => {
+    engine.triggerNoteAttack(inst.id, toneNote, 0, velocity, inst);
+    engine.triggerChannelMeter(channelIndex, velocity);
+    setTimeout(() => engine.triggerNoteRelease(inst.id, toneNote, 0, inst), PREVIEW_HOLD_MS);
+  });
+  return true;
+}
+
+/**
+ * Play Row (Audition) - sound every note of the row under the cursor once, without starting playback.
+ * A muted channel stays silent and its meter dark, as in playback (TrackerReplayer.triggerNote).
+ *
+ * Classic tracker command (Keypad Enter in Impulse Tracker, Enter step play in ProTracker).
+ * Returns how many notes it sounded.
+ */
+export function playRow(): number {
   // CRITICAL for iOS: Tone.start() MUST be called synchronously within user gesture
   unlockIOSAudio();
-  Tone.start();
+  void Tone.start();
   const { cursor } = useCursorStore.getState();
   const { patterns, currentPatternIndex } = useTrackerStore.getState();
   const pattern = patterns[currentPatternIndex];
-
-  if (!pattern) {
-    console.warn('[playRow] No pattern at index', currentPatternIndex);
-    return true;
-  }
+  if (!pattern) return 0;
 
   const engine = getToneEngine();
-  const { instruments } = useInstrumentStore.getState();
-
-  // Collect notes to play
-  const notesToPlay: Array<{ instrumentId: number; noteStr: string; chIdx: number; instrument: typeof instruments[0] }> = [];
-
+  let sounded = 0;
   pattern.channels.forEach((channel, chIdx) => {
+    if (engine.isChannelMuted(chIdx)) return;
     const cell = channel.rows[cursor.rowIndex];
-
-    // Skip if no note (0 = empty, NOTE_OFF.note = note off)
-    if (!cell.note || cell.note === 0 || cell.note === NOTE_OFF.note) return;
-
-    const noteStr = xmNoteToString(cell.note);
-    const instrumentId = cell.instrument || 0;
-
-    if (instrumentId === 0) return;
-
-    const instrument = instruments.find(i => i.id === instrumentId);
-    if (!instrument) return;
-
-    notesToPlay.push({ instrumentId, noteStr, chIdx, instrument });
+    if (previewCell(cell, previewInstrumentId(pattern, chIdx, cursor.rowIndex), chIdx)) sounded++;
   });
-
-  // Ensure all instruments are ready (for WASM synths)
-  await Promise.all(notesToPlay.map(n => engine.ensureInstrumentReady(n.instrument)));
-
-  // Now trigger all notes
-  for (const { instrumentId, noteStr, chIdx, instrument } of notesToPlay) {
-    engine.triggerNoteAttack(instrumentId, noteStr, chIdx, 1, instrument);
-  }
-
-  return true;
+  return sounded;
 }
