@@ -200,6 +200,9 @@ export interface FormatStore {
   /** `orders`: a parser decoded each subsong's song order (the grid switches with it, UADE is pinned to it); `start`: the subsong loaded. */
   uadeEditableSubsongs: { count: number; speeds: number[]; orders?: number[][]; start?: number; first?: number } | null;
   uadeEditableCurrentSubsong: number;
+  /** The clock the parser/scan measured for the grid (TrackerSong.uadeFirstTick / uadePlayerTickGrid): the playhead follow and the row preview map UADE's tick counts through it. */
+  uadeFirstTick: number | null;
+  uadePlayerTickGrid: boolean;
   libopenmptFileData: ArrayBuffer | null;
   hivelyMeta: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number } | null;
   furnaceSubsongs: FurnaceSubsongPlayback[] | null;
@@ -615,6 +618,8 @@ export const useFormatStore = create<FormatStore>()(
     tfmxSelectedPattern: 0,
     uadeEditableSubsongs: null,
     uadeEditableCurrentSubsong: 0,
+    uadeFirstTick: null,
+    uadePlayerTickGrid: false,
     libopenmptFileData: null,
     hivelyMeta: null,
     furnaceSubsongs: null,
@@ -1204,6 +1209,8 @@ export const useFormatStore = create<FormatStore>()(
         state.tfmxTimingTable = (song as any).tfmxTimingTable ?? null;
         state.uadeEditableSubsongs = (song as any).uadeEditableSubsongs ?? null;
         state.uadeEditableCurrentSubsong = (song as any).uadeEditableSubsongs?.start ?? 0;
+        state.uadeFirstTick = (song as any).uadeFirstTick ?? null;
+        state.uadePlayerTickGrid = (song as any).uadePlayerTickGrid === true;
         state.libopenmptFileData = (song as any).libopenmptFileData ?? null;
         if (song.furnaceNative) {
           newEditorMode = 'furnace';
@@ -1560,6 +1567,8 @@ export const useFormatStore = create<FormatStore>()(
       state.tfmxSelectedPattern = 0;
       state.uadeEditableSubsongs = null;
       state.uadeEditableCurrentSubsong = 0;
+      state.uadeFirstTick = null;
+      state.uadePlayerTickGrid = false;
       state.libopenmptFileData = null;
       state.originalModuleData = null;
       state.songDBInfo = null;

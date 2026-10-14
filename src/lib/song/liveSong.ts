@@ -89,6 +89,11 @@ export function liveTrackerSong(overrides: Partial<TrackerSong> = {}): TrackerSo
     eaglePlayerSubsong: fmt.eaglePlayerSubsong ?? undefined,
     eaglePlayerTickGrid: fmt.eaglePlayerTickGrid ?? undefined,
     uadeCompanionFiles: fmt.uadeCompanionFiles ?? undefined,
+    // The grid's UADE clock and the subsong played: the playhead follow and the row preview read them from the song.
+    uadeFirstTick: fmt.uadeFirstTick ?? undefined,
+    uadePlayerTickGrid: fmt.uadePlayerTickGrid || undefined,
+    uadeEditableSubsongs: fmt.uadeEditableSubsongs ?? undefined,
+    uadeEditableCurrentSubsong: fmt.uadeEditableCurrentSubsong,
     adplugTicksPerRow: fmt.adplugTicksPerRow ?? undefined,
     c64MemPatches: fmt.c64MemPatches ?? undefined,
     sunTronicCompanionPcm: fmt.sunTronicCompanionPcm ?? undefined,

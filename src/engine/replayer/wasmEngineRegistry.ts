@@ -15,6 +15,7 @@
 import type { TrackerSong } from '../TrackerReplayer';
 import { FILE_DATA_FIELDS } from '../formatFileDataFields';
 import { nuadeSongHasCellWrite } from '../nuade/nuadeCaps';
+import { uadeEditableLoadArgs } from '../uade/uadeLoadArgs';
 
 // ---------------------------------------------------------------------------
 // Engine registry types
@@ -1004,6 +1005,8 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     suppressNotes: true,
     fileDataKey: 'uadeEditableFileData',
     loadMethod: 'loadTune',
+    // The module name, subsong and companions UADE loads with, from the song (a song without a name falls back to the format store inside loadTune).
+    getLoadArgs: (song: TrackerSong) => (song.uadeEditableFileName ? uadeEditableLoadArgs(song) : []),
     supportsPause: false,
     supportsResume: false,
     needsDirectRouting: true,
