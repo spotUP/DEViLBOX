@@ -11,8 +11,19 @@ import { scopeCells } from '../channelLayout';
 describe('track scopes line up with the pattern columns', () => {
   const layout = { offsets: [40, 200, 360], widths: [160, 160, 160], scrollLeft: 0, numChannels: 3 };
 
-  it('puts each scope over its channel column, not in equal cells across the strip', () => {
+  // Owner 2026-10-14: "the gaps are still there" - with every channel on screen the
+  // scopes left the strip empty over the order list, row numbers and global lane
+  // (left) and the pitch fader (right). They now span the strip edge to edge, each
+  // with its column's share of the width.
+  it('spans the whole strip edge to edge when every channel is on screen, no side gaps', () => {
     const cells = scopeCells(3, 1200, layout);
+    expect(cells.map((c) => c.x)).toEqual([0, 400, 800]);
+    expect(cells[0].x).toBe(0);
+    expect(cells[2].x + cells[2].w).toBe(1200);
+  });
+
+  it('keeps each scope over its column while the columns do not fit the strip', () => {
+    const cells = scopeCells(3, 400, layout);
     expect(cells.map((c) => c.x)).toEqual([40, 200, 360]);
     expect(cells.every((c) => c.w === 159)).toBe(true);
   });
@@ -34,8 +45,8 @@ describe('track scopes line up with the pattern columns', () => {
   // Owner, same day, GoatTracker view: "channel oscillators are doubled" - the
   // view mounted a second strip under the app-wide one, which sat over the
   // order sidebar, left of the pattern columns.
-  it('shifts by where the editor starts inside a wider strip', () => {
-    expect(scopeCells(3, 1200, layout, 80).map((c) => c.x)).toEqual([120, 280, 440]);
+  it('shifts by where the editor starts inside a wider strip (columns not fitting)', () => {
+    expect(scopeCells(3, 500, layout, 80).map((c) => c.x)).toEqual([120, 280, 440]);
   });
 
   it('is mounted once, by the tracker view, and measures the editor\'s left edge', () => {
