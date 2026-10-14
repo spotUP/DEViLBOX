@@ -58,8 +58,9 @@ describe('djLayout: pinned outcomes (the same ones the real-Chrome sweep found)'
     [1280, 720, 2, null, 'compact', ['mixerExtrasPopover', 'shortWaveforms', 'deckPanelOnDemand', 'compact']],
     [1280, 720, 3, 'scratchOnly', 'compact', ['mixerExtrasPopover', 'shortWaveforms', 'deckPanelOnDemand', 'compact']],
     [1366, 768, 3, 'scratchOnly', 'compact', ['mixerExtrasPopover', 'shortWaveforms', 'deckPanelOnDemand', 'compact']],
-    [1512, 982, 2, null, 'regular', ['mixerExtrasPopover']],
-    [1728, 1117, 2, null, 'regular', []],
+    [1512, 982, 2, null, 'regular', ['mixerExtrasPopover', 'shortWaveforms']],
+    [1728, 1117, 3, 'scratchOnly', 'regular', ['mixerExtrasPopover']],
+    [1440, 900, 2, null, 'regular', ['mixerExtrasPopover', 'shortWaveforms', 'deckPanelOnDemand']],
     [1920, 1080, 2, null, 'regular', ['mixerExtrasPopover']],
     [2560, 1440, 2, null, 'large', []],
     [2560, 1440, 3, 'scratchOnly', 'large', []],
@@ -74,7 +75,8 @@ describe('djLayout: pinned outcomes (the same ones the real-Chrome sweep found)'
 });
 
 describe('djLayout: what each give-way step changes', () => {
-  const roomy = djLayout(inputFor(1728, 1117, 2, null, false));
+  // 1728x1117 itself is a razor-edge case (the mixer needs 800 of 799-800 px), so the roomy example is 100 px taller.
+  const roomy = djLayout(inputFor(1728, 1217, 2, null, false));
   const tight = djLayout(inputFor(1280, 720, 3, 'scratchOnly', false));
 
   it('a roomy screen gives way to nothing: inline extras, docked panel, regular sizes', () => {

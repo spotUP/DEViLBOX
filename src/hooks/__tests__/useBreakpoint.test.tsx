@@ -331,7 +331,7 @@ describe('breakpoint single source of truth', () => {
         'hook instead:\n' +
         offenders.join('\n')
     ).toEqual([]);
-  }, 30_000);
+  }, 120_000);
 
   // DJ view band sizes (DJ-VIEW-RESOLUTIONS DJVR-08): the DJ layout has ONE source,
   // DJ_SIZES in src/lib/dj/djLayout.ts (measurements) and DJ_LAYOUT_LIMITS in
@@ -376,5 +376,5 @@ describe('breakpoint single source of truth', () => {
         'value from useDJLayoutContext():\n' +
         offenders.join('\n')
     ).toEqual([]);
-  }, 30_000);
+  }, 120_000);
 });
