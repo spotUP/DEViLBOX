@@ -99,6 +99,22 @@ if (!globalThis.DevilboxChannelStream) {
     }
 
     /**
+     * Post what is buffered now, as a short chunk (a row clip ends mid-chunk: its audio would otherwise wait for the
+     * next audio, which may be a different clip or never come).
+     */
+    flush() {
+      if (this.fill === 0) return;
+      const channels = this.bufs.map((b) => b.slice(0, this.fill));
+      this.port.postMessage(
+        { type: 'oscData', channels, frame: this.chunkStart, sampleRate: this.sampleRate },
+        channels.map((b) => b.buffer),
+      );
+      this.bufs = Array.from({ length: this.voices }, () => new Int16Array(this.chunk));
+      this.fill = 0;
+      this.chunkStart = this.frame;
+    }
+
+    /**
      * The audio stops being one stream (new song, seek, stop): drop the
      * partial chunk and leave a gap in `frame`, so the receiver never joins
      * the two.

@@ -186,6 +186,18 @@ describe('NE-2 Nuade.worklet.js', () => {
       expect(vu.some((m) => (m.levels[1] ?? 0) > 0.4)).toBe(true);
     });
 
+    it('a clip shorter than a scope chunk still reaches the scope when it ends', async () => {
+      const r = await boot();
+      await r.send({ type: 'setMuteMask', mask: 0xFFFFFFFF });
+      await r.send({ type: 'playRowClip', clip: clip(960) });
+      r.posted.length = 0;
+      run(r, 10);
+      const osc = oscOf(r);
+      expect(osc).toHaveLength(1);
+      expect(osc[0]!.channels[0]!.length).toBe(960);
+      expect(osc[0]!.channels[1]!.some((s) => s !== 0)).toBe(true);
+    });
+
     it('is dropped by play, and ignored while the song plays', async () => {
       await load(rig);
       await rig.send({ type: 'setMuteMask', mask: 0xFFFFFFFF });

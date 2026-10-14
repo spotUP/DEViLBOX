@@ -448,6 +448,8 @@ class NuadeProcessor extends AudioWorkletProcessor {
       this.port.postMessage({ type: 'vu', levels: this.maskedLevels(this.clipPeaks.slice()) });
       this.clipPeaks = [];
     }
+    // The clip is its own stretch of audio: its scope samples go out now and are not joined to what follows.
+    if (!this.clip.active && this._stream) { this._stream.flush(); this._stream.discontinue(); }
   }
 
   process(inputs, outputs) {
