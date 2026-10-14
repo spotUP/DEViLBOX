@@ -142,4 +142,61 @@ describe('NE-2 Nuade.worklet.js', () => {
     expect(pos.length).toBeGreaterThan(0);
     expect(pos[0]!.frame).toBeLessThan(2000);
   });
+
+  describe('row clip (the row preview plays through the same output code)', () => {
+    /** Two voices: voice 0 a constant 0.25 on both sides of the mix, voice 1 a constant 0.5; `fadeFrames` 0 keeps it exact. */
+    const clip = (frames: number) => ({
+      sampleRate: 48000, frames, startFrame: 0, fadeFrames: 0,
+      stereo: Float32Array.from({ length: frames * 2 }, (_, i) => (i % 2 ? -0.1 : 0.1) + Math.floor(i / 2) * 1e-6),
+      voices: [new Float32Array(frames).fill(0.25), new Float32Array(frames).fill(0.5)],
+      panSteps: [{ at: 0, pans: new Float32Array([-1, 1]) }],
+    });
+    const oscOf = (r: Rig) => r.posted.filter((m) => m.type === 'oscData') as Array<WorkletMsg & { channels: Int16Array[] }>;
+    const vuOf = (r: Rig) => r.posted.filter((m) => m.type === 'vu') as Array<WorkletMsg & { levels: number[] }>;
+
+    it('comes out of output 0 sample for sample, on a song that was never played', async () => {
+      const r = await boot();
+      await r.send({ type: 'setMuteMask', mask: 0xFFFFFFFF });
+      const c = clip(1000);
+      await r.send({ type: 'playRowClip', clip: c });
+      const got: number[] = [];
+      for (let q = 0; q < 8; q++) {
+        const out = stereoOutputs(9);
+        r.proc.process([], out);
+        for (let i = 0; i < 128; i++) got.push(out[0]![0]![i]!, out[0]![1]![i]!);
+      }
+      expect(got.slice(0, 2000)).toEqual(Array.from(c.stereo));
+      expect(got.slice(2000).every((v) => v === 0)).toBe(true);
+      expect(r.posted.map((m) => m.type).filter((t) => t === 'rowClipStarted' || t === 'rowClipDone')).toEqual(['rowClipStarted', 'rowClipDone']);
+    });
+
+    it('draws a muted voice flat on its scope and reads 0 on its meter, and the other voice moves', async () => {
+      const r = await boot();
+      await r.send({ type: 'setMuteMask', mask: 0b10 });               // voice 0 muted, voice 1 audible
+      await r.send({ type: 'playRowClip', clip: clip(20000) });
+      r.posted.length = 0;
+      run(r, 160);
+      const osc = oscOf(r);
+      expect(osc.length).toBeGreaterThan(0);
+      expect(osc.every((m) => m.channels[0]!.every((s) => s === 0)), 'muted voice scope is flat').toBe(true);
+      expect(osc.some((m) => m.channels[1]!.some((s) => s !== 0)), 'audible voice scope moves').toBe(true);
+      const vu = vuOf(r);
+      expect(vu.length).toBeGreaterThan(0);
+      expect(vu.every((m) => m.levels[0] === 0)).toBe(true);
+      expect(vu.some((m) => (m.levels[1] ?? 0) > 0.4)).toBe(true);
+    });
+
+    it('is dropped by play, and ignored while the song plays', async () => {
+      await load(rig);
+      await rig.send({ type: 'setMuteMask', mask: 0xFFFFFFFF });
+      await rig.send({ type: 'playRowClip', clip: clip(20000) });
+      rig.posted.length = 0;
+      await rig.send({ type: 'play' });
+      expect((rig.proc as unknown as { clip: { active: boolean } }).clip.active).toBe(false);
+      expect(rig.posted.some((m) => m.type === 'rowClipDone')).toBe(true);
+      await rig.send({ type: 'playRowClip', clip: clip(20000) });
+      expect((rig.proc as unknown as { clip: { active: boolean } }).clip.active, 'no clip over a playing song').toBe(false);
+      await rig.send({ type: 'pause' });
+    });
+  });
 });

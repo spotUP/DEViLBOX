@@ -5,6 +5,8 @@
  * handle, `NUADE_OUT_MESSAGES` is all it may post. `parseNuadeOut` is the one place a posted message is validated.
  */
 
+import type { RowClip } from '@engine/rowPreview/rowClip';
+
 /** A companion file a player opens beside the module (samples, instrument banks), by name. */
 export interface NuadeCompanion { name: string; data: ArrayBuffer }
 
@@ -30,6 +32,8 @@ export type NuadeIn =
   /** The edited module while it plays: opened, sought to the frame already played, played on. */
   | { type: 'swapModule'; bytes: ArrayBuffer }
   | { type: 'seek'; frame: number }
+  /** A grid row rendered by the row-preview worker, played out of the engine's own output while the song is stopped. */
+  | { type: 'playRowClip'; clip: RowClip }
   | { type: 'setStereoSeparation'; value: number }
   /** Read bytes of the player's typed state (answered with `state`). */
   | { type: 'requestState'; offset: number; len: number }
@@ -64,12 +68,15 @@ export type NuadeOut =
   | { type: 'writeResult'; op: 'cell' | 'instrument'; status: number }
   | { type: 'state'; offset: number; bytes: ArrayBuffer }
   | { type: 'stopped' }
+  /** The row clip player (worklets/row-clip.js): a clip started / ran out. */
+  | { type: 'rowClipStarted'; frames: number }
+  | { type: 'rowClipDone' }
   | { type: 'error'; message: string };
 
 /** Every message type the worklet handles itself (the isolation / dub kinds go through channel-outputs.js). */
 export const NUADE_IN_MESSAGES = [
   'init', 'loadModule', 'play', 'stop', 'pause', 'setSubsong', 'setMuteMask',
-  'swapModule', 'seek', 'setStereoSeparation', 'requestState', 'cellWrite', 'instrumentWrite',
+  'swapModule', 'seek', 'playRowClip', 'setStereoSeparation', 'requestState', 'cellWrite', 'instrumentWrite',
 ] as const satisfies readonly NuadeIn['type'][];
 
 /** The dub / isolation kinds handled by DevilboxChannelOutputs. */
@@ -78,7 +85,7 @@ export const NUADE_CHANNEL_OUTPUT_MESSAGES = [
 ] as const satisfies readonly NuadeIn['type'][];
 
 export const NUADE_OUT_MESSAGES = [
-  'ready', 'moduleLoaded', 'subsongStarted', 'position', 'vu', 'oscData', 'songEnd', 'swapDone', 'writeResult', 'state', 'stopped', 'error',
+  'ready', 'moduleLoaded', 'subsongStarted', 'position', 'vu', 'oscData', 'songEnd', 'swapDone', 'writeResult', 'state', 'stopped', 'rowClipStarted', 'rowClipDone', 'error',
 ] as const satisfies readonly NuadeOut['type'][];
 
 /**
@@ -101,6 +108,10 @@ export function parseNuadeOut(data: unknown): NuadeOut | null {
       return isNum(d.voices) && isNum(d.subsongs) && isNum(d.defaultSubsong) && isStr(d.playerId) && isStr(d.playerName)
         && isNum(d.caps) && Array.isArray(d.instruments) && d.meta !== null && typeof d.meta === 'object'
         ? (d as unknown as NuadeOut) : null;
+    case 'rowClipStarted':
+      return isNum(d.frames) ? { type: 'rowClipStarted', frames: d.frames } : null;
+    case 'rowClipDone':
+      return { type: 'rowClipDone' };
     case 'subsongStarted':
       return isNum(d.index) ? { type: 'subsongStarted', index: d.index } : null;
     case 'position':
