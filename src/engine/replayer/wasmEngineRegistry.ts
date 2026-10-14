@@ -90,6 +90,31 @@ export interface NativeEngineDescriptor {
   liveSwap?: true;
   /** Optional post-start hook for engine-specific setup (e.g., Klys onSongData) */
   onStarted?: (instance: WASMSingletonEngine, song: TrackerSong) => void;
+  /**
+   * How the tracker pitch slider (and its Key Lock) reaches this engine natively. applyNativeEnginePitch
+   * (nativeEnginePitch.ts) drives it from computeTempoPitchSplit while the engine plays, and again when it starts.
+   * Absent: the slider does not reach the engine natively. A direct-routed engine then does not follow the slider at
+   * all; one on the synth bus (needsDirectRouting false) gets the bus resampler's pitch only, tempo unchanged.
+   * Census: thoughts/shared/research/2026-10-15_pitch-slider-engine-census.md.
+   */
+  tempoPitch?: EngineTempoPitchControl;
+}
+
+/** An engine's native tempo/pitch controls (NativeEngineDescriptor.tempoPitch). */
+export interface EngineTempoPitchControl {
+  /** Varispeed: tempo and pitch move together, 1 = normal (a tape transport). */
+  setRate(instance: WASMSingletonEngine, factor: number): void;
+  /**
+   * Tempo only, pitch untouched, 1 = the song's tempo (e.g. the replayer's samples per tick). With it Key Lock holds
+   * the song's key; without it the slider stays a varispeed on this engine.
+   */
+  setTempoScale?(instance: WASMSingletonEngine, factor: number): void;
+}
+
+/** HivelyEngine's tempo/pitch surface, typed here so the registry stays free of engine imports. */
+interface HivelyTempoPitch {
+  setSliderRate(f: number): void;
+  setTempoScale(f: number): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -110,6 +135,12 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     // Linked statically by NativeEngineRouting (STATIC_ENGINES) for its sync stop/pause/resume.
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/hively/HivelyEngine')).HivelyEngine as unknown as WASMSingletonStatic,
+    // Varispeed: the worklet reads its ring at a rate (composes with the dub tape stop);
+    // tempo only: hively_set_tempo_scale scales the replayer's samples per tick.
+    tempoPitch: {
+      setRate: (instance, f) => (instance as unknown as HivelyTempoPitch).setSliderRate(f),
+      setTempoScale: (instance, f) => (instance as unknown as HivelyTempoPitch).setTempoScale(f),
+    },
   },
   {
     key: 'Klystrack',

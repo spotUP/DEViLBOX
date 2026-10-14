@@ -49,6 +49,11 @@ installIOSAudioUnlock();
 import { installOneProgrammeAtATime } from './lib/playback/oneProgrammeAtATime'
 installOneProgrammeAtATime();
 
+// The tracker pitch slider's value reaches the sound through one path: every
+// write of the stored pitch / Key Lock is applied to the engines.
+import { installPitchStateSync } from './engine/PatternScheduler'
+installPitchStateSync();
+
 // DJ playlists: import the bundled seed playlists on first launch, repair their sources afterwards.
 setTimeout(() => { void import('./stores/useDJPlaylistStore').then(({ syncBundledPlaylists }) => syncBundledPlaylists()); }, 100);
 

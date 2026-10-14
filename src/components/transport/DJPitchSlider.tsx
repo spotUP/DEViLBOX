@@ -10,7 +10,6 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { getPatternScheduler } from '@engine/PatternScheduler';
 import { useTransportStore } from '@stores/useTransportStore';
 import { Toggle } from '@components/controls/Toggle';
 
@@ -59,32 +58,23 @@ export const DJPitchSlider: React.FC<DJPitchSliderProps> = ({
     const clamped = Math.max(MIN_PITCH, Math.min(MAX_PITCH, raw));
     setPitch(clamped);
 
-    // Update global pitch in store (so W commands can read it and vice versa)
+    // The store is the one path to the sound: installPitchStateSync applies it
+    // to the engines (during playback and when stopped)
     setGlobalPitch(clamped);
-
-    // Set global pitch offset in PatternScheduler (works during playback and when stopped)
-    const scheduler = getPatternScheduler();
-    scheduler.setGlobalPitchOffset(clamped);
 
     onPitchChange?.(clamped);
   }, [onPitchChange, setGlobalPitch]);
 
   // Key Lock: re-apply the current slider position with the new tempo/pitch split
   const handleKeyLock = useCallback((enabled: boolean) => {
-    const transport = useTransportStore.getState();
-    transport.setTrackerKeyLock(enabled);
-    getPatternScheduler().setGlobalPitchOffset(transport.globalPitch);
+    useTransportStore.getState().setTrackerKeyLock(enabled);
   }, []);
 
   const resetPitch = useCallback(() => {
     setPitch(0);
 
-    // Update global pitch in store
+    // Update global pitch in store (applied to the engines by installPitchStateSync)
     setGlobalPitch(0);
-
-    // Reset global pitch offset in PatternScheduler
-    const scheduler = getPatternScheduler();
-    scheduler.setGlobalPitchOffset(0);
 
     onPitchChange?.(0);
   }, [onPitchChange, setGlobalPitch]);
@@ -292,12 +282,8 @@ export const DJPitchSliderHorizontal: React.FC<DJPitchSliderProps> = ({
     const newValue = parseFloat(e.target.value);
     setPitchSemitones(newValue);
 
-    // Update global pitch in store
+    // Update global pitch in store (applied to the engines by installPitchStateSync)
     setGlobalPitch(newValue);
-
-    // Set global pitch offset in PatternScheduler
-    const scheduler = getPatternScheduler();
-    scheduler.setGlobalPitchOffset(newValue);
 
     onPitchChange?.(newValue);
   }, [onPitchChange, setGlobalPitch]);
@@ -305,12 +291,8 @@ export const DJPitchSliderHorizontal: React.FC<DJPitchSliderProps> = ({
   const handleDoubleClick = useCallback(() => {
     setPitchSemitones(0);
 
-    // Update global pitch in store
+    // Update global pitch in store (applied to the engines by installPitchStateSync)
     setGlobalPitch(0);
-
-    // Reset global pitch offset in PatternScheduler
-    const scheduler = getPatternScheduler();
-    scheduler.setGlobalPitchOffset(0);
 
     onPitchChange?.(0);
   }, [onPitchChange, setGlobalPitch]);
