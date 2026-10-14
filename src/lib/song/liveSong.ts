@@ -71,6 +71,8 @@ export function liveTrackerSong(overrides: Partial<TrackerSong> = {}): TrackerSo
     hivelyMeta: fmt.hivelyMeta ?? undefined,
     klysNative: fmt.klysNative ?? undefined,
     furnaceNative: fmt.furnaceNative ?? undefined,
+    furnaceSamples: fmt.furnaceSamples ?? undefined,
+    furnaceWavetables: fmt.furnaceWavetables ?? undefined,
     furnaceActiveSubsong: fmt.furnaceActiveSubsong ?? undefined,
     channelTrackTables: fmt.channelTrackTables ?? undefined,
     channelSpeeds: fmt.channelSpeeds ?? undefined,

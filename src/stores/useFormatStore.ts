@@ -18,6 +18,8 @@ import type {
   HivelyNativeStep,
   KlysNativeData,
   FurnaceSubsongPlayback,
+  FurnaceModuleSample,
+  FurnaceModuleWavetable,
 } from '@typedefs';
 import type { TFMXNativeData } from '@/types/tfmxNative';
 import type { SunTronicNativeData } from '@/lib/import/formats/sunNativeData';
@@ -54,6 +56,9 @@ export interface HivelyTrackStepUndoEntry {
 export interface FormatStore {
   editorMode: EditorMode;
   furnaceNative: FurnaceNativeData | null;
+  /** The Furnace song's module samples and wavetables: part of the song, the engine plays them from it. */
+  furnaceSamples: FurnaceModuleSample[] | null;
+  furnaceWavetables: FurnaceModuleWavetable[] | null;
   hivelyNative: HivelyNativeData | null;
   hivelyFileData: ArrayBuffer | null;
   klysNative: KlysNativeData | null;
@@ -320,7 +325,7 @@ export interface FormatStore {
   setMaxTraxData: (data: MaxTraxData | null) => void;
   mutateMaxTraxScore: (scoreIndex: number, fn: (score: MaxTraxScore) => void) => void;
   mutateMaxTraxSample: (sampleIndex: number, mutation: MaxTraxSampleMutation) => void;
-  applyEditorMode: (song: { format?: string; linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; sonixSidecarFiles?: Array<{ path: string; data: ArrayBuffer }>; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; eupFmBankData?: ArrayBuffer; eupPcmBankData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; sndhFileData?: ArrayBuffer; hippelStFileData?: ArrayBuffer; gmeFileData?: ArrayBuffer; s98FileData?: ArrayBuffer; asapFileData?: ArrayBuffer; ayFileData?: ArrayBuffer; qsfFileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; gridEstimated?: boolean; gridUnmatchedReason?: string; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; cinter4FileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; sawteethFileData?: ArrayBuffer; soundMonFileData?: ArrayBuffer; sonicArrangerFileData?: ArrayBuffer; robHubbardFileData?: ArrayBuffer; digMugFileData?: ArrayBuffer; davidWhittakerFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; sunTronicSongFileData?: ArrayBuffer; sunTronicCompanionPcm?: Array<{ name: string; data: ArrayBuffer | Uint8Array }>; sunTronicNative?: SunTronicNativeData; maxTraxFileData?: ArrayBuffer; maxTraxFileName?: string; nativeSamplePlayback?: boolean; adplugFileData?: ArrayBuffer; adplugFileName?: string; adplugTicksPerRow?: number; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; musiclineMetadata?: { title: string; author: string; date: string; duration: string; infoText: string[] }; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData; sf2StoreData?: SF2LoadPayload; cheeseCutterStoreData?: import('@/stores/useCheeseCutterStore').CheeseCutterLoadPayload }) => void;
+  applyEditorMode: (song: { format?: string; linearPeriods?: boolean; furnaceNative?: FurnaceNativeData; furnaceSamples?: FurnaceModuleSample[]; furnaceWavetables?: FurnaceModuleWavetable[]; hivelyNative?: HivelyNativeData; hivelyFileData?: ArrayBuffer; klysNative?: KlysNativeData; klysFileData?: ArrayBuffer; musiclineFileData?: Uint8Array; c64SidFileData?: Uint8Array; jamCrackerFileData?: ArrayBuffer; futurePlayerFileData?: ArrayBuffer; preTrackerFileData?: ArrayBuffer; maFileData?: ArrayBuffer; hippelFileData?: ArrayBuffer; sonixFileData?: ArrayBuffer; sonixSidecarFiles?: Array<{ path: string; data: ArrayBuffer }>; pxtoneFileData?: ArrayBuffer; organyaFileData?: ArrayBuffer; eupFileData?: ArrayBuffer; eupFmBankData?: ArrayBuffer; eupPcmBankData?: ArrayBuffer; ixsFileData?: ArrayBuffer; psycleFileData?: ArrayBuffer; sc68FileData?: ArrayBuffer; sndhFileData?: ArrayBuffer; hippelStFileData?: ArrayBuffer; gmeFileData?: ArrayBuffer; s98FileData?: ArrayBuffer; asapFileData?: ArrayBuffer; ayFileData?: ArrayBuffer; qsfFileData?: ArrayBuffer; zxtuneFileData?: ArrayBuffer; gridEstimated?: boolean; gridUnmatchedReason?: string; pumaTrackerFileData?: ArrayBuffer; steveTurnerFileData?: ArrayBuffer; sidmon1WasmFileData?: ArrayBuffer; artOfNoiseFileData?: ArrayBuffer; cinter4FileData?: ArrayBuffer; bdFileData?: ArrayBuffer; sd2FileData?: ArrayBuffer; symphonieFileData?: ArrayBuffer; sawteethFileData?: ArrayBuffer; soundMonFileData?: ArrayBuffer; sonicArrangerFileData?: ArrayBuffer; robHubbardFileData?: ArrayBuffer; digMugFileData?: ArrayBuffer; davidWhittakerFileData?: ArrayBuffer; uadeEditableFileData?: ArrayBuffer; uadeEditableFileName?: string; sunTronicSongFileData?: ArrayBuffer; sunTronicCompanionPcm?: Array<{ name: string; data: ArrayBuffer | Uint8Array }>; sunTronicNative?: SunTronicNativeData; maxTraxFileData?: ArrayBuffer; maxTraxFileName?: string; nativeSamplePlayback?: boolean; adplugFileData?: ArrayBuffer; adplugFileName?: string; adplugTicksPerRow?: number; libopenmptFileData?: ArrayBuffer; hivelyMeta?: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number }; furnaceSubsongs?: FurnaceSubsongPlayback[]; furnaceActiveSubsong?: number; channelTrackTables?: number[][]; channelSpeeds?: number[]; channelGrooves?: number[]; musiclineMetadata?: { title: string; author: string; date: string; duration: string; infoText: string[] }; goatTrackerData?: Uint8Array; tfmxNative?: TFMXNativeData; sf2StoreData?: SF2LoadPayload; cheeseCutterStoreData?: import('@/stores/useCheeseCutterStore').CheeseCutterLoadPayload }) => void;
   setFurnaceActiveSubsong: (index: number) => void;
   setActivisionProSubsongs: (count: number) => void;
   /** The engine reports the subsong it plays; the start field follows, so play after stop resumes it. */
@@ -420,6 +425,8 @@ function restructureTFMXMacro(
 
 const clearNative = (state: any) => {
   state.furnaceNative = null;
+  state.furnaceSamples = null;
+  state.furnaceWavetables = null;
   state.hivelyNative = null;
   state.hivelyFileData = null;
   state.klysNative = null;
@@ -503,6 +510,8 @@ export const useFormatStore = create<FormatStore>()(
   immer((set, get) => ({
     editorMode: 'classic' as EditorMode,
     furnaceNative: null,
+    furnaceSamples: null,
+    furnaceWavetables: null,
     hivelyNative: null,
     hivelyFileData: null,
     klysNative: null,
@@ -1217,6 +1226,8 @@ export const useFormatStore = create<FormatStore>()(
           state.editorMode = 'furnace';
           clearNative(state);
           state.furnaceNative = song.furnaceNative;
+          state.furnaceSamples = song.furnaceSamples ?? null;
+          state.furnaceWavetables = song.furnaceWavetables ?? null;
           state.furnaceSubsongs = song.furnaceSubsongs ?? null;
           state.furnaceActiveSubsong = song.furnaceActiveSubsong ?? 0;
         } else if (song.hivelyNative) {
