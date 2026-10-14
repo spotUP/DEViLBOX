@@ -418,13 +418,13 @@ songs (their instruments are ours).
 
 ## Ledger - wave 0 + 1 (13 items), started 2026-10-14
 
-Running count: 1 of 13. Order: RP-1, RP-2, RP-7, RP-3, N1, RP-4, N2, N3, RP-5, RP-6, N4, RP-R, N5.
+Running count: 3 of 13. Order: RP-1, RP-2, RP-7, RP-3, N1, RP-4, N2, N3, RP-5, RP-6, N4, RP-R, N5.
 
 | ID | Done | Commit |
 |---|---|---|
 | RP-1 | yes | 12502120e |
-| RP-2 | no | |
-| RP-3 | no | |
+| RP-2 | yes | e35f8b4d9 |
+| RP-3 | yes | a59f9a19a |
 | RP-4 | no | |
 | RP-5 | no | |
 | RP-6 | no | |
