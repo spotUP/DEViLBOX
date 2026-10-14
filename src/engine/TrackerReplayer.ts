@@ -34,6 +34,8 @@ import { useTrackerStore } from '@/stores/useTrackerStore';
 import { setCellInPattern } from '@/stores/tracker/patternEditActions';
 import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useCursorStore } from '@/stores/useCursorStore';
+import { useFormatStore } from '@/stores/useFormatStore';
+import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { useOscilloscopeStore } from '@/stores/useOscilloscopeStore';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
@@ -70,6 +72,8 @@ import {
   resumeNativeEngines,
   restoreNativeRouting,
   preInitMusicLine,
+  rowPreviewRoute,
+  previewNativeRow,
 } from './replayer/NativeEngineRouting';
 // ============================================================================
 // CONSTANTS (imported from replayer/PeriodTables.ts)
@@ -3985,6 +3989,22 @@ export class TrackerReplayer {
       this.clearStateQueue();
       // Pattern not in song order — just clear the state queue, don't seek
     }
+  }
+
+  /**
+   * Row preview (Enter on a stopped song). A song played by a whole-song engine that has a row-preview adapter sounds
+   * the row as that engine renders it ('engine'); while the transport plays it sounds nothing, the song already is
+   * ('playing'); every other song or engine takes the instrument path ('unsupported'). The decision is synchronous, the
+   * rendering follows.
+   */
+  previewRow(songPos: number, row: number): 'engine' | 'playing' | 'unsupported' {
+    // The loaded song's engine from the stores (this.song lags a load, see playingEngineFromStores).
+    const route = rowPreviewRoute(useFormatStore.getState() as unknown as Record<string, unknown>, useInstrumentStore.getState().instruments, useTransportStore.getState().isPlaying);
+    if (route !== 'engine') return route;
+    void import('@/lib/song/liveSong')
+      .then(({ liveTrackerSong }) => previewNativeRow(liveTrackerSong(), songPos, row, this.separationNode.inputTone, this.routedNativeEngines))
+      .catch((err) => console.error('[TrackerReplayer] row preview failed:', err));
+    return 'engine';
   }
 
   isPlaying(): boolean { return this.playing; }

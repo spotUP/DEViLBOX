@@ -3,6 +3,7 @@ import { useTrackerStore } from '@stores/useTrackerStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { getToneEngine } from '@engine/ToneEngine';
+import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { xmNoteToToneJS } from '@/lib/xmConversions';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 import type { Pattern, TrackerCell } from '@/types/tracker';
@@ -45,6 +46,10 @@ export function previewCell(cell: TrackerCell | undefined, instrumentId: number,
  * Play Row (Audition) - sound every note of the row under the cursor once, without starting playback.
  * A muted channel stays silent and its meter dark, as in playback (TrackerReplayer.triggerNote).
  *
+ * A song a whole-song engine plays (nuade, ...) sounds the row as that engine renders it
+ * (TrackerReplayer.previewRow -> previewNativeRow): the instrument path below only knows the instruments we hold a
+ * sample or synth for. While such a song plays, Enter sounds nothing: playback already is the grid.
+ *
  * Classic tracker command (Keypad Enter in Impulse Tracker, Enter step play in ProTracker).
  * Returns how many notes it sounded.
  */
@@ -53,9 +58,13 @@ export function playRow(): number {
   unlockIOSAudio();
   void Tone.start();
   const { cursor } = useCursorStore.getState();
-  const { patterns, currentPatternIndex } = useTrackerStore.getState();
+  const { patterns, currentPatternIndex, currentPositionIndex } = useTrackerStore.getState();
   const pattern = patterns[currentPatternIndex];
   if (!pattern) return 0;
+
+  const outcome = getTrackerReplayer().previewRow(currentPositionIndex, cursor.rowIndex);
+  if (outcome === 'engine') return 1;
+  if (outcome === 'playing') return 0;
 
   const engine = getToneEngine();
   let sounded = 0;
