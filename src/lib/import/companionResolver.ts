@@ -51,6 +51,8 @@ export const ROLE_WORDS: ReadonlySet<string> = new Set([
   'sng', 'ins', 'instr', 'smp', 'samples', 'sdata', 'song', 'snd',
   // DynamicSynthesizer, SynthDream, SynthPack, AudioSculpture
   'dns', 'sdr', 'osp', 'adsc',
+  // Richard Joseph Player: RJP.<tune> + SMP.<tune>, else SMP.set (eagleplayer Prefix 'RJP.', SampleName 'SMP.set')
+  'rjp',
   // the server's prefix pairs
   'jpn', 'jpnd', 'jp', 'jpo', 'jpold', 'thm', 'mfp', 'sjs', 'max', 'mcr', 'mcs', 'midi',
   // the server's extension pairs and suffixes
@@ -66,7 +68,7 @@ export const ROLE_WORDS: ReadonlySet<string> = new Set([
 export const EXPECTED_PARTNER: Readonly<Record<string, string[]>> = {
   mdat: ['smpl'], smpl: ['mdat'], tfmx: ['smpl'], tfx: ['smpl'],
   spm: ['sps'], sps: ['spm'],
-  dns: ['smp'], sdr: ['smp', 'smp.set'], osp: ['smp.set'],
+  rjp: ['smp', 'smp.set'], dns: ['smp'], sdr: ['smp', 'smp.set'], osp: ['smp.set'],
   jpn: ['smp'], jpnd: ['smp'], jp: ['smp'], jpo: ['smp'], jpold: ['smp'], thm: ['smp'], mfp: ['smp'], sjs: ['smp'], max: ['smp'],
   mcr: ['mcs'], mcs: ['mcr'], midi: ['smpl'],
   sng: ['ins'], dum: ['ins'], '4v': ['set'],
