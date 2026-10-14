@@ -16,6 +16,7 @@ import { getAutomationPlayer } from './AutomationPlayer';
 import { getEffectProcessor } from './EffectCommands';
 import { useTransportStore } from '@stores/useTransportStore';
 import { computeTempoPitchSplit } from './dj/computeKeyLockShift';
+import { applyNativeEnginePitch, setPitchEnginesChangedListener } from './replayer/nativeEnginePitch';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { notify } from '@stores/useNotificationStore';
@@ -83,7 +84,6 @@ export class PatternScheduler {
   // Global pitch shift tracking (DJ-style performance control)
   private baseBPM: number = 125; // Base tempo (affected by Fxx effects)
   private pitchShiftSemitones: number = 0; // Pitch shift (affected by Wxx effects)
-  private globalPitchOffset: number = 0; // Global pitch offset from DJ slider, etc.
 
   /**
    * Track playback errors and notify user if threshold exceeded
@@ -125,24 +125,21 @@ export class PatternScheduler {
   }
 
   /**
-   * Set global pitch offset from external controls (the tracker view's pitch
-   * slider). Applied on top of the pattern's Wxx pitch shift.
-   */
-  public setGlobalPitchOffset(semitones: number): void {
-    this.globalPitchOffset = semitones;
-    this.applyPitchState();
-  }
-
-  /**
-   * Push the slider offset + Wxx shift to every engine the slider reaches.
-   * The tempo/pitch decision is computeTempoPitchSplit(), the same one a
-   * tracker-mode DJ deck uses: with Key Lock on (useTransportStore
-   * .trackerKeyLock) tempo follows the slider and pitch stays at the song's key.
+   * Push the tracker pitch slider (useTransportStore.globalPitch + trackerKeyLock)
+   * and the pattern's Wxx shift to every engine the slider reaches. The
+   * tempo/pitch decision is computeTempoPitchSplit(), the same one a
+   * tracker-mode DJ deck uses: with Key Lock on tempo follows the slider and
+   * pitch stays at the song's key.
+   *
+   * Callers never invoke this to move the slider: they write the store, and
+   * installPitchStateSync() runs this on every change, so no caller can set the
+   * value without the sound following.
    */
   private applyPitchState(): void {
-    const { trackerKeyLock } = useTransportStore.getState();
-    const split = computeTempoPitchSplit(this.globalPitchOffset, trackerKeyLock);
+    const { trackerKeyLock, globalPitch } = useTransportStore.getState();
+    const split = computeTempoPitchSplit(globalPitch, trackerKeyLock);
     const wxxRate = Math.pow(2, this.pitchShiftSemitones / 12);
+    const tempoRate = split.tempoMultiplier * wxxRate;
     const pitchRate = split.pitchMultiplier * wxxRate;
 
     const engine = getToneEngine();
@@ -150,7 +147,7 @@ export class PatternScheduler {
 
     // Tempo: the replayer's tick rate, as on a DJ deck. The song's own BPM
     // (and every Fxx change of it) stays the song's; the slider scales it.
-    replayer.setTempoMultiplier(split.tempoMultiplier * wxxRate);
+    replayer.setTempoMultiplier(tempoRate);
 
     // Pitch: sample playback rate for new notes and the ones already playing
     engine.setGlobalPlaybackRate(pitchRate);
@@ -163,16 +160,22 @@ export class PatternScheduler {
     // tunes, tempo only for VSync tunes); it follows the tempo.
     const c64Engine = replayer.getC64SIDEngine();
     if (c64Engine) {
-      c64Engine.setPlaybackRate(split.tempoMultiplier * wxxRate);
+      c64Engine.setPlaybackRate(tempoRate);
     }
 
-    // Pitch: the synth-bus resampler (WASM/native engines and DevilboxSynths)
-    engine.setSynthBusPitchRate(pitchRate);
+    // Whole-song WASM engines with native tempo/pitch controls
+    // (NativeEngineDescriptor.tempoPitch): lossless, no added latency.
+    const nativeOwnsBus = applyNativeEnginePitch(tempoRate, pitchRate);
+
+    // Pitch: the synth-bus resampler (WASM/native engines and DevilboxSynths
+    // without native controls). Held at 1 while a synth-bus engine applies the
+    // pitch itself, or the song would be shifted twice.
+    engine.setSynthBusPitchRate(nativeOwnsBus ? 1 : pitchRate);
 
     // LibOpenMPT (MOD/XM/S3M/IT opened from a file) renders the whole song to
     // the master input, past the resampler, and splits natively:
     // play.tempo_factor + play.pitch_factor. Lossless, no added latency.
-    applyToLibopenmpt(split.tempoMultiplier * wxxRate, pitchRate);
+    applyToLibopenmpt(tempoRate, pitchRate);
   }
 
   /**
@@ -180,7 +183,7 @@ export class PatternScheduler {
    * For an engine that has just loaded a song and starts neutral.
    */
   public reapplyGlobalPitch(): void {
-    this.setGlobalPitchOffset(useTransportStore.getState().globalPitch);
+    this.applyPitchState();
   }
 
   /**
@@ -1006,3 +1009,28 @@ export const getPatternScheduler = (): PatternScheduler => {
   }
   return schedulerInstance;
 };
+
+let uninstallPitchStateSync: (() => void) | null = null;
+
+/**
+ * The one path from the tracker pitch slider's value to the sound: every
+ * change of useTransportStore.globalPitch or .trackerKeyLock (the slider, the
+ * MCP set_global_pitch tool, the DJ view's reset, a song load) is applied by
+ * PatternScheduler.applyPitchState, and so is a whole-song engine starting or
+ * stopping (nativeEnginePitch). Call once at startup. Returns the uninstaller (tests).
+ */
+export function installPitchStateSync(): () => void {
+  if (uninstallPitchStateSync) return uninstallPitchStateSync;
+  const off = useTransportStore.subscribe((state, prev) => {
+    if (state.globalPitch !== prev.globalPitch || state.trackerKeyLock !== prev.trackerKeyLock) {
+      getPatternScheduler().reapplyGlobalPitch();
+    }
+  });
+  setPitchEnginesChangedListener(() => getPatternScheduler().reapplyGlobalPitch());
+  uninstallPitchStateSync = () => {
+    off();
+    setPitchEnginesChangedListener(null);
+    uninstallPitchStateSync = null;
+  };
+  return uninstallPitchStateSync;
+}

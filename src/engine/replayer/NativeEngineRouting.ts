@@ -32,6 +32,7 @@ import { needsPaulaOutputStage } from '@engine/paulaOutput';
 import { editedModuleForPlay } from './editedModuleForPlay';
 import { isRowClipPlayer } from '@engine/rowPreview/rowClipPlayer';
 import { rowPreviewSupports } from '@engine/rowPreview/supportedEngines';
+import { registerPitchEngine, unregisterPitchEngine } from './nativeEnginePitch';
 import { WASM_ENGINES, shouldActivate, songFromStores, type NativeEngineDescriptor, type WASMSingletonStatic, type WASMSingletonEngine } from './wasmEngineRegistry';
 
 export { WASM_ENGINES, shouldActivate, playsOnDedicatedEngine } from './wasmEngineRegistry';
@@ -593,6 +594,9 @@ export async function startNativeEngines(
         openEngineOutputGain(instance);
         instance.play();
         console.log(`[NativeEngineRouting] ${desc.key} loaded & playing`);
+        // The tracker pitch slider (and Key Lock), as it stands now: a song
+        // started with the slider moved starts at the slider's speed.
+        if (!isDJDeck) registerPitchEngine(desc, instance);
 
         // Capture HivelyEngine for position sync in TrackerReplayer.
         // AHX/HVL are Amiga chip formats — NOT C64 SID — so they use the
@@ -1044,6 +1048,8 @@ export function stopNativeEngines(
   const wasRunning = new Set(_runningEngineKeys);
   // Clear the running engine guard so next play() can start fresh
   _runningEngineKeys.clear();
+  // The tracker pitch slider stops driving them (and the synth-bus resampler takes the pitch back).
+  for (const key of wasRunning) unregisterPitchEngine(key);
 
 
   // The stopped engines' position callbacks go with them.

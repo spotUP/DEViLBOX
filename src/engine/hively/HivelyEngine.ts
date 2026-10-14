@@ -378,6 +378,11 @@ export class HivelyEngine extends WASMSingletonBase implements IsolationCapableE
     });
   }
 
+  /** Transport rate a move set (dub tape stop), 1 = normal. */
+  private _transportRate = 1;
+  /** Varispeed the tracker pitch slider set, 1 = normal. */
+  private _sliderRate = 1;
+
   /**
    * Playback speed as a fraction of normal, pitch following tempo.
    *
@@ -386,11 +391,33 @@ export class HivelyEngine extends WASMSingletonBase implements IsolationCapableE
    * than three octaves down. `transportTapeStop` uses it so the move is a real
    * transport slowdown on AHX/HVL instead of the bus-only approximation.
    *
-   * 1.0 is normal speed. The worklet clamps to 0.02..4 and ramps to the new
-   * value over a few blocks, so stepping is click-free.
+   * 1.0 is normal speed. Composes with the pitch slider's varispeed
+   * (setSliderRate): the worklet plays their product, so a tape stop slows
+   * the song from the slider's speed and lands back on it, never on 1.0.
+   * The worklet clamps to 0.02..4 and ramps over a few blocks (click-free).
    */
   setRateFactor(factor: number): void {
-    this.workletNode?.port.postMessage({ type: 'setRateFactor', value: factor });
+    this._transportRate = factor;
+    this.postRate();
+  }
+
+  /** The tracker pitch slider's varispeed (Key Lock off). Composes with setRateFactor. */
+  setSliderRate(factor: number): void {
+    this._sliderRate = factor;
+    this.postRate();
+  }
+
+  /**
+   * Tempo only, pitch untouched: the replayer's ticks come `factor` times as
+   * fast (hively_set_tempo_scale scales the samples per tick). The tracker
+   * pitch slider under Key Lock. 1.0 = the song's own tempo; clamped 0.25..4.
+   */
+  setTempoScale(factor: number): void {
+    this.workletNode?.port.postMessage({ type: 'setTempoScale', value: factor });
+  }
+
+  private postRate(): void {
+    this.workletNode?.port.postMessage({ type: 'setRateFactor', value: this._transportRate * this._sliderRate });
   }
 
   /** Set a single step in a track (for pattern editing) */
