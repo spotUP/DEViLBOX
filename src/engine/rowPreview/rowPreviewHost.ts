@@ -12,7 +12,7 @@ import type { RowPreviewIn, RowPreviewOut, RowPreviewRequest } from './rowPrevie
 
 export type AdapterLoaders = Record<string, (sampleRate: number) => Promise<RowRenderAdapter>>;
 
-interface Entry { stream: RowPreviewStream; sampleRate: number }
+interface Entry { stream: RowPreviewStream; adapter: RowRenderAdapter; sampleRate: number }
 interface Job { signal: RowRequestSignal; prepare: boolean }
 
 export interface RowPreviewHost {
@@ -33,9 +33,11 @@ export function createRowPreviewHost(loaders: AdapterLoaders, opts: RowPreviewSt
     if (!e || e.sampleRate !== req.sampleRate) {
       const load = loaders[req.engineKey];
       if (!load) throw new Error(`row preview: no adapter for engine ${req.engineKey}`);
-      e = { stream: new RowPreviewStream(await load(req.sampleRate), opts), sampleRate: req.sampleRate };
+      const adapter = await load(req.sampleRate);
+      e = { stream: new RowPreviewStream(adapter, opts), adapter, sampleRate: req.sampleRate };
       entries.set(req.engineKey, e);
     }
+    await e.adapter.prepare?.(req.args, req.data);
     e.stream.ensureOpen(req.data, req.args);
     return e.stream;
   }

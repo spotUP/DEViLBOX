@@ -25,12 +25,22 @@ import {
 
 export interface RowRenderAdapter {
   readonly sampleRate: number;
+  /**
+   * Get ready for `open(data, args)`: fetch what it needs (an engine whose player is a separate file), or a clean player
+   * instance (one whose reset leaves state of the song before). Called before every ensureOpen, which may not reopen:
+   * cheap when nothing changed.
+   */
+  prepare?(args: unknown[], data: Uint8Array): Promise<void>;
   /** Open the module on a fresh private instance and start its subsong; frame 0. Throws with the engine's message. */
   open(data: Uint8Array, args: unknown[]): void;
   /** Back to frame 0 of the same module. */
   restart(): void;
-  /** From frame 0, run silently to `frame`. Returns the frame reached (less than asked only at the song's end). */
-  advanceSilent(frame: number): number;
+  /**
+   * From frame 0, run silently to `frame` with the voices in `mask` audible. Returns the frame reached (less than asked only at
+   * the song's end). The mask is in force while running, not only afterwards: an engine that renders ahead of what it hands
+   * out (UADE's pipe) would otherwise give the first frames of the row with the mask the run began with.
+   */
+  advanceSilent(frame: number, mask: number): number;
   /** Render the next `frames` frames with the voices in `mask` audible (bit N set = voice N). */
   renderChunk(frames: number, mask: number): RowChunk;
   /** Where the player stands at `frame`, a frame inside the chunk rendered last; null when it cannot tell. */
@@ -58,6 +68,8 @@ const positionKey = (p: PlayerPosition): string => `${p.order}:${p.pattern}:${p.
 
 /** Whether `pos` is inside `target`. */
 export function positionIsInTarget(pos: PlayerPosition, target: RowTarget): boolean {
+  // A frame range is not a player position: the stream knows its first and last frame without looking.
+  if (target.kind === 'frames') return false;
   if (target.kind === 'orderRow') return pos.order === target.order && pos.row === target.row;
   const t = pos.row * Math.max(1, pos.speed) + pos.tick;
   return t >= target.from && t < target.to;
@@ -96,6 +108,8 @@ function deepEqual(a: unknown, b: unknown): boolean {
 export class RowPreviewStream {
   private load: { data: Uint8Array; args: unknown[] } | null = null;
   private cursor = 0;
+  /** The timeline is complete from frame 0 up to here: a silent advance past it leaves a hole no later render fills. */
+  private knownEnd = 0;
   private transitions: Transition[] = [];
   private lastPos: PlayerPosition | null = null;
   private finished: 'ended' | 'looped' | 'limit' | null = null;
@@ -136,11 +150,18 @@ export class RowPreviewStream {
 
   private reset(): void {
     this.cursor = 0;
+    this.knownEnd = 0;
     this.transitions = [];
     this.lastPos = null;
     this.finished = null;
     this.tail = null;
     this.last = null;
+  }
+
+  /** Back to frame 0 with an empty timeline. */
+  private rewind(): void {
+    this.adapter.restart();
+    this.reset();
   }
 
   /** The audible voices changed or the clip is stale: a later request renders again. */
@@ -158,18 +179,35 @@ export class RowPreviewStream {
       return !signal.cancelled;
     };
 
-    let start = this.startOf(target);
-    if (start < 0) {
-      const found = await this.searchForward(target, mask, slice);
-      if (found === 'cancelled') return { kind: 'cancelled' };
-      if (typeof found === 'object') return { kind: 'missed', reason: found.reason };
-      start = found;
+    let start: number;
+    if (target.kind === 'frames') {
+      start = target.from;
+      if (start > this.searchLimitFrames) return { kind: 'missed', reason: 'limit' };
+    } else {
+      start = this.startOf(target);
+      if (start < 0) {
+        // A frames request ran silently to its row: the timeline before the cursor has a hole, and a position that is not in it
+        // may lie in the hole. Render again from the song's start, which records every position on the way.
+        if (this.cursor > this.knownEnd) this.rewind();
+        const found = await this.searchForward(target, mask, slice);
+        if (found === 'cancelled') return { kind: 'cancelled' };
+        if (typeof found === 'object') return { kind: 'missed', reason: found.reason };
+        start = found;
+      }
     }
     if (!this.coverFrom(start, mask)) return { kind: 'missed', reason: 'ended' };
 
     const rate = this.adapter.sampleRate;
     const cap = rowClipMaxFrames(rate);
-    let end = this.endOf(start, target);
+    // A frame range names its end; a player position is found by rendering until the player leaves the row.
+    let end = target.kind === 'frames' ? Math.min(target.to, start + cap) : this.endOf(start, target);
+    if (target.kind === 'frames') {
+      while (this.cursor < end && !this.finished) {
+        if (!(await slice())) return { kind: 'cancelled' };
+        this.renderInto(mask, true);
+      }
+      end = Math.min(end, this.cursor);
+    }
     while (end < 0 && this.cursor - start < cap) {
       if (this.finished) { end = this.cursor; break; }
       if (!(await slice())) return { kind: 'cancelled' };
@@ -252,6 +290,7 @@ export class RowPreviewStream {
     const chunk = this.adapter.renderChunk(ROW_CHUNK_FRAMES, mask);
     if (chunk.frames > 0) this.scanChunk(c, chunk.frames);
     this.cursor = c + chunk.frames;
+    if (c <= this.knownEnd) this.knownEnd = Math.max(this.knownEnd, this.cursor);
     if (chunk.flags & CHUNK_ENDED) this.finished = 'ended';
     else if (chunk.flags & CHUNK_LOOPED) this.finished = 'looped';
     else if (chunk.frames < ROW_CHUNK_FRAMES) this.finished = 'ended';
@@ -280,8 +319,16 @@ export class RowPreviewStream {
   private coverFrom(start: number, mask: number): boolean {
     const t = this.tail;
     if (t && t.mask === mask && t.start <= start && start < this.tailEnd(t)) return true;
-    this.adapter.restart();
-    const reached = this.adapter.advanceSilent(start);
+    // A start just ahead of the cursor (a frame range after the previous row) is reached by running on, not by a restart:
+    // rendering chunk by chunk costs about three silent frames each, so it pays while the gap is under a third of the start.
+    if (t && t.mask === mask && !this.finished && start >= this.cursor && (start - this.cursor) * 3 <= start + this.adapter.sampleRate) {
+      while (this.cursor <= start && !this.finished) this.renderInto(mask, false);
+      const now = this.tail;
+      return !!now && now.mask === mask && now.start <= start && start < this.tailEnd(now);
+    }
+    // The player is already at frame 0 when nothing has been rendered since it opened.
+    if (t || this.cursor !== 0 || this.finished) this.adapter.restart();
+    const reached = this.adapter.advanceSilent(start, mask);
     this.cursor = reached;
     this.lastPos = null;
     this.finished = null;

@@ -107,6 +107,54 @@ describe('RowPreviewStream', () => {
     expect(clip.voices![1]![0]).toBe(0);
   });
 
+  it('renders a frames target as exactly that stretch, with no restart on the first request and the mask in force while advancing', async () => {
+    const { stream, calls } = await open();
+    const clip = clipOf(await stream.request({ kind: 'frames', from: 5000, to: 6500 }, 0xfffffffe));
+    expect(clip.startFrame).toBe(5000);
+    expect(clip.frames).toBe(1500);
+    expect(clip.stereo[0]).toBe(5000);
+    expect(clip.stereo[(1500 - 1) * 2]).toBe(6499);
+    expect(calls.restart, 'the player was at frame 0 already').toBe(0);
+    expect(calls.advanceSilent).toEqual([5000]);
+    expect(calls.masks.every((m) => m === 0xfffffffe)).toBe(true);
+    expect(clip.voices![1]![0]).toBe(0);
+  });
+
+  it('reaches a frames target just ahead of the cursor by running on, and one behind it by a restart', async () => {
+    const { stream, calls } = await open();
+    await stream.request({ kind: 'frames', from: 5000, to: 6000 }, ALL);
+    const next = clipOf(await stream.request({ kind: 'frames', from: 6000, to: 7000 }, ALL));
+    expect(next.startFrame).toBe(6000);
+    expect(next.stereo[0]).toBe(6000);
+    expect(calls.restart, 'the next stretch comes from the tail').toBe(0);
+    const near = clipOf(await stream.request({ kind: 'frames', from: 7600, to: 8000 }, ALL));
+    expect(near.stereo[0]).toBe(7600);
+    expect(calls.restart, 'a stretch just ahead is rendered towards, not restarted').toBe(0);
+    const back = clipOf(await stream.request({ kind: 'frames', from: 2000, to: 3000 }, ALL));
+    expect(back.stereo[0]).toBe(2000);
+    expect(calls.restart).toBe(1);
+    expect(calls.advanceSilent).toEqual([5000, 2000]);
+  });
+
+  it('finds a player position behind a frames request by rendering from the start: the silent advance left a hole in the timeline', async () => {
+    const { stream, calls } = await open();
+    await stream.request({ kind: 'frames', from: 10000, to: 11000 }, ALL);
+    expect(calls.advanceSilent).toEqual([10000]);
+    // order 0 row 3 starts at frame 3000, before the silent advance reached 10000: it is in no timeline entry.
+    const clip = clipOf(await stream.request({ kind: 'orderRow', order: 0, row: 3 }, ALL));
+    expect(clip.startFrame).toBe(3000);
+    expect(clip.stereo[0]).toBe(3000);
+    expect(calls.restart, 'the stream went back to the start to record the positions').toBeGreaterThanOrEqual(1);
+  });
+
+  it('answers a frames target past the song\'s end, or past the search limit, with missed', async () => {
+    const { stream } = await open({ ...SCRIPT, songFrames: 3000 });
+    expect(await stream.request({ kind: 'frames', from: 4000, to: 5000 }, ALL)).toEqual({ kind: 'missed', reason: 'ended' });
+    expect(await stream.request({ kind: 'frames', from: Infinity, to: Infinity }, ALL)).toEqual({ kind: 'missed', reason: 'limit' });
+    const short = clipOf(await stream.request({ kind: 'frames', from: 2500, to: 4000 }, ALL));
+    expect(short.frames, 'the stretch ends where the song does').toBe(500);
+  });
+
   it('answers a row the song never reaches with missed', async () => {
     const { stream } = await open({ ...SCRIPT, songFrames: 3000 });
     const r = await stream.request({ kind: 'orderRow', order: 2, row: 1 }, ALL);

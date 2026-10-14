@@ -10,6 +10,8 @@ export interface RowClipPlayer {
   targetOf(song: never, songPos: number, row: number): RowTarget;
   /** Voices audible in the mix (bit N set = voice N), isolation slots already left out. */
   readonly rowClipMask: number;
+  /** The arguments the row-preview player opens with, when they are more than the play arguments (UADE adds the clock its grid is named in). */
+  rowLoadArgs?(song: never, args: unknown[]): unknown[];
   playRowClip(clip: RowClip): void;
 }
 
