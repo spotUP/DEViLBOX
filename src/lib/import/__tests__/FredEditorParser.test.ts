@@ -7,11 +7,9 @@ import { resolve } from 'path';
 import { isFredEditorFormat, parseFredEditorFile } from '../formats/FredEditorParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FE_DIR1 = resolve(REF, 'FredMon/- unknown');
-const FE_DIR2 = resolve(REF, 'FredMon/Fred');
-const FILE1 = resolve(FE_DIR1, 'aspar.fred');
-const FILE2 = resolve(FE_DIR2, 'ilyad title and ingame.fred');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'fredmon/fireworks ii.fred');
+const FILE2 = resolve(REF, 'formats/bomb jack.fred');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

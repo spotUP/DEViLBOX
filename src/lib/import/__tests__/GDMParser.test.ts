@@ -5,11 +5,11 @@ import { isGDMFormat, parseGDMFile } from '../formats/GDMParser';
 
 const MARSHMELLOW = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/General DigiMusic/Bishop/marshmellow dreams.gdm'
+  '../../../../public/data/songs/general-digimusic/tilbury fair (remix).gdm'
 );
 const RAINY = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/General DigiMusic/Bishop/rainy sunday night.gdm'
+  "../../../../public/data/songs/formats/breakin's chipsong.gdm"
 );
 
 function loadFile(path: string): ArrayBuffer {

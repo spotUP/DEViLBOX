@@ -9,9 +9,9 @@ import { resolve } from 'path';
 import { isPSAFormat, parsePSAFile } from '../formats/PSAParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF_MUSIC  = resolve(import.meta.dirname, '../../../../Reference Music');
-const PSA_FILE_1 = resolve(REF_MUSIC, 'Professional Sound Artists/Leggless/the punisher - title.psa');
-const PSA_FILE_2 = resolve(REF_MUSIC, 'Professional Sound Artists/Leggless/test module.psa');
+const REF_MUSIC  = resolve(import.meta.dirname, '../../../../public/data/songs');
+const PSA_FILE_1 = resolve(REF_MUSIC, 'formats/the punisher - title.psa');
+const PSA_FILE_2 = resolve(REF_MUSIC, 'professional-sound-artists/test module.psa');
 
 function loadAB(path: string): ArrayBuffer {
   const buf = readFileSync(path);

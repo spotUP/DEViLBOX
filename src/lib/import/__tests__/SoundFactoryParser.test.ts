@@ -4,10 +4,10 @@ import { resolve } from 'path';
 import { isSoundFactoryFormat, parseSoundFactoryFile } from '../formats/SoundFactoryParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 
-const FILE1 = resolve(REF, 'SoundFactory/- unknown/axelf.psf');
-const FILE2 = resolve(REF, 'SoundFactory/- unknown/christies song.psf');
+const FILE1 = resolve(REF, 'soundfactory/im maien.psf');
+const FILE2 = resolve(REF, 'soundfactory/oriental.psf');
 
 function loadBytes(p: string): Uint8Array {
   return new Uint8Array(readFileSync(p));

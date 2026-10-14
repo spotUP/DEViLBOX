@@ -10,10 +10,9 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { isSTPFormat } from '../formats/SamplerTrackerPlusParser';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const STP_DIR = resolve(REF, 'FredMon/Soundtracker Pro II/- unknown');
-const FILE1 = resolve(STP_DIR, 'jungle in germany.stp');
-const FILE2 = resolve(STP_DIR, 'this is 4 u.stp');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'formats/noname.stp');
+const FILE2 = resolve(REF, 'formats/noname.stp');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

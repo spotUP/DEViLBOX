@@ -4,10 +4,10 @@ import { resolve } from 'path';
 import { isSteveBarrettFormat, parseSteveBarrettFile } from '../formats/SteveBarrettParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 
-const FILE1 = resolve(REF, 'Steve Barrett/Steve Barrett/advanced ski simulator.sb');
-const FILE2 = resolve(REF, 'Steve Barrett/Steve Barrett/artificial dreams.sb');
+const FILE1 = resolve(REF, 'steve-barrett/street fighter.sb');
+const FILE2 = resolve(REF, 'formats/street_fighter.sb');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

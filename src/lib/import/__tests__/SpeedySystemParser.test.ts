@@ -4,12 +4,12 @@ import { resolve } from 'path';
 import { isSpeedySystemFormat, parseSpeedySystemFile } from '../formats/SpeedySystemParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 
 // Speedy System (.ss)
-const SS_FILE = resolve(REF, 'Speedy System/Michael Winterberg/airdriver.ss');
+const SS_FILE = resolve(REF, 'speedy-system/pauker rap 2.ss');
 // Speedy A1 System (.sas)
-const SAS_FILE = resolve(REF, 'Speedy A1 System/Michael Winterberg/digital voyage.sas');
+const SAS_FILE = resolve(REF, 'speedy-a1-system/digital voyage.sas');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

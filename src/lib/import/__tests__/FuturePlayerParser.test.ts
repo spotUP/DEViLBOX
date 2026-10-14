@@ -10,11 +10,10 @@ import { resolve } from 'path';
 import { isFuturePlayerFormat, parseFuturePlayerFile } from '../formats/FuturePlayerParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FP_DIR = resolve(REF, 'Future Player/Paul Van Der Valk');
-const FILE1 = resolve(FP_DIR, 'hybris ingame.fp');
-const FILE2 = resolve(FP_DIR, 'hybris title.fp');
-const FILE3 = resolve(FP_DIR, 'imploder drums.fp');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'future-player/imploder drums.fp');
+const FILE2 = resolve(REF, 'formats/hybris.fp');
+const FILE3 = resolve(REF, 'formats/imploder_drums.fp');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

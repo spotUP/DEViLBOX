@@ -4,9 +4,9 @@ import { resolve } from 'path';
 import { isRonKlarenFormat, parseRonKlarenFile } from '../formats/RonKlarenParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FILE_ASTRA1 = resolve(REF, 'Ron Klaren/Ron Klaren/astra 1.rk');
-const FILE_ASTRA2 = resolve(REF, 'Ron Klaren/Ron Klaren/astra 2.rk');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE_ASTRA1 = resolve(REF, 'ron-klaren/astra 2.rk');
+const FILE_ASTRA2 = resolve(REF, 'formats/astra_2.rk');
 
 function loadU8(path: string): Uint8Array {
   return new Uint8Array(readFileSync(path));

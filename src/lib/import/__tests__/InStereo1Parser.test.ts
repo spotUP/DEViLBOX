@@ -9,10 +9,10 @@ import { resolve } from 'path';
 import { isInStereo1Format, parseInStereo1File } from '../formats/InStereo1Parser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF_MUSIC = resolve(import.meta.dirname, '../../../../Reference Music');
+const REF_MUSIC = resolve(import.meta.dirname, '../../../../public/data/songs');
 // .is files in the InStereo! 1.0 directory
-const IS1_FILE_1 = resolve(REF_MUSIC, 'InStereo!/- unknown/cherry moon.is');
-const IS1_FILE_2 = resolve(REF_MUSIC, 'InStereo!/- unknown/digital man.is');
+const IS1_FILE_1 = resolve(REF_MUSIC, 'instereo!/fantasi8.is');
+const IS1_FILE_2 = resolve(REF_MUSIC, 'formats/fantasi8.is');
 
 function loadBytes(path: string): Uint8Array {
   const buf = readFileSync(path);

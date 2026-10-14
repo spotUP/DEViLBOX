@@ -4,14 +4,14 @@ import { resolve } from 'path';
 import { isSoundMasterFormat, parseSoundMasterFile } from '../formats/SoundMasterParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 
 // Sound Master (v1)
-const SM_FILE = resolve(REF, 'Sound Master/- unknown/delta-rob hubbard.sm');
+const SM_FILE = resolve(REF, "sound-master/rackney'sisland 4.sm");
 // Sound Master II v1
-const SM2V1_FILE = resolve(REF, 'Sound Master II v1/Jeroen Soede/futureshock-gameover.smpro');
+const SM2V1_FILE = resolve(REF, 'sound-master-ii-v1/futureshock-level 3.smpro');
 // Sound Master II v3
-const SM2V3_FILE = resolve(REF, 'Sound Master II v3/Jeroen Soede/doofus 1.sm3');
+const SM2V3_FILE = resolve(REF, 'sound-master-ii-v3/doofus 3.sm3');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

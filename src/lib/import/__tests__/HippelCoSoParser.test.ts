@@ -7,10 +7,9 @@ import { resolve } from 'path';
 import { isHippelCoSoFormat, parseHippelCoSoFile } from '../formats/HippelCoSoParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const COSO_DIR = resolve(REF, 'Hippel COSO/Jochen Hippel');
-const FILE1 = resolve(COSO_DIR, 'a prehistoric tale (intro).hipc');
-const FILE2 = resolve(COSO_DIR, 'amberstar (01).hipc');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'hippel-coso/wings of death (level 3).hipc');
+const FILE2 = resolve(REF, 'formats/prehistoric_tale.hipc');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

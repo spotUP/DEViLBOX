@@ -7,10 +7,9 @@ import { resolve } from 'path';
 import { isJochenHippelSTFormat, parseJochenHippelSTFile } from '../formats/JochenHippelSTParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const HIP_ST_DIR = resolve(REF, 'Hippel ST/Jochen Hippel');
-const FILE1 = resolve(HIP_ST_DIR, 'astaroth.sog');
-const FILE2 = resolve(HIP_ST_DIR, 'comic bakery.sog');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'formats/astaroth.sog');
+const FILE2 = resolve(REF, 'hippel-st/demo music10.sog');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

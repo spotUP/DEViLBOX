@@ -9,8 +9,8 @@ import { resolve } from 'path';
 import { isFARFormat, parseFARFile } from '../formats/FARParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF_MUSIC = resolve(import.meta.dirname, '../../../../Reference Music');
-const FAR_FILE  = resolve(REF_MUSIC, 'Farandole Composer/4Go10/m31.far');
+const REF_MUSIC = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FAR_FILE  = resolve(REF_MUSIC, 'formats/m31.far');
 
 function loadAB(path: string): ArrayBuffer {
   const buf = readFileSync(path);

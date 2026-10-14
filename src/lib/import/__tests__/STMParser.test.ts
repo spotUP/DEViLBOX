@@ -5,7 +5,7 @@ import { isSTMFormat, parseSTMFile } from '../formats/STMParser';
 
 const STM_FILE = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/Scream Tracker 2/BIG/slideshow i.stm'
+  '../../../../public/data/songs/scream-tracker-2/slideshow i.stm'
 );
 
 function loadFile(path: string): ArrayBuffer {

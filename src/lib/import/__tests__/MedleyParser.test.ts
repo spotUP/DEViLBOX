@@ -10,9 +10,9 @@ import { resolve } from "path";
 import { isMedleyFormat, parseMedleyFile } from "../formats/MedleyParser";
 import { analyzeFormat, formatReportToString } from "./formatAnalysis";
 
-const REF = resolve(import.meta.dirname, "../../../../Reference Music");
-const FILE1 = resolve(REF, "Medley/Paul Van Der Valk/atmos.mso");
-const FILE2 = resolve(REF, "Medley/Paul Van Der Valk/combat.mso");
+const REF = resolve(import.meta.dirname, "../../../../public/data/songs");
+const FILE1 = resolve(REF, "medley/combat.mso");
+const FILE2 = resolve(REF, "medley/combat.mso");
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

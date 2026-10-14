@@ -11,9 +11,9 @@ import { resolve } from 'path';
 import { isSoundFXFormat, parseSoundFXFile } from '../formats/SoundFXParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FILE1 = resolve(REF, 'SoundFX/- unknown/acid housemix.sfx');
-const FILE2 = resolve(REF, 'SoundFX/Allister Brimble/heavy-metal.sfx');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'soundfx/batdance.sfx');
+const FILE2 = resolve(REF, 'soundfx/distancia al ano.sfx');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

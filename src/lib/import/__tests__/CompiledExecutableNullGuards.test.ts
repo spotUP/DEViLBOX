@@ -19,7 +19,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { tryExtractInstrumentNames } from '../formats/UADEParser';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 
 function loadBuf(path: string): ArrayBuffer {
   const b = readFileSync(path);
@@ -29,7 +29,7 @@ function loadBuf(path: string): ArrayBuffer {
 // ── Dave Lowe New (.dln) ───────────────────────────────────────────────────
 
 describe('tryExtractInstrumentNames — Dave Lowe New (.dln) null guard', () => {
-  const DLN_FILE = resolve(REF, 'Dave Lowe New/Dave Lowe/balrog.dln');
+  const DLN_FILE = resolve(REF, 'dave-lowe-new/m-bison.dln');
 
   it('returns null for a real .dln file', () => {
     expect(tryExtractInstrumentNames(loadBuf(DLN_FILE), 'dln')).toBeNull();
@@ -51,7 +51,7 @@ describe('tryExtractInstrumentNames — Dave Lowe New (.dln) null guard', () => 
 // ── David Whittaker (.dw) ─────────────────────────────────────────────────
 
 describe('tryExtractInstrumentNames — David Whittaker (.dw) null guard', () => {
-  const DW_FILE = resolve(REF, 'David Whittaker/David Whittaker/crossbow-title.dw');
+  const DW_FILE = resolve(REF, 'david-whittaker/garfield2+.dw');
 
   it('returns null for a real .dw file (Crossbow)', () => {
     expect(tryExtractInstrumentNames(loadBuf(DW_FILE), 'dw')).toBeNull();
@@ -72,8 +72,8 @@ describe('tryExtractInstrumentNames — David Whittaker (.dw) null guard', () =>
 // ── Jochen Hippel (.hip, .hip7) ───────────────────────────────────────────
 
 describe('tryExtractInstrumentNames — Jochen Hippel (.hip) null guard', () => {
-  const HIP_FILE  = resolve(REF, 'Hippel/Jochen Hippel/warp (ingame 2).hip');
-  const HIP7_FILE = resolve(REF, 'Hippel 7V/Jochen Hippel/lethalxcess-intro.hip7');
+  const HIP_FILE  = resolve(REF, 'hippel/warp (ingame 2).hip');
+  const HIP7_FILE = resolve(REF, 'hippel-7v/lethalxcess-intro.hip7');
 
   it('returns null for a real .hip file (Warp ingame 2)', () => {
     expect(tryExtractInstrumentNames(loadBuf(HIP_FILE), 'hip')).toBeNull();
@@ -95,7 +95,7 @@ describe('tryExtractInstrumentNames — Jochen Hippel (.hip) null guard', () => 
 // ── Rob Hubbard (.rh, .rho) ───────────────────────────────────────────────
 
 describe('tryExtractInstrumentNames — Rob Hubbard (.rh, .rho) null guard', () => {
-  const RH_FILE = resolve(REF, 'Rob Hubbard/- unknown/sanxion.rh');
+  const RH_FILE = resolve(REF, 'rob-hubbard/budokan.rh');
 
   it('returns null for a real .rh file (Sanxion)', () => {
     expect(tryExtractInstrumentNames(loadBuf(RH_FILE), 'rh')).toBeNull();
@@ -116,7 +116,7 @@ describe('tryExtractInstrumentNames — Rob Hubbard (.rh, .rho) null guard', () 
 // ── Mark II (.mk2, .mkii, .mkiio) ─────────────────────────────────────────
 
 describe('tryExtractInstrumentNames — Mark II (.mk2) null guard', () => {
-  const MK2_FILE = resolve(REF, 'Mark II/Andreas Starr/astarrsonix.mk2');
+  const MK2_FILE = resolve(REF, 'mark-ii/astarrsonix.mk2');
 
   it('returns null for a real .mk2 file (astarrsonix)', () => {
     expect(tryExtractInstrumentNames(loadBuf(MK2_FILE), 'mk2')).toBeNull();

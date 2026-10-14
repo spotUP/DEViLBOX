@@ -7,10 +7,9 @@ import { resolve } from 'path';
 import { isCustomMadeFormat, parseCustomMadeFile } from '../formats/CustomMadeParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const DIR = resolve(REF, 'Delitracker Custom/Ben Daglish');
-const FILE1 = resolve(DIR, 'action fighter.cus');
-const FILE2 = resolve(DIR, 'terramex.cus');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'delitracker-custom/bards tale.cus');
+const FILE2 = resolve(REF, 'delitracker-custom/neuromancer.cus');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

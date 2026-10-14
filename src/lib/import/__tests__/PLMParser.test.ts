@@ -5,11 +5,11 @@ import { isPLMFormat, parsePLMFile } from '../formats/PLMParser';
 
 const BLOODY_MARY = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/Disorder Tracker 2/Statix/bloody mary.plm'
+  '../../../../public/data/songs/disorder-tracker-2/hyper geckoo.plm'
 );
 const CALM = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/Disorder Tracker 2/Statix/calm.plm'
+  '../../../../public/data/songs/formats/parity_error.plm'
 );
 
 function loadFile(path: string): ArrayBuffer {

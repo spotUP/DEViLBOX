@@ -16,12 +16,12 @@ import { resolve } from 'path';
 import { parseHivelyBinary, parseHivelyFile } from '../formats/HivelyParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
 
-const AHX1 = resolve(REF, 'AHX/Mortimer Twang/amanda.ahx');
-const AHX2 = resolve(REF, 'AHX/Mortimer Twang/jennipha.ahx');
-const HVL1 = resolve(REF, 'Hively Tracker/chiprolled.hvl');
-const HVL2 = resolve(REF, 'Hively Tracker/doobrey_gubbins.hvl');
+const AHX1 = resolve(REF, 'ahx/amanda.ahx');
+const AHX2 = resolve(REF, 'formats/aces_high.ahx');
+const HVL1 = resolve(REF, 'hivelytracker/waiting for a message.hvl');
+const HVL2 = resolve(REF, 'formats/hexplosion.hvl');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

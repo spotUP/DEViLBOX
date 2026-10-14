@@ -13,9 +13,9 @@ import {
 } from "../formats/PaulRobothamParser";
 import { analyzeFormat, formatReportToString } from "./formatAnalysis";
 
-const REF = resolve(import.meta.dirname, "../../../../Reference Music");
-const FILE1 = resolve(REF, "Paul Robotham/Paul Robotham/Ashes Of Empire/ashes of empire-auto.dat");
-const FILE2 = resolve(REF, "Paul Robotham/Paul Robotham/Dawn Patrol/dawnpatrol-happy.dat");
+const REF = resolve(import.meta.dirname, "../../../../public/data/songs");
+const FILE1 = resolve(REF, "paul-robotham/dawnpatrol-sad.dat");
+const FILE2 = resolve(REF, "formats/dawnpatrol-sad.dat");
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

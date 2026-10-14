@@ -9,8 +9,8 @@ import { resolve } from 'path';
 import { isFashionTrackerFormat, parseFashionTrackerFile } from '../formats/FashionTrackerParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF_MUSIC = resolve(import.meta.dirname, '../../../../Reference Music');
-const EX_FILE   = resolve(REF_MUSIC, 'Fashion Tracker/Richard van de Veen/fashionating 1.ex');
+const REF_MUSIC = resolve(import.meta.dirname, '../../../../public/data/songs');
+const EX_FILE   = resolve(REF_MUSIC, 'fashion-tracker/ivory tover ii.ex');
 
 function loadAB(path: string): ArrayBuffer {
   const buf = readFileSync(path);

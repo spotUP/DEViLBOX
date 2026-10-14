@@ -20,12 +20,12 @@ import {
 } from "../formats/MusicMakerParser";
 import { analyzeFormat, formatReportToString } from "./formatAnalysis";
 
-const REF = resolve(import.meta.dirname, "../../../../Reference Music");
+const REF = resolve(import.meta.dirname, "../../../../public/data/songs");
 
 // 4V file from MusicMaker V8/- unknown/
-const FILE_4V = resolve(REF, "MusicMaker V8/- unknown/axelf.mm4");
+const FILE_4V = resolve(REF, "formats/easystyleofmsx.mm4");
 // 8V file from MusicMaker V8/- unknown/
-const FILE_8V = resolve(REF, "MusicMaker V8/- unknown/crockett8.mm8");
+const FILE_8V = resolve(REF, "musicmaker-v8/roetzmegoem.mm8");
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

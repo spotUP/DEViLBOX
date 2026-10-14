@@ -11,10 +11,10 @@ import { resolve } from 'path';
 import { isDigitalMugicianFormat, parseDigitalMugicianFile } from '../formats/DigitalMugicianParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FILE1 = resolve(REF, 'Digital Mugician/- unknown/editorsong.dmu');
-const FILE2 = resolve(REF, 'Digital Mugician/- unknown/flight.dmu');
-const FILE3 = resolve(REF, 'Digital Mugician 2/- unknown/snickle.mug');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'digital-mugician/believe.dmu');
+const FILE2 = resolve(REF, 'formats/flight.dmu');
+const FILE3 = resolve(REF, 'digital-mugician-2/snickle.mug');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

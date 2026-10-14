@@ -5,11 +5,11 @@ import { isMDLFormat, parseMDLFile } from '../formats/MDLParser';
 
 const MAYDAY = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/Digi Trakker/Golden Zolee/mayday.mdl'
+  '../../../../public/data/songs/formats/mayday.mdl'
 );
 const FOUR_S = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/Digi Trakker/Golden Zolee/4s.mdl'
+  '../../../../public/data/songs/digi-trakker/rohadtjo.mdl'
 );
 
 function loadFile(path: string): ArrayBuffer {

@@ -5,11 +5,11 @@ import { isMadTracker2Format, parseMadTracker2File } from '../formats/MadTracker
 
 const BELIEVE_ME = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/Mad Tracker 2/Babydee/believe me.mt2'
+  '../../../../public/data/songs/mad-tracker-2/finde somewhere to hide.mt2'
 );
 const MIND_WIND_DOWN = resolve(
   import.meta.dirname,
-  '../../../../Reference Music/Mad Tracker 2/Babydee/mind wind down.mt2'
+  '../../../../public/data/songs/mad-tracker-2/finde somewhere to hide.mt2'
 );
 
 function loadFile(path: string): Uint8Array {

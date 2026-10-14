@@ -16,11 +16,11 @@ import { resolve } from 'path';
 import { parseFCMetadata, parseFCFile } from '../formats/FCParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FILE_SMOD = resolve(REF, 'Future Composer 1.3/FTB/commando.smod');
-const FILE_FC14 = resolve(REF, 'Future Composer 1.4/EC-Rider/starglide1.fc');
-const FILE_BSI  = resolve(REF, 'Future Composer BSI/Tony Bybell/newtek.bsi');
-const FILE_TF   = resolve(REF, 'Follin Player II/Tim Follin/ghouls n ghosts title.tf');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE_SMOD = resolve(REF, 'future-composer-1.3/commando.smod');
+const FILE_FC14 = resolve(REF, 'future-composer-1.4/starglide1.fc');
+const FILE_BSI  = resolve(REF, 'future-composer-bsi/newtek.bsi');
+const FILE_TF   = resolve(REF, 'follin-player-ii/sly spy title.tf');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

@@ -11,9 +11,9 @@ import { resolve } from 'path';
 import { isTFMXFile, parseTFMXFile } from '../formats/TFMXParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FILE1 = resolve(REF, 'TFMX/- unknown/mdat.bb-beat');
-const FILE2 = resolve(REF, 'TFMX/Chris Huelsbeck/mdat.apidya (level 1)');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'tfmx/mdat.hbtitle');
+const FILE2 = resolve(REF, 'formats/mdat.rocknroll');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

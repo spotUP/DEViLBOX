@@ -11,11 +11,9 @@ import { isMaximumEffectFormat, parseMaximumEffectFile } from '../formats/Maximu
 import { tryExtractInstrumentNames } from '../formats/UADEParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const DIR1 = resolve(REF, 'MaxTrax/- unknown');
-const DIR2 = resolve(REF, 'MaxTrax/David A. Bean');
-const FILE1 = resolve(DIR1, 'contraptionzack-agro.mxtx');
-const FILE2 = resolve(DIR2, 'darkseed (00).mxtx');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'maxtrax/antmusic.mxtx');
+const FILE2 = resolve(REF, 'maxtrax/darkseed (00).mxtx');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);

@@ -7,10 +7,9 @@ import { resolve } from 'path';
 import { isRobHubbardFormat, parseRobHubbardFile } from '../formats/RobHubbardParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const RH_DIR = resolve(REF, 'Rob Hubbard/Rob Hubbard');
-const FILE1 = resolve(RH_DIR, 'budokan.rh');
-const FILE2 = resolve(RH_DIR, 'flymus.rh');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'rob-hubbard/budokan.rh');
+const FILE2 = resolve(REF, 'rob-hubbard/skateordie.rh');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);

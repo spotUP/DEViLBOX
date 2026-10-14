@@ -2,24 +2,21 @@
  * JasonBrookeParser Tests - Format capability analysis
  */
 import { describe, it, expect } from 'vitest';
-import { existsSync, readFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { isJasonBrookeFormat, parseJasonBrookeFile } from '../formats/JasonBrookeParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-// Reference Music is a local-only corpus (gitignored, absent from a clean checkout): skip, do not fail.
-const HAS_CORPUS = existsSync(REF);
-const JB_DIR = resolve(REF, 'Jason Brooke/Jason Brooke');
-const FILE1 = resolve(JB_DIR, '1943.jb');
-const FILE2 = resolve(JB_DIR, 'afterburner ii.jb');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'jason-brooke/ikari warriors.jb');
+const FILE2 = resolve(REF, 'formats/ikari_warriors.jb');
 
 function loadBuf(p: string): ArrayBuffer {
   const b = readFileSync(p);
   return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
 }
 
-describe.skipIf(!HAS_CORPUS)('isJasonBrookeFormat', () => {
+describe('isJasonBrookeFormat', () => {
   it('detects 1943.jb', () => {
     expect(isJasonBrookeFormat(loadBuf(FILE1), '1943.jb')).toBe(true);
   });
@@ -34,7 +31,7 @@ describe.skipIf(!HAS_CORPUS)('isJasonBrookeFormat', () => {
   });
 });
 
-describe.skipIf(!HAS_CORPUS)('parseJasonBrookeFile — 1943.jb', () => {
+describe('parseJasonBrookeFile — 1943.jb', () => {
   it('parses without throwing', () => {
     expect(() => parseJasonBrookeFile(loadBuf(FILE1), '1943.jb')).not.toThrow();
   });
@@ -64,7 +61,7 @@ describe.skipIf(!HAS_CORPUS)('parseJasonBrookeFile — 1943.jb', () => {
   });
 });
 
-describe.skipIf(!HAS_CORPUS)('parseJasonBrookeFile — afterburner ii.jb', () => {
+describe('parseJasonBrookeFile — afterburner ii.jb', () => {
   it('parses without throwing', () => {
     expect(() => parseJasonBrookeFile(loadBuf(FILE2), 'afterburner ii.jb')).not.toThrow();
   });
