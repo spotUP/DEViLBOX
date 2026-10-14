@@ -91,6 +91,7 @@ interface GTOrderMatrixProps {
 export const GTOrderMatrix: React.FC<GTOrderMatrixProps> = React.memo(({ width, height, collapsed, onToggleCollapse }) => {
   const orderData = useGTUltraStore((s) => s.orderData);
   const songPos = useGTUltraStore((s) => s.playbackPos.songPos);
+  const playing = useGTUltraStore((s) => s.playing);
   const sidCount = useGTUltraStore((s) => s.sidCount);
   const engine = useGTUltraStore((s) => s.engine);
 
@@ -157,7 +158,8 @@ export const GTOrderMatrix: React.FC<GTOrderMatrixProps> = React.memo(({ width, 
         formatColumns={formatColumns}
         formatChannels={formatChannels}
         formatCurrentRow={songPos}
-        formatIsPlaying={false}
+        formatIsPlaying={playing}
+        formatRowsArePositions
         onFormatCellChange={handleCellChange}
         hideVUMeters={true}
         hideAutomationLanes={true}

@@ -60,7 +60,7 @@ interface SongOrderMatrixProps {
   formatChannels: FormatChannel[];
   /** Current playback/cursor row to highlight */
   currentRow?: number;
-  /** Whether playback is actively driving the highlight */
+  /** The song is playing: the matrix rides `currentRow` (the playing POSITION), one step per pattern */
   isPlaying?: boolean;
   /** Cell edit callback */
   onCellChange?: OnCellChange;
@@ -210,6 +210,7 @@ export const SongOrderMatrix: React.FC<SongOrderMatrixProps> = ({
         formatChannels={formatChannels}
         formatCurrentRow={currentRow}
         formatIsPlaying={isPlaying}
+        formatRowsArePositions
         onFormatCellChange={onCellChange}
         hideVUMeters
       />

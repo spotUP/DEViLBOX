@@ -38,13 +38,15 @@ interface Props {
   height: number;
   nativeData: HivelyNativeData;
   currentPosition: number;
+  /** The song is playing: the matrix follows currentPosition, one step per pattern played. */
+  isPlaying: boolean;
   onPositionChange: (pos: number) => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }
 
 export const HivelyPositionEditor: React.FC<Props> = ({
-  width, height, nativeData, currentPosition, onPositionChange: _onPositionChange,
+  width, height, nativeData, currentPosition, isPlaying, onPositionChange: _onPositionChange,
   collapsed, onToggleCollapse,
 }) => {
   const numPos = nativeData.positions.length;
@@ -79,6 +81,7 @@ export const HivelyPositionEditor: React.FC<Props> = ({
       formatColumns={formatColumns}
       formatChannels={formatChannels}
       currentRow={currentPosition}
+      isPlaying={isPlaying}
       onCellChange={handleCellChange}
       collapsed={collapsed}
       onToggleCollapse={onToggleCollapse}

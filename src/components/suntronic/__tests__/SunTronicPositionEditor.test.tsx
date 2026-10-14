@@ -21,7 +21,7 @@ describe('SunTronicPositionEditor', () => {
     };
     const { container } = render(
       <SunTronicPositionEditor width={400} height={200} nativeData={nativeData as never}
-        currentPosition={0} onPositionChange={() => {}} />,
+        currentPosition={0} isPlaying={false} onPositionChange={() => {}} />,
     );
     expect(container).toBeTruthy();
   });

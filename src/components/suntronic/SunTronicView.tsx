@@ -120,6 +120,7 @@ export const SunTronicView: React.FC = () => {
           height={positionH}
           nativeData={nativeData}
           currentPosition={activePosition}
+          isPlaying={isPlaying}
           onPositionChange={handlePositionChange}
           collapsed={matrixCollapsed}
           onToggleCollapse={() => setMatrixCollapsed(!matrixCollapsed)}

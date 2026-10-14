@@ -14,7 +14,7 @@ import { channelLayout, notifyChannelLayout, fitAndStretchChannelWidths, subscri
 import { resolveWasmPattern } from './wasmPatternHold';
 import { computeChannelFollowScroll, createChannelFollowGate } from '@/lib/tracker/followScroll';
 import { resolveCellColumn } from '@/lib/tracker/cellHitTest';
-import { resolveScrollRow } from '@/lib/tracker/playbackNavigation';
+import { resolveScrollRow, resolveFormatViewRow } from '@/lib/tracker/playbackNavigation';
 import { recordModeBorderClass } from '@/lib/tracker/patternEditorChrome';
 import { AutomationLanes } from './AutomationLanes';
 import { GlobalLaneCurves } from './GlobalLaneCurves';
@@ -107,6 +107,10 @@ interface PatternEditorCanvasProps {
   formatChannels?: FormatChannel[];
   formatCurrentRow?: number;
   formatIsPlaying?: boolean;
+  /** The format rows are SONG POSITIONS (an order/position matrix): while playing, the view rides
+   *  formatCurrentRow (the playing position) one step per pattern, never the pattern-row clock or the
+   *  shared cursor (which follow-playback moves every row). See resolveFormatViewRow. */
+  formatRowsArePositions?: boolean;
   onFormatCellChange?: OnCellChange;
   /** Called when the format cursor moves (row/channel/column). Lets parent sync external state. */
   onFormatCursorChange?: (cursor: { channelIndex: number; rowIndex: number; columnIndex: number }) => void;
@@ -134,6 +138,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   formatChannels,
   formatCurrentRow,
   formatIsPlaying,
+  formatRowsArePositions = false,
   onFormatCellChange,
   onFormatCursorChange,
   hideVUMeters = false,
@@ -168,6 +173,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const wasmPatternRef      = useRef<number | null>(null);
   const formatCurrentRowRef = useRef(formatCurrentRow ?? 0);
   const formatIsPlayingRef  = useRef(formatIsPlaying ?? false);
+  const formatRowsArePositionsRef = useRef(formatRowsArePositions);
   // Tracks last formatChannels identity sent to worker — RAF compares this to detect changes.
   const formatChannelsSentRef = useRef<FormatChannel[] | undefined>(undefined);
   // Pre-computed format pattern snapshot — updated every render so RAF always has fresh data
@@ -186,6 +192,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   isFormatModeRef.current     = isFormatMode;
   formatCurrentRowRef.current = formatCurrentRow ?? 0;
   formatIsPlayingRef.current  = formatIsPlaying ?? false;
+  formatRowsArePositionsRef.current = formatRowsArePositions;
   formatChannelsRef.current   = formatChannels;
   const onFormatCellChangeRef = useRef(onFormatCellChange);
   onFormatCellChangeRef.current = onFormatCellChange;
@@ -2217,9 +2224,15 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         const fps = getFormatPlaybackState();
         // Respect the formatIsPlaying prop — the track table matrix passes false
         // to prevent it from scrolling when FormatPlaybackState is globally active.
-        const fpsActive = fps.isPlaying && formatIsPlayingRef.current;
-        isPlaying = fpsActive;
-        playRow = resolveScrollRow(fpsActive, useEditorStore.getState().followPlayback, fpsActive ? fps.row : formatCurrentRowRef.current, formatCursorRef.current.rowIndex);
+        const positions = formatRowsArePositionsRef.current;
+        const view = resolveFormatViewRow({
+          rowsArePositions: positions, hostPlaying: formatIsPlayingRef.current, hostRow: formatCurrentRowRef.current,
+          clockPlaying: fps.isPlaying, clockRow: fps.row, cursorRow: formatCursorRef.current.rowIndex,
+          followPlayback: useEditorStore.getState().followPlayback,
+        });
+        const fpsActive = view.rideClock;
+        isPlaying = positions ? formatIsPlayingRef.current : fpsActive;
+        playRow = view.row;
         if (fpsActive && fps.rowDuration > 0) {
           const ts = useTransportStore.getState();
           if (ts.smoothScrolling) {
@@ -2538,13 +2551,18 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           // This eliminates poll-jitter (the clock advances at exactly rowDuration
           // ms per row regardless of when the engine poll detects the change).
           const fps = getFormatPlaybackState();
-          const fpsSmooth = fps.isPlaying && formatIsPlayingRef.current;
           const newPlaying = formatIsPlayingRef.current;
           // Which row the view shows is the classic editor's rule (resolveScrollRow): the play head only while playing AND
-          // following, otherwise the edit cursor - so stopped, or with follow off, the view sits on the cursor.
+          // following, otherwise the edit cursor - so stopped, or with follow off, the view sits on the cursor. A position
+          // matrix's play head is the playing POSITION, never the pattern-row clock (resolveFormatViewRow).
           const followPlayback = useEditorStore.getState().followPlayback;
           const viewFollows = newPlaying && followPlayback;
-          let newRow = resolveScrollRow(newPlaying, followPlayback, fpsSmooth ? fps.row : formatCurrentRowRef.current, formatCursorRef.current.rowIndex);
+          const view = resolveFormatViewRow({
+            rowsArePositions: formatRowsArePositionsRef.current, hostPlaying: newPlaying, hostRow: formatCurrentRowRef.current,
+            clockPlaying: fps.isPlaying, clockRow: fps.row, cursorRow: formatCursorRef.current.rowIndex, followPlayback,
+          });
+          const fpsSmooth = view.rideClock;
+          let newRow = view.row;
           let smoothOffset = 0;
 
           if (viewFollows && fpsSmooth && fps.rowDuration > 0) {
@@ -2578,8 +2596,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             // cursor.rowIndex when !isPlaying, but format mode skips the normal
             // cursor→worker subscription, so we push it here.
             // (the cursor the worker draws is the shared cursor, never the play head's row)
+            // A following position matrix draws its cursor on the playing position: the shared cursor row is
+            // the PATTERN row while follow-playback runs.
             bridge.post({ type: 'cursor', cursor: {
-              rowIndex:     formatCursorRef.current.rowIndex,
+              rowIndex:     formatRowsArePositionsRef.current && viewFollows ? newRow : formatCursorRef.current.rowIndex,
               channelIndex: formatCursorRef.current.channelIndex,
               columnType:   String(formatCursorRef.current.columnIndex),
               digitIndex:   0,
@@ -2599,10 +2619,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       // Also check wasmPos.active — WASM engines (JamCracker etc.) don't set
       // transportStore.isPlaying (doing so causes infinite engine respawn),
       // so we must fall through to the main playback path when they're active.
-      // wasmPos.active means a WASM engine is reporting position — allow scroll
-      // EXCEPT for format-mode instances that aren't playing (e.g. trackstep matrix).
+      // wasmPos.active means a WASM engine is reporting position — allow scroll.
+      // (Format-mode canvases never get here: their branch above returns. A
+      // position matrix's scroll is decided there, by resolveFormatViewRow.)
       const wasmPosEarly = useWasmPositionStore.getState();
-      const wasmNeedsUpdate = wasmPosEarly.active && !(isFormatModeRef.current && !formatIsPlayingRef.current);
+      const wasmNeedsUpdate = wasmPosEarly.active;
       if (!isPlaying && !prevPlaying && !wasmNeedsUpdate) {
         const cursorRow = useCursorStore.getState().cursor.rowIndex;
         const h = dimensions.height;
@@ -2633,29 +2654,18 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       }
 
       const trackerState   = useTrackerStore.getState();
-      // A format sub-editor that does not play (an order matrix, an instrument
-      // table) shows its own rows: its own cursor, never the song's play row.
-      // Riding the WASM or replayer row made the GoatTracker order matrix
-      // scroll with the pattern, one order step per pattern row (owner
-      // 2026-10-08: "it scrolls at the same speed as the pattern editor").
-      const idleFormatEditor = isFormatModeRef.current && !formatIsPlayingRef.current;
-      let currentRow   = idleFormatEditor ? formatCursorRef.current.rowIndex : useCursorStore.getState().cursor.rowIndex;
+      let currentRow   = useCursorStore.getState().cursor.rowIndex;
       let activePatternIdx = trackerState.currentPatternIndex;
       let smoothOffset = 0;
       let songPosition: number | undefined;
 
       // WASM engine position — check FIRST (bypasses replayer which returns stale state)
-      // In format mode, allow wasmPos only when FormatPlaybackState is NOT driving scroll
-      // (TFMX WASM playback uses wasmPos; UADE streaming uses FormatPlaybackState).
       const wasmPos = wasmPosEarly;
-      const fpsIsActive = isFormatModeRef.current && formatIsPlayingRef.current;
       // The held pattern belongs to one run of one engine. Forget it the
       // moment that engine stops driving, or a stopped song would keep
       // showing the last pattern it happened to reach.
       if (!wasmPos.active) wasmPatternRef.current = null;
-      if (idleFormatEditor) {
-        // keep its own cursor row (above)
-      } else if (wasmPos.active && !fpsIsActive) {
+      if (wasmPos.active) {
         currentRow = wasmPos.row;
         // Row and pattern come from the SAME clock — see wasmPatternHold.ts.
         const resolved = resolveWasmPattern({
