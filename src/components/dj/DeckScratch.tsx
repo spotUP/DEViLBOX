@@ -151,7 +151,7 @@ export const DeckScratch: React.FC<DeckScratchProps> = ({ deckId }) => {
               onPointerUp={() => handlePatternPointerUp(pattern.name)}
               onContextMenu={(e) => e.preventDefault()}
               className={`
-                min-w-0 px-1 py-1.5 rounded border font-mono text-[11px] leading-tight transition-all select-none
+                min-w-0 px-1 py-1.5 rounded border font-mono text-[11px] leading-tight text-center whitespace-normal [overflow-wrap:anywhere] hyphens-auto transition-all select-none
                 ${isActive
                   ? `${deckActiveBg} ${deckColor}`
                   : isWaiting
