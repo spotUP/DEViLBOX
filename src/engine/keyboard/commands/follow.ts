@@ -4,6 +4,7 @@
 
 import { useEditorStore } from '@stores/useEditorStore';
 import { useTransportStore } from '@stores/useTransportStore';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import { useUIStore } from '@stores/useUIStore';
 import { muteChannel, soloChannel } from './channel';
 
@@ -22,7 +23,7 @@ export function toggleLoopPattern(): boolean {
 }
 
 export function toggleContinuousScroll(): boolean {
-  const { smoothScrolling, setSmoothScrolling } = useTransportStore.getState();
+  const { smoothScrolling, setSmoothScrolling } = useSettingsStore.getState();
   setSmoothScrolling(!smoothScrolling);
   useUIStore.getState().setStatusMessage(`Smooth scroll: ${!smoothScrolling ? 'ON' : 'OFF'}`, false, 1000);
   return true;

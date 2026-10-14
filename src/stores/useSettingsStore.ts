@@ -75,6 +75,8 @@ interface SettingsStore {
   autoAdvanceSubsongs: boolean;
   /** Master FX channel buttons take effect on the next bar line of the playing song. */
   masterFxQuantize: boolean;
+  /** Pattern view scrolls per sub-row instead of stepping row by row. User preference, persisted. */
+  smoothScrolling: boolean;
 
   // Actions
   setAmigaLimits: (enabled: boolean) => void;
@@ -115,6 +117,7 @@ interface SettingsStore {
   setWelcomeJingleEnabled: (v: boolean) => void;
   setAutoAdvanceSubsongs: (v: boolean) => void;
   setMasterFxQuantize: (v: boolean) => void;
+  setSmoothScrolling: (smooth: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -206,6 +209,7 @@ export const useSettingsStore = create<SettingsStore>()(
       vuMeterMirror: false,  // Default: VU meters extend upward
       maxHeadroomMode: false,
       welcomeJingleEnabled: true,  // Play startup jingle on first interaction
+      smoothScrolling: false,      // Default to stepped scrolling (classic tracker feel)
       masterFxQuantize: true,      // Owner, 2026-10-08: channel on/offs in the master FX are quantized, switch on by default
       autoAdvanceSubsongs: true,   // Owner, 2026-10-05: "just skip to next subsong when it ends"
 
@@ -412,6 +416,8 @@ export const useSettingsStore = create<SettingsStore>()(
       set((state) => { state.autoAdvanceSubsongs = v; }),
     setMasterFxQuantize: (v) =>
       set((state) => { state.masterFxQuantize = v; }),
+    setSmoothScrolling: (smooth) =>
+      set((state) => { state.smoothScrolling = smooth; }),
     })),
     {
       name: 'devilbox-settings',
@@ -555,6 +561,8 @@ export const useSettingsStore = create<SettingsStore>()(
         // Additive: a save without it merges in the default (on), no version bump.
         autoAdvanceSubsongs: state.autoAdvanceSubsongs,
         masterFxQuantize: state.masterFxQuantize,
+        // Additive: a save without it merges in the default (off), no version bump.
+        smoothScrolling: state.smoothScrolling,
       }),
     }
   )

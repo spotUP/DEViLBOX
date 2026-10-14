@@ -2244,8 +2244,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         isPlaying = positions ? formatIsPlayingRef.current : fpsActive;
         playRow = view.row;
         if (fpsActive && fps.rowDuration > 0) {
-          const ts = useTransportStore.getState();
-          if (ts.smoothScrolling) {
+          if (useSettingsStore.getState().smoothScrolling) {
             const now = performance.now();
             const clock = getClockPosition(now);
             playRow = clock.row;
@@ -2267,7 +2266,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             if (audioState) {
               playRow = audioState.row;
               playPatIdx = audioState.pattern;
-              if (ts.smoothScrolling && audioState.duration > 0) {
+              if (useSettingsStore.getState().smoothScrolling && audioState.duration > 0) {
                 const progress = Math.min(Math.max((audioTime - audioState.time) / audioState.duration, 0), 1);
                 smoothOffset = progress * rowHeightRef.current;
               }
@@ -2576,8 +2575,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           let smoothOffset = 0;
 
           if (viewFollows && fpsSmooth && fps.rowDuration > 0) {
-            const transportState = useTransportStore.getState();
-            if (transportState.smoothScrolling) {
+            if (useSettingsStore.getState().smoothScrolling) {
               // Smooth scrolling: clock provides constant-rate row + sub-pixel offset
               const now = performance.now();
               const clock = getClockPosition(now);
@@ -2711,7 +2709,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             songPosition     = audioState.position;
 
             // Compute smooth offset for worker rendering
-            if (transportState.smoothScrolling && audioState.duration > 0) {
+            if (useSettingsStore.getState().smoothScrolling && audioState.duration > 0) {
               const progress = Math.min(Math.max(
                 (audioTime - audioState.time) / audioState.duration, 0), 1);
               smoothOffset = progress * rowHeightRef.current;
@@ -2747,7 +2745,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           isPlaying:    effectiveIsPlaying,
           bpm:          transportState.bpm,
           speed:        transportState.speed,
-          smoothScrolling: transportState.smoothScrolling,
+          smoothScrolling: useSettingsStore.getState().smoothScrolling,
           songPosition,
         } as any);
       }

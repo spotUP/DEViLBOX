@@ -2,7 +2,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { SettingsModal } from '../SettingsModal';
-import { useTransportStore } from '@stores/useTransportStore';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import { useEditorStore } from '@stores/useEditorStore';
 
 afterEach(cleanup);
@@ -17,16 +17,29 @@ function toggleFor(container: HTMLElement, labelText: string): HTMLButtonElement
 
 describe('Settings dialog toggles', () => {
   it('Smooth Scrolling turns on in the settings dialog', () => {
-    useTransportStore.getState().setSmoothScrolling(false);
+    useSettingsStore.getState().setSmoothScrolling(false);
     const { container } = render(<SettingsModal onClose={() => {}} />);
     const toggle = toggleFor(container, 'Smooth Scrolling:');
     expect(toggle.getAttribute('aria-pressed')).toBe('false');
     fireEvent.click(toggle);
-    expect(useTransportStore.getState().smoothScrolling).toBe(true);
+    expect(useSettingsStore.getState().smoothScrolling).toBe(true);
     expect(toggleFor(container, 'Smooth Scrolling:').getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(toggleFor(container, 'Smooth Scrolling:'));
-    expect(useTransportStore.getState().smoothScrolling).toBe(false);
+    expect(useSettingsStore.getState().smoothScrolling).toBe(false);
     expect(toggleFor(container, 'Smooth Scrolling:').getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('Smooth Scrolling stays on after a reload', async () => {
+    useSettingsStore.getState().setSmoothScrolling(false);
+    const { container } = render(<SettingsModal onClose={() => {}} />);
+    fireEvent.click(toggleFor(container, 'Smooth Scrolling:'));
+    // Reload: keep only what was written to localStorage, wipe memory, rehydrate from the saved copy.
+    const saved = localStorage.getItem('devilbox-settings');
+    expect(saved).not.toBeNull();
+    useSettingsStore.setState({ smoothScrolling: false });
+    localStorage.setItem('devilbox-settings', saved as string);
+    await useSettingsStore.persist.rehydrate();
+    expect(useSettingsStore.getState().smoothScrolling).toBe(true);
   });
 
   it('Ghost Patterns turns off and on in the settings dialog', () => {
