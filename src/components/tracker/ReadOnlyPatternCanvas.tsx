@@ -6,7 +6,7 @@
  * Used in DJ deck views where data comes from per-deck engines.
  */
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import type { Pattern } from '@/types';
 import { OffscreenBridge } from '@engine/renderer/OffscreenBridge';
 import type {
@@ -17,6 +17,8 @@ import type {
   ChannelLayoutSnapshot,
 } from '@engine/renderer/worker-types';
 import { useThemeStore } from '@stores';
+import { useSettingsStore } from '@stores/useSettingsStore';
+import { fitAndStretchChannelWidths } from './channelLayout';
 import { ChannelVUMeters, type ChannelMeterFeed } from './ChannelVUMeters';
 import ReadOnlyWorkerFactory from '@/workers/readonly-pattern.worker.ts?worker';
 
@@ -156,16 +158,31 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
     };
   }, []);
 
-  const buildLayout = useCallback((w: number, nc: number): ChannelLayoutSnapshot => {
+  // Fit all channels (deck setting): the pattern is drawn at `scale` so every
+  // channel is on screen. The layout is in canvas (CSS) px for the DOM; the
+  // worker draws at scale 1 into a canvas 1/scale as large, so it gets
+  // `toWorker`'s layout and resize (px / scale, dpr * scale).
+  const fitDeck = useSettingsStore((s) => s.fitAllChannelsDeck);
+  const fitDeckRef = useRef(fitDeck);
+  fitDeckRef.current = fitDeck;
+
+  const buildLayout = useCallback((w: number, nc: number): ChannelLayoutSnapshot & { scale: number } => {
     const noteWidth   = CHAR_WIDTH * 3 + 4;
     const paramWidth  = CHAR_WIDTH * 4 + 8 + 2 * (CHAR_WIDTH * 3 + 4);
     const contentWidth = noteWidth + 4 + paramWidth;
-    const usable      = w - LINE_NUMBER_WIDTH;
-    const chW         = Math.max(contentWidth + 16, Math.floor(usable / Math.max(1, nc)));
-    const offsets     = Array.from({ length: nc }, (_, i) => LINE_NUMBER_WIDTH + i * chW);
-    const widths      = Array.from({ length: nc }, () => chW);
-    return { offsets, widths, totalWidth: chW * nc };
+    const minWidths   = Array.from({ length: nc }, () => contentWidth + 16);
+    const fitted      = fitAndStretchChannelWidths(minWidths, LINE_NUMBER_WIDTH, w, fitDeckRef.current);
+    const offsets: number[] = [];
+    let x = fitted.leftEdge;
+    for (const cw of fitted.widths) { offsets.push(x); x += cw; }
+    return { offsets, widths: fitted.widths, totalWidth: x - fitted.leftEdge, scale: fitted.scale };
   }, []);
+
+  const toWorker = useCallback((l: ChannelLayoutSnapshot & { scale: number }): ChannelLayoutSnapshot => ({
+    offsets: l.offsets.map((v) => v / l.scale),
+    widths: l.widths.map((v) => v / l.scale),
+    totalWidth: l.totalWidth / l.scale,
+  }), []);
 
   // ── Bridge initialisation ────────────────────────────────────────────────
   // Canvas is created imperatively so React StrictMode's double-invoke doesn't
@@ -193,20 +210,21 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
     const w   = Math.max(1, container.clientWidth);
     const h   = Math.max(1, heightProp ?? container.clientHeight);
     const offscreen = canvas.transferControlToOffscreen();
+    const initLayout = buildLayout(w, numChannels);
 
     bridge.post(
       {
         type:       'init',
         canvas:     offscreen,
-        dpr,
-        width:      w,
-        height:     h,
+        dpr:        dpr * initLayout.scale,
+        width:      w / initLayout.scale,
+        height:     h / initLayout.scale,
         theme:      snapshotTheme(),
         pattern:    snapshotPattern(pattern, numChannels),
         currentRow,
         numChannels,
         isPlaying,
-        layout:     buildLayout(w, numChannels),
+        layout:     toWorker(initLayout),
       },
       [offscreen],
     );
@@ -233,13 +251,25 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
       const h = heightProp ?? Math.floor(entry.contentRect.height);
       if (w > 0 && h > 0) {
         setDimensions({ width: w, height: h });
-        const dpr = window.devicePixelRatio || 1;
-        bridgeRef.current?.post({ type: 'resize', w, h, dpr });
       }
     });
     observer.observe(container);
     return () => observer.disconnect();
   }, [heightProp]);
+
+  const layoutNow = useMemo(
+    () => buildLayout(dimensions.width, numChannels),
+    // fitDeck is read through a ref inside buildLayout; it is a dependency here so a settings change relays out.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [buildLayout, dimensions.width, numChannels, fitDeck],
+  );
+
+  // The worker owns the canvas size: tell it the canvas at the fitted scale.
+  useEffect(() => {
+    const dpr = window.devicePixelRatio || 1;
+    const sc = layoutNow.scale;
+    bridgeRef.current?.post({ type: 'resize', w: dimensions.width / sc, h: dimensions.height / sc, dpr: dpr * sc });
+  }, [dimensions.width, dimensions.height, layoutNow.scale]);
 
   // ── Forward pattern / layout changes ─────────────────────────────────────
 
@@ -248,9 +278,9 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
       type:       'pattern',
       pattern:    snapshotPattern(pattern, numChannels),
       numChannels,
-      layout:     buildLayout(dimensions.width, numChannels),
+      layout:     toWorker(layoutNow),
     });
-  }, [pattern, numChannels, dimensions.width, snapshotPattern, buildLayout]);
+  }, [pattern, numChannels, layoutNow, snapshotPattern, toWorker]);
 
   // ── Forward playback state ────────────────────────────────────────────────
 
@@ -258,7 +288,7 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
     bridgeRef.current?.post({ type: 'playback', currentRow, isPlaying });
   }, [currentRow, isPlaying]);
 
-  const vuLayout = vuFeed ? buildLayout(dimensions.width, numChannels) : null;
+  const vuLayout = vuFeed ? layoutNow : null;
 
   return (
     <div
@@ -268,7 +298,7 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
     >
       {vuFeed && vuLayout && (
         // The tracker's meters (PatternEditorCanvas), over this view's columns and its centre row.
-        <div className="absolute right-0 pointer-events-none overflow-hidden" style={{ top: 0, bottom: 0, left: LINE_NUMBER_WIDTH, zIndex: 1 }}>
+        <div className="absolute right-0 pointer-events-none overflow-hidden" style={{ top: 0, bottom: 0, left: layoutNow.offsets[0] ?? LINE_NUMBER_WIDTH, zIndex: 1 }}>
           <ChannelVUMeters
             channelOffsets={vuLayout.offsets}
             channelWidths={vuLayout.widths}

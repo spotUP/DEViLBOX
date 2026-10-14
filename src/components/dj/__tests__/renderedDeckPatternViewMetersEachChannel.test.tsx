@@ -36,6 +36,7 @@ import { render, cleanup, act } from '@testing-library/react';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { DeckPatternDisplay } from '../DeckPatternDisplay';
 import { useDJStore } from '@/stores/useDJStore';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 import { ChannelScopeTrackBuilder } from '@/engine/dj/channelScopeTrack';
 import { _setSoundingForTest } from '@/engine/audio/signalPresence';
 
@@ -65,6 +66,8 @@ function runFrames(count: number) {
 
 describe('a rendered module deck\'s pattern view meters each channel', () => {
   beforeEach(() => {
+    // Column maths below assumes the unshrunk 170 px columns; the fit has its own test (deckPatternViewFitsEveryChannel).
+    useSettingsStore.setState({ fitAllChannelsDeck: false });
     holder.song = {
       songPositions: [0], numChannels: 4,
       // Channel 2's note: a deck shows the pattern view only for a song with notes (70a57efa2).

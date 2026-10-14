@@ -57,6 +57,8 @@ interface SettingsStore {
 
   // Visual Settings
   trackerVisualBg: boolean;  // Enable WebGL visual background behind tracker pattern
+  fitAllChannelsTracker: boolean; // Shrink the tracker pattern font so every channel fits the width (floor ~7 px); a manual zoom turns it off
+  fitAllChannelsDeck: boolean;    // Same for the DJ deck pattern views
   trackerVisualMode: number; // Current visualizer mode index (0-5)
   channelColorBlend: number; // Channel color background tint opacity (0-100, default 8)
   vjPatternOverlay: boolean; // Show pattern data overlay on VJ view
@@ -98,6 +100,8 @@ interface SettingsStore {
   setHeadphonesMode: (enabled: boolean) => void;
   setMidiPolyphonic: (enabled: boolean) => void;
   setTrackerVisualBg: (enabled: boolean) => void;
+  setFitAllChannelsTracker: (enabled: boolean) => void;
+  setFitAllChannelsDeck: (enabled: boolean) => void;
   setTrackerVisualMode: (mode: number) => void;
   setChannelColorBlend: (blend: number) => void;
   setVjPatternOverlay: (enabled: boolean) => void;
@@ -188,6 +192,8 @@ export const useSettingsStore = create<SettingsStore>()(
       headphonesMode: false,
       midiPolyphonic: true,  // Default: polyphonic enabled for better jamming
       trackerVisualBg: false,  // Default: off
+      fitAllChannelsTracker: true,
+      fitAllChannelsDeck: true,
       trackerVisualMode: 0,    // Default: spectrum bars
       channelColorBlend: 8,    // Default: 8% opacity for channel color tint
       vjPatternOverlay: true, // Default: on — pattern data visible in VJ view
@@ -334,6 +340,16 @@ export const useSettingsStore = create<SettingsStore>()(
       setMidiPolyphonic: (midiPolyphonic) =>
         set((state) => {
           state.midiPolyphonic = midiPolyphonic;
+        }),
+
+      setFitAllChannelsTracker: (enabled) =>
+        set((state) => {
+          state.fitAllChannelsTracker = enabled;
+        }),
+
+      setFitAllChannelsDeck: (enabled) =>
+        set((state) => {
+          state.fitAllChannelsDeck = enabled;
         }),
 
       setTrackerVisualBg: (trackerVisualBg) =>
@@ -510,6 +526,8 @@ export const useSettingsStore = create<SettingsStore>()(
         modplugSeparation: state.modplugSeparation,
         midiPolyphonic: state.midiPolyphonic,
         trackerVisualBg: state.trackerVisualBg,
+        fitAllChannelsTracker: state.fitAllChannelsTracker,
+        fitAllChannelsDeck: state.fitAllChannelsDeck,
         trackerVisualMode: state.trackerVisualMode,
         channelColorBlend: state.channelColorBlend,
         vjPatternOverlay: state.vjPatternOverlay,
