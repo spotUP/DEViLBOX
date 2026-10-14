@@ -16,6 +16,8 @@
  * cycle is 12.5 ms) and ripples it.
  */
 
+import * as Tone from 'tone';
+
 /** Threshold of every DJ safety limiter, dBFS. */
 export const DJ_LIMITER_THRESHOLD_DB = -1;
 /** Per-deck brick-wall threshold, dBFS. */
@@ -28,6 +30,44 @@ const RELEASE_SEC = 0.05;
 export function compressorMakeupDb(thresholdDb: number, ratio: number): number {
   const fullRangeDb = thresholdDb + (0 - thresholdDb) / ratio;
   return -0.6 * fullRangeDb;
+}
+
+/**
+ * The safety limiter's settings - the DJ path's and the tracker master's
+ * (ToneEngine.safetyLimiter): one spec. The tracker ran its own soft 4:1
+ * (knee 6 dB) that let a hot preset through above full scale: Amiga Bass
+ * Cannon peaked 1.06 at the destination, 460 clipped samples per million
+ * (2026-10-14), where the DJ path held it.
+ */
+export const SAFETY_LIMITER = {
+  thresholdDb: DJ_LIMITER_THRESHOLD_DB,
+  ratio: RATIO,
+  kneeDb: 0,
+  attackSec: ATTACK_SEC,
+  releaseSec: RELEASE_SEC,
+} as const;
+
+/** The linear gain that cancels a hard-knee compressor's automatic make-up (unity below the threshold). */
+export function makeupCancelGain(thresholdDb: number, ratio: number): number {
+  return 10 ** (-compressorMakeupDb(thresholdDb, ratio) / 20);
+}
+
+/**
+ * The tracker master's safety limiter, as Tone nodes (ToneEngine wires and
+ * retunes them): the same spec as createSafetyLimiter. Feed `compressor`,
+ * take `makeupCancel`.
+ */
+export function createToneSafetyLimiter(): { compressor: Tone.Compressor; makeupCancel: Tone.Gain } {
+  const compressor = new Tone.Compressor({
+    threshold: SAFETY_LIMITER.thresholdDb,
+    ratio: SAFETY_LIMITER.ratio,
+    attack: SAFETY_LIMITER.attackSec,
+    release: SAFETY_LIMITER.releaseSec,
+    knee: SAFETY_LIMITER.kneeDb,
+  });
+  const makeupCancel = new Tone.Gain(makeupCancelGain(SAFETY_LIMITER.thresholdDb, SAFETY_LIMITER.ratio));
+  compressor.connect(makeupCancel);
+  return { compressor, makeupCancel };
 }
 
 export interface SafetyLimiter {
@@ -47,7 +87,7 @@ export function createSafetyLimiter(ctx: BaseAudioContext): SafetyLimiter {
   compressor.attack.value = ATTACK_SEC;
   compressor.release.value = RELEASE_SEC;
   const makeupCancel = ctx.createGain();
-  makeupCancel.gain.value = 10 ** (-compressorMakeupDb(DJ_LIMITER_THRESHOLD_DB, RATIO) / 20);
+  makeupCancel.gain.value = makeupCancelGain(DJ_LIMITER_THRESHOLD_DB, RATIO);
   compressor.connect(makeupCancel);
   return {
     input: compressor,
