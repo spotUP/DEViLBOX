@@ -33,6 +33,7 @@ export const ROW_PREVIEW_ADAPTERS: Record<string, AdapterLoader> = {
     });
     return createEaglePlayerRowAdapter(await loadEaglePlayerModuleFromPublic(), sampleRate, fetchPlayer, base);
   },
-  // UADEEditable names a row in a UADE clock; the opaque player (U2) runs the same adapter, naming rows in frames.
+  // Both UADE keys run the same adapter: UADEEditable names a row in a UADE clock, 'UADE classic' (an opaque player) in frames.
   UADEEditable: (sampleRate) => loadUade(sampleRate),
+  'UADE classic': (sampleRate) => loadUade(sampleRate),
 };

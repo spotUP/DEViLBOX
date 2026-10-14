@@ -21,6 +21,7 @@ import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import type { UADEEngine } from '@engine/uade/UADEEngine';
 import { liveTrackerSong, liveSongFormat } from '@/lib/song/liveSong';
 import { playsAsOpaqueUADE } from '@engine/replayer/wasmEngineRegistry';
+import { OPAQUE_UADE_FRAMES_PER_ROW } from '@engine/uade/uadeLoadArgs';
 import { computePlaybackFollow } from '@/lib/tracker/playbackFollow';
 import { computeEffectiveSongOrder } from '@/lib/tracker/playbackOrder';
 
@@ -259,7 +260,7 @@ export const usePatternPlayback = () => {
                 // need to advance the row/pattern cursor as the song plays.
                 // Use totalFrames to compute position matching the scan's fixed row rate.
                 uadeChannelUnsubRef.current?.();
-                const framesPerRow = Math.round(44100 * 2.5 * 6 / 125); // ~5292 at standard Amiga rate
+                const framesPerRow = OPAQUE_UADE_FRAMES_PER_ROW; // ~5292 at standard Amiga rate (the row preview names a row by the same number)
                 uadeChannelUnsubRef.current = uadeEngine.onChannelData((_channels, totalFrames) => {
                   // TFMX: use timing table for position sync instead of fixed framesPerRow
                   const tt = tfmxTimingTableRef.current;
