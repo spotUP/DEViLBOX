@@ -30,6 +30,7 @@ import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { useGLTF, OrbitControls, View, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDJStore } from '@/stores/useDJStore';
+import { tonearmProgress } from '@/lib/dj/tonearm';
 import { platterPositionSec } from './DeckCssTurntable';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import { TurntablePhysics, OMEGA_NORMAL } from '@/engine/turntable/TurntablePhysics';
@@ -350,13 +351,10 @@ export function TurntableScene({ deckId, orbitRef, embedded }: TurntableScenePro
 
     // ── Tonearm follows song position ──
     if (tonearmMeshes.length > 0) {
-      let progress = 0;
-      if (mode === 'audio' && dur > 0) {
-        progress = platterPositionSec(deckId) / (dur / 1000);
-      } else if (mode === 'tracker' && total > 0) {
-        progress = sPos / total;
-      }
-      progress = Math.max(0, Math.min(1, progress));
+      const progress = tonearmProgress(
+        { playbackMode: mode, durationMs: dur, songPos: sPos, totalPositions: total },
+        platterPositionSec(deckId),
+      );
 
       // Tonearm on record only when playing, otherwise parked at rest
       const targetAngle = (playing && trackName)

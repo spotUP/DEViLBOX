@@ -18,6 +18,7 @@ import { clockNowMs, deckPositionAt } from '@/engine/audioLatency';
 import type { DeckId } from '@/engine/dj/DeckEngine';
 import * as Tone from 'tone';
 import { deckCPlatterRadians, subscribeDeckCMotion } from '@/engine/dj/scratch/deckCMotion';
+import { tonearmProgress } from '@/lib/dj/tonearm';
 import './DeckCssTurntable.css';
 import { useDJLayoutContext } from './DJLayoutContext';
 
@@ -179,9 +180,7 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
       const ARM_START_DEG = 5;
       const ARM_END_DEG = 25;
       const deck = useDJStore.getState().decks[deckId];
-      const duration = deck.durationMs > 0 ? deck.durationMs / 1000 : 180;
-      const pos = platterPositionSec(deckId);
-      const progress = duration > 0 ? Math.min(pos / duration, 1) : 0;
+      const progress = tonearmProgress(deck, platterPositionSec(deckId));
       // Slight wobble when playing
       const wobble = playing && !isScratchActiveRef.current
         ? Math.sin(now * 0.001) * 0.15
