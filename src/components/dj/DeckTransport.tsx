@@ -4,6 +4,7 @@
  * Play/Pause, Cue, and Sync buttons styled as rubberized hardware buttons.
  */
 
+import { useDJLayoutContext } from './DJLayoutContext';
 import React, { useCallback, useState } from 'react';
 import { Play, Pause, Disc3, Link, Lock } from 'lucide-react';
 import { useDJStore } from '@/stores/useDJStore';
@@ -15,6 +16,8 @@ interface DeckTransportProps {
 }
 
 export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
+  const btn = useDJLayoutContext().deck.transportButton;
+  const buttonSize = { height: btn, minWidth: btn };
   const { isPlaying, cuePoint, keyLockEnabled, pendingAction, thisBPM } = useDJStore(
     useShallow((s) => ({
       isPlaying: s.decks[deckId].isPlaying,
@@ -67,7 +70,7 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
         onClick={handlePlayPause}
         disabled={isPending}
         className={`
-          flex flex-1 items-center justify-center min-w-10 h-10 rounded-lg
+          flex flex-1 items-center justify-center rounded-lg
           transition-all duration-100 border border-dark-border
           active:translate-y-[1px]
           ${
@@ -79,6 +82,7 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
           }
         `}
         title={isPending ? 'Waiting for beat...' : isPlaying ? 'Pause' : 'Play'}
+        style={buttonSize}
       >
         {isPlaying ? <Pause size={18} /> : <Play size={18} />}
       </button>
@@ -87,7 +91,7 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
       <button
         onClick={handleCue}
         className={`
-          flex flex-1 items-center justify-center min-w-10 h-10 rounded-lg
+          flex flex-1 items-center justify-center rounded-lg
           border border-dark-border
           active:translate-y-[1px]
           transition-all duration-100
@@ -96,6 +100,7 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
             : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'}
         `}
         title={cuePending ? 'Waiting for beat...' : 'Cue'}
+        style={buttonSize}
       >
         <Disc3 size={18} />
       </button>
@@ -104,7 +109,7 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
       <button
         onClick={handleSync}
         className={`
-          flex flex-1 items-center justify-center min-w-10 h-10 rounded-lg
+          flex flex-1 items-center justify-center rounded-lg
           border border-dark-border
           active:translate-y-[1px]
           transition-all duration-100
@@ -115,6 +120,7 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
           }
         `}
         title="Sync"
+        style={buttonSize}
       >
         <Link size={16} />
       </button>
@@ -123,7 +129,7 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
       <button
         onClick={handleKeyLock}
         className={`
-          flex flex-1 items-center justify-center min-w-10 h-10 rounded-lg
+          flex flex-1 items-center justify-center rounded-lg
           border border-dark-border
           active:translate-y-[1px]
           transition-all duration-100
@@ -134,6 +140,7 @@ export const DeckTransport: React.FC<DeckTransportProps> = ({ deckId }) => {
           }
         `}
         title={keyLockEnabled ? 'Key Lock ON — pitch slider changes tempo only' : 'Key Lock OFF — pitch and tempo coupled'}
+        style={buttonSize}
       >
         <Lock size={14} />
       </button>

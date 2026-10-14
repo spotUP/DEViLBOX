@@ -22,9 +22,9 @@ interface DeckTurntableProps {
 }
 
 import { deckAccent, deckLabelSurface } from '@lib/deckIdentity';
+import { useDJLayoutContext } from './DJLayoutContext';
 import type { TurntableMsg, DeckColorsExt } from '@engine/renderer/worker-types';
 
-const SIZE = 96;
 const MOMENTUM_DECAY_MS = 500;
 
 function snapshotColors(el: HTMLElement, deckId: string): DeckColorsExt {
@@ -41,6 +41,9 @@ function snapshotColors(el: HTMLElement, deckId: string): DeckColorsExt {
 }
 
 export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
+  // The platter's edge comes from the DJ layout (96 px, smaller when the deck row is short, larger on big screens).
+  const size = useDJLayoutContext().deck.platter;
+  const sizeRef = useRef(size);
   // Mutable ref — set imperatively in useEffect to avoid StrictMode double-transfer
   const canvasRef    = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -72,7 +75,7 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
     if (!container || !('transferControlToOffscreen' in HTMLCanvasElement.prototype)) return;
 
     const canvas = document.createElement('canvas');
-    canvas.style.cssText = `display:block;width:${SIZE}px;height:${SIZE}px;border-radius:4px;touch-action:none;`;
+    canvas.style.cssText = `display:block;width:${sizeRef.current}px;height:${sizeRef.current}px;border-radius:4px;touch-action:none;`;
     container.appendChild(canvas);
     canvasRef.current = canvas;
 
@@ -88,7 +91,7 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
 
     bridge.post({
       type: 'init', canvas: offscreen, dpr,
-      width: SIZE, height: SIZE, colors, deckId,
+      width: sizeRef.current, height: sizeRef.current, colors, deckId,
       isPlaying: deck.isPlaying, effectiveBPM: deck.effectiveBPM,
     }, [offscreen]);
 
@@ -265,6 +268,16 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
     startMomentumDecay(scratchVelocityRef.current);
   }, [deckId, startMomentumDecay]);
 
+  // A new platter size: resize the canvas box and tell the worker (it re-allocates the offscreen buffer).
+  useEffect(() => {
+    sizeRef.current = size;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.style.width = `${size}px`;
+    canvas.style.height = `${size}px`;
+    bridgeRef.current?.post({ type: 'resize', w: size, h: size, dpr: window.devicePixelRatio || 1 });
+  }, [size]);
+
   useEffect(() => {
     return () => { if (momentumDecayRafRef.current) cancelAnimationFrame(momentumDecayRafRef.current); };
   }, []);
@@ -274,7 +287,7 @@ export const DeckTurntable: React.FC<DeckTurntableProps> = ({ deckId }) => {
       ref={containerRef}
       className="flex-shrink-0 rounded"
       style={{
-        width: SIZE, height: SIZE,
+        width: size, height: size,
         cursor: isScratchActive ? 'grabbing' : 'grab',
         touchAction: 'none',
       }}

@@ -48,11 +48,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   // a coarse pointer AND a small screen. See src/hooks/useBreakpoint.ts.
   const { isPhone } = useResponsiveSafe();
   const activeView = useUIStore((s) => s.activeView);
-  const isFullscreenView = activeView === 'vj';
+  const isFullscreenView = activeView === 'vj' || activeView === 'dj';
 
   return (
     <div className="h-screen w-screen flex flex-col bg-dark-bg text-text-primary overflow-hidden">
-      {/* Top Navigation Bar - Hidden on mobile and in fullscreen views (VJ) */}
+      {/* Top Navigation Bar - Hidden on mobile and in fullscreen views (VJ, DJ) */}
       {!isFullscreenView && (
         <div className={isPhone ? 'hidden' : 'block'}>
           <NavBar />

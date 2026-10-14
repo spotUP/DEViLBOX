@@ -322,6 +322,8 @@ interface DJState {
   deckViewMode: DeckViewMode;
   /** Open lower-panel tab per deck; survives deck re-renders and view switches. */
   deckPanelTab: Record<'A' | 'B' | 'C', DeckPanelTab>;
+  /** Whether the lower panel body is open per deck. Only used while the layout opens the panel on demand (short screens); docked, the body is always shown. Not persisted. */
+  deckPanelOpen: Record<'A' | 'B' | 'C', boolean>;
   /** The crate record Deck C's scratch pads play (scratchCatalogue id). */
   deckCRecordId: string;
   thirdDeckActive: boolean;
@@ -416,6 +418,7 @@ interface DJActions {
   cycleDeckViewMode: () => void;
   setDeckViewMode: (mode: DeckViewMode) => void;
   setDeckPanelTab: (deck: 'A' | 'B' | 'C', tab: DeckPanelTab) => void;
+  setDeckPanelOpen: (deck: 'A' | 'B' | 'C', open: boolean) => void;
   setDeckCRecordId: (id: string) => void;
   setThirdDeckActive: (active: boolean) => void;
   setCrossfader: (position: number) => void;
@@ -520,6 +523,7 @@ export const useDJStore = create<DJStore>()(
     djModeActive: false,
     deckViewMode: 'visualizer' as DeckViewMode,
     deckPanelTab: { A: 'pads', B: 'pads', C: 'pads' } as Record<'A' | 'B' | 'C', DeckPanelTab>,
+    deckPanelOpen: { A: false, B: false, C: false } as Record<'A' | 'B' | 'C', boolean>,
     deckCRecordId: CRATE_LOAD_ORDER[0]?.id ?? '',
     thirdDeckActive: false,
     crossfaderPosition: 0.5,
@@ -604,6 +608,10 @@ export const useDJStore = create<DJStore>()(
     setDeckPanelTab: (deck, tab) =>
       set((state) => {
         state.deckPanelTab[deck] = tab;
+      }),
+    setDeckPanelOpen: (deck, open) =>
+      set((state) => {
+        state.deckPanelOpen[deck] = open;
       }),
 
     setThirdDeckActive: (active) =>

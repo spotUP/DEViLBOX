@@ -27,6 +27,8 @@ import { DeckPanelTabs } from '../DeckPanelTabs';
 import { DeckScratch } from '../DeckScratch';
 import { useDJStore } from '@/stores/useDJStore';
 import { SCRATCH_PATTERNS } from '@/engine/dj/DJScratchEngine';
+import { DJLayoutContext, DEFAULT_DJ_LAYOUT } from '../DJLayoutContext';
+import { djLayout } from '@/lib/dj/djLayout';
 
 afterEach(() => {
   cleanup();
@@ -74,7 +76,8 @@ describe('the deck panel fits a 499 px deck', () => {
     const body = container.querySelector('[data-deck-panel-body]') as HTMLElement;
     expect(body.className).toMatch(/\bmin-w-0\b/);
     expect(body.className).toMatch(/\boverflow-x-hidden\b/);
-    expect(body.className).toMatch(/\bh-\d+\b/);
+    // the height comes from the DJ layout (djLayout.ts), as an inline px value
+    expect(body.style.height).toMatch(/^\d+px$/);
   });
 
   it('every scratch pattern is a wrapping grid cell, none in a non-wrapping row', () => {
@@ -92,5 +95,48 @@ describe('the deck panel fits a 499 px deck', () => {
     }
     expect(src).toMatch(/<DeckPanelTabs\b/);
     expect(src).toMatch(/flex gap-2 flex-1 min-h-0/); // the pattern/vinyl/visualizer row still grows
+  });
+});
+
+describe('the lower panel opens on demand on a short screen', () => {
+  // 1280 x 590 with Deck C: the layout gives the panel up (deckPanelOnDemand).
+  const shortLayout = djLayout({ width: 1280, height: 512, deckCount: 3, deckC: 'scratchOnly', waveformCount: 3, dubBusOn: false, pointer: 'fine' });
+  const renderOnDemand = () => render(
+    <DJLayoutContext.Provider value={shortLayout}><DeckPanelTabs deckId="A" /></DJLayoutContext.Provider>,
+  );
+
+  afterEach(() => { for (const d of ['A', 'B', 'C'] as const) useDJStore.getState().setDeckPanelOpen(d, false); });
+
+  it('the solver picked on-demand for that screen, and docked for the roomy default', () => {
+    expect(shortLayout.deck.panel).toBe('onDemand');
+    expect(DEFAULT_DJ_LAYOUT.deck.panel).toBe('docked');
+  });
+
+  it('the body is hidden until a tab is clicked, a second click on the open tab closes it, Escape closes it', () => {
+    const { getByRole, container } = renderOnDemand();
+    const wrap = container.querySelector('[data-deck-panel-tabs]') as HTMLElement;
+    expect(wrap.getAttribute('data-deck-panel-mode')).toBe('onDemand');
+    expect(container.querySelector('[data-deck-panel-body]')).toBeNull();
+
+    fireEvent.click(getByRole('tab', { name: 'Mix' }));
+    expect(container.querySelector('[data-deck-panel-body]')).not.toBeNull();
+    fireEvent.click(getByRole('tab', { name: 'Mix' }));
+    expect(container.querySelector('[data-deck-panel-body]')).toBeNull();
+
+    fireEvent.click(getByRole('tab', { name: 'Pads' }));
+    expect(container.querySelector('[data-deck-panel-body]')).not.toBeNull();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(container.querySelector('[data-deck-panel-body]')).toBeNull();
+  });
+
+  it('the open body overlays the pattern view instead of taking room in the deck column', () => {
+    const { getByRole, container } = renderOnDemand();
+    fireEvent.click(getByRole('tab', { name: 'Pads' }));
+    expect((container.querySelector('[data-deck-panel-body]') as HTMLElement).className).toMatch(/\babsolute\b/);
+  });
+
+  it('docked (the default) keeps the body always open and ignores the open flag', () => {
+    const { container } = render(<DeckPanelTabs deckId="A" />);
+    expect(container.querySelector('[data-deck-panel-body]')).not.toBeNull();
   });
 });

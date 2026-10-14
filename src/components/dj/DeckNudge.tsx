@@ -5,6 +5,7 @@
  * pitch-bend button. Soft: +/-2 %; hard (Shift held on press): +/-5 %.
  */
 
+import { useDJLayoutContext } from './DJLayoutContext';
 import React, { useCallback } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { holdNudgeDeck, releaseNudgeDeck } from '@/engine/dj/DJActions';
@@ -17,6 +18,8 @@ const SOFT_OFFSET = 2;
 const HARD_OFFSET = 5;
 
 export const DeckNudge: React.FC<DeckNudgeProps> = ({ deckId }) => {
+  const btn = useDJLayoutContext().deck.transportButton;
+  const buttonSize = { height: btn, minWidth: btn };
   const handlePress = useCallback(
     (direction: -1 | 1, e: React.PointerEvent<HTMLButtonElement>) => {
       // Capture so the release arrives even when the pointer leaves the button.
@@ -37,13 +40,14 @@ export const DeckNudge: React.FC<DeckNudgeProps> = ({ deckId }) => {
         onPointerCancel={handleRelease}
         onLostPointerCapture={handleRelease}
         className="
-          flex flex-1 items-center justify-center min-w-10 h-10 rounded-lg
+          flex flex-1 items-center justify-center rounded-lg
           bg-dark-bgTertiary text-text-secondary border border-dark-border
           hover:bg-dark-bgHover hover:text-text-primary
           active:translate-y-[1px]
           transition-all duration-100
         "
         title="Nudge slower (Shift = hard nudge)"
+        style={buttonSize}
       >
         <ChevronLeft size={18} />
       </button>
@@ -55,13 +59,14 @@ export const DeckNudge: React.FC<DeckNudgeProps> = ({ deckId }) => {
         onPointerCancel={handleRelease}
         onLostPointerCapture={handleRelease}
         className="
-          flex flex-1 items-center justify-center min-w-10 h-10 rounded-lg
+          flex flex-1 items-center justify-center rounded-lg
           bg-dark-bgTertiary text-text-secondary border border-dark-border
           hover:bg-dark-bgHover hover:text-text-primary
           active:translate-y-[1px]
           transition-all duration-100
         "
         title="Nudge faster (Shift = hard nudge)"
+        style={buttonSize}
       >
         <ChevronRight size={18} />
       </button>

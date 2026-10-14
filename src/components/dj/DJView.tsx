@@ -6,7 +6,6 @@
  */
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import * as Tone from 'tone';
 import { useDJStore } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
@@ -21,6 +20,14 @@ import { useAudioStore } from '@/stores/useAudioStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { handOverToDJ } from '@/lib/playback/oneProgrammeAtATime';
 import { DJDeck } from './DJDeck';
+import { AnchoredPopover } from '@components/ui/AnchoredPopover';
+import { DJLayoutContext } from './DJLayoutContext';
+import { DJSetBrowser } from './DJSetBrowser';
+import { useDJLayout } from '@/hooks/dj/useDJLayout';
+import { SettingsModal } from '@components/dialogs/SettingsModal';
+import { Button } from '@components/ui/Button';
+import { VIEW_OPTIONS, switchView } from '@/constants/viewOptions';
+import { Settings } from 'lucide-react';
 import { DJMixer } from './DJMixer';
 import { DJCratePanel } from './DJCratePanel';
 import { DJPlaylistModal } from './DJPlaylistModal';
@@ -64,6 +71,9 @@ interface DJViewProps {
 
 export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads }) => {
   const djViewRef = useRef<HTMLDivElement>(null);
+  const topBarRef = useRef<HTMLDivElement>(null);
+  const layout = useDJLayout(djViewRef, topBarRef);
+  const [showSettings, setShowSettings] = useState(false);
   const engineRef = useRef<DJEngine | null>(null);
   const { deckViewMode, thirdDeckActive, autoDJEnabled } = useDJStore(
     useShallow((s) => ({
@@ -81,7 +91,6 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [showAutoDJ, setShowAutoDJ] = useState(false);
   const autoDJBtnRef = useRef<HTMLButtonElement>(null);
-  const [autoDJDropdownPos, setAutoDJDropdownPos] = useState({ top: 0, left: 0 });
   const dubBusEnabledDJ = useDrumPadStore((s) => s.dubBus.enabled);
   const activePlaylistName = useDJPlaylistStore((s) => {
     const p = s.playlists.find((pl) => pl.id === s.activePlaylistId);
@@ -394,10 +403,11 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
   }, []);
 
   return (
+    <DJLayoutContext.Provider value={layout}>
     <div
       ref={djViewRef}
       data-dj-view
-      className={`relative flex flex-col overflow-hidden select-none bg-dark-bg font-mono ${layoutFrame ? 'shrink-0' : 'h-full w-full'}`}
+      className={`relative flex flex-col ${layout.floor.scroll ? 'overflow-y-auto' : 'overflow-hidden'} select-none bg-dark-bg font-mono ${layoutFrame ? 'shrink-0' : 'h-full w-full'}`}
       style={layoutFrame ? { width: layoutFrame.width, height: layoutFrame.height, zoom: layoutFrame.zoom } : undefined}
     >
       {/* Audio health indicator — only visible when AudioContext is not running */}
@@ -419,9 +429,9 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       {/* ================================================================== */}
       {/* TOP BAR                                                            */}
       {/* ================================================================== */}
-      <div className="relative shrink-0 bg-dark-bgSecondary border-b border-dark-border">
-        <div className="flex items-center px-2 py-1.5 overflow-x-auto scrollbar-hidden">
-          <div className="flex items-center gap-1.5 flex-nowrap [&>*]:shrink-0">
+      <div ref={topBarRef} className="relative shrink-0 bg-dark-bgSecondary border-b border-dark-border">
+        <div className="flex flex-wrap items-center gap-1.5 px-2 py-1.5 [&>*]:shrink-0">
+          <>
             <DJControllerSelector />
             <DJFxQuickPresets />
             <CustomSelect
@@ -448,13 +458,7 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
             </button>
             <button
               ref={autoDJBtnRef}
-              onClick={() => {
-                if (!showAutoDJ && autoDJBtnRef.current) {
-                  const r = autoDJBtnRef.current.getBoundingClientRect();
-                  setAutoDJDropdownPos({ top: r.bottom + 4, left: r.left });
-                }
-                setShowAutoDJ(!showAutoDJ);
-              }}
+              onClick={() => setShowAutoDJ(!showAutoDJ)}
               className={`px-3 py-1.5 rounded-md text-xs font-mono border transition-all
                 ${showAutoDJ || autoDJEnabled
                   ? 'border-accent-primary bg-accent-primary/20 text-accent-primary'
@@ -494,25 +498,35 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
                 </>
               )}
             </button>
-          </div>
-        </div>
-        {/* Portal: renders outside DOM hierarchy so overflow:hidden can't clip it */}
-        {showAutoDJ && createPortal(
-          <>
-            {/* Invisible backdrop — click outside the panel to close */}
-            <div
-              className="fixed inset-0 z-[99988]"
-              onClick={() => { setShowAutoDJ(false); setShowCrate(false); }}
+            {/* NavBar is hidden in the DJ view (like VJ): its view switcher, Settings and DJ Sets live here */}
+            <CustomSelect
+              value="dj"
+              onChange={(v) => switchView(v, 'dj')}
+              options={VIEW_OPTIONS.map((v) => ({ value: v.value, label: v.label }))}
+              className="px-3 py-1.5 rounded-md text-xs font-mono border transition-all cursor-pointer border-dark-borderLight bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover hover:text-text-primary"
+              title="Switch view"
             />
-            <div
-              className="fixed z-[99989] w-80"
-              style={{ top: autoDJDropdownPos.top, left: autoDJDropdownPos.left }}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowSettings(true)}
+              icon={<Settings size={14} />}
+              iconPosition="left"
+              title="Settings"
             >
-              <DJAutoDJPanel onClose={() => { setShowAutoDJ(false); setShowCrate(false); }} />
-            </div>
-          </>,
-          document.body,
-        )}
+              Settings
+            </Button>
+            <DJSetBrowser />
+          </>
+        </div>
+        <AnchoredPopover
+          open={showAutoDJ}
+          onClose={() => { setShowAutoDJ(false); setShowCrate(false); }}
+          anchorRef={autoDJBtnRef}
+          className="w-80"
+        >
+          <DJAutoDJPanel onClose={() => { setShowAutoDJ(false); setShowCrate(false); }} />
+        </AnchoredPopover>
       </div>
 
       {/* ================================================================== */}
@@ -520,7 +534,8 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       {/* ================================================================== */}
       {showCrate && (
         <div
-          className="absolute inset-x-0 top-12 bottom-0 z-[99990] px-2 pt-2"
+          className="absolute inset-x-0 bottom-0 z-[99990] px-2 pt-2"
+          style={{ top: topBarRef.current?.offsetHeight ?? 48 }}
           onClick={(e) => { if (e.target === e.currentTarget) setShowCrate(false); }}
         >
           <div className="max-h-[50vh]">
@@ -554,15 +569,16 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       }`}>
         <DeckAudioWaveform deckId="A" />
         <DeckAudioWaveform deckId="B" />
+        {thirdDeckActive && <DeckAudioWaveform deckId="C" />}
         {/* Sync status badge between the two waveforms */}
         {syncDriftMs !== null && (
-          <div className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 px-2 py-0.5 rounded text-[10px] font-mono font-bold pointer-events-none z-10 ${
+          <div className={`absolute left-1/2 -translate-x-1/2 -translate-y-1/2 px-2 py-0.5 rounded text-[10px] font-mono font-bold pointer-events-none z-10 ${
             syncDriftMs < 30
               ? 'bg-accent-primary text-text-inverse'
               : syncDriftMs < 80
                 ? 'bg-accent-primary text-text-inverse'
                 : 'bg-dark-bgActive text-text-primary'
-          }`}>
+          }`} style={{ top: layout.waveformHeight }}>
             {syncDriftMs < 30 ? 'SYNCED' : `${syncDriftMs}ms`}
           </div>
         )}
@@ -571,11 +587,15 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
       {/* ================================================================== */}
       {/* MAIN LAYOUT: Deck A | Mixer | Deck B [| Deck C]                   */}
       {/* ================================================================== */}
-      <div data-dj-grid data-dj-scale="legacy" className={`relative flex-1 grid gap-2 p-2 overflow-hidden min-h-0 ${
-        thirdDeckActive
-          ? 'grid-cols-[1fr_400px_1fr_1fr]'
-          : 'grid-cols-[1fr_400px_1fr]'
-      }`}>
+      <div
+        data-dj-grid
+        data-dj-scale={layout.scale}
+        data-dj-steps={layout.steps.join(' ')}
+        data-dj-input={JSON.stringify(layout.input)}
+        data-dj-floor={layout.floor.scroll ? 'true' : 'false'}
+        className="relative flex-1 grid gap-2 p-2 overflow-hidden min-h-0"
+        style={{ gridTemplateColumns: layout.columns, minHeight: layout.floor.scroll ? layout.floor.minHeight : undefined }}
+      >
         {deckViewMode === '3d' ? (
           /* ── 3D mode: Unified scene with decks + mixer side by side ──── */
           <div className="col-span-full min-h-0 min-w-0 overflow-hidden">
@@ -614,6 +634,8 @@ export const DJView: React.FC<DJViewProps> = ({ onShowDrumpads: _onShowDrumpads 
           </>
         )}
       </div>
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </div>
+    </DJLayoutContext.Provider>
   );
 };

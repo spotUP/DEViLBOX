@@ -16,9 +16,11 @@ export interface TabStripProps<Id extends string> {
   onChange: (id: Id) => void;
   ariaLabel: string;
   className?: string;
+  /** Tighter tab padding, for a strip that must stay on one row in a narrow column. */
+  dense?: boolean;
 }
 
-export function TabStrip<Id extends string>({ tabs, active, onChange, ariaLabel, className = '' }: TabStripProps<Id>) {
+export function TabStrip<Id extends string>({ tabs, active, onChange, ariaLabel, className = '', dense = false }: TabStripProps<Id>) {
   return (
     <div role="tablist" aria-label={ariaLabel} className={`flex flex-wrap items-center gap-1 min-w-0 ${className}`}>
       {tabs.map((tab) => {
@@ -31,7 +33,7 @@ export function TabStrip<Id extends string>({ tabs, active, onChange, ariaLabel,
             aria-selected={selected}
             onClick={() => onChange(tab.id)}
             title={tab.title}
-            className={`flex-1 whitespace-nowrap px-2.5 py-1 rounded text-xs font-bold transition-colors ${
+            className={`flex-1 whitespace-nowrap ${dense ? 'px-1' : 'px-2.5'} py-1 rounded text-xs font-bold transition-colors ${
               selected
                 ? 'bg-accent-primary/20 text-accent-primary border border-accent-primary/40'
                 : 'bg-dark-bgTertiary text-text-muted border border-dark-border hover:text-text-secondary'

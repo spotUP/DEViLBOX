@@ -73,6 +73,18 @@ export const BREAKPOINTS = {
   '2xl': 1536,
 } as const;
 
+/**
+ * DJ view thresholds (DJ-VIEW-RESOLUTIONS). Decisions, not measurements: the band
+ * sizes these are compared against live in DJ_SIZES (src/lib/dj/djLayout.ts).
+ */
+export const DJ_LAYOUT_LIMITS = {
+  /** D1: below this the pattern view is hidden instead of drawn as a sliver (~10 rows). */
+  patternMinPx: 160,
+  /** D4: a deck at least this wide AND a row at least largeRowPx tall gets the large tier. */
+  largeDeckWidthPx: 640,
+  largeRowPx: 900,
+} as const;
+
 /** Media query for a coarse (finger / stylus) primary pointer. */
 export const COARSE_POINTER_QUERY = '(pointer: coarse)';
 

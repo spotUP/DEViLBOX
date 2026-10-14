@@ -10,6 +10,7 @@ import React, { useRef, useCallback } from 'react';
 import { useDeckVisualizationData } from '@/hooks/dj/useDeckVisualizationData';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 import { useDJStore } from '@/stores/useDJStore';
+import { deckNumber } from '@/lib/deckIdentity';
 
 interface MixerVUMeterProps {
   deckId: 'A' | 'B' | 'C';
@@ -104,7 +105,7 @@ export const MixerVUMeter: React.FC<MixerVUMeterProps> = ({ deckId, stretch }) =
       ref={containerRef}
       className={`flex flex-col-reverse gap-[1px] justify-center${stretch ? ' self-stretch flex-1' : ''}`}
       style={{ width: 12 }}
-      title={`Deck ${deckId === 'A' ? '1' : '2'} level meter`}
+      title={`Deck ${deckNumber(deckId)} level meter`}
     >
       {Array.from({ length: VU_SEGMENTS }, (_, i) => (
         <div

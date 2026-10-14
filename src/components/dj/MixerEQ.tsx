@@ -9,6 +9,8 @@ import React, { useCallback } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { useDJStore } from '@/stores/useDJStore';
 import * as DJActions from '@/engine/dj/DJActions';
+import { deckNumber } from '@/lib/deckIdentity';
+import { useDJLayoutContext } from '@/components/dj/DJLayoutContext';
 
 interface MixerEQProps {
   deckId: 'A' | 'B' | 'C';
@@ -16,6 +18,7 @@ interface MixerEQProps {
 
 /** Single filter knob for one deck */
 export const MixerFilterKnob: React.FC<MixerEQProps> = ({ deckId }) => {
+  const layout = useDJLayoutContext();
   const filterPosition = useDJStore((s) => s.decks[deckId].filterPosition);
 
   const handleChange = useCallback((value: number) => {
@@ -28,7 +31,7 @@ export const MixerFilterKnob: React.FC<MixerEQProps> = ({ deckId }) => {
     return 'LPF';
   }, []);
 
-  const deckNum = deckId === 'A' ? '1' : '2';
+  const deckNum = deckNumber(deckId);
 
   return (
     <Knob
@@ -37,7 +40,7 @@ export const MixerFilterKnob: React.FC<MixerEQProps> = ({ deckId }) => {
       max={1}
       onChange={handleChange}
       label="FLT"
-      size="sm"
+      size={layout.mixer.knob}
       tone="neutral"
       bipolar
       defaultValue={0}
@@ -56,6 +59,7 @@ export const MixerEQBandKnob: React.FC<{
   label: string;
   side: 'left' | 'right';
 }> = ({ deckId, band, label, side }) => {
+  const layout = useDJLayoutContext();
   const eqValue = useDJStore((s) => s.decks[deckId][`eq${band.charAt(0).toUpperCase() + band.slice(1)}` as 'eqHigh' | 'eqMid' | 'eqLow']);
   const killKey = `eq${band.charAt(0).toUpperCase() + band.slice(1)}Kill` as 'eqHighKill' | 'eqMidKill' | 'eqLowKill';
   const killActive = useDJStore((s) => s.decks[deckId][killKey]);
@@ -80,7 +84,7 @@ export const MixerEQBandKnob: React.FC<{
   const bandKey = band === 'high' ? 'eqHi' : band === 'mid' ? 'eqMid' : 'eqLow';
   const paramKey = `dj.deck${deckId}.${bandKey}`;
 
-  const deckNum = deckId === 'A' ? '1' : '2';
+  const deckNum = deckNumber(deckId);
   const bandDesc = band === 'high' ? 'treble' : band === 'low' ? 'bass' : 'mid';
 
   const killButton = (
@@ -113,7 +117,7 @@ export const MixerEQBandKnob: React.FC<{
         max={12}
         onChange={handleChange}
         label={label}
-        size="sm"
+        size={layout.mixer.knob}
         tone="neutral"
         bipolar
         defaultValue={0}

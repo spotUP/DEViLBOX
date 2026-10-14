@@ -8,7 +8,7 @@
 import { noteCellsPerPattern } from '@/lib/tracker/patternNoteCells';
 import { noteValueName, pitchName } from '@/lib/tracker/noteValue';
 import { useTrackerStore } from '../../stores/useTrackerStore';
-import { readDjLayoutFit } from '@/lib/dj/djLayoutFit';
+import { readDjLayoutFit, measureDjLayoutNow } from '@/lib/dj/djLayoutFit';
 import { getConsoleEntries } from '../consoleCapture';
 import { useTransportStore } from '../../stores/useTransportStore';
 import { useWasmPositionStore } from '../../stores/useWasmPositionStore';
@@ -442,7 +442,8 @@ export function getUIState(): Record<string, unknown> {
 // ─── DJ layout fit ─────────────────────────────────────────────────────────────
 
 /** Real-browser fit probe of the DJ view: which regions are clipped, which bands overrun their budget. */
-export function getDJLayoutFit(): Record<string, unknown> {
+export async function getDJLayoutFit(): Promise<Record<string, unknown>> {
+  await measureDjLayoutNow();
   const root = document.querySelector<HTMLElement>('[data-dj-view]');
   if (!root) return { error: 'DJ view is not mounted - set_active_view dj first' };
   return { ...readDjLayoutFit(root), frame: useUIStore.getState().djLayoutFrame };

@@ -19,6 +19,7 @@ import type { DeckId } from '@/engine/dj/DeckEngine';
 import * as Tone from 'tone';
 import { deckCPlatterRadians, subscribeDeckCMotion } from '@/engine/dj/scratch/deckCMotion';
 import './DeckCssTurntable.css';
+import { useDJLayoutContext } from './DJLayoutContext';
 
 interface DeckCssTurntableProps {
   deckId: 'A' | 'B' | 'C';
@@ -34,6 +35,7 @@ export function platterPositionSec(deckId: DeckId): number {
 }
 
 export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) => {
+  const layout = useDJLayoutContext();
   const containerRef = useRef<HTMLDivElement>(null);
   const platterRef = useRef<HTMLDivElement>(null);
   const recordRef = useRef<HTMLDivElement>(null);
@@ -284,7 +286,7 @@ export const DeckCssTurntable: React.FC<DeckCssTurntableProps> = ({ deckId }) =>
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="turntable-css-container">
+    <div className="turntable-css-container" style={{ ['--tt-max' as string]: layout.scale === 'large' ? '1256px' : undefined }}>
       <div
         ref={containerRef}
         className="turntable-css relative select-none"

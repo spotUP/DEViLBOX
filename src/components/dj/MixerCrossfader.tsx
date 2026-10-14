@@ -8,6 +8,7 @@
 import React, { useCallback, useRef, useEffect } from 'react';
 import { useDJStore, type CrossfaderCurve } from '@/stores/useDJStore';
 import * as DJActions from '@/engine/dj/DJActions';
+import { useDJLayoutContext } from './DJLayoutContext';
 
 interface CrossfaderState {
   position: number;
@@ -21,6 +22,8 @@ const CURVES: { key: CrossfaderCurve; label: string }[] = [
 ];
 
 export const MixerCrossfader: React.FC = () => {
+  // Compact layout: the curve selector sits beside the slider instead of under it.
+  const compact = useDJLayoutContext().mixer.compact;
   const position = useDJStore((s) => s.crossfaderPosition);
   const curve = useDJStore((s) => s.crossfaderCurve);
 
@@ -39,7 +42,10 @@ export const MixerCrossfader: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col items-center gap-1 w-full px-2" title="Crossfader">
+    <div
+      className={compact ? 'flex flex-row items-center gap-2 w-full px-2' : 'flex flex-col items-center gap-1 w-full px-2'}
+      title="Crossfader"
+    >
       {/* A / B labels + slider */}
       <div className="flex items-center gap-3 w-full">
         <span className="text-text-secondary text-xs font-mono font-bold" title="Deck 1">1</span>
@@ -70,7 +76,7 @@ export const MixerCrossfader: React.FC = () => {
       </div>
 
       {/* Curve selector */}
-      <div className="flex gap-1">
+      <div className="flex gap-1 shrink-0">
         {CURVES.map(({ key, label }) => {
           const curveDescriptions: Record<CrossfaderCurve, string> = {
             linear: 'Linear — equal crossfade, smooth blend',

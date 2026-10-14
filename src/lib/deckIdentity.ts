@@ -17,6 +17,11 @@ const DECK_VAR: Record<DeckIdentityId, string> = {
   C: 'var(--color-deck-c)',
 };
 
+/** The number a deck is called by in the UI: A = 1, B = 2, C = 3. */
+export function deckNumber(deckId: DeckIdentityId): '1' | '2' | '3' {
+  return deckId === 'A' ? '1' : deckId === 'B' ? '2' : '3';
+}
+
 /** The deck's identity colour as hex. Unknown ids fall back to deck A. */
 export function deckAccent(deckId: string): string {
   return resolveColor(DECK_VAR[deckId as DeckIdentityId] ?? DECK_VAR.A);

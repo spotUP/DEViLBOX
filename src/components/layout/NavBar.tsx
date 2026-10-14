@@ -123,7 +123,7 @@ const NavBarComponent: React.FC = () => {
   }, []);
 
   return (
-    <div className="bg-dark-bgSecondary border-b border-dark-border relative z-40">
+    <div data-navbar className="bg-dark-bgSecondary border-b border-dark-border relative z-40">
       {/* Top Bar: Title and Volume */}
       {/* Track template is [auto_1fr_auto], NOT three equal 1fr columns: the left
           group (title + badges + Desktop App + Tips + Tour) is intrinsically wider

@@ -31,14 +31,17 @@ import { DeckCScratchOnly } from './DeckCScratchOnly';
 import { DeckScopes } from './DeckScopes';
 import { DeckBeatGrid } from './DeckBeatGrid';
 import { DeckPanelTabs } from './DeckPanelTabs';
+import { useDJLayoutContext } from './DJLayoutContext';
 // DeckAudioWaveform moved to full-width strip in DJView
 import { DeckPatternDisplay } from './DeckPatternDisplay';
+import { deckNumber } from '@/lib/deckIdentity';
 
 interface DJDeckProps {
   deckId: 'A' | 'B' | 'C';
 }
 
 export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
+  const layout = useDJLayoutContext();
   const [isDragOver, setIsDragOver] = useState(false);
   const [isLoadingDrop, setIsLoadingDrop] = useState(false);
   const [vizResetKey, setVizResetKey] = useState(0);
@@ -388,16 +391,17 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
   // Deck C is the scratch deck until a human loads a track on it (then it is a full track deck)
   const scratchOnly = deckId === 'C' && !hasFileLoaded;
   const isB = deckId === 'B';
-  const deckNum = deckId === 'A' ? '1' : deckId === 'B' ? '2' : '3';
+  const deckNum = deckNumber(deckId);
   const deckColor = deckId === 'A' ? 'text-deck-a' : deckId === 'B' ? 'text-deck-b' : 'text-deck-c';
   const deckBorderColor = deckId === 'A' ? 'border-deck-a/30' : deckId === 'B' ? 'border-deck-b/30' : 'border-deck-c/30';
   const deckHighlight = deckId === 'A' ? 'border-deck-a/60' : deckId === 'B' ? 'border-deck-b/60' : 'border-deck-c/60';
 
   return (
     <div
-      className={`relative flex flex-col gap-2 p-3 bg-dark-bg rounded-lg border min-w-0 h-full overflow-hidden transition-all ${
+      className={`relative flex flex-col bg-dark-bg rounded-lg border min-w-0 h-full overflow-hidden transition-all ${
         isDragOver ? deckHighlight : deckBorderColor
       }`}
+      style={{ gap: layout.deck.gap, padding: layout.deck.padding }}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -425,12 +429,12 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
       ) : (
         <>
       {/* Deck header + scopes + turntable */}
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-2" data-dj-band="header" data-dj-budget={layout.budgets.header}>
         <div className="flex-1 min-w-0 overflow-hidden">
           <div className={`text-xs font-mono font-bold tracking-[0.3em] uppercase ${deckColor} opacity-60 mb-1`}>
             Deck {deckNum}
           </div>
-          <DeckScopes deckId={deckId} size={64} />
+          <DeckScopes deckId={deckId} size={layout.deck.scope} />
           <DeckTrackInfo deckId={deckId} />
         </div>
         {deckViewMode === 'visualizer' && <DeckTurntable deckId={deckId} />}
@@ -438,7 +442,7 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
 
       {/* Track overview bar — hidden when combined audio waveform is showing */}
       {!hasAudioWaveform && (
-        <div className="relative">
+        <div className="relative" data-dj-band="overview" data-dj-budget={layout.budgets.overview}>
           <DeckTrackOverview deckId={deckId} />
           <DeckBeatGrid deckId={deckId} />
         </div>
@@ -447,12 +451,18 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
       {/* Waveform moved to full-width strip at top of DJView */}
 
       {/* Deck C: the Auto Scratch strokes' crossfader and slip (D1) */}
-      {deckId === 'C' && <DeckCScratchLanes />}
+      {deckId === 'C' && (
+        <div data-dj-band="lanes" data-dj-budget={layout.budgets.lanes}>
+          <DeckCScratchLanes />
+        </div>
+      )}
 
       {/* Main controls area: pattern display / vinyl + pitch slider */}
       <div className={`flex gap-2 flex-1 min-h-0 ${isB ? 'flex-row-reverse' : ''}`}>
         {/* Pattern display / Visualizer / Vinyl */}
-        <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center relative">
+        {/* D1: below the pattern view's minimum height the area is not drawn at all (no sliver) */}
+        {layout.deck.showPattern[deckId === 'C' ? 'trackC' : 'track'] && (
+        <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center relative" data-dj-band="pattern">
           {deckViewMode === 'vinyl' ? (
             <DeckCssTurntable deckId={deckId} />
           ) : hasFileLoaded && (hasPatternData || hasAudioWaveform) ? (
@@ -466,6 +476,7 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
             </div>
           )}
         </div>
+        )}
 
         {/* Pitch slider */}
         <div className="flex-shrink-0 self-stretch">
@@ -474,7 +485,7 @@ export const DJDeck: React.FC<DJDeckProps> = ({ deckId }) => {
       </div>
 
       {/* Transport + Nudge (loop, quantize and slip live in the Loop & Cue tab) */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-2 flex-wrap" data-dj-band="transport">
         <DeckTransport deckId={deckId} />
         <DeckNudge deckId={deckId} />
       </div>

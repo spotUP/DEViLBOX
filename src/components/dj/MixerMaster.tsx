@@ -12,6 +12,7 @@ import { useAudioStore } from '@/stores/useAudioStore';
 import { getDJEngine } from '@/engine/dj/DJEngine';
 import * as DJActions from '@/engine/dj/DJActions';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
+import { useDJLayoutContext } from '@/components/dj/DJLayoutContext';
 
 const VU_SEGMENTS = 12;
 
@@ -32,6 +33,8 @@ function getSegmentColor(index: number, lit: boolean): string {
 }
 
 export const MixerMaster: React.FC = () => {
+  const layout = useDJLayoutContext();
+  const compact = layout.mixer.compact;
   const masterVolume = useDJStore((s) => s.masterVolume);
   const limiterEnabled = useAudioStore((s) => s.masterLimiterEnabled);
   const limiterThreshold = useAudioStore((s) => s.masterLimiterThreshold);
@@ -92,14 +95,18 @@ export const MixerMaster: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex flex-col items-center gap-0.5" title="Master output">
+    <div
+      className={compact ? 'grid grid-cols-[auto_auto_auto] items-center justify-items-center gap-x-1 gap-y-0.5' : 'flex flex-col items-center gap-0.5'}
+      title="Master output"
+    >
+      <div className="order-1">
       <Knob
         value={masterVolume}
         min={0}
         max={2.0}
         onChange={handleVolumeChange}
         label="MST"
-        size="sm"
+        size={layout.mixer.knob}
         tone="neutral"
         defaultValue={2.0}
         formatValue={formatMaster}
@@ -107,9 +114,10 @@ export const MixerMaster: React.FC = () => {
         title="Master volume — controls overall output level"
         paramKey="dj.masterVolume"
       />
+      </div>
 
       {/* Stereo VU meter (compact) */}
-      <div className="flex gap-[2px]" title="Master stereo level meter (L/R)">
+      <div className="flex gap-[2px] order-2" title="Master stereo level meter (L/R)">
         {/* L channel */}
         <div className="flex flex-col items-center">
           <span className="text-text-muted text-[7px] font-mono leading-none mb-0.5">L</span>
@@ -151,7 +159,7 @@ export const MixerMaster: React.FC = () => {
 
       {/* Limiter controls */}
       <button
-        className="flex items-center gap-0.5 cursor-pointer hover:opacity-80"
+        className={`flex items-center gap-0.5 cursor-pointer hover:opacity-80 ${compact ? 'order-4 col-span-3' : ''}`}
         title={limiterEnabled
           ? `Limiter active (threshold: ${limiterThreshold} dB) — click to disable`
           : 'Limiter disabled — click to enable'}
@@ -175,18 +183,20 @@ export const MixerMaster: React.FC = () => {
         </span>
       </button>
       {limiterEnabled && (
+        <div className="order-3">
         <Knob
           value={limiterThreshold}
           min={-24}
           max={0}
           onChange={setLimiterThreshold}
           label="Threshold"
-          size="sm"
+          size={layout.mixer.knob}
           tone="neutral"
           defaultValue={-1}
           formatValue={(v) => `${v.toFixed(0)} dB`}
           title="Limiter threshold — higher values allow more headroom before limiting kicks in"
         />
+        </div>
       )}
     </div>
   );
