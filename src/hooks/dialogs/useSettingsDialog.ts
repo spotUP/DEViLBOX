@@ -12,6 +12,7 @@ import { useThemeStore } from '@stores/useThemeStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useKeyboardStore } from '@stores/useKeyboardStore';
 import { useEditorStore } from '@stores/useEditorStore';
+import { useTransportStore } from '@stores/useTransportStore';
 import { useAudioStore } from '@stores/useAudioStore';
 import { useDJStore } from '@stores/useDJStore';
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';
@@ -204,6 +205,12 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
   const setRecQuantRes = useEditorStore((s) => s.setRecQuantRes);
   const recReleaseEnabled = useEditorStore((s) => s.recReleaseEnabled);
   const setRecReleaseEnabled = useEditorStore((s) => s.setRecReleaseEnabled);
+  const showGhostPatterns = useEditorStore((s) => s.showGhostPatterns);
+  const setShowGhostPatterns = useEditorStore((s) => s.setShowGhostPatterns);
+
+  // ── Store: useTransportStore ─────────────────────────────────────────────
+  const smoothScrolling = useTransportStore((s) => s.smoothScrolling);
+  const setSmoothScrolling = useTransportStore((s) => s.setSmoothScrolling);
 
   // ── Store: useKeyboardStore ──────────────────────────────────────────────
   const activeScheme = useKeyboardStore((s) => s.activeScheme);
@@ -373,6 +380,7 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
     // Editor store
     editStep, setEditStep, insertMode, toggleInsertMode,
     recQuantEnabled, setRecQuantEnabled, recQuantRes, setRecQuantRes,
+    showGhostPatterns, setShowGhostPatterns, smoothScrolling, setSmoothScrolling,
     recReleaseEnabled, setRecReleaseEnabled,
     // Keyboard store
     activeScheme, setActiveScheme, platformOverride, setPlatformOverride,
