@@ -415,3 +415,25 @@ songs (their instruments are ours).
   UADE's before wave 2 builds it.
 - **Exactness of other engines**: not assumed. Each wave-2/3/4 item has its own row-clip-equals-playback test; a
   mismatch is fixed in that engine (determinism, chunk-size dependence), never masked.
+
+## Ledger - wave 0 + 1 (13 items), started 2026-10-14
+
+Running count: 1 of 13. Order: RP-1, RP-2, RP-7, RP-3, N1, RP-4, N2, N3, RP-5, RP-6, N4, RP-R, N5.
+
+| ID | Done | Commit |
+|---|---|---|
+| RP-1 | yes | 12502120e |
+| RP-2 | no | |
+| RP-3 | no | |
+| RP-4 | no | |
+| RP-5 | no | |
+| RP-6 | no | |
+| RP-7 | no | |
+| N1 | no | |
+| N2 | no | |
+| N3 | no | |
+| N4 | no | |
+| RP-R | no | |
+| N5 | no | |
+
+Decisions / deviations (append as found):
