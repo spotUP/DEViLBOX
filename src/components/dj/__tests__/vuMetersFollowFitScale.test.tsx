@@ -62,7 +62,8 @@ function runFrames(count: number) {
 describe('a deck pattern view fitted to its width', () => {
   beforeEach(() => {
     // Column maths below assumes the unshrunk 170 px columns; the fit has its own test (deckPatternViewFitsEveryChannel).
-    useSettingsStore.setState({ fitAllChannelsDeck: true });
+    // The swing moves a meter by sin(wall clock) * 50 px * scale (ChannelVUMeters), so where it sits depends on when the test runs; this test is about the fit, not the swing.
+    useSettingsStore.setState({ fitAllChannelsDeck: true, vuMeterSwing: false });
     holder.song = {
       songPositions: [0], numChannels: 4,
       // Channel 2's note: a deck shows the pattern view only for a song with notes (70a57efa2).
