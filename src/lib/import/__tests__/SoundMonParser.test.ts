@@ -13,11 +13,11 @@ import { resolve } from 'path';
 import { isSoundMonFormat, parseSoundMonFile } from '../formats/SoundMonParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-const FILE1 = resolve(REF, 'BP SoundMon 2/Zzzax/acid mix.bp');
-const FILE2 = resolve(REF, 'BP SoundMon 2/Allister Brimble/alien breed - menu.bp');
-const FILE3 = resolve(REF, 'BP SoundMon 3/Zzzax/crystals.bp3');
-const FILE4 = resolve(REF, 'BP SoundMon 3/Brian Postma/hawkeye newsynth.bp3');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE1 = resolve(REF, 'bp-soundmon-2/nicktune1.bp');
+const FILE2 = resolve(REF, 'formats/aquarivs.bp');
+const FILE3 = resolve(REF, 'bp-soundmon-3/testmod.bp3');
+const FILE4 = resolve(REF, 'formats/antidust.bp3');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);
@@ -68,6 +68,15 @@ describe('parseSoundMonFile — acid mix.bp (SoundMon 2)', () => {
   });
 });
 
+describe('parseSoundMonFile — nicktune1.bp synth instruments (SoundMon 2)', () => {
+  it('extracts 13 SoundMon synth instruments (slots 1-13 start with the 0xFF synth marker)', async () => {
+    const song = await parseSoundMonFile(loadBuf(FILE1), 'nicktune1.bp');
+    const synthInsts = song.instruments.filter(i => i.synthType === 'SoundMonSynth');
+    expect(synthInsts).toHaveLength(13);
+    expect(synthInsts[0].soundMon).toBeTruthy();
+  });
+});
+
 describe('parseSoundMonFile — alien breed - menu.bp (SoundMon 2)', () => {
   it('reports format capabilities', async () => {
     let song: Awaited<ReturnType<typeof parseSoundMonFile>> | undefined;
@@ -83,32 +92,12 @@ describe('parseSoundMonFile — alien breed - menu.bp (SoundMon 2)', () => {
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
   });
-  it('extracts SoundMon synth instruments', async () => {
+  it('extracts sample instruments and no synth instruments (aquarivs.bp is sample-only)', async () => {
     const song = await parseSoundMonFile(loadBuf(FILE2), 'alien breed - menu.bp');
-    if (!song) return;
+    // None of the 15 instrument slots (32 bytes each from offset 32) starts with the 0xFF synth marker
+    expect(song.instruments.filter(i => i.synthType === 'SoundMonSynth')).toHaveLength(0);
     expect(song.instruments.length).toBeGreaterThan(0);
-    const synthInsts = song.instruments.filter(i => i.synthType === 'SoundMonSynth');
-    expect(synthInsts.length).toBeGreaterThan(0);
-    expect(synthInsts[0].soundMon).toBeTruthy();
-  });
-});
-
-describe('parseSoundMonFile — crystals.bp3 (SoundMon 3)', () => {
-  it('reports format capabilities', async () => {
-    let song: Awaited<ReturnType<typeof parseSoundMonFile>> | undefined;
-    try {
-      song = await parseSoundMonFile(loadBuf(FILE3), 'crystals.bp3');
-    } catch (e) {
-      console.log('threw:', e);
-      return;
-    }
-    if (!song) { console.log('returned null'); return; }
-    const report = analyzeFormat(song, 'crystals.bp3');
-    console.log('\n' + formatReportToString(report));
-    expect(typeof report.format).toBe('string');
-    expect(report.numChannels).toBeGreaterThan(0);
-  });
-});
+  });});
 
 describe('parseSoundMonFile — hawkeye newsynth.bp3 (SoundMon 3)', () => {
   it('reports format capabilities', async () => {

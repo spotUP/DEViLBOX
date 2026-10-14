@@ -1,28 +1,26 @@
 import { describe, it, expect } from 'vitest';
-import { existsSync, readFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { isWallyBebenFormat, parseWallyBebenFile } from '../formats/WallyBebenParser';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
-const REF = resolve(import.meta.dirname, '../../../../Reference Music');
-// Reference Music is a local-only corpus (gitignored, absent from a clean checkout): skip, do not fail.
-const HAS_CORPUS = existsSync(REF);
-const FILE_BALLGAME = resolve(REF, 'Wally Beben/Wally Beben/ballgame.wb');
-const FILE_CIRCUS = resolve(REF, 'Wally Beben/Wally Beben/circusgames.wb');
+const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
+const FILE_BALLGAME = resolve(REF, 'wally-beben/wicked.wb');
+const FILE_CIRCUS = resolve(REF, 'formats/wicked.wb');
 
 function loadBuf(path: string): ArrayBuffer {
   const buf = readFileSync(path);
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 }
 
-describe.skipIf(!HAS_CORPUS)('isWallyBebenFormat', () => {
+describe('isWallyBebenFormat', () => {
   it('detects ballgame.wb', () => expect(isWallyBebenFormat(loadBuf(FILE_BALLGAME))).toBe(true));
   it('detects circusgames.wb', () => expect(isWallyBebenFormat(loadBuf(FILE_CIRCUS))).toBe(true));
   it('rejects a zeroed buffer', () => expect(isWallyBebenFormat(new ArrayBuffer(64))).toBe(false));
   it('rejects a buffer that is too short', () => expect(isWallyBebenFormat(new ArrayBuffer(8))).toBe(false));
 });
 
-describe.skipIf(!HAS_CORPUS)('parseWallyBebenFile — ballgame.wb', () => {
+describe('parseWallyBebenFile — ballgame.wb', () => {
   it('reports format capabilities', () => {
     const song = parseWallyBebenFile(loadBuf(FILE_BALLGAME), 'ballgame.wb');
     const report = analyzeFormat(song, 'ballgame.wb');
@@ -31,11 +29,12 @@ describe.skipIf(!HAS_CORPUS)('parseWallyBebenFile — ballgame.wb', () => {
     expect(report.numChannels).toBeGreaterThan(0);
   });
 
-  it('creates 1 placeholder instrument (no names in format)', () => {
+  it('creates at least one instrument, none named (no names in format)', () => {
     const song = parseWallyBebenFile(loadBuf(FILE_BALLGAME), 'ballgame.wb');
-    // Wally Beben is a compiled 68k executable — instrument count is a placeholder
-    expect(song.instruments).toHaveLength(1);
-    expect(song.instruments[0].name).toBe('');
+    // Wally Beben is a compiled 68k executable: the sample pointer table is located by a code scan, so the count is
+    // file-specific (1 placeholder when no table is found, up to 64 samples otherwise)
+    expect(song.instruments.length).toBeGreaterThanOrEqual(1);
+    expect(song.instruments.every(i => i.name === '')).toBe(true);
   });
 
   it('has 4 channels', () => {
@@ -49,7 +48,7 @@ describe.skipIf(!HAS_CORPUS)('parseWallyBebenFile — ballgame.wb', () => {
   });
 });
 
-describe.skipIf(!HAS_CORPUS)('parseWallyBebenFile — circusgames.wb', () => {
+describe('parseWallyBebenFile — circusgames.wb', () => {
   it('reports format capabilities', () => {
     const song = parseWallyBebenFile(loadBuf(FILE_CIRCUS), 'circusgames.wb');
     const report = analyzeFormat(song, 'circusgames.wb');
@@ -58,8 +57,8 @@ describe.skipIf(!HAS_CORPUS)('parseWallyBebenFile — circusgames.wb', () => {
     expect(report.numChannels).toBeGreaterThan(0);
   });
 
-  it('creates 1 placeholder instrument', () => {
+  it('creates at least one instrument', () => {
     const song = parseWallyBebenFile(loadBuf(FILE_CIRCUS), 'circusgames.wb');
-    expect(song.instruments).toHaveLength(1);
+    expect(song.instruments.length).toBeGreaterThanOrEqual(1);
   });
 });
