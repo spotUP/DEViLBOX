@@ -51,14 +51,22 @@ describe('Export capture tap — routing contract', () => {
   describe('ToneEngine safety limiter routing', () => {
     const src = read('engine/ToneEngine.ts');
 
-    it('has a safetyLimiter (Tone.Compressor) in the master chain', () => {
+    it('has a safetyLimiter (Tone.Compressor) in the master chain, built by the shared DJ limiter factory', () => {
       expect(src).toMatch(/safetyLimiter:\s*Tone\.Compressor/);
-      expect(src).toMatch(/new Tone\.Compressor\(/);
+      expect(src).toMatch(/createToneSafetyLimiter\(\)/);
+      expect(src).toMatch(/this\.safetyLimiter\s*=\s*limiter\.compressor/);
+      // The factory itself must hand back a Tone.Compressor wired into its makeup-cancel gain.
+      const factory = read('engine/dj/djLimiter.ts');
+      expect(factory).toMatch(/new Tone\.Compressor\(/);
+      expect(factory).toMatch(/compressor\.connect\(makeupCancel\)/);
     });
 
     it('routes blepInput → safetyLimiter → exportTap → masterChannel', () => {
-      // The static tail after BLEP: safetyLimiter → exportTap → masterChannel
-      expect(src).toMatch(/safetyLimiter\.connect\(this\.exportTap\)/);
+      // The static tail after BLEP: safetyLimiter (its makeup-cancel gain is the limiter's
+      // output node, wired inside createToneSafetyLimiter) → exportTap → masterChannel.
+      // The tap must hang off the limiter OUTPUT so exports see the limited signal.
+      expect(src).toMatch(/safetyLimiterMakeupCancel\.connect\(this\.exportTap\)/);
+      expect(src).not.toMatch(/safetyLimiter\.connect\(this\.masterChannel\)/);
       expect(src).toMatch(/exportTap\.connect\(this\.masterChannel\)/);
     });
 
