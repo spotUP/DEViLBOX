@@ -97,7 +97,7 @@ describe('Deck C\'s platter, fader and slip follow the strokes (D1)', () => {
     let moved = false;
     for (let s = start; s < start + 4000; s += 50) if (Math.abs(getDeckCMotion().sampleAt(s).recordVel - 1) > 0.2) moved = true;
     expect(moved).toBe(true);
-    // the view: one consumer, its fader lane at the stroke's fade at the clock's time
+    // the view: one consumer, its fader lane at the stroke's hand position at the clock's time
     const clock = { currentTime: 0.1 + 1500 / 22050 };
     holder.ctx = clock;
     const consumers = deckCMotionStats.consumers;
@@ -110,7 +110,7 @@ describe('Deck C\'s platter, fader and slip follow the strokes (D1)', () => {
       lanes.push(view.getByTestId('deck-c-fader').style.left);
     }
     const want = deckCMotionNow(clock.currentTime)!;
-    expect(view.getByTestId('deck-c-fader').style.left).toBe(`${(want.fade * 100).toFixed(2)}%`);
+    expect(view.getByTestId('deck-c-fader').style.left).toBe(`${(want.position * 100).toFixed(2)}%`);
     expect(new Set(lanes).size).toBeGreaterThan(1);
     cleanup();
     expect(deckCMotionStats.consumers).toBe(consumers);

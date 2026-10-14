@@ -10,7 +10,7 @@
  * The views read it through one consumer per view (`subscribeDeckCMotion`).
  */
 
-import type { GestureViz } from './scratchRender';
+import { faderTravelSamples, type GestureViz } from './scratchRender';
 
 export const DECK_C_MOTION_RATE = 22050;
 /** dj_viz: 50 Hz ticks, the SL-1200's 33 1/3 rpm. */
@@ -29,13 +29,18 @@ export interface DeckCMotionSample {
   angle: number;
   /** The record velocity here (1 = nominal forward spin). */
   recordVel: number;
-  /** The crossfader (0 closed .. 1 open): the max of the strokes and needles over this sample. */
+  /** The crossfader gain (0 closed .. 1 open): the max of the strokes and needles over this sample. */
   fade: number;
+  /** The fader's position under the hand (0 closed .. 1 open), travelling at hand speed: what the lane draws. */
+  position: number;
   /** The slip (platter - record velocity) of the stroke over this sample. */
   slip: number;
   /** A stroke or needle covers this sample. */
   active: boolean;
 }
+
+/** A needle flourish's fader throw (a full-velocity stroke's: 1 ms cut-in ramp at the motion rate). */
+const NEEDLE_TRAVEL = faderTravelSamples(Math.trunc(1e-3 * DECK_C_MOTION_RATE));
 
 /** Strokes are kept this long after they end (the integral is carried forward past them). */
 const KEEP_SAMPLES = 2 * DECK_C_MOTION_RATE;
@@ -112,16 +117,18 @@ export class DeckCMotion {
     this.advance(at);
     const rv = this.recordVelAt(at);
     const before = at < this.cursor ? this.angleAtCursor - this.sumRv(at, this.cursor) : this.angleAtCursor;
-    let fade = 0, slip = 0, active = false, slipOrder = -1;
+    let fade = 0, position = 0, slip = 0, active = false, slipOrder = -1;
     for (const g of this.segs) {
       if (at < g.start || at >= g.end) continue;
       active = true;
       fade = Math.max(fade, g.viz ? g.viz.fade[at - g.start]! : 1.0);
+      // a needle opens the fader fully: the hand throws it open and back at the same speed as a stroke's
+      position = Math.max(position, g.viz ? g.viz.position[at - g.start]! : Math.min(1, Math.min(at - g.start, g.end - 1 - at) / NEEDLE_TRAVEL));
       if (g.viz && g.order > slipOrder) { slip = g.viz.slipVel[at - g.start]!; slipOrder = g.order; }
     }
     // drop strokes long past; their integral is in the cursor
     if (this.segs.length > 64) this.segs = this.segs.filter((g) => g.end + KEEP_SAMPLES > this.cursor);
-    return { angle: before + rv, recordVel: rv, fade, slip, active };
+    return { angle: before + rv, recordVel: rv, fade, position, slip, active };
   }
 
   /** Is a stroke or needle placed at or after bus sample `s` (the platter is being driven)? */
