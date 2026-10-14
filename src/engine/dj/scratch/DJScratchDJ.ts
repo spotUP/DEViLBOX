@@ -18,7 +18,8 @@ import { buildScratchContext, scratchSectionFor, type ScratchPerformanceContext 
 import { onTopOfTheDemo, overlayRender, planJuggleResponse, planScratch, toScratchEvents, type OverlayRender, type OverlaySection, type ScratchPlan, type ScratchPlanOptions } from './scratchPlanner';
 import type { PlacedScratch } from './scratchPlacement';
 import type { DemoProfileName } from './scratchRender';
-import { buildScratchDjRoutine, buildThreeDeckRoutine, demoRoutineRenderSpecs, demoRoutineToPlaced, overlayRecord, SCRATCH_DJ_TEMPLATE, THREE_DECK_TEMPLATE, threeDeckJuggleAllowed, validateScratchDjRoutine } from './scratchDemoRoutines';
+import { type CueRotation } from './scratchDemoRoutines';
+import { buildScratchDjRoutine, buildThreeDeckRoutine, cueRotationAfter, demoRoutineRenderSpecs, demoRoutineToPlaced, overlayRecord, SCRATCH_DJ_TEMPLATE, THREE_DECK_TEMPLATE, threeDeckJuggleAllowed, validateScratchDjRoutine } from './scratchDemoRoutines';
 import type { RoutineName } from './scratchRoutines';
 import type { ScratchProfileId } from './scratchStyles';
 import type { JugglePhase } from '../autodj/juggle/juggleTypes';
@@ -220,6 +221,8 @@ export class DJScratchDJ {
   private sink: { key: string; exec: ScratchEventSink } | null = null;
   /** First bar not yet planned on the current track. */
   private plannedThroughBar = -1;
+  /** three_deck's cue record rotation (`role_i`), carried from routine to routine (AUTO-SCRATCH-RECORD-VARIETY). */
+  private cueRotation: CueRotation = {};
   private trackKey = '';
   private lastBar = -1;
   readonly memory = new ScratchMemory();
@@ -502,7 +505,9 @@ export class DJScratchDJ {
           : emphasis
             ? { pools: { HOME: [emphasis], SECONDARY: [emphasis], ACCENT: [emphasis], FX: [emphasis] }, phraseEmphasis: true }
             : picked.length ? { pools: cuePoolsFor(picked) } : {};
-        const demo = battle ? buildScratchDjRoutine(ctx.style, seed + fromBar) : buildThreeDeckRoutine(seed + fromBar, { ...threeDeckOpts, fold });
+        // the crate's rotation carries over from the last routine (each role's pool cycles whole before a record repeats)
+        const demo = battle ? buildScratchDjRoutine(ctx.style, seed + fromBar) : buildThreeDeckRoutine(seed + fromBar, { ...threeDeckOpts, fold, rotation: this.cueRotation });
+        if (!battle) this.cueRotation = cueRotationAfter(demo, this.cueRotation);
         // every stroke rendered as the demo renders it, on the routine's own bus (scratch null test)
         const events = demoRoutineToPlaced(demo, fromBar, ctx.meter, demoRoutineRenderSpecs(demo, seed + fromBar, battle ? 'scratchDj' : 'threeDeck'), fold, battle ? 'routine' : 'set').map((e) => ({ ...e, layer: 'demo' as const }));
         plan = {
