@@ -218,7 +218,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'SoundFxWasmSynth') return 'wasm-param';
   if (synthType === 'VoodooWasmSynth') return 'wasm-param';
   if (synthType === 'AsapSynth') return 'wasm-info';
-  if (synthType === 'KlysSynth') return 'wasm-info';
+  if (synthType === 'KlysSynth') return 'klystrack';
   if (synthType === 'QsfSynth') return 'wasm-info';
   if (synthType === 'UADESynth') return 'wasm-info';
   // UADEEditableSynth already has chip-RAM editing via UADE — falls through to existing handler

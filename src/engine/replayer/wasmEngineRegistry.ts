@@ -153,31 +153,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/klystrack/KlysEngine')).KlysEngine as unknown as WASMSingletonStatic,
-    onStarted: (instance, _song) => {
-      // Listen for extracted song data from WASM and update store
-      const klys = instance as any;
-      if (typeof klys.onSongData === 'function') {
-        klys.onSongData((songData: any) => {
-          import('@stores').then(({ useFormatStore }) => {
-            const state = useFormatStore.getState();
-            if (state.klysNative) {
-              useFormatStore.setState({
-                klysNative: {
-                  ...state.klysNative,
-                  patterns: songData.patterns,
-                  sequences: songData.sequences,
-                  instruments: songData.instruments.filter((i: any): i is NonNullable<typeof i> => i !== null),
-                },
-              });
-              console.log('[NativeEngineRouting] KlysEngine song data extracted:',
-                songData.patterns.length, 'patterns,',
-                songData.sequences.length, 'sequences,',
-                songData.instruments.length, 'instruments');
-            }
-          });
-        });
-      }
-    },
   },
   {
     key: 'JamCracker',

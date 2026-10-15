@@ -88,80 +88,75 @@ export const KLYS_COLUMNS: ColumnDef[] = [
   },
 ];
 
+/** The song rows the pattern view shows: one sequence step, from its first song row up to the next step. */
+export interface KlysWindow {
+  /** First song row of the step. */
+  start: number;
+  /** Song rows in the step (at least 1). */
+  length: number;
+}
+
 /**
- * Convert KlysNativeData at a song position to FormatChannel[] for pattern editing.
- *
- * For each channel, finds the last sequence entry at or before currentPosition,
- * then maps that pattern's steps to FormatCell[] using column keys.
+ * The window of song rows holding `songRow`: the sequence step (klysSequenceSteps) it falls in, up to the next
+ * step or the end of the song. The pattern view draws these song rows; the matrix highlights the same step.
  */
-export function klysToFormatChannels(
-  nativeData: KlysNativeData,
-  currentPosition: number
-): FormatChannel[] {
+export function klysWindowAt(nativeData: KlysNativeData, steps: readonly number[], songRow: number): KlysWindow {
+  const i = klysStepIndexAt(steps, songRow);
+  const start = steps[i] ?? 0;
+  const end = steps[i + 1] ?? Math.max(nativeData.songLength, start + 1);
+  return { start, length: Math.max(1, end - start) };
+}
+
+/**
+ * Which pattern step channel `ch` plays at song row `songRow`: its last sequence entry at or before the row,
+ * and the row's offset into that pattern. Null past the pattern's end or before the channel's first entry
+ * (the channel is silent there).
+ */
+export function klysCellAt(
+  nativeData: KlysNativeData, ch: number, songRow: number,
+): { patternIdx: number; stepIdx: number; noteOffset: number } | null {
+  let entry: { position: number; pattern: number; noteOffset: number } | null = null;
+  for (const e of nativeData.sequences[ch]?.entries ?? []) {
+    if (e.position <= songRow && (!entry || e.position >= entry.position)) entry = e;
+  }
+  if (!entry) return null;
+  const pattern = nativeData.patterns[entry.pattern];
+  const stepIdx = songRow - entry.position;
+  if (!pattern || stepIdx >= pattern.numSteps) return null;
+  return { patternIdx: entry.pattern, stepIdx, noteOffset: entry.noteOffset };
+}
+
+const EMPTY_CELL: FormatCell = { note: 0xFF, instrument: 0xFF, ctrl: 0, volume: 0xFF, command: 0 };
+
+/**
+ * The pattern view's channels for a window of song rows. Row r of every channel is song row window.start + r,
+ * and each channel shows the step IT plays there (klysCellAt): klystrack channels start their patterns at their
+ * own song rows, so a channel whose entry starts mid-step is drawn at its own offset, in line with what plays
+ * (KLYS-CHANNEL-ROW-OFFSET: every channel used to be drawn from row 0 of its pattern, at channel 0's row).
+ */
+export function klysToFormatChannels(nativeData: KlysNativeData, window: KlysWindow): FormatChannel[] {
   const result: FormatChannel[] = [];
-
   for (let ch = 0; ch < nativeData.channels; ch++) {
-    // Find the pattern assigned to this channel at currentPosition
-    const seq = nativeData.sequences[ch];
-    let patternIdx = -1;
-    let noteOffset = 0;
-
-    if (seq) {
-      // Find last sequence entry at or before currentPosition
-      for (const entry of seq.entries) {
-        if (entry.position <= currentPosition) {
-          patternIdx = entry.pattern;
-          noteOffset = entry.noteOffset;
-        }
-      }
-    }
-
-    // Build channel rows
     const rows: FormatCell[] = [];
-    if (patternIdx >= 0 && patternIdx < nativeData.patterns.length) {
-      const pattern = nativeData.patterns[patternIdx];
-      for (let rowIdx = 0; rowIdx < pattern.numSteps; rowIdx++) {
-        const step = pattern.steps[rowIdx];
-        if (step) {
-          rows.push({
-            note: step.note,
-            instrument: step.instrument,
-            ctrl: step.ctrl,
-            volume: step.volume,
-            command: step.command,
-          });
-        } else {
-          // Empty step
-          rows.push({
-            note: 0xFF,
-            instrument: 0xFF,
-            ctrl: 0,
-            volume: 0xFF,
-            command: 0,
-          });
-        }
-      }
+    for (let r = 0; r < window.length; r++) {
+      const at = klysCellAt(nativeData, ch, window.start + r);
+      const step = at ? nativeData.patterns[at.patternIdx].steps[at.stepIdx] : undefined;
+      rows.push(step
+        ? { note: step.note, instrument: step.instrument, ctrl: step.ctrl, volume: step.volume, command: step.command }
+        : EMPTY_CELL);
     }
-
-    // Fallback pattern length
-    const patternLength = rows.length || 64;
-
-    // Build label
-    const trStr = noteOffset === 0 ? '' : (noteOffset > 0 ? `+${noteOffset}` : `${noteOffset}`);
-    const label = patternIdx >= 0
-      ? `CH${(ch + 1).toString().padStart(2, '0')}:P${patternIdx.toString().padStart(3, '0')}${trStr ? ` ${trStr}` : ''}`
-      : `CH${(ch + 1).toString().padStart(2, '0')}`;
-
+    const head = klysCellAt(nativeData, ch, window.start);
+    const transpose = head && head.noteOffset !== 0 ? ` ${head.noteOffset > 0 ? '+' : ''}${head.noteOffset}` : '';
     result.push({
-      label,
-      patternLength,
+      label: head ? `${ch + 1}: Pattern ${head.patternIdx}${transpose}` : `Channel ${ch + 1}`,
+      patternLength: window.length,
       rows,
       isPatternChannel: true,
     });
   }
-
   return result;
 }
+
 /**
  * The rows of the klystrack sequence matrix: every song row at which some
  * channel's sequence starts a pattern, ascending (the union over channels).

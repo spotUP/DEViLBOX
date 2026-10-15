@@ -82,7 +82,7 @@ describe('klystrack follows its engine', () => {
     const starts = [...new Set(native.sequences.flatMap((s) => s.entries.map((e) => e.position)))].sort((a, b) => a - b);
     expect(starts.length).toBeLessThan(native.songLength / 8);
     const render = (songRow: number) => {
-      renderToStaticMarkup(<KlysPositionEditor width={800} height={200} nativeData={native} currentPosition={songRow} isPlaying onPositionChange={() => {}} />);
+      renderToStaticMarkup(<KlysPositionEditor nativeData={native} songRow={songRow} isPlaying />);
       return matrix.props!;
     };
     const p0 = render(0);

@@ -184,17 +184,18 @@ export class KlysEngine extends WASMSingletonBase {
           break;
 
         case 'songData':
-          console.log('[KlysEngine] songData message received:', {
-            patterns: data.patterns?.length,
-            sequences: data.sequences?.length,
-            instruments: data.instruments?.length,
-            callbacks: this._songDataCallbacks.size,
-          });
           this._lastSongData = {
             patterns: data.patterns,
             sequences: data.sequences,
             instruments: data.instruments,
           };
+          // The one writer of klysNative from the engine (klysSongData.ts). Imported
+          // at call time: a static import would put this engine in the stores'
+          // import cycle (songPersistenceImportCycle.test.ts).
+          {
+            const songData = this._lastSongData;
+            void import('./klysSongData').then(({ applyKlysSongData }) => applyKlysSongData(songData));
+          }
           for (const cb of this._songDataCallbacks) {
             cb(this._lastSongData);
           }
