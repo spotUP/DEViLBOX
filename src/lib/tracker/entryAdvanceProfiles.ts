@@ -90,9 +90,10 @@ export const EDIT_BEHAVIOUR_OPTIONS: ReadonlyArray<{ value: EditBehaviourChoice;
 ];
 
 /** Keyboard scheme -> profile. Schemes without a verified original (octamed, renoise)
- *  and fasttracker2 (owner decision pending, plan 2026-10-15) keep the DEViLBOX default. */
+ *  keep the DEViLBOX default. fasttracker2 maps to FastTracker 2 (owner decision 2026-10-15). */
 const KEYMAP_PROFILE: Readonly<Record<string, EntryProfileId>> = {
   protracker: 'protracker',
+  fasttracker2: 'fasttracker2',
   'impulse-tracker': 'impulse-tracker',
   openmpt: 'openmpt',
 };
