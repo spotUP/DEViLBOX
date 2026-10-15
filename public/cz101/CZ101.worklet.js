@@ -11,7 +11,8 @@
 // per sample); the chip renders at that rate and process() resamples it.
 const CHIP_CLOCK = 4480000;
 const CHIP_RATE = CHIP_CLOCK / 112;
-const CHUNK = 256; // chip samples rendered per refill (chip buffer holds 4096)
+const CHUNK = 64;
+const RELEASE_RATE = 40; // chip rate data for a key-off with no release stages // chip samples rendered per refill (chip buffer holds 4096)
 
 class CZ101Processor extends AudioWorkletProcessor {
   constructor() {
@@ -20,6 +21,10 @@ class CZ101Processor extends AudioWorkletProcessor {
     this.isInitialized = false;
     this.bufferPtr = 0;
     this.pendingWrites = [];
+    // Envelope stage sequencers, one per (envelope kind, voice): the CZ-101's
+    // firmware loads each next step when the chip raises its stage interrupt;
+    // the chip alone only runs the single step it was last given.
+    this.seq = [0, 1, 2].map(() => Array.from({ length: 8 }, () => null));
     // Linear resampler state: chip-rate samples -> output rate
     this.phase = 0;
     this.prev = 0;
@@ -40,6 +45,11 @@ class CZ101Processor extends AudioWorkletProcessor {
       case 'writeReg':
         // Queued; applied at the start of the next process() block
         this.pendingWrites.push({ register: data.register, value: data.value });
+        break;
+
+      case 'envelope':
+      case 'keyOff':
+        this.pendingWrites.push(data);
         break;
     }
   }
@@ -73,6 +83,70 @@ class CZ101Processor extends AudioWorkletProcessor {
     this.wasm._upd933_write(value & 0xFF);
   }
 
+  /**
+   * Envelope stages are {rate, level} in chip units (rate 0-127, level 0-127; DCO 0-63).
+   * A stage with rate 0 (after the first) is the sustain point: the envelope holds
+   * the previous level until key-off, which then runs the stages after it. With no
+   * sustain point, key-off falls to zero at RELEASE_RATE.
+   */
+  startEnvelope(kind, voice, stages) {
+    const sustainIdx = stages.findIndex((st, i) => i > 0 && st.rate === 0);
+    const seq = { stages, idx: -1, sustainIdx, held: false, releasing: false, done: false };
+    this.seq[kind][voice & 7] = seq;
+    this.loadStage(kind, voice & 7, seq, 0);
+  }
+
+  keyOff(voice) {
+    for (let kind = 0; kind < 3; kind++) {
+      const seq = this.seq[kind][voice];
+      if (!seq) continue;
+      if (seq.releasing) continue;
+      seq.releasing = true;
+      const first = seq.sustainIdx >= 0 ? seq.sustainIdx + 1 : seq.stages.length;
+      if (seq.idx < first) this.loadStage(kind, voice, seq, first);
+      else if (seq.done) this.loadStep(kind, voice, seq, RELEASE_RATE, 0); // ran out of stages while held on the last level
+    }
+  }
+
+  /** Program stage `idx`, or end/hold the sequence when there is none left. */
+  loadStage(kind, voice, seq, idx) {
+    seq.idx = idx;
+    if (idx >= seq.stages.length) {
+      seq.done = true;
+      // Key-off with no stage left to run: fall to silence rather than finish the old step
+      if (seq.releasing) this.loadStep(kind, voice, seq, RELEASE_RATE, 0);
+      return;
+    }
+    const st = seq.stages[idx];
+    if (!seq.releasing && idx > 0 && st.rate === 0 && idx === seq.sustainIdx) {
+      seq.held = true; // sustain point: hold until key-off
+      return;
+    }
+    seq.held = false;
+    this.loadStep(kind, voice, seq, st.rate, st.level);
+  }
+
+  /** Write one step register; direction comes from where the envelope actually is. */
+  loadStep(kind, voice, seq, rate, level) {
+    const current = this.wasm._upd933_env_level(kind, voice);
+    const direction = level < current ? 1 : 0;
+    const maxLevel = kind === 2 ? 0x3F : 0x7F;
+    const word = (direction << 15) | ((rate & 0x7F) << 8) | (Math.min(level, maxLevel) & maxLevel);
+    this.writeRegister((kind === 0 ? 0x00 : kind === 1 ? 0x20 : 0x10) + voice, word);
+  }
+
+  /** Advance every sequencer whose current step the chip reports as reached. */
+  pollEnvelopes() {
+    for (let kind = 0; kind < 3; kind++) {
+      for (let voice = 0; voice < 8; voice++) {
+        const seq = this.seq[kind][voice];
+        if (!seq || seq.done || seq.held) continue;
+        if (!this.wasm._upd933_env_irq(kind, voice)) continue;
+        this.loadStage(kind, voice, seq, seq.idx + 1);
+      }
+    }
+  }
+
   /** Next chip-rate sample; renders a chunk when the queue runs dry (chip buffer holds 4096). */
   pullChipSample() {
     if (this.chipIdx >= this.chipLen) {
@@ -81,6 +155,7 @@ class CZ101Processor extends AudioWorkletProcessor {
       this.chipBuf.set(this.wasm.HEAPF32.subarray(offset, offset + CHUNK));
       this.chipIdx = 0;
       this.chipLen = CHUNK;
+      this.pollEnvelopes();
     }
     return this.chipBuf[this.chipIdx++];
   }
@@ -99,8 +174,10 @@ class CZ101Processor extends AudioWorkletProcessor {
     }
 
     while (this.pendingWrites.length > 0) {
-      const { register, value } = this.pendingWrites.shift();
-      this.writeRegister(register, value);
+      const msg = this.pendingWrites.shift();
+      if (msg.type === 'envelope') this.startEnvelope(msg.kind, msg.voice, msg.stages);
+      else if (msg.type === 'keyOff') this.keyOff(msg.voice & 7);
+      else this.writeRegister(msg.register, msg.value);
     }
 
     // Streaming linear resample from the chip's rate to the context rate

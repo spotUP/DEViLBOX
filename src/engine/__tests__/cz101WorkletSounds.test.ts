@@ -103,4 +103,45 @@ describe('CZ-101 worklet', () => {
     const rms = render(200); // ~0.5 s at 48 kHz
     expect(rms).toBeGreaterThan(0.001);
   });
+
+  // Owner report: "produces audio that never decays". The synth wrote only the first envelope
+  // stage, and nothing advanced to the next one, so every note held its attack level forever
+  // and key-off was one hard-coded slow fall.
+  async function play(preset: string, holdSeconds: number, releaseSeconds: number) {
+    const { CZ101Synth, CZ101_PRESETS } = await import('../cz101/CZ101Synth');
+    const synth = new CZ101Synth();
+    await synth.init();
+    synth.loadPatch(CZ101_PRESETS[preset]);
+    synth.triggerAttack(60, undefined, 0.8);
+    await new Promise((r) => setTimeout(r, 20));
+    const per100ms = (n: number) => Array.from({ length: n * 10 }, () => render(38)); // 38 blocks of 128 at 48 kHz
+    const held = per100ms(holdSeconds);
+    synth.triggerRelease(60);
+    await new Promise((r) => setTimeout(r, 20));
+    const released = per100ms(releaseSeconds);
+    return { held, released, peak: Math.max(...held) };
+  }
+
+  it('a held note decays to the sustain stage of its patch and stays there (Brass 1)', async () => {
+    const { held, peak } = await play('Brass 1', 2, 1);
+    const last = held.slice(-5);
+    expect(peak).toBeGreaterThan(0.002);
+    expect(last[4]).toBeLessThan(peak * 0.5);            // fell from the attack level
+    expect(last[4]).toBeGreaterThan(peak * 0.05);        // but holds the sustain level
+    expect(Math.abs(last[4] - last[0]) / last[0]).toBeLessThan(0.05); // steady
+  });
+
+  it('a held note with no sustain stage dies away on its own (Electric Piano)', async () => {
+    const { held, peak } = await play('Electric Piano', 4, 1);
+    expect(held[39]).toBeLessThan(peak * 0.02);          // more than 34 dB down after 4 s
+  });
+
+  it('a released note falls below -60 dB of its peak within its release time (Synth Bass)', async () => {
+    // release stage: rate 50 from level 90 -> about 1.2 s on the chip; allow 1.5 s
+    const { held, released, peak } = await play('Synth Bass', 1, 3);
+    expect(held[9]).toBeGreaterThan(peak * 0.5);         // really sounding at key-off
+    const silentAt = released.findIndex((v) => v < peak * 0.001);
+    expect(silentAt, 'never fell below -60 dB').toBeGreaterThanOrEqual(0);
+    expect(silentAt).toBeLessThanOrEqual(15);
+  });
 });

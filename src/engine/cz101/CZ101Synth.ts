@@ -258,27 +258,6 @@ export class CZ101Synth implements DevilboxSynth {
   }
 
   /**
-   * Encode DCA envelope step register value
-   */
-  private encodeDCAStep(direction: number, rate: number, sustain: number, level: number): number {
-    return ((direction & 1) << 15) |
-           ((rate & 0x7F) << 8) |
-           ((sustain & 1) << 7) |
-           (level & 0x7F);
-  }
-
-  /**
-   * Encode DCO envelope step register value (for pitch envelope)
-   */
-  private _encodeDCOStep(direction: number, rate: number, sustain: number, units: number, level: number): number {
-    return ((direction & 1) << 15) |
-           ((rate & 0x7F) << 8) |
-           ((sustain & 1) << 7) |
-           ((units & 1) << 6) |
-           (level & 0x3F);
-  }
-
-  /**
    * Encode waveform register value
    */
   private encodeWaveform(
@@ -354,38 +333,27 @@ export class CZ101Synth implements DevilboxSynth {
     // Reset phase counter (starts the note)
     this.writeReg(UPD933_REG.PHASE + voiceIndex, 0);
 
-    // Set DCA envelope (attack)
-    const dcaStage = this.currentPatch.line1.dcaEnvelope[0];
-    const dcaValue = this.encodeDCAStep(
-      0,  // direction up
-      dcaStage.rate,
-      0,  // no sustain on attack
-      Math.floor(dcaStage.level * voice.velocity / 127)
-    );
-    this.writeReg(UPD933_REG.DCA_STEP + voiceIndex, dcaValue);
+    // The worklet sequences the patch's envelope stages (the chip itself only runs
+    // one step at a time); a rate-0 stage is the sustain point.
+    const velocityScale = voice.velocity / 127;
+    this.sendEnvelope(0, voiceIndex, this.currentPatch.line1.dcaEnvelope, velocityScale);
+    this.sendEnvelope(1, voiceIndex, this.currentPatch.line1.dcwEnvelope, 1);
+    const dco = this.currentPatch.line1.dcoEnvelope;
+    if (dco && dco.length > 0) this.sendEnvelope(2, voiceIndex, dco, 1);
+  }
 
-    // Set DCW envelope (attack)
-    const dcwStage = this.currentPatch.line1.dcwEnvelope[0];
-    const dcwValue = this.encodeDCAStep(
-      0,
-      dcwStage.rate,
-      0,
-      dcwStage.level
-    );
-    this.writeReg(UPD933_REG.DCW_STEP + voiceIndex, dcwValue);
-
-    // Set DCO envelope (pitch) if defined
-    if (this.currentPatch.line1.dcoEnvelope && this.currentPatch.line1.dcoEnvelope.length > 0) {
-      const dcoStage = this.currentPatch.line1.dcoEnvelope[0];
-      const dcoValue = this._encodeDCOStep(
-        0,  // direction up
-        dcoStage.rate,
-        0,  // no sustain
-        0,  // units
-        dcoStage.level
-      );
-      this.writeReg(UPD933_REG.DCO_STEP + voiceIndex, dcoValue);
-    }
+  /** Patch levels are 0-99 on the CZ-101's panel; the chip's DCA/DCW level field is 7 bits. */
+  private sendEnvelope(kind: 0 | 1 | 2, voice: number, stages: CZEnvelopeStage[], scale: number): void {
+    const toChip = kind === 2 ? 1 : 127 / 99;
+    this.workletNode?.port.postMessage({
+      type: 'envelope',
+      kind,
+      voice,
+      stages: stages.map((st) => ({
+        rate: Math.min(127, Math.max(0, Math.round(st.rate))),
+        level: Math.min(kind === 2 ? 63 : 127, Math.round(st.level * toChip * scale)),
+      })),
+    });
   }
 
   /**
@@ -404,10 +372,8 @@ export class CZ101Synth implements DevilboxSynth {
 
     if (!this.workletNode || !this.currentPatch) return;
 
-    // Set DCA envelope to release (direction down, target 0)
-    const releaseRate = 40; // Default release rate
-    const dcaValue = this.encodeDCAStep(1, releaseRate, 0, 0);
-    this.writeReg(UPD933_REG.DCA_STEP + voiceIndex, dcaValue);
+    // The worklet runs the patch's stages after the sustain point (or a default fall)
+    this.workletNode.port.postMessage({ type: 'keyOff', voice: voiceIndex });
   }
 
   /**
