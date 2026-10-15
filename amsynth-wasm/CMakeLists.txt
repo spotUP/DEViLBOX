@@ -69,6 +69,7 @@ if(EMSCRIPTEN)
         "_amsynth_get_preset"
         "_amsynth_set_preset"
         "_amsynth_randomize"
+        "_amsynth_get_voices"
         "_malloc"
         "_free"
     )

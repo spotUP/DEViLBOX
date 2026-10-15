@@ -5,6 +5,7 @@ import type {
   WaveSabreSynthType,
 } from '@typedefs/wavesabreInstrument';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { WasmVoiceHub, registerVoiceHub } from '@/engine/voiceStatus/wasmVoiceStatus';
 import {
   DEFAULT_FALCON_CONFIG,
   DEFAULT_SLAUGHTER_CONFIG,
@@ -35,6 +36,9 @@ export class WaveSabreSynth implements DevilboxSynth {
   readonly output: GainNode;
 
   private workletNode: AudioWorkletNode | null = null;
+  /** Live voice report for the editor curves' markers (wasmVoiceStatus.ts). */
+  readonly voiceHub = new WasmVoiceHub((m) => this.workletNode?.port.postMessage(m));
+  private readonly unregisterVoiceHub: () => void;
   private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
   private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
 
@@ -57,6 +61,8 @@ export class WaveSabreSynth implements DevilboxSynth {
 
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
+    // Falcon and Slaughter have their own curves, so their voices are reported under their own names
+    this.unregisterVoiceHub = registerVoiceHub(synthType === 'slaughter' ? 'WaveSabreSlaughter' : 'WaveSabreFalcon', this.voiceHub);
 
     this._initPromise = new Promise<void>((resolve) => {
       this._resolveInit = resolve;
@@ -89,8 +95,10 @@ export class WaveSabreSynth implements DevilboxSynth {
 
       // Handle messages from worklet
       this.workletNode.port.onmessage = (e) => {
+        if (this.voiceHub.handleMessage(e.data)) return;
         const { type, error } = e.data;
         if (type === 'ready') {
+          this.voiceHub.resume();
           // For adultery, load GM DLS data before applying params
           if (this.synthType === 'adultery') {
             this.loadGmDlsAndApplyParams();
@@ -358,6 +366,7 @@ export class WaveSabreSynth implements DevilboxSynth {
   }
 
   dispose(): void {
+    this.unregisterVoiceHub();
     if (this._disposed) return;
     this._disposed = true;
 

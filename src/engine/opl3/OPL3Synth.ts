@@ -5,6 +5,7 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import type { OplVoiceStatus } from './oplVoiceStatus';
 
 export class OPL3Synth implements DevilboxSynth {
   readonly name = 'OPL3Synth';
@@ -15,6 +16,23 @@ export class OPL3Synth implements DevilboxSynth {
   private static initPromises = new WeakMap<AudioContext, Promise<void>>();
   private static wasmCache: { wasmBinary: ArrayBuffer; jsCode: string } | null = null;
   private static wasmFetchPromise: Promise<{ wasmBinary: ArrayBuffer; jsCode: string }> | null = null;
+
+  /** Every live instance, and who watches their voices (the editor's curve markers). */
+  private static instances = new Set<OPL3Synth>();
+  private static voiceListeners = new Set<(status: OplVoiceStatus) => void>();
+
+  /**
+   * Envelope state of the sounding chip channels (stage and attenuation of both slots), for the editor curves'
+   * markers. The worklets report only while somebody is subscribed.
+   */
+  static subscribeVoiceStatus(cb: (status: OplVoiceStatus) => void): () => void {
+    OPL3Synth.voiceListeners.add(cb);
+    if (OPL3Synth.voiceListeners.size === 1) for (const s of OPL3Synth.instances) s.send({ type: 'watchVoices', on: true });
+    return () => {
+      if (!OPL3Synth.voiceListeners.delete(cb)) return;
+      if (OPL3Synth.voiceListeners.size === 0) for (const s of OPL3Synth.instances) s.send({ type: 'watchVoices', on: false });
+    };
+  }
 
   private audioContext: AudioContext;
   private _disposed = false;
@@ -27,6 +45,8 @@ export class OPL3Synth implements DevilboxSynth {
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
     this.output.gain.value = 0; // Muted until first note trigger
+    OPL3Synth.instances.add(this);
+    if (OPL3Synth.voiceListeners.size > 0) this.send({ type: 'watchVoices', on: true });
     this._initPromise = this.initWorklet();
   }
 
@@ -53,6 +73,8 @@ export class OPL3Synth implements DevilboxSynth {
           this._ready = true;
           for (const msg of this._pendingMessages) this.workletNode?.port.postMessage(msg);
           this._pendingMessages = [];
+        } else if (e.data.type === 'voiceStatus') {
+          for (const cb of OPL3Synth.voiceListeners) cb({ channels: e.data.channels, lfo: e.data.lfo });
         } else if (e.data.type === 'error') {
           console.error('[OPL3]', e.data.message);
         }
@@ -244,6 +266,7 @@ export class OPL3Synth implements DevilboxSynth {
   dispose() {
     if (this._disposed) return;
     this._disposed = true;
+    OPL3Synth.instances.delete(this);
     if (this.workletNode) {
       this.workletNode.port.postMessage({ type: 'destroy' });
       this.workletNode.disconnect();

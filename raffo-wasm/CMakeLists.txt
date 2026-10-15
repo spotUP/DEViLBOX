@@ -30,6 +30,7 @@ set(EXPORTED_FUNCTIONS
   "_raffo_get_param"
   "_raffo_pitch_bend"
   "_raffo_get_num_params"
+  "_raffo_get_voices"
   "_malloc"
   "_free"
 )

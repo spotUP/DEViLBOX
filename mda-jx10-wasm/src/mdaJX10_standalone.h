@@ -81,6 +81,7 @@ struct VOICE
   float  lev2;
   float  target;
   int32_t note;
+  int32_t age;   // samples since the note was triggered (voice report only)
 };
 
 class mdaJX10
@@ -100,6 +101,8 @@ public:
   void setSampleRate(float rate);
   void allNotesOff();
   int32_t getActiveVoices() { return activevoices; }
+  // Live voice report for the editor curves: 8 floats per voice (see src/engine/voiceStatus/wasmVoiceStatus.ts).
+  int32_t getVoices(float* out, int32_t maxVoices);
 
 private:
   void update();

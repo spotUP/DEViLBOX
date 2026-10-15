@@ -8,6 +8,7 @@ import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { DX7_LIBRARY_DIR } from './dx7Library';
 import { packDX7Voice } from './dx7sysex';
+import type { Dx7VoiceStatus } from './dx7VoiceStatus';
 
 export interface DX7PatchBank {
   file: string;
@@ -29,6 +30,40 @@ export class DX7Synth implements DevilboxSynth {
   private static wasmFetchPromise: Promise<{ wasmBinary: ArrayBuffer; jsCode: string }> | null = null;
   private static patchManifest: DX7PatchManifest | null = null;
   private static manifestPromise: Promise<DX7PatchManifest | null> | null = null;
+
+  /** Every live instance, and who watches their voices (the editor's curve markers). */
+  private static instances = new Set<DX7Synth>();
+  private static voiceListeners = new Set<(status: Dx7VoiceStatus) => void>();
+
+  /**
+   * Live voice state of every DX7 voice (EG level and segment per operator, voice pitch, LFO), for the editor curves'
+   * markers. The worklets report only while somebody is subscribed.
+   */
+  static subscribeVoiceStatus(cb: (status: Dx7VoiceStatus) => void): () => void {
+    DX7Synth.voiceListeners.add(cb);
+    if (DX7Synth.voiceListeners.size === 1) for (const s of DX7Synth.instances) s.send({ type: 'watchVoices', on: true });
+    return () => {
+      if (!DX7Synth.voiceListeners.delete(cb)) return;
+      if (DX7Synth.voiceListeners.size === 0) for (const s of DX7Synth.instances) s.send({ type: 'watchVoices', on: false });
+    };
+  }
+
+  /** Ask the firmware for the voice it is playing (155 VCED bytes); resolves null if it does not answer in time. */
+  readVoice(timeoutMs = 400): Promise<Uint8Array | null> {
+    return new Promise((resolve) => {
+      if (!this.workletNode || !this._ready) { resolve(null); return; }
+      const node = this.workletNode;
+      const timer = setTimeout(() => { node.port.removeEventListener('message', onMsg); resolve(null); }, timeoutMs);
+      const onMsg = (e: MessageEvent) => {
+        if (e.data?.type !== 'vced') return;
+        clearTimeout(timer);
+        node.port.removeEventListener('message', onMsg);
+        resolve(new Uint8Array(e.data.values as number[]));
+      };
+      node.port.addEventListener('message', onMsg);
+      this.send({ type: 'getVced' });
+    });
+  }
 
   private audioContext: AudioContext;
   private _disposed = false;
@@ -52,6 +87,8 @@ export class DX7Synth implements DevilboxSynth {
     this.output.gain.value = 1.0;
     this._vcedPresetName = vcedPreset;
     this._initPromise = new Promise((resolve) => { this._resolveInit = resolve; });
+    DX7Synth.instances.add(this);
+    if (DX7Synth.voiceListeners.size > 0) this.send({ type: 'watchVoices', on: true });
     this.initWorklet();
   }
 
@@ -86,6 +123,8 @@ export class DX7Synth implements DevilboxSynth {
           this.tryAutoLoadRom();
         } else if (data.type === 'error') {
           console.error('[DX7]', data.message);
+        } else if (data.type === 'voiceStatus') {
+          for (const cb of DX7Synth.voiceListeners) cb({ voices: data.voices, lfo: data.lfo });
         } else if (data.type === 'patchName') {
           console.log(`[DX7] Patch ${data.index}: ${data.name}`);
         } else if (data.type === 'debugInfo') {
@@ -470,6 +509,7 @@ export class DX7Synth implements DevilboxSynth {
   dispose() {
     if (this._disposed) return;
     this._disposed = true;
+    DX7Synth.instances.delete(this);
     if (this.workletNode) {
       this.workletNode.port.postMessage({ type: 'destroy' });
       this.workletNode.disconnect();

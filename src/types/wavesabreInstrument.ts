@@ -13,29 +13,29 @@
 
 export interface FalconConfig {
   // Oscillator 1
-  /** Osc1 waveform (0=sine, 0.25=saw, 0.5=square, 0.75=noise, 1=silence) */
+  /** Carrier waveform: 0 sine, 1 sine plus the 3rd and 5th square harmonics (a soft square) */
   osc1Waveform: number;
-  /** Osc1 coarse tune (-24 to +24 semitones as 0-1) */
+  /** Carrier frequency ratio, coarse: 1 + floor(value * 32.99) times the note */
   osc1Coarse: number;
-  /** Osc1 fine tune (-100 to +100 cents as 0-1) */
+  /** Carrier frequency ratio, fine: adds ((value - 0.5) * 2)^3 to the ratio */
   osc1Fine: number;
   
   // Oscillator 2
-  /** Osc2 waveform (0=sine, 0.25=saw, 0.5=square, 0.75=noise, 1=silence) */
+  /** Modulator waveform: 0 sine, 1 sine plus the 3rd and 5th square harmonics */
   osc2Waveform: number;
-  /** Osc2 coarse tune (-24 to +24 semitones as 0-1) */
+  /** Modulator frequency ratio, coarse: 1 + floor(value * 32.99) times the note */
   osc2Coarse: number;
-  /** Osc2 fine tune (-100 to +100 cents as 0-1) */
+  /** Modulator frequency ratio, fine: adds ((value - 0.5) * 2)^3 to the ratio */
   osc2Fine: number;
   
   // FM parameters
-  /** FM amount (0-1) */
+  /** FM amount: the modulator reaches the carrier at amount^2 * 13.25 radians at full envelope */
   fmAmount: number;
-  /** FM ratio coarse (integer ratio 1-16 as 0-1) */
+  /** Unused: the engine has no separate FM ratio (kept so saved instruments load) */
   fmCoarse: number;
-  /** FM ratio fine (0-1) */
+  /** Unused (see fmCoarse) */
   fmFine: number;
-  /** FM feedback (0-1) */
+  /** Modulator feedback: value^2 / 2 of its own output re-enters its phase */
   feedback: number;
   
   // Envelope 1 (carrier)
@@ -75,17 +75,17 @@ export interface FalconConfig {
 
 export interface SlaughterConfig {
   // Oscillator
-  /** Waveform (0=saw, 0.5=pulse, 1=noise) */
+  /** Waveform morph: 0 saw, 1 pulse (blend in between) */
   waveform: number;
-  /** Pulse width (0-1, only for pulse wave) */
+  /** Pulse width: the pulse is high for this fraction of the cycle */
   pulseWidth: number;
-  /** Coarse tune (-24 to +24 semitones as 0-1) */
+  /** Coarse tune: floor(value * 24.99) semitones above the note */
   coarse: number;
-  /** Fine tune (-100 to +100 cents as 0-1) */
+  /** Fine tune: 0 to 1 semitone above the note */
   fine: number;
   
   // Filter
-  /** Filter type (0=LP, 0.33=BP, 0.67=HP, 1=notch) */
+  /** Filter type: floor(value * 3) = 0 low-pass, 1 high-pass, 2 band-pass, 3 notch */
   filterType: number;
   /** Filter cutoff frequency (0-1) */
   cutoff: number;
@@ -144,12 +144,12 @@ export interface WaveSabreInstrumentConfig {
 export const DEFAULT_FALCON_CONFIG: FalconConfig = {
   // Oscillator 1
   osc1Waveform: 0,
-  osc1Coarse: 0.5,
+  osc1Coarse: 0, // ratio 1
   osc1Fine: 0.5,
   
   // Oscillator 2
   osc2Waveform: 0,
-  osc2Coarse: 0.5,
+  osc2Coarse: 0.04, // ratio 2
   osc2Fine: 0.5,
   
   // FM
@@ -172,7 +172,7 @@ export const DEFAULT_FALCON_CONFIG: FalconConfig = {
   
   // Master
   gain: 0.5,
-  voices: 1,
+  voices: 0, // one voice (VoicesUnisono = voices * 15 + 1)
   detune: 0.1,
   spread: 0.5,
 };
@@ -181,8 +181,8 @@ export const DEFAULT_SLAUGHTER_CONFIG: SlaughterConfig = {
   // Oscillator
   waveform: 0, // Saw
   pulseWidth: 0.5,
-  coarse: 0.5,
-  fine: 0.5,
+  coarse: 0, // semitones above the note (floor(coarse * 24.99))
+  fine: 0, // 0..1 semitone
   
   // Filter
   filterType: 0, // LP
@@ -204,7 +204,7 @@ export const DEFAULT_SLAUGHTER_CONFIG: SlaughterConfig = {
   
   // Master
   gain: 0.5,
-  voices: 1,
+  voices: 0, // one voice (VoicesUnisono = voices * 15 + 1)
   detune: 0.1,
   spread: 0.5,
 };
@@ -219,50 +219,59 @@ export const DEFAULT_WAVESABRE_INSTRUMENT: WaveSabreInstrumentConfig = {
 // Parameter indices for WASM
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * Engine parameter index for each config key (WaveSabreCore Falcon::ParamIndices and Slaughter::ParamIndices, the order
+ * the VST and Renoise store). -1 marks a config key the engine has no counterpart for: it is kept so saved instruments
+ * load, and nothing is written for it.
+ *
+ * Falcon is a two-operator FM voice: oscillator 2 is the carrier (its envelope shapes the output), oscillator 1 the
+ * modulator (its envelope scales the modulation depth). Config "osc1" and "carrier envelope" (attack1..) are therefore
+ * the engine's oscillator 2, config "osc2" and "modulator envelope" (attack2..) the engine's oscillator 1.
+ */
 export const FalconParamIndex: Record<keyof FalconConfig, number> = {
-  osc1Waveform: 0,
-  osc1Coarse: 1,
-  osc1Fine: 2,
-  osc2Waveform: 3,
-  osc2Coarse: 4,
-  osc2Fine: 5,
-  fmAmount: 6,
-  fmCoarse: 7,
-  fmFine: 8,
-  feedback: 9,
-  attack1: 10,
-  decay1: 11,
-  sustain1: 12,
-  release1: 13,
-  attack2: 14,
-  decay2: 15,
-  sustain2: 16,
-  release2: 17,
-  gain: 18,
-  voices: 19,
-  detune: 20,
-  spread: 21,
+  osc1Waveform: 9,   // Osc2Waveform
+  osc1Coarse: 10,    // Osc2RatioCoarse
+  osc1Fine: 11,      // Osc2RatioFine
+  osc2Waveform: 0,   // Osc1Waveform
+  osc2Coarse: 1,     // Osc1RatioCoarse
+  osc2Fine: 2,       // Osc1RatioFine
+  fmAmount: 4,       // Osc1FeedForward: how much of the modulator reaches the carrier
+  fmCoarse: -1,
+  fmFine: -1,
+  feedback: 3,       // Osc1Feedback
+  attack1: 13,       // Osc2Attack
+  decay1: 14,
+  sustain1: 15,
+  release1: 16,
+  attack2: 5,        // Osc1Attack
+  decay2: 6,
+  sustain2: 7,
+  release2: 8,
+  gain: 17,          // MasterLevel
+  voices: 18,        // VoicesUnisono
+  detune: 19,        // VoicesDetune
+  spread: 20,        // VoicesPan
 };
 
 export const SlaughterParamIndex: Record<keyof SlaughterConfig, number> = {
-  waveform: 0,
-  pulseWidth: 1,
-  coarse: 2,
-  fine: 3,
-  filterType: 4,
-  cutoff: 5,
-  resonance: 6,
-  filterEnvAmount: 7,
-  ampAttack: 8,
-  ampDecay: 9,
-  ampSustain: 10,
-  ampRelease: 11,
-  filterAttack: 12,
-  filterDecay: 13,
-  filterSustain: 14,
-  filterRelease: 15,
-  gain: 16,
-  voices: 17,
-  detune: 18,
-  spread: 19,
+  waveform: 0,       // Osc1Waveform: 0 saw to 1 pulse
+  pulseWidth: 1,     // Osc1PulseWidth
+  coarse: 3,         // Osc1DetuneCoarse
+  fine: 4,           // Osc1DetuneFine
+  filterType: 16,    // FilterType
+  cutoff: 17,        // FilterFreq
+  resonance: 18,     // FilterResonance
+  filterEnvAmount: 19, // FilterModAmt
+  ampAttack: 20,     // AmpAttack
+  ampDecay: 21,
+  ampSustain: 22,
+  ampRelease: 23,
+  filterAttack: 24,  // ModAttack
+  filterDecay: 25,
+  filterSustain: 26,
+  filterRelease: 27,
+  gain: 28,          // MasterLevel
+  voices: 29,        // VoicesUnisono
+  detune: 30,        // VoicesDetune
+  spread: 31,        // VoicesPan
 };

@@ -52,12 +52,15 @@ interface HardwareUIWrapperProps {
   synthType: SynthType;
   parameters: Record<string, number>;
   onParamChange: (key: string, value: number) => void;
+  /** String parameters (a chip instrument that carries its own data, e.g. the CZ-101 patch). */
+  onTextParamChange?: (key: string, value: string) => void;
   instrumentId?: number;
 }
 
 type HWComponentProps = {
   parameters: Record<string, number>;
   onParamChange: (key: string, value: number) => void;
+  onTextParamChange?: (key: string, value: string) => void;
   synthType?: SynthType;
   instrumentId?: number;
 };
@@ -213,6 +216,7 @@ export const HardwareUIWrapper: React.FC<HardwareUIWrapperProps> = ({
   synthType,
   parameters,
   onParamChange,
+  onTextParamChange,
   instrumentId,
 }) => {
   /* Check dedicated UIs first */
@@ -222,6 +226,7 @@ export const HardwareUIWrapper: React.FC<HardwareUIWrapperProps> = ({
       <DedicatedComponent
         parameters={parameters}
         onParamChange={onParamChange}
+        onTextParamChange={onTextParamChange}
         instrumentId={instrumentId}
       />
     );

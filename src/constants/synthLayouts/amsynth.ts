@@ -1,8 +1,17 @@
 import type { SynthPanelLayout } from '@/types/synthPanel';
+import { amsynthCurves, amsynthTimeSeconds, amsynthLfoHz, amsynthCutoffMultiplier, amsynthLfoDepth, amsynthLfoPitchDepth, AMSYNTH_LFO_WAVES } from '@/components/instruments/curves/amsynthCurves';
+import { fmtMs as fmtMilliseconds } from '@/components/instruments/curves/commonCurveModels';
+
+const curves = amsynthCurves();
 
 const fmtPct = (v: number) => `${Math.round(v * 100)}%`;
-const fmtMs = (v: number) => `${Math.round(v * 2500)}ms`;
-const fmtHz = (v: number) => `${v.toFixed(1)} Hz`;
+// The knobs hold the raw parameter values; the engine acts on a control value derived by a law (Parameter.cpp), so
+// the labels show what the engine does: a time is 0.0005 + v^3 seconds, the LFO rate v^2 Hz, the cutoff 16^v of the base
+// frequency (261.6 Hz at middle C), the LFO depths (v + 1) / 2.
+const fmtMs = (v: number) => fmtMilliseconds(amsynthTimeSeconds(v) * 1000);
+const fmtHz = (v: number) => `${amsynthLfoHz(v).toFixed(1)} Hz`;
+const fmtCutoff = (v: number) => `${Math.round(261.626 * amsynthCutoffMultiplier(v))} Hz`;
+const fmtDepth = (v: number) => `${Math.round(amsynthLfoDepth(v) * 100)}%`;
 
 export const AMSYNTH_LAYOUT: SynthPanelLayout = {
   name: 'AMSynth',
@@ -14,6 +23,7 @@ export const AMSYNTH_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'OSCILLATOR 1',
+          curves: [curves.oscillator],
           controls: [
             { type: 'select', key: 'osc1Waveform', label: 'WAVE', options: [
               { value: '0', label: 'Sine' }, { value: '1', label: 'Pulse' },
@@ -66,21 +76,23 @@ export const AMSYNTH_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'FILTER',
+          curves: [curves.filter],
           controls: [
             { type: 'select', key: 'filterType', label: 'TYPE', options: [
               { value: '0', label: 'LP' }, { value: '1', label: 'HP' }, { value: '2', label: 'BP' },
               { value: '3', label: 'BS' }, { value: '4', label: 'Bypass' },
             ]},
             { type: 'toggle', key: 'filterSlope', label: 'SLOPE', labels: ['12dB', '24dB'] },
-            { type: 'knob', key: 'filterCutoff', label: 'CUTOFF', color: '#ffcc00', min: -0.5, max: 1.5, defaultValue: 0.8, formatValue: fmtPct },
+            { type: 'knob', key: 'filterCutoff', label: 'CUTOFF', color: '#ffcc00', min: -0.5, max: 1.5, defaultValue: 0.8, formatValue: fmtCutoff },
             { type: 'knob', key: 'filterResonance', label: 'RESO', color: '#ff6600', min: 0, max: 0.97, defaultValue: 0.3, formatValue: (v) => `${Math.round(v * 100)}%` },
-            { type: 'knob', key: 'filterEnvAmount', label: 'ENV AMT', color: '#22c55e', min: -16, max: 16, defaultValue: 4, bipolar: true, formatValue: (v) => `${v.toFixed(1)} oct` },
+            { type: 'knob', key: 'filterEnvAmount', label: 'ENV AMT', color: '#22c55e', min: -16, max: 16, defaultValue: 4, bipolar: true, formatValue: (v) => (v >= 0 ? `+${v.toFixed(1)} x note` : `${(v / 16 * 100).toFixed(0)}% of cutoff`) },
             { type: 'knob', key: 'filterKbdTrack', label: 'KBD TRK', color: '#66ccff', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
             { type: 'knob', key: 'filterVelSens', label: 'VEL', color: '#66ccff', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
           ],
         },
         {
           label: 'FILTER ENVELOPE',
+          curves: [curves.filterEnv],
           controls: [
             { type: 'knob', key: 'filterAttack', label: 'ATK', color: '#22c55e', min: 0, max: 2.5, defaultValue: 0.01, formatValue: fmtMs },
             { type: 'knob', key: 'filterDecay', label: 'DEC', color: '#22c55e', min: 0, max: 2.5, defaultValue: 0.5, formatValue: fmtMs },
@@ -96,6 +108,7 @@ export const AMSYNTH_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'AMP ENVELOPE',
+          curves: [curves.amp],
           controls: [
             { type: 'knob', key: 'ampAttack', label: 'ATK', color: '#ff3366', min: 0, max: 2.5, defaultValue: 0.01, formatValue: fmtMs },
             { type: 'knob', key: 'ampDecay', label: 'DEC', color: '#ff3366', min: 0, max: 2.5, defaultValue: 0.5, formatValue: fmtMs },
@@ -106,18 +119,16 @@ export const AMSYNTH_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'LFO',
+          curves: [curves.lfo],
           controls: [
-            { type: 'select', key: 'lfoWaveform', label: 'WAVE', options: [
-              { value: '0', label: 'Sine' }, { value: '1', label: 'Square' }, { value: '2', label: 'Saw Up' },
-              { value: '3', label: 'Saw Dn' }, { value: '4', label: 'Noise' }, { value: '5', label: 'Random' }, { value: '6', label: 'S&H' },
-            ]},
+            { type: 'select', key: 'lfoWaveform', label: 'WAVE', options: AMSYNTH_LFO_WAVES.map((label, i) => ({ value: String(i), label })) },
             { type: 'knob', key: 'lfoFreq', label: 'RATE', color: '#9966ff', min: 0, max: 7.5, defaultValue: 3, formatValue: fmtHz },
-            { type: 'knob', key: 'freqModAmount', label: 'PITCH', color: '#cc66ff', min: 0, max: 1.26, defaultValue: 0, formatValue: fmtPct },
+            { type: 'knob', key: 'freqModAmount', label: 'PITCH', color: '#cc66ff', min: 0, max: 1.26, defaultValue: 0, formatValue: (v) => `${Math.round(amsynthLfoPitchDepth(v) * 100)}%` },
             { type: 'select', key: 'freqModOsc', label: 'FM OSC', options: [
               { value: '0', label: 'Both' }, { value: '1', label: 'Osc1' }, { value: '2', label: 'Osc2' },
             ]},
-            { type: 'knob', key: 'filterModAmount', label: 'FILTER', color: '#cc66ff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: (v) => `${Math.round(v * 100)}%` },
-            { type: 'knob', key: 'ampModAmount', label: 'AMP', color: '#cc66ff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: (v) => `${Math.round(v * 100)}%` },
+            { type: 'knob', key: 'filterModAmount', label: 'FILTER', color: '#cc66ff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: fmtDepth },
+            { type: 'knob', key: 'ampModAmount', label: 'AMP', color: '#cc66ff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: fmtDepth },
           ],
         },
       ],

@@ -13,6 +13,7 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import { WasmVoiceHub, registerVoiceHub } from '@/engine/voiceStatus/wasmVoiceStatus';
 import { loadNativePatch, captureNativeState } from '@/engine/common/NativePatchLoader';
 import { CALFMONO_NATIVE_FACTORY_PRESETS } from './calfMonoNativePresets';
 export { CALFMONO_NATIVE_FACTORY_PRESETS };
@@ -268,6 +269,9 @@ export class CalfMonoSynthImpl implements DevilboxSynth {
   readonly name = 'CalfMonoSynth';
   readonly output: GainNode;
   private node: AudioWorkletNode | null = null;
+  /** Live voice report for the editor curves' markers (wasmVoiceStatus.ts). */
+  readonly voiceHub = new WasmVoiceHub((m) => this.node?.port.postMessage(m));
+  private readonly unregisterVoiceHub: () => void;
   private ready = false;
   private config: CalfMonoConfig;
   private pendingPatch: number[] | null = null;
@@ -277,6 +281,7 @@ export class CalfMonoSynthImpl implements DevilboxSynth {
     this.config = { ...DEFAULT_CALF_MONO };
     const ctx = getDevilboxAudioContext();
     this.output = ctx.createGain();
+    this.unregisterVoiceHub = registerVoiceHub('CalfMono', this.voiceHub);
   }
 
   async ensureInitialized(): Promise<void> {
@@ -326,12 +331,14 @@ export class CalfMonoSynthImpl implements DevilboxSynth {
       outputChannelCount: [2],
     });
     this.node.connect(this.output);
+    this.node.port.addEventListener('message', (e: MessageEvent) => { this.voiceHub.handleMessage(e.data); });
 
     // Wait for worklet to initialize
     await new Promise<void>((resolve, reject) => {
       const handler = (e: MessageEvent) => {
         if (e.data?.type === 'ready') {
           this.ready = true;
+          this.voiceHub.resume();
           this.node!.port.removeEventListener('message', handler);
           resolve();
         } else if (e.data?.type === 'error') {
@@ -435,6 +442,7 @@ export class CalfMonoSynthImpl implements DevilboxSynth {
   }
 
   dispose(): void {
+    this.unregisterVoiceHub();
     if (this.node) {
       this.node.disconnect();
       this.node.port.postMessage({ type: 'destroy' });

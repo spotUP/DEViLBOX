@@ -2,6 +2,7 @@
  * Instrument Store - Instrument Bank & Preset Management
  */
 
+import { adoptCz101TonesFrom } from './useCz101UserPatchStore';
 import { classifySampleEdit, propagateSampleEditToSong } from '@/lib/song/sampleEdit';
 import { keepAcrossHmr } from '@/lib/dev/keepAcrossHmr';
 import { create } from 'zustand';
@@ -40,6 +41,7 @@ import { DEFAULT_WAVESABRE_INSTRUMENT } from '@typedefs/wavesabreInstrument';
 import { getFirstPresetForSynthType } from '@constants/factoryPresets';
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
 import { getToneEngine } from '@engine/ToneEngine';
+import { touchesToneVoice } from '@engine/tone/toneSynthKnobs';
 import { peekTrackerReplayer } from '@engine/TrackerReplayer';
 import { recognizeCinter4Instruments } from '@engine/cinter4/cinter4Recognize';
 import { cinter4ParamsToSampleName } from '@lib/import/formats/cinter4Params';
@@ -955,7 +957,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
             const toneJsSynthTypes = ['Synth', 'FMSynth', 'ToneAM', 'MonoSynth', 'DuoSynth', 'PluckSynth',
               'MembraneSynth', 'MetalSynth', 'NoiseSynth'];
             if (toneJsSynthTypes.includes(updatedInstrument.synthType) &&
-                (updates.oscillator || updates.envelope || updates.filter || updates.filterEnvelope || updates.lfo || updates.volume !== undefined)) {
+                touchesToneVoice(updates)) {
               engine.updateToneJsSynthInPlace(id, updatedInstrument);
               return; // Handled — no invalidation needed
             }
@@ -1177,7 +1179,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
               engine.updateComplexSynthParameters(id, synthConfig);
             }
             // Tone.js synths
-            else if ((updates.oscillator || updates.envelope || updates.filter || updates.filterEnvelope || updates.lfo || updates.volume !== undefined)) {
+            else if (touchesToneVoice(updates)) {
               engine.updateToneJsSynthInPlace(id, mergedInst);
             }
           }
@@ -1831,6 +1833,9 @@ export const useInstrumentStore = create<InstrumentStore>()(
           try { usePresetStore.getState().harvestFromSong(toHarvest, sourceSong); } catch { /* non-fatal */ }
         }).catch(() => { /* non-fatal */ });
       }
+
+      // A CZ-101 instrument carries its own patch; list it in this browser's User library (by content, once)
+      try { adoptCz101TonesFrom(newInstruments); } catch { /* non-fatal */ }
 
       // Revoke blob URLs from old instruments to prevent memory leaks
       get().instruments.forEach((inst) => {

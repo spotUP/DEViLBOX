@@ -18,6 +18,11 @@ class RaffoSynthProcessor extends AudioWorkletProcessor {
     this.lastHeapBuffer = null;
     this.initializing = false;
 
+    // Live voice report for the editor curves (src/engine/voiceStatus/wasmVoiceStatus.ts)
+    this.watchVoices = false;
+    this.voiceCounter = 0;
+    this.voicePtr = 0;
+
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
     };
@@ -72,6 +77,9 @@ class RaffoSynthProcessor extends AudioWorkletProcessor {
           }
           this.port.postMessage({ type: 'state', values: Array.from(state), numParams });
         }
+        break;
+      case 'watchVoices':
+        this.watchVoices = !!data.on;
         break;
       case 'getInfo':
         if (this.engine) {
@@ -218,6 +226,10 @@ class RaffoSynthProcessor extends AudioWorkletProcessor {
   }
 
   cleanup() {
+    if (this.module && this.voicePtr) {
+      this.module._free(this.voicePtr);
+      this.voicePtr = 0;
+    }
     if (this.module && this.engine) {
       this.module._raffo_destroy(this.engine);
       this.engine = null;
@@ -266,7 +278,20 @@ class RaffoSynthProcessor extends AudioWorkletProcessor {
     outputL.set(this.outputBufferL.subarray(0, numSamples));
     outputR.set(this.outputBufferR.subarray(0, numSamples));
 
+    this.reportVoices();
     return true;
+  }
+
+  // 8 floats per voice slot, layout in wasmVoiceStatus.ts; every 6th block (about 60 reports a second)
+  reportVoices() {
+    if (!this.watchVoices || typeof this.module._raffo_get_voices !== 'function') return;
+    if (++this.voiceCounter < 6) return;
+    this.voiceCounter = 0;
+    if (!this.voicePtr) this.voicePtr = this.module._malloc(1 * 8 * 4);
+    const n = this.module._raffo_get_voices(this.engine, this.voicePtr, 1);
+    const heap = this.module.HEAPF32 || new Float32Array(this.module.wasmMemory.buffer);
+    const at = this.voicePtr >> 2;
+    this.port.postMessage({ type: 'voiceStatus', voices: heap.slice(at, at + n * 8) });
   }
 }
 

@@ -370,6 +370,32 @@ impl OidosSynth {
         partials_per_voice * 6 * 8 * 16
     }
     
+    /// Live voice report for the editor curves (src/engine/voiceStatus/wasmVoiceStatus.ts): 8 floats per sounding voice,
+    /// written into `out` (room for 16 voices = 128 floats); returns the number of voices written. Fields: note,
+    /// envelope stage (0 attack, 2 held at full level, 3 release), envelope value, seconds since the note, 0 (the
+    /// synth has no cutoff), 0, 0, the same stage code again (the filter sweep runs on the voice's own clock).
+    #[wasm_bindgen]
+    pub fn get_voices(&self, out: &mut [f32]) -> u32 {
+        let mut n = 0usize;
+        for v in self.voices.iter().filter(|v| v.active) {
+            if (n + 1) * 8 > out.len() {
+                break;
+            }
+            let stage = if v.releasing { 3.0 } else if v.envelope >= 1.0 { 2.0 } else { 0.0 };
+            let o = &mut out[n * 8..n * 8 + 8];
+            o[0] = v.tone as f32;
+            o[1] = stage;
+            o[2] = v.envelope;
+            o[3] = v.time as f32 / self.sample_rate;
+            o[4] = 0.0;
+            o[5] = 0.0;
+            o[6] = 0.0;
+            o[7] = stage;
+            n += 1;
+        }
+        n as u32
+    }
+
     /// Get active voice count
     #[wasm_bindgen]
     pub fn get_active_voices(&self) -> u32 {

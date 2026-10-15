@@ -21,6 +21,19 @@
 
 #include <emscripten.h>
 
+// ── Read access to the EGS envelope generators ────────────────────────────
+// EGS keeps its 6x16 Envelope array private. The editor's live markers need each voice's operator envelope level
+// and stage, and a vendored third-party header should stay unedited, so the member is reached through the
+// explicit-instantiation access idiom (standard C++: template arguments of an explicit instantiation are not
+// access-checked).
+template <typename Tag, typename Tag::type Member>
+struct PrivateAccess { friend typename Tag::type privateMember(Tag) { return Member; } };
+struct EgsEnvTag {
+    using type = dx7Emu::Envelope (dx7Emu::EGS::*)[6][16];
+    friend type privateMember(EgsEnvTag);
+};
+template struct PrivateAccess<EgsEnvTag, &dx7Emu::EGS::env>;
+
 static constexpr float kNativeSamplerate = 49096.354f;
 static constexpr int kBufSize = 512;
 
@@ -193,16 +206,16 @@ int dx7LoadSysex(const uint8_t* data, int size) {
 EMSCRIPTEN_KEEPALIVE
 void dx7NoteOff(uint8_t note) {
     if (!g_dx7 || !g_dx7->initialized) return;
-    if (note >= 34)
-        g_dx7->toSynthPtr->key_off(note - 34);
+    if (note >= 36)
+        g_dx7->toSynthPtr->key_off(note - 36);
 }
 
 EMSCRIPTEN_KEEPALIVE
 void dx7NoteOn(uint8_t note, uint8_t velocity) {
     if (!g_dx7 || !g_dx7->initialized) return;
     if (velocity == 0) { dx7NoteOff(note); return; }
-    if (note >= 34)
-        g_dx7->toSynthPtr->key_on(note - 34, g_dx7->midiVelocity[velocity]);
+    if (note >= 36)
+        g_dx7->toSynthPtr->key_on(note - 36, g_dx7->midiVelocity[velocity]);
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -284,6 +297,52 @@ void dx7Process(float* outL, float* outR, int numSamples) {
         outL[i] = sample;
         outR[i] = sample;
     }
+}
+
+/**
+ * Envelope state of every voice and operator, for the editor's live markers.
+ * Writes 16 voices x 6 operators x 4 bytes to `out` (voice-major, operator index in EGS order: 0 = OP6 ... 5 = OP1):
+ *   int16 LE  level    EGS attenuation, 0 = full volume, 0xFF0 = silent (Envelope::level, 1/256 octave steps)
+ *   uint8     stage    0..3 = EG segment 1..4 (3 is the release segment)
+ *   uint8     flags    bit 0 = key released
+ * Returns the number of bytes written (384), or 0 before the firmware has booted.
+ */
+EMSCRIPTEN_KEEPALIVE
+int dx7GetEnvelopeState(uint8_t* out) {
+    if (!g_dx7 || !g_dx7->initialized || !out) return 0;
+    const auto& env = g_dx7->dx7.egs.*privateMember(EgsEnvTag{});
+    int n = 0;
+    for (int voice = 0; voice < 16; voice++) {
+        for (int op = 0; op < 6; op++) {
+            const dx7Emu::Envelope& e = env[op][voice];
+            const uint16_t level = static_cast<uint16_t>(e.level);
+            out[n++] = static_cast<uint8_t>(level & 0xFF);
+            out[n++] = static_cast<uint8_t>(level >> 8);
+            out[n++] = static_cast<uint8_t>(e.stage);
+            out[n++] = e.keyoff ? 1 : 0;
+        }
+    }
+    return n;
+}
+
+/**
+ * Copy of the EGS register file (256 bytes at 0x3000): detune 0x30, EG rates 0x40, EG levels 0x60,
+ * operator output levels 0x80 (6 x 16 voices), sensitivity/scaling 0xE0. The envelope curves are checked against
+ * what the firmware wrote here for a given voice.
+ */
+EMSCRIPTEN_KEEPALIVE
+int dx7GetEgsRegisters(uint8_t* out) {
+    if (!g_dx7 || !g_dx7->initialized || !out) return 0;
+    std::memcpy(out, g_dx7->dx7.memory + 0x3000, 256);
+    return 256;
+}
+
+/** Copy `len` bytes of the 6303 address space starting at `addr` (the firmware's RAM: edit buffer, voice memory). */
+EMSCRIPTEN_KEEPALIVE
+int dx7ReadMemory(int addr, int len, uint8_t* out) {
+    if (!g_dx7 || !g_dx7->initialized || !out || addr < 0 || len < 0 || addr + len > 0x10000) return 0;
+    std::memcpy(out, g_dx7->dx7.memory + addr, len);
+    return len;
 }
 
 EMSCRIPTEN_KEEPALIVE

@@ -13,6 +13,8 @@ import { useCz101Patches } from '@components/instruments/controls/CZ101PatchBrow
 interface CZ101HardwareProps {
   parameters: Record<string, number>;
   onParamChange: (key: string, value: number) => void;
+  /** String parameters (the instrument's own patch travels as `_cz101Tone`). */
+  onTextParamChange?: (key: string, value: string) => void;
 }
 
 /**
@@ -121,9 +123,10 @@ const SLIDERS = [
 export const CZ101Hardware: React.FC<CZ101HardwareProps> = ({
   parameters,
   onParamChange,
+  onTextParamChange,
 }) => {
-  const { program, userPatchId, userPatches, activeUser, current, fileInput, dragOver, setDragOver, chooseFactory, chooseUser, onFilesPicked, onDrop, removePatch } =
-    useCz101Patches(parameters, onParamChange);
+  const { program, ownPatch, userPatches, activeUser, current, fileInput, dragOver, setDragOver, chooseFactory, chooseUser, onFilesPicked, onDrop, removePatch } =
+    useCz101Patches(parameters, onParamChange, onTextParamChange);
 
   const waveform = parameters.waveform1 ?? cz101PatchParameters(current.patch).waveform1;
   const windowValue = parameters.window ?? 0;
@@ -153,7 +156,7 @@ export const CZ101Hardware: React.FC<CZ101HardwareProps> = ({
         <div className="mb-4 bg-gradient-to-b from-gray-800 to-gray-900 p-2 rounded border border-dark-borderLight shadow-inner">
           <div className="bg-amber-900/20 border border-amber-800 rounded p-2 min-h-[60px] font-mono text-xs text-amber-400">
             <div className="flex justify-between">
-              <span>{activeUser ? 'USER' : 'FACTORY'}</span>
+              <span>{ownPatch ? 'USER' : 'FACTORY'}</span>
               <span className="uppercase">{current.patch.name}</span>
             </div>
           </div>
@@ -164,7 +167,7 @@ export const CZ101Hardware: React.FC<CZ101HardwareProps> = ({
           <div className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-2 text-center">Factory</div>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-1 mb-3">
             {CZ101_PRESET_BANK.map((entry, index) => (
-              <CZ101Button key={entry.patch.name} label={(entry.patch.name ?? '').toUpperCase()} small fill active={!activeUser && index === program} onClick={() => chooseFactory(index)} />
+              <CZ101Button key={entry.patch.name} label={(entry.patch.name ?? '').toUpperCase()} small fill active={!ownPatch && index === program} onClick={() => chooseFactory(index)} />
             ))}
           </div>
           <div className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-2 text-center">User</div>
@@ -182,7 +185,7 @@ export const CZ101Hardware: React.FC<CZ101HardwareProps> = ({
             ) : (
               <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-1 mb-2">
                 {userPatches.map((entry) => (
-                  <CZ101Button key={entry.id} label={entry.name.toUpperCase()} small fill active={entry.id === userPatchId} onClick={() => chooseUser(entry.id)} />
+                  <CZ101Button key={entry.id} label={entry.name.toUpperCase()} small fill active={entry.id === activeUser?.id} onClick={() => chooseUser(entry.id)} />
                 ))}
               </div>
             )}

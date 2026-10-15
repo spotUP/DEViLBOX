@@ -1,5 +1,5 @@
 import type { SynthPanelLayout } from '@/types/synthPanel';
-import { adsrCurve, filterCurve, lfoCurve } from '@/components/instruments/curves/commonCurveModels';
+import { toneAdsrCurve, toneFilterCurve, toneLfoCurve } from '@/components/instruments/curves/toneCurves';
 
 const fmtMs = (v: number) => `${Math.round(v)}ms`;
 const fmtPct = (v: number) => `${Math.round(v)}%`;
@@ -28,7 +28,7 @@ export const STRING_MACHINE_LAYOUT: SynthPanelLayout = {
     },
     {
       label: 'ENSEMBLE',
-      curves: [lfoCurve({ label: 'Ensemble chorus LFO', rate: 'ensemble.rate', depth: 'ensemble.depth' })],
+      curves: [toneLfoCurve({ label: 'Ensemble chorus LFO', rate: 'ensemble.rate', depth: 'ensemble.depth' })],
       controls: [
         { type: 'knob', key: 'ensemble.depth', label: 'DEPTH', color: '#cc66ff', min: 0, max: 100, defaultValue: 60, formatValue: fmtPct },
         { type: 'knob', key: 'ensemble.rate', label: 'RATE', color: '#9966ff', min: 0.5, max: 6, defaultValue: 3, formatValue: (v) => `${v.toFixed(1)} Hz` },
@@ -36,8 +36,8 @@ export const STRING_MACHINE_LAYOUT: SynthPanelLayout = {
     },
     {
       label: 'ENVELOPE',
-      curves: [adsrCurve({ label: 'Amp envelope (decay 200 ms, sustain 90% fixed in the engine)', attack: 'attack', decay: 200, sustain: 90, release: 'release' }),
-      filterCurve({ label: 'Brightness filter', cutoff: 'brightness', cutoffToHz: (b) => 2000 + b * 80, resonance: 5, type: 'lowpass' })],
+      curves: [toneAdsrCurve({ label: 'Amp envelope (decay 200 ms, sustain 90% fixed in the engine)', attack: 'attack', decay: 200, sustain: 90, release: 'release' }),
+      toneFilterCurve({ label: 'Brightness filter', cutoff: 'brightness', cutoffToHz: (b) => 2000 + b * 80, resonance: 5, type: 'lowpass' })],
       controls: [
         { type: 'knob', key: 'attack', label: 'ATTACK', color: '#ff9900', min: 10, max: 2000, defaultValue: 200, formatValue: fmtMs },
         { type: 'knob', key: 'release', label: 'RELEASE', color: '#ff9900', min: 100, max: 5000, defaultValue: 1000, formatValue: fmtMs },

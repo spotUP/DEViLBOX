@@ -260,6 +260,34 @@ void RaffoSynth::render(uint32_t from, uint32_t to) {
     }
 }
 
+// Voice report (8 floats): the synth is monophonic, so one record. Fields: note, amplitude stage, amplitude level,
+// seconds on the envelope timeline (the envelope counter / sample rate while a key is held), filter cutoff in Hz
+// (cutoff * filter envelope + 100, as runEqualizer() uses it), filter envelope level, LFO phase (none: 0),
+// filter envelope stage. Stage codes: 0 attack 1 decay 2 sustain 3 release 4 off.
+int RaffoSynth::getVoices(float* out, int maxVoices) {
+    if (maxVoices < 1) return 0;
+    const bool held = !keys.empty();
+    const float a = ATTACK, d = DECAY, fa = FILTER_ATTACK, fd = FILTER_DECAY;
+    const float env = envelope(envelope_count, a, d, SUSTAIN);
+    const float fenv = envelope(filter_count, fa, fd, FILTER_SUSTAIN);
+    float stage = 4.0f, fstage = 4.0f;
+    if (held) {
+        stage = envelope_count < a ? 0.0f : (envelope_count < a + d ? 1.0f : 2.0f);
+        fstage = filter_count < fa ? 0.0f : (filter_count < fa + fd ? 1.0f : 2.0f);
+    } else if (envelope_count > 0) {
+        stage = fstage = 3.0f;
+    }
+    out[0] = held ? (float)keys.front() : -1.0f;
+    out[1] = stage;
+    out[2] = stage == 4.0f ? 0.0f : env;
+    out[3] = held ? (float)envelope_count / (float)sample_rate : 0.0f;
+    out[4] = params[P_FILTER_CUTOFF] * fenv + 100.0f;
+    out[5] = fenv;
+    out[6] = 0.0f;
+    out[7] = fstage;
+    return 1;
+}
+
 void RaffoSynth::runEqualizer(int sample_count) {
     float env = envelope(filter_count, FILTER_ATTACK, FILTER_DECAY, FILTER_SUSTAIN);
 

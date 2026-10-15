@@ -295,6 +295,8 @@ public:
     void calculate_buffer_stereo();
     uint32_t process(uint32_t offset, uint32_t nsamples, uint32_t inputs_mask, uint32_t outputs_mask);
     void all_notes_off();
+    /// Live voice report for the editor curves: 8 floats per voice (src/engine/voiceStatus/wasmVoiceStatus.ts).
+    int get_voices(float *out, int max_voices);
 
     /// Inline modulation matrix calculation (replaces mod_matrix_impl)
     inline void calculate_modmatrix(float *dest, int dest_count, float *src)

@@ -23,9 +23,11 @@ interface CurveCanvasProps {
   readout?: string;
   /** Reads a layout value (for the marker, which depends on the knobs). */
   get: (key: string) => number;
+  /** The edited instrument (for markers that follow one engine voice). */
+  instrumentId?: number;
 }
 
-export const CurveCanvas: React.FC<CurveCanvasProps> = ({ curve, series, accent, readout, get }) => {
+export const CurveCanvas: React.FC<CurveCanvasProps> = ({ curve, series, accent, readout, get, instrumentId }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const markerRef = useRef<number | null>(null);
@@ -99,8 +101,8 @@ export const CurveCanvas: React.FC<CurveCanvasProps> = ({ curve, series, accent,
 
   useEffect(() => {
     if (!curve.marker) return undefined;
-    return curve.marker.subscribe((x) => { markerRef.current = x; draw.current(); }, () => getRef.current);
-  }, [curve.marker]);
+    return curve.marker.subscribe((x) => { markerRef.current = x; draw.current(); }, () => getRef.current, instrumentId);
+  }, [curve.marker, instrumentId]);
 
   return (
     <div ref={hostRef} className="w-full">

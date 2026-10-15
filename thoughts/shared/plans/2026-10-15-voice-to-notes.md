@@ -15,6 +15,8 @@ status: draft
 - UI home: a **panel next to the pattern editor** (record, live preview on the target channel, Finetune, Commit).
 - Drum targets: a **mapping table** of detected hit types to instruments the owner picks.
 - Model shipping: **bundled in the repo, loaded on first use**.
+- Beatbox classifier (O1): **rule-based spectral classifier first** to get going, then a **user-trainable model** from the owner's own guided recordings.
+- Raw take (O5): **notes only**, the take is discarded after Commit.
 
 ## What exists (reuse, do not rebuild)
 
@@ -66,11 +68,11 @@ mic -> RecorderWorklet (ring buffer, 22050 Hz mono tap + full-rate take)
 
 ## Open questions (to resolve before building)
 
-- O1 Drum classifier: ship a model we train on beatbox samples (needs data) versus a published one; dataset licence and size.
+- O1 DECIDED: rule-based classifier first (low/mid/high energy ratios, decay, zero-crossing rate), then guided user training (about 3 minutes of kick/snare/hat/clap takes) producing a small per-user model stored locally.
 - O2 Latency compensation: measure once per device (loopback) or let the user nudge.
 - O3 Overdub and multiple takes: keep the last N takes per project?
 - O4 Tuning: snap to the song's key / scale? Default off, optional lock.
-- O5 Where the raw take goes: keep it as a sample instrument too (owner did not pick this).
+- O5 DECIDED: notes only; no sample instrument is kept.
 
 ## Checklist (IDs; ticked in the open as executed)
 
@@ -94,11 +96,12 @@ Phase V3 - melody panel
 - [ ] VN-3.2 Live preview from sliding windows; the final pass replaces it at take end.
 
 Phase V4 - beatbox
-- [ ] VN-4.1 Onset detector + classifier (per O1) + tests on clips.
+- [ ] VN-4.1 Onset detector + rule-based hit classifier + tests on clips.
+- [ ] VN-4.3 Guided user training: record labelled takes, train a small per-user classifier (browser, local storage), swap it in over the rules when accuracy is higher on a held-out split.
 - [ ] VN-4.2 Drum map UI + writer.
 
 Phase V5 - polish
-- [ ] VN-5.1 Key/scale snap (O4), takes list (O3), keep-as-sample (O5), MCP tool `voice_to_notes` for headless testing.
+- [ ] VN-5.1 Key/scale snap (O4), takes list (O3), MCP tool `voice_to_notes` for headless testing.
 
 ## Verification
 

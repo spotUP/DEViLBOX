@@ -35,6 +35,8 @@ public:
     void allNotesOff();
     void pitchBend(int value); // 0-16383, 8192=center
     int getNumParams() { return RAFFO_NUM_PARAMS; }
+    // Live voice report for the editor curves: 8 floats per voice (src/engine/voiceStatus/wasmVoiceStatus.ts).
+    int getVoices(float* out, int maxVoices);
 
 private:
     void render(uint32_t from, uint32_t to);

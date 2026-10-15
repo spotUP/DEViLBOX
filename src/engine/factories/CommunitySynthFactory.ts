@@ -21,6 +21,7 @@ import {
   DEFAULT_DUB_SIREN,
   DEFAULT_TB303,
 } from '@/types/instrument';
+import { registerVoiceSource } from '../tone/toneVoiceProbe';
 import { WavetableSynth } from '../WavetableSynth';
 import { DrumKitSynth } from '../DrumKitSynth';
 import { DubSirenSynth } from '../dub/DubSirenSynth';
@@ -297,7 +298,7 @@ export function createFormantSynth(config: InstrumentConfig): Tone.ToneAudioNode
   f2.connect(output);
   f3.connect(output);
 
-  return {
+  return registerVoiceSource({
     triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
       try { synth.triggerRelease(note, time); } catch { /* ignore */ }
       synth.triggerAttackRelease(note, duration, time, velocity);
@@ -337,7 +338,7 @@ export function createFormantSynth(config: InstrumentConfig): Tone.ToneAudioNode
       f3.frequency.rampTo(fmts.f3, 0.1);
     },
     volume: synth.volume,
-  } as unknown as Tone.ToneAudioNode;
+  } as unknown as Tone.ToneAudioNode, synth);
 }
 
 /**

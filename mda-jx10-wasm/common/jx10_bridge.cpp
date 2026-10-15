@@ -61,4 +61,9 @@ int jx10_get_active_voices(void* handle) {
   return static_cast<mdaJX10*>(handle)->getActiveVoices();
 }
 
+// Live voice report for the editor curves: 8 floats per voice, returns the voice count written.
+int jx10_get_voices(void* handle, float* out, int maxVoices) {
+  return static_cast<mdaJX10*>(handle)->getVoices(out, maxVoices);
+}
+
 } // extern "C"

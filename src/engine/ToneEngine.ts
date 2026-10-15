@@ -23,6 +23,9 @@ import { AmigaFilter } from './effects/AmigaFilter';
 import { shimAudioListenerParams } from './tone/firefoxAudioListenerShim';
 import { applyLoopToPlayer, sampleLoops } from './tone/samplePlayerLoop';
 import { registerChannelMeterSink } from './tone/channelMeterFeed';
+import { chipChannelFor, LIVE_VOICE_BASE_CHANNEL } from './furnace-dispatch/chipChannel';
+import { trackToneVoices, untrackToneVoices } from './tone/toneVoiceProbe';
+import { createToneSynthNode, toneVoiceOptions } from './tone/toneSynthKnobs';
 import { TrackerEnvelope } from './TrackerEnvelope';
 import { InstrumentAnalyser } from './InstrumentAnalyser';
 import { FurnaceChipEngine } from './chips/FurnaceChipEngine';
@@ -274,7 +277,7 @@ export class ToneEngine {
   private liveVoiceAllocation: Map<string, number> = new Map();
   // Voice allocator with priority-based stealing (replaces simple pool)
   private voiceAllocator: VoiceAllocator;
-  private static readonly LIVE_VOICE_BASE_CHANNEL = 100; // Start at channel 100 to avoid tracker channels
+  private static readonly LIVE_VOICE_BASE_CHANNEL = LIVE_VOICE_BASE_CHANNEL; // Start at channel 100 to avoid tracker channels
   private static readonly MAX_LIVE_VOICES = 16;
 
   // Active voices per channel (for IT NNA support)
@@ -1989,155 +1992,35 @@ export class ToneEngine {
     let instrument: Tone.ToneAudioNode | DevilboxSynth | null = null;
     
     switch (config.synthType) {
+      // The Tone core synths: options, voice class, modulation rig and volume all come from toneSynthKnobs, the same
+      // builder the registry and the live update path use.
       case 'Synth': {
-        if (isTrackerChannel) {
-          // Use MonoSynth for tracker channels - allows direct frequency modulation
-          instrument = new Tone.MonoSynth({
-            oscillator: {
-              type: (config.oscillator?.type === 'noise' ? 'sawtooth' : (config.oscillator?.type || 'sawtooth')) as Tone.ToneOscillatorType,
-            } as any,
-            envelope: {
-              attack: (config.envelope?.attack ?? 10) / 1000,
-              decay: (config.envelope?.decay ?? 200) / 1000,
-              sustain: (config.envelope?.sustain ?? 50) / 100,
-              release: (config.envelope?.release ?? 1000) / 1000,
-            },
-            volume: getNormalizedVolume('Synth', config.volume),
-          });
-        } else {
-          // Use PolySynth for non-tracker use (UI, live input, etc.)
-          const synthPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
-                                 this.currentPerformanceQuality === 'medium' ? 8 : 4;
-          instrument = new Tone.PolySynth({
-            voice: Tone.Synth,
-            maxPolyphony: synthPolyphony,
-            options: {
-              oscillator: {
-                type: (config.oscillator?.type === 'noise' ? 'sawtooth' : (config.oscillator?.type || 'sawtooth')) as Tone.ToneOscillatorType,
-              } as any,
-              envelope: {
-                attack: (config.envelope?.attack ?? 10) / 1000,
-                decay: (config.envelope?.decay ?? 200) / 1000,
-                sustain: (config.envelope?.sustain ?? 50) / 100,
-                release: (config.envelope?.release ?? 1000) / 1000,
-              },
-            },
-            volume: getNormalizedVolume('Synth', config.volume),
-          } as any);
-        }
+        const synthPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
+                               this.currentPerformanceQuality === 'medium' ? 8 : 4;
+        // Tracker channels get a MonoSynth: the engine drives its frequency directly (arpeggio, portamento, vibrato).
+        instrument = createToneSynthNode('Synth', config, { monophonic: isTrackerChannel, polyphony: synthPolyphony });
         break;
       }
 
       case 'MonoSynth':
-        instrument = new Tone.MonoSynth({
-          oscillator: {
-            type: (config.oscillator?.type === 'noise' ? 'sawtooth' : (config.oscillator?.type || 'sawtooth')) as Tone.ToneOscillatorType,
-          } as any,
-          envelope: {
-            attack: (config.envelope?.attack ?? 10) / 1000,
-            decay: (config.envelope?.decay ?? 200) / 1000,
-            sustain: (config.envelope?.sustain ?? 50) / 100,
-            release: (config.envelope?.release ?? 1000) / 1000,
-          },
-          volume: getNormalizedVolume('MonoSynth', config.volume),
-        });
+        instrument = createToneSynthNode('MonoSynth', config);
         break;
 
       case 'DuoSynth':
-        instrument = new Tone.DuoSynth({
-          voice0: {
-            oscillator: { type: (config.oscillator?.type === 'noise' ? 'sawtooth' : (config.oscillator?.type || 'sawtooth')) as Tone.ToneOscillatorType } as any,
-            envelope: {
-              attack: (config.envelope?.attack ?? 10) / 1000,
-              decay: (config.envelope?.decay ?? 200) / 1000,
-              sustain: (config.envelope?.sustain ?? 50) / 100,
-              release: (config.envelope?.release ?? 1000) / 1000,
-            },
-          },
-          voice1: {
-            oscillator: { type: (config.oscillator?.type === 'noise' ? 'sawtooth' : (config.oscillator?.type || 'sawtooth')) as Tone.ToneOscillatorType } as any,
-            envelope: {
-              attack: (config.envelope?.attack ?? 10) / 1000,
-              decay: (config.envelope?.decay ?? 200) / 1000,
-              sustain: (config.envelope?.sustain ?? 50) / 100,
-              release: (config.envelope?.release ?? 1000) / 1000,
-            },
-          },
-          vibratoAmount: config.oscillator?.detune ? config.oscillator.detune / 100 : 0.5,
-          vibratoRate: 5,
-          volume: getNormalizedVolume('DuoSynth', config.volume),
-        });
+        instrument = createToneSynthNode('DuoSynth', config);
         break;
 
       case 'FMSynth': {
-        if (isTrackerChannel) {
-          // Use raw FMSynth for tracker channels
-          instrument = new Tone.FMSynth({
-            oscillator: { type: (config.oscillator?.type === 'noise' ? 'sine' : (config.oscillator?.type || 'sine')) as Tone.ToneOscillatorType } as any,
-            envelope: {
-              attack: (config.envelope?.attack ?? 10) / 1000,
-              decay: (config.envelope?.decay ?? 200) / 1000,
-              sustain: (config.envelope?.sustain ?? 50) / 100,
-              release: (config.envelope?.release ?? 1000) / 1000,
-            },
-            modulationIndex: 10,
-            volume: getNormalizedVolume('FMSynth', config.volume),
-          });
-        } else {
-          // Use PolySynth wrapper for non-tracker use
-          const fmPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
-                              this.currentPerformanceQuality === 'medium' ? 6 : 3;
-          instrument = new Tone.PolySynth({
-            voice: Tone.FMSynth,
-            maxPolyphony: fmPolyphony,
-            options: {
-              oscillator: { type: (config.oscillator?.type === 'noise' ? 'sine' : (config.oscillator?.type || 'sine')) as Tone.ToneOscillatorType } as any,
-              envelope: {
-                attack: (config.envelope?.attack ?? 10) / 1000,
-                decay: (config.envelope?.decay ?? 200) / 1000,
-                sustain: (config.envelope?.sustain ?? 50) / 100,
-                release: (config.envelope?.release ?? 1000) / 1000,
-              },
-              modulationIndex: 10,
-            },
-            volume: getNormalizedVolume('FMSynth', config.volume),
-          } as any);
-        }
+        const fmPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
+                            this.currentPerformanceQuality === 'medium' ? 6 : 3;
+        instrument = createToneSynthNode('FMSynth', config, { monophonic: isTrackerChannel, polyphony: fmPolyphony });
         break;
       }
 
       case 'ToneAM': {
-        if (isTrackerChannel) {
-          // Use raw AMSynth for tracker channels
-          instrument = new Tone.AMSynth({
-            oscillator: { type: (config.oscillator?.type === 'noise' ? 'sine' : (config.oscillator?.type || 'sine')) as Tone.ToneOscillatorType } as any,
-            envelope: {
-              attack: (config.envelope?.attack ?? 10) / 1000,
-              decay: (config.envelope?.decay ?? 200) / 1000,
-              sustain: (config.envelope?.sustain ?? 50) / 100,
-              release: (config.envelope?.release ?? 1000) / 1000,
-            },
-            volume: getNormalizedVolume('ToneAM', config.volume),
-          });
-        } else {
-          // Use PolySynth wrapper for non-tracker use
-          const amPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
-                              this.currentPerformanceQuality === 'medium' ? 8 : 4;
-          instrument = new Tone.PolySynth({
-            voice: Tone.AMSynth,
-            maxPolyphony: amPolyphony,
-            options: {
-              oscillator: { type: (config.oscillator?.type === 'noise' ? 'sine' : (config.oscillator?.type || 'sine')) as Tone.ToneOscillatorType } as any,
-              envelope: {
-                attack: (config.envelope?.attack ?? 10) / 1000,
-                decay: (config.envelope?.decay ?? 200) / 1000,
-                sustain: (config.envelope?.sustain ?? 50) / 100,
-                release: (config.envelope?.release ?? 1000) / 1000,
-              },
-            },
-            volume: getNormalizedVolume('ToneAM', config.volume),
-          } as any);
-        }
+        const amPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
+                            this.currentPerformanceQuality === 'medium' ? 8 : 4;
+        instrument = createToneSynthNode('ToneAM', config, { monophonic: isTrackerChannel, polyphony: amPolyphony });
         break;
       }
 
@@ -2147,11 +2030,7 @@ export class ToneEngine {
         instrument = new (Tone.PolySynth as unknown as new (options: Record<string, unknown>) => Tone.PolySynth)({
           voice: Tone.PluckSynth,
           maxPolyphony: pluckPolyphony,
-          options: {
-            attackNoise: 1,
-            dampening: config.filter?.frequency || 4000,
-            resonance: 0.7,
-          },
+          options: toneVoiceOptions('PluckSynth', config),
           volume: getNormalizedVolume('PluckSynth', config.volume),
         });
         break;
@@ -2722,6 +2601,8 @@ export class ToneEngine {
 
     // Store instrument with composite key (per-channel)
     this.instruments.set(key, instrument);
+    // Live voice markers of the editor curves watch Tone instruments (no-op for any other kind)
+    trackToneVoices(instrumentId, instrument);
     // Track the synth type for proper release handling
     // Don't overwrite if already set (e.g., Sampler converted to Player)
     if (!this.instrumentSynthTypes.has(key)) {
@@ -3410,15 +3291,15 @@ export class ToneEngine {
         instrument.triggerAttack(note, safeTime, velocity);
       } else {
         // Set chip channel on FurnaceSynth before triggering (for multi-channel tracker playback)
+        // (a live keyboard/MIDI voice plays on the instrument's preview channel - chipChannel.ts)
         if (instrument instanceof FurnaceSynth && channelIndex !== undefined) {
           const maxCh = FurnaceSynth.getMaxChannels(instrument.getChipType());
-          instrument.setChannelIndex(channelIndex % maxCh);
+          instrument.setChannelIndex(chipChannelFor(channelIndex, maxCh, config.furnace?.previewChannel));
         }
         // Set chip channel on FurnaceDispatchSynth (for C64/GB/NES multi-channel tracker playback)
         if (instrument instanceof FurnaceDispatchSynth && channelIndex !== undefined) {
           const maxCh = instrument.getNumChannels() || 3;
-          const chipChannel = channelIndex % maxCh;
-          instrument.setChannel(chipChannel);
+          instrument.setChannel(chipChannelFor(channelIndex, maxCh, config.furnace?.previewChannel));
         }
         // Standard synths - apply slide/accent for 303-style effects
         const targetFreq = cachedFrequency(note);
@@ -4130,13 +4011,12 @@ export class ToneEngine {
           // Set chip channel on FurnaceSynth before triggering (for multi-channel tracker playback)
           if (voiceNode instanceof FurnaceSynth && channelIndex !== undefined) {
             const maxCh = FurnaceSynth.getMaxChannels(voiceNode.getChipType());
-            voiceNode.setChannelIndex(channelIndex % maxCh);
+            voiceNode.setChannelIndex(chipChannelFor(channelIndex, maxCh, config.furnace?.previewChannel));
           }
           // Set chip channel on FurnaceDispatchSynth (for C64/GB/NES multi-channel tracker playback)
           if (voiceNode instanceof FurnaceDispatchSynth && channelIndex !== undefined) {
             const maxCh = voiceNode.getNumChannels() || 3;
-            const chipChannel = channelIndex % maxCh;
-            voiceNode.setChannel(chipChannel);
+            voiceNode.setChannel(chipChannelFor(channelIndex, maxCh, config.furnace?.previewChannel));
           }
           // Set chip channel on OPL3Synth (for multi-timbral AdLib tracker playback)
           if (voiceNode instanceof OPL3Synth && channelIndex !== undefined) {
@@ -4693,6 +4573,7 @@ export class ToneEngine {
     const instrument = this.instruments.get(key);
     if (instrument) {
       // Remove from maps IMMEDIATELY so future triggers don't find it
+      untrackToneVoices(instrument);
       this.instruments.delete(key);
       this.instrumentSynthTypes.delete(key);
       this.instrumentLoadingPromises.delete(key);

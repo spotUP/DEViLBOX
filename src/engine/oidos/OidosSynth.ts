@@ -1,6 +1,7 @@
 import type { DevilboxSynth } from '@/types/synth';
 import type { OidosConfig } from '@typedefs/oidosInstrument';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { WasmVoiceHub, registerVoiceHub } from '@/engine/voiceStatus/wasmVoiceStatus';
 import { DEFAULT_OIDOS_CONFIG } from '@typedefs/oidosInstrument';
 
 /**
@@ -69,6 +70,9 @@ export class OidosSynth implements DevilboxSynth {
   readonly output: GainNode;
 
   private workletNode: AudioWorkletNode | null = null;
+  /** Live voice report for the editor curves' markers (wasmVoiceStatus.ts). */
+  readonly voiceHub = new WasmVoiceHub((m) => this.workletNode?.port.postMessage(m));
+  private readonly unregisterVoiceHub: () => void;
   private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
   private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
 
@@ -82,6 +86,7 @@ export class OidosSynth implements DevilboxSynth {
   constructor() {
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
+    this.unregisterVoiceHub = registerVoiceHub('OidosSynth', this.voiceHub);
 
     this._initPromise = new Promise<void>((resolve) => {
       this._resolveInit = resolve;
@@ -114,8 +119,10 @@ export class OidosSynth implements DevilboxSynth {
 
       // Handle messages from worklet
       this.workletNode.port.onmessage = (e) => {
+        if (this.voiceHub.handleMessage(e.data)) return;
         const { type, error } = e.data;
         if (type === 'ready') {
+          this.voiceHub.resume();
           // Send any pending params
           // Send pending params (from XRNS import)
           const hadPendingParams = this._pendingParams.length > 0;
@@ -284,6 +291,7 @@ export class OidosSynth implements DevilboxSynth {
   }
 
   dispose(): void {
+    this.unregisterVoiceHub();
     if (this._disposed) return;
     this._disposed = true;
 

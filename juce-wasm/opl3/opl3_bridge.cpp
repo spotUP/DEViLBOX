@@ -362,6 +362,51 @@ void oplProcess(float* outL, float* outR, int numSamples) {
     }
 }
 
+/**
+ * Envelope state of every chip channel, for the editor's live markers: 18 channels x 12 bytes at `out`.
+ *   [0]      1 when the channel holds a sounding voice (key on, or released and still ringing), else 0
+ *   [1]      MIDI note of the voice
+ *   [2]      modulator slot envelope stage (Nuked eg_gen: 0 attack, 1 decay, 2 sustain, 3 release)
+ *   [3]      carrier slot envelope stage
+ *   [4..5]   modulator eg_rout, uint16 LE: envelope attenuation 0 (full) .. 0x1FF (silent), 1/32 octave per unit
+ *   [6..7]   carrier eg_rout
+ *   [8..11]  voice age, uint32 LE: the note-on counter, so the newest voice has the largest value
+ * After the 18 channels: [216] tremolopos (0..209), [217] vibpos (0..7), [218..219] timer & 0x3FF (uint16 LE, the
+ * position inside one vibrato step), read from the same chip so the LFO curves' markers sit where the chip is.
+ * The slots are read straight from the Nuked chip (opl3_chip::channel[c].slotz[0|1]); nothing is estimated.
+ * Returns 220, or 0 before init.
+ */
+EMSCRIPTEN_KEEPALIVE
+int oplGetChannelEnvelopes(uint8_t* out) {
+    if (!g_opl || !g_opl->initialized || !out) return 0;
+    int n = 0;
+    for (int c = 0; c < NUM_CHANNELS; c++) {
+        const OplVoice& v = g_opl->voices[c];
+        const opl3_slot* mod = g_opl->chip.channel[c].slotz[0];
+        const opl3_slot* car = g_opl->chip.channel[c].slotz[1];
+        const bool ringing = v.active || (car->eg_rout & 0x1F8) != 0x1F8;
+        out[n++] = ringing ? 1 : 0;
+        out[n++] = v.midiNote;
+        out[n++] = mod->eg_gen;
+        out[n++] = car->eg_gen;
+        out[n++] = static_cast<uint8_t>(mod->eg_rout & 0xFF);
+        out[n++] = static_cast<uint8_t>(mod->eg_rout >> 8);
+        out[n++] = static_cast<uint8_t>(car->eg_rout & 0xFF);
+        out[n++] = static_cast<uint8_t>(car->eg_rout >> 8);
+        const uint32_t age = static_cast<uint32_t>(v.age);
+        out[n++] = static_cast<uint8_t>(age & 0xFF);
+        out[n++] = static_cast<uint8_t>((age >> 8) & 0xFF);
+        out[n++] = static_cast<uint8_t>((age >> 16) & 0xFF);
+        out[n++] = static_cast<uint8_t>((age >> 24) & 0xFF);
+    }
+    out[n++] = g_opl->chip.tremolopos;
+    out[n++] = g_opl->chip.vibpos;
+    const uint16_t timerLow = static_cast<uint16_t>(g_opl->chip.timer & 0x3FF);
+    out[n++] = static_cast<uint8_t>(timerLow & 0xFF);
+    out[n++] = static_cast<uint8_t>(timerLow >> 8);
+    return n;
+}
+
 EMSCRIPTEN_KEEPALIVE
 int oplGetActiveVoiceCount() {
     if (!g_opl) return 0;

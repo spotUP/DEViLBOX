@@ -1,4 +1,7 @@
 import type { SynthPanelLayout } from '@/types/synthPanel';
+import { tunefishCurves } from '@/components/instruments/curves/tunefishCurves';
+
+const curves = tunefishCurves();
 
 const fmtPct = (v: number) => `${Math.round(v * 100)}%`;
 const fmtOn = (v: number) => v >= 0.5 ? 'ON' : 'OFF';
@@ -59,6 +62,7 @@ export const TUNEFISH_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'LOWPASS',
+          curves: [curves.lp],
           columns: 3,
           controls: [
             { type: 'knob', key: 'lpFilterOn', label: 'ON', color: '#ff6633', min: 0, max: 1, defaultValue: 0, formatValue: fmtOn },
@@ -68,6 +72,7 @@ export const TUNEFISH_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'HIGHPASS',
+          curves: [curves.hp],
           columns: 3,
           controls: [
             { type: 'knob', key: 'hpFilterOn', label: 'ON', color: '#33ccff', min: 0, max: 1, defaultValue: 0, formatValue: fmtOn },
@@ -77,6 +82,7 @@ export const TUNEFISH_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'BANDPASS',
+          curves: [curves.bp],
           columns: 3,
           controls: [
             { type: 'knob', key: 'bpFilterOn', label: 'ON', color: '#ffcc33', min: 0, max: 1, defaultValue: 0, formatValue: fmtOn },
@@ -86,6 +92,7 @@ export const TUNEFISH_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'NOTCH',
+          curves: [curves.nt],
           columns: 3,
           controls: [
             { type: 'knob', key: 'ntFilterOn', label: 'ON', color: '#cc66ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtOn },

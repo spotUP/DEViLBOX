@@ -1,11 +1,19 @@
 import type { SynthPanelLayout } from '@/types/synthPanel';
+import { raffoCurves, raffoAttackSamples, raffoDecaySamples } from '@/components/instruments/curves/raffoCurves';
+import { audioSampleRate } from '@/components/instruments/curves/wasmSubtractiveModels';
+import { fmtMs as fmtMilliseconds } from '@/components/instruments/curves/commonCurveModels';
+
+const curves = raffoCurves();
 
 const fmtHz = (v: number) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)} Hz`;
-const fmtMs = (v: number) => `${Math.round(v)}ms`;
+// The engine's attack and decay knobs count samples ((knob + 2) * 100 and knob * 100 + 0.1), not milliseconds
+// (raffo_standalone.cpp ATTACK / DECAY macros): the label shows the real time at the audio context's rate.
+const fmtAttack = (v: number) => fmtMilliseconds((raffoAttackSamples(v) / audioSampleRate()) * 1000);
+const fmtDecay = (v: number) => fmtMilliseconds((raffoDecaySamples(v) / audioSampleRate()) * 1000);
 const fmtPct = (v: number) => `${Math.round(v * 100)}%`;
 
 const WAVE_OPTIONS = [
-  { value: '0', label: 'Saw' }, { value: '1', label: 'Tri' },
+  { value: '0', label: 'Triangle' }, { value: '1', label: 'Saw' },
   { value: '2', label: 'Square' }, { value: '3', label: 'Pulse' }, { value: '4', label: 'Off' },
 ];
 const RANGE_OPTIONS = [
@@ -19,6 +27,7 @@ export const RAFFO_LAYOUT: SynthPanelLayout = {
   sections: [
     {
       label: 'OSCILLATOR 1',
+      curves: [curves.oscillator],
       controls: [
         { type: 'toggle', key: 'oscButton0', label: 'ON', labels: ['OFF', 'ON'] },
         { type: 'select', key: 'wave0', label: 'WAVE', options: WAVE_OPTIONS },
@@ -59,6 +68,7 @@ export const RAFFO_LAYOUT: SynthPanelLayout = {
     },
     {
       label: 'FILTER',
+      curves: [curves.filter],
       controls: [
         { type: 'knob', key: 'filterCutoff', label: 'CUTOFF', color: '#ffcc00', min: 500, max: 10000, defaultValue: 3000, formatValue: fmtHz },
         { type: 'knob', key: 'filterResonance', label: 'RESO', color: '#ff6600', min: 0, max: 10, defaultValue: 3, formatValue: (v) => `${Math.round(v)}` },
@@ -66,18 +76,20 @@ export const RAFFO_LAYOUT: SynthPanelLayout = {
     },
     {
       label: 'FILTER ENVELOPE',
+      curves: [curves.filterEnv],
       controls: [
-        { type: 'knob', key: 'filterAttack', label: 'ATK', color: '#22c55e', min: 0, max: 1000, defaultValue: 200, formatValue: fmtMs },
-        { type: 'knob', key: 'filterDecay', label: 'DEC', color: '#22c55e', min: 0, max: 1000, defaultValue: 400, formatValue: fmtMs },
+        { type: 'knob', key: 'filterAttack', label: 'ATK', color: '#22c55e', min: 0, max: 1000, defaultValue: 200, formatValue: fmtAttack },
+        { type: 'knob', key: 'filterDecay', label: 'DEC', color: '#22c55e', min: 0, max: 1000, defaultValue: 400, formatValue: fmtDecay },
         { type: 'knob', key: 'filterSustain', label: 'SUS', color: '#22c55e', min: 0, max: 1, defaultValue: 0.7, formatValue: fmtPct },
         { type: 'knob', key: 'filterRelease', label: 'REL', color: '#22c55e', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
       ],
     },
     {
       label: 'AMP ENVELOPE',
+      curves: [curves.amp],
       controls: [
-        { type: 'knob', key: 'attack', label: 'ATK', color: '#ff3366', min: 10, max: 1000, defaultValue: 10, formatValue: fmtMs },
-        { type: 'knob', key: 'decay', label: 'DEC', color: '#ff3366', min: 0, max: 1000, defaultValue: 200, formatValue: fmtMs },
+        { type: 'knob', key: 'attack', label: 'ATK', color: '#ff3366', min: 10, max: 1000, defaultValue: 10, formatValue: fmtAttack },
+        { type: 'knob', key: 'decay', label: 'DEC', color: '#ff3366', min: 0, max: 1000, defaultValue: 200, formatValue: fmtDecay },
         { type: 'knob', key: 'sustain', label: 'SUS', color: '#ff3366', min: 0, max: 1, defaultValue: 0.8, formatValue: fmtPct },
         { type: 'knob', key: 'release', label: 'REL', color: '#ff3366', min: 0, max: 1, defaultValue: 0.4, formatValue: fmtPct },
       ],

@@ -17,6 +17,11 @@ class AMSynthProcessor extends AudioWorkletProcessor {
     this.lastHeapBuffer = null;
     this.initializing = false;
 
+    // Live voice report for the editor curves (src/engine/voiceStatus/wasmVoiceStatus.ts)
+    this.watchVoices = false;
+    this.voiceCounter = 0;
+    this.voicePtr = 0;
+
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
     };
@@ -68,6 +73,9 @@ class AMSynthProcessor extends AudioWorkletProcessor {
         if (this.engine) {
           this.module._amsynth_randomize(this.engine);
         }
+        break;
+      case 'watchVoices':
+        this.watchVoices = !!data.on;
         break;
       case 'getInfo':
         if (this.engine) {
@@ -215,6 +223,10 @@ class AMSynthProcessor extends AudioWorkletProcessor {
   }
 
   cleanup() {
+    if (this.module && this.voicePtr) {
+      this.module._free(this.voicePtr);
+      this.voicePtr = 0;
+    }
     if (this.module && this.engine) {
       this.module._amsynth_destroy(this.engine);
       this.engine = null;
@@ -275,7 +287,20 @@ class AMSynthProcessor extends AudioWorkletProcessor {
       this.port.postMessage({ type: 'audioLevel', peak, status: 'producing audio' });
     }
 
+    this.reportVoices();
     return true;
+  }
+
+  // 8 floats per voice slot, layout in wasmVoiceStatus.ts; every 6th block (about 60 reports a second)
+  reportVoices() {
+    if (!this.watchVoices || typeof this.module._amsynth_get_voices !== 'function') return;
+    if (++this.voiceCounter < 6) return;
+    this.voiceCounter = 0;
+    if (!this.voicePtr) this.voicePtr = this.module._malloc(16 * 8 * 4);
+    const n = this.module._amsynth_get_voices(this.engine, this.voicePtr, 16);
+    const heap = this.module.HEAPF32 || new Float32Array(this.module.wasmMemory.buffer);
+    const at = this.voicePtr >> 2;
+    this.port.postMessage({ type: 'voiceStatus', voices: heap.slice(at, at + n * 8) });
   }
 }
 

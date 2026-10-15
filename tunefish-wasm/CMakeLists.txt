@@ -70,6 +70,7 @@ if(EMSCRIPTEN)
                 \"_tunefish_render\",\
                 \"_tunefish_set_sample_rate\",\
                 \"_tunefish_get_num_params\",\
+                \"_tunefish_get_voices\",\
                 \"_malloc\",\
                 \"_free\"\
             ]' \

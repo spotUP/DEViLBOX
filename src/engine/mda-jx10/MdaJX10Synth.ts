@@ -13,6 +13,7 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import { WasmVoiceHub, registerVoiceHub } from '@/engine/voiceStatus/wasmVoiceStatus';
 
 /** Parameter indices matching the C++ mdaJX10 NPARAMS=24 */
 export const JX10Param = {
@@ -193,6 +194,9 @@ export class MdaJX10Synth implements DevilboxSynth {
   readonly output: GainNode;
 
   private _worklet: AudioWorkletNode | null = null;
+  /** Live voice report for the editor curves' markers (wasmVoiceStatus.ts). */
+  readonly voiceHub = new WasmVoiceHub((m) => this._worklet?.port.postMessage(m));
+  private readonly unregisterVoiceHub: () => void;
   private config: MdaJX10Config;
   private isInitialized = false;
   private pendingNotes: Array<{ note: number; velocity: number }> = [];
@@ -205,6 +209,7 @@ export class MdaJX10Synth implements DevilboxSynth {
   constructor(config: Partial<MdaJX10Config> = {}) {
     this.output = getDevilboxAudioContext().createGain();
     this.config = { ...DEFAULT_MDA_JX10, ...config };
+    this.unregisterVoiceHub = registerVoiceHub('MdaJX10', this.voiceHub);
     this._initPromise = this.initialize();
   }
 
@@ -254,8 +259,10 @@ export class MdaJX10Synth implements DevilboxSynth {
       });
 
       this._worklet.port.onmessage = (event) => {
+        if (this.voiceHub.handleMessage(event.data)) return;
         if (event.data.type === 'ready') {
           this.isInitialized = true;
+          this.voiceHub.resume();
           this.applyConfig(this.config);
           for (const { note, velocity } of this.pendingNotes) {
             this._worklet!.port.postMessage({ type: 'noteOn', note, velocity });
@@ -357,6 +364,7 @@ export class MdaJX10Synth implements DevilboxSynth {
   }
 
   dispose(): void {
+    this.unregisterVoiceHub();
     if (this._worklet) {
       this._worklet.port.postMessage({ type: 'dispose' });
       this._worklet.disconnect();

@@ -42,4 +42,9 @@ int raffo_get_num_params(void* h) {
     return static_cast<RaffoSynth*>(h)->getNumParams();
 }
 
+// Live voice report for the editor curves: 8 floats per voice, returns the voice count written.
+int raffo_get_voices(void* h, float* out, int maxVoices) {
+    return static_cast<RaffoSynth*>(h)->getVoices(out, maxVoices);
+}
+
 } // extern "C"

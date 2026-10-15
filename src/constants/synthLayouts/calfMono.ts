@@ -1,4 +1,7 @@
 import type { SynthPanelLayout } from '@/types/synthPanel';
+import { calfMonoCurves } from '@/components/instruments/curves/calfMonoCurves';
+
+const curves = calfMonoCurves();
 
 const fmtPct = (v: number) => `${Math.round(v * 100)}%`;
 const fmtHz = (v: number) => v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)} Hz`;
@@ -65,6 +68,7 @@ export const CALF_MONO_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'FILTER',
+          curves: [curves.filter],
           controls: [
             { type: 'select', key: 'filter', label: 'TYPE', options: FILTER_OPTIONS },
             { type: 'knob', key: 'cutoff', label: 'CUTOFF', color: '#ffcc00', min: 10, max: 16000, defaultValue: 2000, formatValue: fmtHz },
@@ -75,6 +79,7 @@ export const CALF_MONO_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'EG1 (FILTER)',
+          curves: [curves.eg1],
           controls: [
             { type: 'knob', key: 'adsrA', label: 'ATK', color: '#22c55e', min: 1, max: 20000, defaultValue: 5, formatValue: fmtMs },
             { type: 'knob', key: 'adsrD', label: 'DEC', color: '#22c55e', min: 10, max: 20000, defaultValue: 200, formatValue: fmtMs },
@@ -88,6 +93,7 @@ export const CALF_MONO_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'EG2 (MOD)',
+          curves: [curves.eg2],
           controls: [
             { type: 'knob', key: 'adsr2A', label: 'ATK', color: '#cc66ff', min: 1, max: 20000, defaultValue: 5, formatValue: fmtMs },
             { type: 'knob', key: 'adsr2D', label: 'DEC', color: '#cc66ff', min: 10, max: 20000, defaultValue: 200, formatValue: fmtMs },
@@ -107,6 +113,7 @@ export const CALF_MONO_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'LFO 1',
+          curves: [curves.lfo],
           controls: [
             { type: 'knob', key: 'lfoRate', label: 'RATE', color: '#9966ff', min: 0.01, max: 20, defaultValue: 2, formatValue: (v) => `${v.toFixed(1)} Hz` },
             { type: 'knob', key: 'lfoDelay', label: 'DELAY', color: '#9966ff', min: 0, max: 5, defaultValue: 0, formatValue: (v) => `${v.toFixed(1)}s` },
@@ -114,8 +121,9 @@ export const CALF_MONO_LAYOUT: SynthPanelLayout = {
             { type: 'knob', key: 'lfo2pitch', label: 'PITCH', color: '#cc66ff', min: 0, max: 1200, defaultValue: 0, formatValue: (v) => `${Math.round(v)} ct` },
             { type: 'knob', key: 'lfo2pw', label: 'PW', color: '#cc66ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'mwhl2lfo', label: 'MWHL', color: '#cc66ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
+            // the engine resets the LFO at note start when the value is 0 (calf_mono_standalone.cpp:338)
             { type: 'select', key: 'lfo1Trig', label: 'TRIG', options: [
-              { value: '0', label: 'Free' }, { value: '1', label: 'Retrig' },
+              { value: '0', label: 'Retrig' }, { value: '1', label: 'Free' },
             ]},
           ],
         },
@@ -125,7 +133,7 @@ export const CALF_MONO_LAYOUT: SynthPanelLayout = {
             { type: 'knob', key: 'lfo2Rate', label: 'RATE', color: '#06b6d4', min: 0.01, max: 20, defaultValue: 2, formatValue: (v) => `${v.toFixed(1)} Hz` },
             { type: 'knob', key: 'lfo2Delay', label: 'DELAY', color: '#06b6d4', min: 0.1, max: 5, defaultValue: 0.1, formatValue: (v) => `${v.toFixed(1)}s` },
             { type: 'select', key: 'lfo2Trig', label: 'TRIG', options: [
-              { value: '0', label: 'Free' }, { value: '1', label: 'Retrig' },
+              { value: '0', label: 'Retrig' }, { value: '1', label: 'Free' },
             ]},
           ],
         },

@@ -587,6 +587,37 @@ void monosynth_audio_module::note_off(int channel, int note, int vel)
     }
 }
 
+// Voice report (8 floats), the synth being monophonic one record: note, EG1 stage, EG1 value, seconds since the note
+// started (lfo_clock), the filter cutoff in Hz after envelopes, LFO and key follow (the member `cutoff`), EG2 value,
+// LFO 1 phase in cycles, EG2 stage. Stage codes: 0 attack 1 decay 2 sustain 3 release 4 off (an envelope that has
+// finished while the voice still runs reports release at level 0).
+static float calf_stage_code(const dsp::adsr &e, bool running)
+{
+    switch (e.state)
+    {
+    case dsp::adsr::ATTACK: return 0.f;
+    case dsp::adsr::DECAY: return 1.f;
+    case dsp::adsr::SUSTAIN: return 2.f;
+    case dsp::adsr::RELEASE:
+    case dsp::adsr::LOCKDECAY: return 3.f;
+    default: return running ? 3.f : 4.f;
+    }
+}
+
+int monosynth_audio_module::get_voices(float *out, int max_voices)
+{
+    if (max_voices < 1) return 0;
+    out[0] = running ? (float)last_key : -1.f;
+    out[1] = running ? calf_stage_code(envelope1, true) : 4.f;
+    out[2] = running ? (float)envelope1.value : 0.f;
+    out[3] = running ? lfo_clock : 0.f;
+    out[4] = cutoff;
+    out[5] = (float)envelope2.value;
+    out[6] = (float)(lfo1.phase / 4294967296.0);
+    out[7] = running ? calf_stage_code(envelope2, true) : 4.f;
+    return 1;
+}
+
 void monosynth_audio_module::end_note()
 {
     if (stack.count())

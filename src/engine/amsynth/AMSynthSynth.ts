@@ -14,6 +14,7 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import { WasmVoiceHub, registerVoiceHub } from '@/engine/voiceStatus/wasmVoiceStatus';
 
 /** Parameter indices matching AMSynth's controls.h kAmsynthParameter enum */
 export const AMSynthParam = {
@@ -335,6 +336,9 @@ export class AMSynthSynth implements DevilboxSynth {
   readonly output: GainNode;
 
   private _worklet: AudioWorkletNode | null = null;
+  /** Live voice report for the editor curves' markers (wasmVoiceStatus.ts). */
+  readonly voiceHub = new WasmVoiceHub((m) => this._worklet?.port.postMessage(m));
+  private readonly unregisterVoiceHub: () => void;
   private config: AMSynthConfig;
   private isInitialized = false;
   private pendingNotes: Array<{ note: number; velocity: number }> = [];
@@ -348,6 +352,7 @@ export class AMSynthSynth implements DevilboxSynth {
   constructor(config: Partial<AMSynthConfig> = {}) {
     this.output = getDevilboxAudioContext().createGain();
     this.config = { ...DEFAULT_AMSYNTH, ...config };
+    this.unregisterVoiceHub = registerVoiceHub('AMSynth', this.voiceHub);
     this._initPromise = this.initialize();
   }
 
@@ -397,9 +402,11 @@ export class AMSynthSynth implements DevilboxSynth {
       });
 
       this._worklet.port.onmessage = (event) => {
+        if (this.voiceHub.handleMessage(event.data)) return;
         if (event.data.type === 'ready') {
           console.log('[AMSynth] Worklet ready');
           this.isInitialized = true;
+          this.voiceHub.resume();
           this.applyConfig(this.config);
           for (const { note, velocity } of this.pendingNotes) {
             this._worklet!.port.postMessage({ type: 'noteOn', note, velocity });
@@ -497,6 +504,7 @@ export class AMSynthSynth implements DevilboxSynth {
   }
 
   dispose(): void {
+    this.unregisterVoiceHub();
     if (this._worklet) {
       this._worklet.port.postMessage({ type: 'dispose' });
       this._worklet.disconnect();

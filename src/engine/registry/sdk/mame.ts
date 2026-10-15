@@ -76,13 +76,15 @@ function getNormalizedVolume(synthType: string, configVolume: number | undefined
  * displayed the declared defaults, so a fresh instrument played with settings
  * no control reflected until a preset was picked.
  */
-export function applyChipParameters(synth: { setParam: (key: string, value: number) => void; loadPreset?: (index: number) => void }, config: InstrumentConfig): void {
+export function applyChipParameters(synth: { setParam: (key: string, value: number) => void; loadPreset?: (index: number) => void; applyStoredParameters?: (params: Record<string, unknown> | undefined) => void }, config: InstrumentConfig): void {
   const params = config.parameters;
   // A chip preset (_program) reprograms the chip wholesale, so it goes first
   // and the parameter writes below layer on top of it.
   if (typeof params?._program === 'number' && typeof synth.loadPreset === 'function') {
     synth.loadPreset(params._program);
   }
+  // Data a chip instrument carries itself (the CZ-101's own patch): after the preset, before the knobs
+  synth.applyStoredParameters?.(params);
   const resolved = resolveChipParameters(config.synthType, params);
   for (const [key, value] of Object.entries(resolved)) {
     synth.setParam(key, value);
