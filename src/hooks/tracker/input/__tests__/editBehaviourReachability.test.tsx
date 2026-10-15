@@ -49,6 +49,14 @@ describe('Edit behaviour reaches real effect-column key input', () => {
     expect(useCursorStore.getState().cursor).toMatchObject({ rowIndex: 5, columnType: 'effTyp', digitIndex: 0 });
   });
 
+  it('FT2 keymap + Follow keymap: C writes the command and lands one row down in the SAME column (ft2_edit.c:263)', () => {
+    const { handle } = setup('fasttracker2', 'follow-keymap');
+    press(handle, 'c');
+    const st = useTrackerStore.getState();
+    expect(st.patterns[st.currentPatternIndex].channels[0].rows[4].effTyp).toBe(0xC);
+    expect(useCursorStore.getState().cursor).toMatchObject({ rowIndex: 5, columnType: 'effTyp', digitIndex: 0 });
+  });
+
   it('explicit DEViLBOX default under the ProTracker keymap: C jumps to the parameter on the same row', () => {
     const { handle } = setup('protracker', 'devilbox');
     press(handle, 'c');

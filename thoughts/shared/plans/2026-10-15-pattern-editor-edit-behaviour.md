@@ -47,3 +47,5 @@ Manual (owner): LOCAL `http://localhost:5174/`, Settings > Keyboard: set ProTrac
 - Earlier ticks were premature: no tests existed. Now written and run: `nibbleAdvance.test.ts` (per-profile numbers), `entryAdvanceProfiles.test.ts` (resolution + migration), `hooks/tracker/input/__tests__/editBehaviourReachability.test.tsx` (the one reachability test through `useEffectInput`). Revert-check done: mapping ProTracker keymap -> devilbox fails the reachability test. All three added to `test:ci`.
 - Decision: `down` keeps the digit slot (PT2/FT2 never change `cursor.mode`); new `downFirstDigit` for the DEViLBOX default and IT, which start a fresh entry. `row` result now carries `digitIndex`.
 - Profiles done: devilbox, protracker, fasttracker2, impulse-tracker, openmpt. Open: Furnace (`effectCursorDir`), klystrack, GoatTracker/GTUltra, SID Factory II (canvas-owned format editors do not call `applyEntryAdvance`; not verifiable in the research table).
+
+- Owner decision 1 (2026-10-15): the FT2 keymap maps to the FastTracker 2 profile under Follow keyboard scheme (down in the same column, ft2_edit.c:263). DEViLBOX default stays selectable.

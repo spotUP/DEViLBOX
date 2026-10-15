@@ -12,10 +12,13 @@ describe('resolveEntryProfile', () => {
     expect(resolveEntryProfile({ choice: 'follow-keymap', keymap: 'impulse-tracker' }).id).toBe('impulse-tracker');
     expect(resolveEntryProfile({ choice: 'follow-keymap', keymap: 'openmpt' }).id).toBe('openmpt');
   });
-  it('follow-keymap: unverified keymaps and the FT2 keymap keep the DEViLBOX default', () => {
-    for (const k of ['fasttracker2', 'renoise', 'octamed', 'nonsense']) {
+  it('follow-keymap: unverified keymaps keep the DEViLBOX default', () => {
+    for (const k of ['renoise', 'octamed', 'nonsense']) {
       expect(resolveEntryProfile({ choice: 'follow-keymap', keymap: k }).id).toBe('devilbox');
     }
+  });
+  it('follow-keymap: the FT2 keymap gets FastTracker 2 behaviour', () => {
+    expect(resolveEntryProfile({ choice: 'follow-keymap', keymap: 'fasttracker2' }).id).toBe('fasttracker2');
   });
   it('an explicit choice beats the keymap', () => {
     expect(resolveEntryProfile({ choice: 'devilbox', keymap: 'protracker' }).id).toBe('devilbox');
