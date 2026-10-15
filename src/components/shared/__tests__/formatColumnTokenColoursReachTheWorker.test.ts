@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { toColumnSpec, type ColumnDef } from '../format-editor-types';
 
-const col = (color: string, emptyColor: string): ColumnDef => ({ key: 'cmd', label: 'Command', charWidth: 4, type: 'hex', color, emptyColor });
+const col = (color: string, emptyColor: string): ColumnDef => ({ key: 'cmd', label: 'Command', charWidth: 4, type: 'hex', color, emptyColor, emptyValue: 0, formatter: (v) => v.toString(16) });
 const rgb = (hex: number[]): number[] => hex.map((v) => v / 255);
 
 afterEach(() => {
