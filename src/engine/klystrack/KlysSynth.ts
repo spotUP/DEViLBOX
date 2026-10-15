@@ -8,6 +8,9 @@ import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { keyOnWholeSongPlayer } from '../wholeSongKeyboard';
 import { KlysEngine } from './KlysEngine';
+import { useFormatStore } from '@stores/useFormatStore';
+import { editKlysField } from '@/components/klystrack/klysInstrumentEdit';
+import { klysFieldByNksId, klysFieldFromNormalized, klysInstrumentIndex } from './klysInstrumentFields';
 
 export class KlysSynth implements DevilboxSynth {
   readonly name = 'KlysSynth';
@@ -15,12 +18,15 @@ export class KlysSynth implements DevilboxSynth {
 
   private engine: KlysEngine;
   private audioContext: AudioContext;
+  private readonly instrumentId: number;
   private _disposed = false;
 
   private static _engineConnectedToSynth = false;
   private _ownsEngineConnection = false;
 
-  constructor() {
+  /** @param instrumentId the InstrumentConfig id this synth stands for (instrument index = id - 1). */
+  constructor(instrumentId: number) {
+    this.instrumentId = instrumentId;
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
 
@@ -49,36 +55,25 @@ export class KlysSynth implements DevilboxSynth {
     this.engine.stop();
   }
 
+  /**
+   * A MIDI/NKS knob (`klystrack.<nksId>` or the bare id) edits THIS synth's instrument - the one the instrument
+   * panel shows - through the one edit path, so the store and the engine agree. The value is the knob's range:
+   * 0..1, or -1..1 for a signed field.
+   */
   set(param: string, value: number): void {
-    switch (param) {
-      case 'volume':
-        this.output.gain.value = Math.max(0, Math.min(1, value));
-        this.engine.setInstrumentParam(0, 10, Math.round(value * 128));
-        break;
-      case 'attack': this.engine.setInstrumentParam(0, 0, Math.round(value * 31)); break;
-      case 'decay': this.engine.setInstrumentParam(0, 1, Math.round(value * 31)); break;
-      case 'sustain': this.engine.setInstrumentParam(0, 2, Math.round(value * 31)); break;
-      case 'release': this.engine.setInstrumentParam(0, 3, Math.round(value * 31)); break;
-      case 'pulseWidth': this.engine.setInstrumentParam(0, 9, Math.round(value * 2047)); break;
-      case 'finetune': this.engine.setInstrumentParam(0, 7, Math.round(value * 127)); break;
-      case 'slideSpeed': this.engine.setInstrumentParam(0, 8, Math.round(value * 255)); break;
-      case 'cutoff': this.engine.setInstrumentParam(0, 16, Math.round(value * 2047)); break;
-      case 'resonance': this.engine.setInstrumentParam(0, 17, Math.round(value * 15)); break;
-      case 'vibratoSpeed': this.engine.setInstrumentParam(0, 12, Math.round(value * 255)); break;
-      case 'vibratoDepth': this.engine.setInstrumentParam(0, 13, Math.round(value * 255)); break;
-      case 'pwmSpeed': this.engine.setInstrumentParam(0, 14, Math.round(value * 255)); break;
-      case 'pwmDepth': this.engine.setInstrumentParam(0, 15, Math.round(value * 255)); break;
-      case 'fmMod': this.engine.setInstrumentParam(0, 24, Math.round(value * 127)); break;
-      case 'fmFeedback': this.engine.setInstrumentParam(0, 25, Math.round(value * 15)); break;
-    }
+    const hit = klysFieldByNksId(param.replace(/^klystrack\./, ''));
+    if (!hit || this._disposed) return;
+    editKlysField(klysInstrumentIndex(this.instrumentId), hit.key, klysFieldFromNormalized(hit.field, value));
   }
 
   get(param: string): number | undefined {
-    switch (param) {
-      case 'volume':
-        return this.output.gain.value;
-    }
-    return undefined;
+    const hit = klysFieldByNksId(param.replace(/^klystrack\./, ''));
+    const inst = useFormatStore.getState().klysNative?.instruments[klysInstrumentIndex(this.instrumentId)];
+    if (!hit || !inst) return undefined;
+    const { field } = hit;
+    const v = field.get(inst);
+    if (field.min < 0) return v < 0 ? v / -field.min : v / field.max;
+    return (v - field.min) / (field.max - field.min);
   }
 
   getEngine(): KlysEngine {

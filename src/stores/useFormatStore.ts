@@ -17,6 +17,7 @@ import type {
   HivelyNativeData,
   HivelyNativeStep,
   KlysNativeData,
+  KlysNativeInstrument,
   FurnaceSubsongPlayback,
   FurnaceModuleSample,
   FurnaceModuleWavetable,
@@ -43,6 +44,11 @@ import { gridOpensInScopeView } from '@/lib/tracker/gridOpensInScopeView';
 // pattern so getState() can be cast without `any`.
 import type { useTrackerStore as _TrackerStoreType } from './useTrackerStore';
 
+/** A plain deep copy of a klystrack instrument (the store hands out immer drafts). */
+function cloneKlysInstrument(i: KlysNativeInstrument): KlysNativeInstrument {
+  return { ...i, adsr: { ...i.adsr }, fm: { ...i.fm, adsr: { ...i.fm.adsr } }, program: [...i.program] };
+}
+
 /** Undo entry for a single Hively track step edit */
 export interface HivelyTrackStepUndoEntry {
   trackIndex: number;
@@ -51,6 +57,13 @@ export interface HivelyTrackStepUndoEntry {
   after: HivelyNativeStep;
   description: string;
   timestamp: number;
+}
+
+/** Undo entry for one klystrack instrument edit: the whole instrument before and after (a program is 32 words). */
+export interface KlysInstrumentUndoEntry {
+  index: number;
+  before: KlysNativeInstrument;
+  after: KlysNativeInstrument;
 }
 
 export interface FormatStore {
@@ -235,6 +248,10 @@ export interface FormatStore {
   hivelyUndoStack: HivelyTrackStepUndoEntry[];
   hivelyRedoStack: HivelyTrackStepUndoEntry[];
 
+  // Klystrack instrument edit undo/redo (src/components/klystrack/klysInstrumentEdit.ts is the only caller)
+  klysInstrumentUndoStack: KlysInstrumentUndoEntry[];
+  klysInstrumentRedoStack: KlysInstrumentUndoEntry[];
+
   setEditorMode: (mode: EditorMode) => void;
   setFurnaceNative: (data: FurnaceNativeData | null) => void;
   setFurnaceOrderEntry: (channel: number, position: number, patternIndex: number) => void;
@@ -293,6 +310,12 @@ export interface FormatStore {
   setKlysSequenceEntry: (channel: number, position: number, field: 'pattern' | 'noteOffset', value: number) => void;
   /** Set one field of a klystrack pattern step (note, instrument, ctrl, volume, command). */
   setKlysPatternStep: (patternIdx: number, stepIdx: number, field: 'note' | 'instrument' | 'ctrl' | 'volume' | 'command', value: number) => void;
+  /** Merge a patch into one klystrack instrument and push an undo entry (no-op when nothing changes). */
+  setKlysInstrument: (index: number, patch: Partial<KlysNativeInstrument>) => void;
+  /** Restore the instrument before the last edit; returns the entry, or null when there is nothing to undo. */
+  undoKlysInstrument: () => KlysInstrumentUndoEntry | null;
+  /** Re-apply the last undone instrument edit; returns the entry, or null. */
+  redoKlysInstrument: () => KlysInstrumentUndoEntry | null;
   /** Insert a new Klystrack sequence entry (copy of current or blank) at the given position */
   insertKlysSequenceEntry: (position: number) => void;
   /** Delete the Klystrack sequence entry at the given position across all channels */
@@ -646,6 +669,8 @@ export const useFormatStore = create<FormatStore>()(
     sidMetadata: null,
     hivelyUndoStack: [],
     hivelyRedoStack: [],
+    klysInstrumentUndoStack: [],
+    klysInstrumentRedoStack: [],
 
     setEditorMode: (mode) => set((state) => { state.editorMode = mode; }),
     setMaxTraxData: (data) => set((state) => { state.maxTraxData = data; state.maxTraxRev = 0; }),
@@ -927,6 +952,37 @@ export const useFormatStore = create<FormatStore>()(
         entry.noteOffset = Math.max(-128, Math.min(127, value));
       }
     }),
+    setKlysInstrument: (index, patch) => set((state) => {
+      const inst = state.klysNative?.instruments[index];
+      if (!inst) return;
+      const before = cloneKlysInstrument(inst);
+      Object.assign(inst, patch);
+      const after = cloneKlysInstrument(inst);
+      if (JSON.stringify(before) === JSON.stringify(after)) return;
+      state.klysInstrumentUndoStack.push({ index, before, after });
+      if (state.klysInstrumentUndoStack.length > 100) state.klysInstrumentUndoStack.shift();
+      state.klysInstrumentRedoStack = [];
+    }),
+    undoKlysInstrument: () => {
+      const entry = get().klysInstrumentUndoStack.at(-1);
+      if (!entry || !get().klysNative?.instruments[entry.index]) return null;
+      set((state) => {
+        state.klysInstrumentUndoStack.pop();
+        state.klysNative!.instruments[entry.index] = cloneKlysInstrument(entry.before);
+        state.klysInstrumentRedoStack.push(entry);
+      });
+      return entry;
+    },
+    redoKlysInstrument: () => {
+      const entry = get().klysInstrumentRedoStack.at(-1);
+      if (!entry || !get().klysNative?.instruments[entry.index]) return null;
+      set((state) => {
+        state.klysInstrumentRedoStack.pop();
+        state.klysNative!.instruments[entry.index] = cloneKlysInstrument(entry.after);
+        state.klysInstrumentUndoStack.push(entry);
+      });
+      return entry;
+    },
     setKlysPatternStep: (patternIdx, stepIdx, field, value) => set((state) => {
       const step = state.klysNative?.patterns[patternIdx]?.steps[stepIdx];
       if (!step) return;
@@ -1260,6 +1316,8 @@ export const useFormatStore = create<FormatStore>()(
           state.editorMode = 'klystrack';
           clearNative(state);
           state.klysNative = song.klysNative;
+          state.klysInstrumentUndoStack = [];
+          state.klysInstrumentRedoStack = [];
           state.klysFileData = song.klysFileData ?? null;
         } else if (song.tfmxNative) {
           newEditorMode = 'tfmx';
