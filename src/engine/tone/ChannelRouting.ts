@@ -1,6 +1,6 @@
 import * as Tone from 'tone';
 import type { InstrumentConfig } from '@typedefs/instrument';
-import type { DevilboxSynth } from '@typedefs/synth';
+import { isDevilboxSynth, type DevilboxSynth } from '@typedefs/synth';
 import { TrackerEnvelope } from '../TrackerEnvelope';
 import { getChannelEffectsManager } from '../ChannelEffectsManager';
 import { getChannelFilterManager } from '../ChannelFilterManager';
@@ -307,7 +307,11 @@ export function createVoice(ctx: ChannelRoutingContext, channelIndex: number, in
  */
 export function stopVoice(voice: VoiceState, time: number): void {
   if ((voice.instrument as any).stop) (voice.instrument as any).stop(time);
-  else if ((voice.instrument as any).triggerRelease) (voice.instrument as any).triggerRelease(time);
+  else if (isDevilboxSynth(voice.instrument)) {
+    // A DevilboxSynth takes (note?, time?). Tone's triggerRelease(time) put the time in the note slot:
+    // a DX7 received noteOff 84.13, never released the real note, and the voice kept sounding.
+    voice.instrument.triggerRelease?.(undefined, time);
+  } else if ((voice.instrument as any).triggerRelease) (voice.instrument as any).triggerRelease(time);
 
   // Dispose nodes after a short delay to allow for audio tail/clipping prevention
   setTimeout(() => {
