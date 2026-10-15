@@ -26,6 +26,7 @@ vi.mock('@/components/shared/SongOrderMatrix', () => ({
 import { KlysPositionEditor } from '@/components/klystrack/KlysPositionEditor';
 import { KlysEngine, klysTransform } from '@/engine/klystrack/KlysEngine';
 import { PlaybackCoordinator } from '@/engine/PlaybackCoordinator';
+import { PositionCallbacks } from '@/engine/wasm/PositionCallbacks';
 
 interface Posted { type?: string; songPosition?: number; patternPosition?: number; speed?: number; songLength?: number; channels?: number; sequences?: KlysNativeData['sequences']; songSpeed?: number; songSpeed2?: number; songRate?: number }
 
@@ -50,7 +51,7 @@ describe('klystrack follows its engine', () => {
     const dispatched: Array<{ row: number; position: number }> = [];
     coordinator.onRowChange = (row, _pattern, position) => dispatched.push({ row, position });
     const engine = Object.create(KlysEngine.prototype) as KlysEngine;
-    Object.assign(engine, { _positionCallbacks: new Set() });
+    Object.assign(engine, { _positions: new PositionCallbacks() });
     const unsub = engine.subscribeToCoordinator(coordinator);
 
     await w.send({ type: 'play' });
@@ -61,7 +62,7 @@ describe('klystrack follows its engine', () => {
       for (const m of (w.posted as unknown as Posted[]).splice(0)) {
         if (m.type !== 'position') continue;
         reports.push(m);
-        for (const cb of (engine as unknown as { _positionCallbacks: Set<(u: unknown) => void> })._positionCallbacks) cb(m);
+        (engine as unknown as { _positions: PositionCallbacks })._positions.emit({ songPos: m.songPosition, row: m.patternPosition });
       }
     }
     unsub();

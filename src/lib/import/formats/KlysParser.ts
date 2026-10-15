@@ -275,6 +275,60 @@ interface KlysBlockCarrier {
   blockRows: TrackerCell[][];
 }
 
+/** The fixed song header (MusSong in klystrack music.h), up to and including the title. */
+interface KlysHeader {
+  version: number;
+  numChannels: number;
+  numInstruments: number;
+  numPatterns: number;
+  numSequences: number[];
+  songLength: number;
+  loopPoint: number;
+  masterVolume: number;
+  songSpeed: number;
+  songSpeed2: number;
+  songRate: number;
+  flags: number;
+  title: string;
+}
+
+/**
+ * Read the song header the way mus_load_song_RW does. Field widths follow
+ * MusSong: time_signature and sequence_step are Uint16, song_rate is Uint8,
+ * flags is Uint32. (The display parse once read them as 8/8/16/16 bits, which
+ * shifted songLength to 0: the order list had one entry and the tracker
+ * rejected every position the engine reported.) Returns null on a bad
+ * signature or a newer version than this reader knows.
+ */
+function readKlysHeader(r: BinaryReader): KlysHeader | null {
+  if (r.readString(8) !== SONG_SIG) return null;
+  const version = r.readU8();
+  if (version > MUS_VERSION) return null;
+  const numChannels = version >= 6 ? r.readU8() : version > 3 ? 4 : 3;
+  r.skip(2); // time_signature (u16)
+  if (version >= 17) r.skip(2); // sequence_step (u16)
+  const numInstruments = r.readU8();
+  const numPatterns = r.readU16LE();
+  const numSequences: number[] = [];
+  for (let i = 0; i < numChannels; i++) numSequences.push(r.readU16LE());
+  const songLength = r.readU16LE();
+  const loopPoint = r.readU16LE();
+  const masterVolume = version >= 12 ? r.readU8() : 128;
+  const songSpeed = r.readU8();
+  const songSpeed2 = r.readU8();
+  const songRate = r.readU8();
+  const flags = version > 2 ? r.readU32LE() : 0;
+  if (version >= 9) r.skip(1); // multiplex_period
+  if (version >= 16) r.skip(1); // pitch_inaccuracy
+  let titleLen = 17; // old default
+  if (version >= 11) titleLen = r.readU8();
+  const title = version >= 5 ? r.readString(Math.min(titleLen, KLYS_SONG_TITLE_SIZE)) : '';
+  return {
+    version, numChannels, numInstruments, numPatterns, numSequences, songLength, loopPoint,
+    masterVolume, songSpeed, songSpeed2, songRate, flags, title,
+  };
+}
+
 /**
  * Fully parse a .kt file linearly to recover each pattern's real file offset/size
  * and decode its carrier rows. Returns null when the parse cannot be validated
@@ -284,29 +338,9 @@ function parseKlysBlocks(buf: ArrayBuffer): KlysBlockCarrier | null {
   try {
     const bytes = new Uint8Array(buf);
     const r = new BinaryReader(buf);
-    if (r.readString(8) !== SONG_SIG) return null;
-    const version = r.readU8();
-    if (version > MUS_VERSION) return null;
-
-    const numChannels = version >= 6 ? r.readU8() : version > 3 ? 4 : 3;
-    r.skip(2); // time_signature (u16)
-    if (version >= 17) r.skip(2); // sequence_step (u16)
-    const numInstruments = r.readU8();
-    const numPatterns = r.readU16LE();
-    const numSequences: number[] = [];
-    for (let i = 0; i < numChannels; i++) numSequences.push(r.readU16LE());
-    r.skip(2); // song_length
-    r.skip(2); // loop_point
-    if (version >= 12) r.skip(1); // master_volume
-    r.skip(1); // song_speed
-    r.skip(1); // song_speed2
-    r.skip(1); // song_rate (u8)
-    if (version > 2) r.skip(4); // flags (u32)
-    if (version >= 9) r.skip(1); // multiplex_period
-    if (version >= 16) r.skip(1); // pitch_inaccuracy
-    let titleLen = 17;
-    if (version >= 11) titleLen = r.readU8();
-    if (version >= 5) r.skip(Math.min(titleLen, KLYS_SONG_TITLE_SIZE)); // title
+    const header = readKlysHeader(r);
+    if (!header) return null;
+    const { version, numChannels, numInstruments, numPatterns, numSequences } = header;
 
     // FX buses. v>=10 stores an explicit count of serialized CydFxSerialized;
     // pre-v10 reverb (MUS_ENABLE_REVERB) is not exercised by modern fixtures and
@@ -372,79 +406,15 @@ function parseKlysBlocks(buf: ArrayBuffer): KlysBlockCarrier | null {
  */
 export function parseKlystrack(buf: ArrayBuffer): TrackerSong {
   const r = new BinaryReader(buf);
+  const header = readKlysHeader(r);
+  if (!header) throw new Error('Not a klystrack file, or a newer version than this reader supports');
+  const {
+    numChannels, numInstruments, numPatterns, songLength, loopPoint, masterVolume,
+    songSpeed, songSpeed2, songRate, flags, title,
+  } = header;
 
-  // Signature
-  const sig = r.readString(8);
-  if (sig !== SONG_SIG) {
-    throw new Error(`Not a klystrack file (sig: ${sig})`);
-  }
-
-  const version = r.readU8();
-  if (version > MUS_VERSION) {
-    throw new Error(`Unsupported klystrack version ${version} (max: ${MUS_VERSION})`);
-  }
-
-  // Number of channels
-  let numChannels: number;
-  if (version >= 6) {
-    numChannels = r.readU8();
-  } else {
-    numChannels = version > 3 ? 4 : 3;
-  }
-
-  // Time signature (advance read position)
-  r.readU8();
-
-  // Sequence step (tick subdivision)
-  if (version >= 17) {
-    r.readU8();
-  }
-
-  // Instrument/pattern/sequence counts
-  const numInstruments = r.readU8();
-  const numPatterns = r.readU16LE();
-  const numSequences: number[] = [];
-  for (let i = 0; i < numChannels; i++) {
-    numSequences.push(r.readU16LE());
-  }
-  const songLength = r.readU16LE();
-  const loopPoint = r.readU16LE();
-
-  let masterVolume = 128;
-  if (version >= 12) {
-    masterVolume = r.readU8();
-  }
-
-  const songSpeed = r.readU8();
-  const songSpeed2 = r.readU8();
-  const songRate = r.readU16LE();
-
-  let flags = 0;
-  if (version > 2) flags = r.readU16LE();
-
-  // Multiplex period (advance read position)
-  if (version >= 9) r.readU8();
-
-  // Pitch inaccuracy (advance read position)
-  if (version >= 16) r.readU8();
-
-  // Title
-  let titleLen = 17; // old default
-  if (version >= 11) {
-    titleLen = r.readU8();
-  }
-  let title = '';
-  if (version >= 5) {
-    title = r.readString(Math.min(titleLen, 64));
-  }
-
-  // FX buses (skip for now — complex and version-dependent)
-  if (version >= 10) {
-    r.readU8(); // nFx
-  }
-  // Skip FX data — it's loaded by WASM
-  // We can't easily skip it without parsing, so we'll stop header parsing here
-  // and rely on WASM for the rest.
+  // The rest (FX, instruments, sequences, patterns) is loaded by the WASM
+  // engine, whose songData replaces the stubs below.
 
   // Build a "slim" TrackerSong for the store.
   // Patterns/instruments/sequences will be populated from WASM after loading.
@@ -489,8 +459,9 @@ export function parseKlystrack(buf: ArrayBuffer): TrackerSong {
   // Song positions (global, maps to first channel's sequence — klystrack doesn't use global positions)
   const songPositions = Array.from({ length: Math.max(1, songLength) }, (_, i) => i % Math.max(1, numPatterns));
 
-  // BPM estimation from song_rate
-  const bpm = songRate > 0 ? Math.round((songRate * 60) / (songSpeed + songSpeed2 || 6)) : 125;
+  // song_rate is the player's tick rate in Hz; the tracker's tick rate is
+  // BPM * 2 / 5, so the BPM that ticks at song_rate is song_rate * 2.5.
+  const bpm = songRate > 0 ? Math.round(songRate * 2.5) : 125;
 
   // Pre-populate klysNative with stub data so KlysView has something to display
   // immediately. WASM onSongData callback will overwrite with real data when ready.
