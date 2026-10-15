@@ -10,6 +10,7 @@ import type { KlysNativeData } from '@/types/tracker';
 import { useFormatStore } from '@stores';
 import { SongOrderMatrix } from '@/components/shared/SongOrderMatrix';
 import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
+import { klysSequenceSteps, klysStepIndexAt } from './klysAdapter';
 
 export const KLYS_MATRIX_HEIGHT = 200;
 export const KLYS_MATRIX_COLLAPSED_HEIGHT = 28;
@@ -57,6 +58,7 @@ interface KlysPositionEditorProps {
   width: number;
   height: number;
   nativeData: KlysNativeData;
+  /** The song ROW playing (or edited): klystrack's song position unit. The matrix highlights the step holding it. */
   currentPosition: number;
   /** The song is playing: the matrix follows currentPosition, one step per pattern played. */
   isPlaying: boolean;
@@ -72,7 +74,6 @@ export const KlysPositionEditor: React.FC<KlysPositionEditorProps> = ({
   collapsed, onToggleCollapse,
 }) => {
   const numChannels = nativeData.channels;
-  const numPositions = nativeData.songLength;
 
   const setEntry = useFormatStore(s => s.setKlysSequenceEntry);
 
@@ -81,42 +82,39 @@ export const KlysPositionEditor: React.FC<KlysPositionEditorProps> = ({
     return [makePatternColumn(), makeOffsetColumn()];
   }, []);
 
+  // One matrix row per sequence step (the song rows where any channel starts a pattern).
+  const steps = useMemo(() => klysSequenceSteps(nativeData), [nativeData]);
+
   // Build FormatChannel[] — one channel per klystrack channel
   const formatChannels = useMemo<FormatChannel[]>(() => {
     const channels: FormatChannel[] = [];
     for (let ch = 0; ch < numChannels; ch++) {
-      const seq = nativeData.sequences[ch];
-      const rows = [];
-      for (let pos = 0; pos < numPositions; pos++) {
-        const entry = seq?.entries.find(e => e.position === pos);
-        if (entry) {
-          rows.push({
-            pattern: entry.pattern,
-            noteOffset: entry.noteOffset,
-          });
-        } else {
-          rows.push({
-            pattern: -1,  // sentinel for "no entry"
-            noteOffset: 0,
-          });
-        }
-      }
+      const byRow = new Map<number, { pattern: number; noteOffset: number }>();
+      for (const e of nativeData.sequences[ch]?.entries ?? []) byRow.set(e.position, e);
+      const rows = steps.map((songRow) => {
+        const entry = byRow.get(songRow);
+        return entry
+          ? { pattern: entry.pattern, noteOffset: entry.noteOffset }
+          : { pattern: -1, noteOffset: 0 }; // sentinel for "no entry"
+      });
       channels.push({
         label: `CH${(ch + 1).toString().padStart(2, '0')}`,
-        patternLength: numPositions,
+        patternLength: steps.length,
         rows,
       });
     }
     return channels;
-  }, [nativeData, numChannels, numPositions]);
+  }, [nativeData, numChannels, steps]);
 
   const handleCellChange = useCallback<OnCellChange>((channelIdx, rowIdx, columnKey, value) => {
+    const songRow = steps[rowIdx];
+    if (songRow === undefined) return;
     if (columnKey === 'pattern') {
-      setEntry(channelIdx, rowIdx, 'pattern', value);
+      setEntry(channelIdx, songRow, 'pattern', value);
     } else if (columnKey === 'noteOffset') {
-      setEntry(channelIdx, rowIdx, 'noteOffset', value);
+      setEntry(channelIdx, songRow, 'noteOffset', value);
     }
-  }, [setEntry]);
+  }, [setEntry, steps]);
 
   return (
     <SongOrderMatrix
@@ -125,7 +123,7 @@ export const KlysPositionEditor: React.FC<KlysPositionEditorProps> = ({
       height={height}
       formatColumns={formatColumns}
       formatChannels={formatChannels}
-      currentRow={currentPosition}
+      currentRow={klysStepIndexAt(steps, currentPosition)}
       isPlaying={isPlaying}
       onCellChange={handleCellChange}
       collapsed={collapsed}

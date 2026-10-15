@@ -162,3 +162,33 @@ export function klysToFormatChannels(
 
   return result;
 }
+/**
+ * The rows of the klystrack sequence matrix: every song row at which some
+ * channel's sequence starts a pattern, ascending (the union over channels).
+ *
+ * A klystrack sequence entry sits at a song ROW (KlysNativeSeqEntry.position),
+ * not at an order index, and songLength counts rows. A matrix with one row per
+ * song row is almost all empty slots - entries every 32/64 rows - and rides the
+ * play head one step per ROW; one row per sequence step shows every entry and
+ * steps once per pattern.
+ */
+export function klysSequenceSteps(nativeData: KlysNativeData): number[] {
+  const set = new Set<number>();
+  for (let ch = 0; ch < nativeData.channels; ch++) {
+    for (const e of nativeData.sequences[ch]?.entries ?? []) set.add(e.position);
+  }
+  if (set.size === 0) set.add(0);
+  return [...set].sort((a, b) => a - b);
+}
+
+/** The matrix row (index into `steps`) that holds song row `songRow`: the last step at or before it. */
+export function klysStepIndexAt(steps: readonly number[], songRow: number): number {
+  let lo = 0;
+  let hi = steps.length - 1;
+  if (hi < 0 || songRow < steps[0]) return 0;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (steps[mid] <= songRow) lo = mid; else hi = mid - 1;
+  }
+  return lo;
+}

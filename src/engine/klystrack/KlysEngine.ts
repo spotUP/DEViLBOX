@@ -277,6 +277,25 @@ export class KlysEngine extends WASMSingletonBase {
     return () => this._positionCallbacks.delete(cb);
   }
 
+  /**
+   * Drive the replayer's coordinator from the engine's own position: the
+   * playing row (channel 0's pattern step) and the song position, which in
+   * klystrack is the song ROW (g_mus.song_position; sequence entries and the
+   * parser's songPositions are indexed by it). With this wired the replayer
+   * skips its TS scheduler, which would otherwise tick the parser's stub song
+   * at its estimated BPM and write the transport row at the wrong rate.
+   */
+  subscribeToCoordinator(coordinator: import('@engine/PlaybackCoordinator').PlaybackCoordinator): () => void {
+    let lastRow = -1;
+    let lastPosition = -1;
+    return this.onPositionUpdate((update) => {
+      if (update.patternPosition === lastRow && update.songPosition === lastPosition) return;
+      lastRow = update.patternPosition;
+      lastPosition = update.songPosition;
+      coordinator.dispatchEnginePosition(update.patternPosition, update.songPosition);
+    });
+  }
+
   onSongEnd(cb: () => void): () => void {
     this._songEndCallbacks.add(cb);
     return () => this._songEndCallbacks.delete(cb);

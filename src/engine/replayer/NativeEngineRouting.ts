@@ -18,6 +18,7 @@ import { HivelyEngine } from '../hively/HivelyEngine';
 import type { UADEEngine } from '../uade/UADEEngine';
 import { uadeClassicLoad } from '../uade/uadeLoadArgs';
 import { MusicLineEngine } from '../musicline/MusicLineEngine';
+import type { KlysEngine } from '../klystrack/KlysEngine';
 import { C64SIDEngine } from '../C64SIDEngine';
 import { SF2Engine } from '../sf2/SF2Engine';
 import { SilenceDetector } from './SilenceDetector';
@@ -222,6 +223,8 @@ export interface NativeEngineStartResult {
   hivelyEngine: HivelyEngine | null;
   uadeEngine: UADEEngine | null;
   musicLineEngine: MusicLineEngine | null;
+  /** Klystrack reports its own position; the replayer dispatches it and skips the TS scheduler. */
+  klysEngine: KlysEngine | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -526,6 +529,7 @@ export async function startNativeEngines(
   let hivelyEngine: HivelyEngine | null = null;
   let uadeEngine: UADEEngine | null = null;
   let musicLineEngine: MusicLineEngine | null = null;
+  let klysEngine: KlysEngine | null = null;
 
   // Clean up any leftover silence detectors from a previous session
   for (const [, detector] of activeSilenceDetectors) {
@@ -615,6 +619,15 @@ export async function startNativeEngines(
         // Capture UADEEngine for position sync in TrackerReplayer
         if (desc.key === 'UADEEditable') {
           uadeEngine = instance as unknown as UADEEngine;
+        }
+
+        // Capture KlysEngine for position sync in TrackerReplayer (and the
+        // live row for DubRouter, as Hively does).
+        if (desc.key === 'Klystrack') {
+          klysEngine = instance as unknown as KlysEngine;
+          trackSubscription(klysEngine.onPositionUpdate((update) => {
+            reportEnginePosition(desc.key, update.patternPosition, update.songPosition);
+          }));
         }
 
         // Capture MusicLineEngine for position sync in TrackerReplayer
@@ -1025,7 +1038,7 @@ export async function startNativeEngines(
     }
   }
 
-  return { suppressNotes, c64SidEngine, sf2Engine, hivelyEngine, uadeEngine, musicLineEngine };
+  return { suppressNotes, c64SidEngine, sf2Engine, hivelyEngine, uadeEngine, musicLineEngine, klysEngine };
 }
 
 // ---------------------------------------------------------------------------
