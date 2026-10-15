@@ -359,3 +359,12 @@ Owner: estimated grids are useless; reverse each format to its real data. Work l
 - [ ] QUEUED NEXT (owner 2026-10-06): Modland download of bob4e.dum fetches no companion (/uade held only bob4e.dum; UADE asked bob4e.ins then bob4.ins). Owner: "is this a prefix/extension issue? both should be tried for all formats" - companion lookup (Modland download path and local) must try both naming forms (prefix: ins.x / smp.x; extension: x.ins / x.smp) and the shared-bank fallback, for every format in EXPECTED_PARTNER and the special cases. Audit table per format.
 
 - 2026-10-06 bob4e via Import dialog (local file, bank bob4.ins sits next to it in public/data/songs/formats): same failure. Root found: ImportModuleDialog.tsx:51 `getExpectedCompanion` hard-codes only TFMX (mdat./smpl.) and MFP (mfp./smp.) and never calls companionResolver (`expectedCompanionNames` / `resolveCompanions`). Three parallel lookups exist (ImportModuleDialog, companionFetch.gatherCompanions, companionDrop.pickCompanionsFromDrop). Fix = one resolver used by the dialog, Modland download and drop paths; both prefix and extension forms plus shared-bank fallback; dialog asks for the companion names the resolver expects.
+
+- 2026-10-06 keyboard-preview audit (agent ab31436b) landed: FC, SM1, SM2, RH, OctaMED, CoSo, SoundMon, Steve Turner, Future Player, Hively, TFMX (commits d0cfd1d7c ed6a60273 0846c43f0 73e5ef392 b5d1cc880 118d1b99b 8627b111b 9e0490659 b238b7ec1 5f8045cbc fd9529cb9). OPEN from it:
+  - Sampler base note C3=8287 Hz may sit one octave under grid (C-2 = period 428) for every Amiga Sampler instrument - unmeasured (createSamplerInstrument).
+  - SidMon 2: replayer preview sd2_note_on unreachable until SidMonSynth in NATIVE_AUDITION_SYNTHS + ToneEngine isWASMSynth (owner decision asked).
+  - No-op synth stubs, silent on keyboard: DigMug, DavidWhittaker, SonicArranger, InStereo1/2, DeltaMusic1/2, StartrekkerAM synth classes; TFMX Pro instruments.
+  - Whole-song synths start/stop the song on any key: KlysSynth, MaxTraxSynth, PreTrackerSynth, SymphonieSynth, UADESynth.
+  - Placeholder instruments: apb.dw shows 1 of 4, insects_in_space.jt 2 of 16.
+  - CoSo grid instrument omits track-table sound transpose (encoder inverts it).
+  - OctaMED vol-table F4/FA, wave-table F7 not modelled.
