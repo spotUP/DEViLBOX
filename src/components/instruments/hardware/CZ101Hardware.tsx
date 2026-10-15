@@ -80,7 +80,9 @@ const CZ101Button: React.FC<{
   onClick?: () => void;
   color?: 'gray' | 'orange';
   small?: boolean;
-}> = ({ label, active = false, onClick, color = 'gray', small = false }) => {
+  /** Fill the grid cell it sits in (the patch grids), instead of the width of its text. */
+  fill?: boolean;
+}> = ({ label, active = false, onClick, color = 'gray', small = false, fill = false }) => {
   const colorMap = {
     gray: active ? 'bg-dark-bgActive' : 'bg-dark-bgHover',
     orange: active ? 'bg-orange-500' : 'bg-orange-600',
@@ -89,7 +91,7 @@ const CZ101Button: React.FC<{
   return (
     <button
       onClick={onClick}
-      className={`${colorMap[color]} hover:brightness-110 text-text-primary ${small ? 'text-[8px] px-2 py-1' : 'text-[9px] px-3 py-1.5'} font-bold rounded border border-dark-border shadow-md transition-all ${active ? 'shadow-lg scale-95' : ''}`}
+      className={`${colorMap[color]} hover:brightness-110 text-text-primary ${small ? 'text-[8px] px-2 py-1' : 'text-[9px] px-3 py-1.5'} ${fill ? 'w-full truncate' : ''} font-bold rounded border border-dark-border shadow-md transition-all ${active ? 'shadow-lg scale-95' : ''}`}
     >
       {label}
     </button>
@@ -160,9 +162,9 @@ export const CZ101Hardware: React.FC<CZ101HardwareProps> = ({
         {/* Preset picker: the Init factory patch, and the User patches imported from SysEx dumps */}
         <div className="mb-4">
           <div className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-2 text-center">Factory</div>
-          <div className="flex flex-wrap gap-1 mb-3">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-1 mb-3">
             {CZ101_PRESET_BANK.map((entry, index) => (
-              <CZ101Button key={entry.patch.name} label={(entry.patch.name ?? '').toUpperCase()} small active={!activeUser && index === program} onClick={() => chooseFactory(index)} />
+              <CZ101Button key={entry.patch.name} label={(entry.patch.name ?? '').toUpperCase()} small fill active={!activeUser && index === program} onClick={() => chooseFactory(index)} />
             ))}
           </div>
           <div className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-2 text-center">User</div>
@@ -178,16 +180,16 @@ export const CZ101Hardware: React.FC<CZ101HardwareProps> = ({
                 No user patches yet. Load Casio CZ single-patch SysEx files (.syx from a CZ-101, CZ-1000, CZ-3000 or CZ-5000), or drop them here.
               </div>
             ) : (
-              <div className="flex flex-wrap gap-1 mb-2">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-1 mb-2">
                 {userPatches.map((entry) => (
-                  <CZ101Button key={entry.id} label={entry.name.toUpperCase()} small active={entry.id === userPatchId} onClick={() => chooseUser(entry.id)} />
+                  <CZ101Button key={entry.id} label={entry.name.toUpperCase()} small fill active={entry.id === userPatchId} onClick={() => chooseUser(entry.id)} />
                 ))}
               </div>
             )}
-            <div className="flex flex-wrap gap-1 justify-center">
-              <CZ101Button label="LOAD SYSEX FILE(S)..." color="orange" onClick={() => fileInput.current?.click()} />
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-1">
+              <CZ101Button label="LOAD SYSEX FILE(S)..." fill color="orange" onClick={() => fileInput.current?.click()} />
               {activeUser && (
-                <CZ101Button label="REMOVE THIS PATCH" small onClick={() => { removePatch(activeUser.id); chooseFactory(0); }} />
+                <CZ101Button label="REMOVE THIS PATCH" small fill onClick={() => { removePatch(activeUser.id); chooseFactory(0); }} />
               )}
             </div>
             <input ref={fileInput} type="file" accept=".syx,audio/sysex,application/octet-stream" multiple className="hidden" onChange={onFilesPicked} />
