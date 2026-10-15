@@ -10,6 +10,8 @@ import { useFormatStore } from '@stores/useFormatStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { KlysEngine } from '@/engine/klystrack/KlysEngine';
 import type { KlysNativeInstrument } from '@/types/tracker';
+import { klysInstrumentToEngine } from '@/engine/klystrack/klysSongData';
+import type { KlysPreset } from '@constants/klysPresets';
 import {
   KLYS_EMPTY_STEP,
   KLYS_EXEMPT_BITS,
@@ -179,4 +181,18 @@ export function undoKlysInstrumentEdit(): void {
 export function redoKlysInstrumentEdit(): void {
   flushKlysInstrumentEdits();
   applyHistory(useFormatStore.getState().redoKlysInstrument(), 'redo');
+}
+
+/**
+ * Replace the whole instrument with a factory preset: ONE store write (one undo entry) and ONE engine message
+ * (setInstrumentData, the exact inverse of the songData read), plus the instrument list name. A preset is a full
+ * instrument value, so nothing of the previous sound survives.
+ */
+export function applyKlysPreset(index: number, preset: KlysPreset): void {
+  const inst = current(index);
+  if (!inst) return;
+  const next: Inst = clone(preset.instrument);
+  queue(index, next);
+  engine()?.setInstrumentData(index, klysInstrumentToEngine(next));
+  useInstrumentStore.getState().updateInstrument(klysInstrumentId(index), { name: next.name });
 }

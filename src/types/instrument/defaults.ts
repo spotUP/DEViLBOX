@@ -296,6 +296,8 @@ export interface InstrumentConfig {
   chiptuneModule?: ChiptuneModuleConfig;
   // HivelyTracker / AHX instrument
   hively?: HivelyConfig;
+  // Klystrack factory preset chosen in the preset select (a request to apply the preset's instrument; never stored)
+  klysPresetId?: string;
   // PreTracker (synth tracker by Pink/Abyss)
   pretracker?: PreTrackerConfig;
   // Sawteeth (software synth tracker by Stansen/Sanity)
