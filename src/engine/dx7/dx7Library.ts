@@ -9,6 +9,7 @@
 export const DX7_LIBRARY_DIR = 'data/sysex/dx7/';
 
 export interface DX7LibraryBank {
+  collection?: string;
   file: string;
   name: string;
   author: string;
@@ -84,4 +85,33 @@ export function dx7LibrarySelectGroups(manifest: DX7LibraryManifest) {
       label: `${i + 1}. ${name}`,
     })),
   }));
+}
+
+export interface DX7LibraryMatch {
+  bank: DX7LibraryBank;
+  /** Voice indices (0..31) of the bank to list: all of them when the bank itself matches, else the voices that match. */
+  voices: number[];
+}
+
+/**
+ * The library narrowed by a filter box: every whitespace-separated word must appear (case-insensitive) in the bank
+ * name, collection, author or voice name. A bank whose own text matches every word lists all its voices; otherwise only
+ * the voices that match together with the bank text ("dexed bass" finds the bass voices of the Dexed banks).
+ */
+export function filterDX7Library(banks: readonly DX7LibraryBank[], query: string): DX7LibraryMatch[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const all = (b: DX7LibraryBank) => b.voices.map((_, i) => i);
+  if (words.length === 0) return banks.map(bank => ({ bank, voices: all(bank) }));
+  const matches: DX7LibraryMatch[] = [];
+  for (const bank of banks) {
+    const bankText = `${bank.name} ${bank.collection ?? ''} ${bank.author}`.toLowerCase();
+    if (words.every(w => bankText.includes(w))) { matches.push({ bank, voices: all(bank) }); continue; }
+    const voices: number[] = [];
+    bank.voices.forEach((name, i) => {
+      const text = `${bankText} ${name.toLowerCase()}`;
+      if (words.every(w => text.includes(w))) voices.push(i);
+    });
+    if (voices.length > 0) matches.push({ bank, voices });
+  }
+  return matches;
 }

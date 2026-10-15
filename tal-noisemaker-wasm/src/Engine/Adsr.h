@@ -171,6 +171,10 @@ public:
 		return returnValue;
 	}
 
+	// Editor voice report: stage code 0 attack 1 decay 2 sustain 3 release 4 done (the state machine in tick()).
+	int getStage() const { return state; }
+	float getReportedValue() const { return returnValue; }
+
 	bool isNotePlaying(bool noteOn)
 	{
 		return noteOn || actualValue > 0;

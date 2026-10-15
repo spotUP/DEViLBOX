@@ -6,6 +6,12 @@
 
 import type { InstrumentPreset } from '@typedefs/instrument';
 import { FurnaceChipType } from '../engine/chips/FurnaceChipEngine';
+import { op, disabledOp } from './furnacePresets';
+
+const noMacros = { macros: [] as never[], opMacros: [] as never[], wavetables: [] as never[] };
+const twoOp = (mod: Parameters<typeof op>[0], car: Parameters<typeof op>[0]) => ({
+  ops: 2, operators: [op(mod), op(car), disabledOp(), disabledOp()], ...noMacros,
+});
 
 export const FURNACE_CHIP_PRESETS: InstrumentPreset['config'][] = [
   // === NES (2A03) ===
@@ -217,7 +223,7 @@ export const FURNACE_CHIP_PRESETS: InstrumentPreset['config'][] = [
     volume: -8,
     pan: 0,
     effects: [],
-    furnace: { chipType: FurnaceChipType.OPL3, algorithm: 0, feedback: 6 }
+    furnace: { chipType: FurnaceChipType.OPL3, algorithm: 0, feedback: 6, ...twoOp({ mult: 1, tl: 22, ar: 15, dr: 6, sl: 4, rr: 6 }, { mult: 1, tl: 0, ar: 15, dr: 5, sl: 3, rr: 7 }) }
   },
   {
     name: 'OPL3 FM Strings',
@@ -226,7 +232,7 @@ export const FURNACE_CHIP_PRESETS: InstrumentPreset['config'][] = [
     volume: -10,
     pan: 0,
     effects: [],
-    furnace: { chipType: FurnaceChipType.OPL3, algorithm: 1, feedback: 2 }
+    furnace: { chipType: FurnaceChipType.OPL3, algorithm: 1, feedback: 2, ...twoOp({ mult: 1, tl: 8, ar: 10, dr: 3, sl: 2, rr: 6 }, { mult: 2, tl: 8, ar: 9, dr: 3, sl: 2, rr: 7 }) }
   },
   {
     name: 'OPL3 FM Brass',
@@ -235,7 +241,7 @@ export const FURNACE_CHIP_PRESETS: InstrumentPreset['config'][] = [
     volume: -10,
     pan: 0,
     effects: [],
-    furnace: { chipType: FurnaceChipType.OPL3, algorithm: 0, feedback: 4 }
+    furnace: { chipType: FurnaceChipType.OPL3, algorithm: 0, feedback: 4, ...twoOp({ mult: 1, tl: 25, ar: 12, dr: 5, sl: 5, rr: 6 }, { mult: 1, tl: 0, ar: 14, dr: 4, sl: 3, rr: 8 }) }
   },
 
   // === AMIGA PAULA ===
@@ -746,7 +752,7 @@ export const FURNACE_CHIP_PRESETS: InstrumentPreset['config'][] = [
     volume: -10,
     pan: 0,
     effects: [],
-    furnace: { chipType: FurnaceChipType.OPL4, algorithm: 4, feedback: 2 }
+    furnace: { chipType: FurnaceChipType.OPL4, algorithm: 0, feedback: 2, ...twoOp({ mult: 4, tl: 28, ar: 15, dr: 7, sl: 5, rr: 7 }, { mult: 1, tl: 0, ar: 15, dr: 5, sl: 4, rr: 7 }) }
   },
   {
     name: 'VRC7 FM Brass',
@@ -755,7 +761,7 @@ export const FURNACE_CHIP_PRESETS: InstrumentPreset['config'][] = [
     volume: -10,
     pan: 0,
     effects: [],
-    furnace: { chipType: FurnaceChipType.OPLL, algorithm: 0, feedback: 4 }
+    furnace: { chipType: FurnaceChipType.OPLL, opllPreset: 0, algorithm: 0, feedback: 4, ...twoOp({ mult: 1, tl: 25, ar: 12, dr: 5, sl: 5, rr: 6 }, { mult: 1, tl: 0, ar: 14, dr: 4, sl: 3, rr: 8 }) }
   },
 
   // === Missing Furnace chips — init presets ===

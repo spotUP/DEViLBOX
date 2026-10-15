@@ -69,7 +69,7 @@ const PARAM_MAP = [
   [63, 'detune'],  // 43: PAD_DETUNE
   [67, 'raw4'],    // 44: PAD_QUALITY
   // Global filter (TS 45-54)
-  [70, 'raw8'],    // 45: FILTER_TYPE
+  [70, 'index'],   // 45: FILTER_TYPE -> Ptype, the analog filter type index 0..8 (LPF1 HPF1 LPF2 HPF2 BPF2 NOTCH2 PEAK2 LOSHELF2 HISHELF2)
   [72, 'uni'],     // 46: FILTER_CUTOFF
   [73, 'uni'],     // 47: FILTER_RESONANCE
   [94, 'uni'],     // 48: FILTER_ENV_AMOUNT -> P_FILTENV_DEPTH
@@ -113,6 +113,7 @@ function transformValue(value, type) {
     }
     case 'detune': return 8192 + value * 8191;        // -1..1 -> 0..16383 (fine detune)
     case 'wave': return Math.round(value);             // waveform index
+    case 'index': return Math.round(value);            // a choice stored as its index
     case 'raw4': return Math.round(value * 3);         // 0..3 range
     case 'raw8': return Math.round(value * 7);         // 0..7 range
     default: return value * 127;
@@ -127,6 +128,10 @@ class ZynAddSubFXProcessor extends AudioWorkletProcessor {
     this.module = null;
     this.leftPtr = 0;
     this.rightPtr = 0;
+    // Live voice report for the editor curves (src/engine/voiceStatus/wasmVoiceStatus.ts): 8 floats per sounding note
+    this.watchVoices = false;
+    this.voiceCounter = 0;
+    this.voicePtr = 0;
     this.port.onmessage = (e) => this.handleMessage(e.data);
   }
 
@@ -209,6 +214,9 @@ class ZynAddSubFXProcessor extends AudioWorkletProcessor {
         }
         break;
       }
+      case 'watchVoices':
+        this.watchVoices = !!data.on;
+        break;
       case 'noteOn':
         if (this.ready) this.module._zasfx_note_on(this.instance, data.note, data.velocity);
         break;
@@ -268,6 +276,8 @@ class ZynAddSubFXProcessor extends AudioWorkletProcessor {
           this.module._zasfx_destroy(this.instance);
           if (this.leftPtr) this.module._free(this.leftPtr);
           if (this.rightPtr) this.module._free(this.rightPtr);
+          if (this.voicePtr) this.module._free(this.voicePtr);
+          this.voicePtr = 0;
           this.instance = null;
           this.ready = false;
         }
@@ -297,7 +307,20 @@ class ZynAddSubFXProcessor extends AudioWorkletProcessor {
       left[i] = heap[lo + i] * gain;
       right[i] = heap[ro + i] * gain;
     }
+    this.reportVoices(heap);
     return true;
+  }
+
+  // every 6th block (about 60 reports a second); 8 floats per sounding ADDsynth note, layout in zasfx_get_voices
+  reportVoices(heap) {
+    if (!this.watchVoices || typeof this.module._zasfx_get_voices !== 'function') return;
+    if (++this.voiceCounter < 6) return;
+    this.voiceCounter = 0;
+    const STRIDE = 8, MAX_VOICES = 8;
+    if (!this.voicePtr) this.voicePtr = this.module._malloc(MAX_VOICES * STRIDE * 4);
+    const n = this.module._zasfx_get_voices(this.instance, this.voicePtr, MAX_VOICES);
+    const at = this.voicePtr >> 2;
+    this.port.postMessage({ type: 'voiceStatus', voices: heap.slice(at, at + n * STRIDE) });
   }
 }
 

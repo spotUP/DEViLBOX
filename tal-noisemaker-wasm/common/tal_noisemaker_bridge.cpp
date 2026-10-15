@@ -26,14 +26,18 @@ struct TalNoiseMakerWrapper {
         // Load default parameter values (matching TalPreset defaults)
         for (int i = 0; i < NUMPARAM; i++) params[i] = 0.0f;
 
+        // Choice parameters are NORMALISED (item k of n at (k - 1) / (n - 1), AudioUtils::calcComboBoxValue), so the first
+        // item is 0.0. The defaults below used to be 1.0, which selects the LAST item: filter type 12 (bypass), the noise
+        // oscillator, the last LFO destinations and, worst, envelope editor destination VOLUME with an empty envelope,
+        // which silenced the default patch completely.
         params[VOLUME] = 0.5f;
-        params[FILTERTYPE] = 1.0f;
+        params[FILTERTYPE] = 0.0f;
         params[CUTOFF] = 1.0f;
         params[OSC1VOLUME] = 0.8f;
         params[OSC2VOLUME] = 0.0f;
         params[OSC3VOLUME] = 0.8f;
-        params[OSC1WAVEFORM] = 1.0f;
-        params[OSC2WAVEFORM] = 1.0f;
+        params[OSC1WAVEFORM] = 0.0f;
+        params[OSC2WAVEFORM] = 0.0f;
         params[OSCMASTERTUNE] = 0.5f;
         params[OSC1TUNE] = 0.25f;
         params[OSC2TUNE] = 0.5f;
@@ -43,21 +47,21 @@ struct TalNoiseMakerWrapper {
         params[FILTERSUSTAIN] = 1.0f;
         params[AMPSUSTAIN] = 1.0f;
         params[VOICES] = 1.0f;
-        params[PORTAMENTOMODE] = 1.0f;
+        params[PORTAMENTOMODE] = 0.0f;
         params[LFO1AMOUNT] = 0.5f;
         params[LFO2AMOUNT] = 0.5f;
-        params[LFO1DESTINATION] = 1.0f;
-        params[LFO2DESTINATION] = 1.0f;
+        params[LFO1DESTINATION] = 0.0f;
+        params[LFO2DESTINATION] = 0.0f;
         params[OSC1PW] = 0.5f;
         params[OSC1PHASE] = 0.5f;
         params[TRANSPOSE] = 0.5f;
-        params[FREEADDESTINATION] = 1.0f;
+        params[FREEADDESTINATION] = 0.0f;
         params[REVERBDECAY] = 0.5f;
         params[REVERBLOWCUT] = 1.0f;
         params[REVERBHIGHCUT] = 0.0f;
         params[OSCBITCRUSHER] = 1.0f;
-        params[ENVELOPEEDITORDEST1] = 1.0f;
-        params[ENVELOPEEDITORSPEED] = 1.0f;
+        params[ENVELOPEEDITORDEST1] = 0.0f;
+        params[ENVELOPEEDITORSPEED] = 0.0f;
 
         // Apply all defaults to engine
         for (int i = 0; i < NUMPARAM; i++) {
@@ -223,6 +227,11 @@ void tal_nm_pitch_bend(void* ptr, int value) {
     auto* w = static_cast<TalNoiseMakerWrapper*>(ptr);
     float normalized = (value - 8192.0f) / (16383.0f * 0.5f);
     w->engine->setPitchwheelAmount(normalized);
+}
+
+// Live voice report for the editor curves: 12 floats per sounding voice, returns the voice count written.
+int tal_nm_get_voices(void* ptr, float* out, int maxVoices) {
+    return static_cast<TalNoiseMakerWrapper*>(ptr)->engine->getVoices(out, maxVoices);
 }
 
 void tal_nm_set_bpm(void* ptr, float bpmVal) {

@@ -85,6 +85,16 @@ function instrumentOf(name: string, spec: Spec): KlysNativeInstrument {
   };
 }
 
+/**
+ * The instrument a new standalone klystrack instrument starts as: a plain pulse voice with a short envelope that holds
+ * while the key is down, sounding at once (the engine's own default, mus_get_default_instrument, is a triangle).
+ */
+export function klysInitInstrument(): KlysNativeInstrument {
+  return instrumentOf('Klystrack', {
+    cydflags: WAVE.pulse, flags: INST.setPulseWidth, pw: 1536, adsr: { a: 1, d: 10, s: 24, r: 8 },
+  });
+}
+
 const bank: KlysPreset[] = [];
 function add(category: KlysPresetCategory, shape: KlysPresetShape, name: string, note: number, spec: Spec): void {
   bank.push({ name, category, shape, note, instrument: instrumentOf(name, spec) });

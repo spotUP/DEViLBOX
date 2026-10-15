@@ -39,6 +39,9 @@ export const klysInstrumentIndex = (id: number): number => id - 1;
  */
 export const klysNoteFromMidi = (midi: number): number => Math.max(0, Math.min(95, Math.round(midi) - 12));
 /** InstrumentConfig id of an instrument index. */
+/** The instrument index the engine's voice and program reports give the standalone preview copy (KlysWrapper.c). */
+export const KLYS_PREVIEW_INSTRUMENT_INDEX = 0xfe;
+
 export const klysInstrumentId = (index: number): number => index + 1;
 
 type Inst = KlysNativeInstrument;

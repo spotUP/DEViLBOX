@@ -795,12 +795,59 @@ static void save_instrument(BufWriter *w, const MusInstrument *inst)
 /* Serialize the in-memory song to the caller-provided buffer.
  * Returns the number of bytes written (or needed if buf is too small).
  * Call with outBuf=NULL, maxBytes=0 to query required size. */
+static int read_instrument_data(MusInstrument *inst, const void *buf, int len);
+static int save_song_of(MusSong *song, Uint8 *outBuf, int maxBytes);
+
 EMSCRIPTEN_KEEPALIVE
 int klys_save_song(Uint8 *outBuf, int maxBytes)
 {
     if (!g_song_loaded) return 0;
+    return save_song_of(&g_song, outBuf, maxBytes);
+}
 
-    MusSong *song = &g_song;
+/*
+ * The export of a song plus standalone instruments: the loaded song with `extraCount` instruments appended to its
+ * table (each KLYS_INSTRUMENT_DATA_BYTES long, the klys_set_instrument_data layout) and every pattern step's
+ * instrument number passed through remap[256] (NULL = unchanged). The live song is never touched: the writer runs on
+ * a copy whose instrument table and pattern steps are private. Returns bytes written (or needed for outBuf NULL).
+ */
+#define KLYS_INSTRUMENT_DATA_BYTES 147
+EMSCRIPTEN_KEEPALIVE
+int klys_save_song_extended(Uint8 *outBuf, int maxBytes, const void *extra, int extraCount, const Uint8 *remap)
+{
+    if (!g_song_loaded || extraCount < 0 || g_song.num_instruments + extraCount > 255) return 0;
+
+    MusSong tmp = g_song;
+    tmp.num_instruments = (Uint8)(g_song.num_instruments + extraCount);
+    tmp.instrument = (MusInstrument *)calloc(tmp.num_instruments ? tmp.num_instruments : 1, sizeof(MusInstrument));
+    if (g_song.num_instruments) memcpy(tmp.instrument, g_song.instrument, g_song.num_instruments * sizeof(MusInstrument));
+    for (int i = 0; i < extraCount; i++) {
+        MusInstrument *inst = &tmp.instrument[g_song.num_instruments + i];
+        mus_get_default_instrument(inst);
+        read_instrument_data(inst, (const Uint8 *)extra + i * KLYS_INSTRUMENT_DATA_BYTES, KLYS_INSTRUMENT_DATA_BYTES);
+    }
+    tmp.pattern = (MusPattern *)calloc(g_song.num_patterns ? g_song.num_patterns : 1, sizeof(MusPattern));
+    for (int p = 0; p < g_song.num_patterns; p++) {
+        tmp.pattern[p] = g_song.pattern[p];
+        int n = g_song.pattern[p].num_steps;
+        tmp.pattern[p].step = (MusStep *)calloc(n ? n : 1, sizeof(MusStep));
+        if (n) memcpy(tmp.pattern[p].step, g_song.pattern[p].step, n * sizeof(MusStep));
+        if (remap) for (int s = 0; s < n; s++) {
+            if (tmp.pattern[p].step[s].instrument != MUS_NOTE_NO_INSTRUMENT)
+                tmp.pattern[p].step[s].instrument = remap[tmp.pattern[p].step[s].instrument];
+        }
+    }
+
+    int r = save_song_of(&tmp, outBuf, maxBytes);
+
+    for (int p = 0; p < g_song.num_patterns; p++) free(tmp.pattern[p].step);
+    free(tmp.pattern);
+    free(tmp.instrument);
+    return r;
+}
+
+static int save_song_of(MusSong *song, Uint8 *outBuf, int maxBytes)
+{
     CydWavetableEntry *wt = g_cyd.wavetable_entries;
 
     BufWriter w;
@@ -1085,11 +1132,10 @@ int klys_set_instrument_program_step(int idx, int step, int value)
  * the name are written only when the buffer holds all of them). Returns the
  * bytes consumed, 0 for a bad index or no song.
  */
-static int set_instrument_data(int idx, const void *buf, int len)
+static int read_instrument_data(MusInstrument *inst, const void *buf, int len)
 {
-    if (!g_song_loaded || idx < 0 || idx >= g_song.num_instruments || !buf || len <= 0) return 0;
+    if (!inst || !buf || len <= 0) return 0;
 
-    MusInstrument *inst = &g_song.instrument[idx];
     const Uint8 *in = (const Uint8 *)buf;
     int pos = 0;
 
@@ -1149,6 +1195,67 @@ static int set_instrument_data(int idx, const void *buf, int len)
 #undef RD16
 #undef RD32
     return pos;
+}
+
+static int set_instrument_data(int idx, const void *buf, int len)
+{
+    if (!g_song_loaded || idx < 0 || idx >= g_song.num_instruments) return 0;
+    return read_instrument_data(&g_song.instrument[idx], buf, len);
+}
+
+/*
+ * Standalone instruments (a synth instrument that belongs to no klystrack song): one engine-owned instrument value,
+ * auditioned on the spare channel whatever song (or none) is loaded. klys_new_song gives the engine an empty song
+ * only when none is loaded, so the audition path (decode, tick callback) has something to run on.
+ */
+/* The index the voice/program reports give the standalone preview instrument (a song's own are 0..126). */
+#define KLYS_PREVIEW_INSTRUMENT_INDEX 0xFE
+static MusInstrument g_preview_inst;
+static int g_preview_inst_set = 0;
+
+EMSCRIPTEN_KEEPALIVE
+int klys_new_song(void)
+{
+    if (!g_initialized) return 0;
+    if (g_song_loaded) return 1; /* a real song is loaded: it stays */
+    memset(&g_song, 0, sizeof(g_song));
+    g_song.num_channels = 4;
+    g_song.song_rate = 50;
+    g_song.song_speed = 6;
+    g_song.song_speed2 = 6;
+    g_song.master_volume = 128;
+    g_song.time_signature = 0x0404;
+    g_song.sequence_step = 16;
+    for (int i = 0; i < MUS_MAX_CHANNELS; i++) g_song.default_volume[i] = MAX_VOLUME;
+    g_song_loaded = 1;
+    g_song_ended = 0;
+    cyd_set_callback(&g_cyd, mus_advance_tick, &g_mus, g_song.song_rate);
+    mus_set_song(&g_mus, &g_song, 0);
+    g_song_attached = 1;
+    g_playing = 0;
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int klys_set_preview_instrument(const void *buf, int len)
+{
+    if (!g_preview_inst_set) { mus_get_default_instrument(&g_preview_inst); g_preview_inst_set = 1; }
+    int n = read_instrument_data(&g_preview_inst, buf, len);
+    if (n > 0) refresh_live_channels(&g_preview_inst);
+    return n;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int klys_preview_note_on_data(int note)
+{
+    if (!g_initialized || !g_song_loaded || !g_preview_inst_set) return 0;
+    if (g_song.num_channels > KLYS_PREVIEW_CHANNEL) return 0;
+    if (note < 0) note = 0;
+    if (note > 95) note = 95;
+    g_mus.channel[KLYS_PREVIEW_CHANNEL].volume = MAX_VOLUME;
+    mus_trigger_instrument(&g_mus, KLYS_PREVIEW_CHANNEL, &g_preview_inst, (Uint16)(note << 8), -1);
+    g_preview = 1;
+    return 1;
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -1243,8 +1350,9 @@ int klys_get_channel_program(void *out, int maxCh)
     Uint8 *o = (Uint8 *)out;
     for (int c = 0; c < n; c++) {
         const MusChannel *chn = &g_mus.channel[c];
-        int ix = chn->instrument ? (int)(chn->instrument - g_song.instrument) : -1;
-        int ok = ix >= 0 && ix < g_song.num_instruments;
+        int isPrev = chn->instrument == &g_preview_inst;
+        int ix = isPrev ? KLYS_PREVIEW_INSTRUMENT_INDEX : chn->instrument ? (int)(chn->instrument - g_song.instrument) : -1;
+        int ok = isPrev || (ix >= 0 && ix < g_song.num_instruments);
         o[0] = ok ? (Uint8)ix : 0xFF;
         o[1] = ok ? chn->program_counter : 0;
         o[2] = ok ? chn->program_tick : 0;
@@ -1278,8 +1386,9 @@ int klys_get_channel_voice(void *out, int maxCh)
         const MusChannel *chn = &g_mus.channel[c];
         const CydChannel *cc = &g_cyd.channel[c];
         const MusTrackStatus *ts = &g_mus.song_track[c];
-        int ix = chn->instrument ? (int)(chn->instrument - g_song.instrument) : -1;
-        int ok = ix >= 0 && ix < g_song.num_instruments;
+        int isPrev = chn->instrument == &g_preview_inst;
+        int ix = isPrev ? KLYS_PREVIEW_INSTRUMENT_INDEX : chn->instrument ? (int)(chn->instrument - g_song.instrument) : -1;
+        int ok = isPrev || (ix >= 0 && ix < g_song.num_instruments);
         Uint32 env = cc->adsr.envelope;
         Uint32 lvl = (cc->flags & CYD_CHN_ENABLE_YM_ENV) ? 0 : (env >> 8);
         if (lvl > 0xFFFF) lvl = 0xFFFF;

@@ -967,7 +967,7 @@ export const SYNTHV1_NKS_PARAMETERS: NKSParameter[] = [
   { id: 'synthv1.dca1Decay', name: 'Amp Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, page: 2, index: 2, isAutomatable: true },
   { id: 'synthv1.dca1Sustain', name: 'Amp Sustain', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, page: 2, index: 3, isAutomatable: true },
   { id: 'synthv1.dca1Release', name: 'Amp Release', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, page: 2, index: 4, ccNumber: 72, isAutomatable: true },
-  { id: 'synthv1.lfo1Bpm', name: 'LFO Rate', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, page: 2, index: 5, isAutomatable: true },
+  { id: 'synthv1.lfo1Rate', name: 'LFO Rate', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, page: 2, index: 5, isAutomatable: true },
   { id: 'synthv1.lfo1Shape', name: 'LFO Shape', section: NKSSection.LFO, type: NKSParameterType.SELECTOR, min: 0, max: 4, defaultValue: 0, page: 2, index: 6, isAutomatable: true },
   { id: 'synthv1.lfo1Pitch', name: 'LFO>Pitch', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: -1, max: 1, defaultValue: 0, page: 2, index: 7, isAutomatable: true },
   // Page 3: LFO & Effects

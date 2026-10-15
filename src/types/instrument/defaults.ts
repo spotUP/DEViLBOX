@@ -292,6 +292,8 @@ export interface InstrumentConfig {
   calfMono?: import('../../engine/calf-mono/CalfMonoSynth').CalfMonoConfig;
   setbfree?: import('../../engine/setbfree/SetBfreeSynth').SetBfreeConfig;
   synthv1?: import('../../engine/synthv1/SynthV1Synth').SynthV1Config;
+  /** KlysSynth: the instrument value of a STANDALONE klystrack instrument (one that belongs to no klystrack song). */
+  klystrack?: import('../tracker').KlysNativeInstrument;
   monique?: import('../../engine/monique/MoniqueSynth').MoniqueConfig;
   vl1?: import('../../engine/vl1/VL1Synth').VL1Config;
   talNoizeMaker?: import('../../engine/tal-noizemaker/TalNoizeMakerSynth').TalNoizeMakerConfig;
@@ -1743,11 +1745,12 @@ export const DEFAULT_OPENWURLI: OpenWurliConfig = {
   velocityCurve: 2,
 };
 
+/** Attack 15 = the chip's fastest rate (rate 1 takes seconds to reach full level: a note on the old default was inaudible for its first second). */
 export const DEFAULT_OPL3: OPL3Config = {
-  op1Attack: 1, op1Decay: 4, op1Sustain: 2, op1Release: 5,
+  op1Attack: 15, op1Decay: 4, op1Sustain: 2, op1Release: 5,
   op1Level: 32, op1Multi: 1, op1Waveform: 0,
   op1Tremolo: 0, op1Vibrato: 0, op1SustainHold: 0, op1KSR: 0, op1KSL: 0,
-  op2Attack: 1, op2Decay: 4, op2Sustain: 2, op2Release: 5,
+  op2Attack: 15, op2Decay: 4, op2Sustain: 2, op2Release: 5,
   op2Level: 63, op2Multi: 1, op2Waveform: 0,
   op2Tremolo: 0, op2Vibrato: 0, op2SustainHold: 0, op2KSR: 0, op2KSL: 0,
   feedback: 0, connection: 0,

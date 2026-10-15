@@ -14,7 +14,7 @@ const opl3Desc: SynthDescriptor = {
   sharedInstance: false,
   useSynthBus: true,
 
-  create: () => new OPL3Synth(),
+  create: (config) => new OPL3Synth(config.opl3),
 
   onTriggerAttack: (synth, note, time, velocity) => {
     (synth as OPL3Synth).triggerAttack(note, time, velocity);
@@ -28,7 +28,7 @@ const opl3Desc: SynthDescriptor = {
 
   parameters: [
     // Operator 1 (modulator)
-    { key: 'op1Attack', label: 'Op1 Attack', group: 'Op1', type: 'knob', min: 0, max: 15, default: 1 },
+    { key: 'op1Attack', label: 'Op1 Attack', group: 'Op1', type: 'knob', min: 0, max: 15, default: 15 },
     { key: 'op1Decay', label: 'Op1 Decay', group: 'Op1', type: 'knob', min: 0, max: 15, default: 4 },
     { key: 'op1Sustain', label: 'Op1 Sustain', group: 'Op1', type: 'knob', min: 0, max: 15, default: 2 },
     { key: 'op1Release', label: 'Op1 Release', group: 'Op1', type: 'knob', min: 0, max: 15, default: 5 },
@@ -41,11 +41,11 @@ const opl3Desc: SynthDescriptor = {
     { key: 'op1KSR', label: 'Op1 KSR', group: 'Op1', type: 'toggle', min: 0, max: 1, default: 0 },
     { key: 'op1KSL', label: 'Op1 KSL', group: 'Op1', type: 'knob', min: 0, max: 3, default: 0 },
     // Operator 2 (carrier)
-    { key: 'op2Attack', label: 'Op2 Attack', group: 'Op2', type: 'knob', min: 0, max: 15, default: 1 },
+    { key: 'op2Attack', label: 'Op2 Attack', group: 'Op2', type: 'knob', min: 0, max: 15, default: 15 },
     { key: 'op2Decay', label: 'Op2 Decay', group: 'Op2', type: 'knob', min: 0, max: 15, default: 4 },
     { key: 'op2Sustain', label: 'Op2 Sustain', group: 'Op2', type: 'knob', min: 0, max: 15, default: 2 },
     { key: 'op2Release', label: 'Op2 Release', group: 'Op2', type: 'knob', min: 0, max: 15, default: 5 },
-    { key: 'op2Level', label: 'Op2 Level', group: 'Op2', type: 'knob', min: 0, max: 63, default: 0 },
+    { key: 'op2Level', label: 'Op2 Level', group: 'Op2', type: 'knob', min: 0, max: 63, default: 63 },
     { key: 'op2Multi', label: 'Op2 Multi', group: 'Op2', type: 'knob', min: 0, max: 15, default: 1 },
     { key: 'op2Waveform', label: 'Op2 Wave', group: 'Op2', type: 'knob', min: 0, max: 7, default: 0 },
     { key: 'op2Tremolo', label: 'Op2 Trem', group: 'Op2', type: 'toggle', min: 0, max: 1, default: 0 },

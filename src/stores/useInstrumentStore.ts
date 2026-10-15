@@ -2,6 +2,7 @@
  * Instrument Store - Instrument Bank & Preset Management
  */
 
+import { registryOutputGain } from '../engine/registry/outputGain';
 import { adoptCz101TonesFrom } from './useCz101UserPatchStore';
 import { classifySampleEdit, propagateSampleEditToSong } from '@/lib/song/sampleEdit';
 import { keepAcrossHmr } from '@/lib/dev/keepAcrossHmr';
@@ -649,9 +650,9 @@ export const useInstrumentStore = create<InstrumentStore>()(
                 for (const [key, synth] of instruments.entries()) {
                   if ((key >>> 16) === id && synth) {
                     if (updates.volume !== undefined) {
-                      // Convert dB to linear gain: 10^(dB/20)
+                      // dB to linear gain, with the synth's registry normalisation offset (as at creation)
                       const vol = updatedInstrument.volume ?? -6;
-                      const linearGain = Math.pow(10, vol / 20);
+                      const linearGain = registryOutputGain(updatedInstrument.synthType, vol);
                       if (synth.output?.gain) {
                         synth.output.gain.value = linearGain;
                       } else if (synth.set && typeof synth.set === 'function') {
@@ -823,9 +824,12 @@ export const useInstrumentStore = create<InstrumentStore>()(
                 synth.loadVcedPreset(dx7Updates.vcedPreset as string);
               }
               if (dx7Updates.vced && typeof dx7Updates.vced === 'object' && synth?.setVcedParam) {
+                // Only the keys that differ from the edits already sent: the editor hands back every edit made on this
+                // voice, and sending them all again per knob tick would be one parameter change per edited key.
+                const sent = (currentInstrument?.dx7 as { vced?: Record<string, number> } | undefined)?.vced ?? {};
                 for (const [paramStr, value] of Object.entries(dx7Updates.vced as Record<string, number>)) {
                   const paramNum = parseInt(paramStr, 10);
-                  if (!isNaN(paramNum)) synth.setVcedParam(paramNum, Math.round(value));
+                  if (!isNaN(paramNum) && sent[paramStr] !== value) synth.setVcedParam(paramNum, Math.round(value));
                 }
               }
               if (dx7Updates.libraryBank && synth?.loadLibraryBank) {
@@ -1049,7 +1053,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
               if ((key >>> 16) === id && synth) {
                 if (updates.volume !== undefined) {
                   const vol = mergedInst.volume ?? -6;
-                  const linearGain = Math.pow(10, vol / 20);
+                  const linearGain = registryOutputGain(mergedInst.synthType, vol);
                   if (synth.output?.gain) synth.output.gain.value = linearGain;
                   else if (synth.set && typeof synth.set === 'function') {
                     try { synth.set('volume', vol); } catch { /* */ }

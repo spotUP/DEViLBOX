@@ -16,6 +16,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
     this.initialized = false;
     this.playing = false;
     this.songLoaded = false;
+    this.hiddenSong = false; // the engine's empty song, made only so the audition path runs with no song loaded
     this.looping = true;
     this.previewing = false; // audition note sounding with the song stopped
     this.watchProgram = false;
@@ -146,6 +147,32 @@ class KlystrackProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      // A standalone instrument (no klystrack song owns it): the instrument value lives in the project, the engine holds
+      // one preview copy of it. The empty song exists only so the audition channel runs; a real song replaces it.
+      case 'setPreviewInstrument': {
+        if (!this.wasm || !this.initialized || typeof this.wasm._klys_set_preview_instrument !== 'function') break;
+        const bytes = new Uint8Array(data.data);
+        const ptr = this.wasm._malloc(bytes.length);
+        this.wasm.HEAPU8.set(bytes, ptr);
+        this.wasm._klys_set_preview_instrument(ptr, bytes.length);
+        this.wasm._free(ptr);
+        break;
+      }
+
+      case 'previewNoteOnData':
+        if (!this.wasm || !this.initialized || typeof this.wasm._klys_preview_note_on_data !== 'function') break;
+        if (!this.songLoaded && this.wasm._klys_new_song()) {
+          this.songLoaded = true;
+          this.hiddenSong = true;
+          this.playing = false;
+        }
+        if (this.songLoaded && !this.playing) this.wasm._klys_set_song_running(0);
+        if (this.songLoaded && this.wasm._klys_preview_note_on_data(data.note)) {
+          this.previewing = true;
+          this.wasm._klys_pause(0);
+        }
+        break;
+
       case 'previewNoteOff':
         if (this.wasm && this.songLoaded) this.wasm._klys_preview_note_off();
         break;
@@ -184,9 +211,46 @@ class KlystrackProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      // The export of a song plus standalone instruments (KlysWrapper.c klys_save_song_extended): `extra` is the packed
+      // instruments to append (147 bytes each), `remap` the 256-entry table pattern-step instrument numbers pass
+      // through. With no song loaded the empty one is made, so a project of standalone instruments alone exports.
+      case 'serializeSongExtended': {
+        if (!this.wasm || typeof this.wasm._klys_save_song_extended !== 'function') {
+          this.port.postMessage({ type: 'serializeSongResult', error: 'WASM not loaded' });
+          break;
+        }
+        try {
+          if (!this.songLoaded && this.wasm._klys_new_song()) { this.songLoaded = true; this.hiddenSong = true; this.playing = false; }
+          const extra = new Uint8Array(data.extra);
+          const eptr = this.wasm._malloc(extra.length || 1);
+          this.wasm.HEAPU8.set(extra, eptr);
+          const rptr = this.wasm._malloc(256);
+          this.wasm.HEAPU8.set(new Uint8Array(data.remap), rptr);
+          const needed = this.wasm._klys_save_song_extended(0, 0, eptr, data.count, rptr);
+          if (needed <= 0) {
+            this.wasm._free(eptr); this.wasm._free(rptr);
+            this.port.postMessage({ type: 'serializeSongResult', error: 'Song could not be serialized' });
+            break;
+          }
+          const ptr = this.wasm._malloc(needed);
+          const written = this.wasm._klys_save_song_extended(ptr, needed, eptr, data.count, rptr);
+          const bytes = new Uint8Array(written);
+          bytes.set(new Uint8Array(this.wasm.HEAPU8.buffer, ptr, written));
+          this.wasm._free(ptr); this.wasm._free(eptr); this.wasm._free(rptr);
+          this.port.postMessage({ type: 'serializeSongResult', data: bytes.buffer }, [bytes.buffer]);
+        } catch (e) {
+          this.port.postMessage({ type: 'serializeSongResult', error: e.message });
+        }
+        break;
+      }
+
       case 'serializeSong': {
         if (!this.wasm) {
           this.port.postMessage({ type: 'serializeSongResult', error: 'WASM not loaded' });
+          break;
+        }
+        if (this.hiddenSong) {
+          this.port.postMessage({ type: 'serializeSongResult', error: 'No song loaded' });
           break;
         }
         try {
@@ -293,6 +357,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
 
     if (ok) {
       this.songLoaded = true;
+      this.hiddenSong = false;
       // A load does not start the song: 'play' does (the editor loads the song
       // for its data long before anyone presses Play).
       this.playing = false;
@@ -336,6 +401,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
     if (this.wasm && this.songLoaded) {
       this.wasm._klys_free_song();
       this.songLoaded = false;
+      this.hiddenSong = false;
       this.playing = false;
     }
   }
@@ -588,7 +654,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
           }
           this.port.postMessage({ type: 'voiceStatus', channels });
         }
-        this.port.postMessage({
+        if (!this.hiddenSong) this.port.postMessage({
           type: 'position',
           songPosition: this.wasm._klys_get_song_position(),
           patternPosition: this.wasm._klys_get_pattern_position(),

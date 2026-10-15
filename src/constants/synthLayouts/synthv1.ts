@@ -1,21 +1,25 @@
 import type { SynthPanelLayout } from '@/types/synthPanel';
+import { synthv1Curves } from '@/components/instruments/curves/synthv1Curves';
+
+const page1 = synthv1Curves(1);
+const page2 = synthv1Curves(2);
 
 const fmtPct = (v: number) => `${Math.round(v * 100)}%`;
 const fmtBipolar = (v: number) => `${Math.round(v * 100)}%`;
+const fmtBpm = (v: number) => (v > 0 ? `${Math.round(v)} BPM` : 'Host');
 
+// synthv1_wave::Shape: 0 Pulse, 1 Saw, 2 Sine, 3 Rand (held random steps), 4 Noise. The oscillators and the LFOs share it.
 const SHAPE_OPTIONS = [
   { value: '0', label: 'Pulse' }, { value: '1', label: 'Saw' },
-  { value: '2', label: 'Sine' }, { value: '3', label: 'Noise' },
+  { value: '2', label: 'Sine' }, { value: '3', label: 'Random' }, { value: '4', label: 'Noise' },
 ];
-const LFO_SHAPE = [
-  { value: '0', label: 'Tri' }, { value: '1', label: 'Sine' },
-  { value: '2', label: 'Saw' }, { value: '3', label: 'Square' }, { value: '4', label: 'S&H' },
-];
+const LFO_SHAPE = SHAPE_OPTIONS;
 const FILTER_TYPE = [
   { value: '0', label: 'LPF' }, { value: '1', label: 'BPF' },
   { value: '2', label: 'HPF' }, { value: '3', label: 'BRF' },
 ];
-const SLOPE_OPTIONS = [{ value: '0', label: '12 dB' }, { value: '1', label: '24 dB' }];
+// synthv1 filter slopes: 0 state variable 12 dB, 1 Moog 24 dB, 2 biquad, 3 formant bank
+const SLOPE_OPTIONS = [{ value: '0', label: '12 dB' }, { value: '1', label: '24 dB' }, { value: '2', label: 'Biquad' }, { value: '3', label: 'Formant' }];
 const OCTAVE_OPTIONS = Array.from({ length: 9 }, (_, i) => ({ value: `${i - 4}`, label: `${i - 4}` }));
 
 export const SYNTHV1_LAYOUT: SynthPanelLayout = {
@@ -29,6 +33,7 @@ export const SYNTHV1_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'OSC A',
+          curves: [page1.oscA],
           controls: [
             { type: 'select', key: 'dco1Shape1', label: 'WAVE', options: SHAPE_OPTIONS },
             { type: 'knob', key: 'dco1Width1', label: 'WIDTH', color: '#ff9900', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
@@ -36,6 +41,7 @@ export const SYNTHV1_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'OSC B',
+          curves: [page1.oscB],
           controls: [
             { type: 'select', key: 'dco1Shape2', label: 'WAVE', options: SHAPE_OPTIONS },
             { type: 'knob', key: 'dco1Width2', label: 'WIDTH', color: '#ff9900', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
@@ -65,18 +71,18 @@ export const SYNTHV1_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'FILTER',
+          curves: [page1.filter],
           controls: [
             { type: 'select', key: 'dcf1Type', label: 'TYPE', options: FILTER_TYPE },
             { type: 'select', key: 'dcf1Slope', label: 'SLOPE', options: SLOPE_OPTIONS },
             { type: 'knob', key: 'dcf1Cutoff', label: 'CUTOFF', color: '#ffcc00', min: 0, max: 1, defaultValue: 0.75, formatValue: fmtPct },
             { type: 'knob', key: 'dcf1Reso', label: 'RESO', color: '#ff6600', min: 0, max: 1, defaultValue: 0.2, formatValue: fmtPct },
-            { type: 'knob', key: 'dcf1Envelope', label: 'ENV', color: '#22c55e', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
-            { type: 'knob', key: 'dcf1KeyFollow', label: 'KEY FLW', color: '#66ccff', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
-            { type: 'knob', key: 'dcf1Velocity', label: 'VEL', color: '#ff3366', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
+            { type: 'knob', key: 'dcf1Envelope', label: 'ENV', color: '#22c55e', min: -1, max: 1, defaultValue: 0.5, bipolar: true, formatValue: fmtBipolar },
           ],
         },
         {
           label: 'FILTER ENVELOPE',
+          curves: [page1.filterEnv],
           controls: [
             { type: 'knob', key: 'dcf1Attack', label: 'ATK', color: '#22c55e', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'dcf1Decay', label: 'DEC', color: '#22c55e', min: 0, max: 1, defaultValue: 0.3, formatValue: fmtPct },
@@ -93,26 +99,28 @@ export const SYNTHV1_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'AMP ENVELOPE',
+          curves: [page1.amp],
           controls: [
             { type: 'knob', key: 'dca1Volume', label: 'VOLUME', color: '#00ff99', min: 0, max: 1, defaultValue: 0.8, formatValue: fmtPct },
             { type: 'knob', key: 'dca1Attack', label: 'ATK', color: '#ff3366', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'dca1Decay', label: 'DEC', color: '#ff3366', min: 0, max: 1, defaultValue: 0.3, formatValue: fmtPct },
             { type: 'knob', key: 'dca1Sustain', label: 'SUS', color: '#ff3366', min: 0, max: 1, defaultValue: 0.8, formatValue: fmtPct },
             { type: 'knob', key: 'dca1Release', label: 'REL', color: '#ff3366', min: 0, max: 1, defaultValue: 0.3, formatValue: fmtPct },
-            { type: 'knob', key: 'dca1Velocity', label: 'VEL', color: '#ff3366', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
           ],
         },
         {
           label: 'LFO 1',
+          curves: [page1.lfo],
           controls: [
             { type: 'select', key: 'lfo1Shape', label: 'WAVE', options: LFO_SHAPE },
-            { type: 'knob', key: 'lfo1Bpm', label: 'RATE', color: '#9966ff', min: 0, max: 1, defaultValue: 0.3, formatValue: fmtPct },
+            { type: 'knob', key: 'lfo1Rate', label: 'RATE', color: '#9966ff', min: 0, max: 1, defaultValue: 0.3, formatValue: fmtPct },
+            { type: 'knob', key: 'lfo1Bpm', label: 'BPM', color: '#9966ff', min: 0, max: 360, defaultValue: 180, formatValue: fmtBpm },
             { type: 'knob', key: 'lfo1Width', label: 'WIDTH', color: '#9966ff', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
-            { type: 'knob', key: 'lfo1Pitch', label: 'PITCH', color: '#cc66ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
-            { type: 'knob', key: 'lfo1Cutoff', label: 'CUTOFF', color: '#cc66ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
-            { type: 'knob', key: 'lfo1Reso', label: 'RESO', color: '#cc66ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
+            { type: 'knob', key: 'lfo1Pitch', label: 'PITCH', color: '#cc66ff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: fmtBipolar },
+            { type: 'knob', key: 'lfo1Cutoff', label: 'CUTOFF', color: '#cc66ff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: fmtBipolar },
+            { type: 'knob', key: 'lfo1Reso', label: 'RESO', color: '#cc66ff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: fmtBipolar },
             { type: 'knob', key: 'lfo1Panning', label: 'PAN', color: '#cc66ff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: fmtBipolar },
-            { type: 'knob', key: 'lfo1Volume', label: 'VOL', color: '#cc66ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
+            { type: 'knob', key: 'lfo1Volume', label: 'VOL', color: '#cc66ff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: fmtBipolar },
             { type: 'toggle', key: 'lfo1Sync', label: 'SYNC', labels: ['OFF', 'ON'] },
           ],
         },
@@ -125,6 +133,7 @@ export const SYNTHV1_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'OSC A',
+          curves: [page2.oscA],
           controls: [
             { type: 'select', key: 'dco2Shape1', label: 'WAVE', options: SHAPE_OPTIONS },
             { type: 'knob', key: 'dco2Width1', label: 'WIDTH', color: '#ff9900', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
@@ -132,6 +141,7 @@ export const SYNTHV1_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'OSC B',
+          curves: [page2.oscB],
           controls: [
             { type: 'select', key: 'dco2Shape2', label: 'WAVE', options: SHAPE_OPTIONS },
             { type: 'knob', key: 'dco2Width2', label: 'WIDTH', color: '#ff9900', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
@@ -161,18 +171,18 @@ export const SYNTHV1_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'FILTER',
+          curves: [page2.filter],
           controls: [
             { type: 'select', key: 'dcf2Type', label: 'TYPE', options: FILTER_TYPE },
             { type: 'select', key: 'dcf2Slope', label: 'SLOPE', options: SLOPE_OPTIONS },
             { type: 'knob', key: 'dcf2Cutoff', label: 'CUTOFF', color: '#ffcc00', min: 0, max: 1, defaultValue: 0.75, formatValue: fmtPct },
             { type: 'knob', key: 'dcf2Reso', label: 'RESO', color: '#ff6600', min: 0, max: 1, defaultValue: 0.2, formatValue: fmtPct },
-            { type: 'knob', key: 'dcf2Envelope', label: 'ENV', color: '#22c55e', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
-            { type: 'knob', key: 'dcf2KeyFollow', label: 'KEY FLW', color: '#66ccff', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
-            { type: 'knob', key: 'dcf2Velocity', label: 'VEL', color: '#ff3366', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
+            { type: 'knob', key: 'dcf2Envelope', label: 'ENV', color: '#22c55e', min: -1, max: 1, defaultValue: 0.5, bipolar: true, formatValue: fmtBipolar },
           ],
         },
         {
           label: 'FILTER ENVELOPE',
+          curves: [page2.filterEnv],
           controls: [
             { type: 'knob', key: 'dcf2Attack', label: 'ATK', color: '#22c55e', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'dcf2Decay', label: 'DEC', color: '#22c55e', min: 0, max: 1, defaultValue: 0.3, formatValue: fmtPct },
@@ -189,26 +199,28 @@ export const SYNTHV1_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'AMP ENVELOPE',
+          curves: [page2.amp],
           controls: [
             { type: 'knob', key: 'dca2Volume', label: 'VOLUME', color: '#00ff99', min: 0, max: 1, defaultValue: 0.8, formatValue: fmtPct },
             { type: 'knob', key: 'dca2Attack', label: 'ATK', color: '#ff3366', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'dca2Decay', label: 'DEC', color: '#ff3366', min: 0, max: 1, defaultValue: 0.3, formatValue: fmtPct },
             { type: 'knob', key: 'dca2Sustain', label: 'SUS', color: '#ff3366', min: 0, max: 1, defaultValue: 0.8, formatValue: fmtPct },
             { type: 'knob', key: 'dca2Release', label: 'REL', color: '#ff3366', min: 0, max: 1, defaultValue: 0.3, formatValue: fmtPct },
-            { type: 'knob', key: 'dca2Velocity', label: 'VEL', color: '#ff3366', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
           ],
         },
         {
           label: 'LFO 2',
+          curves: [page2.lfo],
           controls: [
             { type: 'select', key: 'lfo2Shape', label: 'WAVE', options: LFO_SHAPE },
-            { type: 'knob', key: 'lfo2Bpm', label: 'RATE', color: '#9966ff', min: 0, max: 1, defaultValue: 0.3, formatValue: fmtPct },
+            { type: 'knob', key: 'lfo2Rate', label: 'RATE', color: '#9966ff', min: 0, max: 1, defaultValue: 0.3, formatValue: fmtPct },
+            { type: 'knob', key: 'lfo2Bpm', label: 'BPM', color: '#9966ff', min: 0, max: 360, defaultValue: 180, formatValue: fmtBpm },
             { type: 'knob', key: 'lfo2Width', label: 'WIDTH', color: '#9966ff', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
-            { type: 'knob', key: 'lfo2Pitch', label: 'PITCH', color: '#cc66ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
-            { type: 'knob', key: 'lfo2Cutoff', label: 'CUTOFF', color: '#cc66ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
-            { type: 'knob', key: 'lfo2Reso', label: 'RESO', color: '#cc66ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
+            { type: 'knob', key: 'lfo2Pitch', label: 'PITCH', color: '#cc66ff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: fmtBipolar },
+            { type: 'knob', key: 'lfo2Cutoff', label: 'CUTOFF', color: '#cc66ff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: fmtBipolar },
+            { type: 'knob', key: 'lfo2Reso', label: 'RESO', color: '#cc66ff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: fmtBipolar },
             { type: 'knob', key: 'lfo2Panning', label: 'PAN', color: '#cc66ff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: fmtBipolar },
-            { type: 'knob', key: 'lfo2Volume', label: 'VOL', color: '#cc66ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
+            { type: 'knob', key: 'lfo2Volume', label: 'VOL', color: '#cc66ff', min: -1, max: 1, defaultValue: 0, bipolar: true, formatValue: fmtBipolar },
             { type: 'toggle', key: 'lfo2Sync', label: 'SYNC', labels: ['OFF', 'ON'] },
           ],
         },
@@ -254,7 +266,7 @@ export const SYNTHV1_LAYOUT: SynthPanelLayout = {
             { type: 'knob', key: 'delayWet', label: 'WET', color: '#66ccff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'delayDelay', label: 'TIME', color: '#66ccff', min: 0, max: 1, defaultValue: 0.4, formatValue: fmtPct },
             { type: 'knob', key: 'delayFeedback', label: 'FDBK', color: '#66ccff', min: -1, max: 1, defaultValue: 0.3, bipolar: true, formatValue: fmtBipolar },
-            { type: 'knob', key: 'delayBpm', label: 'BPM', color: '#66ccff', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
+            { type: 'knob', key: 'delayBpm', label: 'BPM', color: '#66ccff', min: 0, max: 360, defaultValue: 180, formatValue: fmtBpm },
           ],
         },
         {

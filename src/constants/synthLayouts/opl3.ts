@@ -37,7 +37,7 @@ export const OPL3_LAYOUT: SynthPanelLayout = {
           curves: [oplOperatorEnvelopeCurve(1, curveContext)],
           columns: 4,
           controls: [
-            { type: 'knob', key: 'op1Attack', label: 'ATTACK', color: '#33ccff', min: 0, max: 15, defaultValue: 1, formatValue: (v) => `${Math.round(v)}` },
+            { type: 'knob', key: 'op1Attack', label: 'ATTACK', color: '#33ccff', min: 0, max: 15, defaultValue: 15, formatValue: (v) => `${Math.round(v)}` },
             { type: 'knob', key: 'op1Decay', label: 'DECAY', color: '#33ccff', min: 0, max: 15, defaultValue: 4, formatValue: (v) => `${Math.round(v)}` },
             { type: 'knob', key: 'op1Sustain', label: 'SUSTAIN', color: '#33ccff', min: 0, max: 15, defaultValue: 2, formatValue: (v) => `${Math.round(v)}` },
             { type: 'knob', key: 'op1Release', label: 'RELEASE', color: '#33ccff', min: 0, max: 15, defaultValue: 5, formatValue: (v) => `${Math.round(v)}` },
@@ -75,7 +75,7 @@ export const OPL3_LAYOUT: SynthPanelLayout = {
           curves: [oplOperatorEnvelopeCurve(2, curveContext)],
           columns: 4,
           controls: [
-            { type: 'knob', key: 'op2Attack', label: 'ATTACK', color: '#ff6633', min: 0, max: 15, defaultValue: 1, formatValue: (v) => `${Math.round(v)}` },
+            { type: 'knob', key: 'op2Attack', label: 'ATTACK', color: '#ff6633', min: 0, max: 15, defaultValue: 15, formatValue: (v) => `${Math.round(v)}` },
             { type: 'knob', key: 'op2Decay', label: 'DECAY', color: '#ff6633', min: 0, max: 15, defaultValue: 4, formatValue: (v) => `${Math.round(v)}` },
             { type: 'knob', key: 'op2Sustain', label: 'SUSTAIN', color: '#ff6633', min: 0, max: 15, defaultValue: 2, formatValue: (v) => `${Math.round(v)}` },
             { type: 'knob', key: 'op2Release', label: 'RELEASE', color: '#ff6633', min: 0, max: 15, defaultValue: 5, formatValue: (v) => `${Math.round(v)}` },
@@ -86,7 +86,7 @@ export const OPL3_LAYOUT: SynthPanelLayout = {
           curves: [oplWaveformCurve(2, curveContext)],
           columns: 3,
           controls: [
-            { type: 'knob', key: 'op2Level', label: 'LEVEL', color: '#66ff99', min: 0, max: 63, defaultValue: 0, formatValue: (v) => `${Math.round(v)}` },
+            { type: 'knob', key: 'op2Level', label: 'LEVEL', color: '#66ff99', min: 0, max: 63, defaultValue: 63, formatValue: (v) => `${Math.round(v)}` },
             { type: 'knob', key: 'op2Multi', label: 'MULTI', color: '#ffcc33', min: 0, max: 15, defaultValue: 1, formatValue: (v) => `${Math.round(v)}` },
             { type: 'knob', key: 'op2Waveform', label: 'WAVE', color: '#ff66cc', min: 0, max: 7, defaultValue: 0, formatValue: fmtWF },
           ],

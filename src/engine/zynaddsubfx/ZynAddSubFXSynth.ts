@@ -13,6 +13,7 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import { WasmVoiceHub, registerVoiceHub } from '@/engine/voiceStatus/wasmVoiceStatus';
 
 export const ZynAddSubFXParam = {
   // ADDsynth (0-19)
@@ -77,7 +78,7 @@ export interface ZynAddSubFXConfig {
   addPanning?: number;      // -1 to 1
   addDetune?: number;       // -1 to 1
   addOctave?: number;       // -4 to 4
-  addVoice1Wave?: number;   // 0-6: sine/tri/saw/square/noise/voice/chirp
+  addVoice1Wave?: number;   // OscilGen base function index 0-15: sine, triangle, pulse, saw, power, gauss, diode, ... (ZYN_BASE_FUNCTIONS)
   addVoice1Volume?: number; // 0-1
   addVoice1Detune?: number; // -1 to 1
   addVoice2Wave?: number;
@@ -120,7 +121,7 @@ export interface ZynAddSubFXConfig {
   padDetune?: number;           // -1 to 1
   padQuality?: number;          // 0-3
   // Global filter
-  filterType?: number;          // 0-5: LP/HP/BP/Notch/Peak/LShelf
+  filterType?: number;          // AnalogFilter type index: 0 LPF1, 1 HPF1, 2 LPF2, 3 HPF2, 4 BPF2, 5 NOTCH (6-8 peak and shelves need the gain, not exposed)
   filterCutoff?: number;        // 0-1
   filterResonance?: number;     // 0-1
   filterEnvAmount?: number;     // 0-1
@@ -256,6 +257,9 @@ export class ZynAddSubFXSynthEngine implements DevilboxSynth {
   readonly output: GainNode;
 
   private _worklet: AudioWorkletNode | null = null;
+  /** Live voice report for the editor curves' markers (wasmVoiceStatus.ts). */
+  readonly voiceHub = new WasmVoiceHub((m) => this._worklet?.port.postMessage(m));
+  private readonly unregisterVoiceHub: () => void;
   private config: ZynAddSubFXConfig;
   private isInitialized = false;
   private pendingNotes: Array<{ note: number; velocity: number }> = [];
@@ -267,6 +271,7 @@ export class ZynAddSubFXSynthEngine implements DevilboxSynth {
   constructor(config: Partial<ZynAddSubFXConfig> = {}) {
     this.output = getDevilboxAudioContext().createGain();
     this.config = { ...DEFAULT_ZYNADDSUBFX, ...config };
+    this.unregisterVoiceHub = registerVoiceHub('ZynAddSubFX', this.voiceHub);
     this._initPromise = this.initialize();
   }
 
@@ -324,8 +329,10 @@ export class ZynAddSubFXSynthEngine implements DevilboxSynth {
       });
 
       this._worklet.port.onmessage = (event) => {
+        if (this.voiceHub.handleMessage(event.data)) return;
         if (event.data.type === 'ready') {
           this.isInitialized = true;
+          this.voiceHub.resume();
           if (this.pendingXmlPreset) {
             const presetName = this.pendingXmlPreset;
             this.pendingXmlPreset = null;
@@ -485,6 +492,7 @@ export class ZynAddSubFXSynthEngine implements DevilboxSynth {
   }
 
   dispose(): void {
+    this.unregisterVoiceHub();
     if (this._worklet) {
       this._worklet.port.postMessage({ type: 'dispose' });
       this._worklet.disconnect();
@@ -502,9 +510,10 @@ export class ZynAddSubFXSynthImpl extends ZynAddSubFXSynthEngine {
   applyConfig(config: Partial<ZynAddSubFXConfig>): void {
     // Only send params that actually changed — avoids flooding the worklet
     // and overwriting WASM state with stale defaults (same pattern as MoniqueSynth)
-    const prev = (this as any).config as Record<string, number | undefined>;
-    for (const [key, value] of Object.entries(config)) {
-      if (typeof value === 'number' && value !== prev[key]) {
+    for (const [key, raw] of Object.entries(config as Record<string, unknown>)) {
+      // A layout select hands over its option value as a string ('3'); the engine wants the number
+      const value = typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : raw;
+      if (typeof value === 'number' && Number.isFinite(value) && value !== this.get(key)) {
         this.set(key, value);
       }
     }

@@ -414,6 +414,19 @@ export class KlysEngine extends WASMSingletonBase {
     this.sendMessage({ type: 'setInstrumentData', idx, data: packKlysInstrument(inst).buffer });
   }
 
+  /**
+   * Standalone instruments (owned by the project, not by a klystrack song): the engine holds ONE preview copy of the
+   * instrument last sent, a whole value (the inverse of the songData read).
+   */
+  setPreviewInstrument(inst: KlysEngineInstrument): void {
+    this.sendMessage({ type: 'setPreviewInstrument', data: packKlysInstrument(inst).buffer });
+  }
+
+  /** Audition the preview copy (setPreviewInstrument); with no song loaded the worklet makes the empty one first. */
+  previewNoteOnData(note: number): void {
+    this.sendMessage({ type: 'previewNoteOnData', note });
+  }
+
   /** Audition instrument inst on the spare channel; never starts or stops the song. */
   previewNoteOn(inst: number, note: number): void {
     this.sendMessage({ type: 'previewNoteOn', inst, note });
@@ -448,6 +461,20 @@ export class KlysEngine extends WASMSingletonBase {
       this._resolveSerialize = resolve;
       this._rejectSerialize = reject;
       this.sendMessage({ type: 'serializeSong' });
+    });
+  }
+
+  /**
+   * Serialize the song with standalone instruments appended to its table and pattern-step instrument numbers passed
+   * through `remap` (256 entries). The live song is untouched; with no song loaded the empty one is used.
+   */
+  serializeSongWith(extra: KlysEngineInstrument[], remap: Uint8Array): Promise<ArrayBuffer> {
+    return new Promise((resolve, reject) => {
+      this._resolveSerialize = resolve;
+      this._rejectSerialize = reject;
+      const packed = new Uint8Array(extra.length * 147);
+      extra.forEach((inst, i) => packed.set(packKlysInstrument(inst), i * 147));
+      this.sendMessage({ type: 'serializeSongExtended', extra: packed.buffer, count: extra.length, remap: remap.slice().buffer });
     });
   }
 

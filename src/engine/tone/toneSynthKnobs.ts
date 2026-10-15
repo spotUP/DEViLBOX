@@ -273,6 +273,24 @@ function addModulator(options: Record<string, unknown>, config: InstrumentConfig
   if (type && type !== 'noise') options.modulation = { type };
 }
 
+/**
+ * The synthPresets/* files (the drum pad's collections) write every envelope the way Tone does: seconds, and sustain as
+ * 0..1. The InstrumentConfig is milliseconds and sustain percent, which is what `toneVoiceOptions` reads. This is the one
+ * conversion; the pad's preset loader applies it to a Tone core synth's preset before it becomes an instrument config.
+ */
+export function toneSecondsPresetToConfig<T extends Record<string, unknown>>(preset: T): T {
+  const out: Record<string, unknown> = { ...preset };
+  for (const key of ['envelope', 'modulationEnvelope', 'filterEnvelope']) {
+    const env = out[key] as Record<string, unknown> | undefined;
+    if (!env || typeof env !== 'object') continue;
+    const converted: Record<string, unknown> = { ...env };
+    for (const stage of ['attack', 'decay', 'release']) if (typeof env[stage] === 'number') converted[stage] = Math.round((env[stage] as number) * 1e6) / 1e3;
+    if (typeof env.sustain === 'number') converted.sustain = Math.round((env.sustain as number) * 1e4) / 1e2;
+    out[key] = converted;
+  }
+  return out as T;
+}
+
 /** MonoSynth's filter slope, a creation-only option. */
 export function toneFilterRolloff(config: InstrumentConfig): -12 | -24 | -48 | -96 {
   return config.filter?.rolloff ?? -12;
@@ -530,8 +548,6 @@ export interface CreateToneSynthOptions {
   monophonic?: boolean;
   /** PolySynth voice limit (Tone's default is 32). */
   polyphony?: number;
-  /** The already normalized volume in dB; default: getNormalizedVolume(synthType, config.volume) of the live engine. */
-  volumeDb?: number;
 }
 
 /** The LFO clock the live markers read: the rate the voice's rig currently runs, 0 when the LFO is off. */
@@ -547,7 +563,7 @@ function rigLfoRateHz(node: unknown): number {
 export function createToneSynthNode(synthType: string, config: InstrumentConfig, create: CreateToneSynthOptions = {}): Tone.ToneAudioNode {
   if (!MODULATED_TYPES.has(synthType)) throw new Error(`[toneSynthKnobs] ${synthType} is not a modulated Tone synth`);
   const options = toneVoiceOptions(synthType, config);
-  const volume = create.volumeDb ?? getNormalizedVolume(synthType, config.volume);
+  const volume = getNormalizedVolume(synthType, config.volume);
   let node: Tone.ToneAudioNode;
   if (synthType === 'MonoSynth') {
     const filter = { ...(options.filter as Record<string, unknown> | undefined), rolloff: toneFilterRolloff(config) };

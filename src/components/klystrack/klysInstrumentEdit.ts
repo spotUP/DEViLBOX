@@ -1,6 +1,15 @@
 /**
  * Klystrack instrument edits - ONE write path for the instrument editor, the MIDI/NKS knobs and KlysSynth.
  *
+ * Two homes for an instrument, one set of edit functions (the caller passes the same `index` = id - 1 either way):
+ *  - SONG instrument (a klystrack song is loaded and owns slot `index`): `useFormatStore.klysNative.instruments`;
+ *    the engine slot `index` of the song is edited member by member.
+ *  - STANDALONE instrument (a KlysSynth instrument of no klystrack song - created from the synth menu or sitting in
+ *    any other song): `InstrumentConfig.klystrack`, a whole instrument value serialized with the project like every
+ *    other synth's config. The engine holds ONE preview copy of it (setPreviewInstrument), re-sent whole after each
+ *    edit and before each key (KlysSynth), so any number of standalone instruments share it.
+ * Standalone edits have no undo stack (the song's stack belongs to the song).
+ *
  * `useFormatStore.klysNative.instruments` is the source of truth (klys_save_song serialises the WASM song, so
  * every edit must reach the store AND the engine in the same call). Each edit clamps through KLYS_FIELDS, sends
  * the changed member to the engine at once (a knob must be heard as it moves), and writes the store once per
@@ -11,7 +20,7 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { KlysEngine } from '@/engine/klystrack/KlysEngine';
 import type { KlysNativeInstrument } from '@/types/tracker';
 import { klysInstrumentToEngine } from '@/engine/klystrack/klysSongData';
-import type { KlysPreset } from '@constants/klysPresets';
+import { klysInitInstrument, type KlysPreset } from '@constants/klysPresets';
 import {
   KLYS_EMPTY_STEP,
   KLYS_EXEMPT_BITS,
@@ -35,10 +44,29 @@ let flushScheduled = false;
 
 const clone = (i: Inst): Inst => ({ ...i, adsr: { ...i.adsr }, fm: { ...i.fm, adsr: { ...i.fm.adsr } }, program: [...i.program] });
 
-/** The instrument as the editor should read it now: pending edits first, then the store. */
+/** The instrument-list entry of slot `index`. */
+function configOf(index: number) {
+  return useInstrumentStore.getState().instruments.find((c) => c.id === klysInstrumentId(index));
+}
+
+/**
+ * Whether slot `index` is a standalone instrument: its config carries its own instrument value, or it is a KlysSynth
+ * entry no loaded klystrack song has a slot for. A song's instruments never carry config.klystrack.
+ */
+export function isStandaloneKlysInstrument(index: number): boolean {
+  const config = configOf(index);
+  if (!config || config.synthType !== 'KlysSynth') return false;
+  return config.klystrack !== undefined || !useFormatStore.getState().klysNative?.instruments[index];
+}
+
+/** The instrument as the editor should read it now: pending edits first, then its home (see the file comment). */
 function current(index: number): Inst | null {
   const queued = pending.get(index);
   if (queued) return queued;
+  if (isStandaloneKlysInstrument(index)) {
+    const own = configOf(index)?.klystrack;
+    return own ? clone(own) : klysInitInstrument();
+  }
   const stored = useFormatStore.getState().klysNative?.instruments[index];
   return stored ? clone(stored) : null;
 }
@@ -63,7 +91,10 @@ export function flushKlysInstrumentEdits(): void {
   flushScheduled = false;
   const queued = [...pending];
   pending.clear();
-  for (const [index, inst] of queued) useFormatStore.getState().setKlysInstrument(index, inst);
+  for (const [index, inst] of queued) {
+    if (isStandaloneKlysInstrument(index)) useInstrumentStore.getState().updateInstrument(klysInstrumentId(index), { klystrack: inst });
+    else useFormatStore.getState().setKlysInstrument(index, inst);
+  }
 }
 
 function queue(index: number, inst: Inst): void {
@@ -79,7 +110,13 @@ function engine(): KlysEngine | null {
 }
 
 function sendMember(index: number, member: KlysMemberKey, inst: Inst): void {
+  if (isStandaloneKlysInstrument(index)) { sendStandalone(inst); return; }
   engine()?.setInstrumentParam(index, KLYS_PARAM_IDS[member], KLYS_MEMBERS[member].get(inst));
+}
+
+/** The engine's one preview copy := this standalone instrument (also called by KlysSynth before each key). */
+export function sendStandalone(inst: Readonly<Inst>): void {
+  engine()?.setPreviewInstrument(klysInstrumentToEngine(inst as Inst));
 }
 
 /** Set one field to `value` (clamped to the original editor's range). */
@@ -108,6 +145,7 @@ function writeProgram(index: number, inst: Inst, program: number[]): void {
   queue(index, { ...inst, program });
   const e = engine();
   if (!e) return;
+  if (isStandaloneKlysInstrument(index)) { sendStandalone({ ...inst, program }); return; }
   for (let step = 0; step < KLYS_PROGRAM_LENGTH; step++) {
     if (program[step] !== before[step]) e.setInstrumentProgramStep(index, step, program[step]);
   }
@@ -148,7 +186,8 @@ export function renameKlysInstrument(index: number, name: string): void {
   if (!inst) return;
   const clipped = name.slice(0, KLYS_NAME_LENGTH);
   queue(index, { ...inst, name: clipped });
-  engine()?.setInstrumentName(index, clipped);
+  if (isStandaloneKlysInstrument(index)) sendStandalone({ ...inst, name: clipped });
+  else engine()?.setInstrumentName(index, clipped);
   useInstrumentStore.getState().updateInstrument(klysInstrumentId(index), { name: clipped });
 }
 
@@ -193,6 +232,7 @@ export function applyKlysPreset(index: number, preset: KlysPreset): void {
   if (!inst) return;
   const next: Inst = clone(preset.instrument);
   queue(index, next);
-  engine()?.setInstrumentData(index, klysInstrumentToEngine(next));
+  if (isStandaloneKlysInstrument(index)) sendStandalone(next);
+  else engine()?.setInstrumentData(index, klysInstrumentToEngine(next));
   useInstrumentStore.getState().updateInstrument(klysInstrumentId(index), { name: next.name });
 }

@@ -84,6 +84,13 @@ int synthv1_get_num_params(void* /*ptr*/)
 	return synthv1::NUM_PARAMS;
 }
 
+// Live voice report for the editor curves: 16 floats per voice, returns the voice count written.
+EMSCRIPTEN_KEEPALIVE
+int synthv1_get_voices(void* ptr, float* out, int maxVoices)
+{
+	return static_cast<synthv1*>(ptr)->getVoices(out, maxVoices);
+}
+
 EMSCRIPTEN_KEEPALIVE
 void synthv1_all_notes_off(void* ptr)
 {

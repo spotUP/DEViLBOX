@@ -6,6 +6,9 @@
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import type { OplVoiceStatus } from './oplVoiceStatus';
+import { levelToTotalLevel } from './oplLevel';
+import { DEFAULT_OPL3 } from '@/types/instrument/defaults';
+import type { OPL3Config } from '@/types/instrument/tonejs';
 
 export class OPL3Synth implements DevilboxSynth {
   readonly name = 'OPL3Synth';
@@ -41,13 +44,16 @@ export class OPL3Synth implements DevilboxSynth {
   private _channelIndex = -1; // -1 = keyboard mode, 0+ = tracker channel
   private _unmuted = false; // Start muted to prevent transient on preload
 
-  constructor() {
+  constructor(config?: OPL3Config) {
+    // The patch the instrument holds reaches the chip before the first note (a synth built without one plays DEFAULT_OPL3).
+    if (config) this.setState(config);
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
     this.output.gain.value = 0; // Muted until first note trigger
     OPL3Synth.instances.add(this);
     if (OPL3Synth.voiceListeners.size > 0) this.send({ type: 'watchVoices', on: true });
     this._initPromise = this.initWorklet();
+    this.setPatchRegisters(this.packRegisters());
   }
 
   private _initPromise: Promise<void>;
@@ -198,18 +204,7 @@ export class OPL3Synth implements DevilboxSynth {
    * Current patch state (individual parameters).
    * Packed into OPL3 registers when sending to worklet.
    */
-  private patchState = {
-    // Operator 1 (modulator) — ADSR, level, multiplier, waveform, flags
-    op1Attack: 1, op1Decay: 4, op1Sustain: 2, op1Release: 5,
-    op1Level: 32, op1Multi: 1, op1Waveform: 0,
-    op1Tremolo: 0, op1Vibrato: 0, op1SustainHold: 0, op1KSR: 0, op1KSL: 0,
-    // Operator 2 (carrier)
-    op2Attack: 1, op2Decay: 4, op2Sustain: 2, op2Release: 5,
-    op2Level: 0, op2Multi: 1, op2Waveform: 0,
-    op2Tremolo: 0, op2Vibrato: 0, op2SustainHold: 0, op2KSR: 0, op2KSL: 0,
-    // Global
-    feedback: 0, connection: 0,
-  };
+  private patchState: Record<keyof typeof DEFAULT_OPL3, number> = { ...DEFAULT_OPL3 } as Record<keyof typeof DEFAULT_OPL3, number>;
 
   /** Pack current patch state into 11 OPL3 registers */
   private packRegisters(): number[] {
@@ -219,10 +214,10 @@ export class OPL3Synth implements DevilboxSynth {
       ((s.op1Tremolo & 1) << 7) | ((s.op1Vibrato & 1) << 6) | ((s.op1SustainHold & 1) << 5) | ((s.op1KSR & 1) << 4) | (s.op1Multi & 0xF),
       // 0x20 car
       ((s.op2Tremolo & 1) << 7) | ((s.op2Vibrato & 1) << 6) | ((s.op2SustainHold & 1) << 5) | ((s.op2KSR & 1) << 4) | (s.op2Multi & 0xF),
-      // 0x40 mod: KSL(2) | TL(6) — level is inverted (63=quiet, 0=loud)
-      ((s.op1KSL & 3) << 6) | ((63 - (s.op1Level & 0x3F)) & 0x3F),
+      // 0x40 mod: KSL(2) | TL(6) — the config level is 63 = loud, the chip's TL is 0 = loud (oplLevel.ts)
+      ((s.op1KSL & 3) << 6) | (levelToTotalLevel(s.op1Level) & 0x3F),
       // 0x40 car
-      ((s.op2KSL & 3) << 6) | ((63 - (s.op2Level & 0x3F)) & 0x3F),
+      ((s.op2KSL & 3) << 6) | (levelToTotalLevel(s.op2Level) & 0x3F),
       // 0x60 mod: AR(4) | DR(4)
       ((s.op1Attack & 0xF) << 4) | (s.op1Decay & 0xF),
       // 0x60 car
@@ -240,14 +235,23 @@ export class OPL3Synth implements DevilboxSynth {
     ];
   }
 
-  /** Batch-update all patch parameters and send a single setPatch message */
-  applyPatch(params: Record<string, number>) {
+  private setState(params: object) {
     for (const [k, v] of Object.entries(params)) {
-      if (k in this.patchState) {
-        (this.patchState as Record<string, number>)[k] = Math.round(v);
+      if (k in this.patchState && (typeof v === 'number' || typeof v === 'boolean')) {
+        (this.patchState as Record<string, number>)[k] = Math.round(Number(v));
       }
     }
+  }
+
+  /** Batch-update all patch parameters and send a single setPatch message */
+  applyPatch(params: Record<string, number>) {
+    this.setState(params);
     this.setPatchRegisters(this.packRegisters());
+  }
+
+  /** The instrument's `opl3` config (the store's edit path, updateComplexSynthParameters, calls this on every knob and preset change). */
+  applyConfig(config: unknown) {
+    this.applyPatch((config ?? {}) as Record<string, number>);
   }
 
   set(param: string, value: number) {

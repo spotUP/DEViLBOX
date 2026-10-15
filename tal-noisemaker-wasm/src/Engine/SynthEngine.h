@@ -189,6 +189,36 @@ public:
 		voiceManager->setNoteOn(note, velocity);
 	}
 
+	// Voice report for the editor curves (src/engine/voiceStatus/wasmVoiceStatus.ts): 12 floats per sounding voice:
+	// note, amplitude stage, amplitude level, seconds since note on, final filter cutoff (the squared 0..1 value the
+	// filter receives), filter envelope level, LFO 1 phase in cycles, filter envelope stage, LFO 2 phase, free AD
+	// level, free AD stage, 0. Stage codes: 0 attack 1 decay 2 sustain 3 release 4 off. The LFOs are shared by all voices.
+	int getVoices(float* out, int maxVoices)
+	{
+		int n = 0;
+		SynthVoice** voices = voiceManager->getAllVoices();
+		for (int i = 0; i < voiceManager->MAX_VOICES && n < maxVoices; i++)
+		{
+			SynthVoice* v = voices[i];
+			if (!v->isNotePlaying()) continue;
+			float* r = out + 12 * n;
+			r[0] = (float)v->noteNumber;
+			r[1] = (float)v->getAmpStage();
+			r[2] = v->getAmpValue();
+			r[3] = v->getAgeSeconds();
+			r[4] = v->getLastCutoff();
+			r[5] = v->getFilterValue();
+			r[6] = lfoHandler1->getPhaseCycles();
+			r[7] = (float)v->getFilterStage();
+			r[8] = lfoHandler2->getPhaseCycles();
+			r[9] = v->getFreeValue();
+			r[10] = (float)v->getFreeStage();
+			r[11] = 0.0f;
+			++n;
+		}
+		return n;
+	}
+
 	void setNoteOff(int note)
 	{
 		voiceManager->setNoteOff(note);

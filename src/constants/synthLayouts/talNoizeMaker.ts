@@ -1,30 +1,25 @@
 import type { SynthPanelLayout } from '@/types/synthPanel';
+import {
+  talNoizeMakerCurves, talComboOptions, TAL_FILTER_TYPES, TAL_OSC1_WAVES, TAL_OSC2_WAVES, TAL_LFO_WAVES,
+  TAL_LFO1_DESTINATIONS, TAL_LFO2_DESTINATIONS, TAL_FREE_AD_DESTINATIONS,
+} from '@/components/instruments/curves/talNoizeMakerCurves';
+
+const curves = talNoizeMakerCurves();
 
 const fmtPct = (v: number) => `${Math.round(v * 100)}%`;
 
-const OSC_WAVE = [
-  { value: '0', label: 'Saw' }, { value: '1', label: 'Pulse' },
-  { value: '2', label: 'Noise' }, { value: '3', label: 'Triangle' }, { value: '4', label: 'Sine' },
-];
-const LFO_WAVE = [
-  { value: '0', label: 'Tri' }, { value: '1', label: 'Saw' },
-  { value: '2', label: 'Square' }, { value: '3', label: 'S&H' }, { value: '4', label: 'Sine' },
-];
-const LFO_DEST = [
-  { value: '0', label: 'Off' }, { value: '1', label: 'Filter' },
-  { value: '2', label: 'Osc' }, { value: '3', label: 'PW' }, { value: '4', label: 'Pan' },
-];
-const FREE_AD_DEST = [
-  { value: '0', label: 'Off' }, { value: '1', label: 'Filter' },
-  { value: '2', label: 'Osc' }, { value: '3', label: 'PW' }, { value: '4', label: 'Pan' },
-];
+// The engine reads every choice as a NORMALISED 0..1 value (AudioUtils::calcComboBoxValue), so the option values are the
+// normalised numbers, not 0, 1, 2...: item k of n is (k - 1) / (n - 1).
+const OSC1_WAVE = talComboOptions(TAL_OSC1_WAVES);
+const OSC2_WAVE = talComboOptions(TAL_OSC2_WAVES);
+const LFO_WAVE = talComboOptions(TAL_LFO_WAVES).map((o, i) => ({ ...o, value: String(i / 5) }));
+const LFO1_DEST = talComboOptions(TAL_LFO1_DESTINATIONS);
+const LFO2_DEST = talComboOptions(TAL_LFO2_DESTINATIONS);
+const FREE_AD_DEST = talComboOptions(TAL_FREE_AD_DESTINATIONS);
 const PORTA_MODE = [
   { value: '0', label: 'Auto' }, { value: '1', label: 'Always' },
 ];
-const FILTER_TYPE = [
-  { value: '0', label: 'LP 24' }, { value: '1', label: 'LP 12' },
-  { value: '2', label: 'HP' }, { value: '3', label: 'BP' },
-];
+const FILTER_TYPE = talComboOptions(TAL_FILTER_TYPES);
 
 export const TAL_NOIZEMAKER_LAYOUT: SynthPanelLayout = {
   name: 'TAL-NoiseMaker',
@@ -36,8 +31,9 @@ export const TAL_NOIZEMAKER_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'OSCILLATOR 1',
+          curves: [curves.osc1],
           controls: [
-            { type: 'select', key: 'osc1Waveform', label: 'WAVE', options: OSC_WAVE },
+            { type: 'select', key: 'osc1Waveform', label: 'WAVE', options: OSC1_WAVE },
             { type: 'knob', key: 'osc1Volume', label: 'VOL', color: '#ff9900', min: 0, max: 1, defaultValue: 0.8, formatValue: fmtPct },
             { type: 'knob', key: 'osc1PW', label: 'PW', color: '#ff9900', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
             { type: 'knob', key: 'osc1Tune', label: 'TUNE', color: '#ffcc00', min: 0, max: 1, defaultValue: 0.25, bipolar: true, formatValue: (v) => `${Math.round((v - 0.5) * 48)} st` },
@@ -47,8 +43,9 @@ export const TAL_NOIZEMAKER_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'OSCILLATOR 2',
+          curves: [curves.osc2],
           controls: [
-            { type: 'select', key: 'osc2Waveform', label: 'WAVE', options: OSC_WAVE },
+            { type: 'select', key: 'osc2Waveform', label: 'WAVE', options: OSC2_WAVE },
             { type: 'knob', key: 'osc2Volume', label: 'VOL', color: '#ff9900', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'osc2Tune', label: 'TUNE', color: '#ffcc00', min: 0, max: 1, defaultValue: 0.5, bipolar: true, formatValue: (v) => `${Math.round((v - 0.5) * 48)} st` },
             { type: 'knob', key: 'osc2FineTune', label: 'FINE', color: '#ffcc00', min: 0, max: 1, defaultValue: 0.5, bipolar: true, formatValue: (v) => `${Math.round((v - 0.5) * 200)} ct` },
@@ -63,7 +60,7 @@ export const TAL_NOIZEMAKER_LAYOUT: SynthPanelLayout = {
             { type: 'knob', key: 'osc3Volume', label: 'SUB VOL', color: '#ff6600', min: 0, max: 1, defaultValue: 0.8, formatValue: fmtPct },
             { type: 'knob', key: 'ringModulation', label: 'RING', color: '#cc66ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'masterTune', label: 'M.TUNE', color: '#66ccff', min: 0, max: 1, defaultValue: 0.5, bipolar: true, formatValue: (v) => `${Math.round((v - 0.5) * 200)} ct` },
-            { type: 'knob', key: 'transpose', label: 'XPOSE', color: '#66ccff', min: 0, max: 1, defaultValue: 0.5, bipolar: true, formatValue: (v) => `${Math.round((v - 0.5) * 48)} st` },
+            { type: 'knob', key: 'transpose', label: 'XPOSE', color: '#66ccff', min: 0, max: 1, defaultValue: 0.5, bipolar: true, formatValue: (v) => `${[-12, 0, 12, 24][Math.min(3, Math.floor(v * 3.00001))]} st` },
             { type: 'knob', key: 'volume', label: 'VOLUME', color: '#00ff99', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
           ],
         },
@@ -75,6 +72,7 @@ export const TAL_NOIZEMAKER_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'FILTER',
+          curves: [curves.filter],
           controls: [
             { type: 'select', key: 'filterType', label: 'TYPE', options: FILTER_TYPE },
             { type: 'knob', key: 'cutoff', label: 'CUTOFF', color: '#ffcc00', min: 0, max: 1, defaultValue: 1, formatValue: fmtPct },
@@ -86,6 +84,7 @@ export const TAL_NOIZEMAKER_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'FILTER ENVELOPE',
+          curves: [curves.filterEnv],
           controls: [
             { type: 'knob', key: 'filterAttack', label: 'ATK', color: '#22c55e', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'filterDecay', label: 'DEC', color: '#22c55e', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
@@ -95,6 +94,7 @@ export const TAL_NOIZEMAKER_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'AMP ENVELOPE',
+          curves: [curves.amp],
           controls: [
             { type: 'knob', key: 'ampAttack', label: 'ATK', color: '#ff3366', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'ampDecay', label: 'DEC', color: '#ff3366', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
@@ -110,11 +110,12 @@ export const TAL_NOIZEMAKER_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'LFO 1',
+          curves: [curves.lfo1],
           controls: [
             { type: 'select', key: 'lfo1Waveform', label: 'WAVE', options: LFO_WAVE },
             { type: 'knob', key: 'lfo1Rate', label: 'RATE', color: '#9966ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'lfo1Amount', label: 'AMOUNT', color: '#9966ff', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
-            { type: 'select', key: 'lfo1Destination', label: 'DEST', options: LFO_DEST },
+            { type: 'select', key: 'lfo1Destination', label: 'DEST', options: LFO1_DEST },
             { type: 'knob', key: 'lfo1Phase', label: 'PHASE', color: '#9966ff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'toggle', key: 'lfo1Sync', label: 'SYNC', labels: ['FREE', 'SYNC'] },
             { type: 'toggle', key: 'lfo1KeyTrigger', label: 'KEY', labels: ['FREE', 'KEY'] },
@@ -122,11 +123,12 @@ export const TAL_NOIZEMAKER_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'LFO 2',
+          curves: [curves.lfo2],
           controls: [
             { type: 'select', key: 'lfo2Waveform', label: 'WAVE', options: LFO_WAVE },
             { type: 'knob', key: 'lfo2Rate', label: 'RATE', color: '#06b6d4', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'lfo2Amount', label: 'AMOUNT', color: '#06b6d4', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
-            { type: 'select', key: 'lfo2Destination', label: 'DEST', options: LFO_DEST },
+            { type: 'select', key: 'lfo2Destination', label: 'DEST', options: LFO2_DEST },
             { type: 'knob', key: 'lfo2Phase', label: 'PHASE', color: '#06b6d4', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'toggle', key: 'lfo2Sync', label: 'SYNC', labels: ['FREE', 'SYNC'] },
             { type: 'toggle', key: 'lfo2KeyTrigger', label: 'KEY', labels: ['FREE', 'KEY'] },
@@ -134,6 +136,7 @@ export const TAL_NOIZEMAKER_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'FREE AD ENVELOPE',
+          curves: [curves.freeEnv],
           controls: [
             { type: 'knob', key: 'freeAdAttack', label: 'ATK', color: '#22c55e', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'freeAdDecay', label: 'DEC', color: '#22c55e', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
@@ -145,7 +148,7 @@ export const TAL_NOIZEMAKER_LAYOUT: SynthPanelLayout = {
           label: 'PERFORMANCE',
           controls: [
             { type: 'knob', key: 'portamento', label: 'PORTA', color: '#33ccff', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
-            { type: 'knob', key: 'voices', label: 'VOICES', color: '#66ccff', min: 0, max: 1, defaultValue: 1, formatValue: (v) => `${1 + Math.floor(15 * v)}` },
+            { type: 'knob', key: 'voices', label: 'VOICES', color: '#66ccff', min: 0, max: 1, defaultValue: 1, formatValue: (v) => `${Math.floor(v * 5 + 1.5)}` },
             { type: 'knob', key: 'detune', label: 'DETUNE', color: '#ffcc00', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
             { type: 'select', key: 'portamentoMode', label: 'PORT MODE', options: PORTA_MODE },
           ],

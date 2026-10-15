@@ -9,26 +9,8 @@ import * as Tone from 'tone';
 import { SynthRegistry } from '../SynthRegistry';
 import type { SynthDescriptor } from '../SynthDescriptor';
 import { registerVoiceSource } from '../../tone/toneVoiceProbe';
+import { getNormalizedVolume } from '../../factories/volumeNormalization';
 import { createToneSynthNode, toneVoiceOptions } from '../../tone/toneSynthKnobs';
-
-// Volume normalization offsets (from InstrumentFactory.VOLUME_NORMALIZATION_OFFSETS)
-const TONE_VOLUME_OFFSETS: Record<string, number> = {
-  Synth: 11,
-  MonoSynth: 14,
-  DuoSynth: 5,
-  FMSynth: 16,
-  ToneAM: 22,
-  PluckSynth: 32,
-  MetalSynth: 23,
-  MembraneSynth: 10,
-  NoiseSynth: 7,
-};
-
-function getNormalizedVolume(synthType: string, configVolume: number | undefined): number {
-  const baseVolume = configVolume ?? -12;
-  const offset = TONE_VOLUME_OFFSETS[synthType] ?? 0;
-  return baseVolume + offset;
-}
 
 // The accent boost factor — must match ToneEngine.ACCENT_BOOST
 const ACCENT_BOOST = 1.35;
@@ -40,7 +22,7 @@ const toneSynths: SynthDescriptor[] = [
     category: 'tone',
     loadMode: 'eager',
     volumeOffsetDb: 11,
-    create: (config) => createToneSynthNode('Synth', config, { volumeDb: getNormalizedVolume('Synth', config.volume) }),
+    create: (config) => createToneSynthNode('Synth', config),
   },
   {
     id: 'MonoSynth',
@@ -48,7 +30,7 @@ const toneSynths: SynthDescriptor[] = [
     category: 'tone',
     loadMode: 'eager',
     volumeOffsetDb: 14,
-    create: (config) => createToneSynthNode('MonoSynth', config, { volumeDb: getNormalizedVolume('MonoSynth', config.volume) }),
+    create: (config) => createToneSynthNode('MonoSynth', config),
     onTriggerRelease: (_synth, _note, time) => {
       // MonoSynth uses triggerRelease(time) — no note parameter
       (_synth as Tone.MonoSynth).triggerRelease(time);
@@ -61,7 +43,7 @@ const toneSynths: SynthDescriptor[] = [
     category: 'tone',
     loadMode: 'eager',
     volumeOffsetDb: 5,
-    create: (config) => createToneSynthNode('DuoSynth', config, { volumeDb: getNormalizedVolume('DuoSynth', config.volume) }),
+    create: (config) => createToneSynthNode('DuoSynth', config),
     onTriggerRelease: (_synth, _note, time) => {
       (_synth as Tone.DuoSynth).triggerRelease(time);
       return true;
@@ -73,7 +55,7 @@ const toneSynths: SynthDescriptor[] = [
     category: 'tone',
     loadMode: 'eager',
     volumeOffsetDb: 16,
-    create: (config) => createToneSynthNode('FMSynth', config, { volumeDb: getNormalizedVolume('FMSynth', config.volume) }),
+    create: (config) => createToneSynthNode('FMSynth', config),
   },
   {
     id: 'ToneAM',
@@ -81,7 +63,7 @@ const toneSynths: SynthDescriptor[] = [
     category: 'tone',
     loadMode: 'eager',
     volumeOffsetDb: 22,
-    create: (config) => createToneSynthNode('ToneAM', config, { volumeDb: getNormalizedVolume('ToneAM', config.volume) }),
+    create: (config) => createToneSynthNode('ToneAM', config),
   },
   {
     id: 'PluckSynth',

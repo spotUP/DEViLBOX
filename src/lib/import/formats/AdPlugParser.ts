@@ -16,6 +16,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import type { InstrumentConfig } from '@/types/instrument';
 import { DEFAULT_OPL3 } from '@/types/instrument';
+import { totalLevelToLevel } from '@/engine/opl3/oplLevel';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -88,9 +89,9 @@ function applyOPLRegisters(inst: InstrumentConfig, regs: Uint8Array, offset: num
   o.op2Multi = b[p + 1] & 0x0F;
   // KSL / Total Level
   o.op1KSL = (b[p + 2] >> 6) & 0x03;
-  o.op1Level = b[p + 2] & 0x3F;
+  o.op1Level = totalLevelToLevel(b[p + 2] & 0x3F); // the register is an attenuation, the config level is 63 = loud
   o.op2KSL = (b[p + 3] >> 6) & 0x03;
-  o.op2Level = b[p + 3] & 0x3F;
+  o.op2Level = totalLevelToLevel(b[p + 3] & 0x3F);
   // Attack / Decay
   o.op1Attack = (b[p + 4] >> 4) & 0x0F;
   o.op1Decay = b[p + 4] & 0x0F;

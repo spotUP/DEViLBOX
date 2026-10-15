@@ -15,7 +15,8 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, FurnaceOperatorConfig, FurnaceConfig } from '@/types';
-import type { OPL3Config } from '@/types/instrument';
+import { DEFAULT_OPL3, type OPL3Config } from '@/types/instrument';
+import { levelToTotalLevel } from '@/engine/opl3/oplLevel';
 
 // RAD v1 header magic
 const RAD_HEADER = 'RAD by REALiTY!!';
@@ -136,8 +137,8 @@ function encodeOPL3Instrument(o: OPL3Config): Uint8Array {
     ((o.op1SustainHold ?? 0) & 1) << 5 | ((o.op1KSR ?? 0) & 1) << 4 | ((o.op1Multi ?? 0) & 0x0F);
   bytes[1] = ((o.op2Tremolo ?? 0) & 1) << 7 | ((o.op2Vibrato ?? 0) & 1) << 6 |
     ((o.op2SustainHold ?? 0) & 1) << 5 | ((o.op2KSR ?? 0) & 1) << 4 | ((o.op2Multi ?? 0) & 0x0F);
-  bytes[2] = (((o.op1KSL ?? 0) & 0x03) << 6) | ((o.op1Level ?? 0) & 0x3F);
-  bytes[3] = (((o.op2KSL ?? 0) & 0x03) << 6) | ((o.op2Level ?? 0) & 0x3F);
+  bytes[2] = (((o.op1KSL ?? 0) & 0x03) << 6) | (levelToTotalLevel(o.op1Level ?? DEFAULT_OPL3.op1Level!) & 0x3F);
+  bytes[3] = (((o.op2KSL ?? 0) & 0x03) << 6) | (levelToTotalLevel(o.op2Level ?? DEFAULT_OPL3.op2Level!) & 0x3F);
   bytes[4] = (((o.op1Attack ?? 0) & 0x0F) << 4) | ((o.op1Decay ?? 0) & 0x0F);
   bytes[5] = (((o.op2Attack ?? 0) & 0x0F) << 4) | ((o.op2Decay ?? 0) & 0x0F);
   bytes[6] = (((o.op1Sustain ?? 0) & 0x0F) << 4) | ((o.op1Release ?? 0) & 0x0F);

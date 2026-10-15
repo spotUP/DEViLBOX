@@ -215,8 +215,8 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
       <div className="p-3 rounded bg-[#1a1a1a]">
         <SectionHeader title={`LFO ${page}`} />
         <div className="grid grid-cols-4 gap-3 mb-3">
-          <Knob value={merged[lfoK('Bpm', page)] as number} min={0} max={1}
-            onChange={(v) => update(lfoK('Bpm', page), v)}
+          <Knob value={merged[lfoK('Rate', page)] as number} min={0} max={1}
+            onChange={(v) => update(lfoK('Rate', page), v)}
             label="Rate" color="#f59e0b" />
           <Knob value={merged[lfoK('Width', page)] as number} min={0} max={1}
             onChange={(v) => update(lfoK('Width', page), v)}
@@ -324,7 +324,7 @@ export const SynthV1Controls: React.FC<SynthV1ControlsProps> = ({ config, onChan
             onChange={(v) => update('delayDelay', v)} label="Time" color="#f59e0b" />
           <Knob value={merged.delayFeedback} min={-1} max={1}
             onChange={(v) => update('delayFeedback', v)} label="Feedback" color="#f59e0b" bipolar />
-          <Knob value={merged.delayBpm} min={0} max={1}
+          <Knob value={merged.delayBpm} min={0} max={360}
             onChange={(v) => update('delayBpm', v)} label="BPM Sync" color="#f59e0b" />
         </div>
       </div>

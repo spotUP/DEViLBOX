@@ -134,7 +134,7 @@ export function dx7OperatorEnvelopeCurve(opNum: number, ctx: Dx7LayoutContext): 
     return result;
   };
   return {
-    label: `OP${opNum} Envelope`,
+    label: `Operator ${opNum} Envelope`,
     xDomain: (get, getText) => [0, Math.max(0.05, compute(get, getText).run.totalSeconds * 1.03)],
     yDomain: [0, 1],
     xUnit: 's',
@@ -332,7 +332,7 @@ export function dx7LfoCurve(ctx: Dx7LayoutContext): CurveDescriptor {
 export function dx7LevelScalingCurve(opNum: number, ctx: Dx7LayoutContext): CurveDescriptor {
   const compute = (get: Get, getText: GetText) => readOp(dx7Reader(ctx, get, getText), opNum);
   return {
-    label: `OP${opNum} Level Scaling`,
+    label: `Operator ${opNum} Keyboard Level Scaling`,
     height: 64,
     xDomain: [21, 108],
     yDomain: (get, getText) => {

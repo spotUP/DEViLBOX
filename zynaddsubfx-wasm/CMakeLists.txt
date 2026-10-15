@@ -10,7 +10,7 @@ if(NOT EMSCRIPTEN)
 endif()
 
 # ZynAddSubFX source tree
-set(ZYN_ROOT "${CMAKE_SOURCE_DIR}/../../Reference Code/zynaddsubfx-master")
+set(ZYN_ROOT "${CMAKE_SOURCE_DIR}/../Reference Code/zynaddsubfx-master")
 set(ZYN_SRC "${ZYN_ROOT}/src")
 
 # Pre-built dependency locations
@@ -208,6 +208,7 @@ set(EXPORTED_FUNCTIONS
     "_zasfx_get_num_params"
     "_zasfx_all_notes_off"
     "_zasfx_load_preset_xml"
+    "_zasfx_get_voices"
     "_malloc"
     "_free"
 )

@@ -112,7 +112,6 @@ const CMIControls = lazy(() => import('../controls/CMIControls').then(m => ({ de
 const MdaEPianoControls = lazy(() => import('../controls/MdaEPianoControls').then(m => ({ default: m.MdaEPianoControls })));
 const MdaJX10Controls = lazy(() => import('../controls/MdaJX10Controls').then(m => ({ default: m.MdaJX10Controls })));
 const MdaDX10Controls = lazy(() => import('../controls/MdaDX10Controls').then(m => ({ default: m.MdaDX10Controls })));
-const DX7Controls = lazy(() => import('../controls/DX7Controls').then(m => ({ default: m.DX7Controls })));
 const AMSynthControls = lazy(() => import('../controls/AMSynthControls').then(m => ({ default: m.AMSynthControls })));
 const RaffoSynthControls = lazy(() => import('../controls/RaffoSynthControls').then(m => ({ default: m.RaffoSynthControls })));
 const CalfMonoControls = lazy(() => import('../controls/CalfMonoControls').then(m => ({ default: m.CalfMonoControls })));
@@ -2703,8 +2702,8 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             </div>
           }
         />
-        <div className="synth-editor-content overflow-y-auto">
-          {uiMode === 'hardware' && hasHardware ? (
+        {uiMode === 'hardware' && hasHardware ? (
+          <div className="synth-editor-content overflow-y-auto">
             <HardwareUIWrapper
               synthType={instrument.synthType}
               parameters={(instrument.parameters || {}) as Record<string, number>}
@@ -2718,19 +2717,11 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                 });
               }}
             />
-          ) : (
-            <>
-              <Suspense fallback={<LoadingControls />}>
-                <DX7Controls
-                  instrument={instrument}
-                  onChange={handleChange}
-                />
-              </Suspense>
-              {/* DX7 FM parameter knobs (all 155 VCED params), algorithm diagram and curves; shows the voice the firmware plays */}
-              <DX7LayoutPanel instrument={instrument} onChange={(updates) => handleChange(updates as Partial<InstrumentConfig>)} />
-            </>
-          )}
-        </div>
+          </div>
+        ) : (
+          /* Tabs Voice / Operators / Modulation / Library: every VCED parameter, the curves, the searchable library; it scrolls itself */
+          <DX7LayoutPanel instrument={instrument} onChange={(updates) => handleChange(updates as Partial<InstrumentConfig>)} />
+        )}
       </div>
     );
   }

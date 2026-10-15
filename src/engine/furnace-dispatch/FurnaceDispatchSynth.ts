@@ -19,6 +19,7 @@ import { encodeFurnaceInstrument } from '@lib/export/FurnaceInstrumentEncoder';
 import type { FurnaceConfig } from '@typedefs/instrument';
 import { FurnaceChipType } from '@engine/chips/FurnaceChipEngine';
 import { getToneEngine } from '@engine/ToneEngine';
+import { fitFmToChip } from './fmInstrument';
 
 // DivInstrumentType constants (matching FurnaceInstrumentEncoder)
 const DIV_INS_FM = 1;
@@ -375,28 +376,8 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     // the LFSR feedback register stays 0 and no waveform is generated.
     // Spread-copy first: the config may be a frozen immer proxy from the store,
     // and we need to mutate chipType/ops/algorithm below for platform correction.
-    const enriched = { ...this.injectChipRequiredMacros(config as unknown as FurnaceConfig) };
-
-    // Correct chipType to match the platform's FM family.
-    // A generic config (e.g. DEFAULT_FURNACE chipType=1/OPN2) uploaded to an OPL chip
-    // would produce a mismatched instrument type, causing silence or wrong register writes.
-    if (correctChipType !== undefined && enriched.chipType !== correctChipType) {
-      console.log(`[FurnaceDispatchSynth] Correcting chipType ${enriched.chipType} → ${correctChipType} for platform ${this.platformType}`);
-      enriched.chipType = correctChipType;
-
-      // If converting from 4-op to 2-op (OPL family), fix operator config
-      if (correctChipType === 2 && enriched.ops !== 2) {
-        enriched.ops = 2;
-        enriched.algorithm = 0; // OPL alg 0 = FM (modulator→carrier)
-        if (enriched.operators && enriched.operators.length >= 2) {
-          // Ensure carrier (op[1]) has tl=0 for full output
-          enriched.operators = [
-            { ...enriched.operators[0], tl: Math.min(enriched.operators[0].tl, 30) },
-            { ...enriched.operators[enriched.operators.length > 2 ? 2 : 1], tl: 0 },
-          ];
-        }
-      }
-    }
+    // Reshape for the platform's FM family (chip id, 2-op for OPL/OPLL); see fmInstrument.ts.
+    const enriched = fitFmToChip(this.injectChipRequiredMacros(config as unknown as FurnaceConfig), correctChipType);
 
     // Encode from config using our encoder
     // The raw binary data from .fur files is in INS2 format, but the WASM expects

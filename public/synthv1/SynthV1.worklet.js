@@ -18,6 +18,12 @@ class SynthV1Processor extends AudioWorkletProcessor {
     this.lastHeapBuffer = null;
     this.initializing = false;
 
+    // Live voice report for the editor curves (src/engine/voiceStatus/wasmVoiceStatus.ts): 16 floats per voice
+    // (synth 1 record, then synth 2 record), so the stride is 16.
+    this.watchVoices = false;
+    this.voiceCounter = 0;
+    this.voicePtr = 0;
+
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
     };
@@ -73,6 +79,9 @@ class SynthV1Processor extends AudioWorkletProcessor {
           }
           this.port.postMessage({ type: 'state', values: Array.from(state), numParams });
         }
+        break;
+      case 'watchVoices':
+        this.watchVoices = !!data.on;
         break;
       case 'getInfo':
         if (this.engine) {
@@ -221,6 +230,10 @@ class SynthV1Processor extends AudioWorkletProcessor {
   }
 
   cleanup() {
+    if (this.module && this.voicePtr) {
+      this.module._free(this.voicePtr);
+      this.voicePtr = 0;
+    }
     if (this.module && this.engine) {
       this.module._synthv1_destroy(this.engine);
       this.engine = null;
@@ -269,7 +282,21 @@ class SynthV1Processor extends AudioWorkletProcessor {
     outputL.set(this.outputBufferL.subarray(0, numSamples));
     outputR.set(this.outputBufferR.subarray(0, numSamples));
 
+    this.reportVoices();
     return true;
+  }
+
+  // every 6th block (about 60 reports a second); layout in wasmVoiceStatus.ts, two 8-float records per voice
+  reportVoices() {
+    if (!this.watchVoices || typeof this.module._synthv1_get_voices !== 'function') return;
+    if (++this.voiceCounter < 6) return;
+    this.voiceCounter = 0;
+    const STRIDE = 16, MAX_VOICES = 32;
+    if (!this.voicePtr) this.voicePtr = this.module._malloc(MAX_VOICES * STRIDE * 4);
+    const n = this.module._synthv1_get_voices(this.engine, this.voicePtr, MAX_VOICES);
+    const heap = this.module.HEAPF32 || new Float32Array(this.module.wasmMemory.buffer);
+    const at = this.voicePtr >> 2;
+    this.port.postMessage({ type: 'voiceStatus', stride: STRIDE, voices: heap.slice(at, at + n * STRIDE) });
   }
 }
 
