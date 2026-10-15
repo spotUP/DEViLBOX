@@ -237,7 +237,11 @@ void dx7NoteOn(uint8_t note, uint8_t velocity) {
 EMSCRIPTEN_KEEPALIVE
 void dx7AllNotesOff() {
     if (!g_dx7 || !g_dx7->initialized) return;
+    // Release only keys that are down: the firmware consumes one key event per
+    // sub-CPU handshake (~1 ms), so 61 blind key-offs per call would queue ahead
+    // of the next note-on and delay or drop it.
     for (int i = 0; i < kDx7Keys; i++) {
+        if (!g_keyDown[i]) continue;
         g_keyDown[i] = false;
         g_dx7->toSynthPtr->key_off(static_cast<uint8_t>(i));
     }
