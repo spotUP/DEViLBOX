@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sectionFlexBasis, SECTION_PADDING } from '../synthPanelSizing';
+import { knobCellWidth, sectionFlexBasis, SECTION_PADDING } from '../synthPanelSizing';
 import { KLYSTRACK_LAYOUT } from '@/constants/synthLayouts/klystrack';
 import type { SectionDescriptor } from '@/types/synthPanel';
 
@@ -24,5 +24,12 @@ describe('synth panel section width', () => {
     for (const section of KLYSTRACK_LAYOUT.sections ?? []) {
       expect(sectionFlexBasis(section), section.label).toBeGreaterThanOrEqual(SECTION_PADDING + 80);
     }
+  });
+
+  it('a long knob label gets a cell wide enough that it cannot run into the next knob', () => {
+    expect(knobCellWidth('Cutoff')).toBe(80);
+    expect(knobCellWidth('Modulator Envelope Start')).toBeGreaterThan(24 * 6);
+    const wide: SectionDescriptor = { label: 'W', controls: [knob('Modulator Multiplier'), knob('Modulator Attack'), knob('Modulator Decay')] };
+    expect(sectionFlexBasis(wide)).toBeGreaterThan(3 * 80 + SECTION_PADDING);
   });
 });

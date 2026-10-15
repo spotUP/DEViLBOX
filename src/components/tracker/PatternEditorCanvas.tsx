@@ -430,6 +430,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         availableWidth: dimensions.width,
         fit: fitChannels,
         manualScale: mobileCanvas ? 1 : manualScale,
+        gutter: LNW,
       });
     }
 
