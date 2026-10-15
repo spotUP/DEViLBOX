@@ -215,6 +215,8 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
   const activeScheme = useKeyboardStore((s) => s.activeScheme);
   const setActiveScheme = useKeyboardStore((s) => s.setActiveScheme);
   const platformOverride = useKeyboardStore((s) => s.platformOverride);
+  const editBehaviour = useKeyboardStore((s) => s.editBehaviour);
+  const setEditBehaviour = useKeyboardStore((s) => s.setEditBehaviour);
   const setPlatformOverride = useKeyboardStore((s) => s.setPlatformOverride);
 
   // ── Store: useModlandContributionModal ───────────────────────────────────
@@ -382,7 +384,7 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
     showGhostPatterns, setShowGhostPatterns, smoothScrolling, setSmoothScrolling,
     recReleaseEnabled, setRecReleaseEnabled,
     // Keyboard store
-    activeScheme, setActiveScheme, platformOverride, setPlatformOverride,
+    activeScheme, setActiveScheme, platformOverride, setPlatformOverride, editBehaviour, setEditBehaviour,
     // Modland contribution
     clearDismissedHashes,
     // Local state

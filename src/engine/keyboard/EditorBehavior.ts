@@ -68,12 +68,8 @@ export interface EditorBehavior {
   // ── Edit step advancement ───────────────────────────────────────────────
   /** Advance cursor after entering a note */
   readonly advanceOnNote: boolean;
-  /** Advance after entering instrument digit */
-  readonly advanceOnInstrument: boolean;
-  /** Advance after entering volume digit */
-  readonly advanceOnVolume: boolean;
-  /** Advance after entering effect/param digit */
-  readonly advanceOnEffect: boolean;
+  // Cursor move after instrument / volume / effect entry is NOT a flag: it is an EntryAdvanceProfile
+  // (src/lib/tracker/entryAdvanceProfiles.ts), chosen by the 'Edit behaviour' setting.
   /** Advance after pressing Delete */
   readonly advanceOnDelete: boolean;
 
@@ -175,9 +171,6 @@ const ft2Behavior: EditorBehavior = {
   pageJumpSize: 16,
   skipHiddenVolumeColumn: true,
   advanceOnNote: true,
-  advanceOnInstrument: true,
-  advanceOnVolume: true,
-  advanceOnEffect: true,
   advanceOnDelete: true,
   deleteClearsWhat: 'note-inst-vol',
   deleteModifierVariants: true,
@@ -223,9 +216,6 @@ const protrackerBehavior: EditorBehavior = {
   pageJumpSize: 16,
   skipHiddenVolumeColumn: false,
   advanceOnNote: true,
-  advanceOnInstrument: true,
-  advanceOnVolume: false,
-  advanceOnEffect: true,
   advanceOnDelete: false,
   deleteClearsWhat: 'note-sample',
   deleteModifierVariants: false,
@@ -271,9 +261,6 @@ const impulseTrackerBehavior: EditorBehavior = {
   pageJumpSize: 16,
   skipHiddenVolumeColumn: false,
   advanceOnNote: true,
-  advanceOnInstrument: false,
-  advanceOnVolume: false,
-  advanceOnEffect: false,
   advanceOnDelete: false,
   deleteClearsWhat: 'cursor-field',
   deleteModifierVariants: false,
@@ -319,9 +306,6 @@ const renoIseBehavior: EditorBehavior = {
   pageJumpSize: 16,
   skipHiddenVolumeColumn: false,
   advanceOnNote: true,
-  advanceOnInstrument: true,
-  advanceOnVolume: true,
-  advanceOnEffect: true,
   advanceOnDelete: true,
   deleteClearsWhat: 'cursor-field',
   deleteModifierVariants: false,
@@ -367,9 +351,6 @@ const openmptBehavior: EditorBehavior = {
   pageJumpSize: 16,
   skipHiddenVolumeColumn: false,
   advanceOnNote: true,
-  advanceOnInstrument: true,
-  advanceOnVolume: true,
-  advanceOnEffect: true,
   advanceOnDelete: true,
   deleteClearsWhat: 'note-inst-vol',
   deleteModifierVariants: true,
@@ -415,9 +396,6 @@ const octamedBehavior: EditorBehavior = {
   pageJumpSize: 8,
   skipHiddenVolumeColumn: false,
   advanceOnNote: true,
-  advanceOnInstrument: true,
-  advanceOnVolume: true,
-  advanceOnEffect: true,
   advanceOnDelete: false,
   deleteClearsWhat: 'cursor-field',
   deleteModifierVariants: false,
