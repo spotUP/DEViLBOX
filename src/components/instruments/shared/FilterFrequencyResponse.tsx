@@ -25,13 +25,14 @@
  */
 
 import React, { useRef, useEffect, useCallback } from 'react';
+import {
+  makeBiquad, magnitudeDb as magnitudeDB, normalisedFilterParams,
+  FILTER_DB_MIN as DB_MIN, FILTER_DB_MAX as DB_MAX, type FilterType,
+} from '../curves/commonCurveModels';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SAMPLE_RATE    = 44100;
 const N_POINTS       = 400;      // evaluation points along the frequency axis
-const DB_MIN         = -60;
-const DB_MAX         = 18;
 const DB_RANGE       = DB_MAX - DB_MIN; // 78 dB
 
 const COLOR_BG       = '#0d1117';
@@ -41,7 +42,7 @@ const COLOR_LABEL    = '#475569';  // slate-600 for axis hints
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
-export type FilterType = 'lowpass' | 'highpass' | 'bandpass' | 'notch';
+export type { FilterType };
 
 export interface FilterFrequencyResponseProps {
   /** Filter topology (default 'lowpass') */
@@ -64,59 +65,6 @@ export interface FilterFrequencyResponseProps {
   color?: string;
   width?: number;
   height?: number;
-}
-
-// ─── Filter math (Audio EQ Cookbook) ─────────────────────────────────────────
-
-interface Coeffs {
-  b0: number; b1: number; b2: number;
-  a1: number; a2: number; // a0 normalised out
-}
-
-function makeBiquad(type: FilterType, fc: number, Q: number): Coeffs {
-  const f     = Math.max(20, Math.min(fc, SAMPLE_RATE * 0.499));
-  const w0    = (2 * Math.PI * f) / SAMPLE_RATE;
-  const cosw  = Math.cos(w0);
-  const sinw  = Math.sin(w0);
-  const alpha = sinw / (2 * Math.max(Q, 0.01));
-  const a0    = 1 + alpha;
-  const a1    = -2 * cosw;
-  const a2    = 1 - alpha;
-  let b0: number, b1: number, b2: number;
-
-  switch (type) {
-    case 'highpass':
-      b0 = (1 + cosw) / 2;  b1 = -(1 + cosw);  b2 = (1 + cosw) / 2; break;
-    case 'bandpass':
-      b0 = sinw / 2;         b1 = 0;             b2 = -sinw / 2;       break;
-    case 'notch':
-      b0 = 1;                b1 = -2 * cosw;     b2 = 1;               break;
-    default: // lowpass
-      b0 = (1 - cosw) / 2;  b1 = 1 - cosw;      b2 = (1 - cosw) / 2;
-  }
-
-  return { b0: b0/a0, b1: b1/a0, b2: b2/a0, a1: a1/a0, a2: a2/a0 };
-}
-
-/** Evaluate magnitude response in dB at a single frequency. */
-function magnitudeDB(c: Coeffs, freq: number, poles: 2 | 4): number {
-  const w     = (2 * Math.PI * freq) / SAMPLE_RATE;
-  const cosw  = Math.cos(w);
-  const sinw  = Math.sin(w);
-  const cos2w = Math.cos(2 * w);
-  const sin2w = Math.sin(2 * w);
-
-  const bRe = c.b0 + c.b1 * cosw + c.b2 * cos2w;
-  const bIm = -c.b1 * sinw - c.b2 * sin2w;
-  const aRe = 1    + c.a1 * cosw + c.a2 * cos2w;
-  const aIm = -c.a1 * sinw - c.a2 * sin2w;
-
-  const denom = aRe * aRe + aIm * aIm;
-  const mag   = Math.sqrt((bRe * bRe + bIm * bIm) / Math.max(denom, 1e-30));
-  const db    = 20 * Math.log10(Math.max(mag, 1e-10));
-
-  // 4-pole = two identical cascaded biquads → double the dB
-  return poles === 4 ? db * 2 : db;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -153,8 +101,7 @@ export const FilterFrequencyResponse: React.FC<FilterFrequencyResponseProps> = (
     const H = height;
 
     // ── Normalised params → real values ────────────────────────────────────
-    const fc = freqMin * Math.pow(freqMax / freqMin, Math.max(0, Math.min(1, cutoff)));
-    const Q  = qMin + Math.max(0, Math.min(1, resonance)) * (qMax - qMin);
+    const { fc, Q } = normalisedFilterParams(cutoff, resonance, freqMin, freqMax, qMin, qMax);
     const coeffs = makeBiquad(filterType, fc, Q);
 
     // ── Coordinate helpers ──────────────────────────────────────────────────

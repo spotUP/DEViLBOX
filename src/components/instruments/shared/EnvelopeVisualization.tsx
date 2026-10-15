@@ -24,6 +24,7 @@
  */
 
 import React, { useRef, useEffect, useCallback, useState } from 'react';
+import { msEnvelopeLayout } from '../curves/commonCurveModels';
 
 // ── Shared style constants ─────────────────────────────────────────────────────
 
@@ -474,14 +475,7 @@ function drawMS(
   w: number, h: number,
   p: MSProps, color: string,
 ) {
-  const atkMs = Math.max(0, p.attack);
-  const decMs = Math.max(0, p.decay);
-  const relMs = Math.max(0, p.release);
-  const susLevel = Math.max(0, Math.min(100, p.sustain)) / 100;
-
-  const adsr = atkMs + decMs + relMs;
-  const susHoldMs = Math.max(adsr * 0.2, 50);
-  const totalMs = adsr + susHoldMs;
+  const { atkMs, decMs, sus: susLevel, holdMs: susHoldMs, totalMs } = msEnvelopeLayout(p.attack, p.decay, p.sustain, p.release);
   if (totalMs === 0) return;
 
   const tx = (ms: number) => (ms / totalMs) * w;

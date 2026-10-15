@@ -9,16 +9,28 @@ import { toPixel, xFraction, xGridValues, type PlotBox } from './curveGeometry';
 
 const PAD = { padLeft: 4, padRight: 4, padTop: 4, padBottom: 4 };
 
+/** A curve whose axis ranges are fixed numbers for this draw. */
+export type ResolvedCurve = Omit<CurveDescriptor, 'xDomain' | 'yDomain'> & {
+  xDomain: readonly [number, number];
+  yDomain: readonly [number, number];
+};
+
 interface CurveCanvasProps {
-  curve: CurveDescriptor;
+  curve: ResolvedCurve;
   series: CurveSeries[];
   accent: string;
+  /** Text drawn in the top-right corner of the plot. */
+  readout?: string;
+  /** Reads a layout value (for the marker, which depends on the knobs). */
+  get: (key: string) => number;
 }
 
-export const CurveCanvas: React.FC<CurveCanvasProps> = ({ curve, series, accent }) => {
+export const CurveCanvas: React.FC<CurveCanvasProps> = ({ curve, series, accent, readout, get }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const markerRef = useRef<number | null>(null);
+  const getRef = useRef(get);
+  getRef.current = get;
   const [width, setWidth] = useState(0);
   const height = curve.height ?? 72;
 
@@ -68,6 +80,13 @@ export const CurveCanvas: React.FC<CurveCanvasProps> = ({ curve, series, accent 
       ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
     }
 
+    if (readout) {
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'right';
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.fillText(readout, width - PAD.padRight - 2, PAD.padTop + 9);
+    }
+
     const m = markerRef.current;
     if (m !== null) {
       const px = PAD.padLeft + xFraction(curve, m) * (width - PAD.padLeft - PAD.padRight);
@@ -76,11 +95,11 @@ export const CurveCanvas: React.FC<CurveCanvasProps> = ({ curve, series, accent 
     }
   };
 
-  useEffect(() => { draw.current(); }, [series, width, height, curve, accent]);
+  useEffect(() => { draw.current(); }, [series, width, height, curve, accent, readout]);
 
   useEffect(() => {
     if (!curve.marker) return undefined;
-    return curve.marker.subscribe((x) => { markerRef.current = x; draw.current(); });
+    return curve.marker.subscribe((x) => { markerRef.current = x; draw.current(); }, () => getRef.current);
   }, [curve.marker]);
 
   return (

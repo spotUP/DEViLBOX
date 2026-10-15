@@ -25,6 +25,7 @@ vi.mock('@/engine/klystrack/KlysEngine', async (importOriginal) => {
   const engine = Object.create(actual.KlysEngine.prototype) as Record<string, unknown>;
   engine.sendMessage = (msg: Record<string, unknown>) => { seen.sent.push(msg); seen.pending.push(seen.w!.send(msg)); };
   engine.subscribeProgramStatus = () => () => {};
+  engine.subscribeVoiceStatus = () => () => {};
   const K = actual.KlysEngine as unknown as { getInstance: () => unknown; hasInstance: () => boolean };
   K.getInstance = () => engine;
   K.hasInstance = () => true;

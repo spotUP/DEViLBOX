@@ -8,7 +8,7 @@ import React, { useCallback, useRef, useEffect, useState } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { CustomSelect } from '@components/common/CustomSelect';
 import type { SynthPanelLayout, SectionDescriptor, ControlDescriptor } from '@/types/synthPanel';
-import { CurveCanvas } from '../curves/CurveCanvas';
+import { CurveCanvas, type ResolvedCurve } from '../curves/CurveCanvas';
 import { SELECT_WIDTH, TOGGLE_CELL, knobCellWidth, sectionFlexBasis } from './synthPanelSizing';
 interface DOMSynthPanelProps {
   layout: SynthPanelLayout;
@@ -245,14 +245,19 @@ const DOMSynthSection: React.FC<SectionProps> = ({ section, flexBasis, getValue,
       {/* Curves: what this section's knobs do to the sound, redrawn as a knob moves */}
       {section.curves && section.curves.length > 0 && (
         <div className="flex flex-col gap-2 mb-3">
-          {section.curves.map((curve) => (
-            <CurveCanvas
-              key={curve.label}
-              curve={curve}
-              series={curve.series((key) => Number(getValue(key)))}
-              accent={accent}
-            />
-          ))}
+          {section.curves.map((curve) => {
+            // A value the config does not hold (the tracker side panel passes the bare instrument) reads as 0, never NaN.
+            const get = (key: string): number => { const n = Number(getValue(key)); return Number.isFinite(n) ? n : 0; };
+            const resolved: ResolvedCurve = {
+              ...curve,
+              xDomain: typeof curve.xDomain === 'function' ? curve.xDomain(get) : curve.xDomain,
+              yDomain: typeof curve.yDomain === 'function' ? curve.yDomain(get) : curve.yDomain,
+            };
+            const getText = (key: string): string => String(getValue(key) ?? '');
+            return (
+              <CurveCanvas key={curve.label} curve={resolved} series={curve.series(get, getText)} readout={curve.readout?.(get, getText)} accent={accent} get={get} />
+            );
+          })}
         </div>
       )}
 
