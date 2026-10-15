@@ -258,7 +258,8 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'SuperCollider') return 'supercollider';
   if (synthType === 'MusicLineSynth') return 'musicline';
   if (isOPL3Type(synthType)) return 'opl3';
-  if (synthType === 'WaveSabreSynth' || synthType === 'OidosSynth' || synthType === 'TunefishSynth') return 'xrns-synth';
+  // The demoscene synths have real layouts (knobs and curves); the XRNS info panel is only for one without.
+  if (synthType === 'WaveSabreSynth' || synthType === 'OidosSynth' || synthType === 'TunefishSynth') return getSynthLayout(synthType) ? 'layout' : 'xrns-synth';
   if (synthType === 'SunVoxSynth') return 'sunvox-synth';
   if (synthType === 'StartrekkerAMSynth') return 'startrekker-am';
   if (synthType === 'WobbleBass') return 'wobblebass';
