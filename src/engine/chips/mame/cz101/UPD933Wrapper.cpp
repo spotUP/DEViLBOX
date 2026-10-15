@@ -30,25 +30,20 @@ struct Envelope {
     uint32_t target = 0;
     uint32_t current = 0;
 
+    // MAME upd933.cpp env_t::update(): the envelope always moves toward its
+    // target; the sustain flag only decides whether arriving raises the
+    // (one-shot) interrupt that the CZ firmware uses to load the next stage.
     void update() {
-        if (!sustain) {
-            if (direction) {
-                // Falling
-                if (current > rate) current -= rate;
-                else current = 0;
-                if (current <= target) {
-                    current = target;
-                    irq = true;
-                }
+        if (current != target) {
+            if (!direction) {
+                if (current > target || target - current <= rate) current = target;
+                else current += rate;
             } else {
-                // Rising
-                current += rate;
-                if (current >= target) {
-                    current = target;
-                    irq = true;
-                }
+                if (current < target || current - target <= rate) current = target;
+                else current -= rate;
             }
         }
+        if (!sustain && current == target) irq = sustain = true;
     }
 };
 
@@ -218,10 +213,28 @@ public:
 
     float* getBuffer() { return m_outputBuffer; }
 
+    // Envelope inspection for the stage sequencer (kind 0 = DCA, 1 = DCW, 2 = DCO).
+    // level() is in the units of the step register's level field.
+    int takeIrq(int kind, int vnum) {
+        Envelope& e = env(kind, vnum);
+        int fired = e.irq ? 1 : 0;
+        e.irq = false;
+        return fired;
+    }
+    int level(int kind, int vnum) {
+        static const unsigned shift[3] = {ENV_DCA_SHIFT + 2, ENV_DCW_SHIFT + 3, ENV_DCO_SHIFT + 5};
+        return (int)(env(kind, vnum).current >> shift[kind]);
+    }
+
     void setCS(int state) { m_cs = state; }
     void setID(int state) { m_id = state; }
 
 private:
+    Envelope& env(int kind, int vnum) {
+        vnum &= 7;
+        return kind == 0 ? m_dca[vnum] : kind == 1 ? m_dcw[vnum] : m_dco[vnum];
+    }
+
     uint32_t envRate(uint8_t data) const {
         return (8 | (data & 7)) << (data >> 3);
     }
@@ -381,6 +394,16 @@ void upd933_reset() {
 EMSCRIPTEN_KEEPALIVE
 void upd933_write(uint8_t data) {
     if (g_upd933) g_upd933->write(data);
+}
+
+EMSCRIPTEN_KEEPALIVE
+int upd933_env_irq(int kind, int voice) {
+    return g_upd933 ? g_upd933->takeIrq(kind, voice) : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int upd933_env_level(int kind, int voice) {
+    return g_upd933 ? g_upd933->level(kind, voice) : 0;
 }
 
 EMSCRIPTEN_KEEPALIVE
