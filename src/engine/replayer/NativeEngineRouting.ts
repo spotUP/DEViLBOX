@@ -621,13 +621,12 @@ export async function startNativeEngines(
           uadeEngine = instance as unknown as UADEEngine;
         }
 
-        // Capture KlysEngine for position sync in TrackerReplayer (and the
-        // live row for DubRouter, as Hively does).
+        // Capture KlysEngine for position sync in TrackerReplayer. Its live
+        // row reaches the position store through the generic subscription
+        // below (one subscription: a second, reading other field names, wrote
+        // an undefined row over every report).
         if (desc.key === 'Klystrack') {
           klysEngine = instance as unknown as KlysEngine;
-          trackSubscription(klysEngine.onPositionUpdate((update) => {
-            reportEnginePosition(desc.key, update.patternPosition, update.songPosition);
-          }));
         }
 
         // Capture MusicLineEngine for position sync in TrackerReplayer

@@ -7,6 +7,7 @@
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { ChannelMeterFeed } from '../tone/channelMeterFeed';
+import { PositionCallbacks, type EnginePositionUpdate } from '@engine/wasm/PositionCallbacks';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -44,12 +45,6 @@ export interface KlysSongInfo {
   flags: number;
 }
 
-export interface KlysPositionUpdate {
-  songPosition: number;
-  patternPosition: number;
-  speed: number;
-}
-
 export interface KlysSongData {
   patterns: Array<{ numSteps: number; steps: Array<{ note: number; instrument: number; ctrl: number; volume: number; command: number }> }>;
   sequences: Array<{ entries: Array<{ position: number; pattern: number; noteOffset: number }> }>;
@@ -68,8 +63,6 @@ export interface KlysSongData {
   } | null>;
 }
 
-type PositionCallback = (update: KlysPositionUpdate) => void;
-
 export class KlysEngine extends WASMSingletonBase {
   private static instance: KlysEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
@@ -77,7 +70,13 @@ export class KlysEngine extends WASMSingletonBase {
   private _songPromise: Promise<KlysSongInfo> | null = null;
   private _resolveSong: ((info: KlysSongInfo) => void) | null = null;
   private _rejectSong: ((err: Error) => void) | null = null;
-  private _positionCallbacks: Set<PositionCallback> = new Set();
+  /**
+   * Position reports in the house shape (EnginePositionUpdate): row = the
+   * pattern step channel 0 plays, songPos = the song ROW (g_mus.song_position),
+   * klystrack's position unit. One shape means NativeEngineRouting wires it
+   * once, through its generic subscription.
+   */
+  private readonly _positions = new PositionCallbacks();
   private _songEndCallbacks: Set<() => void> = new Set();
   private _songDataCallbacks: Set<(data: KlysSongData) => void> = new Set();
   private _lastSongData: KlysSongData | null = null;
@@ -171,13 +170,7 @@ export class KlysEngine extends WASMSingletonBase {
           break;
 
         case 'position':
-          for (const cb of this._positionCallbacks) {
-            cb({
-              songPosition: data.songPosition,
-              patternPosition: data.patternPosition,
-              speed: data.speed,
-            });
-          }
+          this._positions.emit({ songPos: data.songPosition, row: data.patternPosition });
           break;
 
         case 'songEnd':
@@ -272,9 +265,8 @@ export class KlysEngine extends WASMSingletonBase {
     this.workletNode?.port.postMessage({ type: 'freeSong' });
   }
 
-  onPositionUpdate(cb: PositionCallback): () => void {
-    this._positionCallbacks.add(cb);
-    return () => this._positionCallbacks.delete(cb);
+  onPositionUpdate(cb: (update: EnginePositionUpdate) => void): () => void {
+    return this._positions.add(cb);
   }
 
   /**
@@ -289,10 +281,10 @@ export class KlysEngine extends WASMSingletonBase {
     let lastRow = -1;
     let lastPosition = -1;
     return this.onPositionUpdate((update) => {
-      if (update.patternPosition === lastRow && update.songPosition === lastPosition) return;
-      lastRow = update.patternPosition;
-      lastPosition = update.songPosition;
-      coordinator.dispatchEnginePosition(update.patternPosition, update.songPosition);
+      if (update.row === lastRow && update.songPos === lastPosition) return;
+      lastRow = update.row;
+      lastPosition = update.songPos;
+      coordinator.dispatchEnginePosition(update.row, update.songPos);
     });
   }
 
@@ -353,7 +345,7 @@ export class KlysEngine extends WASMSingletonBase {
 
   override dispose(): void {
     super.dispose();
-    this._positionCallbacks.clear();
+    this._positions.clear();
     this._songEndCallbacks.clear();
     if (KlysEngine.instance === this) {
       KlysEngine.instance = null;
