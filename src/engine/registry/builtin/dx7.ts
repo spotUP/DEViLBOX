@@ -15,7 +15,10 @@ const dx7Desc: SynthDescriptor = {
   useSynthBus: true,
   volumeOffsetDb: 14,
 
-  create: (config) => new DX7Synth(config.dx7?.vcedPreset),
+  create: (config) => new DX7Synth(
+    config.dx7?.vcedPreset,
+    config.dx7?.libraryBank ? { file: config.dx7.libraryBank, program: config.dx7.program ?? 0 } : undefined,
+  ),
 
   onTriggerAttack: (synth, note, time, velocity) => {
     (synth as DX7Synth).triggerAttack(note, time, velocity);

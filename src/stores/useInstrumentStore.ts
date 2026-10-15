@@ -826,7 +826,9 @@ export const useInstrumentStore = create<InstrumentStore>()(
                   if (!isNaN(paramNum)) synth.setVcedParam(paramNum, Math.round(value));
                 }
               }
-              if (dx7Updates.bank !== undefined && synth?.loadPatchBank) {
+              if (dx7Updates.libraryBank && synth?.loadLibraryBank) {
+                synth.loadLibraryBank(dx7Updates.libraryBank as string, (dx7Updates.program as number) ?? 0);
+              } else if (dx7Updates.bank !== undefined && synth?.loadPatchBank) {
                 const manifest = (synth.constructor as any).getPatchManifest?.();
                 const bankIdx = dx7Updates.bank as number;
                 const program = (dx7Updates.program as number) ?? 0;

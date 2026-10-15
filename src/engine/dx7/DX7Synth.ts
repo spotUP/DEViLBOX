@@ -6,6 +6,8 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import { DX7_LIBRARY_DIR } from './dx7Library';
+import { packDX7Voice } from './dx7sysex';
 
 export interface DX7PatchBank {
   file: string;
@@ -41,8 +43,11 @@ export class DX7Synth implements DevilboxSynth {
   private _initPromise: Promise<void>;
   private _vcedPresetName: string | undefined;
 
-  constructor(vcedPreset?: string) {
+  private _libraryStart: { file: string; program: number } | undefined;
+
+  constructor(vcedPreset?: string, library?: { file: string; program: number }) {
     this.audioContext = getDevilboxAudioContext();
+    this._libraryStart = library;
     this.output = this.audioContext.createGain();
     this.output.gain.value = 1.0;
     this._vcedPresetName = vcedPreset;
@@ -110,6 +115,11 @@ export class DX7Synth implements DevilboxSynth {
       // Non-fatal — synth works without patches, just silent
     }
 
+    // A library voice saved with the instrument replaces the default first bank
+    if (this._libraryStart) {
+      await this.loadLibraryBank(this._libraryStart.file, this._libraryStart.program);
+    }
+
     // If a VCED preset was requested, load it now
     if (this._vcedPresetName) {
       this._loadVcedPreset(this._vcedPresetName);
@@ -164,50 +174,7 @@ export class DX7Synth implements DevilboxSynth {
 
   /** Convert VCED (155 bytes unpacked) to VMEM (128 bytes packed) */
   static vcedToVmem(vced: Uint8Array): Uint8Array {
-    const vmem = new Uint8Array(128);
-    // 6 operators: VCED has 21 bytes/op, VMEM has 17 bytes/op
-    for (let op = 0; op < 6; op++) {
-      const vs = op * 21; // VCED source offset
-      const vd = op * 17; // VMEM dest offset
-      // Bytes 0-7: EG rates and levels — direct copy
-      for (let i = 0; i < 8; i++) vmem[vd + i] = vced[vs + i];
-      // Byte 8: KLS break point
-      vmem[vd + 8] = vced[vs + 8];
-      // Bytes 9-10: KLS left/right depth
-      vmem[vd + 9] = vced[vs + 9];
-      vmem[vd + 10] = vced[vs + 10];
-      // Byte 11: KLS left curve (0-3) | right curve (0-3) packed
-      vmem[vd + 11] = (vced[vs + 11] & 0x03) | ((vced[vs + 12] & 0x03) << 2);
-      // Byte 12: Rate scaling (0-7) | detune (0-14) packed
-      vmem[vd + 12] = (vced[vs + 13] & 0x07) | ((vced[vs + 20] & 0x0F) << 3);
-      // Byte 13: Amp mod sens (0-3) | key vel sens (0-7) packed
-      vmem[vd + 13] = (vced[vs + 14] & 0x03) | ((vced[vs + 15] & 0x07) << 2);
-      // Byte 14: Output level
-      vmem[vd + 14] = vced[vs + 16];
-      // Byte 15: Freq coarse (0-31) | osc mode (0-1) packed
-      vmem[vd + 15] = (vced[vs + 17] & 0x01) | ((vced[vs + 18] & 0x1F) << 1);
-      // Byte 16: Freq fine
-      vmem[vd + 16] = vced[vs + 19];
-    }
-    // Global params start at VCED offset 126, VMEM offset 102
-    // Pitch EG rates and levels (8 bytes)
-    for (let i = 0; i < 8; i++) vmem[102 + i] = vced[126 + i];
-    // Byte 110: Algorithm (0-31)
-    vmem[110] = vced[134] & 0x1F;
-    // Byte 111: Feedback (0-7) | Osc key sync (0-1) packed
-    vmem[111] = (vced[135] & 0x07) | ((vced[136] & 0x01) << 3);
-    // Bytes 112-115: LFO speed, delay, PMD, AMD
-    vmem[112] = vced[137];
-    vmem[113] = vced[138];
-    vmem[114] = vced[139];
-    vmem[115] = vced[140];
-    // Byte 116: LFO sync (0-1) | LFO wave (0-5) | LFO PMS (0-7) packed
-    vmem[116] = (vced[141] & 0x01) | ((vced[142] & 0x07) << 1) | ((vced[143] & 0x07) << 4);
-    // Byte 117: Transpose
-    vmem[117] = vced[144];
-    // Bytes 118-127: Voice name (10 ASCII chars)
-    for (let i = 0; i < 10; i++) vmem[118 + i] = vced[145 + i];
-    return vmem;
+    return packDX7Voice(vced);
   }
 
   /** Load a VCED preset by name (public API for preset switching) */
@@ -282,10 +249,10 @@ export class DX7Synth implements DevilboxSynth {
   }
 
   /** Load a sysex patch bank by filename and optionally select a voice */
-  async loadPatchBank(bankFile: string, voiceIndex = 0) {
+  async loadPatchBank(bankFile: string, voiceIndex = 0, dir = 'roms/dx7/Patches/') {
     const baseUrl = import.meta.env.BASE_URL || '/';
     try {
-      const resp = await fetch(`${baseUrl}roms/dx7/Patches/${bankFile}`);
+      const resp = await fetch(`${baseUrl}${dir}${bankFile}`);
       if (!resp.ok) throw new Error(`Failed to fetch ${bankFile}`);
       const data = await resp.arrayBuffer();
       console.log(`[DX7] loadPatchBank: ${bankFile} (${data.byteLength} bytes), voiceIndex=${voiceIndex}`);
@@ -298,6 +265,11 @@ export class DX7Synth implements DevilboxSynth {
     } catch (err) {
       console.error(`[DX7] Failed to load patch bank ${bankFile}:`, err);
     }
+  }
+
+  /** Load a bank from the curated library (public/data/sysex/dx7) and select a voice. */
+  async loadLibraryBank(bankFile: string, voiceIndex = 0) {
+    await this.loadPatchBank(bankFile, voiceIndex, DX7_LIBRARY_DIR);
   }
 
   /** Select a voice within the currently loaded bank (0-31) */

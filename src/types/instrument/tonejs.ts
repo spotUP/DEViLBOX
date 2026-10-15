@@ -911,6 +911,7 @@ export interface DX7Config {
   bank?: number;              // 0-7 (cartridge bank)
   program?: number;           // 0-31 (voice within bank)
   vcedPreset?: string;        // VCED preset name from dx7presets.ts
+  libraryBank?: string;       // curated library bank file (public/data/sysex/dx7); program selects the voice
 }
 
 /**

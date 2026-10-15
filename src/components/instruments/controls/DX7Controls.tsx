@@ -10,6 +10,11 @@ import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react'
 import { CustomSelect } from '@components/common/CustomSelect';
 import { DX7Synth, type DX7PatchManifest } from '../../../engine/dx7/DX7Synth';
 import { getToneEngine } from '../../../engine/ToneEngine';
+import { inspectDX7Sysex } from '../../../engine/dx7/dx7sysex';
+import {
+  fetchDX7LibraryManifest, dx7LibrarySelectGroups, dx7LibraryValue, parseDX7LibraryValue,
+  type DX7LibraryManifest,
+} from '../../../engine/dx7/dx7Library';
 
 interface DX7ControlsProps {
   instrument: {
@@ -21,6 +26,7 @@ interface DX7ControlsProps {
       bank?: number;
       program?: number;
       vcedPreset?: string;
+      libraryBank?: string;
     };
   };
   onChange: (updates: Record<string, unknown>) => void;
@@ -60,6 +66,8 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
   const [selectedBank, setSelectedBank] = useState(instrument.dx7?.bank ?? 0);
   const [selectedVoice, setSelectedVoice] = useState(instrument.dx7?.program ?? 0);
   const [currentVoiceName, setCurrentVoiceName] = useState('');
+  const [library, setLibrary] = useState<DX7LibraryManifest | null>(null);
+  const [importStatus, setImportStatus] = useState('');
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const configRef = useRef(instrument.dx7);
@@ -75,6 +83,12 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
     } else {
       DX7Synth.fetchPatchManifest().then(m => { if (m) setManifest(m); });
     }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchDX7LibraryManifest().then(m => { if (!cancelled && m) setLibrary(m); });
+    return () => { cancelled = true; };
   }, []);
 
   // Eagerly create synth on mount and cache the reference
@@ -154,7 +168,7 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
     if (synth?.loadPatchBank) {
       await synth.loadPatchBank(bank.file, voiceIndex);
     }
-    onChange({ dx7: { ...configRef.current, bank: bankIndex, program: voiceIndex, vcedPreset: undefined } });
+    onChange({ dx7: { ...configRef.current, bank: bankIndex, program: voiceIndex, vcedPreset: undefined, libraryBank: undefined } });
     setLoading(false);
   }, [manifest, getSynth, onChange]);
 
@@ -169,50 +183,54 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
       // the firmware's voice memory with a single-voice bulk dump.
       await synth.loadPatchBank(currentBank.file, voiceIndex);
     }
-    onChange({ dx7: { ...configRef.current, bank: selectedBank, program: voiceIndex, vcedPreset: undefined } });
+    onChange({ dx7: { ...configRef.current, bank: selectedBank, program: voiceIndex, vcedPreset: undefined, libraryBank: undefined } });
   }, [currentBank, selectedBank, getSynth, onChange]);
 
   // Load VCED preset — update state (store handles synth call)
   const loadVcedPreset = useCallback((name: string) => {
     setCurrentVoiceName(name);
-    onChange({ dx7: { ...configRef.current, vcedPreset: name, bank: undefined, program: undefined } });
+    onChange({ dx7: { ...configRef.current, vcedPreset: name, bank: undefined, program: undefined, libraryBank: undefined } });
   }, [onChange]);
+
+  // Curated library voice: the store loads the bank into the synth (loadLibraryBank)
+  const selectLibraryVoice = useCallback((value: string) => {
+    const pick = parseDX7LibraryValue(value);
+    if (!pick) return;
+    const bank = library?.banks.find(b => b.file === pick.file);
+    setCurrentVoiceName(bank?.voices[pick.index] || `Voice ${pick.index + 1}`);
+    setSelectedVoice(pick.index);
+    onChange({ dx7: { ...configRef.current, libraryBank: pick.file, program: pick.index, bank: undefined, vcedPreset: undefined } });
+  }, [library, onChange]);
+
+  const libraryBank = library?.banks.find(b => b.file === instrument.dx7?.libraryBank);
 
   // Volume change
   const handleVolumeChange = useCallback((v: number) => {
     onChange({ volume: v });
   }, [onChange]);
 
-  // File loading
+  // File loading: one parser (inspectDX7Sysex) for bulk banks and single voices
   const handleFile = useCallback(async (file: File) => {
-    const buffer = await file.arrayBuffer();
-    const data = new Uint8Array(buffer);
+    const data = new Uint8Array(await file.arrayBuffer());
     const synth = getSynth();
-    console.log('[DX7Controls] handleFile:', file.name, 'size=', data.length, 'synth=', synth);
-
-    if ((data.length === 4104 || data.length === 4096) && synth) {
-      if (data.length === 4096) {
-        const sysex = new Uint8Array(4104);
-        sysex[0] = 0xF0; sysex[1] = 0x43; sysex[2] = 0x00;
-        sysex[3] = 0x09; sysex[4] = 0x20; sysex[5] = 0x00;
-        sysex.set(data, 6);
-        let sum = 0;
-        for (let i = 0; i < 4096; i++) sum += data[i];
-        sysex[4102] = (-sum) & 0x7F;
-        sysex[4103] = 0xF7;
-        synth.loadSysex(sysex.buffer);
-      } else {
-        synth.loadSysex(buffer);
-      }
+    const found = inspectDX7Sysex(data);
+    if (found.kind === 'unknown') {
+      setImportStatus(`${file.name}: not a DX7 voice or 32-voice bank (${data.length} bytes)`);
+      return;
+    }
+    if (!synth) {
+      setImportStatus('Synth not ready yet, try again in a moment');
+      return;
+    }
+    if (found.kind === 'bulk32' && found.bulkSysex) {
+      synth.loadSysex(found.bulkSysex.slice().buffer);
       setCurrentVoiceName(`${file.name} (32 voices)`);
-    } else if (data.length >= 155 && data.length <= 163 && synth) {
-      // Single voice VCED
-      const vcedStart = data[0] === 0xF0 ? 6 : 0;
-      const vcedData = data.subarray(vcedStart, vcedStart + 155);
-      (synth as any)._loadVcedData(new Uint8Array(vcedData));
+      const notes = [!found.checksumOk && 'checksum was wrong', found.repairs > 0 && `${found.repairs} out-of-range values clamped`].filter(Boolean);
+      setImportStatus(notes.length ? `Loaded ${file.name} (${notes.join(', ')})` : `Loaded ${file.name}`);
+    } else if (found.vced) {
+      synth._loadVcedData(new Uint8Array(found.vced));
       setCurrentVoiceName(`${file.name} (single voice)`);
-    } else if (!synth) {
-      console.warn('[DX7Controls] No synth available for file loading');
+      setImportStatus(`Loaded ${file.name}`);
     }
   }, [getSynth]);
 
@@ -279,6 +297,29 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
         </div>
       </div>
 
+      {/* Curated library, grouped by bank, with attribution */}
+      {library && (
+        <div className="border border-ft2-border rounded p-2">
+          <div className="text-ft2-highlight text-[10px] font-bold uppercase mb-2 tracking-wider">
+            Library ({library.banks.length} banks, {library.banks.length * 32} voices)
+          </div>
+          <CustomSelect
+            value={instrument.dx7?.libraryBank ? dx7LibraryValue(instrument.dx7.libraryBank, instrument.dx7.program ?? 0) : ''}
+            onChange={selectLibraryVoice}
+            options={dx7LibrarySelectGroups(library)}
+            placeholder="Choose a library voice"
+            className="w-full bg-dark-bgSecondary text-text-primary border border-ft2-border rounded px-2 py-1.5 text-[11px] focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+          />
+          {libraryBank && (
+            <div className="mt-2 text-[9px] text-text-muted font-mono space-y-0.5">
+              <div>{libraryBank.author}</div>
+              <div>{libraryBank.licence}</div>
+              <a href={libraryBank.source} target="_blank" rel="noreferrer" className="text-accent-primary underline break-all">{libraryBank.source}</a>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Patch Bank Browser */}
       {manifest && (
         <div className="border border-ft2-border rounded p-2">
@@ -302,7 +343,7 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
                   key={i}
                   onClick={() => selectVoiceInBank(i)}
                   className={`px-1.5 py-1 text-[9px] rounded transition-all truncate text-left ${
-                    selectedVoice === i && !instrument.dx7?.vcedPreset
+                    selectedVoice === i && !instrument.dx7?.vcedPreset && !instrument.dx7?.libraryBank
                       ? 'bg-amber-500/30 text-amber-300 ring-1 ring-amber-500/50 font-bold'
                       : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgTertiary hover:text-text-primary'
                   }`}
@@ -329,10 +370,10 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
         onClick={() => fileInputRef.current?.click()}
       >
         <div className="text-text-muted text-[10px]">
-          Drop .SYX file here or click to browse
+          Load SysEx file... (drop a .syx file here or click)
         </div>
         <div className="text-text-muted/50 text-[9px] mt-1">
-          Supports 32-voice bulk dumps (4104 bytes)
+          {importStatus || 'Supports 32-voice bulk dumps and single-voice dumps'}
         </div>
         <input
           ref={fileInputRef}
