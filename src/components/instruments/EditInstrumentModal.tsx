@@ -447,10 +447,14 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
               // Collapsed state - just show expand button
               <button
                 onClick={() => setLeftPanelCollapsed(false)}
-                className="w-full h-full flex items-start justify-center pt-3 text-text-muted hover:text-text-primary hover:bg-dark-bgTertiary transition-colors"
+                className="flex flex-col items-center justify-start gap-3 pt-3 w-full h-full text-text-muted hover:text-text-primary hover:bg-dark-bgTertiary transition-colors"
                 title="Show instrument list"
               >
                 <ChevronRight size={16} />
+                {/* Same vertical label as the collapsed Studio panels. */}
+                <span className="rotate-180 tracking-widest font-mono text-[10px] uppercase" style={{ writingMode: 'vertical-lr' }}>
+                  Instruments
+                </span>
               </button>
             ) : (
               // Expanded state - show instrument list with collapse button
