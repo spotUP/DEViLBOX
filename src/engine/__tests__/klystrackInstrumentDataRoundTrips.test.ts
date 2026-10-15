@@ -131,6 +131,22 @@ describe('klystrack instrument data', () => {
     expect(closed, `the cutoff edit darkens the held note (open ${open}, closed ${closed})`).toBeLessThan(open * 0.5);
   });
 
+  it('an audition on a freshly loaded song does not start the song, and Play afterwards still does', { timeout: 120000 }, async () => {
+    const { w, data } = await loaded(songBuffer(SONG));
+    const out = stereoOutputs(1);
+    const playable = data.instruments.findIndex((i) => i && i.cydflags !== 0 && i.volume > 0);
+    const rows = (): number[] => msgs(w).filter((m) => m.type === 'position').map((m) => m.songPosition as number);
+    msgs(w).splice(0);
+    await w.send({ type: 'previewNoteOn', inst: playable, note: 48 });
+    for (let i = 0; i < 48000 * 2 / 128; i++) w.proc.process([], out);
+    expect(new Set(rows()).size, `the song stays on its row ${rows().slice(0, 4)}`).toBeLessThanOrEqual(1);
+    await w.send({ type: 'previewNoteOff' });
+    msgs(w).splice(0);
+    await w.send({ type: 'play' });
+    for (let i = 0; i < 48000 * 2 / 128; i++) w.proc.process([], out);
+    expect(new Set(rows()).size, 'Play after an audition runs the song').toBeGreaterThan(1);
+  });
+
   it('programStatus reports each playing channel while watched, and songData carries the wavetables', { timeout: 120000 }, async () => {
     const { w, data } = await loaded(songBuffer(SONG));
     expect(Array.isArray(data.wavetables)).toBe(true);

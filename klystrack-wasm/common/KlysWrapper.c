@@ -29,6 +29,7 @@ static MusSong g_song;
 static int g_initialized = 0;
 static int g_song_loaded = 0;
 static int g_playing = 0;
+static int g_song_attached = 0; /* the sequencer is bound to g_song (load binds it, stop and free unbind it) */
 static int g_song_ended = 0;
 /* 1 while the audition note on the spare channel is sounding with the song stopped */
 static int g_preview = 0;
@@ -138,6 +139,7 @@ int klys_load_song(const void *buf, Uint32 len)
 
     if (g_song_loaded) {
         mus_set_song(&g_mus, NULL, 0);
+        g_song_attached = 0;
         mus_free_song(&g_song);
         g_song_loaded = 0;
         g_playing = 0;
@@ -156,6 +158,7 @@ int klys_load_song(const void *buf, Uint32 len)
         /* Set up the callback chain: cyd calls mus_advance_tick at song_rate Hz */
         cyd_set_callback(&g_cyd, mus_advance_tick, &g_mus, g_song.song_rate);
         mus_set_song(&g_mus, &g_song, 0);
+        g_song_attached = 1;
         g_playing = 1;
     }
 
@@ -167,6 +170,7 @@ void klys_free_song(void)
 {
     if (g_song_loaded) {
         mus_set_song(&g_mus, NULL, 0);
+        g_song_attached = 0;
         mus_free_song(&g_song);
         g_song_loaded = 0;
         g_playing = 0;
@@ -252,6 +256,7 @@ void klys_stop(void)
 {
     if (!g_initialized) return;
     mus_set_song(&g_mus, NULL, 0);
+    g_song_attached = 0;
     g_playing = 0;
     g_preview = 0;
 }
@@ -1191,6 +1196,18 @@ int klys_get_wavetable_info(int i, void *out)
  * which a song with at most 31 channels never uses. Never starts or stops the
  * song. note is the klystrack note number (C-0 = 0). Returns 1 when started.
  */
+/*
+ * A loaded song is bound to the sequencer and would advance as soon as the engine renders, so an audition with the
+ * transport stopped would also play the song. Unbinding it keeps its position and state (only the pointer moves)
+ * and the channels still run their instrument programs; binding it again resumes exactly where it was.
+ */
+EMSCRIPTEN_KEEPALIVE
+void klys_set_song_running(int on)
+{
+    if (!g_initialized || !g_song_loaded || !g_song_attached) return;
+    g_mus.song = on ? &g_song : NULL;
+}
+
 EMSCRIPTEN_KEEPALIVE
 int klys_preview_note_on(int inst, int note)
 {

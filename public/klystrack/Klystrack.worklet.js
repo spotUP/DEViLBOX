@@ -62,6 +62,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
 
       case 'play':
         this.playing = true;
+        if (this.wasm) this.wasm._klys_set_song_running(1);
         if (this.wasm) this.wasm._klys_pause(0);
         break;
 
@@ -136,6 +137,8 @@ class KlystrackProcessor extends AudioWorkletProcessor {
       }
 
       case 'previewNoteOn':
+        // With the transport stopped the audition must not start the song.
+        if (this.wasm && this.songLoaded && !this.playing) this.wasm._klys_set_song_running(0);
         if (this.wasm && this.songLoaded && this.wasm._klys_preview_note_on(data.inst, data.note)) {
           this.previewing = true;
           this.wasm._klys_pause(0);
