@@ -442,7 +442,7 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
       <div className="bg-dark-bg w-full h-full flex flex-col overflow-hidden">
         <div className="flex h-full">
           {/* Left Sidebar: Instrument List (Collapsible) — hidden on mobile */}
-          {!isPhone && <div className={`border-r border-dark-border flex-shrink-0 bg-dark-bgSecondary transition-all duration-200 ${leftPanelCollapsed ? 'w-8' : 'w-52'}`}>
+          {!isPhone && <div className={`border-r border-dark-border flex-shrink-0 bg-dark-bgSecondary transition-all duration-200 ${leftPanelCollapsed ? 'w-8' : 'w-fit min-w-52 max-w-[26rem]'}`}>
             {leftPanelCollapsed ? (
               // Collapsed state - just show expand button
               <button
