@@ -79,45 +79,52 @@ export const CZ101PatchBrowser: React.FC<{
   onParamChange: (key: string, value: number) => void;
 }> = ({ parameters, onParamChange }) => {
   const p = useCz101Patches(parameters, onParamChange);
+  // Every patch is a cell of one size in a grid, so rows and columns line up whatever the names are.
+  const grid = 'grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-1';
+  const cell = 'w-full justify-start overflow-hidden text-ellipsis';
   return (
-    <div className="flex flex-col gap-2 rounded border border-dark-border bg-dark-bgSecondary p-3">
-      <div className="text-[10px] font-mono uppercase tracking-widest text-text-muted">Factory</div>
-      <div className="flex flex-wrap gap-1">
-        {CZ101_PRESET_BANK.map((entry, index) => (
-          <Button key={entry.patch.name} size="sm" variant={!p.activeUser && index === p.program ? 'primary' : 'default'} onClick={() => p.chooseFactory(index)}>
-            {entry.patch.name}
-          </Button>
-        ))}
-      </div>
-      <div className="text-[10px] font-mono uppercase tracking-widest text-text-muted">User</div>
-      <div
-        data-sample-drop-zone
-        onDragOver={(event) => { event.preventDefault(); p.setDragOver(true); }}
-        onDragLeave={() => p.setDragOver(false)}
-        onDrop={p.onDrop}
-        className={`rounded border border-dashed p-2 ${p.dragOver ? 'border-accent-primary bg-accent-primary/10' : 'border-dark-borderLight'}`}
-      >
+    <div
+      data-sample-drop-zone
+      onDragOver={(event) => { event.preventDefault(); p.setDragOver(true); }}
+      onDragLeave={() => p.setDragOver(false)}
+      onDrop={p.onDrop}
+      className={`flex flex-col gap-3 rounded border bg-dark-bgSecondary p-3 ${p.dragOver ? 'border-accent-primary bg-accent-primary/10' : 'border-dark-border'}`}
+    >
+      <section className="flex flex-col gap-1">
+        <div className="text-[10px] font-mono uppercase tracking-widest text-text-secondary">Factory</div>
+        <div className={grid}>
+          {CZ101_PRESET_BANK.map((entry, index) => (
+            <Button key={entry.patch.name} size="sm" className={cell} variant={!p.activeUser && index === p.program ? 'primary' : 'default'} onClick={() => p.chooseFactory(index)}>
+              {entry.patch.name}
+            </Button>
+          ))}
+        </div>
+      </section>
+      <section className="flex flex-col gap-1">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-text-secondary">User</div>
+          <div className="flex items-center gap-1">
+            {p.activeUser && (
+              <Button size="sm" variant="ghost" onClick={() => { p.removePatch(p.activeUser!.id); p.chooseFactory(0); }}>Remove Selected</Button>
+            )}
+            <Button size="sm" onClick={() => p.fileInput.current?.click()}>Load SysEx File(s)</Button>
+          </div>
+        </div>
         {p.userPatches.length === 0 ? (
-          <div className="mb-2 text-center text-[10px] font-mono text-text-secondary">
+          <div className="rounded border border-dashed border-dark-borderLight p-3 text-center text-[10px] font-mono text-text-secondary">
             No user patches yet. Load Casio CZ single-patch SysEx files (.syx from a CZ-101, CZ-1000, CZ-3000 or CZ-5000), or drop them here.
           </div>
         ) : (
-          <div className="mb-2 flex flex-wrap gap-1">
+          <div className={grid}>
             {p.userPatches.map((entry) => (
-              <Button key={entry.id} size="sm" variant={entry.id === p.userPatchId ? 'primary' : 'default'} onClick={() => p.chooseUser(entry.id)}>
+              <Button key={entry.id} size="sm" className={cell} variant={entry.id === p.userPatchId ? 'primary' : 'default'} onClick={() => p.chooseUser(entry.id)}>
                 {entry.name}
               </Button>
             ))}
           </div>
         )}
-        <div className="flex flex-wrap justify-center gap-1">
-          <Button size="sm" variant="primary" onClick={() => p.fileInput.current?.click()}>Load SysEx File(s)</Button>
-          {p.activeUser && (
-            <Button size="sm" onClick={() => { p.removePatch(p.activeUser!.id); p.chooseFactory(0); }}>Remove This Patch</Button>
-          )}
-        </div>
         <input ref={p.fileInput} type="file" accept=".syx,audio/sysex,application/octet-stream" multiple className="hidden" onChange={p.onFilesPicked} />
-      </div>
+      </section>
     </div>
   );
 };
