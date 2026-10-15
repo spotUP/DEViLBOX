@@ -1,16 +1,15 @@
 /**
  * KlysSynth.ts - DevilboxSynth wrapper for klystrack engine
  *
- * Song playback mode: triggerAttack starts playback, triggerRelease stops.
+ * A key previews the instrument on the engine's spare channel; the song is started and stopped by the transport only.
  */
 
 import type { DevilboxSynth } from '@/types/synth';
-import { getDevilboxAudioContext } from '@/utils/audio-context';
-import { keyOnWholeSongPlayer } from '../wholeSongKeyboard';
+import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { KlysEngine } from './KlysEngine';
 import { useFormatStore } from '@stores/useFormatStore';
 import { editKlysField } from '@/components/klystrack/klysInstrumentEdit';
-import { klysFieldByNksId, klysFieldFromNormalized, klysInstrumentIndex } from './klysInstrumentFields';
+import { klysFieldByNksId, klysFieldFromNormalized, klysInstrumentIndex, klysNoteFromMidi } from './klysInstrumentFields';
 
 export class KlysSynth implements DevilboxSynth {
   readonly name = 'KlysSynth';
@@ -39,19 +38,25 @@ export class KlysSynth implements DevilboxSynth {
     }
   }
 
-  /** A key plays nothing: the whole-song player has no single-instrument voice, and must not start the song. */
-  triggerAttack(_note?: string | number, _time?: number, _velocity?: number): void {
+  /**
+   * A key auditions THIS synth's instrument on the engine's spare preview channel; it never starts or stops the song.
+   * A number is a MIDI note (as the other native synths read it), a string a note name.
+   */
+  triggerAttack(note?: string | number, _time?: number, _velocity?: number): void {
     if (this._disposed) return;
-    keyOnWholeSongPlayer('Klystrack');
+    const midi = typeof note === 'number' ? note : noteToMidi(note ?? 'C4');
+    this.engine.previewNoteOn(klysInstrumentIndex(this.instrumentId), klysNoteFromMidi(midi));
   }
 
   triggerRelease(_note?: string | number, _time?: number): void {
-    // A key-up never stops the song.
+    if (this._disposed) return;
+    this.engine.previewNoteOff();
   }
 
-  /** Panic / song stop: this one does stop the player. */
+  /** Panic / song stop: stops the player and the preview voice. */
   releaseAll(): void {
     if (this._disposed) return;
+    this.engine.previewNoteOff();
     this.engine.stop();
   }
 

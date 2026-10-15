@@ -959,6 +959,7 @@ export const useFormatStore = create<FormatStore>()(
       Object.assign(inst, patch);
       const after = cloneKlysInstrument(inst);
       if (JSON.stringify(before) === JSON.stringify(after)) return;
+      state.klysNative!.instrumentsFrom = 'edited';
       state.klysInstrumentUndoStack.push({ index, before, after });
       if (state.klysInstrumentUndoStack.length > 100) state.klysInstrumentUndoStack.shift();
       state.klysInstrumentRedoStack = [];

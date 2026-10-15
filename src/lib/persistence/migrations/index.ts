@@ -31,7 +31,7 @@ export const MIN_LOADABLE_SCHEMA = 21;
  * every save and gates loads against it. Kept here so the migration chain and
  * the writer share one source of truth.
  */
-export const CURRENT_SCHEMA = 24;
+export const CURRENT_SCHEMA = 25;
 
 /**
  * Forward-migrate a saved project in place from `fromVersion` up to the current
@@ -61,6 +61,13 @@ export function migrateSavedProject(
   if (fromVersion < 24) {
     const mixer = (project as { mixer?: { channels?: Array<Record<string, unknown>> } }).mixer;
     if (Array.isArray(mixer?.channels)) mixer.channels = mixer.channels.map((c) => migrateMixerChannelShape(c));
+  }
+
+  // 24 → 25: `klysNative.instrumentsFrom` (where the klystrack instruments came from; 'edited' ones survive a
+  //          reopen). Additive: a project saved before it holds the engine's copy of the file, so it reads 'engine'.
+  if (fromVersion < 25) {
+    const klys = (project as { nativeEngineMeta?: { klysNative?: { instrumentsFrom?: string } } }).nativeEngineMeta?.klysNative;
+    if (klys && klys.instrumentsFrom === undefined) klys.instrumentsFrom = 'engine';
   }
 
   // Stamp the project at the current schema so a subsequent save is not

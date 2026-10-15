@@ -703,6 +703,12 @@ export interface KlysNativeData {
   patterns: KlysNativePattern[];
   sequences: KlysNativeSequence[];  // per-channel
   instruments: KlysNativeInstrument[];
+  /**
+   * Where `instruments` came from: the parser's placeholders ('stub'), the engine's songData ('engine'), or the
+   * instrument editor ('edited'). A saved project with 'edited' instruments must not be overwritten by the engine's
+   * copy of the original file when it is reopened; they are sent to the engine instead.
+   */
+  instrumentsFrom: 'stub' | 'engine' | 'edited';
   /** Song-level wavetable entries (read-only here: sample data is edited in klystrack's Wavetable tab). */
   wavetables?: KlysNativeWavetable[];
 }

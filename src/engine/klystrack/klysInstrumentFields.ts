@@ -32,6 +32,12 @@ export const KLYS_NAME_LENGTH = 32;
 
 /** Instrument index (what the engine and `klysNative.instruments` use) of an InstrumentConfig id. */
 export const klysInstrumentIndex = (id: number): number => id - 1;
+
+/**
+ * The klystrack note number (C-0 = 0, 0..95, the grid's own naming: klysAdapter noteToString) that carries the same
+ * note name as a MIDI note: MIDI 60 (C4) is klystrack 48, which the grid prints as C-4.
+ */
+export const klysNoteFromMidi = (midi: number): number => Math.max(0, Math.min(95, Math.round(midi) - 12));
 /** InstrumentConfig id of an instrument index. */
 export const klysInstrumentId = (index: number): number => index + 1;
 
