@@ -8,7 +8,7 @@ import React, { useCallback, useRef, useEffect, useState } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { CustomSelect } from '@components/common/CustomSelect';
 import type { SynthPanelLayout, SectionDescriptor, ControlDescriptor } from '@/types/synthPanel';
-
+import { sectionFlexBasis } from './synthPanelSizing';
 interface DOMSynthPanelProps {
   layout: SynthPanelLayout;
   config: Record<string, unknown>;
@@ -111,15 +111,7 @@ export const DOMSynthPanel: React.FC<DOMSynthPanelProps> = ({ layout, config, on
     ? (layout.tabs.find((t: { id: string; label: string; sections: SectionDescriptor[] }) => t.id === activeTab)?.sections ?? layout.tabs[0]?.sections ?? [])
     : (layout.sections ?? []);
 
-  // Knob width ~80px (56px knob + label padding). Per-section flex-basis
-  // is driven by how many knobs fit in one row (capped at 3).
-  const KNOB_W = 80;
-  const SECTION_PAD = 32; // p-3 * 2 + border
-  const sectionBases = sections.map(s => {
-    const knobCount = s.controls.filter(c => c.type === 'knob' || c.type === 'slider').length;
-    const knobsPerRow = Math.min(knobCount, 3);
-    return knobsPerRow * KNOB_W + SECTION_PAD;
-  });
+  const sectionBases = sections.map(sectionFlexBasis);
 
   return (
     <div
