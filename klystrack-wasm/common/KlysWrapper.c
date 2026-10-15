@@ -1253,3 +1253,52 @@ int klys_get_channel_program(void *out, int maxCh)
     }
     return n;
 }
+
+/*
+ * Live voice state per channel, 16 bytes each (little endian), for editor markers:
+ *   0      instrument index playing on the channel (0xFF none)
+ *   1      volume envelope stage: 0 attack, 1 decay, 2 sustain, 3 release, 4 off (cyd ATTACK..DONE)
+ *   2..3   u16 volume envelope level, 0..65535 = 0..1 (cyd 24-bit envelope >> 8; 0 under YM envelope mode,
+ *          which has no linear level)
+ *   4..5   u16 effective filter cutoff 0..2047 (track_status->filter_cutoff, after program and envelope)
+ *   6..7   u16 pulse width 0..2047 (cyd channel pw, after program and PWM)
+ *   8..11  u32 ticks since the note was triggered (current_tick)
+ *   12..13 u16 tick rate in Hz (song_rate), so elapsed seconds = ticks / rate
+ *   14     filter resonance 0..3
+ *   15     1 when the cyd channel is running (not stage off)
+ * Returns channels written (channel 31 is the audition channel).
+ */
+EMSCRIPTEN_KEEPALIVE
+int klys_get_channel_voice(void *out, int maxCh)
+{
+    if (!g_initialized || !g_song_loaded || !out) return 0;
+    int n = maxCh < MUS_MAX_CHANNELS ? maxCh : MUS_MAX_CHANNELS;
+    Uint8 *o = (Uint8 *)out;
+    for (int c = 0; c < n; c++) {
+        const MusChannel *chn = &g_mus.channel[c];
+        const CydChannel *cc = &g_cyd.channel[c];
+        const MusTrackStatus *ts = &g_mus.song_track[c];
+        int ix = chn->instrument ? (int)(chn->instrument - g_song.instrument) : -1;
+        int ok = ix >= 0 && ix < g_song.num_instruments;
+        Uint32 env = cc->adsr.envelope;
+        Uint32 lvl = (cc->flags & CYD_CHN_ENABLE_YM_ENV) ? 0 : (env >> 8);
+        if (lvl > 0xFFFF) lvl = 0xFFFF;
+        Uint16 cut = ts->filter_cutoff > 2047 ? 2047 : ts->filter_cutoff;
+        Uint16 rate = g_song.song_rate;
+        memset(o, 0, 16);
+        o[0] = ok ? (Uint8)ix : 0xFF;
+        if (ok) {
+            o[1] = cc->adsr.envelope_state;
+            o[2] = lvl & 0xFF; o[3] = (lvl >> 8) & 0xFF;
+            o[4] = cut & 0xFF; o[5] = (cut >> 8) & 0xFF;
+            o[6] = cc->pw & 0xFF; o[7] = (cc->pw >> 8) & 0xFF;
+            o[8] = chn->current_tick & 0xFF; o[9] = (chn->current_tick >> 8) & 0xFF;
+            o[10] = (chn->current_tick >> 16) & 0xFF; o[11] = (chn->current_tick >> 24) & 0xFF;
+            o[12] = rate & 0xFF; o[13] = (rate >> 8) & 0xFF;
+            o[14] = ts->filter_resonance;
+            o[15] = cc->adsr.envelope_state != DONE;
+        }
+        o += 16;
+    }
+    return n;
+}

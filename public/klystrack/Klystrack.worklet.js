@@ -19,6 +19,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
     this.looping = true;
     this.previewing = false; // audition note sounding with the song stopped
     this.watchProgram = false;
+    this.watchVoices = false;
     this._progPtr = 0;
 
     // WASM float buffers for decode output
@@ -147,6 +148,10 @@ class KlystrackProcessor extends AudioWorkletProcessor {
 
       case 'previewNoteOff':
         if (this.wasm && this.songLoaded) this.wasm._klys_preview_note_off();
+        break;
+
+      case 'watchVoices':
+        this.watchVoices = !!data.on;
         break;
 
       case 'watchProgram':
@@ -558,6 +563,30 @@ class KlystrackProcessor extends AudioWorkletProcessor {
             channels.push({ instrument: raw[c * 4], step: raw[c * 4 + 1], tick: raw[c * 4 + 2], running: raw[c * 4 + 3] === 1 });
           }
           this.port.postMessage({ type: 'programStatus', channels });
+        }
+        if (this.watchVoices && typeof this.wasm._klys_get_channel_voice === 'function') {
+          // 16 bytes per channel, layout documented at klys_get_channel_voice in KlysWrapper.c
+          const n = 32; // includes the audition channel 31, which sits past the song's own channels
+          if (!this._voicePtr) this._voicePtr = this.wasm._malloc(32 * 16);
+          const got = this.wasm._klys_get_channel_voice(this._voicePtr, n);
+          const dv = new DataView(this.wasm.HEAPU8.buffer, this._voicePtr, got * 16);
+          const channels = [];
+          for (let c = 0; c < got; c++) {
+            const b = c * 16;
+            channels.push({
+              channel: c,
+              instrument: dv.getUint8(b),
+              stage: dv.getUint8(b + 1),
+              level: dv.getUint16(b + 2, true) / 65535,
+              cutoff: dv.getUint16(b + 4, true),
+              pulseWidth: dv.getUint16(b + 6, true),
+              elapsedTicks: dv.getUint32(b + 8, true),
+              tickRate: dv.getUint16(b + 12, true),
+              resonance: dv.getUint8(b + 14),
+              active: dv.getUint8(b + 15) === 1,
+            });
+          }
+          this.port.postMessage({ type: 'voiceStatus', channels });
         }
         this.port.postMessage({
           type: 'position',
