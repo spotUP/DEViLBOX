@@ -331,3 +331,4 @@ third-party/musicline_playback-main/musicline/asm-version/
 third-party/rtosc-build-wasm/
 nuade-wasm/build/
 !third-party/nuade/docs/
+tools/master-fx-claims-live.json
