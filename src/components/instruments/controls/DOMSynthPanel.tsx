@@ -120,6 +120,7 @@ export const DOMSynthPanel: React.FC<DOMSynthPanelProps> = ({ layout, config, on
         // The panel is as tall as its sections. synth-editor-container says height 100%, which clips the sections
         // below the first rows whenever the parent has a fixed height; the parent scrolls instead.
         height: 'auto',
+        flexShrink: 0, // in a flex column, overflow hidden lets the panel shrink to the space left and clip its bottom
         background: `linear-gradient(170deg, ${enc.bg} 0%, ${enc.bgEnd} 100%)`,
         border: `2px solid ${enc.border}`,
         boxShadow: ENCLOSURE_SHADOW,

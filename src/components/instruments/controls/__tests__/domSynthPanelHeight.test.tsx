@@ -18,5 +18,6 @@ describe('DOMSynthPanel', () => {
     );
     const panel = container.querySelector('.synth-editor-container') as HTMLElement;
     expect(panel.style.height).toBe('auto');
+    expect(panel.style.flexShrink, 'a flex column must not shrink it either').toBe('0');
   });
 });
