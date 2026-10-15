@@ -274,7 +274,7 @@ export function handleFormatKey(e: KeyboardEvent, host: FormatKeyHost): void {
           // Delete clears entire selection
           host.clearSelection();
           host.setSelection(null);
-        } else if (col) {
+        } else if (col && !col.readOnly) {
           const plan = planCursorEntry(entryContext());
           if (plan.write) {
             host.onCellChange?.(pos.channelIndex, plan.row, col.key, col.emptyValue ?? 0);
@@ -284,7 +284,7 @@ export function handleFormatKey(e: KeyboardEvent, host: FormatKeyHost): void {
         return;
     }
 
-    if (!col) return;
+    if (!col || col.readOnly) return;
 
     // Data entry clears selection
     if (col.type === 'note') {

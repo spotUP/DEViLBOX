@@ -30,3 +30,5 @@ export { SelectControl } from './SelectControl';
 export { DrawbarSlider } from './DrawbarSlider';
 export { SampleBrowserPane } from './SampleBrowserPane';
 export type { SampleBrowserEntry, SampleBrowserPaneProps } from './SampleBrowserPane';
+export { InstrumentTableEditor } from './InstrumentTableEditor';
+export type { InstrumentTableEditorProps } from './InstrumentTableEditor';
