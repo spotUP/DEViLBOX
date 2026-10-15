@@ -95,6 +95,7 @@ if(EMSCRIPTEN)
         "_klys_get_wavetable_name"
         "_klys_get_wavetable_info"
         "_klys_preview_note_on"
+        "_klys_set_song_running"
         "_klys_preview_note_off"
         "_klys_get_channel_program"
     )
