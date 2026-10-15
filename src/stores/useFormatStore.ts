@@ -291,6 +291,8 @@ export interface FormatStore {
   duplicateTFMXMacroStep: (macroIdx: number, stepIdx: number) => boolean;
   /** Update a Klystrack sequence entry field (pattern or noteOffset) */
   setKlysSequenceEntry: (channel: number, position: number, field: 'pattern' | 'noteOffset', value: number) => void;
+  /** Set one field of a klystrack pattern step (note, instrument, ctrl, volume, command). */
+  setKlysPatternStep: (patternIdx: number, stepIdx: number, field: 'note' | 'instrument' | 'ctrl' | 'volume' | 'command', value: number) => void;
   /** Insert a new Klystrack sequence entry (copy of current or blank) at the given position */
   insertKlysSequenceEntry: (position: number) => void;
   /** Delete the Klystrack sequence entry at the given position across all channels */
@@ -924,6 +926,11 @@ export const useFormatStore = create<FormatStore>()(
       } else {
         entry.noteOffset = Math.max(-128, Math.min(127, value));
       }
+    }),
+    setKlysPatternStep: (patternIdx, stepIdx, field, value) => set((state) => {
+      const step = state.klysNative?.patterns[patternIdx]?.steps[stepIdx];
+      if (!step) return;
+      step[field] = value;
     }),
     insertKlysSequenceEntry: (position) => set((state) => {
       if (!state.klysNative) return;

@@ -45,7 +45,7 @@ interface ParamRowProps {
 
 const ParamRow: React.FC<ParamRowProps> = ({ label, value, max, min = 0, paramKey, onChange }) => (
   <div className="flex items-center gap-2 h-6">
-    <span className="w-24 text-[11px] text-text-secondary truncate text-right">{label}</span>
+    <span className="w-44 text-[11px] text-text-secondary truncate text-right">{label}</span>
     <input
       type="range"
       min={min}
@@ -236,7 +236,7 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
 
       {/* Oscillator Flags (CYD_CHN_*) */}
       <BitfieldGrid
-        title="Oscillator (CYD_CHN_*)"
+        title="Oscillator"
         value={inst.cydflags}
         bits={CYD_CHN_FLAGS}
         onChange={v => handleParam('cydflags', v)}
@@ -244,7 +244,7 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
 
       {/* Instrument Flags (MUS_INST_*) */}
       <BitfieldGrid
-        title="Instrument Flags (MUS_INST_*)"
+        title="Instrument Flags"
         value={inst.flags}
         bits={MUS_INST_FLAGS}
         onChange={v => handleParam('flags', v)}
@@ -255,7 +255,7 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
         <ParamRow label="Cutoff"    value={inst.cutoff}    max={4095} paramKey="cutoff" onChange={handleParam} />
         <ParamRow label="Resonance" value={inst.resonance} max={3}    paramKey="resonance" onChange={handleParam} />
         <div className="flex items-center gap-2 h-6">
-          <span className="w-24 text-[11px] text-text-secondary text-right">Type</span>
+          <span className="w-44 text-[11px] text-text-secondary text-right">Type</span>
           <CustomSelect
             value={String(inst.flttype)}
             onChange={(v) => handleParam('flttype', parseInt(v, 10))}
@@ -267,11 +267,11 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
 
       {/* Modulation */}
       <Section title="Modulation">
-        <ParamRow label="Vib Speed"  value={inst.vibratoSpeed} max={255} paramKey="vibratoSpeed" onChange={handleParam} />
-        <ParamRow label="Vib Depth"  value={inst.vibratoDepth} max={255} paramKey="vibratoDepth" onChange={handleParam} />
-        <ParamRow label="Vib Delay"  value={inst.vibDelay}     max={255} paramKey="vibDelay" onChange={handleParam} />
+        <ParamRow label="Vibrato Speed" value={inst.vibratoSpeed} max={255} paramKey="vibratoSpeed" onChange={handleParam} />
+        <ParamRow label="Vibrato Depth" value={inst.vibratoDepth} max={255} paramKey="vibratoDepth" onChange={handleParam} />
+        <ParamRow label="Vibrato Delay" value={inst.vibDelay}     max={255} paramKey="vibDelay" onChange={handleParam} />
         <div className="flex items-center gap-2 h-6">
-          <span className="w-24 text-[11px] text-text-secondary text-right">Vib Shape</span>
+          <span className="w-44 text-[11px] text-text-secondary text-right">Vibrato Shape</span>
           <CustomSelect
             value={String(inst.vibShape)}
             onChange={(v) => handleParam('vibShape', parseInt(v, 10))}
@@ -279,10 +279,10 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
             options={KLYS_SHAPE_NAMES.map((n, i) => ({ value: String(i), label: n }))}
           />
         </div>
-        <ParamRow label="PWM Speed"  value={inst.pwmSpeed}     max={255} paramKey="pwmSpeed" onChange={handleParam} />
-        <ParamRow label="PWM Depth"  value={inst.pwmDepth}     max={255} paramKey="pwmDepth" onChange={handleParam} />
+        <ParamRow label="Pulse Width Modulation Speed" value={inst.pwmSpeed}     max={255} paramKey="pwmSpeed" onChange={handleParam} />
+        <ParamRow label="Pulse Width Modulation Depth" value={inst.pwmDepth}     max={255} paramKey="pwmDepth" onChange={handleParam} />
         <div className="flex items-center gap-2 h-6">
-          <span className="w-24 text-[11px] text-text-secondary text-right">PWM Shape</span>
+          <span className="w-44 text-[11px] text-text-secondary text-right">Pulse Width Modulation Shape</span>
           <CustomSelect
             value={String(inst.pwmShape)}
             onChange={(v) => handleParam('pwmShape', parseInt(v, 10))}
@@ -294,7 +294,7 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
 
       {/* Buzz / YM */}
       <Section title="Buzz / YM">
-        <ParamRow label="YM Env Shape" value={inst.ymEnvShape} max={15}    paramKey="ymEnvShape" onChange={handleParam} />
+        <ParamRow label="YM Envelope Shape" value={inst.ymEnvShape} max={15}    paramKey="ymEnvShape" onChange={handleParam} />
         <ParamRow label="Buzz Offset"  value={inst.buzzOffset} min={-128} max={127} paramKey="buzzOffset" onChange={handleParam} />
       </Section>
 
@@ -323,12 +323,12 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
 
       {/* Routing */}
       <Section title="Routing">
-        <ParamRow label="FX Bus"      value={inst.fxBus}          max={3}   paramKey="fxBus" onChange={handleParam} />
-        <ParamRow label="Ring Mod"    value={inst.ringMod}        max={255} paramKey="ringMod" onChange={handleParam} />
-        <ParamRow label="Sync Src"    value={inst.syncSource}     max={255} paramKey="syncSource" onChange={handleParam} />
-        <ParamRow label="LFSR Type"   value={inst.lfsrType}       max={255} paramKey="lfsrType" onChange={handleParam} />
+        <ParamRow label="Effect Bus"value={inst.fxBus}          max={3}   paramKey="fxBus" onChange={handleParam} />
+        <ParamRow label="Ring Modulation"  value={inst.ringMod}        max={255} paramKey="ringMod" onChange={handleParam} />
+        <ParamRow label="Sync Source" value={inst.syncSource}     max={255} paramKey="syncSource" onChange={handleParam} />
+        <ParamRow label="Noise Generator Type" value={inst.lfsrType}       max={255} paramKey="lfsrType" onChange={handleParam} />
         <ParamRow label="Wavetable"   value={inst.wavetableEntry} max={255} paramKey="wavetableEntry" onChange={handleParam} />
-        <ParamRow label="Prog Period" value={inst.progPeriod}     max={255} paramKey="progPeriod" onChange={handleParam} />
+        <ParamRow label="Program Period" value={inst.progPeriod}     max={255} paramKey="progPeriod" onChange={handleParam} />
       </Section>
 
       {/* Program */}

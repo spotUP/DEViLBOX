@@ -253,7 +253,9 @@ class KlystrackProcessor extends AudioWorkletProcessor {
 
     if (ok) {
       this.songLoaded = true;
-      this.playing = true;
+      // A load does not start the song: 'play' does (the editor loads the song
+      // for its data long before anyone presses Play).
+      this.playing = false;
 
       const channels = this.wasm._klys_get_num_channels();
       const numPatterns = this.wasm._klys_get_num_patterns();
