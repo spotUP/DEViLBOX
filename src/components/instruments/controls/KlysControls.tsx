@@ -27,6 +27,13 @@ import { DOMSynthPanel } from './DOMSynthPanel';
 import { InstrumentTableEditor } from '@components/instruments/shared/InstrumentTableEditor';
 import { SectionLabel } from '@components/instruments/shared/SectionLabel';
 import { Button } from '@components/ui/Button';
+import { TabStrip } from '@components/ui/TabStrip';
+
+type KlysTab = 'main' | 'program';
+const KLYS_TABS: ReadonlyArray<{ id: KlysTab; label: string }> = [
+  { id: 'main', label: 'Main' },
+  { id: 'program', label: 'Program and Commands' },
+];
 
 const hex4 = (v: number): string => v.toString(16).toUpperCase().padStart(4, '0');
 
@@ -34,7 +41,7 @@ const hex4 = (v: number): string => v.toString(16).toUpperCase().padStart(4, '0'
 const KlysProgramCommandHelp: React.FC = () => (
   <div className="flex flex-col gap-1">
     <SectionLabel color="var(--color-accent-secondary)" label="Program Commands" />
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-0.5 max-h-48 overflow-y-auto text-[10px] font-mono">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-0.5 text-[10px] font-mono">
       {KLYS_PROGRAM_COMMANDS.map((cmd) => {
         const digits = hex4(cmd.word).split('').map((d, i) => ((cmd.mask >> (12 - 4 * i)) & 0xF) === 0xF ? d : 'X').join('');
         return (
@@ -81,6 +88,7 @@ export const KlysControls: React.FC<{ instrument: InstrumentConfig }> = ({ instr
 
   const playingRow = usePlayingProgramStep(index);
   const [cursorRow, setCursorRow] = useState(0);
+  const [tab, setTab] = useState<KlysTab>('main');
   const columns = useMemo(
     // The pattern renderers draw hex cells only, so the meaning column is not drawn: its text is shown below.
     () => KLYS_PROGRAM_COLUMNS(inst?.baseNote ?? 0).filter((c) => c.key !== 'meaning'),
@@ -96,10 +104,14 @@ export const KlysControls: React.FC<{ instrument: InstrumentConfig }> = ({ instr
   const word = inst.program[cursorRow] ?? KLYS_EMPTY_STEP;
   return (
     <div className="flex flex-col gap-3 p-3 flex-1 min-h-0 overflow-y-auto scrollbar-modern">
-      {/* A content-sized wrapper: the panel's own 100% height then resolves to its content, and this column scrolls. */}
-      <div className="shrink-0">
-        <DOMSynthPanel layout={layout} config={config} onChange={onChange} />
-      </div>
+      <TabStrip tabs={KLYS_TABS} active={tab} onChange={setTab} ariaLabel="Klystrack instrument sections" />
+      {tab === 'main' && (
+        // A content-sized wrapper: the panel's own 100% height then resolves to its content, and this column scrolls.
+        <div className="shrink-0">
+          <DOMSynthPanel layout={layout} config={config} onChange={onChange} />
+        </div>
+      )}
+      {tab === 'program' && (
       <div className="flex flex-col gap-2">
         <InstrumentTableEditor
           label="Program"
@@ -121,6 +133,7 @@ export const KlysControls: React.FC<{ instrument: InstrumentConfig }> = ({ instr
         </div>
         <KlysProgramCommandHelp />
       </div>
+      )}
     </div>
   );
 };

@@ -68,7 +68,7 @@ describe('the klystrack instrument editor', () => {
     render(<UnifiedInstrumentEditor instrument={instrument} onChange={() => {}} />);
     const cutoff = await screen.findByRole('slider', { name: /^Cutoff/ }, { timeout: 30_000 });
     expect(seen.controlsRendered, 'sentinel: KlysControls ran').toBeGreaterThanOrEqual(1);
-    expect(seen.cellChange, 'program grid mounted').not.toBeNull();
+    expect(screen.queryByRole('tab', { name: /^Program/ }), 'the program lives on its own tab').not.toBeNull();
 
     // A knob: ArrowUp on the Cutoff slider.
     const N = 3;
@@ -82,7 +82,9 @@ describe('the klystrack instrument editor', () => {
     await act(async () => { fireEvent.click(filterSwitch); });
     expect(filterSwitch.textContent).toBe('ON');
 
-    // A program step typed in the grid.
+    // A program step typed in the grid, on the Program tab.
+    await act(async () => { fireEvent.click(screen.getByRole('tab', { name: /^Program/ })); });
+    expect(seen.cellChange, 'program grid mounted').not.toBeNull();
     await act(async () => { seen.cellChange!(0, 3, 'cmd', 0x0c40); });
     await act(async () => { flushKlysInstrumentEdits(); await Promise.all(seen.pending); });
 
