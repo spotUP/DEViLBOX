@@ -1,0 +1,12 @@
+diff --git a/WaveSabreCore/src/Adultery.cpp b/WaveSabreCore/src/Adultery.cpp
+index 9447f32..419dfea 100644
+--- a/WaveSabreCore/src/Adultery.cpp
++++ b/WaveSabreCore/src/Adultery.cpp
+@@ -98,6 +98,7 @@ namespace WaveSabreCore
+ 			if (sampleIndex >= 0)
+ 			{
+ 				auto gmDls = GmDls::Load();
++				if (!gmDls) break;
+ 
+ 				// Seek to wave pool chunk's data
+ 				auto ptr = gmDls + GmDls::WaveListOffset;

@@ -1,0 +1,31 @@
+diff --git a/modules/juce_audio_processors/processors/juce_AudioPluginInstance.h b/modules/juce_audio_processors/processors/juce_AudioPluginInstance.h
+index 2f70906..60d0f94 100644
+--- a/modules/juce_audio_processors/processors/juce_AudioPluginInstance.h
++++ b/modules/juce_audio_processors/processors/juce_AudioPluginInstance.h
+@@ -169,8 +169,8 @@ protected:
+ 
+     AudioPluginInstance() = default;
+     AudioPluginInstance (const BusesProperties& ioLayouts) : AudioProcessor (ioLayouts) {}
+-    template <size_t numLayouts>
+-    AudioPluginInstance (const short channelLayoutList[numLayouts][2]) : AudioProcessor (channelLayoutList) {}
++    // Disabled for WASM: template <size_t numLayouts>
++    // AudioPluginInstance (const short channelLayoutList[numLayouts][2]) : AudioProcessor (channelLayoutList) {}
+ 
+ private:
+     // It's not safe to add a plain AudioProcessorParameter to an AudioPluginInstance.
+diff --git a/modules/juce_audio_processors/processors/juce_AudioProcessor.h b/modules/juce_audio_processors/processors/juce_AudioProcessor.h
+index b7d8b63..0fd97a8 100644
+--- a/modules/juce_audio_processors/processors/juce_AudioProcessor.h
++++ b/modules/juce_audio_processors/processors/juce_AudioProcessor.h
+@@ -1484,6 +1484,11 @@ protected:
+     std::atomic<AudioPlayHead*> playHead { nullptr };
+ 
+ public:
++    // WASM compat: these were removed in JUCE 8 but Monique still calls them
++    void beginParameterChangeGesture (int) {}
++    void endParameterChangeGesture (int) {}
++    void sendParamChangeMessageToListeners (int, float) {}
++
+     /** @cond */
+     // These methods are all deprecated in favour of using AudioProcessorParameter
+     // and AudioProcessorParameterGroup

@@ -1,0 +1,66 @@
+# Vendored upstream repos under third-party/ (pinned by the gitlink commit). Local changes to them are kept as
+# patches in third-party-patches/ (scripts/third-party-patches.sh); ignore = dirty keeps their working-tree edits out of git status.
+[submodule "OB-Xf-main"]
+	path = third-party/OB-Xf-main
+	url = https://github.com/surge-synthesizer/OB-Xf.git
+	ignore = dirty
+[submodule "aelapse"]
+	path = third-party/aelapse
+	url = https://github.com/smiarx/aelapse.git
+	ignore = dirty
+[submodule "aeolus"]
+	path = third-party/aeolus
+	url = https://github.com/fugalh/aeolus.git
+	ignore = dirty
+[submodule "amsynth-master"]
+	path = third-party/amsynth-master
+	url = https://github.com/amsynth/amsynth.git
+	ignore = dirty
+[submodule "dexed"]
+	path = third-party/dexed
+	url = https://github.com/asb2m10/dexed.git
+	ignore = dirty
+[submodule "furnace-master/extern/adpcm"]
+	path = third-party/furnace-master/extern/adpcm
+	url = https://github.com/superctr/adpcm.git
+	ignore = dirty
+[submodule "helm-master"]
+	path = third-party/helm-master
+	url = https://github.com/mtytel/helm.git
+	ignore = dirty
+[submodule "monique-monosynth"]
+	path = third-party/monique-monosynth
+	url = https://github.com/surge-synthesizer/monique-monosynth.git
+	ignore = dirty
+[submodule "odin2-master/libs/JUCE"]
+	path = third-party/odin2-master/libs/JUCE
+	url = https://github.com/juce-framework/JUCE
+	ignore = dirty
+[submodule "oidos-master"]
+	path = third-party/oidos-master
+	url = https://github.com/askeksa/Oidos.git
+	ignore = dirty
+[submodule "projectm-master"]
+	path = third-party/projectm-master
+	url = https://github.com/projectM-visualizer/projectm.git
+	ignore = dirty
+[submodule "retromulator"]
+	path = third-party/retromulator
+	url = https://github.com/reales/retromulator.git
+	ignore = dirty
+[submodule "sorcer-master"]
+	path = third-party/sorcer-master
+	url = https://github.com/openAVproductions/openAV-Sorcer.git
+	ignore = dirty
+[submodule "surge-xt"]
+	path = third-party/surge-xt
+	url = https://github.com/surge-synthesizer/surge.git
+	ignore = dirty
+[submodule "tunefish"]
+	path = third-party/tunefish
+	url = https://github.com/paynebc/tunefish.git
+	ignore = dirty
+[submodule "wavesabre"]
+	path = third-party/wavesabre
+	url = https://github.com/logicomacorp/WaveSabre.git
+	ignore = dirty

@@ -1,0 +1,605 @@
+diff --git a/src/common/load_save.cpp b/src/common/load_save.cpp
+index ab32f7b..16d7e82 100644
+--- a/src/common/load_save.cpp
++++ b/src/common/load_save.cpp
+@@ -99,7 +99,7 @@ void LoadSave::loadControls(SynthBase* synth,
+ void LoadSave::loadModulations(SynthBase* synth,
+                                const Array<var>* modulations) {
+   synth->clearModulations();
+-  var* modulation = modulations->begin();
++  const var* modulation = modulations->begin();
+ 
+   for (; modulation != modulations->end(); ++modulation) {
+     DynamicObject* mod = modulation->getDynamicObject();
+@@ -173,7 +173,7 @@ void LoadSave::varToState(SynthBase* synth,
+     }
+ 
+     // Fix modulation routing.
+-    var* modulation = modulations->begin();
++    const var* modulation = modulations->begin();
+     Array<var> old_modulations;
+     Array<DynamicObject*> new_modulations;
+     for (; modulation != modulations->end(); ++modulation) {
+@@ -280,7 +280,7 @@ void LoadSave::varToState(SynthBase* synth,
+     }
+ 
+     // Move modulating saturation to distortion.
+-    var* modulation = modulations->begin();
++    const var* modulation = modulations->begin();
+     for (; modulation != modulations->end(); ++modulation) {
+       DynamicObject* mod = modulation->getDynamicObject();
+       String destination = mod->getProperty("destination").toString();
+@@ -560,8 +560,12 @@ void LoadSave::loadConfig(MidiManager* midi_manager, mopo::StringLayout* layout)
+ }
+ 
+ bool LoadSave::isInstalled() {
++#ifdef __EMSCRIPTEN__
++  return true;
++#else
+   File factory_bank = getFactoryBankDirectory();
+   return factory_bank.exists();
++#endif
+ }
+ 
+ bool LoadSave::wasUpgraded() {
+@@ -696,6 +700,9 @@ std::pair<wchar_t, wchar_t> LoadSave::getComputerKeyboardOctaveControls() {
+ }
+ 
+ File LoadSave::getFactoryBankDirectory() {
++#ifdef __EMSCRIPTEN__
++  return File("/helm_patches");
++#else
+   File patch_dir = File("");
+ #ifdef LINUX
+   patch_dir = File(LINUX_FACTORY_PATCH_DIRECTORY);
+@@ -708,9 +715,13 @@ File LoadSave::getFactoryBankDirectory() {
+ #endif
+ 
+   return patch_dir;
++#endif
+ }
+ 
+ File LoadSave::getBankDirectory() {
++#ifdef __EMSCRIPTEN__
++  return File("/helm_patches");
++#else
+   if (!isInstalled())
+     return File("../../../patches");
+ 
+@@ -731,6 +742,7 @@ File LoadSave::getBankDirectory() {
+   if (!patch_dir.exists())
+     patch_dir.createDirectory();
+   return patch_dir;
++#endif
+ }
+ 
+ File LoadSave::getUserBankDirectory() {
+diff --git a/src/editor_components/filter_response.cpp b/src/editor_components/filter_response.cpp
+index 2861dcb..84744af 100644
+--- a/src/editor_components/filter_response.cpp
++++ b/src/editor_components/filter_response.cpp
+@@ -82,7 +82,7 @@ void FilterResponse::paint(Graphics& g) {
+ }
+ 
+ void FilterResponse::resized() {
+-  const Desktop::Displays::Display& display = Desktop::getInstance().getDisplays().getMainDisplay();
++  const auto& display = *Desktop::getInstance().getDisplays().getPrimaryDisplay();
+   float scale = display.scale;
+   background_ = Image(Image::RGB, scale * getWidth(), scale * getHeight(), true);
+   Graphics g(background_);
+diff --git a/src/editor_components/formant_response.cpp b/src/editor_components/formant_response.cpp
+index c83ef65..db3e20f 100644
+--- a/src/editor_components/formant_response.cpp
++++ b/src/editor_components/formant_response.cpp
+@@ -61,7 +61,7 @@ void FormantResponse::paint(Graphics& g) {
+   g.setColour(Colour(0xff03a9f4));
+   g.strokePath(filter_response_path_, stroke);
+ 
+-  g.setFont(Fonts::getInstance()->proportional_regular().withPointHeight(16.0f));
++  g.setFont(Fonts::instance()->proportional_regular().withPointHeight(16.0f));
+   g.drawText("MIDI", 0, 0, 100, 20, Justification::left);
+   g.drawText(String(midi_), 100, 0, 400, 20, Justification::left);
+   g.drawText("Frequency", 0, 20, 100, 20, Justification::left);
+@@ -73,7 +73,7 @@ void FormantResponse::paint(Graphics& g) {
+ }
+ 
+ void FormantResponse::resized() {
+-  const Desktop::Displays::Display& display = Desktop::getInstance().getDisplays().getMainDisplay();
++  const auto& display = *Desktop::getInstance().getDisplays().getPrimaryDisplay();
+   float scale = display.scale;
+   background_ = Image(Image::ARGB, scale * getWidth(), scale * getHeight(), true);
+   Graphics g(background_);
+@@ -148,10 +148,10 @@ void FormantResponse::computeFilterCoefficients() {
+   for (int i = 0; i < formant_filter_.num_formants(); ++i) {
+     double frequency = mopo::utils::midiNoteToFrequency(cutoff_sliders_[i]->getValue());
+     double resonance = mopo::utils::magnitudeToQ(resonance_sliders_[i]->getValue());
+-    double decibels = INTERPOLATE(MIN_GAIN_DB, MAX_GAIN_DB, gain_sliders_[i]->getValue());
++    double decibels = mopo::utils::interpolate((double)MIN_GAIN_DB, (double)MAX_GAIN_DB, (double)gain_sliders_[i]->getValue());
+     double gain = mopo::utils::dbToGain(decibels);
+ 
+-    formant_filter_.getFormant(i)->computeCoefficients(mopo::Filter::kGainedBandPass,
++    formant_filter_.getFormant(i)->computeCoefficients(mopo::BiquadFilter::kGainedBandPass,
+                                                        frequency, resonance, gain);
+   }
+   resetResponsePath();
+diff --git a/src/editor_components/formant_response.h b/src/editor_components/formant_response.h
+index e9adeec..51038de 100644
+--- a/src/editor_components/formant_response.h
++++ b/src/editor_components/formant_response.h
+@@ -22,7 +22,7 @@
+ #include "helm_common.h"
+ #include "formant_manager.h"
+ 
+-class FormantResponse : public Component, SliderListener {
++class FormantResponse : public Component, public Slider::Listener {
+   public:
+     FormantResponse(int resolution);
+     ~FormantResponse();
+diff --git a/src/editor_components/graphical_step_sequencer.cpp b/src/editor_components/graphical_step_sequencer.cpp
+index e839ece..fe60977 100644
+--- a/src/editor_components/graphical_step_sequencer.cpp
++++ b/src/editor_components/graphical_step_sequencer.cpp
+@@ -101,7 +101,7 @@ void GraphicalStepSequencer::paint(Graphics& g) {
+ void GraphicalStepSequencer::resized() {
+   ensureMinSize();
+ 
+-  const Desktop::Displays::Display& display = Desktop::getInstance().getDisplays().getMainDisplay();
++  const auto& display = *Desktop::getInstance().getDisplays().getPrimaryDisplay();
+   float scale = display.scale;
+   background_ = Image(Image::RGB, scale * getWidth(), scale * getHeight(), true);
+   resetBackground();
+@@ -177,7 +177,7 @@ void GraphicalStepSequencer::resetBackground() {
+     return;
+ 
+   ensureMinSize();
+-  const Desktop::Displays::Display& display = Desktop::getInstance().getDisplays().getMainDisplay();
++  const auto& display = *Desktop::getInstance().getDisplays().getPrimaryDisplay();
+   float scale = display.scale;
+   Graphics g(background_);
+   g.addTransform(AffineTransform::scale(scale, scale));
+diff --git a/src/editor_components/open_gl_envelope.cpp b/src/editor_components/open_gl_envelope.cpp
+index c7a8888..2945759 100644
+--- a/src/editor_components/open_gl_envelope.cpp
++++ b/src/editor_components/open_gl_envelope.cpp
+@@ -71,7 +71,7 @@ void OpenGLEnvelope::paintBackground() {
+ 
+   float ratio = getHeight() / 100.0f;
+ 
+-  const Desktop::Displays::Display& display = Desktop::getInstance().getDisplays().getMainDisplay();
++  const auto& display = *Desktop::getInstance().getDisplays().getPrimaryDisplay();
+   float scale = display.scale;
+   background_image_ = Image(Image::ARGB, scale * getWidth(), scale * getHeight(), true);
+   Graphics g(background_image_);
+@@ -138,6 +138,34 @@ void OpenGLEnvelope::paintBackground() {
+   background_.updateBackgroundImage(background_image_);
+ }
+ 
++void OpenGLEnvelope::paint(Graphics& g) {
++  // Draw the cached background (grid + envelope path + markers)
++  if (background_image_.getWidth() > 0) {
++    g.drawImage(background_image_, 0, 0, getWidth(), getHeight(),
++                0, 0, background_image_.getWidth(), background_image_.getHeight());
++  }
++
++  // Draw animated position marker
++  if (envelope_phase_ == nullptr || envelope_amp_ == nullptr || envelope_amp_->buffer[0] <= 0.0f)
++    return;
++
++  Point<float> point = valuesToPosition(envelope_phase_->buffer[0], envelope_amp_->buffer[0]);
++  float px = (point.x + 1.0f) * 0.5f * getWidth();
++  float py = (1.0f - point.y) * 0.5f * getHeight();
++
++  // Vertical crosshair line
++  g.setColour(Colour(0x77ffffff));
++  g.drawVerticalLine((int)px, 0.0f, (float)getHeight());
++
++  // Position dot (green with black center, matching paintPositionImage)
++  float ratio = getHeight() / 100.0f;
++  float marker = ratio * MARKER_WIDTH;
++  g.setColour(Colors::modulation);
++  g.fillEllipse(px - marker, py - marker, 2.0f * marker, 2.0f * marker);
++  g.setColour(Colour(0xff000000));
++  g.fillEllipse(px - marker * 0.5f, py - marker * 0.5f, marker, marker);
++}
++
+ void OpenGLEnvelope::paintPositionImage() {
+   int min_image_width = roundToInt(4 * MARKER_WIDTH);
+   int image_width = mopo::utils::nextPowerOfTwo(min_image_width);
+diff --git a/src/editor_components/open_gl_envelope.h b/src/editor_components/open_gl_envelope.h
+index ed4b45a..a31d6a7 100644
+--- a/src/editor_components/open_gl_envelope.h
++++ b/src/editor_components/open_gl_envelope.h
+@@ -44,6 +44,7 @@ class OpenGLEnvelope : public OpenGLComponent, public SynthSlider::SliderListene
+     void mouseDrag(const MouseEvent& e) override;
+     void mouseUp(const MouseEvent& e) override;
+ 
++    void paint(Graphics& g) override;
+     void init(OpenGLContext& open_gl_context) override;
+     void render(OpenGLContext& open_gl_context, bool animate = true) override;
+     void destroy(OpenGLContext& open_gl_context) override;
+diff --git a/src/editor_components/open_gl_modulation_meter.cpp b/src/editor_components/open_gl_modulation_meter.cpp
+index 3e8576b..80eee00 100644
+--- a/src/editor_components/open_gl_modulation_meter.cpp
++++ b/src/editor_components/open_gl_modulation_meter.cpp
+@@ -66,7 +66,55 @@ OpenGLModulationMeter::OpenGLModulationMeter(const mopo::Output* mono_total,
+ 
+ OpenGLModulationMeter::~OpenGLModulationMeter() { }
+ 
+-void OpenGLModulationMeter::paint(Graphics& g) { }
++void OpenGLModulationMeter::paint(Graphics& g) {
++  if (!modulated_ || !isVisible())
++    return;
++
++  if (rotary_) {
++    // Draw green arc around rotary knob showing modulation range
++    float angle = SynthSlider::rotary_angle;
++    double range = destination_->getMaximum() - destination_->getMinimum();
++    double knob_pct = (destination_->getValue() - destination_->getMinimum()) / range;
++    double mod_pct = mod_percent_;
++    float min_pct = (float)std::min(mod_pct, knob_pct);
++    float max_pct = (float)std::max(mod_pct, knob_pct);
++
++    float start_rad = mopo::utils::interpolate(-angle, angle, min_pct);
++    float end_rad = mopo::utils::interpolate(-angle, angle, max_pct);
++
++    float cx = getWidth() * 0.5f;
++    float cy = getHeight() * 0.5f;
++    float radius = std::min(cx, cy) * 0.9f;
++    float thickness = std::max(1.5f, radius * 0.08f);
++
++    Path arc;
++    arc.addCentredArc(cx, cy, radius, radius, 0.0f,
++                      start_rad + (float)MathConstants<float>::pi * 0.5f,
++                      end_rad + (float)MathConstants<float>::pi * 0.5f,
++                      true);
++
++    g.setColour(Colour::fromFloatRGBA(0.2f, 0.941f, 0.45f, 0.7f));
++    g.strokePath(arc, PathStrokeType(thickness));
++  }
++  else {
++    // Linear slider modulation indicator
++    g.setColour(Colour::fromFloatRGBA(0.2f, 0.941f, 0.45f, 0.5f));
++    double range = destination_->getMaximum() - destination_->getMinimum();
++    double knob_pct = (destination_->getValue() - destination_->getMinimum()) / range;
++    float min_pct = (float)std::min(mod_percent_, knob_pct);
++    float max_pct = (float)std::max(mod_percent_, knob_pct);
++
++    if (destination_->isHorizontal()) {
++      float x1 = min_pct * getWidth();
++      float x2 = max_pct * getWidth();
++      g.fillRect(x1, 0.0f, x2 - x1, (float)getHeight());
++    } else {
++      float y1 = (1.0f - max_pct) * getHeight();
++      float y2 = (1.0f - min_pct) * getHeight();
++      g.fillRect(0.0f, y1, (float)getWidth(), y2 - y1);
++    }
++  }
++}
+ 
+ void OpenGLModulationMeter::resized() {
+   SynthGuiInterface* parent = findParentComponentOfClass<SynthGuiInterface>();
+diff --git a/src/editor_components/open_gl_oscilloscope.cpp b/src/editor_components/open_gl_oscilloscope.cpp
+index 5e8bf28..632344e 100644
+--- a/src/editor_components/open_gl_oscilloscope.cpp
++++ b/src/editor_components/open_gl_oscilloscope.cpp
+@@ -57,6 +57,35 @@ void OpenGLOscilloscope::paintBackground(Graphics& g) {
+     g.drawLine(0, y, width, y);
+ }
+ 
++void OpenGLOscilloscope::paint(Graphics& g) {
++  if (output_memory_ == nullptr)
++    return;
++
++  int width = getWidth();
++  int height = getHeight();
++  float half_height = height * 0.5f;
++
++  Path waveform;
++  for (int i = 0; i < RESOLUTION; ++i) {
++    float memory_spot = (1.0f * i * mopo::MEMORY_RESOLUTION) / RESOLUTION;
++    int memory_index = (int)memory_spot;
++    float remainder = memory_spot - memory_index;
++    float sample = mopo::utils::interpolate(output_memory_[memory_index],
++                                            output_memory_[memory_index + 1],
++                                            remainder);
++    float x = (float)i / (RESOLUTION - 1.0f) * width;
++    float y = half_height - sample * half_height;
++
++    if (i == 0)
++      waveform.startNewSubPath(x, y);
++    else
++      waveform.lineTo(x, y);
++  }
++
++  g.setColour(Colour::fromFloatRGBA(0.04f, 0.8f, 1.0f, 1.0f));
++  g.strokePath(waveform, PathStrokeType(1.0f));
++}
++
+ void OpenGLOscilloscope::init(OpenGLContext& open_gl_context) {
+   open_gl_context.extensions.glGenBuffers(1, &line_buffer_);
+   open_gl_context.extensions.glBindBuffer(GL_ARRAY_BUFFER, line_buffer_);
+diff --git a/src/editor_components/open_gl_oscilloscope.h b/src/editor_components/open_gl_oscilloscope.h
+index cc2f769..9992cc2 100644
+--- a/src/editor_components/open_gl_oscilloscope.h
++++ b/src/editor_components/open_gl_oscilloscope.h
+@@ -30,6 +30,7 @@ class OpenGLOscilloscope : public OpenGLComponent {
+ 
+     void setOutputMemory(const float* memory) { output_memory_ = memory; }
+ 
++    void paint(Graphics& g) override;
+     void init(OpenGLContext& open_gl_context) override;
+     void render(OpenGLContext& open_gl_context, bool animate = true) override;
+     void destroy(OpenGLContext& open_gl_context) override;
+diff --git a/src/editor_components/open_gl_peak_meter.cpp b/src/editor_components/open_gl_peak_meter.cpp
+index 3dae842..9f74e39 100644
+--- a/src/editor_components/open_gl_peak_meter.cpp
++++ b/src/editor_components/open_gl_peak_meter.cpp
+@@ -138,3 +138,47 @@ void OpenGLPeakMeter::paintBackground(Graphics& g) {
+   g.setColour(Colour(0xff888888));
+   g.fillRect(x - 1.0f, 0.0f, 2.0f, 1.0f * getHeight());
+ }
++
++void OpenGLPeakMeter::paint(Graphics& g) {
++  if (peak_output_ == nullptr)
++    return;
++
++  float val = peak_output_->buffer[left_ ? 0 : 1];
++  float t = val / MAX_GAIN;
++  float level = sqrtf(t);
++  if (level <= 0.001f)
++    return;
++
++  int width = getWidth();
++  int height = getHeight();
++  int meter_width = (int)(level * width);
++  if (meter_width < 1) return;
++
++  // Replicate the shader: 20 bars with green→red gradient
++  const int NUM_BARS = 20;
++  float bar_width_f = (float)meter_width / NUM_BARS;
++
++  for (int bar = 0; bar < NUM_BARS; ++bar) {
++    float x_start = bar * bar_width_f;
++    float x_end = (bar + 1) * bar_width_f;
++    float bar_center = (x_start + x_end) * 0.5f / width;
++
++    // Position in 0..1 range
++    float pos = (float)(bar + 0.5f) / NUM_BARS * level;
++    float r, gr, b;
++    if (pos > 0.4142f) {
++      r = 1.0f;
++      gr = 1.0f - 0.85f * pos;
++      b = 0.2f;
++    } else {
++      r = 0.5f * pos + 0.5f;
++      gr = 1.0f;
++      b = 0.4f;
++    }
++
++    g.setColour(Colour::fromFloatRGBA(r, gr, b, 1.0f));
++    int ix = (int)x_start + 1;
++    int iw = jmax(1, (int)(x_end - 1) - ix);
++    g.fillRect(ix, 0, iw, height);
++  }
++}
+diff --git a/src/editor_components/open_gl_peak_meter.h b/src/editor_components/open_gl_peak_meter.h
+index 598c35f..bbab072 100644
+--- a/src/editor_components/open_gl_peak_meter.h
++++ b/src/editor_components/open_gl_peak_meter.h
+@@ -30,6 +30,7 @@ class OpenGLPeakMeter : public OpenGLComponent {
+ 
+     void resized() override;
+ 
++    void paint(Graphics& g) override;
+     void init(OpenGLContext& open_gl_context) override;
+     void render(OpenGLContext& open_gl_context, bool animate = true) override;
+     void destroy(OpenGLContext& open_gl_context) override;
+diff --git a/src/editor_components/open_gl_wave_viewer.cpp b/src/editor_components/open_gl_wave_viewer.cpp
+index 750acdc..10edc8f 100644
+--- a/src/editor_components/open_gl_wave_viewer.cpp
++++ b/src/editor_components/open_gl_wave_viewer.cpp
+@@ -61,7 +61,7 @@ void OpenGLWaveViewer::paintBackground() {
+   if (getWidth() <= 0 || getHeight() <= 0)
+     return;
+ 
+-  const Desktop::Displays::Display& display = Desktop::getInstance().getDisplays().getMainDisplay();
++  const auto& display = *Desktop::getInstance().getDisplays().getPrimaryDisplay();
+   float scale = display.scale;
+   background_image_ = Image(Image::ARGB, scale * getWidth(), scale * getHeight(), true);
+   Graphics g(background_image_);
+@@ -88,6 +88,34 @@ void OpenGLWaveViewer::paintBackground() {
+   background_.updateBackgroundImage(background_image_);
+ }
+ 
++void OpenGLWaveViewer::paint(Graphics& g) {
++  // Draw the cached background (grid + wave path)
++  if (background_image_.getWidth() > 0) {
++    g.drawImage(background_image_, 0, 0, getWidth(), getHeight(),
++                0, 0, background_image_.getWidth(), background_image_.getHeight());
++  }
++
++  // Draw animated position marker
++  if (wave_phase_ == nullptr || wave_amp_ == nullptr || wave_phase_->buffer[0] <= 0.0f)
++    return;
++
++  float px = wave_phase_->buffer[0] * getWidth();
++  float padding = getRatio() * PADDING;
++  float draw_height = getHeight() - 2.0f * padding;
++  float py = padding + draw_height * (1.0f - wave_amp_->buffer[0]) * 0.5f;
++
++  // Vertical crosshair line
++  g.setColour(Colour(0x77ffffff));
++  g.drawVerticalLine((int)px, 0.0f, (float)getHeight());
++
++  // Position dot (green with black center)
++  float marker = MARKER_WIDTH * 0.5f;
++  g.setColour(Colors::modulation);
++  g.fillEllipse(px - marker, py - marker, 2.0f * marker, 2.0f * marker);
++  g.setColour(Colour(0xff000000));
++  g.fillEllipse(px - marker * 0.5f, py - marker * 0.5f, marker, marker);
++}
++
+ void OpenGLWaveViewer::paintPositionImage() {
+   int min_image_width = roundToInt(2 * MARKER_WIDTH);
+   int image_width = mopo::utils::nextPowerOfTwo(min_image_width);
+diff --git a/src/editor_components/open_gl_wave_viewer.h b/src/editor_components/open_gl_wave_viewer.h
+index 9ddfe8b..186bfc0 100644
+--- a/src/editor_components/open_gl_wave_viewer.h
++++ b/src/editor_components/open_gl_wave_viewer.h
+@@ -40,6 +40,7 @@ class OpenGLWaveViewer : public OpenGLComponent, public SynthSlider::SliderListe
+     void mouseDown(const MouseEvent& e) override;
+     void resized() override;
+ 
++    void paint(Graphics& g) override;
+     void init(OpenGLContext& open_gl_context) override;
+     void render(OpenGLContext& open_gl_context, bool animate = true) override;
+     void destroy(OpenGLContext& open_gl_context) override;
+diff --git a/src/editor_components/oscilloscope.cpp b/src/editor_components/oscilloscope.cpp
+index 4e7bccf..6f17ba8 100644
+--- a/src/editor_components/oscilloscope.cpp
++++ b/src/editor_components/oscilloscope.cpp
+@@ -55,7 +55,7 @@ void Oscilloscope::paintBackground(Graphics& g) {
+ 
+ 
+ void Oscilloscope::resized() {
+-  const Desktop::Displays::Display& display = Desktop::getInstance().getDisplays().getMainDisplay();
++  const auto& display = *Desktop::getInstance().getDisplays().getPrimaryDisplay();
+   float scale = display.scale;
+   background_ = Image(Image::RGB, scale * getWidth(), scale * getHeight(), true);
+   Graphics g(background_);
+diff --git a/src/editor_components/wave_viewer.cpp b/src/editor_components/wave_viewer.cpp
+index 780f559..bd3d8cd 100644
+--- a/src/editor_components/wave_viewer.cpp
++++ b/src/editor_components/wave_viewer.cpp
+@@ -92,7 +92,7 @@ void WaveViewer::paintBackground(Graphics& g) {
+ }
+ 
+ void WaveViewer::resized() {
+-  const Desktop::Displays::Display& display = Desktop::getInstance().getDisplays().getMainDisplay();
++  const auto& display = *Desktop::getInstance().getDisplays().getPrimaryDisplay();
+   float scale = display.scale;
+   background_ = Image(Image::RGB, scale * getWidth(), scale * getHeight(), true);
+   resetWavePath();
+@@ -216,7 +216,7 @@ void WaveViewer::resetWavePath() {
+   else
+     drawSmoothRandom();
+ 
+-  const Desktop::Displays::Display& display = Desktop::getInstance().getDisplays().getMainDisplay();
++  const auto& display = *Desktop::getInstance().getDisplays().getPrimaryDisplay();
+   float scale = display.scale;
+   Graphics g(background_);
+   g.addTransform(AffineTransform::scale(scale, scale));
+diff --git a/src/editor_components/xy_pad.cpp b/src/editor_components/xy_pad.cpp
+index fc587ca..1c4b572 100644
+--- a/src/editor_components/xy_pad.cpp
++++ b/src/editor_components/xy_pad.cpp
+@@ -81,7 +81,7 @@ void XYPad::paint(Graphics& g) {
+ }
+ 
+ void XYPad::resized() {
+-  const Desktop::Displays::Display& display = Desktop::getInstance().getDisplays().getMainDisplay();
++  const auto& display = *Desktop::getInstance().getDisplays().getPrimaryDisplay();
+   float scale = display.scale;
+   background_ = Image(Image::RGB, scale * getWidth(), scale * getHeight(), true);
+   Graphics g(background_);
+diff --git a/src/editor_sections/about_section.cpp b/src/editor_sections/about_section.cpp
+index 06f4214..7898f07 100644
+--- a/src/editor_sections/about_section.cpp
++++ b/src/editor_sections/about_section.cpp
+@@ -99,7 +99,7 @@ void AboutSection::paint(Graphics& g) {
+                                                BinaryData::helm_icon_128_1x_pngSize);
+   shadow.drawForImage(g, helm_small);
+ 
+-  const Desktop::Displays::Display& display = Desktop::getInstance().getDisplays().getMainDisplay();
++  const auto& display = *Desktop::getInstance().getDisplays().getPrimaryDisplay();
+   if (display.scale > 1.5) {
+     Image helm = ImageCache::getFromMemory(BinaryData::helm_icon_128_2x_png,
+                                            BinaryData::helm_icon_128_2x_pngSize);
+diff --git a/src/editor_sections/contribute_section.cpp b/src/editor_sections/contribute_section.cpp
+index 738e9cf..88e1d75 100644
+--- a/src/editor_sections/contribute_section.cpp
++++ b/src/editor_sections/contribute_section.cpp
+@@ -174,7 +174,7 @@ void ContributeSection::paint(Graphics& g) {
+                                                BinaryData::helm_icon_256_1x_pngSize);
+   shadow.drawForImage(g, helm_small);
+ 
+-  const Desktop::Displays::Display& display = Desktop::getInstance().getDisplays().getMainDisplay();
++  const auto& display = *Desktop::getInstance().getDisplays().getPrimaryDisplay();
+   if (display.scale > 1.5) {
+     Image helm = ImageCache::getFromMemory(BinaryData::helm_icon_256_2x_png,
+                                            BinaryData::helm_icon_256_2x_pngSize);
+diff --git a/src/editor_sections/full_interface.cpp b/src/editor_sections/full_interface.cpp
+index 206f81e..c997b74 100644
+--- a/src/editor_sections/full_interface.cpp
++++ b/src/editor_sections/full_interface.cpp
+@@ -53,7 +53,7 @@ FullInterface::FullInterface(mopo::control_map controls, mopo::output_map modula
+   createModulationSliders(modulation_sources, mono_modulations, poly_modulations);
+ 
+   logo_button_ = new ImageButton("logo_button");
+-  const Desktop::Displays::Display& display = Desktop::getInstance().getDisplays().getMainDisplay();
++  const auto& display = *Desktop::getInstance().getDisplays().getPrimaryDisplay();
+   if (display.scale > 1.5) {
+     Image helm = ImageCache::getFromMemory(BinaryData::helm_icon_128_2x_png,
+                                            BinaryData::helm_icon_128_2x_pngSize);
+@@ -125,7 +125,7 @@ FullInterface::~FullInterface() {
+   volume_section_ = nullptr;
+ }
+ 
+-void FullInterface::paint(Graphics& g) { }
++void FullInterface::paint(Graphics& g) { paintBackground(g); }
+ 
+ void FullInterface::paintBackground(Graphics& g) {
+   static const DropShadow shadow(Colour(0xcc000000), 3, Point<int>(0, 1));
+@@ -292,7 +292,7 @@ void FullInterface::animate(bool animate) {
+ }
+ 
+ void FullInterface::checkBackground() {
+-  const Desktop::Displays::Display& display = Desktop::getInstance().getDisplays().getMainDisplay();
++  const auto& display = *Desktop::getInstance().getDisplays().getPrimaryDisplay();
+   float scale = display.scale;
+   int width = scale * getWidth();
+   int height = scale * getHeight();
+diff --git a/src/editor_sections/open_gl_modulation_manager.cpp b/src/editor_sections/open_gl_modulation_manager.cpp
+index 23e4ed6..48e72e5 100644
+--- a/src/editor_sections/open_gl_modulation_manager.cpp
++++ b/src/editor_sections/open_gl_modulation_manager.cpp
+@@ -128,6 +128,12 @@ OpenGLModulationManager::~OpenGLModulationManager() {
+ }
+ 
+ void OpenGLModulationManager::paint(Graphics& g) {
++  // Update meter drawings (replaces GL render() loop)
++  for (auto& meter : meter_lookup_) {
++    bool show = meter.second->isModulated() && slider_model_lookup_[meter.first]->isVisible();
++    if (show)
++      meter.second->updateDrawing();
++  }
+ }
+ 
+ void OpenGLModulationManager::resized() {
+diff --git a/src/editor_sections/update_check_section.cpp b/src/editor_sections/update_check_section.cpp
+index 241f698..532e0e6 100644
+--- a/src/editor_sections/update_check_section.cpp
++++ b/src/editor_sections/update_check_section.cpp
+@@ -107,21 +107,7 @@ void UpdateCheckSection::mouseUp(const MouseEvent &e) {
+ }
+ 
+ void UpdateCheckSection::checkUpdate() {
+-  static const int TIMEOUT = 200;
+-  URL version_url("http://tytel.org/static/dist/helm_version.txt");
+-  const ScopedPointer<InputStream> in(version_url.createInputStream(false, nullptr, nullptr,
+-                                                                    "", TIMEOUT));
+-
+-  if (in == nullptr)
+-    return;
+-
+-  version_ = in->readEntireStreamAsString().upToFirstOccurrenceOf("\n", false, false);
+-
+-  if (!version_.isEmpty() &&
+-      LoadSave::compareVersionStrings(ProjectInfo::versionString, version_) < 0) {
+-    repaint();
+-    setVisible(true);
+-  }
++  // No network access in WASM build
+ }
+ 
+ Rectangle<int> UpdateCheckSection::getUpdateCheckRect() {
