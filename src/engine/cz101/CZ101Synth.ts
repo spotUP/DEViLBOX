@@ -7,9 +7,10 @@
  * voice's DCA / DCW / DCO envelope stages; this class turns a patch into chip
  * registers and envelope messages.
  *
- * Sound source of truth: the preset bank (cz101Presets.ts). The editor selects a
- * bank entry with loadPreset(index) and modifies it with setParam(knob, value);
- * the patch actually played is applyCzKnobs(bank entry, knobs).
+ * Sound source of truth: the base patch, either the Init bank entry (cz101Presets.ts,
+ * loadPreset(index)) or a user patch imported from a CZ SysEx dump (setParam('_userPatch', id),
+ * cz101Sysex.ts). The editor modifies it with setParam(knob, value); the patch actually
+ * played is applyCzKnobs(base patch, knobs).
  */
 
 import type { DevilboxSynth } from '@/types/synth';
@@ -17,6 +18,7 @@ import { getDevilboxAudioContext, noteToMidi } from '@utils/audio-context';
 import { cz101Transform } from './cz101Transform';
 import { CZ101_PRESET_BANK, CZ101_PRESET_NAMES, applyCzKnobs, cz101PresetByName } from './cz101Presets';
 import type { CZKnobs } from './cz101Presets';
+import { getCz101UserPatch } from '@stores/useCz101UserPatchStore';
 import { CZWaveform, CZWindow } from './cz101Types';
 import type { CZEnvelopeStage, CZLine, CZPatch } from './cz101Types';
 
@@ -63,7 +65,7 @@ export class CZ101Synth implements DevilboxSynth {
   private initPromise: Promise<void> | null = null;
   private allocationCounter = 0;
 
-  /** Bank entry being played (the one source of the sound) and the knob changes on top of it. */
+  /** Base patch being played (the one source of the sound) and the knob changes on top of it. */
   private basePatch: CZPatch = CZ101_PRESET_BANK[0].patch;
   private programIndex = 0;
   private knobs: CZKnobs = {};
@@ -328,6 +330,13 @@ export class CZ101Synth implements DevilboxSynth {
     }
     if (param === '_program') {
       this.loadPreset(Math.round(value));
+      return;
+    }
+    if (param === '_userPatch') {
+      // An imported patch becomes the base sound. The knobs stay: they mirror the patch the
+      // editor chose (or the user's tweaks on a reload), so they are not cleared like a bank load.
+      const entry = value > 0 ? getCz101UserPatch(Math.round(value)) : undefined;
+      if (entry) this.basePatch = entry.patch; // unknown id (patch lives in another browser): keep the current base
       return;
     }
     if (!KNOB_KEYS.has(param)) return; // stereo_width and unknown keys: no chip register
