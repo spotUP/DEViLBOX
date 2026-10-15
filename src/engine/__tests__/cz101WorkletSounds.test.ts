@@ -360,6 +360,107 @@ describe('CZ-101 wrapper behaviour (patches built here)', () => {
   });
 });
 
+/** Chip-side probe: the DCO (pitch envelope) offset of the most recently started single-line note's voice, in semitones. */
+function dcoSemitones(rig: Rig): number {
+  const wasm = (rig.proc as unknown as { wasm: { _upd933_env_level: (kind: number, voice: number) => number } }).wasm;
+  return wasm._upd933_env_level(2, lastWrittenVoice(rig)) / 16; // fine units: 1/16 semitone
+}
+/** The voice the most recent (single-line) note was written to. */
+function lastWrittenVoice(rig: Rig): number {
+  const writes = rig.messages.filter((m) => m.type === 'writeReg') as unknown as { register: number }[];
+  return writes.filter((w) => w.register >= 0x60 && w.register < 0x68).slice(-1)[0].register - 0x60;
+}
+
+describe('CZ-101 release and retrigger', () => {
+  /** A bend of +2 semitones held while the key is down, with NO pitch step after the sustain point; slow amplitude release. */
+  const BENT: CZPatch = {
+    name: 'Test Held Bend',
+    line1: {
+      waveform1: 0,
+      dcaEnvelope: [{ rate: 100, level: 99 }, { rate: 0, level: 99 }, { rate: 50, level: 0 }],
+      dcwEnvelope: [{ rate: 100, level: 30 }, { rate: 0, level: 30 }],
+      dcoEnvelope: [{ rate: 110, level: 1, coarse: true }, { rate: 0, level: 1, coarse: true }],
+    },
+  };
+
+  it('a held pitch bend stays put when the key is released (no pitch "boing") until the sound is 40 dB down', async () => {
+    const rig = await makeRig();
+    rig.synth.loadPatch(BENT);
+    rig.synth.triggerAttack(60, undefined, 0.8);
+    await settle();
+    rig.render(0.5);
+    const base = dcoSemitones(rig);
+    expect(base).toBeCloseTo(2, 1);
+    const peak = rms(rig.render(0.05));
+    rig.synth.triggerRelease(60);
+    await settle();
+    let checked = 0;
+    for (let i = 0; i < 24; i++) {
+      const level = rms(rig.render(0.05));
+      if (level > peak * 0.01) {
+        checked++;
+        expect(Math.abs(dcoSemitones(rig) - base) * 100, `release window ${i}: pitch moved`).toBeLessThan(30);
+      }
+    }
+    expect(checked).toBeGreaterThan(3); // the release really was audible for a while
+  });
+
+  /** Pitch and waveform steps after the sustain point that END away from zero: the next note must not inherit them. */
+  const LEFTOVER: CZPatch = {
+    name: 'Test Leftover',
+    line1: {
+      waveform1: 0,
+      dcaEnvelope: [{ rate: 100, level: 99 }, { rate: 0, level: 99 }, { rate: 90, level: 0 }],
+      dcwEnvelope: [{ rate: 100, level: 20 }, { rate: 0, level: 20 }, { rate: 100, level: 70 }],
+      dcoEnvelope: [{ rate: 70, level: 2 }, { rate: 0, level: 2 }, { rate: 110, level: 40, coarse: true }],
+    },
+  };
+
+  it('every note reproduces the first one, also when its voice comes back round after a release that left the envelopes elsewhere', async () => {
+    const rig = await makeRig();
+    rig.synth.loadPatch(LEFTOVER);
+    const firstVoices: number[] = [];
+    const notes: { pitch: number[]; level: number[]; voice: number }[] = [];
+    for (let n = 0; n < 6; n++) { // 4 voice pairs: note 5 returns to the voice note 1 used
+      rig.synth.triggerAttack(60, undefined, 0.8);
+      await settle();
+      const voice = lastWrittenVoice(rig);
+      firstVoices.push(voice);
+      const pitch: number[] = [];
+      const level: number[] = [];
+      for (let i = 0; i < 6; i++) { level.push(rms(rig.render(0.05))); pitch.push(dcoSemitones(rig)); }
+      rig.synth.triggerRelease(60);
+      await settle();
+      rig.render(0.6); // let the release finish
+      notes.push({ pitch, level, voice });
+    }
+    expect(new Set(firstVoices).size, 'a voice came back round').toBeLessThan(6);
+    const [first, ...later] = notes;
+    for (const [i, note] of later.entries()) {
+      note.pitch.forEach((p, k) => expect(Math.abs(p - first.pitch[k]), `note ${i + 2} pitch at ${k * 50} ms`).toBeLessThan(0.1));
+      note.level.forEach((l, k) => expect(Math.abs(20 * Math.log10((l + 1e-6) / (first.level[k] + 1e-6))), `note ${i + 2} level at ${k * 50} ms`).toBeLessThan(1.5));
+    }
+  });
+
+  it('a key pressed again while the last one is still releasing gets a free voice instead of cutting the release', async () => {
+    const rig = await makeRig();
+    rig.synth.loadPatch(BENT);
+    rig.synth.triggerAttack(60, undefined, 0.8);
+    await settle();
+    const first = lastWrittenVoice(rig);
+    rig.render(0.3);
+    rig.synth.triggerRelease(60);
+    await settle();
+    rig.render(0.05); // still ringing out
+    const keyOffs = rig.messages.filter((m) => m.type === 'keyOff').length;
+    rig.synth.triggerAttack(60, undefined, 0.8);
+    await settle();
+    expect(lastWrittenVoice(rig)).not.toBe(first);
+    expect(rig.messages.filter((m) => m.type === 'keyOff').length).toBe(keyOffs); // nothing was stolen
+    expect(rms(rig.render(0.3))).toBeGreaterThan(0.002);
+  });
+});
+
 describe('CZ-101 editor wiring', () => {
   it('choosing a preset through the editor path reaches the synth; a knob move changes the sound', async () => {
     const rig = await makeRig();

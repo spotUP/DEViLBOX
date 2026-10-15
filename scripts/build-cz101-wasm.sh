@@ -30,7 +30,7 @@ emcc "$SRC_DIR/UPD933Wrapper.cpp" \
     -s EXPORT_NAME=CZ101Module \
     -s ALLOW_MEMORY_GROWTH=1 \
     -s INITIAL_MEMORY=16777216 \
-    -s EXPORTED_FUNCTIONS='["_upd933_create","_upd933_destroy","_upd933_reset","_upd933_write","_upd933_set_cs","_upd933_render","_upd933_get_buffer","_upd933_env_irq","_upd933_env_level","_malloc","_free"]' \
+    -s EXPORTED_FUNCTIONS='["_upd933_create","_upd933_destroy","_upd933_reset","_upd933_write","_upd933_set_cs","_upd933_render","_upd933_get_buffer","_upd933_env_irq","_upd933_env_level","_upd933_env_reset","_malloc","_free"]' \
     -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
     -s ENVIRONMENT=web,worker \
     -s FILESYSTEM=0 \
