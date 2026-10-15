@@ -41,7 +41,7 @@ const hex4 = (v: number): string => v.toString(16).toUpperCase().padStart(4, '0'
 const KlysProgramCommandHelp: React.FC = () => (
   <div className="flex flex-col gap-1">
     <SectionLabel color="var(--color-accent-secondary)" label="Program Commands" />
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-4 gap-y-0.5 text-[10px] font-mono">
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-4 gap-y-0.5 text-[10px] font-mono">
       {KLYS_PROGRAM_COMMANDS.map((cmd) => {
         const digits = hex4(cmd.word).split('').map((d, i) => ((cmd.mask >> (12 - 4 * i)) & 0xF) === 0xF ? d : 'X').join('');
         return (
@@ -107,27 +107,32 @@ export const KlysControls: React.FC<{ instrument: InstrumentConfig }> = ({ instr
       <TabStrip tabs={KLYS_TABS} active={tab} onChange={setTab} ariaLabel="Klystrack instrument sections" />
       {tab === 'main' && <DOMSynthPanel layout={layout} config={config} onChange={onChange} />}
       {tab === 'program' && (
-      <div className="flex flex-col gap-2">
-        <InstrumentTableEditor
-          label="Program"
-          columns={columns}
-          rows={rows}
-          playingRow={playingRow}
-          onCellChange={onCellChange}
-          onCursorRow={setCursorRow}
-          onInsertRow={(row) => insertKlysProgramStep(index, row)}
-          onDeleteRow={(row) => deleteKlysProgramStep(index, row)}
-          height={320}
-        />
-        <div className="flex items-center gap-2">
-          <Button size="sm" onClick={undoKlysInstrumentEdit}>Undo</Button>
-          <Button size="sm" onClick={redoKlysInstrumentEdit}>Redo</Button>
-          <span className="text-[10px] font-mono text-text-secondary">
-            Step {String(cursorRow).padStart(2, '0')}: {describeKlysStep(word, inst.baseNote) || 'Empty step'}
-          </span>
+        <div className="flex flex-wrap items-start gap-4">
+          {/* The table is five hex digits wide: it keeps a table's width and the legend takes the rest of the row. */}
+          <div className="flex flex-col gap-2 w-[28rem] max-w-full shrink-0">
+            <InstrumentTableEditor
+              label="Program"
+              columns={columns}
+              rows={rows}
+              playingRow={playingRow}
+              onCellChange={onCellChange}
+              onCursorRow={setCursorRow}
+              onInsertRow={(row) => insertKlysProgramStep(index, row)}
+              onDeleteRow={(row) => deleteKlysProgramStep(index, row)}
+              height={320}
+            />
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={undoKlysInstrumentEdit}>Undo</Button>
+              <Button size="sm" onClick={redoKlysInstrumentEdit}>Redo</Button>
+            </div>
+            <span className="text-[10px] font-mono text-text-secondary">
+              Step {String(cursorRow).padStart(2, '0')}: {describeKlysStep(word, inst.baseNote) || 'Empty step'}
+            </span>
+          </div>
+          <div className="flex-1 min-w-[16rem]">
+            <KlysProgramCommandHelp />
+          </div>
         </div>
-        <KlysProgramCommandHelp />
-      </div>
       )}
     </div>
   );

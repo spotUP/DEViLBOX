@@ -10,16 +10,29 @@ export const TOGGLE_WIDTH = 72;
 export const SELECT_WIDTH = 168;
 export const SECTION_PADDING = 32;
 const PER_ROW = 3;
+/** Knob labels are one line app-wide (.knob-label nowrap, upper case, spaced mono): about this many px per character. */
+const LABEL_CHAR_PX = 6.8;
+
+/** The width of a control's cell: a knob is 80 px, a longer label gets the room to read without running into its neighbour. */
+export function knobCellWidth(label: string): number {
+  return Math.max(KNOB_WIDTH, Math.ceil(label.length * LABEL_CHAR_PX) + 8);
+}
 
 export function sectionFlexBasis(section: SectionDescriptor): number {
-  let knobs = 0, toggles = 0, selects = 0;
+  const knobWidths: number[] = [];
+  let toggles = 0, selects = 0;
   for (const c of section.controls) {
-    if (c.type === 'knob' || c.type === 'slider') knobs++;
+    if (c.type === 'knob' || c.type === 'slider') knobWidths.push(knobCellWidth(c.label));
     else if (c.type === 'select') selects++;
     else toggles++;
   }
+  // The widest row of up to three knobs, as the panel wraps them.
+  let widestRow = 0;
+  for (let i = 0; i < knobWidths.length; i += PER_ROW) {
+    widestRow = Math.max(widestRow, knobWidths.slice(i, i + PER_ROW).reduce((a, b) => a + b, 0));
+  }
   const content = Math.max(
-    Math.min(knobs, PER_ROW) * KNOB_WIDTH,
+    widestRow,
     Math.min(toggles, PER_ROW) * TOGGLE_WIDTH,
     selects > 0 ? SELECT_WIDTH : 0,
   );

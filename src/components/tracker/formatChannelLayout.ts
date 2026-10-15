@@ -16,7 +16,11 @@ export interface FormatChannelLayout {
   numChannels: number;
   channelOffsets: number[];
   channelWidths: number[];
-  /** Right edge of the last channel, from the canvas's left edge. */
+  /**
+   * Right edge of the last channel, from the canvas's left edge; with `gutter` given, from the end of the row-number
+   * gutter instead (the pattern path's definition, which allChannelsFit, the scroll strip and the scroll range add the
+   * gutter to).
+   */
   totalChannelsWidth: number;
   /** Scale the pattern is drawn at (1 unless fit shrank it). */
   fitScale: number;
@@ -29,6 +33,8 @@ export interface FormatChannelLayoutInput {
   charWidth: number;
   /** Where channel 0 starts: row-number gutter plus the global lane when shown. */
   leftEdge: number;
+  /** The row-number gutter (unscaled) inside leftEdge; leave out to measure the total from the canvas edge. */
+  gutter?: number;
   columnGap: number;
   channelPad: number;
   /** Canvas width; 0 or less disables the stretch. */
@@ -40,7 +46,7 @@ export interface FormatChannelLayoutInput {
 }
 
 export function formatChannelLayout(input: FormatChannelLayoutInput): FormatChannelLayout {
-  const { formatChannels, formatColumns, charWidth, leftEdge, columnGap, channelPad, availableWidth, fit = false, manualScale = 1 } = input;
+  const { formatChannels, formatColumns, charWidth, leftEdge, gutter = 0, columnGap, channelPad, availableWidth, fit = false, manualScale = 1 } = input;
   const widths: number[] = [];
   for (const channel of formatChannels) {
     if (channel.hidden) { widths.push(0); continue; }
@@ -52,5 +58,5 @@ export function formatChannelLayout(input: FormatChannelLayoutInput): FormatChan
   const offsets: number[] = [];
   let x = fitted.leftEdge;
   for (const w of fitted.widths) { offsets.push(x); x += w; }
-  return { numChannels: fitted.widths.length, channelOffsets: offsets, channelWidths: fitted.widths, totalChannelsWidth: x, fitScale: fitted.scale };
+  return { numChannels: fitted.widths.length, channelOffsets: offsets, channelWidths: fitted.widths, totalChannelsWidth: x - Math.floor(gutter * fitted.scale), fitScale: fitted.scale };
 }

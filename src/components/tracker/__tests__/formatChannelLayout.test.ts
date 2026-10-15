@@ -28,4 +28,11 @@ describe('formatChannelLayout', () => {
     expect(l.channelWidths).toEqual([3 * 8 + 4 + 2 * 8 + 40]);
     expect(l.totalChannelsWidth).toBe(40 + 84);
   });
+  it('a canvas that is filled by its channels needs no scrollbar once the gutter is counted once', () => {
+    // allChannelsFit adds the row-number gutter to the total; a total that already holds it counted it twice and
+    // showed a horizontal scrollbar on the klystrack program table.
+    const l = formatChannelLayout({ ...base, gutter: 40, formatChannels: [ch()], availableWidth: 660 });
+    expect(l.totalChannelsWidth).toBe(620);
+    expect(40 + l.totalChannelsWidth).toBeLessThanOrEqual(660);
+  });
 });

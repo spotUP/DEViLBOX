@@ -8,7 +8,7 @@ import React, { useCallback, useRef, useEffect, useState } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { CustomSelect } from '@components/common/CustomSelect';
 import type { SynthPanelLayout, SectionDescriptor, ControlDescriptor } from '@/types/synthPanel';
-import { sectionFlexBasis } from './synthPanelSizing';
+import { knobCellWidth, sectionFlexBasis } from './synthPanelSizing';
 interface DOMSynthPanelProps {
   layout: SynthPanelLayout;
   config: Record<string, unknown>;
@@ -284,7 +284,7 @@ const DOMSynthControl: React.FC<ControlProps> = ({ descriptor, value, onChange, 
     case 'knob': {
       const numVal = typeof value === 'number' ? value : (descriptor.defaultValue ?? 0.5);
       return (
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center" style={{ minWidth: knobCellWidth(descriptor.label) }}>
           <Knob
             value={numVal}
             min={descriptor.min ?? 0}
