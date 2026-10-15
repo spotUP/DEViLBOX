@@ -957,6 +957,38 @@ int klys_set_sequence_entry(int chan, int pos, int position, int pattern, int no
     return 1;
 }
 
+/*
+ * A running channel took its filter, waveform, envelope and pulse width from the instrument when the note started
+ * (mus_trigger_instrument), so an edit to the instrument struct alone is heard only on the next note. Re-apply what
+ * the editor can change to every channel (song or audition) that is playing instrument inst, leaving the channel's
+ * pitch, volume, gate and program position as they are.
+ */
+static void refresh_live_channels(const MusInstrument *inst)
+{
+    for (int c = 0; c < CYD_MAX_CHANNELS; c++) {
+        MusChannel *chn = &g_mus.channel[c];
+        if (chn->instrument != inst || !(chn->flags & MUS_CHN_PLAYING)) continue;
+        CydChannel *cydchn = &g_cyd.channel[c];
+        MusTrackStatus *track = &g_mus.song_track[c];
+
+        Uint32 runtime = cydchn->flags & (CYD_CHN_ENABLE_GATE | CYD_CHN_ENABLE_YM_ENV);
+        cydchn->flags = (inst->cydflags & ~(Uint32)(CYD_CHN_ENABLE_GATE | CYD_CHN_ENABLE_YM_ENV)) | runtime;
+        cydchn->flttype = inst->flttype;
+        cydchn->lfsr_type = inst->lfsr_type;
+        cydchn->fx_bus = inst->fx_bus;
+        if (!(inst->flags & MUS_INST_YM_BUZZ)) {
+            cydchn->adsr.a = inst->adsr.a;
+            cydchn->adsr.d = inst->adsr.d;
+            cydchn->adsr.s = inst->adsr.s;
+            cydchn->adsr.r = inst->adsr.r;
+        }
+        track->filter_cutoff = inst->cutoff;
+        track->filter_resonance = inst->resonance;
+        cyd_set_filter_coeffs(&g_cyd, cydchn, inst->cutoff, inst->resonance);
+        track->pw = inst->pw;
+    }
+}
+
 EMSCRIPTEN_KEEPALIVE
 int klys_set_instrument_param(int idx, int paramId, int value)
 {
@@ -1006,6 +1038,7 @@ int klys_set_instrument_param(int idx, int paramId, int value)
         case 38: inst->fm_attack_start = (Uint8)value; break;
         default: return 0;
     }
+    refresh_live_channels(inst);
     return 1;
 }
 
@@ -1047,8 +1080,7 @@ int klys_set_instrument_program_step(int idx, int step, int value)
  * the name are written only when the buffer holds all of them). Returns the
  * bytes consumed, 0 for a bad index or no song.
  */
-EMSCRIPTEN_KEEPALIVE
-int klys_set_instrument_data(int idx, const void *buf, int len)
+static int set_instrument_data(int idx, const void *buf, int len)
 {
     if (!g_song_loaded || idx < 0 || idx >= g_song.num_instruments || !buf || len <= 0) return 0;
 
@@ -1112,6 +1144,14 @@ int klys_set_instrument_data(int idx, const void *buf, int len)
 #undef RD16
 #undef RD32
     return pos;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int klys_set_instrument_data(int idx, const void *buf, int len)
+{
+    int n = set_instrument_data(idx, buf, len);
+    if (n > 0) refresh_live_channels(&g_song.instrument[idx]);
+    return n;
 }
 
 EMSCRIPTEN_KEEPALIVE

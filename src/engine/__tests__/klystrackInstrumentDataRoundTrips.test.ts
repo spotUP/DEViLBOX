@@ -105,6 +105,32 @@ describe('klystrack instrument data', () => {
     expect(Math.sqrt(sum / (200 * 256)), 'the audition sounds').toBeGreaterThan(0.001);
   });
 
+  it('a filter edit is heard in the note that is sounding, not only in the next one', { timeout: 120000 }, async () => {
+    const { w } = await loaded(songBuffer(SONG));
+    await w.send({ type: 'stop' });
+    const out = stereoOutputs(1);
+    const rms = (blocks: number): number => {
+      let sum = 0;
+      for (let i = 0; i < blocks; i++) {
+        w.proc.process([], out);
+        for (let k = 0; k < 128; k++) sum += out[0][0][k] ** 2 + out[0][1][k] ** 2;
+      }
+      return Math.sqrt(sum / (blocks * 256));
+    };
+    const set = (paramId: number, value: number) => w.send({ type: 'setInstrumentParam', idx: 3, paramId, value });
+    // A held sawtooth through a wide-open low-pass filter, no program to move the filter by itself.
+    await set(5, 8 | 512); await set(11, 0); await set(16, 2047); await set(17, 0); await set(18, 0);
+    await set(0, 0); await set(1, 0); await set(2, 31); await set(10, 128);
+    await w.send({ type: 'previewNoteOn', inst: 3, note: 48 });
+    rms(40);
+    const open = rms(100);
+    await set(16, 24); // twist the cutoff while the note holds
+    rms(10);
+    const closed = rms(100);
+    expect(open, 'the held note sounds').toBeGreaterThan(0.001);
+    expect(closed, `the cutoff edit darkens the held note (open ${open}, closed ${closed})`).toBeLessThan(open * 0.5);
+  });
+
   it('programStatus reports each playing channel while watched, and songData carries the wavetables', { timeout: 120000 }, async () => {
     const { w, data } = await loaded(songBuffer(SONG));
     expect(Array.isArray(data.wavetables)).toBe(true);
