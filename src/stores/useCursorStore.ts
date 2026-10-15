@@ -13,6 +13,8 @@ import { create } from 'zustand';
 import type { CursorPosition, BlockSelection } from '@typedefs';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { computeNibbleAdvance } from '@/lib/tracker/nibbleAdvance';
+import { resolveEntryProfile } from '@/lib/tracker/entryAdvanceProfiles';
+import { useKeyboardStore } from './useKeyboardStore';
 // Cross-store access goes through the late-bound storeAccess registry,
 // NOT through direct static imports. The previous cycle between these
 // three stores caused a production TDZ when Rollup froze the aggregator
@@ -273,9 +275,11 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
       isPlaying: getTrackerReplayer().isPlaying(),
       currentRow: cur.rowIndex,
       patternLength: pattern.length,
-      advanceOnInstrument: behavior.advanceOnInstrument,
-      advanceOnVolume: behavior.advanceOnVolume,
-      advanceOnEffect: behavior.advanceOnEffect,
+      profile: resolveEntryProfile({
+        choice: useKeyboardStore.getState().editBehaviour,
+        keymap: behavior.name,
+        sourceFormat: pattern.importMetadata?.sourceFormat,
+      }),
       effectTypeDigits: digitCount(columnType, pattern.channels[cur.channelIndex]),
     });
     switch (adv.kind) {
@@ -287,6 +291,8 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
         break;
       case 'row':
         get().moveCursorToRow(adv.rowIndex);
+        // The profile says which digit slot and column the cursor lands on.
+        set({ cursor: { ...get().cursor, digitIndex: adv.digitIndex, ...(adv.columnType ? { columnType: adv.columnType } : {}) } });
         break;
       case 'none':
         break;

@@ -42,3 +42,8 @@ Manual (owner): LOCAL `http://localhost:5174/`, Settings > Keyboard: set ProTrac
 1. Follow keymap with the FastTracker 2 keymap (the default): keep today's flow (recommended: nothing changes unasked; "FastTracker 2" stays selectable) or switch to FT2-clone behaviour (down in the same column, per `ft2_edit.c:263`)? Today's flow was added deliberately in a5f0748d5 but the FT2 source disagrees with it.
 2. Should Follow keymap also consider the song's format (a .mod under the FT2 keymap edits like ProTracker)? Shipped as a separate choice "Follow song format"; default remains Follow keymap.
 3. Renoise, OctaMED, NoiseTracker, ScreamTracker 3, Digital Tracker have no source or manual in the repo; they use the DEViLBOX default until someone supplies one.
+
+## Execution notes (2026-10-15, second agent)
+- Earlier ticks were premature: no tests existed. Now written and run: `nibbleAdvance.test.ts` (per-profile numbers), `entryAdvanceProfiles.test.ts` (resolution + migration), `hooks/tracker/input/__tests__/editBehaviourReachability.test.tsx` (the one reachability test through `useEffectInput`). Revert-check done: mapping ProTracker keymap -> devilbox fails the reachability test. All three added to `test:ci`.
+- Decision: `down` keeps the digit slot (PT2/FT2 never change `cursor.mode`); new `downFirstDigit` for the DEViLBOX default and IT, which start a fresh entry. `row` result now carries `digitIndex`.
+- Profiles done: devilbox, protracker, fasttracker2, impulse-tracker, openmpt. Open: Furnace (`effectCursorDir`), klystrack, GoatTracker/GTUltra, SID Factory II (canvas-owned format editors do not call `applyEntryAdvance`; not verifiable in the research table).

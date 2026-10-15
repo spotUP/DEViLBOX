@@ -1,21 +1,16 @@
 /**
- * FT2 nibble-cursor advance decider.
- *
- * In Fast Tracker 2 a multi-digit field (instrument, effect param, volume value)
- * is edited one nibble at a time: typing a hex digit writes that nibble AND moves
- * the caret one nibble right within the SAME cell; only after the last nibble does
- * the cursor drop to the next row (per edit step). Typing an effect TYPE character
- * moves the caret straight to the effect PARAM high nibble, so `A`,`0`,`F` is one
- * continuous typing flow.
- *
- * This module is the single source of truth for that post-keystroke cursor move.
- * It is pure so it can be unit-tested without a canvas/DOM.
+ * Post-keystroke cursor move after a data entry. The move itself comes from an
+ * EntryAdvanceProfile (entryAdvanceProfiles.ts): data per original tracker.
+ * This module is the single decision point; it is pure so it can be unit-tested
+ * without a canvas/DOM.
  */
+
+import { ENTRY_PROFILES, type EntryAdvanceProfile, type EntryMove } from './entryAdvanceProfiles';
 
 export type NibbleAdvance =
   | { kind: 'nibble'; digitIndex: number }
   | { kind: 'column'; columnType: 'effParam' | 'effParam2' }
-  | { kind: 'row'; rowIndex: number }
+  | { kind: 'row'; rowIndex: number; columnType?: 'effTyp' | 'effTyp2'; digitIndex: number }
   | { kind: 'none' };
 
 export interface NibbleAdvanceInput {
@@ -25,9 +20,8 @@ export interface NibbleAdvanceInput {
   isPlaying: boolean;
   currentRow: number;
   patternLength: number;
-  advanceOnInstrument: boolean;
-  advanceOnVolume: boolean;
-  advanceOnEffect: boolean;
+  /** Defaults to the DEViLBOX default profile. */
+  profile?: EntryAdvanceProfile;
   /** Digits of the effect TYPE field: 1 (tracker glyph, default) or 2 (Furnace code, effectNotation.ts). */
   effectTypeDigits?: number;
 }
@@ -47,39 +41,45 @@ const NIBBLE_COUNTS: Record<string, number> = {
   flag2: 1,
 };
 
+/** The profile's move for one keystroke; columns the profiles do not cover use the default profile's generic rule. */
+function moveFor(profile: EntryAdvanceProfile, columnType: string, digitIndex: number): EntryMove {
+  const d = digitIndex > 0 ? 1 : 0;
+  switch (columnType) {
+    case 'instrument': return profile.instrument[d];
+    case 'volume': return profile.volume[d];
+    case 'effTyp':
+    case 'effTyp2': return profile.effectCommand;
+    case 'effParam':
+    case 'effParam2': return profile.effectParam[d];
+    default: return (NIBBLE_COUNTS[columnType] ?? 1) > 1 && d === 0 ? 'nextDigit' : 'down';
+  }
+}
+
 export function computeNibbleAdvance(input: NibbleAdvanceInput): NibbleAdvance {
   // During playback the cursor follows the play row; do not fight it with
-  // entry-driven moves (matches the pre-existing "no advance while playing").
+  // entry-driven moves (PT2 and FT2 only step in edit mode: pt2_edit.c:176, ft2_edit.c:262).
   if (input.isPlaying) return { kind: 'none' };
 
   const { columnType, digitIndex } = input;
+  const profile = input.profile ?? ENTRY_PROFILES.devilbox;
+  const isCommand = columnType === 'effTyp' || columnType === 'effTyp2';
 
-  // Effect TYPE: a 2-digit Furnace code moves to its second digit first; the
-  // last type character jumps to the param high nibble on the same cell.
-  if (columnType === 'effTyp' || columnType === 'effTyp2') {
-    if (digitIndex < (input.effectTypeDigits ?? 1) - 1) return { kind: 'nibble', digitIndex: digitIndex + 1 };
-    return { kind: 'column', columnType: columnType === 'effTyp' ? 'effParam' : 'effParam2' };
+  // A 2-digit Furnace effect code always walks to its second digit first (unless the profile keeps the cursor still).
+  if (isCommand && digitIndex < (input.effectTypeDigits ?? 1) - 1) {
+    return profile.effectCommand === 'stay' ? { kind: 'none' } : { kind: 'nibble', digitIndex: digitIndex + 1 };
   }
 
-  const nibbles = NIBBLE_COUNTS[columnType] ?? 1;
+  const down = (digit: number, to?: 'effTyp' | 'effTyp2'): NibbleAdvance =>
+    input.editStep > 0 && input.patternLength > 0
+      ? { kind: 'row', rowIndex: (input.currentRow + input.editStep) % input.patternLength, columnType: to, digitIndex: digit }
+      : { kind: 'none' };
 
-  // Multi-nibble value column, not yet on the last nibble → move one nibble
-  // right within the same cell. Unconditional (independent of edit step) so both
-  // hex digits can always be typed in place.
-  if (nibbles > 1 && digitIndex < nibbles - 1) {
-    return { kind: 'nibble', digitIndex: digitIndex + 1 };
+  switch (moveFor(profile, columnType, digitIndex)) {
+    case 'stay': return { kind: 'none' };
+    case 'nextDigit': return { kind: 'nibble', digitIndex: digitIndex + 1 };
+    case 'toParam': return { kind: 'column', columnType: columnType === 'effTyp2' ? 'effParam2' : 'effParam' };
+    case 'downToCommand': return down(0, columnType === 'effParam2' ? 'effTyp2' : 'effTyp');
+    case 'down': return down(digitIndex);
+    case 'downFirstDigit': return down(0);
   }
-
-  // Last nibble (or a single-char terminal column) → advance a row per edit step,
-  // gated by the scheme's per-column advance flags. digitIndex resets to 0.
-  const gate =
-    columnType === 'instrument' ? input.advanceOnInstrument
-    : columnType === 'volume' ? input.advanceOnVolume
-    : columnType.startsWith('eff') ? input.advanceOnEffect
-    : true; // flag / probability always advance
-
-  if (input.editStep > 0 && gate && input.patternLength > 0) {
-    return { kind: 'row', rowIndex: (input.currentRow + input.editStep) % input.patternLength };
-  }
-  return { kind: 'none' };
 }

@@ -24,6 +24,7 @@ import {
   KEYBOARD_SCHEMES,
 } from '@hooks/dialogs/useSettingsDialog';
 import { KeyBindingEditor } from '@components/dialogs/KeyBindingEditor';
+import { EDIT_BEHAVIOUR_OPTIONS, ENTRY_PROFILES, type EditBehaviourChoice } from '@/lib/tracker/entryAdvanceProfiles';
 import { KeyboardNormalizer } from '@engine/keyboard/KeyboardNormalizer';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { PlaybackEnginesPanel } from '@components/dialogs/PlaybackEnginesPanel';
@@ -47,6 +48,12 @@ function normalizeToHex6(color: string | undefined): string {
 
 interface SettingsModalProps {
   onClose: () => void;
+}
+
+function editBehaviourDescription(choice: EditBehaviourChoice): string {
+  if (choice === 'follow-keymap') return 'The keyboard scheme decides: ProTracker, Impulse Tracker and OpenMPT edit like the original; the others use the DEViLBOX default.';
+  if (choice === 'follow-format') return 'The loaded song decides: .mod like ProTracker, .xm like FastTracker 2, .it and .s3m like Impulse Tracker; otherwise the keyboard scheme.';
+  return ENTRY_PROFILES[choice].description;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
@@ -582,6 +589,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       </div>
                     </div>
                     <span className="text-[9px] text-ft2-textDim font-mono">{KEYBOARD_SCHEMES.find(sc => sc.id === s.activeScheme)?.description}</span>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col">
+                        <label className="text-ft2-text text-xs font-mono">Edit behaviour:</label>
+                        <span className="text-[9px] text-ft2-textDim font-mono">Where the cursor goes after typing an instrument, volume or effect</span>
+                      </div>
+                      <CustomSelect value={s.editBehaviour} onChange={(v) => s.setEditBehaviour(v as EditBehaviourChoice)}
+                        options={EDIT_BEHAVIOUR_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                        className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1" />
+                    </div>
+                    <span className="text-[9px] text-ft2-textDim font-mono">{editBehaviourDescription(s.editBehaviour)}</span>
                   </div>
 
                   <div className="flex items-center justify-between">

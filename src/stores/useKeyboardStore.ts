@@ -3,6 +3,16 @@
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { DEFAULT_EDIT_BEHAVIOUR, isEditBehaviourChoice, type EditBehaviourChoice } from '@/lib/tracker/entryAdvanceProfiles';
+
+/** Persisted schema version of 'keyboard-preferences'. 1 added `editBehaviour`. */
+export const KEYBOARD_PREFS_VERSION = 1;
+
+/** Migration of the persisted state; exported for tests. Unknown or missing editBehaviour -> Follow keyboard scheme. */
+export function migrateKeyboardPrefs(persisted: unknown, _fromVersion: number): Record<string, unknown> {
+  const p = (persisted && typeof persisted === 'object' ? persisted : {}) as Record<string, unknown>;
+  return { ...p, editBehaviour: isEditBehaviourChoice(p.editBehaviour) ? p.editBehaviour : DEFAULT_EDIT_BEHAVIOUR };
+}
 
 export type PlatformOverride = 'auto' | 'mac' | 'pc';
 
@@ -17,6 +27,9 @@ interface KeyboardState {
   customBindings: CustomBindings | null;
   customBindingsVersion: number;
   baseScheme: string;
+  /** What the cursor does after a data entry: a tracker's behaviour, or follow the keyboard scheme / song format. */
+  editBehaviour: EditBehaviourChoice;
+  setEditBehaviour: (choice: EditBehaviourChoice) => void;
   setActiveScheme: (scheme: string) => void;
   setPlatformOverride: (platform: PlatformOverride) => void;
   setCustomBinding: (keyCombo: string, command: string, platform: 'pc' | 'mac') => void;
@@ -33,6 +46,12 @@ export const useKeyboardStore = create<KeyboardState>()(
       customBindings: null,
       customBindingsVersion: 0,
       baseScheme: 'fasttracker2',
+      editBehaviour: DEFAULT_EDIT_BEHAVIOUR,
+
+      setEditBehaviour: (choice: EditBehaviourChoice) => {
+        if (!isEditBehaviourChoice(choice)) return;
+        set({ editBehaviour: choice });
+      },
 
       setActiveScheme: (scheme: string) => {
         if (!scheme || typeof scheme !== 'string') {
@@ -82,6 +101,8 @@ export const useKeyboardStore = create<KeyboardState>()(
     }),
     {
       name: 'keyboard-preferences',
+      version: KEYBOARD_PREFS_VERSION,
+      migrate: (persisted, fromVersion) => migrateKeyboardPrefs(persisted, fromVersion) as unknown as KeyboardState,
     }
   )
 );
