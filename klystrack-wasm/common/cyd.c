@@ -49,6 +49,18 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 #endif
 
+/*
+ * Per-channel tap (DEViLBOX): each channel's own output (after envelope,
+ * filter and the mixer gain; before panning and the FX buses), one value per
+ * frame cyd_output_buffer_stereo renders. With cyd_tap_buf set, frame f of
+ * channel c lands at cyd_tap_buf[c * cyd_tap_stride + f] for c < cyd_tap_channels
+ * (the channel scopes and the channel meters read it).
+ */
+static Sint32 cyd_tap_last[CYD_MAX_CHANNELS];
+Sint32 *cyd_tap_buf = NULL;
+int cyd_tap_stride = 0;
+int cyd_tap_channels = 0;
+
 /* Per-channel mixer gain (0 = mute, 256 = unity). Applied in cyd_output(). */
 static int cyd_channel_gain[CYD_MAX_CHANNELS];
 static int cyd_channel_gain_inited = 0;
@@ -616,6 +628,7 @@ static Sint32 cyd_output(CydEngine *cyd)
 	{
 		CydChannel *chn = &cyd->channel[i];
 		Sint32 o = 0;
+		cyd_tap_last[i] = 0;
 		if (chn->flags & CYD_CHN_ENABLE_GATE)
 		{
 			if (chn->flags & CYD_CHN_ENABLE_RING_MODULATION)
@@ -658,8 +671,10 @@ static Sint32 cyd_output(CydEngine *cyd)
 			}
 #endif
 
-#ifdef STEREOOUTPUT
 			cyd_init_channel_gain();
+			cyd_tap_last[i] = o * cyd_channel_gain[i] / 256;
+
+#ifdef STEREOOUTPUT
 			Sint32 ol = o * chn->gain_left / CYD_STEREO_GAIN * cyd_channel_gain[i] / 256;
 			Sint32 or = o * chn->gain_right / CYD_STEREO_GAIN * cyd_channel_gain[i] / 256;
 #endif
@@ -863,6 +878,12 @@ void cyd_output_buffer_stereo(int chan, void *_stream, int len, void *udata)
 #else
 			left = right = cyd_output(cyd);
 #endif
+
+			if (cyd_tap_buf && (int)cyd->samples_output < cyd_tap_stride)
+			{
+				for (int c = 0 ; c < cyd_tap_channels && c < cyd->n_channels ; ++c)
+					cyd_tap_buf[c * cyd_tap_stride + cyd->samples_output] = cyd_tap_last[c];
+			}
 
 #ifdef NOSDL_MIXER
 			Sint32 o1 = (left * PRE_GAIN) / PRE_GAIN_DIVISOR;

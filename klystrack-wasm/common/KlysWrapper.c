@@ -36,6 +36,22 @@ static Uint32 g_sample_rate = 44100;
 static Sint16 *g_mixBuf = NULL;
 static Uint32 g_mixBufSamples = 0; /* in stereo frames */
 
+/*
+ * Per-channel output (cyd.c's tap): g_tapRaw is channel-major, one Sint32 per
+ * frame of the last klys_decode; g_tapOut holds the same frames as floats on
+ * the master output's scale (the channel scopes read it through
+ * klys_get_channel_tap); g_levels[c] is channel c's peak over that decode
+ * (the channel meters read it through klys_get_channel_levels).
+ */
+extern Sint32 *cyd_tap_buf;
+extern int cyd_tap_stride;
+extern int cyd_tap_channels;
+static Sint32 *g_tapRaw = NULL;
+static float *g_tapOut = NULL;
+static Uint32 g_tapCapacity = 0; /* frames per channel */
+static Uint32 g_tapFrames = 0;   /* frames in the last decode */
+static float g_levels[MUS_MAX_CHANNELS];
+
 /* ---- Memory RWops ---- */
 
 typedef struct {
@@ -162,8 +178,23 @@ int klys_decode(float *outL, float *outR, Uint32 numSamples)
 
     /* cyd_output_buffer_stereo fills interleaved Sint16 stereo.
      * len parameter is in BYTES. */
+    int nch = g_song.num_channels;
+    if (nch > MUS_MAX_CHANNELS) nch = MUS_MAX_CHANNELS;
+    if (numSamples > g_tapCapacity) {
+        free(g_tapRaw);
+        free(g_tapOut);
+        g_tapRaw = (Sint32 *)malloc(numSamples * MUS_MAX_CHANNELS * sizeof(Sint32));
+        g_tapOut = (float *)malloc(numSamples * MUS_MAX_CHANNELS * sizeof(float));
+        g_tapCapacity = numSamples;
+    }
+    memset(g_tapRaw, 0, numSamples * nch * sizeof(Sint32));
+    cyd_tap_buf = g_tapRaw;
+    cyd_tap_stride = (int)numSamples;
+    cyd_tap_channels = nch;
+
     Uint32 lenBytes = numSamples * 2 * sizeof(Sint16);
     cyd_output_buffer_stereo(&g_cyd, (Uint8 *)g_mixBuf, lenBytes);
+    cyd_tap_buf = NULL;
 
     /* Convert interleaved Sint16 → separate float32 L/R.
      * The CYD engine divides output by PRE_GAIN_DIVISOR (4) for multi-channel
@@ -173,6 +204,22 @@ int klys_decode(float *outL, float *outR, Uint32 numSamples)
         outL[i] = g_mixBuf[i * 2] * scale;
         outR[i] = g_mixBuf[i * 2 + 1] * scale;
     }
+
+    /* The channel taps on the same scale as the output (cyd mixes each
+     * channel in at PRE_GAIN / PRE_GAIN_DIVISOR), and each channel's peak. */
+    const float tapScale = scale * (float)PRE_GAIN / (float)PRE_GAIN_DIVISOR;
+    for (int c = 0; c < nch; c++) {
+        float peak = 0.0f;
+        for (Uint32 i = 0; i < numSamples; i++) {
+            float v = g_tapRaw[c * numSamples + i] * tapScale;
+            g_tapOut[c * numSamples + i] = v;
+            float a = v < 0 ? -v : v;
+            if (a > peak) peak = a;
+        }
+        g_levels[c] = peak > 1.0f ? 1.0f : peak;
+    }
+    for (int c = nch; c < MUS_MAX_CHANNELS; c++) g_levels[c] = 0.0f;
+    g_tapFrames = numSamples;
 
     return (int)numSamples;
 }
@@ -246,23 +293,32 @@ void klys_get_note_start_counts(Uint32 *out, int maxCh)
     for (int i = 0; i < maxCh; i++) out[i] = (i < MUS_MAX_CHANNELS) ? g_mus_note_starts[i] : 0;
 }
 
+/*
+ * out[c] = channel c's peak output over the last klys_decode, 0..1 on the
+ * master output's scale (cyd.c's per-channel tap, the same audio the
+ * channel scopes show).
+ */
 EMSCRIPTEN_KEEPALIVE
 void klys_get_channel_levels(float *out, int maxCh)
 {
-    if (!g_initialized || !g_song_loaded) {
-        for (int i = 0; i < maxCh; i++) out[i] = 0.0f;
-        return;
-    }
-    int nch = g_song.num_channels;
-    if (nch > maxCh) nch = maxCh;
-    for (int i = 0; i < nch; i++) {
-        /* adsr.volume is 0-128, envelope is 0-0x00ffffff */
-        Uint8 vol = g_cyd.channel[i].adsr.volume;
-        /* Check if channel is active (flags bit 0 = CYD_CHN_ENABLE_GATE) */
-        int active = (g_cyd.channel[i].flags & 1) ? 1 : 0;
-        out[i] = active ? (float)vol / 128.0f : 0.0f;
-    }
-    for (int i = nch; i < maxCh; i++) out[i] = 0.0f;
+    for (int i = 0; i < maxCh; i++)
+        out[i] = (g_initialized && g_song_loaded && i < MUS_MAX_CHANNELS) ? g_levels[i] : 0.0f;
+}
+
+/*
+ * The per-channel output of the last klys_decode: channel-major floats,
+ * klys_get_channel_tap_frames() frames per channel (0 before any decode).
+ */
+EMSCRIPTEN_KEEPALIVE
+float *klys_get_channel_tap(void)
+{
+    return g_tapOut;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int klys_get_channel_tap_frames(void)
+{
+    return (int)g_tapFrames;
 }
 
 EMSCRIPTEN_KEEPALIVE

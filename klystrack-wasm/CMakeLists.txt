@@ -87,6 +87,9 @@ if(EMSCRIPTEN)
         "_klys_set_instrument_program_step"
         "_klys_save_song"
         "_klys_set_channel_gain"
+        "_klys_get_channel_levels"
+        "_klys_get_channel_tap"
+        "_klys_get_channel_tap_frames"
     )
 
     string(JOIN "," EXPORTED_FUNCTIONS_STR ${EXPORTED_FUNCTIONS})
