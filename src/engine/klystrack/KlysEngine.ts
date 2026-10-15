@@ -46,6 +46,11 @@ export interface KlysSongInfo {
   flags: number;
 }
 
+/** One channel's instrument program state, from the worklet's programStatus report. */
+export interface KlysChannelProgram { instrument: number; step: number; tick: number; running: boolean }
+
+export interface KlysWavetableInfo { name: string; samples: number; loopBegin: number; loopEnd: number; baseNote: number }
+
 export interface KlysSongData {
   patterns: Array<{ numSteps: number; steps: Array<{ note: number; instrument: number; ctrl: number; volume: number; command: number }> }>;
   sequences: Array<{ entries: Array<{ position: number; pattern: number; noteOffset: number }> }>;
@@ -62,6 +67,33 @@ export interface KlysSongData {
     fmAdsr: { a: number; d: number; s: number; r: number }; fmAttackStart: number;
     program: number[];
   } | null>;
+  wavetables: KlysWavetableInfo[];
+}
+
+type KlysEngineInstrument = NonNullable<KlysSongData['instruments'][number]>;
+
+/**
+ * Pack an instrument in the layout of klys_get_instrument_data / klys_set_instrument_data
+ * (KlysWrapper.c): the one inverse of the worklet's reader.
+ */
+export function packKlysInstrument(i: KlysEngineInstrument): Uint8Array {
+  const out = new Uint8Array(147);
+  let p = 0;
+  const u8 = (v: number) => { out[p++] = v & 0xff; };
+  const u16 = (v: number) => { u8(v); u8(v >> 8); };
+  const u32 = (v: number) => { u8(v); u8(v >> 8); u8(v >> 16); u8(v >>> 24); };
+  u8(i.adsr.a); u8(i.adsr.d); u8(i.adsr.s); u8(i.adsr.r);
+  u32(i.flags); u32(i.cydflags);
+  u8(i.baseNote); u8(i.finetune); u8(i.slideSpeed); u16(i.pw); u8(i.volume); u8(i.progPeriod);
+  u8(i.vibratoSpeed); u8(i.vibratoDepth); u8(i.pwmSpeed); u8(i.pwmDepth);
+  u16(i.cutoff); u8(i.resonance); u8(i.flttype); u8(i.ymEnvShape); u16(i.buzzOffset);
+  u8(i.fxBus); u8(i.vibShape); u8(i.vibDelay); u8(i.pwmShape);
+  u8(i.lfsrType); u8(i.wavetableEntry); u8(i.ringMod); u8(i.syncSource);
+  u32(i.fmFlags); u8(i.fmModulation); u8(i.fmFeedback); u8(i.fmWave); u8(i.fmHarmonic);
+  u8(i.fmAdsr.a); u8(i.fmAdsr.d); u8(i.fmAdsr.s); u8(i.fmAdsr.r); u8(i.fmAttackStart);
+  for (let k = 0; k < 32; k++) u16(i.program[k] ?? 0xfffe);
+  for (let k = 0; k < 32; k++) u8(k < i.name.length ? i.name.charCodeAt(k) : 0);
+  return out;
 }
 
 export class KlysEngine extends WASMSingletonBase {
@@ -81,6 +113,7 @@ export class KlysEngine extends WASMSingletonBase {
   private _songEndCallbacks: Set<() => void> = new Set();
   private _songDataCallbacks: Set<(data: KlysSongData) => void> = new Set();
   private _lastSongData: KlysSongData | null = null;
+  private readonly _programCallbacks = new Set<(channels: KlysChannelProgram[]) => void>();
   private _resolveSerialize: ((buf: ArrayBuffer) => void) | null = null;
   private _rejectSerialize: ((err: Error) => void) | null = null;
 
@@ -177,6 +210,10 @@ export class KlysEngine extends WASMSingletonBase {
           this._positions.emit({ songPos: data.songPosition, row: data.patternPosition });
           break;
 
+        case 'programStatus':
+          for (const cb of this._programCallbacks) cb(data.channels);
+          break;
+
         case 'songEnd':
           for (const cb of this._songEndCallbacks) {
             cb();
@@ -188,6 +225,7 @@ export class KlysEngine extends WASMSingletonBase {
             patterns: data.patterns,
             sequences: data.sequences,
             instruments: data.instruments,
+            wavetables: data.wavetables ?? [],
           };
           // The one writer of klysNative from the engine (klysSongData.ts). Imported
           // at call time: a static import would put this engine in the stores'
@@ -347,6 +385,30 @@ export class KlysEngine extends WASMSingletonBase {
     this.sendMessage({ type: 'setInstrumentProgramStep', idx, step, value });
   }
 
+  /** Replace every field of instrument idx at once (inverse of the songData read). */
+  setInstrumentData(idx: number, inst: KlysEngineInstrument): void {
+    this.sendMessage({ type: 'setInstrumentData', idx, data: packKlysInstrument(inst).buffer });
+  }
+
+  /** Audition instrument inst on the spare channel; never starts or stops the song. */
+  previewNoteOn(inst: number, note: number): void {
+    this.sendMessage({ type: 'previewNoteOn', inst, note });
+  }
+
+  previewNoteOff(): void {
+    this.sendMessage({ type: 'previewNoteOff' });
+  }
+
+  /** Per-channel program state with every position report; the worklet watches only while subscribed. */
+  subscribeProgramStatus(cb: (channels: KlysChannelProgram[]) => void): () => void {
+    this._programCallbacks.add(cb);
+    if (this._programCallbacks.size === 1) this.sendMessage({ type: 'watchProgram', on: true });
+    return () => {
+      if (!this._programCallbacks.delete(cb)) return;
+      if (this._programCallbacks.size === 0) this.sendMessage({ type: 'watchProgram', on: false });
+    };
+  }
+
   serializeSong(): Promise<ArrayBuffer> {
     return new Promise((resolve, reject) => {
       this._resolveSerialize = resolve;
@@ -359,6 +421,7 @@ export class KlysEngine extends WASMSingletonBase {
     super.dispose();
     this._positions.clear();
     this._songEndCallbacks.clear();
+    this._programCallbacks.clear();
     if (KlysEngine.instance === this) {
       KlysEngine.instance = null;
     }

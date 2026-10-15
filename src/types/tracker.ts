@@ -703,6 +703,16 @@ export interface KlysNativeData {
   patterns: KlysNativePattern[];
   sequences: KlysNativeSequence[];  // per-channel
   instruments: KlysNativeInstrument[];
+  /** Song-level wavetable entries (read-only here: sample data is edited in klystrack's Wavetable tab). */
+  wavetables?: KlysNativeWavetable[];
+}
+
+export interface KlysNativeWavetable {
+  name: string;
+  samples: number;
+  loopBegin: number;
+  loopEnd: number;
+  baseNote: number;
 }
 
 export interface KlysNativePattern {
