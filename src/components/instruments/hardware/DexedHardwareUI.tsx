@@ -14,7 +14,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { getToneEngine } from '../../../engine/ToneEngine';
-import { unpackDX7Voice } from '../../../engine/dx7/dx7sysex';
+import { unpackDX7Voice, toBulkSysex } from '../../../engine/dx7/dx7sysex';
 import { consumePendingPresetData } from '../../../lib/pendingPresetData';
 
 interface DexedUIModule {
@@ -107,15 +107,7 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
           const synth = engine.instruments.get(key) as any;
           if (synth?.loadSysex) {
             if (data.length === 4096) {
-              const sysex = new Uint8Array(4104);
-              sysex[0] = 0xF0; sysex[1] = 0x43; sysex[2] = 0x00;
-              sysex[3] = 0x09; sysex[4] = 0x20; sysex[5] = 0x00;
-              sysex.set(data, 6);
-              let sum = 0;
-              for (let i = 0; i < 4096; i++) sum += data[i];
-              sysex[4102] = (-sum) & 0x7F;
-              sysex[4103] = 0xF7;
-              synth.loadSysex(sysex.buffer);
+              synth.loadSysex(toBulkSysex(data).buffer);
             } else {
               synth.loadSysex(buffer);
             }

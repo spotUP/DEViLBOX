@@ -221,3 +221,176 @@ export function configToVCED(config: {
 
   return vced;
 }
+
+/** Convert VCED (155 bytes unpacked) to VMEM (128 bytes packed). */
+export function packDX7Voice(vced: Uint8Array): Uint8Array {
+  const vmem = new Uint8Array(128);
+  // 6 operators: VCED has 21 bytes/op, VMEM has 17 bytes/op
+  for (let op = 0; op < 6; op++) {
+    const vs = op * 21; // VCED source offset
+    const vd = op * 17; // VMEM dest offset
+    // Bytes 0-7: EG rates and levels — direct copy
+    for (let i = 0; i < 8; i++) vmem[vd + i] = vced[vs + i];
+    // Byte 8: KLS break point
+    vmem[vd + 8] = vced[vs + 8];
+    // Bytes 9-10: KLS left/right depth
+    vmem[vd + 9] = vced[vs + 9];
+    vmem[vd + 10] = vced[vs + 10];
+    // Byte 11: KLS left curve (0-3) | right curve (0-3) packed
+    vmem[vd + 11] = (vced[vs + 11] & 0x03) | ((vced[vs + 12] & 0x03) << 2);
+    // Byte 12: Rate scaling (0-7) | detune (0-14) packed
+    vmem[vd + 12] = (vced[vs + 13] & 0x07) | ((vced[vs + 20] & 0x0F) << 3);
+    // Byte 13: Amp mod sens (0-3) | key vel sens (0-7) packed
+    vmem[vd + 13] = (vced[vs + 14] & 0x03) | ((vced[vs + 15] & 0x07) << 2);
+    // Byte 14: Output level
+    vmem[vd + 14] = vced[vs + 16];
+    // Byte 15: Freq coarse (0-31) | osc mode (0-1) packed
+    vmem[vd + 15] = (vced[vs + 17] & 0x01) | ((vced[vs + 18] & 0x1F) << 1);
+    // Byte 16: Freq fine
+    vmem[vd + 16] = vced[vs + 19];
+  }
+  // Global params start at VCED offset 126, VMEM offset 102
+  // Pitch EG rates and levels (8 bytes)
+  for (let i = 0; i < 8; i++) vmem[102 + i] = vced[126 + i];
+  // Byte 110: Algorithm (0-31)
+  vmem[110] = vced[134] & 0x1F;
+  // Byte 111: Feedback (0-7) | Osc key sync (0-1) packed
+  vmem[111] = (vced[135] & 0x07) | ((vced[136] & 0x01) << 3);
+  // Bytes 112-115: LFO speed, delay, PMD, AMD
+  vmem[112] = vced[137];
+  vmem[113] = vced[138];
+  vmem[114] = vced[139];
+  vmem[115] = vced[140];
+  // Byte 116: LFO sync (0-1) | LFO wave (0-5) | LFO PMS (0-7) packed
+  vmem[116] = (vced[141] & 0x01) | ((vced[142] & 0x07) << 1) | ((vced[143] & 0x07) << 4);
+  // Byte 117: Transpose
+  vmem[117] = vced[144];
+  // Bytes 118-127: Voice name (10 ASCII chars)
+  for (let i = 0; i < 10; i++) vmem[118 + i] = vced[145 + i];
+  return vmem;
+}
+
+/* ── Validation, framing and file inspection (shared by every .syx entry point) ── */
+
+/** Largest legal value of each of the 155 VCED parameters (Yamaha DX7 data format). */
+export const VCED_MAX: readonly number[] = (() => {
+  const max: number[] = [];
+  // Per operator (21 bytes): EG rates 1-4, EG levels 1-4, break point, left/right depth,
+  // left/right curve, rate scaling, amp mod sens, velocity sens, output level,
+  // osc mode, coarse, fine, detune.
+  const op = [99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 3, 3, 7, 3, 7, 99, 1, 31, 99, 14];
+  for (let i = 0; i < 6; i++) max.push(...op);
+  // Pitch EG rates/levels, algorithm, feedback, osc key sync, LFO speed/delay/PMD/AMD,
+  // LFO sync, LFO wave, LFO PMS, transpose.
+  max.push(99, 99, 99, 99, 99, 99, 99, 99, 31, 7, 1, 99, 99, 99, 99, 1, 5, 7, 48);
+  // Voice name: 10 printable ASCII characters.
+  for (let i = 0; i < 10; i++) max.push(127);
+  return max;
+})();
+
+/** Human-readable list of VCED bytes outside their legal range (empty = valid). */
+export function vcedRangeErrors(vced: Uint8Array): string[] {
+  const errors: string[] = [];
+  for (let i = 0; i < 155; i++) {
+    if (vced[i] > VCED_MAX[i]) errors.push(`byte ${i} = ${vced[i]} (max ${VCED_MAX[i]})`);
+  }
+  return errors;
+}
+
+/**
+ * Clamp every VCED parameter into its legal range and make the name printable ASCII.
+ * Returns the number of bytes changed. Hardware and Dexed clamp the same way on load.
+ */
+export function repairVced(vced: Uint8Array): number {
+  let fixed = 0;
+  for (let i = 0; i < 155; i++) {
+    let v = vced[i];
+    if (i >= 145) {
+      if (v < 32 || v > 126) v = 32;
+    } else if (v > VCED_MAX[i]) {
+      v = VCED_MAX[i];
+    }
+    if (v !== vced[i]) { vced[i] = v; fixed++; }
+  }
+  return fixed;
+}
+
+/** DX7 checksum: two's complement of the data sum, low 7 bits. */
+export function dx7Checksum(data: Uint8Array): number {
+  let sum = 0;
+  for (let i = 0; i < data.length; i++) sum += data[i];
+  return (-sum) & 0x7F;
+}
+
+/** Wrap 4096 bytes of packed voices into a framed 4104-byte bulk dump. */
+export function toBulkSysex(packed4096: Uint8Array): Uint8Array {
+  const sysex = new Uint8Array(4104);
+  sysex.set([0xF0, 0x43, 0x00, 0x09, 0x20, 0x00], 0);
+  sysex.set(packed4096.subarray(0, 4096), 6);
+  sysex[4102] = dx7Checksum(packed4096.subarray(0, 4096));
+  sysex[4103] = 0xF7;
+  return sysex;
+}
+
+export type DX7SysexKind = 'bulk32' | 'single' | 'unknown';
+
+export interface DX7SysexInspection {
+  kind: DX7SysexKind;
+  /** Parameter bytes clamped or name bytes made printable while importing. */
+  repairs: number;
+  /** Framed checksum matched (true for unframed data, which carries none). */
+  checksumOk: boolean;
+  /** One entry for a single-voice dump, 32 for a bulk dump. */
+  patches: DX7Patch[];
+  /** Framed 4104-byte bulk dump, ready for DX7Synth.loadSysex (bulk32 only). */
+  bulkSysex?: Uint8Array;
+  /** 155 VCED bytes (single only). */
+  vced?: Uint8Array;
+}
+
+/**
+ * Classify a user-supplied or shipped .syx file: 32-voice bulk dump (framed 4104 or raw 4096),
+ * single-voice VCED dump (framed 163, F0 43 0n 00 01 1B ... F7, or raw 155), or unknown.
+ */
+export function inspectDX7Sysex(data: Uint8Array): DX7SysexInspection {
+  if (data.length === 4104 || data.length === 4096) {
+    const framed = data.length === 4104;
+    if (framed && (data[0] !== 0xF0 || data[1] !== 0x43 || data[3] !== 0x09)) {
+      return { kind: 'unknown', checksumOk: false, repairs: 0, patches: [] };
+    }
+    const packed = framed ? data.subarray(6, 4102) : data;
+    const checksumOk = framed ? data[4102] === dx7Checksum(packed) : true;
+    const patches = parseDX7Cartridge(framed ? data : packed);
+    let repairs = 0;
+    const clean = new Uint8Array(4096);
+    patches.forEach((p, i) => {
+      repairs += repairVced(p.data);
+      clean.set(packDX7Voice(p.data), i * 128);
+    });
+    return {
+      kind: 'bulk32',
+      checksumOk,
+      repairs,
+      patches,
+      bulkSysex: toBulkSysex(clean),
+    };
+  }
+  if (data.length === 163 || data.length === 155) {
+    const framed = data.length === 163;
+    if (framed && (data[0] !== 0xF0 || data[1] !== 0x43 || data[3] !== 0x00 || data[4] !== 0x01 || data[5] !== 0x1B)) {
+      return { kind: 'unknown', checksumOk: false, repairs: 0, patches: [] };
+    }
+    const vced = new Uint8Array(156);
+    vced.set(data.subarray(framed ? 6 : 0, (framed ? 6 : 0) + 155));
+    const checksumOk = framed ? data[161] === dx7Checksum(vced.subarray(0, 155)) : true;
+    const repairs = repairVced(vced);
+    return {
+      kind: 'single',
+      checksumOk,
+      repairs,
+      patches: [{ name: getVCEDPatchName(vced) || 'Voice', data: vced }],
+      vced: vced.subarray(0, 155),
+    };
+  }
+  return { kind: 'unknown', checksumOk: false, repairs: 0, patches: [] };
+}
