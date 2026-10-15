@@ -1,4 +1,16 @@
 import type { InstrumentPreset } from '../../types/instrument';
+import { CZ101_PRESET_NAMES, cz101PresetParameters } from '../../engine/cz101/cz101Presets';
+
+/** One factory preset per bank entry: the names and knob values come from the bank, not from here. */
+const CZ101_FACTORY_PRESETS: InstrumentPreset['config'][] = CZ101_PRESET_NAMES.map((name, index) => ({
+  type: 'synth' as const,
+  name: `CZ ${name}`,
+  synthType: 'CZ101' as const,
+  parameters: { ...cz101PresetParameters(index), volume: 0.8 },
+  effects: [],
+  volume: -8,
+  pan: 0,
+}));
 
 // ============================================================================
 // MAME CLASSIC PRESETS (8) - Hardware-accurate classic synths
@@ -69,36 +81,5 @@ export const MAME_PRESETS: InstrumentPreset['config'][] = [
     volume: -10,
     pan: 0,
   },
-  {
-    type: 'synth' as const,
-    name: 'CZ Brass 1',
-    synthType: 'CZ101',
-    effects: [],
-    volume: -8,
-    pan: 0,
-  },
-  {
-    type: 'synth' as const,
-    name: 'CZ Electric Piano',
-    synthType: 'CZ101',
-    effects: [],
-    volume: -10,
-    pan: 0,
-  },
-  {
-    type: 'synth' as const,
-    name: 'CZ Synth Bass',
-    synthType: 'CZ101',
-    effects: [],
-    volume: -6,
-    pan: 0,
-  },
-  {
-    type: 'synth' as const,
-    name: 'CZ Digital Pad',
-    synthType: 'CZ101',
-    effects: [],
-    volume: -10,
-    pan: 0,
-  },
+  ...CZ101_FACTORY_PRESETS,
 ];

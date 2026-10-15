@@ -123,15 +123,22 @@ class CZ101Processor extends AudioWorkletProcessor {
       return;
     }
     seq.held = false;
-    this.loadStep(kind, voice, seq, st.rate, st.level);
+    this.loadStep(kind, voice, seq, st.rate, st.level, st.coarse);
   }
 
-  /** Write one step register; direction comes from where the envelope actually is. */
-  loadStep(kind, voice, seq, rate, level) {
+  /**
+   * Write one step register; direction comes from where the envelope actually is.
+   * DCO levels are 6 bits, and `coarse` switches the unit from 6.25 cents to 2 semitones;
+   * env_level() reports the DCO in the finest unit, so compare in that unit.
+   */
+  loadStep(kind, voice, seq, rate, level, coarse) {
     const current = this.wasm._upd933_env_level(kind, voice);
-    const direction = level < current ? 1 : 0;
     const maxLevel = kind === 2 ? 0x3F : 0x7F;
-    const word = (direction << 15) | ((rate & 0x7F) << 8) | (Math.min(level, maxLevel) & maxLevel);
+    const field = Math.min(level, maxLevel) & maxLevel;
+    const target = kind === 2 && coarse ? field << 5 : field;
+    const direction = target < current ? 1 : 0;
+    let word = (direction << 15) | ((rate & 0x7F) << 8) | field;
+    if (kind === 2 && coarse) word |= 0x40;
     this.writeRegister((kind === 0 ? 0x00 : kind === 1 ? 0x20 : 0x10) + voice, word);
   }
 

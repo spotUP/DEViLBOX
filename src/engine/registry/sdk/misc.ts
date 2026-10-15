@@ -18,6 +18,7 @@ import { SAMSynth } from '../../sam/SAMSynth';
 import { DECtalkSynth } from '../../dectalk/DECtalkSynth';
 import { SynareSynth } from '../../SynareSynth';
 import { CZ101Synth } from '../../cz101/CZ101Synth';
+import { applyChipParameters } from './mame';
 import { CEM3394Synth } from '../../cem3394/CEM3394Synth';
 import { SCSPSynth } from '../../scsp/SCSPSynth';
 import { VFXSynth } from '../../vfx/VFXSynth';
@@ -189,11 +190,14 @@ const juceWasmDescs: SynthDescriptor[] = [
     create: (config) => {
       const synth = new CZ101Synth();
       void synth.init();
+      // The chosen preset and knob values, as the editor shows them
+      applyChipParameters(synth, config);
       synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('CZ101', config.volume));
       return synth as unknown as Tone.ToneAudioNode;
     },
-    onTriggerRelease: (synth, _note, time) => {
-      (synth as any).triggerRelease(time);
+    onTriggerRelease: (synth, note, time) => {
+      // Polyphonic: release the voice that plays this note (the time alone cannot name one)
+      (synth as unknown as CZ101Synth).triggerRelease(note, time);
       return true;
     },
   },

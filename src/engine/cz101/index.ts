@@ -6,5 +6,6 @@
  */
 
 export { CZ101Synth, CZ101_PRESETS } from './CZ101Synth';
-export type { CZPatch, CZLine, CZEnvelopeStage } from './CZ101Synth';
-export { CZWaveform, CZWindow } from './CZ101Synth';
+export { CZ101_PRESET_BANK, CZ101_PRESET_NAMES, cz101PresetParameters } from './cz101Presets';
+export type { CZPatch, CZLine, CZEnvelopeStage } from './cz101Types';
+export { CZWaveform, CZWindow } from './cz101Types';
