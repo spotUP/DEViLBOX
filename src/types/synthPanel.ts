@@ -49,9 +49,40 @@ export interface SelectDescriptor {
 
 export type ControlDescriptor = KnobDescriptor | ToggleDescriptor | SliderDescriptor | Switch3WayDescriptor | SelectDescriptor;
 
+/** One drawn line of a curve: points are [x, y] in the curve's own units (seconds, Hz, dB, 0..1). */
+export interface CurveSeries {
+  points: ReadonlyArray<readonly [number, number]>;
+  /** Defaults to the section accent. */
+  color?: string;
+  /** Fill down to the bottom of the plot (an envelope), instead of only stroking the line. */
+  fill?: boolean;
+}
+
+/**
+ * A realtime curve that shows what a section's knobs do to the sound (a filter response, an envelope, an LFO shape).
+ * `series` is a pure function of the layout's current values, so the curve redraws as a knob moves, with no note
+ * held. `marker` is the live part: where the playing voice is right now, reported by the engine.
+ */
+export interface CurveDescriptor {
+  label: string;
+  /** Plot height in px (default 72). */
+  height?: number;
+  xScale?: 'linear' | 'log';
+  xDomain: readonly [number, number];
+  yDomain: readonly [number, number];
+  xUnit?: string;
+  yUnit?: string;
+  /** Layout values in, lines out. `get` returns the numeric value of a layout key. */
+  series: (get: (key: string) => number) => CurveSeries[];
+  /** Live voice position on the x axis (null = no voice); the canvas redraws the marker without re-rendering. */
+  marker?: { subscribe: (onPosition: (x: number | null) => void) => () => void };
+}
+
 export interface SectionDescriptor {
   label: string;
   controls: ControlDescriptor[];
+  /** Curves drawn at the top of the section, above its knobs. */
+  curves?: CurveDescriptor[];
   /** Number of columns in the control grid (default: auto) */
   columns?: number;
 }

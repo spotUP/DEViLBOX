@@ -8,6 +8,7 @@ import React, { useCallback, useRef, useEffect, useState } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { CustomSelect } from '@components/common/CustomSelect';
 import type { SynthPanelLayout, SectionDescriptor, ControlDescriptor } from '@/types/synthPanel';
+import { CurveCanvas } from '../curves/CurveCanvas';
 import { SELECT_WIDTH, TOGGLE_CELL, knobCellWidth, sectionFlexBasis } from './synthPanelSizing';
 interface DOMSynthPanelProps {
   layout: SynthPanelLayout;
@@ -240,6 +241,20 @@ const DOMSynthSection: React.FC<SectionProps> = ({ section, flexBasis, getValue,
           {section.label}
         </span>
       </div>
+
+      {/* Curves: what this section's knobs do to the sound, redrawn as a knob moves */}
+      {section.curves && section.curves.length > 0 && (
+        <div className="flex flex-col gap-2 mb-3">
+          {section.curves.map((curve) => (
+            <CurveCanvas
+              key={curve.label}
+              curve={curve}
+              series={curve.series((key) => Number(getValue(key)))}
+              accent={accent}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Knobs + sliders — auto-sized columns, centered so they don't stretch */}
       {knobs.length > 0 && (
