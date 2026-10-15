@@ -6,6 +6,7 @@
  */
 
 import type { ColumnSpec, PatternSnapshot, ChannelSnapshot, CellSnapshot } from '@engine/renderer/worker-types';
+import { resolveColor } from '@components/ui/controlColor';
 
 export type ColumnType = 'note' | 'hex' | 'ctrl';
 
@@ -143,9 +144,12 @@ export type OnCellChange = (
  */
 export type CurrentRowSpec = number | number[];
 
-/** Parse a CSS hex color to RGBA array. CSS vars/named colors fall back to neutral gray. */
+/**
+ * Parse a CSS colour to an RGBA array. A `var(--token)` is resolved against the document first (resolveColor, the
+ * app's one token resolver): the worker only understands concrete values. Named colours fall back to neutral gray.
+ */
 function parseColorToRgba(css: string): [number, number, number, number] {
-  const clean = css.trim().replace('#', '');
+  const clean = resolveColor(css).replace('#', '');
   if (/^[0-9a-fA-F]{6}$/.test(clean)) {
     return [
       parseInt(clean.slice(0, 2), 16) / 255,
@@ -162,7 +166,7 @@ function parseColorToRgba(css: string): [number, number, number, number] {
       1.0,
     ];
   }
-  // CSS var, named color, or other — fall back to neutral gray
+  // Named color, or a variable that cannot be read — fall back to neutral gray
   return [0.6, 0.6, 0.6, 1.0];
 }
 
