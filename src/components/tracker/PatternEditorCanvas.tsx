@@ -62,7 +62,7 @@ import TrackerWorkerFactory from '@/workers/tracker-render.worker.ts?worker';
 import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
 import { attachFormatKeyboard, type FormatKeyHost, type FormatCursor } from './formatKeyboard';
 import { formatChannelLayout } from './formatChannelLayout';
-import { toColumnSpec, formatChannelsToSnapshot } from '@/components/shared/format-editor-types';
+import { toColumnSpec, formatChannelsToSnapshot, pasteFormatRows } from '@/components/shared/format-editor-types';
 import { transposeFormatNote } from './formatTranspose';
 import { TrackerCanvas2DRenderer } from '@engine/renderer/TrackerCanvas2DRenderer';
 import { TrackerVisualBackground } from './TrackerVisualBackground';
@@ -1081,7 +1081,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     for (let r = startRow; r <= endRow; r++) {
       for (let c = startCol; c <= endCol; c++) {
         const colDef = chCols[c];
-        if (colDef) onFormatCellChange(chIdx, r, colDef.key, colDef.emptyValue ?? 0);
+        if (colDef && !colDef.readOnly) onFormatCellChange(chIdx, r, colDef.key, colDef.emptyValue ?? 0);
       }
     }
   }, [formatColumns, formatChannels, formatCursor, formatSelection, onFormatCellChange]);
@@ -1125,16 +1125,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const ch = formatChannels[formatCursor.channelIndex];
     if (!ch) return;
     const numRows = ch.patternLength;
-    let pasted = 0;
-    for (let i = 0; i < clipboard.length; i++) {
-      const targetRow = formatCursor.rowIndex + i;
-      if (targetRow >= numRows) break;
-      const entry = clipboard[i];
-      for (const [key, value] of Object.entries(entry)) {
-        onFormatCellChange(formatCursor.channelIndex, targetRow, key, value);
-      }
-      pasted++;
-    }
+    const pasted = pasteFormatRows(clipboard, ch.columns ?? formatColumns, formatCursor.channelIndex, formatCursor.rowIndex, numRows, onFormatCellChange);
     useUIStore.getState().setStatusMessage(`PASTED ${pasted} ROW${pasted > 1 ? 'S' : ''}`);
   }, [formatColumns, formatChannels, formatCursor, onFormatCellChange]);
 
@@ -1647,7 +1638,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     if (isFormatMode && fmtCh && fmtChange) {
       const cols = fmtCh.columns ?? formatColumns;
       for (let row = 0; row < fmtCh.patternLength; row++) {
-        cols?.forEach(col => fmtChange(channelIndex, row, col.key, col.emptyValue ?? 0));
+        cols?.forEach(col => { if (!col.readOnly) fmtChange(channelIndex, row, col.key, col.emptyValue ?? 0); });
       }
       useUIStore.getState().setStatusMessage('CHANNEL CLEARED');
       return;
@@ -1694,18 +1685,12 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const clipboard = formatClipboardRef.current;
       const fmtCh = formatChannelsRef.current?.[channelIndex];
       if (!clipboard || clipboard.length === 0 || !fmtCh) return;
-      const len = Math.min(clipboard.length, fmtCh.patternLength);
-      for (let row = 0; row < len; row++) {
-        const entry = clipboard[row];
-        for (const [key, value] of Object.entries(entry)) {
-          fmtChange(channelIndex, row, key, value as number);
-        }
-      }
+      pasteFormatRows(clipboard, fmtCh.columns ?? formatColumns, channelIndex, 0, fmtCh.patternLength, fmtChange);
       useUIStore.getState().setStatusMessage('CHANNEL PASTED');
       return;
     }
     pasteTrack(channelIndex);
-  }, [pasteTrack, isFormatMode]);
+  }, [pasteTrack, isFormatMode, formatColumns]);
 
   const handleTranspose = useCallback((channelIndex: number, semitones: number) => {
     const fmtCh = isFormatMode ? formatChannelsRef.current?.[channelIndex] : undefined;

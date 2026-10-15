@@ -38,6 +38,41 @@ export interface ColumnDef {
   noteMin?: number;
   /** For type='note': how many notes the format holds from noteMin upward (default 96). */
   noteCount?: number;
+  /**
+   * A column that only displays (a derived "meaning" text). The cursor still lands on it, but typing, Delete, clear
+   * and paste never write it.
+   */
+  readOnly?: boolean;
+}
+
+/** True when the column with this key may be written (it exists and is not readOnly). */
+export function isWritableColumn(cols: readonly ColumnDef[] | undefined, key: string): boolean {
+  const col = cols?.find((c) => c.key === key);
+  return !!col && !col.readOnly;
+}
+
+/**
+ * Paste clipboard rows from `startRow` down, writing every cell whose column is writable.
+ * Returns how many rows were pasted. The one paste loop for the cursor paste and the channel paste.
+ */
+export function pasteFormatRows(
+  clipboard: readonly Record<string, number>[],
+  cols: readonly ColumnDef[] | undefined,
+  channelIdx: number,
+  startRow: number,
+  numRows: number,
+  write: OnCellChange,
+): number {
+  let pasted = 0;
+  for (let i = 0; i < clipboard.length; i++) {
+    const row = startRow + i;
+    if (row >= numRows) break;
+    for (const [key, value] of Object.entries(clipboard[i])) {
+      if (isWritableColumn(cols, key)) write(channelIdx, row, key, value);
+    }
+    pasted++;
+  }
+  return pasted;
 }
 
 /** The cell value a typed note (semitones above C-0) becomes in a note column, or null when out of range. */
