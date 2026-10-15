@@ -146,6 +146,7 @@ const EupminiControls = lazy(() => import('../controls/EupminiControls').then(m 
 const WasmParamEditorWrapper = lazy(() => import('../controls/WasmParamEditorWrapper').then(m => ({ default: m.WasmParamEditorWrapper })));
 const WasmInfoEditor = lazy(() => import('../controls/WasmInfoEditor').then(m => ({ default: m.WasmInfoEditor })));
 const Cinter4Controls = lazy(() => import('../controls/Cinter4Controls').then(m => ({ default: m.Cinter4Controls })));
+import { CZ101PatchBrowser } from '../controls/CZ101PatchBrowser';
 const KlysControls = lazy(() => import('../controls/KlysControls').then(m => ({ default: m.KlysControls })));
 const SonixControls = lazy(() => import('../controls/SonixControls').then(m => ({ default: m.SonixControls })));
 const GTUltraControls = lazy(() => import('../controls/GTUltraControls').then(m => ({ default: m.GTUltraControls })));
@@ -2434,6 +2435,14 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                   color={chipDef?.color}
                 />
               </Suspense>
+
+              {/* CZ-101: factory and imported SysEx patches, in this view as well as the Hardware UI */}
+              {instrument.synthType === 'CZ101' && (
+                <CZ101PatchBrowser
+                  parameters={(instrument.parameters || {}) as Record<string, number>}
+                  onParamChange={handleChipParamChange}
+                />
+              )}
 
               {/* Chip Parameters — CMI gets dedicated editor, others get generic */}
               <Suspense fallback={<LoadingControls />}>

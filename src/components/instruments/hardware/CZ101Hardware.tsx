@@ -6,12 +6,9 @@
  * Features: 8-voice Phase Distortion synthesis with compact design
  */
 
-import React, { useRef, useState } from 'react';
-import { CZ101_PRESET_BANK, CZ101_KNOB_NEUTRAL, cz101PresetParameters, cz101PatchParameters } from '@engine/cz101/cz101Presets';
-import { decodeCzSysexFile } from '@engine/cz101/cz101Sysex';
-import type { CZPatch } from '@engine/cz101/cz101Types';
-import { useCz101UserPatchStore } from '@stores/useCz101UserPatchStore';
-import { notify } from '@stores/useNotificationStore';
+import React from 'react';
+import { CZ101_PRESET_BANK, CZ101_KNOB_NEUTRAL, cz101PatchParameters } from '@engine/cz101/cz101Presets';
+import { useCz101Patches } from '@components/instruments/controls/CZ101PatchBrowser';
 
 interface CZ101HardwareProps {
   parameters: Record<string, number>;
@@ -123,63 +120,8 @@ export const CZ101Hardware: React.FC<CZ101HardwareProps> = ({
   parameters,
   onParamChange,
 }) => {
-  const program = typeof parameters._program === 'number' ? parameters._program : 0;
-  const userPatchId = typeof parameters._userPatch === 'number' ? parameters._userPatch : 0;
-  const userPatches = useCz101UserPatchStore((state) => state.patches);
-  const addPatches = useCz101UserPatchStore((state) => state.addPatches);
-  const removePatch = useCz101UserPatchStore((state) => state.removePatch);
-  const activeUser = userPatchId > 0 ? userPatches.find((entry) => entry.id === userPatchId) : undefined;
-  const current = activeUser ? { patch: activeUser.patch } : (CZ101_PRESET_BANK[program] ?? CZ101_PRESET_BANK[0]);
-  const fileInput = useRef<HTMLInputElement>(null);
-  const [dragOver, setDragOver] = useState(false);
-
-  const chooseFactory = (index: number) => {
-    // _program first (the synth swaps its patch), then the knob values the preset implies
-    const implied = cz101PresetParameters(index);
-    onParamChange('_userPatch', 0);
-    onParamChange('_program', index);
-    for (const [key, value] of Object.entries(implied)) {
-      if (key !== '_program') onParamChange(key, value);
-    }
-  };
-
-  const chooseUser = (id: number) => {
-    const entry = userPatches.find((candidate) => candidate.id === id);
-    if (!entry) return;
-    onParamChange('_userPatch', id);
-    for (const [key, value] of Object.entries(cz101PatchParameters(entry.patch))) onParamChange(key, value);
-  };
-
-  const importFiles = async (files: File[]) => {
-    const decoded: CZPatch[] = [];
-    const errors: string[] = [];
-    for (const file of files) {
-      const result = decodeCzSysexFile(new Uint8Array(await file.arrayBuffer()), file.name);
-      result.patches.forEach((entry) => decoded.push(entry.patch));
-      errors.push(...result.errors);
-    }
-    if (errors.length > 0) notify.error(`Not loaded: ${errors.join('; ')}`);
-    if (decoded.length === 0) return;
-    const ids = addPatches(decoded);
-    notify.success(`Loaded ${decoded.length} CZ patch${decoded.length === 1 ? '' : 'es'} into User`);
-    // The last imported patch becomes the sound, so the import is audible straight away
-    const last = decoded[decoded.length - 1];
-    onParamChange('_userPatch', ids[ids.length - 1]);
-    for (const [key, value] of Object.entries(cz101PatchParameters(last))) onParamChange(key, value);
-  };
-
-  const onFilesPicked = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files ?? []);
-    event.target.value = '';
-    if (files.length > 0) void importFiles(files);
-  };
-
-  const onDrop = (event: React.DragEvent) => {
-    event.preventDefault();
-    setDragOver(false);
-    const files = Array.from(event.dataTransfer.files);
-    if (files.length > 0) void importFiles(files);
-  };
+  const { program, userPatchId, userPatches, activeUser, current, fileInput, dragOver, setDragOver, chooseFactory, chooseUser, onFilesPicked, onDrop, removePatch } =
+    useCz101Patches(parameters, onParamChange);
 
   const waveform = parameters.waveform1 ?? cz101PatchParameters(current.patch).waveform1;
   const windowValue = parameters.window ?? 0;
