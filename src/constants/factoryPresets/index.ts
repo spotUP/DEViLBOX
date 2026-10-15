@@ -27,6 +27,7 @@ import { HARMONIC_PRESETS } from '../harmonicPresets';
 import { DJ_ONE_SHOT_PRESETS } from '../djOneShotPresets';
 import { ZYNTHIAN_PRESETS } from '../zynthianPresets';
 import { HIVELY_PRESETS } from '../hivelyPresets';
+import { KLYS_FACTORY_PRESETS } from '../klysPresets';
 
 // Re-export all per-category preset arrays
 export { BASS_PRESETS } from './bass';
@@ -108,6 +109,8 @@ export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   ...DJ_ONE_SHOT_PRESETS,
   ...ZYNTHIAN_PRESETS,
   ...HIVELY_PRESETS,
+  // Klystrack instruments (a whole MusInstrument each; chosen through applyKlysPreset)
+  ...KLYS_FACTORY_PRESETS,
   // Cinter4 voices ripped from bundled Cinter songs (generated)
   ...CINTER_PRESETS,
   // Sonix synth voices ripped from .instr files (generated)

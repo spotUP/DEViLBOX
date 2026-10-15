@@ -140,3 +140,21 @@ export function describeKlysStep(word: number, baseNote: number): string {
   if (cmd.word === 0x4000) return klysNoteName(arg & 0xFF);
   return argMask === 0 || cmd.max === 0 ? cmd.name : `${cmd.name} ${hexOf(arg, argMask)}`;
 }
+
+/**
+ * The program word for a mnemonic and argument (`klysStepWord('PortDn', 0x40)`), the one builder for programs that
+ * are written in code (the preset bank). The argument is clamped to the instruction's range; `chain` sets bit 15 so
+ * the next step runs in the same tick (not available for the 0xFxxx group, where bit 15 is part of the instruction).
+ */
+export function klysStepWord(mnemonic: string, arg = 0, chain = false): number {
+  const cmd = KLYS_PROGRAM_COMMANDS.find((c) => c.mnemonic === mnemonic);
+  if (!cmd) throw new Error(`Unknown klystrack program instruction ${mnemonic}`);
+  const a = Math.min(cmd.max, Math.max(cmd.min, Math.round(arg)));
+  const word = cmd.word | a;
+  if (!chain) return word;
+  if (!klysStepHasChainBit(word)) throw new Error(`${mnemonic} cannot be chained`);
+  // The engine reads the 4-bit-group instructions (Wavetable Offset, fine cutoff) as `word & 0xF000`, chain bit included,
+  // so a chained one never matches (measured in the preset bank).
+  if ((cmd.mask & 0xFF00) === 0x7000) throw new Error(`${mnemonic} is ignored by the engine when chained`);
+  return word | 0x8000;
+}
