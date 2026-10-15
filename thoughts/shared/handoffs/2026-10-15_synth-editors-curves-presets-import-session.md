@@ -36,16 +36,14 @@ status: final
 - Tone.js synths: dead knobs wired through one options builder (`src/engine/tone/toneSynthKnobs.ts`).
 - Routing: Tunefish / WaveSabre / Oidos open their layout editor (was the XRNS info panel).
 
-## UNCOMMITTED work in the tree (180 entries) - commit in this order, BY PATH
+## State at the end of the session (week limit approaching)
 
-Never `git add -A` / `git add .`. Excluded: `tal-noisemaker-wasm/build/**` (build output), `public/data/sysex/cz-pack-1/` (owner's PAID pack, must never be committed), `public/data/cmi-disks/SYSV19.IMD` (unknown origin, identical to tracked `data/cmi-disks/SYSV19.IMD`).
-
-1. Curves wave 2 (SynthV1, TalNoizeMaker, ZynAddSubFX): layouts, engine classes, worklets, C++ + rebuilt WASM (`public/synthv1`, `public/tal-noisemaker`, `public/zynaddsubfx`), `*Curves.ts`, tests, the coverage research doc. Follow-ups were sent to that agent (TAL presets to normalised scale, SynthV1 delayBpm/dead keys/layout bounds widened to engine ranges, Zyn filterSustain, Monique bounds). Then the staged `src/lib/presetImport/**` parsers (their synthv1 test depends on the widened bounds; committing them first fails the pre-commit snapshot).
-2. Tone FM volume fix (agent working: "FM Synth Bell lead" quiet; likely preset envelope units seconds vs ms and volume-offset tables).
-3. OPL3 (standalone OPL3Synth): level inversion in RAD import, defaults, `applyConfig`, velocity attenuation, +11 dB gain; WASM rebuilt.
-4. Furnace OPL silent-on-preset-change (agent working).
-5. DX7: Simple UI rebuild (4 tabs, 155 of 155 params, `Dx7LibraryBrowser`, `dx7VcedEdit.ts`), key/bridge fixes (re-key releases the old voice, velocity clamp, keys outside 36..96 ignored), then the DX7 volume fix (agent working).
-6. Klystrack standalone instrument (no song needed: `InstrumentConfig.klystrack`, `klys_new_song`, preview instrument path, WASM rebuilt) + the `.kt` export of standalone instruments (agent working).
+- EVERYTHING above is committed AND PUSHED: `origin/main` = `85d3cab8f` (confirm with `git ls-remote origin main`). Local `origin/main` ref is stale after HTTPS pushes.
+- Working tree: only the paid CZ pack `public/data/sysex/cz-pack-1/` (NEVER commit), the stray `public/data/cmi-disks/SYSV19.IMD`, and modified TRACKED build output `tal-noisemaker-wasm/build/**` (never `git add -u` without `-- . ':!tal-noisemaker-wasm/build'`) are dirty. The last big batch was committed in `85d3cab8f` (wave 2 curves, FM/AM volume, DX7 trim + Simple UI + key fixes, OPL3, Furnace OPL slots, klystrack standalone + `.kt` export, ten parsers).
+- Agents that may still be running or half-done when this session ends (their edits land uncommitted in the tree; check `git status` first, commit by path after `npm run type-check`):
+  1. DX7 first-note double trigger when a pattern is played with Shift (repro `/Users/spot/Downloads/doubletrigger.dbx`, untrusted data). Sonnet agent id a30a5a6bfa0a83655.
+  2. Pattern editor edit behaviour per original tracker (PRIORITY, owner): ProTracker moves DOWN in the same column after entering an effect command; make it selectable / follow the keymap; EditBehavior profile abstraction; stage 1 writes `thoughts/shared/research/2026-10-15_pattern-editor-edit-behaviour.md` + plan `thoughts/shared/plans/2026-10-15-pattern-editor-edit-behaviour.md`, stage 2 implements. Primary sources: `third-party/pt2-clone-master`, `/Users/spot/Code/HippoPlayer/ft2-clone`, impulse-tracker-main, schismtracker-master under `~/Code/Reference/Reference Code`. Sonnet agent id a8422e6f515878b83.
+  3. KEYBOARD-VS-TRACKER sound hunt (opus agent) was STOPPED to save budget: tracker-triggered notes get a long decay tail vs keyboard; Instrument 2 sounds different in the tracker; Punch Kick (instrument 3, klystrack preset) loses its punch on repeated triggers with Shift. Re-run it next week (details in the ledger entry KEYBOARD-VS-TRACKER-SOUND).
 
 ## Learnings
 
@@ -64,7 +62,7 @@ Plans and research above; the CZ pack zip stays at `/Users/spot/Downloads/cz-pac
 
 ## Next steps (ordered)
 
-1. Wait for / collect the running agents' reports (they report only into the session that spawned them): wave-2 follow-ups, Tone FM volume, Furnace OPL, DX7 volume, klystrack `.kt` export. If the session is cleared first, read each task's output file under `/private/tmp/claude-501/-Users-spot-Code-DEViLBOX/8a1e2ada-7833-42c6-aaec-72755bdfd267/tasks/` (never `Read` the JSONL whole; grep the final report).
+1. Check the pattern editor + DX7 double-trigger agents (state above). Wait for / collect their reports (they report only into the session that spawned them): wave-2 follow-ups, Tone FM volume, Furnace OPL, DX7 volume, klystrack `.kt` export. If the session is cleared first, read each task's output file under `/private/tmp/claude-501/-Users-spot-Code-DEViLBOX/8a1e2ada-7833-42c6-aaec-72755bdfd267/tasks/` (never `Read` the JSONL whole; grep the final report).
 2. Commit the batch in the order above, run `npm run type-check` first, push over HTTPS with the machine idle, confirm `ls-remote` and the live `version.json` hash.
 3. Owner test list (LOCAL `http://localhost:5174`, hard reload): curves and markers on Synth, MonoSynth, DX7, OPL3, Tunefish, WaveSabre; FM Bell lead level; Furnace OPL preset change; DX7 voice change level and key presses; fast key taps on an NES/Game Boy chip; standalone klystrack instrument and `.kt` export.
 4. Preset import registry (design in the import census): registry keyed by synth type, one entry point for preset picker + `GlobalDragDropHandler` + file picker, `usePresetStore` v3 with attribution, wire the ten parsers, then Surge `.fxp`, Furnace instruments, SF2, D-50/VFX sysex.
