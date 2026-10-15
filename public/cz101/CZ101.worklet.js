@@ -1,266 +1,96 @@
 /**
  * CZ101 AudioWorklet Processor
- * Wraps the UPD933 WASM emulation for the Casio CZ-101 synthesizer
+ * Wraps the UPD933 WASM emulation (Emscripten build, CZ101Module factory) for
+ * the Casio CZ-101 synthesizer. Loaded the house way (as Klystrack.worklet.js):
+ * the main thread sends the WASM bytes and the Emscripten glue source, the glue
+ * runs via the Function constructor and instantiates the module itself, so the
+ * minified import/export names are the glue's business, not ours.
  */
+
+// The chip's pitch table assumes a 40 kHz sample clock (4.48 MHz / 112 clocks
+// per sample); the chip renders at that rate and process() resamples it.
+const CHIP_CLOCK = 4480000;
+const CHIP_RATE = CHIP_CLOCK / 112;
+const CHUNK = 256; // chip samples rendered per refill (chip buffer holds 4096)
 
 class CZ101Processor extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.wasmModule = null;
-    this.wasmInstance = null;
+    this.wasm = null;
     this.isInitialized = false;
-    this.sampleRate = 44100;
-
-    // UPD933 state
-    this.csState = 0;  // Chip select (active low)
-    this.idState = 1;  // IRQ disable
-
-    // Pending register writes
+    this.bufferPtr = 0;
     this.pendingWrites = [];
+    // Linear resampler state: chip-rate samples -> output rate
+    this.phase = 0;
+    this.prev = 0;
+    this.next = 0;
+    this.chipBuf = new Float32Array(CHUNK);
+    this.chipIdx = 0;
+    this.chipLen = 0;
 
-    this.port.onmessage = this.handleMessage.bind(this);
+    this.port.onmessage = (event) => { this.handleMessage(event.data); };
   }
 
-  async handleMessage(event) {
-    const { type, register, value, wasmBinary } = event.data;
-
-    switch (type) {
+  async handleMessage(data) {
+    switch (data.type) {
       case 'init':
-        await this.initWasm(wasmBinary);
+        await this.initWasm(data.wasmBinary, data.jsCode);
         break;
 
       case 'writeReg':
-        // Queue register write for processing in audio thread
-        this.pendingWrites.push({ register, value });
-        break;
-
-      case 'setCS':
-        this.csState = value;
+        // Queued; applied at the start of the next process() block
+        this.pendingWrites.push({ register: data.register, value: data.value });
         break;
     }
   }
 
-  async initWasm(wasmBinary) {
+  async initWasm(wasmBinary, jsCode) {
     try {
-      let wasmBytes = wasmBinary;
-      
-      // If no wasmBinary passed, fetch it
-      if (!wasmBytes) {
-        const response = await fetch('/cz101/CZ101.wasm');
-        wasmBytes = await response.arrayBuffer();
+      if (jsCode && !globalThis.CZ101Module) {
+        const factory = new Function(jsCode + '\nreturn CZ101Module;');
+        const result = factory();
+        if (typeof result === 'function') globalThis.CZ101Module = result;
       }
+      if (!globalThis.CZ101Module) throw new Error('CZ101Module factory not available');
 
-      // Compile and instantiate
-      const wasmModule = await WebAssembly.compile(wasmBytes);
-      this.wasmInstance = await WebAssembly.instantiate(wasmModule, {
-        env: {
-          // Minimal environment stubs
-          emscripten_memcpy_js: () => {},
-          emscripten_resize_heap: () => 0,
-          _abort: () => { throw new Error('abort'); },
-          _emscripten_get_now: () => performance.now(),
-        }
-      });
-
-      // Initialize the UPD933 chip
-      // Clock for CZ-101 is approximately 4.5MHz
-      const clock = 4500000;
-      if (this.wasmInstance.exports._upd933_create) {
-        this.chipHandle = this.wasmInstance.exports._upd933_create(clock);
-      }
+      this.wasm = await globalThis.CZ101Module({ wasmBinary });
+      this.wasm._upd933_create(CHIP_CLOCK);
+      this.wasm._upd933_set_cs(0); // chip select is active low; reset leaves it deselected
+      this.bufferPtr = this.wasm._upd933_get_buffer();
 
       this.isInitialized = true;
       this.port.postMessage({ type: 'ready' });
-
-      console.log('[CZ101.worklet] WASM initialized');
     } catch (err) {
       console.error('[CZ101.worklet] Init error:', err);
-
-      // Fallback: use JavaScript-based synthesis
-      this.useFallback = true;
-      this.initFallbackSynth();
-      this.isInitialized = true;
-      this.port.postMessage({ type: 'ready' });
+      this.port.postMessage({ type: 'error', message: err.message || String(err) });
     }
   }
 
-  /**
-   * Fallback JavaScript Phase Distortion synthesizer
-   * Used when WASM is not available
-   */
-  initFallbackSynth() {
-    this.voices = [];
-    for (let i = 0; i < 8; i++) {
-      this.voices.push({
-        active: false,
-        phase: 0,
-        phaseInc: 0,
-        pitch: 0,
-        dcaLevel: 0,
-        dcaTarget: 0,
-        dcaRate: 0,
-        dcwLevel: 0,
-        dcwTarget: 0,
-        dcwRate: 0,
-        waveform: 0,
-        window: 0
-      });
-    }
-
-    // Precompute cosine table (like UPD933)
-    this.cosineTable = new Float32Array(2048);
-    for (let i = 0; i < 2048; i++) {
-      this.cosineTable[i] = (1 - Math.cos(2 * Math.PI * i / 2047)) / 2;
-    }
-
-    console.log('[CZ101.worklet] Using JavaScript fallback synth');
+  /** One register write = 3 bytes on the chip's serial bus: register, high, low. */
+  writeRegister(register, value) {
+    this.wasm._upd933_write(register & 0xFF);
+    this.wasm._upd933_write((value >> 8) & 0xFF);
+    this.wasm._upd933_write(value & 0xFF);
   }
 
-  /**
-   * Write register in fallback mode
-   */
-  writeFallbackReg(register, value) {
-    const voiceNum = register & 7;
-    const regType = register >> 3;
-    const voice = this.voices[voiceNum];
-
-    switch (regType) {
-      case 0: // DCA step (0x00-0x07)
-        voice.dcaDirection = (value >> 15) & 1;
-        voice.dcaRate = this.envRate((value >> 8) & 0x7F);
-        voice.dcaSustain = (value >> 7) & 1;
-        voice.dcaTarget = (value & 0x7F) / 127;
-        break;
-
-      case 4: // DCW step (0x20-0x27)
-        voice.dcwDirection = (value >> 15) & 1;
-        voice.dcwRate = this.envRate((value >> 8) & 0x7F);
-        voice.dcwSustain = (value >> 7) & 1;
-        voice.dcwTarget = (value & 0x7F) / 127;
-        break;
-
-      case 12: // Pitch (0x60-0x67)
-        voice.pitch = value;
-        // Convert 7.9 fixed point semitones to frequency
-        const semitones = value / 512;  // 9 bits fractional
-        // Note 62 = A4 (442Hz)
-        const freq = 442 * Math.pow(2, (semitones - 62) / 12);
-        voice.phaseInc = (freq * 2048) / this.sampleRate;
-        voice.active = true;
-        break;
-
-      case 13: // Waveform (0x68-0x6F)
-        voice.waveform = (value >> 13) & 7;
-        voice.window = (value >> 6) & 7;
-        break;
-
-      case 19: // Phase reset (0x98-0x9F)
-        voice.phase = 0;
-        voice.dcaLevel = 0;
-        voice.dcwLevel = 0;
-        break;
+  /** Next chip-rate sample; renders a chunk when the queue runs dry (chip buffer holds 4096). */
+  pullChipSample() {
+    if (this.chipIdx >= this.chipLen) {
+      this.wasm._upd933_render(CHUNK);
+      const offset = this.bufferPtr / 4;
+      this.chipBuf.set(this.wasm.HEAPF32.subarray(offset, offset + CHUNK));
+      this.chipIdx = 0;
+      this.chipLen = CHUNK;
     }
+    return this.chipBuf[this.chipIdx++];
   }
 
-  envRate(data) {
-    // Convert rate value to envelope speed
-    return ((8 + (data & 7)) << (data >> 3)) / 1000000;
-  }
-
-  /**
-   * Apply phase distortion waveform
-   */
-  applyWaveform(phase, waveform, dcw) {
-    const pos = phase & 2047;
-    const pivot = Math.floor(1024 - dcw * 1024);
-    let distortedPhase = 0;
-
-    switch (waveform) {
-      case 0: // Sawtooth
-        if (pos < pivot) {
-          distortedPhase = Math.floor(pos * 1024 / pivot);
-        } else {
-          distortedPhase = 1024 + Math.floor((pos - pivot) * 1024 / (2048 - pivot));
-        }
-        break;
-
-      case 1: // Square
-        if ((pos & 1023) < pivot) {
-          distortedPhase = Math.floor((pos & 1023) * 1024 / pivot);
-        } else {
-          distortedPhase = 1023;
-        }
-        distortedPhase |= (pos & 1024);
-        break;
-
-      case 2: // Pulse
-        if (pos < pivot * 2) {
-          distortedPhase = Math.floor(pos * 2048 / (pivot * 2));
-        } else {
-          distortedPhase = 2047;
-        }
-        break;
-
-      case 4: // Double sine
-        if (pos < pivot) {
-          distortedPhase = Math.floor(pos * 2048 / pivot);
-        } else {
-          distortedPhase = Math.floor((pos - pivot) * 2048 / (2048 - pivot));
-        }
-        break;
-
-      case 6: // Resonance
-        distortedPhase = (pos + Math.floor(pos * dcw * 16)) & 2047;
-        break;
-
-      default:
-        distortedPhase = pos;
-    }
-
-    return this.cosineTable[distortedPhase & 2047];
-  }
-
-  /**
-   * Update envelope
-   */
-  updateEnvelope(current, target, rate, direction) {
-    if (direction === 0) {
-      // Rising
-      if (current < target) {
-        current = Math.min(current + rate, target);
-      }
-    } else {
-      // Falling
-      if (current > target) {
-        current = Math.max(current - rate, target);
-      }
-    }
-    return current;
-  }
-
-  /**
-   * Process audio
-   */
-  process(inputs, outputs, parameters) {
+  process(inputs, outputs) {
     const output = outputs[0];
     if (!output || output.length === 0) return true;
 
     const left = output[0];
     const right = output[1] || left;
-    const numSamples = left.length;
-
-    // Process pending register writes
-    while (this.pendingWrites.length > 0) {
-      const { register, value } = this.pendingWrites.shift();
-      if (this.useFallback) {
-        this.writeFallbackReg(register, value);
-      } else if (this.wasmInstance?.exports._upd933_write) {
-        // Write to WASM (3-byte serial protocol)
-        this.wasmInstance.exports._upd933_write(this.chipHandle, register);
-        this.wasmInstance.exports._upd933_write(this.chipHandle, (value >> 8) & 0xFF);
-        this.wasmInstance.exports._upd933_write(this.chipHandle, value & 0xFF);
-      }
-    }
 
     if (!this.isInitialized) {
       left.fill(0);
@@ -268,50 +98,24 @@ class CZ101Processor extends AudioWorkletProcessor {
       return true;
     }
 
-    if (this.useFallback) {
-      // JavaScript fallback synthesis
-      for (let i = 0; i < numSamples; i++) {
-        let sample = 0;
-
-        for (let v = 0; v < 8; v++) {
-          const voice = this.voices[v];
-          if (!voice.active || voice.dcaLevel < 0.001) continue;
-
-          // Update envelopes
-          voice.dcaLevel = this.updateEnvelope(
-            voice.dcaLevel, voice.dcaTarget, voice.dcaRate, voice.dcaDirection
-          );
-          voice.dcwLevel = this.updateEnvelope(
-            voice.dcwLevel, voice.dcwTarget, voice.dcwRate, voice.dcwDirection
-          );
-
-          // Generate sample
-          const wave = this.applyWaveform(voice.phase, voice.waveform, voice.dcwLevel);
-          sample += (wave * 2 - 1) * voice.dcaLevel;
-
-          // Advance phase
-          voice.phase = (voice.phase + voice.phaseInc) % 2048;
-        }
-
-        // Clamp and output
-        sample = Math.max(-1, Math.min(1, sample / 4));
-        left[i] = sample;
-        right[i] = sample;
-      }
-    } else if (this.wasmInstance?.exports._upd933_render) {
-      // WASM rendering
-      const bufferPtr = this.wasmInstance.exports._upd933_get_buffer(this.chipHandle);
-      this.wasmInstance.exports._upd933_render(this.chipHandle, numSamples);
-
-      const heap = new Float32Array(this.wasmInstance.exports.memory.buffer);
-      const offset = bufferPtr / 4;
-
-      for (let i = 0; i < numSamples; i++) {
-        left[i] = heap[offset + i];
-        right[i] = heap[offset + i];
-      }
+    while (this.pendingWrites.length > 0) {
+      const { register, value } = this.pendingWrites.shift();
+      this.writeRegister(register, value);
     }
 
+    // Streaming linear resample from the chip's rate to the context rate
+    const step = CHIP_RATE / sampleRate;
+    for (let i = 0; i < left.length; i++) {
+      this.phase += step;
+      while (this.phase >= 1) {
+        this.phase -= 1;
+        this.prev = this.next;
+        this.next = this.pullChipSample();
+      }
+      const s = this.prev + (this.next - this.prev) * this.phase;
+      left[i] = s;
+      right[i] = s;
+    }
     return true;
   }
 }

@@ -13,6 +13,7 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@utils/audio-context';
+import { cz101Transform } from './cz101Transform';
 
 // CZ-101 Waveform types
 export const CZWaveform = {
@@ -190,9 +191,14 @@ export class CZ101Synth implements DevilboxSynth {
       keepalive.connect(ctx.destination);
     } catch { /* keepalive failed */ }
 
-    // Fetch WASM on main thread (fetch not available in AudioWorklets in some browsers)
-    const wasmResponse = await fetch(`${baseUrl}cz101/CZ101.wasm`);
+    // Fetch WASM and its Emscripten glue on the main thread (fetch is not available
+    // in AudioWorklets in some browsers); the worklet runs the glue itself.
+    const [wasmResponse, jsResponse] = await Promise.all([
+      fetch(`${baseUrl}cz101/CZ101.wasm`),
+      fetch(`${baseUrl}cz101/CZ101.js`),
+    ]);
     const wasmBinary = await wasmResponse.arrayBuffer();
+    const jsCode = cz101Transform(await jsResponse.text());
 
     // Wait for worklet ready
     await new Promise<void>((resolve, reject) => {
@@ -203,12 +209,16 @@ export class CZ101Synth implements DevilboxSynth {
           clearTimeout(timeout);
           this.workletNode?.port.removeEventListener('message', handler);
           resolve();
+        } else if (event.data.type === 'error') {
+          clearTimeout(timeout);
+          this.workletNode?.port.removeEventListener('message', handler);
+          reject(new Error(`CZ101 worklet init failed: ${event.data.message}`));
         }
       };
 
       this.workletNode!.port.addEventListener('message', handler);
       this.workletNode!.port.start();
-      this.workletNode!.port.postMessage({ type: 'init', wasmBinary }, [wasmBinary]);
+      this.workletNode!.port.postMessage({ type: 'init', wasmBinary, jsCode }, [wasmBinary]);
     });
 
     this.isInitialized = true;
