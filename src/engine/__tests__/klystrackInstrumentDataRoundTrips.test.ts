@@ -88,6 +88,23 @@ describe('klystrack instrument data', () => {
     expect(new Set(positions).size, `song position stays put ${positions.slice(0, 3)}`).toBe(1);
   });
 
+  it('the audition still sounds after the mixer mutes every channel it does not know', { timeout: 120000 }, async () => {
+    const { w, data } = await loaded(songBuffer(SONG));
+    await w.send({ type: 'stop' });
+    // The mixer broadcasts a gain (or a mute mask) for all 32 engine channels; the spare audition channel is among them.
+    await w.send({ type: 'setChannelGain', channel: 31, gain: 0 });
+    await w.send({ type: 'setMuteMask', mask: 0x0f });
+    const out = stereoOutputs(1);
+    const playable = data.instruments.findIndex((i) => i && i.cydflags !== 0 && i.volume > 0);
+    await w.send({ type: 'previewNoteOn', inst: playable, note: 48 });
+    let sum = 0;
+    for (let i = 0; i < 200; i++) {
+      w.proc.process([], out);
+      for (let k = 0; k < 128; k++) sum += out[0][0][k] ** 2 + out[0][1][k] ** 2;
+    }
+    expect(Math.sqrt(sum / (200 * 256)), 'the audition sounds').toBeGreaterThan(0.001);
+  });
+
   it('programStatus reports each playing channel while watched, and songData carries the wavetables', { timeout: 120000 }, async () => {
     const { w, data } = await loaded(songBuffer(SONG));
     expect(Array.isArray(data.wavetables)).toBe(true);

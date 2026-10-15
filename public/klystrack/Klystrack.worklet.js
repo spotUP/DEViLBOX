@@ -5,6 +5,10 @@
  * since klystron renders arbitrary sample counts via cyd_output_buffer_stereo).
  */
 
+// The audition channel (KlysWrapper.c KLYS_PREVIEW_CHANNEL) belongs to no song channel: the mixer's mute
+// state and mute mask never apply to it, or a key would play silence.
+const PREVIEW_CHANNEL = 31;
+
 class KlystrackProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -157,7 +161,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
         break;
 
       case 'setChannelGain':
-        if (this.wasm && typeof this.wasm._klys_set_channel_gain === 'function') {
+        if (this.wasm && typeof this.wasm._klys_set_channel_gain === 'function' && data.channel !== PREVIEW_CHANNEL) {
           this.wasm._klys_set_channel_gain(data.channel, data.gain);
         }
         break;
@@ -165,7 +169,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
       case 'setMuteMask':
         this.muteMask = data.mask;
         if (this.wasm && typeof this.wasm._klys_set_channel_gain === 'function') {
-          for (let ch = 0; ch < 32; ch++) {
+          for (let ch = 0; ch < PREVIEW_CHANNEL; ch++) {
             const active = (data.mask & (1 << ch)) !== 0;
             this.wasm._klys_set_channel_gain(ch, active ? 1.0 : 0.0);
           }
