@@ -2,7 +2,7 @@
 date: 2026-10-15
 topic: klystrack instrument editor built from the klystron sources (KLYS-INSTRUMENT-EDITOR)
 tags: [klystrack, instrument-editor, wasm, plan]
-status: draft
+status: implemented
 ---
 
 # Klystrack instrument editor

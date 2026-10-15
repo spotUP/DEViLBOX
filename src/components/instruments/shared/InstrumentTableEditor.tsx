@@ -17,6 +17,8 @@ export interface InstrumentTableEditorProps {
   /** The step an engine is playing now. Undefined: nothing plays and the cursor row is shown. */
   playingRow?: number;
   onCellChange: OnCellChange;
+  /** The row the cursor is on, reported as it moves (for a description of the step under the cursor). */
+  onCursorRow?: (row: number) => void;
   onInsertRow?: (row: number) => void;
   onDeleteRow?: (row: number) => void;
   /** Canvas height in px (default 320). */
@@ -24,14 +26,17 @@ export interface InstrumentTableEditorProps {
 }
 
 export const InstrumentTableEditor: React.FC<InstrumentTableEditorProps> = ({
-  label, columns, rows, playingRow, onCellChange, onInsertRow, onDeleteRow, height = 320,
+  label, columns, rows, playingRow, onCellChange, onCursorRow, onInsertRow, onDeleteRow, height = 320,
 }) => {
   const channels = useMemo<FormatChannel[]>(
     () => [{ label, patternLength: rows.length, rows, isPatternChannel: false }],
     [label, rows],
   );
   const cursorRow = useRef(0);
-  const onCursor = useCallback((c: { rowIndex: number }) => { cursorRow.current = c.rowIndex; }, []);
+  const onCursor = useCallback((c: { rowIndex: number }) => {
+    cursorRow.current = c.rowIndex;
+    onCursorRow?.(c.rowIndex);
+  }, [onCursorRow]);
 
   return (
     <div className="flex flex-col gap-2">
