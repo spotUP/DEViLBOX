@@ -41,7 +41,7 @@ const hex4 = (v: number): string => v.toString(16).toUpperCase().padStart(4, '0'
 const KlysProgramCommandHelp: React.FC = () => (
   <div className="flex flex-col gap-1">
     <SectionLabel color="var(--color-accent-secondary)" label="Program Commands" />
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-4 gap-y-0.5 text-[10px] font-mono">
+    <div className="grid grid-cols-[repeat(2,max-content)] gap-x-6 gap-y-0.5 text-[10px] font-mono">
       {KLYS_PROGRAM_COMMANDS.map((cmd) => {
         const digits = hex4(cmd.word).split('').map((d, i) => ((cmd.mask >> (12 - 4 * i)) & 0xF) === 0xF ? d : 'X').join('');
         return (
@@ -107,7 +107,7 @@ export const KlysControls: React.FC<{ instrument: InstrumentConfig }> = ({ instr
       <TabStrip tabs={KLYS_TABS} active={tab} onChange={setTab} ariaLabel="Klystrack instrument sections" />
       {tab === 'main' && <DOMSynthPanel layout={layout} config={config} onChange={onChange} />}
       {tab === 'program' && (
-        <div className="flex flex-1 min-h-0 items-stretch gap-4">
+        <div className="flex flex-1 min-h-0 items-stretch justify-center gap-8">
           {/* The table is five hex digits wide: it keeps a table's width at the full height of the tab and the legend takes the rest of the row. */}
           <div className="flex flex-col gap-2 w-[13rem] shrink-0 min-h-0">
             <InstrumentTableEditor
@@ -129,7 +129,7 @@ export const KlysControls: React.FC<{ instrument: InstrumentConfig }> = ({ instr
               Step {String(cursorRow).padStart(2, '0')}: {describeKlysStep(word, inst.baseNote) || 'Empty step'}
             </span>
           </div>
-          <div className="flex-1 min-w-[16rem]">
+          <div className="shrink-0">
             <KlysProgramCommandHelp />
           </div>
         </div>
