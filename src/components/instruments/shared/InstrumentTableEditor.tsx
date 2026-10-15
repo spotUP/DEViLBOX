@@ -21,8 +21,8 @@ export interface InstrumentTableEditorProps {
   onCursorRow?: (row: number) => void;
   onInsertRow?: (row: number) => void;
   onDeleteRow?: (row: number) => void;
-  /** Canvas height in px (default 320). */
-  height?: number;
+  /** Canvas height in px (default 320), or 'fill' to take the height the parent gives (a flex column with a height). */
+  height?: number | 'fill';
 }
 
 export const InstrumentTableEditor: React.FC<InstrumentTableEditorProps> = ({
@@ -39,7 +39,7 @@ export const InstrumentTableEditor: React.FC<InstrumentTableEditorProps> = ({
   }, [onCursorRow]);
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className={`flex flex-col gap-2 ${height === 'fill' ? 'flex-1 min-h-0' : ''}`}>
       <div className="flex items-center justify-between">
         <SectionLabel color="var(--color-accent-primary)" label={label} />
         {(onInsertRow || onDeleteRow) && (
@@ -49,7 +49,10 @@ export const InstrumentTableEditor: React.FC<InstrumentTableEditorProps> = ({
           </div>
         )}
       </div>
-      <div className="border border-dark-border rounded bg-dark-bg" style={{ height }}>
+      <div
+        className={`border border-dark-border rounded bg-dark-bg ${height === 'fill' ? 'flex-1 min-h-0' : ''}`}
+        style={height === 'fill' ? undefined : { height }}
+      >
         <PatternEditorCanvas
           formatColumns={columns}
           formatChannels={channels}
