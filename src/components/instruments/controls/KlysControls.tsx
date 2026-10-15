@@ -95,8 +95,11 @@ export const KlysControls: React.FC<{ instrument: InstrumentConfig }> = ({ instr
 
   const word = inst.program[cursorRow] ?? KLYS_EMPTY_STEP;
   return (
-    <div className="flex flex-col gap-3 p-3">
-      <DOMSynthPanel layout={layout} config={config} onChange={onChange} />
+    <div className="flex flex-col gap-3 p-3 flex-1 min-h-0 overflow-y-auto scrollbar-modern">
+      {/* A content-sized wrapper: the panel's own 100% height then resolves to its content, and this column scrolls. */}
+      <div className="shrink-0">
+        <DOMSynthPanel layout={layout} config={config} onChange={onChange} />
+      </div>
       <div className="flex flex-col gap-2">
         <InstrumentTableEditor
           label="Program"
