@@ -6,7 +6,9 @@
 import type { SectionDescriptor } from '@/types/synthPanel';
 
 export const KNOB_WIDTH = 80;
-export const TOGGLE_WIDTH = 72;
+/** A toggle's grid cell: wide enough for a 56 px button and a label that wraps to two or three short lines. */
+export const TOGGLE_CELL = 96;
+export const TOGGLE_WIDTH = TOGGLE_CELL;
 export const SELECT_WIDTH = 168;
 export const SECTION_PADDING = 32;
 const PER_ROW = 3;

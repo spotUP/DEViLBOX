@@ -8,7 +8,7 @@ import React, { useCallback, useRef, useEffect, useState } from 'react';
 import { Knob } from '@components/controls/Knob';
 import { CustomSelect } from '@components/common/CustomSelect';
 import type { SynthPanelLayout, SectionDescriptor, ControlDescriptor } from '@/types/synthPanel';
-import { knobCellWidth, sectionFlexBasis } from './synthPanelSizing';
+import { SELECT_WIDTH, TOGGLE_CELL, knobCellWidth, sectionFlexBasis } from './synthPanelSizing';
 interface DOMSynthPanelProps {
   layout: SynthPanelLayout;
   config: Record<string, unknown>;
@@ -214,7 +214,10 @@ interface SectionProps {
 
 const DOMSynthSection: React.FC<SectionProps> = ({ section, flexBasis, getValue, updateParam, accent, enclosure }) => {
   const knobs = section.controls.filter((c: ControlDescriptor) => c.type === 'knob' || c.type === 'slider');
-  const toggles = section.controls.filter((c: ControlDescriptor) => c.type === 'toggle' || c.type === 'switch3way' || c.type === 'select');
+  const switches = section.controls.filter((c: ControlDescriptor) => c.type === 'toggle' || c.type === 'switch3way');
+  const selects = section.controls.filter((c: ControlDescriptor) => c.type === 'select');
+  // One track width for every knob of the section: the widest label decides, so the rows are columns too.
+  const knobTrack = Math.max(...knobs.map((c) => knobCellWidth(c.label)), 0);
 
   return (
     <div
@@ -240,7 +243,10 @@ const DOMSynthSection: React.FC<SectionProps> = ({ section, flexBasis, getValue,
 
       {/* Knobs + sliders — auto-sized columns, centered so they don't stretch */}
       {knobs.length > 0 && (
-        <div className="flex flex-wrap justify-center gap-2">
+        <div
+          className="grid justify-center justify-items-center gap-2"
+          style={{ gridTemplateColumns: `repeat(auto-fill, ${knobTrack}px)` }}
+        >
           {knobs.map((ctrl: ControlDescriptor) => (
             <DOMSynthControl
               key={ctrl.key}
@@ -253,10 +259,31 @@ const DOMSynthSection: React.FC<SectionProps> = ({ section, flexBasis, getValue,
         </div>
       )}
 
-      {/* Toggles + switches */}
-      {toggles.length > 0 && (
-        <div className="flex flex-wrap gap-2 mt-3 pt-3" style={{ borderTop: `1px solid ${enclosure.border}` }}>
-          {toggles.map((ctrl: ControlDescriptor) => (
+      {/* Toggles + switches: one grid, every cell the same size, so the buttons line up row to row and column to column */}
+      {switches.length > 0 && (
+        <div
+          className="grid justify-center justify-items-center gap-x-2 gap-y-3 mt-3 pt-3"
+          style={{ borderTop: `1px solid ${enclosure.border}`, gridTemplateColumns: `repeat(auto-fill, ${TOGGLE_CELL}px)` }}
+        >
+          {switches.map((ctrl: ControlDescriptor) => (
+            <DOMSynthControl
+              key={ctrl.key}
+              descriptor={ctrl}
+              value={getValue(ctrl.key)}
+              onChange={(v) => updateParam(ctrl.key, v)}
+              accent={accent}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Selects: full-width rows of one size */}
+      {selects.length > 0 && (
+        <div
+          className="grid gap-2 mt-3 pt-3"
+          style={{ borderTop: `1px solid ${enclosure.border}`, gridTemplateColumns: `repeat(auto-fill, minmax(${SELECT_WIDTH}px, 1fr))` }}
+        >
+          {selects.map((ctrl: ControlDescriptor) => (
             <DOMSynthControl
               key={ctrl.key}
               descriptor={ctrl}
@@ -305,7 +332,7 @@ const DOMSynthControl: React.FC<ControlProps> = ({ descriptor, value, onChange, 
         <div className="flex flex-col items-center gap-1">
           <button
             onClick={() => onChange(!active)}
-            className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider rounded transition-colors"
+            className="w-14 py-1 text-[9px] font-bold uppercase tracking-wider rounded transition-colors"
             style={active ? {
               background: `${accent}25`,
               color: accent,
@@ -319,7 +346,7 @@ const DOMSynthControl: React.FC<ControlProps> = ({ descriptor, value, onChange, 
           >
             {active ? (descriptor.labels?.[1] ?? 'ON') : (descriptor.labels?.[0] ?? 'OFF')}
           </button>
-          <div className="text-[8px] text-text-muted uppercase tracking-wider">{descriptor.label}</div>
+          <div className="text-[8px] text-text-muted uppercase tracking-wider text-center leading-tight">{descriptor.label}</div>
         </div>
       );
     }
