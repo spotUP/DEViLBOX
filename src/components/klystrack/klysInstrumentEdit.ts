@@ -41,6 +41,14 @@ function current(index: number): Inst | null {
   return stored ? clone(stored) : null;
 }
 
+/**
+ * The instrument as an editor must read it now: edits made since the last animation frame are already in it, the
+ * store catches up on the frame. Callers read; they never mutate the result.
+ */
+export function readKlysInstrument(index: number): Readonly<Inst> | null {
+  return current(index);
+}
+
 /** A program padded to 32 words with the empty step (the parser's stub songs carry no program). */
 function paddedProgram(program: number[]): number[] {
   const out = program.slice(0, KLYS_PROGRAM_LENGTH);

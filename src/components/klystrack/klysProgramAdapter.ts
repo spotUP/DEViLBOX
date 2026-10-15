@@ -10,8 +10,7 @@ import { KLYS_EMPTY_STEP, KLYS_PROGRAM_LENGTH } from '@/engine/klystrack/klysIns
 import {
   describeKlysStep, klysStepHasChainBit, klysStepInstruction,
 } from '@/engine/klystrack/klysProgramCommands';
-import { useFormatStore } from '@stores/useFormatStore';
-import { editKlysProgramStep, flushKlysInstrumentEdits } from './klysInstrumentEdit';
+import { editKlysProgramStep, readKlysInstrument } from './klysInstrumentEdit';
 
 const hex4 = (v: number): string => (v & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
 
@@ -84,14 +83,11 @@ export function makeKlysProgramCellChange(
   };
 }
 
-/** The handler for instrument `index` of the loaded song: reads the store, writes through editKlysProgramStep. */
+/** The handler for instrument `index` of the loaded song: reads the pending instrument, writes through editKlysProgramStep. */
 export function klysProgramCellChange(index: number): OnCellChange {
   return makeKlysProgramCellChange(
-    (step) => {
-      // Two edits of one step inside a frame (a command, then its chain flag) must see each other.
-      flushKlysInstrumentEdits();
-      return useFormatStore.getState().klysNative?.instruments[index]?.program[step] ?? KLYS_EMPTY_STEP;
-    },
+    // readKlysInstrument sees edits not yet written to the store, so a command and its chain flag typed in one frame agree.
+    (step) => readKlysInstrument(index)?.program[step] ?? KLYS_EMPTY_STEP,
     (step, word) => editKlysProgramStep(index, step, word),
   );
 }
