@@ -49,6 +49,25 @@ export interface KlysSongInfo {
 /** One channel's instrument program state, from the worklet's programStatus report. */
 export interface KlysChannelProgram { instrument: number; step: number; tick: number; running: boolean }
 
+/** One channel's live voice state, from the worklet's voiceStatus report (klys_get_channel_voice). */
+export interface KlysChannelVoice {
+  channel: number;
+  /** Instrument index playing on the channel, 255 when none. */
+  instrument: number;
+  /** cyd envelope stage: 0 attack, 1 decay, 2 sustain, 3 release, 4 off. */
+  stage: number;
+  /** Volume envelope level 0..1 (0 under YM envelope mode). */
+  level: number;
+  /** Effective filter cutoff 0..2047. */
+  cutoff: number;
+  resonance: number;
+  pulseWidth: number;
+  /** Ticks since the note was triggered; seconds = elapsedTicks / tickRate. */
+  elapsedTicks: number;
+  tickRate: number;
+  active: boolean;
+}
+
 export interface KlysWavetableInfo { name: string; samples: number; loopBegin: number; loopEnd: number; baseNote: number }
 
 export interface KlysSongData {
@@ -113,6 +132,7 @@ export class KlysEngine extends WASMSingletonBase {
   private _songEndCallbacks: Set<() => void> = new Set();
   private _songDataCallbacks: Set<(data: KlysSongData) => void> = new Set();
   private _lastSongData: KlysSongData | null = null;
+  private readonly _voiceCallbacks = new Set<(channels: KlysChannelVoice[]) => void>();
   private readonly _programCallbacks = new Set<(channels: KlysChannelProgram[]) => void>();
   private _resolveSerialize: ((buf: ArrayBuffer) => void) | null = null;
   private _rejectSerialize: ((err: Error) => void) | null = null;
@@ -212,6 +232,10 @@ export class KlysEngine extends WASMSingletonBase {
 
         case 'programStatus':
           for (const cb of this._programCallbacks) cb(data.channels);
+          break;
+
+        case 'voiceStatus':
+          for (const cb of this._voiceCallbacks) cb(data.channels);
           break;
 
         case 'songEnd':
@@ -406,6 +430,16 @@ export class KlysEngine extends WASMSingletonBase {
     return () => {
       if (!this._programCallbacks.delete(cb)) return;
       if (this._programCallbacks.size === 0) this.sendMessage({ type: 'watchProgram', on: false });
+    };
+  }
+
+  /** Live per-channel voice state (envelope stage and level, cutoff, pulse width); the worklet watches only while subscribed. */
+  subscribeVoiceStatus(cb: (channels: KlysChannelVoice[]) => void): () => void {
+    this._voiceCallbacks.add(cb);
+    if (this._voiceCallbacks.size === 1) this.sendMessage({ type: 'watchVoices', on: true });
+    return () => {
+      if (!this._voiceCallbacks.delete(cb)) return;
+      if (this._voiceCallbacks.size === 0) this.sendMessage({ type: 'watchVoices', on: false });
     };
   }
 

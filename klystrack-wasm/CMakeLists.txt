@@ -98,6 +98,7 @@ if(EMSCRIPTEN)
         "_klys_set_song_running"
         "_klys_preview_note_off"
         "_klys_get_channel_program"
+        "_klys_get_channel_voice"
     )
 
     string(JOIN "," EXPORTED_FUNCTIONS_STR ${EXPORTED_FUNCTIONS})
