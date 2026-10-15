@@ -25,6 +25,7 @@ import { playRow } from '@engine/keyboard/commands/playRow';
 import { playFromCursor } from '@engine/keyboard/commands/playFromCursor';
 import { clonePattern } from '@engine/keyboard/commands/clonePattern';
 import { playStopToggle, playPattern, playSong, stopPlayback } from '@engine/keyboard/commands/transport';
+import { restartKeyAction } from '@engine/keyboard/restartKeys';
 import {
   cursorUp, cursorDown, cursorLeft, cursorRight,
   cursorPageUp, cursorPageDown, cursorHome, cursorEnd,
@@ -1943,11 +1944,13 @@ export function useGlobalKeyboardHandler(options: UseGlobalKeyboardHandlerOption
       // Uses the same code path as the toolbar buttons — playSong/playPattern handle
       // both cold start and restart (including WASM engine stop+restart).
       // Skip in DJ/VJ view — these shortcuts would corrupt the active song.
-      if (e.code === 'ShiftRight' || e.code === 'AltRight') {
+      const _restartAction = restartKeyAction(e);
+      if (_restartAction) {
         if (_isDJVJ) return;
         e.preventDefault();
         e.stopPropagation();
-        if (e.code === 'ShiftRight') playSong(); else playPattern();
+        if (_restartAction === 'playSong') playSong();
+        else if (_restartAction === 'playPattern') playPattern();
         return;
       }
 
