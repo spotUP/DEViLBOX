@@ -79,10 +79,12 @@ components/instruments/curves/
 
 ## Decisions for the owner
 
-- D1 placement: curve inside its section (Recommended: the cause sits next to the knobs it answers) vs a pinned
+- D1 placement: DECIDED 2026-10-15: curve inside its section (Recommended: the cause sits next to the knobs it answers) vs a pinned
   "Sound Shape" strip at the top of the editor (one place to look, but far from the knob).
-- D2 live markers: ship static curves everywhere first, markers where an engine reports state (Recommended) vs
-  markers required before any curve ships.
+- D2 live markers: DECIDED by the owner 2026-10-15: markers are REQUIRED. No curve ships until its engine
+  reports live voice state (envelope stage and level, effective cutoff after envelope and LFO, program step).
+  Consequence: each rollout unit includes an engine state report (worklet message), and the census (CV-0.2) adds
+  a column "can this engine report voice state, and through what".
 - D3 rollout order after the klystrack pilot: layouts ranked by users and by how many of their params are
   curve-able (census C0 produces the ranking; Recommended: follow the ranking, not alphabet).
 
@@ -90,7 +92,7 @@ components/instruments/curves/
 
 Phase C0 - census (no code)
 - [ ] CV-0.1 List every layout DOMSynthPanel renders (count from the registry in `constants/synthLayouts/index.ts`, state which builder was counted).
-- [ ] CV-0.2 Per layout, classify its params into curve kinds (envelope, filter, lfo, waveform, transfer, fm) and record a table in `thoughts/shared/research/2026-10-15_synth-curve-census.md`.
+- [ ] CV-0.2 Per layout, classify (and record whether its engine can report voice state, and how) its params into curve kinds (envelope, filter, lfo, waveform, transfer, fm) and record a table in `thoughts/shared/research/2026-10-15_synth-curve-census.md`.
 - [ ] CV-0.3 Rank layouts by users x curve-able share; this ranking is D3.
 
 Phase C1 - pilot on klystrack (the engine whose math I can read: `klystrack-wasm/common/cyd.c`, `music.c`)
@@ -98,7 +100,7 @@ Phase C1 - pilot on klystrack (the engine whose math I can read: `klystrack-wasm
 - [ ] CV-1.2 `curveModels.ts` pure functions for envelope, filter, lfo, pulse width, waveform, with unit tests that compare against numbers measured from the WASM (not against themselves).
 - [ ] CV-1.3 `CurveDescriptor` in `types/synthPanel.ts`; `CurvePanel.tsx`; DOMSynthPanel renders a section's curves.
 - [ ] CV-1.4 Klystrack layout declares: Volume envelope (ADSR), Filter response (cutoff, resonance, type, enable bit), Vibrato and PWM shapes (speed, depth, shape), Oscillator waveform (flags + pulse width).
-- [ ] CV-1.5 Live marker: the program step already marked in the Program tab; add the playing instrument's envelope playhead only if the worklet reports stage and level (needs a new worklet message; otherwise static).
+- [ ] CV-1.5 Live markers (required, D2): new worklet message `voiceStatus` for the playing channels of the edited instrument (envelope stage and level, effective filter cutoff after program and envelope, pulse width), read from `g_mus.channel` / `cyd` channel state by a new `klys_get_channel_voice` in `KlysWrapper.c`; the curves draw the marker from it; subscribed only while the editor is open, like `subscribeProgramStatus`.
 - [ ] CV-1.6 Reachability test: drive `UnifiedInstrumentEditor` as the existing klystrack test does, twist Cutoff, assert the filter curve model input changed and the canvas draw was called (sentinel). Revert-check red.
 - [ ] CV-1.7 Delete `ui/FilterCurve.tsx` (0 users) after confirming with a second grep from the exports.
 
@@ -106,7 +108,7 @@ Phase C2 - roll out by ranking (one PR-sized unit per layout group, each with th
 - [ ] CV-2.n One item per layout group from CV-0.3 (filled in after census).
 
 Phase C3 - measured layer
-- [ ] CV-3.1 Header spectrum stays; add a "response at held note" overlay only if D2 asks for it.
+- [ ] CV-3.1 Header spectrum stays unchanged.
 
 ## Verification
 
