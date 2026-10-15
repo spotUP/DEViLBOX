@@ -107,9 +107,9 @@ export const KlysControls: React.FC<{ instrument: InstrumentConfig }> = ({ instr
       <TabStrip tabs={KLYS_TABS} active={tab} onChange={setTab} ariaLabel="Klystrack instrument sections" />
       {tab === 'main' && <DOMSynthPanel layout={layout} config={config} onChange={onChange} />}
       {tab === 'program' && (
-        <div className="flex flex-wrap items-start gap-4">
-          {/* The table is five hex digits wide: it keeps a table's width and the legend takes the rest of the row. */}
-          <div className="flex flex-col gap-2 w-[28rem] max-w-full shrink-0">
+        <div className="flex flex-1 min-h-0 items-stretch gap-4">
+          {/* The table is five hex digits wide: it keeps a table's width at the full height of the tab and the legend takes the rest of the row. */}
+          <div className="flex flex-col gap-2 w-[13rem] shrink-0 min-h-0">
             <InstrumentTableEditor
               label="Program"
               columns={columns}
@@ -119,7 +119,7 @@ export const KlysControls: React.FC<{ instrument: InstrumentConfig }> = ({ instr
               onCursorRow={setCursorRow}
               onInsertRow={(row) => insertKlysProgramStep(index, row)}
               onDeleteRow={(row) => deleteKlysProgramStep(index, row)}
-              height={320}
+              height="fill"
             />
             <div className="flex items-center gap-2">
               <Button size="sm" onClick={undoKlysInstrumentEdit}>Undo</Button>
