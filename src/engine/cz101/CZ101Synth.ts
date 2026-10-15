@@ -211,17 +211,26 @@ export class CZ101Synth implements DevilboxSynth {
     }
   }
 
-  /** Free a pair of voices (oldest first), or one voice. */
+  /**
+   * Free a pair of voices, or one voice. Among the free ones the voice released longest ago is
+   * taken, so a note that was just let go keeps ringing out its release instead of being cut
+   * by the next key press; only when every voice is held is the oldest held one stolen.
+   */
   private allocate(paired: boolean): number[] {
+    const oldest = (candidates: readonly number[]) =>
+      candidates.reduce((best, v) => (this.voices[v].age < this.voices[best].age ? v : best));
     if (paired) {
-      const free = VOICE_PAIRS.find(([a, b]) => !this.voices[a].active && !this.voices[b].active);
-      const pair = free ?? [...VOICE_PAIRS].sort((x, y) =>
-        Math.min(this.voices[x[0]].age, this.voices[x[1]].age) - Math.min(this.voices[y[0]].age, this.voices[y[1]].age))[0];
-      return [...pair];
+      const free = VOICE_PAIRS.filter(([a, b]) => !this.voices[a].active && !this.voices[b].active);
+      const age = (pair: readonly [number, number]) => Math.min(this.voices[pair[0]].age, this.voices[pair[1]].age);
+      const pool = free.length > 0 ? free : VOICE_PAIRS;
+      return [...pool.reduce((best, pair) => (age(pair) < age(best) ? pair : best))];
     }
-    const free = SINGLE_VOICE_ORDER.find((v) => !this.voices[v].active);
-    if (free !== undefined) return [free];
-    return [SINGLE_VOICE_ORDER.reduce((oldest, v) => (this.voices[v].age < this.voices[oldest].age ? v : oldest))];
+    const free = SINGLE_VOICE_ORDER.filter((v) => !this.voices[v].active);
+    if (free.length > 0) {
+      const odd = free.filter((v) => (v & 1) === 1); // odd voices first so the even ones stay free for pairs
+      return [oldest(odd.length > 0 ? odd : free)];
+    }
+    return [oldest(SINGLE_VOICE_ORDER)];
   }
 
   /** The patch that plays: the bank entry with the editor knobs applied. */

@@ -229,6 +229,13 @@ public:
         return (int)(env(kind, vnum).current >> shift[kind]);
     }
 
+    // Return one envelope to rest at level 0 (the firmware does this implicitly: a voice that is
+    // keyed again starts its envelopes from zero, not from where the last note left them).
+    void resetEnvelope(int kind, int vnum) {
+        env(kind, vnum) = Envelope();
+        if (kind == 2) updatePitchStep(vnum & 7);
+    }
+
     void setCS(int state) { m_cs = state; }
     void setID(int state) { m_id = state; }
 
@@ -431,6 +438,11 @@ int upd933_env_irq(int kind, int voice) {
 EMSCRIPTEN_KEEPALIVE
 int upd933_env_level(int kind, int voice) {
     return g_upd933 ? g_upd933->level(kind, voice) : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void upd933_env_reset(int kind, int voice) {
+    if (g_upd933) g_upd933->resetEnvelope(kind, voice);
 }
 
 EMSCRIPTEN_KEEPALIVE

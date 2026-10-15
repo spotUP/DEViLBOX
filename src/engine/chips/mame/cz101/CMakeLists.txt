@@ -18,7 +18,7 @@ target_link_options(CZ101 PRIVATE
     -sALLOW_MEMORY_GROWTH=1
     -sINITIAL_MEMORY=16777216
     -sMAXIMUM_MEMORY=67108864
-    -sEXPORTED_FUNCTIONS=["_upd933_create","_upd933_destroy","_upd933_reset","_upd933_write","_upd933_set_cs","_upd933_render","_upd933_get_buffer","_upd933_env_irq","_upd933_env_level","_malloc","_free"]
+    -sEXPORTED_FUNCTIONS=["_upd933_create","_upd933_destroy","_upd933_reset","_upd933_write","_upd933_set_cs","_upd933_render","_upd933_get_buffer","_upd933_env_irq","_upd933_env_level","_upd933_env_reset","_malloc","_free"]
     -sEXPORTED_RUNTIME_METHODS=["ccall","cwrap"]
     -sAUDIO_WORKLET=1
     -sWASM=1

@@ -90,6 +90,10 @@ class CZ101Processor extends AudioWorkletProcessor {
    * sustain point, key-off falls to zero at RELEASE_RATE.
    */
   startEnvelope(kind, voice, stages) {
+    // A new note starts every envelope from zero. The chip keeps each envelope where the last
+    // note left it (a released pitch or waveform envelope rests at its last level), so without
+    // this the second note began from the first note's leftovers.
+    this.wasm._upd933_env_reset(kind, voice & 7);
     const sustainIdx = stages.findIndex((st, i) => i > 0 && st.rate === 0);
     const seq = { stages, idx: -1, sustainIdx, held: false, releasing: false, done: false };
     this.seq[kind][voice & 7] = seq;
@@ -104,8 +108,17 @@ class CZ101Processor extends AudioWorkletProcessor {
       seq.releasing = true;
       const first = seq.sustainIdx >= 0 ? seq.sustainIdx + 1 : seq.stages.length;
       if (seq.idx < first) this.loadStage(kind, voice, seq, first);
-      else if (seq.done) this.loadStep(kind, voice, seq, RELEASE_RATE, 0); // ran out of stages while held on the last level
+      else if (seq.done) this.endRelease(kind, voice, seq); // ran out of stages while held on the last level
     }
+  }
+
+  /**
+   * The patch has no release stage left. Only the amplitude falls to silence; the waveform and
+   * pitch envelopes stay where they are (gliding them to zero was an audible pitch "boing" and
+   * a timbre sweep on every key-off of a patch that ends on a sustain stage).
+   */
+  endRelease(kind, voice, seq) {
+    if (kind === 0) this.loadStep(kind, voice, seq, RELEASE_RATE, 0);
   }
 
   /** Program stage `idx`, or end/hold the sequence when there is none left. */
@@ -113,8 +126,8 @@ class CZ101Processor extends AudioWorkletProcessor {
     seq.idx = idx;
     if (idx >= seq.stages.length) {
       seq.done = true;
-      // Key-off with no stage left to run: fall to silence rather than finish the old step
-      if (seq.releasing) this.loadStep(kind, voice, seq, RELEASE_RATE, 0);
+      // Key-off with no stage left to run
+      if (seq.releasing) this.endRelease(kind, voice, seq);
       return;
     }
     const st = seq.stages[idx];
