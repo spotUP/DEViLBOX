@@ -1,4 +1,5 @@
 import type { SynthPanelLayout } from '@/types/synthPanel';
+import { adsrCurve, filterCurve, lfoCurve } from '@/components/instruments/curves/commonCurveModels';
 
 const fmtHz = (v: number) => `${Math.round(v)} Hz`;
 const fmtMs = (v: number) => `${Math.round(v)}ms`;
@@ -24,6 +25,7 @@ export const PWM_SYNTH_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'PULSE',
+          curves: [lfoCurve({ label: 'PWM modulation (chorus LFO)', rate: 'pwmRate', depth: 'pwmDepth' })],
           controls: [
             { type: 'knob', key: 'pulseWidth', label: 'WIDTH', color: '#ff9900', min: 0, max: 100, defaultValue: 50, formatValue: fmtPct },
             { type: 'knob', key: 'pwmDepth', label: 'PWM DEPTH', color: '#ff6600', min: 0, max: 100, defaultValue: 30, formatValue: fmtPct },
@@ -45,6 +47,7 @@ export const PWM_SYNTH_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'FILTER',
+          curves: [filterCurve({ cutoff: 'filter.cutoff', resonance: 'filter.resonance', typeKey: 'filter.type', poles: 4 })],
           controls: [
             { type: 'knob', key: 'filter.cutoff', label: 'CUTOFF', color: '#ffcc00', min: 20, max: 20000, defaultValue: 4000, formatValue: fmtHz },
             { type: 'knob', key: 'filter.resonance', label: 'RESO', color: '#ff6600', min: 0, max: 100, defaultValue: 20, formatValue: fmtPct },
@@ -69,6 +72,7 @@ export const PWM_SYNTH_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'AMP ENVELOPE',
+          curves: [adsrCurve({ label: 'Amp envelope', attack: 'envelope.attack', decay: 'envelope.decay', sustain: 'envelope.sustain', release: 'envelope.release' })],
           controls: [
             { type: 'knob', key: 'envelope.attack', label: 'ATK', color: '#ff9900', min: 0, max: 2000, defaultValue: 50, formatValue: fmtMs },
             { type: 'knob', key: 'envelope.decay', label: 'DEC', color: '#ff9900', min: 0, max: 2000, defaultValue: 500, formatValue: fmtMs },

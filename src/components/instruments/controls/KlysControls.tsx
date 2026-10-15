@@ -15,7 +15,9 @@ import { useFormatStore } from '@stores/useFormatStore';
 import { KlysEngine } from '@/engine/klystrack/KlysEngine';
 import { KLYS_EMPTY_STEP, klysInstrumentIndex } from '@/engine/klystrack/klysInstrumentFields';
 import { KLYS_PROGRAM_COMMANDS, describeKlysStep } from '@/engine/klystrack/klysProgramCommands';
-import { buildKlystrackLayout } from '@/constants/synthLayouts/klystrack';
+import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { voiceMarkerFor } from '@/engine/klystrack/klysVoiceStatus';
+import { buildKlystrackLayout, type KlysCurveContext } from '@/constants/synthLayouts/klystrack';
 import { applyKlysLayoutChange, klysLayoutValues, type KlysLayoutValues } from '@/components/klystrack/klysLayoutAdapter';
 import {
   KLYS_PROGRAM_COLUMNS, klysProgramCellChange, klysProgramToRows,
@@ -55,6 +57,21 @@ const KlysProgramCommandHelp: React.FC = () => (
   </div>
 );
 
+/** The audio context's rate for the curves; the editor can open before audio is initialised, then 48 kHz stands in. */
+function audioSampleRate(): number {
+  try { return getDevilboxAudioContext().sampleRate; } catch { return 48000; }
+}
+
+/** The live voice playing instrument `index`, from the engine's voice status (watched only while a curve subscribes). */
+function klysVoiceSource(index: number): NonNullable<KlysCurveContext['voice']> {
+  return {
+    subscribe: (onVoice) => {
+      if (!KlysEngine.hasInstance()) return () => {};
+      return KlysEngine.getInstance().subscribeVoiceStatus((channels) => onVoice(voiceMarkerFor(channels, index)));
+    },
+  };
+}
+
 /** The step the first channel playing instrument `index` has its program running at, or undefined. */
 function usePlayingProgramStep(index: number): number | undefined {
   const [step, setStep] = useState<number | undefined>(undefined);
@@ -73,7 +90,10 @@ export const KlysControls: React.FC<{ instrument: InstrumentConfig }> = ({ instr
   const index = klysInstrumentIndex(instrument.id);
   const inst = useFormatStore((s) => s.klysNative?.instruments[index]);
   const wavetables = useFormatStore((s) => s.klysNative?.wavetables);
-  const layout = useMemo(() => buildKlystrackLayout(wavetables ?? []), [wavetables]);
+  const layout = useMemo(
+    () => buildKlystrackLayout(wavetables ?? [], { sampleRate: audioSampleRate(), voice: klysVoiceSource(index) }),
+    [wavetables, index],
+  );
   const values = useMemo(() => (inst ? klysLayoutValues(inst) : null), [inst]);
   const config = useMemo(() => ({ klys: values }), [values]);
 

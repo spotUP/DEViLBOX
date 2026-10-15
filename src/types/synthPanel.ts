@@ -68,14 +68,20 @@ export interface CurveDescriptor {
   /** Plot height in px (default 72). */
   height?: number;
   xScale?: 'linear' | 'log';
-  xDomain: readonly [number, number];
-  yDomain: readonly [number, number];
+  /** Axis ranges; a function when the range depends on the knobs (an envelope's length). */
+  xDomain: readonly [number, number] | ((get: (key: string) => number) => readonly [number, number]);
+  yDomain: readonly [number, number] | ((get: (key: string) => number) => readonly [number, number]);
   xUnit?: string;
   yUnit?: string;
-  /** Layout values in, lines out. `get` returns the numeric value of a layout key. */
-  series: (get: (key: string) => number) => CurveSeries[];
+  /** Layout values in, lines out. `get` returns the numeric value of a layout key, `getText` its string value (a filter type). */
+  series: (get: (key: string) => number, getText?: (key: string) => string) => CurveSeries[];
+  /** Short text drawn in the corner of the plot: the real numbers behind a normalised axis ("A 50 ms  D 500 ms ..."). */
+  readout?: (get: (key: string) => number, getText?: (key: string) => string) => string;
   /** Live voice position on the x axis (null = no voice); the canvas redraws the marker without re-rendering. */
-  marker?: { subscribe: (onPosition: (x: number | null) => void) => () => void };
+  marker?: {
+    /** `latestValues` returns the layout's current numeric reader, so a position can depend on the knobs. */
+    subscribe: (onPosition: (x: number | null) => void, latestValues: () => (key: string) => number) => () => void;
+  };
 }
 
 export interface SectionDescriptor {

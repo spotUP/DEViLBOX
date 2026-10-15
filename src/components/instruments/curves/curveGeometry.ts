@@ -2,11 +2,14 @@
  * Plot geometry for CurveCanvas: units in, pixels out. Pure, so the mapping (and the log frequency axis) is
  * tested without a canvas.
  */
-import type { CurveDescriptor } from '@/types/synthPanel';
-
 export interface PlotBox { width: number; height: number; padLeft: number; padRight: number; padTop: number; padBottom: number }
 
-type Axis = Pick<CurveDescriptor, 'xScale' | 'xDomain' | 'yDomain'>;
+/** The axes of a curve once its ranges are numbers. */
+export interface Axis {
+  xScale?: 'linear' | 'log';
+  xDomain: readonly [number, number];
+  yDomain: readonly [number, number];
+}
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
 

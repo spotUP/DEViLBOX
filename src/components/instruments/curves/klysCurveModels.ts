@@ -282,15 +282,18 @@ export interface LfoCurve {
  * Vibrato = shape * depth / 64 in 1/256 semitone (music.c:1400, the note is 8.8 fixed point). PWM = shape * depth / 32
  * added to the pulse width (music.c:1121). `vibratoDelay` (vibrato only) shrinks the depth by one per tick (music.c:1361).
  * A speed of 0 never moves: a single flat point.
+ * `subSteps` > 1 samples the shape between the ticks for drawing: the engine only reads the LFO once per tick (so the
+ * sound steps at the tick rate), but a curve with a handful of points per cycle looks like a polygon, not the shape.
  */
-export function lfoShape(shape: number, speed: number, depth: number, cycles = 2, kind: LfoKind = 'vibrato', tickHz = DEFAULT_TICK_HZ, vibratoDelay = 0): LfoCurve {
+export function lfoShape(shape: number, speed: number, depth: number, cycles = 2, kind: LfoKind = 'vibrato', tickHz = DEFAULT_TICK_HZ, vibratoDelay = 0, subSteps = 1): LfoCurve {
   const unit = kind === 'vibrato' ? 'semitones' : 'pulse width';
   if (speed <= 0) return { points: [{ x: 0, y: 0 }], cycleSeconds: Infinity, peak: 0, unit };
   const ticks = Math.ceil(cycles * 2 * VIB_TAB_SIZE / speed);
   const points: CurvePoint[] = [];
-  let position = 0, peak = 0;
-  for (let t = 0; t <= ticks; t++) {
-    position += speed; // the engine adds before it reads (music.c:1399)
+  let peak = 0;
+  for (let step = 0; step <= ticks * subSteps; step++) {
+    const t = step / subSteps;
+    const position = Math.floor(speed * (t + 1)); // the engine adds before it reads (music.c:1399): tick t reads (t + 1) * speed
     const dep = kind === 'vibrato' ? Math.max(0, depth - Math.max(0, vibratoDelay - t)) : depth;
     const v = lfoShapeValue(position >> 1, shape);
     const y = kind === 'vibrato' ? Math.trunc(v * dep / 64) / 256 : Math.trunc(v * dep / 32);
