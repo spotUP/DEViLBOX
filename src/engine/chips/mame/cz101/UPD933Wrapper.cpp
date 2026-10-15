@@ -319,8 +319,12 @@ private:
         int16_t sample = m_cosine[phase & 0x7FF];
 
         // Apply volume
-        uint32_t vol = m_volume[dca.current >> (ENV_DCA_SHIFT + 2)];
-        sample = (sample * vol) >> VOLUME_SHIFT;
+        // The DCA target is 7 bits << (ENV_DCA_SHIFT + 2), so shifting by
+        // ENV_DCA_SHIFT yields the 9-bit index m_volume is built for (MAME
+        // upd933.cpp:509). An extra +2 here used a 7-bit index: ~-60 dB.
+        uint32_t vol = m_volume[(dca.current >> ENV_DCA_SHIFT) & 0x1FF];
+        sample = (int16_t)(((int32_t)sample * (int32_t)vol) >> VOLUME_SHIFT);
+        sample -= (int16_t)(vol / 2);  // remove the unipolar cosine DC (MAME upd933.cpp:511)
 
         // Advance phase
         voice.position += voice.pitchStep;
