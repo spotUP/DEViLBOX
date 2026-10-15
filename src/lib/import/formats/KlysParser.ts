@@ -400,6 +400,41 @@ function parseKlysBlocks(buf: ArrayBuffer): KlysBlockCarrier | null {
   }
 }
 
+/** The placeholder instrument the parser shows until the engine's songData replaces it. */
+export function klysStubInstrument(): KlysNativeData['instruments'][number] {
+  return {
+    name: '',
+    adsr: { a: 0, d: 0, s: 127, r: 0 },
+    flags: 0,
+    cydflags: 0,
+    baseNote: 60,
+    finetune: 0,
+    slideSpeed: 0,
+    pw: 128,
+    volume: 100,
+    progPeriod: 0,
+    vibratoSpeed: 0,
+    vibratoDepth: 0,
+    pwmSpeed: 0,
+    pwmDepth: 0,
+    cutoff: 255,
+    resonance: 0,
+    flttype: 0,
+    ymEnvShape: 0,
+    buzzOffset: 0,
+    fxBus: 0,
+    vibShape: 0,
+    vibDelay: 0,
+    pwmShape: 0,
+    lfsrType: 0,
+    wavetableEntry: 0,
+    ringMod: 0,
+    syncSource: 0,
+    fm: { flags: 0, modulation: 0, feedback: 0, wave: 0, harmonic: 0, adsr: { a: 0, d: 0, s: 0, r: 0 }, attackStart: 0 },
+    program: [],
+  };
+}
+
 /**
  * Parse a klystrack .kt file.
  * Returns a TrackerSong with klysNative data and klysFileData for WASM playback.
@@ -487,37 +522,7 @@ export function parseKlystrack(buf: ArrayBuffer): TrackerSong {
     }),
   );
 
-  const nativeInstruments: KlysNativeData['instruments'] = instruments.map(i => ({
-    name: i.name,
-    adsr: { a: 0, d: 0, s: 127, r: 0 },
-    flags: 0,
-    cydflags: 0,
-    baseNote: 60,
-    finetune: 0,
-    slideSpeed: 0,
-    pw: 128,
-    volume: 100,
-    progPeriod: 0,
-    vibratoSpeed: 0,
-    vibratoDepth: 0,
-    pwmSpeed: 0,
-    pwmDepth: 0,
-    cutoff: 255,
-    resonance: 0,
-    flttype: 0,
-    ymEnvShape: 0,
-    buzzOffset: 0,
-    fxBus: 0,
-    vibShape: 0,
-    vibDelay: 0,
-    pwmShape: 0,
-    lfsrType: 0,
-    wavetableEntry: 0,
-    ringMod: 0,
-    syncSource: 0,
-    fm: { flags: 0, modulation: 0, feedback: 0, wave: 0, harmonic: 0, adsr: { a: 0, d: 0, s: 0, r: 0 }, attackStart: 0 },
-    program: [],
-  }));
+  const nativeInstruments: KlysNativeData['instruments'] = instruments.map(() => klysStubInstrument());
 
   const klysNative: KlysNativeData = {
     channels: numChannels,
@@ -531,6 +536,7 @@ export function parseKlystrack(buf: ArrayBuffer): TrackerSong {
     patterns: nativePatterns,
     sequences: nativeSequences,
     instruments: nativeInstruments,
+    instrumentsFrom: 'stub',
   };
 
   const format: TrackerFormat = 'KT';

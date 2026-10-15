@@ -1,6 +1,6 @@
 /**
  * A key on a whole-song player's instrument never starts or stops the song
- * (owner list K3: Klystrack, MaxTrax, PreTracker, Symphonie and UADE called
+ * (owner list K3: MaxTrax, PreTracker, Symphonie and UADE called
  * engine.play() on key-down and engine.stop() on key-up). The key says why it
  * is silent, once per player.
  */
@@ -15,6 +15,7 @@ const { calls, engine, told } = vi.hoisted(() => {
   return { calls, engine, told };
 });
 vi.mock('@/utils/audio-context', () => ({
+  noteToMidi: (n: string) => ({ C4: 60 })[n] ?? 60,
   getDevilboxAudioContext: () => ({ createGain: () => ({ gain: { value: 1 }, connect() {}, disconnect() {} }) }),
 }));
 vi.mock('@/engine/klystrack/KlysEngine', () => ({ KlysEngine: { getInstance: engine } }));
@@ -29,15 +30,35 @@ import { MaxTraxSynth } from '@/engine/maxtrax/MaxTraxSynth';
 import { PreTrackerSynth } from '@/engine/pretracker/PreTrackerSynth';
 import { SymphonieSynth } from '@/engine/symphonie/SymphonieSynth';
 import { UADESynth } from '@/engine/uade/UADESynth';
+import { klysNoteFromMidi } from '@/engine/klystrack/klysInstrumentFields';
 import { resetWholeSongKeyNotices } from '@/engine/wholeSongKeyboard';
 
 const players: Array<[string, () => { triggerAttack(n?: string | number): void; triggerRelease(n?: string | number): void }]> = [
-  ['KlysSynth', () => new KlysSynth(1)],
   ['MaxTraxSynth', () => new MaxTraxSynth()],
   ['PreTrackerSynth', () => new PreTrackerSynth()],
   ['SymphonieSynth', () => new SymphonieSynth()],
   ['UADESynth', () => new UADESynth()],
 ];
+
+describe('keys on klystrack instruments', () => {
+  beforeEach(() => { calls.length = 0; told.length = 0; resetWholeSongKeyNotices(); });
+  it('a key previews the synth instrument (klystrack note numbers), never plays or stops the song, and says nothing', () => {
+    const s = new KlysSynth(3);
+    calls.length = 0;
+    s.triggerAttack('C4'); s.triggerRelease('C4'); s.triggerAttack(72); s.triggerRelease(72);
+    expect(calls.filter((c) => /^(play|stop|pause|resume)/.test(c)), 'engine transport calls').toEqual([]);
+    expect(calls).toEqual(['previewNoteOn(2)', 'previewNoteOff', 'previewNoteOn(2)', 'previewNoteOff']);
+    expect(told).toEqual([]);
+  });
+  it('a MIDI note maps to the klystrack note the grid prints with the same name (C4 -> 48 = C-4, clamped to 0..95)', () => {
+    expect([60, 72, 0, 127].map(klysNoteFromMidi)).toEqual([48, 60, 0, 95]);
+  });
+  it('releaseAll stops the song and the preview voice', () => {
+    calls.length = 0;
+    new KlysSynth(1).releaseAll();
+    expect(calls).toEqual(['previewNoteOff', 'stop']);
+  });
+});
 
 describe('keys on whole-song players', () => {
   beforeEach(() => { calls.length = 0; told.length = 0; resetWholeSongKeyNotices(); });

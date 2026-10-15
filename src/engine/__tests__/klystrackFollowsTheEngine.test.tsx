@@ -42,7 +42,7 @@ describe('klystrack follows its engine', () => {
 
     const native = {
       channels: info.channels!, songLength: info.songLength!, loopPoint: 0, songSpeed: info.songSpeed!, songSpeed2: info.songSpeed2!,
-      songRate: info.songRate!, masterVolume: 128, flags: 0, patterns: [], sequences: data.sequences!, instruments: [],
+      songRate: info.songRate!, masterVolume: 128, flags: 0, patterns: [], sequences: data.sequences!, instruments: [], instrumentsFrom: 'stub',
     } as KlysNativeData;
 
     // The engine plays; its position reports reach the coordinator through KlysEngine.subscribeToCoordinator.
