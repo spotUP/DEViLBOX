@@ -32,7 +32,7 @@ import { UADESynth } from '@/engine/uade/UADESynth';
 import { resetWholeSongKeyNotices } from '@/engine/wholeSongKeyboard';
 
 const players: Array<[string, () => { triggerAttack(n?: string | number): void; triggerRelease(n?: string | number): void }]> = [
-  ['KlysSynth', () => new KlysSynth()],
+  ['KlysSynth', () => new KlysSynth(1)],
   ['MaxTraxSynth', () => new MaxTraxSynth()],
   ['PreTrackerSynth', () => new PreTrackerSynth()],
   ['SymphonieSynth', () => new SymphonieSynth()],

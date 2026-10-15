@@ -24,13 +24,11 @@ import { useFormatStore } from '@stores';
 import { KlysEngine } from '@/engine/klystrack/KlysEngine';
 import {
   KLYS_PARAM_IDS,
-  MUS_INST_FLAGS,
-  CYD_CHN_FLAGS,
-  CYD_FM_FLAGS,
+  KLYS_FLAG_BITS,
   KLYS_FILTER_TYPES,
-  KLYS_SHAPE_NAMES,
-  type KlysParamKey,
-} from '@/engine/klystrack/klysParams';
+  KLYS_SHAPES,
+  type KlysMemberKey as KlysParamKey,
+} from '@/engine/klystrack/klysInstrumentFields';
 import type { KlysNativeInstrument } from '@/types/tracker';
 import { CustomSelect } from '@components/common/CustomSelect';
 
@@ -238,7 +236,7 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
       <BitfieldGrid
         title="Oscillator"
         value={inst.cydflags}
-        bits={CYD_CHN_FLAGS}
+        bits={KLYS_FLAG_BITS.cydflags}
         onChange={v => handleParam('cydflags', v)}
       />
 
@@ -246,7 +244,7 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
       <BitfieldGrid
         title="Instrument Flags"
         value={inst.flags}
-        bits={MUS_INST_FLAGS}
+        bits={KLYS_FLAG_BITS.flags}
         onChange={v => handleParam('flags', v)}
       />
 
@@ -276,7 +274,7 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
             value={String(inst.vibShape)}
             onChange={(v) => handleParam('vibShape', parseInt(v, 10))}
             className="flex-1 bg-dark-bgSecondary text-[11px] text-text-secondary border border-dark-border rounded-sm px-1"
-            options={KLYS_SHAPE_NAMES.map((n, i) => ({ value: String(i), label: n }))}
+            options={KLYS_SHAPES.map((n, i) => ({ value: String(i), label: n }))}
           />
         </div>
         <ParamRow label="Pulse Width Modulation Speed" value={inst.pwmSpeed}     max={255} paramKey="pwmSpeed" onChange={handleParam} />
@@ -287,7 +285,7 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
             value={String(inst.pwmShape)}
             onChange={(v) => handleParam('pwmShape', parseInt(v, 10))}
             className="flex-1 bg-dark-bgSecondary text-[11px] text-text-secondary border border-dark-border rounded-sm px-1"
-            options={KLYS_SHAPE_NAMES.map((n, i) => ({ value: String(i), label: n }))}
+            options={KLYS_SHAPES.map((n, i) => ({ value: String(i), label: n }))}
           />
         </div>
       </Section>
@@ -305,7 +303,7 @@ export const KlysInstrumentEditor: React.FC<KlysInstrumentEditorProps> = ({ inst
             <BitfieldGrid
               title="FM Operator Flags"
               value={inst.fm.flags}
-              bits={CYD_FM_FLAGS}
+              bits={KLYS_FLAG_BITS.fmFlags}
               onChange={v => handleParam('fm.flags', v)}
             />
             <ParamRow label="Modulation"   value={inst.fm.modulation}  max={255} paramKey="fm.modulation" onChange={handleParam} />

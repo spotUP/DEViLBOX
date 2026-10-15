@@ -6,6 +6,7 @@
  */
 import type { NKSParameter } from './types';
 import { NKSParameterType, NKSSection } from './types';
+import { KLYS_FIELDS, KLYS_FIELD_KEYS, type KlysField } from '@/engine/klystrack/klysInstrumentFields';
 
 // ─────────────────────────────────────────────────────
 // TR-808 Drum Machine
@@ -327,25 +328,15 @@ export const OPENMPT_NKS_PARAMETERS: NKSParameter[] = [
   { id: 'openmpt.globalVolume', name: 'Global Vol', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 1.0, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true, accessibilityName: 'Global Master Volume' },
 ];
 
-// Klystrack — full chiptune synthesis (SID-style + FM + wavetable)
-// Params route via KlysEngine.setInstrumentParam() → worklet → _klys_set_instrument_param()
-export const KLYSTRACK_NKS_PARAMETERS: NKSParameter[] = [
-  // Page 0: ADSR + basic
-  { id: 'klystrack.attack', name: 'Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.1, unit: '%', formatString: '%.0f%%', page: 0, index: 0, isAutomatable: true, accessibilityName: 'Envelope Attack' },
-  { id: 'klystrack.decay', name: 'Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true, accessibilityName: 'Envelope Decay' },
-  { id: 'klystrack.sustain', name: 'Sustain', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true, accessibilityName: 'Envelope Sustain' },
-  { id: 'klystrack.release', name: 'Release', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.2, unit: '%', formatString: '%.0f%%', page: 0, index: 3, isAutomatable: true, accessibilityName: 'Envelope Release' },
-  { id: 'klystrack.volume', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 4, isAutomatable: true, accessibilityName: 'Instrument Volume' },
-  { id: 'klystrack.pulseWidth', name: 'Pulse Width', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true, accessibilityName: 'Pulse Width' },
-  { id: 'klystrack.finetune', name: 'Fine Tune', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: -1, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 6, isAutomatable: true, accessibilityName: 'Fine Tuning' },
-  { id: 'klystrack.slideSpeed', name: 'Slide Spd', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true, accessibilityName: 'Slide Speed' },
-  // Page 1: Filter + vibrato + PWM
-  { id: 'klystrack.cutoff', name: 'Filter Cut', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 1.0, unit: '%', formatString: '%.0f%%', page: 1, index: 0, isAutomatable: true, accessibilityName: 'Filter Cutoff' },
-  { id: 'klystrack.resonance', name: 'Filter Res', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 1, index: 1, isAutomatable: true, accessibilityName: 'Filter Resonance' },
-  { id: 'klystrack.vibratoSpeed', name: 'Vib Speed', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 1, index: 2, isAutomatable: true, accessibilityName: 'Vibrato Speed' },
-  { id: 'klystrack.vibratoDepth', name: 'Vib Depth', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 1, index: 3, isAutomatable: true, accessibilityName: 'Vibrato Depth' },
-  { id: 'klystrack.pwmSpeed', name: 'PWM Speed', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 1, index: 4, isAutomatable: true, accessibilityName: 'PWM Modulation Speed' },
-  { id: 'klystrack.pwmDepth', name: 'PWM Depth', section: NKSSection.LFO, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 1, index: 5, isAutomatable: true, accessibilityName: 'PWM Modulation Depth' },
-  { id: 'klystrack.fmMod', name: 'FM Mod', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 1, index: 6, isAutomatable: true, accessibilityName: 'FM Modulation Depth' },
-  { id: 'klystrack.fmFeedback', name: 'FM Fdbk', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.0, unit: '%', formatString: '%.0f%%', page: 1, index: 7, isAutomatable: true, accessibilityName: 'FM Feedback Amount' },
-];
+// Klystrack - full chiptune synthesis (SID-style + FM + wavetable)
+// Generated from KLYS_FIELDS (src/engine/klystrack/klysInstrumentFields.ts), the one field table: ids, ranges,
+// pages and indices live there. Edits route through KlysSynth.set -> klysInstrumentEdit.
+export const KLYSTRACK_NKS_PARAMETERS: NKSParameter[] = KLYS_FIELD_KEYS.flatMap((key) => {
+  const f: KlysField = KLYS_FIELDS[key];
+  if (!f.nksId || !f.nks) return [];
+  return [{
+    id: `klystrack.${f.nksId}`, name: f.nks.name, section: f.nks.section, type: NKSParameterType.FLOAT,
+    min: f.min < 0 ? -1 : 0, max: 1, defaultValue: f.nks.defaultValue, unit: '%', formatString: '%.0f%%',
+    page: f.nks.page, index: f.nks.index, isAutomatable: true, accessibilityName: f.nks.accessibilityName,
+  }];
+}).sort((x, y) => x.page - y.page || x.index - y.index);

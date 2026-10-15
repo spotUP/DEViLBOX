@@ -5,8 +5,10 @@
  * whichever ran last decided whether the instrument editor worked.
  */
 import { useFormatStore } from '@stores/useFormatStore';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
 import type { KlysNativeData, KlysNativeInstrument } from '@/types/tracker';
 import type { KlysSongData } from './KlysEngine';
+import { klysInstrumentId } from './klysInstrumentFields';
 
 type EngineInstrument = NonNullable<KlysSongData['instruments'][number]>;
 
@@ -38,5 +40,12 @@ export function klysNativeWithSongData(current: KlysNativeData, data: KlysSongDa
 export function applyKlysSongData(data: KlysSongData): void {
   const current = useFormatStore.getState().klysNative;
   if (!current) return;
-  useFormatStore.setState({ klysNative: klysNativeWithSongData(current, data) });
+  const klysNative = klysNativeWithSongData(current, data);
+  useFormatStore.setState({ klysNative, klysInstrumentUndoStack: [], klysInstrumentRedoStack: [] });
+  // The instrument list shows the file's names: an unnamed instrument stays empty (the list shows its number).
+  const { instruments, updateInstrument } = useInstrumentStore.getState();
+  klysNative.instruments.forEach((inst, index) => {
+    const config = instruments.find((c) => c.id === klysInstrumentId(index));
+    if (config && config.name !== inst.name) updateInstrument(config.id, { name: inst.name });
+  });
 }

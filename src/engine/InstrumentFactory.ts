@@ -676,7 +676,7 @@ export class InstrumentFactory {
         return null;
 
       case 'KlysSynth':
-        instrument = new KlysSynth();
+        instrument = new KlysSynth(config.id);
         break;
 
       case 'JamCrackerSynth': {
