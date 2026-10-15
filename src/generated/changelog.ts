@@ -1,6 +1,6 @@
 /**
  * Auto-generated changelog from git commits
- * Generated: 2026-09-30T11:54:22.183Z
+ * Generated: 2026-10-13T17:42:47.668Z
  *
  * DO NOT EDIT MANUALLY - This file is regenerated on build
  * To add changelog entries, use conventional commit messages:
@@ -19,10 +19,10 @@ export interface ChangelogEntry {
 }
 
 // Build info
-export const BUILD_VERSION = '1.0.7587';
-export const BUILD_NUMBER = '7587';
-export const BUILD_HASH = '49556bb4f';
-export const BUILD_DATE = '2026-09-30';
+export const BUILD_VERSION = '1.0.8523';
+export const BUILD_NUMBER = '8523';
+export const BUILD_HASH = '3396f4d4b';
+export const BUILD_DATE = '2026-10-13';
 
 // Full version (patch IS the build number, so no need to append)
 export const FULL_VERSION = BUILD_VERSION;
@@ -30,214 +30,210 @@ export const FULL_VERSION = BUILD_VERSION;
 // Auto-generated changelog
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.0.7587',
-    date: '2026-09-30',
+    version: '1.0.8523',
+    date: '2026-10-13',
     changes: [
       {
-        type: 'fix',
-        "description": "Tool schemas valid for zod 4 - the tool list loads again"
-      },
-      {
-        type: 'fix',
-        "description": "The make-up writer finds double-quoted preset names"
-      },
-      {
-        type: 'fix',
-        "description": "Drive, amp and dynamics presets levelled after the wet-path move"
-      },
-      {
-        type: 'fix',
-        "description": "Drive and amp corrections on the wet signal; late worklet messages ignored"
-      },
-      {
-        type: 'fix',
-        "description": "The RE-201 shares the bus's intensity over its heads"
-      },
-      {
-        type: 'fix',
-        "description": "Measure_dub_echo_response fires moves and releases held ones"
-      },
-      {
-        type: 'fix',
-        "description": "Every persona sets its own chain order and head mode"
-      },
-      {
-        type: 'fix',
-        "description": "Echo engines trimmed to unity, not down to the quietest"
-      },
-      {
-        type: 'fix',
-        "description": "The chain order button says what it does"
-      },
-      {
-        type: 'fix',
-        "description": "RE-201 modes named as the engine runs them; the bus default is head 1"
-      },
-      {
-        type: 'feature',
-        "description": "Measure_dub_echo_response - the dub echo's impulse response"
-      },
-      {
-        type: 'fix',
-        "description": "Master effects aimed at channels play on Hively and UADE songs"
-      },
-      {
-        type: 'fix',
-        "description": "The amp models add their input back, as they were trained"
-      },
-      {
-        type: 'fix',
-        "description": "Removed TapeDelay, ToneArm, Tumult and VinylNoise stop their processors"
-      },
-      {
-        type: 'fix',
-        "description": "A removed guitar amp model stops its audio processor"
-      },
-      {
-        type: 'feature',
-        "description": "Measure_master_effect reports the effect's polarity"
-      },
-      {
-        type: 'fix',
-        "description": "Radiowave and two RE-201 presets levelled on music"
-      },
-      {
-        type: 'fix',
-        "description": "Every guitar amp model comes out at its input's level"
-      },
-      {
-        type: 'feature',
-        "description": "Measure_master_effect can measure on the playing song"
-      },
-      {
-        type: 'fix',
-        "description": "Master FX preset make-ups measured on the calibrated effects"
-      },
-      {
-        type: 'feature',
-        "description": "Measure_master_effect measures whole preset chains"
-      },
-      {
-        type: 'fix',
-        "description": "The four echo engines come out at the same level"
-      },
-      {
-        type: 'fix',
-        "description": "Calibrate delays, reverbs and modulation in their wet path"
-      },
-      {
-        type: 'fix',
-        "description": "The RE-Tape Echo engine no longer self-oscillates at high intensity"
-      },
-      {
-        type: 'fix',
-        "description": "An echo-engine swap restores the bus input the bus should have now"
-      },
-      {
-        type: 'fix',
-        "description": "The liquid sweep colours without adding level; measure_dub_bus_stages"
+        type: 'improvement',
+        "description": "Plan nuade engine: NS-0..NS-11 ticked with commit b4372a2d2 (27 of 159)"
       },
       {
         type: 'improvement',
-        "description": "Test(dub): compressor-bypass contract reads the named sidechain ratio"
+        "description": "NS-0..NS-11: nuade registry descriptor, fields, table, resolver, settings v14, withNuade, switchFormatEngine, selector, Settings tab, MCP"
       },
       {
         type: 'improvement',
-        "description": "Test(ci): run this session's regression tests in test:ci"
-      },
-      {
-        type: 'fix',
-        "description": "Leaving a scratch restores note suppression - the pattern scrolls again"
-      },
-      {
-        type: 'fix',
-        "description": "One control per setting on screen; a twist ends a held drone"
-      },
-      {
-        type: 'fix',
-        "description": "Wet stages pass level through - the return no longer drowns the mix"
-      },
-      {
-        type: 'fix',
-        "description": "The pattern scrolls again after a scratch"
-      },
-      {
-        type: 'fix',
-        "description": "Encoders with a held press turn like every other knob"
-      },
-      {
-        type: 'fix',
-        "description": "Master BASS adds or removes bass on the whole mix - nothing else"
-      },
-      {
-        type: 'fix',
-        "description": "The bus HPF knob filters the bus, not the whole song"
+        "description": "NE-3, NE-5, NE-6, NE-7, NE-8, NE-9, NE-10: NuadeEngine on the real worklet"
       },
       {
         type: 'improvement',
-        "description": "One parse path + Amiga notes - 22 of 23, live check done"
+        "description": "NE-4: extract tickGridFollow from EaglePlayerEngine; both engines use it"
+      },
+      {
+        type: 'improvement',
+        "description": "Track third-party/nuade/docs (docs/ was gitignored; nuadeVendored test reads docs/players.md)"
+      },
+      {
+        type: 'improvement',
+        "description": "NE-2: Nuade.worklet.js (render loop, per-voice buffers to channel outputs, mute mask, pause, stop rewind)"
+      },
+      {
+        type: 'improvement',
+        "description": "NE-1: nuade worklet protocol types and one validator; nuade tests join test:ci"
+      },
+      {
+        type: 'improvement',
+        "description": "NV-5: nuade.yml rebuilds Nuade.wasm from committed sources and fails on stale artifacts"
+      },
+      {
+        type: 'improvement',
+        "description": "NV-2, NV-3, NV-4: nuade-wasm build, C shim with edit-slot probe, committed Nuade.{js,wasm} (1.75 MB)"
+      },
+      {
+        type: 'improvement',
+        "description": "NV-1: vendor emoon/nuade at 4900e597e (pristine, MIT) with UPSTREAM.md and update.sh"
+      },
+      {
+        type: 'improvement',
+        "description": "Record owner decisions DN-1..DN-3 in the nuade engine plan; plan final"
+      },
+      {
+        type: 'feature',
+        "description": "Add plan: nuade as one WASM engine replacing UADE playback per format, with a per-format engine selector and dual-engine A/B"
+      },
+      {
+        type: 'feature',
+        "description": "Add research: what emoon's nuade gives DEViLBOX, per format"
+      },
+      {
+        type: 'feature',
+        "description": "Add session handoff: scratch full port, SID deck audit, app idle CPU"
+      },
+      {
+        type: 'improvement',
+        "description": "Ledger and handoff after the last-rows run (78 of 81; R6, R12, D2 open; three owner reports)"
       },
       {
         type: 'fix',
-        "description": "One MOD writer - exportAsMOD is exportSongToMOD"
+        "description": "The planned scratch level measures the decks as they are heard (trim and channel fader), and a new DJ engine gets a new scratch pool"
+      },
+      {
+        type: 'fix',
+        "description": "Deck C follows the set's master clock instead of showing the store's 125 BPM default"
+      },
+      {
+        type: 'feature',
+        "description": "The Three Deck Showcase plays the demo's whole three-deck render while the set holds (J1-J10, X8, D1, D3-D6)"
+      },
+      {
+        type: 'improvement',
+        "description": "Record the Three Deck Showcase and vocalstab port decisions in the scratch full-port ledger"
+      },
+      {
+        type: 'improvement',
+        "description": "Ledger and handoff after the final-phases run (62 of 81: X7, R5; PG-I engine built, D1 partial)"
+      },
+      {
+        type: 'feature',
+        "description": "Deck C's platter, crossfader and slip follow the Auto Scratch strokes from the same render (D1)"
+      },
+      {
+        type: 'feature',
+        "description": "A phrase WAV dropped on Deck C is its scratch phrase with the demo's word cues (R5)"
+      },
+      {
+        type: 'feature',
+        "description": "A module deck's routine duck and level come from its rendered-ahead audio (X7)"
+      },
+      {
+        type: 'feature',
+        "description": "The demo's beat-juggle engine and the three-deck A/B layer, with its drum voices and records (PG-I J1-J10 engine)"
+      },
+      {
+        type: 'improvement',
+        "description": "One gate stops every picture loop and the idle effect worklets while the app is silent; the hidden DJ view stops drawing"
+      },
+      {
+        type: 'fix',
+        "description": "A pressed Juggle Now skips the random intensity wobble; the Auto DJ's own juggles keep it"
+      },
+      {
+        type: 'improvement',
+        "description": "Record R5, X7, X8, Juggle Now and PG-K decisions in the scratch full-port ledger"
+      },
+      {
+        type: 'improvement',
+        "description": "Handoff after the Render mode, C15, PG-K and PG-G run (60 of 81)"
+      },
+      {
+        type: 'feature',
+        "description": "The demo's bank analyzer and phrase auto-cue; a tracker sample is analysed at load (PG-G: R3, R5)"
+      },
+      {
+        type: 'feature',
+        "description": "The demo's model and fader options - cartridge response, grip states, needle skip, fader curve flip, contact bounce, lag, left deck (PG-K: T6, T8, T10, F5, F6)"
+      },
+      {
+        type: 'fix',
+        "description": "A rendered channel array keeps its AudioBuffer alive (the scratch null NaN flake)"
+      },
+      {
+        type: 'feature',
+        "description": "Auto Scratch Render mode (section / three_deck / dj_routine, default three_deck) and the two-hands rule (S2, C15)"
+      },
+      {
+        type: 'fix',
+        "description": "Test(juggle): Juggle Now's opening test pins the wall clock - it failed one run in three (fixture fix, no code change)"
+      },
+      {
+        type: 'feature',
+        "description": "Auto Scratch picks records with the demo's record_set selector, and plays the demo's statement-and-chop (R8, C16)"
+      },
+      {
+        type: 'fix',
+        "description": "Every channel up to 16 has a mute stem, stored as one channel and its pan (SID-FOLLOWUP-2 a)"
+      },
+      {
+        type: 'improvement',
+        "description": "Build(dj): libopenmpt 0.8.4 with per-channel taps for the DJ render worker (SID-FOLLOWUP-2 d)"
+      },
+      {
+        type: 'improvement',
+        "description": "Record Render mode decision, pending R8/C16 commit and the Dark preset flake in the scratch ledger"
+      },
+      {
+        type: 'fix',
+        "description": "The track end and the render cut-off are no section boundaries - La Mer juggles (SID-FOLLOWUP-2 b)"
+      },
+      {
+        type: 'feature',
+        "description": "The demo's scratch macro language plays from the registry (G11)"
+      },
+      {
+        type: 'fix',
+        "description": "Every SID Settings control reaches the engines - clock, ASID, voice mask, buffer size (SID-FOLLOWUP-2 c)"
+      },
+      {
+        type: 'fix',
+        "description": "The gesture ladder is the demo's GESTURE_LEVELS (P12)"
+      },
+      {
+        type: 'improvement',
+        "description": "The scratch bus is the channel alone; the old voice bus's stages are deleted"
+      },
+      {
+        type: 'feature',
+        "description": "The demo's overlay plan plays whole in every mode; DEViLBOX extras only add on top (P13)"
+      },
+      {
+        type: 'improvement',
+        "description": "Test(ci): the affected-test selector's test runs in test:ci"
+      },
+      {
+        type: 'fix',
+        "description": "Test(dj): the deck VU fixture song has a note; the push gate selects tests that import a changed module"
+      },
+      {
+        type: 'fix',
+        "description": "A SID deck render plays the SID Settings chip model and clock, cached per setting (SID-FOLLOWUP-2 f)"
+      },
+      {
+        type: 'improvement',
+        "description": "Test(sid): the SID-DECK-AUDIT tests run in test:ci (SID-FOLLOWUP-2 e)"
+      },
+      {
+        type: 'improvement',
+        "description": "Record section-end decision and next scratch phase (P13) in the full-port ledger"
       }
     ]
   },
   {
-    version: '2026-09-29',
-    date: '2026-09-29',
+    version: '2026-10-12',
+    date: '2026-10-12',
     changes: [
       {
         type: 'fix',
-        "description": "One parse per format - the tracker and the DJ decks open the same song"
-      },
-      {
-        type: 'fix',
-        "description": "One note naming for every Amiga period - ProTracker's"
-      },
-      {
-        type: 'feature',
-        "description": "The song lights up its instruments and moves the editor playhead"
-      },
-      {
-        type: 'fix',
-        "description": "A MOD note's speed comes from its period, not its number"
-      },
-      {
-        type: 'fix',
-        "description": "Judge a drum as the song plays it, and within its kit"
-      },
-      {
-        type: 'fix',
-        "description": "One role chip, slot numbers, no redundant PCM badge"
-      },
-      {
-        type: 'fix',
-        "description": "Opening the editor no longer switches an imported loop off"
-      },
-      {
-        type: 'feature',
-        "description": "Owner instrument labels as evidence, in the list and over MCP"
-      },
-      {
-        type: 'fix',
-        "description": "Instruments keep the slot number the pattern cells name"
-      },
-      {
-        type: 'feature',
-        "description": "Instrument-first song analyzer"
-      },
-      {
-        type: 'fix',
-        "description": "Changes under __tests__ no longer reload the app tab"
-      },
-      {
-        type: 'improvement',
-        "description": "Test(classifier): labelled corpus and a scored accuracy ratchet"
-      },
-      {
-        type: 'improvement',
-        "description": "The replayer's song is liveTrackerSong"
+        "description": "The UADE debugger panel uses the design-system tokens and components"
       }
     ]
   }
