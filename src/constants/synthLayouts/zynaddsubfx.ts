@@ -1,15 +1,17 @@
 import type { SynthPanelLayout } from '@/types/synthPanel';
+import { zynCurves, ZYN_BASE_FUNCTIONS, ZYN_FILTER_TYPES } from '@/components/instruments/curves/zynCurves';
+
+const curves = zynCurves();
 
 const fmtPct = (v: number) => `${Math.round(v * 100)}%`;
 
-const VOICE_WAVE = [
-  { value: '0', label: 'Sine' }, { value: '1', label: 'Tri' }, { value: '2', label: 'Saw' },
-  { value: '3', label: 'Square' }, { value: '4', label: 'Noise' }, { value: '5', label: 'Voice' }, { value: '6', label: 'Chirp' },
-];
-const FILTER_TYPE = [
-  { value: '0', label: 'LP' }, { value: '1', label: 'HP' }, { value: '2', label: 'BP' },
-  { value: '3', label: 'Notch' }, { value: '4', label: 'Peak' }, { value: '5', label: 'LShelf' },
-];
+// OscilGen's base functions by engine index: 0 is a sine, 1..15 the getBaseFunction table. The old list (Sine, Tri, Saw, Square,
+// Noise, Voice, Chirp as 0..6) named indices 2..6 after the wrong functions: its Saw was a Pulse, its Square a Saw, its Noise a Power.
+const VOICE_WAVE = ZYN_BASE_FUNCTIONS.map((label, i) => ({ value: String(i), label }));
+// AnalogFilter types by engine index (the worklet writes the index straight to Ptype).
+// Types 6..8 (Peak, Low Shelf, High Shelf) boost or cut by the filter's gain, which the editor does not expose (0 dB): they would
+// be flat, so only the six that do something are offered.
+const FILTER_TYPE = ZYN_FILTER_TYPES.slice(0, 6).map((label, i) => ({ value: String(i), label }));
 const SUB_MAG_TYPE = [
   { value: '0', label: 'Linear' }, { value: '1', label: 'dB' },
   { value: '2', label: '-40dB' }, { value: '3', label: '-60dB' },
@@ -36,6 +38,7 @@ export const ZYNADDSUBFX_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'VOICE 1',
+          curves: [curves.voice(1)],
           controls: [
             { type: 'select', key: 'addVoice1Wave', label: 'WAVE', options: VOICE_WAVE },
             { type: 'knob', key: 'addVoice1Volume', label: 'VOL', color: '#ff9900', min: 0, max: 1, defaultValue: 1, formatValue: fmtPct },
@@ -44,6 +47,7 @@ export const ZYNADDSUBFX_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'VOICE 2',
+          curves: [curves.voice(2)],
           controls: [
             { type: 'select', key: 'addVoice2Wave', label: 'WAVE', options: VOICE_WAVE },
             { type: 'knob', key: 'addVoice2Volume', label: 'VOL', color: '#ff9900', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
@@ -53,6 +57,7 @@ export const ZYNADDSUBFX_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'VOICE 3',
+          curves: [curves.voice(3)],
           controls: [
             { type: 'select', key: 'addVoice3Wave', label: 'WAVE', options: VOICE_WAVE },
             { type: 'knob', key: 'addVoice3Volume', label: 'VOL', color: '#ff9900', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
@@ -62,6 +67,7 @@ export const ZYNADDSUBFX_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'VOICE 4',
+          curves: [curves.voice(4)],
           controls: [
             { type: 'select', key: 'addVoice4Wave', label: 'WAVE', options: VOICE_WAVE },
             { type: 'knob', key: 'addVoice4Volume', label: 'VOL', color: '#ff9900', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
@@ -124,6 +130,7 @@ export const ZYNADDSUBFX_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'FILTER',
+          curves: [curves.filter],
           controls: [
             { type: 'select', key: 'filterType', label: 'TYPE', options: FILTER_TYPE },
             { type: 'knob', key: 'filterCutoff', label: 'CUTOFF', color: '#ffcc00', min: 0, max: 1, defaultValue: 0.8, formatValue: fmtPct },
@@ -135,6 +142,7 @@ export const ZYNADDSUBFX_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'FILTER ENVELOPE',
+          curves: [curves.filterEnv],
           controls: [
             { type: 'knob', key: 'filterAttack', label: 'ATK', color: '#22c55e', min: 0, max: 1, defaultValue: 0.01, formatValue: fmtPct },
             { type: 'knob', key: 'filterDecay', label: 'DEC', color: '#22c55e', min: 0, max: 1, defaultValue: 0.3, formatValue: fmtPct },
@@ -144,6 +152,7 @@ export const ZYNADDSUBFX_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'AMP ENVELOPE',
+          curves: [curves.amp],
           controls: [
             { type: 'knob', key: 'ampAttack', label: 'ATK', color: '#ff3366', min: 0, max: 1, defaultValue: 0.01, formatValue: fmtPct },
             { type: 'knob', key: 'ampDecay', label: 'DEC', color: '#ff3366', min: 0, max: 1, defaultValue: 0.1, formatValue: fmtPct },

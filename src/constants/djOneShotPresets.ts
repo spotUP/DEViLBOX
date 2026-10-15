@@ -171,8 +171,10 @@ const TENSION_BUILDER: InstrumentPreset['config'] = {
   name: 'Tension Swell',
   synthType: 'MonoSynth',
   oscillator: { type: 'sawtooth', detune: 12, octave: 0 },
-  envelope: { attack: 1200, decay: 200, sustain: 0.3, release: 200 },
+  envelope: { attack: 1200, decay: 200, sustain: 30, release: 200 },
   filter: { type: 'lowpass', frequency: 400, Q: 12, rolloff: -24 },
+  // a MonoSynth's cutoff is its filter envelope's sweep: a static cutoff at 400 Hz is a sweep of 0 octaves from it
+  filterEnvelope: { baseFrequency: 400, octaves: 0 },
   effects: [
     { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 80, parameters: { frequency: 0.15, baseFrequency: 200, octaves: 6, type: 'sine', depth: 1 } },
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 45, parameters: { drive: 40, frequency: 2000 } },
@@ -188,8 +190,10 @@ const FREQUENCY_SWEEP: InstrumentPreset['config'] = {
   name: 'Filter Sweep',
   synthType: 'MonoSynth',
   oscillator: { type: 'sawtooth', detune: 0, octave: 0 },
-  envelope: { attack: 600, decay: 400, sustain: 0.2, release: 200 },
+  envelope: { attack: 600, decay: 400, sustain: 20, release: 200 },
   filter: { type: 'lowpass', frequency: 200, Q: 14, rolloff: -24 },
+  // a MonoSynth's cutoff is its filter envelope's sweep: a static cutoff at 200 Hz is a sweep of 0 octaves from it
+  filterEnvelope: { baseFrequency: 200, octaves: 0 },
   effects: [
     { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 85, parameters: { frequency: 0.2, baseFrequency: 100, octaves: 8, type: 'sawtooth', depth: 1 } },
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 45, parameters: { drive: 40, frequency: 2500 } },
@@ -205,7 +209,7 @@ const DARK_RISER: InstrumentPreset['config'] = {
   name: 'Dark Growl',
   synthType: 'FMSynth',
   oscillator: { type: 'sine', detune: 0, octave: -1 },
-  envelope: { attack: 800, decay: 400, sustain: 0.2, release: 200 },
+  envelope: { attack: 800, decay: 400, sustain: 20, release: 200 },
   filter: { type: 'lowpass', frequency: 600, Q: 8, rolloff: -24 },
   effects: [
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 55, parameters: { drive: 55, frequency: 800 } },
@@ -222,8 +226,10 @@ const EUPHORIA_RISER: InstrumentPreset['config'] = {
   name: 'Shimmer Rise',
   synthType: 'MonoSynth',
   oscillator: { type: 'sawtooth', detune: 7, octave: 1 },
-  envelope: { attack: 1000, decay: 300, sustain: 0.1, release: 400 },
+  envelope: { attack: 1000, decay: 300, sustain: 10, release: 400 },
   filter: { type: 'highpass', frequency: 600, Q: 5, rolloff: -12 },
+  // a MonoSynth's cutoff is its filter envelope's sweep: a static cutoff at 600 Hz is a sweep of 0 octaves from it
+  filterEnvelope: { baseFrequency: 600, octaves: 0 },
   effects: [
     { category: 'tonejs', type: 'Chorus', enabled: true, wet: 55, parameters: { frequency: 4, delayTime: 5, depth: 0.9, spread: 180 } },
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 40, parameters: { drive: 35, frequency: 3000 } },
@@ -575,7 +581,7 @@ const WIND_GUST: InstrumentPreset['config'] = {
   name: 'Storm Wash',
   synthType: 'NoiseSynth',
   oscillator: { type: 'sine', detune: 0, octave: 0 },
-  envelope: { attack: 50, decay: 600, sustain: 0.4, release: 400 },
+  envelope: { attack: 50, decay: 600, sustain: 40, release: 400 },
   filter: { type: 'bandpass', frequency: 800, Q: 5, rolloff: -24 },
   effects: [
     { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 85, parameters: { frequency: 0.5, baseFrequency: 200, octaves: 6, type: 'sine', depth: 1 } },
@@ -592,7 +598,7 @@ const RADIO_TUNE: InstrumentPreset['config'] = {
   name: 'Radio Static',
   synthType: 'NoiseSynth',
   oscillator: { type: 'sine', detune: 0, octave: 0 },
-  envelope: { attack: 1, decay: 250, sustain: 0.5, release: 150 },
+  envelope: { attack: 1, decay: 250, sustain: 50, release: 150 },
   filter: { type: 'bandpass', frequency: 1500, Q: 14, rolloff: -24 },
   effects: [
     { category: 'tonejs', type: 'BitCrusher', enabled: true, wet: 35, parameters: { bits: 5 } },
@@ -614,8 +620,10 @@ const ECHO_WASHOUT: InstrumentPreset['config'] = {
   name: 'Dub Echo',
   synthType: 'MonoSynth',
   oscillator: { type: 'sawtooth', detune: 5, octave: 0 },
-  envelope: { attack: 5, decay: 300, sustain: 0.2, release: 200 },
+  envelope: { attack: 5, decay: 300, sustain: 20, release: 200 },
   filter: { type: 'lowpass', frequency: 1200, Q: 8, rolloff: -24 },
+  // a MonoSynth's cutoff is its filter envelope's sweep: a static cutoff at 1200 Hz is a sweep of 0 octaves from it
+  filterEnvelope: { baseFrequency: 1200, octaves: 0 },
   effects: [
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 50, parameters: { drive: 45, frequency: 1800 } },
     { category: 'tonejs', type: 'Compressor', enabled: true, wet: 100, parameters: { threshold: -10, ratio: 6, attack: 0.002, release: 0.06 } },
@@ -631,8 +639,10 @@ const REWIND: InstrumentPreset['config'] = {
   name: 'Rewind Sound',
   synthType: 'MonoSynth',
   oscillator: { type: 'sawtooth', detune: 0, octave: 0 },
-  envelope: { attack: 5, decay: 400, sustain: 0.1, release: 100 },
+  envelope: { attack: 5, decay: 400, sustain: 10, release: 100 },
   filter: { type: 'lowpass', frequency: 500, Q: 18, rolloff: -24 },
+  // a MonoSynth's cutoff is its filter envelope's sweep: a static cutoff at 500 Hz is a sweep of 0 octaves from it
+  filterEnvelope: { baseFrequency: 500, octaves: 0 },
   effects: [
     { category: 'tonejs', type: 'AutoFilter', enabled: true, wet: 90, parameters: { frequency: 0.4, baseFrequency: 150, octaves: 7, type: 'sawtooth', depth: 1 } },
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 50, parameters: { drive: 50, frequency: 1500 } },
@@ -650,6 +660,8 @@ const TAPE_STOP: InstrumentPreset['config'] = {
   oscillator: { type: 'square', detune: 0, octave: 0 },
   envelope: { attack: 1, decay: 350, sustain: 0, release: 150 },
   filter: { type: 'lowpass', frequency: 1000, Q: 10, rolloff: -24 },
+  // a MonoSynth's cutoff is its filter envelope's sweep: a static cutoff at 1000 Hz is a sweep of 0 octaves from it
+  filterEnvelope: { baseFrequency: 1000, octaves: 0 },
   effects: [
     { category: 'tonejs', type: 'BitCrusher', enabled: true, wet: 30, parameters: { bits: 6 } },
     { category: 'tonejs', type: 'TapeSaturation', enabled: true, wet: 55, parameters: { drive: 55, frequency: 1500 } },

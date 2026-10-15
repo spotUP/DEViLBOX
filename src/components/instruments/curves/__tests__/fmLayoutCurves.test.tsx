@@ -71,7 +71,7 @@ const flush = () => act(async () => { await new Promise((r) => setTimeout(r, 20)
 describe('every FM layout curve that follows a voice carries a marker', () => {
   it('DX7: operator envelopes, all-operators view, pitch EG, LFO and level scaling', () => {
     const withMarker = curvesOf(DX7_LAYOUT).filter((c) => c.marker).map((c) => c.label);
-    for (let n = 1; n <= 6; n++) { expect(withMarker).toContain(`OP${n} Envelope`); expect(withMarker).toContain(`OP${n} Level Scaling`); }
+    for (let n = 1; n <= 6; n++) { expect(withMarker).toContain(`Operator ${n} Envelope`); expect(withMarker).toContain(`Operator ${n} Keyboard Level Scaling`); }
     expect(withMarker).toContain('Pitch Envelope');
     expect(withMarker).toContain('LFO Pitch Modulation');
     expect(withMarker.some((l) => l.startsWith('Operator Envelopes'))).toBe(true);
@@ -90,7 +90,7 @@ describe('DOMSynthPanel draws the DX7 curves from the layout and a knob value ch
 
   it('OP1 envelope: R1 99 -> 40 redraws a different envelope (sentinel: strokes recorded on the real canvas)', () => {
     const { getByText, rerender } = render(<DOMSynthPanel layout={DX7_LAYOUT} config={op1(99)} onChange={() => {}} />);
-    fireEvent.click(getByText('OP1'));
+    fireEvent.click(getByText('Operator 1'));
     const before = polylines();
     expect(before.length, 'curves were drawn at all').toBeGreaterThan(0);
     strokes = [];
@@ -123,7 +123,7 @@ describe('the DX7 live markers follow the voice report (stub engine behind the r
   it('OP1 envelope: a decay-stage report puts the marker where dx7EnvelopeMarkerX says, and it moves with the level', async () => {
     const config = { dx7: { vced: vcedOp1 } };
     const { getByText } = render(<DOMSynthPanel layout={DX7_LAYOUT} config={config} onChange={() => {}} />);
-    fireEvent.click(getByText('OP1'));
+    fireEvent.click(getByText('Operator 1'));
     await flush();
     expect(bus.dx7.size, 'the markers subscribed to the engine').toBeGreaterThan(0);
     const run = dx7EnvelopeRun(egParams(readOp((n) => (vcedOp1 as Record<string, number>)[String(n)] ?? 0, 1), 60));
@@ -152,7 +152,8 @@ describe('the DX7 live markers follow the voice report (stub engine behind the r
 
   it('pitch envelope and LFO (global tab): markers sit at the time since the note and at the LFO phase', async () => {
     const config = { dx7: { vced: { '126': 70, '127': 60, '128': 50, '129': 60, '130': 20, '131': 90, '132': 50, '133': 30, '137': 40, '139': 99, '142': 0, '143': 7, '138': 0 } } };
-    render(<DOMSynthPanel layout={DX7_LAYOUT} config={config} onChange={() => {}} />);
+    const { getByText } = render(<DOMSynthPanel layout={DX7_LAYOUT} config={config} onChange={() => {}} />);
+    fireEvent.click(getByText('Modulation'));
     await flush();
     const curve = pitchEgRun([70, 60, 50, 60], [20, 90, 50, 30], 0.4);
     const v = report({ elapsedSeconds: 0.3, ops: Array.from({ length: 6 }, (_, i) => ({ level: i === 5 ? 500 : 4080, stage: 2, released: i !== 5 })) });

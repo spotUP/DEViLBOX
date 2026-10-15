@@ -773,6 +773,8 @@ struct synthv1_voice : public synthv1_list<synthv1_voice>
 	synthv1_ramp1 out1_vol, out2_vol;			// output volume
 
 	bool sustain1, sustain2;
+
+	uint32_t age;								// frames since the voice was allocated (editor voice report)
 };
 
 
@@ -884,6 +886,7 @@ public:
 	uint32_t midiInCount();
 
 	void directNoteOn(int note, int vel);
+	int getVoices(float *out, int maxVoices);
 
 	bool running(bool on);
 
@@ -927,6 +930,7 @@ protected:
 		if (pv) {
 			m_free_list.remove(pv);
 			m_play_list.append(pv);
+			pv->age = 0;
 			++m_nvoices;
 		}
 		return pv;
@@ -1041,7 +1045,7 @@ synthv1_voice::synthv1_voice ( synthv1_impl *pImpl ) :
 	dco2_glide2(pImpl->dco2_last2),
 	out1_panning(0.0f), out2_panning(0.0f),
 	out1_volume(1.0f), out2_volume(1.0f),
-	sustain1(false), sustain2(false)
+	sustain1(false), sustain2(false), age(0)
 {
 }
 
@@ -2186,6 +2190,62 @@ void synthv1_impl::directNoteOn ( int note, int vel )
 }
 
 
+// Voice report for the editor curves (src/engine/voiceStatus/wasmVoiceStatus.ts): 16 floats per playing voice, two
+// 8-float records (synth 1, then synth 2). Record: note (-1 when released), amplitude stage, amplitude level, seconds
+// since the voice was allocated, effective filter cutoff (the 0..1 value the filter receives: sigmoid_1 of the cutoff
+// knob times the envelope term times the LFO term, as process() computes it), filter envelope level, LFO phase in
+// cycles, filter envelope stage. Stage codes: 0 attack 1 decay 2 sustain 3 release 4 off (idle or ended).
+static float synthv1_stage_code ( synthv1_env::Stage stage )
+{
+	switch (stage) {
+	case synthv1_env::Attack:  return 0.0f;
+	case synthv1_env::Decay:   return 1.0f;
+	case synthv1_env::Sustain: return 2.0f;
+	case synthv1_env::Release: return 3.0f;
+	default:                   return 4.0f;
+	}
+}
+
+int synthv1_impl::getVoices ( float *out, int maxVoices )
+{
+	int n = 0;
+	for (synthv1_voice *pv = m_play_list.next(); pv && n < maxVoices; pv = pv->next()) {
+		float *r = out + 16 * n;
+		const float seconds = float(pv->age) / m_srate;
+		// synth 1
+		{
+			const float lfo_env = (m_lfo1.enabled.value() > 0.0f ? pv->lfo1_env.value : 0.0f);
+			const float lfo = pv->lfo1_sample * lfo_env;
+			const float env = 0.5f * (1.0f + m_dcf1.envelope.value() * pv->dcf1_env.value);
+			r[0] = float(pv->note1);
+			r[1] = synthv1_stage_code(pv->dca1_env.stage);
+			r[2] = pv->dca1_env.value;
+			r[3] = seconds;
+			r[4] = synthv1_sigmoid_1(m_dcf1.cutoff.value() * env * (1.0f + m_lfo1.cutoff.value() * lfo));
+			r[5] = pv->dcf1_env.value;
+			r[6] = pv->lfo1.phase();
+			r[7] = synthv1_stage_code(pv->dcf1_env.stage);
+		}
+		// synth 2
+		{
+			const float lfo_env = (m_lfo2.enabled.value() > 0.0f ? pv->lfo2_env.value : 0.0f);
+			const float lfo = pv->lfo2_sample * lfo_env;
+			const float env = 0.5f * (1.0f + m_dcf2.envelope.value() * pv->dcf2_env.value);
+			r[8]  = float(pv->note2);
+			r[9]  = synthv1_stage_code(pv->dca2_env.stage);
+			r[10] = pv->dca2_env.value;
+			r[11] = seconds;
+			r[12] = synthv1_sigmoid_1(m_dcf2.cutoff.value() * env * (1.0f + m_lfo2.cutoff.value() * lfo));
+			r[13] = pv->dcf2_env.value;
+			r[14] = pv->lfo2.phase();
+			r[15] = synthv1_stage_code(pv->dcf2_env.stage);
+		}
+		++n;
+	}
+	return n;
+}
+
+
 // controllers accessor
 
 synthv1_controls *synthv1_impl::controls (void)
@@ -2639,6 +2699,7 @@ void synthv1_impl::process ( float **ins, float **outs, uint32_t nframes )
 			}
 
 			nblock -= ngen;
+			pv->age += ngen;
 
 			// voice ramps countdown
 
@@ -2925,6 +2986,12 @@ uint32_t synthv1::midiInCount (void)
 void synthv1::directNoteOn ( int note, int vel )
 {
 	m_pImpl->directNoteOn(note, vel);
+}
+
+
+int synthv1::getVoices ( float *out, int maxVoices )
+{
+	return m_pImpl->getVoices(out, maxVoices);
 }
 
 

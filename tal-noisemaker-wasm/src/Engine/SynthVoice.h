@@ -74,6 +74,9 @@ private:
 
 	int countPostFilter;
 	int countSilentFilter;
+	float lastCutoff;
+	unsigned long ageSamples;
+	float sampleRateHz;
 
 	int portamentoMode;
 	float portamentoValue;
@@ -117,6 +120,9 @@ private:
 	void initialize(float sampleRate)
 	{
 		this->isNoteOn = false;
+		this->lastCutoff = 0.0f;
+		this->ageSamples = 0;
+		this->sampleRateHz = sampleRate;
 		this->noteNumber = 60;
 		this->resonance = 0.0f;
 		this->keyfollow = 0.0f;
@@ -168,6 +174,7 @@ private:
 
 		if (cutoff > 1.0f) cutoff = 1.0f;
 		if (cutoff < 0.0f) cutoff = 0.0f;
+		this->lastCutoff = cutoff;
         this->filterHandler->process(sample, cutoff, this->resonance);
 	}
 
@@ -210,6 +217,16 @@ public:
     {
         countPostFilter = 0;
     }
+
+	// Editor voice report (see SynthEngine::getVoices): this voice's state, read without side effects.
+	int getAmpStage() { return ampAdsr->getStage(); }
+	float getAmpValue() { return ampAdsr->getReportedValue(); }
+	int getFilterStage() { return filterAdsr->getStage(); }
+	float getFilterValue() { return filterAdsr->getValueFasterAttack(); }
+	int getFreeStage() { return freeAdsr->getStage(); }
+	float getFreeValue() { return freeAdsr->value; }
+	float getLastCutoff() { return lastCutoff; }
+	float getAgeSeconds() { return (float)ageSamples / sampleRateHz; }
 
 	bool isNotePlaying()
 	{
@@ -261,6 +278,7 @@ public:
 		}
 
 		this->isNoteOn = true;
+		this->ageSamples = 0;
 		this->noteNumber = note;
 		this->countPostFilter = 0;
 
@@ -518,6 +536,7 @@ public:
 		float sample = 0.0f;
 		if (this->isNotePlaying())
 		{
+            ++this->ageSamples;
             this->envelopeEditorVoiceHandler->tick();
 			this->processFreeEnvelope();
 

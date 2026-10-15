@@ -59,6 +59,7 @@ set(EXPORTED_FUNCTIONS
     "_tal_nm_pitch_bend"
     "_tal_nm_get_num_params"
     "_tal_nm_set_bpm"
+    "_tal_nm_get_voices"
     "_malloc"
     "_free"
 )

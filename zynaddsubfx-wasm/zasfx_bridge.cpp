@@ -21,6 +21,35 @@
 #include <cstring>
 #include <cstdio>
 #include <cmath>
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <cassert>
+#include <cstdint>
+#include <deque>
+#include <functional>
+#include <list>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <string>
+#include <thread>
+#include <utility>
+#include <vector>
+
+// The editor's voice report (zasfx_get_voices below) reads the running note's envelopes and filter, which ZynAddSubFX keeps in
+// private members (ADnote::NoteGlobalPar, ModFilter::baseFreq, Envelope::currentpoint). The vendored source lives outside this
+// repository, so the bridge opens those classes for its own translation unit instead of patching the vendor tree.
+#define private public
+#define protected public
+#include "Misc/Part.h"
+#include "Synth/ADnote.h"
+#include "Synth/ModFilter.h"
+#include "Synth/Envelope.h"
+#include "DSP/Filter.h"
+#undef private
+#undef protected
 
 #include "Misc/Master.h"
 #include "Misc/Part.h"
@@ -143,7 +172,26 @@ struct ZasfxInstance {
     float*  tmpR;
     int     sampleRate;
     int     bufferSize;
+    float   filtEnvSustain = 0.0f; // SUS knob, 0..127: the sustain as a share of the envelope depth
 };
+
+// The filter envelope is ADSR_filter, whose sustain is fixed at the centre (converttofree: A_val -> D_val -> 64 -> R_val), so the SUS knob
+// had nothing to write. The envelope is switched to free mode with the same four points, the sustain point at
+// 64 + (peak - 64) * SUS: SUS 0 is the old behaviour (decays back to the centre), SUS 127 holds the peak.
+static void syncFilterEnvelope(ZasfxInstance* inst, EnvelopeParams* env) {
+    if (!env) return;
+    const float peak = (float)env->PD_val - 64.0f;
+    env->Pfreemode = true;
+    env->Penvpoints = 4;
+    env->Penvsustain = 2;
+    env->Penvval[0] = env->PA_val;
+    env->envdt[1] = env->A_dt;
+    env->Penvval[1] = env->PD_val;
+    env->envdt[2] = env->D_dt;
+    env->Penvval[2] = (unsigned char)(64.0f + peak * inst->filtEnvSustain / 127.0f + 0.5f);
+    env->envdt[3] = env->R_dt;
+    env->Penvval[3] = env->PR_val;
+}
 
 static inline Part* getPart(ZasfxInstance* inst) {
     return inst->master->part[0];
@@ -165,6 +213,13 @@ static inline unsigned char clamp127(float v) {
 // Convert 0-127 to 0.0-1.0 float
 static inline float norm127(float v) {
     return (v < 0.0f) ? 0.0f : (v > 127.0f) ? 1.0f : v / 127.0f;
+}
+// Envelope times are SECONDS in ZynAddSubFX 3.x (EnvelopeParams::A_dt, D_dt, R_dt are floats, 0..41 s); the editor's 0..127 scale
+// is Zyn's own time law dTREAL: (2^(v / 127 * 12) - 1) / 100 s. The bridge used to store the raw 0..127 as whole seconds, so the
+// default amplitude attack (0.01 -> 1.27) became 1 s and the release (0.5 -> 64) 64 s.
+static inline float envSeconds(float v) {
+    const float x = (v < 0.0f) ? 0.0f : (v > 127.0f) ? 127.0f : v;
+    return (powf(2.0f, x / 127.0f * 12.0f) - 1.0f) / 100.0f;
 }
 
 extern "C" {
@@ -189,6 +244,7 @@ void* zasfx_create(int sampleRate) {
     if (!part->kit[0].padpars)
         part->kit[0].padpars = new PADnoteParameters(inst->synth, inst->master->fft, &inst->master->time);
     inst->master->applyparameters();
+    syncFilterEnvelope(inst, getAD(inst)->GlobalPar.FilterEnvelope);
     inst->master->initialize_rt();
     // Boost master volume from default -6.67dB to 0dB
     inst->master->Volume = 0.0f;
@@ -232,17 +288,72 @@ void zasfx_note_on(void* ptr, int note, int velocity) {
 void zasfx_note_off(void* ptr, int note) {
     if (!ptr) return;
     auto* inst = (ZasfxInstance*)ptr;
-    // Part::NoteOff(note) searches the notePool by note value but fails to match
-    // in mono/legato modes. Use Part::cleanup() which immediately kills all voices
-    // on the part — same mechanism as Master::ShutUp() but per-part.
-    // In a tracker, only one note plays per instrument at a time, so this is safe.
-    getPart(inst)->cleanup();
+    // Release the note through the engine: the amplitude and filter envelopes run their release stage (forced release is on, so
+    // the release always plays out). This used to call Part::cleanup(), which kills every voice at once: the release knob and the
+    // release stage of both envelopes never sounded.
+    inst->master->noteOff(0, (note_t)note);
 }
 
 void zasfx_all_notes_off(void* ptr) {
     if (!ptr) return;
     auto* inst = (ZasfxInstance*)ptr;
     inst->master->ShutUp();
+}
+
+// Live voice report for the editor curves (src/engine/voiceStatus/wasmVoiceStatus.ts): 8 floats per sounding ADDsynth note.
+//   note, amplitude stage, amplitude level 0..1 (the envelope's dB value through env_dB2rap), seconds since note on,
+//   filter cutoff in Hz (base + velocity + filter envelope + key tracking, in octaves around 1 kHz, as ModFilter::update adds them),
+//   filter envelope level 0..1 ((octaves + 6) / 12, the scale Envelope::watch uses), 0 (no LFO in the editor), filter envelope stage.
+// Stage codes: 0 attack 1 decay 2 sustain 3 release 4 off. Mid-flight the report is read without advancing any smoothing.
+static float zasfxEnvStage(const Envelope* e) {
+    if (!e || e->envfinish) return 4.0f;
+    if (e->keyreleased) return 3.0f;
+    if (e->currentpoint <= 1) return 0.0f;
+    if (e->currentpoint == 2) return 1.0f;
+    return 2.0f;
+}
+
+// The envelope's current output in its own units (dB for the amplitude envelope, octaves for the filter envelope). A forced
+// release (Envelope::envout) interpolates from the value at key off without storing it in envoutval, so it is replayed here.
+static float zasfxEnvValue(const Envelope* e) {
+    if (e->envfinish) return e->envval[e->envpoints - 1];
+    if (e->keyreleased && e->forcedrelease) {
+        const int ri = (e->envsustain < 0) ? (e->envpoints - 1) : (e->envsustain + 1);
+        return e->envoutval + (e->envval[ri] - e->envoutval) * e->t;
+    }
+    return e->envoutval;
+}
+
+int zasfx_get_voices(void* ptr, float* out, int maxVoices) {
+    if (!ptr || !out || maxVoices < 1) return 0;
+    auto* inst = (ZasfxInstance*)ptr;
+    Part* part = getPart(inst);
+    int n = 0;
+    for (auto& d : part->notePool.activeDesc()) {
+        if (n >= maxVoices) break;
+        for (auto& s : part->notePool.activeNotes(d)) {
+            if (!s.note) continue;
+            ADnote* note = dynamic_cast<ADnote*>(s.note);
+            if (!note) continue;
+            const ADnote::Global& g = note->NoteGlobalPar;
+            float* r = out + 8 * n;
+            const float ampStage = zasfxEnvStage(g.AmpEnvelope);
+            r[0] = (float)d.note;
+            r[1] = ampStage;
+            r[2] = ampStage == 4.0f ? 0.0f : EnvelopeParams::env_dB2rap(zasfxEnvValue(g.AmpEnvelope));
+            r[3] = (float)d.age * inst->synth.dt();
+            float octaves = 0.0f, filterLevel = 0.5f;
+            if (g.Filter) octaves += g.Filter->baseFreq.next_value + g.Filter->sense.next_value + g.Filter->tracking.next_value;
+            if (g.FilterEnvelope) { const float oct = zasfxEnvValue(g.FilterEnvelope); octaves += oct; filterLevel = (oct + 6.0f) / 12.0f; }
+            r[4] = Filter::getrealfreq(octaves);
+            r[5] = filterLevel;
+            r[6] = 0.0f;
+            r[7] = zasfxEnvStage(g.FilterEnvelope);
+            ++n;
+            break;
+        }
+    }
+    return n;
 }
 
 int zasfx_get_num_params(void) {
@@ -364,7 +475,9 @@ void zasfx_set_param(void* ptr, int index, float value) {
         break;
     case P_FILTER_RESONANCE:
         if (ad && ad->GlobalPar.GlobalFilter) {
-            ad->GlobalPar.GlobalFilter->baseq = value / 127.0f * 10.0f;
+            // Zyn's own law (FilterParams::baseqFromOldPq): Q 0.1 .. 999. A linear 0..10 reached Q = 0 at the bottom of the knob,
+            // which divides by zero in the two-pole filters (alpha = sin(w) / (2 Q)).
+            ad->GlobalPar.GlobalFilter->baseq = FilterParams::baseqFromOldPq((int)(v));
         }
         break;
     case P_FILTER_STAGES:
@@ -387,10 +500,10 @@ void zasfx_set_param(void* ptr, int index, float value) {
     case P_FILTER_VELFUNC: if (ad) ad->GlobalPar.PFilterVelocityScaleFunction = v; break;
 
     // === Amplitude Envelope (80-89) ===
-    case P_AMPENV_ATTACK: if (ad && ad->GlobalPar.AmpEnvelope) ad->GlobalPar.AmpEnvelope->A_dt = v; break;
-    case P_AMPENV_DECAY: if (ad && ad->GlobalPar.AmpEnvelope) ad->GlobalPar.AmpEnvelope->D_dt = v; break;
+    case P_AMPENV_ATTACK: if (ad && ad->GlobalPar.AmpEnvelope) ad->GlobalPar.AmpEnvelope->A_dt = envSeconds(value); break;
+    case P_AMPENV_DECAY: if (ad && ad->GlobalPar.AmpEnvelope) ad->GlobalPar.AmpEnvelope->D_dt = envSeconds(value); break;
     case P_AMPENV_SUSTAIN: if (ad && ad->GlobalPar.AmpEnvelope) ad->GlobalPar.AmpEnvelope->PS_val = v; break;
-    case P_AMPENV_RELEASE: if (ad && ad->GlobalPar.AmpEnvelope) ad->GlobalPar.AmpEnvelope->R_dt = v; break;
+    case P_AMPENV_RELEASE: if (ad && ad->GlobalPar.AmpEnvelope) ad->GlobalPar.AmpEnvelope->R_dt = envSeconds(value); break;
     case P_AMPENV_STRETCH: if (ad && ad->GlobalPar.AmpEnvelope) ad->GlobalPar.AmpEnvelope->Penvstretch = v; break;
     case P_AMPENV_LINEARIZE: if (ad && ad->GlobalPar.AmpEnvelope) ad->GlobalPar.AmpEnvelope->Plinearenvelope = (v > 63) ? 1 : 0; break;
     case P_AMPENV_FORCED_RELEASE: if (ad && ad->GlobalPar.AmpEnvelope) ad->GlobalPar.AmpEnvelope->Pforcedrelease = (v > 63) ? 1 : 0; break;
@@ -399,11 +512,13 @@ void zasfx_set_param(void* ptr, int index, float value) {
     case P_AMPENV_D_VALUE: if (ad && ad->GlobalPar.AmpEnvelope) ad->GlobalPar.AmpEnvelope->PD_val = v; break;
 
     // === Filter Envelope (90-99) ===
-    case P_FILTENV_ATTACK: if (ad && ad->GlobalPar.FilterEnvelope) ad->GlobalPar.FilterEnvelope->A_dt = v; break;
-    case P_FILTENV_DECAY: if (ad && ad->GlobalPar.FilterEnvelope) ad->GlobalPar.FilterEnvelope->D_dt = v; break;
-    case P_FILTENV_SUSTAIN: if (ad && ad->GlobalPar.FilterEnvelope) ad->GlobalPar.FilterEnvelope->PS_val = v; break;
-    case P_FILTENV_RELEASE: if (ad && ad->GlobalPar.FilterEnvelope) ad->GlobalPar.FilterEnvelope->R_dt = v; break;
-    case P_FILTENV_DEPTH: if (ad && ad->GlobalPar.FilterEnvelope) ad->GlobalPar.FilterEnvelope->PR_val = v; break;
+    case P_FILTENV_ATTACK: if (ad && ad->GlobalPar.FilterEnvelope) { ad->GlobalPar.FilterEnvelope->A_dt = envSeconds(value); syncFilterEnvelope(inst, ad->GlobalPar.FilterEnvelope); } break;
+    case P_FILTENV_DECAY: if (ad && ad->GlobalPar.FilterEnvelope) { ad->GlobalPar.FilterEnvelope->D_dt = envSeconds(value); syncFilterEnvelope(inst, ad->GlobalPar.FilterEnvelope); } break;
+    case P_FILTENV_SUSTAIN: inst->filtEnvSustain = (float)v; if (ad && ad->GlobalPar.FilterEnvelope) syncFilterEnvelope(inst, ad->GlobalPar.FilterEnvelope); break;
+    case P_FILTENV_RELEASE: if (ad && ad->GlobalPar.FilterEnvelope) { ad->GlobalPar.FilterEnvelope->R_dt = envSeconds(value); syncFilterEnvelope(inst, ad->GlobalPar.FilterEnvelope); } break;
+    // The filter envelope (ADSR_filter) runs A_val -> D_val -> 64 (sustain, the centre) -> R_val in octaves; the peak is D_val.
+    // ENV AMT used to write R_val, the value the cutoff releases TO. 0..127 now sets the peak from the centre (64) up to +6 octaves.
+    case P_FILTENV_DEPTH: if (ad && ad->GlobalPar.FilterEnvelope) { ad->GlobalPar.FilterEnvelope->PD_val = (unsigned char)(64.0f + norm127(value) * 63.0f + 0.5f); syncFilterEnvelope(inst, ad->GlobalPar.FilterEnvelope); } break;
     case P_FILTENV_A_VALUE: if (ad && ad->GlobalPar.FilterEnvelope) ad->GlobalPar.FilterEnvelope->PA_val = v; break;
     case P_FILTENV_D_VALUE: if (ad && ad->GlobalPar.FilterEnvelope) ad->GlobalPar.FilterEnvelope->PD_val = v; break;
     case P_FILTENV_R_VALUE: if (ad && ad->GlobalPar.FilterEnvelope) ad->GlobalPar.FilterEnvelope->PR_val = v; break;
@@ -411,8 +526,8 @@ void zasfx_set_param(void* ptr, int index, float value) {
     case P_FILTENV_FORCED_RELEASE: if (ad && ad->GlobalPar.FilterEnvelope) ad->GlobalPar.FilterEnvelope->Pforcedrelease = (v > 63) ? 1 : 0; break;
 
     // === Frequency Envelope (100-109) ===
-    case P_FREQENV_ATTACK: if (ad && ad->GlobalPar.FreqEnvelope) ad->GlobalPar.FreqEnvelope->A_dt = v; break;
-    case P_FREQENV_RELEASE: if (ad && ad->GlobalPar.FreqEnvelope) ad->GlobalPar.FreqEnvelope->R_dt = v; break;
+    case P_FREQENV_ATTACK: if (ad && ad->GlobalPar.FreqEnvelope) ad->GlobalPar.FreqEnvelope->A_dt = envSeconds(value); break;
+    case P_FREQENV_RELEASE: if (ad && ad->GlobalPar.FreqEnvelope) ad->GlobalPar.FreqEnvelope->R_dt = envSeconds(value); break;
     case P_FREQENV_DEPTH: if (ad && ad->GlobalPar.FreqEnvelope) ad->GlobalPar.FreqEnvelope->PA_val = v; break;
     case P_FREQENV_A_VALUE: if (ad && ad->GlobalPar.FreqEnvelope) ad->GlobalPar.FreqEnvelope->PA_val = v; break;
     case P_FREQENV_R_VALUE: if (ad && ad->GlobalPar.FreqEnvelope) ad->GlobalPar.FreqEnvelope->PR_val = v; break;

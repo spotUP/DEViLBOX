@@ -23,6 +23,8 @@ export const FX_PRESETS: InstrumentPreset['config'][] = [
     oscillator: { type: 'sawtooth', detune: 0, octave: 0 },
     envelope: { attack: 10, decay: 2000, sustain: 0, release: 100 },
     filter: { type: 'lowpass', frequency: 5000, Q: 3, rolloff: -24 },
+    // a MonoSynth's cutoff is its filter envelope's sweep: a static cutoff at 5000 Hz is a sweep of 0 octaves from it
+    filterEnvelope: { baseFrequency: 5000, octaves: 0 },
     effects: [],
     volume: -14,
     pan: 0,

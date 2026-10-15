@@ -10,6 +10,10 @@ import {
   oplTremoloHz, oplVibratoHz, type OplSlotParams,
 } from '../opl3CurveModels';
 import { spectrumLines } from '../spectrumMath';
+import { OPL_OUTPUT_GAIN_DB } from '@/engine/opl3/oplLevel';
+
+/** The bridge's fixed output gain (linear) between the chip's int16 and the float stream. */
+const OUTPUT_GAIN = 10 ** (OPL_OUTPUT_GAIN_DB / 20);
 
 type Reg = { type: string; channels?: Array<{ carrierStage: number; carrierAttenuation: number; modulatorStage: number; modulatorAttenuation: number; age: number; note: number }>; lfo?: { tremoloPosition: number; vibratoPosition: number; timer: number } };
 
@@ -128,7 +132,7 @@ describe('OPL3 level: total level and key scale level attenuation against the re
     const audio = await e.run(60);
     let peak = 0; for (let i = 4000; i < audio.length; i++) peak = Math.max(peak, Math.abs(audio[i]));
     const attenuation = 20 * 4 + oplKslAttenuation(oplFnumBlock(84), 2);
-    const modelPeak = (4084 * oplAmplitude(attenuation)) / 32768;
+    const modelPeak = (4084 * oplAmplitude(attenuation) * OUTPUT_GAIN) / 32768;
     // the modulator at TL 63 adds a little (additive) -- allow for it
     console.log(`[opl3 level] engine peak ${peak.toFixed(5)}, model ${modelPeak.toFixed(5)} (${(20 * Math.log10(peak / modelPeak)).toFixed(2)} dB)`);
     expect(Math.abs(20 * Math.log10(peak / modelPeak))).toBeLessThan(0.7);
@@ -148,13 +152,13 @@ describe('OPL3 spectrum: the slot pipeline port against rendered audio', () => {
     const top = (a: Array<{ db: number }>) => Math.max(...a.map((l) => l.db));
     const eTop = top(eng); const mTop = top(mdl);
     // absolute level: the chip's 13-bit output over the worklet's 16-bit full scale
-    expect(Math.abs((mTop + 20 * Math.log10(4084 / 32768)) - eTop)).toBeLessThan(1);
+    expect(Math.abs((mTop + 20 * Math.log10((4084 * OUTPUT_GAIN) / 32768)) - eTop)).toBeLessThan(1);
     const strong = mdl.filter((l) => l.db > mTop - 30);
     const errs = strong.map((m) => {
       const near = eng.filter((x) => Math.abs(x.hz - m.hz) < 25).sort((a, b) => b.db - a.db)[0];
       return near ? Math.abs((near.db - eTop) - (m.db - mTop)) : 99;
     });
-    console.log(`[opl3 spectrum] ${strong.length} lines within 30 dB, level error max ${Math.max(...errs).toFixed(2)} dB (absolute top ${(eTop - (mTop + 20 * Math.log10(4084 / 32768))).toFixed(2)} dB)`);
+    console.log(`[opl3 spectrum] ${strong.length} lines within 30 dB, level error max ${Math.max(...errs).toFixed(2)} dB (absolute top ${(eTop - (mTop + 20 * Math.log10((4084 * OUTPUT_GAIN) / 32768))).toFixed(2)} dB)`);
     expect(strong.length).toBeGreaterThanOrEqual(5);
     expect(Math.max(...errs)).toBeLessThan(2);
   }, 60000);

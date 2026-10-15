@@ -8,7 +8,7 @@ import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { KlysEngine } from './KlysEngine';
 import { useFormatStore } from '@stores/useFormatStore';
-import { editKlysField } from '@/components/klystrack/klysInstrumentEdit';
+import { editKlysField, isStandaloneKlysInstrument, readKlysInstrument, sendStandalone } from '@/components/klystrack/klysInstrumentEdit';
 import { klysFieldByNksId, klysFieldFromNormalized, klysInstrumentIndex, klysNoteFromMidi } from './klysInstrumentFields';
 
 export class KlysSynth implements DevilboxSynth {
@@ -45,7 +45,16 @@ export class KlysSynth implements DevilboxSynth {
   triggerAttack(note?: string | number, _time?: number, _velocity?: number): void {
     if (this._disposed) return;
     const midi = typeof note === 'number' ? note : noteToMidi(note ?? 'C4');
-    this.engine.previewNoteOn(klysInstrumentIndex(this.instrumentId), klysNoteFromMidi(midi));
+    const index = klysInstrumentIndex(this.instrumentId);
+    if (isStandaloneKlysInstrument(index)) {
+      // No song owns this instrument: the engine's preview copy is loaded with ITS value, then keyed.
+      const own = readKlysInstrument(index);
+      if (!own) return;
+      sendStandalone(own);
+      this.engine.previewNoteOnData(klysNoteFromMidi(midi));
+      return;
+    }
+    this.engine.previewNoteOn(index, klysNoteFromMidi(midi));
   }
 
   triggerRelease(_note?: string | number, _time?: number): void {
@@ -73,7 +82,8 @@ export class KlysSynth implements DevilboxSynth {
 
   get(param: string): number | undefined {
     const hit = klysFieldByNksId(param.replace(/^klystrack\./, ''));
-    const inst = useFormatStore.getState().klysNative?.instruments[klysInstrumentIndex(this.instrumentId)];
+    const index = klysInstrumentIndex(this.instrumentId);
+    const inst = isStandaloneKlysInstrument(index) ? readKlysInstrument(index) : useFormatStore.getState().klysNative?.instruments[index];
     if (!hit || !inst) return undefined;
     const { field } = hit;
     const v = field.get(inst);

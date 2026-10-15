@@ -6,6 +6,7 @@
  * Delegates to focused sub-factories in ./factories/
  */
 
+import { registryOutputGain } from './registry/outputGain';
 import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import type { DevilboxSynth } from '@typedefs/synth';
@@ -47,6 +48,7 @@ import { ES5503Synth } from './es5503/ES5503Synth';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { FurnaceDispatchSynth, FurnaceDispatchPlatform } from './furnace-dispatch';
 import { moduleIns2Of } from './furnace-dispatch/ins2Uploads';
+import { furnaceSlotOf } from './furnace-dispatch/fmInstrument';
 import { BuzzmachineType } from './buzzmachines/BuzzmachineEngine';
 import { VSTBridgeSynth } from './vstbridge/VSTBridgeSynth';
 import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
@@ -165,8 +167,7 @@ export class InstrumentFactory {
       else if (registryDesc.volumeOffsetDb) {
         const dsInst = instrument as unknown as { output?: { gain?: { value: number } } };
         if (dsInst.output?.gain) {
-          const volDb = (config.volume ?? -12) + registryDesc.volumeOffsetDb;
-          dsInst.output.gain.value = Math.pow(10, volDb / 20);
+          dsInst.output.gain.value = registryOutputGain(config.synthType, config.volume ?? -12);
         }
       }
       return instrument;
@@ -253,7 +254,7 @@ export class InstrumentFactory {
         if (dispatchPlatform !== undefined) {
           instrument = new FurnaceDispatchSynth(dispatchPlatform, { fromModule: moduleIns2Of(config) !== null });
           // Set the Furnace instrument index and upload encoded instrument
-          const furnaceIndex = config.furnace?.furnaceIndex ?? 0;
+          const furnaceIndex = furnaceSlotOf(config);
           (instrument as FurnaceDispatchSynth).setFurnaceInstrumentIndex(furnaceIndex);
           if (config.furnace) {
             // Encode and upload instrument from config (converts to FINS format)

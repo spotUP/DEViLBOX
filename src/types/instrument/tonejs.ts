@@ -880,7 +880,7 @@ export interface OPL3Config {
   op1Decay?: number;          // 0-15
   op1Sustain?: number;        // 0-15
   op1Release?: number;        // 0-15
-  op1Level?: number;          // 0-63
+  op1Level?: number;          // 0-63, 63 = loudest (NOT the chip's TL register, which is 0 = loudest: see engine/opl3/oplLevel.ts)
   op1Multi?: number;          // 0-15 (frequency multiplier)
   op1Waveform?: number;       // 0-7 (sine, half-sine, abs-sine, pulse, sine2x, abs2x, square, dsaw)
   op1Tremolo?: number;        // 0-1
@@ -912,6 +912,7 @@ export interface DX7Config {
   program?: number;           // 0-31 (voice within bank)
   vcedPreset?: string;        // VCED preset name from dx7presets.ts
   libraryBank?: string;       // curated library bank file (public/data/sysex/dx7); program selects the voice
+  vced?: Record<string, number>; // knob edits of the sounding voice by VCED byte offset (0..154); cleared when a voice is loaded
 }
 
 /**

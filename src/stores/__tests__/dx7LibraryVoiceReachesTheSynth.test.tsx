@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -59,12 +59,10 @@ describe('DX7 library voice reaches the instrument and the synth', () => {
     const bank = manifest.banks[1];
 
     render(<Editor id={id} />);
-    // Library group submenus: open the select, open the bank group, click voice 5.
-    fireEvent.click(await screen.findByText(/Choose a library voice/));
-    fireEvent.mouseEnter(await screen.findByText(bank.name));
-    const squash = (t: string) => t.replace(/\s+/g, ' ').trim();
-    const voiceLabel = squash(`5. ${bank.voices[4]}`);
-    fireEvent.click(await screen.findByText((c) => squash(c) === voiceLabel, {}, { timeout: 2000 }));
+    // Library browser: filter to the bank, browse it, click voice 5.
+    fireEvent.change(await screen.findByLabelText('Search the library'), { target: { value: bank.name } });
+    fireEvent.click(await screen.findByRole('option', { name: new RegExp(`^${bank.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }));
+    fireEvent.click(within(screen.getByRole('listbox', { name: 'Voices' })).getAllByRole('option')[4]);
 
     await waitFor(() => expect(loadLibraryBank).toHaveBeenCalledWith(bank.file, 4));
     const dx7 = useInstrumentStore.getState().instruments.find(i => i.id === id)!.dx7!;

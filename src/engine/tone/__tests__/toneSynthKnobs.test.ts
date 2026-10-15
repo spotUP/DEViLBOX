@@ -93,6 +93,32 @@ describe('the voice rig: oscillator detune and octave', () => {
     expect(peakHz(both, 190, 230, 0.3, 0.9, 0.25)).toBeCloseTo(220 * 2 ** (-50 / 1200), 0);
   });
 
+  it.each(['Synth', 'MonoSynth', 'DuoSynth', 'FMSynth', 'ToneAM'])(
+    '%s: a default config and a config saved before Octave existed (no oscillator.octave, or no oscillator at all) sound A4 at 440 Hz, like an unwired Tone synth', async (type) => {
+      const legacy: Array<[string, Record<string, unknown>]> = [
+        ['default', { oscillator: { type: 'sine', detune: 0, octave: 0 } }],
+        ['no octave field', { oscillator: { type: 'sine' } }],
+        ['no oscillator', { oscillator: undefined }],
+      ];
+      for (const [label, patch] of legacy) {
+        const config = cfg(type, patch);
+        // the rig sees no offset at all: no detune signal is built for a voice that has nothing to add
+        expect(K.toneRigSettings(type, config).detuneCents, `${type} ${label}`).toBe(0);
+        const rendered = await render(config, 1, { note: 'A4' });
+        expect(peakHz(rendered, 400, 480, 0.3, 0.9, 0.5), `${type} ${label} (registry)`).toBeCloseTo(440, 0);
+        // the engine's creation switch (what the keyboard's trigger reaches) builds the same voice
+        const made = engineMake(type, patch, 100);
+        const rig = (made.voice.rig ?? made.voice.options?.rig) as { detuneCents: number } | undefined;
+        expect(rig?.detuneCents ?? 0, `${type} ${label} (engine voice)`).toBe(0);
+      }
+      const plain = await renderOffline(Tone, 1, () => {
+        const synth = new ({ Synth: Tone.Synth, MonoSynth: Tone.MonoSynth, DuoSynth: Tone.DuoSynth, FMSynth: Tone.FMSynth, ToneAM: Tone.AMSynth } as Any)[type]({ oscillator: { type: 'sine' } }) as Any;
+        synth.connect(Tone.getDestination());
+        synth.triggerAttackRelease('A4', 0.8, 0.05);
+      });
+      expect(peakHz(plain, 400, 480, 0.3, 0.9, 0.5)).toBeCloseTo(440, 0);
+    }, 60000);
+
   it('DuoSynth: Octave moves the pitch, Detune stays the vibrato depth it always was', async () => {
     // The Duo's own default vibrato (+-25 cents at 5 Hz) wobbles the line, so the peak is judged to within a semitone.
     const flat = await render(cfg('DuoSynth'), 1, { note: 440 });

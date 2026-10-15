@@ -8,6 +8,7 @@ import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { DX7_LIBRARY_DIR } from './dx7Library';
 import { packDX7Voice } from './dx7sysex';
+import { dx7VoiceTrimDb } from './dx7Loudness';
 import type { Dx7VoiceStatus } from './dx7VoiceStatus';
 
 export interface DX7PatchBank {
@@ -22,6 +23,9 @@ export interface DX7PatchManifest {
 export class DX7Synth implements DevilboxSynth {
   readonly name = 'DX7Synth';
   readonly output: GainNode;
+  /** Evens out the loudness of voices (dx7Loudness.ts); between the worklet and `output`, whose gain the instrument volume owns. */
+  private readonly trim: GainNode;
+  private _trimTimer: ReturnType<typeof setTimeout> | undefined;
 
   private workletNode: AudioWorkletNode | null = null;
   private static loadedContexts = new WeakSet<AudioContext>();
@@ -85,6 +89,8 @@ export class DX7Synth implements DevilboxSynth {
     this._libraryStart = library;
     this.output = this.audioContext.createGain();
     this.output.gain.value = 1.0;
+    this.trim = this.audioContext.createGain();
+    this.trim.connect(this.output);
     this._vcedPresetName = vcedPreset;
     this._initPromise = new Promise((resolve) => { this._resolveInit = resolve; });
     DX7Synth.instances.add(this);
@@ -134,7 +140,7 @@ export class DX7Synth implements DevilboxSynth {
         }
       };
 
-      this.workletNode.connect(this.output);
+      this.workletNode.connect(this.trim);
       this.workletNode.port.postMessage({
         type: 'init', sampleRate: this.audioContext.sampleRate,
         wasmBinary: assets.wasmBinary, jsCode: assets.jsCode,
@@ -316,6 +322,7 @@ export class DX7Synth implements DevilboxSynth {
     const voiceIndex = Math.max(0, Math.min(31, Math.round(index)));
     this._currentVoice = voiceIndex;
     this.send({ type: 'programChange', program: voiceIndex });
+    this.scheduleTrim();
     // Notify listener
     if (this._onPatchChange) {
       const manifest = DX7Synth.patchManifest;
@@ -348,6 +355,22 @@ export class DX7Synth implements DevilboxSynth {
   /** Load DX7 sysex data (4104 bytes for 32-voice bulk dump) */
   loadSysex(data: ArrayBuffer) {
     this.send({ type: 'loadSysex', data });
+    this.scheduleTrim();
+  }
+
+  /**
+   * After a voice load, once the firmware has processed it: read the voice it now plays and set the output trim that gives
+   * it the level of the default voice. Computed once per distinct voice; a knob edit (setVcedParam) does not come here, so
+   * tweaking a sound never moves its level underneath the hand.
+   */
+  private scheduleTrim(delayMs = 250) {
+    clearTimeout(this._trimTimer);
+    this._trimTimer = setTimeout(async () => {
+      if (this._disposed) return;
+      const bytes = await this.readVoice();
+      if (!bytes || this._disposed) return;
+      this.trim.gain.value = Math.pow(10, dx7VoiceTrimDb(bytes) / 20);
+    }, delayMs);
   }
 
   /** Set a single VCED voice parameter via SysEx parameter change message.
@@ -401,7 +424,8 @@ export class DX7Synth implements DevilboxSynth {
   triggerAttack(note: string | number, _time?: number, velocity = 1) {
     const midi = typeof note === 'string' ? noteToMidi(note) : note;
     this._currentMidiNote = midi;
-    this.send({ type: 'noteOn', note: midi, velocity: Math.round(velocity * 127) });
+    // velocity is 0..1; the bridge's velocity table has 128 entries, so a stray value above 1 must not reach it
+    this.send({ type: 'noteOn', note: midi, velocity: Math.max(0, Math.min(127, Math.round(velocity * 127))) });
   }
 
   triggerRelease(note?: string | number, _time?: number) {
@@ -426,6 +450,7 @@ export class DX7Synth implements DevilboxSynth {
   /** Select program within current bank (0-31) */
   programChange(program: number) {
     this.send({ type: 'programChange', program });
+    this.scheduleTrim();
   }
 
   pitchBend(value: number) {
@@ -510,11 +535,13 @@ export class DX7Synth implements DevilboxSynth {
     if (this._disposed) return;
     this._disposed = true;
     DX7Synth.instances.delete(this);
+    clearTimeout(this._trimTimer);
     if (this.workletNode) {
       this.workletNode.port.postMessage({ type: 'destroy' });
       this.workletNode.disconnect();
       this.workletNode = null;
     }
+    this.trim.disconnect();
     this.output.disconnect();
   }
 

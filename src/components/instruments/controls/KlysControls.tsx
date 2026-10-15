@@ -8,12 +8,18 @@
  *    marked from the engine's program status, the meaning of the step under the cursor, and the command list.
  *
  * Instrument index = InstrumentConfig.id - 1 (klysInstrumentIndex).
+ *
+ * Two homes, one editor (klysInstrumentEdit.ts): a SONG instrument is read from the loaded klystrack song; a
+ * STANDALONE one (config.klystrack, or any KlysSynth entry no klystrack song has a slot for) from its own config,
+ * with no wavetables and no undo buttons (the undo stack belongs to the song). Same layout, tabs, curves and markers.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { InstrumentConfig } from '@/types';
 import { useFormatStore } from '@stores/useFormatStore';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { klysInitInstrument } from '@constants/klysPresets';
 import { KlysEngine } from '@/engine/klystrack/KlysEngine';
-import { KLYS_EMPTY_STEP, klysInstrumentIndex } from '@/engine/klystrack/klysInstrumentFields';
+import { KLYS_EMPTY_STEP, KLYS_PREVIEW_INSTRUMENT_INDEX, klysInstrumentIndex } from '@/engine/klystrack/klysInstrumentFields';
 import { KLYS_PROGRAM_COMMANDS, describeKlysStep } from '@/engine/klystrack/klysProgramCommands';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { voiceMarkerFor } from '@/engine/klystrack/klysVoiceStatus';
@@ -88,11 +94,18 @@ function usePlayingProgramStep(index: number): number | undefined {
 
 export const KlysControls: React.FC<{ instrument: InstrumentConfig }> = ({ instrument }) => {
   const index = klysInstrumentIndex(instrument.id);
-  const inst = useFormatStore((s) => s.klysNative?.instruments[index]);
-  const wavetables = useFormatStore((s) => s.klysNative?.wavetables);
+  const songInst = useFormatStore((s) => s.klysNative?.instruments[index]);
+  const songWavetables = useFormatStore((s) => s.klysNative?.wavetables);
+  const ownInst = useInstrumentStore((s) => s.instruments.find((c) => c.id === instrument.id)?.klystrack) ?? instrument.klystrack;
+  const standalone = ownInst !== undefined || !songInst;
+  const initInst = useMemo(klysInitInstrument, []);
+  const inst = standalone ? (ownInst ?? initInst) : songInst;
+  const wavetables = standalone ? undefined : songWavetables;
+  // The engine reports a standalone instrument's voice and program under its own preview index.
+  const reportIndex = standalone ? KLYS_PREVIEW_INSTRUMENT_INDEX : index;
   const layout = useMemo(
-    () => buildKlystrackLayout(wavetables ?? [], { sampleRate: audioSampleRate(), voice: klysVoiceSource(index) }),
-    [wavetables, index],
+    () => buildKlystrackLayout(wavetables ?? [], { sampleRate: audioSampleRate(), voice: klysVoiceSource(reportIndex) }),
+    [wavetables, reportIndex],
   );
   const values = useMemo(() => (inst ? klysLayoutValues(inst) : null), [inst]);
   const config = useMemo(() => ({ klys: values }), [values]);
@@ -106,7 +119,7 @@ export const KlysControls: React.FC<{ instrument: InstrumentConfig }> = ({ instr
     if (before && after) applyKlysLayoutChange(index, before, after);
   }, [index]);
 
-  const playingRow = usePlayingProgramStep(index);
+  const playingRow = usePlayingProgramStep(reportIndex);
   const [cursorRow, setCursorRow] = useState(0);
   const [tab, setTab] = useState<KlysTab>('main');
   const columns = useMemo(
@@ -117,9 +130,7 @@ export const KlysControls: React.FC<{ instrument: InstrumentConfig }> = ({ instr
   const rows = useMemo(() => klysProgramToRows(inst?.program ?? []), [inst?.program]);
   const onCellChange = useMemo(() => klysProgramCellChange(index), [index]);
 
-  if (!inst) {
-    return <div className="p-4 text-[10px] font-mono text-text-muted">No klystrack song is loaded for this instrument.</div>;
-  }
+  if (!inst) return null;
 
   const word = inst.program[cursorRow] ?? KLYS_EMPTY_STEP;
   return (
@@ -141,10 +152,12 @@ export const KlysControls: React.FC<{ instrument: InstrumentConfig }> = ({ instr
               onDeleteRow={(row) => deleteKlysProgramStep(index, row)}
               height="fill"
             />
-            <div className="flex items-center gap-2">
-              <Button size="sm" onClick={undoKlysInstrumentEdit}>Undo</Button>
-              <Button size="sm" onClick={redoKlysInstrumentEdit}>Redo</Button>
-            </div>
+            {!standalone && (
+              <div className="flex items-center gap-2">
+                <Button size="sm" onClick={undoKlysInstrumentEdit}>Undo</Button>
+                <Button size="sm" onClick={redoKlysInstrumentEdit}>Redo</Button>
+              </div>
+            )}
             <span className="text-[10px] font-mono text-text-secondary">
               Step {String(cursorRow).padStart(2, '0')}: {describeKlysStep(word, inst.baseNote) || 'Empty step'}
             </span>

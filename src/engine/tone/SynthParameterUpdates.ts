@@ -6,6 +6,7 @@ import { MAMEBaseSynth } from '../mame/MAMEBaseSynth';
 import { WAMSynth } from '../wam/WAMSynth';
 import { applyToneVoiceOptions } from './toneSynthKnobs';
 import { voiceSourceOf } from './toneVoiceProbe';
+import { getNormalizedVolume } from '../factories/volumeNormalization';
 
 /** Ramp time for smooth parameter transitions (seconds) */
 export const EFFECT_RAMP_TIME = 0.02;
@@ -84,10 +85,10 @@ export function updateFurnaceInstrument(ctx: SynthUpdateContext, instrumentId: n
   }
 
   // Find all FurnaceDispatchSynth instances for this instrument
-  const synths: Array<{ uploadInstrumentData: (data: Uint8Array) => void }> = [];
+  const synths: Array<{ uploadInstrumentFromConfig: (config: Record<string, unknown>, name: string) => Promise<void> }> = [];
   ctx.instruments.forEach((instrument, key) => {
-    if (ctx.instrumentIdFromKey(key) === instrumentId && (instrument as unknown as { uploadInstrumentData?: unknown }).uploadInstrumentData) {
-      synths.push(instrument as unknown as { uploadInstrumentData: (data: Uint8Array) => void });
+    if (ctx.instrumentIdFromKey(key) === instrumentId && (instrument as unknown as { uploadInstrumentFromConfig?: unknown }).uploadInstrumentFromConfig) {
+      synths.push(instrument as unknown as { uploadInstrumentFromConfig: (config: Record<string, unknown>, name: string) => Promise<void> });
     }
   });
 
@@ -97,18 +98,15 @@ export function updateFurnaceInstrument(ctx: SynthUpdateContext, instrumentId: n
     return;
   }
 
-  // Dynamically import the encoder (code-split to reduce main bundle)
-  import('@lib/export/FurnaceInstrumentEncoder').then(({ updateFurnaceInstrument }) => {
-    const furnaceIndex = config.furnace!.furnaceIndex ?? 0;
-    const binaryData = updateFurnaceInstrument(config.furnace!, config.name, furnaceIndex);
-    
-    // Update all synth instances
-    synths.forEach((synth) => {
-      synth.uploadInstrumentData(binaryData);
+  // The synth's own upload: its slot, the chip's instrument shape, and the
+  // channel re-select that makes the chip take the new patch. Encoding here
+  // with the config's own index (0 for a user instrument) put the patch in
+  // slot 0 - every other instrument's - in the shape of the wrong chip.
+  const furnace = config.furnace as unknown as Record<string, unknown>;
+  synths.forEach((synth) => {
+    synth.uploadInstrumentFromConfig(furnace, config.name).catch((err) => {
+      console.error('[ToneEngine] Failed to upload Furnace instrument:', err);
     });
-    
-  }).catch(err => {
-    console.error('[ToneEngine] Failed to encode Furnace instrument:', err);
   });
 }
 
@@ -569,7 +567,8 @@ export function updateToneJsSynthInPlace(ctx: SynthUpdateContext, instrumentId: 
     const volume = (instrument as { volume?: Tone.Param<'decibels'> }).volume;
     if (config.volume !== undefined && volume) {
       try {
-        volume.rampTo(config.volume, R);
+        // the level the creation paths gave it: volume plus the synth's normalization offset (one table)
+        volume.rampTo(getNormalizedVolume(config.synthType, config.volume), R);
       } catch { /* ignore */ }
     }
   });

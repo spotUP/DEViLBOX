@@ -133,12 +133,21 @@ struct DX7Engine {
 
 static DX7Engine* g_dx7 = nullptr;
 
+// The DX7 keyboard has 61 keys: MIDI 36 (C2) .. 96 (C7). A key is either down or up; the firmware allocates a fresh
+// voice for every key-down it is sent, so a second key-down of a key that is still down (a lost key-up: window blur,
+// a dropped release, a double trigger) sounded the pitch twice and left one voice stuck after the single key-up.
+static constexpr int kDx7Keys = 61;
+static constexpr int kDx7FirstNote = 36;
+static bool g_keyDown[kDx7Keys] = {};
+
+
 extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
 int dx7Init() {
     if (g_dx7) delete g_dx7;
     g_dx7 = new DX7Engine();
+    for (int i = 0; i < kDx7Keys; i++) g_keyDown[i] = false;
     return 0;
 }
 
@@ -206,23 +215,32 @@ int dx7LoadSysex(const uint8_t* data, int size) {
 EMSCRIPTEN_KEEPALIVE
 void dx7NoteOff(uint8_t note) {
     if (!g_dx7 || !g_dx7->initialized) return;
-    if (note >= 36)
-        g_dx7->toSynthPtr->key_off(note - 36);
+    if (note < kDx7FirstNote || note >= kDx7FirstNote + kDx7Keys) return;
+    const int key = note - kDx7FirstNote;
+    g_keyDown[key] = false;
+    g_dx7->toSynthPtr->key_off(static_cast<uint8_t>(key));
 }
 
 EMSCRIPTEN_KEEPALIVE
 void dx7NoteOn(uint8_t note, uint8_t velocity) {
     if (!g_dx7 || !g_dx7->initialized) return;
     if (velocity == 0) { dx7NoteOff(note); return; }
-    if (note >= 36)
-        g_dx7->toSynthPtr->key_on(note - 36, g_dx7->midiVelocity[velocity]);
+    if (note < kDx7FirstNote || note >= kDx7FirstNote + kDx7Keys) return;
+    const int key = note - kDx7FirstNote;
+    // midiVelocity has 128 entries: a larger value read past the table and the key sounded nothing (200, 255) or noise.
+    if (velocity > 127) velocity = 127;
+    if (g_keyDown[key]) g_dx7->toSynthPtr->key_off(static_cast<uint8_t>(key));
+    g_keyDown[key] = true;
+    g_dx7->toSynthPtr->key_on(static_cast<uint8_t>(key), g_dx7->midiVelocity[velocity]);
 }
 
 EMSCRIPTEN_KEEPALIVE
 void dx7AllNotesOff() {
     if (!g_dx7 || !g_dx7->initialized) return;
-    for (int i = 0; i < 61; i++)
+    for (int i = 0; i < kDx7Keys; i++) {
+        g_keyDown[i] = false;
         g_dx7->toSynthPtr->key_off(static_cast<uint8_t>(i));
+    }
 }
 
 EMSCRIPTEN_KEEPALIVE

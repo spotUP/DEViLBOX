@@ -165,6 +165,12 @@ public:
         return value;
     }
 
+    // Editor voice report: the oscillator phase in cycles 0..1 (the table index runs 0..255).
+    inline float getPhaseCycles()
+    {
+        return lfo->phase / 256.0f;
+    }
+
     inline float getAmount()
     {
         return amount;

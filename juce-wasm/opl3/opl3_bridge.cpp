@@ -77,13 +77,12 @@ static void writeReg(uint16_t reg, uint8_t val) {
     if (g_opl) OPL3_WriteRegBuffered(&g_opl->chip, reg, val);
 }
 
-static void applyPatch(uint8_t ch) {
+static void applyPatch(uint8_t ch, const SbiPatch& p) {
     if (!g_opl) return;
     uint16_t bank; uint8_t chInBank;
     channelToBank(ch, bank, chInBank);
     const uint8_t so = SLOT_OFFSET[chInBank];
     const uint8_t sc = so + 3;
-    const auto& p = g_opl->voices[ch].patch;
 
     writeReg(bank | (0x20 + so), p.modTVSKSRMult);
     writeReg(bank | (0x20 + sc), p.carTVSKSRMult);
@@ -107,10 +106,28 @@ static void noteToFnumBlock(uint8_t note, float semitones, uint16_t& fnum, uint8
     fnum = static_cast<uint16_t>(std::clamp(static_cast<int>(fnumF + 0.5f), 0, 1023));
 }
 
-static void oplKeyOn(uint8_t ch, uint8_t note, float pitchBend) {
+/**
+ * The patch as the chip must hold it for a note of this velocity: the stored patch with the velocity attenuation added
+ * to the carrier's total level (and to the modulator's too in the additive connection, where both slots reach the
+ * output). The stored patch itself is never changed: attenuating it in place made every retrigger of a channel
+ * quieter than the last until the patch was sent again.
+ */
+static SbiPatch patchForVelocity(const SbiPatch& base, uint8_t velocity) {
+    SbiPatch p = base;
+    const uint8_t velAtten = static_cast<uint8_t>((127 - velocity) * 32 / 127);
+    const uint8_t carTL = static_cast<uint8_t>(std::min(63, (p.carKSLTL & 0x3F) + velAtten));
+    p.carKSLTL = static_cast<uint8_t>((p.carKSLTL & 0xC0) | carTL);
+    if (p.fbAlg & 1) {
+        const uint8_t modTL = static_cast<uint8_t>(std::min(63, (p.modKSLTL & 0x3F) + velAtten));
+        p.modKSLTL = static_cast<uint8_t>((p.modKSLTL & 0xC0) | modTL);
+    }
+    return p;
+}
+
+static void oplKeyOn(uint8_t ch, uint8_t note, float pitchBend, const SbiPatch& patch) {
     uint16_t bank; uint8_t chInBank;
     channelToBank(ch, bank, chInBank);
-    applyPatch(ch);
+    applyPatch(ch, patch);
     uint16_t fnum; uint8_t blk;
     noteToFnumBlock(note, pitchBend, fnum, blk);
     writeReg(bank | (0xA0 + chInBank), static_cast<uint8_t>(fnum & 0xFF));
@@ -154,6 +171,23 @@ static uint8_t allocVoice() {
     return best;
 }
 
+/**
+ * Output level. The chip's int16 output peaks near 4096 (-18 dBFS) for ONE voice at full level, which left the synth
+ * about 12 dB below the other synths of the app (CZ-101: -6.5 dBFS peak for a held note). kOutputGainDb lifts a note to a
+ * comparable level; softLimit keeps a chord of many voices inside full scale (the chip itself clips its int16 sum at
+ * 8 full voices, as the hardware does) instead of handing the master bus 2-3x full scale.
+ */
+static constexpr float kOutputGainDb = 11.0f;
+static const float kOutputScale = std::pow(10.0f, kOutputGainDb / 20.0f) / 32768.0f;
+
+static inline float softLimit(float x) {
+    constexpr float knee = 0.8f;
+    const float a = std::fabs(x);
+    if (a <= knee) return x;
+    const float y = knee + (1.0f - knee) * std::tanh((a - knee) / (1.0f - knee));
+    return x < 0 ? -y : y;
+}
+
 // ── Exported C API ──────────────────────────────────────────────────────
 extern "C" {
 
@@ -195,12 +229,9 @@ void oplNoteOn(uint8_t note, uint8_t velocity) {
     v.midiNote = note; v.age = g_opl->ageCounter;
     v.pitchBend = g_opl->globalPitchBend;
 
-    // Copy current global patch to voice, apply velocity attenuation
+    // Copy current global patch to voice; the chip gets it with the velocity attenuation
     v.patch = g_opl->patch;
-    uint8_t velAtten = static_cast<uint8_t>((127 - velocity) * 32 / 127);
-    uint8_t carTL = static_cast<uint8_t>(std::min(63, (v.patch.carKSLTL & 0x3F) + velAtten));
-    v.patch.carKSLTL = static_cast<uint8_t>((v.patch.carKSLTL & 0xC0) | carTL);
-    oplKeyOn(ch, note, g_opl->globalPitchBend);
+    oplKeyOn(ch, note, g_opl->globalPitchBend, patchForVelocity(v.patch, velocity));
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -244,12 +275,7 @@ void oplChannelNoteOn(uint8_t ch, uint8_t note, uint8_t velocity) {
     v.midiNote = note; v.age = g_opl->ageCounter;
     v.pitchBend = g_opl->globalPitchBend;
 
-    // Apply velocity attenuation to carrier TL
-    uint8_t velAtten = static_cast<uint8_t>((127 - velocity) * 32 / 127);
-    uint8_t carTL = static_cast<uint8_t>(std::min(63, (v.patch.carKSLTL & 0x3F) + velAtten));
-    v.patch.carKSLTL = static_cast<uint8_t>((v.patch.carKSLTL & 0xC0) | carTL);
-
-    oplKeyOn(ch, note, g_opl->globalPitchBend);
+    oplKeyOn(ch, note, g_opl->globalPitchBend, patchForVelocity(v.patch, velocity));
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -355,10 +381,9 @@ void oplProcess(float* outL, float* outR, int numSamples) {
 
     OPL3_GenerateStream(&g_opl->chip, g_opl->intBuf, static_cast<uint32_t>(numSamples));
 
-    constexpr float kScale = 1.0f / 32768.0f; // normalize OPL int16 to [-1,1] float
     for (int i = 0; i < numSamples; i++) {
-        outL[i] = static_cast<float>(g_opl->intBuf[i * 2 + 0]) * kScale;
-        outR[i] = static_cast<float>(g_opl->intBuf[i * 2 + 1]) * kScale;
+        outL[i] = softLimit(static_cast<float>(g_opl->intBuf[i * 2 + 0]) * kOutputScale);
+        outR[i] = softLimit(static_cast<float>(g_opl->intBuf[i * 2 + 1]) * kOutputScale);
     }
 }
 

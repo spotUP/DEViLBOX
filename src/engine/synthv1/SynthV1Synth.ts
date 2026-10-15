@@ -8,6 +8,7 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import { WasmVoiceHub, registerVoiceHub } from '@/engine/voiceStatus/wasmVoiceStatus';
 import { loadNativePatch, captureNativeState, type NativePatch } from '@/engine/common/NativePatchLoader';
 
 // Parameter index map — per-page offsets (add page*40 for page 2)
@@ -77,6 +78,8 @@ export interface SynthV1Config {
   flangerWet: number; flangerDelay: number; flangerFeedback: number; flangerDaft: number;
   phaserWet: number; phaserRate: number; phaserFeedback: number; phaserDepth: number; phaserDaft: number;
   delayWet: number; delayDelay: number; delayFeedback: number; delayBpm: number;
+  // LFO rate knobs (0..1, LFO_RATE); lfo1Bpm / lfo2Bpm are the LFO tempo in beats per minute (0..360)
+  lfo1Rate: number; lfo2Rate: number;
   reverbWet: number; reverbRoom: number;
 }
 
@@ -112,13 +115,16 @@ export const CONFIG_KEYS: (keyof SynthV1Config)[] = [
   'phaserWet', 'phaserRate', 'phaserFeedback', 'phaserDepth', 'phaserDaft',
   'delayWet', 'delayDelay', 'delayFeedback', 'delayBpm',
   'reverbWet', 'reverbRoom',
+  // appended: LFO_RATE has its own key, the BPM keys keep the engine's tempo meaning
+  'lfo1Rate', 'lfo2Rate',
 ];
 
 /** Map CONFIG_KEYS index → WASM ParamIndex enum value.
  *  WASM has 147 params (NUM_PARAMS), CONFIG_KEYS has 100. The WASM enum
  *  has extra params (BANDL, SYNC2, ENVTIME, ENABLED, RATE, SWEEP, OUT, DEF, DYN, KEY)
  *  that CONFIG_KEYS doesn't expose. Indices diverge after position 1. */
-const WASM_PARAM_INDEX: Record<number, number> = {
+// lfo1Bpm / lfo2Bpm are LFO_BPM (0..360, the LFO tempo); the RATE knobs have their own keys lfo1Rate / lfo2Rate -> LFO_RATE (0..1).
+export const WASM_PARAM_INDEX: Record<number, number> = {
   0:0, 1:1, 2:4, 3:5, 4:12, 5:13, 6:14, 7:3, 8:8, 9:11,
   10:17, 11:18, 12:19, 13:20, 14:21, 15:22, 16:23, 17:24, 18:25,
   // 19: dcf1KeyFollow — no WASM equivalent
@@ -138,6 +144,7 @@ const WASM_PARAM_INDEX: Record<number, number> = {
   89:127, 90:128, 91:129, 92:130, 93:131,
   94:132, 95:133, 96:134, 97:135,
   98:136, 99:137,
+  100:30, 101:89,
 };
 
 export const SYNTHV1_PARAM_NAMES: Record<number, string> = {};
@@ -158,7 +165,7 @@ const PAGE1_DEFAULTS = {
   dcfEnvelope: 0.5, dcfAttack: 0, dcfDecay: 0.3, dcfSustain: 0.6,
   dcfRelease: 0.3, dcfKeyFollow: 0.5,
   dcaVolume: 0.8, dcaAttack: 0, dcaDecay: 0.3, dcaSustain: 0.8, dcaRelease: 0.3,
-  lfoBpm: 0.3, lfoShape: 0, lfoWidth: 0.5, lfoPitch: 0,
+  lfoBpm: 180, lfoRate: 0.3, lfoShape: 0, lfoWidth: 0.5, lfoPitch: 0,
   lfoCutoff: 0, lfoReso: 0, lfoPanning: 0, lfoVolume: 0, lfoSync: 0,
   dcoDetune: 0.1, dcoPhase: 0, dcoPanning: 0,
   dcoVelocity: 0.5, dcfVelocity: 0.5, dcaVelocity: 0.5,
@@ -183,7 +190,7 @@ export const DEFAULT_SYNTHV1: SynthV1Config = {
   chorusWet: 0, chorusDelay: 0.3, chorusFeedback: 0, chorusRate: 0.3, chorusMod: 0.5,
   flangerWet: 0, flangerDelay: 0.3, flangerFeedback: 0, flangerDaft: 0,
   phaserWet: 0, phaserRate: 0.3, phaserFeedback: 0, phaserDepth: 0.5, phaserDaft: 0,
-  delayWet: 0, delayDelay: 0.4, delayFeedback: 0.3, delayBpm: 0.5,
+  delayWet: 0, delayDelay: 0.4, delayFeedback: 0.3, delayBpm: 180,
   reverbWet: 0, reverbRoom: 0.5,
 } as SynthV1Config;
 
@@ -327,7 +334,7 @@ export const SYNTHV1_PRESETS: Record<string, Partial<SynthV1Config>> = {
     dcf1Cutoff: 0.3, dcf1Reso: 0.55, dcf1Envelope: 0.4, dcf1Type: 0,
     dcf1Attack: 0, dcf1Decay: 0.3, dcf1Sustain: 0.3, dcf1Release: 0.15,
     dca1Volume: 0.9, dca1Attack: 0, dca1Decay: 0.2, dca1Sustain: 0.85, dca1Release: 0.15,
-    lfo1Shape: 2, lfo1Bpm: 0.4, lfo1Cutoff: 0.6, lfo1Reso: 0.15, lfo1Sync: 1,
+    lfo1Shape: 1, lfo1Rate: 0.4, lfo1Cutoff: 0.6, lfo1Reso: 0.15, lfo1Sync: 1,
     dca2Volume: 0,
   },
   'Ambient Texture': {
@@ -433,7 +440,7 @@ export const SYNTHV1_PRESETS: Record<string, Partial<SynthV1Config>> = {
     dco2Shape1: 1, dco2Shape2: 1, dco2Octave: -1, dco2Detune: 0.55,
     dcf2Cutoff: 0.25, dcf2Reso: 0.35,
     dca2Volume: 0.6, dca2Attack: 0.9, dca2Decay: 0.5, dca2Sustain: 0.85, dca2Release: 0.9,
-    lfo1Shape: 0, lfo1Bpm: 0.1, lfo1Cutoff: 0.3,
+    lfo1Shape: 2, lfo1Rate: 0.1, lfo1Cutoff: 0.3,
     reverbWet: 0.6, reverbRoom: 0.9,
   },
   'Sync Lead': {
@@ -475,7 +482,7 @@ export const SYNTHV1_PRESETS: Record<string, Partial<SynthV1Config>> = {
     dcf1Cutoff: 0.5, dcf1Reso: 0.6, dcf1Envelope: 0.8,
     dcf1Attack: 0.3, dcf1Decay: 0.8, dcf1Sustain: 0.1, dcf1Release: 0.8,
     dca1Attack: 0.1, dca1Decay: 0.9, dca1Sustain: 0.05, dca1Release: 0.9,
-    lfo1Shape: 4, lfo1Bpm: 0.5, lfo1Pitch: 0.3, lfo1Cutoff: 0.4,
+    lfo1Shape: 3, lfo1Rate: 0.5, lfo1Pitch: 0.3, lfo1Cutoff: 0.4,
     dca2Volume: 0,
     reverbWet: 0.5, reverbRoom: 0.8,
     delayWet: 0.4, delayDelay: 0.5, delayFeedback: 0.6,
@@ -493,6 +500,9 @@ export class SynthV1Engine implements DevilboxSynth {
   readonly output: GainNode;
 
   private _worklet: AudioWorkletNode | null = null;
+  /** Live voice report for the editor curves' markers (wasmVoiceStatus.ts); records are 16 floats, one per synth page. */
+  readonly voiceHub = new WasmVoiceHub((m) => this._worklet?.port.postMessage(m));
+  private readonly unregisterVoiceHub: () => void;
   private config: SynthV1Config;
   private isInitialized = false;
   private pendingNotes: Array<{ note: number; velocity: number }> = [];
@@ -505,6 +515,7 @@ export class SynthV1Engine implements DevilboxSynth {
   constructor(config: Partial<SynthV1Config> = {}) {
     this.output = getDevilboxAudioContext().createGain();
     this.config = { ...DEFAULT_SYNTHV1, ...config };
+    this.unregisterVoiceHub = registerVoiceHub('SynthV1', this.voiceHub);
   }
 
   /** Deferred init — called by factory pattern (createSynthV1) */
@@ -561,8 +572,10 @@ export class SynthV1Engine implements DevilboxSynth {
       });
 
       this._worklet.port.onmessage = (event) => {
+        if (this.voiceHub.handleMessage(event.data)) return;
         if (event.data.type === 'ready') {
           this.isInitialized = true;
+          this.voiceHub.resume();
           if (this.pendingPatch) {
             void loadNativePatch(this._worklet!, this.pendingPatch).catch(() => {});
             this.pendingPatch = null;
@@ -711,6 +724,7 @@ export class SynthV1Engine implements DevilboxSynth {
   }
 
   dispose(): void {
+    this.unregisterVoiceHub();
     if (this._worklet) {
       this._worklet.port.postMessage({ type: 'dispose' });
       this._worklet.disconnect();

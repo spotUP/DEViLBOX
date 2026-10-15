@@ -7,7 +7,7 @@ import type { InstrumentPreset } from '@typedefs/instrument';
  */
 
 // Helper to create operator with defaults
-const op = (overrides: Partial<{
+export const op = (overrides: Partial<{
   enabled: boolean; am: boolean; ar: number; dr: number; mult: number;
   rr: number; sl: number; tl: number; dt2: number; rs: number; dt: number;
   d2r: number; ssg: number; ksl: number; ksr: boolean; sus: boolean;
@@ -18,7 +18,7 @@ const op = (overrides: Partial<{
   vib: false, ws: 0, ...overrides,
 });
 
-const disabledOp = () => op({ enabled: false, tl: 127, ar: 0, rr: 0 });
+export const disabledOp = () => op({ enabled: false, tl: 127, ar: 0, rr: 0 });
 
 export const FURNACE_PRESETS: InstrumentPreset['config'][] = [
   // ============================================
@@ -200,7 +200,7 @@ export const FURNACE_PRESETS: InstrumentPreset['config'][] = [
     pan: 0,
     effects: [],
     furnace: {
-      chipType: 14,
+      chipType: 2,  // OPL (FurnaceChipType.OPL3)
       algorithm: 0,
       feedback: 3,
       operators: [
@@ -220,7 +220,7 @@ export const FURNACE_PRESETS: InstrumentPreset['config'][] = [
     pan: 0,
     effects: [],
     furnace: {
-      chipType: 14,
+      chipType: 2,  // OPL (FurnaceChipType.OPL3)
       algorithm: 0,
       feedback: 5,
       operators: [
@@ -240,7 +240,7 @@ export const FURNACE_PRESETS: InstrumentPreset['config'][] = [
     pan: 0,
     effects: [],
     furnace: {
-      chipType: 14,
+      chipType: 2,  // OPL (FurnaceChipType.OPL3)
       algorithm: 0,
       feedback: 4,
       operators: [
@@ -260,7 +260,7 @@ export const FURNACE_PRESETS: InstrumentPreset['config'][] = [
     pan: 0,
     effects: [],
     furnace: {
-      chipType: 14,
+      chipType: 2,  // OPL (FurnaceChipType.OPL3)
       algorithm: 0,
       feedback: 0,
       operators: [
@@ -280,7 +280,7 @@ export const FURNACE_PRESETS: InstrumentPreset['config'][] = [
     pan: 0,
     effects: [],
     furnace: {
-      chipType: 14,
+      chipType: 2,  // OPL (FurnaceChipType.OPL3)
       algorithm: 0,
       feedback: 4,
       operators: [
@@ -1097,7 +1097,7 @@ export const FURNACE_PRESETS: InstrumentPreset['config'][] = [
     pan: 0,
     effects: [] as never[],
     furnace: {
-      chipType: 9,
+      chipType: 11,  // OPLL (FurnaceChipType.OPLL)
       opllPreset: i + 1, // 1-15 (0 = custom)
       algorithm: 0,
       feedback: 0,
@@ -1119,7 +1119,7 @@ export const FURNACE_PRESETS: InstrumentPreset['config'][] = [
     pan: 0,
     effects: [],
     furnace: {
-      chipType: 9,
+      chipType: 11,  // OPLL (FurnaceChipType.OPLL)
       opllPreset: 0,
       algorithm: 0,
       feedback: 2,

@@ -279,6 +279,20 @@ export function getDefaultFurnaceConfig(synthType: string): import('@typedefs/in
     operators: DEFAULT_FURNACE.operators.map(op => ({ ...op })),
   };
 
+  // OPL and OPLL play two operators. DEFAULT_FURNACE is OPN-shaped (four operators, the
+  // first carrier at TL 50): on an OPL chip that is a quiet carrier, -35 dB against a
+  // properly set 2-op patch.
+  if (chipType === 2 || chipType === 23 || chipType === 26 || chipType === 11) {
+    config.ops = 2;
+    config.algorithm = 0;
+    config.feedback = 4;
+    config.operators = [
+      { ...DEFAULT_FURNACE.operators[0], mult: 2, tl: 30, ar: 15, dr: 4, d2r: 0, sl: 4, rr: 8 },
+      { ...DEFAULT_FURNACE.operators[1], mult: 1, tl: 0, ar: 15, dr: 6, d2r: 0, sl: 2, rr: 8 },
+    ];
+    config.opMacros = [{}, {}];
+  }
+
   // Add chip-specific defaults
   if (synthType === 'FurnaceC64' || synthType === 'FurnaceSID6581' || synthType === 'FurnaceSID8580') {
     config.c64 = {

@@ -17,6 +17,11 @@ class TalNoizeMakerProcessor extends AudioWorkletProcessor {
     this.lastHeapBuffer = null;
     this.initializing = false;
 
+    // Live voice report for the editor curves (src/engine/voiceStatus/wasmVoiceStatus.ts), stride 12
+    this.watchVoices = false;
+    this.voiceCounter = 0;
+    this.voicePtr = 0;
+
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
     };
@@ -76,6 +81,9 @@ class TalNoizeMakerProcessor extends AudioWorkletProcessor {
           }
           this.port.postMessage({ type: 'state', values: Array.from(state), numParams });
         }
+        break;
+      case 'watchVoices':
+        this.watchVoices = !!data.on;
         break;
       case 'getInfo':
         if (this.engine) {
@@ -218,6 +226,10 @@ class TalNoizeMakerProcessor extends AudioWorkletProcessor {
   }
 
   cleanup() {
+    if (this.module && this.voicePtr) {
+      this.module._free(this.voicePtr);
+      this.voicePtr = 0;
+    }
     if (this.module && this.engine) {
       this.module._tal_nm_destroy(this.engine);
       this.engine = null;
@@ -257,7 +269,21 @@ class TalNoizeMakerProcessor extends AudioWorkletProcessor {
       outputR.set(this.outputBufferR.subarray(0, numFrames));
     }
 
+    this.reportVoices();
     return true;
+  }
+
+  // every 6th block (about 60 reports a second); 12 floats per sounding voice, layout in SynthEngine::getVoices
+  reportVoices() {
+    if (!this.watchVoices || typeof this.module._tal_nm_get_voices !== 'function') return;
+    if (++this.voiceCounter < 6) return;
+    this.voiceCounter = 0;
+    const STRIDE = 12, MAX_VOICES = 6;
+    if (!this.voicePtr) this.voicePtr = this.module._malloc(MAX_VOICES * STRIDE * 4);
+    const n = this.module._tal_nm_get_voices(this.engine, this.voicePtr, MAX_VOICES);
+    const heap = this.module.HEAPF32 || new Float32Array(this.module.wasmMemory.buffer);
+    const at = this.voicePtr >> 2;
+    this.port.postMessage({ type: 'voiceStatus', stride: STRIDE, voices: heap.slice(at, at + n * STRIDE) });
   }
 }
 

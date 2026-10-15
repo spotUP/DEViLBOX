@@ -3,6 +3,7 @@
  * Supports filtering by current synth type so the browser shows relevant presets first.
  */
 
+import { TONE_KNOB_SYNTH_TYPES, toneSecondsPresetToConfig } from '@engine/tone/toneSynthKnobs';
 import type { PresetIndex, PresetCollection, PresetMetadata, PresetCategory } from '../types/preset';
 import type { SynthType } from '@typedefs/instrument/base';
 
@@ -118,7 +119,7 @@ function createCollectionFromSynthPresets(
       name: sp.name,
       synthType,
       // Nest synth-specific config under the correct key, or spread flat as fallback
-      ...(configKey ? { [configKey]: sp.config } : sp.config),
+      ...(configKey ? { [configKey]: sp.config } : TONE_KNOB_SYNTH_TYPES.has(synthType) ? toneSecondsPresetToConfig(sp.config) : sp.config),
       effects: [],
       volume: -10,
       pan: 0,

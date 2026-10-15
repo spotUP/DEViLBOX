@@ -15,6 +15,7 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import { WasmVoiceHub, registerVoiceHub } from '@/engine/voiceStatus/wasmVoiceStatus';
 import { loadNativePatch, captureNativeState } from '@/engine/common/NativePatchLoader';
 import { TAL_NATIVE_FACTORY_PRESETS, TAL_ALL_FACTORY_PRESETS } from './talNativePresets';
 export { TAL_NATIVE_FACTORY_PRESETS, TAL_ALL_FACTORY_PRESETS };
@@ -197,10 +198,14 @@ export const TAL_NM_PARAM_NAMES: Record<number, string> = {
   [TalNMParam.DELAYFEEDBACK]: 'Delay Feedback',
 };
 
-/** Default parameter values matching TalPreset.h defaults, keyed by WASM index. */
+/**
+ * Default parameter values, keyed by WASM index. Choice parameters (filter type, waveforms, destinations, portamento mode,
+ * envelope editor) are NORMALISED 0..1 (item k of n at (k - 1) / (n - 1)); the TalPreset.h values of 1.0 select the LAST
+ * item, which silenced the default patch (envelope editor destination Volume with an empty envelope) and bypassed the filter.
+ */
 export const DEFAULT_TAL_NM_PARAMS: Record<number, number> = {
   [TalNMParam.VOLUME]: 0.5,
-  [TalNMParam.FILTERTYPE]: 1.0,
+  [TalNMParam.FILTERTYPE]: 0.0,
   [TalNMParam.CUTOFF]: 1.0,
   [TalNMParam.OSC1VOLUME]: 0.8,
   [TalNMParam.OSC2VOLUME]: 0.0,
@@ -210,26 +215,26 @@ export const DEFAULT_TAL_NM_PARAMS: Record<number, number> = {
   [TalNMParam.OSC2TUNE]: 0.5,
   [TalNMParam.OSC1FINETUNE]: 0.5,
   [TalNMParam.OSC2FINETUNE]: 0.5,
-  [TalNMParam.OSC1WAVEFORM]: 1.0,
-  [TalNMParam.OSC2WAVEFORM]: 1.0,
+  [TalNMParam.OSC1WAVEFORM]: 0.0,
+  [TalNMParam.OSC2WAVEFORM]: 0.0,
   [TalNMParam.FILTERCONTOUR]: 0.5,
   [TalNMParam.FILTERSUSTAIN]: 1.0,
   [TalNMParam.AMPSUSTAIN]: 1.0,
   [TalNMParam.VOICES]: 1.0,
-  [TalNMParam.PORTAMENTOMODE]: 1.0,
+  [TalNMParam.PORTAMENTOMODE]: 0.0,
   [TalNMParam.LFO1AMOUNT]: 0.5,
   [TalNMParam.LFO2AMOUNT]: 0.5,
-  [TalNMParam.LFO1DESTINATION]: 1.0,
-  [TalNMParam.LFO2DESTINATION]: 1.0,
+  [TalNMParam.LFO1DESTINATION]: 0.0,
+  [TalNMParam.LFO2DESTINATION]: 0.0,
   [TalNMParam.OSC1PW]: 0.5,
   [TalNMParam.OSC1PHASE]: 0.5,
   [TalNMParam.TRANSPOSE]: 0.5,
-  [TalNMParam.FREEADDESTINATION]: 1.0,
+  [TalNMParam.FREEADDESTINATION]: 0.0,
   [TalNMParam.REVERBDECAY]: 0.5,
   [TalNMParam.REVERBLOWCUT]: 1.0,
   [TalNMParam.OSCBITCRUSHER]: 1.0,
-  [TalNMParam.ENVELOPEEDITORDEST1]: 1.0,
-  [TalNMParam.ENVELOPEEDITORSPEED]: 1.0,
+  [TalNMParam.ENVELOPEEDITORDEST1]: 0.0,
+  [TalNMParam.ENVELOPEEDITORSPEED]: 0.0,
 };
 
 /** Friendly config interface for presets */
@@ -314,7 +319,7 @@ export interface TalNoizeMakerConfig {
 }
 
 /** Maps config keys to WASM parameter indices */
-const CONFIG_TO_INDEX: Record<string, number> = {
+export const CONFIG_TO_INDEX: Record<string, number> = {
   volume: TalNMParam.VOLUME,
   filterType: TalNMParam.FILTERTYPE,
   cutoff: TalNMParam.CUTOFF,
@@ -394,7 +399,7 @@ const CONFIG_TO_INDEX: Record<string, number> = {
   delayFeedback: TalNMParam.DELAYFEEDBACK,
 };
 
-export const TAL_NOIZEMAKER_PRESETS: Record<string, Partial<TalNoizeMakerConfig>> = {
+const TAL_LEGACY_PRESETS: Record<string, Partial<TalNoizeMakerConfig>> = {
   'Init': {},
   'Fat Bass': {
     osc1Volume: 0.9, osc1Waveform: 1.0,
@@ -572,6 +577,32 @@ export const TAL_NOIZEMAKER_PRESETS: Record<string, Partial<TalNoizeMakerConfig>
   },
 };
 
+/**
+ * The hand-written presets above were authored on a raw scale (waveform 1.0 = saw, 0.5 = pulse, 0.0 = noise or sine, filter type 1.0 =
+ * the first type, LFO destination 0.25 = Filter, 0.5 = Oscillator). The engine reads choices as NORMALISED item positions
+ * (AudioUtils::calcComboBoxValue), where 1.0 is the LAST item (noise, filter bypass). This is the one place that converts them.
+ */
+const LEGACY_OSC1: Record<number, number> = { 1: 0, 0.5: 0.5, 0: 1 };         // saw, pulse, noise -> items 1, 2, 3 of 3
+const LEGACY_OSC2: Record<number, number> = { 1: 0, 0.5: 0.25, 0: 0.75 };     // saw, pulse, sine -> items 1, 2, 4 of 5
+const LEGACY_DESTINATION: Record<number, number> = { 0: 0, 0.25: 1 / 7, 0.5: 1, 1: 1 }; // Off, Filter, Oscillator pitch (item 8)
+export function convertLegacyTalPreset(p: Partial<TalNoizeMakerConfig>): Partial<TalNoizeMakerConfig> {
+  const out: Partial<TalNoizeMakerConfig> = { ...p };
+  const map = (key: keyof TalNoizeMakerConfig, table: Record<number, number>): void => {
+    const v = p[key];
+    if (typeof v === 'number' && table[v] !== undefined) (out as Record<string, number>)[key] = table[v];
+  };
+  map('osc1Waveform', LEGACY_OSC1);
+  map('osc2Waveform', LEGACY_OSC2);
+  map('lfo1Destination', LEGACY_DESTINATION);
+  map('lfo2Destination', LEGACY_DESTINATION);
+  if (p.filterType === 1.0) out.filterType = 0; // the presets meant the first type, LP 24
+  return out;
+}
+
+export const TAL_NOIZEMAKER_PRESETS: Record<string, Partial<TalNoizeMakerConfig>> = Object.fromEntries(
+  Object.entries(TAL_LEGACY_PRESETS).map(([name, preset]) => [name, convertLegacyTalPreset(preset)]),
+);
+
 // Native factory presets re-exported above from talNativePresets.ts
 
 export class TalNoizeMakerEngine implements DevilboxSynth {
@@ -579,6 +610,9 @@ export class TalNoizeMakerEngine implements DevilboxSynth {
   readonly output: GainNode;
 
   private _worklet: AudioWorkletNode | null = null;
+  /** Live voice report for the editor curves' markers (wasmVoiceStatus.ts); 12-float records. */
+  readonly voiceHub = new WasmVoiceHub((m) => this._worklet?.port.postMessage(m));
+  private readonly unregisterVoiceHub: () => void;
   private params: Record<number, number> = {};
   private isInitialized = false;
   private pendingNotes: Array<{ note: number; velocity: number }> = [];
@@ -591,12 +625,15 @@ export class TalNoizeMakerEngine implements DevilboxSynth {
   constructor(config: Partial<TalNoizeMakerConfig> = {}) {
     this.output = getDevilboxAudioContext().createGain();
     this.params = { ...DEFAULT_TAL_NM_PARAMS };
-    for (const [key, value] of Object.entries(config)) {
+    for (const [key, raw] of Object.entries(config)) {
       const idx = CONFIG_TO_INDEX[key];
-      if (idx !== undefined && typeof value === 'number') {
+      // a layout select stores its option value as a string ('0.5')
+      const value = typeof raw === 'string' && (raw as string).trim() !== '' ? Number(raw) : raw;
+      if (idx !== undefined && typeof value === 'number' && Number.isFinite(value)) {
         this.params[idx] = value;
       }
     }
+    this.unregisterVoiceHub = registerVoiceHub('TalNoizeMaker', this.voiceHub);
     this._initPromise = this.initialize();
   }
 
@@ -646,8 +683,10 @@ export class TalNoizeMakerEngine implements DevilboxSynth {
       });
 
       this._worklet.port.onmessage = (event) => {
+        if (this.voiceHub.handleMessage(event.data)) return;
         if (event.data.type === 'ready') {
           this.isInitialized = true;
+          this.voiceHub.resume();
           if (this.pendingPatch) {
             void loadNativePatch(this._worklet!, this.pendingPatch).catch(() => {});
             this.pendingPatch = null;
@@ -797,6 +836,7 @@ export class TalNoizeMakerEngine implements DevilboxSynth {
   }
 
   dispose(): void {
+    this.unregisterVoiceHub();
     if (this._worklet) {
       this._worklet.port.postMessage({ type: 'dispose' });
       this._worklet.disconnect();
@@ -815,10 +855,11 @@ export class TalNoizeMakerSynthImpl extends TalNoizeMakerEngine {
   }
 
   applyConfig(config: Partial<TalNoizeMakerConfig>): void {
-    const prev = (this as any).config as Record<string, number | undefined>;
-    for (const [key, value] of Object.entries(config)) {
-      if (typeof value === 'number' && value !== prev[key]) {
-        this.set(key, value);
+    for (const [key, value] of Object.entries(config as Record<string, unknown>)) {
+      // A layout select hands over its option value as a string ('0.5'); the engine wants the number
+      const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
+      if (typeof n === 'number' && Number.isFinite(n) && n !== this.get(key)) {
+        this.set(key, n);
       }
     }
   }

@@ -89,6 +89,8 @@ public:
 		this->adsr->resetState();
 	}
 
+	int getStage() const { return this->adsr->getStage(); }
+
 	void resetAll()
 	{
 		this->adsr->resetAll();

@@ -207,6 +207,8 @@ public:
 	uint32_t midiInCount();
 
 	void directNoteOn(int note, int vel);
+	// Live voice report for the editor curves: 16 floats per voice (two 8-float records), returns the voice count.
+	int getVoices(float *out, int maxVoices);
 
 	void setTuningEnabled(bool enabled);
 	bool isTuningEnabled() const;

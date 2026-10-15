@@ -298,6 +298,9 @@ public:
 	// post-iter.
 	void update(float freq)
 		{ m_wave->update(m_phase, freq); }
+	// current phase in cycles 0..1 (the editor's live LFO marker).
+	float phase() const
+		{ return m_phase.phase; }
 
 	// hard-sync slave.
 	void sync(synthv1_oscillator *slave)
