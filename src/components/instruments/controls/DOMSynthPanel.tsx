@@ -117,6 +117,9 @@ export const DOMSynthPanel: React.FC<DOMSynthPanelProps> = ({ layout, config, on
     <div
       className="synth-editor-container rounded-xl overflow-hidden select-none"
       style={{
+        // The panel is as tall as its sections. synth-editor-container says height 100%, which clips the sections
+        // below the first rows whenever the parent has a fixed height; the parent scrolls instead.
+        height: 'auto',
         background: `linear-gradient(170deg, ${enc.bg} 0%, ${enc.bgEnd} 100%)`,
         border: `2px solid ${enc.border}`,
         boxShadow: ENCLOSURE_SHADOW,

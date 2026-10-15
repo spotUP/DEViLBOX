@@ -3917,7 +3917,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             isBaked={isBaked}
             isBaking={isBaking}
           />
-          <div className="p-3 space-y-3">
+          <div className="p-3 space-y-3 flex-1 min-h-0 overflow-y-auto scrollbar-modern">
           <DOMSynthPanel
             layout={layout}
             config={config}

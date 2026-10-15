@@ -105,12 +105,7 @@ export const KlysControls: React.FC<{ instrument: InstrumentConfig }> = ({ instr
   return (
     <div className="flex flex-col gap-3 p-3 flex-1 min-h-0 overflow-y-auto scrollbar-modern">
       <TabStrip tabs={KLYS_TABS} active={tab} onChange={setTab} ariaLabel="Klystrack instrument sections" />
-      {tab === 'main' && (
-        // A content-sized wrapper: the panel's own 100% height then resolves to its content, and this column scrolls.
-        <div className="shrink-0">
-          <DOMSynthPanel layout={layout} config={config} onChange={onChange} />
-        </div>
-      )}
+      {tab === 'main' && <DOMSynthPanel layout={layout} config={config} onChange={onChange} />}
       {tab === 'program' && (
       <div className="flex flex-col gap-2">
         <InstrumentTableEditor
