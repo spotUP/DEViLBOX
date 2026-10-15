@@ -20,7 +20,6 @@ import { KlysInstrumentEditor } from './KlysInstrumentEditor';
 import { klysToFormatChannels, KLYS_COLUMNS } from './klysAdapter';
 import { KlysEngine } from '@/engine/klystrack/KlysEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
-import { getToneEngine } from '@engine/ToneEngine';
 import { exportAsKlystrack } from '@lib/export/KlysExporter';
 import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 import { CustomSelect } from '@components/common/CustomSelect';
@@ -51,7 +50,6 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
     if (!klysFileData) return;
     let cancelled = false;
     let unsubData: (() => void) | null = null;
-    let unsubPos: (() => void) | null = null;
 
     (async () => {
       const engine = KlysEngine.getInstance();
@@ -62,16 +60,9 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
       // Connect engine output to audio destination so process() gets called
       try { engine.output.connect(engine.output.context.destination); } catch { /* already connected */ }
 
-      // Wire position updates
-      unsubPos = engine.onPositionUpdate((update) => {
-        if (cancelled) return;
-        const sp = update.songPosition;
-        useTrackerStore.setState({ currentPositionIndex: sp });
-
-        // patternPosition = g_mus.song_track[0].pattern_step = song_position - entry.position
-        // This is the correct row within the currently-playing pattern for channel 0.
-        useTransportStore.setState({ currentRow: update.patternPosition });
-      });
+      // Position: the replayer dispatches the engine's row and song position
+      // (KlysEngine.subscribeToCoordinator) into the transport and tracker
+      // stores. This view only reads them.
 
       // Subscribe to song data BEFORE loading so we catch the response
       unsubData = engine.onSongData((data) => {
@@ -116,7 +107,6 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
     return () => {
       cancelled = true;
       unsubData?.();
-      unsubPos?.();
     };
   }, [klysFileData]);
 
@@ -190,23 +180,10 @@ export const KlysView: React.FC<{ width?: number; height?: number }> = ({ width:
     }
   }, [nativeData, activePosition]);
 
-  const handlePlay = useCallback(async () => {
-    if (!KlysEngine.hasInstance()) return;
-    const toneEngine = getToneEngine();
-    await toneEngine.init();
-    toneEngine.stop();
-    await new Promise(r => setTimeout(r, 60));
-    KlysEngine.getInstance().play();
-    useTransportStore.setState((s) => { s.isPlaying = true; s.isPaused = false; });
-  }, []);
-
-  const handleStop = useCallback(() => {
-    if (!KlysEngine.hasInstance()) return;
-    KlysEngine.getInstance().stop();
-    useTransportStore.setState((s) => { s.isPlaying = false; s.isPaused = false; });
-    // Match playStopToggle — mute/unmute cycle resets audio graph for next play
-    getToneEngine().stop();
-  }, []);
+  // Play/Stop go through the transport like every other play surface, so the
+  // replayer starts the engine and dispatches its position (one path).
+  const handlePlay = useCallback(() => { void useTransportStore.getState().play(); }, []);
+  const handleStop = useCallback(() => { useTransportStore.getState().stop(); }, []);
 
   const handleExport = useCallback(async () => {
     const song = getTrackerReplayer().getSong();

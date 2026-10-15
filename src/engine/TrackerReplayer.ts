@@ -790,6 +790,7 @@ export class TrackerReplayer {
   private hivelyEngine: import('./hively/HivelyEngine').HivelyEngine | null = null;
   private _hvlPositionUnsub: (() => void) | null = null;
   private _mlPositionUnsub: (() => void) | null = null;
+  private _klysPositionUnsub: (() => void) | null = null;
   // Composite UADE cleanup returned by UADEEngine.subscribeToCoordinator;
   // unwinds position subscription + Paula log polling + deferred pattern
   // reconstruction + TFMX channel subscription in one call.
@@ -2308,6 +2309,14 @@ export class TrackerReplayer {
         this.coordinator.markDispatchActive();
       }
 
+      // Klystrack reports its own row and song position: dispatch them, and
+      // keep the TS scheduler off (it would tick the parser's stub song at the
+      // estimated BPM and write the transport row ~3.7x too fast).
+      if (result.klysEngine) {
+        this._klysPositionUnsub = result.klysEngine.subscribeToCoordinator(this.coordinator);
+        this.coordinator.markDispatchActive();
+      }
+
       // UADE setup — position subscription with CIA-tick→row math, Paula log
       // polling for automation capture, optional deferred pattern reconstruction
       // for SKIP_SCAN formats, and optional TFMX timing-table position sync.
@@ -2865,6 +2874,10 @@ export class TrackerReplayer {
     if (this._mlPositionUnsub) {
       this._mlPositionUnsub();
       this._mlPositionUnsub = null;
+    }
+    if (this._klysPositionUnsub) {
+      this._klysPositionUnsub();
+      this._klysPositionUnsub = null;
     }
 
     // Clean up UADE composite cleanup (position, Paula log, deferred capture,
