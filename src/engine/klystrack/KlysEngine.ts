@@ -8,6 +8,7 @@
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { ChannelMeterFeed } from '../tone/channelMeterFeed';
 import { PositionCallbacks, type EnginePositionUpdate } from '@engine/wasm/PositionCallbacks';
+import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -137,6 +138,9 @@ export class KlysEngine extends WASMSingletonBase {
           break;
 
         case 'songLoaded':
+          useOscilloscopeStore.getState().setChipInfo(
+            data.channels, 0, Array.from({ length: data.channels }, (_, i) => `CH${i + 1}`),
+          );
           if (this._resolveSong) {
             this._resolveSong({
               title: data.title,
@@ -211,6 +215,10 @@ export class KlysEngine extends WASMSingletonBase {
         case 'chLevels':
           meterFeed.report(data.levels, data.noteStarts);
           break;
+
+        case 'oscData':
+          useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
+          break;
       }
     };
 
@@ -247,10 +255,13 @@ export class KlysEngine extends WASMSingletonBase {
 
   play(): void {
     this.workletNode?.port.postMessage({ type: 'play' });
+    this.workletNode?.port.postMessage({ type: 'enableOsc' });
   }
 
   stop(): void {
     this.workletNode?.port.postMessage({ type: 'stop' });
+    this.workletNode?.port.postMessage({ type: 'disableOsc' });
+    useOscilloscopeStore.getState().clear();
   }
 
   pause(): void {

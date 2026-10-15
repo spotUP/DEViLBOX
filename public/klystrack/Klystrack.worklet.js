@@ -29,6 +29,10 @@ class KlystrackProcessor extends AudioWorkletProcessor {
     this.levelsCounter = 0;
     this.numChannels = 0;
 
+    // Per-channel audio for the channel scopes (worklets/channel-stream.js)
+    this.oscEnabled = false;
+    this._stream = null;
+
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
     };
@@ -41,6 +45,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
         break;
 
       case 'loadSong':
+        this._stream?.discontinue();
         this.loadSong(data.buffer);
         break;
 
@@ -112,6 +117,16 @@ class KlystrackProcessor extends AudioWorkletProcessor {
         this.wasm._klys_set_instrument_program_step(progIdx, step, progVal);
         break;
       }
+
+      case 'enableOsc':
+        this.oscEnabled = true;
+        // Nothing was streamed while disabled: never join across that.
+        this._stream?.discontinue();
+        break;
+
+      case 'disableOsc':
+        this.oscEnabled = false;
+        break;
 
       case 'setChannelGain':
         if (this.wasm && typeof this.wasm._klys_set_channel_gain === 'function') {
@@ -454,6 +469,22 @@ class KlystrackProcessor extends AudioWorkletProcessor {
         for (let i = 0; i < decoded; i++) {
           outputL[i] = heapF32[offL + i];
           outputR[i] = heapF32[offR + i];
+        }
+
+        // Every sample each channel rendered (the engine's per-channel tap),
+        // streamed for the channel scopes and the runtime role classifiers.
+        if (this.oscEnabled && this.numChannels > 0 && globalThis.DevilboxChannelStream) {
+          const frames = this.wasm._klys_get_channel_tap_frames();
+          const tapOff = this.wasm._klys_get_channel_tap() >> 2;
+          if (frames > 0 && tapOff > 0) {
+            const heap = this.wasm.HEAPF32;
+            const views = [];
+            for (let c = 0; c < this.numChannels; c++) {
+              views.push(heap.subarray(tapOff + c * frames, tapOff + (c + 1) * frames));
+            }
+            this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
+            this._stream.writeFloat32(views, Math.min(frames, decoded));
+          }
         }
       }
     }
