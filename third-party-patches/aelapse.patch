@@ -1,0 +1,143 @@
+diff --git a/src/GUI/SpreadSlider.cpp b/src/GUI/SpreadSlider.cpp
+index 8b2579e..7055c59 100644
+--- a/src/GUI/SpreadSlider.cpp
++++ b/src/GUI/SpreadSlider.cpp
+@@ -1,5 +1,8 @@
+ #include "SpreadSlider.h"
+ 
++namespace aelapse
++{
++
+ _SpreadSlider::_SpreadSlider(juce::AudioProcessorValueTreeState &apvts,
+                              const juce::String &spreadId) :
+     m_spread{apvts.getParameter(spreadId)->getValue()},
+@@ -99,3 +102,5 @@ void _SpreadSlider::mouseDrag(const juce::MouseEvent &e)
+         juce::Slider::mouseDrag(e);
+     }
+ }
++
++} // namespace aelapse
+diff --git a/src/GUI/SpreadSlider.h b/src/GUI/SpreadSlider.h
+index bad2c92..d85dbde 100644
+--- a/src/GUI/SpreadSlider.h
++++ b/src/GUI/SpreadSlider.h
+@@ -5,6 +5,9 @@
+ 
+ #include "Widgets.h"
+ 
++namespace aelapse
++{
++
+ class _SpreadSlider : public juce::Slider
+ {
+   public:
+@@ -42,23 +45,31 @@ class SpreadSlider : public Widget<_SpreadSlider>
+     SpreadSlider(APVTS &apvts, const juce::String &id,
+                  const juce::String &spreadId, const juce::String &name) :
+         Widget<_SpreadSlider>(name, apvts, spreadId),
+-        m_attachment(apvts, id, m_component)
++        attachment_(apvts, id, component_)
+     {
+-        m_component.setSliderStyle(
++        component_.setSliderStyle(
+             juce::Slider::SliderStyle::RotaryVerticalDrag);
+-        m_component.setTextBoxStyle(
++        component_.setTextBoxStyle(
+             juce::Slider::TextEntryBoxPosition::NoTextBox, false, 0, 0);
+-        m_component.setPopupDisplayEnabled(true, false, getTopLevelComponent());
++        component_.setPopupDisplayEnabled(true, false, getTopLevelComponent());
+     }
+ 
+     juce::Slider &getSlider() { return getComponent(); }
+ 
+     void resized() override
+     {
+-        squareSized();
++        // Square-sized: match what SliderWithLabel::resized() does — pin the
++        // component to a square inside the label-aware bounds. Without this
++        // the knob stretches horizontally. (Upstream aelapse calls a
++        // non-existent `squareSized()` helper; we inline the behaviour.)
+         Widget<_SpreadSlider>::resized();
++        auto ibounds = component_.getLocalBounds();
++        component_.setBounds(ibounds.withWidth(ibounds.getHeight())
++                                     .withCentre(ibounds.getCentre()));
+     }
+ 
+   private:
+-    APVTS::SliderAttachment m_attachment;
++    APVTS::SliderAttachment attachment_;
+ };
++
++} // namespace aelapse
+diff --git a/src/GUI/SpringsGL.cpp b/src/GUI/SpringsGL.cpp
+index e259fb8..e912c62 100644
+--- a/src/GUI/SpringsGL.cpp
++++ b/src/GUI/SpringsGL.cpp
+@@ -1,5 +1,8 @@
+ #include "SpringsGL.h"
+ 
++// DEViLBOX WASM UI build — see SpringsGL.h compile gate
++#ifndef AELAPSE_WASM_UI
++
+ #include <memory>
+ 
+ #include "../PluginProcessor.h"
+@@ -248,3 +251,6 @@ void SpringsGL::parameterValueChanged(int parameterIndex, float newValue)
+ }
+ 
+ } // namespace aelapse
++
++#endif // !AELAPSE_WASM_UI
++
+diff --git a/src/GUI/SpringsGL.h b/src/GUI/SpringsGL.h
+index def9694..ed3af03 100644
+--- a/src/GUI/SpringsGL.h
++++ b/src/GUI/SpringsGL.h
+@@ -1,5 +1,41 @@
+ #pragma once
+ 
++// DEViLBOX WASM UI build — libjuce-wasm has juce_opengl disabled, so we
++// provide a minimal Component stub here. The real spring visualisation is
++// rendered by an overlay WebGL2 canvas outside JUCE; see the DEViLBOX
++// AelapseHardwareUI React wrapper.
++#ifdef AELAPSE_WASM_UI
++
++#include "../PluginProcessor.h"
++#include <juce_audio_processors/juce_audio_processors.h>
++#include <juce_gui_basics/juce_gui_basics.h>
++#include "SpringsDefines.h"
++
++namespace aelapse
++{
++
++class SpringsGL : public juce::Component,
++                  public juce::SettableTooltipClient,
++                  public juce::Timer
++{
++  public:
++    SpringsGL(PluginProcessor &processor) : processor_(processor) { (void)processor_; }
++    ~SpringsGL() override = default;
++
++    void timerCallback() override {}
++    void paint(juce::Graphics &) override {}
++    void resized() override {}
++    void mouseDown(const juce::MouseEvent &) override {}
++
++  private:
++    PluginProcessor &processor_;
++    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SpringsGL)
++};
++
++} // namespace aelapse
++
++#else // AELAPSE_WASM_UI
++
+ #include <juce_opengl/juce_opengl.h>
+ 
+ #include "../PluginProcessor.h"
+@@ -132,3 +168,5 @@ class SpringsGL : public juce::Component,
+ };
+ 
+ } // namespace aelapse
++
++#endif // AELAPSE_WASM_UI

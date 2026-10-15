@@ -1,0 +1,111 @@
+diff --git a/src/common/dsp/Effect.cpp b/src/common/dsp/Effect.cpp
+index 00e6159..9ad1f45 100644
+--- a/src/common/dsp/Effect.cpp
++++ b/src/common/dsp/Effect.cpp
+@@ -20,7 +20,7 @@
+  * https://github.com/surge-synthesizer/surge
+  */
+ 
+-#if !defined(_M_ARM64EC)
++#if !defined(_M_ARM64EC) && !defined(SURGE_WASM)
+ #include "BBDEnsembleEffect.h"
+ #endif
+ 
+@@ -35,7 +35,9 @@
+ #include "FrequencyShifterEffect.h"
+ #include "GraphicEQ11BandEffect.h"
+ #include "MSToolEffect.h"
++#ifndef SURGE_WASM
+ #include "NimbusEffect.h"
++#endif
+ #include "ParametricEQ3BandEffect.h"
+ #include "PhaserEffect.h"
+ #include "ResonatorEffect.h"
+@@ -47,11 +49,13 @@
+ #include "VocoderEffect.h"
+ #include "WaveShaperEffect.h"
+ #include "airwindows/AirWindowsEffect.h"
++#ifndef SURGE_WASM
+ #include "chowdsp/NeuronEffect.h"
+ #include "chowdsp/CHOWEffect.h"
+ #include "chowdsp/ExciterEffect.h"
+ #include "chowdsp/SpringReverbEffect.h"
+ #include "chowdsp/TapeEffect.h"
++#endif
+ #include "DebugHelpers.h"
+ #include "AudioInputEffect.h"
+ #include "FloatyDelayEffect.h"
+@@ -93,7 +97,11 @@ Effect *spawn_effect(int id, SurgeStorage *storage, FxStorage *fxdata, pdata *pd
+     case fxt_airwindows:
+         return new AirWindowsEffect(storage, fxdata, pd);
+     case fxt_neuron:
++#ifndef SURGE_WASM
+         return new chowdsp::NeuronEffect(storage, fxdata, pd);
++#else
++        return nullptr;
++#endif
+     case fxt_geq11:
+         return new GraphicEQ11BandEffect(storage, fxdata, pd);
+     case fxt_resonator:
+@@ -101,15 +109,31 @@ Effect *spawn_effect(int id, SurgeStorage *storage, FxStorage *fxdata, pdata *pd
+     case fxt_combulator:
+         return new CombulatorEffect(storage, fxdata, pd);
+     case fxt_chow:
++#ifndef SURGE_WASM
+         return new chowdsp::CHOWEffect(storage, fxdata, pd);
++#else
++        return nullptr;
++#endif
+     case fxt_nimbus:
++#ifndef SURGE_WASM
+         return new NimbusEffect(storage, fxdata, pd);
++#else
++        return nullptr;
++#endif
+     case fxt_exciter:
++#ifndef SURGE_WASM
+         return new chowdsp::ExciterEffect(storage, fxdata, pd);
++#else
++        return nullptr;
++#endif
+     case fxt_tape:
++#ifndef SURGE_WASM
+         return new chowdsp::TapeEffect(storage, fxdata, pd);
++#else
++        return nullptr;
++#endif
+     case fxt_ensemble:
+-#if defined(_M_ARM64EC)
++#if defined(_M_ARM64EC) || defined(SURGE_WASM)
+         return nullptr;
+ #else
+         return new BBDEnsembleEffect(storage, fxdata, pd);
+@@ -121,7 +145,11 @@ Effect *spawn_effect(int id, SurgeStorage *storage, FxStorage *fxdata, pdata *pd
+     case fxt_mstool:
+         return new MSToolEffect(storage, fxdata, pd);
+     case fxt_spring_reverb:
++#ifndef SURGE_WASM
+         return new chowdsp::SpringReverbEffect(storage, fxdata, pd);
++#else
++        return nullptr;
++#endif
+     case fxt_bonsai:
+         return new BonsaiEffect(storage, fxdata, pd);
+     case fxt_audio_input:
+diff --git a/src/common/dsp/SurgeVoice.cpp b/src/common/dsp/SurgeVoice.cpp
+index 3e11f6c..5488a34 100644
+--- a/src/common/dsp/SurgeVoice.cpp
++++ b/src/common/dsp/SurgeVoice.cpp
+@@ -109,10 +109,12 @@ float SurgeVoice::channelKeyEquivalent(float key, int channel, SurgeStorage *sto
+     {
+         res += 12 * shift;
+     }
++#ifndef SURGE_SKIP_ODDSOUND_MTS
+     else if (storage->oddsound_mts_active_as_client)
+     {
+         res += MTS_GetMapSize(storage->oddsound_mts_client) * shift;
+     }
++#endif
+     else if (storage->tuningApplicationMode == SurgeStorage::RETUNE_ALL)
+     {
+         // keys are in scale space so move scale.count

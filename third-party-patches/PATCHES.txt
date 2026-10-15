@@ -1,0 +1,11 @@
+# <repo path under the project root> | <patch file in this directory>
+# Each patch is the working-tree change on top of the commit the gitlink pins (git diff HEAD, new files included).
+third-party/aelapse | aelapse.patch
+third-party/aeolus | aeolus.patch
+third-party/furnace-master/extern/adpcm | furnace-adpcm.patch
+third-party/helm-master | helm-master.patch
+third-party/monique-monosynth | monique-monosynth.patch
+third-party/wavesabre | wavesabre.patch
+third-party/surge-xt | surge-xt.patch
+third-party/surge-xt/libs/JUCE | surge-xt-juce.patch
+third-party/surge-xt/libs/sst/sst-plugininfra | surge-xt-sst-plugininfra.patch

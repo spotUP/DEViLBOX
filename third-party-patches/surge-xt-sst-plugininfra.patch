@@ -1,0 +1,93 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 72b03b7..64b7ce7 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -77,7 +77,11 @@ target_link_libraries(${PROJECT_NAME} PUBLIC ${PROJECT_NAME}::filesystem ${PROJE
+ 
+ target_sources(${PROJECT_NAME} PRIVATE src/cpufeatures.cpp)
+ 
+-if(WIN32)
++if(EMSCRIPTEN)
++    target_sources(${PROJECT_NAME} PRIVATE src/paths_wasm.cpp src/misc_wasm.cpp)
++    target_compile_definitions(${PROJECT_NAME} PRIVATE WASM=1)
++    target_compile_definitions(${PROJECT_NAME} PUBLIC SST_COMMAND_CTRL_SAME_KEY=1)
++elseif(WIN32)
+     target_sources(${PROJECT_NAME} PRIVATE src/paths_windows.cpp src/misc_windows.cpp)
+     target_compile_definitions(${PROJECT_NAME} PRIVATE WINDOWS=1)
+     target_compile_definitions(${PROJECT_NAME} PUBLIC SST_COMMAND_CTRL_SAME_KEY=1)
+diff --git a/src/misc_wasm.cpp b/src/misc_wasm.cpp
+new file mode 100644
+index 0000000..8bc4a40
+--- /dev/null
++++ b/src/misc_wasm.cpp
+@@ -0,0 +1,24 @@
++/*
++ * misc_wasm.cpp — Emscripten/WASM stubs for sst-plugininfra
++ *
++ * Provides no-op/minimal implementations of platform functions
++ * that are not applicable in a browser/worker environment.
++ */
++
++#include <sst/plugininfra/misc_platform.h>
++#include <string>
++
++namespace sst
++{
++namespace plugininfra
++{
++namespace misc_platform
++{
++bool isDarkMode() { return true; }
++void allocateConsole() {}
++std::string toOSCase(const std::string &text) { return text; }
++std::string stackTraceToString(int depth) { return "(stack trace unavailable in WASM)"; }
++std::string getLastSystemError() { return ""; }
++} // namespace misc_platform
++} // namespace plugininfra
++} // namespace sst
+diff --git a/src/paths_wasm.cpp b/src/paths_wasm.cpp
+new file mode 100644
+index 0000000..63317a5
+--- /dev/null
++++ b/src/paths_wasm.cpp
+@@ -0,0 +1,40 @@
++/*
++ * paths_wasm.cpp — Emscripten/WASM stubs for sst-plugininfra
++ *
++ * Provides minimal path implementations for a sandboxed WASM environment.
++ * File system operations are meaningless in a browser AudioWorklet,
++ * but the functions must exist for linking.
++ */
++
++#include "filesystem/import.h"
++#include "sst/plugininfra/paths.h"
++#include <string>
++
++namespace sst
++{
++namespace plugininfra
++{
++namespace paths
++{
++fs::path homePath() { return fs::path{"/tmp"}; }
++
++fs::path sharedLibraryBinaryPath() { return fs::path{}; }
++
++fs::path bestDocumentsVendorFolderPathFor(const std::string &vendorName,
++                                          const std::string &productName)
++{
++    if (!vendorName.empty())
++        return fs::path{"/tmp"} / vendorName / productName;
++    return fs::path{"/tmp"} / productName;
++}
++
++fs::path bestLibrarySharedVendorFolderPathFor(const std::string &vendorName,
++                                              const std::string &productName, bool userLevel)
++{
++    if (!vendorName.empty())
++        return fs::path{"/tmp"} / vendorName / productName;
++    return fs::path{"/tmp"} / productName;
++}
++} // namespace paths
++} // namespace plugininfra
++} // namespace sst

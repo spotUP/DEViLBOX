@@ -1,0 +1,13 @@
+diff --git a/src/App.h b/src/App.h
+index 297afab7..1590106c 100644
+--- a/src/App.h
++++ b/src/App.h
+@@ -128,7 +128,7 @@ static inline bool is_aax() noexcept
+ // --------------------------------------------------------------------------------------------
+ 
+ // INLINING //
+-#if JUCE_LINUX || JUCE_MAC
++#if JUCE_LINUX || JUCE_MAC || JUCE_WASM
+ #define COLD
+ //__attribute__ ((noinline,cold))
+ #elif JUCE_WINDOWS || JUCE_IOS || JUCE_ANDROID
