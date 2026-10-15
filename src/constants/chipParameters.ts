@@ -39,6 +39,8 @@ export interface RomConfig {
   romType: string;        // Identifier for ToneEngine dispatch ('rsa', 'swp30', etc.)
 }
 
+import { CZ101_PRESET_NAMES, cz101PresetParameters, CZ101_KNOB_NEUTRAL } from '../engine/cz101/cz101Presets';
+
 export interface ChipSynthDef {
   synthType: string;
   name: string;
@@ -47,6 +49,8 @@ export interface ChipSynthDef {
   parameters: ChipParameterDef[];
   presetCount: number;
   presetNames?: string[];
+  /** Knob values a preset implies, so choosing it moves the editor's controls to match (optional). */
+  presetParameters?: (index: number) => Record<string, number>;
   operatorCount?: number;
   operatorParams?: ChipParameterDef[];
   romConfig?: RomConfig;
@@ -55,6 +59,11 @@ export interface ChipSynthDef {
 // ---------------------------------------------------------------------------
 // Definitions
 // ---------------------------------------------------------------------------
+
+const CZ_WAVEFORM_OPTIONS = [
+  { value: 0, label: 'Sawtooth' }, { value: 1, label: 'Square' }, { value: 2, label: 'Pulse' }, { value: 3, label: 'Silent' },
+  { value: 4, label: 'Double Sine' }, { value: 5, label: 'Saw Pulse' }, { value: 6, label: 'Resonance' }, { value: 7, label: 'Double Pulse' },
+];
 
 export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
 
@@ -889,19 +898,20 @@ export const CHIP_SYNTH_DEFS: Record<string, ChipSynthDef> = {
     name: 'CZ-101',
     subtitle: 'Casio Phase Distortion Synthesizer (1984)',
     color: '#8b5cf6',
-    presetCount: 4,
-    presetNames: ['Brass 1', 'E.Piano', 'Synth Bass', 'Pad'],
+    presetCount: CZ101_PRESET_NAMES.length,
+    presetNames: CZ101_PRESET_NAMES,
+    presetParameters: cz101PresetParameters,
     parameters: [
       { key: 'volume', label: 'Volume', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.8, formatValue: 'percent' },
-      { key: 'waveform1', label: 'Waveform 1', group: 'Oscillator', type: 'select', min: 0, max: 7, step: 1, default: 0, formatValue: 'int', options: [{ value: 0, label: 'Sawtooth' }, { value: 1, label: 'Square' }, { value: 2, label: 'Pulse' }, { value: 3, label: 'Silent' }, { value: 4, label: 'Double Sine' }, { value: 5, label: 'Saw Pulse' }, { value: 6, label: 'Resonance' }, { value: 7, label: 'Dbl Pulse' }] },
-      { key: 'waveform2', label: 'Waveform 2', group: 'Oscillator', type: 'select', min: 0, max: 7, step: 1, default: 0, formatValue: 'int', options: [{ value: 0, label: 'Sawtooth' }, { value: 1, label: 'Square' }, { value: 2, label: 'Pulse' }, { value: 3, label: 'Silent' }, { value: 4, label: 'Double Sine' }, { value: 5, label: 'Saw Pulse' }, { value: 6, label: 'Resonance' }, { value: 7, label: 'Dbl Pulse' }] },
-      { key: 'window', label: 'Window', group: 'Oscillator', type: 'select', min: 0, max: 5, step: 1, default: 0, formatValue: 'int', options: [{ value: 0, label: 'None' }, { value: 1, label: 'Saw' }, { value: 2, label: 'Triangle' }, { value: 3, label: 'Trapezoid' }, { value: 4, label: 'Pulse' }, { value: 5, label: 'Double Saw' }] },
-      { key: 'dcw_depth', label: 'DCW Depth', group: 'Waveform', type: 'knob', min: 0, max: 127, step: 1, default: 64, formatValue: 'int' },
-      { key: 'dca_rate', label: 'DCA Rate', group: 'Envelope', type: 'knob', min: 0, max: 127, step: 1, default: 80, formatValue: 'int' },
-      { key: 'dcw_rate', label: 'DCW Rate', group: 'Envelope', type: 'knob', min: 0, max: 127, step: 1, default: 60, formatValue: 'int' },
-      { key: 'dco_rate', label: 'DCO Rate', group: 'Pitch Env', type: 'knob', min: 0, max: 127, step: 1, default: 0, formatValue: 'int' },
-      { key: 'dco_depth', label: 'DCO Depth', group: 'Pitch Env', type: 'knob', min: 0, max: 63, step: 1, default: 0, formatValue: 'int' },
-      { key: 'ring_mod', label: 'Ring Mod', group: 'Oscillator', type: 'toggle', min: 0, max: 1, default: 0 },
+      { key: 'waveform1', label: 'Waveform 1', group: 'Oscillator', type: 'select', min: 0, max: 7, step: 1, default: cz101PresetParameters(0).waveform1, formatValue: 'int', options: CZ_WAVEFORM_OPTIONS },
+      { key: 'waveform2', label: 'Waveform 2', group: 'Oscillator', type: 'select', min: 0, max: 7, step: 1, default: cz101PresetParameters(0).waveform2, formatValue: 'int', options: CZ_WAVEFORM_OPTIONS },
+      { key: 'window', label: 'Window', group: 'Oscillator', type: 'select', min: 0, max: 5, step: 1, default: cz101PresetParameters(0).window, formatValue: 'int', options: [{ value: 0, label: 'None' }, { value: 1, label: 'Saw' }, { value: 2, label: 'Triangle' }, { value: 3, label: 'Trapezoid' }, { value: 4, label: 'Pulse' }, { value: 5, label: 'Double Saw' }] },
+      { key: 'dcw_depth', label: 'Waveform Depth', group: 'Waveform', type: 'knob', min: 0, max: 127, step: 1, default: CZ101_KNOB_NEUTRAL, formatValue: 'int' },
+      { key: 'dca_rate', label: 'Amplitude Speed', group: 'Envelope', type: 'knob', min: 0, max: 127, step: 1, default: CZ101_KNOB_NEUTRAL, formatValue: 'int' },
+      { key: 'dcw_rate', label: 'Waveform Speed', group: 'Envelope', type: 'knob', min: 0, max: 127, step: 1, default: CZ101_KNOB_NEUTRAL, formatValue: 'int' },
+      { key: 'dco_rate', label: 'Pitch Drop Speed', group: 'Pitch Env', type: 'knob', min: 0, max: 127, step: 1, default: CZ101_KNOB_NEUTRAL, formatValue: 'int' },
+      { key: 'dco_depth', label: 'Pitch Drop Depth', group: 'Pitch Env', type: 'knob', min: 0, max: 63, step: 1, default: 0, formatValue: 'int' },
+      { key: 'ring_mod', label: 'Ring Modulation', group: 'Oscillator', type: 'toggle', min: 0, max: 1, default: 0 },
       { key: 'stereo_width', label: 'Stereo Width', group: 'Output', type: 'knob', min: 0, max: 1, step: 0.01, default: 0.3, formatValue: 'percent' },
     ],
   },

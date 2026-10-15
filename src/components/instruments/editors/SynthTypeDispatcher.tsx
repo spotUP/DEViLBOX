@@ -73,7 +73,8 @@ import { DOMSynthPanel } from '../controls/DOMSynthPanel';
 const LiveFilterCurve = lazy(() => import('../../visualization/LiveFilterCurve').then(m => ({ default: m.LiveFilterCurve })));
 import { EnvelopeVisualization } from '@components/instruments/shared';
 import { getSynthLayout } from '@/constants/synthLayouts';
-import { renameKlysInstrument } from '@/components/klystrack/klysInstrumentEdit';
+import { applyKlysPreset, renameKlysInstrument } from '@/components/klystrack/klysInstrumentEdit';
+import { klysPresetById } from '@constants/klysPresets';
 import { klysInstrumentIndex } from '@/engine/klystrack/klysInstrumentFields';
 
 // ============================================================================
@@ -571,12 +572,14 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
 
   // Handle MAME chip synth preset load
   const handleChipPresetLoad = useCallback((program: number) => {
-    handleChange({ parameters: { _program: program } });
+    // A preset that implies knob values (CZ-101) moves the editor's controls with it
+    const implied = getChipSynthDef(instrument.synthType)?.presetParameters?.(program);
+    handleChange({ parameters: { ...implied, _program: program } });
     try {
       const engine = getToneEngine();
       engine.loadMAMEChipPreset(instrument.id, program);
     } catch { /* ignored */ }
-  }, [instrument.parameters, instrument.id, handleChange]);
+  }, [instrument.parameters, instrument.id, instrument.synthType, handleChange]);
 
   // Handle ROM upload for chip synths that require ROMs
   const handleChipRomUpload = useCallback((bank: number, data: Uint8Array) => {
@@ -1642,7 +1645,10 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   if (editorMode === 'klystrack') {
     // A name edit goes through renameKlysInstrument (native model, engine and the instrument list entry); the rest is the usual change.
     const handleKlysHeaderChange = (updates: Partial<InstrumentConfig>) => {
-      const { name, ...rest } = updates;
+      const { name, klysPresetId, ...rest } = updates;
+      // The preset select hands back the preset's id: the whole instrument (its name included) is written, nothing else.
+      const preset = klysPresetId ? klysPresetById(klysPresetId) : undefined;
+      if (preset) { applyKlysPreset(klysInstrumentIndex(instrument.id), preset); return; }
       if (name !== undefined) renameKlysInstrument(klysInstrumentIndex(instrument.id), name);
       if (Object.keys(rest).length > 0) handleChange(rest);
     };

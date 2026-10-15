@@ -2,94 +2,54 @@
  * CZ101Synth - Casio CZ-101 Phase Distortion Synthesizer
  * Based on the NEC uPD933 chip emulation from MAME
  *
- * This is an 8-voice Phase Distortion synthesizer with:
- * - 8 PD waveforms (Saw, Square, Pulse, Double Sine, Saw Pulse, Resonance, etc.)
- * - 5 window functions for amplitude modulation
- * - DCA (Digitally Controlled Amplifier) envelope
- * - DCW (Digitally Controlled Waveform) envelope
- * - DCO (Digitally Controlled Oscillator) pitch envelope
- * - Ring modulation and pitch modulation between voice pairs
+ * 8 chip voices: a note takes one voice, or a pair of voices (two lines) when the
+ * patch has a second line, ring modulation or noise. The worklet sequences each
+ * voice's DCA / DCW / DCO envelope stages; this class turns a patch into chip
+ * registers and envelope messages.
+ *
+ * Sound source of truth: the preset bank (cz101Presets.ts). The editor selects a
+ * bank entry with loadPreset(index) and modifies it with setParam(knob, value);
+ * the patch actually played is applyCzKnobs(bank entry, knobs).
  */
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@utils/audio-context';
 import { cz101Transform } from './cz101Transform';
+import { CZ101_PRESET_BANK, CZ101_PRESET_NAMES, applyCzKnobs, cz101PresetByName } from './cz101Presets';
+import type { CZKnobs } from './cz101Presets';
+import { CZWaveform, CZWindow } from './cz101Types';
+import type { CZEnvelopeStage, CZLine, CZPatch } from './cz101Types';
 
-// CZ-101 Waveform types
-export const CZWaveform = {
-  SAW: 0,        // Sawtooth
-  SQUARE: 1,     // Square wave
-  PULSE: 2,      // Pulse wave
-  SILENT: 3,     // Silent (undocumented)
-  DOUBLE_SINE: 4, // Double sine
-  SAW_PULSE: 5,  // Saw-pulse hybrid
-  RESONANCE: 6,  // Resonant waveform
-  DOUBLE_PULSE: 7 // Double pulse (undocumented)
-} as const;
-export type CZWaveform = typeof CZWaveform[keyof typeof CZWaveform];
+export { CZWaveform, CZWindow };
+export type { CZEnvelopeStage, CZLine, CZPatch };
 
-// CZ-101 Window functions
-export const CZWindow = {
-  NONE: 0,
-  SAW: 1,
-  TRIANGLE: 2,
-  TRAPEZOID: 3,
-  PULSE: 4,
-  DOUBLE_SAW: 5
-} as const;
-export type CZWindow = typeof CZWindow[keyof typeof CZWindow];
-
-// Envelope stage
-export interface CZEnvelopeStage {
-  rate: number;   // 0-127
-  level: number;  // 0-127
-}
-
-// Complete CZ patch definition
-export interface CZPatch {
-  name?: string;
-  line1: CZLine;
-  line2?: CZLine;
-  detune?: number;      // -7 to +7 fine tune
-  octave?: number;      // -2 to +2 octave shift
-  vibrato?: {
-    wave: number;       // 0-3 (triangle, saw up, saw down, square)
-    delay: number;      // 0-99
-    rate: number;       // 0-99
-    depth: number;      // 0-99
-  };
-  ringMod?: boolean;
-  noiseMode?: boolean;
-}
-
-// Single line (oscillator) configuration
-export interface CZLine {
-  waveform1: CZWaveform;
-  waveform2?: CZWaveform;  // Only used if enabled
-  dcaEnvelope: CZEnvelopeStage[];  // 8 stages
-  dcwEnvelope: CZEnvelopeStage[];  // 8 stages
-  dcoEnvelope?: CZEnvelopeStage[]; // 8 stages (pitch envelope)
-  dcwEnd?: number;      // End level for DCW
-  dcaEnd?: number;      // End level (sustain)
-}
-
-// UPD933 Register addresses
+// UPD933 register bases (voice number is added)
 const UPD933_REG = {
-  DCA_STEP: 0x00,    // 0x00-0x07: DCA envelope step per voice
-  DCO_STEP: 0x10,    // 0x10-0x17: DCO envelope step per voice
-  DCW_STEP: 0x20,    // 0x20-0x27: DCW envelope step per voice
-  PITCH: 0x60,       // 0x60-0x67: Pitch per voice (7.9 fixed point)
-  WAVEFORM: 0x68,    // 0x68-0x6F: Waveform per voice
-  PHASE: 0x98,       // 0x98-0x9F: Phase counter per voice
-  PM_LEVEL: 0xB8,    // 0xB8-0xBB: Pitch modulator level
+  PITCH: 0x60,
+  WAVEFORM: 0x68,
+  PHASE: 0x98,
 };
 
-// Voice state
+/**
+ * Voice pairs in the chip's processing order: the odd voice (line 1) is processed
+ * just before its even partner (line 2), which is the one ring modulation and
+ * pitch modulation act on (MAME upd933.cpp voice_map).
+ */
+const VOICE_PAIRS: readonly (readonly [number, number])[] = [[5, 0], [7, 2], [1, 4], [3, 6]];
+/** Single-line notes prefer odd voices so the even voices stay free for pairs. */
+const SINGLE_VOICE_ORDER = [1, 3, 5, 7, 0, 2, 4, 6];
+
+const CENTS_TO_PITCH_UNITS = 512 / 100; // pitch register: 1/512 semitone
+const KNOB_KEYS: ReadonlySet<string> = new Set([
+  'waveform1', 'waveform2', 'window', 'ring_mod', 'dcw_depth', 'dca_rate', 'dcw_rate', 'dco_rate', 'dco_depth',
+]);
+
 interface VoiceState {
   note: number;
   velocity: number;
   active: boolean;
-  envStage: number;
+  /** Order of allocation, for stealing the oldest */
+  age: number;
 }
 
 export class CZ101Synth implements DevilboxSynth {
@@ -99,50 +59,26 @@ export class CZ101Synth implements DevilboxSynth {
 
   private workletNode: AudioWorkletNode | null = null;
   private voices: VoiceState[] = [];
-  private currentPatch: CZPatch | null = null;
   private isInitialized = false;
   private initPromise: Promise<void> | null = null;
+  private allocationCounter = 0;
 
-  // Default CZ-101 patch (Electric Piano style)
-  private static readonly DEFAULT_PATCH: CZPatch = {
-    name: 'Init',
-    line1: {
-      waveform1: CZWaveform.SAW,
-      dcaEnvelope: [
-        { rate: 99, level: 99 },
-        { rate: 60, level: 80 },
-        { rate: 40, level: 60 },
-        { rate: 30, level: 40 },
-        { rate: 20, level: 20 },
-        { rate: 10, level: 10 },
-        { rate: 5, level: 5 },
-        { rate: 0, level: 0 }
-      ],
-      dcwEnvelope: [
-        { rate: 99, level: 99 },
-        { rate: 50, level: 70 },
-        { rate: 30, level: 40 },
-        { rate: 20, level: 20 },
-        { rate: 10, level: 10 },
-        { rate: 5, level: 5 },
-        { rate: 2, level: 2 },
-        { rate: 0, level: 0 }
-      ]
-    }
-  };
+  /** Bank entry being played (the one source of the sound) and the knob changes on top of it. */
+  private basePatch: CZPatch = CZ101_PRESET_BANK[0].patch;
+  private programIndex = 0;
+  private knobs: CZKnobs = {};
+  /** Waveform register shadow (bits 15-6) and the modulation bits aimed at each voice */
+  private waveBits: number[] = new Array(8).fill(0);
+  private modBits: number[] = new Array(8).fill(0);
+  /** Which line (1 or 2) each voice plays, 0 = none, for live oscillator edits */
+  private voiceLine: (0 | 1 | 2)[] = new Array(8).fill(0);
 
   constructor() {
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
 
-    // Initialize 8 voices
     for (let i = 0; i < 8; i++) {
-      this.voices.push({
-        note: 0,
-        velocity: 0,
-        active: false,
-        envStage: 0
-      });
+      this.voices.push({ note: 0, velocity: 0, active: false, age: 0 });
     }
   }
 
@@ -224,7 +160,6 @@ export class CZ101Synth implements DevilboxSynth {
     this.isInitialized = true;
 
     // Load default patch
-    this.loadPatch(CZ101Synth.DEFAULT_PATCH);
 
     console.log('[CZ101Synth] Initialized');
   }
@@ -244,102 +179,104 @@ export class CZ101Synth implements DevilboxSynth {
 
   /**
    * Convert MIDI note to UPD933 pitch value (7.9 fixed point semitones)
-   * A4 (MIDI 69) = note 62 in UPD933 = 442Hz
+   * A4 (MIDI 69) = note 62 in UPD933 = 442Hz, so chip note = MIDI note - 7.
    */
-  private midiNoteToPitch(midiNote: number, detune: number = 0): number {
-    // UPD933 uses note 62 for A4
-    // MIDI uses note 69 for A4
-    // So UPD933 note = MIDI note - 7
-    const upd933Note = midiNote - 7;
-
-    // 7.9 fixed point: 9 bits for fractional semitone
-    // Add detune (each unit is roughly 1/512 of a semitone)
-    return (upd933Note << 9) + (detune * 4);
+  private midiNoteToPitch(midiNote: number, units: number): number {
+    return Math.max(0, Math.min(0xFFFF, Math.round(((midiNote - 7) << 9) + units)));
   }
 
-  /**
-   * Encode waveform register value
-   */
-  private encodeWaveform(
-    wave1: CZWaveform,
-    wave2: CZWaveform | undefined,
-    window: CZWindow,
-    ringMod: boolean,
-    pitchMod: number,
-    muteOther: boolean
-  ): number {
-    const enable2 = wave2 !== undefined ? 1 : 0;
-    const w2 = wave2 ?? wave1;
-
-    return ((wave1 & 7) << 13) |
-           ((w2 & 7) << 10) |
-           (enable2 << 9) |
-           ((window & 7) << 6) |
-           ((ringMod ? 1 : 0) << 5) |
-           ((pitchMod & 3) << 3) |
-           ((muteOther ? 1 : 0) << 2);
+  /** Waveform register bits 15-6 for a line: both waveforms enabled (the second defaults to the first). */
+  private static waveBitsFor(line: CZLine): number {
+    const w1 = line.waveform1 & 7;
+    const w2 = (line.waveform2 ?? line.waveform1) & 7;
+    return (w1 << 13) | (w2 << 10) | (1 << 9) | (((line.window ?? 0) & 7) << 6);
   }
 
-  /**
-   * Load a CZ patch
-   */
-  loadPatch(patch: CZPatch): void {
-    this.currentPatch = patch;
+  /** Register word for voice `v`: its own waveform plus, on even voices, the modulation bits of the voice it controls. */
+  private writeWaveformRegister(v: number): void {
+    const modulated = (v & 1) === 0 ? this.modBits[(v + 6) & 7] : 0;
+    this.writeReg(UPD933_REG.WAVEFORM + v, this.waveBits[v] | modulated);
+  }
 
-    if (!this.workletNode) return;
-
-    // Configure all 8 voices with the patch parameters
-    for (let voice = 0; voice < 8; voice++) {
-      // Set waveform for line 1
-      const wave = this.encodeWaveform(
-        patch.line1.waveform1,
-        patch.line1.waveform2,
-        CZWindow.NONE,
-        patch.ringMod ?? false,
-        patch.noiseMode ? 2 : 0,
-        false
-      );
-      this.writeReg(UPD933_REG.WAVEFORM + voice, wave);
+  /** Point voice `v` at `line`; `modulation` = ring (bit 5) and pitch-mod (bits 4-3) bits aimed at this voice. */
+  private assignLine(v: number, line: CZLine, lineNumber: 1 | 2, modulation: number): void {
+    this.voiceLine[v] = lineNumber;
+    this.waveBits[v] = CZ101Synth.waveBitsFor(line);
+    this.writeWaveformRegister(v);
+    if ((v & 1) === 0 && this.modBits[v] !== modulation) {
+      this.modBits[v] = modulation;
+      this.writeWaveformRegister((v + 2) & 7); // the register that controls voice v
     }
+  }
 
+  /** Free a pair of voices (oldest first), or one voice. */
+  private allocate(paired: boolean): number[] {
+    if (paired) {
+      const free = VOICE_PAIRS.find(([a, b]) => !this.voices[a].active && !this.voices[b].active);
+      const pair = free ?? [...VOICE_PAIRS].sort((x, y) =>
+        Math.min(this.voices[x[0]].age, this.voices[x[1]].age) - Math.min(this.voices[y[0]].age, this.voices[y[1]].age))[0];
+      return [...pair];
+    }
+    const free = SINGLE_VOICE_ORDER.find((v) => !this.voices[v].active);
+    if (free !== undefined) return [free];
+    return [SINGLE_VOICE_ORDER.reduce((oldest, v) => (this.voices[v].age < this.voices[oldest].age ? v : oldest))];
+  }
+
+  /** The patch that plays: the bank entry with the editor knobs applied. */
+  private effectivePatch(): CZPatch {
+    return applyCzKnobs(this.basePatch, this.knobs);
+  }
+
+  /** Select a patch directly (not from the bank); knob changes are cleared. */
+  loadPatch(patch: CZPatch): void {
+    this.basePatch = patch;
+    this.knobs = {};
     console.log(`[CZ101Synth] Loaded patch: ${patch.name || 'Unnamed'}`);
+  }
+
+  /** Select a bank preset by index. Knob changes are cleared. */
+  loadPreset(index: number): void {
+    const entry = CZ101_PRESET_BANK[index];
+    if (!entry) return;
+    this.programIndex = index;
+    this.loadPatch(entry.patch);
+  }
+
+  getProgram(): number {
+    return this.programIndex;
   }
 
   /**
    * Trigger a note on
    */
   triggerAttack(note: string | number, _time?: number, velocity: number = 0.8): void {
-    const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
+    // Numbers above 127 are frequencies in Hz (the engine's convention for chip synths)
+    const midiNote = typeof note === 'string' || note > 127 ? noteToMidi(note) : note;
+    if (!this.workletNode) return;
 
-    // Find a free voice
-    let voiceIndex = this.voices.findIndex(v => !v.active);
-    if (voiceIndex === -1) {
-      // Steal oldest voice
-      voiceIndex = 0;
-    }
+    const patch = this.effectivePatch();
+    const lines: CZLine[] = [patch.line1];
+    if (patch.line2) lines.push(patch.line2);
+    const voices = this.allocate(lines.length > 1);
 
-    const voice = this.voices[voiceIndex];
-    voice.note = midiNote;
-    voice.velocity = Math.floor(velocity * 127);
-    voice.active = true;
-    voice.envStage = 0;
+    // Stealing a voice: its partner (if it was a pair) is silenced too
+    const keyedVelocity = Math.floor(Math.max(0, Math.min(1, velocity)) * 127);
+    voices.forEach((v, i) => {
+      if (this.voices[v].active) this.workletNode!.port.postMessage({ type: 'keyOff', voice: v });
+      this.voices[v] = { note: midiNote, velocity: keyedVelocity, active: true, age: ++this.allocationCounter };
+      const line = lines[i];
+      // Line 2 is the even voice: ring modulation (bit 5) and noise pitch modulation (bits 4-3 = 3)
+      const modulation = i === 1 ? (patch.ringMod ? 0x20 : 0) | (patch.noiseMode ? 0x18 : 0) | (patch.ringOnly ? 0x04 : 0) : 0;
+      this.assignLine(v, line, i === 1 ? 2 : 1, modulation);
 
-    if (!this.workletNode || !this.currentPatch) return;
+      const detuneUnits = (patch.detune ?? 0) * 4 + (line.detune ?? 0) * CENTS_TO_PITCH_UNITS;
+      this.writeReg(UPD933_REG.PITCH + v, this.midiNoteToPitch(midiNote + 12 * (patch.octave ?? 0), detuneUnits));
+      this.writeReg(UPD933_REG.PHASE + v, 0);
 
-    // Set pitch
-    const pitch = this.midiNoteToPitch(midiNote, this.currentPatch.detune ?? 0);
-    this.writeReg(UPD933_REG.PITCH + voiceIndex, pitch);
-
-    // Reset phase counter (starts the note)
-    this.writeReg(UPD933_REG.PHASE + voiceIndex, 0);
-
-    // The worklet sequences the patch's envelope stages (the chip itself only runs
-    // one step at a time); a rate-0 stage is the sustain point.
-    const velocityScale = voice.velocity / 127;
-    this.sendEnvelope(0, voiceIndex, this.currentPatch.line1.dcaEnvelope, velocityScale);
-    this.sendEnvelope(1, voiceIndex, this.currentPatch.line1.dcwEnvelope, 1);
-    const dco = this.currentPatch.line1.dcoEnvelope;
-    if (dco && dco.length > 0) this.sendEnvelope(2, voiceIndex, dco, 1);
+      this.sendEnvelope(0, v, line.dcaEnvelope, keyedVelocity / 127);
+      this.sendEnvelope(1, v, line.dcwEnvelope, 1);
+      if (line.dcoEnvelope && line.dcoEnvelope.length > 0) this.sendEnvelope(2, v, line.dcoEnvelope, 1);
+    });
   }
 
   /** Patch levels are 0-99 on the CZ-101's panel; the chip's DCA/DCW level field is 7 bits. */
@@ -352,136 +289,84 @@ export class CZ101Synth implements DevilboxSynth {
       stages: stages.map((st) => ({
         rate: Math.min(127, Math.max(0, Math.round(st.rate))),
         level: Math.min(kind === 2 ? 63 : 127, Math.round(st.level * toChip * scale)),
+        coarse: st.coarse,
       })),
     });
   }
 
   /**
-   * Trigger a note off
+   * Trigger a note off. With no note (the engine's mono-style release) every sounding
+   * voice is released.
    */
-  triggerRelease(note: string | number, time?: number): void {
-    void time;
-    const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
+  triggerRelease(note?: string | number, _time?: number): void {
+    const midiNote = note === undefined ? undefined : (typeof note === 'string' ? noteToMidi(note) : note);
+    if (!this.workletNode) return;
 
-    // Find the voice playing this note
-    const voiceIndex = this.voices.findIndex(v => v.active && v.note === midiNote);
-    if (voiceIndex === -1) return;
-
-    const voice = this.voices[voiceIndex];
-    voice.active = false;
-
-    if (!this.workletNode || !this.currentPatch) return;
-
-    // The worklet runs the patch's stages after the sustain point (or a default fall)
-    this.workletNode.port.postMessage({ type: 'keyOff', voice: voiceIndex });
+    this.voices.forEach((voice, v) => {
+      if (!voice.active || (midiNote !== undefined && voice.note !== midiNote)) return;
+      voice.active = false;
+      this.workletNode!.port.postMessage({ type: 'keyOff', voice: v });
+    });
   }
 
   /**
    * Release all active voices (panic button, song stop, etc.)
    */
   releaseAll(): void {
-    for (const voice of this.voices.filter(v => v.active)) {
-      this.triggerRelease(voice.note);
-    }
+    this.triggerRelease();
   }
 
   /**
-   * Set a parameter value
+   * Editor knob / MIDI parameter change (the chip-synth contract the engine calls).
+   * Oscillator knobs change sounding notes immediately; envelope knobs apply from
+   * the next note.
    */
-  setParameter(param: string, value: number): void {
-    if (!this.workletNode) return;
-
-    switch (param) {
-      case 'volume':
-        this.output.gain.value = Math.max(0, Math.min(1, value));
-        break;
-      case 'waveform1':
-        // Set waveform for all voices (3-bit PD waveform index)
-        for (let v = 0; v < 8; v++) {
-          this.writeReg(UPD933_REG.WAVEFORM + v, Math.round(value) & 0x0F);
-        }
-        if (this.currentPatch) this.currentPatch.line1.waveform1 = Math.round(value) as CZWaveform;
-        break;
-      case 'waveform2':
-        // Set second waveform (upper nibble of waveform register)
-        for (let v = 0; v < 8; v++) {
-          const current = this.currentPatch?.line1.waveform1 ?? 0;
-          this.writeReg(UPD933_REG.WAVEFORM + v, (current & 0x0F) | ((Math.round(value) & 0x0F) << 4));
-        }
-        if (this.currentPatch?.line2) this.currentPatch.line2.waveform1 = Math.round(value) as CZWaveform;
-        break;
-      case 'window':
-        // Window function — stored in patch but applied on next note trigger
-        break;
-      case 'dcw_depth':
-        if (this.currentPatch) {
-          const depth = Math.round(value);
-          for (const stage of this.currentPatch.line1.dcwEnvelope) {
-            stage.level = depth;
-          }
-        }
-        break;
-      case 'dca_rate':
-        if (this.currentPatch) {
-          const rate = Math.round(value);
-          for (const stage of this.currentPatch.line1.dcaEnvelope) {
-            stage.rate = rate;
-          }
-        }
-        break;
-      case 'dcw_rate':
-        if (this.currentPatch) {
-          const rate = Math.round(value);
-          for (const stage of this.currentPatch.line1.dcwEnvelope) {
-            stage.rate = rate;
-          }
-        }
-        break;
-      case 'dco_rate':
-        if (this.currentPatch?.line1.dcoEnvelope) {
-          const rate = Math.round(value);
-          for (const stage of this.currentPatch.line1.dcoEnvelope) {
-            stage.rate = rate;
-          }
-        }
-        break;
-      case 'dco_depth':
-        if (this.currentPatch?.line1.dcoEnvelope) {
-          const depth = Math.round(value);
-          for (const stage of this.currentPatch.line1.dcoEnvelope) {
-            stage.level = depth;
-          }
-        }
-        break;
-      case 'ring_mod':
-        if (this.currentPatch) this.currentPatch.ringMod = value > 0.5;
-        break;
-      case 'stereo_width':
-        // No direct register — would need pan per voice
-        break;
+  setParam(param: string, value: number): void {
+    if (param === 'volume') {
+      this.output.gain.value = Math.max(0, Math.min(1, value));
+      return;
     }
+    if (param === '_program') {
+      this.loadPreset(Math.round(value));
+      return;
+    }
+    if (!KNOB_KEYS.has(param)) return; // stereo_width and unknown keys: no chip register
+    (this.knobs as Record<string, number>)[param] = value;
+    if (param === 'waveform1' || param === 'waveform2' || param === 'window') this.refreshOscillators();
+  }
+
+  /** Legacy name for setParam. */
+  setParameter(param: string, value: number): void {
+    this.setParam(param, value);
+  }
+
+  /** Rewrite the waveform registers of sounding voices from the current knobs. */
+  private refreshOscillators(): void {
+    if (!this.workletNode) return;
+    const patch = this.effectivePatch();
+    this.voices.forEach((voice, v) => {
+      if (!voice.active || this.voiceLine[v] === 0) return;
+      const line = this.voiceLine[v] === 2 ? patch.line2 : patch.line1;
+      if (!line) return;
+      this.waveBits[v] = CZ101Synth.waveBitsFor(line);
+      this.writeWaveformRegister(v);
+    });
   }
 
   /**
    * Get current parameter values
    */
   getParameters(): Record<string, number> {
-    return {};
+    return { ...(this.knobs as Record<string, number>) };
   }
 
   set(param: string, value: number): void {
-    switch (param) {
-      case 'volume':
-        this.output.gain.setValueAtTime(value, this.output.context.currentTime);
-        break;
-    }
+    this.setParam(param, value);
   }
 
   get(param: string): number | undefined {
-    switch (param) {
-      case 'volume': return this.output.gain.value;
-      default: return undefined;
-    }
+    if (param === 'volume') return this.output.gain.value;
+    return (this.knobs as Record<string, number | undefined>)[param];
   }
 
   dispose(): void {
@@ -493,113 +378,9 @@ export class CZ101Synth implements DevilboxSynth {
   }
 }
 
-// Factory presets (classic CZ-101 sounds)
-export const CZ101_PRESETS: Record<string, CZPatch> = {
-  'Brass 1': {
-    name: 'Brass 1',
-    line1: {
-      waveform1: CZWaveform.RESONANCE,
-      dcaEnvelope: [
-        { rate: 80, level: 99 },
-        { rate: 70, level: 85 },
-        { rate: 50, level: 70 },
-        { rate: 40, level: 60 },
-        { rate: 0, level: 60 },
-        { rate: 30, level: 40 },
-        { rate: 20, level: 20 },
-        { rate: 10, level: 0 }
-      ],
-      dcwEnvelope: [
-        { rate: 99, level: 99 },
-        { rate: 60, level: 60 },
-        { rate: 40, level: 40 },
-        { rate: 30, level: 30 },
-        { rate: 0, level: 30 },
-        { rate: 20, level: 20 },
-        { rate: 10, level: 10 },
-        { rate: 5, level: 0 }
-      ]
-    }
-  },
-  'Electric Piano': {
-    name: 'Electric Piano',
-    line1: {
-      waveform1: CZWaveform.SAW_PULSE,
-      dcaEnvelope: [
-        { rate: 99, level: 99 },
-        { rate: 75, level: 70 },
-        { rate: 55, level: 50 },
-        { rate: 40, level: 35 },
-        { rate: 30, level: 25 },
-        { rate: 20, level: 15 },
-        { rate: 10, level: 5 },
-        { rate: 0, level: 0 }
-      ],
-      dcwEnvelope: [
-        { rate: 99, level: 80 },
-        { rate: 70, level: 50 },
-        { rate: 50, level: 30 },
-        { rate: 35, level: 20 },
-        { rate: 25, level: 15 },
-        { rate: 15, level: 10 },
-        { rate: 8, level: 5 },
-        { rate: 0, level: 0 }
-      ]
-    }
-  },
-  'Synth Bass': {
-    name: 'Synth Bass',
-    line1: {
-      waveform1: CZWaveform.SQUARE,
-      dcaEnvelope: [
-        { rate: 99, level: 99 },
-        { rate: 99, level: 90 },
-        { rate: 0, level: 90 },
-        { rate: 0, level: 90 },
-        { rate: 0, level: 90 },
-        { rate: 0, level: 90 },
-        { rate: 50, level: 0 },
-        { rate: 0, level: 0 }
-      ],
-      dcwEnvelope: [
-        { rate: 99, level: 99 },
-        { rate: 70, level: 40 },
-        { rate: 0, level: 40 },
-        { rate: 0, level: 40 },
-        { rate: 0, level: 40 },
-        { rate: 0, level: 40 },
-        { rate: 30, level: 0 },
-        { rate: 0, level: 0 }
-      ]
-    },
-    octave: -1
-  },
-  'Pad': {
-    name: 'Pad',
-    line1: {
-      waveform1: CZWaveform.DOUBLE_SINE,
-      dcaEnvelope: [
-        { rate: 30, level: 40 },
-        { rate: 25, level: 60 },
-        { rate: 20, level: 75 },
-        { rate: 15, level: 85 },
-        { rate: 0, level: 85 },
-        { rate: 20, level: 60 },
-        { rate: 15, level: 30 },
-        { rate: 10, level: 0 }
-      ],
-      dcwEnvelope: [
-        { rate: 25, level: 30 },
-        { rate: 20, level: 45 },
-        { rate: 15, level: 55 },
-        { rate: 10, level: 60 },
-        { rate: 0, level: 60 },
-        { rate: 15, level: 40 },
-        { rate: 10, level: 20 },
-        { rate: 5, level: 0 }
-      ]
-    }
-  }
-};
+/** The bank as a name -> patch record (kept for callers that look presets up by name). */
+export const CZ101_PRESETS: Record<string, CZPatch> = Object.fromEntries(
+  CZ101_PRESET_NAMES.map((name) => [name, cz101PresetByName(name)]),
+);
 
 export default CZ101Synth;

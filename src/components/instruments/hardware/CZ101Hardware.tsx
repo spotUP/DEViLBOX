@@ -6,7 +6,9 @@
  * Features: 8-voice Phase Distortion synthesis with compact design
  */
 
-import React from 'react';
+import React, { useState } from 'react';
+import { CZ101_PRESET_BANK, CZ101_KNOB_NEUTRAL, cz101PresetParameters } from '@engine/cz101/cz101Presets';
+import type { CZPresetCategory } from '@engine/cz101/cz101Presets';
 
 interface CZ101HardwareProps {
   parameters: Record<string, number>;
@@ -94,13 +96,46 @@ const CZ101Button: React.FC<{
   );
 };
 
+const WAVEFORM_BUTTONS = [
+  { label: 'SAWTOOTH', value: 0 }, { label: 'SQUARE', value: 1 }, { label: 'PULSE', value: 2 }, { label: 'DOUBLE SINE', value: 4 },
+  { label: 'SAW PULSE', value: 5 }, { label: 'RESONANCE', value: 6 }, { label: 'DOUBLE PULSE', value: 7 }, { label: 'SILENT', value: 3 },
+];
+const WINDOW_BUTTONS = ['NONE', 'SAW', 'TRIANGLE', 'TRAPEZOID', 'PULSE', 'DOUBLE SAW'];
+const CATEGORIES: CZPresetCategory[] = Array.from(new Set(CZ101_PRESET_BANK.map((entry) => entry.category)));
+
+/** Knob range a panel slider (0 to 1) covers. */
+const SLIDERS = [
+  { label: 'Waveform Depth', key: 'dcw_depth', max: 127, rest: CZ101_KNOB_NEUTRAL },
+  { label: 'Waveform Speed', key: 'dcw_rate', max: 127, rest: CZ101_KNOB_NEUTRAL },
+  { label: 'Amplitude Speed', key: 'dca_rate', max: 127, rest: CZ101_KNOB_NEUTRAL },
+  { label: 'Pitch Drop Depth', key: 'dco_depth', max: 63, rest: 0 },
+  { label: 'Pitch Drop Speed', key: 'dco_rate', max: 127, rest: CZ101_KNOB_NEUTRAL },
+] as const;
+
 /**
- * CZ-101 Hardware Panel
+ * CZ-101 Hardware Panel. Every control writes the editor's real parameters
+ * (the same keys the simple controls use), and choosing a preset also writes
+ * the knob values it implies, so both views always agree.
  */
 export const CZ101Hardware: React.FC<CZ101HardwareProps> = ({
   parameters,
   onParamChange,
 }) => {
+  const program = typeof parameters._program === 'number' ? parameters._program : 0;
+  const current = CZ101_PRESET_BANK[program] ?? CZ101_PRESET_BANK[0];
+  const [category, setCategory] = useState<CZPresetCategory>(current.category);
+
+  const choosePreset = (index: number) => {
+    // _program first (the synth swaps its patch), then the knob values the preset implies
+    const implied = cz101PresetParameters(index);
+    onParamChange('_program', index);
+    for (const [key, value] of Object.entries(implied)) {
+      if (key !== '_program') onParamChange(key, value);
+    }
+  };
+
+  const waveform = parameters.waveform1 ?? cz101PresetParameters(program).waveform1;
+  const windowValue = parameters.window ?? 0;
 
   return (
     <div
@@ -122,92 +157,80 @@ export const CZ101Hardware: React.FC<CZ101HardwareProps> = ({
         </div>
       </div>
 
-      {/* Main Panel - Compact Layout */}
       <div className="p-4">
-        {/* LCD Display Area */}
+        {/* Display: the loaded preset */}
         <div className="mb-4 bg-gradient-to-b from-gray-800 to-gray-900 p-2 rounded border border-dark-borderLight shadow-inner">
           <div className="bg-amber-900/20 border border-amber-800 rounded p-2 min-h-[60px] font-mono text-xs text-amber-400">
             <div className="flex justify-between">
-              <span>PATCH: 12</span>
-              <span>BRASS 1</span>
+              <span>PRESET {program + 1} OF {CZ101_PRESET_BANK.length}</span>
+              <span className="uppercase">{current.patch.name}</span>
             </div>
-            <div className="text-[10px] text-amber-500/80 mt-1">
-              DCO1: SAW | DCO2: PULSE
-            </div>
+            <div className="text-[10px] text-amber-500/80 mt-1 uppercase">{current.category}</div>
           </div>
         </div>
 
-        {/* Sliders Section */}
+        {/* Preset picker */}
+        <div className="mb-4">
+          <div className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-2 text-center">Presets</div>
+          <div className="flex flex-wrap gap-1 mb-2">
+            {CATEGORIES.map((name) => (
+              <CZ101Button key={name} label={name.toUpperCase()} small color="orange" active={name === category} onClick={() => setCategory(name)} />
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {CZ101_PRESET_BANK.map((entry, index) => (entry.category === category ? (
+              <CZ101Button key={entry.patch.name} label={(entry.patch.name ?? '').toUpperCase()} small active={index === program} onClick={() => choosePreset(index)} />
+            ) : null))}
+          </div>
+        </div>
+
+        {/* Sliders: offsets from the preset */}
         <div className="mb-4">
           <div className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-2 text-center">
             Parameter Control
           </div>
           <div className="flex gap-3 justify-center items-end bg-dark-bgSecondary/30 rounded p-3">
-            <CZ101Slider
-              label="DCW"
-              value={parameters.dcw || 0.5}
-              onChange={(value) => onParamChange('dcw', value)}
-            />
-            <CZ101Slider
-              label="DCA"
-              value={parameters.dca || 0.8}
-              onChange={(value) => onParamChange('dca', value)}
-            />
-            <CZ101Slider
-              label="DCO"
-              value={parameters.dco || 0.5}
-              onChange={(value) => onParamChange('dco', value)}
-            />
-            <CZ101Slider
-              label="Detune"
-              value={parameters.detune || 0.5}
-              onChange={(value) => onParamChange('detune', value)}
-            />
-            <CZ101Slider
-              label="Octave"
-              value={parameters.octave || 0.5}
-              onChange={(value) => onParamChange('octave', value)}
-            />
+            {SLIDERS.map((slider) => (
+              <CZ101Slider
+                key={slider.key}
+                label={slider.label}
+                value={(parameters[slider.key] ?? slider.rest) / slider.max}
+                onChange={(value) => onParamChange(slider.key, Math.round(value * slider.max))}
+              />
+            ))}
             <CZ101Slider
               label="Volume"
-              value={parameters.volume || 0.8}
+              value={parameters.volume ?? 0.8}
               onChange={(value) => onParamChange('volume', value)}
             />
           </div>
         </div>
 
-        {/* Waveform Selection */}
+        {/* Waveform, window, ring modulation */}
         <div className="mb-3">
-          <div className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-2 text-center">
-            Waveform
-          </div>
+          <div className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-2 text-center">Waveform</div>
           <div className="grid grid-cols-4 gap-1">
-            <CZ101Button label="SAW" small active={parameters.waveform === 0} onClick={() => onParamChange('waveform', 0)} />
-            <CZ101Button label="SQUARE" small active={parameters.waveform === 1} onClick={() => onParamChange('waveform', 1)} />
-            <CZ101Button label="PULSE" small active={parameters.waveform === 2} onClick={() => onParamChange('waveform', 2)} />
-            <CZ101Button label="RESO" small active={parameters.waveform === 6} onClick={() => onParamChange('waveform', 6)} />
+            {WAVEFORM_BUTTONS.map((button) => (
+              <CZ101Button key={button.value} label={button.label} small active={waveform === button.value} onClick={() => { onParamChange('waveform1', button.value); onParamChange('waveform2', button.value); }} />
+            ))}
           </div>
         </div>
-
-        {/* Function Buttons */}
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          <CZ101Button label="CARTRIDGE" color="gray" />
-          <CZ101Button label="TONE EDIT" color="orange" />
-          <CZ101Button label="PROGRAM" color="gray" />
+        <div className="mb-3">
+          <div className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-2 text-center">Window</div>
+          <div className="grid grid-cols-3 gap-1">
+            {WINDOW_BUTTONS.map((label, value) => (
+              <CZ101Button key={label} label={label} small active={windowValue === value} onClick={() => onParamChange('window', value)} />
+            ))}
+          </div>
         </div>
-
-        {/* Preset Banks */}
-        <div className="grid grid-cols-4 gap-1">
-          {['A-1', 'A-2', 'A-3', 'A-4', 'B-1', 'B-2', 'B-3', 'B-4'].map((preset) => (
-            <CZ101Button key={preset} label={preset} small color="gray" />
-          ))}
+        <div className="grid grid-cols-1 gap-2">
+          <CZ101Button label="RING MODULATION" color="orange" active={(parameters.ring_mod ?? 0) > 0.5} onClick={() => onParamChange('ring_mod', (parameters.ring_mod ?? 0) > 0.5 ? 0 : 1)} />
         </div>
       </div>
 
-      {/* Bottom Info */}
       <div className="px-4 py-1 bg-black border-t border-dark-border">
         <div className="text-[9px] text-text-muted text-center uppercase tracking-widest">
-          Phase Distortion Synthesis • 8 Voices • 1984
+          Phase Distortion Synthesis - 8 Voices - 1984
         </div>
       </div>
     </div>

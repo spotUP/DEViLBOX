@@ -20,6 +20,9 @@ static constexpr unsigned VOLUME_SHIFT = 12;
 static constexpr unsigned ENV_DCA_SHIFT = 16;
 static constexpr unsigned ENV_DCW_SHIFT = 16;
 static constexpr unsigned ENV_DCO_SHIFT = 11;
+// One voice at full level peaks at 1/8 of the 16-bit range (the chip sums eight);
+// this makes a single note a sensible level instead of -18 dBFS.
+static constexpr float OUTPUT_GAIN = 4.0f;
 
 // Envelope structure
 struct Envelope {
@@ -205,7 +208,7 @@ public:
             // Clamp to 16-bit range and convert to float
             if (sample > 32767) sample = 32767;
             if (sample < -32768) sample = -32768;
-            output[i] = sample / 32768.0f;
+            output[i] = std::max(-1.0f, std::min(1.0f, sample * (OUTPUT_GAIN / 32768.0f)));
 
             m_sampleCount++;
         }
@@ -239,110 +242,133 @@ private:
         return (8 | (data & 7)) << (data >> 3);
     }
 
+    // MAME upd933.cpp update_pitch_step(): base pitch + DCO offset + pitch modulation
     void updatePitchStep(int vnum) {
         Voice& voice = m_voice[vnum];
-        uint32_t note = voice.pitch >> NOTE_SHIFT;
-        uint32_t fine = voice.pitch & ((1 << NOTE_SHIFT) - 1);
+        const int32_t pitch = (int32_t)(voice.pitch + (m_dco[vnum].current >> ENV_DCO_SHIFT)) + voice.pmLevel;
+        uint32_t step = 0;
 
-        if (note >= 0x80) note = 0x7F;
-
-        uint32_t step = m_pitch[note];
-        step += (step >> PITCH_FINE_SHIFT) * m_pitchFine[fine];
+        if (pitch > 0 && pitch < (1 << 16)) {
+            const uint8_t note = pitch >> NOTE_SHIFT;
+            const uint16_t fine = pitch & ((1 << NOTE_SHIFT) - 1);
+            step = m_pitch[note & 0x7F];
+            if (fine) step += (step >> PITCH_FINE_SHIFT) * m_pitchFine[fine];
+        }
         voice.pitchStep = step;
+
+        // The effective DCW value is limited for high pitches (keeps narrow pulses
+        // audible and stops aliasing noise).
+        voice.dcwLimit = 0x400 - std::min<uint32_t>(0x400, step >> (PITCH_SHIFT - 2));
     }
 
+    // MAME upd933.cpp update(): transfer function, window, ring mod, envelopes,
+    // pitch modulation. Voices must be processed in voiceMap order so m_lastSample
+    // is the partner line's output.
     int16_t updateVoice(int vnum) {
         Voice& voice = m_voice[vnum];
-        Envelope& dca = m_dca[vnum];
-        Envelope& dcw = m_dcw[vnum];
-        Envelope& dco = m_dco[vnum];
 
-        // Update envelopes
-        dca.update();
-        dcw.update();
-        dco.update();
+        const uint16_t pos = (voice.position >> PITCH_SHIFT) & 0x7FF;
+        const uint8_t wave = (voice.position >> (PITCH_SHIFT + 11)) & 1;
 
-        if (dca.current == 0) return 0;
-
-        uint16_t pos = (voice.position >> PITCH_SHIFT) & 0x7FF;
-        uint8_t wave = (voice.position >> (PITCH_SHIFT + 11)) & 1;
-
-        uint16_t dcwVal = std::min<uint16_t>(dcw.current >> ENV_DCW_SHIFT, voice.dcwLimit > 0 ? voice.dcwLimit : 0x3FF);
-        uint16_t pivot = 0x400 - dcwVal;
+        const uint16_t dcw = std::min<uint16_t>(m_dcw[vnum].current >> ENV_DCW_SHIFT, voice.dcwLimit);
+        const uint16_t pivot = 0x400 - dcw;
         uint16_t phase = 0;
+        uint16_t window = 0;
 
-        // Apply transfer function
         switch (voice.wave[wave] & 7) {
-            case 0: // Sawtooth
-                if (pos < pivot)
-                    phase = pos * 0x400 / std::max<uint16_t>(pivot, 1);
-                else
-                    phase = 0x400 + (pos - pivot) * 0x400 / std::max<uint16_t>(0x800 - pivot, 1);
+            case 0: // sawtooth
+                if (pos < pivot) phase = pos * 0x400 / pivot;
+                else phase = 0x400 + (pos - pivot) * 0x400 / (0x800 - pivot);
                 break;
-
-            case 1: // Square
-                if ((pos & 0x3FF) < pivot)
-                    phase = (pos & 0x3FF) * 0x400 / std::max<uint16_t>(pivot, 1);
-                else
-                    phase = 0x3FF;
+            case 1: // square
+                if ((pos & 0x3FF) < pivot) phase = (pos & 0x3FF) * 0x400 / pivot;
+                else phase = 0x3FF;
                 phase |= (pos & 0x400);
                 break;
-
-            case 2: // Pulse
-                if (pos < pivot * 2)
-                    phase = pos * 0x800 / std::max<uint16_t>(pivot * 2, 1);
-                else
-                    phase = 0x7FF;
+            case 2: // pulse
+                if (pos < pivot * 2) phase = pos * 0x800 / (pivot * 2);
+                else phase = 0x7FF;
                 break;
-
-            case 3: // Silent
-                phase = 0;
+            case 3: // silent
                 break;
-
-            case 4: // Double sine
-                if (pos < pivot)
-                    phase = pos * 0x800 / std::max<uint16_t>(pivot, 1);
-                else
-                    phase = (pos - pivot) * 0x800 / std::max<uint16_t>(0x800 - pivot, 1);
+            case 4: // double sine
+                if (pos < pivot) phase = pos * 0x800 / pivot;
+                else phase = (pos - pivot) * 0x800 / (0x800 - pivot);
                 break;
-
-            case 5: // Saw pulse
-                if (pos < 0x400)
-                    phase = pos;
-                else if (pos < (pivot + 0x400))
-                    phase = 0x400 + (pos & 0x3FF) * 0x400 / std::max<uint16_t>(pivot, 1);
-                else
-                    phase = 0x7FF;
+            case 5: // saw pulse
+                if (pos < 0x400) phase = pos;
+                else if (pos < (pivot + 0x400)) phase = 0x400 + (pos & 0x3FF) * 0x400 / pivot;
+                else phase = 0x7FF;
                 break;
-
-            case 6: // Resonance
-                phase = pos + ((pos * dcwVal) >> 6);
-                phase &= 0x7FF;
+            case 6: // resonance: multiplies the frequency by the DCW level, hard-synced
+                phase = (pos + ((pos * dcw) >> 6)) & 0x7FF;
                 break;
-
-            case 7: // Double pulse
-                if ((pos & 0x3FF) < pivot)
-                    phase = (pos & 0x3FF) * 0x400 / std::max<uint16_t>(pivot, 1);
-                else
-                    phase = 0x7FF;
+            case 7: // double pulse
+                if ((pos & 0x3FF) < pivot) phase = (pos & 0x3FF) * 0x400 / pivot;
+                else phase = 0x7FF;
                 break;
         }
 
-        // Get waveform sample
-        int16_t sample = m_cosine[phase & 0x7FF];
+        switch (voice.window & 7) {
+            case 0: break;
+            case 1: window = pos; break;
+            case 2:
+                window = (pos & 0x3FF) * 2;
+                if (pos < 0x400) window ^= 0x7FE;
+                break;
+            case 3:
+                if (pos >= 0x400) window = (pos & 0x3FF) * 2;
+                break;
+            case 4:
+                if (pos < 0x400) window = pos * 2;
+                else window = 0x7FF;
+                break;
+            default:
+                window = (0x3FF ^ (pos & 0x3FF)) * 2;
+                break;
+        }
 
-        // Apply volume
-        // The DCA target is 7 bits << (ENV_DCA_SHIFT + 2), so shifting by
-        // ENV_DCA_SHIFT yields the 9-bit index m_volume is built for (MAME
-        // upd933.cpp:509). An extra +2 here used a 7-bit index: ~-60 dB.
-        uint32_t vol = m_volume[(dca.current >> ENV_DCA_SHIFT) & 0x1FF];
-        sample = (int16_t)(((int32_t)sample * (int32_t)vol) >> VOLUME_SHIFT);
-        sample -= (int16_t)(vol / 2);  // remove the unipolar cosine DC (MAME upd933.cpp:511)
+        int32_t sample = m_cosine[phase];
+        if (window) sample = (sample * (0x800 - window)) / 0x800;
 
-        // Advance phase
+        // center around zero, apply volume (9-bit index, MAME upd933.cpp:509-511) and ring mod
+        const uint32_t vol = m_volume[(m_dca[vnum].current >> ENV_DCA_SHIFT) & 0x1FF];
+        sample = (sample * (int32_t)vol) >> VOLUME_SHIFT;
+        sample -= (int32_t)(vol / 2);
+
+        if (voice.ringMod) sample = (sample * m_lastSample) / 0x1000;
+        if (voice.muteOther) sample -= m_lastSample;
+
+        const uint32_t oldDco = m_dco[vnum].current;
+        const int16_t oldPm = voice.pmLevel;
+
+        m_dca[vnum].update();
+        m_dcw[vnum].update();
+        m_dco[vnum].update();
+
+        // pitch/noise modulation latches a new pitch multiplier every 8 samples
+        if (!(m_sampleCount & 7)) {
+            switch (voice.pitchMod & 3) {
+                default: voice.pmLevel = 0; break;
+                case 2: voice.pmLevel = m_lastSample; break;
+                case 3: voice.pmLevel = (int16_t)(nextRandom() & (32 << NOTE_SHIFT)); break;
+            }
+        }
+
+        if (((oldDco ^ m_dco[vnum].current) >> ENV_DCO_SHIFT) || oldPm != voice.pmLevel)
+            updatePitchStep(vnum);
+
         voice.position += voice.pitchStep;
 
-        return sample;
+        if (sample > 32767) sample = 32767;
+        if (sample < -32768) sample = -32768;
+        m_lastSample = (int16_t)sample;
+        return (int16_t)sample;
+    }
+
+    uint32_t nextRandom() {
+        m_rng = m_rng * 1664525u + 1013904223u;
+        return m_rng >> 8;
     }
 
     uint32_t m_clock;
@@ -354,6 +380,7 @@ private:
     std::array<uint16_t, 256> m_soundRegs;
     uint32_t m_sampleCount;
     int16_t m_lastSample;
+    uint32_t m_rng = 12345;
 
     uint16_t m_cosine[0x800];
     uint32_t m_pitch[0x80];
