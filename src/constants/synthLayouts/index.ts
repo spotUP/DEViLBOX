@@ -62,6 +62,7 @@ import { CZ101_LAYOUT } from './cz101';
 import { D50_LAYOUT } from './d50';
 import { C64SID_LAYOUT } from './c64sid';
 import { V2SPEECH_LAYOUT } from './v2speech';
+import { KLYSTRACK_LAYOUT } from './klystrack';
 
 /** Map from SynthType string to layout descriptor */
 export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
@@ -143,6 +144,9 @@ export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
   MAMETR707: TR707_LAYOUT,
   TR808: TR808_LAYOUT,
   TR909: TR909_LAYOUT,
+
+  // Klystrack native instrument editor (values and edits go through klysLayoutAdapter)
+  KlysSynth: KLYSTRACK_LAYOUT,
 
   // Playback engines with minimal controls
   C64SID: C64SID_LAYOUT,

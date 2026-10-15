@@ -73,6 +73,8 @@ import { DOMSynthPanel } from '../controls/DOMSynthPanel';
 const LiveFilterCurve = lazy(() => import('../../visualization/LiveFilterCurve').then(m => ({ default: m.LiveFilterCurve })));
 import { EnvelopeVisualization } from '@components/instruments/shared';
 import { getSynthLayout } from '@/constants/synthLayouts';
+import { renameKlysInstrument } from '@/components/klystrack/klysInstrumentEdit';
+import { klysInstrumentIndex } from '@/engine/klystrack/klysInstrumentFields';
 
 // ============================================================================
 // LAZY-LOADED CONTROL COMPONENTS
@@ -143,7 +145,7 @@ const EupminiControls = lazy(() => import('../controls/EupminiControls').then(m 
 const WasmParamEditorWrapper = lazy(() => import('../controls/WasmParamEditorWrapper').then(m => ({ default: m.WasmParamEditorWrapper })));
 const WasmInfoEditor = lazy(() => import('../controls/WasmInfoEditor').then(m => ({ default: m.WasmInfoEditor })));
 const Cinter4Controls = lazy(() => import('../controls/Cinter4Controls').then(m => ({ default: m.Cinter4Controls })));
-const KlysInstrumentEditor = lazy(() => import('@/components/klystrack/KlysInstrumentEditor').then(m => ({ default: m.KlysInstrumentEditor })));
+const KlysControls = lazy(() => import('../controls/KlysControls').then(m => ({ default: m.KlysControls })));
 const SonixControls = lazy(() => import('../controls/SonixControls').then(m => ({ default: m.SonixControls })));
 const GTUltraControls = lazy(() => import('../controls/GTUltraControls').then(m => ({ default: m.GTUltraControls })));
 const JamCrackerControls = lazy(() => import('../controls/JamCrackerControls').then(m => ({ default: m.JamCrackerControls })));
@@ -1638,17 +1640,23 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   // KLYSTRACK INSTRUMENT EDITOR (every MusInstrument field; instrument id N is klystrack instrument N - 1)
   // ============================================================================
   if (editorMode === 'klystrack') {
+    // A name edit goes through renameKlysInstrument (native model, engine and the instrument list entry); the rest is the usual change.
+    const handleKlysHeaderChange = (updates: Partial<InstrumentConfig>) => {
+      const { name, ...rest } = updates;
+      if (name !== undefined) renameKlysInstrument(klysInstrumentIndex(instrument.id), name);
+      if (Object.keys(rest).length > 0) handleChange(rest);
+    };
     return (
       <div className="synth-editor-container bg-dark-bg">
         <EditorHeader
           instrument={instrument}
-          onChange={handleChange}
+          onChange={handleKlysHeaderChange}
           vizMode={vizMode}
           onVizModeChange={setVizMode}
           showHelpButton={false}
         />
         <Suspense fallback={<LoadingControls />}>
-          <KlysInstrumentEditor instrumentIndex={instrument.id - 1} />
+          <KlysControls instrument={instrument} />
         </Suspense>
       </div>
     );
