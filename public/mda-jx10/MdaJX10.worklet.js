@@ -19,6 +19,10 @@ class MdaJX10Processor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
     this.initializing = false;
+    // Live voice report for the editor curves (src/engine/voiceStatus/wasmVoiceStatus.ts)
+    this.watchVoices = false;
+    this.voiceCounter = 0;
+    this.voicePtr = 0;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -54,6 +58,9 @@ class MdaJX10Processor extends AudioWorkletProcessor {
         if (this.engine) {
           this.module._jx10_all_notes_off(this.engine);
         }
+        break;
+      case 'watchVoices':
+        this.watchVoices = !!data.on;
         break;
       case 'getInfo':
         if (this.engine) {
@@ -212,6 +219,10 @@ class MdaJX10Processor extends AudioWorkletProcessor {
       this.engine = null;
     }
     if (this.module) {
+      if (this.voicePtr) {
+        this.module._free(this.voicePtr);
+        this.voicePtr = 0;
+      }
       if (this.outputPtrL) {
         this.module._free(this.outputPtrL);
         this.outputPtrL = 0;
@@ -259,7 +270,20 @@ class MdaJX10Processor extends AudioWorkletProcessor {
     outputL.set(this.outputBufferL.subarray(0, numSamples));
     outputR.set(this.outputBufferR.subarray(0, numSamples));
 
+    this.reportVoices();
     return true;
+  }
+
+  // 8 floats per voice slot, layout in wasmVoiceStatus.ts; every 6th block (about 60 reports a second)
+  reportVoices() {
+    if (!this.watchVoices || typeof this.module._jx10_get_voices !== 'function') return;
+    if (++this.voiceCounter < 6) return;
+    this.voiceCounter = 0;
+    if (!this.voicePtr) this.voicePtr = this.module._malloc(8 * 8 * 4);
+    const n = this.module._jx10_get_voices(this.engine, this.voicePtr, 8);
+    const heap = this.module.HEAPF32 || new Float32Array(this.module.wasmMemory.buffer);
+    const at = this.voicePtr >> 2;
+    this.port.postMessage({ type: 'voiceStatus', voices: heap.slice(at, at + n * 8) });
   }
 }
 

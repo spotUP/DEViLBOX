@@ -16,7 +16,7 @@ import { resolve } from 'node:path';
 import { ROOT, startWorklet, stereoOutputs, type WorkletProc } from './workletHarness';
 import { cz101Transform } from '../cz101/cz101Transform';
 import { CZ101_PRESET_BANK, cz101PatchParameters } from '../cz101/cz101Presets';
-import { encodeCzSysex, decodeCzSysexFile } from '../cz101/cz101Sysex';
+import { CZ101_TONE_NAME_PARAM, CZ101_TONE_PARAM, czToneFromPatch, czToneToBase64, encodeCzSysex, decodeCzSysexFile } from '../cz101/cz101Sysex';
 import type { CZPatch } from '../cz101/cz101Types';
 import { useCz101UserPatchStore } from '@stores/useCz101UserPatchStore';
 import { getChipSynthDef } from '@constants/chipParameters';
@@ -461,6 +461,68 @@ describe('CZ-101 release and retrigger', () => {
   });
 });
 
+/** Pitch in Hz from the autocorrelation of 4096 samples starting at `start` (200 to 400 Hz search, parabolic refinement). */
+function autocorrPitch(x: Float32Array, start: number): number {
+  const n = 4096;
+  const corr = (lag: number) => { let sum = 0; for (let i = 0; i < n; i++) sum += (x[start + i] ?? 0) * (x[start + i + lag] ?? 0); return sum; };
+  const lo = Math.floor(SAMPLE_RATE / 400);
+  const hi = Math.ceil(SAMPLE_RATE / 200);
+  let best = lo;
+  const values = new Map<number, number>();
+  for (let lag = lo - 1; lag <= hi + 1; lag++) values.set(lag, corr(lag));
+  for (let lag = lo; lag <= hi; lag++) if (values.get(lag)! > values.get(best)!) best = lag;
+  const a = values.get(best - 1)!, b = values.get(best)!, c = values.get(best + 1)!;
+  return SAMPLE_RATE / (best + (0.5 * (a - c)) / (a - 2 * b + c));
+}
+
+describe('CZ-101 spamming one key', () => {
+  /** Ends its pitch envelope far from zero, as an imported patch can. */
+  const WITH_BEND: CZPatch = {
+    name: 'Test Bend Leaves Pitch',
+    line1: {
+      waveform1: 0,
+      dcaEnvelope: [{ rate: 100, level: 99 }, { rate: 0, level: 99 }, { rate: 90, level: 0 }],
+      dcwEnvelope: [{ rate: 100, level: 30 }, { rate: 0, level: 30 }],
+      dcoEnvelope: [{ rate: 100, level: 2 }, { rate: 0, level: 2 }, { rate: 110, level: 40, coarse: true }],
+    },
+  };
+  /** No pitch envelope at all. */
+  const PLAIN: CZPatch = {
+    name: 'Test Plain',
+    line1: {
+      waveform1: 0,
+      dcaEnvelope: [{ rate: 100, level: 99 }, { rate: 0, level: 99 }, { rate: 90, level: 0 }],
+      dcwEnvelope: [{ rate: 100, level: 30 }, { rate: 0, level: 30 }],
+    },
+  };
+
+  it('spamming one key gives the same pitch every time, also after a patch with a pitch envelope played on those voices', async () => {
+    const rig = await makeRig();
+    rig.synth.loadPatch(WITH_BEND);
+    for (let i = 0; i < 8; i++) { // leave every voice's pitch envelope at its release level
+      rig.synth.triggerAttack(60, undefined, 0.8);
+      await settle();
+      rig.render(0.25);
+      rig.synth.triggerRelease(60);
+      await settle();
+      rig.render(0.3);
+    }
+    rig.synth.loadPatch(PLAIN);
+    const pitches: number[] = [];
+    for (let i = 0; i < 24; i++) {
+      rig.synth.triggerAttack(60, undefined, 0.8);
+      await settle();
+      const x = rig.render(0.3);
+      pitches.push(autocorrPitch(x, 4800));
+      rig.synth.triggerRelease(60);
+      await settle();
+      rig.render(i % 2 === 0 ? 0.05 : 0.25);
+    }
+    const cents = pitches.map((p) => 1200 * Math.log2(p / pitches[0]));
+    expect(Math.max(...cents.map(Math.abs)), `pitches ${pitches.map((p) => p.toFixed(1)).join(' ')}`).toBeLessThan(10);
+  });
+});
+
 describe('CZ-101 editor wiring', () => {
   it('choosing a preset through the editor path reaches the synth; a knob move changes the sound', async () => {
     const rig = await makeRig();
@@ -533,15 +595,37 @@ describe('CZ-101 SysEx import reaches the sound', () => {
     const { patches, errors } = decodeCzSysexFile(file, 'My Imported Sound.syx');
     expect(errors).toEqual([]);
     expect(patches[0].patch.name).toBe('My Imported Sound');
-    const [id] = useCz101UserPatchStore.getState().addPatches([patches[0].patch]);
 
-    const config = { synthType: 'CZ101', parameters: { _program: 0, _userPatch: id, ...cz101PatchParameters(patches[0].patch), volume: 0.8 } };
+    const config = { synthType: 'CZ101', parameters: { _program: 0, [CZ101_TONE_PARAM]: czToneToBase64(patches[0].tone), [CZ101_TONE_NAME_PARAM]: 'My Imported Sound', ...cz101PatchParameters(patches[0].patch), volume: 0.8 } };
     applyChipParameters(rig.synth, config as unknown as InstrumentConfig);
     rig.synth.triggerAttack(60, undefined, 0.8);
     await settle();
     expect(rms(rig.render(0.5))).toBeGreaterThan(0.0005);
     const dca = rig.messages.find((m) => m.type === 'envelope' && (m as { kind?: number }).kind === 0) as unknown as { stages: { rate: number }[] };
     expect(dca.stages.map((s) => s.rate)).toEqual(SUSTAINED.line1.dcaEnvelope.map((s) => s.rate)); // the imported patch's rates, not Init's
-    useCz101UserPatchStore.getState().removePatch(id);
+  });
+
+  it('an instrument that carries its tone sounds the same on a synth whose library is empty (a song opened elsewhere)', async () => {
+    const tone = czToneToBase64(czToneFromPatch({ ...SUSTAINED, line2: { ...SUSTAINED.line1, detune: 700 }, octave: 1 }));
+    const config = { synthType: 'CZ101', parameters: { _program: 0, [CZ101_TONE_PARAM]: tone, [CZ101_TONE_NAME_PARAM]: 'Carried', volume: 0.8 } } as unknown as InstrumentConfig;
+    const play = async () => {
+      const rig = await makeRig();
+      applyChipParameters(rig.synth, config);
+      rig.synth.triggerAttack(60, undefined, 0.8);
+      await settle();
+      return rig.render(0.8);
+    };
+    useCz101UserPatchStore.setState({ patches: [], nextId: 1 });
+    const first = await play();
+    expect(useCz101UserPatchStore.getState().patches.map((p) => p.name)).toEqual(['Carried']); // listed again from the instrument
+    useCz101UserPatchStore.setState({ patches: [], nextId: 1 });
+    const second = await play(); // "other browser": empty library again
+    expect(Math.abs(1200 * Math.log2(peakFrequency(second) / peakFrequency(first)))).toBeLessThan(10);
+    expect(Math.abs(20 * Math.log10(rms(second, 4800) / rms(first, 4800)))).toBeLessThan(1);
+    expect(rms(first, 4800)).toBeGreaterThan(0.0005);
+    // and the library alone, with no tone on the instrument, does not decide the sound: Init plays
+    const plain = await makeRig();
+    applyChipParameters(plain.synth, { synthType: 'CZ101', parameters: { _program: 0, _userPatch: 1 } } as unknown as InstrumentConfig);
+    expect(plain.synth.getProgram()).toBe(0);
   });
 });

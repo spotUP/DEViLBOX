@@ -94,4 +94,10 @@ void calf_mono_control_change(void* ptr, int controller, int value) {
     synth->control_change(0, controller, value);
 }
 
+// Live voice report for the editor curves: 8 floats per voice, returns the voice count written.
+int calf_mono_get_voices(void* ptr, float* out, int max_voices) {
+    if (!ptr || !out) return 0;
+    return static_cast<monosynth_audio_module*>(ptr)->get_voices(out, max_voices);
+}
+
 } // extern "C"

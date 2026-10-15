@@ -17,6 +17,8 @@ import {
 import { ArpeggioEngine } from '../ArpeggioEngine';
 import { getNormalizedVolume } from './volumeNormalization';
 import { createBitCrusher, setBitCrusherBits } from '../tone/bitCrusher';
+import { registerVoiceSource } from '../tone/toneVoiceProbe';
+import { createToneSynthNode, toneVoiceOptions } from '../tone/toneSynthKnobs';
 
 
 /**
@@ -56,158 +58,41 @@ export function createToneJSSynth(config: InstrumentConfig): Tone.ToneAudioNode 
 }
 
 
-export function createSynth(config: InstrumentConfig): Tone.ToneAudioNode {
-  const synth = new Tone.PolySynth(Tone.Synth, {
-    oscillator: {
-      type: (config.oscillator?.type || 'sawtooth') as Tone.ToneOscillatorType,
-    } as Partial<Tone.OmniOscillatorOptions>,
-    envelope: {
-      attack: (config.envelope?.attack ?? 10) / 1000,
-      decay: (config.envelope?.decay ?? 200) / 1000,
-      sustain: (config.envelope?.sustain ?? 50) / 100,
-      release: (config.envelope?.release ?? 1000) / 1000,
-    },
-    volume: getNormalizedVolume('Synth', config.volume),
-  });
-  if (config.oscillator?.detune) {
-    synth.set({ detune: config.oscillator.detune });
-  }
-
-  // Setup pitch envelope if enabled
-  const pitchEnv = config.pitchEnvelope;
-  const hasPitchEnv = pitchEnv?.enabled && pitchEnv.amount !== 0;
-
-  // If no pitch envelope, return wrapped synth with voice leak prevention
-  if (!hasPitchEnv) {
-    return {
-      triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
-        // Release any existing voice for this note first to prevent voice leak
-        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
-        synth.triggerAttackRelease(note, duration, time, velocity);
-      },
-      triggerAttack: (note: string, time?: number, velocity?: number) => {
-        // Release any existing voice for this note first to prevent voice leak
-        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
-        synth.triggerAttack(note, time, velocity);
-      },
-      triggerRelease: (note: string, time?: number) => {
-        synth.triggerRelease(note, time);
-      },
-      releaseAll: () => synth.releaseAll(),
-      connect: (dest: Tone.InputNode) => synth.connect(dest),
-      disconnect: () => synth.disconnect(),
-      dispose: () => synth.dispose(),
-      volume: synth.volume,
-    } as unknown as Tone.ToneAudioNode;
-  }
-
-  // Wrap synth to add pitch envelope support
-  return {
+/** A wrapper that releases a voice before re-attacking it (voice-leak guard); the Tone node is registered for the voice probe. */
+function polyWrapper(synth: Tone.PolySynth): Tone.ToneAudioNode {
+  return registerVoiceSource({
     triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
-      const t = time ?? Tone.now();
       // Release any existing voice for this note first to prevent voice leak
-      try { synth.triggerRelease(note, t); } catch { /* ignore */ }
-      applyPitchEnvelope(synth, pitchEnv!, t, duration);
-      synth.triggerAttackRelease(note, duration, t, velocity);
+      try { synth.triggerRelease(note, time); } catch { /* ignore */ }
+      synth.triggerAttackRelease(note, duration, time, velocity);
     },
     triggerAttack: (note: string, time?: number, velocity?: number) => {
-      const t = time ?? Tone.now();
-      // Release any existing voice for this note first to prevent voice leak
-      try { synth.triggerRelease(note, t); } catch { /* ignore */ }
-      triggerPitchEnvelopeAttack(synth, pitchEnv!, t);
-      synth.triggerAttack(note, t, velocity);
+      try { synth.triggerRelease(note, time); } catch { /* ignore */ }
+      synth.triggerAttack(note, time, velocity);
     },
-    triggerRelease: (note: string, time?: number) => {
-      const t = time ?? Tone.now();
-      triggerPitchEnvelopeRelease(synth, pitchEnv!, t);
-      synth.triggerRelease(note, t);
-    },
-    releaseAll: () => {
-      synth.set({ detune: 0 });
-      synth.releaseAll();
-    },
+    triggerRelease: (note: string, time?: number) => synth.triggerRelease(note, time),
+    releaseAll: () => synth.releaseAll(),
     connect: (dest: Tone.InputNode) => synth.connect(dest),
     disconnect: () => synth.disconnect(),
     dispose: () => synth.dispose(),
     volume: synth.volume,
-  } as unknown as Tone.ToneAudioNode;
+  } as unknown as Tone.ToneAudioNode, synth);
+}
+
+// The pitch envelope, detune, octave and LFO of these five run inside the voice (tone/toneSynthKnobs ToneRig).
+export function createSynth(config: InstrumentConfig): Tone.ToneAudioNode {
+  return polyWrapper(createToneSynthNode('Synth', config) as Tone.PolySynth);
 }
 
 export function createMonoSynth(config: InstrumentConfig): Tone.MonoSynth {
-  // Build base config first
-  const monoConfig: Record<string, unknown> = {
-    oscillator: {
-      type: (config.oscillator?.type || 'sawtooth') as Tone.ToneOscillatorType,
-      detune: config.oscillator?.detune || 0,
-    },
-    envelope: {
-      attack: (config.envelope?.attack ?? 10) / 1000,
-      decay: (config.envelope?.decay ?? 200) / 1000,
-      sustain: (config.envelope?.sustain ?? 50) / 100,
-      release: (config.envelope?.release ?? 1000) / 1000,
-    },
-    volume: getNormalizedVolume('MonoSynth', config.volume),
-  };
-
-  // Only add filter if all required properties exist (don't pass undefined)
-  if (config.filter && config.filter.type && config.filter.frequency) {
-    monoConfig.filter = {
-      type: config.filter.type,
-      frequency: config.filter.frequency,
-      Q: config.filter.Q ?? 1,
-      rolloff: config.filter.rolloff ?? -12,
-    };
-  }
-
-  // Only add filterEnvelope if all required properties exist (don't pass undefined)
-  if (config.filterEnvelope &&
-      config.filterEnvelope.baseFrequency !== undefined &&
-      config.filterEnvelope.attack !== undefined) {
-    monoConfig.filterEnvelope = {
-      baseFrequency: config.filterEnvelope.baseFrequency,
-      octaves: config.filterEnvelope.octaves ?? 3,
-      attack: config.filterEnvelope.attack / 1000,
-      decay: (config.filterEnvelope.decay ?? 200) / 1000,
-      sustain: (config.filterEnvelope.sustain ?? 50) / 100,
-      release: (config.filterEnvelope.release ?? 1000) / 1000,
-    };
-  }
-
-  return new Tone.MonoSynth(monoConfig as unknown as Tone.MonoSynthOptions);
+  return createToneSynthNode('MonoSynth', config) as Tone.MonoSynth;
 }
 
 export function createDuoSynth(config: InstrumentConfig): Tone.ToneAudioNode {
-  const oscType = (config.oscillator?.type || 'sawtooth') as Tone.ToneOscillatorType;
-  const synth = new Tone.DuoSynth({
-    voice0: {
-      oscillator: {
-        type: oscType,
-      } as Partial<Tone.OmniOscillatorOptions>,
-      envelope: {
-        attack: (config.envelope?.attack ?? 10) / 1000,
-        decay: (config.envelope?.decay ?? 200) / 1000,
-        sustain: (config.envelope?.sustain ?? 50) / 100,
-        release: (config.envelope?.release ?? 1000) / 1000,
-      },
-    },
-    voice1: {
-      oscillator: {
-        type: oscType,
-      } as Partial<Tone.OmniOscillatorOptions>,
-      envelope: {
-        attack: (config.envelope?.attack ?? 10) / 1000,
-        decay: (config.envelope?.decay ?? 200) / 1000,
-        sustain: (config.envelope?.sustain ?? 50) / 100,
-        release: (config.envelope?.release ?? 1000) / 1000,
-      },
-    },
-    vibratoAmount: config.oscillator?.detune ? config.oscillator.detune / 100 : 0.5,
-    vibratoRate: 5,
-    volume: getNormalizedVolume('DuoSynth', config.volume),
-  });
+  const synth = createToneSynthNode('DuoSynth', config) as Tone.DuoSynth;
   // DuoSynth is monophonic (2 oscillators per single voice) but can still get stuck
   // if triggered rapidly before release completes. Wrap to force release before attack.
-  return {
+  return registerVoiceSource({
     triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
       try { synth.triggerRelease(time); } catch { /* ignore */ }
       synth.triggerAttackRelease(note, duration, time, velocity);
@@ -222,86 +107,25 @@ export function createDuoSynth(config: InstrumentConfig): Tone.ToneAudioNode {
     disconnect: () => synth.disconnect(),
     dispose: () => synth.dispose(),
     volume: synth.volume,
-  } as unknown as Tone.ToneAudioNode;
+  } as unknown as Tone.ToneAudioNode, synth);
 }
 
 export function createFMSynth(config: InstrumentConfig): Tone.ToneAudioNode {
-  const synth = new Tone.PolySynth(Tone.FMSynth, {
-    oscillator: {
-      type: config.oscillator?.type || 'sine',
-    } as Partial<Tone.OmniOscillatorOptions>,
-    envelope: {
-      attack: (config.envelope?.attack ?? 10) / 1000,
-      decay: (config.envelope?.decay ?? 200) / 1000,
-      sustain: (config.envelope?.sustain ?? 50) / 100,
-      release: (config.envelope?.release ?? 1000) / 1000,
-    },
-    modulationIndex: 10,
-    volume: getNormalizedVolume('FMSynth', config.volume),
-  });
-  // Wrap to prevent voice leak on rapid retrigger
-  return {
-    triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
-      try { synth.triggerRelease(note, time); } catch { /* ignore */ }
-      synth.triggerAttackRelease(note, duration, time, velocity);
-    },
-    triggerAttack: (note: string, time?: number, velocity?: number) => {
-      try { synth.triggerRelease(note, time); } catch { /* ignore */ }
-      synth.triggerAttack(note, time, velocity);
-    },
-    triggerRelease: (note: string, time?: number) => synth.triggerRelease(note, time),
-    releaseAll: () => synth.releaseAll(),
-    connect: (dest: Tone.InputNode) => synth.connect(dest),
-    disconnect: () => synth.disconnect(),
-    dispose: () => synth.dispose(),
-    volume: synth.volume,
-  } as unknown as Tone.ToneAudioNode;
+  return polyWrapper(createToneSynthNode('FMSynth', config) as Tone.PolySynth);
 }
 
 export function createAMSynth(config: InstrumentConfig): Tone.ToneAudioNode {
-  const synth = new Tone.PolySynth(Tone.AMSynth, {
-    oscillator: {
-      type: config.oscillator?.type || 'sine',
-    } as Partial<Tone.OmniOscillatorOptions>,
-    envelope: {
-      attack: (config.envelope?.attack ?? 10) / 1000,
-      decay: (config.envelope?.decay ?? 200) / 1000,
-      sustain: (config.envelope?.sustain ?? 50) / 100,
-      release: (config.envelope?.release ?? 1000) / 1000,
-    },
-    volume: getNormalizedVolume('ToneAM', config.volume),
-  });
-  // Wrap to prevent voice leak on rapid retrigger
-  return {
-    triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
-      try { synth.triggerRelease(note, time); } catch { /* ignore */ }
-      synth.triggerAttackRelease(note, duration, time, velocity);
-    },
-    triggerAttack: (note: string, time?: number, velocity?: number) => {
-      try { synth.triggerRelease(note, time); } catch { /* ignore */ }
-      synth.triggerAttack(note, time, velocity);
-    },
-    triggerRelease: (note: string, time?: number) => synth.triggerRelease(note, time),
-    releaseAll: () => synth.releaseAll(),
-    connect: (dest: Tone.InputNode) => synth.connect(dest),
-    disconnect: () => synth.disconnect(),
-    dispose: () => synth.dispose(),
-    volume: synth.volume,
-  } as unknown as Tone.ToneAudioNode;
+  return polyWrapper(createToneSynthNode('ToneAM', config) as Tone.PolySynth);
 }
 
 export function createPluckSynth(config: InstrumentConfig): Tone.ToneAudioNode {
   // PluckSynth (Karplus-Strong) — use directly, NOT wrapped in PolySynth.
   // PolySynth(PluckSynth) fails because PluckSynth doesn't expose the standard
   // frequency/envelope interface that PolySynth expects from its voice type.
-  const synth = new Tone.PluckSynth({
-    attackNoise: 1,
-    dampening: 3000,
-    resonance: 0.96,
-  });
+  const synth = new Tone.PluckSynth(toneVoiceOptions('PluckSynth', config));
   synth.volume.value = getNormalizedVolume('PluckSynth', config.volume);
 
-  return {
+  return registerVoiceSource({
     triggerAttack: (note: string | number, time?: number) =>
       synth.triggerAttack(note as string, time),
     triggerRelease: (_note?: string | number, time?: number) =>
@@ -313,50 +137,28 @@ export function createPluckSynth(config: InstrumentConfig): Tone.ToneAudioNode {
     disconnect: () => synth.disconnect(),
     dispose: () => synth.dispose(),
     volume: synth.volume,
-  } as unknown as Tone.ToneAudioNode;
+  } as unknown as Tone.ToneAudioNode, synth);
 }
 
 export function createMetalSynth(config: InstrumentConfig): Tone.MetalSynth {
   return new Tone.MetalSynth({
-    envelope: {
-      attack: (config.envelope?.attack ?? 1) / 1000,
-      decay: (config.envelope?.decay ?? 100) / 1000,
-      release: (config.envelope?.release ?? 100) / 1000,
-    },
+    ...toneVoiceOptions('MetalSynth', config),
     volume: getNormalizedVolume('MetalSynth', config.volume),
-  });
+  } as Partial<Tone.MetalSynthOptions>);
 }
 
 export function createMembraneSynth(config: InstrumentConfig): Tone.MembraneSynth {
   return new Tone.MembraneSynth({
-    pitchDecay: 0.05,
-    octaves: 10,
-    oscillator: {
-      type: config.oscillator?.type || 'sine',
-    } as Partial<Tone.OmniOscillatorOptions>,
-    envelope: {
-      attack: (config.envelope?.attack ?? 1) / 1000,
-      decay: (config.envelope?.decay ?? 400) / 1000,
-      sustain: 0.01,
-      release: (config.envelope?.release ?? 100) / 1000,
-    },
+    ...toneVoiceOptions('MembraneSynth', config),
     volume: getNormalizedVolume('MembraneSynth', config.volume),
-  });
+  } as Partial<Tone.MembraneSynthOptions>);
 }
 
 export function createNoiseSynth(config: InstrumentConfig): Tone.NoiseSynth {
   return new Tone.NoiseSynth({
-    noise: {
-      type: 'white',
-    },
-    envelope: {
-      attack: (config.envelope?.attack ?? 10) / 1000,
-      decay: (config.envelope?.decay ?? 200) / 1000,
-      sustain: (config.envelope?.sustain ?? 50) / 100,
-      release: (config.envelope?.release ?? 1000) / 1000,
-    },
+    ...toneVoiceOptions('NoiseSynth', config),
     volume: getNormalizedVolume('NoiseSynth', config.volume),
-  });
+  } as Partial<Tone.NoiseSynthOptions>);
 }
 
 export function createSampler(config: InstrumentConfig): Tone.Sampler {
@@ -506,7 +308,7 @@ export function createSuperSaw(config: InstrumentConfig): Tone.ToneAudioNode {
   const hasPitchEnv = pitchEnv?.enabled && pitchEnv.amount !== 0;
 
   // Return a wrapper object
-  return {
+  return registerVoiceSource({
     triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
       const t = time ?? Tone.now();
       // Release any existing voice for this note first to prevent voice leak
@@ -565,7 +367,7 @@ export function createSuperSaw(config: InstrumentConfig): Tone.ToneAudioNode {
       });
     },
     volume: synth.volume,
-  } as unknown as Tone.ToneAudioNode;
+  } as unknown as Tone.ToneAudioNode, synth, { filter });
 }
 
 export function createPolySynth(config: InstrumentConfig): Tone.ToneAudioNode {
@@ -596,7 +398,7 @@ export function createPolySynth(config: InstrumentConfig): Tone.ToneAudioNode {
 
   // If no pitch envelope, return wrapped synth with voice leak prevention
   if (!hasPitchEnv) {
-    return {
+    return registerVoiceSource({
       triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
         try { synth.triggerRelease(note, time); } catch { /* ignore */ }
         synth.triggerAttackRelease(note, duration, time, velocity);
@@ -611,11 +413,11 @@ export function createPolySynth(config: InstrumentConfig): Tone.ToneAudioNode {
       disconnect: () => synth.disconnect(),
       dispose: () => synth.dispose(),
       volume: synth.volume,
-    } as unknown as Tone.ToneAudioNode;
+    } as unknown as Tone.ToneAudioNode, synth);
   }
 
   // Wrap synth to add pitch envelope support
-  return {
+  return registerVoiceSource({
     triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
       const t = time ?? Tone.now();
       try { synth.triggerRelease(note, t); } catch { /* ignore */ }
@@ -641,7 +443,7 @@ export function createPolySynth(config: InstrumentConfig): Tone.ToneAudioNode {
     disconnect: () => synth.disconnect(),
     dispose: () => synth.dispose(),
     volume: synth.volume,
-  } as unknown as Tone.ToneAudioNode;
+  } as unknown as Tone.ToneAudioNode, synth);
 }
 
 export function createOrgan(config: InstrumentConfig): Tone.ToneAudioNode {
@@ -1886,7 +1688,7 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
     const bitCrusher = createBitCrusher(chipConfig.bitDepth);
     noise.connect(bitCrusher);
 
-    return {
+    return registerVoiceSource({
       triggerAttackRelease: (_note: string, duration: number, time?: number, velocity?: number) => {
         noise.triggerAttackRelease(duration, time, velocity);
       },
@@ -1920,7 +1722,7 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
         setBitCrusherBits(bitCrusher, Number(csc.bitDepth));
       },
       volume: noise.volume,
-    } as unknown as Tone.ToneAudioNode;
+    } as unknown as Tone.ToneAudioNode, noise);
   }
 
   // Square/Triangle channels
@@ -2042,7 +1844,7 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
     isArpeggioPlaying: () => arpeggioEngine?.getIsPlaying() ?? false,
   };
 
-  return chipSynthWrapper as unknown as Tone.ToneAudioNode;
+  return registerVoiceSource(chipSynthWrapper as unknown as Tone.ToneAudioNode, synth);
 }
 
 export function createPWMSynth(config: InstrumentConfig): Tone.ToneAudioNode {
@@ -2084,7 +1886,7 @@ export function createPWMSynth(config: InstrumentConfig): Tone.ToneAudioNode {
   synth.connect(filter);
   filter.connect(chorus);
 
-  return {
+  return registerVoiceSource({
     triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
       try { synth.triggerRelease(note, time); } catch { /* ignore */ }
       synth.triggerAttackRelease(note, duration, time, velocity);
@@ -2127,7 +1929,7 @@ export function createPWMSynth(config: InstrumentConfig): Tone.ToneAudioNode {
       });
     },
     volume: synth.volume,
-  } as unknown as Tone.ToneAudioNode;
+  } as unknown as Tone.ToneAudioNode, synth, { filter, lfo: { rateHz: () => Number(chorus.frequency.value), startTime: Tone.now() } });
 }
 
 /**
@@ -2172,7 +1974,7 @@ export function createStringMachine(config: InstrumentConfig): Tone.ToneAudioNod
   synth.connect(filter);
   filter.connect(chorus);
 
-  return {
+  return registerVoiceSource({
     triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
       try { synth.triggerRelease(note, time); } catch { /* ignore */ }
       synth.triggerAttackRelease(note, duration, time, velocity);
@@ -2208,7 +2010,7 @@ export function createStringMachine(config: InstrumentConfig): Tone.ToneAudioNod
       filter.frequency.rampTo(2000 + ((sc.brightness as number) * 80), 0.1);
     },
     volume: synth.volume,
-  } as unknown as Tone.ToneAudioNode;
+  } as unknown as Tone.ToneAudioNode, synth, { filter, lfo: { rateHz: () => Number(chorus.frequency.value), startTime: Tone.now() } });
 }
 
 /**

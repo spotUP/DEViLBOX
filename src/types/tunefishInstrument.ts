@@ -1,6 +1,12 @@
 // Tunefish 4 Synth Types
 // Used by XRNS import and the TunefishSynth engine
 
+/**
+ * Parameter indices: the engine's own eTfParam enum (third-party/tunefish/.../synth/tf4.hpp), which is also the VST
+ * parameter order Renoise stores. The keys below are the ones the editor drives; the enum also holds the envelopes
+ * (TF_ADSR1_*, TF_ADSR2_*), LFOs and the modulation matrix between them, so these indices are not contiguous.
+ * tunefishParams.test.ts compares this table with the header.
+ */
 export const TunefishParam = {
   GLOBAL_GAIN: 0,
   GEN_BANDWIDTH: 1,
@@ -28,35 +34,35 @@ export const TunefishParam = {
   HP_FILTER_ON: 23,
   HP_FILTER_CUTOFF: 24,
   HP_FILTER_RESONANCE: 25,
-  DISTORT_AMOUNT: 26,
-  CHORUS_RATE: 27,
-  CHORUS_DEPTH: 28,
-  DELAY_LEFT: 29,
-  DELAY_RIGHT: 30,
-  DELAY_DECAY: 31,
-  REVERB_ROOMSIZE: 32,
-  REVERB_DAMP: 33,
-  REVERB_WET: 34,
-  REVERB_WIDTH: 35,
-  FLANGER_LFO: 36,
-  FLANGER_FREQUENCY: 37,
-  FLANGER_AMPLITUDE: 38,
-  FLANGER_WET: 39,
-  CHORUS_GAIN: 40,
-  FORMANT_MODE: 41,
-  FORMANT_WET: 42,
-  EQ_LOW: 43,
-  EQ_MID: 44,
-  EQ_HIGH: 45,
-  PITCHWHEEL_UP: 46,
-  PITCHWHEEL_DOWN: 47,
-  BP_FILTER_ON: 48,
-  BP_FILTER_CUTOFF: 49,
-  BP_FILTER_Q: 50,
-  NT_FILTER_ON: 51,
-  NT_FILTER_CUTOFF: 52,
-  NT_FILTER_Q: 53,
-  PARAM_COUNT: 54
+  DISTORT_AMOUNT: 84,
+  CHORUS_RATE: 85,
+  CHORUS_DEPTH: 86,
+  DELAY_LEFT: 87,
+  DELAY_RIGHT: 88,
+  DELAY_DECAY: 89,
+  REVERB_ROOMSIZE: 90,
+  REVERB_DAMP: 91,
+  REVERB_WET: 92,
+  REVERB_WIDTH: 93,
+  FLANGER_LFO: 94,
+  FLANGER_FREQUENCY: 95,
+  FLANGER_AMPLITUDE: 96,
+  FLANGER_WET: 97,
+  CHORUS_GAIN: 98,
+  FORMANT_MODE: 99,
+  FORMANT_WET: 100,
+  EQ_LOW: 101,
+  EQ_MID: 102,
+  EQ_HIGH: 103,
+  PITCHWHEEL_UP: 104,
+  PITCHWHEEL_DOWN: 105,
+  BP_FILTER_ON: 106,
+  BP_FILTER_CUTOFF: 107,
+  BP_FILTER_Q: 108,
+  NT_FILTER_ON: 109,
+  NT_FILTER_CUTOFF: 110,
+  NT_FILTER_Q: 111,
+  PARAM_COUNT: 112,
 } as const;
 
 /**
@@ -229,66 +235,74 @@ export const DEFAULT_TUNEFISH: TunefishInstrumentConfig = {
   pitchwheelDown: 0.5
 };
 
+/** Which engine parameter each config key drives. */
+export const TUNEFISH_CONFIG_PARAM: Record<keyof TunefishInstrumentConfig, number> = {
+  globalGain: TunefishParam.GLOBAL_GAIN,
+  genBandwidth: TunefishParam.GEN_BANDWIDTH,
+  genNumHarmonics: TunefishParam.GEN_NUMHARMONICS,
+  genDamp: TunefishParam.GEN_DAMP,
+  genModulation: TunefishParam.GEN_MODULATION,
+  genVolume: TunefishParam.GEN_VOLUME,
+  genPanning: TunefishParam.GEN_PANNING,
+  genSlop: TunefishParam.GEN_SLOP,
+  genOctave: TunefishParam.GEN_OCTAVE,
+  genGlide: TunefishParam.GEN_GLIDE,
+  genDetune: TunefishParam.GEN_DETUNE,
+  genFreq: TunefishParam.GEN_FREQ,
+  genPolyphony: TunefishParam.GEN_POLYPHONY,
+  genDrive: TunefishParam.GEN_DRIVE,
+  genUnisono: TunefishParam.GEN_UNISONO,
+  genSpread: TunefishParam.GEN_SPREAD,
+  genScale: TunefishParam.GEN_SCALE,
+  noiseAmount: TunefishParam.NOISE_AMOUNT,
+  noiseFreq: TunefishParam.NOISE_FREQ,
+  noiseBw: TunefishParam.NOISE_BW,
+  lpFilterOn: TunefishParam.LP_FILTER_ON,
+  lpFilterCutoff: TunefishParam.LP_FILTER_CUTOFF,
+  lpFilterResonance: TunefishParam.LP_FILTER_RESONANCE,
+  hpFilterOn: TunefishParam.HP_FILTER_ON,
+  hpFilterCutoff: TunefishParam.HP_FILTER_CUTOFF,
+  hpFilterResonance: TunefishParam.HP_FILTER_RESONANCE,
+  bpFilterOn: TunefishParam.BP_FILTER_ON,
+  bpFilterCutoff: TunefishParam.BP_FILTER_CUTOFF,
+  bpFilterQ: TunefishParam.BP_FILTER_Q,
+  ntFilterOn: TunefishParam.NT_FILTER_ON,
+  ntFilterCutoff: TunefishParam.NT_FILTER_CUTOFF,
+  ntFilterQ: TunefishParam.NT_FILTER_Q,
+  distortAmount: TunefishParam.DISTORT_AMOUNT,
+  chorusRate: TunefishParam.CHORUS_RATE,
+  chorusDepth: TunefishParam.CHORUS_DEPTH,
+  chorusGain: TunefishParam.CHORUS_GAIN,
+  delayLeft: TunefishParam.DELAY_LEFT,
+  delayRight: TunefishParam.DELAY_RIGHT,
+  delayDecay: TunefishParam.DELAY_DECAY,
+  reverbRoomsize: TunefishParam.REVERB_ROOMSIZE,
+  reverbDamp: TunefishParam.REVERB_DAMP,
+  reverbWet: TunefishParam.REVERB_WET,
+  reverbWidth: TunefishParam.REVERB_WIDTH,
+  flangerLfo: TunefishParam.FLANGER_LFO,
+  flangerFrequency: TunefishParam.FLANGER_FREQUENCY,
+  flangerAmplitude: TunefishParam.FLANGER_AMPLITUDE,
+  flangerWet: TunefishParam.FLANGER_WET,
+  formantMode: TunefishParam.FORMANT_MODE,
+  formantWet: TunefishParam.FORMANT_WET,
+  eqLow: TunefishParam.EQ_LOW,
+  eqMid: TunefishParam.EQ_MID,
+  eqHigh: TunefishParam.EQ_HIGH,
+  pitchwheelUp: TunefishParam.PITCHWHEEL_UP,
+  pitchwheelDown: TunefishParam.PITCHWHEEL_DOWN,
+};
+
 /**
- * Convert TunefishInstrumentConfig to parameter array
+ * The config as engine parameters: engine index -> value. Sparse on purpose: the engine also holds the envelopes, LFOs
+ * and modulation matrix, which the config does not carry, so a config edit must never write over them.
  */
-export function tunefishConfigToParams(config: TunefishInstrumentConfig): number[] {
-  return [
-    config.globalGain,
-    config.genBandwidth,
-    config.genNumHarmonics,
-    config.genDamp,
-    config.genModulation,
-    config.genVolume,
-    config.genPanning,
-    config.genSlop,
-    config.genOctave,
-    config.genGlide,
-    config.genDetune,
-    config.genFreq,
-    config.genPolyphony,
-    config.genDrive,
-    config.genUnisono,
-    config.genSpread,
-    config.genScale,
-    config.noiseAmount,
-    config.noiseFreq,
-    config.noiseBw,
-    config.lpFilterOn,
-    config.lpFilterCutoff,
-    config.lpFilterResonance,
-    config.hpFilterOn,
-    config.hpFilterCutoff,
-    config.hpFilterResonance,
-    config.distortAmount,
-    config.chorusRate,
-    config.chorusDepth,
-    config.delayLeft,
-    config.delayRight,
-    config.delayDecay,
-    config.reverbRoomsize,
-    config.reverbDamp,
-    config.reverbWet,
-    config.reverbWidth,
-    config.flangerLfo,
-    config.flangerFrequency,
-    config.flangerAmplitude,
-    config.flangerWet,
-    config.chorusGain,
-    config.formantMode,
-    config.formantWet,
-    config.eqLow,
-    config.eqMid,
-    config.eqHigh,
-    config.pitchwheelUp,
-    config.pitchwheelDown,
-    config.bpFilterOn,
-    config.bpFilterCutoff,
-    config.bpFilterQ,
-    config.ntFilterOn,
-    config.ntFilterCutoff,
-    config.ntFilterQ
-  ];
+export function tunefishConfigToParams(config: TunefishInstrumentConfig): Record<number, number> {
+  const params: Record<number, number> = {};
+  for (const key of Object.keys(TUNEFISH_CONFIG_PARAM) as Array<keyof TunefishInstrumentConfig>) {
+    params[TUNEFISH_CONFIG_PARAM[key]] = config[key];
+  }
+  return params;
 }
 
 /**

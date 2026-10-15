@@ -51,6 +51,8 @@ export interface FMAlgorithmDiagramProps {
   onSelectOp?: (op: number) => void;
   /** Carrier box fill color (theme accent) */
   accentColor?: string;
+  /** Text drawn in an operator box instead of its number (the OPL convention numbers the modulator 1 and the carrier 2). */
+  opLabels?: Partial<Record<number, string>>;
   className?: string;
 }
 
@@ -171,6 +173,7 @@ export const FMAlgorithmDiagram: React.FC<FMAlgorithmDiagramProps> = ({
   selectedOp = null,
   onSelectOp,
   accentColor = C_CARRIER,
+  opLabels,
   className = '',
 }) => {
   const algList  = opCount === 2 ? ALG_2OP : ALG_4OP;
@@ -309,7 +312,7 @@ export const FMAlgorithmDiagram: React.FC<FMAlgorithmDiagramProps> = ({
                 fontWeight="bold"
                 fill={isCarrier || isSelected ? '#000' : '#e2e8f0'}
               >
-                {opNum}
+                {opLabels?.[opNum] ?? opNum}
               </text>
             </g>
           );

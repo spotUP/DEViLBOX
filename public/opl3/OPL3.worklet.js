@@ -3,6 +3,9 @@
  * WASM JS code passed as string from main thread.
  */
 
+// A voice report every ~10 ms at 48 kHz.
+const REPORT_EVERY_FRAMES = 512;
+
 class OPL3Processor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -10,6 +13,10 @@ class OPL3Processor extends AudioWorkletProcessor {
     this.module = null;
     this.outPtrL = 0;
     this.outPtrR = 0;
+    // Live voice report for the editor's curve markers: posted while the editor watches (message 'watchVoices').
+    this.watchVoices = false;
+    this.voicePtr = 0;
+    this.framesSinceReport = 0;
     this.port.onmessage = (e) => this.handleMessage(e.data);
   }
 
@@ -55,10 +62,42 @@ class OPL3Processor extends AudioWorkletProcessor {
       case 'chNoteOff':
         if (this.ready) this.module._oplChannelNoteOff(msg.ch);
         break;
+      case 'watchVoices':
+        this.watchVoices = !!msg.on;
+        this.framesSinceReport = REPORT_EVERY_FRAMES; // report at once, so the marker does not wait for the next interval
+        break;
       case 'destroy':
         if (this.ready) { this.module._oplDestroy(); this.ready = false; }
         break;
     }
+  }
+
+  /** Post the envelope state of the sounding chip channels (oplGetChannelEnvelopes, 12 bytes per channel, then the chip LFO positions). */
+  postVoiceStatus() {
+    if (!this.voicePtr) this.voicePtr = this.module._malloc(18 * 12 + 4);
+    const got = this.module._oplGetChannelEnvelopes(this.voicePtr);
+    if (got === 0) return;
+    const dv = new DataView(this.module.HEAPU8.buffer, this.voicePtr, got);
+    const channels = [];
+    for (let c = 0; c < 18; c++) {
+      const b = c * 12;
+      if (dv.getUint8(b) !== 1) continue;
+      channels.push({
+        channel: c,
+        note: dv.getUint8(b + 1),
+        modulatorStage: dv.getUint8(b + 2),
+        carrierStage: dv.getUint8(b + 3),
+        modulatorAttenuation: dv.getUint16(b + 4, true),
+        carrierAttenuation: dv.getUint16(b + 6, true),
+        age: dv.getUint32(b + 8, true),
+      });
+    }
+    const lfoBase = 18 * 12;
+    this.port.postMessage({
+      type: 'voiceStatus',
+      channels,
+      lfo: { tremoloPosition: dv.getUint8(lfoBase), vibratoPosition: dv.getUint8(lfoBase + 1), timer: dv.getUint16(lfoBase + 2, true) },
+    });
   }
 
   loadSbiData(arrayBuf) {
@@ -139,6 +178,14 @@ class OPL3Processor extends AudioWorkletProcessor {
     const heap = this.module.HEAPF32 || new Float32Array(this.module.wasmMemory.buffer);
     outL.set(heap.subarray(this.outPtrL >> 2, (this.outPtrL >> 2) + n));
     outR.set(heap.subarray(this.outPtrR >> 2, (this.outPtrR >> 2) + n));
+
+    if (this.watchVoices && typeof this.module._oplGetChannelEnvelopes === 'function') {
+      this.framesSinceReport += n;
+      if (this.framesSinceReport >= REPORT_EVERY_FRAMES) {
+        this.framesSinceReport = 0;
+        this.postVoiceStatus();
+      }
+    }
     return true;
   }
 }

@@ -31,11 +31,18 @@ let wavesabre_set_chunk = null;
 let wavesabre_note_on = null;
 let wavesabre_note_off = null;
 let wavesabre_render = null;
+let wavesabre_get_voices = null;
 
 // Audio buffers
 let outputPtrL = 0;
 let outputPtrR = 0;
 const BUFFER_SIZE = 128;
+
+// Live voice report for the editor curves (src/engine/voiceStatus/wasmVoiceStatus.ts): 8 floats per sounding voice
+const MAX_REPORTED_VOICES = 64;
+let watchVoices = false;
+let voiceCounter = 0;
+let voicePtr = 0;
 
 class WaveSabreProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -46,6 +53,9 @@ class WaveSabreProcessor extends AudioWorkletProcessor {
       const { type, data } = e.data;
       
       switch (type) {
+        case 'watchVoices':
+          watchVoices = !!e.data.on;
+          break;
         case 'init':
           console.log('[WaveSabre] init received, synthType:', data.synthType || 'falcon');
           this.initWasm(data.wasmBytes, data.synthType || 'falcon');
@@ -139,6 +149,7 @@ class WaveSabreProcessor extends AudioWorkletProcessor {
       wavesabre_set_chunk = Module.cwrap('wavesabre_set_chunk', null, ['number', 'number', 'number']);
       wavesabre_note_on = Module.cwrap('wavesabre_note_on', null, ['number', 'number', 'number', 'number']);
       wavesabre_note_off = Module.cwrap('wavesabre_note_off', null, ['number', 'number']);
+      wavesabre_get_voices = Module.cwrap('wavesabre_get_voices', 'number', ['number', 'number', 'number']);
       wavesabre_render = Module.cwrap('wavesabre_render', null, ['number', 'number', 'number', 'number']);
       
       // Set sample rate
@@ -214,6 +225,14 @@ class WaveSabreProcessor extends AudioWorkletProcessor {
       if (absL > maxSample) maxSample = absL;
     }
     
+    if (watchVoices && wavesabre_get_voices && ++voiceCounter >= 6) {
+      voiceCounter = 0;
+      if (!voicePtr) voicePtr = Module._malloc(MAX_REPORTED_VOICES * 8 * 4);
+      const n = wavesabre_get_voices(synth, voicePtr, MAX_REPORTED_VOICES);
+      const at = voicePtr >> 2;
+      this.port.postMessage({ type: 'voiceStatus', voices: heapF32.slice(at, at + n * 8) });
+    }
+
     // Log once per second if we have audio
     if (!this._lastLog || currentTime - this._lastLog > 1) {
       if (maxSample > 0.0001) {

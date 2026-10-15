@@ -1,5 +1,5 @@
 import type { SynthPanelLayout } from '@/types/synthPanel';
-import { adsrCurve } from '@/components/instruments/curves/commonCurveModels';
+import { toneAdsrCurve } from '@/components/instruments/curves/toneCurves';
 
 const fmtHz = (v: number) => `${Math.round(v)} Hz`;
 const fmtMs = (v: number) => `${Math.round(v)}ms`;
@@ -46,7 +46,7 @@ export const FORMANT_SYNTH_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'AMP ENVELOPE',
-          curves: [adsrCurve({ label: 'Amp envelope', attack: 'envelope.attack', decay: 'envelope.decay', sustain: 'envelope.sustain', release: 'envelope.release' })],
+          curves: [toneAdsrCurve({ label: 'Amp envelope', attack: 'envelope.attack', decay: 'envelope.decay', sustain: 'envelope.sustain', release: 'envelope.release' })],
           controls: [
             { type: 'knob', key: 'envelope.attack', label: 'ATK', color: '#ff9900', min: 0, max: 2000, defaultValue: 10, formatValue: fmtMs },
             { type: 'knob', key: 'envelope.decay', label: 'DEC', color: '#ff9900', min: 0, max: 2000, defaultValue: 200, formatValue: fmtMs },

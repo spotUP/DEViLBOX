@@ -36,7 +36,7 @@ if(EMSCRIPTEN)
         "SHELL:-s ENVIRONMENT=web,worker"
         "SHELL:-s ALLOW_MEMORY_GROWTH=1"
         "SHELL:-s INITIAL_MEMORY=16777216"
-        "SHELL:-s EXPORTED_FUNCTIONS=[_dx7Init,_dx7Destroy,_dx7LoadFirmware,_dx7LoadVoices,_dx7LoadSysex,_dx7NoteOn,_dx7NoteOff,_dx7AllNotesOff,_dx7Sustain,_dx7PitchBend,_dx7ModWheel,_dx7SetBank,_dx7ProgramChange,_dx7SetVolume,_dx7GetNativeSamplerate,_dx7IsReady,_dx7Process,_dx7GetPatchName,_malloc,_free]"
+        "SHELL:-s EXPORTED_FUNCTIONS=[_dx7Init,_dx7Destroy,_dx7LoadFirmware,_dx7LoadVoices,_dx7LoadSysex,_dx7NoteOn,_dx7NoteOff,_dx7AllNotesOff,_dx7Sustain,_dx7PitchBend,_dx7ModWheel,_dx7SetBank,_dx7ProgramChange,_dx7SetVolume,_dx7GetNativeSamplerate,_dx7IsReady,_dx7Process,_dx7GetPatchName,_dx7GetEnvelopeState,_dx7GetEgsRegisters,_dx7ReadMemory,_malloc,_free]"
         "SHELL:-s EXPORTED_RUNTIME_METHODS=[ccall,cwrap,HEAPF32,HEAPU8,UTF8ToString]"
         -O3
         --no-entry

@@ -14,8 +14,9 @@ import type { DevilboxSynth } from '@/types/synth';
 import type { WavetableConfig } from '../types/instrument';
 import { getDevilboxAudioContext, noteToMidi, noteToFrequency, audioNow, timeToSeconds } from '@/utils/audio-context';
 import { getWavetablePreset, getFrameAtPosition } from '../constants/wavetablePresets';
+import type { VoiceReadable, VoiceReadout } from './tone/toneVoiceProbe';
 
-export class WavetableSynth implements DevilboxSynth {
+export class WavetableSynth implements DevilboxSynth, VoiceReadable {
   readonly name = 'WavetableSynth';
   readonly output: GainNode;
 
@@ -35,6 +36,9 @@ export class WavetableSynth implements DevilboxSynth {
 
   // Current morph position (modulated)
   private baseMorphPosition: number = 0;
+
+  // The voice triggered last: the live curve markers read its gain (envelope level) and the filter cutoff
+  private lastVoice: WavetableVoice | null = null;
 
   constructor(config: WavetableConfig) {
     this.config = config;
@@ -113,6 +117,7 @@ export class WavetableSynth implements DevilboxSynth {
       // Trigger the voice
       voice.triggerAttack(freq, now, velocity);
       this.voices.set(midiNote, voice);
+      this.lastVoice = voice;
 
       // Filter envelope modulation (manual scheduling)
       if (this.config.filter.envelopeAmount !== 0) {
@@ -131,6 +136,16 @@ export class WavetableSynth implements DevilboxSynth {
         this.filter.frequency.linearRampToValueAtTime(sustainFreq, now + filterAttack + filterDecay);
       }
     }
+  }
+
+  /**
+   * The newest voice as the live curve markers read it: its envelope level (the unison gain AudioParam, which
+   * follows the scheduled ramps), its ADSR timings and the filter cutoff as the filter really is now.
+   */
+  readVoice(): VoiceReadout | null {
+    const voice = this.lastVoice;
+    if (!voice) return null;
+    return { level: voice.level(), env: voice.envelopeTimes(), cutoffHz: this.filter.frequency.value };
   }
 
   /**
@@ -398,6 +413,16 @@ class WavetableVoice {
       param.linearRampToValueAtTime(1, time + fadeOut + this.attackTime);
       param.linearRampToValueAtTime(this.sustainLevel, time + fadeOut + this.attackTime + this.decayTime);
     });
+  }
+
+  /** Current envelope level (the first unison gain follows the scheduled ramps). */
+  level(): number {
+    return this.gains[0]?.gain.value ?? 0;
+  }
+
+  /** The ADSR this voice plays, in seconds (sustain 0..1). */
+  envelopeTimes(): { attack: number; decay: number; sustain: number; release: number } {
+    return { attack: this.attackTime, decay: this.decayTime, sustain: this.sustainLevel, release: this.releaseTime };
   }
 
   /**

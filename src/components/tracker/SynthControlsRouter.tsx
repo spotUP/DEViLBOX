@@ -602,6 +602,7 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
             layout={declLayout}
             config={instrument as unknown as Record<string, unknown>}
             onChange={(updates) => onUpdate(updates)}
+            instrumentId={instrument.id}
           />
         );
       }

@@ -1,5 +1,5 @@
 import type { SynthPanelLayout } from '@/types/synthPanel';
-import { adsrCurve } from '@/components/instruments/curves/commonCurveModels';
+import { toneAdsrCurve } from '@/components/instruments/curves/toneCurves';
 
 const fmtHz = (v: number) => `${Math.round(v)} Hz`;
 const fmtMs = (v: number) => `${Math.round(v)} ms`;
@@ -30,7 +30,7 @@ export const CHIP_SYNTH_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'ENVELOPE',
-          curves: [adsrCurve({ label: 'Amp envelope', attack: 'envelope.attack', decay: 'envelope.decay', sustain: 'envelope.sustain', release: 'envelope.release' })],
+          curves: [toneAdsrCurve({ label: 'Amp envelope', attack: 'envelope.attack', decay: 'envelope.decay', sustain: 'envelope.sustain', release: 'envelope.release' })],
           controls: [
             { type: 'knob', key: 'envelope.attack', label: 'A', formatValue: fmtMs },
             { type: 'knob', key: 'envelope.decay', label: 'D', formatValue: fmtMs },

@@ -4,6 +4,11 @@
  * Includes linear-interpolation resampler (49096 Hz → host rate).
  */
 
+// A voice report every ~10 ms at 48 kHz.
+const REPORT_EVERY_FRAMES = 512;
+// EGS envelope level of a silent operator (Envelope::level 0xFF0).
+const EG_SILENT = 0xff0;
+
 class DX7Processor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -27,7 +32,17 @@ class DX7Processor extends AudioWorkletProcessor {
     this.curSampleL = 0;
     this.curSampleR = 0;
 
-    // Level monitoring (unused)
+    // Live voice report for the editor's curve markers (message 'watchVoices'): the EGS envelope state of every voice.
+    this.watchVoices = false;
+    this.framesSinceReport = 0;
+    this.framesProcessed = 0;
+    this.pendingNotes = [];          // notes keyed since the last voice start was matched to a note
+    this.voiceActive = new Array(16).fill(false);
+    this.voiceStartFrame = new Array(16).fill(0);
+    this.voiceReleaseFrame = new Array(16).fill(-1);
+    this.voiceNote = new Array(16).fill(-1);
+    this.envPtr = 0;
+    this.regPtr = 0;
 
     this.port.onmessage = (e) => this.handleMessage(e.data);
   }
@@ -47,7 +62,10 @@ class DX7Processor extends AudioWorkletProcessor {
         if (this.ready) this.loadSysex(msg.data);
         break;
       case 'noteOn':
-        if (this.ready) this.module._dx7NoteOn(msg.note, msg.velocity);
+        if (this.ready) {
+          if (this.watchVoices) this.pendingNotes.push(msg.note);
+          this.module._dx7NoteOn(msg.note, msg.velocity);
+        }
         break;
       case 'noteOff':
         if (this.ready) this.module._dx7NoteOff(msg.note);
@@ -72,6 +90,21 @@ class DX7Processor extends AudioWorkletProcessor {
         break;
       case 'setVolume':
         if (this.ready) this.module._dx7SetVolume(msg.volume);
+        break;
+      case 'watchVoices':
+        this.watchVoices = !!msg.on;
+        this.pendingNotes = [];
+        this.framesSinceReport = REPORT_EVERY_FRAMES; // report at once
+        break;
+      case 'getVced':
+        // The 155-byte voice the firmware is playing (its edit buffer at 0x2000), so the editor shows the sounding voice.
+        if (this.ready && typeof this.module._dx7ReadMemory === 'function') {
+          const ptr = this.module._malloc(155);
+          this.module._dx7ReadMemory(0x2000, 155, ptr);
+          const values = Array.from(this.module.HEAPU8.slice(ptr, ptr + 155));
+          this.module._free(ptr);
+          this.port.postMessage({ type: 'vced', values });
+        }
         break;
       case 'getPatchName': {
         if (this.ready) {
@@ -208,6 +241,62 @@ class DX7Processor extends AudioWorkletProcessor {
     return n;
   }
 
+  /**
+   * Post the voices that are sounding: per operator the EG level (1/256 octave attenuation), segment and key-up flag,
+   * the voice pitch, and the LFO modulation registers. dx7GetEnvelopeState layout: 16 voices x 6 ops x 4 bytes.
+   */
+  postVoiceStatus() {
+    const m = this.module;
+    if (typeof m._dx7GetEnvelopeState !== 'function' || typeof m._dx7GetEgsRegisters !== 'function') return;
+    if (!this.envPtr) { this.envPtr = m._malloc(384); this.regPtr = m._malloc(256); }
+    if (m._dx7GetEnvelopeState(this.envPtr) === 0) return;
+    m._dx7GetEgsRegisters(this.regPtr);
+    const heap = m.HEAPU8;
+    const env = heap.subarray(this.envPtr, this.envPtr + 384);
+    const reg = heap.subarray(this.regPtr, this.regPtr + 256);
+    const dv = new DataView(env.buffer, env.byteOffset, 384);
+    const voices = [];
+    for (let v = 0; v < 16; v++) {
+      const ops = [];
+      let anyDown = false;
+      let loudest = EG_SILENT;
+      for (let o = 0; o < 6; o++) {
+        const b = (v * 6 + o) * 4;
+        const level = dv.getUint16(b, true);
+        const released = (env[b + 3] & 1) === 1;
+        if (!released) anyDown = true;
+        if (level < loudest) loudest = level;
+        ops.push({ level, stage: env[b + 2], released });
+      }
+      const sounding = anyDown || loudest < EG_SILENT - 64;
+      if (sounding && !this.voiceActive[v]) {
+        this.voiceActive[v] = true;
+        this.voiceStartFrame[v] = this.framesProcessed;
+        this.voiceReleaseFrame[v] = -1;
+        this.voiceNote[v] = this.pendingNotes.length ? this.pendingNotes.shift() : -1;
+      } else if (!sounding) {
+        this.voiceActive[v] = false;
+      }
+      if (!sounding) continue;
+      if (!anyDown && this.voiceReleaseFrame[v] < 0) this.voiceReleaseFrame[v] = this.framesProcessed;
+      if (anyDown) this.voiceReleaseFrame[v] = -1;
+      voices.push({
+        voice: v,
+        note: this.voiceNote[v],
+        ops,
+        pitch: ((reg[2 * v] << 8) | reg[2 * v + 1]) >> 2,
+        elapsedSeconds: (this.framesProcessed - this.voiceStartFrame[v]) / this.hostRate,
+        releasedSeconds: this.voiceReleaseFrame[v] < 0 ? null : (this.framesProcessed - this.voiceReleaseFrame[v]) / this.hostRate,
+      });
+    }
+    this.port.postMessage({
+      type: 'voiceStatus',
+      voices,
+      // int16 pitch modulation (LFO, 1/16 of a 1024-per-octave unit) and the amplitude modulation byte
+      lfo: { pitchMod: ((reg[0xf2] << 8) | reg[0xf3]) << 16 >> 16, ampMod: reg[0xf0] },
+    });
+  }
+
   // Get next native sample, generating more if needed
   nextNativeSample() {
     if (this.nativeReadIdx >= this.nativeBufFilled) {
@@ -248,6 +337,14 @@ class DX7Processor extends AudioWorkletProcessor {
       outR[i] = gain * (this.prevSampleR + frac * (this.curSampleR - this.prevSampleR));
     }
 
+    this.framesProcessed += n;
+    if (this.watchVoices) {
+      this.framesSinceReport += n;
+      if (this.framesSinceReport >= REPORT_EVERY_FRAMES) {
+        this.framesSinceReport = 0;
+        this.postVoiceStatus();
+      }
+    }
     return true;
   }
 }

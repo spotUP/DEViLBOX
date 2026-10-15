@@ -12,6 +12,7 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import { WasmVoiceHub, registerVoiceHub } from '@/engine/voiceStatus/wasmVoiceStatus';
 import { loadNativePatch, captureNativeState, type NativePatch } from '@/engine/common/NativePatchLoader';
 
 export const RaffoParam = {
@@ -212,6 +213,9 @@ export class RaffoSynthEngine implements DevilboxSynth {
   readonly output: GainNode;
 
   private _worklet: AudioWorkletNode | null = null;
+  /** Live voice report for the editor curves' markers (wasmVoiceStatus.ts). */
+  readonly voiceHub = new WasmVoiceHub((m) => this._worklet?.port.postMessage(m));
+  private readonly unregisterVoiceHub: () => void;
   private config: RaffoSynthConfig;
   private isInitialized = false;
   private pendingNotes: Array<{ note: number; velocity: number }> = [];
@@ -225,6 +229,7 @@ export class RaffoSynthEngine implements DevilboxSynth {
   constructor(config: Partial<RaffoSynthConfig> = {}) {
     this.output = getDevilboxAudioContext().createGain();
     this.config = { ...DEFAULT_RAFFO, ...config };
+    this.unregisterVoiceHub = registerVoiceHub('RaffoSynth', this.voiceHub);
     this._initPromise = this.initialize();
   }
 
@@ -274,8 +279,10 @@ export class RaffoSynthEngine implements DevilboxSynth {
       });
 
       this._worklet.port.onmessage = (event) => {
+        if (this.voiceHub.handleMessage(event.data)) return;
         if (event.data.type === 'ready') {
           this.isInitialized = true;
+          this.voiceHub.resume();
           if (this.pendingPatch) {
             void loadNativePatch(this._worklet!, this.pendingPatch).catch(() => {});
             this.pendingPatch = null;
@@ -408,6 +415,7 @@ export class RaffoSynthEngine implements DevilboxSynth {
   }
 
   dispose(): void {
+    this.unregisterVoiceHub();
     if (this._worklet) {
       this._worklet.port.postMessage({ type: 'dispose' });
       this._worklet.disconnect();

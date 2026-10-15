@@ -34,7 +34,7 @@ if(EMSCRIPTEN)
         "SHELL:-s ENVIRONMENT=web,worker"
         "SHELL:-s ALLOW_MEMORY_GROWTH=1"
         "SHELL:-s INITIAL_MEMORY=4194304"
-        "SHELL:-s EXPORTED_FUNCTIONS=[_oplInit,_oplDestroy,_oplNoteOn,_oplNoteOff,_oplSustainPedal,_oplPitchBend,_oplAllNotesOff,_oplLoadSbi,_oplSetPatchRegisters,_oplProcess,_oplGetActiveVoiceCount,_malloc,_free]"
+        "SHELL:-s EXPORTED_FUNCTIONS=[_oplInit,_oplDestroy,_oplNoteOn,_oplNoteOff,_oplSustainPedal,_oplPitchBend,_oplAllNotesOff,_oplLoadSbi,_oplSetPatchRegisters,_oplProcess,_oplGetActiveVoiceCount,_oplGetChannelEnvelopes,_malloc,_free]"
         "SHELL:-s EXPORTED_RUNTIME_METHODS=[ccall,cwrap,HEAPF32,HEAPU8]"
         -O3
         --no-entry

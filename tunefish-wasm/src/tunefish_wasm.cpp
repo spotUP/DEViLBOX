@@ -27,6 +27,8 @@ struct TunefishWrapper {
     eF32* tempBufferL;
     eF32* tempBufferR;
     eU32 bufferSize;
+    // Samples each voice has played since its note started (the engine's voice.time counts process calls, not samples).
+    eU32 voiceAge[TF_MAXVOICES];
 };
 
 // Default params for a basic saw-like init patch
@@ -96,6 +98,7 @@ EXPORT void* tunefish_create(float sampleRate) {
     setDefaultParams(wrapper->instrument);
     
     // Allocate temp buffers
+    memset(wrapper->voiceAge, 0, sizeof(wrapper->voiceAge));
     wrapper->bufferSize = 256;
     wrapper->tempBufferL = new eF32[wrapper->bufferSize];
     wrapper->tempBufferR = new eF32[wrapper->bufferSize];
@@ -198,6 +201,12 @@ EXPORT void tunefish_render(void* ptr, float* outputL, float* outputR, int numSa
         memset(wrapper->tempBufferR, 0, chunkSize * sizeof(eF32));
         
         eTfInstrumentProcess(wrapper->synth, wrapper->instrument, outputs, chunkSize);
+
+        for (eU32 v = 0; v < TF_MAXVOICES; v++) {
+            const eTfVoice& voice = wrapper->instrument.voice[v];
+            if (voice.time <= 1) wrapper->voiceAge[v] = 0;
+            if (voice.noteIsOn || voice.playing) wrapper->voiceAge[v] += chunkSize;
+        }
         
         // Copy to output
         for (eU32 i = 0; i < chunkSize; i++) {
@@ -211,4 +220,37 @@ EXPORT void tunefish_render(void* ptr, float* outputL, float* outputR, int numSa
 
 EXPORT int tunefish_get_num_params() {
     return TF_PARAM_COUNT;
+}
+
+// Live voice report for the editor curves (src/engine/voiceStatus/wasmVoiceStatus.ts): 12 floats per sounding voice.
+// The standard eight: note, amplitude stage (envelope 1 phase: 0 attack 1 decay 2 sustain 3 release 4 finished),
+// amplitude level (envelope 1 volume), seconds since the note, the low-pass cutoff parameter after the modulation
+// matrix (0..1, as eTfFilterUpdate receives it), envelope 2 volume, LFO 1 phase in cycles, envelope 2 phase. Then
+// the high-pass, band-pass and notch cutoff parameters after the modulation matrix, and one spare (the note's
+// velocity / 127).
+EXPORT int tunefish_get_voices(void* ptr, float* out, int maxVoices) {
+    auto wrapper = static_cast<TunefishWrapper*>(ptr);
+    if (!wrapper) return 0;
+    eTfInstrument& instr = wrapper->instrument;
+    int n = 0;
+    for (eU32 v = 0; v < TF_MAXVOICES && n < maxVoices; v++) {
+        eTfVoice& voice = instr.voice[v];
+        if (!voice.noteIsOn && !voice.playing) continue;
+        eTfModMatrix& mm = voice.modMatrix;
+        float* o = out + n * 12;
+        o[0] = (float)voice.currentNote;
+        o[1] = (float)(int)mm.envState[0].phase;
+        o[2] = mm.envState[0].volume;
+        o[3] = (float)wrapper->voiceAge[v] / (float)wrapper->synth.sampleRate;
+        o[4] = instr.params[TF_LP_FILTER_CUTOFF] * eTfModMatrixGet(mm, eTfModMatrix::OUTPUT_LP_FILTER_CUTOFF);
+        o[5] = mm.envState[1].volume;
+        o[6] = mm.lfoState[0].phase / 6.2831853f;
+        o[7] = (float)(int)mm.envState[1].phase;
+        o[8] = instr.params[TF_HP_FILTER_CUTOFF] * eTfModMatrixGet(mm, eTfModMatrix::OUTPUT_HP_FILTER_CUTOFF);
+        o[9] = instr.params[TF_BP_FILTER_CUTOFF] * eTfModMatrixGet(mm, eTfModMatrix::OUTPUT_BP_FILTER_CUTOFF);
+        o[10] = instr.params[TF_NT_FILTER_CUTOFF] * eTfModMatrixGet(mm, eTfModMatrix::OUTPUT_NT_FILTER_CUTOFF);
+        o[11] = (float)voice.currentVelocity / 127.0f;
+        n++;
+    }
+    return n;
 }

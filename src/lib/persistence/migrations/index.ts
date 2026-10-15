@@ -70,6 +70,12 @@ export function migrateSavedProject(
     if (klys && klys.instrumentsFrom === undefined) klys.instrumentsFrom = 'engine';
   }
 
+  // CZ-101 instruments carry their own patch as the string parameters `_cz101Tone` (128 tone bytes, base64) and
+  // `_cz101Name` inside `instrument.parameters`. Additive, so there is no schema bump and nothing to transform: a
+  // project saved before it has no such parameter and plays the bank patch, one saved with it loads in a build
+  // that has never heard of it (the parameters are ignored). The User library that lists these patches is a
+  // separate localStorage store with its own version (src/stores/useCz101UserPatchStore.ts).
+
   // Stamp the project at the current schema so a subsequent save is not
   // re-migrated.
   project.schemaVersion = CURRENT_SCHEMA;

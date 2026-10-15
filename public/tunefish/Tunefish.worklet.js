@@ -25,11 +25,19 @@ let tunefish_pitch_bend = null;
 let tunefish_mod_wheel = null;
 let tunefish_render = null;
 let tunefish_get_num_params = null;
+let tunefish_get_voices = null;
 
 // Audio buffers in WASM memory
 let outputPtrL = 0;
 let outputPtrR = 0;
 const BUFFER_SIZE = 128;
+
+// Live voice report for the editor curves (src/engine/voiceStatus/wasmVoiceStatus.ts): 12 floats per voice
+const VOICE_STRIDE = 12;
+const MAX_VOICES = 16;
+let watchVoices = false;
+let voiceCounter = 0;
+let voicePtr = 0;
 
 class TunefishProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -39,6 +47,9 @@ class TunefishProcessor extends AudioWorkletProcessor {
       const { type, data } = e.data;
       
       switch (type) {
+        case 'watchVoices':
+          watchVoices = !!e.data.on;
+          break;
         case 'init':
           this.initWasm(data.wasmBytes);
           break;
@@ -114,6 +125,7 @@ class TunefishProcessor extends AudioWorkletProcessor {
       tunefish_mod_wheel = Module.cwrap('tunefish_mod_wheel', null, ['number', 'number']);
       tunefish_render = Module.cwrap('tunefish_render', null, ['number', 'number', 'number', 'number']);
       tunefish_get_num_params = Module.cwrap('tunefish_get_num_params', 'number', []);
+      tunefish_get_voices = Module.cwrap('tunefish_get_voices', 'number', ['number', 'number', 'number']);
       
       // Create synth instance
       synth = tunefish_create(sampleRate);
@@ -155,6 +167,14 @@ class TunefishProcessor extends AudioWorkletProcessor {
     for (let i = 0; i < blockSize; i++) {
       left[i] = heapF32[offsetL + i];
       right[i] = heapF32[offsetR + i];
+    }
+
+    if (watchVoices && tunefish_get_voices && ++voiceCounter >= 6) {
+      voiceCounter = 0;
+      if (!voicePtr) voicePtr = Module._malloc(MAX_VOICES * VOICE_STRIDE * 4);
+      const n = tunefish_get_voices(synth, voicePtr, MAX_VOICES);
+      const at = voicePtr >> 2;
+      this.port.postMessage({ type: 'voiceStatus', stride: VOICE_STRIDE, voices: Module.HEAPF32.slice(at, at + n * VOICE_STRIDE) });
     }
 
     return true;

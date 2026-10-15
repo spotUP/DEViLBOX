@@ -246,19 +246,23 @@ export interface AdsrCurveOptions {
   height?: number;
 }
 
+/** The ADSR a curve built with `o` shows for the current layout values: times in milliseconds, sustain in percent. */
+export function adsrValues(o: AdsrCurveOptions, get: (key: string) => number): { a: number; d: number; sustainPercent: number; r: number } {
+  const toMs = o.timeUnit === 's' ? 1000 : 1;
+  const s = read(get, o.sustain, 0);
+  return {
+    a: read(get, o.attack, 0) * toMs, d: read(get, o.decay, 0) * toMs, r: read(get, o.release, 0) * toMs,
+    sustainPercent: o.sustainUnit === 'unit' ? s * 100 : s,
+  };
+}
+
 /**
  * An amplitude envelope curve. X is the fraction (0..1) of the drawn timeline (the real times change with the knobs;
  * the readout names them), Y the level 0..1.
  */
 export function adsrCurve(o: AdsrCurveOptions): CurveDescriptor {
-  const toMs = o.timeUnit === 's' ? 1000 : 1;
-  const sustainPercent = (get: Get): number => {
-    const s = read(get, o.sustain, 0);
-    return o.sustainUnit === 'unit' ? s * 100 : s;
-  };
-  const times = (get: Get) => ({
-    a: read(get, o.attack, 0) * toMs, d: read(get, o.decay, 0) * toMs, r: read(get, o.release, 0) * toMs,
-  });
+  const sustainPercent = (get: Get): number => adsrValues(o, get).sustainPercent;
+  const times = (get: Get) => adsrValues(o, get);
   return {
     label: o.label ?? 'Envelope',
     height: o.height,
@@ -393,4 +397,9 @@ export function cutoffEnvelopeCurve(o: CutoffEnvelopeCurveOptions): CurveDescrip
       return `${fmtHz(m.base)} to ${fmtHz(m.peak)} to ${fmtHz(m.sustainHz)}`;
     },
   };
+}
+
+/** The numeric value of a layout key or constant (a curve builder's `Source`), 0-safe. */
+export function readSource(get: (key: string) => number, src: Source, fallback = 0): number {
+  return read(get, src, fallback);
 }

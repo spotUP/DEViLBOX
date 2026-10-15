@@ -138,6 +138,7 @@ mdaJX10::mdaJX10(float sampleRate)
     voice[v].f0   = voice[v].f1    = voice[v].f2    = 0.0f;
     voice[v].ff   = 0.0f;
     voice[v].note = 0;
+    voice[v].age = 0;
   }
   lfo = modwhl = filtwhl = press = fzip = 0.0f;
   rezwhl = pbend = ipbend = 1.0f;
@@ -380,6 +381,7 @@ void mdaJX10::process(float* outL, float* outR, int32_t sampleFrames)
               V->sinx2 = 2.0f * (float)cos(V->dp2);
               if(y*y > .1f) y = V->sin02 / y; else y = V->lev2;
             }
+            V->age++;
             V->saw = V->saw * hpf + V->dc + x - V->dc2 - y;  // integrated sinc = saw
             x = V->saw + w;
             V->env += V->envd * (V->envl - V->env);
@@ -438,6 +440,45 @@ void mdaJX10::process(float* outL, float* outR, int32_t sampleFrames)
   }
   fzip = fz;
   K = k;
+}
+
+
+// Voice report (8 floats per voice, wasmVoiceStatus.ts): note, amplitude stage, amplitude level, seconds since the
+// note, filter coefficient ff (the SVF's per-sample step after envelope and LFO, clamped like process()), filter
+// envelope level, LFO phase in cycles, filter envelope stage. Stage codes: 0 attack 1 decay 2 sustain 3 release 4 off.
+int32_t mdaJX10::getVoices(float* out, int32_t maxVoices)
+{
+  const float fq = filtq * rezwhl;
+  const float fx = 1.97f - 0.85f * fq;
+  float phase = lfo / TWOPI;
+  phase -= (float)floor(phase);
+  int32_t n = maxVoices < NVOICES ? maxVoices : NVOICES;
+  for(int32_t v = 0; v < n; v++)
+  {
+    const VOICE *V = &voice[v];
+    float *o = out + v * 8;
+    const bool sounding = V->env > SILENCE;
+    const bool held = V->note != 0;
+    float stage = 4.0f, fstage = 4.0f;
+    if(sounding)
+    {
+      if(!held) stage = fstage = 3.0f;
+      else
+      {
+        stage = (V->envl >= 2.0f) ? 0.0f : ((V->env - sus) > 0.005f ? 1.0f : 2.0f);
+        fstage = (V->fenvl >= 2.0f) ? 0.0f : ((V->fenv - fsus) > 0.005f ? 1.0f : 2.0f);
+      }
+    }
+    o[0] = held ? (float)V->note : -1.0f;
+    o[1] = stage;
+    o[2] = sounding ? (V->env > 1.0f ? 1.0f : V->env) : 0.0f;
+    o[3] = (float)V->age / Fs;
+    o[4] = V->ff > fx ? fx : V->ff;
+    o[5] = V->fenv > 1.0f ? 1.0f : (V->fenv < 0.0f ? 0.0f : V->fenv);
+    o[6] = phase;
+    o[7] = fstage;
+  }
+  return n;
 }
 
 
@@ -522,6 +563,7 @@ void mdaJX10::noteOn(int32_t note, int32_t velocity)
     {
       voice[v].env += SILENCE + SILENCE; // anti-glitching trick
     }
+    voice[v].age = 0;
     voice[v].envl  = 2.0f;
     voice[v].envd  = att;
     voice[v].fenvl = 2.0f;

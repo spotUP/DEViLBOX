@@ -77,6 +77,7 @@ if(EMSCRIPTEN)
                 \"_wavesabre_note_on\",\
                 \"_wavesabre_note_off\",\
                 \"_wavesabre_render\",\
+                \"_wavesabre_get_voices\",\
                 \"_wavesabre_set_sample_rate\",\
                 \"_malloc\",\
                 \"_free\"\

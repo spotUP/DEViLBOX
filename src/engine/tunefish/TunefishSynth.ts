@@ -4,11 +4,13 @@
  */
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { WasmVoiceHub, registerVoiceHub } from '@/engine/voiceStatus/wasmVoiceStatus';
 import {
   type TunefishInstrumentConfig,
   TunefishParam,
   DEFAULT_TUNEFISH,
   tunefishConfigToParams,
+  TUNEFISH_CONFIG_PARAM,
 } from '@typedefs/tunefishInstrument';
 
 export class TunefishSynth implements DevilboxSynth {
@@ -16,6 +18,9 @@ export class TunefishSynth implements DevilboxSynth {
   readonly output: GainNode;
 
   private workletNode: AudioWorkletNode | null = null;
+  /** Live voice report for the editor curves' markers (wasmVoiceStatus.ts). */
+  readonly voiceHub = new WasmVoiceHub((m) => this.workletNode?.port.postMessage(m));
+  private readonly unregisterVoiceHub: () => void;
   private static loadedContexts: WeakSet<AudioContext> = new WeakSet();
   private static initPromises: WeakMap<AudioContext, Promise<void>> = new WeakMap();
 
@@ -31,6 +36,7 @@ export class TunefishSynth implements DevilboxSynth {
     this.config = { ...DEFAULT_TUNEFISH, ...initialConfig };
     this.audioContext = getDevilboxAudioContext();
     this.output = this.audioContext.createGain();
+    this.unregisterVoiceHub = registerVoiceHub('TunefishSynth', this.voiceHub);
 
     this._initPromise = new Promise<void>((resolve) => {
       this._resolveInit = resolve;
@@ -64,8 +70,10 @@ export class TunefishSynth implements DevilboxSynth {
 
       // Handle messages from worklet
       this.workletNode.port.onmessage = (e) => {
+        if (this.voiceHub.handleMessage(e.data)) return;
         const { type, error, numParams } = e.data;
         if (type === 'ready') {
+          this.voiceHub.resume();
           if (numParams) {
             this.numParams = numParams;
           }
@@ -161,65 +169,9 @@ export class TunefishSynth implements DevilboxSynth {
     }
   }
 
-  /** Map parameter name to index */
+  /** Map parameter name to the engine's parameter index */
   private getParamIndex(paramName: keyof TunefishInstrumentConfig): number {
-    const mapping: Record<keyof TunefishInstrumentConfig, number> = {
-      globalGain: TunefishParam.GLOBAL_GAIN,
-      genBandwidth: TunefishParam.GEN_BANDWIDTH,
-      genNumHarmonics: TunefishParam.GEN_NUMHARMONICS,
-      genDamp: TunefishParam.GEN_DAMP,
-      genModulation: TunefishParam.GEN_MODULATION,
-      genVolume: TunefishParam.GEN_VOLUME,
-      genPanning: TunefishParam.GEN_PANNING,
-      genSlop: TunefishParam.GEN_SLOP,
-      genOctave: TunefishParam.GEN_OCTAVE,
-      genGlide: TunefishParam.GEN_GLIDE,
-      genDetune: TunefishParam.GEN_DETUNE,
-      genFreq: TunefishParam.GEN_FREQ,
-      genPolyphony: TunefishParam.GEN_POLYPHONY,
-      genDrive: TunefishParam.GEN_DRIVE,
-      genUnisono: TunefishParam.GEN_UNISONO,
-      genSpread: TunefishParam.GEN_SPREAD,
-      genScale: TunefishParam.GEN_SCALE,
-      noiseAmount: TunefishParam.NOISE_AMOUNT,
-      noiseFreq: TunefishParam.NOISE_FREQ,
-      noiseBw: TunefishParam.NOISE_BW,
-      lpFilterOn: TunefishParam.LP_FILTER_ON,
-      lpFilterCutoff: TunefishParam.LP_FILTER_CUTOFF,
-      lpFilterResonance: TunefishParam.LP_FILTER_RESONANCE,
-      hpFilterOn: TunefishParam.HP_FILTER_ON,
-      hpFilterCutoff: TunefishParam.HP_FILTER_CUTOFF,
-      hpFilterResonance: TunefishParam.HP_FILTER_RESONANCE,
-      bpFilterOn: TunefishParam.BP_FILTER_ON,
-      bpFilterCutoff: TunefishParam.BP_FILTER_CUTOFF,
-      bpFilterQ: TunefishParam.BP_FILTER_Q,
-      ntFilterOn: TunefishParam.NT_FILTER_ON,
-      ntFilterCutoff: TunefishParam.NT_FILTER_CUTOFF,
-      ntFilterQ: TunefishParam.NT_FILTER_Q,
-      distortAmount: TunefishParam.DISTORT_AMOUNT,
-      chorusRate: TunefishParam.CHORUS_RATE,
-      chorusDepth: TunefishParam.CHORUS_DEPTH,
-      chorusGain: TunefishParam.CHORUS_GAIN,
-      delayLeft: TunefishParam.DELAY_LEFT,
-      delayRight: TunefishParam.DELAY_RIGHT,
-      delayDecay: TunefishParam.DELAY_DECAY,
-      reverbRoomsize: TunefishParam.REVERB_ROOMSIZE,
-      reverbDamp: TunefishParam.REVERB_DAMP,
-      reverbWet: TunefishParam.REVERB_WET,
-      reverbWidth: TunefishParam.REVERB_WIDTH,
-      flangerLfo: TunefishParam.FLANGER_LFO,
-      flangerFrequency: TunefishParam.FLANGER_FREQUENCY,
-      flangerAmplitude: TunefishParam.FLANGER_AMPLITUDE,
-      flangerWet: TunefishParam.FLANGER_WET,
-      formantMode: TunefishParam.FORMANT_MODE,
-      formantWet: TunefishParam.FORMANT_WET,
-      eqLow: TunefishParam.EQ_LOW,
-      eqMid: TunefishParam.EQ_MID,
-      eqHigh: TunefishParam.EQ_HIGH,
-      pitchwheelUp: TunefishParam.PITCHWHEEL_UP,
-      pitchwheelDown: TunefishParam.PITCHWHEEL_DOWN,
-    };
-    return mapping[paramName] ?? -1;
+    return TUNEFISH_CONFIG_PARAM[paramName] ?? -1;
   }
 
   /** Set a single parameter by name (DevilboxSynth interface) */
@@ -266,15 +218,24 @@ export class TunefishSynth implements DevilboxSynth {
     }
   }
 
-  private _prevParams: number[] = [];
+  private _prevParams: Record<number, number> = {};
 
   applyConfig(config: TunefishInstrumentConfig): void {
     this.config = { ...config };
     const params = tunefishConfigToParams(config);
-    // Only send if params actually changed — avoids audio glitches from redundant messages
-    if (this._prevParams.length === params.length && params.every((v, i) => v === this._prevParams[i])) return;
-    this._prevParams = [...params];
-    this.setParameters(params);
+    // Only send what changed: redundant messages glitch the audio, and the first call sends everything
+    const changed: Record<number, number> = {};
+    let any = false;
+    for (const [index, value] of Object.entries(params)) {
+      if (this._prevParams[Number(index)] !== value) { changed[Number(index)] = value; any = true; }
+    }
+    if (!any) return;
+    this._prevParams = { ...params };
+    if (this.workletNode) {
+      this.workletNode.port.postMessage({ type: 'setParameters', data: { params: changed } });
+    } else {
+      for (const [index, value] of Object.entries(changed)) this._pendingParams.push({ index: parseInt(index), value });
+    }
   }
 
   private _currentMidiNote = 69;
@@ -375,6 +336,7 @@ export class TunefishSynth implements DevilboxSynth {
   }
 
   dispose(): void {
+    this.unregisterVoiceHub();
     if (this._disposed) return;
     this._disposed = true;
 

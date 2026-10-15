@@ -18,7 +18,8 @@ import { getDevilboxAudioContext, noteToMidi } from '@utils/audio-context';
 import { cz101Transform } from './cz101Transform';
 import { CZ101_PRESET_BANK, CZ101_PRESET_NAMES, applyCzKnobs, cz101PresetByName } from './cz101Presets';
 import type { CZKnobs } from './cz101Presets';
-import { getCz101UserPatch } from '@stores/useCz101UserPatchStore';
+import { adoptCz101Tone, getCz101UserPatch } from '@stores/useCz101UserPatchStore';
+import { CZ101_TONE_NAME_PARAM, CZ101_TONE_PARAM, czToneFromBase64, decodeCzTone } from './cz101Sysex';
 import { CZWaveform, CZWindow } from './cz101Types';
 import type { CZEnvelopeStage, CZLine, CZPatch } from './cz101Types';
 
@@ -68,6 +69,9 @@ export class CZ101Synth implements DevilboxSynth {
   /** Base patch being played (the one source of the sound) and the knob changes on top of it. */
   private basePatch: CZPatch = CZ101_PRESET_BANK[0].patch;
   private programIndex = 0;
+  /** The base patch came from the instrument's own tone (not the bank). */
+  private carriesTone = false;
+  private toneName = '';
   private knobs: CZKnobs = {};
   /** Waveform register shadow (bits 15-6) and the modulation bits aimed at each voice */
   private waveBits: number[] = new Array(8).fill(0);
@@ -245,11 +249,46 @@ export class CZ101Synth implements DevilboxSynth {
     console.log(`[CZ101Synth] Loaded patch: ${patch.name || 'Unnamed'}`);
   }
 
+  /**
+   * The instrument's own patch: `_cz101Tone` (the 128 tone bytes, base64; '' = the bank patch) with its
+   * name in `_cz101Name`. The imported patch becomes the base sound and is listed in the User library.
+   * The knobs stay: they mirror the patch (or the user's tweaks on a reload), so they are not cleared.
+   */
+  setTextParam(param: string, value: string): void {
+    if (param === CZ101_TONE_NAME_PARAM) {
+      this.toneName = value;
+      return;
+    }
+    if (param !== CZ101_TONE_PARAM) return;
+    if (value === '') {
+      this.carriesTone = false;
+      this.basePatch = CZ101_PRESET_BANK[this.programIndex]?.patch ?? CZ101_PRESET_BANK[0].patch;
+      return;
+    }
+    try {
+      const name = this.toneName || 'CZ patch';
+      this.basePatch = decodeCzTone(czToneFromBase64(value), name).patch;
+      this.carriesTone = true;
+      adoptCz101Tone(name, value);
+    } catch (error) {
+      console.warn('[CZ101Synth] Stored tone not usable:', error);
+    }
+  }
+
+  /** Apply the string parameters a stored instrument carries (called by the chip loader after the preset, before the knobs). */
+  applyStoredParameters(params: Record<string, unknown> | undefined): void {
+    const name = params?.[CZ101_TONE_NAME_PARAM];
+    const tone = params?.[CZ101_TONE_PARAM];
+    if (typeof name === 'string') this.setTextParam(CZ101_TONE_NAME_PARAM, name);
+    if (typeof tone === 'string') this.setTextParam(CZ101_TONE_PARAM, tone);
+  }
+
   /** Select a bank preset by index. Knob changes are cleared. */
   loadPreset(index: number): void {
     const entry = CZ101_PRESET_BANK[index];
     if (!entry) return;
     this.programIndex = index;
+    this.carriesTone = false;
     this.loadPatch(entry.patch);
   }
 
@@ -286,7 +325,9 @@ export class CZ101Synth implements DevilboxSynth {
 
       this.sendEnvelope(0, v, line.dcaEnvelope, keyedVelocity / 127);
       this.sendEnvelope(1, v, line.dcwEnvelope, 1);
-      if (line.dcoEnvelope && line.dcoEnvelope.length > 0) this.sendEnvelope(2, v, line.dcoEnvelope, 1);
+      // Always sent, empty or not: it also returns this voice's pitch envelope to zero, which a voice that last played
+      // a patch with a pitch envelope would otherwise keep (the next note would sound that many semitones off)
+      this.sendEnvelope(2, v, line.dcoEnvelope ?? [], 1);
     });
   }
 
@@ -342,10 +383,10 @@ export class CZ101Synth implements DevilboxSynth {
       return;
     }
     if (param === '_userPatch') {
-      // An imported patch becomes the base sound. The knobs stay: they mirror the patch the
-      // editor chose (or the user's tweaks on a reload), so they are not cleared like a bank load.
-      const entry = value > 0 ? getCz101UserPatch(Math.round(value)) : undefined;
-      if (entry) this.basePatch = entry.patch; // unknown id (patch lives in another browser): keep the current base
+      // Legacy convenience (songs saved before instruments carried their tone): a library id. The id means
+      // nothing in another browser, so a tone the instrument carries always wins.
+      const entry = value > 0 && !this.carriesTone ? getCz101UserPatch(Math.round(value)) : undefined;
+      if (entry) this.basePatch = entry.patch;
       return;
     }
     if (!KNOB_KEYS.has(param)) return; // stereo_width and unknown keys: no chip register

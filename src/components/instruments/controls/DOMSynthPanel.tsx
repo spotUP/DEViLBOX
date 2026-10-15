@@ -14,6 +14,8 @@ interface DOMSynthPanelProps {
   layout: SynthPanelLayout;
   config: Record<string, unknown>;
   onChange: (updates: Record<string, unknown>) => void;
+  /** The edited instrument's id: curve markers follow that instrument's live voice. */
+  instrumentId?: number;
 }
 
 // ─── Enclosure color system (matches effect pedal styling) ─────────────────
@@ -80,7 +82,7 @@ const deepSet = (container: unknown, pathParts: string[], value: unknown): unkno
   return copy;
 };
 
-export const DOMSynthPanel: React.FC<DOMSynthPanelProps> = ({ layout, config, onChange }) => {
+export const DOMSynthPanel: React.FC<DOMSynthPanelProps> = ({ layout, config, onChange, instrumentId }) => {
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; });
 
@@ -195,6 +197,7 @@ export const DOMSynthPanel: React.FC<DOMSynthPanelProps> = ({ layout, config, on
             updateParam={updateParam}
             accent={SECTION_ACCENTS[sIdx % SECTION_ACCENTS.length]}
             enclosure={enc}
+            instrumentId={instrumentId}
           />
         ))}
       </div>
@@ -211,9 +214,10 @@ interface SectionProps {
   updateParam: (key: string, value: unknown) => void;
   accent: string;
   enclosure: EnclosureColors;
+  instrumentId?: number;
 }
 
-const DOMSynthSection: React.FC<SectionProps> = ({ section, flexBasis, getValue, updateParam, accent, enclosure }) => {
+const DOMSynthSection: React.FC<SectionProps> = ({ section, flexBasis, getValue, updateParam, accent, enclosure, instrumentId }) => {
   const knobs = section.controls.filter((c: ControlDescriptor) => c.type === 'knob' || c.type === 'slider');
   const switches = section.controls.filter((c: ControlDescriptor) => c.type === 'toggle' || c.type === 'switch3way');
   const selects = section.controls.filter((c: ControlDescriptor) => c.type === 'select');
@@ -248,14 +252,15 @@ const DOMSynthSection: React.FC<SectionProps> = ({ section, flexBasis, getValue,
           {section.curves.map((curve) => {
             // A value the config does not hold (the tracker side panel passes the bare instrument) reads as 0, never NaN.
             const get = (key: string): number => { const n = Number(getValue(key)); return Number.isFinite(n) ? n : 0; };
+            // getText reads '' for a key the config does not hold, which lets a curve tell "unset" from 0 (the DX7's sparse config).
+            const getText = (key: string): string => String(getValue(key) ?? '');
             const resolved: ResolvedCurve = {
               ...curve,
-              xDomain: typeof curve.xDomain === 'function' ? curve.xDomain(get) : curve.xDomain,
-              yDomain: typeof curve.yDomain === 'function' ? curve.yDomain(get) : curve.yDomain,
+              xDomain: typeof curve.xDomain === 'function' ? curve.xDomain(get, getText) : curve.xDomain,
+              yDomain: typeof curve.yDomain === 'function' ? curve.yDomain(get, getText) : curve.yDomain,
             };
-            const getText = (key: string): string => String(getValue(key) ?? '');
             return (
-              <CurveCanvas key={curve.label} curve={resolved} series={curve.series(get, getText)} readout={curve.readout?.(get, getText)} accent={accent} get={get} />
+              <CurveCanvas key={curve.label} curve={resolved} series={curve.series(get, getText)} readout={curve.readout?.(get, getText)} accent={accent} get={get} instrumentId={instrumentId} />
             );
           })}
         </div>

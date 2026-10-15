@@ -4,6 +4,8 @@ import { DB303Synth, DB303Synth as JC303Synth } from '../db303';
 import { MAMESynth } from '../MAMESynth';
 import { MAMEBaseSynth } from '../mame/MAMEBaseSynth';
 import { WAMSynth } from '../wam/WAMSynth';
+import { applyToneVoiceOptions } from './toneSynthKnobs';
+import { voiceSourceOf } from './toneVoiceProbe';
 
 /** Ramp time for smooth parameter transitions (seconds) */
 export const EFFECT_RAMP_TIME = 0.02;
@@ -551,71 +553,23 @@ export function updateComplexSynthParameters(ctx: SynthUpdateContext, instrument
 }
 
 /**
- * Update standard Tone.js synth parameters in real-time (no instrument recreation)
- * Handles oscillator, envelope, filter, filterEnvelope changes with smooth ramping
+ * Update standard Tone.js synth parameters in real-time (no instrument recreation).
+ * Every knob of the nine core synths goes through toneSynthKnobs.applyToneVoiceOptions - the same options the creation
+ * paths build - so a knob cannot reach creation and miss this path.
  */
 export function updateToneJsSynthInPlace(ctx: SynthUpdateContext, instrumentId: number, config: InstrumentConfig): void {
   const R = EFFECT_RAMP_TIME;
   ctx.instruments.forEach((instrument, key) => {
     if (ctx.instrumentIdFromKey(key) !== instrumentId) return;
-    const inst = instrument as any;
 
-    // Update oscillator type (discrete, no ramp needed)
-    if (config.oscillator?.type && inst.oscillator) {
-      try {
-        const type = config.oscillator.type === 'noise' ? 'sawtooth' : config.oscillator.type;
-        inst.oscillator.type = type;
-      } catch { /* PolySynth wraps oscillator differently */ }
-    }
-    // PolySynth: update via .set()
-    if (instrument instanceof Tone.PolySynth && config.oscillator?.type) {
-      try {
-        const type = config.oscillator.type === 'noise' ? 'sawtooth' : config.oscillator.type;
-        instrument.set({ oscillator: { type: type as Tone.ToneOscillatorType } } as any);
-      } catch { /* ignore */ }
-    }
-
-    // Update envelope (with ramp for smooth transitions)
-    if (config.envelope) {
-      const env = config.envelope;
-      try {
-        if (instrument instanceof Tone.PolySynth) {
-          instrument.set({
-            envelope: {
-              attack: (env.attack ?? 10) / 1000,
-              decay: (env.decay ?? 200) / 1000,
-              sustain: (env.sustain ?? 50) / 100,
-              release: (env.release ?? 1000) / 1000,
-            }
-          });
-        } else if (inst.envelope) {
-          inst.envelope.attack = (env.attack ?? 10) / 1000;
-          inst.envelope.decay = (env.decay ?? 200) / 1000;
-          inst.envelope.sustain = (env.sustain ?? 50) / 100;
-          inst.envelope.release = (env.release ?? 1000) / 1000;
-        }
-      } catch { /* ignore */ }
-    }
-
-    // Update filter (with ramp)
-    if (config.filter && inst.filter) {
-      try {
-        if (config.filter.frequency !== undefined) {
-          inst.filter.frequency.rampTo(config.filter.frequency, R);
-        }
-        if (config.filter.Q !== undefined) {
-          inst.filter.Q.rampTo(config.filter.Q, R);
-        }
-        if (config.filter.type) {
-          inst.filter.type = config.filter.type;
-        }
-      } catch { /* ignore */ }
-    }
+    // Factories wrap some Tone nodes in plain objects; the probe registry knows the node behind the wrapper.
+    try { applyToneVoiceOptions(voiceSourceOf(instrument), config.synthType, config); } catch { /* a voice that rejects an option keeps the rest */ }
 
     // Update volume (with ramp)
-    if (config.volume !== undefined && inst.volume) {
+    const volume = (instrument as { volume?: Tone.Param<'decibels'> }).volume;
+    if (config.volume !== undefined && volume) {
       try {
-        inst.volume.rampTo(config.volume, R);
+        volume.rampTo(config.volume, R);
       } catch { /* ignore */ }
     }
   });

@@ -1,4 +1,8 @@
-import type { SynthPanelLayout } from '@/types/synthPanel';
+import type { ControlDescriptor, SynthPanelLayout } from '@/types/synthPanel';
+import {
+  dx7AlgorithmCurve, dx7AllOperatorsCurve, dx7LevelScalingCurve, dx7LfoCurve, dx7OperatorEnvelopeCurve, dx7PitchEgCurve, dx7SpectrumCurve,
+  type Dx7LayoutContext,
+} from '@/components/instruments/curves/fmCurveModels';
 
 const fmtPct = (v: number) => `${Math.round(v)}`;
 
@@ -13,12 +17,34 @@ const LFO_WAVE_OPTIONS = [
   { value: '4', label: 'Sine' }, { value: '5', label: 'S&H' },
 ];
 
+/**
+ * The layout default of `vced.N`, read from the controls below (one table: the knobs' own defaults). The curves use it
+ * for a key the config does not hold, so a curve and the knob next to it show the same voice.
+ */
+let vcedDefaults: Map<number, number> | null = null;
+function vcedDefault(n: number): number {
+  if (vcedDefaults === null) {
+    vcedDefaults = new Map();
+    for (const tab of DX7_LAYOUT.tabs ?? []) {
+      for (const section of tab.sections) {
+        for (const c of section.controls as ControlDescriptor[]) {
+          const m = /^vced\.(\d+)$/.exec(c.key);
+          if (m && c.type === 'knob') vcedDefaults.set(Number(m[1]), c.defaultValue ?? 0);
+        }
+      }
+    }
+  }
+  return vcedDefaults.get(n) ?? 0;
+}
+const curveContext: Dx7LayoutContext = { defaultOf: vcedDefault };
+
 /** Generate operator tab sections. VCED offsets: OP6=0, OP5=21, OP4=42, OP3=63, OP2=84, OP1=105 */
 function makeOperatorSections(opNum: number) {
   const base = (6 - opNum) * 21;
   return [
     {
       label: `OP${opNum} ENVELOPE`,
+      curves: [dx7OperatorEnvelopeCurve(opNum, curveContext)],
       controls: [
         { type: 'knob' as const, key: `vced.${base + 0}`, label: 'R1', color: '#22c55e', min: 0, max: 99, defaultValue: 99, formatValue: fmtPct },
         { type: 'knob' as const, key: `vced.${base + 1}`, label: 'R2', color: '#22c55e', min: 0, max: 99, defaultValue: 99, formatValue: fmtPct },
@@ -32,6 +58,7 @@ function makeOperatorSections(opNum: number) {
     },
     {
       label: `OP${opNum} OSCILLATOR`,
+      curves: [dx7SpectrumCurve(curveContext)],
       controls: [
         { type: 'knob' as const, key: `vced.${base + 16}`, label: 'LEVEL', color: '#ff9900', min: 0, max: 99, defaultValue: opNum === 1 ? 99 : 0, formatValue: fmtPct },
         { type: 'toggle' as const, key: `vced.${base + 17}`, label: 'MODE', labels: ['RATIO', 'FIXED'] as [string, string] },
@@ -42,6 +69,7 @@ function makeOperatorSections(opNum: number) {
     },
     {
       label: `OP${opNum} SCALING`,
+      curves: [dx7LevelScalingCurve(opNum, curveContext)],
       controls: [
         { type: 'knob' as const, key: `vced.${base + 8}`, label: 'BRK PT', color: '#66ccff', min: 0, max: 99, defaultValue: 39, formatValue: fmtPct },
         { type: 'knob' as const, key: `vced.${base + 9}`, label: 'L DEPTH', color: '#66ccff', min: 0, max: 99, defaultValue: 0, formatValue: fmtPct },
@@ -66,6 +94,7 @@ export const DX7_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'ALGORITHM',
+          curves: [dx7AlgorithmCurve(curveContext), dx7AllOperatorsCurve(curveContext), dx7SpectrumCurve(curveContext)],
           controls: [
             { type: 'knob', key: 'vced.134', label: 'ALGO', color: '#ff9900', min: 0, max: 31, defaultValue: 0, formatValue: (v) => `${Math.round(v) + 1}` },
             { type: 'knob', key: 'vced.135', label: 'FEEDBK', color: '#ff6600', min: 0, max: 7, defaultValue: 0, formatValue: fmtPct },
@@ -75,6 +104,7 @@ export const DX7_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'LFO',
+          curves: [dx7LfoCurve(curveContext)],
           controls: [
             { type: 'knob', key: 'vced.137', label: 'SPEED', color: '#9966ff', min: 0, max: 99, defaultValue: 0, formatValue: fmtPct },
             { type: 'knob', key: 'vced.138', label: 'DELAY', color: '#9966ff', min: 0, max: 99, defaultValue: 0, formatValue: fmtPct },
@@ -87,6 +117,7 @@ export const DX7_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'PITCH ENVELOPE',
+          curves: [dx7PitchEgCurve(curveContext)],
           controls: [
             { type: 'knob', key: 'vced.126', label: 'R1', color: '#22c55e', min: 0, max: 99, defaultValue: 99, formatValue: fmtPct },
             { type: 'knob', key: 'vced.127', label: 'R2', color: '#22c55e', min: 0, max: 99, defaultValue: 99, formatValue: fmtPct },

@@ -32,6 +32,7 @@ set(EXPORTED_FUNCTIONS
   "_jx10_get_num_programs"
   "_jx10_get_num_params"
   "_jx10_get_active_voices"
+  "_jx10_get_voices"
   "_malloc"
   "_free"
 )

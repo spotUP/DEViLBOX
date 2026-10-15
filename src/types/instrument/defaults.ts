@@ -16,6 +16,7 @@ import type {
   SynthType,
   OscillatorConfig,
   EnvelopeConfig,
+  WaveformType,
   FilterConfig,
   FilterEnvelopeConfig,
   PitchEnvelopeConfig,
@@ -235,6 +236,14 @@ export interface InstrumentConfig {
   filter?: FilterConfig;
   filterEnvelope?: FilterEnvelopeConfig;
   pitchEnvelope?: PitchEnvelopeConfig;  // Pitch modulation envelope (for synth basses, kicks, FX)
+  /** Tone FMSynth / AMSynth: carrier-to-modulator frequency ratio (src/engine/tone/toneSynthKnobs.ts is the one reader). */
+  harmonicity?: number;
+  /** Tone FMSynth: modulation depth. */
+  modulationIndex?: number;
+  /** Tone FMSynth / AMSynth: the modulator's own amplitude envelope (milliseconds, sustain percent, like `envelope`). */
+  modulationEnvelope?: Partial<EnvelopeConfig>;
+  /** Tone FMSynth / AMSynth: the modulator's waveform. */
+  modulation?: { type?: WaveformType };
   tb303?: TB303Config;
   wavetable?: WavetableConfig;
   harmonicSynth?: HarmonicSynthConfig;

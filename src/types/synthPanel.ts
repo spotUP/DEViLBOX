@@ -69,8 +69,8 @@ export interface CurveDescriptor {
   height?: number;
   xScale?: 'linear' | 'log';
   /** Axis ranges; a function when the range depends on the knobs (an envelope's length). */
-  xDomain: readonly [number, number] | ((get: (key: string) => number) => readonly [number, number]);
-  yDomain: readonly [number, number] | ((get: (key: string) => number) => readonly [number, number]);
+  xDomain: readonly [number, number] | ((get: (key: string) => number, getText?: (key: string) => string) => readonly [number, number]);
+  yDomain: readonly [number, number] | ((get: (key: string) => number, getText?: (key: string) => string) => readonly [number, number]);
   xUnit?: string;
   yUnit?: string;
   /** Layout values in, lines out. `get` returns the numeric value of a layout key, `getText` its string value (a filter type). */
@@ -80,7 +80,12 @@ export interface CurveDescriptor {
   /** Live voice position on the x axis (null = no voice); the canvas redraws the marker without re-rendering. */
   marker?: {
     /** `latestValues` returns the layout's current numeric reader, so a position can depend on the knobs. */
-    subscribe: (onPosition: (x: number | null) => void, latestValues: () => (key: string) => number) => () => void;
+    subscribe: (
+      onPosition: (x: number | null) => void,
+      latestValues: () => (key: string) => number,
+      /** The edited instrument's id, for markers that read a live engine voice (layouts are shared constants, so the id arrives here). */
+      instrumentId?: number,
+    ) => () => void;
   };
 }
 

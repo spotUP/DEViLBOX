@@ -55,8 +55,14 @@ export class CZSysexError extends Error {
   }
 }
 
+/** Instrument parameter keys that make a CZ-101 instrument carry its own patch (strings in `instrument.parameters`). */
+export const CZ101_TONE_PARAM = '_cz101Tone';
+export const CZ101_TONE_NAME_PARAM = '_cz101Name';
+
 export interface CZDecoded {
   patch: CZPatch;
+  /** The 128 tone bytes the patch was decoded from: what an instrument stores, so nothing the dump holds is lost. */
+  tone: Uint8Array;
   /** Features present in the dump that the chip voice model cannot play. */
   ignored: string[];
 }
@@ -128,7 +134,30 @@ function decodeLine(tone: Uint8Array, start: number): { line: CZLine; modulation
 
 /** Decode one 264-byte tone message into a patch. */
 export function decodeCzSysex(message: Uint8Array, name?: string): CZDecoded {
-  const tone = czToneBytes(message);
+  return decodeCzTone(czToneBytes(message), name);
+}
+
+/** The tone bytes of a patch (what encodeCzSysex would send), for storing a patch that was not imported from a dump. */
+export function czToneFromPatch(patch: CZPatch): Uint8Array {
+  return czToneBytes(encodeCzSysex(patch));
+}
+
+export function czToneToBase64(tone: Uint8Array): string {
+  let binary = '';
+  tone.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary);
+}
+
+export function czToneFromBase64(text: string): Uint8Array {
+  let binary: string;
+  try { binary = atob(text); } catch { throw new CZSysexError('Stored tone is not base64'); }
+  if (binary.length !== CZ_TONE_BYTES) throw new CZSysexError(`Stored tone is ${binary.length} bytes, expected ${CZ_TONE_BYTES}`);
+  return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+}
+
+/** Decode the 128 tone bytes into a patch. */
+export function decodeCzTone(tone: Uint8Array, name?: string): CZDecoded {
+  if (tone.length !== CZ_TONE_BYTES) throw new CZSysexError(`Expected ${CZ_TONE_BYTES} tone bytes, got ${tone.length}`);
   const ignored: string[] = [];
   const lineSelect = tone[0] & 3;
   const octaveBits = (tone[0] >> 2) & 3;
@@ -160,7 +189,7 @@ export function decodeCzSysex(message: Uint8Array, name?: string): CZDecoded {
     ringMod: ring || undefined,
     noiseMode: noise || undefined,
   };
-  return { patch, ignored };
+  return { patch, ignored, tone: tone.slice() };
 }
 
 /** Split a .syx file into its F0..F7 messages (a file may hold several tones). */

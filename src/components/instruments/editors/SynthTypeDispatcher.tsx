@@ -70,8 +70,8 @@ import { isFurnacePCMType } from '../hardware/FurnacePCMHardware';
 import { isFurnaceInsEdType } from '../hardware/FurnaceInsEdHardware';
 import { SpaceLaserHeader, V2Header, DubSirenHeader, SynareHeader, type SynthHeaderProps } from './InstrumentPresetManager';
 import { DOMSynthPanel } from '../controls/DOMSynthPanel';
-const LiveFilterCurve = lazy(() => import('../../visualization/LiveFilterCurve').then(m => ({ default: m.LiveFilterCurve })));
-import { EnvelopeVisualization } from '@components/instruments/shared';
+import { DX7LayoutPanel } from '../controls/DX7LayoutPanel';
+import { OPL3LayoutPanel } from '../controls/OPL3LayoutPanel';
 import { getSynthLayout } from '@/constants/synthLayouts';
 import { applyKlysPreset, renameKlysInstrument } from '@/components/klystrack/klysInstrumentEdit';
 import { klysPresetById } from '@constants/klysPresets';
@@ -1510,6 +1510,8 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
         <Suspense fallback={<LoadingControls />}>
           <OPL3Controls config={opl3Config} />
         </Suspense>
+        {/* Operator knobs with the envelope, spectrum and LFO curves and their live voice markers */}
+        <OPL3LayoutPanel instrument={instrument} onChange={(updates) => handleChange(updates as Partial<InstrumentConfig>)} />
       </div>
     );
   }
@@ -2423,6 +2425,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
               synthType={instrument.synthType}
               parameters={(instrument.parameters || {}) as Record<string, number>}
               onParamChange={handleChipParamChange}
+              onTextParamChange={handleChipTextChange}
             />
           ) : (
             /* Simple Controls Mode */
@@ -2441,6 +2444,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                 <CZ101PatchBrowser
                   parameters={(instrument.parameters || {}) as Record<string, number>}
                   onParamChange={handleChipParamChange}
+                  onTextParamChange={handleChipTextChange}
                 />
               )}
 
@@ -2722,21 +2726,8 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                   onChange={handleChange}
                 />
               </Suspense>
-              {/* DX7 FM parameter knobs (all 155 VCED params) */}
-              {(() => {
-                const declLayout = getSynthLayout('DX7');
-                if (!declLayout) return null;
-                const config = { dx7: instrument.dx7 ?? {} } as Record<string, unknown>;
-                return (
-                  <div className="border-t border-dark-border/30 mt-2 pt-2">
-                    <DOMSynthPanel
-                      layout={declLayout}
-                      config={config}
-                      onChange={(updates) => handleChange(updates as Partial<InstrumentConfig>)}
-                    />
-                  </div>
-                );
-              })()}
+              {/* DX7 FM parameter knobs (all 155 VCED params), algorithm diagram and curves; shows the voice the firmware plays */}
+              <DX7LayoutPanel instrument={instrument} onChange={(updates) => handleChange(updates as Partial<InstrumentConfig>)} />
             </>
           )}
         </div>
@@ -3937,36 +3928,8 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             layout={layout}
             config={config}
             onChange={(updates) => handleChange(updates as Partial<InstrumentConfig>)}
+            instrumentId={instrument.id}
           />
-          {/* Filter curve + ADSR visualizer — only for Tone.js synths with real filter/envelope configs */}
-          {!configKey && (instrument.filter?.frequency != null || instrument.envelope?.attack != null) && (
-            <div className="flex gap-2">
-              {instrument.filter?.frequency != null && (
-                <Suspense fallback={null}>
-                  <LiveFilterCurve
-                    instrumentId={instrument.id}
-                    cutoff={instrument.filter.frequency ?? 2000}
-                    resonance={instrument.filter.Q ?? 1}
-                    type={(instrument.filter.type as 'lowpass') ?? 'lowpass'}
-                    width="auto"
-                    height={70}
-                  />
-                </Suspense>
-              )}
-              {instrument.envelope?.attack != null && (
-                <EnvelopeVisualization
-                  mode="ms"
-                  attack={instrument.envelope.attack ?? 10}
-                  decay={instrument.envelope.decay ?? 100}
-                  sustain={instrument.envelope.sustain ?? 80}
-                  release={instrument.envelope.release ?? 300}
-                  width="auto"
-                  height={70}
-                  border="none"
-                />
-              )}
-            </div>
-          )}
           </div>
         </div>
       );

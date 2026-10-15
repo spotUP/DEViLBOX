@@ -1,5 +1,5 @@
 import type { SynthPanelLayout } from '@/types/synthPanel';
-import { adsrCurve, filterCurve, cutoffEnvelopeCurve } from '@/components/instruments/curves/commonCurveModels';
+import { toneAdsrCurve, toneFilterCurve, toneCutoffEnvelopeCurve } from '@/components/instruments/curves/toneCurves';
 
 const fmtHz = (v: number) => `${Math.round(v)} Hz`;
 const fmtMs = (v: number) => `${Math.round(v)}ms`;
@@ -47,7 +47,7 @@ export const WAVETABLE_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'FILTER',
-          curves: [filterCurve({ cutoff: 'filter.cutoff', resonance: 'filter.resonance', typeKey: 'filter.type', poles: 2 })],
+          curves: [toneFilterCurve({ cutoff: 'filter.cutoff', resonance: 'filter.resonance', typeKey: 'filter.type', poles: 2 })],
           controls: [
             { type: 'knob', key: 'filter.cutoff', label: 'CUTOFF', color: '#ffcc00', min: 20, max: 20000, defaultValue: 8000, formatValue: fmtHz },
             { type: 'knob', key: 'filter.resonance', label: 'RESO', color: '#ff6600', min: 0, max: 100, defaultValue: 0, formatValue: fmtPct },
@@ -56,7 +56,7 @@ export const WAVETABLE_LAYOUT: SynthPanelLayout = {
         },
         {
           label: 'FILTER ENV',
-          curves: [cutoffEnvelopeCurve({ cutoff: 'filter.cutoff', amount: 'filter.envelopeAmount', attack: 'filterEnvelope.attack', decay: 'filterEnvelope.decay', sustain: 'filterEnvelope.sustain' })],
+          curves: [toneCutoffEnvelopeCurve({ cutoff: 'filter.cutoff', amount: 'filter.envelopeAmount', attack: 'filterEnvelope.attack', decay: 'filterEnvelope.decay', sustain: 'filterEnvelope.sustain' })],
           controls: [
             { type: 'knob', key: 'filterEnvelope.attack', label: 'ATK', color: '#ff9900', min: 0, max: 2000, defaultValue: 0, formatValue: fmtMs },
             { type: 'knob', key: 'filterEnvelope.decay', label: 'DEC', color: '#ff9900', min: 0, max: 2000, defaultValue: 500, formatValue: fmtMs },
@@ -72,7 +72,7 @@ export const WAVETABLE_LAYOUT: SynthPanelLayout = {
       sections: [
         {
           label: 'AMP ENVELOPE',
-          curves: [adsrCurve({ label: 'Amp envelope', attack: 'envelope.attack', decay: 'envelope.decay', shape: 'linear', sustain: 'envelope.sustain', release: 'envelope.release' })],
+          curves: [toneAdsrCurve({ label: 'Amp envelope', attack: 'envelope.attack', decay: 'envelope.decay', shape: 'linear', sustain: 'envelope.sustain', release: 'envelope.release' })],
           controls: [
             { type: 'knob', key: 'envelope.attack', label: 'ATK', color: '#ff9900', min: 0, max: 2000, defaultValue: 10, formatValue: fmtMs },
             { type: 'knob', key: 'envelope.decay', label: 'DEC', color: '#ff9900', min: 0, max: 2000, defaultValue: 500, formatValue: fmtMs },

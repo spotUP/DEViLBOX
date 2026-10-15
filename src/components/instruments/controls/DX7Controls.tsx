@@ -168,7 +168,7 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
     if (synth?.loadPatchBank) {
       await synth.loadPatchBank(bank.file, voiceIndex);
     }
-    onChange({ dx7: { ...configRef.current, bank: bankIndex, program: voiceIndex, vcedPreset: undefined, libraryBank: undefined } });
+    onChange({ dx7: { ...configRef.current, bank: bankIndex, program: voiceIndex, vcedPreset: undefined, libraryBank: undefined, vced: undefined } });
     setLoading(false);
   }, [manifest, getSynth, onChange]);
 
@@ -183,13 +183,13 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
       // the firmware's voice memory with a single-voice bulk dump.
       await synth.loadPatchBank(currentBank.file, voiceIndex);
     }
-    onChange({ dx7: { ...configRef.current, bank: selectedBank, program: voiceIndex, vcedPreset: undefined, libraryBank: undefined } });
+    onChange({ dx7: { ...configRef.current, bank: selectedBank, program: voiceIndex, vcedPreset: undefined, libraryBank: undefined, vced: undefined } });
   }, [currentBank, selectedBank, getSynth, onChange]);
 
   // Load VCED preset — update state (store handles synth call)
   const loadVcedPreset = useCallback((name: string) => {
     setCurrentVoiceName(name);
-    onChange({ dx7: { ...configRef.current, vcedPreset: name, bank: undefined, program: undefined, libraryBank: undefined } });
+    onChange({ dx7: { ...configRef.current, vcedPreset: name, bank: undefined, program: undefined, libraryBank: undefined, vced: undefined } });
   }, [onChange]);
 
   // Curated library voice: the store loads the bank into the synth (loadLibraryBank)
@@ -199,7 +199,7 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange }
     const bank = library?.banks.find(b => b.file === pick.file);
     setCurrentVoiceName(bank?.voices[pick.index] || `Voice ${pick.index + 1}`);
     setSelectedVoice(pick.index);
-    onChange({ dx7: { ...configRef.current, libraryBank: pick.file, program: pick.index, bank: undefined, vcedPreset: undefined } });
+    onChange({ dx7: { ...configRef.current, libraryBank: pick.file, program: pick.index, bank: undefined, vcedPreset: undefined, vced: undefined } });
   }, [library, onChange]);
 
   const libraryBank = library?.banks.find(b => b.file === instrument.dx7?.libraryBank);
