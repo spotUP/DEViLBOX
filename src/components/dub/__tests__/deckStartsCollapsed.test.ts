@@ -17,19 +17,13 @@ describe('the dub deck starts collapsed', () => {
     expect(useDubStore.getState().stripCollapsed).toBe(true);
   });
 
-  it('the initial mount records the bus state without acting on it', () => {
+  it('only the Bus button expands the deck: no effect expands it when the bus turns on by itself', () => {
     const src = readFileSync(join(process.cwd(), 'src/components/dub/DubDeckStrip.tsx'), 'utf-8');
-    const start = src.indexOf('const prevBusEnabledRef');
-    const effect = src.slice(start, src.indexOf('}, [busEnabled, setStripCollapsed]);', start));
-
-    // The initial mount must leave before it can touch the collapse state.
-    const bail = effect.indexOf('if (isInitialMount) return;');
-    const apply = effect.indexOf('setStripCollapsed(');
-    expect(bail, 'the initial mount no longer bails out').toBeGreaterThan(-1);
-    expect(apply, 'nothing sets the collapse state any more').toBeGreaterThan(-1);
-    expect(bail, 'the initial mount can still reach setStripCollapsed').toBeLessThan(apply);
-
-    // And it must not sneak the same call in through a deferred frame.
-    expect(effect).not.toContain('requestAnimationFrame');
+    // A restored project and AutoDub enable the bus after the first render; an effect on busEnabled that set the
+    // collapse state expanded the deck on every boot (2026-09-22 fixed the first render only, 2026-10-15 the rest).
+    expect(src).not.toMatch(/\}, \[busEnabled, setStripCollapsed\]\)/);
+    expect(src).not.toContain('prevBusEnabledRef');
+    // The button does it: arming expands (collapsed becomes false), disarming collapses.
+    expect(src).toMatch(/setDubBusPower\(!busEnabled\); setStripCollapsed\(busEnabled\)/);
   });
 });

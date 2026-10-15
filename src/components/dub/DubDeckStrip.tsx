@@ -682,24 +682,9 @@ export const DubDeckStrip: React.FC = () => {
   }, [busEnabled, releaseAllHeld]);
   useEffect(() => releaseAllHeld, [releaseAllHeld]);
 
-  // Bus enable auto-expands the strip (enabling dub = showing the deck) but
-  // no longer touches editor-fullscreen directly. Fullscreen follows the
-  // strip-expanded state via the effect below, which means the user can also
-  // get fullscreen by clicking DUB DECK without arming the bus.
-  const prevBusEnabledRef = useRef<boolean | null>(null);
-  useEffect(() => {
-    const isInitialMount = prevBusEnabledRef.current === null;
-    const changed = prevBusEnabledRef.current !== busEnabled;
-    prevBusEnabledRef.current = busEnabled;
-    if (!changed) return;
-    // ARMING the bus expands the deck. Finding it already armed at boot is not
-    // an arming action, so the initial mount only records the value and leaves
-    // the deck at the store's default (collapsed). Before this, a session that
-    // started with the bus enabled — which AutoDub and a restored project both
-    // do — opened with the deck expanded every time.
-    if (isInitialMount) return;
-    setStripCollapsed(!busEnabled);
-  }, [busEnabled, setStripCollapsed]);
+  // Arming the bus with the Bus button expands the deck and disarming it collapses it (the button's handler below).
+  // Nothing reacts to the bus becoming enabled: a restored project and AutoDub enable it after the first render, and
+  // an effect on that state expanded the deck on every boot.
 
   // Editor-fullscreen follows the strip-expanded state. Opening the Dub Deck
   // (DUB DECK ▾) drops the editor into fullscreen mode so the performer has
@@ -1887,7 +1872,7 @@ export const DubDeckStrip: React.FC = () => {
               ? 'bg-accent-primary/10 border-accent-primary text-accent-primary'
               : 'bg-dark-bgTertiary border-dark-borderLight text-text-secondary hover:text-text-primary')
           }
-          onClick={() => setDubBusPower(!busEnabled)}
+          onClick={() => { setDubBusPower(!busEnabled); setStripCollapsed(busEnabled); }}
           title={busEnabled ? 'Dub Bus ON — click to disable' : 'Dub Bus OFF — click to enable'}
         >
           Bus {busEnabled ? 'ON' : 'OFF'}
