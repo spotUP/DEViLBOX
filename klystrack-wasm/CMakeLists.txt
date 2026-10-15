@@ -90,6 +90,13 @@ if(EMSCRIPTEN)
         "_klys_get_channel_levels"
         "_klys_get_channel_tap"
         "_klys_get_channel_tap_frames"
+        "_klys_set_instrument_data"
+        "_klys_get_num_wavetables"
+        "_klys_get_wavetable_name"
+        "_klys_get_wavetable_info"
+        "_klys_preview_note_on"
+        "_klys_preview_note_off"
+        "_klys_get_channel_program"
     )
 
     string(JOIN "," EXPORTED_FUNCTIONS_STR ${EXPORTED_FUNCTIONS})

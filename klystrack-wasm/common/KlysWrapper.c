@@ -30,6 +30,9 @@ static int g_initialized = 0;
 static int g_song_loaded = 0;
 static int g_playing = 0;
 static int g_song_ended = 0;
+/* 1 while the audition note on the spare channel is sounding with the song stopped */
+static int g_preview = 0;
+#define KLYS_PREVIEW_CHANNEL (CYD_MAX_CHANNELS - 1)
 static Uint32 g_sample_rate = 44100;
 
 /* Interleaved stereo int16 mix buffer */
@@ -124,6 +127,7 @@ void klys_init(Uint32 sampleRate)
     g_initialized = 1;
     g_song_loaded = 0;
     g_playing = 0;
+    g_preview = 0;
     g_song_ended = 0;
 }
 
@@ -137,6 +141,7 @@ int klys_load_song(const void *buf, Uint32 len)
         mus_free_song(&g_song);
         g_song_loaded = 0;
         g_playing = 0;
+        g_preview = 0;
     }
 
     memset(&g_song, 0, sizeof(g_song));
@@ -165,13 +170,14 @@ void klys_free_song(void)
         mus_free_song(&g_song);
         g_song_loaded = 0;
         g_playing = 0;
+        g_preview = 0;
     }
 }
 
 EMSCRIPTEN_KEEPALIVE
 int klys_decode(float *outL, float *outR, Uint32 numSamples)
 {
-    if (!g_initialized || !g_song_loaded || !g_playing) return 0;
+    if (!g_initialized || !g_song_loaded || (!g_playing && !g_preview)) return 0;
 
     ensure_mix_buffer(numSamples);
     memset(g_mixBuf, 0, numSamples * 2 * sizeof(Sint16));
@@ -221,6 +227,13 @@ int klys_decode(float *outL, float *outR, Uint32 numSamples)
     for (int c = nch; c < MUS_MAX_CHANNELS; c++) g_levels[c] = 0.0f;
     g_tapFrames = numSamples;
 
+    /* With the song stopped, the audition runs only until its note has died. */
+    if (g_preview && !g_playing) {
+        CydChannel *pc = &g_cyd.channel[KLYS_PREVIEW_CHANNEL];
+        if (!(pc->flags & CYD_CHN_ENABLE_GATE) && pc->adsr.envelope_state == DONE)
+            g_preview = 0;
+    }
+
     return (int)numSamples;
 }
 
@@ -240,6 +253,7 @@ void klys_stop(void)
     if (!g_initialized) return;
     mus_set_song(&g_mus, NULL, 0);
     g_playing = 0;
+    g_preview = 0;
 }
 
 /* ---- Query API ---- */
@@ -727,10 +741,12 @@ static void save_instrument(BufWriter *w, const MusInstrument *inst)
     bw_u16(w, inst->pw);
     bw_u8(w, inst->volume);
 
-    /* Count non-zero program steps */
+    /* Count program steps up to the last one that is not a NOP, exactly as
+     * klystrack's diskop.c does. 0x0000 is a real command (arpeggio base
+     * note), so it must not be trimmed; the empty step is MUS_FX_NOP. */
     Uint8 progsteps = 0;
     for (int i = MUS_PROG_LEN - 1; i >= 0; --i) {
-        if (inst->program[i] != 0) { progsteps = (Uint8)(i + 1); break; }
+        if (inst->program[i] != MUS_FX_NOP) { progsteps = (Uint8)(i + 1); break; }
     }
     bw_u8(w, progsteps);
     if (progsteps) bw_write(w, inst->program, progsteps * sizeof(Uint16));
@@ -1020,4 +1036,163 @@ int klys_set_instrument_program_step(int idx, int step, int value)
     if (step < 0 || step >= MUS_PROG_LEN) return 0;
     g_song.instrument[idx].program[step] = (Uint16)value;
     return 1;
+}
+
+
+/* ---- Instrument editor support ---- */
+
+/*
+ * Exact inverse of klys_get_instrument_data. Members are read in the same
+ * order; a short `len` stops after the last complete member (the program and
+ * the name are written only when the buffer holds all of them). Returns the
+ * bytes consumed, 0 for a bad index or no song.
+ */
+EMSCRIPTEN_KEEPALIVE
+int klys_set_instrument_data(int idx, const void *buf, int len)
+{
+    if (!g_song_loaded || idx < 0 || idx >= g_song.num_instruments || !buf || len <= 0) return 0;
+
+    MusInstrument *inst = &g_song.instrument[idx];
+    const Uint8 *in = (const Uint8 *)buf;
+    int pos = 0;
+
+#define NEED(n) if (pos + (n) > len) return pos
+#define RD8(dst)  do { NEED(1); (dst) = in[pos++]; } while (0)
+#define RD16(dst) do { NEED(2); (dst) = (Uint16)(in[pos] | (in[pos + 1] << 8)); pos += 2; } while (0)
+#define RD32(dst) do { NEED(4); (dst) = (Uint32)in[pos] | ((Uint32)in[pos + 1] << 8) | ((Uint32)in[pos + 2] << 16) | ((Uint32)in[pos + 3] << 24); pos += 4; } while (0)
+
+    RD8(inst->adsr.a); RD8(inst->adsr.d); RD8(inst->adsr.s); RD8(inst->adsr.r);
+    RD32(inst->flags);
+    RD32(inst->cydflags);
+    RD8(inst->base_note);
+    { Uint8 v; RD8(v); inst->finetune = (Sint8)v; }
+    RD8(inst->slide_speed);
+    RD16(inst->pw);
+    RD8(inst->volume);
+    RD8(inst->prog_period);
+    RD8(inst->vibrato_speed);
+    RD8(inst->vibrato_depth);
+    RD8(inst->pwm_speed);
+    RD8(inst->pwm_depth);
+    RD16(inst->cutoff);
+    RD8(inst->resonance);
+    RD8(inst->flttype);
+    RD8(inst->ym_env_shape);
+    { Uint16 v; RD16(v); inst->buzz_offset = (Sint16)v; }
+    RD8(inst->fx_bus);
+    RD8(inst->vib_shape);
+    RD8(inst->vib_delay);
+    RD8(inst->pwm_shape);
+    RD8(inst->lfsr_type);
+    RD8(inst->wavetable_entry);
+    RD8(inst->ring_mod);
+    RD8(inst->sync_source);
+    RD32(inst->fm_flags);
+    RD8(inst->fm_modulation);
+    RD8(inst->fm_feedback);
+    RD8(inst->fm_wave);
+    RD8(inst->fm_harmonic);
+    RD8(inst->fm_adsr.a); RD8(inst->fm_adsr.d); RD8(inst->fm_adsr.s); RD8(inst->fm_adsr.r);
+    RD8(inst->fm_attack_start);
+
+    if (pos + MUS_PROG_LEN * 2 <= len) {
+        for (int i = 0; i < MUS_PROG_LEN; i++) RD16(inst->program[i]);
+    } else {
+        return pos;
+    }
+
+    if (pos + 32 <= len) {
+        memcpy(inst->name, in + pos, 32);
+        inst->name[MUS_INSTRUMENT_NAME_LEN] = 0;
+        pos += 32;
+    }
+
+#undef NEED
+#undef RD8
+#undef RD16
+#undef RD32
+    return pos;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int klys_get_num_wavetables(void)
+{
+    if (!g_song_loaded) return 0;
+    return g_song.num_wavetables;
+}
+
+EMSCRIPTEN_KEEPALIVE
+const char *klys_get_wavetable_name(int i)
+{
+    if (!g_song_loaded || i < 0 || i >= g_song.num_wavetables || !g_song.wavetable_names || !g_song.wavetable_names[i]) return "";
+    return g_song.wavetable_names[i];
+}
+
+/* out: samples u32, loop_begin u32, loop_end u32, base_note u16, flags u32 (18 bytes, little-endian). */
+EMSCRIPTEN_KEEPALIVE
+int klys_get_wavetable_info(int i, void *out)
+{
+    if (!g_song_loaded || i < 0 || i >= g_song.num_wavetables || !out) return 0;
+    const CydWavetableEntry *e = &g_cyd.wavetable_entries[i];
+    BufWriter w;
+    w.buf = (Uint8 *)out;
+    w.pos = 0;
+    w.cap = 18;
+    bw_u32(&w, e->samples);
+    bw_u32(&w, e->loop_begin);
+    bw_u32(&w, e->loop_end);
+    bw_u16(&w, e->base_note);
+    bw_u32(&w, e->flags);
+    return (int)w.pos;
+}
+
+/*
+ * Audition: play instrument `inst` on the spare channel (CYD_MAX_CHANNELS-1),
+ * which a song with at most 31 channels never uses. Never starts or stops the
+ * song. note is the klystrack note number (C-0 = 0). Returns 1 when started.
+ */
+EMSCRIPTEN_KEEPALIVE
+int klys_preview_note_on(int inst, int note)
+{
+    if (!g_initialized || !g_song_loaded) return 0;
+    if (g_song.num_channels > KLYS_PREVIEW_CHANNEL) return 0;
+    if (inst < 0 || inst >= g_song.num_instruments) return 0;
+    if (note < 0) note = 0;
+    if (note > 95) note = 95;
+
+    /* The song only sets the volume of its own channels (the rest read 0). */
+    g_mus.channel[KLYS_PREVIEW_CHANNEL].volume = MAX_VOLUME;
+    mus_trigger_instrument(&g_mus, KLYS_PREVIEW_CHANNEL, &g_song.instrument[inst], (Uint16)(note << 8), -1);
+    g_preview = 1;
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void klys_preview_note_off(void)
+{
+    if (!g_initialized || !g_song_loaded) return;
+    mus_release(&g_mus, KLYS_PREVIEW_CHANNEL);
+}
+
+/*
+ * Per channel, 4 bytes: instrument index (0xFF none), program step
+ * (program_counter), program tick, running flag. Returns channels written.
+ */
+EMSCRIPTEN_KEEPALIVE
+int klys_get_channel_program(void *out, int maxCh)
+{
+    if (!g_initialized || !g_song_loaded || !out) return 0;
+    int n = maxCh < MUS_MAX_CHANNELS ? maxCh : MUS_MAX_CHANNELS;
+    Uint8 *o = (Uint8 *)out;
+    for (int c = 0; c < n; c++) {
+        const MusChannel *chn = &g_mus.channel[c];
+        int ix = chn->instrument ? (int)(chn->instrument - g_song.instrument) : -1;
+        int ok = ix >= 0 && ix < g_song.num_instruments;
+        o[0] = ok ? (Uint8)ix : 0xFF;
+        o[1] = ok ? chn->program_counter : 0;
+        o[2] = ok ? chn->program_tick : 0;
+        o[3] = (ok && (chn->flags & MUS_CHN_PROGRAM_RUNNING)) ? 1 : 0;
+        o += 4;
+    }
+    return n;
 }

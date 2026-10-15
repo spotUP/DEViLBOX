@@ -13,6 +13,9 @@ class KlystrackProcessor extends AudioWorkletProcessor {
     this.playing = false;
     this.songLoaded = false;
     this.looping = true;
+    this.previewing = false; // audition note sounding with the song stopped
+    this.watchProgram = false;
+    this._progPtr = 0;
 
     // WASM float buffers for decode output
     this.decodePtrL = 0;
@@ -117,6 +120,31 @@ class KlystrackProcessor extends AudioWorkletProcessor {
         this.wasm._klys_set_instrument_program_step(progIdx, step, progVal);
         break;
       }
+
+      case 'setInstrumentData': {
+        if (!this.wasm || typeof this.wasm._klys_set_instrument_data !== 'function') break;
+        const bytes = new Uint8Array(data.data);
+        const ptr = this.wasm._malloc(bytes.length);
+        this.wasm.HEAPU8.set(bytes, ptr);
+        this.wasm._klys_set_instrument_data(data.idx, ptr, bytes.length);
+        this.wasm._free(ptr);
+        break;
+      }
+
+      case 'previewNoteOn':
+        if (this.wasm && this.songLoaded && this.wasm._klys_preview_note_on(data.inst, data.note)) {
+          this.previewing = true;
+          this.wasm._klys_pause(0);
+        }
+        break;
+
+      case 'previewNoteOff':
+        if (this.wasm && this.songLoaded) this.wasm._klys_preview_note_off();
+        break;
+
+      case 'watchProgram':
+        this.watchProgram = !!data.on;
+        break;
 
       case 'enableOsc':
         this.oscEnabled = true;
@@ -429,6 +457,21 @@ class KlystrackProcessor extends AudioWorkletProcessor {
     }
     w._free(instPtr);
 
+    // Song-level wavetable entries (metadata only)
+    const wavetables = [];
+    const numWt = w._klys_get_num_wavetables();
+    const wtPtr = w._malloc(18);
+    for (let i = 0; i < numWt; i++) {
+      w._klys_get_wavetable_info(i, wtPtr);
+      const b = new Uint8Array(w.HEAPU8.buffer, wtPtr, 18);
+      const rd32 = (o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
+      wavetables.push({
+        name: w.UTF8ToString(w._klys_get_wavetable_name(i)),
+        samples: rd32(0), loopBegin: rd32(4), loopEnd: rd32(8), baseNote: b[12] | (b[13] << 8),
+      });
+    }
+    w._free(wtPtr);
+
     console.log('[Klystrack Worklet] Sending songData:', {
       patterns: patterns.length,
       sequences: sequences.length,
@@ -439,6 +482,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
       patterns,
       sequences,
       instruments,
+      wavetables,
     });
     console.log('[Klystrack Worklet] songData message posted');
     } catch (err) {
@@ -460,10 +504,11 @@ class KlystrackProcessor extends AudioWorkletProcessor {
     outputL.fill(0);
     outputR.fill(0);
 
-    if (this.playing && this.songLoaded) {
+    if ((this.playing || this.previewing) && this.songLoaded) {
       this.ensureDecodeBuffers(numSamples);
 
       const decoded = this.wasm._klys_decode(this.decodePtrL, this.decodePtrR, numSamples);
+      if (!this.playing && decoded <= 0) this.previewing = false;
       if (decoded > 0) {
         const heapF32 = this.wasm.HEAPF32;
         const offL = this.decodePtrL >> 2;
@@ -496,6 +541,17 @@ class KlystrackProcessor extends AudioWorkletProcessor {
     if (this.reportCounter >= this.reportInterval) {
       this.reportCounter = 0;
       if (this.songLoaded) {
+        if (this.watchProgram && typeof this.wasm._klys_get_channel_program === 'function') {
+          const n = Math.min(this.numChannels + 1, 32);
+          if (!this._progPtr) this._progPtr = this.wasm._malloc(32 * 4);
+          const got = this.wasm._klys_get_channel_program(this._progPtr, n);
+          const raw = new Uint8Array(this.wasm.HEAPU8.buffer, this._progPtr, got * 4);
+          const channels = [];
+          for (let c = 0; c < got; c++) {
+            channels.push({ instrument: raw[c * 4], step: raw[c * 4 + 1], tick: raw[c * 4 + 2], running: raw[c * 4 + 3] === 1 });
+          }
+          this.port.postMessage({ type: 'programStatus', channels });
+        }
         this.port.postMessage({
           type: 'position',
           songPosition: this.wasm._klys_get_song_position(),
