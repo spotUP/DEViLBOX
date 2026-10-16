@@ -93,6 +93,14 @@ async function getModule(): Promise<WasmModule> {
   return loadPromise;
 }
 
+/**
+ * Load the soundlib WASM now, so the first caller that needs it does not pay
+ * the script + compile cost (~370 ms in Chrome dev) at that moment.
+ */
+export async function preloadSoundlib(): Promise<void> {
+  await getModule();
+}
+
 // ─── Module lifecycle ──────────────────────────────────────────────────────
 
 /**
