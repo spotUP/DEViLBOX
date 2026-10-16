@@ -84,6 +84,26 @@ jobs:
           path: dist/
 
   # Build Electron desktop apps for all platforms
+  # Backend API image: built here so a broken Dockerfile fails CI, shipped
+  # as a release asset that the server's deploy script loads.
+  backend-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -f Dockerfile.backend -t devilbox-backend:latest .
+
+      - name: Save backend image
+        run: docker save devilbox-backend:latest | gzip > devilbox-backend.tar.gz
+
+      - name: Upload backend image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-image
+          path: devilbox-backend.tar.gz
+
   electron:
     runs-on: ${{ matrix.os }}
     continue-on-error: true
@@ -142,7 +162,7 @@ jobs:
 
   # Create a GitHub Release with all desktop app binaries + trigger pull-based deploy
   release:
-    needs: [build-server, electron]
+    needs: [build-server, backend-image, electron]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -168,6 +188,12 @@ jobs:
 
       - name: Package server build
         run: mkdir -p release-assets && tar -czf release-assets/devilbox-dist.tar.gz -C dist-server/ .
+
+      - name: Download backend image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-image
+          path: release-assets/
 
       - name: List release assets
         run: ls -la release-assets/ || echo "No assets found"

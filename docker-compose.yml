@@ -2,6 +2,9 @@ services:
   # Backend API
   backend:
     container_name: devilbox-backend
+    # CI builds and ships this tag (release asset devilbox-backend.tar.gz);
+    # the deploy script loads it and restarts the service without a build.
+    image: devilbox-backend:latest
     build:
       context: .
       dockerfile: Dockerfile.backend
