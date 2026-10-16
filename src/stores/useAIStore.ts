@@ -10,7 +10,7 @@ import { persist } from 'zustand/middleware';
 
 // --- Provider + Model definitions ---
 
-export type AIProvider = 'claude' | 'copilot';
+export type AIProvider = 'claude' | 'copilot' | 'pi' | 'opencode';
 
 export interface AIModelDef {
   id: string;
@@ -22,6 +22,8 @@ export interface AIModelDef {
 export const AI_PROVIDERS: { id: AIProvider; label: string }[] = [
   { id: 'claude',  label: 'Claude' },
   { id: 'copilot', label: 'Copilot' },
+  { id: 'pi',       label: 'Pi' },
+  { id: 'opencode', label: 'OpenCode' },
 ];
 
 export const AI_MODELS: AIModelDef[] = [
@@ -34,6 +36,15 @@ export const AI_MODELS: AIModelDef[] = [
   { id: 'claude-sonnet-4.6', label: 'Sonnet', description: 'Claude via Copilot',  provider: 'copilot' },
   { id: 'claude-opus-4.6',   label: 'Opus',   description: 'Premium via Copilot', provider: 'copilot' },
   { id: 'gpt-4.1',           label: 'GPT-4.1',    description: 'OpenAI via Copilot',  provider: 'copilot' },
+  // Pi models (provider/id as accepted by `pi --model`; Haiku first = default)
+  { id: 'anthropic/claude-haiku-4-5',  label: 'Haiku',  description: 'Fast via Pi',       provider: 'pi' },
+  { id: 'anthropic/claude-sonnet-4-6', label: 'Sonnet', description: 'Balanced via Pi',   provider: 'pi' },
+  { id: 'anthropic/claude-opus-4-8',   label: 'Opus',   description: 'Most capable via Pi', provider: 'pi' },
+  // OpenCode models (provider/id as listed by `opencode models`; free model first = default)
+  { id: 'opencode/big-pickle',         label: 'Big Pickle', description: 'Free via OpenCode',     provider: 'opencode' },
+  { id: 'opencode/claude-haiku-4-5',   label: 'Haiku',      description: 'Fast via OpenCode',     provider: 'opencode' },
+  { id: 'opencode/claude-sonnet-4-6',  label: 'Sonnet',     description: 'Balanced via OpenCode', provider: 'opencode' },
+  { id: 'opencode/gpt-5',              label: 'GPT-5',      description: 'OpenAI via OpenCode',   provider: 'opencode' },
 ];
 
 export function getModelsForProvider(provider: AIProvider): AIModelDef[] {
