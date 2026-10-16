@@ -34,7 +34,6 @@ import { injectMouthPatterns, teardownMouthPatterns } from '@engine/jingle/Jingl
 import type { EffectConfig } from './types/instrument';
 import { Zap, Music, Sliders, Download, List } from 'lucide-react';
 import { ToastNotification } from '@components/ui/ToastNotification';
-import { AIPanel } from '@components/ai/AIPanel';
 import { JukeboxPanel } from '@components/jukebox/JukeboxPanel';
 import { PopOutWindow } from '@components/ui/PopOutWindow';
 import { UpdateNotification } from '@components/ui/UpdateNotification';
@@ -1367,9 +1366,6 @@ function App() {
 
       {/* Floating video chat window — visible when collaboration is connected */}
       <PeerVideoWindow />
-
-      {/* AI Assistant Panel */}
-      <AIPanel />
 
       {/* Toast Notifications */}
       <ToastNotification />

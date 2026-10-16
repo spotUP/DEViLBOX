@@ -8,6 +8,7 @@ import { MobileMenu } from './MobileMenu';
 import { MobileTabBar } from './MobileTabBar';
 import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 import { useUIStore } from '@/stores';
+import { AIPanel } from '@components/ai/AIPanel';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -85,6 +86,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         className={`flex-1 flex min-h-0 min-w-0 overflow-hidden ${isPhone ? 'mobile-bottom-padding animate-fade-in-fast' : ''}`}
       >
         {children}
+        <AIPanel />
       </main>
 
       {/* Mobile Bottom Tab Bar */}

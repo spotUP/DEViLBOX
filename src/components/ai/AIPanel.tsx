@@ -1,6 +1,9 @@
 /**
- * AIPanel — right-sidebar React DOM overlay for the in-app AI assistant.
- * Rendered as a fixed-position overlay, works in both DOM and WebGL render modes.
+ * AIPanel — the in-app AI assistant, docked as a column at the right edge of
+ * AppLayout (the same place and style as the tracker's instrument list).
+ * Its header is always visible; the body is shown only while the panel is
+ * expanded. One flag drives it: useAIStore.isOpen (persisted), which the
+ * header, the Ctrl+L command and the toolbar menu all toggle.
  */
 
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
@@ -9,21 +12,26 @@ import { useTrackerStore } from '@stores/useTrackerStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { sendMessage, stopStreaming, checkAIStatus } from '@/services/aiChatService';
+import { Button } from '@components/ui/Button';
 import { AIMessage } from './AIMessage';
 import { AIInput } from './AIInput';
+import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 export const AIPanel: React.FC = () => {
   const isOpen = useAIStore((s) => s.isOpen);
   const messages = useAIStore((s) => s.messages);
   const isStreaming = useAIStore((s) => s.isStreaming);
   const error = useAIStore((s) => s.error);
-  const close = useAIStore((s) => s.close);
+  const toggle = useAIStore((s) => s.toggle);
   const clearHistory = useAIStore((s) => s.clearHistory);
   const provider = useAIStore((s) => s.provider);
   const model = useAIStore((s) => s.model);
   const setProvider = useAIStore((s) => s.setProvider);
   const setModel = useAIStore((s) => s.setModel);
 
+  const { isPhone } = useResponsiveSafe();
+  const rootRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [authStatus, setAuthStatus] = useState<{ available: boolean; error?: string } | null>(null);
 
@@ -48,6 +56,14 @@ export const AIPanel: React.FC = () => {
     }
   }, [isOpen, authStatus]);
 
+  // Opening (header click, Ctrl+L, toolbar menu) puts the cursor in the prompt.
+  // Not on first mount: a panel restored as expanded must not steal focus.
+  const wasOpen = useRef(isOpen);
+  useEffect(() => {
+    if (isOpen && !wasOpen.current) rootRef.current?.querySelector('textarea')?.focus();
+    wasOpen.current = isOpen;
+  }, [isOpen]);
+
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -66,78 +82,91 @@ export const AIPanel: React.FC = () => {
     e.stopPropagation();
   }, []);
 
-  if (!isOpen) return null;
+  const Chevron = isOpen ? ChevronDown : ChevronRight;
+
+  // Collapsed: a narrow strip whose header stays visible. On a phone a
+  // collapsed strip would cost width, so only the expanded overlay shows.
+  if (!isOpen && isPhone) return null;
+
+  const frame = isOpen
+    ? isPhone
+      ? 'fixed right-0 top-0 bottom-0 w-[440px] max-w-full z-[45] shadow-xl'
+      : 'w-[440px] shrink-0'
+    : 'w-7 shrink-0';
 
   return (
     <div
-      className="fixed right-0 top-0 bottom-0 w-[440px] z-[45] flex flex-col bg-dark-bg border-l border-dark-border shadow-xl"
-      style={{ animation: 'slideInRight 0.2s ease-out' }}
+      ref={rootRef}
+      data-testid="ai-panel"
+      className={`${frame} flex flex-col bg-dark-bg border-l border-dark-border overflow-hidden`}
       onKeyDown={stopPropagation}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-dark-border shrink-0">
-        <span className="text-sm font-semibold text-text-primary">AI</span>
-        <div className="flex items-center gap-1">
-          {/* Provider toggle */}
-          <div className="flex items-center bg-dark-bgSecondary rounded overflow-hidden border border-dark-border mr-1">
-            {AI_PROVIDERS.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setProvider(p.id)}
-                className={`px-1.5 py-0.5 text-[10px] transition-colors ${
-                  provider === p.id
-                    ? 'bg-dark-bgHover text-text-primary font-semibold'
-                    : 'text-text-muted hover:text-text-primary'
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
+      {/* Header — always visible */}
+      <div className={`flex ${isOpen ? 'flex-row items-center justify-between px-3 py-2 border-b border-dark-border' : 'flex-col items-center py-2'} shrink-0`}>
+        <Button
+          variant="ghost"
+          size="sm"
+          data-testid="ai-panel-header"
+          aria-expanded={isOpen}
+          onClick={toggle}
+          title={isOpen ? 'Collapse AI Assistant (Ctrl+L)' : 'Expand AI Assistant (Ctrl+L)'}
+          className={`text-[10px] font-mono text-text-primary ${isOpen ? '' : '[writing-mode:vertical-rl] px-1 py-2'}`}
+        >
+          <Chevron size={12} className="inline-block" />
+          <span>AI Assistant</span>
+        </Button>
+        {isOpen && (
+          <div className="flex items-center gap-1">
+            <div className="flex items-center bg-dark-bgSecondary rounded overflow-hidden border border-dark-border mr-1">
+              {AI_PROVIDERS.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setProvider(p.id)}
+                  className={`px-1.5 py-0.5 text-[10px] font-mono transition-colors ${
+                    provider === p.id
+                      ? 'bg-dark-bgHover text-text-primary font-semibold'
+                      : 'text-text-muted hover:text-text-primary'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center bg-dark-bgSecondary rounded overflow-hidden border border-dark-border">
+              {getModelsForProvider(provider).map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setModel(m.id)}
+                  className={`px-1.5 py-0.5 text-[10px] font-mono transition-colors ${
+                    model === m.id
+                      ? 'bg-accent-primary text-text-inverse font-semibold'
+                      : 'text-text-muted hover:text-text-primary'
+                  }`}
+                  title={m.description}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <Button variant="ghost" size="sm" onClick={clearHistory} title="Clear chat history" className="text-[10px] font-mono">
+              Clear
+            </Button>
           </div>
-          {/* Model selector */}
-          <div className="flex items-center bg-dark-bgSecondary rounded overflow-hidden border border-dark-border">
-            {getModelsForProvider(provider).map((m) => (
-              <button
-                key={m.id}
-                onClick={() => setModel(m.id)}
-                className={`px-1.5 py-0.5 text-[10px] transition-colors ${
-                  model === m.id
-                    ? 'bg-accent text-text-primary font-semibold'
-                    : 'text-text-muted hover:text-text-primary'
-                }`}
-                title={m.description}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={clearHistory}
-            className="px-2 py-0.5 text-xs text-text-muted hover:text-text-primary transition-colors"
-            title="Clear chat history"
-          >
-            Clear
-          </button>
-          <button
-            onClick={close}
-            className="w-6 h-6 flex items-center justify-center text-text-muted hover:text-text-primary transition-colors"
-            title="Close (Ctrl+L)"
-          >
-            x
-          </button>
-        </div>
+        )}
       </div>
 
+      {isOpen && (
+        <>
       {/* Auth error */}
       {authStatus && !authStatus.available && (
-        <div className="px-3 py-2 bg-red-500/10 border-b border-red-500/20 text-xs text-red-400">
+        <div className="px-3 py-2 bg-accent-error/10 border-b border-accent-error/20 text-[10px] font-mono text-accent-error">
           {authStatus.error}
         </div>
       )}
 
       {/* Error banner */}
       {error && (
-        <div className="px-3 py-2 bg-red-500/10 border-b border-red-500/20 text-xs text-red-400">
+        <div className="px-3 py-2 bg-accent-error/10 border-b border-accent-error/20 text-[10px] font-mono text-accent-error">
           {error}
         </div>
       )}
@@ -148,7 +177,7 @@ export const AIPanel: React.FC = () => {
           <div className="text-center text-text-muted text-xs mt-8">
             <p>Ask the AI to edit patterns, mix,</p>
             <p>search music archives, and more.</p>
-            <p className="mt-2 text-text-muted/50">Press Ctrl+L to toggle this panel</p>
+            <p className="mt-2 text-text-muted/50">Press Ctrl+L to expand or collapse this panel</p>
           </div>
         )}
         {messages.map((msg) => (
@@ -172,12 +201,8 @@ export const AIPanel: React.FC = () => {
         disabled={authStatus !== null && !authStatus.available}
       />
 
-      <style>{`
-        @keyframes slideInRight {
-          from { transform: translateX(100%); }
-          to { transform: translateX(0); }
-        }
-      `}</style>
+        </>
+      )}
     </div>
   );
 };
