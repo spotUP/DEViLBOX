@@ -19,6 +19,8 @@ import { midiToXMNote } from '@/lib/xmConversions';
 import { ANNOTATIONS_FPS, PITCH_SAMPLE_RATE, midiToHz, type PitchModelOutput } from '@/lib/voice/pitchNotes';
 import type { PitchModel } from '@/lib/voice/basicPitchModel';
 import type { VoiceCapture } from '@/lib/voice/voiceRecorder';
+import { clearTakes } from '@/lib/voice/takeHistory';
+import { LATENCY_STORAGE_KEY } from '@/lib/voice/latencyCalibration';
 
 const HOP = 256;
 
@@ -89,6 +91,8 @@ function concat(parts: Float32Array[]): Float32Array {
 }
 
 beforeEach(() => {
+  clearTakes();
+  try { localStorage.removeItem(LATENCY_STORAGE_KEY); } catch { /* none */ }
   resetStore(useTrackerStore);
   useTransportStore.setState({ bpm: 150, speed: 6 } as never);
   useCursorStore.setState({ cursor: { ...useCursorStore.getState().cursor, channelIndex: 0, rowIndex: 4 } } as never);
@@ -129,5 +133,88 @@ describe('Voice to Notes panel', () => {
     expect(useHistoryStore.getState().undoStack.length - undoBefore).toBe(1);
     expect(useHistoryStore.getState().undoStack.at(-1)?.description).toBe('Voice to Notes');
     expect(ANNOTATIONS_FPS).toBe(86);
+  });
+
+  /** One take through the panel: 0.3 s silence after the count-in, then a sine note. */
+  async function takeThrough(midi: number, before?: (utils: ReturnType<typeof render>) => Promise<void> | void) {
+    const model = new SineReadingModel();
+    const mic = fakeMic();
+    const deps = {
+      getStream: async () => ({} as MediaStream),
+      createCapture: () => mic.capture,
+      listDevices: async () => [],
+    };
+    const utils = render(<VoiceToNotesPanel onClose={() => {}} model={model} deps={deps} />);
+    await before?.(utils);
+    fireEvent.click(screen.getByText('Record'));
+    await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
+    mic.feed(concat([new Float32Array(Math.round(1.6 * PITCH_SAMPLE_RATE)), new Float32Array(Math.round(0.3 * PITCH_SAMPLE_RATE)), sine(midi, 0.5), new Float32Array(2205)]));
+    fireEvent.click(screen.getByText('Stop'));
+    const commit = screen.getByText('Commit').closest('button') as HTMLButtonElement;
+    await waitFor(() => expect(commit.disabled).toBe(false));
+    expect(model.calls).toBeGreaterThan(0);
+    fireEvent.click(commit);
+    const rows = useTrackerStore.getState().patterns[0].channels[0].rows;
+    return rows.map((r, i) => ({ i, note: r.note })).filter((c) => c.note > 0 && c.note !== 97);
+  }
+
+  it('Snap to key moves an out-of-key note onto the key (C sharp to C in C major)', async () => {
+    const plain = await takeThrough(61);
+    expect(plain.map((c) => c.note)).toEqual([midiToXMNote(61)]);
+    cleanup();
+    resetStore(useTrackerStore);
+    const snapped = await takeThrough(61, () => {
+      fireEvent.click(screen.getByLabelText('Snap to key'));
+    });
+    expect(snapped.map((c) => c.note)).toEqual([midiToXMNote(60)]);
+  });
+
+  it('Calibrate latency measures a 100 ms loopback and moves the committed notes one row earlier', async () => {
+    const plain = await takeThrough(60);
+    cleanup();
+    resetStore(useTrackerStore);
+
+    // Loopback fake: the click comes back on the input 100 ms after it was scheduled
+    let deliver: (b: Float32Array) => void = () => {};
+    const loop: VoiceCapture = {
+      sampleRate: PITCH_SAMPLE_RATE,
+      start: async (cb) => { deliver = cb; },
+      click: (delay) => {
+        const total = new Float32Array(PITCH_SAMPLE_RATE);
+        const at = Math.round((delay + 0.1) * PITCH_SAMPLE_RATE);
+        for (let i = 0; i < 40; i++) total[at + i] = 0.8 * (i % 2 ? -1 : 1);
+        setTimeout(() => { for (let i = 0; i < total.length; i += 128) deliver(total.slice(i, i + 128)); }, 0);
+      },
+      stop: () => {},
+    };
+    let calibrationCaptures = 0;
+    const mic = fakeMic();
+    const deps = {
+      getStream: async () => ({} as MediaStream),
+      createCapture: () => (calibrationCaptures++ === 0 ? loop : mic.capture),
+      listDevices: async () => [],
+    };
+    const model = new SineReadingModel();
+    render(<VoiceToNotesPanel onClose={() => {}} model={model} deps={deps} />);
+    fireEvent.click(screen.getByText('Calibrate latency'));
+    await waitFor(() => expect(screen.getByTestId('voice-calibrated-latency').textContent).toContain('100 ms'));
+
+    fireEvent.click(screen.getByText('Record'));
+    await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
+    mic.feed(concat([new Float32Array(Math.round(1.6 * PITCH_SAMPLE_RATE)), new Float32Array(Math.round(0.3 * PITCH_SAMPLE_RATE)), sine(60, 0.5), new Float32Array(2205)]));
+    fireEvent.click(screen.getByText('Stop'));
+    const commit = screen.getByText('Commit').closest('button') as HTMLButtonElement;
+    await waitFor(() => expect(commit.disabled).toBe(false));
+    fireEvent.click(commit);
+    const rows = useTrackerStore.getState().patterns[0].channels[0].rows;
+    const calibrated = rows.map((r, i) => ({ i, note: r.note })).filter((c) => c.note > 0 && c.note !== 97);
+    expect(calibrated[0].i).toBe(plain[0].i - 1);
+    expect(JSON.parse(localStorage.getItem(LATENCY_STORAGE_KEY) ?? '{}')).toEqual({ default: 100 });
+  });
+
+  it('keeps earlier takes and re-commits one', async () => {
+    await takeThrough(60);
+    expect(screen.getByText('Takes')).toBeTruthy();
+    expect(screen.getByText(/^Take 1/)).toBeTruthy();
   });
 });

@@ -6,28 +6,30 @@
  * note extraction in lib/voice/pitchNotes, row snapping in lib/voice/quantise,
  * pattern writing in lib/voice/writeToPattern.
  */
-import React, { useCallback, useMemo, useState } from 'react';
-import { Mic, Square, Check, X, Loader2 } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Mic, Square, Check, X, Loader2, Timer } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { Knob } from '@components/controls/Knob';
+import { Toggle } from '@components/controls/Toggle';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { notify } from '@/stores/useNotificationStore';
-import { useVoiceRecorder, type VoiceRecorderDeps } from '@/hooks/audio/useVoiceRecorder';
+import { useVoiceRecorder, defaultVoiceRecorderDeps, type VoiceRecorderDeps } from '@/hooks/audio/useVoiceRecorder';
 import { basicPitchModel, type PitchModel } from '@/lib/voice/basicPitchModel';
 import {
   DEFAULT_PITCH_SETTINGS,
-  modelOutputToNotes,
-  transposeNotes,
   type PitchModelOutput,
   type PitchSettings,
   type VoiceNote,
 } from '@/lib/voice/pitchNotes';
-import { quantiseNotes, rowSeconds } from '@/lib/voice/quantise';
-import { writeNotesToPattern } from '@/lib/voice/writeToPattern';
+import { rowSeconds } from '@/lib/voice/quantise';
+import { commitVoiceNotes, shapeNotes } from '@/lib/voice/voiceToNotes';
+import { SCALES, SCALE_LABELS, TONIC_NAMES, type ScaleName } from '@/lib/voice/scaleSnap';
+import { getStoredLatencyMs, measureLoopbackLatencyMs, storeLatencyMs } from '@/lib/voice/latencyCalibration';
+import { addTake, listTakes, type Take } from '@/lib/voice/takeHistory';
 
 export interface VoiceToNotesPanelProps {
   onClose: () => void;
@@ -42,6 +44,10 @@ interface Finetune extends PitchSettings {
   swing: number;
   minLengthRows: number;
   latencyNudgeMs: number;
+  keySnapOn: boolean;
+  /** Pitch class 0..11, 0 = C */
+  keyTonic: number;
+  keyScale: ScaleName;
 }
 
 const DEFAULT_FINETUNE: Finetune = {
@@ -50,6 +56,9 @@ const DEFAULT_FINETUNE: Finetune = {
   swing: 0,
   minLengthRows: 1,
   latencyNudgeMs: 0,
+  keySnapOn: false,
+  keyTonic: 0,
+  keyScale: 'major',
 };
 
 const COUNT_IN_BEATS = 4;
@@ -95,6 +104,15 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   const [output, setOutput] = useState<PitchModelOutput | null>(null);
   const [analysing, setAnalysing] = useState(false);
   const [takeSeconds, setTakeSeconds] = useState(0);
+  const [calibratedMs, setCalibratedMs] = useState(() => getStoredLatencyMs(''));
+  const [calibrating, setCalibrating] = useState(false);
+  const [takes, setTakes] = useState<readonly Take[]>(() => listTakes());
+  const [activeTakeId, setActiveTakeId] = useState<number | null>(null);
+  const backend = deps ?? defaultVoiceRecorderDeps;
+
+  useEffect(() => {
+    setCalibratedMs(getStoredLatencyMs(deviceId));
+  }, [deviceId]);
 
   const bpm = useTransportStore((s) => s.bpm);
   const speed = useTransportStore((s) => s.speed);
@@ -108,7 +126,13 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   }, []);
 
   const finalNotes = useMemo(
-    () => (output ? transposeNotes(modelOutputToNotes(output, fine, true), fine.transpose) : []),
+    () =>
+      output
+        ? shapeNotes(output, {
+            ...fine,
+            keySnap: fine.keySnapOn ? { tonic: fine.keyTonic, scale: fine.keyScale } : null,
+          })
+        : [],
     [output, fine],
   );
 
@@ -129,7 +153,10 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     setAnalysing(true);
     try {
       // Full-take pass: replaces the live preview
-      setOutput(await model.evaluate(take));
+      const result = await model.evaluate(take);
+      setOutput(result);
+      setActiveTakeId(addTake(result, take.length / 22050).id);
+      setTakes(listTakes());
     } catch (err) {
       notify.error(`Pitch detection failed: ${err instanceof Error ? err.message : 'unknown error'}`);
     } finally {
@@ -138,25 +165,53 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   }, [recorder, model]);
 
   const handleCommit = useCallback(() => {
-    const rows = quantiseNotes(finalNotes, {
-      bpm,
-      speed,
-      swing: fine.swing,
-      minLengthRows: fine.minLengthRows,
-      latencyNudgeMs: fine.latencyNudgeMs,
-    });
-    if (rows.length === 0) {
+    const result = commitVoiceNotes(
+      finalNotes,
+      {
+        bpm,
+        speed,
+        swing: fine.swing,
+        minLengthRows: fine.minLengthRows,
+        // Measured device latency plus the manual nudge on top
+        latencyNudgeMs: calibratedMs + fine.latencyNudgeMs,
+      },
+      { channelIndex, startRow, instrumentId },
+    );
+    if (!result) {
       notify.warning('No notes to write');
       return;
     }
-    const result = writeNotesToPattern(rows, { channelIndex, startRow, instrumentId });
-    // Notes only: the take is discarded after Commit
-    setOutput(null);
     notify.success(
       `Wrote ${result.written} note${result.written === 1 ? '' : 's'}` +
         (result.dropped ? `, ${result.dropped} past the end of the pattern` : ''),
     );
-  }, [finalNotes, bpm, speed, fine, channelIndex, startRow, instrumentId]);
+  }, [finalNotes, bpm, speed, fine, calibratedMs, channelIndex, startRow, instrumentId]);
+
+  const handleCalibrate = useCallback(async () => {
+    setCalibrating(true);
+    try {
+      const stream = await backend.getStream(deviceId || undefined);
+      const ms = await measureLoopbackLatencyMs(backend.createCapture(stream));
+      if (ms === null) {
+        notify.warning('The click did not reach the microphone. Turn the speakers up or move the microphone closer.');
+        return;
+      }
+      storeLatencyMs(deviceId, ms);
+      setCalibratedMs(ms);
+      notify.success(`Measured latency ${ms} ms`);
+    } catch (err) {
+      notify.error(`Calibration failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+    } finally {
+      setCalibrating(false);
+    }
+  }, [backend, deviceId]);
+
+  const handleUseTake = useCallback((take: Take) => {
+    setOutput(take.output);
+    setTakeSeconds(take.seconds);
+    setActiveTakeId(take.id);
+    setStartRow(useCursorStore.getState().cursor.rowIndex);
+  }, []);
 
   const recording = recorder.phase !== 'idle';
   const shownNotes = recording ? recorder.liveNotes : finalNotes;
@@ -236,6 +291,51 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
         <Knob label="Min Rows" value={fine.minLengthRows} min={1} max={8} step={1} onChange={(v) => patch('minLengthRows', Math.round(v))} size="sm" />
         <Knob label="Latency" unit="ms" value={fine.latencyNudgeMs} min={-300} max={300} step={1} bipolar onChange={(v) => patch('latencyNudgeMs', Math.round(v))} size="sm" title="Move the notes earlier (positive) or later (negative) to match your microphone and output latency" />
       </div>
+
+      <div className="text-[10px] font-mono text-text-secondary">Key</div>
+      <Toggle label="Snap to key" value={fine.keySnapOn} onChange={(v) => patch('keySnapOn', v)} size="sm" />
+      {fine.keySnapOn && (
+        <div className="flex gap-2">
+          <CustomSelect
+            value={String(fine.keyTonic)}
+            onChange={(v) => patch('keyTonic', Number(v))}
+            options={TONIC_NAMES.map((n, i) => ({ value: String(i), label: n }))}
+            title="Key"
+          />
+          <CustomSelect
+            value={fine.keyScale}
+            onChange={(v) => patch('keyScale', v as ScaleName)}
+            options={(Object.keys(SCALES) as ScaleName[]).map((k) => ({ value: k, label: SCALE_LABELS[k] }))}
+            title="Scale"
+          />
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="sm" icon={<Timer size={12} />} onClick={() => void handleCalibrate()} disabled={recording || analysing || calibrating}>
+          Calibrate latency
+        </Button>
+        <span className="text-[9px] font-mono text-text-muted" data-testid="voice-calibrated-latency">{calibratedMs} ms measured</span>
+      </div>
+
+      {takes.length > 0 && (
+        <>
+          <div className="text-[10px] font-mono text-text-secondary">Takes</div>
+          <div className="flex flex-col gap-1">
+            {takes.map((t, i) => (
+              <Button
+                key={t.id}
+                variant={t.id === activeTakeId ? 'primary' : 'ghost'}
+                size="sm"
+                disabled={recording || analysing}
+                onClick={() => handleUseTake(t)}
+              >
+                {`Take ${takes.length - i} (${t.seconds.toFixed(1)} s)`}
+              </Button>
+            ))}
+          </div>
+        </>
+      )}
 
       <Button
         variant="primary"

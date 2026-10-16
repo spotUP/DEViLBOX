@@ -144,3 +144,65 @@ describe('applyNotesToPattern', () => {
     expect(rows[2].note).toBe(NOTE_OFF);
   });
 });
+
+import { snapMidiToKey, snapNotesToKey } from '../scaleSnap';
+import { detectClickOnset, getStoredLatencyMs, storeLatencyMs, measureLoopbackLatencyMs, LATENCY_STORAGE_KEY } from '../latencyCalibration';
+import { addTake, listTakes, clearTakes, MAX_TAKES } from '../takeHistory';
+
+describe('scaleSnap', () => {
+  it('snaps to the nearest key note, ties go lower', () => {
+    const cMajor = { tonic: 0, scale: 'major' as const };
+    expect(snapMidiToKey(60, cMajor)).toBe(60);
+    expect(snapMidiToKey(61, cMajor)).toBe(60); // tie C#: lower
+    expect(snapMidiToKey(63, cMajor)).toBe(62); // D#: tie, lower
+    expect(snapMidiToKey(66, cMajor)).toBe(65); // F#: tie, lower
+    expect(snapMidiToKey(61, { tonic: 2, scale: 'minor' })).toBe(60); // D minor: C# to C (no C#)
+    expect(snapMidiToKey(70, { tonic: 0, scale: 'pentatonicMajor' })).toBe(69);
+    expect(snapNotesToKey([note(0, 1, 61)], cMajor)[0].pitchMidi).toBe(60);
+  });
+});
+
+describe('latency calibration', () => {
+  it('detectClickOnset finds a click at known offsets', () => {
+    for (const ms of [0, 37, 120, 410]) {
+      const buf = new Float32Array(22050);
+      const at = Math.round((ms / 1000) * 22050);
+      for (let i = 0; i < 30; i++) buf[at + i] = 0.7;
+      const t = detectClickOnset(buf, 22050);
+      expect(t).not.toBeNull();
+      expect(Math.abs((t as number) * 1000 - ms)).toBeLessThan(1);
+    }
+    expect(detectClickOnset(new Float32Array(1000), 22050)).toBeNull();
+  });
+
+  it('stores the offset per device under the versioned key', () => {
+    localStorage.removeItem(LATENCY_STORAGE_KEY);
+    storeLatencyMs('mic-a', 80);
+    storeLatencyMs('', 20);
+    expect(getStoredLatencyMs('mic-a')).toBe(80);
+    expect(getStoredLatencyMs('')).toBe(20);
+    expect(getStoredLatencyMs('mic-b')).toBe(0);
+    localStorage.removeItem(LATENCY_STORAGE_KEY);
+  });
+
+  it('measureLoopbackLatencyMs reports null when no click arrives', async () => {
+    let deliver: (b: Float32Array) => void = () => {};
+    const cap = {
+      sampleRate: 22050,
+      start: async (cb: (b: Float32Array) => void) => { deliver = cb; },
+      click: () => { setTimeout(() => deliver(new Float32Array(22050)), 0); },
+      stop: () => {},
+    };
+    expect(await measureLoopbackLatencyMs(cap)).toBeNull();
+  });
+});
+
+describe('takeHistory', () => {
+  it('keeps the newest 8', () => {
+    clearTakes();
+    for (let i = 0; i < 11; i++) addTake({ frames: [], onsets: [], contours: [] }, i);
+    expect(listTakes().length).toBe(MAX_TAKES);
+    expect(listTakes()[0].seconds).toBe(10);
+    clearTakes();
+  });
+});
