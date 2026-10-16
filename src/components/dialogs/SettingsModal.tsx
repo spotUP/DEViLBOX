@@ -27,6 +27,7 @@ import { KeyBindingEditor } from '@components/dialogs/KeyBindingEditor';
 import { EDIT_BEHAVIOUR_OPTIONS, ENTRY_PROFILES, type EditBehaviourChoice } from '@/lib/tracker/entryAdvanceProfiles';
 import { KeyboardNormalizer } from '@engine/keyboard/KeyboardNormalizer';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { AIKeysPanel } from '@components/ai/AIKeysPanel';
 import { PlaybackEnginesPanel } from '@components/dialogs/PlaybackEnginesPanel';
 
 /** Normalize any CSS color to #RRGGBB for <input type="color"> */
@@ -838,6 +839,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               ABOUT TAB
               ═══════════════════════════════════════════════════════════════════ */}
           {s.activeTab === 'engines' && <PlaybackEnginesPanel />}
+          {s.activeTab === 'ai' && <AIKeysPanel />}
 
           {s.activeTab === 'about' && (
             <>
