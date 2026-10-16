@@ -51,3 +51,6 @@ mame-wasm/build*/
 furnace-wasm/build*/
 juce-wasm/build*/
 db303-local/
+
+# Tests are not shipped; the image has no vitest, so tsc must not see them
+server/src/**/*.test.ts
