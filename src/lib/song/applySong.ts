@@ -28,6 +28,7 @@ import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { useDubStore } from '@/stores/useDubStore';
 import { ensureBusIsFed } from '@/lib/dub/seedSendOnEnable';
 import { getToneEngine } from '@/engine/ToneEngine';
+import { routesThroughLibopenmpt, warmLibopenmptPlayback } from '@/engine/libopenmpt/warmLibopenmptPlayback';
 import type { AutomationCurve } from '@typedefs/automation';
 import type { EffectConfig } from '@typedefs/instrument';
 import type { MixerSnapshot } from '@stores/useMixerStore';
@@ -214,6 +215,10 @@ export async function applySong(song: SongToApply, source: SongSource): Promise<
 
   // Undoing into the previous song is not meaningful.
   useHistoryStore.getState().clearHistory();
+
+  // The libopenmpt path's one-time costs (soundlib WASM, worklet, chunks) at
+  // open, not inside the first play() where they delayed row 1 by ~500 ms.
+  if (routesThroughLibopenmpt(song.engine)) void warmLibopenmptPlayback();
 
   if (song.preload !== false && song.instruments.some((i) => i.synthType && i.synthType !== 'Synth')) {
     await engine.preloadInstruments(song.instruments);
