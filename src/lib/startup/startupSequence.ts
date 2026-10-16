@@ -46,6 +46,22 @@ export function isStartupHolding(stage: StartupJingleStage): boolean {
   return stage === 'awaiting-gesture' || stage === 'playing';
 }
 
+/**
+ * Resolves once no startup jingle is pending: immediately when the jingle is
+ * off or already done, otherwise when it ends (or fails). Every song load
+ * (openSong, the one door) awaits this, so no song loads before the jingle.
+ */
+export function whenStartupJingleDone(): Promise<void> {
+  if (!isStartupHolding(useUIStore.getState().startupJingleStage)) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const unsubscribe = useUIStore.subscribe((state) => {
+      if (isStartupHolding(state.startupJingleStage)) return;
+      unsubscribe();
+      resolve();
+    });
+  });
+}
+
 function setStage(stage: StartupJingleStage): void {
   useUIStore.getState().setStartupJingleStage(stage);
 }
