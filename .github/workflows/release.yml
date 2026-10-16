@@ -25,6 +25,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Full commit history (commits only, no old trees or blobs): the
+          # changelog and BUILD_NUMBER count commits, a shallow clone counts 1.
+          fetch-depth: 0
+          filter: tree:0
 
       - name: Setup Node
         uses: actions/setup-node@v4
