@@ -4,7 +4,10 @@ FROM node:20-alpine
 # Install build dependencies for native modules (bcrypt, better-sqlite3)
 RUN apk add --no-cache python3 make g++
 
-WORKDIR /app
+# The repository layout is kept: the server lives in /app/server and its build
+# inlines a few shared leaf modules it imports from the frontend tree
+# (../../../src/lib/..., see server/build.mjs), so those sources sit in /app/src.
+WORKDIR /app/server
 
 # Copy package files
 COPY server/package*.json ./
@@ -14,14 +17,16 @@ RUN npm install
 
 # Copy source code
 COPY server/src ./src
-COPY server/tsconfig.json ./
+COPY server/tsconfig.json server/build.mjs ./
+COPY src/lib /app/src/lib
+COPY src/types /app/src/types
 
 # Build TypeScript, then prune devDeps
 RUN npm run build && npm prune --production
 
-# Create data directory and seed with demo content
+# Create the data directory. Content lives in the devilbox-data volume;
+# server/data is not in the repository, so there is nothing to seed here.
 RUN mkdir -p /data/public/songs /data/public/instruments /data/users
-COPY server/data/public/ /data/public/
 
 # Set permissions
 RUN chown -R node:node /app /data
