@@ -77,23 +77,23 @@ mic -> RecorderWorklet (ring buffer, 22050 Hz mono tap + full-rate take)
 ## Checklist (IDs; ticked in the open as executed)
 
 Phase V0 - research (no feature code)
-- [ ] VN-0.1 Read `AudioToMidiModal.tsx` fully; list what moves into the pure core and what stays UI.
+- [x] VN-0.1 Read `AudioToMidiModal.tsx` fully; list what moves into the pure core and what stays UI.
 - [ ] VN-0.2 Decide O1 (drum classifier source) with a small experiment: 3 candidate approaches measured on recorded beatbox clips the owner provides.
 - [ ] VN-0.3 Measure Basic Pitch accuracy on 10 sung and hummed clips (cents error, note count, onset error in ms); pick default thresholds.
 
 Phase V1 - pure core
-- [ ] VN-1.1 `voice/pitchNotes.ts`: frames to monophonic notes (extracted from the modal), tests with synthetic sine sequences and recorded fixtures.
-- [ ] VN-1.2 `voice/quantise.ts`: notes/hits to rows (bpm, speed, ticks per row, swing, strength, min length), property tests (monotonic rows, no overlaps, length conservation).
-- [ ] VN-1.3 `voice/writeToPattern.ts`: rows to cells through the store as one undo step; per-format note encoding.
-- [ ] VN-1.4 Re-point `AudioToMidiModal` at the core (no behaviour change; its existing behaviour is the regression test).
+- [x] VN-1.1 `voice/pitchNotes.ts`: frames to monophonic notes (extracted from the modal), tests with synthetic sine sequences and recorded fixtures.
+- [x] VN-1.2 `voice/quantise.ts`: notes/hits to rows (bpm, speed, ticks per row, swing, strength, min length), property tests (monotonic rows, no overlaps, length conservation).
+- [x] VN-1.3 `voice/writeToPattern.ts`: rows to cells through the store as one undo step; per-format note encoding.
+- [x] VN-1.4 Re-point `AudioToMidiModal` at the core (no behaviour change; its existing behaviour is the regression test).
 
 Phase V2 - capture
-- [ ] VN-2.1 `RecorderWorklet` + `useVoiceRecorder` (permission, device pick, level meter, count-in, metronome, song-position alignment).
+- [x] VN-2.1 `RecorderWorklet` + `useVoiceRecorder` (permission, device pick, level meter, count-in, metronome, song-position alignment).
 - [ ] VN-2.2 Latency calibration (O2).
 
 Phase V3 - melody panel
-- [ ] VN-3.1 Panel next to the pattern editor: record, stop, live ghost notes, Finetune controls, Commit.
-- [ ] VN-3.2 Live preview from sliding windows; the final pass replaces it at take end.
+- [x] VN-3.1 Panel next to the pattern editor: record, stop, live ghost notes, Finetune controls, Commit.
+- [x] VN-3.2 Live preview from sliding windows; the final pass replaces it at take end.
 
 Phase V4 - beatbox
 - [ ] VN-4.1 Onset detector + rule-based hit classifier + tests on clips.
@@ -110,3 +110,19 @@ Automated: pure-function tests; a reachability test that drives the PANEL'S comm
 ## Out of scope for now
 
 Polyphonic/chord transcription into several channels, lyrics, auto-harmonising, cloud models.
+
+## Implementation notes (melody path, 2026-10-16)
+
+Done: VN-0.1, VN-1.1 to VN-1.4, VN-2.1, VN-3.1, VN-3.2. Open: VN-0.2, VN-0.3, VN-2.2, VN-4.x, VN-5.1 (out of scope for this run).
+
+Searched before building: audio-to-midi, basic-pitch, getUserMedia, AudioInputManager, bulkBlockEdit, midiToXMNote, noteValue; reused AudioToMidiModal extraction, `bulkBlockEdit`, `midiToXMNote`, Button/Knob/CustomSelect.
+
+VN-0.1: moved to `src/lib/voice/` (pitchNotes, basicPitchModel, writeToPattern constants); stayed in the modal: its own quantiser (rowsPerBeat, new-pattern insert, clipboard export).
+
+Findings:
+- The "strength" quantise control was omitted: without a note-delay effect it has no meaning on the grid. Nudge (ms, positive = earlier) replaces calibration (O2).
+- Capture runs at 22050 Hz only (the model rate); no full-rate take is kept (notes only, O5).
+- Ghost notes are drawn in the panel's mini roll, not in the GL pattern grid.
+- The reachability test uses a fake pitch model that reads the recorded sine; the real Basic Pitch model is not run in tests (unverified by test, needs the manual check).
+- Alignment to the playing song during a take is unverified; the take starts at the cursor row after the count-in.
+- Per-format note encoding is `midiToXMNote` only.
