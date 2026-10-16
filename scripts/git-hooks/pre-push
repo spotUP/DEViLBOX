@@ -179,7 +179,7 @@ affected_tests() {
   fi
   echo "$files"
   # shellcheck disable=SC2086
-  in_snapshot env VITEST_TIER=fast npx vitest run --config vite.config.ts --passWithNoTests $files
+  ( export VITEST_TIER=fast; run_vitest_suites --passWithNoTests -- $files )
 }
 
 for sha in $SHAS; do

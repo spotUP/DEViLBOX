@@ -85,7 +85,7 @@ describe('pre-commit gate stays fast and isolated', () => {
       const text = fs.readFileSync(path.join(root, 'scripts/git-hooks', hook), 'utf8');
       // Sourced from the hook's own directory, so the hook also works when run from another cwd.
       expect(text).toContain('. "$(dirname "$0")/snapshot.sh"');
-      expect(text).toMatch(/in_snapshot[^\n]*vitest|in_snapshot npm|\(cd "\$SNAP"/);
+      expect(text).toMatch(/in_snapshot[^\n]*vitest|in_snapshot npm|run_vitest_suites|\(cd "\$SNAP"/);
     }
   });
 

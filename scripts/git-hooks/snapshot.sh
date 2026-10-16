@@ -30,6 +30,32 @@ install_snapshot_traps() {
 snapshot_env() { env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE -u GIT_PREFIX -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES "$@"; }
 in_snapshot() { ( cd "$SNAP" && snapshot_env "$@" ); }
 
+# Runs test suites in the snapshot, each under the vitest config that includes it:
+# server/ suites from server/ under server/vitest.config.ts, all others under the
+# root vite.config.ts. Usage: run_vitest_suites [vitest flags...] -- <repo paths...>
+# One root run used to get every suite, and the root config includes only src/**:
+# a commit of server files alone aborted on "No test files found", and a mixed
+# commit (or a push, with --passWithNoTests) skipped its server suites silently.
+# server/ has no vitest of its own; its package script also runs the root one.
+run_vitest_suites() {
+  local flags=() src=() srv=() f rc=0
+  while [ $# -gt 0 ] && [ "$1" != "--" ]; do flags+=("$1"); shift; done
+  [ $# -gt 0 ] && shift
+  for f in "$@"; do
+    case $f in
+      server/*) srv+=("${f#server/}") ;;
+      *) src+=("$f") ;;
+    esac
+  done
+  if [ ${#src[@]} -gt 0 ]; then
+    in_snapshot ./node_modules/.bin/vitest run --config vite.config.ts ${flags[@]+"${flags[@]}"} "${src[@]}" || rc=1
+  fi
+  if [ ${#srv[@]} -gt 0 ]; then
+    ( cd "$SNAP/server" && snapshot_env ../node_modules/.bin/vitest run --config vitest.config.ts ${flags[@]+"${flags[@]}"} "${srv[@]}" ) || rc=1
+  fi
+  return $rc
+}
+
 # What a snapshot leaves out. A full checkout is 66 000 files / 2.2 GB, and 1.5 GB
 # of it is read by no test, no type-check and no build step the hooks run. This is a
 # BLACKLIST on purpose: a new src/ or tools/ file is always included, and only paths
