@@ -33,8 +33,22 @@ export class JingleEngine {
     this.buffer = await this.audioCtx.decodeAudioData(buf);
   }
 
+  /** True once the asset is fetched and decoded and play() can start at once. */
+  isReady(): boolean {
+    return !!this.audioCtx && !!this.buffer && !!this.analyserNode;
+  }
+
+  /**
+   * Resume the context. Must run synchronously inside the user gesture: the
+   * context made at page load is suspended until then.
+   */
+  unlock(): void {
+    if (this.audioCtx && this.audioCtx.state !== 'running') void this.audioCtx.resume();
+  }
+
   play(): void {
     if (!this.audioCtx || !this.buffer || !this.analyserNode) return;
+    this.unlock();
     this.source = this.audioCtx.createBufferSource();
     this.source.buffer = this.buffer;
     this.source.connect(this.analyserNode);

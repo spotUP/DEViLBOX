@@ -93,7 +93,7 @@ describe('wiring contract', () => {
   it('the dialog registers while it is rendered, and unregisters after', () => {
     expect(app).toContain('setRecoveryPrompt({');
     expect(app).toContain('return () => setRecoveryPrompt(null);');
-    expect(app).toContain("if (!recoverySnapshot) { setRecoveryPrompt(null); return; }");
+    expect(app).toContain("if (!recoverySnapshot || startupHolding) { setRecoveryPrompt(null); return; }");
   });
 
   it('get_modal_state reports it', () => {
