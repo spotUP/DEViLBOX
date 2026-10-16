@@ -87,6 +87,17 @@ tar -xzf "$TARBALL" -C "$EXTRACT_DIR"
 # Sync to web root (rsync preserves permissions, atomically replaces changed files)
 rsync -a --delete "${EXTRACT_DIR}/" "${DIST_DIR}/"
 
+# Backend API: load the image CI built and restart the service on it.
+# BACKEND_COMPOSE_DIR holds docker-compose.yml and the .env with JWT_SECRET
+# and OPENROUTER_API_KEY.
+BACKEND_COMPOSE_DIR="${BACKEND_COMPOSE_DIR:-/var/www/devilbox}"
+IMAGE_URL="https://github.com/${GH_REPO}/releases/download/${RELEASE_TAG}/devilbox-backend.tar.gz"
+log "    Downloading ${IMAGE_URL}..."
+curl -fsSL "$IMAGE_URL" -o "${TMP_DIR}/devilbox-backend.tar.gz"
+gunzip -c "${TMP_DIR}/devilbox-backend.tar.gz" | docker load | tee -a "$LOG"
+(cd "$BACKEND_COMPOSE_DIR" && docker compose up -d --no-build backend) 2>&1 | tee -a "$LOG"
+log "    Backend restarted on devilbox-backend:latest"
+
 # Clean up
 rm -rf "$TMP_DIR"
 

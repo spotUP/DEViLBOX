@@ -108,3 +108,28 @@ describe('CI checkout depth', () => {
     }
   });
 });
+
+describe('backend image ships with every deploy', () => {
+  // The webhook deploy only rsynced the web build, so the live backend stayed
+  // on a hand-built image and never got new server code (the free AI provider).
+  const deploy = readFileSync(join(ROOT, '.github/workflows/deploy.yml'), 'utf8');
+  const compose = readFileSync(join(ROOT, 'docker-compose.yml'), 'utf8');
+  const setup = readFileSync(join(ROOT, 'scripts/server-setup.sh'), 'utf8');
+  const TAG = 'devilbox-backend:latest';
+  const ASSET = 'devilbox-backend.tar.gz';
+
+  it('CI builds the image, saves it and releases it beside the web build', () => {
+    expect(deploy).toContain(`docker build -f Dockerfile.backend -t ${TAG} .`);
+    expect(deploy).toContain(`docker save ${TAG} | gzip > ${ASSET}`);
+    expect(deploy).toMatch(/needs: \[[^\]]*backend-image[^\]]*\]/);
+    expect(deploy).toMatch(/name: backend-image\n\s+path: release-assets\//);
+  });
+
+  it('compose runs that tag and the deploy script loads it without a build', () => {
+    expect(compose).toContain(`image: ${TAG}`);
+    const script = setup.slice(setup.indexOf("<< 'DEPLOY_SCRIPT'"), setup.indexOf('\nDEPLOY_SCRIPT\n'));
+    expect(script).toContain(`releases/download/\${RELEASE_TAG}/${ASSET}`);
+    expect(script).toContain('docker load');
+    expect(script).toMatch(/docker compose .*up -d --no-build backend/);
+  });
+});
