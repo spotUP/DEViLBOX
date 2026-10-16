@@ -17,6 +17,7 @@ import {
 } from './freeModels';
 import { openRouterAdapter } from './openRouterAdapter';
 import { createFreeToolset } from './freeToolset';
+import { makeJsonPost, providerFetch, scrub, setProviderFetch } from './vendorPost';
 import { DEFAULT_DEADLINE_MS, ProviderError, askWithTools, type ChatTurn, type LoopAdapter, type ToolSpec } from './toolLoop';
 import type { BrowserCaller } from '../mcp/mcpServer';
 
@@ -25,10 +26,9 @@ export const MAX_TOKENS = 600;
 export const NO_KEY_MESSAGE = 'No OpenRouter key is available. Add your own key in Settings (OpenRouter API Key) to use the free models.';
 const REFERER_HEADERS = { 'HTTP-Referer': 'https://devilbox.uprough.net', 'X-Title': 'DEViLBOX' };
 
-let fetchImpl: FetchFn | null = null;
-/** Test seam: replace the fetch the provider uses (the test's own client keeps the real one). */
-export function setFreeProviderFetch(f: FetchFn | null): void { fetchImpl = f; }
-const doFetch: FetchFn = (...args) => (fetchImpl ?? globalThis.fetch)(...args);
+/** Test seam: replace the fetch the provider uses (shared with the vendor providers). */
+export const setFreeProviderFetch = setProviderFetch;
+const doFetch: FetchFn = providerFetch;
 
 export type FreeEvent = Record<string, unknown>;
 
@@ -46,37 +46,10 @@ export interface FreeChatOptions {
   deadlineMs?: number;
 }
 
-const scrub = (message: string, key: string): string => (key ? message.split(key).join('[key]') : message);
-
 /** The status a free provider can use: is any key available at all? */
 export function freeAvailability(visitor?: string): { available: boolean; message?: string } {
   const available = !!visitor || !!process.env.OPENROUTER_API_KEY;
   return available ? { available } : { available, message: NO_KEY_MESSAGE };
-}
-
-function makePost(key: string, adapter: LoopAdapter, signal?: AbortSignal) {
-  return async (body: Record<string, unknown>, timeoutMs: number): Promise<unknown> => {
-    const timeout = AbortSignal.timeout(timeoutMs);
-    let r: Response;
-    try {
-      r = await doFetch(`${OPENROUTER_BASE}/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}`, ...REFERER_HEADERS },
-        body: JSON.stringify(body),
-        signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-      });
-    } catch (e) {
-      if (signal?.aborted) throw new ProviderError('other', 'The chat was stopped');
-      throw new ProviderError(timeout.aborted ? 'timeout' : 'other', timeout.aborted ? 'The model took too long' : 'Could not reach OpenRouter');
-    }
-    let json: unknown = null;
-    try { json = await r.json(); } catch { /* an empty or non-JSON body */ }
-    if (!r.ok) throw adapter.mapError(r.status, json);
-    // OpenRouter reports some upstream failures as 200 with an error object.
-    const embedded = (json as { error?: { code?: number } } | null)?.error;
-    if (embedded) throw adapter.mapError(typeof embedded.code === 'number' ? embedded.code : 500, json);
-    return json;
-  };
 }
 
 export async function runFreeChat(opts: FreeChatOptions): Promise<{ text: string | null; model: string | null }> {
@@ -98,7 +71,11 @@ export async function runFreeChat(opts: FreeChatOptions): Promise<{ text: string
 
   const toolset = await createFreeToolset(opts.callBrowser);
   const deadline = Date.now() + (opts.deadlineMs ?? DEFAULT_DEADLINE_MS);
-  const post = makePost(key, adapter, opts.signal);
+  const post = makeJsonPost({
+    url: `${OPENROUTER_BASE}/chat/completions`,
+    headers: { Authorization: `Bearer ${key}`, ...REFERER_HEADERS },
+    vendor: 'OpenRouter', adapter, signal: opts.signal,
+  });
   let lastError = 'No free model answered in time. Try again in a moment.';
   let answer: { text: string; model: string } | null = null;
   let stopped = false;

@@ -219,3 +219,121 @@ describe('POST /api/ai/chat provider free (reachability)', () => {
     expect(events.filter((e) => e.type === 'text').map((e) => e.content).join('')).toBe('The song is Test Song.');
   });
 });
+
+describe('POST /api/ai/chat with a visitor Anthropic or OpenAI key (FA-14)', () => {
+  const calls: Array<{ url: string; headers: Headers; body: Record<string, unknown> | null }> = [];
+
+  const stubVendorFetch: typeof fetch = async (input, init) => {
+    const url = String(input);
+    const headers = new Headers(init?.headers);
+    const body = typeof init?.body === 'string' ? JSON.parse(init.body) as Record<string, unknown> : null;
+    calls.push({ url, headers, body });
+    if (url.endsWith('/models')) {
+      const data = url.includes('anthropic') ? [{ id: 'claude-sonnet-5-5' }] : [{ id: 'gpt-5-mini' }, { id: 'whisper-1' }];
+      return new Response(JSON.stringify({ data }), { status: 200 });
+    }
+    if (url.includes('anthropic')) {
+      const answered = JSON.stringify(body?.messages).includes('tool_result');
+      return new Response(JSON.stringify(answered
+        ? { content: [{ type: 'text', text: 'The song is Test Song.' }], stop_reason: 'end_turn' }
+        : { content: [{ type: 'tool_use', id: 'u1', name: 'get_song_info', input: {} }], stop_reason: 'tool_use' }), { status: 200 });
+    }
+    const answered = ((body?.messages ?? []) as Array<{ role: string }>).some((m) => m.role === 'tool');
+    const message = answered
+      ? { content: 'The song is Test Song.' }
+      : { content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'get_song_info', arguments: '{}' } }] };
+    return new Response(JSON.stringify({ choices: [{ message, finish_reason: 'stop' }] }), { status: 200 });
+  };
+
+  async function vendorChat(provider: string, headers: Record<string, string> = {}): Promise<Array<Record<string, unknown>>> {
+    const r = await fetch(`${base}/api/ai/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ prompt: 'what song is loaded?', provider, conversationId: `conv-${Math.random()}` }),
+    });
+    const events: Array<Record<string, unknown>> = [];
+    const reader = r.body!.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let conversationId = '';
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split('\n\n');
+      buf = parts.pop() ?? '';
+      for (const part of parts.filter((x) => x.startsWith('data: '))) {
+        const ev = JSON.parse(part.slice(6)) as Record<string, unknown>;
+        events.push(ev);
+        if (ev.type === 'init') conversationId = String(ev.conversationId);
+        if (ev.type === 'tool_call') {
+          await fetch(`${base}/api/ai/tool-result`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ conversationId, callId: ev.callId, result: { title: 'Test Song' } }),
+          });
+        }
+      }
+    }
+    return events;
+  }
+
+  beforeAll(() => { setFreeProviderFetch(stubVendorFetch); });
+  afterAll(() => { setFreeProviderFetch(null); });
+
+  it.each([
+    ['anthropic', 'x-anthropic-key', 'sk-ant-test', 'x-api-key', 'sk-ant-test', 'messages'],
+    ['openai', 'x-openai-key', 'sk-test', 'authorization', 'Bearer sk-test', 'chat/completions'],
+  ])('%s: the visitor key reaches the models and chat URLs, tool_call round trip, final text, key in no event', async (provider, header, key, sent, sentValue, chatPath) => {
+    calls.length = 0;
+    const events = await vendorChat(provider, { [header]: key });
+    const models = calls.filter((c) => c.url.endsWith('/models'));
+    const chats = calls.filter((c) => c.url.endsWith(chatPath));
+    expect(models).toHaveLength(1); // sentinel: the stubbed vendor ran
+    expect(chats.length).toBeGreaterThanOrEqual(2);
+    expect([...models, ...chats].every((c) => c.headers.get(sent) === sentValue)).toBe(true);
+    expect(events.find((e) => e.type === 'tool_call')).toMatchObject({ method: 'get_song_info' });
+    expect(events.filter((e) => e.type === 'text').map((e) => e.content).join('')).toBe('The song is Test Song.');
+    expect(events[events.length - 1]).toMatchObject({ type: 'done', code: 0 });
+    expect(JSON.stringify(events)).not.toContain(key);
+  });
+
+  it.each(['anthropic', 'openai'])('%s with no key: one error event and zero fetches', async (provider) => {
+    calls.length = 0;
+    const events = await vendorChat(provider);
+    expect(calls).toHaveLength(0);
+    expect(events.filter((e) => e.type === 'error')).toHaveLength(1);
+    expect(events.find((e) => e.type === 'error')).toMatchObject({ error: expect.stringContaining('Settings') });
+  });
+
+  it('a rejected key surfaces the vendor message with the key scrubbed', async () => {
+    setFreeProviderFetch(async () => new Response(JSON.stringify({ error: { message: 'invalid x-api-key sk-ant-bad' } }), { status: 401 }));
+    const events = await vendorChat('anthropic', { 'x-anthropic-key': 'sk-ant-bad' });
+    setFreeProviderFetch(stubVendorFetch);
+    const err = events.find((e) => e.type === 'error');
+    expect(err).toMatchObject({ error: expect.stringContaining('Anthropic key was rejected') });
+    expect(JSON.stringify(events)).not.toContain('sk-ant-bad');
+  });
+
+  it('GET /status reports key presence as booleans only', async () => {
+    const r = await fetch(`${base}/api/ai/status`, { headers: { 'x-openai-key': 'sk-secret' } });
+    const text = await r.text();
+    expect(JSON.parse(text).vendors).toEqual({ anthropic: { keyPresent: false }, openai: { keyPresent: true } });
+    expect(text).not.toContain('sk-secret');
+  });
+
+  it('POST /check-key: ok returns the model count; a 401 returns kind auth and never the key', async () => {
+    const check = async (vendor: string, header: string, key: string) => {
+      const r = await fetch(`${base}/api/ai/check-key`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', [header]: key }, body: JSON.stringify({ vendor }),
+      });
+      return r.text();
+    };
+    expect(JSON.parse(await check('anthropic', 'x-anthropic-key', 'sk-ant-test'))).toEqual({ ok: true, models: 1 });
+    setFreeProviderFetch(async () => new Response(JSON.stringify({ error: { message: 'bad sk-ant-nope' } }), { status: 401 }));
+    const bad = await check('anthropic', 'x-anthropic-key', 'sk-ant-nope');
+    setFreeProviderFetch(stubVendorFetch);
+    expect(JSON.parse(bad)).toMatchObject({ ok: false, kind: 'auth' });
+    expect(bad).not.toContain('sk-ant-nope');
+  });
+});

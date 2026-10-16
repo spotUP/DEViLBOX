@@ -1,9 +1,9 @@
 /**
  * AI Chat Route — SSE endpoint that streams AI responses.
  *
- * Supports four providers (see ../ai/cliProviders.ts): Claude, Copilot, Pi, OpenCode.
- *
- * Uses the user's existing CLI auth (no API key needed).
+ * Supports four CLI providers (see ../ai/cliProviders.ts): Claude, Copilot, Pi,
+ * OpenCode, which use the user's existing CLI auth, plus the in-process
+ * providers Free (OpenRouter), Anthropic and OpenAI (the visitor's own key).
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -12,7 +12,11 @@ import { resolve } from 'path';
 import { buildSystemPrompt } from '../ai/systemPrompt';
 import { BrowserChannel, deliverToolResult } from '../ai/browserChannel';
 import { freeAvailability, runFreeChat } from '../ai/freeProvider';
-import { visitorKey } from '../ai/limits';
+import { visitorKey, vendorKey } from '../ai/limits';
+import { runVendorChat } from '../ai/vendorChat';
+import { VENDORS, checkOpenRouterKey, isVendorId, listVendorModels, type VendorId } from '../ai/vendors';
+import { ProviderError } from '../ai/toolLoop';
+import { scrub } from '../ai/vendorPost';
 import {
   AI_PROVIDER_IDS, CLI_NOT_FOUND_MESSAGE, buildInvocation, findCli, isLoggedIn, parseEvent,
   type AIProviderId,
@@ -26,7 +30,7 @@ const MAX_CONVERSATIONS = 10;
 
 // Track active processes for cancellation
 const activeProcesses = new Map<string, ChildProcess>();
-// Free provider chats in flight, so /stop can abort them
+// Free/Anthropic/OpenAI chats in flight, so /stop can abort them
 const activeFreeChats = new Map<string, AbortController>();
 
 /** Keep the conversation for the next turn (oldest conversation dropped past the cap). */
@@ -43,6 +47,11 @@ function remember(convId: string, history: Array<{ role: string; content: string
 // Path to the MCP server entry point
 const MCP_SERVER_PATH = resolve(__dirname, '../mcp/index.ts');
 
+/** Which vendor keys this request carries: booleans only, never the keys. */
+function vendorStatus(req: Request): Record<VendorId, { keyPresent: boolean }> {
+  return { anthropic: { keyPresent: !!vendorKey(req, 'anthropic') }, openai: { keyPresent: !!vendorKey(req, 'openai') } };
+}
+
 /**
  * GET /api/ai/status — Check if AI CLIs are available
  */
@@ -55,10 +64,10 @@ router.get('/status', (req: Request, res: Response) => {
   }
 
   if (!free.available && AI_PROVIDER_IDS.every((id) => !providers[id].path)) {
-    return res.json({ available: false, free, error: free.message });
+    return res.json({ available: false, free, vendors: vendorStatus(req), error: free.message });
   }
 
-  res.json({ available: true, free, providers });
+  res.json({ available: true, free, providers, vendors: vendorStatus(req) });
 });
 
 /**
@@ -94,25 +103,28 @@ router.post('/chat', (req: Request, res: Response) => {
 
   const systemPrompt = buildSystemPrompt(context);
 
-  if (provider === 'free') {
-    // Free provider: no CLI; the logic lives in ../ai/freeProvider. Route is glue.
+  if (provider === 'free' || isVendorId(provider)) {
+    // In-process providers: no CLI; the logic lives in ../ai/freeProvider and ../ai/vendorChat. Route is glue.
     const abort = new AbortController();
     activeFreeChats.set(convId, abort);
     const channel = new BrowserChannel(convId, (event) => { res.write(`data: ${JSON.stringify(event)}\n\n`); });
     res.write(`data: ${JSON.stringify({ type: 'init', conversationId: convId })}\n\n`);
     res.on('close', () => { abort.abort(); channel.close(); activeFreeChats.delete(convId); });
-    void runFreeChat({
+    const common = {
       system: systemPrompt,
-      history: history.slice(-10).map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content })),
-      visitorKey: visitorKey(req),
+      history: history.slice(-10).map((m) => ({ role: m.role === 'user' ? 'user' as const : 'assistant' as const, content: m.content })),
       requestedModel: typeof model === 'string' ? model : undefined,
-      emit: (event) => { if (!res.writableEnded) res.write(`data: ${JSON.stringify(event)}\n\n`); },
+      emit: (event: Record<string, unknown>) => { if (!res.writableEnded) res.write(`data: ${JSON.stringify(event)}\n\n`); },
       callBrowser: channel.call,
       signal: abort.signal,
-    }).then((r) => { if (r.text) remember(convId, history, r.text); })
+    };
+    const run = isVendorId(provider)
+      ? runVendorChat({ ...common, vendor: provider, visitorKey: vendorKey(req, provider) })
+      : runFreeChat({ ...common, visitorKey: visitorKey(req) });
+    void run.then((r) => { if (r.text) remember(convId, history, r.text); })
       .catch((e: unknown) => {
-        console.error('[AI] free provider failed:', e instanceof Error ? e.message : 'unknown');
-        if (!res.writableEnded) res.write(`data: ${JSON.stringify({ type: 'error', error: 'The free AI failed unexpectedly.' })}\n\n`);
+        console.error(`[AI] ${provider} provider failed:`, e instanceof Error ? e.message : 'unknown');
+        if (!res.writableEnded) res.write(`data: ${JSON.stringify({ type: 'error', error: 'The AI failed unexpectedly.' })}\n\n`);
       })
       .finally(() => { activeFreeChats.delete(convId); channel.close(); if (!res.writableEnded) res.end(); });
     return;
@@ -202,6 +214,25 @@ router.post('/chat', (req: Request, res: Response) => {
       activeProcesses.delete(convId);
     }
   });
+});
+
+/**
+ * POST /api/ai/check-key — does this key work? Body: { vendor }, key in the
+ * vendor's header (x-openrouter-key, x-anthropic-key, x-openai-key). The key
+ * is used for this call only, never stored or logged.
+ */
+router.post('/check-key', async (req: Request, res: Response) => {
+  const vendor = (req.body as { vendor?: unknown } | undefined)?.vendor;
+  const key = vendor === 'openrouter' ? visitorKey(req) : isVendorId(vendor) ? vendorKey(req, vendor) : undefined;
+  if (vendor !== 'openrouter' && !isVendorId(vendor)) return res.status(400).json({ ok: false, kind: 'bad-request', error: 'Unknown vendor' });
+  if (!key) return res.json({ ok: false, kind: 'auth', error: 'No key was sent.' });
+  try {
+    const models = vendor === 'openrouter' ? await checkOpenRouterKey(key) : (await listVendorModels(vendor, key)).length;
+    res.json({ ok: true, models });
+  } catch (e) {
+    const err = e instanceof ProviderError ? e : new ProviderError('other', `Could not check the ${vendor === 'openrouter' ? 'OpenRouter' : VENDORS[vendor].label} key`);
+    res.json({ ok: false, kind: err.kind, error: scrub(err.message, key) });
+  }
 });
 
 /**
