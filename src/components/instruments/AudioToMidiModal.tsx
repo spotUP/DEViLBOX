@@ -12,13 +12,10 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { flushSync } from 'react-dom';
 import { X, Music, Play, Square, Loader2, ChevronDown, ChevronUp, Copy } from 'lucide-react';
-import {
-  BasicPitch,
-  noteFramesToTime,
-  addPitchBendsToNoteEvents,
-  outputToNotesPoly,
-} from '@spotify/basic-pitch';
 import type { NoteEventTime } from '@spotify/basic-pitch';
+import { evaluateBuffer, resampleToMono22050 } from '../../lib/voice/basicPitchModel';
+import { modelOutputToNotes } from '../../lib/voice/pitchNotes';
+import { NOTE_OFF, velocityToVolume } from '../../lib/voice/writeToPattern';
 import type { InstrumentConfig } from '../../types/instrument';
 import type { Pattern, TrackerCell, ChannelData, ClipboardData } from '../../types/tracker';
 import { midiToXMNote } from '../../lib/xmConversions';
@@ -29,9 +26,6 @@ import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const MODEL_URL = '/basic-pitch/model.json';
-const ANNOTATIONS_FPS = Math.floor(22050 / 256); // 86 fps
-const AUDIO_SAMPLE_RATE = 22050;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -62,24 +56,8 @@ const DEFAULT_SETTINGS: ConversionSettings = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function midiToHz(midi: number): number {
-  return 440 * Math.pow(2, (midi - 69) / 12);
-}
-
 function generateId(prefix = 'id'): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-}
-
-/** Resample an AudioBuffer to 22050 Hz mono using OfflineAudioContext */
-async function resampleToMono22050(buffer: AudioBuffer): Promise<AudioBuffer> {
-  const targetRate = AUDIO_SAMPLE_RATE;
-  const targetLength = Math.ceil((buffer.length / buffer.sampleRate) * targetRate);
-  const offlineCtx = new OfflineAudioContext(1, targetLength, targetRate);
-  const source = offlineCtx.createBufferSource();
-  source.buffer = buffer;
-  source.connect(offlineCtx.destination);
-  source.start(0);
-  return await offlineCtx.startRendering();
 }
 
 /** Convert detected notes to tracker Pattern */
@@ -124,13 +102,13 @@ function notesToPattern(
       rows[startRow].note = xmNote;
       rows[startRow].instrument = instrumentId;
       // Convert amplitude (0-1) to XM volume column (0x10–0x50)
-      rows[startRow].volume = 0x10 + Math.round(note.amplitude * 64);
+      rows[startRow].volume = velocityToVolume(note.amplitude);
     }
 
     // Note-off at end
     const endRow = Math.round((note.startTimeSeconds + note.durationSeconds) * rowsPerSecond);
     if (endRow < patternLength && endRow > startRow && rows[endRow].note === 0) {
-      rows[endRow].note = 97; // XM note-off
+      rows[endRow].note = NOTE_OFF;
     }
   }
 
@@ -192,12 +170,12 @@ function notesToClipboard(
     if (cells[startRow].note === 0) {
       cells[startRow].note = xmNote;
       cells[startRow].instrument = instrumentId;
-      cells[startRow].volume = 0x10 + Math.round(note.amplitude * 64);
+      cells[startRow].volume = velocityToVolume(note.amplitude);
     }
 
     const endRow = Math.round((note.startTimeSeconds + note.durationSeconds) * rowsPerSecond);
     if (endRow < rowCount && endRow > startRow && cells[endRow].note === 0) {
-      cells[endRow].note = 97; // XM note-off
+      cells[endRow].note = NOTE_OFF;
     }
   }
 
@@ -252,20 +230,11 @@ export const AudioToMidiModal: React.FC<AudioToMidiModalProps> = ({
   const [showSettings, setShowSettings] = useState(true);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isPlayingSample, setIsPlayingSample] = useState(false);
-  const basicPitchRef = useRef<BasicPitch | null>(null);
   const cancelRef = useRef(false);
   const previewStopRef = useRef<(() => void) | null>(null);
   const sampleStopRef = useRef<(() => void) | null>(null);
 
   const bpm = useTransportStore((s) => s.bpm);
-
-  // Lazy-initialize BasicPitch (loads the TF.js model once)
-  const getBasicPitch = useCallback(() => {
-    if (!basicPitchRef.current) {
-      basicPitchRef.current = new BasicPitch(MODEL_URL);
-    }
-    return basicPitchRef.current;
-  }, []);
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -308,47 +277,15 @@ export const AudioToMidiModal: React.FC<AudioToMidiModalProps> = ({
 
       // Step 2: Run inference
       setProgressLabel('Running neural pitch detection…');
-      const bp = getBasicPitch();
-
-      const allFrames: number[][] = [];
-      const allOnsets: number[][] = [];
-      const allContours: number[][] = [];
-
-      await bp.evaluateModel(
-        monoBuffer,
-        (frames, onsets, contours) => {
-          allFrames.push(...frames);
-          allOnsets.push(...onsets);
-          allContours.push(...contours);
-        },
-        (pct) => {
-          if (!cancelRef.current) flushSync(() => setProgress(Math.round(pct * 100)));
-        },
-      );
+      const output = await evaluateBuffer(monoBuffer, (pct) => {
+        if (!cancelRef.current) flushSync(() => setProgress(Math.round(pct * 100)));
+      });
 
       if (cancelRef.current) return;
 
-      // Step 3: Convert frames to notes
+      // Step 3: Convert frames to notes (shared extraction, polyphonic)
       setProgressLabel('Extracting notes…');
-      const minNoteFrames = Math.max(
-        1,
-        Math.round((settings.minNoteLengthMs / 1000) * ANNOTATIONS_FPS),
-      );
-      const minHz = midiToHz(settings.minMidiNote);
-      const maxHz = midiToHz(settings.maxMidiNote);
-
-      const noteEvents = outputToNotesPoly(
-        allFrames,
-        allOnsets,
-        settings.onsetThreshold,
-        settings.frameThreshold,
-        minNoteFrames,
-        true,
-        maxHz,
-        minHz,
-      );
-      const withBends = addPitchBendsToNoteEvents(allContours, noteEvents);
-      const notes = noteFramesToTime(withBends);
+      const notes = modelOutputToNotes(output, settings, false);
 
       setDetectedNotes(notes);
       setProgress(100);
@@ -360,7 +297,7 @@ export const AudioToMidiModal: React.FC<AudioToMidiModalProps> = ({
     } finally {
       if (!cancelRef.current) setIsConverting(false);
     }
-  }, [audioBuffer, settings, getBasicPitch]);
+  }, [audioBuffer, settings]);
 
   const handleInsert = useCallback(() => {
     if (!detectedNotes || detectedNotes.length === 0) return;
