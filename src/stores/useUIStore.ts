@@ -19,6 +19,8 @@ export interface DjLayoutFrame {
 
 export type PerformanceQuality = 'high' | 'medium' | 'low';
 
+export type StartupJingleStage = 'off' | 'awaiting-gesture' | 'playing' | 'done';
+
 export type TrackerViewMode = 'tracker' | 'grid' | 'pianoroll' | 'matrix' | 'sunvox' | 'dj' | 'drumpad' | 'vj';
 
 export type DialogCommand =
@@ -139,6 +141,8 @@ interface UIStore {
   pendingTD3File: File | null;     // TD-3 pattern file pending import (.sqs/.seq)
   pendingSunVoxFile: File | null;  // SunVox file pending import (.sunsynth / .sunvox)
   jingleActive: boolean;           // Startup jingle is playing
+  /** Startup sequence stage; the boot prompts wait while it is awaiting-gesture or playing. */
+  startupJingleStage: StartupJingleStage;
   postJingleActive: boolean;       // Jingle just ended — switch visualizer to logo mode
 
   // Layout presets (1-4)
@@ -224,6 +228,7 @@ interface UIStore {
   setPendingSunVoxFile: (file: File | null) => void;
 
   // Jingle action
+  setStartupJingleStage: (v: StartupJingleStage) => void;
   setJingleActive: (v: boolean) => void;
   setPostJingleActive: (v: boolean) => void;
 
@@ -343,6 +348,7 @@ export const useUIStore = create<UIStore>()(
       pendingTD3File: null,
       pendingSunVoxFile: null,
       jingleActive: false,
+      startupJingleStage: 'off',
       postJingleActive: false,
 
       // Dialog bridge (keyboard → dialog)
@@ -759,6 +765,11 @@ export const useUIStore = create<UIStore>()(
       setPendingSunVoxFile: (file) =>
         set((state) => {
           state.pendingSunVoxFile = file;
+        }),
+
+      setStartupJingleStage: (v) =>
+        set((state) => {
+          state.startupJingleStage = v;
         }),
 
       setJingleActive: (v) =>

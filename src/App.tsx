@@ -29,8 +29,7 @@ import { setRecoveryPrompt } from './lib/persistence/recoveryPrompt';
 import { setupCloudSyncSubscribers } from './lib/cloudSyncSubscribers';
 import { setupInstrumentSelectionSync } from './midi/instrumentSelectionWiring';
 import { getToneEngine } from '@engine/ToneEngine';
-import { getJingleEngine, STARTUP_JINGLE_URL } from '@engine/jingle/JingleEngine';
-import { injectMouthPatterns, teardownMouthPatterns } from '@engine/jingle/JinglePatterns';
+import { beginStartupSequence, isStartupHolding, runFirstGesture, startStartupJingle, startupGestureSurface, startupTipsModal } from '@lib/startup/startupSequence';
 import type { EffectConfig } from './types/instrument';
 import { Zap, Music, Sliders, Download, List } from 'lucide-react';
 import { ToastNotification } from '@components/ui/ToastNotification';
@@ -97,33 +96,6 @@ const AuthModal = lazy(() => import('@components/dialogs/AuthModal').then(m => (
 const ModuleInfoModal = lazy(() => import('@components/dialogs/ModuleInfoModal').then(m => ({ default: m.ModuleInfoModal })));
 const SettingsModal = lazy(() => import('@components/dialogs/SettingsModal').then(m => ({ default: m.SettingsModal })));
 const RevisionBrowserDialog = lazy(() => import('@components/dialogs/RevisionBrowserDialog').then(m => ({ default: m.RevisionBrowserDialog })));
-
-// Module-level flag — resets on every page load (sessionStorage persists through reloads)
-let jinglePlayedThisLoad = false;
-
-/** Play the startup jingle once per page load (no-op if disabled or already played). */
-async function playStartupJingle(): Promise<void> {
-  const settings = useSettingsStore.getState();
-  if (!settings.welcomeJingleEnabled || jinglePlayedThisLoad) return;
-
-  jinglePlayedThisLoad = true;
-  const jingle = getJingleEngine();
-  jingle.onEnd(() => {
-    useUIStore.getState().setJingleActive(false);
-    useUIStore.getState().setPostJingleActive(true);
-    teardownMouthPatterns();
-    useUIStore.getState().setStatusMessage('DEVILBOX READY', false, 3000);
-  });
-  try {
-    await jingle.preload(STARTUP_JINGLE_URL);
-    injectMouthPatterns();
-    jingle.play();
-    useUIStore.getState().setJingleActive(true);
-  } catch (error) {
-    // The app continues without the jingle, but a missing or undecodable asset is reported.
-    console.warn('[startup jingle]', error);
-  }
-}
 
 const DesignSystemPage = lazy(() => import('./components/design-system/DesignSystemPage').then(m => ({ default: m.DesignSystemPage })));
 const IsolatedComponent = lazy(() => import('./components/design-system/IsolatedComponent').then(m => ({ default: m.IsolatedComponent })));
@@ -254,40 +226,28 @@ function App() {
 
   const { showPatternDialog: showTD3Pattern, closePatternDialog, showKnobBar, setShowKnobBar } = useMIDIStore();
 
-  // Startup jingle: track whether the tips modal was shown and when it's dismissed
-  const tipsModalWasShownRef = useRef(false);
+  // Startup sequence (src/lib/startup/startupSequence.ts decides the order):
+  // the jingle asset loads now; the boot prompts wait until the jingle ends.
+  useEffect(() => { beginStartupSequence(); }, []);
+  const startupHolding = useUIStore(s => isStartupHolding(s.startupJingleStage));
+  const startupStage = useUIStore(s => s.startupJingleStage);
   const prevModalOpenRef = useRef<string | null>(null);
 
   useEffect(() => {
     const prev = prevModalOpenRef.current;
     prevModalOpenRef.current = modalOpen;
 
-    if (modalOpen === 'tips') {
-      tipsModalWasShownRef.current = true;
-    }
-
-    // Tips modal just dismissed → fire jingle now (audio context is guaranteed running
-    // since the user had to click something to dismiss the dialog)
+    // Tips modal just dismissed: that click is the gesture that starts the jingle.
     if (prev === 'tips' && !modalOpen) {
-      void playStartupJingle();
+      void startStartupJingle();
     }
   }, [modalOpen]);
 
   // Unified startup logic: Show Tips or What's New
   useEffect(() => {
-    const SEEN_VERSION_KEY = 'devilbox-seen-version';
-    const seenVersion = localStorage.getItem(SEEN_VERSION_KEY);
-    const showTipsAtStartup = localStorage.getItem('show-tips-at-startup') !== 'false';
-
-    const hasNewVersion = seenVersion !== currentVersion.buildNumber;
-
-    if (hasNewVersion) {
-      // Prioritize Changelog for new versions
-      openModal('tips', { initialTab: 'changelog' });
-    } else if (showTipsAtStartup) {
-      // Otherwise show Tips if enabled
-      openModal('tips', { initialTab: 'tips' });
-    }
+    // Changelog for a new version, otherwise Tips if enabled.
+    const tips = startupTipsModal(currentVersion.buildNumber);
+    if (tips) openModal('tips', tips);
   }, [currentVersion.buildNumber, openModal]);
 
   // Auto-join collab room from URL (e.g. ?collab=XXXXXX)
@@ -453,7 +413,7 @@ function App() {
   // from outside React; see `recoveryPrompt.ts` for why resolving it stays an
   // explicit choice rather than something `dismiss_modal` may do.
   useEffect(() => {
-    if (!recoverySnapshot) { setRecoveryPrompt(null); return; }
+    if (!recoverySnapshot || startupHolding) { setRecoveryPrompt(null); return; }
     setRecoveryPrompt({
       restore: () => restoreRecovery(),
       discard: () => discardRecovery(),
@@ -463,7 +423,7 @@ function App() {
       }),
     });
     return () => setRecoveryPrompt(null);
-  }, [recoverySnapshot, restoreRecovery, discardRecovery]);
+  }, [recoverySnapshot, startupHolding, restoreRecovery, discardRecovery]);
 
   // Initialize KeyboardRouter once at app startup
   useEffect(() => {
@@ -774,7 +734,14 @@ function App() {
     // qualify as a user gesture for AudioContext.resume(). We listen for all three
     // event types to cover desktop (click/keydown) and mobile (touchstart).
     const handleFirstInteraction = async () => {
-      if (contextState !== 'running') {
+      // Remove all listeners after first interaction
+      window.removeEventListener('click', handleFirstInteraction);
+      window.removeEventListener('keydown', handleFirstInteraction);
+      window.removeEventListener('touchstart', handleFirstInteraction);
+
+      // Jingle first (splash mode), engine init in parallel and never ahead of it.
+      await runFirstGesture(currentVersion.buildNumber, async () => {
+        if (contextState === 'running') return;
         try {
           const engine = getToneEngine();
           await engine.init();
@@ -782,18 +749,7 @@ function App() {
         } catch (error) {
           console.error('Failed to resume audio engine:', error);
         }
-      }
-      // Remove all listeners after first interaction
-      window.removeEventListener('click', handleFirstInteraction);
-      window.removeEventListener('keydown', handleFirstInteraction);
-      window.removeEventListener('touchstart', handleFirstInteraction);
-
-      // Fire jingle immediately only when the tips modal was never shown.
-      // When tips IS shown, playStartupJingle() is called by the modalOpen watcher
-      // (tips → null transition) so we don't double-fire here.
-      if (!tipsModalWasShownRef.current) {
-        void playStartupJingle();
-      }
+      });
     };
 
     window.addEventListener('click', handleFirstInteraction);
@@ -805,7 +761,7 @@ function App() {
       window.removeEventListener('keydown', handleFirstInteraction);
       window.removeEventListener('touchstart', handleFirstInteraction);
     };
-  }, [contextState, setContextState]);
+  }, [contextState, setContextState, currentVersion.buildNumber]);
 
   // Check if a filename is a supported tracker/module format (lazy-loaded)
   // Load song file after confirmation (uses unified file loader)
@@ -1430,11 +1386,21 @@ function App() {
       {/* Guided Tour overlay — subtitles + controls */}
       <TourOverlay />
 
+      {/* Click-to-start splash: the gesture that starts the jingle when the tips dialog is off. */}
+      {startupStage === 'awaiting-gesture' && startupGestureSurface(currentVersion.buildNumber) === 'splash' && (
+        <Modal isOpen onClose={() => void startStartupJingle()} size="sm" onConfirm={() => void startStartupJingle()}>
+          <div className="p-4 space-y-3 text-center">
+            <h2 className="text-sm font-mono text-text-primary">DEViLBOX</h2>
+            <Button variant="primary" onClick={() => void startStartupJingle()}>Click to Start</Button>
+          </div>
+        </Modal>
+      )}
+
       {/* Boot restore prompt. Two sources, two very different things to say:
           a crash snapshot is work the user never saved, while the explicit
           slot is a project they named and saved on purpose — and which boot
           used to open silently over whatever they were about to load. */}
-      {recoverySnapshot && (
+      {recoverySnapshot && !startupHolding && (
         <Modal isOpen onClose={discardRecovery} size="sm" onConfirm={restoreRecovery}>
           <div className="p-4 space-y-3">
             <h2 className="text-sm font-mono text-text-primary">
