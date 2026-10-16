@@ -22,7 +22,7 @@ import songdbRoutes from './routes/songdb';
 import scRoutes from './routes/sc';
 import deepsidRoutes from './routes/deepsid';
 import aiRoutes from './routes/ai';
-import { createAiGuards } from './ai/limits';
+import { createAiGuards, trustProxyHops } from './ai/limits';
 import analysisRoutes from './routes/analysis';
 import renderRoutes from './routes/render';
 import djsetsRoutes from './routes/djsets';
@@ -52,9 +52,9 @@ app.use(cors({
   origin: parseCorsOrigin(process.env.CORS_ORIGIN),
   credentials: true
 }));
-// nginx sits in front: trust one proxy hop so req.ip is the visitor, not nginx
-// (the AI rate limits are per IP).
-app.set('trust proxy', 1);
+// Proxies in front (TRUST_PROXY_HOPS, see trustProxyHops): req.ip must be the
+// visitor, not the last proxy, because the AI rate limits are per IP.
+app.set('trust proxy', trustProxyHops());
 // The AI endpoints take small JSON bodies (a prompt, a tool result capped at
 // 64 KB), so they get a tight parser BEFORE the 10 MB global one; body-parser
 // skips a body that is already parsed. The plan said 64kb; 256kb leaves room
