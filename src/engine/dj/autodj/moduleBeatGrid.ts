@@ -13,6 +13,7 @@ import { resolveSongChannelRoles } from '@/engine/dub/songChannelIdentity';
 import { getRoleAtPosition } from '@/bridge/analysis/SongRoleTimeline';
 import { rowsPerBeat as speedRowsPerBeat, DEFAULT_BEATS_PER_BAR } from '@/lib/dub/musicalClock';
 import { PHRASE_BOUNDARY_SUPPORT, PHRASE_LENGTHS, PHRASE_UNALIGNED_CONFIDENCE } from './structure';
+import { PLAUSIBLE_BPM_MIN, PLAUSIBLE_BPM_MAX } from './beatGrid';
 import { classifyInstrument } from '@/bridge/analysis/ChannelNaming';
 
 /**
@@ -39,9 +40,6 @@ const METER_EVIDENCE_MARGIN = 0.1;
  * tracker tracks) has not run yet and may move it.
  */
 export const MODULE_GRID_TOLERANCE = 0.02;
-/** A beat level whose tempo falls outside this range is not the song's beat (a half or double reading). */
-export const PLAUSIBLE_BPM_MIN = 60;
-export const PLAUSIBLE_BPM_MAX = 200;
 /** How much better the drums must fit another beat level before it replaces the speed convention. */
 const DRUM_EVIDENCE_MARGIN = 0.15;
 
