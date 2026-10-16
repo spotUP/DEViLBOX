@@ -27,6 +27,18 @@ const envInt = (name: string, fallback: number): number => {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 };
 
+/**
+ * Proxy hops between the visitor and Express, for `app.set('trust proxy', n)`.
+ * The per-IP limits key on req.ip, which is only the visitor's address when n
+ * matches the deploy chain: live is Caddy -> nginx -> Express (2), the plain
+ * compose stack is nginx -> Express (1). Too low and every visitor shares the
+ * last proxy's address, so one daily cap for the whole site; too high and a
+ * visitor can spoof X-Forwarded-For.
+ */
+export function trustProxyHops(): number {
+  return envInt('TRUST_PROXY_HOPS', 1);
+}
+
 /** The visitor's own OpenRouter key from the request, or undefined. Never log it. */
 export function visitorKey(req: { header(name: string): string | undefined }): string | undefined {
   const v = req.header(OPENROUTER_KEY_HEADER)?.trim();

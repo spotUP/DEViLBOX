@@ -14,6 +14,9 @@ services:
       - PORT=3001
       - JWT_SECRET=${JWT_SECRET}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      # Live chain is Caddy -> nginx -> backend: two proxy hops, so req.ip is
+      # the visitor and the per-IP AI limits are per visitor.
+      - TRUST_PROXY_HOPS=${TRUST_PROXY_HOPS:-2}
       - CORS_ORIGIN=https://devilbox.uprough.net
       - DATA_ROOT=/data
       - DB_DIR=/data/db
