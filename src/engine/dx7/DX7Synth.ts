@@ -421,25 +421,28 @@ export class DX7Synth implements DevilboxSynth {
 
   private _currentMidiNote = 69;
 
-  triggerAttack(note: string | number, _time?: number, velocity = 1) {
+  // `time` (AudioContext seconds) travels with the note: the worklet holds a note sent ahead until its frame,
+  // so a main-thread stall that delivers rows late and bunched does not move them.
+  triggerAttack(note: string | number, time?: number, velocity = 1) {
     const midi = typeof note === 'string' ? noteToMidi(note) : note;
     this._currentMidiNote = midi;
     // velocity is 0..1; the bridge's velocity table has 128 entries, so a stray value above 1 must not reach it
-    this.send({ type: 'noteOn', note: midi, velocity: Math.max(0, Math.min(127, Math.round(velocity * 127))) });
+    this.send({ type: 'noteOn', note: midi, velocity: Math.max(0, Math.min(127, Math.round(velocity * 127))), time });
   }
 
-  triggerRelease(note?: string | number, _time?: number) {
+  triggerRelease(note?: string | number, time?: number) {
     if (note !== undefined) {
       const midi = typeof note === 'string' ? noteToMidi(note) : note;
-      this.send({ type: 'noteOff', note: midi });
+      this.send({ type: 'noteOff', note: midi, time });
     } else {
-      this.send({ type: 'allNotesOff' });
+      this.send({ type: 'allNotesOff', time });
     }
   }
 
-  triggerAttackRelease(note: string | number, duration: number, _time?: number, velocity?: number) {
-    this.triggerAttack(note, _time, velocity);
-    setTimeout(() => this.triggerRelease(note), duration * 1000);
+  triggerAttackRelease(note: string | number, duration: number, time?: number, velocity?: number) {
+    const start = time ?? this.audioContext.currentTime;
+    this.triggerAttack(note, start, velocity);
+    this.triggerRelease(note, start + duration);
   }
 
   /** Select voice bank (0-7) */
