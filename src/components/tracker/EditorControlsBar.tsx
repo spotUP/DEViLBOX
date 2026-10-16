@@ -11,7 +11,7 @@
 import { useShallow } from 'zustand/react/shallow';
 import { scopeFormatLabel } from '@/lib/tracker/scopeFormatLabel';
 import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Mic } from 'lucide-react';
 import { useUIStore } from '@stores';
 import { useAudioStore } from '@stores/useAudioStore';
 import { masterFxButtonState } from '@/lib/audio/masterFxButtonState';
@@ -54,6 +54,9 @@ export interface EditorControlsBarProps {
   /** Find & Replace toggle */
   showFindReplace?: boolean;
   onShowFindReplace?: () => void;
+  /** Voice to Notes panel toggle */
+  showVoicePanel?: boolean;
+  onToggleVoicePanel?: () => void;
 }
 
 export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
@@ -68,6 +71,8 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   onShowCleanup,
   showFindReplace,
   onShowFindReplace,
+  showVoicePanel,
+  onToggleVoicePanel,
 }) => {
   // ── Shared hook ───────────────────────────────────────────────────────────
   const c = useEditorControls({
@@ -353,6 +358,22 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
             title="Find & replace (Ctrl+F)"
           >
             Find
+          </button>
+        )}
+
+        {/* Voice to Notes */}
+        {onToggleVoicePanel && (
+          <button
+            onClick={onToggleVoicePanel}
+            className={`flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors ${
+              showVoicePanel
+                ? 'bg-accent-primary/20 text-accent-primary'
+                : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
+            }`}
+            title="Record your voice and turn it into notes"
+          >
+            <Mic size={11} />
+            Voice
           </button>
         )}
 

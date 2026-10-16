@@ -34,6 +34,7 @@ import { UndoHistoryPanel } from './UndoHistoryPanel';
 import { FT2Toolbar } from './FT2Toolbar';
 import { InstrumentKnobPanel } from './InstrumentKnobPanel';
 import { EditorControlsBar } from './EditorControlsBar';
+import { VoiceToNotesPanel } from './VoiceToNotesPanel';
 import { MobilePatternInput } from './mobile/MobilePatternInput';
 import { MobileTransportBar } from './mobile/MobileTransportBar';
 import { useMobileTrackerInput } from './mobile/useMobileTrackerInput';
@@ -224,6 +225,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const [showFindReplace, setShowFindReplace] = useState(false);
   const [showShortcutSheet, setShowShortcutSheet] = useState(false);
   const [showStrum, setShowStrum] = useState(false);
+  const [voicePanelOpen, setVoicePanelOpen] = useState(false);
   const [showEffectPicker, setShowEffectPicker] = useState(false);
   const [showUndoHistory, setShowUndoHistory] = useState(false);
   const [internalShowImportModule, setInternalShowImportModule] = useState(false);
@@ -473,6 +475,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
           onShowCleanup={() => setShowCleanup(true)}
           showFindReplace={showFindReplace}
           onShowFindReplace={() => setShowFindReplace(v => !v)}
+          showVoicePanel={voicePanelOpen}
+          onToggleVoicePanel={() => setVoicePanelOpen(v => !v)}
         />
       </ResponsivePanel>
       )}
@@ -528,6 +532,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                 hasC64Sid ? (
                   <Sc68Visualizer />
                 ) : (
+                  <div className="flex flex-1 min-h-0 min-w-0">
+                  <div className="flex-1 min-w-0 min-h-0 flex flex-col">
                   <TrackerEditorWithBg
                     trackerVisualBg={trackerVisualBg}
                     onAcidGenerator={() => {}}
@@ -537,6 +543,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                     visibleChannels={isPhone ? mobileInput.visibleChannels : undefined}
                     startChannel={isPhone ? mobileInput.startChannel : undefined}
                   />
+                  </div>
+                  {voicePanelOpen && <VoiceToNotesPanel onClose={() => setVoicePanelOpen(false)} />}
+                  </div>
                 )
               );
 
