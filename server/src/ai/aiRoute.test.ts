@@ -11,6 +11,9 @@ import { mkdtempSync, writeFileSync, chmodSync, readFileSync, existsSync, rmSync
 import { tmpdir } from 'os';
 import { join } from 'path';
 import aiRoutes from '../routes/ai';
+import { setFreeProviderFetch } from './freeProvider';
+import { resetModelCatalogue } from './freeModels';
+import { resetModelCosts } from './modelCosts';
 
 let dir: string;
 let server: Server;
@@ -100,5 +103,119 @@ describe('POST /api/ai/chat with stubbed CLIs', () => {
       const events = await chat('pi');
       expect(events.some((e) => e.type === 'error')).toBe(true);
     }
+  });
+});
+
+/**
+ * FA-14: the Free provider through the real POST /api/ai/chat route, with the
+ * OpenRouter fetch stubbed. Proves the whole path ran: discovery, free-only
+ * choice, the tool schema offered, a tool_call reaching the browser channel,
+ * the browser's POST /api/ai/tool-result feeding the second round, the final
+ * text, and which key was sent.
+ */
+describe('POST /api/ai/chat provider free (reachability)', () => {
+  const calls: Array<{ url: string; auth: string | null; body: Record<string, unknown> | null }> = [];
+  const MODELS = [
+    { id: 'a/free-one:free', pricing: { prompt: '0', completion: '0' }, supported_parameters: ['tools'], context_length: 8000 },
+    { id: 'b/free-two:free', pricing: { prompt: '0', completion: '0' }, supported_parameters: ['tools'], context_length: 32000 },
+    { id: 'c/paid', pricing: { prompt: '0.001', completion: '0.002' }, supported_parameters: ['tools'], context_length: 4000 },
+  ];
+  let completions = 0;
+
+  const stubFetch: typeof fetch = async (input, init) => {
+    const url = String(input);
+    const headers = new Headers(init?.headers);
+    const body = typeof init?.body === 'string' ? JSON.parse(init.body) as Record<string, unknown> : null;
+    calls.push({ url, auth: headers.get('authorization'), body });
+    if (url.endsWith('/models')) return new Response(JSON.stringify({ data: MODELS }), { status: 200 });
+    completions++;
+    const messages = (body?.messages ?? []) as Array<{ role: string }>;
+    const answered = messages.some((m) => m.role === 'tool');
+    const message = answered
+      ? { content: 'The song is Test Song.' }
+      : { content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'get_song_info', arguments: '{}' } }] };
+    return new Response(JSON.stringify({ choices: [{ message, finish_reason: 'stop' }] }), { status: 200 });
+  };
+
+  /** Run a chat like the browser does: read the SSE, answer each tool_call by POSTing the result. */
+  async function freeChat(headers: Record<string, string> = {}): Promise<Array<Record<string, unknown>>> {
+    const r = await fetch(`${base}/api/ai/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ prompt: 'what song is loaded?', provider: 'free', conversationId: `conv-${Math.random()}` }),
+    });
+    const events: Array<Record<string, unknown>> = [];
+    const reader = r.body!.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let conversationId = '';
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split('\n\n');
+      buf = parts.pop() ?? '';
+      for (const part of parts.filter((x) => x.startsWith('data: '))) {
+        const ev = JSON.parse(part.slice(6)) as Record<string, unknown>;
+        events.push(ev);
+        if (ev.type === 'init') conversationId = String(ev.conversationId);
+        if (ev.type === 'tool_call') {
+          await fetch(`${base}/api/ai/tool-result`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ conversationId, callId: ev.callId, result: { title: 'Test Song' } }),
+          });
+        }
+      }
+    }
+    return events;
+  }
+
+  beforeAll(() => {
+    process.env.DB_DIR = dir;
+    setFreeProviderFetch(stubFetch);
+  });
+  afterAll(() => {
+    setFreeProviderFetch(null);
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.DB_DIR;
+  });
+  const reset = () => { calls.length = 0; completions = 0; resetModelCatalogue(); resetModelCosts(); };
+
+  it('no key anywhere: one error telling the visitor to add a key in Settings, and no network call', async () => {
+    reset();
+    delete process.env.OPENROUTER_API_KEY;
+    const events = await freeChat();
+    expect(calls).toHaveLength(0);
+    expect(events.find((e) => e.type === 'error')).toMatchObject({ error: expect.stringContaining('Settings') });
+  });
+
+  it('server key: free model chosen, tool_call round trip through the browser channel, final text', async () => {
+    reset();
+    process.env.OPENROUTER_API_KEY = 'server-key';
+    const events = await freeChat();
+    const posts = calls.filter((c) => c.url.endsWith('/chat/completions') && (c.body?.max_tokens as number) > 5);
+    expect(completions).toBeGreaterThanOrEqual(2); // sentinel: the stubbed OpenRouter ran for both rounds
+    expect(posts[0].auth).toBe('Bearer server-key');
+    expect(posts[0].body?.model).toBe('a/free-one:free'); // free, smaller context first; never c/paid
+    expect(calls.some((c) => c.body?.model === 'c/paid')).toBe(false);
+    const offered = (posts[0].body?.tools as Array<{ function: { name: string } }>).map((t) => t.function.name);
+    expect(offered).toContain('get_song_info');
+    expect(offered).not.toContain('load_file');
+    expect(events.find((e) => e.type === 'tool_call')).toMatchObject({ method: 'get_song_info' });
+    const second = posts[1].body?.messages as Array<{ role: string; content: string }>;
+    expect(second.find((m) => m.role === 'tool')?.content).toContain('Test Song'); // the browser's answer reached the model
+    expect(events.filter((e) => e.type === 'text').map((e) => e.content).join('')).toBe('The song is Test Song.');
+    expect(events[events.length - 1]).toMatchObject({ type: 'done', code: 0 });
+  });
+
+  it('visitor key header: that key is used for every OpenRouter call and the server key is never sent', async () => {
+    reset();
+    process.env.OPENROUTER_API_KEY = 'server-key';
+    const events = await freeChat({ 'X-OpenRouter-Key': 'visitor-key' });
+    expect(calls.length).toBeGreaterThanOrEqual(3); // models + two rounds
+    expect(calls.every((c) => c.auth === 'Bearer visitor-key')).toBe(true);
+    expect(JSON.stringify(events)).not.toContain('visitor-key');
+    expect(events.filter((e) => e.type === 'text').map((e) => e.content).join('')).toBe('The song is Test Song.');
   });
 });
