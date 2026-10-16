@@ -24,7 +24,7 @@ import { useUIStore } from '@stores/useUIStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import {
   beginStartupSequence, isStartupHolding, resetStartupSequenceForTest,
-  runFirstGesture, startStartupJingle,
+  runFirstGesture, startStartupJingle, whenStartupJingleDone,
 } from '../startupSequence';
 
 const holding = () => isStartupHolding(useUIStore.getState().startupJingleStage);
@@ -70,6 +70,25 @@ describe('startup sequence: jingle first', () => {
     void runFirstGesture('b1', async () => { log.push('init-start'); });
     expect(log.indexOf('jingle-play')).toBeGreaterThan(-1);
     expect(log.indexOf('jingle-play')).toBeLessThan(log.indexOf('init-start'));
+  });
+
+  it('a song load (whenStartupJingleDone) waits for the jingle to end', async () => {
+    beginStartupSequence(); releasePreload();
+    await Promise.resolve(); await Promise.resolve();
+    await startStartupJingle();
+    let loaded = false;
+    const load = whenStartupJingleDone().then(() => { loaded = true; });
+    await Promise.resolve(); await Promise.resolve();
+    expect(loaded).toBe(false); // jingle playing: the load is held
+    endCb!();
+    await load;
+    expect(loaded).toBe(true);
+  });
+
+  it('a song load does not wait when the jingle setting is off', async () => {
+    useSettingsStore.setState({ welcomeJingleEnabled: false });
+    beginStartupSequence();
+    await whenStartupJingleDone();
   });
 
   it('with the jingle setting off nothing waits', () => {

@@ -26,6 +26,7 @@
  * same prepareSong, and its Import hands the choices back; it writes no
  * settings (D4).
  */
+import { whenStartupJingleDone } from '@lib/startup/startupSequence';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 import { isSongFormat, isAudioFile, type FileLoadOptions, type FileLoadResult } from '@/lib/file/UnifiedFileLoader';
 import { loadSongFile, loadV2MFile, loadAdPlugFile, importModuleFile, prepareModuleFile } from '@/lib/song/songBranches';
@@ -371,6 +372,8 @@ export async function openSong(src: SongSourceRef | StoredSongSource, o: OpenOpt
 export async function openSong(src: SongSourceRef | StoredSongSource, o: OpenOptions): Promise<OpenResult | DeckSong> {
   if (src.kind === 'song') return openStoredSong(src);
   if (typeof o.target === 'object') return openDeckSong(src, o as OpenOptions & { target: DeckTarget });
+  // The startup jingle plays before any song loads.
+  await whenStartupJingleDone();
   const interactive = o.interactive ?? INTERACTIVE_ORIGINS.has(o.origin);
   const phase = (p: OpenPhase): void => {
     setSongLoadPhase(p);
