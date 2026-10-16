@@ -12,6 +12,7 @@ import { useCursorStore } from '@/stores/useCursorStore';
 import { resetStore } from '@/stores/__tests__/_harness';
 import { midiToXMNote } from '@/lib/xmConversions';
 import { ANNOTATIONS_FPS } from '@/lib/voice/pitchNotes';
+import { synthTake } from '@/lib/voice/drumSynth';
 
 function oneNoteOutput(midi: number) {
   const frames: number[][] = [];
@@ -65,5 +66,20 @@ describe('voice_to_notes handler', () => {
     expect(rows.some((r) => r.note === midiToXMNote(61))).toBe(true);
     expect(decoded).toBe(3);
     expect((await voiceToNotes({}, deps)).error).toBeDefined();
+  });
+
+  it('drums mode detects kick and snare hits and writes the mapped notes without calling the pitch model', async () => {
+    const take = synthTake([{ drum: 'kick', at: 0.3 }, { drum: 'snare', at: 0.8 }], 1.5);
+    const drumDeps: VoiceToNotesDeps = { ...deps, decode: async () => take };
+    const undoBefore = useHistoryStore.getState().undoStack.length;
+    const res = await voiceToNotes({ data: btoa('abcd'), mode: 'drums', drumMap: { snare: { midi: 40 } } }, drumDeps);
+    expect(res.error).toBeUndefined();
+    expect(calls).toBe(0);
+    expect(res.hits).toEqual({ kick: 1, snare: 1, hat: 0, clap: 0 });
+    const rows = useTrackerStore.getState().patterns[0].channels[1].rows;
+    const written = rows.map((r, i) => ({ i, note: r.note })).filter((c) => c.note > 0 && c.note !== 97);
+    expect(written.map((c) => c.note)).toEqual([midiToXMNote(36), midiToXMNote(40)]);
+    expect(useHistoryStore.getState().undoStack.length - undoBefore).toBe(1);
+    expect((await voiceToNotes({ data: 'AA==', mode: 'bogus' }, deps)).error).toBeDefined();
   });
 });

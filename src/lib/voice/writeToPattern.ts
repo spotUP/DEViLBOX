@@ -62,11 +62,11 @@ export function applyNotesToPattern(
       continue;
     }
     rows[row].note = xm;
-    rows[row].instrument = target.instrumentId;
+    rows[row].instrument = n.instrumentId ?? target.instrumentId;
     rows[row].volume = velocityToVolume(n.velocity);
     result.written++;
     const off = row + n.lengthRows;
-    if (off < rows.length && rows[off].note === 0) rows[off].note = NOTE_OFF;
+    if (n.noteOff !== false && off < rows.length && rows[off].note === 0) rows[off].note = NOTE_OFF;
   }
   return result;
 }

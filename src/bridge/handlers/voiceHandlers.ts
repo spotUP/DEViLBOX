@@ -7,6 +7,8 @@
  */
 import { basicPitchModel, resampleToMono22050, type PitchModel } from '@/lib/voice/basicPitchModel';
 import { DEFAULT_SHAPING, commitVoiceNotes, shapeNotes } from '@/lib/voice/voiceToNotes';
+import { classifyByRules, detectHits, DRUM_CLASSES } from '@/lib/voice/drumHits';
+import { commitDrumHits, defaultDrumMap, type DrumMap } from '@/lib/voice/drumToNotes';
 import { SCALES, type ScaleName } from '@/lib/voice/scaleSnap';
 import { getStoredLatencyMs } from '@/lib/voice/latencyCalibration';
 import { useCursorStore } from '@/stores/useCursorStore';
@@ -55,8 +57,30 @@ export async function voiceToNotes(
   try {
     const bytes = data ? base64ToBuffer(data) : await deps.fetchBytes(url as string);
     const samples = await deps.decode(bytes);
-    const output = await deps.model.evaluate(samples);
+    const mode = (params.mode as string | undefined) ?? 'melody';
+    if (mode !== 'melody' && mode !== 'drums') return { error: `Unknown mode: ${mode}` };
 
+    const cursor = useCursorStore.getState().cursor;
+    const channelIndex = (params.channel as number | undefined) ?? cursor.channelIndex;
+    const startRow = (params.row as number | undefined) ?? cursor.rowIndex;
+    const { bpm, speed } = useTransportStore.getState();
+    const quantise = { bpm, speed, swing: 0, minLengthRows: 1, latencyNudgeMs: getStoredLatencyMs('') };
+
+    if (mode === 'drums') {
+      const fallback = (params.instrumentId as number | undefined) ?? useInstrumentStore.getState().currentInstrumentId ?? 1;
+      const map: DrumMap = defaultDrumMap(useInstrumentStore.getState().instruments, fallback);
+      const override = (params.drumMap ?? {}) as Record<string, { instrumentId?: number; midi?: number }>;
+      for (const d of DRUM_CLASSES) {
+        if (override[d]) map[d] = { ...map[d], ...override[d] };
+      }
+      const hits = detectHits(samples, classifyByRules);
+      const written = commitDrumHits(hits, map, quantise, { channelIndex, startRow, instrumentId: fallback });
+      const counts = Object.fromEntries(DRUM_CLASSES.map((d) => [d, hits.filter((h) => h.drum === d).length]));
+      if (!written) return { ok: true, written: 0, dropped: 0, detected: hits.length, hits: counts };
+      return { ok: true, ...written, detected: hits.length, hits: counts, channel: channelIndex, row: startRow };
+    }
+
+    const output = await deps.model.evaluate(samples);
     const tonic = params.keyTonic as number | undefined;
     const scale = (params.keyScale as string | undefined) ?? 'major';
     if (tonic !== undefined && !(scale in SCALES)) return { error: `Unknown keyScale: ${scale}` };
@@ -66,15 +90,11 @@ export async function voiceToNotes(
       keySnap: tonic === undefined ? null : { tonic, scale: scale as ScaleName },
     });
 
-    const cursor = useCursorStore.getState().cursor;
-    const channelIndex = (params.channel as number | undefined) ?? cursor.channelIndex;
-    const startRow = (params.row as number | undefined) ?? cursor.rowIndex;
     const instrumentId =
       (params.instrumentId as number | undefined) ?? useInstrumentStore.getState().currentInstrumentId ?? 1;
-    const { bpm, speed } = useTransportStore.getState();
     const result = commitVoiceNotes(
       notes,
-      { bpm, speed, swing: 0, minLengthRows: 1, latencyNudgeMs: getStoredLatencyMs('') },
+      quantise,
       { channelIndex, startRow, instrumentId },
     );
     if (!result) return { ok: true, written: 0, dropped: 0, detected: notes.length };
