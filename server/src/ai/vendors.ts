@@ -87,16 +87,24 @@ export function pickModel(available: string[], preferred: string[], requested?: 
   return available[0] ?? null;
 }
 
-/** OpenRouter has no vendor entry (its server key and ranking live in freeProvider); a key check is one authenticated model-list call. */
+/**
+ * OpenRouter has no vendor entry (its server key and ranking live in freeProvider).
+ * Its /models list is public and answers 200 for any key, so the key itself is checked
+ * against /key (401 for a bad key); the model count then comes from /models.
+ */
 export async function checkOpenRouterKey(key: string, fetchImpl: FetchFn = providerFetch): Promise<number> {
-  let r: Response;
-  try {
-    r = await fetchImpl(`${OPENROUTER_BASE}/models`, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(8000) });
-  } catch {
-    throw new ProviderError('other', 'Could not reach OpenRouter');
-  }
-  if (r.status === 401 || r.status === 403) throw new ProviderError('auth', 'The OpenRouter key was rejected', r.status);
-  if (!r.ok) throw new ProviderError('other', `OpenRouter error ${r.status}`, r.status);
-  const body = await r.json().catch(() => null) as { data?: unknown[] } | null;
+  const get = async (path: string): Promise<Response> => {
+    let r: Response;
+    try {
+      r = await fetchImpl(`${OPENROUTER_BASE}${path}`, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(8000) });
+    } catch {
+      throw new ProviderError('other', 'Could not reach OpenRouter');
+    }
+    if (r.status === 401 || r.status === 403) throw new ProviderError('auth', 'The OpenRouter key was rejected', r.status);
+    if (!r.ok) throw new ProviderError('other', `OpenRouter error ${r.status}`, r.status);
+    return r;
+  };
+  await get('/key');
+  const body = await (await get('/models')).json().catch(() => null) as { data?: unknown[] } | null;
   return Array.isArray(body?.data) ? body.data.length : 0;
 }

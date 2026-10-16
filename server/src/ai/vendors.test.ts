@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { VENDORS, listVendorModels, pickModel } from './vendors';
+import { VENDORS, checkOpenRouterKey, listVendorModels, pickModel } from './vendors';
 import { openAiAdapter, openRouterAdapter } from './openRouterAdapter';
 
 const stub = (status: number, body: unknown): typeof fetch => async () => new Response(JSON.stringify(body), { status });
@@ -28,6 +28,23 @@ describe('listVendorModels', () => {
   it('headers carry the key the vendor expects', () => {
     expect(VENDORS.anthropic.headers('K')).toMatchObject({ 'x-api-key': 'K', 'anthropic-version': '2023-06-01' });
     expect(VENDORS.openai.headers('K')).toEqual({ Authorization: 'Bearer K' });
+  });
+});
+
+describe('checkOpenRouterKey', () => {
+  // Mirrors the live API (probed 2026-10-16): /models is public and answers 200 for any key; /key answers 401 for a bad one.
+  const openRouter = (validKey: string) => (async (url: string | URL | Request, init?: RequestInit) => {
+    const auth = new Headers(init?.headers).get('Authorization');
+    if (String(url).endsWith('/models')) return new Response(JSON.stringify({ data: [{ id: 'a:free' }, { id: 'b:free' }] }), { status: 200 });
+    if (String(url).endsWith('/key')) return auth === `Bearer ${validKey}` ? new Response(JSON.stringify({ data: { label: 'k' } }), { status: 200 }) : new Response('{}', { status: 401 });
+    return new Response('{}', { status: 404 });
+  }) as typeof fetch;
+
+  it('rejects a made-up key even though the public model list answers', async () => {
+    await expect(checkOpenRouterKey('sk-or-invalid-test-000', openRouter('sk-or-good'))).rejects.toMatchObject({ kind: 'auth' });
+  });
+  it('accepts a real key and reports the model count', async () => {
+    expect(await checkOpenRouterKey('sk-or-good', openRouter('sk-or-good'))).toBe(2);
   });
 });
 
