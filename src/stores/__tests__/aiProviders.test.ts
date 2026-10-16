@@ -2,10 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { AI_PROVIDERS, getModelsForProvider, getDefaultModel } from '../useAIStore';
 
 describe('AI assistant providers', () => {
-  it('lists all five providers with full-word labels, free first', () => {
+  it('lists all seven providers with full-word labels, free first, then the own-key vendors', () => {
     expect(AI_PROVIDERS.map((p) => [p.id, p.label])).toEqual([
-      ['free', 'Free'], ['claude', 'Claude'], ['copilot', 'Copilot'], ['pi', 'Pi'], ['opencode', 'OpenCode'],
+      ['free', 'Free'],
+      ['anthropic', 'Claude (Your Anthropic Key)'], ['openai', 'OpenAI (Your Key)'],
+      ['claude', 'Claude'], ['copilot', 'Copilot'], ['pi', 'Pi'], ['opencode', 'OpenCode'],
     ]);
+    expect(getDefaultModel('anthropic')).toBe('auto');
+    expect(getDefaultModel('openai')).toBe('auto');
   });
 
   it('gives Pi and OpenCode their own models, in provider/id form the CLIs accept', () => {

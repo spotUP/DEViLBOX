@@ -1,34 +1,38 @@
 /**
- * AIKeysPanel - lets a visitor paste their own OpenRouter API key.
- * The key lives in useAIKeysStore (this browser only).
+ * AIKeysPanel - lets a visitor paste their own OpenRouter, Anthropic or OpenAI
+ * API key. Keys live in useAIKeysStore (this browser only).
  */
 
 import { useState } from 'react';
-import { useAIKeysStore } from '@stores/useAIKeysStore';
+import { useAIKeysStore, AI_KEY_VENDORS, type AIKeyVendor } from '@stores/useAIKeysStore';
+import { useAIWizardStore } from '@stores/useAIWizardStore';
 import { Button } from '@components/ui/Button';
 
-export function AIKeysPanel() {
-  const saved = useAIKeysStore((s) => s.keys.openrouter);
+const VENDORS = Object.keys(AI_KEY_VENDORS) as AIKeyVendor[];
+
+function KeyField({ vendor }: { vendor: AIKeyVendor }) {
+  const saved = useAIKeysStore((s) => s.keys[vendor]);
   const setKey = useAIKeysStore((s) => s.setKey);
   const clearKey = useAIKeysStore((s) => s.clearKey);
   const [draft, setDraft] = useState('');
+  const { label, keyUrl } = AI_KEY_VENDORS[vendor];
 
   const save = () => {
-    setKey('openrouter', draft);
+    setKey(vendor, draft);
     setDraft('');
   };
   const clear = () => {
-    clearKey('openrouter');
+    clearKey(vendor);
     setDraft('');
   };
 
   return (
-    <div className="flex flex-col gap-1 px-3 py-2 bg-dark-bgSecondary border-b border-dark-border">
-      <label htmlFor="ai-openrouter-key" className="text-[10px] font-mono text-text-secondary">
-        OpenRouter API Key
+    <div className="flex flex-col gap-1" data-testid={`ai-key-${vendor}`}>
+      <label htmlFor={`ai-${vendor}-key`} className="text-[10px] font-mono text-text-secondary">
+        {label} API Key
       </label>
       <input
-        id="ai-openrouter-key"
+        id={`ai-${vendor}-key`}
         type="password"
         autoComplete="off"
         value={draft}
@@ -43,17 +47,29 @@ export function AIKeysPanel() {
             Key saved (ends in {saved.slice(-4)})
           </span>
         )}
-      </div>
-      <div className="text-[10px] font-mono text-text-muted">
-        Stored only in this browser. Used for free models with your own quota.{' '}
         <a
-          href="https://openrouter.ai/keys"
+          href={keyUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-accent-primary"
+          className="text-[10px] font-mono text-accent-primary"
         >
           Get a key
         </a>
+      </div>
+    </div>
+  );
+}
+
+export function AIKeysPanel() {
+  const openWizard = useAIWizardStore((s) => s.open);
+  return (
+    <div className="flex flex-col gap-3 px-3 py-2 bg-dark-bgSecondary border-b border-dark-border">
+      {VENDORS.map((v) => <KeyField key={v} vendor={v} />)}
+      <div className="text-[10px] font-mono text-text-muted">
+        Keys are stored only in this browser and sent only to the provider they belong to.
+      </div>
+      <div>
+        <Button variant="default" onClick={openWizard}>Set Up AI Help</Button>
       </div>
     </div>
   );

@@ -12,9 +12,12 @@ import { CustomSelect } from '@components/common/CustomSelect';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
-import { sendMessage, stopStreaming, checkAIStatus } from '@/services/aiChatService';
+import { sendMessage, stopStreaming, checkAIStatus, type AIStatus } from '@/services/aiChatService';
 import { Button } from '@components/ui/Button';
 import { AIKeysPanel } from './AIKeysPanel';
+import { AISetupWizard } from './AISetupWizard';
+import { useAIKeysStore } from '@stores/useAIKeysStore';
+import { useAIWizardStore } from '@stores/useAIWizardStore';
 import { AIMessage } from './AIMessage';
 import { AIInput } from './AIInput';
 import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
@@ -37,7 +40,7 @@ export const AIPanel: React.FC = () => {
   const { isPhone } = useResponsiveSafe();
   const rootRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [authStatus, setAuthStatus] = useState<{ available: boolean; error?: string } | null>(null);
+  const [authStatus, setAuthStatus] = useState<AIStatus | null>(null);
 
   // Context badge
   const bpm = useTransportStore((s) => s.bpm);
@@ -59,6 +62,14 @@ export const AIPanel: React.FC = () => {
       checkAIStatus().then(setAuthStatus);
     }
   }, [isOpen, authStatus]);
+
+  // First time the panel is expanded with no key and no working Free fallback: offer the setup wizard once.
+  const hasKey = useAIKeysStore((s) => Object.keys(s.keys).length > 0);
+  const wizardSettled = useAIWizardStore((s) => s.settled);
+  const openWizard = useAIWizardStore((s) => s.open);
+  useEffect(() => {
+    if (isOpen && authStatus?.free?.available === false && !hasKey && !wizardSettled) openWizard();
+  }, [isOpen, authStatus, hasKey, wizardSettled, openWizard]);
 
   // Opening (header click, Ctrl+L, toolbar menu) puts the cursor in the prompt.
   // Not on first mount: a panel restored as expanded must not steal focus.
@@ -88,12 +99,13 @@ export const AIPanel: React.FC = () => {
 
   // Collapsed: a narrow strip whose header stays visible. On a phone a
   // collapsed strip would cost width, so only the expanded overlay shows.
-  if (!isOpen && isPhone) return null;
+  if (!isOpen && isPhone) return <AISetupWizard />;
 
   // Collapsed: the same strip as the synth editor's instrument list.
   if (!isOpen) {
     return (
       <div data-testid="ai-panel" className="w-8 shrink-0 bg-dark-bgSecondary border-l border-dark-border">
+        <AISetupWizard />
         <CollapsedPanelStrip
           side="right"
           label="AI Assistant"
@@ -117,6 +129,8 @@ export const AIPanel: React.FC = () => {
       className={`${frame} flex flex-col bg-dark-bg border-l border-dark-border overflow-hidden`}
       onKeyDown={stopPropagation}
     >
+      <AISetupWizard />
+
       {/* Header, same as the synth editor's instrument list header */}
       <div className="flex items-center justify-between gap-2 px-2 py-1 bg-dark-bgSecondary border-b border-dark-border shrink-0">
         <span className="text-xs font-medium text-text-muted">AI Assistant</span>
@@ -168,7 +182,7 @@ export const AIPanel: React.FC = () => {
         </div>
       )}
 
-      {provider === 'free' && <AIKeysPanel />}
+      {(provider === 'free' || provider === 'anthropic' || provider === 'openai') && <AIKeysPanel />}
 
       {/* Auth error */}
       {authStatus && !authStatus.available && (

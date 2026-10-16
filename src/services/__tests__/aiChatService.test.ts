@@ -91,3 +91,22 @@ describe('aiChatService visitor key header', () => {
     expect((await chatHeaders()).has('x-openrouter-key')).toBe(false);
   });
 });
+
+describe('checkAIKey', () => {
+  it('posts the vendor with the key in that vendor header and maps failures to plain words', async () => {
+    const seen: { url: string; headers: Record<string, string>; body: unknown }[] = [];
+    const replies = [{ ok: true, models: 7 }, { ok: false, kind: 'credit', error: 'raw' }];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      seen.push({ url, headers: init?.headers as Record<string, string>, body: JSON.parse(String(init?.body)) });
+      return new Response(JSON.stringify(replies.shift()), { status: 200 });
+    }));
+    const { checkAIKey, describeKeyCheckFailure } = await import('../aiChatService');
+    expect(await checkAIKey('openai', 'sk-x')).toEqual({ ok: true, models: 7 });
+    expect(seen[0].url.endsWith('/ai/check-key')).toBe(true);
+    expect(seen[0].headers['x-openai-key']).toBe('sk-x');
+    expect(seen[0].body).toEqual({ vendor: 'openai' });
+    const bad = await checkAIKey('openai', 'sk-x');
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(describeKeyCheckFailure(bad)).toContain('no credit');
+  });
+});
