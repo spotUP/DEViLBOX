@@ -96,9 +96,9 @@ Phase V3 - melody panel
 - [x] VN-3.2 Live preview from sliding windows; the final pass replaces it at take end.
 
 Phase V4 - beatbox
-- [ ] VN-4.1 Onset detector + rule-based hit classifier + tests on clips.
-- [ ] VN-4.3 Guided user training: record labelled takes, train a small per-user classifier (browser, local storage), swap it in over the rules when accuracy is higher on a held-out split.
-- [ ] VN-4.2 Drum map UI + writer.
+- [x] VN-4.1 Onset detector + rule-based hit classifier + tests on clips. (synthetic tests pass; real-clip test skips until owner clips exist in test-data/voice-beatbox/, see notes) (9343d1f89)
+- [x] VN-4.3 Guided user training: record labelled takes, train a small per-user classifier (browser, local storage), swap it in over the rules when accuracy is higher on a held-out split. (9fec0559f) Nearest centroid on z-scored features (drumModel.ts); every 3rd sample per class held out; model used only when strictly better than the rules on the same held-out hits; keys devilbox.voice.drumSamples.v1 and devilbox.voice.drumModel.v1; the voice_to_notes drums mode uses the stored model too.
+- [x] VN-4.2 Drum map UI + writer. (a9852383a) Melody/Drums mode select, per class instrument + note selects, hit counts, swing and latency knobs; same quantise + writeToPattern, one undo step; MCP voice_to_notes gets mode 'drums' and a drumMap override. Defaults: kick 36, snare 38, hat 42, clap 39; instrument picked by name (kick|bd, snare|sd, hat|hh, clap|cp) else the current one. Unverified: real beatbox accuracy, real microphone. Real-clip test (src/lib/voice/__tests__/drumHits.test.ts) skips until test-data/voice-beatbox/<class>-*.wav exist (22050 Hz mono 16-bit).
 
 Phase V5 - polish
 - [x] VN-5.1 Key/scale snap (O4), takes list (O3), MCP tool `voice_to_notes` for headless testing. d0bc92c30
