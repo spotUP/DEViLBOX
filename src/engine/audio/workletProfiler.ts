@@ -9,6 +9,8 @@
  */
 
 const MAX_PROCESSORS = 1024;
+/** Per processor: [processMs, processCalls, worstProcessMs, messageMs, messageCalls, worstMessageMs]. */
+const SLOTS = 6;
 
 let buffer: SharedArrayBuffer | null = null;
 let node: AudioWorkletNode | null = null;
@@ -185,7 +187,7 @@ export function installWorkletProfiler(ctx: AudioContext): Promise<void> {
   if (typeof SharedArrayBuffer === 'undefined') return Promise.resolve();
   const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
   installing = ctx.audioWorklet.addModule(`${base}worklets/worklet-profiler.js`).then(() => {
-    buffer = new SharedArrayBuffer(MAX_PROCESSORS * 2 * Float64Array.BYTES_PER_ELEMENT);
+    buffer = new SharedArrayBuffer(MAX_PROCESSORS * SLOTS * Float64Array.BYTES_PER_ELEMENT);
     node = new AudioWorkletNode(ctx, 'dbx-worklet-profiler', { numberOfInputs: 0, numberOfOutputs: 1 });
     node.port.postMessage({ type: 'attach', buffer });
   }).catch(() => { /* profiling is diagnostics only */ });
@@ -198,17 +200,35 @@ export interface WorkletProfileEntry {
   msPerSecond: number;
   /** process() calls per second over the window. */
   callsPerSecond: number;
+  /** Longest single process() call in the window, whole milliseconds. */
+  worstProcessMs: number;
+  /** Milliseconds per second spent in the processor's port message handler. */
+  messageMsPerSecond: number;
+  /** Longest single message handler call in the window, whole milliseconds. */
+  worstMessageMs: number;
+  /**
+   * Longest single call in the window per message kind (`cmd` or `type`) and
+   * for the processor constructor, longest first: which message blocked.
+   */
+  worstCalls: Array<{ kind: string; ms: number }>;
 }
 
-function names(): Promise<string[]> {
+interface WorstCall { processor: string; kind: string; ms: number }
+
+/** Processor names, and the worst calls since the last reset (then reset them). */
+function names(): Promise<{ names: string[]; worstCalls: WorstCall[] }> {
   return new Promise((resolve) => {
-    if (!node) { resolve([]); return; }
+    const none = { names: [], worstCalls: [] };
+    if (!node) { resolve(none); return; }
     const port = node.port;
-    const timer = setTimeout(() => resolve([]), 2000);
+    const timer = setTimeout(() => resolve(none), 2000);
     port.onmessage = (e) => {
-      if (e.data?.type === 'names') { clearTimeout(timer); resolve(e.data.names as string[]); }
+      if (e.data?.type === 'names') {
+        clearTimeout(timer);
+        resolve({ names: e.data.names as string[], worstCalls: (e.data.worstCalls ?? []) as WorstCall[] });
+      }
     };
-    port.postMessage({ type: 'names' });
+    port.postMessage({ type: 'names', resetWorst: true });
   });
 }
 
@@ -219,17 +239,33 @@ function names(): Promise<string[]> {
 export async function readWorkletProfile(windowMs = 2000): Promise<WorkletProfileEntry[] | null> {
   if (!buffer) return null;
   const view = new Float64Array(buffer);
+  // The worst-call slots hold a maximum since the last read: clear them so
+  // they cover this window only.
+  for (let i = 0; i < MAX_PROCESSORS; i++) { view[i * SLOTS + 2] = 0; view[i * SLOTS + 5] = 0; }
+  await names();
   const before = Float64Array.from(view);
   const t0 = performance.now();
   await new Promise((r) => setTimeout(r, windowMs));
   const seconds = (performance.now() - t0) / 1000;
-  const list = await names();
+  const { names: list, worstCalls } = await names();
   const out: WorkletProfileEntry[] = [];
   for (let i = 0; i < list.length; i++) {
-    const ms = view[i * 2] - before[i * 2];
-    const calls = view[i * 2 + 1] - before[i * 2 + 1];
-    if (calls === 0) continue;
-    out.push({ processor: list[i], msPerSecond: +(ms / seconds).toFixed(1), callsPerSecond: Math.round(calls / seconds) });
+    const b = i * SLOTS;
+    const ms = view[b] - before[b];
+    const calls = view[b + 1] - before[b + 1];
+    const messageMs = view[b + 3] - before[b + 3];
+    const messages = view[b + 4] - before[b + 4];
+    if (calls === 0 && messages === 0 && !worstCalls.some((w) => w.processor === list[i])) continue;
+    out.push({
+      processor: list[i],
+      msPerSecond: +(ms / seconds).toFixed(1),
+      callsPerSecond: Math.round(calls / seconds),
+      worstProcessMs: view[b + 2],
+      messageMsPerSecond: +(messageMs / seconds).toFixed(1),
+      worstMessageMs: view[b + 5],
+      worstCalls: worstCalls.filter((w) => w.processor === list[i])
+        .map(({ kind, ms }) => ({ kind, ms })).sort((a, b) => b.ms - a.ms),
+    });
   }
   return out.sort((a, b) => b.msPerSecond - a.msPerSecond);
 }
