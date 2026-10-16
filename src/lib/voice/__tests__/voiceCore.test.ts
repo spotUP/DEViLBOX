@@ -3,8 +3,9 @@ import { toMonophonic, transposeNotes, modelOutputToNotes, DEFAULT_PITCH_SETTING
 import { quantiseNotes, rowSeconds, type QuantiseSettings } from '../quantise';
 import { mergeWindowNotes } from '../liveWindow';
 import { VoiceRecorder, type VoiceCapture } from '../voiceRecorder';
-import { applyNotesToPattern, NOTE_OFF, velocityToVolume } from '../writeToPattern';
+import { applyNotesToPattern, writeNotesToPattern, NOTE_OFF, velocityToVolume } from '../writeToPattern';
 import { useTrackerStore } from '@/stores/useTrackerStore';
+import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { resetStore } from '@/stores/__tests__/_harness';
 
 const note = (start: number, dur: number, midi: number, amp = 0.8): VoiceNote => ({
@@ -48,6 +49,32 @@ describe('pitchNotes', () => {
     expect(notes).toHaveLength(1);
     expect(notes[0].pitchMidi).toBe(60);
     expect(notes[0].startTimeSeconds).toBeCloseTo(10 / ANNOTATIONS_FPS, 2);
+  });
+
+  it('default thresholds keep every note of a sung take (voice-level confidence)', () => {
+    // Shaped on a measured take: onsets peak ~0.52, frames sit ~0.35-0.4.
+    // The old 0.55 / 0.45 defaults returned zero of these three notes.
+    const frames: number[][] = [];
+    const onsets: number[][] = [];
+    const contours: number[][] = [];
+    const sung = [
+      { start: 10, end: 30, midi: 52 },
+      { start: 40, end: 60, midi: 48 },
+      { start: 70, end: 90, midi: 43 },
+    ];
+    for (let f = 0; f < 100; f++) {
+      const fr = new Array(88).fill(0);
+      const on = new Array(88).fill(0);
+      for (const s of sung) {
+        if (f >= s.start && f < s.end) fr[s.midi - 21] = f % 2 ? 0.35 : 0.4;
+        if (f === s.start) on[s.midi - 21] = 0.52;
+      }
+      frames.push(fr);
+      onsets.push(on);
+      contours.push(new Array(264).fill(0));
+    }
+    const notes = modelOutputToNotes({ frames, onsets, contours }, DEFAULT_PITCH_SETTINGS, true);
+    expect(notes.map((n) => n.pitchMidi)).toEqual([52, 48, 43]);
   });
 });
 
@@ -142,6 +169,38 @@ describe('applyNotesToPattern', () => {
     expect(rows[0].instrument).toBe(3);
     expect(rows[0].volume).toBe(velocityToVolume(1));
     expect(rows[2].note).toBe(NOTE_OFF);
+  });
+});
+
+describe('writeNotesToPattern', () => {
+  beforeEach(() => {
+    resetStore(useTrackerStore);
+    resetStore(useInstrumentStore);
+  });
+
+  it('creates a default instrument when the song has none, so the note is not silent', () => {
+    expect(useInstrumentStore.getState().instruments).toHaveLength(0);
+    const res = writeNotesToPattern([{ row: 0, lengthRows: 2, midi: 60, velocity: 1 }], {
+      channelIndex: 0,
+      startRow: 0,
+      instrumentId: 1,
+    });
+    expect(res.written).toBe(1);
+    const ids = useInstrumentStore.getState().instruments.map((i) => i.id);
+    expect(ids).toHaveLength(1);
+    const cell = useTrackerStore.getState().patterns[0].channels[0].rows[0];
+    expect(ids).toContain(cell.instrument);
+  });
+
+  it('keeps an existing instrument and creates nothing', () => {
+    const id = useInstrumentStore.getState().createInstrument();
+    writeNotesToPattern([{ row: 0, lengthRows: 1, midi: 60, velocity: 1 }], {
+      channelIndex: 0,
+      startRow: 0,
+      instrumentId: id,
+    });
+    expect(useInstrumentStore.getState().instruments).toHaveLength(1);
+    expect(useTrackerStore.getState().patterns[0].channels[0].rows[0].instrument).toBe(id);
   });
 });
 
