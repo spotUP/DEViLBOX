@@ -84,3 +84,27 @@ describe('NV-5 nuade workflow', () => {
     expect(existsSync(join(ROOT, 'nuade-wasm/build.sh'))).toBe(true);
   });
 });
+
+describe('CI checkout depth', () => {
+  // A depth-1 checkout made `git rev-list --count HEAD` return 1, so the live
+  // version.json said buildNumber "1" and the changelog held one commit.
+  const workflowsDir = join(ROOT, '.github/workflows');
+  const jobs = readdirSync(workflowsDir)
+    .filter((f) => /\.ya?ml$/.test(f))
+    .flatMap((wf) =>
+      readFileSync(join(workflowsDir, wf), 'utf8')
+        .split(/^(?=  [a-z-]+:$)/m)
+        .filter((body) => /^  [a-z-]+:\n/.test(body))
+        .map((body) => ({ name: `${wf} ${body.split('\n')[0].trim()}`, body })),
+    );
+
+  it('every job that runs the production build checks out the full commit history', () => {
+    const building = jobs.filter((j) => j.body.includes('npm run build'));
+    expect(building.length).toBeGreaterThan(0);
+    for (const j of building) {
+      const checkouts = j.body.match(/uses: actions\/checkout@v\d+\n(?:\s+with:\n(?:\s{10}.*\n)*)?/g) ?? [];
+      expect(checkouts.length, j.name).toBeGreaterThan(0);
+      for (const c of checkouts) expect(c, j.name).toMatch(/fetch-depth: 0/);
+    }
+  });
+});

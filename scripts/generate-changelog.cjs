@@ -73,6 +73,17 @@ function getVersion() {
 
 // Get git commit count for build number
 function getCommitCount() {
+  // A shallow clone (actions/checkout's default depth 1) counts 1 commit and
+  // shipped BUILD_NUMBER '1' with a one-entry changelog. Refuse it loudly.
+  let shallow = 'false';
+  try {
+    shallow = execSync('git rev-parse --is-shallow-repository', { encoding: 'utf-8' }).trim();
+  } catch {
+    // not a git checkout: handled below
+  }
+  if (shallow === 'true') {
+    throw new Error('generate-changelog: shallow git clone; check out with fetch-depth: 0 so BUILD_NUMBER and the changelog see every commit');
+  }
   try {
     return execSync('git rev-list --count HEAD', { encoding: 'utf-8' }).trim();
   } catch {
