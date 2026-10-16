@@ -1,10 +1,12 @@
 /**
  * AI Chat Store — shared state for the in-app AI assistant panel.
- * NOT persisted to localStorage.
+ * Only the panel's expanded/collapsed flag (isOpen) is persisted, under a
+ * versioned key; the conversation itself is not.
  */
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { persist } from 'zustand/middleware';
 
 // --- Provider + Model definitions ---
 
@@ -61,6 +63,7 @@ export interface AIMessage {
 }
 
 interface AIState {
+  /** true = panel expanded; false (default) = collapsed to its header. */
   isOpen: boolean;
   messages: AIMessage[];
   isStreaming: boolean;
@@ -89,6 +92,7 @@ interface AIActions {
 }
 
 export const useAIStore = create<AIState & AIActions>()(
+  persist(
   immer((set) => ({
     isOpen: false,
     messages: [],
@@ -178,4 +182,14 @@ export const useAIStore = create<AIState & AIActions>()(
         s.error = null;
       }),
   })),
+  {
+    name: 'devilbox-ai-panel',
+    version: 1,
+    partialize: (state) => ({ isOpen: state.isOpen }),
+    migrate: (persistedState) => {
+      const state = (persistedState ?? {}) as { isOpen?: unknown };
+      return { isOpen: state.isOpen === true };
+    },
+  },
+  ),
 );
