@@ -10,11 +10,13 @@
  * Every number is overridable by environment variable and read when the
  * guards are built. A request that brings its own OpenRouter key skips the
  * DAILY cap (its own quota pays) but keeps the per-minute limit and the
- * concurrency cap.
+ * concurrency cap. The same holds for a request carrying the Anthropic or
+ * OpenAI key for the provider it asks for.
  */
 import { Router, type NextFunction, type Request, type RequestHandler, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { AI_PROVIDER_IDS } from './cliProviders';
+import { VENDOR_KEY_HEADER, isVendorId, type VendorId } from './vendors';
 
 export const DEFAULT_PER_MINUTE = 10;
 export const DEFAULT_PER_DAY = 100;
@@ -45,11 +47,27 @@ export function visitorKey(req: { header(name: string): string | undefined }): s
   return v ? v : undefined;
 }
 
+/** The visitor's own key for a vendor (Anthropic, OpenAI) from the request, or undefined. Never log it. */
+export function vendorKey(req: { header(name: string): string | undefined }, id: VendorId): string | undefined {
+  const v = req.header(VENDOR_KEY_HEADER[id])?.trim();
+  return v ? v : undefined;
+}
+
 /** The provider a chat body asks for; Free is the default. */
 export function requestedProvider(body: unknown): string {
   const p = (body as { provider?: unknown } | undefined)?.provider;
   return typeof p === 'string' && p ? p : 'free';
 }
+
+/** True when the request carries the visitor's own key for the provider it asks for (its own quota pays). */
+function bringsOwnKey(req: { header(name: string): string | undefined; body?: unknown }): boolean {
+  const provider = requestedProvider(req.body);
+  if (isVendorId(provider)) return !!vendorKey(req, provider);
+  return provider === 'free' && !!visitorKey(req);
+}
+
+/** Providers that hold a server-side loop and a browser channel for the whole reply. */
+const isLoopProvider = (provider: string): boolean => provider === 'free' || isVendorId(provider);
 
 /** What refuse() needs of a response (structural: the root and server express typings are separate copies). */
 interface RefusableResponse {
@@ -76,7 +94,7 @@ export function createAiGuards(): Router {
   router.post('/chat', (req: Request, res: Response, next: NextFunction) => {
     const provider = requestedProvider(req.body);
     const isCli = (AI_PROVIDER_IDS as string[]).includes(provider);
-    if (provider !== 'free' && !isCli) return refuse(res, 400, `Unknown provider: ${provider.slice(0, 40)}`);
+    if (provider !== 'free' && !isVendorId(provider) && !isCli) return refuse(res, 400, `Unknown provider: ${provider.slice(0, 40)}`);
     if (isCli && process.env.AI_CLI_PROVIDERS !== '1') {
       return refuse(res, 403, 'CLI providers are disabled on this server. Choose Free, or set AI_CLI_PROVIDERS=1 on a trusted dev machine.');
     }
@@ -94,13 +112,15 @@ export function createAiGuards(): Router {
     handler: (_req, res) => refuse(res, 429, `Too many AI requests (${what}). Try again later.`),
   }) as unknown as RequestHandler;
   router.post('/chat', limited(60 * 1000, perMinute, `limit ${perMinute} per minute`));
-  router.post('/chat', limited(24 * 60 * 60 * 1000, perDay, `limit ${perDay} per day; add your own OpenRouter key in Settings to lift it`, (req) => !!visitorKey(req)));
+  router.post('/chat', limited(24 * 60 * 60 * 1000, perDay, `limit ${perDay} per day; add your own key in Settings to lift it`, bringsOwnKey));
+  // Key check: a few per minute per IP, no daily cap (it spends the visitor's own quota).
+  router.post('/check-key', limited(60 * 1000, perMinute, `limit ${perMinute} per minute`));
 
-  // 3. One Free chat in flight per IP, and a site-wide cap.
+  // 3. One loop chat (Free, Anthropic, OpenAI) in flight per IP, and a site-wide cap.
   const inFlightIps = new Set<string>();
   let inFlight = 0;
   router.post('/chat', (req: Request, res: Response, next: NextFunction) => {
-    if (requestedProvider(req.body) !== 'free') return next();
+    if (!isLoopProvider(requestedProvider(req.body))) return next();
     const ip = req.ip ?? 'unknown';
     if (inFlightIps.has(ip)) return refuse(res, 429, 'You already have an AI chat running. Wait for it to finish.');
     if (inFlight >= maxConcurrent) return refuse(res, 429, 'The AI is busy. Try again in a moment.');
