@@ -8,6 +8,7 @@
 import type { Pattern, TrackerCell } from '@typedefs';
 import { midiToXMNote } from '@/lib/xmConversions';
 import { useTrackerStore } from '@/stores/useTrackerStore';
+import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import type { QuantisedNote } from './quantise';
 
 /** XM note-off */
@@ -71,14 +72,45 @@ export function applyNotesToPattern(
   return result;
 }
 
+/**
+ * Every instrument the notes point at must exist, or they play silent. A fresh
+ * song has no instruments at all, and the panel's default target is 1, so a
+ * missing id gets a new default instrument (one per distinct missing id).
+ */
+export function resolveInstruments(
+  notes: readonly QuantisedNote[],
+  target: WriteTarget,
+): { notes: QuantisedNote[]; target: WriteTarget } {
+  const store = useInstrumentStore.getState();
+  const existing = new Set(store.instruments.map((i) => i.id));
+  const remap = new Map<number, number>();
+  const resolve = (id: number): number => {
+    if (existing.has(id)) return id;
+    let created = remap.get(id);
+    if (created === undefined) {
+      created = useInstrumentStore.getState().createInstrument();
+      // -1: the format's instrument limit refused it; keep the original id
+      if (created < 0) created = id;
+      remap.set(id, created);
+    }
+    return created;
+  };
+  const resolvedTarget = { ...target, instrumentId: resolve(target.instrumentId) };
+  const resolvedNotes = notes.map((n) =>
+    n.instrumentId === undefined ? n : { ...n, instrumentId: resolve(n.instrumentId) },
+  );
+  return { notes: resolvedNotes, target: resolvedTarget };
+}
+
 /** Store part: one undo step on the current pattern. */
 export function writeNotesToPattern(
   notes: readonly QuantisedNote[],
   target: WriteTarget,
 ): WriteResult {
+  const resolved = resolveInstruments(notes, target);
   let result: WriteResult = { written: 0, dropped: 0 };
   useTrackerStore.getState().bulkBlockEdit('Voice to Notes', (pattern) => {
-    result = applyNotesToPattern(pattern, notes, target);
+    result = applyNotesToPattern(pattern, resolved.notes, resolved.target);
   });
   return result;
 }
