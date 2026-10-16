@@ -89,7 +89,7 @@ Phase V1 - pure core
 
 Phase V2 - capture
 - [x] VN-2.1 `RecorderWorklet` + `useVoiceRecorder` (permission, device pick, level meter, count-in, metronome, song-position alignment).
-- [ ] VN-2.2 Latency calibration (O2).
+- [x] VN-2.2 Latency calibration (O2). d0bc92c30
 
 Phase V3 - melody panel
 - [x] VN-3.1 Panel next to the pattern editor: record, stop, live ghost notes, Finetune controls, Commit.
@@ -101,7 +101,7 @@ Phase V4 - beatbox
 - [ ] VN-4.2 Drum map UI + writer.
 
 Phase V5 - polish
-- [ ] VN-5.1 Key/scale snap (O4), takes list (O3), MCP tool `voice_to_notes` for headless testing.
+- [x] VN-5.1 Key/scale snap (O4), takes list (O3), MCP tool `voice_to_notes` for headless testing. d0bc92c30
 
 ## Verification
 
@@ -113,7 +113,7 @@ Polyphonic/chord transcription into several channels, lyrics, auto-harmonising, 
 
 ## Implementation notes (melody path, 2026-10-16)
 
-Done: VN-0.1, VN-1.1 to VN-1.4, VN-2.1, VN-3.1, VN-3.2. Open: VN-0.2, VN-0.3, VN-2.2, VN-4.x, VN-5.1 (out of scope for this run).
+Done: VN-0.1, VN-1.1 to VN-1.4, VN-2.1, VN-2.2, VN-3.1, VN-3.2, VN-5.1. Open: VN-0.2, VN-0.3, VN-4.x (out of scope for this run).
 
 Searched before building: audio-to-midi, basic-pitch, getUserMedia, AudioInputManager, bulkBlockEdit, midiToXMNote, noteValue; reused AudioToMidiModal extraction, `bulkBlockEdit`, `midiToXMNote`, Button/Knob/CustomSelect.
 
@@ -126,3 +126,11 @@ Findings:
 - The reachability test uses a fake pitch model that reads the recorded sine; the real Basic Pitch model is not run in tests (unverified by test, needs the manual check).
 - Alignment to the playing song during a take is unverified; the take starts at the cursor row after the count-in.
 - Per-format note encoding is `midiToXMNote` only.
+
+### VN-2.2 and VN-5.1 (2026-10-16, d0bc92c30)
+
+- Calibration: "Calibrate latency" plays a click through the output, detects the onset on the mic input (`detectClickOnset`), stores ms per input device id in localStorage `devilbox.voice.latencyMs.v1` ("default" for the default mic). The manual nudge adds on top.
+- Key snap: default off. No song key exists in `ProjectMetadata`, so the key and scale are user-picked (major, minor, dorian, mixolydian, pentatonics). Ties snap lower.
+- Takes: last 8 kept in memory for the session (`takeHistory.ts`), no project schema change. A take stays after Commit and can be re-committed from the Takes list.
+- MCP tool `voice_to_notes` (path or url, channel, row, instrumentId, transpose, keyTonic, keyScale) runs the same `shapeNotes` and `commitVoiceNotes` core at the cursor channel.
+- Unverified: real loopback on real hardware, the real Basic Pitch model in the handler, `defaultVoiceDeps` decode in a browser, the server-side tool (no test).
