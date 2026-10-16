@@ -7,7 +7,8 @@
  */
 
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
-import { useAIStore, AI_PROVIDERS, getModelsForProvider } from '@stores/useAIStore';
+import { useAIStore, AI_PROVIDERS, getModelsForProvider, type AIProvider } from '@stores/useAIStore';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
@@ -118,49 +119,44 @@ export const AIPanel: React.FC = () => {
       <div className="flex items-center justify-between gap-2 px-2 py-1 bg-dark-bgSecondary border-b border-dark-border shrink-0">
         <span className="text-xs font-medium text-text-muted">AI Assistant</span>
         <div className="flex items-center gap-1">
-            <div className="flex items-center bg-dark-bgSecondary rounded overflow-hidden border border-dark-border mr-1">
-              {AI_PROVIDERS.map((p) => (
-                <Button
-                  key={p.id}
-                  variant={provider === p.id ? 'primary' : 'ghost'}
-                  size="sm"
-                  aria-pressed={provider === p.id}
-                  onClick={() => setProvider(p.id)}
-                  className="text-[10px] font-mono"
-                >
-                  {p.label}
-                </Button>
-              ))}
-            </div>
-            <div className="flex items-center bg-dark-bgSecondary rounded overflow-hidden border border-dark-border">
-              {getModelsForProvider(provider).map((m) => (
-                <Button
-                  key={m.id}
-                  variant={model === m.id ? 'primary' : 'ghost'}
-                  size="sm"
-                  aria-pressed={model === m.id}
-                  onClick={() => setModel(m.id)}
-                  className="text-[10px] font-mono"
-                  title={m.description}
-                >
-                  {m.label}
-                </Button>
-              ))}
-            </div>
-            <Button variant="ghost" size="sm" onClick={clearHistory} title="Clear chat history" className="text-[10px] font-mono">
-              Clear
-            </Button>
-            <Button
-              variant="icon"
-              size="icon"
-              data-testid="ai-panel-header"
-              aria-expanded={true}
-              onClick={toggle}
-              title="Hide AI Assistant (Ctrl+L)"
-            >
-              <ChevronRight size={14} />
-            </Button>
-          </div>
+          <Button variant="ghost" size="sm" onClick={clearHistory} title="Clear chat history" className="text-[10px] font-mono">
+            Clear
+          </Button>
+          <Button
+            variant="icon"
+            size="icon"
+            data-testid="ai-panel-header"
+            aria-expanded={true}
+            onClick={toggle}
+            title="Hide AI Assistant (Ctrl+L)"
+          >
+            <ChevronRight size={14} />
+          </Button>
+        </div>
+      </div>
+
+      {/* Provider and model pickers: dropdowns, so any number of providers and models fits the panel width */}
+      <div className="flex items-center gap-2 px-2 py-1 bg-dark-bgSecondary border-b border-dark-border shrink-0">
+        <label className="flex items-center gap-1 flex-1 min-w-0 text-[10px] font-mono text-text-muted">
+          Provider
+          <CustomSelect
+            value={provider}
+            onChange={(v) => setProvider(v as AIProvider)}
+            options={AI_PROVIDERS.map((p) => ({ value: p.id, label: p.label }))}
+            title="AI provider"
+            className="flex-1 min-w-0 px-2 py-0.5 text-[10px] font-mono bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary"
+          />
+        </label>
+        <label className="flex items-center gap-1 flex-1 min-w-0 text-[10px] font-mono text-text-muted">
+          Model
+          <CustomSelect
+            value={model}
+            onChange={setModel}
+            options={getModelsForProvider(provider).map((m) => ({ value: m.id, label: `${m.label} (${m.description})` }))}
+            title="AI model"
+            className="flex-1 min-w-0 px-2 py-0.5 text-[10px] font-mono bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary"
+          />
+        </label>
       </div>
 
       {/* Auth error */}
