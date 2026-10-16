@@ -30,7 +30,21 @@ import { commitVoiceNotes, shapeNotes } from '@/lib/voice/voiceToNotes';
 import { SCALES, SCALE_LABELS, TONIC_NAMES, type ScaleName } from '@/lib/voice/scaleSnap';
 import { getStoredLatencyMs, measureLoopbackLatencyMs, storeLatencyMs } from '@/lib/voice/latencyCalibration';
 import { addTake, listTakes, type Take } from '@/lib/voice/takeHistory';
-import { DRUM_CLASSES, DRUM_CLASS_LABELS, classifyByRules, detectHits, type DrumHit } from '@/lib/voice/drumHits';
+import { DRUM_CLASSES, DRUM_CLASS_LABELS, classifyByRules, detectHits, type DrumClass, type DrumHit } from '@/lib/voice/drumHits';
+import {
+  MIN_SAMPLES_PER_CLASS,
+  clearTraining,
+  countsByClass,
+  loadSamples,
+  loadTrainingResult,
+  modelClassifier,
+  samplesFromTake,
+  saveSamples,
+  saveTrainingResult,
+  trainAndEvaluate,
+  type TrainingResult,
+  type TrainingSample,
+} from '@/lib/voice/drumModel';
 import { commitDrumHits, defaultDrumMap, type DrumMap } from '@/lib/voice/drumToNotes';
 
 export interface VoiceToNotesPanelProps {
@@ -117,6 +131,10 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   const [fine, setFine] = useState<Finetune>(DEFAULT_FINETUNE);
   const [mode, setMode] = useState<VoiceMode>('melody');
   const [hits, setHits] = useState<readonly DrumHit[]>([]);
+  const [trainClass, setTrainClass] = useState<DrumClass>('kick');
+  const [trainingTake, setTrainingTake] = useState<DrumClass | null>(null);
+  const [samples, setSamples] = useState<TrainingSample[]>(() => loadSamples());
+  const [training, setTraining] = useState<TrainingResult | null>(() => loadTrainingResult());
   const [drumMap, setDrumMap] = useState<DrumMap>(() =>
     defaultDrumMap(useInstrumentStore.getState().instruments, useInstrumentStore.getState().currentInstrumentId ?? 1),
   );
@@ -171,12 +189,43 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     });
   }, [recorder, deviceId]);
 
+  const handleRecordTraining = useCallback(async () => {
+    setTrainingTake(trainClass);
+    await recorder.start({ deviceId: deviceId || undefined, countInBeats: 0, beatSeconds: 60 / useTransportStore.getState().bpm });
+  }, [recorder, deviceId, trainClass]);
+
+  const handleTrain = useCallback((all: TrainingSample[]) => {
+    const result = trainAndEvaluate(all);
+    setTraining(result);
+    saveTrainingResult(result);
+  }, []);
+
+  const handleClearTraining = useCallback(() => {
+    clearTraining();
+    setSamples([]);
+    setTraining(null);
+  }, []);
+
   const handleStop = useCallback(async () => {
     const take = recorder.stop();
+    const labelled = trainingTake;
+    setTrainingTake(null);
     if (!take || take.length === 0) return;
+    if (labelled) {
+      const added = samplesFromTake(take, labelled);
+      if (added.length === 0) {
+        notify.warning('No hit heard in that take');
+        return;
+      }
+      const all = [...samples, ...added];
+      setSamples(all);
+      saveSamples(all);
+      handleTrain(all);
+      return;
+    }
     setTakeSeconds(take.length / 22050);
     if (drums) {
-      setHits(detectHits(take, classifyByRules));
+      setHits(detectHits(take, training?.useModel ? modelClassifier(training.model) : classifyByRules));
       return;
     }
     setAnalysing(true);
@@ -191,7 +240,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     } finally {
       setAnalysing(false);
     }
-  }, [recorder, model, drums]);
+  }, [recorder, model, drums, trainingTake, samples, training, handleTrain]);
 
   const handleCommit = useCallback(() => {
     const quantise = {
@@ -333,6 +382,31 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
               </div>
             );
           })}
+          <div className="text-[10px] font-mono text-text-secondary">Train on your voice</div>
+          <div className="flex gap-1">
+            <CustomSelect
+              value={trainClass}
+              onChange={(v) => setTrainClass(v as DrumClass)}
+              options={DRUM_CLASSES.map((d) => ({ value: d, label: DRUM_CLASS_LABELS[d] }))}
+              title="Training class"
+              disabled={recording}
+            />
+            <Button variant="default" size="sm" icon={<Mic size={12} />} onClick={() => void handleRecordTraining()} disabled={recording || analysing}>
+              Record training take
+            </Button>
+          </div>
+          <div className="text-[9px] font-mono text-text-muted" data-testid="drum-training-status">
+            {DRUM_CLASSES.map((d) => `${DRUM_CLASS_LABELS[d]} ${countsByClass(samples)[d]}`).join(', ')}
+            {' - '}
+            {training
+              ? `held out ${training.heldOut}: model ${Math.round(training.modelAccuracy * 100)} percent, rules ${Math.round(training.rulesAccuracy * 100)} percent, using ${training.useModel ? 'your model' : 'the rules'}`
+              : `needs ${MIN_SAMPLES_PER_CLASS} hits for at least two classes`}
+          </div>
+          {samples.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={handleClearTraining} disabled={recording}>
+              Clear training
+            </Button>
+          )}
           <div className="text-[9px] font-mono text-text-muted">
             {hits.length} hit{hits.length === 1 ? '' : 's'} - row length {(rowLength * 1000).toFixed(0)} ms
           </div>

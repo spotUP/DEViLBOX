@@ -20,6 +20,9 @@ import { ANNOTATIONS_FPS, PITCH_SAMPLE_RATE, midiToHz, type PitchModelOutput } f
 import type { PitchModel } from '@/lib/voice/basicPitchModel';
 import type { VoiceCapture } from '@/lib/voice/voiceRecorder';
 import { synthTake } from '@/lib/voice/drumSynth';
+import { clearTraining, saveSamples } from '@/lib/voice/drumModel';
+import { hitFeatures } from '@/lib/voice/drumHits';
+import { synthHit } from '@/lib/voice/drumSynth';
 import { clearTakes } from '@/lib/voice/takeHistory';
 import { LATENCY_STORAGE_KEY } from '@/lib/voice/latencyCalibration';
 
@@ -93,6 +96,7 @@ function concat(parts: Float32Array[]): Float32Array {
 
 beforeEach(() => {
   clearTakes();
+  clearTraining();
   try { localStorage.removeItem(LATENCY_STORAGE_KEY); } catch { /* none */ }
   resetStore(useTrackerStore);
   useTransportStore.setState({ bpm: 150, speed: 6 } as never);
@@ -252,5 +256,50 @@ describe('Voice to Notes panel', () => {
     expect(written[1].i - written[0].i).toBeLessThanOrEqual(6);
     expect(useHistoryStore.getState().undoStack.length - undoBefore).toBe(1);
     expect(useHistoryStore.getState().undoStack.at(-1)?.description).toBe('Voice to Notes');
+  });
+
+  it('Drums mode: a model trained on this voice (kick sound called snare) replaces the rules and changes the written note', async () => {
+    const feat = (drum: 'kick' | 'snare', seed: number) => {
+      const take = new Float32Array(PITCH_SAMPLE_RATE / 4);
+      take.set(synthHit(drum, seed), 500);
+      return hitFeatures(take, 500);
+    };
+    // Earlier training takes, stored: this user calls the kick sound "snare" and the snare sound "kick"
+    saveSamples([1, 2, 3, 4, 5].flatMap((seed) => [
+      { drum: 'snare' as const, features: feat('kick', seed) },
+      { drum: 'kick' as const, features: feat('snare', seed) },
+    ]));
+    const mic = fakeMic();
+    const deps = {
+      getStream: async () => ({} as MediaStream),
+      createCapture: () => mic.capture,
+      listDevices: async () => [],
+    };
+    render(<VoiceToNotesPanel onClose={() => {}} model={new SineReadingModel()} deps={deps} />);
+    fireEvent.click(screen.getByTitle('Mode'));
+    fireEvent.click(await screen.findByText('Drums'));
+    await waitFor(() => expect(screen.getByTestId('drum-training-status')).toBeTruthy());
+
+    // One more labelled take through the panel: a kick sound, labelled Snare. Trains and evaluates.
+    fireEvent.click(screen.getByTitle('Training class'));
+    const snareItems = await screen.findAllByText('Snare');
+    fireEvent.click(snareItems[snareItems.length - 1]);
+    fireEvent.click(screen.getByText('Record training take'));
+    await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
+    mic.feed(synthTake([{ drum: 'kick', at: 0.1 }], 0.5, 9));
+    fireEvent.click(screen.getByText('Stop'));
+    await waitFor(() => expect(screen.getByTestId('drum-training-status').textContent).toContain('using your model'));
+
+    // A normal drum take now: the kick sound is written as the snare note
+    fireEvent.click(screen.getByText('Record'));
+    await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
+    mic.feed(concat([new Float32Array(Math.round(1.6 * PITCH_SAMPLE_RATE)), synthTake([{ drum: 'kick', at: 0.3 }], 0.8)]));
+    fireEvent.click(screen.getByText('Stop'));
+    await waitFor(() => expect(screen.getByTestId('drum-map-snare').textContent).toContain('1 hit'));
+    expect(screen.getByTestId('drum-map-kick').textContent).toContain('0 hits');
+    fireEvent.click(screen.getByText('Commit').closest('button') as HTMLButtonElement);
+    const rows = useTrackerStore.getState().patterns[0].channels[0].rows;
+    const written = rows.map((r) => r.note).filter((n) => n > 0 && n !== 97);
+    expect(written).toEqual([midiToXMNote(38)]);
   });
 });

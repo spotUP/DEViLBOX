@@ -7,7 +7,8 @@
  */
 import { basicPitchModel, resampleToMono22050, type PitchModel } from '@/lib/voice/basicPitchModel';
 import { DEFAULT_SHAPING, commitVoiceNotes, shapeNotes } from '@/lib/voice/voiceToNotes';
-import { classifyByRules, detectHits, DRUM_CLASSES } from '@/lib/voice/drumHits';
+import { loadActiveClassifier } from '@/lib/voice/drumModel';
+import { detectHits, DRUM_CLASSES } from '@/lib/voice/drumHits';
 import { commitDrumHits, defaultDrumMap, type DrumMap } from '@/lib/voice/drumToNotes';
 import { SCALES, type ScaleName } from '@/lib/voice/scaleSnap';
 import { getStoredLatencyMs } from '@/lib/voice/latencyCalibration';
@@ -73,7 +74,7 @@ export async function voiceToNotes(
       for (const d of DRUM_CLASSES) {
         if (override[d]) map[d] = { ...map[d], ...override[d] };
       }
-      const hits = detectHits(samples, classifyByRules);
+      const hits = detectHits(samples, loadActiveClassifier());
       const written = commitDrumHits(hits, map, quantise, { channelIndex, startRow, instrumentId: fallback });
       const counts = Object.fromEntries(DRUM_CLASSES.map((d) => [d, hits.filter((h) => h.drum === d).length]));
       if (!written) return { ok: true, written: 0, dropped: 0, detected: hits.length, hits: counts };
