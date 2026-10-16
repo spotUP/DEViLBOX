@@ -24,6 +24,8 @@ libopenmptPromise({ print: () => {}, printErr: () => {} })
 	libopenmpt.version = libopenmpt.UTF8ToString(libopenmpt._openmpt_get_string(asciiToStack('library_version')))
 	libopenmpt.build = libopenmpt.UTF8ToString(libopenmpt._openmpt_get_string(asciiToStack('build')))
 	libopenmpt.stackRestore(stack)
+
+	warmUpLibopenmpt()
 })
 .catch(e => console.error(e))
 
@@ -36,6 +38,66 @@ function asciiToStack(str) {
 	return stackStr
 }
 function writeAsciiToMemory(str,buffer,dontAddNull){for(let i=0;i<str.length;++i){libopenmpt.HEAP8[buffer++>>0]=str.charCodeAt(i)}if(!dontAddNull)libopenmpt.HEAP8[buffer>>0]=0}
+
+// Every module instance (main, isolation slot, dub slot, oscilloscope copy)
+// renders through the A1200 resampler model.
+function setAmigaResampler(modulePtr) {
+	if (!libopenmpt.stackSave) return
+	const stack = libopenmpt.stackSave()
+	libopenmpt._openmpt_module_ctl_set(modulePtr, asciiToStack('render.resampler.emulate_amiga'), asciiToStack('1'))
+	libopenmpt._openmpt_module_ctl_set(modulePtr, asciiToStack('render.resampler.emulate_amiga_type'), asciiToStack('a1200'))
+	libopenmpt.stackRestore(stack)
+}
+
+// The empty one-pattern XM the tracker engine sends for a synth-only song
+// (OpenMPT 1.33 writer, 187 bytes).
+const WARMUP_XM_HEX =
+	'457874656e646564204d6f64756c653a2020202020202020202020202020202020202020201a4f70656e4d505420312e33332e30302e3233202004011500000001000000040001000000000006007d00000900000000400000005354504d2e4250520400040000002e4d50520400100000002e4d4d500400040000002e5657430400230033015657534c0400230033012e415053040030000000565453560400300000002e46534d1100010702000001f8ffff1f40270400010022'
+
+// The first module libopenmpt creates after the wasm loads costs ~41 ms
+// (measured with the real wasm: later creates take ~4 ms), and its first
+// render ~4 ms against 0.1 ms. That one-time cost used to land in the 'play'
+// handler of the first song after a page load: the handler runs on the audio
+// thread, so every processor missed its deadline and the first play dropped
+// out (DX7 song, reported 2026-10-15). Pay it here instead, at boot, while
+// nothing is audible: create, configure and render one module the same way
+// play() does, then throw it away. An XM is used because that is what the
+// engine sends; a MOD warm-up still left ~10 ms on the first XM create.
+function warmUpLibopenmpt() {
+	const t0 = Date.now()
+	let frames = 0
+	try {
+		const bytes = new Uint8Array(WARMUP_XM_HEX.length / 2)
+		for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(WARMUP_XM_HEX.substr(i * 2, 2), 16)
+		const filePtr = libopenmpt._malloc(bytes.length)
+		libopenmpt.HEAPU8.set(bytes, filePtr)
+		let extPtr = 0
+		let modulePtr = 0
+		if (libopenmpt._openmpt_module_ext_create_from_memory) {
+			extPtr = libopenmpt._openmpt_module_ext_create_from_memory(filePtr, bytes.length, 0, 0, 0, 0, 0, 0, 0)
+			if (extPtr) modulePtr = libopenmpt._openmpt_module_ext_get_module(extPtr)
+		}
+		if (!modulePtr) modulePtr = libopenmpt._openmpt_module_create_from_memory(filePtr, bytes.length, 0, 0, 0)
+		libopenmpt._free(filePtr)
+		if (modulePtr) {
+			setAmigaResampler(modulePtr)
+			libopenmpt._openmpt_module_set_repeat_count(modulePtr, -1)
+			const leftPtr = libopenmpt._malloc(4 * 128)
+			const rightPtr = libopenmpt._malloc(4 * 128)
+			for (let i = 0; i < 4; i++) {
+				frames += libopenmpt._openmpt_module_read_float_stereo(modulePtr, sampleRate, 128, leftPtr, rightPtr)
+			}
+			libopenmpt._free(leftPtr)
+			libopenmpt._free(rightPtr)
+			if (extPtr) libopenmpt._openmpt_module_ext_destroy(extPtr)
+			else libopenmpt._openmpt_module_destroy(modulePtr)
+		}
+	} catch (e) {
+		console.warn('[libopenmpt] warm-up failed', e)
+	}
+	// Read by the regression test and handy in a worklet debugger.
+	globalThis.__libopenmptWarmup = { frames, ms: Date.now() - t0 }
+}
 
 
 //
@@ -572,12 +634,7 @@ class MPT extends AudioWorkletProcessor {
 			return
 		}
 
-		if (libopenmpt.stackSave) {
-			const stack = libopenmpt.stackSave()
-			libopenmpt._openmpt_module_ctl_set(this.modulePtr, asciiToStack('render.resampler.emulate_amiga'), asciiToStack('1'))
-			libopenmpt._openmpt_module_ctl_set(this.modulePtr, asciiToStack('render.resampler.emulate_amiga_type'), asciiToStack('a1200'))
-			libopenmpt.stackRestore(stack)
-		}
+		setAmigaResampler(this.modulePtr)
 		
 		this.paused = paused
 		this.leftPtr = libopenmpt._malloc(4 * maxFramesPerChunk)	// 4x = float
@@ -894,12 +951,7 @@ class MPT extends AudioWorkletProcessor {
 		libopenmpt._openmpt_module_set_render_param(modulePtr, OPENMPT_MODULE_RENDER_STEREOSEPARATION_PERCENT, this.config.stereoSeparation)
 		libopenmpt._openmpt_module_set_render_param(modulePtr, OPENMPT_MODULE_RENDER_INTERPOLATIONFILTER_LENGTH, this.config.interpolationFilter)
 
-		if (libopenmpt.stackSave) {
-			const stack = libopenmpt.stackSave()
-			libopenmpt._openmpt_module_ctl_set(modulePtr, asciiToStack('render.resampler.emulate_amiga'), asciiToStack('1'))
-			libopenmpt._openmpt_module_ctl_set(modulePtr, asciiToStack('render.resampler.emulate_amiga_type'), asciiToStack('a1200'))
-			libopenmpt.stackRestore(stack)
-		}
+		setAmigaResampler(modulePtr)
 
 		// Seek to main module's current position for sync
 		if (this.modulePtr) {
@@ -1061,12 +1113,7 @@ class MPT extends AudioWorkletProcessor {
 		libopenmpt._openmpt_module_set_repeat_count(modulePtr, this.config.repeatCount)
 		libopenmpt._openmpt_module_set_render_param(modulePtr, OPENMPT_MODULE_RENDER_STEREOSEPARATION_PERCENT, this.config.stereoSeparation)
 		libopenmpt._openmpt_module_set_render_param(modulePtr, OPENMPT_MODULE_RENDER_INTERPOLATIONFILTER_LENGTH, this.config.interpolationFilter)
-		if (libopenmpt.stackSave) {
-			const stack = libopenmpt.stackSave()
-			libopenmpt._openmpt_module_ctl_set(modulePtr, asciiToStack('render.resampler.emulate_amiga'), asciiToStack('1'))
-			libopenmpt._openmpt_module_ctl_set(modulePtr, asciiToStack('render.resampler.emulate_amiga_type'), asciiToStack('a1200'))
-			libopenmpt.stackRestore(stack)
-		}
+		setAmigaResampler(modulePtr)
 
 		// Sync to main module's current position so audio is in lockstep.
 		if (this.modulePtr) {
@@ -1201,10 +1248,7 @@ class MPT extends AudioWorkletProcessor {
 		libopenmpt._openmpt_module_set_repeat_count(modulePtr, this.config.repeatCount)
 		libopenmpt._openmpt_module_set_render_param(modulePtr, OPENMPT_MODULE_RENDER_STEREOSEPARATION_PERCENT, this.config.stereoSeparation)
 		libopenmpt._openmpt_module_set_render_param(modulePtr, OPENMPT_MODULE_RENDER_INTERPOLATIONFILTER_LENGTH, this.config.interpolationFilter)
-		const stack = libopenmpt.stackSave()
-		libopenmpt._openmpt_module_ctl_set(modulePtr, asciiToStack('render.resampler.emulate_amiga'), asciiToStack('1'))
-		libopenmpt._openmpt_module_ctl_set(modulePtr, asciiToStack('render.resampler.emulate_amiga_type'), asciiToStack('a1200'))
-		libopenmpt.stackRestore(stack)
+		setAmigaResampler(modulePtr)
 
 		if (order > 0 || row > 0) {
 			libopenmpt._openmpt_module_set_position_order_row(modulePtr, order, row)
