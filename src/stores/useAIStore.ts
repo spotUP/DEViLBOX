@@ -10,7 +10,7 @@ import { persist } from 'zustand/middleware';
 
 // --- Provider + Model definitions ---
 
-export type AIProvider = 'claude' | 'copilot' | 'pi' | 'opencode';
+export type AIProvider = 'free' | 'claude' | 'copilot' | 'pi' | 'opencode';
 
 export interface AIModelDef {
   id: string;
@@ -20,6 +20,7 @@ export interface AIModelDef {
 }
 
 export const AI_PROVIDERS: { id: AIProvider; label: string }[] = [
+  { id: 'free',    label: 'Free' },
   { id: 'claude',  label: 'Claude' },
   { id: 'copilot', label: 'Copilot' },
   { id: 'pi',       label: 'Pi' },
@@ -27,6 +28,8 @@ export const AI_PROVIDERS: { id: AIProvider; label: string }[] = [
 ];
 
 export const AI_MODELS: AIModelDef[] = [
+  // Free models via OpenRouter (server picks the model)
+  { id: 'auto', label: 'Automatic', description: 'Fastest free model', provider: 'free' },
   // Claude models
   { id: 'haiku',  label: 'Haiku',  description: 'Fast & cheap',   provider: 'claude' },
   { id: 'sonnet', label: 'Sonnet', description: 'Balanced',       provider: 'claude' },
@@ -82,6 +85,8 @@ interface AIState {
   error: string | null;
   provider: AIProvider;
   model: string;
+  /** Model that answered the current chat (from the `model` SSE event); not persisted. */
+  activeModel: string | null;
 }
 
 interface AIActions {
@@ -99,6 +104,7 @@ interface AIActions {
   finalizeAssistantMessage: (messageId: string) => void;
   setProvider: (provider: AIProvider) => void;
   setModel: (model: string) => void;
+  setActiveModel: (model: string | null) => void;
   clearHistory: () => void;
 }
 
@@ -110,8 +116,9 @@ export const useAIStore = create<AIState & AIActions>()(
     isStreaming: false,
     conversationId: null,
     error: null,
-    provider: 'copilot' as AIProvider,
-    model: 'claude-haiku-4.5',
+    provider: 'free' as AIProvider,
+    model: 'auto',
+    activeModel: null,
 
     toggle: () => set((s) => { s.isOpen = !s.isOpen; }),
     open: () => set((s) => { s.isOpen = true; }),
@@ -121,6 +128,7 @@ export const useAIStore = create<AIState & AIActions>()(
     setConversationId: (id) => set((s) => { s.conversationId = id; }),
     setError: (error) => set((s) => { s.error = error; }),
     setModel: (model) => set((s) => { s.model = model; }),
+    setActiveModel: (model) => set((s) => { s.activeModel = model; }),
 
     setProvider: (provider) => set((s) => {
       s.provider = provider;

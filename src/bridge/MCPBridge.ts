@@ -637,19 +637,35 @@ async function handleMessage(data: string): Promise<void> {
   agentAttached = true;
   autoRestoreForAgent();
 
-  const handler = handlers[request.method];
-  if (!handler) {
-    send({ id: request.id, type: 'error', error: `Unknown method: ${request.method}` });
-    return;
+  const outcome = await dispatchBridgeCall(request.method, request.params ?? {});
+  if (outcome.ok) {
+    send({ id: request.id, type: 'result', data: outcome.data });
+  } else {
+    send({ id: request.id, type: 'error', error: outcome.error });
   }
+}
+
+export type BridgeDispatchResult = { ok: true; data: unknown } | { ok: false; error: string };
+
+/**
+ * The one dispatch path into the handler table. The relay socket (handleMessage)
+ * and the in-browser AI chat tool loop both go through here, so in-flight
+ * bookkeeping and dialog annotation apply to both.
+ */
+export async function dispatchBridgeCall(
+  method: string,
+  params: Record<string, unknown>,
+): Promise<BridgeDispatchResult> {
+  const handler = Object.prototype.hasOwnProperty.call(handlers, method) ? handlers[method] : undefined;
+  if (!handler) return { ok: false, error: `Unknown method: ${method}` };
 
   callsInFlight++;
   lastCallActivityAt = Date.now();
   try {
-    const result = await handler(request.params ?? {});
-    send({ id: request.id, type: 'result', data: annotateBlockingDialog(request.method, result) });
+    const result = await handler(params);
+    return { ok: true, data: annotateBlockingDialog(method, result) };
   } catch (e) {
-    send({ id: request.id, type: 'error', error: (e as Error).message });
+    return { ok: false, error: (e as Error).message };
   } finally {
     callsInFlight--;
     lastCallActivityAt = Date.now();

@@ -28,6 +28,7 @@ export const AIPanel: React.FC = () => {
   const toggle = useAIStore((s) => s.toggle);
   const clearHistory = useAIStore((s) => s.clearHistory);
   const provider = useAIStore((s) => s.provider);
+  const activeModel = useAIStore((s) => s.activeModel);
   const model = useAIStore((s) => s.model);
   const setProvider = useAIStore((s) => s.setProvider);
   const setModel = useAIStore((s) => s.setModel);
@@ -158,6 +159,13 @@ export const AIPanel: React.FC = () => {
           />
         </label>
       </div>
+
+      {provider === 'free' && (
+        <div className="px-3 py-1 bg-dark-bgSecondary border-b border-dark-border text-[10px] font-mono text-text-muted">
+          <div>Free models via OpenRouter. Answers may be slower.</div>
+          {activeModel && <div>Answered by {activeModel}</div>}
+        </div>
+      )}
 
       {/* Auth error */}
       {authStatus && !authStatus.available && (

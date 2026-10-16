@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { AI_PROVIDERS, getModelsForProvider, getDefaultModel } from '../useAIStore';
 
 describe('AI assistant providers', () => {
-  it('lists all four providers with full-word labels', () => {
+  it('lists all five providers with full-word labels, free first', () => {
     expect(AI_PROVIDERS.map((p) => [p.id, p.label])).toEqual([
-      ['claude', 'Claude'], ['copilot', 'Copilot'], ['pi', 'Pi'], ['opencode', 'OpenCode'],
+      ['free', 'Free'], ['claude', 'Claude'], ['copilot', 'Copilot'], ['pi', 'Pi'], ['opencode', 'OpenCode'],
     ]);
   });
 

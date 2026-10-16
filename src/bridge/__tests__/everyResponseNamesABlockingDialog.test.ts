@@ -45,7 +45,9 @@ describe('every MCP response names an open dialog and how to clear it', () => {
   const fn = BRIDGE.slice(BRIDGE.indexOf('function annotateBlockingDialog('), BRIDGE.indexOf('function connect(): void {'));
 
   it('is what the dispatcher runs on every result', () => {
-    expect(BRIDGE).toContain("send({ id: request.id, type: 'result', data: annotateBlockingDialog(request.method, result) });");
+    // dispatchBridgeCall is the one path for the relay socket and the AI chat tool loop.
+    expect(BRIDGE).toContain("return { ok: true, data: annotateBlockingDialog(method, result) };");
+    expect(BRIDGE).toContain('const outcome = await dispatchBridgeCall(request.method, request.params ?? {});');
     expect(BRIDGE, 'the old recovery-only annotator is still wired').not.toContain('annotateRecoveryPrompt');
   });
 
