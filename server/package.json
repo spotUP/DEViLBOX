@@ -7,6 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "node build.mjs",
     "typecheck": "tsc --noEmit",
+    "test": "../node_modules/.bin/vitest run",
     "start": "node dist/index.js",
     "migrate": "node dist/db/migrate.js",
     "collab": "tsx collab-server.ts",
