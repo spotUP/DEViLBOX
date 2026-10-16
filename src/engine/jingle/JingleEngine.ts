@@ -5,6 +5,13 @@
 
 let instance: JingleEngine | null = null;
 
+/**
+ * The startup jingle asset, served from public/. It must be a tracked file:
+ * an untracked copy plays on one machine only, and a missing file makes the
+ * SPA fallback answer with index.html, which decodes to nothing.
+ */
+export const STARTUP_JINGLE_URL = '/devilbox1.mp3';
+
 export class JingleEngine {
   private audioCtx: AudioContext | null = null;
   private analyserNode: AnalyserNode | null = null;
@@ -17,13 +24,13 @@ export class JingleEngine {
     this.analyserNode = this.audioCtx.createAnalyser();
     this.analyserNode.fftSize = 256;
     this.analyserNode.connect(this.audioCtx.destination);
-    try {
-      const resp = await fetch(url);
-      const buf = await resp.arrayBuffer();
-      this.buffer = await this.audioCtx.decodeAudioData(buf);
-    } catch {
-      // Preload failed — jingle will be silent
+    const resp = await fetch(url);
+    const contentType = resp.headers.get('content-type') ?? '';
+    if (!resp.ok || contentType.startsWith('text/html')) {
+      throw new Error(`Startup jingle not found at ${url} (HTTP ${resp.status}, ${contentType || 'no content type'})`);
     }
+    const buf = await resp.arrayBuffer();
+    this.buffer = await this.audioCtx.decodeAudioData(buf);
   }
 
   play(): void {

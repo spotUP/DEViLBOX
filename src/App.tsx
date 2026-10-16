@@ -29,7 +29,7 @@ import { setRecoveryPrompt } from './lib/persistence/recoveryPrompt';
 import { setupCloudSyncSubscribers } from './lib/cloudSyncSubscribers';
 import { setupInstrumentSelectionSync } from './midi/instrumentSelectionWiring';
 import { getToneEngine } from '@engine/ToneEngine';
-import { getJingleEngine } from '@engine/jingle/JingleEngine';
+import { getJingleEngine, STARTUP_JINGLE_URL } from '@engine/jingle/JingleEngine';
 import { injectMouthPatterns, teardownMouthPatterns } from '@engine/jingle/JinglePatterns';
 import type { EffectConfig } from './types/instrument';
 import { Zap, Music, Sliders, Download, List } from 'lucide-react';
@@ -115,12 +115,13 @@ async function playStartupJingle(): Promise<void> {
     useUIStore.getState().setStatusMessage('DEVILBOX READY', false, 3000);
   });
   try {
-    await jingle.preload('/devilbox1.mp3');
+    await jingle.preload(STARTUP_JINGLE_URL);
     injectMouthPatterns();
     jingle.play();
     useUIStore.getState().setJingleActive(true);
-  } catch {
-    // Jingle load failed — silently skip; app continues normally
+  } catch (error) {
+    // The app continues without the jingle, but a missing or undecodable asset is reported.
+    console.warn('[startup jingle]', error);
   }
 }
 
