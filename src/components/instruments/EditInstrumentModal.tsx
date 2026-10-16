@@ -24,6 +24,7 @@ import { X, Check, Search, Settings, Sparkles, Music2, Save, Keyboard, ChevronDo
 import { useUIStore } from '@stores/useUIStore';
 import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 import { focusPopout } from '@components/ui/PopOutWindow';
+import { CollapsedPanelStrip } from '@components/ui/CollapsedPanelStrip';
 import type { InstrumentConfig, SynthType, BuzzmachineType } from '@typedefs/instrument';
 import {
   DEFAULT_OSCILLATOR,
@@ -445,17 +446,12 @@ export const EditInstrumentModal: React.FC<EditInstrumentModalProps> = ({
           {!isPhone && <div className={`border-r border-dark-border flex-shrink-0 bg-dark-bgSecondary transition-all duration-200 ${leftPanelCollapsed ? 'w-8' : 'w-fit min-w-52 max-w-[26rem]'}`}>
             {leftPanelCollapsed ? (
               // Collapsed state - just show expand button
-              <button
+              <CollapsedPanelStrip
+                side="left"
+                label="Instruments"
                 onClick={() => setLeftPanelCollapsed(false)}
-                className="flex flex-col items-center justify-start gap-3 pt-3 w-full h-full text-text-muted hover:text-text-primary hover:bg-dark-bgTertiary transition-colors"
                 title="Show instrument list"
-              >
-                <ChevronRight size={16} />
-                {/* Same vertical label as the collapsed Studio panels. */}
-                <span className="rotate-180 tracking-widest font-mono text-[10px] uppercase" style={{ writingMode: 'vertical-lr' }}>
-                  Instruments
-                </span>
-              </button>
+              />
             ) : (
               // Expanded state - show instrument list with collapse button
               <div className="h-full flex flex-col">
