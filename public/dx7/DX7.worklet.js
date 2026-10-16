@@ -37,6 +37,9 @@ class DX7Processor extends AudioWorkletProcessor {
     this.framesSinceReport = 0;
     this.framesProcessed = 0;
     this.pendingNotes = [];          // notes keyed since the last voice start was matched to a note
+    // Note events with a future `time` (AudioContext seconds), oldest first. The replayer schedules
+    // rows ahead; a main-thread stall delivers them late and bunched, so they wait here for their frame.
+    this.eventQueue = [];
     this.voiceActive = new Array(16).fill(false);
     this.voiceStartFrame = new Array(16).fill(0);
     this.voiceReleaseFrame = new Array(16).fill(-1);
@@ -62,16 +65,17 @@ class DX7Processor extends AudioWorkletProcessor {
         if (this.ready) this.loadSysex(msg.data);
         break;
       case 'noteOn':
-        if (this.ready) {
-          if (this.watchVoices) this.pendingNotes.push(msg.note);
-          this.module._dx7NoteOn(msg.note, msg.velocity);
-        }
-        break;
       case 'noteOff':
-        if (this.ready) this.module._dx7NoteOff(msg.note);
+        if (this.ready) this.scheduleNoteEvent(msg);
         break;
       case 'allNotesOff':
-        if (this.ready) this.module._dx7AllNotesOff();
+        // All Notes Off cancels the notes scheduled at or after it: on Stop the replayer has already
+        // sent the coming rows, and those must not sound after the release.
+        if (this.ready) {
+          const at = msg.time ?? currentTime;
+          this.eventQueue = this.eventQueue.filter((e) => e.time < at);
+          this.scheduleNoteEvent(msg);
+        }
         break;
       case 'sustain':
         if (this.ready) this.module._dx7Sustain(msg.value ? 1 : 0);
@@ -116,6 +120,29 @@ class DX7Processor extends AudioWorkletProcessor {
       }
       case 'destroy':
         if (this.ready) { this.module._dx7Destroy(); this.ready = false; }
+        break;
+    }
+  }
+
+  /** Apply a note event now when its time has come (or it has none), otherwise queue it in time order. */
+  scheduleNoteEvent(msg) {
+    if (msg.time === undefined || msg.time <= currentTime) { this.applyNoteEvent(msg); return; }
+    let i = this.eventQueue.length;
+    while (i > 0 && this.eventQueue[i - 1].time > msg.time) i--;
+    this.eventQueue.splice(i, 0, msg);
+  }
+
+  applyNoteEvent(msg) {
+    switch (msg.type) {
+      case 'noteOn':
+        if (this.watchVoices) this.pendingNotes.push(msg.note);
+        this.module._dx7NoteOn(msg.note, msg.velocity);
+        break;
+      case 'noteOff':
+        this.module._dx7NoteOff(msg.note);
+        break;
+      case 'allNotesOff':
+        this.module._dx7AllNotesOff();
         break;
     }
   }
@@ -318,7 +345,13 @@ class DX7Processor extends AudioWorkletProcessor {
     const gain = 1.0;
 
     // Linear interpolation resampler: native rate → host rate
+    const frameSec = 1 / sampleRate;
     for (let i = 0; i < n; i++) {
+      // Queued note events reach the firmware at the host frame they are due
+      const frameTime = currentTime + i * frameSec;
+      while (this.eventQueue.length > 0 && this.eventQueue[0].time <= frameTime) {
+        this.applyNoteEvent(this.eventQueue.shift());
+      }
       this.resamplePhase += this.resampleRatio;
 
       // Consume native samples as needed
