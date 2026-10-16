@@ -19,6 +19,7 @@ import { midiToXMNote } from '@/lib/xmConversions';
 import { ANNOTATIONS_FPS, PITCH_SAMPLE_RATE, midiToHz, type PitchModelOutput } from '@/lib/voice/pitchNotes';
 import type { PitchModel } from '@/lib/voice/basicPitchModel';
 import type { VoiceCapture } from '@/lib/voice/voiceRecorder';
+import { synthTake } from '@/lib/voice/drumSynth';
 import { clearTakes } from '@/lib/voice/takeHistory';
 import { LATENCY_STORAGE_KEY } from '@/lib/voice/latencyCalibration';
 
@@ -216,5 +217,40 @@ describe('Voice to Notes panel', () => {
     await takeThrough(60);
     expect(screen.getByText('Takes')).toBeTruthy();
     expect(screen.getByText(/^Take 1/)).toBeTruthy();
+  });
+
+  it('Drums mode: a kick and snare take ends as mapped cells in the pattern as one undo step, without the pitch model', async () => {
+    const model = new SineReadingModel();
+    const mic = fakeMic();
+    const deps = {
+      getStream: async () => ({} as MediaStream),
+      createCapture: () => mic.capture,
+      listDevices: async () => [],
+    };
+    const undoBefore = useHistoryStore.getState().undoStack.length;
+    render(<VoiceToNotesPanel onClose={() => {}} model={model} deps={deps} />);
+    fireEvent.click(screen.getByTitle('Mode'));
+    fireEvent.click(await screen.findByText('Drums'));
+    await waitFor(() => expect(screen.getByTestId('drum-map-kick')).toBeTruthy());
+
+    fireEvent.click(screen.getByText('Record'));
+    await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
+    mic.feed(concat([new Float32Array(Math.round(1.6 * PITCH_SAMPLE_RATE)), synthTake([{ drum: 'kick', at: 0.3 }, { drum: 'snare', at: 0.8 }], 1.4)]));
+    fireEvent.click(screen.getByText('Stop'));
+
+    await waitFor(() => expect(screen.getByTestId('drum-map-kick').textContent).toContain('1 hit'));
+    expect(screen.getByTestId('drum-map-snare').textContent).toContain('1 hit');
+    expect(model.calls).toBe(0);
+    fireEvent.click(screen.getByText('Commit').closest('button') as HTMLButtonElement);
+
+    const rows = useTrackerStore.getState().patterns[0].channels[0].rows;
+    const written = rows.map((r, i) => ({ i, note: r.note })).filter((c) => c.note > 0 && c.note !== 97);
+    expect(written.map((c) => c.note)).toEqual([midiToXMNote(36), midiToXMNote(38)]);
+    expect(written[0].i).toBeGreaterThanOrEqual(6);
+    expect(written[0].i).toBeLessThanOrEqual(8);
+    expect(written[1].i - written[0].i).toBeGreaterThanOrEqual(4);
+    expect(written[1].i - written[0].i).toBeLessThanOrEqual(6);
+    expect(useHistoryStore.getState().undoStack.length - undoBefore).toBe(1);
+    expect(useHistoryStore.getState().undoStack.at(-1)?.description).toBe('Voice to Notes');
   });
 });

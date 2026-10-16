@@ -1629,6 +1629,8 @@ export function createMcpServer(): McpServer {
       transpose: z.number().optional().describe('Semitones to shift'),
       keyTonic: z.number().optional().describe('Snap to a key: tonic pitch class 0-11 (0 = C); omit for no snap'),
       keyScale: z.string().optional().describe('Scale for the key snap: major, minor, dorian, mixolydian, pentatonicMajor, pentatonicMinor'),
+      mode: z.enum(['melody', 'drums']).optional().describe('"melody" (default) tracks pitch; "drums" detects beatbox hits (kick, snare, hat, clap) and writes them as mapped notes'),
+      drumMap: z.record(z.string(), z.object({ instrumentId: z.number().optional(), midi: z.number().optional() })).optional().describe('Drums mode: per class (kick, snare, hat, clap) override of target instrument and MIDI note; defaults pick instruments by name and notes 36/38/42/39'),
     },
     async (p) => {
       try {

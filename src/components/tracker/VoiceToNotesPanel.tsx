@@ -30,6 +30,8 @@ import { commitVoiceNotes, shapeNotes } from '@/lib/voice/voiceToNotes';
 import { SCALES, SCALE_LABELS, TONIC_NAMES, type ScaleName } from '@/lib/voice/scaleSnap';
 import { getStoredLatencyMs, measureLoopbackLatencyMs, storeLatencyMs } from '@/lib/voice/latencyCalibration';
 import { addTake, listTakes, type Take } from '@/lib/voice/takeHistory';
+import { DRUM_CLASSES, DRUM_CLASS_LABELS, classifyByRules, detectHits, type DrumHit } from '@/lib/voice/drumHits';
+import { commitDrumHits, defaultDrumMap, type DrumMap } from '@/lib/voice/drumToNotes';
 
 export interface VoiceToNotesPanelProps {
   onClose: () => void;
@@ -62,6 +64,22 @@ const DEFAULT_FINETUNE: Finetune = {
 };
 
 const COUNT_IN_BEATS = 4;
+
+type VoiceMode = 'melody' | 'drums';
+const MODE_OPTIONS = [
+  { value: 'melody', label: 'Melody' },
+  { value: 'drums', label: 'Drums' },
+];
+
+/** Drum mode never needs the pitch model; the live preview runs against this empty one. */
+const NO_PITCH_MODEL: PitchModel = {
+  evaluate: async () => ({ frames: [], onsets: [], contours: [] }),
+};
+
+const DRUM_NOTE_OPTIONS = Array.from({ length: 61 }, (_, i) => {
+  const midi = 24 + i;
+  return { value: String(midi), label: `${TONIC_NAMES[midi % 12]}${Math.floor(midi / 12) - 1}` };
+});
 
 const NoteRoll: React.FC<{ notes: readonly VoiceNote[]; seconds: number }> = ({ notes, seconds }) => {
   const span = Math.max(2, seconds);
@@ -97,6 +115,11 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   deps,
 }) => {
   const [fine, setFine] = useState<Finetune>(DEFAULT_FINETUNE);
+  const [mode, setMode] = useState<VoiceMode>('melody');
+  const [hits, setHits] = useState<readonly DrumHit[]>([]);
+  const [drumMap, setDrumMap] = useState<DrumMap>(() =>
+    defaultDrumMap(useInstrumentStore.getState().instruments, useInstrumentStore.getState().currentInstrumentId ?? 1),
+  );
   const [deviceId, setDeviceId] = useState('');
   const [channelIndex, setChannelIndex] = useState(() => useCursorStore.getState().cursor.channelIndex);
   const [instrumentId, setInstrumentId] = useState<number>(() => useInstrumentStore.getState().currentInstrumentId ?? 1);
@@ -119,7 +142,8 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   const channelCount = useTrackerStore((s) => s.patterns[s.currentPatternIndex]?.channels.length ?? 0);
   const instruments = useInstrumentStore((s) => s.instruments);
 
-  const recorder = useVoiceRecorder(model, fine, deps);
+  const drums = mode === 'drums';
+  const recorder = useVoiceRecorder(drums ? NO_PITCH_MODEL : model, fine, deps);
 
   const patch = useCallback(<K extends keyof Finetune>(key: K, value: Finetune[K]) => {
     setFine((prev) => ({ ...prev, [key]: value }));
@@ -138,6 +162,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
 
   const handleRecord = useCallback(async () => {
     setOutput(null);
+    setHits([]);
     setStartRow(useCursorStore.getState().cursor.rowIndex);
     await recorder.start({
       deviceId: deviceId || undefined,
@@ -150,6 +175,10 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     const take = recorder.stop();
     if (!take || take.length === 0) return;
     setTakeSeconds(take.length / 22050);
+    if (drums) {
+      setHits(detectHits(take, classifyByRules));
+      return;
+    }
     setAnalysing(true);
     try {
       // Full-take pass: replaces the live preview
@@ -162,30 +191,30 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     } finally {
       setAnalysing(false);
     }
-  }, [recorder, model]);
+  }, [recorder, model, drums]);
 
   const handleCommit = useCallback(() => {
-    const result = commitVoiceNotes(
-      finalNotes,
-      {
-        bpm,
-        speed,
-        swing: fine.swing,
-        minLengthRows: fine.minLengthRows,
-        // Measured device latency plus the manual nudge on top
-        latencyNudgeMs: calibratedMs + fine.latencyNudgeMs,
-      },
-      { channelIndex, startRow, instrumentId },
-    );
+    const quantise = {
+      bpm,
+      speed,
+      swing: fine.swing,
+      minLengthRows: fine.minLengthRows,
+      // Measured device latency plus the manual nudge on top
+      latencyNudgeMs: calibratedMs + fine.latencyNudgeMs,
+    };
+    const target = { channelIndex, startRow, instrumentId };
+    const result = drums
+      ? commitDrumHits(hits, drumMap, quantise, target)
+      : commitVoiceNotes(finalNotes, quantise, target);
     if (!result) {
-      notify.warning('No notes to write');
+      notify.warning(drums ? 'No drum hits to write' : 'No notes to write');
       return;
     }
     notify.success(
       `Wrote ${result.written} note${result.written === 1 ? '' : 's'}` +
         (result.dropped ? `, ${result.dropped} past the end of the pattern` : ''),
     );
-  }, [finalNotes, bpm, speed, fine, calibratedMs, channelIndex, startRow, instrumentId]);
+  }, [drums, hits, drumMap, finalNotes, bpm, speed, fine, calibratedMs, channelIndex, startRow, instrumentId]);
 
   const handleCalibrate = useCallback(async () => {
     setCalibrating(true);
@@ -239,6 +268,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
         </Button>
       </div>
 
+      <CustomSelect value={mode} onChange={(v) => setMode(v as VoiceMode)} options={MODE_OPTIONS} title="Mode" disabled={recording} />
       <CustomSelect value={deviceId} onChange={setDeviceId} options={deviceOptions} title="Microphone" disabled={recording} />
       <CustomSelect
         value={String(channelIndex)}
@@ -246,12 +276,14 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
         options={channelOptions}
         title="Target channel"
       />
-      <CustomSelect
-        value={String(instrumentId)}
-        onChange={(v) => setInstrumentId(Number(v))}
-        options={instrumentOptions}
-        title="Instrument"
-      />
+      {!drums && (
+        <CustomSelect
+          value={String(instrumentId)}
+          onChange={(v) => setInstrumentId(Number(v))}
+          options={instrumentOptions}
+          title="Instrument"
+        />
+      )}
 
       <div className="flex items-center gap-2">
         {!recording ? (
@@ -274,6 +306,43 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
       </div>
       {recorder.error && <div className="text-[10px] font-mono text-accent-error">{recorder.error}</div>}
 
+      {drums ? (
+        <>
+          <div className="text-[10px] font-mono text-text-secondary">Drum map</div>
+          {DRUM_CLASSES.map((drum) => {
+            const count = hits.filter((h) => h.drum === drum).length;
+            return (
+              <div key={drum} className="flex flex-col gap-1" data-testid={`drum-map-${drum}`}>
+                <span className="text-[10px] font-mono text-text-muted">
+                  {DRUM_CLASS_LABELS[drum]} - {count} hit{count === 1 ? '' : 's'}
+                </span>
+                <div className="flex gap-1">
+                  <CustomSelect
+                    value={String(drumMap[drum].instrumentId)}
+                    onChange={(v) => setDrumMap((m) => ({ ...m, [drum]: { ...m[drum], instrumentId: Number(v) } }))}
+                    options={instrumentOptions}
+                    title={`${DRUM_CLASS_LABELS[drum]} instrument`}
+                  />
+                  <CustomSelect
+                    value={String(drumMap[drum].midi)}
+                    onChange={(v) => setDrumMap((m) => ({ ...m, [drum]: { ...m[drum], midi: Number(v) } }))}
+                    options={DRUM_NOTE_OPTIONS}
+                    title={`${DRUM_CLASS_LABELS[drum]} note`}
+                  />
+                </div>
+              </div>
+            );
+          })}
+          <div className="text-[9px] font-mono text-text-muted">
+            {hits.length} hit{hits.length === 1 ? '' : 's'} - row length {(rowLength * 1000).toFixed(0)} ms
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <Knob label="Swing" value={fine.swing} min={0} max={1} step={0.01} onChange={(v) => patch('swing', v)} size="sm" />
+            <Knob label="Latency" unit="ms" value={fine.latencyNudgeMs} min={-300} max={300} step={1} bipolar onChange={(v) => patch('latencyNudgeMs', Math.round(v))} size="sm" title="Move the hits earlier (positive) or later (negative) to match your microphone and output latency" />
+          </div>
+        </>
+      ) : (
+      <>
       <NoteRoll notes={shownNotes} seconds={takeSeconds || 4} />
       <div className="text-[9px] font-mono text-text-muted">
         {shownNotes.length} note{shownNotes.length === 1 ? '' : 's'} - row length {(rowLength * 1000).toFixed(0)} ms
@@ -310,6 +379,8 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
           />
         </div>
       )}
+      </>
+      )}
 
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" icon={<Timer size={12} />} onClick={() => void handleCalibrate()} disabled={recording || analysing || calibrating}>
@@ -318,7 +389,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
         <span className="text-[9px] font-mono text-text-muted" data-testid="voice-calibrated-latency">{calibratedMs} ms measured</span>
       </div>
 
-      {takes.length > 0 && (
+      {!drums && takes.length > 0 && (
         <>
           <div className="text-[10px] font-mono text-text-secondary">Takes</div>
           <div className="flex flex-col gap-1">
@@ -342,7 +413,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
         size="sm"
         icon={<Check size={12} />}
         onClick={handleCommit}
-        disabled={recording || analysing || finalNotes.length === 0}
+        disabled={recording || analysing || (drums ? hits.length === 0 : finalNotes.length === 0)}
       >
         Commit
       </Button>

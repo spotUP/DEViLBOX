@@ -27,6 +27,10 @@ export interface QuantisedNote {
   midi: number;
   /** 0..1 */
   velocity: number;
+  /** Per-note instrument (drum maps); falls back to the write target's. */
+  instrumentId?: number;
+  /** false = write no note-off after the note (drum hits). Default true. */
+  noteOff?: boolean;
 }
 
 export function rowSeconds(bpm: number, speed: number): number {
