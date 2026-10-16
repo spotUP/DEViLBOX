@@ -10,7 +10,7 @@ import { persist } from 'zustand/middleware';
 
 // --- Provider + Model definitions ---
 
-export type AIProvider = 'free' | 'claude' | 'copilot' | 'pi' | 'opencode';
+export type AIProvider = 'free' | 'anthropic' | 'openai' | 'claude' | 'copilot' | 'pi' | 'opencode';
 
 export interface AIModelDef {
   id: string;
@@ -21,6 +21,8 @@ export interface AIModelDef {
 
 export const AI_PROVIDERS: { id: AIProvider; label: string }[] = [
   { id: 'free',    label: 'Free' },
+  { id: 'anthropic', label: 'Claude (Your Anthropic Key)' },
+  { id: 'openai',    label: 'OpenAI (Your Key)' },
   { id: 'claude',  label: 'Claude' },
   { id: 'copilot', label: 'Copilot' },
   { id: 'pi',       label: 'Pi' },
@@ -30,6 +32,9 @@ export const AI_PROVIDERS: { id: AIProvider; label: string }[] = [
 export const AI_MODELS: AIModelDef[] = [
   // Free models via OpenRouter (server picks the model)
   { id: 'auto', label: 'Automatic', description: 'Fastest free model', provider: 'free' },
+  // Your own vendor key (the server picks the model the key can use)
+  { id: 'auto', label: 'Automatic', description: 'Best model for your key', provider: 'anthropic' },
+  { id: 'auto', label: 'Automatic', description: 'Best model for your key', provider: 'openai' },
   // Claude models
   { id: 'haiku',  label: 'Haiku',  description: 'Fast & cheap',   provider: 'claude' },
   { id: 'sonnet', label: 'Sonnet', description: 'Balanced',       provider: 'claude' },

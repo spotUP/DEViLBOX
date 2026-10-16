@@ -4,7 +4,7 @@
  */
 
 import { useAIStore } from '@stores/useAIStore';
-import { useAIKeysStore, keyHeadersFor } from '@stores/useAIKeysStore';
+import { useAIKeysStore, keyHeadersFor, AI_KEY_HEADERS, type AIKeyVendor } from '@stores/useAIKeysStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
@@ -33,13 +33,54 @@ function gatherContext(): Record<string, unknown> {
   }
 }
 
-/** Check if Claude CLI is available */
-export async function checkAIStatus(): Promise<{ available: boolean; error?: string }> {
+export interface AIStatus {
+  available: boolean;
+  error?: string;
+  /** Whether the server has its own OpenRouter key, so Free works without a visitor key. */
+  free?: { available: boolean; message?: string };
+}
+
+/** Check if an AI backend is available */
+export async function checkAIStatus(): Promise<AIStatus> {
   try {
     const res = await fetch(`${API_BASE}/ai/status`);
     return await res.json();
   } catch {
     return { available: false, error: 'Cannot reach server. Is the dev server running?' };
+  }
+}
+
+export type AIKeyCheck =
+  | { ok: true; models: number }
+  | { ok: false; kind: string; error: string };
+
+/** Ask the server whether this key works; the key is sent in the vendor's header and not stored here. */
+export async function checkAIKey(vendor: AIKeyVendor, key: string): Promise<AIKeyCheck> {
+  try {
+    const res = await fetch(`${API_BASE}/ai/check-key`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', [AI_KEY_HEADERS[vendor]]: key },
+      body: JSON.stringify({ vendor }),
+    });
+    const body = await res.json();
+    if (body && body.ok === true) return { ok: true, models: Number(body.models) || 0 };
+    return {
+      ok: false,
+      kind: typeof body?.kind === 'string' ? body.kind : 'other',
+      error: typeof body?.error === 'string' ? body.error : 'The key could not be checked.',
+    };
+  } catch {
+    return { ok: false, kind: 'network', error: 'Cannot reach the server. Is it running?' };
+  }
+}
+
+/** A failed key check in plain words. */
+export function describeKeyCheckFailure(check: Extract<AIKeyCheck, { ok: false }>): string {
+  switch (check.kind) {
+    case 'auth': return 'The provider did not accept this key. Check that you copied all of it.';
+    case 'credit': return 'This key has no credit left. Add credit with the provider, then try again.';
+    case 'rate': return 'The provider is rate limiting this key. Wait a minute and try again.';
+    default: return check.error;
   }
 }
 

@@ -15,7 +15,21 @@ export const AI_KEY_HEADERS: Record<AIKeyVendor, string> = {
   openai: 'x-openai-key',
 };
 
-type AIKeys = Partial<Record<AIKeyVendor, string>>;
+/** Display name and key-page link for each vendor (shared by the keys panel and the setup wizard). */
+export const AI_KEY_VENDORS: Record<AIKeyVendor, { label: string; keyUrl: string }> = {
+  openrouter: { label: 'OpenRouter', keyUrl: 'https://openrouter.ai/keys' },
+  anthropic: { label: 'Anthropic', keyUrl: 'https://console.anthropic.com/settings/keys' },
+  openai: { label: 'OpenAI', keyUrl: 'https://platform.openai.com/api-keys' },
+};
+
+/** The chat provider that spends this vendor's key. */
+export const PROVIDER_FOR_VENDOR: Record<AIKeyVendor, 'free' | 'anthropic' | 'openai'> = {
+  openrouter: 'free',
+  anthropic: 'anthropic',
+  openai: 'openai',
+};
+
+export type AIKeys = Partial<Record<AIKeyVendor, string>>;
 
 interface AIKeysState {
   keys: AIKeys;
@@ -28,9 +42,10 @@ interface AIKeysActions {
 
 /** Headers carrying the visitor's key for this provider; {} when none applies. */
 export function keyHeadersFor(provider: string, keys: AIKeys): Record<string, string> {
-  // anthropic / openai providers are added with FA-17 / FA-18.
-  if (provider === 'free' && keys.openrouter) {
-    return { [AI_KEY_HEADERS.openrouter]: keys.openrouter };
+  // Only the chosen provider's key is sent, never another vendor's.
+  for (const vendor of Object.keys(PROVIDER_FOR_VENDOR) as AIKeyVendor[]) {
+    const key = keys[vendor];
+    if (PROVIDER_FOR_VENDOR[vendor] === provider && key) return { [AI_KEY_HEADERS[vendor]]: key };
   }
   return {};
 }
