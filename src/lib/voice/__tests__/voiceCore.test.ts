@@ -7,6 +7,7 @@ import { applyNotesToPattern, writeNotesToPattern, NOTE_OFF, velocityToVolume } 
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { resetStore } from '@/stores/__tests__/_harness';
+import { sungTakeModelOutput, SUNG_TAKE_PITCHES } from './sungTakeFixture';
 
 const note = (start: number, dur: number, midi: number, amp = 0.8): VoiceNote => ({
   startTimeSeconds: start,
@@ -52,29 +53,9 @@ describe('pitchNotes', () => {
   });
 
   it('default thresholds keep every note of a sung take (voice-level confidence)', () => {
-    // Shaped on a measured take: onsets peak ~0.52, frames sit ~0.35-0.4.
     // The old 0.55 / 0.45 defaults returned zero of these three notes.
-    const frames: number[][] = [];
-    const onsets: number[][] = [];
-    const contours: number[][] = [];
-    const sung = [
-      { start: 10, end: 30, midi: 52 },
-      { start: 40, end: 60, midi: 48 },
-      { start: 70, end: 90, midi: 43 },
-    ];
-    for (let f = 0; f < 100; f++) {
-      const fr = new Array(88).fill(0);
-      const on = new Array(88).fill(0);
-      for (const s of sung) {
-        if (f >= s.start && f < s.end) fr[s.midi - 21] = f % 2 ? 0.35 : 0.4;
-        if (f === s.start) on[s.midi - 21] = 0.52;
-      }
-      frames.push(fr);
-      onsets.push(on);
-      contours.push(new Array(264).fill(0));
-    }
-    const notes = modelOutputToNotes({ frames, onsets, contours }, DEFAULT_PITCH_SETTINGS, true);
-    expect(notes.map((n) => n.pitchMidi)).toEqual([52, 48, 43]);
+    const notes = modelOutputToNotes(sungTakeModelOutput(), DEFAULT_PITCH_SETTINGS, true);
+    expect(notes.map((n) => n.pitchMidi)).toEqual(SUNG_TAKE_PITCHES);
   });
 });
 

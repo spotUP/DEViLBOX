@@ -41,7 +41,8 @@ export interface PitchSettings {
 /**
  * Basic Pitch's own published thresholds (0.5 onset, 0.3 frame). A sung take
  * peaks around 0.6-0.8 frame confidence and sags well below 0.45 within a
- * note, so the sample editor's stricter 0.55 / 0.45 kept one note of several.
+ * note, so the old stricter 0.55 / 0.45 kept one note of several. The one
+ * default set: Voice to Notes and the sample editor's Audio to MIDI both use it.
  */
 export const DEFAULT_PITCH_SETTINGS: PitchSettings = {
   onsetThreshold: 0.5,

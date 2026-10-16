@@ -14,7 +14,7 @@ import { flushSync } from 'react-dom';
 import { X, Music, Play, Square, Loader2, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import type { NoteEventTime } from '@spotify/basic-pitch';
 import { evaluateBuffer, resampleToMono22050 } from '../../lib/voice/basicPitchModel';
-import { modelOutputToNotes } from '../../lib/voice/pitchNotes';
+import { modelOutputToNotes, DEFAULT_PITCH_SETTINGS, type PitchSettings } from '../../lib/voice/pitchNotes';
 import { NOTE_OFF, velocityToVolume } from '../../lib/voice/writeToPattern';
 import type { InstrumentConfig } from '../../types/instrument';
 import type { Pattern, TrackerCell, ChannelData, ClipboardData } from '../../types/tracker';
@@ -36,21 +36,13 @@ interface AudioToMidiModalProps {
   instrument: InstrumentConfig;
 }
 
-interface ConversionSettings {
-  onsetThreshold: number;
-  frameThreshold: number;
-  minNoteLengthMs: number;
-  minMidiNote: number;
-  maxMidiNote: number;
+export interface ConversionSettings extends PitchSettings {
   rowsPerBeat: number; // 4 = 1/4 note, 8 = 1/8 note, 16 = 1/16 note
 }
 
-const DEFAULT_SETTINGS: ConversionSettings = {
-  onsetThreshold: 0.55,
-  frameThreshold: 0.45,
-  minNoteLengthMs: 90,
-  minMidiNote: 21, // A0
-  maxMidiNote: 108, // C8
+/** Detection defaults are the one set in pitchNotes, shared with Voice to Notes. */
+export const DEFAULT_SETTINGS: ConversionSettings = {
+  ...DEFAULT_PITCH_SETTINGS,
   rowsPerBeat: 4,
 };
 
