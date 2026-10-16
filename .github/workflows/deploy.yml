@@ -60,6 +60,12 @@ jobs:
         env:
           VITEST_MAX_WORKERS: '2'
 
+      # The server's suites live under server/ with their own vitest config
+      # (node environment, src/**/*.test.ts from server/); test:ci runs the
+      # root config, whose include is src/** of the client, so it never ran them.
+      - name: Server tests
+        run: npm test --prefix server
+
       - name: Effects compliance
         run: npm run test:compliance
 
