@@ -103,7 +103,10 @@ describe('X8 — no handler is left unreachable', () => {
   const DELIBERATELY_UNDECLARED = new Set(['evaluate_script']);
 
   it('declares every routed tool, or names why not', () => {
-    const routed = [...bridge.matchAll(/^  ([a-z_]+): [a-zA-Z]+,$/gm)].map(m => m[1]);
+    // Only the handler table: other two-space `name: Type,` lines (a function
+    // signature split over lines) are not routes.
+    const table = bridge.slice(bridge.indexOf('const handlers: Record<string, Handler> = {'), bridge.indexOf('\n};\n', bridge.indexOf('const handlers: Record<string, Handler> = {')));
+    const routed = [...table.matchAll(/^  ([a-z_]+): [a-zA-Z]+,$/gm)].map(m => m[1]);
     expect(routed.length).toBeGreaterThan(50);
     const missing = routed.filter(name =>
       !INTENTIONALLY_INDIRECT.test(name)
