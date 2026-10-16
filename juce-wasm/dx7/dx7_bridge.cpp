@@ -46,12 +46,8 @@ struct DX7Engine {
 
     float volume = 1.0f;
     float midiExpression = 0.0f;
-    double cpuCyclesPerSample = 0.0;
-    double cycCount = 0.0;
 
     float internalBuffer[kBufSize] = {};
-    float discardBuffer[kBufSize] = {};
-    int discardCnt = 0;
 
     uint8_t midiVelocity[128] = {};
 
@@ -64,9 +60,6 @@ struct DX7Engine {
         toSynthPtr = &appToSynth;
         toGuiPtr = &nullToGui;
 
-        // CPU cycles per sample: DX7 master clock 9.4265 MHz / 2 / 4 = 1,178,312.5 Hz
-        cpuCyclesPerSample = (9.4265e6 / 2.0 / 4.0) / static_cast<double>(kNativeSamplerate);
-
         // Default velocity curve (0.4 = convex, matches VDX7 default)
         setVelocityCurve(0.4f);
     }
@@ -77,25 +70,24 @@ struct DX7Engine {
             midiVelocity[i] = static_cast<uint8_t>(127.0f * std::pow(static_cast<float>(i) / 127.0f, c) + 0.5f);
     }
 
+    // The EGS is clocked 4x per CPU cycle and emits one sample per 16 voices x 6 operators (96 clocks), so one
+    // output sample is exactly 24 CPU cycles: the sample stream and the CPU share one clock. Run instructions until
+    // the buffer is full instead of crediting a cycles-per-sample budget derived from the float native rate: that
+    // budget (23.99999937 cycles) drifts against the 24-cycle sample clock, and once the drift crosses an
+    // instruction boundary (about 32 s of play) calls start returning n-1 samples (a zero sample in the stream) or
+    // throwing one away, which is broadband clicking on every sustained note. An instruction is at most 12 cycles
+    // (48 EGS clocks), so it can complete at most one sample and the loop never overshoots the buffer.
     int fillBuffer(float* outBuffer, int maxSamples) {
-        cycCount += cpuCyclesPerSample * maxSamples;
         int outCnt = 0;
-        discardCnt = 0;
         dx7Emu::Message msg;
 
-        while (cycCount > 0) {
+        while (outCnt < maxSamples) {
             if (!dx7.haveMsg)
                 if (toSynthPtr->pop(msg)) processMessage(msg);
 
             dx7.run();
             const int cycles = dx7.inst->cycles;
-
-            if (outCnt < maxSamples)
-                dx7.egs.clock(outBuffer, outCnt, 4 * cycles);
-            else
-                dx7.egs.clock(discardBuffer, discardCnt, 4 * cycles);
-
-            cycCount -= (cycles > 0) ? cycles : 1;
+            dx7.egs.clock(outBuffer, outCnt, 4 * (cycles > 0 ? cycles : 1));
         }
         return outCnt;
     }
