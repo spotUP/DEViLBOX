@@ -10,7 +10,7 @@ import { z } from 'zod';
 import { config as loadEnv } from 'dotenv';
 import { readFile, readdir, stat as fsStat } from 'fs/promises';
 import { basename, dirname, join, resolve } from 'path';
-import { callBrowser } from './wsRelay';
+import { callBrowser as relayCallBrowser } from './wsRelay';
 import { resolveCompanions, modlandListing, type CompanionListing } from '../../../src/lib/import/companionResolver';
 
 /** Sample subdirectories a module may own. Listed when present, by their name as on disk. */
@@ -88,11 +88,13 @@ function textResult(data: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
 }
 
-async function call(method: string, params: Record<string, unknown> = {}) {
-  return textResult(await callBrowser(method, params));
-}
+/** How a tool reaches the browser: the WS relay for the CLI path, a per-chat channel for the Free provider. */
+export type BrowserCaller = (method: string, params: Record<string, unknown>) => Promise<unknown>;
 
-export function createMcpServer(): McpServer {
+export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowser?: BrowserCaller } = {}): McpServer {
+  const call = async (method: string, params: Record<string, unknown> = {}) =>
+    textResult(await callBrowser(method, params));
+
   const server = new McpServer({
     name: 'devilbox-tracker',
     version: '2.0.0',

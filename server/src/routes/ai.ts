@@ -10,6 +10,9 @@ import { Router, type Request, type Response } from 'express';
 import { spawn, type ChildProcess } from 'child_process';
 import { resolve } from 'path';
 import { buildSystemPrompt } from '../ai/systemPrompt';
+import { BrowserChannel, deliverToolResult } from '../ai/browserChannel';
+import { freeAvailability, runFreeChat } from '../ai/freeProvider';
+import { visitorKey } from '../ai/limits';
 import {
   AI_PROVIDER_IDS, CLI_NOT_FOUND_MESSAGE, buildInvocation, findCli, isLoggedIn, parseEvent,
   type AIProviderId,
@@ -23,6 +26,19 @@ const MAX_CONVERSATIONS = 10;
 
 // Track active processes for cancellation
 const activeProcesses = new Map<string, ChildProcess>();
+// Free provider chats in flight, so /stop can abort them
+const activeFreeChats = new Map<string, AbortController>();
+
+/** Keep the conversation for the next turn (oldest conversation dropped past the cap). */
+function remember(convId: string, history: Array<{ role: string; content: string }>, assistantText: string): void {
+  if (!assistantText) return;
+  history.push({ role: 'assistant', content: assistantText });
+  if (conversations.size >= MAX_CONVERSATIONS && !conversations.has(convId)) {
+    const oldest = conversations.keys().next().value;
+    if (oldest) conversations.delete(oldest);
+  }
+  conversations.set(convId, history);
+}
 
 // Path to the MCP server entry point
 const MCP_SERVER_PATH = resolve(__dirname, '../mcp/index.ts');
@@ -30,18 +46,19 @@ const MCP_SERVER_PATH = resolve(__dirname, '../mcp/index.ts');
 /**
  * GET /api/ai/status — Check if AI CLIs are available
  */
-router.get('/status', (_req: Request, res: Response) => {
+router.get('/status', (req: Request, res: Response) => {
+  const free = freeAvailability(visitorKey(req));
   const providers: Record<string, { available: boolean; path: string | null }> = {};
   for (const id of AI_PROVIDER_IDS) {
     const path = findCli(id);
     providers[id] = { available: !!path && isLoggedIn(id), path };
   }
 
-  if (AI_PROVIDER_IDS.every((id) => !providers[id].path)) {
-    return res.json({ available: false, error: 'No AI CLI found. Install Claude, Copilot, Pi or OpenCode.' });
+  if (!free.available && AI_PROVIDER_IDS.every((id) => !providers[id].path)) {
+    return res.json({ available: false, free, error: free.message });
   }
 
-  res.json({ available: true, providers });
+  res.json({ available: true, free, providers });
 });
 
 /**
@@ -50,7 +67,7 @@ router.get('/status', (_req: Request, res: Response) => {
  * Body: { prompt, context?, conversationId?, provider?, model? }
  */
 router.post('/chat', (req: Request, res: Response) => {
-  const { prompt, context, conversationId, provider = 'copilot', model } = req.body;
+  const { prompt, context, conversationId, provider = 'free', model } = req.body;
 
   if (!prompt || typeof prompt !== 'string') {
     return res.status(400).json({ error: 'prompt is required' });
@@ -76,6 +93,30 @@ router.post('/chat', (req: Request, res: Response) => {
     : prompt;
 
   const systemPrompt = buildSystemPrompt(context);
+
+  if (provider === 'free') {
+    // Free provider: no CLI; the logic lives in ../ai/freeProvider. Route is glue.
+    const abort = new AbortController();
+    activeFreeChats.set(convId, abort);
+    const channel = new BrowserChannel(convId, (event) => { res.write(`data: ${JSON.stringify(event)}\n\n`); });
+    res.write(`data: ${JSON.stringify({ type: 'init', conversationId: convId })}\n\n`);
+    res.on('close', () => { abort.abort(); channel.close(); activeFreeChats.delete(convId); });
+    void runFreeChat({
+      system: systemPrompt,
+      history: history.slice(-10).map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content })),
+      visitorKey: visitorKey(req),
+      requestedModel: typeof model === 'string' ? model : undefined,
+      emit: (event) => { if (!res.writableEnded) res.write(`data: ${JSON.stringify(event)}\n\n`); },
+      callBrowser: channel.call,
+      signal: abort.signal,
+    }).then((r) => { if (r.text) remember(convId, history, r.text); })
+      .catch((e: unknown) => {
+        console.error('[AI] free provider failed:', e instanceof Error ? e.message : 'unknown');
+        if (!res.writableEnded) res.write(`data: ${JSON.stringify({ type: 'error', error: 'The free AI failed unexpectedly.' })}\n\n`);
+      })
+      .finally(() => { activeFreeChats.delete(convId); channel.close(); if (!res.writableEnded) res.end(); });
+    return;
+  }
 
   const providerId: AIProviderId = (AI_PROVIDER_IDS as string[]).includes(provider) ? provider : 'copilot';
   const cliPath = findCli(providerId);
@@ -140,14 +181,7 @@ router.post('/chat', (req: Request, res: Response) => {
     console.log(`[AI] Process exited: code=${code}, provider=${providerId}, output=${assistantText.length} chars`);
     activeProcesses.delete(convId);
 
-    if (assistantText) {
-      history.push({ role: 'assistant', content: assistantText });
-      if (conversations.size >= MAX_CONVERSATIONS && !conversations.has(convId)) {
-        const oldest = conversations.keys().next().value;
-        if (oldest) conversations.delete(oldest);
-      }
-      conversations.set(convId, history);
-    }
+    remember(convId, history, assistantText);
 
     res.write(`data: ${JSON.stringify({ type: 'done', code })}\n\n`);
     res.end();
@@ -171,10 +205,27 @@ router.post('/chat', (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/ai/tool-result — the browser's answer to a Free-provider tool_call
+ *
+ * Body: { conversationId, callId, result?, error? }
+ */
+router.post('/tool-result', (req: Request, res: Response) => {
+  const { conversationId, ...rest } = req.body ?? {};
+  if (!deliverToolResult(conversationId, rest)) return res.status(404).json({ error: 'No pending tool call' });
+  res.json({ ok: true });
+});
+
+/**
  * POST /api/ai/stop — Stop a running AI conversation
  */
 router.post('/stop', (req: Request, res: Response) => {
   const { conversationId } = req.body;
+  const free = activeFreeChats.get(conversationId);
+  if (free) {
+    free.abort();
+    activeFreeChats.delete(conversationId);
+    return res.json({ stopped: true });
+  }
   const child = activeProcesses.get(conversationId);
   if (child && child.exitCode === null) {
     child.kill('SIGTERM');
