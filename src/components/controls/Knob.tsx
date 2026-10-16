@@ -6,7 +6,7 @@
 import React, { useRef, useCallback, useEffect, useState, useId } from 'react';
 import { resolveControlTone, type ControlTone } from '@components/ui/controlColor';
 import { createPortal } from 'react-dom';
-import { useThemeStore } from '@stores';
+import { useThemeStore } from '@stores/useThemeStore';
 import { haptics } from '@/utils/haptics';
 import { subscribeToParamLiveValue } from '@/midi/performance/parameterRouter';
 

@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { resolveControlTone, type ControlTone } from '@components/ui/controlColor';
-import { useThemeStore } from '@stores';
+import { useThemeStore } from '@stores/useThemeStore';
 
 interface ToggleProps {
   label: string;
