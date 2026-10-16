@@ -4,6 +4,7 @@
  */
 
 import { useAIStore } from '@stores/useAIStore';
+import { useAIKeysStore, keyHeadersFor } from '@stores/useAIKeysStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
@@ -86,7 +87,10 @@ export async function sendMessage(prompt: string): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}/ai/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...keyHeadersFor(store.provider, useAIKeysStore.getState().keys),
+      },
       body: JSON.stringify({
         prompt,
         context: gatherContext(),

@@ -14,6 +14,7 @@ import { useTransportStore } from '@stores/useTransportStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { sendMessage, stopStreaming, checkAIStatus } from '@/services/aiChatService';
 import { Button } from '@components/ui/Button';
+import { AIKeysPanel } from './AIKeysPanel';
 import { AIMessage } from './AIMessage';
 import { AIInput } from './AIInput';
 import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
@@ -166,6 +167,8 @@ export const AIPanel: React.FC = () => {
           {activeModel && <div>Answered by {activeModel}</div>}
         </div>
       )}
+
+      {provider === 'free' && <AIKeysPanel />}
 
       {/* Auth error */}
       {authStatus && !authStatus.available && (

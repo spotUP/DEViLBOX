@@ -7,6 +7,7 @@ vi.mock('@/bridge/MCPBridge', () => ({
 
 import { sendMessage } from '../aiChatService';
 import { useAIStore } from '@stores/useAIStore';
+import { useAIKeysStore } from '@stores/useAIKeysStore';
 
 function sse(events: object[]): Response {
   const body = events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('');
@@ -61,5 +62,32 @@ describe('aiChatService tool round trip', () => {
     await sendMessage('hi');
     await vi.waitFor(() => expect(posts).toHaveLength(1));
     expect(posts[0]).toEqual({ conversationId: 'conv-2', callId: 'c2', error: 'Unknown method: nope' });
+  });
+});
+
+describe('aiChatService visitor key header', () => {
+  async function chatHeaders(): Promise<Headers> {
+    let headers = new Headers();
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => {
+      headers = new Headers(init?.headers);
+      return sse([{ type: 'done' }]);
+    }));
+    await sendMessage('hi');
+    return headers;
+  }
+
+  beforeEach(() => {
+    useAIStore.getState().clearHistory();
+    useAIStore.setState({ provider: 'free' });
+    useAIKeysStore.setState({ keys: {} });
+  });
+
+  it('sends x-openrouter-key for the free provider when a key is saved', async () => {
+    useAIKeysStore.getState().setKey('openrouter', 'sk-or-mine');
+    expect((await chatHeaders()).get('x-openrouter-key')).toBe('sk-or-mine');
+  });
+
+  it('omits the header when no key is saved', async () => {
+    expect((await chatHeaders()).has('x-openrouter-key')).toBe(false);
   });
 });
