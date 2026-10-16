@@ -16,7 +16,8 @@ import { Button } from '@components/ui/Button';
 import { AIMessage } from './AIMessage';
 import { AIInput } from './AIInput';
 import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { CollapsedPanelStrip } from '@components/ui/CollapsedPanelStrip';
+import { ChevronRight } from 'lucide-react';
 
 export const AIPanel: React.FC = () => {
   const isOpen = useAIStore((s) => s.isOpen);
@@ -82,17 +83,29 @@ export const AIPanel: React.FC = () => {
     e.stopPropagation();
   }, []);
 
-  const Chevron = isOpen ? ChevronDown : ChevronRight;
-
   // Collapsed: a narrow strip whose header stays visible. On a phone a
   // collapsed strip would cost width, so only the expanded overlay shows.
   if (!isOpen && isPhone) return null;
 
-  const frame = isOpen
-    ? isPhone
-      ? 'fixed right-0 top-0 bottom-0 w-[440px] max-w-full z-[45] shadow-xl'
-      : 'w-[440px] shrink-0'
-    : 'w-7 shrink-0';
+  // Collapsed: the same strip as the synth editor's instrument list.
+  if (!isOpen) {
+    return (
+      <div data-testid="ai-panel" className="w-8 shrink-0 bg-dark-bgSecondary border-l border-dark-border">
+        <CollapsedPanelStrip
+          side="right"
+          label="AI Assistant"
+          data-testid="ai-panel-header"
+          aria-expanded={false}
+          onClick={toggle}
+          title="Show AI Assistant (Ctrl+L)"
+        />
+      </div>
+    );
+  }
+
+  const frame = isPhone
+    ? 'fixed right-0 top-0 bottom-0 w-[440px] max-w-full z-[45] shadow-xl'
+    : 'w-[440px] shrink-0';
 
   return (
     <div
@@ -101,22 +114,10 @@ export const AIPanel: React.FC = () => {
       className={`${frame} flex flex-col bg-dark-bg border-l border-dark-border overflow-hidden`}
       onKeyDown={stopPropagation}
     >
-      {/* Header — always visible */}
-      <div className={`flex ${isOpen ? 'flex-row items-center justify-between px-3 py-2 border-b border-dark-border' : 'flex-col items-center py-2'} shrink-0`}>
-        <Button
-          variant="ghost"
-          size="sm"
-          data-testid="ai-panel-header"
-          aria-expanded={isOpen}
-          onClick={toggle}
-          title={isOpen ? 'Collapse AI Assistant (Ctrl+L)' : 'Expand AI Assistant (Ctrl+L)'}
-          className={`text-[10px] font-mono text-text-primary ${isOpen ? '' : '[writing-mode:vertical-rl] px-1 py-2'}`}
-        >
-          <Chevron size={12} className="inline-block" />
-          <span>AI Assistant</span>
-        </Button>
-        {isOpen && (
-          <div className="flex items-center gap-1">
+      {/* Header, same as the synth editor's instrument list header */}
+      <div className="flex items-center justify-between gap-2 px-2 py-1 bg-dark-bgSecondary border-b border-dark-border shrink-0">
+        <span className="text-xs font-medium text-text-muted">AI Assistant</span>
+        <div className="flex items-center gap-1">
             <div className="flex items-center bg-dark-bgSecondary rounded overflow-hidden border border-dark-border mr-1">
               {AI_PROVIDERS.map((p) => (
                 <Button
@@ -149,12 +150,19 @@ export const AIPanel: React.FC = () => {
             <Button variant="ghost" size="sm" onClick={clearHistory} title="Clear chat history" className="text-[10px] font-mono">
               Clear
             </Button>
+            <Button
+              variant="icon"
+              size="icon"
+              data-testid="ai-panel-header"
+              aria-expanded={true}
+              onClick={toggle}
+              title="Hide AI Assistant (Ctrl+L)"
+            >
+              <ChevronRight size={14} />
+            </Button>
           </div>
-        )}
       </div>
 
-      {isOpen && (
-        <>
       {/* Auth error */}
       {authStatus && !authStatus.available && (
         <div className="px-3 py-2 bg-accent-error/10 border-b border-accent-error/20 text-[10px] font-mono text-accent-error">
@@ -198,9 +206,6 @@ export const AIPanel: React.FC = () => {
         isStreaming={isStreaming}
         disabled={authStatus !== null && !authStatus.available}
       />
-
-        </>
-      )}
     </div>
   );
 };
