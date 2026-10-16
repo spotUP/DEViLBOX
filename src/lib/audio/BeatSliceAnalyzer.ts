@@ -39,7 +39,7 @@ function computeMagnitudeSpectrum(real: Float32Array, imag: Float32Array): Float
 /**
  * Apply Hann window to audio frame
  */
-function applyHannWindow(frame: Float32Array): Float32Array {
+export function applyHannWindow(frame: Float32Array): Float32Array {
   const windowed = new Float32Array(frame.length);
   for (let i = 0; i < frame.length; i++) {
     const multiplier = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (frame.length - 1)));
@@ -52,7 +52,7 @@ function applyHannWindow(frame: Float32Array): Float32Array {
  * Simple in-place FFT implementation
  * Uses Cooley-Tukey algorithm
  */
-function fft(real: Float32Array, imag: Float32Array): void {
+export function fft(real: Float32Array, imag: Float32Array): void {
   const n = real.length;
   if (n <= 1) return;
 
