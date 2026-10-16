@@ -119,33 +119,31 @@ export const AIPanel: React.FC = () => {
           <div className="flex items-center gap-1">
             <div className="flex items-center bg-dark-bgSecondary rounded overflow-hidden border border-dark-border mr-1">
               {AI_PROVIDERS.map((p) => (
-                <button
+                <Button
                   key={p.id}
+                  variant={provider === p.id ? 'primary' : 'ghost'}
+                  size="sm"
+                  aria-pressed={provider === p.id}
                   onClick={() => setProvider(p.id)}
-                  className={`px-1.5 py-0.5 text-[10px] font-mono transition-colors ${
-                    provider === p.id
-                      ? 'bg-dark-bgHover text-text-primary font-semibold'
-                      : 'text-text-muted hover:text-text-primary'
-                  }`}
+                  className="text-[10px] font-mono"
                 >
                   {p.label}
-                </button>
+                </Button>
               ))}
             </div>
             <div className="flex items-center bg-dark-bgSecondary rounded overflow-hidden border border-dark-border">
               {getModelsForProvider(provider).map((m) => (
-                <button
+                <Button
                   key={m.id}
+                  variant={model === m.id ? 'primary' : 'ghost'}
+                  size="sm"
+                  aria-pressed={model === m.id}
                   onClick={() => setModel(m.id)}
-                  className={`px-1.5 py-0.5 text-[10px] font-mono transition-colors ${
-                    model === m.id
-                      ? 'bg-accent-primary text-text-inverse font-semibold'
-                      : 'text-text-muted hover:text-text-primary'
-                  }`}
+                  className="text-[10px] font-mono"
                   title={m.description}
                 >
                   {m.label}
-                </button>
+                </Button>
               ))}
             </div>
             <Button variant="ghost" size="sm" onClick={clearHistory} title="Clear chat history" className="text-[10px] font-mono">
