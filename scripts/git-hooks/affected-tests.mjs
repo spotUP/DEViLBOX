@@ -53,18 +53,20 @@ const staged = changed
 
 const isTest = (f) => /\.test\.(ts|tsx)$/.test(f);
 
-/** Sibling test suites for a staged source file, matched by basename. */
+/**
+ * Sibling test suites for a staged source file, matched by basename: in its
+ * __tests__/ directory (the src/ layout) or next to it (the server/src layout).
+ */
 function siblingTests(sourceFile) {
   const ext = extname(sourceFile); // .ts | .tsx
   const stem = basename(sourceFile, ext); // foo
-  const testsDir = join(dirname(sourceFile), '__tests__');
-  const abs = join(root, testsDir);
-  if (!existsSync(abs)) return [];
   const out = [];
-  for (const entry of readdirSync(abs)) {
-    // foo.test.ts / foo.contract.test.ts / foo.golden.test.ts …
-    if (isTest(entry) && (entry === `${stem}.test.ts` || entry === `${stem}.test.tsx` || entry.startsWith(`${stem}.`))) {
-      if (isTest(entry)) out.push(join(testsDir, entry));
+  for (const testsDir of [join(dirname(sourceFile), '__tests__'), dirname(sourceFile)]) {
+    const abs = join(root, testsDir);
+    if (!existsSync(abs)) continue;
+    for (const entry of readdirSync(abs)) {
+      // foo.test.ts / foo.contract.test.ts / foo.golden.test.ts …
+      if (isTest(entry) && entry.startsWith(`${stem}.`)) out.push(join(testsDir, entry));
     }
   }
   return out;
@@ -83,7 +85,7 @@ function grepTests(patterns) {
   try {
     return execFileSync(
       'git',
-      ['grep', '-l', '-F', ...patterns, '--', 'src/**/*.test.ts', 'src/**/*.test.tsx'],
+      ['grep', '-l', '-F', ...patterns, '--', 'src/**/*.test.ts', 'src/**/*.test.tsx', 'server/src/**/*.test.ts'],
       { encoding: 'utf8', cwd: root },
     ).split('\n').map((s) => s.trim()).filter(Boolean);
   } catch {
@@ -121,8 +123,8 @@ for (const f of staged) {
     if (existsSync(join(root, f))) set.add(f);
   } else {
     sources.push(f);
-    // server/ suites are not in the vitest CI glob; only src/ tests read server code.
-    if (f.startsWith('src/')) for (const t of siblingTests(f)) set.add(t);
+    // server/ suites run under server/vitest.config.ts (run_vitest_suites in snapshot.sh).
+    if (f.startsWith('src/') || f.startsWith('server/src/')) for (const t of siblingTests(f)) set.add(t);
   }
 }
 for (const t of sourceTextTests(sources)) set.add(t);

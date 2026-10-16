@@ -82,7 +82,7 @@ fi
 echo "${YLW}[pre-commit] running ${#FILES[@]} affected test suite(s):${RST}" >&2
 printf '  %s\n' "${FILES[@]}" >&2
 
-if ! in_snapshot npx vitest run --config vite.config.ts "${FILES[@]}"; then
+if ! run_vitest_suites -- "${FILES[@]}"; then
   echo "${RED}[pre-commit] affected tests failed — commit aborted.${RST}" >&2
   echo "${RED}  Fix the failures above, or bypass with 'git commit --no-verify'.${RST}" >&2
   exit 1
