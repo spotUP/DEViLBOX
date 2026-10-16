@@ -12,7 +12,7 @@
  *
  * Pure.
  */
-import { PLAUSIBLE_BPM_MIN, PLAUSIBLE_BPM_MAX } from './autodj/moduleBeatGrid';
+import { PLAUSIBLE_BPM_MIN, PLAUSIBLE_BPM_MAX } from './autodj/beatGrid';
 
 /** WebSID's player call counter after a render chunk. */
 export interface PlayerCallSample {

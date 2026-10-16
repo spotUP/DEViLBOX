@@ -10,6 +10,14 @@ import type {
 } from './types';
 
 /**
+ * A beat level whose tempo falls outside this range is not the song's beat (a
+ * half or double reading). Kept in this pure module so the SID player clock in
+ * the DJ render worker can use it without moduleBeatGrid's store imports.
+ */
+export const PLAUSIBLE_BPM_MIN = 60;
+export const PLAUSIBLE_BPM_MAX = 200;
+
+/**
  * A track's beat confidence (owner juggling plan section 31): its beats AND
  * its bars - the beat grid and the downbeat grid with the meter (an assumed
  * meter lowers the downbeat confidence). A cut on the beat of a wrong bar is
