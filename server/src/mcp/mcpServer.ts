@@ -1618,6 +1618,30 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    'voice_to_notes',
+    'Headless Voice to Notes: run a recorded melody (audio file path or URL) through the same pipeline as the Voice to Notes panel (Basic Pitch, quantise, write) into the current pattern at the cursor channel and row, as one undo step.',
+    {
+      path: z.string().optional().describe('Absolute path to an audio file on disk (read server-side)'),
+      url: z.string().optional().describe('URL the browser fetches the audio from (instead of path)'),
+      channel: z.number().optional().describe('Target channel (default: cursor channel)'),
+      row: z.number().optional().describe('First row (default: cursor row)'),
+      instrumentId: z.number().optional().describe('Instrument number (default: current instrument)'),
+      transpose: z.number().optional().describe('Semitones to shift'),
+      keyTonic: z.number().optional().describe('Snap to a key: tonic pitch class 0-11 (0 = C); omit for no snap'),
+      keyScale: z.string().optional().describe('Scale for the key snap: major, minor, dorian, mixolydian, pentatonicMajor, pentatonicMinor'),
+    },
+    async (p) => {
+      try {
+        const { path, ...rest } = p;
+        const data = path ? (await readFile(path)).toString('base64') : undefined;
+        return textResult(await callBrowser('voice_to_notes', { ...rest, ...(data ? { data } : {}) }));
+      } catch (e) {
+        return textResult({ error: `Failed to read file: ${(e as Error).message}` });
+      }
+    },
+  );
+
+  server.tool(
     'get_audio_level',
     'Measure audio output level over a time window. Returns RMS average/max, peak max, and whether audio is silent. Useful for verifying a loaded file produces sound. With bands: true it also returns bandsDb - the mean power per octave band (63 Hz ... 16 kHz, dB) over the window, for measuring an effect\'s frequency response with a broadband signal.',
     {

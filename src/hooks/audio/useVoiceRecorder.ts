@@ -19,7 +19,7 @@ export interface VoiceRecorderDeps {
   listDevices: () => Promise<MediaDeviceInfo[]>;
 }
 
-const defaultDeps: VoiceRecorderDeps = {
+export const defaultVoiceRecorderDeps: VoiceRecorderDeps = {
   getStream: getMicStream,
   createCapture: createMicCapture,
   listDevices: async () => (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput'),
@@ -32,7 +32,7 @@ export interface StartOptions {
   onTakeStart?: () => void;
 }
 
-export function useVoiceRecorder(model: PitchModel, pitchSettings: PitchSettings, deps: VoiceRecorderDeps = defaultDeps) {
+export function useVoiceRecorder(model: PitchModel, pitchSettings: PitchSettings, deps: VoiceRecorderDeps = defaultVoiceRecorderDeps) {
   const [phase, setPhase] = useState<RecorderPhase>('idle');
   const [level, setLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);

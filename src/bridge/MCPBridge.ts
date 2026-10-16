@@ -200,6 +200,7 @@ import {
   evaluateScript,
 } from './handlers/writeHandlers';
 import { analyzeSongHandler } from './handlers/analysisHandlers';
+import { voiceToNotes } from './handlers/voiceHandlers';
 import { generatePattern, transformPattern } from './handlers/generatorHandlers';
 import { getFormatEngines, setFormatEngine } from './handlers/engineHandlers';
 import {
@@ -433,6 +434,7 @@ const handlers: Record<string, Handler> = {
 
   // ─── File Loading & Audio Measurement ───────────────────────────────────
   load_file: loadFile,
+  voice_to_notes: (p) => voiceToNotes(p),
   test_tone: testTone,
   get_audio_level: getAudioLevel,
   wait_for_audio: waitForAudio,
