@@ -277,7 +277,7 @@ export const AudioToMidiModal: React.FC<AudioToMidiModalProps> = ({
 
       // Step 3: Convert frames to notes (shared extraction, polyphonic)
       setProgressLabel('Extracting notes…');
-      const notes = modelOutputToNotes(output, settings, false);
+      const notes = modelOutputToNotes(output, settings);
 
       setDetectedNotes(notes);
       setProgress(100);

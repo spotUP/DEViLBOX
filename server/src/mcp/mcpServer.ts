@@ -1621,7 +1621,7 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
 
   server.tool(
     'voice_to_notes',
-    'Headless Voice to Notes: run a recorded melody (audio file path or URL) through the same pipeline as the Voice to Notes panel (Basic Pitch, quantise, write) into the current pattern at the cursor channel and row, as one undo step.',
+    'Headless Voice to Notes: run a recorded melody (audio file path or URL) through the same pipeline as the Voice to Notes panel (SwiftF0 pitch track, note segmenter, quantise, write) into the current pattern at the cursor channel and row, as one undo step.',
     {
       path: z.string().optional().describe('Absolute path to an audio file on disk (read server-side)'),
       url: z.string().optional().describe('URL the browser fetches the audio from (instead of path)'),
@@ -1647,9 +1647,11 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
 
   server.tool(
     'get_voice_take',
-    'Read the take the Voice to Notes panel holds (read-only): length in seconds and samples, the voiced span (RMS per 0.1 s over the take\'s own gate, as dB), the notes the current fine settings shape from the stored model output (start, duration, midi, amplitude), the last note end, and drum hits. Measures "recording stopped early" and "extra wrong notes" from the real recording.',
-    {},
-    () => call('get_voice_take'),
+    'Read the take the Voice to Notes panel holds (read-only): length in seconds and samples, the voiced span (RMS per 0.1 s over the take\'s own gate, as dB), the notes the current fine settings shape from the stored pitch track (start, duration, midi, amplitude), the last note end, drum hits, and a track summary (voiced frames, median confidence, per note mean Hz and confidence). Measures "recording stopped early" and "extra wrong notes" from the real recording.',
+    {
+      frames: z.boolean().optional().describe('Also return the per-frame hz, confidence and loudnessDb arrays of the pitch track'),
+    },
+    (p) => call('get_voice_take', p),
   );
 
   server.tool(
@@ -2196,7 +2198,7 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
           { tool: 'get_audio_analysis', description: 'RMS, peak, FFT, band energy, beat detection' },
           { tool: 'get_audio_context_info', description: 'Web Audio context state' },
           { tool: 'get_voice_state', description: 'Voice allocation state' },
-          { tool: 'get_voice_take', description: 'The stored Voice to Notes take: length, voiced span, shaped notes, hits' },
+          { tool: 'get_voice_take', description: 'The stored Voice to Notes take: length, voiced span, shaped notes, hits, pitch track summary' },
           { tool: 'get_instrument_level', description: 'Per-instrument audio level' },
           { tool: 'get_audio_state', description: 'Audio engine diagnostics' },
           { tool: 'get_audio_level', description: 'Measure audio output level over time' },

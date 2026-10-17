@@ -435,7 +435,7 @@ const handlers: Record<string, Handler> = {
   // ─── File Loading & Audio Measurement ───────────────────────────────────
   load_file: loadFile,
   voice_to_notes: (p) => voiceToNotes(p),
-  get_voice_take: getVoiceTake,
+  get_voice_take: (p) => getVoiceTake(p),
   test_tone: testTone,
   get_audio_level: getAudioLevel,
   wait_for_audio: waitForAudio,

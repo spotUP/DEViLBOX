@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { toMonophonic, transposeNotes, modelOutputToNotes, melodyRange, noteName, DEFAULT_PITCH_SETTINGS, ANNOTATIONS_FPS, type VoiceNote } from '../pitchNotes';
+import { transposeNotes, modelOutputToNotes, melodyRange, noteName, DEFAULT_PITCH_SETTINGS, ANNOTATIONS_FPS, type VoiceNote } from '../pitchNotes';
 import { quantiseNotes, rowSeconds, type QuantiseSettings } from '../quantise';
 import { mergeWindowNotes } from '../liveWindow';
 import { VoiceRecorder, type VoiceCapture } from '../voiceRecorder';
@@ -29,14 +29,6 @@ describe('pitchNotes', () => {
     expect(melodyRange([note(0, 0.4, 40), note(0.4, 0.4, 43), note(0.8, 0.4, 45)])).toEqual({ minMidiNote: 37, maxMidiNote: 48, transpose: 12 });
   });
 
-  it('toMonophonic keeps the strongest of overlapping notes and never overlaps', () => {
-    const out = toMonophonic([note(0, 1, 60, 0.5), note(0.5, 1, 64, 0.9), note(2, 0.5, 67, 0.4)]);
-    expect(out.map((n) => n.pitchMidi)).toEqual([64, 67]);
-    for (let i = 1; i < out.length; i++) {
-      expect(out[i].startTimeSeconds).toBeGreaterThanOrEqual(out[i - 1].startTimeSeconds + out[i - 1].durationSeconds);
-    }
-  });
-
   it('transposeNotes shifts pitch only', () => {
     const [n] = transposeNotes([note(1, 0.5, 60)], 7);
     expect(n.pitchMidi).toBe(67);
@@ -58,7 +50,7 @@ describe('pitchNotes', () => {
       onsets.push(on_);
       contours.push(new Array(264).fill(0));
     }
-    const notes = modelOutputToNotes({ frames, onsets, contours }, DEFAULT_PITCH_SETTINGS, true);
+    const notes = modelOutputToNotes({ frames, onsets, contours }, DEFAULT_PITCH_SETTINGS);
     expect(notes).toHaveLength(1);
     expect(notes[0].pitchMidi).toBe(60);
     expect(notes[0].startTimeSeconds).toBeCloseTo(10 / ANNOTATIONS_FPS, 2);
@@ -66,7 +58,7 @@ describe('pitchNotes', () => {
 
   it('default thresholds keep every note of a sung take (voice-level confidence)', () => {
     // The old 0.55 / 0.45 defaults returned zero of these three notes.
-    const notes = modelOutputToNotes(sungTakeModelOutput(), DEFAULT_PITCH_SETTINGS, true);
+    const notes = modelOutputToNotes(sungTakeModelOutput(), DEFAULT_PITCH_SETTINGS);
     expect(notes.map((n) => n.pitchMidi)).toEqual(SUNG_TAKE_PITCHES);
   });
 });

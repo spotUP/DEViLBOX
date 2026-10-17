@@ -168,14 +168,20 @@ Phase B - segmenter
   - Done: fixtures come from `tools/voice/swiftf0-parity.py` (swift-f0 at d1ba77f, run with `python -I`). Parity is frame-exact on both fixtures; the alternating fixture gives 6 notes 57 61 57 61 57 61. Deviation: parity runs with `voicingThreshold` 0, because the Voice to Notes threshold (0.5) zeroes the weight of frames the Python DP still counts. SG-5 measured 24.5 ms for 3750 frames and 150 notes; no quantisation. The test asserts under 200 ms so a loaded CI box does not flake; the 50 ms budget is in a comment.
 
 Phase C - melody wiring
-- [ ] WC-1 `useVoiceStore`: take holds `track`; `Finetune extends SegmentSettings`; defaults.
-- [ ] WC-2 `shapeNotes(track, shaping)`; `commitVoiceNotes` unchanged downstream.
-- [ ] WC-3 `liveWindow.previewStep` uses the tracker and `shapeNotes`; `useVoiceRecorder(tracker, ...)`.
-- [ ] WC-4 Panel: `tracker` prop, full-take `tracker.track`, knobs Pitch Hold and Voicing replace Onset/Frame (Knob, `size="sm"`, full-English labels).
-- [ ] WC-5 `noteEffects.contourFromTrack`; panel and handler use it; `noteEffects.test.ts` builds contours from tracks.
-- [ ] WC-6 `voiceHandlers.ts`: `voice_to_notes` and `get_voice_take` on the tracker; `get_voice_take` track summary (+ `frames: true` option); server tool description updated.
-- [ ] WC-7 `pitchNotes.ts`: monophonic branch removed; `AudioToMidiModal` unchanged and its tests green.
-- [ ] WC-8 Delete unused `voicing.ts` exports (verified from tsc unused-export errors and a grep of callers), `basicPitchModel` no longer imported under `src/lib/voice` except by `AudioToMidiModal`'s path.
+- [x] WC-1 `useVoiceStore`: take holds `track`; `Finetune extends SegmentSettings`; defaults.
+- [x] WC-2 `shapeNotes(track, shaping)`; `commitVoiceNotes` unchanged downstream.
+- [x] WC-3 `liveWindow.previewStep` uses the tracker and `shapeNotes`; `useVoiceRecorder(tracker, ...)`.
+- [x] WC-4 Panel: `tracker` prop, full-take `tracker.track`, knobs Pitch Hold and Voicing replace Onset/Frame (Knob, `size="sm"`, full-English labels).
+- [x] WC-5 `noteEffects.contourFromTrack`; panel and handler use it; `noteEffects.test.ts` builds contours from tracks.
+  - Probe span measured 2026-10-17 in Chrome through `swiftF0Tracker`, depth read from whole vibrato periods after 0.4 s.
+    Voice-like tone (8 harmonics), ratio of read depth to sung depth at 3 / 5 / 7 Hz:
+    midi 55: 0.5 st 0.93 / 0.93 / 0.96, 1 st 0.95 / 0.95 / 0.93, 2 st 0.99 / 0.99 / 0.98.
+    midi 67: 0.5 st 0.92 / 0.95 / 1.01, 1 st 0.97 / 1.03 / 1.03, 2 st 1.01 / 1.00 / 1.00.
+    No loss grows with rate, so `SWIFTF0_PROBE_SECONDS = 0`. 0.25 st reads 0.67-0.98: that is the detector's minimum depth (`VIBRATO_MIN_DEPTH`), so a vibrato that shallow may be read as none.
+    A pure sine reads 0.27-1.15 and drops voicing at 5-7 Hz, depending on pitch and depth: out of the tracker's domain, not a span smear.
+- [x] WC-6 `voiceHandlers.ts`: `voice_to_notes` and `get_voice_take` on the tracker; `get_voice_take` track summary (+ `frames: true` option); server tool description updated.
+- [x] WC-7 `pitchNotes.ts`: monophonic branch removed; `AudioToMidiModal` unchanged and its tests green.
+- [x] WC-8 Delete unused `voicing.ts` exports (verified from tsc unused-export errors and a grep of callers), `basicPitchModel` no longer imported under `src/lib/voice` except by `AudioToMidiModal`'s path.
 
 Phase D - melody range (VNR-22)
 - [ ] MR-1 Wizard melody step on the tracker; range writes `minMidiNote`/`maxMidiNote`.

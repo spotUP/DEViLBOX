@@ -1,8 +1,8 @@
 /**
  * noteEffects.ts - what the voice did on each note, as tracker effects.
  *
- * Pure. A take's pitch contour (YIN every CONTOUR_STEP_SECONDS, voiced spans
- * only) is read once per take; each quantised note is then compared with the
+ * Pure. A take's pitch contour (the pitch tracker's voiced frames, one per
+ * hop) is read once per take; each quantised note is then compared with the
  * contour under it:
  *
  *  - a pitch that leaves the note's start and settles a semitone or more away
@@ -21,15 +21,26 @@
  */
 import type { VoiceEffectToggles } from '@/stores/useVoiceStore';
 import type { VoiceNote } from './pitchNotes';
+import { TRACK_VOICED_CONFIDENCE, hzToMidi, type F0Track } from './pitchTrack';
 import { anchorToFirstNote, quantiseNotes, rowSeconds, type QuantisedNote, type QuantiseSettings } from './quantise';
 import type { VoiceEffect } from './voiceEffects';
-import { spanRms, voiceGateLevel, yinHz, yinProbeSeconds, YIN_WINDOW } from './voicing';
+import { spanRms } from './voicing';
 
 /** Every effect on: the pipeline without a panel (MCP, tests). */
 export const ALL_EFFECTS: VoiceEffectToggles = { volume: true, slides: true, vibrato: true, arpeggio: true, flams: true };
 
-/** Contour probe spacing: 50 Hz sampling, enough for a 9 Hz vibrato. */
-export const CONTOUR_STEP_SECONDS = 0.02;
+/**
+ * The span one tracker frame averages its pitch over. A wobble whose period
+ * is near this span reads shallower by sinc(rate x span); the vibrato detector
+ * undoes that. SWIFTF0_PROBE_SECONDS is set from the depth loss measured on
+ * synthetic vibratos through the tracker in Chrome (plan WC-5): a voice-like
+ * tone (8 harmonics, midi 55 and 67) with 0.5-2 semitone vibrato at 3-7 Hz
+ * reads 0.92-1.03 of its depth, with no loss that grows with rate. SwiftF0
+ * frames do not smear a vocal vibrato, so the span is 0. (A pure sine reads
+ * shallower and drops voicing, but that loss depends on pitch and depth, not
+ * on rate, and a voice is never a pure sine.)
+ */
+export const SWIFTF0_PROBE_SECONDS = 0;
 /** A contour probe further than this from its neighbours' median is a glitch, not a pitch. */
 const DESPIKE_SEMITONES = 3;
 /** Pitch must move at least this far to be a slide. */
@@ -40,6 +51,11 @@ const EDGE_SECONDS = 0.06;
 const ON_PITCH_SEMITONES = 0.5;
 /** Share of contour steps that must move the slide's way. */
 const SLIDE_MONOTONE_SHARE = 0.8;
+/** Segmented notes this close in time, one or two semitones apart, can be steps of one glide. */
+const GLIDE_JOIN_GAP_SECONDS = 0.04;
+const GLIDE_JOIN_MAX_STEP = 2;
+/** A step note moving at least this far across its own span is part of a glide, not a held note. */
+const GLIDE_MOVING_SEMITONES = 0.5;
 const VIBRATO_MIN_HZ = 3;
 const VIBRATO_MAX_HZ = 9;
 const VIBRATO_MIN_DEPTH = 0.25;
@@ -59,16 +75,13 @@ export interface ContourPoint {
 
 export interface TakeContour {
   points: ContourPoint[];
-  sampleRate: number;
+  /** Averaging span of one point (see SWIFTF0_PROBE_SECONDS). */
+  probeSeconds: number;
 }
 
 export interface TakeAudio {
   audio: Float32Array;
   sampleRate: number;
-}
-
-function hzToMidi(hz: number): number {
-  return 69 + 12 * Math.log2(hz / 440);
 }
 
 function median(values: readonly number[]): number {
@@ -82,36 +95,31 @@ function clamp(v: number, lo: number, hi: number): number {
 }
 
 /**
- * The take's pitch contour: one point per CONTOUR_STEP_SECONDS where the
- * audio is louder than the take's voice gate and periodic. A probe more than
- * DESPIKE_SEMITONES from the median of its 5 neighbours (an octave error, a
- * glitch) is replaced by that median; every other probe is kept as read, so a
- * wobble keeps its depth (a plain 5-point median flattened a 5 Hz vibrato to
- * half). Read once per take and shared by every quantise setting.
+ * The take's pitch contour: one point per tracker frame whose confidence
+ * reaches TRACK_VOICED_CONFIDENCE. A frame more than DESPIKE_SEMITONES from
+ * the median of its 5 neighbours (an octave error, a glitch) is replaced by
+ * that median; every other frame is kept as read, so a wobble keeps its depth
+ * (a plain 5-point median flattened a 5 Hz vibrato to half). Read once per
+ * take and shared by every quantise setting.
  */
-export function takeContour(audio: Float32Array, sampleRate: number): TakeContour {
-  const points: ContourPoint[] = [];
-  if (audio.length < YIN_WINDOW) return { points, sampleRate };
-  const gate = voiceGateLevel(audio);
-  const step = Math.max(1, Math.round(CONTOUR_STEP_SECONDS * sampleRate));
+export function contourFromTrack(track: F0Track, probeSeconds = SWIFTF0_PROBE_SECONDS): TakeContour {
+  const step = track.hopSeconds;
   const raw: ContourPoint[] = [];
-  for (let centre = YIN_WINDOW / 2; centre + YIN_WINDOW / 2 <= audio.length; centre += step) {
-    const time = centre / sampleRate;
-    if (spanRms(audio, sampleRate, time - CONTOUR_STEP_SECONDS / 2, CONTOUR_STEP_SECONDS) < gate) continue;
-    const hz = yinHz(audio, centre - YIN_WINDOW / 2, sampleRate);
-    if (hz === null) continue;
-    raw.push({ time, midi: hzToMidi(hz) });
+  for (let i = 0; i < track.hz.length; i++) {
+    if (track.confidence[i] < TRACK_VOICED_CONFIDENCE || track.hz[i] <= 0) continue;
+    raw.push({ time: i * step, midi: hzToMidi(track.hz[i]) });
   }
+  const points: ContourPoint[] = [];
   for (let i = 0; i < raw.length; i++) {
     const window: number[] = [];
     for (let j = Math.max(0, i - 2); j <= Math.min(raw.length - 1, i + 2); j++) {
-      // Only neighbours of the same voiced run; a gap of more than two steps is a new run.
-      if (Math.abs(raw[j].time - raw[i].time) <= CONTOUR_STEP_SECONDS * 2.5) window.push(raw[j].midi);
+      // Only neighbours of the same voiced run; a gap of more than two frames is a new run.
+      if (Math.abs(raw[j].time - raw[i].time) <= step * 2.5) window.push(raw[j].midi);
     }
     const smooth = median(window);
     points.push({ time: raw[i].time, midi: Math.abs(raw[i].midi - smooth) > DESPIKE_SEMITONES ? smooth : raw[i].midi });
   }
-  return { points, sampleRate };
+  return { points, probeSeconds };
 }
 
 function contourUnder(contour: TakeContour, start: number, end: number): ContourPoint[] {
@@ -166,6 +174,82 @@ export function arpeggiateNotes(notes: readonly VoiceNote[], q: QuantiseSettings
   return out;
 }
 
+/** Pitch travelled across a note's span, from a least-squares line through its contour. */
+function contourTravel(points: readonly ContourPoint[], start: number, end: number): number {
+  if (points.length < 2) return 0;
+  const n = points.length;
+  let st = 0;
+  let sm = 0;
+  let stt = 0;
+  let stm = 0;
+  for (const p of points) {
+    st += p.time;
+    sm += p.midi;
+    stt += p.time * p.time;
+    stm += p.time * p.midi;
+  }
+  const denom = n * stt - st * st;
+  return denom !== 0 ? ((n * stm - st * sm) / denom) * (end - start) : 0;
+}
+
+/**
+ * The segmenter splits a sung glide into semitone steps, as SwiftF0 itself
+ * does (segmentNotes parity). Back-to-back steps the same way, with an
+ * unbroken contour across each join and at least one side of each join
+ * moving, become one note at the first step's pitch; the slide detector then
+ * hears the glide on it. Two held notes sung legato stay two notes: neither
+ * side moves. Runs on the sung notes, before quantising.
+ */
+export function joinGlides(notes: readonly VoiceNote[], contour: TakeContour): VoiceNote[] {
+  const sorted = [...notes].sort((a, b) => a.startTimeSeconds - b.startTimeSeconds);
+  const travel = (n: VoiceNote): number => {
+    const end = n.startTimeSeconds + n.durationSeconds;
+    return contourTravel(contourUnder(contour, n.startTimeSeconds, end), n.startTimeSeconds, end);
+  };
+  const unbroken = (a: VoiceNote, b: VoiceNote): boolean => {
+    const join = contourUnder(contour, a.startTimeSeconds + a.durationSeconds - EDGE_SECONDS, b.startTimeSeconds + EDGE_SECONDS);
+    if (join.length < 2) return false;
+    for (let i = 1; i < join.length; i++) {
+      if (join[i].time - join[i - 1].time > GLIDE_JOIN_GAP_SECONDS) return false;
+      if (Math.abs(join[i].midi - join[i - 1].midi) > ON_PITCH_SEMITONES) return false;
+    }
+    return true;
+  };
+  const out: VoiceNote[] = [];
+  let i = 0;
+  while (i < sorted.length) {
+    const first = sorted[i];
+    let last = first;
+    let direction = 0;
+    let j = i + 1;
+    for (; j < sorted.length; j++) {
+      const next = sorted[j];
+      const step = Math.round(next.pitchMidi) - Math.round(last.pitchMidi);
+      const gap = next.startTimeSeconds - (last.startTimeSeconds + last.durationSeconds);
+      if (step === 0 || Math.abs(step) > GLIDE_JOIN_MAX_STEP || gap > GLIDE_JOIN_GAP_SECONDS) break;
+      if (direction !== 0 && Math.sign(step) !== direction) break;
+      const moving = (n: VoiceNote): boolean => travel(n) * Math.sign(step) >= GLIDE_MOVING_SEMITONES;
+      if (!moving(last) && !moving(next)) break;
+      if (!unbroken(last, next)) break;
+      direction = Math.sign(step);
+      last = next;
+    }
+    if (last === first) {
+      out.push(first);
+    } else {
+      const group = sorted.slice(i, j);
+      out.push({
+        startTimeSeconds: first.startTimeSeconds,
+        durationSeconds: last.startTimeSeconds + last.durationSeconds - first.startTimeSeconds,
+        pitchMidi: first.pitchMidi,
+        amplitude: Math.max(...group.map((n) => n.amplitude)),
+      });
+    }
+    i = j;
+  }
+  return out;
+}
+
 interface SlideHeard {
   startMidi: number;
   endMidi: number;
@@ -208,12 +292,10 @@ interface VibratoHeard {
 }
 
 /**
- * Vibrato rate and depth of a note's contour. The pitch probe averages over
- * its span (yinProbeSeconds, 79 ms at 22050 Hz), which flattens a wobble whose
- * period is near that span by sinc(rate x span): measured 0.94 / 0.86 / 0.77 /
- * 0.67 / 0.57 of the depth at 3 / 4 / 5 / 6 / 7 Hz against the model's
- * 0.91 / 0.85 / 0.77 / 0.67 / 0.57. The depth is divided by that loss before
- * it becomes the y nibble.
+ * Vibrato rate and depth of a note's contour. Each contour point averages
+ * its pitch over the contour's probe span, which flattens a wobble whose
+ * period is near that span by sinc(rate x span). The depth is divided by that
+ * loss before it becomes the y nibble.
  */
 function vibratoHeard(points: readonly ContourPoint[], probeSeconds: number): VibratoHeard | null {
   if (points.length < 8) return null;
@@ -318,7 +400,7 @@ export function detectNoteEffects(
       }
     }
 
-    const vibrato = toggles.vibrato && !slide && contour ? vibratoHeard(points, yinProbeSeconds(contour.sampleRate)) : null;
+    const vibrato = toggles.vibrato && !slide && contour ? vibratoHeard(points, contour.probeSeconds) : null;
     if (vibrato) {
       const x = clamp(Math.round((vibrato.rateHz * 64) / ticksPerSecond), 1, 15);
       const y = clamp(Math.round(vibrato.depthSemitones * 8), 1, 15);
@@ -337,6 +419,14 @@ export function detectNoteEffects(
 }
 
 /**
+ * The notes a take is heard as before quantising: glide steps joined into one
+ * note when slides are on. The note roll draws these, melodyRows writes them.
+ */
+export function heardNotes(notes: readonly VoiceNote[], contour: TakeContour | null, toggles: VoiceEffectToggles): readonly VoiceNote[] {
+  return toggles.slides && contour ? joinGlides(notes, contour) : notes;
+}
+
+/**
  * The rows a melody take writes: arpeggios folded, quantised, effects
  * attached, first note on row 0. The one path for the commit, the pattern preview and the panel's
  * written-rows table.
@@ -348,6 +438,7 @@ export function melodyRows(
   contour: TakeContour | null,
   toggles: VoiceEffectToggles,
 ): QuantisedNote[] {
-  const folded = toggles.arpeggio ? arpeggiateNotes(notes, q) : notes;
+  const heard = heardNotes(notes, contour, toggles);
+  const folded = toggles.arpeggio ? arpeggiateNotes(heard, q) : heard;
   return anchorToFirstNote(detectNoteEffects(quantiseNotes(folded, q), take, contour, q, toggles));
 }

@@ -4,7 +4,9 @@
  * model's 22050 Hz, so no audio files are needed.
  */
 import { describe, it, expect } from 'vitest';
-import { ALL_EFFECTS, arpeggiateNotes, melodyRows, noteDelayEffect, takeContour } from '../noteEffects';
+import { ALL_EFFECTS, arpeggiateNotes, melodyRows, noteDelayEffect, contourFromTrack } from '../noteEffects';
+import { sineTrack } from './sineReadingTracker';
+import { DEFAULT_SHAPING, shapeNotes } from '../voiceToNotes';
 import { quantiseHits, defaultDrumMap } from '../drumToNotes';
 import { midiToHz, PITCH_SAMPLE_RATE, type VoiceNote } from '../pitchNotes';
 import type { QuantiseSettings, QuantisedNote } from '../quantise';
@@ -39,7 +41,7 @@ const sung = (startSeconds: number, seconds: number, midi: number): VoiceNote =>
 });
 
 function rowsOf(audio: Float32Array, notes: VoiceNote[], toggles = ALL_EFFECTS): QuantisedNote[] {
-  return melodyRows(notes, Q, { audio, sampleRate: SR }, takeContour(audio, SR), toggles);
+  return melodyRows(notes, Q, { audio, sampleRate: SR }, contourFromTrack(sineTrack(audio), 0), toggles);
 }
 
 const kinds = (n: QuantisedNote, kind: VoiceEffect['kind']) => (n.effects ?? []).filter((e) => e.kind === kind);
@@ -60,6 +62,25 @@ describe('Voice to Notes hears tracker effects on a take (VNR-14)', () => {
     const [plain] = rowsOf(glide, [sung(LEAD, 5 * ROW, 64)], { ...ALL_EFFECTS, slides: false });
     expect(plain.midi).toBe(64);
     expect(kinds(plain, 'tonePorta')).toEqual([]);
+  });
+
+  it('a glide the segmenter splits into semitone steps is heard as one slide; two held notes sung legato stay two notes', () => {
+    // A steady four-semitone ramp over five rows: the segmenter writes it as steps, as SwiftF0 does
+    const ramp = synth(5 * ROW, (t) => 60 + (4 * t) / (5 * ROW));
+    const steps = shapeNotes(sineTrack(ramp), DEFAULT_SHAPING);
+    expect(steps.length).toBeGreaterThan(1);
+    const glided = rowsOf(ramp, steps);
+    expect(glided).toHaveLength(1);
+    expect(glided[0].midi).toBe(60);
+    expect(kinds(glided[0], 'tonePorta')[0]).toMatchObject({ midi: 64 });
+    // Slides off: the steps stay as sung
+    expect(rowsOf(ramp, steps, { ...ALL_EFFECTS, slides: false }).length).toBe(steps.length);
+
+    // C-4 held three rows, then D-4 held three rows, no gap: neither side moves
+    const legato = synth(6 * ROW, (t) => (t < 3 * ROW ? 60 : 62));
+    const held = shapeNotes(sineTrack(legato), DEFAULT_SHAPING);
+    expect(held.map((n) => n.pitchMidi)).toEqual([60, 62]);
+    expect(rowsOf(legato, held).map((n) => n.midi)).toEqual([60, 62]);
   });
 
   it('a wobble becomes vibrato on every row of the note, rate x and depth y from the voice', () => {

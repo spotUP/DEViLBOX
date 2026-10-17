@@ -23,14 +23,16 @@ import { useTransportStore } from '@/stores/useTransportStore';
 import { notify } from '@/stores/useNotificationStore';
 import { useVoiceStore, type Finetune, type VoiceEffectToggles, type VoiceMode, type VoiceTake } from '@/stores/useVoiceStore';
 import { useVoiceRecorder, defaultVoiceRecorderDeps, type VoiceRecorderDeps } from '@/hooks/audio/useVoiceRecorder';
-import { basicPitchModel, type PitchModel } from '@/lib/voice/basicPitchModel';
-import { DEFAULT_PITCH_SETTINGS, PITCH_SAMPLE_RATE, noteName, type MelodyRange, type VoiceNote } from '@/lib/voice/pitchNotes';
+import { PITCH_SAMPLE_RATE, noteName, type MelodyRange, type VoiceNote } from '@/lib/voice/pitchNotes';
 import { rowSeconds, type QuantiseSettings, type QuantisedNote } from '@/lib/voice/quantise';
-import { melodyRows, takeContour } from '@/lib/voice/noteEffects';
+import { contourFromTrack, heardNotes, melodyRows } from '@/lib/voice/noteEffects';
+import type { PitchTracker } from '@/lib/voice/pitchTrack';
+import { swiftF0Tracker } from '@/lib/voice/swiftF0';
+import { DEFAULT_SEGMENT_SETTINGS } from '@/lib/voice/segmentNotes';
 import { voiceEffectSet, type VoiceEffectKind } from '@/lib/voice/voiceEffects';
 import { melodyPreview, drumPreview } from '@/lib/voice/takePreview';
 import { useVoicePreviewStore } from '@/stores/useVoicePreviewStore';
-import { commitVoiceNotes, shapeNotes } from '@/lib/voice/voiceToNotes';
+import { commitVoiceNotes, shapeNotes, type NoteShaping } from '@/lib/voice/voiceToNotes';
 import { SCALES, SCALE_LABELS, TONIC_NAMES, type ScaleName } from '@/lib/voice/scaleSnap';
 import {
   markVoiceSetupSeen,
@@ -56,8 +58,8 @@ import { currentTargetInstrument, drumMapAsWritten } from '@/lib/voice/voiceInst
 export interface VoiceToNotesPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  /** Test seam: the pitch model. Defaults to Basic Pitch. */
-  model?: PitchModel;
+  /** Test seam: the pitch tracker. Defaults to SwiftF0. */
+  tracker?: PitchTracker;
   /** Test seam: microphone and capture backend. */
   deps?: VoiceRecorderDeps;
 }
@@ -151,7 +153,7 @@ const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   isOpen,
   onClose,
-  model = basicPitchModel,
+  tracker = swiftF0Tracker,
   deps,
 }) => {
   const fine = useVoiceStore((s) => s.fine);
@@ -205,8 +207,13 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   const drumMap: DrumMap = storedDrumMap ?? fallbackDrumMap;
 
   const drums = mode === 'drums';
-  const recorder = useVoiceRecorder(model, fine, deps);
-  const output = take?.output ?? null;
+  // The one shaping of a melody take, shared by the live preview and the final notes
+  const shaping = useMemo<NoteShaping>(
+    () => ({ ...fine, keySnap: fine.keySnapOn ? { tonic: fine.keyTonic, scale: fine.keyScale } : null }),
+    [fine],
+  );
+  const recorder = useVoiceRecorder(tracker, shaping, deps);
+  const track = take?.track ?? null;
   const hits: readonly DrumHit[] = take?.hits ?? [];
   const takeSeconds = take?.seconds ?? 0;
 
@@ -236,13 +243,8 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
 
   const finalNotes = useMemo(
     () =>
-      output
-        ? shapeNotes(output, {
-            ...fine,
-            keySnap: fine.keySnapOn ? { tonic: fine.keyTonic, scale: fine.keyScale } : null,
-          })
-        : [],
-    [output, fine],
+      track ? shapeNotes(track, shaping) : [],
+    [track, shaping],
   );
 
   const handleRecord = useCallback(async () => {
@@ -253,7 +255,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
       deviceId: deviceId || undefined,
       countInBeats: COUNT_IN_BEATS,
       beatSeconds: 60 / useTransportStore.getState().bpm,
-      // Drum hits are found when the take stops; the pitch model is not needed
+      // Drum hits are found when the take stops; the pitch tracker is not needed
       livePreview: !drums,
     });
   }, [recorder, deviceId, drums, clearTake, setStartRow]);
@@ -269,7 +271,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     await recorder.start({ deviceId: deviceId || undefined, countInBeats: 0, beatSeconds: 60 / useTransportStore.getState().bpm, livePreview: false });
   }, [recorder, deviceId]);
 
-  /** The wizard's scale take: heard with the pitch model, kept as the take, never written to the grid. */
+  /** The wizard's scale take: heard with the pitch tracker, kept as the take, never written to the grid. */
   const handleRecordMelody = useCallback(async () => {
     setWizardMelody(true);
     clearTake();
@@ -316,40 +318,40 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
       return;
     }
     if (drums && !forWizard) {
-      addTake({ mode: 'drums', audio, output: null, hits: detectHits(audio, training?.useModel ? modelClassifier(training.model) : classifyByRules) });
+      addTake({ mode: 'drums', audio, track: null, hits: detectHits(audio, training?.useModel ? modelClassifier(training.model) : classifyByRules) });
       setAutoCommit(true);
       return;
     }
     setAnalysing(true);
     try {
       // Full-take pass: replaces the live preview
-      const result = await model.evaluate(audio);
-      addTake({ mode: 'melody', audio, output: result, hits: [] });
+      const result = await tracker.track(audio);
+      addTake({ mode: 'melody', audio, track: result, hits: [] });
       if (!forWizard) setAutoCommit(true);
     } catch (err) {
       notify.error(`Pitch detection failed: ${err instanceof Error ? err.message : 'unknown error'}`);
     } finally {
       setAnalysing(false);
     }
-  }, [recorder, model, drums, recordingClass, wizardMelody, levelCheck, samples, training, handleTrain, addTake, setSamples, setTrainingTake]);
+  }, [recorder, tracker, drums, recordingClass, wizardMelody, levelCheck, samples, training, handleTrain, addTake, setSamples, setTrainingTake]);
 
   // The wizard's range step hears the scale with the full pitch range so the range can be derived from it
   const melodyForWizard = useMemo(
     () =>
-      take?.mode === 'melody' && output
+      take?.mode === 'melody' && track
         ? {
             audio: take.audio,
             sampleRate: take.sampleRate,
-            notes: shapeNotes(output, {
+            notes: shapeNotes(track, {
               ...fine,
-              minMidiNote: DEFAULT_PITCH_SETTINGS.minMidiNote,
-              maxMidiNote: DEFAULT_PITCH_SETTINGS.maxMidiNote,
+              minMidiNote: DEFAULT_SEGMENT_SETTINGS.minMidiNote,
+              maxMidiNote: DEFAULT_SEGMENT_SETTINGS.maxMidiNote,
               transpose: 0,
               keySnap: null,
             }),
           }
         : null,
-    [take, output, fine],
+    [take, track, fine],
   );
   const rangeInUse = useMemo<MelodyRange>(
     () => ({ minMidiNote: fine.minMidiNote, maxMidiNote: fine.maxMidiNote, transpose: fine.transpose }),
@@ -416,10 +418,12 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   const takeRecording = recording && !levelCheck && recordingClass === null;
   const shownNotes = recording ? recorder.liveNotes : finalNotes;
 
-  // The take's audio and pitch contour: read once per take (YIN every 20 ms),
+  // The take's audio and pitch contour: read once per take from its pitch track,
   // shared by the preview, the commit and the timing table (lib/voice/noteEffects).
   const takeAudio = useMemo(() => (take ? { audio: take.audio, sampleRate: take.sampleRate } : null), [take]);
-  const contour = useMemo(() => (take && take.mode === 'melody' ? takeContour(take.audio, take.sampleRate) : null), [take]);
+  const contour = useMemo(() => (track ? contourFromTrack(track) : null), [track]);
+  // The note roll draws the notes as heard: glide steps joined, as the commit writes them
+  const rollNotes = recording ? recorder.liveNotes : heardNotes(finalNotes, contour, fine.effects);
 
   // The take shows in the pattern as ghost notes while recording and until it
   // is committed; built with the commit's own steps (lib/voice/takePreview).
@@ -554,8 +558,8 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
             <>
               <SectionLabel>Finetune</SectionLabel>
               <div className="grid grid-cols-3 gap-2">
-                <Knob label="Onset" value={fine.onsetThreshold} min={0.1} max={0.9} step={0.01} onChange={(v) => patch('onsetThreshold', v)} size="sm" />
-                <Knob label="Sustain" value={fine.frameThreshold} min={0.1} max={0.9} step={0.01} onChange={(v) => patch('frameThreshold', v)} size="sm" />
+                <Knob label="Pitch Hold" unit="ms" value={fine.pitchHoldMs} min={0} max={300} step={5} onChange={(v) => patch('pitchHoldMs', Math.round(v))} size="sm" title="How long a pitch must change before it becomes a new note" />
+                <Knob label="Voicing" value={fine.voicingThreshold} min={0.1} max={0.9} step={0.01} onChange={(v) => patch('voicingThreshold', v)} size="sm" title="How sure the tracker must be that a frame is sung" />
                 <Knob label="Min Length" unit="ms" value={fine.minNoteLengthMs} min={30} max={400} step={5} onChange={(v) => patch('minNoteLengthMs', v)} size="sm" />
                 <Knob label="Lowest" value={fine.minMidiNote} min={21} max={108} step={1} onChange={(v) => patch('minMidiNote', v)} size="sm" />
                 <Knob label="Highest" value={fine.maxMidiNote} min={21} max={108} step={1} onChange={(v) => patch('maxMidiNote', v)} size="sm" />
@@ -611,7 +615,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
             spanSeconds={Math.max(patternSpan, recording ? liveSeconds : takeSeconds)}
             playhead={recording ? liveSeconds : null}
           />
-          {!drums && <NoteRoll notes={shownNotes} seconds={Math.max(patternSpan, recording ? liveSeconds : takeSeconds)} />}
+          {!drums && <NoteRoll notes={rollNotes} seconds={Math.max(patternSpan, recording ? liveSeconds : takeSeconds)} />}
           <div className="text-[9px] font-mono text-text-muted">
             {eventCount} {eventWord}{eventCount === 1 ? '' : 's'} - row length {(rowLength * 1000).toFixed(0)} ms
             {` - this pattern ${patternSpan.toFixed(1)} s from row ${startRow}, then on through the song`}

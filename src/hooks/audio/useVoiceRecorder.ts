@@ -4,7 +4,7 @@
  *
  * While recording, `liveAudio` is the take so far (every LIVE_HOP_SECONDS) so
  * the waveform grows in place; with `livePreview` the same tick also runs the
- * pitch model and fills `liveNotes`.
+ * pitch tracker and fills `liveNotes`.
  *
  * `deps` lets tests supply a fake MediaStream source and capture backend.
  */
@@ -12,8 +12,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { VoiceRecorder, type VoiceCaptureFactory } from '@/lib/voice/voiceRecorder';
 import { createMicCapture, getMicStream } from '@/lib/voice/micCapture';
 import { previewStep, LIVE_HOP_SECONDS } from '@/lib/voice/liveWindow';
-import type { PitchModel } from '@/lib/voice/basicPitchModel';
-import type { PitchSettings, VoiceNote } from '@/lib/voice/pitchNotes';
+import type { VoiceNote } from '@/lib/voice/pitchNotes';
+import type { PitchTracker } from '@/lib/voice/pitchTrack';
+import type { NoteShaping } from '@/lib/voice/voiceToNotes';
 
 export type RecorderPhase = 'idle' | 'countIn' | 'recording';
 
@@ -34,11 +35,11 @@ export interface StartOptions {
   countInBeats: number;
   beatSeconds: number;
   onTakeStart?: () => void;
-  /** Run the pitch model on the growing take for live notes. Off for drum, training and level-check takes. Default on. */
+  /** Run the pitch tracker on the growing take for live notes. Off for drum, training and level-check takes. Default on. */
   livePreview?: boolean;
 }
 
-export function useVoiceRecorder(model: PitchModel, pitchSettings: PitchSettings, deps: VoiceRecorderDeps = defaultVoiceRecorderDeps) {
+export function useVoiceRecorder(tracker: PitchTracker, shaping: NoteShaping, deps: VoiceRecorderDeps = defaultVoiceRecorderDeps) {
   const [phase, setPhase] = useState<RecorderPhase>('idle');
   const [level, setLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -50,8 +51,8 @@ export function useVoiceRecorder(model: PitchModel, pitchSettings: PitchSettings
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const busyRef = useRef(false);
   const liveRef = useRef<VoiceNote[]>([]);
-  const settingsRef = useRef(pitchSettings);
-  settingsRef.current = pitchSettings;
+  const settingsRef = useRef(shaping);
+  settingsRef.current = shaping;
 
   const refreshDevices = useCallback(async () => {
     try {
@@ -95,7 +96,7 @@ export function useVoiceRecorder(model: PitchModel, pitchSettings: PitchSettings
         setLiveAudio(take);
         if (opts.livePreview === false || busyRef.current) return;
         busyRef.current = true;
-        previewStep(take, liveRef.current, model, settingsRef.current)
+        previewStep(take, liveRef.current, tracker, settingsRef.current)
           .then((notes) => {
             liveRef.current = notes;
             setLiveNotes(notes);
@@ -109,7 +110,7 @@ export function useVoiceRecorder(model: PitchModel, pitchSettings: PitchSettings
       setPhase('idle');
       setError(err instanceof Error ? err.message : 'Microphone unavailable');
     }
-  }, [deps, model, refreshDevices]);
+  }, [deps, tracker, refreshDevices]);
 
   /** Stop and return the take (22050 Hz mono), or null when nothing was recording. */
   const stop = useCallback((): Float32Array | null => {
