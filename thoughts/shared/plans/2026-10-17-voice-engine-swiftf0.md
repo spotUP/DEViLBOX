@@ -202,7 +202,7 @@ Phase WF - wizard flow
 - [ ] WF-3 Wizard test covers the blocked-step case measured in M-3.
 
 Phase TE - take end (VNR-18)
-- [ ] TE-1 Worklet flush handshake; async `stop()` through `micCapture`, `VoiceRecorder`, `useVoiceRecorder`, panel; test: blocks posted after stop is called are in the take.
+- [x] TE-1 Worklet flush handshake; async `stop()` through `micCapture`, `VoiceRecorder`, `useVoiceRecorder`, panel; test: blocks posted after stop is called are in the take. Done: the worklet answers `flush` with `flushed`; `micCapture.stop()` waits for it (FLUSH_TIMEOUT_MS = 200) before disconnecting. Tests: micCapture.test.ts (late block delivered, timeout) and voiceCore.test.ts (the recorder keeps blocks delivered during the flush).
 - [ ] TE-2 Root-cause fix from M-2 (written in at M-4), with a regression test.
 
 Phase R - reachability and validation

@@ -52,7 +52,9 @@ export function useVoiceRecorder(tracker: PitchTracker, shaping: NoteShaping, de
   const busyRef = useRef(false);
   const liveRef = useRef<VoiceNote[]>([]);
   const settingsRef = useRef(shaping);
-  settingsRef.current = shaping;
+  useEffect(() => {
+    settingsRef.current = shaping;
+  }, [shaping]);
 
   const refreshDevices = useCallback(async () => {
     try {
@@ -113,7 +115,7 @@ export function useVoiceRecorder(tracker: PitchTracker, shaping: NoteShaping, de
   }, [deps, tracker, refreshDevices]);
 
   /** Stop and return the take (22050 Hz mono), or null when nothing was recording. */
-  const stop = useCallback((): Float32Array | null => {
+  const stop = useCallback(async (): Promise<Float32Array | null> => {
     const recorder = recorderRef.current;
     if (!recorder) return null;
     clearTimer();
@@ -126,7 +128,7 @@ export function useVoiceRecorder(tracker: PitchTracker, shaping: NoteShaping, de
 
   useEffect(() => () => {
     clearTimer();
-    recorderRef.current?.stop();
+    void recorderRef.current?.stop();
     recorderRef.current = null;
   }, []);
 

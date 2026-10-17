@@ -17,7 +17,7 @@ describe('useVoiceRecorder live preview', () => {
         sampleRate: 22050,
         start: async (cb) => { deliver = cb; },
         click: () => {},
-        stop: () => {},
+        stop: async () => {},
       }),
       listDevices: async () => [],
     };
@@ -29,7 +29,7 @@ describe('useVoiceRecorder live preview', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(LIVE_HOP_SECONDS * 1000 + 1); });
 
     expect(result.current.error).toBe('Live preview failed: model not loaded');
-    act(() => { result.current.stop(); });
+    await act(async () => { await result.current.stop(); });
   });
 
   it('a level-check or training take (livePreview off) never runs the pitch tracker, so no ghost notes appear', async () => {
@@ -41,7 +41,7 @@ describe('useVoiceRecorder live preview', () => {
         sampleRate: 22050,
         start: async (cb) => { deliver = cb; },
         click: () => {},
-        stop: () => {},
+        stop: async () => {},
       }),
       listDevices: async () => [],
     };
@@ -60,6 +60,6 @@ describe('useVoiceRecorder live preview', () => {
 
     expect(calls).toBe(0);
     expect(result.current.liveNotes).toEqual([]);
-    act(() => { result.current.stop(); });
+    await act(async () => { await result.current.stop(); });
   });
 });

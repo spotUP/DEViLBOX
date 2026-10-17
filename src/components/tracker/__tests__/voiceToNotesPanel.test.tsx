@@ -49,7 +49,7 @@ function fakeMic() {
     sampleRate: PITCH_SAMPLE_RATE,
     start: async (cb) => { deliver = cb; },
     click: () => {},
-    stop: () => {},
+    stop: async () => {},
   };
   return {
     capture,
@@ -297,7 +297,7 @@ describe('Voice to Notes panel', () => {
         for (let i = 0; i < 40; i++) total[at + i] = 0.8 * (i % 2 ? -1 : 1);
         setTimeout(() => { for (let i = 0; i < total.length; i += 128) deliver(total.slice(i, i + 128)); }, 0);
       },
-      stop: () => {},
+      stop: async () => {},
     };
     let calibrationCaptures = 0;
     const mic = fakeMic();
@@ -615,7 +615,7 @@ describe('Voice to Notes setup wizard', () => {
         for (let i = 0; i < 40; i++) total[at + i] = 0.8 * (i % 2 ? -1 : 1);
         setTimeout(() => { for (let i = 0; i < total.length; i += 128) deliver(total.slice(i, i + 128)); }, 0);
       },
-      stop: () => {},
+      stop: async () => {},
     };
     let captures = 0;
     const deps = {

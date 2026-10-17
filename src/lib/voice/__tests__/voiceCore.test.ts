@@ -117,7 +117,7 @@ describe('VoiceRecorder count-in', () => {
       sampleRate: 1000,
       start: async (cb) => { deliver = cb; },
       click: (d) => { clicks.push(d); },
-      stop: () => {},
+      stop: async () => {},
     };
     let started = 0;
     const rec = new VoiceRecorder(capture, { countInBeats: 2, beatSeconds: 0.5, onTakeStart: () => { started++; } });
@@ -126,10 +126,27 @@ describe('VoiceRecorder count-in', () => {
     deliver(new Float32Array(900).fill(0.1)); // count-in (1000 samples long)
     expect(started).toBe(0);
     deliver(new Float32Array(300).fill(0.5)); // 100 more count-in + 200 take
-    const take = rec.stop();
+    const take = await rec.stop();
     expect(started).toBe(1);
     expect(take.length).toBe(200);
     expect(take[0]).toBe(0.5);
+  });
+
+  it('keeps the blocks the capture delivers while it flushes on stop (TE-1)', async () => {
+    let deliver: (b: Float32Array) => void = () => {};
+    const capture: VoiceCapture = {
+      sampleRate: 1000,
+      start: async (cb) => { deliver = cb; },
+      click: () => {},
+      // The last block is still on its way from the worklet when stop is called.
+      stop: async () => { deliver(new Float32Array(50).fill(0.75)); },
+    };
+    const rec = new VoiceRecorder(capture, { countInBeats: 0, beatSeconds: 0.5 });
+    await rec.start();
+    deliver(new Float32Array(100).fill(0.2));
+    const take = await rec.stop();
+    expect(take.length).toBe(150);
+    expect(take[149]).toBe(0.75);
   });
 });
 
@@ -278,7 +295,7 @@ describe('latency calibration', () => {
       sampleRate: 22050,
       start: async (cb: (b: Float32Array) => void) => { deliver = cb; },
       click: () => { setTimeout(() => deliver(new Float32Array(22050)), 0); },
-      stop: () => {},
+      stop: async () => {},
     };
     expect(await measureLoopbackLatencyMs(cap)).toBeNull();
   });

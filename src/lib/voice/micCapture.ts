@@ -5,6 +5,9 @@
 import { PITCH_SAMPLE_RATE } from './pitchNotes';
 import type { VoiceCapture, VoiceCaptureFactory } from './voiceRecorder';
 
+/** How long stop() waits for the worklet to answer the flush before it gives up. */
+export const FLUSH_TIMEOUT_MS = 200;
+
 export function getMicStream(deviceId?: string): Promise<MediaStream> {
   return navigator.mediaDevices.getUserMedia({
     audio: {
@@ -21,13 +24,17 @@ export const createMicCapture: VoiceCaptureFactory = (stream): VoiceCapture => {
   const ctx = new AudioContext({ sampleRate: PITCH_SAMPLE_RATE });
   let node: AudioWorkletNode | null = null;
   let source: MediaStreamAudioSourceNode | null = null;
+  let flushed: (() => void) | null = null;
   return {
     sampleRate: PITCH_SAMPLE_RATE,
     async start(onBlock) {
       await ctx.resume();
       await ctx.audioWorklet.addModule('/worklets/voice-recorder.worklet.js');
       node = new AudioWorkletNode(ctx, 'voice-recorder', { numberOfOutputs: 0 });
-      node.port.onmessage = (e: MessageEvent<Float32Array>) => onBlock(e.data);
+      node.port.onmessage = (e: MessageEvent<Float32Array | 'flushed'>) => {
+        if (e.data === 'flushed') flushed?.();
+        else onBlock(e.data);
+      };
       source = ctx.createMediaStreamSource(stream);
       source.connect(node);
     },
@@ -42,7 +49,20 @@ export const createMicCapture: VoiceCaptureFactory = (stream): VoiceCapture => {
       osc.start(t);
       osc.stop(t + 0.06);
     },
-    stop() {
+    async stop() {
+      // Collect the blocks still on their way from the worklet before tearing down.
+      if (node) {
+        const port = node.port;
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, FLUSH_TIMEOUT_MS);
+          flushed = () => {
+            clearTimeout(timer);
+            resolve();
+          };
+          port.postMessage('flush');
+        });
+        flushed = null;
+      }
       source?.disconnect();
       node?.disconnect();
       stream.getTracks().forEach((t) => t.stop());

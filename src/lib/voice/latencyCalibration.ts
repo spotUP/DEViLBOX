@@ -116,7 +116,7 @@ export async function measureLoopbackLatencyMs(
   });
   capture.click(CLICK_DELAY_SECONDS, true);
   await finished;
-  capture.stop();
+  await capture.stop();
   const onset = detectClickOnset(concatBlocks(blocks), capture.sampleRate);
   if (onset === null) return null;
   return Math.max(0, Math.round((onset - CLICK_DELAY_SECONDS) * 1000));
