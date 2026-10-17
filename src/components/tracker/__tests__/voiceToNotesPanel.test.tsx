@@ -397,6 +397,43 @@ describe('Voice to Notes panel', () => {
     expect(table).toMatch(/ED[1-3]/);
   });
 
+  it('while recording, the waveform and note roll span the pattern from the cursor row and show the growing take (VNR-23, owner: "it starts at the center and overflows on the right side")', async () => {
+    const model = new SineReadingModel();
+    const mic = fakeMic();
+    const deps = {
+      getStream: async () => ({} as MediaStream),
+      createCapture: () => mic.capture,
+      listDevices: async () => [],
+    };
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={model} deps={deps} />);
+    // 64 rows of 0.1 s, recording from cursor row 4: the pattern has 6.0 s left
+    expect(useTrackerStore.getState().patterns[0].length).toBe(64);
+    const waveform = () => screen.getByTestId('voice-take-waveform');
+    fireEvent.click(screen.getByText('Record'));
+    await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
+    expect(waveform().dataset.seconds).toBe('6.00');
+    expect(screen.getByTestId('voice-note-roll').dataset.seconds).toBe('6.00');
+
+    // Count-in, then one note held for 5 s: the take grows on the pattern's axis, not a 4 s one
+    mic.feed(concat([silence(1.6), sine(60, 5), new Float32Array(2205)]));
+    await waitFor(() => expect(Number(waveform().dataset.audio)).toBeGreaterThanOrEqual(5), { timeout: 3000 });
+    expect(waveform().dataset.seconds).toBe('6.00');
+    await waitFor(() => expect(screen.getAllByTestId('voice-ghost-note').length).toBeGreaterThan(0), { timeout: 3000 });
+    for (const rect of screen.getAllByTestId('voice-ghost-note')) {
+      const x = Number(rect.getAttribute('x'));
+      const w = Number(rect.getAttribute('width'));
+      expect(x).toBeGreaterThanOrEqual(0);
+      expect(x + w).toBeLessThanOrEqual(100);
+    }
+    fireEvent.click(screen.getByText('Stop'));
+    await waitFor(() => expect(writtenNotes().length).toBeGreaterThan(0));
+
+    // The finished take is shorter than the pattern: the axis stays the pattern's length
+    expect(waveform().dataset.seconds).toBe('6.00');
+    expect(Number(waveform().dataset.audio)).toBeGreaterThanOrEqual(5);
+    expect(screen.getByTestId('voice-note-roll').dataset.seconds).toBe('6.00');
+  });
+
   it('Drums mode: a kick and snare take ends as TR-808 cells in the pattern as one undo step, without the pitch model', async () => {
     const model = new SineReadingModel();
     const mic = fakeMic();
