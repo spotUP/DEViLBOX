@@ -8,6 +8,8 @@
 // ─── Types ─────────────────────────────────────────────────────────────
 
 export interface WaveformDrawOptions {
+  /** Overrides for the stroke colours; themes pass resolved CSS variable values. */
+  colors?: Partial<{ waveform: string; accent: string }>;
   audioBuffer: AudioBuffer | null;
   
   // View window (0–1 normalized, for zoom/scroll)
@@ -98,7 +100,7 @@ export function drawSampleWaveform(
   const centerColor = cs.getPropertyValue('--color-border').trim() || COLORS.center;
   const textMuted = cs.getPropertyValue('--color-text-muted').trim() || COLORS.placeholder;
   const textSubtle = cs.getPropertyValue('--color-text-subtle').trim() || COLORS.placeholderSub;
-  const accentColor = cs.getPropertyValue('--color-accent-primary').trim() || '#10b981';
+  const accentColor = opts.colors?.accent || cs.getPropertyValue('--color-accent-primary').trim() || '#10b981';
 
   // Background
   ctx.fillStyle = bgColor;
@@ -173,9 +175,10 @@ function drawWaveformData(
   const visibleSamples = viewEndSample - viewStartSample;
   const samplesPerPixel = visibleSamples / width;
 
-  ctx.shadowColor = COLORS.waveform;
+  const waveColor = opts.colors?.waveform || COLORS.waveform;
+  ctx.shadowColor = waveColor;
   ctx.shadowBlur = 6;
-  ctx.strokeStyle = COLORS.waveform;
+  ctx.strokeStyle = waveColor;
   ctx.lineWidth = 1;
   ctx.beginPath();
 
