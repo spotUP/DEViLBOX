@@ -117,6 +117,16 @@ export function voiceSourceOf(instrument: object): object {
   return registrations.get(instrument)?.source ?? instrument;
 }
 
+/**
+ * The Tone voices that sound now: the held (unreleased) voices of a PolySynth, else the wrapped mono instrument itself.
+ * Pitch effects bend these (a PolySynth's _activeVoices entries are `{ midi, voice, released }`, not voices).
+ */
+export function soundingToneVoices(instrument: object): object[] {
+  const source = voiceSourceOf(instrument) as Partial<PolyInternals>;
+  if (!Array.isArray(source._activeVoices)) return [source];
+  return source._activeVoices.filter((e) => !e.released).map((e) => e.voice);
+}
+
 /** Tag a factory wrapper with the Tone instrument it hides, so the probe can patch and read it. Returns the wrapper. */
 export function registerVoiceSource<T extends object>(wrapper: T, source: object, extras: VoiceSourceExtras = {}): T {
   registrations.set(wrapper, { source, extras });

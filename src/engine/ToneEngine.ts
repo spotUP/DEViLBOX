@@ -24,7 +24,7 @@ import { shimAudioListenerParams } from './tone/firefoxAudioListenerShim';
 import { applyLoopToPlayer, sampleLoops } from './tone/samplePlayerLoop';
 import { registerChannelMeterSink } from './tone/channelMeterFeed';
 import { chipChannelFor, LIVE_VOICE_BASE_CHANNEL } from './furnace-dispatch/chipChannel';
-import { trackToneVoices, untrackToneVoices } from './tone/toneVoiceProbe';
+import { soundingToneVoices, trackToneVoices, untrackToneVoices } from './tone/toneVoiceProbe';
 import { createToneSynthNode, toneVoiceOptions } from './tone/toneSynthKnobs';
 import { TrackerEnvelope } from './TrackerEnvelope';
 import { InstrumentAnalyser } from './InstrumentAnalyser';
@@ -5812,51 +5812,16 @@ export class ToneEngine {
 
     const safeTime = this.getSafeTime() ?? Tone.now();
 
-    // Handle monophonic synths (MonoSynth, DuoSynth, FMSynth, AMSynth)
-    let freqParam: Tone.Param<'frequency'> | undefined;
-    
-    if ('frequency' in instrument && instrument.frequency) {
-      freqParam = instrument.frequency as Tone.Param<'frequency'>;
-    } else if ('oscillator' in instrument && (instrument as any).oscillator?.frequency) {
-      freqParam = (instrument as any).oscillator.frequency;
-    } else if ('voice0' in instrument && (instrument as any).voice0?.oscillator?.frequency) {
-      freqParam = (instrument as any).voice0.oscillator.frequency;
-    }
-
-    if (freqParam && typeof freqParam.setValueAtTime === 'function') {
+    // Tone synths: the sounding voices behind any factory wrapper (each held PolySynth voice, or the mono synth).
+    for (const voice of soundingToneVoices(instrument)) {
+      const v = voice as { frequency?: unknown; oscillator?: { frequency?: unknown }; voice0?: { oscillator?: { frequency?: unknown } } };
+      const freqParam = (v.frequency ?? v.oscillator?.frequency ?? v.voice0?.oscillator?.frequency) as Tone.Param<'frequency'> | undefined;
+      if (!freqParam || typeof freqParam.setValueAtTime !== 'function') continue;
       if (rampTime && typeof freqParam.exponentialRampToValueAtTime === 'function') {
         freqParam.exponentialRampToValueAtTime(Math.max(0.01, frequency), safeTime + rampTime);
       } else {
         freqParam.setValueAtTime(frequency, safeTime);
       }
-      return;
-    }
-
-    // PolySynth: Apply to all active voices (fallback for non-tracker use)
-    if (instrument instanceof Tone.PolySynth) {
-      const activeVoices = (instrument as any)._activeVoices;
-      if (activeVoices && activeVoices.length > 0) {
-        activeVoices.forEach((voice: any) => {
-          let voiceFreqParam: Tone.Param<'frequency'> | undefined;
-          
-          if (voice.frequency) {
-            voiceFreqParam = voice.frequency;
-          } else if (voice.oscillator?.frequency) {
-            voiceFreqParam = voice.oscillator.frequency;
-          } else if (voice.voice0?.oscillator?.frequency) {
-            voiceFreqParam = voice.voice0.oscillator.frequency;
-          }
-          
-          if (voiceFreqParam && typeof voiceFreqParam.setValueAtTime === 'function') {
-            if (rampTime && typeof voiceFreqParam.exponentialRampToValueAtTime === 'function') {
-              voiceFreqParam.exponentialRampToValueAtTime(Math.max(0.01, frequency), safeTime + rampTime);
-            } else {
-              voiceFreqParam.setValueAtTime(frequency, safeTime);
-            }
-          }
-        });
-      }
-      return;
     }
   }
 
