@@ -146,10 +146,10 @@ Drum reachability: same file, existing drum test extended: wizard trains kick an
 ## Checklist
 
 Phase M - owner measurement (before any code)
-- [ ] M-1 Owner reconnects Claude Code MCP (`/mcp`) so `get_voice_take` is in the tool list (the tool exists in `server/src/mcp/mcpServer.ts:1649`; this session's list predates it).
-- [ ] M-2 Owner records one melody take "ooo eeee oooo eee oooo eeee" (two alternating pitches, Stop by hand) on http://localhost:5174, noting roughly how long they sang. Read with `get_voice_take`: seconds, voicedTo, lastNoteEnd, notes. Record: note count vs 6, pitches, and the take-end gap (VNR-18) in "Measurements" below.
+- [x] M-1 Owner reconnects Claude Code MCP (`/mcp`) so `get_voice_take` is in the tool list (the tool exists in `server/src/mcp/mcpServer.ts:1649`; this session's list predates it).
+- [x] M-2 Owner records one melody take "ooo eeee oooo eee oooo eeee" (two alternating pitches, Stop by hand) on http://localhost:5174, noting roughly how long they sang. Read with `get_voice_take`: seconds, voicedTo, lastNoteEnd, notes. Record: note count vs 6, pitches, and the take-end gap (VNR-18) in "Measurements" below.
 - [ ] M-3 Owner runs the Setup wizard drum steps (kick, snare, hat, clap, eight each). Read with `get_voice_take`: hits per step, training confusion. Record: hits found per step vs 8, which step blocked Next and why, confusion matrix.
-- [ ] M-4 Write the VNR-18 root cause and the wizard-flow fixes into this plan (sections "Take end" and "Drums"), turning TE-2 and WF-2 into exact items.
+- [x] M-4 Write the VNR-18 root cause and the wizard-flow fixes into this plan (sections "Take end" and "Drums"), turning TE-2 and WF-2 into exact items.
 
 Phase A - SwiftF0 tracker
 - [x] SA-1 Vendor `public/models/swift-f0/model.onnx` (135,090 bytes, size checked) and `LICENSE`.
@@ -198,12 +198,12 @@ Phase E - drums
 
 Phase WF - wizard flow
 - [x] WF-1 Next gate counts calibrated-detector samples. Done by WD-4: the wizard builds its samples with `samplesFromTake` and the fitted settings, so the Next gate counts what the calibrated detector heard.
-- [ ] WF-2 Fixes from M-3 (written in at M-4).
+- [ ] WF-2 Fixes from M-3. Waiting on the owner: hits found per wizard step and which step blocked Next. Stored totals and held-out accuracy (100 percent on 9) show no defect yet.
 - [ ] WF-3 Wizard test covers the blocked-step case measured in M-3.
 
 Phase TE - take end (VNR-18)
 - [x] TE-1 Worklet flush handshake; async `stop()` through `micCapture`, `VoiceRecorder`, `useVoiceRecorder`, panel; test: blocks posted after stop is called are in the take. Done: the worklet answers `flush` with `flushed`; `micCapture.stop()` waits for it (FLUSH_TIMEOUT_MS = 200) before disconnecting. Tests: micCapture.test.ts (late block delivered, timeout) and voiceCore.test.ts (the recorder keeps blocks delivered during the flush).
-- [ ] TE-2 Root-cause fix from M-2 (written in at M-4), with a regression test.
+- [x] TE-2 M-2 showed no take-end loss in two takes (2.5 s and 1.6 s of silence kept after the last note), so the only take-end defect found is the in-flight blocks fixed in TE-1. The M-2 defect was the scoop split instead; fixed in e28477ab2 with a regression test (noteEffects.test.ts). VR-4 re-checks the take end.
 
 Phase R - reachability and validation
 - [x] VR-1 Reachability test per design (FakeTracker, 6 notes, preview equals pattern, sentinel); drum reachability with the kNN sentinel.
@@ -218,11 +218,12 @@ Phase R - reachability and validation
 
 | What | Before (Basic Pitch, rules) | After |
 |------|------------------------------|-------|
-| ooo/eee take: notes found (expected 6) | 11 (take 1, 2026-10-17 17:38, 5.60 s). Envelope shows 6 sung phrases: 0.2-0.65, 0.8-1.25, 1.5-1.95, 2.1-2.6, 2.8-3.25, 3.4-3.9 s, dips -33 to -43 dB between them. Phrases 1, 2 and 5 split into 3, 3 and 2 notes; every extra note is 104-174 ms and 1 semitone from its neighbour. | |
+| ooo/eee take: notes found (expected 6) | 11 (take 1, 2026-10-17 17:38, 5.60 s). Envelope shows 6 sung phrases: 0.2-0.65, 0.8-1.25, 1.5-1.95, 2.1-2.6, 2.8-3.25, 3.4-3.9 s, dips -33 to -43 dB between them. Phrases 1, 2 and 5 split into 3, 3 and 2 notes; every extra note is 104-174 ms and 1 semitone from its neighbour. | Take 2 (SwiftF0, 2026-10-18): 7.80 s, gate -47.9 dB, voiced 0.7-5.3 s, median confidence 0.985. 8 notes: 46 55 46 55 46, then 54 56 55 for the last "eee". The last phrase was a sung scoop (54 up to 56, settling on 55), which the segmenter wrote as three quick notes (owner: "two quick notes instead of slides"). Fixed in e28477ab2: a scoop or overshoot joins into one note at the settled pitch, so the take now gives 6 notes, 46 55 46 55 46 55. A -29 dB bump at 4.9-5.2 s with no voiced frames made no note. |
 | ooo/eee take: wrong pitches | Phrase pitches (majority) E-3 52, F-3 53, E-3, F-3, E-3, F-3: alternation is right if the owner sang a semitone apart (owner to confirm the interval). Extras are 51 and 52/53 neighbours, the "extra wrong notes" of VNR-17. | |
-| Take end gap: owner stop vs `seconds` vs `lastNoteEnd` | Not reproduced: take is 5.60 s, singing ends 3.9 s, lastNoteEnd 3.949, 1.6 s of silence recorded after the last note. The take holds the whole performance this time; VNR-18 needs a take where the owner sees it happen. | |
-| Wizard hits found per step (expected 8) | | |
-| Wizard held-out accuracy / confusion | | |
+| Take end gap: owner stop vs `seconds` vs `lastNoteEnd` | Not reproduced: take is 5.60 s, singing ends 3.9 s, lastNoteEnd 3.949, 1.6 s of silence recorded after the last note. The take holds the whole performance this time; VNR-18 needs a take where the owner sees it happen. | Take 2: 7.80 s take, voiced to 5.3 s, 2.5 s of silence after the last note. Not reproduced in either take. |
+| Wizard hits found per step (expected 8) | | Session 2026-10-17 22:06 (owner sang quietly, house asleep). Stored samples after the session: kick 5, snare 10, hat 6, clap 10. Samples accumulate over retakes, so these are totals, not per-take counts; per-step counts and which step blocked Next still to come from the owner. |
+| Wizard held-out accuracy / confusion | | 100 percent on 9 held out: kick 1/1, snare 3/3, hat 2/2, clap 3/3. |
+| Wizard melody range step (expected 8 notes) | | 8 notes, 6.90 s take, voiced 1.3-4.6 s, gate -46.2 dB, singing peaks -20 to -31 dB, median confidence 0.976. Pitches 42 46 50 55 59 52 49 45 (up then down, not one way up a scale), each 0.14-0.26 s, last 0.53 s. A -20.6 dB burst at 4.3 s with no voiced frames (breath or click) made no note. |
 
 ## Verification
 
