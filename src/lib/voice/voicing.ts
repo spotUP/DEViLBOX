@@ -17,7 +17,7 @@
 
 /** Frame hop the model uses (22050 / 256 annotation frames per second). */
 const HOP = 256;
-const YIN_WINDOW = 2048;
+export const YIN_WINDOW = 2048;
 const YIN_THRESHOLD = 0.12;
 const YIN_MIN_HZ = 70;
 const YIN_MAX_HZ = 1000;
@@ -53,6 +53,15 @@ export function voiceGateLevel(audio: Float32Array): number {
 export function spanRms(audio: Float32Array, sampleRate: number, startSeconds: number, durationSeconds: number): number {
   const s = Math.round(startSeconds * sampleRate);
   return rms(audio, s, s + Math.round(durationSeconds * sampleRate));
+}
+
+/**
+ * The span one YIN probe averages its pitch over: the difference function
+ * runs over the window minus the longest lag. A pitch wobble faster than this
+ * span reads shallower by sinc(rate x span); the contour detectors undo that.
+ */
+export function yinProbeSeconds(sampleRate: number): number {
+  return (YIN_WINDOW - Math.ceil(sampleRate / YIN_MIN_HZ)) / sampleRate;
 }
 
 /** YIN f0 of the window starting at `start`, in Hz, or null when not periodic enough. */

@@ -138,6 +138,8 @@ One test in `voiceToNotesPanel.test.tsx`, through the real entry: it mounts `<Vo
 - The wizard stays a nested Modal (owner rule: extend `VoiceSetupWizard`, no second wizard; nested Modal already works today).
 - Effect sets are chosen by channel notation and format effect-column count only; `supportedEffects` is null everywhere so no narrower set exists to consult.
 - Negative timing offsets are shown, not written (no tracker plays a note before its row).
+- Phase E deviations: the notation comes from `channelMeta` (`effectNotationOf`) and the column count from `getFormatConstraints(sourceFormat).maxEffectCols`; effects travel as a per-note `effects: VoiceEffect[]` with a `rowOffset` and an optional `midi` (the tone-portamento target note, repeated on every slide row so a one-column channel still reaches it); arpeggio folds notes before quantising; vibrato is written on every row of the note; the volume slide uses rows 1..lengthRows-1; the contour is read once per melody take at 20 ms (never for drum takes); the MCP handler detects with every effect on; the Effects column shows tracker notation whatever the channel; a note delay is written only from the offset the strength leaves (none at strength 1).
+- Contour smoothing is an outlier-only despike (a probe more than 3 semitones from its 5-neighbour median is replaced), not a 5-point median: the median flattened a 5 Hz vibrato to half its depth. The remaining depth loss is the YIN probe's averaging over its difference span (`yinProbeSeconds`, 79 ms at 22050 Hz); measured 0.94 / 0.86 / 0.77 / 0.67 / 0.57 at 3..7 Hz against sinc 0.91 / 0.85 / 0.77 / 0.67 / 0.57, so the depth is divided by that sinc. The vibrato rate is the period between the first and last interpolated line crossing (the crossing count over the whole note was 15 % off on a 0.6 s note).
 
 ## Checklist
 
@@ -168,12 +170,12 @@ Phase D, quantise (VQ):
 - [x] VQ-4 Unit test `src/lib/voice/__tests__/quantise.test.ts`: strength 1 snaps, strength 0 keeps the offset, tolerance zeroes small offsets, swing-aware grid times.
 
 Phase E, effects (VE):
-- [ ] VE-1 `voiceEffects.ts`: `voiceEffectSet` table for both notations, column cap and priority.
-- [ ] VE-2 `noteEffects.ts`: contour, slides, vibrato, arpeggio, volume slide, note delay per the formulas.
-- [ ] VE-3 `drumToNotes.ts`: flam detection -> retrigger; note delay from offset.
-- [ ] VE-4 `writeToPattern.ts`: `TakeCell.effects`, `takeCells` and `applyNotesToPattern` write effect columns; writer resolves the effect set from the target pattern's notation and format.
-- [ ] VE-5 `voiceToNotes.ts` / `drumToNotes.ts` commit paths pass audio and effects through; effects toggles in `fine`.
-- [ ] VE-6 Unit tests `src/lib/voice/__tests__/noteEffects.test.ts` and `voiceEffects.test.ts`: each detector on a synthetic contour; one-column cap keeps the priority command; Furnace codes.
+- [x] VE-1 `voiceEffects.ts`: `voiceEffectSet` table for both notations, column cap and priority.
+- [x] VE-2 `noteEffects.ts`: contour, slides, vibrato, arpeggio, volume slide, note delay per the formulas.
+- [x] VE-3 `drumToNotes.ts`: flam detection -> retrigger; note delay from offset.
+- [x] VE-4 `writeToPattern.ts`: `TakeCell.effects`, `takeCells` and `applyNotesToPattern` write effect columns; writer resolves the effect set from the target pattern's notation and format.
+- [x] VE-5 `voiceToNotes.ts` / `drumToNotes.ts` commit paths pass audio and effects through; effects toggles in `fine`.
+- [x] VE-6 Unit tests `src/lib/voice/__tests__/noteEffects.test.ts` and `voiceEffects.test.ts`: each detector on a synthetic contour; one-column cap keeps the priority command; Furnace codes.
 
 Phase F, reachability and close-out (VR):
 - [ ] VR-1 Reachability test per design (dialog, markers, effect cells, sentinel).

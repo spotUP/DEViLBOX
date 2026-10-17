@@ -4,6 +4,7 @@
  * The single note-extraction path: the Voice to Notes panel (monophonic) and
  * the sample editor's AudioToMidiModal (polyphonic) both call this.
  */
+import type { VoiceEffect } from './voiceEffects';
 import {
   noteFramesToTime,
   addPitchBendsToNoteEvents,
@@ -23,6 +24,8 @@ export interface VoiceNote {
   pitchMidi: number;
   /** 0..1 */
   amplitude: number;
+  /** Effects heard on this note (noteEffects.ts); carried through quantising. */
+  effects?: VoiceEffect[];
 }
 
 export interface PitchModelOutput {

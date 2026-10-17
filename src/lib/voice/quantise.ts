@@ -4,6 +4,7 @@
  * Pure. A tracker row lasts `speed * 2.5 / bpm` seconds (tick = 2.5 / bpm).
  */
 import type { VoiceNote } from './pitchNotes';
+import type { VoiceEffect } from './voiceEffects';
 
 export interface QuantiseSettings {
   bpm: number;
@@ -58,6 +59,8 @@ export interface QuantisedNote {
   velocity: number;
   /** Per-note instrument (drum maps); falls back to the write target's. */
   instrumentId?: number;
+  /** Effects the writer encodes on the note's cells (voiceEffects.ts). */
+  effects?: VoiceEffect[];
   /** false = write no note-off after the note (drum hits). Default true. */
   noteOff?: boolean;
 }
@@ -123,6 +126,7 @@ export function quantiseNotes(
       lengthRows: Math.max(minLen, endRow - row),
       midi: n.pitchMidi,
       velocity: n.amplitude,
+      effects: n.effects,
       end: endRow,
     };
     const prev = byRow.get(row);
@@ -140,6 +144,7 @@ export function quantiseNotes(
       lengthRows: Math.max(1, Math.min(q.lengthRows, room)),
       midi: q.midi,
       velocity: q.velocity,
+      ...(q.effects ? { effects: q.effects } : {}),
     };
   });
 }
