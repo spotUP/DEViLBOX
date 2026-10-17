@@ -56,13 +56,14 @@ const DEFAULT_SET = voiceEffectSet('tracker', 2);
 export interface TakeCells extends WriteResult {
   /** Pattern row of cells[0] */
   startRow: number;
-  /** Every row of the take's span; empty rows are all zero (the span is cleared). */
+  /** Every row from the start row to the pattern end; empty rows are all zero (the channel is cleared). */
   cells: TakeCell[];
 }
 
 /**
- * The cells a take writes on its channel: the span from `target.startRow`
- * through the last note's note-off, clipped to `rowCount`. The one place the
+ * The cells a take writes on its channel: every row from `target.startRow` to
+ * the pattern end, so a take replaces the channel and a shorter take leaves no
+ * old notes behind its last note (owner decision 2026-10-17). The one place the
  * write rules live: the commit copies these cells and the pattern's live
  * preview draws them, so the preview shows exactly what a commit writes.
  */
@@ -72,8 +73,7 @@ export function takeCells(
   rowCount: number,
   set: VoiceEffectSet = DEFAULT_SET,
 ): TakeCells {
-  const last = notes.length ? notes[notes.length - 1] : null;
-  const spanEnd = last ? Math.min(rowCount, target.startRow + last.row + last.lengthRows + 1) : target.startRow;
+  const spanEnd = Math.max(target.startRow, rowCount);
   const out: TakeCells = { startRow: target.startRow, cells: [], written: 0, dropped: 0 };
   for (let r = target.startRow; r < spanEnd; r++) out.cells.push({ note: 0, instrument: 0, volume: 0, effects: [] });
   /** Effects per cell index, merged across notes before encoding. */
@@ -94,9 +94,9 @@ export function takeCells(
     const off = i + n.lengthRows;
     if (n.noteOff !== false && off < out.cells.length && out.cells[off].note === 0) out.cells[off].note = NOTE_OFF;
     addEffects(i, ownCellEffects(n.effects));
-    // Later cells of the note's span: up to the next note's row, inside the pattern.
+    // Later cells of the note's span: up to the next note's row (the last note: its note-off), inside the pattern.
     const next = notes[k + 1];
-    const spanLimit = Math.min(out.cells.length, next ? next.row : Infinity);
+    const spanLimit = Math.min(out.cells.length, next ? next.row : i + n.lengthRows + 1);
     for (const e of n.effects ?? []) {
       if (e.rowOffset <= 0) continue;
       const at = i + e.rowOffset;
