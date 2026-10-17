@@ -1,6 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync, readdirSync } from 'node:fs';
-import { BAND_COUNT, DRUM_CLASSES, FEATURE_COUNT, detectHits, detectOnsets, featureVector, hitFeatures, type DrumClass } from '../drumHits';
+import {
+  BAND_COUNT,
+  DEFAULT_ONSET_SETTINGS,
+  DRUM_CLASSES,
+  FEATURE_COUNT,
+  calibrateOnsets,
+  detectHits,
+  detectOnsets,
+  featureVector,
+  hitFeatures,
+  type DrumClass,
+} from '../drumHits';
 import { synthHit, synthTake } from '../drumSynth';
 import { PITCH_SAMPLE_RATE } from '../pitchNotes';
 import { activeClassifier, knnClassifier, type TrainingSample } from '../drumModel';
@@ -190,6 +201,45 @@ describe('onset detection and the whole pipeline', () => {
     expect(onsets.length, onsets.join(' ')).toBe(expected.length);
     onsets.forEach((t, i) => expect(Math.abs(t - expected[i])).toBeLessThan(0.02));
     expect(detectHits(take, () => 'kick').length).toBe(kicks.length + 1);
+  });
+});
+
+describe('onset calibration from the wizard takes (WD-4)', () => {
+  /** Eight kicks 0.35 s apart over -60 dBFS hiss; the first at `loud`, the rest at `soft`. */
+  function wizardTake(loud: number, soft: number, seed: number): Float32Array {
+    const SR = PITCH_SAMPLE_RATE;
+    const take = new Float32Array(Math.round(SR * 3.2));
+    let x = seed;
+    for (let i = 0; i < take.length; i++) {
+      x = (x * 1664525 + 1013904223) >>> 0;
+      take[i] = (x / 4294967296 - 0.5) * 0.002;
+    }
+    for (let n = 0; n < 8; n++) {
+      const hit = synthHit('kick', seed + n);
+      const at = Math.round((0.2 + n * 0.35) * SR);
+      const gain = n === 0 ? loud : soft;
+      for (let j = 0; j < hit.length && at + j < take.length; j++) take[at + j] += gain * hit[j];
+    }
+    return take;
+  }
+
+  it('no takes keep the defaults', () => {
+    expect(calibrateOnsets([])).toEqual(DEFAULT_ONSET_SETTINGS);
+  });
+
+  it('a take the defaults hear fewer than 8 hits in is heard 8 of 8 after calibration', () => {
+    // One shout, then seven hits 33 dB under it: under the default 30 dB drop limit
+    const take = wizardTake(0.9, 0.9 * 10 ** (-33 / 20), 21);
+    expect(detectOnsets(take).length).toBeLessThan(8);
+    const fitted = calibrateOnsets([{ audio: take, expected: 8 }]);
+    expect(fitted).not.toEqual(DEFAULT_ONSET_SETTINGS);
+    expect(detectOnsets(take, PITCH_SAMPLE_RATE, fitted)).toHaveLength(8);
+  });
+
+  it('takes the defaults already hear 8 of 8 in keep the defaults', () => {
+    const takes = [21, 22].map((seed) => ({ audio: wizardTake(0.3, 0.3, seed), expected: 8 }));
+    for (const t of takes) expect(detectOnsets(t.audio)).toHaveLength(8);
+    expect(calibrateOnsets(takes)).toEqual(DEFAULT_ONSET_SETTINGS);
   });
 });
 

@@ -80,7 +80,8 @@ export async function voiceToNotes(
       for (const d of DRUM_CLASSES) {
         if (override[d]) map[d] = { ...map[d], ...override[d] };
       }
-      const hits = detectHits(samples, activeClassifier(useVoiceStore.getState().samples));
+      const voice = useVoiceStore.getState();
+      const hits = detectHits(samples, activeClassifier(voice.samples), voice.onsets);
       const written = commitDrumHits(hits, map, quantise, { channelIndex, startRow, instrumentId: fallback });
       const counts = Object.fromEntries(DRUM_CLASSES.map((d) => [d, hits.filter((h) => h.drum === d).length]));
       if (!written) return { ok: true, written: 0, dropped: 0, detected: hits.length, hits: counts };

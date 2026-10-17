@@ -1,7 +1,8 @@
 /**
  * drumHits.ts - beatbox audio to classified drum hits. Pure functions.
  *
- *   samples -> detectOnsets (spectral flux, adaptive threshold)
+ *   samples -> detectOnsets (spectral flux, adaptive threshold; calibrateOnsets fits
+ *              its gates to the wizard takes)
  *           -> hitFeatures (60 ms window: band energy ratios, decay, zero-crossing rate, bursts)
  *           -> a HitClassifier (kick / snare / hat / clap): the k-NN over the user's
  *              samples and the AVP prior in drumModel.ts
@@ -114,8 +115,14 @@ export function detectOnsets(
   sampleRate = PITCH_SAMPLE_RATE,
   s: OnsetSettings = DEFAULT_ONSET_SETTINGS,
 ): number[] {
+  const flux = onsetFlux(samples, sampleRate, s);
+  return flux ? pickOnsets(samples, flux, sampleRate, s) : [];
+}
+
+/** The onset function per hop, or null when the take is shorter than three frames. */
+function onsetFlux(samples: Float32Array, sampleRate: number, s: OnsetSettings): Float32Array | null {
   const frames = Math.floor((samples.length - s.frame) / s.hop);
-  if (frames < 3) return [];
+  if (frames < 3) return null;
   // Onset function: per band (low / mid / high) the mean positive change of the
   // log magnitude, then the strongest band. Bands keep a narrow kick (a few bins)
   // from being drowned by broadband noise hits.
@@ -137,6 +144,12 @@ export function detectOnsets(
     flux[f] = best;
     prev = cur;
   }
+  return flux;
+}
+
+/** Peaks of `flux` that pass the threshold, gap, silence and relative gates, in seconds. */
+function pickOnsets(samples: Float32Array, flux: Float32Array, sampleRate: number, s: OnsetSettings): number[] {
+  const frames = flux.length;
   const sorted = [...flux].sort((a, b) => a - b);
   const median = sorted[Math.floor(sorted.length / 2)];
   const threshold = median * s.sensitivity;
@@ -175,6 +188,46 @@ export function detectOnsets(
   const loudest = Math.max(0, ...candidates.map((c) => c.level));
   const relativeGate = loudest * 10 ** (-s.maxDropDb / 20);
   return candidates.filter((c) => c.level >= relativeGate).map((c) => c.at / sampleRate);
+}
+
+/** One wizard take and the number of hits the user was asked for. */
+export interface CalibrationTake {
+  audio: Float32Array;
+  expected: number;
+}
+
+const SENSITIVITY_STEPS = [1.5, 2, 2.5, 3, 4, 5, 6, 8];
+const MAX_DROP_DB_STEPS = [20, 25, 30, 35, 40, 45];
+
+/**
+ * Onset settings fitted to the user's voice and mic (VNR-19): the sensitivity
+ * and relative-gate pair whose detector finds the expected count in the wizard
+ * takes, measured as the summed count error over all takes. A tie goes to the
+ * pair nearest the default, so a take the default already hears keeps it.
+ * The flux of each take is computed once; only the picking runs per pair.
+ */
+export function calibrateOnsets(takes: readonly CalibrationTake[], sampleRate = PITCH_SAMPLE_RATE): OnsetSettings {
+  const d = DEFAULT_ONSET_SETTINGS;
+  const fluxes = takes.map((t) => ({ take: t, flux: onsetFlux(t.audio, sampleRate, d) }));
+  let best = d;
+  let bestError = Infinity;
+  let bestDistance = Infinity;
+  for (const sensitivity of SENSITIVITY_STEPS) {
+    for (const maxDropDb of MAX_DROP_DB_STEPS) {
+      const s = { ...d, sensitivity, maxDropDb };
+      const error = fluxes.reduce(
+        (a, { take, flux }) => a + Math.abs((flux ? pickOnsets(take.audio, flux, sampleRate, s).length : 0) - take.expected),
+        0,
+      );
+      const distance = Math.abs(Math.log(sensitivity / d.sensitivity)) + Math.abs(maxDropDb - d.maxDropDb) / 10;
+      if (error < bestError || (error === bestError && distance < bestDistance)) {
+        best = s;
+        bestError = error;
+        bestDistance = distance;
+      }
+    }
+  }
+  return best;
 }
 
 /** Loudest LEVEL_BLOCK-sized RMS block that starts inside [from, to). */
@@ -306,9 +359,10 @@ export const FEATURE_COUNT = 6 + BAND_COUNT + 3;
 export function detectHits(
   samples: Float32Array,
   classify: HitClassifier,
+  onsetSettings: OnsetSettings = DEFAULT_ONSET_SETTINGS,
   sampleRate = PITCH_SAMPLE_RATE,
 ): DrumHit[] {
-  const onsets = detectOnsets(samples, sampleRate);
+  const onsets = detectOnsets(samples, sampleRate, onsetSettings);
   const raw = onsets.map((t) => {
     const at = Math.round(t * sampleRate);
     const features = hitFeatures(samples, at, sampleRate);

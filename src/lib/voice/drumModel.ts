@@ -6,10 +6,20 @@
  * runs. Clap has no prior: it is only ever heard after the user trains it.
  * Pure train/evaluate functions plus versioned localStorage (every access in
  * try/catch). The classifier is rebuilt from the stored samples, so no model
- * state is stored next to them.
+ * state is stored next to them; the onset settings fitted by calibrateOnsets
+ * are stored beside them.
  */
 import avpPrior from './data/avpPrior.json';
-import { DRUM_CLASSES, detectHits, featureVector, type DrumClass, type HitClassifier, type HitFeatures } from './drumHits';
+import {
+  DEFAULT_ONSET_SETTINGS,
+  DRUM_CLASSES,
+  detectHits,
+  featureVector,
+  type DrumClass,
+  type HitClassifier,
+  type HitFeatures,
+  type OnsetSettings,
+} from './drumHits';
 
 export interface TrainingSample {
   drum: DrumClass;
@@ -25,6 +35,8 @@ export interface PriorSample {
 export const AVP_PRIOR: readonly PriorSample[] = (avpPrior as { samples: PriorSample[] }).samples;
 
 export const KNN_K = 3;
+/** Hits the setup wizard asks for in each drum take (its prompts say "eight times"). */
+export const HITS_PER_TRAINING_TAKE = 8;
 /** A class needs this many hits before one of them is held out to report accuracy. */
 export const MIN_SAMPLES_PER_CLASS = 3;
 /** Every HOLD_OUT_EVERY-th sample of a class (0-based index % n === n-1) is held out. */
@@ -146,6 +158,8 @@ export function describeTraining(result: TrainingResult | null): string {
 
 export const DRUM_SAMPLES_KEY = 'devilbox.voice.drumSamples.v2';
 export const DRUM_MODEL_KEY = 'devilbox.voice.drumModel.v2';
+/** The onset settings calibrateOnsets fitted to the wizard takes. */
+export const DRUM_ONSETS_KEY = 'devilbox.voice.drumOnsets.v2';
 const STORAGE_VERSION = 2;
 
 export function loadSamples(): TrainingSample[] {
@@ -187,12 +201,39 @@ export function saveTrainingResult(result: TrainingResult | null): void {
   }
 }
 
+/** The fitted onset settings, or the defaults when none are stored or they are unreadable. */
+export function loadOnsetSettings(): OnsetSettings {
+  try {
+    const raw = localStorage.getItem(DRUM_ONSETS_KEY);
+    if (!raw) return DEFAULT_ONSET_SETTINGS;
+    const parsed = JSON.parse(raw) as { version?: number; onsets?: Partial<OnsetSettings> };
+    const o = parsed.onsets;
+    const valid =
+      parsed.version === STORAGE_VERSION &&
+      o !== undefined &&
+      (Object.keys(DEFAULT_ONSET_SETTINGS) as (keyof OnsetSettings)[]).every((k) => Number.isFinite(o[k]) && (o[k] as number) > 0);
+    return valid ? { ...DEFAULT_ONSET_SETTINGS, ...o } : DEFAULT_ONSET_SETTINGS;
+  } catch {
+    return DEFAULT_ONSET_SETTINGS;
+  }
+}
+
+export function saveOnsetSettings(onsets: OnsetSettings | null): void {
+  try {
+    if (onsets) localStorage.setItem(DRUM_ONSETS_KEY, JSON.stringify({ version: STORAGE_VERSION, onsets }));
+    else localStorage.removeItem(DRUM_ONSETS_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 export function clearTraining(): void {
   saveSamples([]);
   saveTrainingResult(null);
+  saveOnsetSettings(null);
 }
 
 /** Labelled training samples from one take: every detected hit gets `drum`. */
-export function samplesFromTake(take: Float32Array, drum: DrumClass): TrainingSample[] {
-  return detectHits(take, () => drum).map((h) => ({ drum, features: h.features }));
+export function samplesFromTake(take: Float32Array, drum: DrumClass, onsets: OnsetSettings = DEFAULT_ONSET_SETTINGS): TrainingSample[] {
+  return detectHits(take, () => drum, onsets).map((h) => ({ drum, features: h.features }));
 }

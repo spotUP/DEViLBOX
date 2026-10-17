@@ -12,10 +12,13 @@ import { create } from 'zustand';
 import { PITCH_SAMPLE_RATE, loadMelodyRange, storeMelodyRange } from '@/lib/voice/pitchNotes';
 import type { F0Track } from '@/lib/voice/pitchTrack';
 import { DEFAULT_SEGMENT_SETTINGS, type SegmentSettings } from '@/lib/voice/segmentNotes';
-import type { DrumClass, DrumHit } from '@/lib/voice/drumHits';
+import { calibrateOnsets, type CalibrationTake, type DrumClass, type DrumHit, type OnsetSettings } from '@/lib/voice/drumHits';
 import {
+  HITS_PER_TRAINING_TAKE,
+  loadOnsetSettings,
   loadSamples,
   loadTrainingResult,
+  saveOnsetSettings,
   saveSamples,
   saveTrainingResult,
   type TrainingResult,
@@ -101,6 +104,10 @@ export interface VoiceState {
   drumMap: DrumMap | null;
   /** The last wizard training take, kept so the wizard can draw and retake it. */
   trainingTake: TrainingTake | null;
+  /** Onset settings fitted to the wizard takes (persisted); every detectHits call uses them. */
+  onsets: OnsetSettings;
+  /** The newest wizard take per drum, this session only: what calibrateOnsets fits to. */
+  calibrationTakes: Partial<Record<DrumClass, CalibrationTake>>;
   deviceId: string;
   channelIndex: number;
   startRow: number;
@@ -117,6 +124,10 @@ export interface VoiceState {
   setTraining: (training: TrainingResult | null) => void;
   setDrumMap: (map: DrumMap | null) => void;
   setTrainingTake: (take: TrainingTake | null) => void;
+  /** Adds a wizard take (replacing that drum's last one), refits and stores the onset settings, returns them. */
+  addCalibrationTake: (drum: DrumClass, audio: Float32Array) => OnsetSettings;
+  /** Back to the default onset settings with no calibration takes. */
+  clearCalibration: () => void;
   setDeviceId: (deviceId: string) => void;
   setChannelIndex: (channelIndex: number) => void;
   setStartRow: (startRow: number) => void;
@@ -140,6 +151,8 @@ function freshState(): Omit<VoiceState, keyof VoiceActions> {
     training: loadTrainingResult(),
     drumMap: null,
     trainingTake: null,
+    onsets: loadOnsetSettings(),
+    calibrationTakes: {},
     deviceId: '',
     channelIndex: 0,
     startRow: 0,
@@ -158,6 +171,8 @@ type VoiceActions = Pick<
   | 'setTraining'
   | 'setDrumMap'
   | 'setTrainingTake'
+  | 'addCalibrationTake'
+  | 'clearCalibration'
   | 'setDeviceId'
   | 'setChannelIndex'
   | 'setStartRow'
@@ -206,6 +221,17 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
 
   setDrumMap: (drumMap) => set({ drumMap }),
   setTrainingTake: (trainingTake) => set({ trainingTake }),
+  addCalibrationTake: (drum, audio) => {
+    const calibrationTakes = { ...get().calibrationTakes, [drum]: { audio, expected: HITS_PER_TRAINING_TAKE } };
+    const onsets = calibrateOnsets(Object.values(calibrationTakes));
+    saveOnsetSettings(onsets);
+    set({ calibrationTakes, onsets });
+    return onsets;
+  },
+  clearCalibration: () => {
+    saveOnsetSettings(null);
+    set({ calibrationTakes: {}, onsets: loadOnsetSettings() });
+  },
   setDeviceId: (deviceId) => set({ deviceId, calibratedMs: getStoredLatencyMs(deviceId) }),
   setChannelIndex: (channelIndex) => set({ channelIndex }),
   setStartRow: (startRow) => set({ startRow }),

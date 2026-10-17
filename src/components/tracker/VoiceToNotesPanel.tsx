@@ -174,6 +174,9 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   const setDrumMap = useVoiceStore((s) => s.setDrumMap);
   const trainingTake = useVoiceStore((s) => s.trainingTake);
   const setTrainingTake = useVoiceStore((s) => s.setTrainingTake);
+  const onsets = useVoiceStore((s) => s.onsets);
+  const addCalibrationTake = useVoiceStore((s) => s.addCalibrationTake);
+  const clearCalibration = useVoiceStore((s) => s.clearCalibration);
   const deviceId = useVoiceStore((s) => s.deviceId);
   const setDeviceId = useVoiceStore((s) => s.setDeviceId);
   const channelIndex = useVoiceStore((s) => s.channelIndex);
@@ -293,7 +296,8 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     setSamples([]);
     setTraining(null);
     setTrainingTake(null);
-  }, [setSamples, setTraining, setTrainingTake]);
+    clearCalibration();
+  }, [setSamples, setTraining, setTrainingTake, clearCalibration]);
 
   const handleStop = useCallback(async () => {
     const audio = recorder.stop();
@@ -307,8 +311,9 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     }
     if (!audio || audio.length === 0) return;
     if (labelled) {
-      const added = samplesFromTake(audio, labelled);
-      setTrainingTake({ drum: labelled, audio, hits: detectHits(audio, activeClassifier(samples)) });
+      const fitted = addCalibrationTake(labelled, audio);
+      const added = samplesFromTake(audio, labelled, fitted);
+      setTrainingTake({ drum: labelled, audio, hits: detectHits(audio, activeClassifier(samples), fitted) });
       if (added.length === 0) {
         notify.warning('No hit heard in that take');
         return;
@@ -319,7 +324,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
       return;
     }
     if (drums && !forWizard) {
-      addTake({ mode: 'drums', audio, track: null, hits: detectHits(audio, activeClassifier(samples)) });
+      addTake({ mode: 'drums', audio, track: null, hits: detectHits(audio, activeClassifier(samples), onsets) });
       setAutoCommit(true);
       return;
     }
@@ -335,7 +340,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     } finally {
       setAnalysing(false);
     }
-  }, [recorder, tracker, drums, recordingClass, wizardMelody, levelCheck, samples, training, handleTrain, addTake, setSamples, setTrainingTake, fine]);
+  }, [recorder, tracker, drums, recordingClass, wizardMelody, levelCheck, samples, training, handleTrain, addTake, setSamples, setTrainingTake, addCalibrationTake, onsets, fine]);
 
   // The wizard's range step hears the scale with the full pitch range so the range can be derived from it
   const melodyForWizard = useMemo(
