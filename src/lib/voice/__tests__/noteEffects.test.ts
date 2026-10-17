@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { ALL_EFFECTS, arpeggiateNotes, melodyRows, noteDelayEffect, contourFromTrack } from '../noteEffects';
 import { sineTrack } from './sineReadingTracker';
 import { DEFAULT_SHAPING, shapeNotes } from '../voiceToNotes';
+import { segmentNotes, DEFAULT_SEGMENT_SETTINGS } from '../segmentNotes';
 import { quantiseHits, defaultDrumMap } from '../drumToNotes';
 import { midiToHz, PITCH_SAMPLE_RATE, type VoiceNote } from '../pitchNotes';
 import type { QuantiseSettings, QuantisedNote } from '../quantise';
@@ -81,6 +82,28 @@ describe('Voice to Notes hears tracker effects on a take (VNR-14)', () => {
     const held = shapeNotes(sineTrack(legato), DEFAULT_SHAPING);
     expect(held.map((n) => n.pitchMidi)).toEqual([60, 62]);
     expect(rowsOf(legato, held).map((n) => n.midi)).toEqual([60, 62]);
+  });
+
+  it('a sung scoop with an overshoot is one note at the pitch the voice settled on', () => {
+    // The last "eee" of the owner's take of 2026-10-18, as the pitch model tracked it (16 ms frames from 4.000 s):
+    // down from 56 to 53.9, up past the target to 56.6, settling on G-3 (55). SwiftF0 segments it 54, 56, 55.
+    const hz = [209.676, 203.383, 195.833, 188.833, 185.529, 183.934, 183.392, 183.438, 184.905, 189.206, 194.407, 200.433, 205.745, 209.799, 213.406, 215.028, 214.873, 214.532, 213.545, 212.537, 209.184, 206.485, 203.588, 202.538, 201.278, 199.539, 198.498, 198.464, 199.065, 198.506, 196.91, 195.895, 195.971, 195.694, 194.653, 192.39, 190.989, 200.093, 210.008, 213.69, 215.321, 193.348, 195.741, 195.714, 193.824];
+    const confidence = [0.822, 0.968, 0.983, 0.968, 0.955, 0.945, 0.945, 0.947, 0.956, 0.959, 0.97, 0.971, 0.983, 0.983, 0.987, 0.984, 0.984, 0.983, 0.982, 0.985, 0.984, 0.988, 0.984, 0.988, 0.99, 0.994, 0.993, 0.994, 0.993, 0.991, 0.986, 0.98, 0.978, 0.977, 0.971, 0.928, 0.856, 0.754, 0.5, 0.229, 0.075, 0.052, 0.038, 0.036, 0.018];
+    const loudnessDb = [-32.904, -24.614, -22.567, -23.051, -23.373, -23.621, -23.773, -23.684, -23.279, -22.448, -21.694, -21.394, -21.152, -21.008, -21.35, -21.344, -21.268, -21.602, -21.778, -22.03, -21.922, -21.698, -21.897, -21.812, -21.431, -21.033, -20.702, -20.493, -20.278, -20.186, -20.354, -20.496, -20.729, -21.207, -21.558, -22.355, -23.755, -25.119, -27.135, -31.15, -38.222, -46.689, -48.713, -51.062, -51.592];
+    // Ten unvoiced frames either side
+    const pad = 10;
+    const n = hz.length + 2 * pad;
+    const track = { hz: new Float32Array(n).fill(100), confidence: new Float32Array(n), loudnessDb: new Float32Array(n).fill(-60), hopSeconds: 0.016 };
+    hz.forEach((v, i) => {
+      track.hz[pad + i] = v;
+      track.confidence[pad + i] = confidence[i];
+      track.loudnessDb[pad + i] = loudnessDb[i];
+    });
+    const notes = segmentNotes(track, DEFAULT_SEGMENT_SETTINGS);
+    expect(notes.map((x) => x.pitchMidi)).toEqual([54, 56, 55]);
+    const rows = melodyRows(notes, Q, null, contourFromTrack(track, 0), ALL_EFFECTS);
+    expect(rows.map((r) => r.midi)).toEqual([55]);
+    expect(kinds(rows[0], 'tonePorta')).toEqual([]);
   });
 
   it('a wobble becomes vibrato on every row of the note, rate x and depth y from the voice', () => {
