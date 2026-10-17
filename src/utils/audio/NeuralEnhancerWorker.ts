@@ -3,18 +3,12 @@
  * Handles Audio Super Resolution inference using ONNX Runtime Web.
  */
 
-import * as ort from 'onnxruntime-web';
+import { ort, createOrtSession } from '@/lib/onnx/ortSession';
 import { bufferToDataUrl } from './SampleProcessing';
 import type { ProcessedResult } from './SampleProcessing';
 
-// Configure ONNX Runtime WASM paths so the runtime can find its .wasm files.
-// Without this, the runtime tries to fetch them from the page URL, gets a 404 HTML page,
-// and fails with "expected magic word 00 61 73 6d" (because it got <!doctype html>).
-ort.env.wasm.wasmPaths = '/onnx-wasm/';
-
-// Initialize ONNX runtime options
+// ONNX Runtime setup (wasm path, one thread): lib/onnx/ortSession.ts.
 const ORT_OPTIONS: ort.InferenceSession.SessionOptions = {
-  executionProviders: ['wasm'],
   graphOptimizationLevel: 'all',
 };
 
@@ -36,7 +30,7 @@ async function getSession(): Promise<ort.InferenceSession> {
     const modelUrl = `${baseUrl}models/enhancement/resurrect.onnx`;
     
     console.log(`[NeuralEnhancer] Loading model from ${modelUrl}...`);
-    session = await ort.InferenceSession.create(modelUrl, ORT_OPTIONS);
+    session = await createOrtSession(modelUrl, ORT_OPTIONS);
     console.log('[NeuralEnhancer] Model loaded successfully.');
     return session;
   } catch (err) {
