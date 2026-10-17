@@ -48,7 +48,7 @@ describe('Voice to Notes ghost notes show what a commit writes (owner report 202
 
   it('drum preview shows silent classes at the 808 pitch the commit writes, and creates nothing', () => {
     const hits = [hit(0, 'kick'), hit(2, 'snare')];
-    const map = defaultDrumMap([], 1);
+    const map = defaultDrumMap([]);
     const preview = drumPreview(hits, map, Q, target, 64);
     expect(useInstrumentStore.getState().instruments).toHaveLength(0);
     expect(preview?.notes[0]).toBe(midiToXMNote(DRUM_808_MIDI));

@@ -69,7 +69,7 @@ export async function voiceToNotes(
 
     if (mode === 'drums') {
       const fallback = (params.instrumentId as number | undefined) ?? useInstrumentStore.getState().currentInstrumentId ?? 1;
-      const map: DrumMap = defaultDrumMap(useInstrumentStore.getState().instruments, fallback);
+      const map: DrumMap = defaultDrumMap(useInstrumentStore.getState().instruments);
       const override = (params.drumMap ?? {}) as Record<string, { instrumentId?: number; midi?: number }>;
       for (const d of DRUM_CLASSES) {
         if (override[d]) map[d] = { ...map[d], ...override[d] };

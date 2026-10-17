@@ -31,13 +31,20 @@ const NAME_HINTS: Record<DrumClass, RegExp> = {
 };
 
 /**
+ * "No instrument": the commit creates the class's TR-808 voice for it. Never
+ * a real instrument id (ids start at 1), so it is always a silent target.
+ */
+export const NEW_808_INSTRUMENT = 0;
+
+/**
  * Default map: the song's TR-808 voice for the class (at C-4), else an
- * instrument whose name mentions the class, else `fallbackInstrumentId`.
+ * instrument whose name mentions the class, else NEW_808_INSTRUMENT. Never
+ * the song's current instrument: a playable fallback hid every drum on the
+ * melody synth and no 808 got created (owner report 2026-10-17).
  * Silent targets are swapped for 808 voices at commit (commitDrumHits).
  */
 export function defaultDrumMap(
   instruments: readonly { id: number; name: string; synthType?: string; parameters?: Record<string, unknown> }[],
-  fallbackInstrumentId: number,
 ): DrumMap {
   const map = {} as DrumMap;
   for (const drum of DRUM_CLASSES) {
@@ -45,7 +52,7 @@ export function defaultDrumMap(
     map[drum] = tr808
       ? { instrumentId: tr808.id, midi: DRUM_808_MIDI }
       : {
-          instrumentId: instruments.find((i) => NAME_HINTS[drum].test(i.name))?.id ?? fallbackInstrumentId,
+          instrumentId: instruments.find((i) => NAME_HINTS[drum].test(i.name))?.id ?? NEW_808_INSTRUMENT,
           midi: DEFAULT_DRUM_NOTES[drum],
         };
   }
