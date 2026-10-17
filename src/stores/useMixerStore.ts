@@ -995,12 +995,18 @@ export const useMixerStore = create<MixerStore>()(
 
     setChannelSolo(ch: number, soloed: boolean): void {
       set((state) => {
-        // Exclusive solo: clear all other solos first (tracker convention)
-        state.channels.forEach((c, i) => {
-          if (i !== ch) c.soloed = false;
-        });
+        // Exclusive solo: soloing a channel clears every other solo (tracker
+        // convention). Unsoloing touches only `ch`, so a loop that writes
+        // `false` to the other channels (MCP solo_channel, export restore,
+        // unmuteAllChannels) leaves the active solo in place.
+        if (soloed) {
+          state.channels.forEach((c, i) => {
+            if (i !== ch) c.soloed = false;
+          });
+        }
         state.channels[ch].soloed = soloed;
-        state.isSoloing = soloed; // Only one can be soloed
+        // Invariant: isSoloing is true exactly when some channel is soloed.
+        state.isSoloing = state.channels.some((c) => c.soloed);
       });
 
       // Recompute effective mutes for all channels based on solo state
