@@ -40,14 +40,15 @@ import {
   shouldOpenVoiceSetup,
   storeLatencyMs,
 } from '@/lib/voice/latencyCalibration';
+import { DRUMS_RESET_MESSAGE, drumsResetPending } from '@/lib/persistence/migrations/voiceDrumsV2';
 import { VoiceLevelMeter, VoiceSetupWizard } from './VoiceSetupWizard';
 import { VoiceTakeWaveform, type WaveformMarker } from './VoiceTakeWaveform';
-import { DRUM_CLASSES, DRUM_CLASS_LABELS, classifyByRules, detectHits, type DrumClass, type DrumHit } from '@/lib/voice/drumHits';
+import { DRUM_CLASSES, DRUM_CLASS_LABELS, detectHits, type DrumClass, type DrumHit } from '@/lib/voice/drumHits';
 import {
+  activeClassifier,
   clearTraining,
   countsByClass,
   describeTraining,
-  modelClassifier,
   samplesFromTake,
   trainAndEvaluate,
   type TrainingSample,
@@ -307,7 +308,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     if (!audio || audio.length === 0) return;
     if (labelled) {
       const added = samplesFromTake(audio, labelled);
-      setTrainingTake({ drum: labelled, audio, hits: detectHits(audio) });
+      setTrainingTake({ drum: labelled, audio, hits: detectHits(audio, activeClassifier(samples)) });
       if (added.length === 0) {
         notify.warning('No hit heard in that take');
         return;
@@ -318,7 +319,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
       return;
     }
     if (drums && !forWizard) {
-      addTake({ mode: 'drums', audio, track: null, hits: detectHits(audio, training?.useModel ? modelClassifier(training.model) : classifyByRules) });
+      addTake({ mode: 'drums', audio, track: null, hits: detectHits(audio, activeClassifier(samples)) });
       setAutoCommit(true);
       return;
     }
@@ -502,6 +503,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
         onRecordMelody={() => void handleRecordMelody()}
         onMelodyRange={(range) => patchFine(range)}
         range={rangeInUse}
+        notice={drumsResetPending() ? DRUMS_RESET_MESSAGE : undefined}
       />
 
       <div data-testid="voice-to-notes-panel" className="flex-1 min-h-0 flex gap-2 p-2 overflow-hidden text-text-primary">

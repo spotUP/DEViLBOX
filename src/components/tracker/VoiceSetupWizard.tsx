@@ -89,6 +89,8 @@ export interface VoiceSetupWizardProps {
   onMelodyRange: (range: MelodyRange) => void;
   /** The range in use, shown on the result step */
   range: MelodyRange;
+  /** Shown above every step, e.g. the v2 drum migration reset message */
+  notice?: string;
 }
 
 function describeRange(range: MelodyRange): string {
@@ -117,6 +119,7 @@ export const VoiceSetupWizard: React.FC<VoiceSetupWizardProps> = ({
   onRecordMelody,
   onMelodyRange,
   range,
+  notice,
 }) => {
   const [stepIndex, setStepIndex] = useState(0);
   const step = STEPS[stepIndex];
@@ -170,6 +173,11 @@ export const VoiceSetupWizard: React.FC<VoiceSetupWizardProps> = ({
         onClose={close}
       />
       <div className="flex flex-col gap-2 p-3 text-text-primary" data-testid={`voice-setup-step-${step}`}>
+        {notice && (
+          <div className="text-[10px] font-mono text-accent-warning" data-testid="voice-setup-notice">
+            {notice}
+          </div>
+        )}
         {step === 'microphone' && (
           <>
             <p className="text-[10px] font-mono text-text-secondary">
@@ -206,7 +214,7 @@ export const VoiceSetupWizard: React.FC<VoiceSetupWizardProps> = ({
         {isDrumStep(step) && (
           <>
             <p className="text-[10px] font-mono text-text-secondary">
-              {DRUM_PROMPTS[step]} {MIN_SAMPLES_PER_CLASS} hits per drum for at least two drums trains a model on your voice.
+              {DRUM_PROMPTS[step]} {MIN_SAMPLES_PER_CLASS} hits train this drum on your voice; until then the built-in voice samples are used.
             </p>
             <div className="flex items-center gap-2" data-testid={`voice-setup-train-${step}`}>
               <span className="w-16 text-[10px] font-mono text-text-primary">{DRUM_CLASS_LABELS[step]}</span>

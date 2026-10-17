@@ -24,6 +24,7 @@ import {
 import type { DrumMap } from '@/lib/voice/drumToNotes';
 import type { ScaleName } from '@/lib/voice/scaleSnap';
 import { getStoredLatencyMs } from '@/lib/voice/latencyCalibration';
+import { migrateVoiceDrumsV2 } from '@/lib/persistence/migrations/voiceDrumsV2';
 
 export const MAX_TAKES = 8;
 
@@ -129,6 +130,7 @@ let nextTakeId = 1;
 const RANGE_KEYS = ['minMidiNote', 'maxMidiNote', 'transpose'] as const;
 
 function freshState(): Omit<VoiceState, keyof VoiceActions> {
+  migrateVoiceDrumsV2();
   return {
     mode: 'melody',
     fine: { ...DEFAULT_FINETUNE, ...loadMelodyRange() },

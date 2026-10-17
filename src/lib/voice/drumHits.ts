@@ -3,7 +3,8 @@
  *
  *   samples -> detectOnsets (spectral flux, adaptive threshold)
  *           -> hitFeatures (60 ms window: band energy ratios, decay, zero-crossing rate, bursts)
- *           -> classifyByRules (kick / snare / hat / clap) or a trained model (drumModel.ts)
+ *           -> a HitClassifier (kick / snare / hat / clap): the k-NN over the user's
+ *              samples and the AVP prior in drumModel.ts
  *
  * The FFT is the one in lib/audio/BeatSliceAnalyzer.
  */
@@ -295,14 +296,6 @@ export function hitFeatures(samples: Float32Array, onsetSample: number, sampleRa
   };
 }
 
-/** The rule-based classifier (the default, before any user training). */
-export const classifyByRules: HitClassifier = (f) => {
-  if (f.low > 0.55 && f.zcr < 0.1) return 'kick';
-  if (f.bursts >= 2 && f.low < 0.3) return 'clap';
-  if (f.high > 0.5 && f.zcr > 0.25) return 'hat';
-  return 'snare';
-};
-
 /** Feature vector for the classifier, fixed order: FEATURE_COUNT values. */
 export function featureVector(f: HitFeatures): number[] {
   return [f.low, f.mid, f.high, f.decay, f.zcr, Math.min(4, f.bursts) / 4, ...f.bands, f.centroid, f.flatness, f.attack];
@@ -312,7 +305,7 @@ export const FEATURE_COUNT = 6 + BAND_COUNT + 3;
 /** Whole pipeline: audio to classified hits. */
 export function detectHits(
   samples: Float32Array,
-  classify: HitClassifier = classifyByRules,
+  classify: HitClassifier,
   sampleRate = PITCH_SAMPLE_RATE,
 ): DrumHit[] {
   const onsets = detectOnsets(samples, sampleRate);
