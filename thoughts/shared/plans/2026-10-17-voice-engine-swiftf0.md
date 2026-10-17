@@ -205,13 +205,13 @@ Phase R - reachability and validation
 
 ## Measurements
 
-(Filled in at Phase M and VR-4.)
+(Filled in at Phase M and VR-4. Drum rows: wizard session not recorded yet; stored training is older: kick 6, snare 1, hat 0, clap 0 samples, rules confusion kick: 3 kick, 3 snare.)
 
 | What | Before (Basic Pitch, rules) | After |
 |------|------------------------------|-------|
-| ooo/eee take: notes found (expected 6) | | |
-| ooo/eee take: wrong pitches | | |
-| Take end gap: owner stop vs `seconds` vs `lastNoteEnd` | | |
+| ooo/eee take: notes found (expected 6) | 11 (take 1, 2026-10-17 17:38, 5.60 s). Envelope shows 6 sung phrases: 0.2-0.65, 0.8-1.25, 1.5-1.95, 2.1-2.6, 2.8-3.25, 3.4-3.9 s, dips -33 to -43 dB between them. Phrases 1, 2 and 5 split into 3, 3 and 2 notes; every extra note is 104-174 ms and 1 semitone from its neighbour. | |
+| ooo/eee take: wrong pitches | Phrase pitches (majority) E-3 52, F-3 53, E-3, F-3, E-3, F-3: alternation is right if the owner sang a semitone apart (owner to confirm the interval). Extras are 51 and 52/53 neighbours, the "extra wrong notes" of VNR-17. | |
+| Take end gap: owner stop vs `seconds` vs `lastNoteEnd` | Not reproduced: take is 5.60 s, singing ends 3.9 s, lastNoteEnd 3.949, 1.6 s of silence recorded after the last note. The take holds the whole performance this time; VNR-18 needs a take where the owner sees it happen. | |
 | Wizard hits found per step (expected 8) | | |
 | Wizard held-out accuracy / confusion | | |
 
