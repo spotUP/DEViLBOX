@@ -3,6 +3,9 @@ import { MAX_TAKES, useVoiceStore } from '../useVoiceStore';
 import { LATENCY_STORAGE_KEY } from '@/lib/voice/latencyCalibration';
 import { MELODY_RANGE_STORAGE_KEY } from '@/lib/voice/pitchNotes';
 import { DEFAULT_SEGMENT_SETTINGS } from '@/lib/voice/segmentNotes';
+import { DEFAULT_ONSET_SETTINGS, detectOnsets } from '@/lib/voice/drumHits';
+import { synthHit } from '@/lib/voice/drumSynth';
+import { PITCH_SAMPLE_RATE } from '@/lib/voice/pitchNotes';
 
 function audio(seconds: number): Float32Array {
   return new Float32Array(Math.round(seconds * 22050));
@@ -66,5 +69,26 @@ describe('useVoiceStore', () => {
     localStorage.setItem(LATENCY_STORAGE_KEY, JSON.stringify({ mic1: 120 }));
     useVoiceStore.getState().setDeviceId('mic1');
     expect(useVoiceStore.getState().calibratedMs).toBe(120);
+  });
+
+  it('a wizard take refits the onset settings, they survive a reload, clearCalibration drops them', () => {
+    // Eight snares, seven of them 33 dB under the first: the defaults miss them
+    const take = new Float32Array(Math.round(PITCH_SAMPLE_RATE * 3.2));
+    for (let n = 0; n < 8; n++) {
+      const hit = synthHit('snare', n + 1);
+      const at = Math.round((0.2 + n * 0.35) * PITCH_SAMPLE_RATE);
+      const gain = n === 0 ? 0.9 : 0.9 * 10 ** (-33 / 20);
+      for (let j = 0; j < hit.length; j++) take[at + j] += gain * hit[j];
+    }
+    expect(detectOnsets(take).length).toBeLessThan(8);
+    const fitted = useVoiceStore.getState().addCalibrationTake('snare', take);
+    expect(detectOnsets(take, PITCH_SAMPLE_RATE, fitted)).toHaveLength(8);
+    expect(useVoiceStore.getState().onsets).toEqual(fitted);
+    useVoiceStore.getState().reset();
+    expect(useVoiceStore.getState().onsets).toEqual(fitted);
+    expect(useVoiceStore.getState().calibrationTakes).toEqual({});
+    useVoiceStore.getState().clearCalibration();
+    useVoiceStore.getState().reset();
+    expect(useVoiceStore.getState().onsets).toEqual(DEFAULT_ONSET_SETTINGS);
   });
 });

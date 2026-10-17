@@ -1,18 +1,21 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { DRUM_CLASSES, FEATURE_COUNT, featureVector, hitFeatures, type DrumClass } from '../drumHits';
+import { DEFAULT_ONSET_SETTINGS, DRUM_CLASSES, FEATURE_COUNT, featureVector, hitFeatures, type DrumClass } from '../drumHits';
 import { synthHit, synthTake } from '../drumSynth';
 import { PITCH_SAMPLE_RATE } from '../pitchNotes';
 import {
   AVP_PRIOR,
   DRUM_MODEL_KEY,
+  DRUM_ONSETS_KEY,
   DRUM_SAMPLES_KEY,
   activeClassifier,
   clearTraining,
   describeTraining,
   knnClassifier,
+  loadOnsetSettings,
   loadSamples,
   loadTrainingResult,
   samplesFromTake,
+  saveOnsetSettings,
   saveSamples,
   saveTrainingResult,
   splitSamples,
@@ -132,6 +135,25 @@ describe('drum training storage', () => {
       expect(loadTrainingResult()).toBeNull();
     } finally {
       Storage.prototype.getItem = original;
+    }
+  });
+
+  it('round-trips the fitted onset settings; clearTraining and bad data give the defaults', () => {
+    expect(DRUM_ONSETS_KEY).toMatch(/\.v2$/);
+    expect(loadOnsetSettings()).toEqual(DEFAULT_ONSET_SETTINGS);
+    const fitted = { ...DEFAULT_ONSET_SETTINGS, sensitivity: 2, maxDropDb: 40 };
+    saveOnsetSettings(fitted);
+    expect(loadOnsetSettings()).toEqual(fitted);
+    clearTraining();
+    expect(loadOnsetSettings()).toEqual(DEFAULT_ONSET_SETTINGS);
+    for (const raw of [
+      '{nope',
+      JSON.stringify({ version: 1, onsets: fitted }),
+      JSON.stringify({ version: 2, onsets: { ...fitted, sensitivity: -1 } }),
+      JSON.stringify({ version: 2, onsets: { ...fitted, hop: 'x' } }),
+    ]) {
+      localStorage.setItem(DRUM_ONSETS_KEY, raw);
+      expect(loadOnsetSettings(), raw).toEqual(DEFAULT_ONSET_SETTINGS);
     }
   });
 });
