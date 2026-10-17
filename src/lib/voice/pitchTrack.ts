@@ -45,6 +45,15 @@ export function clampRange(range?: PitchRange): PitchRange {
   return { fminHz, fmaxHz };
 }
 
+/**
+ * The band the tracker searches for a singer whose notes lie in
+ * minMidiNote..maxMidiNote: it cannot then report an octave outside that
+ * range (VNR-22). Every tracker.track call for a melody take passes it.
+ */
+export function trackRange(range: { minMidiNote: number; maxMidiNote: number }): PitchRange {
+  return { fminHz: midiToHz(range.minMidiNote), fmaxHz: midiToHz(range.maxMidiNote) };
+}
+
 export function midiToHz(midi: number): number {
   return 440 * 2 ** ((midi - 69) / 12);
 }

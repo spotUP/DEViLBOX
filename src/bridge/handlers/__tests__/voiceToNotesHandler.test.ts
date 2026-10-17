@@ -11,7 +11,10 @@ import { useTransportStore } from '@/stores/useTransportStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { resetStore } from '@/stores/__tests__/_harness';
 import { midiToXMNote } from '@/lib/xmConversions';
-import { TRACK_HOP_SECONDS, midiToHz, type F0Track } from '@/lib/voice/pitchTrack';
+import { TRACK_HOP_SECONDS, midiToHz, hzToMidi, type F0Track, type PitchRange, type PitchTracker } from '@/lib/voice/pitchTrack';
+import { useVoiceStore, DEFAULT_FINETUNE } from '@/stores/useVoiceStore';
+import { previewStep } from '@/lib/voice/liveWindow';
+import { DEFAULT_SHAPING } from '@/lib/voice/voiceToNotes';
 import { synthTake } from '@/lib/voice/drumSynth';
 import { DRUM_808_MIDI } from '@/lib/voice/voiceInstruments';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
@@ -85,5 +88,51 @@ describe('voice_to_notes handler', () => {
     expect(written.map((c) => c.instrument)).toEqual([kick808?.id, snareSynth]);
     expect(useHistoryStore.getState().undoStack.length - undoBefore).toBe(1);
     expect((await voiceToNotes({ data: 'AA==', mode: 'bogus' }, deps)).error).toBeDefined();
+  });
+});
+
+/**
+ * A tracker with an octave ambiguity, as SwiftF0 has on a breathy low take:
+ * the sung note is 60, but the subharmonic 48 scores as high. Without a range
+ * it reports 48; with one it reports the candidate inside [fmin, fmax] (VNR-22).
+ */
+class OctaveAmbiguousTracker implements PitchTracker {
+  ranges: (PitchRange | undefined)[] = [];
+  async track(_samples: Float32Array, range?: PitchRange): Promise<F0Track> {
+    this.ranges.push(range);
+    const inRange = (midi: number) => !range || (midiToHz(midi) >= range.fminHz && midiToHz(midi) <= range.fmaxHz);
+    return oneNoteTrack([48, 60].find((m) => range && inRange(m)) ?? 48);
+  }
+}
+
+describe('the singer range reaches the pitch tracker (MR-3)', () => {
+  beforeEach(() => {
+    resetStore(useTrackerStore);
+    useTransportStore.setState({ bpm: 150, speed: 6 } as never);
+    useCursorStore.setState({ cursor: { ...useCursorStore.getState().cursor, channelIndex: 1, rowIndex: 2 } } as never);
+    useVoiceStore.setState({ fine: { ...DEFAULT_FINETUNE, minMidiNote: 55, maxMidiNote: 72 } });
+  });
+
+  it('voice_to_notes tracks inside the wizard range, so the octave below the range is not written', async () => {
+    const tracker = new OctaveAmbiguousTracker();
+    const deps: VoiceToNotesDeps = { tracker, decode: async () => new Float32Array(44100), fetchBytes: async () => new ArrayBuffer(3) };
+    expect((await voiceToNotes({ data: btoa('abcd') }, deps)).error).toBeUndefined();
+    expect(tracker.ranges).toHaveLength(1);
+    const range = tracker.ranges[0]!;
+    expect(Math.round(hzToMidi(range.fminHz))).toBe(55);
+    expect(Math.round(hzToMidi(range.fmaxHz))).toBe(72);
+    const rows = useTrackerStore.getState().patterns[0].channels[1].rows;
+    const written = rows.map((r) => r.note).filter((n) => n > 0 && n !== 97);
+    expect(written).toEqual([midiToXMNote(60)]);
+  });
+
+  it('the live preview passes the same range, and without one the tracker picks the wrong octave', async () => {
+    const tracker = new OctaveAmbiguousTracker();
+    const shaping = { ...DEFAULT_SHAPING, minMidiNote: 55, maxMidiNote: 72 };
+    const notes = await previewStep(new Float32Array(44100), [], tracker, shaping);
+    expect(notes.map((n) => n.pitchMidi)).toEqual([60]);
+    expect(Math.round(hzToMidi(tracker.ranges[0]!.fminHz))).toBe(55);
+    const unranged = await tracker.track(new Float32Array(44100));
+    expect(Math.round(hzToMidi(unranged.hz[30]))).toBe(48);
   });
 });

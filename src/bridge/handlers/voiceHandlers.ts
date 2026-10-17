@@ -6,7 +6,7 @@
  * the cursor channel and row.
  */
 import { resampleToMono22050 } from '@/lib/voice/basicPitchModel';
-import { TRACK_VOICED_CONFIDENCE, type F0Track, type PitchTracker } from '@/lib/voice/pitchTrack';
+import { TRACK_VOICED_CONFIDENCE, trackRange, type F0Track, type PitchTracker } from '@/lib/voice/pitchTrack';
 import { swiftF0Tracker } from '@/lib/voice/swiftF0';
 import { DEFAULT_SHAPING, commitVoiceNotes, shapeNotes } from '@/lib/voice/voiceToNotes';
 import { ALL_EFFECTS, contourFromTrack } from '@/lib/voice/noteEffects';
@@ -87,12 +87,16 @@ export async function voiceToNotes(
       return { ok: true, ...written, detected: hits.length, hits: counts, channel: channelIndex, row: startRow };
     }
 
-    const track = await deps.tracker.track(samples);
+    // The singer's range from the setup wizard, as the panel uses it
+    const { minMidiNote, maxMidiNote } = useVoiceStore.getState().fine;
+    const track = await deps.tracker.track(samples, trackRange({ minMidiNote, maxMidiNote }));
     const tonic = params.keyTonic as number | undefined;
     const scale = (params.keyScale as string | undefined) ?? 'major';
     if (tonic !== undefined && !(scale in SCALES)) return { error: `Unknown keyScale: ${scale}` };
     const notes = shapeNotes(track, {
       ...DEFAULT_SHAPING,
+      minMidiNote,
+      maxMidiNote,
       transpose: (params.transpose as number | undefined) ?? 0,
       keySnap: tonic === undefined ? null : { tonic, scale: scale as ScaleName },
     });

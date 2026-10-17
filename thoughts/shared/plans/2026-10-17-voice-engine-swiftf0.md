@@ -184,9 +184,9 @@ Phase C - melody wiring
 - [x] WC-8 Delete unused `voicing.ts` exports (verified from tsc unused-export errors and a grep of callers), `basicPitchModel` no longer imported under `src/lib/voice` except by `AudioToMidiModal`'s path.
 
 Phase D - melody range (VNR-22)
-- [ ] MR-1 Wizard melody step on the tracker; range writes `minMidiNote`/`maxMidiNote`.
-- [ ] MR-2 `fminHz`/`fmaxHz` from the range passed to every `tracker.track` call (panel, live, handler).
-- [ ] MR-3 Test: a take sung an octave below the range's middle with a tracker that reports both octaves returns the in-range octave.
+- [x] MR-1 Wizard melody step on the tracker; range writes `minMidiNote`/`maxMidiNote`. Done: `melodyForWizard` shapes the tracker take at full range; `onMelodyRange` calls `patchFine`.
+- [x] MR-2 `fminHz`/`fmaxHz` from the range passed to every `tracker.track` call (panel, live, handler). Done: `trackRange` in `pitchTrack.ts`; panel (except the wizard take, which needs the full band), `previewStep`, `voice_to_notes` handler (range from `useVoiceStore.fine`, same min/max in shaping).
+- [x] MR-3 Test: a take sung an octave below the range's middle with a tracker that reports both octaves returns the in-range octave. Done: `voiceToNotesHandler.test.ts` "the singer range reaches the pitch tracker"; fails with the handler range reverted.
 
 Phase E - drums
 - [ ] WD-1 Features v2 in `drumHits.ts` (reuse the repo's FFT helper; name it here); `featureVector` 17 values; unit test per feature on synthetic clicks/noise bursts.
