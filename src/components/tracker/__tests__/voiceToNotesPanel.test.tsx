@@ -16,7 +16,7 @@ import { useTransportStore } from '@/stores/useTransportStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { resetStore } from '@/stores/__tests__/_harness';
 import { midiToXMNote } from '@/lib/xmConversions';
-import { ANNOTATIONS_FPS, PITCH_SAMPLE_RATE, midiToHz, type PitchModelOutput } from '@/lib/voice/pitchNotes';
+import { ANNOTATIONS_FPS, DEFAULT_PITCH_SETTINGS, PITCH_SAMPLE_RATE, midiToHz, type PitchModelOutput } from '@/lib/voice/pitchNotes';
 import type { PitchModel } from '@/lib/voice/basicPitchModel';
 import type { VoiceCapture } from '@/lib/voice/voiceRecorder';
 import { synthTake } from '@/lib/voice/drumSynth';
@@ -411,7 +411,7 @@ describe('Voice to Notes panel', () => {
 });
 
 describe('Voice to Notes setup wizard', () => {
-  it('opens on first use and walks microphone check, latency, drum training and result', async () => {
+  it('opens on first use and walks microphone check, latency, a step per drum, the melody range and result', async () => {
     localStorage.removeItem(SETUP_SEEN_KEY);
     const model = new SineReadingModel();
     const mic = fakeMic();
@@ -450,19 +450,43 @@ describe('Voice to Notes setup wizard', () => {
     fireEvent.click(within(screen.getByTestId('voice-setup-step-latency')).getByText('Calibrate latency'));
     await waitFor(() => expect(screen.getByTestId('voice-setup-latency').textContent).toBe('100 ms measured'));
 
-    fireEvent.click(screen.getByText('Next'));
-    for (const drum of ['kick', 'snare'] as const) {
-      const row = screen.getByTestId(`voice-setup-train-${drum}`);
+    // One step per drum class: Next waits until the class has enough hits, and the take is drawn with its hits
+    const nextButton = () => screen.getByText('Next').closest('button') as HTMLButtonElement;
+    for (const drum of ['kick', 'snare', 'hat', 'clap'] as const) {
+      fireEvent.click(screen.getByText('Next'));
+      const step = screen.getByTestId(`voice-setup-step-${drum}`);
+      expect(nextButton().disabled).toBe(true);
+      const row = within(step).getByTestId(`voice-setup-train-${drum}`);
       fireEvent.click(within(row).getByText('Record'));
       await waitFor(() => expect(within(row).getByText('Stop')).toBeTruthy());
       mic.feed(synthTake([{ drum, at: 0.1 }, { drum, at: 0.5 }, { drum, at: 0.9 }], 1.3));
       fireEvent.click(within(row).getByText('Stop'));
       await waitFor(() => expect(within(row).getByText('3 hits')).toBeTruthy());
+      expect(within(step).getByTestId('voice-take-waveform').getAttribute('data-markers')).toBe('3');
+      expect(within(step).getByTestId('voice-setup-heard').textContent).toBe('Heard 3 hits');
+      expect(within(row).getByText('Retake')).toBeTruthy();
+      expect(nextButton().disabled).toBe(false);
     }
     expect(model.calls).toBe(0);
 
+    // Melody step: the scale sets the pitch range on Next, and is never written to the grid
     fireEvent.click(screen.getByText('Next'));
+    const melodyStep = screen.getByTestId('voice-setup-step-melody');
+    expect(nextButton().disabled).toBe(true);
+    fireEvent.click(within(melodyStep).getByText('Record'));
+    await waitFor(() => expect(within(melodyStep).getByText('Stop')).toBeTruthy());
+    mic.feed(concat([sine(60, 0.4), sine(64, 0.4), sine(67, 0.4), new Float32Array(2205)]));
+    fireEvent.click(within(melodyStep).getByText('Stop'));
+    await waitFor(() => expect(within(melodyStep).getByTestId('voice-take-waveform').getAttribute('data-markers')).toBe('3'));
+    expect(model.calls).toBe(1);
+    expect(screen.getByTestId('voice-setup-range').textContent).toBe('Heard 3 notes: A3 to A#4, no transpose');
+    expect(useVoiceStore.getState().fine.minMidiNote).toBe(DEFAULT_PITCH_SETTINGS.minMidiNote);
+    fireEvent.click(screen.getByText('Next'));
+    expect(useVoiceStore.getState().fine).toMatchObject({ minMidiNote: 57, maxMidiNote: 70, transpose: 0 });
+    expect(writtenNotes()).toEqual([]);
+
     expect(screen.getByTestId('voice-setup-result').textContent).toMatch(/^Drum training: held out \d+: model \d+ percent, rules \d+ percent, using /);
+    expect(screen.getByTestId('voice-setup-result-range').textContent).toBe('Melody range: A3 to A#4, no transpose');
 
     fireEvent.click(screen.getByText('Finish'));
     await waitFor(() => expect(screen.queryByTestId('voice-setup-step-result')).toBeNull());

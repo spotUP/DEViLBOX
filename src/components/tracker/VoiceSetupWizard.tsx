@@ -1,11 +1,13 @@
 /**
  * VoiceSetupWizard - first-use setup for Voice to Notes: microphone level,
- * latency calibration, beatbox training per drum class, and the result.
+ * latency calibration, one beatbox training step per drum class, one sung
+ * scale for the melody range, and the result.
  *
  * Presentation only. Recording, calibration, training and storage are the
- * Voice to Notes panel's own handlers, passed in as props.
+ * Voice to Notes panel's own handlers, passed in as props; the takes shown
+ * here come from useVoiceStore through the panel.
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Mic, Square, Timer } from 'lucide-react';
 import { Modal } from '@components/ui/Modal';
 import { ModalHeader } from '@components/ui/ModalHeader';
@@ -19,6 +21,9 @@ import {
   type TrainingResult,
   type TrainingSample,
 } from '@/lib/voice/drumModel';
+import { PITCH_SAMPLE_RATE, melodyRange, noteName, type MelodyRange, type VoiceNote } from '@/lib/voice/pitchNotes';
+import type { TrainingTake } from '@/stores/useVoiceStore';
+import { VoiceTakeWaveform, type WaveformMarker } from './VoiceTakeWaveform';
 
 /** Input level bar, shared by the panel and the wizard. */
 export const VoiceLevelMeter: React.FC<{ level: number }> = ({ level }) => (
@@ -27,14 +32,35 @@ export const VoiceLevelMeter: React.FC<{ level: number }> = ({ level }) => (
   </div>
 );
 
-const STEPS = ['microphone', 'latency', 'drums', 'result'] as const;
+const STEPS = ['microphone', 'latency', ...DRUM_CLASSES, 'melody', 'result'] as const;
 type Step = (typeof STEPS)[number];
 const STEP_TITLES: Record<Step, string> = {
   microphone: 'Microphone level',
   latency: 'Latency calibration',
-  drums: 'Train on your voice',
+  kick: 'Train your kick',
+  snare: 'Train your snare',
+  hat: 'Train your hi-hat',
+  clap: 'Train your clap',
+  melody: 'Your singing range',
   result: 'Result',
 };
+const DRUM_PROMPTS: Record<DrumClass, string> = {
+  kick: 'Say "boom" eight times, one per beat, with short gaps.',
+  snare: 'Say "ka" or "pss" eight times, one per beat, with short gaps.',
+  hat: 'Say "ts" eight times, one per beat, with short gaps.',
+  clap: 'Clap, or say "pah", eight times, one per beat, with short gaps.',
+};
+
+function isDrumStep(step: Step): step is DrumClass {
+  return (DRUM_CLASSES as readonly string[]).includes(step);
+}
+
+/** A recorded melody for the range step: the take's audio and what was heard in it. */
+export interface WizardMelody {
+  audio: Float32Array;
+  sampleRate: number;
+  notes: readonly VoiceNote[];
+}
 
 export interface VoiceSetupWizardProps {
   isOpen: boolean;
@@ -43,7 +69,9 @@ export interface VoiceSetupWizardProps {
   level: number;
   recording: boolean;
   /** The class a training take is being recorded for, or null */
-  trainingTake: DrumClass | null;
+  recordingClass: DrumClass | null;
+  /** The last training take, with the hits heard in it */
+  lastTrainingTake: TrainingTake | null;
   error: string | null;
   onCheckLevel: () => void;
   onStop: () => void;
@@ -53,6 +81,19 @@ export interface VoiceSetupWizardProps {
   samples: readonly TrainingSample[];
   training: TrainingResult | null;
   onRecordTraining: (drum: DrumClass) => void;
+  /** The melody take recorded in this wizard, or null */
+  melody: WizardMelody | null;
+  melodyRecording: boolean;
+  onRecordMelody: () => void;
+  /** Called on Next from the melody step with the range heard */
+  onMelodyRange: (range: MelodyRange) => void;
+  /** The range in use, shown on the result step */
+  range: MelodyRange;
+}
+
+function describeRange(range: MelodyRange): string {
+  const shift = range.transpose === 0 ? 'no transpose' : `transpose ${range.transpose > 0 ? '+' : ''}${range.transpose}`;
+  return `${noteName(range.minMidiNote)} to ${noteName(range.maxMidiNote)}, ${shift}`;
 }
 
 export const VoiceSetupWizard: React.FC<VoiceSetupWizardProps> = ({
@@ -60,7 +101,8 @@ export const VoiceSetupWizard: React.FC<VoiceSetupWizardProps> = ({
   onClose,
   level,
   recording,
-  trainingTake,
+  recordingClass,
+  lastTrainingTake,
   error,
   onCheckLevel,
   onStop,
@@ -70,11 +112,44 @@ export const VoiceSetupWizard: React.FC<VoiceSetupWizardProps> = ({
   samples,
   training,
   onRecordTraining,
+  melody,
+  melodyRecording,
+  onRecordMelody,
+  onMelodyRange,
+  range,
 }) => {
   const [stepIndex, setStepIndex] = useState(0);
   const step = STEPS[stepIndex];
   const counts = countsByClass(samples);
   const last = stepIndex === STEPS.length - 1;
+
+  const heardRange = useMemo(() => (melody ? melodyRange(melody.notes) : null), [melody]);
+  const hitMarkers = useMemo<WaveformMarker[]>(
+    () =>
+      lastTrainingTake
+        ? lastTrainingTake.hits.map((h, i) => ({ id: `hit-${i}`, timeSeconds: h.timeSeconds, label: '', kind: 'hit' as const }))
+        : [],
+    [lastTrainingTake],
+  );
+  const noteMarkers = useMemo<WaveformMarker[]>(
+    () =>
+      melody
+        ? melody.notes.map((n, i) => ({
+            id: `note-${i}`,
+            timeSeconds: n.startTimeSeconds,
+            endSeconds: n.startTimeSeconds + n.durationSeconds,
+            label: noteName(n.pitchMidi),
+            kind: 'note' as const,
+          }))
+        : [],
+    [melody],
+  );
+
+  // Next is gated: a drum step needs its class trained, the melody step a heard range
+  const nextBlocked =
+    recording ||
+    (isDrumStep(step) && counts[step] < MIN_SAMPLES_PER_CLASS) ||
+    (step === 'melody' && heardRange === null);
 
   const close = () => {
     if (recording) onStop();
@@ -83,11 +158,12 @@ export const VoiceSetupWizard: React.FC<VoiceSetupWizardProps> = ({
   };
   const go = (delta: number) => {
     if (recording) onStop();
+    if (delta > 0 && step === 'melody' && heardRange) onMelodyRange(heardRange);
     setStepIndex((i) => Math.max(0, Math.min(STEPS.length - 1, i + delta)));
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={close} size="md" closeOnEnter={false}>
+    <Modal isOpen={isOpen} onClose={close} size="xl" closeOnEnter={false}>
       <ModalHeader
         title="Voice to Notes setup"
         subtitle={`Step ${stepIndex + 1} of ${STEPS.length}: ${STEP_TITLES[step]}`}
@@ -127,36 +203,72 @@ export const VoiceSetupWizard: React.FC<VoiceSetupWizardProps> = ({
           </>
         )}
 
-        {step === 'drums' && (
+        {isDrumStep(step) && (
           <>
             <p className="text-[10px] font-mono text-text-secondary">
-              For each drum, record a take of the sound you make for it, a few hits with short gaps. {MIN_SAMPLES_PER_CLASS}{' '}
-              hits per drum for at least two drums trains a model on your voice. Skip this step to use the built-in rules.
+              {DRUM_PROMPTS[step]} {MIN_SAMPLES_PER_CLASS} hits per drum for at least two drums trains a model on your voice.
             </p>
-            {DRUM_CLASSES.map((drum) => (
-              <div key={drum} className="flex items-center gap-2" data-testid={`voice-setup-train-${drum}`}>
-                <span className="w-16 text-[10px] font-mono text-text-primary">{DRUM_CLASS_LABELS[drum]}</span>
-                <span className="w-16 text-[10px] font-mono text-text-muted">
-                  {counts[drum]} hit{counts[drum] === 1 ? '' : 's'}
-                </span>
-                {trainingTake === drum ? (
-                  <Button variant="danger" size="sm" icon={<Square size={12} />} onClick={onStop}>
-                    Stop
-                  </Button>
-                ) : (
-                  <Button
-                    variant="default"
-                    size="sm"
-                    icon={<Mic size={12} />}
-                    onClick={() => onRecordTraining(drum)}
-                    disabled={recording}
-                  >
-                    Record
-                  </Button>
-                )}
-              </div>
-            ))}
+            <div className="flex items-center gap-2" data-testid={`voice-setup-train-${step}`}>
+              <span className="w-16 text-[10px] font-mono text-text-primary">{DRUM_CLASS_LABELS[step]}</span>
+              <span className="w-16 text-[10px] font-mono text-text-muted">
+                {counts[step]} hit{counts[step] === 1 ? '' : 's'}
+              </span>
+              {recordingClass === step ? (
+                <Button variant="danger" size="sm" icon={<Square size={12} />} onClick={onStop}>
+                  Stop
+                </Button>
+              ) : (
+                <Button
+                  variant="default"
+                  size="sm"
+                  icon={<Mic size={12} />}
+                  onClick={() => onRecordTraining(step)}
+                  disabled={recording}
+                >
+                  {lastTrainingTake?.drum === step ? 'Retake' : 'Record'}
+                </Button>
+              )}
+            </div>
             {recording && <VoiceLevelMeter level={level} />}
+            <VoiceTakeWaveform
+              audio={lastTrainingTake?.drum === step ? lastTrainingTake.audio : null}
+              sampleRate={PITCH_SAMPLE_RATE}
+              markers={lastTrainingTake?.drum === step ? hitMarkers : []}
+              placeholder={`Record your ${DRUM_CLASS_LABELS[step].toLowerCase()} to see the take`}
+            />
+            {lastTrainingTake?.drum === step && (
+              <span className="text-[10px] font-mono text-text-muted" data-testid="voice-setup-heard">
+                Heard {lastTrainingTake.hits.length} hit{lastTrainingTake.hits.length === 1 ? '' : 's'}
+              </span>
+            )}
+          </>
+        )}
+
+        {step === 'melody' && (
+          <>
+            <p className="text-[10px] font-mono text-text-secondary">
+              Sing eight notes up a scale at a comfortable pitch. The lowest and highest notes set the range Voice to
+              Notes listens for; a low voice is written an octave up.
+            </p>
+            {melodyRecording ? (
+              <Button variant="danger" size="sm" icon={<Square size={12} />} onClick={onStop}>
+                Stop
+              </Button>
+            ) : (
+              <Button variant="default" size="sm" icon={<Mic size={12} />} onClick={onRecordMelody} disabled={recording}>
+                {melody ? 'Retake' : 'Record'}
+              </Button>
+            )}
+            {recording && <VoiceLevelMeter level={level} />}
+            <VoiceTakeWaveform
+              audio={melody?.audio ?? null}
+              sampleRate={melody?.sampleRate ?? PITCH_SAMPLE_RATE}
+              markers={noteMarkers}
+              placeholder="Record a scale to see the notes heard"
+            />
+            <span className="text-[10px] font-mono text-text-muted" data-testid="voice-setup-range">
+              {heardRange ? `Heard ${melody?.notes.length ?? 0} notes: ${describeRange(heardRange)}` : 'No notes heard yet'}
+            </span>
           </>
         )}
 
@@ -165,6 +277,9 @@ export const VoiceSetupWizard: React.FC<VoiceSetupWizardProps> = ({
             <span className="text-[10px] font-mono text-text-primary">Latency: {calibratedMs} ms</span>
             <span className="text-[10px] font-mono text-text-primary" data-testid="voice-setup-result">
               Drum training: {describeTraining(training)}
+            </span>
+            <span className="text-[10px] font-mono text-text-primary" data-testid="voice-setup-result-range">
+              Melody range: {describeRange(range)}
             </span>
             <p className="text-[10px] font-mono text-text-secondary">
               Open this setup again from the Voice to Notes panel at any time.
@@ -183,7 +298,7 @@ export const VoiceSetupWizard: React.FC<VoiceSetupWizardProps> = ({
             Finish
           </Button>
         ) : (
-          <Button variant="primary" size="sm" onClick={() => go(1)}>
+          <Button variant="primary" size="sm" onClick={() => go(1)} disabled={nextBlocked}>
             Next
           </Button>
         )}

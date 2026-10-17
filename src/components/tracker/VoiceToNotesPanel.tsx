@@ -25,7 +25,7 @@ import { notify } from '@/stores/useNotificationStore';
 import { useVoiceStore, type Finetune, type VoiceEffectToggles, type VoiceMode, type VoiceTake } from '@/stores/useVoiceStore';
 import { useVoiceRecorder, defaultVoiceRecorderDeps, type VoiceRecorderDeps } from '@/hooks/audio/useVoiceRecorder';
 import { basicPitchModel, type PitchModel } from '@/lib/voice/basicPitchModel';
-import { PITCH_SAMPLE_RATE, type VoiceNote } from '@/lib/voice/pitchNotes';
+import { DEFAULT_PITCH_SETTINGS, PITCH_SAMPLE_RATE, noteName, type MelodyRange, type VoiceNote } from '@/lib/voice/pitchNotes';
 import { quantiseNotes, rowSeconds, type QuantiseSettings, type QuantisedNote } from '@/lib/voice/quantise';
 import { melodyPreview, drumPreview } from '@/lib/voice/takePreview';
 import { useVoicePreviewStore } from '@/stores/useVoicePreviewStore';
@@ -80,10 +80,6 @@ const DRUM_NOTE_OPTIONS = Array.from({ length: 61 }, (_, i) => {
   const midi = 24 + i;
   return { value: String(midi), label: noteName(midi) };
 });
-
-function noteName(midi: number): string {
-  return `${TONIC_NAMES[midi % 12]}${Math.floor(midi / 12) - 1}`;
-}
 
 const NoteRoll: React.FC<{ notes: readonly VoiceNote[]; seconds: number }> = ({ notes, seconds }) => {
   const span = Math.max(2, seconds);
@@ -155,6 +151,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   const [analysing, setAnalysing] = useState(false);
   const [calibrating, setCalibrating] = useState(false);
   const [levelCheck, setLevelCheck] = useState(false);
+  const [wizardMelody, setWizardMelody] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(shouldOpenVoiceSetup);
   const backend = deps ?? defaultVoiceRecorderDeps;
 
@@ -234,6 +231,13 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     await recorder.start({ deviceId: deviceId || undefined, countInBeats: 0, beatSeconds: 60 / useTransportStore.getState().bpm, livePreview: false });
   }, [recorder, deviceId]);
 
+  /** The wizard's scale take: heard with the pitch model, kept as the take, never written to the grid. */
+  const handleRecordMelody = useCallback(async () => {
+    setWizardMelody(true);
+    clearTake();
+    await recorder.start({ deviceId: deviceId || undefined, countInBeats: 0, beatSeconds: 60 / useTransportStore.getState().bpm, livePreview: true });
+  }, [recorder, deviceId, clearTake]);
+
   const handleCloseWizard = useCallback(() => {
     markVoiceSetupSeen();
     setWizardOpen(false);
@@ -253,7 +257,9 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   const handleStop = useCallback(async () => {
     const audio = recorder.stop();
     const labelled = recordingClass;
+    const forWizard = wizardMelody;
     setRecordingClass(null);
+    setWizardMelody(false);
     if (levelCheck) {
       setLevelCheck(false);
       return;
@@ -271,7 +277,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
       handleTrain(all);
       return;
     }
-    if (drums) {
+    if (drums && !forWizard) {
       addTake({ mode: 'drums', audio, output: null, hits: detectHits(audio, training?.useModel ? modelClassifier(training.model) : classifyByRules) });
       setAutoCommit(true);
       return;
@@ -281,13 +287,36 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
       // Full-take pass: replaces the live preview
       const result = await model.evaluate(audio);
       addTake({ mode: 'melody', audio, output: result, hits: [] });
-      setAutoCommit(true);
+      if (!forWizard) setAutoCommit(true);
     } catch (err) {
       notify.error(`Pitch detection failed: ${err instanceof Error ? err.message : 'unknown error'}`);
     } finally {
       setAnalysing(false);
     }
-  }, [recorder, model, drums, recordingClass, levelCheck, samples, training, handleTrain, addTake, setSamples, setTrainingTake]);
+  }, [recorder, model, drums, recordingClass, wizardMelody, levelCheck, samples, training, handleTrain, addTake, setSamples, setTrainingTake]);
+
+  // The wizard's range step hears the scale with the full pitch range so the range can be derived from it
+  const melodyForWizard = useMemo(
+    () =>
+      take?.mode === 'melody' && output
+        ? {
+            audio: take.audio,
+            sampleRate: take.sampleRate,
+            notes: shapeNotes(output, {
+              ...fine,
+              minMidiNote: DEFAULT_PITCH_SETTINGS.minMidiNote,
+              maxMidiNote: DEFAULT_PITCH_SETTINGS.maxMidiNote,
+              transpose: 0,
+              keySnap: null,
+            }),
+          }
+        : null,
+    [take, output, fine],
+  );
+  const rangeInUse = useMemo<MelodyRange>(
+    () => ({ minMidiNote: fine.minMidiNote, maxMidiNote: fine.maxMidiNote, transpose: fine.transpose }),
+    [fine.minMidiNote, fine.maxMidiNote, fine.transpose],
+  );
 
   const handleCommit = useCallback(() => {
     const target = { channelIndex, startRow, instrumentId };
@@ -405,7 +434,8 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
         onClose={handleCloseWizard}
         level={recorder.level}
         recording={recording}
-        trainingTake={recordingClass}
+        recordingClass={recordingClass}
+        lastTrainingTake={trainingTake}
         error={recorder.error}
         onCheckLevel={() => void handleCheckLevel()}
         onStop={() => void handleStop()}
@@ -415,6 +445,11 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
         samples={samples}
         training={training}
         onRecordTraining={(drum) => void handleRecordTraining(drum)}
+        melody={melodyForWizard}
+        melodyRecording={wizardMelody && recording}
+        onRecordMelody={() => void handleRecordMelody()}
+        onMelodyRange={(range) => patchFine(range)}
+        range={rangeInUse}
       />
 
       <div data-testid="voice-to-notes-panel" className="flex-1 min-h-0 flex gap-2 p-2 overflow-hidden text-text-primary">
