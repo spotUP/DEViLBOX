@@ -162,6 +162,28 @@ describe('applyNotesToPattern', () => {
     expect(rows[0].volume).toBe(velocityToVolume(1));
     expect(rows[2].note).toBe(NOTE_OFF);
   });
+
+  it('clears the whole channel from the start row, so a shorter take leaves no old notes behind', () => {
+    const pattern = structuredClone(useTrackerStore.getState().patterns[0]);
+    const rows = pattern.channels[0].rows;
+    const last = rows.length - 1;
+    rows[1].note = 30; // before the start row: kept
+    rows[10].note = 40;
+    rows[last].note = 50;
+    rows[last].instrument = 2;
+    rows[last].effTyp = 0xa;
+    rows[last].eff = 0x0f;
+    applyNotesToPattern(
+      pattern,
+      [{ row: 0, offsetRows: 0, heardSeconds: 0, lengthRows: 2, midi: 60, velocity: 1 }],
+      { channelIndex: 0, startRow: 4, instrumentId: 3 },
+    );
+    expect(rows[1].note).toBe(30);
+    expect(rows[4].note).toBeGreaterThan(0);
+    expect(rows[6].note).toBe(NOTE_OFF);
+    expect(rows[10].note).toBe(0);
+    expect(rows[last]).toMatchObject({ note: 0, instrument: 0, effTyp: 0, eff: 0 });
+  });
 });
 
 

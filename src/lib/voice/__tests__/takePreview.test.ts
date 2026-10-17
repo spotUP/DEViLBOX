@@ -39,7 +39,8 @@ describe('Voice to Notes ghost notes show what a commit writes (owner report 202
     const preview = melodyPreview(notes, Q, target, 64);
     const commit = takeCells(quantiseNotes(notes, Q), target, 64);
     expect(preview).toEqual({ channelIndex: 2, startRow: 4, notes: commit.cells.map((c) => c.note) });
-    expect(preview?.notes).toEqual([midiToXMNote(60), 0, NOTE_OFF, 0, midiToXMNote(64), NOTE_OFF]);
+    // Start row to pattern end: the take clears the rest of the channel (60 rows from row 4).
+    expect(preview?.notes).toEqual([midiToXMNote(60), 0, NOTE_OFF, 0, midiToXMNote(64), NOTE_OFF, ...new Array(54).fill(0)]);
   });
 
   it('no notes, no preview', () => {
