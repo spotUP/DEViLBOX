@@ -1,6 +1,10 @@
 /**
  * useVoiceRecorder - microphone permission, device pick, level meter, count-in,
- * and the live preview loop, on top of the lib/voice recorder.
+ * and the live loop, on top of the lib/voice recorder.
+ *
+ * While recording, `liveAudio` is the take so far (every LIVE_HOP_SECONDS) so
+ * the waveform grows in place; with `livePreview` the same tick also runs the
+ * pitch model and fills `liveNotes`.
  *
  * `deps` lets tests supply a fake MediaStream source and capture backend.
  */
@@ -40,6 +44,7 @@ export function useVoiceRecorder(model: PitchModel, pitchSettings: PitchSettings
   const [error, setError] = useState<string | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [liveNotes, setLiveNotes] = useState<VoiceNote[]>([]);
+  const [liveAudio, setLiveAudio] = useState<Float32Array | null>(null);
 
   const recorderRef = useRef<VoiceRecorder | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -65,6 +70,7 @@ export function useVoiceRecorder(model: PitchModel, pitchSettings: PitchSettings
     if (recorderRef.current) return;
     setError(null);
     setLiveNotes([]);
+    setLiveAudio(null);
     liveRef.current = [];
     try {
       const stream = await deps.getStream(opts.deviceId);
@@ -81,11 +87,13 @@ export function useVoiceRecorder(model: PitchModel, pitchSettings: PitchSettings
       setPhase(opts.countInBeats > 0 ? 'countIn' : 'recording');
       await recorder.start();
       void refreshDevices();
-      if (opts.livePreview === false) return;
       timerRef.current = setInterval(() => {
-        if (busyRef.current || !recorderRef.current) return;
-        const take = recorderRef.current.snapshot();
+        const current = recorderRef.current;
+        if (!current) return;
+        const take = current.snapshot();
         if (take.length === 0) return;
+        setLiveAudio(take);
+        if (opts.livePreview === false || busyRef.current) return;
         busyRef.current = true;
         previewStep(take, liveRef.current, model, settingsRef.current)
           .then((notes) => {
@@ -111,6 +119,7 @@ export function useVoiceRecorder(model: PitchModel, pitchSettings: PitchSettings
     recorderRef.current = null;
     setPhase('idle');
     setLevel(0);
+    setLiveAudio(null);
     return recorder.stop();
   }, []);
 
@@ -120,5 +129,5 @@ export function useVoiceRecorder(model: PitchModel, pitchSettings: PitchSettings
     recorderRef.current = null;
   }, []);
 
-  return { phase, level, error, devices, liveNotes, start, stop, refreshDevices };
+  return { phase, level, error, devices, liveNotes, liveAudio, start, stop, refreshDevices };
 }

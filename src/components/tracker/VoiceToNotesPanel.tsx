@@ -90,6 +90,8 @@ const NoteRoll: React.FC<{ notes: readonly VoiceNote[]; seconds: number }> = ({ 
   const rangeSize = Math.max(12, hi - lo);
   return (
     <svg
+      data-testid="voice-note-roll"
+      data-seconds={span.toFixed(2)}
       viewBox="0 0 100 40"
       preserveAspectRatio="none"
       className="w-full h-24 bg-dark-bgTertiary border border-dark-borderLight rounded"
@@ -430,6 +432,9 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   useEffect(() => setPreview(isOpen ? preview : null), [preview, setPreview, isOpen]);
   useEffect(() => () => setPreview(null), [setPreview]);
   const rowLength = rowSeconds(bpm, speed);
+  /** Time the pattern has left from the start row: the visualiser's axis while recording. */
+  const patternSpan = Math.max(0, rowCount - startRow) * rowLength;
+  const liveSeconds = recorder.liveAudio ? recorder.liveAudio.length / PITCH_SAMPLE_RATE : 0;
 
   // The rows the commit writes, for the timing table and the waveform markers
   const written = useMemo<QuantisedNote[]>(() => {
@@ -598,15 +603,18 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
         <div className="flex-1 min-w-0 flex flex-col gap-2 overflow-y-auto">
           <SectionLabel>Take</SectionLabel>
           <VoiceTakeWaveform
-            audio={take?.audio ?? null}
-            sampleRate={take?.sampleRate ?? PITCH_SAMPLE_RATE}
+            audio={recording ? recorder.liveAudio : take?.audio ?? null}
+            sampleRate={recording ? PITCH_SAMPLE_RATE : take?.sampleRate ?? PITCH_SAMPLE_RATE}
             markers={markers}
             rowSeconds={rowLength}
+            spanSeconds={patternSpan}
+            playhead={recording ? liveSeconds : null}
           />
-          {!drums && <NoteRoll notes={shownNotes} seconds={takeSeconds || 4} />}
+          {!drums && <NoteRoll notes={shownNotes} seconds={Math.max(patternSpan, recording ? liveSeconds : takeSeconds)} />}
           <div className="text-[9px] font-mono text-text-muted">
             {eventCount} {eventWord}{eventCount === 1 ? '' : 's'} - row length {(rowLength * 1000).toFixed(0)} ms
-            {takeSeconds > 0 ? ` - take ${takeSeconds.toFixed(1)} s` : ''}
+            {` - pattern ${patternSpan.toFixed(1)} s from row ${startRow}`}
+            {recording ? ` - recording ${liveSeconds.toFixed(1)} s` : takeSeconds > 0 ? ` - take ${takeSeconds.toFixed(1)} s` : ''}
           </div>
           {recorder.error && <div className="text-[10px] font-mono text-accent-error">{recorder.error}</div>}
 

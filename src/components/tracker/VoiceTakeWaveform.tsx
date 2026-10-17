@@ -32,6 +32,12 @@ export interface VoiceTakeWaveformProps {
   rowsPerBeat?: number;
   /** Current position while recording or playing, in seconds. */
   playhead?: number | null;
+  /**
+   * Time the pattern has left from the start row, in seconds. The axis covers
+   * at least this, so a take growing while recording stays in scale and the
+   * pattern end is marked.
+   */
+  spanSeconds?: number;
   /** Shown over the empty waveform. */
   placeholder?: string;
 }
@@ -65,12 +71,37 @@ function drawMarkers(
   rowSeconds: number | undefined,
   rowsPerBeat: number,
   playhead: number | null | undefined,
+  spanSeconds: number | undefined,
 ): void {
   const x = (t: number) => (t / seconds) * width;
   const accent = themeColour('--color-accent-primary', '#10b981');
   const text = themeColour('--color-text-primary', '#e5e7eb');
   const muted = themeColour('--color-text-muted', '#6b7280');
   const warning = themeColour('--color-accent-warning', '#f59e0b');
+
+  // Past the pattern end: shaded, and a line where the pattern runs out.
+  if (spanSeconds !== undefined && spanSeconds > 0 && spanSeconds <= seconds) {
+    const end = Math.round(x(spanSeconds)) + 0.5;
+    if (spanSeconds < seconds) {
+      ctx.fillStyle = muted;
+      ctx.globalAlpha = 0.15;
+      ctx.fillRect(end, 0, width - end, height);
+    }
+    ctx.strokeStyle = warning;
+    ctx.globalAlpha = 0.9;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(end, 0);
+    ctx.lineTo(end, height);
+    ctx.stroke();
+    ctx.fillStyle = warning;
+    ctx.globalAlpha = 1;
+    ctx.font = LABEL_FONT;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+    ctx.fillText('Pattern end', end - 3, 2);
+    ctx.textAlign = 'left';
+  }
 
   if (rowSeconds && rowSeconds > 0) {
     for (let row = 0; row * rowSeconds < seconds; row++) {
@@ -140,12 +171,15 @@ export const VoiceTakeWaveform: React.FC<VoiceTakeWaveformProps> = ({
   rowSeconds,
   rowsPerBeat = 4,
   playhead,
+  spanSeconds,
   placeholder = 'Record a take to see its waveform',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const buffer = useMemo(() => toAudioBuffer(audio, sampleRate), [audio, sampleRate]);
-  const seconds = audio && audio.length > 0 ? audio.length / sampleRate : 0;
+  const audioSeconds = audio && audio.length > 0 ? audio.length / sampleRate : 0;
+  /** The axis: the longer of the audio and the pattern span. */
+  const seconds = Math.max(audioSeconds, spanSeconds ?? 0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -162,17 +196,21 @@ export const VoiceTakeWaveform: React.FC<VoiceTakeWaveformProps> = ({
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      ctx.fillStyle = themeColour('--color-bg', '#111');
+      ctx.fillRect(0, 0, width, HEIGHT);
       if (!buffer) {
-        ctx.fillStyle = themeColour('--color-bg', '#111');
-        ctx.fillRect(0, 0, width, HEIGHT);
+        if (seconds > 0) drawMarkers(ctx, width, HEIGHT, seconds, markers, rowSeconds, rowsPerBeat, playhead, spanSeconds);
         ctx.fillStyle = themeColour('--color-text-muted', '#6b7280');
+        ctx.globalAlpha = 1;
         ctx.font = LABEL_FONT;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(placeholder, width / 2, HEIGHT / 2);
         return;
       }
-      drawSampleWaveform(ctx, width, HEIGHT, {
+      // The audio takes its share of the axis; the rest is the pattern still to come.
+      const audioWidth = Math.max(1, Math.round((width * audioSeconds) / seconds));
+      drawSampleWaveform(ctx, audioWidth, HEIGHT, {
         audioBuffer: buffer,
         viewStart: 0,
         viewEnd: 1,
@@ -186,7 +224,7 @@ export const VoiceTakeWaveform: React.FC<VoiceTakeWaveformProps> = ({
         activeDrag: null,
         colors: { waveform: themeColour('--color-accent-primary', '#10b981') },
       });
-      drawMarkers(ctx, width, HEIGHT, seconds, markers, rowSeconds, rowsPerBeat, playhead);
+      drawMarkers(ctx, width, HEIGHT, seconds, markers, rowSeconds, rowsPerBeat, playhead, spanSeconds);
     };
 
     draw();
@@ -194,7 +232,7 @@ export const VoiceTakeWaveform: React.FC<VoiceTakeWaveformProps> = ({
     const observer = new ResizeObserver(draw);
     observer.observe(wrap);
     return () => observer.disconnect();
-  }, [buffer, seconds, markers, rowSeconds, rowsPerBeat, playhead, placeholder]);
+  }, [buffer, seconds, audioSeconds, markers, rowSeconds, rowsPerBeat, playhead, spanSeconds, placeholder]);
 
   return (
     <div ref={wrapRef} className="w-full bg-dark-bgTertiary border border-dark-borderLight rounded overflow-hidden">
@@ -203,6 +241,7 @@ export const VoiceTakeWaveform: React.FC<VoiceTakeWaveformProps> = ({
         data-testid="voice-take-waveform"
         data-markers={markers.length}
         data-seconds={seconds.toFixed(2)}
+        data-audio={audioSeconds.toFixed(2)}
         className="block w-full"
         style={{ height: HEIGHT }}
         role="img"
