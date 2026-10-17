@@ -152,10 +152,12 @@ Phase M - owner measurement (before any code)
 - [ ] M-4 Write the VNR-18 root cause and the wizard-flow fixes into this plan (sections "Take end" and "Drums"), turning TE-2 and WF-2 into exact items.
 
 Phase A - SwiftF0 tracker
-- [ ] SA-1 Vendor `public/models/swift-f0/model.onnx` (135,090 bytes, size checked) and `LICENSE`.
-- [ ] SA-2 `src/lib/onnx/ortSession.ts`; `instrument-classifier.worker.ts` and `NeuralEnhancerWorker.ts` use it.
-- [ ] SA-3 `src/lib/voice/pitchTrack.ts` types and constants; `src/workers/swift-f0.worker.ts`; `src/lib/voice/swiftF0.ts` (`swiftF0Tracker`, resample, loudness).
-- [ ] SA-4 Browser check through MCP: `evaluate_script` runs `swiftF0Tracker.track` on a 220 Hz sine (2 s); median Hz within 1 % of 220, confidence > 0.9; time per 1.5 s window recorded (budget under 40 ms so the 250 ms live hop holds).
+- [x] SA-1 Vendor `public/models/swift-f0/model.onnx` (135,090 bytes, size checked) and `LICENSE`.
+- [x] SA-2 `src/lib/onnx/ortSession.ts`; `instrument-classifier.worker.ts` and `NeuralEnhancerWorker.ts` use it.
+- [x] SA-3 `src/lib/voice/pitchTrack.ts` types and constants; `src/workers/swift-f0.worker.ts`; `src/lib/voice/swiftF0.ts` (`swiftF0Tracker`, resample, loudness).
+- [x] SA-4 Browser check through MCP: `evaluate_script` runs `swiftF0Tracker.track` on a 220 Hz sine (2 s); median Hz within 1 % of 220, confidence > 0.9; time per 1.5 s window recorded (budget under 40 ms so the 250 ms live hop holds).
+  - Done 2026-10-17, real Chrome: median 219.02 Hz (0.45 % low), median confidence 0.962 (min 0.959), loudness -9.03 dB for a 0.5 sine; first call 1217 ms including model load; 1.5 s window 24-32 ms.
+  - SA-3 deviations: loudness is computed from the 16 kHz audio inside the worker, the same as core.py; resampling to 16 kHz uses `resampleTo16k` from `CedMelSpectrogram.ts` in the worker (reuse, no second resampler). deploy.yml fetches model.onnx and LICENSE pinned to swift-f0 commit d1ba77f and checks 135,090 bytes.
 
 Phase B - segmenter
 - [ ] SG-1 `src/lib/voice/segmentNotes.ts` per design.
