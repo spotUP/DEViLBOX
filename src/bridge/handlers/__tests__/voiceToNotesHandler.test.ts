@@ -13,6 +13,8 @@ import { resetStore } from '@/stores/__tests__/_harness';
 import { midiToXMNote } from '@/lib/xmConversions';
 import { ANNOTATIONS_FPS } from '@/lib/voice/pitchNotes';
 import { synthTake } from '@/lib/voice/drumSynth';
+import { DRUM_808_MIDI } from '@/lib/voice/voiceInstruments';
+import { useInstrumentStore } from '@/stores/useInstrumentStore';
 
 function oneNoteOutput(midi: number) {
   const frames: number[][] = [];
@@ -72,13 +74,17 @@ describe('voice_to_notes handler', () => {
     const take = synthTake([{ drum: 'kick', at: 0.3 }, { drum: 'snare', at: 0.8 }], 1.5);
     const drumDeps: VoiceToNotesDeps = { ...deps, decode: async () => take };
     const undoBefore = useHistoryStore.getState().undoStack.length;
-    const res = await voiceToNotes({ data: btoa('abcd'), mode: 'drums', drumMap: { snare: { midi: 40 } } }, drumDeps);
+    // Snare mapped to a playable synth at E-2 by the caller; kick unmapped, so the commit adds a TR-808 kick
+    const snareSynth = useInstrumentStore.getState().createInstrument({ synthType: 'FMSynth', name: 'FM Snare Synth' });
+    const res = await voiceToNotes({ data: btoa('abcd'), mode: 'drums', drumMap: { snare: { instrumentId: snareSynth, midi: 40 } } }, drumDeps);
     expect(res.error).toBeUndefined();
     expect(calls).toBe(0);
     expect(res.hits).toEqual({ kick: 1, snare: 1, hat: 0, clap: 0 });
     const rows = useTrackerStore.getState().patterns[0].channels[1].rows;
-    const written = rows.map((r, i) => ({ i, note: r.note })).filter((c) => c.note > 0 && c.note !== 97);
-    expect(written.map((c) => c.note)).toEqual([midiToXMNote(36), midiToXMNote(40)]);
+    const written = rows.map((r, i) => ({ i, note: r.note, instrument: r.instrument })).filter((c) => c.note > 0 && c.note !== 97);
+    expect(written.map((c) => c.note)).toEqual([midiToXMNote(DRUM_808_MIDI), midiToXMNote(40)]);
+    const kick808 = useInstrumentStore.getState().instruments.find((i) => i.synthType === 'TR808' && i.parameters?.io808Type === 'kick');
+    expect(written.map((c) => c.instrument)).toEqual([kick808?.id, snareSynth]);
     expect(useHistoryStore.getState().undoStack.length - undoBefore).toBe(1);
     expect((await voiceToNotes({ data: 'AA==', mode: 'bogus' }, deps)).error).toBeDefined();
   });

@@ -57,7 +57,7 @@ describe('committed voice notes play (owner report 2026-10-17)', () => {
   });
 
   it('drums into a fresh song play on TR-808 voices at C-4, one per class', () => {
-    const map = defaultDrumMap([], 1);
+    const map = defaultDrumMap([]);
     const res = commitDrumHits([hit(0, 'kick'), hit(4, 'snare'), hit(8, 'hat'), hit(12, 'kick')], map, Q, target(1));
     expect(res?.written).toBe(4);
     const voices = [0, 4, 8, 12].map((r) => {
@@ -69,12 +69,12 @@ describe('committed voice notes play (owner report 2026-10-17)', () => {
     expect(voices).toEqual(['kick', 'snare', 'closedHat', 'kick']);
     expect(useInstrumentStore.getState().instruments).toHaveLength(3);
     // The next default map points at the 808s the commit created
-    expect(defaultDrumMap(useInstrumentStore.getState().instruments, 1).kick).toEqual(res?.drumMap.kick);
+    expect(defaultDrumMap(useInstrumentStore.getState().instruments).kick).toEqual(res?.drumMap.kick);
   });
 
   it('a drum class mapped to a playable instrument keeps that instrument and note', () => {
     const mine = useInstrumentStore.getState().createInstrument({ synthType: 'MembraneSynth', name: 'My Kick' });
-    const map = { ...defaultDrumMap([], 1), kick: { instrumentId: mine, midi: 36 } };
+    const map = { ...defaultDrumMap([]), kick: { instrumentId: mine, midi: 36 } };
     commitDrumHits([hit(0, 'kick')], map, Q, target(1));
     expect(rows()[0].instrument).toBe(mine);
     expect(rows()[0].note).toBe(midiToXMNote(36));
