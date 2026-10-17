@@ -3,12 +3,13 @@
  *
  * Goes through useTrackerStore.bulkBlockEdit (one history entry, one live
  * engine resync). Note encoding is lib/xmConversions.midiToXMNote, the same
- * function the sample editor's Audio to MIDI path uses.
+ * function the sample editor's Audio to MIDI path uses. The commit functions
+ * (voiceToNotes, drumToNotes) pick playable instruments before writing
+ * (voiceInstruments.ts).
  */
 import type { Pattern, TrackerCell } from '@typedefs';
 import { midiToXMNote } from '@/lib/xmConversions';
 import { useTrackerStore } from '@/stores/useTrackerStore';
-import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import type { QuantisedNote } from './quantise';
 
 /** XM note-off */
@@ -32,74 +33,62 @@ export interface WriteResult {
   dropped: number;
 }
 
-/** Pure part: mutate a pattern in place. */
+export interface TakeCell {
+  note: number;
+  instrument: number;
+  volume: number;
+}
+
+export interface TakeCells extends WriteResult {
+  /** Pattern row of cells[0] */
+  startRow: number;
+  /** Every row of the take's span; empty rows are all zero (the span is cleared). */
+  cells: TakeCell[];
+}
+
+/**
+ * The cells a take writes on its channel: the span from `target.startRow`
+ * through the last note's note-off, clipped to `rowCount`. The one place the
+ * write rules live: the commit copies these cells and the pattern's live
+ * preview draws them, so the preview shows exactly what a commit writes.
+ */
+export function takeCells(notes: readonly QuantisedNote[], target: WriteTarget, rowCount: number): TakeCells {
+  const last = notes.length ? notes[notes.length - 1] : null;
+  const spanEnd = last ? Math.min(rowCount, target.startRow + last.row + last.lengthRows + 1) : target.startRow;
+  const out: TakeCells = { startRow: target.startRow, cells: [], written: 0, dropped: 0 };
+  for (let r = target.startRow; r < spanEnd; r++) out.cells.push({ note: 0, instrument: 0, volume: 0 });
+  for (const n of notes) {
+    const i = n.row;
+    const xm = midiToXMNote(n.midi);
+    if (target.startRow + i >= rowCount || !xm) {
+      out.dropped++;
+      continue;
+    }
+    out.cells[i] = { note: xm, instrument: n.instrumentId ?? target.instrumentId, volume: velocityToVolume(n.velocity) };
+    out.written++;
+    const off = i + n.lengthRows;
+    if (n.noteOff !== false && off < out.cells.length && out.cells[off].note === 0) out.cells[off].note = NOTE_OFF;
+  }
+  return out;
+}
+
+/** Pure part: mutate a pattern in place (replace semantics over the take's span). */
 export function applyNotesToPattern(
   pattern: Pattern,
   notes: readonly QuantisedNote[],
   target: WriteTarget,
 ): WriteResult {
   const channel = pattern.channels[target.channelIndex];
-  const result: WriteResult = { written: 0, dropped: 0 };
-  if (!channel) {
-    result.dropped = notes.length;
-    return result;
-  }
+  if (!channel) return { written: 0, dropped: notes.length };
   const rows: TrackerCell[] = channel.rows;
-  const last = notes.length ? notes[notes.length - 1] : null;
-  if (last) {
-    // Replace semantics: the take's span is cleared of notes first.
-    const spanEnd = Math.min(rows.length, target.startRow + last.row + last.lengthRows + 1);
-    for (let r = target.startRow; r < spanEnd; r++) {
-      rows[r].note = 0;
-      rows[r].instrument = 0;
-      rows[r].volume = 0;
-    }
-  }
-  for (const n of notes) {
-    const row = target.startRow + n.row;
-    const xm = midiToXMNote(n.midi);
-    if (row >= rows.length || !xm) {
-      result.dropped++;
-      continue;
-    }
-    rows[row].note = xm;
-    rows[row].instrument = n.instrumentId ?? target.instrumentId;
-    rows[row].volume = velocityToVolume(n.velocity);
-    result.written++;
-    const off = row + n.lengthRows;
-    if (n.noteOff !== false && off < rows.length && rows[off].note === 0) rows[off].note = NOTE_OFF;
-  }
-  return result;
-}
-
-/**
- * Every instrument the notes point at must exist, or they play silent. A fresh
- * song has no instruments at all, and the panel's default target is 1, so a
- * missing id gets a new default instrument (one per distinct missing id).
- */
-export function resolveInstruments(
-  notes: readonly QuantisedNote[],
-  target: WriteTarget,
-): { notes: QuantisedNote[]; target: WriteTarget } {
-  const store = useInstrumentStore.getState();
-  const existing = new Set(store.instruments.map((i) => i.id));
-  const remap = new Map<number, number>();
-  const resolve = (id: number): number => {
-    if (existing.has(id)) return id;
-    let created = remap.get(id);
-    if (created === undefined) {
-      created = useInstrumentStore.getState().createInstrument();
-      // -1: the format's instrument limit refused it; keep the original id
-      if (created < 0) created = id;
-      remap.set(id, created);
-    }
-    return created;
-  };
-  const resolvedTarget = { ...target, instrumentId: resolve(target.instrumentId) };
-  const resolvedNotes = notes.map((n) =>
-    n.instrumentId === undefined ? n : { ...n, instrumentId: resolve(n.instrumentId) },
-  );
-  return { notes: resolvedNotes, target: resolvedTarget };
+  const take = takeCells(notes, target, rows.length);
+  take.cells.forEach((c, i) => {
+    const cell = rows[take.startRow + i];
+    cell.note = c.note;
+    cell.instrument = c.instrument;
+    cell.volume = c.volume;
+  });
+  return { written: take.written, dropped: take.dropped };
 }
 
 /** Store part: one undo step on the current pattern. */
@@ -107,10 +96,9 @@ export function writeNotesToPattern(
   notes: readonly QuantisedNote[],
   target: WriteTarget,
 ): WriteResult {
-  const resolved = resolveInstruments(notes, target);
   let result: WriteResult = { written: 0, dropped: 0 };
   useTrackerStore.getState().bulkBlockEdit('Voice to Notes', (pattern) => {
-    result = applyNotesToPattern(pattern, resolved.notes, resolved.target);
+    result = applyNotesToPattern(pattern, notes, target);
   });
   return result;
 }
