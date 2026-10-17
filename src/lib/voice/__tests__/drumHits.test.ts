@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync, readdirSync } from 'node:fs';
-import { DRUM_CLASSES, classifyByRules, detectHits, detectOnsets, hitFeatures, type DrumClass } from '../drumHits';
+import { BAND_COUNT, DRUM_CLASSES, FEATURE_COUNT, classifyByRules, detectHits, detectOnsets, featureVector, hitFeatures, type DrumClass } from '../drumHits';
 import { synthHit, synthTake } from '../drumSynth';
 import { PITCH_SAMPLE_RATE } from '../pitchNotes';
 
@@ -24,6 +24,55 @@ describe('hit features and rules (synthetic signals)', () => {
     expect(feat('clap').bursts).toBeGreaterThanOrEqual(2);
     expect(feat('snare').bursts).toBe(1);
     expect(feat('hat').decay).toBeLessThan(feat('kick').decay);
+  });
+});
+
+describe('features v2: bands, centroid, flatness, attack (WD-1)', () => {
+  const SR = PITCH_SAMPLE_RATE;
+  const sine = (hz: number) => Float32Array.from({ length: SR / 4 }, (_, i) => 0.5 * Math.sin((2 * Math.PI * hz * i) / SR));
+  /** Deterministic white noise (LCG), so the test never flakes. */
+  const noise = () => {
+    let x = 12345;
+    return Float32Array.from({ length: SR / 4 }, () => {
+      x = (x * 1103515245 + 12345) % 2147483648;
+      return x / 1073741824 - 1;
+    });
+  };
+
+  it('the vector has FEATURE_COUNT finite values and the bands sum to 1', () => {
+    for (const f of [hitFeatures(sine(100), 0), hitFeatures(noise(), 0), hitFeatures(synthHit('snare', 1), 0)]) {
+      expect(f.bands).toHaveLength(BAND_COUNT);
+      expect(f.bands.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 6);
+      const v = featureVector(f);
+      expect(v).toHaveLength(FEATURE_COUNT);
+      expect(v.every(Number.isFinite)).toBe(true);
+    }
+  });
+
+  it('a 100 Hz sine puts its energy in the lowest band, a 5 kHz sine in the second highest', () => {
+    const low = hitFeatures(sine(100), 0).bands;
+    expect(low.indexOf(Math.max(...low))).toBe(0);
+    const high = hitFeatures(sine(5000), 0).bands;
+    expect(high.indexOf(Math.max(...high))).toBe(BAND_COUNT - 2);
+  });
+
+  it('the centroid follows the pitch; white noise is flat and centred, a sine is not flat', () => {
+    expect(hitFeatures(sine(1000), 0).centroid).toBeCloseTo(1000 / (SR / 2), 1);
+    const n = hitFeatures(noise(), 0);
+    expect(n.centroid).toBeGreaterThan(0.4);
+    expect(n.centroid).toBeLessThan(0.6);
+    expect(n.flatness).toBeGreaterThan(0.4);
+    expect(hitFeatures(sine(1000), 0).flatness).toBeLessThan(0.05);
+  });
+
+  it('attack is near 0 for a sharp click and grows when the peak comes late', () => {
+    expect(hitFeatures(synthHit('kick', 1), 0).attack).toBeLessThan(0.1);
+    const late = new Float32Array(SR / 4);
+    const peakAt = Math.round(0.03 * SR); // 30 ms of a 60 ms window
+    for (let i = 0; i < late.length; i++) late[i] = Math.sin(i * 0.3) * Math.max(0, 1 - Math.abs(i - peakAt) / peakAt);
+    const a = hitFeatures(late, 0).attack;
+    expect(a).toBeGreaterThan(0.4);
+    expect(a).toBeLessThan(0.6);
   });
 });
 

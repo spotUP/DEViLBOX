@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { NEW_808_INSTRUMENT, defaultDrumMap, quantiseHits } from '../drumToNotes';
 import type { DrumHit } from '../drumHits';
 
-const feat = { low: 0, mid: 0, high: 0, decay: 0, zcr: 0, bursts: 1 };
+const feat = { low: 0, mid: 0, high: 0, decay: 0, zcr: 0, bursts: 1, bands: [0, 0, 0, 0, 0, 0, 0, 0], centroid: 0, flatness: 0, attack: 0 };
 const hit = (drum: DrumHit['drum'], timeSeconds: number, strength: number): DrumHit => ({ drum, timeSeconds, strength, features: feat });
 const q = { bpm: 150, speed: 6, swing: 0, minLengthRows: 1, latencyNudgeMs: 0, strength: 1, toleranceRows: 0.1 };
 
