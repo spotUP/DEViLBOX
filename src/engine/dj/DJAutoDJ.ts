@@ -11,6 +11,7 @@
  * - DJTrackLoader for automatic Modland track downloading
  */
 
+import { API_URL } from '@lib/apiBase';
 import { useDJStore } from '@/stores/useDJStore';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
 import type { PlaylistTrack } from '@/stores/useDJPlaylistStore';
@@ -1374,7 +1375,6 @@ class DJAutoDJ {
   // ── Private: Network Health ──────────────────────────────────────────────
 
   private async isServerUnreachable(): Promise<boolean> {
-    const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
     try {
       const resp = await fetch(`${API_URL}/modland/status`, {
         method: 'HEAD',

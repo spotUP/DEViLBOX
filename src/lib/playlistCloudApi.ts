@@ -7,7 +7,7 @@
 
 import { useAuthStore } from '@/stores/useAuthStore';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
+import { API_URL } from '@lib/apiBase';
 
 function getAuthHeaders(): HeadersInit {
   const { token } = useAuthStore.getState();

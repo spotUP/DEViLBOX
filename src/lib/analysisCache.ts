@@ -7,7 +7,7 @@
 
 import type { ExtendedAnalysis } from '@/engine/dj/autodj/types';
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+import { API_URL } from '@lib/apiBase';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 

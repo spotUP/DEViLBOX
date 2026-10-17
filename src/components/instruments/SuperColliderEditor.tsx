@@ -11,7 +11,7 @@ import { SCGuiRenderer } from './SCGuiRenderer';
 import { SC_PRESETS, SC_PRESET_CATEGORIES, type SCPreset } from '@constants/scPresets';
 import { getToneEngine } from '@engine/ToneEngine';
 
-const API_URL = import.meta.env.VITE_API_URL as string | undefined ?? 'https://devilbox.uprough.net/api';
+import { API_URL } from '@lib/apiBase';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -302,7 +302,7 @@ export const SuperColliderEditor: React.FC<Props> = ({ config, onChange }) => {
       const isConnectionError = raw === 'Failed to fetch' || raw.toLowerCase().includes('networkerror');
       const message = isConnectionError ? 'Compile server unreachable' : raw;
       const rawOutput = isConnectionError
-        ? `Could not connect to the compile server:\n  ${API_URL}/sc/compile\n\nStart the backend with:\n  cd server && npm run dev\n\nOr set VITE_API_URL in your .env.local to point at a running instance.`
+        ? `Could not connect to the compile server:\n  ${API_URL}/sc/compile\n\nStart the backend with:\n  cd server && npm run dev\n\nOr set the API URL variable in your .env.local to point at a running instance.`
         : undefined;
       setStatus({ state: 'error', message, rawOutput });
     }

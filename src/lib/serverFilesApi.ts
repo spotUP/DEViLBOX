@@ -18,7 +18,7 @@ async function authFetch(url: string, init?: RequestInit): Promise<Response> {
   return response;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
+import { API_URL } from '@lib/apiBase';
 
 export interface ServerFile {
   id: string;

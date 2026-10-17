@@ -6,7 +6,7 @@
 
 import fileManifest from '@generated/file-manifest.json';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
+import { API_URL as API_BASE } from '@lib/apiBase';
 
 export interface ServerFileEntry {
   name: string;

@@ -46,7 +46,7 @@ import type { InstrumentType } from '@/bridge/analysis/AudioSetInstrumentMap';
 //
 // `/onnx-wasm` is mounted on the same Express app that serves `/api`
 // (server/src/index.ts), so the API base is the right thing to follow.
-const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
+import { API_URL } from '@lib/apiBase';
 ort.env.wasm.wasmPaths = `${API_URL.replace(/\/api\/?$/, '')}/onnx-wasm/`;
 // One thread. Classification is background work with no deadline; ORT's
 // default pool took three extra cores at ~88 % each while a song played
