@@ -4,6 +4,7 @@ import { useTransportStore } from '../useTransportStore';
 import { useHistoryStore } from '../useHistoryStore';
 import { useCursorStore } from '../useCursorStore';
 import { resetStore } from './_harness';
+import { undo as undoCommand, redo as redoCommand } from '@engine/keyboard/commands/history';
 
 describe('useTrackerStore — pattern lifecycle', () => {
   beforeEach(() => resetStore(useTrackerStore));
@@ -96,11 +97,11 @@ describe('useTrackerStore — bulkBlockEdit atomic undo', () => {
       }
     });
 
-    const restored = useHistoryStore.getState().undo();
-    expect(restored).not.toBeNull();
-    // Single undo returns the whole pre-edit pattern, not just the last cell.
-    expect(restored!.channels[0].rows[0].note).toBe(originalNote);
-    expect(restored!.channels[0].rows[7].note).toBe(originalNote);
+    expect(useTrackerStore.getState().undoEdit()).not.toBeNull();
+    // Single undo restores the whole pre-edit pattern, not just the last cell.
+    const restored = useTrackerStore.getState().patterns[0];
+    expect(restored.channels[0].rows[0].note).toBe(originalNote);
+    expect(restored.channels[0].rows[7].note).toBe(originalNote);
   });
 });
 
@@ -125,10 +126,10 @@ describe('useTrackerStore — resizePattern undo + cursor clamp', () => {
     expect(useTrackerStore.getState().patterns[0].length).toBe(8);
 
     // Undo must give back the pre-shrink pattern with the discarded row intact.
-    const restored = useHistoryStore.getState().undo();
-    expect(restored).not.toBeNull();
-    expect(restored!.length).toBe(startLen);
-    expect(restored!.channels[0].rows[startLen - 1].note).toBe(61);
+    expect(useTrackerStore.getState().undoEdit()).not.toBeNull();
+    const restored = useTrackerStore.getState().patterns[0];
+    expect(restored.length).toBe(startLen);
+    expect(restored.channels[0].rows[startLen - 1].note).toBe(61);
   });
 
   it('clamps the edit cursor when a shrink leaves it past the new pattern end', () => {
@@ -142,5 +143,73 @@ describe('useTrackerStore — resizePattern undo + cursor clamp', () => {
 
     // Cursor may not dangle past the end — FT2 clamps to the last valid row.
     expect(useCursorStore.getState().cursor.rowIndex).toBe(7);
+  });
+});
+
+describe('useTrackerStore — undo restores the step\'s own patterns', () => {
+  beforeEach(() => {
+    resetStore(useTrackerStore);
+    useHistoryStore.getState().clearHistory();
+  });
+
+  it('undo restores the edited pattern after the view moved to another pattern', () => {
+    useTrackerStore.getState().addPattern();
+    const original = useTrackerStore.getState().patterns[0].channels[0].rows[0].note;
+    const otherBefore = structuredClone(useTrackerStore.getState().patterns[1]);
+    useTrackerStore.getState().bulkBlockEdit('edit pattern 0', (pattern) => {
+      pattern.channels[0].rows[0].note = 50;
+    });
+    useTrackerStore.setState({ currentPatternIndex: 1 });
+
+    undoCommand();
+    let s = useTrackerStore.getState();
+    expect(s.patterns[0].channels[0].rows[0].note).toBe(original);
+    expect(s.patterns[1]).toEqual(otherBefore);
+
+    redoCommand();
+    s = useTrackerStore.getState();
+    expect(s.patterns[0].channels[0].rows[0].note).toBe(50);
+    expect(s.patterns[1]).toEqual(otherBefore);
+  });
+
+  it('multiPatternEdit is one undo step over several patterns, an appended pattern and the order', () => {
+    useTrackerStore.getState().addPattern();
+    useTrackerStore.getState().setPatternOrder([0, 1]);
+    useHistoryStore.getState().clearHistory();
+    const start = structuredClone(useTrackerStore.getState().patterns);
+    const len = start[0].length;
+
+    const added = structuredClone(start[1]);
+    added.id = 'appended';
+    added.channels[0].rows[3].note = 53;
+    useTrackerStore.getState().multiPatternEdit('span', (song) => {
+      song.patterns[0].channels[0].rows[1].note = 49;
+      song.patterns[1].channels[0].rows[2].note = 51;
+      song.patterns.push(added);
+      song.patternOrder.push(2);
+    });
+    expect(useHistoryStore.getState().undoStack.length).toBe(1);
+    let s = useTrackerStore.getState();
+    expect(s.patterns.length).toBe(3);
+    expect(s.patternOrder).toEqual([0, 1, 2]);
+
+    expect(useTrackerStore.getState().undoEdit()?.description).toBe('span');
+    s = useTrackerStore.getState();
+    expect(s.patterns).toEqual(start);
+    expect(s.patternOrder).toEqual([0, 1]);
+
+    useTrackerStore.getState().redoEdit();
+    s = useTrackerStore.getState();
+    expect(s.patterns.length).toBe(3);
+    expect(s.patterns[0].channels[0].rows[1].note).toBe(49);
+    expect(s.patterns[1].channels[0].rows[2].note).toBe(51);
+    expect(s.patterns[2].channels[0].rows[3].note).toBe(53);
+    expect(s.patterns[2].length).toBe(len);
+    expect(s.patternOrder).toEqual([0, 1, 2]);
+  });
+
+  it('multiPatternEdit that changes nothing records no step', () => {
+    useTrackerStore.getState().multiPatternEdit('noop', () => {});
+    expect(useHistoryStore.getState().undoStack.length).toBe(0);
   });
 });

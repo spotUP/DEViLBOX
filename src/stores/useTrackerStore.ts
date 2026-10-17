@@ -24,7 +24,7 @@ import { SYSTEM_PRESETS, DivChanType } from '../constants/systemPresets';
 import { autoNameChannels as computeAutoNames } from '@/bridge/analysis/ChannelNaming';
 import { useInstrumentStore } from './useInstrumentStore';
 import { isSynthCompatibleWithChannel, getChannelBadge, getSynthBadge } from '../constants/channelTypeCompat';
-import { useHistoryStore } from './useHistoryStore';
+import { useHistoryStore, type HistoryAction, type PatternChange } from './useHistoryStore';
 // Late-bound access to the sibling stores that used to form an import cycle
 // with this file. storeAccess is a leaf — it imports nothing — so the three
 // stores no longer participate in the same module-graph cycle that caused
@@ -214,6 +214,36 @@ function syncBulkEdit(
 
   // MusicLine / PumaTracker / Symphonie (debounced re-export)
   debouncedWasmEngineReexport();
+}
+
+/**
+ * Put one history step's patterns and song order back (undo) or forward (redo).
+ * Patterns the step appended (`before: null`) are removed on undo and appended
+ * again on redo; the others are replaced and resynced to the playing engines.
+ */
+function applyHistoryStep(action: HistoryAction, dir: 'undo' | 'redo'): void {
+  const changes = dir === 'undo' ? [...action.changes].reverse() : action.changes;
+  const replaced: Array<{ index: number; before: Pattern }> = [];
+  useTrackerStore.setState((state) => {
+    for (const c of changes) {
+      if (c.before === null) {
+        if (dir === 'undo') {
+          if (c.patternIndex === state.patterns.length - 1) state.patterns.pop();
+        } else if (c.patternIndex === state.patterns.length) {
+          state.patterns.push(structuredClone(c.after));
+        }
+        continue;
+      }
+      if (c.patternIndex < 0 || c.patternIndex >= state.patterns.length) continue;
+      replaced.push({ index: c.patternIndex, before: useTrackerStore.getState().patterns[c.patternIndex] });
+      state.patterns[c.patternIndex] = structuredClone(dir === 'undo' ? c.before : c.after);
+    }
+    if (action.order) state.patternOrder = [...(dir === 'undo' ? action.order.before : action.order.after)];
+    state.currentPatternIndex = Math.min(state.currentPatternIndex, state.patterns.length - 1);
+    state.currentPositionIndex = Math.min(state.currentPositionIndex, state.patternOrder.length - 1);
+  });
+  const patterns = useTrackerStore.getState().patterns;
+  for (const r of replaced) syncBulkEdit(r.index, patterns[r.index], r.before);
 }
 
 /**
@@ -445,6 +475,19 @@ interface TrackerStore {
 
   // Undo/Redo support
   replacePattern: (index: number, pattern: Pattern) => void;
+  /**
+   * The one undo/redo path: pops the history step and restores every pattern
+   * and the song order it changed, at the step's own indices. Every entry point
+   * (keyboard, toolbar, MIDI, history panel, MCP) calls these.
+   */
+  undoEdit: () => HistoryAction | null;
+  redoEdit: () => HistoryAction | null;
+  /**
+   * An edit across several patterns and the song order as ONE undo step.
+   * `edit` gets the patterns and order drafts; it may change patterns and append
+   * new ones at the end, never remove one. Changed patterns resync the engines.
+   */
+  multiPatternEdit: (label: string, edit: (song: { patterns: Pattern[]; patternOrder: number[] }) => void) => void;
 
   // UADE live pattern display — updates cells in-place without undo history
   setLiveChannelData: (row: number, channelData: Array<{ note: number; instrument: number; volume: number }>) => void;
@@ -2009,6 +2052,40 @@ export const useTrackerStore = create<TrackerStore>()(
         state.patterns[index] = structuredClone(pattern);
       });
       syncBulkEdit(index, get().patterns[index], beforePattern);
+    },
+
+    undoEdit: () => {
+      const action = useHistoryStore.getState().undo();
+      if (action) applyHistoryStep(action, 'undo');
+      return action;
+    },
+
+    redoEdit: () => {
+      const action = useHistoryStore.getState().redo();
+      if (action) applyHistoryStep(action, 'redo');
+      return action;
+    },
+
+    multiPatternEdit: (label, edit) => {
+      const before = get().patterns;
+      const orderBefore = get().patternOrder;
+      set((state) => {
+        edit(state);
+      });
+      const after = get().patterns;
+      if (after.length < before.length) throw new Error('multiPatternEdit: an edit may not remove patterns');
+      // Immer keeps untouched patterns by reference, so a changed reference is a changed pattern.
+      const changes: PatternChange[] = [];
+      after.forEach((pattern, i) => {
+        if (i >= before.length) changes.push({ patternIndex: i, before: null, after: pattern });
+        else if (before[i] !== pattern) changes.push({ patternIndex: i, before: before[i], after: pattern });
+      });
+      const orderAfter = get().patternOrder;
+      const orderChanged = orderAfter.length !== orderBefore.length || orderAfter.some((p, i) => p !== orderBefore[i]);
+      if (changes.length === 0 && !orderChanged) return;
+      useHistoryStore.getState().pushMultiAction('BULK_BLOCK_EDIT', label, changes,
+        orderChanged ? { before: orderBefore, after: orderAfter } : undefined);
+      for (const c of changes) if (c.before) syncBulkEdit(c.patternIndex, c.after, c.before);
     },
 
     // FT2: Pattern Order List management
