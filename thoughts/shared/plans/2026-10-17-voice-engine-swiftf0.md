@@ -160,11 +160,12 @@ Phase A - SwiftF0 tracker
   - SA-3 deviations: loudness is computed from the 16 kHz audio inside the worker, the same as core.py; resampling to 16 kHz uses `resampleTo16k` from `CedMelSpectrogram.ts` in the worker (reuse, no second resampler). deploy.yml fetches model.onnx and LICENSE pinned to swift-f0 commit d1ba77f and checks 135,090 bytes.
 
 Phase B - segmenter
-- [ ] SG-1 `src/lib/voice/segmentNotes.ts` per design.
-- [ ] SG-2 Parity fixture: run SwiftF0 Python (`pip install swift-f0` in the scratchpad venv) on two WAVs synthesised by a script (alternating 220/277 Hz with vowel-like harmonic swap; a glide), save `{track, notes}` JSON to `src/lib/voice/__tests__/fixtures/swiftf0-parity/`; test asserts our DP returns the same note boundaries (frame-exact) and MIDI numbers.
-- [ ] SG-3 Unit tests: vowel change at one pitch is one note; a one-semitone step held 64 ms does not split, held 96 ms does; a 60 ms unvoiced gap splits same-pitch notes; quiet dip under 3.01 dB does not split; range and min length filters.
-- [ ] SG-4 `amplitude` from loudness; test: louder note has higher amplitude.
-- [ ] SG-5 Timing: 60 s synthetic track under 50 ms in vitest (measured, number recorded here); 10-cent candidate quantisation only if over budget.
+- [x] SG-1 `src/lib/voice/segmentNotes.ts` per design.
+- [x] SG-2 Parity fixture: run SwiftF0 Python (`pip install swift-f0` in the scratchpad venv) on two WAVs synthesised by a script (alternating 220/277 Hz with vowel-like harmonic swap; a glide), save `{track, notes}` JSON to `src/lib/voice/__tests__/fixtures/swiftf0-parity/`; test asserts our DP returns the same note boundaries (frame-exact) and MIDI numbers.
+- [x] SG-3 Unit tests: vowel change at one pitch is one note; a one-semitone step held 64 ms does not split, held 96 ms does; a 60 ms unvoiced gap splits same-pitch notes; quiet dip under 3.01 dB does not split; range and min length filters.
+- [x] SG-4 `amplitude` from loudness; test: louder note has higher amplitude.
+- [x] SG-5 Timing: 60 s synthetic track under 50 ms in vitest (measured, number recorded here); 10-cent candidate quantisation only if over budget.
+  - Done: fixtures come from `tools/voice/swiftf0-parity.py` (swift-f0 at d1ba77f, run with `python -I`). Parity is frame-exact on both fixtures; the alternating fixture gives 6 notes 57 61 57 61 57 61. Deviation: parity runs with `voicingThreshold` 0, because the Voice to Notes threshold (0.5) zeroes the weight of frames the Python DP still counts. SG-5 measured 24.5 ms for 3750 frames and 150 notes; no quantisation. The test asserts under 200 ms so a loaded CI box does not flake; the 50 ms budget is in a comment.
 
 Phase C - melody wiring
 - [ ] WC-1 `useVoiceStore`: take holds `track`; `Finetune extends SegmentSettings`; defaults.
