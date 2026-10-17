@@ -87,6 +87,48 @@ describe('onset detection and the whole pipeline', () => {
     expect(onsets.length).toBe(pattern.length);
     onsets.forEach((t, i) => expect(Math.abs(t - pattern[i].at)).toBeLessThan(0.02));
   });
+
+  // Regression (owner report 2026-10-17, "the drum recorder fails to identify my
+  // kicks"): one crisp hit raised the flux threshold through its floor*peakMax
+  // term, so every slow-attack mouth kick a few dB quieter fell under it. Measured
+  // on a real take: threshold 1.01, the kicks' flux 0.6 to 0.95, all other gates
+  // passed. A soft bump 35 dB under the loudest hit still stays out.
+  it('finds slow-attack kicks that are quieter than one sharp hit in the take', () => {
+    const SR = PITCH_SAMPLE_RATE;
+    const take = new Float32Array(Math.round(SR * 2.8));
+    let seed = 5;
+    const rnd = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296 - 0.5;
+    };
+    for (let i = 0; i < take.length; i++) take[i] = rnd() * 0.006; // room at -50 dBFS peak
+    // A mouth kick: a 60 Hz tone whose level grows exponentially over `attack`
+    // seconds (so the log-magnitude flux stays low on every hop), then decays.
+    const mouthKick = (at: number, gain: number, attack: number) => {
+      const start = Math.round(at * SR);
+      const ramp = Math.round(attack * SR);
+      let phase = 0;
+      for (let j = 0; j < Math.round(0.25 * SR) && start + j < take.length; j++) {
+        phase += (2 * Math.PI * 60) / SR;
+        const env = Math.min(1, Math.exp((j - ramp) / (ramp / 4.6))) * Math.exp(-Math.max(0, j - ramp) / (0.12 * SR));
+        take[start + j] += gain * env * Math.sin(phase);
+      }
+    };
+    // A crisp hit: broadband noise from one sample, 15 ms decay
+    const crispHit = (at: number, gain: number) => {
+      const start = Math.round(at * SR);
+      for (let j = 0; j < Math.round(0.05 * SR); j++) take[start + j] += gain * rnd() * 2 * Math.exp(-j / (0.015 * SR));
+    };
+    const kicks = [0.3, 0.7, 1.5, 1.9, 2.3];
+    kicks.forEach((t) => mouthKick(t, 0.2, 0.07));
+    crispHit(1.1, 0.25);
+    mouthKick(2.6, 0.005, 0.07); // 32 dB under the kicks: background, not a hit
+    const expected = [...kicks, 1.1].sort((a, b) => a - b);
+    const onsets = detectOnsets(take);
+    expect(onsets.length, onsets.join(' ')).toBe(expected.length);
+    onsets.forEach((t, i) => expect(Math.abs(t - expected[i])).toBeLessThan(0.02));
+    expect(detectHits(take).filter((h) => h.drum === 'kick').length).toBe(kicks.length);
+  });
 });
 
 // Real beatbox clips are owner-provided. Drop them in
