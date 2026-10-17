@@ -7,7 +7,7 @@
 
 import { md5 } from 'js-md5';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
+import { API_URL } from '@lib/apiBase';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 

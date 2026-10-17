@@ -26,7 +26,7 @@ interface ServiceState {
 
 // ── Health check helpers ──────────────────────────────────────────────
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_URL as API_BASE } from '@lib/apiBase';
 
 async function checkExpressHealth(): Promise<ServiceState> {
   try {

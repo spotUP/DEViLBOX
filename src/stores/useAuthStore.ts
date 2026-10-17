@@ -6,7 +6,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { hasElectronFS } from '@utils/electron';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
+import { API_URL } from '@lib/apiBase';
 
 interface User {
   id: string;

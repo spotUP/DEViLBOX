@@ -8,6 +8,7 @@
  * Used by Auto DJ to ensure smart sort has the metadata it needs.
  */
 
+import { API_URL } from '@lib/apiBase';
 import { useDJPlaylistStore, type PlaylistTrack, type DJPlaylist } from '@/stores/useDJPlaylistStore';
 import { cacheSourceFile, getCachedAudioByFilename, PREVIEW_RENDER_CAP_SEC } from './DJAudioCache';
 import { getDJPipeline } from './DJPipeline';
@@ -581,7 +582,6 @@ export async function analyzePlaylist(
           // Guarded with AbortController + hard timeout so one sick track
           // can't stall the whole run. Caller signal is forwarded too, so
           // closing the modal cancels in-flight work.
-          const serverBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
           // Detect TFMX companion file: mdat.* needs smpl.* from same directory
           let companionParam = '';
@@ -603,7 +603,7 @@ export async function analyzePlaylist(
           let response: Response;
           try {
             response = await fetch(
-              `${serverBase}/render/analyze?filename=${encodeURIComponent(filename)}${companionParam}`,
+              `${API_URL}/render/analyze?filename=${encodeURIComponent(filename)}${companionParam}`,
               {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/octet-stream' },

@@ -10,7 +10,7 @@ import { useTransportStore } from '@stores/useTransportStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { dispatchBridgeCall } from '@/bridge/MCPBridge';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_URL as API_BASE } from '@lib/apiBase';
 
 let activeAbort: AbortController | null = null;
 

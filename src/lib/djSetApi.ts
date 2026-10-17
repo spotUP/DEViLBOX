@@ -8,7 +8,7 @@
 import { useAuthStore } from '@/stores/useAuthStore';
 import type { DJSet, DJSetMetadata } from '@/engine/dj/recording/DJSetFormat';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
+import { API_URL } from '@lib/apiBase';
 
 function getHeaders(): HeadersInit {
   const token = useAuthStore.getState().token;

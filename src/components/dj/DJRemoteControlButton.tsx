@@ -10,7 +10,7 @@ import { createPortal } from 'react-dom';
 import { DJRemoteMicReceiver } from '@/engine/dj/DJRemoteMicReceiver';
 import { QRCode } from './QRCode';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { API_URL as API_BASE } from '@lib/apiBase';
 
 export const DJRemoteControlButton: React.FC = () => {
   const [showPanel, setShowPanel] = useState(false);

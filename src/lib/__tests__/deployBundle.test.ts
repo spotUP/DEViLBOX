@@ -44,7 +44,7 @@ describe('nothing hardcodes the development server', () => {
     // guard that fails intermittently is a guard people switch off.
     let hits: string[];
     try {
-      const cmd = 'git grep -nE "https?://localhost:3011" -- "src/*.ts" "src/*.tsx"';
+      const cmd = 'git grep -nE "https?://localhost:30(11|01)" -- "src/*.ts" "src/*.tsx"';
       hits = execSync(cmd, { cwd: ROOT, encoding: 'utf8' }).trim().split('\n').filter(Boolean);
     } catch {
       hits = [];   // git grep exits non-zero when it finds nothing
@@ -63,7 +63,7 @@ describe('nothing hardcodes the development server', () => {
 });
 
 describe('the API base is environment-driven with a PRODUCTION fallback', () => {
-  const api = readFileSync(resolve(ROOT, 'src/lib/modlandApi.ts'), 'utf8');
+  const api = readFileSync(resolve(ROOT, 'src/lib/apiBase.ts'), 'utf8');
 
   it('falls back to the live host, not to localhost', () => {
     // The fallback is what a CI build compiles in, so it has to be the one
@@ -72,6 +72,30 @@ describe('the API base is environment-driven with a PRODUCTION fallback', () => 
     expect(match, 'API_URL should be `import.meta.env.VITE_API_URL || <fallback>`').toBeTruthy();
     expect(match![1]).not.toMatch(/localhost/);
     expect(match![1]).toMatch(/^https:\/\//);
+  });
+
+  /**
+   * The AI panel showed "Cannot reach server" on the live site because
+   * aiChatService.ts had its own `VITE_API_URL || 'http://localhost:3001'`.
+   * About twenty files each defined their own base with different fallbacks;
+   * one wrong copy is enough. Exactly one module may read the variable.
+   */
+  it('only apiBase.ts reads VITE_API_URL, so no consumer can fall back to localhost', { timeout: 30_000 }, () => {
+    let hits: string[];
+    try {
+      const cmd = 'git grep -n "VITE_API_URL" -- "src/*.ts" "src/*.tsx"';
+      hits = execSync(cmd, { cwd: ROOT, encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+    } catch {
+      hits = [];
+    }
+    const offenders = hits.filter(line => {
+      const file = line.slice(0, line.indexOf(':'));
+      if (file === 'src/lib/apiBase.ts' || file === 'src/vite-env.d.ts') return false;
+      if (/(__tests__|\.test\.tsx?$)/.test(file)) return false;
+      const code = line.slice(line.indexOf(':', line.indexOf(':') + 1) + 1);
+      return !/^\s*(\*|\/\/)/.test(code);
+    });
+    expect(offenders, 'Import API_URL from @lib/apiBase instead.').toEqual([]);
   });
 });
 

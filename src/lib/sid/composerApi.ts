@@ -3,7 +3,7 @@
  * and player info from the local DeepSID database mirror on the server.
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
+import { API_URL } from '@lib/apiBase';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 

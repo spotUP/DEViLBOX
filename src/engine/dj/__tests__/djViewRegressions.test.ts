@@ -843,18 +843,6 @@ describe('MPK Mini has dedicated profile with volume on knobs', () => {
 
 // ── Analysis cache uses relative URL ────────────────────────────────────────
 
-describe('Analysis cache — relative URL for dev proxy', () => {
-  it('analysisCache.ts defaults to /api (not absolute URL)', () => {
-    const cacheSrc = fs.readFileSync(
-      path.resolve(__dirname, '../../../lib/analysisCache.ts'), 'utf-8',
-    );
-    const urlMatch = cacheSrc.match(/const API_URL\s*=.*\|\|\s*'([^']+)'/);
-    expect(urlMatch).not.toBeNull();
-    expect(urlMatch![1]).toBe('/api');
-    expect(cacheSrc).not.toContain('devilbox.uprough.net');
-  });
-});
-
 // ── Sammy Blammy samples on One-Shots Live bank B ───────────────────────────
 
 describe('One-Shots Live preset — Sammy Blammy on bank B', () => {

@@ -5,7 +5,7 @@
  * Uses HVSC HTTP mirrors and STIL metadata.
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://devilbox.uprough.net/api';
+import { API_URL } from '@lib/apiBase';
 
 // HVSC mirrors (HTTP access)
 export const HVSC_MIRRORS = [
