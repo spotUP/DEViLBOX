@@ -27,7 +27,7 @@ import { clearTakes } from '@/lib/voice/takeHistory';
 import { LATENCY_STORAGE_KEY, SETUP_SEEN_KEY } from '@/lib/voice/latencyCalibration';
 import { useVoicePreviewStore } from '@/stores/useVoicePreviewStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
-import { isPlayable } from '@/lib/voice/voiceInstruments';
+import { isPlayable, VOICE_LEAD_NAME } from '@/lib/voice/voiceInstruments';
 
 const HOP = 256;
 
@@ -236,6 +236,30 @@ describe('Voice to Notes panel', () => {
     const calibrated = rows.map((r, i) => ({ i, note: r.note })).filter((c) => c.note > 0 && c.note !== 97);
     expect(calibrated[0].i).toBe(plain[0].i - 1);
     expect(JSON.parse(localStorage.getItem(LATENCY_STORAGE_KEY) ?? '{}')).toEqual({ default: 100 });
+  });
+
+  it('writes with the song\'s current instrument after the one selected at mount is deleted (owner report 2026-10-17)', async () => {
+    // The owner had OPL3 Brass selected when recording, yet every cell pointed
+    // at id 1, an instrument that no longer existed: the panel kept a copy of
+    // the current instrument from mount and a Voice Lead got created at the
+    // freed id. The target is the store's current instrument, read live.
+    resetStore(useInstrumentStore);
+    const store = useInstrumentStore.getState();
+    const bass = store.createInstrument({ synthType: 'FMSynth', name: 'OPL3 FM Bass' });
+    const brass = store.createInstrument({ synthType: 'FMSynth', name: 'OPL3 Brass' });
+    store.setCurrentInstrument(bass);
+    const leads = () => useInstrumentStore.getState().instruments.filter((i) => i.name === VOICE_LEAD_NAME).length;
+    const leadsBefore = leads();
+    const written = await takeThrough(60, async () => {
+      useInstrumentStore.getState().deleteInstrument(bass);
+      useInstrumentStore.getState().setCurrentInstrument(brass);
+      // The panel's Instrument select follows the song's selection
+      await waitFor(() => expect(screen.getByTitle('Instrument').textContent).toContain(`${brass}. OPL3 Brass`));
+    });
+    const rows = useTrackerStore.getState().patterns[0].channels[0].rows;
+    expect(written.map((c) => rows[c.i].instrument)).toEqual([brass]);
+    expect(leads()).toBe(leadsBefore);
+    expect(useInstrumentStore.getState().currentInstrumentId).toBe(brass);
   });
 
   it('keeps earlier takes and re-commits one', async () => {

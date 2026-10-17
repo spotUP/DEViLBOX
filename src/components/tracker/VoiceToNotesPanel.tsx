@@ -55,6 +55,7 @@ import {
   type TrainingSample,
 } from '@/lib/voice/drumModel';
 import { commitDrumHits, defaultDrumMap, type DrumMap } from '@/lib/voice/drumToNotes';
+import { currentTargetInstrument } from '@/lib/voice/voiceInstruments';
 
 export interface VoiceToNotesPanelProps {
   onClose: () => void;
@@ -139,12 +140,12 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   const [trainingTake, setTrainingTake] = useState<DrumClass | null>(null);
   const [samples, setSamples] = useState<TrainingSample[]>(() => loadSamples());
   const [training, setTraining] = useState<TrainingResult | null>(() => loadTrainingResult());
-  const [drumMap, setDrumMap] = useState<DrumMap>(() =>
-    defaultDrumMap(useInstrumentStore.getState().instruments, useInstrumentStore.getState().currentInstrumentId ?? 1),
-  );
+  const [drumMap, setDrumMap] = useState<DrumMap>(() => {
+    const { instruments, currentInstrumentId } = useInstrumentStore.getState();
+    return defaultDrumMap(instruments, currentTargetInstrument(instruments, currentInstrumentId));
+  });
   const [deviceId, setDeviceId] = useState('');
   const [channelIndex, setChannelIndex] = useState(() => useCursorStore.getState().cursor.channelIndex);
-  const [instrumentId, setInstrumentId] = useState<number>(() => useInstrumentStore.getState().currentInstrumentId ?? 1);
   const [startRow, setStartRow] = useState(0);
   const [output, setOutput] = useState<PitchModelOutput | null>(null);
   const [analysing, setAnalysing] = useState(false);
@@ -166,6 +167,11 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   const channelCount = useTrackerStore((s) => s.patterns[s.currentPatternIndex]?.channels.length ?? 0);
   const rowCount = useTrackerStore((s) => s.patterns[s.currentPatternIndex]?.length ?? 0);
   const instruments = useInstrumentStore((s) => s.instruments);
+  // The melody target is the song's current instrument, read live from the
+  // store: the panel's Instrument select is that selection, not a private copy
+  const currentInstrumentId = useInstrumentStore((s) => s.currentInstrumentId);
+  const instrumentId = currentTargetInstrument(instruments, currentInstrumentId);
+  const setInstrumentId = useInstrumentStore((s) => s.setCurrentInstrument);
 
   const drums = mode === 'drums';
   const recorder = useVoiceRecorder(model, fine, deps);
