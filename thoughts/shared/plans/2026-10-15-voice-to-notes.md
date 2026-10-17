@@ -79,7 +79,9 @@ mic -> RecorderWorklet (ring buffer, 22050 Hz mono tap + full-rate take)
 Phase V0 - research (no feature code)
 - [x] VN-0.1 Read `AudioToMidiModal.tsx` fully; list what moves into the pure core and what stays UI.
 - [ ] VN-0.2 Decide O1 (drum classifier source) with a small experiment: 3 candidate approaches measured on recorded beatbox clips the owner provides.
+  - 2026-10-17: still open, no owner beatbox clips yet. The setup wizard (VoiceSetupWizard) now records labelled per-class takes, so its stored samples can feed this experiment.
 - [ ] VN-0.3 Measure Basic Pitch accuracy on 10 sung and hummed clips (cents error, note count, onset error in ms); pick default thresholds.
+  - 2026-10-17: partial. Three real owner takes measured through the real capture path (thoughts/shared/research/2026-10-17-voice-to-notes-debug-report.md); the fixes are the energy gate, YIN octave check and split-note merge in voicing.ts. Take 3 was meant as C D E F G A B but its audio did not contain that scale, so no scale-accuracy number yet. Ten clips with cents and onset error remain open.
 
 Phase V1 - pure core
 - [x] VN-1.1 `voice/pitchNotes.ts`: frames to monophonic notes (extracted from the modal), tests with synthetic sine sequences and recorded fixtures.
