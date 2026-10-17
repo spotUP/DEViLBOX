@@ -1646,6 +1646,13 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
   );
 
   server.tool(
+    'get_voice_take',
+    'Read the take the Voice to Notes panel holds (read-only): length in seconds and samples, the voiced span (RMS per 0.1 s over the take\'s own gate, as dB), the notes the current fine settings shape from the stored model output (start, duration, midi, amplitude), the last note end, and drum hits. Measures "recording stopped early" and "extra wrong notes" from the real recording.',
+    {},
+    () => call('get_voice_take'),
+  );
+
+  server.tool(
     'get_audio_level',
     'Measure audio output level over a time window. Returns RMS average/max, peak max, and whether audio is silent. Useful for verifying a loaded file produces sound. With bands: true it also returns bandsDb - the mean power per octave band (63 Hz ... 16 kHz, dB) over the window, for measuring an effect\'s frequency response with a broadband signal.',
     {
@@ -2189,6 +2196,7 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
           { tool: 'get_audio_analysis', description: 'RMS, peak, FFT, band energy, beat detection' },
           { tool: 'get_audio_context_info', description: 'Web Audio context state' },
           { tool: 'get_voice_state', description: 'Voice allocation state' },
+          { tool: 'get_voice_take', description: 'The stored Voice to Notes take: length, voiced span, shaped notes, hits' },
           { tool: 'get_instrument_level', description: 'Per-instrument audio level' },
           { tool: 'get_audio_state', description: 'Audio engine diagnostics' },
           { tool: 'get_audio_level', description: 'Measure audio output level over time' },
