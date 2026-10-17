@@ -217,6 +217,53 @@ describe('Voice to Notes panel', () => {
     expect(ANNOTATIONS_FPS).toBe(86);
   });
 
+  it('a take that starts late after the count-in still puts its first sung note and first hit on row 0, gaps kept (VNR-24, owner: "it lands on pos 6")', async () => {
+    // Snapshot the pristine instrument store before the drum half adds TR-808 voices.
+    resetStore(useInstrumentStore);
+    const deps = (capture: VoiceCapture) => ({
+      getStream: async () => ({} as MediaStream),
+      createCapture: () => capture,
+      listDevices: async () => [],
+    });
+    // Melody: 0.7 s of silence after the 1.6 s count-in, then C4 and E4 for 0.5 s each (row = 0.1 s)
+    const mic = fakeMic();
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={new SineReadingModel()} deps={deps(mic.capture)} />);
+    fireEvent.click(screen.getByText('Record'));
+    await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
+    mic.feed(concat([new Float32Array(Math.round(2.3 * PITCH_SAMPLE_RATE)), sine(60, 0.5), sine(64, 0.5), new Float32Array(2205)]));
+    // The ghost preview while recording already starts the take on row 0
+    await waitFor(() => {
+      const ghost = useVoicePreviewStore.getState().preview;
+      expect(ghost?.startRow).toBe(0);
+      expect(ghost?.notes[0]).toBe(midiToXMNote(60));
+    }, { timeout: 3000 });
+    fireEvent.click(screen.getByText('Stop'));
+    await waitFor(() => expect(writtenNotes().length).toBe(2));
+    const melody = writtenNotes();
+    expect(melody.map((c) => c.note)).toEqual([midiToXMNote(60), midiToXMNote(64)]);
+    expect(melody[0].i).toBe(0);
+    expect(melody[1].i).toBeGreaterThanOrEqual(4);
+    expect(melody[1].i).toBeLessThanOrEqual(6);
+    cleanup();
+    resetStore(useTrackerStore);
+
+    // Drums: kick 0.7 s after beat 1, snare 0.5 s later
+    const drumMic = fakeMic();
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={new SineReadingModel()} deps={deps(drumMic.capture)} />);
+    fireEvent.click(screen.getByTitle('Mode'));
+    fireEvent.click(await screen.findByText('Drums'));
+    await waitFor(() => expect(screen.getByTestId('drum-map-kick')).toBeTruthy());
+    fireEvent.click(screen.getByText('Record'));
+    await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
+    drumMic.feed(concat([new Float32Array(Math.round(1.6 * PITCH_SAMPLE_RATE)), synthTake([{ drum: 'kick', at: 0.7 }, { drum: 'snare', at: 1.2 }], 1.8)]));
+    fireEvent.click(screen.getByText('Stop'));
+    await waitFor(() => expect(writtenNotes().length).toBe(2));
+    const hits = writtenNotes();
+    expect(hits[0].i).toBe(0);
+    expect(hits[1].i).toBeGreaterThanOrEqual(4);
+    expect(hits[1].i).toBeLessThanOrEqual(6);
+  });
+
   /** One take through the panel: 0.3 s silence after the count-in, then a sine note. */
   async function takeThrough(midi: number, before?: (utils: ReturnType<typeof render>) => Promise<void> | void) {
     const model = new SineReadingModel();
@@ -248,8 +295,9 @@ describe('Voice to Notes panel', () => {
     expect(snapped.map((c) => c.note)).toEqual([midiToXMNote(60)]);
   });
 
-  it('Calibrate latency measures a 100 ms loopback and moves the committed notes one row earlier', async () => {
-    const plain = await takeThrough(60);
+  it('Calibrate latency measures a 100 ms loopback and hears the take 100 ms earlier', async () => {
+    await takeThrough(60);
+    const plainHeard = parseFloat(screen.getAllByTestId('voice-timing-heard')[0].textContent ?? '');
     cleanup();
     resetStore(useTrackerStore);
 
@@ -283,8 +331,10 @@ describe('Voice to Notes panel', () => {
     mic.feed(concat([new Float32Array(Math.round(1.6 * PITCH_SAMPLE_RATE)), new Float32Array(Math.round(0.3 * PITCH_SAMPLE_RATE)), sine(60, 0.5), new Float32Array(2205)]));
     fireEvent.click(screen.getByText('Stop'));
     await waitFor(() => expect(writtenNotes().length).toBeGreaterThan(0));
-    const calibrated = writtenNotes();
-    expect(calibrated[0].i).toBe(plain[0].i - 1);
+    // The first note is on row 0 either way (VNR-24); the calibration moves where it was heard
+    expect(writtenNotes()[0].i).toBe(0);
+    const calibratedHeard = parseFloat(screen.getAllByTestId('voice-timing-heard')[0].textContent ?? '');
+    expect(calibratedHeard).toBeCloseTo(plainHeard - 0.1, 3);
     expect(JSON.parse(localStorage.getItem(LATENCY_STORAGE_KEY) ?? '{}')).toEqual({ default: 100 });
   });
 
@@ -364,8 +414,8 @@ describe('Voice to Notes panel', () => {
     const rows = useTrackerStore.getState().patterns[0].channels[0].rows;
     const written = writtenNotes().filter((c) => rows[c.i].effTyp !== 0x3);
     expect(written.map((c) => c.note)).toEqual([midiToXMNote(60), midiToXMNote(60), midiToXMNote(67)]);
-    // Written from row 0 (VNR-24), not from the cursor on row 4
-    expect(written.map((c) => c.i)).toEqual([3, 11, 19]);
+    // The first note is on row 0 (VNR-24), not on the cursor's row 4 or the 0.3 s after beat 1
+    expect(written.map((c) => c.i)).toEqual([0, 8, 16]);
     const commands = rows
       .flatMap((r, i) => [{ i, note: r.note, effTyp: r.effTyp, eff: r.eff }, { i, note: r.note, effTyp: r.effTyp2, eff: r.eff2 }])
       .filter((c) => c.effTyp !== 0 || c.eff !== 0);
@@ -466,9 +516,8 @@ describe('Voice to Notes panel', () => {
     const voices = tr808Voices();
     expect(voices.map((v) => v.voice)).toEqual(['kick', 'snare']);
     expect(written.map((c) => rows[c.i].instrument)).toEqual(voices.map((v) => v.id));
-    // Written from row 0 (VNR-24), not from the cursor on row 4
-    expect(written[0].i).toBeGreaterThanOrEqual(2);
-    expect(written[0].i).toBeLessThanOrEqual(4);
+    // The first hit is on row 0 (VNR-24), not on the cursor's row 4 or the 0.3 s after beat 1
+    expect(written[0].i).toBe(0);
     expect(written[1].i - written[0].i).toBeGreaterThanOrEqual(4);
     expect(written[1].i - written[0].i).toBeLessThanOrEqual(6);
     expect(useHistoryStore.getState().undoStack.length - undoBefore).toBe(1);

@@ -21,7 +21,7 @@
  */
 import type { VoiceEffectToggles } from '@/stores/useVoiceStore';
 import type { VoiceNote } from './pitchNotes';
-import { quantiseNotes, rowSeconds, type QuantisedNote, type QuantiseSettings } from './quantise';
+import { anchorToFirstNote, quantiseNotes, rowSeconds, type QuantisedNote, type QuantiseSettings } from './quantise';
 import type { VoiceEffect } from './voiceEffects';
 import { spanRms, voiceGateLevel, yinHz, yinProbeSeconds, YIN_WINDOW } from './voicing';
 
@@ -338,7 +338,7 @@ export function detectNoteEffects(
 
 /**
  * The rows a melody take writes: arpeggios folded, quantised, effects
- * attached. The one path for the commit, the pattern preview and the panel's
+ * attached, first note on row 0. The one path for the commit, the pattern preview and the panel's
  * written-rows table.
  */
 export function melodyRows(
@@ -349,5 +349,5 @@ export function melodyRows(
   toggles: VoiceEffectToggles,
 ): QuantisedNote[] {
   const folded = toggles.arpeggio ? arpeggiateNotes(notes, q) : notes;
-  return detectNoteEffects(quantiseNotes(folded, q), take, contour, q, toggles);
+  return anchorToFirstNote(detectNoteEffects(quantiseNotes(folded, q), take, contour, q, toggles));
 }

@@ -58,7 +58,7 @@ describe('voice_to_notes handler', () => {
     const rows = useTrackerStore.getState().patterns[0].channels[1].rows;
     const written = rows.map((r, i) => ({ i, note: r.note })).filter((c) => c.note > 0 && c.note !== 97);
     expect(written.map((c) => c.note)).toEqual([midiToXMNote(60)]); // 61 snapped down
-    expect(written[0].i).toBeGreaterThanOrEqual(4); // row 2 + onset at ~0.2 s (2 rows)
+    expect(written[0].i).toBe(2); // the take's first note lands on the start row (cursor row 2), lead-in silence cut (VNR-24)
     expect(useHistoryStore.getState().undoStack.length - undoBefore).toBe(1);
   });
 
