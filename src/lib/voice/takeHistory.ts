@@ -1,6 +1,7 @@
 /**
  * takeHistory.ts - the last few takes of this session, kept in memory only
- * (no project schema change), so an earlier take can be committed again.
+ * (no project schema change), so an earlier take can be committed again. A
+ * take's output carries its audio (up to ~1.8 MB for 20 s), capped at MAX_TAKES.
  */
 import type { PitchModelOutput } from './pitchNotes';
 
