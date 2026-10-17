@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MAX_TAKES, useVoiceStore } from '../useVoiceStore';
 import { LATENCY_STORAGE_KEY } from '@/lib/voice/latencyCalibration';
+import { MELODY_RANGE_STORAGE_KEY } from '@/lib/voice/pitchNotes';
+import { DEFAULT_SEGMENT_SETTINGS } from '@/lib/voice/segmentNotes';
 
 function audio(seconds: number): Float32Array {
   return new Float32Array(Math.round(seconds * 22050));
@@ -47,6 +49,17 @@ describe('useVoiceStore', () => {
     useVoiceStore.getState().reset();
     expect(useVoiceStore.getState().samples).toHaveLength(1);
     expect(useVoiceStore.getState().training).toBeNull();
+  });
+
+  it('the singer range survives a reload; a broken stored range falls back to the default', () => {
+    useVoiceStore.getState().patchFine({ minMidiNote: 52, maxMidiNote: 74, transpose: 12 });
+    useVoiceStore.getState().reset();
+    const { fine } = useVoiceStore.getState();
+    expect([fine.minMidiNote, fine.maxMidiNote, fine.transpose]).toEqual([52, 74, 12]);
+    localStorage.setItem(MELODY_RANGE_STORAGE_KEY, JSON.stringify({ minMidiNote: 80, maxMidiNote: 40, transpose: 0 }));
+    useVoiceStore.getState().reset();
+    expect(useVoiceStore.getState().fine.minMidiNote).toBe(DEFAULT_SEGMENT_SETTINGS.minMidiNote);
+    expect(useVoiceStore.getState().fine.maxMidiNote).toBe(DEFAULT_SEGMENT_SETTINGS.maxMidiNote);
   });
 
   it('changing the microphone reloads its stored latency', () => {
