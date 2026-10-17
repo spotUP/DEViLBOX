@@ -9,7 +9,6 @@ import { useEffect, useCallback } from 'react';
 import { getCCMapManager } from '../midi/CCMapManager';
 import { useTrackerStore, useTransportStore, useInstrumentStore } from '../stores';
 import { useEditorStore } from '../stores/useEditorStore';
-import { useHistoryStore } from '../stores/useHistoryStore';
 import { getToneEngine } from '../engine/ToneEngine';
 
 /**
@@ -45,11 +44,6 @@ export function useMIDIActions() {
         setCurrentInstrument,
         instruments,
       } = useInstrumentStore.getState();
-
-      const {
-        undo,
-        redo,
-      } = useHistoryStore.getState();
 
       switch (action) {
         // Transport
@@ -128,10 +122,10 @@ export function useMIDIActions() {
           }
           break;
         case 'edit.undo':
-          undo();
+          useTrackerStore.getState().undoEdit();
           break;
         case 'edit.redo':
-          redo();
+          useTrackerStore.getState().redoEdit();
           break;
 
         default:

@@ -523,26 +523,17 @@ function App() {
   }, [useBLEP, initialized]);
 
   // Get undo/redo functions from history store
-  const { undo, redo, canUndo, canRedo } = useHistoryStore();
-  const { replacePattern, currentPatternIndex } = useTrackerStore();
+  const { canUndo, canRedo } = useHistoryStore();
+  const { undoEdit, redoEdit } = useTrackerStore();
 
-  // Handle undo action
+  // Undo/redo restore the step's own patterns, wherever the view is now.
   const handleUndo = useCallback(() => {
-    if (!canUndo()) return;
-    const pattern = undo();
-    if (pattern) {
-      replacePattern(currentPatternIndex, pattern);
-    }
-  }, [undo, canUndo, replacePattern, currentPatternIndex]);
+    if (canUndo()) undoEdit();
+  }, [canUndo, undoEdit]);
 
-  // Handle redo action
   const handleRedo = useCallback(() => {
-    if (!canRedo()) return;
-    const pattern = redo();
-    if (pattern) {
-      replacePattern(currentPatternIndex, pattern);
-    }
-  }, [redo, canRedo, replacePattern, currentPatternIndex]);
+    if (canRedo()) redoEdit();
+  }, [canRedo, redoEdit]);
 
   // Keyboard shortcuts (global level - only handle non-tracker keys)
   useEffect(() => {

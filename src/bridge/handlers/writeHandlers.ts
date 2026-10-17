@@ -8,7 +8,6 @@ import { useTrackerStore } from '../../stores/useTrackerStore';
 import { clearConsoleEntries } from '../consoleCapture';
 import { useTransportStore } from '../../stores/useTransportStore';
 import { useCursorStore } from '../../stores/useCursorStore';
-import { useHistoryStore } from '../../stores/useHistoryStore';
 import { useEditorStore } from '../../stores/useEditorStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { resolveViewTarget, VIEW_TARGETS } from '../../stores/uiViews';
@@ -1300,26 +1299,13 @@ export function setProjectMetadata(params: Record<string, unknown>): Record<stri
 // ─── History ───────────────────────────────────────────────────────────────────
 
 export function undo(): Record<string, unknown> {
-  const history = useHistoryStore.getState();
-  const restored = history.undo();
-  if (restored) {
-    // Through the store action: the cells reach the playing engine like a typed edit.
-    const patternIndex = useTrackerStore.getState().currentPatternIndex;
-    useTrackerStore.getState().replacePattern(patternIndex, restored);
-    return { ok: true };
-  }
+  // Through the store action: the step's own patterns come back and reach the playing engine.
+  if (useTrackerStore.getState().undoEdit()) return { ok: true };
   return { ok: false, error: 'Nothing to undo' };
 }
 
 export function redo(): Record<string, unknown> {
-  const history = useHistoryStore.getState();
-  const restored = history.redo();
-  if (restored) {
-    // Through the store action: the cells reach the playing engine like a typed edit.
-    const patternIndex = useTrackerStore.getState().currentPatternIndex;
-    useTrackerStore.getState().replacePattern(patternIndex, restored);
-    return { ok: true };
-  }
+  if (useTrackerStore.getState().redoEdit()) return { ok: true };
   return { ok: false, error: 'Nothing to redo' };
 }
 

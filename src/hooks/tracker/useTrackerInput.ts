@@ -12,7 +12,6 @@ import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { useEditorStore } from '@stores/useEditorStore';
 import { useUIStore } from '@stores/useUIStore';
 import { useFormatStore } from '@stores/useFormatStore';
-import { useHistoryStore } from '@stores/useHistoryStore';
 import * as Tone from 'tone';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
@@ -111,7 +110,6 @@ export const useTrackerInput = () => {
   const insertRow = useTrackerStore((state) => state.insertRow);
   const deleteRow = useTrackerStore((state) => state.deleteRow);
   const interpolateSelection = useTrackerStore((state) => state.interpolateSelection);
-  const replacePattern = useTrackerStore((state) => state.replacePattern);
   const expandPattern = useTrackerStore((state) => state.expandPattern);
   const shrinkPattern = useTrackerStore((state) => state.shrinkPattern);
   const copyCommands = useTrackerStore((state) => state.copyCommands);
@@ -277,26 +275,16 @@ export const useTrackerInput = () => {
       if ((e.ctrlKey || e.metaKey) && keyLower === 'z' && !e.altKey) {
         e.preventDefault();
         if (e.shiftKey) {
-          const histStore = useHistoryStore.getState();
-          if (histStore.canRedo()) {
-            const afterState = histStore.redo();
-            if (afterState) {
-              const action = histStore.getLastAction();
-              replacePattern(action?.patternIndex ?? currentPatternIndex, afterState);
-              useUIStore.getState().setStatusMessage(`REDO: ${action?.description ?? ''}`);
-            }
+          const action = useTrackerStore.getState().redoEdit();
+          if (action) {
+            useUIStore.getState().setStatusMessage(`REDO: ${action.description}`);
           } else {
             useUIStore.getState().setStatusMessage('NOTHING TO REDO');
           }
         } else {
-          const histStore = useHistoryStore.getState();
-          if (histStore.canUndo()) {
-            const action = histStore.getLastAction();
-            const beforeState = histStore.undo();
-            if (beforeState && action) {
-              replacePattern(action.patternIndex, beforeState);
-              useUIStore.getState().setStatusMessage(`UNDO: ${action.description}`);
-            }
+          const action = useTrackerStore.getState().undoEdit();
+          if (action) {
+            useUIStore.getState().setStatusMessage(`UNDO: ${action.description}`);
           } else {
             useUIStore.getState().setStatusMessage('NOTHING TO UNDO');
           }
@@ -306,14 +294,9 @@ export const useTrackerInput = () => {
 
       if ((e.ctrlKey || e.metaKey) && keyLower === 'y' && !e.altKey && !e.shiftKey) {
         e.preventDefault();
-        const histStore = useHistoryStore.getState();
-        if (histStore.canRedo()) {
-          const afterState = histStore.redo();
-          if (afterState) {
-            const action = histStore.getLastAction();
-            replacePattern(action?.patternIndex ?? currentPatternIndex, afterState);
-            useUIStore.getState().setStatusMessage(`REDO: ${action?.description ?? ''}`);
-          }
+        const action = useTrackerStore.getState().redoEdit();
+        if (action) {
+          useUIStore.getState().setStatusMessage(`REDO: ${action.description}`);
         } else {
           useUIStore.getState().setStatusMessage('NOTHING TO REDO');
         }
@@ -1725,7 +1708,6 @@ export const useTrackerInput = () => {
       readMacroSlot,
       writeMacroSlot,
       toggleInsertMode,
-      replacePattern,
       interpolateSelection,
       expandPattern,
       shrinkPattern,

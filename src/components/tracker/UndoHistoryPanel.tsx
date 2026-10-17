@@ -9,6 +9,7 @@ import {
   getActionTypeName,
   getActionTypeColor,
 } from '@stores/useHistoryStore';
+import { useTrackerStore } from '@stores/useTrackerStore';
 
 interface UndoHistoryPanelProps {
   isOpen: boolean;
@@ -29,7 +30,8 @@ const ACTION_TYPE_BG_COLORS: Record<string, string> = {
 const getBgColor = (textColor: string) => ACTION_TYPE_BG_COLORS[textColor] || 'bg-neutral-400';
 
 export const UndoHistoryPanel: React.FC<UndoHistoryPanelProps> = ({ isOpen, onClose }) => {
-  const { undoStack, redoStack, undo, redo } = useHistoryStore();
+  const { undoStack, redoStack } = useHistoryStore();
+  const { undoEdit, redoEdit } = useTrackerStore();
 
   if (!isOpen) return null;
 
@@ -48,7 +50,7 @@ export const UndoHistoryPanel: React.FC<UndoHistoryPanelProps> = ({ isOpen, onCl
         </div>
         <div className="flex items-center gap-1">
           <button
-            onClick={undo}
+            onClick={() => undoEdit()}
             disabled={undoStack.length === 0}
             className="p-1 rounded hover:bg-dark-bgSecondary disabled:opacity-30 transition-colors"
             title="Undo"
@@ -57,7 +59,7 @@ export const UndoHistoryPanel: React.FC<UndoHistoryPanelProps> = ({ isOpen, onCl
             <Undo2 size={12} className="text-text-secondary" />
           </button>
           <button
-            onClick={redo}
+            onClick={() => redoEdit()}
             disabled={redoStack.length === 0}
             className="p-1 rounded hover:bg-dark-bgSecondary disabled:opacity-30 transition-colors"
             title="Redo"
@@ -87,7 +89,7 @@ export const UndoHistoryPanel: React.FC<UndoHistoryPanelProps> = ({ isOpen, onCl
               <div
                 key={`redo-${action.id}-${i}`}
                 className="flex items-center gap-2 px-3 py-1 hover:bg-dark-bgSecondary/50 cursor-pointer"
-                onClick={() => redo()}
+                onClick={() => redoEdit()}
                 title="Redo one step"
               >
                 <div className={`w-1.5 h-1.5 rounded-full ${getBgColor(getActionTypeColor(action.type))}`} />
@@ -117,7 +119,7 @@ export const UndoHistoryPanel: React.FC<UndoHistoryPanelProps> = ({ isOpen, onCl
               <div
                 key={`undo-${action.id}-${i}`}
                 className="flex items-center gap-2 px-3 py-1 hover:bg-dark-bgSecondary/50 cursor-pointer"
-                onClick={() => undo()}
+                onClick={() => undoEdit()}
                 title="Undo one step"
               >
                 <div className={`w-1.5 h-1.5 rounded-full ${getBgColor(getActionTypeColor(action.type))}`} />

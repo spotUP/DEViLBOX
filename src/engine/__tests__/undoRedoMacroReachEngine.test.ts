@@ -49,12 +49,11 @@ const settle = () => new Promise((r) => setTimeout(r, 0));
 describe('undo, redo and macro paste reach the engine', { timeout: 60000 }, () => {
   it('each restores the cell in the replayer, not just in the grid', async () => {
     loaded = parseDigitalSoundStudioFile(new Uint8Array(readFileSync(resolve(ROOT, 'public/data/songs/digital-sound-studio/zrimay.dss'))), 'zrimay.dss')!;
-    // What every undo/redo entry point does (App, toolbar, Ctrl+Z, MIDI): pop the
-    // history, put the pattern back through the store's replacePattern.
+    // What every undo/redo entry point does (App, toolbar, Ctrl+Z, MIDI, MCP):
+    // the tracker store's undoEdit/redoEdit restore the step's own patterns.
     const restore = (dir: 'undo' | 'redo') => {
-      const pattern = useHistoryStore.getState()[dir]();
-      expect(pattern, `${dir} had something to restore`).toBeTruthy();
-      useTrackerStore.getState().replacePattern(useTrackerStore.getState().currentPatternIndex, pattern!);
+      const action = useTrackerStore.getState()[dir === 'undo' ? 'undoEdit' : 'redoEdit']();
+      expect(action, `${dir} had something to restore`).toBeTruthy();
     };
     const undo = () => restore('undo');
     const redo = () => restore('redo');

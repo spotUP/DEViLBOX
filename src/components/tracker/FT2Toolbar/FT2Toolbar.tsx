@@ -77,7 +77,6 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     currentPositionIndex,
     setCurrentPosition,
     reset: resetTracker,
-    replacePattern,
   } = useTrackerStore(useShallow((s) => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex,
@@ -88,39 +87,31 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     currentPositionIndex: s.currentPositionIndex,
     setCurrentPosition: s.setCurrentPosition,
     reset: s.reset,
-    replacePattern: s.replacePattern,
   })));
 
-  const { undo, redo, canUndo, canRedo } = useHistoryStore(useShallow((s) => ({
-    undo: s.undo, redo: s.redo, canUndo: s.canUndo, canRedo: s.canRedo,
+  const { canUndo, canRedo } = useHistoryStore(useShallow((s) => ({
+    canUndo: s.canUndo, canRedo: s.canRedo,
   })));
 
   const editorFullscreen = useUIStore((s) => s.editorFullscreen);
 
   /**
-   * Undo and redo read the CURRENT pattern index, not the one from the render
-   * that defined them.
+   * Undo and redo go through the tracker store's undoEdit/redoEdit, which
+   * restore the patterns the history step itself recorded.
    *
    * These are registered with `useFT2ToolbarActions` so the NavBar can drive
    * them while this toolbar is hidden by dub-deck fullscreen, and the
-   * registration deliberately outlives the unmount. An unmounted component
-   * stops rendering, so a captured `currentPatternIndex` freezes — and undo
-   * would then write the recovered pattern into whichever pattern happened to
-   * be open when the toolbar went away. That is not a dead button; it is the
-   * wrong pattern being overwritten. Same fault as the transport buttons, with
-   * worse consequences.
+   * registration deliberately outlives the unmount. Nothing here may capture
+   * render state (a frozen pattern index would overwrite the wrong pattern);
+   * the step carries its own indices.
    */
   const handleUndo = useCallback(() => {
-    if (!canUndo()) return;
-    const pattern = undo();
-    if (pattern) replacePattern(useTrackerStore.getState().currentPatternIndex, pattern);
-  }, [undo, canUndo, replacePattern]);
+    if (canUndo()) useTrackerStore.getState().undoEdit();
+  }, [canUndo]);
 
   const handleRedo = useCallback(() => {
-    if (!canRedo()) return;
-    const pattern = redo();
-    if (pattern) replacePattern(useTrackerStore.getState().currentPatternIndex, pattern);
-  }, [redo, canRedo, replacePattern]);
+    if (canRedo()) useTrackerStore.getState().redoEdit();
+  }, [canRedo]);
 
   const {
     editStep,

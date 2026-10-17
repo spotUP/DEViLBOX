@@ -52,14 +52,28 @@ export type ActionType =
   | 'HALVE_BLOCK'
   | 'BULK_BLOCK_EDIT';
 
+/**
+ * One pattern an action changed. `before: null` means the action appended this
+ * pattern (undo removes it again); appended patterns sit at the end of the list.
+ */
+export interface PatternChange {
+  patternIndex: number;
+  before: Pattern | null;
+  after: Pattern;
+}
+
+/**
+ * One undo step: every pattern it changed and, when it changed the song order,
+ * the order before and after. Undo and redo restore these exact indices, never
+ * whatever pattern happens to be on screen (useTrackerStore.undoEdit/redoEdit).
+ */
 export interface HistoryAction {
   id: string;
   type: ActionType;
   timestamp: number;
   description: string;
-  patternIndex: number;
-  beforeState: Pattern;
-  afterState: Pattern;
+  changes: PatternChange[];
+  order?: { before: number[]; after: number[] };
 }
 
 interface HistoryStore {
@@ -77,8 +91,16 @@ interface HistoryStore {
     beforeState: Pattern,
     afterState: Pattern
   ) => void;
-  undo: () => Pattern | null;
-  redo: () => Pattern | null;
+  /** One undo step spanning several patterns and, optionally, the song order. */
+  pushMultiAction: (
+    type: ActionType,
+    description: string,
+    changes: PatternChange[],
+    order?: { before: number[]; after: number[] }
+  ) => void;
+  /** Pops the step and returns it; apply it with useTrackerStore.undoEdit, which calls this. */
+  undo: () => HistoryAction | null;
+  redo: () => HistoryAction | null;
   canUndo: () => boolean;
   canRedo: () => boolean;
   clearHistory: () => void;
@@ -101,15 +123,22 @@ export const useHistoryStore = create<HistoryStore>()(
 
     // Push new action to undo stack
     pushAction: (type, description, patternIndex, beforeState, afterState) =>
+      get().pushMultiAction(type, description, [{ patternIndex, before: beforeState, after: afterState }]),
+
+    pushMultiAction: (type, description, changes, order) =>
       set((state) => {
         const action: HistoryAction = {
           id: `action-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           type,
           timestamp: Date.now(),
           description,
-          patternIndex,
-          beforeState: structuredClone(beforeState), // Deep clone
-          afterState: structuredClone(afterState), // Deep clone
+          // Deep clone
+          changes: changes.map((c) => ({
+            patternIndex: c.patternIndex,
+            before: c.before ? structuredClone(c.before) : null,
+            after: structuredClone(c.after),
+          })),
+          ...(order ? { order: { before: [...order.before], after: [...order.after] } } : {}),
         };
 
         // Add to undo stack
@@ -146,8 +175,7 @@ export const useHistoryStore = create<HistoryStore>()(
         }
       });
 
-      // Return before state to apply
-      return action.beforeState;
+      return action;
     },
 
     // Redo last undone action
@@ -169,8 +197,7 @@ export const useHistoryStore = create<HistoryStore>()(
         }
       });
 
-      // Return after state to apply
-      return action.afterState;
+      return action;
     },
 
     // Check if undo is available
@@ -227,104 +254,6 @@ export const useHistoryStore = create<HistoryStore>()(
     },
   }))
 );
-
-/**
- * Hook for integrating history with tracker operations
- */
-export const useTrackerHistory = () => {
-  const { pushAction, undo, redo, canUndo, canRedo } = useHistoryStore();
-
-  /**
-   * Record a tracker edit action
-   */
-  const recordEdit = (
-    type: ActionType,
-    description: string,
-    patternIndex: number,
-    beforeState: Pattern,
-    afterState: Pattern
-  ) => {
-    pushAction(type, description, patternIndex, beforeState, afterState);
-  };
-
-  /**
-   * Handle Ctrl+Z (undo)
-   */
-  const handleUndo = (): Pattern | null => {
-    if (!canUndo()) {
-      console.warn('Nothing to undo');
-      return null;
-    }
-    return undo();
-  };
-
-  /**
-   * Handle Ctrl+Shift+Z or Ctrl+Y (redo)
-   */
-  const handleRedo = (): Pattern | null => {
-    if (!canRedo()) {
-      console.warn('Nothing to redo');
-      return null;
-    }
-    return redo();
-  };
-
-  return {
-    recordEdit,
-    handleUndo,
-    handleRedo,
-    canUndo: canUndo(),
-    canRedo: canRedo(),
-  };
-};
-
-/**
- * Keyboard shortcut handler for undo/redo
- */
-export const useHistoryKeyboardShortcuts = (
-  onUndo: (pattern: Pattern) => void,
-  onRedo: (pattern: Pattern) => void
-) => {
-  const { handleUndo, handleRedo } = useTrackerHistory();
-
-  const handleKeyDown = (e: KeyboardEvent) => {
-    // Ignore if typing in input field
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-      return;
-    }
-
-    // Ctrl+Z - Undo
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-      e.preventDefault();
-      const pattern = handleUndo();
-      if (pattern) {
-        onUndo(pattern);
-      }
-      return;
-    }
-
-    // Ctrl+Shift+Z or Ctrl+Y - Redo
-    if (
-      ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) ||
-      ((e.ctrlKey || e.metaKey) && e.key === 'y')
-    ) {
-      e.preventDefault();
-      const pattern = handleRedo();
-      if (pattern) {
-        onRedo(pattern);
-      }
-      return;
-    }
-  };
-
-  // Attach listener
-  if (typeof window !== 'undefined') {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }
-};
 
 /**
  * History panel component props
