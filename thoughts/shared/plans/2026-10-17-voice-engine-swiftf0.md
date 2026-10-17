@@ -190,7 +190,7 @@ Phase D - melody range (VNR-22)
 
 Phase E - drums
 - [x] WD-1 Features v2 in `drumHits.ts` (reuses `fft` + `applyHannWindow` from `BeatSliceAnalyzer` through `magnitudes()`); `featureVector` 17 values; unit test per feature on synthetic clicks/noise bursts.
-- [ ] WD-2 `tools/voice/build-avp-prior.ts`; generated `avpPrior.json` + `AVP_NOTICE.md`; prior class balance printed and recorded here.
+- [x] WD-2 `tools/voice/build-avp-prior.ts`; generated `avpPrior.json` + `AVP_NOTICE.md`; prior class balance printed and recorded here. Balance: kick 60 / snare 60 / hat 60, each from all 28 performers (annotated 1529 / 1566 / 3106; detected and matched within 50 ms 1525 / 1550 / 2903). Leave-one-performer-out 3-NN over all 5978 matched hits: 68.8 % (the cross-performer floor; the user's own samples replace the prior per class).
 - [ ] WD-3 `knnClassifier`; user samples replace the prior per class; `classifyByRules` and `useModel` deleted; all callers on the active classifier.
 - [ ] WD-4 `calibrateOnsets` + storage v2 + migration `voiceDrumsV2.ts` (unit test: v1 keys removed, setup flagged).
 - [ ] WD-5 Wizard: markers and counts from the calibrated detector and active classifier; "Heard N of 8".
