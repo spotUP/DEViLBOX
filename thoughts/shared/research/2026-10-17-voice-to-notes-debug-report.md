@@ -86,3 +86,30 @@ panel shows them only as small inline controls the owner did not find. Fix: a
 setup wizard Modal (input level, latency calibration, guided per-class
 beatbox training, train and result), opened automatically on first use when
 no calibration is stored, and reopenable from the panel.
+
+## 5. Commit target went stale (second owner report, 2026-10-17)
+
+Report: "there was an instrument in the list before i recorded and the new
+instrument added did not match the pattern data".
+
+Measured live through the MCP: the instrument list held only id 2 "OPL3
+Brass" (FurnaceOPL, playable); pattern 0 channel 0 had 9 note cells, all with
+instrument 1, which did not exist, so the committed take was silent. The
+recovery snapshot had loaded 2 instruments; the owner deleted one before
+recording.
+
+Cause: `VoiceToNotesPanel` took `currentInstrumentId` once at mount into a
+private `useState` and never resynced it. Once the instrument with that id was
+gone, the panel's Instrument select showed the placeholder, and
+`playableMelodyInstrument` saw a missing target and created a Voice Lead at
+the lowest free id (1), so every cell got 1 while the song's selected OPL3
+Brass would have played. The Voice Lead was later deleted by the owner, which
+left the cells orphaned.
+
+Fix: the panel has no private copy. The melody target is the store's
+`currentInstrumentId` read live, resolved by `currentTargetInstrument` to an
+instrument that exists (else the first instrument). The panel's Instrument
+select is the song's selection (`setCurrentInstrument`). The drum map's
+mount-time fallback uses the same resolution. Regression test: panel test
+"writes with the song's current instrument after the one selected at mount is
+deleted" (fails on the old code with `Select…` in the select).

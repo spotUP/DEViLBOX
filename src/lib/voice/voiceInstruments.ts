@@ -55,6 +55,18 @@ function preset(list: readonly DeepPartial<InstrumentConfig>[], match: (p: DeepP
   return p;
 }
 
+/**
+ * The song's current instrument as a commit target: `currentId` when that
+ * instrument exists, else the first instrument in the list. The panel reads
+ * this live from the store instead of keeping a copy taken at mount, which
+ * went stale when instruments were deleted or a project was loaded and then
+ * pointed every written cell at an id that no longer existed.
+ */
+export function currentTargetInstrument(instruments: readonly { id: number }[], currentId: number | null | undefined): number {
+  if (currentId != null && instruments.some((i) => i.id === currentId)) return currentId;
+  return instruments[0]?.id ?? 1;
+}
+
 /** `id` when it plays, else the song's Voice Lead (created when missing). */
 export function playableMelodyInstrument(id: number): number {
   if (isPlayable(find(id))) return id;
