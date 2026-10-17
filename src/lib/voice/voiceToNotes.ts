@@ -17,7 +17,7 @@ import type { VoiceEffectToggles } from '@/stores/useVoiceStore';
 import { ALL_EFFECTS, melodyRows, type TakeAudio, type TakeContour } from './noteEffects';
 import { snapNotesToKey, type KeySnap } from './scaleSnap';
 import type { QuantiseSettings } from './quantise';
-import { writeNotesToPattern, type WriteResult, type WriteTarget } from './writeToPattern';
+import { writeNotesToPattern, type TakeWriteResult, type WriteTarget } from './writeToPattern';
 import { playableMelodyInstrument } from './voiceInstruments';
 
 export interface NoteShaping extends PitchSettings {
@@ -46,7 +46,7 @@ export function commitVoiceNotes(
   take: TakeAudio | null = null,
   contour: TakeContour | null = null,
   toggles: VoiceEffectToggles = ALL_EFFECTS,
-): (WriteResult & { instrumentId: number }) | null {
+): (TakeWriteResult & { instrumentId: number }) | null {
   const rows = melodyRows(notes, quantise, take, contour, toggles);
   if (rows.length === 0) return null;
   const instrumentId = playableMelodyInstrument(target.instrumentId);

@@ -3,7 +3,8 @@ import { toMonophonic, transposeNotes, modelOutputToNotes, melodyRange, noteName
 import { quantiseNotes, rowSeconds, type QuantiseSettings } from '../quantise';
 import { mergeWindowNotes } from '../liveWindow';
 import { VoiceRecorder, type VoiceCapture } from '../voiceRecorder';
-import { applyNotesToPattern, NOTE_OFF, velocityToVolume } from '../writeToPattern';
+import { applyNotesToPattern, applyTakeToSong, planTakeSegments, takeRowsNeeded, NOTE_OFF, velocityToVolume, type TakeSong } from '../writeToPattern';
+import type { Pattern } from '@typedefs';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { resetStore } from '@/stores/__tests__/_harness';
 import { sungTakeModelOutput, SUNG_TAKE_PITCHES } from './sungTakeFixture';
@@ -186,6 +187,59 @@ describe('applyNotesToPattern', () => {
   });
 });
 
+
+describe('multi-pattern take (VNR-27)', () => {
+  beforeEach(() => resetStore(useTrackerStore));
+
+  const sized = (length: number): Pattern => {
+    const p = structuredClone(useTrackerStore.getState().patterns[0]);
+    p.length = length;
+    for (const ch of p.channels) ch.rows = Array.from({ length }, () => ({ ...ch.rows[0], note: 0 }));
+    return p;
+  };
+  const note = (row: number, midi = 60) => ({ row, offsetRows: 0, heardSeconds: 0, lengthRows: 1, midi, velocity: 1 });
+
+  it('needs rows through the last note only', () => {
+    expect(takeRowsNeeded([note(3), note(20)])).toBe(21);
+    expect(takeRowsNeeded([])).toBe(0);
+  });
+
+  it('walks the song order, copies a repeated pattern and adds empty patterns past the order end', () => {
+    const song: TakeSong = { patterns: [sized(16), sized(8)], patternOrder: [0, 1, 0] };
+    const segs = planTakeSegments(song, 0, 0, 4, 60, null);
+    expect(segs).toEqual([
+      { position: 0, patternIndex: 0, create: null, fromRow: 4, rows: 12 },
+      { position: 1, patternIndex: 1, create: null, fromRow: 0, rows: 8 },
+      { position: 2, patternIndex: 2, create: { from: 0, kind: 'copy' }, fromRow: 0, rows: 16 },
+      { position: 3, patternIndex: 3, create: { from: 0, kind: 'empty' }, fromRow: 0, rows: 16 },
+      { position: 4, patternIndex: 4, create: { from: 0, kind: 'empty' }, fromRow: 0, rows: 16 },
+    ]);
+  });
+
+  it('stops at the format pattern limit, and writes one pattern when it is not in the order', () => {
+    const song: TakeSong = { patterns: [sized(16)], patternOrder: [0] };
+    expect(planTakeSegments(song, 0, 0, 0, 40, { maxPatterns: 2, maxPositions: 128 })).toHaveLength(2);
+    expect(planTakeSegments(song, 0, 0, 0, 40, { maxPatterns: 64, maxPositions: 1 })).toHaveLength(1);
+    expect(planTakeSegments(song, 0, -1, 0, 40, null)).toHaveLength(1);
+  });
+
+  it('writes across patterns, clears every reached pattern to its end and drops notes past the limit', () => {
+    const song: TakeSong = { patterns: [sized(16), sized(16)], patternOrder: [0, 1] };
+    song.patterns[1].channels[0].rows[12].note = 40; // old note in the last reached pattern: cleared
+    song.patterns[1].channels[1].rows[12].note = 41; // other channel: kept
+    const segs = planTakeSegments(song, 0, 0, 8, 40, { maxPatterns: 3, maxPositions: 128 });
+    const built = new Map([[2, sized(16)]]);
+    const res = applyTakeToSong(song, [note(0), note(10, 62), note(30, 64), note(60, 65)], { channelIndex: 0, startRow: 8, instrumentId: 1 }, segs, built);
+    expect(res).toEqual({ written: 3, dropped: 1, patterns: 3 });
+    expect(song.patternOrder).toEqual([0, 1, 2]);
+    expect(song.patterns).toHaveLength(3);
+    expect(song.patterns[0].channels[0].rows[8].note).toBeGreaterThan(0);
+    expect(song.patterns[1].channels[0].rows[2].note).toBeGreaterThan(0); // row 10 of the take
+    expect(song.patterns[1].channels[0].rows[12].note).toBe(0);
+    expect(song.patterns[1].channels[1].rows[12].note).toBe(41);
+    expect(song.patterns[2].channels[0].rows[6].note).toBeGreaterThan(0); // row 30 of the take
+  });
+});
 
 import { snapMidiToKey, snapNotesToKey } from '../scaleSnap';
 import { detectClickOnset, getStoredLatencyMs, storeLatencyMs, measureLoopbackLatencyMs, LATENCY_STORAGE_KEY } from '../latencyCalibration';
