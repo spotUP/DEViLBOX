@@ -155,7 +155,6 @@ describe('applyNotesToPattern', () => {
 
 import { snapMidiToKey, snapNotesToKey } from '../scaleSnap';
 import { detectClickOnset, getStoredLatencyMs, storeLatencyMs, measureLoopbackLatencyMs, LATENCY_STORAGE_KEY } from '../latencyCalibration';
-import { addTake, listTakes, clearTakes, MAX_TAKES } from '../takeHistory';
 
 describe('scaleSnap', () => {
   it('snaps to the nearest key note, ties go lower', () => {
@@ -205,12 +204,3 @@ describe('latency calibration', () => {
   });
 });
 
-describe('takeHistory', () => {
-  it('keeps the newest 8', () => {
-    clearTakes();
-    for (let i = 0; i < 11; i++) addTake({ frames: [], onsets: [], contours: [] }, i);
-    expect(listTakes().length).toBe(MAX_TAKES);
-    expect(listTakes()[0].seconds).toBe(10);
-    clearTakes();
-  });
-});

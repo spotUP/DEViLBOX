@@ -20,10 +20,10 @@ import { ANNOTATIONS_FPS, PITCH_SAMPLE_RATE, midiToHz, type PitchModelOutput } f
 import type { PitchModel } from '@/lib/voice/basicPitchModel';
 import type { VoiceCapture } from '@/lib/voice/voiceRecorder';
 import { synthTake } from '@/lib/voice/drumSynth';
-import { clearTraining, saveSamples } from '@/lib/voice/drumModel';
+import { clearTraining } from '@/lib/voice/drumModel';
 import { hitFeatures } from '@/lib/voice/drumHits';
 import { synthHit } from '@/lib/voice/drumSynth';
-import { clearTakes } from '@/lib/voice/takeHistory';
+import { useVoiceStore } from '@/stores/useVoiceStore';
 import { LATENCY_STORAGE_KEY, SETUP_SEEN_KEY } from '@/lib/voice/latencyCalibration';
 import { useVoicePreviewStore } from '@/stores/useVoicePreviewStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
@@ -111,8 +111,8 @@ function concat(parts: Float32Array[]): Float32Array {
 }
 
 beforeEach(() => {
-  clearTakes();
   clearTraining();
+  useVoiceStore.getState().reset();
   try { localStorage.removeItem(LATENCY_STORAGE_KEY); } catch { /* none */ }
   resetStore(useTrackerStore);
   useTransportStore.setState({ bpm: 150, speed: 6 } as never);
@@ -133,7 +133,7 @@ describe('Voice to Notes panel', () => {
       listDevices: async () => [],
     };
     const undoBefore = useHistoryStore.getState().undoStack.length;
-    render(<VoiceToNotesPanel onClose={() => {}} model={model} deps={deps} />);
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={model} deps={deps} />);
 
     fireEvent.click(screen.getByText('Record'));
     await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
@@ -183,7 +183,7 @@ describe('Voice to Notes panel', () => {
       createCapture: () => mic.capture,
       listDevices: async () => [],
     };
-    const utils = render(<VoiceToNotesPanel onClose={() => {}} model={model} deps={deps} />);
+    const utils = render(<VoiceToNotesPanel isOpen onClose={() => {}} model={model} deps={deps} />);
     await before?.(utils);
     fireEvent.click(screen.getByText('Record'));
     await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
@@ -231,7 +231,7 @@ describe('Voice to Notes panel', () => {
       listDevices: async () => [],
     };
     const model = new SineReadingModel();
-    render(<VoiceToNotesPanel onClose={() => {}} model={model} deps={deps} />);
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={model} deps={deps} />);
     fireEvent.click(screen.getByText('Calibrate latency'));
     await waitFor(() => expect(screen.getByTestId('voice-calibrated-latency').textContent).toContain('100 ms'));
 
@@ -298,7 +298,7 @@ describe('Voice to Notes panel', () => {
       listDevices: async () => [],
     };
     const undoBefore = useHistoryStore.getState().undoStack.length;
-    render(<VoiceToNotesPanel onClose={() => {}} model={model} deps={deps} />);
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={model} deps={deps} />);
     fireEvent.click(screen.getByTitle('Mode'));
     fireEvent.click(await screen.findByText('Drums'));
     await waitFor(() => expect(screen.getByTestId('drum-map-kick')).toBeTruthy());
@@ -335,7 +335,7 @@ describe('Voice to Notes panel', () => {
       return hitFeatures(take, 500);
     };
     // Earlier training takes, stored: this user calls the kick sound "snare" and the snare sound "kick"
-    saveSamples([1, 2, 3, 4, 5].flatMap((seed) => [
+    useVoiceStore.getState().setSamples([1, 2, 3, 4, 5].flatMap((seed) => [
       { drum: 'snare' as const, features: feat('kick', seed) },
       { drum: 'kick' as const, features: feat('snare', seed) },
     ]));
@@ -345,7 +345,7 @@ describe('Voice to Notes panel', () => {
       createCapture: () => mic.capture,
       listDevices: async () => [],
     };
-    render(<VoiceToNotesPanel onClose={() => {}} model={new SineReadingModel()} deps={deps} />);
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={new SineReadingModel()} deps={deps} />);
     fireEvent.click(screen.getByTitle('Mode'));
     fireEvent.click(await screen.findByText('Drums'));
     await waitFor(() => expect(screen.getByTestId('drum-training-status')).toBeTruthy());
@@ -387,7 +387,7 @@ describe('Voice to Notes panel', () => {
       createCapture: () => mic.capture,
       listDevices: async () => [],
     };
-    render(<VoiceToNotesPanel onClose={() => {}} model={new SineReadingModel()} deps={deps} />);
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={new SineReadingModel()} deps={deps} />);
     fireEvent.click(screen.getByTitle('Mode'));
     fireEvent.click(await screen.findByText('Drums'));
     await waitFor(() => expect(screen.getByTestId('drum-map-kick')).toBeTruthy());
@@ -434,7 +434,7 @@ describe('Voice to Notes setup wizard', () => {
       createCapture: () => (captures++ === 1 ? loop : mic.capture),
       listDevices: async () => [],
     };
-    render(<VoiceToNotesPanel onClose={() => {}} model={model} deps={deps} />);
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={model} deps={deps} />);
 
     // Microphone check: a sung take is only metered, never turned into notes
     const micStep = screen.getByTestId('voice-setup-step-microphone');
@@ -475,7 +475,7 @@ describe('Voice to Notes setup wizard', () => {
       createCapture: () => fakeMic().capture,
       listDevices: async () => [],
     };
-    render(<VoiceToNotesPanel onClose={() => {}} model={new SineReadingModel()} deps={deps} />);
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={new SineReadingModel()} deps={deps} />);
     expect(screen.queryByTestId('voice-setup-step-microphone')).toBeNull();
     fireEvent.click(screen.getByLabelText('Setup wizard'));
     expect(screen.getByTestId('voice-setup-step-microphone')).toBeTruthy();

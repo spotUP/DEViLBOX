@@ -544,7 +544,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                     startChannel={isPhone ? mobileInput.startChannel : undefined}
                   />
                   </div>
-                  {voicePanelOpen && <VoiceToNotesPanel onClose={() => setVoicePanelOpen(false)} />}
+                  <VoiceToNotesPanel isOpen={voicePanelOpen} onClose={() => setVoicePanelOpen(false)} />
                   </div>
                 )
               );

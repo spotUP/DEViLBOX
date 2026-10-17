@@ -1,14 +1,19 @@
 /**
- * VoiceToNotesPanel - record a hummed or sung melody, preview it live, fine-tune
- * it, and write it into the pattern as one undo step.
+ * VoiceToNotesPanel - record a hummed or sung melody, or beatboxed drums, see
+ * the take as a waveform with every heard event marked, fine-tune it, and write
+ * it into the pattern as one undo step.
  *
  * Glue only: capture lives in lib/voice/voiceRecorder + hooks/audio/useVoiceRecorder,
  * note extraction in lib/voice/pitchNotes, row snapping in lib/voice/quantise,
- * pattern writing in lib/voice/writeToPattern.
+ * pattern writing in lib/voice/writeToPattern. Take, settings and training state
+ * live in stores/useVoiceStore; this modal and the setup wizard only render it.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Mic, Square, Check, X, Loader2, Timer, Wand2 } from 'lucide-react';
+import { Mic, Square, Check, Loader2, Timer, Wand2 } from 'lucide-react';
 import { Button } from '@components/ui/Button';
+import { Modal } from '@components/ui/Modal';
+import { ModalHeader } from '@components/ui/ModalHeader';
+import { ModalFooter } from '@components/ui/ModalFooter';
 import { Knob } from '@components/controls/Knob';
 import { Toggle } from '@components/controls/Toggle';
 import { CustomSelect } from '@components/common/CustomSelect';
@@ -17,47 +22,38 @@ import { useCursorStore } from '@/stores/useCursorStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { notify } from '@/stores/useNotificationStore';
+import { useVoiceStore, type Finetune, type VoiceEffectToggles, type VoiceMode, type VoiceTake } from '@/stores/useVoiceStore';
 import { useVoiceRecorder, defaultVoiceRecorderDeps, type VoiceRecorderDeps } from '@/hooks/audio/useVoiceRecorder';
 import { basicPitchModel, type PitchModel } from '@/lib/voice/basicPitchModel';
-import {
-  DEFAULT_PITCH_SETTINGS,
-  type PitchModelOutput,
-  type PitchSettings,
-  type VoiceNote,
-} from '@/lib/voice/pitchNotes';
-import { rowSeconds, type QuantiseSettings } from '@/lib/voice/quantise';
+import { PITCH_SAMPLE_RATE, type VoiceNote } from '@/lib/voice/pitchNotes';
+import { quantiseNotes, rowSeconds, type QuantiseSettings, type QuantisedNote } from '@/lib/voice/quantise';
 import { melodyPreview, drumPreview } from '@/lib/voice/takePreview';
 import { useVoicePreviewStore } from '@/stores/useVoicePreviewStore';
 import { commitVoiceNotes, shapeNotes } from '@/lib/voice/voiceToNotes';
 import { SCALES, SCALE_LABELS, TONIC_NAMES, type ScaleName } from '@/lib/voice/scaleSnap';
 import {
-  getStoredLatencyMs,
   markVoiceSetupSeen,
   measureLoopbackLatencyMs,
   shouldOpenVoiceSetup,
   storeLatencyMs,
 } from '@/lib/voice/latencyCalibration';
 import { VoiceLevelMeter, VoiceSetupWizard } from './VoiceSetupWizard';
-import { addTake, listTakes, type Take } from '@/lib/voice/takeHistory';
+import { VoiceTakeWaveform, type WaveformMarker } from './VoiceTakeWaveform';
 import { DRUM_CLASSES, DRUM_CLASS_LABELS, classifyByRules, detectHits, type DrumClass, type DrumHit } from '@/lib/voice/drumHits';
 import {
   clearTraining,
   countsByClass,
   describeTraining,
-  loadSamples,
-  loadTrainingResult,
   modelClassifier,
   samplesFromTake,
-  saveSamples,
-  saveTrainingResult,
   trainAndEvaluate,
-  type TrainingResult,
   type TrainingSample,
 } from '@/lib/voice/drumModel';
-import { NEW_808_INSTRUMENT, commitDrumHits, defaultDrumMap, type DrumMap } from '@/lib/voice/drumToNotes';
-import { currentTargetInstrument } from '@/lib/voice/voiceInstruments';
+import { NEW_808_INSTRUMENT, commitDrumHits, defaultDrumMap, quantiseHits, usedDrumClasses, type DrumMap } from '@/lib/voice/drumToNotes';
+import { currentTargetInstrument, drumMapAsWritten } from '@/lib/voice/voiceInstruments';
 
 export interface VoiceToNotesPanelProps {
+  isOpen: boolean;
   onClose: () => void;
   /** Test seam: the pitch model. Defaults to Basic Pitch. */
   model?: PitchModel;
@@ -65,40 +61,29 @@ export interface VoiceToNotesPanelProps {
   deps?: VoiceRecorderDeps;
 }
 
-interface Finetune extends PitchSettings {
-  transpose: number;
-  swing: number;
-  minLengthRows: number;
-  latencyNudgeMs: number;
-  keySnapOn: boolean;
-  /** Pitch class 0..11, 0 = C */
-  keyTonic: number;
-  keyScale: ScaleName;
-}
-
-const DEFAULT_FINETUNE: Finetune = {
-  ...DEFAULT_PITCH_SETTINGS,
-  transpose: 0,
-  swing: 0,
-  minLengthRows: 1,
-  latencyNudgeMs: 0,
-  keySnapOn: false,
-  keyTonic: 0,
-  keyScale: 'major',
-};
-
 const COUNT_IN_BEATS = 4;
 
-type VoiceMode = 'melody' | 'drums';
 const MODE_OPTIONS = [
   { value: 'melody', label: 'Melody' },
   { value: 'drums', label: 'Drums' },
 ];
 
+const EFFECT_LABELS: Record<keyof VoiceEffectToggles, string> = {
+  volume: 'Volume',
+  slides: 'Slides',
+  vibrato: 'Vibrato',
+  arpeggio: 'Arpeggio',
+  flams: 'Flams',
+};
+
 const DRUM_NOTE_OPTIONS = Array.from({ length: 61 }, (_, i) => {
   const midi = 24 + i;
-  return { value: String(midi), label: `${TONIC_NAMES[midi % 12]}${Math.floor(midi / 12) - 1}` };
+  return { value: String(midi), label: noteName(midi) };
 });
+
+function noteName(midi: number): string {
+  return `${TONIC_NAMES[midi % 12]}${Math.floor(midi / 12) - 1}`;
+}
 
 const NoteRoll: React.FC<{ notes: readonly VoiceNote[]; seconds: number }> = ({ notes, seconds }) => {
   const span = Math.max(2, seconds);
@@ -109,7 +94,7 @@ const NoteRoll: React.FC<{ notes: readonly VoiceNote[]; seconds: number }> = ({ 
     <svg
       viewBox="0 0 100 40"
       preserveAspectRatio="none"
-      className="w-full h-20 bg-dark-bgTertiary border border-dark-borderLight rounded"
+      className="w-full h-24 bg-dark-bgTertiary border border-dark-borderLight rounded"
       role="img"
       aria-label="Detected notes"
     >
@@ -128,36 +113,50 @@ const NoteRoll: React.FC<{ notes: readonly VoiceNote[]; seconds: number }> = ({ 
   );
 };
 
+const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="text-[10px] font-mono text-text-secondary uppercase tracking-wide">{children}</div>
+);
+
 export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
+  isOpen,
   onClose,
   model = basicPitchModel,
   deps,
 }) => {
-  const [fine, setFine] = useState<Finetune>(DEFAULT_FINETUNE);
-  const [mode, setMode] = useState<VoiceMode>('melody');
-  const [hits, setHits] = useState<readonly DrumHit[]>([]);
+  const fine = useVoiceStore((s) => s.fine);
+  const patchFine = useVoiceStore((s) => s.patchFine);
+  const mode = useVoiceStore((s) => s.mode);
+  const setMode = useVoiceStore((s) => s.setMode);
+  const take = useVoiceStore((s) => s.take);
+  const takes = useVoiceStore((s) => s.takes);
+  const addTake = useVoiceStore((s) => s.addTake);
+  const useTake = useVoiceStore((s) => s.useTake);
+  const clearTake = useVoiceStore((s) => s.clearTake);
+  const samples = useVoiceStore((s) => s.samples);
+  const setSamples = useVoiceStore((s) => s.setSamples);
+  const training = useVoiceStore((s) => s.training);
+  const setTraining = useVoiceStore((s) => s.setTraining);
+  const storedDrumMap = useVoiceStore((s) => s.drumMap);
+  const setDrumMap = useVoiceStore((s) => s.setDrumMap);
+  const trainingTake = useVoiceStore((s) => s.trainingTake);
+  const setTrainingTake = useVoiceStore((s) => s.setTrainingTake);
+  const deviceId = useVoiceStore((s) => s.deviceId);
+  const setDeviceId = useVoiceStore((s) => s.setDeviceId);
+  const channelIndex = useVoiceStore((s) => s.channelIndex);
+  const setChannelIndex = useVoiceStore((s) => s.setChannelIndex);
+  const startRow = useVoiceStore((s) => s.startRow);
+  const setStartRow = useVoiceStore((s) => s.setStartRow);
+  const calibratedMs = useVoiceStore((s) => s.calibratedMs);
+  const setCalibratedMs = useVoiceStore((s) => s.setCalibratedMs);
+
+  // Transient: what the microphone is doing right now, never part of a take
   const [trainClass, setTrainClass] = useState<DrumClass>('kick');
-  const [trainingTake, setTrainingTake] = useState<DrumClass | null>(null);
-  const [samples, setSamples] = useState<TrainingSample[]>(() => loadSamples());
-  const [training, setTraining] = useState<TrainingResult | null>(() => loadTrainingResult());
-  const [drumMap, setDrumMap] = useState<DrumMap>(() => defaultDrumMap(useInstrumentStore.getState().instruments));
-  const [deviceId, setDeviceId] = useState('');
-  const [channelIndex, setChannelIndex] = useState(() => useCursorStore.getState().cursor.channelIndex);
-  const [startRow, setStartRow] = useState(0);
-  const [output, setOutput] = useState<PitchModelOutput | null>(null);
+  const [recordingClass, setRecordingClass] = useState<DrumClass | null>(null);
   const [analysing, setAnalysing] = useState(false);
-  const [takeSeconds, setTakeSeconds] = useState(0);
-  const [calibratedMs, setCalibratedMs] = useState(() => getStoredLatencyMs(''));
   const [calibrating, setCalibrating] = useState(false);
-  const [takes, setTakes] = useState<readonly Take[]>(() => listTakes());
-  const [activeTakeId, setActiveTakeId] = useState<number | null>(null);
   const [levelCheck, setLevelCheck] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(shouldOpenVoiceSetup);
   const backend = deps ?? defaultVoiceRecorderDeps;
-
-  useEffect(() => {
-    setCalibratedMs(getStoredLatencyMs(deviceId));
-  }, [deviceId]);
 
   const bpm = useTransportStore((s) => s.bpm);
   const speed = useTransportStore((s) => s.speed);
@@ -169,13 +168,22 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   const currentInstrumentId = useInstrumentStore((s) => s.currentInstrumentId);
   const instrumentId = currentTargetInstrument(instruments, currentInstrumentId);
   const setInstrumentId = useInstrumentStore((s) => s.setCurrentInstrument);
+  // The drum map follows the song's instruments until the user edits it
+  const fallbackDrumMap = useMemo(() => defaultDrumMap(instruments), [instruments]);
+  const drumMap: DrumMap = storedDrumMap ?? fallbackDrumMap;
 
   const drums = mode === 'drums';
   const recorder = useVoiceRecorder(model, fine, deps);
+  const output = take?.output ?? null;
+  const hits: readonly DrumHit[] = take?.hits ?? [];
+  const takeSeconds = take?.seconds ?? 0;
 
   const patch = useCallback(<K extends keyof Finetune>(key: K, value: Finetune[K]) => {
-    setFine((prev) => ({ ...prev, [key]: value }));
-  }, []);
+    patchFine({ [key]: value } as Partial<Finetune>);
+  }, [patchFine]);
+  const patchEffect = useCallback((key: keyof VoiceEffectToggles, value: boolean) => {
+    patchFine({ effects: { ...useVoiceStore.getState().fine.effects, [key]: value } });
+  }, [patchFine]);
 
   const quantise = useMemo<QuantiseSettings>(() => ({
     bpm,
@@ -188,7 +196,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
 
   // A new take, or a change to how it lands, is pending again until committed.
   const [pending, setPending] = useState(false);
-  useEffect(() => setPending(true), [output, hits, fine, quantise, channelIndex, startRow, mode]);
+  useEffect(() => setPending(true), [take, fine, quantise, channelIndex, startRow, mode]);
   // Set when a take ends: the take lands on the grid without a Commit click.
   const [autoCommit, setAutoCommit] = useState(false);
 
@@ -204,8 +212,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   );
 
   const handleRecord = useCallback(async () => {
-    setOutput(null);
-    setHits([]);
+    clearTake();
     setStartRow(useCursorStore.getState().cursor.rowIndex);
     await recorder.start({
       deviceId: deviceId || undefined,
@@ -214,10 +221,10 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
       // Drum hits are found when the take stops; the pitch model is not needed
       livePreview: !drums,
     });
-  }, [recorder, deviceId, drums]);
+  }, [recorder, deviceId, drums, clearTake, setStartRow]);
 
   const handleRecordTraining = useCallback(async (drum: DrumClass) => {
-    setTrainingTake(drum);
+    setRecordingClass(drum);
     await recorder.start({ deviceId: deviceId || undefined, countInBeats: 0, beatSeconds: 60 / useTransportStore.getState().bpm, livePreview: false });
   }, [recorder, deviceId]);
 
@@ -233,58 +240,54 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   }, []);
 
   const handleTrain = useCallback((all: TrainingSample[]) => {
-    const result = trainAndEvaluate(all);
-    setTraining(result);
-    saveTrainingResult(result);
-  }, []);
+    setTraining(trainAndEvaluate(all));
+  }, [setTraining]);
 
   const handleClearTraining = useCallback(() => {
     clearTraining();
     setSamples([]);
     setTraining(null);
-  }, []);
+    setTrainingTake(null);
+  }, [setSamples, setTraining, setTrainingTake]);
 
   const handleStop = useCallback(async () => {
-    const take = recorder.stop();
-    const labelled = trainingTake;
-    setTrainingTake(null);
+    const audio = recorder.stop();
+    const labelled = recordingClass;
+    setRecordingClass(null);
     if (levelCheck) {
       setLevelCheck(false);
       return;
     }
-    if (!take || take.length === 0) return;
+    if (!audio || audio.length === 0) return;
     if (labelled) {
-      const added = samplesFromTake(take, labelled);
+      const added = samplesFromTake(audio, labelled);
+      setTrainingTake({ drum: labelled, audio, hits: detectHits(audio) });
       if (added.length === 0) {
         notify.warning('No hit heard in that take');
         return;
       }
       const all = [...samples, ...added];
       setSamples(all);
-      saveSamples(all);
       handleTrain(all);
       return;
     }
-    setTakeSeconds(take.length / 22050);
     if (drums) {
-      setHits(detectHits(take, training?.useModel ? modelClassifier(training.model) : classifyByRules));
+      addTake({ mode: 'drums', audio, output: null, hits: detectHits(audio, training?.useModel ? modelClassifier(training.model) : classifyByRules) });
       setAutoCommit(true);
       return;
     }
     setAnalysing(true);
     try {
       // Full-take pass: replaces the live preview
-      const result = await model.evaluate(take);
-      setOutput(result);
-      setActiveTakeId(addTake(result, take.length / 22050).id);
-      setTakes(listTakes());
+      const result = await model.evaluate(audio);
+      addTake({ mode: 'melody', audio, output: result, hits: [] });
       setAutoCommit(true);
     } catch (err) {
       notify.error(`Pitch detection failed: ${err instanceof Error ? err.message : 'unknown error'}`);
     } finally {
       setAnalysing(false);
     }
-  }, [recorder, model, drums, trainingTake, levelCheck, samples, training, handleTrain]);
+  }, [recorder, model, drums, recordingClass, levelCheck, samples, training, handleTrain, addTake, setSamples, setTrainingTake]);
 
   const handleCommit = useCallback(() => {
     const target = { channelIndex, startRow, instrumentId };
@@ -305,7 +308,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
       `Wrote ${result.written} note${result.written === 1 ? '' : 's'}` +
         (result.dropped ? `, ${result.dropped} past the end of the pattern` : ''),
     );
-  }, [drums, hits, drumMap, finalNotes, quantise, channelIndex, startRow, instrumentId]);
+  }, [drums, hits, drumMap, finalNotes, quantise, channelIndex, startRow, instrumentId, setDrumMap, setInstrumentId]);
 
   // A finished take is written at once (owner kept forgetting Commit); Commit
   // stays for re-writing after a change. Runs once `pending` has seen the take.
@@ -333,18 +336,16 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     } finally {
       setCalibrating(false);
     }
-  }, [backend, deviceId]);
+  }, [backend, deviceId, setCalibratedMs]);
 
-  const handleUseTake = useCallback((take: Take) => {
-    setOutput(take.output);
-    setTakeSeconds(take.seconds);
-    setActiveTakeId(take.id);
+  const handleUseTake = useCallback((t: VoiceTake) => {
+    useTake(t.id);
     setStartRow(useCursorStore.getState().cursor.rowIndex);
-  }, []);
+  }, [useTake, setStartRow]);
 
   const recording = recorder.phase !== 'idle';
   // Level checks and training takes are not takes for the pattern
-  const takeRecording = recording && !levelCheck && trainingTake === null;
+  const takeRecording = recording && !levelCheck && recordingClass === null;
   const shownNotes = recording ? recorder.liveNotes : finalNotes;
 
   // The take shows in the pattern as ghost notes while recording and until it
@@ -356,9 +357,28 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     return melodyPreview(shownNotes, quantise, target, rowCount);
   }, [recording, takeRecording, pending, drums, hits, drumMap, shownNotes, quantise, channelIndex, startRow, instrumentId, rowCount]);
   const setPreview = useVoicePreviewStore((s) => s.setPreview);
-  useEffect(() => setPreview(preview), [preview, setPreview]);
+  useEffect(() => setPreview(isOpen ? preview : null), [preview, setPreview, isOpen]);
   useEffect(() => () => setPreview(null), [setPreview]);
   const rowLength = rowSeconds(bpm, speed);
+
+  // The rows the commit writes, for the timing table and the waveform markers
+  const written = useMemo<QuantisedNote[]>(() => {
+    if (drums) return hits.length ? quantiseHits(hits, drumMapAsWritten(drumMap, usedDrumClasses(hits)), quantise) : [];
+    return finalNotes.length ? quantiseNotes(finalNotes, quantise) : [];
+  }, [drums, hits, drumMap, finalNotes, quantise]);
+
+  const markers = useMemo<WaveformMarker[]>(() => {
+    if (drums) {
+      return hits.map((h, i) => ({ id: `hit-${i}`, timeSeconds: h.timeSeconds, label: DRUM_CLASS_LABELS[h.drum], kind: 'hit' as const }));
+    }
+    return shownNotes.map((n, i) => ({
+      id: `note-${i}`,
+      timeSeconds: n.startTimeSeconds,
+      endSeconds: n.startTimeSeconds + n.durationSeconds,
+      label: noteName(n.pitchMidi),
+      kind: 'note' as const,
+    }));
+  }, [drums, hits, shownNotes]);
 
   const deviceOptions = [
     { value: '', label: 'Default microphone' },
@@ -373,29 +393,19 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     { value: String(NEW_808_INSTRUMENT), label: `TR-808 ${DRUM_CLASS_LABELS[drum]} (added on commit)` },
     ...instrumentOptions,
   ];
+  const eventCount = drums ? hits.length : shownNotes.length;
+  const eventWord = drums ? 'hit' : 'note';
+  const phaseLabel = recorder.phase === 'countIn' ? 'Count-in' : recorder.phase === 'recording' ? 'Recording' : analysing ? 'Analysing' : 'Ready';
 
   return (
-    <aside
-      data-testid="voice-to-notes-panel"
-      className="flex flex-col gap-2 w-72 shrink-0 p-2 overflow-y-auto bg-dark-bgSecondary border-l border-dark-border text-text-primary"
-    >
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-mono text-text-secondary">Voice to Notes</span>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={() => setWizardOpen(true)} disabled={recording} title="Setup wizard" aria-label="Setup wizard">
-            <Wand2 size={12} />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={onClose} title="Close panel" aria-label="Close panel">
-            <X size={12} />
-          </Button>
-        </div>
-      </div>
+    <Modal isOpen={isOpen} onClose={onClose} size="fullscreen" closeOnEnter={false} closeOnBackdropClick={false}>
+      <ModalHeader title="Voice to Notes" subtitle={drums ? 'Beatbox a drum pattern' : 'Hum or sing a melody'} icon={<Mic size={16} />} onClose={onClose} />
       <VoiceSetupWizard
         isOpen={wizardOpen}
         onClose={handleCloseWizard}
         level={recorder.level}
         recording={recording}
-        trainingTake={trainingTake}
+        trainingTake={recordingClass}
         error={recorder.error}
         onCheckLevel={() => void handleCheckLevel()}
         onStop={() => void handleStop()}
@@ -407,156 +417,155 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
         onRecordTraining={(drum) => void handleRecordTraining(drum)}
       />
 
-      <CustomSelect value={mode} onChange={(v) => setMode(v as VoiceMode)} options={MODE_OPTIONS} title="Mode" disabled={recording} />
-      <CustomSelect value={deviceId} onChange={setDeviceId} options={deviceOptions} title="Microphone" disabled={recording} />
-      <CustomSelect
-        value={String(channelIndex)}
-        onChange={(v) => setChannelIndex(Number(v))}
-        options={channelOptions}
-        title="Target channel"
-      />
-      {!drums && (
-        <CustomSelect
-          value={String(instrumentId)}
-          onChange={(v) => setInstrumentId(Number(v))}
-          options={instrumentOptions}
-          title="Instrument"
-        />
-      )}
+      <div data-testid="voice-to-notes-panel" className="flex-1 min-h-0 flex gap-2 p-2 overflow-hidden text-text-primary">
+        {/* Left: what to record and how it lands */}
+        <div className="w-80 shrink-0 flex flex-col gap-2 overflow-y-auto pr-1">
+          <SectionLabel>Source</SectionLabel>
+          <CustomSelect value={mode} onChange={(v) => setMode(v as VoiceMode)} options={MODE_OPTIONS} title="Mode" disabled={recording} />
+          <CustomSelect value={deviceId} onChange={setDeviceId} options={deviceOptions} title="Microphone" disabled={recording} />
 
-      <div className="flex items-center gap-2">
-        {!recording ? (
-          <Button variant="primary" size="sm" icon={<Mic size={12} />} onClick={() => void handleRecord()} disabled={analysing}>
-            Record
-          </Button>
-        ) : (
-          <Button variant="danger" size="sm" icon={<Square size={12} />} onClick={() => void handleStop()}>
-            Stop
-          </Button>
-        )}
-        <span className="text-[10px] font-mono text-text-muted">
-          {recorder.phase === 'countIn' ? 'Count-in' : recorder.phase === 'recording' ? 'Recording' : analysing ? 'Analysing' : 'Ready'}
-        </span>
-        {analysing && <Loader2 size={12} className="animate-spin text-accent-primary" />}
-      </div>
+          <SectionLabel>Target</SectionLabel>
+          <CustomSelect
+            value={String(channelIndex)}
+            onChange={(v) => setChannelIndex(Number(v))}
+            options={channelOptions}
+            title="Target channel"
+          />
+          {!drums && (
+            <CustomSelect
+              value={String(instrumentId)}
+              onChange={(v) => setInstrumentId(Number(v))}
+              options={instrumentOptions}
+              title="Instrument"
+            />
+          )}
 
-      <VoiceLevelMeter level={recorder.level} />
-      {recorder.error && <div className="text-[10px] font-mono text-accent-error">{recorder.error}</div>}
+          {drums ? (
+            <>
+              <SectionLabel>Drum map</SectionLabel>
+              {DRUM_CLASSES.map((drum) => {
+                const count = hits.filter((h) => h.drum === drum).length;
+                return (
+                  <div key={drum} className="flex flex-col gap-1" data-testid={`drum-map-${drum}`}>
+                    <span className="text-[10px] font-mono text-text-muted">
+                      {DRUM_CLASS_LABELS[drum]} - {count} hit{count === 1 ? '' : 's'}
+                    </span>
+                    <div className="flex gap-1">
+                      <CustomSelect
+                        value={String(drumMap[drum].instrumentId)}
+                        onChange={(v) => setDrumMap({ ...drumMap, [drum]: { ...drumMap[drum], instrumentId: Number(v) } })}
+                        options={drumInstrumentOptions(drum)}
+                        title={`${DRUM_CLASS_LABELS[drum]} instrument`}
+                      />
+                      <CustomSelect
+                        value={String(drumMap[drum].midi)}
+                        onChange={(v) => setDrumMap({ ...drumMap, [drum]: { ...drumMap[drum], midi: Number(v) } })}
+                        options={DRUM_NOTE_OPTIONS}
+                        title={`${DRUM_CLASS_LABELS[drum]} note`}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          ) : (
+            <>
+              <SectionLabel>Finetune</SectionLabel>
+              <div className="grid grid-cols-3 gap-2">
+                <Knob label="Onset" value={fine.onsetThreshold} min={0.1} max={0.9} step={0.01} onChange={(v) => patch('onsetThreshold', v)} size="sm" />
+                <Knob label="Sustain" value={fine.frameThreshold} min={0.1} max={0.9} step={0.01} onChange={(v) => patch('frameThreshold', v)} size="sm" />
+                <Knob label="Min Length" unit="ms" value={fine.minNoteLengthMs} min={30} max={400} step={5} onChange={(v) => patch('minNoteLengthMs', v)} size="sm" />
+                <Knob label="Lowest" value={fine.minMidiNote} min={21} max={108} step={1} onChange={(v) => patch('minMidiNote', v)} size="sm" />
+                <Knob label="Highest" value={fine.maxMidiNote} min={21} max={108} step={1} onChange={(v) => patch('maxMidiNote', v)} size="sm" />
+                <Knob label="Transpose" value={fine.transpose} min={-24} max={24} step={1} bipolar onChange={(v) => patch('transpose', Math.round(v))} size="sm" />
+              </div>
 
-      {drums ? (
-        <>
-          <div className="text-[10px] font-mono text-text-secondary">Drum map</div>
-          {DRUM_CLASSES.map((drum) => {
-            const count = hits.filter((h) => h.drum === drum).length;
-            return (
-              <div key={drum} className="flex flex-col gap-1" data-testid={`drum-map-${drum}`}>
-                <span className="text-[10px] font-mono text-text-muted">
-                  {DRUM_CLASS_LABELS[drum]} - {count} hit{count === 1 ? '' : 's'}
-                </span>
-                <div className="flex gap-1">
+              <SectionLabel>Key</SectionLabel>
+              <Toggle label="Snap to key" value={fine.keySnapOn} onChange={(v) => patch('keySnapOn', v)} size="sm" />
+              {fine.keySnapOn && (
+                <div className="flex gap-2">
                   <CustomSelect
-                    value={String(drumMap[drum].instrumentId)}
-                    onChange={(v) => setDrumMap((m) => ({ ...m, [drum]: { ...m[drum], instrumentId: Number(v) } }))}
-                    options={drumInstrumentOptions(drum)}
-                    title={`${DRUM_CLASS_LABELS[drum]} instrument`}
+                    value={String(fine.keyTonic)}
+                    onChange={(v) => patch('keyTonic', Number(v))}
+                    options={TONIC_NAMES.map((n, i) => ({ value: String(i), label: n }))}
+                    title="Key"
                   />
                   <CustomSelect
-                    value={String(drumMap[drum].midi)}
-                    onChange={(v) => setDrumMap((m) => ({ ...m, [drum]: { ...m[drum], midi: Number(v) } }))}
-                    options={DRUM_NOTE_OPTIONS}
-                    title={`${DRUM_CLASS_LABELS[drum]} note`}
+                    value={fine.keyScale}
+                    onChange={(v) => patch('keyScale', v as ScaleName)}
+                    options={(Object.keys(SCALES) as ScaleName[]).map((k) => ({ value: k, label: SCALE_LABELS[k] }))}
+                    title="Scale"
                   />
                 </div>
-              </div>
-            );
-          })}
-          <div className="text-[10px] font-mono text-text-secondary">Train on your voice</div>
-          <div className="flex gap-1">
-            <CustomSelect
-              value={trainClass}
-              onChange={(v) => setTrainClass(v as DrumClass)}
-              options={DRUM_CLASSES.map((d) => ({ value: d, label: DRUM_CLASS_LABELS[d] }))}
-              title="Training class"
-              disabled={recording}
-            />
-            <Button variant="default" size="sm" icon={<Mic size={12} />} onClick={() => void handleRecordTraining(trainClass)} disabled={recording || analysing}>
-              Record training take
-            </Button>
-          </div>
-          <div className="text-[9px] font-mono text-text-muted" data-testid="drum-training-status">
-            {DRUM_CLASSES.map((d) => `${DRUM_CLASS_LABELS[d]} ${countsByClass(samples)[d]}`).join(', ')}
-            {' - '}
-            {describeTraining(training)}
-          </div>
-          {samples.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={handleClearTraining} disabled={recording}>
-              Clear training
-            </Button>
+              )}
+            </>
           )}
-          <div className="text-[9px] font-mono text-text-muted">
-            {hits.length} hit{hits.length === 1 ? '' : 's'} - row length {(rowLength * 1000).toFixed(0)} ms
-          </div>
+
+          <SectionLabel>Quantise</SectionLabel>
           <div className="grid grid-cols-3 gap-2">
+            <Knob label="Strength" value={fine.strength} min={0} max={1} step={0.01} onChange={(v) => patch('strength', v)} size="sm" title="How far each note moves to its nearest row: 1 lands on the row, 0 keeps the timing you sang" />
+            <Knob label="Tolerance" unit="rows" value={fine.toleranceRows} min={0} max={0.5} step={0.01} onChange={(v) => patch('toleranceRows', v)} size="sm" title="Notes closer than this to a row snap to it fully" />
             <Knob label="Swing" value={fine.swing} min={0} max={1} step={0.01} onChange={(v) => patch('swing', v)} size="sm" />
-            <Knob label="Latency" unit="ms" value={fine.latencyNudgeMs} min={-300} max={300} step={1} bipolar onChange={(v) => patch('latencyNudgeMs', Math.round(v))} size="sm" title="Move the hits earlier (positive) or later (negative) to match your microphone and output latency" />
+            <Knob label="Min Rows" value={fine.minLengthRows} min={1} max={8} step={1} onChange={(v) => patch('minLengthRows', Math.round(v))} size="sm" />
+            <Knob label="Latency" unit="ms" value={fine.latencyNudgeMs} min={-300} max={300} step={1} bipolar onChange={(v) => patch('latencyNudgeMs', Math.round(v))} size="sm" title="Move the notes earlier (positive) or later (negative) to match your microphone and output latency" />
           </div>
-        </>
-      ) : (
-      <>
-      <NoteRoll notes={shownNotes} seconds={takeSeconds || 4} />
-      <div className="text-[9px] font-mono text-text-muted">
-        {shownNotes.length} note{shownNotes.length === 1 ? '' : 's'} - row length {(rowLength * 1000).toFixed(0)} ms
-      </div>
 
-      <div className="text-[10px] font-mono text-text-secondary">Finetune</div>
-      <div className="grid grid-cols-3 gap-2">
-        <Knob label="Onset" value={fine.onsetThreshold} min={0.1} max={0.9} step={0.01} onChange={(v) => patch('onsetThreshold', v)} size="sm" />
-        <Knob label="Sustain" value={fine.frameThreshold} min={0.1} max={0.9} step={0.01} onChange={(v) => patch('frameThreshold', v)} size="sm" />
-        <Knob label="Min Length" unit="ms" value={fine.minNoteLengthMs} min={30} max={400} step={5} onChange={(v) => patch('minNoteLengthMs', v)} size="sm" />
-        <Knob label="Lowest" value={fine.minMidiNote} min={21} max={108} step={1} onChange={(v) => patch('minMidiNote', v)} size="sm" />
-        <Knob label="Highest" value={fine.maxMidiNote} min={21} max={108} step={1} onChange={(v) => patch('maxMidiNote', v)} size="sm" />
-        <Knob label="Transpose" value={fine.transpose} min={-24} max={24} step={1} bipolar onChange={(v) => patch('transpose', Math.round(v))} size="sm" />
-        <Knob label="Swing" value={fine.swing} min={0} max={1} step={0.01} onChange={(v) => patch('swing', v)} size="sm" />
-        <Knob label="Min Rows" value={fine.minLengthRows} min={1} max={8} step={1} onChange={(v) => patch('minLengthRows', Math.round(v))} size="sm" />
-        <Knob label="Latency" unit="ms" value={fine.latencyNudgeMs} min={-300} max={300} step={1} bipolar onChange={(v) => patch('latencyNudgeMs', Math.round(v))} size="sm" title="Move the notes earlier (positive) or later (negative) to match your microphone and output latency" />
-      </div>
-
-      <div className="text-[10px] font-mono text-text-secondary">Key</div>
-      <Toggle label="Snap to key" value={fine.keySnapOn} onChange={(v) => patch('keySnapOn', v)} size="sm" />
-      {fine.keySnapOn && (
-        <div className="flex gap-2">
-          <CustomSelect
-            value={String(fine.keyTonic)}
-            onChange={(v) => patch('keyTonic', Number(v))}
-            options={TONIC_NAMES.map((n, i) => ({ value: String(i), label: n }))}
-            title="Key"
-          />
-          <CustomSelect
-            value={fine.keyScale}
-            onChange={(v) => patch('keyScale', v as ScaleName)}
-            options={(Object.keys(SCALES) as ScaleName[]).map((k) => ({ value: k, label: SCALE_LABELS[k] }))}
-            title="Scale"
-          />
+          <SectionLabel>Effects</SectionLabel>
+          <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+            {(Object.keys(EFFECT_LABELS) as (keyof VoiceEffectToggles)[]).map((key) => (
+              <Toggle key={key} label={EFFECT_LABELS[key]} value={fine.effects[key]} onChange={(v) => patchEffect(key, v)} size="sm" />
+            ))}
+          </div>
         </div>
-      )}
-      </>
-      )}
 
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" icon={<Timer size={12} />} onClick={() => void handleCalibrate()} disabled={recording || analysing || calibrating}>
-          Calibrate latency
-        </Button>
-        <span className="text-[9px] font-mono text-text-muted" data-testid="voice-calibrated-latency">{calibratedMs} ms measured</span>
-      </div>
+        {/* Centre: the take */}
+        <div className="flex-1 min-w-0 flex flex-col gap-2 overflow-y-auto">
+          <SectionLabel>Take</SectionLabel>
+          <VoiceTakeWaveform
+            audio={take?.audio ?? null}
+            sampleRate={take?.sampleRate ?? PITCH_SAMPLE_RATE}
+            markers={markers}
+            rowSeconds={rowLength}
+          />
+          {!drums && <NoteRoll notes={shownNotes} seconds={takeSeconds || 4} />}
+          <div className="text-[9px] font-mono text-text-muted">
+            {eventCount} {eventWord}{eventCount === 1 ? '' : 's'} - row length {(rowLength * 1000).toFixed(0)} ms
+            {takeSeconds > 0 ? ` - take ${takeSeconds.toFixed(1)} s` : ''}
+          </div>
+          {recorder.error && <div className="text-[10px] font-mono text-accent-error">{recorder.error}</div>}
 
-      {!drums && takes.length > 0 && (
-        <>
-          <div className="text-[10px] font-mono text-text-secondary">Takes</div>
+          <SectionLabel>Written rows</SectionLabel>
+          <table data-testid="voice-timing" className="w-full text-[10px] font-mono text-text-primary border-collapse">
+            <thead>
+              <tr className="text-text-muted text-left">
+                <th className="font-normal pr-2">Row</th>
+                <th className="font-normal pr-2">Note</th>
+                <th className="font-normal pr-2">Length</th>
+                <th className="font-normal pr-2">Instrument</th>
+              </tr>
+            </thead>
+            <tbody>
+              {written.map((n, i) => (
+                <tr key={i} className="border-t border-dark-borderLight">
+                  <td className="pr-2">{startRow + n.row}</td>
+                  <td className="pr-2">{noteName(n.midi)}</td>
+                  <td className="pr-2">{n.lengthRows} row{n.lengthRows === 1 ? '' : 's'}</td>
+                  <td className="pr-2">{n.instrumentId ?? instrumentId}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Right: takes, training, setup */}
+        <div className="w-56 shrink-0 flex flex-col gap-2 overflow-y-auto">
+          <SectionLabel>Takes</SectionLabel>
+          {takes.length === 0 && <div className="text-[9px] font-mono text-text-muted">No takes yet</div>}
           <div className="flex flex-col gap-1">
             {takes.map((t, i) => (
               <Button
                 key={t.id}
-                variant={t.id === activeTakeId ? 'primary' : 'ghost'}
+                variant={t.id === take?.id ? 'primary' : 'ghost'}
                 size="sm"
                 disabled={recording || analysing}
                 onClick={() => handleUseTake(t)}
@@ -565,18 +574,79 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
               </Button>
             ))}
           </div>
-        </>
-      )}
 
-      <Button
-        variant="primary"
-        size="sm"
-        icon={<Check size={12} />}
-        onClick={handleCommit}
-        disabled={recording || analysing || !pending || (drums ? hits.length === 0 : finalNotes.length === 0)}
-      >
-        Commit
-      </Button>
-    </aside>
+          <SectionLabel>Your voice</SectionLabel>
+          <div className="flex gap-1">
+            <CustomSelect
+              value={trainClass}
+              onChange={(v) => setTrainClass(v as DrumClass)}
+              options={DRUM_CLASSES.map((d) => ({ value: d, label: DRUM_CLASS_LABELS[d] }))}
+              title="Training class"
+              disabled={recording}
+            />
+          </div>
+          <Button variant="default" size="sm" icon={<Mic size={12} />} onClick={() => void handleRecordTraining(trainClass)} disabled={recording || analysing}>
+            Record training take
+          </Button>
+          <div className="text-[9px] font-mono text-text-muted" data-testid="drum-training-status">
+            {DRUM_CLASSES.map((d) => `${DRUM_CLASS_LABELS[d]} ${countsByClass(samples)[d]}`).join(', ')}
+            {' - '}
+            {describeTraining(training)}
+          </div>
+          {trainingTake && (
+            <div className="text-[9px] font-mono text-text-muted">
+              Last training take: {DRUM_CLASS_LABELS[trainingTake.drum]}, {trainingTake.hits.length} hit{trainingTake.hits.length === 1 ? '' : 's'}
+            </div>
+          )}
+          {samples.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={handleClearTraining} disabled={recording}>
+              Clear training
+            </Button>
+          )}
+
+          <SectionLabel>Setup</SectionLabel>
+          <Button variant="ghost" size="sm" icon={<Wand2 size={12} />} onClick={() => setWizardOpen(true)} disabled={recording} aria-label="Setup wizard">
+            Setup wizard
+          </Button>
+          <Button variant="ghost" size="sm" icon={<Timer size={12} />} onClick={() => void handleCalibrate()} disabled={recording || analysing || calibrating}>
+            Calibrate latency
+          </Button>
+          <span className="text-[9px] font-mono text-text-muted" data-testid="voice-calibrated-latency">{calibratedMs} ms measured</span>
+        </div>
+      </div>
+
+      <ModalFooter align="between">
+        <div className="flex items-center gap-2">
+          {!recording ? (
+            <Button variant="primary" size="sm" icon={<Mic size={12} />} onClick={() => void handleRecord()} disabled={analysing}>
+              Record
+            </Button>
+          ) : (
+            <Button variant="danger" size="sm" icon={<Square size={12} />} onClick={() => void handleStop()}>
+              Stop
+            </Button>
+          )}
+          <span className="text-[10px] font-mono text-text-muted">{phaseLabel}</span>
+          {analysing && <Loader2 size={12} className="animate-spin text-accent-primary" />}
+          <div className="w-32">
+            <VoiceLevelMeter level={recorder.level} />
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="primary"
+            size="sm"
+            icon={<Check size={12} />}
+            onClick={handleCommit}
+            disabled={recording || analysing || !pending || (drums ? hits.length === 0 : finalNotes.length === 0)}
+          >
+            Commit
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </ModalFooter>
+    </Modal>
   );
 };
