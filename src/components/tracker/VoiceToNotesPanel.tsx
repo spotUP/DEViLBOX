@@ -26,7 +26,7 @@ import { useVoiceRecorder, defaultVoiceRecorderDeps, type VoiceRecorderDeps } fr
 import { PITCH_SAMPLE_RATE, noteName, type MelodyRange, type VoiceNote } from '@/lib/voice/pitchNotes';
 import { rowSeconds, type QuantiseSettings, type QuantisedNote } from '@/lib/voice/quantise';
 import { contourFromTrack, heardNotes, melodyRows } from '@/lib/voice/noteEffects';
-import type { PitchTracker } from '@/lib/voice/pitchTrack';
+import { trackRange, type PitchTracker } from '@/lib/voice/pitchTrack';
 import { swiftF0Tracker } from '@/lib/voice/swiftF0';
 import { DEFAULT_SEGMENT_SETTINGS } from '@/lib/voice/segmentNotes';
 import { voiceEffectSet, type VoiceEffectKind } from '@/lib/voice/voiceEffects';
@@ -324,8 +324,9 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     }
     setAnalysing(true);
     try {
-      // Full-take pass: replaces the live preview
-      const result = await tracker.track(audio);
+      // Full-take pass: replaces the live preview. The wizard's range step
+      // hears the whole band; every other take only the singer's range.
+      const result = await tracker.track(audio, forWizard ? undefined : trackRange(fine));
       addTake({ mode: 'melody', audio, track: result, hits: [] });
       if (!forWizard) setAutoCommit(true);
     } catch (err) {
@@ -333,7 +334,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     } finally {
       setAnalysing(false);
     }
-  }, [recorder, tracker, drums, recordingClass, wizardMelody, levelCheck, samples, training, handleTrain, addTake, setSamples, setTrainingTake]);
+  }, [recorder, tracker, drums, recordingClass, wizardMelody, levelCheck, samples, training, handleTrain, addTake, setSamples, setTrainingTake, fine]);
 
   // The wizard's range step hears the scale with the full pitch range so the range can be derived from it
   const melodyForWizard = useMemo(

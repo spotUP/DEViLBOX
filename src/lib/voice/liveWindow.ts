@@ -3,7 +3,7 @@
  * Advisory only: the full-take pass replaces it at take end.
  */
 import { PITCH_SAMPLE_RATE, type VoiceNote } from './pitchNotes';
-import type { PitchRange, PitchTracker } from './pitchTrack';
+import { trackRange, type PitchTracker } from './pitchTrack';
 import { shapeNotes, type NoteShaping } from './voiceToNotes';
 
 export const LIVE_WINDOW_SECONDS = 1.5;
@@ -35,11 +35,10 @@ export async function previewStep(
   previous: readonly VoiceNote[],
   tracker: PitchTracker,
   shaping: NoteShaping,
-  range?: PitchRange,
 ): Promise<VoiceNote[]> {
   const windowLen = Math.round(LIVE_WINDOW_SECONDS * PITCH_SAMPLE_RATE);
   const from = Math.max(0, take.length - windowLen);
-  const track = await tracker.track(take.subarray(from), range);
+  const track = await tracker.track(take.subarray(from), trackRange(shaping));
   const notes = shapeNotes(track, shaping);
   return mergeWindowNotes(previous, notes, from / PITCH_SAMPLE_RATE);
 }
