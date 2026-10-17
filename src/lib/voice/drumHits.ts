@@ -44,8 +44,16 @@ export interface DrumHit {
 /** Classifies a feature set. Rules by default; drumModel.ts supplies the trained one. */
 export type HitClassifier = (f: HitFeatures) => DrumClass;
 
-/** Below this RMS a window is silence, not a hit. */
-const SILENCE_RMS = 0.005;
+/**
+ * A hit must be louder than the take's own noise floor by this factor. The gate
+ * is relative because a laptop mic at the browser's default gain records mouth
+ * drums at -30 to -40 dBFS; an absolute floor dropped every hit but the loudest.
+ */
+const NOISE_FLOOR_RATIO = 2.5;
+/** Below this RMS nothing is a hit, whatever the noise floor (digital silence). */
+const ABSOLUTE_FLOOR_RMS = 0.0005;
+/** RMS block for the noise floor and the attack-level checks: 256 samples = 11.6 ms at 22050 Hz. */
+const LEVEL_BLOCK = 256;
 const FFT_SIZE = 1024;
 const WINDOW_SECONDS = 0.06;
 const LOW_BAND: [number, number] = [40, 250];
@@ -112,6 +120,7 @@ export function detectOnsets(
   const median = sorted[Math.floor(sorted.length / 2)];
   const peakMax = sorted[sorted.length - 1];
   const threshold = median * s.sensitivity + s.floor * peakMax;
+  const silenceGate = Math.max(ABSOLUTE_FLOOR_RMS, NOISE_FLOOR_RATIO * noiseFloor(samples));
 
   const onsets: number[] = [];
   let lastSample = -Infinity;
@@ -128,13 +137,35 @@ export function detectOnsets(
       if (Math.abs(samples[i]) >= peak * 0.25) { at = i; break; }
     }
     if (at - lastSample < minGap) continue;
-    if (rms(samples, at, at + 256) < SILENCE_RMS) continue;
+    // Level of the hit: the loudest short block inside the attack window. A mouth
+    // attack takes 20-60 ms to reach its level, so one block right at the 25%
+    // point under-reads it by 10 dB or more.
+    const level = peakBlockRms(samples, at, to);
+    if (level < silenceGate) continue;
     // A real attack is louder than what came just before it (not a decaying tail)
-    if (rms(samples, at, at + 256) < 1.5 * rms(samples, at - 512, at)) continue;
+    if (level < 1.5 * rms(samples, at - 2 * LEVEL_BLOCK, at)) continue;
     lastSample = at;
     onsets.push(at / sampleRate);
   }
   return onsets;
+}
+
+/** Loudest LEVEL_BLOCK-sized RMS block that starts inside [from, to). */
+function peakBlockRms(x: Float32Array, from: number, to: number): number {
+  let peak = 0;
+  for (let i = Math.max(0, from); i < Math.min(x.length, to); i += LEVEL_BLOCK / 4) {
+    peak = Math.max(peak, rms(x, i, i + LEVEL_BLOCK));
+  }
+  return peak;
+}
+
+/** The take's own noise floor: the 10th percentile of block RMS over the whole take. */
+function noiseFloor(x: Float32Array): number {
+  const blocks: number[] = [];
+  for (let i = 0; i + LEVEL_BLOCK <= x.length; i += LEVEL_BLOCK) blocks.push(rms(x, i, i + LEVEL_BLOCK));
+  if (blocks.length === 0) return 0;
+  blocks.sort((a, b) => a - b);
+  return blocks[Math.floor(blocks.length * 0.1)];
 }
 
 function rms(x: Float32Array, from: number, to: number): number {
