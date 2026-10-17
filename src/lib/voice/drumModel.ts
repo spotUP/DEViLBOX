@@ -59,6 +59,17 @@ function columnStats(vecs: readonly (readonly number[])[]): { mean: number[]; st
   return { mean, std };
 }
 
+let knnClassifications = 0;
+
+/** How many hits k-NN classifiers have labelled since the last reset (reachability sentinel for tests). */
+export function knnClassificationCount(): number {
+  return knnClassifications;
+}
+
+export function resetKnnClassificationCount(): void {
+  knnClassifications = 0;
+}
+
 /**
  * k-NN over the user's samples plus the prior of every class the user did not
  * train. The z-score comes from the union of user and prior samples, so one
@@ -78,6 +89,7 @@ export function knnClassifier(
   }));
   if (points.length === 0) throw new Error('knnClassifier needs at least one sample or prior point');
   return (f) => {
+    knnClassifications++;
     const z = zscore(featureVector(f), mean, std);
     const near = points
       .map((p) => ({ drum: p.drum, d: p.z.reduce((a, x, i) => a + (x - z[i]) ** 2, 0) }))
