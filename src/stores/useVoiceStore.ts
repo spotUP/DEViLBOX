@@ -118,7 +118,7 @@ export interface VoiceState {
   /** Adds a take as the newest and makes it current. */
   addTake: (take: Omit<VoiceTake, 'id' | 'recordedAt' | 'sampleRate' | 'seconds'> & { recordedAt?: number }) => VoiceTake;
   /** Makes an earlier take current again. */
-  useTake: (id: number) => void;
+  selectTake: (id: number) => void;
   clearTake: () => void;
   setSamples: (samples: TrainingSample[]) => void;
   setTraining: (training: TrainingResult | null) => void;
@@ -165,7 +165,7 @@ type VoiceActions = Pick<
   | 'setMode'
   | 'patchFine'
   | 'addTake'
-  | 'useTake'
+  | 'selectTake'
   | 'clearTake'
   | 'setSamples'
   | 'setTraining'
@@ -202,7 +202,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     return take;
   },
 
-  useTake: (id) => {
+  selectTake: (id) => {
     const take = get().takes.find((t) => t.id === id);
     if (take) set({ take, mode: take.mode });
   },

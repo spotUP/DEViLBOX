@@ -164,7 +164,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   const take = useVoiceStore((s) => s.take);
   const takes = useVoiceStore((s) => s.takes);
   const addTake = useVoiceStore((s) => s.addTake);
-  const useTake = useVoiceStore((s) => s.useTake);
+  const selectTake = useVoiceStore((s) => s.selectTake);
   const clearTake = useVoiceStore((s) => s.clearTake);
   const samples = useVoiceStore((s) => s.samples);
   const setSamples = useVoiceStore((s) => s.setSamples);
@@ -416,9 +416,9 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   }, [backend, deviceId, setCalibratedMs]);
 
   const handleUseTake = useCallback((t: VoiceTake) => {
-    useTake(t.id);
+    selectTake(t.id);
     setStartRow(0);
-  }, [useTake, setStartRow]);
+  }, [selectTake, setStartRow]);
 
   const recording = recorder.phase !== 'idle';
   // Level checks and training takes are not takes for the pattern
