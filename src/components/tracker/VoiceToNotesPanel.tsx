@@ -109,6 +109,12 @@ const NoteRoll: React.FC<{ notes: readonly VoiceNote[]; seconds: number }> = ({ 
   );
 };
 
+/** "on row", "+0.25 row" (late) or "-0.10 row" (early), for the timing table. */
+function formatOffset(offsetRows: number): string {
+  if (Math.abs(offsetRows) < 0.005) return 'on row';
+  return `${offsetRows > 0 ? '+' : ''}${offsetRows.toFixed(2)} row`;
+}
+
 const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="text-[10px] font-mono text-text-secondary uppercase tracking-wide">{children}</div>
 );
@@ -189,7 +195,9 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     minLengthRows: fine.minLengthRows,
     // Measured device latency plus the manual nudge on top
     latencyNudgeMs: calibratedMs + fine.latencyNudgeMs,
-  }), [bpm, speed, fine.swing, fine.minLengthRows, fine.latencyNudgeMs, calibratedMs]);
+    strength: fine.strength,
+    toleranceRows: fine.toleranceRows,
+  }), [bpm, speed, fine.swing, fine.minLengthRows, fine.latencyNudgeMs, fine.strength, fine.toleranceRows, calibratedMs]);
 
   // A new take, or a change to how it lands, is pending again until committed.
   const [pending, setPending] = useState(false);
@@ -576,6 +584,8 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
                 <th className="font-normal pr-2">Row</th>
                 <th className="font-normal pr-2">Note</th>
                 <th className="font-normal pr-2">Length</th>
+                <th className="font-normal pr-2">Heard</th>
+                <th className="font-normal pr-2">Off by</th>
                 <th className="font-normal pr-2">Instrument</th>
               </tr>
             </thead>
@@ -585,6 +595,8 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
                   <td className="pr-2">{startRow + n.row}</td>
                   <td className="pr-2">{noteName(n.midi)}</td>
                   <td className="pr-2">{n.lengthRows} row{n.lengthRows === 1 ? '' : 's'}</td>
+                  <td className="pr-2">{n.heardSeconds.toFixed(3)} s</td>
+                  <td className="pr-2" data-testid="voice-timing-offset">{formatOffset(n.offsetRows)}</td>
                   <td className="pr-2">{n.instrumentId ?? instrumentId}</td>
                 </tr>
               ))}
