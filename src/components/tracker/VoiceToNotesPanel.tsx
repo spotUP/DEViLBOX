@@ -637,7 +637,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
                   <td className="pr-2">{startRow + n.row}</td>
                   <td className="pr-2">{noteName(n.midi)}</td>
                   <td className="pr-2">{n.lengthRows} row{n.lengthRows === 1 ? '' : 's'}</td>
-                  <td className="pr-2">{n.heardSeconds.toFixed(3)} s</td>
+                  <td className="pr-2" data-testid="voice-timing-heard">{n.heardSeconds.toFixed(3)} s</td>
                   <td className="pr-2" data-testid="voice-timing-offset">{formatOffset(n.offsetRows)}</td>
                   <td className="pr-2">{n.instrumentId ?? instrumentId}</td>
                   <td className="pr-2" data-testid="voice-timing-effects">{formatEffects(n)}</td>

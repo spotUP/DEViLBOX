@@ -16,9 +16,10 @@ describe('drumToNotes', () => {
   it('maps each class to its note and instrument, one hit per row, louder wins, no note-off', () => {
     const map = { ...defaultDrumMap([{ id: 3, name: 'Snare' }]), kick: { instrumentId: 1, midi: 36 } };
     const rows = quantiseHits([hit('kick', 0.3, 0.4), hit('snare', 0.3, 0.9), hit('kick', 0.8, 0.5)], map, q);
+    // The first hit is on row 0 (VNR-24), the second 5 rows after it
     expect(rows.map((r) => [r.row, r.midi, r.instrumentId, r.noteOff])).toEqual([
-      [3, 38, 3, false],
-      [8, 36, 1, false],
+      [0, 38, 3, false],
+      [5, 36, 1, false],
     ]);
   });
 });

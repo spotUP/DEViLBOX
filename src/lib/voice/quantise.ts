@@ -99,6 +99,19 @@ export function quantiseTime(t: number, s: QuantiseSettings): QuantisedTime {
 }
 
 /**
+ * The take moved earlier by whole rows so its first note is on row 0: the
+ * silence sung before the first note is not written (owner decision VNR-24,
+ * "first sung note on row 0"). Gaps between notes, the kept offsets and
+ * `heardSeconds` (take time, for effect detection) are unchanged, so the
+ * latency nudge still sets where notes fall between rows. On a swung grid an
+ * odd shift moves the take onto the other swing phase.
+ */
+export function anchorToFirstNote(notes: readonly QuantisedNote[]): QuantisedNote[] {
+  const first = notes.length ? Math.min(...notes.map((n) => n.row)) : 0;
+  return first === 0 ? [...notes] : notes.map((n) => ({ ...n, row: n.row - first }));
+}
+
+/**
  * Snap notes to rows. Output: strictly increasing rows (one note per row; on a
  * collision the louder note wins), lengths >= minLengthRows and clipped so a
  * note ends no later than the next note starts (no overlaps).

@@ -98,7 +98,8 @@ describe('Voice to Notes hears tracker effects on a take (VNR-14)', () => {
     // A third of a row late at speed 6: 2 ticks at strength 0, none at strength 1.
     const late = [sung(4 * ROW + 0.04, 2 * ROW, 60)];
     const [note] = melodyRows(late, { ...Q, strength: 0 }, null, null, ALL_EFFECTS);
-    expect(note.row).toBe(4);
+    // Sung on row 4, written on row 0 as the take's first note (VNR-24); the delay stays
+    expect(note.row).toBe(0);
     expect(note.effects).toEqual([{ kind: 'noteDelay', param: 2, rowOffset: 0 }]);
     const [half] = melodyRows(late, { ...Q, strength: 0.5 }, null, null, ALL_EFFECTS);
     expect(half.effects).toEqual([{ kind: 'noteDelay', param: 1, rowOffset: 0 }]);

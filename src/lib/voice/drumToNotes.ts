@@ -9,7 +9,7 @@
  */
 import { DRUM_CLASSES, type DrumClass, type DrumHit } from './drumHits';
 import { noteDelayEffect } from './noteEffects';
-import { quantiseTime, type QuantisedNote, type QuantiseSettings } from './quantise';
+import { anchorToFirstNote, quantiseTime, type QuantisedNote, type QuantiseSettings } from './quantise';
 import type { VoiceEffect } from './voiceEffects';
 import { writeNotesToPattern, type WriteResult, type WriteTarget } from './writeToPattern';
 import { playableDrumMap, DRUM_808_VOICE, DRUM_808_MIDI } from './voiceInstruments';
@@ -62,7 +62,8 @@ export function defaultDrumMap(
 }
 
 /**
- * Pure part: hits to quantised cells (unique rows, ascending). With `flams`,
+ * Pure part: hits to quantised cells (unique rows, ascending, the first hit
+ * on row 0, see anchorToFirstNote). With `flams`,
  * two hits of one class inside a row become the first hit with a retrigger
  * (E9x, x ticks apart); a hit the quantiser pulled onto an earlier row gets a
  * note delay (EDx) so it still sounds where it was heard.
@@ -108,7 +109,7 @@ export function quantiseHits(hits: readonly DrumHit[], map: DrumMap, q: Quantise
       lastOfClass.set(h.drum, { time: heard, note: prev });
     }
   }
-  return [...byRow.values()].sort((a, b) => a.row - b.row);
+  return anchorToFirstNote([...byRow.values()].sort((a, b) => a.row - b.row));
 }
 
 /** The drum classes the take has hits for. */
