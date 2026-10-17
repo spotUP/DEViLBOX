@@ -167,7 +167,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('Voice to Notes panel', () => {
-  it('Record then Stop puts the sung notes on the grid as one undo step, without a Commit click', async () => {
+  it('Record then Stop puts the sung notes on the grid from row 0 as one undo step, without a Commit click (VNR-24, owner: "why doesnt it put my voice -> note stuff on position 0?")', async () => {
     const model = new SineReadingModel();
     const mic = fakeMic();
     const deps = {
@@ -188,7 +188,7 @@ describe('Voice to Notes panel', () => {
     await waitFor(() => {
       const ghost = useVoicePreviewStore.getState().preview;
       expect(ghost?.channelIndex).toBe(0);
-      expect(ghost?.startRow).toBe(4);
+      expect(ghost?.startRow).toBe(0);
       expect(ghost?.notes).toContain(midiToXMNote(60));
     }, { timeout: 3000 });
     expect(screen.getByText('Stop')).toBeTruthy();
@@ -201,10 +201,10 @@ describe('Voice to Notes panel', () => {
     expect((screen.getByText('Commit').closest('button') as HTMLButtonElement).disabled).toBe(true);
 
     const rows = useTrackerStore.getState().patterns[0].channels[0].rows;
-    // Cursor was on row 4: take row 0 lands there; notes 5 rows apart (+-1 row for the model's onset frame)
+    // The cursor sits on row 4 but the take always starts at row 0; notes 5 rows apart (+-1 row for the model's onset frame)
     const written = writtenNotes();
     expect(written.map((c) => c.note)).toEqual([midiToXMNote(60), midiToXMNote(64), midiToXMNote(67)]);
-    expect(written[0].i).toBe(4);
+    expect(written[0].i).toBe(0);
     // Every written note plays: its instrument exists and makes sound
     for (const c of written) {
       const inst = useInstrumentStore.getState().instruments.find((x) => x.id === rows[c.i].instrument);
@@ -364,7 +364,8 @@ describe('Voice to Notes panel', () => {
     const rows = useTrackerStore.getState().patterns[0].channels[0].rows;
     const written = writtenNotes().filter((c) => rows[c.i].effTyp !== 0x3);
     expect(written.map((c) => c.note)).toEqual([midiToXMNote(60), midiToXMNote(60), midiToXMNote(67)]);
-    expect(written.map((c) => c.i)).toEqual([7, 15, 23]);
+    // Written from row 0 (VNR-24), not from the cursor on row 4
+    expect(written.map((c) => c.i)).toEqual([3, 11, 19]);
     const commands = rows
       .flatMap((r, i) => [{ i, note: r.note, effTyp: r.effTyp, eff: r.eff }, { i, note: r.note, effTyp: r.effTyp2, eff: r.eff2 }])
       .filter((c) => c.effTyp !== 0 || c.eff !== 0);
@@ -397,7 +398,7 @@ describe('Voice to Notes panel', () => {
     expect(table).toMatch(/ED[1-3]/);
   });
 
-  it('while recording, the waveform and note roll span the pattern from the cursor row and show the growing take (VNR-23, owner: "it starts at the center and overflows on the right side")', async () => {
+  it('while recording, the waveform and note roll span the whole pattern from row 0 and show the growing take (VNR-23, owner: "it starts at the center and overflows on the right side")', async () => {
     const model = new SineReadingModel();
     const mic = fakeMic();
     const deps = {
@@ -406,18 +407,18 @@ describe('Voice to Notes panel', () => {
       listDevices: async () => [],
     };
     render(<VoiceToNotesPanel isOpen onClose={() => {}} model={model} deps={deps} />);
-    // 64 rows of 0.1 s, recording from cursor row 4: the pattern has 6.0 s left
+    // 64 rows of 0.1 s from row 0: the pattern is 6.4 s long whatever row the cursor is on
     expect(useTrackerStore.getState().patterns[0].length).toBe(64);
     const waveform = () => screen.getByTestId('voice-take-waveform');
     fireEvent.click(screen.getByText('Record'));
     await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
-    expect(waveform().dataset.seconds).toBe('6.00');
-    expect(screen.getByTestId('voice-note-roll').dataset.seconds).toBe('6.00');
+    expect(waveform().dataset.seconds).toBe('6.40');
+    expect(screen.getByTestId('voice-note-roll').dataset.seconds).toBe('6.40');
 
     // Count-in, then one note held for 5 s: the take grows on the pattern's axis, not a 4 s one
     mic.feed(concat([silence(1.6), sine(60, 5), new Float32Array(2205)]));
     await waitFor(() => expect(Number(waveform().dataset.audio)).toBeGreaterThanOrEqual(5), { timeout: 3000 });
-    expect(waveform().dataset.seconds).toBe('6.00');
+    expect(waveform().dataset.seconds).toBe('6.40');
     await waitFor(() => expect(screen.getAllByTestId('voice-ghost-note').length).toBeGreaterThan(0), { timeout: 3000 });
     for (const rect of screen.getAllByTestId('voice-ghost-note')) {
       const x = Number(rect.getAttribute('x'));
@@ -429,9 +430,9 @@ describe('Voice to Notes panel', () => {
     await waitFor(() => expect(writtenNotes().length).toBeGreaterThan(0));
 
     // The finished take is shorter than the pattern: the axis stays the pattern's length
-    expect(waveform().dataset.seconds).toBe('6.00');
+    expect(waveform().dataset.seconds).toBe('6.40');
     expect(Number(waveform().dataset.audio)).toBeGreaterThanOrEqual(5);
-    expect(screen.getByTestId('voice-note-roll').dataset.seconds).toBe('6.00');
+    expect(screen.getByTestId('voice-note-roll').dataset.seconds).toBe('6.40');
   });
 
   it('Drums mode: a kick and snare take ends as TR-808 cells in the pattern as one undo step, without the pitch model', async () => {
@@ -465,8 +466,9 @@ describe('Voice to Notes panel', () => {
     const voices = tr808Voices();
     expect(voices.map((v) => v.voice)).toEqual(['kick', 'snare']);
     expect(written.map((c) => rows[c.i].instrument)).toEqual(voices.map((v) => v.id));
-    expect(written[0].i).toBeGreaterThanOrEqual(6);
-    expect(written[0].i).toBeLessThanOrEqual(8);
+    // Written from row 0 (VNR-24), not from the cursor on row 4
+    expect(written[0].i).toBeGreaterThanOrEqual(2);
+    expect(written[0].i).toBeLessThanOrEqual(4);
     expect(written[1].i - written[0].i).toBeGreaterThanOrEqual(4);
     expect(written[1].i - written[0].i).toBeLessThanOrEqual(6);
     expect(useHistoryStore.getState().undoStack.length - undoBefore).toBe(1);

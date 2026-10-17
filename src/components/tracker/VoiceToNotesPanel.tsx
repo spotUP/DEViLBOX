@@ -18,7 +18,6 @@ import { Knob } from '@components/controls/Knob';
 import { Toggle } from '@components/controls/Toggle';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { useTrackerStore } from '@/stores/useTrackerStore';
-import { useCursorStore } from '@/stores/useCursorStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { notify } from '@/stores/useNotificationStore';
@@ -248,7 +247,8 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
 
   const handleRecord = useCallback(async () => {
     clearTake();
-    setStartRow(useCursorStore.getState().cursor.rowIndex);
+    // A take always writes from row 0 of the pattern, wherever the cursor is (owner decision VNR-24)
+    setStartRow(0);
     await recorder.start({
       deviceId: deviceId || undefined,
       countInBeats: COUNT_IN_BEATS,
@@ -407,7 +407,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
 
   const handleUseTake = useCallback((t: VoiceTake) => {
     useTake(t.id);
-    setStartRow(useCursorStore.getState().cursor.rowIndex);
+    setStartRow(0);
   }, [useTake, setStartRow]);
 
   const recording = recorder.phase !== 'idle';
