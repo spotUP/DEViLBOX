@@ -1,19 +1,23 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { DRUM_CLASSES, classifyByRules, hitFeatures, type DrumClass } from '../drumHits';
-import { synthHit } from '../drumSynth';
+import { DRUM_CLASSES, FEATURE_COUNT, featureVector, hitFeatures, type DrumClass } from '../drumHits';
+import { synthHit, synthTake } from '../drumSynth';
 import { PITCH_SAMPLE_RATE } from '../pitchNotes';
 import {
+  AVP_PRIOR,
   DRUM_MODEL_KEY,
   DRUM_SAMPLES_KEY,
-  classifyWithModel,
+  activeClassifier,
   clearTraining,
-  loadActiveClassifier,
+  describeTraining,
+  knnClassifier,
   loadSamples,
   loadTrainingResult,
+  samplesFromTake,
   saveSamples,
   saveTrainingResult,
   splitSamples,
   trainAndEvaluate,
+  type PriorSample,
   type TrainingSample,
 } from '../drumModel';
 
@@ -24,64 +28,96 @@ function features(drum: DrumClass, seed: number) {
 }
 
 /** `n` synthetic hits per class; `label` lets a test relabel what a sound is called. */
-function samples(n: number, label: (d: DrumClass) => DrumClass = (d) => d): TrainingSample[] {
+function samples(n: number, label: (d: DrumClass) => DrumClass = (d) => d, first = 1): TrainingSample[] {
   const out: TrainingSample[] = [];
-  for (let seed = 1; seed <= n; seed++) {
+  for (let seed = first; seed < first + n; seed++) {
     for (const d of DRUM_CLASSES) out.push({ drum: label(d), features: features(d, seed) });
   }
   return out;
 }
 
+const swap = (d: DrumClass): DrumClass => (d === 'kick' ? 'snare' : d === 'snare' ? 'kick' : d);
+
 beforeEach(() => clearTraining());
 
-describe('drum model training and evaluation', () => {
+describe('k-NN drum classifier (WD-3)', () => {
+  it('the shipped AVP prior has v2 feature vectors for kick, snare and hat, no clap', () => {
+    expect(AVP_PRIOR.length).toBeGreaterThan(100);
+    for (const p of AVP_PRIOR) expect(p.vector).toHaveLength(FEATURE_COUNT);
+    expect(new Set(AVP_PRIOR.map((p) => p.drum))).toEqual(new Set(['kick', 'snare', 'hat']));
+  });
+
+  it('separable synthetic hits: trained on seeds 1-6, every held-out seed 7-12 hit is right', () => {
+    const classify = knnClassifier(samples(6), []);
+    const test = samples(6, undefined, 7);
+    expect(test.filter((s) => classify(s.features) === s.drum)).toHaveLength(test.length);
+  });
+
+  it('a voice that names its sounds differently wins over the prior: the labels the user gave are what it returns', () => {
+    const classify = knnClassifier(samples(6, swap));
+    expect(classify(features('kick', 40))).toBe('snare');
+    expect(classify(features('snare', 40))).toBe('kick');
+  });
+
+  it('a class the user did not train falls back to the prior; a trained class replaces its prior', () => {
+    // Query q sits on the prior hat point, a hair from the prior kick point
+    const q = features('kick', 1);
+    const at = (dx: number) => featureVector(q).map((x, i) => (i === 0 ? x + dx : x));
+    const prior: PriorSample[] = [
+      { drum: 'hat', vector: at(0) },
+      { drum: 'kick', vector: at(1e-3) },
+    ];
+    const elsewhere = (drum: DrumClass): TrainingSample => ({ drum, features: features('snare', 9) });
+    expect(knnClassifier([elsewhere('snare')], prior, 1)(q)).toBe('hat'); // snare trained, hat prior kept
+    expect(knnClassifier([elsewhere('hat')], prior, 1)(q)).toBe('kick'); // hat trained, its prior gone
+  });
+
+  it('with no samples and no prior there is nothing to vote with', () => {
+    expect(() => knnClassifier([], [])).toThrow();
+  });
+
+  it('samplesFromTake labels every detected hit of a training take', () => {
+    const take = synthTake([{ drum: 'snare', at: 0.2 }, { drum: 'snare', at: 0.6 }, { drum: 'snare', at: 1.0 }], 1.4);
+    const got = samplesFromTake(take, 'snare');
+    expect(got.map((s) => s.drum)).toEqual(['snare', 'snare', 'snare']);
+  });
+});
+
+describe('training evaluation', () => {
   it('splits every third sample of each class out', () => {
     const { train, test } = splitSamples(samples(6));
     expect(test.length).toBe(8);
     expect(train.length).toBe(16);
   });
 
-  it('needs three hits in at least two classes before it trains', () => {
+  it('is null until one class has three hits, then reports held-out accuracy', () => {
     expect(trainAndEvaluate(samples(2))).toBeNull();
-    const oneClass = samples(6).filter((s) => s.drum === 'kick');
-    expect(trainAndEvaluate(oneClass)).toBeNull();
-  });
-
-  it('on correct labels the model matches but does not beat the rules, so the rules stay', () => {
-    const r = trainAndEvaluate(samples(6));
-    expect(r).not.toBeNull();
-    expect(r!.modelAccuracy).toBe(1);
-    expect(r!.rulesAccuracy).toBe(1);
-    expect(r!.useModel).toBe(false);
-  });
-
-  it('on a voice the rules get wrong, the model wins on held-out takes and is selected', () => {
-    // This user calls the kick sound "snare" and the snare sound "kick"
-    const swap = (d: DrumClass): DrumClass => (d === 'kick' ? 'snare' : d === 'snare' ? 'kick' : d);
-    const set = samples(6, swap);
-    const r = trainAndEvaluate(set)!;
-    expect(r.rulesAccuracy).toBeLessThan(0.7);
-    expect(r.modelAccuracy).toBe(1);
-    expect(r.useModel).toBe(true);
-    expect(classifyWithModel(r.model, features('kick', 40))).toBe('snare');
-    expect(classifyByRules(features('kick', 40))).toBe('kick');
+    expect(describeTraining(null)).toMatch(/built-in voice samples/);
+    const kicks = samples(3).filter((s) => s.drum === 'kick');
+    const r = trainAndEvaluate(kicks)!;
+    expect(r.heldOut).toBe(1);
+    const full = trainAndEvaluate(samples(6, swap))!;
+    expect(full.accuracy).toBe(1);
+    expect(full.heldOut).toBe(8);
+    expect(full.confusion.kick?.snare ?? 0).toBe(0);
+    expect(describeTraining(full)).toMatch(/held out 8: 100 percent/);
   });
 });
 
-describe('drum model storage', () => {
-  it('round-trips samples and the training result under versioned keys', () => {
-    expect(DRUM_SAMPLES_KEY).toMatch(/\.v1$/);
-    expect(DRUM_MODEL_KEY).toMatch(/\.v1$/);
-    const set = samples(4);
+describe('drum training storage', () => {
+  it('round-trips samples and the training result under v2 keys', () => {
+    expect(DRUM_SAMPLES_KEY).toMatch(/\.v2$/);
+    expect(DRUM_MODEL_KEY).toMatch(/\.v2$/);
+    const set = samples(4, swap);
     saveSamples(set);
     expect(loadSamples()).toEqual(set);
-    const r = trainAndEvaluate(samples(6, (d) => (d === 'kick' ? 'snare' : d === 'snare' ? 'kick' : d)))!;
+    expect(activeClassifier(loadSamples())(features('kick', 41))).toBe('snare');
+    const r = trainAndEvaluate(set)!;
     saveTrainingResult(r);
     expect(loadTrainingResult()).toEqual(r);
-    expect(loadActiveClassifier()(features('kick', 41))).toBe('snare');
     clearTraining();
     expect(loadTrainingResult()).toBeNull();
-    expect(loadActiveClassifier()(features('kick', 41))).toBe('kick');
+    expect(loadSamples()).toEqual([]);
   });
 
   it('survives corrupt, wrong-version and unavailable storage', () => {
@@ -93,7 +129,7 @@ describe('drum model storage', () => {
     Storage.prototype.getItem = () => { throw new Error('blocked'); };
     try {
       expect(loadSamples()).toEqual([]);
-      expect(loadActiveClassifier()(features('hat', 1))).toBe('hat');
+      expect(loadTrainingResult()).toBeNull();
     } finally {
       Storage.prototype.getItem = original;
     }

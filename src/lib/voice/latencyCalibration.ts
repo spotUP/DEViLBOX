@@ -8,6 +8,7 @@
  */
 import { PITCH_SAMPLE_RATE } from './pitchNotes';
 import { concatBlocks, type VoiceCapture } from './voiceRecorder';
+import { clearDrumsReset, drumsResetPending } from '@/lib/persistence/migrations/voiceDrumsV2';
 
 export const LATENCY_STORAGE_KEY = 'devilbox.voice.latencyMs.v1';
 /** Device id used when the user keeps the default microphone. */
@@ -57,8 +58,12 @@ export function hasStoredLatency(deviceId: string): boolean {
 
 export const SETUP_SEEN_KEY = 'devilbox.voice.setupSeen.v1';
 
-/** The setup wizard opens by itself until it was closed once or a latency is stored. */
+/**
+ * The setup wizard opens by itself until it was closed once or a latency is
+ * stored, and once more after the v2 drum migration reset the training.
+ */
 export function shouldOpenVoiceSetup(): boolean {
+  if (drumsResetPending()) return true;
   try {
     if (localStorage.getItem(SETUP_SEEN_KEY) === '1') return false;
   } catch {
@@ -68,6 +73,7 @@ export function shouldOpenVoiceSetup(): boolean {
 }
 
 export function markVoiceSetupSeen(): void {
+  clearDrumsReset();
   try {
     localStorage.setItem(SETUP_SEEN_KEY, '1');
   } catch {

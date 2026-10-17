@@ -1,17 +1,30 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync, readdirSync } from 'node:fs';
-import { BAND_COUNT, DRUM_CLASSES, FEATURE_COUNT, classifyByRules, detectHits, detectOnsets, featureVector, hitFeatures, type DrumClass } from '../drumHits';
+import { BAND_COUNT, DRUM_CLASSES, FEATURE_COUNT, detectHits, detectOnsets, featureVector, hitFeatures, type DrumClass } from '../drumHits';
 import { synthHit, synthTake } from '../drumSynth';
 import { PITCH_SAMPLE_RATE } from '../pitchNotes';
+import { activeClassifier, knnClassifier, type TrainingSample } from '../drumModel';
 
-describe('hit features and rules (synthetic signals)', () => {
+/** A k-NN trained on synthetic hits of seeds 11-16, with no prior: the synthetic voice. */
+const synthClassify = knnClassifier(
+  DRUM_CLASSES.flatMap((drum) =>
+    [11, 12, 13, 14, 15, 16].map((seed): TrainingSample => {
+      const take = new Float32Array(PITCH_SAMPLE_RATE / 2);
+      take.set(synthHit(drum, seed), 2000);
+      return { drum, features: hitFeatures(take, 2000) };
+    }),
+  ),
+  [],
+);
+
+describe('hit features and k-NN (synthetic signals)', () => {
   for (const drum of DRUM_CLASSES) {
     it(`classifies a synthetic ${drum} (3 noise seeds)`, () => {
       for (const seed of [1, 2, 3]) {
         const take = new Float32Array(PITCH_SAMPLE_RATE / 2);
         take.set(synthHit(drum, seed), 2000);
         const f = hitFeatures(take, 2000);
-        expect(classifyByRules(f), JSON.stringify(f)).toBe(drum);
+        expect(synthClassify(f), JSON.stringify(f)).toBe(drum);
       }
     });
   }
@@ -94,11 +107,11 @@ describe('onset detection and the whole pipeline', () => {
   });
 
   it('classifies the sequence', () => {
-    expect(detectHits(take).map((h) => h.drum)).toEqual(pattern.map((p) => p.drum));
+    expect(detectHits(take, synthClassify).map((h) => h.drum)).toEqual(pattern.map((p) => p.drum));
   });
 
   it('finds no hits in silence', () => {
-    expect(detectHits(new Float32Array(PITCH_SAMPLE_RATE))).toEqual([]);
+    expect(detectHits(new Float32Array(PITCH_SAMPLE_RATE), synthClassify)).toEqual([]);
   });
 
   it('finds no hits in mic noise alone (quiet room, no sounds)', () => {
@@ -107,7 +120,7 @@ describe('onset detection and the whole pipeline', () => {
       seed = (seed * 1664525 + 1013904223) >>> 0;
       return (seed / 4294967296 - 0.5) * 0.004;
     });
-    expect(detectHits(take)).toEqual([]);
+    expect(detectHits(take, synthClassify)).toEqual([]);
   });
 
   // Regression (VNR-16): a laptop mic at the browser's default gain records mouth
@@ -176,7 +189,7 @@ describe('onset detection and the whole pipeline', () => {
     const onsets = detectOnsets(take);
     expect(onsets.length, onsets.join(' ')).toBe(expected.length);
     onsets.forEach((t, i) => expect(Math.abs(t - expected[i])).toBeLessThan(0.02));
-    expect(detectHits(take).filter((h) => h.drum === 'kick').length).toBe(kicks.length);
+    expect(detectHits(take, () => 'kick').length).toBe(kicks.length + 1);
   });
 });
 
@@ -185,7 +198,7 @@ describe('onset detection and the whole pipeline', () => {
 // is NOT resampled here: 22050 Hz mono 16-bit WAV). The test skips while the folder is absent.
 const REAL_DIR = 'test-data/voice-beatbox';
 describe.skipIf(!existsSync(REAL_DIR))('real beatbox clips (owner fixtures)', () => {
-  it('rules classify each clip file by its name prefix at least 60 percent of the time', async () => {
+  it('the AVP prior classifies each clip file by its name prefix at least 60 percent of the time', async () => {
     const { readFileSync } = await import('node:fs');
     const files = readdirSync(REAL_DIR).filter((f) => f.endsWith('.wav'));
     expect(files.length).toBeGreaterThan(0);
@@ -194,7 +207,7 @@ describe.skipIf(!existsSync(REAL_DIR))('real beatbox clips (owner fixtures)', ()
       const buf = readFileSync(`${REAL_DIR}/${file}`);
       const pcm = new Int16Array(buf.buffer.slice(buf.byteOffset + 44, buf.byteOffset + buf.length - ((buf.length - 44) % 2)));
       const samples = Float32Array.from(pcm, (v) => v / 32768);
-      const hits = detectHits(samples);
+      const hits = detectHits(samples, activeClassifier([]));
       if (hits[0]?.drum === file.split('-')[0]) ok++;
     }
     expect(ok / files.length).toBeGreaterThanOrEqual(0.6);

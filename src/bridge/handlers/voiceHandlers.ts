@@ -11,8 +11,8 @@ import { swiftF0Tracker } from '@/lib/voice/swiftF0';
 import { DEFAULT_SHAPING, commitVoiceNotes, shapeNotes } from '@/lib/voice/voiceToNotes';
 import { ALL_EFFECTS, contourFromTrack } from '@/lib/voice/noteEffects';
 import { PITCH_SAMPLE_RATE } from '@/lib/voice/pitchNotes';
-import { countsByClass, loadActiveClassifier, modelClassifier, type TrainingSample } from '@/lib/voice/drumModel';
-import { classifyByRules, detectHits, DRUM_CLASSES, type HitClassifier } from '@/lib/voice/drumHits';
+import { activeClassifier, countsByClass, type TrainingSample } from '@/lib/voice/drumModel';
+import { detectHits, DRUM_CLASSES } from '@/lib/voice/drumHits';
 import { commitDrumHits, defaultDrumMap, type DrumMap } from '@/lib/voice/drumToNotes';
 import { SCALES, type ScaleName } from '@/lib/voice/scaleSnap';
 import { getStoredLatencyMs } from '@/lib/voice/latencyCalibration';
@@ -80,7 +80,7 @@ export async function voiceToNotes(
       for (const d of DRUM_CLASSES) {
         if (override[d]) map[d] = { ...map[d], ...override[d] };
       }
-      const hits = detectHits(samples, loadActiveClassifier());
+      const hits = detectHits(samples, activeClassifier(useVoiceStore.getState().samples));
       const written = commitDrumHits(hits, map, quantise, { channelIndex, startRow, instrumentId: fallback });
       const counts = Object.fromEntries(DRUM_CLASSES.map((d) => [d, hits.filter((h) => h.drum === d).length]));
       if (!written) return { ok: true, written: 0, dropped: 0, detected: hits.length, hits: counts };
@@ -120,31 +120,11 @@ export async function voiceToNotes(
   }
 }
 
-/** Per true class: how the classifier labelled that class's training samples. */
-function confusion(classify: HitClassifier, samples: readonly TrainingSample[]): Record<string, Record<string, number>> {
-  const out: Record<string, Record<string, number>> = {};
-  for (const s of samples) {
-    const row = (out[s.drum] ??= {});
-    const got = classify(s.features);
-    row[got] = (row[got] ?? 0) + 1;
-  }
-  return out;
-}
-
-/** The drum training state: sample counts per class, accuracies, confusion of model and rules. */
+/** The drum training state: sample counts per class and the held-out report (accuracy, confusion). */
 function trainingReport(samples: readonly TrainingSample[], training: ReturnType<typeof useVoiceStore.getState>['training']) {
   return {
     samples: countsByClass(samples),
-    result: training
-      ? {
-          modelAccuracy: training.modelAccuracy,
-          rulesAccuracy: training.rulesAccuracy,
-          heldOut: training.heldOut,
-          useModel: training.useModel,
-        }
-      : null,
-    modelConfusion: training ? confusion(modelClassifier(training.model), samples) : null,
-    rulesConfusion: confusion(classifyByRules, samples),
+    result: training,
   };
 }
 

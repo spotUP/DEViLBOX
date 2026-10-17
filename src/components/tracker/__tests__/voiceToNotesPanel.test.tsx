@@ -26,6 +26,7 @@ import { synthHit } from '@/lib/voice/drumSynth';
 import { useVoiceStore } from '@/stores/useVoiceStore';
 import { LATENCY_STORAGE_KEY, SETUP_SEEN_KEY } from '@/lib/voice/latencyCalibration';
 import { useVoicePreviewStore } from '@/stores/useVoicePreviewStore';
+import { DRUMS_RESET_MESSAGE, V1_DRUM_KEYS } from '@/lib/persistence/migrations/voiceDrumsV2';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { DRUM_808_MIDI, isPlayable, VOICE_LEAD_NAME } from '@/lib/voice/voiceInstruments';
 
@@ -508,7 +509,7 @@ describe('Voice to Notes panel', () => {
     expect(useHistoryStore.getState().undoStack.at(-1)?.description).toBe('Voice to Notes');
   });
 
-  it('Drums mode: a model trained on this voice (kick sound called snare) replaces the rules and changes the written note', async () => {
+  it('Drums mode: training on this voice (kick sound called snare) replaces the built-in samples and changes the written note', async () => {
     const feat = (drum: 'kick' | 'snare', seed: number) => {
       const take = new Float32Array(PITCH_SAMPLE_RATE / 4);
       take.set(synthHit(drum, seed), 500);
@@ -538,7 +539,7 @@ describe('Voice to Notes panel', () => {
     await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
     mic.feed(synthTake([{ drum: 'kick', at: 0.1 }], 0.5, 9));
     fireEvent.click(screen.getByText('Stop'));
-    await waitFor(() => expect(screen.getByTestId('drum-training-status').textContent).toContain('using your model'));
+    await waitFor(() => expect(screen.getByTestId('drum-training-status').textContent).toMatch(/held out \d+: 100 percent correct/));
 
     // A normal drum take now: the kick sound is written as the snare note
     fireEvent.click(screen.getByText('Record'));
@@ -591,6 +592,15 @@ describe('Voice to Notes panel', () => {
 });
 
 describe('Voice to Notes setup wizard', () => {
+  it('after the v2 drum migration it opens once more, with the reset message, even though setup was done', async () => {
+    localStorage.setItem(SETUP_SEEN_KEY, '1');
+    localStorage.setItem(V1_DRUM_KEYS[0], '{"version":1,"samples":[]}');
+    useVoiceStore.getState().reset();
+    const deps = { getStream: async () => ({} as MediaStream), createCapture: () => fakeMic().capture, listDevices: async () => [] };
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} tracker={new SineReadingTracker()} deps={deps} />);
+    expect((await screen.findByTestId('voice-setup-notice')).textContent).toBe(DRUMS_RESET_MESSAGE);
+  });
+
   it('opens on first use and walks microphone check, latency, a step per drum, the melody range and result', async () => {
     localStorage.removeItem(SETUP_SEEN_KEY);
     const tracker = new SineReadingTracker();
@@ -665,7 +675,7 @@ describe('Voice to Notes setup wizard', () => {
     expect(useVoiceStore.getState().fine).toMatchObject({ minMidiNote: 57, maxMidiNote: 70, transpose: 0 });
     expect(writtenNotes()).toEqual([]);
 
-    expect(screen.getByTestId('voice-setup-result').textContent).toMatch(/^Drum training: held out \d+: model \d+ percent, rules \d+ percent, using /);
+    expect(screen.getByTestId('voice-setup-result').textContent).toMatch(/^Drum training: held out \d+: \d+ percent correct/);
     expect(screen.getByTestId('voice-setup-result-range').textContent).toBe('Melody range: A3 to A#4, no transpose');
 
     fireEvent.click(screen.getByText('Finish'));
