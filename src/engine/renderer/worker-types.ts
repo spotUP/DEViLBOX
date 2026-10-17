@@ -185,7 +185,11 @@ export type TrackerWorkerMsg =
   | { type: 'uiState'; uiState: UIStateSnapshot }
   | { type: 'channelLayout'; channelLayout: ChannelLayoutSnapshot }
   | { type: 'dragOver'; cell: { channelIndex: number; rowIndex: number } | null }
+  | { type: 'previewCells'; preview: PatternPreviewSnapshot | null }
   | { type: 'hitTest'; id: number; relX: number; relY: number };
+
+/** Cells a pending Voice to Notes take writes on one channel of the current pattern; drawn as ghost notes. note 0 = empty row of the span, 97 = note-off. */
+export interface PatternPreviewSnapshot { channelIndex: number; startRow: number; notes: number[] }
 
 // ─── Worker replies (worker → main thread) ────────────────────────────────────
 

@@ -7,7 +7,7 @@
  * pattern writing in lib/voice/writeToPattern.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Mic, Square, Check, X, Loader2, Timer } from 'lucide-react';
+import { Mic, Square, Check, X, Loader2, Timer, Wand2 } from 'lucide-react';
 import { Button } from '@components/ui/Button';
 import { Knob } from '@components/controls/Knob';
 import { Toggle } from '@components/controls/Toggle';
@@ -25,16 +25,25 @@ import {
   type PitchSettings,
   type VoiceNote,
 } from '@/lib/voice/pitchNotes';
-import { rowSeconds } from '@/lib/voice/quantise';
+import { rowSeconds, type QuantiseSettings } from '@/lib/voice/quantise';
+import { melodyPreview, drumPreview } from '@/lib/voice/takePreview';
+import { useVoicePreviewStore } from '@/stores/useVoicePreviewStore';
 import { commitVoiceNotes, shapeNotes } from '@/lib/voice/voiceToNotes';
 import { SCALES, SCALE_LABELS, TONIC_NAMES, type ScaleName } from '@/lib/voice/scaleSnap';
-import { getStoredLatencyMs, measureLoopbackLatencyMs, storeLatencyMs } from '@/lib/voice/latencyCalibration';
+import {
+  getStoredLatencyMs,
+  markVoiceSetupSeen,
+  measureLoopbackLatencyMs,
+  shouldOpenVoiceSetup,
+  storeLatencyMs,
+} from '@/lib/voice/latencyCalibration';
+import { VoiceLevelMeter, VoiceSetupWizard } from './VoiceSetupWizard';
 import { addTake, listTakes, type Take } from '@/lib/voice/takeHistory';
 import { DRUM_CLASSES, DRUM_CLASS_LABELS, classifyByRules, detectHits, type DrumClass, type DrumHit } from '@/lib/voice/drumHits';
 import {
-  MIN_SAMPLES_PER_CLASS,
   clearTraining,
   countsByClass,
+  describeTraining,
   loadSamples,
   loadTrainingResult,
   modelClassifier,
@@ -84,11 +93,6 @@ const MODE_OPTIONS = [
   { value: 'melody', label: 'Melody' },
   { value: 'drums', label: 'Drums' },
 ];
-
-/** Drum mode never needs the pitch model; the live preview runs against this empty one. */
-const NO_PITCH_MODEL: PitchModel = {
-  evaluate: async () => ({ frames: [], onsets: [], contours: [] }),
-};
 
 const DRUM_NOTE_OPTIONS = Array.from({ length: 61 }, (_, i) => {
   const midi = 24 + i;
@@ -149,6 +153,8 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   const [calibrating, setCalibrating] = useState(false);
   const [takes, setTakes] = useState<readonly Take[]>(() => listTakes());
   const [activeTakeId, setActiveTakeId] = useState<number | null>(null);
+  const [levelCheck, setLevelCheck] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(shouldOpenVoiceSetup);
   const backend = deps ?? defaultVoiceRecorderDeps;
 
   useEffect(() => {
@@ -158,14 +164,28 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   const bpm = useTransportStore((s) => s.bpm);
   const speed = useTransportStore((s) => s.speed);
   const channelCount = useTrackerStore((s) => s.patterns[s.currentPatternIndex]?.channels.length ?? 0);
+  const rowCount = useTrackerStore((s) => s.patterns[s.currentPatternIndex]?.length ?? 0);
   const instruments = useInstrumentStore((s) => s.instruments);
 
   const drums = mode === 'drums';
-  const recorder = useVoiceRecorder(drums ? NO_PITCH_MODEL : model, fine, deps);
+  const recorder = useVoiceRecorder(model, fine, deps);
 
   const patch = useCallback(<K extends keyof Finetune>(key: K, value: Finetune[K]) => {
     setFine((prev) => ({ ...prev, [key]: value }));
   }, []);
+
+  const quantise = useMemo<QuantiseSettings>(() => ({
+    bpm,
+    speed,
+    swing: fine.swing,
+    minLengthRows: fine.minLengthRows,
+    // Measured device latency plus the manual nudge on top
+    latencyNudgeMs: calibratedMs + fine.latencyNudgeMs,
+  }), [bpm, speed, fine.swing, fine.minLengthRows, fine.latencyNudgeMs, calibratedMs]);
+
+  // A new take, or a change to how it lands, is pending again until committed.
+  const [pending, setPending] = useState(false);
+  useEffect(() => setPending(true), [output, hits, fine, quantise, channelIndex, startRow, mode]);
 
   const finalNotes = useMemo(
     () =>
@@ -186,13 +206,26 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
       deviceId: deviceId || undefined,
       countInBeats: COUNT_IN_BEATS,
       beatSeconds: 60 / useTransportStore.getState().bpm,
+      // Drum hits are found when the take stops; the pitch model is not needed
+      livePreview: !drums,
     });
+  }, [recorder, deviceId, drums]);
+
+  const handleRecordTraining = useCallback(async (drum: DrumClass) => {
+    setTrainingTake(drum);
+    await recorder.start({ deviceId: deviceId || undefined, countInBeats: 0, beatSeconds: 60 / useTransportStore.getState().bpm, livePreview: false });
   }, [recorder, deviceId]);
 
-  const handleRecordTraining = useCallback(async () => {
-    setTrainingTake(trainClass);
-    await recorder.start({ deviceId: deviceId || undefined, countInBeats: 0, beatSeconds: 60 / useTransportStore.getState().bpm });
-  }, [recorder, deviceId, trainClass]);
+  /** A take only for the level meter; it is thrown away on stop. */
+  const handleCheckLevel = useCallback(async () => {
+    setLevelCheck(true);
+    await recorder.start({ deviceId: deviceId || undefined, countInBeats: 0, beatSeconds: 60 / useTransportStore.getState().bpm, livePreview: false });
+  }, [recorder, deviceId]);
+
+  const handleCloseWizard = useCallback(() => {
+    markVoiceSetupSeen();
+    setWizardOpen(false);
+  }, []);
 
   const handleTrain = useCallback((all: TrainingSample[]) => {
     const result = trainAndEvaluate(all);
@@ -210,6 +243,10 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     const take = recorder.stop();
     const labelled = trainingTake;
     setTrainingTake(null);
+    if (levelCheck) {
+      setLevelCheck(false);
+      return;
+    }
     if (!take || take.length === 0) return;
     if (labelled) {
       const added = samplesFromTake(take, labelled);
@@ -240,30 +277,28 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     } finally {
       setAnalysing(false);
     }
-  }, [recorder, model, drums, trainingTake, samples, training, handleTrain]);
+  }, [recorder, model, drums, trainingTake, levelCheck, samples, training, handleTrain]);
 
   const handleCommit = useCallback(() => {
-    const quantise = {
-      bpm,
-      speed,
-      swing: fine.swing,
-      minLengthRows: fine.minLengthRows,
-      // Measured device latency plus the manual nudge on top
-      latencyNudgeMs: calibratedMs + fine.latencyNudgeMs,
-    };
     const target = { channelIndex, startRow, instrumentId };
-    const result = drums
-      ? commitDrumHits(hits, drumMap, quantise, target)
-      : commitVoiceNotes(finalNotes, quantise, target);
+    let result;
+    if (drums) {
+      result = commitDrumHits(hits, drumMap, quantise, target);
+      if (result) setDrumMap(result.drumMap);
+    } else {
+      result = commitVoiceNotes(finalNotes, quantise, target);
+      if (result) setInstrumentId(result.instrumentId);
+    }
     if (!result) {
       notify.warning(drums ? 'No drum hits to write' : 'No notes to write');
       return;
     }
+    setPending(false);
     notify.success(
       `Wrote ${result.written} note${result.written === 1 ? '' : 's'}` +
         (result.dropped ? `, ${result.dropped} past the end of the pattern` : ''),
     );
-  }, [drums, hits, drumMap, finalNotes, bpm, speed, fine, calibratedMs, channelIndex, startRow, instrumentId]);
+  }, [drums, hits, drumMap, finalNotes, quantise, channelIndex, startRow, instrumentId]);
 
   const handleCalibrate = useCallback(async () => {
     setCalibrating(true);
@@ -292,7 +327,21 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   }, []);
 
   const recording = recorder.phase !== 'idle';
+  // Level checks and training takes are not takes for the pattern
+  const takeRecording = recording && !levelCheck && trainingTake === null;
   const shownNotes = recording ? recorder.liveNotes : finalNotes;
+
+  // The take shows in the pattern as ghost notes while recording and until it
+  // is committed; built with the commit's own steps (lib/voice/takePreview).
+  const preview = useMemo(() => {
+    if (recording ? !takeRecording : !pending) return null;
+    const target = { channelIndex, startRow, instrumentId };
+    if (drums) return recording ? null : drumPreview(hits, drumMap, quantise, target, rowCount);
+    return melodyPreview(shownNotes, quantise, target, rowCount);
+  }, [recording, takeRecording, pending, drums, hits, drumMap, shownNotes, quantise, channelIndex, startRow, instrumentId, rowCount]);
+  const setPreview = useVoicePreviewStore((s) => s.setPreview);
+  useEffect(() => setPreview(preview), [preview, setPreview]);
+  useEffect(() => () => setPreview(null), [setPreview]);
   const rowLength = rowSeconds(bpm, speed);
 
   const deviceOptions = [
@@ -312,10 +361,31 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     >
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-mono text-text-secondary">Voice to Notes</span>
-        <Button variant="ghost" size="icon" onClick={onClose} title="Close panel" aria-label="Close panel">
-          <X size={12} />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={() => setWizardOpen(true)} disabled={recording} title="Setup wizard" aria-label="Setup wizard">
+            <Wand2 size={12} />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={onClose} title="Close panel" aria-label="Close panel">
+            <X size={12} />
+          </Button>
+        </div>
       </div>
+      <VoiceSetupWizard
+        isOpen={wizardOpen}
+        onClose={handleCloseWizard}
+        level={recorder.level}
+        recording={recording}
+        trainingTake={trainingTake}
+        error={recorder.error}
+        onCheckLevel={() => void handleCheckLevel()}
+        onStop={() => void handleStop()}
+        calibratedMs={calibratedMs}
+        calibrating={calibrating}
+        onCalibrate={() => void handleCalibrate()}
+        samples={samples}
+        training={training}
+        onRecordTraining={(drum) => void handleRecordTraining(drum)}
+      />
 
       <CustomSelect value={mode} onChange={(v) => setMode(v as VoiceMode)} options={MODE_OPTIONS} title="Mode" disabled={recording} />
       <CustomSelect value={deviceId} onChange={setDeviceId} options={deviceOptions} title="Microphone" disabled={recording} />
@@ -350,9 +420,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
         {analysing && <Loader2 size={12} className="animate-spin text-accent-primary" />}
       </div>
 
-      <div className="h-1 bg-dark-bgTertiary rounded overflow-hidden" aria-label="Input level">
-        <div className="h-full bg-accent-success" style={{ width: `${Math.min(100, recorder.level * 300)}%` }} />
-      </div>
+      <VoiceLevelMeter level={recorder.level} />
       {recorder.error && <div className="text-[10px] font-mono text-accent-error">{recorder.error}</div>}
 
       {drums ? (
@@ -391,16 +459,14 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
               title="Training class"
               disabled={recording}
             />
-            <Button variant="default" size="sm" icon={<Mic size={12} />} onClick={() => void handleRecordTraining()} disabled={recording || analysing}>
+            <Button variant="default" size="sm" icon={<Mic size={12} />} onClick={() => void handleRecordTraining(trainClass)} disabled={recording || analysing}>
               Record training take
             </Button>
           </div>
           <div className="text-[9px] font-mono text-text-muted" data-testid="drum-training-status">
             {DRUM_CLASSES.map((d) => `${DRUM_CLASS_LABELS[d]} ${countsByClass(samples)[d]}`).join(', ')}
             {' - '}
-            {training
-              ? `held out ${training.heldOut}: model ${Math.round(training.modelAccuracy * 100)} percent, rules ${Math.round(training.rulesAccuracy * 100)} percent, using ${training.useModel ? 'your model' : 'the rules'}`
-              : `needs ${MIN_SAMPLES_PER_CLASS} hits for at least two classes`}
+            {describeTraining(training)}
           </div>
           {samples.length > 0 && (
             <Button variant="ghost" size="sm" onClick={handleClearTraining} disabled={recording}>

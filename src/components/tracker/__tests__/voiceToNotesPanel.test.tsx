@@ -8,7 +8,7 @@
  * extraction, quantiser and writer. Sentinel: the fake model's calls.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, fireEvent, cleanup, waitFor, screen } from '@testing-library/react';
+import { render, fireEvent, cleanup, waitFor, screen, within } from '@testing-library/react';
 import { VoiceToNotesPanel } from '../VoiceToNotesPanel';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useHistoryStore } from '@/stores/useHistoryStore';
@@ -24,7 +24,10 @@ import { clearTraining, saveSamples } from '@/lib/voice/drumModel';
 import { hitFeatures } from '@/lib/voice/drumHits';
 import { synthHit } from '@/lib/voice/drumSynth';
 import { clearTakes } from '@/lib/voice/takeHistory';
-import { LATENCY_STORAGE_KEY } from '@/lib/voice/latencyCalibration';
+import { LATENCY_STORAGE_KEY, SETUP_SEEN_KEY } from '@/lib/voice/latencyCalibration';
+import { useVoicePreviewStore } from '@/stores/useVoicePreviewStore';
+import { useInstrumentStore } from '@/stores/useInstrumentStore';
+import { isPlayable } from '@/lib/voice/voiceInstruments';
 
 const HOP = 256;
 
@@ -101,6 +104,9 @@ beforeEach(() => {
   resetStore(useTrackerStore);
   useTransportStore.setState({ bpm: 150, speed: 6 } as never);
   useCursorStore.setState({ cursor: { ...useCursorStore.getState().cursor, channelIndex: 0, rowIndex: 4 } } as never);
+
+  // The setup wizard opens on first use; the panel tests below start past it
+  try { localStorage.setItem(SETUP_SEEN_KEY, '1'); } catch { /* none */ }
 });
 afterEach(cleanup);
 
@@ -121,18 +127,33 @@ describe('Voice to Notes panel', () => {
 
     // 4 count-in beats at 150 bpm = 1.6 s of silence, then C4, E4, G4 for 0.5 s each (row = 0.1 s)
     mic.feed(concat([new Float32Array(Math.round(1.6 * PITCH_SAMPLE_RATE)), sine(60, 0.5), sine(64, 0.5), sine(67, 0.5), new Float32Array(2205)]));
+
+    // Ghost notes: while still recording, the live preview puts the sung notes on the target channel
+    await waitFor(() => {
+      const ghost = useVoicePreviewStore.getState().preview;
+      expect(ghost?.channelIndex).toBe(0);
+      expect(ghost?.startRow).toBe(4);
+      expect(ghost?.notes).toContain(midiToXMNote(60));
+    }, { timeout: 3000 });
+    expect(screen.getByText('Stop')).toBeTruthy();
+    expect(model.calls).toBeGreaterThan(0);
     fireEvent.click(screen.getByText('Stop'));
 
     const commit = screen.getByText('Commit').closest('button') as HTMLButtonElement;
     await waitFor(() => expect(commit.disabled).toBe(false));
-    expect(model.calls).toBeGreaterThan(0);
     fireEvent.click(commit);
+    expect(useVoicePreviewStore.getState().preview).toBeNull();
 
     const rows = useTrackerStore.getState().patterns[0].channels[0].rows;
     // Cursor was on row 4: take row 0 lands there; notes 5 rows apart (+-1 row for the model's onset frame)
     const written = rows.map((r, i) => ({ i, note: r.note })).filter((c) => c.note > 0 && c.note !== 97);
     expect(written.map((c) => c.note)).toEqual([midiToXMNote(60), midiToXMNote(64), midiToXMNote(67)]);
     expect(written[0].i).toBe(4);
+    // Every written note plays: its instrument exists and makes sound
+    for (const c of written) {
+      const inst = useInstrumentStore.getState().instruments.find((x) => x.id === rows[c.i].instrument);
+      expect(isPlayable(inst)).toBe(true);
+    }
     expect(written[1].i - written[0].i).toBeGreaterThanOrEqual(4);
     expect(written[1].i - written[0].i).toBeLessThanOrEqual(6);
     expect(useHistoryStore.getState().undoStack.length - undoBefore).toBe(1);
@@ -301,5 +322,77 @@ describe('Voice to Notes panel', () => {
     const rows = useTrackerStore.getState().patterns[0].channels[0].rows;
     const written = rows.map((r) => r.note).filter((n) => n > 0 && n !== 97);
     expect(written).toEqual([midiToXMNote(38)]);
+  });
+});
+
+describe('Voice to Notes setup wizard', () => {
+  it('opens on first use and walks microphone check, latency, drum training and result', async () => {
+    localStorage.removeItem(SETUP_SEEN_KEY);
+    const model = new SineReadingModel();
+    const mic = fakeMic();
+    let deliver: (b: Float32Array) => void = () => {};
+    const loop: VoiceCapture = {
+      sampleRate: PITCH_SAMPLE_RATE,
+      start: async (cb) => { deliver = cb; },
+      click: (delay) => {
+        const total = new Float32Array(PITCH_SAMPLE_RATE);
+        const at = Math.round((delay + 0.1) * PITCH_SAMPLE_RATE);
+        for (let i = 0; i < 40; i++) total[at + i] = 0.8 * (i % 2 ? -1 : 1);
+        setTimeout(() => { for (let i = 0; i < total.length; i += 128) deliver(total.slice(i, i + 128)); }, 0);
+      },
+      stop: () => {},
+    };
+    let captures = 0;
+    const deps = {
+      getStream: async () => ({} as MediaStream),
+      // Capture 0 is the microphone check, capture 1 the latency loopback, the rest training takes
+      createCapture: () => (captures++ === 1 ? loop : mic.capture),
+      listDevices: async () => [],
+    };
+    render(<VoiceToNotesPanel onClose={() => {}} model={model} deps={deps} />);
+
+    // Microphone check: a sung take is only metered, never turned into notes
+    const micStep = screen.getByTestId('voice-setup-step-microphone');
+    fireEvent.click(within(micStep).getByText('Test microphone'));
+    await waitFor(() => expect(within(micStep).getByText('Stop test')).toBeTruthy());
+    mic.feed(sine(60, 1));
+    fireEvent.click(within(micStep).getByText('Stop test'));
+    await waitFor(() => expect(within(micStep).getByText('Test microphone')).toBeTruthy());
+    expect(model.calls).toBe(0);
+    expect((screen.getByText('Commit').closest('button') as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(within(screen.getByTestId('voice-setup-step-latency')).getByText('Calibrate latency'));
+    await waitFor(() => expect(screen.getByTestId('voice-setup-latency').textContent).toBe('100 ms measured'));
+
+    fireEvent.click(screen.getByText('Next'));
+    for (const drum of ['kick', 'snare'] as const) {
+      const row = screen.getByTestId(`voice-setup-train-${drum}`);
+      fireEvent.click(within(row).getByText('Record'));
+      await waitFor(() => expect(within(row).getByText('Stop')).toBeTruthy());
+      mic.feed(synthTake([{ drum, at: 0.1 }, { drum, at: 0.5 }, { drum, at: 0.9 }], 1.3));
+      fireEvent.click(within(row).getByText('Stop'));
+      await waitFor(() => expect(within(row).getByText('3 hits')).toBeTruthy());
+    }
+    expect(model.calls).toBe(0);
+
+    fireEvent.click(screen.getByText('Next'));
+    expect(screen.getByTestId('voice-setup-result').textContent).toMatch(/^Drum training: held out \d+: model \d+ percent, rules \d+ percent, using /);
+
+    fireEvent.click(screen.getByText('Finish'));
+    await waitFor(() => expect(screen.queryByTestId('voice-setup-step-result')).toBeNull());
+    expect(localStorage.getItem(SETUP_SEEN_KEY)).toBe('1');
+  });
+
+  it('stays closed once seen and opens from the Setup wizard button', () => {
+    const deps = {
+      getStream: async () => ({} as MediaStream),
+      createCapture: () => fakeMic().capture,
+      listDevices: async () => [],
+    };
+    render(<VoiceToNotesPanel onClose={() => {}} model={new SineReadingModel()} deps={deps} />);
+    expect(screen.queryByTestId('voice-setup-step-microphone')).toBeNull();
+    fireEvent.click(screen.getByLabelText('Setup wizard'));
+    expect(screen.getByTestId('voice-setup-step-microphone')).toBeTruthy();
   });
 });

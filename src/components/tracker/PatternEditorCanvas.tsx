@@ -8,6 +8,7 @@
 import React, { useRef, useEffect, useLayoutEffect, useCallback, useState, useMemo } from 'react';
 import { useTrackerStore, useCursorStore, useTransportStore, useThemeStore, useEditorStore, useAutomationStore } from '@stores';
 import { useMixerStore } from '@stores/useMixerStore';
+import { useVoicePreviewStore } from '@stores/useVoicePreviewStore';
 import { useChannelTypeStore } from '@stores/useChannelTypeStore';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { channelLayout, notifyChannelLayout, fitAndStretchChannelWidths, subscribeChannelLayout, type ChannelLayout } from './channelLayout';
@@ -1415,6 +1416,17 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     cellContextMenu.closeMenu();
   }, [cellContextMenu, cellContextMenu.cellInfo, cellContextMenu.cellInfo?.channelIndex, pattern]);
 
+  // Voice to Notes ghost notes: forward the preview to the worker renderer on
+  // every change (the main-thread renderer reads the store each frame).
+  useEffect(() => {
+    const send = (preview: ReturnType<typeof useVoicePreviewStore.getState>['preview']) =>
+      bridgeRef.current?.post({ type: 'previewCells', preview });
+    send(useVoicePreviewStore.getState().preview);
+    return useVoicePreviewStore.subscribe((s, prev) => {
+      if (s.preview !== prev.preview) send(s.preview);
+    });
+  }, []);
+
   // Notify worker when theme changes
   useEffect(() => {
     bridgeRef.current?.post({ type: 'theme', theme: snapshotTheme() });
@@ -1915,6 +1927,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         liveness.stop();
         // Worker is ready — send layout so it can start rendering
         bridge.post({ type: 'channelLayout', channelLayout: snapshotLayoutRef.current() });
+        bridge.post({ type: 'previewCells', preview: useVoicePreviewStore.getState().preview });
       },
       onMessage: (msg) => {
         if (msg.type === 'booting') {
@@ -2394,6 +2407,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         ui: cachedUI,
         layout: { offsets: channelOffsetsRef.current, widths: channelWidthsRef.current, totalWidth: totalChannelsWidth },
         dragOver: null,
+        preview: useVoicePreviewStore.getState().preview,
       });
 
       mainThreadRafRef.current = requestAnimationFrame(tick);

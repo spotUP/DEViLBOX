@@ -14,6 +14,7 @@ import type {
   ThemeSnapshot,
   UIStateSnapshot,
   ChannelLayoutSnapshot,
+  PatternPreviewSnapshot,
 } from './worker-types';
 import { SUN_EFFECT_GLYPH } from '@/lib/import/formats/sunEffectGlyphs';
 import { SNX_EFFECT_GLYPH } from '@/lib/import/formats/sonixEffectGlyphs';
@@ -143,10 +144,11 @@ export class TrackerCanvas2DRenderer {
     ui: UIStateSnapshot;
     layout: ChannelLayoutSnapshot;
     dragOver: { channelIndex: number; rowIndex: number } | null;
+    preview?: PatternPreviewSnapshot | null;
   }): void {
     const {
       patterns, currentPatternIndex, cursor, selection,
-      playback, theme, ui, layout,
+      playback, theme, ui, layout, preview,
     } = opts;
 
     const { isPlaying, row: playRow, patternIndex: playPatIdx } = playback;
@@ -316,6 +318,18 @@ export class TrackerCanvas2DRenderer {
         const cell = chan.rows[r];
         const isPlayRow = isPlaying && r === playRow;
 
+        // Voice to Notes ghost note for this cell (null = no preview here)
+        const previewNote = preview && ch === preview.channelIndex
+          && r >= preview.startRow && r < preview.startRow + preview.notes.length
+          ? preview.notes[r - preview.startRow] : null;
+        if (previewNote !== null) {
+          const keepAlpha = ctx.globalAlpha;
+          ctx.globalAlpha = 0.12 * keepAlpha;
+          ctx.fillStyle = theme.accent;
+          ctx.fillRect(chanX, y - rowH / 2, chanWidths[ch] ?? cw * 9, rowH);
+          ctx.globalAlpha = keepAlpha;
+        }
+
         if (ui.columns && cell?.params) {
           // DATA-DRIVEN PATH — renders custom format columns
           const chColumns = chan.columnSpecs ?? ui.columns;
@@ -355,13 +369,23 @@ export class TrackerCanvas2DRenderer {
           const NOTE_COL_GROUP_W = cw * 3 + 4 + 4 + cw * 2 + 4 + cw * 2 + 4; // note+inst+vol+gaps
           for (let nc = 0; nc < totalNoteCols; nc++) {
             const ncX = chanX + 2 + nc * NOTE_COL_GROUP_W;
-            const noteVal = nc === 0 ? (cell?.note ?? 0)
+            const isPreviewNc = nc === 0 && previewNote !== null;
+            const noteVal = isPreviewNc ? previewNote
+              : nc === 0 ? (cell?.note ?? 0)
               : nc === 1 ? (cell?.note2 ?? 0)
               : nc === 2 ? (cell?.note3 ?? 0) : (cell?.note4 ?? 0);
             const noteText = noteStr(noteVal, displayOffset);
-            ctx.fillStyle = isPlayRow ? theme.textNoteActive
-              : noteVal === 0 ? theme.textMuted : theme.textNote;
-            ctx.fillText(noteText, ncX, y);
+            if (isPreviewNc && noteVal !== 0) {
+              const keepAlpha = ctx.globalAlpha;
+              ctx.globalAlpha = 0.6 * keepAlpha;
+              ctx.fillStyle = theme.accent;
+              ctx.fillText(noteText, ncX, y);
+              ctx.globalAlpha = keepAlpha;
+            } else {
+              ctx.fillStyle = isPlayRow ? theme.textNoteActive
+                : noteVal === 0 ? theme.textMuted : theme.textNote;
+              ctx.fillText(noteText, ncX, y);
+            }
 
             const inst = nc === 0 ? (cell?.instrument ?? 0)
               : nc === 1 ? (cell?.instrument2 ?? 0)
