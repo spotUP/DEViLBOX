@@ -63,9 +63,16 @@ const HIGH_BAND: [number, number] = [4000, 11025];
 export interface OnsetSettings {
   frame: number;
   hop: number;
-  /** Threshold = median flux * this + floor */
+  /**
+   * Flux threshold = median flux * this. Only the take's own background sets
+   * the bar: scaling it by the loudest flux peak (an earlier floor term) let
+   * one crisp hit hide every slow-attack kick a few dB quieter (owner report
+   * 2026-10-17: a real take's threshold rose to 1.01 while the kicks' flux
+   * was 0.6 to 0.95, so none of them came through).
+   */
   sensitivity: number;
-  floor: number;
+  /** A hit this many dB under the take's loudest hit is background, not a hit. */
+  maxDropDb: number;
   minGapSeconds: number;
 }
 
@@ -73,7 +80,7 @@ export const DEFAULT_ONSET_SETTINGS: OnsetSettings = {
   frame: 512,
   hop: 128,
   sensitivity: 3,
-  floor: 0.2,
+  maxDropDb: 30,
   minGapSeconds: 0.07,
 };
 
@@ -118,15 +125,16 @@ export function detectOnsets(
   }
   const sorted = [...flux].sort((a, b) => a - b);
   const median = sorted[Math.floor(sorted.length / 2)];
-  const peakMax = sorted[sorted.length - 1];
-  const threshold = median * s.sensitivity + s.floor * peakMax;
+  const threshold = median * s.sensitivity;
   const silenceGate = Math.max(ABSOLUTE_FLOOR_RMS, NOISE_FLOOR_RATIO * noiseFloor(samples));
 
-  const onsets: number[] = [];
+  const candidates: { at: number; level: number }[] = [];
   let lastSample = -Infinity;
   const minGap = s.minGapSeconds * sampleRate;
   for (let f = 1; f < frames - 1; f++) {
-    if (flux[f] < threshold || flux[f] < flux[f - 1] || flux[f] < flux[f + 1]) continue;
+    // Strictly above the bar: in digital silence the median is 0 and a flat
+    // zero run would otherwise count as a local maximum.
+    if (flux[f] <= threshold || flux[f] < flux[f - 1] || flux[f] < flux[f + 1]) continue;
     // Locate the attack: first sample near the frame that reaches 25% of the local peak
     const from = Math.max(0, f * s.hop - s.frame);
     const to = Math.min(samples.length, f * s.hop + s.frame * 2);
@@ -145,9 +153,14 @@ export function detectOnsets(
     // A real attack is louder than what came just before it (not a decaying tail)
     if (level < 1.5 * rms(samples, at - 2 * LEVEL_BLOCK, at)) continue;
     lastSample = at;
-    onsets.push(at / sampleRate);
+    candidates.push({ at, level });
   }
-  return onsets;
+  // Relative gate: with the flux bar set by the background alone, a breath or
+  // a chair creak 30 dB under the take's hits would pass it; the hits' own
+  // level is the reference that keeps them out.
+  const loudest = Math.max(0, ...candidates.map((c) => c.level));
+  const relativeGate = loudest * 10 ** (-s.maxDropDb / 20);
+  return candidates.filter((c) => c.level >= relativeGate).map((c) => c.at / sampleRate);
 }
 
 /** Loudest LEVEL_BLOCK-sized RMS block that starts inside [from, to). */
