@@ -95,6 +95,17 @@ describe('useMixerStore — solo/mute interaction (tracker convention)', () => {
     }
   });
 
+  it('unsoloing a non-soloed channel keeps the active solo (MCP solo_channel loop)', () => {
+    const mix = useMixerStore.getState();
+    mix.setChannelSolo(0, true);
+    // writeHandlers.soloChannel writes `false` to every other channel after the solo.
+    for (let i = 1; i < 16; i++) mix.setChannelSolo(i, false);
+    const s = useMixerStore.getState();
+    expect(s.channels[0].soloed).toBe(true);
+    expect(s.isSoloing).toBe(true);
+    expect(s.channels.filter((c) => c.soloed)).toHaveLength(1);
+  });
+
   it('setChannelSolo to false on a non-soloed channel is a no-op', () => {
     const mix = useMixerStore.getState();
     mix.setChannelSolo(4, false);
