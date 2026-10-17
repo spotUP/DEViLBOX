@@ -26,11 +26,11 @@ describe('useVoiceStore', () => {
     expect(take?.id).toBe(takes[0].id);
   });
 
-  it('useTake brings an earlier take back with its mode', () => {
+  it('selectTake brings an earlier take back with its mode', () => {
     const { addTake } = useVoiceStore.getState();
     const drums = addTake({ mode: 'drums', audio: audio(1), track: null, hits: [] });
     addTake({ mode: 'melody', audio: audio(2), track: null, hits: [] });
-    useVoiceStore.getState().useTake(drums.id);
+    useVoiceStore.getState().selectTake(drums.id);
     expect(useVoiceStore.getState().take?.id).toBe(drums.id);
     expect(useVoiceStore.getState().mode).toBe('drums');
   });

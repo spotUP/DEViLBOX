@@ -193,11 +193,11 @@ Phase E - drums
 - [x] WD-2 `tools/voice/build-avp-prior.ts`; generated `avpPrior.json` + `AVP_NOTICE.md`; prior class balance printed and recorded here. Balance: kick 60 / snare 60 / hat 60, each from all 28 performers (annotated 1529 / 1566 / 3106; detected and matched within 50 ms 1525 / 1550 / 2903). Leave-one-performer-out 3-NN over all 5978 matched hits: 68.8 % (the cross-performer floor; the user's own samples replace the prior per class).
 - [x] WD-3 `knnClassifier`; user samples replace the prior per class; `classifyByRules` and `useModel` deleted; all callers on the active classifier. Storage v2 keys and the `voiceDrumsV2.ts` migration landed here too (v1 keys removed, wizard opens once with a reset notice; tests in `migrations/__tests__/voiceDrumsV2.test.ts` and the panel test 'after the v2 drum migration'). WD-4 keeps `calibrateOnsets`.
 - [x] WD-4 `calibrateOnsets` (grid search over sensitivity x maxDropDb, smallest summed count error, ties to the setting nearest the default). Deviation: the fitted settings live under their own key `devilbox.voice.drumOnsets.v2`, not inside `drumModel.v2`; `clearTraining` removes it. The store keeps the newest wizard take per drum in memory (`addCalibrationTake`), refits on each one, and every `detectHits` caller (panel drum takes, wizard takes, MCP `voice_to_notes`) passes the store's `onsets`. Storage v2 and the migration landed in WD-3. Tests: drumHits 'onset calibration from the wizard takes', drumModel onset round-trip, useVoiceStore refit/reload/clear.
-- [ ] WD-5 Wizard: markers and counts from the calibrated detector and active classifier; "Heard N of 8".
-- [ ] WD-6 Unit tests: kNN on separable synthetic features 100 %; prior used for an untrained class; calibration finds 8 of 8 on a quiet synthetic take where the default finds fewer.
+- [x] WD-5 Wizard: markers and counts from the calibrated detector and active classifier; "Heard N of 8". Each wizard take refits the detector over every wizard take first (WD-4), so the count shown is already the re-run; below 8 the line adds a retake hint. Panel wizard test covers 3 of 8 (hint) and 8 of 8 (no hint).
+- [x] WD-6 Unit tests (drumModel 'k-NN drum classifier', drumHits 'onset calibration from the wizard takes'): kNN on separable synthetic features 100 %; prior used for an untrained class; calibration finds 8 of 8 on a quiet synthetic take where the default finds fewer.
 
 Phase WF - wizard flow
-- [ ] WF-1 Next gate counts calibrated-detector samples.
+- [x] WF-1 Next gate counts calibrated-detector samples. Done by WD-4: the wizard builds its samples with `samplesFromTake` and the fitted settings, so the Next gate counts what the calibrated detector heard.
 - [ ] WF-2 Fixes from M-3 (written in at M-4).
 - [ ] WF-3 Wizard test covers the blocked-step case measured in M-3.
 

@@ -649,11 +649,15 @@ describe('Voice to Notes setup wizard', () => {
       const row = within(step).getByTestId(`voice-setup-train-${drum}`);
       fireEvent.click(within(row).getByText('Record'));
       await waitFor(() => expect(within(row).getByText('Stop')).toBeTruthy());
-      mic.feed(synthTake([{ drum, at: 0.1 }, { drum, at: 0.5 }, { drum, at: 0.9 }], 1.3));
+      // Clap is recorded as asked (eight hits); the others fall short and get the retake hint
+      const n = drum === 'clap' ? 8 : 3;
+      mic.feed(synthTake(Array.from({ length: n }, (_, i) => ({ drum, at: 0.1 + i * 0.4 })), 0.5 + n * 0.4));
       fireEvent.click(within(row).getByText('Stop'));
-      await waitFor(() => expect(within(row).getByText('3 hits')).toBeTruthy());
-      expect(within(step).getByTestId('voice-take-waveform').getAttribute('data-markers')).toBe('3');
-      expect(within(step).getByTestId('voice-setup-heard').textContent).toBe('Heard 3 hits');
+      await waitFor(() => expect(within(row).getByText(`${n} hits`)).toBeTruthy());
+      expect(within(step).getByTestId('voice-take-waveform').getAttribute('data-markers')).toBe(String(n));
+      expect(within(step).getByTestId('voice-setup-heard').textContent).toBe(
+        n === 8 ? 'Heard 8 of 8 hits' : 'Heard 3 of 8 hits. Retake with one hit per beat and short gaps.',
+      );
       expect(within(row).getByText('Retake')).toBeTruthy();
       expect(nextButton().disabled).toBe(false);
     }

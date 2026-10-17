@@ -15,6 +15,7 @@ import { ModalFooter } from '@components/ui/ModalFooter';
 import { Button } from '@components/ui/Button';
 import { DRUM_CLASSES, DRUM_CLASS_LABELS, type DrumClass } from '@/lib/voice/drumHits';
 import {
+  HITS_PER_TRAINING_TAKE,
   MIN_SAMPLES_PER_CLASS,
   countsByClass,
   describeTraining,
@@ -44,6 +45,12 @@ const STEP_TITLES: Record<Step, string> = {
   melody: 'Your singing range',
   result: 'Result',
 };
+/** The count line under a wizard take; the hits come from the detector fitted to every wizard take so far. */
+function describeHeard(heard: number): string {
+  const line = `Heard ${heard} of ${HITS_PER_TRAINING_TAKE} hits`;
+  return heard === HITS_PER_TRAINING_TAKE ? line : `${line}. Retake with one hit per beat and short gaps.`;
+}
+
 const DRUM_PROMPTS: Record<DrumClass, string> = {
   kick: 'Say "boom" eight times, one per beat, with short gaps.',
   snare: 'Say "ka" or "pss" eight times, one per beat, with short gaps.',
@@ -246,7 +253,7 @@ export const VoiceSetupWizard: React.FC<VoiceSetupWizardProps> = ({
             />
             {lastTrainingTake?.drum === step && (
               <span className="text-[10px] font-mono text-text-muted" data-testid="voice-setup-heard">
-                Heard {lastTrainingTake.hits.length} hit{lastTrainingTake.hits.length === 1 ? '' : 's'}
+                {describeHeard(lastTrainingTake.hits.length)}
               </span>
             )}
           </>
