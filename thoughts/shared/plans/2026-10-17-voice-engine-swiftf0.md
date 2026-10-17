@@ -206,9 +206,9 @@ Phase TE - take end (VNR-18)
 - [ ] TE-2 Root-cause fix from M-2 (written in at M-4), with a regression test.
 
 Phase R - reachability and validation
-- [ ] VR-1 Reachability test per design (FakeTracker, 6 notes, preview equals pattern, sentinel); drum reachability with the kNN sentinel.
-- [ ] VR-2 `npm run type-check` clean.
-- [ ] VR-3 Affected tests only: `npx vitest run src/lib/voice src/stores/__tests__/useVoiceStore.test.ts src/components/tracker/__tests__/voiceToNotesPanel.test.tsx src/bridge/handlers/__tests__/voiceToNotesHandler.test.ts src/components/instruments` (no full suite).
+- [x] VR-1 Reachability test per design (FakeTracker, 6 notes, preview equals pattern, sentinel); drum reachability with the kNN sentinel.
+- [x] VR-2 `npm run type-check` clean.
+- [x] VR-3 Affected tests only: `npx vitest run src/lib/voice src/stores/__tests__/useVoiceStore.test.ts src/components/tracker/__tests__/voiceToNotesPanel.test.tsx src/bridge/handlers/__tests__/voiceToNotesHandler.test.ts src/components/instruments` (no full suite).
 - [ ] VR-4 Owner re-records the M-2 phrase and the M-3 wizard session; `get_voice_take` numbers recorded next to the Phase M numbers (note count, pitches, take-end gap, hits per step, held-out accuracy).
 - [ ] VR-5 Commit by path per phase; one push at the end; tick VNR-17..22, VNR-25 in `thoughts/spot/todos.md`; handoff updated.
 
