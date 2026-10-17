@@ -56,6 +56,14 @@ const GLIDE_JOIN_GAP_SECONDS = 0.04;
 const GLIDE_JOIN_MAX_STEP = 2;
 /** A step note moving at least this far across its own span is part of a glide, not a held note. */
 const GLIDE_MOVING_SEMITONES = 0.5;
+/**
+ * Largest pitch change between neighbouring contour points inside one glide.
+ * A fast sung scoop moves 0.65 semitone per 16 ms frame (take of 2026-10-18);
+ * a new note sung without a glide jumps its whole step in one frame.
+ */
+const GLIDE_FRAME_JUMP_SEMITONES = 1;
+/** A glide may turn once (a scoop or an overshoot) through a step note no longer than this. */
+const GLIDE_TURN_MAX_SECONDS = 0.2;
 const VIBRATO_MIN_HZ = 3;
 const VIBRATO_MAX_HZ = 9;
 const VIBRATO_MIN_DEPTH = 0.25;
@@ -194,24 +202,36 @@ function contourTravel(points: readonly ContourPoint[], start: number, end: numb
 
 /**
  * The segmenter splits a sung glide into semitone steps, as SwiftF0 itself
- * does (segmentNotes parity). Back-to-back steps the same way, with an
- * unbroken contour across each join and at least one side of each join
- * moving, become one note at the first step's pitch; the slide detector then
- * hears the glide on it. Two held notes sung legato stay two notes: neither
- * side moves. Runs on the sung notes, before quantising.
+ * does (segmentNotes parity). Back-to-back steps with an unbroken contour
+ * across each join and at least one side of each join moving become one
+ * note. The steps may turn once, through a short step note: a scoop down
+ * into a note, or an overshoot past it. The joined note takes the pitch of
+ * its longest step, the one the voice stayed on (the first on a tie); the
+ * slide detector then hears a one-way glide on it. Two held notes sung
+ * legato stay two notes: neither side moves. Runs on the sung notes, before
+ * quantising.
  */
 export function joinGlides(notes: readonly VoiceNote[], contour: TakeContour): VoiceNote[] {
   const sorted = [...notes].sort((a, b) => a.startTimeSeconds - b.startTimeSeconds);
-  const travel = (n: VoiceNote): number => {
-    const end = n.startTimeSeconds + n.durationSeconds;
-    return contourTravel(contourUnder(contour, n.startTimeSeconds, end), n.startTimeSeconds, end);
+  const travel = (start: number, end: number): number => contourTravel(contourUnder(contour, start, end), start, end);
+  // A side moves when its whole span, or its edge at the join, travels the step's way.
+  // The edge counts because a scoop puts a V in the step note: no travel across it, but rising into the join.
+  const moving = (a: VoiceNote, b: VoiceNote, direction: number): boolean => {
+    const aEnd = a.startTimeSeconds + a.durationSeconds;
+    const bEnd = b.startTimeSeconds + b.durationSeconds;
+    return [
+      travel(a.startTimeSeconds, aEnd),
+      travel(b.startTimeSeconds, bEnd),
+      travel(aEnd - EDGE_SECONDS, aEnd),
+      travel(b.startTimeSeconds, b.startTimeSeconds + EDGE_SECONDS),
+    ].some((t) => t * direction >= GLIDE_MOVING_SEMITONES);
   };
   const unbroken = (a: VoiceNote, b: VoiceNote): boolean => {
     const join = contourUnder(contour, a.startTimeSeconds + a.durationSeconds - EDGE_SECONDS, b.startTimeSeconds + EDGE_SECONDS);
     if (join.length < 2) return false;
     for (let i = 1; i < join.length; i++) {
       if (join[i].time - join[i - 1].time > GLIDE_JOIN_GAP_SECONDS) return false;
-      if (Math.abs(join[i].midi - join[i - 1].midi) > ON_PITCH_SEMITONES) return false;
+      if (Math.abs(join[i].midi - join[i - 1].midi) > GLIDE_FRAME_JUMP_SEMITONES) return false;
     }
     return true;
   };
@@ -221,16 +241,18 @@ export function joinGlides(notes: readonly VoiceNote[], contour: TakeContour): V
     const first = sorted[i];
     let last = first;
     let direction = 0;
+    let turned = false;
     let j = i + 1;
     for (; j < sorted.length; j++) {
       const next = sorted[j];
       const step = Math.round(next.pitchMidi) - Math.round(last.pitchMidi);
       const gap = next.startTimeSeconds - (last.startTimeSeconds + last.durationSeconds);
       if (step === 0 || Math.abs(step) > GLIDE_JOIN_MAX_STEP || gap > GLIDE_JOIN_GAP_SECONDS) break;
-      if (direction !== 0 && Math.sign(step) !== direction) break;
-      const moving = (n: VoiceNote): boolean => travel(n) * Math.sign(step) >= GLIDE_MOVING_SEMITONES;
-      if (!moving(last) && !moving(next)) break;
+      const turns = direction !== 0 && Math.sign(step) !== direction;
+      if (turns && (turned || last.durationSeconds > GLIDE_TURN_MAX_SECONDS)) break;
+      if (!moving(last, next, Math.sign(step))) break;
       if (!unbroken(last, next)) break;
+      turned ||= turns;
       direction = Math.sign(step);
       last = next;
     }
@@ -238,10 +260,11 @@ export function joinGlides(notes: readonly VoiceNote[], contour: TakeContour): V
       out.push(first);
     } else {
       const group = sorted.slice(i, j);
+      const held = group.reduce((a, b) => (b.durationSeconds > a.durationSeconds ? b : a));
       out.push({
         startTimeSeconds: first.startTimeSeconds,
         durationSeconds: last.startTimeSeconds + last.durationSeconds - first.startTimeSeconds,
-        pitchMidi: first.pitchMidi,
+        pitchMidi: held.pitchMidi,
         amplitude: Math.max(...group.map((n) => n.amplitude)),
       });
     }
