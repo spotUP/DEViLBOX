@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { transposeNotes, modelOutputToNotes, melodyRange, noteName, DEFAULT_PITCH_SETTINGS, ANNOTATIONS_FPS, type VoiceNote } from '../pitchNotes';
+import { transposeNotes, modelOutputToNotes, melodyRange, noteName, DEFAULT_PITCH_SETTINGS, ANNOTATIONS_FPS, PITCH_SAMPLE_RATE, midiToHz, type VoiceNote } from '../pitchNotes';
 import { quantiseNotes, rowSeconds, type QuantiseSettings } from '../quantise';
-import { mergeWindowNotes } from '../liveWindow';
+import { LIVE_WINDOW_SECONDS, mergeWindowNotes, previewStep } from '../liveWindow';
+import { DEFAULT_SHAPING } from '../voiceToNotes';
+import { SineReadingTracker } from './sineReadingTracker';
 import { VoiceRecorder, type VoiceCapture } from '../voiceRecorder';
 import { applyNotesToPattern, applyTakeToSong, planTakeSegments, takeRowsNeeded, NOTE_OFF, velocityToVolume, type TakeSong } from '../writeToPattern';
 import type { Pattern } from '@typedefs';
@@ -106,6 +108,23 @@ describe('liveWindow.mergeWindowNotes', () => {
     const merged = mergeWindowNotes(prev, [note(0.1, 0.3, 64)], 1.0);
     expect(merged.map((n) => n.pitchMidi)).toEqual([60, 64]);
     expect(merged[1].startTimeSeconds).toBeCloseTo(1.1, 6);
+  });
+
+  it('previewStep keeps the onset of a note the window would cut, so the ghost note starts where the commit puts it (VR-1)', async () => {
+    const tone = (midi: number, from: number, to: number, out: Float32Array) => {
+      const w = (2 * Math.PI * midiToHz(midi)) / PITCH_SAMPLE_RATE;
+      for (let i = Math.round(from * PITCH_SAMPLE_RATE); i < Math.round(to * PITCH_SAMPLE_RATE); i++) out[i] = 0.5 * Math.sin(w * i);
+    };
+    const take = new Float32Array(3 * PITCH_SAMPLE_RATE);
+    tone(60, 1.2, 2.2, take);
+    tone(64, 2.3, 3.0, take);
+    // The step at 2.0 s heard C4 from 1.2 s on; the window at 3.0 s starts mid-note
+    expect(3 - LIVE_WINDOW_SECONDS).toBeGreaterThan(1.2);
+    const earlier = await previewStep(take.subarray(0, 2 * PITCH_SAMPLE_RATE), [], new SineReadingTracker(), DEFAULT_SHAPING);
+    expect(earlier.map((n) => n.pitchMidi)).toEqual([60]);
+    const merged = await previewStep(take, earlier, new SineReadingTracker(), DEFAULT_SHAPING);
+    expect(merged.map((n) => n.pitchMidi)).toEqual([60, 64]);
+    expect(merged[0].startTimeSeconds).toBeCloseTo(1.2, 1);
   });
 });
 
