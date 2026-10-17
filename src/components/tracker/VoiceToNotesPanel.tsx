@@ -300,7 +300,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   }, [setSamples, setTraining, setTrainingTake, clearCalibration]);
 
   const handleStop = useCallback(async () => {
-    const audio = recorder.stop();
+    const audio = await recorder.stop();
     const labelled = recordingClass;
     const forWizard = wizardMelody;
     setRecordingClass(null);

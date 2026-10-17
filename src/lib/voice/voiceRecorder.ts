@@ -12,7 +12,8 @@ export interface VoiceCapture {
   start(onBlock: (block: Float32Array) => void): Promise<void>;
   /** Schedule a metronome click `delaySeconds` from now (audio clock). */
   click(delaySeconds: number, accent: boolean): void;
-  stop(): void;
+  /** Deliver every block already captured, then release the microphone. */
+  stop(): Promise<void>;
 }
 
 export type VoiceCaptureFactory = (stream: MediaStream) => VoiceCapture;
@@ -94,9 +95,9 @@ export class VoiceRecorder {
     return n / this.capture.sampleRate;
   }
 
-  /** Stop and return the take. */
-  stop(): Float32Array {
-    this.capture.stop();
+  /** Stop and return the take, including the blocks delivered while the capture flushed. */
+  async stop(): Promise<Float32Array> {
+    await this.capture.stop();
     return concatBlocks(this.blocks);
   }
 }
