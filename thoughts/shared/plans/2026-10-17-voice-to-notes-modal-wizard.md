@@ -140,6 +140,8 @@ One test in `voiceToNotesPanel.test.tsx`, through the real entry: it mounts `<Vo
 - Negative timing offsets are shown, not written (no tracker plays a note before its row).
 - Phase E deviations: the notation comes from `channelMeta` (`effectNotationOf`) and the column count from `getFormatConstraints(sourceFormat).maxEffectCols`; effects travel as a per-note `effects: VoiceEffect[]` with a `rowOffset` and an optional `midi` (the tone-portamento target note, repeated on every slide row so a one-column channel still reaches it); arpeggio folds notes before quantising; vibrato is written on every row of the note; the volume slide uses rows 1..lengthRows-1; the contour is read once per melody take at 20 ms (never for drum takes); the MCP handler detects with every effect on; the Effects column shows tracker notation whatever the channel; a note delay is written only from the offset the strength leaves (none at strength 1).
 - Contour smoothing is an outlier-only despike (a probe more than 3 semitones from its 5-neighbour median is replaced), not a 5-point median: the median flattened a 5 Hz vibrato to half its depth. The remaining depth loss is the YIN probe's averaging over its difference span (`yinProbeSeconds`, 79 ms at 22050 Hz); measured 0.94 / 0.86 / 0.77 / 0.67 / 0.57 at 3..7 Hz against sinc 0.91 / 0.85 / 0.77 / 0.67 / 0.57, so the depth is divided by that sinc. The vibrato rate is the period between the first and last interpolated line crossing (the crossing count over the whole note was 15 % off on a 0.6 s note).
+- Phase F deviations: the sentinel is the fake pitch model's call count (the model is the only dependency the test owns; a `writeNotesToPattern` spy would need module mocking of the writer the test is meant to reach); markers are asserted as at least the note count (`data-markers`); the test patches `strength` to 0 through `useVoiceStore.patchFine` because the default strength 1 pulls every note onto its row and leaves no offset for a note delay; the fake model gates on its own hop and holds a bend within 4 semitones on one bin so a glide is one note with a contour, not a run of onsets; the first tone-portamento slide cell carries the target note, so the pattern holds one more note cell than notes heard.
+- Earlier phase deviations recorded here: Phases A and B landed in one commit (332f39ec6); the take stores the model output and the drum hits; `drumMap` is null until the panel resolves the default map; tests seed training samples through the store; `noteName` moved to `pitchNotes.ts`; a wizard melody take never auto-commits and the melody step prop carries `sampleRate`; `QuantiseSettings.strength` and `toleranceRows` are required (the MCP handler passes 1 and 0.1); `quantiseHits` no longer goes through `quantiseNotes`.
 
 ## Checklist
 
@@ -178,10 +180,10 @@ Phase E, effects (VE):
 - [x] VE-6 Unit tests `src/lib/voice/__tests__/noteEffects.test.ts` and `voiceEffects.test.ts`: each detector on a synthetic contour; one-column cap keeps the priority command; Furnace codes.
 
 Phase F, reachability and close-out (VR):
-- [ ] VR-1 Reachability test per design (dialog, markers, effect cells, sentinel).
-- [ ] VR-2 `npm run type-check` clean.
-- [ ] VR-3 Affected tests only: `npx vitest run src/lib/voice src/stores/__tests__/useVoiceStore.test.ts src/components/tracker/__tests__/voiceToNotesPanel.test.tsx src/bridge/handlers/__tests__/voiceToNotesHandler.test.ts`.
-- [ ] VR-4 Commit by path per phase; push; tick VNR-12..15 in `thoughts/spot/todos.md`; update the handoff.
+- [x] VR-1 Reachability test per design (dialog, markers, effect cells, sentinel).
+- [x] VR-2 `npm run type-check` clean.
+- [x] VR-3 Affected tests only: `npx vitest run src/lib/voice src/stores/__tests__/useVoiceStore.test.ts src/components/tracker/__tests__/voiceToNotesPanel.test.tsx src/bridge/handlers/__tests__/voiceToNotesHandler.test.ts`.
+- [x] VR-4 Commit by path per phase; push; tick VNR-12..15 in `thoughts/spot/todos.md`; update the handoff.
 
 ## Verification
 
