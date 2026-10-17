@@ -5,6 +5,30 @@
 
 let instance: JingleEngine | null = null;
 
+/** Below this peak level (dBFS) the rest of the jingle counts as silence. */
+export const AUDIBLE_FLOOR_DB = -40;
+
+/**
+ * Seconds from the start of `buffer` to its last sample above `floorDb`.
+ * The jingle asset has a 5 s near-silent tail after the music; playing only
+ * the audible part lets the end handler (and the lips teardown) run when the
+ * sound stops, not seconds later.
+ */
+export function audibleDurationSeconds(buffer: AudioBuffer, floorDb: number = AUDIBLE_FLOOR_DB): number {
+  const floor = Math.pow(10, floorDb / 20);
+  let last = -1;
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    const data = buffer.getChannelData(ch);
+    for (let i = data.length - 1; i > last; i--) {
+      if (Math.abs(data[i]!) > floor) {
+        last = i;
+        break;
+      }
+    }
+  }
+  return last < 0 ? 0 : (last + 1) / buffer.sampleRate;
+}
+
 /**
  * The startup jingle asset, served from public/. It must be a tracked file:
  * an untracked copy plays on one machine only, and a missing file makes the
@@ -46,6 +70,7 @@ export class JingleEngine {
     if (this.audioCtx && this.audioCtx.state !== 'running') void this.audioCtx.resume();
   }
 
+  /** Play the audible part of the jingle; `onEnd` fires when that part is over. */
   play(): void {
     if (!this.audioCtx || !this.buffer || !this.analyserNode) return;
     this.unlock();
@@ -55,7 +80,7 @@ export class JingleEngine {
     this.source.onended = () => {
       this.endCallback?.();
     };
-    this.source.start();
+    this.source.start(0, 0, audibleDurationSeconds(this.buffer));
   }
 
   stop(): void {
