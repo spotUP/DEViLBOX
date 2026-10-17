@@ -8,6 +8,7 @@ import { keepAcrossHmr } from '@/lib/dev/keepAcrossHmr';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import type {
+  ChannelData,
   Pattern,
   TrackerCell,
   ClipboardData,
@@ -407,6 +408,13 @@ interface TrackerStore {
 
   // Channel management
   addChannel: () => void;
+  /**
+   * Grow every pattern to `count` channels for a transient overlay (the startup
+   * jingle lips) that restores the original count itself. Skips the keyboard
+   * scheme and format-compatibility caps that `addChannel` enforces on user
+   * edits; only the hard MAX_CHANNELS limit applies. Returns the resulting count.
+   */
+  addOverlayChannels: (count: number) => number;
   removeChannel: (channelIndex: number) => void;
   toggleChannelMute: (channelIndex: number) => void;
   toggleChannelSolo: (channelIndex: number) => void;
@@ -503,6 +511,27 @@ function validateChannelInstrumentCompat(
 // Reset mismatch warnings when preset changes
 export function resetChannelMismatchWarnings() {
   _warnedMismatches.clear();
+}
+
+/**
+ * A fresh, empty channel as `addChannel` creates it. Shared by the user-facing
+ * `addChannel` and by `addOverlayChannels`, so both produce the same shape.
+ */
+function makeEmptyChannel(index: number, patternLength: number, color: string): ChannelData {
+  return {
+    id: idGenerator.generate('channel'),
+    name: `Channel ${index + 1}`,
+    rows: Array.from({ length: patternLength }, () => ({ ...EMPTY_CELL })),
+    muted: false,
+    solo: false,
+    collapsed: false,
+    volume: 80,
+    pan: 0,
+    instrumentId: null,
+    color,
+    // Shown at once although empty: the pattern views hide unused imported channels (visibleChannels.ts).
+    channelMeta: { importedFromMOD: false, addedAfterImport: true },
+  };
 }
 
 export const useTrackerStore = create<TrackerStore>()(
@@ -1552,21 +1581,7 @@ export const useTrackerStore = create<TrackerStore>()(
 
         state.patterns.forEach((pattern) => {
           if (pattern.channels.length < maxChannels) {
-            const newChannelIndex = pattern.channels.length;
-            pattern.channels.push({
-              id: idGenerator.generate('channel'),
-              name: `Channel ${newChannelIndex + 1}`,
-              rows: Array.from({ length: pattern.length }, () => ({ ...EMPTY_CELL })),
-              muted: false,
-              solo: false,
-              collapsed: false,
-              volume: 80,
-              pan: 0,
-              instrumentId: null,
-              color: randomColor,
-              // Shown at once although empty: the pattern views hide unused imported channels (visibleChannels.ts).
-              channelMeta: { importedFromMOD: false, addedAfterImport: true },
-            });
+            pattern.channels.push(makeEmptyChannel(pattern.channels.length, pattern.length, randomColor));
           }
         });
         // Add status message
@@ -1576,6 +1591,20 @@ export const useTrackerStore = create<TrackerStore>()(
           });
         }
       });
+    },
+
+    addOverlayChannels: (count) => {
+      const target = Math.min(count, MAX_CHANNELS);
+      set((state) => {
+        const availableColors = CHANNEL_COLORS.filter((c) => c !== null) as string[];
+        state.patterns.forEach((pattern) => {
+          while (pattern.channels.length < target) {
+            const color = availableColors[pattern.channels.length % availableColors.length]!;
+            pattern.channels.push(makeEmptyChannel(pattern.channels.length, pattern.length, color));
+          }
+        });
+      });
+      return get().patterns[0]?.channels.length ?? 0;
     },
 
     removeChannel: (channelIndex) =>

@@ -22,6 +22,8 @@ vi.mock('@engine/TrackerReplayer', () => ({
 
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useCursorStore } from '@stores/useCursorStore';
+import { useEditorStore } from '@stores/useEditorStore';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import {
   injectMouthPatterns,
   teardownMouthPatterns,
@@ -41,6 +43,9 @@ const litRowsOf = (channel: number) =>
     .map((r, i) => (r.note !== 0 ? i : -1))
     .filter((i) => i >= 0);
 const litRows = () => litRowsOf(0).length;
+/** How many channels have at least one lit cell (every lip channel while a vowel sounds). */
+const litColumns = () =>
+  useTrackerStore.getState().patterns[0]!.channels.filter((ch) => ch.rows.some((r) => r.note !== 0)).length;
 const cursorRow = () => useCursorStore.getState().cursor.rowIndex;
 
 describe('startup jingle: the pattern grid animates from the jingle analyser', () => {
@@ -48,7 +53,7 @@ describe('startup jingle: the pattern grid animates from the jingle analyser', (
     level = 200;
     vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance'] });
   });
-  afterEach(() => { teardownMouthPatterns(); vi.useRealTimers(); });
+  afterEach(() => { teardownMouthPatterns(); useEditorStore.getState().setActiveBehavior('fasttracker2'); vi.useRealTimers(); });
 
   it('lights pattern rows while the jingle plays and restores the grid at the end', () => {
     const before = litRows();
@@ -58,6 +63,29 @@ describe('startup jingle: the pattern grid animates from the jingle analyser', (
     expect(litRows()).toBeGreaterThan(before); // driver ran and wrote cells (sentinel)
     teardownMouthPatterns();
     expect(litRows()).toBe(before);
+  });
+
+  it('shows all 12 lip channels under the ProTracker scheme, whose 4-channel cap stops user edits', () => {
+    useEditorStore.getState().setActiveBehavior('protracker');
+    injectMouthPatterns();
+    const names = useTrackerStore.getState().patterns[0]!.channels.map(ch => ch.name);
+    expect(names.length).toBe(JINGLE_CHANNEL_COUNT);
+    expect(names[0]).toBe('Left');
+    expect(names[LAST]).toBe('Right');
+    vi.advanceTimersByTime(900);
+    expect(litColumns()).toBe(JINGLE_CHANNEL_COUNT); // every lip channel lit, not only the first 4
+    teardownMouthPatterns();
+    teardownMouthPatterns(); // onended and the stop path both call it: a second call must not strip channels
+    expect(useTrackerStore.getState().patterns[0]!.channels.length).toBe(4);
+  });
+
+  it('forces fit-all-channels on while the lips show (no scrollbar) and puts the setting back', () => {
+    useSettingsStore.getState().setFitAllChannelsTracker(false);
+    injectMouthPatterns();
+    expect(useSettingsStore.getState().fitAllChannelsTracker).toBe(true);
+    teardownMouthPatterns();
+    expect(useSettingsStore.getState().fitAllChannelsTracker).toBe(false);
+    useSettingsStore.getState().setFitAllChannelsTracker(true);
   });
 
   it('parks the cursor on row 8 while the jingle plays and puts it back at the end (JMA-1)', () => {
