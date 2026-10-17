@@ -189,7 +189,7 @@ Phase D - melody range (VNR-22)
 - [x] MR-3 Test: a take sung an octave below the range's middle with a tracker that reports both octaves returns the in-range octave. Done: `voiceToNotesHandler.test.ts` "the singer range reaches the pitch tracker"; fails with the handler range reverted.
 
 Phase E - drums
-- [ ] WD-1 Features v2 in `drumHits.ts` (reuse the repo's FFT helper; name it here); `featureVector` 17 values; unit test per feature on synthetic clicks/noise bursts.
+- [x] WD-1 Features v2 in `drumHits.ts` (reuses `fft` + `applyHannWindow` from `BeatSliceAnalyzer` through `magnitudes()`); `featureVector` 17 values; unit test per feature on synthetic clicks/noise bursts.
 - [ ] WD-2 `tools/voice/build-avp-prior.ts`; generated `avpPrior.json` + `AVP_NOTICE.md`; prior class balance printed and recorded here.
 - [ ] WD-3 `knnClassifier`; user samples replace the prior per class; `classifyByRules` and `useModel` deleted; all callers on the active classifier.
 - [ ] WD-4 `calibrateOnsets` + storage v2 + migration `voiceDrumsV2.ts` (unit test: v1 keys removed, setup flagged).

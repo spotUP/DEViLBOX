@@ -31,6 +31,14 @@ export interface HitFeatures {
   zcr: number;
   /** Separate amplitude bursts in the first 50 ms */
   bursts: number;
+  /** Energy ratios of BAND_COUNT log-spaced bands from 60 Hz to 10 kHz (sum to 1) */
+  bands: number[];
+  /** Spectral centroid over the Nyquist frequency, 0..1 */
+  centroid: number;
+  /** Spectral flatness (geometric over arithmetic mean of the power), 0..1 */
+  flatness: number;
+  /** Time from the onset to the loudest 2 ms block, over the 60 ms window, 0..1 */
+  attack: number;
 }
 
 export interface DrumHit {
@@ -56,9 +64,14 @@ const ABSOLUTE_FLOOR_RMS = 0.0005;
 const LEVEL_BLOCK = 256;
 const FFT_SIZE = 1024;
 const WINDOW_SECONDS = 0.06;
+/** Keeps the flatness log finite on all-zero bins. */
+const FLATNESS_EPS = 1e-12;
 const LOW_BAND: [number, number] = [40, 250];
 const MID_BAND: [number, number] = [250, 4000];
 const HIGH_BAND: [number, number] = [4000, 11025];
+export const BAND_COUNT = 8;
+/** Edges of the log-spaced feature bands: 60 Hz to 10 kHz. */
+const BAND_EDGES = Array.from({ length: BAND_COUNT + 1 }, (_, i) => 60 * (10000 / 60) ** (i / BAND_COUNT));
 
 export interface OnsetSettings {
   frame: number;
@@ -238,6 +251,36 @@ export function hitFeatures(samples: Float32Array, onsetSample: number, sampleRa
     }
   }
 
+  const bandEnergies = Array.from({ length: BAND_COUNT }, (_, b) =>
+    bandEnergy(power, [BAND_EDGES[b], BAND_EDGES[b + 1]], sampleRate),
+  );
+  const bandTotal = bandEnergies.reduce((a, e) => a + e, 0) || 1;
+
+  // Centroid and flatness over every bin above DC
+  const binHz = sampleRate / FFT_SIZE;
+  let powerSum = 0;
+  let weighted = 0;
+  let logSum = 0;
+  for (let k = 1; k < power.length; k++) {
+    powerSum += power[k];
+    weighted += k * binHz * power[k];
+    logSum += Math.log(power[k] + FLATNESS_EPS);
+  }
+  const bins = power.length - 1;
+  const centroid = powerSum > 0 ? weighted / powerSum / (sampleRate / 2) : 0;
+  const flatness = powerSum > 0 ? Math.min(1, Math.exp(logSum / bins) / (powerSum / bins + FLATNESS_EPS)) : 0;
+
+  // Attack: where the 2 ms envelope peaks inside the whole window
+  let attackBlock = 0;
+  let attackPeak = -1;
+  for (let i = 0; i + step <= w.length; i += step) {
+    const r = rms(w, i, i + step);
+    if (r > attackPeak) {
+      attackPeak = r;
+      attackBlock = i;
+    }
+  }
+
   return {
     low: low / total,
     mid: mid / total,
@@ -245,6 +288,10 @@ export function hitFeatures(samples: Float32Array, onsetSample: number, sampleRa
     decay,
     zcr: w.length > 1 ? crossings / w.length : 0,
     bursts: Math.max(1, bursts),
+    bands: bandEnergies.map((e) => e / bandTotal),
+    centroid,
+    flatness,
+    attack: len > 0 ? attackBlock / len : 0,
   };
 }
 
@@ -256,10 +303,11 @@ export const classifyByRules: HitClassifier = (f) => {
   return 'snare';
 };
 
-/** Feature vector for the trained model, fixed order. */
+/** Feature vector for the classifier, fixed order: FEATURE_COUNT values. */
 export function featureVector(f: HitFeatures): number[] {
-  return [f.low, f.mid, f.high, f.decay, f.zcr, Math.min(4, f.bursts) / 4];
+  return [f.low, f.mid, f.high, f.decay, f.zcr, Math.min(4, f.bursts) / 4, ...f.bands, f.centroid, f.flatness, f.attack];
 }
+export const FEATURE_COUNT = 6 + BAND_COUNT + 3;
 
 /** Whole pipeline: audio to classified hits. */
 export function detectHits(

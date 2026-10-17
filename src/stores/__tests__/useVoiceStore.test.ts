@@ -42,7 +42,7 @@ describe('useVoiceStore', () => {
 
   it('persists training samples and result through drumModel storage', () => {
     const s = useVoiceStore.getState();
-    s.setSamples([{ drum: 'kick', features: { low: 1, mid: 0, high: 0, decay: 0.2, zcr: 0.01, bursts: 1 } }]);
+    s.setSamples([{ drum: 'kick', features: { low: 1, mid: 0, high: 0, decay: 0.2, zcr: 0.01, bursts: 1, bands: [1, 0, 0, 0, 0, 0, 0, 0], centroid: 0.01, flatness: 0, attack: 0 } }]);
     s.setTraining(null);
     useVoiceStore.getState().reset();
     expect(useVoiceStore.getState().samples).toHaveLength(1);
