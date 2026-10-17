@@ -9,7 +9,7 @@
  */
 
 import { create } from 'zustand';
-import { PITCH_SAMPLE_RATE } from '@/lib/voice/pitchNotes';
+import { PITCH_SAMPLE_RATE, loadMelodyRange, storeMelodyRange } from '@/lib/voice/pitchNotes';
 import type { F0Track } from '@/lib/voice/pitchTrack';
 import { DEFAULT_SEGMENT_SETTINGS, type SegmentSettings } from '@/lib/voice/segmentNotes';
 import type { DrumClass, DrumHit } from '@/lib/voice/drumHits';
@@ -126,10 +126,12 @@ export interface VoiceState {
 
 let nextTakeId = 1;
 
+const RANGE_KEYS = ['minMidiNote', 'maxMidiNote', 'transpose'] as const;
+
 function freshState(): Omit<VoiceState, keyof VoiceActions> {
   return {
     mode: 'melody',
-    fine: DEFAULT_FINETUNE,
+    fine: { ...DEFAULT_FINETUNE, ...loadMelodyRange() },
     take: null,
     takes: [],
     samples: loadSamples(),
@@ -165,7 +167,11 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
   ...freshState(),
 
   setMode: (mode) => set({ mode, take: null }),
-  patchFine: (patch) => set({ fine: { ...get().fine, ...patch } }),
+  patchFine: (patch) => {
+    const fine = { ...get().fine, ...patch };
+    if (RANGE_KEYS.some((k) => k in patch)) storeMelodyRange(fine);
+    set({ fine });
+  },
 
   addTake: (partial) => {
     const take: VoiceTake = {

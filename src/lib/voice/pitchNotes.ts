@@ -79,6 +79,40 @@ export interface MelodyRange {
   transpose: number;
 }
 
+/**
+ * The singer range survives a reload: the wizard measures it once, the
+ * Finetune knobs adjust it, and every later take tracks inside it.
+ */
+export const MELODY_RANGE_STORAGE_KEY = 'devilbox.voice.melodyRange.v1';
+
+function isMidi(v: unknown): v is number {
+  return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 127;
+}
+
+/** The stored range, or null when none was stored or it does not parse. */
+export function loadMelodyRange(): MelodyRange | null {
+  try {
+    const raw = localStorage.getItem(MELODY_RANGE_STORAGE_KEY);
+    const r: unknown = raw ? JSON.parse(raw) : null;
+    if (!r || typeof r !== 'object') return null;
+    const { minMidiNote, maxMidiNote, transpose } = r as Record<string, unknown>;
+    if (!isMidi(minMidiNote) || !isMidi(maxMidiNote) || minMidiNote > maxMidiNote) return null;
+    if (typeof transpose !== 'number' || !Number.isInteger(transpose)) return null;
+    return { minMidiNote, maxMidiNote, transpose };
+  } catch {
+    return null;
+  }
+}
+
+export function storeMelodyRange(range: MelodyRange): void {
+  try {
+    const { minMidiNote, maxMidiNote, transpose } = range;
+    localStorage.setItem(MELODY_RANGE_STORAGE_KEY, JSON.stringify({ minMidiNote, maxMidiNote, transpose }));
+  } catch {
+    /* storage unavailable: the range lasts for this session only */
+  }
+}
+
 /** Semitones of headroom kept around the sung range. */
 export const RANGE_MARGIN = 3;
 /** A median below this (C3) is a low voice, written one octave up. */
