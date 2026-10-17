@@ -80,6 +80,18 @@ jobs:
             -o public/models/ced/config.json
           echo "CED model: $(du -sh public/models/ced/model.onnx)"
 
+      # SwiftF0 pitch tracker for Voice to Notes (MIT, lars76/swift-f0, 135,090 bytes).
+      - name: Download SwiftF0 pitch model
+        run: |
+          mkdir -p public/models/swift-f0
+          curl -L --fail --retry 3 --retry-delay 5 \
+            "https://raw.githubusercontent.com/lars76/swift-f0/d1ba77fe5331310b778ebe126b6cb3656d41d24f/swift_f0/model.onnx" \
+            -o public/models/swift-f0/model.onnx
+          curl -L --fail --retry 3 \
+            "https://raw.githubusercontent.com/lars76/swift-f0/d1ba77fe5331310b778ebe126b6cb3656d41d24f/LICENSE" \
+            -o public/models/swift-f0/LICENSE
+          test "$(wc -c < public/models/swift-f0/model.onnx)" -eq 135090
+
       - name: Build for custom server
         run: npm run build
 
