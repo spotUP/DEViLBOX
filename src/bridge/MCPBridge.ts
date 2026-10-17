@@ -218,6 +218,7 @@ import {
 
 import { RELAY_WS_URL } from './relayEndpoint';
 import { createReloadGate } from '../lib/dev/engineReloadGate';
+import { isStartupSplashOpen, startStartupJingle } from '../lib/startup/startupSequence';
 
 const WS_URL = RELAY_WS_URL;
 const INITIAL_BACKOFF_MS = 500;
@@ -492,10 +493,14 @@ const handlers: Record<string, Handler> = {
     try {
       const { getContext } = await import('tone');
       const ctx = getContext().rawContext as AudioContext;
+      // The click-to-start splash waits for this same gesture; press it too,
+      // or the app stays covered with the context running underneath.
+      const splash = isStartupSplashOpen();
+      if (splash) void startStartupJingle();
       if (ctx.state !== 'running') {
         await ctx.resume();
       }
-      return { ok: true, state: ctx.state };
+      return { ok: true, state: ctx.state, ...(splash ? { pressed: 'click-to-start' } : {}) };
     } catch (e) {
       return { ok: false, error: String(e) };
     }
@@ -702,8 +707,9 @@ function annotateBlockingDialog(method: string, result: unknown): unknown {
     || method === 'get_synth_errors') return result;
   if (!result || typeof result !== 'object' || Array.isArray(result)) return result;
   try {
-    const { modalOpen, recoveryPromptOpen, recoveryPrompt, synthErrorDialogOpen, synthError } =
+    const { modalOpen, recoveryPromptOpen, recoveryPrompt, synthErrorDialogOpen, synthError, startupSplashOpen } =
       getModalState() as {
+        startupSplashOpen: boolean;
         modalOpen: string | null;
         recoveryPromptOpen: boolean;
         recoveryPrompt: unknown;
@@ -750,6 +756,16 @@ function annotateBlockingDialog(method: string, result: unknown): unknown {
         blockingDialog: modalOpen,
         blockingModal: modalOpen,
         blockingDialogHint: `A "${modalOpen}" modal is covering the UI. Clear it with dismiss_modal.`,
+      };
+    }
+
+    if (startupSplashOpen) {
+      return {
+        ...(result as Record<string, unknown>),
+        blockingDialog: 'click-to-start',
+        blockingDialogHint:
+          'The "Click to Start" splash is covering the UI and the audio engine has not started. '
+          + 'Press it with unlock_audio (or dismiss_modal) before testing anything audible.',
       };
     }
 

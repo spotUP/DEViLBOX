@@ -1837,7 +1837,7 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
 
   server.tool(
     'get_modal_state',
-    'Check whether any dialog is covering the DEViLBOX UI. Reports all three blocking surfaces: a useUIStore modal (modalOpen, cleared with dismiss_modal), the crash-recovery prompt (recoveryPromptOpen, answered with resolve_recovery_prompt) and the synth-error dialog (synthErrorDialogOpen + synthError.message, cleared with dismiss_errors). Every other tool also reports an open dialog on its own response under `blockingDialog` / `blockingDialogHint`, so this call is for checking deliberately rather than for noticing. A dialog means the app may be half-started: engines stall and every audio level reads zero.',
+    'Check whether any dialog is covering the DEViLBOX UI. Reports all four blocking surfaces: a useUIStore modal (modalOpen, cleared with dismiss_modal), the crash-recovery prompt (recoveryPromptOpen, answered with resolve_recovery_prompt), the synth-error dialog (synthErrorDialogOpen + synthError.message, cleared with dismiss_errors) and the startup "Click to Start" splash (startupSplashOpen, pressed with unlock_audio or dismiss_modal). Every other tool also reports an open dialog on its own response under `blockingDialog` / `blockingDialogHint`, so this call is for checking deliberately rather than for noticing. A dialog means the app may be half-started: engines stall and every audio level reads zero.',
     {},
     () => call('get_modal_state'),
   );
@@ -2489,7 +2489,7 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
 
   server.tool(
     'unlock_audio',
-    'Resume the AudioContext to unlock audio output — equivalent to clicking in the browser. Call this after hard_reload or on a fresh page load before using play/audio tools.',
+    'Resume the AudioContext to unlock audio output — equivalent to clicking in the browser. Also presses the startup "Click to Start" splash when it is showing. Call this after hard_reload or on a fresh page load before using play/audio tools.',
     {},
     () => call('unlock_audio'),
   );
