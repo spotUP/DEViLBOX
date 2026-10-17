@@ -11,7 +11,7 @@
 import { effectNotationOf, effectTypeDigits, type EffectNotation } from '@/lib/tracker/effectNotation';
 import { create } from 'zustand';
 import type { CursorPosition, BlockSelection } from '@typedefs';
-import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { getTrackerReplayer, peekTrackerReplayer } from '@engine/TrackerReplayer';
 import { computeNibbleAdvance } from '@/lib/tracker/nibbleAdvance';
 import { resolveEntryProfile } from '@/lib/tracker/entryAdvanceProfiles';
 import { useKeyboardStore } from './useKeyboardStore';
@@ -253,8 +253,11 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
     const pattern = ts.patterns[ts.currentPatternIndex];
     if (row >= 0 && row < pattern.length) {
       set({ cursor: { ...get().cursor, rowIndex: row } });
-      const replayer = getTrackerReplayer();
-      if (replayer.isPlaying()) {
+      // Only an existing, playing replayer follows the cursor. Constructing one
+      // here would build the audio graph as a side effect of a cursor move
+      // (the startup jingle parks the cursor before the engine exists).
+      const replayer = peekTrackerReplayer();
+      if (replayer?.isPlaying()) {
         replayer.seekTo(replayer.getCurrentPosition(), row);
       }
     }
