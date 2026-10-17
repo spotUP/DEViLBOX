@@ -19,6 +19,7 @@ import type {
   TrackerWorkerMsg,
   TrackerWorkerReply,
   PatternSnapshot,
+  PatternPreviewSnapshot,
   CursorSnapshot,
   SelectionSnapshot,
   ThemeSnapshot,
@@ -63,6 +64,7 @@ let ui: UIStateSnapshot = {
 let layout: ChannelLayoutSnapshot = { offsets: [], widths: [], totalWidth: 0 };
 let playback = { row: 0, smoothOffset: 0, patternIndex: 0, isPlaying: false };
 let dragOver: { channelIndex: number; rowIndex: number } | null = null;
+let preview: PatternPreviewSnapshot | null = null;
 const layoutHold = new LayoutHold(); // new patterns wait for their channel layout
 let dirty = true; // Dirty flag — skip GPU draws when nothing changed
 // Reusable playback object for render calls (avoids per-frame allocation)
@@ -193,6 +195,11 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
       dirty = true;
       break;
 
+    case 'previewCells':
+      preview = msg.preview;
+      dirty = true;
+      break;
+
     case 'hitTest': {
       const result = hitTest(msg.relX, msg.relY);
       if (result) {
@@ -254,6 +261,7 @@ function renderFrame(): void {
     ui: scaledUi(),
     layout: scaledLayout(),
     dragOver,
+    preview,
   });
 }
 

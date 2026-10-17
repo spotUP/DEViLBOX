@@ -30,6 +30,8 @@ export interface StartOptions {
   countInBeats: number;
   beatSeconds: number;
   onTakeStart?: () => void;
+  /** Run the pitch model on the growing take for live notes. Off for drum, training and level-check takes. Default on. */
+  livePreview?: boolean;
 }
 
 export function useVoiceRecorder(model: PitchModel, pitchSettings: PitchSettings, deps: VoiceRecorderDeps = defaultVoiceRecorderDeps) {
@@ -79,6 +81,7 @@ export function useVoiceRecorder(model: PitchModel, pitchSettings: PitchSettings
       setPhase(opts.countInBeats > 0 ? 'countIn' : 'recording');
       await recorder.start();
       void refreshDevices();
+      if (opts.livePreview === false) return;
       timerRef.current = setInterval(() => {
         if (busyRef.current || !recorderRef.current) return;
         const take = recorderRef.current.snapshot();
@@ -89,7 +92,8 @@ export function useVoiceRecorder(model: PitchModel, pitchSettings: PitchSettings
             liveRef.current = notes;
             setLiveNotes(notes);
           })
-          .catch(() => { /* advisory only */ })
+          // The take is still recorded; the live preview says why it stopped updating.
+          .catch((err) => setError(`Live preview failed: ${err instanceof Error ? err.message : 'unknown error'}`))
           .finally(() => { busyRef.current = false; });
       }, LIVE_HOP_SECONDS * 1000);
     } catch (err) {

@@ -50,6 +50,31 @@ export function getStoredLatencyMs(deviceId: string): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : 0;
 }
 
+/** True once a latency was measured for this device (a stored 0 counts). */
+export function hasStoredLatency(deviceId: string): boolean {
+  return typeof readStore()[deviceId || DEFAULT_DEVICE_KEY] === 'number';
+}
+
+export const SETUP_SEEN_KEY = 'devilbox.voice.setupSeen.v1';
+
+/** The setup wizard opens by itself until it was closed once or a latency is stored. */
+export function shouldOpenVoiceSetup(): boolean {
+  try {
+    if (localStorage.getItem(SETUP_SEEN_KEY) === '1') return false;
+  } catch {
+    /* storage unavailable: fall through to the latency check */
+  }
+  return !hasStoredLatency('');
+}
+
+export function markVoiceSetupSeen(): void {
+  try {
+    localStorage.setItem(SETUP_SEEN_KEY, '1');
+  } catch {
+    /* storage unavailable: the wizard opens again next time */
+  }
+}
+
 export function storeLatencyMs(deviceId: string, ms: number): void {
   try {
     localStorage.setItem(

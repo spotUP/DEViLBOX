@@ -132,6 +132,16 @@ export function trainAndEvaluate(samples: readonly TrainingSample[]): TrainingRe
   };
 }
 
+/** The training outcome as one line for the panel and the setup wizard. */
+export function describeTraining(result: TrainingResult | null): string {
+  if (!result) return `needs ${MIN_SAMPLES_PER_CLASS} hits for at least two classes`;
+  return (
+    `held out ${result.heldOut}: model ${Math.round(result.modelAccuracy * 100)} percent, ` +
+    `rules ${Math.round(result.rulesAccuracy * 100)} percent, ` +
+    `using ${result.useModel ? 'your model' : 'the rules'}`
+  );
+}
+
 /* ---- Storage (per user, versioned, try/catch on every access) ---- */
 
 export const DRUM_SAMPLES_KEY = 'devilbox.voice.drumSamples.v1';

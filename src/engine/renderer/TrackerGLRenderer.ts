@@ -34,6 +34,7 @@ import type {
   ThemeSnapshot,
   UIStateSnapshot,
   ChannelLayoutSnapshot,
+  PatternPreviewSnapshot,
 } from './worker-types';
 
 // ─── Constants matching PatternEditorCanvas ───────────────────────────────────
@@ -417,6 +418,7 @@ export class TrackerGLRenderer {
     ui: UIStateSnapshot;
     layout: ChannelLayoutSnapshot;
     dragOver: { channelIndex: number; rowIndex: number } | null;
+    preview?: PatternPreviewSnapshot | null;
   }): void {
     if (!this.atlas) this.buildAtlas();
     const atlas = this.atlas!;
@@ -428,7 +430,7 @@ export class TrackerGLRenderer {
 
     const {
       patterns, currentPatternIndex, scrollX, cursor, selection,
-      playback, theme, ui, layout, dragOver,
+      playback, theme, ui, layout, dragOver, preview,
     } = opts;
 
     const { isPlaying, row: playRow, smoothOffset, patternIndex: playPatternIdx } = playback;
@@ -755,12 +757,23 @@ export class TrackerGLRenderer {
         const effCellW = effectCellWidth(CHAR_WIDTH, effectNotation);
         const gy = y + (rowH - atlas.glyphLogicalHeight) / 2;
 
+        // Voice to Notes ghost note for this cell (null = no preview here)
+        const previewNote = preview && !isGhostRow && ch === preview.channelIndex
+          && rowIndex >= preview.startRow && rowIndex < preview.startRow + preview.notes.length
+          ? preview.notes[rowIndex - preview.startRow] : null;
+        if (previewNote !== null) {
+          const ac = colors.accent;
+          this.addRect(colX, y, chW, rowH, [ac[0], ac[1], ac[2], 0.12]);
+        }
+
         if (isCollapsed) {
           const x = colX + Math.floor((chW - noteWidth) / 2);
-          const noteHas = (cell.note ?? 0) !== 0;
+          const shownNote = previewNote ?? cell.note ?? 0;
+          const noteHas = shownNote !== 0;
           const nc = lerpWhiteRGBA(noteHas ? colors.textNote : colors.textMuted, noteHas ? glow : 0);
-          this.setTmpColor(nc, cellAlpha);
-          this.addGlyphString(noteGlyphs(noteTable, cell.note ?? 0, ui.noteDisplayOffset), x, gy, atlas, this.tmpColor, noteHas && bold);
+          if (previewNote !== null && noteHas) this.setTmpColor(colors.accent, 0.6 * cellAlpha);
+          else this.setTmpColor(nc, cellAlpha);
+          this.addGlyphString(noteGlyphs(noteTable, shownNote, ui.noteDisplayOffset), x, gy, atlas, this.tmpColor, noteHas && bold);
           continue;
         }
 
@@ -813,7 +826,9 @@ export class TrackerGLRenderer {
           // Render each note column group (note + inst + vol)
           for (let nc = 0; nc < totalNoteCols; nc++) {
             const ncX = x + nc * NOTE_COL_GROUP_W;
-            const cellNote = nc === 0 ? (cell.note ?? 0)
+            const isPreviewNc = nc === 0 && previewNote !== null;
+            const cellNote = isPreviewNc ? previewNote
+              : nc === 0 ? (cell.note ?? 0)
               : nc === 1 ? (cell.note2 ?? 0)
               : nc === 2 ? (cell.note3 ?? 0) : (cell.note4 ?? 0);
             if (!ui.blankEmpty || cellNote !== 0) {
@@ -822,7 +837,8 @@ export class TrackerGLRenderer {
                 cellNote === 0 ? colors.textMuted
                 : cellNote === 97 ? colors.textEffect
                 : colors.textNote, noteHas ? glow : 0);
-              this.setTmpColor(noteColor, cellAlpha);
+              if (isPreviewNc && noteHas) this.setTmpColor(colors.accent, 0.6 * cellAlpha);
+              else this.setTmpColor(noteColor, cellAlpha);
               this.addGlyphString(noteGlyphs(noteTable, cellNote, ui.noteDisplayOffset), ncX, gy, atlas, this.tmpColor, noteHas && bold);
             }
 
