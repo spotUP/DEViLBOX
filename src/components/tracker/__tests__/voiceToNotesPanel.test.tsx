@@ -17,10 +17,11 @@ import { useCursorStore } from '@/stores/useCursorStore';
 import { resetStore } from '@/stores/__tests__/_harness';
 import { midiToXMNote } from '@/lib/xmConversions';
 import { DEFAULT_PITCH_SETTINGS, PITCH_SAMPLE_RATE, midiToHz } from '@/lib/voice/pitchNotes';
-import { SineReadingTracker } from '@/lib/voice/__tests__/sineReadingTracker';
+import { SineReadingTracker, sineTrack } from '@/lib/voice/__tests__/sineReadingTracker';
+import type { F0Track, PitchRange, PitchTracker } from '@/lib/voice/pitchTrack';
 import type { VoiceCapture } from '@/lib/voice/voiceRecorder';
 import { synthTake } from '@/lib/voice/drumSynth';
-import { clearTraining } from '@/lib/voice/drumModel';
+import { clearTraining, knnClassificationCount, resetKnnClassificationCount } from '@/lib/voice/drumModel';
 import { hitFeatures } from '@/lib/voice/drumHits';
 import { synthHit } from '@/lib/voice/drumSynth';
 import { useVoiceStore } from '@/stores/useVoiceStore';
@@ -100,6 +101,30 @@ function concat(parts: Float32Array[]): Float32Array {
   return out;
 }
 
+/**
+ * The plan's FakeTracker: the zero-crossing track of the take with a timbre
+ * change on every voiced frame f % 4 === 2 (confidence 0.6, as SwiftF0 dips
+ * when ooo turns to eee). The 2 dB loudness dips are in the audio itself.
+ */
+class FakeTracker implements PitchTracker {
+  calls = 0;
+  async track(samples22050: Float32Array, _range?: PitchRange): Promise<F0Track> {
+    this.calls++;
+    const track = sineTrack(samples22050);
+    for (let f = 0; f < track.hz.length; f++) if (track.hz[f] > 0 && f % 4 === 2) track.confidence[f] = 0.6;
+    return track;
+  }
+}
+
+/** A sung note: a sine with a 2 dB quieter stretch of 50 ms in its middle (a dip under the 3.01 dB split rule). */
+function sungNote(midi: number, seconds: number): Float32Array {
+  const out = sine(midi, seconds);
+  const dip = 10 ** (-2 / 20);
+  const from = Math.round((seconds / 2 - 0.025) * PITCH_SAMPLE_RATE);
+  for (let i = from; i < from + Math.round(0.05 * PITCH_SAMPLE_RATE); i++) out[i] *= dip;
+  return out;
+}
+
 beforeEach(() => {
   clearTraining();
   useVoiceStore.getState().reset();
@@ -162,6 +187,56 @@ describe('Voice to Notes panel', () => {
     expect(useHistoryStore.getState().undoStack.length - undoBefore).toBe(1);
     expect(useHistoryStore.getState().undoStack.at(-1)?.description).toBe('Voice to Notes');
   });
+
+  it('an ooo/eee take of six notes two pitches apart, with timbre dips inside each note, writes exactly those six notes from row 0, the same as the ghost preview (VR-1, owner: "it\'s still VERY inacurrate")', async () => {
+    const tracker = new FakeTracker();
+    const mic = fakeMic();
+    const deps = {
+      getStream: async () => ({} as MediaStream),
+      createCapture: () => mic.capture,
+      listDevices: async () => [],
+    };
+    const undoBefore = useHistoryStore.getState().undoStack.length;
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} tracker={tracker} deps={deps} />);
+
+    fireEvent.click(screen.getByText('Record'));
+    await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
+    // Count-in, then A3 C#4 A3 C#4 A3 C#4: 0.45 s each with a 60 ms unvoiced gap between notes
+    const a3 = 57;
+    const cs4 = 61;
+    const sung = [a3, cs4, a3, cs4, a3, cs4];
+    const take = concat([silence(1.6), ...sung.flatMap((m) => [sungNote(m, 0.45), silence(0.06)]), silence(0.1)]);
+    // Fed as a microphone does, half a second at a time; after the count-in (which
+    // the recorder skips) each part is seen by a live preview step
+    const countIn = Math.round(1.6 * PITCH_SAMPLE_RATE);
+    mic.feed(take.subarray(0, countIn));
+    const part = PITCH_SAMPLE_RATE / 2;
+    for (let at = countIn; at < take.length; at += part) {
+      const calls = tracker.calls;
+      mic.feed(take.subarray(at, at + part));
+      await waitFor(() => expect(tracker.calls).toBeGreaterThan(calls), { timeout: 2000 });
+    }
+    const expected = sung.map(midiToXMNote);
+
+    // The ghost preview while recording shows the six notes the commit will write
+    await waitFor(() => {
+      const ghost = useVoicePreviewStore.getState().preview;
+      expect(ghost?.startRow).toBe(0);
+      expect(ghost?.notes.filter((n) => n > 0 && n !== 97)).toEqual(expected);
+    }, { timeout: 3000 });
+    const ghostNotes = useVoicePreviewStore.getState().preview!.notes;
+    expect(tracker.calls).toBeGreaterThanOrEqual(1);
+    fireEvent.click(screen.getByText('Stop'));
+
+    await waitFor(() => expect(writtenNotes().length).toBe(6));
+    const written = writtenNotes();
+    expect(written.map((c) => c.note)).toEqual(expected);
+    expect(written[0].i).toBe(0);
+    // Preview and pattern agree row for row
+    expect(written.map((c) => c.i)).toEqual(ghostNotes.flatMap((n, i) => (n > 0 && n !== 97 ? [i] : [])));
+    expect(useHistoryStore.getState().undoStack.length - undoBefore).toBe(1);
+    expect(useHistoryStore.getState().undoStack.at(-1)?.description).toBe('Voice to Notes');
+  }, 20000);
 
   it('a take longer than the pattern records on into a pattern added at the song end, as one undo step (VNR-27, owner: "it would be nicer if it recorded several patterns, for as long as it records")', async () => {
     const tracker = new SineReadingTracker();
@@ -541,7 +616,8 @@ describe('Voice to Notes panel', () => {
     fireEvent.click(screen.getByText('Stop'));
     await waitFor(() => expect(screen.getByTestId('drum-training-status').textContent).toMatch(/held out \d+: 100 percent correct/));
 
-    // A normal drum take now: the kick sound is written as the snare note
+    // A normal drum take now: the kick sound is written as the snare note, labelled by the trained k-NN
+    resetKnnClassificationCount();
     fireEvent.click(screen.getByText('Record'));
     await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
     mic.feed(concat([new Float32Array(Math.round(1.6 * PITCH_SAMPLE_RATE)), synthTake([{ drum: 'kick', at: 0.3 }], 0.8)]));
@@ -552,6 +628,7 @@ describe('Voice to Notes panel', () => {
     const rows = useTrackerStore.getState().patterns[0].channels[0].rows;
     expect(writtenNotes().map((c) => c.note)).toEqual([midiToXMNote(DRUM_808_MIDI)]);
     expect(tr808Voices().find((v) => v.id === rows[writtenNotes()[0].i].instrument)?.voice).toBe('snare');
+    expect(knnClassificationCount()).toBeGreaterThanOrEqual(1);
   });
 
   it('a beatbox take into a song whose current instrument is playable adds TR-808 voices to the instrument list (owner report 2026-10-17)', async () => {
