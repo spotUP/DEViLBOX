@@ -9,7 +9,9 @@
  */
 
 import { create } from 'zustand';
-import { DEFAULT_PITCH_SETTINGS, PITCH_SAMPLE_RATE, type PitchModelOutput, type PitchSettings } from '@/lib/voice/pitchNotes';
+import { PITCH_SAMPLE_RATE } from '@/lib/voice/pitchNotes';
+import type { F0Track } from '@/lib/voice/pitchTrack';
+import { DEFAULT_SEGMENT_SETTINGS, type SegmentSettings } from '@/lib/voice/segmentNotes';
 import type { DrumClass, DrumHit } from '@/lib/voice/drumHits';
 import {
   loadSamples,
@@ -36,7 +38,7 @@ export interface VoiceEffectToggles {
   flams: boolean;
 }
 
-export interface Finetune extends PitchSettings {
+export interface Finetune extends SegmentSettings {
   transpose: number;
   swing: number;
   minLengthRows: number;
@@ -53,7 +55,7 @@ export interface Finetune extends PitchSettings {
 }
 
 export const DEFAULT_FINETUNE: Finetune = {
-  ...DEFAULT_PITCH_SETTINGS,
+  ...DEFAULT_SEGMENT_SETTINGS,
   transpose: 0,
   swing: 0,
   minLengthRows: 1,
@@ -73,8 +75,8 @@ export interface VoiceTake {
   sampleRate: number;
   seconds: number;
   recordedAt: number;
-  /** Pitch model result (melody takes). */
-  output: PitchModelOutput | null;
+  /** Pitch track of the take (melody takes); the notes are segmented from it. */
+  track: F0Track | null;
   /** Detected hits (drum takes). */
   hits: DrumHit[];
 }

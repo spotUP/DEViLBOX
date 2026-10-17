@@ -1,18 +1,13 @@
 /**
- * voiceToNotes.ts - the one pipeline from pitch-model output to pattern cells.
+ * voiceToNotes.ts - the one pipeline from a pitch track to pattern cells.
  *
  * Used by the Voice to Notes panel (live take) and the voice_to_notes MCP
- * handler (audio file): model output -> notes -> transpose -> key snap ->
- * quantise -> one undo step.
+ * handler (audio file): pitch track -> segmented notes -> transpose -> key
+ * snap -> quantise -> one undo step.
  */
-import {
-  DEFAULT_PITCH_SETTINGS,
-  modelOutputToNotes,
-  transposeNotes,
-  type PitchModelOutput,
-  type PitchSettings,
-  type VoiceNote,
-} from './pitchNotes';
+import { transposeNotes, type VoiceNote } from './pitchNotes';
+import type { F0Track } from './pitchTrack';
+import { DEFAULT_SEGMENT_SETTINGS, segmentNotes, type SegmentSettings } from './segmentNotes';
 import type { VoiceEffectToggles } from '@/stores/useVoiceStore';
 import { ALL_EFFECTS, melodyRows, type TakeAudio, type TakeContour } from './noteEffects';
 import { snapNotesToKey, type KeySnap } from './scaleSnap';
@@ -20,16 +15,16 @@ import type { QuantiseSettings } from './quantise';
 import { writeNotesToPattern, type TakeWriteResult, type WriteTarget } from './writeToPattern';
 import { playableMelodyInstrument } from './voiceInstruments';
 
-export interface NoteShaping extends PitchSettings {
+export interface NoteShaping extends SegmentSettings {
   transpose: number;
   /** null = no snapping */
   keySnap: KeySnap | null;
 }
 
-export const DEFAULT_SHAPING: NoteShaping = { ...DEFAULT_PITCH_SETTINGS, transpose: 0, keySnap: null };
+export const DEFAULT_SHAPING: NoteShaping = { ...DEFAULT_SEGMENT_SETTINGS, transpose: 0, keySnap: null };
 
-export function shapeNotes(output: PitchModelOutput, s: NoteShaping): VoiceNote[] {
-  const notes = transposeNotes(modelOutputToNotes(output, s, true), s.transpose);
+export function shapeNotes(track: F0Track, s: NoteShaping): VoiceNote[] {
+  const notes = transposeNotes(segmentNotes(track, s), s.transpose);
   return s.keySnap ? snapNotesToKey(notes, s.keySnap) : notes;
 }
 

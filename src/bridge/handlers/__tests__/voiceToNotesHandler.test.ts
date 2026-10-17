@@ -1,7 +1,7 @@
 /**
  * voice_to_notes MCP handler: an audio file's bytes go through the same core as
  * the panel (shape, quantise, write) into the pattern at the cursor channel,
- * as one undo step. Sentinel: the fake model's calls and the decoder's input.
+ * as one undo step. Sentinel: the fake tracker's calls and the decoder's input.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { voiceToNotes, type VoiceToNotesDeps } from '../voiceHandlers';
@@ -11,32 +11,30 @@ import { useTransportStore } from '@/stores/useTransportStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { resetStore } from '@/stores/__tests__/_harness';
 import { midiToXMNote } from '@/lib/xmConversions';
-import { ANNOTATIONS_FPS } from '@/lib/voice/pitchNotes';
+import { TRACK_HOP_SECONDS, midiToHz, type F0Track } from '@/lib/voice/pitchTrack';
 import { synthTake } from '@/lib/voice/drumSynth';
 import { DRUM_808_MIDI } from '@/lib/voice/voiceInstruments';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 
-function oneNoteOutput(midi: number) {
-  const frames: number[][] = [];
-  const onsets: number[][] = [];
-  const contours: number[][] = [];
-  for (let f = 0; f < ANNOTATIONS_FPS * 2; f++) {
-    const fr = new Array(88).fill(0);
-    const on = new Array(88).fill(0);
-    if (f >= 17 && f < 60) fr[midi - 21] = 0.9;
-    if (f === 17) on[midi - 21] = 0.9;
-    frames.push(fr);
-    onsets.push(on);
-    contours.push(new Array(264).fill(0));
+/** A 2 s track with one voiced note of `midi` from 0.27 s to 0.96 s. */
+function oneNoteTrack(midi: number): F0Track {
+  const frames = Math.round(2 / TRACK_HOP_SECONDS);
+  const hz = new Float32Array(frames);
+  const confidence = new Float32Array(frames);
+  const loudnessDb = new Float32Array(frames).fill(-100);
+  for (let f = 17; f < 60; f++) {
+    hz[f] = midiToHz(midi);
+    confidence[f] = 0.9;
+    loudnessDb[f] = -20;
   }
-  return { frames, onsets, contours };
+  return { hz, confidence, loudnessDb, hopSeconds: TRACK_HOP_SECONDS };
 }
 
 describe('voice_to_notes handler', () => {
   let calls = 0;
   let decoded = 0;
   const deps: VoiceToNotesDeps = {
-    model: { evaluate: async () => { calls++; return oneNoteOutput(61); } },
+    tracker: { track: async () => { calls++; return oneNoteTrack(61); } },
     decode: async (b) => { decoded = b.byteLength; return new Float32Array(44100); },
     fetchBytes: async () => new ArrayBuffer(3),
   };

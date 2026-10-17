@@ -5,9 +5,11 @@
  * (lib/voice/voiceToNotes: shape, quantise, write) into the current pattern at
  * the cursor channel and row.
  */
-import { basicPitchModel, resampleToMono22050, type PitchModel } from '@/lib/voice/basicPitchModel';
+import { resampleToMono22050 } from '@/lib/voice/basicPitchModel';
+import { TRACK_VOICED_CONFIDENCE, type F0Track, type PitchTracker } from '@/lib/voice/pitchTrack';
+import { swiftF0Tracker } from '@/lib/voice/swiftF0';
 import { DEFAULT_SHAPING, commitVoiceNotes, shapeNotes } from '@/lib/voice/voiceToNotes';
-import { ALL_EFFECTS, takeContour } from '@/lib/voice/noteEffects';
+import { ALL_EFFECTS, contourFromTrack } from '@/lib/voice/noteEffects';
 import { PITCH_SAMPLE_RATE } from '@/lib/voice/pitchNotes';
 import { countsByClass, loadActiveClassifier, modelClassifier, type TrainingSample } from '@/lib/voice/drumModel';
 import { classifyByRules, detectHits, DRUM_CLASSES, type HitClassifier } from '@/lib/voice/drumHits';
@@ -21,14 +23,14 @@ import { useVoiceStore } from '@/stores/useVoiceStore';
 import { spanRms, voiceGateLevel } from '@/lib/voice/voicing';
 
 export interface VoiceToNotesDeps {
-  model: PitchModel;
+  tracker: PitchTracker;
   /** Audio bytes to 22050 Hz mono samples */
   decode: (bytes: ArrayBuffer) => Promise<Float32Array>;
   fetchBytes: (url: string) => Promise<ArrayBuffer>;
 }
 
 export const defaultVoiceDeps: VoiceToNotesDeps = {
-  model: basicPitchModel,
+  tracker: swiftF0Tracker,
   async decode(bytes) {
     const ctx = new AudioContext();
     try {
@@ -85,11 +87,11 @@ export async function voiceToNotes(
       return { ok: true, ...written, detected: hits.length, hits: counts, channel: channelIndex, row: startRow };
     }
 
-    const output = await deps.model.evaluate(samples);
+    const track = await deps.tracker.track(samples);
     const tonic = params.keyTonic as number | undefined;
     const scale = (params.keyScale as string | undefined) ?? 'major';
     if (tonic !== undefined && !(scale in SCALES)) return { error: `Unknown keyScale: ${scale}` };
-    const notes = shapeNotes(output, {
+    const notes = shapeNotes(track, {
       ...DEFAULT_SHAPING,
       transpose: (params.transpose as number | undefined) ?? 0,
       keySnap: tonic === undefined ? null : { tonic, scale: scale as ScaleName },
@@ -104,7 +106,7 @@ export async function voiceToNotes(
       quantise,
       { channelIndex, startRow, instrumentId },
       take,
-      takeContour(samples, PITCH_SAMPLE_RATE),
+      contourFromTrack(track),
       ALL_EFFECTS,
     );
     if (!result) return { ok: true, written: 0, dropped: 0, detected: notes.length };
@@ -142,6 +144,58 @@ function trainingReport(samples: readonly TrainingSample[], training: ReturnType
   };
 }
 
+/**
+ * The pitch track behind get_voice_take's notes: how much of the take the
+ * tracker heard as voiced, how sure it was, and per note the mean pitch and
+ * confidence of the frames under it.
+ */
+function trackSummary(
+  track: F0Track,
+  notes: readonly { startTimeSeconds: number; durationSeconds: number; pitchMidi: number }[],
+  frames: boolean,
+): Record<string, unknown> {
+  const round = (v: number) => Math.round(v * 1000) / 1000;
+  const voiced: number[] = [];
+  for (let i = 0; i < track.hz.length; i++) {
+    if (track.confidence[i] >= TRACK_VOICED_CONFIDENCE && track.hz[i] > 0) voiced.push(track.confidence[i]);
+  }
+  voiced.sort((a, b) => a - b);
+  const perNote = notes.map((n) => {
+    const from = Math.max(0, Math.floor(n.startTimeSeconds / track.hopSeconds));
+    const to = Math.min(track.hz.length, Math.ceil((n.startTimeSeconds + n.durationSeconds) / track.hopSeconds));
+    let hz = 0;
+    let conf = 0;
+    let count = 0;
+    for (let i = from; i < to; i++) {
+      if (track.hz[i] <= 0) continue;
+      hz += track.hz[i];
+      conf += track.confidence[i];
+      count++;
+    }
+    return {
+      start: round(n.startTimeSeconds),
+      end: round(n.startTimeSeconds + n.durationSeconds),
+      midi: n.pitchMidi,
+      meanHz: count ? round(hz / count) : null,
+      meanConfidence: count ? round(conf / count) : null,
+    };
+  });
+  return {
+    frames: track.hz.length,
+    hopSeconds: track.hopSeconds,
+    voicedFrames: voiced.length,
+    medianConfidence: voiced.length ? round(voiced[voiced.length >> 1]) : null,
+    perNote,
+    ...(frames
+      ? {
+          hz: Array.from(track.hz, round),
+          confidence: Array.from(track.confidence, round),
+          loudnessDb: Array.from(track.loudnessDb, round),
+        }
+      : {}),
+  };
+}
+
 /** Envelope step of get_voice_take, seconds. */
 const ENVELOPE_STEP_SECONDS = 0.1;
 
@@ -152,15 +206,17 @@ function toDb(rms: number): number {
 /**
  * get_voice_take: the take the Voice to Notes panel holds, as numbers. Take
  * length against the voiced span (RMS per 0.1 s over the take's own gate) and
- * the notes the current fine settings shape from the stored model output, so
+ * the notes the current fine settings shape from the stored pitch track, so
  * "it stops before I stop" and "extra wrong notes" are measured from the real
- * recording instead of guessed. Read-only.
+ * recording instead of guessed. The track is summarised (voiced frames, median
+ * confidence, per note mean Hz and confidence); `frames: true` adds the
+ * per-frame hz, confidence and loudness arrays. Read-only.
  */
-export function getVoiceTake(): Record<string, unknown> {
+export function getVoiceTake(params: Record<string, unknown> = {}): Record<string, unknown> {
   const { take, takes, fine, mode, samples, training } = useVoiceStore.getState();
   if (!take) return { ok: false, error: 'No take recorded', takes: takes.length, mode };
-  const notes = take.output
-    ? shapeNotes(take.output, {
+  const notes = take.track
+    ? shapeNotes(take.track, {
         ...fine,
         keySnap: fine.keySnapOn ? { tonic: fine.keyTonic, scale: fine.keyScale } : null,
       })
@@ -190,7 +246,7 @@ export function getVoiceTake(): Record<string, unknown> {
     voicedFrom: voicedFrom === null ? null : round(voicedFrom),
     voicedTo: voicedTo === null ? null : round(voicedTo),
     envelopeDb,
-    hasModelOutput: take.output !== null,
+    track: take.track ? trackSummary(take.track, notes, params.frames === true) : null,
     notes: notes.map((n) => ({
       start: round(n.startTimeSeconds),
       duration: round(n.durationSeconds),
@@ -202,8 +258,8 @@ export function getVoiceTake(): Record<string, unknown> {
     takes: takes.length,
     training: trainingReport(samples, training),
     fine: {
-      onsetThreshold: fine.onsetThreshold,
-      frameThreshold: fine.frameThreshold,
+      pitchHoldMs: fine.pitchHoldMs,
+      voicingThreshold: fine.voicingThreshold,
       minNoteLengthMs: fine.minNoteLengthMs,
       transpose: fine.transpose,
       keySnapOn: fine.keySnapOn,

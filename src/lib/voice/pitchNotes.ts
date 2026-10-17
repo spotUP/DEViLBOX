@@ -1,8 +1,9 @@
 /**
  * pitchNotes.ts - Basic Pitch model output (frames, onsets, contours) to notes.
  *
- * The single note-extraction path: the Voice to Notes panel (monophonic) and
- * the sample editor's AudioToMidiModal (polyphonic) both call this.
+ * Polyphonic note extraction for the sample editor's AudioToMidiModal. The
+ * Voice to Notes panel no longer uses Basic Pitch: it reads a SwiftF0 pitch
+ * track and segments it (pitchTrack.ts, noteSegmenter.ts, voiceToNotes.ts).
  */
 import type { VoiceEffect } from './voiceEffects';
 import {
@@ -11,7 +12,10 @@ import {
   outputToNotesPoly,
 } from '@spotify/basic-pitch';
 import type { NoteEventTime } from '@spotify/basic-pitch';
-import { voiceGateLevel, spanRms, spanF0Midi, octaveFromAudio } from './voicing';
+import { voiceGateLevel, spanRms } from './voicing';
+import { midiToHz } from './pitchTrack';
+
+export { midiToHz };
 
 /** Basic Pitch annotation frame rate (22050 / 256). */
 export const ANNOTATIONS_FPS = Math.floor(22050 / 256);
@@ -62,10 +66,6 @@ export const DEFAULT_PITCH_SETTINGS: PitchSettings = {
   maxMidiNote: 108,
 };
 
-export function midiToHz(midi: number): number {
-  return 440 * Math.pow(2, (midi - 69) / 12);
-}
-
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
 
 /** MIDI 60 is C4. */
@@ -101,25 +101,6 @@ export function melodyRange(notes: readonly VoiceNote[]): MelodyRange | null {
   };
 }
 
-/**
- * Reduce overlapping notes to one line: the highest-amplitude note wins, any
- * note that overlaps an already accepted one is dropped. Result is sorted by
- * start time and never overlaps.
- */
-export function toMonophonic<T extends VoiceNote>(notes: readonly T[]): T[] {
-  const byConfidence = [...notes].sort((a, b) => b.amplitude - a.amplitude);
-  const accepted: T[] = [];
-  for (const n of byConfidence) {
-    const s = n.startTimeSeconds;
-    const e = s + n.durationSeconds;
-    const clash = accepted.some(
-      (a) => s < a.startTimeSeconds + a.durationSeconds && a.startTimeSeconds < e,
-    );
-    if (!clash) accepted.push(n);
-  }
-  return accepted.sort((a, b) => a.startTimeSeconds - b.startTimeSeconds);
-}
-
 /** Same-pitch notes this close together are one held note the model split. */
 const MERGE_GAP_SECONDS = 2 / ANNOTATIONS_FPS;
 
@@ -149,14 +130,12 @@ export function mergeSplitNotes<T extends VoiceNote & { pitchBends?: number[] }>
 }
 
 /**
- * Model frames to note events. `monophonic` keeps the strongest single line.
- * With `out.audio`, notes with no voice under them are dropped and monophonic
- * notes take their octave from the audio.
+ * Model frames to note events. With `out.audio`, notes with no voice under
+ * them (span RMS below the take's own noise gate) are dropped.
  */
 export function modelOutputToNotes(
   out: PitchModelOutput,
   settings: PitchSettings,
-  monophonic: boolean,
 ): NoteEventTime[] {
   const minNoteFrames = Math.max(1, Math.round((settings.minNoteLengthMs / 1000) * ANNOTATIONS_FPS));
   const events = outputToNotesPoly(
@@ -174,15 +153,6 @@ export function modelOutputToNotes(
   if (audio) {
     const gate = voiceGateLevel(audio);
     notes = notes.filter((n) => spanRms(audio, PITCH_SAMPLE_RATE, n.startTimeSeconds, n.durationSeconds) >= gate);
-  }
-  if (monophonic) {
-    notes = toMonophonic(notes);
-    if (audio) {
-      notes = notes.map((n) => ({
-        ...n,
-        pitchMidi: octaveFromAudio(n.pitchMidi, spanF0Midi(audio, PITCH_SAMPLE_RATE, n.startTimeSeconds, n.durationSeconds)),
-      }));
-    }
   }
   return mergeSplitNotes(notes);
 }

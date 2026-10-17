@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useVoiceRecorder, type VoiceRecorderDeps } from '../useVoiceRecorder';
-import { DEFAULT_PITCH_SETTINGS } from '@/lib/voice/pitchNotes';
+import { DEFAULT_SHAPING } from '@/lib/voice/voiceToNotes';
 import { LIVE_HOP_SECONDS } from '@/lib/voice/liveWindow';
-import type { PitchModel } from '@/lib/voice/basicPitchModel';
+import type { PitchTracker } from '@/lib/voice/pitchTrack';
 
 describe('useVoiceRecorder live preview', () => {
   afterEach(() => vi.useRealTimers());
@@ -21,8 +21,8 @@ describe('useVoiceRecorder live preview', () => {
       }),
       listDevices: async () => [],
     };
-    const model: PitchModel = { evaluate: async () => { throw new Error('model not loaded'); } };
-    const { result } = renderHook(() => useVoiceRecorder(model, DEFAULT_PITCH_SETTINGS, deps));
+    const tracker: PitchTracker = { track: async () => { throw new Error('model not loaded'); } };
+    const { result } = renderHook(() => useVoiceRecorder(tracker, DEFAULT_SHAPING, deps));
 
     await act(async () => { await result.current.start({ countInBeats: 0, beatSeconds: 0.5 }); });
     act(() => deliver(new Float32Array(2205).fill(0.2)));
@@ -32,7 +32,7 @@ describe('useVoiceRecorder live preview', () => {
     act(() => { result.current.stop(); });
   });
 
-  it('a level-check or training take (livePreview off) never runs the pitch model, so no ghost notes appear', async () => {
+  it('a level-check or training take (livePreview off) never runs the pitch tracker, so no ghost notes appear', async () => {
     vi.useFakeTimers();
     let deliver: (b: Float32Array) => void = () => {};
     const deps: VoiceRecorderDeps = {
@@ -46,8 +46,13 @@ describe('useVoiceRecorder live preview', () => {
       listDevices: async () => [],
     };
     let calls = 0;
-    const model: PitchModel = { evaluate: async () => { calls++; return { frames: [], onsets: [], contours: [] }; } };
-    const { result } = renderHook(() => useVoiceRecorder(model, DEFAULT_PITCH_SETTINGS, deps));
+    const tracker: PitchTracker = {
+      track: async () => {
+        calls++;
+        return { hz: new Float32Array(0), confidence: new Float32Array(0), loudnessDb: new Float32Array(0), hopSeconds: 0.016 };
+      },
+    };
+    const { result } = renderHook(() => useVoiceRecorder(tracker, DEFAULT_SHAPING, deps));
 
     await act(async () => { await result.current.start({ countInBeats: 0, beatSeconds: 0.5, livePreview: false }); });
     act(() => deliver(new Float32Array(2205).fill(0.2)));

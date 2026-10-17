@@ -3,9 +3,9 @@
  * driven by a synthetic sine melody through a fake microphone, put the notes
  * on the grid at the right rows as exactly ONE undo entry.
  *
- * The pitch model is a fake that reads the recorded samples (zero-crossing
+ * The pitch tracker is a fake that reads the recorded samples (zero-crossing
  * pitch per frame), so the take really passes through recorder, panel,
- * extraction, quantiser and writer. Sentinel: the fake model's calls.
+ * segmenter, quantiser and writer. Sentinel: the fake tracker's calls.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, cleanup, waitFor, screen, within } from '@testing-library/react';
@@ -16,8 +16,8 @@ import { useTransportStore } from '@/stores/useTransportStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { resetStore } from '@/stores/__tests__/_harness';
 import { midiToXMNote } from '@/lib/xmConversions';
-import { ANNOTATIONS_FPS, DEFAULT_PITCH_SETTINGS, PITCH_SAMPLE_RATE, midiToHz, type PitchModelOutput } from '@/lib/voice/pitchNotes';
-import type { PitchModel } from '@/lib/voice/basicPitchModel';
+import { DEFAULT_PITCH_SETTINGS, PITCH_SAMPLE_RATE, midiToHz } from '@/lib/voice/pitchNotes';
+import { SineReadingTracker } from '@/lib/voice/__tests__/sineReadingTracker';
 import type { VoiceCapture } from '@/lib/voice/voiceRecorder';
 import { synthTake } from '@/lib/voice/drumSynth';
 import { clearTraining } from '@/lib/voice/drumModel';
@@ -40,60 +40,6 @@ function tr808Voices() {
   return useInstrumentStore.getState().instruments
     .filter((i) => i.synthType === 'TR808')
     .map((i) => ({ id: i.id, voice: i.parameters?.io808Type as string }));
-}
-
-const HOP = 256;
-
-/**
- * Frame pitch from zero crossings; silent frames give no note. The pitch
- * window looks 2048 samples ahead; the voice gate reads only the frame's own
- * hop, so an onset lands on the frame where the sound starts. `holdSemitones`
- * keeps a pitch that drifts within that many semitones of a note's start on
- * the start bin (a bend, as Basic Pitch reports one), with no new onset.
- */
-class SineReadingModel implements PitchModel {
-  calls = 0;
-  holdSemitones: number;
-  constructor(holdSemitones = 0) {
-    this.holdSemitones = holdSemitones;
-  }
-  async evaluate(samples: Float32Array): Promise<PitchModelOutput> {
-    this.calls++;
-    const frames: number[][] = [];
-    const onsets: number[][] = [];
-    const contours: number[][] = [];
-    const count = Math.floor(samples.length / HOP);
-    let held = -1;
-    for (let f = 0; f < count; f++) {
-      const from = f * HOP;
-      const to = Math.min(samples.length, from + 2048);
-      let crossings = 0;
-      let peak = 0;
-      let voiced = 0;
-      for (let i = from + 1; i < to; i++) {
-        if (i < from + HOP) peak = Math.max(peak, Math.abs(samples[i]));
-        if (samples[i] === 0 || samples[i - 1] === 0) continue;
-        voiced++;
-        if (samples[i - 1] < 0 !== samples[i] < 0) crossings++;
-      }
-      const hz = voiced > 0 ? (crossings / 2) / (voiced / PITCH_SAMPLE_RATE) : 0;
-      const midi = peak > 0.05 && hz > 0 ? Math.round(69 + 12 * Math.log2(hz / 440)) : -1;
-      const fr = new Array(88).fill(0);
-      const on = new Array(88).fill(0);
-      if (midi >= 21) {
-        const bin = held >= 21 && Math.abs(midi - held) <= this.holdSemitones ? held : midi;
-        fr[bin - 21] = 0.9;
-        if (bin !== held) on[bin - 21] = 0.9;
-        held = bin;
-      } else {
-        held = -1;
-      }
-      frames.push(fr);
-      onsets.push(on);
-      contours.push(new Array(264).fill(0));
-    }
-    return { frames, onsets, contours };
-  }
 }
 
 function fakeMic() {
@@ -168,7 +114,7 @@ afterEach(cleanup);
 
 describe('Voice to Notes panel', () => {
   it('Record then Stop puts the sung notes on the grid from row 0 as one undo step, without a Commit click (VNR-24, owner: "why doesnt it put my voice -> note stuff on position 0?")', async () => {
-    const model = new SineReadingModel();
+    const tracker = new SineReadingTracker();
     const mic = fakeMic();
     const deps = {
       getStream: async () => ({} as MediaStream),
@@ -176,7 +122,7 @@ describe('Voice to Notes panel', () => {
       listDevices: async () => [],
     };
     const undoBefore = useHistoryStore.getState().undoStack.length;
-    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={model} deps={deps} />);
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} tracker={tracker} deps={deps} />);
 
     fireEvent.click(screen.getByText('Record'));
     await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
@@ -192,7 +138,7 @@ describe('Voice to Notes panel', () => {
       expect(ghost?.notes).toContain(midiToXMNote(60));
     }, { timeout: 3000 });
     expect(screen.getByText('Stop')).toBeTruthy();
-    expect(model.calls).toBeGreaterThan(0);
+    expect(tracker.calls).toBeGreaterThan(0);
     fireEvent.click(screen.getByText('Stop'));
 
     // The take lands as soon as it ends; Commit only re-writes after a change
@@ -201,7 +147,7 @@ describe('Voice to Notes panel', () => {
     expect((screen.getByText('Commit').closest('button') as HTMLButtonElement).disabled).toBe(true);
 
     const rows = useTrackerStore.getState().patterns[0].channels[0].rows;
-    // The cursor sits on row 4 but the take always starts at row 0; notes 5 rows apart (+-1 row for the model's onset frame)
+    // The cursor sits on row 4 but the take always starts at row 0; notes 5 rows apart (+-1 row for the onset frame)
     const written = writtenNotes();
     expect(written.map((c) => c.note)).toEqual([midiToXMNote(60), midiToXMNote(64), midiToXMNote(67)]);
     expect(written[0].i).toBe(0);
@@ -214,11 +160,10 @@ describe('Voice to Notes panel', () => {
     expect(written[1].i - written[0].i).toBeLessThanOrEqual(6);
     expect(useHistoryStore.getState().undoStack.length - undoBefore).toBe(1);
     expect(useHistoryStore.getState().undoStack.at(-1)?.description).toBe('Voice to Notes');
-    expect(ANNOTATIONS_FPS).toBe(86);
   });
 
   it('a take longer than the pattern records on into a pattern added at the song end, as one undo step (VNR-27, owner: "it would be nicer if it recorded several patterns, for as long as it records")', async () => {
-    const model = new SineReadingModel();
+    const tracker = new SineReadingTracker();
     const mic = fakeMic();
     const deps = {
       getStream: async () => ({} as MediaStream),
@@ -229,7 +174,7 @@ describe('Voice to Notes panel', () => {
     useTrackerStore.getState().resizePattern(0, 16);
     expect(useTrackerStore.getState().patternOrder).toEqual([0]);
     const undoBefore = useHistoryStore.getState().undoStack.length;
-    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={model} deps={deps} />);
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} tracker={tracker} deps={deps} />);
     fireEvent.click(screen.getByText('Record'));
     await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
     // Count-in, then C4, E4, G4 for 1 s each: 30 rows, past the 16-row pattern
@@ -238,7 +183,7 @@ describe('Voice to Notes panel', () => {
     fireEvent.click(screen.getByText('Stop'));
 
     await waitFor(() => expect(useTrackerStore.getState().patterns.length).toBe(2));
-    expect(model.calls).toBeGreaterThan(0);
+    expect(tracker.calls).toBeGreaterThan(0);
     const { patterns, patternOrder } = useTrackerStore.getState();
     expect(patternOrder).toEqual([0, 1]);
     expect(patterns[1].length).toBe(16);
@@ -266,7 +211,7 @@ describe('Voice to Notes panel', () => {
     });
     // Melody: 0.7 s of silence after the 1.6 s count-in, then C4 and E4 for 0.5 s each (row = 0.1 s)
     const mic = fakeMic();
-    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={new SineReadingModel()} deps={deps(mic.capture)} />);
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} tracker={new SineReadingTracker()} deps={deps(mic.capture)} />);
     fireEvent.click(screen.getByText('Record'));
     await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
     mic.feed(concat([new Float32Array(Math.round(2.3 * PITCH_SAMPLE_RATE)), sine(60, 0.5), sine(64, 0.5), new Float32Array(2205)]));
@@ -288,7 +233,7 @@ describe('Voice to Notes panel', () => {
 
     // Drums: kick 0.7 s after beat 1, snare 0.5 s later
     const drumMic = fakeMic();
-    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={new SineReadingModel()} deps={deps(drumMic.capture)} />);
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} tracker={new SineReadingTracker()} deps={deps(drumMic.capture)} />);
     fireEvent.click(screen.getByTitle('Mode'));
     fireEvent.click(await screen.findByText('Drums'));
     await waitFor(() => expect(screen.getByTestId('drum-map-kick')).toBeTruthy());
@@ -305,21 +250,21 @@ describe('Voice to Notes panel', () => {
 
   /** One take through the panel: 0.3 s silence after the count-in, then a sine note. */
   async function takeThrough(midi: number, before?: (utils: ReturnType<typeof render>) => Promise<void> | void) {
-    const model = new SineReadingModel();
+    const tracker = new SineReadingTracker();
     const mic = fakeMic();
     const deps = {
       getStream: async () => ({} as MediaStream),
       createCapture: () => mic.capture,
       listDevices: async () => [],
     };
-    const utils = render(<VoiceToNotesPanel isOpen onClose={() => {}} model={model} deps={deps} />);
+    const utils = render(<VoiceToNotesPanel isOpen onClose={() => {}} tracker={tracker} deps={deps} />);
     await before?.(utils);
     fireEvent.click(screen.getByText('Record'));
     await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
     mic.feed(concat([new Float32Array(Math.round(1.6 * PITCH_SAMPLE_RATE)), new Float32Array(Math.round(0.3 * PITCH_SAMPLE_RATE)), sine(midi, 0.5), new Float32Array(2205)]));
     fireEvent.click(screen.getByText('Stop'));
     await waitFor(() => expect(writtenNotes().length).toBeGreaterThan(0));
-    expect(model.calls).toBeGreaterThan(0);
+    expect(tracker.calls).toBeGreaterThan(0);
     return writtenNotes();
   }
 
@@ -360,8 +305,8 @@ describe('Voice to Notes panel', () => {
       createCapture: () => (calibrationCaptures++ === 0 ? loop : mic.capture),
       listDevices: async () => [],
     };
-    const model = new SineReadingModel();
-    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={model} deps={deps} />);
+    const tracker = new SineReadingTracker();
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} tracker={tracker} deps={deps} />);
     fireEvent.click(screen.getByText('Calibrate latency'));
     await waitFor(() => expect(screen.getByTestId('voice-calibrated-latency').textContent).toContain('100 ms'));
 
@@ -422,7 +367,7 @@ describe('Voice to Notes panel', () => {
   });
 
   it('a take with a glide, a wobble and a late note writes tone portamento, vibrato and note delay cells, drawn as notes and markers in the modal (VNR-12, VNR-14)', async () => {
-    const model = new SineReadingModel(4);
+    const tracker = new SineReadingTracker();
     const mic = fakeMic();
     const deps = {
       getStream: async () => ({} as MediaStream),
@@ -432,7 +377,7 @@ describe('Voice to Notes panel', () => {
     // Strength 0 keeps the timing as sung (the Strength knob's lowest setting), so
     // a late note keeps its offset and is written with a note delay
     useVoiceStore.getState().patchFine({ strength: 0 });
-    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={model} deps={deps} />);
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} tracker={tracker} deps={deps} />);
     // The panel is a design-system Modal
     expect(within(screen.getByRole('dialog')).getByTestId('voice-to-notes-panel')).toBeTruthy();
     fireEvent.click(screen.getByText('Record'));
@@ -444,7 +389,7 @@ describe('Voice to Notes panel', () => {
     fireEvent.click(screen.getByText('Stop'));
     // Three heard notes; the glide's slide cell carries its target note too
     await waitFor(() => expect(writtenNotes().length).toBe(4));
-    expect(model.calls).toBeGreaterThan(0);
+    expect(tracker.calls).toBeGreaterThan(0);
 
     // The modal draws every heard note and marks each on the waveform
     expect(screen.getAllByTestId('voice-ghost-note')).toHaveLength(3);
@@ -488,14 +433,14 @@ describe('Voice to Notes panel', () => {
   });
 
   it('while recording, the waveform and note roll span the whole pattern from row 0 and show the growing take (VNR-23, owner: "it starts at the center and overflows on the right side")', async () => {
-    const model = new SineReadingModel();
+    const tracker = new SineReadingTracker();
     const mic = fakeMic();
     const deps = {
       getStream: async () => ({} as MediaStream),
       createCapture: () => mic.capture,
       listDevices: async () => [],
     };
-    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={model} deps={deps} />);
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} tracker={tracker} deps={deps} />);
     // 64 rows of 0.1 s from row 0: the pattern is 6.4 s long whatever row the cursor is on
     expect(useTrackerStore.getState().patterns[0].length).toBe(64);
     const waveform = () => screen.getByTestId('voice-take-waveform');
@@ -524,8 +469,8 @@ describe('Voice to Notes panel', () => {
     expect(screen.getByTestId('voice-note-roll').dataset.seconds).toBe('6.40');
   });
 
-  it('Drums mode: a kick and snare take ends as TR-808 cells in the pattern as one undo step, without the pitch model', async () => {
-    const model = new SineReadingModel();
+  it('Drums mode: a kick and snare take ends as TR-808 cells in the pattern as one undo step, without the pitch tracker', async () => {
+    const tracker = new SineReadingTracker();
     const mic = fakeMic();
     const deps = {
       getStream: async () => ({} as MediaStream),
@@ -533,7 +478,7 @@ describe('Voice to Notes panel', () => {
       listDevices: async () => [],
     };
     const undoBefore = useHistoryStore.getState().undoStack.length;
-    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={model} deps={deps} />);
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} tracker={tracker} deps={deps} />);
     fireEvent.click(screen.getByTitle('Mode'));
     fireEvent.click(await screen.findByText('Drums'));
     await waitFor(() => expect(screen.getByTestId('drum-map-kick')).toBeTruthy());
@@ -545,7 +490,7 @@ describe('Voice to Notes panel', () => {
 
     await waitFor(() => expect(screen.getByTestId('drum-map-kick').textContent).toContain('1 hit'));
     expect(screen.getByTestId('drum-map-snare').textContent).toContain('1 hit');
-    expect(model.calls).toBe(0);
+    expect(tracker.calls).toBe(0);
     await waitFor(() => expect(writtenNotes().length).toBe(2));
 
     // Each class lands on its own TR-808 voice, created by the commit, at the 808 trigger note
@@ -580,7 +525,7 @@ describe('Voice to Notes panel', () => {
       createCapture: () => mic.capture,
       listDevices: async () => [],
     };
-    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={new SineReadingModel()} deps={deps} />);
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} tracker={new SineReadingTracker()} deps={deps} />);
     fireEvent.click(screen.getByTitle('Mode'));
     fireEvent.click(await screen.findByText('Drums'));
     await waitFor(() => expect(screen.getByTestId('drum-training-status')).toBeTruthy());
@@ -622,7 +567,7 @@ describe('Voice to Notes panel', () => {
       createCapture: () => mic.capture,
       listDevices: async () => [],
     };
-    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={new SineReadingModel()} deps={deps} />);
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} tracker={new SineReadingTracker()} deps={deps} />);
     fireEvent.click(screen.getByTitle('Mode'));
     fireEvent.click(await screen.findByText('Drums'));
     await waitFor(() => expect(screen.getByTestId('drum-map-kick')).toBeTruthy());
@@ -648,7 +593,7 @@ describe('Voice to Notes panel', () => {
 describe('Voice to Notes setup wizard', () => {
   it('opens on first use and walks microphone check, latency, a step per drum, the melody range and result', async () => {
     localStorage.removeItem(SETUP_SEEN_KEY);
-    const model = new SineReadingModel();
+    const tracker = new SineReadingTracker();
     const mic = fakeMic();
     let deliver: (b: Float32Array) => void = () => {};
     const loop: VoiceCapture = {
@@ -669,7 +614,7 @@ describe('Voice to Notes setup wizard', () => {
       createCapture: () => (captures++ === 1 ? loop : mic.capture),
       listDevices: async () => [],
     };
-    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={model} deps={deps} />);
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} tracker={tracker} deps={deps} />);
 
     // Microphone check: a sung take is only metered, never turned into notes
     const micStep = screen.getByTestId('voice-setup-step-microphone');
@@ -678,7 +623,7 @@ describe('Voice to Notes setup wizard', () => {
     mic.feed(sine(60, 1));
     fireEvent.click(within(micStep).getByText('Stop test'));
     await waitFor(() => expect(within(micStep).getByText('Test microphone')).toBeTruthy());
-    expect(model.calls).toBe(0);
+    expect(tracker.calls).toBe(0);
     expect((screen.getByText('Commit').closest('button') as HTMLButtonElement).disabled).toBe(true);
 
     fireEvent.click(screen.getByText('Next'));
@@ -702,7 +647,7 @@ describe('Voice to Notes setup wizard', () => {
       expect(within(row).getByText('Retake')).toBeTruthy();
       expect(nextButton().disabled).toBe(false);
     }
-    expect(model.calls).toBe(0);
+    expect(tracker.calls).toBe(0);
 
     // Melody step: the scale sets the pitch range on Next, and is never written to the grid
     fireEvent.click(screen.getByText('Next'));
@@ -713,7 +658,7 @@ describe('Voice to Notes setup wizard', () => {
     mic.feed(concat([sine(60, 0.4), sine(64, 0.4), sine(67, 0.4), new Float32Array(2205)]));
     fireEvent.click(within(melodyStep).getByText('Stop'));
     await waitFor(() => expect(within(melodyStep).getByTestId('voice-take-waveform').getAttribute('data-markers')).toBe('3'));
-    expect(model.calls).toBe(1);
+    expect(tracker.calls).toBe(1);
     expect(screen.getByTestId('voice-setup-range').textContent).toBe('Heard 3 notes: A3 to A#4, no transpose');
     expect(useVoiceStore.getState().fine.minMidiNote).toBe(DEFAULT_PITCH_SETTINGS.minMidiNote);
     fireEvent.click(screen.getByText('Next'));
@@ -734,7 +679,7 @@ describe('Voice to Notes setup wizard', () => {
       createCapture: () => fakeMic().capture,
       listDevices: async () => [],
     };
-    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={new SineReadingModel()} deps={deps} />);
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} tracker={new SineReadingTracker()} deps={deps} />);
     expect(screen.queryByTestId('voice-setup-step-microphone')).toBeNull();
     fireEvent.click(screen.getByLabelText('Setup wizard'));
     expect(screen.getByTestId('voice-setup-step-microphone')).toBeTruthy();

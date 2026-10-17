@@ -14,7 +14,7 @@ describe('useVoiceStore', () => {
 
   it('keeps the newest 8 takes and makes the newest current', () => {
     const { addTake } = useVoiceStore.getState();
-    for (let i = 1; i <= 11; i++) addTake({ mode: 'melody', audio: audio(i), output: null, hits: [] });
+    for (let i = 1; i <= 11; i++) addTake({ mode: 'melody', audio: audio(i), track: null, hits: [] });
     const { takes, take } = useVoiceStore.getState();
     expect(takes).toHaveLength(MAX_TAKES);
     expect(takes[0].seconds).toBeCloseTo(11, 3);
@@ -23,8 +23,8 @@ describe('useVoiceStore', () => {
 
   it('useTake brings an earlier take back with its mode', () => {
     const { addTake } = useVoiceStore.getState();
-    const drums = addTake({ mode: 'drums', audio: audio(1), output: null, hits: [] });
-    addTake({ mode: 'melody', audio: audio(2), output: null, hits: [] });
+    const drums = addTake({ mode: 'drums', audio: audio(1), track: null, hits: [] });
+    addTake({ mode: 'melody', audio: audio(2), track: null, hits: [] });
     useVoiceStore.getState().useTake(drums.id);
     expect(useVoiceStore.getState().take?.id).toBe(drums.id);
     expect(useVoiceStore.getState().mode).toBe('drums');
