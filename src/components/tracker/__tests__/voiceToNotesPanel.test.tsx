@@ -44,34 +44,50 @@ function tr808Voices() {
 
 const HOP = 256;
 
-/** Frame pitch from zero crossings; silent frames give no note. */
+/**
+ * Frame pitch from zero crossings; silent frames give no note. The pitch
+ * window looks 2048 samples ahead; the voice gate reads only the frame's own
+ * hop, so an onset lands on the frame where the sound starts. `holdSemitones`
+ * keeps a pitch that drifts within that many semitones of a note's start on
+ * the start bin (a bend, as Basic Pitch reports one), with no new onset.
+ */
 class SineReadingModel implements PitchModel {
   calls = 0;
+  holdSemitones: number;
+  constructor(holdSemitones = 0) {
+    this.holdSemitones = holdSemitones;
+  }
   async evaluate(samples: Float32Array): Promise<PitchModelOutput> {
     this.calls++;
     const frames: number[][] = [];
     const onsets: number[][] = [];
     const contours: number[][] = [];
     const count = Math.floor(samples.length / HOP);
-    let prev = -1;
+    let held = -1;
     for (let f = 0; f < count; f++) {
       const from = f * HOP;
       const to = Math.min(samples.length, from + 2048);
       let crossings = 0;
       let peak = 0;
+      let voiced = 0;
       for (let i = from + 1; i < to; i++) {
-        peak = Math.max(peak, Math.abs(samples[i]));
+        if (i < from + HOP) peak = Math.max(peak, Math.abs(samples[i]));
+        if (samples[i] === 0 || samples[i - 1] === 0) continue;
+        voiced++;
         if (samples[i - 1] < 0 !== samples[i] < 0) crossings++;
       }
-      const hz = (crossings / 2) / ((to - from) / PITCH_SAMPLE_RATE);
-      const midi = peak > 0.05 ? Math.round(69 + 12 * Math.log2(hz / 440)) : -1;
+      const hz = voiced > 0 ? (crossings / 2) / (voiced / PITCH_SAMPLE_RATE) : 0;
+      const midi = peak > 0.05 && hz > 0 ? Math.round(69 + 12 * Math.log2(hz / 440)) : -1;
       const fr = new Array(88).fill(0);
       const on = new Array(88).fill(0);
       if (midi >= 21) {
-        fr[midi - 21] = 0.9;
-        if (midi !== prev) on[midi - 21] = 0.9;
+        const bin = held >= 21 && Math.abs(midi - held) <= this.holdSemitones ? held : midi;
+        fr[bin - 21] = 0.9;
+        if (bin !== held) on[bin - 21] = 0.9;
+        held = bin;
+      } else {
+        held = -1;
       }
-      prev = midi;
       frames.push(fr);
       onsets.push(on);
       contours.push(new Array(264).fill(0));
@@ -100,6 +116,33 @@ function sine(midi: number, seconds: number): Float32Array {
   const out = new Float32Array(Math.round(seconds * PITCH_SAMPLE_RATE));
   const w = (2 * Math.PI * midiToHz(midi)) / PITCH_SAMPLE_RATE;
   for (let i = 0; i < out.length; i++) out[i] = 0.5 * Math.sin(w * i);
+  return out;
+}
+
+function silence(seconds: number): Float32Array {
+  return new Float32Array(Math.round(seconds * PITCH_SAMPLE_RATE));
+}
+
+/** A sine whose pitch moves evenly from one note to another over the span. */
+function glide(fromMidi: number, toMidi: number, seconds: number): Float32Array {
+  const out = new Float32Array(Math.round(seconds * PITCH_SAMPLE_RATE));
+  let phase = 0;
+  for (let i = 0; i < out.length; i++) {
+    phase += (2 * Math.PI * midiToHz(fromMidi + ((toMidi - fromMidi) * i) / out.length)) / PITCH_SAMPLE_RATE;
+    out[i] = 0.5 * Math.sin(phase);
+  }
+  return out;
+}
+
+/** A sine with vibrato: `depth` semitones either side of the note at `rateHz`. */
+function wobble(midi: number, seconds: number, rateHz: number, depth: number): Float32Array {
+  const out = new Float32Array(Math.round(seconds * PITCH_SAMPLE_RATE));
+  let phase = 0;
+  for (let i = 0; i < out.length; i++) {
+    const t = i / PITCH_SAMPLE_RATE;
+    phase += (2 * Math.PI * midiToHz(midi + depth * Math.sin(2 * Math.PI * rateHz * t))) / PITCH_SAMPLE_RATE;
+    out[i] = 0.5 * Math.sin(phase);
+  }
   return out;
 }
 
@@ -287,6 +330,71 @@ describe('Voice to Notes panel', () => {
     fireEvent.click(commit);
     expect(writtenNotes(1).map((c) => c.note)).toEqual([midiToXMNote(60)]);
     expect(commit.disabled).toBe(true);
+  });
+
+  it('a take with a glide, a wobble and a late note writes tone portamento, vibrato and note delay cells, drawn as notes and markers in the modal (VNR-12, VNR-14)', async () => {
+    const model = new SineReadingModel(4);
+    const mic = fakeMic();
+    const deps = {
+      getStream: async () => ({} as MediaStream),
+      createCapture: () => mic.capture,
+      listDevices: async () => [],
+    };
+    // Strength 0 keeps the timing as sung (the Strength knob's lowest setting), so
+    // a late note keeps its offset and is written with a note delay
+    useVoiceStore.getState().patchFine({ strength: 0 });
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={model} deps={deps} />);
+    // The panel is a design-system Modal
+    expect(within(screen.getByRole('dialog')).getByTestId('voice-to-notes-panel')).toBeTruthy();
+    fireEvent.click(screen.getByText('Record'));
+    await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
+    // Rows are 0.1 s (150 BPM, speed 6). After the 1.6 s count-in: a glide of four
+    // semitones over six rows from row 3, a 5 Hz wobble of 0.45 semitones over six
+    // rows from row 11, and a plain note 35 ms (about two ticks) after row 19.
+    mic.feed(concat([silence(1.6), silence(0.3), glide(60, 64, 0.6), silence(0.2), wobble(60, 0.6, 5, 0.45), silence(0.235), sine(67, 0.4), new Float32Array(2205)]));
+    fireEvent.click(screen.getByText('Stop'));
+    // Three heard notes; the glide's slide cell carries its target note too
+    await waitFor(() => expect(writtenNotes().length).toBe(4));
+    expect(model.calls).toBeGreaterThan(0);
+
+    // The modal draws every heard note and marks each on the waveform
+    expect(screen.getAllByTestId('voice-ghost-note')).toHaveLength(3);
+    expect(Number(screen.getByTestId('voice-take-waveform').dataset.markers)).toBeGreaterThanOrEqual(3);
+
+    const rows = useTrackerStore.getState().patterns[0].channels[0].rows;
+    const written = writtenNotes().filter((c) => rows[c.i].effTyp !== 0x3);
+    expect(written.map((c) => c.note)).toEqual([midiToXMNote(60), midiToXMNote(60), midiToXMNote(67)]);
+    expect(written.map((c) => c.i)).toEqual([7, 15, 23]);
+    const commands = rows
+      .flatMap((r, i) => [{ i, note: r.note, effTyp: r.effTyp, eff: r.eff }, { i, note: r.note, effTyp: r.effTyp2, eff: r.eff2 }])
+      .filter((c) => c.effTyp !== 0 || c.eff !== 0);
+
+    // The glide: written at its start pitch; later rows of its span slide (3xx) to the end pitch, named on the first slide cell
+    const porta = commands.filter((c) => c.effTyp === 0x3);
+    expect(porta.length).toBeGreaterThan(0);
+    expect(porta[0].note).toBe(midiToXMNote(64));
+    expect(porta.every((c) => c.i > written[0].i && c.i < written[1].i)).toBe(true);
+
+    // The wobble: 4xy on every row of the note; x = 5 Hz * 64 / 60 ticks per second, y = 0.45 semitones * 8
+    const vibrato = commands.filter((c) => c.effTyp === 0x4);
+    expect(vibrato.length).toBeGreaterThanOrEqual(5);
+    expect(vibrato.every((c) => c.i >= written[1].i && c.i < written[2].i)).toBe(true);
+    expect(vibrato[0].eff >> 4).toBeGreaterThanOrEqual(4);
+    expect(vibrato[0].eff >> 4).toBeLessThanOrEqual(6);
+    expect(vibrato[0].eff & 0xf).toBeGreaterThanOrEqual(3);
+    expect(vibrato[0].eff & 0xf).toBeLessThanOrEqual(5);
+
+    // The late note: on its row with a note delay (EDx) of the ticks it was heard late
+    const delay = commands.find((c) => c.i === written[2].i && c.effTyp === 0xe && (c.eff & 0xf0) === 0xd0);
+    expect(delay).toBeTruthy();
+    expect(delay!.eff & 0xf).toBeGreaterThanOrEqual(1);
+    expect(delay!.eff & 0xf).toBeLessThanOrEqual(3);
+
+    // The written-rows table names the effects by command
+    const table = screen.getAllByTestId('voice-timing-effects').map((td) => td.textContent ?? '').join(' | ');
+    expect(table).toMatch(/3[0-9A-F]{2}/);
+    expect(table).toMatch(/4[0-9A-F]{2}/);
+    expect(table).toMatch(/ED[1-3]/);
   });
 
   it('Drums mode: a kick and snare take ends as TR-808 cells in the pattern as one undo step, without the pitch model', async () => {
