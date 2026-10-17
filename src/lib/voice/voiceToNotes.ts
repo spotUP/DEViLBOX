@@ -16,6 +16,7 @@ import {
 import { snapNotesToKey, type KeySnap } from './scaleSnap';
 import { quantiseNotes, type QuantiseSettings } from './quantise';
 import { writeNotesToPattern, type WriteResult, type WriteTarget } from './writeToPattern';
+import { playableMelodyInstrument } from './voiceInstruments';
 
 export interface NoteShaping extends PitchSettings {
   transpose: number;
@@ -30,13 +31,18 @@ export function shapeNotes(output: PitchModelOutput, s: NoteShaping): VoiceNote[
   return s.keySnap ? snapNotesToKey(notes, s.keySnap) : notes;
 }
 
-/** Quantise and write; null when there is nothing to write. */
+/**
+ * Quantise and write; null when there is nothing to write. A silent or
+ * missing target instrument is replaced by the Voice Lead; `instrumentId` is
+ * the instrument the notes were written with.
+ */
 export function commitVoiceNotes(
   notes: readonly VoiceNote[],
   quantise: QuantiseSettings,
   target: WriteTarget,
-): WriteResult | null {
+): (WriteResult & { instrumentId: number }) | null {
   const rows = quantiseNotes(notes, quantise);
   if (rows.length === 0) return null;
-  return writeNotesToPattern(rows, target);
+  const instrumentId = playableMelodyInstrument(target.instrumentId);
+  return { ...writeNotesToPattern(rows, { ...target, instrumentId }), instrumentId };
 }

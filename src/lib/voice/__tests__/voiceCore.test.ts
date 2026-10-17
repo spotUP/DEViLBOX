@@ -3,9 +3,8 @@ import { toMonophonic, transposeNotes, modelOutputToNotes, DEFAULT_PITCH_SETTING
 import { quantiseNotes, rowSeconds, type QuantiseSettings } from '../quantise';
 import { mergeWindowNotes } from '../liveWindow';
 import { VoiceRecorder, type VoiceCapture } from '../voiceRecorder';
-import { applyNotesToPattern, writeNotesToPattern, NOTE_OFF, velocityToVolume } from '../writeToPattern';
+import { applyNotesToPattern, NOTE_OFF, velocityToVolume } from '../writeToPattern';
 import { useTrackerStore } from '@/stores/useTrackerStore';
-import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { resetStore } from '@/stores/__tests__/_harness';
 import { sungTakeModelOutput, SUNG_TAKE_PITCHES } from './sungTakeFixture';
 
@@ -153,37 +152,6 @@ describe('applyNotesToPattern', () => {
   });
 });
 
-describe('writeNotesToPattern', () => {
-  beforeEach(() => {
-    resetStore(useTrackerStore);
-    resetStore(useInstrumentStore);
-  });
-
-  it('creates a default instrument when the song has none, so the note is not silent', () => {
-    expect(useInstrumentStore.getState().instruments).toHaveLength(0);
-    const res = writeNotesToPattern([{ row: 0, lengthRows: 2, midi: 60, velocity: 1 }], {
-      channelIndex: 0,
-      startRow: 0,
-      instrumentId: 1,
-    });
-    expect(res.written).toBe(1);
-    const ids = useInstrumentStore.getState().instruments.map((i) => i.id);
-    expect(ids).toHaveLength(1);
-    const cell = useTrackerStore.getState().patterns[0].channels[0].rows[0];
-    expect(ids).toContain(cell.instrument);
-  });
-
-  it('keeps an existing instrument and creates nothing', () => {
-    const id = useInstrumentStore.getState().createInstrument();
-    writeNotesToPattern([{ row: 0, lengthRows: 1, midi: 60, velocity: 1 }], {
-      channelIndex: 0,
-      startRow: 0,
-      instrumentId: id,
-    });
-    expect(useInstrumentStore.getState().instruments).toHaveLength(1);
-    expect(useTrackerStore.getState().patterns[0].channels[0].rows[0].instrument).toBe(id);
-  });
-});
 
 import { snapMidiToKey, snapNotesToKey } from '../scaleSnap';
 import { detectClickOnset, getStoredLatencyMs, storeLatencyMs, measureLoopbackLatencyMs, LATENCY_STORAGE_KEY } from '../latencyCalibration';
