@@ -26,7 +26,9 @@ import { useVoiceStore, type Finetune, type VoiceEffectToggles, type VoiceMode, 
 import { useVoiceRecorder, defaultVoiceRecorderDeps, type VoiceRecorderDeps } from '@/hooks/audio/useVoiceRecorder';
 import { basicPitchModel, type PitchModel } from '@/lib/voice/basicPitchModel';
 import { DEFAULT_PITCH_SETTINGS, PITCH_SAMPLE_RATE, noteName, type MelodyRange, type VoiceNote } from '@/lib/voice/pitchNotes';
-import { quantiseNotes, rowSeconds, type QuantiseSettings, type QuantisedNote } from '@/lib/voice/quantise';
+import { rowSeconds, type QuantiseSettings, type QuantisedNote } from '@/lib/voice/quantise';
+import { melodyRows, takeContour } from '@/lib/voice/noteEffects';
+import { voiceEffectSet, type VoiceEffectKind } from '@/lib/voice/voiceEffects';
 import { melodyPreview, drumPreview } from '@/lib/voice/takePreview';
 import { useVoicePreviewStore } from '@/stores/useVoicePreviewStore';
 import { commitVoiceNotes, shapeNotes } from '@/lib/voice/voiceToNotes';
@@ -113,6 +115,32 @@ const NoteRoll: React.FC<{ notes: readonly VoiceNote[]; seconds: number }> = ({ 
 function formatOffset(offsetRows: number): string {
   if (Math.abs(offsetRows) < 0.005) return 'on row';
   return `${offsetRows > 0 ? '+' : ''}${offsetRows.toFixed(2)} row`;
+}
+
+const EFFECT_NAMES: Record<VoiceEffectKind, string> = {
+  arpeggio: 'Arpeggio',
+  portaUp: 'Portamento Up',
+  portaDown: 'Portamento Down',
+  tonePorta: 'Tone Portamento',
+  vibrato: 'Vibrato',
+  volumeSlide: 'Volume Slide',
+  retrigger: 'Retrigger',
+  noteDelay: 'Note Delay',
+};
+
+/** The effect columns of a note as tracker notation, e.g. "3A4 Tone Portamento +2", for the timing table. */
+const TABLE_EFFECTS = voiceEffectSet('tracker', 8);
+function formatEffects(n: QuantisedNote): string {
+  const effects = n.effects ?? [];
+  if (effects.length === 0) return '';
+  const hex = (e: { effTyp: number; eff: number }) => `${e.effTyp.toString(16).toUpperCase()}${e.eff.toString(16).toUpperCase().padStart(2, '0')}`;
+  return effects
+    .map((e) => {
+      const cmd = TABLE_EFFECTS.encode(e.kind, e.param);
+      const where = e.rowOffset > 0 ? ` +${e.rowOffset}` : '';
+      return `${cmd ? hex(cmd) : ''} ${EFFECT_NAMES[e.kind]}${where}`.trim();
+    })
+    .join(', ');
 }
 
 const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -330,10 +358,10 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     const target = { channelIndex, startRow, instrumentId };
     let result;
     if (drums) {
-      result = commitDrumHits(hits, drumMap, quantise, target);
+      result = commitDrumHits(hits, drumMap, quantise, target, fine.effects.flams);
       if (result) setDrumMap(result.drumMap);
     } else {
-      result = commitVoiceNotes(finalNotes, quantise, target);
+      result = commitVoiceNotes(finalNotes, quantise, target, takeAudio, contour, fine.effects);
       if (result) setInstrumentId(result.instrumentId);
     }
     if (!result) {
@@ -385,14 +413,19 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   const takeRecording = recording && !levelCheck && recordingClass === null;
   const shownNotes = recording ? recorder.liveNotes : finalNotes;
 
+  // The take's audio and pitch contour: read once per take (YIN every 20 ms),
+  // shared by the preview, the commit and the timing table (lib/voice/noteEffects).
+  const takeAudio = useMemo(() => (take ? { audio: take.audio, sampleRate: take.sampleRate } : null), [take]);
+  const contour = useMemo(() => (take && take.mode === 'melody' ? takeContour(take.audio, take.sampleRate) : null), [take]);
+
   // The take shows in the pattern as ghost notes while recording and until it
   // is committed; built with the commit's own steps (lib/voice/takePreview).
   const preview = useMemo(() => {
     if (recording ? !takeRecording : !pending) return null;
     const target = { channelIndex, startRow, instrumentId };
-    if (drums) return recording ? null : drumPreview(hits, drumMap, quantise, target, rowCount);
-    return melodyPreview(shownNotes, quantise, target, rowCount);
-  }, [recording, takeRecording, pending, drums, hits, drumMap, shownNotes, quantise, channelIndex, startRow, instrumentId, rowCount]);
+    if (drums) return recording ? null : drumPreview(hits, drumMap, quantise, target, rowCount, fine.effects.flams);
+    return melodyPreview(shownNotes, quantise, target, rowCount, recording ? null : takeAudio, recording ? null : contour, fine.effects);
+  }, [recording, takeRecording, pending, drums, hits, drumMap, shownNotes, quantise, channelIndex, startRow, instrumentId, rowCount, takeAudio, contour, fine.effects]);
   const setPreview = useVoicePreviewStore((s) => s.setPreview);
   useEffect(() => setPreview(isOpen ? preview : null), [preview, setPreview, isOpen]);
   useEffect(() => () => setPreview(null), [setPreview]);
@@ -400,9 +433,9 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
 
   // The rows the commit writes, for the timing table and the waveform markers
   const written = useMemo<QuantisedNote[]>(() => {
-    if (drums) return hits.length ? quantiseHits(hits, drumMapAsWritten(drumMap, usedDrumClasses(hits)), quantise) : [];
-    return finalNotes.length ? quantiseNotes(finalNotes, quantise) : [];
-  }, [drums, hits, drumMap, finalNotes, quantise]);
+    if (drums) return hits.length ? quantiseHits(hits, drumMapAsWritten(drumMap, usedDrumClasses(hits)), quantise, fine.effects.flams) : [];
+    return finalNotes.length ? melodyRows(finalNotes, quantise, takeAudio, contour, fine.effects) : [];
+  }, [drums, hits, drumMap, finalNotes, quantise, takeAudio, contour, fine.effects]);
 
   const markers = useMemo<WaveformMarker[]>(() => {
     if (drums) {
@@ -587,6 +620,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
                 <th className="font-normal pr-2">Heard</th>
                 <th className="font-normal pr-2">Off by</th>
                 <th className="font-normal pr-2">Instrument</th>
+                <th className="font-normal pr-2">Effects</th>
               </tr>
             </thead>
             <tbody>
@@ -598,6 +632,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
                   <td className="pr-2">{n.heardSeconds.toFixed(3)} s</td>
                   <td className="pr-2" data-testid="voice-timing-offset">{formatOffset(n.offsetRows)}</td>
                   <td className="pr-2">{n.instrumentId ?? instrumentId}</td>
+                  <td className="pr-2" data-testid="voice-timing-effects">{formatEffects(n)}</td>
                 </tr>
               ))}
             </tbody>

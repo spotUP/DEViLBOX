@@ -8,8 +8,10 @@
 import type { PatternPreviewSnapshot } from '@/engine/renderer/worker-types';
 import type { DrumHit } from './drumHits';
 import { quantiseHits, usedDrumClasses, type DrumMap } from './drumToNotes';
+import type { VoiceEffectToggles } from '@/stores/useVoiceStore';
+import { ALL_EFFECTS, melodyRows, type TakeAudio, type TakeContour } from './noteEffects';
 import type { VoiceNote } from './pitchNotes';
-import { quantiseNotes, type QuantisedNote, type QuantiseSettings } from './quantise';
+import type { QuantisedNote, QuantiseSettings } from './quantise';
 import { drumMapAsWritten } from './voiceInstruments';
 import { takeCells, type WriteTarget } from './writeToPattern';
 
@@ -19,14 +21,21 @@ function snapshot(rows: readonly QuantisedNote[], target: WriteTarget, rowCount:
   return { channelIndex: target.channelIndex, startRow: take.startRow, notes: take.cells.map((c) => c.note) };
 }
 
-/** Melody notes (live while recording, or the shaped take) as the commit will write them. */
+/**
+ * Melody notes (live while recording, or the shaped take) as the commit will
+ * write them. `take` and `contour` null (live) = no slide / vibrato / volume
+ * detection, only arpeggios and note delays.
+ */
 export function melodyPreview(
   notes: readonly VoiceNote[],
   quantise: QuantiseSettings,
   target: WriteTarget,
   rowCount: number,
+  take: TakeAudio | null = null,
+  contour: TakeContour | null = null,
+  toggles: VoiceEffectToggles = ALL_EFFECTS,
 ): PatternPreviewSnapshot | null {
-  return snapshot(quantiseNotes(notes, quantise), target, rowCount);
+  return snapshot(melodyRows(notes, quantise, take, contour, toggles), target, rowCount);
 }
 
 /** Drum hits as the commit will write them; silent classes show at the 808 pitch. */
@@ -36,6 +45,7 @@ export function drumPreview(
   quantise: QuantiseSettings,
   target: WriteTarget,
   rowCount: number,
+  flams = true,
 ): PatternPreviewSnapshot | null {
-  return snapshot(quantiseHits(hits, drumMapAsWritten(map, usedDrumClasses(hits)), quantise), target, rowCount);
+  return snapshot(quantiseHits(hits, drumMapAsWritten(map, usedDrumClasses(hits)), quantise, flams), target, rowCount);
 }

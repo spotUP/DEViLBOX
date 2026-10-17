@@ -7,6 +7,8 @@
  */
 import { basicPitchModel, resampleToMono22050, type PitchModel } from '@/lib/voice/basicPitchModel';
 import { DEFAULT_SHAPING, commitVoiceNotes, shapeNotes } from '@/lib/voice/voiceToNotes';
+import { ALL_EFFECTS, takeContour } from '@/lib/voice/noteEffects';
+import { PITCH_SAMPLE_RATE } from '@/lib/voice/pitchNotes';
 import { loadActiveClassifier } from '@/lib/voice/drumModel';
 import { detectHits, DRUM_CLASSES } from '@/lib/voice/drumHits';
 import { commitDrumHits, defaultDrumMap, type DrumMap } from '@/lib/voice/drumToNotes';
@@ -93,10 +95,15 @@ export async function voiceToNotes(
 
     const instrumentId =
       (params.instrumentId as number | undefined) ?? useInstrumentStore.getState().currentInstrumentId ?? 1;
+    // Every effect on, as the panel's toggles default: the headless path has no UI.
+    const take = { audio: samples, sampleRate: PITCH_SAMPLE_RATE };
     const result = commitVoiceNotes(
       notes,
       quantise,
       { channelIndex, startRow, instrumentId },
+      take,
+      takeContour(samples, PITCH_SAMPLE_RATE),
+      ALL_EFFECTS,
     );
     if (!result) return { ok: true, written: 0, dropped: 0, detected: notes.length };
     return { ok: true, ...result, detected: notes.length, channel: channelIndex, row: startRow };
