@@ -54,7 +54,7 @@ import {
   type TrainingResult,
   type TrainingSample,
 } from '@/lib/voice/drumModel';
-import { commitDrumHits, defaultDrumMap, type DrumMap } from '@/lib/voice/drumToNotes';
+import { NEW_808_INSTRUMENT, commitDrumHits, defaultDrumMap, type DrumMap } from '@/lib/voice/drumToNotes';
 import { currentTargetInstrument } from '@/lib/voice/voiceInstruments';
 
 export interface VoiceToNotesPanelProps {
@@ -140,10 +140,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   const [trainingTake, setTrainingTake] = useState<DrumClass | null>(null);
   const [samples, setSamples] = useState<TrainingSample[]>(() => loadSamples());
   const [training, setTraining] = useState<TrainingResult | null>(() => loadTrainingResult());
-  const [drumMap, setDrumMap] = useState<DrumMap>(() => {
-    const { instruments, currentInstrumentId } = useInstrumentStore.getState();
-    return defaultDrumMap(instruments, currentTargetInstrument(instruments, currentInstrumentId));
-  });
+  const [drumMap, setDrumMap] = useState<DrumMap>(() => defaultDrumMap(useInstrumentStore.getState().instruments));
   const [deviceId, setDeviceId] = useState('');
   const [channelIndex, setChannelIndex] = useState(() => useCursorStore.getState().cursor.channelIndex);
   const [startRow, setStartRow] = useState(0);
@@ -192,6 +189,8 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
   // A new take, or a change to how it lands, is pending again until committed.
   const [pending, setPending] = useState(false);
   useEffect(() => setPending(true), [output, hits, fine, quantise, channelIndex, startRow, mode]);
+  // Set when a take ends: the take lands on the grid without a Commit click.
+  const [autoCommit, setAutoCommit] = useState(false);
 
   const finalNotes = useMemo(
     () =>
@@ -269,6 +268,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     setTakeSeconds(take.length / 22050);
     if (drums) {
       setHits(detectHits(take, training?.useModel ? modelClassifier(training.model) : classifyByRules));
+      setAutoCommit(true);
       return;
     }
     setAnalysing(true);
@@ -278,6 +278,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
       setOutput(result);
       setActiveTakeId(addTake(result, take.length / 22050).id);
       setTakes(listTakes());
+      setAutoCommit(true);
     } catch (err) {
       notify.error(`Pitch detection failed: ${err instanceof Error ? err.message : 'unknown error'}`);
     } finally {
@@ -305,6 +306,15 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
         (result.dropped ? `, ${result.dropped} past the end of the pattern` : ''),
     );
   }, [drums, hits, drumMap, finalNotes, quantise, channelIndex, startRow, instrumentId]);
+
+  // A finished take is written at once (owner kept forgetting Commit); Commit
+  // stays for re-writing after a change. Runs once `pending` has seen the take.
+  useEffect(() => {
+    if (!autoCommit || !pending || analysing) return;
+    setAutoCommit(false);
+    if (drums ? hits.length === 0 : finalNotes.length === 0) return;
+    handleCommit();
+  }, [autoCommit, pending, analysing, drums, hits, finalNotes, handleCommit]);
 
   const handleCalibrate = useCallback(async () => {
     setCalibrating(true);
@@ -359,6 +369,10 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     label: `Channel ${i + 1}`,
   }));
   const instrumentOptions = instruments.map((i) => ({ value: String(i.id), label: `${i.id}. ${i.name}` }));
+  const drumInstrumentOptions = (drum: DrumClass) => [
+    { value: String(NEW_808_INSTRUMENT), label: `TR-808 ${DRUM_CLASS_LABELS[drum]} (added on commit)` },
+    ...instrumentOptions,
+  ];
 
   return (
     <aside
@@ -443,7 +457,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
                   <CustomSelect
                     value={String(drumMap[drum].instrumentId)}
                     onChange={(v) => setDrumMap((m) => ({ ...m, [drum]: { ...m[drum], instrumentId: Number(v) } }))}
-                    options={instrumentOptions}
+                    options={drumInstrumentOptions(drum)}
                     title={`${DRUM_CLASS_LABELS[drum]} instrument`}
                   />
                   <CustomSelect
@@ -559,7 +573,7 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
         size="sm"
         icon={<Check size={12} />}
         onClick={handleCommit}
-        disabled={recording || analysing || (drums ? hits.length === 0 : finalNotes.length === 0)}
+        disabled={recording || analysing || !pending || (drums ? hits.length === 0 : finalNotes.length === 0)}
       >
         Commit
       </Button>

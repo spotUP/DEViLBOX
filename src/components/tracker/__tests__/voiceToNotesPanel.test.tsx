@@ -27,7 +27,20 @@ import { clearTakes } from '@/lib/voice/takeHistory';
 import { LATENCY_STORAGE_KEY, SETUP_SEEN_KEY } from '@/lib/voice/latencyCalibration';
 import { useVoicePreviewStore } from '@/stores/useVoicePreviewStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
-import { isPlayable, VOICE_LEAD_NAME } from '@/lib/voice/voiceInstruments';
+import { DRUM_808_MIDI, isPlayable, VOICE_LEAD_NAME } from '@/lib/voice/voiceInstruments';
+
+/** Note cells on a channel of pattern 0 (row index + note), note-offs excluded. */
+function writtenNotes(channel = 0) {
+  const rows = useTrackerStore.getState().patterns[0].channels[channel].rows;
+  return rows.map((r, i) => ({ i, note: r.note })).filter((c) => c.note > 0 && c.note !== 97);
+}
+
+/** TR-808 instruments in the song, by 808 voice. */
+function tr808Voices() {
+  return useInstrumentStore.getState().instruments
+    .filter((i) => i.synthType === 'TR808')
+    .map((i) => ({ id: i.id, voice: i.parameters?.io808Type as string }));
+}
 
 const HOP = 256;
 
@@ -111,7 +124,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('Voice to Notes panel', () => {
-  it('Record, Stop, Commit puts the sung notes on the grid as one undo step', async () => {
+  it('Record then Stop puts the sung notes on the grid as one undo step, without a Commit click', async () => {
     const model = new SineReadingModel();
     const mic = fakeMic();
     const deps = {
@@ -139,14 +152,14 @@ describe('Voice to Notes panel', () => {
     expect(model.calls).toBeGreaterThan(0);
     fireEvent.click(screen.getByText('Stop'));
 
-    const commit = screen.getByText('Commit').closest('button') as HTMLButtonElement;
-    await waitFor(() => expect(commit.disabled).toBe(false));
-    fireEvent.click(commit);
+    // The take lands as soon as it ends; Commit only re-writes after a change
+    await waitFor(() => expect(writtenNotes().length).toBe(3));
     expect(useVoicePreviewStore.getState().preview).toBeNull();
+    expect((screen.getByText('Commit').closest('button') as HTMLButtonElement).disabled).toBe(true);
 
     const rows = useTrackerStore.getState().patterns[0].channels[0].rows;
     // Cursor was on row 4: take row 0 lands there; notes 5 rows apart (+-1 row for the model's onset frame)
-    const written = rows.map((r, i) => ({ i, note: r.note })).filter((c) => c.note > 0 && c.note !== 97);
+    const written = writtenNotes();
     expect(written.map((c) => c.note)).toEqual([midiToXMNote(60), midiToXMNote(64), midiToXMNote(67)]);
     expect(written[0].i).toBe(4);
     // Every written note plays: its instrument exists and makes sound
@@ -176,12 +189,9 @@ describe('Voice to Notes panel', () => {
     await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
     mic.feed(concat([new Float32Array(Math.round(1.6 * PITCH_SAMPLE_RATE)), new Float32Array(Math.round(0.3 * PITCH_SAMPLE_RATE)), sine(midi, 0.5), new Float32Array(2205)]));
     fireEvent.click(screen.getByText('Stop'));
-    const commit = screen.getByText('Commit').closest('button') as HTMLButtonElement;
-    await waitFor(() => expect(commit.disabled).toBe(false));
+    await waitFor(() => expect(writtenNotes().length).toBeGreaterThan(0));
     expect(model.calls).toBeGreaterThan(0);
-    fireEvent.click(commit);
-    const rows = useTrackerStore.getState().patterns[0].channels[0].rows;
-    return rows.map((r, i) => ({ i, note: r.note })).filter((c) => c.note > 0 && c.note !== 97);
+    return writtenNotes();
   }
 
   it('Snap to key moves an out-of-key note onto the key (C sharp to C in C major)', async () => {
@@ -229,11 +239,8 @@ describe('Voice to Notes panel', () => {
     await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
     mic.feed(concat([new Float32Array(Math.round(1.6 * PITCH_SAMPLE_RATE)), new Float32Array(Math.round(0.3 * PITCH_SAMPLE_RATE)), sine(60, 0.5), new Float32Array(2205)]));
     fireEvent.click(screen.getByText('Stop'));
-    const commit = screen.getByText('Commit').closest('button') as HTMLButtonElement;
-    await waitFor(() => expect(commit.disabled).toBe(false));
-    fireEvent.click(commit);
-    const rows = useTrackerStore.getState().patterns[0].channels[0].rows;
-    const calibrated = rows.map((r, i) => ({ i, note: r.note })).filter((c) => c.note > 0 && c.note !== 97);
+    await waitFor(() => expect(writtenNotes().length).toBeGreaterThan(0));
+    const calibrated = writtenNotes();
     expect(calibrated[0].i).toBe(plain[0].i - 1);
     expect(JSON.parse(localStorage.getItem(LATENCY_STORAGE_KEY) ?? '{}')).toEqual({ default: 100 });
   });
@@ -268,7 +275,21 @@ describe('Voice to Notes panel', () => {
     expect(screen.getByText(/^Take 1/)).toBeTruthy();
   });
 
-  it('Drums mode: a kick and snare take ends as mapped cells in the pattern as one undo step, without the pitch model', async () => {
+  it('a take lands on the grid when it ends, and Commit re-writes it after a change (owner: "i keep forgetting to commit")', async () => {
+    const written = await takeThrough(60);
+    expect(written.map((c) => c.note)).toEqual([midiToXMNote(60)]);
+    const commit = screen.getByText('Commit').closest('button') as HTMLButtonElement;
+    expect(commit.disabled).toBe(true);
+    // Changing the target channel makes the take pending again; Commit writes it there
+    fireEvent.click(screen.getByTitle('Target channel'));
+    fireEvent.click(await screen.findByText('Channel 2'));
+    await waitFor(() => expect(commit.disabled).toBe(false));
+    fireEvent.click(commit);
+    expect(writtenNotes(1).map((c) => c.note)).toEqual([midiToXMNote(60)]);
+    expect(commit.disabled).toBe(true);
+  });
+
+  it('Drums mode: a kick and snare take ends as TR-808 cells in the pattern as one undo step, without the pitch model', async () => {
     const model = new SineReadingModel();
     const mic = fakeMic();
     const deps = {
@@ -290,11 +311,15 @@ describe('Voice to Notes panel', () => {
     await waitFor(() => expect(screen.getByTestId('drum-map-kick').textContent).toContain('1 hit'));
     expect(screen.getByTestId('drum-map-snare').textContent).toContain('1 hit');
     expect(model.calls).toBe(0);
-    fireEvent.click(screen.getByText('Commit').closest('button') as HTMLButtonElement);
+    await waitFor(() => expect(writtenNotes().length).toBe(2));
 
+    // Each class lands on its own TR-808 voice, created by the commit, at the 808 trigger note
     const rows = useTrackerStore.getState().patterns[0].channels[0].rows;
-    const written = rows.map((r, i) => ({ i, note: r.note })).filter((c) => c.note > 0 && c.note !== 97);
-    expect(written.map((c) => c.note)).toEqual([midiToXMNote(36), midiToXMNote(38)]);
+    const written = writtenNotes();
+    expect(written.map((c) => c.note)).toEqual([midiToXMNote(DRUM_808_MIDI), midiToXMNote(DRUM_808_MIDI)]);
+    const voices = tr808Voices();
+    expect(voices.map((v) => v.voice)).toEqual(['kick', 'snare']);
+    expect(written.map((c) => rows[c.i].instrument)).toEqual(voices.map((v) => v.id));
     expect(written[0].i).toBeGreaterThanOrEqual(6);
     expect(written[0].i).toBeLessThanOrEqual(8);
     expect(written[1].i - written[0].i).toBeGreaterThanOrEqual(4);
@@ -342,10 +367,46 @@ describe('Voice to Notes panel', () => {
     fireEvent.click(screen.getByText('Stop'));
     await waitFor(() => expect(screen.getByTestId('drum-map-snare').textContent).toContain('1 hit'));
     expect(screen.getByTestId('drum-map-kick').textContent).toContain('0 hits');
-    fireEvent.click(screen.getByText('Commit').closest('button') as HTMLButtonElement);
+    await waitFor(() => expect(writtenNotes().length).toBe(1));
     const rows = useTrackerStore.getState().patterns[0].channels[0].rows;
-    const written = rows.map((r) => r.note).filter((n) => n > 0 && n !== 97);
-    expect(written).toEqual([midiToXMNote(38)]);
+    expect(writtenNotes().map((c) => c.note)).toEqual([midiToXMNote(DRUM_808_MIDI)]);
+    expect(tr808Voices().find((v) => v.id === rows[writtenNotes()[0].i].instrument)?.voice).toBe('snare');
+  });
+
+  it('a beatbox take into a song whose current instrument is playable adds TR-808 voices to the instrument list (owner report 2026-10-17)', async () => {
+    // The owner beatboxed with OPL3 Brass selected and no drum got added: the
+    // drum map fell back to the current (playable) instrument, so the commit
+    // saw nothing silent and created no 808.
+    resetStore(useInstrumentStore);
+    const brass = useInstrumentStore.getState().createInstrument({ synthType: 'FMSynth', name: 'OPL3 Brass' });
+    useInstrumentStore.getState().setCurrentInstrument(brass);
+    expect(tr808Voices()).toEqual([]);
+    const mic = fakeMic();
+    const deps = {
+      getStream: async () => ({} as MediaStream),
+      createCapture: () => mic.capture,
+      listDevices: async () => [],
+    };
+    render(<VoiceToNotesPanel onClose={() => {}} model={new SineReadingModel()} deps={deps} />);
+    fireEvent.click(screen.getByTitle('Mode'));
+    fireEvent.click(await screen.findByText('Drums'));
+    await waitFor(() => expect(screen.getByTestId('drum-map-kick')).toBeTruthy());
+    // Before any take, the map says what the commit will do
+    expect(screen.getByTitle('Kick instrument').textContent).toContain('TR-808 Kick (added on commit)');
+
+    fireEvent.click(screen.getByText('Record'));
+    await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
+    mic.feed(concat([new Float32Array(Math.round(1.6 * PITCH_SAMPLE_RATE)), synthTake([{ drum: 'kick', at: 0.3 }, { drum: 'snare', at: 0.8 }], 1.4)]));
+    fireEvent.click(screen.getByText('Stop'));
+    await waitFor(() => expect(writtenNotes().length).toBe(2));
+
+    const voices = tr808Voices();
+    expect(voices.map((v) => v.voice)).toEqual(['kick', 'snare']);
+    const rows = useTrackerStore.getState().patterns[0].channels[0].rows;
+    expect(writtenNotes().map((c) => rows[c.i].instrument)).toEqual(voices.map((v) => v.id));
+    expect(writtenNotes().every((c) => rows[c.i].instrument !== brass)).toBe(true);
+    // The map now names the created voices
+    await waitFor(() => expect(screen.getByTitle('Kick instrument').textContent).toContain(`${voices[0].id}.`));
   });
 });
 
