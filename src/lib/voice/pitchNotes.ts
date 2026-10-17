@@ -63,6 +63,41 @@ export function midiToHz(midi: number): number {
   return 440 * Math.pow(2, (midi - 69) / 12);
 }
 
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
+
+/** MIDI 60 is C4. */
+export function noteName(midi: number): string {
+  return `${NOTE_NAMES[((midi % 12) + 12) % 12]}${Math.floor(midi / 12) - 1}`;
+}
+
+export interface MelodyRange {
+  minMidiNote: number;
+  maxMidiNote: number;
+  transpose: number;
+}
+
+/** Semitones of headroom kept around the sung range. */
+export const RANGE_MARGIN = 3;
+/** A median below this (C3) is a low voice, written one octave up. */
+export const LOW_VOICE_MEDIAN = 48;
+
+/**
+ * The pitch range to keep from a sung scale: the lowest heard note minus
+ * RANGE_MARGIN, the highest plus it, and a +12 transpose when the median
+ * pitch sits below LOW_VOICE_MEDIAN so a low voice still lands in a lead's
+ * range. Null when nothing was heard.
+ */
+export function melodyRange(notes: readonly VoiceNote[]): MelodyRange | null {
+  if (notes.length === 0) return null;
+  const pitches = notes.map((n) => n.pitchMidi).sort((a, b) => a - b);
+  const median = pitches[Math.floor(pitches.length / 2)];
+  return {
+    minMidiNote: Math.max(0, pitches[0] - RANGE_MARGIN),
+    maxMidiNote: Math.min(127, pitches[pitches.length - 1] + RANGE_MARGIN),
+    transpose: median < LOW_VOICE_MEDIAN ? 12 : 0,
+  };
+}
+
 /**
  * Reduce overlapping notes to one line: the highest-amplitude note wins, any
  * note that overlaps an already accepted one is dropped. Result is sorted by

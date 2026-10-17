@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { toMonophonic, transposeNotes, modelOutputToNotes, DEFAULT_PITCH_SETTINGS, ANNOTATIONS_FPS, type VoiceNote } from '../pitchNotes';
+import { toMonophonic, transposeNotes, modelOutputToNotes, melodyRange, noteName, DEFAULT_PITCH_SETTINGS, ANNOTATIONS_FPS, type VoiceNote } from '../pitchNotes';
 import { quantiseNotes, rowSeconds, type QuantiseSettings } from '../quantise';
 import { mergeWindowNotes } from '../liveWindow';
 import { VoiceRecorder, type VoiceCapture } from '../voiceRecorder';
@@ -16,6 +16,18 @@ const note = (start: number, dur: number, midi: number, amp = 0.8): VoiceNote =>
 });
 
 describe('pitchNotes', () => {
+  it('noteName names MIDI 60 C4 and 69 A4', () => {
+    expect(noteName(60)).toBe('C4');
+    expect(noteName(69)).toBe('A4');
+    expect(noteName(61)).toBe('C#4');
+  });
+
+  it('melodyRange widens the sung range by three semitones and raises a low voice an octave', () => {
+    expect(melodyRange([])).toBeNull();
+    expect(melodyRange([note(0, 0.4, 60), note(0.4, 0.4, 64), note(0.8, 0.4, 67)])).toEqual({ minMidiNote: 57, maxMidiNote: 70, transpose: 0 });
+    expect(melodyRange([note(0, 0.4, 40), note(0.4, 0.4, 43), note(0.8, 0.4, 45)])).toEqual({ minMidiNote: 37, maxMidiNote: 48, transpose: 12 });
+  });
+
   it('toMonophonic keeps the strongest of overlapping notes and never overlaps', () => {
     const out = toMonophonic([note(0, 1, 60, 0.5), note(0.5, 1, 64, 0.9), note(2, 0.5, 67, 0.4)]);
     expect(out.map((n) => n.pitchMidi)).toEqual([64, 67]);
