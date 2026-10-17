@@ -51,6 +51,42 @@ describe('onset detection and the whole pipeline', () => {
   it('finds no hits in silence', () => {
     expect(detectHits(new Float32Array(PITCH_SAMPLE_RATE))).toEqual([]);
   });
+
+  it('finds no hits in mic noise alone (quiet room, no sounds)', () => {
+    let seed = 7;
+    const take = new Float32Array(PITCH_SAMPLE_RATE * 2).map(() => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return (seed / 4294967296 - 0.5) * 0.004;
+    });
+    expect(detectHits(take)).toEqual([]);
+  });
+
+  // Regression (VNR-16): a laptop mic at the browser's default gain records mouth
+  // drums at -30 to -40 dBFS with 20-40 ms attacks; the old absolute silence gate
+  // kept one hit of eight, so the take wrote a single snare.
+  it('finds every hit in a quiet take with slow mouth attacks (one-note symptom)', () => {
+    const pattern: { drum: DrumClass; at: number }[] = [
+      { drum: 'kick', at: 0.3 }, { drum: 'snare', at: 0.8 }, { drum: 'kick', at: 1.3 },
+      { drum: 'snare', at: 1.8 }, { drum: 'kick', at: 2.3 }, { drum: 'kick', at: 2.55 }, { drum: 'snare', at: 2.8 },
+    ];
+    const take = new Float32Array(Math.round(PITCH_SAMPLE_RATE * 3.3));
+    let seed = 3;
+    for (let i = 0; i < take.length; i++) {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      take[i] = (seed / 4294967296 - 0.5) * 0.002; // mic hiss at -60 dBFS peak
+    }
+    const attackSamples = Math.round(0.03 * PITCH_SAMPLE_RATE);
+    pattern.forEach((h, i) => {
+      const hit = synthHit(h.drum, i + 1);
+      const at = Math.round(h.at * PITCH_SAMPLE_RATE);
+      for (let j = 0; j < hit.length && at + j < take.length; j++) {
+        take[at + j] += 0.02 * Math.min(1, j / attackSamples) * hit[j]; // peak about -34 dBFS
+      }
+    });
+    const onsets = detectOnsets(take);
+    expect(onsets.length).toBe(pattern.length);
+    onsets.forEach((t, i) => expect(Math.abs(t - pattern[i].at)).toBeLessThan(0.02));
+  });
 });
 
 // Real beatbox clips are owner-provided. Drop them in
