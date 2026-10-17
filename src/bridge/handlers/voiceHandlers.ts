@@ -9,14 +9,16 @@ import { basicPitchModel, resampleToMono22050, type PitchModel } from '@/lib/voi
 import { DEFAULT_SHAPING, commitVoiceNotes, shapeNotes } from '@/lib/voice/voiceToNotes';
 import { ALL_EFFECTS, takeContour } from '@/lib/voice/noteEffects';
 import { PITCH_SAMPLE_RATE } from '@/lib/voice/pitchNotes';
-import { loadActiveClassifier } from '@/lib/voice/drumModel';
-import { detectHits, DRUM_CLASSES } from '@/lib/voice/drumHits';
+import { countsByClass, loadActiveClassifier, modelClassifier, type TrainingSample } from '@/lib/voice/drumModel';
+import { classifyByRules, detectHits, DRUM_CLASSES, type HitClassifier } from '@/lib/voice/drumHits';
 import { commitDrumHits, defaultDrumMap, type DrumMap } from '@/lib/voice/drumToNotes';
 import { SCALES, type ScaleName } from '@/lib/voice/scaleSnap';
 import { getStoredLatencyMs } from '@/lib/voice/latencyCalibration';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useTransportStore } from '@/stores/useTransportStore';
+import { useVoiceStore } from '@/stores/useVoiceStore';
+import { spanRms, voiceGateLevel } from '@/lib/voice/voicing';
 
 export interface VoiceToNotesDeps {
   model: PitchModel;
@@ -110,4 +112,101 @@ export async function voiceToNotes(
   } catch (e) {
     return { error: `voice_to_notes failed: ${(e as Error).message}` };
   }
+}
+
+/** Per true class: how the classifier labelled that class's training samples. */
+function confusion(classify: HitClassifier, samples: readonly TrainingSample[]): Record<string, Record<string, number>> {
+  const out: Record<string, Record<string, number>> = {};
+  for (const s of samples) {
+    const row = (out[s.drum] ??= {});
+    const got = classify(s.features);
+    row[got] = (row[got] ?? 0) + 1;
+  }
+  return out;
+}
+
+/** The drum training state: sample counts per class, accuracies, confusion of model and rules. */
+function trainingReport(samples: readonly TrainingSample[], training: ReturnType<typeof useVoiceStore.getState>['training']) {
+  return {
+    samples: countsByClass(samples),
+    result: training
+      ? {
+          modelAccuracy: training.modelAccuracy,
+          rulesAccuracy: training.rulesAccuracy,
+          heldOut: training.heldOut,
+          useModel: training.useModel,
+        }
+      : null,
+    modelConfusion: training ? confusion(modelClassifier(training.model), samples) : null,
+    rulesConfusion: confusion(classifyByRules, samples),
+  };
+}
+
+/** Envelope step of get_voice_take, seconds. */
+const ENVELOPE_STEP_SECONDS = 0.1;
+
+function toDb(rms: number): number {
+  return Math.round(20 * Math.log10(Math.max(rms, 1e-6)) * 10) / 10;
+}
+
+/**
+ * get_voice_take: the take the Voice to Notes panel holds, as numbers. Take
+ * length against the voiced span (RMS per 0.1 s over the take's own gate) and
+ * the notes the current fine settings shape from the stored model output, so
+ * "it stops before I stop" and "extra wrong notes" are measured from the real
+ * recording instead of guessed. Read-only.
+ */
+export function getVoiceTake(): Record<string, unknown> {
+  const { take, takes, fine, mode, samples, training } = useVoiceStore.getState();
+  if (!take) return { ok: false, error: 'No take recorded', takes: takes.length, mode };
+  const notes = take.output
+    ? shapeNotes(take.output, {
+        ...fine,
+        keySnap: fine.keySnapOn ? { tonic: fine.keyTonic, scale: fine.keyScale } : null,
+      })
+    : [];
+  const gate = voiceGateLevel(take.audio);
+  const envelopeDb: number[] = [];
+  let voicedFrom: number | null = null;
+  let voicedTo: number | null = null;
+  for (let t = 0; t < take.seconds; t += ENVELOPE_STEP_SECONDS) {
+    const level = spanRms(take.audio, take.sampleRate, t, ENVELOPE_STEP_SECONDS);
+    envelopeDb.push(toDb(level));
+    if (level > gate) {
+      voicedFrom ??= t;
+      voicedTo = t + ENVELOPE_STEP_SECONDS;
+    }
+  }
+  const round = (v: number) => Math.round(v * 1000) / 1000;
+  return {
+    ok: true,
+    id: take.id,
+    mode: take.mode,
+    recordedAt: new Date(take.recordedAt).toISOString(),
+    seconds: round(take.seconds),
+    sampleRate: take.sampleRate,
+    samples: take.audio.length,
+    gateDb: toDb(gate),
+    voicedFrom: voicedFrom === null ? null : round(voicedFrom),
+    voicedTo: voicedTo === null ? null : round(voicedTo),
+    envelopeDb,
+    hasModelOutput: take.output !== null,
+    notes: notes.map((n) => ({
+      start: round(n.startTimeSeconds),
+      duration: round(n.durationSeconds),
+      midi: n.pitchMidi,
+      amplitude: round(n.amplitude),
+    })),
+    lastNoteEnd: notes.length ? round(Math.max(...notes.map((n) => n.startTimeSeconds + n.durationSeconds))) : null,
+    hits: take.hits.map((h) => ({ time: round(h.timeSeconds), drum: h.drum, strength: round(h.strength) })),
+    takes: takes.length,
+    training: trainingReport(samples, training),
+    fine: {
+      onsetThreshold: fine.onsetThreshold,
+      frameThreshold: fine.frameThreshold,
+      minNoteLengthMs: fine.minNoteLengthMs,
+      transpose: fine.transpose,
+      keySnapOn: fine.keySnapOn,
+    },
+  };
 }
