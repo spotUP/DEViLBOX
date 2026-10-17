@@ -21,6 +21,7 @@ import { useMixerStore } from '../../stores/useMixerStore';
 import { useInstrumentStore } from '../../stores/useInstrumentStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useSynthErrorStore } from '../../stores/useSynthErrorStore';
+import { isStartupSplashOpen, startStartupJingle } from '../../lib/startup/startupSequence';
 import { getGlobalRegistry } from '../../hooks/useGlobalKeyboardHandler';
 import { getToneEngine } from '../../engine/ToneEngine';
 import { suppressFormatChecks, restoreFormatChecks } from '../../lib/formatCompatibility';
@@ -2587,6 +2588,12 @@ export function dismissModal(): Record<string, unknown> {
     useUIStore.getState().closeModal();
     return { ok: true, dismissed: modalOpen };
   }
+  // The click-to-start splash: pressing it is the gesture that starts the
+  // startup jingle, so dismissing it does exactly what its button does.
+  if (isStartupSplashOpen()) {
+    void startStartupJingle();
+    return { ok: true, dismissed: 'click-to-start' };
+  }
   // The crash-recovery prompt is a real dialog that this cannot close, and
   // saying "no modal was open" while it sits in front of the user is how it
   // went unnoticed (2026-09-18). Dismissing it means choosing between
@@ -2622,6 +2629,11 @@ export function getModalState(): Record<string, unknown> {
     // be invisible here entirely.
     recoveryPromptOpen: recoveryOpen,
     recoveryPrompt: recoveryOpen ? describeRecoveryPrompt() : null,
+    // The click-to-start splash is a fourth surface, rendered from the startup
+    // stage rather than a store modal. It was invisible here, so an agent never
+    // saw it and never pressed it (owner, 2026-10-17: "you always fail to see
+    // and click the click to start dialog").
+    startupSplashOpen: isStartupSplashOpen(),
     synthErrorDialogOpen: !!activeError,
     synthError: activeError
       ? {

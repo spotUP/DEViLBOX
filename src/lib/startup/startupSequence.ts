@@ -41,6 +41,15 @@ export function startupGestureSurface(buildNumber: string): StartupGestureSurfac
   return startupTipsModal(buildNumber) ? 'tips' : 'splash';
 }
 
+/**
+ * True while the click-to-start splash covers the app: the sequence waits for a
+ * gesture and the tips dialog (a useUIStore modal) is not the surface carrying it.
+ */
+export function isStartupSplashOpen(): boolean {
+  const ui = useUIStore.getState();
+  return ui.startupJingleStage === 'awaiting-gesture' && ui.modalOpen !== 'tips';
+}
+
 /** True while the boot restore prompt and the changelog must stay hidden. */
 export function isStartupHolding(stage: StartupJingleStage): boolean {
   return stage === 'awaiting-gesture' || stage === 'playing';
