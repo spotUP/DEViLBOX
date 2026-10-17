@@ -19,7 +19,7 @@ function getBasicPitch(): BasicPitch {
   return shared;
 }
 
-/** Run Basic Pitch over an AudioBuffer that is already 22050 Hz mono. */
+/** Run Basic Pitch over an AudioBuffer that is already 22050 Hz mono. The output carries the samples. */
 export async function evaluateBuffer(
   buffer: AudioBuffer,
   onProgress?: (fraction: number) => void,
@@ -36,7 +36,8 @@ export async function evaluateBuffer(
     },
     (pct) => onProgress?.(pct),
   );
-  return { frames, onsets, contours };
+  // The audio rides along so note extraction can check it (voicing.ts)
+  return { frames, onsets, contours, audio: new Float32Array(buffer.getChannelData(0)) };
 }
 
 /** Resample an AudioBuffer to 22050 Hz mono. */

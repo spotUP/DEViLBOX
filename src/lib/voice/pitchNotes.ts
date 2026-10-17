@@ -10,6 +10,7 @@ import {
   outputToNotesPoly,
 } from '@spotify/basic-pitch';
 import type { NoteEventTime } from '@spotify/basic-pitch';
+import { voiceGateLevel, spanRms, spanF0Midi, octaveFromAudio } from './voicing';
 
 /** Basic Pitch annotation frame rate (22050 / 256). */
 export const ANNOTATIONS_FPS = Math.floor(22050 / 256);
@@ -28,6 +29,12 @@ export interface PitchModelOutput {
   frames: number[][];
   onsets: number[][];
   contours: number[][];
+  /**
+   * The 22050 Hz mono samples the model saw. When present, note extraction
+   * drops notes with no voice under them and takes each note's octave from
+   * the audio's fundamental (see voicing.ts).
+   */
+  audio?: Float32Array;
 }
 
 export interface PitchSettings {
@@ -75,7 +82,39 @@ export function toMonophonic<T extends VoiceNote>(notes: readonly T[]): T[] {
   return accepted.sort((a, b) => a.startTimeSeconds - b.startTimeSeconds);
 }
 
-/** Model frames to note events. `monophonic` keeps the strongest single line. */
+/** Same-pitch notes this close together are one held note the model split. */
+const MERGE_GAP_SECONDS = 2 / ANNOTATIONS_FPS;
+
+/** Join same-pitch neighbours separated by at most MERGE_GAP_SECONDS. */
+export function mergeSplitNotes<T extends VoiceNote & { pitchBends?: number[] }>(notes: readonly T[]): T[] {
+  const sorted = [...notes].sort((a, b) => a.pitchMidi - b.pitchMidi || a.startTimeSeconds - b.startTimeSeconds);
+  const out: T[] = [];
+  for (const n of sorted) {
+    const prev = out[out.length - 1];
+    if (prev && prev.pitchMidi === n.pitchMidi) {
+      const prevEnd = prev.startTimeSeconds + prev.durationSeconds;
+      if (n.startTimeSeconds - prevEnd <= MERGE_GAP_SECONDS + 1e-9) {
+        const end = Math.max(prevEnd, n.startTimeSeconds + n.durationSeconds);
+        const bends = prev.pitchBends && n.pitchBends ? [...prev.pitchBends, ...n.pitchBends] : prev.pitchBends;
+        out[out.length - 1] = {
+          ...prev,
+          durationSeconds: end - prev.startTimeSeconds,
+          amplitude: Math.max(prev.amplitude, n.amplitude),
+          ...(bends ? { pitchBends: bends } : {}),
+        };
+        continue;
+      }
+    }
+    out.push(n);
+  }
+  return out.sort((a, b) => a.startTimeSeconds - b.startTimeSeconds);
+}
+
+/**
+ * Model frames to note events. `monophonic` keeps the strongest single line.
+ * With `out.audio`, notes with no voice under them are dropped and monophonic
+ * notes take their octave from the audio.
+ */
 export function modelOutputToNotes(
   out: PitchModelOutput,
   settings: PitchSettings,
@@ -92,8 +131,22 @@ export function modelOutputToNotes(
     midiToHz(settings.maxMidiNote),
     midiToHz(settings.minMidiNote),
   );
-  const notes = noteFramesToTime(addPitchBendsToNoteEvents(out.contours, events));
-  return monophonic ? toMonophonic(notes) : notes;
+  let notes = noteFramesToTime(addPitchBendsToNoteEvents(out.contours, events));
+  const audio = out.audio;
+  if (audio) {
+    const gate = voiceGateLevel(audio);
+    notes = notes.filter((n) => spanRms(audio, PITCH_SAMPLE_RATE, n.startTimeSeconds, n.durationSeconds) >= gate);
+  }
+  if (monophonic) {
+    notes = toMonophonic(notes);
+    if (audio) {
+      notes = notes.map((n) => ({
+        ...n,
+        pitchMidi: octaveFromAudio(n.pitchMidi, spanF0Midi(audio, PITCH_SAMPLE_RATE, n.startTimeSeconds, n.durationSeconds)),
+      }));
+    }
+  }
+  return mergeSplitNotes(notes);
 }
 
 /** Shift every note by whole semitones. */
