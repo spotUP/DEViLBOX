@@ -25,6 +25,7 @@
 
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useCursorStore } from '@stores/useCursorStore';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import type { TrackerCell } from '@typedefs';
 import { EMPTY_CELL } from '@typedefs';
 import { getJingleEngine } from './JingleEngine';
@@ -101,6 +102,10 @@ let savedChannelData: TrackerCell[][] | null = null;
 let savedChannelNames: string[] = [];
 let savedCursorRow: number | null = null;
 let injectedNumCh = 0;
+/** Fit-all-channels setting before the jingle; the lips force it on so all 12 channels fit the width. */
+let savedFitAllChannels: boolean | null = null;
+/** True between injectMouthPatterns and teardownMouthPatterns; makes teardown idempotent. */
+let overlayActive = false;
 let rafHandle: number | null = null;
 let timeBuf: Uint8Array<ArrayBuffer> | null = null;
 let startedAt = 0;
@@ -190,17 +195,18 @@ function updateChannels(guardPatternIdx: number, seconds: number): void {
 export function injectMouthPatterns(): void {
   const tracker = useTrackerStore.getState();
 
-  // ① Expand to JINGLE_CHANNEL_COUNT channels (addPattern inherits from patterns[0], so expand first)
+  // ① Expand to JINGLE_CHANNEL_COUNT channels (addPattern inherits from patterns[0], so expand first).
+  // Not `addChannel`: that is the user edit path and stops at the keyboard scheme's
+  // channel cap (ProTracker: 4) and at the format-compatibility prompt. The lips are a
+  // transient overlay that teardownMouthPatterns removes again, so they bypass both.
+  if (overlayActive) return;
+  overlayActive = true;
   savedOriginalChannelCount = tracker.patterns[0]?.channels.length ?? 4;
-  const channelsToAdd = Math.max(0, JINGLE_CHANNEL_COUNT - savedOriginalChannelCount);
-  for (let i = 0; i < channelsToAdd; i++) {
-    useTrackerStore.getState().addChannel();
-  }
+  injectedNumCh = Math.min(tracker.addOverlayChannels(JINGLE_CHANNEL_COUNT), JINGLE_CHANNEL_COUNT);
 
-  injectedNumCh = Math.min(
-    useTrackerStore.getState().patterns[0]?.channels.length ?? JINGLE_CHANNEL_COUNT,
-    JINGLE_CHANNEL_COUNT,
-  );
+  // All lip channels must be on screen: force fit-all-channels (a manual zoom turns it off).
+  savedFitAllChannels = useSettingsStore.getState().fitAllChannelsTracker;
+  useSettingsStore.getState().setFitAllChannelsTracker(true);
 
   // ② Save current channel names then set the mouth labels
   const { patterns: currentPatterns } = useTrackerStore.getState();
@@ -252,6 +258,13 @@ export function teardownMouthPatterns(): void {
   if (rafHandle !== null) {
     cancelAnimationFrame(rafHandle);
     rafHandle = null;
+  }
+  if (!overlayActive) return; // already torn down (onended and the stop path both call this)
+  overlayActive = false;
+
+  if (savedFitAllChannels !== null) {
+    useSettingsStore.getState().setFitAllChannelsTracker(savedFitAllChannels);
+    savedFitAllChannels = null;
   }
 
   // Restore channel names
