@@ -217,6 +217,45 @@ describe('Voice to Notes panel', () => {
     expect(ANNOTATIONS_FPS).toBe(86);
   });
 
+  it('a take longer than the pattern records on into a pattern added at the song end, as one undo step (VNR-27, owner: "it would be nicer if it recorded several patterns, for as long as it records")', async () => {
+    const model = new SineReadingModel();
+    const mic = fakeMic();
+    const deps = {
+      getStream: async () => ({} as MediaStream),
+      createCapture: () => mic.capture,
+      listDevices: async () => [],
+    };
+    // 16 rows of 0.1 s: a 1.6 s pattern, the only one in the order
+    useTrackerStore.getState().resizePattern(0, 16);
+    expect(useTrackerStore.getState().patternOrder).toEqual([0]);
+    const undoBefore = useHistoryStore.getState().undoStack.length;
+    render(<VoiceToNotesPanel isOpen onClose={() => {}} model={model} deps={deps} />);
+    fireEvent.click(screen.getByText('Record'));
+    await waitFor(() => expect(screen.getByText('Stop')).toBeTruthy());
+    // Count-in, then C4, E4, G4 for 1 s each: 30 rows, past the 16-row pattern
+    mic.feed(concat([silence(1.6), sine(60, 1), sine(64, 1), sine(67, 1), new Float32Array(2205)]));
+    await waitFor(() => expect(Number(screen.getByTestId('voice-take-waveform').dataset.audio)).toBeGreaterThanOrEqual(3), { timeout: 3000 });
+    fireEvent.click(screen.getByText('Stop'));
+
+    await waitFor(() => expect(useTrackerStore.getState().patterns.length).toBe(2));
+    expect(model.calls).toBeGreaterThan(0);
+    const { patterns, patternOrder } = useTrackerStore.getState();
+    expect(patternOrder).toEqual([0, 1]);
+    expect(patterns[1].length).toBe(16);
+    const notesOf = (p: number) => patterns[p].channels[0].rows
+      .map((r, i) => ({ i, note: r.note })).filter((c) => c.note > 0 && c.note !== 97);
+    expect(notesOf(0).map((c) => c.note)).toEqual([midiToXMNote(60), midiToXMNote(64)]);
+    // G4 starts 20 rows into the take (+-1 for the onset frame): row 4 of the added pattern
+    expect(notesOf(1).map((c) => c.note)).toEqual([midiToXMNote(67)]);
+    expect(Math.abs(notesOf(1)[0].i - 4)).toBeLessThanOrEqual(1);
+    expect(useHistoryStore.getState().undoStack.length - undoBefore).toBe(1);
+
+    // One undo removes the added pattern and its order position again
+    useTrackerStore.getState().undoEdit();
+    expect(useTrackerStore.getState().patterns.length).toBe(1);
+    expect(useTrackerStore.getState().patternOrder).toEqual([0]);
+  });
+
   it('a take that starts late after the count-in still puts its first sung note and first hit on row 0, gaps kept (VNR-24, owner: "it lands on pos 6")', async () => {
     // Snapshot the pristine instrument store before the drum half adds TR-808 voices.
     resetStore(useInstrumentStore);

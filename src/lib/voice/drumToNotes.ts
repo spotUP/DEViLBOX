@@ -11,7 +11,7 @@ import { DRUM_CLASSES, type DrumClass, type DrumHit } from './drumHits';
 import { noteDelayEffect } from './noteEffects';
 import { anchorToFirstNote, quantiseTime, type QuantisedNote, type QuantiseSettings } from './quantise';
 import type { VoiceEffect } from './voiceEffects';
-import { writeNotesToPattern, type WriteResult, type WriteTarget } from './writeToPattern';
+import { writeNotesToPattern, type TakeWriteResult, type WriteTarget } from './writeToPattern';
 import { playableDrumMap, DRUM_808_VOICE, DRUM_808_MIDI } from './voiceInstruments';
 
 export interface DrumTarget {
@@ -128,7 +128,7 @@ export function commitDrumHits(
   quantise: QuantiseSettings,
   target: WriteTarget,
   flams = true,
-): (WriteResult & { drumMap: DrumMap }) | null {
+): (TakeWriteResult & { drumMap: DrumMap }) | null {
   if (quantiseHits(hits, map, quantise, flams).length === 0) return null;
   const drumMap = playableDrumMap(map, usedDrumClasses(hits));
   return { ...writeNotesToPattern(quantiseHits(hits, drumMap, quantise, flams), target), drumMap };

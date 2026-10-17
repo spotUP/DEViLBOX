@@ -373,7 +373,8 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
     setPending(false);
     notify.success(
       `Wrote ${result.written} note${result.written === 1 ? '' : 's'}` +
-        (result.dropped ? `, ${result.dropped} past the end of the pattern` : ''),
+        (result.patterns > 1 ? ` over ${result.patterns} patterns` : '') +
+        (result.dropped ? `, ${result.dropped} past the song's pattern limit` : ''),
     );
   }, [drums, hits, drumMap, finalNotes, quantise, channelIndex, startRow, instrumentId, setDrumMap, setInstrumentId]);
 
@@ -607,13 +608,13 @@ export const VoiceToNotesPanel: React.FC<VoiceToNotesPanelProps> = ({
             sampleRate={recording ? PITCH_SAMPLE_RATE : take?.sampleRate ?? PITCH_SAMPLE_RATE}
             markers={markers}
             rowSeconds={rowLength}
-            spanSeconds={patternSpan}
+            spanSeconds={Math.max(patternSpan, recording ? liveSeconds : takeSeconds)}
             playhead={recording ? liveSeconds : null}
           />
           {!drums && <NoteRoll notes={shownNotes} seconds={Math.max(patternSpan, recording ? liveSeconds : takeSeconds)} />}
           <div className="text-[9px] font-mono text-text-muted">
             {eventCount} {eventWord}{eventCount === 1 ? '' : 's'} - row length {(rowLength * 1000).toFixed(0)} ms
-            {` - pattern ${patternSpan.toFixed(1)} s from row ${startRow}`}
+            {` - this pattern ${patternSpan.toFixed(1)} s from row ${startRow}, then on through the song`}
             {recording ? ` - recording ${liveSeconds.toFixed(1)} s` : takeSeconds > 0 ? ` - take ${takeSeconds.toFixed(1)} s` : ''}
           </div>
           {recorder.error && <div className="text-[10px] font-mono text-accent-error">{recorder.error}</div>}
