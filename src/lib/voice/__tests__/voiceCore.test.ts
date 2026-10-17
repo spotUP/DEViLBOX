@@ -71,7 +71,7 @@ describe('pitchNotes', () => {
 });
 
 describe('quantiseNotes', () => {
-  const base: QuantiseSettings = { bpm: 150, speed: 6, swing: 0, minLengthRows: 1, latencyNudgeMs: 0 };
+  const base: QuantiseSettings = { bpm: 150, speed: 6, swing: 0, minLengthRows: 1, latencyNudgeMs: 0, strength: 1, toleranceRows: 0.1 };
 
   it('row length is speed * 2.5 / bpm', () => {
     expect(rowSeconds(150, 6)).toBeCloseTo(0.1, 6);
@@ -150,8 +150,8 @@ describe('applyNotesToPattern', () => {
     const res = applyNotesToPattern(
       pattern,
       [
-        { row: 0, lengthRows: 2, midi: 60, velocity: 1 },
-        { row: len, lengthRows: 1, midi: 62, velocity: 1 },
+        { row: 0, offsetRows: 0, heardSeconds: 0, lengthRows: 2, midi: 60, velocity: 1 },
+        { row: len, offsetRows: 0, heardSeconds: 0, lengthRows: 1, midi: 62, velocity: 1 },
       ],
       { channelIndex: 0, startRow: 0, instrumentId: 3 },
     );

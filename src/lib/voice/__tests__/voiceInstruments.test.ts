@@ -10,7 +10,7 @@ import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { resetStore } from '@/stores/__tests__/_harness';
 
-const Q: QuantiseSettings = { bpm: 125, speed: 6, swing: 0, minLengthRows: 1, latencyNudgeMs: 0 };
+const Q: QuantiseSettings = { bpm: 125, speed: 6, swing: 0, minLengthRows: 1, latencyNudgeMs: 0, strength: 1, toleranceRows: 0.1 };
 const ROW = 0.12; // seconds per row at 125 BPM, speed 6
 const sung: VoiceNote[] = [{ startTimeSeconds: 0, durationSeconds: 2 * ROW, pitchMidi: 60, amplitude: 0.8 }];
 const hit = (row: number, drum: DrumHit['drum']): DrumHit => ({

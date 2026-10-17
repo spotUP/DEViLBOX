@@ -8,7 +8,7 @@
  * note-off.
  */
 import { DRUM_CLASSES, type DrumClass, type DrumHit } from './drumHits';
-import { quantiseNotes, type QuantisedNote, type QuantiseSettings } from './quantise';
+import { quantiseTime, type QuantisedNote, type QuantiseSettings } from './quantise';
 import { writeNotesToPattern, type WriteResult, type WriteTarget } from './writeToPattern';
 import { playableDrumMap, DRUM_808_VOICE, DRUM_808_MIDI } from './voiceInstruments';
 
@@ -62,16 +62,24 @@ export function defaultDrumMap(
 /** Pure part: hits to quantised cells (unique rows, ascending). */
 export function quantiseHits(hits: readonly DrumHit[], map: DrumMap, q: QuantiseSettings): QuantisedNote[] {
   const byRow = new Map<number, QuantisedNote>();
-  for (const drum of DRUM_CLASSES) {
-    const target = map[drum];
-    const notes = hits
-      .filter((h) => h.drum === drum)
-      .map((h) => ({ startTimeSeconds: h.timeSeconds, durationSeconds: 0.01, pitchMidi: target.midi, amplitude: h.strength }));
-    for (const n of quantiseNotes(notes, q)) {
-      const prev = byRow.get(n.row);
-      if (!prev || prev.velocity < n.velocity) {
-        byRow.set(n.row, { ...n, lengthRows: 1, instrumentId: target.instrumentId, noteOff: false });
-      }
+  const shift = q.latencyNudgeMs / 1000;
+  for (const h of hits) {
+    const target = map[h.drum];
+    const heard = h.timeSeconds - shift;
+    if (heard + 0.01 <= 0) continue;
+    const time = quantiseTime(Math.max(0, heard), q);
+    const prev = byRow.get(time.row);
+    if (!prev || prev.velocity < h.strength) {
+      byRow.set(time.row, {
+        row: time.row,
+        offsetRows: time.offsetRows,
+        heardSeconds: time.heardSeconds,
+        lengthRows: 1,
+        midi: target.midi,
+        velocity: h.strength,
+        instrumentId: target.instrumentId,
+        noteOff: false,
+      });
     }
   }
   return [...byRow.values()].sort((a, b) => a.row - b.row);

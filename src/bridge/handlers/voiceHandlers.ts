@@ -65,7 +65,7 @@ export async function voiceToNotes(
     const channelIndex = (params.channel as number | undefined) ?? cursor.channelIndex;
     const startRow = (params.row as number | undefined) ?? cursor.rowIndex;
     const { bpm, speed } = useTransportStore.getState();
-    const quantise = { bpm, speed, swing: 0, minLengthRows: 1, latencyNudgeMs: getStoredLatencyMs('') };
+    const quantise = { bpm, speed, swing: 0, minLengthRows: 1, latencyNudgeMs: getStoredLatencyMs(''), strength: 1, toleranceRows: 0.1 };
 
     if (mode === 'drums') {
       const fallback = (params.instrumentId as number | undefined) ?? useInstrumentStore.getState().currentInstrumentId ?? 1;
