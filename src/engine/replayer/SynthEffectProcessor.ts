@@ -89,7 +89,10 @@ interface EffectChannelState {
 
   // Base state (from note trigger)
   baseFrequency: number;
+  /** The channel's real pitch: the note plus portamento. Vibrato and arpeggio sound offsets from it. */
   currentFrequency: number;
+  /** The pitch last sent to the synth, offsets included; 0 before anything was sent. */
+  sentFrequency: number;
   baseVolume: number;       // 0-64
   currentVolume: number;    // 0-64
 
@@ -242,7 +245,13 @@ export class SynthEffectProcessor {
         if (baseFreq > 0) {
           state.baseFrequency = baseFreq;
           state.currentFrequency = baseFreq;
+          // The note trigger sounds the new pitch itself.
+          state.sentFrequency = baseFreq;
         }
+      } else if (state.sentFrequency > 0 && state.sentFrequency !== state.currentFrequency) {
+        // Like FT2 and ProTracker, every row starts at the real pitch: a vibrato or arpeggio offset
+        // left by the previous row must not stay on the voice once the effect stops.
+        this.sendFrequency(ch, state, state.currentFrequency);
       }
 
       // Parse volume column (direct set volume 0x10-0x50 range in XM)
@@ -333,12 +342,12 @@ export class SynthEffectProcessor {
           case EFX_FINE_PORTA_UP:
             if (subParam !== 0) state.finePortaUpSpeed = subParam;
             state.currentFrequency *= Math.pow(FREQ_RATIO_PER_PERIOD_UNIT, state.finePortaUpSpeed * 4);
-            this.deps.applySynthFrequency(state.instrumentId, state.currentFrequency, ch, 0.002);
+            this.sendFrequency(ch, state, state.currentFrequency, 0.002);
             break;
           case EFX_FINE_PORTA_DOWN:
             if (subParam !== 0) state.finePortaDownSpeed = subParam;
             state.currentFrequency /= Math.pow(FREQ_RATIO_PER_PERIOD_UNIT, state.finePortaDownSpeed * 4);
-            this.deps.applySynthFrequency(state.instrumentId, state.currentFrequency, ch, 0.002);
+            this.sendFrequency(ch, state, state.currentFrequency, 0.002);
             break;
           case EFX_VIBRATO_WAVEFORM:
             state.vibratoWaveform = subParam & 0x03;
@@ -455,24 +464,28 @@ export class SynthEffectProcessor {
 
   private processArpeggio(ch: number, state: EffectChannelState, tick: number): void {
     const phase = tick % 3;
-    let freq = state.baseFrequency;
+    let freq = state.currentFrequency;
     if (phase === 1) freq *= Math.pow(2, state.arpeggioX / 12);
     else if (phase === 2) freq *= Math.pow(2, state.arpeggioY / 12);
 
-    state.currentFrequency = freq;
-    this.deps.applySynthFrequency(state.instrumentId, freq, ch);
+    this.sendFrequency(ch, state, freq);
+  }
+
+  private sendFrequency(ch: number, state: EffectChannelState, freq: number, rampTime?: number): void {
+    state.sentFrequency = freq;
+    this.deps.applySynthFrequency(state.instrumentId, freq, ch, rampTime);
   }
 
   private processPortaUp(ch: number, state: EffectChannelState): void {
     state.currentFrequency *= Math.pow(FREQ_RATIO_PER_PERIOD_UNIT, state.portaSpeed * 4);
     state.currentFrequency = Math.min(state.currentFrequency, 22050);
-    this.deps.applySynthFrequency(state.instrumentId, state.currentFrequency, ch, 0.002);
+    this.sendFrequency(ch, state, state.currentFrequency, 0.002);
   }
 
   private processPortaDown(ch: number, state: EffectChannelState): void {
     state.currentFrequency /= Math.pow(FREQ_RATIO_PER_PERIOD_UNIT, state.portaSpeed * 4);
     state.currentFrequency = Math.max(state.currentFrequency, 1);
-    this.deps.applySynthFrequency(state.instrumentId, state.currentFrequency, ch, 0.002);
+    this.sendFrequency(ch, state, state.currentFrequency, 0.002);
   }
 
   private processTonePorta(ch: number, state: EffectChannelState): void {
@@ -494,7 +507,7 @@ export class SynthEffectProcessor {
       }
     }
 
-    this.deps.applySynthFrequency(state.instrumentId, state.currentFrequency, ch, 0.002);
+    this.sendFrequency(ch, state, state.currentFrequency, 0.002);
   }
 
   private processVibrato(ch: number, state: EffectChannelState): void {
@@ -523,8 +536,8 @@ export class SynthEffectProcessor {
     const sign = (state.vibratoPos & 0x80) ? 1 : -1;
     const freqMultiplier = Math.pow(FREQ_RATIO_PER_PERIOD_UNIT, sign * periodDelta);
 
-    const freq = state.baseFrequency * freqMultiplier;
-    this.deps.applySynthFrequency(state.instrumentId, freq, ch, 0.002);
+    const freq = state.currentFrequency * freqMultiplier;
+    this.sendFrequency(ch, state, freq, 0.002);
   }
 
   private processTremolo(ch: number, state: EffectChannelState, time: number): void {
@@ -585,6 +598,7 @@ function createDefaultState(instrumentId: number): EffectChannelState {
   return {
     instrumentId,
     baseFrequency: 440,
+    sentFrequency: 0,
     currentFrequency: 440,
     baseVolume: 64,
     currentVolume: 64,
