@@ -159,6 +159,11 @@ export interface LayoutMsg {
 
 export type TrackerWorkerMsg =
   | {
+      type: 'cover';
+      /** A song-load overlay sits over the editor: a channel-count fade waits at 0 until this is false. */
+      covered: boolean;
+    }
+  | {
       type: 'init';
       canvas: OffscreenCanvas;
       dpr: number;

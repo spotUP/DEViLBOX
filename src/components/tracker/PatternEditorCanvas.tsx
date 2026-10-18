@@ -7,6 +7,7 @@
 
 import React, { useRef, useEffect, useLayoutEffect, useCallback, useState, useMemo } from 'react';
 import { useTrackerStore, useCursorStore, useTransportStore, useThemeStore, useEditorStore, useAutomationStore } from '@stores';
+import { useSongLoadStore } from '@stores/useSongLoadStore';
 import { useMixerStore } from '@stores/useMixerStore';
 import { useVoicePreviewStore } from '@stores/useVoicePreviewStore';
 import { useChannelTypeStore } from '@stores/useChannelTypeStore';
@@ -2502,6 +2503,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshotLayout, pattern, layoutKey]);
+
+  // The song-load panel covers the editor while the load depth is above 0: the
+  // worker holds a channel-count fade at 0 until it lifts (layoutTween.setCovered).
+  useEffect(() => {
+    const send = (depth: number) => bridgeRef.current?.post({ type: 'cover', covered: depth > 0 });
+    send(useSongLoadStore.getState().depth);
+    return useSongLoadStore.subscribe((s, prev) => { if ((s.depth > 0) !== (prev.depth > 0)) send(s.depth); });
+  }, []);
 
   // Format mode: re-sync columns/channels/layout when props change
   useEffect(() => {

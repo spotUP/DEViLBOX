@@ -91,7 +91,7 @@ describe('tracker worker tweens layout', () => {
     runFrame(16); runFrame(16);
     expect(renders.length).toBe(held);
     post(layoutMsg(24, off16, 50));
-    for (let i = 0; i < 10; i++) runFrame(16);
+    for (let i = 0; i < 12; i++) runFrame(16);
     const after = renders.slice(held);
     expect(after[0].offsets).toEqual(off16);
     expect(after[0].fade).toBeLessThan(1);
@@ -119,5 +119,47 @@ describe('tracker worker tweens layout', () => {
     for (let i = 0; i < 3; i++) runFrame(16);
     expect(resizes.filter(r => r[2] === 0.5)).toEqual([[1600, 1200, 0.5]]);
     expect(renders[renders.length - 1].offsets).toEqual(OFF4.map(v => v / 0.5));
+  });
+
+  it('c5: a second same-count layout 1 ms after the first keeps the fade rising', async () => {
+    const post = await bootWorker();
+    post(initMsg());
+    runFrame(16);
+    const off16 = Array.from({ length: 16 }, (_, i) => 40 + i * 50);
+    post({ type: 'patterns', patterns: [], currentPatternIndex: 0, awaitLayout: true });
+    const held = renders.length;
+    post(layoutMsg(24, off16, 50));
+    now += 1;
+    post(layoutMsg(24, off16, 51));
+    for (let i = 0; i < 12; i++) runFrame(16);
+    const fades = renders.slice(held).map(r => r.fade ?? 1);
+    expect(fades[0]).toBe(0);
+    expect(fades.some(f => f > 0 && f < 1)).toBe(true);
+    for (let i = 1; i < fades.length; i++) expect(fades[i]).toBeGreaterThanOrEqual(fades[i - 1]);
+    expect(fades[fades.length - 1]).toBe(1);
+    expect(renders[renders.length - 1].offsets).toEqual(off16);
+  });
+
+  it('c6: covered by the song-load overlay, the fade waits at 0 and runs 150 ms after the reveal', async () => {
+    const post = await bootWorker();
+    post(initMsg());
+    runFrame(16);
+    post({ type: 'cover', covered: true });
+    const off16 = Array.from({ length: 16 }, (_, i) => 40 + i * 50);
+    post({ type: 'patterns', patterns: [], currentPatternIndex: 0, awaitLayout: true });
+    post(layoutMsg(24, off16, 50));
+    const start = renders.length;
+    for (let i = 0; i < 20; i++) runFrame(16); // 320 ms under the overlay
+    const covered = renders.slice(start);
+    expect(covered.length).toBeGreaterThan(0);
+    expect(covered.every(r => r.fade === 0)).toBe(true);
+    post({ type: 'cover', covered: false });
+    const revealed = renders.length;
+    for (let i = 0; i < 12; i++) runFrame(16);
+    const fades = renders.slice(revealed).map(r => r.fade ?? 1);
+    expect(fades[0]).toBe(0);
+    expect(fades.some(f => f > 0 && f < 1)).toBe(true);
+    for (let i = 1; i < fades.length; i++) expect(fades[i]).toBeGreaterThanOrEqual(fades[i - 1]);
+    expect(fades[fades.length - 1]).toBe(1);
   });
 });
