@@ -5,6 +5,7 @@ import { TrackerEnvelope } from '../TrackerEnvelope';
 import { getChannelEffectsManager } from '../ChannelEffectsManager';
 import { getChannelFilterManager } from '../ChannelFilterManager';
 import { connectAudio } from './connectAudio';
+import { isChannelSilenced } from '@/lib/tracker/channelDim';
 
 // Voice state type (mirrors ToneEngine.ts interface)
 export interface VoiceState {
@@ -630,15 +631,13 @@ export function setMixerChannelPan(ctx: ChannelRoutingContext, channelIndex: num
 
 /**
  * Update mute states for all channels considering solo logic
- * Solo logic: if any channel is solo'd, only solo'd channels play
+ * Solo logic: if any channel is solo'd, only solo'd channels play; mute wins over solo
  */
 export function updateMuteStates(ctx: ChannelRoutingContext, channels: { muted: boolean; solo: boolean }[]): void {
   const anySolo = channels.some(ch => ch.solo);
 
   channels.forEach((channel, idx) => {
-    const shouldMute = anySolo
-      ? !channel.solo  // If any solo, mute non-solo'd channels
-      : channel.muted;  // Otherwise, respect individual mute states
+    const shouldMute = isChannelSilenced(channel.muted, channel.solo, anySolo);
 
     // Store in quick lookup map
     ctx.channelMuteStates.set(idx, shouldMute);

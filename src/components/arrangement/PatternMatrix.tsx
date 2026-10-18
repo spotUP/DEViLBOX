@@ -25,6 +25,7 @@ import { useMixerStore } from '@stores/useMixerStore';
 import { ContextMenu, type MenuItemType } from '@components/common/ContextMenu';
 import type { Pattern, TrackerCell } from '@/types/tracker';
 import { Copy, Trash2, Plus, VolumeX, Volume2 } from 'lucide-react';
+import { isChannelDimmed } from '@/lib/tracker/channelDim';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -610,7 +611,7 @@ export const PatternMatrix: React.FC = () => {
             const muted = getChannelMuted(ch);
             const soloed = getChannelSoloed(ch);
             const color = TRACK_COLORS[ch % TRACK_COLORS.length];
-            const dimmed = muted || (anySolo && !soloed);
+            const dimmed = isChannelDimmed(muted, soloed, anySolo);
             return (
               <div
                 key={ch}
@@ -677,7 +678,7 @@ export const PatternMatrix: React.FC = () => {
                 const isMuted = slotMutes.has(slotKey(posIdx, ch));
                 const trackMuted = getChannelMuted(ch);
                 const trackSoloed = getChannelSoloed(ch);
-                const dimmed = trackMuted || (anySolo && !trackSoloed);
+                const dimmed = isChannelDimmed(trackMuted, trackSoloed, anySolo);
                 const selected = isInSelection(posIdx, ch);
                 const isDragTarget = dragOver?.pos === posIdx && dragOver?.ch === ch;
                 const isRepeated = repeatedSlots.has(slotKey(posIdx, ch));
