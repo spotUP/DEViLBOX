@@ -29,7 +29,6 @@ interface TransportStore extends TransportState {
   isPaused: boolean;
   isLooping: boolean;
   currentRow: number;
-  currentPatternIndex: number;
   // Loop tracking for smooth scrolling (continuous row counter that doesn't reset on loop)
   continuousRow: number;
   // Metronome state
@@ -79,7 +78,6 @@ interface TransportStore extends TransportState {
   setIsLooping: (looping: boolean) => void;
   setCurrentRow: (row: number, patternLength?: number) => void;
   setCurrentRowThrottled: (row: number, patternLength?: number, immediate?: boolean) => void; // NEW: Throttled version for playback
-  setCurrentPattern: (index: number) => void;
   setMetronomeEnabled: (enabled: boolean) => void;
   setMetronomeVolume: (volume: number) => void;
   toggleMetronome: () => void;
@@ -167,7 +165,6 @@ export const useTransportStore = create<TransportStore>()(
     isPaused: false,
     isLooping: true,
     currentRow: 0,
-    currentPatternIndex: 0,
     continuousRow: 0,
     metronomeEnabled: false,
     metronomeVolume: 75, // Default to 75%
@@ -459,11 +456,6 @@ export const useTransportStore = create<TransportStore>()(
       // If timer is already scheduled, just update the pending values (already done above)
     },
 
-    setCurrentPattern: (index) =>
-      set((state) => {
-        state.currentPatternIndex = index;
-      }),
-
     setMetronomeEnabled: (enabled) =>
       set((state) => {
         state.metronomeEnabled = enabled;
@@ -581,7 +573,6 @@ export const useTransportStore = create<TransportStore>()(
         state.isPaused = false;
         state.isLooping = true;
         state.currentRow = 0;
-        state.currentPatternIndex = 0;
         state.continuousRow = 0;
         state.speed = 6;
         state.loopStartRow = 0;

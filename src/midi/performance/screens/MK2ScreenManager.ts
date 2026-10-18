@@ -86,7 +86,7 @@ function drawTransportBar(d: MK2Display): void {
   d.text(12, barY + 1, bpmStr, WHITE);
 
   // Position: pattern.row
-  const patStr = `P${transport.currentPatternIndex}`;
+  const patStr = `P${useTrackerStore.getState().currentPatternIndex}`;
   const rowStr = `R${String(transport.currentRow).padStart(2, '0')}`;
   d.text(70, barY + 1, `${patStr} ${rowStr}`, WHITE);
 
@@ -134,7 +134,7 @@ function drawTransportBarMK3(d: MK3Display, mode: MK2Mode): void {
   const transport = useTransportStore.getState();
   d.text(8, barY + 5, transport.isPlaying ? 'PLAY' : 'STOP', transport.isPlaying ? MK3Display.GREEN : MK3Display.RED, 1);
   d.text(72, barY + 5, `${Math.round(transport.bpm)} BPM`, MK3Display.WHITE, 1);
-  d.text(172, barY + 5, `P${transport.currentPatternIndex} R${String(transport.currentRow).padStart(2, '0')}`, MK3Display.LGRAY, 1);
+  d.text(172, barY + 5, `P${useTrackerStore.getState().currentPatternIndex} R${String(transport.currentRow).padStart(2, '0')}`, MK3Display.LGRAY, 1);
   d.text(392, barY + 5, mode.toUpperCase().substring(0, 9), MK3Display.NI_ORANGE, 1);
 }
 

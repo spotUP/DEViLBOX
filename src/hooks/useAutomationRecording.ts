@@ -31,10 +31,8 @@ export function useAutomationRecording(): void {
       if (!transportState.isPlaying) return;
 
       const row = transportState.currentRow;
-      const patternIndex = transportState.currentPatternIndex;
-
       // Get current pattern ID
-      const { patterns } = useTrackerStore.getState();
+      const { patterns, currentPatternIndex: patternIndex } = useTrackerStore.getState();
       const pattern = patterns[patternIndex];
       if (!pattern) return;
 

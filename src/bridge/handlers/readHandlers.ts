@@ -307,7 +307,7 @@ export function getPlaybackState(): Record<string, unknown> {
     isPaused: transport.isPaused,
     isLooping: transport.isLooping,
     currentRow: transport.currentRow,
-    currentPattern: transport.currentPatternIndex,
+    currentPattern: useTrackerStore.getState().currentPatternIndex,
     currentGlobalRow: transport.currentGlobalRow,
     bpm: transport.bpm,
     speed: transport.speed,

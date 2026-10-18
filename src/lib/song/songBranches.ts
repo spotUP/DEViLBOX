@@ -46,7 +46,6 @@ async function stopActivePlaybackForIncomingSong(
   transport.stop();
   if (options.resetPosition) {
     transport.setCurrentRow(0);
-    transport.setCurrentPattern(0);
   }
   engine.releaseAll();
 

@@ -82,7 +82,7 @@ export class SongScreen implements MK2Screen {
     const transport = useTransportStore.getState();
     const { patternOrder, currentPositionIndex, patterns, slotMutes } = state;
 
-    const patIdx = patternOrder[currentPositionIndex] ?? transport.currentPatternIndex;
+    const patIdx = patternOrder[currentPositionIndex] ?? state.currentPatternIndex;
     const pat = patterns[patIdx];
 
     if (!pat) {

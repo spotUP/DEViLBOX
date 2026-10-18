@@ -9,7 +9,7 @@ function rig(song: Partial<TrackerSong>, opts: { playing?: boolean; module?: Arr
   const deps: SwitchDeps = {
     getSong: () => ({ name: 'x', ...song }) as TrackerSong,
     isPlaying: () => opts.playing ?? false,
-    position: () => ({ pattern: 3, row: 17 }),
+    position: () => ({ position: 3, row: 17 }),
     restorePosition: (p) => calls.restore!.push(p),
     moduleFor: async () => (opts.module === undefined ? new Uint8Array([9, 8, 7]).buffer : opts.module),
     open: async (name, bytes, companions, start) => { calls.open!.push({ name, len: bytes.byteLength, companions, start }); return opts.openOk === false ? { ok: false, error: 'boom' } : { ok: true }; },
@@ -26,7 +26,7 @@ describe('NS-7 switchFormatEngine', () => {
     expect(r).toEqual({ switched: true, reopened: true, stored: 'native' });
     expect(calls.choice).toEqual([['soundmon', 'native']]);
     expect(calls.open).toEqual([{ name: 'antidust.bp3', len: 3, companions: undefined, start: 'song' }]);
-    expect(calls.restore).toEqual([{ pattern: 3, row: 17 }]);
+    expect(calls.restore).toEqual([{ position: 3, row: 17 }]);
   });
 
   it('default forgets the stored choice, reopens the loaded song, and reports the engine the row plays on by default', async () => {

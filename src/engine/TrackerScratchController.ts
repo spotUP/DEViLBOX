@@ -563,9 +563,8 @@ export class TrackerScratchController {
       this.scratchStartRow = audioState.row;
       this.scratchStartPattern = audioState.pattern;
     } else {
-      const ts = useTransportStore.getState();
-      this.scratchStartRow = ts.currentRow;
-      this.scratchStartPattern = ts.currentPatternIndex;
+      this.scratchStartRow = useTransportStore.getState().currentRow;
+      this.scratchStartPattern = useTrackerStore.getState().currentPatternIndex;
     }
     this.scratchRowOffset = 0;
     const patterns = useTrackerStore.getState().patterns;
