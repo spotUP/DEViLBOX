@@ -128,6 +128,7 @@ import {
   updateMuteStates as _updateMuteStates,
   isChannelMuted as _isChannelMuted,
   disposeChannelOutputs as _disposeChannelOutputs,
+  setChannelStripDestination as _setChannelStripDestination,
   getChannelLevels as _getChannelLevels,
   updateChannelEnvelopes as _updateChannelEnvelopes,
   setChannelKeyOff as _setChannelKeyOff,
@@ -5489,6 +5490,7 @@ export class ToneEngine {
   public initChannelPitch(channelIndex: number, instrumentKey: number, baseFrequency: number, basePlaybackRate: number = 1): void { _initChannelPitch(this._channelCtx, channelIndex, instrumentKey, baseFrequency, basePlaybackRate); }
   public clearChannelPitch(channelIndex: number): void { _clearChannelPitch(this._channelCtx, channelIndex); }
   public setChannelMute(channelIndex: number, muted: boolean): void { _setChannelMute(this._channelCtx, channelIndex, muted); }
+  public setChannelStripDestination(channelIndex: number, destination: Tone.InputNode | null): void { _setChannelStripDestination(this._channelCtx, channelIndex, destination); }
   public setMixerChannelVolume(channelIndex: number, volumeDb: number): void { _setMixerChannelVolume(this._channelCtx, channelIndex, volumeDb); }
   public setMixerChannelPan(channelIndex: number, pan: number): void { _setMixerChannelPan(this._channelCtx, channelIndex, pan); }
   public updateMuteStates(channels: { muted: boolean; solo: boolean }[]): void { _updateMuteStates(this._channelCtx, channels); }

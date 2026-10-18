@@ -22,13 +22,18 @@ import { installRealWebAudio, realDelay } from '@/test/audio/realWebAudio';
 
 const SR = 48000;
 const SECONDS = 1;
-let chain: { rebuild: (effects: unknown[]) => Promise<void>; masterIn: ToneNS.Gain } | null = null;
+let chain: {
+  rebuild: (effects: unknown[]) => Promise<void>;
+  masterIn: ToneNS.Gain;
+  routeStrip: (channel: number, destination: AudioNode | null) => void;
+} | null = null;
 let replaced = false;
 
 vi.mock('@/engine/ToneEngine', () => ({
   getToneEngine: () => ({
     get masterEffectsInput() { return chain!.masterIn; },
     rebuildMasterEffects: (effects: unknown[]) => chain!.rebuild(effects),
+    setChannelStripDestination: (channel: number, destination: AudioNode | null) => chain!.routeStrip(channel, destination),
   }),
 }));
 vi.mock('@/engine/TrackerReplayer', () => ({
@@ -106,7 +111,25 @@ async function playWithEffectOn(selected: number[], mode: 'isolating' | 'no-slot
     masterEffectAnalysers: new Map(), masterEffectsRebuildVersion: 0, _isPlaying: false,
     _notifyNoiseEffectsPlaying() {}, applyEffectParametersDiff() {}, updateBpmSyncedEffects: async () => {},
   };
-  chain = { masterIn, rebuild: (effects) => rebuildMasterEffects(mctx as never, effects as never) };
+  // Hybrid playback: each channel's synth plays into its Tone strip (2 kHz on
+  // channel 1, 5 kHz on channel 2), which feeds the master input unless the
+  // slot builder routes it into the channel's effect.
+  const strips = new Map<number, GainNode>();
+  if (replaced) {
+    [2000, 5000].forEach((hz, c) => {
+      const osc = ctx.createOscillator(); osc.frequency.value = hz;
+      const strip = ctx.createGain(); strip.gain.value = 0.25;
+      osc.connect(strip); Tone.connect(strip as never, masterIn as never); osc.start();
+      strips.set(c, strip);
+    });
+  }
+  const routeStrip = (c: number, destination: AudioNode | null) => {
+    const strip = strips.get(c);
+    if (!strip) return;
+    strip.disconnect();
+    if (destination) strip.connect(destination); else Tone.connect(strip as never, masterIn as never);
+  };
+  chain = { masterIn, routeStrip, rebuild: (effects) => rebuildMasterEffects(mctx as never, effects as never) };
 
   const { main, engine } = buildSong(ctx, mode);
   Tone.connect(main as never, masterIn as never);
@@ -118,7 +141,7 @@ async function playWithEffectOn(selected: number[], mode: 'isolating' | 'no-slot
   await realDelay(1000);                 // debounce + async slot build
 
   const out = (await ctx.startRendering()).getChannelData(0);
-  return { low: levelDb(out, 100), high: levelDb(out, 3000) };
+  return { low: levelDb(out, 100), high: levelDb(out, 3000), synth1: levelDb(out, 2000), synth2: levelDb(out, 5000) };
 }
 
 const DRY_DB = 20 * Math.log10(0.25);
@@ -144,10 +167,15 @@ describe('master effect aimed at channels', () => {
     expect(r.high).toBeLessThan(DRY_DB - 25);
   }, 120000);
 
-  it('during hybrid playback (native synths) the effect still processes the whole mix', async () => {
+  it('during hybrid playback the effect processes the chosen channel\'s samples and synth, nothing else', async () => {
+    // Owner precheck 2026-10-18: a channel effect on a synth song processed the
+    // whole mix ("channels cannot be isolated" whenever instruments were replaced).
     replaced = true;
     const r = await playWithEffectOn([0], 'isolating');
-    expect(r.high).toBeLessThan(DRY_DB - 25);
+    expect(r.low).toBeGreaterThan(DRY_DB - 1.5);     // channel 1 sample passes the low-pass
+    expect(r.synth1).toBeLessThan(DRY_DB - 25);      // channel 1 synth is cut: it reaches the effect
+    expect(r.high).toBeGreaterThan(DRY_DB - 1.5);    // channel 2 sample untouched
+    expect(r.synth2).toBeGreaterThan(DRY_DB - 1.5);  // channel 2 synth untouched
   }, 120000);
 
   it('on an isolating engine the effect processes only the chosen channel', async () => {

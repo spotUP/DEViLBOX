@@ -120,7 +120,12 @@ interface IsolationSlot {
   effectNodes: (Tone.ToneAudioNode | { input: AudioNode; output: AudioNode; dispose(): void })[];
   /** Native GainNode connected between worklet output and effect chain */
   outputGain: GainNode;
+  /** Where the channel strip joins: the first routed master effect, after the inserts the strip already has. */
+  stripJunction: GainNode | null;
 }
+
+/** Sends a channel strip into a node, or back to the master input with null (ToneEngine.setChannelStripDestination). */
+export type ChannelStripRouter = (channelIndex: number, destination: AudioNode | null) => void;
 
 /** How an activation attempt ended: wired, no path yet, carried by the whole-mix tap, or no longer wanted. */
 type DubActivation = 'wired' | 'unavailable' | 'fallback' | 'cancelled';
@@ -180,6 +185,8 @@ export class ChannelRoutedEffectsManager {
 
   /** Stops following the BLEED switch; see `bleedsInto`. */
   private readonly unsubscribeBleed: () => void;
+
+  private stripRouter: ChannelStripRouter | null = null;
 
   constructor(masterEffectsInput: Tone.Gain) {
     this.masterEffectsInput = masterEffectsInput;
@@ -879,15 +886,29 @@ export class ChannelRoutedEffectsManager {
 
   // ── Per-channel effect routing ──────────────────────────────────
 
+  /** How rebuild reaches the channel strips (the Tone side, where synths on a channel play). */
+  setStripRouter(router: ChannelStripRouter | null): void {
+    this.stripRouter = router;
+  }
+
   /**
    * Rebuild per-channel effect routing based on mixer store state.
    * Connects worklet outputs[1..4] → per-channel effect chains → masterEffectsInput.
-   * @param channelEffects Map of channel index → effect configs to apply
+   *
+   * The worklet slot carries the channel's samples only. Synths replacing an
+   * instrument play into the channel strip, which already runs the inserts
+   * (ChannelEffectsManager), so the strip joins the chain after them, at the
+   * first routed master effect: one effect instance processes the channel's
+   * samples and synths together, and the inserts never run twice.
+   *
+   * @param channelEffects Map of channel index → mixer insert effects
    * @param engine The isolation-capable engine to route through (auto-detected if omitted)
+   * @param routedEffects Map of channel index → master effects aimed at that channel
    */
   async rebuild(
     channelEffects: Map<number, EffectConfig[]>,
     engine?: IsolationCapableEngine,
+    routedEffects: ReadonlyMap<number, EffectConfig[]> = new Map(),
   ): Promise<void> {
     console.log(`[ChannelRoutedEffects] rebuild() called with ${channelEffects.size} channels:`,
       [...channelEffects.entries()].map(([ch, fx]) => `ch${ch}: ${fx.length} effects (${fx.filter(e=>e.enabled).length} enabled)`));
@@ -915,13 +936,15 @@ export class ChannelRoutedEffectsManager {
     // SidechainCompressor ignored its source channel and keyed on the channel
     // it sat on - "routing it to a channel kills it" (2026-09-29).
     const sidechainWiring: Array<{ node: Tone.ToneAudioNode; source: number }> = [];
-    for (const [channelIndex, effects] of channelEffects) {
+    const channels = [...new Set([...channelEffects.keys(), ...routedEffects.keys()])];
+    for (const channelIndex of channels) {
       if (slotIdx >= 4) {
         console.warn('[ChannelRoutedEffects] Only 4 isolation slots available, skipping remaining channels');
         break;
       }
 
-      const enabledEffects = effects.filter(e => e.enabled);
+      const enabledInserts = (channelEffects.get(channelIndex) ?? []).filter(e => e.enabled);
+      const enabledEffects = [...enabledInserts, ...(routedEffects.get(channelIndex) ?? []).filter(e => e.enabled)];
       if (enabledEffects.length === 0) continue;
 
       const channelMask = 1 << channelIndex;
@@ -931,10 +954,12 @@ export class ChannelRoutedEffectsManager {
 
       // Create effect nodes (may be Tone.js or native DevilboxSynth like BuzzmachineSynth)
       const effectNodes: IsolationSlot['effectNodes'] = [];
-      for (const config of enabledEffects) {
+      let insertNodeCount = 0;
+      for (const [i, config] of enabledEffects.entries()) {
         try {
           const node = await createEffect(config) as Tone.ToneAudioNode | { input: AudioNode; output: AudioNode; dispose(): void };
           if (node) {
+            if (i < enabledInserts.length) insertNodeCount++;
             if ('wet' in node && (node as any).wet instanceof Tone.Signal) {
               ((node as any).wet as Tone.Signal).value = config.wet / 100;
             }
@@ -985,6 +1010,16 @@ export class ChannelRoutedEffectsManager {
       }
       connectAudio(effectNodes[effectNodes.length - 1], this.masterEffectsInput);
 
+      // The strip (synths on this channel, inserts applied) joins at the first
+      // routed effect. Inserts alone need no junction: the strip has them.
+      let stripJunction: GainNode | null = null;
+      if (insertNodeCount < effectNodes.length && this.stripRouter) {
+        stripJunction = audioContext.createGain();
+        stripJunction.gain.value = 1;
+        connectAudio(stripJunction, effectNodes[insertNodeCount]);
+        this.stripRouter(channelIndex, stripJunction);
+      }
+
       this.slots[slotIdx] = {
         slotIndex: slotIdx,
         channels: [channelIndex],
@@ -992,6 +1027,7 @@ export class ChannelRoutedEffectsManager {
         effectConfigs: enabledEffects,
         effectNodes,
         outputGain,
+        stripJunction,
       };
 
       console.log(`[ChannelRoutedEffects] Slot ${slotIdx}: ch${channelIndex + 1} → ${enabledEffects.map(e => e.type).join(' → ')} (mask=0x${channelMask.toString(16)}) via worklet output[${outputIndex}]`);
@@ -1063,6 +1099,11 @@ export class ChannelRoutedEffectsManager {
         try { node.dispose(); } catch { /* */ }
       }
       try { slot.outputGain.disconnect(); } catch { /* */ }
+      if (slot.stripJunction) {
+        // Strip back to the master input before its effect goes.
+        for (const ch of slot.channels) this.stripRouter?.(ch, null);
+        try { slot.stripJunction.disconnect(); } catch { /* */ }
+      }
 
       // Tell engine to remove the worklet isolation module
       if (engine) {
@@ -1324,14 +1365,8 @@ export async function resolveChannelIsolation(): Promise<ChannelIsolationStatus>
   if (engine.supportsIsolationSlots?.() === false) {
     return { engine: null, reason: 'This engine renders channels for the dub sends only, so an effect cannot be taken off one channel. It processes the whole mix.' };
   }
-  try {
-    const { getTrackerReplayer } = await import('../TrackerReplayer');
-    // Native synths replacing the WASM channels bypass the worklet, so an
-    // isolation slot would carry silence.
-    if (getTrackerReplayer().hasReplacedInstruments) {
-      return { engine: null, reason: 'Some instruments are played by built-in synths, which cannot be taken out of the mix per channel. The effect processes the whole mix.' };
-    }
-  } catch { /* replayer not initialised: nothing is replaced */ }
+  // Synths replacing instruments bypass the worklet, but they play into the
+  // channel strip, which rebuild sends into the same effect as the slot.
   return { engine, reason: null };
 }
 
