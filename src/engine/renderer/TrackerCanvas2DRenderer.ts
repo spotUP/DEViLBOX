@@ -7,15 +7,7 @@
  * so the worker can swap between them transparently.
  */
 
-import type {
-  PatternSnapshot,
-  CursorSnapshot,
-  SelectionSnapshot,
-  ThemeSnapshot,
-  UIStateSnapshot,
-  ChannelLayoutSnapshot,
-  PatternPreviewSnapshot,
-} from './worker-types';
+import type { TrackerRenderInput } from './worker-types';
 import { SUN_EFFECT_GLYPH } from '@/lib/import/formats/sunEffectGlyphs';
 import { SNX_EFFECT_GLYPH } from '@/lib/import/formats/sonixEffectGlyphs';
 import { SPL_EFFECT_GLYPH } from '@/lib/import/formats/soundPlayerEffectGlyphs';
@@ -133,19 +125,7 @@ export class TrackerCanvas2DRenderer {
     this.ctx.canvas.height = Math.round(h * dpr);
   }
 
-  render(opts: {
-    patterns: PatternSnapshot[];
-    currentPatternIndex: number;
-    scrollX: number;
-    cursor: CursorSnapshot;
-    selection: SelectionSnapshot | null;
-    playback: { row: number; smoothOffset: number; patternIndex: number; isPlaying: boolean; songPosition?: number };
-    theme: ThemeSnapshot;
-    ui: UIStateSnapshot;
-    layout: ChannelLayoutSnapshot;
-    dragOver: { channelIndex: number; rowIndex: number } | null;
-    preview?: PatternPreviewSnapshot | null;
-  }): void {
+  render(opts: TrackerRenderInput): void {
     const {
       patterns, currentPatternIndex, cursor, selection,
       playback, theme, ui, layout, preview,
@@ -471,6 +451,13 @@ export class TrackerCanvas2DRenderer {
     ctx.lineTo(W, centerY);
     ctx.stroke();
     ctx.globalAlpha = 1;
+
+    if (opts.fade !== undefined && opts.fade < 1) {
+      ctx.globalAlpha = 1 - opts.fade;
+      ctx.fillStyle = theme.bg;
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = 1;
+    }
 
     ctx.restore();
   }
