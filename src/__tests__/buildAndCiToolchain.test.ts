@@ -72,11 +72,12 @@ describe('NV-5 nuade workflow', () => {
     }
   });
 
-  it('rebuilds with nuade-wasm/build.sh and fails when the sources changed without Nuade.wasm', () => {
+  it('rebuilds with nuade-wasm/build.sh and fails when the sources changed without Nuade.wasm or Nuade.js', () => {
     expect(text).toContain('nuade-wasm/build.sh');
     expect(text).toContain('~/emsdk/emsdk install latest');
     expect(text).toMatch(/grep -qE '\^\(third-party\/nuade\|nuade-wasm\)\/'/);
-    expect(text).toContain("grep -qx 'public/nuade/Nuade.wasm'");
+    // A link-flag change can rebuild only the JS glue, so either artifact counts as rebuilt.
+    expect(text).toContain("grep -qxE 'public/nuade/Nuade\\.(wasm|js)'");
     expect(text).toContain('exit 1');
   });
 
