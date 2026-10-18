@@ -41,12 +41,14 @@ export interface FormatChannelLayoutInput {
   availableWidth: number;
   /** Shrink the pattern so every channel fits (fit all channels). */
   fit?: boolean;
+  /** Smallest scale the fit shrinks to (default FIT_SCALE_FLOOR). */
+  fitFloor?: number;
   /** Scale when fit is off (the zoom slider; 1 = base font). */
   manualScale?: number;
 }
 
 export function formatChannelLayout(input: FormatChannelLayoutInput): FormatChannelLayout {
-  const { formatChannels, formatColumns, charWidth, leftEdge, gutter = 0, columnGap, channelPad, availableWidth, fit = false, manualScale = 1 } = input;
+  const { formatChannels, formatColumns, charWidth, leftEdge, gutter = 0, columnGap, channelPad, availableWidth, fit = false, fitFloor, manualScale = 1 } = input;
   const widths: number[] = [];
   for (const channel of formatChannels) {
     if (channel.hidden) { widths.push(0); continue; }
@@ -54,7 +56,7 @@ export function formatChannelLayout(input: FormatChannelLayoutInput): FormatChan
     const contentWidth = cols.reduce((sum, col) => sum + col.charWidth * charWidth + columnGap, 0) - columnGap;
     widths.push(contentWidth + channelPad);
   }
-  const fitted = fitAndStretchChannelWidths(widths, leftEdge, availableWidth, fit, undefined, manualScale);
+  const fitted = fitAndStretchChannelWidths(widths, leftEdge, availableWidth, fit, fitFloor, manualScale);
   const offsets: number[] = [];
   let x = fitted.leftEdge;
   for (const w of fitted.widths) { offsets.push(x); x += w; }

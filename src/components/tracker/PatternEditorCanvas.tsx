@@ -12,7 +12,7 @@ import { useMixerStore } from '@stores/useMixerStore';
 import { useVoicePreviewStore } from '@stores/useVoicePreviewStore';
 import { useChannelTypeStore } from '@stores/useChannelTypeStore';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
-import { channelLayout, notifyChannelLayout, fitAndStretchChannelWidths, subscribeChannelLayout, type ChannelLayout } from './channelLayout';
+import { channelLayout, notifyChannelLayout, fitAndStretchChannelWidths, subscribeChannelLayout, FIT_SCALE_FLOOR, JINGLE_FIT_SCALE_FLOOR, type ChannelLayout } from './channelLayout';
 import { resolveWasmPattern } from './wasmPatternHold';
 import { computeChannelFollowScroll, createChannelFollowGate } from '@/lib/tracker/followScroll';
 import { resolveCellColumn } from '@/lib/tracker/cellHitTest';
@@ -418,6 +418,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // Channel Metrics: calculate numChannels, offsets, and widths once per pattern/theme change
   const fitChannels = useSettingsStore(s => s.fitAllChannelsTracker) && !mobileCanvas;
+  const fitFloor = useUIStore(s => s.jingleActive) ? JINGLE_FIT_SCALE_FLOOR : FIT_SCALE_FLOOR;
   // With fit off the pattern is drawn at the zoom slider's scale; `fitScale` below is the scale in use either way.
   const manualScale = useUIStore(s => s.trackerZoom) / 100;
   // Channels with no data in any pattern are width 0 (hidden, not deleted): one list for the grid, headers, scopes, meters and the fit scale.
@@ -437,6 +438,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         channelPad: mobileCanvas ? Math.round(40 * MOBILE_SCALE) : 40,
         availableWidth: dimensions.width,
         fit: fitChannels,
+        fitFloor,
         manualScale: mobileCanvas ? 1 : manualScale,
         gutter: LNW,
       });
@@ -494,7 +496,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Fit first (shrink the whole pattern so every channel is on screen), then stretch.
     const fitted = mobileCanvas
       ? { scale: 1, leftEdge: LNW + globalLaneOffset, widths: minWidths }
-      : fitAndStretchChannelWidths(minWidths, LNW + globalLaneOffset, dimensions.width, fitChannels, undefined, manualScale);
+      : fitAndStretchChannelWidths(minWidths, LNW + globalLaneOffset, dimensions.width, fitChannels, fitFloor, manualScale);
     const widths = fitted.widths;
     const offsets: number[] = [];
     let currentX = fitted.leftEdge;
@@ -507,7 +509,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       totalChannelsWidth: currentX - Math.floor(LNW * fitted.scale),
       fitScale: fitted.scale,
     };
-  }, [pattern, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts, globalLaneVisible, dimensions.width, fitChannels, manualScale, visibleMask]);
+  }, [pattern, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts, globalLaneVisible, dimensions.width, fitChannels, fitFloor, manualScale, visibleMask]);
 
   // Row-number gutter and global lane at the fitted scale (canvas px). Everything
   // the worker draws is scaled by fitScale, so these are what the DOM must match.
