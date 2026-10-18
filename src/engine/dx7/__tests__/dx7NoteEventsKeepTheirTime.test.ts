@@ -106,6 +106,16 @@ describe('DX7 note events keep their scheduled time', () => {
     expect(keyed.map((k) => k.ev)).toEqual(['alloff']);
   });
 
+  it('a note with no usable time keys at once and never blocks the notes after it', () => {
+    const { proc, keyed } = loadWorklet();
+    renderSeconds(proc, 0.01);
+    post(proc, { type: 'noteOn', note: 60, velocity: 100, time: NaN });
+    post(proc, { type: 'noteOn', note: 62, velocity: 100, time: Infinity });
+    post(proc, { type: 'noteOn', note: 64, velocity: 100, time: now + 0.05 });
+    renderSeconds(proc, 0.1);
+    expect(keyed.map((k) => k.note)).toEqual([60, 62, 64]);
+  });
+
   it('DX7Synth sends the scheduled time with note-on, note-off and All Notes Off', () => {
     const sent: Array<Record<string, unknown>> = [];
     // A DX7Synth without its worklet: only the messages it sends matter here.
