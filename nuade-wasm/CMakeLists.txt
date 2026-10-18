@@ -31,7 +31,7 @@ target_link_options(Nuade PRIVATE
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"
     "SHELL:-s INITIAL_MEMORY=16777216"
     "SHELL:-s STACK_SIZE=131072"
-    "SHELL:-s ENVIRONMENT=web,worker,node"
+    "SHELL:-s ENVIRONMENT=web,worker"
     "SHELL:-s FILESYSTEM=0"
     "SHELL:-s SINGLE_FILE=0"
     -O2
