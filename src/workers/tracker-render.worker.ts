@@ -26,6 +26,7 @@ import type {
   ThemeSnapshot,
   UIStateSnapshot,
   ChannelLayoutSnapshot,
+  TrackerRenderInput,
 } from '../engine/renderer/worker-types';
 
 // Constants (must match PatternEditorCanvas.tsx)
@@ -72,6 +73,10 @@ const tween = new LayoutTween({ rowHeight: ui.rowHeight, layout });
 let drawVersion = 0; // bumps whenever tween.current is rewritten, keys the scaled* memos
 const layoutHold = new LayoutHold(); // new patterns wait for their channel layout
 let dirty = true; // Dirty flag — skip GPU draws when nothing changed
+/** The last frame drawn from live state: redrawn, dimming, while a channel-count change fades the old picture out. */
+let lastPicture: TrackerRenderInput | null = null;
+/** A canvas size or scale change that waits for the fade-out to end (it would distort the old picture). */
+let pendingResize = false;
 // Reusable playback object for render calls (avoids per-frame allocation)
 const workerPlayback = { row: 0, smoothOffset: 0, patternIndex: 0, isPlaying: false };
 
@@ -175,12 +180,13 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
     case 'layout': {
       if (msg.w !== width || msg.h !== height || msg.dpr !== dpr || msg.scale !== scale) {
         width = msg.w; height = msg.h; dpr = msg.dpr; scale = msg.scale;
-        renderer?.resize(width / scale, height / scale, dpr * scale);
+        pendingResize = true;
       }
       ui = msg.uiState;
       layout = msg.channelLayout;
       layoutHold.layout();
       tween.retarget({ rowHeight: ui.rowHeight, layout }, performance.now(), reducedMotion || !renderer);
+      applyPendingResize();
       drawVersion++;
       dirty = true;
       break;
@@ -228,9 +234,11 @@ function startRAF(): void {
     // During playback, always render (smooth scrolling needs continuous updates)
     if (playback.isPlaying) dirty = true;
     if (tween.active && tween.sample(performance.now())) { drawVersion++; dirty = true; }
+    applyPendingResize();
 
-    // Only call renderFrame if dirty (skip GPU calls when nothing changed)
-    if (dirty && layoutHold.canDraw(performance.now())) {
+    // Only call renderFrame if dirty (skip GPU calls when nothing changed).
+    // The fade-out redraws the last frame, so it never waits for a layout.
+    if (dirty && (tween.fadingOut || layoutHold.canDraw(performance.now()))) {
       renderFrame();
     }
     requestAnimationFrame(tick);
@@ -238,9 +246,21 @@ function startRAF(): void {
   requestAnimationFrame(tick);
 }
 
+function applyPendingResize(): void {
+  if (!pendingResize || tween.fadingOut) return;
+  pendingResize = false;
+  renderer?.resize(width / scale, height / scale, dpr * scale);
+}
+
 function renderFrame(): void {
   if (!renderer || !theme) return;
   dirty = false;
+
+  if (tween.fadingOut) {
+    // workerPlayback is only written below, so the stored frame's playback is still the frozen one.
+    if (lastPicture) renderer.render({ ...lastPicture, fade: tween.fade });
+    return;
+  }
 
   // Use smoothOffset directly from main thread
   // Main thread has accurate replayer state, no need to recompute
@@ -252,7 +272,7 @@ function renderFrame(): void {
   workerPlayback.patternIndex = playback.patternIndex;
   workerPlayback.isPlaying = playback.isPlaying;
 
-  renderer.render({
+  lastPicture = {
     patterns,
     currentPatternIndex,
     scrollX: scrollX / scale,
@@ -265,7 +285,8 @@ function renderFrame(): void {
     dragOver,
     preview,
     fade: tween.fade,
-  });
+  };
+  renderer.render(lastPicture);
 }
 
 // ─── Pattern scale ────────────────────────────────────────────────────────────

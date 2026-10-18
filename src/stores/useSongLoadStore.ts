@@ -49,6 +49,12 @@ interface SongLoadState {
   interactive: boolean;
   /** The load was cancelled (the panel's Cancel button); the opener steps stop at their next check. */
   cancelled: boolean;
+  /**
+   * The silent boot restore: the editor is still covered (its fade-in waits for
+   * the load) but no loading panel shows, so the jingle's lips fade straight
+   * into the restored song.
+   */
+  silent: boolean;
   /** The loading panel's Cancel button: the running openSong sets it, the panel calls it. */
   cancel: (() => void) | null;
 }
@@ -62,6 +68,7 @@ export const useSongLoadStore = create<SongLoadState>(() => ({
   startedAt: 0,
   interactive: true,
   cancelled: false,
+  silent: false,
   cancel: null,
 }));
 

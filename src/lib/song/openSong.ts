@@ -304,6 +304,8 @@ export interface StoredSongSource {
   song: () => SongToApply | Promise<SongToApply>;
   /** Which opener this is, for logs and the few source-specific choices in applySong. */
   source: SongSource;
+  /** The silent boot restore: no loading panel (useSongLoadStore.silent). */
+  silent?: boolean;
 }
 
 /** The lifecycle of a song that needs no parse: unload, loading state, apply once. */
@@ -315,7 +317,7 @@ async function openStoredSong(src: StoredSongSource): Promise<OpenResult> {
       const song = await src.song();
       setSongLoadPhase('apply');
       await applySong(song, src.source);
-    });
+    }, { silent: src.silent });
     const format = useFormatStore.getState();
     return { ok: true, name: src.name, message: `Opened ${src.name}`, engine: 'saved', editorMode: format.editorMode,
       kind: 'saved', started: false, companions: 0, notified: false };

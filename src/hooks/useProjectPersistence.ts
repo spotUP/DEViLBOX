@@ -412,9 +412,10 @@ export { migrateDubLaneEvents } from '@/lib/song/migrateDubLaneEvents';
  * never-saved window (explicitlySaved=false, dirty=true) so the recovery
  * scheduler keeps writing and a second crash after Restore is still covered.
  * The default path (explicit-save slot) marks the project saved and arms
- * explicit auto-save.
+ * explicit auto-save. `opts.silent` (the boot restore) opens it without the
+ * loading panel.
  */
-export async function applySavedProject(project: SavedProject, opts?: { fromRecovery?: boolean }): Promise<boolean> {
+export async function applySavedProject(project: SavedProject, opts?: { fromRecovery?: boolean; silent?: boolean }): Promise<boolean> {
   if (!prepareSavedProject(project, 'discard')) return false;
   // The stored module bytes are decoded again by today's decoder; the user's
   // edited cells, instruments, mixer and the rest of the project come from the
@@ -424,6 +425,7 @@ export async function applySavedProject(project: SavedProject, opts?: { fromReco
   await openSavedSong({
     name: project.metadata?.name || 'saved project',
     source: opts?.fromRecovery ? 'recovery' : 'project',
+    silent: opts?.silent,
     song: async () => {
       const restored = await restoreFromStoredBytes(savedSongToApply(project), project.gridBaseline);
       console.log(`[restore] ${restored.redecoded ? 're-decoded from the stored module bytes' : `kept as saved (${restored.reason})`}`);
@@ -685,9 +687,9 @@ export function useProjectPersistence() {
         // The explicit slot is authoritative: a crash snapshot beside it is
         // stale by definition.
         await idbDeleteRecovery().catch(() => {});
-        await applySavedProject(saved!);
+        await applySavedProject(saved!, { silent: true });
       } else if (decision.kind === 'recovery') {
-        await applySavedProject(rec!, { fromRecovery: true });
+        await applySavedProject(rec!, { fromRecovery: true, silent: true });
       }
     })()
       .catch((error: unknown) => { console.error('[Persistence] Boot restore failed:', error); })

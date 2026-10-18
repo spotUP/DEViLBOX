@@ -3,7 +3,8 @@
  * Reachability: a `layout` message posted to the real worker onmessage glides
  * the geometry over the rAF loop (strictly intermediate row heights are the
  * sentinel), resizes the renderer only when w/h/dpr/scale change, and draws
- * nothing once idle.
+ * nothing once idle. A channel-count change fades the last frame out, then the
+ * new picture in.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -43,6 +44,12 @@ const ui = (rowHeight: number) => ({
   rowHighlightInterval: 4, rowSecondaryHighlightInterval: 16,
   showBeatLabels: false, noteDisplayOffset: 0, bookmarks: [],
 });
+/** The renders after `from`, split at the first frame drawn with the new offsets. */
+function outThenIn(from: number, newOffsets: number[]) {
+  const after = renders.slice(from);
+  const swap = after.findIndex(r => r.offsets.join() === newOffsets.join());
+  return { out: after.slice(0, swap), in: after.slice(swap) };
+}
 const lay = (offsets: number[], width: number) => ({ offsets, widths: offsets.map(() => width), totalWidth: offsets.length * width });
 const OFF4 = [40, 200, 360, 520];
 const TARGET4 = [40, 280, 520, 760];
@@ -81,7 +88,7 @@ describe('tracker worker tweens layout', () => {
     expect(renders.length).toBe(n);
   });
 
-  it('c2: a channel-count change fades in without resizing', async () => {
+  it('c2: a channel-count change fades the old picture out, then the new one in, without resizing', async () => {
     const post = await bootWorker();
     post(initMsg());
     runFrame(16);
@@ -91,11 +98,14 @@ describe('tracker worker tweens layout', () => {
     runFrame(16); runFrame(16);
     expect(renders.length).toBe(held);
     post(layoutMsg(24, off16, 50));
-    for (let i = 0; i < 12; i++) runFrame(16);
-    const after = renders.slice(held);
-    expect(after[0].offsets).toEqual(off16);
-    expect(after[0].fade).toBeLessThan(1);
-    expect(after.some(r => r.fade === 1)).toBe(true);
+    for (let i = 0; i < 24; i++) runFrame(16);
+    const { out, in: fadeIn } = outThenIn(held, off16);
+    expect(out.length).toBeGreaterThan(2);
+    expect(out.every(r => r.offsets.join() === OFF4.join())).toBe(true);
+    for (let i = 1; i < out.length; i++) expect(out[i].fade!).toBeLessThan(out[i - 1].fade!);
+    expect(out[0].fade).toBeLessThan(1);
+    expect(fadeIn[0].fade).toBe(0);
+    expect(fadeIn[fadeIn.length - 1].fade).toBe(1);
     expect(resizes.length).toBe(1);
   });
 
@@ -131,8 +141,8 @@ describe('tracker worker tweens layout', () => {
     post(layoutMsg(24, off16, 50));
     now += 1;
     post(layoutMsg(24, off16, 51));
-    for (let i = 0; i < 12; i++) runFrame(16);
-    const fades = renders.slice(held).map(r => r.fade ?? 1);
+    for (let i = 0; i < 24; i++) runFrame(16);
+    const fades = outThenIn(held, off16).in.map(r => r.fade ?? 1);
     expect(fades[0]).toBe(0);
     expect(fades.some(f => f > 0 && f < 1)).toBe(true);
     for (let i = 1; i < fades.length; i++) expect(fades[i]).toBeGreaterThanOrEqual(fades[i - 1]);
@@ -140,7 +150,7 @@ describe('tracker worker tweens layout', () => {
     expect(renders[renders.length - 1].offsets).toEqual(off16);
   });
 
-  it('c6: covered by the song-load overlay, the fade waits at 0 and runs 150 ms after the reveal', async () => {
+  it('c6: covered by the song-load overlay, the old picture fades out, the new one waits at 0 and fades in 150 ms after the reveal', async () => {
     const post = await bootWorker();
     post(initMsg());
     runFrame(16);
@@ -150,9 +160,11 @@ describe('tracker worker tweens layout', () => {
     post(layoutMsg(24, off16, 50));
     const start = renders.length;
     for (let i = 0; i < 20; i++) runFrame(16); // 320 ms under the overlay
-    const covered = renders.slice(start);
-    expect(covered.length).toBeGreaterThan(0);
-    expect(covered.every(r => r.fade === 0)).toBe(true);
+    const { out, in: held } = outThenIn(start, off16);
+    expect(out.length).toBeGreaterThan(2);
+    expect(out[0].fade).toBeGreaterThan(0);
+    expect(held.length).toBeGreaterThan(0);
+    expect(held.every(r => r.fade === 0)).toBe(true);
     post({ type: 'cover', covered: false });
     const revealed = renders.length;
     for (let i = 0; i < 12; i++) runFrame(16);
@@ -161,5 +173,33 @@ describe('tracker worker tweens layout', () => {
     expect(fades.some(f => f > 0 && f < 1)).toBe(true);
     for (let i = 1; i < fades.length; i++) expect(fades[i]).toBeGreaterThanOrEqual(fades[i - 1]);
     expect(fades[fades.length - 1]).toBe(1);
+  });
+
+  it('c7: the jingle end (lips torn down, then the restored song at another scale) fades out once and never shows the torn-down picture', async () => {
+    const lips = Array.from({ length: 10 }, (_, i) => 40 + i * 70);
+    const post = await bootWorker();
+    post(initMsg({}, lips));
+    runFrame(16);
+    const start = renders.length;
+    const resizesBefore = resizes.length;
+    post(layoutMsg(24, OFF4, 160)); // teardown: the empty pre-jingle song
+    post({ type: 'cover', covered: true });
+    runFrame(16); runFrame(16);
+    post({ type: 'patterns', patterns: [], currentPatternIndex: 0, awaitLayout: true });
+    post(layoutMsg(24, TARGET4, 240, { scale: 0.5 })); // the restored song, fit to width
+    expect(resizes.length).toBe(resizesBefore); // the old picture keeps its canvas while it leaves
+    for (let i = 0; i < 14; i++) runFrame(16);
+    post({ type: 'cover', covered: false });
+    for (let i = 0; i < 14; i++) runFrame(16);
+    const drawn = renders.slice(start);
+    const restored = TARGET4.map(v => v / 0.5).join();
+    const { out, in: fadeIn } = outThenIn(start, TARGET4.map(v => v / 0.5));
+    expect(out.length).toBeGreaterThan(2);
+    expect(out.every(r => r.offsets.join() === lips.join())).toBe(true);
+    for (let i = 1; i < out.length; i++) expect(out[i].fade!).toBeLessThan(out[i - 1].fade!);
+    expect(drawn.every(r => r.offsets.join() === lips.join() || r.offsets.join() === restored)).toBe(true);
+    expect(resizes.slice(resizesBefore)).toEqual([[1600, 1200, 0.5]]);
+    expect(fadeIn[0].fade).toBe(0);
+    expect(fadeIn[fadeIn.length - 1].fade).toBe(1);
   });
 });
