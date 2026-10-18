@@ -2597,6 +2597,7 @@ export class TrackerReplayer {
                 const inst = typeof ch.instrument === 'object' && ch.instrument !== null
                   ? (ch.instrument as InstrumentConfig) : null;
                 if (!inst?.synthType || inst.synthType === 'Sampler') return;
+                if (replayer.isChannelMuted(channelIndex)) return;
                 try {
                   getToneEngine().triggerNote(inst.id, ch.lastPlayedNoteName ?? 'C4', 0, time, 1, inst, false, false, channelIndex);
                 } catch { /* ignored */ }
@@ -2607,6 +2608,7 @@ export class TrackerReplayer {
                 const inst = replayer.instrumentMap.get(instrumentId);
                 if (!inst?.synthType || inst.synthType === 'Sampler') return;
                 ch.instrument = inst;
+                if (replayer.isChannelMuted(channelIndex)) return;
                 try {
                   const noteName = xmNoteToNoteName(xmNote);
                   if (volume > 0 && volume <= 64) {
@@ -3224,21 +3226,23 @@ export class TrackerReplayer {
   // VOICE CONTROL
   // ==========================================================================
 
+  /**
+   * Whether notes for a tracker channel are silenced right now. DJ decks keep a
+   * per-replayer bitmask (bit N set = channel N audible) so each deck is
+   * independent; the tracker view asks ToneEngine's global mute/solo state.
+   * Every path that fires a note for a channel (row trigger, E9x/Rxy retrigger,
+   * EDx note delay) has to ask this, or a muted channel keeps sounding.
+   */
+  isChannelMuted(channelIndex: number): boolean {
+    if (this.isDJDeck) return (this.channelMuteMask & (1 << channelIndex)) === 0;
+    return getToneEngine().isChannelMuted(channelIndex);
+  }
+
   private triggerNote(ch: ChannelState, time: number, _offset: number, channelIndex?: number, accent?: boolean, slideActive?: boolean, currentRowSlide?: boolean, hammer?: boolean): void {
     // Skip note trigger if channel is muted.
     // slideActive = from PREVIOUS row's slide flag, determines pitch glide behavior
     // currentRowSlide = CURRENT row's slide flag, determines gate timing (sustain into next note)
-    if (channelIndex !== undefined) {
-      if (this.isDJDeck) {
-        // DJ decks use a per-replayer bitmask so each deck is independent.
-        // Bit N = 1 → channel N audible; bit N = 0 → muted.
-        if ((this.channelMuteMask & (1 << channelIndex)) === 0) return;
-      } else {
-        // Tracker view uses ToneEngine's global mute state.
-        const engine = getToneEngine();
-        if (engine.isChannelMuted(channelIndex)) return;
-      }
-    }
+    if (channelIndex !== undefined && this.isChannelMuted(channelIndex)) return;
 
     const safeTime = time ?? Tone.now();
 
