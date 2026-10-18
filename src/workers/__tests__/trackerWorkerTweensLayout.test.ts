@@ -98,7 +98,7 @@ describe('tracker worker tweens layout', () => {
     runFrame(16); runFrame(16);
     expect(renders.length).toBe(held);
     post(layoutMsg(24, off16, 50));
-    for (let i = 0; i < 24; i++) runFrame(16);
+    for (let i = 0; i < 60; i++) runFrame(16);
     const { out, in: fadeIn } = outThenIn(held, off16);
     expect(out.length).toBeGreaterThan(2);
     expect(out.every(r => r.offsets.join() === OFF4.join())).toBe(true);
@@ -141,7 +141,7 @@ describe('tracker worker tweens layout', () => {
     post(layoutMsg(24, off16, 50));
     now += 1;
     post(layoutMsg(24, off16, 51));
-    for (let i = 0; i < 24; i++) runFrame(16);
+    for (let i = 0; i < 60; i++) runFrame(16);
     const fades = outThenIn(held, off16).in.map(r => r.fade ?? 1);
     expect(fades[0]).toBe(0);
     expect(fades.some(f => f > 0 && f < 1)).toBe(true);
@@ -150,7 +150,7 @@ describe('tracker worker tweens layout', () => {
     expect(renders[renders.length - 1].offsets).toEqual(off16);
   });
 
-  it('c6: covered by the song-load overlay, the old picture fades out, the new one waits at 0 and fades in 150 ms after the reveal', async () => {
+  it('c6: covered by the song-load overlay, the old picture fades out, the new one waits at 0 and fades in after the reveal', async () => {
     const post = await bootWorker();
     post(initMsg());
     runFrame(16);
@@ -159,7 +159,7 @@ describe('tracker worker tweens layout', () => {
     post({ type: 'patterns', patterns: [], currentPatternIndex: 0, awaitLayout: true });
     post(layoutMsg(24, off16, 50));
     const start = renders.length;
-    for (let i = 0; i < 20; i++) runFrame(16); // 320 ms under the overlay
+    for (let i = 0; i < 30; i++) runFrame(16); // 480 ms under the overlay
     const { out, in: held } = outThenIn(start, off16);
     expect(out.length).toBeGreaterThan(2);
     expect(out[0].fade).toBeGreaterThan(0);
@@ -167,7 +167,7 @@ describe('tracker worker tweens layout', () => {
     expect(held.every(r => r.fade === 0)).toBe(true);
     post({ type: 'cover', covered: false });
     const revealed = renders.length;
-    for (let i = 0; i < 12; i++) runFrame(16);
+    for (let i = 0; i < 30; i++) runFrame(16);
     const fades = renders.slice(revealed).map(r => r.fade ?? 1);
     expect(fades[0]).toBe(0);
     expect(fades.some(f => f > 0 && f < 1)).toBe(true);
@@ -188,9 +188,9 @@ describe('tracker worker tweens layout', () => {
     post({ type: 'patterns', patterns: [], currentPatternIndex: 0, awaitLayout: true });
     post(layoutMsg(24, TARGET4, 240, { scale: 0.5 })); // the restored song, fit to width
     expect(resizes.length).toBe(resizesBefore); // the old picture keeps its canvas while it leaves
-    for (let i = 0; i < 14; i++) runFrame(16);
+    for (let i = 0; i < 30; i++) runFrame(16);
     post({ type: 'cover', covered: false });
-    for (let i = 0; i < 14; i++) runFrame(16);
+    for (let i = 0; i < 30; i++) runFrame(16);
     const drawn = renders.slice(start);
     const restored = TARGET4.map(v => v / 0.5).join();
     const { out, in: fadeIn } = outThenIn(start, TARGET4.map(v => v / 0.5));

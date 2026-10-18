@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { LayoutTween, LAYOUT_TWEEN_MS, easeOutCubic, type LayoutGeometry } from '../layoutTween';
+import { LayoutTween, LAYOUT_TWEEN_MS, LAYOUT_FADE_MS, easeOutCubic, type LayoutGeometry } from '../layoutTween';
 
 const geo = (rowHeight: number, offsets: number[], width: number): LayoutGeometry => ({
   rowHeight,
@@ -43,6 +43,15 @@ describe('LayoutTween', () => {
     expect(t.current.rowHeight).toBeLessThan(mid + 1);
   });
 
+  it('the channel-count fade is slow enough to see: 400 ms out, 400 ms in', () => {
+    expect(LAYOUT_FADE_MS).toBe(400);
+    const t = new LayoutTween(A());
+    t.retarget(geo(24, [40, 200], 160), 0, false);
+    t.sample(LAYOUT_TWEEN_MS); // a glide would be over; the old picture is still on screen
+    expect(t.fadingOut).toBe(true);
+    expect(t.fade).toBeGreaterThan(0.2);
+  });
+
   it('a channel-count change fades the old picture out, then the new one in', () => {
     const t = new LayoutTween(A());
     const to = geo(24, [40, 200], 160);
@@ -50,18 +59,18 @@ describe('LayoutTween', () => {
     expect(t.fadingOut).toBe(true);
     expect(t.fade).toBe(1);
     expect(t.current.layout.offsets).toEqual([40, 200, 360, 520]); // the old picture stays while it leaves
-    expect(t.sample(75)).toBe(true);
+    expect(t.sample(LAYOUT_FADE_MS / 2)).toBe(true);
     expect(t.fade).toBeCloseTo(1 - easeOutCubic(0.5));
     expect(t.current.layout.offsets).toEqual([40, 200, 360, 520]);
-    t.sample(LAYOUT_TWEEN_MS);
+    t.sample(LAYOUT_FADE_MS);
     expect(t.fadingOut).toBe(false);
     expect(t.fade).toBe(0);
     expect(t.current.layout.offsets).toEqual([40, 200]);
-    expect(t.sample(LAYOUT_TWEEN_MS + 1)).toBe(true); // the fade-in anchors its clock at 0
+    expect(t.sample(LAYOUT_FADE_MS + 1)).toBe(true); // the fade-in anchors its clock at 0
     expect(t.fade).toBe(0);
-    t.sample(LAYOUT_TWEEN_MS + 1 + 75);
+    t.sample(LAYOUT_FADE_MS + 1 + LAYOUT_FADE_MS / 2);
     expect(t.fade).toBeCloseTo(easeOutCubic(0.5));
-    t.sample(2 * LAYOUT_TWEEN_MS + 1);
+    t.sample(2 * LAYOUT_FADE_MS + 1);
     expect(t.fade).toBe(1);
     expect(t.current).toBe(to);
     expect(t.active).toBe(false);
@@ -75,7 +84,7 @@ describe('LayoutTween', () => {
     t.retarget(restored, 60, false);
     expect(t.fadingOut).toBe(true);
     expect(t.current.layout.offsets).toEqual([40, 200, 360, 520]);
-    t.sample(LAYOUT_TWEEN_MS);
+    t.sample(LAYOUT_FADE_MS);
     expect(t.current.layout.offsets).toEqual(restored.layout.offsets);
   });
 
@@ -86,14 +95,14 @@ describe('LayoutTween', () => {
     t.sample(75);
     expect(t.fade).toBeGreaterThan(0);
     expect(t.fade).toBeLessThan(1);
-    t.sample(LAYOUT_TWEEN_MS);
+    t.sample(LAYOUT_FADE_MS);
     expect(t.fade).toBe(0);
-    expect(t.sample(400)).toBe(false);
+    expect(t.sample(LAYOUT_FADE_MS + 250)).toBe(false);
     expect(t.fade).toBe(0);
     t.setCovered(false);
-    t.sample(500);
+    t.sample(1000);
     expect(t.fade).toBe(0);
-    t.sample(500 + LAYOUT_TWEEN_MS);
+    t.sample(1000 + LAYOUT_FADE_MS);
     expect(t.fade).toBe(1);
   });
 
@@ -101,8 +110,8 @@ describe('LayoutTween', () => {
     const t = new LayoutTween(A());
     t.setCovered(true);
     t.retarget(geo(24, [40, 200], 160), 0, false);
-    t.sample(LAYOUT_TWEEN_MS);
-    t.retarget(geo(24, [40, 200, 360], 160), 200, false);
+    t.sample(LAYOUT_FADE_MS);
+    t.retarget(geo(24, [40, 200, 360], 160), LAYOUT_FADE_MS + 50, false);
     expect(t.fadingOut).toBe(false);
     expect(t.current.layout.offsets).toEqual([40, 200, 360]);
   });
@@ -127,21 +136,21 @@ describe('LayoutTween', () => {
     const t = new LayoutTween(A());
     const off16 = Array.from({ length: 16 }, (_, i) => 40 + i * 50);
     t.retarget(geo(24, off16, 50), 0, false);
-    t.sample(LAYOUT_TWEEN_MS); // the old picture is out
-    t.sample(LAYOUT_TWEEN_MS + 1);
-    t.sample(LAYOUT_TWEEN_MS + 31);
+    t.sample(LAYOUT_FADE_MS); // the old picture is out
+    t.sample(LAYOUT_FADE_MS + 1);
+    t.sample(LAYOUT_FADE_MS + 31);
     const mid = t.fade;
     expect(mid).toBeGreaterThan(0);
     const next = geo(24, off16, 51);
-    t.retarget(next, LAYOUT_TWEEN_MS + 32, false);
+    t.retarget(next, LAYOUT_FADE_MS + 32, false);
     expect(t.active).toBe(true);
     expect(t.current.layout.widths[0]).toBe(51);
-    t.sample(LAYOUT_TWEEN_MS + 32);
+    t.sample(LAYOUT_FADE_MS + 32);
     expect(t.fade).toBeGreaterThanOrEqual(mid);
     expect(t.fade).toBeLessThan(1);
-    t.sample(2 * LAYOUT_TWEEN_MS);
+    t.sample(2 * LAYOUT_FADE_MS);
     expect(t.fade).toBeLessThan(1);
-    t.sample(2 * LAYOUT_TWEEN_MS + 1);
+    t.sample(2 * LAYOUT_FADE_MS + 1);
     expect(t.fade).toBe(1);
     expect(t.current).toBe(next);
     expect(t.active).toBe(false);
@@ -157,10 +166,10 @@ describe('LayoutTween', () => {
     t.setCovered(false);
     t.sample(2000);
     expect(t.fade).toBe(0);
-    t.sample(2000 + LAYOUT_TWEEN_MS / 2);
+    t.sample(2000 + LAYOUT_FADE_MS / 2);
     expect(t.fade).toBeGreaterThan(0);
     expect(t.fade).toBeLessThan(1);
-    t.sample(2000 + LAYOUT_TWEEN_MS);
+    t.sample(2000 + LAYOUT_FADE_MS);
     expect(t.fade).toBe(1);
   });
 });
