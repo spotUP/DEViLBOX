@@ -6,7 +6,7 @@
  * channel count cannot be tweened column by column: the picture on screen fades
  * out (`fade` 1 -> 0, the 'out' phase; the worker keeps drawing the last frame),
  * then the geometry snaps and the new picture fades in (0 -> 1, the 'in'
- * phase), each over LAYOUT_TWEEN_MS on the same curve. Layouts that arrive
+ * phase), each over LAYOUT_FADE_MS on the same curve. Layouts that arrive
  * during the 'out' phase only move the target, so a song that passes through an
  * intermediate picture (the jingle's teardown before the restored song) is
  * never shown.
@@ -16,6 +16,8 @@
 import type { ChannelLayoutSnapshot } from './worker-types';
 
 export const LAYOUT_TWEEN_MS = 150;
+/** Each half of a channel-count fade. Longer than the glide: at 150 ms the owner could not see it. */
+export const LAYOUT_FADE_MS = 400;
 
 export interface LayoutGeometry {
   rowHeight: number;
@@ -49,11 +51,13 @@ export class LayoutTween {
   /** Where the 'out' phase starts (1, or less when a fade-in is cut short). */
   private outFrom = 1;
   private readonly duration: number;
+  private readonly fadeDuration: number;
 
-  constructor(initial: LayoutGeometry, duration = LAYOUT_TWEEN_MS) {
+  constructor(initial: LayoutGeometry, duration = LAYOUT_TWEEN_MS, fadeDuration = LAYOUT_FADE_MS) {
     this.current = initial;
     this.to = initial;
     this.duration = duration;
+    this.fadeDuration = fadeDuration;
   }
 
   get active(): boolean { return this.mode !== null; }
@@ -115,7 +119,7 @@ export class LayoutTween {
   sample(now: number): boolean {
     if (this.mode === null) return false;
     if (this.mode === 'fade' && this.phase === 'out') {
-      const t = Math.min(1, (now - this.start!) / this.duration);
+      const t = Math.min(1, (now - this.start!) / this.fadeDuration);
       this.fade = this.outFrom * (1 - easeOutCubic(t));
       if (t >= 1) {
         // Black: swap to the new picture and fade it in from the next frame (or after the overlay lifts).
@@ -130,7 +134,7 @@ export class LayoutTween {
       if (this.covered) return false; // held at 0 under the overlay; already drawn at 0
       if (this.start === null) { this.start = now; this.fade = 0; return true; }
     }
-    const t = Math.min(1, (now - this.start!) / this.duration);
+    const t = Math.min(1, (now - this.start!) / (this.mode === 'fade' ? this.fadeDuration : this.duration));
     const e = easeOutCubic(t);
     if (this.mode === 'fade') {
       this.fade = e;
