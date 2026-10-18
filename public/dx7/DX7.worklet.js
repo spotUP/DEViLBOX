@@ -124,9 +124,11 @@ class DX7Processor extends AudioWorkletProcessor {
     }
   }
 
-  /** Apply a note event now when its time has come (or it has none), otherwise queue it in time order. */
+  /** Apply a note event now when its time has come (or it has none), otherwise queue it in time order.
+   *  A time that is not a finite number never comes due: queued, it would sit at the head and block
+   *  every event after it, so it plays at once like an untimed event. */
   scheduleNoteEvent(msg) {
-    if (msg.time === undefined || msg.time <= currentTime) { this.applyNoteEvent(msg); return; }
+    if (!Number.isFinite(msg.time) || msg.time <= currentTime) { this.applyNoteEvent(msg); return; }
     let i = this.eventQueue.length;
     while (i > 0 && this.eventQueue[i - 1].time > msg.time) i--;
     this.eventQueue.splice(i, 0, msg);
