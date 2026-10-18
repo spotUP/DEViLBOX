@@ -828,3 +828,29 @@ gives a different value at 75 ms).
 - Pass 5: worker reachability through a mocked bridge cannot prove the tween ran; added the worker-level test that imports the real worker module under node with mocked renderers and captured rAF, fractional row height as sentinel.
 - Pass 6: cell edits would restart the tween through the `pattern` dependency; added `geometryEquals` short-circuit in `retarget` and the `drawVersion` memo key.
 - Pass 7: consistency check against the source: both renderers declare the render input inline, so the plan lifts it into `TrackerRenderInput`; the GL rect helper is `addRect` (not `pushRect`) and the fade rect reuses the clear colour chosen at `:495-500`; dropped the `layoutHold.pending` getter and the `holding` flag, Phase 2.2 is the final worker form and Phase 3 adds no worker code.
+
+## Implementation record (2026-10-18, session 3)
+
+Phase 1 committed as `b04577467`. Deviations from the plan text, with reasons:
+
+- **Fit-scale publish effect split in two.** `useEffect(() => { publishFitScale(fitScale); return () => publishFitScale(1); }, [fitScale])` reset the store to 1 in its cleanup on every fit-scale change, so a zoom flapped `trackerScale` 1.5 -> 1 -> 1.5 and the UI-store subscription bumped `layoutTick` twice more, posting the same layout in two extra commits (measured with a stack trace on `requestLayoutPost`). The reset now runs only on unmount.
+- **`rowHeight` reads the render's fit scale.** `snapshotUI` used `Math.round(24 * ui.trackerScale)`; the store copy is published after commit, so the layout posted in the zoom commit carried the old row height. It now reads `fitScaleRef.current`, and the UI-store subscription no longer bumps on `trackerScale` (nothing in the message depends on it any more).
+- **Worker placeholder.** Phase 1 keeps `let reducedMotion` with a `void reducedMotion` line until Phase 2 reads it, so the strict type-check passes between phases.
+- **Canvas CSS size in the initial measure.** The first `getBoundingClientRect` branch also sets the canvas element's CSS width/height, matching what the ResizeObserver branch does, so the first layout message and the DOM agree.
+- **4.3 column-visibility case uses 16 channels.** With 4 channels in a 1900 px container the widths are stretched to fill, so a new column does not move them; 16 channels overflow and keep their minimums, which is where the width change is observable.
+
+### Phase 2 (commit 97089a001)
+
+- `LayoutTween` lives in `src/engine/renderer/layoutTween.ts` as planned. A retarget to the same geometry keeps any running motion instead of restarting it, so a cell edit that re-posts the layout mid-tween does not stutter.
+- The worker keys the `scaledLayout()` / `scaledUi()` memos on a `drawVersion` counter that bumps on every retarget and every tween sample, because the tween rewrites its arrays in place and identity no longer signals change.
+- Layouts that arrive before the renderer exists (and the init layout) snap, the same as reduced motion.
+- GL renderer: the fade overlay rect is queued after the glyph flush so it covers text as well as cell backgrounds. With the tracker visual background on, the overlay uses black at 0.75 alpha, matching the cleared background.
+- Worker test c1 asserts the drawn row heights are non-decreasing and that the first tweened frame is already above the start height, rather than checking values at fixed timestamps. c4 checks that a scale-0.5 layout resizes the renderer exactly once and draws offsets divided by the scale.
+
+### Phase 3
+
+Verify only, nothing changed: worker test c2 (count change holds, then fades) and the song-load test (no frame shows new rows in the old layout) both pass on 97089a001.
+
+### Phase 4
+
+Lint on the touched files reports 7 `no-explicit-any` errors and 2 unused eslint-disable warnings in PatternEditorCanvas.tsx. git blame puts every one in commits older than this work; left as they are.
