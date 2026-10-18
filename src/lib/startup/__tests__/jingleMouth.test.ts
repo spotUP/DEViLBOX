@@ -65,7 +65,7 @@ describe('startup jingle: the pattern grid animates from the jingle analyser', (
     expect(litRows()).toBe(before);
   });
 
-  it('shows all 12 lip channels under the ProTracker scheme, whose 4-channel cap stops user edits', () => {
+  it('shows all 10 lip channels under the ProTracker scheme, whose 4-channel cap stops user edits', () => {
     useEditorStore.getState().setActiveBehavior('protracker');
     injectMouthPatterns();
     const names = useTrackerStore.getState().patterns[0]!.channels.map(ch => ch.name);
@@ -135,7 +135,7 @@ describe('startup jingle: the pattern grid animates from the jingle analyser', (
   });
 
   it('lip curve is 0 at the corners, 1 in the middle, flatter for a wide viseme', () => {
-    expect(JINGLE_CHANNEL_COUNT).toBeGreaterThanOrEqual(12); // high-resolution mouth
+    expect(JINGLE_CHANNEL_COUNT).toBe(10); // owner 2026-10-18: 12 lips made the text too small to fit
     expect(lipProfile(0, 1)).toBe(0);
     expect(lipProfile(LAST, 0)).toBe(0);
     expect(lipProfile(MIDDLE, 0.5)).toBeGreaterThan(0.95);
