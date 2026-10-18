@@ -58,6 +58,7 @@ import type {
   ChannelLayoutSnapshot,
   ChannelSnapshot,
   CellSnapshot,
+  LayoutMsg,
 } from '@engine/renderer/worker-types';
 import TrackerWorkerFactory from '@/workers/tracker-render.worker.ts?worker';
 import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
@@ -214,6 +215,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const headerScrollRef = useRef<HTMLDivElement>(null);
   const bottomScrollRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  // Store changes that reshape the grid (hex mode, zoom, column visibility,
+  // ghost patterns, ...) re-render through this tick so the ONE posting effect
+  // below sends them with the layout they belong to.
+  const [layoutTick, setLayoutTick] = useState(0);
+  const requestLayoutPost = useCallback(() => setLayoutTick(t => t + 1), []);
   const [scrollLeft, setScrollLeft] = useState(0);
   // PERF: Use refs for scroll/visible state to avoid React re-renders during playback.
   // The canvas render loop updates these every frame — React state would cause 60Hz re-renders.
@@ -508,8 +514,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const lnwCanvasPx = mobileCanvas ? LNW : lnwPx; // the gutter the canvas itself draws (mobile has its own)
   const globalLanePx = globalLaneVisible ? (mobileCanvas ? GLOBAL_LANE_W : Math.floor((LINE_NUMBER_WIDTH + GLOBAL_LANE_W) * fitScale) - lnwPx) : 0;
   const publishFitScale = useUIStore(s => s.setTrackerScale);
-  useEffect(() => { publishFitScale(fitScale); return () => publishFitScale(1); }, [fitScale, publishFitScale]);
+  // Publish on change, reset only on unmount: a cleanup that reset on every
+  // change flapped the store (1.5 -> 1 -> 1.5) and cost two extra commits, each
+  // posting the same layout again.
+  useEffect(() => { publishFitScale(fitScale); }, [fitScale, publishFitScale]);
+  useEffect(() => () => publishFitScale(1), [publishFitScale]);
   const fitScaleRef = useRef(fitScale);
+  const dimensionsRef = useRef(dimensions);
+  dimensionsRef.current = dimensions;
   const lnwPxRef = useRef(lnwPx);
   fitScaleRef.current = fitScale;
   lnwPxRef.current = lnwPx;
@@ -1530,7 +1542,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       columnVisibility:   editor.columnVisibility,
       trackerVisualBg:    settings.trackerVisualBg,
       recordMode:         editor.recordMode,
-      rowHeight:          Math.round(24 * ui.trackerScale),
+      // From this render's fit scale, not the store copy: the store is published
+      // after commit, so the layout posted in the zoom commit would carry the old row height.
+      rowHeight:          Math.round(24 * fitScaleRef.current),
       rowHighlightInterval: ui.rowHighlightInterval,
       rowSecondaryHighlightInterval: ui.rowSecondaryHighlightInterval,
       showBeatLabels:     ui.showBeatLabels,
@@ -1617,6 +1631,20 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // columns are drawn at an earlier width's scale while headers and meters use this one.
   const snapshotLayoutRef = useRef(snapshotLayout);
   snapshotLayoutRef.current = snapshotLayout;
+  const snapshotUIRef = useRef(snapshotUI);
+  snapshotUIRef.current = snapshotUI;
+
+  /** The one message that shapes the grid; every post site uses it so the worker
+   *  never sees a partial target (zoom without its layout, size without its scale). */
+  const buildLayoutMsg = useCallback((): LayoutMsg => ({
+    type: 'layout',
+    w: Math.max(1, dimensionsRef.current.width),
+    h: Math.max(1, dimensionsRef.current.height),
+    dpr: window.devicePixelRatio || 1,
+    scale: fitScaleRef.current,
+    uiState: snapshotUIRef.current(),
+    channelLayout: snapshotLayoutRef.current(),
+  }), []);
 
   // Channel context menu handlers — work in both normal and format modes
   const handleFillPattern = useCallback((channelIndex: number, generatorType: GeneratorType) => {
@@ -1926,7 +1954,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         clearTimeout(readyTimeoutId);
         liveness.stop();
         // Worker is ready — send layout so it can start rendering
-        bridge.post({ type: 'channelLayout', channelLayout: snapshotLayoutRef.current() });
+        bridge.post(buildLayoutMsg());
         bridge.post({ type: 'previewCells', preview: useVoicePreviewStore.getState().preview });
       },
       onMessage: (msg) => {
@@ -2015,6 +2043,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           } : null),
           channelLayout: snapshotLayoutRef.current(),
           scale: fitScaleRef.current,
+          reducedMotion: typeof window.matchMedia === 'function'
+            && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
         },
         [offscreen],
       );
@@ -2077,7 +2107,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       // New patterns with another layout (a song with a different channel
       // count): the worker keeps the old picture until the layout effect below
       // has posted the matching channel layout.
-      if (feedWorkerFromTracker(s, prev, (m) => b.post(m), snapshotPatterns, snapshotUI)) {
+      if (feedWorkerFromTracker(s, prev, (m) => b.post(m), snapshotPatterns)) {
         layoutOwedRef.current = true;
       }
     });
@@ -2087,7 +2117,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const b = bridgeRef.current;
       if (!b) return;
       if (s.columnVisibility !== prev.columnVisibility || s.recordMode !== prev.recordMode || s.bookmarks !== prev.bookmarks) {
-        b.post({ type: 'uiState', uiState: snapshotUI() });
+        requestLayoutPost();
       }
     });
 
@@ -2122,10 +2152,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // zoom change must re-send the row height (PATTERN-MATRIX-ZOOM). snapshotUI reads no pattern data.
     const unsubUI = useUIStore.subscribe((s, prev) => {
       if (s.useHexNumbers !== prev.useHexNumbers || s.blankEmptyCells !== prev.blankEmptyCells
-          || s.trackerZoom !== prev.trackerZoom || s.trackerScale !== prev.trackerScale || s.rowHighlightInterval !== prev.rowHighlightInterval
+          || s.trackerZoom !== prev.trackerZoom || s.rowHighlightInterval !== prev.rowHighlightInterval
           || s.showBeatLabels !== prev.showBeatLabels
           || s.showAutomationLanes !== prev.showAutomationLanes || s.showMacroLanes !== prev.showMacroLanes) {
-        bridgeRef.current?.post({ type: 'uiState', uiState: snapshotUI() });
+        requestLayoutPost();
       }
     });
 
@@ -2133,7 +2163,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const unsubSettings = useSettingsStore.subscribe((s, prev) => {
       if (isFormatModeRef.current) return;
       if (s.trackerVisualBg !== prev.trackerVisualBg || s.showGhostPatterns !== prev.showGhostPatterns) {
-        bridgeRef.current?.post({ type: 'uiState', uiState: snapshotUI() });
+        requestLayoutPost();
       }
     });
 
@@ -2438,6 +2468,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     return () => container.removeEventListener('contextmenu', handler, true);
   }, []);
 
+  // Every non-layout input of the layout message, folded into one dependency.
+  const layoutKey = `${dimensions.width}x${dimensions.height}@${fitScale}#${layoutTick}`;
+  const postedLayoutKeyRef = useRef('');
+
   // Forward layout changes to worker when channel widths/offsets change
   // A layout effect, so it runs in the commit that renders the new song's
   // headers, before the browser paints either. When the new patterns were posted
@@ -2461,25 +2495,25 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         if (bottomScrollRef.current) bottomScrollRef.current.scrollLeft = next;
       }
     }
-    if (owed || postedLayoutFnRef.current !== snapshotLayout) {
+    if (owed || postedLayoutFnRef.current !== snapshotLayout || postedLayoutKeyRef.current !== layoutKey) {
       postedLayoutFnRef.current = snapshotLayout;
-      bridge?.post({ type: 'channelLayout', channelLayout: snapshotLayout() });
+      postedLayoutKeyRef.current = layoutKey;
+      bridge?.post(buildLayoutMsg());
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snapshotLayout, pattern]);
+  }, [snapshotLayout, pattern, layoutKey]);
 
   // Format mode: re-sync columns/channels/layout when props change
   useEffect(() => {
     if (!isFormatMode) return;
     const bridge = bridgeRef.current;
     if (!bridge) return;
-    bridge.post({ type: 'uiState', uiState: snapshotUI() });
     bridge.post({
       type: 'patterns',
       patterns: snapshotFormatPatterns(),
       currentPatternIndex: 0,
     });
-    bridge.post({ type: 'channelLayout', channelLayout: snapshotLayout() });
+    bridge.post(buildLayoutMsg());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFormatMode, formatColumns, formatChannels]);
 
@@ -2562,7 +2596,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
               patterns: formatPatternSnapshotRef.current,
               currentPatternIndex: 0,
             });
-            bridge.post({ type: 'channelLayout', channelLayout: snapshotLayout() });
+            bridge.post(buildLayoutMsg());
             // Force a playback send on channel change to update worker position
             prevRow = -1;
           }
@@ -2870,11 +2904,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         const { width, height } = entry.contentRect;
         if (width > 0 && height > 0) {
           setDimensions({ width, height });
-          // Post resize directly to worker to avoid React re-render delay —
-          // critical on first layout when the worker may have been init'd with
-          // height=1, causing the center line to fill the entire viewport.
-          const dpr = window.devicePixelRatio || 1;
-          bridgeRef.current?.post({ type: 'resize', w: width, h: height, dpr });
           if (canvasRef.current) {
             canvasRef.current.style.width  = `${width}px`;
             canvasRef.current.style.height = `${height}px`;
@@ -2887,26 +2916,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const rect = container.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) {
       setDimensions({ width: rect.width, height: rect.height });
+      if (canvasRef.current) {
+        canvasRef.current.style.width  = `${rect.width}px`;
+        canvasRef.current.style.height = `${rect.height}px`;
+      }
     }
 
     return () => resizeObserver.disconnect();
   }, []);
-
-  // Tell the worker the pattern scale; it draws the whole pattern at that size.
-  useEffect(() => {
-    bridgeRef.current?.post({ type: 'scale', scale: fitScale });
-  }, [fitScale]);
-
-  // Notify worker when dimensions change (worker owns canvas.width/height)
-  useEffect(() => {
-    const dpr = window.devicePixelRatio || 1;
-    bridgeRef.current?.post({ type: 'resize', w: dimensions.width, h: dimensions.height, dpr });
-    // Keep canvas CSS size in sync (canvas is created imperatively, not via JSX)
-    if (canvasRef.current) {
-      canvasRef.current.style.width  = `${dimensions.width}px`;
-      canvasRef.current.style.height = `${dimensions.height}px`;
-    }
-  }, [dimensions]);
 
   // Reset horizontal scroll when all channels fit in viewport
   useEffect(() => {

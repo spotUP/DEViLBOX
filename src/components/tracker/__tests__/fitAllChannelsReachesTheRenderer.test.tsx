@@ -40,20 +40,20 @@ function withChannels(n: number) {
   useTrackerStore.setState({ patterns: [{ ...base, channels }], currentPatternIndex: 0 });
 }
 
-/** The scale the worker was last told: init, then any 'scale' message. */
+/** The scale the worker was last told: init, then any 'layout' message. */
 function workerScale(): number {
   let s = 1;
   for (const m of posted) {
-    if (m.type === 'init' || m.type === 'scale') s = m.scale ?? 1;
+    if (m.type === 'init' || m.type === 'layout') s = m.scale ?? 1;
   }
   return s;
 }
-/** The row height the worker was last told: in init, or a later uiState message. */
+/** The row height the worker was last told: in init, or a later layout message. */
 function lastRowHeight(): number {
-  return posted.filter((m) => m.uiState !== undefined).pop()!.uiState!.rowHeight;
+  return posted.filter((m) => (m.type === 'init' || m.type === 'layout') && m.uiState !== undefined).pop()!.uiState!.rowHeight;
 }
 function lastLayout() {
-  const m = [...posted].reverse().find((x) => x.channelLayout !== undefined && x.channelLayout.widths.length > 0);
+  const m = [...posted].reverse().find((x) => (x.type === 'init' || x.type === 'layout') && x.channelLayout !== undefined && x.channelLayout.widths.length > 0);
   return m!.channelLayout!;
 }
 

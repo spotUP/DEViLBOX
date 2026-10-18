@@ -47,11 +47,11 @@ function modelWorker(hold: boolean) {
   };
   return {
     frames,
-    receive(msg: { type: string; patterns?: Array<{ channels: unknown[] }>; awaitLayout?: boolean; channelLayout?: { widths: number[] } }) {
+    receive(msg: { type: string; patterns?: Array<{ channels: unknown[] }>; awaitLayout?: boolean; w?: number; h?: number; dpr?: number; scale?: number; uiState?: object; channelLayout?: { offsets: number[]; widths: number[] } }) {
       if (msg.type === 'patterns') {
         patternChannels = msg.patterns![0].channels.length;
         h.patterns(hold ? msg.awaitLayout : false, clock);
-      } else if (msg.type === 'channelLayout') {
+      } else if (msg.type === 'layout') {
         layoutChannels = msg.channelLayout!.widths.length;
         h.layout();
       }
@@ -92,7 +92,10 @@ async function loadAndRecord(hold: boolean) {
     // What the layout effect does in the commit that renders the new song.
     const n = useTrackerStore.getState().patterns[useTrackerStore.getState().currentPatternIndex].channels.length;
     owed = false;
-    post({ type: 'channelLayout', channelLayout: { widths: new Array(n).fill(120) } });
+    post({
+      type: 'layout', w: 1900, h: 600, dpr: 1, scale: 1, uiState: {},
+      channelLayout: { offsets: new Array(n).fill(0), widths: new Array(n).fill(120) },
+    });
   };
 
   await applySong(four, 'project');
@@ -101,7 +104,7 @@ async function loadAndRecord(hold: boolean) {
   posts = 0;
 
   const unsub = useTrackerStore.subscribe((s, prev) => {
-    if (feedWorkerFromTracker(s, prev, (m) => post(m as never), () => s.patterns as never, () => ({}) as never)) owed = true;
+    if (feedWorkerFromTracker(s, prev, (m) => post(m as never), () => s.patterns as never)) owed = true;
   });
   await applySong(seven, 'project');
   if (owed) postLayout();

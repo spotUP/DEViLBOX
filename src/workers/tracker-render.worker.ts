@@ -40,6 +40,8 @@ let height = 600;
 let dpr    = 1;
 /** Pattern scale (fit all channels): the renderer draws in canvas px / scale at dpr * scale. */
 let scale  = 1;
+/** `prefers-reduced-motion: reduce`, from init; layout changes snap instead of tweening. */
+let reducedMotion = false;
 
 let patterns: PatternSnapshot[] = [];
 let currentPatternIndex = 0;
@@ -96,6 +98,8 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
       selection = msg.selection;
       layout   = msg.channelLayout;
       scale    = msg.scale ?? 1;
+      reducedMotion = msg.reducedMotion ?? false;
+      void reducedMotion; // read by the layout tween in Phase 2
 
       let glErr: unknown = null;
       try {
@@ -158,35 +162,20 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
       break;
     }
 
-    case 'resize':
-      width  = msg.w;
-      height = msg.h;
-      dpr    = msg.dpr;
-      renderer?.resize(width / scale, height / scale, dpr * scale);
-      dirty = true;
-      break;
-
-    case 'scale':
-      if (msg.scale !== scale) {
-        scale = msg.scale;
+    case 'layout': {
+      if (msg.w !== width || msg.h !== height || msg.dpr !== dpr || msg.scale !== scale) {
+        width = msg.w; height = msg.h; dpr = msg.dpr; scale = msg.scale;
         renderer?.resize(width / scale, height / scale, dpr * scale);
       }
+      ui = msg.uiState;
+      layout = msg.channelLayout;
+      layoutHold.layout();
       dirty = true;
       break;
+    }
 
     case 'theme':
       theme = msg.theme;
-      dirty = true;
-      break;
-
-    case 'uiState':
-      ui = msg.uiState;
-      dirty = true;
-      break;
-
-    case 'channelLayout':
-      layout = msg.channelLayout;
-      layoutHold.layout();
       dirty = true;
       break;
 
