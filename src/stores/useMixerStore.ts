@@ -22,6 +22,7 @@ import { getActiveDubBus } from '../engine/dub/DubBus';
 import { dubSendBaselines } from '@/lib/dub/channelSendBaseline';
 import { clampChannelShapeValue, isChannelShapeKind, type ChannelShapeKind } from '@/lib/dub/channelShape';
 import { migrateMixerChannelShape } from '@/lib/persistence/migrations';
+import { isChannelSilenced } from '@/lib/tracker/channelDim';
 
 /**
  * Who is writing a channel's dub send / mute.
@@ -349,11 +350,11 @@ void (async () => {
 })();
 
 
-/** The mute mask the mixer's channel state means for a bitmask engine: bit N set = channel N audible (solo wins over mute). */
+/** The mute mask the mixer's channel state means for a bitmask engine: bit N set = channel N audible (mute wins over solo). */
 export function mixerAudibleMask(channels: ReadonlyArray<Pick<MixerChannelState, 'muted' | 'soloed'>>, isSoloing: boolean): number {
   let mask = 0;
   for (let i = 0; i < Math.min(channels.length, 32); i++) {
-    const effectiveMute = isSoloing ? !channels[i].soloed : channels[i].muted;
+    const effectiveMute = isChannelSilenced(channels[i].muted, channels[i].soloed, isSoloing);
     if (!effectiveMute) mask |= (1 << i);
   }
   return mask;
@@ -614,7 +615,7 @@ function forwardSunVoxModuleMute(channels: MixerChannelState[], isSoloing: boole
       const modId = inst.sunvox.noteTargetModuleId as number;
       if (seen.has(modId)) continue; // Already handled by a previous channel
       seen.add(modId);
-      const effectiveMute = isSoloing ? !ch.soloed : ch.muted;
+      const effectiveMute = isChannelSilenced(ch.muted, ch.soloed, isSoloing);
       // Check if ANY channel targeting this module is unmuted
       let anyUnmuted = !effectiveMute;
       if (!anyUnmuted) {
@@ -624,7 +625,7 @@ function forwardSunVoxModuleMute(channels: MixerChannelState[], isSoloing: boole
           const instrId2 = pattern.channels[j]?.instrumentId;
           const inst2 = instruments.find((ins: { id: number }) => ins.id === instrId2);
           if (inst2?.sunvox?.noteTargetModuleId !== modId) continue;
-          const mute2 = isSoloing ? !ch2.soloed : ch2.muted;
+          const mute2 = isChannelSilenced(ch2.muted, ch2.soloed, isSoloing);
           if (!mute2) { anyUnmuted = true; break; }
         }
       }
@@ -652,7 +653,7 @@ function forwardWasmChannelGain(ch: number, channels: MixerChannelState[], isSol
       const eng = getFurnaceDispatchEngine();
       if (eng) {
         const c = channels[ch];
-        const effectiveMute = isSoloing ? !c.soloed : (c.muted || c.volume <= 0);
+        const effectiveMute = isChannelSilenced(c.muted || c.volume <= 0, c.soloed, isSoloing);
         eng.getInstance().mute(ch, effectiveMute);
       }
     } catch (e: any) {
@@ -677,7 +678,7 @@ function forwardWasmChannelGain(ch: number, channels: MixerChannelState[], isSol
   if (gainEngine) {
     try {
       const c = channels[ch];
-      const effectiveMute = isSoloing ? !c.soloed : c.muted;
+      const effectiveMute = isChannelSilenced(c.muted, c.soloed, isSoloing);
       const gain = effectiveMute ? 0 : c.volume;
       gainEngine.setChannelGain(ch, gain);
     } catch (e: any) {
@@ -701,7 +702,7 @@ function forwardAllWasmChannelGains(channels: MixerChannelState[], isSoloing: bo
       if (eng) {
         const engine = eng.getInstance();
         channels.forEach((c, i) => {
-          const effectiveMute = isSoloing ? !c.soloed : (c.muted || c.volume <= 0);
+          const effectiveMute = isChannelSilenced(c.muted || c.volume <= 0, c.soloed, isSoloing);
           engine.mute(i, effectiveMute);
         });
       }
@@ -722,7 +723,7 @@ function forwardAllWasmChannelGains(channels: MixerChannelState[], isSoloing: bo
   if (gainEngine) {
     try {
       channels.forEach((c, i) => {
-        const effectiveMute = isSoloing ? !c.soloed : c.muted;
+        const effectiveMute = isChannelSilenced(c.muted, c.soloed, isSoloing);
         const gain = effectiveMute ? 0 : c.volume;
         gainEngine.setChannelGain(i, gain);
       });
@@ -984,7 +985,7 @@ export const useMixerStore = create<MixerStore>()(
       });
       applyToEngine(() => {
         const { channels: chans, isSoloing: soloing } = get();
-        const effectiveMute = soloing ? !chans[ch].soloed : muted;
+        const effectiveMute = isChannelSilenced(muted, chans[ch].soloed, soloing);
         getToneEngine().setChannelMute(ch, effectiveMute);
       });
       const { channels: chans, isSoloing: soloing } = get();
@@ -1013,7 +1014,7 @@ export const useMixerStore = create<MixerStore>()(
       const { channels, isSoloing } = get();
       applyToEngine(() => {
         channels.forEach((c, i) => {
-          const effectiveMute = isSoloing ? !c.soloed : c.muted;
+          const effectiveMute = isChannelSilenced(c.muted, c.soloed, isSoloing);
           getToneEngine().setChannelMute(i, effectiveMute);
         });
       });
@@ -1047,7 +1048,7 @@ export const useMixerStore = create<MixerStore>()(
       const { channels, isSoloing } = get();
       applyToEngine(() => {
         channels.forEach((c, i) => {
-          const effectiveMute = isSoloing ? !c.soloed : c.muted;
+          const effectiveMute = isChannelSilenced(c.muted, c.soloed, isSoloing);
           try { getToneEngine().setChannelMute(i, effectiveMute); } catch { /* ok */ }
         });
       });
@@ -1532,7 +1533,7 @@ export const useMixerStore = create<MixerStore>()(
         channels.forEach((c, i) => {
           engine.setMixerChannelVolume(i, toDb(c.volume));
           engine.setMixerChannelPan(i, c.pan);
-          const effectiveMute = isSoloing ? !c.soloed : c.muted;
+          const effectiveMute = isChannelSilenced(c.muted, c.soloed, isSoloing);
           try { engine.setChannelMute(i, effectiveMute); } catch { /* ok */ }
         });
       });

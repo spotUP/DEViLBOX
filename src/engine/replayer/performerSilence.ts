@@ -11,6 +11,7 @@
  * resolved lazily because it imports the router.
  */
 import { drySilencedByDub } from '@/lib/dub/drySilence';
+import { isChannelSilenced } from '@/lib/tracker/channelDim';
 
 type MixerStoreLike = { getState(): { channels: Array<{ muted: boolean; soloed: boolean }>; isSoloing: boolean } };
 let _mixerStore: MixerStoreLike | null = null;
@@ -20,7 +21,7 @@ void import('@/stores/useMixerStore').then((m) => { _mixerStore = m.useMixerStor
 export function mixerSilencesAChannel(): boolean {
   const st = _mixerStore?.getState();
   if (!st) return false;
-  return st.channels.some((c) => (st.isSoloing ? !c.soloed : c.muted));
+  return st.channels.some((c) => isChannelSilenced(c.muted, c.soloed, st.isSoloing));
 }
 
 /** Mixer mute/solo, or a dub move holding the dry down. */
