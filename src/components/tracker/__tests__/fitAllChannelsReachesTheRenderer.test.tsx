@@ -120,21 +120,21 @@ describe('the tracker pattern view fits every channel to the width', () => {
   });
 
   // Owner 2026-10-18: "it is not scaled to fit i see 6,5 channels during the jingle".
-  // The 12 lips are too wide for the 10 px floor in a laptop-sized editor; the jingle has no floor.
-  it('the startup jingle fits all 12 lips below the font floor; a song at that width scrolls', async () => {
-    width = 1000; // 12 channels do not fit here even at the 10 px floor
-    withChannels(12);
+  // The jingle's lips are too wide for the 10 px floor in a laptop-sized editor; the jingle has no floor.
+  it('the startup jingle fits all 10 lips below the font floor; a song at that width scrolls', async () => {
+    width = 850; // 10 channels do not fit here even at the 10 px floor
+    withChannels(10);
     let view = await mount();
     expect(workerScale()).toBe(FIT_SCALE_FLOOR);
-    expect(lastLayout().offsets[11] + lastLayout().widths[11]).toBeGreaterThan(width);
+    expect(lastLayout().offsets[9] + lastLayout().widths[9]).toBeGreaterThan(width);
     view.unmount(); cleanup();
 
     act(() => { useUIStore.getState().setJingleActive(true); });
     view = await mount();
     expect(workerScale()).toBeLessThan(FIT_SCALE_FLOOR);
     const layout = lastLayout();
-    expect(layout.offsets).toHaveLength(12);
-    expect(layout.offsets[11] + layout.widths[11]).toBeLessThanOrEqual(width); // every lip on screen
+    expect(layout.offsets).toHaveLength(10);
+    expect(layout.offsets[9] + layout.widths[9]).toBeLessThanOrEqual(width); // every lip on screen
     view.unmount(); cleanup();
     act(() => { useUIStore.getState().setJingleActive(false); });
   });

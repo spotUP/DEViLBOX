@@ -33,8 +33,8 @@ import { getJingleEngine } from './JingleEngine';
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const PATTERN_LENGTH = 16;
-/** Channels across the mouth; more channels give a smoother lip curve. */
-export const JINGLE_CHANNEL_COUNT = 12;
+/** Channels across the mouth. 10, not 12: 12 lips shrank the text too far to fit the width (owner 2026-10-18). */
+export const JINGLE_CHANNEL_COUNT = 10;
 const UPDATE_MS = 50;           // 20 fps — smooth without canvas flicker
 
 /** The row the lips are centred on; the cursor sits here while the jingle plays. */
@@ -102,7 +102,7 @@ let savedChannelData: TrackerCell[][] | null = null;
 let savedChannelNames: string[] = [];
 let savedCursorRow: number | null = null;
 let injectedNumCh = 0;
-/** Fit-all-channels setting before the jingle; the lips force it on so all 12 channels fit the width. */
+/** Fit-all-channels setting before the jingle; the lips force it on so all lip channels fit the width. */
 let savedFitAllChannels: boolean | null = null;
 /** True between injectMouthPatterns and teardownMouthPatterns; makes teardown idempotent. */
 let overlayActive = false;
