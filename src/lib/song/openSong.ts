@@ -371,11 +371,15 @@ export async function openDeckTrack(src: SongSourceRef, deck?: DeckId, o: Omit<O
 export async function openSong(src: SongSourceRef, o: OpenOptions & { target: DeckTarget }): Promise<DeckSong | { ok: false; error: string }>;
 export async function openSong(src: SongSourceRef | StoredSongSource, o: OpenOptions): Promise<OpenResult>;
 export async function openSong(src: SongSourceRef | StoredSongSource, o: OpenOptions): Promise<OpenResult | DeckSong> {
-  if (src.kind === 'song') return openStoredSong(src);
-  if (typeof o.target === 'object') return openDeckSong(src, o as OpenOptions & { target: DeckTarget });
-  // The startup jingle plays, and the silent boot restore lands, before any song
-  // loads: a restore finishing after a load would overwrite the loaded song.
+  if (src.kind !== 'song' && typeof o.target === 'object') return openDeckSong(src, o as OpenOptions & { target: DeckTarget });
+  // The startup jingle owns the tracker while it plays (its lips are overlay
+  // channels in the current pattern), so no song loads into the tracker before
+  // it ends. That includes a stored song: the silent boot restore opens one, and
+  // landing it mid-jingle replaced the lips with the restored pattern.
   await whenStartupJingleDone();
+  // The boot restore is itself a stored-song open, so it cannot wait on its own gate.
+  if (src.kind === 'song') return openStoredSong(src);
+  // A restore finishing after a load would overwrite the loaded song.
   await whenBootRestoreDone();
   const interactive = o.interactive ?? INTERACTIVE_ORIGINS.has(o.origin);
   const phase = (p: OpenPhase): void => {
