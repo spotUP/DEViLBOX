@@ -44,8 +44,9 @@ jobs:
           fi
           CHANGED=$(git diff --name-only "$BASE" HEAD)
           if echo "$CHANGED" | grep -qE '^(third-party/nuade|nuade-wasm)/' \
-             && ! echo "$CHANGED" | grep -qx 'public/nuade/Nuade.wasm'; then
-            echo "third-party/nuade or nuade-wasm changed but public/nuade/Nuade.wasm was not rebuilt."
+             && ! echo "$CHANGED" | grep -qxE 'public/nuade/Nuade\.(wasm|js)'; then
+            # A link-flag change (e.g. -s ENVIRONMENT) can rebuild only the JS glue with a byte-identical wasm.
+            echo "third-party/nuade or nuade-wasm changed but public/nuade/Nuade.wasm / Nuade.js were not rebuilt."
             echo "Run: nuade-wasm/build.sh (emcc on PATH) and commit public/nuade/Nuade.wasm + Nuade.js"
             exit 1
           fi
