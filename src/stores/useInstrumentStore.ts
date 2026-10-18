@@ -112,6 +112,22 @@ const bakingInstruments = new Set<number>();
  * without a live re-export (the debounce checks sourceFormat internally). Lazy-imported
  * to avoid a static cycle with useTrackerStore.
  */
+
+/**
+ * Stop the engine synths of instruments that left the store. Without this the
+ * synth instances (one per channel for per-channel synths) keep running: five
+ * orphaned DX7 worklets starved the audio thread and the song played silent.
+ */
+function disposeEngineInstruments(ids: number[]): void {
+  if (ids.length === 0) return;
+  try {
+    const engine = getToneEngine();
+    for (const id of ids) engine.disposeInstrument(id);
+  } catch (error) {
+    console.warn('[InstrumentStore] Could not dispose engine instruments:', error);
+  }
+}
+
 function triggerWasmReexport(): void {
   void import('./useTrackerStore').then((m) => m.debouncedWasmEngineReexport()).catch(() => { /* store not ready */ });
 }
@@ -1286,6 +1302,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     deleteInstrument: (id) => {
+      const { instruments } = get();
+      if (instruments.length <= 1 || !instruments.some((inst) => inst.id === id)) return;
       set((state) => {
         const index = state.instruments.findIndex((inst) => inst.id === id);
         if (index !== -1 && state.instruments.length > 1) {
@@ -1297,11 +1315,20 @@ export const useInstrumentStore = create<InstrumentStore>()(
           }
         }
       });
+      disposeEngineInstruments([id]);
       triggerWasmReexport();
     },
 
     removeInstrumentsRenumbered: (ids) => {
       const drop = new Set(ids);
+      const before = get().instruments;
+      if (drop.size === 0 || drop.size >= before.length) return;
+      // Engine synths are keyed by the old id: a dropped instrument's synths must
+      // stop, and a renumbered one's would answer to the wrong instrument.
+      const stale = before.filter((inst) => drop.has(inst.id)).map((inst) => inst.id);
+      before.filter((inst) => !drop.has(inst.id)).forEach((inst, i) => {
+        if (inst.id !== i + 1) stale.push(inst.id);
+      });
       set((state) => {
         if (drop.size === 0 || drop.size >= state.instruments.length) return;
         for (const inst of state.instruments) if (drop.has(inst.id)) revokeInstrumentSampleUrls(inst.sample);
@@ -1318,6 +1345,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
         state.instruments = kept;
         state.currentInstrumentId = current ?? kept[0].id;
       });
+      disposeEngineInstruments(stale);
       triggerWasmReexport();
     },
 
