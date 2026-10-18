@@ -104,6 +104,8 @@ let savedCursorRow: number | null = null;
 let injectedNumCh = 0;
 /** Fit-all-channels setting before the jingle; the lips force it on so all lip channels fit the width. */
 let savedFitAllChannels: boolean | null = null;
+/** Each pattern's lip-channel effect column counts before the jingle, [pattern][channel]; undefined = the default. */
+let savedEffectCols: (number | undefined)[][] | null = null;
 /** True between injectMouthPatterns and teardownMouthPatterns; makes teardown idempotent. */
 let overlayActive = false;
 let rafHandle: number | null = null;
@@ -208,6 +210,15 @@ export function injectMouthPatterns(): void {
   savedFitAllChannels = useSettingsStore.getState().fitAllChannelsTracker;
   useSettingsStore.getState().setFitAllChannelsTracker(true);
 
+  // The lips use only note, instrument and volume: drop the effect columns so the
+  // fitted text can be larger (owner 2026-10-18). channelMeta drives the width maths
+  // and the renderer alike, so both see the narrow channels.
+  savedEffectCols = useTrackerStore.getState().patterns
+    .map(p => p.channels.slice(0, injectedNumCh).map(ch => ch.channelMeta?.effectCols));
+  for (let i = 0; i < injectedNumCh; i++) {
+    useTrackerStore.getState().setChannelMeta(i, { effectCols: 0 });
+  }
+
   // ② Save current channel names then set the mouth labels
   const { patterns: currentPatterns } = useTrackerStore.getState();
   savedChannelNames = (currentPatterns[0]?.channels ?? [])
@@ -265,6 +276,22 @@ export function teardownMouthPatterns(): void {
   if (savedFitAllChannels !== null) {
     useSettingsStore.getState().setFitAllChannelsTracker(savedFitAllChannels);
     savedFitAllChannels = null;
+  }
+
+  // Restore the effect columns, pattern by pattern (patterns may differ)
+  if (savedEffectCols !== null) {
+    const saved = savedEffectCols;
+    useTrackerStore.setState((state) => {
+      state.patterns.forEach((pattern, pi) => {
+        saved[pi]?.forEach((cols, ch) => {
+          const meta = pattern.channels[ch]?.channelMeta;
+          if (!meta) return;
+          if (cols === undefined) delete meta.effectCols;
+          else meta.effectCols = cols;
+        });
+      });
+    });
+    savedEffectCols = null;
   }
 
   // Restore channel names

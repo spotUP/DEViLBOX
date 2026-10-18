@@ -88,6 +88,20 @@ describe('startup jingle: the pattern grid animates from the jingle analyser', (
     useSettingsStore.getState().setFitAllChannelsTracker(true);
   });
 
+  // Owner 2026-10-18: the lips were too small. They use note, instrument and volume only,
+  // so the effect columns go while they show and the text can grow.
+  it('drops the effect columns on the lip channels and puts each pattern\'s columns back', () => {
+    useTrackerStore.getState().setChannelMeta(1, { effectCols: 3 });
+    const before = useTrackerStore.getState().patterns.map(p => p.channels.map(ch => ch.channelMeta?.effectCols));
+    injectMouthPatterns();
+    const lips = useTrackerStore.getState().patterns[0]!.channels.map(ch => ch.channelMeta?.effectCols);
+    expect(lips).toHaveLength(JINGLE_CHANNEL_COUNT);
+    expect(lips.every(c => c === 0)).toBe(true);
+    teardownMouthPatterns();
+    expect(useTrackerStore.getState().patterns.map(p => p.channels.map(ch => ch.channelMeta?.effectCols))).toEqual(before);
+    useTrackerStore.getState().setChannelMeta(1, { effectCols: undefined });
+  });
+
   it('parks the cursor on row 8 while the jingle plays and puts it back at the end (JMA-1)', () => {
     useCursorStore.getState().moveCursorToRow(3);
     injectMouthPatterns();

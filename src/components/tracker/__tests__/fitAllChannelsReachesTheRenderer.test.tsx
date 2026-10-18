@@ -138,4 +138,27 @@ describe('the tracker pattern view fits every channel to the width', () => {
     view.unmount(); cleanup();
     act(() => { useUIStore.getState().setJingleActive(false); });
   });
+
+  // Owner 2026-10-18: the lips were too small. They have no automation lanes, so the width goes to the text.
+  it('the startup jingle drops the automation lanes from the channel widths', async () => {
+    width = 400; // fit off and too narrow to stretch: the widths are the channels' own
+    useSettingsStore.setState({ fitAllChannelsTracker: false });
+    withChannels(10);
+    act(() => { useUIStore.setState({ showAutomationLanes: true }); });
+    let view = await mount();
+    const withLanes = lastLayout().widths[0];
+    view.unmount(); cleanup();
+
+    act(() => { useUIStore.setState({ showAutomationLanes: false }); });
+    view = await mount();
+    const noLanes = lastLayout().widths[0];
+    view.unmount(); cleanup();
+    expect(withLanes).toBeGreaterThan(noLanes);
+
+    act(() => { useUIStore.setState({ showAutomationLanes: true, jingleActive: true }); });
+    view = await mount();
+    expect(lastLayout().widths[0]).toBe(noLanes);
+    view.unmount(); cleanup();
+    act(() => { useUIStore.setState({ showAutomationLanes: false, jingleActive: false }); });
+  });
 });
