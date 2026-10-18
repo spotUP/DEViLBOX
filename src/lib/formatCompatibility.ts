@@ -279,11 +279,12 @@ export function getActiveFormatLimits(): FormatConstraints | null {
     if (fmt.editorMode === 'furnace') return null; // Furnace has its own limits
     if (fmt.editorMode === 'klystrack') return null; // Klystrack has its own limits
 
-    // For libopenmpt formats, detect from the editorMode or default to MOD
+    // libopenmpt songs keep their own format's limits: an XM has 128
+    // instruments, not MOD's 31 (flo boarding warned on instrument 32,
+    // 2026-10-18). Formats without an entry fall to MOD, the format the
+    // exporter writes them as.
     if (fmt.libopenmptFileData) {
-      // The format is stored in the song — check TrackerSong.format
-      // For now, default to MOD limits (most restrictive of the PC tracker formats)
-      return FORMAT_LIMITS.MOD;
+      return (fmt.songFormat && FORMAT_LIMITS[fmt.songFormat]) || FORMAT_LIMITS.MOD;
     }
 
     // UADE / Amiga formats — use FC limits as a safe default

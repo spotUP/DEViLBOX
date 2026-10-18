@@ -17,7 +17,14 @@ describe('format limits for eagleplayer songs', () => {
   });
 
   it('a libopenmpt MOD still gets MOD limits', () => {
-    useFormatStore.setState({ eaglePlayerFileData: null, eaglePlayerId: null, libopenmptFileData: new ArrayBuffer(16) } as never);
+    useFormatStore.setState({ eaglePlayerFileData: null, eaglePlayerId: null, libopenmptFileData: new ArrayBuffer(16), songFormat: 'MOD' } as never);
     expect(getActiveFormatLimits()?.name).toBe('MOD');
+  });
+
+  it('a libopenmpt XM gets XM limits, so instrument 32 is allowed', () => {
+    useFormatStore.setState({ eaglePlayerFileData: null, eaglePlayerId: null, libopenmptFileData: new ArrayBuffer(16), songFormat: 'XM' } as never);
+    const limits = getActiveFormatLimits();
+    expect(limits?.name).toBe('XM');
+    expect(limits?.maxInstruments).toBe(128);
   });
 });
