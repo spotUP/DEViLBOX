@@ -366,7 +366,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // Convert blend % (0-100) to 2-digit hex alpha for CSS color suffix
   const blendHex = Math.round(channelColorBlend * 2.55).toString(16).padStart(2, '0');
   const showChannelNames = useUIStore(s => s.showChannelNames);
-  const showAutomationLanes = useUIStore(s => s.showAutomationLanes);
+  // The startup jingle's lips have no automation lanes: the width goes to larger text (owner 2026-10-18).
+  const jingleActive = useUIStore(s => s.jingleActive);
+  const showAutomationLanes = useUIStore(s => s.showAutomationLanes) && !jingleActive;
   const showMacroLanes = useUIStore(s => s.showMacroLanes);
 
   // Channel role overrides — read from mixer store, auto-roles from classifier.
@@ -418,7 +420,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
   // Channel Metrics: calculate numChannels, offsets, and widths once per pattern/theme change
   const fitChannels = useSettingsStore(s => s.fitAllChannelsTracker) && !mobileCanvas;
-  const fitFloor = useUIStore(s => s.jingleActive) ? JINGLE_FIT_SCALE_FLOOR : FIT_SCALE_FLOOR;
+  const fitFloor = jingleActive ? JINGLE_FIT_SCALE_FLOOR : FIT_SCALE_FLOOR;
   // With fit off the pattern is drawn at the zoom slider's scale; `fitScale` below is the scale in use either way.
   const manualScale = useUIStore(s => s.trackerZoom) / 100;
   // Channels with no data in any pattern are width 0 (hidden, not deleted): one list for the grid, headers, scopes, meters and the fit scale.
