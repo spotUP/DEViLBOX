@@ -28,7 +28,7 @@ import { useMediaSession } from './hooks/useMediaSession';
 import { setupCloudSyncSubscribers } from './lib/cloudSyncSubscribers';
 import { setupInstrumentSelectionSync } from './midi/instrumentSelectionWiring';
 import { getToneEngine } from '@engine/ToneEngine';
-import { beginStartupSequence, closeStartDialog, startupDialog } from '@lib/startup/startupSequence';
+import { beginStartupSequence, closeStartDialog, openStartDialog } from '@lib/startup/startupSequence';
 import type { EffectConfig } from './types/instrument';
 import { Zap, Music, Sliders, Download, List } from 'lucide-react';
 import { ToastNotification } from '@components/ui/ToastNotification';
@@ -62,7 +62,6 @@ import { pickCompanionsFromDrop } from '@lib/import/companionDrop';
 import { expectedCompanionNames } from '@lib/import/companionResolver';
 import { companionRelativeName } from '@lib/import/companionRelativeName';
 import { runPrefetchIfNeeded } from '@/lib/SamplePackPrefetcher';
-import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { PeerMouseCursor } from '@components/collaboration/PeerMouseCursor';
 import { PeerVideoWindow } from '@components/collaboration/PeerVideoWindow';
 import { ExposeOverlay } from '@components/ui/ExposeOverlay';
@@ -231,19 +230,7 @@ function App() {
 
   // The one start dialog: Tip of the day / What's new on every start, or the
   // collaboration modal for a ?collab=CODE link.
-  useEffect(() => {
-    const dialog = startupDialog(currentVersion.buildNumber, window.location.search);
-    if (dialog.modal === 'collab') {
-      // Clean the URL so refreshing doesn't re-trigger
-      const url = new URL(window.location.href);
-      url.searchParams.delete('collab');
-      window.history.replaceState({}, '', url.pathname + url.search);
-      openModal('collab');
-      useCollaborationStore.getState().joinRoom(dialog.collabCode);
-    } else {
-      openModal('tips', { initialTab: dialog.initialTab });
-    }
-  }, [currentVersion.buildNumber, openModal]);
+  useEffect(() => { openStartDialog(currentVersion.buildNumber); }, [currentVersion.buildNumber]);
 
   // Cloud sync: pull on login, push on local mutations
   useCloudSync();

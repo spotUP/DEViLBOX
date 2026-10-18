@@ -18,26 +18,23 @@ vi.mock('@engine/jingle/JingleEngine', () => ({
     onEnd: (cb: () => void) => { endCb = cb; },
   }),
 }));
+const joins: string[] = [];
+vi.mock('@stores/useCollaborationStore', () => ({
+  useCollaborationStore: { getState: () => ({ joinRoom: (code: string) => joins.push(code) }) },
+}));
 vi.mock('@engine/jingle/JinglePatterns', () => ({ injectMouthPatterns: () => {}, teardownMouthPatterns: () => {} }));
 
 import { dispatchBridgeCall } from '../../../bridge/MCPBridge';
 import { useUIStore } from '@stores/useUIStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import {
-  beginStartupSequence, resetStartupSequenceForTest, startupDialog, whenStartupJingleDone,
+  beginStartupSequence, openStartDialog, resetStartupSequenceForTest, whenStartupJingleDone,
 } from '../startupSequence';
 import { beginBootRestore, endBootRestore, resetBootRestoreForTest, whenBootRestoreDone } from '../bootRestore';
 
-/** What App's mount effect does with the chosen dialog. */
-function openStartDialog(search: string): void {
-  const dialog = startupDialog('b1', search);
-  if (dialog.modal === 'collab') useUIStore.getState().openModal('collab');
-  else useUIStore.getState().openModal('tips', { initialTab: dialog.initialTab });
-}
-
 describe('one start dialog', () => {
   beforeEach(() => {
-    unlocks.length = 0; endCb = null;
+    unlocks.length = 0; joins.length = 0; endCb = null;
     resetStartupSequenceForTest(); resetBootRestoreForTest();
     localStorage.clear();
     useUIStore.getState().closeModal();
@@ -51,11 +48,14 @@ describe('one start dialog', () => {
   ])('start %j opens exactly the %s dialog; closing it starts the jingle and releases a queued load after the restore', async (search, modal) => {
     beginStartupSequence();
     beginBootRestore();
-    openStartDialog(search);
+    window.history.replaceState({}, '', '/' + search);
+    openStartDialog('b1');
 
     const state = await dispatchBridgeCall('get_modal_state', {});
     expect((state as { data: { modalOpen: string } }).data.modalOpen).toBe(modal);
     expect(useUIStore.getState().startupJingleStage).toBe('awaiting-gesture');
+    expect(joins).toEqual(modal === 'collab' ? ['ABCDEF'] : []);
+    expect(window.location.search).toBe('');
 
     const order: string[] = [];
     const load = Promise.all([whenStartupJingleDone(), whenBootRestoreDone()]).then(() => order.push('load'));

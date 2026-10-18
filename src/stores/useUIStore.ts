@@ -19,6 +19,17 @@ export interface DjLayoutFrame {
 
 export type PerformanceQuality = 'high' | 'medium' | 'low';
 
+/**
+ * Every id a modal renderer listens for (`modalOpen === '<id>'`). openModal
+ * takes only these, so an id nothing renders fails the type-check instead of
+ * opening nothing. 'dj-playlist' renders itself and only marks a modal open.
+ */
+export type ModalId =
+  | 'auth' | 'collab' | 'dj-playlist' | 'drumpads' | 'export' | 'help'
+  | 'instrumentFx' | 'instruments' | 'masterFx' | 'midi-mapper' | 'midi-wizard'
+  | 'moduleInfo' | 'nks-library' | 'nks-wizard' | 'revisions' | 'settings'
+  | 'tips' | 'usb-sid-wizard';
+
 export type StartupJingleStage = 'off' | 'awaiting-gesture' | 'playing' | 'done';
 
 export type TrackerViewMode = 'tracker' | 'grid' | 'pianoroll' | 'matrix' | 'sunvox' | 'dj' | 'drumpad' | 'vj';
@@ -64,7 +75,7 @@ interface UIStore {
   trackerScale: number;
   trackWidthZoom: number; // 0=narrowest (more channels), 6=widest (fewer channels)
   activePanel: PanelType;
-  modalOpen: string | null;
+  modalOpen: ModalId | null;
   modalData: Record<string, unknown> | null;
   showPatterns: boolean;
   editorFullscreen: boolean;
@@ -156,7 +167,7 @@ interface UIStore {
   setTrackerScale: (scale: number) => void;
   increaseTrackZoom: () => void;
   decreaseTrackZoom: () => void;
-  openModal: (modalId: string, data?: Record<string, unknown>) => void;
+  openModal: (modalId: ModalId, data?: Record<string, unknown>) => void;
   closeModal: () => void;
   togglePatterns: () => void;
   toggleEditorFullscreen: () => void;
