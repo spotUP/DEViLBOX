@@ -155,10 +155,6 @@ export function useNavBar() {
     useUIStore.getState().openModal('auth');
   }, []);
 
-  const handleOpenDownload = useCallback(() => {
-    useUIStore.getState().openModal('download');
-  }, []);
-
   const handleOpenModuleInfo = useCallback(() => {
     requestAnimationFrame(() => useUIStore.getState().openModal('moduleInfo'));
   }, []);
@@ -216,7 +212,6 @@ export function useNavBar() {
     handleLoadFile,
     handleOpenCollab,
     handleOpenAuth,
-    handleOpenDownload,
     handleOpenModuleInfo,
     handleExpose,
     handleSwitchView,

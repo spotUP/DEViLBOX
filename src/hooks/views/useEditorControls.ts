@@ -91,8 +91,7 @@ export function useEditorControls(opts?: {
   }, []);
 
   const handleShowAutoEditor = useCallback(() => {
-    if (opts?.onShowAutomation) opts.onShowAutomation();
-    else useUIStore.getState().openModal('automation');
+    opts?.onShowAutomation?.();
   }, [opts?.onShowAutomation]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleShowDrumpads = useCallback(() => {
@@ -102,14 +101,6 @@ export function useEditorControls(opts?: {
 
   const handleRecSettings = useCallback(() => {
     useUIStore.getState().openModal('settings');
-  }, []);
-
-  const handleGrooveSettings = useCallback(() => {
-    useUIStore.getState().openModal('grooveSettings');
-  }, []);
-
-  const handleAdvancedEdit = useCallback(() => {
-    useUIStore.getState().openModal('advancedEdit');
   }, []);
 
   const handleHardwarePresetChange = useCallback(
@@ -156,8 +147,6 @@ export function useEditorControls(opts?: {
     handleShowAutoEditor,
     handleShowDrumpads,
     handleRecSettings,
-    handleGrooveSettings,
-    handleAdvancedEdit,
     handleHardwarePresetChange,
   };
 }

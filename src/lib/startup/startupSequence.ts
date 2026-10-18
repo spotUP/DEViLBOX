@@ -11,6 +11,7 @@
  */
 import { getJingleEngine, STARTUP_JINGLE_URL } from '@engine/jingle/JingleEngine';
 import { injectMouthPatterns, teardownMouthPatterns } from '@engine/jingle/JinglePatterns';
+import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useUIStore, type StartupJingleStage } from '@stores/useUIStore';
 
@@ -48,6 +49,24 @@ export function startupDialog(buildNumber: string, search: string): StartupDialo
   const collabCode = new URLSearchParams(search).get('collab');
   if (collabCode && collabCode.length >= 6) return { modal: 'collab', collabCode };
   return { modal: 'tips', ...startupTipsModal(buildNumber) };
+}
+
+/**
+ * Open the one start dialog. A ?collab=CODE link opens the collaboration modal,
+ * joins the room and drops the parameter so a refresh does not join again.
+ */
+export function openStartDialog(buildNumber: string): void {
+  const dialog = startupDialog(buildNumber, window.location.search);
+  const { openModal } = useUIStore.getState();
+  if (dialog.modal === 'collab') {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('collab');
+    window.history.replaceState({}, '', url.pathname + url.search);
+    openModal(dialog.modal);
+    useCollaborationStore.getState().joinRoom(dialog.collabCode);
+  } else {
+    openModal(dialog.modal, { initialTab: dialog.initialTab });
+  }
 }
 
 /**
