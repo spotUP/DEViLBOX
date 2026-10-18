@@ -62,7 +62,7 @@ import { DEFAULT_VL1, type VL1Config } from '@engine/vl1/VL1Synth';
 import { DEFAULT_TAL_NOIZEMAKER, type TalNoizeMakerConfig } from '@engine/tal-noizemaker/TalNoizeMakerSynth';
 import { DEFAULT_AEOLUS, type AeolusConfig } from '@engine/aeolus/AeolusSynth';
 import { DEFAULT_FLUIDSYNTH, type FluidSynthConfig } from '@engine/fluidsynth/FluidSynthSynth';
-import { DEFAULT_SFIZZ, type SfizzConfig } from '@engine/sfizz/SfizzSynth';
+import { DEFAULT_SFIZZ, type SfizzConfig, type SfizzSynthEngine } from '@engine/sfizz/SfizzSynth';
 import { DEFAULT_ZYNADDSUBFX, type ZynAddSubFXConfig } from '@engine/zynaddsubfx/ZynAddSubFXSynth';
 import { isFurnacePSGType } from '../hardware/FurnacePSGHardware';
 import { isFurnaceWaveType } from '../hardware/FurnaceWaveHardware';
@@ -700,14 +700,17 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   const [sfizzLoadedName, setSfizzLoadedName] = useState<string | undefined>();
   const handleSfizzLoadFiles = useCallback(async (files: FileList) => {
     const engine = getToneEngine();
-    const synth = engine.instruments.get(engine.getInstrumentKey(instrument.id, -1));
-    if (synth && 'loadSFZFromFiles' in synth) {
-      const result = await (synth as any).loadSFZFromFiles(files);
-      if (result.success) {
-        setSfizzLoadedName(result.name);
-        // Update config so re-renders don't overwrite the loaded file with a built-in preset
-        handleSfizzChange({ sfzPreset: '__file__' } as any);
-      }
+    // Every instance of this instrument (shared plus one per tracker channel) gets the files.
+    const synths = engine.instancesOf(instrument.id).filter((s) => s && 'loadSFZFromFiles' in s) as unknown as SfizzSynthEngine[];
+    let loadedName: string | undefined;
+    for (const synth of synths) {
+      const result = await synth.loadSFZFromFiles(files);
+      if (result.success) loadedName = result.name;
+    }
+    if (loadedName !== undefined) {
+      setSfizzLoadedName(loadedName);
+      // Update config so re-renders don't overwrite the loaded file with a built-in preset
+      handleSfizzChange({ sfzPreset: '__file__' } as any);
     }
   }, [instrument.id]);
 

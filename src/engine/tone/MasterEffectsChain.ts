@@ -596,9 +596,20 @@ export function updateInstrumentEffectParams(
   effectId: string,
   config: EffectConfig
 ): void {
-  const effectData = instrumentEffectNodes.get(effectId);
-  if (!effectData) return; // Effect not in active chain
+  // The registry is keyed `${chainKey}:${effectId}`; one effect id lives in
+  // every instance chain of its instrument (shared plus one per channel).
+  const suffix = `:${effectId}`;
+  for (const [registryKey, effectData] of instrumentEffectNodes) {
+    if (!registryKey.endsWith(suffix)) continue;
+    updateOneInstrumentEffectNode(effectData, applyDiff, config);
+  }
+}
 
+function updateOneInstrumentEffectNode(
+  effectData: { node: Tone.ToneAudioNode; config: EffectConfig },
+  applyDiff: (node: Tone.ToneAudioNode, type: string, changed: Record<string, number | string>) => void,
+  config: EffectConfig
+): void {
   const { node, config: prevConfig } = effectData;
   // Unwrap gain-compensation wrapper for wet/param updates
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

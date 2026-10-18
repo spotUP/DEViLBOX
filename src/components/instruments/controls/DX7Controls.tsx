@@ -124,18 +124,19 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange, 
       setImportStatus(`${file.name}: not a DX7 voice or 32-voice bank (${data.length} bytes)`);
       return;
     }
-    const synth = getSynth();
-    if (!synth) { setImportStatus('Synth not ready yet, try again in a moment'); return; }
+    // Every instance of this instrument (shared plus one per tracker channel) gets the file.
+    const synths = getSynth() ? (getToneEngine().instancesOf(instrument.id).filter((v) => v && 'loadSysex' in v) as unknown as DX7Synth[]) : [];
+    if (synths.length === 0) { setImportStatus('Synth not ready yet, try again in a moment'); return; }
     if (found.kind === 'bulk32' && found.bulkSysex) {
-      synth.loadSysex(found.bulkSysex.slice().buffer);
+      for (const synth of synths) synth.loadSysex(found.bulkSysex.slice().buffer);
       const notes = [!found.checksumOk && 'checksum was wrong', found.repairs > 0 && `${found.repairs} out-of-range values clamped`].filter(Boolean);
       setImportStatus(notes.length ? `Loaded ${file.name} (${notes.join(', ')})` : `Loaded ${file.name} (32 voices)`);
     } else if (found.vced) {
-      synth._loadVcedData(new Uint8Array(found.vced));
+      for (const synth of synths) synth._loadVcedData(new Uint8Array(found.vced));
       setImportStatus(`Loaded ${file.name} (single voice)`);
     }
     onChange({ dx7: { libraryBank: undefined, bank: undefined, vcedPreset: undefined, vced: undefined } });
-  }, [getSynth, onChange]);
+  }, [getSynth, onChange, instrument.id]);
 
   const [presetNames, setPresetNames] = useState<string[]>([]);
   useEffect(() => {

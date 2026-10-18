@@ -48,6 +48,15 @@ function isAUBridgeSynthType(synthType: string | undefined): boolean {
 
 import { reportSynthError } from '../stores/useSynthErrorStore';
 import { SYNTH_REGISTRY } from './vstbridge/synth-registry';
+import { isPerChannelNativeSynthType, perChannelInstanceChannels } from './perChannelNativeSynths';
+import {
+  type ChannelSynthLane,
+  type ChannelSynthLaneContext,
+  getChannelSynthLane,
+  applyChannelSynthLaneGains,
+  setChannelSynthLanePitchRate,
+  disposeChannelSynthLanes,
+} from './tone/ChannelSynthLanes';
 import { WAMSynth } from './wam/WAMSynth';
 import { CHIP_SYNTH_DEFS } from '../constants/chipParameters';
 import { useRomDialogStore } from '../stores/useRomDialogStore';
@@ -214,6 +223,10 @@ export class ToneEngine {
   private synthBusMeter: Tone.Meter; // Level meter on synthBus for WASM engine metering
   private masterMeter: Tone.Meter; // Level meter at masterEffectsInput merge point
   private pitchResamplerNode: AudioWorkletNode | null = null; // Pitch resampler for WASM engines
+  /** Per-channel lanes for standalone native synths (tone/ChannelSynthLanes.ts). */
+  private channelSynthLanes: Map<number, ChannelSynthLane> = new Map();
+  private _synthPitchRate = 1;
+  private _pitchResamplerModule: Promise<void> | null = null;
   public masterEffectsInput: Tone.Gain; // Merge point for master effects (both paths feed in here)
   public blepInput: Tone.Gain; // BLEP insertion point — isolates BLEP routing from effects chain rebuilds
   // Safety limiter — prevents channel summing from exceeding 0 dBFS at destination.
@@ -1031,7 +1044,14 @@ export class ToneEngine {
    * Preload instruments (especially Samplers) and wait for them to be ready
    * Call this after importing a module to ensure samples are loaded before playback
    */
-  public async preloadInstruments(configs: InstrumentConfig[]): Promise<void> {
+  /**
+   * Preload every instrument of a song. `usage` (instrument id -> channels it
+   * plays on, from `instrumentChannelUsage(song.patterns)`) decides how many
+   * instances a per-channel native synth gets: one per used channel, so the
+   * channel strip (volume, pan, mute, channel effects) reaches each one. An
+   * instrument with no usage entry keeps the single shared `-1` instance.
+   */
+  public async preloadInstruments(configs: InstrumentConfig[], usage?: ReadonlyMap<number, ReadonlySet<number>>): Promise<void> {
     // Bump generation to invalidate any in-flight preload
     const generation = ++this.preloadGeneration;
 
@@ -1046,9 +1066,8 @@ export class ToneEngine {
 
     // Then, dispose any existing instruments to start fresh
     configs.forEach((config) => {
-      // BUG FIX: Use proper key format (was checking config.id but Map keys are strings like "3--1")
-      const key = this.getInstrumentKey(config.id, -1);
-      if (this.instruments.has(key)) {
+      // Every instance of the id: the shared -1 key and the per-channel keys.
+      if (this.instancesOf(config.id).length > 0) {
         this.disposeInstrument(config.id);
       }
     });
@@ -1091,9 +1110,12 @@ export class ToneEngine {
       return true;
     });
 
-    // Create non-sampler instruments immediately
+    // Create non-sampler instruments immediately; a per-channel native synth
+    // gets one instance per channel it plays on.
     dedupedOther.forEach((config) => {
-      this.getInstrument(config.id, config);
+      for (const channel of this.instanceChannels(config, usage)) {
+        this.getInstrument(config.id, config, channel);
+      }
     });
 
     // Create sampler instruments
@@ -1104,9 +1126,11 @@ export class ToneEngine {
     // Create and wait for speech synths
     const speechReadyPromises: Promise<void>[] = [];
     speechConfigs.forEach((config) => {
-      const instrument = this.getInstrument(config.id, config);
-      if ((instrument as any)?.ready) {
-        speechReadyPromises.push((instrument as any).ready());
+      for (const channel of this.instanceChannels(config, usage)) {
+        const instrument = this.getInstrument(config.id, config, channel);
+        if ((instrument as any)?.ready) {
+          speechReadyPromises.push((instrument as any).ready());
+        }
       }
     });
 
@@ -1142,11 +1166,11 @@ export class ToneEngine {
     // This includes: MAME synths, Buzzmachine, TB303, V2, DubSiren, etc.
     const wasmPromises: Promise<void>[] = [];
     for (const config of configs) {
-      const key = this.getInstrumentKey(config.id, -1);
-      const instrument = this.instruments.get(key);
-      // Check if instrument has ensureInitialized method (all WASM-based synths should)
-      if (instrument && typeof (instrument as any).ensureInitialized === 'function') {
-        wasmPromises.push((instrument as any).ensureInitialized());
+      for (const instrument of this.instancesOf(config.id)) {
+        // Check if instrument has ensureInitialized method (all WASM-based synths should)
+        if (typeof (instrument as any).ensureInitialized === 'function') {
+          wasmPromises.push((instrument as any).ensureInitialized());
+        }
       }
     }
     if (wasmPromises.length > 0) {
@@ -1197,10 +1221,10 @@ export class ToneEngine {
     // today; the WASM engines were already `ensureInitialized()` above and
     // their worklets are rendering.
     for (const config of configs) {
-      const key = this.getInstrumentKey(config.id, -1);
-      const instrument = this.instruments.get(key);
-      if (instrument && isDevilboxSynth(instrument)) {
-        try { (instrument as DevilboxSynth).warmUp?.(); } catch { /* a warm-up must never break a load */ }
+      for (const instrument of this.instancesOf(config.id)) {
+        if (isDevilboxSynth(instrument)) {
+          try { (instrument as DevilboxSynth).warmUp?.(); } catch { /* a warm-up must never break a load */ }
+        }
       }
     }
 
@@ -1215,8 +1239,8 @@ export class ToneEngine {
       const { useInstrumentStore: romInstStore } = await import('../stores/useInstrumentStore');
       const instStore = romInstStore.getState();
       for (const config of romChipConfigs) {
-        const key = this.getInstrumentKey(config.id, -1);
-        const synth = this.instruments.get(key) as any;
+        // MAME chips are shared, so there is one instance; read whichever exists.
+        const synth = this.instancesOf(config.id)[0] as any;
         const chipDef = CHIP_SYNTH_DEFS[config.synthType || ''];
         if (!synth || !chipDef?.romConfig) continue;
 
@@ -1248,7 +1272,7 @@ export class ToneEngine {
    * Ensure all WASM-based synths for the given instruments are initialized.
    * Creates instances if needed and waits for their AudioWorklet WASM to be ready.
    */
-  public async ensureWASMSynthsReady(configs: InstrumentConfig[]): Promise<void> {
+  public async ensureWASMSynthsReady(configs: InstrumentConfig[], usage?: ReadonlyMap<number, ReadonlySet<number>>): Promise<void> {
     const wasmConfigs = configs.filter((c) => 
       ['TB303', 'Buzz3o3', 'V2', 'V2Speech', 'Sam', 'DECtalk', 'PinkTrombone', 'Synare', 'DubSiren', 'SpaceLaser', 'Furnace', 'HivelySynth', 'UADESynth', 'UADEEditableSynth', 'SymphonieSynth', 'MusicLineSynth',
        'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth', 'TFMXSynth',
@@ -1281,10 +1305,13 @@ export class ToneEngine {
 
     const promises: Promise<void>[] = [];
     for (const config of deduped) {
-      // Create the instrument if it doesn't exist yet
-      const instrument = this.getInstrument(config.id, config);
-      if ((instrument as any)?.ensureInitialized) {
-        promises.push((instrument as any).ensureInitialized());
+      // Create the instrument if it doesn't exist yet (per channel for the
+      // per-channel native types, see preloadInstruments)
+      for (const channel of this.instanceChannels(config, usage)) {
+        const instrument = this.getInstrument(config.id, config, channel);
+        if ((instrument as any)?.ensureInitialized) {
+          promises.push((instrument as any).ensureInitialized());
+        }
       }
     }
     if (promises.length > 0) {
@@ -1344,6 +1371,7 @@ export class ToneEngine {
     const synthDb = this._manualSynthGainDb + this.autoGainSynthCorr;
     this.masterInput.gain.value = Math.pow(10, sampleDb / 20);
     this.synthBus.gain.value = Math.pow(10, synthDb / 20);
+    applyChannelSynthLaneGains(this._laneCtx);
   }
 
   /**
@@ -1483,6 +1511,27 @@ export class ToneEngine {
     return this.globalPlaybackRate;
   }
 
+  /** Load the PitchResampler worklet module once per engine; later calls share the promise. */
+  private ensurePitchResamplerModule(): Promise<void> {
+    if (!this._pitchResamplerModule) {
+      const nativeCtx = (Tone.getContext().rawContext as AudioContext);
+      this._pitchResamplerModule = nativeCtx.audioWorklet.addModule('/pitch-resampler/PitchResampler.worklet.js');
+    }
+    return this._pitchResamplerModule;
+  }
+
+  /** A stereo pitch-resampler node at the current synth pitch rate (module must be loaded). */
+  private createPitchResamplerNode(): AudioWorkletNode {
+    const nativeCtx = (Tone.getContext().rawContext as AudioContext);
+    const node = new AudioWorkletNode(nativeCtx, 'pitch-resampler', {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      outputChannelCount: [2],
+    });
+    if (this._synthPitchRate !== 1) node.port.postMessage({ type: 'set-rate', rate: this._synthPitchRate });
+    return node;
+  }
+
   /**
    * Initialize the PitchResampler AudioWorklet between synthBus and masterEffectsInput.
    * All WASM/native DevilboxSynths feed through synthBus — the resampler pitch-shifts
@@ -1490,14 +1539,8 @@ export class ToneEngine {
    */
   private async initPitchResampler(): Promise<void> {
     try {
-      const nativeCtx = (Tone.getContext().rawContext as AudioContext);
-      await nativeCtx.audioWorklet.addModule('/pitch-resampler/PitchResampler.worklet.js');
-
-      const resampler = new AudioWorkletNode(nativeCtx, 'pitch-resampler', {
-        numberOfInputs: 1,
-        numberOfOutputs: 1,
-        outputChannelCount: [2],
-      });
+      await this.ensurePitchResamplerModule();
+      const resampler = this.createPitchResamplerNode();
 
       // Re-route: synthBus → resampler → masterEffectsInput (instead of synthBus → masterEffectsInput)
       const nativeSynthBus = getNativeAudioNode(this.synthBus as any);
@@ -1514,14 +1557,32 @@ export class ToneEngine {
     }
   }
 
+  private get _laneCtx(): ChannelSynthLaneContext {
+    return {
+      lanes: this.channelSynthLanes,
+      synthBusGain: () => this.synthBus.gain.value,
+      createGain: (gain) => new Tone.Gain(gain),
+      getChannelOutput: (ch) => this.getChannelOutput(ch),
+      ensurePitchResamplerModule: () => this.ensurePitchResamplerModule(),
+      createPitchResamplerNode: () => this.createPitchResamplerNode(),
+    };
+  }
+
+  /** Channels that have a native synth lane (test and diagnostics hook). */
+  public getChannelSynthLaneChannels(): number[] {
+    return [...this.channelSynthLanes.keys()];
+  }
+
   /**
-   * Set pitch rate for WASM/native synth bus (DJ pitch slider).
+   * Set pitch rate for WASM/native synth bus and every per-channel lane (DJ pitch slider).
    * Rate 1.0 = normal, 2.0 = octave up, 0.5 = octave down.
    */
   public setSynthBusPitchRate(rate: number): void {
+    this._synthPitchRate = rate;
     if (this.pitchResamplerNode) {
       this.pitchResamplerNode.port.postMessage({ type: 'set-rate', rate });
     }
+    setChannelSynthLanePitchRate(this._laneCtx, rate);
   }
 
   /**
@@ -1737,6 +1798,24 @@ export class ToneEngine {
     return key >>> 16;
   }
 
+  /** Every live instance of an instrument: the shared `-1` one and the per-channel ones. */
+  /** Every live instance of an instrument: the shared one plus one per tracker channel. */
+  public instancesOf(instrumentId: number): Array<Tone.ToneAudioNode | DevilboxSynth> {
+    const out: Array<Tone.ToneAudioNode | DevilboxSynth> = [];
+    this.instruments.forEach((instrument, key) => {
+      if (this.instrumentIdFromKey(key) === instrumentId) out.push(instrument);
+    });
+    return out;
+  }
+
+  /**
+   * The channels a song load creates instances on: each used tracker channel
+   * for a per-channel native synth type, else `undefined` (the shared `-1` key).
+   */
+  private instanceChannels(config: InstrumentConfig, usage?: ReadonlyMap<number, ReadonlySet<number>>): Array<number | undefined> {
+    return perChannelInstanceChannels(config.synthType, usage?.get(config.id));
+  }
+
   /**
    * Put the Amiga output stage between an engine and where it was going.
    *
@@ -1777,10 +1856,26 @@ export class ToneEngine {
     }
   }
 
-  private getInstrumentOutputDestination(instrumentId: number, isNativeSynth: boolean): Tone.ToneAudioNode {
+  /**
+   * Where an instrument's effect chain output goes. An output override (DJ deck,
+   * stem export) wins; a native per-channel instance plays into its channel's
+   * synth lane; the shared native instance goes to synthBus; Tone.js instruments
+   * to masterInput (their channel strip is wired in ChannelRouting).
+   */
+  private getInstrumentOutputDestination(instrumentId: number, isNativeSynth: boolean, channelIndex = -1): Tone.ToneAudioNode {
     const override = this.instrumentOutputOverrides.get(instrumentId);
     if (override) return override;
-    return isNativeSynth ? this.synthBus : this.masterInput;
+    if (!isNativeSynth) return this.masterInput;
+    if (channelIndex >= 0 && channelIndex < ToneEngine.LIVE_VOICE_BASE_CHANNEL) {
+      return getChannelSynthLane(this._laneCtx, channelIndex).gain;
+    }
+    return this.synthBus;
+  }
+
+  /** The channel half of a composite instrument key; -1 for the shared instance. */
+  private channelFromKey(key: number): number {
+    const channel = key & 0xFFFF;
+    return channel === 0xFFFF ? -1 : channel;
   }
 
   // Track the last trigger time to ensure strictly increasing times
@@ -1882,7 +1977,13 @@ export class ToneEngine {
       'DX7', 'OPL3', 'OpenWurli',
     ].includes(config.synthType || '');
     const isVSTBridge = !isWASMSynth && typeof config.synthType === 'string' && SYNTH_REGISTRY.has(config.synthType);
-    const isSharedType = config.synthType === 'Sampler' || config.synthType === 'Player' || config.synthType === 'SunVoxSynth' || isMAME || isFurnace || isBuzzmachine || isWASMSynth || isWAM || isVSTBridge;
+    // Standalone native synths get one instance per tracker channel so the
+    // channel strip reaches them (see perChannelNativeSynths.ts). Preview and
+    // live-voice channels keep the shared -1 instance.
+    const isLiveVoiceChannel = channelIndex !== undefined && channelIndex >= ToneEngine.LIVE_VOICE_BASE_CHANNEL;
+    const isTrackerChannel = channelIndex !== undefined && channelIndex >= 0 && channelIndex < 100;
+    const isPerChannelNative = isTrackerChannel && isPerChannelNativeSynthType(config.synthType);
+    const isSharedType = !isPerChannelNative && (config.synthType === 'Sampler' || config.synthType === 'Player' || config.synthType === 'SunVoxSynth' || isMAME || isFurnace || isBuzzmachine || isWASMSynth || isWAM || isVSTBridge);
     const key = isSharedType
       ? this.getInstrumentKey(instrumentId, -1)  // Use shared instance
       : this.getInstrumentKey(instrumentId, channelIndex);
@@ -1924,10 +2025,8 @@ export class ToneEngine {
     // BUT: Don't reuse for live voice channels (100+) - those need separate instances for polyphony
     // BUT: Don't reuse for Tone.js synths on tracker channels - they need per-channel
     //       monophonic instances for proper pitch effect support (arpeggio, vibrato, portamento)
-    const isLiveVoiceChannel = channelIndex !== undefined && channelIndex >= ToneEngine.LIVE_VOICE_BASE_CHANNEL;
-    const isTrackerChannel = channelIndex !== undefined && channelIndex >= 0 && channelIndex < 100;
     const isToneJSSynth = ['Synth', 'MonoSynth', 'DuoSynth', 'FMSynth', 'ToneAM', 'PluckSynth', 'MembraneSynth', 'MetalSynth', 'NoiseSynth', 'PolySynth', 'SuperSaw'].includes(config.synthType || '');
-    const needsPerChannelInstance = isTrackerChannel && isToneJSSynth;
+    const needsPerChannelInstance = isTrackerChannel && (isToneJSSynth || isPerChannelNative);
     const legacyKey = this.getInstrumentKey(instrumentId, -1);
     if (needsPerChannelInstance) {
       // Skip legacy reuse — falls through to create per-channel MonoSynth
@@ -2656,10 +2755,24 @@ export class ToneEngine {
   // INSTRUMENT ANALYSER FOR VISUALIZATION
   // ============================================================================
 
+  /** True when any live instance of the instrument is a native (DevilboxSynth) instrument. */
+  private isNativeInstrument(instrumentId: number): boolean {
+    for (const [key, inst] of this.instruments) {
+      if ((key >>> 16) === instrumentId) return isDevilboxSynth(inst);
+    }
+    return false;
+  }
+
   /**
    * Get or create an analyser for an instrument
    * Lazy-creates the analyser only when visualization requests it
    * Returns null if instrument doesn't exist or isn't connected
+   *
+   * Tone.js instruments have one destination, so the analyser sits in series:
+   * chain output -> analyser -> destination. Native instruments can have one
+   * chain per channel, each with its own lane, so the analyser is a parallel
+   * tap: every chain output also feeds the analyser input, and the analyser
+   * output stays unconnected (an AnalyserNode reads with no output edge).
    */
   public getInstrumentAnalyser(instrumentId: number): InstrumentAnalyser | null {
     // Check if analyser already exists
@@ -2670,41 +2783,30 @@ export class ToneEngine {
 
     // Create new analyser
     analyser = new InstrumentAnalyser();
+    const isNative = this.isNativeInstrument(instrumentId);
 
-    // Determine if this instrument is a DevilboxSynth to pick the right output bus
-    let isNative = false;
-    for (const [key, inst] of this.instruments) {
-      if ((key >> 16) === instrumentId) {
-        if (isDevilboxSynth(inst)) isNative = true;
-        break;
+    if (!isNative) {
+      try {
+        analyser.output.connect(this.getInstrumentOutputDestination(instrumentId, false));
+      } catch (e) {
+        // May fail if synth was recreated on a different audio context
+        console.warn('[ToneEngine] Analyser connect failed (context mismatch):', e);
+        return analyser;
       }
     }
-    try {
-      analyser.output.connect(this.getInstrumentOutputDestination(instrumentId, isNative));
-    } catch (e) {
-      // May fail if synth was recreated on a different audio context
-      console.warn('[ToneEngine] Analyser connect failed (context mismatch):', e);
-      return analyser;
-    }
 
-    // Redirect ALL existing effect chains for this instrument to the analyser
-    let foundChains = 0;
+    // Route every existing effect chain of this instrument through (Tone.js) or into (native) the analyser
     this.instrumentEffectChains.forEach((chain, key) => {
-      if ((key >> 16) === instrumentId) {
-        // Disconnect from all possible destinations, then connect to analyser
+      if ((key >>> 16) !== instrumentId) return;
+      if (!isNative) {
         try { chain.output.disconnect(this.masterInput); } catch { /* May not be connected */ }
-        try { chain.output.disconnect(this.synthBus); } catch { /* May not be connected */ }
         const override = this.instrumentOutputOverrides.get(instrumentId);
         if (override) try { chain.output.disconnect(override); } catch { /* May not be connected */ }
-        chain.output.connect(analyser.input);
-        foundChains++;
       }
+      chain.output.connect(analyser.input);
     });
 
-    if (foundChains === 0) {
-      // No active chains found, but we still store the analyser
-      // so future chains (from buildInstrumentEffectChain) will connect to it
-    }
+    // Chains built later (buildInstrumentEffectChain) connect to the stored analyser themselves
     this.instrumentAnalysers.set(instrumentId, analyser);
     return analyser;
   }
@@ -2716,53 +2818,28 @@ export class ToneEngine {
     const analyser = this.instrumentAnalysers.get(instrumentId);
     if (!analyser) return;
 
-    // Find the instrument
-    const sharedKey = this.getInstrumentKey(instrumentId, -1);
-    let instrument = this.instruments.get(sharedKey);
+    const isNative = this.isNativeInstrument(instrumentId);
 
-    if (!instrument) {
-      for (const [key, inst] of this.instruments) {
-        if ((key >> 16) === instrumentId) {
-          instrument = inst;
-          break;
-        }
-      }
-    }
-
-    // Re-route instrument directly (bypass analyser)
-    if (instrument) {
-      const isNative = isDevilboxSynth(instrument);
-      try {
-        if (isNative) {
-          (instrument as DevilboxSynth).output.disconnect();
-        } else {
-          (instrument as Tone.ToneAudioNode).disconnect();
-        }
-      } catch {
-        // May not be connected
-      }
-
-      const effectChain = this.instrumentEffectChains.get(sharedKey);
-      const connectTo = (dest: Tone.ToneAudioNode) => {
-        if (isNative) {
-          this.connectNativeSynth((instrument as DevilboxSynth).output, dest);
-        } else {
-          (instrument as Tone.ToneAudioNode).connect(dest);
-        }
-      };
-
-      if (effectChain) {
-        if (effectChain.effects.length > 0) {
-          connectTo(effectChain.effects[0]);
-        } else {
-          connectTo(effectChain.output);
-        }
-        // Reconnect effect chain output back to the correct bus
-        // (it was disconnected from synthBus/masterInput when the analyser was created)
-        try { effectChain.output.disconnect(analyser.input); } catch { /* not connected */ }
-        effectChain.output.connect(this.getInstrumentOutputDestination(instrumentId, isNative));
-      } else {
-        connectTo(this.getInstrumentOutputDestination(instrumentId, isNative));
+    if (isNative) {
+      // The analyser was a parallel tap: drop the tap edge, the lane / bus path is untouched
+      this.instrumentEffectChains.forEach((chain, key) => {
+        if ((key >>> 16) !== instrumentId) return;
+        try { chain.output.disconnect(analyser.input); } catch { /* not connected */ }
+      });
+    } else {
+      // Series analyser: send every chain output back to the real destination
+      const dest = this.getInstrumentOutputDestination(instrumentId, false);
+      this.instrumentEffectChains.forEach((chain, key) => {
+        if ((key >>> 16) !== instrumentId) return;
+        try { chain.output.disconnect(analyser.input); } catch { /* not connected */ }
+        chain.output.connect(dest);
+      });
+      // A Tone.js instrument without a chain yet was wired straight to the analyser
+      const sharedKey = this.getInstrumentKey(instrumentId, -1);
+      const instrument = this.instruments.get(sharedKey);
+      if (instrument && !isDevilboxSynth(instrument) && !this.instrumentEffectChains.has(sharedKey)) {
+        try { (instrument as Tone.ToneAudioNode).disconnect(analyser.input); } catch { /* not connected */ }
+        (instrument as Tone.ToneAudioNode).connect(dest);
       }
     }
 
@@ -5181,6 +5258,7 @@ export class ToneEngine {
     this.instruments.clear();
 
     // Dispose channel outputs
+    disposeChannelSynthLanes(this._laneCtx);
     this.disposeChannelOutputs();
 
     // Dispose master effects
@@ -5234,8 +5312,9 @@ export class ToneEngine {
       masterInput: this.masterInput,
       synthBus: this.synthBus,
       connectNativeSynth: (o, d) => this.connectNativeSynth(o, d),
-      getInstrumentOutputDestination: (id, n) => this.getInstrumentOutputDestination(id, n),
+      getInstrumentOutputDestination: (id, n, ch) => this.getInstrumentOutputDestination(id, n, ch),
       getInstrumentKey: (id, ch) => this.getInstrumentKey(id, ch),
+      channelFromKey: (key) => this.channelFromKey(key),
     };
   }
 
