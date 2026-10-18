@@ -260,6 +260,16 @@ export function setLooping(params: Record<string, unknown>): Record<string, unkn
   return { ok: true };
 }
 
+/**
+ * new_song - start a blank song the way the New Song wizard's "Empty Song"
+ * does. The open song stays in its own tab, so a test never builds inside it.
+ */
+export async function newSong(): Promise<Record<string, unknown>> {
+  const { startNewSong } = await import('../../lib/song/startNewSong');
+  await startNewSong('empty', false, '');
+  return { ok: true };
+}
+
 export function seekTo(params: Record<string, unknown>): Record<string, unknown> {
   if (params.position !== undefined) {
     useTrackerStore.getState().setCurrentPosition(params.position as number);

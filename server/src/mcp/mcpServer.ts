@@ -2124,6 +2124,7 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
           { tool: 'set_global_pitch', description: 'Set global pitch offset' },
           { tool: 'toggle_metronome', description: 'Toggle metronome click' },
           { tool: 'set_looping', description: 'Enable/disable pattern looping' },
+          { tool: 'new_song', description: 'Start a blank song in a new tab (the open song stays in its tab)' },
           { tool: 'seek_to', description: 'Seek to a position' },
           { tool: 'get_playback_state', description: 'Get playback state (playing, position, BPM)' },
           { tool: 'get_playback_silence', description: 'Diagnose playing-but-silent (engine rendering silence)' },
@@ -2510,6 +2511,13 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
   // ═══════════════════════════════════════════════════════════════════════════════
   // SOAK TEST / TELEMETRY (dev-only tools for DJ/VJ stress testing)
   // ═══════════════════════════════════════════════════════════════════════════════
+
+  server.tool(
+    'new_song',
+    'Start a blank song in a new tab, as the New Song wizard does for an empty song. The open song stays in its own tab: build tests here, never in the song that was open.',
+    {},
+    () => call('new_song', {}),
+  );
 
   server.tool(
     'set_looping',

@@ -12,15 +12,14 @@ import { useState, useCallback } from 'react';
 import { useUIStore } from '@stores/useUIStore';
 import { getGroupedPresets, SYSTEM_PRESETS } from '@constants/systemPresets';
 import type { SystemPreset } from '@constants/systemPresets';
-import { AMIGA_UADE_PRESET_IDS, getInstrumentPresetsForSystem } from '@constants/uadeInstrumentPresets';
-import { useTrackerStore } from '@stores/useTrackerStore';
-import { useInstrumentStore } from '@stores/useInstrumentStore';
-import { useTabsStore } from '@stores/useTabsStore';
+import { getInstrumentPresetsForSystem } from '@constants/uadeInstrumentPresets';
+import { startNewSong } from '@/lib/song/startNewSong';
+import type { NewSongMode } from '@/lib/song/startNewSong';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type WizardStep = 1 | 2 | 3;
-export type StartMode = 'empty' | 'preset';
+export type StartMode = NewSongMode;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -46,65 +45,17 @@ export function useNewSongWizard() {
     setWithPresetInstruments(true);
   }, []);
 
-  // ── finish ─────────────────────────────────────────────────────────────────
-
-  /**
-   * Standard (non-template) finish: creates a new tab, applies system preset,
-   * optionally loads starter instruments, tracks active system.
-   *
-   * The template-file path is handled by the caller before this runs — this
-   * function handles only the non-template flow.
-   */
-  const finishStandard = useCallback(
-    (mode: StartMode, loadInstruments: boolean, presetId: string) => {
-      // 1. addTab() saves current project state and resets stores to blank.
-      //    NOTE: addTab → restoreState → loadInstruments uses queueMicrotask to
-      //    defer the instrument state reset. We must defer our work too, otherwise
-      //    the microtask overwrites any instruments we create synchronously here.
-      useTabsStore.getState().addTab();
-
-      // Defer preset application so it runs AFTER loadInstruments' microtask.
-      queueMicrotask(() => {
-        // 2. Apply system preset (channel names, colors, count)
-        if (mode === 'preset' && presetId) {
-          useTrackerStore.getState().applySystemPreset(presetId);
-
-          // 3. Apply Amiga song settings (hard-panning + BPM) if Amiga format
-          if (AMIGA_UADE_PRESET_IDS.has(presetId)) {
-            useTrackerStore.getState().applyAmigaSongSettings(presetId);
-          }
-        }
-
-        // 4. Load starter instruments
-        if (mode === 'preset' && loadInstruments && presetId) {
-          const presets = getInstrumentPresetsForSystem(presetId);
-          presets.forEach((inst) => {
-            useInstrumentStore.getState().createInstrument(inst);
-          });
-        }
-
-        // 5. Track active system for filtering
-        useUIStore.getState().setActiveSystemPreset(
-          mode === 'preset' ? presetId : null
-        );
-
-        useUIStore.getState().setStatusMessage('New project', false, 1500);
-      });
-    },
-    []
-  );
-
   /**
    * DOM finish — no template-file support.
    */
   const finish = useCallback(
     (mode: StartMode, loadInstruments: boolean) => {
       const presetId = selectedPresetId;
-      finishStandard(mode, loadInstruments, presetId);
+      void startNewSong(mode, loadInstruments, presetId);
       resetWizardState();
       close();
     },
-    [selectedPresetId, finishStandard, resetWizardState, close]
+    [selectedPresetId, resetWizardState, close]
   );
 
   // ── Derived values ─────────────────────────────────────────────────────────
@@ -188,7 +139,6 @@ export function useNewSongWizard() {
 
     // Handlers
     finish,
-    finishStandard,
     resetWizardState,
     handleNext,
     handleBack,
