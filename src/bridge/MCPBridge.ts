@@ -97,6 +97,7 @@ import {
   setGlobalPitch,
   toggleMetronome,
   setLooping,
+  newSong,
   seekTo,
   moveCursor,
   selectRange,
@@ -316,6 +317,7 @@ const handlers: Record<string, Handler> = {
   set_global_pitch: setGlobalPitch,
   toggle_metronome: () => toggleMetronome(),
   set_looping: setLooping,
+  new_song: newSong,
   seek_to: seekTo,
 
   // ─── Write: Cursor & Selection ───────────────────────────────────────────────
