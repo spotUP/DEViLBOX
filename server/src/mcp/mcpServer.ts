@@ -1823,21 +1823,14 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
 
   server.tool(
     'dismiss_modal',
-    'Dismiss any open modal/dialog in the DEViLBOX UI. Call this after loading a file or on startup to clear the welcome dialog.',
+    'Dismiss any open modal/dialog in the DEViLBOX UI. Call this on startup to close the Tip of the day / What is new dialog; closing it starts the startup jingle and unlocks audio.',
     {},
     () => call('dismiss_modal'),
   );
 
   server.tool(
-    'resolve_recovery_prompt',
-    'Answer the crash-recovery dialog that DEViLBOX shows on boot when unsaved work was found. { action: "restore" } loads the recovered snapshot; { action: "discard" } throws it away permanently. Explicit on purpose - discard destroys work that was never saved, so dismiss_modal will not do it for you. get_modal_state reports recoveryPromptOpen when this dialog is up.',
-    { action: z.enum(['restore', 'discard']) },
-    (p) => call('resolve_recovery_prompt', p),
-  );
-
-  server.tool(
     'get_modal_state',
-    'Check whether any dialog is covering the DEViLBOX UI. Reports all four blocking surfaces: a useUIStore modal (modalOpen, cleared with dismiss_modal), the crash-recovery prompt (recoveryPromptOpen, answered with resolve_recovery_prompt), the synth-error dialog (synthErrorDialogOpen + synthError.message, cleared with dismiss_errors) and the startup "Click to Start" splash (startupSplashOpen, pressed with unlock_audio or dismiss_modal). Every other tool also reports an open dialog on its own response under `blockingDialog` / `blockingDialogHint`, so this call is for checking deliberately rather than for noticing. A dialog means the app may be half-started: engines stall and every audio level reads zero.',
+    'Check whether any dialog is covering the DEViLBOX UI. Reports the blocking surfaces: a useUIStore modal (modalOpen, cleared with dismiss_modal; the Tip of the day / What is new dialog every start opens is one, and closing it starts the startup jingle) and the synth-error dialog (synthErrorDialogOpen + synthError.message, cleared with dismiss_errors). Every other tool also reports an open dialog on its own response under `blockingDialog` / `blockingDialogHint`, so this call is for checking deliberately rather than for noticing. A dialog means the app may be half-started: engines stall and every audio level reads zero.',
     {},
     () => call('get_modal_state'),
   );

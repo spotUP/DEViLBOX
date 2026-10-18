@@ -147,7 +147,7 @@ export function useNavBar() {
     if (collabStatus === 'connected') {
       setCollabViewMode('split');
     } else {
-      useUIStore.getState().openModal('collaboration');
+      useUIStore.getState().openModal('collab');
     }
   }, [collabStatus, collabViewMode, setCollabViewMode]);
 

@@ -9,7 +9,6 @@
 import { furnaceCmdLog } from './handlers/furnaceCmdLog';
 import type { BridgeRequest, BridgeResponse } from './protocol';
 import { RELAY_REPLACED_CLOSE_CODE, RELAY_AGENT_ATTACHED } from './protocol';
-import { isRecoveryPromptOpen, resolveRecoveryPrompt as resolveRecovery, onRecoveryPromptOpen } from '../lib/persistence/recoveryPrompt';
 import { useNotificationStore } from '@stores/useNotificationStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
@@ -184,7 +183,6 @@ import {
   setAutoEffect,
   cancelAutoEffect,
   dismissModal,
-  resolveRecoveryPrompt,
   getModalState,
   runFormatTest,
   runRegressionSuite,
@@ -218,7 +216,6 @@ import {
 
 import { RELAY_WS_URL } from './relayEndpoint';
 import { createReloadGate } from '../lib/dev/engineReloadGate';
-import { isStartupSplashOpen, startStartupJingle } from '../lib/startup/startupSequence';
 
 const WS_URL = RELAY_WS_URL;
 const INITIAL_BACKOFF_MS = 500;
@@ -460,7 +457,6 @@ const handlers: Record<string, Handler> = {
 
   // ─── Modal Control ────────────────────────────────────────────────────────
   dismiss_modal: dismissModal,
-  resolve_recovery_prompt: resolveRecoveryPrompt,
   get_modal_state: getModalState,
 
   // ─── Format Regression Testing ──────────────────────────────────────────
@@ -493,14 +489,10 @@ const handlers: Record<string, Handler> = {
     try {
       const { getContext } = await import('tone');
       const ctx = getContext().rawContext as AudioContext;
-      // The click-to-start splash waits for this same gesture; press it too,
-      // or the app stays covered with the context running underneath.
-      const splash = isStartupSplashOpen();
-      if (splash) void startStartupJingle();
       if (ctx.state !== 'running') {
         await ctx.resume();
       }
-      return { ok: true, state: ctx.state, ...(splash ? { pressed: 'click-to-start' } : {}) };
+      return { ok: true, state: ctx.state };
     } catch (e) {
       return { ok: false, error: String(e) };
     }
@@ -568,36 +560,6 @@ function send(msg: BridgeResponse): void {
 }
 
 /**
- * True once an MCP session has shown itself on this connection - the relay's
- * agent-attached greeting, or any call.
- */
-let agentAttached = false;
-
-/**
- * Answer the crash-recovery prompt with Restore while an agent is attached.
- *
- * Every reload during an agent session - the HMR reload after an edit, a
- * hard_reload - brings the prompt up, and it blocks the whole app. The agent
- * could answer it (resolve_recovery_prompt) and every response reported it
- * (blockingDialog), but the agent had to NOTICE, between its own calls, that
- * a reload had happened; it often did not, and the prompt sat on the user's
- * screen ("for the one millionth time: you never dismiss the blocking song
- * recovery dialog", 2026-09-27). Restore is the owner's standing answer and
- * loses nothing; Discard stays an explicit call only.
- */
-function autoRestoreForAgent(): void {
-  if (!agentAttached || !isRecoveryPromptOpen()) return;
-  if (!resolveRecovery('restore')) return;
-  console.log('[mcp-bridge] Recovery prompt answered with Restore (MCP session attached)');
-  useNotificationStore.getState().addNotification({
-    type: 'info',
-    message: 'Unsaved work restored automatically - a Claude session is driving this tab.',
-    duration: 10000,
-  });
-}
-onRecoveryPromptOpen(() => { queueMicrotask(autoRestoreForAgent); });
-
-/**
  * Dev only: a Vite save under src/engine|stores|bridge|audio|midi asks the page
  * to reload. While a bridge call is running (a master-FX measurement lasts up
  * to 90 s) or ran in the last few seconds, the reload waits; otherwise another
@@ -635,14 +597,9 @@ async function handleMessage(data: string): Promise<void> {
   }
 
   if ((request as { type: string }).type === RELAY_AGENT_ATTACHED) {
-    agentAttached = true;
-    autoRestoreForAgent();
     return;
   }
   if (request.type !== 'call') return;
-  agentAttached = true;
-  autoRestoreForAgent();
-
   const outcome = await dispatchBridgeCall(request.method, request.params ?? {});
   if (outcome.ok) {
     send({ id: request.id, type: 'result', data: outcome.data });
@@ -681,9 +638,9 @@ export async function dispatchBridgeCall(
 /**
  * Tell every caller when ANY dialog is blocking the UI.
  *
- * The app has three separate blocking surfaces and each was introduced
- * without the others knowing: a `useUIStore` modal, the crash-recovery
- * prompt, and the synth-error dialog (its own store, its own renderer in
+ * The app has separate blocking surfaces and each was introduced
+ * without the others knowing: a `useUIStore` modal (the start dialog is one)
+ * and the synth-error dialog (its own store, its own renderer in
  * App.tsx). Meanwhile `load_modland`, `play` and the rest still answer
  * `ok: true` from the store layer, so an agent driving DEViLBOX over MCP
  * reads a stalled engine with no reason given and goes hunting in the audio
@@ -696,46 +653,21 @@ export async function dispatchBridgeCall(
  * clears it. A blocking dialog is reported on the SAME key shape whatever
  * kind it is, so a caller only has to look for one thing.
  *
- * This only REPORTS. Clearing is always an explicit call, because
- * `discard` on the recovery prompt destroys unsaved work — see
- * `dismissModal` for why that is never done implicitly.
+ * This only REPORTS. Clearing is always an explicit call.
  */
 function annotateBlockingDialog(method: string, result: unknown): unknown {
   // The calls that speak about dialogs themselves need no annotation.
-  if (method === 'get_modal_state' || method === 'resolve_recovery_prompt'
+  if (method === 'get_modal_state'
     || method === 'dismiss_errors' || method === 'dismiss_modal'
     || method === 'get_synth_errors') return result;
   if (!result || typeof result !== 'object' || Array.isArray(result)) return result;
   try {
-    const { modalOpen, recoveryPromptOpen, recoveryPrompt, synthErrorDialogOpen, synthError, startupSplashOpen } =
+    const { modalOpen, synthErrorDialogOpen, synthError } =
       getModalState() as {
-        startupSplashOpen: boolean;
         modalOpen: string | null;
-        recoveryPromptOpen: boolean;
-        recoveryPrompt: unknown;
         synthErrorDialogOpen: boolean;
         synthError: { message?: string } | null;
       };
-
-    // The recovery prompt first: it is the only one holding unsaved work, so
-    // it is the one whose answer cannot be chosen for the user.
-    if (recoveryPromptOpen) {
-      return {
-        ...(result as Record<string, unknown>),
-        blockingDialog: 'recovery-prompt',
-        recoveryPromptOpen: true,
-        recoveryPrompt,
-        blockingDialogHint:
-          'The crash-recovery prompt is covering the UI and holds UNSAVED work. '
-          + 'Answer it with resolve_recovery_prompt { action: "restore" | "discard" } '
-          + 'before trusting anything on screen.',
-        // Kept so callers written against the older shape still see it.
-        recoveryPromptHint:
-          'The crash-recovery prompt is covering the UI and holds UNSAVED work. '
-          + 'Answer it with resolve_recovery_prompt { action: "restore" | "discard" } '
-          + 'before trusting anything on screen.',
-      };
-    }
 
     if (synthErrorDialogOpen) {
       return {
@@ -755,17 +687,9 @@ function annotateBlockingDialog(method: string, result: unknown): unknown {
         ...(result as Record<string, unknown>),
         blockingDialog: modalOpen,
         blockingModal: modalOpen,
-        blockingDialogHint: `A "${modalOpen}" modal is covering the UI. Clear it with dismiss_modal.`,
-      };
-    }
-
-    if (startupSplashOpen) {
-      return {
-        ...(result as Record<string, unknown>),
-        blockingDialog: 'click-to-start',
-        blockingDialogHint:
-          'The "Click to Start" splash is covering the UI and the audio engine has not started. '
-          + 'Press it with unlock_audio (or dismiss_modal) before testing anything audible.',
+        blockingDialogHint: modalOpen === 'tips' || modalOpen === 'collab'
+          ? `The start dialog ("${modalOpen}") is covering the UI and closing it starts the startup jingle and unlocks audio. Clear it with dismiss_modal.`
+          : `A "${modalOpen}" modal is covering the UI. Clear it with dismiss_modal.`,
       };
     }
 
@@ -800,26 +724,12 @@ function connect(): void {
       backoffMs = INITIAL_BACKOFF_MS;
       connectAttempts = 0;
       console.log('[mcp-bridge] MCP server active');
-      // Auto-dismiss the startup dialog so MCP sessions don't start blocked.
-      // Mark the current version as seen so the What's New changelog doesn't open.
-      try {
-        import('@generated/changelog').then(({ BUILD_NUMBER }) => {
-          localStorage.setItem('devilbox-seen-version', String(BUILD_NUMBER));
-          localStorage.setItem('show-tips-at-startup', 'false');
-        }).catch(() => {});
-        // Close the modal immediately if it's already open
-        import('@stores/useUIStore').then(({ useUIStore }) => {
-          const { modalOpen, closeModal } = useUIStore.getState();
-          if (modalOpen === 'tips') closeModal();
-        }).catch(() => {});
-      } catch { /* ok */ }
     }
     handleMessage(typeof event.data === 'string' ? event.data : event.data.toString());
   };
 
   ws.onclose = (event) => {
     // A new connection is greeted again if an agent is still attached.
-    agentAttached = false;
     if (event.code === RELAY_REPLACED_CLOSE_CODE) {
       ws = null;
       onReplacedByAnotherTab();

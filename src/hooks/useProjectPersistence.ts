@@ -8,7 +8,8 @@
  * bump SCHEMA_VERSION to invalidate old cached data.
  */
 
-import { useEffect, useCallback, useRef, useState } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
+import { beginBootRestore, endBootRestore } from '@/lib/startup/bootRestore';
 import { shouldWriteRecovery, hasProjectContent, postLoadFlags, decideBootRestore } from '@/lib/persistence/recoveryGate';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore } from '@stores';
 import type { AutomationCurve } from '@typedefs/automation';
@@ -636,24 +637,23 @@ export function useProjectPersistence() {
   const { isDirty, markAsModified } = useProjectStore();
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialLoadRef = useRef(true);
-  const [recoverySnapshot, setRecoverySnapshot] = useState<SavedProject | null>(null);
-  /** Which slot the pending prompt came from — it decides the post-load flags. */
-  const recoverySourceRef = useRef<'saved' | 'recovery' | null>(null);
-  /** Same value, for rendering: the prompt's wording differs by source. */
-  const [recoverySource, setRecoverySource] = useState<'saved' | 'recovery' | null>(null);
-
-  // Boot OFFERS stored work; it never loads it silently.
+  // Boot restores the last session silently (owner decision, 2026-10-18: never
+  // ask; the user clears the project if they do not want it).
   //
-  // It used to call `loadProjectFromStorage()` outright whenever a project had
-  // ever been saved, so every session opened on top of the last one: "i load a
-  // song on every boot because a stale song is there on every boot"
-  // (2026-09-22). That second load also re-wires the dub bus underneath the
-  // deck while the real song comes in.
+  // History: boot used to load the explicit slot unconditionally, so a stale
+  // song came back on every boot (2026-09-22); it then offered a Restore /
+  // Discard prompt instead. The prompt is gone: the offer was one more blocking
+  // dialog at start. Which slot wins is still decideBootRestore's call (the
+  // newer of the saved project and the crash snapshot).
+  //
+  // A song load requested meanwhile waits on the bootRestore gate (openSong), so
+  // the restore can never overwrite it.
   //
   // Only once per page session — the module-level guard survives HMR remounts.
   useEffect(() => {
     if (hasLoadedFromStorage) return;
     hasLoadedFromStorage = true;
+    beginBootRestore();
     void (async () => {
       if (await handleResetParam()) return;
 
@@ -682,18 +682,16 @@ export function useProjectPersistence() {
         recoveryAt: rec?.metadata?.modifiedAt ?? null,
       });
       if (decision.kind === 'saved') {
-        // The explicit slot is authoritative, as before — a crash snapshot
-        // beside it is stale by definition.
+        // The explicit slot is authoritative: a crash snapshot beside it is
+        // stale by definition.
         await idbDeleteRecovery().catch(() => {});
-        recoverySourceRef.current = 'saved';
-        setRecoverySource('saved');
-        setRecoverySnapshot(saved!);
+        await applySavedProject(saved!);
       } else if (decision.kind === 'recovery') {
-        recoverySourceRef.current = 'recovery';
-        setRecoverySource('recovery');
-        setRecoverySnapshot(rec!);
+        await applySavedProject(rec!, { fromRecovery: true });
       }
-    })();
+    })()
+      .catch((error: unknown) => { console.error('[Persistence] Boot restore failed:', error); })
+      .finally(endBootRestore);
   }, []);
 
   // Subscribe to tracker store changes to mark as dirty
@@ -839,33 +837,8 @@ export function useProjectPersistence() {
     return () => document.removeEventListener('visibilitychange', onHidden);
   }, [writeRecoveryNow]);
 
-  const restoreRecovery = useCallback(() => {
-    if (!recoverySnapshot) return;
-    // A crash snapshot restores with `fromRecovery`, which keeps the project
-    // never-saved + dirty so the scheduler re-arms and a second crash after
-    // Restore is still covered (spec). The explicit-save slot must NOT use
-    // that tail — it is saved work, and marking it unsaved would re-arm
-    // recovery over a project that already has a home.
-    const fromRecovery = recoverySourceRef.current === 'recovery';
-    void applySavedProject(recoverySnapshot, { fromRecovery });
-    recoverySourceRef.current = null;
-    setRecoverySource(null);
-    setRecoverySnapshot(null);
-  }, [recoverySnapshot]);
-
-  const discardRecovery = useCallback(() => {
-    const wasRecovery = recoverySourceRef.current === 'recovery';
-    recoverySourceRef.current = null;
-    setRecoverySource(null);
-    setRecoverySnapshot(null);
-    // Dismissing the offer of a SAVED project must never delete it — the user
-    // still finds it under Load. Only a crash snapshot is consumed by being
-    // declined.
-    if (wasRecovery) void idbDeleteRecovery().catch(() => {});
-  }, []);
-
   const save = useCallback(() => saveProjectToStorage({ explicit: true }), []);
   const load = useCallback(() => loadProjectFromStorage(), []);
 
-  return { save, load, clear: clearSavedProject, isDirty, recoverySnapshot, recoverySource, restoreRecovery, discardRecovery };
+  return { save, load, clear: clearSavedProject, isDirty };
 }

@@ -1,9 +1,9 @@
 /**
  * The startup sequence: the one place that decides what comes first at boot.
  *
- * Order: a gesture surface (the tips dialog, or a click-to-start splash when
- * tips are off) -> its click starts the startup jingle at once -> only when the
- * jingle ends do the boot restore prompt and the changelog appear.
+ * Order: the one start dialog (tips / what's new, or the collaboration modal for
+ * a ?collab= link) -> closing it starts the startup jingle at once -> song loads
+ * wait for the silent boot restore and for the jingle to end.
  *
  * The jingle asset is fetched and decoded at page load (beginStartupSequence),
  * so the gesture only has to resume the context and start the source. Playback
@@ -25,32 +25,44 @@ export function resetStartupSequenceForTest(): void {
   loading = null;
 }
 
-/** What the user must click to start the jingle. */
-export type StartupGestureSurface = 'tips' | 'splash' | 'none';
+/** The one blocking dialog a start opens. */
+export type StartupDialog =
+  | { modal: 'tips'; initialTab: 'changelog' | 'tips' }
+  | { modal: 'collab'; collabCode: string };
 
-/** Which dialog (if any) is the first thing on screen. The tips dialog also carries the changelog tab. */
-export function startupTipsModal(buildNumber: string): { initialTab: 'changelog' | 'tips' } | null {
+/**
+ * The tips dialog's tab: the changelog on a new build, the tips otherwise. It
+ * opens on every start, so there is no "off" answer.
+ */
+export function startupTipsModal(buildNumber: string): { initialTab: 'changelog' | 'tips' } {
   const hasNewVersion = localStorage.getItem('devilbox-seen-version') !== buildNumber;
-  if (hasNewVersion) return { initialTab: 'changelog' };
-  if (localStorage.getItem('show-tips-at-startup') !== 'false') return { initialTab: 'tips' };
-  return null;
-}
-
-export function startupGestureSurface(buildNumber: string): StartupGestureSurface {
-  if (!useSettingsStore.getState().welcomeJingleEnabled) return 'none';
-  return startupTipsModal(buildNumber) ? 'tips' : 'splash';
+  return { initialTab: hasNewVersion ? 'changelog' : 'tips' };
 }
 
 /**
- * True while the click-to-start splash covers the app: the sequence waits for a
- * gesture and the tips dialog (a useUIStore modal) is not the surface carrying it.
+ * Which dialog is the one dialog at app start: the collaboration modal for a
+ * ?collab=CODE link, the tips dialog otherwise. Closing it is the start gesture
+ * (closeStartDialog), whichever it is.
  */
-export function isStartupSplashOpen(): boolean {
-  const ui = useUIStore.getState();
-  return ui.startupJingleStage === 'awaiting-gesture' && ui.modalOpen !== 'tips';
+export function startupDialog(buildNumber: string, search: string): StartupDialog {
+  const collabCode = new URLSearchParams(search).get('collab');
+  if (collabCode && collabCode.length >= 6) return { modal: 'collab', collabCode };
+  return { modal: 'tips', ...startupTipsModal(buildNumber) };
 }
 
-/** True while the boot restore prompt and the changelog must stay hidden. */
+/**
+ * Close the open dialog and, in the same click, start the jingle. The jingle's
+ * AudioContext unlock must run synchronously inside the user gesture, so this
+ * is the only close handler the start dialogs and dismiss_modal use. Safe to
+ * call for any later modal: startStartupJingle ignores everything after the
+ * first gesture.
+ */
+export function closeStartDialog(): void {
+  void startStartupJingle();
+  useUIStore.getState().closeModal();
+}
+
+/** True while song loads must wait: the jingle is pending or playing. */
 export function isStartupHolding(stage: StartupJingleStage): boolean {
   return stage === 'awaiting-gesture' || stage === 'playing';
 }
@@ -125,13 +137,4 @@ export async function startStartupJingle(): Promise<void> {
   injectMouthPatterns();
   jingle.play();
   useUIStore.getState().setJingleActive(true);
-}
-
-/**
- * First user gesture anywhere: jingle first, then engine init. The jingle is
- * started before init is even called, so a slow init cannot delay it.
- */
-export async function runFirstGesture(buildNumber: string, initAudioEngine: () => Promise<void>): Promise<void> {
-  if (startupGestureSurface(buildNumber) === 'splash') void startStartupJingle();
-  await initAudioEngine();
 }

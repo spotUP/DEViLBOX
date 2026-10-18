@@ -24,7 +24,7 @@ import { useUIStore } from '@stores/useUIStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import {
   beginStartupSequence, isStartupHolding, resetStartupSequenceForTest,
-  runFirstGesture, startStartupJingle, whenStartupJingleDone,
+  closeStartDialog, startStartupJingle, startupDialog, startupTipsModal, whenStartupJingleDone,
 } from '../startupSequence';
 
 const holding = () => isStartupHolding(useUIStore.getState().startupJingleStage);
@@ -39,37 +39,44 @@ describe('startup sequence: jingle first', () => {
     useSettingsStore.setState({ welcomeJingleEnabled: true });
   });
 
-  it('plays on the dismiss gesture before engine init resolves, and holds the boot prompts until the jingle ends', async () => {
+  it('holds song loads from page load, plays on the dialog close, and releases when the jingle ends', async () => {
     beginStartupSequence();
     releasePreload(); // decoded at page load, before any gesture
     await Promise.resolve(); await Promise.resolve();
-    expect(holding()).toBe(true); // restore prompt / changelog held from page load
+    expect(holding()).toBe(true);
 
-    // Tips dismissal is the gesture; the engine init click runs in parallel and is slow.
-    let finishInit: () => void = () => {};
-    const init = runFirstGesture('b1', () => new Promise<void>((r) => { log.push('init-start'); finishInit = () => { log.push('init-done'); r(); }; }));
-    await startStartupJingle();
+    useUIStore.getState().openModal('tips');
+    closeStartDialog();
+    await Promise.resolve(); await Promise.resolve();
 
-    expect(log).toContain('jingle-play');
-    expect(log).not.toContain('init-done'); // play happened while init is still pending
-    expect(holding()).toBe(true); // still held while playing
-
-    finishInit(); await init;
-    expect(holding()).toBe(true); // init finishing does not release the prompts
+    expect(useUIStore.getState().modalOpen).toBeNull();
+    expect(log).toEqual(expect.arrayContaining(['unlock', 'jingle-play']));
+    expect(holding()).toBe(true); // still playing
 
     endCb!(); // jingle-end event
     expect(holding()).toBe(false);
     expect(useUIStore.getState().postJingleActive).toBe(true);
   });
 
-  it('with the tips dialog off, the first gesture (splash click) starts the jingle before engine init', async () => {
-    localStorage.setItem('devilbox-seen-version', 'b1');
-    localStorage.setItem('show-tips-at-startup', 'false');
+  it('closeStartDialog unlocks audio once, synchronously, and ignores later closes', () => {
     beginStartupSequence(); releasePreload();
-    await Promise.resolve(); await Promise.resolve();
-    void runFirstGesture('b1', async () => { log.push('init-start'); });
-    expect(log.indexOf('jingle-play')).toBeGreaterThan(-1);
-    expect(log.indexOf('jingle-play')).toBeLessThan(log.indexOf('init-start'));
+    closeStartDialog();
+    expect(log.filter((l) => l === 'unlock')).toHaveLength(1);
+    closeStartDialog();
+    expect(log.filter((l) => l === 'unlock')).toHaveLength(1);
+  });
+
+  it('startupTipsModal: changelog on a new build, tips otherwise, never off', () => {
+    expect(startupTipsModal('b1')).toEqual({ initialTab: 'tips' });
+    expect(startupTipsModal('b2')).toEqual({ initialTab: 'changelog' });
+    localStorage.setItem('show-tips-at-startup', 'false');
+    expect(startupTipsModal('b1')).toEqual({ initialTab: 'tips' });
+  });
+
+  it('startupDialog: collab modal for a ?collab= code of 6+ characters, tips otherwise', () => {
+    expect(startupDialog('b1', '?collab=ABCDEF')).toEqual({ modal: 'collab', collabCode: 'ABCDEF' });
+    expect(startupDialog('b1', '?collab=AB')).toMatchObject({ modal: 'tips' });
+    expect(startupDialog('b1', '')).toEqual({ modal: 'tips', initialTab: 'tips' });
   });
 
   it('a song load (whenStartupJingleDone) waits for the jingle to end', async () => {

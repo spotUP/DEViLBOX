@@ -2,7 +2,7 @@
  * App - Main application component
  */
 
-import { useEffect, useRef, useState, useCallback, lazy, Suspense } from 'react';
+import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { AppLayout } from '@components/layout/AppLayout';
 import { TrackerView } from '@components/tracker/TrackerView';
@@ -25,11 +25,10 @@ import { useGlobalKeyboardHandler } from './hooks/useGlobalKeyboardHandler';
 import { initKeyboardRouter, destroyKeyboardRouter } from './engine/keyboard/KeyboardRouter';
 import { useCloudSync } from './hooks/useCloudSync';
 import { useMediaSession } from './hooks/useMediaSession';
-import { setRecoveryPrompt } from './lib/persistence/recoveryPrompt';
 import { setupCloudSyncSubscribers } from './lib/cloudSyncSubscribers';
 import { setupInstrumentSelectionSync } from './midi/instrumentSelectionWiring';
 import { getToneEngine } from '@engine/ToneEngine';
-import { beginStartupSequence, isStartupHolding, runFirstGesture, startStartupJingle, startupGestureSurface, startupTipsModal } from '@lib/startup/startupSequence';
+import { beginStartupSequence, closeStartDialog, startupDialog } from '@lib/startup/startupSequence';
 import type { EffectConfig } from './types/instrument';
 import { Zap, Music, Sliders, Download, List } from 'lucide-react';
 import { ToastNotification } from '@components/ui/ToastNotification';
@@ -49,7 +48,6 @@ import { ImportDBXDialog } from '@components/dialogs/ImportDBXDialog';
 import { ImportInstrumentDialog } from '@components/dialogs/ImportInstrumentDialog';
 import { ImportTD3Dialog } from '@components/dialogs/ImportTD3Dialog';
 import { Button } from '@components/ui/Button';
-import { Modal } from '@components/ui/Modal';
 import { useVersionCheck } from '@hooks/useVersionCheck';
 import { useDevServerStatus } from '@hooks/useDevServerStatus';
 import { DevServerDownBanner } from '@components/ui/DevServerDownBanner';
@@ -226,44 +224,26 @@ function App() {
 
   const { showPatternDialog: showTD3Pattern, closePatternDialog, showKnobBar, setShowKnobBar } = useMIDIStore();
 
-  // Startup sequence (src/lib/startup/startupSequence.ts decides the order):
-  // the jingle asset loads now; the boot prompts wait until the jingle ends.
+  // Startup sequence (src/lib/startup/startupSequence.ts): the jingle asset loads
+  // now; song loads wait for the jingle. Exactly one blocking dialog opens at
+  // start, and closing it (closeStartDialog) is the gesture that starts the jingle.
   useEffect(() => { beginStartupSequence(); }, []);
-  const startupHolding = useUIStore(s => isStartupHolding(s.startupJingleStage));
-  const startupStage = useUIStore(s => s.startupJingleStage);
-  const prevModalOpenRef = useRef<string | null>(null);
 
+  // The one start dialog: Tip of the day / What's new on every start, or the
+  // collaboration modal for a ?collab=CODE link.
   useEffect(() => {
-    const prev = prevModalOpenRef.current;
-    prevModalOpenRef.current = modalOpen;
-
-    // Tips modal just dismissed: that click is the gesture that starts the jingle.
-    if (prev === 'tips' && !modalOpen) {
-      void startStartupJingle();
-    }
-  }, [modalOpen]);
-
-  // Unified startup logic: Show Tips or What's New
-  useEffect(() => {
-    // Changelog for a new version, otherwise Tips if enabled.
-    const tips = startupTipsModal(currentVersion.buildNumber);
-    if (tips) openModal('tips', tips);
-  }, [currentVersion.buildNumber, openModal]);
-
-  // Auto-join collab room from URL (e.g. ?collab=XXXXXX)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const collabCode = params.get('collab');
-    if (collabCode && collabCode.length >= 6) {
+    const dialog = startupDialog(currentVersion.buildNumber, window.location.search);
+    if (dialog.modal === 'collab') {
       // Clean the URL so refreshing doesn't re-trigger
       const url = new URL(window.location.href);
       url.searchParams.delete('collab');
       window.history.replaceState({}, '', url.pathname + url.search);
-      // Open the collab modal in join mode and auto-join
-      openModal('collaboration');
-      useCollaborationStore.getState().joinRoom(collabCode);
+      openModal('collab');
+      useCollaborationStore.getState().joinRoom(dialog.collabCode);
+    } else {
+      openModal('tips', { initialTab: dialog.initialTab });
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentVersion.buildNumber, openModal]);
 
   // Cloud sync: pull on login, push on local mutations
   useCloudSync();
@@ -403,27 +383,7 @@ function App() {
     applyAutoCompact();
   }, [applyAutoCompact]);
 
-  const { save: saveProject, recoverySnapshot, recoverySource, restoreRecovery, discardRecovery } = useProjectPersistence();
-
-  // Publish the crash-recovery prompt while it is on screen.
-  //
-  // It is driven by `useProjectPersistence`'s own state, so `get_modal_state`
-  // — which reads `useUIStore.modalOpen` — reported no dialog while this one
-  // was sitting in front of the user. Registering it makes the UI answerable
-  // from outside React; see `recoveryPrompt.ts` for why resolving it stays an
-  // explicit choice rather than something `dismiss_modal` may do.
-  useEffect(() => {
-    if (!recoverySnapshot || startupHolding) { setRecoveryPrompt(null); return; }
-    setRecoveryPrompt({
-      restore: () => restoreRecovery(),
-      discard: () => discardRecovery(),
-      describe: () => ({
-        name: recoverySnapshot.metadata?.name,
-        savedAt: recoverySnapshot.metadata?.modifiedAt,
-      }),
-    });
-    return () => setRecoveryPrompt(null);
-  }, [recoverySnapshot, startupHolding, restoreRecovery, discardRecovery]);
+  const { save: saveProject } = useProjectPersistence();
 
   // Initialize KeyboardRouter once at app startup
   useEffect(() => {
@@ -730,17 +690,15 @@ function App() {
       window.removeEventListener('keydown', handleFirstInteraction);
       window.removeEventListener('touchstart', handleFirstInteraction);
 
-      // Jingle first (splash mode), engine init in parallel and never ahead of it.
-      await runFirstGesture(currentVersion.buildNumber, async () => {
-        if (contextState === 'running') return;
-        try {
-          const engine = getToneEngine();
-          await engine.init();
-          setContextState(engine.getContextState() as 'suspended' | 'running' | 'closed');
-        } catch (error) {
-          console.error('Failed to resume audio engine:', error);
-        }
-      });
+      // The jingle is started by closing the start dialog (closeStartDialog), not here.
+      if (contextState === 'running') return;
+      try {
+        const engine = getToneEngine();
+        await engine.init();
+        setContextState(engine.getContextState() as 'suspended' | 'running' | 'closed');
+      } catch (error) {
+        console.error('Failed to resume audio engine:', error);
+      }
     };
 
     window.addEventListener('click', handleFirstInteraction);
@@ -1160,7 +1118,7 @@ function App() {
         {modalOpen === 'tips' && (
           <TipOfTheDay
             isOpen={true}
-            onClose={closeModal}
+            onClose={closeStartDialog}
             initialTab={(modalData?.initialTab as 'tips' | 'changelog') || 'tips'}
           />
         )}
@@ -1376,43 +1334,6 @@ function App() {
 
       {/* Guided Tour overlay — subtitles + controls */}
       <TourOverlay />
-
-      {/* Click-to-start splash: the gesture that starts the jingle when the tips dialog is off. */}
-      {startupStage === 'awaiting-gesture' && startupGestureSurface(currentVersion.buildNumber) === 'splash' && (
-        <Modal isOpen onClose={() => void startStartupJingle()} size="sm" onConfirm={() => void startStartupJingle()}>
-          <div className="p-4 space-y-3 text-center">
-            <h2 className="text-sm font-mono text-text-primary">DEViLBOX</h2>
-            <Button variant="primary" onClick={() => void startStartupJingle()}>Click to Start</Button>
-          </div>
-        </Modal>
-      )}
-
-      {/* Boot restore prompt. Two sources, two very different things to say:
-          a crash snapshot is work the user never saved, while the explicit
-          slot is a project they named and saved on purpose — and which boot
-          used to open silently over whatever they were about to load. */}
-      {recoverySnapshot && !startupHolding && (
-        <Modal isOpen onClose={discardRecovery} size="sm" onConfirm={restoreRecovery}>
-          <div className="p-4 space-y-3">
-            <h2 className="text-sm font-mono text-text-primary">
-              {recoverySource === 'saved' ? 'Open your last project' : 'Recover unsaved work'}
-            </h2>
-            <p className="text-[11px] font-mono text-text-secondary">
-              {recoverySource === 'saved'
-                ? `Your last saved project${recoverySnapshot.metadata?.name ? ` — ${recoverySnapshot.metadata.name}` : ''} is ready. Open it, or start with an empty song?`
-                : 'Unsaved work from your last session was recovered. Restore it, or discard and start fresh?'}
-            </p>
-            <div className="flex justify-end gap-2 pt-1">
-              <Button variant="ghost" onClick={discardRecovery}>
-                {recoverySource === 'saved' ? 'Start Empty' : 'Discard'}
-              </Button>
-              <Button variant="primary" onClick={restoreRecovery}>
-                {recoverySource === 'saved' ? 'Open' : 'Restore'}
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
     </AppLayout>
     </GlobalDragDropHandler>
   );

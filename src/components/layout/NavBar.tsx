@@ -9,6 +9,7 @@ import { DJSetBrowser } from '@components/dj/DJSetBrowser';
 import { DownloadModal } from '@components/dialogs/DownloadModal';
 import { SettingsModal } from '@components/dialogs/SettingsModal';
 import { AuthModal } from '@components/dialogs/AuthModal';
+import { closeStartDialog } from '@lib/startup/startupSequence';
 import { CollaborationModal } from '@components/collaboration/CollaborationModal';
 import { Button } from '@components/ui/Button';
 import { isElectron } from '@utils/electron';
@@ -32,6 +33,7 @@ const NavBarComponent: React.FC = () => {
   const openModal = useUIStore((state) => state.openModal);
   const modalOpen = useUIStore((state) => state.modalOpen);
   const closeModal = useUIStore((state) => state.closeModal);
+  const startupStage = useUIStore((state) => state.startupJingleStage);
   const tourActive = useTourStore((s) => s.isActive);
 
   // Dub deck transport bar — shown in the header while the FT2 toolbar's own
@@ -72,10 +74,13 @@ const NavBarComponent: React.FC = () => {
 
   // Auto-close collab modal when connection succeeds
   useEffect(() => {
-    if (n.collabStatus === 'connected' && modalOpen === 'collab') {
+    // Not while the start gesture is pending: a ?collab= start shows this modal
+    // as the one start dialog, and only the user's own close (a click) may end
+    // it, because that click starts the jingle and unlocks audio.
+    if (n.collabStatus === 'connected' && modalOpen === 'collab' && startupStage !== 'awaiting-gesture') {
       closeModal();
     }
-  }, [n.collabStatus, modalOpen, closeModal]);
+  }, [n.collabStatus, modalOpen, closeModal, startupStage]);
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -374,7 +379,7 @@ const NavBarComponent: React.FC = () => {
       {modalOpen === 'collab' && (
         <CollaborationModal
           isOpen={true}
-          onClose={() => closeModal()}
+          onClose={closeStartDialog}
         />
       )}
 
