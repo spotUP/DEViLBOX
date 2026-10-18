@@ -36,6 +36,7 @@ import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';
 import { clearPatternGuard } from '../keyboard/commands/djScratch';
 import { recueDeck, type DeckRecueResult } from './scratch/deckRecue';
 import type { DeckScratchSnapshot } from './scratch/scratchSnapshot';
+import { instrumentChannelUsage } from '@/lib/song/instrumentChannelUsage';
 
 
 /** Past the signal gate's ~2 s hangover: a deck woken by a silent action unplugs again. */
@@ -651,8 +652,9 @@ export class DeckEngine {
     // The deck holds this song from here: the pattern view reads it now, not
     // when the audio load that follows writes the file name.
     useDJStore.getState().setDeckState(this.id, { songVersion: (useDJStore.getState().decks[this.id]?.songVersion ?? 0) + 1 });
-    await engine.preloadInstruments(song.instruments);
-    await engine.ensureWASMSynthsReady(song.instruments);
+    const usage = instrumentChannelUsage(song.patterns);
+    await engine.preloadInstruments(song.instruments, usage);
+    await engine.ensureWASMSynthsReady(song.instruments, usage);
 
     // Reroute native singleton engine outputs into this deck's audio chain
     // so they go through the deck's EQ, filter, and crossfader.

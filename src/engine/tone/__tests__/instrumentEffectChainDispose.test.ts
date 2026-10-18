@@ -39,8 +39,10 @@ describe('instrument effect chains', () => {
       instrumentEffectNodes: new Map(),
       instrumentAnalysers: new Map(),
       instruments: new Map(),
+      instrumentOutputOverrides: new Map(),
       connectNativeSynth: vi.fn(),
       getInstrumentOutputDestination: () => ({}),
+      channelFromKey: () => -1,
     } as unknown as InstrumentEffectsContext;
     const nativeSynth = { name: 'n', output: { connect() {}, disconnect() {}, numberOfOutputs: 1 }, dispose() {}, triggerAttack() {}, triggerRelease() {} };
     const fx = [{ id: 'fx1', type: 'Reverb', enabled: true, wet: 50, parameters: {} }];

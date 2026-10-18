@@ -24,8 +24,10 @@ export interface InstrumentEffectsContext {
   masterInput: Tone.Gain;
   synthBus: Tone.Gain;
   connectNativeSynth: (output: AudioNode, destination: Tone.ToneAudioNode) => void;
-  getInstrumentOutputDestination: (instrumentId: number, isNative: boolean) => Tone.ToneAudioNode;
+  getInstrumentOutputDestination: (instrumentId: number, isNative: boolean, channelIndex?: number) => Tone.ToneAudioNode;
   getInstrumentKey: (instrumentId: number, channel: number) => number;
+  /** Channel half of a composite key; -1 for the shared instance. */
+  channelFromKey: (key: number) => number;
 }
 
 /**
@@ -42,23 +44,54 @@ export function clearConnectedNativeOutputs(): void {
  * Connect effect chain output to destination, inserting a channel filter
  * for native (WASM) synths. Tone.js instruments already have per-channel
  * filters wired in ChannelRouting, but native synths bypass that path.
+ * A per-channel native instance (channelIndex >= 0) plays into its channel
+ * lane, which sits before the channel strip and its filter, so it skips the
+ * global native-synth filter slot.
  */
 function connectToDestWithFilter(
   output: Tone.Gain,
   dest: Tone.ToneAudioNode,
   isNative: boolean,
   instrumentId: number,
+  channelIndex = -1,
 ): void {
-  if (isNative) {
+  if (isNative && channelIndex < 0) {
     const filterMgr = getChannelFilterManager();
-    const channelIdx = NATIVE_SYNTH_FILTER_BASE + instrumentId;
-    const filterInput = filterMgr.getInput(channelIdx);
-    const filterOutput = filterMgr.getOutput(channelIdx);
+    const filterIdx = NATIVE_SYNTH_FILTER_BASE + instrumentId;
+    const filterInput = filterMgr.getInput(filterIdx);
+    const filterOutput = filterMgr.getOutput(filterIdx);
     connectAudio(output, filterInput);
     connectAudio(filterOutput, dest);
+  } else if (isNative) {
+    connectAudio(output, dest);
   } else {
     output.connect(dest);
   }
+}
+
+/**
+ * Route a built chain's output. The destination comes from the key's channel
+ * (per-channel native lane, synthBus or masterInput, or an output override).
+ * An open instrument analyser is in series for Tone.js instruments (one
+ * destination per instrument) and a parallel tap for native ones, whose
+ * instances can have different destinations.
+ */
+export function connectChainOutput(
+  ctx: InstrumentEffectsContext,
+  key: number,
+  output: Tone.Gain,
+  isNative: boolean,
+): void {
+  const instrumentId = key >>> 16;
+  const channelIndex = ctx.channelFromKey(key);
+  const activeAnalyser = ctx.instrumentAnalysers.get(instrumentId);
+  if (activeAnalyser && !isNative) {
+    output.connect(activeAnalyser.input);
+    return;
+  }
+  const dest = ctx.getInstrumentOutputDestination(instrumentId, isNative, channelIndex);
+  connectToDestWithFilter(output, dest, isNative, instrumentId, channelIndex);
+  if (activeAnalyser) connectAudio(output, activeAnalyser.input);
 }
 
 export async function buildInstrumentEffectChain(
@@ -102,16 +135,7 @@ export async function buildInstrumentEffectChain(
     // No effects - direct connection
     connectInstrumentTo(output);
 
-    // Determine destination: use instrument analyser if active, otherwise master input
-    const instrumentId = key >>> 16;
-    const activeAnalyser = ctx.instrumentAnalysers.get(instrumentId);
-
-    if (activeAnalyser) {
-      connectToDestWithFilter(output, activeAnalyser.input, isNativeSynth, instrumentId);
-    } else {
-      const dest = ctx.getInstrumentOutputDestination(instrumentId, isNativeSynth);
-      connectToDestWithFilter(output, dest, isNativeSynth, instrumentId);
-    }
+    connectChainOutput(ctx, key, output, isNativeSynth);
 
     ctx.instrumentEffectChains.set(key, { effects: [], output });
     return;
@@ -151,26 +175,32 @@ export async function buildInstrumentEffectChain(
     connectInstrumentTo(output);
   }
 
-  // Determine destination: use instrument analyser if active, otherwise master input
-  const instrumentId2 = key >>> 16;
-  const activeAnalyser = ctx.instrumentAnalysers.get(instrumentId2);
-
-  if (activeAnalyser) {
-    console.log('[ToneEngine] buildInstrumentEffectChain: connecting output to analyser');
-    connectToDestWithFilter(output, activeAnalyser.input, isNativeSynth, instrumentId2);
-  } else {
-    const dest = ctx.getInstrumentOutputDestination(instrumentId2, isNativeSynth);
-    console.log('[ToneEngine] buildInstrumentEffectChain: connecting output to destination (native:', isNativeSynth, ')');
-    connectToDestWithFilter(output, dest, isNativeSynth, instrumentId2);
-  }
+  console.log('[ToneEngine] buildInstrumentEffectChain: connecting output to destination (native:', isNativeSynth, ')');
+  connectChainOutput(ctx, key, output, isNativeSynth);
 
   ctx.instrumentEffectChains.set(key, { effects: effectNodes as Tone.ToneAudioNode[], output, bridge });
   console.log('[ToneEngine] buildInstrumentEffectChain: chain built and stored for key', key);
 
   // Register individual effect nodes for real-time parameter updates
+  // Keyed by chain key and effect id: one instrument may own one chain per
+  // tracker channel, and every chain carries its own copy of each effect.
   enabledEffects.forEach((config, i) => {
-    ctx.instrumentEffectNodes.set(config.id, { node: effectNodes[i] as Tone.ToneAudioNode, config });
+    ctx.instrumentEffectNodes.set(instrumentEffectNodeKey(key, config.id), { node: effectNodes[i] as Tone.ToneAudioNode, config });
   });
+}
+
+/** Registry key for one effect node inside one instrument instance's chain. */
+export function instrumentEffectNodeKey(chainKey: number, effectId: string): string {
+  return `${chainKey}:${effectId}`;
+}
+
+/** Every instance key (shared and per-channel) currently built for an instrument id. */
+export function instanceKeysOf(instruments: Map<number, unknown>, instrumentId: number): number[] {
+  const keys: number[] = [];
+  for (const key of instruments.keys()) {
+    if ((key >> 16) === instrumentId) keys.push(key);
+  }
+  return keys;
 }
 
 /**
@@ -181,42 +211,42 @@ export async function rebuildInstrumentEffects(
   instrumentId: number,
   effects: EffectConfig[]
 ): Promise<void> {
-  const key = ctx.getInstrumentKey(instrumentId, -1);
-  const instrument = ctx.instruments.get(key);
-  
-  // Debug: log all keys in the instruments map
-  console.log('[ToneEngine] rebuildInstrumentEffects called for instrumentId:', instrumentId, 
-    'key:', key, 
-    'has instrument:', !!instrument,
-    'effects count:', effects.length,
-    'all keys in map:', Array.from(ctx.instruments.keys()));
-  
-  if (!instrument) {
+  // One instrument may have a shared instance plus one instance per tracker
+  // channel; the new chain must reach every one of them.
+  const keys = instanceKeysOf(ctx.instruments, instrumentId);
+
+  console.log('[ToneEngine] rebuildInstrumentEffects called for instrumentId:', instrumentId,
+    'keys:', keys,
+    'effects count:', effects.length);
+
+  if (keys.length === 0) {
     // Instrument not yet created (no notes played) - effects will be applied on first note
     // This is expected behavior, not an error
     console.log('[ToneEngine] rebuildInstrumentEffects: instrument not yet created - effects will apply on first note');
     return;
   }
 
-  // Disconnect instrument from current chain
-  try {
-    if (isDevilboxSynth(instrument)) {
-      // Native synth — disconnect the AudioNode output
-      console.log('[ToneEngine] rebuildInstrumentEffects: disconnecting native synth output');
-      instrument.output.disconnect();
-    } else {
-      console.log('[ToneEngine] rebuildInstrumentEffects: disconnecting Tone.js instrument');
-      instrument.disconnect();
-    }
-  } catch (e) {
-    // May not be connected
-    console.log('[ToneEngine] rebuildInstrumentEffects: disconnect error (expected if not connected):', e);
-  }
+  for (const key of keys) {
+    const instrument = ctx.instruments.get(key);
+    if (!instrument) continue;
 
-  // Build new effect chain (await for neural effects)
-  console.log('[ToneEngine] rebuildInstrumentEffects: building new effect chain with', effects.length, 'effects');
-  await buildInstrumentEffectChain(ctx, key, effects, instrument);
-  console.log('[ToneEngine] rebuildInstrumentEffects: effect chain built successfully');
+    // Disconnect instrument from current chain
+    try {
+      if (isDevilboxSynth(instrument)) {
+        // Native synth — disconnect the AudioNode output
+        instrument.output.disconnect();
+      } else {
+        instrument.disconnect();
+      }
+    } catch (e) {
+      // May not be connected
+      console.log('[ToneEngine] rebuildInstrumentEffects: disconnect error (expected if not connected):', e);
+    }
+
+    // Build new effect chain (await for neural effects)
+    await buildInstrumentEffectChain(ctx, key, effects, instrument);
+  }
+  console.log('[ToneEngine] rebuildInstrumentEffects: effect chain built for', keys.length, 'instance(s)');
 }
 
 /**

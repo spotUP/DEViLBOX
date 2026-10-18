@@ -298,11 +298,15 @@ export async function speakMAMEChipText(ctx: SynthUpdateContext, instrumentId: n
  * Dispatches to the appropriate ROM loading method based on synthType.
  */
 export function loadSynthROM(ctx: SynthUpdateContext, instrumentId: number, synthType: string, bank: number, data: Uint8Array): void {
-  const instrumentKey = ctx.getInstrumentKey(instrumentId, -1);
-  const instrument = ctx.instruments.get(instrumentKey);
-  if (!instrument) return;
+  // Every instance of the instrument (shared plus one per tracker channel) needs the ROM.
+  for (const [key, instrument] of ctx.instruments) {
+    if (ctx.instrumentIdFromKey(key) !== instrumentId) continue;
+    loadSynthROMInto(instrument, synthType, bank, data);
+  }
+}
 
-  const synth = instrument as unknown as {
+function loadSynthROMInto(instrument: unknown, synthType: string, bank: number, data: Uint8Array): void {
+  const synth = instrument as {
     loadROM?: (bank: number, data: Uint8Array) => void;
     loadRom?: (data: Uint8Array) => void;
     loadWaveROM?: (buffer: ArrayBuffer) => void;

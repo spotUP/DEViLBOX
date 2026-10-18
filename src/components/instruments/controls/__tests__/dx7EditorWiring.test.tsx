@@ -19,6 +19,7 @@ const fakeSynth = {
 const fakeEngine = {
   instruments: new Map<number, unknown>(),
   getInstrumentKey: (id: number) => (id << 16) | 0xFFFF,
+  instancesOf: (id: number) => [...fakeEngine.instruments.entries()].filter(([k]) => (k >> 16) === id).map(([, v]) => v),
   ensureInstrumentReady: async () => {},
 };
 vi.mock('@engine/ToneEngine', () => ({ getToneEngine: () => fakeEngine }));

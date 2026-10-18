@@ -53,6 +53,17 @@ import { deepMerge, ensureCompleteInstrumentConfig } from '@/lib/migration';
 import { getDefaultSonixParams } from '@engine/sonix/sonixInstrument';
 import { WaveformProcessor } from '@/lib/audio/WaveformProcessor';
 
+/** The DX7 live-edit surface used by the store: every method is optional because older builds lack some. */
+interface DX7LiveSynth {
+  loadSysex?: unknown;
+  loadVcedPreset?: (name: string) => void;
+  setVcedParam?: (param: number, value: number) => void;
+  loadLibraryBank?: (bank: string, program: number) => void;
+  loadPatchBank?: (file: string, program: number) => void;
+  selectVoice?: (program: number) => void;
+  constructor: { getPatchManifest?: () => { banks?: Array<{ file: string }> } | undefined };
+}
+
 // Extracted helper modules
 import {
   processSampleReverse,
@@ -809,40 +820,33 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
             if (updatedInstrument.synthType === 'DX7' && updates.dx7) {
               const dx7Updates = updates.dx7 as Record<string, unknown>;
-              // Find all DX7 synth instances for this instrument
-              const instruments = (engine as any).instruments as Map<number, any>;
-              const findDX7 = () => {
-                if (!instruments) return null;
-                for (const [key, synth] of instruments.entries()) {
-                  if ((key >>> 16) === id && synth?.loadSysex) return synth;
+              // Every DX7 instance of this instrument: the shared one plus one per tracker channel.
+              const dx7Synths = engine.instancesOf(id).filter((s) => !!(s as { loadSysex?: unknown })?.loadSysex) as unknown as DX7LiveSynth[];
+              for (const synth of dx7Synths) {
+                if (dx7Updates.vcedPreset && synth?.loadVcedPreset) {
+                  synth.loadVcedPreset(dx7Updates.vcedPreset as string);
                 }
-                return null;
-              };
-              const synth = findDX7();
-
-              if (dx7Updates.vcedPreset && synth?.loadVcedPreset) {
-                synth.loadVcedPreset(dx7Updates.vcedPreset as string);
-              }
-              if (dx7Updates.vced && typeof dx7Updates.vced === 'object' && synth?.setVcedParam) {
-                // Only the keys that differ from the edits already sent: the editor hands back every edit made on this
-                // voice, and sending them all again per knob tick would be one parameter change per edited key.
-                const sent = (currentInstrument?.dx7 as { vced?: Record<string, number> } | undefined)?.vced ?? {};
-                for (const [paramStr, value] of Object.entries(dx7Updates.vced as Record<string, number>)) {
-                  const paramNum = parseInt(paramStr, 10);
-                  if (!isNaN(paramNum) && sent[paramStr] !== value) synth.setVcedParam(paramNum, Math.round(value));
+                if (dx7Updates.vced && typeof dx7Updates.vced === 'object' && synth?.setVcedParam) {
+                  // Only the keys that differ from the edits already sent: the editor hands back every edit made on this
+                  // voice, and sending them all again per knob tick would be one parameter change per edited key.
+                  const sent = (currentInstrument?.dx7 as { vced?: Record<string, number> } | undefined)?.vced ?? {};
+                  for (const [paramStr, value] of Object.entries(dx7Updates.vced as Record<string, number>)) {
+                    const paramNum = parseInt(paramStr, 10);
+                    if (!isNaN(paramNum) && sent[paramStr] !== value) synth.setVcedParam(paramNum, Math.round(value));
+                  }
                 }
-              }
-              if (dx7Updates.libraryBank && synth?.loadLibraryBank) {
-                synth.loadLibraryBank(dx7Updates.libraryBank as string, (dx7Updates.program as number) ?? 0);
-              } else if (dx7Updates.bank !== undefined && synth?.loadPatchBank) {
-                const manifest = (synth.constructor as any).getPatchManifest?.();
-                const bankIdx = dx7Updates.bank as number;
-                const program = (dx7Updates.program as number) ?? 0;
-                if (manifest?.banks?.[bankIdx]) {
-                  synth.loadPatchBank(manifest.banks[bankIdx].file, program);
+                if (dx7Updates.libraryBank && synth?.loadLibraryBank) {
+                  synth.loadLibraryBank(dx7Updates.libraryBank as string, (dx7Updates.program as number) ?? 0);
+                } else if (dx7Updates.bank !== undefined && synth?.loadPatchBank) {
+                  const manifest = synth.constructor.getPatchManifest?.();
+                  const bankIdx = dx7Updates.bank as number;
+                  const program = (dx7Updates.program as number) ?? 0;
+                  if (manifest?.banks?.[bankIdx]) {
+                    synth.loadPatchBank(manifest.banks[bankIdx].file, program);
+                  }
+                } else if (dx7Updates.program !== undefined && synth?.selectVoice) {
+                  synth.selectVoice(dx7Updates.program as number);
                 }
-              } else if (dx7Updates.program !== undefined && synth?.selectVoice) {
-                synth.selectVoice(dx7Updates.program as number);
               }
               // NEVER invalidate DX7 — all changes go through SysEx, not synth recreation
               return; // Handled
