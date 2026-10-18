@@ -29,12 +29,8 @@ import { anySoloActive, isChannelDimmed } from '@/lib/tracker/channelDim';
 import { noteValueToPitch, pitchName } from '@/lib/tracker/noteValue';
 import type {
   PatternSnapshot,
-  CursorSnapshot,
-  SelectionSnapshot,
   ThemeSnapshot,
-  UIStateSnapshot,
-  ChannelLayoutSnapshot,
-  PatternPreviewSnapshot,
+  TrackerRenderInput,
 } from './worker-types';
 
 // ─── Constants matching PatternEditorCanvas ───────────────────────────────────
@@ -407,19 +403,7 @@ export class TrackerGLRenderer {
    * Render one frame of the tracker pattern editor.
    * All state is provided as plain data — no Zustand, no React.
    */
-  render(opts: {
-    patterns: PatternSnapshot[];
-    currentPatternIndex: number;
-    scrollX: number;
-    cursor: CursorSnapshot;
-    selection: SelectionSnapshot | null;
-    playback: { row: number; smoothOffset: number; patternIndex: number; isPlaying: boolean };
-    theme: ThemeSnapshot;
-    ui: UIStateSnapshot;
-    layout: ChannelLayoutSnapshot;
-    dragOver: { channelIndex: number; rowIndex: number } | null;
-    preview?: PatternPreviewSnapshot | null;
-  }): void {
+  render(opts: TrackerRenderInput): void {
     if (!this.atlas) this.buildAtlas();
     const atlas = this.atlas!;
     const gl = this.gl;
@@ -994,6 +978,13 @@ export class TrackerGLRenderer {
     // Flush final batches
     this.flushRects();
     this.flushGlyphs();
+
+    if (opts.fade !== undefined && opts.fade < 1) {
+      // Same colour the frame was cleared with (see Clear above).
+      const [fr, fg, fb, fa] = ui.trackerVisualBg ? [0, 0, 0, 0.75] : colors.bg;
+      this.addRect(0, 0, this.width, this.height, [fr, fg, fb, fa * (1 - opts.fade)]);
+      this.flushRects();
+    }
   }
 
   // ─── Instance data helpers ───────────────────────────────────────────────────

@@ -398,3 +398,20 @@ export type VelocityMsg =
   | { type: 'state'; state: VelocityState }
   | { type: 'hover'; noteId: string | null }
   | { type: 'resize'; w: number; dpr: number };
+
+/** Everything a renderer's `render` needs for one frame. */
+export interface TrackerRenderInput {
+  patterns: PatternSnapshot[];
+  currentPatternIndex: number;
+  scrollX: number;
+  cursor: CursorSnapshot;
+  selection: SelectionSnapshot | null;
+  playback: { row: number; smoothOffset: number; patternIndex: number; isPlaying: boolean; songPosition?: number };
+  theme: ThemeSnapshot;
+  ui: UIStateSnapshot;
+  layout: ChannelLayoutSnapshot;
+  dragOver: { channelIndex: number; rowIndex: number } | null;
+  preview?: PatternPreviewSnapshot | null;
+  /** 0..1 opacity of the drawn frame over the background; omitted = 1. */
+  fade?: number;
+}

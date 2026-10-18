@@ -15,6 +15,7 @@
 import { TrackerGLRenderer } from '../engine/renderer/TrackerGLRenderer';
 import { TrackerCanvas2DRenderer } from '../engine/renderer/TrackerCanvas2DRenderer';
 import { LayoutHold } from '../engine/renderer/layoutHold';
+import { LayoutTween } from '../engine/renderer/layoutTween';
 import type {
   TrackerWorkerMsg,
   TrackerWorkerReply,
@@ -67,6 +68,8 @@ let layout: ChannelLayoutSnapshot = { offsets: [], widths: [], totalWidth: 0 };
 let playback = { row: 0, smoothOffset: 0, patternIndex: 0, isPlaying: false };
 let dragOver: { channelIndex: number; rowIndex: number } | null = null;
 let preview: PatternPreviewSnapshot | null = null;
+const tween = new LayoutTween({ rowHeight: ui.rowHeight, layout });
+let drawVersion = 0; // bumps whenever tween.current is rewritten, keys the scaled* memos
 const layoutHold = new LayoutHold(); // new patterns wait for their channel layout
 let dirty = true; // Dirty flag — skip GPU draws when nothing changed
 // Reusable playback object for render calls (avoids per-frame allocation)
@@ -99,7 +102,8 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
       layout   = msg.channelLayout;
       scale    = msg.scale ?? 1;
       reducedMotion = msg.reducedMotion ?? false;
-      void reducedMotion; // read by the layout tween in Phase 2
+      tween.retarget({ rowHeight: ui.rowHeight, layout }, performance.now(), true);
+      drawVersion++;
 
       let glErr: unknown = null;
       try {
@@ -170,6 +174,8 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
       ui = msg.uiState;
       layout = msg.channelLayout;
       layoutHold.layout();
+      tween.retarget({ rowHeight: ui.rowHeight, layout }, performance.now(), reducedMotion || !renderer);
+      drawVersion++;
       dirty = true;
       break;
     }
@@ -215,7 +221,8 @@ function startRAF(): void {
   const tick = () => {
     // During playback, always render (smooth scrolling needs continuous updates)
     if (playback.isPlaying) dirty = true;
-    
+    if (tween.active && tween.sample(performance.now())) { drawVersion++; dirty = true; }
+
     // Only call renderFrame if dirty (skip GPU calls when nothing changed)
     if (dirty && layoutHold.canDraw(performance.now())) {
       renderFrame();
@@ -251,6 +258,7 @@ function renderFrame(): void {
     layout: scaledLayout(),
     dragOver,
     preview,
+    fade: tween.fade,
   });
 }
 
@@ -258,33 +266,35 @@ function renderFrame(): void {
 // The main thread speaks canvas px; the renderer draws at scale 1 into a canvas
 // 1/scale as large, so px quantities it receives are divided by scale here.
 
-let scaledLayoutSrc: ChannelLayoutSnapshot | null = null;
+let scaledLayoutAtVersion = -1;
 let scaledLayoutAt = 1;
 let scaledLayoutOut: ChannelLayoutSnapshot = layout;
 function scaledLayout(): ChannelLayoutSnapshot {
-  if (scale === 1) return layout;
-  if (scaledLayoutSrc !== layout || scaledLayoutAt !== scale) {
-    scaledLayoutSrc = layout;
+  const src = tween.current.layout;
+  if (scale === 1 && !tween.active) return src;
+  if (scaledLayoutAtVersion !== drawVersion || scaledLayoutAt !== scale) {
+    scaledLayoutAtVersion = drawVersion;
     scaledLayoutAt = scale;
     scaledLayoutOut = {
-      ...layout,
-      offsets: layout.offsets.map(v => v / scale),
-      widths: layout.widths.map(v => v / scale),
-      totalWidth: layout.totalWidth / scale,
+      ...src,
+      offsets: src.offsets.map(v => v / scale),
+      widths: src.widths.map(v => v / scale),
+      totalWidth: src.totalWidth / scale,
     };
   }
   return scaledLayoutOut;
 }
 
-let scaledUiSrc: UIStateSnapshot | null = null;
+let scaledUiAtVersion = -1;
 let scaledUiAt = 1;
 let scaledUiOut: UIStateSnapshot = ui;
 function scaledUi(): UIStateSnapshot {
-  if (scale === 1) return ui;
-  if (scaledUiSrc !== ui || scaledUiAt !== scale) {
-    scaledUiSrc = ui;
+  const rowHeight = tween.current.rowHeight;
+  if (scale === 1 && !tween.active && rowHeight === ui.rowHeight) return ui;
+  if (scaledUiAtVersion !== drawVersion || scaledUiAt !== scale) {
+    scaledUiAtVersion = drawVersion;
     scaledUiAt = scale;
-    scaledUiOut = { ...ui, rowHeight: ui.rowHeight / scale };
+    scaledUiOut = { ...ui, rowHeight: rowHeight / scale };
   }
   return scaledUiOut;
 }
