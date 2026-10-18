@@ -14,19 +14,16 @@ interface FeedState {
 /**
  * One store change -> the worker messages it needs. Returns true when the
  * patterns were posted with `awaitLayout` (the caller owes the worker a
- * `channelLayout` for them, posted before the next paint).
+ * `layout` for them, posted before the next paint).
  */
 export function feedWorkerFromTracker(
   s: FeedState & { patterns: unknown },
   prev: FeedState & { patterns: unknown },
   post: (msg: TrackerWorkerMsg) => void,
   snapshotPatterns: () => PatternSnapshot[],
-  snapshotUI: () => Extract<TrackerWorkerMsg, { type: 'uiState' }>['uiState'],
 ): boolean {
   if (s.patterns === prev.patterns && s.currentPatternIndex === prev.currentPatternIndex) return false;
   const awaitLayout = layoutInputsChanged(prev, s);
   post({ type: 'patterns', patterns: snapshotPatterns(), currentPatternIndex: s.currentPatternIndex, awaitLayout });
-  // Re-send uiState when song changes — noteDisplayOffset may differ per format
-  post({ type: 'uiState', uiState: snapshotUI() });
   return awaitLayout;
 }

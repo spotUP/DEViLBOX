@@ -7,7 +7,7 @@
  *
  * Reachability (the one test of the wiring): the real corpus song is opened
  * through importTrackerModule, the Furnace view TrackerView mounts for it is
- * rendered, and what the render worker is told to draw (its channelLayout
+ * rendered, and what the render worker is told to draw (its layout
  * message) and what the scope strip reads (the shared channelLayout) are
  * compared with a count made from the NATIVE song structure (the subsong's
  * per-channel pattern pools), not from the store patterns the mask reads.
@@ -124,14 +124,14 @@ describe('unused chip channels are hidden in the tracker', () => {
     // position). The pattern grid is the bridge whose init carried the song's patterns (54), not one snapshot.
     const gridBridge = posted.find((m) => m.type === 'init' && (m.patterns?.length ?? 0) > 1)?.bridge;
     expect(gridBridge).toBeDefined();
-    const layouts = posted.filter((m) => m.bridge === gridBridge).filter((m) => m.type === 'channelLayout' || m.channelLayout).map((m) => m.channelLayout!);
+    const layouts = posted.filter((m) => m.bridge === gridBridge).filter((m) => m.type === 'layout').map((m) => m.channelLayout!);
     const last = layouts[layouts.length - 1];
     const drawn = last.widths.map((w, i) => (w > 0 ? i : -1)).filter((i) => i >= 0);
     expect(drawn).toEqual(withData.map((h, i) => (h ? i : -1)).filter((i) => i >= 0));
 
     // The order matrix above the grid (one column per channel) shows the same channels: the owner
     // saw 32 order columns over a 16-channel grid (2026-10-14).
-    const orderLayouts = posted.filter((m) => m.bridge !== gridBridge && m.channelLayout).map((m) => m.channelLayout!);
+    const orderLayouts = posted.filter((m) => m.bridge !== gridBridge && m.type === 'layout').map((m) => m.channelLayout!);
     expect(orderLayouts.length).toBeGreaterThan(0);
     const orderLast = orderLayouts[orderLayouts.length - 1];
     expect(orderLast.widths.length).toBe(32);

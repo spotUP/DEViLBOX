@@ -142,6 +142,21 @@ export interface ChannelLayoutSnapshot {
 
 // ─── Worker messages (main thread → worker) ───────────────────────────────────
 
+/**
+ * Everything that shapes the grid, posted once per React commit so the worker
+ * tweens toward one settled target (see layoutTween.ts). Sizes in canvas (CSS)
+ * px; `scale` is the fit-all-channels pattern scale (<= 1).
+ */
+export interface LayoutMsg {
+  type: 'layout';
+  w: number;
+  h: number;
+  dpr: number;
+  scale: number;
+  uiState: UIStateSnapshot;
+  channelLayout: ChannelLayoutSnapshot;
+}
+
 export type TrackerWorkerMsg =
   | {
       type: 'init';
@@ -156,8 +171,10 @@ export type TrackerWorkerMsg =
       cursor: CursorSnapshot;
       selection: SelectionSnapshot | null;
       channelLayout: ChannelLayoutSnapshot;
-      /** Pattern scale at init (see the 'scale' message); 1 when absent. */
+      /** Pattern scale at init (see the 'layout' message); 1 when absent. */
       scale?: number;
+      /** `prefers-reduced-motion: reduce` at mount: layout changes snap instead of tweening. */
+      reducedMotion?: boolean;
     }
   | {
       type: 'patterns';
@@ -178,12 +195,8 @@ export type TrackerWorkerMsg =
       /** Song order position (0-based). Updates on D00/Bxx even when patternIndex stays the same. */
       songPosition?: number;
     }
-  | { type: 'resize'; w: number; h: number; dpr: number }
-  /** Draw the whole pattern at `scale` (<= 1) of its size; every px in the other messages stays in canvas (CSS) px. */
-  | { type: 'scale'; scale: number }
+  | LayoutMsg
   | { type: 'theme'; theme: ThemeSnapshot }
-  | { type: 'uiState'; uiState: UIStateSnapshot }
-  | { type: 'channelLayout'; channelLayout: ChannelLayoutSnapshot }
   | { type: 'dragOver'; cell: { channelIndex: number; rowIndex: number } | null }
   | { type: 'previewCells'; preview: PatternPreviewSnapshot | null }
   | { type: 'hitTest'; id: number; relX: number; relY: number };

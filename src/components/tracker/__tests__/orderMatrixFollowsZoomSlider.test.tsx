@@ -117,8 +117,9 @@ describe('the order matrix follows the zoom slider like the pattern grid', () =>
 
     for (const b of bridges) {
       const mine = posted.filter((m) => m.bridge === b);
-      const scale = mine.filter((m) => m.type === 'scale').pop()?.scale;
-      const rowHeight = mine.filter((m) => m.type === 'uiState').pop()?.uiState?.rowHeight;
+      const lastLayout = mine.filter((m) => m.type === 'layout').pop();
+      const scale = lastLayout?.scale;
+      const rowHeight = lastLayout?.uiState?.rowHeight;
       expect(scale, `bridge ${b} scale`).toBe(1.5);
       expect(rowHeight, `bridge ${b} row height`).toBe(36);
     }
