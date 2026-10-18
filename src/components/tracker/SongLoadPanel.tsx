@@ -6,14 +6,16 @@
  * is in, the seconds it has taken, and Cancel. Reads useSongLoadStore, the one
  * loading state the status bar reads too. Cancel calls the store's cancel hook,
  * which aborts the running openSong; the outgoing song is already unloaded
- * (owner decision D3), so a cancelled open leaves silence.
+ * (owner decision D3), so a cancelled open leaves silence. The silent boot
+ * restore shows no panel.
  */
 import React, { useEffect, useState } from 'react';
 import { Button } from '@components/ui/Button';
 import { useSongLoadStore, OPEN_PHASE_LABEL } from '@/stores/useSongLoadStore';
 
 export const SongLoadPanel: React.FC = () => {
-  const label = useSongLoadStore((s) => (s.depth > 0 ? s.label || 'song' : null));
+  // The silent boot restore covers the editor without a panel (useSongLoadStore.silent).
+  const label = useSongLoadStore((s) => (s.depth > 0 && !s.silent ? s.label || 'song' : null));
   const phase = useSongLoadStore((s) => s.phase);
   const startedAt = useSongLoadStore((s) => s.startedAt);
   const cancel = useSongLoadStore((s) => s.cancel);

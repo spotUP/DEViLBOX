@@ -43,20 +43,68 @@ describe('LayoutTween', () => {
     expect(t.current.rowHeight).toBeLessThan(mid + 1);
   });
 
-  it('a channel-count change snaps the geometry and fades in', () => {
+  it('a channel-count change fades the old picture out, then the new one in', () => {
     const t = new LayoutTween(A());
     const to = geo(24, [40, 200], 160);
     t.retarget(to, 0, false);
+    expect(t.fadingOut).toBe(true);
+    expect(t.fade).toBe(1);
+    expect(t.current.layout.offsets).toEqual([40, 200, 360, 520]); // the old picture stays while it leaves
+    expect(t.sample(75)).toBe(true);
+    expect(t.fade).toBeCloseTo(1 - easeOutCubic(0.5));
+    expect(t.current.layout.offsets).toEqual([40, 200, 360, 520]);
+    t.sample(LAYOUT_TWEEN_MS);
+    expect(t.fadingOut).toBe(false);
     expect(t.fade).toBe(0);
     expect(t.current.layout.offsets).toEqual([40, 200]);
-    expect(t.sample(0)).toBe(true); // first frame anchors the clock and draws fade 0
+    expect(t.sample(LAYOUT_TWEEN_MS + 1)).toBe(true); // the fade-in anchors its clock at 0
     expect(t.fade).toBe(0);
+    t.sample(LAYOUT_TWEEN_MS + 1 + 75);
+    expect(t.fade).toBeCloseTo(easeOutCubic(0.5));
+    t.sample(2 * LAYOUT_TWEEN_MS + 1);
+    expect(t.fade).toBe(1);
+    expect(t.current).toBe(to);
+    expect(t.active).toBe(false);
+  });
+
+  it('layouts that arrive during the fade-out only move the target, so an intermediate picture is never shown', () => {
+    const t = new LayoutTween(A());
+    t.retarget(geo(24, [40], 160), 0, false); // the torn-down jingle song
+    t.sample(50);
+    const restored = geo(24, [40, 200, 360, 520, 680, 840], 160);
+    t.retarget(restored, 60, false);
+    expect(t.fadingOut).toBe(true);
+    expect(t.current.layout.offsets).toEqual([40, 200, 360, 520]);
+    t.sample(LAYOUT_TWEEN_MS);
+    expect(t.current.layout.offsets).toEqual(restored.layout.offsets);
+  });
+
+  it('the fade-out runs under the overlay; the new picture then waits at 0 until the reveal', () => {
+    const t = new LayoutTween(A());
+    t.setCovered(true);
+    t.retarget(geo(24, [40, 200], 160), 0, false);
     t.sample(75);
     expect(t.fade).toBeGreaterThan(0);
     expect(t.fade).toBeLessThan(1);
     t.sample(LAYOUT_TWEEN_MS);
+    expect(t.fade).toBe(0);
+    expect(t.sample(400)).toBe(false);
+    expect(t.fade).toBe(0);
+    t.setCovered(false);
+    t.sample(500);
+    expect(t.fade).toBe(0);
+    t.sample(500 + LAYOUT_TWEEN_MS);
     expect(t.fade).toBe(1);
-    expect(t.active).toBe(false);
+  });
+
+  it('a new channel count while the fade-in is still held at 0 skips the fade-out', () => {
+    const t = new LayoutTween(A());
+    t.setCovered(true);
+    t.retarget(geo(24, [40, 200], 160), 0, false);
+    t.sample(LAYOUT_TWEEN_MS);
+    t.retarget(geo(24, [40, 200, 360], 160), 200, false);
+    expect(t.fadingOut).toBe(false);
+    expect(t.current.layout.offsets).toEqual([40, 200, 360]);
   });
 
   it('snap applies the target at once', () => {
@@ -79,20 +127,21 @@ describe('LayoutTween', () => {
     const t = new LayoutTween(A());
     const off16 = Array.from({ length: 16 }, (_, i) => 40 + i * 50);
     t.retarget(geo(24, off16, 50), 0, false);
-    t.sample(0);
-    t.sample(30);
+    t.sample(LAYOUT_TWEEN_MS); // the old picture is out
+    t.sample(LAYOUT_TWEEN_MS + 1);
+    t.sample(LAYOUT_TWEEN_MS + 31);
     const mid = t.fade;
     expect(mid).toBeGreaterThan(0);
     const next = geo(24, off16, 51);
-    t.retarget(next, 31, false);
+    t.retarget(next, LAYOUT_TWEEN_MS + 32, false);
     expect(t.active).toBe(true);
     expect(t.current.layout.widths[0]).toBe(51);
-    t.sample(31);
+    t.sample(LAYOUT_TWEEN_MS + 32);
     expect(t.fade).toBeGreaterThanOrEqual(mid);
     expect(t.fade).toBeLessThan(1);
-    t.sample(LAYOUT_TWEEN_MS - 1);
+    t.sample(2 * LAYOUT_TWEEN_MS);
     expect(t.fade).toBeLessThan(1);
-    t.sample(LAYOUT_TWEEN_MS);
+    t.sample(2 * LAYOUT_TWEEN_MS + 1);
     expect(t.fade).toBe(1);
     expect(t.current).toBe(next);
     expect(t.active).toBe(false);
