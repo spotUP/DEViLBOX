@@ -50,4 +50,15 @@ describe('channel chains', () => {
     expect(out.channel.volume.value).toBe(-12);
     expect(out.channel.pan.value).toBe(-0.25);
   });
+
+  it('carry the fader and pan when each call gets a new context over the same strips, as ToneEngine does', () => {
+    const shared = ctx();
+    const engineCtx = (): ChannelRoutingContext => ({ ...shared });
+    setMixerChannelVolume(engineCtx(), 2, -20);
+    setMixerChannelPan(engineCtx(), 2, 0.5);
+    getChannelOutput(engineCtx(), 2);
+    const out = shared.channelOutputs.get(2) as unknown as { channel: InstanceType<typeof Channel> };
+    expect(out.channel.volume.value).toBe(-20);
+    expect(out.channel.pan.value).toBe(0.5);
+  });
 });
