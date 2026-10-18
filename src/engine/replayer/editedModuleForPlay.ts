@@ -80,15 +80,22 @@ export async function editedModuleForPlay(
     return a.length !== b.length || a.some((v, i) => v !== b[i]);
   };
   try {
-    const { exportNativeSong } = await import('@/lib/export/nativeExportRouter');
-    const out = await exportNativeSong(null, {});
-    if (out) {
-      const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
-      const name = song.uadeEditableFileName ?? out.filename;
-      const copy = new Uint8Array(out.data).buffer as ArrayBuffer;
-      const reloaded = await parseModuleToSong(new File([copy], name), 0) as unknown as Partial<TrackerSong>;
-      const data = reloaded[desc.fileDataKey] as ArrayBuffer | Uint8Array | undefined;
-      if (carriesEdit(data)) return data;
+    // The exporter's output is read back through the parser to learn the bytes the engine plays. That read-back can
+    // need a running scan engine (a UADE-parsed format): when it cannot run, the layout writer below still builds
+    // the edited module, so a failed read-back must not end the attempt.
+    try {
+      const { exportNativeSong } = await import('@/lib/export/nativeExportRouter');
+      const out = await exportNativeSong(null, {});
+      if (out) {
+        const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
+        const name = song.uadeEditableFileName ?? out.filename;
+        const copy = new Uint8Array(out.data).buffer as ArrayBuffer;
+        const reloaded = await parseModuleToSong(new File([copy], name), 0) as unknown as Partial<TrackerSong>;
+        const data = reloaded[desc.fileDataKey] as ArrayBuffer | Uint8Array | undefined;
+        if (carriesEdit(data)) return data;
+      }
+    } catch (err) {
+      console.warn(`[NativeEngineRouting] ${desc.key}: the exported module could not be read back, writing the edit through the parser's layout:`, err);
     }
     // No exporter, or one that writes the module as loaded (a native serializer that reads a running
     // engine's state): write the edited cells into the module through the parser's own layout.
