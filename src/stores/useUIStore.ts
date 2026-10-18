@@ -40,7 +40,7 @@ export type DialogCommand =
   | 'effect-picker'
   | 'undo-history'
   | 'automation'
-  | 'collaboration'
+  | 'collab'
   | 'randomize'
   | 'acid-pattern'
   | 'pattern-length';

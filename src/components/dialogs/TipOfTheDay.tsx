@@ -60,10 +60,6 @@ const VersionEntry: React.FC<{ entry: ChangelogEntry; isLatest: boolean }> = ({ 
 export const TipOfTheDay: React.FC<TipOfTheDayProps> = ({ isOpen, onClose, initialTab = 'tips' }) => {
   const [activeTab, setActiveTab] = useState<'tips' | 'changelog'>(initialTab);
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
-  const [showAtStartup, setShowAtStartup] = useState(() => {
-    const saved = localStorage.getItem('show-tips-at-startup');
-    return saved === null ? true : saved === 'true';
-  });
 
   const { getCurrentTheme } = useThemeStore();
 
@@ -89,11 +85,6 @@ export const TipOfTheDay: React.FC<TipOfTheDayProps> = ({ isOpen, onClose, initi
 
   const handlePrev = () => {
     setCurrentTipIndex((prev) => (prev - 1 + DEVILBOX_TIPS.length) % DEVILBOX_TIPS.length);
-  };
-
-  const toggleStartup = (checked: boolean) => {
-    setShowAtStartup(checked);
-    localStorage.setItem('show-tips-at-startup', checked.toString());
   };
 
   // Use standard modal close hook for Enter/Escape
@@ -218,7 +209,7 @@ export const TipOfTheDay: React.FC<TipOfTheDayProps> = ({ isOpen, onClose, initi
           )}
         </div>
 
-        {/* Navigation / Startup Toggle */}
+        {/* Navigation */}
         <div className="px-6 py-4 flex items-center justify-between border-t border-dark-border bg-black/20">
           {activeTab === 'tips' ? (
             <div className="flex gap-2">
@@ -243,19 +234,6 @@ export const TipOfTheDay: React.FC<TipOfTheDayProps> = ({ isOpen, onClose, initi
             </div>
           )}
 
-          <label className="flex items-center gap-2 cursor-pointer group">
-            <input 
-              type="checkbox" 
-              checked={showAtStartup}
-              onChange={(e) => toggleStartup(e.target.checked)}
-              className={`w-4 h-4 rounded border-2 bg-transparent cursor-pointer
-                border-accent-primary checked:bg-accent-primary
-              `}
-            />
-            <span className="text-xs text-text-muted group-hover:text-text-secondary transition-colors uppercase font-bold tracking-tighter">
-              Show at startup
-            </span>
-          </label>
         </div>
 
         {/* Footer Action */}

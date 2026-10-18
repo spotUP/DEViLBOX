@@ -11,17 +11,12 @@ import { useCursorStore } from '../../stores/useCursorStore';
 import { useEditorStore } from '../../stores/useEditorStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { resolveViewTarget, VIEW_TARGETS } from '../../stores/uiViews';
-import {
-  isRecoveryPromptOpen,
-  describeRecoveryPrompt,
-  resolveRecoveryPrompt as resolveRecovery,
-} from '../../lib/persistence/recoveryPrompt';
 import { useAudioStore } from '../../stores/useAudioStore';
 import { useMixerStore } from '../../stores/useMixerStore';
 import { useInstrumentStore } from '../../stores/useInstrumentStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useSynthErrorStore } from '../../stores/useSynthErrorStore';
-import { isStartupSplashOpen, startStartupJingle } from '../../lib/startup/startupSequence';
+import { closeStartDialog } from '../../lib/startup/startupSequence';
 import { getGlobalRegistry } from '../../hooks/useGlobalKeyboardHandler';
 import { getToneEngine } from '../../engine/ToneEngine';
 import { suppressFormatChecks, restoreFormatChecks } from '../../lib/formatCompatibility';
@@ -2585,30 +2580,11 @@ export function cancelAutoEffect(params: Record<string, unknown>): Record<string
 export function dismissModal(): Record<string, unknown> {
   const modalOpen = useUIStore.getState().modalOpen;
   if (modalOpen) {
-    useUIStore.getState().closeModal();
+    // closeStartDialog is the close that also starts the startup jingle: the
+    // start dialog's close IS the gesture, and a plain closeModal would leave
+    // every song load waiting on it.
+    closeStartDialog();
     return { ok: true, dismissed: modalOpen };
-  }
-  // The click-to-start splash: pressing it is the gesture that starts the
-  // startup jingle, so dismissing it does exactly what its button does.
-  if (isStartupSplashOpen()) {
-    void startStartupJingle();
-    return { ok: true, dismissed: 'click-to-start' };
-  }
-  // The crash-recovery prompt is a real dialog that this cannot close, and
-  // saying "no modal was open" while it sits in front of the user is how it
-  // went unnoticed (2026-09-18). Dismissing it means choosing between
-  // restoring and DISCARDING unsaved work, which a general "close whatever is
-  // open" must never decide on someone's behalf.
-  if (isRecoveryPromptOpen()) {
-    return {
-      ok: false,
-      dismissed: null,
-      recoveryPrompt: describeRecoveryPrompt(),
-      message:
-        'The crash-recovery prompt is open and holds UNSAVED work. It is not dismissed '
-        + 'here because that would mean choosing to keep or destroy it. Use '
-        + 'resolve_recovery_prompt with { action: "restore" } or { action: "discard" }.',
-    };
   }
   return { ok: true, dismissed: null, message: 'No modal was open' };
 }
@@ -2616,7 +2592,6 @@ export function dismissModal(): Record<string, unknown> {
 /** Get current modal state */
 export function getModalState(): Record<string, unknown> {
   const { modalOpen, modalData } = useUIStore.getState();
-  const recoveryOpen = isRecoveryPromptOpen();
   // The synth-error dialog is a third kind of blocking surface, with its own
   // store and its own renderer in App.tsx. It was invisible here, so an agent
   // driving the app saw a stalled engine and no reason for it — the owner,
@@ -2625,15 +2600,6 @@ export function getModalState(): Record<string, unknown> {
   return {
     modalOpen: modalOpen ?? null,
     modalData: modalData ?? null,
-    // Reported separately because it is not a `useUIStore` modal; it used to
-    // be invisible here entirely.
-    recoveryPromptOpen: recoveryOpen,
-    recoveryPrompt: recoveryOpen ? describeRecoveryPrompt() : null,
-    // The click-to-start splash is a fourth surface, rendered from the startup
-    // stage rather than a store modal. It was invisible here, so an agent never
-    // saw it and never pressed it (owner, 2026-10-17: "you always fail to see
-    // and click the click to start dialog").
-    startupSplashOpen: isStartupSplashOpen(),
     synthErrorDialogOpen: !!activeError,
     synthError: activeError
       ? {
@@ -2644,22 +2610,6 @@ export function getModalState(): Record<string, unknown> {
         }
       : null,
   };
-}
-
-/**
- * Answer the crash-recovery prompt.
- *
- * Explicit on purpose: `discard` destroys work that was never saved, so it is
- * never something a general dismiss may do by accident.
- */
-export function resolveRecoveryPrompt(params: Record<string, unknown>): Record<string, unknown> {
-  const action = params.action;
-  if (action !== 'restore' && action !== 'discard') {
-    return { error: 'action must be "restore" or "discard"' };
-  }
-  const resolved = resolveRecovery(action);
-  if (!resolved) return { ok: false, message: 'The crash-recovery prompt is not open.' };
-  return { ok: true, action };
 }
 
 // ─── Format Regression Testing ──────────────────────────────────────────────

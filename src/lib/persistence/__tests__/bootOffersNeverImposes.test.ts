@@ -17,18 +17,18 @@ import { decideBootRestore } from '../recoveryGate';
  * top — two songs per boot, with the dub bus re-wired underneath the deck in
  * between.
  *
- * Boot now OFFERS. The saved slot reuses the Restore/Discard prompt the crash
- * snapshot already had, so there is one mechanism, and a boot the user ignores
- * leaves them on a clean slate.
+ * Boot now picks ONE slot with decideBootRestore (never both) and restores it
+ * silently (owner, 2026-10-18: never ask; the user clears it if unwanted). A
+ * song load requested during boot waits for the restore (bootRestore gate).
  */
-describe('boot offers stored work and never imposes it', () => {
+describe('boot picks the stored work to restore silently', () => {
   it('a clean machine starts clean', () => {
     expect(decideBootRestore({
       everExplicitlySaved: false, savedHasContent: false, hasRecoveryRecord: false,
     })).toEqual({ kind: 'none' });
   });
 
-  it('a saved project is offered, not loaded', () => {
+  it('a saved project is chosen', () => {
     expect(decideBootRestore({
       everExplicitlySaved: true, savedHasContent: true, hasRecoveryRecord: false,
     })).toEqual({ kind: 'saved' });
@@ -83,7 +83,7 @@ describe('boot offers stored work and never imposes it', () => {
     })).toEqual({ kind: 'none' });
   });
 
-  it('every outcome is an offer — none of them load', () => {
+  it('every outcome is one of three slots', () => {
     const outcomes = [
       decideBootRestore({ everExplicitlySaved: true, savedHasContent: true, hasRecoveryRecord: true }),
       decideBootRestore({ everExplicitlySaved: false, savedHasContent: false, hasRecoveryRecord: true }),
@@ -93,7 +93,7 @@ describe('boot offers stored work and never imposes it', () => {
   });
 });
 
-describe('the boot effect cannot load silently', () => {
+describe('the boot effect restores one slot silently', () => {
   const HOOK = readFileSync(join(process.cwd(), 'src/hooks/useProjectPersistence.ts'), 'utf-8');
 
   const bootEffect = (): string => {
@@ -105,22 +105,26 @@ describe('the boot effect cannot load silently', () => {
   it('does not call loadProjectFromStorage', () => {
     expect(
       bootEffect(),
-      'boot loading the saved project is exactly the stale-song report'
+      'loading both slots is exactly the stale-song report'
     ).not.toContain('loadProjectFromStorage(');
   });
 
-  it('asks the gate what to offer', () => {
+  it('asks the gate which slot to restore', () => {
     expect(bootEffect()).toContain('decideBootRestore(');
+  });
+
+  it('holds song loads until the restore has applied', () => {
+    const effect = bootEffect();
+    expect(effect).toContain('beginBootRestore()');
+    expect(effect).toContain('endBootRestore');
   });
 
   it('keeps the ?reset escape hatch, which used to live inside the load', () => {
     expect(bootEffect()).toContain('handleResetParam()');
   });
 
-  it('declining a SAVED project does not delete it', () => {
-    const discard = HOOK.slice(HOOK.indexOf('const discardRecovery'), HOOK.indexOf('const save ='));
-    // Only a crash snapshot is consumed by being declined.
-    expect(discard).toContain('if (wasRecovery) void idbDeleteRecovery()');
-    expect(discard, 'the saved project must survive a Discard').not.toContain('idbDelete()');
+  it('no restore prompt remains', () => {
+    expect(HOOK).not.toContain('discardRecovery');
+    expect(HOOK).not.toContain('recoverySnapshot');
   });
 });

@@ -49,7 +49,7 @@ export function shouldPromptRestore(args: {
   return args.hasRecoveryRecord && !args.everExplicitlySaved;
 }
 
-/** What boot offers the user. Never a silent load. */
+/** What boot restores, silently (useProjectPersistence applies it; there is no prompt). */
 export type BootRestore =
   /** Nothing worth restoring — start on a clean slate. */
   | { kind: 'none' }
@@ -70,10 +70,9 @@ export type BootRestore =
  * song is there on every boot" — the restored song also re-wires the dub bus
  * underneath the deck as the real song loads over it.
  *
- * Boot now offers and never imposes. The saved slot gets the same
- * Restore/Discard prompt the crash snapshot already uses, so there is one
- * mechanism rather than two, and a boot the user ignores leaves them on a
- * clean slate.
+ * Boot then offered a Restore/Discard prompt. Since 2026-10-18 it restores the
+ * chosen slot silently (the prompt was one more blocking dialog at start; the
+ * owner clears the project if unwanted). This function only picks the slot.
  *
  * The explicit slot wins when both exist: it is work the user deliberately
  * named and saved, where the snapshot is only ever a crash guess.

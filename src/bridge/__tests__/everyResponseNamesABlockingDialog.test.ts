@@ -5,14 +5,14 @@ import { join } from 'node:path';
 /**
  * A dialog covering the UI must be visible in EVERY MCP response.
  *
- * DEViLBOX has three separate blocking surfaces, each added without the
- * others knowing: a `useUIStore` modal, the crash-recovery prompt, and the
+ * DEViLBOX has separate blocking surfaces, each added without the
+ * others knowing: a `useUIStore` modal (the start dialog is one) and the
  * synth-error dialog (its own store, its own renderer in App.tsx). The store
  * layer keeps answering `ok: true` underneath all three, so an agent driving
  * the app over MCP sees a stalled engine, levels reading zero and no reason
  * given — and goes hunting in the audio graph instead.
  *
- * Only the recovery prompt was ever annotated. The synth-error dialog was
+ * Only one kind was ever annotated. The synth-error dialog was
  * invisible to both `get_modal_state` and the annotation, which is the one
  * that actually fired on 2026-09-23 ("Pattern editor renderer stalled").
  * Owner, the same day: "there was a dialog in devilbox", "you always miss
@@ -23,14 +23,15 @@ const BRIDGE = readFileSync(join(process.cwd(), 'src/bridge/MCPBridge.ts'), 'utf
 const WRITE = readFileSync(join(process.cwd(), 'src/bridge/handlers/writeHandlers.ts'), 'utf-8');
 
 describe('get_modal_state reports every blocking surface', () => {
-  const body = WRITE.slice(WRITE.indexOf('export function getModalState()'), WRITE.indexOf('* Answer the crash-recovery prompt.'));
+  const body = WRITE.slice(WRITE.indexOf('export function getModalState()'), WRITE.indexOf('// ─── Format Regression Testing'));
 
   it('reports the useUIStore modal', () => {
     expect(body).toContain('modalOpen:');
   });
 
-  it('reports the crash-recovery prompt', () => {
-    expect(body).toContain('recoveryPromptOpen:');
+  it('has no recovery prompt or splash surface left, only the one start dialog as a modal', () => {
+    expect(body).not.toContain('recoveryPromptOpen');
+    expect(body).not.toContain('startupSplashOpen');
   });
 
   it('reports the synth-error dialog, which used to be invisible here', () => {
@@ -48,17 +49,16 @@ describe('every MCP response names an open dialog and how to clear it', () => {
     // dispatchBridgeCall is the one path for the relay socket and the AI chat tool loop.
     expect(BRIDGE).toContain("return { ok: true, data: annotateBlockingDialog(method, result) };");
     expect(BRIDGE).toContain('const outcome = await dispatchBridgeCall(request.method, request.params ?? {});');
-    expect(BRIDGE, 'the old recovery-only annotator is still wired').not.toContain('annotateRecoveryPrompt');
   });
 
-  it('covers all three kinds on one key, so a caller looks for one thing', () => {
-    for (const kind of ["blockingDialog: 'recovery-prompt'", "blockingDialog: 'synth-error'", 'blockingDialog: modalOpen']) {
+  it('covers both kinds on one key, so a caller looks for one thing', () => {
+    for (const kind of ["blockingDialog: 'synth-error'", 'blockingDialog: modalOpen']) {
       expect(fn, kind).toContain(kind);
     }
   });
 
   it('names the call that clears each one', () => {
-    expect(fn).toContain('resolve_recovery_prompt');
+    expect(fn).not.toContain('resolve_recovery_prompt');
     expect(fn).toContain('dismiss_errors');
     expect(fn).toContain('dismiss_modal');
   });
@@ -69,8 +69,12 @@ describe('every MCP response names an open dialog and how to clear it', () => {
     expect(branch, 'the dialog text itself is the useful part').toContain('synthError?.message');
   });
 
-  it('keeps the recovery prompt first — it is the one holding unsaved work', () => {
-    expect(fn.indexOf('if (recoveryPromptOpen)')).toBeLessThan(fn.indexOf('if (synthErrorDialogOpen)'));
+  it('names the start dialog and says closing it starts the jingle', () => {
+    expect(fn).toContain('The start dialog');
+    expect(fn).toContain('starts the startup jingle');
+  });
+
+  it('puts the synth error before the modal', () => {
     expect(fn.indexOf('if (synthErrorDialogOpen)')).toBeLessThan(fn.indexOf('if (modalOpen)'));
   });
 
@@ -81,6 +85,5 @@ describe('every MCP response names an open dialog and how to clear it', () => {
 
   it('never clears a dialog on its own — that stays an explicit call', () => {
     expect(fn).not.toContain('dismissAll(');
-    expect(fn).not.toContain('resolveRecovery(');
   });
 });
