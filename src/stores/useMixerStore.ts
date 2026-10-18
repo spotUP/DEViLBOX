@@ -53,7 +53,7 @@ export function scheduleWasmEffectRebuild(): void {
       try {
         const { refreshChannelIsolation } = await import('../engine/tone/ChannelRoutedEffects');
         // The same answer the master chain used to decide where each effect
-        // lives (engine running, isolation slots, no hybrid playback).
+        // lives (engine running, isolation slots).
         const { engine } = await refreshChannelIsolation();
         if (!engine) {
           console.log('[MixerStore] scheduleWasmEffectRebuild: channels cannot be isolated - effects aimed at channels stay on the whole mix');
@@ -73,8 +73,11 @@ export function scheduleWasmEffectRebuild(): void {
         const { getToneEngine } = await import('../engine/ToneEngine');
         const masterEffectsInput = getToneEngine().masterEffectsInput;
         const mgr = getChannelRoutedEffectsManager(masterEffectsInput);
+        // Synths on a channel play into its strip, not the worklet slot.
+        mgr.setStripRouter((ch, destination) => getToneEngine().setChannelStripDestination(ch, destination));
 
         const channelEffects = new Map<number, EffectConfig[]>();
+        const routedEffects = new Map<number, EffectConfig[]>();
 
         // 1. Per-channel insert effects from mixer store
         const state = useMixerStore.getState();
@@ -93,15 +96,15 @@ export function scheduleWasmEffectRebuild(): void {
         for (const fx of masterEffects) {
           if (fx.enabled && targetsChannels(fx)) {
             for (const ch of await channelRoleTargets(fx)) {
-              const existing = channelEffects.get(ch) ?? [];
+              const existing = routedEffects.get(ch) ?? [];
               existing.push({ ...fx, parameters: { ...fx.parameters } });
-              channelEffects.set(ch, existing);
+              routedEffects.set(ch, existing);
             }
           }
         }
 
-        console.log(`[MixerStore] scheduleWasmEffectRebuild: rebuilding with ${channelEffects.size} channels having effects`);
-        await mgr.rebuild(channelEffects, engine);
+        console.log(`[MixerStore] scheduleWasmEffectRebuild: rebuilding with ${channelEffects.size} channels having inserts, ${routedEffects.size} with routed master effects`);
+        await mgr.rebuild(channelEffects, engine, routedEffects);
       } catch (e) {
         console.warn('[MixerStore] Failed to rebuild WASM per-channel effects:', e);
       }

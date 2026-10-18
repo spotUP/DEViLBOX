@@ -11,7 +11,12 @@ import { describe, it, expect, vi } from 'vitest';
 
 const { Gain, Channel, Meter } = vi.hoisted(() => {
   class Param { value = 0; }
-  class Node { connect = () => {}; disconnect = () => {}; dispose = () => {}; }
+  class Node {
+    targets: unknown[] = [];
+    connect = (d: unknown) => { this.targets.push(d); };
+    disconnect = (d?: unknown) => { this.targets = d === undefined ? [] : this.targets.filter((t) => t !== d); };
+    dispose = () => {};
+  }
   class Gain extends Node { gain = new Param(); }
   class Channel extends Node { volume = new Param(); pan = new Param(); mute = false; }
   class Meter extends Node {}
@@ -22,7 +27,7 @@ vi.mock('../../ChannelEffectsManager', () => ({ getChannelEffectsManager: () => 
 vi.mock('../../ChannelFilterManager', () => ({ getChannelFilterManager: () => ({ getInput: () => ({}), getOutput: () => ({}), disposeAll: () => {} }) }));
 vi.mock('../connectAudio', () => ({ connectAudio: vi.fn() }));
 
-import { getChannelOutput, setChannelMute, setMixerChannelVolume, setMixerChannelPan, type ChannelRoutingContext } from '../ChannelRouting';
+import { getChannelOutput, setChannelStripDestination, setChannelMute, setMixerChannelVolume, setMixerChannelPan, type ChannelRoutingContext } from '../ChannelRouting';
 
 function ctx(): ChannelRoutingContext {
   return { masterInput: new Gain(), channelOutputs: new Map(), channelMuteStates: new Map() } as unknown as ChannelRoutingContext;
@@ -60,5 +65,25 @@ describe('channel chains', () => {
     const out = shared.channelOutputs.get(2) as unknown as { channel: InstanceType<typeof Channel> };
     expect(out.channel.volume.value).toBe(-20);
     expect(out.channel.pan.value).toBe(0.5);
+  });
+
+  it('send their strip to the channel effect it is routed into, built before or after the route', () => {
+    // A master effect aimed at a synth channel routes that channel's strip into
+    // the effect; the strip must not also reach the master input.
+    const c = ctx();
+    const effect = new Gain();
+    setChannelStripDestination(c, 1, effect as never);   // route recorded before the strip exists
+    getChannelOutput(c, 1);
+    const strip = (c.channelOutputs.get(1) as unknown as { channel: InstanceType<typeof Channel> }).channel;
+    expect(strip.targets).toContain(effect);
+    expect(strip.targets).not.toContain(c.masterInput);
+
+    setChannelStripDestination(c, 1, null);              // effect removed: back to the master input
+    expect(strip.targets).toContain(c.masterInput);
+    expect(strip.targets).not.toContain(effect);
+
+    setChannelStripDestination(c, 1, effect as never);   // strip already built
+    expect(strip.targets).toContain(effect);
+    expect(strip.targets).not.toContain(c.masterInput);
   });
 });

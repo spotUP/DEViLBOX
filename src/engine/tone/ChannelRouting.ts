@@ -187,6 +187,36 @@ function pendingMixOf(ctx: ChannelRoutingContext): Map<number, { volumeDb?: numb
   return m;
 }
 
+/**
+ * Where a channel strip sends its post-fader audio instead of the master
+ * input: the head of the effects a master effect aimed at that channel adds
+ * (ChannelRoutedEffectsManager.rebuild). Synths on the channel play into the
+ * strip, not into the worklet's isolation slot, so without this a routed
+ * effect never heard them. Keyed by the strip map like pendingMix, and kept
+ * across strip rebuilds so a strip built after the route still follows it.
+ */
+const stripDestinations = new WeakMap<ChannelRoutingContext['channelOutputs'], Map<number, Tone.InputNode>>();
+
+function stripDestinationsOf(ctx: ChannelRoutingContext): Map<number, Tone.InputNode> {
+  let m = stripDestinations.get(ctx.channelOutputs);
+  if (!m) { m = new Map(); stripDestinations.set(ctx.channelOutputs, m); }
+  return m;
+}
+
+/** Send a channel strip into `destination`, or back to the master input with null. */
+export function setChannelStripDestination(ctx: ChannelRoutingContext, channelIndex: number, destination: Tone.InputNode | null): void {
+  const routes = stripDestinationsOf(ctx);
+  const previous = routes.get(channelIndex) ?? ctx.masterInput;
+  const next = destination ?? ctx.masterInput;
+  if (destination) routes.set(channelIndex, destination);
+  else routes.delete(channelIndex);
+  if (previous === next) return;
+  const out = ctx.channelOutputs.get(channelIndex);
+  if (!out) return;
+  try { out.channel.disconnect(previous); } catch { /* already gone with its effect */ }
+  out.channel.connect(next);
+}
+
 export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: number): Tone.Gain {
   if (!ctx.channelOutputs.has(channelIndex)) {
     // Create channel audio chain with metering
@@ -205,11 +235,12 @@ export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: numbe
     const filterOutput = filterMgr.getOutput(channelIndex);
 
     // Connect: input → [effect chain] → HPF → LPF → channel → meter + masterInput
+    // (or the channel's routed effects, see setChannelStripDestination)
     input.connect(chainInput);
     connectAudio(chainOutput, filterInput);
     connectAudio(filterOutput, channel);
     channel.connect(meter);
-    channel.connect(ctx.masterInput);
+    channel.connect(stripDestinationsOf(ctx).get(channelIndex) ?? ctx.masterInput);
 
     ctx.channelOutputs.set(channelIndex, {
       input,
