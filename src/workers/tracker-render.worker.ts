@@ -133,6 +133,12 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
       break;
     }
 
+    case 'cover':
+      tween.setCovered(msg.covered);
+      drawVersion++;
+      dirty = true;
+      break;
+
     case 'patterns':
       patterns = msg.patterns;
       currentPatternIndex = msg.currentPatternIndex;

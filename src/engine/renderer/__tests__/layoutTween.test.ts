@@ -49,6 +49,8 @@ describe('LayoutTween', () => {
     t.retarget(to, 0, false);
     expect(t.fade).toBe(0);
     expect(t.current.layout.offsets).toEqual([40, 200]);
+    expect(t.sample(0)).toBe(true); // first frame anchors the clock and draws fade 0
+    expect(t.fade).toBe(0);
     t.sample(75);
     expect(t.fade).toBeGreaterThan(0);
     expect(t.fade).toBeLessThan(1);
@@ -71,5 +73,45 @@ describe('LayoutTween', () => {
     t.retarget(to, 0, false);
     expect(t.current).toBe(to);
     expect(t.active).toBe(false);
+  });
+
+  it('a same-count retarget during a fade keeps the fade and snaps the geometry under it', () => {
+    const t = new LayoutTween(A());
+    const off16 = Array.from({ length: 16 }, (_, i) => 40 + i * 50);
+    t.retarget(geo(24, off16, 50), 0, false);
+    t.sample(0);
+    t.sample(30);
+    const mid = t.fade;
+    expect(mid).toBeGreaterThan(0);
+    const next = geo(24, off16, 51);
+    t.retarget(next, 31, false);
+    expect(t.active).toBe(true);
+    expect(t.current.layout.widths[0]).toBe(51);
+    t.sample(31);
+    expect(t.fade).toBeGreaterThanOrEqual(mid);
+    expect(t.fade).toBeLessThan(1);
+    t.sample(LAYOUT_TWEEN_MS - 1);
+    expect(t.fade).toBeLessThan(1);
+    t.sample(LAYOUT_TWEEN_MS);
+    expect(t.fade).toBe(1);
+    expect(t.current).toBe(next);
+    expect(t.active).toBe(false);
+  });
+
+  it('a fade held under an overlay stays at 0, then runs its duration after the reveal', () => {
+    const t = new LayoutTween(A());
+    t.setCovered(true);
+    t.retarget(geo(24, [40, 200], 160), 0, false);
+    for (let now = 0; now <= 1000; now += 16) t.sample(now);
+    expect(t.fade).toBe(0);
+    expect(t.active).toBe(true);
+    t.setCovered(false);
+    t.sample(2000);
+    expect(t.fade).toBe(0);
+    t.sample(2000 + LAYOUT_TWEEN_MS / 2);
+    expect(t.fade).toBeGreaterThan(0);
+    expect(t.fade).toBeLessThan(1);
+    t.sample(2000 + LAYOUT_TWEEN_MS);
+    expect(t.fade).toBe(1);
   });
 });
