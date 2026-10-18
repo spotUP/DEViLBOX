@@ -176,11 +176,14 @@ export function getRealtimeChannelLevels(state: ChannelMeterState, numChannels: 
  * effect chain and HPF/LPF each - processed every quantum, on a 4-channel MOD
  * about 150 nodes nobody used (2026-09-29 audio trace).
  */
-const pendingMix = new WeakMap<ChannelRoutingContext, Map<number, { volumeDb?: number; pan?: number }>>();
+// Keyed by the strip map, not the context: ToneEngine builds a new context
+// object on every call, so a context key lost every fader and pan set before
+// the strip existed.
+const pendingMix = new WeakMap<ChannelRoutingContext['channelOutputs'], Map<number, { volumeDb?: number; pan?: number }>>();
 
 function pendingMixOf(ctx: ChannelRoutingContext): Map<number, { volumeDb?: number; pan?: number }> {
-  let m = pendingMix.get(ctx);
-  if (!m) { m = new Map(); pendingMix.set(ctx, m); }
+  let m = pendingMix.get(ctx.channelOutputs);
+  if (!m) { m = new Map(); pendingMix.set(ctx.channelOutputs, m); }
   return m;
 }
 
