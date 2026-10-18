@@ -6,6 +6,7 @@
 import type { FormatEngineChoice } from '@/types/formatEngine';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useTransportStore } from '@/stores/useTransportStore';
+import { useTrackerStore } from '@/stores/useTrackerStore';
 import { nuadeFormatsByPrefKey, type NuadeFormat } from '@/engine/nuade/nuadeFormats';
 import { engineChoicesFor, storedChoiceFor } from '@/engine/nuade/nuadeRouting';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
@@ -14,8 +15,8 @@ import { liveTrackerSong } from './liveSong';
 export interface SwitchDeps {
   getSong(): TrackerSong;
   isPlaying(): boolean;
-  position(): { pattern: number; row: number };
-  restorePosition(p: { pattern: number; row: number }): void;
+  position(): { position: number; row: number };
+  restorePosition(p: { position: number; row: number }): void;
   /** The playing engine's module for the song, the edited one when the grid was edited. */
   moduleFor(song: TrackerSong): Promise<ArrayBuffer | Uint8Array | null>;
   open(name: string, bytes: ArrayBuffer, companions: Map<string, ArrayBuffer> | undefined, start: false | 'song'): Promise<{ ok: boolean; error?: string }>;
@@ -72,14 +73,13 @@ function defaultDeps(): SwitchDeps {
   return {
     getSong: () => liveTrackerSong(),
     isPlaying: () => useTransportStore.getState().isPlaying,
-    position: () => {
-      const t = useTransportStore.getState();
-      return { pattern: t.currentPatternIndex, row: t.currentRow };
-    },
-    restorePosition: ({ pattern, row }) => {
-      const t = useTransportStore.getState();
-      t.setCurrentPattern(pattern);
-      t.setCurrentRow(row);
+    position: () => ({
+      position: useTrackerStore.getState().currentPositionIndex,
+      row: useTransportStore.getState().currentRow,
+    }),
+    restorePosition: ({ position, row }) => {
+      useTrackerStore.getState().setCurrentPosition(position);
+      useTransportStore.getState().setCurrentRow(row);
     },
     moduleFor: async (song) => {
       const { playingDescriptor } = await import('@/engine/replayer/liveCellEdits');

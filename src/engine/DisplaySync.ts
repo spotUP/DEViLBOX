@@ -196,7 +196,7 @@ class DisplaySync {
 
     this.currentState = {
       row: transport.currentRow,
-      pattern: transport.currentPatternIndex,
+      pattern: tracker.currentPatternIndex,
       position: tracker.currentPositionIndex,
       isPlaying: transport.isPlaying,
       tick: 0, // Could be enhanced to track sub-row ticks

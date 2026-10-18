@@ -18,7 +18,6 @@ function makeTransport(overrides: Partial<CaptureTransport> = {}): CaptureTransp
     stop: vi.fn(),
     play: vi.fn(),
     setCurrentRow: vi.fn(),
-    setCurrentPattern: vi.fn(),
     setIsLooping: vi.fn(),
     ...overrides,
   };
@@ -27,17 +26,18 @@ function makeTransport(overrides: Partial<CaptureTransport> = {}): CaptureTransp
 describe('startTransportForCapture', () => {
   it('rewinds to bar 1 and disables looping so the song plays through', () => {
     const t = makeTransport();
-    startTransportForCapture(() => t);
+    const rewindSong = vi.fn();
+    startTransportForCapture(() => t, rewindSong);
 
     expect(t.stop).toHaveBeenCalled();
     expect(t.setCurrentRow).toHaveBeenCalledWith(0);
-    expect(t.setCurrentPattern).toHaveBeenCalledWith(0);
+    expect(rewindSong).toHaveBeenCalledTimes(1);
     expect(t.setIsLooping).toHaveBeenCalledWith(false);
   });
 
   it('restore() stops playback and restores the previous looping state', () => {
     const t = makeTransport({ isLooping: true });
-    const restore = startTransportForCapture(() => t);
+    const restore = startTransportForCapture(() => t, vi.fn());
     (t.stop as ReturnType<typeof vi.fn>).mockClear();
 
     restore();
@@ -48,7 +48,7 @@ describe('startTransportForCapture', () => {
 
   it('does not re-enable looping on restore when it was off before capture', () => {
     const t = makeTransport({ isLooping: false });
-    const restore = startTransportForCapture(() => t);
+    const restore = startTransportForCapture(() => t, vi.fn());
 
     restore();
 
@@ -59,7 +59,7 @@ describe('startTransportForCapture', () => {
     const t = makeTransport({ stop: vi.fn(() => { throw new Error('not playing'); }) });
 
     expect(() => {
-      const restore = startTransportForCapture(() => t);
+      const restore = startTransportForCapture(() => t, vi.fn());
       restore();
     }).not.toThrow();
     expect(t.setIsLooping).toHaveBeenCalledWith(false);

@@ -287,20 +287,16 @@ function routeTransportParameter(param: string, value: number): void {
       return;
     case 'transport.nextPattern':
     case 'transport.prevPattern':
-      void import('@/stores/useTransportStore').then(({ useTransportStore }) => {
-        void import('@/stores/useTrackerStore').then(({ useTrackerStore }) => {
-          const order = useTrackerStore.getState().patternOrder;
-          if (!order?.length) return;
-          const transport = useTransportStore.getState();
-          const step = param === 'transport.nextPattern' ? 1 : -1;
-          // Step within the ORDER, not the pattern list: the order is the
-          // arrangement the performer hears, and two entries may name the
-          // same pattern.
-          const here = order.indexOf(transport.currentPatternIndex);
-          const from = here === -1 ? 0 : here;
-          const next = Math.min(order.length - 1, Math.max(0, from + step));
-          transport.setCurrentPattern(order[next]);
-        });
+      void import('@/stores/useTrackerStore').then(({ useTrackerStore }) => {
+        const tracker = useTrackerStore.getState();
+        const order = tracker.patternOrder;
+        if (!order?.length) return;
+        const step = param === 'transport.nextPattern' ? 1 : -1;
+        // Step within the ORDER, not the pattern list: the order is the
+        // arrangement the performer hears, and two entries may name the
+        // same pattern.
+        const next = Math.min(order.length - 1, Math.max(0, tracker.currentPositionIndex + step));
+        tracker.setCurrentPosition(next);
       });
       return;
     default:

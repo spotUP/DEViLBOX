@@ -446,7 +446,12 @@ export async function captureLiveSong(options: {
   if (options.maxDurationSec && options.maxDurationSec > 0) durationSec = Math.min(durationSec, options.maxDurationSec);
 
   const { useTransportStore } = await import('@/stores/useTransportStore');
-  const restore = startTransportForCapture(useTransportStore.getState, useTransportStore.getState);
+  const { useTrackerStore } = await import('@/stores/useTrackerStore');
+  const restore = startTransportForCapture(
+    useTransportStore.getState,
+    () => useTrackerStore.getState().setCurrentPosition(0),
+    useTransportStore.getState,
+  );
   try {
     // Connect the capture tap FIRST (so nothing is missed), then AWAIT play()
     // so the engine is confirmed running before the window elapses. Extend
@@ -466,7 +471,6 @@ export interface CaptureTransport {
   stop(): void;
   play(): Promise<void> | void;
   setCurrentRow(row: number): void;
-  setCurrentPattern(pattern: number): void;
   setIsLooping(looping: boolean): void;
 }
 
@@ -484,12 +488,14 @@ export interface CaptureTransport {
  */
 export function startTransportForCapture(
   getState: () => CaptureTransport,
+  rewindSong: () => void,
   getFreshState: () => CaptureTransport = getState,
 ): () => void {
   const transport = getState();
   try { transport.stop(); } catch { /* not playing */ }
   transport.setCurrentRow(0);
-  transport.setCurrentPattern(0);
+  // The song position lives in the tracker store (order position + pattern), not the transport.
+  rewindSong();
   const wasLooping = getFreshState().isLooping;
   transport.setIsLooping(false); // song mode: advance through all patterns
   return () => {

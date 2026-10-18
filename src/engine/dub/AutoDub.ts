@@ -2496,8 +2496,9 @@ export async function runChannelAudioScrub(
   const priorVol = mixer.master?.volume ?? 1;
   try { mixer.setMasterVolume(0); } catch { /* ok */ }
 
-  // Seek to richest pattern (tempo-aware — engine processes Fxx up to this point)
-  try { useTransportStore.getState().setCurrentPattern(richestIdx); } catch { /* ok */ }
+  // Seek to the first order position that plays the richest pattern (tempo-aware — engine processes Fxx up to this point)
+  const richestPosition = Math.max(0, tracker.patternOrder.indexOf(richestIdx));
+  try { useTrackerStore.getState().setCurrentPosition(richestPosition); } catch { /* ok */ }
 
   // Start silent playback
   try { await useTransportStore.getState().play(); } catch {
@@ -2530,7 +2531,7 @@ export async function runChannelAudioScrub(
 
   // Stop, restore, return to start
   try { useTransportStore.getState().stop(); } catch { /* ok */ }
-  try { useTransportStore.getState().setCurrentPattern(0); } catch { /* ok */ }
+  try { useTrackerStore.getState().setCurrentPosition(0); } catch { /* ok */ }
   try { mixer.setMasterVolume(priorVol); } catch { /* ok */ }
 
   onProgress?.(true);

@@ -50,7 +50,7 @@ export class PlaybackScreen implements MK2Screen {
     const { W, WHITE, BLACK } = MK2Display;
     const state = useTrackerStore.getState();
     const transport = useTransportStore.getState();
-    const pattern = state.patterns[transport.currentPatternIndex];
+    const pattern = state.patterns[state.currentPatternIndex];
     if (!pattern) return;
 
     const contentY = 10;  // below soft labels
