@@ -128,6 +128,12 @@ export const PATTERN_FONT_PX = 14;
 export const FIT_MIN_FONT_PX = 10;
 /** The smallest scale the fit will use: FIT_MIN_FONT_PX / PATTERN_FONT_PX. */
 export const FIT_SCALE_FLOOR = FIT_MIN_FONT_PX / PATTERN_FONT_PX;
+/**
+ * The fit floor while the startup jingle's lips are on screen: none. The lips are a
+ * picture, not text to read, and all of them must be visible at any window width
+ * (owner 2026-10-18), so the fit shrinks as far as it must. Songs keep FIT_SCALE_FLOOR.
+ */
+export const JINGLE_FIT_SCALE_FLOOR = 0;
 
 /**
  * The scale (<= 1) at which every channel fits the canvas width. `widths` are

@@ -33,6 +33,8 @@ import { useUIStore } from '@stores/useUIStore';
 import { FIT_SCALE_FLOOR } from '../channelLayout';
 
 const WIDTH = 1900; // narrower than 12 channels at full size, wider than they need at the font floor (10 px)
+/** The container width jsdom reports; a test may narrow it. */
+let width = WIDTH;
 
 function withChannels(n: number) {
   const base = useTrackerStore.getState().patterns[0];
@@ -59,7 +61,7 @@ function lastLayout() {
 
 async function mount() {
   posted.length = 0;
-  const view = render(<div style={{ width: WIDTH, height: 600 }}><PatternEditorCanvas /></div>);
+  const view = render(<div style={{ width, height: 600 }}><PatternEditorCanvas /></div>);
   await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
   return view;
 }
@@ -71,12 +73,13 @@ describe('the tracker pattern view fits every channel to the width', () => {
     globalThis.ResizeObserver = class {
       cb: ResizeObserverCallback;
       constructor(cb: ResizeObserverCallback) { this.cb = cb; }
-      observe(el: Element) { this.cb([{ target: el, contentRect: { width: WIDTH, height: 600 } } as unknown as ResizeObserverEntry], this as never); }
+      observe(el: Element) { this.cb([{ target: el, contentRect: { width, height: 600 } } as unknown as ResizeObserverEntry], this as never); }
       unobserve() {}
       disconnect() {}
     } as never;
+    width = WIDTH;
     useSettingsStore.setState({ fitAllChannelsTracker: true });
-    useUIStore.setState({ trackerZoom: 100, trackerScale: 1 });
+    useUIStore.setState({ trackerZoom: 100, trackerScale: 1, jingleActive: false });
   });
   afterEach(cleanup);
 
@@ -114,5 +117,25 @@ describe('the tracker pattern view fits every channel to the width', () => {
     act(() => { useUIStore.getState().setTrackerZoom(50); });
     view = await mount();
     expect(workerScale()).toBe(0.5);
+  });
+
+  // Owner 2026-10-18: "it is not scaled to fit i see 6,5 channels during the jingle".
+  // The 12 lips are too wide for the 10 px floor in a laptop-sized editor; the jingle has no floor.
+  it('the startup jingle fits all 12 lips below the font floor; a song at that width scrolls', async () => {
+    width = 1000; // 12 channels do not fit here even at the 10 px floor
+    withChannels(12);
+    let view = await mount();
+    expect(workerScale()).toBe(FIT_SCALE_FLOOR);
+    expect(lastLayout().offsets[11] + lastLayout().widths[11]).toBeGreaterThan(width);
+    view.unmount(); cleanup();
+
+    act(() => { useUIStore.getState().setJingleActive(true); });
+    view = await mount();
+    expect(workerScale()).toBeLessThan(FIT_SCALE_FLOOR);
+    const layout = lastLayout();
+    expect(layout.offsets).toHaveLength(12);
+    expect(layout.offsets[11] + layout.widths[11]).toBeLessThanOrEqual(width); // every lip on screen
+    view.unmount(); cleanup();
+    act(() => { useUIStore.getState().setJingleActive(false); });
   });
 });
