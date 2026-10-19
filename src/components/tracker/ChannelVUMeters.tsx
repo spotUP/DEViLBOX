@@ -111,26 +111,32 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
     }));
   }, [numChannels]);
 
-  // Canvas resize via ResizeObserver — no clientHeight read/write loop
+  // Canvas resize via ResizeObserver — no clientHeight read/write loop. The backing
+  // store follows the canvas in device pixels: the draw loop reads the current
+  // devicePixelRatio, so a ratio cached at mount drew the meters scaled and shifted
+  // right after a browser zoom or a move to another display. Observing the
+  // device-pixel box also fires when only the ratio changes.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const parent = canvas.parentElement;
-    if (!parent) return;
 
-    const dpr = window.devicePixelRatio || 1;
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
-      const { width, height } = entry.contentRect;
-      const bw = Math.round(width * dpr);
-      const bh = Math.round(height * dpr);
+      const device = entry.devicePixelContentBoxSize?.[0];
+      const dpr = window.devicePixelRatio || 1;
+      const bw = device ? device.inlineSize : Math.round(entry.contentRect.width * dpr);
+      const bh = device ? device.blockSize : Math.round(entry.contentRect.height * dpr);
       if (canvas.width !== bw || canvas.height !== bh) {
         canvas.width = bw;
         canvas.height = bh;
       }
     });
-    observer.observe(parent);
+    try {
+      observer.observe(canvas, { box: 'device-pixel-content-box' });
+    } catch {
+      observer.observe(canvas);
+    }
     return () => observer.disconnect();
   }, []);
 
