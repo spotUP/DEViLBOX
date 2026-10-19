@@ -36,3 +36,38 @@ describe('nextTabChannel (LOW: Tab symmetry)', () => {
     expect(nextTabChannel(0, 0, true)).toBe(0);
   });
 });
+
+/**
+ * Owner 2026-10-20: "i cant tab longer than to channel 4", then "zoom scale
+ * changes when i use tab". Tab stepped onto empty (hidden) channels; standing
+ * on one reveals it, the visible set changed and the fit scale with it. Tab
+ * now steps through the shown channels only and never reveals a hidden one.
+ */
+describe('nextTabChannel skips hidden channels', () => {
+  // 7 channels; 2, 4 and 5 are empty and hidden.
+  const mask = [true, true, false, true, false, false, true];
+
+  it('forward Tab jumps over hidden channels and wraps from the last shown one', () => {
+    expect(nextTabChannel(1, 7, false, mask)).toBe(3);
+    expect(nextTabChannel(3, 7, false, mask)).toBe(6);
+    expect(nextTabChannel(6, 7, false, mask)).toBe(0);
+  });
+
+  it('Shift+Tab jumps over hidden channels and wraps from the first', () => {
+    expect(nextTabChannel(6, 7, true, mask)).toBe(3);
+    expect(nextTabChannel(3, 7, true, mask)).toBe(1);
+    expect(nextTabChannel(0, 7, true, mask)).toBe(6);
+  });
+
+  it('a full Tab cycle visits exactly the shown channels', () => {
+    const seen: number[] = [];
+    let ch = 0;
+    for (let i = 0; i < 4; i++) { ch = nextTabChannel(ch, 7, false, mask); seen.push(ch); }
+    expect(seen).toEqual([1, 3, 6, 0]);
+  });
+
+  it('from a hidden channel the cursor was moved to, Tab goes to the next shown one', () => {
+    expect(nextTabChannel(4, 7, false, mask)).toBe(6);
+    expect(nextTabChannel(4, 7, true, mask)).toBe(3);
+  });
+});

@@ -6,17 +6,26 @@
  * Shift+Tab only moved channel when the cursor already sat on the note column,
  * while forward Tab always moved — an asymmetry).
  *
+ * Tab moves between the channels the grid shows (visibleChannels.ts): a hidden
+ * channel is skipped, never revealed. Revealing one changed the visible set and
+ * with it the fit-all-channels scale, so the grid zoomed on every Tab (owner
+ * 2026-10-20). Arrow-right off the last shown channel is the way to open one.
+ *
  * Pure so it can be unit-tested without the keyboard pipeline.
  */
+import { isChannelVisible } from './visibleChannels';
 
 /**
  * Target channel index for a Tab (`shift=false`) or Shift+Tab (`shift=true`)
- * press, wrapping around the ends of the channel range.
+ * press, wrapping around the ends of the channel range and skipping the
+ * channels `mask` hides. Without a mask every channel counts as shown.
  */
-export function nextTabChannel(current: number, channelCount: number, shift: boolean): number {
+export function nextTabChannel(current: number, channelCount: number, shift: boolean, mask?: readonly boolean[]): number {
   if (channelCount <= 0) return 0;
-  if (shift) {
-    return current > 0 ? current - 1 : channelCount - 1;
+  const dir = shift ? -1 : 1;
+  for (let step = 1; step <= channelCount; step++) {
+    const i = (((current + dir * step) % channelCount) + channelCount) % channelCount;
+    if (isChannelVisible(mask, i)) return i;
   }
-  return current < channelCount - 1 ? current + 1 : 0;
+  return current;
 }

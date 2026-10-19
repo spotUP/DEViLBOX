@@ -6,7 +6,8 @@
 
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useEditorStore } from '@stores/useEditorStore';
-import { useCursorStore } from '@/stores/useCursorStore';
+import { useCursorStore, shownChannelMask } from '@/stores/useCursorStore';
+import { nextTabChannel } from '@/lib/tracker/tabNavigation';
 
 /**
  * Move cursor up one row
@@ -113,9 +114,7 @@ export function nextChannel(): boolean {
   const pattern = patterns[currentPatternIndex];
   if (!pattern) return false;
 
-  const numChannels = pattern.channels.length;
-  const newChannel = (cursor.channelIndex + 1) % numChannels;
-  moveCursorToChannel(newChannel);
+  moveCursorToChannel(nextTabChannel(cursor.channelIndex, pattern.channels.length, false, shownChannelMask(patterns)));
   moveCursorToColumn('note');
   return true;
 }
@@ -129,9 +128,7 @@ export function prevChannel(): boolean {
   const pattern = patterns[currentPatternIndex];
   if (!pattern) return false;
 
-  const numChannels = pattern.channels.length;
-  const newChannel = (cursor.channelIndex - 1 + numChannels) % numChannels;
-  moveCursorToChannel(newChannel);
+  moveCursorToChannel(nextTabChannel(cursor.channelIndex, pattern.channels.length, true, shownChannelMask(patterns)));
   moveCursorToColumn('note');
   return true;
 }
