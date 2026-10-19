@@ -1,17 +1,20 @@
 {
  "format": "uprough-softsynth-song",
- "schema": 1,
+ "schema": 2,
  "generator": {
   "tool": "hiphop",
   "version": "e6"
  },
  "song": {
+  "name": "trap 1",
   "style": "trap",
   "seed": 1,
   "key": {
    "tonic": 9,
    "mode": "minor"
   },
+  "bpm": 140,
+  "speed": 6,
   "rate": 22050,
   "tier": "a1200",
   "bars": 16,
