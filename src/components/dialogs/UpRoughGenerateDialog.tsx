@@ -4,12 +4,13 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Wand2 } from 'lucide-react';
+import { Loader2, Wand2 } from 'lucide-react';
 import { useTrackerStore } from '@stores';
 import { Modal } from '@components/ui/Modal';
 import { ModalHeader } from '@components/ui/ModalHeader';
 import { ModalFooter } from '@components/ui/ModalFooter';
 import { Button } from '@components/ui/Button';
+import { CustomSelect } from '@components/common/CustomSelect';
 import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
 import { fetchStyles, generateSong } from '@/lib/uprough/generateClient';
 
@@ -20,6 +21,13 @@ export interface UpRoughGenerateDialogProps {
 
 const KEY_PATTERN = /^[A-G][#b]?m?$/;
 
+type Phase = 'idle' | 'generating' | 'loading';
+
+const PHASE_TEXT: Record<Exclude<Phase, 'idle'>, string> = {
+  generating: 'Generating on the server',
+  loading: 'Loading into the tracker',
+};
+
 export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ isOpen, onClose }) => {
   const [styles, setStyles] = useState<string[]>([]);
   const [style, setStyle] = useState('');
@@ -27,7 +35,11 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
   const [key, setKey] = useState('Am');
   // Empty = the whole song; the generator scales its arrangement to a count.
   const [bars, setBars] = useState('16');
-  const [busy, setBusy] = useState(false);
+  // The server answers in one response with no progress of its own, so the dialog
+  // shows which phase is running and for how long instead of a percentage.
+  const [phase, setPhase] = useState<Phase>('idle');
+  const [elapsed, setElapsed] = useState(0);
+  const busy = phase !== 'idle';
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -46,6 +58,14 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
     return () => ac.abort();
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!busy) return;
+    const started = performance.now();
+    setElapsed(0);
+    const id = window.setInterval(() => setElapsed(Math.floor((performance.now() - started) / 1000)), 1000);
+    return () => window.clearInterval(id);
+  }, [busy]);
+
   const seedValid = Number.isInteger(seed) && seed >= 0 && seed <= 9999;
   const keyValid = KEY_PATTERN.test(key);
   const barsCount = bars.trim() === '' ? undefined : Number(bars);
@@ -61,15 +81,16 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
     if (!canGenerate) return;
     const ac = new AbortController();
     abortRef.current = ac;
-    setBusy(true);
+    setPhase('generating');
     setError(null);
     try {
       const text = await generateSong({ style, seed, key, ...(barsCount !== undefined && { bars: barsCount }) }, ac.signal);
+      setPhase('loading');
       await useTrackerStore.getState().importUpRoughSong(text);
-      setBusy(false);
+      setPhase('idle');
       onClose();
     } catch (e) {
-      setBusy(false);
+      setPhase('idle');
       if (!ac.signal.aborted) setError(e instanceof Error ? e.message : String(e));
     }
   };
@@ -104,22 +125,19 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
         </p>
 
         <div>
-          <label htmlFor="uprough-style" className="block text-xs text-text-muted mb-1">Style</label>
-          <select
-            id="uprough-style"
+          <span className="block text-[10px] font-mono text-text-muted mb-1">Style</span>
+          <CustomSelect
             value={style}
-            onChange={(e) => setStyle(e.target.value)}
+            onChange={setStyle}
+            options={styles.map((s) => ({ value: s, label: s }))}
             disabled={busy}
-            className="w-full bg-dark-bg text-text-secondary rounded p-2 text-xs"
-          >
-            {styles.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
+            title="Style"
+            className="w-full px-2 py-1.5 bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs focus:outline-none focus:ring-1 focus:ring-accent-primary disabled:opacity-50"
+          />
         </div>
 
         <div>
-          <label htmlFor="uprough-seed" className="block text-xs text-text-muted mb-1">Seed (0 to 9999)</label>
+          <label htmlFor="uprough-seed" className="block text-[10px] font-mono text-text-muted mb-1">Seed (0 to 9999)</label>
           <input
             id="uprough-seed"
             type="number"
@@ -129,26 +147,26 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
             value={seed}
             onChange={(e) => setSeed(e.target.valueAsNumber)}
             disabled={busy}
-            className="w-full bg-dark-bg text-text-secondary rounded p-2 text-xs"
+            className="w-full px-2 py-1.5 bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs focus:outline-none focus:ring-1 focus:ring-accent-primary disabled:opacity-50"
           />
-          {!seedValid && <p className="text-xs text-accent-warning mt-1">Seed must be a whole number from 0 to 9999.</p>}
+          {!seedValid && <p className="text-[10px] font-mono text-accent-warning mt-1">Seed must be a whole number from 0 to 9999.</p>}
         </div>
 
         <div>
-          <label htmlFor="uprough-key" className="block text-xs text-text-muted mb-1">Key</label>
+          <label htmlFor="uprough-key" className="block text-[10px] font-mono text-text-muted mb-1">Key</label>
           <input
             id="uprough-key"
             type="text"
             value={key}
             onChange={(e) => setKey(e.target.value)}
             disabled={busy}
-            className="w-full bg-dark-bg text-text-secondary rounded p-2 text-xs"
+            className="w-full px-2 py-1.5 bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs focus:outline-none focus:ring-1 focus:ring-accent-primary disabled:opacity-50"
           />
-          {!keyValid && <p className="text-xs text-accent-warning mt-1">Key looks like Am, C or F#m.</p>}
+          {!keyValid && <p className="text-[10px] font-mono text-accent-warning mt-1">Key looks like Am, C or F#m.</p>}
         </div>
 
         <div>
-          <label htmlFor="uprough-bars" className="block text-xs text-text-muted mb-1">Bars (empty for the whole song)</label>
+          <label htmlFor="uprough-bars" className="block text-[10px] font-mono text-text-muted mb-1">Bars (empty for the whole song)</label>
           <input
             id="uprough-bars"
             type="number"
@@ -158,12 +176,19 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
             value={bars}
             onChange={(e) => setBars(e.target.value)}
             disabled={busy}
-            className="w-full bg-dark-bg text-text-secondary rounded p-2 text-xs"
+            className="w-full px-2 py-1.5 bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs focus:outline-none focus:ring-1 focus:ring-accent-primary disabled:opacity-50"
           />
-          {!barsValid && <p className="text-xs text-accent-warning mt-1">Bars must be a whole number from 1 to 999.</p>}
+          {!barsValid && <p className="text-[10px] font-mono text-accent-warning mt-1">Bars must be a whole number from 1 to 999.</p>}
         </div>
 
-        {error && <p role="alert" className="text-xs text-accent-warning">{error}</p>}
+        {busy && (
+          <p role="status" className="flex items-center gap-2 text-xs font-mono text-text-secondary">
+            <Loader2 size={14} className="animate-spin text-accent-primary" />
+            {PHASE_TEXT[phase as Exclude<Phase, 'idle'>]}... {elapsed} s
+          </p>
+        )}
+
+        {error && <p role="alert" className="text-xs font-mono text-accent-error">{error}</p>}
       </div>
 
       <ModalFooter theme="modern" align="right">
