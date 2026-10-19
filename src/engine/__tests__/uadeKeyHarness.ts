@@ -3,6 +3,7 @@
  * ToneEngine plays it (offline), and the model of what Paula makes of a sample.
  */
 import { vi } from 'vitest';
+import { forgetAudioGlobals } from './forgetAudioGlobals';
 import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch, audioLoadsSettled } from '@/test/audio/realWebAudio';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { startWorklet, songBuffer, stereoOutputs } from './workletHarness';
@@ -11,7 +12,7 @@ export const SR = 48000; // the UADE worklet's and the fundamentalHz helper's ra
 const uadeTransform = async (c: string) => (await import('@/engine/uade/UADEEngine')).uadeTransform(c);
 
 export interface Shape {
-  voice: number; period: number; volume: number; firstChunk: number; count: number;
+  voice: number; period: number; volume: number; volumes: number[]; firstChunk: number; count: number;
   attackPtr: number; attackLen: number; loopPtr: number | null; loopLen: number;
   pcm: ArrayBuffer; loopStart: number; loopLength: number;
 }
@@ -67,6 +68,7 @@ export interface KeyPress { note: string; at: number; period?: number }
 /** The instrument on the real ToneEngine, rendered offline: what the keyboard plays. One render per call (a fresh engine). */
 export async function renderKeys(config: InstrumentConfig, presses: KeyPress[], secs: number): Promise<Float32Array> {
   vi.resetModules();
+  forgetAudioGlobals(); // a fresh engine on this render's OfflineAudioContext, not the previous render's
   installRealWebAudio(); resolveWorkletsFromPublic(); servePublicToFetch();
   const Tone = await import('tone');
   const ctx = new OfflineAudioContext(2, Math.ceil(SR * secs), SR);
@@ -95,17 +97,23 @@ export async function renderKeys(config: InstrumentConfig, presses: KeyPress[], 
   }
 }
 
-/** What Paula makes of a sample: the bytes at 3546895 / period per second, looped as the shape says, at UADE's output gain. */
+/**
+ * What Paula makes of a sample: the bytes at 3546895 / period per second, looped as the shape says, at the
+ * channel volume the player wrote over the note's first 160 ms (its envelope, one step per 10 ms scan chunk),
+ * at UADE's output gain.
+ */
 export function paulaVoice(sh: Shape, frames: number): Float32Array {
   const bytes = new Int8Array(sh.pcm);
   const out = new Float32Array(frames);
   const step = 3546895 / sh.period / SR;
-  const gain = (sh.volume / 64) * 0.48 / 128;
+  const chunkFrames = SR / 100;
+  const volumes = sh.volumes.length > 0 ? sh.volumes : [sh.volume];
   let pos = 0;
   for (let i = 0; i < frames; i++) {
     let j = Math.floor(pos);
     if (sh.loopLength > 0 && j >= sh.loopStart + sh.loopLength) { pos = sh.loopStart + ((pos - sh.loopStart) % sh.loopLength); j = Math.floor(pos); }
-    out[i] = j < bytes.length ? bytes[j] * gain : 0;
+    const volume = volumes[Math.min(volumes.length - 1, Math.floor(i / chunkFrames))];
+    out[i] = j < bytes.length ? bytes[j] * (volume / 64) * 0.48 / 128 : 0;
     pos += step;
   }
   return out;

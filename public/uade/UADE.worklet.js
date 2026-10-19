@@ -2262,6 +2262,10 @@ class UADEProcessor extends AudioWorkletProcessor {
       // again within LOOP_WINDOW chunks of the note start is what the DMA reloads at the end of the attack
       // (the last one written wins); a pair that changes later is the next note.
       const LOOP_WINDOW = 4;
+      // The channel volume over the first VOL_CHUNKS chunks (10 ms each) of a note. A player with a per-tick
+      // envelope (Jeroen Tel's ADSR: attack step, peak, decay to sustain) writes AUDxVOL every tick, so the
+      // level of the note is this trajectory; `volume` alone is the step the note started on.
+      const VOL_CHUNKS = 16;
       const settle = (v) => {
         const c = v.cur;
         if (!c || c.settled) return;
@@ -2284,12 +2288,13 @@ class UADEProcessor extends AudioWorkletProcessor {
         const key = c.attackPtr + ':' + c.attackLen + ':' + (c.loopPtr === null ? 'self' : c.loopPtr + ':' + c.loopLen);
         let sh = shapes.get(key);
         if (!sh) {
-          sh = { voice: c.voice, period: c.period, volume: c.volume, firstChunk: c.chunk, count: 0, attackPtr: c.attackPtr, attackLen: c.attackLen,
+          sh = { voice: c.voice, period: c.period, volume: c.volume, volumes: c.volumes, firstChunk: c.chunk, count: 0, attackPtr: c.attackPtr, attackLen: c.attackLen,
             loopPtr: c.loopPtr, loopLen: c.loopLen, pcm, loopStart, loopLength };
           shapes.set(key, sh);
         }
         sh.count++;
-        if (!sh.volume && c.volume) sh.volume = c.volume;
+        // a sample first started silent (a player's start-up) takes the volume, and its trajectory, of its first audible start
+        if (!sh.volume && c.volume) { sh.volume = c.volume; sh.volumes = c.volumes; }
       };
 
       for (let k = 0; k < chunks; k++) {
@@ -2309,6 +2314,7 @@ class UADEProcessor extends AudioWorkletProcessor {
             v.vol = val;
             // the channel volume the note settles at: the last write within the loop window of its start
             if (v.cur && !v.cur.settled && k - v.cur.chunk <= LOOP_WINDOW) v.cur.volume = Math.min(64, val);
+            if (v.cur && k - v.cur.chunk < VOL_CHUNKS) v.cur.volumes[k - v.cur.chunk] = Math.min(64, val);
           } else if (reg === 3 && val >= 60 && val <= 7000) {
             // the hardware ignores bit 0 of the pointer (words)
             const ptr = (((v.lch << 16) | v.lcl) & ~1) >>> 0;
@@ -2322,7 +2328,7 @@ class UADEProcessor extends AudioWorkletProcessor {
             settle(v);
             // one word is a silent stub (UADE's idle buffer at start-up, a player's "off"), not a sample
             if (v.len <= 1) { v.cur = null; continue; }
-            v.cur = { voice: ch, period: val, volume: Math.min(64, v.vol), chunk: k, attackPtr: ptr, attackLen: v.len, loopPtr: null, loopLen: 0, settled: false };
+            v.cur = { voice: ch, period: val, volume: Math.min(64, v.vol), volumes: [Math.min(64, v.vol)], chunk: k, attackPtr: ptr, attackLen: v.len, loopPtr: null, loopLen: 0, settled: false };
           }
         }
         // the loop window is over: read the bytes now (a player may rewrite its waveform memory later)
@@ -2345,7 +2351,10 @@ class UADEProcessor extends AudioWorkletProcessor {
       const out = samples.map((s2) => {
         const buf = s2.pcm.buffer.slice(s2.pcm.byteOffset, s2.pcm.byteOffset + s2.pcm.byteLength);
         transfer.push(buf);
-        return { ...s2, pcm: buf };
+        // a chunk with no volume write keeps the volume of the chunk before it
+        const volumes = [];
+        for (let i = 0, cur = s2.volume; i < VOL_CHUNKS; i++) { if (s2.volumes[i] !== undefined) cur = s2.volumes[i]; volumes.push(cur); }
+        return { ...s2, volumes, pcm: buf };
       });
       this.port.postMessage({ type: 'paulaSamples', requestId, samples: out }, transfer);
     } catch (err) {

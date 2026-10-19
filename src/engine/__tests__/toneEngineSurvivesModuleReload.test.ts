@@ -15,6 +15,7 @@
  * an HMR re-evaluation does.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { forgetAudioGlobals } from './forgetAudioGlobals';
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -23,9 +24,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 beforeEach(() => {
   vi.resetModules();
-  const g = globalThis as Record<string, unknown>;
-  delete g.__devilboxSingletons;
-  delete g.__devilboxAudioContext;
+  forgetAudioGlobals();
 });
 
 describe('DEViLBOX audio context across module copies', () => {
