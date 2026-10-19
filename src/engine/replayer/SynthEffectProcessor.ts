@@ -11,6 +11,7 @@
  */
 
 import { VIBRATO_TABLE } from './PeriodTables';
+import { decodeVolumeColumn, VOLUME_COLUMN_MAX } from '@lib/tracker/volumeColumn';
 
 // XM effect types (matching effTyp from TrackerCell)
 const FX_ARPEGGIO = 0;
@@ -68,6 +69,8 @@ export interface SynthEffectDeps {
   getPatternCell(channel: number, row: number): EffectPatternCell | null;
   /** Get the number of channels */
   getChannelCount(): number;
+  /** The format store's editor mode: decides whether `volume` is an XM byte (0x10-0x50) or a raw 0-64 level */
+  getEditorMode(): string | null;
   /** Set frequency on a synth channel via ToneEngine */
   applySynthFrequency(instrumentId: number, frequency: number, channelIndex: number, rampTime?: number): void;
   /** Set volume on a channel's gain node (0-1 linear) */
@@ -254,10 +257,12 @@ export class SynthEffectProcessor {
         this.sendFrequency(ch, state, state.currentFrequency);
       }
 
-      // Parse volume column (direct set volume 0x10-0x50 range in XM)
-      if (cell.volume > 0 && cell.volume <= 64) {
-        state.baseVolume = cell.volume;
-        state.currentVolume = cell.volume;
+      // Volume column: an XM byte (0x10-0x50) in classic mode, a raw 0-64 level in native-replayer
+      // modes. The decoder owns that convention; null means the cell sets no volume.
+      const columnVolume = this.readVolumeColumn(cell);
+      if (columnVolume !== null) {
+        state.baseVolume = columnVolume;
+        state.currentVolume = columnVolume;
       }
 
       // Parse primary effect column
@@ -271,6 +276,12 @@ export class SynthEffectProcessor {
         this.initEffect(ch, state, cell.effTyp2, cell.eff2, cell, time);
       }
     }
+  }
+
+  /** The cell's volume column as a 0-64 level, or null when the cell sets no volume. */
+  private readVolumeColumn(cell: EffectPatternCell): number | null {
+    const level = decodeVolumeColumn(cell.volume, this.deps.getEditorMode());
+    return level === null ? null : level * VOLUME_COLUMN_MAX;
   }
 
   private initEffect(ch: number, state: EffectChannelState, fx: number, param: number,
@@ -367,7 +378,7 @@ export class SynthEffectProcessor {
               state.noteDelayTick = subParam;
               state.noteDelayXmNote = cell.note;
               state.noteDelayInstrumentId = cell.instrument || state.instrumentId;
-              state.noteDelayVolume = (cell.volume > 0 && cell.volume <= 64) ? cell.volume : state.currentVolume;
+              state.noteDelayVolume = this.readVolumeColumn(cell) ?? state.currentVolume;
             }
             break;
           case EFX_FINE_VOLUME_UP:

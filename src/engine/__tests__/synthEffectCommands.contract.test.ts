@@ -3,23 +3,22 @@
  * must work for WASM synths (DevilboxSynth), not just Tone.js instruments.
  *
  * Regression: applySynthFrequency only looked for Tone.js `.frequency` param,
- * silently returning for WASM synths. applySynthVolume only checked Tone.js
- * `.volume` (dB). setChannelGain in TrackerReplayer only modulated per-channel
- * gainNodes that WASM synths don't route through.
+ * silently returning for WASM synths. setChannelGain in TrackerReplayer only
+ * modulated per-channel gainNodes that WASM synths don't route through.
  *
  * The fix:
  * 1. applySynthFrequency checks isDevilboxSynth → calls setFrequency()
- * 2. applySynthVolume checks isDevilboxSynth → modulates output GainNode
- * 3. applySynthPitch checks isDevilboxSynth → converts semitones → setFrequency()
- * 4. setChannelGain callback also routes through ToneEngine.applySynthVolume
- * 5. DB303Synth, VSTBridgeSynth, DX7Synth, OPL3Synth, TunefishSynth, SfizzSynth,
+ * 2. applySynthPitch checks isDevilboxSynth → converts semitones → setFrequency()
+ * 3. setChannelGain callback routes through ToneEngine.setChannelVolume, which
+ *    drives the channel's live voices and its per-channel synth lane level (the
+ *    channel's volume, never the instrument's shared output level)
+ * 4. DB303Synth, VSTBridgeSynth, DX7Synth, OPL3Synth, TunefishSynth, SfizzSynth,
  *    RdPianoSynth all implement setFrequency() via their pitch bend mechanisms
  *
  * Guard: statically verify that:
  * - applySynthFrequency has isDevilboxSynth branch
- * - applySynthVolume has isDevilboxSynth branch with GainNode
  * - applySynthPitch has isDevilboxSynth branch
- * - setChannelGain callback routes to applySynthVolume
+ * - setChannelGain callback routes to setChannelVolume, not an instrument-level setter
  * - DevilboxSynth interface declares setFrequency
  * - Key WASM synths implement setFrequency
  */
@@ -56,12 +55,11 @@ describe('Effect commands work for WASM synths (DevilboxSynth)', () => {
     expect(methodBlock).toContain('instrument.setFrequency');
   });
 
-  it('applySynthVolume has isDevilboxSynth fallback with GainNode', () => {
-    const methodStart = toneEngine.indexOf('public applySynthVolume(');
+  it('setChannelVolume drives the per-channel synth lane level', () => {
+    const methodStart = toneEngine.indexOf('public setChannelVolume(');
     expect(methodStart).toBeGreaterThan(-1);
-    const methodBlock = toneEngine.slice(methodStart, methodStart + 1500);
-    expect(methodBlock).toContain('isDevilboxSynth(instrument)');
-    expect(methodBlock).toContain('GainNode');
+    const methodBlock = toneEngine.slice(methodStart, methodStart + 600);
+    expect(methodBlock).toContain('setChannelSynthLaneLevel(');
   });
 
   it('applySynthPitch has isDevilboxSynth fallback', () => {
@@ -72,10 +70,11 @@ describe('Effect commands work for WASM synths (DevilboxSynth)', () => {
     expect(methodBlock).toContain('setFrequency');
   });
 
-  it('setChannelGain callback routes through ToneEngine.applySynthVolume', () => {
-    // The setChannelGain callback in TrackerReplayer should call applySynthVolume
-    const gainCallback = replayer.match(/setChannelGain:[\s\S]*?applySynthVolume/);
-    expect(gainCallback, 'setChannelGain should call applySynthVolume for WASM synths').not.toBeNull();
+  it('setChannelGain callback routes through ToneEngine.setChannelVolume, never an instrument setter', () => {
+    const gainCallback = replayer.match(/setChannelGain:[\s\S]*?\.setChannelVolume\(channelIndex/);
+    expect(gainCallback, 'setChannelGain should call setChannelVolume for the channel').not.toBeNull();
+    expect(toneEngine).not.toContain('applySynthVolume(');
+    expect(replayer).not.toContain('applySynthVolume(');
   });
 });
 

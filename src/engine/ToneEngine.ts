@@ -57,6 +57,8 @@ import {
   applyChannelSynthLaneGains,
   setChannelSynthLanePitchRate,
   applyPitchShift,
+  setChannelSynthLaneLevel,
+  resetChannelSynthLaneLevels,
   disposeChannelSynthLanes,
 } from './tone/ChannelSynthLanes';
 import { DeckKeyLock } from './dj/DeckKeyLock';
@@ -121,6 +123,7 @@ import {
   createVoice as _createVoice,
   stopVoice as _stopVoice,
   setChannelVolume as _setChannelVolume,
+  channelVolumeDbToGain,
   setChannelFilterCutoff as _setChannelFilterCutoff,
   setChannelFilterResonance as _setChannelFilterResonance,
   setChannelPan as _setChannelPan,
@@ -5468,7 +5471,19 @@ export class ToneEngine {
   public getChannelOutput(channelIndex: number): Tone.Gain { return _getChannelOutput(this._channelCtx, channelIndex); }
   private createVoice(channelIndex: number, instrument: Tone.ToneAudioNode | DevilboxSynth, note: string, config: InstrumentConfig): VoiceState { return _createVoice(this._channelCtx, channelIndex, instrument, note, config); }
   private stopVoice(voice: VoiceState, time: number): void { _stopVoice(voice, time); }
-  public setChannelVolume(channelIndex: number, volumeDb: number): void { _setChannelVolume(this._channelCtx, channelIndex, volumeDb); }
+  /**
+   * The tracker channel volume (volume column, Cxx, Axx, tremolo) for one channel: the
+   * live voices on the channel and, when the channel has a per-channel native synth,
+   * that channel's lane level. It never touches an instrument's own output level, so
+   * two channels playing the same instrument keep separate volumes.
+   */
+  public setChannelVolume(channelIndex: number, volumeDb: number, time?: number): void {
+    const t = this.getSafeTime(time) ?? Tone.now();
+    _setChannelVolume(this._channelCtx, channelIndex, volumeDb, t);
+    setChannelSynthLaneLevel(this._laneCtx, channelIndex, channelVolumeDbToGain(volumeDb), t);
+  }
+  /** Every per-channel synth lane back to unity: playback stopped, nothing carries into the next song. */
+  public resetChannelVolumes(): void { resetChannelSynthLaneLevels(this._laneCtx); }
   public setChannelFilterCutoff(channelIndex: number, cutoff: number): void { _setChannelFilterCutoff(this._channelCtx, channelIndex, cutoff); }
   public setChannelFilterResonance(channelIndex: number, resonance: number): void { _setChannelFilterResonance(this._channelCtx, channelIndex, resonance); }
   public setChannelPan(channelIndex: number, pan: number | null | undefined): void { _setChannelPan(this._channelCtx, channelIndex, pan); }
@@ -5705,48 +5720,6 @@ export class ToneEngine {
   // ============================================
   // EFFECT COMMAND SUPPORT FOR SYNTHS
   // ============================================
-
-  /**
-   * Apply volume to a synth instrument (for Cxx, Axy, 7xy effects)
-   * @param instrumentId - Instrument ID
-   * @param volume - Volume 0-1 (linear gain)
-   * @param time - Audio time
-   * @param channelIndex - Channel index for per-channel synths
-   */
-  public applySynthVolume(instrumentId: number, volume: number, time: number, channelIndex?: number): void {
-    const key = this.getInstrumentKey(instrumentId, channelIndex);
-    let instrument = this.instruments.get(key);
-
-    if (!instrument && channelIndex !== undefined) {
-      const legacyKey = this.getInstrumentKey(instrumentId, -1);
-      instrument = this.instruments.get(legacyKey);
-    }
-
-    if (!instrument) return;
-
-    const safeTime = this.getSafeTime(time) ?? Tone.now();
-
-    // DevilboxSynth (WASM): modulate the output GainNode directly
-    if (isDevilboxSynth(instrument)) {
-      const out = instrument.output;
-      if (out instanceof GainNode) {
-        try { out.gain.setValueAtTime(Math.max(0, Math.min(1, volume)), safeTime); }
-        catch { /* ignored */ }
-      }
-      return;
-    }
-    
-    // Convert 0-1 linear gain to decibels for Tone.js
-    const dbVolume = volume <= 0 ? -Infinity : Tone.gainToDb(volume);
-    
-    // Most Tone.js synths have .volume (Param<"decibels">)
-    if ('volume' in instrument && instrument.volume) {
-      const volParam = instrument.volume as unknown as Tone.Param<'decibels'>;
-      if (typeof volParam.setValueAtTime === 'function') {
-        volParam.setValueAtTime(dbVolume, safeTime);
-      }
-    }
-  }
 
   /**
    * Apply panning to a synth instrument (for 8xx, Pxy effects)

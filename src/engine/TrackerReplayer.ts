@@ -2556,24 +2556,21 @@ export class TrackerReplayer {
                 return pat?.channels[channel]?.rows[row] ?? null;
               },
               getChannelCount: () => replayer.channels.length,
+              getEditorMode: () => useFormatStore.getState().editorMode ?? null,
               applySynthFrequency: (instrumentId, frequency, channelIndex, rampTime) => {
                 try { getToneEngine().applySynthFrequency(instrumentId, frequency, channelIndex, rampTime); }
                 catch { /* ToneEngine not ready */ }
               },
-              setChannelGain: (channelIndex, gain, _time) => {
+              setChannelGain: (channelIndex, gain, time) => {
                 const ch = replayer.channels[channelIndex];
                 if (ch?.gainNode) {
-                  try { ch.gainNode.gain.setValueAtTime(gain, Tone.now()); }
+                  try { ch.gainNode.gain.setValueAtTime(gain, time); }
                   catch { /* ignored */ }
                 }
-                // Also route through ToneEngine for WASM synths (DevilboxSynth output GainNode)
-                const instId = typeof ch?.instrument === 'number' ? ch.instrument
-                  : ch?.instrument != null && typeof ch.instrument === 'object' && 'id' in ch.instrument
-                    ? (ch.instrument as { id: number }).id : 0;
-                if (instId > 0) {
-                  try { getToneEngine().applySynthVolume(instId, gain, Tone.now(), channelIndex); }
-                  catch { /* ToneEngine not ready */ }
-                }
+                // The channel's own volume for its live voices and its per-channel synth lane:
+                // never the instrument's output level, which other channels share.
+                try { getToneEngine().setChannelVolume(channelIndex, gain <= 0 ? -Infinity : Tone.gainToDb(gain), time); }
+                catch { /* ToneEngine not ready */ }
               },
               getChannelBaseFrequency: (channelIndex) => {
                 try { return getToneEngine().getChannelLastNoteFrequency(channelIndex); }
@@ -2816,6 +2813,10 @@ export class TrackerReplayer {
         });
       } catch { /* ignored */ }
     }
+
+    // Channel volumes the synth effects set live on the engine's per-channel lanes; clear them
+    // so nothing from this song carries into the next.
+    try { getToneEngine().resetChannelVolumes(); } catch { /* engine not built */ }
 
     // Stop libopenmpt playback if active — synchronous to avoid race with next play()
     if (this.useLibopenmptPlayback) {
