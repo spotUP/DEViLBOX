@@ -4,6 +4,7 @@
  * Reused, not rewritten: delay, reverb, mixerColor, vintageCharacter, addVinylSurface, paulaFilter (busEffects),
  * hp and npSum (refDsp). Constants mirrored from hiphop.py are emitted by gen_song_mix.py and asserted by the test.
  */
+import { pexp } from '@/engine/dj/scratch/portableMath';
 import { hp, npSum } from '@/engine/dj/scratch/refDsp';
 import {
   addVinylSurface, delay, masterBus, mixerColor, paulaFilter, reverb, vintageCharacter, type SamplerReverbKind,
@@ -55,7 +56,7 @@ export function activeRms(x: Signal, rate: number, floorDb = -40.0, frameSec = 0
   let top = fr[0]!;
   for (let k = 1; k < n; k++) if (fr[k]! > top) top = fr[k]!;
   if (top <= 1e-18) return 1e-12;
-  const thr = top * 10.0 ** (floorDb / 10.0);
+  const thr = top * pexp(floorDb / 10.0 * 2.302585092994046);
   const kept: number[] = [];
   for (let k = 0; k < n; k++) if (fr[k]! >= thr) kept.push(fr[k]!);
   return Math.sqrt(npSum(kept, 0, kept.length) / kept.length);
