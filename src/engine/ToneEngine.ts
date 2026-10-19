@@ -2671,6 +2671,14 @@ export class ToneEngine {
         if (config.synthType === 'SuperCollider') {
           console.log('[SC:ToneEngine] getInstrument default case — synthType:', config.synthType, 'SYNTH_REGISTRY.has:', SYNTH_REGISTRY.has(synthTypeStr), 'SynthRegistry.knows:', SynthRegistry.knows(synthTypeStr));
         }
+        // A lazy type whose loader has not run yet is unknown to the sync
+        // SynthRegistry.get, so InstrumentFactory would build a plain Tone.js
+        // Synth and the cache would keep it under this type's name for good.
+        // Start the loader and cache nothing; the next call gets the real synth.
+        if (!SYNTH_REGISTRY.has(synthTypeStr) && SynthRegistry.knows(synthTypeStr) && !SynthRegistry.get(synthTypeStr)) {
+          void SynthRegistry.ensure(synthTypeStr);
+          return null;
+        }
         if (SYNTH_REGISTRY.has(synthTypeStr) || SynthRegistry.knows(synthTypeStr)) {
           if (config.synthType === 'SuperCollider') {
             console.log('[SC:ToneEngine] creating SuperColliderSynth via InstrumentFactory...');
