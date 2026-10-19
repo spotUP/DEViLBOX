@@ -240,10 +240,14 @@ export function allpass(x: ArrayLike<number>, d: number, g: number): Float64Arra
   return out;
 }
 
-export type RefReverbKind = 'room' | 'plate';
-export const REF_REVERBS: Readonly<Record<RefReverbKind, { combs: ReadonlyArray<readonly [number, number]>; pre: number; damp: number }>> = {
+export type RefReverbKind = 'room' | 'plate' | 'hall' | 'gated' | 'spring';
+export interface RefReverbConfig { combs: ReadonlyArray<readonly [number, number]>; pre: number; damp: number; gate?: number; boing?: boolean }
+export const REF_REVERBS: Readonly<Record<RefReverbKind, RefReverbConfig>> = {
   room: { combs: [[0.030, 0.72], [0.037, 0.70], [0.041, 0.68], [0.044, 0.66]], pre: 0.005, damp: 0.2 },
   plate: { combs: [[0.022, 0.80], [0.029, 0.78], [0.034, 0.77], [0.038, 0.75]], pre: 0.002, damp: 0.1 },
+  hall: { combs: [[0.043, 0.84], [0.053, 0.83], [0.061, 0.82], [0.067, 0.81]], pre: 0.02, damp: 0.25 },
+  gated: { combs: [[0.025, 0.80], [0.031, 0.78], [0.037, 0.77]], pre: 0.0, damp: 0.2, gate: 0.18 },
+  spring: { combs: [[0.017, 0.82], [0.021, 0.80], [0.027, 0.78]], pre: 0.0, damp: 0.35, boing: true },
 };
 
 /** synth_dsp `reverb` (Schroeder): length len(x) + 0.12 s, (1 - mix) dry + mix wet. */
@@ -261,21 +265,42 @@ export function reverb(x: ArrayLike<number>, rate: number, kind: RefReverbKind, 
   for (let i = 0; i < n; i++) wet[i] = wet[i]! / cfg.combs.length;
   wet = allpass(wet, Math.trunc(0.005 * rate), 0.7);
   wet = allpass(wet, Math.trunc(0.0017 * rate), 0.7);
+  if (cfg.gate) {
+    const g = Math.trunc(cfg.gate * rate);
+    for (let i = g; i < n; i++) wet[i] = wet[i]! * 0.0;
+  }
+  if (cfg.boing) {
+    for (let i = 0; i < n; i++) {
+      const gate = Math.abs(wet[i]!) > 0.01 ? 1 : 0;
+      wet[i] = wet[i]! + 0.15 * Math.sin(2 * Math.PI * 40 * i / rate) * gate;
+    }
+  }
   const out = new Float64Array(n);
   for (let i = 0; i < n; i++) out[i] = (1 - mix) * (i < x.length ? x[i]! : 0) + mix * wet[i]!;
   return out;
 }
 
+export type SamplerReverbKind = 'small_room' | 'dark_room' | 'short_plate' | 'gated' | 'spring' | 'warehouse' | 'reverse';
+
 /**
- * sampler.py `reverb` kinds the scratch channel and the three-deck juggle bus use (small_room: X8): the input's
- * length, (1 - mix) x + mix wet.
+ * sampler.py `reverb` (every kind but lofi_digital, which runs the sampler radio profile): the input's
+ * length, (1 - mix) x + mix wet. An unknown kind is the small_room wet in Python; callers here name a kind.
  */
-export function samplerReverb(x: ArrayLike<number>, rate: number, kind: 'short_plate' | 'dark_room' | 'small_room', mix = 1.0): Float64Array {
-  const wet = kind === 'dark_room'
-    ? lp(reverb(x, rate, 'room', 1.0, 0.8), 2400, rate)
-    : kind === 'small_room'
-      ? hp(lp(reverb(x, rate, 'room', 1.0, 0.5), 5000, rate), 250, rate)
-      : hp(lp(reverb(x, rate, 'plate', 1.0, 0.7), 6000, rate), 350, rate);
+export function samplerReverb(x: ArrayLike<number>, rate: number, kind: SamplerReverbKind, mix = 1.0): Float64Array {
+  let wet: Float64Array;
+  switch (kind) {
+    case 'dark_room': wet = lp(reverb(x, rate, 'room', 1.0, 0.8), 2400, rate); break;
+    case 'short_plate': wet = hp(lp(reverb(x, rate, 'plate', 1.0, 0.7), 6000, rate), 350, rate); break;
+    case 'gated': wet = reverb(x, rate, 'gated', 1.0, 0.6); break;
+    case 'spring': wet = lp(hp(reverb(x, rate, 'spring', 1.0, 0.9), 300, rate), 3200, rate); break;
+    case 'warehouse': wet = lp(reverb(x, rate, 'hall', 1.0, 1.6), 4000, rate); break;
+    case 'reverse': {
+      const rev = Float64Array.from(x).reverse();
+      wet = lp(reverb(rev, rate, 'room', 1.0, 0.8).reverse(), 4500, rate);
+      break;
+    }
+    default: wet = hp(lp(reverb(x, rate, 'room', 1.0, 0.5), 5000, rate), 250, rate);
+  }
   const out = Float64Array.from(x);
   const n = Math.min(x.length, wet.length);
   for (let i = 0; i < n; i++) out[i] = (1 - mix) * out[i]! + mix * wet[i]!;
@@ -301,4 +326,42 @@ export function tapeDelay(x: ArrayLike<number>, rate: number, delaySec: number, 
   const out = new Float64Array(len);
   for (let i = 0; i < len; i++) out[i] = (1 - mix) * (i < n ? x[i]! : 0) + mix * buf[i]!;
   return out;
+}
+
+/** numpy's pairwise float64 sum (np.sum / np.mean over a contiguous array): the order its C loop adds in. */
+export function npSum(x: ArrayLike<number>, start = 0, n: number = x.length - start): number {
+  if (n < 8) { let r = 0; for (let i = 0; i < n; i++) r += x[start + i]!; return r; }
+  if (n <= 128) {
+    const r = new Array<number>(8);
+    for (let k = 0; k < 8; k++) r[k] = x[start + k]!;
+    let i = 8;
+    for (; i < n - (n % 8); i += 8) for (let k = 0; k < 8; k++) r[k] = r[k]! + x[start + i + k]!;
+    let res = ((r[0]! + r[1]!) + (r[2]! + r[3]!)) + ((r[4]! + r[5]!) + (r[6]! + r[7]!));
+    for (; i < n; i++) res += x[start + i]!;
+    return res;
+  }
+  let n2 = Math.trunc(n / 2);
+  n2 -= n2 % 8;
+  return npSum(x, start, n2) + npSum(x, start + n2, n - n2);
+}
+
+/**
+ * synth_dsp `_echo_line`: the delay line with a one-pole damp, tanh(sat v) and a 0.7 Hz sine wow (whole
+ * samples) in the feedback loop; without wow and sat it is the plain damped comb (`_comb_lti`).
+ */
+export function echoLine(x: ArrayLike<number>, d: number, fb: number, damp: number, sat: number, wowDepth: number, rate: number): Float64Array {
+  const n = x.length;
+  const buf = new Float64Array(n + Math.trunc(d * 6));
+  for (let i = 0; i < n; i++) buf[i] = x[i]!;
+  const len = n + Math.trunc(d * 4);
+  if (!wowDepth && !sat) return comb(buf, d, fb, damp).subarray(0, len);
+  let lpState = 0;
+  for (let i = d; i < buf.length; i++) {
+    const dd = d + (wowDepth ? Math.trunc(wowDepth * Math.sin(2 * Math.PI * 0.7 * i / rate)) : 0);
+    let v = i - dd >= 0 ? buf[i - dd]! : 0.0;
+    if (damp) { lpState = (1 - damp) * v + damp * lpState; v = lpState; }
+    if (sat) v = Math.tanh(sat * v);
+    buf[i] = buf[i]! + fb * v;
+  }
+  return buf.subarray(0, len);
 }

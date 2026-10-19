@@ -145,6 +145,15 @@ export const classicSynthEntries: Record<string, SynthInfo> = {
     icon: 'BarChart3',
     color: 'text-emerald-400',
   },
+  UpRoughSoftsynth: {
+    type: 'UpRoughSoftsynth',
+    name: 'Up Rough Softsynth',
+    shortName: 'Softsynth',
+    description: 'Up Rough demo-system voices: golden-era drum kit, 808 bass and piano',
+    bestFor: ['Hip-hop drums', '808 bass', 'Boom-bap piano', 'Demo-system parity'],
+    icon: 'Disc3',
+    color: 'text-amber-400',
+  },
   WobbleBass: {
     type: 'WobbleBass',
     name: 'Wobble Bass',

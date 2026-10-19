@@ -79,6 +79,7 @@ import {
   updateTB303Parameters as _updateTB303Parameters,
   updateFurnaceInstrument as _updateFurnaceInstrument,
   updateHarmonicSynthParameters as _updateHarmonicSynthParameters,
+  updateUpRoughSoftsynthParameters as _updateUpRoughSoftsynthParameters,
   getMAMESynthHandle as _getMAMESynthHandle,
   getMAMEChipSynth as _getMAMEChipSynth,
   updateMAMEParameters as _updateMAMEParameters,
@@ -5075,6 +5076,7 @@ export class ToneEngine {
   public updateWAMParameters(instrumentId: number, wamConfig: NonNullable<InstrumentConfig['wam']>): void { _updateWAMParameters(this._synthCtx, instrumentId, wamConfig); }
   public updateTB303Parameters(instrumentId: number, tb303Config: NonNullable<InstrumentConfig['tb303']>): void { _updateTB303Parameters(this._synthCtx, instrumentId, tb303Config); }
   public updateFurnaceInstrument(instrumentId: number, config: InstrumentConfig): void { _updateFurnaceInstrument(this._synthCtx, instrumentId, config); }
+  public updateUpRoughSoftsynthParameters(instrumentId: number, cfg: NonNullable<InstrumentConfig['upRoughSoftsynth']>): void { _updateUpRoughSoftsynthParameters(this._synthCtx, instrumentId, cfg); }
   public updateHarmonicSynthParameters(instrumentId: number, harmonicConfig: NonNullable<InstrumentConfig['harmonicSynth']>): void { _updateHarmonicSynthParameters(this._synthCtx, instrumentId, harmonicConfig); }
   public getMAMESynthHandle(instrumentId: number): number { return _getMAMESynthHandle(this._synthCtx, instrumentId); }
   public getMAMEChipSynth(instrumentId: number): MAMEBaseSynth | null { return _getMAMEChipSynth(this._synthCtx, instrumentId); }

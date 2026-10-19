@@ -16,6 +16,7 @@ import { FM_SYNTH_PRESETS } from './fmSynth';
 import { AM_SYNTH_PRESETS } from './amSynth';
 import { WOBBLE_BASS_PRESETS } from './wobbleBass';
 import { HARMONIC_SYNTH_PRESETS } from './harmonicSynth';
+import { UPROUGH_SOFTSYNTH_PRESETS } from './upRoughSoftsynth';
 import { SYNARE_PRESETS } from './synare';
 import { V2_PRESETS } from './v2';
 import { WAVETABLE_PRESETS } from './wavetable';
@@ -58,6 +59,8 @@ export function getPresetsForSynthType(synthType: SynthType): SynthPreset[] {
       return WOBBLE_BASS_PRESETS;
     case 'HarmonicSynth':
       return HARMONIC_SYNTH_PRESETS;
+    case 'UpRoughSoftsynth':
+      return UPROUGH_SOFTSYNTH_PRESETS;
     case 'Synare':
       return SYNARE_PRESETS;
     case 'V2':
@@ -94,6 +97,7 @@ export const ALL_PRESETS: Record<string, SynthPreset[]> = {
   ToneAM: AM_SYNTH_PRESETS,
   WobbleBass: WOBBLE_BASS_PRESETS,
   HarmonicSynth: HARMONIC_SYNTH_PRESETS,
+  UpRoughSoftsynth: UPROUGH_SOFTSYNTH_PRESETS,
   Synare: SYNARE_PRESETS,
   V2: V2_PRESETS,
   Wavetable: WAVETABLE_PRESETS,

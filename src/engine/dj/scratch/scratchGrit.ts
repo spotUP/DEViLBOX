@@ -133,7 +133,7 @@ export function demoResample(mono: ArrayLike<number>, srcRate: number, rate = TT
 }
 
 /** Python `Fraction(x).limit_denominator(maxDen)` as [numerator, denominator]. */
-function limitDenominator(x: number, maxDen: number): [number, number] {
+export function limitDenominator(x: number, maxDen: number): [number, number] {
   // the exact binary fraction of x, then the best rational with a denominator <= maxDen (CPython's algorithm)
   let [n, d] = exactFraction(x);
   if (d <= maxDen) return [n, d];

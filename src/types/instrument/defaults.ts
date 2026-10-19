@@ -31,6 +31,7 @@ import type {
   TB303Config,
   WavetableConfig,
   HarmonicSynthConfig,
+  UpRoughSoftsynthConfig,
   GranularConfig,
   SuperSawConfig,
   PolySynthConfig,
@@ -61,6 +62,8 @@ import type {
   DX7Config,
 } from './tonejs';
 import { VOWEL_FORMANTS } from './tonejs';
+import { voiceDefaults } from '@engine/uprough/softsynthVoice';
+import { bass808Voice } from '@engine/uprough/voices/bass808';
 import type {
   FurnaceConfig,
 } from './furnace';
@@ -247,6 +250,7 @@ export interface InstrumentConfig {
   tb303?: TB303Config;
   wavetable?: WavetableConfig;
   harmonicSynth?: HarmonicSynthConfig;
+  upRoughSoftsynth?: UpRoughSoftsynthConfig;
   granular?: GranularConfig;
   // New synth configs
   superSaw?: SuperSawConfig;
@@ -479,6 +483,12 @@ export const DEFAULT_ARPEGGIO: ArpeggioConfig = {
 
 /** Sawtooth harmonic series: 1/n */
 const SAW_HARMONICS = Array.from({ length: 32 }, (_, i) => 1 / (i + 1));
+
+export const DEFAULT_UPROUGH_SOFTSYNTH: UpRoughSoftsynthConfig = {
+  voice: 'bass808',
+  params: voiceDefaults(bass808Voice),
+  seed: 0,
+};
 
 export const DEFAULT_HARMONIC_SYNTH: HarmonicSynthConfig = {
   harmonics: SAW_HARMONICS,

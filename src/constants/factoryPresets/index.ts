@@ -197,6 +197,7 @@ const SHOWCASE_PRESETS: Record<string, string> = {
   PluckSynth: 'Trance Pluck',
   NoiseSynth: 'Riser',
   HarmonicSynth: 'Spectral Bell',
+  UpRoughSoftsynth: 'Golden Era 808 Bass',
   SpaceLaser: 'Cosmic Burst',
   DubSiren: 'Code Red',
   PolySynth: 'Poly Brass',

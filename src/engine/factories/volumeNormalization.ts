@@ -16,6 +16,7 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
   'NoiseSynth': 2,       // Measured: -4.7dB → target -10dB
   'PolySynth': 8,        // Measured: -10.3dB → on target
   'HarmonicSynth': -5,   // Measured: -5.5dB → target -10dB
+  'UpRoughSoftsynth': 0,
   // Custom synths (WASM and specialized engines) - recalibrated 2026-03-05
   'TB303': 1,            // Measured: 4.0dB → target -10dB
   'JC303': 1,            // Same engine as TB303
