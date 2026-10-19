@@ -11,12 +11,12 @@
  * connectChainOutput -> getInstrumentOutputDestination -> getChannelSynthLane
  * -> triggerAttack. The engine is a prototype instance over fake state; only
  * the audio context plumbing (safe time, per-voice nodes, channel strips, the
- * resampler worklet) is replaced.
+ * Signalsmith pitch shifter) is replaced.
  */
 import { describe, it, expect, vi } from 'vitest';
 import type { InstrumentConfig } from '@typedefs/instrument';
 
-const { FakeGain, FakeAudioNode, nativeOf, factory } = vi.hoisted(() => {
+const { FakeGain, FakeAudioNode, FakeShift, shifts, nativeOf, factory } = vi.hoisted(() => {
   const sharedContext = { state: 'running' };
   class Param {
     value: number;
@@ -40,9 +40,23 @@ const { FakeGain, FakeAudioNode, nativeOf, factory } = vi.hoisted(() => {
     disconnect(n?: unknown) { this.connections = n ? this.connections.filter((c) => c !== n) : []; }
     dispose() { /* fake */ }
   }
+  /** Stands in for DeckKeyLock: records the pitch it was asked for, passes audio straight through. */
+  class FakeShift {
+    input = new FakeGain();
+    output = new FakeGain();
+    active = false;
+    semitones = 0;
+    onLatencyChange: (() => void) | null = null;
+    constructor() { this.input.connect(this.output); shifts.push(this); }
+    setActive(active: boolean) { this.active = active; }
+    setPitchSemiTones(semitones: number) { this.semitones = semitones; }
+    latencySec() { return this.active ? 0.1 : 0; }
+    dispose() { /* fake */ }
+  }
+  const shifts: FakeShift[] = [];
   const nativeOf = (n: unknown) => (n as { native?: FakeAudioNode })?.native ?? ((n as FakeAudioNode)?.connect ? n : null);
   const factory = { createInstrument: vi.fn(), createEffect: vi.fn() };
-  return { FakeGain, FakeAudioNode, nativeOf, factory };
+  return { FakeGain, FakeAudioNode, FakeShift, shifts, nativeOf, factory };
 });
 
 vi.mock('tone', async (importOriginal) => {
@@ -53,6 +67,7 @@ vi.mock('@utils/audio-context', async (importOriginal) => {
   const orig = await importOriginal<typeof import('@utils/audio-context')>();
   return { ...orig, getNativeAudioNode: nativeOf };
 });
+vi.mock('../dj/DeckKeyLock', () => ({ DeckKeyLock: FakeShift }));
 vi.mock('@/engine/InstrumentFactory', () => ({ InstrumentFactory: factory }));
 vi.mock('@/engine/InstrumentAnalyser', () => ({ InstrumentAnalyser: class {} }));
 vi.mock('@/engine/ChannelFilterManager', () => {
@@ -82,17 +97,6 @@ function fakeInstrument() {
   return { output, triggerAttack: vi.fn(), triggerRelease: vi.fn(), dispose: vi.fn() };
 }
 
-function fakeResampler() {
-  const node = {
-    connections: [] as unknown[],
-    messages: [] as { type: string; rate?: number }[],
-    port: { postMessage(m: { type: string; rate?: number }) { node.messages.push(m); } },
-    connect(n: unknown) { node.connections.push(n); },
-    disconnect() { node.connections = []; },
-  };
-  return node;
-}
-
 /** Depth-first: does `from` reach `to` over fake connections (Tone or native)? */
 function reaches(from: unknown, to: unknown, seen = new Set<unknown>()): boolean {
   if (from === to) return true;
@@ -105,8 +109,25 @@ function reaches(from: unknown, to: unknown, seen = new Set<unknown>()): boolean
 
 /** A ToneEngine over fake state: real prototype methods, fake audio plumbing. */
 function makeEngine() {
+  shifts.length = 0;
+  // Strips keyed by channel: the lane enters at `join`, after the voice delay.
   const strips = new Map<number, FakeGainNode>();
-  const resamplers: ReturnType<typeof fakeResampler>[] = [];
+  type Strip = { input: FakeGainNode; voiceDelay: { delayTime: { value: number } }; join: FakeGainNode; channel: FakeGainNode; meter: FakeGainNode };
+  const stripFor = (ch: number) => {
+    let join = strips.get(ch);
+    if (!join) {
+      join = new FakeGain();
+      strips.set(ch, join);
+      Map.prototype.set.call(channelOutputs, ch, { input: new FakeGain(), voiceDelay: { delayTime: { value: 0 } }, join, channel: new FakeGain(), meter: new FakeGain() });
+    }
+    return join;
+  };
+  // Strips build on first touch, as the real getChannelOutput does, but out of fakes.
+  const channelOutputs = new (class extends Map<number, Strip> {
+    override has(ch: number) { stripFor(ch); return true; }
+    override get(ch: number) { stripFor(ch); return super.get(ch); }
+  })();
+  const synthBusPitchShift = new FakeShift();
   const state = {
     instruments: new Map(),
     instrumentSynthTypes: new Map(),
@@ -138,16 +159,13 @@ function makeEngine() {
     getSafeTime: () => 0,
     stopVoice: () => { /* no voices to stop */ },
     createVoice: (_ch: number, instrument: unknown, note: string) => ({ instrument, note, nodes: { gain: new FakeGain() }, fadeoutStep: 0 }),
-    getChannelOutput: (ch: number) => {
-      let s = strips.get(ch);
-      if (!s) { s = new FakeGain(); strips.set(ch, s); }
-      return s;
-    },
-    ensurePitchResamplerModule: () => Promise.resolve(),
-    createPitchResamplerNode: () => { const r = fakeResampler(); resamplers.push(r); return r; },
+    getChannelOutput: stripFor,
+    synthBusPitchShift,
   };
   const engine = Object.assign(Object.create(ToneEngine.prototype), state) as ToneEngine;
-  return { engine, state, strips, resamplers };
+  // The real `_channelCtx` getter needs the whole engine; the lane only needs the strip table.
+  Object.defineProperty(engine, '_channelCtx', { value: { channelOutputs, getChannelOutput: stripFor }, configurable: true });
+  return { engine, state, strips, channelOutputs, synthBusPitchShift, stripFor };
 }
 
 const tb303 = (id: number): InstrumentConfig => ({ id, name: 'acid', synthType: 'TB303', effects: [] } as unknown as InstrumentConfig);
@@ -179,7 +197,7 @@ describe('per-channel native synth routing (TB303 on tracker channel 3)', () => 
     const chain = state.instrumentEffectChains.get(key(7, 3)) as { output: FakeGainNode };
     expect(chain).toBeDefined();
     expect(reaches(instruments[0].output, chain.output.native)).toBe(true);
-    const lane = state.channelSynthLanes.get(3) as { gain: FakeGainNode; resampler: ReturnType<typeof fakeResampler> | null };
+    const lane = state.channelSynthLanes.get(3) as { gain: FakeGainNode; shift: InstanceType<typeof FakeShift> };
     expect(lane).toBeDefined();
     expect(chain.output.connections).toContain(lane.gain);
     expect(reaches(instruments[0].output, strips.get(3)!.native)).toBe(true);
@@ -203,21 +221,33 @@ describe('per-channel native synth routing (TB303 on tracker channel 3)', () => 
   it('lane follows the synth bus gain and the DJ pitch rate', async () => {
     factory.createInstrument.mockReset();
     factory.createInstrument.mockImplementation(fakeInstrument);
-    const { engine, state, resamplers } = makeEngine();
+    const { engine, state, channelOutputs, synthBusPitchShift } = makeEngine();
 
     engine.triggerNote(7, 'C4', 0, 0, 1, tb303(7), false, false, 3);
     await state.pendingEffectChains.get(key(7, 3));
     await flush();
-    const lane = state.channelSynthLanes.get(3) as { gain: FakeGainNode; resampler: ReturnType<typeof fakeResampler> | null };
+    const lane = state.channelSynthLanes.get(3) as { gain: FakeGainNode; shift: InstanceType<typeof FakeShift> };
 
     engine.setSynthBusGain(-6);
     expect(state.synthBus.gain.value).toBeCloseTo(Math.pow(10, -6 / 20), 6);
     expect(lane.gain.gain.value).toBeCloseTo(Math.pow(10, -6 / 20), 6);
 
-    expect(resamplers).toHaveLength(1);
-    expect(lane.resampler).toBe(resamplers[0]);
+    // One shifter per lane (plus the synth-bus one), inert at pitch 0.
+    expect(shifts).toHaveLength(2);
+    expect(lane.shift).toBe(shifts[1]);
+    expect(lane.shift.active).toBe(false);
+
+    // Pitch -12: the lane shifts by -12 semitones and the strip's voices wait out the bus shifter's latency.
     engine.setSynthBusPitchRate(0.5);
-    expect(resamplers[0].messages).toContainEqual({ type: 'set-rate', rate: 0.5 });
+    expect(lane.shift.active).toBe(true);
+    expect(lane.shift.semitones).toBeCloseTo(-12, 6);
+    expect(synthBusPitchShift.semitones).toBeCloseTo(-12, 6);
+    expect(channelOutputs.get(3)!.voiceDelay.delayTime.value).toBeCloseTo(0.1, 6);
+
+    // Back to pitch 0: direct wire, no delay.
+    engine.setSynthBusPitchRate(1);
+    expect(lane.shift.active).toBe(false);
+    expect(channelOutputs.get(3)!.voiceDelay.delayTime.value).toBe(0);
   });
 
   it('keeps pooled chip synths and live-voice channels on the shared instance into synthBus', async () => {

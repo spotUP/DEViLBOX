@@ -65,6 +65,13 @@ export class DeckKeyLock {
 
   private static moduleLoads = new Map<BaseAudioContext, Promise<CreateStretchNode>>();
 
+  /**
+   * Called after every rewire, i.e. whenever latencySec() may have changed:
+   * on engage, on bypass, and when the stretcher finishes loading after the
+   * caller already engaged. ToneEngine refreshes its delay compensation here.
+   */
+  public onLatencyChange: (() => void) | null = null;
+
   constructor() {
     this.input = new Tone.Gain(1);
     this.output = new Tone.Gain(1);
@@ -149,6 +156,7 @@ export class DeckKeyLock {
       this.input.connect(this.bypassGain);
       this.bypassGain.connect(this.output);
     }
+    this.onLatencyChange?.();
   }
 
   private async _initStretcher(): Promise<void> {
