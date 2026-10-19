@@ -45,4 +45,34 @@ describe('Preview Up Rough Song from the hamburger menu', () => {
     expect(JSON.parse((posts[0]![1] as RequestInit).body as string)).toEqual({ song: exported });
     expect(Array.from(new Uint8Array((vi.mocked(playAudition).mock.calls[0]![0])))).toEqual([82, 73, 70, 70]);
   });
+
+  it('a second click cancels the render still in flight, so only the newest render plays', async () => {
+    vi.mocked(playAudition).mockClear();
+    const signals: (AbortSignal | undefined)[] = [];
+    let releaseFirst: (r: Response) => void = () => undefined;
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+      if (_url !== '/api/uprough/render') return Promise.resolve(new Response('{}', { status: 200 }));
+      signals.push(init?.signal ?? undefined);
+      if (signals.length === 1) return new Promise<Response>((resolve) => { releaseFirst = resolve; });
+      return Promise.resolve(new Response(new Uint8Array([2]).buffer, { status: 200 }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await useTrackerStore.getState().importUpRoughSong(JSON.stringify(fixture));
+
+    const { container } = render(<FT2Toolbar />);
+    const burger = container.querySelector('svg.lucide-menu')?.closest('button');
+    if (!burger) throw new Error('no hamburger button');
+    fireEvent.click(burger);
+    fireEvent.click(await screen.findByText('Preview Up Rough Song'));
+    await waitFor(() => expect(signals).toHaveLength(1));
+    fireEvent.click(burger);
+    fireEvent.click(await screen.findByText('Preview Up Rough Song'));
+    await waitFor(() => expect(playAudition).toHaveBeenCalledTimes(1));
+
+    expect(signals[0]?.aborted).toBe(true);
+    releaseFirst(new Response(new Uint8Array([1]).buffer, { status: 200 }));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(playAudition).toHaveBeenCalledTimes(1);
+    expect(Array.from(new Uint8Array(vi.mocked(playAudition).mock.calls[0]![0]))).toEqual([2]);
+  });
 });
