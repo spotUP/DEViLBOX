@@ -2,7 +2,7 @@
  * The Up Rough demo system's DSP primitives, ported to the sample (scratch null test, owner 2026-10-12:
  * "make the demo and devilbox scratch 1:1"). Each function is the reference's own math in float64:
  *
- *   butter / lfilter   scipy.signal.butter (zpk -> bilinear with fs = 2 -> tf) and lfilter (transposed
+ *   butter / lfilter   portable_iir.butter (scipy zpk -> bilinear fs = 2 -> tf, machine-independent) and lfilter (transposed
  *                      direct form II, the order scipy's C loop sums in) - synth_dsp.py lp / hp / bp
  *   firwin / resamplePoly   scipy.signal.firwin (Kaiser 5.0) and resample_poly (upfirdn, its padding and
  *                      trim) - synth_dsp.py resample_ratio, the bank's loader
@@ -13,97 +13,14 @@
  * per sample; these whole-array versions are the record loader's and the tests'.
  */
 
-// ── complex arithmetic (the zpk design) ──────────────────────────────────
+import { portableButter, type PortableBa } from './portableIir';
 
-type C = readonly [re: number, im: number];
-const cadd = (a: C, b: C): C => [a[0] + b[0], a[1] + b[1]];
-const csub = (a: C, b: C): C => [a[0] - b[0], a[1] - b[1]];
-const cmul = (a: C, b: C): C => [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]];
-const cscale = (a: C, k: number): C => [a[0] * k, a[1] * k];
-function cdiv(a: C, b: C): C {
-  // numpy complex division (Smith's algorithm, as npymath does)
-  const [ar, ai] = a, [br, bi] = b;
-  const abs_br = Math.abs(br), abs_bi = Math.abs(bi);
-  if (abs_br >= abs_bi) {
-    if (abs_br === 0 && abs_bi === 0) return [ar / abs_br, ai / abs_bi];
-    const rat = bi / br, scl = 1.0 / (br + bi * rat);
-    return [(ar + ai * rat) * scl, (ai - ar * rat) * scl];
-  }
-  const rat = br / bi, scl = 1.0 / (bi + br * rat);
-  return [(ar * rat + ai) * scl, (ai * rat - ar) * scl];
-}
-function csqrt(a: C): C {
-  // principal branch (npymath csqrt)
-  const [re, im] = a;
-  if (re === 0 && im === 0) return [0, im];
-  const t = Math.sqrt((Math.abs(re) + Math.hypot(re, im)) * 0.5);
-  if (re >= 0) return [t, im / (2 * t)];
-  return [Math.abs(im) / (2 * t), im >= 0 ? t : -t];
-}
+export type Ba = PortableBa;
 
-/** numpy.poly: the monic polynomial with these roots (convolution in root order), real part. */
-function poly(roots: readonly C[]): number[] {
-  let a: C[] = [[1, 0]];
-  for (const r of roots) {
-    const next: C[] = new Array(a.length + 1).fill(null).map(() => [0, 0] as C);
-    for (let i = 0; i < a.length; i++) {
-      next[i] = cadd(next[i]!, a[i]!);
-      next[i + 1] = csub(next[i + 1]!, cmul(a[i]!, r));
-    }
-    a = next;
-  }
-  return a.map((c) => c[0]);
-}
-
-const cprod = (xs: readonly C[]): C => xs.reduce<C>((p, x) => cmul(p, x), [1, 0]);
-
-export interface Ba { b: number[]; a: number[] }
-
-/** scipy.signal.butter(N, Wn, btype) for digital filters (fs = 2, Wn relative to Nyquist). */
-export function butter(N: number, Wn: number | readonly [number, number], btype: 'low' | 'high' | 'band'): Ba {
-  // buttap: p = -exp(1j * pi * arange(-N + 1, N, 2) / (2 N)), k = 1
-  const p0: C[] = [];
-  for (let m = -N + 1; m < N; m += 2) {
-    const th = Math.PI * m / (2 * N);
-    p0.push([-Math.cos(th), -Math.sin(th)]);
-  }
-  const fs = 2.0;
-  const warp = (w: number) => 2 * fs * Math.tan(Math.PI * w / fs);
-  let z: C[] = [], p: C[], k: number;
-  if (btype === 'low') {
-    const wo = warp(Wn as number);
-    p = p0.map((x) => cscale(x, wo));
-    k = wo ** N;
-  } else if (btype === 'high') {
-    const wo = warp(Wn as number);
-    p = p0.map((x) => cdiv([wo, 0], x));
-    z = Array.from({ length: N }, () => [0, 0] as C);
-    // k * real(prod(-z) / prod(-p)) with z empty: 1 / real(prod(-p))
-    const pp = cprod(p0.map((x) => cscale(x, -1)));
-    k = cdiv([1, 0], pp)[0];
-  } else {
-    const [w1, w2] = Wn as readonly [number, number];
-    const lo = warp(w1), hi = warp(w2);
-    const bw = hi - lo, wo = Math.sqrt(lo * hi);
-    const pl = p0.map((x) => cscale(x, bw / 2));
-    const plus: C[] = [], minus: C[] = [];
-    for (const x of pl) {
-      const s = csqrt(csub(cmul(x, x), [wo * wo, 0]));
-      plus.push(cadd(x, s)); minus.push(csub(x, s));
-    }
-    p = [...plus, ...minus];
-    z = Array.from({ length: N }, () => [0, 0] as C);
-    k = bw ** N;
-  }
-  // bilinear_zpk, fs2 = 2 fs
-  const fs2: C = [2 * fs, 0];
-  const degree = p.length - z.length;
-  const zz = z.map((x) => cdiv(cadd(fs2, x), csub(fs2, x)));
-  for (let i = 0; i < degree; i++) zz.push([-1, 0]);
-  const pz = p.map((x) => cdiv(cadd(fs2, x), csub(fs2, x)));
-  const kz = k * cdiv(cprod(z.map((x) => csub(fs2, x))), cprod(p.map((x) => csub(fs2, x))))[0];
-  return { b: poly(zz).map((v) => v * kz), a: poly(pz) };
-}
+/** scipy.signal.butter(N, Wn, btype) for digital filters (fs = 2, Wn relative to Nyquist), designed the
+ * way the reference designs it: portable_iir.butter (musl tan / sin / cos kernels, fixed complex formulas),
+ * so the coefficients are the Python's bits on every machine. */
+export const butter = portableButter;
 
 /** synth_dsp `_norm`: a corner (Hz) relative to Nyquist, clamped to [0.001, 0.99]. */
 export const normFc = (fc: number, rate: number) => Math.min(0.99, Math.max(0.001, fc / (rate / 2.0)));

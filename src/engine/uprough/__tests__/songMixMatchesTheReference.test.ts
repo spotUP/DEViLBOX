@@ -33,12 +33,11 @@ const MIXED = Float64Array.from(LOUD, (_, i) => (LOUD[i]! + lane('bass')[i]! + l
 /** Looser bounds than 1e-9, with the reason. Empty when every case holds the default bound. */
 const TOLERANCE: Record<string, number> = {};
 /**
- * The final int8 stage is a noise-shaped quantiser (error feedback, 2 e1 - e2): the texture chain's ~1e-10 drift from
- * Python flips a rounding tie and the feedback carries it, so a few percent of samples land one or two LSB (1/127) away.
- * The quantiser itself is exact: it is also fed Python's own textured signal and must then match to 1e-9.
+ * The final int8 stage is a noise-shaped quantiser (error feedback, 2 e1 - e2): any drift in the texture chain flips a
+ * rounding tie and the feedback carries it. Since both sides design their Butterworth filters through portable_iir
+ * (musl tan / sin / cos kernels, fixed op order) the drift is gone and the track must be int8-identical to Python:
+ * not one sample may land on a different step (owner rule: exported files are 1:1 on device).
  */
-const LSB = 1 / 127;
-const MAX_LSB_MISMATCH_FRACTION = 0.1;
 
 function check(label: string, y: ArrayLike<number>, r: Out, bound: number): number {
   expect(y.length, label).toBe(r.length);
@@ -126,10 +125,9 @@ describe('song mix matches the Python reference', () => {
           let bad = 0;
           c.samples!.forEach((v, k) => {
             const d = Math.abs(final[k * ref.keep]! - v);
-            expect(d, label).toBeLessThanOrEqual(2 * LSB + 1e-9);
             if (d > bound) bad++;
           });
-          expect(bad / c.samples!.length, `${label} LSB mismatch fraction`).toBeLessThan(MAX_LSB_MISMATCH_FRACTION);
+          expect(bad, `${label} samples on a different int8 step`).toBe(0);
           // the master stage alone, fed Python's textured signal: exact
           const m = bus.masterBus(Float64Array.from(c.texturedAll!), {}, RATE);
           check(`${label}.master`, Float64Array.from(m, (v) => v / 127.0), c as Out, bound);
