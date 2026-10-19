@@ -214,8 +214,15 @@ export const VOLUME_NORMALIZATION_OFFSETS: Record<string, number> = {
  * Get the normalized volume for a synth type
  * Applies synth-specific offset to achieve consistent output levels
  */
+/**
+ * Config volume a new instrument starts at. Every offset above was measured
+ * against this value, so every path that makes a default instrument config
+ * must use it (getInitialConfig, createDefaultInstrument).
+ */
+export const DEFAULT_INSTRUMENT_VOLUME_DB = -12;
+
 export function getNormalizedVolume(synthType: string, configVolume: number | undefined): number {
-  const baseVolume = configVolume ?? -12;
+  const baseVolume = configVolume ?? DEFAULT_INSTRUMENT_VOLUME_DB;
   const offset = VOLUME_NORMALIZATION_OFFSETS[synthType] ?? 0;
   return baseVolume + offset;
 }
