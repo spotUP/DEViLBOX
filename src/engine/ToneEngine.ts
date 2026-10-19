@@ -71,7 +71,7 @@ import { SynthRegistry } from './registry/SynthRegistry';
 import { VoiceAllocator } from './audio/VoiceAllocator';
 import { getSendBusManager } from './SendBusManager';
 import { getNormalizedVolume } from './factories/volumeNormalization';
-import { setInstrumentVolumeOn } from './instrumentOutputLevel';
+import { setInstrumentVolumeOn, restoreInstrumentOutputGain, fadeOutThenRestoreInstrumentOutput } from './instrumentOutputLevel';
 
 // Extracted modules
 import { applyEffectParametersDiff as _applyEffectParamsDiff, applyBpmSyncedParam as _applyBpmSyncedParam } from './tone/EffectParameterEngine';
@@ -4073,7 +4073,7 @@ export class ToneEngine {
           // Safety: ensure DevilboxSynth output gain isn't stuck at 0
           if (isDevilboxSynth(voiceNode)) {
             const gain = (voiceNode.output as GainNode).gain;
-            if (gain.value === 0) { gain.cancelScheduledValues(0); gain.value = 1; }
+            if (gain.value === 0) restoreInstrumentOutputGain(voiceNode, gain);
           }
           // Set chip channel on FurnaceSynth before triggering (for multi-channel tracker playback)
           if (voiceNode instanceof FurnaceSynth && channelIndex !== undefined) {
@@ -4129,10 +4129,7 @@ export class ToneEngine {
     // (can happen if releaseAll gain-restore races with instrument disposal/recreation)
     if (isDevilboxSynth(instrument)) {
       const gain = (instrument.output as GainNode).gain;
-      if (gain.value === 0) {
-        gain.cancelScheduledValues(0);
-        gain.value = 1;
-      }
+      if (gain.value === 0) restoreInstrumentOutputGain(instrument, gain);
     }
 
     try {
@@ -4550,19 +4547,11 @@ export class ToneEngine {
           // double-releaseAll captures gain=0 and permanently silences the instrument
           const prevTimeout = this.releaseRestoreTimeouts.get(key);
           if (prevTimeout) clearTimeout(prevTimeout);
-          outputGain.cancelScheduledValues(now);
-          outputGain.setValueAtTime(outputGain.value || 1, now);
-          outputGain.linearRampToValueAtTime(0, now + 0.05);
-          // Always restore to 1.0 — DevilboxSynth output GainNode is a pass-through
-          const timeout = setTimeout(() => {
+          // The output gain carries the instrument's volume (instrumentOutputLevel.ts):
+          // the restore goes back to that level, never to unity.
+          const timeout = fadeOutThenRestoreInstrumentOutput(instrument, outputGain, now, () => {
             this.releaseRestoreTimeouts.delete(key);
-            try {
-              outputGain.cancelScheduledValues(0);
-              outputGain.value = 1;
-            } catch {
-              // Instrument may be disposed
-            }
-          }, 100);
+          });
           this.releaseRestoreTimeouts.set(key, timeout);
         }
       } catch (e) {
