@@ -6,6 +6,8 @@ import { InstrumentFactory } from '../InstrumentFactory';
 import { InstrumentAnalyser } from '../InstrumentAnalyser';
 import { getChannelFilterManager } from '../ChannelFilterManager';
 import { connectAudio } from './connectAudio';
+import type { VoiceState } from './ChannelRouting';
+import { LIVE_VOICE_BASE_CHANNEL } from '../furnace-dispatch/chipChannel';
 
 // Channel indices 1000+ are reserved for native synth global filters,
 // avoiding collision with per-channel voice indices (0-63).
@@ -21,6 +23,8 @@ export interface InstrumentEffectsContext {
   instrumentAnalysers: Map<number, InstrumentAnalyser>;
   instrumentOutputOverrides: Map<number, Tone.ToneAudioNode>;
   instruments: Map<number, Tone.ToneAudioNode | DevilboxSynth>;
+  /** Sounding voices per tracker channel (ToneEngine.activeVoices). */
+  activeVoices: Map<number, VoiceState[]>;
   masterInput: Tone.Gain;
   synthBus: Tone.Gain;
   connectNativeSynth: (output: AudioNode, destination: Tone.ToneAudioNode) => void;
@@ -69,12 +73,38 @@ function connectToDestWithFilter(
   }
 }
 
+/** A tracker channel (pattern playback), as opposed to the shared -1 instance or a live-voice channel. */
+export function isTrackerChannel(channelIndex: number): boolean {
+  return channelIndex >= 0 && channelIndex < LIVE_VOICE_BASE_CHANNEL;
+}
+
 /**
- * Route a built chain's output. The destination comes from the key's channel
+ * Feed a tracker-channel voice's gain from `source` (the instrument's chain
+ * output, or the voice node itself when the chain is not built yet). The
+ * previous source edge is dropped so a voice never carries two copies.
+ */
+export function attachVoiceSource(voice: VoiceState, source: Tone.ToneAudioNode): void {
+  if (voice.nodes.source && voice.nodes.source !== source) {
+    try { voice.nodes.source.disconnect(voice.nodes.gain); } catch { /* not connected */ }
+  }
+  source.connect(voice.nodes.gain);
+  voice.nodes.source = source;
+}
+
+/**
+ * Route a built chain's output.
+ *
+ * A Tone.js instrument on a tracker channel reaches master only through its
+ * channel strip: chain output -> voice gain (velocity, column effects, pan)
+ * -> strip (fader, mute, solo, channel effects). It gets no static
+ * destination here; triggerNoteAttack attaches each new voice, and a rebuilt
+ * chain re-attaches the voices already sounding. (Before this, the chain also
+ * fed masterInput directly: a second, unscaled copy that bypassed the strip
+ * and drove the safety limiter into pumping.)
+ *
+ * Every other key gets its destination from getInstrumentOutputDestination
  * (per-channel native lane, synthBus or masterInput, or an output override).
- * An open instrument analyser is in series for Tone.js instruments (one
- * destination per instrument) and a parallel tap for native ones, whose
- * instances can have different destinations.
+ * An open instrument analyser is always a parallel tap.
  */
 export function connectChainOutput(
   ctx: InstrumentEffectsContext,
@@ -84,13 +114,16 @@ export function connectChainOutput(
 ): void {
   const instrumentId = key >>> 16;
   const channelIndex = ctx.channelFromKey(key);
-  const activeAnalyser = ctx.instrumentAnalysers.get(instrumentId);
-  if (activeAnalyser && !isNative) {
-    output.connect(activeAnalyser.input);
-    return;
+  if (!isNative && isTrackerChannel(channelIndex)) {
+    const instrument = ctx.instruments.get(key);
+    for (const voice of ctx.activeVoices.get(channelIndex) ?? []) {
+      if (voice.instrument === instrument) attachVoiceSource(voice, output);
+    }
+  } else {
+    const dest = ctx.getInstrumentOutputDestination(instrumentId, isNative, channelIndex);
+    connectToDestWithFilter(output, dest, isNative, instrumentId, channelIndex);
   }
-  const dest = ctx.getInstrumentOutputDestination(instrumentId, isNative, channelIndex);
-  connectToDestWithFilter(output, dest, isNative, instrumentId, channelIndex);
+  const activeAnalyser = ctx.instrumentAnalysers.get(instrumentId);
   if (activeAnalyser) connectAudio(output, activeAnalyser.input);
 }
 

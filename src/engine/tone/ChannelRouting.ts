@@ -24,6 +24,8 @@ export interface VoiceState {
     gain: Tone.Gain;
     filter: Tone.Filter | AudioWorkletNode;
     panner: Tone.Panner;
+    /** Tone.js node feeding `gain` (chain output or the voice node); dropped when the voice stops. */
+    source?: Tone.ToneAudioNode;
   };
 }
 
@@ -350,6 +352,10 @@ export function stopVoice(voice: VoiceState, time: number): void {
 
   // Dispose nodes after a short delay to allow for audio tail/clipping prevention
   setTimeout(() => {
+    // Drop the inbound edge first: a GainNode that still has a connected
+    // source stays alive in the graph after dispose() (which only disconnects
+    // its outputs), so every stopped voice would keep processing.
+    try { voice.nodes.source?.disconnect(voice.nodes.gain); } catch { /* not connected */ }
     voice.nodes.gain.dispose();
     if (typeof (voice.nodes.filter as any).dispose === 'function') (voice.nodes.filter as any).dispose();
     voice.nodes.panner.dispose();
