@@ -76,13 +76,18 @@ export class ModularSynth implements DevilboxSynth {
    * Trigger a note on (allocate voice and gate on)
    */
   triggerAttack(note: number, time: number = this.ctx.currentTime, velocity: number = 1): void {
-    // Find free voice or steal oldest
-    let voice = this.voices.find((v) => !v.isActive);
+    // The same note again retriggers its own voice; otherwise the free voice released longest ago; otherwise
+    // steal the oldest held note.
+    let voice = this.activeVoices.get(note);
+    if (voice) {
+      this.activeVoices.delete(note);
+    } else {
+      voice = this.voices.filter((v) => !v.isActive).sort((a, b) => a.releasedAt - b.releasedAt)[0];
+    }
     if (!voice) {
-      // Voice stealing: steal the oldest active voice
-      const oldestNote = Array.from(this.activeVoices.keys())[0];
-      voice = this.activeVoices.get(oldestNote);
-      if (voice) {
+      const oldestNote = this.activeVoices.keys().next().value;
+      if (oldestNote !== undefined) {
+        voice = this.activeVoices.get(oldestNote);
         this.activeVoices.delete(oldestNote);
       }
     }
