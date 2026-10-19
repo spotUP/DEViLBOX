@@ -5,6 +5,7 @@
  */
 
 import { getFirstPresetForSynthType } from '@constants/factoryPresets';
+import { catalogSynthConfig } from '@constants/synthCategories';
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
 import { cinter4ParamsToSampleName } from '@lib/import/formats/cinter4Params';
 import {
@@ -24,7 +25,12 @@ import { DEFAULT_OIDOS_INSTRUMENT } from '@typedefs/oidosInstrument';
 import { DEFAULT_WAVESABRE_INSTRUMENT } from '@typedefs/wavesabreInstrument';
 
 /** Mutates `instrument` (an immer draft or a plain config) as a switch to `newType` does. */
-export function applySynthTypeDefaults(instrument: InstrumentConfig, newType: SynthType, isPresetLoad: boolean): void {
+export function applySynthTypeDefaults(instrument: InstrumentConfig, pickedType: SynthType, isPresetLoad: boolean): void {
+  // A catalog variant key (WaveSabreSlaughter) becomes its engine type plus the variant marker
+  const catalog = catalogSynthConfig(pickedType);
+  Object.assign(instrument, catalog);
+  const newType = catalog.synthType;
+
   // Auto-initialize furnace config when synthType changes to a Furnace type
   // BUT skip this when loading a preset — the preset already provides
   // the correct furnace config with its unique c64/gb/etc. chip data.

@@ -2,7 +2,7 @@
  * Helper functions and utilities for synth categories
  */
 
-import type { SynthType } from '@typedefs/instrument';
+import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import type { SynthInfo, SynthCategory } from './types';
 import { SYNTH_INFO } from './synthInfo';
 import { SYNTH_CATEGORIES } from './categories';
@@ -21,6 +21,24 @@ export function getCategoryForSynth(synthType: SynthType): SynthCategory | undef
 const UNKNOWN_SYNTH_INFO: SynthInfo = { type: 'Synth' as any, name: 'Unknown', shortName: '???', description: '', bestFor: [], icon: 'Music2', color: 'text-text-secondary' };
 export function getSynthInfo(synthType: SynthType): SynthInfo {
   return SYNTH_INFO[synthType] ?? UNKNOWN_SYNTH_INFO;
+}
+
+/**
+ * The instrument fields a pick from the synth catalog sets. Most catalog keys are
+ * the engine synthType itself; a variant key (WaveSabreSlaughter) names its engine
+ * type in `info.type` and selects the variant through `info.defaultConfig`.
+ */
+export function catalogSynthConfig(key: SynthType): Partial<InstrumentConfig> & { synthType: SynthType } {
+  const info = SYNTH_INFO[key];
+  if (!info) return { synthType: key };
+  return { ...info.defaultConfig, synthType: info.type };
+}
+
+/** True when `instrument` is what picking catalog `key` produces (variant marker included). */
+export function catalogKeyMatches(key: SynthType, instrument: Pick<InstrumentConfig, 'synthType' | 'xrns'>): boolean {
+  if (catalogSynthConfig(key).synthType !== instrument.synthType) return false;
+  const variant = SYNTH_INFO[key]?.defaultConfig?.xrns?.synthType;
+  return !variant || instrument.xrns?.synthType === variant;
 }
 
 // Map Tailwind color classes to CSS hex values

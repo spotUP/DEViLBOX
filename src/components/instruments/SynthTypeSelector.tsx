@@ -8,7 +8,7 @@ import * as LucideIcons from 'lucide-react';
 import { Search, X } from 'lucide-react';
 import type { InstrumentConfig, SynthType } from '../../types/instrument';
 import { useInstrumentStore } from '../../stores';
-import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
+import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo, catalogKeyMatches } from '@constants/synthCategories';
 import { getDefaultSonixParams, readSonixSynthParams } from '@engine/sonix/sonixInstrument';
 
 interface SynthTypeSelectorProps {
@@ -92,7 +92,7 @@ export const SynthTypeSelector: React.FC<SynthTypeSelectorProps> = ({ instrument
           <SynthGridItem
             key={synthType}
             synthType={synthType}
-            isActive={instrument.synthType === synthType}
+            isActive={catalogKeyMatches(synthType, instrument)}
             onSelect={handleTypeChange}
           />
         ))}
