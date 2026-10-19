@@ -551,13 +551,21 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     }
   };
 
+  // One audition at a time: a new click cancels the render still in flight.
+  const previewAbortRef = useRef<AbortController | null>(null);
   const handlePreviewUpRoughSong = async () => {
+    previewAbortRef.current?.abort();
+    const ac = new AbortController();
+    previewAbortRef.current = ac;
     stopAudition();
     try {
       const text = useTrackerStore.getState().exportUpRoughSong();
       notify.info('Rendering with the Up Rough synth, this can take up to a minute...');
-      await playAudition(await renderSong(text));
+      const wav = await renderSong(text, ac.signal);
+      if (ac.signal.aborted) return;
+      await playAudition(wav);
     } catch (e) {
+      if (ac.signal.aborted) return;
       notify.error(e instanceof Error ? e.message : String(e));
     }
   };
