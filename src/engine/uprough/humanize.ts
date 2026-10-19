@@ -11,6 +11,7 @@
  * `humanizeSeed(seed, hit) = seed*2311 + hit*17`. Every trigger of a humanizing voice increments the
  * counter, so two triggers of the same note differ, while the same (seed, counter) is reproducible.
  */
+import { pexp2 } from '@/engine/dj/scratch/portableMath';
 import { NumpyRandomState } from '@/engine/turntable/turntableSim';
 import { resamplePoly } from '@/engine/dj/scratch/refDsp';
 import { limitDenominator } from '@/engine/dj/scratch/scratchGrit';
@@ -57,7 +58,7 @@ export function varyHit(smp: ArrayLike<number>, h: HitHumanize, tighten = 1.0, r
   let out: Float64Array = Float64Array.from(smp);
   let float32 = false;
   if (Math.abs(cents) > 0.1) {
-    out = resampleRatio(out, 2.0 ** (cents / 1200.0));
+    out = resampleRatio(out, pexp2(cents / 1200.0));
     float32 = true;
   }
   if (h.attack > 1.0) {

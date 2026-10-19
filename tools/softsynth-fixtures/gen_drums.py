@@ -14,7 +14,17 @@ import json
 import os
 import sys
 
+import math
+
 import numpy as np
+
+
+def seq_rms(y):
+    """RMS with a left-to-right sum, the order the TypeScript test sums in (np.mean is pairwise)."""
+    s = 0.0
+    for v in np.asarray(y, dtype=np.float64).tolist():
+        s += v * v
+    return math.sqrt(s / len(y))
 
 TOOLS, OUT = sys.argv[1], sys.argv[2]
 sys.path.insert(0, TOOLS)  # the synth modules import their portable_* siblings
@@ -109,7 +119,7 @@ for voice, seed, params in CASES:
     y = np.asarray(VOICES[voice](params, seed), dtype=np.float64)
     cases.append({
         "voice": voice, "seed": seed, "params": params, "length": int(len(y)),
-        "rms": float(np.sqrt(np.mean(y ** 2))),
+        "rms": seq_rms(y),
         "samples": [float(v) for v in y[::KEEP]],
     })
 

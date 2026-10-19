@@ -268,3 +268,14 @@ export function pasin(x: number): number {
   }
   return hx >>> 31 ? -t : t;
 }
+
+const LN2 = 6.93147180559945286227e-01;
+
+/** 2^x = 2^k * pexp(f ln2), k = floor(x + 0.5), f = x - k. Mirrors portable_math.exp2. */
+export function pexp2(x: number): number {
+  const k = Math.floor(x + 0.5);
+  const y = pexp((x - k) * LN2);
+  if (k < -1021) return y * pow2(k + 1000) * TWOM1000;
+  if (k === 1024) return y * 2.0 * TWO1023;
+  return y * pow2(k);
+}

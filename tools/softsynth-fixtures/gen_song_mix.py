@@ -13,7 +13,17 @@ import json
 import os
 import sys
 
+import math
+
 import numpy as np
+
+
+def seq_rms(y):
+    """RMS with a left-to-right sum, the order the TypeScript test sums in (np.mean is pairwise)."""
+    s = 0.0
+    for v in np.asarray(y, dtype=np.float64).tolist():
+        s += v * v
+    return math.sqrt(s / len(y))
 
 TOOLS, OUT = sys.argv[1], sys.argv[2]
 RATE = 22050
@@ -43,7 +53,7 @@ SPARSE[4000:4100] = 0.02
 
 def ser(y):
     y = np.asarray(y, np.float64)
-    return {"length": int(len(y)), "rms": float(np.sqrt(np.mean(y ** 2))), "samples": [float(v) for v in y[::KEEP]]}
+    return {"length": int(len(y)), "rms": seq_rms(y), "samples": [float(v) for v in y[::KEEP]]}
 
 
 cases = []
