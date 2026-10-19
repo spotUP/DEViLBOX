@@ -35,6 +35,7 @@ import { FurnaceSynth } from './FurnaceSynth';
 import { OPL3Synth } from './opl3/OPL3Synth';
 import { normalizeUrl } from '@utils/urlUtils';
 import { getNativeAudioNode, setDevilboxAudioContext, noteToMidi } from '@utils/audio-context';
+import { globalSingleton, clearGlobalSingleton } from '@utils/globalSingleton';
 import { SAFETY_LIMITER, makeupCancelGain, createToneSafetyLimiter } from './dj/djLimiter';
 import { VinylNoiseEffect } from './effects/VinylNoiseEffect';
 import { TumultEffect } from './effects/TumultEffect';
@@ -210,6 +211,8 @@ interface VoiceState {
     proto.__devilboxDisposeGuard = true;
   }
 }
+
+const TONE_ENGINE_SINGLETON = 'toneEngine';
 
 export class ToneEngine {
   private static instance: ToneEngine | null = null;
@@ -569,10 +572,18 @@ export class ToneEngine {
    */
   public static getInstance(): ToneEngine {
     if (!ToneEngine.instance) {
-      ToneEngine.instance = new ToneEngine();
-      ToneEngine.instance._followTransport();
-      // Expose for console diagnostics (scripts/db303-knob-diag.js)
-      (window as unknown as Record<string, unknown>)._toneEngine = ToneEngine.instance;
+      // The instance is kept on globalThis, not only in this static field: an
+      // HMR re-evaluation of this module starts with `instance = null` and
+      // would otherwise build a second engine with a second AudioContext that
+      // hijacks getDevilboxAudioContext() for every synth created after it
+      // (utils/globalSingleton.ts).
+      ToneEngine.instance = globalSingleton(TONE_ENGINE_SINGLETON, () => {
+        const engine = new ToneEngine();
+        engine._followTransport();
+        // Expose for console diagnostics (scripts/db303-knob-diag.js)
+        (window as unknown as Record<string, unknown>)._toneEngine = engine;
+        return engine;
+      });
     }
     return ToneEngine.instance;
   }
@@ -5297,6 +5308,7 @@ export class ToneEngine {
     this.masterChannel.dispose();
 
     ToneEngine.instance = null;
+    clearGlobalSingleton(TONE_ENGINE_SINGLETON);
   }
 
   // ============================================================================
