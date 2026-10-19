@@ -36,7 +36,7 @@ import { getDrumPadEngine } from '../../hooks/drumpad/useMIDIPadRouting';
 import { useSynthErrorStore } from '../../stores/useSynthErrorStore';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { getGlobalRegistry } from '../../hooks/useGlobalKeyboardHandler';
-import { getTrackerReplayer } from '../../engine/TrackerReplayer';
+import { getTrackerReplayer, peekTrackerReplayer } from '../../engine/TrackerReplayer';
 import { UADEEngine } from '../../engine/uade/UADEEngine';
 import { playingEngineFromStores } from '../../engine/replayer/NativeEngineRouting';
 import { getToneEngine } from '../../engine/ToneEngine';
@@ -314,6 +314,14 @@ export function getPlaybackState(): Record<string, unknown> {
     swing: transport.swing,
     jitter: transport.jitter,
     globalPitch: transport.globalPitch,
+    trackerKeyLock: transport.trackerKeyLock,
+    // What the replayer's scheduler actually runs at: the pitch slider's tempo
+    // share lands in tempoMultiplier, and the row clock is bpm * multiplier.
+    replayerTempo: (() => {
+      // peek: a state read must not build the audio graph (and cannot, headless).
+      const m = peekTrackerReplayer()?.getTempoMultiplier() ?? 1;
+      return { tempoMultiplier: m, effectiveBpm: transport.bpm * m, clockMs: Date.now() };
+    })(),
     metronomeEnabled: transport.metronomeEnabled,
     metronomeVolume: transport.metronomeVolume,
     countInEnabled: transport.countInEnabled,
