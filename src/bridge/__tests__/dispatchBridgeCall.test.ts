@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { dispatchBridgeCall } from '../MCPBridge';
+import './engineFreeMcpBridge';
+
+const { dispatchBridgeCall } = await import('../MCPBridge');
 
 describe('dispatchBridgeCall', () => {
   it('returns an error result for an unknown method', async () => {
