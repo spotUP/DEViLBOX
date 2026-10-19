@@ -33,10 +33,13 @@ import { measureDjLayoutNow } from '@/lib/dj/djLayoutFit';
 
 // ─── Note Parsing ──────────────────────────────────────────────────────────────
 
+/** Cell `note` value for a note-off (`OFF`); 0 is a rest, 1..96 real notes. */
+const NOTE_OFF_VALUE = 97;
+
 function parseNoteString(noteStr: string): number | undefined {
   const t = noteStr.trim();
   const upper = t.toUpperCase();
-  if (upper === 'OFF') return 97;
+  if (upper === 'OFF') return NOTE_OFF_VALUE;
   if (upper === '---' || upper === '') return 0;
   // One parser for every note name (C-4, C#4, and the octave below C-0, c_1 .. b_1)
   return parseNoteName(t) ?? undefined;
@@ -1402,8 +1405,15 @@ export function writeNoteSequence(params: Record<string, unknown>): Record<strin
 
   let row = startRow;
   for (const note of notes) {
-    const cellParams: Record<string, unknown> = { channel, row, note };
-    if (instrument !== undefined) cellParams.instrument = instrument;
+    const noteVal = resolveNote(note);
+    if (noteVal === undefined) {
+      return { error: `Invalid note at row ${row}: ${String(note)}` };
+    }
+    const cellParams: Record<string, unknown> = { channel, row, note: noteVal };
+    // FT2 / ProTracker rule: the instrument number belongs beside a real note.
+    // A rest (0) or note-off (97) carries none; the user may still add one by hand.
+    const isRealNote = noteVal !== 0 && noteVal !== NOTE_OFF_VALUE;
+    if (instrument !== undefined && isRealNote) cellParams.instrument = instrument;
     const result = setCell(cellParams);
     if ('error' in result) return result;
     row += step;
