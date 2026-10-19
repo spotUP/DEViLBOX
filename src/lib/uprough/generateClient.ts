@@ -28,7 +28,7 @@ export async function fetchStyles(signal?: AbortSignal): Promise<string[]> {
   return ((await res.json()) as { styles: string[] }).styles;
 }
 
-/** Returns the song-file JSON text, ready for importUpRoughSong. */
+/** Returns the song-file JSON text, ready for openUpRoughSong. */
 export async function generateSong(req: GenerateRequest, signal?: AbortSignal): Promise<string> {
   const res = await fetch('/api/uprough/generate', {
     method: 'POST',

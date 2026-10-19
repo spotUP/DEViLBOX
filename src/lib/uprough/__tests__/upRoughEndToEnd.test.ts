@@ -34,6 +34,7 @@ vi.mock('@stores/useInstrumentTypeStore', () => ({
 
 import * as songFile from '../songFile';
 import * as applySongModule from '@/lib/song/applySong';
+import { openUpRoughSong } from '@/lib/uprough/openUpRoughSong';
 import { useTrackerStore } from '@stores/useTrackerStore';
 
 const ROOT = process.env.UPROUGH_ROOT;
@@ -126,7 +127,7 @@ describe.skipIf(!ROOT)('Up Rough generate -> import -> export renders 1:1 on the
 
       const apply = vi.spyOn(applySongModule, 'applySong');
       const serialize = vi.spyOn(songFile, 'songToSongFile');
-      await useTrackerStore.getState().importUpRoughSong(gen.text);
+      await openUpRoughSong(gen.text);
       expect(apply).toHaveBeenCalledTimes(1);
       expect(apply.mock.calls[0]![1]).toBe('import');
       const exported = useTrackerStore.getState().exportUpRoughSong();

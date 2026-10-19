@@ -55,6 +55,7 @@ import { CURRENT_VERSION } from '@generated/changelog';
 import { useFT2ToolbarActions } from '@stores/useFT2ToolbarActions';
 import { useDubStore } from '@stores/useDubStore';
 import { TapTempoButton } from '@components/ui/TapTempoButton';
+import { openUpRoughSong } from '@/lib/uprough/openUpRoughSong';
 
 
 interface FT2ToolbarProps {
@@ -526,7 +527,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
       const file = input.files?.[0];
       if (!file) return;
       try {
-        await useTrackerStore.getState().importUpRoughSong(await file.text());
+        await openUpRoughSong(await file.text());
         notify.success('Up Rough song imported');
       } catch (e) {
         notify.error(e instanceof Error ? e.message : String(e));
