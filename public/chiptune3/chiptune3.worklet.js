@@ -17,6 +17,7 @@ let libopenmpt
 libopenmptPromise({ print: () => {}, printErr: () => {} })
 .then(res => {
 	libopenmpt = res
+	globalThis.__libopenmpt = res // tests read stackSave()
 
 	if (!libopenmpt.stackSave) return
 	// set libopenmpt version to display later
@@ -38,6 +39,17 @@ function asciiToStack(str) {
 	return stackStr
 }
 function writeAsciiToMemory(str,buffer,dontAddNull){for(let i=0;i<str.length;++i){libopenmpt.HEAP8[buffer++>>0]=str.charCodeAt(i)}if(!dontAddNull)libopenmpt.HEAP8[buffer>>0]=0}
+
+// Set one libopenmpt ctl. Both strings live on the wasm stack only for the
+// duration of the call: a stackAlloc without a matching stackRestore leaks
+// stack space for the life of the wasm instance, and the pitch slider sends
+// a setPitch + setTempo pair per input event, so a few thousand events
+// overran the stack ("memory access out of bounds", 2026-10-19).
+function ctlSet(modulePtr, key, value) {
+	const stack = libopenmpt.stackSave()
+	libopenmpt._openmpt_module_ctl_set(modulePtr, asciiToStack(key), asciiToStack(value))
+	libopenmpt.stackRestore(stack)
+}
 
 // Every module instance (main, isolation slot, dub slot, oscilloscope copy)
 // renders through the A1200 resampler model.
@@ -385,11 +397,11 @@ class MPT extends AudioWorkletProcessor {
 				break
 			case 'setPitch':
 				if (!libopenmpt.stackSave || !this.modulePtr) return
-				libopenmpt._openmpt_module_ctl_set(this.modulePtr, asciiToStack('play.pitch_factor'), asciiToStack(v.toString()))
+				ctlSet(this.modulePtr, 'play.pitch_factor', v.toString())
 				break
 			case 'setTempo':
 				if (!libopenmpt.stackSave || !this.modulePtr) return
-				libopenmpt._openmpt_module_ctl_set(this.modulePtr, asciiToStack('play.tempo_factor'), asciiToStack(v.toString()))
+				ctlSet(this.modulePtr, 'play.tempo_factor', v.toString())
 				break
 			case 'selectSubsong':
 				if (!this.modulePtr) return
