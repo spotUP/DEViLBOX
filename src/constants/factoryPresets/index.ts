@@ -24,6 +24,7 @@ import { AMI_PRESETS } from '../amiPresets';
 import { BUZZMACHINE_FACTORY_PRESETS, BUZZMACHINE_GENERIC_PRESETS } from '../buzzmachineFactoryPresets';
 import { MAKK_FACTORY_PRESETS } from '../makkPresets';
 import { HARMONIC_PRESETS } from '../harmonicPresets';
+import { GOLDEN_ERA_KIT } from '../synthPresets/upRoughSoftsynth';
 import { DJ_ONE_SHOT_PRESETS } from '../djOneShotPresets';
 import { ZYNTHIAN_PRESETS } from '../zynthianPresets';
 import { HIVELY_PRESETS } from '../hivelyPresets';
@@ -115,6 +116,16 @@ export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   ...CINTER_PRESETS,
   // Sonix synth voices ripped from .instr files (generated)
   ...SONIX_PRESETS,
+  // Up Rough Softsynth Golden Era kit, derived from its one preset list
+  ...GOLDEN_ERA_KIT.map((p) => ({
+    type: 'synth' as const,
+    name: p.name,
+    synthType: 'UpRoughSoftsynth' as const,
+    volume: -8,
+    pan: 0,
+    effects: [],
+    upRoughSoftsynth: p.config,
+  })),
   // Player Init
   {
     type: 'synth' as const,
