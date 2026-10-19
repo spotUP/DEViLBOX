@@ -31,7 +31,7 @@ import { DeckPatternDisplay } from '../DeckPatternDisplay';
 import { useDJStore } from '@/stores/useDJStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { ChannelScopeTrackBuilder } from '@/engine/dj/channelScopeTrack';
-import { FIT_SCALE_FLOOR } from '@/components/tracker/channelLayout';
+import { fitChannelScale } from '@/components/tracker/channelLayout';
 import { _setSoundingForTest } from '@/engine/audio/signalPresence';
 
 const RATE = 44100;
@@ -106,13 +106,13 @@ describe('a deck pattern view fitted to its width', () => {
     act(() => runFrames(3));
     expect(fills.length).toBeGreaterThan(0);
     // Four 170 px channels cannot fit 400 px at scale 1: the text is shrunk, so the meter is too.
-    // They need more than the fit floor allows (10 px text), so the scale is the floor and the
-    // view scrolls sideways beyond 400 px.
+    // The fit has no floor, so all four fit inside 400 px.
     for (const w of widths) expect(w).toBeLessThan(28);
-    // Columns sit beside the (shrunk) row-number gutter at the floor scale; the sounding channel 2
+    // Columns sit beside the (shrunk) row-number gutter at the fit scale; the sounding channel 2
     // is the second column, and each meter lies inside it.
-    const gutter = Math.floor(40 * FIT_SCALE_FLOOR);
-    const colW = Math.floor(170 * FIT_SCALE_FLOOR);
+    const scale = fitChannelScale([170, 170, 170, 170], 40, 400);
+    const gutter = Math.floor(40 * scale);
+    const colW = Math.floor(170 * scale);
     const colLeft = gutter + colW;
     fills.forEach((x, k) => {
       expect(x).toBeGreaterThanOrEqual(colLeft - 2);

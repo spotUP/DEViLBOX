@@ -117,40 +117,24 @@ export function stretchChannelWidths(
 
 /** Pattern font size at scale 1 (px); the renderers draw at this size. */
 export const PATTERN_FONT_PX = 14;
-/**
- * Smallest pattern font the fit will shrink to (px). Below it the view scrolls sideways.
- * 10 px is the smallest text the app already sets for reading (compact panel labels are
- * 10 px; 9 px is kept for badges nobody reads in a row), and 7 px glyphs of a 14 px
- * monospace font (the old floor) smear into each other: the owner called fit-all
- * "too small to be useful" (2026-10-14). A song too wide for 10 px scrolls sideways
- * or the zoom slider goes lower by hand.
- */
-export const FIT_MIN_FONT_PX = 10;
-/** The smallest scale the fit will use: FIT_MIN_FONT_PX / PATTERN_FONT_PX. */
-export const FIT_SCALE_FLOOR = FIT_MIN_FONT_PX / PATTERN_FONT_PX;
-/**
- * The fit floor while the startup jingle's lips are on screen: none. The lips are a
- * picture, not text to read, and all of them must be visible at any window width
- * (owner 2026-10-18), so the fit shrinks as far as it must. Songs keep FIT_SCALE_FLOOR.
- */
-export const JINGLE_FIT_SCALE_FLOOR = 0;
 
 /**
  * The scale (<= 1) at which every channel fits the canvas width. `widths` are
  * the channels' minimum widths and `leftEdge` the gutter before channel 0, both
- * at scale 1. Shrink only: channels that already fit return 1 (never enlarge),
- * and the result never goes below `floor`, where the view scrolls sideways as
- * before. Unknown width (<= 0) returns 1.
+ * at scale 1. Shrink only: channels that already fit return 1 (never enlarge).
+ * There is no lower limit: fit on means every channel is on screen, however
+ * small the text gets (owner 2026-10-20, after a 10 px floor left the last
+ * channel of a 7-channel song half off screen). The zoom slider is the tool for
+ * a readable size. Unknown width (<= 0) returns 1.
  */
 export function fitChannelScale(
   widths: readonly number[],
   leftEdge: number,
   availableWidth: number,
-  floor: number = FIT_SCALE_FLOOR,
 ): number {
   const content = leftEdge + widths.reduce((a, b) => a + b, 0);
   if (availableWidth <= 0 || widths.length === 0 || content <= availableWidth) return 1;
-  return Math.max(floor, availableWidth / content);
+  return availableWidth / content;
 }
 
 export interface FittedChannelWidths {
@@ -173,11 +157,10 @@ export function fitAndStretchChannelWidths(
   leftEdge: number,
   availableWidth: number,
   fit: boolean,
-  floor: number = FIT_SCALE_FLOOR,
   manualScale: number = 1,
 ): FittedChannelWidths {
   // Fit on: the scale that fits. Fit off: the hand-set zoom (1 = the base font).
-  const scale = fit ? fitChannelScale(minWidths, leftEdge, availableWidth, floor) : manualScale;
+  const scale = fit ? fitChannelScale(minWidths, leftEdge, availableWidth) : manualScale;
   const scaled = scale === 1 ? [...minWidths] : minWidths.map(w => Math.floor(w * scale));
   const edge = Math.floor(leftEdge * scale);
   return { scale, leftEdge: edge, widths: stretchChannelWidths(scaled, edge, availableWidth) };
