@@ -1,54 +1,52 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { InstrumentConfig } from '@typedefs/instrument';
 
-const calls: string[] = [];
-let captured: InstrumentConfig | null = null;
+let readied: InstrumentConfig | null = null;
+const attacks: Array<{ id: number; note: string }> = [];
+let peak = 0;
 
-vi.mock('@engine/InstrumentFactory', async (orig) => {
-  const actual = await orig<Record<string, unknown>>();
-  return {
-    ...actual,
-    InstrumentFactory: {
-      createInstrument: (config: InstrumentConfig) => {
-        calls.push('create');
-        captured = config;
-        return null;
-      },
-    },
-  };
-});
+const engine = {
+  ensureInstrumentReady: vi.fn(async (config: InstrumentConfig) => { readied = config; }),
+  getInstrumentAnalyser: vi.fn(() => ({ getPeak: () => peak })),
+  triggerNoteAttack: vi.fn((id: number, note: string) => { attacks.push({ id, note }); }),
+  triggerNoteRelease: vi.fn(),
+  instancesOf: vi.fn(() => [{}]),
+  disposeInstrumentAnalyser: vi.fn(),
+  disposeInstrument: vi.fn(),
+};
 
-vi.mock('@engine/registry/SynthRegistry', () => ({
-  SynthRegistry: {
-    ensure: vi.fn(async () => {
-      calls.push('ensure');
-      return undefined;
-    }),
-    knows: () => true,
-  },
-}));
+vi.mock('@engine/ToneEngine', () => ({ getToneEngine: () => engine }));
 
 import { testSynth } from '../synthTester';
-import { SynthRegistry } from '@engine/registry/SynthRegistry';
 
-describe('synthTester builds instruments like the app', () => {
+describe('synthTester plays synths through the app engine path', () => {
   beforeEach(() => {
-    calls.length = 0;
-    captured = null;
+    readied = null;
+    attacks.length = 0;
+    peak = 0;
+    vi.clearAllMocks();
   });
 
   it('applies the synth-type defaults a real switch applies', async () => {
     await testSynth('FurnaceSID6581');
-    expect(captured!.furnace?.chipType).toBeDefined();
-    expect(captured!.synthType).toBe('FurnaceSID6581');
+    expect(readied!.furnace?.chipType).toBeDefined();
+    expect(readied!.synthType).toBe('FurnaceSID6581');
 
     await testSynth('DubSiren');
-    expect(captured!.dubSiren).toBeDefined();
+    expect(readied!.dubSiren).toBeDefined();
   });
 
-  it('ensures the lazy synth is registered before creating it', async () => {
-    await testSynth('MAMETIA');
-    expect(SynthRegistry.ensure).toHaveBeenCalledWith('MAMETIA');
-    expect(calls).toEqual(['ensure', 'create']);
+  it('triggers the note on the engine and hears it on the engine analyser', async () => {
+    peak = 0.2;
+    const result = await testSynth('DubSiren');
+    expect(attacks).toEqual([{ id: 32000, note: 'C4' }]);
+    expect(result.producedSound).toBe(true);
+    expect(engine.disposeInstrument).toHaveBeenCalledWith(32000);
+  });
+
+  it('skips whole-song replayer types instead of reporting them silent', async () => {
+    const result = await testSynth('SidMon2Synth');
+    expect(engine.ensureInstrumentReady).not.toHaveBeenCalled();
+    expect(result.error).toMatch(/whole-song/);
   });
 });
