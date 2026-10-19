@@ -3,9 +3,9 @@
  *
  * A per-channel native synth instance (key channel >= 0) feeds its channel
  * lane directly; the shared native instance keeps the global native-synth
- * filter slot before the synth bus. An open instrument analyser sits in
- * series for Tone.js instruments and as a parallel tap for native ones, so a
- * native instrument is never summed twice at its destination.
+ * filter slot before the synth bus. An open instrument analyser is always a
+ * parallel tap, never a node in the signal path, so no instrument is summed
+ * twice at its destination and closing the analyser cannot drop the signal.
  */
 import { describe, it, expect, vi } from 'vitest';
 
@@ -88,14 +88,14 @@ describe('connectChainOutput', () => {
     expect(slot(1007).output.connections).toEqual([synthBus]);
   });
 
-  it('puts an open analyser in series for a Tone.js instrument', () => {
+  it('taps an open analyser in parallel for a shared Tone.js instrument, keeping the master destination', () => {
     const { c, masterInput } = ctx();
     const analyser = { input: new Gain(), output: new Gain() };
     c.instrumentAnalysers.set(2, analyser as never);
     const output = new Gain();
     connectChainOutput(c, getInstrumentKey(2), output as never, false);
-    expect(output.connections).toEqual([analyser.input]);
-    expect(output.connections).not.toContain(masterInput);
+    expect(output.connections).toEqual([masterInput, analyser.input]);
+    expect(analyser.output.connections).toEqual([]);
   });
 
   it('taps an open analyser in parallel for a native instance, keeping the lane destination', () => {

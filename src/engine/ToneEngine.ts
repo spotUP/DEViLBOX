@@ -156,7 +156,9 @@ import {
   throwInstrumentToEffect as _throwInstrumentToEffect,
   disposeInstrumentEffectChain as _disposeInstrumentEffectChain,
   clearConnectedNativeOutputs,
+  attachVoiceSource,
 } from './tone/InstrumentEffectsChain';
+import { connectAudio } from './tone/connectAudio';
 
 // Module-level frequency cache: avoids creating transient Tone.Frequency objects on every call.
 // Note name strings (e.g. "C4", "D#3") are finite and reused, so this cache stays small.
@@ -186,6 +188,7 @@ interface VoiceState {
     gain: Tone.Gain;
     filter: Tone.Filter | AudioWorkletNode;
     panner: Tone.Panner;
+    source?: Tone.ToneAudioNode;
   };
 }
 
@@ -1869,10 +1872,24 @@ export class ToneEngine {
   }
 
   /**
+   * What feeds a Tone.js voice's gain. When the voice node is the channel's
+   * own instrument instance, its effect chain output (so instrument effects
+   * stay in the strip path); otherwise the voice node itself (per-voice
+   * Player/Synth clones, shared instances, or a chain still being built).
+   */
+  private voiceSource(instrumentId: number, channelIndex: number, voiceNode: Tone.ToneAudioNode): Tone.ToneAudioNode {
+    const key = this.getInstrumentKey(instrumentId, channelIndex);
+    if (this.instruments.get(key) !== voiceNode) return voiceNode;
+    return this.instrumentEffectChains.get(key)?.output ?? voiceNode;
+  }
+
+  /**
    * Where an instrument's effect chain output goes. An output override (DJ deck,
    * stem export) wins; a native per-channel instance plays into its channel's
    * synth lane; the shared native instance goes to synthBus; Tone.js instruments
-   * to masterInput (their channel strip is wired in ChannelRouting).
+   * on the shared / live-voice keys to masterInput. A Tone.js instrument on a
+   * tracker channel never gets a static destination: its chain output feeds its
+   * voices' gains (connectChainOutput / voiceSource), i.e. the channel strip.
    */
   private getInstrumentOutputDestination(instrumentId: number, isNativeSynth: boolean, channelIndex = -1): Tone.ToneAudioNode {
     const override = this.instrumentOutputOverrides.get(instrumentId);
@@ -2768,92 +2785,41 @@ export class ToneEngine {
   // ============================================================================
 
   /** True when any live instance of the instrument is a native (DevilboxSynth) instrument. */
-  private isNativeInstrument(instrumentId: number): boolean {
-    for (const [key, inst] of this.instruments) {
-      if ((key >>> 16) === instrumentId) return isDevilboxSynth(inst);
-    }
-    return false;
-  }
-
   /**
-   * Get or create an analyser for an instrument
-   * Lazy-creates the analyser only when visualization requests it
-   * Returns null if instrument doesn't exist or isn't connected
-   *
-   * Tone.js instruments have one destination, so the analyser sits in series:
-   * chain output -> analyser -> destination. Native instruments can have one
-   * chain per channel, each with its own lane, so the analyser is a parallel
-   * tap: every chain output also feeds the analyser input, and the analyser
-   * output stays unconnected (an AnalyserNode reads with no output edge).
+   * Get or create a per-instrument analyser: a parallel tap on every effect
+   * chain output of the instrument. The chains keep their own destinations
+   * (strip voices, synth lane, synthBus, masterInput or an output override),
+   * so opening an oscilloscope never moves or duplicates the audio path.
    */
   public getInstrumentAnalyser(instrumentId: number): InstrumentAnalyser | null {
-    // Check if analyser already exists
     let analyser = this.instrumentAnalysers.get(instrumentId);
     if (analyser) {
       return analyser;
     }
 
-    // Create new analyser
     analyser = new InstrumentAnalyser();
-    const isNative = this.isNativeInstrument(instrumentId);
-
-    if (!isNative) {
-      try {
-        analyser.output.connect(this.getInstrumentOutputDestination(instrumentId, false));
-      } catch (e) {
-        // May fail if synth was recreated on a different audio context
-        console.warn('[ToneEngine] Analyser connect failed (context mismatch):', e);
-        return analyser;
-      }
-    }
-
-    // Route every existing effect chain of this instrument through (Tone.js) or into (native) the analyser
     this.instrumentEffectChains.forEach((chain, key) => {
       if ((key >>> 16) !== instrumentId) return;
-      if (!isNative) {
-        try { chain.output.disconnect(this.masterInput); } catch { /* May not be connected */ }
-        const override = this.instrumentOutputOverrides.get(instrumentId);
-        if (override) try { chain.output.disconnect(override); } catch { /* May not be connected */ }
-      }
-      chain.output.connect(analyser.input);
+      connectAudio(chain.output, analyser.input);
     });
 
-    // Chains built later (buildInstrumentEffectChain) connect to the stored analyser themselves
+    // Chains built later (buildInstrumentEffectChain) tap the stored analyser themselves
     this.instrumentAnalysers.set(instrumentId, analyser);
     return analyser;
   }
 
   /**
-   * Dispose an instrument analyser when no longer needed
+   * Dispose an instrument analyser when no longer needed: drop the tap edges,
+   * the chains' own destinations are untouched.
    */
   public disposeInstrumentAnalyser(instrumentId: number): void {
     const analyser = this.instrumentAnalysers.get(instrumentId);
     if (!analyser) return;
 
-    const isNative = this.isNativeInstrument(instrumentId);
-
-    if (isNative) {
-      // The analyser was a parallel tap: drop the tap edge, the lane / bus path is untouched
-      this.instrumentEffectChains.forEach((chain, key) => {
-        if ((key >>> 16) !== instrumentId) return;
-        try { chain.output.disconnect(analyser.input); } catch { /* not connected */ }
-      });
-    } else {
-      // Series analyser: send every chain output back to the real destination
-      const dest = this.getInstrumentOutputDestination(instrumentId, false);
-      this.instrumentEffectChains.forEach((chain, key) => {
-        if ((key >>> 16) !== instrumentId) return;
-        try { chain.output.disconnect(analyser.input); } catch { /* not connected */ }
-        chain.output.connect(dest);
-      });
-      // A Tone.js instrument without a chain yet was wired straight to the analyser
-      const sharedKey = this.getInstrumentKey(instrumentId, -1);
-      const instrument = this.instruments.get(sharedKey);
-      if (instrument && !isDevilboxSynth(instrument) && !this.instrumentEffectChains.has(sharedKey)) {
-        try { (instrument as Tone.ToneAudioNode).disconnect(analyser.input); } catch { /* not connected */ }
-        (instrument as Tone.ToneAudioNode).connect(dest);
-      }
-    }
+    this.instrumentEffectChains.forEach((chain, key) => {
+      if ((key >>> 16) !== instrumentId) return;
+      try { chain.output.disconnect(analyser.input); } catch { /* not connected */ }
+    });
 
     analyser.dispose();
     this.instrumentAnalysers.delete(instrumentId);
@@ -4042,9 +4008,9 @@ export class ToneEngine {
         try {
           const voice = this.createVoice(channelIndex, voiceNode, note, config);
           if (!isDevilboxSynth(voiceNode)) {
-            voiceNode.connect(voice.nodes.gain);
+            attachVoiceSource(voice, this.voiceSource(instrumentId, channelIndex, voiceNode));
           }
-          // DevilboxSynths: audio flows via buildInstrumentEffectChain → masterInput
+          // DevilboxSynths: audio flows via buildInstrumentEffectChain → channel synth lane
           voices.push(voice);
         } catch (voiceErr) {
           console.error(`[ToneEngine] createVoice failed for ch=${channelIndex} type=${config.synthType}:`, voiceErr);
@@ -5322,6 +5288,7 @@ export class ToneEngine {
       instrumentAnalysers: this.instrumentAnalysers,
       instrumentOutputOverrides: this.instrumentOutputOverrides,
       instruments: this.instruments,
+      activeVoices: this.activeVoices,
       masterInput: this.masterInput,
       synthBus: this.synthBus,
       connectNativeSynth: (o, d) => this.connectNativeSynth(o, d),
