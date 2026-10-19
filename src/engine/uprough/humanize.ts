@@ -44,8 +44,13 @@ export function resampleRatio(x: ArrayLike<number>, ratio: number): Float64Array
   return out;
 }
 
+/** The per-note seed of a bass bar note: hiphop.render_bass_bar draws `humanize(seed * 1291 + step * 11)`. */
+export function bassHumanizeSeed(seed: number, step: number): number {
+  return seed * 1291 + step * 11;
+}
+
 /** numpy.linspace(start, stop, num)[i] for num >= 1. */
-function linspaceAt(start: number, stop: number, num: number, i: number): number {
+export function linspaceAt(start: number, stop: number, num: number, i: number): number {
   if (num === 1) return start;
   if (i === num - 1) return stop;
   return i * ((stop - start) / (num - 1)) + start;
