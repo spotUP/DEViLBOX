@@ -19,6 +19,7 @@ vi.mock('@lib/uprough/auditionPlayer', () => ({
 import { FT2Toolbar } from '@components/tracker/FT2Toolbar/FT2Toolbar';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { playAudition } from '@lib/uprough/auditionPlayer';
+import { openUpRoughSong } from '@/lib/uprough/openUpRoughSong';
 
 afterEach(() => {
   cleanup();
@@ -30,7 +31,7 @@ describe('Preview Up Rough Song from the hamburger menu', () => {
     const wav = new Uint8Array([82, 73, 70, 70]).buffer;
     const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response(wav, { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
-    await useTrackerStore.getState().importUpRoughSong(JSON.stringify(fixture));
+    await openUpRoughSong(JSON.stringify(fixture));
     const exported = useTrackerStore.getState().exportUpRoughSong();
 
     const { container } = render(<FT2Toolbar />);
@@ -57,7 +58,7 @@ describe('Preview Up Rough Song from the hamburger menu', () => {
       return Promise.resolve(new Response(new Uint8Array([2]).buffer, { status: 200 }));
     });
     vi.stubGlobal('fetch', fetchMock);
-    await useTrackerStore.getState().importUpRoughSong(JSON.stringify(fixture));
+    await openUpRoughSong(JSON.stringify(fixture));
 
     const { container } = render(<FT2Toolbar />);
     const burger = container.querySelector('svg.lucide-menu')?.closest('button');

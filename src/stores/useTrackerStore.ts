@@ -24,8 +24,7 @@ import { SYSTEM_PRESETS, DivChanType } from '../constants/systemPresets';
 import { autoNameChannels as computeAutoNames } from '@/bridge/analysis/ChannelNaming';
 import { useInstrumentStore } from './useInstrumentStore';
 import { useProjectStore } from './useProjectStore';
-import { applySong } from '@/lib/song/applySong';
-import { parseSongFile, songFileToSong, songToSongFile, type SongMeta } from '@lib/uprough/songFile';
+import { songToSongFile, type SongMeta } from '@lib/uprough/songFile';
 import { isSynthCompatibleWithChannel, getChannelBadge, getSynthBadge } from '../constants/channelTypeCompat';
 import { useHistoryStore, type HistoryAction, type PatternChange } from './useHistoryStore';
 // Late-bound access to the sibling stores that used to form an import cycle
@@ -477,8 +476,6 @@ interface TrackerStore {
   setPatternOrder: (order: number[]) => void;
   /** What an imported Up Rough song file carries that the grid cannot show (null: no song file loaded). */
   upRoughMeta: SongMeta | null;
-  /** .uprough-song.json text -> patterns, order and instruments (throws SongFileError by name). */
-  importUpRoughSong: (text: string) => Promise<void>;
   /** Current song -> .uprough-song.json text (throws SongFileError by name). */
   exportUpRoughSong: () => string;
 
@@ -2026,19 +2023,6 @@ export const useTrackerStore = create<TrackerStore>()(
     },
 
     upRoughMeta: null,
-
-    importUpRoughSong: async (text) => {
-      const song = songFileToSong(parseSongFile(text));
-      await applySong({
-        instruments: song.instruments, patterns: song.patterns, order: song.meta.order,
-        bpm: song.tempo.bpm, speed: song.tempo.speed,
-        metadata: { name: song.tempo.name },
-        originalModuleData: null,
-        engine: {},
-      }, 'import');
-      // After applySong: loadPatterns clears upRoughMeta.
-      set({ upRoughMeta: song.meta });
-    },
 
     exportUpRoughSong: () => {
       const { patterns, upRoughMeta } = get();

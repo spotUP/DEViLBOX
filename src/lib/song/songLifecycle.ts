@@ -17,6 +17,7 @@ import { useTransportStore } from '@/stores/useTransportStore';
 import { getToneEngine } from '@/engine/ToneEngine';
 import { releaseEngineSubscriptions } from '@/engine/replayer/NativeEngineRouting';
 import { useFormatStore } from '@/stores/useFormatStore';
+import { stopAudition } from '@/lib/uprough/auditionPlayer';
 
 /** The generation of the song that is current now. */
 export function currentSongGeneration(): number {
@@ -35,6 +36,8 @@ export async function unloadSong(): Promise<void> {
   useFormatStore.getState().clearSongInfo();
 
   useTransportStore.getState().stop();
+  // The Up Rough audition is a render of the outgoing song: it leaves with it.
+  stopAudition();
   getToneEngine().releaseAll();
   try {
     const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');

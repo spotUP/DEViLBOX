@@ -5,7 +5,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Wand2 } from 'lucide-react';
-import { useTrackerStore } from '@stores';
 import { Modal } from '@components/ui/Modal';
 import { ModalHeader } from '@components/ui/ModalHeader';
 import { ModalFooter } from '@components/ui/ModalFooter';
@@ -13,6 +12,7 @@ import { Button } from '@components/ui/Button';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
 import { fetchStyles, generateSong } from '@/lib/uprough/generateClient';
+import { openUpRoughSong } from '@/lib/uprough/openUpRoughSong';
 
 export interface UpRoughGenerateDialogProps {
   isOpen: boolean;
@@ -86,7 +86,7 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
     try {
       const text = await generateSong({ style, seed, key, ...(barsCount !== undefined && { bars: barsCount }) }, ac.signal);
       setPhase('loading');
-      await useTrackerStore.getState().importUpRoughSong(text);
+      await openUpRoughSong(text);
       setPhase('idle');
       onClose();
     } catch (e) {

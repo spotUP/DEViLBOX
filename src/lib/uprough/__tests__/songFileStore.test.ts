@@ -14,14 +14,15 @@ import * as applySongModule from '@/lib/song/applySong';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useProjectStore } from '@stores/useProjectStore';
+import { openUpRoughSong } from '@/lib/uprough/openUpRoughSong';
 
 describe('Up Rough song file through the tracker store', () => {
-  it('importUpRoughSong -> exportUpRoughSong runs parse/serialize and returns the same file', async () => {
+  it('openUpRoughSong -> exportUpRoughSong runs parse/serialize and returns the same file', async () => {
     const parse = vi.spyOn(songFile, 'parseSongFile');
     const serialize = vi.spyOn(songFile, 'songToSongFile');
     const apply = vi.spyOn(applySongModule, 'applySong');
     const text = JSON.stringify(fixture);
-    await useTrackerStore.getState().importUpRoughSong(text);
+    await openUpRoughSong(text);
     expect(apply).toHaveBeenCalledTimes(1);
     expect(apply.mock.calls[0]![1]).toBe('import');
     expect(parse).toHaveBeenCalledTimes(1);
