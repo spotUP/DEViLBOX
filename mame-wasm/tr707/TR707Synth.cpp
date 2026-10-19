@@ -257,7 +257,7 @@ struct DrumHit {
     int cymbal_index;  // CV_CRASH or CV_RIDE
 };
 
-// Maps MIDI notes 35-56 to TR-707 drum hits
+// Maps MIDI notes 35-56 to TR-707 drum hits; other notes fold onto that range
 static const int MIDI_MAP_START = 35;
 static const int MIDI_MAP_END = 56;
 
@@ -310,7 +310,14 @@ static const DrumHit* getDrumHit(int midiNote) {
         {MC_RIMSHOT, 1, false, 0},
     };
 
-    if (midiNote < MIDI_MAP_START || midiNote > MIDI_MAP_END) return nullptr;
+    if (midiNote < 0 || midiNote > 127) return nullptr;
+    // A note outside the map folds onto it by octave, so a tracker's C-4 (MIDI 60)
+    // plays the bass drum like C2 (MIDI 36) instead of nothing: 36..59 is the base
+    // octave pair, and the top of it (57..59) drops one more octave onto 45..47.
+    if (midiNote < MIDI_MAP_START || midiNote > MIDI_MAP_END) {
+        midiNote = 36 + (((midiNote - 36) % 24) + 24) % 24;
+        if (midiNote > MIDI_MAP_END) midiNote -= 12;
+    }
     return &hits[midiNote - MIDI_MAP_START];
 }
 
