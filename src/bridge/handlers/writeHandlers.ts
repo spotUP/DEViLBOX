@@ -246,6 +246,13 @@ export function setGlobalPitch(params: Record<string, unknown>): Record<string, 
   return { ok: true };
 }
 
+/** Tracker Key Lock: on, the pitch slider changes tempo only; off, pitch and tempo move together. */
+export function setTrackerKeyLock(params: Record<string, unknown>): Record<string, unknown> {
+  const enabled = params.enabled === true;
+  useTransportStore.getState().setTrackerKeyLock(enabled);
+  return { ok: true, trackerKeyLock: useTransportStore.getState().trackerKeyLock };
+}
+
 export function toggleMetronome(): Record<string, unknown> {
   useTransportStore.getState().toggleMetronome();
   const state = useTransportStore.getState();
