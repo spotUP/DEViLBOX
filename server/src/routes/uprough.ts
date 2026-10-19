@@ -16,7 +16,8 @@ import path from 'path';
 
 const router = Router();
 
-const PYTHON = process.env.UPROUGH_PYTHON || 'python3.11';
+/** Interpreter for the Up Rough tools; read per spawn so tests and deploys can set UPROUGH_PYTHON. */
+const python = () => process.env.UPROUGH_PYTHON || 'python3.11';
 const TIMEOUT_MS = Number(process.env.UPROUGH_TIMEOUT_MS) || 120_000;
 const MAX_OUTPUT = 64 * 1024 * 1024;
 
@@ -38,7 +39,7 @@ function songFileScript(): { script?: string; error?: string } {
 /** Run an Up Rough tool script; the child is killed on timeout or when `signal` aborts. */
 function runSongFile(script: string, args: string[], signal?: AbortSignal, cwd: string = path.dirname(script)): Promise<RunResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn(PYTHON, [script, ...args], { cwd });
+    const child = spawn(python(), [script, ...args], { cwd });
     let stdout = '';
     let stderr = '';
     let timedOut = false;
