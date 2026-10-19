@@ -14,6 +14,11 @@
  * instances are keyed per tracker channel and their effect chain ends in the
  * channel's synth lane (`ToneEngine.getChannelSynthLane`), which feeds the strip.
  *
+ * Some Tone-built graphs are listed too (DubSiren, SpaceLaser, Synare,
+ * WobbleBass): one shared filter / filter envelope / LFO per instance, so a
+ * shared instance let one channel's note-off cut another channel's note
+ * (owner 2026-10-20, WobbleBass on two channels).
+ *
  * NOT listed, on purpose:
  * - Pooled Amiga per-note replayers (`POOLED_NATIVE_SYNTH_TYPES`): one engine
  *   singleton per type with a fixed player-handle pool; per-channel instances
@@ -34,7 +39,7 @@ export const PER_CHANNEL_NATIVE_SYNTH_TYPES: ReadonlySet<SynthType> = new Set<Sy
   'SpaceLaser', 'Synare', 'TR808', 'TR909', 'WaveSabreSynth', 'OidosSynth',
   'TunefishSynth', 'MdaEPiano', 'MdaJX10', 'MdaDX10', 'Amsynth', 'RaffoSynth', 'CalfMono',
   'SetBfree', 'SynthV1', 'TalNoizeMaker', 'Aeolus', 'FluidSynth', 'Sfizz', 'ZynAddSubFX',
-  'Monique', 'VL1', 'DX7', 'OpenWurli',
+  'Monique', 'VL1', 'DX7', 'OpenWurli', 'WobbleBass',
 ]);
 
 /** Pooled Amiga per-note replayers: one engine singleton, fixed player pool. Shared across channels. */
