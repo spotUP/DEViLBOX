@@ -3,8 +3,9 @@
  * tools/drummachine.py (ported in src/engine/dj/scratch/demoDrums.ts, sample-exact) behind the ParameterDef
  * knobs of its Python keyword arguments, with the Python defaults (drummachine.VOICE_PARAMS).
  *
- * Note handling, the same for all: `tune` that is semitones (kick, snare, tom, conga) moves by (midi - 60);
- * `tune` that is a frequency ratio (hat, cowbell) is multiplied by 2^((midi - 60) / 12); velocity scales the
+ * Note handling, the same for all: `tune` that is semitones (kick, snare, tom, conga) moves by (midi - 48);
+ * `tune` that is a frequency ratio (hat, cowbell) is multiplied by 2^((midi - 48) / 12), where 48 is the host's
+ * drum cell note (song_file.DRUM_NOTE "C-4", HOST_DRUM_MIDI); velocity scales the
  * output; durSec is ignored (a drum's length is its own decay parameter). The render `seed` goes to the
  * Python `seed` argument where one exists (hat, rim, ride); the other voices' noise seeds are fixed in the
  * Python and stay fixed.
@@ -17,7 +18,7 @@ import {
   type ClapParams, type DrumMachine, type HatParams, type KickParams, type SnareParams, type TomParams,
 } from '@/engine/dj/scratch/demoDrums';
 import { pexp2 } from '@/engine/dj/scratch/portableMath';
-import type { SoftsynthNote, SoftsynthVoice } from '../softsynthVoice';
+import { HOST_DRUM_MIDI, type SoftsynthNote, type SoftsynthVoice } from '../softsynthVoice';
 import { humanizeDraw, humanizeSeed, varyHit } from '../humanize';
 
 /** Hi-hats have their own variation path in the Python (vary_hat_hit); the humanize knob is for the other drums. */
@@ -33,7 +34,7 @@ const machineSelect = (def: DrumMachine): ParameterDef => ({
   options: [{ value: 808, label: 'TR-808' }, { value: 909, label: 'TR-909' }],
 });
 
-const semitones = (note: SoftsynthNote): number => note.midi - 60;
+const semitones = (note: SoftsynthNote): number => note.midi - HOST_DRUM_MIDI;
 const ratio = (note: SoftsynthNote): number => pexp2(semitones(note) / 12);
 const machineOf = (v: number): DrumMachine => (Math.round(v) === 808 ? '808' : '909');
 const scaled = (x: Float64Array, velocity: number): Float64Array => {
@@ -79,7 +80,7 @@ const kickKnobs = (d: KickParams): ParameterDef[] => [
 ];
 const KICK_KEYS = Object.keys(KICK909_PARAMS) as (keyof KickParams)[];
 
-/** kick808; `tune` + (midi - 60) semitones; the Python has no seed (click noise seed 1). */
+/** kick808; `tune` + (midi - 48) semitones; the Python has no seed (click noise seed 1). */
 export const kickVoice: SoftsynthVoice = voice('kick', 'Kick', kickKnobs(DEMO_VOICE_PARAMS.kick808), (get, note, rate) => {
   const o: Partial<KickParams> = {};
   for (const k of KICK_KEYS) o[k] = get(k);
@@ -97,7 +98,7 @@ const snareKnobs = (d: SnareParams): ParameterDef[] => [
 const snareRun = (fn: typeof snare808) => (get: (k: string) => number, note: SoftsynthNote, rate: number): Float64Array =>
   fn({ tune: get('tune') + semitones(note), noise_amt: get('noise_amt'), body_decay: get('body_decay'), noise_decay: get('noise_decay'), drive: get('drive') }, rate);
 
-/** snare808 / snare909: `tune` + (midi - 60) semitones; fixed noise seeds 2 and 7. */
+/** snare808 / snare909: `tune` + (midi - 48) semitones; fixed noise seeds 2 and 7. */
 export const snare808Voice: SoftsynthVoice = voice('snare808', 'Snare 808', snareKnobs(DEMO_VOICE_PARAMS.snare808), snareRun(snare808));
 export const snare909Voice: SoftsynthVoice = voice('snare909', 'Snare 909', snareKnobs(DEMO_VOICE_PARAMS.snare909), snareRun((o, r) => snare909(o, r)));
 
@@ -162,7 +163,7 @@ export const hatOpenVoice: SoftsynthVoice = voice('hatOpen', 'Open Hat', hatKnob
  */
 export const hatPedalVoice: SoftsynthVoice = voice('hatPedal', 'Pedal Hat', hatKnobs(35), hatRun(false));
 
-/** tom: `tune` + (midi - 60) semitones; no seed. */
+/** tom: `tune` + (midi - 48) semitones; no seed. */
 export const tomVoice: SoftsynthVoice = voice('tom', 'Tom', [
   machineSelect('909'),
   knob('tune', 'Tune', 20, -12, 48, 'Pitch'),
@@ -178,13 +179,13 @@ export const tomVoice: SoftsynthVoice = voice('tom', 'Tom', [
 export const rimVoice: SoftsynthVoice = voice('rim', 'Rim', [machineSelect('909')],
   (get, _note, rate, seed) => rim({ machine: machineOf(get('machine')), seed }, rate));
 
-/** cowbell: `tune` is a ratio, multiplied by 2^((midi - 60) / 12); no seed. */
+/** cowbell: `tune` is a ratio, multiplied by 2^((midi - 48) / 12); no seed. */
 export const cowbellVoice: SoftsynthVoice = voice('cowbell', 'Cowbell', [
   knob('tune', 'Tune', 1.0, 0.5, 2, 'Tone'),
   knob('dirt', 'Dirt', 0, 0, 4, 'Character'),
 ], (get, note, rate) => cowbell({ tune: get('tune') * ratio(note), dirt: get('dirt') }, rate));
 
-/** conga: `tune` + (midi - 60) semitones; no seed. */
+/** conga: `tune` + (midi - 48) semitones; no seed. */
 export const congaVoice: SoftsynthVoice = voice('conga', 'Conga', [
   knob('tune', 'Tune', 32, 0, 60, 'Pitch'),
   knob('decay', 'Decay', 140, 40, 600, 'Amplitude'),

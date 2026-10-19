@@ -14,7 +14,20 @@ import type { ParameterDef } from '@/engine/registry/SynthDescriptor';
 /** The engine rate of the reference (hiphop / drummachine RATE). */
 export const SOFTSYNTH_RATE = 22050;
 
-/** The tracker note a voice hears; drums treat (midi - 60) as semitones on their `tune`. */
+/**
+ * The song file's note numbering (Up_Rough_Demo_System/tools/song_file.py note_name / note_midi): the cell
+ * text "C-4" is MIDI 48. DEViLBOX names the same text MIDI 60 (noteToMidi), so the softsynth boundary
+ * (UpRoughSoftsynth) subtracts this once and every voice hears the host's number.
+ */
+export const DEVILBOX_TO_HOST_MIDI = 12;
+
+/** The host's drum cell note (song_file.DRUM_NOTE "C-4" = 48): the untransposed hit. */
+export const HOST_DRUM_MIDI = 48;
+
+/**
+ * The note a voice hears, in the host's numbering (C-4 = 48): the piano plays hz(midi), the 808 plays trap808
+ * semi (midi - 36), drums treat (midi - 48) as semitones on their `tune`.
+ */
 export interface SoftsynthNote {
   midi: number;
   durSec: number;
