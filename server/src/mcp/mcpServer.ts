@@ -1105,8 +1105,14 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
     {
       name: z.string().optional().describe('Instrument name'),
       synthType: z.string().optional().describe('Synth type (e.g., "sample", "tb303", "wavetable")'),
+      volume: z.number().optional().describe('Instrument volume in dB (default -12)'),
+      pan: z.number().min(-1).max(1).optional().describe('Pan -1..1'),
+      config: z.record(z.string(), z.any()).optional().describe('Any other InstrumentConfig fields, merged over the named ones'),
     },
-    (p) => call('create_instrument', { config: p }),
+    (p) => {
+      const { config, ...named } = p;
+      return call('create_instrument', { config: { ...named, ...(config ?? {}) } });
+    },
   );
 
   server.tool(
@@ -1116,10 +1122,13 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
       id: z.number().int().min(0).describe('Instrument ID'),
       name: z.string().optional().describe('Instrument name'),
       synthType: z.string().optional().describe('Synth type'),
+      volume: z.number().optional().describe('Instrument volume in dB'),
+      pan: z.number().min(-1).max(1).optional().describe('Pan -1..1'),
+      updates: z.record(z.string(), z.any()).optional().describe('Any other InstrumentConfig fields (deep-partial), merged over the named ones'),
     },
     (p) => {
-      const { id, ...updates } = p;
-      return call('update_instrument', { id, updates });
+      const { id, updates, ...named } = p;
+      return call('update_instrument', { id, updates: { ...named, ...(updates ?? {}) } });
     },
   );
 
