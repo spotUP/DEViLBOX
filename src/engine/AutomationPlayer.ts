@@ -15,8 +15,6 @@ import { interpolateAutomationValue } from '@typedefs/automation';
 import type { AutomationCurve } from '@typedefs/automation';
 import { routeParameterToEngine, DUB_MOVE_KINDS } from '@/midi/performance/parameterRouter';
 import { isWholeSongSynth } from './wholeSongSynths';
-import { decodeVolumeColumn } from '@/lib/tracker/volumeColumn';
-import { getFormatStoreRefOrNull } from '@/stores/storeAccess';
 
 /**
  * Is a live performer already driving the dub bus?
@@ -51,6 +49,15 @@ interface AutomationData {
     };
   };
 }
+
+/**
+ * Tracker hex columns that drive an instrument parameter directly.
+ *
+ * `volume` is NOT in this list on purpose. See `getColumnValue`: the volume
+ * column is a channel-level row value applied by the replayer, never a write
+ * into an instrument's persistent volume.
+ */
+export const TRACKER_COLUMN_PARAMS = ['cutoff', 'resonance', 'envMod', 'pan'] as const;
 
 export class AutomationPlayer {
   private currentPattern: Pattern | null = null;
@@ -93,24 +100,20 @@ export class AutomationPlayer {
       case 'pan':
         rawValue = cell.pan;
         break;
-      case 'volume': {
-        // The volume column means different things in different formats, and
-        // reading it with the wrong convention yields a plausible wrong level
-        // rather than an error — an AHX volume of 16 read as XM's 0x10 is
-        // "set volume 0". `decodeVolumeColumn` already returns 0..1, so return
-        // it here rather than falling through the 0..64 normalisation below.
-        const formatState = getFormatStoreRefOrNull()?.getState() as
-          { editorMode?: string } | undefined;
-        return decodeVolumeColumn(cell.volume, formatState?.editorMode ?? null);
-      }
       default:
+        // The volume column is deliberately absent. It is a per-channel,
+        // per-row level that the replayer channel path owns (velocity and
+        // channel gain, see SynthEffectProcessor). Sending it through
+        // applyParameter writes an instrument's PERSISTENT volume (DX7
+        // firmware volume, DB303 setVolume, Tone `.volume`), which nothing
+        // restores on stop: an XM volume byte of 0x10 ("set volume 0") on
+        // every row made the whole rig song go silent after the first row.
         return null;
     }
 
     if (rawValue === undefined) return null;
 
-    // The remaining columns are 0x00-0xFF. `volume` returns above, through
-    // `decodeVolumeColumn`, because its range depends on the format.
+    // All tracker columns read here are 0x00-0xFF.
     return rawValue / 0xff;
   }
 
@@ -298,9 +301,10 @@ export class AutomationPlayer {
 
     // A native replayer plays the whole song through ONE shared instance, and
     // its `output` gain carries the entire mix. A value derived from a single
-    // channel's cell must not reach it: `set('volume', 0)` there silences the
-    // song, not the channel, and nothing restores it. Those replayers apply
-    // their own per-channel volumes internally, so there is nothing to add.
+    // channel's cell must not reach it. The volume column no longer reaches
+    // any instrument (see `getColumnValue`), but a curve or another column
+    // still would, and those replayers apply their own per-channel values
+    // internally, so there is nothing to add.
     if (isWholeSongSynth(engine.getInstrumentSynthType(instrumentId, channelIndex))) return;
 
     try {
@@ -429,8 +433,7 @@ export class AutomationPlayer {
     if (instrumentId === null) return;
 
     // Column-based params (always checked — these come from TrackerCell hex columns)
-    const columnParams = ['cutoff', 'resonance', 'envMod', 'pan', 'volume'];
-    for (const param of columnParams) {
+    for (const param of TRACKER_COLUMN_PARAMS) {
       const colValue = this.getColumnValue(cell, param);
       if (colValue !== null) {
         this.applyParameter(instrumentId, param, colValue, channelIndex);
@@ -467,8 +470,7 @@ export class AutomationPlayer {
       if (instrumentId === null) return;
 
       // Column-based params (always checked at integer row)
-      const columnParams = ['cutoff', 'resonance', 'envMod', 'pan', 'volume'];
-      for (const param of columnParams) {
+      for (const param of TRACKER_COLUMN_PARAMS) {
         const colValue = this.getColumnValue(cell, param);
         if (colValue !== null) {
           this.applyParameter(instrumentId, param, colValue, channelIndex);
