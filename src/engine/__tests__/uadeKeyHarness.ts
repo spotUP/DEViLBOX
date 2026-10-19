@@ -6,6 +6,7 @@ import { vi } from 'vitest';
 import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch, audioLoadsSettled } from '@/test/audio/realWebAudio';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { startWorklet, songBuffer, stereoOutputs } from './workletHarness';
+import { clearAllGlobalSingletons } from '@utils/globalSingleton';
 
 export const SR = 48000; // the UADE worklet's and the fundamentalHz helper's rate
 const uadeTransform = async (c: string) => (await import('@/engine/uade/UADEEngine')).uadeTransform(c);
@@ -67,6 +68,7 @@ export interface KeyPress { note: string; at: number; period?: number }
 /** The instrument on the real ToneEngine, rendered offline: what the keyboard plays. One render per call (a fresh engine). */
 export async function renderKeys(config: InstrumentConfig, presses: KeyPress[], secs: number): Promise<Float32Array> {
   vi.resetModules();
+  clearAllGlobalSingletons(); // the engine lives on globalThis, so a module reset alone reuses the last render's engine
   installRealWebAudio(); resolveWorkletsFromPublic(); servePublicToFetch();
   const Tone = await import('tone');
   const ctx = new OfflineAudioContext(2, Math.ceil(SR * secs), SR);
