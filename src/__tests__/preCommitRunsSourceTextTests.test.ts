@@ -120,12 +120,17 @@ describe('pre-commit gate stays fast and isolated', () => {
   });
   it('the kept snapshot is reused between commits, follows the new staged content, drops leftovers and releases its lock', () => {
     const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'precommit-kept-'));
-    const env = cleanEnv();
+    // The kept slot lives under TMPDIR; point it inside the test repository so the
+    // finally block removes it (17 orphaned devilbox-test-kept-* slots on 2026-10-19).
+    const env = { ...cleanEnv(), TMPDIR: path.join(repo, '.tmp') + '/' };
+    fs.mkdirSync(path.join(repo, '.tmp'));
     const git = (...a: string[]) => execFileSync('git', a, { cwd: repo, encoding: 'utf8', env }).trim();
     try {
       git('init', '-q');
       git('config', 'user.email', 't@t');
       git('config', 'user.name', 't');
+      fs.writeFileSync(path.join(repo, '.gitignore'), '.tmp\n');
+      git('add', '.gitignore');
       fs.writeFileSync(path.join(repo, 'a.txt'), 'base\n');
       git('add', 'a.txt');
       git('commit', '-q', '-m', 'base');

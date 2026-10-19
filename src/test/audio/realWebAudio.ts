@@ -10,7 +10,7 @@
  */
 import * as webAudio from 'node-web-audio-api';
 import { dirname, join } from 'node:path';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { readFile } from 'node:fs/promises';
 
@@ -147,6 +147,9 @@ export function resolveWorkletsFromPublic(root = process.cwd()): void {
   const original = proto.addModule;
   if ((original as { _public?: boolean })._public) return;
   const outDir = mkdtempSync(join(tmpdir(), 'devilbox-worklets-'));
+  // One directory per test process; without this every vitest worker left its
+  // copied worklets behind in TMPDIR (576 directories on 2026-10-19).
+  process.on('exit', () => rmSync(outDir, { recursive: true, force: true }));
   const patched = function (this: unknown, url: string): Promise<void> {
     if (typeof url !== 'string' || !url.startsWith('/')) return track(original.call(this, url));
     const rel = url.split('?')[0];

@@ -81,6 +81,28 @@ describe('hook snapshot leaves out the paths no test reads', { timeout: 120000 }
     expect(existsSync(join(second, 'third-party/furnace-master/x.c'))).toBe(false);
   });
 
+  it('prunes an unlocked kept slot whose working tree is gone, keeps a locked one and the live ones', () => {
+    // Slot A: made from a repository that is then deleted (a removed worktree), unlocked.
+    // Slot B: same, but its lock is still held (a hook still running there).
+    const out = bash(
+      `. "${SNAPSHOT_SH}"; SNAP_LABEL=t
+       mk() { mkdir -p "$1" && git -C "$1" init -q -b main && git -C "$1" -c user.email=t@t -c user.name=t commit -q --allow-empty -m seed; }
+       mk "$TMPDIR/gone-a"; mk "$TMPDIR/gone-b"
+       (cd "$TMPDIR/gone-a" && materialise_reusable "$(git rev-parse HEAD)" "$(git write-tree)" && echo "$SNAP" && cleanup_snapshot)
+       (cd "$TMPDIR/gone-b" && materialise_reusable "$(git rev-parse HEAD)" "$(git write-tree)" && echo "$SNAP")
+       rm -rf "$TMPDIR/gone-a" "$TMPDIR/gone-b"
+       sha=$(git rev-parse HEAD); tree=$(git write-tree); materialise_reusable "$sha" "$tree"; echo "$SNAP"`,
+      repo, { TMPDIR: scratch + '/' });
+    const [orphan, locked, own] = out.split('\n');
+    expect(orphan).toMatch(/-kept-\d+$/);
+    expect(existsSync(orphan)).toBe(false); // origin gone, no lock: pruned
+    expect(existsSync(locked)).toBe(true); // origin gone but a hook holds it: left alone
+    expect(existsSync(join(own, 'src/a.ts'))).toBe(true);
+    // A second take from the live repository keeps its own slot.
+    bash(`. "${SNAPSHOT_SH}"; SNAP_LABEL=t; rmdir "${own}.lock"; materialise_reusable "$(git rev-parse HEAD)" "$(git write-tree)"; cleanup_snapshot`, repo, { TMPDIR: scratch + '/' });
+    expect(existsSync(join(own, 'src/a.ts'))).toBe(true);
+  });
+
   it('rebuilds a kept snapshot made with other patterns (the old full checkouts)', () => {
     const out = bash(
       `. "${SNAPSHOT_SH}"; SNAP_LABEL=t; sha=$(git rev-parse HEAD); tree=$(git write-tree)

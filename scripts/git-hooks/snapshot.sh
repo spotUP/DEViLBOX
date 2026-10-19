@@ -22,6 +22,28 @@ install_snapshot_traps() {
   trap cleanup_snapshot EXIT
   trap 'stop_children; cleanup_snapshot; exit 130' INT
   trap 'stop_children; cleanup_snapshot; exit 143' TERM
+  # A closed terminal (HUP) or a reader that went away (PIPE: git's pager, a
+  # killed `git push`) must also release the kept slot, or its lock stays
+  # until the stale-lock takeover an hour later (2026-10-19: 2.6 GB of
+  # orphaned slots in TMPDIR).
+  trap 'stop_children; cleanup_snapshot; exit 129' HUP
+  trap 'stop_children; cleanup_snapshot; exit 141' PIPE
+}
+
+# A kept slot belongs to one working tree (its clone origin). Worktrees come
+# and go, and each left its ~0.7 GB slot behind under TMPDIR. Any unlocked slot
+# of this label whose origin path no longer exists is removed before a slot is
+# taken. Nothing can be using it: a slot is only ever locked by a hook running
+# from its origin, and that origin is gone.
+prune_orphan_slots() {
+  local d url
+  for d in "${TMPDIR:-/tmp}"/devilbox-"${SNAP_LABEL:-snapshot}"-kept-*; do
+    [ -d "$d/.git" ] || continue
+    [ -d "$d.lock" ] && continue
+    url="$(snapshot_env git -C "$d" config remote.origin.url 2>/dev/null)"
+    [ -n "$url" ] && [ -e "$url" ] && continue
+    rm -rf "$d"
+  done
 }
 
 # The snapshot is its own repository: a hook (or commit-files.sh) exports
@@ -146,6 +168,7 @@ materialise_reusable() {
   slots=${DEVILBOX_HOOK_SLOTS:-2}
   # Not inside .git/: vite and vitest ignore every path under a .git directory.
   base="${TMPDIR:-/tmp}/devilbox-${SNAP_LABEL:-snapshot}-kept-$(printf '%s' "$top" | cksum | cut -d' ' -f1)"
+  prune_orphan_slots
   dir=""
   for n in $(seq 1 "$slots"); do
     slot="$base"; [ "$n" -gt 1 ] && slot="$base-$n"
