@@ -49,6 +49,10 @@ export interface SongFileGroove {
 export function songGroove(song: JsonObject): SongFileGroove | null {
   return song.groove as SongFileGroove | null;
 }
+/** The style's bass_cut (render_bass_bar's brightness multiplier), copied into song.bass_cut like the groove row. */
+export function songBassCut(song: JsonObject): number {
+  return song.bass_cut as number;
+}
 
 export interface SongFileDoc {
   format: string;
@@ -165,7 +169,7 @@ const RENDER_PARAMS = [
   'voice_cfg',
 ];
 const TOP = ['format', 'schema', 'generator', 'song', 'instruments', 'sections', 'order', 'side', 'bus'];
-const SONG = ['name', 'style', 'seed', 'key', 'bpm', 'speed', 'groove', 'rate', 'tier', 'bars', 'rows_per_bar', 'render', 'motif', 'chord_roots'];
+const SONG = ['name', 'style', 'seed', 'key', 'bpm', 'speed', 'groove', 'bass_cut', 'rate', 'tier', 'bars', 'rows_per_bar', 'render', 'motif', 'chord_roots'];
 const GROOVE = ['swing', 'micro', 'vel'];
 const GROOVE_MICRO = ['kick', 'snare', 'ch', 'ghost', 'perc', 'chop'];
 const SECTION = ['id', 'header', 'lanes', 'bars', 'locked'];
@@ -216,6 +220,7 @@ export function parseSongFile(input: string | unknown): SongFileDoc {
       if (typeof v !== 'number' || !Number.isFinite(v)) throw new SongFileError(`Song groove field "${k}" is ${JSON.stringify(v)}, not a number.`);
     }
   }
+  if (typeof d.song.bass_cut !== 'number' || !Number.isFinite(d.song.bass_cut) || d.song.bass_cut <= 0) throw new SongFileError(`Song field "bass_cut" is ${JSON.stringify(d.song.bass_cut)}, not a positive number.`);
   if (d.song.rows_per_bar !== ROWS_PER_BAR) throw new SongFileError(`rows_per_bar is ${JSON.stringify(d.song.rows_per_bar)}; schema ${SCHEMA} is 16 rows per bar.`);
   if (typeof d.song.name !== 'string') throw new SongFileError(`Song name ${JSON.stringify(d.song.name)} is not text.`);
   if (d.song.speed !== SPEED) throw new SongFileError(`Song speed is ${JSON.stringify(d.song.speed)}; Up Rough songs play at speed 6 (16 rows per bar).`);
