@@ -64,6 +64,7 @@ import type {
 import { VOWEL_FORMANTS } from './tonejs';
 import { voiceDefaults } from '@engine/uprough/softsynthVoice';
 import { bass808Voice } from '@engine/uprough/voices/bass808';
+import { ANALOG_KIT_MAP } from '@constants/drumnibusPresets';
 import type {
   FurnaceConfig,
 } from './furnace';
@@ -1450,8 +1451,9 @@ export const DEFAULT_RDPIANO: RdPianoConfig = {
   volume: 1.0,
 };
 
+// A new Drum Kit starts with the Drumnibus Analog kit (kick on C-2, snare on D-2, ...).
 export const DEFAULT_DRUMKIT: DrumKitConfig = {
-  keymap: [],
+  keymap: ANALOG_KIT_MAP,
   polyphony: 'poly',
   maxVoices: 8,
   noteCut: false,

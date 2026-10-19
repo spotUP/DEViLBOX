@@ -12,6 +12,7 @@ import type { DevilboxSynth } from '../types/synth';
 import { getDevilboxAudioContext, audioNow } from '../utils/audio-context';
 import type { DrumKitConfig, DrumKitKeyMapping } from '../types/instrument';
 import { noteToMidi } from '../lib/xmConversions';
+import { normalizeUrl } from '../utils/urlUtils';
 
 interface ActiveVoice {
   source: AudioBufferSourceNode;
@@ -28,7 +29,7 @@ export class DrumKitSynth implements DevilboxSynth {
   // Configuration
   private config: DrumKitConfig;
 
-  // Loaded sample buffers
+  // Loaded sample buffers, keyed by sampleId (what resolveSampleId returns)
   private sampleBuffers: Map<string, AudioBuffer> = new Map();
 
   // Active voices
@@ -44,11 +45,15 @@ export class DrumKitSynth implements DevilboxSynth {
   private outputGain: GainNode;
   readonly output: GainNode;
 
-  // Callback for loading samples
-  private onSampleNeeded?: (sampleId: string, sampleUrl?: string) => Promise<AudioBuffer | null>;
+  // Loads one sample; defaults to fetching and decoding its sampleUrl
+  private onSampleNeeded: (sampleId: string, sampleUrl?: string) => Promise<AudioBuffer | null>;
+
+  // The running preload, awaited by ensureInitialized()
+  private preload: Promise<void> = Promise.resolve();
 
   constructor(config: DrumKitConfig) {
-    this.config = config;
+    // Own copy of the keymap: addMapping/removeMapping must not mutate the store's config.
+    this.config = { ...config, keymap: [...config.keymap] };
     this.audioContext = getDevilboxAudioContext();
 
     // Create output
@@ -59,29 +64,53 @@ export class DrumKitSynth implements DevilboxSynth {
     this.outputGain = this.audioContext.createGain();
     this.outputGain.gain.value = 0.8;
     this.outputGain.connect(this.output);
+
+    this.onSampleNeeded = (sampleId, sampleUrl) => this.fetchSample(sampleId, sampleUrl);
+    this.preload = this.preloadSamples();
   }
 
   /**
-   * Set the sample loader callback
+   * Fetch and decode a mapping's sample from its URL (pack path, data URL or blob URL).
+   */
+  private async fetchSample(sampleId: string, sampleUrl?: string): Promise<AudioBuffer | null> {
+    if (!sampleUrl) return null;
+    try {
+      const response = await fetch(normalizeUrl(sampleUrl));
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await this.audioContext.decodeAudioData(await response.arrayBuffer());
+    } catch (err) {
+      console.warn(`[DrumKitSynth] Could not load sample ${sampleId} from ${sampleUrl}:`, err);
+      return null;
+    }
+  }
+
+  /**
+   * Resolves once every sample in the keymap has been loaded (or failed to).
+   */
+  ensureInitialized(): Promise<void> {
+    return this.preload;
+  }
+
+  /**
+   * Replace the sample loader callback and reload the keymap with it
    */
   setSampleLoader(loader: (sampleId: string, sampleUrl?: string) => Promise<AudioBuffer | null>): void {
     this.onSampleNeeded = loader;
+    this.preload = this.preloadSamples();
   }
 
   /**
    * Preload all samples in the keymap
    */
   async preloadSamples(): Promise<void> {
-    if (!this.onSampleNeeded) return;
-
     const promises: Promise<void>[] = [];
 
     for (const mapping of this.config.keymap) {
       // Preload primary sample
-      if (!this.sampleBuffers.has(mapping.id)) {
+      if (!this.sampleBuffers.has(mapping.sampleId)) {
         promises.push(
           this.onSampleNeeded(mapping.sampleId, mapping.sampleUrl).then(buffer => {
-            if (buffer) this.sampleBuffers.set(mapping.id, buffer);
+            if (buffer) this.sampleBuffers.set(mapping.sampleId, buffer);
           })
         );
       }
@@ -90,7 +119,7 @@ export class DrumKitSynth implements DevilboxSynth {
         for (const layer of mapping.velocityLayers) {
           if (!this.sampleBuffers.has(layer.sampleId)) {
             promises.push(
-              this.onSampleNeeded!(layer.sampleId, layer.sampleUrl).then(buffer => {
+              this.onSampleNeeded(layer.sampleId, layer.sampleUrl).then(buffer => {
                 if (buffer) this.sampleBuffers.set(layer.sampleId, buffer);
               })
             );
@@ -105,8 +134,8 @@ export class DrumKitSynth implements DevilboxSynth {
   /**
    * Load a specific sample buffer
    */
-  loadSample(mappingId: string, buffer: AudioBuffer): void {
-    this.sampleBuffers.set(mappingId, buffer);
+  loadSample(sampleId: string, buffer: AudioBuffer): void {
+    this.sampleBuffers.set(sampleId, buffer);
   }
 
   /**
@@ -334,7 +363,8 @@ export class DrumKitSynth implements DevilboxSynth {
    * Update configuration
    */
   updateConfig(config: Partial<DrumKitConfig>): void {
-    this.config = { ...this.config, ...config };
+    this.config = { ...this.config, ...config, keymap: [...(config.keymap ?? this.config.keymap)] };
+    if (config.keymap) this.preload = this.preloadSamples();
   }
 
   /**
@@ -349,6 +379,7 @@ export class DrumKitSynth implements DevilboxSynth {
    */
   addMapping(mapping: DrumKitKeyMapping): void {
     this.config.keymap.push(mapping);
+    this.preload = this.preloadSamples();
   }
 
   /**
@@ -357,8 +388,10 @@ export class DrumKitSynth implements DevilboxSynth {
   removeMapping(mappingId: string): void {
     const idx = this.config.keymap.findIndex(m => m.id === mappingId);
     if (idx !== -1) {
-      this.config.keymap.splice(idx, 1);
-      this.sampleBuffers.delete(mappingId);
+      const [removed] = this.config.keymap.splice(idx, 1);
+      if (!this.config.keymap.some(m => m.sampleId === removed.sampleId)) {
+        this.sampleBuffers.delete(removed.sampleId);
+      }
     }
   }
 
