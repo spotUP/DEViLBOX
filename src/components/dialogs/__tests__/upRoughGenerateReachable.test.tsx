@@ -23,11 +23,14 @@ afterEach(() => {
 });
 
 describe('Generate Up Rough Song from the hamburger menu', () => {
-  it('fetches styles, posts the choice once and loads the returned song into the tracker', async () => {
+  it('fetches styles, posts the choice once, shows the running phase and loads the returned song into the tracker', async () => {
+    // Hold the generate answer so the dialog can be seen while the server works.
+    let answer: (r: Response) => void = () => undefined;
+    const generated = new Promise<Response>((resolve) => { answer = resolve; });
     const fetchMock = vi.fn(async (url: string, _init?: RequestInit) =>
       url === '/api/uprough/styles'
         ? new Response(JSON.stringify({ styles: ['trap'] }), { status: 200 })
-        : new Response(JSON.stringify(fixture), { status: 200 }),
+        : generated,
     );
     vi.stubGlobal('fetch', fetchMock);
     useTrackerStore.setState({ upRoughMeta: null });
@@ -38,12 +41,15 @@ describe('Generate Up Rough Song from the hamburger menu', () => {
     fireEvent.click(burger);
     fireEvent.click(await screen.findByText('Generate Up Rough Song...'));
 
-    const select = (await screen.findByLabelText('Style')) as HTMLSelectElement;
-    await waitFor(() => expect(select.value).toBe('trap'));
+    const style = await screen.findByTitle('Style');
+    await waitFor(() => expect(style.textContent).toContain('trap'));
     fireEvent.change(screen.getByLabelText('Bars (empty for the whole song)'), { target: { value: '16' } });
     fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
 
-    await waitFor(() => expect(useTrackerStore.getState().upRoughMeta?.song.style).toBe('trap'));
+    expect((await screen.findByRole('status')).textContent).toContain('Generating on the server... 0 s');
+    answer(new Response(JSON.stringify(fixture), { status: 200 }));
+
+    await waitFor(() => expect(useTrackerStore.getState().upRoughMeta?.song.style).toBe('trap'), { timeout: 10_000 }); // the import unloads the outgoing song first
     expect(useTrackerStore.getState().upRoughMeta?.song.name).toBe('trap 1');
     const posts = fetchMock.mock.calls.filter((c) => c[0] === '/api/uprough/generate');
     expect(posts).toHaveLength(1);
