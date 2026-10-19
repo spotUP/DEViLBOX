@@ -18,6 +18,7 @@ import {
   GeonkickKickEnvelope,
   GeonkickOscEnvelope,
   GeonkickOscFunction,
+  GeonkickEnvelopeApplyType,
   type GeonkickEnvelopePoint,
 } from './GeonkickEngine';
 
@@ -25,6 +26,7 @@ import {
 
 interface PresetEnvelope {
   amplitude?: number;
+  apply_type?: number;   // 0 = linear, 1 = logarithmic
   points?: number[][]; // each entry is [x, y]
 }
 
@@ -34,6 +36,7 @@ interface PresetFilter {
   cutoff?: number;
   factor?: number;
   cutoff_env?: number[][];
+  apply_type?: number;   // cutoff envelope: 0 = linear, 1 = logarithmic
 }
 
 interface PresetDistortion {
@@ -95,6 +98,10 @@ function pointsFromArray(arr?: number[][]): GeonkickEnvelopePoint[] {
     .map((p) => ({ x: p[0], y: p[1], controlPoint: false }));
 }
 
+function applyTypeOf(t: number | undefined): GeonkickEnvelopeApplyType {
+  return t === 1 ? GeonkickEnvelopeApplyType.Logarithmic : GeonkickEnvelopeApplyType.Linear;
+}
+
 function clampFilterType(t: number | undefined): GeonkickFilterType {
   if (t === 1) return GeonkickFilterType.HighPass;
   if (t === 2) return GeonkickFilterType.BandPass;
@@ -145,6 +152,7 @@ function applyKickBlock(engine: GeonkickEngine, kick: PresetKick): void {
     if (cutoffPoints.length > 0) {
       engine.setKickEnvelope(GeonkickKickEnvelope.FilterCutoff, cutoffPoints);
     }
+    engine.setKickEnvelopeApplyType(GeonkickKickEnvelope.FilterCutoff, applyTypeOf(kick.filter.apply_type));
   }
 
   if (kick.distortion) {
@@ -191,7 +199,11 @@ function applyOscillator(
   );
 
   // ── frequency envelope ─────────────────────────────────────────────
-  engine.setOscillatorFrequency(oscIndex, osc.freq_env?.amplitude ?? 800);
+  // Presets sweep frequency logarithmically (apply_type 1); applied linearly
+  // the sweep sits up to an octave or more too high mid-envelope.
+  // 150 Hz is the core's default (GKICK_OSC_DEFAULT_FREQUENCY).
+  engine.setOscillatorFrequency(oscIndex, osc.freq_env?.amplitude ?? 150);
+  engine.setOscillatorEnvelopeApplyType(oscIndex, GeonkickOscEnvelope.Frequency, applyTypeOf(osc.freq_env?.apply_type));
   const freqPoints = pointsFromArray(osc.freq_env?.points);
   if (freqPoints.length > 0) {
     engine.setOscillatorEnvelope(oscIndex, GeonkickOscEnvelope.Frequency, freqPoints);
@@ -221,6 +233,7 @@ function applyOscillator(
     if (cutoffEnvPoints.length > 0) {
       engine.setOscillatorEnvelope(oscIndex, GeonkickOscEnvelope.FilterCutoff, cutoffEnvPoints);
     }
+    engine.setOscillatorEnvelopeApplyType(oscIndex, GeonkickOscEnvelope.FilterCutoff, applyTypeOf(f.apply_type));
   }
 }
 

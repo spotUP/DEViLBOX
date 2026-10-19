@@ -53,13 +53,26 @@ export const GeonkickKickEnvelope = {
 } as const;
 export type GeonkickKickEnvelope = (typeof GeonkickKickEnvelope)[keyof typeof GeonkickKickEnvelope];
 
+/**
+ * Oscillator envelope indices. The core looks these up with the same
+ * geonkick_envelope_type numbering as the kick envelopes
+ * (gkick_osc_get_envelope), so pitch shift is 5; 3 is the oscillator's
+ * distortion drive envelope.
+ */
 export const GeonkickOscEnvelope = {
   Amplitude:    0,
   Frequency:    1,
   FilterCutoff: 2,
-  PitchShift:   3,
+  PitchShift:   5,
 } as const;
 export type GeonkickOscEnvelope = (typeof GeonkickOscEnvelope)[keyof typeof GeonkickOscEnvelope];
+
+/** gkick_envelope_apply_type: how an envelope value maps onto its range. */
+export const GeonkickEnvelopeApplyType = {
+  Linear:      0,
+  Logarithmic: 1,
+} as const;
+export type GeonkickEnvelopeApplyType = (typeof GeonkickEnvelopeApplyType)[keyof typeof GeonkickEnvelopeApplyType];
 
 export interface GeonkickEnvelopePoint {
   x: number;
@@ -370,6 +383,28 @@ export class GeonkickEngine extends WASMSingletonBase {
       },
       [serialized.buffer],
     );
+  }
+
+  /** Only the frequency and filter cutoff envelopes read the apply type in the core. */
+  setKickEnvelopeApplyType(envType: GeonkickKickEnvelope, applyType: GeonkickEnvelopeApplyType): void {
+    this.workletNode?.port.postMessage({
+      type: 'setKickEnvApplyType',
+      envType: envType | 0,
+      applyType: applyType | 0,
+    });
+  }
+
+  setOscillatorEnvelopeApplyType(
+    oscIndex: number,
+    envIndex: GeonkickOscEnvelope,
+    applyType: GeonkickEnvelopeApplyType,
+  ): void {
+    this.workletNode?.port.postMessage({
+      type: 'setOscEnvApplyType',
+      oscIndex: oscIndex | 0,
+      envIndex: envIndex | 0,
+      applyType: applyType | 0,
+    });
   }
 
   override dispose(): void {
