@@ -299,7 +299,9 @@ describe('FMSynth and AMSynth: modulation index, harmonicity, modulator', () => 
     expect(purity(fast)).toBeGreaterThan(purity(slow) * 3);
     const square = await render(fm({ modulationIndex: 20, harmonicity: 3, modulation: { type: 'square' } }), 1.2, { note: 400, hold: 1 });
     const sine = fast;
-    expect(Math.abs(toneAmplitude(square, 5 * 400, 0.3, 1) - toneAmplitude(sine, 5 * 400, 0.3, 1))).toBeGreaterThan(0.05);
+    // relative to the sine's line: the instrument plays at the registry's normalized level, so an absolute height would measure that level, not the knob
+    const fifth = (r: Rendered) => toneAmplitude(r, 5 * 400, 0.3, 1);
+    expect(Math.abs(fifth(square) - fifth(sine))).toBeGreaterThan(0.25 * fifth(sine));
   });
 
   it('AM: sidebands sit at carrier +- harmonicity x carrier, at the amplitude the curve draws', async () => {
@@ -460,7 +462,9 @@ describe('MetalSynth and MembraneSynth', () => {
     expect(band(low, 500, 3000)).toBeGreaterThan(band(high, 500, 3000) * 2);
     const narrow = await hit({ octaves: 0 });
     const wide = await hit({ octaves: 6 });
-    expect(Math.abs(rms(narrow, 0.06, 0.3) - rms(wide, 0.06, 0.3))).toBeGreaterThan(0.002);
+    // relative to the louder hit, for the same reason: the level is the registry's, the knob's effect is the ratio
+    const [n, w] = [rms(narrow, 0.06, 0.3), rms(wide, 0.06, 0.3)];
+    expect(Math.abs(n - w)).toBeGreaterThan(0.5 * Math.max(n, w));
   });
 
   it('Membrane: Pitch Decay and Octaves reach the Tone voice (engine creation, live edit)', () => {
