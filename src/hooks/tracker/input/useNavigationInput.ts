@@ -16,6 +16,7 @@ import { ALT_TRACK_MAP_1, ALT_TRACK_MAP_2, type TrackerInputRefs } from './input
 import { isKeyHandled } from '@lib/tracker/keyHandledSentinel';
 import { isManualRowNavAllowed } from '@lib/tracker/playbackNavigation';
 import { nextTabChannel } from '@lib/tracker/tabNavigation';
+import { shownChannelMask } from '@stores/useCursorStore';
 import { jumpRow, startHeldRepeat } from '@lib/tracker/cursorNavigation';
 
 export const useNavigationInput = (refs: TrackerInputRefs) => {
@@ -248,9 +249,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
               (cursorRef.current.digitIndex ?? 0) === 0;
             if (isFirstCol) {
               // At first column — move to previous channel's last column
-              const prevCh = cursorRef.current.channelIndex > 0
-                ? cursorRef.current.channelIndex - 1
-                : pattern.channels.length - 1;
+              const prevCh = nextTabChannel(cursorRef.current.channelIndex, pattern.channels.length, true, shownChannelMask(useTrackerStore.getState().patterns));
               moveCursorToChannel(prevCh);
               const prevCols = useCursorStore.getState().getColumnsForChannel(prevCh);
               if (prevCols && prevCols.length > 0) {
@@ -266,9 +265,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
               (cursorRef.current.noteColumnIndex ?? 0) === cols[cols.length - 1].nci;
             if (isLastCol) {
               // At last column — move to next channel's first column
-              const nextCh = cursorRef.current.channelIndex < pattern.channels.length - 1
-                ? cursorRef.current.channelIndex + 1
-                : 0;
+              const nextCh = nextTabChannel(cursorRef.current.channelIndex, pattern.channels.length, false, shownChannelMask(useTrackerStore.getState().patterns));
               moveCursorToChannel(nextCh);
               moveCursorToColumn('note');
             } else {
@@ -279,7 +276,7 @@ export const useNavigationInput = (refs: TrackerInputRefs) => {
           // FT2/PT: Tab and Shift+Tab both jump to the next/prev channel's note
           // column, wrapping — symmetric, never gated on the current column.
           moveCursorToChannel(
-            nextTabChannel(cursorRef.current.channelIndex, pattern.channels.length, e.shiftKey),
+            nextTabChannel(cursorRef.current.channelIndex, pattern.channels.length, e.shiftKey, shownChannelMask(useTrackerStore.getState().patterns)),
           );
           moveCursorToColumn('note');
         }

@@ -89,6 +89,14 @@ function getEditorState(): ReturnType<typeof _EditorStoreType.getState> {
   return getEditorStoreRef().getState() as ReturnType<typeof _EditorStoreType.getState>;
 }
 
+/**
+ * The channels the grid shows (visibleChannels.ts), without the cursor's own
+ * reveal: what left/right, Tab and Shift+Tab step through.
+ */
+export function shownChannelMask(patterns: Parameters<typeof visibleChannelMask>[0]): boolean[] {
+  return visibleChannelMask(patterns, { showUnused: useSettingsStore.getState().showUnusedChannels });
+}
+
 export const useCursorStore = create<CursorStore>()((set, get) => ({
   cursor: { channelIndex: 0, rowIndex: 0, noteColumnIndex: 0, columnType: 'note', digitIndex: 0 },
   selection: null,
@@ -107,7 +115,7 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
 
     // Get total note columns for the current channel
     // Channels with no data in any pattern are hidden (visibleChannels.ts): left/right skip them.
-    const shownChannels = () => visibleChannelMask(ts.patterns, { showUnused: useSettingsStore.getState().showUnusedChannels });
+    const shownChannels = () => shownChannelMask(ts.patterns);
     const getNoteCols = (ch: number) => pattern.channels[ch]?.channelMeta?.noteCols ?? 1;
 
     // Clamp noteColumnIndex to valid range — prevents stale values after note column changes
