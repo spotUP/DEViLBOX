@@ -138,7 +138,7 @@ registerVSTBridge({
   wasmFile: 'Monique',
   synthClassName: 'MoniqueSynth',
   moduleFactoryName: 'createMoniqueModule',
-  volumeOffsetDb: 0,
+  volumeOffsetDb: 5,
   configKey: 'monique',
   // Maps MoniqueConfig keys → WASM param IDs (C++ MoniqueParams enum, 0-119)
   paramMapping: {

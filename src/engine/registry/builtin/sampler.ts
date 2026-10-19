@@ -7,13 +7,9 @@
 import * as Tone from 'tone';
 import { SynthRegistry } from '../SynthRegistry';
 import type { SynthDescriptor } from '../SynthDescriptor';
+import { getNormalizedVolume } from '../../factories/volumeNormalization';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { periodToNoteIndex, getPeriodExtended } from '../../effects/PeriodTables';
-
-function getNormalizedVolume(synthType: string, configVolume: number | undefined): number {
-  const offsets: Record<string, number> = { Sampler: 10, Player: 10, GranularSynth: -47 };
-  return (configVolume ?? -12) + (offsets[synthType] ?? 0);
-}
 
 /**
  * Handle period-based playback for MOD/XM samples.

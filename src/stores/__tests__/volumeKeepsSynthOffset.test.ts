@@ -1,9 +1,11 @@
 /**
  * Changing the volume (or loading a preset, which carries one) must not change a synth's level relative to how it was
- * created. InstrumentFactory sets a registry synth's output gain to volume + volumeOffsetDb (the DX7's is +14 dB); the store's
- * volume path used to set volume alone, so the first preset change or volume move dropped a DX7 by 14 dB.
+ * created. InstrumentFactory sets a registry synth's output level to volume + volumeOffsetDb (the DX7's is +14 dB); the
+ * store's volume path used to set volume alone, so the first preset change or volume move dropped a DX7 by 14 dB.
+ * Both paths now go through ToneEngine.setInstrumentVolume, which applies getNormalizedVolume like creation does.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { setInstrumentVolumeOn } from '../../engine/instrumentOutputLevel';
 
 const fakeSynth = { loadSysex: vi.fn(), loadVcedPreset: vi.fn(), output: { gain: { value: 1 } } };
 const fakeEngine = {
@@ -11,13 +13,15 @@ const fakeEngine = {
   getInstrumentKey: (id: number) => (id << 16) | 0xFFFF,
   instancesOf: (id: number) => [...fakeEngine.instruments.entries()].filter(([k]) => (k >> 16) === id).map(([, v]) => v),
   ensureInstrumentReady: async () => {},
+  setInstrumentVolume: (id: number, synthType: string, volumeDb: number | undefined) =>
+    setInstrumentVolumeOn(fakeEngine.instruments, id, synthType, volumeDb),
 };
 vi.mock('@engine/ToneEngine', () => ({ getToneEngine: () => fakeEngine }));
 vi.mock('../../engine/ToneEngine', () => ({ getToneEngine: () => fakeEngine }));
 
 import '../../engine/registry/builtin/dx7';
 import { useInstrumentStore } from '../useInstrumentStore';
-import { registryOutputGain } from '../../engine/registry/outputGain';
+import { getNormalizedVolume } from '../../engine/factories/volumeNormalization';
 
 const db = (gain: number) => 20 * Math.log10(gain);
 
@@ -27,11 +31,11 @@ beforeEach(() => {
   fakeSynth.output.gain.value = 1;
 });
 
-describe('registryOutputGain', () => {
+describe('getNormalizedVolume', () => {
   it('adds the descriptor offset (DX7 +14 dB); an unknown synth and a Furnace synth get none', () => {
-    expect(db(registryOutputGain('DX7', -12))).toBeCloseTo(2, 5);
-    expect(db(registryOutputGain('NoSuchSynth', -12))).toBeCloseTo(-12, 5);
-    expect(db(registryOutputGain('FurnaceOPN', -12))).toBeCloseTo(-12, 5);
+    expect(getNormalizedVolume('DX7', -12)).toBeCloseTo(2, 5);
+    expect(getNormalizedVolume('NoSuchSynth', -12)).toBeCloseTo(-12, 5);
+    expect(getNormalizedVolume('FurnaceOPN', -12)).toBeCloseTo(-12, 5);
   });
 });
 

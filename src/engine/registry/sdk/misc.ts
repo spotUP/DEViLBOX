@@ -37,20 +37,6 @@ import {
   DEFAULT_OSC_BASS, DEFAULT_CRUSH_BASS, DEFAULT_SONAR_PING, DEFAULT_RADIO_RISER, DEFAULT_SUB_SWELL,
 } from '@/types/instrument';
 
-const VOLUME_OFFSETS: Record<string, number> = {
-  DubSiren: 13, SpaceLaser: 24, V2: 0, V2Speech: 0, Sam: 16, DECtalk: 10, PinkTrombone: 6, Synare: 7,
-  CZ101: 0, CEM3394: 19, SCSP: 15,
-  MAMEVFX: 0, VFX: 0, D50: 0, MAMEDOC: 0, MAMERSA: 0, MAMESWP30: 0,
-  DrumKit: 0, Wavetable: 5, SuperSaw: 9, PolySynth: 8, Organ: 3,
-  DrumMachine: 18, ChipSynth: 5, PWMSynth: 9, StringMachine: 11,
-  FormantSynth: 9, WobbleBass: 13, ChiptuneModule: -6,
-  OscBass: 6, CrushBass: 6, SonarPing: 4, RadioRiser: 6, SubSwell: 6,
-};
-
-function getNormalizedVolume(synthType: string, configVolume: number | undefined): number {
-  return (configVolume ?? -12) + (VOLUME_OFFSETS[synthType] ?? 0);
-}
-
 // ── Speech / Special WASM synths ─────────────────────────────────────────────
 
 const speechAndSpecialDescs: SynthDescriptor[] = [
@@ -62,7 +48,6 @@ const speechAndSpecialDescs: SynthDescriptor[] = [
     volumeOffsetDb: 13,
     create: (config) => {
       const synth = new DubSirenSynth(config.dubSiren || DEFAULT_DUB_SIREN);
-      synth.volume.value = getNormalizedVolume('DubSiren', config.volume);
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: (synth, _note, time) => {
@@ -78,7 +63,6 @@ const speechAndSpecialDescs: SynthDescriptor[] = [
     volumeOffsetDb: 24,
     create: (config) => {
       const synth = new SpaceLaserSynth(config.spaceLaser || DEFAULT_SPACE_LASER);
-      synth.volume.value = getNormalizedVolume('SpaceLaser', config.volume);
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: (synth, _note, time) => {
@@ -96,7 +80,6 @@ const speechAndSpecialDescs: SynthDescriptor[] = [
     volumeOffsetDb: 0,
     create: (config) => {
       const synth = new V2Synth(config.v2 || undefined);
-      synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('V2', config.volume));
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: (synth, _note, time) => {
@@ -114,7 +97,6 @@ const speechAndSpecialDescs: SynthDescriptor[] = [
     volumeOffsetDb: 0,
     create: (config) => {
       const synth = new V2SpeechSynth(config.v2Speech || undefined);
-      synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('V2', config.volume));
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: (synth, _note, time) => {
@@ -132,7 +114,6 @@ const speechAndSpecialDescs: SynthDescriptor[] = [
     volumeOffsetDb: 16,
     create: (config) => {
       const synth = new SAMSynth(config.sam || DEFAULT_SAM);
-      synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('Sam', config.volume));
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: (synth, _note, time) => {
@@ -150,7 +131,6 @@ const speechAndSpecialDescs: SynthDescriptor[] = [
     volumeOffsetDb: 16,
     create: (config) => {
       const synth = new DECtalkSynth(config.dectalk || DEFAULT_DECTALK);
-      synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('DECtalk', config.volume));
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: (synth, _note, time) => {
@@ -166,7 +146,6 @@ const speechAndSpecialDescs: SynthDescriptor[] = [
     volumeOffsetDb: 7,
     create: (config) => {
       const synth = new SynareSynth(config.synare || DEFAULT_SYNARE);
-      synth.volume.value = getNormalizedVolume('Synare', config.volume);
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: (synth, _note, time) => {
@@ -192,7 +171,6 @@ const juceWasmDescs: SynthDescriptor[] = [
       void synth.init();
       // The chosen preset and knob values, as the editor shows them
       applyChipParameters(synth, config);
-      synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('CZ101', config.volume));
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: (synth, note, time) => {
@@ -209,9 +187,8 @@ const juceWasmDescs: SynthDescriptor[] = [
     sharedInstance: true,
     useSynthBus: true,
     volumeOffsetDb: 19,
-    create: (config) => {
+    create: () => {
       const synth = new CEM3394Synth();
-      synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('CEM3394', config.volume));
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: (synth, _note, time) => {
@@ -227,9 +204,8 @@ const juceWasmDescs: SynthDescriptor[] = [
     sharedInstance: true,
     useSynthBus: true,
     volumeOffsetDb: 15,
-    create: (config) => {
+    create: () => {
       const synth = new SCSPSynth();
-      synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('SCSP', config.volume));
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: (synth, _note, time) => {
@@ -250,10 +226,9 @@ const mameComplexDescs: SynthDescriptor[] = [
     sharedInstance: true,
     useSynthBus: true,
     volumeOffsetDb: 0,
-    create: (config) => {
+    create: () => {
       const synth = new VFXSynth();
       void synth.init();
-      synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEVFX', config.volume));
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: (synth, _note, time) => { (synth as any).triggerRelease(time); return true; },
@@ -266,10 +241,9 @@ const mameComplexDescs: SynthDescriptor[] = [
     sharedInstance: true,
     useSynthBus: true,
     volumeOffsetDb: 0,
-    create: (config) => {
+    create: () => {
       const synth = new VFXSynth();
       void synth.init();
-      synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMEVFX', config.volume));
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: (synth, _note, time) => { (synth as any).triggerRelease(time); return true; },
@@ -282,10 +256,9 @@ const mameComplexDescs: SynthDescriptor[] = [
     sharedInstance: true,
     useSynthBus: true,
     volumeOffsetDb: 0,
-    create: (config) => {
+    create: () => {
       const synth = new D50Synth();
       void synth.init();
-      synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMERSA', config.volume));
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: (synth, _note, time) => { (synth as any).triggerRelease(time); return true; },
@@ -317,7 +290,6 @@ const mameComplexDescs: SynthDescriptor[] = [
     volumeOffsetDb: 0,
     create: (config) => {
       const synth = new RdPianoSynth(config.rdpiano || {});
-      synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMERSA', config.volume));
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: (synth, _note, time) => { (synth as any).triggerRelease(time); return true; },
@@ -330,10 +302,9 @@ const mameComplexDescs: SynthDescriptor[] = [
     sharedInstance: true,
     useSynthBus: true,
     volumeOffsetDb: 0,
-    create: (config) => {
+    create: () => {
       const synth = new MU2000Synth();
       void synth.init();
-      synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('MAMESWP30', config.volume));
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: (synth, _note, time) => { (synth as any).triggerRelease(time); return true; },
@@ -381,7 +352,6 @@ const specialDescs: SynthDescriptor[] = [
       // Fallback to basic synth — full implementation requires libopenmpt WASM
       const synth = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: (config.oscillator?.type || 'sawtooth') as Tone.ToneOscillatorType } as Partial<Tone.OmniOscillatorOptions>,
-        volume: getNormalizedVolume('ChiptuneModule', config.volume),
       });
       return synth;
     },
@@ -402,7 +372,6 @@ const dubDerivedDescs: SynthDescriptor[] = [
     volumeOffsetDb: 6,
     create: (config) => {
       const synth = new OscBassSynth(config.oscBass || DEFAULT_OSC_BASS);
-      synth.volume.value = Tone.dbToGain(getNormalizedVolume('OscBass', config.volume));
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: (synth, _note, time) => {
@@ -418,7 +387,6 @@ const dubDerivedDescs: SynthDescriptor[] = [
     volumeOffsetDb: 6,
     create: (config) => {
       const synth = new CrushBassSynth(config.crushBass || DEFAULT_CRUSH_BASS);
-      synth.volume.value = Tone.dbToGain(getNormalizedVolume('CrushBass', config.volume));
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: (synth, _note, time) => {
@@ -434,7 +402,6 @@ const dubDerivedDescs: SynthDescriptor[] = [
     volumeOffsetDb: 4,
     create: (config) => {
       const synth = new SonarPingSynth(config.sonarPing || DEFAULT_SONAR_PING);
-      synth.volume.value = Tone.dbToGain(getNormalizedVolume('SonarPing', config.volume));
       return synth as unknown as Tone.ToneAudioNode;
     },
     // Trigger-only voice: no meaningful release, but we still answer
@@ -449,7 +416,6 @@ const dubDerivedDescs: SynthDescriptor[] = [
     volumeOffsetDb: 6,
     create: (config) => {
       const synth = new RadioRiserSynth(config.radioRiser || DEFAULT_RADIO_RISER);
-      synth.volume.value = Tone.dbToGain(getNormalizedVolume('RadioRiser', config.volume));
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: () => true,
@@ -462,7 +428,6 @@ const dubDerivedDescs: SynthDescriptor[] = [
     volumeOffsetDb: 6,
     create: (config) => {
       const synth = new SubSwellSynth(config.subSwell || DEFAULT_SUB_SWELL);
-      synth.volume.value = Tone.dbToGain(getNormalizedVolume('SubSwell', config.volume));
       return synth as unknown as Tone.ToneAudioNode;
     },
     onTriggerRelease: () => true,

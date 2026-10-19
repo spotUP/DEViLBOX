@@ -16,6 +16,7 @@ const descriptor: SynthDescriptor = {
   name: 'Modular Synth',
   category: 'native',
   loadMode: 'lazy',
+  volumeOffsetDb: 6,
 
   create: (config) => {
     const patchConfig = config.modularSynth || MODULAR_INIT_PATCH;

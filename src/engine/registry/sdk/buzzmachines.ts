@@ -4,6 +4,7 @@
 
 import * as Tone from 'tone';
 import { SynthRegistry } from '../SynthRegistry';
+import { getNormalizedVolume } from '../../factories/volumeNormalization';
 import { BuzzmachineGenerator } from '../../buzzmachines/BuzzmachineGenerator';
 import { BuzzmachineType } from '../../buzzmachines/BuzzmachineEngine';
 
@@ -12,10 +13,6 @@ const VOLUME_OFFSETS: Record<string, number> = {
   Buzz4FM2F: 7, BuzzFreqBomb: 4, BuzzDTMF: 0, BuzzDynamite6: 0,
   BuzzM3: 0, BuzzM4: 0, Buzz3o3: 5, Buzz3o3DF: 8,
 };
-
-function getNormalizedVolume(synthType: string, configVolume: number | undefined): number {
-  return (configVolume ?? -12) + (VOLUME_OFFSETS[synthType] ?? 0);
-}
 
 interface BuzzDef {
   id: string;
