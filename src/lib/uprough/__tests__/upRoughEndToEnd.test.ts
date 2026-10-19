@@ -10,15 +10,18 @@
  *   UPROUGH_ROOT=~/Code/UpRough/Up_Rough_Demo_System npx vitest run src/lib/uprough/__tests__/upRoughEndToEnd.test.ts
  * Sentinels: applySong ran once as an import, songToSongFile ran once, and the
  * host check prints "F4 OK" only after comparing the renders.
+ *
+ * The route runs in the server's own process (server/, its tsx and express, as
+ * `npm run dev` does), not imported here: the server is its own TypeScript
+ * project with its own express, and the app type-check must not compile it.
  */
 import { describe, expect, it, vi } from 'vitest';
-import express from 'express';
 import fs from 'fs';
 import http from 'http';
 import os from 'os';
 import path from 'path';
-import { spawnSync } from 'child_process';
-import type { AddressInfo } from 'net';
+import { spawn, spawnSync } from 'child_process';
+import type { ChildProcess } from 'child_process';
 
 vi.mock('@engine/ToneEngine', () => {
   const engine: unknown = new Proxy({}, { get: (_t, k) => () => (k === 'preloadInstruments' ? Promise.resolve() : undefined) });
@@ -29,7 +32,6 @@ vi.mock('@stores/useInstrumentTypeStore', () => ({
   useInstrumentTypeStore: { getState: () => ({ resetClassified: () => undefined, classifyInstruments: () => undefined }) },
 }));
 
-import uproughRoutes from '../../../../server/src/routes/uprough';
 import * as songFile from '../songFile';
 import * as applySongModule from '@/lib/song/applySong';
 import { useTrackerStore } from '@stores/useTrackerStore';
@@ -53,6 +55,36 @@ assert np.array_equal(got, want), "render differs"
 print("F4 OK %d samples" % len(got))
 `;
 
+// Mounts the real route on the server's express, as server/src/index.ts does.
+const SERVE = `
+import express from 'express';
+import routes from './src/routes/uprough';
+const app = express();
+app.use(express.json());
+app.use('/api/uprough', routes);
+const s = app.listen(0, '127.0.0.1', () => {
+  const a = s.address();
+  console.log('PORT ' + (a && typeof a === 'object' ? a.port : ''));
+});
+`;
+
+/** Starts the route in server/ and resolves its port. */
+function serve(): Promise<{ proc: ChildProcess; port: number }> {
+  const server = path.resolve(__dirname, '../../../../server');
+  const proc = spawn(path.join(server, 'node_modules/.bin/tsx'), ['--eval', SERVE],
+    { cwd: server, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+  return new Promise((resolve, reject) => {
+    let out = '';
+    proc.stdout!.setEncoding('utf8').on('data', (c: string) => {
+      out += c;
+      const m = /PORT (\d+)/.exec(out);
+      if (m) resolve({ proc, port: Number(m[1]) });
+    });
+    proc.stderr!.setEncoding('utf8').on('data', (c: string) => { out += c; });
+    proc.on('exit', (code) => reject(new Error(`route server exited ${code}: ${out.slice(-2000)}`)));
+  });
+}
+
 /** POST through node's http: the test DOM's fetch applies browser CORS rules. */
 function post(port: number, route: string, body: unknown): Promise<{ status: number; text: string }> {
   return new Promise((resolve, reject) => {
@@ -71,13 +103,9 @@ function post(port: number, route: string, body: unknown): Promise<{ status: num
 
 describe.skipIf(!ROOT)('Up Rough generate -> import -> export renders 1:1 on the host', () => {
   it(`${STYLE}/${SEED}: render of the exported file equals render_track`, async () => {
-    const app = express();
-    app.use(express.json());
-    app.use('/api/uprough', uproughRoutes);
-    const server = app.listen(0);
+    const { proc, port } = await serve();
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'uprough-f4-'));
     try {
-      const port = (server.address() as AddressInfo).port;
       const gen = await post(port, '/api/uprough/generate', { style: STYLE, seed: SEED });
       expect(gen.status, gen.text.slice(0, 2000)).toBe(200);
 
@@ -96,7 +124,7 @@ describe.skipIf(!ROOT)('Up Rough generate -> import -> export renders 1:1 on the
       expect(r.status, (r.stderr || '').slice(-3000)).toBe(0);
       expect(r.stdout).toMatch(/^F4 OK \d+ samples/m);
     } finally {
-      server.close();
+      proc.kill();
       fs.rmSync(dir, { recursive: true, force: true });
     }
   }, 900_000);
