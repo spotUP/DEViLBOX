@@ -41,6 +41,31 @@ const FORMATS: Array<{ name: string; file: string; companions?: Record<string, s
   { name: 'Jason Page jpn.fire and ice-1', file: 'jason-page/jpn.fire and ice-1', companions: { 'smp.fire and ice-1': 'jason-page/smp.fire and ice-1' }, minVoices: 1, minSteady: 1, minGridCover: 0.55 /* the rest play constant (silent) waves */ },
 ];
 
+
+/** The channel volume (0-64) a song voice plays `sh` at: at least the scan's first write, raised to the loudest the song voice reaches in 1.2 s. */
+async function playedVolume(sh: Shape): Promise<number> {
+  const file = currentFile, companions = currentCompanions;
+  const secs = Math.ceil(sh.firstChunk / 100 + 1.4);
+  const sa = await isolatedVoice(file, companions, sh.voice, secs);
+  let on = Math.max(0, Math.round(sh.firstChunk * 480) - 2400);
+  while (on < sa.length && Math.abs(sa[on]) < 0.003) on++;
+  let best = sh.volume;
+  for (let k = 0; k < 12 && on + (k + 1) * 4800 <= sa.length; k++) {
+    const bytes = new Int8Array(sh.pcm);
+    const from = Math.floor(k * 4800 * 3546895 / sh.period / SR);
+    if (from >= bytes.length && sh.loopLength === 0) break; // the wave has ended
+    // a looped wave restarts inside its loop, so the window is only compared where the position is before the loop
+    if (sh.loopLength > 0) break;
+    const model = paulaVoice({ ...sh, volume: 64, pcm: bytes.slice(from).buffer as ArrayBuffer }, 4800);
+    const m = rms(model, 0, 4800);
+    if (m > 0) best = Math.max(best, Math.min(64, 64 * rms(sa, on + k * 4800, on + (k + 1) * 4800) / m));
+  }
+  return best;
+}
+
+let currentFile = '';
+let currentCompanions: Record<string, string> | undefined;
+
 describe.each(FORMATS)('$name: a key plays the sample the player plays', ({ file, companions, minVoices, minSteady, minGridCover, nativeGrid }) => {
   let song: Awaited<ReturnType<typeof importThroughUade>>['song'];
   let shapes: Shape[];
@@ -48,6 +73,7 @@ describe.each(FORMATS)('$name: a key plays the sample the player plays', ({ file
   let getInstance: { mock: { calls: unknown[] } };
 
   beforeAll(async () => {
+    currentFile = file; currentCompanions = companions;
     const imp = await importThroughUade(file, companions);
     song = imp.song;
     let found = imp.paulaSamples as Array<Omit<Shape, 'pcm'> & { pcm: Uint8Array }>;
@@ -112,7 +138,11 @@ describe.each(FORMATS)('$name: a key plays the sample the player plays', ({ file
       // the key plays the period of the note it stands for: the song's period to within a semitone
       const keyPeriod = noteToPeriod(note);
       expect(Math.abs(1200 * Math.log2(keyPeriod / sh.period)), `${noteName} against period ${sh.period}`).toBeLessThanOrEqual(50);
-      const model = paulaVoice({ ...sh, period: keyPeriod }, 4800);
+      // The reference is Paula at the volume the song plays the sample at. The scan's volume is the FIRST volume write, which
+      // a player with a volume envelope (Jeroen Tel: 32 rising to the record's 48) starts below the level it sustains; a key
+      // plays the sample's default (sustained) volume, so the model must too. The song voice says what that is: the
+      // loudest volume that, on the same bytes, reproduces its rms in the 1.2 s after the note starts.
+      const model = paulaVoice({ ...sh, period: keyPeriod, volume: await playedVolume(sh) }, 4800);
       const key = await renderKeys(inst, [{ note: noteName, at: 0 }], 0.5);
       const keyOn = key.findIndex((v) => Math.abs(v) > 0.0005);
       const keyWin = key.subarray(Math.max(0, keyOn), Math.max(0, keyOn) + 4800);
