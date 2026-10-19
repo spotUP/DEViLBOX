@@ -58,12 +58,28 @@ math_x = {
                  rng.uniform(-1e10, 1e10, 50), [0.0, -0.0, 1e-9, math.pi / 4, math.pi, 2 * math.pi, 1e5 * math.pi]),
 }
 math_x["cos"] = math_x["sin"]
+# asin: every fdlibm branch (tiny, |x| < 0.5, 0.5 .. 0.975, 0.975 .. 1, +-1, outside) plus triangle-oscillator inputs
+math_x["asin"] = _span(rng.uniform(-1.0, 1.0, 400), rng.uniform(0.5, 1.0, 100), rng.uniform(0.97, 1.0, 50),
+                       rng.uniform(-1e-8, 1e-8, 20),
+                       [0.0, -0.0, 1e-9, 0.5, -0.5, 0.49999999, 0.975, 0.9749999, -0.975, 0.9999999999, 1.0, -1.0])
+
+# portable_resample: the cephes I0, the Kaiser firwin and the polyphase sum (refDsp besselI0 / firwinKaiser / resamplePoly)
+import portable_resample as pres  # noqa: E402
+i0_x = _span(rng.uniform(0.0, 8.0, 100), rng.uniform(8.0, 40.0, 50), [0.0, 5.0, 8.0, 8.000001])
+resample_in = [float(v) for v in rng.uniform(-1.0, 1.0, 700)]
+resample = [{"up": u, "down": d, "y": pres.resample_poly(np.array(resample_in), u, d).tolist()}
+            for u, d in ((1, 2), (2, 1), (1, 3), (1000, 1059), (1999, 1000), (147, 160), (3, 3))]
+firwin = [{"numtaps": nt, "cutoff": c, "h": pres.firwin_kaiser(nt, c, 5.0).tolist()} for nt, c in ((21, 0.5), (41, 0.5), (601, 1.0 / 30))]
 
 out = {
     "tan": [[x, piir.tan(x)] for x in tan_x],
     "sin": [[x, piir._kernel_sin(x)] for x in kern_x],
     "cos": [[x, piir._kernel_cos(x)] for x in kern_x],
     "butter": cases,
+    "i0": [[x, float(pres.bessel_i0(np.array([x]))[0])] for x in i0_x],
+    "resample_in": resample_in,
+    "resample": resample,
+    "firwin": firwin,
     "math": {name: [[x, float(getattr(pm, name)(x))] for x in xs] for name, xs in math_x.items()},
 }
 with open(OUT, "w") as f:

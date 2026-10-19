@@ -9,7 +9,7 @@ import type { ParameterDef } from '@/engine/registry/SynthDescriptor';
 import { SOFTSYNTH_RATE, type SoftsynthNote, type SoftsynthVoice } from '../softsynthVoice';
 import { expDecay, semiHz, tapeSat } from '@/engine/dj/scratch/demoDrums';
 import { lp as dspLp, hp as dspHp } from '@/engine/dj/scratch/refDsp';
-import { pcos, pexp, psin, ptanh } from '@/engine/dj/scratch/portableMath';
+import { pasin, pcos, pexp, psin, ptanh } from '@/engine/dj/scratch/portableMath';
 
 /** zlib.crc32 over bytes. */
 const CRC_TABLE = (() => {
@@ -216,7 +216,7 @@ export function render808Note(semi: number, durSec: number, rate = SOFTSYNTH_RAT
     acc += 2 * Math.PI * freq / rate;
     const ph = acc + off;
     const s = psin(ph);
-    body[i] = p.sine_mix * s + p.tri_mix * (2.0 / Math.PI * Math.asin(psin(ph)));
+    body[i] = p.sine_mix * s + p.tri_mix * (2.0 / Math.PI * pasin(psin(ph)));
   }
 
   const tau = Math.max(1.0, decMs * 1e-3 * rate);
