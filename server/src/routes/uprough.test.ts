@@ -13,6 +13,7 @@ const FAKE = `
 import json, sys
 a = sys.argv[1:]
 if a[0] == "styles":
+    open(__file__ + ".styles-calls", "a").write("x")
     print(json.dumps(["golden_era", "trap"]))
 elif "--crash" in a:
     sys.exit(3)
@@ -127,6 +128,33 @@ describe('GET /api/uprough/styles', () => {
   it('returns the generator\'s own style list', async () => {
     const r = await fetch(`${base}/api/uprough/styles`);
     expect(await r.json()).toEqual({ styles: ['golden_era', 'trap'] });
+  });
+});
+
+describe('style list cache', () => {
+  const callFile = () => path.join(root, 'tools', 'song_file.py.styles-calls');
+  const spawns = () => (fs.existsSync(callFile()) ? fs.readFileSync(callFile(), 'utf8').length : 0);
+  const hiphop = () => path.join(root, 'tools', 'hiphop.py');
+
+  it('spawns python once for repeated GET /styles, again after hiphop.py changes, and /generate reuses it', async () => {
+    fs.writeFileSync(hiphop(), '# styles');
+    fs.rmSync(callFile(), { force: true });
+    const [a, b] = await Promise.all([fetch(`${base}/api/uprough/styles`), fetch(`${base}/api/uprough/styles`)]);
+    expect(await a.json()).toEqual({ styles: ['golden_era', 'trap'] });
+    expect(b.status).toBe(200);
+    await fetch(`${base}/api/uprough/styles`);
+    expect(spawns()).toBe(1);
+
+    expect((await post({ style: 'trap', seed: 1 })).status).toBe(200);
+    expect(spawns()).toBe(1);
+
+    const later = new Date(Date.now() + 60_000);
+    fs.utimesSync(hiphop(), later, later);
+    await fetch(`${base}/api/uprough/styles`);
+    expect(spawns()).toBe(2);
+    await fetch(`${base}/api/uprough/styles`);
+    expect(spawns()).toBe(2);
+    fs.rmSync(hiphop());
   });
 });
 
