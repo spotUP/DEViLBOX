@@ -5,11 +5,13 @@
  */
 import { describe, expect, it } from 'vitest';
 import { kernelCos, kernelSin, portableButter, portableTan } from '@/engine/dj/scratch/portableIir';
+import { pcos, pexp, pexpm1, psin, ptanh } from '@/engine/dj/scratch/portableMath';
 import { butter } from '@/engine/dj/scratch/refDsp';
 import ref from './fixtures/portable_iir.json';
 
 type Case = { N: number; Wn: number | [number, number]; btype: 'low' | 'high' | 'band'; b: number[]; a: number[] };
-const fx = ref as { tan: [number, number][]; sin: [number, number][]; cos: [number, number][]; butter: Case[] };
+const fx = ref as { tan: [number, number][]; sin: [number, number][]; cos: [number, number][]; butter: Case[];
+  math: Record<'exp' | 'expm1' | 'tanh' | 'sin' | 'cos', [number, number][]> };
 
 const mismatches = (pairs: [number, number][], f: (x: number) => number) =>
   pairs.filter(([x, y]) => !Object.is(f(x), y)).map(([x, y]) => `${x}: ${f(x)} != ${y}`);
@@ -18,6 +20,14 @@ describe('portable_iir mirror is bit-exact', () => {
   it('tan matches musl tan from the Python port', () => {
     expect(fx.tan.length).toBeGreaterThan(400);
     expect(mismatches(fx.tan, portableTan)).toEqual([]);
+  });
+  it('portable_math exp / expm1 / tanh / sin / cos match bit for bit', () => {
+    const F = { exp: pexp, expm1: pexpm1, tanh: ptanh, sin: psin, cos: pcos };
+    for (const [name, f] of Object.entries(F)) {
+      const pairs = fx.math[name as keyof typeof F];
+      expect(pairs.length, name).toBeGreaterThan(300);
+      expect(mismatches(pairs, f), name).toEqual([]);
+    }
   });
   it('the sin and cos kernels match', () => {
     expect(mismatches(fx.sin, kernelSin)).toEqual([]);

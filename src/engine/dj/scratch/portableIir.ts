@@ -41,12 +41,12 @@ const PIO4 = fromBits(0x3fe921fb, 0x54442d18);
 const PIO4LO = fromBits(0x3c81a626, 0x33145c07);
 const PIO2_1 = fromBits(0x3ff921fb, 0x54400000);
 const PIO2_1T = fromBits(0x3dd0b461, 0x1a626331);
-const S1 = fromBits(0xbfc55555, 0x55555549), S2 = fromBits(0x3f811111, 0x1110f8a6);
-const S3 = fromBits(0xbf2a01a0, 0x19c161d5), S4 = fromBits(0x3ec71de3, 0x57b1fe7d);
-const S5 = fromBits(0xbe5ae5e6, 0x8a2b9ceb), S6 = fromBits(0x3de5d93a, 0x5acfd57c);
-const C1 = fromBits(0x3fa55555, 0x5555554c), C2 = fromBits(0xbf56c16c, 0x16c15177);
-const C3 = fromBits(0x3efa01a0, 0x19cb1590), C4 = fromBits(0xbe927e4f, 0x809c52ad);
-const C5 = fromBits(0x3e21ee9e, 0xbdb4b1c4), C6 = fromBits(0xbda8fae9, 0xbe8838d4);
+export const S1 = fromBits(0xbfc55555, 0x55555549), S2 = fromBits(0x3f811111, 0x1110f8a6);
+export const S3 = fromBits(0xbf2a01a0, 0x19c161d5), S4 = fromBits(0x3ec71de3, 0x57b1fe7d);
+export const S5 = fromBits(0xbe5ae5e6, 0x8a2b9ceb), S6 = fromBits(0x3de5d93a, 0x5acfd57c);
+export const C1 = fromBits(0x3fa55555, 0x5555554c), C2 = fromBits(0xbf56c16c, 0x16c15177);
+export const C3 = fromBits(0x3efa01a0, 0x19cb1590), C4 = fromBits(0xbe927e4f, 0x809c52ad);
+export const C5 = fromBits(0x3e21ee9e, 0xbdb4b1c4), C6 = fromBits(0xbda8fae9, 0xbe8838d4);
 
 /** musl __tan(x, y, odd): tan(x+y) (odd = 0) or -1/tan(x+y) (odd = 1), |x+y| <= ~pi/4. */
 function kernelTan(x: number, y: number, odd: 0 | 1): number {

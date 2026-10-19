@@ -9,6 +9,7 @@ import type { ParameterDef } from '@/engine/registry/SynthDescriptor';
 import { SOFTSYNTH_RATE, type SoftsynthNote, type SoftsynthVoice } from '../softsynthVoice';
 import { expDecay, semiHz, tapeSat } from '@/engine/dj/scratch/demoDrums';
 import { lp as dspLp, hp as dspHp } from '@/engine/dj/scratch/refDsp';
+import { pcos, pexp, psin, ptanh } from '@/engine/dj/scratch/portableMath';
 
 /** zlib.crc32 over bytes. */
 const CRC_TABLE = (() => {
@@ -134,12 +135,12 @@ export function applyDrive(x: Float64Array, kind: Profile808['drive_kind'], amt:
   if (kind === 'tape') return tapeSat(x, drive);
   const out = new Float64Array(x.length);
   if (kind === 'asym') {
-    for (let i = 0; i < x.length; i++) out[i] = x[i]! >= 0 ? Math.tanh(drive * x[i]!) : Math.tanh(0.6 * drive * x[i]!);
+    for (let i = 0; i < x.length; i++) out[i] = x[i]! >= 0 ? ptanh(drive * x[i]!) : ptanh(0.6 * drive * x[i]!);
   } else if (kind === 'tube') {
-    const off = Math.tanh(drive * 0.2);
-    for (let i = 0; i < x.length; i++) out[i] = Math.tanh(drive * (x[i]! + 0.2)) - off;
+    const off = ptanh(drive * 0.2);
+    for (let i = 0; i < x.length; i++) out[i] = ptanh(drive * (x[i]! + 0.2)) - off;
   } else {
-    for (let i = 0; i < x.length; i++) out[i] = Math.tanh(drive * x[i]!);
+    for (let i = 0; i < x.length; i++) out[i] = ptanh(drive * x[i]!);
   }
   return out;
 }
@@ -214,8 +215,8 @@ export function render808Note(semi: number, durSec: number, rate = SOFTSYNTH_RAT
     const freq = baseHz * 2.0 ** (penv[i]! / 12.0);
     acc += 2 * Math.PI * freq / rate;
     const ph = acc + off;
-    const s = Math.sin(ph);
-    body[i] = p.sine_mix * s + p.tri_mix * (2.0 / Math.PI * Math.asin(Math.sin(ph)));
+    const s = psin(ph);
+    body[i] = p.sine_mix * s + p.tri_mix * (2.0 / Math.PI * Math.asin(psin(ph)));
   }
 
   const tau = Math.max(1.0, decMs * 1e-3 * rate);
@@ -224,7 +225,7 @@ export function render808Note(semi: number, durSec: number, rate = SOFTSYNTH_RAT
   const gain = opts.gainEnv === undefined ? null : fitTo(opts.gainEnv, n);
   let sig: Float64Array = new Float64Array(n);
   for (let k = 0; k < n; k++) {
-    let a = Math.exp(-k / tau);
+    let a = pexp(-k / tau);
     a *= ramp[k]!;
     a *= rel[k]!;
     if (gain) a = a * gain[k]!;
@@ -354,7 +355,7 @@ function curveShape(name: SlideCurve, t: number): number {
   t = Math.min(1, Math.max(0, t));
   switch (name) {
     case 'LINEAR': return t;
-    case 'EXPONENTIAL': return (Math.exp(4.0 * t) - 1.0) / (Math.exp(4.0) - 1.0);
+    case 'EXPONENTIAL': return (pexp(4.0 * t) - 1.0) / (pexp(4.0) - 1.0);
     case 'EASE_IN': return t * t;
     case 'EASE_OUT': return 1.0 - (1.0 - t) * (1.0 - t);
     case 'S_CURVE': return t * t * (3.0 - 2.0 * t);
@@ -406,7 +407,7 @@ function applySlide(prevSemi: number, targetSemi: number, type: SlideType, durMs
   let gainEnv: Float64Array | undefined;
   if (spec.gainLift > 0) {
     gainEnv = new Float64Array(nTotal).fill(1.0);
-    for (let i = 0; i < glideN; i++) gainEnv[i] = 1.0 + spec.gainLift * (0.5 * (1.0 - Math.cos(2 * Math.PI * i / glideN)));
+    for (let i = 0; i < glideN; i++) gainEnv[i] = 1.0 + spec.gainLift * (0.5 * (1.0 - pcos(2 * Math.PI * i / glideN)));
   }
   return render808Note(prevSemi, durS, rate, { profile, seed, decayMs: decMs, extraSemi: extra, gainEnv, accent: spec.gainLift > 0 });
 }

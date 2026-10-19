@@ -1,4 +1,4 @@
-"""Writes src/engine/uprough/__tests__/fixtures/portable_iir.json: tools/portable_iir.py's tan, sin / cos
+"""Writes src/engine/uprough/__tests__/fixtures/portable_iir.json: tools/portable_iir.py's tan, sin / cos, tools/portable_math.py's exp / expm1 / tanh / sin / cos
 kernels and butter() coefficients, for the bit-exact test of src/engine/dj/scratch/portableIir.ts.
 Values are float64 repr (round-trips exactly through JSON).
   /opt/homebrew/bin/python3.11 -I tools/softsynth-fixtures/gen_portable_iir.py \
@@ -17,6 +17,10 @@ sys.path.insert(0, TOOLS)
 sp = importlib.util.spec_from_file_location("portable_iir", os.path.join(TOOLS, "portable_iir.py"))
 piir = importlib.util.module_from_spec(sp)
 sp.loader.exec_module(piir)
+sys.modules["portable_iir"] = piir
+sp = importlib.util.spec_from_file_location("portable_math", os.path.join(TOOLS, "portable_math.py"))
+pm = importlib.util.module_from_spec(sp)
+sp.loader.exec_module(pm)
 
 rng = np.random.RandomState(11)
 # tan over the whole supported range plus both branch edges; kernels over [-pi/4, pi/4]
@@ -40,12 +44,29 @@ for rate in (44100.0, 22050.0, 28603.0):
             b, a = piir.butter(n, wn, kind)
             cases.append({"N": n, "Wn": wn, "btype": kind, "b": b.tolist(), "a": a.tolist()})
 
+# portable_math: every branch of exp / expm1 / tanh, and sin / cos up to oscillator phases (2 pi f t, minutes long)
+def _span(*parts):
+    return [float(v) for p in parts for v in p]
+math_x = {
+    "exp": _span(rng.uniform(-745.0, 709.7, 300), rng.uniform(-2.0, 2.0, 300), rng.uniform(-1e-8, 1e-8, 20),
+                 [0.0, -0.0, 0.25, 0.3465735902799726, 0.5, 1.0397207708399179, 709.78, -745.1, -708.5, -720.0]),
+    "expm1": _span(rng.uniform(-60.0, 60.0, 300), rng.uniform(-1.2, 1.2, 300), rng.uniform(-1e-9, 1e-9, 20),
+                   [0.0, 1e-17, 0.3, -0.3, 0.5, -0.5, -0.26, 13.0, 30.0, 40.0, 45.0, 700.0]),
+    "tanh": _span(rng.uniform(-25.0, 25.0, 300), rng.uniform(-1.5, 1.5, 300), rng.uniform(-1e-8, 1e-8, 20),
+                  [0.0, -0.0, 1.0, -1.0, 22.0, -22.0, 0.999999, 21.9]),
+    "sin": _span(rng.uniform(-4.0, 4.0, 300), rng.uniform(-3e3, 3e3, 200), rng.uniform(-2e7, 2e7, 200),
+                 rng.uniform(-1e10, 1e10, 50), [0.0, -0.0, 1e-9, math.pi / 4, math.pi, 2 * math.pi, 1e5 * math.pi]),
+}
+math_x["cos"] = math_x["sin"]
+
 out = {
     "tan": [[x, piir.tan(x)] for x in tan_x],
     "sin": [[x, piir._kernel_sin(x)] for x in kern_x],
     "cos": [[x, piir._kernel_cos(x)] for x in kern_x],
     "butter": cases,
+    "math": {name: [[x, float(getattr(pm, name)(x))] for x in xs] for name, xs in math_x.items()},
 }
 with open(OUT, "w") as f:
     json.dump(out, f)
-print("tan %d kernels %d butter %d" % (len(out["tan"]), len(kern_x), len(cases)))
+print("tan %d kernels %d butter %d math %d" % (len(out["tan"]), len(kern_x), len(cases),
+                                              sum(len(v) for v in out["math"].values())))

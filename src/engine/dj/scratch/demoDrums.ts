@@ -8,6 +8,7 @@
 import { NumpyRandomState, linspace } from '@/engine/turntable/turntableSim';
 import { roundHalfEven } from './scratchGrit';
 import { lfilter, reverb } from './refDsp';
+import { pexp, psin, ptanh } from './portableMath';
 
 export const DEMO_DRUM_RATE = 22050;
 
@@ -40,7 +41,7 @@ export const semiHz = (semi: number): number => 32.703 * (2.0 ** (semi / 12.0));
 export function expDecay(n: number, decayMs: number, rate = DEMO_DRUM_RATE): Float64Array {
   const tau = Math.max(1.0, decayMs * 1e-3 * rate);
   const out = new Float64Array(n);
-  for (let k = 0; k < n; k++) out[k] = Math.exp(-k / tau);
+  for (let k = 0; k < n; k++) out[k] = pexp(-k / tau);
   return out;
 }
 
@@ -54,13 +55,13 @@ export function demoNoise(n: number, seed = 0): Float64Array {
 
 /** `_onepole_hp`: lfilter([a, -a], [1, -a]). */
 export function onepoleHp(x: ArrayLike<number>, cutoffHz: number, rate = DEMO_DRUM_RATE): Float64Array {
-  const a = Math.exp(-2 * Math.PI * cutoffHz / rate);
+  const a = pexp(-2 * Math.PI * cutoffHz / rate);
   return lfilter({ b: [a, -a], a: [1.0, -a] }, x);
 }
 
 /** `_onepole_lp`: lfilter([1 - a], [1, -a]). */
 export function onepoleLp(x: ArrayLike<number>, hz: number, rate = DEMO_DRUM_RATE): Float64Array {
-  const a = Math.exp(-2 * Math.PI * hz / rate);
+  const a = pexp(-2 * Math.PI * hz / rate);
   return lfilter({ b: [1.0 - a], a: [1.0, -a] }, x);
 }
 
@@ -69,7 +70,7 @@ export function satLut(drive = 2.0, size = 512): Int16Array {
   const x = linspace(-1.0, 1.0, size);
   const d = Math.max(0.1, drive);
   const out = new Int16Array(size);
-  for (let i = 0; i < size; i++) out[i] = roundHalfEven((Math.tanh(d * x[i]!) / Math.tanh(d)) * 115.0);
+  for (let i = 0; i < size; i++) out[i] = roundHalfEven((ptanh(d * x[i]!) / ptanh(d)) * 115.0);
   return out;
 }
 
@@ -91,7 +92,7 @@ export function softClip(x: ArrayLike<number>, drive: number): Float64Array {
 /** synth_dsp `tape_sat`: tanh(drive x) - 0.12 y^3. */
 export function tapeSat(x: ArrayLike<number>, drive = 1.5): Float64Array {
   const out = new Float64Array(x.length);
-  for (let i = 0; i < x.length; i++) { const y = Math.tanh(drive * x[i]!); out[i] = y - 0.12 * y ** 3; }
+  for (let i = 0; i < x.length; i++) { const y = ptanh(drive * x[i]!); out[i] = y - 0.12 * y ** 3; }
   return out;
 }
 
@@ -118,7 +119,7 @@ export function oscSweepSine(n: number, baseHz: number, pitchSemi: ArrayLike<num
   const inc = new Float64Array(n);
   for (let i = 0; i < n; i++) inc[i] = 2 * Math.PI * (baseHz * 2.0 ** (pitchSemi[i]! / 12.0)) / rate;
   const ph = cumsum(inc);
-  for (let i = 0; i < n; i++) ph[i] = Math.sin(ph[i]!);
+  for (let i = 0; i < n; i++) ph[i] = psin(ph[i]!);
   return ph;
 }
 
@@ -158,7 +159,7 @@ export function kick808(opts: Partial<KickParams> = {}, rate = DEMO_DRUM_RATE, d
     const inc = new Float64Array(n);
     for (let i = 0; i < n; i++) inc[i] = 2 * Math.PI * base * (2.0 ** (pitch[i]! / 12.0)) / rate;
     const ph = cumsum(inc);
-    for (let i = 0; i < n; i++) body[i] = body[i]! + P.body_h3 * Math.sin(3 * ph[i]!) + 0.4 * P.body_h3 * Math.sin(2 * ph[i]!);
+    for (let i = 0; i < n; i++) body[i] = body[i]! + P.body_h3 * psin(3 * ph[i]!) + 0.4 * P.body_h3 * psin(2 * ph[i]!);
   }
   // _amp_env(punch)
   const rel = expDecay(n, P.amp_decay, rate);
@@ -191,12 +192,12 @@ export function snare808(opts: Partial<SnareParams> = {}, rate = DEMO_DRUM_RATE,
   const n = Math.trunc(Math.max(bodyDecay, noiseDecay) * 1e-3 * rate);
   const f0 = semiHz(tune);
   const pblip = new Float64Array(n);
-  for (let i = 0; i < n; i++) pblip[i] = 1.0 + 0.5 * Math.exp(-(i / rate) / 0.008);
+  for (let i = 0; i < n; i++) pblip[i] = 1.0 + 0.5 * pexp(-(i / rate) / 0.008);
   const cb = cumsum(pblip);
   const tone = (mult: number): Float64Array => {
     const out = new Float64Array(n);
     const k = 2 * Math.PI * f0 * mult;
-    for (let i = 0; i < n; i++) { const p = k * cb[i]! / rate; out[i] = Math.sin(p) + 0.12 * Math.sin(3 * p); }
+    for (let i = 0; i < n; i++) { const p = k * cb[i]! / rate; out[i] = psin(p) + 0.12 * psin(3 * p); }
     return out;
   };
   const t1 = tone(1.0), t2 = tone(1.83), t3 = tone(1.93), bd = expDecay(n, bodyDecay, rate);
@@ -312,8 +313,8 @@ export function hat(opts: Partial<HatParams> = {}, rate = DEMO_DRUM_RATE): Float
   const jr = new NumpyRandomState((seed + 5) >>> 0);
   const r1 = jr.rand(), r2 = jr.rand();
   for (let k = 0; k < n; k++) {
-    const jit = 1.0 + 0.04 * Math.sin(2 * Math.PI * (30 + 40 * r1) * (k / rate) + r2 * 6);
-    sig[k] = Math.tanh(sig[k]! * jit * 1.3);
+    const jit = 1.0 + 0.04 * psin(2 * Math.PI * (30 + 40 * r1) * (k / rate) + r2 * 6);
+    sig[k] = ptanh(sig[k]! * jit * 1.3);
   }
   sig = lpHz ? onepoleLp(onepoleLp(sig, lpHz, rate), lpHz, rate) : onepoleLp(sig, machine === '909' ? 8500 : 7500, rate);
   if (hpHz) sig = onepoleHp(onepoleHp(sig, hpHz, rate), hpHz, rate);
@@ -358,7 +359,7 @@ export function rim(opts: { machine?: DrumMachine; seed?: number } = {}, rate = 
   let body: Float64Array = new Float64Array(n);
   modes.forEach(([f, dec], i) => {
     const env = expDecay(n, dec, rate);
-    for (let k = 0; k < n; k++) body[k] = body[k]! + (0.9 ** i) * Math.sin(2 * Math.PI * f * (k / rate) + phases[i]!) * env[k]!;
+    for (let k = 0; k < n; k++) body[k] = body[k]! + (0.9 ** i) * psin(2 * Math.PI * f * (k / rate) + phases[i]!) * env[k]!;
   });
   body = peakNorm(body);
   const nb = Math.trunc(ndecay * 1e-3 * rate);
@@ -382,7 +383,7 @@ export function rim(opts: { machine?: DrumMachine; seed?: number } = {}, rate = 
   for (let k = 0; k < a; k++) sig[k] = sig[k]! * lin[k]! ** 1.2;
   for (let k = 0; k < n; k++) {
     const d = Math.min(1, Math.max(-1, sig[k]! * (1 + drive * 3)));
-    sig[k] = Math.tanh(d >= 0 ? d : d * 0.85);
+    sig[k] = ptanh(d >= 0 ? d : d * 0.85);
   }
   sig = onepoleLp(onepoleHp(sig, hpHz, rate), lpHz, rate);
   const m = maxAbs(sig) || 1.0;
@@ -396,7 +397,7 @@ export function cowbell(opts: { tune?: number; dirt?: number } = {}, rate = DEMO
   const tune = opts.tune ?? 1.0, dirt = opts.dirt ?? 0.0;
   const n = Math.trunc(0.18 * rate);
   const sq = new Float64Array(n);
-  for (let k = 0; k < n; k++) { const t = k / rate; sq[k] = Math.sign(Math.sin(2 * Math.PI * 555 * tune * t)) + Math.sign(Math.sin(2 * Math.PI * 835 * tune * t)); }
+  for (let k = 0; k < n; k++) { const t = k / rate; sq[k] = Math.sign(psin(2 * Math.PI * 555 * tune * t)) + Math.sign(psin(2 * Math.PI * 835 * tune * t)); }
   const hpd = onepoleHp(sq, 500, rate), env = expDecay(n, 120, rate);
   for (let k = 0; k < n; k++) hpd[k] = hpd[k]! * env[k]!;
   return dirtStage(peakNorm(hpd), dirt);
@@ -420,7 +421,7 @@ export function ride(opts: { seed?: number; machine?: DrumMachine; pcm_bits?: nu
   const e850 = expDecay(n, 850, rate), e700 = expDecay(n, 700, rate);
   for (let k = 0; k < n; k++) {
     const t = k / rate;
-    const ring = Math.sin(2 * Math.PI * 1200 * t) * Math.sin(2 * Math.PI * 1200 * 1.487 * t);
+    const ring = psin(2 * Math.PI * 1200 * t) * psin(2 * Math.PI * 1200 * 1.487 * t);
     body[k] = body[k]! * e850[k]! + 0.04 * ring * e700[k]!;
   }
   const wash = peakNorm(hatNoise(n, rate, seed + 21, 2000)), e1800 = expDecay(n, 1800, rate);
@@ -430,7 +431,7 @@ export function ride(opts: { seed?: number; machine?: DrumMachine; pcm_bits?: nu
   const sig = new Float64Array(n);
   for (let k = 0; k < n; k++) sig[k] = 0.15 * strike[k]! + 0.50 * body[k]! + 0.35 * wash[k]!;
   const hf = onepoleHp(sig, 7000, rate), e250 = expDecay(n, 250, rate), lo = onepoleLp(sig, 9000, rate);
-  for (let k = 0; k < n; k++) sig[k] = Math.tanh((lo[k]! + hf[k]! * Math.max(e250[k]! - e850[k]!, 0)) * 1.2);
+  for (let k = 0; k < n; k++) sig[k] = ptanh((lo[k]! + hf[k]! * Math.max(e250[k]! - e850[k]!, 0)) * 1.2);
   const m = maxAbs(sig) || 1.0;
   const norm = new Float64Array(n);
   for (let k = 0; k < n; k++) norm[k] = sig[k]! / m * 0.9;

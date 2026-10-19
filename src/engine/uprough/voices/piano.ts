@@ -8,6 +8,7 @@ import type { ParameterDef } from '@/engine/registry/SynthDescriptor';
 import { NumpyRandomState } from '@/engine/turntable/turntableSim';
 import { onepoleLp } from '@/engine/dj/scratch/demoDrums';
 import { SOFTSYNTH_RATE, type SoftsynthNote, type SoftsynthVoice } from '../softsynthVoice';
+import { pcos } from '@/engine/dj/scratch/portableMath';
 
 /** synth_common.hz: the tracker note number IS the semitone (A4 = 69 = 440 Hz). */
 export const pianoHz = (semi: number): number => 440.0 * 2.0 ** ((semi - 69) / 12.0);
@@ -27,7 +28,7 @@ function hammer(p: number, rate: number, seed: number, hardness: number, contact
   const exc = new Float64Array(p);
   const k = 0.05 * (1.0 + 2.0 * hardness);
   for (let i = 0; i < nC; i++) {
-    const pulse = 0.5 * (1.0 - Math.cos(2.0 * Math.PI * i / nC));
+    const pulse = 0.5 * (1.0 - pcos(2.0 * Math.PI * i / nC));
     exc[i] = pulse * (1.0 + k * u[i]!);
   }
   let s = 0;

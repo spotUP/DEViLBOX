@@ -14,6 +14,7 @@
  */
 
 import { portableButter, type PortableBa } from './portableIir';
+import { pexp, psin, ptanh } from './portableMath';
 
 export type Ba = PortableBa;
 
@@ -79,8 +80,8 @@ function chbevl(x: number, c: readonly number[]): number {
 }
 export function besselI0(x: number): number {
   x = Math.abs(x);
-  if (x <= 8.0) return Math.exp(x) * chbevl(x / 2.0 - 2.0, I0_A);
-  return Math.exp(x) * chbevl(32.0 / x - 2.0, I0_B) / Math.sqrt(x);
+  if (x <= 8.0) return pexp(x) * chbevl(x / 2.0 - 2.0, I0_A);
+  return pexp(x) * chbevl(32.0 / x - 2.0, I0_B) / Math.sqrt(x);
 }
 
 /** scipy.signal.firwin(numtaps, cutoff, window=('kaiser', beta)) for a low pass (cutoff relative to Nyquist). */
@@ -91,7 +92,7 @@ export function firwinKaiser(numtaps: number, cutoff: number, beta: number): Flo
   for (let i = 0; i < numtaps; i++) {
     const m = i - alpha;
     const xs = cutoff * m;
-    const sinc = xs === 0 ? 1 : Math.sin(Math.PI * xs) / (Math.PI * xs);
+    const sinc = xs === 0 ? 1 : psin(Math.PI * xs) / (Math.PI * xs);
     // windows.kaiser(M, beta, sym=True): I0(beta sqrt(1 - ((n - alpha) / alpha)^2)) / I0(beta)
     const r = (i - alpha) / alpha;
     const w = besselI0(beta * Math.sqrt(1 - r * r)) / i0b;
@@ -189,7 +190,7 @@ export function reverb(x: ArrayLike<number>, rate: number, kind: RefReverbKind, 
   if (cfg.boing) {
     for (let i = 0; i < n; i++) {
       const gate = Math.abs(wet[i]!) > 0.01 ? 1 : 0;
-      wet[i] = wet[i]! + 0.15 * Math.sin(2 * Math.PI * 40 * i / rate) * gate;
+      wet[i] = wet[i]! + 0.15 * psin(2 * Math.PI * 40 * i / rate) * gate;
     }
   }
   const out = new Float64Array(n);
@@ -233,10 +234,10 @@ export function tapeDelay(x: ArrayLike<number>, rate: number, delaySec: number, 
   for (let i = 0; i < n; i++) buf[i] = x[i]!;
   let lpState = 0;
   for (let i = d; i < buf.length; i++) {
-    const dd = d + Math.trunc(wowDepth * Math.sin(2 * Math.PI * 0.7 * i / rate));
+    const dd = d + Math.trunc(wowDepth * psin(2 * Math.PI * 0.7 * i / rate));
     let v = i - dd >= 0 ? buf[i - dd]! : 0.0;
     lpState = (1 - dmp) * v + dmp * lpState;
-    v = Math.tanh(sat * lpState);
+    v = ptanh(sat * lpState);
     buf[i] = buf[i]! + fb * v;
   }
   const len = n + Math.trunc(d * 4);
@@ -274,10 +275,10 @@ export function echoLine(x: ArrayLike<number>, d: number, fb: number, damp: numb
   if (!wowDepth && !sat) return comb(buf, d, fb, damp).subarray(0, len);
   let lpState = 0;
   for (let i = d; i < buf.length; i++) {
-    const dd = d + (wowDepth ? Math.trunc(wowDepth * Math.sin(2 * Math.PI * 0.7 * i / rate)) : 0);
+    const dd = d + (wowDepth ? Math.trunc(wowDepth * psin(2 * Math.PI * 0.7 * i / rate)) : 0);
     let v = i - dd >= 0 ? buf[i - dd]! : 0.0;
     if (damp) { lpState = (1 - damp) * v + damp * lpState; v = lpState; }
-    if (sat) v = Math.tanh(sat * v);
+    if (sat) v = ptanh(sat * v);
     buf[i] = buf[i]! + fb * v;
   }
   return buf.subarray(0, len);

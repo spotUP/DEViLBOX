@@ -17,6 +17,7 @@ import sys
 import numpy as np
 
 TOOLS, OUT = sys.argv[1], sys.argv[2]
+sys.path.insert(0, TOOLS)  # the synth modules import their portable_* siblings
 RATE = 22050
 KEEP = 13
 
