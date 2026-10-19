@@ -10,7 +10,10 @@ import { ModuleRegistry } from './ModuleRegistry';
 import { noteToFrequency } from '../../utils/audio-context';
 
 export class ModularVoice {
+  /** True while a key holds the voice (note on, no note off yet). */
   isActive = false;
+  /** Context time of the last note off; a free voice released longest ago is reused first. */
+  releasedAt = -Infinity;
   private ctx: AudioContext;
   private modules = new Map<string, ModuleInstance>();
   private sharedModules: Map<string, any>; // Reference to shared modules
@@ -102,11 +105,12 @@ export class ModularVoice {
       }
     });
 
-    // Mark as inactive after envelope decay
-    setTimeout(() => {
-      this.isActive = false;
-      this._currentNote = null;
-    }, 2000); // Conservative 2s for envelope decay
+    // Free for the next note at once: a released voice may still ring out, and the allocator reuses the one
+    // released longest ago first. (A fixed 2 s busy timer here dropped every note played within 2 s of the last
+    // release on a one-voice patch.)
+    this.isActive = false;
+    this._currentNote = null;
+    this.releasedAt = time;
   }
 
   /**
