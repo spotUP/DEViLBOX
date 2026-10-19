@@ -6,7 +6,7 @@
 
 import { useCallback, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useTrackerStore, useCursorStore } from '@stores';
+import { useTrackerStore, useCursorStore, useTransportStore } from '@stores';
 import { useEditorStore } from '@stores/useEditorStore';
 import {
   HEX_DIGITS_ALL,
@@ -45,8 +45,10 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
     (e: KeyboardEvent): boolean => {
       if (isKeyHandled(e)) return false;
       if (!recordMode) return false;
-      // Suppress key repeat on all data entry columns (matches note input behavior)
-      if (e.repeat) return false;
+      // FT2 rule, same as the note column: a held key auto-repeats while the song
+      // is stopped (edit mode), so holding `0` writes a column of zeros. While the
+      // song plays, repeats are dropped so a held key does not spray a channel.
+      if (e.repeat && useTransportStore.getState().isPlaying) return false;
 
       const key = e.key;
       const keyLower = key.toLowerCase();
