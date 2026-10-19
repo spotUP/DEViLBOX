@@ -1,0 +1,2656 @@
+{
+ "format": "uprough-softsynth-song",
+ "schema": 3,
+ "generator": {
+  "tool": "hiphop",
+  "version": "7ac8b7401"
+ },
+ "song": {
+  "name": "golden_era 3",
+  "style": "golden_era",
+  "seed": 3,
+  "key": {
+   "tonic": 9,
+   "mode": "minor"
+  },
+  "bpm": 98,
+  "speed": 6,
+  "groove": {
+   "swing": 0.12,
+   "micro": {
+    "kick": 1,
+    "snare": 14,
+    "ch": 5,
+    "ghost": -10,
+    "perc": 8,
+    "chop": 4
+   },
+   "vel": 1.0
+  },
+  "bass_cut": 0.8,
+  "rate": 22050,
+  "tier": "a1200",
+  "bars": 4,
+  "rows_per_bar": 16,
+  "render": {
+   "section": null,
+   "sample": null,
+   "sample_age": null,
+   "stem": null,
+   "break_pitch": null,
+   "use_source_record": true,
+   "use_real_break": false,
+   "real_break_kick_gain": 0.8,
+   "real_break_lp": 7000,
+   "real_break_mode": "straight",
+   "vintage": true,
+   "scratch_cfg": null,
+   "melody_voice": null,
+   "use_trap808": false,
+   "voice_cfg": null
+  },
+  "motif": [
+   [
+    63,
+    3,
+    3
+   ],
+   [
+    64,
+    6,
+    2
+   ],
+   [
+    64,
+    9,
+    2
+   ],
+   [
+    63,
+    11,
+    2
+   ]
+  ],
+  "chord_roots": [
+   0,
+   0
+  ]
+ },
+ "instruments": [
+  {
+   "name": "kick",
+   "voice": "kick",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "snare",
+   "voice": "snare",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "ch",
+   "voice": "ch",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "sampled",
+   "voice": "sampled",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "rim",
+   "voice": "rim",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "snare_accent",
+   "voice": "snare_accent",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "tom",
+   "voice": "tom",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "oh",
+   "voice": "oh",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "melody",
+   "voice": "melody",
+   "params": {},
+   "seed": 0
+  }
+ ],
+ "sections": [
+  {
+   "id": "verse_0",
+   "header": {
+    "style": "golden_era",
+    "section": "verse",
+    "bars": 1,
+    "seed": 3,
+    "drum_seed": 3,
+    "bar_offset": 0,
+    "fill_pending": false,
+    "carry_fill": false,
+    "layers": {
+     "drums": 1,
+     "bass": 1,
+     "sample": 1,
+     "melody": 0,
+     "vocal": 1,
+     "energy": 0.6
+    },
+    "melody_from_bar": 1
+   },
+   "lanes": {
+    "kick": [
+     [
+      "C-4",
+      1,
+      61,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      50,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      50,
+      null
+     ],
+     null
+    ],
+    "snare": [
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null
+    ],
+    "hat": [
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      48,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      45,
+      null
+     ],
+     null,
+     null,
+     null
+    ],
+    "bass": [
+     null,
+     [
+      "A-6",
+      4,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-6",
+      4,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "bars": [
+    {
+     "drop": null,
+     "fill": false,
+     "bass": {
+      "voice": "sampled",
+      "seed": 3
+     },
+     "melody": false,
+     "order": [
+      "kick:0",
+      "kick:11",
+      "kick:14",
+      "snare:4",
+      "snare:12",
+      "hat:4",
+      "hat:12",
+      "bass:1",
+      "bass:10"
+     ]
+    }
+   ],
+   "locked": {
+    "chops": [
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 13500,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.007811245899137865,
+        "choke_ms": 6.315678644998855,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 21
+       },
+       {
+        "slice_index": 1,
+        "start": 27000,
+        "length": 13500,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.003534905012588693,
+        "choke_ms": 7.991851682307164,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 23
+       }
+      ],
+      "offers": [
+       [
+        0,
+        4.0,
+        "answer",
+        "REJECT",
+        "reserved by rap"
+       ],
+       [
+        0,
+        12.0,
+        "fill",
+        "REJECT",
+        "bar 0 (section_start) is full of sample_chop (cap 0.35)"
+       ]
+      ],
+      "ops": [
+       "FULL_LOOP",
+       0,
+       false
+      ]
+     }
+    ],
+    "scratch": {
+     "plan": {
+      "source": "AH_STANDARD",
+      "routine": null,
+      "placed": [
+       []
+      ]
+     },
+     "offers": []
+    },
+    "vocals": {
+     "voice": {
+      "mode": "SYNTH_SPEECH",
+      "register": "LOW",
+      "syllables_per_bar": 10,
+      "landing": "DOWNBEAT",
+      "anticipation": false,
+      "articulation": "staccato",
+      "pitch_mode": "SEMI_PITCHED",
+      "follows": "melody",
+      "role": "HOOK",
+      "density": 0.8,
+      "silence_rule": "breathing_room",
+      "transition_rule": "no_dub_throw",
+      "processing": [],
+      "repetition": "ABAB",
+      "engine": "hiphop",
+      "style": "golden_era",
+      "section": "MAIN",
+      "character": "LOW_MALE"
+     },
+     "rap_syl": 10,
+     "voice_bars": [
+      0
+     ],
+     "words": [
+      {
+       "word": "they",
+       "semitones": [
+        6
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "tell",
+       "semitones": [
+        5
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "behind",
+       "semitones": [
+        1,
+        3
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "line",
+       "semitones": [
+        2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "rhyme",
+       "semitones": [
+        -3
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": true
+      }
+     ],
+     "bars": {
+      "0": [
+       [
+        "they",
+        [
+         6
+        ],
+        1,
+        false,
+        true,
+        0.06905928138040905,
+        0.06905928138040905
+       ],
+       [
+        "tell",
+        [
+         5
+        ],
+        1,
+        false,
+        true,
+        2.014181341350163,
+        2.014181341350163
+       ],
+       [
+        "behind",
+        [
+         1,
+         3
+        ],
+        2,
+        false,
+        true,
+        2.924808919852045,
+        2.924808919852045
+       ],
+       [
+        "line",
+        [
+         2
+        ],
+        1,
+        false,
+        true,
+        6.948995085741856,
+        6.948995085741856
+       ],
+       [
+        "rhyme",
+        [
+         -3
+        ],
+        1,
+        false,
+        true,
+        8.966072966491838,
+        8.966072966491838
+       ]
+      ]
+     },
+     "reserves": [
+      [
+       -0.08943310657596372,
+       1.0017233560090704,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       0.9636281179138323,
+       1.3022675736961453,
+       "rap",
+       5,
+       0.5
+      ],
+      null,
+      [
+       0.9636281179138323,
+       1.3022675736961453,
+       "rap_punchline",
+       5,
+       1.0
+      ],
+      [
+       0.01056689342403628,
+       1.0017233560090704,
+       "main_vocal",
+       4,
+       0.5
+      ],
+      [
+       1.0636281179138323,
+       1.302267573696145,
+       "main_vocal",
+       4,
+       0.5
+      ]
+     ],
+     "adlibs": [
+      [
+       "REJECT",
+       "no budget for adlib in verse",
+       null
+      ]
+     ],
+     "bank_words": {}
+    }
+   }
+  },
+  {
+   "id": "hook_1",
+   "header": {
+    "style": "golden_era",
+    "section": "hook",
+    "bars": 1,
+    "seed": 4,
+    "drum_seed": 3,
+    "bar_offset": 1,
+    "fill_pending": false,
+    "carry_fill": false,
+    "layers": {
+     "drums": 1,
+     "bass": 1,
+     "sample": 1,
+     "melody": 1,
+     "vocal": 1,
+     "energy": 0.9
+    },
+    "melody_from_bar": 1
+   },
+   "lanes": {
+    "kick": [
+     [
+      "C-4",
+      1,
+      61,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      50,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      50,
+      null
+     ],
+     null
+    ],
+    "snare": [
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null
+    ],
+    "hat": [
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      53,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      50,
+      null
+     ],
+     null,
+     null,
+     null
+    ],
+    "perc1": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      5,
+      17,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "bass": [
+     null,
+     [
+      "E-7",
+      4,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-6",
+      4,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "bars": [
+    {
+     "drop": null,
+     "fill": false,
+     "bass": {
+      "voice": "sampled",
+      "seed": 3
+     },
+     "melody": false,
+     "order": [
+      "kick:0",
+      "kick:11",
+      "kick:14",
+      "snare:4",
+      "snare:12",
+      "perc1:8",
+      "hat:4",
+      "hat:12",
+      "bass:1",
+      "bass:10"
+     ]
+    }
+   ],
+   "locked": {
+    "chops": [
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 13500,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.004138857099259937,
+        "choke_ms": 12.107881284809643,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 28
+       },
+       {
+        "slice_index": 1,
+        "start": 27000,
+        "length": 13500,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.0008087281605249104,
+        "choke_ms": 8.449622339208057,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 30
+       },
+       {
+        "slice_index": 0,
+        "start": 40500,
+        "length": 13500,
+        "gain": 0.68,
+        "role": "fill",
+        "reverse": false,
+        "start_offset": 0.004049591821164263,
+        "choke_ms": 6.931044480048829,
+        "lp": 3600,
+        "ring": null,
+        "filter_seed": 31
+       }
+      ],
+      "offers": [
+       [
+        0,
+        12.0,
+        "fill",
+        "ACCEPT",
+        "ok"
+       ]
+      ],
+      "ops": [
+       "HALF_LOOP",
+       0,
+       false
+      ]
+     }
+    ],
+    "scratch": {
+     "plan": {
+      "source": "HEY_HEY",
+      "routine": null,
+      "placed": [
+       []
+      ]
+     },
+     "offers": []
+    },
+    "vocals": {
+     "voice": {
+      "mode": "SYNTH_SPEECH",
+      "register": "LOW",
+      "syllables_per_bar": 9,
+      "landing": "DOWNBEAT",
+      "anticipation": false,
+      "articulation": "staccato",
+      "pitch_mode": "SEMI_PITCHED",
+      "follows": "melody",
+      "role": "HOOK",
+      "density": 0.8,
+      "silence_rule": "breathing_room",
+      "transition_rule": "no_dub_throw",
+      "processing": [],
+      "repetition": "AABB",
+      "engine": "hiphop",
+      "style": "golden_era",
+      "section": "MAIN",
+      "character": "LOW_MALE"
+     },
+     "rap_syl": 9,
+     "voice_bars": [
+      0
+     ],
+     "words": [
+      {
+       "word": "rough",
+       "semitones": [
+        7
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      },
+      {
+       "word": "love",
+       "semitones": [
+        -3
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      }
+     ],
+     "bars": {
+      "0": [
+       [
+        "rough",
+        [
+         7
+        ],
+        1,
+        false,
+        true,
+        0.02583953002274014,
+        0.02583953002274014
+       ],
+       [
+        "love",
+        [
+         -3
+        ],
+        1,
+        false,
+        true,
+        1.0400933566494348,
+        1.0400933566494348
+       ]
+      ]
+     },
+     "reserves": [
+      [
+       -0.09605442176870749,
+       0.29106575963718817,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       0.05918367346938774,
+       0.42952380952380953,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       0.05918367346938774,
+       0.42952380952380953,
+       "rap_punchline",
+       5,
+       1.0
+      ],
+      [
+       0.003945578231292517,
+       0.2910657596371882,
+       "hook",
+       4,
+       0.5
+      ],
+      [
+       0.15918367346938775,
+       0.42952380952380953,
+       "hook",
+       4,
+       0.5
+      ]
+     ],
+     "adlibs": [],
+     "bank_words": {}
+    }
+   }
+  },
+  {
+   "id": "verse_2",
+   "header": {
+    "style": "golden_era",
+    "section": "verse",
+    "bars": 1,
+    "seed": 5,
+    "drum_seed": 3,
+    "bar_offset": 2,
+    "fill_pending": false,
+    "carry_fill": false,
+    "layers": {
+     "drums": 1,
+     "bass": 1,
+     "sample": 1,
+     "melody": 0,
+     "vocal": 1,
+     "energy": 0.6
+    },
+    "melody_from_bar": 1
+   },
+   "lanes": {
+    "kick": [
+     [
+      "C-4",
+      1,
+      61,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      50,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      50,
+      null
+     ],
+     null
+    ],
+    "snare": [
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null
+    ],
+    "hat": [
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      48,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "bass": [
+     null,
+     [
+      "E-7",
+      4,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-6",
+      4,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "bars": [
+    {
+     "drop": null,
+     "fill": false,
+     "bass": {
+      "voice": "sampled",
+      "seed": 3
+     },
+     "melody": false,
+     "order": [
+      "kick:0",
+      "kick:11",
+      "kick:14",
+      "snare:4",
+      "snare:12",
+      "hat:4",
+      "bass:1",
+      "bass:10"
+     ]
+    }
+   ],
+   "locked": {
+    "chops": [
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 13500,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.006305180437933928,
+        "choke_ms": 12.167208361943999,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 35
+       },
+       {
+        "slice_index": 1,
+        "start": 27000,
+        "length": 13500,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.0016011291676203555,
+        "choke_ms": 12.546852826733806,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 37
+       }
+      ],
+      "offers": [
+       [
+        0,
+        12.0,
+        "fill",
+        "REJECT",
+        "reserved by rap"
+       ]
+      ],
+      "ops": [
+       "FULL_LOOP",
+       0,
+       false
+      ]
+     }
+    ],
+    "scratch": {
+     "plan": {
+      "source": "AH_YEAH",
+      "routine": null,
+      "placed": [
+       []
+      ]
+     },
+     "offers": []
+    },
+    "vocals": {
+     "voice": {
+      "mode": "SYNTH_SPEECH",
+      "register": "LOW",
+      "syllables_per_bar": 8,
+      "landing": "OFFBEAT",
+      "anticipation": false,
+      "articulation": "sustained",
+      "pitch_mode": "SPOKEN",
+      "follows": "drums",
+      "role": "RAP",
+      "density": 0.8,
+      "silence_rule": "breathing_room",
+      "transition_rule": "no_dub_throw",
+      "processing": [],
+      "repetition": "AABB",
+      "engine": "hiphop",
+      "style": "golden_era",
+      "section": "MAIN",
+      "character": "LOW_MALE"
+     },
+     "rap_syl": 8,
+     "voice_bars": [
+      0
+     ],
+     "words": [
+      {
+       "word": "hunger",
+       "semitones": [
+        4,
+        2
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "is",
+       "semitones": [
+        3
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "long",
+       "semitones": [
+        3
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "when",
+       "semitones": [
+        2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "that",
+       "semitones": [
+        2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "climb",
+       "semitones": [
+        0
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": true
+      }
+     ],
+     "bars": {
+      "0": [
+       [
+        "hunger",
+        [
+         4,
+         2
+        ],
+        2,
+        false,
+        true,
+        -0.017380221334928742,
+        -0.017380221334928742
+       ],
+       [
+        "is",
+        [
+         3
+        ],
+        1,
+        false,
+        true,
+        5.066005371948707,
+        5.066005371948707
+       ],
+       [
+        "long",
+        [
+         3
+        ],
+        1,
+        false,
+        true,
+        6.965017734979753,
+        6.965017734979753
+       ],
+       [
+        "when",
+        [
+         2
+        ],
+        1,
+        false,
+        true,
+        9.041146048402016,
+        9.041146048402016
+       ],
+       [
+        "that",
+        [
+         2
+        ],
+        1,
+        false,
+        true,
+        11.01563156191522,
+        11.01563156191522
+       ],
+       [
+        "climb",
+        [
+         0
+        ],
+        1,
+        false,
+        true,
+        13.034215071825411,
+        13.034215071825411
+       ]
+      ]
+     },
+     "reserves": [
+      [
+       -0.1,
+       0.47913832199546486,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       0.6754195011337869,
+       1.4965986394557822,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       1.2838548752834467,
+       2.1310657596371883,
+       "rap",
+       5,
+       0.5
+      ],
+      null,
+      [
+       1.2838548752834467,
+       2.1310657596371883,
+       "rap_punchline",
+       5,
+       1.0
+      ],
+      [
+       0.0,
+       0.47913832199546486,
+       "main_vocal",
+       4,
+       0.5
+      ],
+      [
+       0.7754195011337869,
+       1.4965986394557824,
+       "main_vocal",
+       4,
+       0.5
+      ],
+      [
+       1.3838548752834468,
+       2.1310657596371883,
+       "main_vocal",
+       4,
+       0.5
+      ]
+     ],
+     "adlibs": [
+      [
+       "REJECT",
+       "reserved by rap",
+       null
+      ]
+     ],
+     "bank_words": {}
+    }
+   }
+  },
+  {
+   "id": "breakdown_3",
+   "header": {
+    "style": "golden_era",
+    "section": "breakdown",
+    "bars": 1,
+    "seed": 6,
+    "drum_seed": 3,
+    "bar_offset": 3,
+    "fill_pending": false,
+    "carry_fill": false,
+    "layers": {
+     "drums": 0,
+     "bass": 0,
+     "sample": 1,
+     "melody": 1,
+     "vocal": 0,
+     "energy": 0.35
+    },
+    "melody_from_bar": 0
+   },
+   "lanes": {
+    "kick": [
+     [
+      "C-4",
+      1,
+      61,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      50,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      50,
+      null
+     ],
+     null
+    ],
+    "snare": [
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      6,
+      58,
+      null
+     ],
+     [
+      "C-4",
+      2,
+      38,
+      null
+     ],
+     null,
+     null
+    ],
+    "hat": [
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      53,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      50,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      8,
+      52,
+      null
+     ],
+     null
+    ],
+    "perc1": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      7,
+      32,
+      null
+     ]
+    ],
+    "melody1": [
+     null,
+     null,
+     null,
+     [
+      "D-5",
+      9,
+      64,
+      null
+     ],
+     null,
+     null,
+     [
+      "E-5",
+      9,
+      64,
+      null
+     ],
+     null,
+     null,
+     [
+      "E-5",
+      9,
+      64,
+      null
+     ],
+     null,
+     [
+      "D-5",
+      9,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "bars": [
+    {
+     "drop": null,
+     "fill": false,
+     "bass": null,
+     "melody": true,
+     "order": [
+      "kick:0",
+      "kick:11",
+      "kick:14",
+      "snare:4",
+      "snare:12",
+      "snare:13",
+      "perc1:15",
+      "hat:4",
+      "hat:12",
+      "hat:14",
+      "melody1:3",
+      "melody1:6",
+      "melody1:9",
+      "melody1:11"
+     ]
+    }
+   ],
+   "locked": {
+    "chops": [
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 13500,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.005622339208056763,
+        "choke_ms": 6.631357289997711,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 42
+       },
+       {
+        "slice_index": 1,
+        "start": 27000,
+        "length": 13500,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.0007902647440299077,
+        "choke_ms": 11.518272678721294,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 44
+       },
+       {
+        "slice_index": 0,
+        "start": 40500,
+        "length": 13500,
+        "gain": 0.68,
+        "role": "fill",
+        "reverse": false,
+        "start_offset": 0.0064467841611352715,
+        "choke_ms": 9.68743419546807,
+        "lp": 3600,
+        "ring": null,
+        "filter_seed": 45
+       }
+      ],
+      "offers": [
+       [
+        0,
+        12.0,
+        "fill",
+        "ACCEPT",
+        "ok"
+       ]
+      ],
+      "ops": [
+       "PITCH_SHIFT",
+       0,
+       true
+      ]
+     }
+    ],
+    "scratch": {
+     "plan": {
+      "source": "YEAH_STANDARD",
+      "routine": null,
+      "placed": [
+       []
+      ]
+     },
+     "offers": []
+    },
+    "vocals": {
+     "voice": null,
+     "rap_syl": null,
+     "voice_bars": [],
+     "words": [],
+     "bars": {},
+     "reserves": [],
+     "adlibs": [],
+     "bank_words": {}
+    }
+   }
+  },
+  {
+   "id": "hook_4",
+   "header": {
+    "style": "golden_era",
+    "section": "hook",
+    "bars": 1,
+    "seed": 7,
+    "drum_seed": 3,
+    "bar_offset": 4,
+    "fill_pending": false,
+    "carry_fill": false,
+    "layers": {
+     "drums": 1,
+     "bass": 1,
+     "sample": 1,
+     "melody": 1,
+     "vocal": 1,
+     "energy": 0.95
+    },
+    "melody_from_bar": 0
+   },
+   "lanes": {
+    "kick": [
+     [
+      "C-4",
+      1,
+      61,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      50,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      50,
+      null
+     ],
+     null
+    ],
+    "snare": [
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null
+    ],
+    "hat": [
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      56,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      53,
+      null
+     ],
+     null,
+     null,
+     null
+    ],
+    "bass": [
+     null,
+     [
+      "C-7",
+      4,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-6",
+      4,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "bars": [
+    {
+     "drop": null,
+     "fill": false,
+     "bass": {
+      "voice": "sampled",
+      "seed": 3
+     },
+     "melody": false,
+     "order": [
+      "kick:0",
+      "kick:11",
+      "kick:14",
+      "snare:4",
+      "snare:12",
+      "hat:4",
+      "hat:12",
+      "bass:1",
+      "bass:10"
+     ]
+    }
+   ],
+   "locked": {
+    "chops": [
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 13500,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.004878461890592813,
+        "choke_ms": 9.985290302891585,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 49
+       },
+       {
+        "slice_index": 1,
+        "start": 27000,
+        "length": 13500,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.0013812466620889603,
+        "choke_ms": 7.214373998626688,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 51
+       },
+       {
+        "slice_index": 0,
+        "start": 40500,
+        "length": 13500,
+        "gain": 0.68,
+        "role": "fill",
+        "reverse": false,
+        "start_offset": 0.009376974135957885,
+        "choke_ms": 8.221347371633478,
+        "lp": 3600,
+        "ring": null,
+        "filter_seed": 52
+       }
+      ],
+      "offers": [
+       [
+        0,
+        4.0,
+        "answer",
+        "REJECT",
+        "reserved by rap"
+       ],
+       [
+        0,
+        12.0,
+        "fill",
+        "ACCEPT",
+        "ok"
+       ]
+      ],
+      "ops": [
+       "FULL_LOOP",
+       0,
+       false
+      ]
+     }
+    ],
+    "scratch": {
+     "plan": {
+      "source": "HEY_HEY",
+      "routine": null,
+      "placed": [
+       []
+      ]
+     },
+     "offers": []
+    },
+    "vocals": {
+     "voice": {
+      "mode": "SYNTH_SPEECH",
+      "register": "LOW",
+      "syllables_per_bar": 10,
+      "landing": "OFFBEAT",
+      "anticipation": false,
+      "articulation": "sustained",
+      "pitch_mode": "SPOKEN",
+      "follows": "drums",
+      "role": "RAP",
+      "density": 0.8,
+      "silence_rule": "breathing_room",
+      "transition_rule": "no_dub_throw",
+      "processing": [],
+      "repetition": "ABAB",
+      "engine": "hiphop",
+      "style": "golden_era",
+      "section": "MAIN",
+      "character": "LOW_MALE"
+     },
+     "rap_syl": 10,
+     "voice_bars": [
+      0
+     ],
+     "words": [
+      {
+       "word": "bass",
+       "semitones": [
+        6
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      },
+      {
+       "word": "boom",
+       "semitones": [
+        4
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      },
+      {
+       "word": "rough",
+       "semitones": [
+        2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      },
+      {
+       "word": "yeah",
+       "semitones": [
+        -3
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      }
+     ],
+     "bars": {
+      "0": [
+       [
+        "bass",
+        [
+         6
+        ],
+        1,
+        false,
+        true,
+        0.09218027604100307,
+        0.09218027604100307
+       ],
+       [
+        "boom",
+        [
+         4
+        ],
+        1,
+        false,
+        true,
+        0.9218294024559807,
+        0.9218294024559807
+       ],
+       [
+        "rough",
+        [
+         2
+        ],
+        1,
+        false,
+        true,
+        3.0052265501074618,
+        3.0052265501074618
+       ],
+       [
+        "yeah",
+        [
+         -3
+        ],
+        1,
+        false,
+        true,
+        6.937297010970906,
+        6.937297010970906
+       ]
+      ]
+     },
+     "reserves": [
+      [
+       -0.08589569160997733,
+       0.2759637188208617,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       0.04108843537414966,
+       0.3797278911564626,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       0.36,
+       0.7183673469387755,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       0.9618140589569161,
+       1.4040362811791383,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       0.9618140589569161,
+       1.4040362811791383,
+       "rap_punchline",
+       5,
+       1.0
+      ],
+      [
+       0.014104308390022675,
+       0.2759637188208617,
+       "hook",
+       4,
+       0.5
+      ],
+      [
+       0.14108843537414967,
+       0.3797278911564626,
+       "hook",
+       4,
+       0.5
+      ],
+      [
+       0.46,
+       0.7183673469387755,
+       "hook",
+       4,
+       0.5
+      ],
+      [
+       1.061814058956916,
+       1.4040362811791383,
+       "hook",
+       4,
+       0.5
+      ]
+     ],
+     "adlibs": [],
+     "bank_words": {}
+    }
+   }
+  },
+  {
+   "id": "outro_5",
+   "header": {
+    "style": "golden_era",
+    "section": "outro",
+    "bars": 1,
+    "seed": 8,
+    "drum_seed": 3,
+    "bar_offset": 5,
+    "fill_pending": false,
+    "carry_fill": false,
+    "layers": {
+     "drums": 1,
+     "bass": 0,
+     "sample": 1,
+     "melody": 0,
+     "vocal": 0,
+     "energy": 0.4
+    },
+    "melody_from_bar": 1
+   },
+   "lanes": {
+    "kick": [
+     [
+      "C-4",
+      1,
+      61,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      50,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      50,
+      null
+     ],
+     null
+    ],
+    "snare": [
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null
+    ],
+    "hat": [
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      45,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      43,
+      null
+     ],
+     null,
+     null,
+     null
+    ],
+    "perc1": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      5,
+      17,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "bars": [
+    {
+     "drop": null,
+     "fill": false,
+     "bass": null,
+     "melody": false,
+     "order": [
+      "kick:0",
+      "kick:11",
+      "kick:14",
+      "snare:4",
+      "snare:12",
+      "perc1:8",
+      "hat:4",
+      "hat:12"
+     ]
+    }
+   ],
+   "locked": {
+    "chops": [
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 13500,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.008277714198519874,
+        "choke_ms": 10.215640497444113,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 56
+       },
+       {
+        "slice_index": 1,
+        "start": 27000,
+        "length": 13500,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.009293965056839857,
+        "choke_ms": 8.782513160906387,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 58
+       }
+      ],
+      "offers": [
+       [
+        0,
+        4.0,
+        "answer",
+        "REJECT",
+        "bar 0 (section_start) is full of sample_chop (cap 0.98)"
+       ],
+       [
+        0,
+        12.0,
+        "fill",
+        "REJECT",
+        "bar 0 (section_start) is full of sample_chop (cap 0.98)"
+       ]
+      ],
+      "ops": [
+       "HALF_LOOP",
+       0,
+       false
+      ]
+     }
+    ],
+    "scratch": {
+     "plan": {
+      "source": "UH_SHORT",
+      "routine": null,
+      "placed": [
+       []
+      ]
+     },
+     "offers": []
+    },
+    "vocals": {
+     "voice": null,
+     "rap_syl": null,
+     "voice_bars": [],
+     "words": [],
+     "bars": {},
+     "reserves": [],
+     "adlibs": [],
+     "bank_words": {}
+    }
+   }
+  }
+ ],
+ "order": [
+  0,
+  1,
+  2,
+  3,
+  4,
+  5
+ ],
+ "side": {
+  "verse_0": {
+   "kick:0": {
+    "vel": 0.95,
+    "role": "main"
+   },
+   "kick:11": {
+    "vel": 0.775,
+    "role": "main"
+   },
+   "kick:14": {
+    "vel": 0.775,
+    "role": "secondary"
+   },
+   "snare:4": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "snare:12": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "hat:4": {
+    "hat": {
+     "kind": "accent",
+     "vel": 96,
+     "micro_ms": -5.239,
+     "sub": []
+    }
+   },
+   "hat:12": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 90,
+     "micro_ms": 2.654,
+     "sub": []
+    }
+   },
+   "bass:1": {
+    "ebass": {
+     "semi": 45,
+     "dur": 6,
+     "glide": null,
+     "vel": 1.0
+    }
+   },
+   "bass:10": {
+    "ebass": {
+     "semi": 45,
+     "dur": 6,
+     "glide": null,
+     "vel": 1.0
+    }
+   }
+  },
+  "hook_1": {
+   "kick:0": {
+    "vel": 0.95,
+    "role": "main"
+   },
+   "kick:11": {
+    "vel": 0.775,
+    "role": "main"
+   },
+   "kick:14": {
+    "vel": 0.775,
+    "role": "secondary"
+   },
+   "snare:4": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "snare:12": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "perc1:8": {
+    "vel": 0.27,
+    "role": "ghost"
+   },
+   "hat:4": {
+    "hat": {
+     "kind": "accent",
+     "vel": 105,
+     "micro_ms": -5.239,
+     "sub": []
+    }
+   },
+   "hat:12": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 99,
+     "micro_ms": 2.654,
+     "sub": []
+    }
+   },
+   "bass:1": {
+    "ebass": {
+     "semi": 52,
+     "dur": 6,
+     "glide": null,
+     "vel": 1.0
+    }
+   },
+   "bass:10": {
+    "ebass": {
+     "semi": 45,
+     "dur": 6,
+     "glide": null,
+     "vel": 1.0
+    }
+   }
+  },
+  "verse_2": {
+   "kick:0": {
+    "vel": 0.95,
+    "role": "main"
+   },
+   "kick:11": {
+    "vel": 0.775,
+    "role": "main"
+   },
+   "kick:14": {
+    "vel": 0.775,
+    "role": "secondary"
+   },
+   "snare:4": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "snare:12": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "hat:4": {
+    "hat": {
+     "kind": "accent",
+     "vel": 96,
+     "micro_ms": -5.239,
+     "sub": []
+    }
+   },
+   "bass:1": {
+    "ebass": {
+     "semi": 52,
+     "dur": 6,
+     "glide": null,
+     "vel": 1.0
+    }
+   },
+   "bass:10": {
+    "ebass": {
+     "semi": 45,
+     "dur": 6,
+     "glide": null,
+     "vel": 1.0
+    }
+   }
+  },
+  "breakdown_3": {
+   "kick:0": {
+    "vel": 0.95,
+    "role": "main"
+   },
+   "kick:11": {
+    "vel": 0.775,
+    "role": "main"
+   },
+   "kick:14": {
+    "vel": 0.775,
+    "role": "secondary"
+   },
+   "snare:4": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "snare:12": {
+    "vel": 0.9,
+    "role": "backbeat"
+   },
+   "snare:13": {
+    "vel": 0.593353933012894,
+    "role": "fill"
+   },
+   "perc1:15": {
+    "vel": 0.5,
+    "role": "fill"
+   },
+   "hat:4": {
+    "hat": {
+     "kind": "accent",
+     "vel": 106,
+     "micro_ms": 4.156,
+     "sub": []
+    }
+   },
+   "hat:12": {
+    "hat": {
+     "kind": "accent",
+     "vel": 99,
+     "micro_ms": 4.457,
+     "sub": []
+    }
+   },
+   "hat:14": {
+    "hat": {
+     "kind": "single",
+     "vel": 104,
+     "micro_ms": 0.0,
+     "sub": []
+    }
+   },
+   "melody1:3": {
+    "dur": 3
+   },
+   "melody1:6": {
+    "dur": 2
+   },
+   "melody1:9": {
+    "dur": 2
+   },
+   "melody1:11": {
+    "dur": 2
+   }
+  },
+  "hook_4": {
+   "kick:0": {
+    "vel": 0.95,
+    "role": "main"
+   },
+   "kick:11": {
+    "vel": 0.775,
+    "role": "main"
+   },
+   "kick:14": {
+    "vel": 0.775,
+    "role": "secondary"
+   },
+   "snare:4": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "snare:12": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "hat:4": {
+    "hat": {
+     "kind": "single",
+     "vel": 111,
+     "micro_ms": 2.773,
+     "sub": []
+    }
+   },
+   "hat:12": {
+    "hat": {
+     "kind": "accent",
+     "vel": 105,
+     "micro_ms": -4.255,
+     "sub": []
+    }
+   },
+   "bass:1": {
+    "ebass": {
+     "semi": 48,
+     "dur": 6,
+     "glide": null,
+     "vel": 1.0
+    }
+   },
+   "bass:10": {
+    "ebass": {
+     "semi": 45,
+     "dur": 6,
+     "glide": null,
+     "vel": 1.0
+    }
+   }
+  },
+  "outro_5": {
+   "kick:0": {
+    "vel": 0.95,
+    "role": "main"
+   },
+   "kick:11": {
+    "vel": 0.775,
+    "role": "main"
+   },
+   "kick:14": {
+    "vel": 0.775,
+    "role": "secondary"
+   },
+   "snare:4": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "snare:12": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "perc1:8": {
+    "vel": 0.27,
+    "role": "ghost"
+   },
+   "hat:4": {
+    "hat": {
+     "kind": "double",
+     "vel": 89,
+     "micro_ms": 2.802,
+     "sub": [
+      [
+       17.770791059412538,
+       0.31591076542474616
+      ]
+     ]
+    }
+   },
+   "hat:12": {
+    "hat": {
+     "kind": "double",
+     "vel": 86,
+     "micro_ms": 5.107,
+     "sub": [
+      [
+       8.696651161173456,
+       0.2703257583632333
+      ]
+     ]
+    }
+   }
+  }
+ },
+ "bus": {}
+}
