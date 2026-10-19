@@ -6,7 +6,7 @@
  */
 import { hp, npSum } from '@/engine/dj/scratch/refDsp';
 import {
-  addVinylSurface, delay, mixerColor, paulaFilter, reverb, vintageCharacter, type SamplerReverbKind,
+  addVinylSurface, delay, masterBus, mixerColor, paulaFilter, reverb, vintageCharacter, type SamplerReverbKind,
 } from '@/engine/uprough/effects/busEffects';
 
 type Signal = ArrayLike<number>;
@@ -100,10 +100,16 @@ export interface LaneBuses {
 }
 export interface BalanceOptions { bassGain: number; hasDrums: boolean }
 
+/** hiphop.bus_gain_span: the loudest MIX_GAINS entry among the balanced buses. */
+export function busGainSpan(bassGain: number, hasDrums: boolean): number {
+  const sampleG = hasDrums ? MIX_GAINS.sample_ducked : MIX_GAINS.sample_solo;
+  return Math.max(MIX_GAINS.drums, bassGain, sampleG, MIX_GAINS.melody, MIX_GAINS.vocal) || 1.0;
+}
+
 /** The RMS bus balance of render_section: each bus to BUS_REFERENCE_RMS * gain / span. Returns new buffers. */
 export function balanceBuses(b: LaneBuses, o: BalanceOptions): LaneBuses {
   const sampleG = o.hasDrums ? MIX_GAINS.sample_ducked : MIX_GAINS.sample_solo;
-  const span = Math.max(MIX_GAINS.drums, o.bassGain, sampleG, MIX_GAINS.melody, MIX_GAINS.vocal) || 1.0;
+  const span = busGainSpan(o.bassGain, o.hasDrums);
   const scale = (buf: Float64Array, g: number): { buf: Float64Array; f: number } => {
     const r = Math.sqrt(meanSquare(buf));
     if (!(r > 1e-9)) return { buf: Float64Array.from(buf), f: 1.0 };
@@ -206,4 +212,59 @@ export function applyTexture(track: Signal, rate: number, options: Pick<TextureO
   const n = Math.min(out.length, paula.length);
   for (let i = 0; i < n; i++) out[i] = 0.35 * out[i]! + 0.65 * paula[i]!;
   return out;
+}
+
+// ── section and track mix ───────────────────────────────────────────────────
+
+export interface ScratchLane {
+  /** The scratch bus after its own chain (macros, echo, reverb): those lane processors are not ported yet. */
+  buf: Float64Array;
+  /** The style's use_scratch flag: picks MIX_GAINS.scratch_on / scratch_off. */
+  useScratch: boolean;
+  /** Bars the voice occupies (duck_under_voice). */
+  voiceBars: Iterable<number>;
+  barLen: number;
+}
+export interface MixSectionOptions {
+  /** The section length in samples (render_section's L); the lane buffers carry L + tail. */
+  length: number; bassGain: number; hasDrums: boolean; rate: number;
+  scratch?: ScratchLane | null;
+}
+
+/**
+ * The render_section tail: RMS bus balance (HIPHOP_BUS_BALANCE), `sec = (drums + bass + sample + melody + vocal +
+ * reinforce)[:L]` in Python's left-to-right order, then the scratch bus scaled by active RMS, ducked under the voice
+ * and added. Lane buffers must already carry their per-lane chains; they are not modified.
+ */
+export function mixSection(lanes: LaneBuses, o: MixSectionOptions): Float64Array {
+  const b = balanceBuses(lanes, { bassGain: o.bassGain, hasDrums: o.hasDrums });
+  const sec = new Float64Array(o.length);
+  for (let i = 0; i < o.length; i++) {
+    sec[i] = b.drums[i]! + b.bass[i]! + b.sample[i]! + b.melody[i]! + b.vocal[i]! + (b.reinforce ? b.reinforce[i]! : 0);
+  }
+  const s = o.scratch;
+  if (s && s.buf.length) {
+    const g = s.useScratch ? MIX_GAINS.scratch_on : MIX_GAINS.scratch_off;
+    const k = (BUS_REFERENCE_RMS * g / busGainSpan(o.bassGain, o.hasDrums)) / activeRms(s.buf, o.rate);
+    const scaled = new Float64Array(s.buf.length);
+    for (let i = 0; i < scaled.length; i++) scaled[i] = s.buf[i]! * k;
+    const scr = duckUnderVoice(scaled, s.voiceBars, s.barLen, o.rate);
+    const n = Math.min(sec.length, scr.length);
+    for (let i = 0; i < n; i++) sec[i] = sec[i]! + 1.0 * scr[i]!;
+  }
+  return sec;
+}
+
+/** render_track's tail: concatenate the (non-empty) sections, _apply_texture, master_bus, int8 / 127. */
+export function mixTrack(
+  sections: readonly Signal[], rate: number, options: Pick<TextureOptions, 'style'> & Partial<TextureOptions>,
+): Float64Array {
+  const parts = sections.filter((p) => p.length);
+  const total = parts.reduce((a, p) => a + p.length, 0);
+  const track = new Float64Array(total);
+  let at = 0;
+  for (const p of parts) { for (let i = 0; i < p.length; i++) track[at + i] = p[i]!; at += p.length; }
+  const textured = applyTexture(track, rate, options);
+  const master = masterBus(textured, {}, rate);
+  return Float64Array.from(master, (v) => v / 127.0);
 }

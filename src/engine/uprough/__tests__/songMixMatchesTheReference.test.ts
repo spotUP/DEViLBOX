@@ -5,16 +5,17 @@
  * TOLERANCE says otherwise with its reason.
  */
 import { describe, expect, it } from 'vitest';
+import * as bus from '../effects/busEffects';
 import * as mix from '../mix/songMix';
 import fixture from './fixtures/song_mix.json';
 
 interface Out { length: number; rms: number; samples: number[] }
 interface Case extends Partial<Out> {
   fn: string; input?: string; options?: Record<string, unknown>; scalar?: number; trim?: number; model?: string;
-  outputs?: Record<string, Out>;
+  outputs?: Record<string, Out>; textured?: Out; texturedAll?: number[];
 }
 const ref = fixture as unknown as {
-  rate: number; keep: number; barLen: number; lanes: Record<string, number[]>; sparse: number[];
+  rate: number; keep: number; barLen: number; scratch: number[]; lanes: Record<string, number[]>; sparse: number[];
   constants: { MIX_GAINS: Record<string, number>; BUS_REFERENCE_RMS: number; BUS_REFERENCE_PEAK: number;
     SAMPLE_ECHO: { send: number; fb: number }; STYLE_TEXTURE: Record<string, { tape: number; vinyl: number }> };
   cases: Case[];
@@ -31,6 +32,13 @@ const MIXED = Float64Array.from(LOUD, (_, i) => (LOUD[i]! + lane('bass')[i]! + l
 
 /** Looser bounds than 1e-9, with the reason. Empty when every case holds the default bound. */
 const TOLERANCE: Record<string, number> = {};
+/**
+ * The final int8 stage is a noise-shaped quantiser (error feedback, 2 e1 - e2): the texture chain's ~1e-10 drift from
+ * Python flips a rounding tie and the feedback carries it, so a few percent of samples land one or two LSB (1/127) away.
+ * The quantiser itself is exact: it is also fed Python's own textured signal and must then match to 1e-9.
+ */
+const LSB = 1 / 127;
+const MAX_LSB_MISMATCH_FRACTION = 0.1;
 
 function check(label: string, y: ArrayLike<number>, r: Out, bound: number): number {
   expect(y.length, label).toBe(r.length);
@@ -42,6 +50,17 @@ function check(label: string, y: ArrayLike<number>, r: Out, bound: number): numb
   expect(worst, label).toBeLessThanOrEqual(bound);
   return worst;
 }
+
+/** The three mixSection cases, recomputed by the TS port and reused by the mixTrack cases. */
+const sectionOut: Record<string, Float64Array> = {};
+function runSection(o: Record<string, unknown>): Float64Array {
+  const lanes = { drums: lane('drums'), bass: lane('bass'), sample: lane('sample'), melody: lane('melody'), vocal: lane('vocal'), reinforce: lane('reinforce') };
+  return mix.mixSection(lanes, {
+    length: o.length as number, bassGain: o.bassGain as number, hasDrums: o.hasDrums as boolean, rate: RATE,
+    scratch: o.scratch ? { buf: Float64Array.from(ref.scratch), useScratch: o.useScratch as boolean, voiceBars: o.voiceBars as number[], barLen: o.barLen as number } : null,
+  });
+}
+const SECTION_NAME = (o: Record<string, unknown>): string => (o.scratch ? (o.hasDrums ? 'full' : 'solo') : 'noscratch');
 
 describe('song mix matches the Python reference', () => {
   it('mirrors the Python constants', () => {
@@ -91,6 +110,31 @@ describe('song mix matches the Python reference', () => {
           check(label, mix.duckUnderVoice(x, o.voiceBars as number[], o.barLen as number, RATE, o.floor as number, o.fadeSec as number), c as Out, bound);
           break;
         case 'applyTexture': check(label, mix.applyTexture(MIXED, RATE, o as { style: string }), c as Out, bound); break;
+        case 'mixSection': {
+          const y = runSection(o);
+          sectionOut[SECTION_NAME(o)] = y;
+          check(label, y, c as Out, bound);
+          break;
+        }
+        case 'mixTrack': {
+          const names = o.sections as string[];
+          const secs = names.map((n) => sectionOut[n] ?? runSection(ref.cases.find((k) => k.fn === 'mixSection' && SECTION_NAME(k.options!) === n)!.options!));
+          const cat = Float64Array.from(secs.flatMap((p) => [...p]));
+          check(`${label}.textured`, mix.applyTexture(cat, RATE, { style: o.style as string, seed: o.seed as number }), c.textured!, bound);
+          const final = mix.mixTrack(secs, RATE, { style: o.style as string, seed: o.seed as number });
+          expect(final.length, label).toBe(c.length);
+          let bad = 0;
+          c.samples!.forEach((v, k) => {
+            const d = Math.abs(final[k * ref.keep]! - v);
+            expect(d, label).toBeLessThanOrEqual(2 * LSB + 1e-9);
+            if (d > bound) bad++;
+          });
+          expect(bad / c.samples!.length, `${label} LSB mismatch fraction`).toBeLessThan(MAX_LSB_MISMATCH_FRACTION);
+          // the master stage alone, fed Python's textured signal: exact
+          const m = bus.masterBus(Float64Array.from(c.texturedAll!), {}, RATE);
+          check(`${label}.master`, Float64Array.from(m, (v) => v / 127.0), c as Out, bound);
+          break;
+        }
         default: throw new Error(`no runner for ${c.fn}`);
       }
     });
