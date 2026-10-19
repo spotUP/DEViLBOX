@@ -19,6 +19,18 @@ else:
     print(json.dumps({"args": a}))
 `;
 
+// A fake tools/synth_song.py: records its args, writes a known WAV, or fails like the 64k tier.
+const FAKE_SYNTH = `
+import json, os, sys
+a = sys.argv[1:]
+out = a[a.index("--out-dir") + 1]
+if "32 bars" in open(a[a.index("--song-file") + 1]).read():
+    sys.stderr.write("noise\\nthe song file has 32 bars; tier 64k holds 16\\n")
+    sys.exit(1)
+json.dump({"args": a, "cwd": os.getcwd()}, open(os.path.join(os.path.dirname(out), "args.json"), "w"))
+open(os.path.join(out, "synth_preview.wav"), "wb").write(b"RIFF\\x00\\x01\\x02WAVEfake")
+`;
+
 let root: string;
 let server: Server;
 let base: string;
@@ -34,6 +46,7 @@ beforeAll(async () => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'uprough-fake-'));
   fs.mkdirSync(path.join(root, 'tools'));
   fs.writeFileSync(path.join(root, 'tools', 'song_file.py'), FAKE);
+  fs.writeFileSync(path.join(root, 'tools', 'synth_song.py'), FAKE_SYNTH);
   const app = express();
   app.use(express.json());
   app.use('/api/uprough', uproughRoutes);
@@ -101,5 +114,60 @@ describe('GET /api/uprough/styles', () => {
   it('returns the generator\'s own style list', async () => {
     const r = await fetch(`${base}/api/uprough/styles`);
     expect(await r.json()).toEqual({ styles: ['golden_era', 'trap'] });
+  });
+});
+
+describe('POST /api/uprough/render', () => {
+  const render = (body: unknown) =>
+    fetch(`${base}/api/uprough/render`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  const renderDirs = () => fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('uprough-render-')).sort();
+
+  it('runs synth_song.py with the maker flags on the posted text and returns its WAV', async () => {
+    const before = renderDirs();
+    const song = JSON.stringify({ schema: 2, note: 'exact text' }, null, 1);
+    const r = await render({ song });
+    expect(r.status).toBe(200);
+    expect(r.headers.get('content-type')).toContain('audio/wav');
+    expect(Buffer.from(await r.arrayBuffer())).toEqual(Buffer.from('RIFF\x00\x01\x02WAVEfake', 'latin1'));
+    expect(renderDirs()).toEqual(before);
+  });
+
+  it('passes the flags and a --song-file whose content is the posted text', async () => {
+    // The fake leaves no trace once the temp dir is removed, so make it copy what it saw.
+    fs.writeFileSync(path.join(root, 'tools', 'synth_song.py'), FAKE_SYNTH + `
+import shutil
+shutil.copy(a[a.index("--song-file") + 1], os.path.join(${JSON.stringify(root)}, "seen_song.json"))
+json.dump(a, open(os.path.join(${JSON.stringify(root)}, "seen_args.json"), "w"))
+`);
+    const song = JSON.stringify({ schema: 2, bars: 4 });
+    expect((await render({ song })).status).toBe(200);
+    const args = JSON.parse(fs.readFileSync(path.join(root, 'seen_args.json'), 'utf8')) as string[];
+    const val = (f: string) => args[args.indexOf(f) + 1];
+    expect(val('--engine')).toBe('hiphop');
+    expect(val('--tier')).toBe('64k');
+    expect(val('--acid-source')).toBe('auto');
+    expect(val('--prebaked')).toBe('1');
+    expect(path.basename(val('--song-file'))).toBe('song.uprough-song.json');
+    expect(path.basename(val('--out-dir'))).toBe('out');
+    expect(fs.readFileSync(path.join(root, 'seen_song.json'), 'utf8')).toBe(song);
+    fs.writeFileSync(path.join(root, 'tools', 'synth_song.py'), FAKE_SYNTH);
+  });
+
+  it('400 for text that is not JSON or has no schema field', async () => {
+    expect((await render({ song: 'not json' })).status).toBe(400);
+    expect((await render({ song: '{"a":1}' })).status).toBe(400);
+    expect((await render({})).status).toBe(400);
+  });
+
+  it('400 with the synth\'s last stderr line, and removes the temp dir', async () => {
+    const before = renderDirs();
+    const r = await render({ song: JSON.stringify({ schema: 2, note: '32 bars' }) });
+    expect(r.status).toBe(400);
+    expect(((await r.json()) as { error: string }).error).toBe('the song file has 32 bars; tier 64k holds 16');
+    expect(renderDirs()).toEqual(before);
   });
 });

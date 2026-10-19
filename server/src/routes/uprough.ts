@@ -11,6 +11,7 @@
 import { Router, Request, Response } from 'express';
 import { spawn } from 'child_process';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 const router = Router();
@@ -21,18 +22,23 @@ const MAX_OUTPUT = 64 * 1024 * 1024;
 
 interface RunResult { code: number | null; stdout: string; stderr: string; timedOut: boolean; aborted: boolean }
 
-function songFileScript(): { script?: string; error?: string } {
+/** Resolve tools/<name> in the Up Rough checkout named by UPROUGH_ROOT. */
+function uproughScript(name: string): { script?: string; root?: string; error?: string } {
   const root = process.env.UPROUGH_ROOT;
   if (!root) return { error: 'UPROUGH_ROOT is not set: point it at the Up Rough Demo System checkout' };
-  const script = path.join(root, 'tools', 'song_file.py');
-  if (!fs.existsSync(script)) return { error: `UPROUGH_ROOT has no tools/song_file.py: ${root}` };
-  return { script };
+  const script = path.join(root, 'tools', name);
+  if (!fs.existsSync(script)) return { error: `UPROUGH_ROOT has no tools/${name}: ${root}` };
+  return { script, root };
 }
 
-/** Run song_file.py; the child is killed on timeout or when `signal` aborts. */
-function runSongFile(script: string, args: string[], signal?: AbortSignal): Promise<RunResult> {
+function songFileScript(): { script?: string; error?: string } {
+  return uproughScript('song_file.py');
+}
+
+/** Run an Up Rough tool script; the child is killed on timeout or when `signal` aborts. */
+function runSongFile(script: string, args: string[], signal?: AbortSignal, cwd: string = path.dirname(script)): Promise<RunResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn(PYTHON, [script, ...args], { cwd: path.dirname(script) });
+    const child = spawn(PYTHON, [script, ...args], { cwd });
     let stdout = '';
     let stderr = '';
     let timedOut = false;
@@ -106,6 +112,55 @@ router.post('/generate', async (req: Request, res: Response) => {
     res.type('application/json').send(r.stdout);
   } catch (e) {
     if (!ac.signal.aborted) res.status(500).json({ error: (e as Error).message });
+  }
+});
+
+/**
+ * POST /api/uprough/render {song: "<song file JSON text>"} renders the song with
+ * the real Up Rough synth (tools/synth_song.py, the maker's own flags) and
+ * returns the WAV. The body is JSON (the app's global express.json already
+ * parses it, limit 10mb); the song text travels as a string so it is written
+ * to disk byte for byte.
+ */
+router.post('/render', async (req: Request, res: Response) => {
+  const { script, root, error } = uproughScript('synth_song.py');
+  if (!script || !root) return res.status(503).json({ error });
+
+  const song = req.body?.song;
+  if (typeof song !== 'string' || !song) return res.status(400).json({ error: 'song must be the song file text' });
+  try {
+    const doc = JSON.parse(song) as { schema?: unknown };
+    if (doc === null || typeof doc !== 'object' || doc.schema === undefined) {
+      return res.status(400).json({ error: 'the song file has no schema field' });
+    }
+  } catch {
+    return res.status(400).json({ error: 'the song file is not valid JSON' });
+  }
+
+  const ac = new AbortController();
+  res.on('close', () => { if (!res.writableEnded) ac.abort(); });
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'uprough-render-'));
+  try {
+    const songPath = path.join(dir, 'song.uprough-song.json');
+    const outDir = path.join(dir, 'out');
+    fs.writeFileSync(songPath, song);
+    fs.mkdirSync(outDir);
+    const r = await runSongFile(script, [
+      '--out-dir', outDir, '--engine', 'hiphop', '--tier', '64k',
+      '--acid-source', 'auto', '--prebaked', '1', '--song-file', songPath,
+    ], ac.signal, root);
+    if (r.aborted) return;
+    if (r.timedOut) return res.status(504).json({ error: `render timed out after ${TIMEOUT_MS} ms` });
+    if (r.code !== 0) {
+      const lines = r.stderr.trim().split('\n');
+      return res.status(400).json({ error: lines[lines.length - 1] || 'render failed' });
+    }
+    res.type('audio/wav').send(fs.readFileSync(path.join(outDir, 'synth_preview.wav')));
+  } catch (e) {
+    if (!ac.signal.aborted) res.status(500).json({ error: (e as Error).message });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 

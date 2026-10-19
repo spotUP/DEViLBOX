@@ -39,3 +39,15 @@ export async function generateSong(req: GenerateRequest, signal?: AbortSignal): 
   if (!res.ok) throw await failure(res);
   return res.text();
 }
+
+/** Renders a song-file text with the real Up Rough synth on the server; returns the WAV bytes. */
+export async function renderSong(text: string, signal?: AbortSignal): Promise<ArrayBuffer> {
+  const res = await fetch('/api/uprough/render', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ song: text }),
+    signal,
+  });
+  if (!res.ok) throw await failure(res);
+  return res.arrayBuffer();
+}

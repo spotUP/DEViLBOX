@@ -19,6 +19,8 @@ import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore
 import { useShallow } from 'zustand/react/shallow';
 import { notify } from '@stores/useNotificationStore';
 import { SONG_FILE_EXTENSION } from '@lib/uprough/songFile';
+import { renderSong } from '@lib/uprough/generateClient';
+import { playAudition, stopAudition } from '@lib/uprough/auditionPlayer';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
@@ -29,7 +31,7 @@ import { setFormatPlaybackPlaying, resetFormatPlaybackState } from '@engine/Form
 import { gtUltraTogglePlay } from '@engine/gtultra/gtUltraTransport';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { useCursorStore } from '@stores/useCursorStore';
-import { X, Menu, FileUp, FileDown, FilePlus, Trash2 as ClearIcon, Wand2, HelpCircle, Info as InfoIcon, Gamepad2 } from 'lucide-react';
+import { X, Menu, FileUp, FileDown, FilePlus, Trash2 as ClearIcon, Wand2, HelpCircle, Info as InfoIcon, Gamepad2, Headphones } from 'lucide-react';
 import { UpRoughGenerateDialog } from '@components/dialogs/UpRoughGenerateDialog';
 import { LogoAnimation } from '@components/visualization/LogoAnimation';
 import { SineScroller } from '@components/visualization/SineScroller';
@@ -549,11 +551,23 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     }
   };
 
+  const handlePreviewUpRoughSong = async () => {
+    stopAudition();
+    try {
+      const text = useTrackerStore.getState().exportUpRoughSong();
+      notify.info('Rendering with the Up Rough synth, this can take up to a minute...');
+      await playAudition(await renderSong(text));
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const hamburgerMenuItems: MenuItemType[] = [
     { id: 'export', label: 'Export', icon: <FileUp size={14} />, shortcut: '⌘⇧E', onClick: () => onShowExport?.() },
     { id: 'generate-uprough-song', label: 'Generate Up Rough Song...', icon: <Wand2 size={14} />, onClick: () => setShowUpRoughGenerate(true) },
     { id: 'import-uprough-song', label: 'Import Up Rough Song...', icon: <FileDown size={14} />, onClick: handleImportUpRoughSong },
     { id: 'export-uprough-song', label: 'Export Up Rough Song...', icon: <FileUp size={14} />, onClick: handleExportUpRoughSong },
+    { id: 'preview-uprough-song', label: 'Preview Up Rough Song', icon: <Headphones size={14} />, onClick: handlePreviewUpRoughSong },
     { id: 'new', label: 'New Song', icon: <FilePlus size={14} />, onClick: () => useUIStore.getState().openNewSongWizard() },
     { id: 'clear', label: 'Clear All Patterns', icon: <ClearIcon size={14} />, danger: true, onClick: () => setShowClearModal(true) },
     { type: 'divider' as const },
