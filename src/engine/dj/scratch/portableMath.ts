@@ -220,3 +220,51 @@ export function pcos(x: number): number {
   if (q === 2) return -kcos(y0, y1);
   return ksin(y0, y1);
 }
+
+// fdlibm e_asin.c (portable_math.asin), line for line.
+const PIO2_HI = 1.57079632679489655800e+00;
+const PIO2_LO = 6.12323399573676603587e-17;
+const PIO4_HI = 7.85398163397448278999e-01;
+const PS0 = 1.66666666666666657415e-01;
+const PS1 = -3.25565818622400915405e-01;
+const PS2 = 2.01212532134862925881e-01;
+const PS3 = -4.00555345006794114027e-02;
+const PS4 = 7.91534994289814532176e-04;
+const PS5 = 3.47933107596021167570e-05;
+const QS1 = -2.40339491173441421878e+00;
+const QS2 = 2.02094576023350569471e+00;
+const QS3 = -6.88283971605453293030e-01;
+const QS4 = 7.70381505559019352791e-02;
+
+/** asin(x), fdlibm e_asin.c; NaN outside [-1, 1]. */
+export function pasin(x: number): number {
+  const hx = highWord(x);
+  const ix = hx & 0x7fffffff;
+  if (ix >= 0x3ff00000) {
+    if (x === 1 || x === -1) return x * PIO2_HI + x * PIO2_LO;
+    return NaN;
+  }
+  if (ix < 0x3e400000) return x;
+  if (ix < 0x3fe00000) {
+    const t = x * x;
+    const p = t * (PS0 + t * (PS1 + t * (PS2 + t * (PS3 + t * (PS4 + t * PS5)))));
+    const q = 1.0 + t * (QS1 + t * (QS2 + t * (QS3 + t * QS4)));
+    return x + x * (p / q);
+  }
+  const w = 1.0 - Math.abs(x);
+  let t = w * 0.5;
+  let p = t * (PS0 + t * (PS1 + t * (PS2 + t * (PS3 + t * (PS4 + t * PS5)))));
+  let q = 1.0 + t * (QS1 + t * (QS2 + t * (QS3 + t * QS4)));
+  const s = Math.sqrt(t);
+  if (ix >= 0x3fef3333) {
+    t = PIO2_HI - (2.0 * (s + s * (p / q)) - PIO2_LO);
+  } else {
+    const w0 = fromBits(highWord(s), 0);
+    const c = (t - w0 * w0) / (s + w0);
+    const r = p / q;
+    p = 2.0 * s * r - (PIO2_LO - 2.0 * c);
+    q = PIO4_HI - 2.0 * w0;
+    t = PIO4_HI - (p - q);
+  }
+  return hx >>> 31 ? -t : t;
+}
