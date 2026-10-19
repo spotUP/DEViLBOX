@@ -25,7 +25,7 @@ import { applyLoopToPlayer, sampleLoops } from './tone/samplePlayerLoop';
 import { registerChannelMeterSink } from './tone/channelMeterFeed';
 import { chipChannelFor, LIVE_VOICE_BASE_CHANNEL } from './furnace-dispatch/chipChannel';
 import { soundingToneVoices, trackToneVoices, untrackToneVoices } from './tone/toneVoiceProbe';
-import { createToneSynthNode, toneVoiceOptions } from './tone/toneSynthKnobs';
+import { createToneSynthNode } from './tone/toneSynthKnobs';
 import { TrackerEnvelope } from './TrackerEnvelope';
 import { InstrumentAnalyser } from './InstrumentAnalyser';
 import { FurnaceChipEngine } from './chips/FurnaceChipEngine';
@@ -2157,14 +2157,9 @@ export class ToneEngine {
       }
 
       case 'PluckSynth': {
-        const pluckPolyphony = this.currentPerformanceQuality === 'high' ? 16 :
-                               this.currentPerformanceQuality === 'medium' ? 8 : 4;
-        instrument = new (Tone.PolySynth as unknown as new (options: Record<string, unknown>) => Tone.PolySynth)({
-          voice: Tone.PluckSynth,
-          maxPolyphony: pluckPolyphony,
-          options: toneVoiceOptions('PluckSynth', config),
-          volume: getNormalizedVolume('PluckSynth', config.volume),
-        });
+        // The registry's plain PluckSynth, one per tracker channel. A Tone.PolySynth of PluckSynth voices never frees
+        // a voice (PluckSynth fires no onsilence), so it went silent after maxPolyphony notes.
+        instrument = InstrumentFactory.createInstrument(config);
         break;
       }
 
