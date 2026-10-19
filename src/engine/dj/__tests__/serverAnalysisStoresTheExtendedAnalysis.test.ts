@@ -6,7 +6,7 @@
  * trip, the migration of an old table, and that a base-only upload never
  * wipes (nor an older version overwrites) the stored extended analysis.
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -42,6 +42,11 @@ beforeAll(async () => {
   codec = await import('../../../../server/src/services/extendedAnalysisCodec');
   const t = corpusTrack('steady');
   extended = computeExtendedAnalysis(t.pcm, t.sampleRate, { beats: t.beats });
+});
+
+afterAll(() => {
+  // The database directory is this test's own; leave nothing in TMPDIR.
+  if (process.env.DB_DIR) fs.rmSync(process.env.DB_DIR, { recursive: true, force: true });
 });
 
 describe('the server stores the extended analysis', () => {
