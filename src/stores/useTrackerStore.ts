@@ -23,6 +23,7 @@ import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } fro
 import { SYSTEM_PRESETS, DivChanType } from '../constants/systemPresets';
 import { autoNameChannels as computeAutoNames } from '@/bridge/analysis/ChannelNaming';
 import { useInstrumentStore } from './useInstrumentStore';
+import { useProjectStore } from './useProjectStore';
 import { applySong } from '@/lib/song/applySong';
 import { parseSongFile, songFileToSong, songToSongFile, type SongMeta } from '@lib/uprough/songFile';
 import { isSynthCompatibleWithChannel, getChannelBadge, getSynthBadge } from '../constants/channelTypeCompat';
@@ -2028,11 +2029,10 @@ export const useTrackerStore = create<TrackerStore>()(
 
     importUpRoughSong: async (text) => {
       const song = songFileToSong(parseSongFile(text));
-      // The song file carries no tempo, so the defaults the other non-module importers use (SunVox: 125 / 6).
       await applySong({
         instruments: song.instruments, patterns: song.patterns, order: song.meta.order,
-        bpm: 125, speed: 6,
-        metadata: { name: 'Up Rough song' },
+        bpm: song.tempo.bpm, speed: song.tempo.speed,
+        metadata: { name: song.tempo.name },
         originalModuleData: null,
         engine: {},
       }, 'import');
@@ -2043,7 +2043,9 @@ export const useTrackerStore = create<TrackerStore>()(
     exportUpRoughSong: () => {
       const { patterns, upRoughMeta } = get();
       if (!upRoughMeta) throw new Error('No Up Rough song is loaded: import a .uprough-song.json file first.');
-      const doc = songToSongFile({ meta: upRoughMeta, patterns, instruments: useInstrumentStore.getState().instruments });
+      const { bpm, speed } = useTransportStore.getState();
+      const tempo = { bpm, speed, name: useProjectStore.getState().metadata.name };
+      const doc = songToSongFile({ meta: upRoughMeta, patterns, instruments: useInstrumentStore.getState().instruments, tempo });
       return `${JSON.stringify(doc, null, 2)}\n`;
     },
 

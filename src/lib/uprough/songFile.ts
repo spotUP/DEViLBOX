@@ -3,7 +3,7 @@
  *
  *   parseSongFile(text)        read + validate, refusals by name (the same texts as tools/song_file.py)
  *   songFileToSong(doc)        file -> UpRoughSong: one Pattern per section, one channel per lane, instruments
- *   songToSongFile(song)       UpRoughSong -> file, refusing what schema 1 cannot hold
+ *   songToSongFile(song)       UpRoughSong -> file, refusing what the schema cannot hold
  *
  * Lossless: everything the grid cannot show (header, per-bar records, locked chops/scratch/vocals, the side table,
  * the song block, the generator) rides in `meta` and is written back verbatim. The grid owns only the cells and the
@@ -16,7 +16,9 @@ import { voiceDefaults } from '@/engine/uprough/softsynthVoice';
 import { INSERT_EFFECTS, INSERT_LABEL, insertKey } from '@/engine/uprough/effects/insertEffects';
 
 export const FORMAT = 'uprough-softsynth-song';
-export const SCHEMA = 1;
+export const SCHEMA = 2;
+/** Up Rough songs play at speed 6: 16 rows per bar, one row per 16th note (tools/song_file.py SPEED). */
+export const SPEED = 6;
 export const ROWS_PER_BAR = 16;
 export const SONG_FILE_EXTENSION = '.uprough-song.json';
 
@@ -64,7 +66,9 @@ export interface SongMeta {
   fileVoices: string[];
 }
 
-export interface UpRoughSong { meta: SongMeta; patterns: Pattern[]; instruments: InstrumentConfig[] }
+/** The song's tempo and name: what the transport and the project metadata show (song.bpm / song.speed / song.name). */
+export interface SongTempo { bpm: number; speed: number; name: string }
+export interface UpRoughSong { meta: SongMeta; patterns: Pattern[]; instruments: InstrumentConfig[]; tempo: SongTempo }
 
 export class SongFileError extends Error {}
 
@@ -150,7 +154,7 @@ const RENDER_PARAMS = [
   'voice_cfg',
 ];
 const TOP = ['format', 'schema', 'generator', 'song', 'instruments', 'sections', 'order', 'side', 'bus'];
-const SONG = ['style', 'seed', 'key', 'rate', 'tier', 'bars', 'rows_per_bar', 'render', 'motif', 'chord_roots'];
+const SONG = ['name', 'style', 'seed', 'key', 'bpm', 'speed', 'rate', 'tier', 'bars', 'rows_per_bar', 'render', 'motif', 'chord_roots'];
 const SECTION = ['id', 'header', 'lanes', 'bars', 'locked'];
 const HEADER = ['style', 'section', 'bars', 'seed', 'drum_seed', 'bar_offset', 'fill_pending', 'carry_fill', 'layers', 'melody_from_bar'];
 const BAR = ['drop', 'fill', 'bass', 'melody', 'order'];
@@ -190,7 +194,10 @@ export function parseSongFile(input: string | unknown): SongFileDoc {
   const d = doc as unknown as SongFileDoc;
   checkKeys(d.song, SONG, 'song');
   checkKeys(d.song.render, RENDER_PARAMS, 'song.render');
-  if (d.song.rows_per_bar !== ROWS_PER_BAR) throw new SongFileError(`rows_per_bar is ${JSON.stringify(d.song.rows_per_bar)}; schema 1 is 16 rows per bar.`);
+  if (d.song.rows_per_bar !== ROWS_PER_BAR) throw new SongFileError(`rows_per_bar is ${JSON.stringify(d.song.rows_per_bar)}; schema ${SCHEMA} is 16 rows per bar.`);
+  if (typeof d.song.name !== 'string') throw new SongFileError(`Song name ${JSON.stringify(d.song.name)} is not text.`);
+  if (d.song.speed !== SPEED) throw new SongFileError(`Song speed is ${JSON.stringify(d.song.speed)}; Up Rough songs play at speed 6 (16 rows per bar).`);
+  if (typeof d.song.bpm !== 'number' || !Number.isInteger(d.song.bpm) || d.song.bpm <= 0) throw new SongFileError(`Song tempo is ${JSON.stringify(d.song.bpm)} BPM; the ${String(d.song.style)} style renders at a whole number of BPM.`);
   d.instruments.forEach((inst, i) => {
     checkKeys(inst, INSTRUMENT, `instruments[${i}]`);
     if (!(FILE_VOICES as readonly string[]).includes(inst.voice)) {
@@ -218,7 +225,7 @@ export function parseSongFile(input: string | unknown): SongFileDoc {
         if (cell === null) return;
         const [, inst, , fx] = cell;
         if (!(inst >= 1 && inst <= d.instruments.length)) throw new SongFileError(`Cell ${lane}:${row} in ${sec.id} uses instrument ${inst}, which does not exist.`);
-        if (fx !== null) throw new SongFileError(`Cell ${lane}:${row} in ${sec.id} has an effect; schema 1 renders no effect column.`);
+        if (fx !== null) throw new SongFileError(`Cell ${lane}:${row} in ${sec.id} has an effect; schema ${SCHEMA} renders no effect column.`);
       });
     }
     if (sec.bars.length !== sec.header.bars) throw new SongFileError(`${sec.id} has ${sec.bars.length} bar records, expected ${String(sec.header.bars)}`);
@@ -282,6 +289,7 @@ export function songFileToSong(doc: SongFileDoc): UpRoughSong {
     },
     patterns,
     instruments: d.instruments.map(importInstrument),
+    tempo: { bpm: d.song.bpm as number, speed: d.song.speed as number, name: d.song.name as string },
   };
 }
 
@@ -313,9 +321,17 @@ function checkInstrument(inst: InstrumentConfig, i: number, previous: string | u
 
 const sideOf = (song: UpRoughSong, sid: string): Record<string, SideEntry> => song.meta.side[sid] ?? {};
 
-/** Patterns + instruments -> file. Refuses by name what schema 1 cannot hold (D1a, D5). */
+/** Patterns + instruments -> file. Refuses by name what the schema cannot hold (D1a, D5). */
 export function songToSongFile(song: UpRoughSong): SongFileDoc {
   const m = structuredClone(song.meta);
+  const fileBpm = m.song.bpm as number;
+  if (song.tempo.bpm !== fileBpm) {
+    throw new SongFileError(`Tempo changed from ${fileBpm} to ${song.tempo.bpm} BPM; the ${String(m.song.style)} style renders at ${fileBpm} BPM.`);
+  }
+  if (song.tempo.speed !== SPEED) {
+    throw new SongFileError(`Speed changed to ${song.tempo.speed}; Up Rough songs play at speed 6 (16 rows per bar).`);
+  }
+  m.song.name = song.tempo.name;
   const instruments: SongFileInstrument[] = song.instruments.map((inst, i) => ({
     name: inst.name, voice: checkInstrument(inst, i, m.fileVoices[i]), params: {}, seed: 0,
   }));
@@ -339,7 +355,7 @@ export function songToSongFile(song: UpRoughSong): SongFileDoc {
         if (hasNoteDelay(r) && entry && ('offset' in entry || 'e808' in entry || 'hat' in entry)) {
           throw new SongFileError(`Cell ${key} in ${meta.id} has both a note delay and an exact offset. Clear one.`);
         }
-        if (r.note === 97) throw new SongFileError(`Cell ${key} in ${meta.id} is a note off; schema 1 has no note-off.`);
+        if (r.note === 97) throw new SongFileError(`Cell ${key} in ${meta.id} is a note off; schema ${SCHEMA} has no note-off.`);
         if (r.instrument < 1 || r.instrument > instruments.length) throw new SongFileError(`Cell ${key} in ${meta.id} uses instrument ${r.instrument}, which does not exist.`);
         const vol = r.volume >= VOLUME_BASE && r.volume <= VOLUME_BASE + 64 ? r.volume - VOLUME_BASE : 64;
         cells.push([noteToText(r.note), r.instrument, vol, fxText(r.effTyp, r.eff)]);
