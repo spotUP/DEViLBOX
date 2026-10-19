@@ -109,6 +109,8 @@ export function laneOfChannel(ch: Pick<ChannelData, 'id' | 'name'>): Lane | unde
 export const FILE_VOICES = [
   'kick', 'snare', 'snare_accent', 'snare_ghost', 'clap', 'rim', 'tom', 'ch', 'oh', 'conga', 'cowbell', 'metal',
   'ride', 'shaker', 'tamb', 'bass808', 'melody',
+  // BASS_VOICES, host order: the non-808 bass voices a style's bass_voice names ("808" is the plain sub, not bass808).
+  '808', 'electro', 'reese', 'gfunk', 'sampled', 'electric', 'warmsub',
 ] as const;
 
 /**
@@ -120,9 +122,13 @@ export const VOICE_TO_SOFTSYNTH: Record<string, string> = {
   kick: 'kick', snare: 'snare808', snare_accent: 'snare808', snare_ghost: 'snare808', clap: 'clap', rim: 'rim',
   tom: 'tom', ch: 'hatClosed', oh: 'hatOpen', conga: 'conga', cowbell: 'cowbell', metal: 'rim', ride: 'ride',
   shaker: 'rim', tamb: 'rim', bass808: 'bass808', melody: 'piano',
+  '808': 'bassVoice808', electro: 'bassElectro', reese: 'bassReese', gfunk: 'bassGfunk', sampled: 'bassSampled',
+  electric: 'bassElectric', warmsub: 'bassWarmsub',
 };
 
-const BUS_OF_VOICE = (v: string): string => (v === 'bass808' ? 'bass' : v === 'melody' ? 'melody' : 'drums');
+const BASS_FILE_VOICES: readonly string[] = ['808', 'electro', 'reese', 'gfunk', 'sampled', 'electric', 'warmsub'];
+
+const BUS_OF_VOICE = (v: string): string => (v === 'bass808' || BASS_FILE_VOICES.includes(v) ? 'bass' : v === 'melody' ? 'melody' : 'drums');
 
 /** The file voice of an instrument: unchanged voice keeps the file's spelling, a changed one maps back by first match. */
 function fileVoiceOf(config: string, previous: string | undefined): string | undefined {
@@ -176,7 +182,7 @@ const SECTION = ['id', 'header', 'lanes', 'bars', 'locked'];
 const HEADER = ['style', 'section', 'bars', 'seed', 'drum_seed', 'bar_offset', 'fill_pending', 'carry_fill', 'layers', 'melody_from_bar'];
 const BAR = ['drop', 'fill', 'bass', 'melody', 'order'];
 const INSTRUMENT = ['name', 'voice', 'params', 'seed'];
-const SIDE_KEYS = ['vel', 'role', 'hat', 'e808', 'dur'];
+const SIDE_KEYS = ['vel', 'role', 'hat', 'e808', 'dur', 'ebass'];
 
 function checkKeys(obj: unknown, allowed: readonly string[], path: string): void {
   if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
@@ -187,6 +193,20 @@ function checkKeys(obj: unknown, allowed: readonly string[], path: string): void
   }
   for (const k of allowed) {
     if (!(k in obj)) throw new SongFileError(`Missing field "${path ? `${path}.${k}` : k}" in Up Rough song file schema ${SCHEMA}.`);
+  }
+}
+
+const EBASS = ['semi', 'dur', 'glide', 'vel'];
+
+/** A non-808 bass note's own numbers (host: render_bass_bar's (semi, step, dur_steps, glide, vel) minus the step, which is the cell row). */
+function checkEbass(e: unknown, path: string): void {
+  checkKeys(e, EBASS, path);
+  const o = e as Record<string, unknown>;
+  for (const k of ['semi', 'dur', 'vel']) {
+    if (typeof o[k] !== 'number' || !Number.isFinite(o[k])) throw new SongFileError(`Field "${path}.${k}" in Up Rough song file schema ${SCHEMA} is not a number.`);
+  }
+  if (o.glide !== null && (typeof o.glide !== 'number' || !Number.isFinite(o.glide))) {
+    throw new SongFileError(`Field "${path}.glide" in Up Rough song file schema ${SCHEMA} is not a number or null.`);
   }
 }
 
@@ -265,6 +285,7 @@ export function parseSongFile(input: string | unknown): SongFileDoc {
       for (const k of Object.keys(entry)) {
         if (!SIDE_KEYS.includes(k)) throw new SongFileError(`Unknown field "side.${sid}.${cell}.${k}" in Up Rough song file schema ${SCHEMA}.`);
       }
+      if ('ebass' in entry) checkEbass((entry as { ebass: unknown }).ebass, `side.${sid}.${cell}.ebass`);
     }
   }
   for (const o of d.order) {
