@@ -18,6 +18,7 @@ import { FT2SubsongInput } from './FT2SubsongInput';
 import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useUIStore, useEditorStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { notify } from '@stores/useNotificationStore';
+import { SONG_FILE_EXTENSION } from '@lib/uprough/songFile';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
@@ -28,7 +29,7 @@ import { setFormatPlaybackPlaying, resetFormatPlaybackState } from '@engine/Form
 import { gtUltraTogglePlay } from '@engine/gtultra/gtUltraTransport';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { useCursorStore } from '@stores/useCursorStore';
-import { X, Menu, FileUp, FilePlus, Trash2 as ClearIcon, Wand2, HelpCircle, Info as InfoIcon, Gamepad2 } from 'lucide-react';
+import { X, Menu, FileUp, FileDown, FilePlus, Trash2 as ClearIcon, Wand2, HelpCircle, Info as InfoIcon, Gamepad2 } from 'lucide-react';
 import { LogoAnimation } from '@components/visualization/LogoAnimation';
 import { SineScroller } from '@components/visualization/SineScroller';
 import { NibblesGame } from '@components/visualization/NibblesGame';
@@ -513,8 +514,43 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     if (newLength >= 1 && newLength <= 256) resizePattern(currentPatternIndex, newLength);
   };
 
+  const handleImportUpRoughSong = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = SONG_FILE_EXTENSION;
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        await useTrackerStore.getState().importUpRoughSong(await file.text());
+        notify.success('Up Rough song imported');
+      } catch (e) {
+        notify.error(e instanceof Error ? e.message : String(e));
+      }
+    };
+    input.click();
+  };
+
+  const handleExportUpRoughSong = () => {
+    try {
+      const text = useTrackerStore.getState().exportUpRoughSong();
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `song${SONG_FILE_EXTENSION}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const hamburgerMenuItems: MenuItemType[] = [
     { id: 'export', label: 'Export', icon: <FileUp size={14} />, shortcut: '⌘⇧E', onClick: () => onShowExport?.() },
+    { id: 'import-uprough-song', label: 'Import Up Rough Song...', icon: <FileDown size={14} />, onClick: handleImportUpRoughSong },
+    { id: 'export-uprough-song', label: 'Export Up Rough Song...', icon: <FileUp size={14} />, onClick: handleExportUpRoughSong },
     { id: 'new', label: 'New Song', icon: <FilePlus size={14} />, onClick: () => useUIStore.getState().openNewSongWizard() },
     { id: 'clear', label: 'Clear All Patterns', icon: <ClearIcon size={14} />, danger: true, onClick: () => setShowClearModal(true) },
     { type: 'divider' as const },
