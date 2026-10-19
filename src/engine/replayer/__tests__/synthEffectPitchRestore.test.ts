@@ -21,6 +21,7 @@ function run(rows: EffectPatternCell[]) {
     getReplacedInstruments: () => new Set([INST]),
     getPatternCell: (_ch, r) => rows[r] ?? null,
     getChannelCount: () => 1,
+    getEditorMode: () => 'classic',
     applySynthFrequency: (_id, freq) => { sent.push({ row, freq }); },
     setChannelGain: () => {},
     setChannelPan: () => {},

@@ -395,21 +395,24 @@ export function stopVoice(voice: VoiceState, time: number): void {
   }, 100);
 }
 
+/** A channel volume in dB as the linear gain the voice and lane nodes take; -60 dB and below is silence. */
+export function channelVolumeDbToGain(volumeDb: number): number {
+  return volumeDb <= -60 ? 0 : Math.pow(10, volumeDb / 20);
+}
+
 /**
  * Set channel volume (affects active voices on this channel)
  * ProTracker Cxx command targets the voice/sample volume, not mixer volume
  */
-export function setChannelVolume(ctx: ChannelRoutingContext, channelIndex: number, volumeDb: number): void {
+export function setChannelVolume(ctx: ChannelRoutingContext, channelIndex: number, volumeDb: number, time: number = Tone.now()): void {
   // Update active voice gains (ProTracker-style: Cxx affects sample volume)
   const voices = ctx.activeVoices.get(channelIndex);
 
   if (voices && voices.length > 0) {
-    const now = Tone.now();
-    // Convert dB to linear gain for voice nodes
-    const linearGain = volumeDb <= -60 ? 0 : Math.pow(10, volumeDb / 20);
+    const linearGain = channelVolumeDbToGain(volumeDb);
     for (const voice of voices) {
       if (voice.nodes.gain) {
-        voice.nodes.gain.gain.setValueAtTime(linearGain, now);
+        voice.nodes.gain.gain.setValueAtTime(linearGain, time);
       } else {
         console.warn(`[ToneEngine] Voice has no gain node!`, voice.nodes);
       }

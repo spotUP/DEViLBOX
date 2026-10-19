@@ -6,7 +6,13 @@
 import { describe, it, expect, vi } from 'vitest';
 
 const { Gain } = vi.hoisted(() => {
-  class Param { value = 0; constructor(v = 0) { this.value = v; } }
+  class Param {
+    value = 0;
+    scheduled: { value: number; time: number }[] = [];
+    constructor(v = 0) { this.value = v; }
+    setValueAtTime(value: number, time: number) { this.scheduled.push({ value, time }); this.value = value; }
+    cancelScheduledValues() { this.scheduled = []; }
+  }
   class Gain {
     gain: Param;
     connections: unknown[] = [];
@@ -24,6 +30,8 @@ import {
   getChannelSynthLane,
   applyChannelSynthLaneGains,
   setChannelSynthLanePitchRate,
+  setChannelSynthLaneLevel,
+  resetChannelSynthLaneLevels,
   disposeChannelSynthLanes,
   type ChannelSynthLaneContext,
   type PitchShiftInsert,
@@ -72,7 +80,9 @@ describe('channel synth lanes', () => {
     const { c, strips, shifts } = ctx({ busGain: 0.25 });
     const lane = getChannelSynthLane(c, 3);
     expect(lane.gain.gain.value).toBe(0.25);
-    expect((lane.gain as unknown as FakeGain).connections).toEqual([shifts[0].input]);
+    expect((lane.gain as unknown as FakeGain).connections).toEqual([lane.level]);
+    expect(lane.level.gain.value).toBe(1);
+    expect((lane.level as unknown as FakeGain).connections).toEqual([shifts[0].input]);
     expect(shifts[0].output.connections).toEqual([strips.get(3)]);
     expect(shifts[0].active).toBe(false);
     expect(getChannelSynthLane(c, 3)).toBe(lane);
@@ -114,12 +124,38 @@ describe('channel synth lanes', () => {
     expect(b.gain.gain.value).toBe(0.125);
   });
 
-  it('dispose every lane, shifter included', () => {
+  it('tracker channel volume lands on that channel\'s level only, scheduled at the given time', () => {
+    const { c } = ctx();
+    const a = getChannelSynthLane(c, 0);
+    const b = getChannelSynthLane(c, 1);
+    setChannelSynthLaneLevel(c, 0, 0.5, 1.25);
+    expect(a.level.gain.value).toBe(0.5);
+    expect((a.level.gain as unknown as { scheduled: unknown[] }).scheduled).toEqual([{ value: 0.5, time: 1.25 }]);
+    expect(b.level.gain.value).toBe(1);
+    expect(a.gain.gain.value).toBe(0.5); // the bus mirror is untouched
+    setChannelSynthLaneLevel(c, 7, 0.1); // no lane for channel 7: nothing built
+    expect(c.lanes.size).toBe(2);
+  });
+
+  it('reset puts every level back to unity', () => {
+    const { c } = ctx();
+    const a = getChannelSynthLane(c, 0);
+    const b = getChannelSynthLane(c, 3);
+    setChannelSynthLaneLevel(c, 0, 0);
+    setChannelSynthLaneLevel(c, 3, 0.25, 2);
+    resetChannelSynthLaneLevels(c);
+    expect(a.level.gain.value).toBe(1);
+    expect(b.level.gain.value).toBe(1);
+    expect((b.level.gain as unknown as { scheduled: unknown[] }).scheduled).toEqual([]);
+  });
+
+  it('dispose every lane, level and shifter included', () => {
     const { c, shifts } = ctx();
     const lane = getChannelSynthLane(c, 4);
     disposeChannelSynthLanes(c);
     expect(c.lanes.size).toBe(0);
     expect((lane.gain as unknown as FakeGain).disposed).toBe(true);
+    expect((lane.level as unknown as FakeGain).disposed).toBe(true);
     expect(shifts[0].disposed).toBe(true);
   });
 });
