@@ -12,6 +12,9 @@
 import * as Tone from 'tone';
 import { ALL_SYNTH_TYPES, SYNTH_INFO } from '@constants/synthCategories';
 import { InstrumentFactory } from '@engine/InstrumentFactory';
+import { SynthRegistry } from '@engine/registry/SynthRegistry';
+import { buildInstrumentConfig } from '@stores/useInstrumentStore';
+import { applySynthTypeDefaults } from '@stores/instrument/synthTypeDefaults';
 import { isDevilboxSynth } from '@typedefs/synth';
 import { getNativeAudioNode, getDevilboxAudioContext } from '@utils/audio-context';
 import type { SynthType, InstrumentConfig } from '@typedefs/instrument';
@@ -54,7 +57,7 @@ const SKIP_SYNTHS: SynthType[] = [
 /**
  * Test a single synth
  */
-async function testSynth(synthType: SynthType): Promise<SynthTestResult> {
+export async function testSynth(synthType: SynthType): Promise<SynthTestResult> {
   const info = SYNTH_INFO[synthType];
   const result: SynthTestResult = {
     synthType,
@@ -75,16 +78,19 @@ async function testSynth(synthType: SynthType): Promise<SynthTestResult> {
   const startTime = performance.now();
 
   try {
-    // Create a minimal instrument config
-    const config: InstrumentConfig = {
-      id: 999,
+    // Build the config as the app does when a user switches an instrument's synthType
+    const config: InstrumentConfig = buildInstrumentConfig(999, {
       name: `Test ${synthType}`,
       type: 'synth',
       synthType,
       effects: [],
       volume: -12,
       pan: 0,
-    };
+    });
+    applySynthTypeDefaults(config, synthType, false);
+
+    // Lazily-registered synths are invisible to the factory until their loader ran (as in ToneEngine.ensureInstrumentReady)
+    await SynthRegistry.ensure(config.synthType);
 
     // Create the instrument
     const instrument = InstrumentFactory.createInstrument(config);
