@@ -60,7 +60,7 @@ const SERVE = `
 import express from 'express';
 import routes from './src/routes/uprough';
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use('/api/uprough', routes);
 const s = app.listen(0, '127.0.0.1', () => {
   const a = s.address();
@@ -101,6 +101,21 @@ function post(port: number, route: string, body: unknown): Promise<{ status: num
   });
 }
 
+/** Like post, but returns the raw response bytes (the render route sends a WAV). */
+function postBytes(port: number, route: string, body: unknown): Promise<{ status: number; bytes: Buffer }> {
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify(body);
+    const req = http.request({ host: '127.0.0.1', port, path: route, method: 'POST',
+      agent: false, headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(data) } }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (c: Buffer) => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode ?? 0, bytes: Buffer.concat(chunks) }));
+    });
+    req.on('error', reject);
+    req.end(data);
+  });
+}
+
 describe.skipIf(!ROOT)('Up Rough generate -> import -> export renders 1:1 on the host', () => {
   it(`${STYLE}/${SEED}: render of the exported file equals render_track`, async () => {
     const { proc, port } = await serve();
@@ -123,6 +138,33 @@ describe.skipIf(!ROOT)('Up Rough generate -> import -> export renders 1:1 on the
         { cwd: ROOT, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
       expect(r.status, (r.stderr || '').slice(-3000)).toBe(0);
       expect(r.stdout).toMatch(/^F4 OK \d+ samples/m);
+    } finally {
+      proc.kill();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }, 900_000);
+});
+
+describe.skipIf(!ROOT)('Up Rough server render equals running synth_song.py directly', () => {
+  it('16-bar trap/1: the route sends the same WAV bytes as the command line', async () => {
+    const { proc, port } = await serve();
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'uprough-render-parity-'));
+    try {
+      const gen = await post(port, '/api/uprough/generate', { style: STYLE, seed: SEED, bars: 16 });
+      expect(gen.status, gen.text.slice(0, 2000)).toBe(200);
+      const file = path.join(dir, `p${songFile.SONG_FILE_EXTENSION}`);
+      fs.writeFileSync(file, gen.text);
+      const out = path.join(dir, 'direct');
+      fs.mkdirSync(out);
+      const r = spawnSync(PYTHON, ['tools/synth_song.py', '--out-dir', out, '--engine', 'hiphop', '--tier', '64k',
+        '--acid-source', 'auto', '--prebaked', '1', '--song-file', file],
+        { cwd: ROOT, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+      expect(r.status, (r.stderr || '').slice(-3000)).toBe(0);
+      const want = fs.readFileSync(path.join(out, 'synth_preview.wav'));
+
+      const got = await postBytes(port, '/api/uprough/render', { song: gen.text });
+      expect(got.status, got.bytes.toString('utf8', 0, 500)).toBe(200);
+      expect(got.bytes.equals(want)).toBe(true);
     } finally {
       proc.kill();
       fs.rmSync(dir, { recursive: true, force: true });
