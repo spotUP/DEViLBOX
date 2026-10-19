@@ -66,14 +66,15 @@ describe('a tracker note plays the Up Rough softsynth voice', () => {
     const buf = await playC3(config);
     expect(softsynthRenderCount()).toBe(1);
     const voice = getSoftsynthVoice(voiceId)!;
-    const ref = voice.render(voiceDefaults(voice), { midi: 48, durSec: 0.5, velocity: 1 }, SOFTSYNTH_RATE, 0);
+    const ref = voice.render(voiceDefaults(voice), { midi: 36, durSec: 0.5, velocity: 1 }, SOFTSYNTH_RATE, 0);
     expect(rms(buf)).toBeGreaterThan(1e-4);
     expect(Math.abs(db(rms(buf)) - db(rms(ref)))).toBeLessThan(3);
   });
 
   it('bass808: the decay knob changes what is played', async () => {
     const voice = getSoftsynthVoice('bass808')!;
-    const key = voice.params.find((p) => p.key === 'decay_high_ms')!.key;
+    // C3 is host note 36, the 808's lowest note (semi 0), where the low-note decay sets the envelope.
+    const key = voice.params.find((p) => p.key === 'decay_low_ms')!.key;
     const def = voiceDefaults(voice)[key]!;
     const a = await playC3(cfg(920, 'bass808'));
     const b = await playC3(cfg(921, 'bass808', { [key]: def * 0.25 }));

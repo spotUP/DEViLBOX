@@ -10,7 +10,7 @@ import { onepoleLp } from '@/engine/dj/scratch/demoDrums';
 import { SOFTSYNTH_RATE, type SoftsynthNote, type SoftsynthVoice } from '../softsynthVoice';
 import { pcos, pexp, pexp2, plog } from '@/engine/dj/scratch/portableMath';
 
-/** synth_common.hz: the tracker note number IS the semitone (A4 = 69 = 440 Hz). */
+/** synth_common.hz: the host note number (song file C-4 = 48) IS the semitone (A4 = 69 = 440 Hz). */
 export const pianoHz = (semi: number): number => 440.0 * pexp2((semi - 69) / 12.0);
 
 function contactTime(freq: number, hardness: number): number {

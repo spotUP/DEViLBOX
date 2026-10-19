@@ -30,8 +30,8 @@ const ascii = (s: string): number[] => Array.from(s, (ch) => ch.charCodeAt(0));
 
 export const C1_SEMI = 0;
 export const C3_SEMI = 24;
-/** The tracker note that is the reference's `semi` 0 (C1). */
-export const BASS808_C1_MIDI = 24;
+/** The host note that is trap808 `semi` 0 (C1 = 32.703 Hz): song_file.py writes a bass cell as note_name(36 + semi). */
+export const BASS808_C1_MIDI = 36;
 
 /** trap808.DEFAULT_PROFILE (the s.53 Strong Default 808); string modes as indices. */
 export const DRIVE_KINDS = ['asym', 'tube', 'tape', 'soft'] as const;

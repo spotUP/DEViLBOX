@@ -25,7 +25,7 @@ describe('drum voices match drummachine.py', () => {
   cases.forEach((c, i) => {
     it(`${c.voice} case ${i} (${JSON.stringify(c.params).slice(0, 60)}) is sample-exact`, () => {
       const voice = DRUM_VOICES.find((v) => v.id === c.voice)!;
-      const y = voice.render(c.params, { midi: 60, durSec: 0.5, velocity: 1 }, SOFTSYNTH_RATE, c.seed);
+      const y = voice.render(c.params, { midi: 48, durSec: 0.5, velocity: 1 }, SOFTSYNTH_RATE, c.seed);
       expect(y.length).toBe(c.length);
       let worst = 0;
       c.samples.forEach((ref, k) => { worst = Math.max(worst, Math.abs(y[k * keep]! - ref)); });
@@ -38,9 +38,9 @@ describe('drum voices match drummachine.py', () => {
 
   it('velocity scales the output and the note shifts tune', () => {
     const kick = DRUM_VOICES.find((v) => v.id === 'kick')!;
-    const a = kick.render({}, { midi: 60, durSec: 0.5, velocity: 1 }, SOFTSYNTH_RATE, 1);
-    const half = kick.render({}, { midi: 60, durSec: 0.5, velocity: 0.5 }, SOFTSYNTH_RATE, 1);
-    const up = kick.render({}, { midi: 72, durSec: 0.5, velocity: 1 }, SOFTSYNTH_RATE, 1);
+    const a = kick.render({}, { midi: 48, durSec: 0.5, velocity: 1 }, SOFTSYNTH_RATE, 1);
+    const half = kick.render({}, { midi: 48, durSec: 0.5, velocity: 0.5 }, SOFTSYNTH_RATE, 1);
+    const up = kick.render({}, { midi: 60, durSec: 0.5, velocity: 1 }, SOFTSYNTH_RATE, 1);
     expect(half[100]).toBeCloseTo(a[100]! * 0.5, 12);
     expect(up[3000]).not.toBe(a[3000]);
   });

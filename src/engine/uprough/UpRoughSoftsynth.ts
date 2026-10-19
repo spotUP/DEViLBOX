@@ -7,7 +7,7 @@
 import type { DevilboxSynth } from '@/types/synth';
 import type { UpRoughSoftsynthConfig } from '@/types/instrument';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
-import { SOFTSYNTH_RATE, voiceDefaults, type SoftsynthVoice } from './softsynthVoice';
+import { DEVILBOX_TO_HOST_MIDI, SOFTSYNTH_RATE, voiceDefaults, type SoftsynthVoice } from './softsynthVoice';
 import { getSoftsynthVoice, SOFTSYNTH_VOICES } from './voiceRegistry';
 
 const CACHE_MAX = 256;
@@ -57,9 +57,10 @@ export class UpRoughSoftsynth implements DevilboxSynth {
     this.seed = config.seed;
   }
 
+  /** The tracker note (DEViLBOX MIDI, C-4 = 60) as the host's number (C-4 = 48), the only note conversion. */
   private midiOf(note: string | number): number {
-    if (typeof note === 'number' && Number.isInteger(note) && note >= 0 && note <= 127) return note;
-    return noteToMidi(note);
+    const midi = typeof note === 'number' && Number.isInteger(note) && note >= 0 && note <= 127 ? note : noteToMidi(note);
+    return midi - DEVILBOX_TO_HOST_MIDI;
   }
 
   private render(midi: number, durSec: number, velocity: number): Float64Array {

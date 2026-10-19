@@ -46,19 +46,20 @@ def pack(sig):
 
 
 cases = []
-# bass808: params are registry keys (the TS voice maps them onto the profile), midi - 24 = semi.
+# bass808: params are registry keys (the TS voice maps them onto the profile); midi is the song file's host note
+# (C-4 = 48) and midi - 36 = trap808 semi, the song_file.py contract (cell = note_name(36 + semi)).
 BASS_ALT = {"sine_mix": 0.6, "tri_mix": 0.4, "click_amt": 0.2, "click_ms": 6.0, "pitch_start_semi": 7.0,
             "pitch_drop_ms": 80.0, "attack_ms": 12.0, "release_ms": 90.0, "drive_amt": 0.5,
             "cleanup_lp_hz": 1800.0, "drive_kind": "tube"}
-for midi, dur in ((28, 0.25), (28, 0.9), (40, 0.25), (40, 0.9)):
+for midi, dur in ((40, 0.25), (40, 0.9), (52, 0.25), (52, 0.9)):
     cases.append({"voice": "bass808", "params": {}, "midi": midi, "durSec": dur, "velocity": 0.8, "seed": 3,
-                  "sig": pack(t8.render_808_note(midi - 24, dur, RATE, velocity=0.8, seed=3))})
+                  "sig": pack(t8.render_808_note(midi - 36, dur, RATE, velocity=0.8, seed=3))})
 prof = dict(t8.DEFAULT_PROFILE, **BASS_ALT)
 cases.append({"voice": "bass808",
               "params": {**{k: v for k, v in BASS_ALT.items() if k != "drive_kind"}, "drive_kind": 1,
                          "decay_ms": 700.0, "accent": 1, "parallel": 1},
-              "midi": 33, "durSec": 0.6, "velocity": 0.95, "seed": 9,
-              "sig": pack(t8.render_808_note(33 - 24, 0.6, RATE, profile=prof, velocity=0.95, seed=9,
+              "midi": 45, "durSec": 0.6, "velocity": 0.95, "seed": 9,
+              "sig": pack(t8.render_808_note(45 - 36, 0.6, RATE, profile=prof, velocity=0.95, seed=9,
                                              decay_ms=700.0, accent=True, parallel=True))})
 
 # piano: note.midi is the semitone (hz(semi) = 440 * 2^((semi-69)/12)); velocity scales in the TS voice.

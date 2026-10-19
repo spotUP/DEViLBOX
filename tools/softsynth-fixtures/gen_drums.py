@@ -3,7 +3,7 @@ the voice defaults and at two non-default parameter sets each, for the null test
 (src/engine/uprough/voices/drums.ts, which is src/engine/dj/scratch/demoDrums.ts behind ParameterDefs).
 
 Each case: voice id, the params as the SoftsynthVoice takes them (machine is 808 / 909), the render seed,
-the sample count, every 13th sample (float64 repr) and the RMS. The test renders midi 60, velocity 1.
+the sample count, every 13th sample (float64 repr) and the RMS. The test renders midi 48 (the host drum note, untransposed), velocity 1.
 
 hatPedal has no Python twin: it is hat(open_hat=False) with decay 35, rendered here the same way.
   /opt/homebrew/bin/python3.11 -I tools/softsynth-fixtures/gen_drums.py \
