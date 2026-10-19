@@ -27,7 +27,7 @@ import { RdPianoSynth } from '../../rdpiano/RdPianoSynth';
 import { MU2000Synth } from '../../mu2000/MU2000Synth';
 import { ES5503Synth } from '../../es5503/ES5503Synth';
 import { DrumKitSynth } from '../../DrumKitSynth';
-import { WavetableSynth } from '../../WavetableSynth';
+import { createWavetable } from '../../factories/CommunitySynthFactory';
 import {
   OscBassSynth, CrushBassSynth, SonarPingSynth, RadioRiserSynth, SubSwellSynth,
 } from '../../dub/DubDerivedSynths';
@@ -337,10 +337,9 @@ const specialDescs: SynthDescriptor[] = [
     category: 'native',
     loadMode: 'lazy',
     volumeOffsetDb: 5,
-    create: (config) => {
-      const synth = new WavetableSynth(config as any);
-      return synth;
-    },
+    // createWavetable deep-merges config.wavetable over DEFAULT_WAVETABLE; the
+    // whole InstrumentConfig has no unison/filter blocks and crashed the voices.
+    create: (config) => createWavetable(config),
   },
   {
     id: 'ChiptuneModule',

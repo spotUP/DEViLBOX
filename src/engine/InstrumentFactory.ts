@@ -75,7 +75,6 @@ import {
   createTB303,
   createWAM,
   createNamedWAM,
-  createWavetable,
   createFormantSynth,
   createWobbleBass,
   createDrumKit,
@@ -310,10 +309,6 @@ export class InstrumentFactory {
         }
         break;
       }
-
-      case 'Wavetable':
-        instrument = createWavetable(config);
-        break;
 
       case 'GranularSynth':
         instrument = createToneJSSynth({ ...config, synthType: "GranularSynth" })!;
