@@ -21,4 +21,16 @@ describe('song file round trip', () => {
     const song = songFileToSong(parseSongFile(structuredClone(f)));
     expect(songToSongFile(song)).toEqual(f);
   });
+
+  it('schema 3: the groove row round trips verbatim and a file without song.groove is refused', () => {
+    const f = load();
+    expect(f.schema).toBe(3);
+    expect(f.song.groove).toEqual({ swing: 0, micro: { kick: 0, snare: 1, ch: 3, ghost: -3, perc: 4, chop: 2 }, vel: 1 });
+    const out = songToSongFile(songFileToSong(parseSongFile(structuredClone(f))));
+    expect(JSON.stringify(out)).toBe(JSON.stringify(f));
+    expect(Object.keys(out.song).slice(5, 8)).toEqual(['speed', 'groove', 'rate']);
+    const g = load();
+    delete g.song.groove;
+    expect(() => parseSongFile(g)).toThrow(/Missing field "song\.groove" in Up Rough song file schema 3\./);
+  });
 });

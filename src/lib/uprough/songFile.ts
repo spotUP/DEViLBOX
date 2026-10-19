@@ -16,7 +16,7 @@ import { voiceDefaults } from '@/engine/uprough/softsynthVoice';
 import { INSERT_EFFECTS, INSERT_LABEL, insertKey } from '@/engine/uprough/effects/insertEffects';
 
 export const FORMAT = 'uprough-softsynth-song';
-export const SCHEMA = 2;
+export const SCHEMA = 3;
 /** Up Rough songs play at speed 6: 16 rows per bar, one row per 16th note (tools/song_file.py SPEED). */
 export const SPEED = 6;
 export const ROWS_PER_BAR = 16;
@@ -39,6 +39,17 @@ export interface SongFileSection {
 export interface SongFileInstrument { name: string; voice: string; params: Record<string, number>; seed: number }
 export type SideEntry = JsonObject;
 export type SideTable = Record<string, Record<string, SideEntry>>;
+/** The style's GROOVE_TEMPLATES row (tools/hiphop.py), copied verbatim into song.groove; null when the style has none.
+ *  TS has no style table, so only the shape is checked here; the host checks the value against its table. */
+export interface SongFileGroove {
+  swing: number;
+  micro: { kick: number; snare: number; ch: number; ghost: number; perc: number; chop: number };
+  vel: number;
+}
+export function songGroove(song: JsonObject): SongFileGroove | null {
+  return song.groove as SongFileGroove | null;
+}
+
 export interface SongFileDoc {
   format: string;
   schema: number;
@@ -154,7 +165,9 @@ const RENDER_PARAMS = [
   'voice_cfg',
 ];
 const TOP = ['format', 'schema', 'generator', 'song', 'instruments', 'sections', 'order', 'side', 'bus'];
-const SONG = ['name', 'style', 'seed', 'key', 'bpm', 'speed', 'rate', 'tier', 'bars', 'rows_per_bar', 'render', 'motif', 'chord_roots'];
+const SONG = ['name', 'style', 'seed', 'key', 'bpm', 'speed', 'groove', 'rate', 'tier', 'bars', 'rows_per_bar', 'render', 'motif', 'chord_roots'];
+const GROOVE = ['swing', 'micro', 'vel'];
+const GROOVE_MICRO = ['kick', 'snare', 'ch', 'ghost', 'perc', 'chop'];
 const SECTION = ['id', 'header', 'lanes', 'bars', 'locked'];
 const HEADER = ['style', 'section', 'bars', 'seed', 'drum_seed', 'bar_offset', 'fill_pending', 'carry_fill', 'layers', 'melody_from_bar'];
 const BAR = ['drop', 'fill', 'bass', 'melody', 'order'];
@@ -194,6 +207,15 @@ export function parseSongFile(input: string | unknown): SongFileDoc {
   const d = doc as unknown as SongFileDoc;
   checkKeys(d.song, SONG, 'song');
   checkKeys(d.song.render, RENDER_PARAMS, 'song.render');
+  if (d.song.groove !== null) {
+    const g = d.song.groove as Record<string, unknown>;
+    checkKeys(g, GROOVE, 'song.groove');
+    checkKeys(g.micro, GROOVE_MICRO, 'song.groove.micro');
+    const m = g.micro as Record<string, unknown>;
+    for (const [k, v] of [['swing', g.swing], ['vel', g.vel], ...GROOVE_MICRO.map((r) => [`micro.${r}`, m[r]] as const)] as const) {
+      if (typeof v !== 'number' || !Number.isFinite(v)) throw new SongFileError(`Song groove field "${k}" is ${JSON.stringify(v)}, not a number.`);
+    }
+  }
   if (d.song.rows_per_bar !== ROWS_PER_BAR) throw new SongFileError(`rows_per_bar is ${JSON.stringify(d.song.rows_per_bar)}; schema ${SCHEMA} is 16 rows per bar.`);
   if (typeof d.song.name !== 'string') throw new SongFileError(`Song name ${JSON.stringify(d.song.name)} is not text.`);
   if (d.song.speed !== SPEED) throw new SongFileError(`Song speed is ${JSON.stringify(d.song.speed)}; Up Rough songs play at speed 6 (16 rows per bar).`);
