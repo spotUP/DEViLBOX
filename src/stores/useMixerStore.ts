@@ -44,11 +44,18 @@ export interface DubWriteOrigin {
 // Rebuild WASM per-channel effect routing after any insert-effect mutation
 // or when a master effect's selectedChannels changes.
 // Debounced to coalesce rapid changes (e.g. loading a preset adds 4 effects).
+// A trigger that lands while a rebuild is running (the debounce only covers
+// the wait before it starts) is remembered and runs once after it, so
+// triggers 80 ms apart produce sequential rebuilds, never overlapping ones.
 let _wasmRebuildTimer: ReturnType<typeof setTimeout> | null = null;
+let _wasmRebuildRunning = false;
+let _wasmRebuildAgain = false;
 export function scheduleWasmEffectRebuild(): void {
   if (_wasmRebuildTimer) clearTimeout(_wasmRebuildTimer);
   _wasmRebuildTimer = setTimeout(() => {
     _wasmRebuildTimer = null;
+    if (_wasmRebuildRunning) { _wasmRebuildAgain = true; return; }
+    _wasmRebuildRunning = true;
     void (async () => {
       try {
         const { refreshChannelIsolation } = await import('../engine/tone/ChannelRoutedEffects');
@@ -107,6 +114,12 @@ export function scheduleWasmEffectRebuild(): void {
         await mgr.rebuild(channelEffects, engine, routedEffects);
       } catch (e) {
         console.warn('[MixerStore] Failed to rebuild WASM per-channel effects:', e);
+      } finally {
+        _wasmRebuildRunning = false;
+        if (_wasmRebuildAgain) {
+          _wasmRebuildAgain = false;
+          scheduleWasmEffectRebuild();
+        }
       }
     })();
   }, 50);

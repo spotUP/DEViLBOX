@@ -910,6 +910,23 @@ export class ChannelRoutedEffectsManager {
     engine?: IsolationCapableEngine,
     routedEffects: ReadonlyMap<number, EffectConfig[]> = new Map(),
   ): Promise<void> {
+    // One rebuild at a time. A rebuild is teardown + async effect creation +
+    // slot assignment; two interleaved ones each tore down before the other
+    // had stored its slots, so the overwritten slots' effects (a GuitarML
+    // worklet each) were never disposed.
+    const run = this.rebuildQueue.then(() => this.rebuildExclusive(channelEffects, engine, routedEffects));
+    this.rebuildQueue = run.catch(() => undefined);
+    return run;
+  }
+
+  /** Tail of the rebuild queue; see rebuild(). */
+  private rebuildQueue: Promise<void> = Promise.resolve();
+
+  private async rebuildExclusive(
+    channelEffects: Map<number, EffectConfig[]>,
+    engine: IsolationCapableEngine | undefined,
+    routedEffects: ReadonlyMap<number, EffectConfig[]>,
+  ): Promise<void> {
     console.log(`[ChannelRoutedEffects] rebuild() called with ${channelEffects.size} channels:`,
       [...channelEffects.entries()].map(([ch, fx]) => `ch${ch}: ${fx.length} effects (${fx.filter(e=>e.enabled).length} enabled)`));
 
