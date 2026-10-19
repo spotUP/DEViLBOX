@@ -8,6 +8,13 @@
 const REPORT_EVERY_FRAMES = 512;
 // EGS envelope level of a silent operator (Envelope::level 0xFF0).
 const EG_SILENT = 0xff0;
+// Idle skip: with no voice keyed or ringing, the emulated firmware (HD6303 + EGS + OPS) still cost 130-205 ms of every
+// audio-thread second (measured 2026-10-19, get_audio_worklet_profile). After IDLE_AFTER_FRAMES of silent output with
+// every envelope silent and nothing queued, process() writes silence and leaves the firmware frozen until the next message.
+// WAKE_FRAMES after any message keeps it running so the firmware can boot and act on patch, bank and sysex changes.
+const IDLE_SILENT = 1e-5;
+const IDLE_AFTER_FRAMES = 12000;
+const WAKE_FRAMES = 192000;
 
 class DX7Processor extends AudioWorkletProcessor {
   constructor() {
@@ -46,11 +53,14 @@ class DX7Processor extends AudioWorkletProcessor {
     this.voiceNote = new Array(16).fill(-1);
     this.envPtr = 0;
     this.regPtr = 0;
+    this.awakeUntilFrame = WAKE_FRAMES;
+    this.quietFrames = 0;
 
     this.port.onmessage = (e) => this.handleMessage(e.data);
   }
 
   async handleMessage(msg) {
+    this.wake();
     switch (msg.type) {
       case 'init':
         await this.initWasm(msg.sampleRate, msg.wasmBinary, msg.jsCode);
@@ -134,7 +144,34 @@ class DX7Processor extends AudioWorkletProcessor {
     this.eventQueue.splice(i, 0, msg);
   }
 
+  /** Run the firmware for at least WAKE_FRAMES more host frames. */
+  wake() {
+    this.awakeUntilFrame = this.framesProcessed + WAKE_FRAMES;
+    this.quietFrames = 0;
+  }
+
+  /** True when no voice is keyed or audible (same test as the voice report's "sounding"). */
+  envelopesSilent() {
+    const m = this.module;
+    if (typeof m._dx7GetEnvelopeState !== 'function') return false;
+    if (!this.envPtr) { this.envPtr = m._malloc(384); this.regPtr = m._malloc(256); }
+    if (m._dx7GetEnvelopeState(this.envPtr) === 0) return false;
+    const env = m.HEAPU8.subarray(this.envPtr, this.envPtr + 384);
+    for (let v = 0; v < 16; v++) {
+      let loudest = EG_SILENT;
+      for (let o = 0; o < 6; o++) {
+        const b = (v * 6 + o) * 4;
+        if ((env[b + 3] & 1) !== 1) return false;
+        const level = env[b] | (env[b + 1] << 8);
+        if (level < loudest) loudest = level;
+      }
+      if (loudest < EG_SILENT - 64) return false;
+    }
+    return true;
+  }
+
   applyNoteEvent(msg) {
+    this.wake();
     switch (msg.type) {
       case 'noteOn':
         if (this.watchVoices) this.pendingNotes.push(msg.note);
@@ -343,11 +380,22 @@ class DX7Processor extends AudioWorkletProcessor {
     const outL = output[0], outR = output[1];
     const n = outL.length;
 
+    if (this.eventQueue.length === 0 && this.framesProcessed >= this.awakeUntilFrame
+        && this.quietFrames >= IDLE_AFTER_FRAMES && this.envelopesSilent()) {
+      outL.fill(0);
+      outR.fill(0);
+      this.prevSampleL = this.curSampleL = this.prevSampleR = this.curSampleR = 0;
+      this.framesProcessed += n;
+      this.reportVoices(n);
+      return true;
+    }
+
     // No worklet gain — VDX7 raw output peaks ~0.3, registry volumeOffsetDb handles boost
     const gain = 1.0;
 
     // Linear interpolation resampler: native rate → host rate
     const frameSec = 1 / sampleRate;
+    let loud = false;
     for (let i = 0; i < n; i++) {
       // Queued note events reach the firmware at the host frame they are due
       const frameTime = currentTime + i * frameSec;
@@ -370,17 +418,23 @@ class DX7Processor extends AudioWorkletProcessor {
       const frac = this.resamplePhase;
       outL[i] = gain * (this.prevSampleL + frac * (this.curSampleL - this.prevSampleL));
       outR[i] = gain * (this.prevSampleR + frac * (this.curSampleR - this.prevSampleR));
+      const a = outL[i], b = outR[i];
+      if (a > IDLE_SILENT || a < -IDLE_SILENT || b > IDLE_SILENT || b < -IDLE_SILENT) loud = true;
     }
 
+    this.quietFrames = loud ? 0 : this.quietFrames + n;
     this.framesProcessed += n;
-    if (this.watchVoices) {
-      this.framesSinceReport += n;
-      if (this.framesSinceReport >= REPORT_EVERY_FRAMES) {
-        this.framesSinceReport = 0;
-        this.postVoiceStatus();
-      }
-    }
+    this.reportVoices(n);
     return true;
+  }
+
+  reportVoices(n) {
+    if (!this.watchVoices) return;
+    this.framesSinceReport += n;
+    if (this.framesSinceReport >= REPORT_EVERY_FRAMES) {
+      this.framesSinceReport = 0;
+      this.postVoiceStatus();
+    }
   }
 }
 
