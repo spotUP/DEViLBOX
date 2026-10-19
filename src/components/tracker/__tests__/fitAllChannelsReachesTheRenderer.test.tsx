@@ -30,7 +30,6 @@ import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useUIStore } from '@stores/useUIStore';
-import { FIT_SCALE_FLOOR } from '../channelLayout';
 
 const WIDTH = 1900; // narrower than 12 channels at full size, wider than they need at the font floor (10 px)
 /** The container width jsdom reports; a test may narrow it. */
@@ -88,7 +87,7 @@ describe('the tracker pattern view fits every channel to the width', () => {
     let view = await mount();
     const scale = workerScale();
     expect(scale).toBeLessThan(1);
-    expect(scale).toBeGreaterThanOrEqual(FIT_SCALE_FLOOR);
+    expect(scale).toBeGreaterThan(0);
     const layout = lastLayout();
     const end = layout.offsets[11] + layout.widths[11];
     expect(layout.offsets).toHaveLength(12);
@@ -119,27 +118,23 @@ describe('the tracker pattern view fits every channel to the width', () => {
     expect(workerScale()).toBe(0.5);
   });
 
-  // Owner 2026-10-18: "it is not scaled to fit i see 6,5 channels during the jingle".
-  // The jingle's lips are too wide for the 10 px floor in a laptop-sized editor; the jingle has no floor.
-  it('the startup jingle fits all 10 lips below the font floor; a song at that width scrolls', async () => {
-    width = 850; // 10 channels do not fit here even at the 10 px floor
-    withChannels(10);
-    let view = await mount();
-    expect(workerScale()).toBe(FIT_SCALE_FLOOR);
-    expect(lastLayout().offsets[9] + lastLayout().widths[9]).toBeGreaterThan(width);
-    view.unmount(); cleanup();
-
-    act(() => { useUIStore.getState().setJingleActive(true); });
-    view = await mount();
-    expect(workerScale()).toBeLessThan(FIT_SCALE_FLOOR);
-    const layout = lastLayout();
-    expect(layout.offsets).toHaveLength(10);
-    expect(layout.offsets[9] + layout.widths[9]).toBeLessThanOrEqual(width); // every lip on screen
-    view.unmount(); cleanup();
+  // Owner 2026-10-18: "it is not scaled to fit i see 6,5 channels during the jingle", and 2026-10-20:
+  // "the last channel is not fully visible" in a song. Both hit the old 10 px font floor; fit has no floor now.
+  it('10 channels in an 850 px editor all fit below a 10 px font, for a song and for the jingle', async () => {
+    width = 850; // 10 channels need text smaller than 10 px here
+    for (const jingle of [false, true]) {
+      act(() => { useUIStore.getState().setJingleActive(jingle); });
+      withChannels(10);
+      const view = await mount();
+      expect(workerScale()).toBeLessThan(10 / 14);
+      const layout = lastLayout();
+      expect(layout.offsets).toHaveLength(10);
+      expect(layout.offsets[9] + layout.widths[9]).toBeLessThanOrEqual(width); // every channel on screen
+      view.unmount(); cleanup();
+    }
     act(() => { useUIStore.getState().setJingleActive(false); });
   });
 
-  // Owner 2026-10-18: the lips were too small. They have no automation lanes, so the width goes to the text.
   it('the startup jingle drops the automation lanes from the channel widths', async () => {
     width = 400; // fit off and too narrow to stretch: the widths are the channels' own
     useSettingsStore.setState({ fitAllChannelsTracker: false });
