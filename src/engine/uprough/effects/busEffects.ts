@@ -10,7 +10,7 @@ import type { ParameterDef } from '@/engine/registry/SynthDescriptor';
 import { NumpyRandomState } from '@/engine/turntable/turntableSim';
 import {
   bp, butter, echoLine, hp, lfilter, lp, npSum, reverb as schroederReverb, samplerReverb,
-  type RefReverbKind, type SamplerReverbKind,
+  type RefReverbKind, type SamplerReverbKind as RefSamplerReverbKind,
 } from '@/engine/dj/scratch/refDsp';
 import { tapeSat } from '@/engine/dj/scratch/demoDrums';
 import { roundHalfEven } from '@/engine/dj/scratch/scratchGrit';
@@ -130,13 +130,96 @@ export function schroeder(x: Signal, rate: number, options: Partial<SchroederRev
   return schroederReverb(x as Float64Array, rate, o.kind, o.mix, o.decay);
 }
 
-export interface SamplerReverbOptions { kind: SamplerReverbKind; mix: number }
-export const SAMPLER_REVERB_DEFAULTS: Readonly<SamplerReverbOptions> = { kind: 'small_room', mix: 0.1 };
+export type SamplerReverbKind = RefSamplerReverbKind | 'lofi_digital';
+export interface SamplerReverbOptions { kind: SamplerReverbKind; mix: number; seed: number }
+export const SAMPLER_REVERB_DEFAULTS: Readonly<SamplerReverbOptions> = { kind: 'small_room', mix: 0.1, seed: 0 };
 
-/** sampler.py `reverb` (hip-hop palette, all kinds but lofi_digital): the input's length. */
+/**
+ * sampler.py `reverb` (hip-hop palette): the input's length. `lofi_digital` (s.30) is a room tail run through the
+ * sampler `radio` profile with dither; every other kind is refDsp's samplerReverb.
+ */
 export function reverb(x: Signal, rate: number, options: Partial<SamplerReverbOptions> = {}): Float64Array {
   const o = { ...SAMPLER_REVERB_DEFAULTS, ...options };
-  return samplerReverb(x as Float64Array, rate, o.kind, o.mix);
+  if (o.kind !== 'lofi_digital') return samplerReverb(x as Float64Array, rate, o.kind, o.mix);
+  const wet = samplerProcess(schroederReverb(x as Float64Array, rate, 'room', 1.0, 0.6), 'radio', rate, true, o.seed);
+  const out = Float64Array.from(x);
+  const n = Math.min(x.length, wet.length);
+  for (let i = 0; i < n; i++) out[i] = (1 - o.mix) * out[i]! + o.mix * wet[i]!;
+  return out;
+}
+
+// ── sampler.py `process`: the vintage sampler chain (s.2-s.10) ──────────────
+
+export interface SamplerProfile {
+  bits: number; decim: number; aaCut: number | null; alias: number; inDrive: number; outLp: number | null;
+  interp: 'dark_linear' | 'hold' | 'linear'; noise: number; peak: number; hp?: number; wow?: number; crackle?: boolean;
+}
+export const SAMPLER_PROFILES: Readonly<Record<string, SamplerProfile>> = {
+  mpc60: { bits: 12, decim: 1, aaCut: 9000, alias: 0.18, inDrive: 0.05, outLp: 8500, interp: 'dark_linear', noise: 0.002, peak: 0.8 },
+  sp1200: { bits: 12, decim: 2, aaCut: 7000, alias: 0.28, inDrive: 0.09, outLp: 7000, interp: 'hold', noise: 0.004, peak: 0.78 },
+  s950: { bits: 12, decim: 2, aaCut: 8000, alias: 0.12, inDrive: 0.03, outLp: 7500, interp: 'dark_linear', noise: 0.002, peak: 0.8 },
+  amiga: { bits: 8, decim: 1, aaCut: 9000, alias: 0.28, inDrive: 0.04, outLp: 9000, interp: 'linear', noise: 0.003, peak: 0.82 },
+  cassette: { bits: 12, decim: 1, aaCut: 6000, alias: 0.20, inDrive: 0.06, outLp: 6000, interp: 'dark_linear', noise: 0.008, wow: 0.4, peak: 0.78 },
+  vinyl: { bits: 12, decim: 1, aaCut: 8000, alias: 0.20, inDrive: 0.04, outLp: 8000, interp: 'dark_linear', noise: 0.016, wow: 0.2, crackle: true, peak: 0.8 },
+  radio: { bits: 10, decim: 2, aaCut: 4200, alias: 0.22, inDrive: 0.07, outLp: 3800, hp: 500, interp: 'hold', noise: 0.006, peak: 0.78 },
+  clean: { bits: 16, decim: 1, aaCut: null, alias: 0.0, inDrive: 0.0, outLp: null, interp: 'linear', noise: 0.0, peak: 0.9 },
+};
+export const SAMPLER_PROFILE_IDS: ReadonlyArray<readonly [string, string]> = [
+  ['mpc60', 'MPC60'], ['sp1200', 'SP1200'], ['s950', 'S950'], ['amiga', 'Amiga'], ['cassette', 'Cassette'],
+  ['vinyl', 'Vinyl'], ['radio', 'Radio'], ['clean', 'Clean'],
+];
+
+/** `np.repeat(x[::k], k)[:n]`: the zero-order-hold decimator. */
+function holdDecimate(x: Float64Array, k: number): Float64Array {
+  return Float64Array.from(x, (_, i) => x[Math.trunc(i / k) * k]!);
+}
+
+/** sampler `_quantize`: headroom, mild tanh saturation, optional fixed-seed dither, round half to even. */
+function quantize(x: Float64Array, bits: number, peak: number, dither: boolean): Float64Array {
+  let m = 0;
+  for (let i = 0; i < x.length; i++) m = Math.max(m, Math.abs(x[i]!));
+  m += 1e-9;
+  const q = 2 ** (bits - 1);
+  const d = dither && bits < 16 ? new NumpyRandomState(7).uniformArray(-0.5, 0.5, x.length) : null;
+  return Float64Array.from(x, (v, i) => {
+    let y = v / m * peak;
+    y = Math.tanh(y * 1.05) / 1.05;
+    if (d) y = y + d[i]! / q;
+    return roundHalfEven(y * q) / q * m / peak;
+  });
+}
+
+/**
+ * sampler `process`: input saturation, anti-alias, sample-rate reduction with controlled aliasing, quantise,
+ * interpolation colour, output filter, wow, crackle, noise floor. `profile` names a SAMPLER_PROFILES entry
+ * (unknown names run mpc60, as in Python).
+ */
+export function samplerProcess(x: Signal, profile = 'mpc60', rate = 22050, dither = true, seed = 0): Float64Array {
+  const p = SAMPLER_PROFILES[profile] ?? SAMPLER_PROFILES.mpc60!;
+  let y: Float64Array = Float64Array.from(x);
+  const n = y.length;
+  if (p.hp) y = hp(y, p.hp, rate);
+  if (p.inDrive) y = y.map((v) => Math.tanh(v * (1.0 + 4.0 * p.inDrive)));
+  if (p.aaCut) y = lp(y, p.aaCut, rate);
+  if (p.decim > 1) {
+    const held = holdDecimate(y, p.decim);
+    const smooth = lp(held, rate / (2.0 * p.decim), rate);
+    y = held.map((v, i) => p.alias * v + (1.0 - p.alias) * smooth[i]!);
+  }
+  y = quantize(y, p.bits, p.peak, dither);
+  if (p.interp === 'dark_linear') y = lp(y, 7000, rate);
+  else if (p.interp === 'hold') y = lp(holdDecimate(y, 2), 6500, rate);
+  if (p.outLp) y = lp(y, p.outLp, rate);
+  if (p.wow) y = vintageCharacter(y, rate, { tapeAge: p.wow, seed });
+  if (p.crackle) {
+    const v = vinylNoise(n, rate, seed);
+    y = y.map((s, i) => s + 0.5 * p.noise * v[i]!);
+  }
+  if (p.noise) {
+    const w = new NumpyRandomState((seed + 1) >>> 0).uniformArray(-1, 1, n);
+    y = y.map((s, i) => s + p.noise * w[i]!);
+  }
+  return y;
 }
 
 // ── drum bus, parallel dirt, mixer colour (sampler.py) ──────────────────────
@@ -164,15 +247,16 @@ export function compress(x: Signal, c: CompressorOptions): Float64Array {
   return out;
 }
 
-export interface DrumBusOptions { drive: number; comp: boolean; compParams: Partial<CompressorOptions> }
-export const DRUM_BUS_DEFAULTS: Readonly<DrumBusOptions> = { drive: 0.10, comp: true, compParams: {} };
+export interface DrumBusOptions { drive: number; comp: boolean; compParams: Partial<CompressorOptions>; resample: string | null; seed: number }
+export const DRUM_BUS_DEFAULTS: Readonly<DrumBusOptions> = { drive: 0.10, comp: true, compParams: {}, resample: null, seed: 0 };
 
-/** sampler `drum_bus` without the optional `resample` profile: HP 28 Hz, tape saturation, glue compression, LP 12 kHz. */
+/** sampler `drum_bus`: HP 28 Hz, tape saturation, glue compression, optional `resample` sampler profile (s.16/44), LP 12 kHz. */
 export function drumBus(x: Signal, rate: number, options: Partial<DrumBusOptions> = {}): Float64Array {
   const o = { ...DRUM_BUS_DEFAULTS, ...options };
   let y: Float64Array = hp(x as Float64Array, 28, rate);
   y = tapeSat(y, 1.0 + o.drive * 2.0);
   if (o.comp) y = compress(y, { ...DRUM_BUS_COMP, ...o.compParams });
+  if (o.resample) y = samplerProcess(y, o.resample, rate, true, o.seed);
   return lp(y, 12000, rate);
 }
 
@@ -347,15 +431,88 @@ export const PAULA_MODELS: Readonly<Record<string, number>> = { a500: 4400, led:
 export const PAULA_ORDERS: Readonly<Record<string, number>> = { a500: 1, a1200: 1, led: 4 };
 export const PAULA_DEFAULT = 'a500';
 
-export interface PaulaOptions { model: string; cutoff: number | null; order: number | null }
-export const PAULA_DEFAULTS: Readonly<PaulaOptions> = { model: PAULA_DEFAULT, cutoff: null, order: null };
+export interface PaulaOptions { model: string; cutoff: number | null; order: number | null; zoh: boolean; replayRate: number | null }
+export const PAULA_DEFAULTS: Readonly<PaulaOptions> = { model: PAULA_DEFAULT, cutoff: null, order: null, zoh: false, replayRate: null };
 
-/** softsynth_engine `paula_filter` with the zero-order hold off (its default): the analog output low-pass. */
+/** In-place complex FFT of any length: radix-2, or Bluestein's chirp-z through a power-of-two FFT. */
+function fftInPlace(re: Float64Array, im: Float64Array, inverse: boolean): void {
+  const n = re.length;
+  if (n <= 1) return;
+  const sign = inverse ? 1 : -1;
+  if ((n & (n - 1)) === 0) {
+    for (let i = 1, j = 0; i < n; i++) {
+      let bit = n >> 1;
+      for (; j & bit; bit >>= 1) j ^= bit;
+      j ^= bit;
+      if (i < j) { [re[i], re[j]] = [re[j]!, re[i]!]; [im[i], im[j]] = [im[j]!, im[i]!]; }
+    }
+    for (let len = 2; len <= n; len <<= 1) {
+      const half = len >> 1;
+      for (let i = 0; i < n; i += len) {
+        for (let k = 0; k < half; k++) {
+          const a = sign * 2 * Math.PI * k / len, wr = Math.cos(a), wi = Math.sin(a);
+          const u = i + k, v = u + half;
+          const tr = re[v]! * wr - im[v]! * wi, ti = re[v]! * wi + im[v]! * wr;
+          re[v] = re[u]! - tr; im[v] = im[u]! - ti; re[u] = re[u]! + tr; im[u] = im[u]! + ti;
+        }
+      }
+    }
+    return;
+  }
+  let m = 1;
+  while (m < 2 * n - 1) m <<= 1;
+  const cr = new Float64Array(n), ci = new Float64Array(n);
+  for (let k = 0; k < n; k++) {
+    const a = sign * Math.PI * ((k * k) % (2 * n)) / n;
+    cr[k] = Math.cos(a); ci[k] = Math.sin(a);
+  }
+  const ar = new Float64Array(m), ai = new Float64Array(m), br = new Float64Array(m), bi = new Float64Array(m);
+  for (let k = 0; k < n; k++) {
+    ar[k] = re[k]! * cr[k]! - im[k]! * ci[k]!; ai[k] = re[k]! * ci[k]! + im[k]! * cr[k]!;
+    br[k] = cr[k]!; bi[k] = -ci[k]!;
+    if (k > 0) { br[m - k] = cr[k]!; bi[m - k] = -ci[k]!; }
+  }
+  fftInPlace(ar, ai, false); fftInPlace(br, bi, false);
+  for (let k = 0; k < m; k++) {
+    const r = ar[k]! * br[k]! - ai[k]! * bi[k]!, i2 = ar[k]! * bi[k]! + ai[k]! * br[k]!;
+    ar[k] = r; ai[k] = i2;
+  }
+  fftInPlace(ar, ai, true);
+  for (let k = 0; k < n; k++) {
+    const r = ar[k]! / m, i2 = ai[k]! / m;
+    re[k] = r * cr[k]! - i2 * ci[k]!; im[k] = r * ci[k]! + i2 * cr[k]!;
+  }
+}
+
+/**
+ * softsynth_engine `paula_zoh`: the zero-order-hold droop |sinc(f / replayRate)| of a DAC replaying at `replayRate`
+ * (default the render rate), applied in the frequency domain with zero phase. The FFT is Bluestein float64, so
+ * it matches numpy's pocketfft to rounding error at any length.
+ */
+export function paulaZoh(x: Signal, rate: number, replayRate: number | null = null): Float64Array {
+  const n = x.length;
+  if (n === 0) return Float64Array.from(x);
+  const fs = replayRate || rate;
+  const re = Float64Array.from(x), im = new Float64Array(n);
+  fftInPlace(re, im, false);
+  const gain = (k: number): number => {
+    const j = Math.min(k, n - k);
+    const u = j / (n * (1.0 / rate)) / fs;
+    return j === 0 ? 1.0 : Math.sin(Math.PI * u) / (Math.PI * u);
+  };
+  for (let k = 0; k < n; k++) { const g = gain(k); re[k] = re[k]! * g; im[k] = im[k]! * g; }
+  fftInPlace(re, im, true);
+  for (let k = 0; k < n; k++) re[k] = re[k]! / n;
+  return re;
+}
+
+/** softsynth_engine `paula_filter`: the zero-order hold first when `zoh` (off by default, as PAULA_ZOH is), then the analog output low-pass. */
 export function paulaFilter(x: Signal, rate: number, options: Partial<PaulaOptions> = {}): Float64Array {
   const o = { ...PAULA_DEFAULTS, ...options };
   const cutoff = o.cutoff ?? PAULA_MODELS[o.model] ?? PAULA_MODELS[PAULA_DEFAULT]!;
   const order = o.order ?? PAULA_ORDERS[o.model] ?? 1;
-  return lfilter(butter(order, Math.min(cutoff, rate * 0.49) / (rate / 2.0), 'low'), x as Float64Array);
+  const held = o.zoh ? paulaZoh(x, rate, o.replayRate) : (x as Float64Array);
+  return lfilter(butter(order, Math.min(cutoff, rate * 0.49) / (rate / 2.0), 'low'), held);
 }
 
 /** softsynth_engine `noise_shape_int8`: second-order error-feedback quantize of a signal already scaled to +-127. */
@@ -425,7 +582,7 @@ export const DELAY_KIND_IDS: ReadonlyArray<readonly [DelayKind, string]> = [['di
 export const CHORUS_KIND_IDS: ReadonlyArray<readonly [ChorusKind, string]> = [['stereo', 'Stereo'], ['juno', 'Juno'], ['dimension', 'Dimension'], ['ensemble', 'Ensemble']];
 export const SAMPLER_REVERB_KIND_IDS: ReadonlyArray<readonly [SamplerReverbKind, string]> = [
   ['small_room', 'Small Room'], ['dark_room', 'Dark Room'], ['short_plate', 'Short Plate'], ['gated', 'Gated'],
-  ['spring', 'Spring'], ['warehouse', 'Warehouse'], ['reverse', 'Reverse'],
+  ['spring', 'Spring'], ['lofi_digital', 'Lo-Fi Digital'], ['warehouse', 'Warehouse'], ['reverse', 'Reverse'],
 ];
 
 export type BusEffectId =
@@ -486,6 +643,7 @@ export const BUS_EFFECTS: Readonly<Record<BusEffectId, BusEffectMeta>> = {
       knob('ratio', 'Compressor Ratio', 1, 10, DRUM_BUS_COMP.ratio),
       knob('thresh', 'Compressor Threshold', 0.05, 1, DRUM_BUS_COMP.thresh),
       knob('makeup', 'Compressor Makeup Gain', 0.5, 2, DRUM_BUS_COMP.makeup),
+      select('resample', 'Resample Sampler', [['', 'Off'], ...SAMPLER_PROFILE_IDS], ''),
     ],
   },
   parallelDirt: {
@@ -521,7 +679,7 @@ export const BUS_EFFECTS: Readonly<Record<BusEffectId, BusEffectMeta>> = {
   },
   paulaFilter: {
     label: 'Paula Output Filter',
-    parameters: [select('model', 'Machine', [['a500', 'Amiga 500'], ['led', 'Amiga 500 LED Filter'], ['a1200', 'Amiga 1200']], 'a500')],
+    parameters: [select('model', 'Machine', [['a500', 'Amiga 500'], ['led', 'Amiga 500 LED Filter'], ['a1200', 'Amiga 1200']], 'a500'), toggle('zoh', 'Zero-Order Hold', false)],
   },
   masterBus: {
     label: 'Master Bus',

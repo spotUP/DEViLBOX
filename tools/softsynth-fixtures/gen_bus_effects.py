@@ -75,10 +75,23 @@ for kind in ("plate", "hall", "gated", "spring"):
     CASES.append(("schroederReverb", {"kind": kind, "mix": 0.5, "decay": 0.7},
                   lambda o, kind=kind: sd.reverb(X, RATE, kind=kind, mix=0.5, decay=0.7)))
 CASES.append(("samplerReverb", {}, lambda o: sm.reverb(X, RATE)))
-for kind in ("dark_room", "short_plate", "gated", "spring", "warehouse", "reverse"):
+for kind in ("dark_room", "short_plate", "gated", "spring", "warehouse", "reverse", "lofi_digital"):
     CASES.append(("samplerReverb", {"kind": kind, "mix": 0.4},
                   lambda o, kind=kind: sm.reverb(X, RATE, kind=kind, mix=0.4)))
+CASES.append(("samplerReverb", {"kind": "lofi_digital", "mix": 0.6, "seed": 5},
+              lambda o: sm.reverb(X, RATE, kind="lofi_digital", mix=0.6, seed=5)))
 CASES += [
+    ("drumBus", {"resample": "sp1200"}, lambda o: sm.drum_bus(X, RATE, resample="sp1200")),
+    ("drumBus", {"resample": "cassette", "seed": 3}, lambda o: sm.drum_bus(X, RATE, resample="cassette", seed=3)),
+    ("drumBus", {"resample": "vinyl", "comp": False}, lambda o: sm.drum_bus(X, RATE, resample="vinyl", comp=False)),
+    ("drumBus", {"resample": "amiga"}, lambda o: sm.drum_bus(X, RATE, resample="amiga")),
+    ("samplerProcess", {"profile": "mpc60"}, lambda o: sm.process(X, "mpc60", RATE)),
+    ("samplerProcess", {"profile": "radio", "dither": False, "seed": 2}, lambda o: sm.process(X, "radio", RATE, dither=False, seed=2)),
+    ("samplerProcess", {"profile": "clean"}, lambda o: sm.process(X, "clean", RATE)),
+    ("paulaFilter", {"zoh": True}, lambda o: se.paula_filter(X, RATE, zoh=True)),
+    ("paulaFilter", {"zoh": True, "model": "led", "replayRate": 16000}, lambda o: se.paula_filter(X, RATE, model="led", zoh=True, replay_rate=16000)),
+    ("paulaZoh", {}, lambda o: se.paula_zoh(X, RATE)),
+    ("paulaZoh", {"replayRate": 11025}, lambda o: se.paula_zoh(X, RATE, 11025)),
     ("drumBus", {}, lambda o: sm.drum_bus(X, RATE)),
     ("drumBus", {"drive": 0.5, "comp": False}, lambda o: sm.drum_bus(X, RATE, drive=0.5, comp=False)),
     ("drumBus", {"drive": 0.3, "compParams": {"ratio": 3.0, "thresh": 0.2}},
