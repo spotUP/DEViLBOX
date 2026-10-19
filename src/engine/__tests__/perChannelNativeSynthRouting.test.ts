@@ -143,6 +143,7 @@ function makeEngine() {
     bridgeSlots: new Map(),
     kontaktChannelNotes: new Map(),
     masterInput: new FakeGain(),
+    nativeVoiceDelay: { delayTime: { value: 0 } },
     synthBus: new FakeGain(),
     amigaPeriodSong: false,
     globalDetuneCents: 0,
@@ -243,11 +244,13 @@ describe('per-channel native synth routing (TB303 on tracker channel 3)', () => 
     expect(lane.shift.semitones).toBeCloseTo(-12, 6);
     expect(synthBusPitchShift.semitones).toBeCloseTo(-12, 6);
     expect(channelOutputs.get(3)!.voiceDelay.delayTime.value).toBeCloseTo(0.1, 6);
+    expect(state.nativeVoiceDelay.delayTime.value).toBeCloseTo(0.1, 6);
 
     // Back to pitch 0: direct wire, no delay.
     engine.setSynthBusPitchRate(1);
     expect(lane.shift.active).toBe(false);
     expect(channelOutputs.get(3)!.voiceDelay.delayTime.value).toBe(0);
+    expect(state.nativeVoiceDelay.delayTime.value).toBe(0);
   });
 
   it('keeps pooled chip synths and live-voice channels on the shared instance into synthBus', async () => {
