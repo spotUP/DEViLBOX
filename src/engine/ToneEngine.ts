@@ -67,6 +67,7 @@ import { SynthRegistry } from './registry/SynthRegistry';
 import { VoiceAllocator } from './audio/VoiceAllocator';
 import { getSendBusManager } from './SendBusManager';
 import { getNormalizedVolume } from './factories/volumeNormalization';
+import { setInstrumentVolumeOn } from './instrumentOutputLevel';
 
 // Extracted modules
 import { applyEffectParametersDiff as _applyEffectParamsDiff, applyBpmSyncedParam as _applyBpmSyncedParam } from './tone/EffectParameterEngine';
@@ -1813,7 +1814,6 @@ export class ToneEngine {
     return key >>> 16;
   }
 
-  /** Every live instance of an instrument: the shared `-1` one and the per-channel ones. */
   /** Every live instance of an instrument: the shared one plus one per tracker channel. */
   public instancesOf(instrumentId: number): Array<Tone.ToneAudioNode | DevilboxSynth> {
     const out: Array<Tone.ToneAudioNode | DevilboxSynth> = [];
@@ -1821,6 +1821,15 @@ export class ToneEngine {
       if (this.instrumentIdFromKey(key) === instrumentId) out.push(instrument);
     });
     return out;
+  }
+
+  /**
+   * Live volume change for every instance of an instrument, at the same
+   * normalized level InstrumentFactory gives a new instance. Returns the
+   * number of instances that took the level.
+   */
+  public setInstrumentVolume(instrumentId: number, synthType: string, volumeDb: number | undefined): number {
+    return setInstrumentVolumeOn(this.instruments, instrumentId, synthType, volumeDb);
   }
 
   /**

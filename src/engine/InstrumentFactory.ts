@@ -6,7 +6,7 @@
  * Delegates to focused sub-factories in ./factories/
  */
 
-import { registryOutputGain } from './registry/outputGain';
+import { applyInstrumentOutputLevel } from './instrumentOutputLevel';
 import * as Tone from 'tone';
 import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import type { DevilboxSynth } from '@typedefs/synth';
@@ -62,7 +62,7 @@ import { createIO808Instrument } from './io808/createIO808Instrument';
 import { createTR909Instrument } from './tr909/createTR909Instrument';
 
 // Sub-factory imports
-import { VOLUME_NORMALIZATION_OFFSETS } from './factories/volumeNormalization';
+import { getNormalizedVolume, instrumentOffsetDb } from './factories/volumeNormalization';
 import {
   createToneJSSynth,
   createSynth as createToneJSBasicSynth,
@@ -159,16 +159,15 @@ export class InstrumentFactory {
     const registryDesc = SynthRegistry.get(config.synthType);
     if (registryDesc) {
       const instrument = registryDesc.create(config);
-      // Apply volume offset for Furnace WASM synths via setVolumeOffset
-      if (config.synthType.startsWith('Furnace') && registryDesc.volumeOffsetDb && 'setVolumeOffset' in instrument) {
-        (instrument as unknown as { setVolumeOffset: (offset: number) => void }).setVolumeOffset(registryDesc.volumeOffsetDb);
-      }
-      // Apply volume offset for native-output synths via output GainNode
-      else if (registryDesc.volumeOffsetDb) {
-        const dsInst = instrument as unknown as { output?: { gain?: { value: number } } };
-        if (dsInst.output?.gain) {
-          dsInst.output.gain.value = registryOutputGain(config.synthType, config.volume ?? -12);
+      // Furnace WASM synths take their offset through setVolumeOffset
+      if (config.synthType.startsWith('Furnace')) {
+        if (registryDesc.volumeOffsetDb && 'setVolumeOffset' in instrument) {
+          (instrument as unknown as { setVolumeOffset: (offset: number) => void }).setVolumeOffset(registryDesc.volumeOffsetDb);
         }
+      }
+      // Every other registry synth starts at the level a live volume update sets (one source)
+      else {
+        applyInstrumentOutputLevel(instrument, config.synthType, config.volume);
       }
       return instrument;
     }
@@ -950,9 +949,7 @@ export class InstrumentFactory {
         const audioCtx = getDevilboxAudioContext();
         const scSynth = new SuperColliderSynth(sc, audioCtx);
         // Apply volume normalization via output GainNode
-        const scOffset = VOLUME_NORMALIZATION_OFFSETS['SuperCollider'] ?? 0;
-        const scVolDb = (config.volume ?? -12) + scOffset;
-        (scSynth.output as GainNode).gain.value = Math.pow(10, scVolDb / 20);
+        (scSynth.output as GainNode).gain.value = Tone.dbToGain(getNormalizedVolume('SuperCollider', config.volume));
         instrument = scSynth;
         break;
       }
@@ -1051,7 +1048,7 @@ export class InstrumentFactory {
     // These route audio through native GainNodes (bypassing Tone.js gain),
     // so we use setVolumeOffset() to control the native gain
     if (config.synthType.startsWith('Furnace') && instrument) {
-      const offset = VOLUME_NORMALIZATION_OFFSETS[config.synthType] ?? 0;
+      const offset = instrumentOffsetDb(config.synthType);
       if (offset !== 0 && 'setVolumeOffset' in instrument) {
         (instrument as unknown as { setVolumeOffset: (offset: number) => void }).setVolumeOffset(offset);
       }

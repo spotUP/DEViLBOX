@@ -7,6 +7,7 @@
 
 import * as Tone from 'tone';
 import { SynthRegistry } from '../SynthRegistry';
+import { getNormalizedVolume } from '../../factories/volumeNormalization';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import { resolveChipParameters } from '@constants/chipParameters';
 import { ASCSynth } from '../../asc/ASCSynth';
@@ -62,10 +63,6 @@ const VOLUME_OFFSETS: Record<string, number> = {
   MAMEVLM5030: 34,
   MAMEHC55516: 30,
 };
-
-function getNormalizedVolume(synthType: string, configVolume: number | undefined): number {
-  return (configVolume ?? -12) + (VOLUME_OFFSETS[synthType] ?? 0);
-}
 
 /**
  * Bring a freshly created chip to the state the UI claims it is in.

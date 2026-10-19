@@ -2,7 +2,6 @@
  * Instrument Store - Instrument Bank & Preset Management
  */
 
-import { registryOutputGain } from '../engine/registry/outputGain';
 import { adoptCz101TonesFrom } from './useCz101UserPatchStore';
 import { classifySampleEdit, propagateSampleEditToSong } from '@/lib/song/sampleEdit';
 import { keepAcrossHmr } from '@/lib/dev/keepAcrossHmr';
@@ -672,22 +671,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
           if (updatedInstrument) {
             // Universal volume/pan handler — adjust output gain directly, never invalidate
             if ((updates.volume !== undefined || updates.pan !== undefined) && !updates.oscillator && !updates.envelope && !updates.filter) {
-              const instruments = (engine as any).instruments as Map<number, any>;
-              if (instruments) {
-                for (const [key, synth] of instruments.entries()) {
-                  if ((key >>> 16) === id && synth) {
-                    if (updates.volume !== undefined) {
-                      // dB to linear gain, with the synth's registry normalisation offset (as at creation)
-                      const vol = updatedInstrument.volume ?? -6;
-                      const linearGain = registryOutputGain(updatedInstrument.synthType, vol);
-                      if (synth.output?.gain) {
-                        synth.output.gain.value = linearGain;
-                      } else if (synth.set && typeof synth.set === 'function') {
-                        try { synth.set('volume', vol); } catch { /* */ }
-                      }
-                    }
-                  }
-                }
+              if (updates.volume !== undefined) {
+                engine.setInstrumentVolume(id, updatedInstrument.synthType, updatedInstrument.volume);
               }
               // If ONLY volume/pan changed, we're done — don't invalidate
               const otherKeys = Object.keys(updates).filter(k => k !== 'volume' && k !== 'pan');
@@ -1067,20 +1052,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
         // Volume/pan fast path
         if ((updates.volume !== undefined || updates.pan !== undefined) && !updates.oscillator && !updates.envelope && !updates.filter) {
-          const instruments = (engine as any).instruments as Map<number, any>;
-          if (instruments) {
-            for (const [key, synth] of instruments.entries()) {
-              if ((key >>> 16) === id && synth) {
-                if (updates.volume !== undefined) {
-                  const vol = mergedInst.volume ?? -6;
-                  const linearGain = registryOutputGain(mergedInst.synthType, vol);
-                  if (synth.output?.gain) synth.output.gain.value = linearGain;
-                  else if (synth.set && typeof synth.set === 'function') {
-                    try { synth.set('volume', vol); } catch { /* */ }
-                  }
-                }
-              }
-            }
+          if (updates.volume !== undefined) {
+            engine.setInstrumentVolume(id, mergedInst.synthType, mergedInst.volume);
           }
           const otherKeys = Object.keys(updates).filter(k => k !== 'volume' && k !== 'pan');
           if (otherKeys.length === 0) {

@@ -21,7 +21,7 @@ const toneSynths: SynthDescriptor[] = [
     name: 'Synth',
     category: 'tone',
     loadMode: 'eager',
-    volumeOffsetDb: 11,
+    volumeOffsetDb: 5,
     create: (config) => createToneSynthNode('Synth', config),
   },
   {
@@ -29,7 +29,7 @@ const toneSynths: SynthDescriptor[] = [
     name: 'Mono Synth',
     category: 'tone',
     loadMode: 'eager',
-    volumeOffsetDb: 14,
+    volumeOffsetDb: 2,
     create: (config) => createToneSynthNode('MonoSynth', config),
     onTriggerRelease: (_synth, _note, time) => {
       // MonoSynth uses triggerRelease(time) — no note parameter
@@ -42,7 +42,7 @@ const toneSynths: SynthDescriptor[] = [
     name: 'Duo Synth',
     category: 'tone',
     loadMode: 'eager',
-    volumeOffsetDb: 5,
+    volumeOffsetDb: 6,
     create: (config) => createToneSynthNode('DuoSynth', config),
     onTriggerRelease: (_synth, _note, time) => {
       (_synth as Tone.DuoSynth).triggerRelease(time);
@@ -70,7 +70,7 @@ const toneSynths: SynthDescriptor[] = [
     name: 'Pluck Synth',
     category: 'tone',
     loadMode: 'eager',
-    volumeOffsetDb: 32,
+    volumeOffsetDb: 19,
     create: (config) => {
       // Use a plain PluckSynth (not PolySynth wrapper) so the FeedbackCombFilter AudioWorklet
       // is created ONCE at construction time. synthTester's workletsAreReady() + 50ms wait
@@ -100,7 +100,7 @@ const toneSynths: SynthDescriptor[] = [
     name: 'Metal Synth',
     category: 'tone',
     loadMode: 'eager',
-    volumeOffsetDb: 23,
+    volumeOffsetDb: 17,
     create: (config) => {
       const synth = new Tone.MetalSynth({ ...toneVoiceOptions('MetalSynth', config), volume: getNormalizedVolume('MetalSynth', config.volume) } as Partial<Tone.MetalSynthOptions>);
       return registerVoiceSource({
@@ -130,7 +130,7 @@ const toneSynths: SynthDescriptor[] = [
     name: 'Membrane Synth',
     category: 'tone',
     loadMode: 'eager',
-    volumeOffsetDb: 10,
+    volumeOffsetDb: 3,
     create: (config) => {
       return new Tone.MembraneSynth({ ...toneVoiceOptions('MembraneSynth', config), volume: getNormalizedVolume('MembraneSynth', config.volume) } as Partial<Tone.MembraneSynthOptions>);
     },
@@ -149,7 +149,7 @@ const toneSynths: SynthDescriptor[] = [
     name: 'Noise Synth',
     category: 'tone',
     loadMode: 'eager',
-    volumeOffsetDb: 7,
+    volumeOffsetDb: 2,
     create: (config) => {
       return new Tone.NoiseSynth({ ...toneVoiceOptions('NoiseSynth', config), volume: getNormalizedVolume('NoiseSynth', config.volume) } as Partial<Tone.NoiseSynthOptions>);
     },
