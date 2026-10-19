@@ -6,12 +6,10 @@
  * Parity fixture: tools/softsynth-fixtures/gen_bass_pluck.py. `seed` is the PLUCK seed, i.e. the host's `seed + step`.
  * `vel` does not enter the synthesis (it only scales the note in the tail), so it is not an argument here.
  */
-import { pexp, pexp2, psin, ptanh } from '@/engine/dj/scratch/portableMath';
+import { pexp, pexp2, psin } from '@/engine/dj/scratch/portableMath';
 import { hp, lp } from '@/engine/dj/scratch/refDsp';
-import { roundHalfEven } from '@/engine/dj/scratch/scratchGrit';
-import { NumpyRandomState } from '@/engine/turntable/turntableSim';
 import { distort, karplus, moogLadder } from '../synthDsp';
-import { tube } from '../effects/busEffects';
+import { samplerProcess, tube } from '../effects/busEffects';
 
 export type PluckBassVoice = 'sampled' | 'electric' | 'warmsub';
 
@@ -50,47 +48,6 @@ export function sub808(semi: number, durS: number, rate: number, glideFrom: numb
   return distort(body, 'soft', 1.0 + drive * 3.0);
 }
 
-/** sampler.PROFILES["sp1200"]. */
-const SP1200 = { bits: 12, decim: 2, aaCut: 7000, alias: 0.28, inDrive: 0.09, outLp: 7000, holdLp: 6500, noise: 0.004, peak: 0.78 } as const;
-
-/**
- * sampler.process(x, "sp1200", rate, dither=True, seed=0): input saturation, anti-alias, sample-rate reduction with
- * controlled alias, 12-bit quantise with headroom + dither (RandomState(7)), "hold" interpolation colour, output
- * filter, white noise floor (RandomState(seed + 1)). The S950 twin lives in scratchGrit (its own constants, Math.tanh).
- */
-export function sp1200Process(input: ArrayLike<number>, rate: number): Float64Array {
-  const P = SP1200;
-  const n = input.length;
-  let y: Float64Array = new Float64Array(n);
-  for (let i = 0; i < n; i++) y[i] = ptanh(input[i]! * (1.0 + 4.0 * P.inDrive));
-  y = lp(y, P.aaCut, rate);
-  const held = new Float64Array(n);
-  for (let i = 0; i < n; i++) held[i] = y[i - (i % P.decim)]!;
-  const smooth = lp(held, rate / (2.0 * P.decim), rate);
-  for (let i = 0; i < n; i++) y[i] = P.alias * held[i]! + (1.0 - P.alias) * smooth[i]!;
-  // _quantize
-  let m = 0;
-  for (let i = 0; i < n; i++) m = Math.max(m, Math.abs(y[i]!));
-  m += 1e-9;
-  const q = 2 ** (P.bits - 1);
-  const dither = new NumpyRandomState(7);
-  const dith = dither.uniformArray(-0.5, 0.5, n);
-  for (let i = 0; i < n; i++) {
-    let v = y[i]! / m * P.peak;
-    v = ptanh(v * 1.05) / 1.05;
-    v = v + dith[i]! / q;
-    y[i] = roundHalfEven(v * q) / q * m / P.peak;
-  }
-  // _interp_color "hold": zero-order hold of every 2nd sample, then a low pass
-  const hold = new Float64Array(n);
-  for (let i = 0; i < n; i++) hold[i] = y[i - (i % 2)]!;
-  y = lp(hold, P.holdLp, rate);
-  y = lp(y, P.outLp, rate);
-  const noise = new NumpyRandomState(1).uniformArray(-1, 1, n);
-  for (let i = 0; i < n; i++) y[i] = y[i]! + P.noise * noise[i]!;
-  return y;
-}
-
 export interface PluckBassNote {
   /** Host semitone (the event's `semi`; the string plays semi - 12, the sub plays `_hz(semi - 12)`). */
   semi: number;
@@ -115,7 +72,7 @@ export function renderPluckBassNote(voice: PluckBassVoice, note: PluckBassNote, 
   string = lp(string, Math.trunc(2600 * bcut), rate);
   const out = new Float64Array(nNote);
   if (voice === 'sampled') {
-    const s = sp1200Process(string, rate);
+    const s = samplerProcess(string, 'sp1200', rate, true, 0);
     for (let i = 0; i < nNote; i++) out[i] = 0.55 * sub[i]! + 0.80 * s[i]!;
   } else if (voice === 'electric') {
     string = moogLadder(string, Math.trunc(2400 * bcut), 0.46, rate);
