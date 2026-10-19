@@ -29,8 +29,8 @@ describe('song file refusals', () => {
 
   it('refuses a foreign or newer file', () => {
     expect(() => parseSongFile('{"format":"x"}')).toThrow(/Not an Up Rough song file/);
-    expect(() => parseSongFile({ ...structuredClone(fixture), schema: 3 })).toThrow(/newer than this reader/);
-    expect(() => parseSongFile({ ...structuredClone(fixture), schema: 1 })).toThrow(/schema 1 has no migration to schema 2/);
+    expect(() => parseSongFile({ ...structuredClone(fixture), schema: 4 })).toThrow(/newer than this reader/);
+    expect(() => parseSongFile({ ...structuredClone(fixture), schema: 1 })).toThrow(/schema 1 has no migration to schema 3/);
   });
 
   it('refuses a song block the renderer would not honour', () => {
