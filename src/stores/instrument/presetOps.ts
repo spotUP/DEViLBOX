@@ -3,6 +3,7 @@
  * Called by useInstrumentStore — the store remains the single Zustand store.
  */
 
+import { DEFAULT_INSTRUMENT_VOLUME_DB } from '../../engine/factories/volumeNormalization';
 import type {
   InstrumentConfig,
   InstrumentPreset,
@@ -50,7 +51,7 @@ export function getInitialConfig(synthType: string): Partial<InstrumentConfig> {
   const base: Partial<InstrumentConfig> = {
     synthType: synthType as SynthType,
     effects: [],
-    volume: -12,
+    volume: DEFAULT_INSTRUMENT_VOLUME_DB,
     pan: 0,
   };
 
@@ -216,7 +217,7 @@ export function createDefaultInstrument(id: number): InstrumentConfig {
     envelope: { ...DEFAULT_ENVELOPE },
     filter: { ...DEFAULT_FILTER },
     effects: [],
-    volume: 0,
+    volume: DEFAULT_INSTRUMENT_VOLUME_DB,
     pan: 0,
   } as InstrumentConfig;
 }
