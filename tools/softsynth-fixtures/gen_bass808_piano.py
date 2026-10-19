@@ -10,7 +10,17 @@ import json
 import os
 import sys
 
+import math
+
 import numpy as np
+
+
+def seq_rms(y):
+    """RMS with a left-to-right sum, the order the TypeScript test sums in (np.mean is pairwise)."""
+    s = 0.0
+    for v in np.asarray(y, dtype=np.float64).tolist():
+        s += v * v
+    return math.sqrt(s / len(y))
 
 TOOLS, OUT = sys.argv[1], sys.argv[2]
 RATE = 22050
@@ -31,7 +41,7 @@ sf = load("synth_factory")
 
 def pack(sig):
     sig = np.asarray(sig, dtype=np.float64)
-    return {"length": int(sig.size), "rms": float(np.sqrt(np.mean(sig * sig))),
+    return {"length": int(sig.size), "rms": seq_rms(sig),
             "kept": [float(v) for v in sig[::KEEP]]}
 
 
