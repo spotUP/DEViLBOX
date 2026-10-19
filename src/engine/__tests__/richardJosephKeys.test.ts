@@ -77,7 +77,7 @@ describe('Richard Joseph cannon fodder (intro): a key plays the instrument sampl
       const note = periodToNote(sh.period);
       const noteName = xmNoteToToneJS(note)!;
       const asPlayed: Shape = {
-        ...sh, period: noteToPeriod(note), volume: 64 /* the format stores no volume per sample: a key stands for full channel volume */,
+        ...sh, period: noteToPeriod(note), volume: 64, volumes: [] /* the format stores no volume per sample: a key stands for full channel volume, flat, not the player's envelope */,
         pcm: Int8Array.from(got.bytes).buffer, loopStart: got.loop ? got.loopStart : 0, loopLength: got.loop ? got.loopEnd - got.loopStart : 0,
       };
       const model = paulaVoice(asPlayed, 4800);

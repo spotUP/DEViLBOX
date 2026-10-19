@@ -112,6 +112,12 @@ export interface UADEPaulaSample {
   /** Period and channel volume (0-64) of the first note that started it. */
   period: number;
   volume: number;
+  /**
+   * The channel volume over the first 160 ms of that note, one value per 10 ms render chunk. A player with a
+   * per-tick envelope (Jeroen Tel's ADSR) writes AUDxVOL every tick: the note's level is this trajectory and
+   * `volume` is only the step it started on.
+   */
+  volumes: number[];
   /** Times the song started it, and the 10 ms render chunk of the first start. */
   count: number;
   firstChunk: number;

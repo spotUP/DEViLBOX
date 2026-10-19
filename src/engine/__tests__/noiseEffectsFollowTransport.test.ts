@@ -16,7 +16,7 @@ const src = readFileSync(join(process.cwd(), 'src/engine/ToneEngine.ts'), 'utf8'
 
 describe('noise effects follow the transport', () => {
   it('the engine subscribes to the transport when it is created', () => {
-    expect(src).toMatch(/ToneEngine\.instance = new ToneEngine\(\);\n\s*ToneEngine\.instance\._followTransport\(\);/);
+    expect(src).toMatch(/const engine = new ToneEngine\(\);\n\s*engine\._followTransport\(\);/);
   });
   it('a change of isPlaying sets the flag and tells the noise effects', () => {
     const body = src.slice(src.indexOf('private _followTransport'), src.indexOf('private _notifyNoiseEffectsPlaying'));

@@ -113,15 +113,20 @@ describe.each(FORMATS)('$name: a key plays the sample the player plays', ({ file
       const keyPeriod = noteToPeriod(note);
       expect(Math.abs(1200 * Math.log2(keyPeriod / sh.period)), `${noteName} against period ${sh.period}`).toBeLessThanOrEqual(50);
       const model = paulaVoice({ ...sh, period: keyPeriod }, 4800);
+      // pitch is the bytes at the period: measured on a constant-volume render, since the volume steps of an
+      // enveloped player's note (the model's trajectory) are not a periodic signal the estimator can read
+      const pitchModel = paulaVoice({ ...sh, period: keyPeriod, volumes: [] }, 4800);
       const key = await renderKeys(inst, [{ note: noteName, at: 0 }], 0.5);
       const keyOn = key.findIndex((v) => Math.abs(v) > 0.0005);
       const keyWin = key.subarray(Math.max(0, keyOn), Math.max(0, keyOn) + 4800);
-      const mHz = fundamentalHz(model.subarray(0, 3800), 30, 3000), kHz = fundamentalHz(keyWin.subarray(0, 3800), 30, 3000);
+      const mHz = fundamentalHz(pitchModel.subarray(0, 3800), 30, 3000), kHz = fundamentalHz(keyWin.subarray(0, 3800), 30, 3000);
       if (!(mHz > 0)) continue; // a very short or noise-like wave has no fundamental
       measured++;
       expect(Math.abs(1200 * Math.log2(kHz / mHz)), `${noteName} voice ${sh.voice}: key ${kHz.toFixed(1)} Hz, Paula ${mHz.toFixed(1)} Hz`).toBeLessThan(50);
       // Paula holds each byte, the Sampler interpolates between them: that lowers the rms of a bright wave by up to ~3 dB
-      // (the 2 dB bound is held against the song voice, in the next test)
+      // (the 2 dB bound is held against the song voice, in the next test). The key plays flat at the instrument's
+      // volume, the sample's peak; the model plays the volume trajectory the player wrote (Jeroen Tel's ADSR starts a
+      // note at an attack step below the peak), so the level is compared over the note's first 100 ms as a whole.
       expect(Math.abs(20 * Math.log10(rms(keyWin, 0, 4800) / rms(model, 0, 4800))), `${noteName} voice ${sh.voice}: key level against Paula's, dB`).toBeLessThan(3.5);
     }
     expect(measured, 'voices with a measurable first note').toBeGreaterThanOrEqual(minVoices);
