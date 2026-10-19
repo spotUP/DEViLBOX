@@ -82,6 +82,8 @@ function serve(): Promise<{ proc: ChildProcess; port: number }> {
       if (m) resolve({ proc, port: Number(m[1]) });
     });
     proc.stderr!.setEncoding('utf8').on('data', (c: string) => { out += c; });
+    // A spawn that fails (no server/node_modules) emits 'error' and never 'exit'.
+    proc.on('error', (e) => reject(new Error(`route server did not start: ${e.message}`)));
     proc.on('exit', (code) => reject(new Error(`route server exited ${code}: ${out.slice(-2000)}`)));
   });
 }
