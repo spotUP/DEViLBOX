@@ -1,19 +1,17 @@
 """Writes src/engine/uprough/__tests__/fixtures/song_mix.json: the Up Rough song-mix stage of tools/hiphop.py run on
 deterministic lane buffers, for the null test of the TypeScript port (src/engine/uprough/mix/songMix.ts).
 
-Top-level functions (bus_makeup, duck_under_voice, _bus_rms, _active_rms, _apply_texture) are imported and called.
-The balance, drum trim and _echo live INSIDE render_section, so their source text is cut out of
-inspect.getsource(hiphop.render_section) between fixed markers and exec'd unchanged: no Python is re-implemented.
+Functions (bus_makeup, duck_under_voice, _bus_rms, _active_rms, _apply_texture) are imported and called.
+The drum trim, bus balance and echo are module-level (trim_drums_to_peak, restore_drum_trim, balance_buses,
+synced_echo), imported and called: no Python is re-implemented.
 The mirrored constants (MIX_GAINS, BUS_REFERENCE_*, SAMPLE_ECHO, the styles' tape/vinyl) are emitted for the test.
   /opt/homebrew/bin/python3.11 -I tools/softsynth-fixtures/gen_song_mix.py \
     /Users/spot/Code/UpRough/Up_Rough_Demo_System/tools src/engine/uprough/__tests__/fixtures/song_mix.json
 """
 import importlib.util
-import inspect
 import json
 import os
 import sys
-import textwrap
 
 import numpy as np
 
@@ -25,23 +23,6 @@ sys.path.insert(0, TOOLS)
 hh = importlib.import_module("hiphop")
 _dsp = hh._dsp
 assert hh._sm.RATE == RATE
-
-SRC = inspect.getsource(hh.render_section)
-
-
-def cut(start, end, include_end=False):
-    a = SRC.index(start)
-    b = SRC.index(end, a)
-    if include_end:
-        b += len(end)
-    return textwrap.dedent(" " * (len(SRC[:a]) - SRC[:a].rfind("\n") - 1) + SRC[a:b])
-
-
-TRIM_SRC = cut("_drum_trim = 1.0", "    if lay[\"drums\"]:\n        drums_buf = _sm.drum_bus")
-RESTORE_SRC = cut("if _drum_trim != 1.0:", "        if dc[\"parallel\"]")
-BALANCE_SRC = cut("if HIPHOP_BUS_BALANCE:", "    sec = (drums_buf")
-ECHO_SRC = cut("def _echo(", "    if lay[\"sample\"]:")
-
 
 def lane(seed, f0, scale, decay):
     i = np.arange(N)
@@ -58,15 +39,6 @@ QUIET = L["melody"] * 0.4
 SPARSE = np.zeros(N)
 SPARSE[1500:1900] = 0.5 * np.sin(np.arange(400) * 0.3)
 SPARSE[4000:4100] = 0.02
-
-
-def runsrc(src, ns):
-    g = {"np": np, "MIX_GAINS": hh.MIX_GAINS, "BUS_REFERENCE_RMS": hh.BUS_REFERENCE_RMS,
-         "BUS_REFERENCE_PEAK": hh.BUS_REFERENCE_PEAK, "HIPHOP_BUS_BALANCE": True, "HIPHOP_DRUM_BUS_HEADROOM": True,
-         "_dsp": _dsp, "rate": RATE}
-    g.update(ns)
-    exec(src, g)
-    return g
 
 
 def ser(y):
@@ -87,21 +59,20 @@ for name, x, pre, cap in (("quiet", QUIET, 0.2, 4.0), ("loud", LOUD, 0.05, 4.0),
     cases.append({"fn": "busMakeup", "input": name, "options": {"preRms": pre, "cap": cap}, **ser(hh.bus_makeup(x, pre, cap))})
 
 for name, x in (("loud", LOUD), ("quiet", QUIET)):
-    g = runsrc(TRIM_SRC, {"lay": {"drums": True}, "drums_buf": x.copy()})
-    cases.append({"fn": "trimDrumsToPeak", "input": name, "trim": float(g["_drum_trim"]), **ser(g["drums_buf"])})
-    g2 = runsrc(RESTORE_SRC, {"_drum_trim": g["_drum_trim"], "drums_buf": g["drums_buf"].copy(), "dc": {"parallel": 0}})
-    cases.append({"fn": "restoreDrumTrim", "input": name, "options": {"trim": float(g["_drum_trim"])}, **ser(g2["drums_buf"])})
+    trimmed, trim = hh.trim_drums_to_peak(x.copy())
+    cases.append({"fn": "trimDrumsToPeak", "input": name, "trim": float(trim), **ser(trimmed)})
+    restored = hh.restore_drum_trim(trimmed.copy(), trim)
+    cases.append({"fn": "restoreDrumTrim", "input": name, "options": {"trim": float(trim)}, **ser(restored)})
 
 for has_drums in (True, False):
     for bass_g, silent in ((1.272, None), (2.0, "melody")):
         bufs = {k: v.copy() for k, v in L.items()}
         if silent:
             bufs[silent][:] = 0.0
-        g = runsrc(BALANCE_SRC, {"lay": {"drums": has_drums}, "_bass_g": bass_g, "drums_buf": bufs["drums"],
-                                 "bass_buf": bufs["bass"], "sample_buf": bufs["sample"], "melody_buf": bufs["melody"],
-                                 "vocal_buf": bufs["vocal"], "reinforce_buf": bufs["reinforce"]})
+        hh.balance_buses(bufs["drums"], bufs["bass"], bufs["sample"], bufs["melody"], bufs["vocal"], bufs["reinforce"],
+                         bass_g, has_drums)
         cases.append({"fn": "balanceBuses", "options": {"bassGain": bass_g, "hasDrums": has_drums, "silent": silent},
-                      "outputs": {k: ser(g[k + "_buf"]) for k in ("drums", "bass", "sample", "melody", "vocal", "reinforce")}})
+                      "outputs": {k: ser(bufs[k]) for k in ("drums", "bass", "sample", "melody", "vocal", "reinforce")}})
 
 # _echo: step_samp / tempo-synced delay times at 92 BPM sixteenths
 step = int(RATE * 60.0 / 92 / 4)
@@ -109,8 +80,7 @@ for src_name, delay_s, fb, gain, damp in (("sample", 2 * step / RATE, hh.SAMPLE_
                                           ("vocal", 4 * step / RATE, 0.30, 0.32, None),
                                           ("vocal", step / float(RATE), 0.0, 0.12, None),
                                           ("melody", 3 * step / RATE, 0.45, 0.5, 0.2)):
-    g = runsrc(ECHO_SRC, {"step_samp": step})
-    y = g["_echo"](L[src_name], delay_s, fb, gain) if damp is None else g["_echo"](L[src_name], delay_s, fb, gain, damp)
+    y = hh.synced_echo(L[src_name], delay_s, fb, gain, rate=RATE) if damp is None else hh.synced_echo(L[src_name], delay_s, fb, gain, damp, rate=RATE)
     opt = {"delaySec": float(delay_s), "fb": fb, "g": gain}
     if damp is not None:
         opt["damp"] = damp
