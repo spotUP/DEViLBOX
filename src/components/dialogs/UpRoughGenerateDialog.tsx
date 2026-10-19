@@ -25,6 +25,8 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
   const [style, setStyle] = useState('');
   const [seed, setSeed] = useState(1);
   const [key, setKey] = useState('Am');
+  // Empty = the whole song; the generator scales its arrangement to a count.
+  const [bars, setBars] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -46,7 +48,9 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
 
   const seedValid = Number.isInteger(seed) && seed >= 0 && seed <= 9999;
   const keyValid = KEY_PATTERN.test(key);
-  const canGenerate = !busy && !!style && seedValid && keyValid;
+  const barsCount = bars.trim() === '' ? undefined : Number(bars);
+  const barsValid = barsCount === undefined || (Number.isInteger(barsCount) && barsCount >= 1 && barsCount <= 999);
+  const canGenerate = !busy && !!style && seedValid && keyValid && barsValid;
 
   const handleCancel = () => {
     abortRef.current?.abort();
@@ -60,7 +64,7 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
     setBusy(true);
     setError(null);
     try {
-      const text = await generateSong({ style, seed, key }, ac.signal);
+      const text = await generateSong({ style, seed, key, ...(barsCount !== undefined && { bars: barsCount }) }, ac.signal);
       await useTrackerStore.getState().importUpRoughSong(text);
       setBusy(false);
       onClose();
@@ -141,6 +145,22 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
             className="w-full bg-dark-bg text-text-secondary rounded p-2 text-xs"
           />
           {!keyValid && <p className="text-xs text-accent-warning mt-1">Key looks like Am, C or F#m.</p>}
+        </div>
+
+        <div>
+          <label htmlFor="uprough-bars" className="block text-xs text-text-muted mb-1">Bars (empty for the whole song)</label>
+          <input
+            id="uprough-bars"
+            type="number"
+            min={1}
+            max={999}
+            step={1}
+            value={bars}
+            onChange={(e) => setBars(e.target.value)}
+            disabled={busy}
+            className="w-full bg-dark-bg text-text-secondary rounded p-2 text-xs"
+          />
+          {!barsValid && <p className="text-xs text-accent-warning mt-1">Bars must be a whole number from 1 to 999.</p>}
         </div>
 
         {error && <p role="alert" className="text-xs text-accent-warning">{error}</p>}

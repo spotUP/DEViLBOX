@@ -1,7 +1,7 @@
 /**
  * Up Rough song generation.
  *
- * POST /api/uprough/generate {style, seed, key?} runs the real Python
+ * POST /api/uprough/generate {style, seed, key?, bars?} runs the real Python
  * generator (tools/song_file.py in the Up Rough checkout named by the
  * UPROUGH_ROOT env var) and returns the song file it prints. The generator is
  * the Up Rough host's own, so the file renders 1:1 on the device by
@@ -78,11 +78,14 @@ router.post('/generate', async (req: Request, res: Response) => {
   const { script, error } = songFileScript();
   if (!script) return res.status(503).json({ error });
 
-  const { style, seed, key } = req.body ?? {};
+  const { style, seed, key, bars } = req.body ?? {};
   if (typeof style !== 'string' || !style) return res.status(400).json({ error: 'style must be a non-empty string' });
   if (!Number.isInteger(seed)) return res.status(400).json({ error: 'seed must be an integer' });
   if (key !== undefined && (typeof key !== 'string' || !/^[A-G][#b]?m?$/.test(key))) {
     return res.status(400).json({ error: 'key must look like "Am" or "C#"' });
+  }
+  if (bars !== undefined && !(Number.isInteger(bars) && bars >= 1)) {
+    return res.status(400).json({ error: 'bars must be a whole number, 1 or more' });
   }
 
   const ac = new AbortController();
@@ -95,6 +98,7 @@ router.post('/generate', async (req: Request, res: Response) => {
     }
     const args = ['new', '--style', style, '--seed', String(seed)];
     if (key) args.push('--key', key);
+    if (bars !== undefined) args.push('--bars', String(bars));
     const r = await runSongFile(script, args, ac.signal);
     if (r.aborted) return;
     if (r.timedOut) return res.status(504).json({ error: `generator timed out after ${TIMEOUT_MS} ms` });

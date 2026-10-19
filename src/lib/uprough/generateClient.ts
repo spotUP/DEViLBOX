@@ -7,6 +7,8 @@ export interface GenerateRequest {
   style: string;
   seed: number;
   key?: string;
+  /** Song length in bars; omitted = the whole song. */
+  bars?: number;
 }
 
 async function failure(res: Response): Promise<Error> {

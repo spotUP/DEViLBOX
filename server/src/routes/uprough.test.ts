@@ -80,6 +80,17 @@ describe('POST /api/uprough/generate', () => {
     expect(((await r.json()) as { styles: string[] }).styles).toEqual(['golden_era', 'trap']);
   });
 
+  it('passes bars to song_file.py new as --bars', async () => {
+    const r = await post({ style: 'trap', seed: 1, bars: 16 });
+    expect(((await r.json()) as { args: string[] }).args).toEqual(['new', '--style', 'trap', '--seed', '1', '--bars', '16']);
+  });
+
+  it('400 for a bars count below 1 or not a whole number', async () => {
+    expect((await post({ style: 'trap', seed: 1, bars: 0 })).status).toBe(400);
+    expect((await post({ style: 'trap', seed: 1, bars: 2.5 })).status).toBe(400);
+    expect((await post({ style: 'trap', seed: 1, bars: '16' })).status).toBe(400);
+  });
+
   it('400 for a non-integer seed or a bad key', async () => {
     expect((await post({ style: 'trap', seed: 'x' })).status).toBe(400);
     expect((await post({ style: 'trap', seed: 1, key: '; rm' })).status).toBe(400);

@@ -40,6 +40,7 @@ describe('Generate Up Rough Song from the hamburger menu', () => {
 
     const select = (await screen.findByLabelText('Style')) as HTMLSelectElement;
     await waitFor(() => expect(select.value).toBe('trap'));
+    fireEvent.change(screen.getByLabelText('Bars (empty for the whole song)'), { target: { value: '16' } });
     fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
 
     await waitFor(() => expect(useTrackerStore.getState().upRoughMeta?.song.style).toBe('trap'));
@@ -47,6 +48,6 @@ describe('Generate Up Rough Song from the hamburger menu', () => {
     const posts = fetchMock.mock.calls.filter((c) => c[0] === '/api/uprough/generate');
     expect(posts).toHaveLength(1);
     const init = posts[0]![1] as RequestInit;
-    expect(JSON.parse(init.body as string)).toEqual({ style: 'trap', seed: 1, key: 'Am' });
+    expect(JSON.parse(init.body as string)).toEqual({ style: 'trap', seed: 1, key: 'Am', bars: 16 });
   });
 });
