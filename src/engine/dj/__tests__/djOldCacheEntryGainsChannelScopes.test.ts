@@ -10,7 +10,7 @@
  * DJPipeline (real queue, stand-in render worker) -> cache -> DeckEngine.
  */
 import 'fake-indexeddb/auto';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
 
 const holder = vi.hoisted(() => ({ engine: null as unknown, decodes: 0, renders: [] as Array<{ id: string; maxSeconds?: number }> }));
 
@@ -70,8 +70,20 @@ class StandInWorker {
 
 const PEAKS = new Float32Array([0.1, 0.4]);
 
+// The real engine graph is transformed cold on first import (tens of seconds
+// on a loaded machine). Load it here, before the re-render module is held, so
+// the test body measures the re-render and not the import.
+let DeckEngineCls!: typeof import('../DeckEngine').DeckEngine;
+let DJEngineCls!: typeof import('../DJEngine').DJEngine;
+let getDJPipelineFn!: typeof import('../DJPipeline').getDJPipeline;
+beforeAll(async () => {
+  DeckEngineCls = (await vi.importActual<typeof import('../DeckEngine')>('../DeckEngine')).DeckEngine;
+  DJEngineCls = (await vi.importActual<typeof import('../DJEngine')>('../DJEngine')).DJEngine;
+  getDJPipelineFn = (await import('../DJPipeline')).getDJPipeline;
+}, 180_000);
+
 async function realDeck(id: 'A' | 'B') {
-  const { DeckEngine } = await vi.importActual<typeof import('../DeckEngine')>('../DeckEngine');
+  const DeckEngine = DeckEngineCls;
   const audioPlayer = new DeckAudioPlayer({} as never);
   return Object.assign(Object.create(DeckEngine.prototype), {
     id, audioPlayer, replayer: { stop: () => {} }, stemPlayer: { stop: () => {}, disable: () => {} }, _stemMode: false,
@@ -103,13 +115,12 @@ async function stripScopeMarker(): Promise<void> {
 describe('an old cache entry without channel scopes gains them in the background', () => {
   it('loading it queues one low-priority re-render; the deck gains its scopes without reloading the audio', async () => {
     vi.stubGlobal('Worker', StandInWorker);
-    const { DJEngine } = await vi.importActual<typeof import('../DJEngine')>('../DJEngine');
+    const DJEngine = DJEngineCls;
     const decks = { A: await realDeck('A'), B: await realDeck('B') };
     holder.engine = Object.assign(Object.create(DJEngine.prototype), {
       getDeck: (id: 'A' | 'B') => decks[id], recorder: null, _pendingTrackSource: null, tryAutoLoadStems: async () => {},
     });
-    const { getDJPipeline } = await import('../DJPipeline');
-    const enqueue = vi.spyOn(getDJPipeline(), 'enqueue');
+    const enqueue = vi.spyOn(getDJPipelineFn(), 'enqueue');
     // Deck B's load asks for the re-render module while deck A's first import
     // of it is still evaluating (held at its last dependency here, as a busy CI
     // worker did by chance). Vite's module runner sees the module in an import

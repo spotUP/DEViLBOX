@@ -14,6 +14,7 @@ import {
   DEFAULT_FURNACE, DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH, DEFAULT_SYNARE,
   DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_SAM,
   DEFAULT_HARMONIC_SYNTH as DEFAULT_HARMONIC_SYNTH_VAL,
+  DEFAULT_UPROUGH_SOFTSYNTH,
   DEFAULT_HIVELY,
   DEFAULT_PRETRACKER,
   DEFAULT_SAWTEETH,
@@ -129,6 +130,7 @@ const ZynAddSubFXControls = lazy(() => import('../controls/ZynAddSubFXControls')
 const WAMControls = lazy(() => import('../controls/WAMControls').then(m => ({ default: m.WAMControls })));
 const VSTBridgePanel = lazy(() => import('../controls/VSTBridgePanel').then(m => ({ default: m.VSTBridgePanel })));
 
+const UpRoughSoftsynthControls = lazy(() => import('../controls/UpRoughSoftsynthControls').then(m => ({ default: m.UpRoughSoftsynthControls })));
 const HarmonicSynthControls = lazy(() => import('../controls/HarmonicSynthControls').then(m => ({ default: m.HarmonicSynthControls })));
 const ModularSynthControls = lazy(() => import('../synths/modular/ModularSynthControls').then(m => ({ default: m.ModularSynthControls })));
 import { SunVoxModularEditor } from '../synths/modular/SunVoxModularEditor';
@@ -202,7 +204,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'layout' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'geonkick' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'sidfactory2' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth' | 'opl3' | 'ronklaren' | 'cheesecutter' | 'pretracker' | 'sawteeth' | 'fmplayer' | 'eupmini' | 'cinter4' | 'klystrack' | 'sonix' | 'wasm-param' | 'wasm-info';
+export type EditorMode = 'generic' | 'layout' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'geonkick' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'uproughsoftsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'sidfactory2' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth' | 'opl3' | 'ronklaren' | 'cheesecutter' | 'pretracker' | 'sawteeth' | 'fmplayer' | 'eupmini' | 'cinter4' | 'klystrack' | 'sonix' | 'wasm-param' | 'wasm-info';
 
 export interface SynthTypeDispatcherProps {
   editorMode: EditorMode;
@@ -3719,6 +3721,39 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             <WAMControls
               instrument={instrument}
               onChange={handleChange}
+            />
+          </Suspense>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // UP ROUGH SOFTSYNTH EDITOR
+  // ============================================================================
+  if (editorMode === 'uproughsoftsynth') {
+    const softsynthConfig = { ...DEFAULT_UPROUGH_SOFTSYNTH, ...(instrument.upRoughSoftsynth || {}) };
+
+    return (
+      <div className="synth-editor-container bg-gradient-to-b from-[#1e1e1e] to-[#151515]">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          showHelpButton={false}
+          onBake={handleBake}
+          onBakePro={handleBakePro}
+          onUnbake={handleUnbake}
+          isBaked={isBaked}
+          isBaking={isBaking}
+        />
+        <div className="synth-editor-content overflow-y-auto p-3">
+          <Suspense fallback={<LoadingControls />}>
+            <UpRoughSoftsynthControls
+              config={softsynthConfig}
+              instrumentId={instrument.id}
+              onChange={(updates) => handleChange({ upRoughSoftsynth: { ...softsynthConfig, ...updates } })}
             />
           </Suspense>
         </div>

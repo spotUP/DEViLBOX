@@ -35,3 +35,12 @@ export function globalSingleton<T>(name: string, create: () => T): T {
 export function clearGlobalSingleton(name: string): void {
   registry().delete(name);
 }
+
+/**
+ * Forget every instance, as a new page would. Test harnesses that call
+ * `vi.resetModules()` to get a fresh engine must call this as well: the
+ * instances outlive the module copies by design.
+ */
+export function clearAllGlobalSingletons(): void {
+  registry().clear();
+}

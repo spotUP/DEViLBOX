@@ -57,6 +57,12 @@ SynthRegistry.registerLazy(
   () => import('./harmonicsynth').then(() => {}),
 );
 
+// ── Up Rough softsynth ───────────────────────────────────────────────────
+SynthRegistry.registerLazy(
+  ['UpRoughSoftsynth'],
+  () => import('./uprough-softsynth').then(() => {}),
+);
+
 // ── Misc synths (speech, JUCE WASM, special, dub-derived) ────────────────────
 SynthRegistry.registerLazy(
   [

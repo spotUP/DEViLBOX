@@ -115,6 +115,7 @@ export type SynthType =
   | 'C64SID'
   // Additive/Spectral
   | 'HarmonicSynth'
+  | 'UpRoughSoftsynth'
   // Bass synths
   | 'WobbleBass'
   // Buzzmachines (Jeskola Buzz effects as synths)

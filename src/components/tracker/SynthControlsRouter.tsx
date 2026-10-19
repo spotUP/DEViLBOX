@@ -12,6 +12,7 @@ import {
   DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH,
   DEFAULT_SYNARE, DEFAULT_SAM, DEFAULT_PINK_TROMBONE, DEFAULT_DECTALK,
   DEFAULT_HARMONIC_SYNTH as DEFAULT_HARMONIC_SYNTH_VAL,
+  DEFAULT_UPROUGH_SOFTSYNTH,
   DEFAULT_HIVELY, DEFAULT_JAMCRACKER,
   DEFAULT_SOUNDMON, DEFAULT_SIDMON, DEFAULT_DIGMUG, DEFAULT_FC,
   DEFAULT_DELTAMUSIC1, DEFAULT_DELTAMUSIC2, DEFAULT_FRED, DEFAULT_TFMX,
@@ -175,6 +176,9 @@ const SymphonieControls = lazy(() =>
 );
 const FuturePlayerControls = lazy(() =>
   import('@components/instruments/controls/FuturePlayerControls').then(m => ({ default: m.FuturePlayerControls }))
+);
+const UpRoughSoftsynthControls = lazy(() =>
+  import('@components/instruments/controls/UpRoughSoftsynthControls').then(m => ({ default: m.UpRoughSoftsynthControls }))
 );
 const HarmonicSynthControls = lazy(() =>
   import('@components/instruments/controls/HarmonicSynthControls').then(m => ({ default: m.HarmonicSynthControls }))
@@ -501,6 +505,12 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     if (synthType === 'FuturePlayerSynth') {
       const cfg = deepMerge(DEFAULT_FUTUREPLAYER, instrument.futurePlayer || {});
       return <FuturePlayerControls config={cfg} onChange={(u) => onUpdateLive('futurePlayer', cfg, u)} />;
+    }
+
+    // ── UpRoughSoftsynth ────────────────────────────────────
+    if (synthType === 'UpRoughSoftsynth') {
+      const cfg = { ...DEFAULT_UPROUGH_SOFTSYNTH, ...(instrument.upRoughSoftsynth || {}) };
+      return <UpRoughSoftsynthControls config={cfg} instrumentId={instrument.id} onChange={(u) => onUpdate({ upRoughSoftsynth: { ...cfg, ...u } })} />;
     }
 
     // ── HarmonicSynth ───────────────────────────────────────

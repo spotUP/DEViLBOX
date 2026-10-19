@@ -204,6 +204,13 @@ export interface WavetableConfig {
   filterEnvelope: EnvelopeConfig;
 }
 
+/** Up Rough softsynth: one voice (bass808, piano, a drum) rendered whole per note. `params` are the voice's knobs by key. */
+export interface UpRoughSoftsynthConfig {
+  voice: string;
+  params: Record<string, number>;
+  seed: number;
+}
+
 export interface HarmonicSynthConfig {
   harmonics: number[];        // 32 values, each 0-1 (amplitude per harmonic)
   spectralTilt: number;       // -100 to 100 (shapes harmonic rolloff)
