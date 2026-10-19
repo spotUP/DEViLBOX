@@ -511,6 +511,13 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
   );
 
   server.tool(
+    'set_tracker_key_lock',
+    'Tracker Key Lock: on, the pitch slider changes tempo only (pitch stays); off, pitch and tempo move together',
+    { enabled: z.boolean().describe('true = key lock on') },
+    (p) => call('set_tracker_key_lock', p),
+  );
+
+  server.tool(
     'toggle_metronome',
     'Toggle the metronome on/off',
     {},
@@ -2131,6 +2138,7 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
           { tool: 'set_speed', description: 'Set tracker speed' },
           { tool: 'set_swing', description: 'Set swing amount' },
           { tool: 'set_global_pitch', description: 'Set global pitch offset' },
+          { tool: 'set_tracker_key_lock', description: 'Tracker Key Lock on/off (tempo-only pitch slider)' },
           { tool: 'toggle_metronome', description: 'Toggle metronome click' },
           { tool: 'set_looping', description: 'Enable/disable pattern looping' },
           { tool: 'new_song', description: 'Start a blank song in a new tab (the open song stays in its tab)' },
