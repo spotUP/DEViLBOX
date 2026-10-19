@@ -70,6 +70,17 @@ import { SONIX_PRESETS } from '@generated/sonixPresets';
 // COMBINED FACTORY PRESETS
 // ============================================================================
 
+// The Up Rough Softsynth Golden Era kit as instrument presets, shared by the dropdown and the Presets tab
+const UPROUGH_SOFTSYNTH_FACTORY_PRESETS: InstrumentPreset['config'][] = GOLDEN_ERA_KIT.map((p) => ({
+  type: 'synth' as const,
+  name: p.name,
+  synthType: 'UpRoughSoftsynth' as const,
+  volume: -8,
+  pan: 0,
+  effects: [],
+  upRoughSoftsynth: p.config,
+}));
+
 export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   ...BASS_PRESETS,
   ...LEAD_PRESETS,
@@ -117,15 +128,7 @@ export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   // Sonix synth voices ripped from .instr files (generated)
   ...SONIX_PRESETS,
   // Up Rough Softsynth Golden Era kit, derived from its one preset list
-  ...GOLDEN_ERA_KIT.map((p) => ({
-    type: 'synth' as const,
-    name: p.name,
-    synthType: 'UpRoughSoftsynth' as const,
-    volume: -8,
-    pan: 0,
-    effects: [],
-    upRoughSoftsynth: p.config,
-  })),
+  ...UPROUGH_SOFTSYNTH_FACTORY_PRESETS,
   // Player Init
   {
     type: 'synth' as const,
@@ -194,6 +197,7 @@ export const PRESET_CATEGORIES = {
   Makk: MAKK_FACTORY_PRESETS,
   Harmonic: HARMONIC_PRESETS,
   'DJ FX': DJ_ONE_SHOT_PRESETS,
+  'Up Rough': UPROUGH_SOFTSYNTH_FACTORY_PRESETS,
 };
 
 export type PresetCategory = keyof typeof PRESET_CATEGORIES;
