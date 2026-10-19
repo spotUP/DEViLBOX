@@ -32,7 +32,7 @@ const createKit = (name: string, mappings: DrumKitKeyMapping[]): InstrumentPrese
 });
 
 // Kit 1: Analog Style (Drumnibus selections)
-const ANALOG_KIT_MAP: DrumKitKeyMapping[] = [
+export const ANALOG_KIT_MAP: DrumKitKeyMapping[] = [
   map(36, 'Kick', 'kicks/BD_808A1200.wav'),
   map(38, 'Snare', 'snares/SD_Analog Noise1.wav'),
   map(39, 'Clap', 'percussion/CLAP_Juxtapos.wav'),
