@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fixture from './fixtures/e6.uprough-song.json';
-import { parseSongFile, songFileToSong, songToSongFile, type SongFileDoc } from '../songFile';
+import { parseSongFile, songBassCut, songFileToSong, songToSongFile, type SongFileDoc } from '../songFile';
 
 const load = (): SongFileDoc => structuredClone(fixture) as unknown as SongFileDoc;
 
@@ -28,9 +28,20 @@ describe('song file round trip', () => {
     expect(f.song.groove).toEqual({ swing: 0, micro: { kick: 0, snare: 1, ch: 3, ghost: -3, perc: 4, chop: 2 }, vel: 1 });
     const out = songToSongFile(songFileToSong(parseSongFile(structuredClone(f))));
     expect(JSON.stringify(out)).toBe(JSON.stringify(f));
-    expect(Object.keys(out.song).slice(5, 8)).toEqual(['speed', 'groove', 'rate']);
+    expect(Object.keys(out.song).slice(5, 9)).toEqual(['speed', 'groove', 'bass_cut', 'rate']);
     const g = load();
     delete g.song.groove;
     expect(() => parseSongFile(g)).toThrow(/Missing field "song\.groove" in Up Rough song file schema 3\./);
+  });
+
+  it('schema 3: song.bass_cut round trips and a file without it or with a non-number is refused', () => {
+    const f = load();
+    expect(songBassCut(parseSongFile(structuredClone(f)).song)).toBe(1);
+    const g = load();
+    delete g.song.bass_cut;
+    expect(() => parseSongFile(g)).toThrow(/Missing field "song\.bass_cut" in Up Rough song file schema 3\./);
+    const h = load();
+    h.song.bass_cut = '0.8';
+    expect(() => parseSongFile(h)).toThrow(/Song field "bass_cut" is "0\.8", not a positive number\./);
   });
 });
