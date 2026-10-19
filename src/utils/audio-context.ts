@@ -5,17 +5,22 @@ const NativeBaseAudioContext = (_globalThis.BaseAudioContext ||
                                _globalThis.webkitAudioContext) as (new (...args: unknown[]) => AudioContext) | undefined;
 
 // ── DEViLBOX-owned AudioContext ──────────────────────────────────────────
-// Module-level registration: ToneEngine sets this in its constructor,
+// Page-level registration: ToneEngine sets this in its constructor,
 // and any synth (WAM, WASM, etc.) can read it without importing ToneEngine
 // (avoiding circular dependency issues).
-let _devilboxAudioContext: AudioContext | null = null;
+//
+// It lives on globalThis, not in a module variable: Vite HMR can evaluate
+// this module more than once, and a per-copy variable let the engine set the
+// context in one copy while a synth read `null` (or a stale context) from
+// another. See utils/globalSingleton.ts for the 2026-10-19 silence this caused.
+const AUDIO_CONTEXT_KEY = '__devilboxAudioContext';
 
 /**
  * Register the DEViLBOX-owned native AudioContext.
  * Called once by ToneEngine constructor before any Tone.js nodes are created.
  */
 export function setDevilboxAudioContext(ctx: AudioContext): void {
-  _devilboxAudioContext = ctx;
+  _globalThis[AUDIO_CONTEXT_KEY] = ctx;
 }
 
 /**
@@ -24,10 +29,11 @@ export function setDevilboxAudioContext(ctx: AudioContext): void {
  * instead of extracting rawContext from Tone.js.
  */
 export function getDevilboxAudioContext(): AudioContext {
-  if (!_devilboxAudioContext) {
+  const ctx = _globalThis[AUDIO_CONTEXT_KEY] as AudioContext | undefined;
+  if (!ctx) {
     throw new Error('[audio-context] AudioContext not initialized — ToneEngine must be created first');
   }
-  return _devilboxAudioContext;
+  return ctx;
 }
 
 /**
@@ -285,8 +291,8 @@ export function noteToFrequency(note: string | number): number {
  * Replaces Tone.now().
  */
 export function audioNow(): number {
-  if (!_devilboxAudioContext) return 0;
-  return _devilboxAudioContext.currentTime;
+  const ctx = _globalThis[AUDIO_CONTEXT_KEY] as AudioContext | undefined;
+  return ctx ? ctx.currentTime : 0;
 }
 
 /**
