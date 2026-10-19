@@ -27,6 +27,7 @@ const DEFAULT_KIND: Partial<Record<InsertId, string>> = { delay: 'tape' };
 const LABEL: Record<InsertId, string> = {
   tapeSaturation: 'Saturation', chorus: 'Chorus', delay: 'Tape Echo', samplerReverb: 'Reverb',
 };
+export { LABEL as INSERT_LABEL };
 export const insertKey = (id: InsertId, param?: string): string => (param ? `fx_${id}_${param}` : `fx_${id}`);
 
 /** Reverb ring-out appended when the reverb insert is on (the longest sampler room, warehouse, is under this). */
