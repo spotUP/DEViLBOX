@@ -24,7 +24,7 @@ if (!globalThis.__dbxIdleGate) {
     // Measured 2026-10-12 with nothing playing: the master reverb and delay,
     // the DJ decks' Key Lock stretchers and the synth-bus pitch resampler ran
     // 46 ms of every second of the audio thread between them.
-    'mverb-processor', 'another-delay-processor', 'signalsmith-stretch', 'pitch-resampler',
+    'mverb-processor', 'another-delay-processor', 'signalsmith-stretch',
   ]);
   // -80 dBFS. Not lower: the dub bus's external feedback loop keeps a floor
   // near -91 dBFS circulating with nothing playing (measured), which would

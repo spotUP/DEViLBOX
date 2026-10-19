@@ -30,13 +30,24 @@ export interface VoiceState {
 }
 
 export interface ChannelOutput {
+  /** Where the channel's voices (samples, Tone.js synths) enter. */
   input: Tone.Gain;
+  /**
+   * Holds the voices back by the synth-bus pitch shifter's latency, so a
+   * per-channel native synth lane (shifted, see ChannelSynthLanes) that joins
+   * at `join` stays in time with the samples on the same channel.
+   */
+  voiceDelay: Tone.Delay;
+  /** Post-delay join: delayed voices plus the channel's synth lane, into the effect chain. */
+  join: Tone.Gain;
   channel: Tone.Channel;
   meter: Tone.Meter;
 }
 
 export interface ChannelRoutingContext {
   masterInput: Tone.Gain;
+  /** Current voice-delay compensation, seconds (the synth-bus pitch shifter's latency); new strips start at it. */
+  sampleDelaySec: () => number;
   channelOutputs: Map<number, ChannelOutput>;
   activeVoices: Map<number, VoiceState[]>;
   channelPitchState: Map<number, {
@@ -223,6 +234,8 @@ export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: numbe
   if (!ctx.channelOutputs.has(channelIndex)) {
     // Create channel audio chain with metering
     const input = new Tone.Gain(1);
+    const voiceDelay = new Tone.Delay({ delayTime: ctx.sampleDelaySec(), maxDelay: MAX_VOICE_DELAY_SEC });
+    const join = new Tone.Gain(1);
     const channel = new Tone.Channel({ volume: 0, pan: 0 });
     const meter = new Tone.Meter({ smoothing: 0.15 });
 
@@ -236,9 +249,12 @@ export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: numbe
     const filterInput = filterMgr.getInput(channelIndex);
     const filterOutput = filterMgr.getOutput(channelIndex);
 
-    // Connect: input → [effect chain] → HPF → LPF → channel → meter + masterInput
+    // Connect: input → voiceDelay → join (+ synth lane) → [effect chain] → HPF → LPF
+    //          → channel → meter + masterInput
     // (or the channel's routed effects, see setChannelStripDestination)
-    input.connect(chainInput);
+    input.connect(voiceDelay);
+    voiceDelay.connect(join);
+    join.connect(chainInput);
     connectAudio(chainOutput, filterInput);
     connectAudio(filterOutput, channel);
     channel.connect(meter);
@@ -246,6 +262,8 @@ export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: numbe
 
     ctx.channelOutputs.set(channelIndex, {
       input,
+      voiceDelay,
+      join,
       channel,
       meter,
     });
@@ -261,6 +279,21 @@ export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: numbe
   }
 
   return ctx.channelOutputs.get(channelIndex)!.input;
+}
+
+/** Longest voice-delay compensation a strip can hold, seconds (the shifter reports ~0.1 s). */
+export const MAX_VOICE_DELAY_SEC = 1;
+
+/** The strip's post-delay join, where the channel's synth lane enters (builds the strip on demand). */
+export function getChannelLaneDestination(ctx: ChannelRoutingContext, channelIndex: number): Tone.Gain {
+  getChannelOutput(ctx, channelIndex);
+  return ctx.channelOutputs.get(channelIndex)!.join;
+}
+
+/** Hold every strip's voices back by `seconds` (the synth-bus pitch shifter's latency). */
+export function setChannelVoiceDelays(ctx: ChannelRoutingContext, seconds: number): void {
+  const delay = Math.min(Math.max(seconds, 0), MAX_VOICE_DELAY_SEC);
+  for (const out of ctx.channelOutputs.values()) out.voiceDelay.delayTime.value = delay;
 }
 
 /**
@@ -713,6 +746,8 @@ export function disposeChannelOutputs(ctx: ChannelRoutingContext): void {
       console.warn(`[ToneEngine] Failed to dispose channel ${channelIndex}:`, e);
     }
     try {
+      channelOutput.join.dispose();
+      channelOutput.voiceDelay.dispose();
       channelOutput.input.dispose();
     } catch (e) {
       console.warn(`[ToneEngine] Failed to dispose input for channel ${channelIndex}:`, e);

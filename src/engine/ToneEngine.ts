@@ -56,8 +56,10 @@ import {
   getChannelSynthLane,
   applyChannelSynthLaneGains,
   setChannelSynthLanePitchRate,
+  applyPitchShift,
   disposeChannelSynthLanes,
 } from './tone/ChannelSynthLanes';
+import { DeckKeyLock } from './dj/DeckKeyLock';
 import { WAMSynth } from './wam/WAMSynth';
 import { CHIP_SYNTH_DEFS } from '../constants/chipParameters';
 import { useRomDialogStore } from '../stores/useRomDialogStore';
@@ -112,6 +114,8 @@ import {
   getChannelTriggerLevels as _getChannelTriggerLevels,
   getChannelTriggerGenerations as _getChannelTriggerGenerations,
   getChannelOutput as _getChannelOutput,
+  getChannelLaneDestination,
+  setChannelVoiceDelays,
   createVoice as _createVoice,
   stopVoice as _stopVoice,
   setChannelVolume as _setChannelVolume,
@@ -225,16 +229,21 @@ export class ToneEngine {
 
   // Master routing chain (AmigaFilter bypassed — players have their own):
   // - Tracker instruments → masterInput → masterEffectsInput → [master fx?] → blepInput → [BLEP?] → safetyLimiter → exportTap → masterChannel → destination
-  // - DevilboxSynths → synthBus ────────→ masterEffectsInput → [master fx?] → blepInput → [BLEP?] → safetyLimiter → exportTap → masterChannel → destination
+  // - DevilboxSynths → synthBus → synthBusPitchShift → masterEffectsInput → [master fx?] → blepInput → [BLEP?] → safetyLimiter → exportTap → masterChannel → destination
   public masterInput: Tone.Gain; // Where tracker instruments connect
   public synthBus: Tone.Gain; // Bypass bus for DevilboxSynths
   private synthBusMeter: Tone.Meter; // Level meter on synthBus for WASM engine metering
   private masterMeter: Tone.Meter; // Level meter at masterEffectsInput merge point
-  private pitchResamplerNode: AudioWorkletNode | null = null; // Pitch resampler for WASM engines
+  /**
+   * DJ pitch slider for the synth bus: a time-preserving Signalsmith pitch
+   * shifter (the DJ deck's Key Lock), a direct wire at pitch 0. Its latency
+   * while active is mirrored into every channel strip's voice delay so sample
+   * voices stay in time with the shifted synths (see applyPitchShiftLatency).
+   */
+  private synthBusPitchShift: DeckKeyLock;
   /** Per-channel lanes for standalone native synths (tone/ChannelSynthLanes.ts). */
   private channelSynthLanes: Map<number, ChannelSynthLane> = new Map();
   private _synthPitchRate = 1;
-  private _pitchResamplerModule: Promise<void> | null = null;
   public masterEffectsInput: Tone.Gain; // Merge point for master effects (both paths feed in here)
   public blepInput: Tone.Gain; // BLEP insertion point — isolates BLEP routing from effects chain rebuilds
   // Safety limiter — prevents channel summing from exceeding 0 dBFS at destination.
@@ -319,11 +328,7 @@ export class ToneEngine {
   private nativeEngineRouting: Map<string, { gain: GainNode; destinations: Set<AudioNode> }> = new Map();
 
   // Per-channel audio routing (volume, pan, mute/solo, metering)
-  private channelOutputs: Map<number, {
-    input: Tone.Gain;
-    channel: Tone.Channel;
-    meter: Tone.Meter;
-  }> = new Map();
+  private channelOutputs: Map<number, ChannelOutput> = new Map();
 
   // Channel mute/solo state for quick lookup during playback
   private channelMuteStates: Map<number, boolean> = new Map(); // true = should be muted
@@ -525,9 +530,13 @@ export class ToneEngine {
     this.exportTap.connect(this.masterChannel);
 
     // Synth bus bypasses AmigaFilter for native synths (DB303, Vital, etc.)
+    // synthBus → synthBusPitchShift → masterEffectsInput; the shifter is a direct
+    // wire until the DJ pitch slider leaves 0 (setSynthBusPitchRate).
     this.synthBus = new Tone.Gain(1);
-    // PitchResampler inserted async between synthBus and masterEffectsInput (see initPitchResampler)
-    this.synthBus.connect(this.masterEffectsInput);
+    this.synthBusPitchShift = new DeckKeyLock();
+    this.synthBusPitchShift.onLatencyChange = () => this.applyPitchShiftLatency();
+    this.synthBus.connect(this.synthBusPitchShift.input);
+    this.synthBusPitchShift.output.connect(this.masterEffectsInput);
 
     // Initialize send/return buses — returns feed into masterEffectsInput
     getSendBusManager().init(this.masterEffectsInput);
@@ -536,9 +545,6 @@ export class ToneEngine {
     // Connected on play via connectMeters(), disconnected on stop via disconnectMeters().
     this.synthBusMeter = new Tone.Meter({ normalRange: true });
     this.masterMeter = new Tone.Meter({ normalRange: true });
-
-    // Init pitch resampler for WASM engine pitch shifting (async — falls back to direct connection)
-    this.initPitchResampler();
 
     /* Pre-register the dub-bus feedback-tap NaN/soft-limit worklet on the
        shared AudioContext. DubBus is constructed later by DrumPadEngine;
@@ -1527,60 +1533,18 @@ export class ToneEngine {
     return this.globalPlaybackRate;
   }
 
-  /** Load the PitchResampler worklet module once per engine; later calls share the promise. */
-  private ensurePitchResamplerModule(): Promise<void> {
-    if (!this._pitchResamplerModule) {
-      const nativeCtx = (Tone.getContext().rawContext as AudioContext);
-      this._pitchResamplerModule = nativeCtx.audioWorklet.addModule('/pitch-resampler/PitchResampler.worklet.js');
-    }
-    return this._pitchResamplerModule;
-  }
-
-  /** A stereo pitch-resampler node at the current synth pitch rate (module must be loaded). */
-  private createPitchResamplerNode(): AudioWorkletNode {
-    const nativeCtx = (Tone.getContext().rawContext as AudioContext);
-    const node = new AudioWorkletNode(nativeCtx, 'pitch-resampler', {
-      numberOfInputs: 1,
-      numberOfOutputs: 1,
-      outputChannelCount: [2],
-    });
-    if (this._synthPitchRate !== 1) node.port.postMessage({ type: 'set-rate', rate: this._synthPitchRate });
-    return node;
-  }
-
-  /**
-   * Initialize the PitchResampler AudioWorklet between synthBus and masterEffectsInput.
-   * All WASM/native DevilboxSynths feed through synthBus — the resampler pitch-shifts
-   * their audio for the DJ pitch slider without per-engine modifications.
-   */
-  private async initPitchResampler(): Promise<void> {
-    try {
-      await this.ensurePitchResamplerModule();
-      const resampler = this.createPitchResamplerNode();
-
-      // Re-route: synthBus → resampler → masterEffectsInput (instead of synthBus → masterEffectsInput)
-      const nativeSynthBus = getNativeAudioNode(this.synthBus as any);
-      const nativeMasterFxIn = getNativeAudioNode(this.masterEffectsInput as any);
-      if (nativeSynthBus && nativeMasterFxIn) {
-        nativeSynthBus.disconnect(nativeMasterFxIn);
-        nativeSynthBus.connect(resampler);
-        resampler.connect(nativeMasterFxIn);
-        this.pitchResamplerNode = resampler;
-        console.log('[ToneEngine] PitchResampler worklet inserted: synthBus → resampler → masterEffectsInput');
-      }
-    } catch (e) {
-      console.warn('[ToneEngine] PitchResampler worklet failed to load, WASM pitch shifting unavailable:', e);
-    }
-  }
-
   private get _laneCtx(): ChannelSynthLaneContext {
     return {
       lanes: this.channelSynthLanes,
       synthBusGain: () => this.synthBus.gain.value,
       createGain: (gain) => new Tone.Gain(gain),
-      getChannelOutput: (ch) => this.getChannelOutput(ch),
-      ensurePitchResamplerModule: () => this.ensurePitchResamplerModule(),
-      createPitchResamplerNode: () => this.createPitchResamplerNode(),
+      getLaneDestination: (ch) => getChannelLaneDestination(this._channelCtx, ch),
+      synthPitchRate: () => this._synthPitchRate,
+      createPitchShift: () => {
+        const shift = new DeckKeyLock();
+        shift.onLatencyChange = () => this.applyPitchShiftLatency();
+        return shift;
+      },
     };
   }
 
@@ -1591,14 +1555,23 @@ export class ToneEngine {
 
   /**
    * Set pitch rate for WASM/native synth bus and every per-channel lane (DJ pitch slider).
-   * Rate 1.0 = normal, 2.0 = octave up, 0.5 = octave down.
+   * Rate 1.0 = normal, 2.0 = octave up, 0.5 = octave down. Pitch is shifted
+   * time-preserving (Signalsmith Stretch); rate 1 bypasses the shifters.
    */
   public setSynthBusPitchRate(rate: number): void {
     this._synthPitchRate = rate;
-    if (this.pitchResamplerNode) {
-      this.pitchResamplerNode.port.postMessage({ type: 'set-rate', rate });
-    }
+    applyPitchShift(this.synthBusPitchShift, rate);
     setChannelSynthLanePitchRate(this._laneCtx, rate);
+    this.applyPitchShiftLatency();
+  }
+
+  /**
+   * Mirror the synth-bus shifter's latency (0 when bypassed) into every channel
+   * strip's voice delay, so sample voices and shifted synths stay in sync.
+   * Also runs when a shifter finishes loading, since it reports latency only then.
+   */
+  private applyPitchShiftLatency(): void {
+    setChannelVoiceDelays(this._channelCtx, this.synthBusPitchShift.latencySec());
   }
 
   /**
@@ -5273,6 +5246,7 @@ export class ToneEngine {
     this.paulaFilter?.dispose();
     this.synthBusMeter.dispose();
     this.masterMeter.dispose();
+    this.synthBusPitchShift.dispose();
     this.synthBus.dispose();
     this.masterEffectsInput.dispose();
     this.blepInput.dispose();
@@ -5447,6 +5421,7 @@ export class ToneEngine {
   private get _channelCtx(): ChannelRoutingContext {
     return {
       masterInput: this.masterInput,
+      sampleDelaySec: () => this.synthBusPitchShift.latencySec(),
       channelOutputs: this.channelOutputs,
       activeVoices: this.activeVoices,
       channelPitchState: this.channelPitchState,

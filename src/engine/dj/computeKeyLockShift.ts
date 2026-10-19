@@ -68,3 +68,18 @@ export function computeTempoPitchSplit(
     detuneCents: keyLockEnabled ? 0 : (s * 100 || 0),
   };
 }
+
+/** A DJ pitch-slider rate expressed as a Signalsmith shift: bypass at rate 1. */
+export interface PitchShift {
+  /** False at rate 1 (or an invalid rate): the shifter is a direct wire. */
+  active: boolean;
+  /** 12 * log2(rate); 0 when inactive. */
+  semitones: number;
+}
+
+/** Rate 2 = +12 semitones, rate 0.5 = -12; rate 1, 0, negative or NaN = inactive. */
+export function pitchRateToShift(rate: number): PitchShift {
+  if (!Number.isFinite(rate) || rate <= 0) return { active: false, semitones: 0 };
+  const semitones = 12 * Math.log2(rate);
+  return Math.abs(semitones) > 1e-6 ? { active: true, semitones } : { active: false, semitones: 0 };
+}

@@ -36,7 +36,7 @@ beforeAll(() => {
   }
   (g.registerProcessor as (n: string, c: unknown) => void)('re201-processor', Echo);
   (g.registerProcessor as (n: string, c: unknown) => void)('tfmx-processor', Echo);
-  for (const name of ['mverb-processor', 'another-delay-processor', 'signalsmith-stretch', 'pitch-resampler']) {
+  for (const name of ['mverb-processor', 'another-delay-processor', 'signalsmith-stretch']) {
     (g.registerProcessor as (n: string, c: unknown) => void)(name, Echo);
   }
 });
@@ -82,8 +82,8 @@ describe('the effect idle gate', () => {
     expect(p.dsp).toBe(1000);
   });
 
-  it('skips the master reverb, delay, Key Lock and pitch resampler once idle (46 ms/s with nothing playing, 2026-10-12)', () => {
-    for (const name of ['mverb-processor', 'another-delay-processor', 'signalsmith-stretch', 'pitch-resampler']) {
+  it('skips the master reverb, delay, Key Lock once idle (46 ms/s with nothing playing, 2026-10-12)', () => {
+    for (const name of ['mverb-processor', 'another-delay-processor', 'signalsmith-stretch']) {
       const p = new (registered.get(name)!)();
       run(p, 20, 0.3);
       run(p, 500);

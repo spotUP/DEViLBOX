@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 
-const { Gain, Channel, Meter } = vi.hoisted(() => {
+const { Gain, Channel, Meter, Delay } = vi.hoisted(() => {
   class Param { value = 0; }
   class Node {
     targets: unknown[] = [];
@@ -20,9 +20,10 @@ const { Gain, Channel, Meter } = vi.hoisted(() => {
   class Gain extends Node { gain = new Param(); }
   class Channel extends Node { volume = new Param(); pan = new Param(); mute = false; }
   class Meter extends Node {}
-  return { Gain, Channel, Meter };
+  class Delay extends Node { delayTime = new Param(); }
+  return { Gain, Channel, Meter, Delay };
 });
-vi.mock('tone', () => ({ Gain, Channel, Meter }));
+vi.mock('tone', () => ({ Gain, Channel, Meter, Delay }));
 vi.mock('../../ChannelEffectsManager', () => ({ getChannelEffectsManager: () => ({ getChainInput: () => new Gain(), getChainOutput: () => new Gain() }) }));
 vi.mock('../../ChannelFilterManager', () => ({ getChannelFilterManager: () => ({ getInput: () => ({}), getOutput: () => ({}), disposeAll: () => {} }) }));
 vi.mock('../connectAudio', () => ({ connectAudio: vi.fn() }));
@@ -30,7 +31,7 @@ vi.mock('../connectAudio', () => ({ connectAudio: vi.fn() }));
 import { getChannelOutput, setChannelStripDestination, setChannelMute, setMixerChannelVolume, setMixerChannelPan, type ChannelRoutingContext } from '../ChannelRouting';
 
 function ctx(): ChannelRoutingContext {
-  return { masterInput: new Gain(), channelOutputs: new Map(), channelMuteStates: new Map() } as unknown as ChannelRoutingContext;
+  return { masterInput: new Gain(), sampleDelaySec: () => 0, channelOutputs: new Map(), channelMuteStates: new Map() } as unknown as ChannelRoutingContext;
 }
 
 describe('channel chains', () => {
