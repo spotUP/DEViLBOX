@@ -3,6 +3,7 @@ import express from 'express';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { execFileSync } from 'child_process';
 import type { AddressInfo } from 'net';
 import type { Server } from 'http';
 import uproughRoutes from './uprough';
@@ -33,6 +34,17 @@ open(os.path.join(out, "synth_preview.wav"), "wb").write(b"RIFF\\x00\\x01\\x02WA
 
 let root: string;
 let server: Server;
+
+/** The fakes use only the standard library, so any python3 on PATH runs them (CI has no python3.11). */
+function findPython(): string {
+  for (const name of ['python3.11', 'python3']) {
+    try {
+      execFileSync(name, ['--version'], { stdio: 'ignore' });
+      return name;
+    } catch { /* not on PATH */ }
+  }
+  throw new Error('uprough.test.ts needs a python3 on PATH');
+}
 let base: string;
 
 const post = (body: unknown) =>
@@ -43,6 +55,7 @@ const post = (body: unknown) =>
   });
 
 beforeAll(async () => {
+  process.env.UPROUGH_PYTHON = findPython();
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'uprough-fake-'));
   fs.mkdirSync(path.join(root, 'tools'));
   fs.writeFileSync(path.join(root, 'tools', 'song_file.py'), FAKE);
