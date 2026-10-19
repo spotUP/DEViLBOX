@@ -413,6 +413,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.formantSynth ||
         updates.wavetable ||
         updates.harmonicSynth ||
+        updates.upRoughSoftsynth ||
         updates.granular ||
         updates.furnace ||
         updates.dubSiren ||
@@ -715,6 +716,11 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
             if (updatedInstrument.synthType === 'Synare' && updatedInstrument.synare && updates.synare) {
               engine.updateSynareParameters(id, updatedInstrument.synare);
+              return; // Handled
+            }
+
+            if (updatedInstrument.synthType === 'UpRoughSoftsynth' && updatedInstrument.upRoughSoftsynth && updates.upRoughSoftsynth) {
+              engine.updateUpRoughSoftsynthParameters(id, updatedInstrument.upRoughSoftsynth);
               return; // Handled
             }
 
@@ -1094,6 +1100,10 @@ export const useInstrumentStore = create<InstrumentStore>()(
         // Synare
         else if (mergedInst.synthType === 'Synare' && mergedInst.synare && updates.synare) {
           engine.updateSynareParameters(id, mergedInst.synare);
+        }
+        // UpRoughSoftsynth
+        else if (mergedInst.synthType === 'UpRoughSoftsynth' && mergedInst.upRoughSoftsynth && updates.upRoughSoftsynth) {
+          engine.updateUpRoughSoftsynthParameters(id, mergedInst.upRoughSoftsynth);
         }
         // HarmonicSynth
         else if (mergedInst.synthType === 'HarmonicSynth' && mergedInst.harmonicSynth && updates.harmonicSynth) {

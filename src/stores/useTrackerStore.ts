@@ -23,6 +23,9 @@ import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } fro
 import { SYSTEM_PRESETS, DivChanType } from '../constants/systemPresets';
 import { autoNameChannels as computeAutoNames } from '@/bridge/analysis/ChannelNaming';
 import { useInstrumentStore } from './useInstrumentStore';
+import { useProjectStore } from './useProjectStore';
+import { applySong } from '@/lib/song/applySong';
+import { parseSongFile, songFileToSong, songToSongFile, type SongMeta } from '@lib/uprough/songFile';
 import { isSynthCompatibleWithChannel, getChannelBadge, getSynthBadge } from '../constants/channelTypeCompat';
 import { useHistoryStore, type HistoryAction, type PatternChange } from './useHistoryStore';
 // Late-bound access to the sibling stores that used to form an import cycle
@@ -472,6 +475,12 @@ interface TrackerStore {
   loadPatterns: (patterns: Pattern[]) => void;
   importPattern: (pattern: Pattern) => number;
   setPatternOrder: (order: number[]) => void;
+  /** What an imported Up Rough song file carries that the grid cannot show (null: no song file loaded). */
+  upRoughMeta: SongMeta | null;
+  /** .uprough-song.json text -> patterns, order and instruments (throws SongFileError by name). */
+  importUpRoughSong: (text: string) => Promise<void>;
+  /** Current song -> .uprough-song.json text (throws SongFileError by name). */
+  exportUpRoughSong: () => string;
 
   // Undo/Redo support
   replacePattern: (index: number, pattern: Pattern) => void;
@@ -1987,6 +1996,7 @@ export const useTrackerStore = create<TrackerStore>()(
           currentPatternIndex: 0,
           currentPositionIndex: 0,
           clipboard: null,
+          upRoughMeta: null,
         });
         useCursorStore.setState({
           cursor: { channelIndex: 0, rowIndex: 0, noteColumnIndex: 0, columnType: 'note', digitIndex: 0 },
@@ -2013,6 +2023,30 @@ export const useTrackerStore = create<TrackerStore>()(
           }
         }, 0);
       }
+    },
+
+    upRoughMeta: null,
+
+    importUpRoughSong: async (text) => {
+      const song = songFileToSong(parseSongFile(text));
+      await applySong({
+        instruments: song.instruments, patterns: song.patterns, order: song.meta.order,
+        bpm: song.tempo.bpm, speed: song.tempo.speed,
+        metadata: { name: song.tempo.name },
+        originalModuleData: null,
+        engine: {},
+      }, 'import');
+      // After applySong: loadPatterns clears upRoughMeta.
+      set({ upRoughMeta: song.meta });
+    },
+
+    exportUpRoughSong: () => {
+      const { patterns, upRoughMeta } = get();
+      if (!upRoughMeta) throw new Error('No Up Rough song is loaded: import a .uprough-song.json file first.');
+      const { bpm, speed } = useTransportStore.getState();
+      const tempo = { bpm, speed, name: useProjectStore.getState().metadata.name };
+      const doc = songToSongFile({ meta: upRoughMeta, patterns, instruments: useInstrumentStore.getState().instruments, tempo });
+      return `${JSON.stringify(doc, null, 2)}\n`;
     },
 
     setPatternOrder: (order) =>

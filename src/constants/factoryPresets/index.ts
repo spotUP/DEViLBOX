@@ -24,6 +24,7 @@ import { AMI_PRESETS } from '../amiPresets';
 import { BUZZMACHINE_FACTORY_PRESETS, BUZZMACHINE_GENERIC_PRESETS } from '../buzzmachineFactoryPresets';
 import { MAKK_FACTORY_PRESETS } from '../makkPresets';
 import { HARMONIC_PRESETS } from '../harmonicPresets';
+import { GOLDEN_ERA_KIT } from '../synthPresets/upRoughSoftsynth';
 import { DJ_ONE_SHOT_PRESETS } from '../djOneShotPresets';
 import { ZYNTHIAN_PRESETS } from '../zynthianPresets';
 import { HIVELY_PRESETS } from '../hivelyPresets';
@@ -68,6 +69,17 @@ import { SONIX_PRESETS } from '@generated/sonixPresets';
 // ============================================================================
 // COMBINED FACTORY PRESETS
 // ============================================================================
+
+// The Up Rough Softsynth Golden Era kit as instrument presets, shared by the dropdown and the Presets tab
+const UPROUGH_SOFTSYNTH_FACTORY_PRESETS: InstrumentPreset['config'][] = GOLDEN_ERA_KIT.map((p) => ({
+  type: 'synth' as const,
+  name: p.name,
+  synthType: 'UpRoughSoftsynth' as const,
+  volume: -8,
+  pan: 0,
+  effects: [],
+  upRoughSoftsynth: p.config,
+}));
 
 export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   ...BASS_PRESETS,
@@ -115,6 +127,8 @@ export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   ...CINTER_PRESETS,
   // Sonix synth voices ripped from .instr files (generated)
   ...SONIX_PRESETS,
+  // Up Rough Softsynth Golden Era kit, derived from its one preset list
+  ...UPROUGH_SOFTSYNTH_FACTORY_PRESETS,
   // Player Init
   {
     type: 'synth' as const,
@@ -183,6 +197,7 @@ export const PRESET_CATEGORIES = {
   Makk: MAKK_FACTORY_PRESETS,
   Harmonic: HARMONIC_PRESETS,
   'DJ FX': DJ_ONE_SHOT_PRESETS,
+  'Up Rough': UPROUGH_SOFTSYNTH_FACTORY_PRESETS,
 };
 
 export type PresetCategory = keyof typeof PRESET_CATEGORIES;
@@ -197,6 +212,7 @@ const SHOWCASE_PRESETS: Record<string, string> = {
   PluckSynth: 'Trance Pluck',
   NoiseSynth: 'Riser',
   HarmonicSynth: 'Spectral Bell',
+  UpRoughSoftsynth: 'Golden Era 808 Bass',
   SpaceLaser: 'Cosmic Burst',
   DubSiren: 'Code Red',
   PolySynth: 'Poly Brass',

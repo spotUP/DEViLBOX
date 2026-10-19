@@ -2,7 +2,7 @@
  * The Up Rough demo system's DSP primitives, ported to the sample (scratch null test, owner 2026-10-12:
  * "make the demo and devilbox scratch 1:1"). Each function is the reference's own math in float64:
  *
- *   butter / lfilter   scipy.signal.butter (zpk -> bilinear with fs = 2 -> tf) and lfilter (transposed
+ *   butter / lfilter   portable_iir.butter (scipy zpk -> bilinear fs = 2 -> tf, machine-independent) and lfilter (transposed
  *                      direct form II, the order scipy's C loop sums in) - synth_dsp.py lp / hp / bp
  *   firwin / resamplePoly   scipy.signal.firwin (Kaiser 5.0) and resample_poly (upfirdn, its padding and
  *                      trim) - synth_dsp.py resample_ratio, the bank's loader
@@ -13,97 +13,15 @@
  * per sample; these whole-array versions are the record loader's and the tests'.
  */
 
-// ── complex arithmetic (the zpk design) ──────────────────────────────────
+import { portableButter, type PortableBa } from './portableIir';
+import { pexp, psin, ptanh } from './portableMath';
 
-type C = readonly [re: number, im: number];
-const cadd = (a: C, b: C): C => [a[0] + b[0], a[1] + b[1]];
-const csub = (a: C, b: C): C => [a[0] - b[0], a[1] - b[1]];
-const cmul = (a: C, b: C): C => [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]];
-const cscale = (a: C, k: number): C => [a[0] * k, a[1] * k];
-function cdiv(a: C, b: C): C {
-  // numpy complex division (Smith's algorithm, as npymath does)
-  const [ar, ai] = a, [br, bi] = b;
-  const abs_br = Math.abs(br), abs_bi = Math.abs(bi);
-  if (abs_br >= abs_bi) {
-    if (abs_br === 0 && abs_bi === 0) return [ar / abs_br, ai / abs_bi];
-    const rat = bi / br, scl = 1.0 / (br + bi * rat);
-    return [(ar + ai * rat) * scl, (ai - ar * rat) * scl];
-  }
-  const rat = br / bi, scl = 1.0 / (bi + br * rat);
-  return [(ar * rat + ai) * scl, (ai * rat - ar) * scl];
-}
-function csqrt(a: C): C {
-  // principal branch (npymath csqrt)
-  const [re, im] = a;
-  if (re === 0 && im === 0) return [0, im];
-  const t = Math.sqrt((Math.abs(re) + Math.hypot(re, im)) * 0.5);
-  if (re >= 0) return [t, im / (2 * t)];
-  return [Math.abs(im) / (2 * t), im >= 0 ? t : -t];
-}
+export type Ba = PortableBa;
 
-/** numpy.poly: the monic polynomial with these roots (convolution in root order), real part. */
-function poly(roots: readonly C[]): number[] {
-  let a: C[] = [[1, 0]];
-  for (const r of roots) {
-    const next: C[] = new Array(a.length + 1).fill(null).map(() => [0, 0] as C);
-    for (let i = 0; i < a.length; i++) {
-      next[i] = cadd(next[i]!, a[i]!);
-      next[i + 1] = csub(next[i + 1]!, cmul(a[i]!, r));
-    }
-    a = next;
-  }
-  return a.map((c) => c[0]);
-}
-
-const cprod = (xs: readonly C[]): C => xs.reduce<C>((p, x) => cmul(p, x), [1, 0]);
-
-export interface Ba { b: number[]; a: number[] }
-
-/** scipy.signal.butter(N, Wn, btype) for digital filters (fs = 2, Wn relative to Nyquist). */
-export function butter(N: number, Wn: number | readonly [number, number], btype: 'low' | 'high' | 'band'): Ba {
-  // buttap: p = -exp(1j * pi * arange(-N + 1, N, 2) / (2 N)), k = 1
-  const p0: C[] = [];
-  for (let m = -N + 1; m < N; m += 2) {
-    const th = Math.PI * m / (2 * N);
-    p0.push([-Math.cos(th), -Math.sin(th)]);
-  }
-  const fs = 2.0;
-  const warp = (w: number) => 2 * fs * Math.tan(Math.PI * w / fs);
-  let z: C[] = [], p: C[], k: number;
-  if (btype === 'low') {
-    const wo = warp(Wn as number);
-    p = p0.map((x) => cscale(x, wo));
-    k = wo ** N;
-  } else if (btype === 'high') {
-    const wo = warp(Wn as number);
-    p = p0.map((x) => cdiv([wo, 0], x));
-    z = Array.from({ length: N }, () => [0, 0] as C);
-    // k * real(prod(-z) / prod(-p)) with z empty: 1 / real(prod(-p))
-    const pp = cprod(p0.map((x) => cscale(x, -1)));
-    k = cdiv([1, 0], pp)[0];
-  } else {
-    const [w1, w2] = Wn as readonly [number, number];
-    const lo = warp(w1), hi = warp(w2);
-    const bw = hi - lo, wo = Math.sqrt(lo * hi);
-    const pl = p0.map((x) => cscale(x, bw / 2));
-    const plus: C[] = [], minus: C[] = [];
-    for (const x of pl) {
-      const s = csqrt(csub(cmul(x, x), [wo * wo, 0]));
-      plus.push(cadd(x, s)); minus.push(csub(x, s));
-    }
-    p = [...plus, ...minus];
-    z = Array.from({ length: N }, () => [0, 0] as C);
-    k = bw ** N;
-  }
-  // bilinear_zpk, fs2 = 2 fs
-  const fs2: C = [2 * fs, 0];
-  const degree = p.length - z.length;
-  const zz = z.map((x) => cdiv(cadd(fs2, x), csub(fs2, x)));
-  for (let i = 0; i < degree; i++) zz.push([-1, 0]);
-  const pz = p.map((x) => cdiv(cadd(fs2, x), csub(fs2, x)));
-  const kz = k * cdiv(cprod(z.map((x) => csub(fs2, x))), cprod(p.map((x) => csub(fs2, x))))[0];
-  return { b: poly(zz).map((v) => v * kz), a: poly(pz) };
-}
+/** scipy.signal.butter(N, Wn, btype) for digital filters (fs = 2, Wn relative to Nyquist), designed the
+ * way the reference designs it: portable_iir.butter (musl tan / sin / cos kernels, fixed complex formulas),
+ * so the coefficients are the Python's bits on every machine. */
+export const butter = portableButter;
 
 /** synth_dsp `_norm`: a corner (Hz) relative to Nyquist, clamped to [0.001, 0.99]. */
 export const normFc = (fc: number, rate: number) => Math.min(0.99, Math.max(0.001, fc / (rate / 2.0)));
@@ -162,8 +80,8 @@ function chbevl(x: number, c: readonly number[]): number {
 }
 export function besselI0(x: number): number {
   x = Math.abs(x);
-  if (x <= 8.0) return Math.exp(x) * chbevl(x / 2.0 - 2.0, I0_A);
-  return Math.exp(x) * chbevl(32.0 / x - 2.0, I0_B) / Math.sqrt(x);
+  if (x <= 8.0) return pexp(x) * chbevl(x / 2.0 - 2.0, I0_A);
+  return pexp(x) * chbevl(32.0 / x - 2.0, I0_B) / Math.sqrt(x);
 }
 
 /** scipy.signal.firwin(numtaps, cutoff, window=('kaiser', beta)) for a low pass (cutoff relative to Nyquist). */
@@ -174,7 +92,7 @@ export function firwinKaiser(numtaps: number, cutoff: number, beta: number): Flo
   for (let i = 0; i < numtaps; i++) {
     const m = i - alpha;
     const xs = cutoff * m;
-    const sinc = xs === 0 ? 1 : Math.sin(Math.PI * xs) / (Math.PI * xs);
+    const sinc = xs === 0 ? 1 : psin(Math.PI * xs) / (Math.PI * xs);
     // windows.kaiser(M, beta, sym=True): I0(beta sqrt(1 - ((n - alpha) / alpha)^2)) / I0(beta)
     const r = (i - alpha) / alpha;
     const w = besselI0(beta * Math.sqrt(1 - r * r)) / i0b;
@@ -240,10 +158,14 @@ export function allpass(x: ArrayLike<number>, d: number, g: number): Float64Arra
   return out;
 }
 
-export type RefReverbKind = 'room' | 'plate';
-export const REF_REVERBS: Readonly<Record<RefReverbKind, { combs: ReadonlyArray<readonly [number, number]>; pre: number; damp: number }>> = {
+export type RefReverbKind = 'room' | 'plate' | 'hall' | 'gated' | 'spring';
+export interface RefReverbConfig { combs: ReadonlyArray<readonly [number, number]>; pre: number; damp: number; gate?: number; boing?: boolean }
+export const REF_REVERBS: Readonly<Record<RefReverbKind, RefReverbConfig>> = {
   room: { combs: [[0.030, 0.72], [0.037, 0.70], [0.041, 0.68], [0.044, 0.66]], pre: 0.005, damp: 0.2 },
   plate: { combs: [[0.022, 0.80], [0.029, 0.78], [0.034, 0.77], [0.038, 0.75]], pre: 0.002, damp: 0.1 },
+  hall: { combs: [[0.043, 0.84], [0.053, 0.83], [0.061, 0.82], [0.067, 0.81]], pre: 0.02, damp: 0.25 },
+  gated: { combs: [[0.025, 0.80], [0.031, 0.78], [0.037, 0.77]], pre: 0.0, damp: 0.2, gate: 0.18 },
+  spring: { combs: [[0.017, 0.82], [0.021, 0.80], [0.027, 0.78]], pre: 0.0, damp: 0.35, boing: true },
 };
 
 /** synth_dsp `reverb` (Schroeder): length len(x) + 0.12 s, (1 - mix) dry + mix wet. */
@@ -261,21 +183,42 @@ export function reverb(x: ArrayLike<number>, rate: number, kind: RefReverbKind, 
   for (let i = 0; i < n; i++) wet[i] = wet[i]! / cfg.combs.length;
   wet = allpass(wet, Math.trunc(0.005 * rate), 0.7);
   wet = allpass(wet, Math.trunc(0.0017 * rate), 0.7);
+  if (cfg.gate) {
+    const g = Math.trunc(cfg.gate * rate);
+    for (let i = g; i < n; i++) wet[i] = wet[i]! * 0.0;
+  }
+  if (cfg.boing) {
+    for (let i = 0; i < n; i++) {
+      const gate = Math.abs(wet[i]!) > 0.01 ? 1 : 0;
+      wet[i] = wet[i]! + 0.15 * psin(2 * Math.PI * 40 * i / rate) * gate;
+    }
+  }
   const out = new Float64Array(n);
   for (let i = 0; i < n; i++) out[i] = (1 - mix) * (i < x.length ? x[i]! : 0) + mix * wet[i]!;
   return out;
 }
 
+export type SamplerReverbKind = 'small_room' | 'dark_room' | 'short_plate' | 'gated' | 'spring' | 'warehouse' | 'reverse';
+
 /**
- * sampler.py `reverb` kinds the scratch channel and the three-deck juggle bus use (small_room: X8): the input's
- * length, (1 - mix) x + mix wet.
+ * sampler.py `reverb` (every kind but lofi_digital, which runs the sampler radio profile): the input's
+ * length, (1 - mix) x + mix wet. An unknown kind is the small_room wet in Python; callers here name a kind.
  */
-export function samplerReverb(x: ArrayLike<number>, rate: number, kind: 'short_plate' | 'dark_room' | 'small_room', mix = 1.0): Float64Array {
-  const wet = kind === 'dark_room'
-    ? lp(reverb(x, rate, 'room', 1.0, 0.8), 2400, rate)
-    : kind === 'small_room'
-      ? hp(lp(reverb(x, rate, 'room', 1.0, 0.5), 5000, rate), 250, rate)
-      : hp(lp(reverb(x, rate, 'plate', 1.0, 0.7), 6000, rate), 350, rate);
+export function samplerReverb(x: ArrayLike<number>, rate: number, kind: SamplerReverbKind, mix = 1.0): Float64Array {
+  let wet: Float64Array;
+  switch (kind) {
+    case 'dark_room': wet = lp(reverb(x, rate, 'room', 1.0, 0.8), 2400, rate); break;
+    case 'short_plate': wet = hp(lp(reverb(x, rate, 'plate', 1.0, 0.7), 6000, rate), 350, rate); break;
+    case 'gated': wet = reverb(x, rate, 'gated', 1.0, 0.6); break;
+    case 'spring': wet = lp(hp(reverb(x, rate, 'spring', 1.0, 0.9), 300, rate), 3200, rate); break;
+    case 'warehouse': wet = lp(reverb(x, rate, 'hall', 1.0, 1.6), 4000, rate); break;
+    case 'reverse': {
+      const rev = Float64Array.from(x).reverse();
+      wet = lp(reverb(rev, rate, 'room', 1.0, 0.8).reverse(), 4500, rate);
+      break;
+    }
+    default: wet = hp(lp(reverb(x, rate, 'room', 1.0, 0.5), 5000, rate), 250, rate);
+  }
   const out = Float64Array.from(x);
   const n = Math.min(x.length, wet.length);
   for (let i = 0; i < n; i++) out[i] = (1 - mix) * out[i]! + mix * wet[i]!;
@@ -291,14 +234,52 @@ export function tapeDelay(x: ArrayLike<number>, rate: number, delaySec: number, 
   for (let i = 0; i < n; i++) buf[i] = x[i]!;
   let lpState = 0;
   for (let i = d; i < buf.length; i++) {
-    const dd = d + Math.trunc(wowDepth * Math.sin(2 * Math.PI * 0.7 * i / rate));
+    const dd = d + Math.trunc(wowDepth * psin(2 * Math.PI * 0.7 * i / rate));
     let v = i - dd >= 0 ? buf[i - dd]! : 0.0;
     lpState = (1 - dmp) * v + dmp * lpState;
-    v = Math.tanh(sat * lpState);
+    v = ptanh(sat * lpState);
     buf[i] = buf[i]! + fb * v;
   }
   const len = n + Math.trunc(d * 4);
   const out = new Float64Array(len);
   for (let i = 0; i < len; i++) out[i] = (1 - mix) * (i < n ? x[i]! : 0) + mix * buf[i]!;
   return out;
+}
+
+/** numpy's pairwise float64 sum (np.sum / np.mean over a contiguous array): the order its C loop adds in. */
+export function npSum(x: ArrayLike<number>, start = 0, n: number = x.length - start): number {
+  if (n < 8) { let r = 0; for (let i = 0; i < n; i++) r += x[start + i]!; return r; }
+  if (n <= 128) {
+    const r = new Array<number>(8);
+    for (let k = 0; k < 8; k++) r[k] = x[start + k]!;
+    let i = 8;
+    for (; i < n - (n % 8); i += 8) for (let k = 0; k < 8; k++) r[k] = r[k]! + x[start + i + k]!;
+    let res = ((r[0]! + r[1]!) + (r[2]! + r[3]!)) + ((r[4]! + r[5]!) + (r[6]! + r[7]!));
+    for (; i < n; i++) res += x[start + i]!;
+    return res;
+  }
+  let n2 = Math.trunc(n / 2);
+  n2 -= n2 % 8;
+  return npSum(x, start, n2) + npSum(x, start + n2, n - n2);
+}
+
+/**
+ * synth_dsp `_echo_line`: the delay line with a one-pole damp, tanh(sat v) and a 0.7 Hz sine wow (whole
+ * samples) in the feedback loop; without wow and sat it is the plain damped comb (`_comb_lti`).
+ */
+export function echoLine(x: ArrayLike<number>, d: number, fb: number, damp: number, sat: number, wowDepth: number, rate: number): Float64Array {
+  const n = x.length;
+  const buf = new Float64Array(n + Math.trunc(d * 6));
+  for (let i = 0; i < n; i++) buf[i] = x[i]!;
+  const len = n + Math.trunc(d * 4);
+  if (!wowDepth && !sat) return comb(buf, d, fb, damp).subarray(0, len);
+  let lpState = 0;
+  for (let i = d; i < buf.length; i++) {
+    const dd = d + (wowDepth ? Math.trunc(wowDepth * psin(2 * Math.PI * 0.7 * i / rate)) : 0);
+    let v = i - dd >= 0 ? buf[i - dd]! : 0.0;
+    if (damp) { lpState = (1 - damp) * v + damp * lpState; v = lpState; }
+    if (sat) v = ptanh(sat * v);
+    buf[i] = buf[i]! + fb * v;
+  }
+  return buf.subarray(0, len);
 }

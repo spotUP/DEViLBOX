@@ -247,6 +247,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'FuturePlayerSynth') return 'futureplayer';
   if (synthType === 'SymphonieSynth') return 'symphonie';
   if (synthType === 'HarmonicSynth') return 'harmonicsynth';
+  if (synthType === 'UpRoughSoftsynth') return 'uproughsoftsynth';
   if (synthType === 'ModularSynth') return 'modular';
   if (synthType === 'SunVoxModular') return 'sunvox-modular';
   if (synthType === 'WAM' || synthType.startsWith('WAM')) return 'wam';

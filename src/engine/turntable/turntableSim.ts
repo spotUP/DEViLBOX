@@ -127,6 +127,29 @@ export class NumpyRandomState {
   uniform(low: number, high: number): number {
     return low + (high - low) * this.rand();
   }
+
+  /** `uniform(low, high, size)`: size draws in order. */
+  uniformArray(low: number, high: number, size: number): Float64Array {
+    const out = new Float64Array(size);
+    for (let i = 0; i < size; i++) out[i] = this.uniform(low, high);
+    return out;
+  }
+
+  /** `randint(low, high, size)` (legacy RandomState, masked rejection on 32-bit draws; high - low <= 2^32). */
+  randint(low: number, high: number, size: number): Int32Array {
+    const rng = high - low - 1;
+    const out = new Int32Array(size);
+    if (rng <= 0) { out.fill(low); return out; }
+    let mask = rng;
+    mask |= mask >>> 1; mask |= mask >>> 2; mask |= mask >>> 4; mask |= mask >>> 8; mask |= mask >>> 16;
+    mask >>>= 0;
+    for (let i = 0; i < size; i++) {
+      let v: number;
+      do { v = (this.nextU32() & mask) >>> 0; } while (v > rng);
+      out[i] = low + v;
+    }
+    return out;
+  }
 }
 
 // ── numpy helpers ──────────────────────────────────────────────────────────

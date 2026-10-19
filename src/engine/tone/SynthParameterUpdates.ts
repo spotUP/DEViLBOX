@@ -111,6 +111,23 @@ export function updateFurnaceInstrument(ctx: SynthUpdateContext, instrumentId: n
 }
 
 /**
+ * Update UpRoughSoftsynth voice/params/seed in real-time (live instances keep their render cache keyed by params).
+ */
+export function updateUpRoughSoftsynthParameters(ctx: SynthUpdateContext, instrumentId: number, cfg: NonNullable<InstrumentConfig['upRoughSoftsynth']>): void {
+  const synths: Array<{ applyConfig: (config: typeof cfg) => void }> = [];
+  ctx.instruments.forEach((instrument, key) => {
+    if (ctx.instrumentIdFromKey(key) === instrumentId && (instrument as unknown as { applyConfig?: unknown }).applyConfig) {
+      synths.push(instrument as unknown as { applyConfig: (config: typeof cfg) => void });
+    }
+  });
+  if (synths.length === 0) {
+    ctx.invalidateInstrument(instrumentId);
+    return;
+  }
+  synths.forEach((synth) => synth.applyConfig(cfg));
+}
+
+/**
  * Update HarmonicSynth parameters in real-time without recreating the synth
  */
 export function updateHarmonicSynthParameters(ctx: SynthUpdateContext, instrumentId: number, harmonicConfig: NonNullable<InstrumentConfig['harmonicSynth']>): void {

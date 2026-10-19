@@ -41,6 +41,7 @@ const FORMATS: Array<{ name: string; file: string; companions?: Record<string, s
   { name: 'Jason Page jpn.fire and ice-1', file: 'jason-page/jpn.fire and ice-1', companions: { 'smp.fire and ice-1': 'jason-page/smp.fire and ice-1' }, minVoices: 1, minSteady: 1, minGridCover: 0.55 /* the rest play constant (silent) waves */ },
 ];
 
+
 describe.each(FORMATS)('$name: a key plays the sample the player plays', ({ file, companions, minVoices, minSteady, minGridCover, nativeGrid }) => {
   let song: Awaited<ReturnType<typeof importThroughUade>>['song'];
   let shapes: Shape[];
