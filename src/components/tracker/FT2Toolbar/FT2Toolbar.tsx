@@ -30,6 +30,7 @@ import { gtUltraTogglePlay } from '@engine/gtultra/gtUltraTransport';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { useCursorStore } from '@stores/useCursorStore';
 import { X, Menu, FileUp, FileDown, FilePlus, Trash2 as ClearIcon, Wand2, HelpCircle, Info as InfoIcon, Gamepad2 } from 'lucide-react';
+import { UpRoughGenerateDialog } from '@components/dialogs/UpRoughGenerateDialog';
 import { LogoAnimation } from '@components/visualization/LogoAnimation';
 import { SineScroller } from '@components/visualization/SineScroller';
 import { NibblesGame } from '@components/visualization/NibblesGame';
@@ -205,6 +206,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
   const [showFileBrowser, setShowFileBrowser] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
+  const [showUpRoughGenerate, setShowUpRoughGenerate] = useState(false);
   const aiOpen = useAIStore((s) => s.isOpen);
   const toggleAI = useAIStore((s) => s.toggle);
 
@@ -549,6 +551,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
   const hamburgerMenuItems: MenuItemType[] = [
     { id: 'export', label: 'Export', icon: <FileUp size={14} />, shortcut: '⌘⇧E', onClick: () => onShowExport?.() },
+    { id: 'generate-uprough-song', label: 'Generate Up Rough Song...', icon: <Wand2 size={14} />, onClick: () => setShowUpRoughGenerate(true) },
     { id: 'import-uprough-song', label: 'Import Up Rough Song...', icon: <FileDown size={14} />, onClick: handleImportUpRoughSong },
     { id: 'export-uprough-song', label: 'Export Up Rough Song...', icon: <FileUp size={14} />, onClick: handleExportUpRoughSong },
     { id: 'new', label: 'New Song', icon: <FilePlus size={14} />, onClick: () => useUIStore.getState().openNewSongWizard() },
@@ -732,6 +735,8 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         // the file has a real choice, and opens it directly otherwise.
         await openUserSong(new File([buffer], filename), 'filebrowser', companionFiles, (message) => notify.error(message));
       }} />
+
+      <UpRoughGenerateDialog isOpen={showUpRoughGenerate} onClose={() => setShowUpRoughGenerate(false)} />
 
       {/* Clear Modal */}
       {showClearModal && (
