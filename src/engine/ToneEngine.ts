@@ -116,6 +116,7 @@ import {
   getChannelOutput as _getChannelOutput,
   getChannelLaneDestination,
   setChannelVoiceDelays,
+  MAX_VOICE_DELAY_SEC,
   createVoice as _createVoice,
   stopVoice as _stopVoice,
   setChannelVolume as _setChannelVolume,
@@ -231,6 +232,15 @@ export class ToneEngine {
   // - Tracker instruments → masterInput → masterEffectsInput → [master fx?] → blepInput → [BLEP?] → safetyLimiter → exportTap → masterChannel → destination
   // - DevilboxSynths → synthBus → synthBusPitchShift → masterEffectsInput → [master fx?] → blepInput → [BLEP?] → safetyLimiter → exportTap → masterChannel → destination
   public masterInput: Tone.Gain; // Where tracker instruments connect
+  /**
+   * Where whole-song native engines (libopenmpt, direct-routed WASM replayers)
+   * connect. Runs through nativeVoiceDelay into masterInput so the native
+   * stream waits out the synth-bus shifter's latency like the strips' samples
+   * do (setChannelVoiceDelays); otherwise the hybrid synths it plays with
+   * would land ~100 ms late while the pitch slider is off 0 with Key Lock off.
+   */
+  public nativeInput: Tone.Gain;
+  private nativeVoiceDelay: Tone.Delay;
   public synthBus: Tone.Gain; // Bypass bus for DevilboxSynths
   private synthBusMeter: Tone.Meter; // Level meter on synthBus for WASM engine metering
   private masterMeter: Tone.Meter; // Level meter at masterEffectsInput merge point
@@ -466,6 +476,11 @@ export class ToneEngine {
 
     // Master input (where all instruments connect)
     this.masterInput = new Tone.Gain(1);
+    // Native-engine input: nativeInput → nativeVoiceDelay → masterInput
+    this.nativeInput = new Tone.Gain(1);
+    this.nativeVoiceDelay = new Tone.Delay({ delayTime: 0, maxDelay: MAX_VOICE_DELAY_SEC });
+    this.nativeInput.connect(this.nativeVoiceDelay);
+    this.nativeVoiceDelay.connect(this.masterInput);
 
     // Amiga audio filter (E0x) - 1:1 hardware emulation
     this.amigaFilter = new AmigaFilter();
@@ -1567,11 +1582,14 @@ export class ToneEngine {
 
   /**
    * Mirror the synth-bus shifter's latency (0 when bypassed) into every channel
-   * strip's voice delay, so sample voices and shifted synths stay in sync.
+   * strip's voice delay and the native-engine input delay, so sample voices,
+   * native replayers and shifted synths stay in sync.
    * Also runs when a shifter finishes loading, since it reports latency only then.
    */
   private applyPitchShiftLatency(): void {
-    setChannelVoiceDelays(this._channelCtx, this.synthBusPitchShift.latencySec());
+    const latency = this.synthBusPitchShift.latencySec();
+    setChannelVoiceDelays(this._channelCtx, latency);
+    this.nativeVoiceDelay.delayTime.value = Math.min(Math.max(latency, 0), MAX_VOICE_DELAY_SEC);
   }
 
   /**
@@ -5253,6 +5271,8 @@ export class ToneEngine {
     this.safetyLimiter.dispose();
     this.safetyLimiterMakeupCancel.dispose();
     this.exportTap.dispose();
+    this.nativeInput.dispose();
+    this.nativeVoiceDelay.dispose();
     this.masterInput.dispose();
     this.masterChannel.dispose();
 

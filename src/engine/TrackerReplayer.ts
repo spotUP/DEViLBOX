@@ -830,7 +830,8 @@ export class TrackerReplayer {
 
   constructor(outputNode?: Tone.ToneAudioNode) {
     // Connect to provided output node (for DJ decks) or default to
-    // ToneEngine's masterInput (existing behavior for tracker view).
+    // ToneEngine's nativeInput (tracker view): masterInput behind the delay
+    // that keeps native engines in time with the pitch-shifted synth bus.
     this.masterGain = new Tone.Gain(1);
     this.separationNode = new StereoSeparationNode();
     // Chain: masterGain → separationNode → destination
@@ -841,7 +842,7 @@ export class TrackerReplayer {
     } else {
       try {
         const engine = getToneEngine();
-        this.separationNode.outputTone.connect(engine.masterInput);
+        this.separationNode.outputTone.connect(engine.nativeInput);
       } catch (err) {
         // AudioContext mismatch during view transitions — defer connection
         // until the shared context is ready
@@ -849,7 +850,7 @@ export class TrackerReplayer {
         setTimeout(() => {
           try {
             const engine = getToneEngine();
-            this.separationNode.outputTone.connect(engine.masterInput);
+            this.separationNode.outputTone.connect(engine.nativeInput);
           } catch { /* will reconnect on next song load */ }
         }, 500);
       }
@@ -1986,7 +1987,7 @@ export class TrackerReplayer {
       const newSep = new StereoSeparationNode();
       this.masterGain.connect(newSep.inputTone);
       if (engine) {
-        newSep.outputTone.connect(engine.masterInput);
+        newSep.outputTone.connect(engine.nativeInput);
       }
       // Replace the readonly separation node
       (this as unknown as { separationNode: StereoSeparationNode }).separationNode = newSep;

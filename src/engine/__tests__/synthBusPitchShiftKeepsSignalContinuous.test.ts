@@ -58,7 +58,7 @@ vi.mock('@/engine/ChannelFilterManager', () => ({ getChannelFilterManager: () =>
 import { ToneEngine } from '../ToneEngine';
 
 describe('synth bus pitch shift keeps the signal continuous', () => {
-  it('setSynthBusPitchRate drives the bus and lane shifters and the strips\' voice delays', () => {
+  it('setSynthBusPitchRate drives the bus and lane shifters, the strips\' voice delays and the native-input delay', () => {
     const synthBusPitchShift = new FakeShift();
     const laneShift = new FakeShift();
     const strip = (ch: number) => [ch, { input: new FakeGain(), voiceDelay: { delayTime: { value: 0 } }, join: new FakeGain(), channel: new FakeGain(), meter: new FakeGain() }] as const;
@@ -67,8 +67,10 @@ describe('synth bus pitch shift keeps the signal continuous', () => {
       synthBus: new FakeGain(),
       synthBusPitchShift,
       channelSynthLanes: new Map([[2, { gain: new FakeGain(), shift: laneShift }]]),
+      nativeVoiceDelay: { delayTime: { value: 0 } },
       _synthPitchRate: 1,
     }) as ToneEngine;
+    const nativeDelay = () => (engine as unknown as { nativeVoiceDelay: { delayTime: { value: number } } }).nativeVoiceDelay.delayTime.value;
     Object.defineProperty(engine, '_channelCtx', { value: { channelOutputs } });
     const delays = () => [...channelOutputs.values()].map((s) => s.voiceDelay.delayTime.value);
 
@@ -78,11 +80,15 @@ describe('synth bus pitch shift keeps the signal continuous', () => {
     expect(laneShift.active).toBe(true);
     expect(laneShift.semitones).toBeCloseTo(12, 6);
     expect(delays()).toEqual([0.1, 0.1, 0.1]);
+    // Native engines (libopenmpt, direct-routed WASM replayers) enter at
+    // nativeInput and wait out the same latency, or hybrid synths land late.
+    expect(nativeDelay()).toBe(0.1);
 
     engine.setSynthBusPitchRate(1);
     expect(synthBusPitchShift.active).toBe(false);
     expect(laneShift.active).toBe(false);
     expect(delays()).toEqual([0, 0, 0]);
+    expect(nativeDelay()).toBe(0);
 
     // The shifter reports its latency only once loaded; the constructor wires its
     // onLatencyChange to this re-apply, so a late report still reaches every strip.
@@ -90,6 +96,7 @@ describe('synth bus pitch shift keeps the signal continuous', () => {
     synthBusPitchShift.latencySec = () => 0.25;
     (engine as unknown as { applyPitchShiftLatency(): void }).applyPitchShiftLatency();
     expect(delays()).toEqual([0.25, 0.25, 0.25]);
+    expect(nativeDelay()).toBe(0.25);
   });
 
   it('pitchRateToShift maps playback rate to semitones, inactive at rate 1 and on bad input', () => {
