@@ -14,6 +14,7 @@ import {
 } from '@/engine/dj/scratch/refDsp';
 import { tapeSat } from '@/engine/dj/scratch/demoDrums';
 import { roundHalfEven } from '@/engine/dj/scratch/scratchGrit';
+import { pcos, pexp, psin, ptanh } from '@/engine/dj/scratch/portableMath';
 
 /** sampler.RATE: the compressor's time constants use this, not the render rate. */
 const COMPRESSOR_RATE = 22050;
@@ -32,7 +33,7 @@ const rms = (x: Signal): number => {
 /** synth_dsp `soft_clip`: tanh(drive x). (demoDrums has an int8-LUT softClip with another meaning.) */
 export function softClip(x: Signal, drive = 2.0): Float64Array {
   const out = new Float64Array(x.length);
-  for (let i = 0; i < x.length; i++) out[i] = Math.tanh(drive * x[i]!);
+  for (let i = 0; i < x.length; i++) out[i] = ptanh(drive * x[i]!);
   return out;
 }
 
@@ -41,8 +42,8 @@ export { tapeSat };
 /** synth_dsp `tube`: asymmetric warmth, tanh(drive (x + bias)) - tanh(drive bias). */
 export function tube(x: Signal, drive = 2.0, bias = 0.2): Float64Array {
   const out = new Float64Array(x.length);
-  const off = Math.tanh(drive * bias);
-  for (let i = 0; i < x.length; i++) out[i] = Math.tanh(drive * (x[i]! + bias)) - off;
+  const off = ptanh(drive * bias);
+  for (let i = 0; i < x.length; i++) out[i] = ptanh(drive * (x[i]! + bias)) - off;
   return out;
 }
 
@@ -110,7 +111,7 @@ export function chorus(x: Signal, rate: number, options: Partial<ChorusOptions> 
   for (const p0 of phases) {
     const gain = o.mix / phases.length;
     for (let i = 0; i < n; i++) {
-      const lfo = Math.sin(2 * Math.PI * rateHz * i / rate + p0);
+      const lfo = psin(2 * Math.PI * rateHz * i / rate + p0);
       let idx = i - base - Math.trunc(dmax * (0.5 + 0.5 * lfo));
       idx = Math.min(Math.max(idx, 0), n - 1);
       out[i] = out[i]! + gain * x[idx]!;
@@ -183,7 +184,7 @@ function quantize(x: Float64Array, bits: number, peak: number, dither: boolean):
   const d = dither && bits < 16 ? new NumpyRandomState(7).uniformArray(-0.5, 0.5, x.length) : null;
   return Float64Array.from(x, (v, i) => {
     let y = v / m * peak;
-    y = Math.tanh(y * 1.05) / 1.05;
+    y = ptanh(y * 1.05) / 1.05;
     if (d) y = y + d[i]! / q;
     return roundHalfEven(y * q) / q * m / peak;
   });
@@ -199,7 +200,7 @@ export function samplerProcess(x: Signal, profile = 'mpc60', rate = 22050, dithe
   let y: Float64Array = Float64Array.from(x);
   const n = y.length;
   if (p.hp) y = hp(y, p.hp, rate);
-  if (p.inDrive) y = y.map((v) => Math.tanh(v * (1.0 + 4.0 * p.inDrive)));
+  if (p.inDrive) y = y.map((v) => ptanh(v * (1.0 + 4.0 * p.inDrive)));
   if (p.aaCut) y = lp(y, p.aaCut, rate);
   if (p.decim > 1) {
     const held = holdDecimate(y, p.decim);
@@ -232,8 +233,8 @@ export const PARALLEL_DIRT_COMP: Readonly<CompressorOptions> = { ratio: 4.0, thr
 
 /** sampler `_compress`: slow transient-preserving soft compression (envelope times use the 22050 Hz constant). */
 export function compress(x: Signal, c: CompressorOptions): Float64Array {
-  const a = Math.exp(-1.0 / (c.attack * COMPRESSOR_RATE));
-  const r = Math.exp(-1.0 / (c.release * COMPRESSOR_RATE));
+  const a = pexp(-1.0 / (c.attack * COMPRESSOR_RATE));
+  const r = pexp(-1.0 / (c.release * COMPRESSOR_RATE));
   const out = new Float64Array(x.length);
   let e = 0.0;
   for (let i = 0; i < x.length; i++) {
@@ -313,7 +314,7 @@ function crackleLayer(n: number, rate: number, rng: NumpyRandomState, perS: numb
     const k = Math.max(2, Math.trunc(ms * 1e-3 * rate));
     const noiseK = rng.uniformArray(-1, 1, k);
     const kernel = new Float64Array(k);
-    for (let i = 0; i < k; i++) kernel[i] = noiseK[i]! * Math.exp(-i / (k / 4.0));
+    for (let i = 0; i < k; i++) kernel[i] = noiseK[i]! * pexp(-i / (k / 4.0));
     const sq = kernel.map((v) => v * v);
     const kn = Math.sqrt(npSum(sq, 0, k)) + 1e-12;
     for (let i = 0; i < k; i++) kernel[i] = kernel[i]! / kn;
@@ -397,7 +398,7 @@ export function vintageCharacter(x: Signal, rate: number, options: Partial<Vinta
     const idx = new Int32Array(n);
     let acc = 0;
     for (let i = 0; i < n; i++) {
-      acc += 1 + 0.002 * o.tapeAge * Math.sin(2 * Math.PI * 1.2 * i / rate);
+      acc += 1 + 0.002 * o.tapeAge * psin(2 * Math.PI * 1.2 * i / rate);
       idx[i] = clip(Math.trunc(acc));
     }
     y = Float64Array.from(idx, (j) => src[j]!);
@@ -450,7 +451,7 @@ function fftInPlace(re: Float64Array, im: Float64Array, inverse: boolean): void 
       const half = len >> 1;
       for (let i = 0; i < n; i += len) {
         for (let k = 0; k < half; k++) {
-          const a = sign * 2 * Math.PI * k / len, wr = Math.cos(a), wi = Math.sin(a);
+          const a = sign * 2 * Math.PI * k / len, wr = pcos(a), wi = psin(a);
           const u = i + k, v = u + half;
           const tr = re[v]! * wr - im[v]! * wi, ti = re[v]! * wi + im[v]! * wr;
           re[v] = re[u]! - tr; im[v] = im[u]! - ti; re[u] = re[u]! + tr; im[u] = im[u]! + ti;
@@ -464,7 +465,7 @@ function fftInPlace(re: Float64Array, im: Float64Array, inverse: boolean): void 
   const cr = new Float64Array(n), ci = new Float64Array(n);
   for (let k = 0; k < n; k++) {
     const a = sign * Math.PI * ((k * k) % (2 * n)) / n;
-    cr[k] = Math.cos(a); ci[k] = Math.sin(a);
+    cr[k] = pcos(a); ci[k] = psin(a);
   }
   const ar = new Float64Array(m), ai = new Float64Array(m), br = new Float64Array(m), bi = new Float64Array(m);
   for (let k = 0; k < n; k++) {
@@ -498,7 +499,7 @@ export function paulaZoh(x: Signal, rate: number, replayRate: number | null = nu
   const gain = (k: number): number => {
     const j = Math.min(k, n - k);
     const u = j / (n * (1.0 / rate)) / fs;
-    return j === 0 ? 1.0 : Math.sin(Math.PI * u) / (Math.PI * u);
+    return j === 0 ? 1.0 : psin(Math.PI * u) / (Math.PI * u);
   };
   for (let k = 0; k < n; k++) { const g = gain(k); re[k] = re[k]! * g; im[k] = im[k]! * g; }
   fftInPlace(re, im, true);
@@ -541,7 +542,7 @@ export function masterBus(x: Signal, options: Partial<MasterBusOptions> = {}, ra
   let sig = new Float64Array(n);
   for (let i = 0; i < n; i++) sig[i] = x[i]! - mean;
   if (o.lowpassHz) {
-    const a = Math.exp(-2 * Math.PI * o.lowpassHz / rate);
+    const a = pexp(-2 * Math.PI * o.lowpassHz / rate);
     let y = 0.0;
     const filtered = new Float64Array(n);
     for (let i = 0; i < n; i++) { y = a * y + (1 - a) * sig[i]!; filtered[i] = y; }
