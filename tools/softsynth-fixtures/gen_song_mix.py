@@ -109,10 +109,46 @@ for style, rev, mix in (("trap", "gated", None), ("lofi", None, 0.3), ("east_coa
         dc["master_rev"], dc["master_rev_mix"] = old
     cases.append({"fn": "applyTexture", "options": {"style": style, "seed": 0, "masterRev": rev, "masterRevMix": mix}, **ser(y)})
 
+# render_section tail + render_track tail on the same per-lane buffers. render_section keeps this tail inline, so the
+# sum and the scratch add below mirror hiphop.py:6889-7013 line for line; every called piece is the real function.
+L_SEC = 5500
+SCR = lane(7, 660.0, 0.4, 1500.0)[:5200]
+
+
+def section(lanes, bass_g, has_drums, scr, use_scratch, voice_bars):
+    b = {k: v.copy() for k, v in lanes.items()}
+    span = hh.bus_gain_span(bass_g, has_drums)
+    hh.balance_buses(b["drums"], b["bass"], b["sample"], b["melody"], b["vocal"], b["reinforce"], bass_g, has_drums)
+    sec = (b["drums"] + b["bass"] + b["sample"] + b["melody"] + b["vocal"] + b["reinforce"])[:L_SEC]
+    if scr is not None and len(scr):
+        g = hh.MIX_GAINS["scratch_on"] if use_scratch else hh.MIX_GAINS["scratch_off"]
+        scr = scr * ((hh.BUS_REFERENCE_RMS * g / span) / hh._active_rms(scr, RATE))
+        g = 1.0
+        scr = hh.duck_under_voice(scr, frozenset(voice_bars), BAR, RATE)
+        n = min(len(sec), len(scr))
+        sec[:n] += g * scr[:n]
+    return sec
+
+
+SECS = {}
+for name, bass_g, hd, with_scr, use_scr, vb in (("full", 1.272, True, True, True, [1, 3]), ("solo", 2.0, False, True, False, [0]),
+                                                 ("noscratch", 1.272, True, False, False, [])):
+    y = section(L, bass_g, hd, SCR if with_scr else None, use_scr, vb)
+    SECS[name] = y
+    cases.append({"fn": "mixSection", "options": {"length": L_SEC, "bassGain": bass_g, "hasDrums": hd, "scratch": with_scr,
+                                                  "useScratch": use_scr, "voiceBars": vb, "barLen": BAR}, **ser(y)})
+
+for style, names in (("lofi", ("full", "solo", "noscratch")), ("trap", ("noscratch", "full"))):
+    track = np.concatenate([SECS[n] for n in names] + [np.zeros(0)])
+    textured = hh._apply_texture(track.copy(), style, RATE, seed=3)
+    final = hh._se.master_bus(textured, rate=RATE).astype(np.float64) / 127.0
+    cases.append({"fn": "mixTrack", "options": {"style": style, "seed": 3, "sections": list(names)},
+                  "textured": ser(textured), "texturedAll": [float(v) for v in textured], **ser(final)})
+
 doc = {
     "rate": RATE, "keep": KEEP, "barLen": BAR,
     "lanes": {k: [float(v) for v in x] for k, x in L.items()},
-    "sparse": [float(v) for v in SPARSE],
+    "sparse": [float(v) for v in SPARSE], "scratch": [float(v) for v in SCR],
     "constants": {
         "MIX_GAINS": hh.MIX_GAINS, "BUS_REFERENCE_RMS": hh.BUS_REFERENCE_RMS, "BUS_REFERENCE_PEAK": hh.BUS_REFERENCE_PEAK,
         "SAMPLE_ECHO": hh.SAMPLE_ECHO, "STYLE_TEXTURE": {k: {"tape": v["tape"], "vinyl": v["vinyl"]} for k, v in hh.STYLES.items()},
