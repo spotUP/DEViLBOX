@@ -15,6 +15,32 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { RELAY_REPLACED_CLOSE_CODE } from '../protocol';
 import { RELAY_REPLACED_CLOSE_CODE as SERVER_CODE } from '../../../server/src/mcp/protocol';
 
+// MCPBridge's handler modules and the transport / oscilloscope / DJ stores pull
+// the whole audio engine (ToneEngine, every WASM wrapper) into the import graph.
+// This test covers the relay socket only, so each of those modules becomes a
+// Proxy of spies and the import stays in the millisecond range instead of a
+// minute that times the test out on a loaded machine.
+const { spyModule, storeModule } = vi.hoisted(() => ({
+  spyModule: () => new Proxy({}, {
+    has: () => true,
+    get: (_t, key) => (key === '__esModule' ? true : key === 'then' ? undefined : () => ({})),
+  }),
+  storeModule: (name: string) => ({
+    [name]: Object.assign(() => ({}), { getState: () => ({ isPlaying: false, isActive: false, decks: {} }) }),
+  }),
+}));
+vi.mock('../handlers/readHandlers', spyModule);
+vi.mock('../handlers/writeHandlers', spyModule);
+vi.mock('../handlers/analysisHandlers', spyModule);
+vi.mock('../handlers/voiceHandlers', spyModule);
+vi.mock('../handlers/generatorHandlers', spyModule);
+vi.mock('../handlers/engineHandlers', spyModule);
+vi.mock('../handlers/djHandlers', spyModule);
+vi.mock('../handlers/furnaceCmdLog', spyModule);
+vi.mock('@stores/useTransportStore', () => storeModule('useTransportStore'));
+vi.mock('@stores/useOscilloscopeStore', () => storeModule('useOscilloscopeStore'));
+vi.mock('@stores/useDJStore', () => storeModule('useDJStore'));
+
 class FakeSocket {
   static made: FakeSocket[] = [];
   static OPEN = 1;
@@ -35,7 +61,7 @@ beforeAll(() => {
 });
 afterAll(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
-describe('a tab another tab took MCP control from', { timeout: 60000 }, () => {
+describe('a tab another tab took MCP control from', () => {
   it('uses the close code the relay sends', () => {
     expect(RELAY_REPLACED_CLOSE_CODE).toBe(SERVER_CODE);
   });
