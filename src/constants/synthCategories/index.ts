@@ -5,4 +5,4 @@
 export type { SynthInfo, SynthCategory } from './types';
 export { SYNTH_INFO } from './synthInfo';
 export { SYNTH_CATEGORIES } from './categories';
-export { ALL_SYNTH_TYPES, getCategoryForSynth, getSynthInfo, tailwindToHex } from './helpers';
+export { ALL_SYNTH_TYPES, getCategoryForSynth, getSynthInfo, catalogSynthConfig, catalogKeyMatches, tailwindToHex } from './helpers';

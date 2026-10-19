@@ -12,7 +12,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
-import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
+import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo, catalogSynthConfig } from '@constants/synthCategories';
 import { UnifiedInstrumentEditor } from './editors';
 import { TestKeyboard, CategorizedSynthSelector } from './shared';
 import { InstrumentEffectsPanel } from '@components/effects/InstrumentEffectsPanel';
@@ -746,7 +746,7 @@ function createTempInstrument(synthType: SynthType): InstrumentConfig {
     id: -1,
     name: getSynthInfo(synthType).name,
     type: 'synth' as const,
-    synthType,
+    ...catalogSynthConfig(synthType),
     volume: -6,
     pan: 0,
     oscillator: DEFAULT_OSCILLATOR,
