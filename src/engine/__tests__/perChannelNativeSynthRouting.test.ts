@@ -86,6 +86,7 @@ vi.mock('@/engine/ChannelFilterManager', () => {
 });
 
 import { ToneEngine } from '../ToneEngine';
+import { perChannelInstanceChannels } from '../perChannelNativeSynths';
 
 type FakeGainNode = InstanceType<typeof FakeGain>;
 
@@ -251,6 +252,31 @@ describe('per-channel native synth routing (TB303 on tracker channel 3)', () => 
     expect(lane.shift.active).toBe(false);
     expect(channelOutputs.get(3)!.voiceDelay.delayTime.value).toBe(0);
     expect(state.nativeVoiceDelay.delayTime.value).toBe(0);
+  });
+
+  // Owner 2026-10-20: WobbleBass "sounds terrible when i put wobble bass notes in more than one channel", fine soloed.
+  // Its Tone graph has one filter, filter envelope and LFO; a shared instance let channel 1's release cut channel 0's note.
+  it('gives WobbleBass one instance per tracker channel', async () => {
+    factory.createInstrument.mockReset();
+    const instruments: ReturnType<typeof fakeInstrument>[] = [];
+    factory.createInstrument.mockImplementation(() => { const i = fakeInstrument(); instruments.push(i); return i; });
+    const { engine, state } = makeEngine();
+    const wobble = { id: 9, name: 'wobble', synthType: 'WobbleBass', effects: [] } as unknown as InstrumentConfig;
+
+    // A song load preloads per channel; a shared preload would be reused by every channel.
+    expect(perChannelInstanceChannels('WobbleBass', new Set([1, 0]))).toEqual([0, 1]);
+    engine.getInstrument(9, wobble);
+    await state.pendingEffectChains.get(key(9, SHARED));
+    engine.triggerNote(9, 'C2', 0, 0, 1, wobble, false, false, 0);
+    await state.pendingEffectChains.get(key(9, 0));
+    engine.triggerNote(9, 'G2', 0, 0, 1, wobble, false, false, 1);
+    await state.pendingEffectChains.get(key(9, 1));
+
+    const played = instruments.filter((i) => i.triggerAttack.mock.calls.length > 0);
+    expect(played).toHaveLength(2);
+    expect(state.instruments.has(key(9, 0))).toBe(true);
+    expect(state.instruments.has(key(9, 1))).toBe(true);
+    expect(state.instruments.get(key(9, 0))).not.toBe(state.instruments.get(key(9, 1)));
   });
 
   it('keeps pooled chip synths and live-voice channels on the shared instance into synthBus', async () => {
