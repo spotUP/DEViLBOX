@@ -4,8 +4,6 @@
 Every 13th sample is kept (float64 repr), plus the length and the RMS.
   /opt/homebrew/bin/python3.11 -I tools/softsynth-fixtures/gen_bass_primitives.py \
     /Users/spot/Code/UpRough/Up_Rough_Demo_System/tools src/engine/uprough/__tests__/fixtures/bass_primitives.json
-karplus(fractional=True) raises in the host (portable_math.exp rejects the complex argument in
-_allpass_phase_delay), so it has no reference and is recorded under "unreferenced".
 """
 import importlib.util
 import json
@@ -101,21 +99,12 @@ for kind in ["pluck", "mallet", "metal", "bell", "wood"]:
     add("karplus_" + kind, {"freq": 196.0, "dur": 0.4, "damp": 0.5, "kind": kind, "seed": 4}, sd.karplus(196.0, 0.4, RATE, 0.5, kind, 4))
 add("karplus_pluck_damp", {"freq": 82.4, "dur": 0.6, "damp": 0.9, "kind": "pluck", "seed": 1}, sd.karplus(82.4, 0.6, RATE, 0.9, "pluck", 1))
 
-unref = []
-frac = {}
-try:
-    sd.karplus(196.0, 0.4, RATE, 0.5, "pluck", 4, True)
-except Exception as e:  # host breakage, see the module docstring
-    unref.append({"name": "karplus_fractional", "error": repr(e)})
-    # Reference with ONLY the complex exp swapped for numpy's, so the allpass tuning is still checked.
-    # Weaker than a host reference: that exp is not the host's fdlibm one, hence the separate "patched" block.
-    real_exp = sd._pm.exp
-    sd._pm.exp = lambda v: np.exp(v) if np.iscomplexobj(v) else real_exp(v)
-    for kind in ["pluck", "mallet", "metal", "wood"]:
-        frac["karplus_frac_" + kind] = {"params": {"freq": 196.3, "dur": 0.4, "damp": 0.5, "kind": kind, "seed": 4, "fractional": True},
-                                        "signal": pack(sd.karplus(196.3, 0.4, RATE, 0.5, kind, 4, True))}
-    sd._pm.exp = real_exp
+# Karplus, fractional (allpass-tuned) path. Host fixed in Up Rough e24a13d29: the allpass z is
+# built from portable cos/sin, as allpassPhaseDelay does.
+for kind in ["pluck", "mallet", "metal", "wood"]:
+    add("karplus_frac_" + kind, {"freq": 196.3, "dur": 0.4, "damp": 0.5, "kind": kind, "seed": 4, "fractional": True},
+        sd.karplus(196.3, 0.4, RATE, 0.5, kind, 4, True))
 
 with open(OUT, "w") as f:
-    json.dump({"rate": RATE, "keep": KEEP, "cases": cases, "unreferenced": unref, "patched": frac}, f)
-print(len(cases), "cases", unref)
+    json.dump({"rate": RATE, "keep": KEEP, "cases": cases}, f)
+print(len(cases), "cases")

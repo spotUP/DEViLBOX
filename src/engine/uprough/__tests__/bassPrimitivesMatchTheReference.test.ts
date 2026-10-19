@@ -61,7 +61,7 @@ function render(name: string, p: Record<string, any>): Float64Array {  // eslint
 const worstByPrimitive: Record<string, number> = {};
 
 describe('bass primitives match the reference', () => {
-  Object.entries({ ...(fixture.cases as Record<string, Case>), ...(fixture.patched as Record<string, Case>) }).forEach(([name, c]) => {
+  Object.entries(fixture.cases as Record<string, Case>).forEach(([name, c]) => {
     it(name, () => {
       const out = render(name, c.params);
       expect(out.length).toBe(c.signal.length);
