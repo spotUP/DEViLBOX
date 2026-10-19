@@ -27,6 +27,8 @@ const RUN: Record<string, Runner> = {
   mixerColor: (o) => bus.mixerColor(X, RATE, o),
   vinylSurface: (o) => bus.addVinylSurface(X, RATE, o),
   vintageCharacter: (o) => bus.vintageCharacter(X, RATE, o),
+  samplerProcess: (o) => bus.samplerProcess(X, o.profile as string, RATE, o.dither as boolean | undefined, o.seed as number | undefined),
+  paulaZoh: (o) => bus.paulaZoh(X, RATE, o.replayRate as number | undefined),
   paulaFilter: (o) => bus.paulaFilter(X, RATE, o),
   masterBus: (o) => bus.masterBus(X, o),
 };
