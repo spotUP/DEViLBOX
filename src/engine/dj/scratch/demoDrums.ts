@@ -8,7 +8,7 @@
 import { NumpyRandomState, linspace } from '@/engine/turntable/turntableSim';
 import { roundHalfEven } from './scratchGrit';
 import { lfilter, reverb } from './refDsp';
-import { pexp, psin, ptanh } from './portableMath';
+import { pexp, pexp2, psin, ptanh } from './portableMath';
 
 export const DEMO_DRUM_RATE = 22050;
 
@@ -35,7 +35,7 @@ export const CLAP909_PARAMS: ClapParams = { bright: 1.2, tap_ms: 4.0, tap_decay_
 export type DrumMachine = '808' | '909';
 
 /** `_semi_hz`: a drum 'tune' as semitones over C1. */
-export const semiHz = (semi: number): number => 32.703 * (2.0 ** (semi / 12.0));
+export const semiHz = (semi: number): number => 32.703 * pexp2(semi / 12.0);
 
 /** `_exp_decay(n, decay_ms)`. */
 export function expDecay(n: number, decayMs: number, rate = DEMO_DRUM_RATE): Float64Array {
@@ -117,7 +117,7 @@ export function pitchEnv(n: number, startSemi: number, dropMs: number, rate = DE
 /** `_osc_sweep(..., 'sine')`: phase = cumsum(2 pi base 2^(p/12) / rate). */
 export function oscSweepSine(n: number, baseHz: number, pitchSemi: ArrayLike<number>, rate = DEMO_DRUM_RATE): Float64Array {
   const inc = new Float64Array(n);
-  for (let i = 0; i < n; i++) inc[i] = 2 * Math.PI * (baseHz * 2.0 ** (pitchSemi[i]! / 12.0)) / rate;
+  for (let i = 0; i < n; i++) inc[i] = 2 * Math.PI * (baseHz * pexp2(pitchSemi[i]! / 12.0)) / rate;
   const ph = cumsum(inc);
   for (let i = 0; i < n; i++) ph[i] = psin(ph[i]!);
   return ph;
@@ -157,7 +157,7 @@ export function kick808(opts: Partial<KickParams> = {}, rate = DEMO_DRUM_RATE, d
   const body = oscSweepSine(n, base, pitch, rate);
   if (P.body_h3 > 0) {
     const inc = new Float64Array(n);
-    for (let i = 0; i < n; i++) inc[i] = 2 * Math.PI * base * (2.0 ** (pitch[i]! / 12.0)) / rate;
+    for (let i = 0; i < n; i++) inc[i] = 2 * Math.PI * base * pexp2(pitch[i]! / 12.0) / rate;
     const ph = cumsum(inc);
     for (let i = 0; i < n; i++) body[i] = body[i]! + P.body_h3 * psin(3 * ph[i]!) + 0.4 * P.body_h3 * psin(2 * ph[i]!);
   }

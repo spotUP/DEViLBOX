@@ -16,6 +16,7 @@ import {
   clap, conga, cowbell, hat, kick808, ride, rim, snare808, snare909, tom,
   type ClapParams, type DrumMachine, type HatParams, type KickParams, type SnareParams, type TomParams,
 } from '@/engine/dj/scratch/demoDrums';
+import { pexp2 } from '@/engine/dj/scratch/portableMath';
 import type { SoftsynthNote, SoftsynthVoice } from '../softsynthVoice';
 import { humanizeDraw, humanizeSeed, varyHit } from '../humanize';
 
@@ -33,7 +34,7 @@ const machineSelect = (def: DrumMachine): ParameterDef => ({
 });
 
 const semitones = (note: SoftsynthNote): number => note.midi - 60;
-const ratio = (note: SoftsynthNote): number => 2 ** (semitones(note) / 12);
+const ratio = (note: SoftsynthNote): number => pexp2(semitones(note) / 12);
 const machineOf = (v: number): DrumMachine => (Math.round(v) === 808 ? '808' : '909');
 const scaled = (x: Float64Array, velocity: number): Float64Array => {
   for (let i = 0; i < x.length; i++) x[i] = x[i]! * velocity;

@@ -8,13 +8,13 @@ import type { ParameterDef } from '@/engine/registry/SynthDescriptor';
 import { NumpyRandomState } from '@/engine/turntable/turntableSim';
 import { onepoleLp } from '@/engine/dj/scratch/demoDrums';
 import { SOFTSYNTH_RATE, type SoftsynthNote, type SoftsynthVoice } from '../softsynthVoice';
-import { pcos } from '@/engine/dj/scratch/portableMath';
+import { pcos, pexp, pexp2, plog } from '@/engine/dj/scratch/portableMath';
 
 /** synth_common.hz: the tracker note number IS the semitone (A4 = 69 = 440 Hz). */
-export const pianoHz = (semi: number): number => 440.0 * 2.0 ** ((semi - 69) / 12.0);
+export const pianoHz = (semi: number): number => 440.0 * pexp2((semi - 69) / 12.0);
 
 function contactTime(freq: number, hardness: number): number {
-  let c = 0.0012 * (440.0 / Math.max(20.0, freq)) ** 0.45;
+  let c = 0.0012 * pexp(0.45 * plog(440.0 / Math.max(20.0, freq)));
   c *= 1.35 - 0.7 * hardness;
   return Math.min(0.006, Math.max(0.00035, c));
 }
@@ -73,8 +73,8 @@ export function renderPiano(semi: number, durSec: number, rate = SOFTSYNTH_RATE,
   const n = Math.max(1, Math.trunc(durSec * rate));
   const f = pianoHz(semi);
   const vert = stringVoice(f, n, rate, seed, 0.075, bright);
-  const horiz = stringVoice(f * 2 ** (0.7 / 1200.0), n, rate, seed + 2, 0.012, bright);
-  const uni = stringVoice(f * 2 ** (detuneCents / 1200.0), n, rate, seed + 1, 0.06, bright);
+  const horiz = stringVoice(f * pexp2(0.7 / 1200.0), n, rate, seed + 2, 0.012, bright);
+  const uni = stringVoice(f * pexp2(detuneCents / 1200.0), n, rate, seed + 1, 0.06, bright);
   const mixed = new Float64Array(n);
   for (let i = 0; i < n; i++) mixed[i] = 0.62 * vert[i]! + 0.30 * horiz[i]! + 0.28 * uni[i]!;
   const x = onepoleLp(mixed, 5200, rate);

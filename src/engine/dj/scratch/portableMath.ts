@@ -279,3 +279,85 @@ export function pexp2(x: number): number {
   if (k === 1024) return y * 2.0 * TWO1023;
   return y * pow2(k);
 }
+
+const TWO54 = 1.80143985094819840000e+16;
+const LG1 = 6.666666666666735130e-01, LG2 = 3.999999999940941908e-01, LG3 = 2.857142874366239149e-01;
+const LG4 = 2.222219843214978396e-01, LG5 = 1.818357216161805012e-01, LG6 = 1.531383769920937332e-01;
+const LG7 = 1.479819860511658591e-01;
+const IVLN10 = 4.34294481903251816668e-01;
+const LOG10_2HI = 3.01029995663611771306e-01, LOG10_2LO = 3.69423907715893078616e-13;
+function lowWord(x: number): number {
+  buf.setFloat64(0, x);
+  return buf.getUint32(4);
+}
+
+/** fdlibm __ieee754_log, line for line as portable_math._s_log. */
+export function plog(x: number): number {
+  let hx = highWord(x);
+  const lx = lowWord(x);
+  let k = 0;
+  if (hx < 0x00100000 || (hx & 0x80000000) !== 0) {
+    if (((hx & 0x7FFFFFFF) | lx) === 0) return -Infinity;
+    if ((hx & 0x80000000) !== 0) return NaN;
+    k -= 54;
+    x *= TWO54;
+    hx = highWord(x);
+  }
+  if (hx >= 0x7FF00000) return x + x;
+  k += (hx >> 20) - 1023;
+  hx &= 0x000FFFFF;
+  let i = (hx + 0x95F64) & 0x100000;
+  x = fromBits(hx | (i ^ 0x3FF00000), lowWord(x));
+  k += i >> 20;
+  const f = x - 1.0;
+  if ((0x000FFFFF & (2 + hx)) < 3) {
+    if (f === 0.0) {
+      if (k === 0) return 0.0;
+      const dk0 = k;
+      return dk0 * LN2_HI + dk0 * LN2_LO;
+    }
+    const R0 = f * f * (0.5 - 0.33333333333333333 * f);
+    if (k === 0) return f - R0;
+    const dk1 = k;
+    return dk1 * LN2_HI - ((R0 - dk1 * LN2_LO) - f);
+  }
+  const s = f / (2.0 + f);
+  const dk = k;
+  const z = s * s;
+  i = hx - 0x6147A;
+  const w = z * z;
+  const j = 0x6B851 - hx;
+  const t1 = w * (LG2 + w * (LG4 + w * LG6));
+  const t2 = z * (LG1 + w * (LG3 + w * (LG5 + w * LG7)));
+  i |= j;
+  const R = t2 + t1;
+  if (i > 0) {
+    const hfsq = 0.5 * f * f;
+    if (k === 0) return f - (hfsq - s * (hfsq + R));
+    return dk * LN2_HI - ((hfsq - (s * (hfsq + R) + dk * LN2_LO)) - f);
+  }
+  if (k === 0) return f - s * (f - R);
+  return dk * LN2_HI - ((s * (f - R) - dk * LN2_LO) - f);
+}
+
+/** fdlibm __ieee754_log10, as portable_math.log10. */
+export function plog10(x: number): number {
+  let hx = highWord(x);
+  const lx = lowWord(x);
+  let k = 0;
+  if (hx < 0x00100000 || (hx & 0x80000000) !== 0) {
+    if (((hx & 0x7FFFFFFF) | lx) === 0) return -Infinity;
+    if ((hx & 0x80000000) !== 0) return NaN;
+    k -= 54;
+    x *= TWO54;
+    hx = highWord(x);
+  }
+  if (hx >= 0x7FF00000) return x + x;
+  k += (hx >> 20) - 1023;
+  const i = k < 0 ? 1 : 0;
+  hx = (hx & 0x000FFFFF) | ((0x3FF - i) << 20);
+  const y = k + i;
+  x = fromBits(hx, lowWord(x));
+  const z = y * LOG10_2LO + IVLN10 * plog(x);
+  return z + y * LOG10_2HI;
+}
