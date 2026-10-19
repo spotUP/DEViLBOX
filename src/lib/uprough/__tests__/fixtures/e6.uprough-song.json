@@ -1,0 +1,10206 @@
+{
+ "format": "uprough-softsynth-song",
+ "schema": 1,
+ "generator": {
+  "tool": "hiphop",
+  "version": "e6"
+ },
+ "song": {
+  "style": "trap",
+  "seed": 1,
+  "key": {
+   "tonic": 9,
+   "mode": "minor"
+  },
+  "rate": 22050,
+  "tier": "a1200",
+  "bars": 16,
+  "rows_per_bar": 16,
+  "render": {
+   "section": null,
+   "sample": null,
+   "sample_age": null,
+   "stem": null,
+   "break_pitch": null,
+   "use_source_record": true,
+   "use_real_break": false,
+   "real_break_kick_gain": 0.8,
+   "real_break_lp": 7000,
+   "real_break_mode": "straight",
+   "vintage": true,
+   "scratch_cfg": null,
+   "melody_voice": null,
+   "use_trap808": null,
+   "voice_cfg": null
+  },
+  "motif": [
+   [
+    74,
+    3,
+    2
+   ],
+   [
+    72,
+    6,
+    2
+   ],
+   [
+    74,
+    11,
+    3
+   ]
+  ],
+  "chord_roots": [
+   0,
+   0
+  ]
+ },
+ "instruments": [
+  {
+   "name": "kick",
+   "voice": "kick",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "snare",
+   "voice": "snare",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "snare_ghost",
+   "voice": "snare_ghost",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "ch",
+   "voice": "ch",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "bass808",
+   "voice": "bass808",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "rim",
+   "voice": "rim",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "oh",
+   "voice": "oh",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "melody",
+   "voice": "melody",
+   "params": {},
+   "seed": 0
+  }
+ ],
+ "sections": [
+  {
+   "id": "verse_0",
+   "header": {
+    "style": "trap",
+    "section": "verse",
+    "bars": 5,
+    "seed": 1,
+    "drum_seed": 1,
+    "bar_offset": 0,
+    "fill_pending": false,
+    "carry_fill": true,
+    "layers": {
+     "drums": 1,
+     "bass": 1,
+     "sample": 1,
+     "melody": 0,
+     "vocal": 1,
+     "energy": 0.6
+    },
+    "melody_from_bar": 0
+   },
+   "lanes": {
+    "kick": [
+     [
+      "C-4",
+      1,
+      62,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      62,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      62,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      62,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      62,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "snare": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      17,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      17,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      17,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      17,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "hat": [
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      34,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      27,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      17,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      11,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      39,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      38,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      47,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      29,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      59,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      39,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      53,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      16,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      42,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      20,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      45,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      58,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      22,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      29,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      37,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      34,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      27,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      17,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      11,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      39,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      38,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      47,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      29,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      59,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      39,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      53,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      16,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      42,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      20,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      45,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      58,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      29,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      7,
+      22,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      37,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      30,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      19,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      12,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      43,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      41,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      51,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      31,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      43,
+      null
+     ],
+     null
+    ],
+    "perc1": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      6,
+      17,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "perc2": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      4,
+      37,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "bass": [
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "G-4",
+      5,
+      64,
+      null
+     ],
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     [
+      "E-4",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "G-4",
+      5,
+      64,
+      null
+     ],
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "G-4",
+      5,
+      64,
+      null
+     ],
+     null
+    ]
+   },
+   "bars": [
+    {
+     "drop": null,
+     "fill": false,
+     "bass": {
+      "profile": "deep",
+      "root_semi": 9
+     },
+     "melody": false,
+     "order": [
+      "kick:0",
+      "kick:6",
+      "kick:10",
+      "snare:8",
+      "snare:6",
+      "hat:0",
+      "hat:2",
+      "hat:3",
+      "hat:4",
+      "hat:5",
+      "hat:6",
+      "hat:7",
+      "hat:8",
+      "hat:10",
+      "hat:12",
+      "hat:14",
+      "bass:0",
+      "bass:6",
+      "bass:10",
+      "bass:14"
+     ]
+    },
+    {
+     "drop": null,
+     "fill": false,
+     "bass": {
+      "profile": "deep",
+      "root_semi": 9
+     },
+     "melody": false,
+     "order": [
+      "kick:16",
+      "kick:22",
+      "kick:26",
+      "snare:24",
+      "perc1:30",
+      "hat:16",
+      "hat:18",
+      "hat:20",
+      "hat:21",
+      "hat:22",
+      "hat:23",
+      "hat:24",
+      "hat:25",
+      "hat:26",
+      "hat:28",
+      "hat:30",
+      "bass:16",
+      "bass:26",
+      "bass:27",
+      "bass:30"
+     ]
+    },
+    {
+     "drop": null,
+     "fill": false,
+     "bass": {
+      "profile": "deep",
+      "root_semi": 9
+     },
+     "melody": false,
+     "order": [
+      "kick:32",
+      "kick:38",
+      "kick:42",
+      "snare:40",
+      "snare:38",
+      "hat:32",
+      "hat:34",
+      "hat:35",
+      "hat:36",
+      "hat:37",
+      "hat:38",
+      "hat:39",
+      "hat:40",
+      "hat:42",
+      "hat:44",
+      "hat:46",
+      "bass:32",
+      "bass:38",
+      "bass:43",
+      "bass:47"
+     ]
+    },
+    {
+     "drop": null,
+     "fill": "s.23 4bar boundary (p=0.20)",
+     "bass": {
+      "profile": "deep",
+      "root_semi": 9
+     },
+     "melody": false,
+     "order": [
+      "kick:48",
+      "kick:54",
+      "kick:58",
+      "snare:56",
+      "snare:54",
+      "hat:48",
+      "hat:50",
+      "hat:52",
+      "hat:53",
+      "hat:54",
+      "hat:55",
+      "hat:56",
+      "hat:62",
+      "hat:58",
+      "hat:60",
+      "perc2:62",
+      "bass:48",
+      "bass:55",
+      "bass:59"
+     ]
+    },
+    {
+     "drop": null,
+     "fill": false,
+     "bass": {
+      "profile": "deep",
+      "root_semi": 9
+     },
+     "melody": false,
+     "order": [
+      "kick:64",
+      "kick:70",
+      "kick:74",
+      "snare:72",
+      "snare:70",
+      "hat:64",
+      "hat:66",
+      "hat:67",
+      "hat:68",
+      "hat:69",
+      "hat:70",
+      "hat:71",
+      "hat:72",
+      "hat:74",
+      "hat:76",
+      "hat:78",
+      "bass:64",
+      "bass:70",
+      "bass:74",
+      "bass:78"
+     ]
+    }
+   ],
+   "locked": {
+    "chops": [
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.0010347142748149843,
+        "choke_ms": 11.524010070954452,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 7
+       },
+       {
+        "slice_index": 1,
+        "start": 18896,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.003198138399328603,
+        "choke_ms": 12.25375753414206,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 9
+       }
+      ],
+      "offers": [
+       [
+        0,
+        12.0,
+        "fill",
+        "REJECT",
+        "bar 0 (section_start) is full of sample_chop (cap 0.21)"
+       ]
+      ],
+      "ops": [
+       "FULL_LOOP",
+       0,
+       false
+      ]
+     },
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.004770275425345236,
+        "choke_ms": 9.836850537880522,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 11
+       },
+       {
+        "slice_index": 2,
+        "start": 18896,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.007045090409704738,
+        "choke_ms": 13.626214999618526,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 13
+       }
+      ],
+      "offers": [
+       [
+        1,
+        4.0,
+        "answer",
+        "REJECT",
+        "reserved by rap"
+       ],
+       [
+        1,
+        12.0,
+        "fill",
+        "REJECT",
+        "reserved by rap"
+       ]
+      ],
+      "ops": [
+       "HALF_LOOP",
+       0,
+       false
+      ]
+     },
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.0035252918287937748,
+        "choke_ms": 7.899198901350424,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 15
+       },
+       {
+        "slice_index": 3,
+        "start": 18896,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.00909575036240177,
+        "choke_ms": 13.000595101853971,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 17
+       }
+      ],
+      "offers": [
+       [
+        2,
+        4.0,
+        "answer",
+        "REJECT",
+        "reserved by rap"
+       ]
+      ],
+      "ops": [
+       "FULL_LOOP",
+       0,
+       false
+      ]
+     },
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.007298695353627832,
+        "choke_ms": 13.461173418783856,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 19
+       },
+       {
+        "slice_index": 5,
+        "start": 9448,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "answer",
+        "reverse": false,
+        "start_offset": 0.004973220416571298,
+        "choke_ms": 12.379858091096361,
+        "lp": 6000,
+        "ring": null,
+        "filter_seed": 20
+       },
+       {
+        "slice_index": 4,
+        "start": 18896,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.0009922941939421682,
+        "choke_ms": 13.035629816128786,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 21
+       }
+      ],
+      "offers": [
+       [
+        3,
+        4.0,
+        "answer",
+        "ACCEPT",
+        "ok"
+       ]
+      ],
+      "ops": [
+       "PITCH_SHIFT",
+       -12,
+       true
+      ]
+     },
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.006053711757076371,
+        "choke_ms": 11.273517967498282,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 23
+       },
+       {
+        "slice_index": 5,
+        "start": 18896,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.0013994048981460288,
+        "choke_ms": 12.755230029755094,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 25
+       }
+      ],
+      "offers": [
+       [
+        4,
+        4.0,
+        "answer",
+        "REJECT",
+        "reserved by rap"
+       ],
+       [
+        4,
+        12.0,
+        "fill",
+        "REJECT",
+        "bar 4 (section_end) is full of sample_chop (cap 0.18)"
+       ]
+      ],
+      "ops": [
+       "FULL_LOOP",
+       0,
+       false
+      ]
+     }
+    ],
+    "scratch": {
+     "plan": {
+      "source": "FRESH_ALT_4",
+      "routine": null,
+      "placed": [
+       [],
+       []
+      ]
+     },
+     "offers": []
+    },
+    "vocals": {
+     "voice": {
+      "mode": "SYNTH_SPEECH",
+      "register": "LOW",
+      "syllables_per_bar": 8,
+      "landing": "GAP_FILL",
+      "anticipation": false,
+      "articulation": "staccato",
+      "pitch_mode": "SEMI_PITCHED",
+      "follows": "bass",
+      "role": "ADLIB",
+      "density": 0.7166666666666667,
+      "silence_rule": "breathing_room",
+      "transition_rule": "no_dub_throw",
+      "processing": [],
+      "repetition": "AAAB",
+      "engine": "hiphop",
+      "style": "trap",
+      "section": "MAIN",
+      "character": "LOW_MALE"
+     },
+     "rap_syl": 8,
+     "voice_bars": [
+      1,
+      2,
+      4
+     ],
+     "words": [
+      {
+       "word": "sharp",
+       "semitones": [
+        4
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "threat",
+       "semitones": [
+        4
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "and",
+       "semitones": [
+        1
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "stack",
+       "semitones": [
+        3
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "so",
+       "semitones": [
+        2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "through",
+       "semitones": [
+        2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "the",
+       "semitones": [
+        -1
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "spot",
+       "semitones": [
+        0
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "they",
+       "semitones": [
+        5
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "cross",
+       "semitones": [
+        5
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "the",
+       "semitones": [
+        1
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "block",
+       "semitones": [
+        3
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "so",
+       "semitones": [
+        3
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "linger",
+       "semitones": [
+        2,
+        -2
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "plot",
+       "semitones": [
+        -3
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "route",
+       "semitones": [
+        4
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "but",
+       "semitones": [
+        4
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "meet",
+       "semitones": [
+        3
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "this",
+       "semitones": [
+        3
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "friend",
+       "semitones": [
+        2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "when",
+       "semitones": [
+        2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "old",
+       "semitones": [
+        1
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "shot",
+       "semitones": [
+        -1
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "rough",
+       "semitones": [
+        4
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "stack",
+       "semitones": [
+        4
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "until",
+       "semitones": [
+        1,
+        3
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "pain",
+       "semitones": [
+        2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "climb",
+       "semitones": [
+        2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "loss",
+       "semitones": [
+        1
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "hot",
+       "semitones": [
+        -1
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "stack",
+       "semitones": [
+        4
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "when",
+       "semitones": [
+        4
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "a",
+       "semitones": [
+        1
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": true
+      },
+      {
+       "word": "money",
+       "semitones": [
+        3,
+        0
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "were",
+       "semitones": [
+        2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": true
+      },
+      {
+       "word": "heavy",
+       "semitones": [
+        1,
+        -3
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": true
+      }
+     ],
+     "bars": {
+      "1": [
+       [
+        "they",
+        [
+         5
+        ],
+        1,
+        false,
+        true,
+        -0.0006196266645346563,
+        -0.0006196266645346563
+       ],
+       [
+        "cross",
+        [
+         5
+        ],
+        1,
+        false,
+        true,
+        1.0007415765483902,
+        1.0007415765483902
+       ],
+       [
+        "the",
+        [
+         1
+        ],
+        1,
+        false,
+        true,
+        3.0570476689598123,
+        3.0570476689598123
+       ],
+       [
+        "block",
+        [
+         3
+        ],
+        1,
+        false,
+        true,
+        5.04383053484427,
+        5.04383053484427
+       ],
+       [
+        "so",
+        [
+         3
+        ],
+        1,
+        false,
+        true,
+        6.978911605270693,
+        6.978911605270693
+       ],
+       [
+        "linger",
+        [
+         2,
+         -2
+        ],
+        2,
+        false,
+        true,
+        8.97874822210338,
+        8.97874822210338
+       ],
+       [
+        "plot",
+        [
+         -3
+        ],
+        1,
+        false,
+        true,
+        14.989592426875728,
+        14.989592426875728
+       ]
+      ],
+      "2": [
+       [
+        "route",
+        [
+         4
+        ],
+        1,
+        false,
+        true,
+        -0.011819626664534656,
+        -0.011819626664534656
+       ],
+       [
+        "but",
+        [
+         4
+        ],
+        1,
+        false,
+        true,
+        0.9895415765483903,
+        0.9895415765483903
+       ],
+       [
+        "meet",
+        [
+         3
+        ],
+        1,
+        false,
+        true,
+        3.0458476689598126,
+        3.0458476689598126
+       ],
+       [
+        "this",
+        [
+         3
+        ],
+        1,
+        false,
+        true,
+        5.0326305348442695,
+        5.0326305348442695
+       ],
+       [
+        "friend",
+        [
+         2
+        ],
+        1,
+        true,
+        true,
+        6.9677116052706936,
+        6.9677116052706936
+       ],
+       [
+        "when",
+        [
+         2
+        ],
+        1,
+        false,
+        true,
+        8.96754822210338,
+        8.96754822210338
+       ],
+       [
+        "old",
+        [
+         1
+        ],
+        1,
+        false,
+        true,
+        10.978392426875727,
+        10.978392426875727
+       ],
+       [
+        "shot",
+        [
+         -1
+        ],
+        1,
+        false,
+        true,
+        12.979006025569175,
+        12.979006025569175
+       ]
+      ],
+      "4": [
+       [
+        "stack",
+        [
+         4
+        ],
+        1,
+        false,
+        true,
+        0.995647040002132,
+        0.995647040002132
+       ],
+       [
+        "when",
+        [
+         4
+        ],
+        1,
+        false,
+        true,
+        2.9970082432150567,
+        2.9970082432150567
+       ],
+       [
+        "a",
+        [
+         1
+        ],
+        1,
+        false,
+        true,
+        5.053314335626479,
+        5.053314335626479
+       ],
+       [
+        "money",
+        [
+         3,
+         0
+        ],
+        2,
+        false,
+        true,
+        7.040097201510936,
+        7.040097201510936
+       ],
+       [
+        "were",
+        [
+         2
+        ],
+        1,
+        false,
+        true,
+        9.97517827193736,
+        9.97517827193736
+       ],
+       [
+        "heavy",
+        [
+         1,
+         -3
+        ],
+        2,
+        false,
+        true,
+        10.975014888770048,
+        10.975014888770048
+       ]
+      ]
+     },
+     "reserves": [
+      [
+       1.613877551020408,
+       2.206893424036281,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       1.9414058956916098,
+       3.2970068027210884,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       3.219591836734694,
+       3.5728798185941044,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       3.326575963718821,
+       3.8825850340136054,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       3.6541043083900226,
+       5.082267573696145,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       4.503854875283447,
+       4.824172335600907,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       4.7181405895691615,
+       5.068934240362812,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       6.862358276643992,
+       7.245578231292518,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       7.076734693877551,
+       7.406213151927437,
+       "rap",
+       5,
+       0.5
+      ],
+      null,
+      [
+       7.50984126984127,
+       7.929387755102041,
+       "rap",
+       5,
+       0.5
+      ],
+      null,
+      null,
+      [
+       4.7181405895691615,
+       5.068934240362812,
+       "rap_punchline",
+       5,
+       1.0
+      ],
+      [
+       7.50984126984127,
+       7.929387755102041,
+       "rap_punchline",
+       5,
+       1.0
+      ],
+      [
+       1.713877551020408,
+       2.206893424036281,
+       "main_vocal",
+       4,
+       0.5
+      ],
+      [
+       2.04140589569161,
+       3.2970068027210884,
+       "main_vocal",
+       4,
+       0.5
+      ],
+      [
+       3.319591836734694,
+       3.5728798185941044,
+       "main_vocal",
+       4,
+       0.5
+      ],
+      [
+       3.426575963718821,
+       3.8825850340136054,
+       "main_vocal",
+       4,
+       0.5
+      ],
+      [
+       3.7541043083900227,
+       5.082267573696146,
+       "main_vocal",
+       4,
+       0.5
+      ],
+      [
+       4.603854875283447,
+       4.824172335600907,
+       "main_vocal",
+       4,
+       0.5
+      ],
+      [
+       4.818140589569161,
+       5.068934240362812,
+       "main_vocal",
+       4,
+       0.5
+      ],
+      [
+       6.962358276643991,
+       7.245578231292517,
+       "main_vocal",
+       4,
+       0.5
+      ],
+      [
+       7.176734693877551,
+       7.406213151927438,
+       "main_vocal",
+       4,
+       0.5
+      ],
+      [
+       7.60984126984127,
+       7.929387755102041,
+       "main_vocal",
+       4,
+       0.5
+      ]
+     ],
+     "adlibs": [
+      [
+       "REJECT",
+       "reserved by rap",
+       null
+      ],
+      [
+       "REJECT",
+       "reserved by rap",
+       null
+      ],
+      [
+       "REJECT",
+       "no budget for adlib in verse",
+       null
+      ]
+     ],
+     "bank_words": {}
+    }
+   }
+  },
+  {
+   "id": "hook_1",
+   "header": {
+    "style": "trap",
+    "section": "hook",
+    "bars": 2,
+    "seed": 6,
+    "drum_seed": 1,
+    "bar_offset": 5,
+    "fill_pending": true,
+    "carry_fill": false,
+    "layers": {
+     "drums": 1,
+     "bass": 1,
+     "sample": 1,
+     "melody": 1,
+     "vocal": 1,
+     "energy": 0.9
+    },
+    "melody_from_bar": 0
+   },
+   "lanes": {
+    "kick": [
+     [
+      "C-4",
+      1,
+      62,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      62,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "snare": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      20,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "hat": [
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      34,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      27,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      14,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      54,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      24,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      52,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      28,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      54,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      28,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      58,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      40,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      35,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      38,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      62,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      50,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      34,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      54,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      19,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      35,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      34,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      16,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      25,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      26,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      40,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      22,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      49,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      46,
+      null
+     ]
+    ],
+    "perc1": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      6,
+      20,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "bass": [
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "G-4",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      5,
+      64,
+      null
+     ],
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     [
+      "A#3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null
+    ],
+    "melody1": [
+     null,
+     null,
+     null,
+     [
+      "E-6",
+      8,
+      64,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-6",
+      8,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     [
+      "D-6",
+      8,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "bars": [
+    {
+     "drop": null,
+     "fill": false,
+     "bass": {
+      "profile": "deep",
+      "root_semi": 9
+     },
+     "melody": true,
+     "order": [
+      "kick:0",
+      "kick:6",
+      "kick:10",
+      "snare:8",
+      "perc1:14",
+      "hat:0",
+      "hat:1",
+      "hat:2",
+      "hat:3",
+      "hat:4",
+      "hat:5",
+      "hat:6",
+      "hat:7",
+      "hat:8",
+      "hat:10",
+      "hat:11",
+      "hat:12",
+      "hat:14",
+      "hat:15",
+      "bass:0",
+      "bass:6",
+      "bass:10",
+      "bass:14",
+      "melody1:3",
+      "melody1:6",
+      "melody1:11"
+     ]
+    },
+    {
+     "drop": null,
+     "fill": false,
+     "bass": {
+      "profile": "deep",
+      "root_semi": 9
+     },
+     "melody": false,
+     "order": [
+      "kick:16",
+      "kick:22",
+      "kick:26",
+      "snare:24",
+      "snare:22",
+      "hat:16",
+      "hat:18",
+      "hat:19",
+      "hat:20",
+      "hat:21",
+      "hat:22",
+      "hat:23",
+      "hat:24",
+      "hat:25",
+      "hat:26",
+      "hat:27",
+      "hat:28",
+      "hat:29",
+      "hat:30",
+      "hat:31",
+      "bass:16",
+      "bass:22",
+      "bass:23",
+      "bass:26",
+      "bass:30"
+     ]
+    }
+   ],
+   "locked": {
+    "chops": [
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.005622339208056763,
+        "choke_ms": 6.631357289997711,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 42
+       },
+       {
+        "slice_index": 1,
+        "start": 18896,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.0007902647440299077,
+        "choke_ms": 11.518272678721294,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 44
+       },
+       {
+        "slice_index": 0,
+        "start": 28344,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "fill",
+        "reverse": false,
+        "start_offset": 0.0064467841611352715,
+        "choke_ms": 9.68743419546807,
+        "lp": 3600,
+        "ring": null,
+        "filter_seed": 45
+       }
+      ],
+      "offers": [
+       [
+        0,
+        12.0,
+        "fill",
+        "ACCEPT",
+        "ok"
+       ]
+      ],
+      "ops": [
+       "HALF_LOOP",
+       0,
+       false
+      ]
+     },
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.006867627985046159,
+        "choke_ms": 8.56900892652781,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 46
+       },
+       {
+        "slice_index": 2,
+        "start": 18896,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.002840619516289006,
+        "choke_ms": 11.143633173113603,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 48
+       },
+       {
+        "slice_index": 0,
+        "start": 28344,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "fill",
+        "reverse": false,
+        "start_offset": 0.004629587243457695,
+        "choke_ms": 10.075135423819333,
+        "lp": 3600,
+        "ring": null,
+        "filter_seed": 49
+       }
+      ],
+      "offers": [
+       [
+        1,
+        4.0,
+        "answer",
+        "REJECT",
+        "reserved by rap"
+       ],
+       [
+        1,
+        12.0,
+        "fill",
+        "ACCEPT",
+        "ok"
+       ]
+      ],
+      "ops": [
+       "FULL_LOOP",
+       0,
+       false
+      ]
+     }
+    ],
+    "scratch": {
+     "plan": {
+      "source": "AH_FRESH_FULL_PHRASE",
+      "routine": null,
+      "placed": [
+       []
+      ]
+     },
+     "offers": []
+    },
+    "vocals": {
+     "voice": {
+      "mode": "VOCODER",
+      "register": "LOW",
+      "syllables_per_bar": 7,
+      "landing": "OFFBEAT",
+      "anticipation": false,
+      "articulation": "sustained",
+      "pitch_mode": "SPOKEN",
+      "follows": "drums",
+      "role": "RAP",
+      "density": 0.7166666666666667,
+      "silence_rule": "breathing_room",
+      "transition_rule": "no_dub_throw",
+      "processing": [],
+      "repetition": "AAAB",
+      "engine": "hiphop",
+      "style": "trap",
+      "section": "MAIN",
+      "character": "LOW_MALE"
+     },
+     "rap_syl": 7,
+     "voice_bars": [
+      1
+     ],
+     "words": [
+      {
+       "word": "boom",
+       "semitones": [
+        6
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      },
+      {
+       "word": "ghost",
+       "semitones": [
+        5
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      },
+      {
+       "word": "ayeah",
+       "semitones": [
+        4,
+        0,
+        -1,
+        -6
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      },
+      {
+       "word": "boom",
+       "semitones": [
+        6
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      },
+      {
+       "word": "ghost",
+       "semitones": [
+        5
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      },
+      {
+       "word": "ayeah",
+       "semitones": [
+        4,
+        0,
+        -1,
+        -6
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      }
+     ],
+     "bars": {
+      "1": [
+       [
+        "boom",
+        [
+         6
+        ],
+        1,
+        false,
+        true,
+        -0.010190463186951262,
+        -0.010190463186951262
+       ],
+       [
+        "ghost",
+        [
+         5
+        ],
+        1,
+        false,
+        true,
+        1.0624368510704658,
+        1.0624368510704658
+       ],
+       [
+        "ayeah",
+        [
+         4,
+         0,
+         -1,
+         -6
+        ],
+        2,
+        false,
+        true,
+        3.0582486393282107,
+        3.0582486393282107
+       ]
+      ]
+     },
+     "reserves": [
+      [
+       1.6128344671201813,
+       1.9750566893424035,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       1.7277097505668932,
+       2.1363265306122448,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       1.9415419501133786,
+       2.76421768707483,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       1.9415419501133786,
+       2.76421768707483,
+       "rap_punchline",
+       5,
+       1.0
+      ],
+      [
+       1.7128344671201814,
+       1.9750566893424035,
+       "hook",
+       4,
+       0.5
+      ],
+      [
+       1.8277097505668933,
+       2.1363265306122448,
+       "hook",
+       4,
+       0.5
+      ],
+      [
+       2.0415419501133787,
+       2.76421768707483,
+       "hook",
+       4,
+       0.5
+      ]
+     ],
+     "adlibs": [],
+     "bank_words": {}
+    }
+   }
+  },
+  {
+   "id": "verse_2",
+   "header": {
+    "style": "trap",
+    "section": "verse",
+    "bars": 4,
+    "seed": 8,
+    "drum_seed": 1,
+    "bar_offset": 7,
+    "fill_pending": false,
+    "carry_fill": true,
+    "layers": {
+     "drums": 1,
+     "bass": 1,
+     "sample": 1,
+     "melody": 0,
+     "vocal": 1,
+     "energy": 0.6
+    },
+    "melody_from_bar": 0
+   },
+   "lanes": {
+    "kick": [
+     [
+      "C-4",
+      1,
+      62,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      62,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      62,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      62,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "snare": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      17,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      35,
+      null
+     ],
+     [
+      "C-4",
+      2,
+      45,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      17,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      17,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "hat": [
+     [
+      "C-4",
+      4,
+      57,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      32,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      20,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      53,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      33,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      36,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      52,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      60,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      61,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      45,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      43,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      34,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      46,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      44,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      27,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      16,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      25,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      26,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      37,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      33,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      22,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      63,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      35,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      21,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      58,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      36,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      39,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      57,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      49,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      47,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      37,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      46,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      44,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      27,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      16,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      25,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      26,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      37,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      33,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      43,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      22,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      57,
+      null
+     ]
+    ],
+    "perc1": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      6,
+      17,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "perc2": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      7,
+      52,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "bass": [
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A#3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     [
+      "E-4",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "A#3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A#3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A#3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "bars": [
+    {
+     "drop": null,
+     "fill": false,
+     "bass": {
+      "profile": "deep",
+      "root_semi": 9
+     },
+     "melody": false,
+     "order": [
+      "kick:0",
+      "kick:6",
+      "kick:10",
+      "snare:8",
+      "snare:6",
+      "snare:13",
+      "snare:14",
+      "hat:0",
+      "hat:1",
+      "hat:2",
+      "hat:4",
+      "hat:6",
+      "hat:7",
+      "hat:8",
+      "hat:10",
+      "hat:11",
+      "hat:12",
+      "hat:13",
+      "hat:14",
+      "perc2:14",
+      "bass:0",
+      "bass:6",
+      "bass:10"
+     ]
+    },
+    {
+     "drop": null,
+     "fill": false,
+     "bass": {
+      "profile": "deep",
+      "root_semi": 9
+     },
+     "melody": false,
+     "order": [
+      "kick:16",
+      "kick:22",
+      "kick:26",
+      "snare:24",
+      "snare:22",
+      "hat:16",
+      "hat:17",
+      "hat:18",
+      "hat:20",
+      "hat:22",
+      "hat:23",
+      "hat:24",
+      "hat:26",
+      "hat:28",
+      "hat:30",
+      "bass:21",
+      "bass:22",
+      "bass:26",
+      "bass:30"
+     ]
+    },
+    {
+     "drop": null,
+     "fill": false,
+     "bass": {
+      "profile": "deep",
+      "root_semi": 9
+     },
+     "melody": false,
+     "order": [
+      "kick:32",
+      "kick:38",
+      "kick:42",
+      "snare:40",
+      "perc1:46",
+      "hat:32",
+      "hat:33",
+      "hat:34",
+      "hat:36",
+      "hat:38",
+      "hat:39",
+      "hat:40",
+      "hat:42",
+      "hat:43",
+      "hat:44",
+      "hat:45",
+      "hat:46",
+      "bass:32",
+      "bass:38",
+      "bass:43",
+      "bass:47"
+     ]
+    },
+    {
+     "drop": null,
+     "fill": "s.23 section boundary (p=0.70)",
+     "bass": {
+      "profile": "deep",
+      "root_semi": 9
+     },
+     "melody": false,
+     "order": [
+      "kick:48",
+      "kick:54",
+      "kick:58",
+      "snare:56",
+      "snare:54",
+      "hat:48",
+      "hat:49",
+      "hat:50",
+      "hat:52",
+      "hat:54",
+      "hat:55",
+      "hat:56",
+      "hat:58",
+      "hat:60",
+      "hat:61",
+      "hat:62",
+      "hat:63",
+      "bass:48",
+      "bass:55",
+      "bass:59"
+     ]
+    }
+   ],
+   "locked": {
+    "chops": [
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.008277714198519874,
+        "choke_ms": 10.215640497444113,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 56
+       },
+       {
+        "slice_index": 1,
+        "start": 18896,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.009293965056839857,
+        "choke_ms": 8.782513160906387,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 58
+       }
+      ],
+      "offers": [
+       [
+        0,
+        4.0,
+        "answer",
+        "REJECT",
+        "reserved by rap"
+       ],
+       [
+        0,
+        12.0,
+        "fill",
+        "REJECT",
+        "reserved by rap"
+       ]
+      ],
+      "ops": [
+       "PITCH_SHIFT",
+       -7,
+       true
+      ]
+     },
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.00952300297550927,
+        "choke_ms": 12.028290226596475,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 60
+       },
+       {
+        "slice_index": 2,
+        "start": 18896,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.006931105516136416,
+        "choke_ms": 8.407141222247654,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 62
+       }
+      ],
+      "offers": [
+       [
+        1,
+        4.0,
+        "answer",
+        "REJECT",
+        "bar 1 (phrase_middle) is full of sample_chop (cap 0.18)"
+       ],
+       [
+        1,
+        12.0,
+        "fill",
+        "REJECT",
+        "bar 1 (phrase_middle) is full of sample_chop (cap 0.18)"
+       ]
+      ],
+      "ops": [
+       "FULL_LOOP",
+       0,
+       false
+      ]
+     },
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.005768215457389181,
+        "choke_ms": 6.340337224383917,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 64
+       },
+       {
+        "slice_index": 3,
+        "start": 18896,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.0033170061799038682,
+        "choke_ms": 9.53325703822385,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 66
+       }
+      ],
+      "offers": [
+       [
+        2,
+        4.0,
+        "answer",
+        "REJECT",
+        "reserved by rap"
+       ],
+       [
+        2,
+        12.0,
+        "fill",
+        "REJECT",
+        "reserved by rap"
+       ]
+      ],
+      "ops": [
+       "HALF_LOOP",
+       0,
+       false
+      ]
+     },
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.007013504234378576,
+        "choke_ms": 8.402990768291753,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 68
+       },
+       {
+        "slice_index": 4,
+        "start": 18896,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.000328526741435874,
+        "choke_ms": 9.159838254367894,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 70
+       }
+      ],
+      "offers": [
+       [
+        3,
+        4.0,
+        "answer",
+        "REJECT",
+        "bar 3 (section_end) is full of sample_chop (cap 0.18)"
+       ],
+       [
+        3,
+        12.0,
+        "fill",
+        "REJECT",
+        "bar 3 (section_end) is full of sample_chop (cap 0.18)"
+       ]
+      ],
+      "ops": [
+       "FULL_LOOP",
+       0,
+       false
+      ]
+     }
+    ],
+    "scratch": {
+     "plan": {
+      "source": "FRESH_YEAH",
+      "routine": null,
+      "placed": [
+       [],
+       []
+      ]
+     },
+     "offers": []
+    },
+    "vocals": {
+     "voice": {
+      "mode": "VOCODER",
+      "register": "LOW",
+      "syllables_per_bar": 13,
+      "landing": "OFFBEAT",
+      "anticipation": false,
+      "articulation": "sustained",
+      "pitch_mode": "SPOKEN",
+      "follows": "drums",
+      "role": "RAP",
+      "density": 0.7166666666666667,
+      "silence_rule": "breathing_room",
+      "transition_rule": "no_dub_throw",
+      "processing": [],
+      "repetition": "ABAB",
+      "engine": "hiphop",
+      "style": "trap",
+      "section": "MAIN",
+      "character": "LOW_MALE"
+     },
+     "rap_syl": 13,
+     "voice_bars": [
+      0,
+      2
+     ],
+     "words": [
+      {
+       "word": "sharp",
+       "semitones": [
+        5
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "cold",
+       "semitones": [
+        5
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "when",
+       "semitones": [
+        4
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "run",
+       "semitones": [
+        4
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "a",
+       "semitones": [
+        1
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": true
+      },
+      {
+       "word": "warning",
+       "semitones": [
+        4,
+        0
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "because",
+       "semitones": [
+        0,
+        3
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "my",
+       "semitones": [
+        2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "risk",
+       "semitones": [
+        2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "are",
+       "semitones": [
+        2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": true
+      },
+      {
+       "word": "wild",
+       "semitones": [
+        -1
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "push",
+       "semitones": [
+        10
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "the",
+       "semitones": [
+        5
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "command",
+       "semitones": [
+        4,
+        8
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "while",
+       "semitones": [
+        7
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": true
+      },
+      {
+       "word": "pressure",
+       "semitones": [
+        6,
+        2
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "press",
+       "semitones": [
+        5
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "and",
+       "semitones": [
+        0
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "he",
+       "semitones": [
+        4
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "lift",
+       "semitones": [
+        3
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "in",
+       "semitones": [
+        -2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "weight",
+       "semitones": [
+        -3
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "rent",
+       "semitones": [
+        7
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "count",
+       "semitones": [
+        7
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "the",
+       "semitones": [
+        2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "pocket",
+       "semitones": [
+        6,
+        1
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "so",
+       "semitones": [
+        4
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "money",
+       "semitones": [
+        4,
+        0
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "under",
+       "semitones": [
+        3,
+        -1
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "this",
+       "semitones": [
+        2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "wage",
+       "semitones": [
+        1
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "mild",
+       "semitones": [
+        -3
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "worn",
+       "semitones": [
+        5
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "burden",
+       "semitones": [
+        5,
+        2
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "so",
+       "semitones": [
+        4
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "they",
+       "semitones": [
+        4
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "survive",
+       "semitones": [
+        0,
+        3
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "pain",
+       "semitones": [
+        3
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "but",
+       "semitones": [
+        2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "in",
+       "semitones": [
+        -1
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": true,
+       "adlib": false
+      },
+      {
+       "word": "a",
+       "semitones": [
+        -1
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": true
+      },
+      {
+       "word": "state",
+       "semitones": [
+        -1
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": true
+      }
+     ],
+     "bars": {
+      "0": [
+       [
+        "sharp",
+        [
+         5
+        ],
+        1,
+        false,
+        true,
+        0.04198120223015913,
+        0.04198120223015913
+       ],
+       [
+        "cold",
+        [
+         5
+        ],
+        1,
+        false,
+        true,
+        0.9937816275025011,
+        0.9937816275025011
+       ],
+       [
+        "when",
+        [
+         4
+        ],
+        1,
+        false,
+        true,
+        2.984062360774134,
+        2.984062360774134
+       ],
+       [
+        "run",
+        [
+         4
+        ],
+        1,
+        false,
+        true,
+        5.010748805857612,
+        5.010748805857612
+       ],
+       [
+        "a",
+        [
+         1
+        ],
+        1,
+        false,
+        true,
+        7.061509264309662,
+        7.061509264309662
+       ],
+       [
+        "warning",
+        [
+         4,
+         0
+        ],
+        2,
+        false,
+        true,
+        9.007118059911043,
+        9.007118059911043
+       ],
+       [
+        "because",
+        [
+         0,
+         3
+        ],
+        2,
+        false,
+        true,
+        13.027281718051347,
+        13.027281718051347
+       ]
+      ],
+      "2": [
+       [
+        "rent",
+        [
+         7
+        ],
+        1,
+        false,
+        true,
+        0.030781202230159132,
+        0.030781202230159132
+       ],
+       [
+        "count",
+        [
+         7
+        ],
+        1,
+        false,
+        true,
+        0.9825816275025011,
+        0.9825816275025011
+       ],
+       [
+        "the",
+        [
+         2
+        ],
+        1,
+        false,
+        true,
+        2.972862360774134,
+        2.972862360774134
+       ],
+       [
+        "pocket",
+        [
+         6,
+         1
+        ],
+        2,
+        false,
+        true,
+        4.9995488058576125,
+        4.9995488058576125
+       ],
+       [
+        "so",
+        [
+         4
+        ],
+        1,
+        false,
+        true,
+        9.050309264309663,
+        9.050309264309663
+       ],
+       [
+        "money",
+        [
+         4,
+         0
+        ],
+        2,
+        false,
+        true,
+        10.995918059911045,
+        10.995918059911045
+       ]
+      ]
+     },
+     "reserves": [
+      [
+       -0.09551020408163266,
+       0.7134240362811792,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       0.43673469387755104,
+       0.7225396825396826,
+       "rap",
+       5,
+       0.5
+      ],
+      null,
+      [
+       0.8648526077097506,
+       1.2370521541950112,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       1.2954648526077097,
+       1.672607709750567,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       3.331156462585034,
+       4.02984126984127,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       3.8634013605442177,
+       4.228390022675737,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       4.297324263038549,
+       4.936825396825396,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       4.297324263038549,
+       4.936825396825396,
+       "rap_punchline",
+       5,
+       1.0
+      ],
+      [
+       0.004489795918367347,
+       0.7134240362811791,
+       "main_vocal",
+       4,
+       0.5
+      ],
+      [
+       0.536734693877551,
+       0.7225396825396826,
+       "main_vocal",
+       4,
+       0.5
+      ],
+      [
+       0.9648526077097506,
+       1.2370521541950112,
+       "main_vocal",
+       4,
+       0.5
+      ],
+      [
+       1.3954648526077098,
+       1.672607709750567,
+       "main_vocal",
+       4,
+       0.5
+      ],
+      [
+       3.431156462585034,
+       4.02984126984127,
+       "main_vocal",
+       4,
+       0.5
+      ],
+      [
+       3.9634013605442178,
+       4.228390022675737,
+       "main_vocal",
+       4,
+       0.5
+      ],
+      [
+       4.3973242630385485,
+       4.936825396825397,
+       "main_vocal",
+       4,
+       0.5
+      ]
+     ],
+     "adlibs": [
+      [
+       "REJECT",
+       "no budget for adlib in verse",
+       null
+      ]
+     ],
+     "bank_words": {}
+    }
+   }
+  },
+  {
+   "id": "breakdown_3",
+   "header": {
+    "style": "trap",
+    "section": "breakdown",
+    "bars": 2,
+    "seed": 12,
+    "drum_seed": 1,
+    "bar_offset": 11,
+    "fill_pending": true,
+    "carry_fill": false,
+    "layers": {
+     "drums": 0,
+     "bass": 0,
+     "sample": 1,
+     "melody": 1,
+     "vocal": 0,
+     "energy": 0.35
+    },
+    "melody_from_bar": 0
+   },
+   "lanes": {
+    "kick": [
+     [
+      "C-4",
+      1,
+      62,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      62,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "snare": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      15,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      35,
+      null
+     ],
+     [
+      "C-4",
+      2,
+      45,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      15,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "hat": [
+     [
+      "C-4",
+      4,
+      63,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      24,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      31,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      27,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      50,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      22,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      28,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      53,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      27,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      39,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      34,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      61,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      29,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      37,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      28,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      39,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      7,
+      30,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      56,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      25,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      50,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      30,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      31,
+      null
+     ],
+     null
+    ],
+    "perc2": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      7,
+      52,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "melody1": [
+     null,
+     null,
+     null,
+     [
+      "D-6",
+      8,
+      64,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-6",
+      8,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     [
+      "D-6",
+      8,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "D-6",
+      8,
+      64,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-6",
+      8,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     [
+      "E-6",
+      8,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "bars": [
+    {
+     "drop": null,
+     "fill": false,
+     "bass": null,
+     "melody": true,
+     "order": [
+      "kick:0",
+      "kick:6",
+      "kick:10",
+      "snare:8",
+      "snare:6",
+      "snare:13",
+      "snare:14",
+      "hat:0",
+      "hat:1",
+      "hat:2",
+      "hat:3",
+      "hat:4",
+      "hat:5",
+      "hat:6",
+      "hat:8",
+      "hat:10",
+      "hat:12",
+      "hat:14",
+      "perc2:14",
+      "melody1:3",
+      "melody1:6",
+      "melody1:11"
+     ]
+    },
+    {
+     "drop": null,
+     "fill": false,
+     "bass": null,
+     "melody": true,
+     "order": [
+      "kick:16",
+      "kick:22",
+      "kick:26",
+      "snare:24",
+      "snare:22",
+      "hat:16",
+      "hat:17",
+      "hat:18",
+      "hat:19",
+      "hat:20",
+      "hat:22",
+      "hat:24",
+      "hat:26",
+      "hat:28",
+      "hat:29",
+      "hat:30",
+      "melody1:19",
+      "melody1:22",
+      "melody1:27"
+     ]
+    }
+   ],
+   "locked": {
+    "chops": [
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.0012445258258945602,
+        "choke_ms": 7.262714579995422,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 84
+       },
+       {
+        "slice_index": 1,
+        "start": 18896,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.00925108720531014,
+        "choke_ms": 10.016174563210498,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 86
+       }
+      ],
+      "offers": [],
+      "ops": [
+       "PITCH_SHIFT",
+       -5,
+       true
+      ]
+     },
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.002499580376897841,
+        "choke_ms": 9.450370031280995,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 88
+       },
+       {
+        "slice_index": 0,
+        "start": 9448,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "answer",
+        "reverse": false,
+        "start_offset": 0.006887312123292897,
+        "choke_ms": 10.641794460975053,
+        "lp": 6000,
+        "ring": null,
+        "filter_seed": 89
+       },
+       {
+        "slice_index": 2,
+        "start": 18896,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.008176699473563745,
+        "choke_ms": 11.383749141680019,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 90
+       },
+       {
+        "slice_index": 0,
+        "start": 28344,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "fill",
+        "reverse": false,
+        "start_offset": 0.005259479667353323,
+        "choke_ms": 10.33929961089494,
+        "lp": 3600,
+        "ring": null,
+        "filter_seed": 91
+       }
+      ],
+      "offers": [
+       [
+        1,
+        4.0,
+        "answer",
+        "ACCEPT",
+        "ok"
+       ],
+       [
+        1,
+        12.0,
+        "fill",
+        "ACCEPT",
+        "ok"
+       ]
+      ],
+      "ops": [
+       "FULL_LOOP",
+       0,
+       false
+      ]
+     }
+    ],
+    "scratch": {
+     "plan": {
+      "source": "LASER_FX",
+      "routine": null,
+      "placed": [
+       []
+      ]
+     },
+     "offers": []
+    },
+    "vocals": {
+     "voice": null,
+     "rap_syl": null,
+     "voice_bars": [],
+     "words": [],
+     "bars": {},
+     "reserves": [],
+     "adlibs": [],
+     "bank_words": {}
+    }
+   }
+  },
+  {
+   "id": "hook_4",
+   "header": {
+    "style": "trap",
+    "section": "hook",
+    "bars": 2,
+    "seed": 14,
+    "drum_seed": 1,
+    "bar_offset": 13,
+    "fill_pending": false,
+    "carry_fill": false,
+    "layers": {
+     "drums": 1,
+     "bass": 1,
+     "sample": 1,
+     "melody": 1,
+     "vocal": 1,
+     "energy": 0.95
+    },
+    "melody_from_bar": 0
+   },
+   "lanes": {
+    "kick": [
+     [
+      "C-4",
+      1,
+      62,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      62,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "snare": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      21,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "hat": [
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      35,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      25,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      20,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      56,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      15,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      29,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      63,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      36,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      60,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      37,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      45,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      13,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      62,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      52,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      48,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      36,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      30,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      61,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      25,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      63,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      28,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      43,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      15,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      30,
+      null
+     ]
+    ],
+    "perc1": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      6,
+      21,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "bass": [
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "G-4",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "E-4",
+      5,
+      64,
+      null
+     ],
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "G-4",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      5,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "G-4",
+      5,
+      64,
+      null
+     ],
+     null
+    ],
+    "melody1": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "D-6",
+      8,
+      64,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-6",
+      8,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     [
+      "E-6",
+      8,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "bars": [
+    {
+     "drop": null,
+     "fill": false,
+     "bass": {
+      "profile": "deep",
+      "root_semi": 9
+     },
+     "melody": false,
+     "order": [
+      "kick:0",
+      "kick:6",
+      "kick:10",
+      "snare:8",
+      "perc1:14",
+      "hat:0",
+      "hat:1",
+      "hat:2",
+      "hat:3",
+      "hat:4",
+      "hat:5",
+      "hat:6",
+      "hat:7",
+      "hat:8",
+      "hat:10",
+      "hat:11",
+      "hat:12",
+      "hat:13",
+      "hat:14",
+      "hat:15",
+      "bass:0",
+      "bass:6",
+      "bass:10",
+      "bass:14"
+     ]
+    },
+    {
+     "drop": null,
+     "fill": false,
+     "bass": {
+      "profile": "deep",
+      "root_semi": 9
+     },
+     "melody": true,
+     "order": [
+      "kick:16",
+      "kick:22",
+      "kick:26",
+      "snare:24",
+      "snare:22",
+      "hat:16",
+      "hat:17",
+      "hat:18",
+      "hat:19",
+      "hat:20",
+      "hat:21",
+      "hat:23",
+      "hat:24",
+      "hat:25",
+      "hat:26",
+      "hat:27",
+      "hat:28",
+      "hat:29",
+      "hat:30",
+      "hat:31",
+      "bass:16",
+      "bass:18",
+      "bass:22",
+      "bass:26",
+      "bass:30",
+      "melody1:19",
+      "melody1:22",
+      "melody1:27"
+     ]
+    }
+   ],
+   "locked": {
+    "chops": [
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.009756923781185626,
+        "choke_ms": 13.974608987563897,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 98
+       },
+       {
+        "slice_index": 1,
+        "start": 18896,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.009232928969253072,
+        "choke_ms": 9.951476310368506,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 100
+       }
+      ],
+      "offers": [
+       [
+        0,
+        4.0,
+        "answer",
+        "REJECT",
+        "reserved by rap"
+       ],
+       [
+        0,
+        12.0,
+        "fill",
+        "REJECT",
+        "reserved by rap"
+       ]
+      ],
+      "ops": [
+       "HALF_LOOP",
+       0,
+       false
+      ]
+     },
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.008511940184634165,
+        "choke_ms": 11.786953536278325,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 102
+       },
+       {
+        "slice_index": 0,
+        "start": 9448,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "answer",
+        "reverse": false,
+        "start_offset": 0.006909132524605173,
+        "choke_ms": 9.328053711757077,
+        "lp": 6000,
+        "ring": null,
+        "filter_seed": 103
+       },
+       {
+        "slice_index": 2,
+        "start": 18896,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.0023506523231860837,
+        "choke_ms": 9.465506981002518,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 104
+       }
+      ],
+      "offers": [
+       [
+        1,
+        4.0,
+        "answer",
+        "ACCEPT",
+        "ok"
+       ],
+       [
+        1,
+        12.0,
+        "fill",
+        "REJECT",
+        "bar 1 (section_end) is full of sample_chop (cap 1.51)"
+       ]
+      ],
+      "ops": [
+       "FULL_LOOP",
+       0,
+       false
+      ]
+     }
+    ],
+    "scratch": {
+     "plan": {
+      "source": "FRESH_ALT",
+      "routine": null,
+      "placed": [
+       []
+      ]
+     },
+     "offers": []
+    },
+    "vocals": {
+     "voice": {
+      "mode": "SYNTH_SPEECH",
+      "register": "LOW",
+      "syllables_per_bar": 9,
+      "landing": "GAP_FILL",
+      "anticipation": false,
+      "articulation": "sustained",
+      "pitch_mode": "SEMI_PITCHED",
+      "follows": "bass",
+      "role": "ADLIB",
+      "density": 0.7166666666666667,
+      "silence_rule": "breathing_room",
+      "transition_rule": "no_dub_throw",
+      "processing": [],
+      "repetition": "AAAB",
+      "engine": "hiphop",
+      "style": "trap",
+      "section": "MAIN",
+      "character": "LOW_MALE"
+     },
+     "rap_syl": 9,
+     "voice_bars": [
+      0
+     ],
+     "words": [
+      {
+       "word": "power",
+       "semitones": [
+        5,
+        1
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      },
+      {
+       "word": "ghost",
+       "semitones": [
+        3
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      },
+      {
+       "word": "boom",
+       "semitones": [
+        2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      },
+      {
+       "word": "uhhah",
+       "semitones": [
+        1,
+        -5
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      },
+      {
+       "word": "power",
+       "semitones": [
+        5,
+        1
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      },
+      {
+       "word": "ghost",
+       "semitones": [
+        3
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      },
+      {
+       "word": "boom",
+       "semitones": [
+        2
+       ],
+       "syllables": 1,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      },
+      {
+       "word": "uhhah",
+       "semitones": [
+        1,
+        -5
+       ],
+       "syllables": 2,
+       "from_contour": true,
+       "rec": null,
+       "synth": false,
+       "adlib": false
+      }
+     ],
+     "bars": {
+      "0": [
+       [
+        "power",
+        [
+         5,
+         1
+        ],
+        2,
+        false,
+        true,
+        0.0118295317279002,
+        0.0118295317279002
+       ],
+       [
+        "ghost",
+        [
+         3
+        ],
+        1,
+        false,
+        true,
+        2.974482623552197,
+        2.974482623552197
+       ],
+       [
+        "boom",
+        [
+         2
+        ],
+        1,
+        false,
+        true,
+        6.041503525242288,
+        6.041503525242288
+       ],
+       [
+        "uhhah",
+        [
+         1,
+         -5
+        ],
+        2,
+        false,
+        true,
+        7.049059704852474,
+        7.049059704852474
+       ]
+      ]
+     },
+     "reserves": [
+      [
+       -0.09873015873015874,
+       0.2785487528344671,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       0.21863945578231295,
+       0.5586394557823129,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       0.5471655328798186,
+       0.8511111111111112,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       0.6551020408163265,
+       1.3015419501133785,
+       "rap",
+       5,
+       0.5
+      ],
+      [
+       0.6551020408163265,
+       1.3015419501133785,
+       "rap_punchline",
+       5,
+       1.0
+      ],
+      [
+       0.0012698412698412698,
+       0.2785487528344671,
+       "hook",
+       4,
+       0.5
+      ],
+      [
+       0.31863945578231295,
+       0.5586394557823129,
+       "hook",
+       4,
+       0.5
+      ],
+      [
+       0.6471655328798186,
+       0.8511111111111112,
+       "hook",
+       4,
+       0.5
+      ],
+      [
+       0.7551020408163265,
+       1.3015419501133787,
+       "hook",
+       4,
+       0.5
+      ]
+     ],
+     "adlibs": [],
+     "bank_words": {}
+    }
+   }
+  },
+  {
+   "id": "outro_5",
+   "header": {
+    "style": "trap",
+    "section": "outro",
+    "bars": 1,
+    "seed": 16,
+    "drum_seed": 1,
+    "bar_offset": 15,
+    "fill_pending": false,
+    "carry_fill": false,
+    "layers": {
+     "drums": 1,
+     "bass": 0,
+     "sample": 1,
+     "melody": 0,
+     "vocal": 0,
+     "energy": 0.4
+    },
+    "melody_from_bar": 0
+   },
+   "lanes": {
+    "kick": [
+     [
+      "C-4",
+      1,
+      62,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      54,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "snare": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      3,
+      16,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      2,
+      64,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      35,
+      null
+     ],
+     [
+      "C-4",
+      2,
+      45,
+      null
+     ],
+     null
+    ],
+    "hat": [
+     [
+      "C-4",
+      4,
+      64,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      25,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      42,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      28,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      52,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      23,
+      null
+     ],
+     [
+      "C-4",
+      4,
+      23,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      55,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      28,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      40,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      35,
+      null
+     ],
+     null
+    ],
+    "perc2": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      7,
+      52,
+      null
+     ],
+     null
+    ]
+   },
+   "bars": [
+    {
+     "drop": null,
+     "fill": false,
+     "bass": null,
+     "melody": false,
+     "order": [
+      "kick:0",
+      "kick:6",
+      "kick:10",
+      "snare:8",
+      "snare:6",
+      "snare:13",
+      "snare:14",
+      "hat:0",
+      "hat:1",
+      "hat:2",
+      "hat:3",
+      "hat:4",
+      "hat:5",
+      "hat:6",
+      "hat:8",
+      "hat:10",
+      "hat:12",
+      "hat:14",
+      "perc2:14"
+     ]
+    }
+   ],
+   "locked": {
+    "chops": [
+     {
+      "triggers": [
+       {
+        "slice_index": 0,
+        "start": 0,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.0065603112840466925,
+        "choke_ms": 7.302510109102006,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 112
+       },
+       {
+        "slice_index": 1,
+        "start": 18896,
+        "length": 9448,
+        "gain": 0.68,
+        "role": "anchor",
+        "reverse": false,
+        "start_offset": 0.0028450446326390476,
+        "choke_ms": 11.102128633554589,
+        "lp": 4800,
+        "ring": null,
+        "filter_seed": 114
+       }
+      ],
+      "offers": [
+       [
+        0,
+        4.0,
+        "answer",
+        "REJECT",
+        "bar 0 (section_start) is full of sample_chop (cap 0.59)"
+       ],
+       [
+        0,
+        12.0,
+        "fill",
+        "REJECT",
+        "bar 0 (section_start) is full of sample_chop (cap 0.59)"
+       ]
+      ],
+      "ops": [
+       "PITCH_SHIFT",
+       0,
+       true
+      ]
+     }
+    ],
+    "scratch": {
+     "plan": {
+      "source": "WELCOME_TO_THE_NEXT_LEVEL",
+      "routine": null,
+      "placed": [
+       []
+      ]
+     },
+     "offers": []
+    },
+    "vocals": {
+     "voice": null,
+     "rap_syl": null,
+     "voice_bars": [],
+     "words": [],
+     "bars": {},
+     "reserves": [],
+     "adlibs": [],
+     "bank_words": {}
+    }
+   }
+  }
+ ],
+ "order": [
+  0,
+  1,
+  2,
+  3,
+  4,
+  5
+ ],
+ "side": {
+  "verse_0": {
+   "kick:0": {
+    "vel": 0.975,
+    "role": "downbeat"
+   },
+   "kick:6": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "kick:10": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "snare:8": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "snare:6": {
+    "vel": 0.273,
+    "role": "ghost"
+   },
+   "hat:0": {
+    "hat": {
+     "kind": "double",
+     "vel": 127,
+     "micro_ms": -0.932,
+     "sub": [
+      [
+       13.029668522857584,
+       0.36220576565964274
+      ]
+     ]
+    }
+   },
+   "hat:2": {
+    "hat": {
+     "kind": "double",
+     "vel": 67,
+     "micro_ms": -3.22,
+     "sub": [
+      [
+       14.854452696941507,
+       0.25636130803614304
+      ]
+     ]
+    }
+   },
+   "hat:3": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 54,
+     "micro_ms": 5.329,
+     "sub": [
+      [
+       14.137225324748236,
+       0.3272563115475321
+      ]
+     ]
+    }
+   },
+   "hat:4": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 34,
+     "micro_ms": -4.119,
+     "sub": []
+    }
+   },
+   "hat:5": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 21,
+     "micro_ms": -2.114,
+     "sub": []
+    }
+   },
+   "hat:6": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 78,
+     "micro_ms": 0.501,
+     "sub": [
+      [
+       19.74350721287536,
+       0.46989915630672835
+      ]
+     ]
+    }
+   },
+   "hat:7": {
+    "hat": {
+     "kind": "double",
+     "vel": 75,
+     "micro_ms": 1.194,
+     "sub": [
+      [
+       15.473791662875543,
+       0.21979045344485065
+      ]
+     ]
+    }
+   },
+   "hat:8": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 93,
+     "micro_ms": 0.552,
+     "sub": [
+      [
+       10.029894309926773,
+       0.4388024896545557
+      ]
+     ]
+    }
+   },
+   "hat:10": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 57,
+     "micro_ms": 4.311,
+     "sub": []
+    }
+   },
+   "hat:12": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 118,
+     "micro_ms": 4.784,
+     "sub": [
+      [
+       16.38030249627242,
+       0.3099586923834351
+      ]
+     ]
+    }
+   },
+   "hat:14": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 78,
+     "micro_ms": -2.427,
+     "sub": [
+      [
+       18.95304467351524,
+       0.28479240627998
+      ]
+     ]
+    }
+   },
+   "bass:0": {
+    "e808": {
+     "start_s": 0.0,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "ANCHOR",
+     "kind": "short"
+    }
+   },
+   "bass:6": {
+    "e808": {
+     "start_s": 0.6428571428571428,
+     "dur_s": 0.42857142857142855,
+     "semi": 9.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "medium"
+    }
+   },
+   "bass:10": {
+    "e808": {
+     "start_s": 1.0714285714285714,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "short"
+    }
+   },
+   "bass:14": {
+    "e808": {
+     "start_s": 1.5,
+     "dur_s": 0.2132857142857142,
+     "semi": 19.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "slide"
+    }
+   },
+   "kick:16": {
+    "vel": 0.975,
+    "role": "downbeat"
+   },
+   "kick:22": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "kick:26": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "snare:24": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "perc1:30": {
+    "vel": 0.273,
+    "role": "ghost"
+   },
+   "hat:16": {
+    "hat": {
+     "kind": "accent",
+     "vel": 105,
+     "micro_ms": 1.729,
+     "sub": [
+      [
+       10.714400339123479,
+       0.29556367232189257
+      ]
+     ]
+    }
+   },
+   "hat:18": {
+    "hat": {
+     "kind": "double",
+     "vel": 32,
+     "micro_ms": -0.95,
+     "sub": [
+      [
+       11.262446748706306,
+       0.33973604937329627
+      ]
+     ]
+    }
+   },
+   "hat:20": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 127,
+     "micro_ms": -5.555,
+     "sub": []
+    }
+   },
+   "hat:21": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 84,
+     "micro_ms": -0.429,
+     "sub": [
+      [
+       11.63145901066011,
+       0.24348840670071165
+      ]
+     ]
+    }
+   },
+   "hat:22": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 40,
+     "micro_ms": -1.346,
+     "sub": [
+      [
+       10.204082404976138,
+       0.2591075943003675
+      ]
+     ]
+    }
+   },
+   "hat:23": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 90,
+     "micro_ms": -2.065,
+     "sub": [
+      [
+       13.03396942648349,
+       0.3808187941737675
+      ]
+     ]
+    }
+   },
+   "hat:24": {
+    "hat": {
+     "kind": "single",
+     "vel": 115,
+     "micro_ms": -3.239,
+     "sub": [
+      [
+       18.163758128420966,
+       0.2156889470067166
+      ]
+     ]
+    }
+   },
+   "hat:25": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 44,
+     "micro_ms": 1.092,
+     "sub": [
+      [
+       18.208875936268527,
+       0.44015836147030774
+      ]
+     ]
+    }
+   },
+   "hat:26": {
+    "hat": {
+     "kind": "double",
+     "vel": 58,
+     "micro_ms": 1.24,
+     "sub": [
+      [
+       16.065963965064604,
+       0.20653740574662008
+      ]
+     ]
+    }
+   },
+   "hat:28": {
+    "hat": {
+     "kind": "single",
+     "vel": 127,
+     "micro_ms": 4.807,
+     "sub": [
+      [
+       15.178981463856882,
+       0.4904944304438672
+      ]
+     ]
+    }
+   },
+   "hat:30": {
+    "hat": {
+     "kind": "accent",
+     "vel": 73,
+     "micro_ms": -5.608,
+     "sub": [
+      [
+       12.923178681449713,
+       0.4765242835937004
+      ]
+     ]
+    }
+   },
+   "bass:16": {
+    "e808": {
+     "start_s": 0.0,
+     "dur_s": 0.8571428571428571,
+     "semi": 9.0,
+     "slide": false,
+     "role": "ANCHOR",
+     "kind": "long"
+    }
+   },
+   "bass:26": {
+    "e808": {
+     "start_s": 1.0714285714285714,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "short"
+    }
+   },
+   "bass:27": {
+    "e808": {
+     "start_s": 1.1785714285714286,
+     "dur_s": 0.10714285714285714,
+     "semi": 16.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "short"
+    }
+   },
+   "bass:30": {
+    "e808": {
+     "start_s": 1.5000000000000002,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "CUT",
+     "kind": "cut"
+    }
+   },
+   "kick:32": {
+    "vel": 0.975,
+    "role": "downbeat"
+   },
+   "kick:38": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "kick:42": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "snare:40": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "snare:38": {
+    "vel": 0.273,
+    "role": "ghost"
+   },
+   "hat:32": {
+    "hat": {
+     "kind": "double",
+     "vel": 127,
+     "micro_ms": -0.932,
+     "sub": [
+      [
+       13.029668522857584,
+       0.36220576565964274
+      ]
+     ]
+    }
+   },
+   "hat:34": {
+    "hat": {
+     "kind": "double",
+     "vel": 67,
+     "micro_ms": -3.22,
+     "sub": [
+      [
+       14.854452696941507,
+       0.25636130803614304
+      ]
+     ]
+    }
+   },
+   "hat:35": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 54,
+     "micro_ms": 5.329,
+     "sub": [
+      [
+       14.137225324748236,
+       0.3272563115475321
+      ]
+     ]
+    }
+   },
+   "hat:36": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 34,
+     "micro_ms": -4.119,
+     "sub": []
+    }
+   },
+   "hat:37": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 21,
+     "micro_ms": -2.114,
+     "sub": []
+    }
+   },
+   "hat:38": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 78,
+     "micro_ms": 0.501,
+     "sub": [
+      [
+       19.74350721287536,
+       0.46989915630672835
+      ]
+     ]
+    }
+   },
+   "hat:39": {
+    "hat": {
+     "kind": "double",
+     "vel": 75,
+     "micro_ms": 1.194,
+     "sub": [
+      [
+       15.473791662875543,
+       0.21979045344485065
+      ]
+     ]
+    }
+   },
+   "hat:40": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 93,
+     "micro_ms": 0.552,
+     "sub": [
+      [
+       10.029894309926773,
+       0.4388024896545557
+      ]
+     ]
+    }
+   },
+   "hat:42": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 57,
+     "micro_ms": 4.311,
+     "sub": []
+    }
+   },
+   "hat:44": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 118,
+     "micro_ms": 4.784,
+     "sub": [
+      [
+       16.38030249627242,
+       0.3099586923834351
+      ]
+     ]
+    }
+   },
+   "hat:46": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 78,
+     "micro_ms": -2.427,
+     "sub": [
+      [
+       18.95304467351524,
+       0.28479240627998
+      ]
+     ]
+    }
+   },
+   "bass:32": {
+    "e808": {
+     "start_s": 0.0,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "ANCHOR",
+     "kind": "short"
+    }
+   },
+   "bass:38": {
+    "e808": {
+     "start_s": 0.6428571428571428,
+     "dur_s": 0.42857142857142855,
+     "semi": 9.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "medium"
+    }
+   },
+   "bass:43": {
+    "e808": {
+     "start_s": 1.1785714285714284,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "short"
+    }
+   },
+   "bass:47": {
+    "e808": {
+     "start_s": 1.6071428571428572,
+     "dur_s": 0.10614285714285676,
+     "semi": 19.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "slide"
+    }
+   },
+   "kick:48": {
+    "vel": 0.975,
+    "role": "downbeat"
+   },
+   "kick:54": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "kick:58": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "snare:56": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "snare:54": {
+    "vel": 0.273,
+    "role": "ghost"
+   },
+   "hat:48": {
+    "hat": {
+     "kind": "accent",
+     "vel": 105,
+     "micro_ms": 1.729,
+     "sub": [
+      [
+       10.714400339123479,
+       0.29556367232189257
+      ]
+     ]
+    }
+   },
+   "hat:50": {
+    "hat": {
+     "kind": "double",
+     "vel": 32,
+     "micro_ms": -0.95,
+     "sub": [
+      [
+       11.262446748706306,
+       0.33973604937329627
+      ]
+     ]
+    }
+   },
+   "hat:52": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 127,
+     "micro_ms": -5.555,
+     "sub": []
+    }
+   },
+   "hat:53": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 84,
+     "micro_ms": -0.429,
+     "sub": [
+      [
+       11.63145901066011,
+       0.24348840670071165
+      ]
+     ]
+    }
+   },
+   "hat:54": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 40,
+     "micro_ms": -1.346,
+     "sub": [
+      [
+       10.204082404976138,
+       0.2591075943003675
+      ]
+     ]
+    }
+   },
+   "hat:55": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 90,
+     "micro_ms": -2.065,
+     "sub": [
+      [
+       13.03396942648349,
+       0.3808187941737675
+      ]
+     ]
+    }
+   },
+   "hat:56": {
+    "hat": {
+     "kind": "single",
+     "vel": 115,
+     "micro_ms": -3.239,
+     "sub": [
+      [
+       18.163758128420966,
+       0.2156889470067166
+      ]
+     ]
+    }
+   },
+   "hat:62": {
+    "hat": {
+     "kind": "open",
+     "vel": 44,
+     "micro_ms": 1.092,
+     "sub": [
+      [
+       18.208875936268527,
+       0.44015836147030774
+      ]
+     ]
+    }
+   },
+   "hat:58": {
+    "hat": {
+     "kind": "double",
+     "vel": 58,
+     "micro_ms": 1.24,
+     "sub": [
+      [
+       16.065963965064604,
+       0.20653740574662008
+      ]
+     ]
+    }
+   },
+   "hat:60": {
+    "hat": {
+     "kind": "single",
+     "vel": 127,
+     "micro_ms": 4.807,
+     "sub": [
+      [
+       15.178981463856882,
+       0.4904944304438672
+      ]
+     ]
+    }
+   },
+   "perc2:62": {
+    "hat": {
+     "kind": "accent",
+     "vel": 73,
+     "micro_ms": -5.608,
+     "sub": [
+      [
+       12.923178681449713,
+       0.4765242835937004
+      ]
+     ]
+    }
+   },
+   "bass:48": {
+    "e808": {
+     "start_s": 0.0,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "ANCHOR",
+     "kind": "short"
+    }
+   },
+   "bass:55": {
+    "e808": {
+     "start_s": 0.7499999999999991,
+     "dur_s": 0.42857142857142855,
+     "semi": 9.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "medium"
+    }
+   },
+   "bass:59": {
+    "e808": {
+     "start_s": 1.178571428571428,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "TURNAROUND",
+     "kind": "short"
+    }
+   },
+   "kick:64": {
+    "vel": 0.975,
+    "role": "downbeat"
+   },
+   "kick:70": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "kick:74": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "snare:72": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "snare:70": {
+    "vel": 0.273,
+    "role": "ghost"
+   },
+   "hat:64": {
+    "hat": {
+     "kind": "double",
+     "vel": 127,
+     "micro_ms": -0.932,
+     "sub": [
+      [
+       13.029668522857584,
+       0.36220576565964274
+      ]
+     ]
+    }
+   },
+   "hat:66": {
+    "hat": {
+     "kind": "double",
+     "vel": 73,
+     "micro_ms": -3.22,
+     "sub": [
+      [
+       14.854452696941507,
+       0.25636130803614304
+      ]
+     ]
+    }
+   },
+   "hat:67": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 59,
+     "micro_ms": 5.329,
+     "sub": [
+      [
+       14.137225324748236,
+       0.3272563115475321
+      ]
+     ]
+    }
+   },
+   "hat:68": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 37,
+     "micro_ms": -4.119,
+     "sub": []
+    }
+   },
+   "hat:69": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 23,
+     "micro_ms": -2.114,
+     "sub": []
+    }
+   },
+   "hat:70": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 85,
+     "micro_ms": 0.501,
+     "sub": [
+      [
+       19.74350721287536,
+       0.46989915630672835
+      ]
+     ]
+    }
+   },
+   "hat:71": {
+    "hat": {
+     "kind": "double",
+     "vel": 82,
+     "micro_ms": 1.194,
+     "sub": [
+      [
+       15.473791662875543,
+       0.21979045344485065
+      ]
+     ]
+    }
+   },
+   "hat:72": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 102,
+     "micro_ms": 0.552,
+     "sub": [
+      [
+       10.029894309926773,
+       0.4388024896545557
+      ]
+     ]
+    }
+   },
+   "hat:74": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 62,
+     "micro_ms": 4.311,
+     "sub": []
+    }
+   },
+   "hat:76": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 127,
+     "micro_ms": 4.784,
+     "sub": [
+      [
+       16.38030249627242,
+       0.3099586923834351
+      ]
+     ]
+    }
+   },
+   "hat:78": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 85,
+     "micro_ms": -2.427,
+     "sub": [
+      [
+       18.95304467351524,
+       0.28479240627998
+      ]
+     ]
+    }
+   },
+   "bass:64": {
+    "e808": {
+     "start_s": 0.0,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "ANCHOR",
+     "kind": "short"
+    }
+   },
+   "bass:70": {
+    "e808": {
+     "start_s": 0.6428571428571428,
+     "dur_s": 0.42857142857142855,
+     "semi": 9.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "medium"
+    }
+   },
+   "bass:74": {
+    "e808": {
+     "start_s": 1.0714285714285714,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "short"
+    }
+   },
+   "bass:78": {
+    "e808": {
+     "start_s": 1.5,
+     "dur_s": 0.2132857142857142,
+     "semi": 19.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "slide"
+    }
+   }
+  },
+  "hook_1": {
+   "kick:0": {
+    "vel": 0.975,
+    "role": "downbeat"
+   },
+   "kick:6": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "kick:10": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "snare:8": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "perc1:14": {
+    "vel": 0.318,
+    "role": "ghost"
+   },
+   "hat:0": {
+    "hat": {
+     "kind": "double",
+     "vel": 127,
+     "micro_ms": -0.932,
+     "sub": [
+      [
+       13.029668522857584,
+       0.36220576565964274
+      ]
+     ]
+    }
+   },
+   "hat:1": {
+    "hat": {
+     "kind": "single",
+     "vel": 68,
+     "micro_ms": -3.207,
+     "sub": []
+    }
+   },
+   "hat:2": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 54,
+     "micro_ms": 5.307,
+     "sub": []
+    }
+   },
+   "hat:3": {
+    "hat": {
+     "kind": "single",
+     "vel": 28,
+     "micro_ms": -4.102,
+     "sub": []
+    }
+   },
+   "hat:4": {
+    "hat": {
+     "kind": "double",
+     "vel": 107,
+     "micro_ms": -2.106,
+     "sub": []
+    }
+   },
+   "hat:5": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 48,
+     "micro_ms": 0.499,
+     "sub": [
+      [
+       9.631029620734264,
+       0.49644567977725806
+      ]
+     ]
+    }
+   },
+   "hat:6": {
+    "hat": {
+     "kind": "single",
+     "vel": 103,
+     "micro_ms": -1.414,
+     "sub": [
+      [
+       15.473791662875543,
+       0.21979045344485065
+      ]
+     ]
+    }
+   },
+   "hat:7": {
+    "hat": {
+     "kind": "single",
+     "vel": 56,
+     "micro_ms": 0.549,
+     "sub": []
+    }
+   },
+   "hat:8": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 107,
+     "micro_ms": 0.764,
+     "sub": [
+      [
+       14.137225324748236,
+       0.3272563115475321
+      ]
+     ]
+    }
+   },
+   "hat:10": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 55,
+     "micro_ms": 4.311,
+     "sub": [
+      [
+       13.03396942648349,
+       0.3808187941737675
+      ]
+     ]
+    }
+   },
+   "hat:11": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 115,
+     "micro_ms": 4.765,
+     "sub": [
+      [
+       18.95304467351524,
+       0.28479240627998
+      ]
+     ]
+    }
+   },
+   "hat:12": {
+    "hat": {
+     "kind": "accent",
+     "vel": 80,
+     "micro_ms": -2.408,
+     "sub": [
+      [
+       12.356259715633215,
+       0.30357924631100686
+      ]
+     ]
+    }
+   },
+   "hat:14": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 69,
+     "micro_ms": 1.716,
+     "sub": [
+      [
+       17.49604735359548,
+       0.45847188717840853
+      ]
+     ]
+    }
+   },
+   "hat:15": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 75,
+     "micro_ms": 2.943,
+     "sub": []
+    }
+   },
+   "bass:0": {
+    "e808": {
+     "start_s": 0.0,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "ANCHOR",
+     "kind": "cut"
+    }
+   },
+   "bass:6": {
+    "e808": {
+     "start_s": 0.6428571428571428,
+     "dur_s": 0.10714285714285714,
+     "semi": 19.0,
+     "slide": false,
+     "role": "CUT",
+     "kind": "cut"
+    }
+   },
+   "bass:10": {
+    "e808": {
+     "start_s": 1.0714285714285714,
+     "dur_s": 0.42857142857142855,
+     "semi": 9.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "medium"
+    }
+   },
+   "bass:14": {
+    "e808": {
+     "start_s": 1.5,
+     "dur_s": 0.2132857142857142,
+     "semi": 9.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "medium"
+    }
+   },
+   "melody1:3": {
+    "dur": 2
+   },
+   "melody1:6": {
+    "dur": 2
+   },
+   "melody1:11": {
+    "dur": 3
+   },
+   "kick:16": {
+    "vel": 0.975,
+    "role": "downbeat"
+   },
+   "kick:22": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "kick:26": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "snare:24": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "snare:22": {
+    "vel": 0.318,
+    "role": "ghost"
+   },
+   "hat:16": {
+    "hat": {
+     "kind": "accent",
+     "vel": 124,
+     "micro_ms": -0.943,
+     "sub": []
+    }
+   },
+   "hat:18": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 100,
+     "micro_ms": -5.512,
+     "sub": []
+    }
+   },
+   "hat:19": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 68,
+     "micro_ms": -0.426,
+     "sub": [
+      [
+       10.971378004362972,
+       0.31728491093996813
+      ]
+     ]
+    }
+   },
+   "hat:20": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 107,
+     "micro_ms": -3.723,
+     "sub": [
+      [
+       13.390248811391972,
+       0.3648319727432112
+      ]
+     ]
+    }
+   },
+   "hat:21": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 37,
+     "micro_ms": -2.049,
+     "sub": [
+      [
+       18.208875936268527,
+       0.44015836147030774
+      ]
+     ]
+    }
+   },
+   "hat:22": {
+    "hat": {
+     "kind": "single",
+     "vel": 70,
+     "micro_ms": -3.214,
+     "sub": []
+    }
+   },
+   "hat:23": {
+    "hat": {
+     "kind": "single",
+     "vel": 68,
+     "micro_ms": 1.083,
+     "sub": []
+    }
+   },
+   "hat:24": {
+    "hat": {
+     "kind": "accent",
+     "vel": 127,
+     "micro_ms": 1.231,
+     "sub": [
+      [
+       19.597852154249054,
+       0.24291574073204447
+      ]
+     ]
+    }
+   },
+   "hat:25": {
+    "hat": {
+     "kind": "single",
+     "vel": 31,
+     "micro_ms": 4.753,
+     "sub": [
+      [
+       16.38030249627242,
+       0.3099586923834351
+      ]
+     ]
+    }
+   },
+   "hat:26": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 49,
+     "micro_ms": 0.818,
+     "sub": [
+      [
+       18.310423390462226,
+       0.48506718490479755
+      ]
+     ]
+    }
+   },
+   "hat:27": {
+    "hat": {
+     "kind": "accent",
+     "vel": 52,
+     "micro_ms": 4.757,
+     "sub": [
+      [
+       10.029894309926773,
+       0.4388024896545557
+      ]
+     ]
+    }
+   },
+   "hat:28": {
+    "hat": {
+     "kind": "accent",
+     "vel": 80,
+     "micro_ms": -0.273,
+     "sub": [
+      [
+       19.74350721287536,
+       0.46989915630672835
+      ]
+     ]
+    }
+   },
+   "hat:29": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 44,
+     "micro_ms": 2.65,
+     "sub": [
+      [
+       15.178981463856882,
+       0.4904944304438672
+      ]
+     ]
+    }
+   },
+   "hat:30": {
+    "hat": {
+     "kind": "double",
+     "vel": 97,
+     "micro_ms": -5.111,
+     "sub": [
+      [
+       8.00279938281628,
+       0.2453794796838284
+      ]
+     ]
+    }
+   },
+   "hat:31": {
+    "hat": {
+     "kind": "single",
+     "vel": 91,
+     "micro_ms": -1.425,
+     "sub": [
+      [
+       10.714400339123479,
+       0.29556367232189257
+      ]
+     ]
+    }
+   },
+   "bass:16": {
+    "e808": {
+     "start_s": 0.0,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "ANCHOR",
+     "kind": "cut"
+    }
+   },
+   "bass:22": {
+    "e808": {
+     "start_s": 0.6428571428571426,
+     "dur_s": 0.10714285714285714,
+     "semi": 12.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "short"
+    }
+   },
+   "bass:23": {
+    "e808": {
+     "start_s": 0.7500000000000002,
+     "dur_s": 0.21428571428571427,
+     "semi": 9.0,
+     "slide": true,
+     "role": "SLIDE",
+     "kind": "slide"
+    }
+   },
+   "bass:26": {
+    "e808": {
+     "start_s": 1.0714285714285714,
+     "dur_s": 0.10714285714285714,
+     "semi": 10.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "short"
+    }
+   },
+   "bass:30": {
+    "e808": {
+     "start_s": 1.5000000000000002,
+     "dur_s": 0.21328571428571397,
+     "semi": 9.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "medium"
+    }
+   }
+  },
+  "verse_2": {
+   "kick:0": {
+    "vel": 0.975,
+    "role": "downbeat"
+   },
+   "kick:6": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "kick:10": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "snare:8": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "snare:6": {
+    "vel": 0.273,
+    "role": "ghost"
+   },
+   "snare:13": {
+    "vel": 0.5522476539253834,
+    "role": "fill"
+   },
+   "snare:14": {
+    "vel": 0.7077233539330129,
+    "role": "fill"
+   },
+   "hat:0": {
+    "hat": {
+     "kind": "double",
+     "vel": 114,
+     "micro_ms": -3.612,
+     "sub": [
+      [
+       17.770791059412538,
+       0.31591076542474616
+      ]
+     ]
+    }
+   },
+   "hat:1": {
+    "hat": {
+     "kind": "double",
+     "vel": 64,
+     "micro_ms": 5.273,
+     "sub": [
+      [
+       10.813030334529332,
+       0.22581647298689306
+      ]
+     ]
+    }
+   },
+   "hat:2": {
+    "hat": {
+     "kind": "accent",
+     "vel": 39,
+     "micro_ms": 4.004,
+     "sub": [
+      [
+       9.543481795798314,
+       0.3940315515240631
+      ]
+     ]
+    }
+   },
+   "hat:4": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 106,
+     "micro_ms": 3.651,
+     "sub": [
+      [
+       16.4218370789755,
+       0.2444623372242845
+      ]
+     ]
+    }
+   },
+   "hat:6": {
+    "hat": {
+     "kind": "single",
+     "vel": 65,
+     "micro_ms": -3.294,
+     "sub": []
+    }
+   },
+   "hat:7": {
+    "hat": {
+     "kind": "accent",
+     "vel": 71,
+     "micro_ms": 4.278,
+     "sub": [
+      [
+       10.770831763136185,
+       0.2883244980466809
+      ]
+     ]
+    }
+   },
+   "hat:8": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 104,
+     "micro_ms": 1.221,
+     "sub": [
+      [
+       9.683886751036468,
+       0.48960668265528506
+      ]
+     ]
+    }
+   },
+   "hat:10": {
+    "hat": {
+     "kind": "single",
+     "vel": 119,
+     "micro_ms": 3.135,
+     "sub": []
+    }
+   },
+   "hat:11": {
+    "hat": {
+     "kind": "double",
+     "vel": 122,
+     "micro_ms": -3.472,
+     "sub": [
+      [
+       17.219390137862177,
+       0.2213961556594584
+      ]
+     ]
+    }
+   },
+   "hat:12": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 89,
+     "micro_ms": 5.27,
+     "sub": [
+      [
+       9.949518253060424,
+       0.2161453869394732
+      ]
+     ]
+    }
+   },
+   "hat:13": {
+    "hat": {
+     "kind": "single",
+     "vel": 85,
+     "micro_ms": 2.523,
+     "sub": [
+      [
+       11.249951420058329,
+       0.25592874820190814
+      ]
+     ]
+    }
+   },
+   "hat:14": {
+    "hat": {
+     "kind": "accent",
+     "vel": 67,
+     "micro_ms": -3.963,
+     "sub": [
+      [
+       17.735152622889437,
+       0.2654410116165094
+      ]
+     ]
+    }
+   },
+   "perc2:14": {
+    "hat": {
+     "kind": "single",
+     "vel": 104,
+     "micro_ms": 0.0,
+     "sub": []
+    }
+   },
+   "bass:0": {
+    "e808": {
+     "start_s": 0.0,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "ANCHOR",
+     "kind": "cut"
+    }
+   },
+   "bass:6": {
+    "e808": {
+     "start_s": 0.6428571428571428,
+     "dur_s": 0.42857142857142855,
+     "semi": 10.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "medium"
+    }
+   },
+   "bass:10": {
+    "e808": {
+     "start_s": 1.0714285714285714,
+     "dur_s": 1.1775714285714287,
+     "semi": 9.0,
+     "slide": true,
+     "role": "SLIDE",
+     "kind": "long"
+    }
+   },
+   "kick:16": {
+    "vel": 0.975,
+    "role": "downbeat"
+   },
+   "kick:22": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "kick:26": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "snare:24": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "snare:22": {
+    "vel": 0.273,
+    "role": "ghost"
+   },
+   "hat:16": {
+    "hat": {
+     "kind": "accent",
+     "vel": 91,
+     "micro_ms": -4.758,
+     "sub": [
+      [
+       9.246392518003935,
+       0.48905844205177795
+      ]
+     ]
+    }
+   },
+   "hat:17": {
+    "hat": {
+     "kind": "accent",
+     "vel": 88,
+     "micro_ms": 3.594,
+     "sub": []
+    }
+   },
+   "hat:18": {
+    "hat": {
+     "kind": "double",
+     "vel": 53,
+     "micro_ms": 4.002,
+     "sub": [
+      [
+       15.312535966325434,
+       0.3382161713194437
+      ]
+     ]
+    }
+   },
+   "hat:20": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 32,
+     "micro_ms": -3.739,
+     "sub": [
+      [
+       14.767967532222272,
+       0.3221464874251817
+      ]
+     ]
+    }
+   },
+   "hat:22": {
+    "hat": {
+     "kind": "single",
+     "vel": 50,
+     "micro_ms": -3.551,
+     "sub": [
+      [
+       18.52664669928594,
+       0.2769540082984853
+      ]
+     ]
+    }
+   },
+   "hat:23": {
+    "hat": {
+     "kind": "accent",
+     "vel": 51,
+     "micro_ms": -2.967,
+     "sub": [
+      [
+       12.45984109655654,
+       0.21958523892707277
+      ]
+     ]
+    }
+   },
+   "hat:24": {
+    "hat": {
+     "kind": "double",
+     "vel": 74,
+     "micro_ms": -3.852,
+     "sub": [
+      [
+       14.50061449620447,
+       0.20446686560221966
+      ]
+     ]
+    }
+   },
+   "hat:26": {
+    "hat": {
+     "kind": "single",
+     "vel": 65,
+     "micro_ms": -0.838,
+     "sub": [
+      [
+       17.12100378646054,
+       0.32492566177310883
+      ]
+     ]
+    }
+   },
+   "hat:28": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 127,
+     "micro_ms": -5.405,
+     "sub": [
+      [
+       15.407122972588668,
+       0.464871510785437
+      ]
+     ]
+    }
+   },
+   "hat:30": {
+    "hat": {
+     "kind": "single",
+     "vel": 44,
+     "micro_ms": 5.001,
+     "sub": [
+      [
+       8.913930945921612,
+       0.29625636993574134
+      ]
+     ]
+    }
+   },
+   "bass:21": {
+    "e808": {
+     "start_s": 0.5357142857142858,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "ANCHOR",
+     "kind": "slide"
+    }
+   },
+   "bass:22": {
+    "e808": {
+     "start_s": 0.6428571428571426,
+     "dur_s": 0.21428571428571427,
+     "semi": 16.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "slide"
+    }
+   },
+   "bass:26": {
+    "e808": {
+     "start_s": 1.0714285714285714,
+     "dur_s": 0.42857142857142855,
+     "semi": 10.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "medium"
+    }
+   },
+   "bass:30": {
+    "e808": {
+     "start_s": 1.5000000000000002,
+     "dur_s": 0.21428571428571427,
+     "semi": 9.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "medium"
+    }
+   },
+   "kick:32": {
+    "vel": 0.975,
+    "role": "downbeat"
+   },
+   "kick:38": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "kick:42": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "snare:40": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "perc1:46": {
+    "vel": 0.273,
+    "role": "ghost"
+   },
+   "hat:32": {
+    "hat": {
+     "kind": "double",
+     "vel": 125,
+     "micro_ms": -3.612,
+     "sub": [
+      [
+       17.770791059412538,
+       0.31591076542474616
+      ]
+     ]
+    }
+   },
+   "hat:33": {
+    "hat": {
+     "kind": "double",
+     "vel": 70,
+     "micro_ms": 5.273,
+     "sub": [
+      [
+       10.813030334529332,
+       0.22581647298689306
+      ]
+     ]
+    }
+   },
+   "hat:34": {
+    "hat": {
+     "kind": "accent",
+     "vel": 42,
+     "micro_ms": 4.004,
+     "sub": [
+      [
+       9.543481795798314,
+       0.3940315515240631
+      ]
+     ]
+    }
+   },
+   "hat:36": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 116,
+     "micro_ms": 3.651,
+     "sub": [
+      [
+       16.4218370789755,
+       0.2444623372242845
+      ]
+     ]
+    }
+   },
+   "hat:38": {
+    "hat": {
+     "kind": "single",
+     "vel": 71,
+     "micro_ms": -3.294,
+     "sub": []
+    }
+   },
+   "hat:39": {
+    "hat": {
+     "kind": "accent",
+     "vel": 78,
+     "micro_ms": 4.278,
+     "sub": [
+      [
+       10.770831763136185,
+       0.2883244980466809
+      ]
+     ]
+    }
+   },
+   "hat:40": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 114,
+     "micro_ms": 1.221,
+     "sub": [
+      [
+       9.683886751036468,
+       0.48960668265528506
+      ]
+     ]
+    }
+   },
+   "hat:42": {
+    "hat": {
+     "kind": "single",
+     "vel": 127,
+     "micro_ms": 3.135,
+     "sub": []
+    }
+   },
+   "hat:43": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 127,
+     "micro_ms": -3.472,
+     "sub": [
+      [
+       17.219390137862177,
+       0.2213961556594584
+      ]
+     ]
+    }
+   },
+   "hat:44": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 97,
+     "micro_ms": 5.27,
+     "sub": [
+      [
+       9.949518253060424,
+       0.2161453869394732
+      ]
+     ]
+    }
+   },
+   "hat:45": {
+    "hat": {
+     "kind": "single",
+     "vel": 93,
+     "micro_ms": 2.523,
+     "sub": [
+      [
+       11.249951420058329,
+       0.25592874820190814
+      ]
+     ]
+    }
+   },
+   "hat:46": {
+    "hat": {
+     "kind": "accent",
+     "vel": 73,
+     "micro_ms": -3.963,
+     "sub": [
+      [
+       17.735152622889437,
+       0.2654410116165094
+      ]
+     ]
+    }
+   },
+   "bass:32": {
+    "e808": {
+     "start_s": 0.0,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "ANCHOR",
+     "kind": "cut"
+    }
+   },
+   "bass:38": {
+    "e808": {
+     "start_s": 0.6428571428571428,
+     "dur_s": 0.42857142857142855,
+     "semi": 10.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "medium"
+    }
+   },
+   "bass:43": {
+    "e808": {
+     "start_s": 1.1785714285714284,
+     "dur_s": 0.21428571428571427,
+     "semi": 9.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "slide"
+    }
+   },
+   "bass:47": {
+    "e808": {
+     "start_s": 1.6071428571428572,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "PICKUP",
+     "kind": "short"
+    }
+   },
+   "kick:48": {
+    "vel": 0.975,
+    "role": "downbeat"
+   },
+   "kick:54": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "kick:58": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "snare:56": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "snare:54": {
+    "vel": 0.273,
+    "role": "ghost"
+   },
+   "hat:48": {
+    "hat": {
+     "kind": "accent",
+     "vel": 91,
+     "micro_ms": -4.758,
+     "sub": [
+      [
+       9.246392518003935,
+       0.48905844205177795
+      ]
+     ]
+    }
+   },
+   "hat:49": {
+    "hat": {
+     "kind": "accent",
+     "vel": 88,
+     "micro_ms": 3.594,
+     "sub": []
+    }
+   },
+   "hat:50": {
+    "hat": {
+     "kind": "double",
+     "vel": 53,
+     "micro_ms": 4.002,
+     "sub": [
+      [
+       15.312535966325434,
+       0.3382161713194437
+      ]
+     ]
+    }
+   },
+   "hat:52": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 32,
+     "micro_ms": -3.739,
+     "sub": [
+      [
+       14.767967532222272,
+       0.3221464874251817
+      ]
+     ]
+    }
+   },
+   "hat:54": {
+    "hat": {
+     "kind": "single",
+     "vel": 50,
+     "micro_ms": -3.551,
+     "sub": [
+      [
+       18.52664669928594,
+       0.2769540082984853
+      ]
+     ]
+    }
+   },
+   "hat:55": {
+    "hat": {
+     "kind": "accent",
+     "vel": 51,
+     "micro_ms": -2.967,
+     "sub": [
+      [
+       12.45984109655654,
+       0.21958523892707277
+      ]
+     ]
+    }
+   },
+   "hat:56": {
+    "hat": {
+     "kind": "double",
+     "vel": 74,
+     "micro_ms": -3.852,
+     "sub": [
+      [
+       14.50061449620447,
+       0.20446686560221966
+      ]
+     ]
+    }
+   },
+   "hat:58": {
+    "hat": {
+     "kind": "single",
+     "vel": 65,
+     "micro_ms": -0.838,
+     "sub": [
+      [
+       17.12100378646054,
+       0.32492566177310883
+      ]
+     ]
+    }
+   },
+   "hat:60": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 127,
+     "micro_ms": -5.405,
+     "sub": [
+      [
+       15.407122972588668,
+       0.464871510785437
+      ]
+     ]
+    }
+   },
+   "hat:61": {
+    "hat": {
+     "kind": "roll",
+     "vel": 86,
+     "micro_ms": 0.0,
+     "sub": [
+      [
+       7.943635455960154,
+       0.7
+      ],
+      [
+       9.330355124940622,
+       0.45
+      ],
+      [
+       23.22527409445142,
+       0.25
+      ]
+     ]
+    }
+   },
+   "hat:62": {
+    "hat": {
+     "kind": "single",
+     "vel": 44,
+     "micro_ms": 5.001,
+     "sub": [
+      [
+       8.913930945921612,
+       0.29625636993574134
+      ]
+     ]
+    }
+   },
+   "hat:63": {
+    "hat": {
+     "kind": "double",
+     "vel": 114,
+     "micro_ms": 0.0,
+     "sub": [
+      [
+       18.351684629760626,
+       0.28400837509717697
+      ]
+     ]
+    }
+   },
+   "bass:48": {
+    "e808": {
+     "start_s": 0.0,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "ANCHOR",
+     "kind": "cut"
+    }
+   },
+   "bass:55": {
+    "e808": {
+     "start_s": 0.7499999999999991,
+     "dur_s": 0.42857142857142855,
+     "semi": 10.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "medium"
+    }
+   },
+   "bass:59": {
+    "e808": {
+     "start_s": 1.178571428571428,
+     "dur_s": 0.21428571428571427,
+     "semi": 9.0,
+     "slide": false,
+     "role": "TURNAROUND",
+     "kind": "slide"
+    }
+   }
+  },
+  "breakdown_3": {
+   "kick:0": {
+    "vel": 0.975,
+    "role": "downbeat"
+   },
+   "kick:6": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "kick:10": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "snare:8": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "snare:6": {
+    "vel": 0.235,
+    "role": "ghost"
+   },
+   "snare:13": {
+    "vel": 0.5522476539253834,
+    "role": "fill"
+   },
+   "snare:14": {
+    "vel": 0.7077233539330129,
+    "role": "fill"
+   },
+   "hat:0": {
+    "hat": {
+     "kind": "accent",
+     "vel": 125,
+     "micro_ms": 1.68,
+     "sub": []
+    }
+   },
+   "hat:1": {
+    "hat": {
+     "kind": "single",
+     "vel": 48,
+     "micro_ms": 2.819,
+     "sub": []
+    }
+   },
+   "hat:2": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 61,
+     "micro_ms": 4.142,
+     "sub": []
+    }
+   },
+   "hat:3": {
+    "hat": {
+     "kind": "double",
+     "vel": 54,
+     "micro_ms": 1.655,
+     "sub": [
+      [
+       19.686612494314172,
+       0.4497711703179972
+      ]
+     ]
+    }
+   },
+   "hat:4": {
+    "hat": {
+     "kind": "accent",
+     "vel": 100,
+     "micro_ms": -1.232,
+     "sub": []
+    }
+   },
+   "hat:5": {
+    "hat": {
+     "kind": "single",
+     "vel": 44,
+     "micro_ms": -1.776,
+     "sub": []
+    }
+   },
+   "hat:6": {
+    "hat": {
+     "kind": "single",
+     "vel": 56,
+     "micro_ms": 3.2,
+     "sub": []
+    }
+   },
+   "hat:8": {
+    "hat": {
+     "kind": "accent",
+     "vel": 106,
+     "micro_ms": -2.475,
+     "sub": []
+    }
+   },
+   "hat:10": {
+    "hat": {
+     "kind": "single",
+     "vel": 53,
+     "micro_ms": -3.894,
+     "sub": []
+    }
+   },
+   "hat:12": {
+    "hat": {
+     "kind": "accent",
+     "vel": 77,
+     "micro_ms": 4.09,
+     "sub": []
+    }
+   },
+   "hat:14": {
+    "hat": {
+     "kind": "single",
+     "vel": 67,
+     "micro_ms": -0.731,
+     "sub": []
+    }
+   },
+   "perc2:14": {
+    "hat": {
+     "kind": "single",
+     "vel": 104,
+     "micro_ms": 0.0,
+     "sub": []
+    }
+   },
+   "melody1:3": {
+    "dur": 2
+   },
+   "melody1:6": {
+    "dur": 2
+   },
+   "melody1:11": {
+    "dur": 3
+   },
+   "kick:16": {
+    "vel": 0.975,
+    "role": "downbeat"
+   },
+   "kick:22": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "kick:26": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "snare:24": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "snare:22": {
+    "vel": 0.235,
+    "role": "ghost"
+   },
+   "hat:16": {
+    "hat": {
+     "kind": "accent",
+     "vel": 121,
+     "micro_ms": -1.252,
+     "sub": []
+    }
+   },
+   "hat:17": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 58,
+     "micro_ms": 1.09,
+     "sub": []
+    }
+   },
+   "hat:18": {
+    "hat": {
+     "kind": "accent",
+     "vel": 74,
+     "micro_ms": -1.861,
+     "sub": [
+      [
+       15.506972317093265,
+       0.4756261002493222
+      ]
+     ]
+    }
+   },
+   "hat:19": {
+    "hat": {
+     "kind": "single",
+     "vel": 55,
+     "micro_ms": 3.828,
+     "sub": []
+    }
+   },
+   "hat:20": {
+    "hat": {
+     "kind": "single",
+     "vel": 78,
+     "micro_ms": 4.529,
+     "sub": []
+    }
+   },
+   "hat:22": {
+    "hat": {
+     "kind": "open",
+     "vel": 59,
+     "micro_ms": 1.121,
+     "sub": [
+      [
+       "choke_at_ms",
+       60.0,
+       false
+      ]
+     ]
+    }
+   },
+   "hat:24": {
+    "hat": {
+     "kind": "accent",
+     "vel": 111,
+     "micro_ms": 3.658,
+     "sub": []
+    }
+   },
+   "hat:26": {
+    "hat": {
+     "kind": "single",
+     "vel": 50,
+     "micro_ms": -1.492,
+     "sub": []
+    }
+   },
+   "hat:28": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 99,
+     "micro_ms": 2.578,
+     "sub": []
+    }
+   },
+   "hat:29": {
+    "hat": {
+     "kind": "single",
+     "vel": 60,
+     "micro_ms": 3.944,
+     "sub": []
+    }
+   },
+   "hat:30": {
+    "hat": {
+     "kind": "single",
+     "vel": 62,
+     "micro_ms": 5.38,
+     "sub": []
+    }
+   },
+   "melody1:19": {
+    "dur": 2
+   },
+   "melody1:22": {
+    "dur": 2
+   },
+   "melody1:27": {
+    "dur": 3
+   }
+  },
+  "hook_4": {
+   "kick:0": {
+    "vel": 0.975,
+    "role": "downbeat"
+   },
+   "kick:6": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "kick:10": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "snare:8": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "perc1:14": {
+    "vel": 0.325,
+    "role": "ghost"
+   },
+   "hat:0": {
+    "hat": {
+     "kind": "accent",
+     "vel": 127,
+     "micro_ms": 2.037,
+     "sub": []
+    }
+   },
+   "hat:1": {
+    "hat": {
+     "kind": "single",
+     "vel": 70,
+     "micro_ms": -0.506,
+     "sub": []
+    }
+   },
+   "hat:2": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 49,
+     "micro_ms": 0.582,
+     "sub": [
+      [
+       18.501476634452274,
+       0.3641649011663011
+      ]
+     ]
+    }
+   },
+   "hat:3": {
+    "hat": {
+     "kind": "double",
+     "vel": 39,
+     "micro_ms": 4.65,
+     "sub": [
+      [
+       8.5810162930639,
+       0.2051027120610019
+      ]
+     ]
+    }
+   },
+   "hat:4": {
+    "hat": {
+     "kind": "accent",
+     "vel": 111,
+     "micro_ms": 1.782,
+     "sub": [
+      [
+       15.047338869334114,
+       0.3205406412335431
+      ]
+     ]
+    }
+   },
+   "hat:5": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 29,
+     "micro_ms": -0.881,
+     "sub": [
+      [
+       14.838172306060411,
+       0.4578901856349235
+      ]
+     ]
+    }
+   },
+   "hat:6": {
+    "hat": {
+     "kind": "single",
+     "vel": 58,
+     "micro_ms": -0.624,
+     "sub": [
+      [
+       14.404680758380028,
+       0.48934419398186785
+      ]
+     ]
+    }
+   },
+   "hat:7": {
+    "hat": {
+     "kind": "double",
+     "vel": 126,
+     "micro_ms": 5.056,
+     "sub": [
+      [
+       19.70160303076927,
+       0.36817519860135606
+      ]
+     ]
+    }
+   },
+   "hat:8": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 71,
+     "micro_ms": -2.169,
+     "sub": [
+      [
+       14.211581337658327,
+       0.29429601647706866
+      ]
+     ]
+    }
+   },
+   "hat:10": {
+    "hat": {
+     "kind": "double",
+     "vel": 120,
+     "micro_ms": 1.441,
+     "sub": [
+      [
+       8.325116579559582,
+       0.20061369442104413
+      ]
+     ]
+    }
+   },
+   "hat:11": {
+    "hat": {
+     "kind": "single",
+     "vel": 74,
+     "micro_ms": 4.549,
+     "sub": [
+      [
+       14.07136556653631,
+       0.3230977282238152
+      ]
+     ]
+    }
+   },
+   "hat:12": {
+    "hat": {
+     "kind": "accent",
+     "vel": 90,
+     "micro_ms": 1.682,
+     "sub": [
+      [
+       17.306622914010255,
+       0.4316682269810268
+      ]
+     ]
+    }
+   },
+   "hat:13": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 26,
+     "micro_ms": 0.126,
+     "sub": []
+    }
+   },
+   "hat:14": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 123,
+     "micro_ms": 0.635,
+     "sub": [
+      [
+       19.262527352106083,
+       0.4943102518674223
+      ]
+     ]
+    }
+   },
+   "hat:15": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 103,
+     "micro_ms": -2.269,
+     "sub": [
+      [
+       13.588766807283555,
+       0.21557680632138787
+      ]
+     ]
+    }
+   },
+   "bass:0": {
+    "e808": {
+     "start_s": 0.0,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "ANCHOR",
+     "kind": "short"
+    }
+   },
+   "bass:6": {
+    "e808": {
+     "start_s": 0.6428571428571428,
+     "dur_s": 0.21428571428571427,
+     "semi": 19.0,
+     "slide": true,
+     "role": "SLIDE",
+     "kind": "slide"
+    }
+   },
+   "bass:10": {
+    "e808": {
+     "start_s": 1.0714285714285714,
+     "dur_s": 0.42857142857142855,
+     "semi": 9.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "medium"
+    }
+   },
+   "bass:14": {
+    "e808": {
+     "start_s": 1.5,
+     "dur_s": 0.10714285714285714,
+     "semi": 16.0,
+     "slide": false,
+     "role": "PICKUP",
+     "kind": "short"
+    }
+   },
+   "kick:16": {
+    "vel": 0.975,
+    "role": "downbeat"
+   },
+   "kick:22": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "kick:26": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "snare:24": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "snare:22": {
+    "vel": 0.325,
+    "role": "ghost"
+   },
+   "hat:16": {
+    "hat": {
+     "kind": "accent",
+     "vel": 95,
+     "micro_ms": -1.659,
+     "sub": [
+      [
+       17.00360644693134,
+       0.46004382553363543
+      ]
+     ]
+    }
+   },
+   "hat:17": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 72,
+     "micro_ms": -1.779,
+     "sub": [
+      [
+       11.37415283700599,
+       0.23075728307213728
+      ]
+     ]
+    }
+   },
+   "hat:18": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 59,
+     "micro_ms": 4.911,
+     "sub": [
+      [
+       11.045707656366439,
+       0.22699427545054024
+      ]
+     ]
+    }
+   },
+   "hat:19": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 127,
+     "micro_ms": -0.565,
+     "sub": [
+      [
+       13.19169056297688,
+       0.43345434993935217
+      ]
+     ]
+    }
+   },
+   "hat:20": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 127,
+     "micro_ms": 2.104,
+     "sub": [
+      [
+       12.701138026568229,
+       0.2273106116385251
+      ]
+     ]
+    }
+   },
+   "hat:21": {
+    "hat": {
+     "kind": "single",
+     "vel": 122,
+     "micro_ms": 1.784,
+     "sub": [
+      [
+       17.940503668396076,
+       0.27571418700099715
+      ]
+     ]
+    }
+   },
+   "hat:23": {
+    "hat": {
+     "kind": "accent",
+     "vel": 50,
+     "micro_ms": 3.768,
+     "sub": [
+      [
+       8.482258589316816,
+       0.4068928203438398
+      ]
+     ]
+    }
+   },
+   "hat:24": {
+    "hat": {
+     "kind": "accent",
+     "vel": 127,
+     "micro_ms": -4.508,
+     "sub": [
+      [
+       9.59563435427119,
+       0.21983608803344973
+      ]
+     ]
+    }
+   },
+   "hat:25": {
+    "hat": {
+     "kind": "double",
+     "vel": 125,
+     "micro_ms": -5.335,
+     "sub": [
+      [
+       9.135683053475557,
+       0.27357752031817467
+      ]
+     ]
+    }
+   },
+   "hat:26": {
+    "hat": {
+     "kind": "accent",
+     "vel": 55,
+     "micro_ms": -4.163,
+     "sub": [
+      [
+       18.348485795343954,
+       0.2701145201293506
+      ]
+     ]
+    }
+   },
+   "hat:27": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 127,
+     "micro_ms": 2.833,
+     "sub": [
+      [
+       17.107897758948276,
+       0.20424791172319218
+      ]
+     ]
+    }
+   },
+   "hat:28": {
+    "hat": {
+     "kind": "double",
+     "vel": 127,
+     "micro_ms": -2.729,
+     "sub": [
+      [
+       16.962403195618414,
+       0.2693585029027593
+      ]
+     ]
+    }
+   },
+   "hat:29": {
+    "hat": {
+     "kind": "accent",
+     "vel": 86,
+     "micro_ms": 1.147,
+     "sub": [
+      [
+       12.552090351301423,
+       0.2001186777709869
+      ]
+     ]
+    }
+   },
+   "hat:30": {
+    "hat": {
+     "kind": "single",
+     "vel": 29,
+     "micro_ms": -0.59,
+     "sub": [
+      [
+       8.573941023750884,
+       0.36297850832980694
+      ]
+     ]
+    }
+   },
+   "hat:31": {
+    "hat": {
+     "kind": "accent",
+     "vel": 60,
+     "micro_ms": -1.733,
+     "sub": [
+      [
+       8.480396222343888,
+       0.3679235917293644
+      ]
+     ]
+    }
+   },
+   "bass:16": {
+    "e808": {
+     "start_s": 0.0,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "ANCHOR",
+     "kind": "cut"
+    }
+   },
+   "bass:18": {
+    "e808": {
+     "start_s": 0.2142857142857142,
+     "dur_s": 0.21428571428571427,
+     "semi": 9.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "slide"
+    }
+   },
+   "bass:22": {
+    "e808": {
+     "start_s": 0.6428571428571426,
+     "dur_s": 0.21428571428571427,
+     "semi": 19.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "slide"
+    }
+   },
+   "bass:26": {
+    "e808": {
+     "start_s": 1.0714285714285714,
+     "dur_s": 0.10714285714285714,
+     "semi": 9.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "short"
+    }
+   },
+   "bass:30": {
+    "e808": {
+     "start_s": 1.5000000000000002,
+     "dur_s": 0.21428571428571427,
+     "semi": 19.0,
+     "slide": false,
+     "role": "RESPONSE",
+     "kind": "medium"
+    }
+   },
+   "melody1:19": {
+    "dur": 2
+   },
+   "melody1:22": {
+    "dur": 2
+   },
+   "melody1:27": {
+    "dur": 3
+   }
+  },
+  "outro_5": {
+   "kick:0": {
+    "vel": 0.975,
+    "role": "downbeat"
+   },
+   "kick:6": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "kick:10": {
+    "vel": 0.838,
+    "role": "pickup"
+   },
+   "snare:8": {
+    "vel": 1.0,
+    "role": "backbeat"
+   },
+   "snare:6": {
+    "vel": 0.243,
+    "role": "ghost"
+   },
+   "snare:13": {
+    "vel": 0.5522476539253834,
+    "role": "fill"
+   },
+   "snare:14": {
+    "vel": 0.7077233539330129,
+    "role": "fill"
+   },
+   "hat:0": {
+    "hat": {
+     "kind": "accent",
+     "vel": 127,
+     "micro_ms": 1.68,
+     "sub": []
+    }
+   },
+   "hat:1": {
+    "hat": {
+     "kind": "single",
+     "vel": 49,
+     "micro_ms": 2.819,
+     "sub": []
+    }
+   },
+   "hat:2": {
+    "hat": {
+     "kind": "accent",
+     "vel": 83,
+     "micro_ms": 4.142,
+     "sub": []
+    }
+   },
+   "hat:3": {
+    "hat": {
+     "kind": "double",
+     "vel": 56,
+     "micro_ms": 1.655,
+     "sub": [
+      [
+       19.686612494314172,
+       0.4497711703179972
+      ]
+     ]
+    }
+   },
+   "hat:4": {
+    "hat": {
+     "kind": "accent",
+     "vel": 103,
+     "micro_ms": -1.232,
+     "sub": []
+    }
+   },
+   "hat:5": {
+    "hat": {
+     "kind": "single",
+     "vel": 46,
+     "micro_ms": -1.776,
+     "sub": []
+    }
+   },
+   "hat:6": {
+    "hat": {
+     "kind": "pedal",
+     "vel": 45,
+     "micro_ms": 3.2,
+     "sub": []
+    }
+   },
+   "hat:8": {
+    "hat": {
+     "kind": "accent",
+     "vel": 110,
+     "micro_ms": -2.475,
+     "sub": []
+    }
+   },
+   "hat:10": {
+    "hat": {
+     "kind": "single",
+     "vel": 55,
+     "micro_ms": -3.894,
+     "sub": []
+    }
+   },
+   "hat:12": {
+    "hat": {
+     "kind": "accent",
+     "vel": 80,
+     "micro_ms": 4.09,
+     "sub": []
+    }
+   },
+   "hat:14": {
+    "hat": {
+     "kind": "single",
+     "vel": 69,
+     "micro_ms": -0.731,
+     "sub": []
+    }
+   },
+   "perc2:14": {
+    "hat": {
+     "kind": "single",
+     "vel": 104,
+     "micro_ms": 0.0,
+     "sub": []
+    }
+   }
+  }
+ },
+ "bus": {}
+}
