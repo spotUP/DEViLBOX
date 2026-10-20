@@ -442,13 +442,13 @@ export async function loadSongFile(file: File, options: FileLoadOptions, preRead
     const songPositions = result.patterns.map((_: unknown, i: number) => i);
     await applySong({
       instruments: result.instruments, patterns: result.patterns, order: songPositions,
-      bpm: result.bpm, speed: 6,
+      bpm: result.bpm, speed: result.speed,
       metadata: { name: result.metadata.name, description: `Imported from ${file.name} (${result.metadata.tracks} tracks)` },
       originalModuleData: {
         base64: '',
         format: 'XM' as 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN',
         initialBPM: result.bpm,
-        initialSpeed: 6,
+        initialSpeed: result.speed,
         songLength: songPositions.length,
       } as never,
       engine: {},

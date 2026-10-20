@@ -351,13 +351,20 @@ export const GM_PERCUSSION_MAP: Partial<Record<number, PercussionEntry>> = {
   79: { name: 'Open Cuica',         drumType: 'conga',   machineType: '808' },
   80: { name: 'Mute Triangle',      drumType: 'hihat',   machineType: '808' },
   81: { name: 'Open Triangle',      drumType: 'hihat',   machineType: '808' },
+  // General MIDI Level 2 additions
+  82: { name: 'Shaker',             drumType: 'maracas', machineType: '808' },
+  83: { name: 'Jingle Bell',        drumType: 'hihat',   machineType: '808' },
+  84: { name: 'Belltree',           drumType: 'cymbal',  machineType: '808' },
+  85: { name: 'Castanets',          drumType: 'clave',   machineType: '808' },
+  86: { name: 'Mute Surdo',         drumType: 'tom',     machineType: '808' },
+  87: { name: 'Open Surdo',         drumType: 'tom',     machineType: '808' },
 };
 
 /**
  * Create an InstrumentConfig for a single GM percussion note (MIDI channel 10).
  * Each unique MIDI note number gets its own DrumMachine instrument (kick, snare, hihat…).
  *
- * @param midiNote  MIDI percussion note number (35–81)
+ * @param midiNote  MIDI percussion note number (35–87)
  * @param id        1-based instrument slot number
  */
 export function gmPercussionNoteToInstrument(midiNote: number, id: number): InstrumentConfig {

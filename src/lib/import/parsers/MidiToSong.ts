@@ -31,7 +31,7 @@ export async function parseMIDIFile(file: File, options?: MidiImportOptions): Pr
     songLength: order.length,
     restartPosition: 0,
     numChannels: maxChannels,
-    initialSpeed: 6,
+    initialSpeed: result.speed,
     initialBPM: result.bpm,
   };
 }
