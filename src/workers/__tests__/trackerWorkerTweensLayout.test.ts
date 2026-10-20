@@ -121,6 +121,18 @@ describe('tracker worker tweens layout', () => {
     expect(after[0].rowHeight).toBe(36);
   });
 
+  it('c3b: a canvas resize (side panel sliding) draws the new geometry in the next render, no glide', async () => {
+    const post = await bootWorker();
+    post(initMsg());
+    runFrame(16);
+    const before = renders.length;
+    post(layoutMsg(24, TARGET4, 240, { w: 700 }));
+    runFrame(16); runFrame(16); runFrame(16);
+    const after = renders.slice(before);
+    expect(after.length).toBe(1);
+    expect(after[0].offsets).toEqual(TARGET4);
+  });
+
   it('c4: a scale change resizes once and draws offsets divided by the scale', async () => {
     const post = await bootWorker();
     post(initMsg());

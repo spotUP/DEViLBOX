@@ -178,14 +178,20 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
     }
 
     case 'layout': {
-      if (msg.w !== width || msg.h !== height || msg.dpr !== dpr || msg.scale !== scale) {
+      // A new canvas size means the editor's box is moving (a side panel
+      // sliding, a window drag): the box is the animation, and a tween
+      // restarted on every frame of it would trail the box. The grid follows
+      // the size 1:1; only a channel-count change keeps its fade.
+      const sizeChanged = msg.w !== width || msg.h !== height;
+      if (sizeChanged || msg.dpr !== dpr || msg.scale !== scale) {
         width = msg.w; height = msg.h; dpr = msg.dpr; scale = msg.scale;
         pendingResize = true;
       }
       ui = msg.uiState;
+      const sameChannels = msg.channelLayout.offsets.length === layout.offsets.length;
       layout = msg.channelLayout;
       layoutHold.layout();
-      tween.retarget({ rowHeight: ui.rowHeight, layout }, performance.now(), reducedMotion || !renderer);
+      tween.retarget({ rowHeight: ui.rowHeight, layout }, performance.now(), reducedMotion || !renderer || (sizeChanged && sameChannels));
       applyPendingResize();
       drawVersion++;
       dirty = true;
