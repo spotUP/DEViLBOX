@@ -556,7 +556,6 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     layoutOut.offsets = channelOffsets;
     layoutOut.widths = channelWidths;
     layoutOut.numChannels = numChannels;
-    layoutOut.origin = containerRef.current;
     notifyChannelLayout();
   }, [channelOffsets, channelWidths, numChannels]);
 

@@ -22,14 +22,19 @@ describe('track scopes line up with the pattern columns', () => {
     expect(cells[2].x + cells[2].w).toBe(1200);
   });
 
-  it('keeps each scope over its column while the columns do not fit the strip', () => {
-    const cells = scopeCells(3, 400, layout);
-    expect(cells.map((c) => c.x)).toEqual([40, 200, 360]);
-    expect(cells.every((c) => c.w === 159)).toBe(true);
+  // Owner 2026-10-20: "the scopes move when I scroll the channels" - they now
+  // stay put: same cells at every scroll position, columns fitting or not.
+  it('stays put when the editor scrolls sideways', () => {
+    // The editor publishes its scroll on the same object; the scopes ignore it.
+    const scrolled = { ...layout, scrollLeft: 250 };
+    expect(scopeCells(3, 1200, scrolled)).toEqual(scopeCells(3, 1200, layout));
+    expect(scopeCells(3, 400, scrolled)).toEqual(scopeCells(3, 400, layout));
   });
 
-  it('follows the editor when it scrolls sideways', () => {
-    expect(scopeCells(3, 1200, { ...layout, scrollLeft: 100 })[1].x).toBe(100);
+  it('fills a narrow strip edge to edge too, when the columns do not fit it', () => {
+    const cells = scopeCells(3, 400, layout);
+    expect(cells[0].x).toBe(0);
+    expect(cells[2].x + cells[2].w).toBe(400);
   });
 
   it('falls back to equal cells until the editor has published a layout for these channels', () => {
@@ -43,18 +48,11 @@ describe('track scopes line up with the pattern columns', () => {
   });
 
   // Owner, same day, GoatTracker view: "channel oscillators are doubled" - the
-  // view mounted a second strip under the app-wide one, which sat over the
-  // order sidebar, left of the pattern columns.
-  it('shifts by where the editor starts inside a wider strip (columns not fitting)', () => {
-    expect(scopeCells(3, 500, layout, 80).map((c) => c.x)).toEqual([120, 280, 440]);
-  });
-
-  it('is mounted once, by the tracker view, and measures the editor\'s left edge', () => {
+  // view mounted a second strip under the app-wide one.
+  it('is mounted once, by the tracker view, and ignores the editor scroll', () => {
     const gt = readFileSync(resolve(__dirname, '../../gtultra/GTUltraView.tsx'), 'utf8');
     expect(gt).not.toMatch(/<TrackScopesStrip/);
     const strip = readFileSync(resolve(__dirname, '../TrackScopesStrip.tsx'), 'utf8');
-    expect(strip.match(/originShiftFor\(canvas, channelLayout\)/g)?.length).toBe(2);
-    const canvas = readFileSync(resolve(__dirname, '../PatternEditorCanvas.tsx'), 'utf8');
-    expect(canvas).toMatch(/layoutOut\.origin = containerRef\.current;/);
+    expect(strip).not.toMatch(/scrollLeft/);
   });
 });
