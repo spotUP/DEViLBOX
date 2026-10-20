@@ -64,7 +64,7 @@ export function visibleChannelMask(patterns: readonly Pattern[], opts: VisibleCh
   const mask = new Array<boolean>(count).fill(false);
   for (const p of patterns) {
     p.channels.forEach((ch, i) => {
-      if (!mask[i] && (channelHasData(ch) || ch.channelMeta?.addedAfterImport)) mask[i] = true;
+      if (!mask[i] && (channelHasData(ch) || ch.channelMeta?.addedAfterImport || ch.channelMeta?.alwaysShow)) mask[i] = true;
     });
   }
   // A song with no data at all (a new project) shows everything to write into.

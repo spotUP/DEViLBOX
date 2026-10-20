@@ -389,6 +389,7 @@ function importChannel(lane: Lane, cells: (SongFileCell | null)[] | undefined, n
   return {
     id: lane, name: LANE_LABEL[lane], rows, muted: false, solo: false, collapsed: false, volume: 100, pan: 0,
     instrumentId: null, color: null,
+    channelMeta: { importedFromMOD: false, alwaysShow: true },
   };
 }
 
