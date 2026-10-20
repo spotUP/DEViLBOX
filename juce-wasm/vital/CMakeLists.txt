@@ -76,23 +76,57 @@ public:
     }
 };
 
-// MemoryOutputStream stub (used for sample serialization)
+// MemoryOutputStream + Base64: real decode, because .vital presets embed their
+// wavetables, sample and LFO shapes as base64 (WaveSourceKeyframe, Sample).
 class MemoryOutputStream {
 public:
     MemoryOutputStream(size_t sz = 0) : data_(sz, 0) {}
     void* getData() { return data_.data(); }
     const void* getData() const { return data_.data(); }
     size_t getDataSize() const { return data_.size(); }
+    std::vector<char>& bytes() { return data_; }
 private:
     std::vector<char> data_;
 };
 
-// Base64 stub (serialization not needed in WASM)
+// Base64 encode is unused in WASM (presets are only loaded, never saved)
 class Base64 {
 public:
     static String toBase64(const void*, size_t) { return String(); }
-    static bool convertFromBase64(MemoryOutputStream&, const std::string&) { return false; }
+    static bool convertFromBase64(MemoryOutputStream& out, const std::string& in) {
+        auto val = [](unsigned char c) -> int {
+            if (c >= 'A' && c <= 'Z') return c - 'A';
+            if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+            if (c >= '0' && c <= '9') return c - '0' + 52;
+            if (c == '+') return 62;
+            if (c == '/') return 63;
+            return -1;
+        };
+        std::vector<char> decoded;
+        decoded.reserve(in.size() * 3 / 4);
+        unsigned int acc = 0;
+        int bits = 0;
+        for (unsigned char c : in) {
+            int v = val(c);
+            if (v < 0) continue;  // padding, whitespace
+            acc = (acc << 6) | (unsigned int)v;
+            bits += 6;
+            if (bits >= 8) {
+                bits -= 8;
+                decoded.push_back((char)((acc >> bits) & 0xFF));
+            }
+        }
+        // Keep a pre-sized stream at least as large as requested, so callers
+        // that memcpy a fixed size from a short payload read zeros, not garbage.
+        if (decoded.size() < out.bytes().size())
+            decoded.resize(out.bytes().size(), 0);
+        out.bytes() = std::move(decoded);
+        return true;
+    }
 };
+
+// Version string JUCE's Projucer would generate (checked by LoadSave)
+namespace ProjectInfo { static const char* const versionString = "1.5.5"; }
 
 // File class stub (used in synth_base.h)
 namespace juce { class File { public: File() {} File(const char*) {} }; }
@@ -118,6 +152,11 @@ set(VITAL_COMMON_SOURCES
     "${VITAL_SRC}/common/line_generator.cpp"
 )
 
+# Wavetable creator + components: build wavetables from the base64/JSON in a .vital
+# preset (WavetableCreator::jsonToState), same code the desktop plugin runs.
+file(GLOB VITAL_WAVETABLE_SOURCES "${VITAL_SRC}/common/wavetable/*.cpp")
+list(APPEND VITAL_COMMON_SOURCES ${VITAL_WAVETABLE_SOURCES})
+
 # KissFFT (header-only in this version, but may need compilation)
 set(KISSFFT_SOURCES "")
 if(EXISTS "${VITAL_THIRD_PARTY}/kissfft/kissfft.c")
@@ -128,6 +167,7 @@ endif()
 set(WRAPPER_SOURCES
     "${CMAKE_SOURCE_DIR}/VitalWASM.cpp"
     "${CMAKE_SOURCE_DIR}/tuning_stub.cpp"
+    "${CMAKE_SOURCE_DIR}/load_save_stub.cpp"
 )
 
 add_executable(VitalWASMBuild
@@ -138,11 +178,13 @@ add_executable(VitalWASMBuild
 )
 
 target_include_directories(VitalWASMBuild PRIVATE
+    ${CMAKE_SOURCE_DIR}/shim                        # WASM load_save.h (before vital-main/src/common)
     ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/../common                  # WASMSynthBase.h
     ${CMAKE_BINARY_DIR}                            # JuceHeader.h shim
     ${VITAL_SRC}
     ${VITAL_SRC}/common
+    ${VITAL_SRC}/common/wavetable
     ${VITAL_SRC}/synthesis
     ${VITAL_SRC}/synthesis/effects
     ${VITAL_SRC}/synthesis/filters
