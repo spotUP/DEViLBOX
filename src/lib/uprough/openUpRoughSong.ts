@@ -7,6 +7,7 @@
 import { applySong } from '@/lib/song/applySong';
 import { withSongLoad } from '@/lib/song/songLifecycle';
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { installUpRoughAutoRender } from './upRoughSongService';
 import { parseSongFile, songFileToSong } from './songFile';
 
 /** .uprough-song.json text -> patterns, order and instruments (throws SongFileError by name). */
@@ -22,6 +23,7 @@ export async function openUpRoughSong(text: string): Promise<void> {
       engine: {},
     }, 'import');
     // After applySong: loadPatterns clears upRoughMeta.
+    installUpRoughAutoRender(); // before the meta lands: the subscription renders the song ahead of Play
     useTrackerStore.setState({ upRoughMeta: song.meta });
   });
 }

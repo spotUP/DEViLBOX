@@ -22,12 +22,18 @@ export function sectionKey(events: BarEvents, index: number, bseed: number, opti
 }
 
 /** renderSong, rendering only the sections whose key misses `cache`. The cache only grows; the caller clears it. */
-export function renderSongCached(events: BarEvents, options: RenderSongOptions, cache: SectionMixCache): Float64Array {
+export function renderSongCached(
+  events: BarEvents, options: RenderSongOptions, cache: SectionMixCache,
+  /** Called once per section, in order, after its mix is known (`cached` = it came from the cache). */
+  onSection?: (index: number, cached: boolean) => void,
+): Float64Array {
   const seeds = sectionSeeds(events);
   const keys = events.sections.map((_, i) => sectionKey(events, i, seeds[i]!, options));
   const mixes = events.sections.map((_, i) => {
     const key = keys[i]!;
-    if (!cache.has(key)) cache.set(key, renderSectionMix(events, i, seeds[i]!, options));
+    const cached = cache.has(key);
+    if (!cached) cache.set(key, renderSectionMix(events, i, seeds[i]!, options));
+    onSection?.(i, cached);
     return cache.get(key)!;
   });
   return finishSong(mixes, events, options);
