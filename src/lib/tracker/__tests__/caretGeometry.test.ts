@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeCaretRect, type CaretGeometryInput } from '../caretGeometry';
+import { computeCaretRect, computeFieldRect, type CaretGeometryInput } from '../caretGeometry';
 
 // charWidth = 10: note = 34, group = 34+4 + 20+4 + 20+4 = 86.
 // inst field starts at paramBase = 38, vol at 38+24 = 62, effects at noteCols*86.
@@ -65,5 +65,28 @@ describe('computeCaretRect — per-nibble caret geometry', () => {
   it('a second note column shifts the caret by one group width', () => {
     expect(computeCaretRect({ ...base, columnType: 'note', noteColumnIndex: 1 }))
       .toEqual({ offX: 86, width: 34 });
+  });
+});
+
+/**
+ * Field outline: entering a column lights a border around the WHOLE field, not
+ * just the nibble under the caret, so an effect slot reads as one unit.
+ */
+describe('computeFieldRect — outline spans the whole field', () => {
+  it('effect param outline covers the effect type and both param digits', () => {
+    expect(computeFieldRect({ ...base, columnType: 'effParam', digitIndex: 1 }))
+      .toEqual({ offX: 86, width: 30 });
+  });
+
+  it('second effect slot outline starts at its own effect type', () => {
+    expect(computeFieldRect({ ...base, columnType: 'effParam2', digitIndex: 0 }))
+      .toEqual({ offX: 120, width: 30 });
+  });
+
+  it('instrument and volume outlines cover both nibbles', () => {
+    expect(computeFieldRect({ ...base, columnType: 'instrument', digitIndex: 1 }))
+      .toEqual({ offX: 38, width: 20 });
+    expect(computeFieldRect({ ...base, columnType: 'volume', digitIndex: 1 }))
+      .toEqual({ offX: 62, width: 20 });
   });
 });
