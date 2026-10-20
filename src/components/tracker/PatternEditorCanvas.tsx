@@ -33,6 +33,8 @@ import { ChannelVUMeter } from './ChannelVUMeter';
 import { ChannelVUMeters } from './ChannelVUMeters';
 import { ChannelColorPicker } from './ChannelColorPicker';
 import { ChannelContextMenu } from './ChannelContextMenu';
+import { ChannelHeaderContextMenu } from './ChannelHeaderContextMenu';
+import type { ChannelMenuHandlers } from './useChannelMenuItems';
 import { CellContextMenu, useCellContextMenu } from './CellContextMenu';
 import { ParameterEditor } from './ParameterEditor';
 import { GENERATORS, type GeneratorType } from '@utils/patternGenerators';
@@ -1889,6 +1891,39 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     bdAnimations.applyChaos(getBDAnimationOptions(channelIndex));
   }, [bdAnimations, getBDAnimationOptions]);
 
+  // Handlers behind the shared channel menu items (dots button, header right-click, grid "Channel" submenu).
+  const channelMenuHandlers: ChannelMenuHandlers = {
+    isFormatMode,
+    onFillPattern: handleFillPattern,
+    onClearChannel: handleClearChannel,
+    onCopyChannel: handleCopyChannel,
+    onCutChannel: handleCutChannel,
+    onPasteChannel: handlePasteChannel,
+    onTranspose: handleTranspose,
+    onHumanize: handleHumanize,
+    onInterpolate: handleInterpolate,
+    onAcidGenerator: onAcidGenerator || (() => {}),
+    onRandomize: onRandomize || (() => {}),
+    onReverseVisual: handleReverseVisual,
+    onPolyrhythm: handlePolyrhythm,
+    onFibonacci: handleFibonacci,
+    onEuclidean: handleEuclidean,
+    onPingPong: handlePingPong,
+    onGlitch: handleGlitch,
+    onStrobe: handleStrobe,
+    onVisualEcho: handleVisualEcho,
+    onConverge: handleConverge,
+    onSpiral: handleSpiral,
+    onBounce: handleBounce,
+    onChaos: handleChaos,
+  };
+  const [channelHeaderMenu, setChannelHeaderMenu] = useState<{ x: number; y: number; channelIndex: number } | null>(null);
+  const openChannelHeaderMenu = (e: React.MouseEvent, channelIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setChannelHeaderMenu({ x: e.clientX, y: e.clientY, channelIndex });
+  };
+
   // PERF: VU meter polling moved to ref-based update (no React re-renders)
   // The ChannelVUMeters component handles its own animation loop
   // Header VU indicators are updated via refs in the render loop
@@ -3202,6 +3237,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                       return (
                         <div
                           key={idx}
+                          onContextMenu={(e) => openChannelHeaderMenu(e, idx)}
                           className={`flex-shrink-0 flex items-center justify-between gap-1 ${isCollapsed ? 'px-1' : 'px-2'} py-1
                             border-r border-dark-border transition-colors relative
                             ${channel?.muted ? 'opacity-50' : ''}
@@ -3269,28 +3305,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                                   channel={channel}
                                   patternId={pattern?.id ?? ''}
                                   patternLength={pattern?.length ?? 0}
-                                  onFillPattern={handleFillPattern}
-                                  onClearChannel={handleClearChannel}
-                                  onCopyChannel={handleCopyChannel}
-                                  onCutChannel={handleCutChannel}
-                                  onPasteChannel={handlePasteChannel}
-                                  onTranspose={handleTranspose}
-                                  onHumanize={handleHumanize}
-                                  onInterpolate={handleInterpolate}
-                                  onAcidGenerator={onAcidGenerator || (() => {})}
-                                  onRandomize={onRandomize || (() => {})}
-                                  onReverseVisual={handleReverseVisual}
-                                  onPolyrhythm={handlePolyrhythm}
-                                  onFibonacci={handleFibonacci}
-                                  onEuclidean={handleEuclidean}
-                                  onPingPong={handlePingPong}
-                                  onGlitch={handleGlitch}
-                                  onStrobe={handleStrobe}
-                                  onVisualEcho={handleVisualEcho}
-                                  onConverge={handleConverge}
-                                  onSpiral={handleSpiral}
-                                  onBounce={handleBounce}
-                                  onChaos={handleChaos}
+                                  {...channelMenuHandlers}
                                 />
                                 <ChannelColorPicker
                                   currentColor={channel.color}
@@ -3442,6 +3457,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                     return (
                       <div
                         key={channel.id}
+                        onContextMenu={(e) => openChannelHeaderMenu(e, idx)}
                         className={`flex-shrink-0 flex items-center justify-between gap-1 ${isCollapsed ? 'px-1' : 'px-2'} py-1
                           border-r border-dark-border transition-colors relative
                           ${channel.muted ? 'opacity-50' : ''}
@@ -3488,28 +3504,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                             channel={channel}
                             patternId={pattern?.id ?? ''}
                             patternLength={pattern?.length ?? 0}
-                            onFillPattern={handleFillPattern}
-                            onClearChannel={handleClearChannel}
-                            onCopyChannel={handleCopyChannel}
-                            onCutChannel={handleCutChannel}
-                            onPasteChannel={handlePasteChannel}
-                            onTranspose={handleTranspose}
-                            onHumanize={handleHumanize}
-                            onInterpolate={handleInterpolate}
-                            onAcidGenerator={onAcidGenerator || (() => {})}
-                            onRandomize={onRandomize || (() => {})}
-                            onReverseVisual={handleReverseVisual}
-                            onPolyrhythm={handlePolyrhythm}
-                            onFibonacci={handleFibonacci}
-                            onEuclidean={handleEuclidean}
-                            onPingPong={handlePingPong}
-                            onGlitch={handleGlitch}
-                            onStrobe={handleStrobe}
-                            onVisualEcho={handleVisualEcho}
-                            onConverge={handleConverge}
-                            onSpiral={handleSpiral}
-                            onBounce={handleBounce}
-                            onChaos={handleChaos}
+                            {...channelMenuHandlers}
                           />
                           <ChannelColorPicker
                             currentColor={channel.color}
@@ -3769,8 +3764,16 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           }}
         />
 
+        <ChannelHeaderContextMenu
+          position={channelHeaderMenu ? { x: channelHeaderMenu.x, y: channelHeaderMenu.y } : null}
+          channelIndex={channelHeaderMenu?.channelIndex ?? 0}
+          onClose={() => setChannelHeaderMenu(null)}
+          handlers={channelMenuHandlers}
+        />
+
         {/* Cell context menu */}
         <CellContextMenu
+          channelMenuHandlers={channelMenuHandlers}
           isOpen={cellContextMenu.isOpen}
           position={cellContextMenu.position}
           onClose={cellContextMenu.closeMenu}

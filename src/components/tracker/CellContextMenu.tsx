@@ -20,7 +20,6 @@ import {
   Link,
   X,
   Zap,
-  Minus,
 } from 'lucide-react';
 import { ContextMenu, type MenuItemType } from '@components/common/ContextMenu';
 import { useTrackerStore } from '@stores/useTrackerStore';
@@ -38,6 +37,7 @@ import {
   xmNoteShortName,
 } from '@/lib/chordDefinitions';
 import { Layers } from 'lucide-react';
+import { useChannelMenuItems, type ChannelMenuHandlers } from './useChannelMenuItems';
 
 interface CellContextMenuProps {
   isOpen?: boolean;
@@ -63,6 +63,8 @@ interface CellContextMenuProps {
   onSpiral?: () => void;
   onBounce?: () => void;
   onChaos?: () => void;
+  /** Handlers for the shared "Channel" submenu (see useChannelMenuItems). */
+  channelMenuHandlers: ChannelMenuHandlers;
 }
 
 export const CellContextMenu: React.FC<CellContextMenuProps> = ({
@@ -87,6 +89,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
   onSpiral,
   onBounce,
   onChaos,
+  channelMenuHandlers,
 }) => {
   const cursor = useCursorStore((s) => s.cursor);
   const selection = useCursorStore((s) => s.selection);
@@ -102,7 +105,6 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     paste,
     transposeSelection,
     interpolateSelection,
-    removeChannel,
     setChannelMeta,
   } = useTrackerStore(useShallow((s) => ({
     patterns: s.patterns,
@@ -113,12 +115,12 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     paste: s.paste,
     transposeSelection: s.transposeSelection,
     interpolateSelection: s.interpolateSelection,
-    removeChannel: s.removeChannel,
     setChannelMeta: s.setChannelMeta,
   })));
 
   const pattern = patterns[currentPatternIndex];
   const hasSelection = !!selection;
+  const buildChannelItems = useChannelMenuItems(channelIndex, pattern?.channels[channelIndex], pattern?.id ?? '', channelMenuHandlers);
 
   // Block handlers
   const handleCopyBlock = useCallback(() => {
@@ -284,11 +286,6 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     onClose();
   }, [channelIndex, selectChannel, onClose]);
 
-  // Remove channel
-  const handleRemoveChannel = useCallback(() => {
-    removeChannel(channelIndex);
-    onClose();
-  }, [removeChannel, channelIndex, onClose]);
 
   // Automation submenu items (NKS + register params)
   const automationMenuItems = useMemo((): MenuItemType[] => {
@@ -795,27 +792,16 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     // Automation
     { type: 'divider' as const },
     ...automationMenuItems,
-    ...(pattern && pattern.channels.length > 1 ? [
-      { type: 'divider' as const },
-      {
-        id: 'note-columns',
-        label: 'Note Columns',
-        icon: <Columns size={14} />,
-        submenu: [
-          { id: 'notecols-1', label: '1 Column', onClick: () => { setChannelMeta(channelIndex, { noteCols: 1 }); onClose(); } },
-          { id: 'notecols-2', label: '2 Columns', onClick: () => { setChannelMeta(channelIndex, { noteCols: 2 }); onClose(); } },
-          { id: 'notecols-3', label: '3 Columns', onClick: () => { setChannelMeta(channelIndex, { noteCols: 3 }); onClose(); } },
-          { id: 'notecols-4', label: '4 Columns', onClick: () => { setChannelMeta(channelIndex, { noteCols: 4 }); onClose(); } },
-        ],
-      },
-      {
-        id: 'remove-channel',
-        label: 'Remove Channel',
-        icon: <Minus size={14} />,
-        onClick: handleRemoveChannel,
-      },
-    ] : []),
+    { type: 'divider' as const },
+    {
+      id: 'channel',
+      label: 'Channel',
+      icon: <LayoutGrid size={14} />,
+      submenu: position ? buildChannelItems() : [],
+    },
   ], [
+    position,
+    buildChannelItems,
     handleCut,
     handleCopy,
     handlePaste,
@@ -829,7 +815,6 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
     onOpenParameterEditor,
     handleSelectColumn,
     handleSelectChannel,
-    handleRemoveChannel,
     setChannelMeta,
     pattern,
     hasSelection,
