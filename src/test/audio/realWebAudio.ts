@@ -13,6 +13,7 @@ import { dirname, join } from 'node:path';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { readFile } from 'node:fs/promises';
+import { resolveObjectURL } from 'node:buffer';
 
 /** Worklet modules and public files still loading — see `audioLoadsSettled`. */
 let inFlight = 0;
@@ -151,6 +152,16 @@ export function resolveWorkletsFromPublic(root = process.cwd()): void {
   // copied worklets behind in TMPDIR (576 directories on 2026-10-19).
   process.on('exit', () => rmSync(outDir, { recursive: true, force: true }));
   const patched = function (this: unknown, url: string): Promise<void> {
+    // Tone.js registers its processors (comb filter, bit crusher) from a Blob URL.
+    if (typeof url === 'string' && url.startsWith('blob:')) {
+      const blob = resolveObjectURL(url);
+      if (!blob) return Promise.reject(new Error(`unknown worklet blob ${url}`));
+      return track(blob.text().then((source) => {
+        const out = join(outDir, `blob-${url.slice(url.lastIndexOf('/') + 1)}.js`);
+        writeFileSync(out, DETERMINISTIC_PRELUDE + source);
+        return original.call(this, out);
+      }));
+    }
     if (typeof url !== 'string' || !url.startsWith('/')) return track(original.call(this, url));
     const rel = url.split('?')[0];
     const source = readFileSync(join(root, 'public', rel), 'utf8');

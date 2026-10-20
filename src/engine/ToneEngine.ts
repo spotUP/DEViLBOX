@@ -21,6 +21,7 @@ import { keyboardPeriod, keyboardVelocity } from './keyboardPeriod';
 import { periodToNoteIndex, getPeriodExtended, _registerToneEngineRef } from './effects/PeriodTables';
 import { AmigaFilter } from './effects/AmigaFilter';
 import { shimAudioListenerParams } from './tone/firefoxAudioListenerShim';
+import { installNativeContextWorklets } from './tone/nativeContextWorklets';
 import { applyLoopToPlayer, sampleLoops } from './tone/samplePlayerLoop';
 import { registerChannelMeterSink } from './tone/channelMeterFeed';
 import { chipChannelFor, LIVE_VOICE_BASE_CHANNEL } from './furnace-dispatch/chipChannel';
@@ -466,6 +467,10 @@ export class ToneEngine {
     // without this shim Tone.setContext throws "param must be an AudioParam"
     // and the whole app crashes at boot on Firefox.
     shimAudioListenerParams(this._nativeContext);
+    // Tone builds its worklet nodes (PluckSynth's comb filter, BitCrusher,
+    // Freeverb, JCReverb) through standardized-audio-context, which rejects a
+    // native context; without this they stay silent.
+    installNativeContextWorklets();
     // Dev: census every node and edge (MCP get_audio_worklet_profile) before
     // Tone wires its destination, so the census sees that edge too.
     if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV) installNodeCensus();
