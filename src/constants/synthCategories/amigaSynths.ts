@@ -298,15 +298,6 @@ export const amigaSynthEntries: Record<string, SynthInfo> = {
     icon: 'Cpu',
     color: 'text-green-400',
   },
-  RonKlarenSynth: {
-    type: 'RonKlarenSynth',
-    name: 'Ron Klaren',
-    shortName: 'RK',
-    description: 'Ron Klaren custom Amiga sound system with per-instrument wavetables',
-    bestFor: ['Amiga chiptune', 'Custom synth'],
-    icon: 'Cpu',
-    color: 'text-green-400',
-  },
   SawteethSynth: {
     type: 'SawteethSynth',
     name: 'Sawteeth',
