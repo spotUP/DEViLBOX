@@ -238,7 +238,11 @@ export interface MixSectionOptions {
  * and added. Lane buffers must already carry their per-lane chains; they are not modified.
  */
 export function mixSection(lanes: LaneBuses, o: MixSectionOptions): Float64Array {
-  const b = balanceBuses(lanes, { bassGain: o.bassGain, hasDrums: o.hasDrums });
+  return sumBalanced(balanceBuses(lanes, { bassGain: o.bassGain, hasDrums: o.hasDrums }), o);
+}
+
+/** mixSection after balanceBuses: the lane sum and the scratch bus. Split out so a caller can own the balance call. */
+export function sumBalanced(b: LaneBuses, o: MixSectionOptions): Float64Array {
   const sec = new Float64Array(o.length);
   for (let i = 0; i < o.length; i++) {
     sec[i] = b.drums[i]! + b.bass[i]! + b.sample[i]! + b.melody[i]! + b.vocal[i]! + (b.reinforce ? b.reinforce[i]! : 0);
@@ -256,15 +260,21 @@ export function mixSection(lanes: LaneBuses, o: MixSectionOptions): Float64Array
   return sec;
 }
 
-/** render_track's tail: concatenate the (non-empty) sections, _apply_texture, master_bus, int8 / 127. */
-export function mixTrack(
-  sections: readonly Signal[], rate: number, options: Pick<TextureOptions, 'style'> & Partial<TextureOptions>,
-): Float64Array {
+/** The non-empty sections laid end to end. */
+export function joinSections(sections: readonly Signal[]): Float64Array {
   const parts = sections.filter((p) => p.length);
   const total = parts.reduce((a, p) => a + p.length, 0);
   const track = new Float64Array(total);
   let at = 0;
   for (const p of parts) { for (let i = 0; i < p.length; i++) track[at + i] = p[i]!; at += p.length; }
+  return track;
+}
+
+/** render_track's tail: concatenate the (non-empty) sections, _apply_texture, master_bus, int8 / 127. */
+export function mixTrack(
+  sections: readonly Signal[], rate: number, options: Pick<TextureOptions, 'style'> & Partial<TextureOptions>,
+): Float64Array {
+  const track = joinSections(sections);
   const textured = applyTexture(track, rate, options);
   const master = masterBus(textured, {}, rate);
   return Float64Array.from(master, (v) => v / 127.0);
