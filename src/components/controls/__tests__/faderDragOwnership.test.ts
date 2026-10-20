@@ -42,7 +42,7 @@ function syncEffectBody(): string {
 }
 
 describe('while the user is dragging', () => {
-  it('does not let an external value overwrite the thumb', () => {
+  it('does not let an external value overwrite the fill', () => {
     expect(syncEffectBody()).toMatch(/if \(draggingRef\.current\) return;/);
   });
 
@@ -65,7 +65,7 @@ describe('when the hand comes off', () => {
     const body = SOURCE.slice(at, SOURCE.indexOf('}, [', at));
     expect(body).toMatch(/draggingRef\.current = false/);
     expect(body).toMatch(/setInternalValue\(valueRef\.current\)/);
-    expect(body).toMatch(/positionThumbAndFill\(valueRef\.current\)/);
+    expect(body).toMatch(/positionFill\(valueRef\.current\)/);
   });
 
   it('clears the drag flag before settling, or the sync would be skipped', () => {
