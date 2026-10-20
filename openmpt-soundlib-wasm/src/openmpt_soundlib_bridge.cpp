@@ -483,7 +483,7 @@ const char *osl_get_sample_info_json(int32_t sampleIdx) {
         static_cast<unsigned>(smp.nLoopEnd),
         static_cast<unsigned>(smp.nSustainStart),
         static_cast<unsigned>(smp.nSustainEnd),
-        smp.nC5Speed,
+        smp.GetSampleRate(g_sf->GetType()),
         static_cast<unsigned>(smp.nGlobalVol),
         static_cast<unsigned>(smp.nVolume),
         static_cast<unsigned>(smp.nPan),
@@ -545,6 +545,16 @@ int osl_set_sample_data(int32_t sampleIdx, const void *data, int32_t numFrames,
     // Allocate and copy new data
     smp.nLength = static_cast<SmpLength>(numFrames);
     smp.nC5Speed = c5Speed;
+    // MOD, XM and the other finetune/transpose formats play a sample from
+    // RelativeTone + nFineTune and ignore nC5Speed, so a 44.1 kHz sample
+    // left at the default transpose plays as 8363 Hz (2-3 octaves low).
+    // Derive the transpose from the rate the same way ModSample::Convert does.
+    if (g_sf->UseFinetuneAndTranspose()) {
+        if (g_sf->GetType() == MOD_TYPE_MOD)
+            smp.nC5Speed = Util::muldivr_unsigned(smp.nC5Speed, 8363, 8287);
+        smp.FrequencyToTranspose();
+        smp.nC5Speed = c5Speed;
+    }
 
     if (bitsPerSample == 16) smp.uFlags.set(CHN_16BIT);
     else smp.uFlags.reset(CHN_16BIT);
