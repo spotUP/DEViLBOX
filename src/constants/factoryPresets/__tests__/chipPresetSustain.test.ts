@@ -10,7 +10,7 @@ describe('ChipSynth factory presets sustain a held key', () => {
   it('every non-pluck preset has amplitude sustain above 0', () => {
     const offenders = CHIP_PRESETS
       .filter((p) => !PLUCKS.has(p.name ?? ''))
-      .filter((p) => !(p.chipSynth?.envelope && p.chipSynth.envelope.sustain > 0))
+      .filter((p) => !((p.chipSynth?.envelope?.sustain ?? 0) > 0))
       .map((p) => p.name);
     expect(offenders).toEqual([]);
   });
