@@ -766,17 +766,17 @@ export const VITAL_NKS_PARAMETERS: NKSParameter[] = [
 ];
 
 // ============================================================================
-// VSTBridge: Odin2 (top 8 params from 119)
+// VSTBridge: Odin2 (top 8 of 257; ids are engine parameter names, checked by odin2ParamKeysResolve.test.ts)
 // ============================================================================
 export const ODIN2_NKS_PARAMETERS: NKSParameter[] = [
-  { id: 'odin2.osc1Type', name: 'Osc1 Type', section: NKSSection.SYNTHESIS, type: NKSParameterType.INT, min: 0, max: 11, defaultValue: 0, page: 0, index: 0, isAutomatable: true },
-  { id: 'odin2.filter1Freq', name: 'Flt Freq', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true },
-  { id: 'odin2.filter1Reso', name: 'Flt Reso', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true },
-  { id: 'odin2.env1Attack', name: 'Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: 's', formatString: '%.2f', page: 0, index: 3, isAutomatable: true },
-  { id: 'odin2.env1Decay', name: 'Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: 's', formatString: '%.2f', page: 0, index: 4, isAutomatable: true },
-  { id: 'odin2.env1Sustain', name: 'Sustain', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true },
-  { id: 'odin2.env1Release', name: 'Release', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: 's', formatString: '%.2f', page: 0, index: 6, isAutomatable: true },
-  { id: 'odin2.masterVol', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
+  { id: 'odin2.osc1_vol', name: 'Osc1 Volume', section: NKSSection.SYNTHESIS, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.5, page: 0, index: 0, isAutomatable: true },
+  { id: 'odin2.fil1_freq', name: 'Flt Freq', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 1, isAutomatable: true },
+  { id: 'odin2.fil1_res', name: 'Flt Reso', section: NKSSection.FILTER, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: '%', formatString: '%.0f%%', page: 0, index: 2, isAutomatable: true },
+  { id: 'odin2.env1_attack', name: 'Attack', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0, unit: 's', formatString: '%.2f', page: 0, index: 3, isAutomatable: true },
+  { id: 'odin2.env1_decay', name: 'Decay', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: 's', formatString: '%.2f', page: 0, index: 4, isAutomatable: true },
+  { id: 'odin2.env1_sustain', name: 'Sustain', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 5, isAutomatable: true },
+  { id: 'odin2.env1_release', name: 'Release', section: NKSSection.ENVELOPE, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.3, unit: 's', formatString: '%.2f', page: 0, index: 6, isAutomatable: true },
+  { id: 'odin2.master', name: 'Volume', section: NKSSection.OUTPUT, type: NKSParameterType.FLOAT, min: 0, max: 1, defaultValue: 0.7, unit: '%', formatString: '%.0f%%', page: 0, index: 7, isAutomatable: true },
 ];
 
 // ============================================================================

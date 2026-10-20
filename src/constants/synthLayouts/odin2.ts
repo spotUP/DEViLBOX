@@ -33,10 +33,10 @@ export const ODIN2_LAYOUT: SynthPanelLayout = {
     {
       label: 'ENVELOPE',
       controls: [
-        { type: 'knob', key: 'parameterValues.amp_attack', label: 'A', formatValue: fmtPct },
-        { type: 'knob', key: 'parameterValues.amp_decay', label: 'D', formatValue: fmtPct },
-        { type: 'knob', key: 'parameterValues.amp_sustain', label: 'S', formatValue: fmtPct },
-        { type: 'knob', key: 'parameterValues.amp_release', label: 'R', formatValue: fmtPct },
+        { type: 'knob', key: 'parameterValues.env1_attack', label: 'A', formatValue: fmtPct },
+        { type: 'knob', key: 'parameterValues.env1_decay', label: 'D', formatValue: fmtPct },
+        { type: 'knob', key: 'parameterValues.env1_sustain', label: 'S', formatValue: fmtPct },
+        { type: 'knob', key: 'parameterValues.env1_release', label: 'R', formatValue: fmtPct },
       ],
     },
   ],
