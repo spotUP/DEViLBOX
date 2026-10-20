@@ -26,6 +26,21 @@ describe('typing does not play notes', () => {
     expect(isTextEntryTarget(null)).toBe(false);
   });
 
+  it('a focused slider or checkbox is not a text field, so tracker keys still reach the tracker', () => {
+    // A clicked master volume slider kept focus; PageDown/arrows meant for the
+    // pattern went to the slider and pulled the master down to -36 dB.
+    for (const type of ['range', 'checkbox', 'radio', 'button', 'color']) {
+      const el = document.createElement('input');
+      el.type = type;
+      expect(isTextEntryTarget(el), type).toBe(false);
+    }
+    for (const type of ['text', 'number', 'search']) {
+      const el = document.createElement('input');
+      el.type = type;
+      expect(isTextEntryTarget(el), type).toBe(true);
+    }
+  });
+
   it('the jukebox list is marked, and note entry uses the shared check', () => {
     const root = join(__dirname, '../../../..');
     expect(readFileSync(join(root, 'src/components/jukebox/JukeboxPanel.tsx'), 'utf8')).toContain('data-captures-typing');
