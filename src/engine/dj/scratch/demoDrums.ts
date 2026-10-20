@@ -7,7 +7,7 @@
 
 import { NumpyRandomState, linspace } from '@/engine/turntable/turntableSim';
 import { roundHalfEven } from './scratchGrit';
-import { lfilter, reverb } from './refDsp';
+import { bp, hp, lfilter, reverb } from './refDsp';
 import { pexp, pexp2, psin, ptanh } from './portableMath';
 
 export const DEMO_DRUM_RATE = 22050;
@@ -436,4 +436,34 @@ export function ride(opts: { seed?: number; machine?: DrumMachine; pcm_bits?: nu
   const norm = new Float64Array(n);
   for (let k = 0; k < n; k++) norm[k] = sig[k]! / m * 0.9;
   return dirtStage(pcmGrain(norm, machinePcmBits(machine, opts.pcm_bits)), dirt);
+}
+
+/** hiphop `_shaker(rate, seed=3)`: 50 ms of noise, high-passed at 6 kHz, 14 ms decay, x0.7. */
+export function shaker(opts: { seed?: number } = {}, rate = DEMO_DRUM_RATE): Float64Array {
+  const n = Math.trunc(0.05 * rate);
+  const y = hp(demoNoise(n, opts.seed ?? 3), 6000, rate);
+  const tau = 0.014 * rate;
+  for (let k = 0; k < n; k++) y[k] = y[k]! * pexp(-k / tau) * 0.7;
+  return y;
+}
+
+/** hiphop `_tamb(rate, seed=5)`: 120 ms of noise, band-passed 5-10 kHz, 50 ms decay, x0.6. */
+export function tamb(opts: { seed?: number } = {}, rate = DEMO_DRUM_RATE): Float64Array {
+  const n = Math.trunc(0.12 * rate);
+  const y = bp(demoNoise(n, opts.seed ?? 5), 5000, 10000, rate);
+  const tau = 0.05 * rate;
+  for (let k = 0; k < n; k++) y[k] = y[k]! * pexp(-k / tau) * 0.6;
+  return y;
+}
+
+/** hiphop `_metal_hit(rate, seed=7)`: four sines (1720, 2140, 3300, 4700 Hz) / 4, high-passed at 1.5 kHz, 120 ms decay, x0.5. The seed is unused in the Python. */
+export function metalHit(rate = DEMO_DRUM_RATE): Float64Array {
+  const n = Math.trunc(0.3 * rate);
+  const v = new Float64Array(n);
+  for (const f of [1720, 2140, 3300, 4700]) for (let t = 0; t < n; t++) v[t] = v[t]! + psin(2 * Math.PI * f * t / rate);
+  for (let t = 0; t < n; t++) v[t] = v[t]! / 4.0;
+  const y = hp(v, 1500, rate);
+  const tau = 0.12 * rate;
+  for (let t = 0; t < n; t++) y[t] = y[t]! * pexp(-t / tau) * 0.5;
+  return y;
 }

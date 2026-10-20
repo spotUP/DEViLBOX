@@ -14,7 +14,7 @@
 import type { ParameterDef } from '@/engine/registry/SynthDescriptor';
 import {
   CLAP808_PARAMS, CLAP909_PARAMS, DEMO_VOICE_PARAMS, KICK909_PARAMS,
-  clap, conga, cowbell, hat, kick808, ride, rim, snare808, snare909, tom,
+  clap, conga, cowbell, hat, kick808, metalHit, ride, rim, shaker, tamb, snare808, snare909, tom,
   type ClapParams, type DrumMachine, type HatParams, type KickParams, type SnareParams, type TomParams,
 } from '@/engine/dj/scratch/demoDrums';
 import { pexp2 } from '@/engine/dj/scratch/portableMath';
@@ -198,6 +198,16 @@ export const rideVoice: SoftsynthVoice = voice('ride', 'Ride', [
   knob('pcm_bits', 'Sample Bits Override', -1, -1, 16, 'Character'),
   knob('dirt', 'Dirt', 0, 0, 4, 'Character'),
 ], (get, _note, rate, seed) => ride({ machine: machineOf(get('machine')), seed, dirt: get('dirt'), pcm_bits: get('pcm_bits') < 0 ? undefined : get('pcm_bits') }, rate));
+
+/** hiphop `_shaker`: no knobs; `seed` goes to the Python seed (default 3). */
+export const shakerVoice: SoftsynthVoice = voice('shaker', 'Shaker', [], (_get, _note, rate, seed) => shaker({ seed }, rate));
+/** hiphop `_tamb`: no knobs; `seed` goes to the Python seed (default 5). */
+export const tambVoice: SoftsynthVoice = voice('tamb', 'Tambourine', [], (_get, _note, rate, seed) => tamb({ seed }, rate));
+/** hiphop `_metal_hit`: no knobs, no noise (its seed argument is unused in the Python). */
+export const metalVoice: SoftsynthVoice = voice('metal', 'Metal', [], (_get, _note, rate) => metalHit(rate));
+
+/** The hiphop-only percussion (tools/hiphop.py), kept apart from DRUM_VOICES so the registry can append them last. */
+export const PERCUSSION_VOICES: readonly SoftsynthVoice[] = [metalVoice, shakerVoice, tambVoice];
 
 export const DRUM_VOICES: readonly SoftsynthVoice[] = [
   kickVoice, snare808Voice, snare909Voice, clapVoice, hatClosedVoice, hatOpenVoice, hatPedalVoice,

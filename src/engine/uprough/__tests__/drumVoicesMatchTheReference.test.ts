@@ -5,7 +5,9 @@
  * bound is 1e-9 per kept sample and the lengths are equal.
  */
 import { describe, expect, it } from 'vitest';
-import { DRUM_VOICES } from '../voices/drums';
+import { DRUM_VOICES, PERCUSSION_VOICES } from '../voices/drums';
+import { getSoftsynthVoice } from '../voiceRegistry';
+import { FILE_VOICES, VOICE_TO_SOFTSYNTH } from '@/lib/uprough/songFile';
 import { SOFTSYNTH_RATE } from '../softsynthVoice';
 import fixture from './fixtures/drums.json';
 
@@ -24,7 +26,7 @@ describe('drum voices match drummachine.py', () => {
 
   cases.forEach((c, i) => {
     it(`${c.voice} case ${i} (${JSON.stringify(c.params).slice(0, 60)}) is sample-exact`, () => {
-      const voice = DRUM_VOICES.find((v) => v.id === c.voice)!;
+      const voice = [...DRUM_VOICES, ...PERCUSSION_VOICES].find((v) => v.id === c.voice)!;
       const y = voice.render(c.params, { midi: 48, durSec: 0.5, velocity: 1 }, SOFTSYNTH_RATE, c.seed);
       expect(y.length).toBe(c.length);
       let worst = 0;
@@ -43,5 +45,17 @@ describe('drum voices match drummachine.py', () => {
     const up = kick.render({}, { midi: 60, durSec: 0.5, velocity: 1 }, SOFTSYNTH_RATE, 1);
     expect(half[100]).toBeCloseTo(a[100]! * 0.5, 12);
     expect(up[3000]).not.toBe(a[3000]);
+  });
+
+  it('metal, shaker and tamb are their own softsynth voices, not rim, and every file voice maps back to a registered one', () => {
+    expect(PERCUSSION_VOICES.map((v) => v.id)).toEqual(['metal', 'shaker', 'tamb']);
+    for (const v of ['metal', 'shaker', 'tamb']) {
+      expect(VOICE_TO_SOFTSYNTH[v]).toBe(v);
+      expect(getSoftsynthVoice(v)).toBeDefined();
+    }
+    // fileVoiceOf picks the first file voice per softsynth id: only the snare family may share one.
+    const owners = new Map<string, string[]>();
+    for (const f of FILE_VOICES) owners.set(VOICE_TO_SOFTSYNTH[f]!, [...(owners.get(VOICE_TO_SOFTSYNTH[f]!) ?? []), f]);
+    for (const [id, files] of owners) if (files.length > 1) expect(id).toBe('snare808');
   });
 });
