@@ -94,7 +94,6 @@ import { HC55516Synth } from '../hc55516/HC55516Synth';
 import { ModularSynth } from '../modular/ModularSynth';
 import { DEFAULT_MODULAR_PATCH } from '@/types/modular';
 import { getNormalizedVolume } from './volumeNormalization';
-import { createBitCrusher } from '../tone/bitCrusher';
 
 export function createTB303(config: InstrumentConfig): DB303Synth {
   const tb303Config = config.tb303 || { ...DEFAULT_TB303 };
@@ -573,7 +572,7 @@ export function createWobbleBass(config: InstrumentConfig): Tone.ToneAudioNode {
         });
         break;
       case 'bitcrush':
-        distortion = createBitCrusher(Math.max(2, 12 - Math.floor(wbConfig.distortion.drive / 10)));
+        distortion = new Tone.BitCrusher(Math.max(2, 12 - Math.floor(wbConfig.distortion.drive / 10)));
         break;
     }
   }

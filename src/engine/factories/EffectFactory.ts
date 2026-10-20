@@ -32,7 +32,6 @@ import { SidechainCompressor } from '../effects/SidechainCompressor';
 import { WAMEffectNode } from '../wam/WAMEffectNode';
 import { WAM_EFFECT_URLS } from '@/constants/wamPlugins';
 import { EffectRegistry } from '../registry/EffectRegistry';
-import { createBitCrusher } from '../tone/bitCrusher';
 
 /** Default wet % per effect type. Delays/echoes need lower wet to preserve dry signal. */
 export function getDefaultEffectWet(type: string): number {
@@ -460,7 +459,11 @@ export async function createEffect(
       break;
 
     case 'BitCrusher':
-      node = createBitCrusher(paramNumber(p.bits, 4), wetValue);
+      {
+        const crusher = new Tone.BitCrusher(paramNumber(p.bits, 4));
+        crusher.wet.value = wetValue;
+        node = crusher;
+      }
       break;
 
     case 'Chebyshev':
