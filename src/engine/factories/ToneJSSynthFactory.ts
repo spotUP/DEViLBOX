@@ -1776,10 +1776,12 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
         arpeggioEngine.start(note, velocity ?? 1);
         // Schedule stop after duration
         if (duration && typeof duration === 'number') {
-          const stopTime = (time ?? Tone.now()) + duration;
-          Tone.getTransport().scheduleOnce(() => {
+          // Audio-clock timeout, not a Transport event: the Transport is stopped
+          // during live preview and would never fire the stop.
+          const delay = Math.max(0, (time ?? Tone.now()) + duration - Tone.now());
+          Tone.getContext().setTimeout(() => {
             arpeggioEngine.stop(note);
-          }, stopTime);
+          }, delay);
         }
       } else {
         // Release any existing voice for this note first to prevent voice leak
