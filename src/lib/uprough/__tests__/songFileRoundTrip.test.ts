@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fixture from './fixtures/e6.uprough-song.json';
-import { parseSongFile, songFileToSong, songToSongFile, type SongFileDoc } from '../songFile';
+import { FILE_VOICES, MELODY_TIMBRE_SOFTSYNTH, parseSongFile, songBassCut, songMelodyVoice, softsynthOfFileVoice, songFileToSong, songToSongFile, type SongFileDoc } from '../songFile';
 
 const load = (): SongFileDoc => structuredClone(fixture) as unknown as SongFileDoc;
 
@@ -20,5 +20,90 @@ describe('song file round trip', () => {
     sec.bars[0]!.order.push('perc2:4');
     const song = songFileToSong(parseSongFile(structuredClone(f)));
     expect(songToSongFile(song)).toEqual(f);
+  });
+
+  it('schema 3: the groove row round trips verbatim and a file without song.groove is refused', () => {
+    const f = load();
+    expect(f.schema).toBe(3);
+    expect(f.song.groove).toEqual({ swing: 0, micro: { kick: 0, snare: 1, ch: 3, ghost: -3, perc: 4, chop: 2 }, vel: 1 });
+    const out = songToSongFile(songFileToSong(parseSongFile(structuredClone(f))));
+    expect(JSON.stringify(out)).toBe(JSON.stringify(f));
+    expect(Object.keys(out.song).slice(5, 10)).toEqual(['speed', 'groove', 'bass_cut', 'melody_voice', 'rate']);
+    const g = load();
+    delete g.song.groove;
+    expect(() => parseSongFile(g)).toThrow(/Missing field "song\.groove" in Up Rough song file schema 3\./);
+  });
+
+  it('schema 3: song.bass_cut round trips and a file without it or with a non-number is refused', () => {
+    const f = load();
+    expect(songBassCut(parseSongFile(structuredClone(f)).song)).toBe(1);
+    const g = load();
+    delete g.song.bass_cut;
+    expect(() => parseSongFile(g)).toThrow(/Missing field "song\.bass_cut" in Up Rough song file schema 3\./);
+    const h = load();
+    h.song.bass_cut = '0.8';
+    expect(() => parseSongFile(h)).toThrow(/Song field "bass_cut" is "0\.8", not a positive number\./);
+  });
+  it('schema 3: song.melody_voice picks the softsynth the melody instrument plays, and exports back as "melody"', () => {
+    expect(songMelodyVoice(parseSongFile(load()).song)).toBe('bell');
+    const melodyIdx = (d: SongFileDoc): number => d.instruments.findIndex((i) => i.voice === 'melody');
+    for (const [timbre, id] of Object.entries(MELODY_TIMBRE_SOFTSYNTH)) {
+      const f = load();
+      f.song.melody_voice = timbre;
+      const song = songFileToSong(parseSongFile(f));
+      expect(song.instruments[melodyIdx(f)]!.upRoughSoftsynth!.voice).toBe(id);
+      expect(songToSongFile(song)).toEqual(f);
+    }
+    const lead = load();
+    lead.song.melody_voice = 'lead';
+    expect(songFileToSong(parseSongFile(lead)).instruments[melodyIdx(lead)]!.upRoughSoftsynth!.voice).toBe('melodyLead');
+  });
+
+  it('schema 3: a file without song.melody_voice or with an unknown timbre is refused', () => {
+    const g = load();
+    delete g.song.melody_voice;
+    expect(() => parseSongFile(g)).toThrow(/Missing field "song\.melody_voice" in Up Rough song file schema 3\./);
+    const h = load();
+    h.song.melody_voice = 'kazoo';
+    expect(() => parseSongFile(h)).toThrow(/Song field "melody_voice" is "kazoo", not a melody timbre the softsynth has/);
+  });
+
+  it('melody timbres map to distinct softsynth ids (no first-match collision)', () => {
+    const ids = Object.values(MELODY_TIMBRE_SOFTSYNTH);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const timbre of Object.keys(MELODY_TIMBRE_SOFTSYNTH)) {
+      const owners = FILE_VOICES.filter((v) => softsynthOfFileVoice(v, timbre) === MELODY_TIMBRE_SOFTSYNTH[timbre]);
+      expect(owners).toEqual(['melody']);
+    }
+  });
+
+  it('O5b10: a melody instrument swapped to another timbre rewrites song.melody_voice and render.melody_voice', () => {
+    const f = load();
+    f.song.melody_voice = 'lead';
+    const song = songFileToSong(parseSongFile(f));
+    const mi = f.instruments.findIndex((i) => i.voice === 'melody');
+    song.instruments[mi]!.upRoughSoftsynth!.voice = 'melodyBell';
+    const out = songToSongFile(song);
+    expect(out.song.melody_voice).toBe('bell');
+    expect((out.song.render as Record<string, unknown>).melody_voice).toBe('bell');
+    expect(out.instruments[mi]!.voice).toBe('melody');
+    expect(song.meta.song.melody_voice).toBe('lead');
+    expect(() => parseSongFile(JSON.parse(JSON.stringify(out)))).not.toThrow();
+  });
+
+  it('O5b10: an unswapped melody keeps the header render override as it was', () => {
+    const f = load();
+    expect(songToSongFile(songFileToSong(parseSongFile(f))).song.render).toEqual(f.song.render);
+  });
+
+  it('O5b10: two melody instruments on different timbres are refused by name', () => {
+    const f = load();
+    const song = songFileToSong(parseSongFile(f));
+    const mi = f.instruments.findIndex((i) => i.voice === 'melody');
+    const twin = structuredClone(song.instruments[mi]!);
+    twin.upRoughSoftsynth!.voice = 'melodyLead';
+    song.instruments[mi]!.upRoughSoftsynth!.voice = 'melodyBell';
+    song.instruments.push(twin);
+    expect(() => songToSongFile(song)).toThrow(/melody instruments play (bell, lead|lead, bell); an Up Rough song renders one melody timbre/);
   });
 });

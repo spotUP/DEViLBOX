@@ -125,11 +125,37 @@ install_snapshot_traps
 # type-check, then the tests affected by the files changed since the remote
 # ref (scripts/git-hooks/affected-tests.mjs: sibling suites + tests that read
 # a changed file's source). The fast tier (test:ci) and the nightly heavy tier
-# run in CI, which blocks the deploy. A ref with no known remote base (new
-# branch, interactive run) falls back to the fast tier.
+# run in CI, which blocks the deploy. A new branch (remote sha all zeros) is
+# scoped against the nearest commit the remote already has: a remote-tracking
+# ref of this remote that is an ancestor, the merge-base with the remote's
+# default branch, or another commit of the same push (tested in this run).
+# Only a push with no such candidate (interactive run) falls back to the fast
+# tier. Pushing a stack of new branches used to run test:ci once per branch.
 # Owner 2026-10-11: a gate that ran the whole suite on the laptop took 25 min
 # quiet and 1 h 52 min under load, and failed on load-only timeouts.
 ZERO=0000000000000000000000000000000000000000
+REMOTE="${1:-}"
+
+# The closest ancestor of $1 that is already known to be safe: on the remote, or
+# pushed (and so tested) in this same run. Prints nothing when there is none.
+nearest_base() {
+  local sha=$1 cand best="" best_n="" head
+  {
+    if [ -n "$REMOTE" ]; then
+      git for-each-ref --merged "$sha" --format='%(objectname)' "refs/remotes/$REMOTE/"
+      head="$(git rev-parse -q --verify "refs/remotes/$REMOTE/HEAD^{commit}" 2>/dev/null \
+        || git rev-parse -q --verify "refs/remotes/$REMOTE/main^{commit}" 2>/dev/null)" \
+        && git merge-base "$sha" "$head" 2>/dev/null
+    fi
+    for cand in $SHAS; do
+      [ "$cand" != "$sha" ] && git merge-base --is-ancestor "$cand" "$sha" 2>/dev/null && echo "$cand"
+    done
+  } | while read -r cand; do
+    [ -n "$cand" ] && [ "$cand" != "$sha" ] || continue
+    echo "$(git rev-list --count "$cand..$sha") $cand"
+  done | sort -n | head -n 1 | { read -r best_n best && echo "$best"; } || true   # set -e: no candidate is not an error
+}
+
 SHAS=""
 BASES=""   # "local_sha:remote_sha" pairs (bash 3.2 has no associative arrays)
 if [ -n "$PUSH_REFS" ]; then
@@ -141,6 +167,11 @@ if [ -n "$PUSH_REFS" ]; then
       BASES="$BASES $lsha:$rsha"
     fi
   done <<< "$PUSH_REFS"
+  for lsha in $SHAS; do
+    case " $BASES " in *" $lsha:"*) continue ;; esac
+    nb="$(nearest_base "$lsha")"
+    [ -n "$nb" ] && BASES="$BASES $lsha:$nb"
+  done
 else
   SHAS="$(git rev-parse HEAD)"
 fi

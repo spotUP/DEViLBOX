@@ -82,12 +82,34 @@ export function controlRate(tier: 'a500' | 'a1200' | 'offline' = 'offline'): num
   return tier === 'a500' ? 400 : tier === 'a1200' ? 900 : 3000;
 }
 
+import { crLog } from './crLog';
+
+/**
+ * Fused multiply-add a*b+c with one rounding, via Dekker's exact product and a two-sum (inputs here are O(1), so no
+ * overflow or underflow). Differs from a true fma only when the residual sum itself rounds across a tie, which does
+ * not occur for the 53-bit draws randn feeds it (verified against numpy on the fixture).
+ */
+function fma(a: number, b: number, c: number): number {
+  const p = a * b;
+  const SPLIT = 134217729; // 2^27 + 1
+  let t = SPLIT * a; const ah = t - (t - a), al = a - ah;
+  t = SPLIT * b; const bh = t - (t - b), bl = b - bh;
+  const e = ((ah * bh - p) + ah * bl + al * bh) + al * bl;
+  const s = p + c;
+  const bb = s - p;
+  const err = (p - (s - bb)) + (c - bb);
+  return s + (err + e);
+}
+
 // ── numpy RandomState (MT19937) ────────────────────────────────────────────
 
 /** numpy.random.RandomState(seed) for an integer seed: MT19937 `init_genrand`, `random_sample` 53-bit doubles. */
 export class NumpyRandomState {
   private readonly mt = new Uint32Array(624);
   private mti = 625;
+  /** legacy_gauss cache (numpy's has_gauss / gauss): survives interleaved rand() calls, as in numpy. */
+  private hasGauss = false;
+  private gauss = 0;
 
   constructor(seed: number) {
     const mt = this.mt;
@@ -121,6 +143,31 @@ export class NumpyRandomState {
   rand(): number {
     const a = this.nextU32() >>> 5, b = this.nextU32() >>> 6;
     return (a * 67108864 + b) / 9007199254740992;
+  }
+
+  /**
+   * `randn()` (legacy_gauss): polar Box-Muller; returns f*x2 and caches f*x1 for the next call. `log` is correctly rounded
+   * (crLog), which is what numpy's libm returns; `fma` mirrors numpy's contracted r2.
+   */
+  randn(): number {
+    if (this.hasGauss) { this.hasGauss = false; return this.gauss; }
+    let x1: number, x2: number, r2: number;
+    do {
+      x1 = 2.0 * this.rand() - 1.0;
+      x2 = 2.0 * this.rand() - 1.0;
+      r2 = fma(x1, x1, x2 * x2); // numpy's arm64 build contracts x1*x1 + x2*x2 into one fused multiply-add
+    } while (r2 >= 1.0 || r2 === 0.0);
+    const f = Math.sqrt((-2.0 * crLog(r2)) / r2);
+    this.gauss = f * x1;
+    this.hasGauss = true;
+    return f * x2;
+  }
+
+  /** `randn(size)`: size draws in order (an odd size drops nothing here: the cache carries to the next call, as numpy). */
+  randnArray(size: number): Float64Array {
+    const out = new Float64Array(size);
+    for (let i = 0; i < size; i++) out[i] = this.randn();
+    return out;
   }
 
   /** `uniform(low, high)`. */
