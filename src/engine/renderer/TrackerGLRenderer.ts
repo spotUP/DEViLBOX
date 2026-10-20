@@ -32,6 +32,10 @@ import type {
   ThemeSnapshot,
   TrackerRenderInput,
 } from './worker-types';
+import {
+  CHANNEL_COLOR_TINT_ALPHA, CHANNEL_STRIPE_ALPHA, CURSOR_CHANNEL_TINT_ALPHA,
+  MUTED_OVERLAY_ALPHA, MUTED_TEXT_ALPHA, isStripedChannel,
+} from './channelOverlayStyle';
 
 // ─── Constants matching PatternEditorCanvas ───────────────────────────────────
 const ROW_HEIGHT = 24;
@@ -213,7 +217,8 @@ const GLYPH_CAPACITY = 65536;
 // ─── Main renderer class ──────────────────────────────────────────────────────
 
 /** Overlay on every second channel column: subtle, but visible against the row backgrounds. */
-const CHANNEL_STRIPE_COLOR: [number, number, number, number] = [0, 0, 0, 0.07];
+const CHANNEL_STRIPE_COLOR: [number, number, number, number] = [0, 0, 0, CHANNEL_STRIPE_ALPHA];
+const MUTED_OVERLAY_COLOR: [number, number, number, number] = [0, 0, 0, MUTED_OVERLAY_ALPHA];
 
 export class TrackerGLRenderer {
   private readonly gl: WebGL2RenderingContext;
@@ -501,7 +506,6 @@ export class TrackerGLRenderer {
 
     // Mute / solo dimming — compute once per frame
     const anySolo = anySoloActive(pattern.channels);
-    const MUTED_ALPHA = 0.3;
 
     // Selection ranges
     const sel = selection;
@@ -557,23 +561,23 @@ export class TrackerGLRenderer {
       const chData = pattern.channels[ch];
 
       // Every second channel slightly darker, so channel boundaries read at a glance
-      if (ch % 2 === 1) {
+      if (isStripedChannel(ch)) {
         this.addRect(colX, 0, chW, height, CHANNEL_STRIPE_COLOR);
       }
       // Active channel highlight, in the accent hue so it never reads as one of the brightness stripes
       if (ch === cursor.channelIndex) {
         const ac = colors.accent;
-        this.addRect(colX, 0, chW, height, [ac[0], ac[1], ac[2], 0.05]);
+        this.addRect(colX, 0, chW, height, [ac[0], ac[1], ac[2], CURSOR_CHANNEL_TINT_ALPHA]);
       }
       // Channel color tint
       if (chData.color) {
         const c = parseColor(chData.color);
-        this.addRect(colX, 0, chW, height, [c[0], c[1], c[2], 0.03]);
+        this.addRect(colX, 0, chW, height, [c[0], c[1], c[2], CHANNEL_COLOR_TINT_ALPHA]);
       }
       // Muted / non-solo darkening overlay
       const isDimmed = isChannelDimmed(!!chData.muted, !!chData.solo, anySolo);
       if (isDimmed) {
-        this.addRect(colX, 0, chW, height, [0, 0, 0, 0.45]);
+        this.addRect(colX, 0, chW, height, MUTED_OVERLAY_COLOR);
       }
     }
 
@@ -742,7 +746,7 @@ export class TrackerGLRenderer {
 
         // Combined alpha: ghost dimming × mute/solo dimming
         const chDimmed = isChannelDimmed(!!chData.muted, !!chData.solo, anySolo);
-        const cellAlpha = ghostAlpha * (chDimmed ? MUTED_ALPHA : 1.0);
+        const cellAlpha = ghostAlpha * (chDimmed ? MUTED_TEXT_ALPHA : 1.0);
 
         const isCollapsed = chData.collapsed;
         const effectCols = chData.effectCols ?? 2;
