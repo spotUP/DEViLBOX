@@ -85,6 +85,13 @@
 // for WASM we define a fallback via JUCE_LINUX being false.
 // Instead, we add the missing WASM entries by injecting them.
 
+// juce_TargetPlatform.h defines neither JUCE_LITTLE_ENDIAN nor JUCE_BIG_ENDIAN for JUCE_WASM, so
+// ByteOrder::swapIfBigEndian swapped every value and all binary stream reads (ValueTree, var doubles,
+// gzip, MIDI files) came back byte-reversed. WebAssembly is always little-endian.
+#ifndef JUCE_LITTLE_ENDIAN
+#define JUCE_LITTLE_ENDIAN 1
+#endif
+
 // Release mode
 #ifndef NDEBUG
 #define NDEBUG 1
