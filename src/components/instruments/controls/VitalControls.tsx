@@ -16,8 +16,24 @@ import type { InstrumentConfig } from '@typedefs/instrument';
 import type { VSTBridgeSynth } from '@engine/vstbridge/VSTBridgeSynth';
 import type { VSTBridgeParam } from '@engine/vstbridge/synth-registry';
 import { VSTBridgePanel } from './VSTBridgePanel';
+import { Button } from '@components/ui/Button';
+import { CustomSelect, type SelectOptionGroup } from '@components/common/CustomSelect';
+import { notify } from '@stores/useNotificationStore';
+import { VITAL_PRESETS } from '@constants/vitalPresetIndex';
+import {
+  VITAL_PRESET_PARAM_KEY, fetchBundledVitalPreset, findVitalPreset,
+  loadVitalPresetBytes, vitalPresetControlValues,
+} from '@engine/vstbridge/vitalPreset';
 
 type VitalTab = 'osc' | 'filter' | 'env' | 'lfo' | 'fx' | 'master' | 'other';
+
+const PRESET_GROUPS: SelectOptionGroup[] = Array.from(
+  VITAL_PRESETS.reduce((map, p) => {
+    const list = map.get(p.category) ?? [];
+    list.push({ value: p.id, label: p.name });
+    return map.set(p.category, list);
+  }, new Map<string, { value: string; label: string }[]>()),
+).sort(([a], [b]) => a.localeCompare(b)).map(([label, options]) => ({ label, options }));
 
 const TABS: { id: VitalTab; label: string }[] = [
   { id: 'osc', label: 'OSC' },
@@ -165,6 +181,57 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
     }
   }, []);
 
+  const storedPresetId = (instrument.parameters as Record<string, unknown> | undefined)?.[VITAL_PRESET_PARAM_KEY];
+  const [presetId, setPresetId] = useState<string>(typeof storedPresetId === 'string' ? storedPresetId : '');
+  const [presetBusy, setPresetBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  /** Single UI load path: send the bytes to the synth, then mirror the file's control values into the knobs. */
+  const applyPresetBytes = useCallback(async (bytes: Uint8Array, label: string): Promise<boolean> => {
+    const synth = synthRef.current;
+    if (!synth) return false;
+    setPresetBusy(true);
+    try {
+      const values = vitalPresetControlValues(bytes);
+      const ok = await loadVitalPresetBytes(synth, bytes);
+      if (!ok) {
+        notify.error(`Vital could not load preset "${label}"`);
+        return false;
+      }
+      setParamValues(() => {
+        const next = new Map<number, number>();
+        for (const p of allParams) next.set(p.id, values[p.name] ?? p.defaultValue);
+        return next;
+      });
+      return true;
+    } catch (err) {
+      notify.error(`Vital preset "${label}": ${err instanceof Error ? err.message : String(err)}`);
+      return false;
+    } finally {
+      setPresetBusy(false);
+    }
+  }, [allParams]);
+
+  const handlePickPreset = useCallback(async (id: string) => {
+    const entry = findVitalPreset(id);
+    if (!entry) return;
+    setPresetId(id);
+    try {
+      const ok = await applyPresetBytes(await fetchBundledVitalPreset(entry), entry.name);
+      if (ok) onChange({ parameters: { ...(instrument.parameters ?? {}), [VITAL_PRESET_PARAM_KEY]: id } });
+    } catch (err) {
+      notify.error(`Vital preset "${entry.name}": ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, [applyPresetBytes, instrument.parameters, onChange]);
+
+  const handleImportFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const ok = await applyPresetBytes(new Uint8Array(await file.arrayBuffer()), file.name);
+    if (ok) setPresetId('');
+  }, [applyPresetBytes]);
+
   // Shared props for ParamKnob instances
   const paramKnobProps = { paramByName, paramValues, setParam, knobColor };
 
@@ -185,6 +252,28 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
 
   return (
     <div className="flex flex-col gap-0 overflow-y-auto">
+      {/* Preset bar */}
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-dark-border">
+        <CustomSelect
+          value={presetId}
+          onChange={handlePickPreset}
+          options={PRESET_GROUPS}
+          placeholder="Select Preset"
+          disabled={presetBusy}
+          className="w-64"
+        />
+        <Button size="sm" loading={presetBusy} onClick={() => fileInputRef.current?.click()}>
+          Import Preset File
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".vital"
+          className="hidden"
+          onChange={handleImportFile}
+        />
+      </div>
+
       {/* Tab bar */}
       <div className={`flex gap-1 px-4 py-2 ${tabBarBg} border-b border-dark-border`}>
         {TABS.map(tab => (
