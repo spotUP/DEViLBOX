@@ -1752,16 +1752,16 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
     if (arpeggioEngine || !arpeggioConfig) return;
     arpeggioEngine = new ArpeggioEngine({
       config: arpeggioConfig,
-      onNoteOn: (note: string, velocity: number, duration: number) => {
+      onNoteOn: (note: string, velocity: number, duration: number, time?: number) => {
         // Release last arpeggio note before playing new one
         if (lastArpNote) {
-          synth.triggerRelease(lastArpNote);
+          synth.triggerRelease(lastArpNote, time);
         }
-        synth.triggerAttackRelease(note, duration, undefined, velocity);
+        synth.triggerAttackRelease(note, duration, time, velocity);
         lastArpNote = note;
       },
-      onNoteOff: (note: string) => {
-        synth.triggerRelease(note);
+      onNoteOff: (note: string, time?: number) => {
+        synth.triggerRelease(note, time);
         if (lastArpNote === note) {
           lastArpNote = null;
         }

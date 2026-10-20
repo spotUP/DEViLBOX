@@ -17,8 +17,8 @@ import type { ArpeggioConfig, ArpeggioStep } from '@typedefs/instrument';
 export interface ArpeggioEngineOptions {
   config: ArpeggioConfig;
   onStep?: (stepIndex: number, step: ArpeggioStep, noteOffset: number) => void;
-  onNoteOn?: (note: string, velocity: number, duration: number) => void;
-  onNoteOff?: (note: string) => void;
+  onNoteOn?: (note: string, velocity: number, duration: number, time?: number) => void;
+  onNoteOff?: (note: string, time?: number) => void;
 }
 
 export class ArpeggioEngine {
@@ -33,8 +33,8 @@ export class ArpeggioEngine {
 
   // Callbacks
   private onStep?: (stepIndex: number, step: ArpeggioStep, noteOffset: number) => void;
-  private onNoteOn?: (note: string, velocity: number, duration: number) => void;
-  private onNoteOff?: (note: string) => void;
+  private onNoteOn?: (note: string, velocity: number, duration: number, time?: number) => void;
+  private onNoteOff?: (note: string, time?: number) => void;
 
   // Track which note is currently playing for proper release
   private currentPlayingNote: string | null = null;
@@ -202,9 +202,11 @@ export class ArpeggioEngine {
   }
 
   /**
-   * Process a single arpeggio step
+   * Process a single arpeggio step at the clock's scheduled audio time.
+   * The callback runs ahead of that time (lookahead); triggering at "now"
+   * instead would put every step on JS timer jitter.
    */
-  private processStep(): void {
+  private processStep(time: number): void {
     if (!this.isPlaying) return;
 
     const steps = this.getSteps();
@@ -237,12 +239,12 @@ export class ArpeggioEngine {
 
     // Release previous note if still playing
     if (this.currentPlayingNote && this.onNoteOff) {
-      this.onNoteOff(this.currentPlayingNote);
+      this.onNoteOff(this.currentPlayingNote, time);
     }
 
     // Trigger the note
     if (this.onNoteOn) {
-      this.onNoteOn(targetNote, velocity, duration);
+      this.onNoteOn(targetNote, velocity, duration, time);
     }
     this.currentPlayingNote = targetNote;
 
@@ -280,7 +282,7 @@ export class ArpeggioEngine {
     // Tone.Clock, not Tone.Loop: a Loop is scheduled on the Transport, which
     // only runs during song playback, so a live note would never arpeggiate.
     this.loop = new Tone.Clock({
-      callback: () => this.processStep(),
+      callback: (time: number) => this.processStep(time),
       frequency: 1 / Tone.Time(interval).toSeconds(),
     });
     this.loop.start();
