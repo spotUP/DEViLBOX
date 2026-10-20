@@ -74,6 +74,8 @@ import {
   preInitMusicLine,
   rowPreviewRoute,
   previewNativeRow,
+  registerPlayingEngine,
+  unregisterPlayingEngine,
 } from './replayer/NativeEngineRouting';
 // ============================================================================
 // CONSTANTS (imported from replayer/PeriodTables.ts)
@@ -2522,11 +2524,15 @@ export class TrackerReplayer {
           this.coordinator.markDispatchActive();
           // Synchronous cleanup closure — avoids the deferred import().then() race
           // that could null callbacks AFTER the next play() sets new ones.
+          // The isolation engine of this song, as a native engine is: master and
+          // mixer effects aimed at channels play in its slots from now until stop.
+          if (!this.isDJDeck) registerPlayingEngine(mptEngine);
           this._libopenmptCleanup = () => {
             mptEngine.onPosition = null;
             mptEngine.onPositionTick = null;
             mptEngine.onEnded = null;
             mptEngine.stop();
+            if (!this.isDJDeck) unregisterPlayingEngine(mptEngine);
           };
           // Warm the cached reference for zero-latency forcePosition seeks
           getLibopenmptSync();
