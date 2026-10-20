@@ -45,7 +45,7 @@ NOTES = [
     (48, 0.12, None, 3), (48, 0.60, 43, 3), (60, 0.30, None, 7), (60, 0.60, 55, 11),
     (72, 0.12, 67, 7), (69, 0.25, 69, 11), (55, 0.45, None, 5), (64, 0.08, 60, 3),
 ]
-VOICES = ("bell", "darkbell", "fmbell", "lead")
+VOICES = ("bell", "darkbell", "fmbell", "lead", "epiano", "whistle")
 RATES = (22050, 44100)
 cases = []
 for rate in RATES:
