@@ -383,7 +383,13 @@ describe('DJ mode echo prevention', () => {
       src.indexOf('public stop(): void'),
       src.indexOf('Tone.getTransport().stop()'),
     );
-    expect(stopBody).toContain('_djModeActive');
+    // stop() ends its tail mute through endStopTailMute, which owns the DJ-mode check.
+    expect(stopBody).toContain('this.endStopTailMute()');
+    const endBody = src.slice(
+      src.indexOf('private endStopTailMute(): void'),
+      src.indexOf('}\n\n', src.indexOf('private endStopTailMute(): void')),
+    );
+    expect(endBody).toContain('_djModeActive');
   });
 
   it('useUIStore calls setDJMode(true) when entering DJ view', () => {
