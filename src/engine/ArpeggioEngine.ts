@@ -2,7 +2,8 @@
  * ArpeggioEngine - Advanced arpeggiator for ChipSynth
  *
  * Features:
- * - Sample-accurate timing using Tone.Loop
+ * - Sample-accurate timing on a free-running Tone.Clock (runs without the Transport,
+ *   so live preview notes arpeggiate while the song is stopped)
  * - Multiple playback modes: loop, ping-pong, one-shot, random
  * - Per-step volume, gate length, and effects
  * - Swing/shuffle timing
@@ -22,7 +23,7 @@ export interface ArpeggioEngineOptions {
 
 export class ArpeggioEngine {
   private config: ArpeggioConfig;
-  private loop: Tone.Loop | null = null;
+  private loop: Tone.Clock | null = null;
   private currentStepIndex: number = 0;
   private pingPongDirection: 1 | -1 = 1;
   private baseNote: string = 'C4';
@@ -276,11 +277,13 @@ export class ArpeggioEngine {
     // Create and start the loop
     const interval = this.getInterval();
 
-    this.loop = new Tone.Loop(() => {
-      this.processStep();
-    }, interval);
-
-    this.loop.start(0);
+    // Tone.Clock, not Tone.Loop: a Loop is scheduled on the Transport, which
+    // only runs during song playback, so a live note would never arpeggiate.
+    this.loop = new Tone.Clock({
+      callback: () => this.processStep(),
+      frequency: 1 / Tone.Time(interval).toSeconds(),
+    });
+    this.loop.start();
   }
 
   /**
@@ -335,7 +338,7 @@ export class ArpeggioEngine {
     // Update loop interval if speed changed
     if (this.loop && this.isPlaying) {
       const interval = this.getInterval();
-      this.loop.interval = interval;
+      this.loop.frequency.value = 1 / Tone.Time(interval).toSeconds();
     }
 
     // Reset step index if mode changed to oneshot
