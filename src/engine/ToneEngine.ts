@@ -282,6 +282,8 @@ export class ToneEngine {
   private autoGainSynthCorr: number = 0;
   private _manualSampleGainDb: number = 0; // tracks last setSampleBusGain arg
   private _manualSynthGainDb: number = 0;
+  /** Pending restore of the tail-kill mute set by stop(); null when none. */
+  private _stopTailMuteTimer: ReturnType<typeof setTimeout> | null = null;
   private _masterVolumeDb: number = -6;   // tracks intended master volume (avoids race in stop())
   private _djModeActive = false;          // when true, masterChannel stays muted to prevent echo
 
@@ -1650,6 +1652,7 @@ export class ToneEngine {
       await Tone.start();
     }
 
+    this.endStopTailMute();
     this._isPlaying = true;
     this._notifyNoiseEffectsPlaying(true);
     Tone.getTransport().start();
@@ -1678,17 +1681,12 @@ export class ToneEngine {
     // Use _masterVolumeDb (not .volume.value) to avoid race condition:
     // if stop() is called twice within 50ms, reading .volume.value captures
     // -Infinity from the first call, permanently silencing the master channel.
-    const restoreVolume = this._masterVolumeDb;
     this.masterChannel.volume.value = -Infinity;
 
-    // Restore volume after effects have flushed (delay/reverb tails)
-    // BUT NOT if DJ mode is active — masterChannel must stay muted to
-    // prevent echo through the parallel ToneEngine→destination path.
-    setTimeout(() => {
-      if (!this._djModeActive) {
-        this.masterChannel.volume.value = restoreVolume;
-      }
-    }, 50);
+    // Restore volume after effects have flushed (delay/reverb tails), or as
+    // soon as playback starts again, whichever comes first (see endStopTailMute).
+    if (this._stopTailMuteTimer !== null) clearTimeout(this._stopTailMuteTimer);
+    this._stopTailMuteTimer = setTimeout(() => this.endStopTailMute(), 50);
 
     Tone.getTransport().stop();
   }
@@ -1716,6 +1714,26 @@ export class ToneEngine {
     }
   }
 
+  /**
+   * End the tail-kill mute that stop() puts on the master channel.
+   *
+   * The mute exists to cut delay/reverb tails of the playback that just
+   * stopped. It must never cover the playback that follows: a restart on a
+   * WASM-backed song (Shift on a libopenmpt hybrid song) is stop() followed
+   * at once by play(), and row 00 reaches the speakers well inside 50 ms, so a
+   * timer-only restore swallowed the attack of the first notes ("I hear like
+   * half the snare"). Playback start therefore ends the mute immediately.
+   * The master stays muted in DJ mode, where setDJMode owns it.
+   */
+  private endStopTailMute(): void {
+    if (this._stopTailMuteTimer === null) return;
+    clearTimeout(this._stopTailMuteTimer);
+    this._stopTailMuteTimer = null;
+    if (!this._djModeActive) {
+      this.masterChannel.volume.value = this._masterVolumeDb;
+    }
+  }
+
   /** Notify noise-generating master effects (VinylNoise, Tumult) of playback state. */
   /**
    * Follow the song transport's playing state.
@@ -1730,6 +1748,7 @@ export class ToneEngine {
     void import('../stores/useTransportStore').then(({ useTransportStore }) => {
       let last = useTransportStore.getState().isPlaying;
       const apply = (playing: boolean) => {
+        if (playing) this.endStopTailMute();
         this._isPlaying = playing;
         this._notifyNoiseEffectsPlaying(playing);
       };
