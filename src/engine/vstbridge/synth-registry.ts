@@ -80,6 +80,7 @@ registerVSTBridge({
   moduleFactoryName: 'createOdin2Module',
   volumeOffsetDb: 13,
   panelComponent: 'Odin2Controls',
+  configKey: 'odin2',
   commands: ['loadPatch'],
 });
 

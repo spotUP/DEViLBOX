@@ -300,6 +300,8 @@ export interface InstrumentConfig {
   /** KlysSynth: the instrument value of a STANDALONE klystrack instrument (one that belongs to no klystrack song). */
   klystrack?: import('../tracker').KlysNativeInstrument;
   monique?: import('../../engine/monique/MoniqueSynth').MoniqueConfig;
+  /** Odin2 (VSTBridge) preset: wrapper parameter name key -> value, applied at synth creation by VSTBridgeSynth.applyConfig. */
+  odin2?: Record<string, number>;
   vl1?: import('../../engine/vl1/VL1Synth').VL1Config;
   talNoizeMaker?: import('../../engine/tal-noizemaker/TalNoizeMakerSynth').TalNoizeMakerConfig;
   aeolus?: import('../../engine/aeolus/AeolusSynth').AeolusConfig;
