@@ -15,7 +15,8 @@
 
 import { applyEditorCellEdit } from '@lib/import/furnaceEditorCells';
 import { outputLatencySec } from './audioLatency';
-import { isReplacedInstrument } from './replayer/hybridInstruments';
+import { isReplacedInstrument, synthNoteVelocity } from './replayer/hybridInstruments';
+import { isPerChannelNativeSynthType } from './perChannelNativeSynths';
 import { isLowOctaveNote, isPitchedNote, noteValueToPitch } from '@/lib/tracker/noteValue';
 import * as Tone from 'tone';
 import type { Pattern, TrackerCell, FurnaceNativeData, HivelyNativeData, KlysNativeData, FurnaceSubsongPlayback } from '@/types';
@@ -1477,8 +1478,10 @@ export class TrackerReplayer {
       }
       ch.lastPlayedNoteName = newNoteName;
 
-      // Trigger the synth note
-      this.triggerNote(ch, time, 0, chIndex, accent, slideActive, effectiveSlide, hammer);
+      // Trigger the synth note. A per-channel native synth gets its channel volume from the
+      // SynthEffectProcessor on its lane level, so the velocity leaves it out.
+      this.triggerNote(ch, time, 0, chIndex, accent, slideActive, effectiveSlide, hammer,
+        isPerChannelNativeSynthType(ch.instrument?.synthType));
 
       // Update slide flag for next row
       ch.previousSlideFlag = (slide || hammer) ?? false;
@@ -2567,6 +2570,8 @@ export class TrackerReplayer {
                 try { getToneEngine().applySynthFrequency(instrumentId, frequency, channelIndex, rampTime); }
                 catch { /* ToneEngine not ready */ }
               },
+              getInstrumentDefaultVolume: (instrumentId) =>
+                replayer.instrumentMap.get(instrumentId)?.metadata?.modPlayback?.defaultVolume ?? 64,
               setChannelGain: (channelIndex, gain, time) => {
                 const ch = replayer.channels[channelIndex];
                 if (ch?.gainNode) {
@@ -3246,7 +3251,7 @@ export class TrackerReplayer {
     return getToneEngine().isChannelMuted(channelIndex);
   }
 
-  private triggerNote(ch: ChannelState, time: number, _offset: number, channelIndex?: number, accent?: boolean, slideActive?: boolean, currentRowSlide?: boolean, hammer?: boolean): void {
+  private triggerNote(ch: ChannelState, time: number, _offset: number, channelIndex?: number, accent?: boolean, slideActive?: boolean, currentRowSlide?: boolean, hammer?: boolean, volumeOnLane = false): void {
     // Skip note trigger if channel is muted.
     // slideActive = from PREVIOUS row's slide flag, determines pitch glide behavior
     // currentRowSlide = CURRENT row's slide flag, determines gate timing (sustain into next note)
@@ -3316,7 +3321,7 @@ export class TrackerReplayer {
       velocityOffset = getGrooveVelocity(grooveTemplate, stretchedRow) * intensity;
     }
 
-    const velocity = Math.max(0, Math.min(1, (ch.volume / 64) + velocityOffset));
+    const velocity = synthNoteVelocity(ch.volume, velocityOffset, volumeOnLane);
     
     // Store velocity for retriggering
     ch.currentVelocity = velocity;

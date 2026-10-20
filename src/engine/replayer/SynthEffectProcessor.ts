@@ -73,6 +73,8 @@ export interface SynthEffectDeps {
   getEditorMode(): string | null;
   /** Set frequency on a synth channel via ToneEngine */
   applySynthFrequency(instrumentId: number, frequency: number, channelIndex: number, rampTime?: number): void;
+  /** The instrument's default volume (0-64): where a note with that instrument starts */
+  getInstrumentDefaultVolume(instrumentId: number): number;
   /** Set volume on a channel's gain node (0-1 linear) */
   setChannelGain(channelIndex: number, gain: number, time: number): void;
   /** Set panning on a channel (0=full left, 128=center, 255=full right) */
@@ -257,6 +259,13 @@ export class SynthEffectProcessor {
         this.sendFrequency(ch, state, state.currentFrequency);
       }
 
+      // FT2: a note with an instrument starts at the instrument's default volume; a note
+      // without one keeps the channel's volume.
+      if (hasNote && cell.instrument) {
+        state.baseVolume = this.deps.getInstrumentDefaultVolume(cell.instrument);
+        state.currentVolume = state.baseVolume;
+      }
+
       // Volume column: an XM byte (0x10-0x50) in classic mode, a raw 0-64 level in native-replayer
       // modes. The decoder owns that convention; null means the cell sets no volume.
       const columnVolume = this.readVolumeColumn(cell);
@@ -274,6 +283,13 @@ export class SynthEffectProcessor {
       // Check additional effect columns (IT multi-column)
       if (cell.effTyp2 && cell.eff2 !== undefined) {
         this.initEffect(ch, state, cell.effTyp2, cell.eff2, cell, time);
+      }
+
+      // This gain is the channel's only synth volume (the note velocity does not carry it),
+      // so every new note sets it: no Cxx, slide or tremolo from an earlier note carries
+      // into the next one. A delayed note (EDx) sets it when it fires.
+      if (hasNote && state.noteDelayTick === 0) {
+        this.deps.setChannelGain(ch, state.currentVolume / 64, time);
       }
     }
   }
@@ -461,6 +477,9 @@ export class SynthEffectProcessor {
             const delayInst = state.noteDelayInstrumentId;
             const delayVol = state.noteDelayVolume;
             state.noteDelayTick = 0;
+            state.baseVolume = delayVol;
+            state.currentVolume = delayVol;
+            this.deps.setChannelGain(ch, delayVol / 64, time);
             this.deps.triggerDelayedNote(ch, delayNote, delayInst, delayVol, time);
           }
           break;

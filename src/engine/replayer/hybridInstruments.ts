@@ -49,3 +49,13 @@ export function isReplacedInstrument(inst: InstrumentConfig, furnaceSequencer: b
   if (furnaceSequencer && moduleIns2Of(inst) !== null) return false;
   return true;
 }
+
+/**
+ * A synth note's velocity from the tracker channel volume (0-64) plus the groove offset.
+ * On the hybrid path the SynthEffectProcessor applies the channel volume to a per-channel
+ * synth's lane level, so that note's velocity must not scale it a second time.
+ */
+export function synthNoteVelocity(channelVolume: number, grooveOffset: number, volumeOnLane: boolean): number {
+  const level = volumeOnLane ? 1 : channelVolume / 64;
+  return Math.max(0, Math.min(1, level + grooveOffset));
+}

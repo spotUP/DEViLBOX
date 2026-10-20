@@ -23,6 +23,7 @@ function gains(rows: EffectPatternCell[], editorMode: string | null): number[] {
     getPatternCell: (_ch, r) => rows[r] ?? null,
     getChannelCount: () => 1,
     getEditorMode: () => editorMode,
+    getInstrumentDefaultVolume: () => 64,
     applySynthFrequency: () => {},
     setChannelGain: (_ch, gain) => { sent.push(gain); },
     setChannelPan: () => {},
@@ -48,7 +49,9 @@ const slideDown = cell(0, FX_VOLUME_SLIDE, 0x01);
 describe('SynthEffectProcessor volume column', () => {
   it('reads an XM volume byte as the level it names in classic mode', () => {
     const sent = gains([cell(0x30, 0, 0, 49), slideDown], 'classic');
-    expect(sent[0]).toBeCloseTo((32 - 1) / 64, 6);
+    // sent[0] is the note's own level; sent[1] is the first slide tick.
+    expect(sent[0]).toBeCloseTo(32 / 64, 6);
+    expect(sent[1]).toBeCloseTo((32 - 1) / 64, 6);
   });
 
   it('reads XM 0x10 as silence, not level 16', () => {
@@ -59,13 +62,14 @@ describe('SynthEffectProcessor volume column', () => {
   it('ignores an XM volume-column effect byte and an empty column', () => {
     // 0x80 is a volume-column command, not a level; 0 is empty. Both leave the C40 level alone.
     const sent = gains([cell(0, 0xC, 0x40, 49), cell(0x80), cell(0), slideDown], 'classic');
-    // sent[0] is the C40 itself; sent[1] is the first slide tick.
-    expect(sent[1]).toBeCloseTo((64 - 1) / 64, 6);
+    // sent[0] is the C40 itself, sent[1] the note's level; sent[2] is the first slide tick.
+    expect(sent[2]).toBeCloseTo((64 - 1) / 64, 6);
   });
 
   it('reads a raw 0-64 level as itself in a native-replayer mode', () => {
     const sent = gains([cell(32, 0, 0, 49), slideDown], 'hively');
-    expect(sent[0]).toBeCloseTo((32 - 1) / 64, 6);
+    expect(sent[0]).toBeCloseTo(32 / 64, 6);
+    expect(sent[1]).toBeCloseTo((32 - 1) / 64, 6);
   });
 
   it('applies the decoded level to a delayed note', () => {
@@ -76,6 +80,7 @@ describe('SynthEffectProcessor volume column', () => {
       getPatternCell: (_ch, r) => rows[r] ?? null,
       getChannelCount: () => 1,
       getEditorMode: () => 'classic',
+      getInstrumentDefaultVolume: () => 64,
       applySynthFrequency: () => {},
       setChannelGain: () => {},
       setChannelPan: () => {},
