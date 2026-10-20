@@ -30,6 +30,11 @@ const FX_EXTENDED = 0xE;
 const FX_SET_PAN = 0x8;
 
 // Extended effects (E sub-commands)
+/** True when an effect column command is tone portamento (3xx, 5xy): the row's note is a glide target, not a new note. */
+export function isTonePortamentoEffect(effTyp: number | undefined): boolean {
+  return effTyp === FX_TONE_PORTA || effTyp === FX_TONE_PORTA_VOL_SLIDE;
+}
+
 const EFX_FINE_PORTA_UP = 0x1;
 const EFX_FINE_PORTA_DOWN = 0x2;
 const EFX_VIBRATO_WAVEFORM = 0x4;
@@ -243,7 +248,7 @@ export class SynthEffectProcessor {
       // For tone portamento (3xx/5xy), the note sets portaTarget instead — don't reset.
       const fx = cell.effTyp ?? 0;
       const hasNote = cell.note > 0 && cell.note < 97;
-      const isTonePorta = fx === FX_TONE_PORTA || fx === FX_TONE_PORTA_VOL_SLIDE;
+      const isTonePorta = isTonePortamentoEffect(fx);
 
       if (hasNote && !isTonePorta) {
         const baseFreq = this.deps.getChannelBaseFrequency(ch);

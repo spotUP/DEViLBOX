@@ -26,6 +26,7 @@ import { applyLoopToPlayer, sampleLoops } from './tone/samplePlayerLoop';
 import { registerChannelMeterSink } from './tone/channelMeterFeed';
 import { chipChannelFor, LIVE_VOICE_BASE_CHANNEL } from './furnace-dispatch/chipChannel';
 import { soundingToneVoices, trackToneVoices, untrackToneVoices } from './tone/toneVoiceProbe';
+import { cutToneNote } from './tone/toneNoteCut';
 import { createToneSynthNode } from './tone/toneSynthKnobs';
 import { TrackerEnvelope } from './TrackerEnvelope';
 import { InstrumentAnalyser } from './InstrumentAnalyser';
@@ -3399,6 +3400,27 @@ export class ToneEngine {
       }
     } catch (error) {
       console.error(`[ToneEngine] Error in triggerNoteAttack for ${config.synthType}:`, error);
+    }
+  }
+
+  /**
+   * Hard retrigger: end the channel's current note so that it is silent at `time`, where a raw (non-sliding) note
+   * starts. The normal release runs first so every wrapper's own note bookkeeping stays in step; then Tone instruments
+   * get their envelopes cut (toneNoteCut). The order matters: a release at `time` holds its envelope at `time`
+   * (cancelAndHoldAtTime) and would wipe a cut queued before it. Native synths (DevilboxSynth) end their note through
+   * the release alone.
+   */
+  public triggerNoteCut(
+    instrumentId: number,
+    note: string,
+    time: number,
+    config: InstrumentConfig,
+    channelIndex?: number
+  ): void {
+    this.triggerNoteRelease(instrumentId, note, time, config, channelIndex);
+    if (!isAUBridgeSynthType(config.synthType)) {
+      const instrument = this.getInstrument(instrumentId, config, channelIndex);
+      if (instrument && !isDevilboxSynth(instrument)) cutToneNote(instrument, time);
     }
   }
 
