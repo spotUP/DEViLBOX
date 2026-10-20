@@ -36,6 +36,9 @@ import * as songFile from '../songFile';
 import * as applySongModule from '@/lib/song/applySong';
 import { openUpRoughSong } from '@/lib/uprough/openUpRoughSong';
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { getSoftsynthVoice } from '@/engine/uprough/voiceRegistry';
+import { voiceDefaults } from '@/engine/uprough/softsynthVoice';
 
 const ROOT = process.env.UPROUGH_ROOT;
 const PYTHON = process.env.UPROUGH_PYTHON || 'python3.11';
@@ -50,7 +53,8 @@ import numpy as np
 import hiphop as hh
 import song_file as sf
 got = sf.render_doc(sf.load(sys.argv[1]))
-want = hh.render_track(sys.argv[2], seed=int(sys.argv[3]))
+mv = sys.argv[4] if len(sys.argv) > 4 else None
+want = hh.render_track(sys.argv[2], seed=int(sys.argv[3]), melody_voice=mv)
 assert got.shape == want.shape, (got.shape, want.shape)
 assert np.array_equal(got, want), "render differs"
 print("F4 OK %d samples" % len(got))
@@ -138,6 +142,45 @@ describe.skipIf(!ROOT)('Up Rough generate -> import -> export renders 1:1 on the
       const file = path.join(dir, `f4${songFile.SONG_FILE_EXTENSION}`);
       fs.writeFileSync(file, exported);
       const r = spawnSync(PYTHON, ['-c', CHECK, file, STYLE, String(SEED)],
+        { cwd: ROOT, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+      expect(r.status, (r.stderr || '').slice(-3000)).toBe(0);
+      expect(r.stdout).toMatch(/^F4 OK \d+ samples/m);
+    } finally {
+      proc.kill();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }, 900_000);
+});
+
+describe.skipIf(!ROOT)('Up Rough melody timbre swap renders the swapped timbre on the host (O5b10)', () => {
+  it(`${STYLE}/${SEED}: melody bell swapped to lead exports a file the host renders as render_track(melody_voice="lead")`, async () => {
+    const { proc, port } = await serve();
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'uprough-o5b10-'));
+    try {
+      const gen = await post(port, '/api/uprough/generate', { style: STYLE, seed: SEED });
+      expect(gen.status, gen.text.slice(0, 2000)).toBe(200);
+      await openUpRoughSong(gen.text);
+
+      // The swap the softsynth voice picker makes (UpRoughSoftsynthControls: voice + that voice's defaults).
+      const bell = songFile.MELODY_TIMBRE_SOFTSYNTH.bell;
+      const melody = useInstrumentStore.getState().instruments.filter((i) => i.upRoughSoftsynth?.voice === bell);
+      expect(melody.length).toBeGreaterThan(0);
+      const lead = getSoftsynthVoice(songFile.MELODY_TIMBRE_SOFTSYNTH.lead)!;
+      for (const inst of melody) {
+        useInstrumentStore.getState().updateInstrument(inst.id, { upRoughSoftsynth: { voice: lead.id, params: voiceDefaults(lead) } });
+      }
+
+      const serialize = vi.spyOn(songFile, 'songToSongFile');
+      serialize.mockClear();
+      const exported = useTrackerStore.getState().exportUpRoughSong();
+      expect(serialize).toHaveBeenCalledTimes(1);
+      const doc = JSON.parse(exported) as songFile.SongFileDoc;
+      expect(doc.song.melody_voice).toBe('lead');
+      expect((doc.song.render as songFile.JsonObject).melody_voice).toBe('lead');
+
+      const file = path.join(dir, `o5b10${songFile.SONG_FILE_EXTENSION}`);
+      fs.writeFileSync(file, exported);
+      const r = spawnSync(PYTHON, ['-c', CHECK, file, STYLE, String(SEED), 'lead'],
         { cwd: ROOT, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
       expect(r.status, (r.stderr || '').slice(-3000)).toBe(0);
       expect(r.stdout).toMatch(/^F4 OK \d+ samples/m);

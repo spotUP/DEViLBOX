@@ -68,17 +68,42 @@ describe('song file round trip', () => {
     expect(() => parseSongFile(h)).toThrow(/Song field "melody_voice" is "kazoo", not a melody timbre the softsynth has/);
   });
 
-  it('melody timbres map to distinct softsynth ids (no first-match collision) and a foreign melody voice is not exported as melody', () => {
+  it('melody timbres map to distinct softsynth ids (no first-match collision)', () => {
     const ids = Object.values(MELODY_TIMBRE_SOFTSYNTH);
     expect(new Set(ids).size).toBe(ids.length);
     for (const timbre of Object.keys(MELODY_TIMBRE_SOFTSYNTH)) {
       const owners = FILE_VOICES.filter((v) => softsynthOfFileVoice(v, timbre) === MELODY_TIMBRE_SOFTSYNTH[timbre]);
       expect(owners).toEqual(['melody']);
     }
+  });
+
+  it('O5b10: a melody instrument swapped to another timbre rewrites song.melody_voice and render.melody_voice', () => {
     const f = load();
     f.song.melody_voice = 'lead';
     const song = songFileToSong(parseSongFile(f));
-    song.instruments[f.instruments.findIndex((i) => i.voice === 'melody')]!.upRoughSoftsynth!.voice = 'melodyBell';
-    expect(() => songToSongFile(song)).toThrow(/uses voice "melodyBell"/);
+    const mi = f.instruments.findIndex((i) => i.voice === 'melody');
+    song.instruments[mi]!.upRoughSoftsynth!.voice = 'melodyBell';
+    const out = songToSongFile(song);
+    expect(out.song.melody_voice).toBe('bell');
+    expect((out.song.render as Record<string, unknown>).melody_voice).toBe('bell');
+    expect(out.instruments[mi]!.voice).toBe('melody');
+    expect(song.meta.song.melody_voice).toBe('lead');
+    expect(() => parseSongFile(JSON.parse(JSON.stringify(out)))).not.toThrow();
+  });
+
+  it('O5b10: an unswapped melody keeps the header render override as it was', () => {
+    const f = load();
+    expect(songToSongFile(songFileToSong(parseSongFile(f))).song.render).toEqual(f.song.render);
+  });
+
+  it('O5b10: two melody instruments on different timbres are refused by name', () => {
+    const f = load();
+    const song = songFileToSong(parseSongFile(f));
+    const mi = f.instruments.findIndex((i) => i.voice === 'melody');
+    const twin = structuredClone(song.instruments[mi]!);
+    twin.upRoughSoftsynth!.voice = 'melodyLead';
+    song.instruments[mi]!.upRoughSoftsynth!.voice = 'melodyBell';
+    song.instruments.push(twin);
+    expect(() => songToSongFile(song)).toThrow(/melody instruments play (bell, lead|lead, bell); an Up Rough song renders one melody timbre/);
   });
 });

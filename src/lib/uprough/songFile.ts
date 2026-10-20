@@ -387,6 +387,27 @@ function checkInstrument(inst: InstrumentConfig, i: number, previous: string | u
   return fileVoice;
 }
 
+const TIMBRE_OF_SOFTSYNTH: Record<string, string> = Object.fromEntries(
+  Object.entries(MELODY_TIMBRE_SOFTSYNTH).map(([timbre, id]) => [id, timbre]),
+);
+
+/**
+ * The melody timbre the instruments play (O5b10): a melody instrument swapped to another timbre rewrites the header,
+ * so the host renders the swapped timbre. One timbre per song (the host renders one melody_voice); no melody
+ * instrument keeps the header's.
+ */
+function melodyTimbreOf(song: UpRoughSong, header: string): string {
+  const timbres = new Set<string>();
+  for (const inst of song.instruments) {
+    const timbre = TIMBRE_OF_SOFTSYNTH[inst.upRoughSoftsynth?.voice ?? ''];
+    if (timbre !== undefined) timbres.add(timbre);
+  }
+  if (timbres.size > 1) {
+    throw new SongFileError(`The melody instruments play ${[...timbres].join(', ')}; an Up Rough song renders one melody timbre. Give them the same voice.`);
+  }
+  return [...timbres][0] ?? header;
+}
+
 const sideOf = (song: UpRoughSong, sid: string): Record<string, SideEntry> => song.meta.side[sid] ?? {};
 
 /** Patterns + instruments -> file. Refuses by name what the schema cannot hold (D1a, D5). */
@@ -400,8 +421,13 @@ export function songToSongFile(song: UpRoughSong): SongFileDoc {
     throw new SongFileError(`Speed changed to ${song.tempo.speed}; Up Rough songs play at speed 6 (16 rows per bar).`);
   }
   m.song.name = song.tempo.name;
+  const timbre = melodyTimbreOf(song, songMelodyVoice(m.song));
+  if (timbre !== songMelodyVoice(m.song)) {
+    m.song.melody_voice = timbre;
+    (m.song.render as JsonObject).melody_voice = timbre;
+  }
   const instruments: SongFileInstrument[] = song.instruments.map((inst, i) => ({
-    name: inst.name, voice: checkInstrument(inst, i, m.fileVoices[i], songMelodyVoice(m.song)), params: {}, seed: 0,
+    name: inst.name, voice: checkInstrument(inst, i, m.fileVoices[i], timbre), params: {}, seed: 0,
   }));
   const sections: SongFileSection[] = song.patterns.map((pat, si) => {
     const meta = m.sections[si];
