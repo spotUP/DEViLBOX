@@ -61,6 +61,15 @@ def capture(events):
     reals = {k: getattr(sm, k) for k in ("drum_bus", "parallel_dirt", "process", "apply_macros")}
     real_trim, real_bal = hh.trim_drums_to_peak, hh.balance_buses
     real_yields = hh.melody_yields
+    real_makeup = hh.bus_makeup
+
+    def bus_makeup(buf, pre_rms, cap):
+        # "melody_cap_bound": the melody chain's raw make-up gain (pre / post) exceeded MELODY_MAKEUP_MAX, so the cap
+        # (not the level restore) set the gain. Recorded so the test can demand a case where the cap is live.
+        post = hh._bus_rms(buf)
+        if cap == hh.MELODY_MAKEUP_MAX and caller_is_render_section() and post > 0.0:
+            cur["args"]["melody_cap_bound"] = bool(pre_rms / post > cap)
+        return real_makeup(buf, pre_rms, cap)
 
     def melody_yields(view):
         r = real_yields(view)
@@ -117,12 +126,14 @@ def capture(events):
 
     sm.drum_bus, sm.parallel_dirt, sm.process, sm.apply_macros = drum_bus, parallel_dirt, process, apply_macros
     hh.trim_drums_to_peak, hh.balance_buses, hh.melody_yields = trim, balance, melody_yields
+    hh.bus_makeup = bus_makeup
     try:
         hh.render_events(events)
     finally:
         for k, v in reals.items():
             setattr(sm, k, v)
         hh.trim_drums_to_peak, hh.balance_buses, hh.melody_yields = real_trim, real_bal, real_yields
+        hh.bus_makeup = real_makeup
     return secs, cur.get("yields", False)
 
 
@@ -191,6 +202,13 @@ for st in hh.STYLES:
     c = hh._clean_dc(dc)
     clean[st] = {k: c[k] for k in ("drum_drive", "drum_resample", "parallel", "dust")}
 
+def melody_up(octaves):
+    def edit(events):
+        for sec in events["sections"]:
+            sec["melody"] = [[[a + 12 * octaves, b, c] for (a, b, c) in m] if m else m for m in sec["melody"]]
+    return edit
+
+
 cases = [
     run("trap-hook-808", "trap", 6, 1, section="hook"),                               # amiga bass, 808 lp 1600
     run("golden_era-hook", "golden_era", 3, 1, section="hook"),                       # s950, sampled lp 3200, drive .12
@@ -200,6 +218,10 @@ cases = [
     run("lofi-hook", "lofi", 9, 1, section="hook"),                                   # lofi_cassette, warmsub, room 0.48
     run("jazz_rap-hook", "jazz_rap", 4, 1, section="hook"),                           # electric lp 3200
     run("trap-hook-melody-null", "trap", 6, 1, section="hook", edit=null_melody),     # layer on, every bar null
+    # The melody written five octaves up (MIDI 96..): the sampler lowpass (6-7 kHz) eats it, the chain loses ~13-17 dB
+    # and the raw make-up gain exceeds MELODY_MAKEUP_MAX, so the cap binds (melody_cap_bound).
+    run("g_funk-hook-melody-5oct", "g_funk", 5, 1, section="hook", stem="melody", edit=melody_up(5)),
+    run("lofi-hook-melody-5oct", "lofi", 9, 1, section="hook", stem="melody", edit=melody_up(5)),
     run("boom_bap-stem-melody", "boom_bap", 3, 1, section="hook", stem="melody"),
     run("boom_bap-stem-bass", "boom_bap", 3, 1, section="hook", stem="bass"),
     run("boom_bap-stem-drums", "boom_bap", 3, 1, section="hook", stem="drums"),
