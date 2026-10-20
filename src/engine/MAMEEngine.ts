@@ -204,6 +204,34 @@ export class MAMEEngine {
   }
 
   /**
+   * Pull audio from a chip instance into a Web Audio node. MAME instances have no
+   * worklet of their own, so something must call render() continuously; without
+   * this the chip is registered and fed notes but nothing ever reaches `output`.
+   * ScriptProcessorNode is deprecated but is the main-thread render path MAME chips use.
+   * Returns the processor, or null if the context lacks ScriptProcessorNode.
+   */
+  public attachRenderer(
+    handle: number,
+    context: BaseAudioContext,
+    output: AudioNode,
+    bufferSize: number = 512,
+  ): ScriptProcessorNode | null {
+    if (!context.createScriptProcessor) {
+      console.warn('[MAMEEngine] ScriptProcessorNode not available');
+      return null;
+    }
+    const processor = context.createScriptProcessor(bufferSize, 0, 2);
+    processor.onaudioprocess = (e: AudioProcessingEvent) => {
+      if (handle === 0) return;
+      const { left, right } = this.render(handle, bufferSize);
+      e.outputBuffer.getChannelData(0).set(left);
+      e.outputBuffer.getChannelData(1).set(right);
+    };
+    processor.connect(output);
+    return processor;
+  }
+
+  /**
    * Render audio
    */
   public render(handle: number, numSamples: number = 128): { left: Float32Array, right: Float32Array } {

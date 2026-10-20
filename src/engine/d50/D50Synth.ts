@@ -245,6 +245,9 @@ export class D50Synth implements DevilboxSynth {
     this.isInitialized = true;
     console.log('[D50Synth] Initialized with Roland SA handle:', this.handle);
 
+    // Nothing else pulls audio from the chip: render it into this.output.
+    this.mameEngine.attachRenderer(this.handle, this.audioContext, this.output);
+
     // Auto-load ROMs
     try {
       const roms = await loadD50ROMs();
