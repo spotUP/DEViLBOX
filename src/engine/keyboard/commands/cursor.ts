@@ -134,18 +134,18 @@ export function prevChannel(): boolean {
 }
 
 /**
- * Move to next column within channel (IT-style Tab)
+ * Jump to the next field (note, instrument, volume, effect slot); FT2 scheme Option+Right
  */
 export function nextColumn(): boolean {
-  useCursorStore.getState().moveCursor('right');
+  useCursorStore.getState().moveCursorByField('right');
   return true;
 }
 
 /**
- * Move to previous column within channel (IT-style Shift+Tab)
+ * Jump to the previous field; FT2 scheme Option+Left
  */
 export function prevColumn(): boolean {
-  useCursorStore.getState().moveCursor('left');
+  useCursorStore.getState().moveCursorByField('left');
   return true;
 }
 
