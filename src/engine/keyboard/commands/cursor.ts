@@ -134,6 +134,19 @@ export function prevChannel(): boolean {
 }
 
 /**
+ * Extend the block mark one step (FT2 Option+Shift+arrows). Starts a mark at
+ * the cursor when none exists, moves without discarding it, then lets
+ * endSelection compute the same multi-column span a mouse drag does.
+ */
+export function markBlock(direction: 'up' | 'down' | 'left' | 'right'): boolean {
+  const cs = useCursorStore.getState();
+  if (!cs.selection) cs.startSelection();
+  cs.moveCursor(direction, { preserveSelection: true });
+  useCursorStore.getState().endSelection();
+  return true;
+}
+
+/**
  * Jump to the next field (note, instrument, volume, effect slot); FT2 scheme Option+Right
  */
 export function nextColumn(): boolean {
