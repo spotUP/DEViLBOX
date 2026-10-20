@@ -14,7 +14,7 @@ const CACHE_MAX = 256;
 const NATURAL_DUR_SEC = 2;
 const RELEASE_FADE_SEC = 0.05;
 /** Voices whose tail a note-off cuts; drums ring out. */
-const RELEASABLE = new Set(['bass808', 'piano']);
+const RELEASABLE = new Set(['bass808', 'piano', 'bassSampled', 'bassElectric', 'bassWarmsub', 'bassGfunk', 'bassElectro', 'bassReese', 'bassVoice808']);
 
 let renderCount = 0;
 /** Sentinel: number of actual voice renders (cache hits excluded). */

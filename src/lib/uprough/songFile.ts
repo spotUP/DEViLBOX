@@ -16,7 +16,7 @@ import { voiceDefaults } from '@/engine/uprough/softsynthVoice';
 import { INSERT_EFFECTS, INSERT_LABEL, insertKey } from '@/engine/uprough/effects/insertEffects';
 
 export const FORMAT = 'uprough-softsynth-song';
-export const SCHEMA = 2;
+export const SCHEMA = 3;
 /** Up Rough songs play at speed 6: 16 rows per bar, one row per 16th note (tools/song_file.py SPEED). */
 export const SPEED = 6;
 export const ROWS_PER_BAR = 16;
@@ -39,6 +39,38 @@ export interface SongFileSection {
 export interface SongFileInstrument { name: string; voice: string; params: Record<string, number>; seed: number }
 export type SideEntry = JsonObject;
 export type SideTable = Record<string, Record<string, SideEntry>>;
+/** The style's GROOVE_TEMPLATES row (tools/hiphop.py), copied verbatim into song.groove; null when the style has none.
+ *  TS has no style table, so only the shape is checked here; the host checks the value against its table. */
+export interface SongFileGroove {
+  swing: number;
+  micro: { kick: number; snare: number; ch: number; ghost: number; perc: number; chop: number };
+  vel: number;
+}
+export function songGroove(song: JsonObject): SongFileGroove | null {
+  return song.groove as SongFileGroove | null;
+}
+/** The style's bass_cut (render_bass_bar's brightness multiplier), copied into song.bass_cut like the groove row. */
+export function songBassCut(song: JsonObject): number {
+  return song.bass_cut as number;
+}
+
+/** The style's resolved melody timbre (hiphop render_melody_bar: the render override, else the style's melody_voice), copied into song.melody_voice. */
+export function songMelodyVoice(song: JsonObject): string {
+  return song.melody_voice as string;
+}
+
+/** The style's bass_voice (render_bass_bar's voice), which the exporter writes into every non-808 bar as bass.voice;
+ *  null when no bar plays the per-bar bass. */
+export function songBassVoice(doc: { sections: { bars: { bass: Json }[] }[] }): string | null {
+  for (const sec of doc.sections) {
+    for (const bar of sec.bars) {
+      const bb = bar.bass as JsonObject | null;
+      if (bb !== null && typeof bb.voice === 'string') return bb.voice;
+    }
+  }
+  return null;
+}
+
 export interface SongFileDoc {
   format: string;
   schema: number;
@@ -94,25 +126,45 @@ export function laneOfChannel(ch: Pick<ChannelData, 'id' | 'name'>): Lane | unde
 export const FILE_VOICES = [
   'kick', 'snare', 'snare_accent', 'snare_ghost', 'clap', 'rim', 'tom', 'ch', 'oh', 'conga', 'cowbell', 'metal',
   'ride', 'shaker', 'tamb', 'bass808', 'melody',
+  // BASS_VOICES, host order: the non-808 bass voices a style's bass_voice names ("808" is the plain sub, not bass808).
+  '808', 'electro', 'reese', 'gfunk', 'sampled', 'electric', 'warmsub',
 ] as const;
 
 /**
  * File voice -> the softsynth voice that plays it. The file names the hiphop engine's voices; the softsynth registry
- * has its own ids. metal, shaker and tamb have no softsynth voice yet: they play as 'rim' (round trip is exact, the
- * preview sound is not).
+ * has its own ids; every file voice has its own softsynth id (metal, shaker, tamb included), except the snare
+ * family, which shares snare808.
  */
 export const VOICE_TO_SOFTSYNTH: Record<string, string> = {
   kick: 'kick', snare: 'snare808', snare_accent: 'snare808', snare_ghost: 'snare808', clap: 'clap', rim: 'rim',
-  tom: 'tom', ch: 'hatClosed', oh: 'hatOpen', conga: 'conga', cowbell: 'cowbell', metal: 'rim', ride: 'ride',
-  shaker: 'rim', tamb: 'rim', bass808: 'bass808', melody: 'piano',
+  tom: 'tom', ch: 'hatClosed', oh: 'hatOpen', conga: 'conga', cowbell: 'cowbell', metal: 'metal', ride: 'ride',
+  shaker: 'shaker', tamb: 'tamb', bass808: 'bass808', melody: 'piano',
+  '808': 'bassVoice808', electro: 'bassElectro', reese: 'bassReese', gfunk: 'bassGfunk', sampled: 'bassSampled',
+  electric: 'bassElectric', warmsub: 'bassWarmsub',
 };
 
-const BUS_OF_VOICE = (v: string): string => (v === 'bass808' ? 'bass' : v === 'melody' ? 'melody' : 'drums');
+/**
+ * The header's melody timbre (song.melody_voice) -> the softsynth voice the file voice "melody" plays. The host
+ * renders an unknown timbre as pluck; TS keeps no copy of the host STYLES table, so an unknown timbre is refused.
+ */
+export const MELODY_TIMBRE_SOFTSYNTH: Record<string, string> = {
+  piano: 'piano', epiano: 'melodyEpiano', bell: 'melodyBell', fmbell: 'melodyFmbell', darkbell: 'melodyDarkbell',
+  whistle: 'melodyWhistle', lead: 'melodyLead',
+};
+
+/** The softsynth voice a file voice plays; "melody" follows the header's timbre. */
+export function softsynthOfFileVoice(fileVoice: string, melodyTimbre: string): string | undefined {
+  return fileVoice === 'melody' ? MELODY_TIMBRE_SOFTSYNTH[melodyTimbre] : VOICE_TO_SOFTSYNTH[fileVoice];
+}
+
+const BASS_FILE_VOICES: readonly string[] = ['808', 'electro', 'reese', 'gfunk', 'sampled', 'electric', 'warmsub'];
+
+const BUS_OF_VOICE = (v: string): string => (v === 'bass808' || BASS_FILE_VOICES.includes(v) ? 'bass' : v === 'melody' ? 'melody' : 'drums');
 
 /** The file voice of an instrument: unchanged voice keeps the file's spelling, a changed one maps back by first match. */
-function fileVoiceOf(config: string, previous: string | undefined): string | undefined {
-  if (previous !== undefined && VOICE_TO_SOFTSYNTH[previous] === config) return previous;
-  return FILE_VOICES.find((v) => VOICE_TO_SOFTSYNTH[v] === config);
+function fileVoiceOf(config: string, previous: string | undefined, melodyTimbre: string): string | undefined {
+  if (previous !== undefined && softsynthOfFileVoice(previous, melodyTimbre) === config) return previous;
+  return FILE_VOICES.find((v) => softsynthOfFileVoice(v, melodyTimbre) === config);
 }
 
 // --- notes and cells ----------------------------------------------------------------------------------------------
@@ -154,12 +206,14 @@ const RENDER_PARAMS = [
   'voice_cfg',
 ];
 const TOP = ['format', 'schema', 'generator', 'song', 'instruments', 'sections', 'order', 'side', 'bus'];
-const SONG = ['name', 'style', 'seed', 'key', 'bpm', 'speed', 'rate', 'tier', 'bars', 'rows_per_bar', 'render', 'motif', 'chord_roots'];
+const SONG = ['name', 'style', 'seed', 'key', 'bpm', 'speed', 'groove', 'bass_cut', 'melody_voice', 'rate', 'tier', 'bars', 'rows_per_bar', 'render', 'motif', 'chord_roots'];
+const GROOVE = ['swing', 'micro', 'vel'];
+const GROOVE_MICRO = ['kick', 'snare', 'ch', 'ghost', 'perc', 'chop'];
 const SECTION = ['id', 'header', 'lanes', 'bars', 'locked'];
 const HEADER = ['style', 'section', 'bars', 'seed', 'drum_seed', 'bar_offset', 'fill_pending', 'carry_fill', 'layers', 'melody_from_bar'];
 const BAR = ['drop', 'fill', 'bass', 'melody', 'order'];
 const INSTRUMENT = ['name', 'voice', 'params', 'seed'];
-const SIDE_KEYS = ['vel', 'role', 'hat', 'e808', 'dur'];
+const SIDE_KEYS = ['vel', 'role', 'hat', 'e808', 'dur', 'ebass'];
 
 function checkKeys(obj: unknown, allowed: readonly string[], path: string): void {
   if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
@@ -171,6 +225,64 @@ function checkKeys(obj: unknown, allowed: readonly string[], path: string): void
   for (const k of allowed) {
     if (!(k in obj)) throw new SongFileError(`Missing field "${path ? `${path}.${k}` : k}" in Up Rough song file schema ${SCHEMA}.`);
   }
+}
+
+const EBASS = ['semi', 'dur', 'glide', 'vel'];
+
+/** A non-808 bass note's own numbers (host: render_bass_bar's (semi, step, dur_steps, glide, vel) minus the step, which is the cell row). */
+function checkEbass(e: unknown, path: string): void {
+  checkKeys(e, EBASS, path);
+  const o = e as Record<string, unknown>;
+  for (const k of ['semi', 'dur', 'vel']) {
+    if (typeof o[k] !== 'number' || !Number.isFinite(o[k])) throw new SongFileError(`Field "${path}.${k}" in Up Rough song file schema ${SCHEMA} is not a number.`);
+  }
+  if (o.glide !== null && (typeof o.glide !== 'number' || !Number.isFinite(o.glide))) {
+    throw new SongFileError(`Field "${path}.glide" in Up Rough song file schema ${SCHEMA} is not a number or null.`);
+  }
+}
+
+const HAT = ['kind', 'vel', 'micro_ms', 'sub'];
+const E808 = ['start_s', 'dur_s', 'semi', 'slide', 'role', 'kind'];
+
+/** Each named field of `o` must hold `kind`: a finite number, text, true/false or a list. */
+function checkFields(o: Record<string, unknown>, keys: readonly string[], kind: 'number' | 'string' | 'boolean' | 'array', path: string): void {
+  for (const k of keys) {
+    const v = o[k];
+    const ok = kind === 'number' ? typeof v === 'number' && Number.isFinite(v)
+      : kind === 'array' ? Array.isArray(v) : typeof v === kind;
+    if (!ok) throw new SongFileError(`Field "${path}.${k}" in Up Rough song file schema ${SCHEMA} is not ${kind === 'number' ? 'a number' : kind === 'string' ? 'text' : kind === 'boolean' ? 'true or false' : 'a list'}.`);
+  }
+}
+
+/** One side entry: the drum hit's vel / role, the melody note's dur, a hat's own record, an 808 note's timing, a bass note's numbers.
+ *  Host validate() checks none of these past the key names; songFileToBarEvents reads every one, so a wrong type is refused here. */
+function checkSideEntry(entry: Record<string, unknown>, path: string): void {
+  for (const k of Object.keys(entry)) {
+    if (!SIDE_KEYS.includes(k)) throw new SongFileError(`Unknown field "${path}.${k}" in Up Rough song file schema ${SCHEMA}.`);
+  }
+  if ('vel' in entry) checkFields(entry, ['vel'], 'number', path);
+  if ('role' in entry) checkFields(entry, ['role'], 'string', path);
+  if ('dur' in entry) {
+    const dur = entry.dur;
+    if (typeof dur !== 'number' || !Number.isInteger(dur) || dur < 1) throw new SongFileError(`Field "${path}.dur" in Up Rough song file schema ${SCHEMA} is not a whole number of rows.`);
+  }
+  if ('hat' in entry) {
+    const p = `${path}.hat`;
+    checkKeys(entry.hat, HAT, p);
+    const h = entry.hat as Record<string, unknown>;
+    checkFields(h, ['vel', 'micro_ms'], 'number', p);
+    checkFields(h, ['kind'], 'string', p);
+    checkFields(h, ['sub'], 'array', p);
+  }
+  if ('e808' in entry) {
+    const p = `${path}.e808`;
+    checkKeys(entry.e808, E808, p);
+    const e = entry.e808 as Record<string, unknown>;
+    checkFields(e, ['start_s', 'dur_s', 'semi'], 'number', p);
+    checkFields(e, ['slide'], 'boolean', p);
+    checkFields(e, ['role', 'kind'], 'string', p);
+  }
+  if ('ebass' in entry) checkEbass(entry.ebass, `${path}.ebass`);
 }
 
 const refuseNotSongFile = (v: unknown): never => {
@@ -194,6 +306,17 @@ export function parseSongFile(input: string | unknown): SongFileDoc {
   const d = doc as unknown as SongFileDoc;
   checkKeys(d.song, SONG, 'song');
   checkKeys(d.song.render, RENDER_PARAMS, 'song.render');
+  if (d.song.groove !== null) {
+    const g = d.song.groove as Record<string, unknown>;
+    checkKeys(g, GROOVE, 'song.groove');
+    checkKeys(g.micro, GROOVE_MICRO, 'song.groove.micro');
+    const m = g.micro as Record<string, unknown>;
+    for (const [k, v] of [['swing', g.swing], ['vel', g.vel], ...GROOVE_MICRO.map((r) => [`micro.${r}`, m[r]] as const)] as const) {
+      if (typeof v !== 'number' || !Number.isFinite(v)) throw new SongFileError(`Song groove field "${k}" is ${JSON.stringify(v)}, not a number.`);
+    }
+  }
+  if (typeof d.song.bass_cut !== 'number' || !Number.isFinite(d.song.bass_cut) || d.song.bass_cut <= 0) throw new SongFileError(`Song field "bass_cut" is ${JSON.stringify(d.song.bass_cut)}, not a positive number.`);
+  if (typeof d.song.melody_voice !== 'string' || !(d.song.melody_voice in MELODY_TIMBRE_SOFTSYNTH)) throw new SongFileError(`Song field "melody_voice" is ${JSON.stringify(d.song.melody_voice)}, not a melody timbre the softsynth has (known: ${Object.keys(MELODY_TIMBRE_SOFTSYNTH).join(', ')}).`);
   if (d.song.rows_per_bar !== ROWS_PER_BAR) throw new SongFileError(`rows_per_bar is ${JSON.stringify(d.song.rows_per_bar)}; schema ${SCHEMA} is 16 rows per bar.`);
   if (typeof d.song.name !== 'string') throw new SongFileError(`Song name ${JSON.stringify(d.song.name)} is not text.`);
   if (d.song.speed !== SPEED) throw new SongFileError(`Song speed is ${JSON.stringify(d.song.speed)}; Up Rough songs play at speed 6 (16 rows per bar).`);
@@ -235,9 +358,7 @@ export function parseSongFile(input: string | unknown): SongFileDoc {
     if (!ids.has(sid)) throw new SongFileError(`Side table names section "${sid}", which does not exist.`);
     for (const [cell, entry] of Object.entries(entries)) {
       if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) throw new SongFileError(`Side entry ${sid}.${cell} is not an object.`);
-      for (const k of Object.keys(entry)) {
-        if (!SIDE_KEYS.includes(k)) throw new SongFileError(`Unknown field "side.${sid}.${cell}.${k}" in Up Rough song file schema ${SCHEMA}.`);
-      }
+      checkSideEntry(entry as Record<string, unknown>, `side.${sid}.${cell}`);
     }
   }
   for (const o of d.order) {
@@ -248,8 +369,8 @@ export function parseSongFile(input: string | unknown): SongFileDoc {
 
 // --- file -> song --------------------------------------------------------------------------------------------------
 
-function importInstrument(inst: SongFileInstrument, index: number): InstrumentConfig {
-  const voiceId = VOICE_TO_SOFTSYNTH[inst.voice]!;
+function importInstrument(inst: SongFileInstrument, index: number, melodyTimbre: string): InstrumentConfig {
+  const voiceId = softsynthOfFileVoice(inst.voice, melodyTimbre)!;
   const voice = getSoftsynthVoice(voiceId);
   return {
     id: index + 1, name: inst.name, type: 'synth', synthType: 'UpRoughSoftsynth', effects: [], volume: -6, pan: 0,
@@ -288,20 +409,20 @@ export function songFileToSong(doc: SongFileDoc): UpRoughSong {
       fileVoices: d.instruments.map((i) => i.voice),
     },
     patterns,
-    instruments: d.instruments.map(importInstrument),
+    instruments: d.instruments.map((inst, i) => importInstrument(inst, i, songMelodyVoice(d.song))),
     tempo: { bpm: d.song.bpm as number, speed: d.song.speed as number, name: d.song.name as string },
   };
 }
 
 // --- song -> file ------------------------------------------------------------------------------------------------
 
-function checkInstrument(inst: InstrumentConfig, i: number, previous: string | undefined): string {
+function checkInstrument(inst: InstrumentConfig, i: number, previous: string | undefined, melodyTimbre: string): string {
   const n = i + 1;
   if (inst.synthType !== 'UpRoughSoftsynth' || !inst.upRoughSoftsynth) {
     throw new SongFileError(`Instrument ${n} "${inst.name}" is ${inst.synthType}, not UpRoughSoftsynth. Up Rough songs play only softsynth voices: replace or remove it before export.`);
   }
   const cfg = inst.upRoughSoftsynth;
-  const fileVoice = fileVoiceOf(cfg.voice, previous);
+  const fileVoice = fileVoiceOf(cfg.voice, previous, melodyTimbre);
   if (fileVoice === undefined) {
     throw new SongFileError(`Instrument ${n} "${inst.name}" uses voice "${cfg.voice}", which the softsynth does not have (known: ${FILE_VOICES.join(', ')}).`);
   }
@@ -319,6 +440,27 @@ function checkInstrument(inst: InstrumentConfig, i: number, previous: string | u
   return fileVoice;
 }
 
+const TIMBRE_OF_SOFTSYNTH: Record<string, string> = Object.fromEntries(
+  Object.entries(MELODY_TIMBRE_SOFTSYNTH).map(([timbre, id]) => [id, timbre]),
+);
+
+/**
+ * The melody timbre the instruments play (O5b10): a melody instrument swapped to another timbre rewrites the header,
+ * so the host renders the swapped timbre. One timbre per song (the host renders one melody_voice); no melody
+ * instrument keeps the header's.
+ */
+function melodyTimbreOf(song: UpRoughSong, header: string): string {
+  const timbres = new Set<string>();
+  for (const inst of song.instruments) {
+    const timbre = TIMBRE_OF_SOFTSYNTH[inst.upRoughSoftsynth?.voice ?? ''];
+    if (timbre !== undefined) timbres.add(timbre);
+  }
+  if (timbres.size > 1) {
+    throw new SongFileError(`The melody instruments play ${[...timbres].join(', ')}; an Up Rough song renders one melody timbre. Give them the same voice.`);
+  }
+  return [...timbres][0] ?? header;
+}
+
 const sideOf = (song: UpRoughSong, sid: string): Record<string, SideEntry> => song.meta.side[sid] ?? {};
 
 /** Patterns + instruments -> file. Refuses by name what the schema cannot hold (D1a, D5). */
@@ -332,8 +474,13 @@ export function songToSongFile(song: UpRoughSong): SongFileDoc {
     throw new SongFileError(`Speed changed to ${song.tempo.speed}; Up Rough songs play at speed 6 (16 rows per bar).`);
   }
   m.song.name = song.tempo.name;
+  const timbre = melodyTimbreOf(song, songMelodyVoice(m.song));
+  if (timbre !== songMelodyVoice(m.song)) {
+    m.song.melody_voice = timbre;
+    (m.song.render as JsonObject).melody_voice = timbre;
+  }
   const instruments: SongFileInstrument[] = song.instruments.map((inst, i) => ({
-    name: inst.name, voice: checkInstrument(inst, i, m.fileVoices[i]), params: {}, seed: 0,
+    name: inst.name, voice: checkInstrument(inst, i, m.fileVoices[i], timbre), params: {}, seed: 0,
   }));
   const sections: SongFileSection[] = song.patterns.map((pat, si) => {
     const meta = m.sections[si];
