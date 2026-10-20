@@ -2294,6 +2294,25 @@ export const useTrackerStore = create<TrackerStore>()(
 // import cycle at module-init time.
 registerTrackerStore(useTrackerStore);
 
+// Structural edits (patterns added, removed, cloned, reordered or resized, a
+// channel added or removed, the order list edited) reach the OpenMPT soundlib
+// module here, whichever action made them. Cell edits sync per action above;
+// these change the module's shape, which libopenmpt must play from the next
+// hot-reload or play on.
+function songStructureKey(s: Pick<TrackerStore, 'patterns' | 'patternOrder'>): string {
+  const ch = s.patterns[0]?.channels.length ?? 0;
+  return `${ch}|${s.patterns.map(p => `${p.id}:${p.length}`).join(',')}|${s.patternOrder.join(',')}`;
+}
+useTrackerStore.subscribe((state, prev) => {
+  if (state.patterns === prev.patterns && state.patternOrder === prev.patternOrder) return;
+  if (!OpenMPTEditBridge.isActive() || songStructureKey(state) === songStructureKey(prev)) return;
+  void OpenMPTEditBridge.syncSongStructure({
+    numChannels: state.patterns[0]?.channels.length ?? 4,
+    patterns: state.patterns,
+    songPositions: state.patternOrder.length ? state.patternOrder : state.patterns.map((_, i) => i),
+  });
+});
+
 // Export mask constants for use in other modules. Re-export from the leaf
 // editorMasks module — NOT from useEditorStore — to avoid a circular-import
 // TDZ. The store group cycle (useTrackerStore → useEditorStore → useCursorStore

@@ -546,12 +546,15 @@ export class LibopenmptEngine {
       throw new Error('LibopenmptEngine.startWithCoordinator: song.libopenmptFileData is null');
     }
 
-    // If the user has unsaved soundlib edits, re-serialize from the soundlib
-    // (the canonical document model) and use that as the load buffer. The
-    // bridge clears its dirty flag and cancels any pending hot-reload timer.
+    // When the soundlib module holds this song, it is the canonical document
+    // model: bring its structure to the song (patterns, channels and order
+    // edited since the last sync), then load it whenever it carries any edit.
+    // The song's bytes may be the original import, older than those edits.
+    // The bridge clears its dirty flag and cancels any pending hot-reload timer.
     let tuneData: ArrayBuffer = opts.song.libopenmptFileData;
     const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
-    if (bridge.isActive() && bridge.isDirty()) {
+    if (bridge.ownsSongData(opts.song.libopenmptFileData)) await bridge.syncSongStructure(opts.song);
+    if (bridge.isActive() && (bridge.isDirty() || bridge.hasEdits())) {
       const serialized = await bridge.serialize();
       if (serialized) {
         tuneData = serialized;

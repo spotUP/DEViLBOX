@@ -415,7 +415,7 @@ export async function parseWithOpenMPT(
       MOD: 'mod', XM: 'xm', IT: 'it', S3M: 's3m', MPTM: 'it',
     };
     const { markLoaded } = await import('@engine/libopenmpt/OpenMPTEditBridge');
-    markLoaded(saveFormatMap[format] || 'it');
+    markLoaded(saveFormatMap[format] || 'it', song.libopenmptFileData, song.patterns.map(p => p.id));
 
     return song;
   } finally {

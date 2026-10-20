@@ -129,6 +129,9 @@ target_link_options(OpenMPTSoundlib PRIVATE
 '_osl_resize_pattern',\
 '_osl_add_pattern',\
 '_osl_set_order',\
+'_osl_set_num_orders',\
+'_osl_set_num_patterns',\
+'_osl_set_num_channels',\
 '_osl_set_initial_speed',\
 '_osl_set_initial_tempo',\
 '_osl_get_midi_macro_string',\

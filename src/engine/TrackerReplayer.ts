@@ -1914,9 +1914,15 @@ export class TrackerReplayer {
     // Restore any native engines rerouted to separation chain (UADE/Hively)
     restoreNativeRouting(this.routedNativeEngines);
 
-    // Reset the OpenMPT edit bridge — it will be re-activated by parseWithOpenMPT
-    // if the new song is a MOD/XM/IT/S3M loaded via the soundlib
-    import('@engine/libopenmpt/OpenMPTEditBridge').then(b => b.reset()).catch(() => {});
+    // Release the OpenMPT edit bridge unless its module holds this song. A
+    // reload of the same song (a structural edit during playback reloads it)
+    // must keep the bridge and the edits in its module; a reset here made the
+    // next play load the original import bytes. A new song is re-activated by
+    // parseWithOpenMPT or by the Phase 5.4 module build.
+    const songData = song.libopenmptFileData;
+    import('@engine/libopenmpt/OpenMPTEditBridge').then(b => {
+      if (!b.ownsSongData(songData)) b.reset();
+    }).catch(() => {});
 
     this.song = song;
 
@@ -2637,7 +2643,7 @@ export class TrackerReplayer {
           try {
             const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
             if (!bridge.isActive() && this.song.libopenmptFileData) {
-              bridge.markLoaded('xm');
+              bridge.markLoaded('xm', this.song.libopenmptFileData);
             }
           } catch { /* bridge not available */ }
 
