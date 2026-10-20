@@ -449,6 +449,8 @@ export class ToneEngine {
   // Track pending releaseAll gain-restore timeouts per instrument key
   // Prevents race condition where double-releaseAll captures gain=0 and restores to 0
   private releaseRestoreTimeouts: Map<number, ReturnType<typeof setTimeout>> = new Map();
+  /** dB level a pending release fade must return to; captured by the first release only, never mid-fade. */
+  private releaseRestoreVolumeDb: Map<number, number> = new Map();
 
   // Guard against concurrent preloadInstruments calls
   private preloadGeneration = 0;
@@ -4515,7 +4517,12 @@ export class ToneEngine {
         // This prevents long release tails from continuing to sound
         const instAny = instrument as any;
         if (instAny.volume && typeof instAny.volume.rampTo === 'function') {
-          const currentVolume = instAny.volume.value;
+          // A second release inside the 100 ms restore window would read the
+          // half-faded value and restore to it, losing level on every call.
+          const pendingLevel = this.releaseRestoreVolumeDb.get(key);
+          const currentVolume = pendingLevel !== undefined && this.releaseRestoreTimeouts.has(key)
+            ? pendingLevel
+            : instAny.volume.value;
           // Guard against null volume value (can happen if instrument is in bad state)
           if (currentVolume === null || currentVolume === undefined) {
             return; // Skip this instrument in forEach
@@ -4529,8 +4536,10 @@ export class ToneEngine {
           const prevTimeout = this.releaseRestoreTimeouts.get(key);
           if (prevTimeout) clearTimeout(prevTimeout);
           // Restore volume after fade for next playback
+          this.releaseRestoreVolumeDb.set(key, currentVolume);
           const timeout = setTimeout(() => {
             this.releaseRestoreTimeouts.delete(key);
+            this.releaseRestoreVolumeDb.delete(key);
             try {
               if (instAny.volume) {
                 instAny.volume.value = currentVolume;
@@ -4688,6 +4697,7 @@ export class ToneEngine {
     // firing on new instruments and restoring wrong volume values
     this.releaseRestoreTimeouts.forEach((timeout) => clearTimeout(timeout));
     this.releaseRestoreTimeouts.clear();
+    this.releaseRestoreVolumeDb.clear();
     this.instrumentOutputOverrides.clear();
     this._sunvoxOutputConnected = false;
     clearConnectedNativeOutputs();
