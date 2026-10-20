@@ -103,25 +103,15 @@ describe('renderSong matches render_track with the locked layers absent', () => 
           if (s[lane]) expect(maxErr(lanes[lane], laneOf(s[lane]!)), `${c.name} s${i} ${lane}`).toBeLessThan(TOL);
         }
       });
-      // The int8 quantiser is an error-feedback noise shaper. The texture stage agrees with Python to ~1e-15 (numpy's
-      // pairwise sums against a plain loop), and where a value sits on a rounding boundary that last bit flips the
-      // decision and the feedback carries it for a few samples. The measured worst case is 33 of 345120 samples, at
-      // most 3 steps off; every other sample is exact. A real defect (any perturbation) moves thousands of samples.
       const want = laneOf(c.final);
       expect(r.out).toHaveLength(want.length);
-      let off = 0, worst = 0;
-      for (let i = 0; i < want.length; i++) {
-        const d = Math.abs(r.out[i]! - want[i]!);
-        if (d > TOL) off++;
-        worst = Math.max(worst, d);
-      }
-      expect(off / want.length, `${c.name} samples off`).toBeLessThan(2e-4);
-      expect(worst * 127, `${c.name} worst int8 steps`).toBeLessThanOrEqual(3.0001);
+      expect(maxErr(r.out, want), `${c.name} final output`).toBeLessThan(TOL);
     });
   }
   it('the corpus covers the Paula buckets, vintage off, use_scratch, a drums-off section and stored lanes', () => {
     const tex = (style: string) => ref.scratch[style]!;
     expect(ref.cases.some((c) => !c.vintage)).toBe(true);
+    expect(ref.cases.some((c) => Math.max(...c.sections.map((s) => s.n)) > 1.5 * Math.min(...c.sections.map((s) => s.n))), 'a multi-bar section').toBe(true);
     expect(ref.cases.some((c) => c.vintage)).toBe(true);
     expect(new Set(ref.cases.map((c) => c.style))).toEqual(new Set(['boom_bap', 'lofi', 'g_funk', 'trap', 'dirty_south', 'east_coast']));
     expect(ref.cases.some((c) => tex(c.style).use_scratch)).toBe(true);
