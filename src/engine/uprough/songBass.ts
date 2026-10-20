@@ -25,7 +25,7 @@ export interface SongBassOptions {
 }
 
 /** The layers a section plays: the stem isolates one, the params.section fast path, else the arrangement row. */
-function sectionBassOn(events: BarEvents, index: number): boolean {
+export function sectionBassOn(events: BarEvents, index: number): boolean {
   const { section, stem } = events.params;
   if (stem) return stem === 'bass';
   if (section) return section !== 'breakdown';
