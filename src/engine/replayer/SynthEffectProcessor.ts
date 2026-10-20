@@ -250,8 +250,15 @@ export class SynthEffectProcessor {
         if (baseFreq > 0) {
           state.baseFrequency = baseFreq;
           state.currentFrequency = baseFreq;
-          // The note trigger sounds the new pitch itself.
-          state.sentFrequency = baseFreq;
+          // A note trigger does not clear a pitch the effects left on the voice: synths that
+          // take setFrequency as a pitch bend (VST bridge, DX7, sfizz, OPL3 ...) keep the bend
+          // across noteOn. So after a slide, vibrato or arpeggio the new note's own pitch is
+          // sent, or the new note would start slid away from it.
+          if (state.sentFrequency > 0 && state.sentFrequency !== baseFreq) {
+            this.sendFrequency(ch, state, baseFreq);
+          } else {
+            state.sentFrequency = baseFreq;
+          }
         }
       } else if (state.sentFrequency > 0 && state.sentFrequency !== state.currentFrequency) {
         // Like FT2 and ProTracker, every row starts at the real pitch: a vibrato or arpeggio offset
