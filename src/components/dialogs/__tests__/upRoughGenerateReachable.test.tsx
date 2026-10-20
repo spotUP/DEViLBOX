@@ -16,6 +16,8 @@ vi.mock('@stores/useInstrumentTypeStore', () => {
 });
 import { FT2Toolbar } from '@components/tracker/FT2Toolbar/FT2Toolbar';
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { UpRoughGenerateDialog } from '../UpRoughGenerateDialog';
+import type { R2Event } from '@/engine/uprough/r2Events';
 
 afterEach(() => {
   cleanup();
@@ -55,5 +57,35 @@ describe('Generate Up Rough Song from the hamburger menu', () => {
     expect(posts).toHaveLength(1);
     const init = posts[0]![1] as RequestInit;
     expect(JSON.parse(init.body as string)).toEqual({ style: 'trap', seed: 1, key: 'Am', bars: 16 });
+  });
+});
+
+describe('Generate dialog streams the host events (R2c)', () => {
+  it('posts events:true, hands every NDJSON line to onEvent in order across chunk cuts, and loads the done line song', async () => {
+    const lines = [
+      { seq: 0, type: 'start', mode: 'generate' },
+      { seq: 1, type: 'section', section: 0 },
+      { seq: 2, type: 'done', mode: 'generate', samples: 0, song: fixture },
+    ].map((e) => JSON.stringify(e)).join('\n') + '\n';
+    const enc = new TextEncoder().encode(lines);
+    const cuts = [11, 60, enc.length];
+    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) =>
+      url === '/api/uprough/styles'
+        ? new Response(JSON.stringify({ styles: ['trap'] }), { status: 200 })
+        : new Response(new ReadableStream<Uint8Array>({
+          start(c) { let from = 0; for (const to of cuts) { c.enqueue(enc.slice(from, to)); from = to; } c.close(); },
+        }), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    useTrackerStore.setState({ upRoughMeta: null });
+    const seen: R2Event[] = []; // sentinel: the count proves the streaming path ran
+    render(<UpRoughGenerateDialog isOpen onClose={() => undefined} onEvent={(e) => seen.push(e)} />);
+    const style = await screen.findByTitle('Style');
+    await waitFor(() => expect(style.textContent).toContain('trap'));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
+    await waitFor(() => expect(useTrackerStore.getState().upRoughMeta?.song.style).toBe('trap'), { timeout: 10_000 });
+    expect(seen.map((e) => e.type)).toEqual(['start', 'section', 'done']);
+    const post = fetchMock.mock.calls.find((c) => c[0] === '/api/uprough/generate')!;
+    expect(JSON.parse((post[1] as RequestInit).body as string).events).toBe(true);
   });
 });

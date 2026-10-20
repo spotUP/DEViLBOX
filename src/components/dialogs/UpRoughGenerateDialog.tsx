@@ -12,11 +12,14 @@ import { Button } from '@components/ui/Button';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
 import { fetchStyles, generateSong } from '@/lib/uprough/generateClient';
+import type { R2Event } from '@/engine/uprough/r2Events';
 import { openUpRoughSong } from '@/lib/uprough/openUpRoughSong';
 
 export interface UpRoughGenerateDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Receives the host generate run's NDJSON events as they stream in (R2c); the dialog then requests the streaming mode. */
+  onEvent?: (event: R2Event) => void;
 }
 
 const KEY_PATTERN = /^[A-G][#b]?m?$/;
@@ -28,7 +31,7 @@ const PHASE_TEXT: Record<Exclude<Phase, 'idle'>, string> = {
   loading: 'Loading into the tracker',
 };
 
-export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ isOpen, onClose }) => {
+export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ isOpen, onClose, onEvent }) => {
   const [styles, setStyles] = useState<string[]>([]);
   const [style, setStyle] = useState('');
   const [seed, setSeed] = useState(1);
@@ -84,7 +87,7 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
     setPhase('generating');
     setError(null);
     try {
-      const text = await generateSong({ style, seed, key, ...(barsCount !== undefined && { bars: barsCount }) }, ac.signal);
+      const text = await generateSong({ style, seed, key, ...(barsCount !== undefined && { bars: barsCount }) }, ac.signal, { onEvent });
       setPhase('loading');
       await openUpRoughSong(text);
       setPhase('idle');

@@ -6,6 +6,12 @@
  * UPROUGH_ROOT env var) and returns the song file it prints. The generator is
  * the Up Rough host's own, so the file renders 1:1 on the device by
  * construction; nothing here re-implements any musical decision.
+ *
+ * With `events: true` in the body the generator runs with `--events -` and the
+ * response is chunked NDJSON (application/x-ndjson): one render event per line
+ * as it arrives, the last line a `done` event carrying the song file. A failure
+ * after the first line ends the stream with one `error` line instead of a
+ * status code (the status is already sent); a stream with no `done` line failed.
  */
 
 import { Router, Request, Response } from 'express';
@@ -37,7 +43,10 @@ function songFileScript(): { script?: string; error?: string } {
 }
 
 /** Run an Up Rough tool script; the child is killed on timeout or when `signal` aborts. */
-function runSongFile(script: string, args: string[], signal?: AbortSignal, cwd: string = path.dirname(script)): Promise<RunResult> {
+function runSongFile(
+  script: string, args: string[], signal?: AbortSignal, cwd: string = path.dirname(script),
+  onStdout?: (chunk: string) => void,
+): Promise<RunResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(python(), [script, ...args], { cwd });
     let stdout = '';
@@ -50,7 +59,16 @@ function runSongFile(script: string, args: string[], signal?: AbortSignal, cwd: 
     if (signal) {
       if (signal.aborted) onAbort(); else signal.addEventListener('abort', onAbort, { once: true });
     }
-    child.stdout.on('data', (d) => {
+    // With onStdout the chunks stream out and only their size is kept, so MAX_OUTPUT still bounds the run.
+    let streamed = 0;
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (d: string) => {
+      if (onStdout) {
+        streamed += d.length;
+        onStdout(d);
+        if (streamed > MAX_OUTPUT) kill();
+        return;
+      }
       stdout += d;
       if (stdout.length > MAX_OUTPUT) kill();
     });
@@ -116,11 +134,58 @@ router.get('/styles', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Forwards the generator's stdout to the client one complete line at a time. The
+ * status line waits for the first line, so a generator that fails before it
+ * printed anything still answers with a plain JSON error and status.
+ */
+class NdjsonSink {
+  private pending = '';
+  private started = false;
+  constructor(private readonly res: Response) {}
+
+  private write(line: string): void {
+    if (!this.started) {
+      this.started = true;
+      this.res.status(200).type('application/x-ndjson');
+      this.res.flushHeaders();
+    }
+    this.res.write(`${line}\n`);
+  }
+
+  push(chunk: string): void {
+    this.pending += chunk;
+    for (let i = this.pending.indexOf('\n'); i >= 0; i = this.pending.indexOf('\n')) {
+      const line = this.pending.slice(0, i);
+      this.pending = this.pending.slice(i + 1);
+      if (line) this.write(line);
+    }
+  }
+
+  /** Ends the response. A cut-off last line is dropped on failure, so the error line never lands mid-line. */
+  finish(failed?: { status: number; error: string; detail?: string }): void {
+    if (failed) {
+      if (!this.started) {
+        this.res.status(failed.status).json({ error: failed.error, ...(failed.detail !== undefined && { detail: failed.detail }) });
+        return;
+      }
+      this.write(JSON.stringify({ type: 'error', error: failed.error, ...(failed.detail !== undefined && { detail: failed.detail }) }));
+    } else if (this.pending) {
+      this.write(this.pending);
+    }
+    if (!this.started) {
+      this.res.status(500).json({ error: 'generator printed no events' });
+      return;
+    }
+    this.res.end();
+  }
+}
+
 router.post('/generate', async (req: Request, res: Response) => {
   const { script, error } = songFileScript();
   if (!script) return res.status(503).json({ error });
 
-  const { style, seed, key, bars } = req.body ?? {};
+  const { style, seed, key, bars, events } = req.body ?? {};
   if (typeof style !== 'string' || !style) return res.status(400).json({ error: 'style must be a non-empty string' });
   if (!Number.isInteger(seed)) return res.status(400).json({ error: 'seed must be an integer' });
   if (key !== undefined && (typeof key !== 'string' || !/^[A-G][#b]?m?$/.test(key))) {
@@ -129,6 +194,8 @@ router.post('/generate', async (req: Request, res: Response) => {
   if (bars !== undefined && !(Number.isInteger(bars) && bars >= 1)) {
     return res.status(400).json({ error: 'bars must be a whole number, 1 or more' });
   }
+
+  if (events !== undefined && typeof events !== 'boolean') return res.status(400).json({ error: 'events must be true or false' });
 
   const ac = new AbortController();
   res.on('close', () => { if (!res.writableEnded) ac.abort(); });
@@ -141,10 +208,17 @@ router.post('/generate', async (req: Request, res: Response) => {
     const args = ['new', '--style', style, '--seed', String(seed)];
     if (key) args.push('--key', key);
     if (bars !== undefined) args.push('--bars', String(bars));
-    const r = await runSongFile(script, args, ac.signal);
+    const sink = events === true ? new NdjsonSink(res) : undefined;
+    if (sink) args.push('--events', '-');
+    const r = await runSongFile(script, args, ac.signal, undefined, sink ? (c) => sink.push(c) : undefined);
     if (r.aborted) return;
-    if (r.timedOut) return res.status(504).json({ error: `generator timed out after ${TIMEOUT_MS} ms` });
-    if (r.code !== 0) return res.status(500).json({ error: 'generator failed', detail: r.stderr.trim().slice(-2000) });
+    const failed = r.timedOut
+      ? { status: 504, error: `generator timed out after ${TIMEOUT_MS} ms`, detail: undefined }
+      : r.code !== 0
+        ? { status: 500, error: 'generator failed', detail: r.stderr.trim().slice(-2000) }
+        : undefined;
+    if (sink) return sink.finish(failed);
+    if (failed) return res.status(failed.status).json({ error: failed.error, ...(failed.detail !== undefined && { detail: failed.detail }) });
     res.type('application/json').send(r.stdout);
   } catch (e) {
     if (!ac.signal.aborted) res.status(500).json({ error: (e as Error).message });
