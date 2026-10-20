@@ -5,6 +5,7 @@
  * RandomState = MT19937), so `make_break` nulls against the demo (ledger PG-I, J3).
  */
 
+import type { Tap } from '@/engine/uprough/r2Events';
 import { NumpyRandomState, linspace } from '@/engine/turntable/turntableSim';
 import { roundHalfEven } from './scratchGrit';
 import { bp, hp, lfilter, reverb } from './refDsp';
@@ -148,18 +149,25 @@ export const machinePcmBits = (machine: DrumMachine, override: number | undefine
   override !== undefined && Math.trunc(override) >= 0 ? Math.trunc(override) : machine === '909' ? 6 : 0;
 
 /** drummachine `kick808` (two-stage pitch, punch, body harmonics, the beater, the LUT clip); `defaults` = kick909's for `kick909`. */
-export function kick808(opts: Partial<KickParams> = {}, rate = DEMO_DRUM_RATE, defaults: KickParams = DEMO_VOICE_PARAMS.kick808): Float64Array {
+export function kick808(opts: Partial<KickParams> = {}, rate = DEMO_DRUM_RATE, defaults: KickParams = DEMO_VOICE_PARAMS.kick808, tap?: Tap): Float64Array {
   const P: KickParams = { ...defaults };
   for (const k of Object.keys(opts) as (keyof KickParams)[]) if (opts[k] !== undefined) P[k] = opts[k]!;
   const n = Math.trunc(P.amp_decay * 1e-3 * rate);
   const pitch = pitchEnv(n, P.pitch_start, P.pitch_decay, rate, P.pitch_tail_ms, P.pitch_tail_amt);
   const base = semiHz(P.tune);
   const body = oscSweepSine(n, base, pitch, rate);
+  if (tap) {
+    const hz = new Float64Array(n);
+    for (let i = 0; i < n; i++) hz[i] = base * pexp2(pitch[i]! / 12.0);
+    tap('pitch_env', hz, true);
+    tap('body', body);
+  }
   if (P.body_h3 > 0) {
     const inc = new Float64Array(n);
     for (let i = 0; i < n; i++) inc[i] = 2 * Math.PI * base * pexp2(pitch[i]! / 12.0) / rate;
     const ph = cumsum(inc);
     for (let i = 0; i < n; i++) body[i] = body[i]! + P.body_h3 * psin(3 * ph[i]!) + 0.4 * P.body_h3 * psin(2 * ph[i]!);
+    if (tap) tap('harmonics', body);
   }
   // _amp_env(punch)
   const rel = expDecay(n, P.amp_decay, rate);
@@ -170,6 +178,13 @@ export function kick808(opts: Partial<KickParams> = {}, rate = DEMO_DRUM_RATE, d
     const pun = expDecay(n, Math.max(0.5, P.amp_punch_ms), rate);
     for (let i = 0; i < n; i++) sig[i] = body[i]! * ((rel[i]! + P.amp_punch * pun[i]!) / (1.0 + P.amp_punch));
   }
+  if (tap) {
+    const amp = new Float64Array(n);
+    if (P.amp_punch <= 0.0) amp.set(rel);
+    else { const pun = expDecay(n, Math.max(0.5, P.amp_punch_ms), rate); for (let i = 0; i < n; i++) amp[i] = (rel[i]! + P.amp_punch * pun[i]!) / (1.0 + P.amp_punch); }
+    tap('amp_env', amp, true);
+    tap('shaped', sig);
+  }
   if (P.click > 0) {
     const cn = Math.min(n, Math.trunc(P.click_len_ms * 1e-3 * rate));
     const nz = demoNoise(cn, 1), env = expDecay(cn, P.click_ms, rate);
@@ -177,15 +192,18 @@ export function kick808(opts: Partial<KickParams> = {}, rate = DEMO_DRUM_RATE, d
     for (let i = 0; i < cn; i++) beater[i] = nz[i]! * env[i]!;
     if (P.click_hp > 0) beater = onepoleHp(beater, P.click_hp, rate);
     for (let i = 0; i < cn; i++) sig[i] = sig[i]! + P.click * beater[i]!;
+    if (tap) tap('click', sig);
   }
-  return softClip(sig, P.drive);
+  const driven = softClip(sig, P.drive);
+  if (tap) tap('drive', driven);
+  return driven;
 }
 
 /** drummachine `kick909`: `kick808` on the 909's VOICE_PARAMS. */
-export const kick909 = (opts: Partial<KickParams> = {}, rate = DEMO_DRUM_RATE): Float64Array => kick808(opts, rate, KICK909_PARAMS);
+export const kick909 = (opts: Partial<KickParams> = {}, rate = DEMO_DRUM_RATE, tap?: Tap): Float64Array => kick808(opts, rate, KICK909_PARAMS, tap);
 
 /** drummachine `snare808` / `snare909`'s voice: the tuned pair with the attack blip, the band-passed rattle, the snap. */
-export function snare808(opts: Partial<SnareParams> = {}, rate = DEMO_DRUM_RATE, defaults: SnareParams = DEMO_VOICE_PARAMS.snare808): Float64Array {
+export function snare808(opts: Partial<SnareParams> = {}, rate = DEMO_DRUM_RATE, defaults: SnareParams = DEMO_VOICE_PARAMS.snare808, tap?: Tap): Float64Array {
   const tune = opts.tune ?? defaults.tune, noiseAmt = opts.noise_amt ?? defaults.noise_amt;
   const bodyDecay = opts.body_decay ?? defaults.body_decay, noiseDecay = opts.noise_decay ?? defaults.noise_decay;
   const drive = opts.drive ?? defaults.drive;
@@ -204,18 +222,30 @@ export function snare808(opts: Partial<SnareParams> = {}, rate = DEMO_DRUM_RATE,
   const nz = onepoleLp(onepoleHp(demoNoise(n, 2), 1500, rate), 7000, rate), nd = expDecay(n, noiseDecay, rate);
   const snap = onepoleHp(demoNoise(n, 7), 3500, rate), sd = expDecay(n, 8, rate);
   const mix = new Float64Array(n);
+  if (tap) {
+    const bodyOnly = new Float64Array(n), noiseOnly = new Float64Array(n), snapOnly = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      bodyOnly[i] = (1.0 - noiseAmt) * 1.5 * ((t1[i]! + 0.85 * t2[i]! + 0.25 * t3[i]!) * bd[i]!);
+      noiseOnly[i] = noiseAmt * (nz[i]! * nd[i]!);
+      snapOnly[i] = 0.5 * (snap[i]! * sd[i]!);
+    }
+    tap('body', bodyOnly); tap('noise', noiseOnly); tap('snap', snapOnly);
+  }
   for (let i = 0; i < n; i++) {
     const body = (t1[i]! + 0.85 * t2[i]! + 0.25 * t3[i]!) * bd[i]!;
     mix[i] = (1.0 - noiseAmt) * 1.5 * body + noiseAmt * (nz[i]! * nd[i]!) + 0.5 * (snap[i]! * sd[i]!);
   }
-  return softClip(mix, drive);
+  if (tap) tap('mix', mix);
+  const driven = softClip(mix, drive);
+  if (tap) tap('drive', driven);
+  return driven;
 }
 
 /** drummachine `snare909`: the 808 voice on the 909's defaults. */
-export const snare909 = (opts: Partial<SnareParams> = {}, rate = DEMO_DRUM_RATE): Float64Array => snare808(opts, rate, DEMO_VOICE_PARAMS.snare909);
+export const snare909 = (opts: Partial<SnareParams> = {}, rate = DEMO_DRUM_RATE, tap?: Tap): Float64Array => snare808(opts, rate, DEMO_VOICE_PARAMS.snare909, tap);
 
 /** drummachine `clap`: tapped noise bursts, a one-pole band cascade, an optional body layer, the Schroeder room, the clip. */
-export function clap(opts: Partial<ClapParams> = {}, rate = DEMO_DRUM_RATE, defaults: ClapParams = CLAP909_PARAMS): Float64Array {
+export function clap(opts: Partial<ClapParams> = {}, rate = DEMO_DRUM_RATE, defaults: ClapParams = CLAP909_PARAMS, tap?: Tap): Float64Array {
   const P: ClapParams = { ...defaults, ...Object.fromEntries(Object.entries(opts).filter(([, v]) => v !== undefined)) } as ClapParams;
   let n = Math.trunc(0.22 * rate);
   let out: Float64Array = new Float64Array(n);
@@ -227,16 +257,20 @@ export function clap(opts: Partial<ClapParams> = {}, rate = DEMO_DRUM_RATE, defa
       for (let i = 0; i < bn; i++) out[s + i] = out[s + i]! + nz[i]! * env[i]!;
     }
   }
+  if (tap) tap('taps', out);
   const tn = demoNoise(n, 9), te = expDecay(n, P.tail_decay_ms, rate);
   for (let i = 0; i < n; i++) out[i] = out[i]! + tn[i]! * te[i]! * P.tail_level;
+  if (tap) tap('tail', out);
   for (let k = 0; k < Math.trunc(P.hp_stages); k++) out = onepoleHp(out, P.band_lo * P.bright, rate);
   for (let k = 0; k < Math.trunc(P.lp_stages); k++) out = onepoleLp(out, P.band_hi * P.bright, rate);
+  if (tap) tap('band', out);
   if (P.body > 0.0) {
     const bz = demoNoise(n, 33), be = expDecay(n, 60, rate);
     const raw = new Float64Array(n);
     for (let i = 0; i < n; i++) raw[i] = bz[i]! * be[i]!;
     const lo = onepoleLp(raw, 900, rate);
     for (let i = 0; i < n; i++) out[i] = out[i]! + lo[i]! * P.body;
+    if (tap) tap('body', out);
   }
   if (P.room_wet > 0) {
     const pad = new Float64Array(n + Math.trunc(P.room_tail_ms * 1e-3 * rate));
@@ -246,9 +280,14 @@ export function clap(opts: Partial<ClapParams> = {}, rate = DEMO_DRUM_RATE, defa
     const mixed = new Float64Array(n);
     for (let i = 0; i < n; i++) mixed[i] = (1.0 - P.room_wet) * (i < pad.length ? pad[i]! : 0) + P.room_wet * (i < wet.length ? wet[i]! : 0);
     out = onepoleLp(onepoleHp(mixed, 400.0, rate), 5000.0, rate);
+    if (tap) tap('room', out);
   }
   out = peakNorm(out);
-  if (P.drive > 0) out = peakNorm(softClip(out, P.drive));
+  if (tap) tap('normalise', out);
+  if (P.drive > 0) {
+    out = peakNorm(softClip(out, P.drive));
+    if (tap) tap('drive', out);
+  }
   return out;
 }
 
@@ -287,7 +326,7 @@ export function hatNoise(n: number, rate: number, seed: number, hp: number): Flo
 export interface HatParams { open_hat: boolean; tune: number; machine: DrumMachine; seed: number; noise: number; decay: number | null; start_ms: number; pcm_bits: number | undefined; dirt: number; lp: number; hp: number }
 
 /** drummachine `hat`: the metallic cluster, the noise, the transient grit, the body (and open-hat fizz) envelope, jitter, tanh, filters, the machine's PCM grain. */
-export function hat(opts: Partial<HatParams> = {}, rate = DEMO_DRUM_RATE): Float64Array {
+export function hat(opts: Partial<HatParams> = {}, rate = DEMO_DRUM_RATE, tap?: Tap): Float64Array {
   const openHat = opts.open_hat ?? false, tune = opts.tune ?? DEMO_VOICE_PARAMS.hat.tune, machine = opts.machine ?? '909';
   const seed = opts.seed ?? 4, noiseScale = opts.noise ?? 1.0, startMs = opts.start_ms ?? 0.0, dirt = opts.dirt ?? 0.0;
   const lpHz = opts.lp ?? 0.0, hpHz = opts.hp ?? 0.0;
@@ -298,12 +337,15 @@ export function hat(opts: Partial<HatParams> = {}, rate = DEMO_DRUM_RATE): Float
   const noiseLvl = noiseLvl0 * noiseScale;
   const metallic = peakNorm(metallicCluster(base, HAT_RATIOS, n, rate, seed, 2800, 8000));
   const noise = peakNorm(hatNoise(n, rate, seed + 11, machine === '909' ? 3200 : 3000));
+  if (tap) { tap('metallic', metallic); tap('noise', noise); }
   let sig: Float64Array = new Float64Array(n);
   for (let k = 0; k < n; k++) sig[k] = metLvl * metallic[k]! + noiseLvl * noise[k]!;
   const ac = Math.trunc(0.003 * rate);
   const grit = onepoleHp(demoNoise(ac, seed + 3), 6500, rate);
   for (let k = 0; k < ac; k++) sig[k] = sig[k]! + 0.22 * grit[k]!;
+  if (tap) tap('mix', sig);
   const bodyEnv = expDecay(n, decay, rate);
+  if (tap) tap('body_env', bodyEnv, true);
   if (openHat) {
     const hf = onepoleHp(sig, 6500, rate), fe = expDecay(n, decay * 0.35, rate);
     for (let k = 0; k < n; k++) sig[k] = sig[k]! * bodyEnv[k]! + hf[k]! * Math.max(fe[k]! - bodyEnv[k]!, 0);
@@ -312,10 +354,13 @@ export function hat(opts: Partial<HatParams> = {}, rate = DEMO_DRUM_RATE): Float
   }
   const jr = new NumpyRandomState((seed + 5) >>> 0);
   const r1 = jr.rand(), r2 = jr.rand();
+  const jittered = tap ? new Float64Array(n) : null;
   for (let k = 0; k < n; k++) {
     const jit = 1.0 + 0.04 * psin(2 * Math.PI * (30 + 40 * r1) * (k / rate) + r2 * 6);
+    if (jittered) jittered[k] = sig[k]! * jit * 1.3;
     sig[k] = ptanh(sig[k]! * jit * 1.3);
   }
+  if (tap) { tap('jitter', jittered!); tap('tanh', sig); }
   sig = lpHz ? onepoleLp(onepoleLp(sig, lpHz, rate), lpHz, rate) : onepoleLp(sig, machine === '909' ? 8500 : 7500, rate);
   if (hpHz) sig = onepoleHp(onepoleHp(sig, hpHz, rate), hpHz, rate);
   if (startMs) {
@@ -326,10 +371,14 @@ export function hat(opts: Partial<HatParams> = {}, rate = DEMO_DRUM_RATE): Float
       if (ramp > 1) { const lin = linspace(0.0, 1.0, ramp); for (let i = 0; i < ramp; i++) sig[i] = sig[i]! * lin[i]!; }
     }
   }
+  if (tap) tap('filter', sig);
   const pk = maxAbs(sig) || 1.0;
   const norm = new Float64Array(sig.length);
   for (let k = 0; k < sig.length; k++) norm[k] = sig[k]! / pk * 0.9;
-  return dirtStage(pcmGrain(norm, machinePcmBits(machine, opts.pcm_bits)), dirt);
+  if (tap) tap('normalise', norm);
+  const grained = dirtStage(pcmGrain(norm, machinePcmBits(machine, opts.pcm_bits)), dirt);
+  if (tap) tap('pcm_grain', grained);
+  return grained;
 }
 
 /** The beat-juggle's hat: `hat(open_hat=False, machine='909')` at `seed`. */
@@ -457,13 +506,15 @@ export function tamb(opts: { seed?: number } = {}, rate = DEMO_DRUM_RATE): Float
 }
 
 /** hiphop `_metal_hit(rate, seed=7)`: four sines (1720, 2140, 3300, 4700 Hz) / 4, high-passed at 1.5 kHz, 120 ms decay, x0.5. The seed is unused in the Python. */
-export function metalHit(rate = DEMO_DRUM_RATE): Float64Array {
+export function metalHit(rate = DEMO_DRUM_RATE, tap?: Tap): Float64Array {
   const n = Math.trunc(0.3 * rate);
   const v = new Float64Array(n);
   for (const f of [1720, 2140, 3300, 4700]) for (let t = 0; t < n; t++) v[t] = v[t]! + psin(2 * Math.PI * f * t / rate);
   for (let t = 0; t < n; t++) v[t] = v[t]! / 4.0;
+  if (tap) tap('sines', v);
   const y = hp(v, 1500, rate);
   const tau = 0.12 * rate;
   for (let t = 0; t < n; t++) y[t] = y[t]! * pexp(-t / tau) * 0.5;
+  if (tap) tap('filter_decay', y);
   return y;
 }

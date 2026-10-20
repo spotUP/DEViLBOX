@@ -5,15 +5,19 @@
  */
 import { renderSongCached, type SectionMixCache } from '@engine/uprough/songRenderCache';
 import type { RenderSongOptions } from '@engine/uprough/songRender';
+import type { OnEvent } from '@engine/uprough/r2Events';
 import type { BarEvents } from './barEvents';
 
 export interface SectionEvent {
   seq: number; type: 'section'; section: number; name: string; bars: number; cached: boolean; sectionCount: number;
 }
 
-export function runRenderJob(events: BarEvents, options: RenderSongOptions, cache: SectionMixCache, emit: (e: SectionEvent) => void): Float64Array {
+/** `onEvent` (optional) receives the R2 render events of the same job; the progress `emit` is unchanged. */
+export function runRenderJob(
+  events: BarEvents, options: RenderSongOptions, cache: SectionMixCache, emit: (e: SectionEvent) => void, onEvent?: OnEvent,
+): Float64Array {
   let seq = 0;
-  return renderSongCached(events, options, cache, (i, cached) => {
+  return renderSongCached(events, onEvent ? { ...options, onEvent } : options, cache, (i, cached) => {
     const s = events.sections[i]!;
     emit({ seq: seq++, type: 'section', section: i, name: String(s.header.name ?? ''), bars: s.drums.length, cached, sectionCount: events.sections.length });
   });

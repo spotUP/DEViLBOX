@@ -7,14 +7,15 @@
  * joinSections, applyTexture and masterBus always rerun (they are whole-song).
  */
 import type { BarEvents } from '@/lib/uprough/barEvents';
-import { finishSong, renderSectionMix, sectionSeeds, type RenderSongOptions } from './songRender';
+import { beginRender, finishSong, renderSectionMix, sectionSeeds, type RenderSongOptions } from './songRender';
 
 export type SectionMixCache = Map<string, Float64Array | null>;
 
 /** The renderSectionMix inputs of section `index`, as one string. */
 export function sectionKey(events: BarEvents, index: number, bseed: number, options: RenderSongOptions): string {
-  const { masterRev, masterRevMix, ...sectionOptions } = options;
+  const { masterRev, masterRevMix, onEvent, bankSeen, ...sectionOptions } = options;
   void masterRev; void masterRevMix; // finishSong's inputs, not the section's
+  void onEvent; void bankSeen; // the event listener never changes a section's audio
   return JSON.stringify([
     events.sections[index], events.arrangement[index], events.melody_windows ? events.melody_windows[index] : null,
     events.params, bseed, sectionOptions,
@@ -29,12 +30,17 @@ export function renderSongCached(
 ): Float64Array {
   const seeds = sectionSeeds(events);
   const keys = events.sections.map((_, i) => sectionKey(events, i, seeds[i]!, options));
+  const ctx = beginRender(events, options);
   const mixes = events.sections.map((_, i) => {
     const key = keys[i]!;
     const cached = cache.has(key);
-    if (!cached) cache.set(key, renderSectionMix(events, i, seeds[i]!, options));
+    if (cached) {
+      ctx.em?.emit({ type: 'section', section: i, name: String(events.arrangement[i]![0]), bars: events.sections[i]!.drums.length, cached: true });
+    } else {
+      cache.set(key, renderSectionMix(events, i, seeds[i]!, options, ctx));
+    }
     onSection?.(i, cached);
     return cache.get(key)!;
   });
-  return finishSong(mixes, events, options);
+  return finishSong(mixes, events, options, ctx);
 }

@@ -21,6 +21,9 @@ export const SCHEMA = 3;
 export const SPEED = 6;
 export const ROWS_PER_BAR = 16;
 export const SONG_FILE_EXTENSION = '.uprough-song.json';
+/** File picker filter. The macOS picker matches only the last extension segment, so a
+ *  two-segment extension alone greys every song file out; '.json' keeps them selectable. */
+export const SONG_FILE_ACCEPT = `${SONG_FILE_EXTENSION},.json`;
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 export type JsonObject = { [key: string]: Json };
