@@ -16,6 +16,12 @@ import type { ArpeggioConfig, ArpeggioStep } from '@typedefs/instrument';
 
 export interface ArpeggioEngineOptions {
   config: ArpeggioConfig;
+  /**
+   * The audio context the owning synth lives on. The step clock is built on it, never on whatever
+   * Tone.getContext() is at start() time: offline renders (SynthBaker, previewGenerator) swap the global
+   * context across an async render, and a Clock built on that context never ticks on the live one.
+   */
+  context?: Tone.BaseContext;
   onStep?: (stepIndex: number, step: ArpeggioStep, noteOffset: number) => void;
   onNoteOn?: (note: string, velocity: number, duration: number, time?: number) => void;
   onNoteOff?: (note: string, time?: number) => void;
@@ -24,6 +30,7 @@ export interface ArpeggioEngineOptions {
 export class ArpeggioEngine {
   private config: ArpeggioConfig;
   private loop: Tone.Clock | null = null;
+  private context: Tone.BaseContext | undefined;
   private currentStepIndex: number = 0;
   private pingPongDirection: 1 | -1 = 1;
   private baseNote: string = 'C4';
@@ -41,6 +48,7 @@ export class ArpeggioEngine {
 
   constructor(options: ArpeggioEngineOptions) {
     this.config = { ...options.config };
+    this.context = options.context;
     this.onStep = options.onStep;
     this.onNoteOn = options.onNoteOn;
     this.onNoteOff = options.onNoteOff;
@@ -282,6 +290,7 @@ export class ArpeggioEngine {
     // Tone.Clock, not Tone.Loop: a Loop is scheduled on the Transport, which
     // only runs during song playback, so a live note would never arpeggiate.
     this.loop = new Tone.Clock({
+      ...(this.context ? { context: this.context } : {}),
       callback: (time: number) => this.processStep(time),
       frequency: 1 / Tone.Time(interval).toSeconds(),
     });
@@ -361,6 +370,26 @@ export class ArpeggioEngine {
    */
   public getIsPlaying(): boolean {
     return this.isPlaying;
+  }
+
+  /** Read-only snapshot for diagnostics (MCP get_loaded_synths). */
+  public getDebugState(): {
+    isPlaying: boolean;
+    heldNotes: number;
+    clockState: string | null;
+    clockContextIsBound: boolean | null;
+  } {
+    return {
+      isPlaying: this.isPlaying,
+      heldNotes: this.heldNotes.size,
+      clockState: this.loop ? this.loop.state : null,
+      clockContextIsBound: this.loop && this.context ? this.loop.context === this.context : null,
+    };
+  }
+
+  /** The Clock driving the steps (null while stopped). For tests and diagnostics. */
+  public getClock(): Tone.Clock | null {
+    return this.loop;
   }
 
   /**

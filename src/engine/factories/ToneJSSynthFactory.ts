@@ -1752,6 +1752,7 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
     if (arpeggioEngine || !arpeggioConfig) return;
     arpeggioEngine = new ArpeggioEngine({
       config: arpeggioConfig,
+      context: synth.context,
       onNoteOn: (note: string, velocity: number, duration: number, time?: number) => {
         // Release last arpeggio note before playing new one
         if (lastArpNote) {
@@ -1790,8 +1791,9 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
         if (duration && typeof duration === 'number') {
           // Audio-clock timeout, not a Transport event: the Transport is stopped
           // during live preview and would never fire the stop.
-          const delay = Math.max(0, (time ?? Tone.now()) + duration - Tone.now());
-          Tone.getContext().setTimeout(() => {
+          // The synth's own context, never the global one (an offline render may have swapped it).
+          const delay = Math.max(0, (time ?? synth.now()) + duration - synth.now());
+          synth.context.setTimeout(() => {
             arpeggioEngine?.stop(note);
           }, delay);
         }

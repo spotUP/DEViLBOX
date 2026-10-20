@@ -1455,7 +1455,7 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
 
   server.tool(
     'get_loaded_synths',
-    'List all synth instances currently loaded in the audio engine',
+    'List all synth instances currently loaded in the audio engine. Per synth, when exposed: volumeDb, contextIsEngineNative / contextIsToneGlobal (is the synth bound to the engine native context / the current global Tone context), activeVoices, and arpeggio {isPlaying, heldNotes, clockState, clockContextIsBound} for ChipSynth. Use to tell a muted volume, a wrong audio context and a stuck arpeggio apart.',
     {},
     () => call('get_loaded_synths'),
   );

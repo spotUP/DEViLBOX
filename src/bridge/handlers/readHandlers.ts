@@ -41,6 +41,7 @@ import { UADEEngine } from '../../engine/uade/UADEEngine';
 import { playingEngineFromStores } from '../../engine/replayer/NativeEngineRouting';
 import { getToneEngine } from '../../engine/ToneEngine';
 import * as Tone from 'tone';
+import { voiceSourceOf } from '../../engine/tone/toneVoiceProbe';
 import { AudioDataBus } from '../../engine/vj/AudioDataBus';
 import {
   judgePlaybackSilence,
@@ -2148,6 +2149,33 @@ export function getInstrumentLevel(params: Record<string, unknown>): Record<stri
   }
 }
 
+/**
+ * Read-only liveness fields for one synth: output volume, which audio context it is bound to (versus the
+ * engine's native context and the current global Tone context), its arpeggio clock and its active voices.
+ * Each field is present only when the synth exposes it.
+ */
+function liveSynthDiagnostics(synth: unknown, nativeContext: BaseAudioContext): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (!synth || typeof synth !== 'object') return out;
+  const s = synth as {
+    volume?: { value: number };
+    getArpeggioEngine?: () => { getDebugState: () => Record<string, unknown> } | null;
+  };
+  if (typeof s.volume?.value === 'number') out.volumeDb = +s.volume.value.toFixed(2);
+
+  const source = voiceSourceOf(synth) as { context?: { rawContext?: unknown }; _activeVoices?: unknown[] };
+  const raw = source.context?.rawContext;
+  if (raw) {
+    out.contextIsEngineNative = raw === nativeContext;
+    out.contextIsToneGlobal = raw === Tone.getContext().rawContext;
+  }
+  if (Array.isArray(source._activeVoices)) out.activeVoices = source._activeVoices.length;
+
+  const arp = s.getArpeggioEngine?.();
+  if (arp) out.arpeggio = arp.getDebugState();
+  return out;
+}
+
 /** List all loaded synth instances in the engine */
 export function getLoadedSynths(): Record<string, unknown> {
   try {
@@ -2168,6 +2196,8 @@ export function getLoadedSynths(): Record<string, unknown> {
       if (synth && typeof synth === 'object' && 'name' in synth) {
         entry.engineName = (synth as { name: string }).name;
       }
+
+      Object.assign(entry, liveSynthDiagnostics(synth, engine.nativeContext));
 
       list.push(entry);
     });
