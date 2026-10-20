@@ -22,6 +22,7 @@ import {
   DEFAULT_TB303,
 } from '@/types/instrument';
 import { registerVoiceSource } from '../tone/toneVoiceProbe';
+import { registerCutTargets } from '../tone/toneNoteCut';
 import { WavetableSynth } from '../WavetableSynth';
 import { DrumKitSynth } from '../DrumKitSynth';
 import { DubSirenSynth } from '../dub/DubSirenSynth';
@@ -644,7 +645,7 @@ export function createWobbleBass(config: InstrumentConfig): Tone.ToneAudioNode {
   // Store active notes for release
   const activeNotes = new Set<string>();
 
-  return {
+  const wrapper = {
     triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
       const t = time ?? Tone.now();
       const v = velocity ?? 0.8;
@@ -670,6 +671,7 @@ export function createWobbleBass(config: InstrumentConfig): Tone.ToneAudioNode {
       if (subOsc) subOsc.triggerAttackRelease(note, duration, t, v);
       if (fmSynth) fmSynth.triggerAttackRelease(note, duration, t, v);
       unisonVoices.forEach(voice => voice.triggerAttackRelease(note, duration, t, v * 0.6));
+      filterEnv.triggerRelease(t + duration);
     },
     triggerAttack: (note: string, time?: number, velocity?: number) => {
       const t = time ?? Tone.now();
@@ -787,7 +789,13 @@ export function createWobbleBass(config: InstrumentConfig): Tone.ToneAudioNode {
     // Expose LFO for external control
     wobbleLFO,
     filter,
-  } as unknown as Tone.ToneAudioNode;
+  };
+
+  // A raw note cuts every voice and the shared filter envelope (hard retrigger, toneNoteCut).
+  const cutTargets: object[] = [osc1, osc2, ...unisonVoices, filterEnv];
+  if (subOsc) cutTargets.push(subOsc);
+  if (fmSynth) cutTargets.push(fmSynth);
+  return registerCutTargets(wrapper, cutTargets) as unknown as Tone.ToneAudioNode;
 }
 
 /**

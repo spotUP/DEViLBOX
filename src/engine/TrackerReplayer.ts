@@ -16,6 +16,7 @@
 import { applyEditorCellEdit } from '@lib/import/furnaceEditorCells';
 import { outputLatencySec } from './audioLatency';
 import { isReplacedInstrument, synthNoteVelocity } from './replayer/hybridInstruments';
+import { isTonePortamentoEffect } from './replayer/SynthEffectProcessor';
 import { isPerChannelNativeSynthType } from './perChannelNativeSynths';
 import { isLowOctaveNote, isPitchedNote, noteValueToPitch } from '@/lib/tracker/noteValue';
 import * as Tone from 'tone';
@@ -1470,10 +1471,16 @@ export class TrackerReplayer {
         ? xmNoteToNoteName(noteValue)
         : periodToNoteName(usePeriod);
 
-      // Release previous synth note (unless sliding)
+      // Release previous synth note (unless sliding). A raw note (no 303 slide or hammer, no tone
+      // portamento) is a hard retrigger, as in FT2: the old note is cut so the new one starts from zero.
       if (!slideActive && ch.lastPlayedNoteName && ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
         try {
-          getToneEngine().triggerNoteRelease(ch.instrument.id, ch.lastPlayedNoteName, time, ch.instrument, chIndex);
+          const engine = getToneEngine();
+          if (!hammer && !isTonePortamentoEffect(effect)) {
+            engine.triggerNoteCut(ch.instrument.id, ch.lastPlayedNoteName, time, ch.instrument, chIndex);
+          } else {
+            engine.triggerNoteRelease(ch.instrument.id, ch.lastPlayedNoteName, time, ch.instrument, chIndex);
+          }
         } catch { /* ignored */ }
       }
       ch.lastPlayedNoteName = newNoteName;
