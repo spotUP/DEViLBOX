@@ -12,7 +12,7 @@ import { useMixerStore } from '@stores/useMixerStore';
 import { useVoicePreviewStore } from '@stores/useVoicePreviewStore';
 import { useChannelTypeStore } from '@stores/useChannelTypeStore';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
-import { channelLayout, notifyChannelLayout, fitAndStretchChannelWidths, subscribeChannelLayout, type ChannelLayout } from './channelLayout';
+import { channelLayout, notifyChannelLayout, fitAndStretchChannelWidths, channelAreaWidth, ADD_CHANNEL_BUTTON_PX, subscribeChannelLayout, type ChannelLayout } from './channelLayout';
 import { resolveWasmPattern } from './wasmPatternHold';
 import { computeChannelFollowScroll, createChannelFollowGate } from '@/lib/tracker/followScroll';
 import { resolveCellColumn } from '@/lib/tracker/cellHitTest';
@@ -422,6 +422,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const fitChannels = useSettingsStore(s => s.fitAllChannelsTracker) && !mobileCanvas;
   // With fit off the pattern is drawn at the zoom slider's scale; `fitScale` below is the scale in use either way.
   const manualScale = useUIStore(s => s.trackerZoom) / 100;
+  // The header's "+" column; the channel layout leaves room for it.
+  const showAddChannel = !isFormatMode && !isMobile && (pattern?.channels.length ?? 0) < 16;
+  const addChannelPx = showAddChannel ? ADD_CHANNEL_BUTTON_PX : 0;
   // Channels with no data in any pattern are width 0 (hidden, not deleted): one list for the grid, headers, scopes, meters and the fit scale.
   const visibleMask = useVisibleChannelMask();
   const { numChannels, channelOffsets: rawChannelOffsets, channelWidths, totalChannelsWidth, fitScale } = useMemo(() => {
@@ -496,7 +499,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     // Fit first (shrink the whole pattern so every channel is on screen), then stretch.
     const fitted = mobileCanvas
       ? { scale: 1, leftEdge: LNW + globalLaneOffset, widths: minWidths }
-      : fitAndStretchChannelWidths(minWidths, LNW + globalLaneOffset, dimensions.width, fitChannels, manualScale);
+      : fitAndStretchChannelWidths(minWidths, LNW + globalLaneOffset, channelAreaWidth(dimensions.width, showAddChannel), fitChannels, manualScale);
     const widths = fitted.widths;
     const offsets: number[] = [];
     let currentX = fitted.leftEdge;
@@ -509,7 +512,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       totalChannelsWidth: currentX - Math.floor(LNW * fitted.scale),
       fitScale: fitted.scale,
     };
-  }, [pattern, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts, globalLaneVisible, dimensions.width, fitChannels, manualScale, visibleMask]);
+  }, [pattern, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts, globalLaneVisible, dimensions.width, fitChannels, manualScale, visibleMask, showAddChannel]);
 
   // Row-number gutter and global lane at the fitted scale (canvas px). Everything
   // the worker draws is scaled by fitScale, so these are what the DOM must match.
@@ -3154,7 +3157,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             className={`flex-shrink-0 h-3 bg-dark-bgTertiary border-b border-dark-border overflow-x-auto scrollbar-always ${allChannelsFit ? 'hidden' : ''}`}
             style={{ paddingLeft: lnwPx }}
           >
-            <div style={{ width: totalChannelsWidth, height: 1 }} />
+            <div style={{ width: totalChannelsWidth + addChannelPx, height: 1 }} />
           </div>
 
           {/* Horizontal global lane removed — global FX now lives as a
@@ -3415,7 +3418,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 className="overflow-x-hidden overflow-y-hidden flex-1"
                 data-vu-scroll
               >
-                <div className="flex" style={{ width: totalChannelsWidth, marginLeft: centerPadding }}>
+                <div className="flex" style={{ width: totalChannelsWidth + addChannelPx, marginLeft: centerPadding }}>
                   {/* GLOBAL FX lane header — sits to the left of channel 1.
                       Bus-wide dub params + song-level transport curves live
                       on this lane (channelIndex = -1). */}
@@ -3567,10 +3570,11 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   })}
 
                   {/* Add channel button */}
-                  {(pattern?.channels.length ?? 0) < 16 && !isFormatMode && (
+                  {showAddChannel && (
                     <button
                       onClick={addChannel}
-                      className="flex-shrink-0 w-12 flex items-center justify-center border-r border-dark-border
+                      style={{ width: ADD_CHANNEL_BUTTON_PX }}
+                      className="flex-shrink-0 flex items-center justify-center border-r border-dark-border
                         text-text-muted hover:text-accent-primary hover:bg-dark-bgHover transition-colors"
                       title="Add Channel"
                     >

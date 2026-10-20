@@ -115,6 +115,19 @@ export function stretchChannelWidths(
   return out;
 }
 
+/** Width of the "+" (Add Channel) column at the right end of the channel header, DOM px. */
+export const ADD_CHANNEL_BUTTON_PX = 48;
+
+/**
+ * Canvas width the channels may fill. When the Add Channel button is shown it
+ * keeps its own column at the right: channels stretched to the full canvas
+ * width pushed it past the clipped header edge, so there was no way to add a
+ * channel (owner 2026-10-20).
+ */
+export function channelAreaWidth(canvasWidth: number, showAddChannel: boolean): number {
+  return showAddChannel ? Math.max(0, canvasWidth - ADD_CHANNEL_BUTTON_PX) : canvasWidth;
+}
+
 /** Pattern font size at scale 1 (px); the renderers draw at this size. */
 export const PATTERN_FONT_PX = 14;
 
