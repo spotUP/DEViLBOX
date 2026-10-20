@@ -1,8 +1,8 @@
 /**
  * The Up Rough song player (plan 2026-10-20 O6k2): the tracker plays the rendered mix as ONE whole-song source.
  * The render backend here is the worker's own job (runRenderJob) over a shared cache, run in-process; the audio side is
- * a recording fake. One test drives the player entry point the replayer calls (startUpRoughSong, via a play hook)
- * from a loaded fixture and holds the played buffer to renderSong of the same doc.
+ * a recording fake. The ONE reachability test (TrackerReplayer.play() -> startUpRoughSong, buffer == renderSong) lives in
+ * src/engine/__tests__/upRoughReplayerPlay.test.ts; this file holds the behaviours at the player and service.
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import fixture from './fixtures/e6.uprough-song.json';
@@ -16,9 +16,6 @@ vi.mock('@stores/useInstrumentTypeStore', () => ({
 }));
 
 import { openUpRoughSong } from '@/lib/uprough/openUpRoughSong';
-import { parseSongFile } from '@/lib/uprough/songFile';
-import { songFileToBarEvents } from '@/lib/uprough/barEvents';
-import { renderSong, songRenderOptions } from '@engine/uprough/songRender';
 import * as songRender from '@engine/uprough/songRender';
 import type { SectionMixCache } from '@engine/uprough/songRenderCache';
 import { useTrackerStore } from '@stores/useTrackerStore';
@@ -29,7 +26,7 @@ import {
   ensureUpRoughSong, renderUpRoughSong, setRenderBackendForTests, type RenderBackend,
 } from '@/lib/uprough/upRoughSongService';
 import {
-  setPlayerAudioForTests, startUpRoughSong, stopUpRoughSong, upRoughMixPlayed, upRoughPlayheadSample,
+  setPlayerAudioForTests, startUpRoughSong, stopUpRoughSong, upRoughPlayheadSample,
   upRoughSongOwnsPlayback, isUpRoughSongPlaying, type PlayerAudio,
 } from '@/lib/uprough/upRoughSongPlayer';
 
@@ -66,12 +63,6 @@ const fakeAudio: PlayerAudio = {
     },
   },
   destination: {} as AudioNode,
-};
-
-const maxErr = (a: ArrayLike<number>, b: ArrayLike<number>): number => {
-  let m = a.length === b.length ? 0 : Infinity;
-  for (let i = 0; i < b.length; i++) m = Math.max(m, Math.abs(a[i]! - b[i]!));
-  return m;
 };
 
 /** Edits one melody note of `pattern` so that exactly one section's events change; returns that section index. */
@@ -130,29 +121,6 @@ describe('whole-song path', () => {
 });
 
 describe('play, edit, swap', () => {
-  it('reachability: play from the loaded fixture renders once, plays one buffer equal to renderSong of the same doc', async () => {
-    const spy = vi.spyOn(songRender, 'renderSectionMix');
-    started.length = 0; renderCalls = 0; clock.now = 1;
-    const doc = parseSongFile(useTrackerStore.getState().exportUpRoughSong());
-    const reference = renderSong(songFileToBarEvents(doc), songRenderOptions(doc));
-    spy.mockClear();
-    await startUpRoughSong(0, 0); // what TrackerReplayer.play() calls when upRoughMeta is set
-    const sections = doc.sections.length;
-    expect(spy).toHaveBeenCalledTimes(sections); // the song rendered once, every section once (cold cache)
-    expect(isUpRoughSongPlaying()).toBe(true);
-    expect(renderCalls).toBeGreaterThanOrEqual(1); // sentinel: the render ran through the worker job
-    expect(started).toHaveLength(1);
-    expect(started[0]!.offset).toBe(0);
-    expect(started[0]!.length).toBe(reference.length);
-    const played = upRoughMixPlayed()!;
-    expect(maxErr(played, reference)).toBeLessThan(1e-9);
-    expect(maxErr(started[0]!.data, reference)).toBeLessThan(1e-6); // Float32 copy of the same mix
-    spy.mockClear();
-    await renderUpRoughSong();
-    expect(spy).toHaveBeenCalledTimes(0); // warm cache: a second render rendered no section
-    spy.mockRestore();
-  }, 120000);
-
   it('(c) one edited pattern note re-renders exactly one section', async () => {
     await ensureUpRoughSong();
     const spy = vi.spyOn(songRender, 'renderSectionMix');
