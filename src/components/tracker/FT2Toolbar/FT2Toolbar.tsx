@@ -18,7 +18,7 @@ import { FT2SubsongInput } from './FT2SubsongInput';
 import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useUIStore, useEditorStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { notify } from '@stores/useNotificationStore';
-import { SONG_FILE_EXTENSION } from '@lib/uprough/songFile';
+import { SONG_FILE_ACCEPT, SONG_FILE_EXTENSION } from '@lib/uprough/songFile';
 import { renderSong } from '@lib/uprough/generateClient';
 import { playAudition, stopAudition } from '@lib/uprough/auditionPlayer';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -522,7 +522,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const handleImportUpRoughSong = () => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = SONG_FILE_EXTENSION;
+    input.accept = SONG_FILE_ACCEPT;
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
