@@ -14,6 +14,20 @@ import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { ensureVSTBridgeLoaded, createVSTBridgeNode } from './vstbridge-loader';
 import type { VSTBridgeDescriptor, VSTBridgeParam } from './synth-registry';
 
+/**
+ * Resolve a config key to a WASM parameter id: explicit descriptor mapping first,
+ * else a normalized (lowercase alphanumeric) name match against the WASM parameter metadata.
+ */
+export function resolveConfigParamId(
+  key: string,
+  mapping: Record<string, number> | undefined,
+  params: ReadonlyArray<{ id: number; name: string }>,
+): number | undefined {
+  if (mapping && key in mapping) return mapping[key];
+  const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return params.find((p) => p.name.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedKey)?.id;
+}
+
 export class VSTBridgeSynth implements DevilboxSynth {
   readonly name: string;
   readonly output: GainNode;
@@ -238,23 +252,8 @@ export class VSTBridgeSynth implements DevilboxSynth {
     for (const [key, value] of Object.entries(config)) {
       if (typeof value !== 'number') continue;
 
-      // Try explicit mapping first (fast, exact)
-      if (mapping && key in mapping) {
-        this.setParameter(mapping[key], value);
-        continue;
-      }
-
-      // Fallback: try to match against WASM parameter metadata by name
-      if (this._params.length > 0) {
-        const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const found = this._params.find((p) => {
-          const normalizedName = p.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-          return normalizedName === normalizedKey;
-        });
-        if (found) {
-          this.setParameter(found.id, value);
-        }
-      }
+      const paramId = resolveConfigParamId(key, mapping, this._params);
+      if (paramId !== undefined) this.setParameter(paramId, value);
     }
   }
 

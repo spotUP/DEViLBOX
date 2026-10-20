@@ -211,7 +211,8 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
         synthRef.current = synth;
         if ('getParams' in synth) {
           const wasmParams = synth.getParams();
-          const vals = wasmParams.map(p => p.defaultValue);
+          // Show the values the synth actually holds (a factory preset is applied at creation), not the defaults
+          const vals = wasmParams.map(p => (synth as VSTBridgeSynth).getParameter(p.id) ?? p.defaultValue);
           if (!cancelled) {
             setParams(vals);
             setSynthReady(true);

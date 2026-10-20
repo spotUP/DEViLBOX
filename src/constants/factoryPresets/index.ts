@@ -6,6 +6,7 @@
 
 import type { InstrumentPreset } from '../../types/instrument';
 import { TB303_PRESETS } from '../tb303Presets';
+import { ODIN2_PRESETS } from '../odin2Presets';
 import { FURNACE_PRESETS } from '../furnacePresets';
 import { DUB_SIREN_PRESETS } from '../dubSirenPresets';
 import { SPACE_LASER_PRESETS } from '../spaceLaserPresets';
@@ -81,6 +82,17 @@ const UPROUGH_SOFTSYNTH_FACTORY_PRESETS: InstrumentPreset['config'][] = GOLDEN_E
   upRoughSoftsynth: p.config,
 }));
 
+// Odin2 factory soundbank (GPL), converted from the plugin's .odin files by tools/convertOdinPresets.ts
+const ODIN2_FACTORY_PRESETS: InstrumentPreset['config'][] = ODIN2_PRESETS.map((p) => ({
+  type: 'synth' as const,
+  name: `Odin2 ${p.category} - ${p.name}`,
+  synthType: 'Odin2' as const,
+  volume: -8,
+  pan: 0,
+  effects: [],
+  odin2: p.params,
+}));
+
 export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   ...BASS_PRESETS,
   ...LEAD_PRESETS,
@@ -129,6 +141,8 @@ export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   ...SONIX_PRESETS,
   // Up Rough Softsynth Golden Era kit, derived from its one preset list
   ...UPROUGH_SOFTSYNTH_FACTORY_PRESETS,
+  // Odin2 factory soundbank, derived from its one preset list
+  ...ODIN2_FACTORY_PRESETS,
   // Player Init
   {
     type: 'synth' as const,
@@ -155,7 +169,6 @@ export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   { type: 'synth' as const, name: 'Surge Init', synthType: 'Surge' as const, volume: -8, pan: 0, effects: [] },
   { type: 'synth' as const, name: 'Vital Init', synthType: 'Vital' as const, volume: -8, pan: 0, effects: [] },
   { type: 'synth' as const, name: 'Helm Init', synthType: 'Helm' as const, volume: -8, pan: 0, effects: [] },
-  { type: 'synth' as const, name: 'Odin2 Init', synthType: 'Odin2' as const, volume: -8, pan: 0, effects: [] },
   { type: 'synth' as const, name: 'Amsynth Init', synthType: 'Amsynth' as const, volume: -8, pan: 0, effects: [] },
   { type: 'synth' as const, name: 'Monique Init', synthType: 'Monique' as const, volume: -8, pan: 0, effects: [] },
   { type: 'synth' as const, name: 'VL-1 Piano', synthType: 'VL1' as const, volume: -6, pan: 0, effects: [] },
@@ -198,6 +211,7 @@ export const PRESET_CATEGORIES = {
   Harmonic: HARMONIC_PRESETS,
   'DJ FX': DJ_ONE_SHOT_PRESETS,
   'Up Rough': UPROUGH_SOFTSYNTH_FACTORY_PRESETS,
+  Odin2: ODIN2_FACTORY_PRESETS,
 };
 
 export type PresetCategory = keyof typeof PRESET_CATEGORIES;
@@ -229,6 +243,7 @@ const SHOWCASE_PRESETS: Record<string, string> = {
   FurnaceGB: 'GB Pulse',
   FurnaceOPLL: 'OPLL Organ',
   ChipSynth: 'C64 Minor Arp',
+  Odin2: 'Odin2 Bass - Growly FM Bass',
 };
 
 /**
