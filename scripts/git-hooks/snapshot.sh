@@ -9,9 +9,12 @@
 SNAP=""
 KEPT=""
 KEPT_LOCK=""
-# A kept snapshot is released, not deleted.
+# A kept snapshot is released, not deleted. Its release time is what
+# prune_snapshots ages it by.
 cleanup_snapshot() {
-  if [ -n "$KEPT" ]; then [ -n "$KEPT_LOCK" ] && rmdir "$KEPT_LOCK" 2>/dev/null; KEPT=""; KEPT_LOCK=""
+  if [ -n "$KEPT" ]; then
+    [ -n "$SNAP" ] && touch "$SNAP/.git/devilbox-last-used" 2>/dev/null
+    [ -n "$KEPT_LOCK" ] && rmdir "$KEPT_LOCK" 2>/dev/null; KEPT=""; KEPT_LOCK=""
   elif [ -n "$SNAP" ]; then rm -rf "$SNAP"; fi
   SNAP=""
 }
@@ -30,19 +33,40 @@ install_snapshot_traps() {
   trap 'stop_children; cleanup_snapshot; exit 141' PIPE
 }
 
-# A kept slot belongs to one working tree (its clone origin). Worktrees come
-# and go, and each left its ~0.7 GB slot behind under TMPDIR. Any unlocked slot
-# of this label whose origin path no longer exists is removed before a slot is
-# taken. Nothing can be using it: a slot is only ever locked by a hook running
-# from its origin, and that origin is gone.
-prune_orphan_slots() {
-  local d url
-  for d in "${TMPDIR:-/tmp}"/devilbox-"${SNAP_LABEL:-snapshot}"-kept-*; do
+# Every hook copy under TMPDIR is ~1 GB, and they piled up: one kept pool per
+# working tree (2026-10-19: 2.6 GB of orphaned slots), and every fresh snapshot
+# whose hook died by SIGKILL, which no trap sees (2026-10-20: 4.8 GB in a day, the
+# Mac under 1 GB free). Before a hook makes a copy it removes, for every label:
+#  - an unlocked kept slot whose working tree is gone (nothing can lock it again);
+#  - an unlocked kept slot idle for DEVILBOX_HOOK_IDLE_MIN minutes (default 30);
+#  - unlocked kept slots beyond DEVILBOX_HOOK_MAX_IDLE (default 2), oldest first;
+#  - a fresh snapshot whose hook process is gone (its pid is in .git/devilbox-owner;
+#    one without an owner file is a pre-2026-10-20 leftover once an hour old).
+# A locked slot or a fresh snapshot of a live hook is never touched.
+prune_snapshots() {
+  local d url pid idle_min=${DEVILBOX_HOOK_IDLE_MIN:-30} max_idle=${DEVILBOX_HOOK_MAX_IDLE:-2} idle=()
+  for d in "${TMPDIR:-/tmp}"/devilbox-*; do
     [ -d "$d/.git" ] || continue
-    [ -d "$d.lock" ] && continue
-    url="$(snapshot_env git -C "$d" config remote.origin.url 2>/dev/null)"
-    [ -n "$url" ] && [ -e "$url" ] && continue
-    rm -rf "$d"
+    case "$d" in
+      *-kept-*)
+        [ -d "$d.lock" ] && continue
+        url="$(snapshot_env git -C "$d" config remote.origin.url 2>/dev/null)"
+        if [ -z "$url" ] || [ ! -e "$url" ]; then rm -rf "$d"; continue; fi
+        [ -e "$d/.git/devilbox-last-used" ] || touch -r "$d/.git" "$d/.git/devilbox-last-used"
+        if [ -n "$(find "$d/.git/devilbox-last-used" -mmin +"$idle_min" 2>/dev/null)" ]; then rm -rf "$d"; continue; fi
+        idle+=("$d")
+        ;;
+      *)
+        pid="$(cat "$d/.git/devilbox-owner" 2>/dev/null)"
+        if [ -n "$pid" ]; then kill -0 "$pid" 2>/dev/null || rm -rf "$d"
+        elif [ -n "$(find "$d" -maxdepth 0 -mmin +60 2>/dev/null)" ]; then rm -rf "$d"; fi
+        ;;
+    esac
+  done
+  [ "${#idle[@]}" -gt "$max_idle" ] || return 0
+  # Newest first; everything after the first max_idle goes.
+  ls -td $(printf '%s/.git/devilbox-last-used\n' "${idle[@]}") | tail -n +"$((max_idle + 1))" | while read -r f; do
+    rm -rf "${f%/.git/devilbox-last-used}"
   done
 }
 
@@ -169,7 +193,7 @@ materialise_reusable() {
   slots=${DEVILBOX_HOOK_SLOTS:-2}
   # Not inside .git/: vite and vitest ignore every path under a .git directory.
   base="${TMPDIR:-/tmp}/devilbox-${SNAP_LABEL:-snapshot}-kept-$(printf '%s' "$top" | cksum | cut -d' ' -f1)"
-  prune_orphan_slots
+  prune_snapshots
   dir=""
   for n in $(seq 1 "$slots"); do
     slot="$base"; [ "$n" -gt 1 ] && slot="$base-$n"
@@ -216,6 +240,7 @@ link_node_modules() {
 materialise() {
   local sha=$1 tree=${2:-} top nm
   top="$(pwd)"
+  prune_snapshots
   SNAP="$(mktemp -d "${TMPDIR:-/tmp}/devilbox-${SNAP_LABEL:-snapshot}.XXXXXX")"
   echo "${YLW}[${SNAP_LABEL:-snapshot}] testing ${tree:+the staged files on }commit ${sha:0:9} (snapshot, not the working tree)…${RST}" >&2
   # A throwaway clone, not a bare file tree: tests may ask git which files are
@@ -225,6 +250,7 @@ materialise() {
   # paths no test reads. Rule 2 for tests: read only
   # TRACKED fixtures, or the snapshot (and any clean checkout) lacks them.
   snapshot_env git clone --quiet --shared --no-checkout "$top" "$SNAP"
+  echo $$ > "$SNAP/.git/devilbox-owner"
   apply_sparse "$SNAP"
   snapshot_env git -C "$SNAP" -c advice.detachedHead=false checkout --quiet "$sha"
   if [ -n "$tree" ]; then
