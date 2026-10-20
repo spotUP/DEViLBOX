@@ -212,6 +212,9 @@ const GLYPH_CAPACITY = 65536;
 
 // ─── Main renderer class ──────────────────────────────────────────────────────
 
+/** Overlay on every second channel column: subtle, but visible against the row backgrounds. */
+const CHANNEL_STRIPE_COLOR: [number, number, number, number] = [0, 0, 0, 0.07];
+
 export class TrackerGLRenderer {
   private readonly gl: WebGL2RenderingContext;
   private readonly rectProg: WebGLProgram;
@@ -507,29 +510,6 @@ export class TrackerGLRenderer {
     const minSelRow = sel ? Math.min(sel.startRow, sel.endRow) : -1;
     const maxSelRow = sel ? Math.max(sel.startRow, sel.endRow) : -1;
 
-    // Full-height channel tints (drawn before rows)
-    for (let ch = 0; ch < numChannels; ch++) {
-      const colX = channelOffsets[ch] - scrollX;
-      const chW  = channelWidths[ch];
-      if (chW <= 0 || colX + chW < 0 || colX > width) continue; // width 0 = hidden channel
-      const chData = pattern.channels[ch];
-
-      // Active channel highlight
-      if (ch === cursor.channelIndex) {
-        this.addRect(colX, 0, chW, height, [1,1,1, 0.02]);
-      }
-      // Channel color tint
-      if (chData.color) {
-        const c = parseColor(chData.color);
-        this.addRect(colX, 0, chW, height, [c[0], c[1], c[2], 0.03]);
-      }
-      // Muted / non-solo darkening overlay
-      const isDimmed = isChannelDimmed(!!chData.muted, !!chData.solo, anySolo);
-      if (isDimmed) {
-        this.addRect(colX, 0, chW, height, [0, 0, 0, 0.45]);
-      }
-    }
-
     // Row backgrounds
     for (let i = vStart; i < visibleEnd; i++) {
       let rowIndex: number;
@@ -565,6 +545,35 @@ export class TrackerGLRenderer {
         const bgColor = isHL2 ? colors.rowSecondaryHighlight : isHL ? colors.rowHighlight : colors.rowNormal;
         const alpha = isGhostRow ? bgColor[3] * 0.35 : bgColor[3];
         this.addRect(0, y, width, rowH, [bgColor[0], bgColor[1], bgColor[2], alpha]);
+      }
+    }
+
+    // Full-height channel overlays, drawn over the row backgrounds. Main rows are opaque, so an overlay drawn before
+    // them only showed through the translucent ghost rows.
+    for (let ch = 0; ch < numChannels; ch++) {
+      const colX = channelOffsets[ch] - scrollX;
+      const chW  = channelWidths[ch];
+      if (chW <= 0 || colX + chW < 0 || colX > width) continue; // width 0 = hidden channel
+      const chData = pattern.channels[ch];
+
+      // Every second channel slightly darker, so channel boundaries read at a glance
+      if (ch % 2 === 1) {
+        this.addRect(colX, 0, chW, height, CHANNEL_STRIPE_COLOR);
+      }
+      // Active channel highlight, in the accent hue so it never reads as one of the brightness stripes
+      if (ch === cursor.channelIndex) {
+        const ac = colors.accent;
+        this.addRect(colX, 0, chW, height, [ac[0], ac[1], ac[2], 0.05]);
+      }
+      // Channel color tint
+      if (chData.color) {
+        const c = parseColor(chData.color);
+        this.addRect(colX, 0, chW, height, [c[0], c[1], c[2], 0.03]);
+      }
+      // Muted / non-solo darkening overlay
+      const isDimmed = isChannelDimmed(!!chData.muted, !!chData.solo, anySolo);
+      if (isDimmed) {
+        this.addRect(colX, 0, chW, height, [0, 0, 0, 0.45]);
       }
     }
 
