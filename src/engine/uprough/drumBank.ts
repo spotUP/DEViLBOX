@@ -218,6 +218,6 @@ export function addSnareGhost(bank: DrumBank, rate: number): DrumBank {
   return { ...bank, [SNARE_GHOST_VOICE]: x };
 }
 
-/** The bank _render_song plays: drum_bank, then the accent, then the ghost (seed 0 there). */
+/** The bank _render_song plays: drum_bank, then the accent, then the ghost. _render_song passes the SONG seed (the seed the drums draw from). */
 export const songDrumBank = (style: HipHopStyle, rate: number, seed = 0): DrumBank =>
   addSnareGhost(addSnareAccent(drumBank(style, rate, seed)), rate);
