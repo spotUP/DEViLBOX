@@ -115,13 +115,13 @@ export const FILE_VOICES = [
 
 /**
  * File voice -> the softsynth voice that plays it. The file names the hiphop engine's voices; the softsynth registry
- * has its own ids. metal, shaker and tamb have no softsynth voice yet: they play as 'rim' (round trip is exact, the
- * preview sound is not).
+ * has its own ids; every file voice has its own softsynth id (metal, shaker, tamb included), except the snare
+ * family, which shares snare808.
  */
 export const VOICE_TO_SOFTSYNTH: Record<string, string> = {
   kick: 'kick', snare: 'snare808', snare_accent: 'snare808', snare_ghost: 'snare808', clap: 'clap', rim: 'rim',
-  tom: 'tom', ch: 'hatClosed', oh: 'hatOpen', conga: 'conga', cowbell: 'cowbell', metal: 'rim', ride: 'ride',
-  shaker: 'rim', tamb: 'rim', bass808: 'bass808', melody: 'piano',
+  tom: 'tom', ch: 'hatClosed', oh: 'hatOpen', conga: 'conga', cowbell: 'cowbell', metal: 'metal', ride: 'ride',
+  shaker: 'shaker', tamb: 'tamb', bass808: 'bass808', melody: 'piano',
   '808': 'bassVoice808', electro: 'bassElectro', reese: 'bassReese', gfunk: 'bassGfunk', sampled: 'bassSampled',
   electric: 'bassElectric', warmsub: 'bassWarmsub',
 };
