@@ -26,7 +26,7 @@ export interface VSTBridgeDescriptor {
   synthClassName: string;
   /** Emscripten module factory function name, e.g. 'createDexedModule' */
   moduleFactoryName: string;
-  /** Volume normalization offset in dB (applied to output gain) */
+  /** Volume normalization offset in dB: raw default-patch peak + -12 dB volume + offset = -10 dBFS (vstbridgeLevelCalibration.test.ts) */
   volumeOffsetDb?: number;
   /** Optional custom UI panel component name (overrides auto-generated knobs) */
   panelComponent?: string;
@@ -62,7 +62,7 @@ registerVSTBridge({
   wasmFile: 'Vital',
   synthClassName: 'VitalSynth',
   moduleFactoryName: 'createVitalModule',
-  volumeOffsetDb: 0,
+  volumeOffsetDb: 11,
   panelComponent: 'VitalControls',
   commands: ['loadWavetable', 'loadPreset'],
 });
@@ -78,7 +78,7 @@ registerVSTBridge({
   wasmFile: 'Odin2',
   synthClassName: 'Odin2Synth',
   moduleFactoryName: 'createOdin2Module',
-  volumeOffsetDb: 0,
+  volumeOffsetDb: 15,
   panelComponent: 'Odin2Controls',
   commands: ['loadPatch'],
 });
@@ -94,7 +94,7 @@ registerVSTBridge({
   wasmFile: 'Surge',
   synthClassName: 'SurgeSynth',
   moduleFactoryName: 'createSurgeModule',
-  volumeOffsetDb: 0,
+  volumeOffsetDb: 9,
   panelComponent: 'SurgeControls',
   commands: ['loadPatch', 'loadWavetable'],
 });
@@ -110,7 +110,7 @@ registerVSTBridge({
   wasmFile: 'Tonewheel',
   synthClassName: 'TonewheelOrganSynth',
   moduleFactoryName: 'createTonewheelModule',
-  volumeOffsetDb: 0,
+  volumeOffsetDb: 15,
 });
 
 // ---------------------------------------------------------------------------
@@ -124,7 +124,7 @@ registerVSTBridge({
   wasmFile: 'Melodica',
   synthClassName: 'MelodicaWASMSynth',
   moduleFactoryName: 'createMelodicaModule',
-  volumeOffsetDb: -9,
+  volumeOffsetDb: 5,
 });
 
 // ---------------------------------------------------------------------------
@@ -138,7 +138,7 @@ registerVSTBridge({
   wasmFile: 'Monique',
   synthClassName: 'MoniqueSynth',
   moduleFactoryName: 'createMoniqueModule',
-  volumeOffsetDb: 5,
+  volumeOffsetDb: 11,
   configKey: 'monique',
   // Maps MoniqueConfig keys → WASM param IDs (C++ MoniqueParams enum, 0-119)
   paramMapping: {
@@ -208,7 +208,7 @@ registerVSTBridge({
   wasmFile: 'Helm',
   synthClassName: 'HelmSynth',
   moduleFactoryName: 'createHelmModule',
-  volumeOffsetDb: 0,
+  volumeOffsetDb: 12,
 });
 
 // ---------------------------------------------------------------------------
@@ -223,7 +223,7 @@ registerVSTBridge({
   wasmFile: 'Sorcer',
   synthClassName: 'SorcerSynth',
   moduleFactoryName: 'createSorcerModule',
-  volumeOffsetDb: 17,
+  volumeOffsetDb: 34,
 });
 
 // ---------------------------------------------------------------------------
@@ -243,7 +243,7 @@ registerVSTBridge({
   wasmFile: 'OBXf',
   synthClassName: 'OBXfSynth',
   moduleFactoryName: 'createOBXfModule',
-  volumeOffsetDb: 0,
+  volumeOffsetDb: 20,
 });
 
 
