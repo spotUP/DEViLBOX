@@ -16,6 +16,7 @@ import { describe, it, expect } from 'vitest';
 interface SynthInstance {
   initialize(sampleRate: number): boolean | void;
   noteOn(note: number, velocity: number): void;
+  noteOff(note: number): void;
   process(l: number, r: number, n: number): void;
   delete?(): void;
 }
@@ -24,7 +25,7 @@ interface WasmModule {
   [key: string]: unknown;
 }
 
-async function peakAfterNoteOn(dir: string, file: string, factory: string, cls: string): Promise<number> {
+async function renderAfterNoteOff(dir: string, file: string, factory: string, cls: string): Promise<{ held: number; tail: number }> {
   const root = resolve(__dirname, '../../../../public', dir);
   const wasmBinary = readFileSync(resolve(root, `${file}.wasm`));
   let memory: WebAssembly.Memory | null = null;
@@ -52,14 +53,25 @@ async function peakAfterNoteOn(dir: string, file: string, factory: string, cls: 
   const l = mod._malloc(frames * 4);
   const r = mod._malloc(frames * 4);
   synth.noteOn(60, 100);
-  let peak = 0;
-  for (let block = 0; block < 200; block++) {
-    synth.process(l, r, frames);
-    const buf = (memory as WebAssembly.Memory | null)!.buffer;
-    const out = new Float32Array(buf, l, frames);
-    for (let i = 0; i < frames; i++) peak = Math.max(peak, Math.abs(out[i]));
-  }
-  return peak;
+  const peakOf = (blocks: number): number => {
+    let peak = 0;
+    for (let block = 0; block < blocks; block++) {
+      synth.process(l, r, frames);
+      const buf = (memory as WebAssembly.Memory | null)!.buffer;
+      const out = new Float32Array(buf, l, frames);
+      for (let i = 0; i < frames; i++) peak = Math.max(peak, Math.abs(out[i]));
+    }
+    return peak;
+  };
+  const held = peakOf(200);
+  synth.noteOff(60);
+  peakOf(375); // ~1s release window
+  const tail = peakOf(50);
+  return { held, tail };
+}
+
+async function peakAfterNoteOn(dir: string, file: string, factory: string, cls: string): Promise<number> {
+  return (await renderAfterNoteOff(dir, file, factory, cls)).held;
 }
 
 describe('VSTBridge WASM synths render sound after a note on', () => {
@@ -68,5 +80,16 @@ describe('VSTBridge WASM synths render sound after a note on', () => {
   }, 60000);
   it('Odin2 initializes without trapping and renders a signal', async () => {
     expect(await peakAfterNoteOn('odin2', 'Odin2', 'createOdin2Module', 'Odin2Synth')).toBeGreaterThan(0.001);
+  }, 60000);
+});
+
+describe('VSTBridge WASM synths go silent after a note off', () => {
+  it('Vital falls silent after release', async () => {
+    const { held, tail } = await renderAfterNoteOff('vital', 'Vital', 'createVitalModule', 'VitalSynth');
+    expect(tail).toBeLessThan(held * 0.01);
+  }, 60000);
+  it('Odin2 falls silent after release', async () => {
+    const { held, tail } = await renderAfterNoteOff('odin2', 'Odin2', 'createOdin2Module', 'Odin2Synth');
+    expect(tail).toBeLessThan(held * 0.01);
   }, 60000);
 });
