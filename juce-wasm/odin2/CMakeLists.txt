@@ -1,81 +1,34 @@
-# Odin2 Semi-Modular Synthesizer - WASM Build
-# Based on Odin2 by The Wave Warden (GPL v3)
+# Odin2 audio engine - WASM build of the REAL upstream OdinAudioProcessor.
+# Based on Odin2 by The Wave Warden (GPL v3).
+#
+# Source list, include dirs and defines are shared with the editor build (../odin2-ui) via
+# Odin2Sources.cmake, so the two modules can never diverge.
 #
 # Build:
 #   cd juce-wasm/odin2 && mkdir -p build && cd build
-#   emcmake cmake .. && emmake make -j$(nproc)
-#
-# Odin2's DSP code only uses 5 JUCE math functions which are shimmed
-# via JuceLibraryCode/JuceHeader.h with standard C++ equivalents.
-# No actual JUCE modules are compiled.
+#   emcmake cmake .. && emmake make -j8
 
 cmake_minimum_required(VERSION 3.15)
-project(Odin2WASM VERSION 2.4.1)
+project(Odin2WASM VERSION 2.4.1 LANGUAGES CXX)
 
-set(ODIN2_ROOT "${CMAKE_SOURCE_DIR}/../../third-party/odin2-master")
-set(ODIN2_SRC "${ODIN2_ROOT}/Source")
+set(ODIN2_UI_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../odin2-ui")
+include("${ODIN2_UI_DIR}/Odin2Sources.cmake")
 
-# --- Odin2 Audio DSP Sources ---
-file(GLOB ODIN2_AUDIO_SOURCES
-    "${ODIN2_SRC}/audio/*.cpp"
-)
-# Exclude ImpulseResponseCreator — uses JUCE audio file I/O (WavAudioFormat, etc.)
-list(FILTER ODIN2_AUDIO_SOURCES EXCLUDE REGEX ".*ImpulseResponseCreator.*")
-file(GLOB ODIN2_FILTER_SOURCES
-    "${ODIN2_SRC}/audio/Filters/*.cpp"
-)
-file(GLOB ODIN2_FX_SOURCES
-    "${ODIN2_SRC}/audio/FX/*.cpp"
-)
-file(GLOB ODIN2_OSC_SOURCES
-    "${ODIN2_SRC}/audio/Oscillators/*.cpp"
-)
-file(GLOB ODIN2_WAVETABLE_SOURCES
-    "${ODIN2_SRC}/audio/Oscillators/Wavetables/*.cpp"
-    "${ODIN2_SRC}/audio/Oscillators/Wavetables/Tables/*.cpp"
-    "${ODIN2_SRC}/audio/Oscillators/Wavetables/Coefficients/*.cpp"
-)
-
-# WASM Wrapper (replaces PluginProcessor — manages Voice objects directly)
-set(WRAPPER_SOURCES
-    "${CMAKE_SOURCE_DIR}/Odin2WASM.cpp"
-)
-
-add_executable(Odin2WASMBuild
-    ${WRAPPER_SOURCES}
-    ${ODIN2_AUDIO_SOURCES}
-    ${ODIN2_FILTER_SOURCES}
-    ${ODIN2_FX_SOURCES}
-    ${ODIN2_OSC_SOURCES}
-    ${ODIN2_WAVETABLE_SOURCES}
-)
+add_executable(Odin2WASMBuild ${ODIN2_ALL_SOURCES} "${CMAKE_CURRENT_SOURCE_DIR}/Odin2WASM.cpp")
 
 target_include_directories(Odin2WASMBuild PRIVATE
-    ${CMAKE_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/../common              # WASMSynthBase.h
-    ${ODIN2_SRC}                               # GlobalIncludes.h, etc.
-    ${ODIN2_SRC}/audio
-    ${ODIN2_SRC}/audio/Filters
-    ${ODIN2_SRC}/audio/FX
-    ${ODIN2_SRC}/audio/Oscillators
-    ${ODIN2_SRC}/audio/Oscillators/Wavetables
-    ${ODIN2_SRC}/audio/Oscillators/Wavetables/Tables
-    ${ODIN2_SRC}/audio/Oscillators/Wavetables/Coefficients
-    ${ODIN2_ROOT}                              # For ../JuceLibraryCode/JuceHeader.h resolution
-    ${ODIN2_ROOT}/JuceLibraryCode             # For #include "JuceHeader.h" (no prefix)
-    ${ODIN2_ROOT}/libs/json
-    ${ODIN2_ROOT}/libs/tuning-library/include
+    "${CMAKE_CURRENT_SOURCE_DIR}/../common"   # WASMSynthBase.h
+    ${ODIN2_INCLUDE_DIRS}
 )
+target_compile_definitions(Odin2WASMBuild PRIVATE ${ODIN2_COMPILE_DEFS})
+target_compile_options(Odin2WASMBuild PRIVATE ${ODIN2_COMPILE_OPTS})
 
-target_compile_definitions(Odin2WASMBuild PRIVATE
-    ODIN2_WASM=1
-    NDEBUG=1
-)
+target_link_libraries(Odin2WASMBuild PRIVATE "${JUCE_LIB}")
 
 set_target_properties(Odin2WASMBuild PROPERTIES
     OUTPUT_NAME "Odin2"
     SUFFIX ".js"
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/../../public/odin2"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../../public/odin2"
 )
 
 target_link_options(Odin2WASMBuild PRIVATE
@@ -88,14 +41,10 @@ target_link_options(Odin2WASMBuild PRIVATE
     "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','setValue','getValue']"
     "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free']"
     "SHELL:-s NO_EXIT_RUNTIME=1"
-    "SHELL:-s INITIAL_MEMORY=33554432"  # 32MB initial
+    "SHELL:-s STACK_SIZE=1048576"
+    "SHELL:-s INITIAL_MEMORY=134217728"
+    "SHELL:-s USE_FREETYPE=1"
     "SHELL:--bind"
-    -O3
-)
-
-target_compile_options(Odin2WASMBuild PRIVATE
-    -O3
-    -std=c++17
-    -fno-exceptions
-    -Wno-deprecated-declarations
+    -fexceptions
+    -O2
 )
