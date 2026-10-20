@@ -1179,18 +1179,15 @@ export class ChannelRoutedEffectsManager {
  */
 const engineResolversByMode: Record<string, () => Promise<IsolationCapableEngine | null>> = {
   classic: async () => {
-    // Only when libopenmpt is the engine playing this song. Classic mode also
-    // plays Hippel/TFMX and other native engines; a libopenmpt instance left
-    // from an earlier MOD still reports available with no module loaded, and
-    // claiming it here told the dub bus these songs could isolate channels -
-    // so its whole-mix fallback stayed silent and no tap ever opened
-    // (ghostbattle_gameover.hip7 after a MOD, 2026-09-29).
-    const { LibopenmptEngine } = await import('../libopenmpt/LibopenmptEngine');
-    if (LibopenmptEngine.hasInstance()) {
-      const engine = LibopenmptEngine.getInstance();
-      if (engine.isAvailable() && engine.isPlaying()) return engine;
-    }
-    // PreTracker likewise only while one of its songs is loaded.
+    // libopenmpt is never claimed here: TrackerReplayer registers it as the
+    // playing engine when it starts the song (setPlayingIsolationEngine), as
+    // NativeEngineRouting does for the native engines. Asking its isPlaying()
+    // flag instead claimed an idle instance left from an earlier MOD for a
+    // Hippel song (2026-09-29). It also lost a playing one whenever the flag
+    // fell false while audio went on (worklet 'end' or 'err' messages set it):
+    // master effects aimed at channels then fell back to the whole mix, and
+    // nothing rebuilt the chain to move them back (2026-10-20).
+    // PreTracker only while one of its songs is loaded.
     const { useFormatStore } = await import('../../stores/useFormatStore');
     if (useFormatStore.getState().preTrackerFileData) {
       const { PreTrackerEngine } = await import('../pretracker/PreTrackerEngine');
@@ -1268,6 +1265,10 @@ const _fallbackResolvers: (() => Promise<IsolationCapableEngine | null>)[] = [];
  * twenty native engines).
  */
 let _playingIsolationEngine: IsolationCapableEngine | null = null;
+
+export function getPlayingIsolationEngine(): IsolationCapableEngine | null {
+  return _playingIsolationEngine;
+}
 
 export function setPlayingIsolationEngine(engine: IsolationCapableEngine | null): void {
   const changed = engine !== _playingIsolationEngine;

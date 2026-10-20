@@ -28,7 +28,7 @@ import { advanceNativeSubsong } from './nativeSubsongPlayback';
 import { useWasmPositionStore } from '../../stores/useWasmPositionStore';
 import { JamCrackerEngine } from '../jamcracker/JamCrackerEngine';
 import { getActiveDubBus } from '../dub/DubBus';
-import { asIsolationCapable, setPlayingIsolationEngine } from '../tone/ChannelRoutedEffects';
+import { asIsolationCapable, getPlayingIsolationEngine, setPlayingIsolationEngine } from '../tone/ChannelRoutedEffects';
 import { needsPaulaOutputStage } from '@engine/paulaOutput';
 import { editedModuleForPlay } from './editedModuleForPlay';
 import { isRowClipPlayer } from '@engine/rowPreview/rowClipPlayer';
@@ -175,8 +175,13 @@ export async function reportPlaybackIsolation(
  * for Fred Editor - the dub bus then muted the whole-mix tap, the only way Fred's audio
  * reaches it, and every dub toggle went silent.
  */
-function registerPlayingEngine(instance: unknown): void {
+export function registerPlayingEngine(instance: unknown): void {
   setPlayingIsolationEngine(asIsolationCapable(instance));
+}
+
+/** The song stopped on this engine: it stops being the isolation engine, unless another took over already. */
+export function unregisterPlayingEngine(instance: unknown): void {
+  if (getPlayingIsolationEngine() === instance) setPlayingIsolationEngine(null);
 }
 
 function unregisterWholeMixDubSend(key: string): void {
