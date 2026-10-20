@@ -355,3 +355,40 @@ export function karplus(freq: number, durS: number, rate: number, dampIn = 0.5, 
   for (let i = 0; i < n; i++) out[i] = out[i]! * pexp(-i / tau);
   return out;
 }
+
+/** synth_dsp `noise(kind="white")`: RandomState(seed & 0xFFFFFFFF).uniform(-1, 1, n). Other kinds are not ported yet. */
+export function noise(kind: 'white', n: number, seed = 0): Float64Array {
+  if (kind !== 'white') throw new Error(`noise kind ${String(kind)} is not ported`);
+  return new NumpyRandomState(seed >>> 0).uniformArray(-1, 1, n);
+}
+
+export type ChorusKind = 'stereo' | 'juno' | 'dimension' | 'ensemble';
+export interface ChorusOptions {
+  kind?: ChorusKind; depthMs?: number; rateHz?: number; mix?: number; voices?: number;
+  delayMs?: number | null; phaseOffsets?: ArrayLike<number> | null;
+}
+
+/** synth_dsp `chorus` (mono in, mono out): the LFO-modulated delay taps summed against the dry signal. */
+export function chorus(x: ArrayLike<number>, rate: number, opts: ChorusOptions = {}): Float64Array {
+  const { kind = 'stereo', mix = 0.4, delayMs = null, phaseOffsets = null } = opts;
+  let { depthMs = 6.0, rateHz = 0.6, voices = 2 } = opts;
+  if (kind === 'juno') { voices = 1; depthMs = 3.0; rateHz = 0.5; }
+  else if (kind === 'dimension') { voices = 2; depthMs = 4.0; }
+  else if (kind === 'ensemble') { voices = 3; depthMs = 8.0; rateHz = 0.8; }
+  const n = x.length;
+  const base = Math.trunc((delayMs === null ? 0.02 : delayMs * 1e-3) * rate);
+  const dmax = Math.trunc(depthMs * 1e-3 * rate);
+  const phases = phaseOffsets ? Array.from(phaseOffsets) : Array.from({ length: voices }, (_, v) => v * 2.1);
+  const out = new Float64Array(n);
+  for (let i = 0; i < n; i++) out[i] = (1 - mix) * x[i]!;
+  const w = mix / phases.length;
+  for (const p0 of phases) {
+    for (let i = 0; i < n; i++) {
+      const lfo = psin(2 * Math.PI * rateHz * i / rate + p0);
+      let idx = i - base - Math.trunc(dmax * (0.5 + 0.5 * lfo));
+      idx = Math.min(Math.max(idx, 0), n - 1);
+      out[i] = out[i]! + w * x[idx]!;
+    }
+  }
+  return out;
+}
