@@ -179,6 +179,7 @@ target_link_options(VitalWASMBuild PRIVATE
     "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','setValue','getValue']"
     "SHELL:-s EXPORTED_FUNCTIONS=['_malloc','_free']"
     "SHELL:-s NO_EXIT_RUNTIME=1"
+    "SHELL:-s STACK_SIZE=1048576"  # default 64KB stack overflows in SoundEngine::init and corrupts malloc state
     "SHELL:-s INITIAL_MEMORY=67108864"  # 64MB initial (Vital needs more memory)
     "SHELL:--bind"
     -O3
