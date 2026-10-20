@@ -59,6 +59,18 @@ export function songMelodyVoice(song: JsonObject): string {
   return song.melody_voice as string;
 }
 
+/** The style's bass_voice (render_bass_bar's voice), which the exporter writes into every non-808 bar as bass.voice;
+ *  null when no bar plays the per-bar bass. */
+export function songBassVoice(doc: { sections: { bars: { bass: Json }[] }[] }): string | null {
+  for (const sec of doc.sections) {
+    for (const bar of sec.bars) {
+      const bb = bar.bass as JsonObject | null;
+      if (bb !== null && typeof bb.voice === 'string') return bb.voice;
+    }
+  }
+  return null;
+}
+
 export interface SongFileDoc {
   format: string;
   schema: number;
