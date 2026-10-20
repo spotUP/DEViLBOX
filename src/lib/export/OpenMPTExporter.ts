@@ -169,19 +169,14 @@ export async function exportWithOpenMPT(
       await osl.setOrderPattern(i, songPositions[i]);
     }
 
-    // Upload sample data for instruments
-    for (let i = 0; i < instruments.length; i++) {
-      const inst = instruments[i];
+    // Sample data: each Sampler's WAV goes into the slot at its id, the number
+    // its cells carry, at the pitch it plays at in the editor.
+    const { writeSamplerSlot } = await import('@engine/libopenmpt/OpenMPTEditBridge');
+    for (const inst of instruments) {
+      if (inst.synthType !== 'Sampler' && inst.synthType !== 'Player') continue;
       if (!inst.sample?.audioBuffer || inst.sample.audioBuffer.byteLength === 0) continue;
-
-      try {
-        const sampleRate = inst.sample.sampleRate || 8363;
-        const data = new Int16Array(inst.sample.audioBuffer);
-        if (data.length > 0) {
-          await osl.setSampleData(i + 1, data, sampleRate, false);
-        }
-      } catch {
-        warnings.push(`Failed to write sample data for instrument ${i + 1} "${inst.name}"`);
+      if (!(await writeSamplerSlot(osl, inst, format))) {
+        warnings.push(`Failed to write sample data for instrument ${inst.id} "${inst.name}"`);
       }
     }
 

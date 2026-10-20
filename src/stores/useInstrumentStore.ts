@@ -33,6 +33,7 @@ import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
 import { getToneEngine } from '@engine/ToneEngine';
 import { touchesToneVoice } from '@engine/tone/toneSynthKnobs';
 import { peekTrackerReplayer } from '@engine/TrackerReplayer';
+import * as OpenMPTEditBridge from '@engine/libopenmpt/OpenMPTEditBridge';
 import { recognizeCinter4Instruments } from '@engine/cinter4/cinter4Recognize';
 import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } from '@/lib/formatCompatibility';
 import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
@@ -2301,6 +2302,15 @@ export const useInstrumentStore = create<InstrumentStore>()(
   };
   })
 );
+
+// libopenmpt plays every Sampler note of a song (ToneEngine leaves them to
+// it), so a Sampler added or reloaded after the song's module was built must
+// reach that module, or its notes are silent in the pattern while the keyboard
+// plays them. The bridge skips instruments whose sample buffer is unchanged.
+useInstrumentStore.subscribe((state, prev) => {
+  if (state.instruments === prev.instruments || !OpenMPTEditBridge.isActive()) return;
+  void OpenMPTEditBridge.syncSamplerInstruments(state.instruments);
+});
 
 /**
  * Dev only: carry this store's data over a hot reload.
