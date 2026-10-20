@@ -173,6 +173,8 @@ export interface ChannelData {
     importedFromMOD: boolean;
     originalIndex?: number; // Original position in MOD/XM
     addedAfterImport?: boolean;
+    /** The importer defines this lane even when it holds no notes (Up Rough: all 11 lanes); never hidden as unused. */
+    alwaysShow?: boolean;
     channelType?: 'sample' | 'synth' | 'hybrid' | 'sunvox';
     furnaceType?: number; // Furnace DivChanType for system presets
     hardwareName?: string; // Hardware-specific channel name
