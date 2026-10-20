@@ -29,6 +29,7 @@ type Lane = 'drums' | 'bass' | 'melody';
 interface LaneRec { pre?: Arr; post?: Arr; n?: number }
 interface SectionRec {
   bars: number; keep: boolean; on: Record<Lane, boolean>;
+  args: { melody_cap_bound?: boolean };
   calls: { trim: number; drum_bus: number; parallel: number; process: number; macros: number };
   lanes: Record<Lane, LaneRec>;
 }
@@ -136,6 +137,8 @@ describe('songBuses matches render_section lane for lane', () => {
     expect(secs.some(({ s }) => s.calls.parallel > 0)).toBe(true);
     // a fast-path song whose view yields the melody has the layer off although the section is a hook
     expect(ref.cases.some((c) => !c.doc && c.melody_yields && c.sections.every((s) => !s.on.melody))).toBe(true);
+    // the melody make-up cap is live: the host's raw gain exceeded MELODY_MAKEUP_MAX in at least one kept section
+    expect(secs.some(({ s }) => s.on.melody && s.args.melody_cap_bound === true)).toBe(true);
     // an 808 bass voice takes the 1600 Hz lp, a string voice 3200 Hz
     expect(new Set(ref.cases.map((c) => c.bass_voice === '808'))).toEqual(new Set([true, false]));
     // at least one drum section was trimmed (pre-chain peak above the 0.8 reference)
