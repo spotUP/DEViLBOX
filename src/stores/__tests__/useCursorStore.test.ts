@@ -69,3 +69,48 @@ describe('useCursorStore — keyboard selection spans columns like the mouse (M4
     expect(sel?.columnTypes).toEqual(['note', 'instrument', 'volume']);
   });
 });
+
+/**
+ * Option+Left/Right jumps a whole field at a time: an effect type and its
+ * params are one field, so the jump never lands on a param digit. Left from
+ * inside a field goes to the field start first, like Option+Left in text.
+ */
+describe('useCursorStore — moveCursorByField (Option+Left/Right)', () => {
+  beforeEach(() => {
+    resetStore(useTrackerStore);
+    useCursorStore.setState({
+      cursor: { channelIndex: 0, rowIndex: 0, noteColumnIndex: 0, columnType: 'note', digitIndex: 0 },
+      selection: null,
+    });
+  });
+
+  const at = () => {
+    const c = useCursorStore.getState().cursor;
+    return `${c.channelIndex}:${c.columnType}:${c.digitIndex}`;
+  };
+
+  it('right steps note, instrument, volume, effect slots, then the next channel', () => {
+    const seen: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      useCursorStore.getState().moveCursorByField('right');
+      seen.push(at());
+    }
+    expect(seen).toEqual(['0:instrument:0', '0:volume:0', '0:effTyp:0', '0:effTyp2:0', '1:note:0']);
+  });
+
+  it('left from an effect param digit goes to its effect type', () => {
+    useCursorStore.setState({
+      cursor: { channelIndex: 0, rowIndex: 0, noteColumnIndex: 0, columnType: 'effParam', digitIndex: 1 },
+    });
+    useCursorStore.getState().moveCursorByField('left');
+    expect(at()).toBe('0:effTyp:0');
+  });
+
+  it('left from an effect type goes to the volume field', () => {
+    useCursorStore.setState({
+      cursor: { channelIndex: 0, rowIndex: 0, noteColumnIndex: 0, columnType: 'effTyp', digitIndex: 0 },
+    });
+    useCursorStore.getState().moveCursorByField('left');
+    expect(at()).toBe('0:volume:0');
+  });
+});

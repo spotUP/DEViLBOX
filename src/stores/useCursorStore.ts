@@ -63,6 +63,8 @@ interface CursorStore {
   selection: BlockSelection | null;
 
   moveCursor: (direction: 'up' | 'down' | 'left' | 'right', opts?: { preserveSelection?: boolean }) => void;
+  /** Option+Left/Right: jump a whole field (note, instrument, volume, one effect slot) instead of one digit. */
+  moveCursorByField: (direction: 'left' | 'right') => void;
   moveCursorToRow: (row: number) => void;
   /** The format editors' cursor: the same store, bounds clamped by the caller against the format's own channels. */
   setFormatCursor: (pos: { channelIndex: number; rowIndex: number; columnIndex: number }) => void;
@@ -79,6 +81,20 @@ interface CursorStore {
   selectColumn: (channelIndex: number, columnType: CursorPosition['columnType']) => void;
   selectChannel: (channelIndex: number) => void;
   selectPattern: () => void;
+}
+
+type ChannelColumn = { type: CursorPosition['columnType']; nci: number };
+
+/** An effect slot's type and parameter are one field: the parameter's index maps back to its type. */
+export function fieldStartIndex(cols: readonly ChannelColumn[], i: number): number {
+  const t = cols[i]?.type;
+  const pairType = t === 'effParam' ? 'effTyp' : t === 'effParam2' ? 'effTyp2' : null;
+  return pairType && i > 0 && cols[i - 1].type === pairType ? i - 1 : i;
+}
+
+/** Index of the field after the one starting at `start`, or cols.length past the last field. */
+export function nextFieldIndex(cols: readonly ChannelColumn[], start: number): number {
+  return fieldStartIndex(cols, start + 1) === start ? start + 2 : start + 1;
 }
 
 function getTrackerState(): ReturnType<typeof _TrackerStoreType.getState> {
@@ -254,6 +270,44 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
     const cur = get().cursor;
     if (cur.channelIndex === channelIndex && cur.rowIndex === rowIndex && (cur.formatColumnIndex ?? 0) === columnIndex) return;
     set({ cursor: { ...cur, channelIndex, rowIndex, formatColumnIndex: columnIndex, digitIndex: 0 } });
+  },
+
+  moveCursorByField: (direction) => {
+    const cur = get().cursor;
+    const ts = getTrackerState();
+    const pattern = ts.patterns[ts.currentPatternIndex];
+    if (!pattern) return;
+    const cols = get().getColumnsForChannel(cur.channelIndex);
+    if (!cols || cols.length === 0) return;
+    let channelIndex = cur.channelIndex;
+    let ci = cols.findIndex(c => c.type === cur.columnType && c.nci === (cur.noteColumnIndex ?? 0));
+    if (ci === -1) ci = 0;
+    const start = fieldStartIndex(cols, ci);
+    let target: ChannelColumn;
+    if (direction === 'right') {
+      const next = nextFieldIndex(cols, start);
+      if (next < cols.length) {
+        target = cols[next];
+      } else {
+        channelIndex = stepChannel(shownChannelMask(ts.patterns), channelIndex, 1, pattern.channels.length);
+        target = get().getColumnsForChannel(channelIndex)?.[0] ?? { type: 'note', nci: 0 };
+      }
+    } else if (ci !== start || cur.digitIndex > 0) {
+      // Inside a field: go to its first digit first, like Option+Left in a text field.
+      target = cols[start];
+    } else if (start > 0) {
+      target = cols[fieldStartIndex(cols, start - 1)];
+    } else {
+      channelIndex = stepChannel(shownChannelMask(ts.patterns), channelIndex, -1, pattern.channels.length);
+      const prev = get().getColumnsForChannel(channelIndex) ?? [];
+      target = prev.length > 0 ? prev[fieldStartIndex(prev, prev.length - 1)] : { type: 'note', nci: 0 };
+    }
+    if (
+      channelIndex === cur.channelIndex && target.type === cur.columnType &&
+      target.nci === (cur.noteColumnIndex ?? 0) && cur.digitIndex === 0
+    ) return;
+    if (get().selection) set({ selection: null });
+    set({ cursor: { ...cur, channelIndex, noteColumnIndex: target.nci, columnType: target.type, digitIndex: 0 } });
   },
 
   moveCursorToRow: (row) => {

@@ -214,8 +214,8 @@ function initializeRegistry() {
     { name: 'cursor_pattern_end', contexts: ['pattern'], handler: cursorPatternEnd, description: 'Move to end of pattern' },
     { name: 'next_channel', contexts: ['pattern'], handler: nextChannel, description: 'Move to next channel' },
     { name: 'prev_channel', contexts: ['pattern'], handler: prevChannel, description: 'Move to previous channel' },
-    { name: 'next_column', contexts: ['pattern'], handler: nextColumn, description: 'Move to next column' },
-    { name: 'prev_column', contexts: ['pattern'], handler: prevColumn, description: 'Move to previous column' },
+    { name: 'next_column', contexts: ['pattern'], handler: nextColumn, description: 'Jump to next field' },
+    { name: 'prev_column', contexts: ['pattern'], handler: prevColumn, description: 'Jump to previous field' },
     { name: 'next_track', contexts: ['pattern'], handler: nextChannel, description: 'Move to next track' },
     { name: 'prev_track', contexts: ['pattern'], handler: prevChannel, description: 'Move to previous track' },
     // FT2 row jumps
