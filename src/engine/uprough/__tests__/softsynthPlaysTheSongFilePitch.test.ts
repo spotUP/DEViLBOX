@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { installRealWebAudio } from '@/test/audio/realWebAudio';
 import type { InstrumentConfig } from '@typedefs/instrument';
-import { parseSongFile, songFileToSong } from '@/lib/uprough/songFile';
+import { MELODY_TIMBRE_SOFTSYNTH, parseSongFile, songFileToSong } from '@/lib/uprough/songFile';
 import e6 from '@/lib/uprough/__tests__/fixtures/e6.uprough-song.json';
 import { xmNoteToNoteName } from '@/engine/replayer/PeriodTables';
 import { SOFTSYNTH_RATE, voiceDefaults } from '../softsynthVoice';
@@ -115,14 +115,23 @@ describe('a song-file cell plays at the host pitch through the tracker', () => {
     expect(Math.abs(hz / 55.0 - 1), `808 "A-3" measured ${hz.toFixed(2)} Hz`).toBeLessThan(0.03);
   });
 
-  it('piano (melody lane): an imported melody cell sounds at the host hz(midi) +-3%', async () => {
+  it('melody lane: an imported melody cell sounds at the host midi in the header melody_voice', async () => {
     const cell = importedCell('hook_1', 'melody1');
-    expect(cell.instrument.upRoughSoftsynth?.voice).toBe('piano');
-    const want = 440 * 2 ** ((hostMidi(cell.text) - 69) / 12);
+    // The melody track plays the song file's melody_voice (e6: "bell"), not a fixed piano.
+    expect(cell.instrument.upRoughSoftsynth?.voice).toBe(MELODY_TIMBRE_SOFTSYNTH[e6.song.melody_voice]);
+    // The bell is 2-op FM at ratio 3.5, so its partials sit on multiples of fc/2 and its waveform
+    // period is 2/fc: an autocorrelation reads half of hz(midi) for any correct render. The pitch
+    // proof is therefore "the tracker cell reaches the voice as the host's midi": the tracker's
+    // buffer has the period of the same voice rendered directly at hostMidi(text), and the voice
+    // itself equals the host's melody_voice_note through its parity fixture.
+    const voice = getSoftsynthVoice(cell.instrument.upRoughSoftsynth!.voice)!;
+    const direct = Float32Array.from(voice.render(cell.instrument.upRoughSoftsynth!.params,
+      { midi: hostMidi(cell.text), durSec: 0.9, velocity: 1 }, SOFTSYNTH_RATE, 0));
+    const want = fundamentalHz(direct, 0.05, 0.3, 25, 2000);
     const buf = await playCell({ ...cell.instrument, id: 961 }, cell.note, 0.9);
     const hz = fundamentalHz(buf, 0.05, 0.3, 25, 2000);
-    console.log(`[pitch] piano "${cell.text}" measured ${hz.toFixed(2)} Hz (host ${want.toFixed(2)})`);
-    expect(Math.abs(hz / want - 1), `piano "${cell.text}" measured ${hz.toFixed(2)} Hz`).toBeLessThan(0.03);
+    console.log(`[pitch] melody "${cell.text}" measured ${hz.toFixed(2)} Hz (voice at host midi ${want.toFixed(2)})`);
+    expect(Math.abs(hz / want - 1), `melody "${cell.text}" measured ${hz.toFixed(2)} Hz`).toBeLessThan(0.005);
   });
 
   it('kick (drum lane): cell "C-4" (the host DRUM_NOTE) is the untransposed reference kick, sample for sample', async () => {
