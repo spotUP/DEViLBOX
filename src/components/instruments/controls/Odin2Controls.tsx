@@ -1,201 +1,148 @@
 /**
- * Odin2Controls - Custom panel for Odin2 Semi-Modular Hybrid Synth
+ * Odin2Controls - panel for the real Odin2 synth (OdinAudioProcessor compiled to WASM).
  *
- * 119 parameters organized into sections:
- * Master, Oscillators (3x), Filters (2x), Routing, Envelopes (3x),
- * LFOs (3x), Distortion, Delay, Phaser, Flanger, Chorus, Reverb.
- * Interacts with VSTBridge synth via setParameter().
- * Falls back to VSTBridgePanel if synth not yet loaded.
+ * Every knob is looked up by engine parameter NAME from getParams() (osc1_vol, fil1_freq, ...), with the
+ * engine's own ranges. Oscillator and filter type selectors are ValueTree properties, driven through the
+ * 'setValueTreeProperty' command. Presets are the plugin's native .odin state, loaded through 'loadPreset'
+ * (bundled picker and file import share one path, see engine/vstbridge/odin2Preset.ts).
+ * Falls back to VSTBridgePanel while the synth is not loaded.
  */
 
-import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Knob } from '@components/controls/Knob';
+import { Toggle } from '@components/controls/Toggle';
 import { Loader } from 'lucide-react';
 import { useInstrumentColors } from '@/hooks/useInstrumentColors';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { VSTBridgeSynth } from '@engine/vstbridge/VSTBridgeSynth';
+import type { VSTBridgeParam } from '@engine/vstbridge/synth-registry';
 import { VSTBridgePanel } from './VSTBridgePanel';
-import { FilterFrequencyResponse } from '@components/instruments/shared';
-import type { FilterType } from '@components/instruments/shared';
+import { ImportPresetFileButton } from './ImportPresetFileButton';
+import { CustomSelect, type SelectOptionGroup } from '@components/common/CustomSelect';
+import { notify } from '@stores/useNotificationStore';
+import { ODIN2_PRESETS } from '@constants/odin2PresetIndex';
+import {
+  ODIN2_PRESET_PARAM_KEY, fetchBundledOdin2Preset, findOdin2Preset,
+  loadOdin2PresetBytes, setOdin2Selector, type Odin2SelectorTree,
+} from '@engine/vstbridge/odin2Preset';
+import { odinPresetValues } from '@engine/vstbridge/odinState';
 
-// ============================================================================
-// Module-scope sub-components (extracted to satisfy react-hooks/static-components)
-// ============================================================================
+/** Pack, then category: "Factory / Bass", "Lukas Lundh", "PSY-LION". */
+const PRESET_GROUPS: SelectOptionGroup[] = Array.from(
+  ODIN2_PRESETS.reduce((map, p) => {
+    const group = p.pack === 'factory' ? `Factory / ${p.category}` : p.category;
+    const list = map.get(group) ?? [];
+    list.push({ value: p.id, label: p.name });
+    return map.set(group, list);
+  }, new Map<string, { value: string; label: string }[]>()),
+).map(([label, options]) => ({ label, options }));
 
-/** Toggle button helper */
-const Toggle = memo(({ id, label, params, accentColor, setParam }: {
-  id: number; label: string; params: number[]; accentColor: string;
-  setParam: (id: number, value: number) => void;
-}) => (
-  <button
-    onClick={() => setParam(id, params[id] > 0.5 ? 0 : 1)}
-    className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${
-      params[id] > 0.5 ? 'text-black' : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover'
-    }`}
-    style={params[id] > 0.5 ? { backgroundColor: accentColor } : {}}
-  >
-    {label}
-  </button>
-));
-Toggle.displayName = 'Toggle';
-
-/** FX toggle */
-const FxToggle = memo(({ id, label, params, fxAccent, setParam }: {
-  id: number; label: string; params: number[]; fxAccent: string;
-  setParam: (id: number, value: number) => void;
-}) => (
-  <button
-    onClick={() => setParam(id, params[id] > 0.5 ? 0 : 1)}
-    className={`px-2 py-1 text-[10px] font-bold rounded transition-all ${
-      params[id] > 0.5 ? 'text-black' : 'bg-dark-bgTertiary text-text-muted hover:bg-dark-bgHover'
-    }`}
-    style={params[id] > 0.5 ? { backgroundColor: fxAccent } : {}}
-  >
-    {label}
-  </button>
-));
-FxToggle.displayName = 'FxToggle';
-
-/** Type selector helper */
-const TypeSelect = memo(({ id, labels, params, accentColor, setParam }: {
-  id: number; labels: string[]; params: number[]; accentColor: string;
-  setParam: (id: number, value: number) => void;
-}) => (
-  <div className="flex flex-wrap gap-1">
-    {labels.map((label, i) => (
-      <button
-        key={label}
-        onClick={() => setParam(id, i)}
-        className={`px-1.5 py-1 text-[9px] font-bold rounded transition-all ${
-          Math.round(params[id]) === i ? 'text-black' : 'bg-dark-bgTertiary text-text-secondary hover:bg-dark-bgHover'
-        }`}
-        style={Math.round(params[id]) === i ? { backgroundColor: accentColor } : {}}
-      >
-        {label}
-      </button>
-    ))}
-  </div>
-));
-TypeSelect.displayName = 'TypeSelect';
-
-/** Section header */
-const Section = memo(({ title, color, bg, panelBg, accentColor, children }: {
-  title: string; color?: string; bg?: string; panelBg: string; accentColor: string;
-  children: React.ReactNode;
-}) => (
-  <div className={`p-2 rounded-lg border ${bg || panelBg}`}>
-    <h3 className="font-bold uppercase tracking-tight text-sm mb-2" style={{ color: color || accentColor }}>
-      {title}
-    </h3>
-    {children}
-  </div>
-));
-Section.displayName = 'Section';
-
-// Parameter IDs matching Odin2WASM.cpp (119 params)
-const P = {
-  // Master (6)
-  MASTER_VOL: 0, MASTER_GAIN: 1, MASTER_PAN: 2, MASTER_GLIDE: 3,
-  MASTER_VELOCITY: 4, MASTER_UNISON_DETUNE: 5,
-  // Osc1 (11)
-  OSC1_TYPE: 6, OSC1_VOL: 7, OSC1_OCT: 8, OSC1_SEMI: 9, OSC1_FINE: 10,
-  OSC1_WAVE: 11, OSC1_PW: 12, OSC1_POS: 13, OSC1_FM: 14, OSC1_DRIFT: 15, OSC1_RESET: 16,
-  // Osc2 (12)
-  OSC2_TYPE: 17, OSC2_VOL: 18, OSC2_OCT: 19, OSC2_SEMI: 20, OSC2_FINE: 21,
-  OSC2_WAVE: 22, OSC2_PW: 23, OSC2_POS: 24, OSC2_FM: 25, OSC2_DRIFT: 26,
-  OSC2_SYNC: 27, OSC2_RESET: 28,
-  // Osc3 (12)
-  OSC3_TYPE: 29, OSC3_VOL: 30, OSC3_OCT: 31, OSC3_SEMI: 32, OSC3_FINE: 33,
-  OSC3_WAVE: 34, OSC3_PW: 35, OSC3_POS: 36, OSC3_FM: 37, OSC3_DRIFT: 38,
-  OSC3_SYNC: 39, OSC3_RESET: 40,
-  // Filter1 (11)
-  FIL1_TYPE: 41, FIL1_FREQ: 42, FIL1_RES: 43, FIL1_GAIN: 44,
-  FIL1_ENV: 45, FIL1_SAT: 46, FIL1_VEL: 47, FIL1_KBD: 48,
-  FIL1_OSC1: 49, FIL1_OSC2: 50, FIL1_OSC3: 51,
-  // Filter2 (12)
-  FIL2_TYPE: 52, FIL2_FREQ: 53, FIL2_RES: 54, FIL2_GAIN: 55,
-  FIL2_ENV: 56, FIL2_SAT: 57, FIL2_VEL: 58, FIL2_KBD: 59,
-  FIL2_OSC1: 60, FIL2_OSC2: 61, FIL2_OSC3: 62, FIL2_FIL1: 63,
-  // Routing (2)
-  FIL1_AMP: 64, FIL2_AMP: 65,
-  // Env1 (5)
-  ENV1_A: 66, ENV1_D: 67, ENV1_S: 68, ENV1_R: 69, ENV1_LOOP: 70,
-  // Env2 (5)
-  ENV2_A: 71, ENV2_D: 72, ENV2_S: 73, ENV2_R: 74, ENV2_LOOP: 75,
-  // Env3 (5)
-  ENV3_A: 76, ENV3_D: 77, ENV3_S: 78, ENV3_R: 79, ENV3_LOOP: 80,
-  // LFO1 (3)
-  LFO1_FREQ: 81, LFO1_WAVE: 82, LFO1_DEPTH: 83,
-  // LFO2 (3)
-  LFO2_FREQ: 84, LFO2_WAVE: 85, LFO2_DEPTH: 86,
-  // LFO3 (3)
-  LFO3_FREQ: 87, LFO3_WAVE: 88, LFO3_DEPTH: 89,
-  // Distortion (3)
-  DIST_ON: 90, DIST_BOOST: 91, DIST_DRYWET: 92,
-  // Delay (6)
-  DELAY_ON: 93, DELAY_TIME: 94, DELAY_FB: 95, DELAY_HP: 96, DELAY_DRY: 97, DELAY_WET: 98,
-  // Phaser (5)
-  PHASER_ON: 99, PHASER_RATE: 100, PHASER_MOD: 101, PHASER_FB: 102, PHASER_DW: 103,
-  // Flanger (5)
-  FLANGER_ON: 104, FLANGER_RATE: 105, FLANGER_AMT: 106, FLANGER_FB: 107, FLANGER_DW: 108,
-  // Chorus (5)
-  CHORUS_ON: 109, CHORUS_RATE: 110, CHORUS_AMT: 111, CHORUS_FB: 112, CHORUS_DW: 113,
-  // Reverb (5)
-  REVERB_ON: 114, REVERB_HALL: 115, REVERB_DAMP: 116, REVERB_PRE: 117, REVERB_DW: 118,
-} as const;
-
-const PARAM_COUNT = 119;
-
-const OSC_TYPE_LABELS = [
-  'Analog', 'Wavetable', 'Multi', 'Vector', 'Chip',
-  'FM', 'PM', 'Noise', 'WaveDraw', 'ChipDraw', 'SpecDraw',
+/** Selector values are the engine's enum numbers (GlobalIncludes.h), not list positions. */
+const OSC_TYPES = [
+  { value: '2', label: 'Analog' }, { value: '3', label: 'Wavetable' }, { value: '4', label: 'Multi' },
+  { value: '5', label: 'Vector' }, { value: '6', label: 'Chiptune' }, { value: '7', label: 'FM' },
+  { value: '8', label: 'Phase Modulation' }, { value: '15', label: 'Noise' }, { value: '20', label: 'Wave Draw' },
+  { value: '21', label: 'Chip Draw' }, { value: '22', label: 'Spectral Draw' },
+];
+const FILTER_TYPES = [
+  { value: '1', label: 'Off' }, { value: '2', label: 'Low Pass 24' }, { value: '3', label: 'Low Pass 12' },
+  { value: '4', label: 'Band Pass 24' }, { value: '5', label: 'Band Pass 12' }, { value: '6', label: 'High Pass 24' },
+  { value: '7', label: 'High Pass 12' }, { value: '15', label: 'SEM 12' }, { value: '19', label: 'Diode' },
+  { value: '24', label: 'Korg Low Pass' }, { value: '25', label: 'Korg High Pass' }, { value: '30', label: 'Comb' },
+  { value: '35', label: 'Formant' }, { value: '40', label: 'Ring Modulator' },
 ];
 
-const FILTER_TYPE_LABELS = [
-  'None', 'LP24', 'LP12', 'BP24', 'BP12', 'HP24', 'HP12',
-  'SEM12', 'Korg LP', 'Korg HP', 'Diode', 'Formant', 'Comb', 'Ring',
+interface KnobSpec { name: string; label: string; min?: number; max?: number; bipolar?: boolean; logarithmic?: boolean; unit?: string; step?: number }
+interface ToggleSpec { name: string; label: string }
+
+const k = (name: string, label: string, extra: Partial<KnobSpec> = {}): KnobSpec => ({ name, label, ...extra });
+
+const oscKnobs = (n: number): KnobSpec[] => [
+  k(`osc${n}_vol`, 'Volume', { unit: 'dB' }), k(`osc${n}_oct`, 'Octave', { step: 1 }), k(`osc${n}_semi`, 'Semitone', { bipolar: true, step: 1 }),
+  k(`osc${n}_fine`, 'Fine', { bipolar: true, unit: 'ct' }), k(`osc${n}_position`, 'Position'), k(`osc${n}_pulsewidth`, 'Pulse Width'),
+  k(`osc${n}_detune`, 'Detune'), k(`osc${n}_spread`, 'Spread'), k(`osc${n}_fm`, 'FM Amount'), k(`osc${n}_drift`, 'Drift'),
+];
+const filKnobs = (n: number): KnobSpec[] => [
+  k(`fil${n}_freq`, 'Frequency', { logarithmic: true, unit: 'Hz' }), k(`fil${n}_res`, 'Resonance'), k(`fil${n}_gain`, 'Gain', { unit: 'dB' }),
+  k(`fil${n}_env`, 'Envelope', { bipolar: true }), k(`fil${n}_kbd`, 'Key Track'), k(`fil${n}_vel`, 'Velocity'), k(`fil${n}_saturation`, 'Saturation'),
+];
+const envKnobs = (n: number): KnobSpec[] => [
+  k(`env${n}_attack`, 'Attack', { logarithmic: true, unit: 's' }), k(`env${n}_decay`, 'Decay', { logarithmic: true, unit: 's' }),
+  k(`env${n}_sustain`, 'Sustain'), k(`env${n}_release`, 'Release', { logarithmic: true, unit: 's' }),
 ];
 
-type Odin2FilterEntry = { type: FilterType; poles: 2 | 4 };
-// Maps FILTER_TYPE_LABELS index → biquad approximation for the frequency response curve.
-// null = filter bypassed (None), so no curve is drawn.
-const ODIN2_FILTER_MAP: Array<Odin2FilterEntry | null> = [
-  null,                               // None
-  { type: 'lowpass',  poles: 4 },    // LP24
-  { type: 'lowpass',  poles: 2 },    // LP12
-  { type: 'bandpass', poles: 4 },    // BP24
-  { type: 'bandpass', poles: 2 },    // BP12
-  { type: 'highpass', poles: 4 },    // HP24
-  { type: 'highpass', poles: 2 },    // HP12
-  { type: 'lowpass',  poles: 2 },    // SEM12 (state-variable, approximate as LP12)
-  { type: 'lowpass',  poles: 4 },    // Korg LP (Moog ladder)
-  { type: 'highpass', poles: 4 },    // Korg HP
-  { type: 'lowpass',  poles: 4 },    // Diode
-  { type: 'lowpass',  poles: 2 },    // Formant (approximate)
-  { type: 'bandpass', poles: 2 },    // Comb (approximate)
-  { type: 'bandpass', poles: 2 },    // Ring (approximate)
+const MASTER_KNOBS: KnobSpec[] = [
+  k('master', 'Master', { unit: 'dB' }), k('amp_gain', 'Amp Gain', { unit: 'dB' }), k('amp_pan', 'Amp Pan', { bipolar: true }),
+  k('amp_velocity', 'Amp Velocity'), k('glide', 'Glide'), k('unison_detune', 'Unison Detune'), k('unison_width', 'Unison Width'),
+  k('dist_boost', 'Distortion Boost'), k('dist_drywet', 'Distortion Mix'),
 ];
+const LFO_KNOBS: KnobSpec[] = [1, 2, 3, 4].map((n) => k(`lfo${n}_freq`, `LFO ${n} Rate`, { logarithmic: true, unit: 'Hz' }));
+const FX_GROUPS: { title: string; on: string; knobs: KnobSpec[] }[] = [
+  { title: 'Delay', on: 'delay_on', knobs: [k('delay_time', 'Time', { unit: 's' }), k('delay_feedback', 'Feedback'), k('delay_hp', 'High Pass'), k('delay_ducking', 'Ducking'), k('delay_dry', 'Dry'), k('delay_wet', 'Wet')] },
+  { title: 'Reverb', on: 'reverb_on', knobs: [k('rev_delay', 'Pre Delay'), k('rev_mid_hall', 'Hall'), k('rev_hf_damp', 'Damping'), k('rev_eqgain', 'EQ Gain'), k('rev_eqfreq', 'EQ Frequency'), k('rev_drywet', 'Mix')] },
+  { title: 'Phaser', on: 'phaser_on', knobs: [k('phaser_freq', 'Frequency'), k('phaser_feedback', 'Feedback'), k('phaser_rate', 'Rate'), k('phaser_mod', 'Depth'), k('phaser_drywet', 'Mix')] },
+  { title: 'Flanger', on: 'flanger_on', knobs: [k('flanger_rate', 'Rate'), k('flanger_feedback', 'Feedback'), k('flanger_amount', 'Amount'), k('flanger_drywet', 'Mix')] },
+  { title: 'Chorus', on: 'chorus_on', knobs: [k('chorus_rate', 'Rate'), k('chorus_amount', 'Amount'), k('chorus_feedback', 'Feedback'), k('chorus_drywet', 'Mix')] },
+];
+
+interface ControlsContext {
+  paramByName: Map<string, VSTBridgeParam>;
+  values: Map<number, number>;
+  setParam: (id: number, value: number) => void;
+  knobColor: string;
+}
+
+const NamedKnobs: React.FC<{ specs: KnobSpec[]; ctx: ControlsContext }> = ({ specs, ctx }) => (
+  <>
+    {specs.map((s) => {
+      const p = ctx.paramByName.get(s.name);
+      if (!p) return null;
+      const unit = s.unit;
+      return (
+        <Knob
+          key={s.name}
+          label={s.label}
+          value={ctx.values.get(p.id) ?? p.defaultValue}
+          min={s.min ?? p.min}
+          max={s.max ?? p.max}
+          defaultValue={p.defaultValue}
+          step={s.step}
+          onChange={(v) => ctx.setParam(p.id, s.step ? Math.round(v) : v)}
+          color={ctx.knobColor}
+          bipolar={s.bipolar}
+          logarithmic={s.logarithmic}
+          formatValue={unit ? (v) => `${v >= 100 ? v.toFixed(0) : v.toFixed(2)} ${unit}` : undefined}
+        />
+      );
+    })}
+  </>
+);
+
+const NamedToggle: React.FC<{ spec: ToggleSpec; ctx: ControlsContext }> = ({ spec, ctx }) => {
+  const p = ctx.paramByName.get(spec.name);
+  if (!p) return null;
+  return (
+    <Toggle label={spec.label} value={(ctx.values.get(p.id) ?? p.defaultValue) > 0.5} onChange={(on) => ctx.setParam(p.id, on ? 1 : 0)} />
+  );
+};
 
 interface Odin2ControlsProps {
   instrument: InstrumentConfig;
   onChange: (updates: Partial<InstrumentConfig>) => void;
 }
 
-export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
-  instrument,
-  onChange,
-}) => {
-  const [params, setParams] = useState<number[]>(new Array(PARAM_COUNT).fill(0));
+export const Odin2Controls: React.FC<Odin2ControlsProps> = ({ instrument, onChange }) => {
+  const [values, setValues] = useState<Map<number, number>>(new Map());
+  const [paramByName, setParamByName] = useState<Map<string, VSTBridgeParam>>(new Map());
+  const [selectors, setSelectors] = useState<Record<string, number>>({});
   const [synthReady, setSynthReady] = useState(false);
   const synthRef = useRef<VSTBridgeSynth | null>(null);
 
-  const { isCyan: isCyanTheme, accent: accentColor, knob: knobColor } = useInstrumentColors('#4a9eff');
-  const fxAccent = isCyanTheme ? '#00ccaa' : '#7c3aed';
+  const { accent: accentColor, knob: knobColor, panelBg, panelStyle } = useInstrumentColors('#4a9eff');
 
   useEffect(() => {
     let cancelled = false;
-
     const connect = async () => {
       try {
         const engine = getToneEngine();
@@ -205,40 +152,91 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
           setTimeout(() => { if (!cancelled) connect(); }, 500);
           return;
         }
-        if ('ensureInitialized' in synth) {
-          await (synth as VSTBridgeSynth).ensureInitialized();
-        }
+        await synth.ensureInitialized();
         synthRef.current = synth;
-        if ('getParams' in synth) {
-          const wasmParams = synth.getParams();
-          // Show the values the synth actually holds (a factory preset is applied at creation), not the defaults
-          const vals = wasmParams.map(p => (synth as VSTBridgeSynth).getParameter(p.id) ?? p.defaultValue);
-          if (!cancelled) {
-            setParams(vals);
-            setSynthReady(true);
-          }
-        } else {
-          if (!cancelled) setSynthReady(true);
+        const wasmParams = synth.getParams();
+        const nameMap = new Map<string, VSTBridgeParam>();
+        const valMap = new Map<number, number>();
+        for (const p of wasmParams) {
+          nameMap.set(p.name, p);
+          // The synth already holds the instrument's preset: show its live values, not the defaults.
+          valMap.set(p.id, synth.getParameter(p.id) ?? p.defaultValue);
+        }
+        if (!cancelled) {
+          setParamByName(nameMap);
+          setValues(valMap);
+          setSynthReady(true);
         }
       } catch {
         setTimeout(() => { if (!cancelled) connect(); }, 1000);
       }
     };
-
     connect();
     return () => { cancelled = true; };
   }, [instrument.id]);
 
   const setParam = useCallback((id: number, value: number) => {
-    setParams(prev => {
-      const next = [...prev];
-      next[id] = value;
-      return next;
-    });
-    if (synthRef.current) {
-      synthRef.current.setParameter(id, value);
-    }
+    setValues((prev) => new Map(prev).set(id, value));
+    synthRef.current?.setParameter(id, value);
   }, []);
+
+  const setSelector = useCallback((tree: Odin2SelectorTree, property: string, value: number) => {
+    const synth = synthRef.current;
+    if (!synth) return;
+    setSelectors((prev) => ({ ...prev, [`${tree}.${property}`]: value }));
+    void setOdin2Selector(synth, tree, property, value).then((ok) => {
+      if (!ok) notify.error(`Odin2 rejected ${tree}.${property}`);
+    });
+  }, []);
+
+  const storedPresetId = (instrument.parameters as Record<string, unknown> | undefined)?.[ODIN2_PRESET_PARAM_KEY];
+  const [presetId, setPresetId] = useState<string>(typeof storedPresetId === 'string' ? storedPresetId : '');
+  const [presetBusy, setPresetBusy] = useState(false);
+
+  /** Single UI load path: send the bytes to the synth, then mirror the file's values into the knobs. */
+  const applyPresetBytes = useCallback(async (bytes: Uint8Array, label: string, gainTrimDb: number): Promise<boolean> => {
+    const synth = synthRef.current;
+    if (!synth) return false;
+    setPresetBusy(true);
+    try {
+      const preset = odinPresetValues(bytes);
+      const ok = await loadOdin2PresetBytes(synth, bytes);
+      if (!ok) {
+        notify.error(`Odin2 could not load preset "${label}"`);
+        return false;
+      }
+      synth.setPresetGainTrimDb(gainTrimDb);
+      setValues(() => {
+        const next = new Map<number, number>();
+        for (const [name, p] of paramByName) next.set(p.id, preset.params[name] ?? p.defaultValue);
+        return next;
+      });
+      setSelectors(preset.selectors);
+      return true;
+    } catch (err) {
+      notify.error(`Odin2 preset "${label}": ${err instanceof Error ? err.message : String(err)}`);
+      return false;
+    } finally {
+      setPresetBusy(false);
+    }
+  }, [paramByName]);
+
+  const handlePickPreset = useCallback(async (id: string) => {
+    const entry = findOdin2Preset(id);
+    if (!entry) return;
+    setPresetId(id);
+    try {
+      const ok = await applyPresetBytes(await fetchBundledOdin2Preset(entry), entry.name, entry.gainTrimDb);
+      if (ok) onChange({ parameters: { ...(instrument.parameters ?? {}), [ODIN2_PRESET_PARAM_KEY]: id } });
+    } catch (err) {
+      notify.error(`Odin2 preset "${entry.name}": ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, [applyPresetBytes, instrument.parameters, onChange]);
+
+  const handleImportFile = useCallback(async (bytes: Uint8Array, fileName: string) => {
+    const ok = await applyPresetBytes(bytes, fileName, 0);
+    if (ok) setPresetId('');
+  }, [applyPresetBytes]);
 
   if (!synthReady) {
     return (
@@ -252,342 +250,66 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({
     );
   }
 
-  const panelBg = isCyanTheme
-    ? 'bg-[#051515] border-accent-highlight/20'
-    : 'bg-[#1a1a1a] border-blue-900/30';
-  const fxBg = isCyanTheme
-    ? 'bg-[#041210] border-teal-900/40'
-    : 'bg-[#151020] border-purple-900/30';
-
-  // Oscillator row data
-  const oscData = [
-    { idx: 0, typeId: P.OSC1_TYPE, volId: P.OSC1_VOL, octId: P.OSC1_OCT, semiId: P.OSC1_SEMI, fineId: P.OSC1_FINE, pwId: P.OSC1_PW, posId: P.OSC1_POS, fmId: P.OSC1_FM, driftId: P.OSC1_DRIFT, resetId: P.OSC1_RESET, syncId: -1 },
-    { idx: 1, typeId: P.OSC2_TYPE, volId: P.OSC2_VOL, octId: P.OSC2_OCT, semiId: P.OSC2_SEMI, fineId: P.OSC2_FINE, pwId: P.OSC2_PW, posId: P.OSC2_POS, fmId: P.OSC2_FM, driftId: P.OSC2_DRIFT, resetId: P.OSC2_RESET, syncId: P.OSC2_SYNC },
-    { idx: 2, typeId: P.OSC3_TYPE, volId: P.OSC3_VOL, octId: P.OSC3_OCT, semiId: P.OSC3_SEMI, fineId: P.OSC3_FINE, pwId: P.OSC3_PW, posId: P.OSC3_POS, fmId: P.OSC3_FM, driftId: P.OSC3_DRIFT, resetId: P.OSC3_RESET, syncId: P.OSC3_SYNC },
-  ];
+  const ctx: ControlsContext = { paramByName, values, setParam, knobColor };
+  const section = (title: string, children: React.ReactNode, extra?: React.ReactNode) => (
+    <div key={title} className={`p-2 rounded-lg border ${panelBg}`} style={panelStyle}>
+      <div className="flex items-center gap-2 mb-2">
+        <h3 className="font-bold uppercase tracking-tight text-sm" style={{ color: accentColor }}>{title}</h3>
+        {extra}
+      </div>
+      <div className="flex gap-2 flex-wrap">{children}</div>
+    </div>
+  );
+  const selector = (tree: Odin2SelectorTree, property: string, options: { value: string; label: string }[]) => (
+    <CustomSelect
+      value={String(selectors[`${tree}.${property}`] ?? '')}
+      onChange={(v) => setSelector(tree, property, Number(v))}
+      options={options}
+      placeholder="Type"
+      className="w-40"
+    />
+  );
 
   return (
-    <div className="synth-controls-flow grid grid-cols-4 gap-2 p-2 overflow-y-auto">
-      {/* ═══ MASTER ═══ */}
-      <Section title="Master" panelBg={panelBg} accentColor={accentColor}>
-        <div className="flex gap-4 justify-center flex-wrap">
-          <Knob label="Volume" value={params[P.MASTER_VOL]} min={0} max={1} defaultValue={0.7}
-            onChange={(v) => setParam(P.MASTER_VOL, v)} size="md" color={knobColor} />
-          <Knob label="Gain" value={params[P.MASTER_GAIN]} min={-24} max={12} defaultValue={0}
-            onChange={(v) => setParam(P.MASTER_GAIN, v)} color={knobColor} bipolar
-            formatValue={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)}dB`} />
-          <Knob label="Pan" value={params[P.MASTER_PAN]} min={-1} max={1} defaultValue={0}
-            onChange={(v) => setParam(P.MASTER_PAN, v)} color={knobColor} bipolar />
-          <Knob label="Glide" value={params[P.MASTER_GLIDE]} min={0} max={1} defaultValue={0}
-            onChange={(v) => setParam(P.MASTER_GLIDE, v)} color={knobColor}
-            formatValue={(v) => `${Math.round(v * 1000)}ms`} />
-          <Knob label="Velocity" value={params[P.MASTER_VELOCITY]} min={0} max={1} defaultValue={1}
-            onChange={(v) => setParam(P.MASTER_VELOCITY, v)} color={knobColor} />
-          <Knob label="Uni Det" value={params[P.MASTER_UNISON_DETUNE]} min={0} max={1} defaultValue={0}
-            onChange={(v) => setParam(P.MASTER_UNISON_DETUNE, v)} color={knobColor} />
-        </div>
-      </Section>
-
-      {/* ═══ OSCILLATORS ═══ */}
-      <Section title="Oscillators" panelBg={panelBg} accentColor={accentColor}>
-        <div className="flex flex-col gap-4">
-          {oscData.map(osc => (
-            <div key={osc.idx} className="flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold w-10 shrink-0" style={{ color: accentColor }}>
-                  OSC {osc.idx + 1}
-                </span>
-                <TypeSelect id={osc.typeId} labels={OSC_TYPE_LABELS} params={params} accentColor={accentColor} setParam={setParam} />
-              </div>
-              <div className="flex gap-2 flex-wrap justify-center">
-                <Knob label="Vol" value={params[osc.volId]} min={0} max={1} defaultValue={0.7}
-                  onChange={(v) => setParam(osc.volId, v)} color={knobColor} />
-                <Knob label="Oct" value={params[osc.octId]} min={-4} max={4} defaultValue={0} step={1}
-                  onChange={(v) => setParam(osc.octId, Math.round(v))} color={knobColor}
-                  formatValue={(v) => `${v > 0 ? '+' : ''}${Math.round(v)}`} />
-                <Knob label="Semi" value={params[osc.semiId]} min={-12} max={12} defaultValue={0} step={1}
-                  onChange={(v) => setParam(osc.semiId, Math.round(v))} color={knobColor} bipolar
-                  formatValue={(v) => `${v > 0 ? '+' : ''}${Math.round(v)}`} />
-                <Knob label="Fine" value={params[osc.fineId]} min={-100} max={100} defaultValue={0}
-                  onChange={(v) => setParam(osc.fineId, v)} color={knobColor} bipolar
-                  formatValue={(v) => `${v.toFixed(0)}ct`} />
-                <Knob label="PW" value={params[osc.pwId]} min={0.02} max={0.98} defaultValue={0.5}
-                  onChange={(v) => setParam(osc.pwId, v)} color={knobColor} />
-                <Knob label="Pos" value={params[osc.posId]} min={0} max={1} defaultValue={0}
-                  onChange={(v) => setParam(osc.posId, v)} color={knobColor} />
-                <Knob label="FM" value={params[osc.fmId]} min={0} max={1} defaultValue={0}
-                  onChange={(v) => setParam(osc.fmId, v)} color={knobColor} />
-                <Knob label="Drift" value={params[osc.driftId]} min={0} max={1} defaultValue={0}
-                  onChange={(v) => setParam(osc.driftId, v)} color={knobColor} />
-                <Toggle id={osc.resetId} label="Reset" params={params} accentColor={accentColor} setParam={setParam} />
-                {osc.syncId >= 0 && <Toggle id={osc.syncId} label="Sync" params={params} accentColor={accentColor} setParam={setParam} />}
-              </div>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      {/* ═══ FILTERS ═══ */}
-      <Section title="Filters" panelBg={panelBg} accentColor={accentColor}>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Filter 1 */}
-          <div className="flex flex-col gap-3">
-            <span className="text-xs font-bold" style={{ color: accentColor }}>FILTER 1</span>
-            <TypeSelect id={P.FIL1_TYPE} labels={FILTER_TYPE_LABELS} params={params} accentColor={accentColor} setParam={setParam} />
-            <div className="flex gap-2 justify-center flex-wrap">
-              <Knob label="Freq" value={params[P.FIL1_FREQ]} min={20} max={20000} defaultValue={10000}
-                onChange={(v) => setParam(P.FIL1_FREQ, v)} color={knobColor} logarithmic
-                formatValue={(v) => v >= 1000 ? `${(v/1000).toFixed(1)}k` : `${Math.round(v)}`} />
-              <Knob label="Res" value={params[P.FIL1_RES]} min={0} max={1} defaultValue={0.2}
-                onChange={(v) => setParam(P.FIL1_RES, v)} color={knobColor} />
-              <Knob label="Gain" value={params[P.FIL1_GAIN]} min={0} max={2} defaultValue={1}
-                onChange={(v) => setParam(P.FIL1_GAIN, v)} color={knobColor} />
-              <Knob label="Env" value={params[P.FIL1_ENV]} min={-1} max={1} defaultValue={0.5}
-                onChange={(v) => setParam(P.FIL1_ENV, v)} color={knobColor} bipolar />
-              <Knob label="Sat" value={params[P.FIL1_SAT]} min={0} max={1} defaultValue={0}
-                onChange={(v) => setParam(P.FIL1_SAT, v)} color={knobColor} />
-              <Knob label="Vel" value={params[P.FIL1_VEL]} min={0} max={1} defaultValue={0}
-                onChange={(v) => setParam(P.FIL1_VEL, v)} color={knobColor} />
-              <Knob label="Kbd" value={params[P.FIL1_KBD]} min={0} max={1} defaultValue={0}
-                onChange={(v) => setParam(P.FIL1_KBD, v)} color={knobColor} />
-            </div>
-            {(() => {
-              const entry = ODIN2_FILTER_MAP[Math.round(params[P.FIL1_TYPE])];
-              if (!entry) return null;
-              const norm = Math.log10(Math.max(params[P.FIL1_FREQ], 20) / 20) / 3;
-              return (
-                <div className="my-1">
-                  <FilterFrequencyResponse
-                    filterType={entry.type} cutoff={norm}
-                    resonance={params[P.FIL1_RES]} poles={entry.poles}
-                    color={accentColor} width={280} height={56}
-                  />
-                </div>
-              );
-            })()}
-            <div className="flex gap-1 justify-center">
-              <Toggle id={P.FIL1_OSC1} label="Osc1" params={params} accentColor={accentColor} setParam={setParam} />
-              <Toggle id={P.FIL1_OSC2} label="Osc2" params={params} accentColor={accentColor} setParam={setParam} />
-              <Toggle id={P.FIL1_OSC3} label="Osc3" params={params} accentColor={accentColor} setParam={setParam} />
-            </div>
-          </div>
-
-          {/* Filter 2 */}
-          <div className="flex flex-col gap-3">
-            <span className="text-xs font-bold" style={{ color: accentColor }}>FILTER 2</span>
-            <TypeSelect id={P.FIL2_TYPE} labels={FILTER_TYPE_LABELS} params={params} accentColor={accentColor} setParam={setParam} />
-            <div className="flex gap-2 justify-center flex-wrap">
-              <Knob label="Freq" value={params[P.FIL2_FREQ]} min={20} max={20000} defaultValue={10000}
-                onChange={(v) => setParam(P.FIL2_FREQ, v)} color={knobColor} logarithmic
-                formatValue={(v) => v >= 1000 ? `${(v/1000).toFixed(1)}k` : `${Math.round(v)}`} />
-              <Knob label="Res" value={params[P.FIL2_RES]} min={0} max={1} defaultValue={0}
-                onChange={(v) => setParam(P.FIL2_RES, v)} color={knobColor} />
-              <Knob label="Gain" value={params[P.FIL2_GAIN]} min={0} max={2} defaultValue={1}
-                onChange={(v) => setParam(P.FIL2_GAIN, v)} color={knobColor} />
-              <Knob label="Env" value={params[P.FIL2_ENV]} min={-1} max={1} defaultValue={0}
-                onChange={(v) => setParam(P.FIL2_ENV, v)} color={knobColor} bipolar />
-              <Knob label="Sat" value={params[P.FIL2_SAT]} min={0} max={1} defaultValue={0}
-                onChange={(v) => setParam(P.FIL2_SAT, v)} color={knobColor} />
-              <Knob label="Vel" value={params[P.FIL2_VEL]} min={0} max={1} defaultValue={0}
-                onChange={(v) => setParam(P.FIL2_VEL, v)} color={knobColor} />
-              <Knob label="Kbd" value={params[P.FIL2_KBD]} min={0} max={1} defaultValue={0}
-                onChange={(v) => setParam(P.FIL2_KBD, v)} color={knobColor} />
-            </div>
-            {(() => {
-              const entry = ODIN2_FILTER_MAP[Math.round(params[P.FIL2_TYPE])];
-              if (!entry) return null;
-              const norm = Math.log10(Math.max(params[P.FIL2_FREQ], 20) / 20) / 3;
-              return (
-                <div className="my-1">
-                  <FilterFrequencyResponse
-                    filterType={entry.type} cutoff={norm}
-                    resonance={params[P.FIL2_RES]} poles={entry.poles}
-                    color={accentColor} width={280} height={56}
-                  />
-                </div>
-              );
-            })()}
-            <div className="flex gap-1 justify-center">
-              <Toggle id={P.FIL2_OSC1} label="Osc1" params={params} accentColor={accentColor} setParam={setParam} />
-              <Toggle id={P.FIL2_OSC2} label="Osc2" params={params} accentColor={accentColor} setParam={setParam} />
-              <Toggle id={P.FIL2_OSC3} label="Osc3" params={params} accentColor={accentColor} setParam={setParam} />
-              <Toggle id={P.FIL2_FIL1} label="Fil1" params={params} accentColor={accentColor} setParam={setParam} />
-            </div>
-          </div>
-        </div>
-      </Section>
-
-      {/* ═══ ROUTING ═══ */}
-      <Section title="Routing" panelBg={panelBg} accentColor={accentColor}>
-        <div className="flex gap-2 justify-center">
-          <Toggle id={P.FIL1_AMP} label="Fil1 → Amp" params={params} accentColor={accentColor} setParam={setParam} />
-          <Toggle id={P.FIL2_AMP} label="Fil2 → Amp" params={params} accentColor={accentColor} setParam={setParam} />
-        </div>
-      </Section>
-
-      {/* ═══ ENVELOPES ═══ */}
-      <Section title="Envelopes" panelBg={panelBg} accentColor={accentColor}>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[
-            { label: 'AMP EG', a: P.ENV1_A, d: P.ENV1_D, s: P.ENV1_S, r: P.ENV1_R, loop: P.ENV1_LOOP },
-            { label: 'FILTER EG', a: P.ENV2_A, d: P.ENV2_D, s: P.ENV2_S, r: P.ENV2_R, loop: P.ENV2_LOOP },
-            { label: 'MOD EG', a: P.ENV3_A, d: P.ENV3_D, s: P.ENV3_S, r: P.ENV3_R, loop: P.ENV3_LOOP },
-          ].map(env => (
-            <div key={env.label}>
-              <span className="text-xs font-bold block mb-2" style={{ color: accentColor }}>
-                {env.label}
-              </span>
-              <div className="flex gap-2 justify-center flex-wrap">
-                <Knob label="A" value={params[env.a]} min={0.001} max={5} defaultValue={0.01}
-                  onChange={(v) => setParam(env.a, v)} color={knobColor}
-                  formatValue={(v) => v < 0.1 ? `${(v * 1000).toFixed(0)}ms` : `${v.toFixed(2)}s`} />
-                <Knob label="D" value={params[env.d]} min={0.001} max={5} defaultValue={0.3}
-                  onChange={(v) => setParam(env.d, v)} color={knobColor}
-                  formatValue={(v) => v < 0.1 ? `${(v * 1000).toFixed(0)}ms` : `${v.toFixed(2)}s`} />
-                <Knob label="S" value={params[env.s]} min={0} max={1} defaultValue={0.7}
-                  onChange={(v) => setParam(env.s, v)} color={knobColor}
-                  formatValue={(v) => `${Math.round(v * 100)}%`} />
-                <Knob label="R" value={params[env.r]} min={0.001} max={5} defaultValue={0.3}
-                  onChange={(v) => setParam(env.r, v)} color={knobColor}
-                  formatValue={(v) => v < 0.1 ? `${(v * 1000).toFixed(0)}ms` : `${v.toFixed(2)}s`} />
-                <Toggle id={env.loop} label="Loop" params={params} accentColor={accentColor} setParam={setParam} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      {/* ═══ LFOs ═══ */}
-      <Section title="LFOs" panelBg={panelBg} accentColor={accentColor}>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[
-            { label: 'LFO1 → Filter', freq: P.LFO1_FREQ, depth: P.LFO1_DEPTH },
-            { label: 'LFO2 → Pitch', freq: P.LFO2_FREQ, depth: P.LFO2_DEPTH },
-            { label: 'LFO3 → Amp', freq: P.LFO3_FREQ, depth: P.LFO3_DEPTH },
-          ].map(lfo => (
-            <div key={lfo.label}>
-              <span className="text-xs font-bold block mb-2" style={{ color: accentColor }}>
-                {lfo.label}
-              </span>
-              <div className="flex gap-2 justify-center">
-                <Knob label="Freq" value={params[lfo.freq]} min={0.01} max={20} defaultValue={2}
-                  onChange={(v) => setParam(lfo.freq, v)} color={knobColor}
-                  formatValue={(v) => `${v.toFixed(1)}Hz`} />
-                <Knob label="Depth" value={params[lfo.depth]} min={0} max={1} defaultValue={0}
-                  onChange={(v) => setParam(lfo.depth, v)} color={knobColor}
-                  formatValue={(v) => `${Math.round(v * 100)}%`} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      {/* ═══ DISTORTION ═══ */}
-      <Section title="Distortion" color={fxAccent} bg={fxBg} panelBg={panelBg} accentColor={accentColor}>
-        <div className="flex gap-3 items-center justify-center flex-wrap">
-          <FxToggle id={P.DIST_ON} label="ON" params={params} fxAccent={fxAccent} setParam={setParam} />
-          <Knob label="Boost" value={params[P.DIST_BOOST]} min={0} max={1} defaultValue={0.5}
-            onChange={(v) => setParam(P.DIST_BOOST, v)} color={fxAccent} />
-          <Knob label="Dry/Wet" value={params[P.DIST_DRYWET]} min={0} max={1} defaultValue={1}
-            onChange={(v) => setParam(P.DIST_DRYWET, v)} color={fxAccent} />
-        </div>
-      </Section>
-
-      {/* ═══ FX CHAIN ═══ */}
-      <Section title="Effects" color={fxAccent} bg={fxBg} panelBg={panelBg} accentColor={accentColor}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Delay */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <FxToggle id={P.DELAY_ON} label="DELAY" params={params} fxAccent={fxAccent} setParam={setParam} />
-            </div>
-            <div className="flex gap-2 flex-wrap justify-center">
-              <Knob label="Time" value={params[P.DELAY_TIME]} min={0.01} max={2} defaultValue={0.3}
-                onChange={(v) => setParam(P.DELAY_TIME, v)} color={fxAccent}
-                formatValue={(v) => `${(v * 1000).toFixed(0)}ms`} />
-              <Knob label="Feedback" value={params[P.DELAY_FB]} min={0} max={1} defaultValue={0.4}
-                onChange={(v) => setParam(P.DELAY_FB, v)} color={fxAccent} />
-              <Knob label="HP" value={params[P.DELAY_HP]} min={20} max={2000} defaultValue={80}
-                onChange={(v) => setParam(P.DELAY_HP, v)} color={fxAccent} logarithmic />
-              <Knob label="Dry" value={params[P.DELAY_DRY]} min={0} max={1} defaultValue={1}
-                onChange={(v) => setParam(P.DELAY_DRY, v)} color={fxAccent} />
-              <Knob label="Wet" value={params[P.DELAY_WET]} min={0} max={1} defaultValue={0.3}
-                onChange={(v) => setParam(P.DELAY_WET, v)} color={fxAccent} />
-            </div>
-          </div>
-
-          {/* Chorus */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <FxToggle id={P.CHORUS_ON} label="CHORUS" params={params} fxAccent={fxAccent} setParam={setParam} />
-            </div>
-            <div className="flex gap-2 flex-wrap justify-center">
-              <Knob label="Rate" value={params[P.CHORUS_RATE]} min={0.01} max={10} defaultValue={0.3}
-                onChange={(v) => setParam(P.CHORUS_RATE, v)} color={fxAccent} />
-              <Knob label="Amount" value={params[P.CHORUS_AMT]} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => setParam(P.CHORUS_AMT, v)} color={fxAccent} />
-              <Knob label="FB" value={params[P.CHORUS_FB]} min={-0.98} max={0.98} defaultValue={0}
-                onChange={(v) => setParam(P.CHORUS_FB, v)} color={fxAccent} bipolar />
-              <Knob label="D/W" value={params[P.CHORUS_DW]} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => setParam(P.CHORUS_DW, v)} color={fxAccent} />
-            </div>
-          </div>
-
-          {/* Phaser */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <FxToggle id={P.PHASER_ON} label="PHASER" params={params} fxAccent={fxAccent} setParam={setParam} />
-            </div>
-            <div className="flex gap-2 flex-wrap justify-center">
-              <Knob label="Rate" value={params[P.PHASER_RATE]} min={0.01} max={10} defaultValue={0.5}
-                onChange={(v) => setParam(P.PHASER_RATE, v)} color={fxAccent} />
-              <Knob label="Mod" value={params[P.PHASER_MOD]} min={0} max={1.5} defaultValue={0.5}
-                onChange={(v) => setParam(P.PHASER_MOD, v)} color={fxAccent} />
-              <Knob label="FB" value={params[P.PHASER_FB]} min={0} max={0.97} defaultValue={0.3}
-                onChange={(v) => setParam(P.PHASER_FB, v)} color={fxAccent} />
-              <Knob label="D/W" value={params[P.PHASER_DW]} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => setParam(P.PHASER_DW, v)} color={fxAccent} />
-            </div>
-          </div>
-
-          {/* Flanger */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <FxToggle id={P.FLANGER_ON} label="FLANGER" params={params} fxAccent={fxAccent} setParam={setParam} />
-            </div>
-            <div className="flex gap-2 flex-wrap justify-center">
-              <Knob label="Rate" value={params[P.FLANGER_RATE]} min={0.01} max={10} defaultValue={0.3}
-                onChange={(v) => setParam(P.FLANGER_RATE, v)} color={fxAccent} />
-              <Knob label="Amount" value={params[P.FLANGER_AMT]} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => setParam(P.FLANGER_AMT, v)} color={fxAccent} />
-              <Knob label="FB" value={params[P.FLANGER_FB]} min={-0.98} max={0.98} defaultValue={0.3}
-                onChange={(v) => setParam(P.FLANGER_FB, v)} color={fxAccent} bipolar />
-              <Knob label="D/W" value={params[P.FLANGER_DW]} min={0} max={1} defaultValue={0.5}
-                onChange={(v) => setParam(P.FLANGER_DW, v)} color={fxAccent} />
-            </div>
-          </div>
-
-          {/* Reverb */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <FxToggle id={P.REVERB_ON} label="REVERB" params={params} fxAccent={fxAccent} setParam={setParam} />
-            </div>
-            <div className="flex gap-2 flex-wrap justify-center">
-              <Knob label="Hall" value={params[P.REVERB_HALL]} min={0.2} max={10} defaultValue={2}
-                onChange={(v) => setParam(P.REVERB_HALL, v)} color={fxAccent}
-                formatValue={(v) => `${v.toFixed(1)}s`} />
-              <Knob label="Damp" value={params[P.REVERB_DAMP]} min={500} max={20000} defaultValue={6000}
-                onChange={(v) => setParam(P.REVERB_DAMP, v)} color={fxAccent} logarithmic
-                formatValue={(v) => v >= 1000 ? `${(v/1000).toFixed(1)}k` : `${Math.round(v)}`} />
-              <Knob label="Pre-D" value={params[P.REVERB_PRE]} min={0.001} max={0.5} defaultValue={0.04}
-                onChange={(v) => setParam(P.REVERB_PRE, v)} color={fxAccent}
-                formatValue={(v) => `${(v * 1000).toFixed(0)}ms`} />
-              <Knob label="D/W" value={params[P.REVERB_DW]} min={0} max={1} defaultValue={0.3}
-                onChange={(v) => setParam(P.REVERB_DW, v)} color={fxAccent} />
-            </div>
-          </div>
-        </div>
-      </Section>
+    <div className="flex flex-col gap-0 overflow-y-auto">
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-dark-border">
+        <CustomSelect
+          value={presetId}
+          onChange={handlePickPreset}
+          options={PRESET_GROUPS}
+          placeholder="Select Preset"
+          disabled={presetBusy}
+          className="w-72"
+        />
+        <ImportPresetFileButton accept=".odin" busy={presetBusy} onImport={handleImportFile} />
+      </div>
+      <div className="p-4 grid grid-cols-1 xl:grid-cols-2 gap-3">
+        {section('Master', <NamedKnobs specs={MASTER_KNOBS} ctx={ctx} />)}
+        {[1, 2, 3].map((n) => section(
+          `Oscillator ${n}`,
+          <>
+            <NamedKnobs specs={oscKnobs(n)} ctx={ctx} />
+            <NamedToggle spec={{ name: `osc${n}_reset`, label: 'Reset' }} ctx={ctx} />
+            {n > 1 && <NamedToggle spec={{ name: `osc${n}_sync`, label: 'Sync' }} ctx={ctx} />}
+          </>,
+          selector('osc', `osc${n}_type`, OSC_TYPES),
+        ))}
+        {[1, 2].map((n) => section(
+          `Filter ${n}`,
+          <NamedKnobs specs={filKnobs(n)} ctx={ctx} />,
+          selector('misc', `fil${n}_type`, FILTER_TYPES),
+        ))}
+        {[1, 2, 3, 4].map((n) => section(`Envelope ${n}`, <>
+          <NamedKnobs specs={envKnobs(n)} ctx={ctx} />
+          <NamedToggle spec={{ name: `env${n}_loop`, label: 'Loop' }} ctx={ctx} />
+        </>))}
+        {section('LFOs', <NamedKnobs specs={LFO_KNOBS} ctx={ctx} />)}
+        {section('Arpeggiator', <>
+          <NamedToggle spec={{ name: 'arp_on', label: 'Arpeggiator' }} ctx={ctx} />
+          <NamedToggle spec={{ name: 'arp_one_shot', label: 'One Shot' }} ctx={ctx} />
+        </>)}
+        {FX_GROUPS.map((fx) => section(fx.title, <NamedKnobs specs={fx.knobs} ctx={ctx} />, <NamedToggle spec={{ name: fx.on, label: 'On' }} ctx={ctx} />))}
+      </div>
     </div>
   );
 };

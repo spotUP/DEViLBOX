@@ -7,6 +7,7 @@
 import { getFirstPresetForSynthType } from '@constants/factoryPresets';
 import { catalogSynthConfig } from '@constants/synthCategories';
 import { DEFAULT_VITAL_PRESET_ID, VITAL_PRESET_PARAM_KEY } from '@engine/vstbridge/vitalPreset';
+import { DEFAULT_ODIN2_PRESET_ID, ODIN2_PRESET_PARAM_KEY } from '@engine/vstbridge/odin2Preset';
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
 import { cinter4ParamsToSampleName } from '@lib/import/formats/cinter4Params';
 import {
@@ -51,6 +52,14 @@ export function applySynthTypeDefaults(instrument: InstrumentConfig, pickedType:
     const params = (instrument.parameters ?? {}) as Record<string, unknown>;
     if (typeof params[VITAL_PRESET_PARAM_KEY] !== 'string') {
       instrument.parameters = { ...params, [VITAL_PRESET_PARAM_KEY]: DEFAULT_VITAL_PRESET_ID };
+    }
+  }
+
+  // Odin2 starts on a bundled musical preset, not the Init beep
+  if (newType === 'Odin2') {
+    const params = (instrument.parameters ?? {}) as Record<string, unknown>;
+    if (typeof params[ODIN2_PRESET_PARAM_KEY] !== 'string') {
+      instrument.parameters = { ...params, [ODIN2_PRESET_PARAM_KEY]: DEFAULT_ODIN2_PRESET_ID };
     }
   }
 

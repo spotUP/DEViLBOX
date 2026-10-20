@@ -69,7 +69,8 @@ registerVSTBridge({
 
 // ---------------------------------------------------------------------------
 // Odin2 — Semi-Modular Hybrid Synthesizer by The Wave Warden
-// 3 oscillators (11 types), 2+1 filters (9 types), 5-slot FX chain
+// Real Odin2 processor: 3 oscillators (11 types), 3 filters (14 types), 257 parameters.
+// Presets are native .odin state (loadPreset); type selectors go through setValueTreeProperty.
 // ---------------------------------------------------------------------------
 registerVSTBridge({
   id: 'Odin2',
@@ -80,8 +81,7 @@ registerVSTBridge({
   moduleFactoryName: 'createOdin2Module',
   volumeOffsetDb: 13,
   panelComponent: 'Odin2Controls',
-  configKey: 'odin2',
-  commands: ['loadPatch'],
+  commands: ['loadPreset', 'setValueTreeProperty'],
 });
 
 // ---------------------------------------------------------------------------

@@ -15,6 +15,11 @@ import { pathToFileURL } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import { SYNTH_REGISTRY, type VSTBridgeDescriptor } from '../synth-registry';
 import { DEFAULT_MONIQUE } from '../../monique/MoniqueSynth';
+import { DEFAULT_ODIN2_PRESET_ID, findOdin2Preset } from '../odin2Preset';
+
+/** A new Odin2 instrument starts on this bundled preset (git-ignored bank, see npm run presets:sync). */
+const ODIN2_DEFAULT = findOdin2Preset(DEFAULT_ODIN2_PRESET_ID);
+const ODIN2_DEFAULT_FILE = resolve(__dirname, '../../../../public', ODIN2_DEFAULT?.path.replace(/^\//, '') ?? 'missing.odin');
 
 const TARGET_PEAK_DB = -10;
 const CONFIG_VOLUME_DB = -12; // DEFAULT_INSTRUMENT_VOLUME_DB
@@ -27,6 +32,7 @@ interface SynthInstance {
   noteOn(note: number, velocity: number): void;
   setParameter(id: number, value: number): void;
   process(l: number, r: number, n: number): void;
+  handleCommand(commandType: string, data: Uint8Array): boolean;
 }
 interface WasmModule { _malloc(n: number): number; [key: string]: unknown }
 
@@ -35,6 +41,7 @@ const LIVE_VELOCITY = 127;
 /** Config a live instrument applies on init (VSTBridgeSynth.applyConfig through the descriptor's paramMapping). */
 const LIVE_CONFIG: Record<string, Record<string, number>> = { monique: DEFAULT_MONIQUE as unknown as Record<string, number> };
 
+/** Raw peak (dB) of the descriptor's default patch; Odin2 measures its default bundled preset like a live instrument. */
 async function rawPeak(desc: VSTBridgeDescriptor): Promise<number> {
   const { wasmDir: dir, wasmFile: file, moduleFactoryName: factory, synthClassName: cls } = desc;
   const root = resolve(__dirname, '../../../../public', dir);
@@ -64,6 +71,7 @@ async function rawPeak(desc: VSTBridgeDescriptor): Promise<number> {
   if (cfg && desc.paramMapping) {
     for (const [k, v] of Object.entries(cfg)) if (typeof v === 'number' && k in desc.paramMapping) synth.setParameter(desc.paramMapping[k], v);
   }
+  if (desc.id === 'Odin2' && !synth.handleCommand('loadPreset', new Uint8Array(readFileSync(ODIN2_DEFAULT_FILE)))) return NaN;
   synth.noteOn(60, LIVE_VELOCITY);
   let peak = 0;
   for (let b = 0; b < 750; b++) { // 2 s held
@@ -85,13 +93,15 @@ describe('VSTBridge default-patch level sits on the target', () => {
   });
   for (const desc of SYNTH_REGISTRY.values()) {
     // A WASM binary that is not tracked in git (checkout snapshot) cannot be measured; it is measured wherever it exists.
-    const present = existsSync(resolve(__dirname, '../../../../public', desc.wasmDir, `${desc.wasmFile}.wasm`));
+    const present = existsSync(resolve(__dirname, '../../../../public', desc.wasmDir, `${desc.wasmFile}.wasm`))
+      && (desc.id !== 'Odin2' || existsSync(ODIN2_DEFAULT_FILE));
     it.skipIf(!present)(`${desc.id}: raw peak + volume + offset is within ${TOLERANCE_DB} dB of ${TARGET_PEAK_DB} dBFS`, async () => {
       if (SKIPPED[desc.id]) return;
       const raw = await rawPeak(desc);
       if (process.env.VSTB_CAL_OUT) appendFileSync(process.env.VSTB_CAL_OUT, `${desc.id}\t${raw.toFixed(2)}\t${desc.volumeOffsetDb ?? 0}\n`);
       expect(Number.isFinite(raw), `${desc.id} raw peak ${raw}`).toBe(true);
-      const level = raw + CONFIG_VOLUME_DB + (desc.volumeOffsetDb ?? 0);
+      const trim = desc.id === 'Odin2' ? (ODIN2_DEFAULT?.gainTrimDb ?? 0) : 0; // per-preset trim, see tools/convertOdinPresets.ts
+      const level = raw + CONFIG_VOLUME_DB + (desc.volumeOffsetDb ?? 0) + trim;
       expect(Math.abs(level - TARGET_PEAK_DB)).toBeLessThanOrEqual(TOLERANCE_DB);
     }, 60000);
   }
