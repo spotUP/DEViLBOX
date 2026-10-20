@@ -93,6 +93,61 @@ function mapEffectToOpenMPT(effTyp: number, eff: number): { cmd: number; param: 
   }
 }
 
+type Soundlib = typeof import('@lib/import/wasm/OpenMPTSoundlib');
+
+/** Write one TrackerCell into the soundlib pattern, in the bridge's current format. */
+async function writeCell(
+  osl: Soundlib,
+  patternIndex: number,
+  rowIndex: number,
+  channelIndex: number,
+  cell: TrackerCell,
+): Promise<void> {
+  const note = mapNoteToOpenMPT(cell.note, _format);
+  const { volcmd, volval } = mapVolumeToOpenMPT(cell.volume);
+
+  let command: number;
+  let param: number;
+
+  if (cell.effTyp === osl.DSP_EFFECT_MARKER) {
+    // Symphonie DSP effect — encode as MIDI macro (CMD_MIDI = 31)
+    // effTyp2 = 0x50+type, eff = bufLen, eff2 = feedback
+    const type     = (cell.effTyp2 - osl.DSP_EFFECT_MARKER) & 0x07;
+    const bufLen   = cell.eff    & 0x7F;
+    const feedback = cell.eff2   & 0x7F;
+    const slot = await allocateDSPMacro(osl, type, bufLen, feedback);
+    command = slot >= 0 ? 31 : 0;
+    param   = slot >= 0 ? (0x80 | slot) : 0;
+  } else {
+    const fx = mapEffectToOpenMPT(cell.effTyp, cell.eff);
+    command = fx.cmd;
+    param   = fx.param;
+  }
+
+  await osl.setPatternCell(patternIndex, rowIndex, channelIndex, {
+    note,
+    instrument: cell.instrument,
+    volcmd,
+    vol: volval,
+    command,
+    param,
+  });
+}
+
+/** Write every cell of one pattern into the soundlib. */
+async function writePatternCells(
+  osl: Soundlib,
+  patternIndex: number,
+  channels: { rows: TrackerCell[] }[],
+): Promise<void> {
+  for (let ch = 0; ch < channels.length; ch++) {
+    const rows = channels[ch].rows;
+    for (let row = 0; row < rows.length; row++) {
+      await writeCell(osl, patternIndex, row, ch, rows[row]);
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -163,35 +218,7 @@ export async function syncCellEdit(
 
   const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
 
-  const note = mapNoteToOpenMPT(fullCell.note, _format);
-  const { volcmd, volval } = mapVolumeToOpenMPT(fullCell.volume);
-
-  let cmdFinal: number;
-  let paramFinal: number;
-
-  if (fullCell.effTyp === osl.DSP_EFFECT_MARKER) {
-    // Symphonie DSP effect — encode as MIDI macro (CMD_MIDI = 31)
-    // effTyp2 = 0x50+type, eff = bufLen, eff2 = feedback
-    const type     = (fullCell.effTyp2 - osl.DSP_EFFECT_MARKER) & 0x07;
-    const bufLen   = fullCell.eff    & 0x7F;
-    const feedback = fullCell.eff2   & 0x7F;
-    const slot = await allocateDSPMacro(osl, type, bufLen, feedback);
-    cmdFinal   = slot >= 0 ? 31 : 0;
-    paramFinal = slot >= 0 ? (0x80 | slot) : 0;
-  } else {
-    const fx = mapEffectToOpenMPT(fullCell.effTyp, fullCell.eff);
-    cmdFinal   = fx.cmd;
-    paramFinal = fx.param;
-  }
-
-  await osl.setPatternCell(patternIndex, rowIndex, channelIndex, {
-    note,
-    instrument: fullCell.instrument,
-    volcmd,
-    vol: volval,
-    command: cmdFinal,
-    param: paramFinal,
-  });
+  await writeCell(osl, patternIndex, rowIndex, channelIndex, fullCell);
 
   _dirty = true;
   scheduleHotReload();
@@ -234,26 +261,53 @@ export async function syncFullPattern(
 
   const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
 
-  for (let ch = 0; ch < channels.length; ch++) {
-    const rows = channels[ch].rows;
-    for (let row = 0; row < rows.length; row++) {
-      const cell = rows[row];
-      const note = mapNoteToOpenMPT(cell.note, _format);
-      const { volcmd, volval } = mapVolumeToOpenMPT(cell.volume);
-      const fx = mapEffectToOpenMPT(cell.effTyp, cell.eff);
-      await osl.setPatternCell(patternIndex, row, ch, {
-        note,
-        instrument: cell.instrument,
-        volcmd,
-        vol: volval,
-        command: fx.cmd,
-        param: fx.param,
-      });
-    }
-  }
+  await writePatternCells(osl, patternIndex, channels);
 
   _dirty = true;
   scheduleHotReload();
+}
+
+/**
+ * Build the soundlib module for a song that was never imported (a fresh song
+ * or one made in the editor), and activate the bridge on it. Called at play
+ * time, so a concurrent import cannot be clobbered by an async init.
+ *
+ * The module gets the song's channel count, pattern lengths, order list AND
+ * every cell. libopenmpt plays every command (Bxx, Dxx, Fxx, E6x, EEx, sample
+ * effects) from this module while the hybrid route plays the synth notes, so
+ * a module without the cells plays none of the song's commands.
+ *
+ * Returns the serialized XM, or null when creation failed or `cancelled()`
+ * turned true while it was being built.
+ */
+export async function createModuleForSong(
+  song: {
+    numChannels: number;
+    patterns: { length: number; channels: { rows: TrackerCell[] }[] }[];
+    songPositions: number[];
+  },
+  cancelled: () => boolean,
+): Promise<ArrayBuffer | null> {
+  const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
+  await osl.destroyModule();
+  const numPat = song.patterns.length || 1;
+  if (!(await osl.createNewModule(1 /* XM */, song.numChannels || 4, numPat))) return null;
+  // createNewModule makes 64-row patterns; without the resize an 8-row song
+  // would play 56 rows of silence before looping.
+  for (let i = 0; i < song.patterns.length; i++) {
+    const rows = song.patterns[i]?.length ?? 64;
+    if (rows !== 64) await osl.resizePattern(i, rows);
+  }
+  // createNewModule sets order = [0, 1, 2, ...]; the song may differ ([0, 1, 0, 2]).
+  for (let i = 0; i < song.songPositions.length; i++) {
+    await osl.setOrderPattern(i, song.songPositions[i]);
+  }
+  markLoaded('xm');
+  for (let p = 0; p < song.patterns.length; p++) {
+    await writePatternCells(osl, p, song.patterns[p].channels);
+  }
+  if (cancelled()) return null;
+  return osl.saveModule('xm');
 }
 
 /**

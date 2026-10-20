@@ -2458,7 +2458,7 @@ export class TrackerReplayer {
     }
 
     // Phase 5.4: If no libopenmptFileData exists (fresh song, never imported),
-    // create an empty XM module on-demand so the song routes through libopenmpt.
+    // build an XM module from the song on demand so it routes through libopenmpt.
     // Done HERE instead of in useTrackerStore.reset() to avoid the race condition
     // where async init clobbers a concurrently-imported real module.
     //
@@ -2471,33 +2471,11 @@ export class TrackerReplayer {
         && !this._suppressNotes && !this.coordinator.hasActiveDispatch
         && !this.song.nativeSamplePlayback) {
       try {
-        const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
+        const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
         if (gen !== this._playGeneration) return;
-        await osl.destroyModule();
-        const numPat = this.song.patterns.length || 1;
-        const ok = await osl.createNewModule(1 /* XM */, this.song.numChannels || 4, numPat);
-        if (ok) {
-          // Resize each pattern to match the actual song pattern lengths.
-          // createNewModule defaults to 64 rows per pattern; without this,
-          // an 8-row .dbx song would play 56 rows of silence before looping.
-          for (let i = 0; i < this.song.patterns.length; i++) {
-            const rows = this.song.patterns[i]?.length ?? 64;
-            if (rows !== 64) {
-              await osl.resizePattern(i, rows);
-            }
-          }
-          // Set up the order list to match the song's pattern order.
-          // createNewModule sets order = [0, 1, 2, ...] but the song may
-          // have a different arrangement (e.g. [0, 1, 0, 2]).
-          for (let i = 0; i < this.song.songPositions.length; i++) {
-            await osl.setOrderPattern(i, this.song.songPositions[i]);
-          }
-          const data = await osl.saveModule('xm');
-          if (data && gen === this._playGeneration) {
-            this.song.libopenmptFileData = data;
-            const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
-            bridge.markLoaded('xm');
-          }
+        const data = await bridge.createModuleForSong(this.song, () => gen !== this._playGeneration);
+        if (data && gen === this._playGeneration) {
+          this.song.libopenmptFileData = data;
         }
       } catch (err) {
         console.warn('[TrackerReplayer] Phase 5.4: soundlib creation failed:', err);
