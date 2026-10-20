@@ -59,6 +59,12 @@ describe('SynthEffectProcessor pitch restore', () => {
     expect(lastOfRow(sent, 2)).toBeCloseTo(C4, 3);
   });
 
+  it('starts a new note at its own pitch after a portamento slide', () => {
+    const sent = run([cell(49), cell(0, 0x2, 0x09), cell(0, 0x2, 0x09), cell(49)]);
+    expect(lastOfRow(sent, 2)!).toBeLessThan(C4 * 0.97);
+    expect(lastOfRow(sent, 3)).toBeCloseTo(C4, 3);
+  });
+
   it('vibrates around the pitch portamento reached, not the note pitch', () => {
     const sent = run([cell(49), cell(0, 0x1, 0x20), cell(0, 0x4, 0x88)]);
     const portaEnd = lastOfRow(sent, 1)!;
