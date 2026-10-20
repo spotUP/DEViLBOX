@@ -246,8 +246,22 @@ export function tapeDelay(x: ArrayLike<number>, rate: number, delaySec: number, 
   return out;
 }
 
-/** numpy's pairwise float64 sum (np.sum / np.mean over a contiguous array): the order its C loop adds in. */
+/**
+ * numpy's float64 sum (np.sum / np.mean over a contiguous array). The reduction iterator feeds the add loop in
+ * buffer-sized chunks of 8192 elements and accumulates the chunk sums left to right; inside a chunk the loop is
+ * numpy's pairwise sum. Beyond 8192 elements the chunking is visible in the last bit.
+ */
 export function npSum(x: ArrayLike<number>, start = 0, n: number = x.length - start): number {
+  if (n <= NP_REDUCE_CHUNK) return npPairwise(x, start, n);
+  let total = 0;
+  for (let s = 0; s < n; s += NP_REDUCE_CHUNK) total += npPairwise(x, start + s, Math.min(NP_REDUCE_CHUNK, n - s));
+  return total;
+}
+
+const NP_REDUCE_CHUNK = 8192;
+
+/** numpy's DOUBLE_pairwise_sum: the order its C loop adds in (8 accumulators up to 128 elements, halves above). */
+function npPairwise(x: ArrayLike<number>, start: number, n: number): number {
   if (n < 8) { let r = 0; for (let i = 0; i < n; i++) r += x[start + i]!; return r; }
   if (n <= 128) {
     const r = new Array<number>(8);
@@ -260,7 +274,7 @@ export function npSum(x: ArrayLike<number>, start = 0, n: number = x.length - st
   }
   let n2 = Math.trunc(n / 2);
   n2 -= n2 % 8;
-  return npSum(x, start, n2) + npSum(x, start + n2, n - n2);
+  return npPairwise(x, start, n2) + npPairwise(x, start + n2, n - n2);
 }
 
 /**

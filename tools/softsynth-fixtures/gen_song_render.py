@@ -113,7 +113,7 @@ def run(name, style, seed, bars, lanes=False, **kw):
 cases = [
     run("boom_bap-drums-off", "boom_bap", 3, 4, drums_off=(1, 3), lanes=True),   # + the default breakdown (section 3)
     run("lofi-a500", "lofi", 9, 4),
-    run("g_funk", "g_funk", 5, 4),
+    run("g_funk-multi-bar", "g_funk", 5, 6),     # section 0 is 2 bars: bseed advances by the bar count
     run("trap", "trap", 6, 4),
     run("dirty_south-a500", "dirty_south", 2, 4),
     run("east_coast-use-scratch", "east_coast", 4, 4),
