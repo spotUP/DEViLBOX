@@ -41,6 +41,8 @@ def load(name):
 
 dm = load("drummachine")
 assert dm.RATE == RATE
+# hiphop.py loads the whole synth stack; its _shaker / _tamb / _metal_hit are the voices ported as shaker / tamb / metal.
+hh = load("hiphop")
 
 KICK = dm.VOICE_PARAMS["kick808"]
 KICK_KEYS = ["tune", "pitch_start", "pitch_decay", "amp_decay", "click", "drive", "pitch_tail_ms",
@@ -79,6 +81,9 @@ VOICES = {
     "rim": lambda p, s: dm.rim(machine=machine(p), seed=s),
     "cowbell": lambda p, s: dm.cowbell(tune=p["tune"], dirt=p["dirt"]),
     "conga": lambda p, s: dm.conga(tune=p["tune"], decay=p["decay"], dirt=p["dirt"]),
+    "shaker": lambda p, s: hh._shaker(RATE, seed=s),
+    "tamb": lambda p, s: hh._tamb(RATE, seed=s),
+    "metal": lambda p, s: hh._metal_hit(RATE, seed=s),
     "ride": lambda p, s: dm.ride(seed=s, machine=machine(p), pcm_bits=int(p["pcm_bits"]), dirt=p["dirt"]),
 }
 
@@ -112,6 +117,9 @@ CASES += [
     ("conga", 0, dict(tune=32, decay=140, dirt=0)), ("conga", 0, dict(tune=40, decay=300, dirt=1.0)), ("conga", 0, dict(tune=24, decay=80, dirt=0)),
     ("ride", 6, dict(machine=909, pcm_bits=-1, dirt=0)), ("ride", 13, dict(machine=808, pcm_bits=-1, dirt=1.0)),
     ("ride", 6, dict(machine=909, pcm_bits=8, dirt=0)),
+    ("shaker", 3, {}), ("shaker", 17, {}), ("shaker", 4242, {}),
+    ("tamb", 5, {}), ("tamb", 9, {}), ("tamb", 123456, {}),
+    ("metal", 7, {}), ("metal", 1, {}),
 ]
 
 cases = []
