@@ -29,8 +29,10 @@ for (const [id, vstDesc] of VST_SYNTH_REGISTRY.entries()) {
     create: (config) => {
       return new VSTBridgeSynth(vstDesc, config);
     },
-    onTriggerRelease: (synth, _note, time) => {
-      (synth as any).triggerRelease(time);
+    onTriggerRelease: (synth, note, time) => {
+      // VSTBridgeSynth is polyphonic: triggerRelease(note, time). Passing only
+      // time made the engine read it as a frequency and send a wrong noteOff.
+      (synth as any).triggerRelease(note, time);
       return true;
     },
   } as SynthDescriptor);
