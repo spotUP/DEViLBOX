@@ -17,6 +17,19 @@ if a[0] == "styles":
     print(json.dumps(["golden_era", "trap"]))
 elif "--crash" in a:
     sys.exit(3)
+elif "--events" in a:
+    # R2 stream mode: NDJSON on stdout, one flushed line each. seed 13 dies after the first line, seed 14 before any.
+    seed = int(a[a.index("--seed") + 1])
+    assert a[a.index("--events") + 1] == "-"
+    if seed == 14:
+        sys.stderr.write("early boom")
+        sys.exit(4)
+    print(json.dumps({"seq": 0, "type": "start", "mode": "generate"}), flush=True)
+    if seed == 13:
+        sys.stdout.write('{"seq": 1, "type": "sec')  # a cut-off line must never reach the client
+        sys.stdout.flush()
+        sys.exit(5)
+    print(json.dumps({"seq": 1, "type": "done", "mode": "generate", "samples": 0, "song": {"args": a}}), flush=True)
 else:
     print(json.dumps({"args": a}))
 `;
@@ -210,5 +223,44 @@ json.dump(a, open(os.path.join(${JSON.stringify(root)}, "seen_args.json"), "w"))
     expect(r.status).toBe(400);
     expect(((await r.json()) as { error: string }).error).toBe('the song file has 32 bars; tier 64k holds 16');
     expect(renderDirs()).toEqual(before);
+  });
+});
+
+describe('POST /api/uprough/generate with events (R2c NDJSON stream)', () => {
+  const ndjson = async (r: Response) => (await r.text()).split('\n').filter(Boolean).map((l) => JSON.parse(l) as Record<string, unknown>);
+
+  it('streams the host lines as application/x-ndjson and passes --events -', async () => {
+    const r = await post({ style: 'trap', seed: 7, events: true });
+    expect(r.status).toBe(200);
+    expect(r.headers.get('content-type')).toContain('application/x-ndjson');
+    const lines = await ndjson(r);
+    expect(lines.map((l) => l.type)).toEqual(['start', 'done']);
+    expect((lines[1]!.song as { args: string[] }).args).toEqual(['new', '--style', 'trap', '--seed', '7', '--events', '-']);
+  });
+
+  it('without events the response is unchanged (no --events argument)', async () => {
+    const r = await post({ style: 'trap', seed: 7 });
+    expect(((await r.json()) as { args: string[] }).args).not.toContain('--events');
+  });
+
+  it('400 when events is not a boolean', async () => {
+    const r = await post({ style: 'trap', seed: 7, events: 'yes' });
+    expect(r.status).toBe(400);
+    expect(((await r.json()) as { error: string }).error).toContain('events');
+  });
+
+  it('a failure after the first line ends the stream with an error line and drops the cut-off line', async () => {
+    const r = await post({ style: 'trap', seed: 13, events: true });
+    const lines = await ndjson(r);
+    expect(lines.map((l) => l.type)).toEqual(['start', 'error']);
+    expect(lines[1]!.error).toBeTruthy();
+  });
+
+  it('a failure before any line is a plain 500 JSON error', async () => {
+    const r = await post({ style: 'trap', seed: 14, events: true });
+    expect(r.status).toBe(500);
+    const body = (await r.json()) as { error: string; detail?: string };
+    expect(body.error).toBeTruthy();
+    expect(body.detail).toContain('early boom');
   });
 });
