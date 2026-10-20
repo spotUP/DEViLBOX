@@ -25,11 +25,14 @@ import * as busEffects from './effects/busEffects';
 import { reverb } from './effects/busEffects';
 import * as songMix from './mix/songMix';
 import { echo, type ScratchLane } from './mix/songMix';
-import { bassBusGain, songBass } from './songBass';
+import { bassBusGain, sectionBassOn, songBass } from './songBass';
 import type { BassVoice } from './voices/bassSynth';
 import { applyMacros, cleanDirt, dirtConfig, songBuses } from './songBuses';
 import { songDrums, sectionDrumsOn } from './songDrums';
 import { songMelody } from './songMelody';
+import { songDrumBank, type DrumBank, type HipHopStyle } from './drumBank';
+import { createEmitter, type Emitter, type OnEvent } from './r2Events';
+import { envOf, peaks, type Env, type Peaks } from './r2Peaks';
 
 /** The DIRT keys the scratch bus reads, plus STYLES[style].use_scratch. */
 export interface ScratchDirt {
@@ -92,6 +95,57 @@ export interface RenderSongOptions {
   /** DIRT[style].master_rev / master_rev_mix, the maker's overrides (null for every style's own table row). */
   masterRev?: SamplerReverbKind | null;
   masterRevMix?: number | null;
+  /** The R2 render-event listener (spec 2026-10-20_r2a-event-protocol.md 3.3). No listener: nothing is summarised or copied. */
+  onEvent?: OnEvent;
+  /** The caller already ran act 1 (the bank build) for this song: suppress the stage, bank and attach events. */
+  bankSeen?: boolean;
+}
+
+/** What one render carries between its steps: the emitter (only with a listener) and the bank built once for the whole song. */
+export interface RenderCtx { em?: Emitter; bank?: DrumBank }
+
+/** The layers of an arrangement row that are on, in the row's key order. */
+const layerNames = (row: unknown): string[] =>
+  Object.entries((row ?? {}) as Record<string, unknown>).filter(([, v]) => Boolean(v)).map(([k]) => k);
+
+/**
+ * Starts a render's event stream: `start`, then (M1) the drum bank built ONCE for the song with every voice stage
+ * observed, as `stage*` and `bank` per voice in bank order and an `attach` for each snare variant. Without a listener
+ * it returns an empty ctx and builds nothing (the bank is built per call as before; same bytes, the bank is deterministic).
+ */
+export function beginRender(events: BarEvents, options: RenderSongOptions): RenderCtx {
+  const em = createEmitter(options.onEvent);
+  if (!em) return {};
+  const rate = events.params.rate as number;
+  const seed = events.params.seed as number;
+  em.emit({
+    type: 'start', mode: 'render', rate, style: events.params.style as string, seed,
+    sections: events.arrangement.map((row, i) => ({
+      name: String(row[0]), bars: events.sections[i]!.drums.length, layers: layerNames(row[2]),
+    })),
+  });
+  const stages = new Map<string, { stage: string; peaks: Peaks; env?: Env }[]>();
+  const bank = songDrumBank(events.params.style as HipHopStyle, rate, seed, (voice, stage, buf, isEnv) => {
+    let list = stages.get(voice);
+    if (!list) stages.set(voice, list = []);
+    list.push(isEnv ? { stage, peaks: peaks(buf), env: envOf(buf) } : { stage, peaks: peaks(buf) });
+  });
+  if (!options.bankSeen) {
+    for (const [voice, buf] of Object.entries(bank)) {
+      if (voice === 'snare_accent' || voice === 'snare_ghost') {
+        em.emit({ type: 'attach', voice, parent: 'snare', peaks: peaks(buf) });
+        continue;
+      }
+      stages.get(voice)?.forEach((st, index) => em.emit({ type: 'stage', voice, index, ...st }));
+      em.emit({ type: 'bank', voice, peaks: peaks(buf), len: buf.length });
+    }
+  }
+  return { em, bank };
+}
+
+/** The first bar-length span of a lane from its first rendered bar: the `born` peaks of a lane event. */
+function bornPeaks(lane: Float64Array, firstBar: number, barLen: number): Peaks {
+  return peaks(lane.subarray(firstBar * barLen, Math.min(lane.length, (firstBar + 1) * barLen)));
 }
 
 /** Everything renderSong needs, read from a song file the way the sibling song tests read it. */
@@ -118,9 +172,13 @@ function sectionSlice(events: BarEvents, index: number, bseed: number): BarEvent
  * bseed (the song seed plus the bars before it): null for a section without bars. The sections of a song are independent
  * given that bseed, so this is the cacheable unit of renderSong. The drum bank keeps the song seed (events.params.seed).
  */
-export function renderSectionMix(events: BarEvents, index: number, bseed: number, options: RenderSongOptions): Float64Array | null {
+export function renderSectionMix(
+  events: BarEvents, index: number, bseed: number, options: RenderSongOptions, ctx: RenderCtx = {},
+): Float64Array | null {
   const section = events.sections[index]!;
   const bars = section.drums.length;
+  const em = ctx.em;
+  if (em) em.emit({ type: 'section', section: index, name: String(events.arrangement[index]![0]), bars, cached: false });
   if (bars <= 0) return null;
   const rate = events.params.rate as number;
   const stepSamp = Math.trunc(rate * 60 / (options.bpm * 4));
@@ -128,9 +186,25 @@ export function renderSectionMix(events: BarEvents, index: number, bseed: number
   const d8d = 3 * stepSamp / rate;
   const bassGain = bassBusGain();
   const one = sectionSlice(events, index, bseed);
-  const drums = songDrums(one, options.bpm, { bankSeed: events.params.seed as number });
+  const drums = songDrums(one, options.bpm, {
+    bankSeed: events.params.seed as number, ...(ctx.bank ? { bank: ctx.bank } : {}),
+    ...(em ? { onHatPool: (_: number, pool: Float64Array[]) =>
+      em.emit({ type: 'hatpool', section: index, variants: pool.map((v, k) => ({ name: `hat_${k}`, peaks: peaks(v) })) }) } : {}),
+  });
   const bass = songBass(one, options.bpm, { groove: options.groove, bassCut: options.bassCut, bassVoice: options.bassVoice });
   const melody = songMelody(one, options.bpm, { melodyVoice: options.melodyVoice });
+  if (em) {
+    const hasMel = section.melody.some((m) => m !== null);
+    const laneEvent = (lane: 'drums' | 'bass' | 'melody', buf: Float64Array, first: number): void =>
+      em.emit({ type: 'lane', section: index, lane, peaks: peaks(buf), born: bornPeaks(buf, first, barLen) });
+    if (sectionDrumsOn(one, 0)) {
+      laneEvent('drums', drums[0]!, Math.max(0, section.drums.findIndex((d) => d.drop !== 'drums')));
+    }
+    if (sectionBassOn(one, 0)) {
+      laneEvent('bass', bass[0]!, Math.max(0, section.drums.findIndex((d, b) => d.drop !== 'bass' && Boolean(section.bass[b]))));
+    }
+    if (hasMel) laneEvent('melody', melody[0]!, section.melody.findIndex((m) => m !== null));
+  }
   const buses = songBuses(one, { style: options.style, bpm: options.bpm, vintage: options.vintage, drums, bass, melody });
   const base = dirtConfig(options.style);
   const profile = (options.vintage ? base : cleanDirt(base)).samplerProfile;
@@ -147,7 +221,16 @@ export function renderSectionMix(events: BarEvents, index: number, bseed: number
   };
   const hasDrums = sectionDrumsOn(one, 0);
   const balanced = songMix.balanceBuses(lanes, { bassGain, hasDrums });
-  return songMix.sumBalanced(balanced, { length, bassGain, hasDrums, rate, scratch });
+  const sum = songMix.sumBalanced(balanced, { length, bassGain, hasDrums, rate, scratch });
+  if (em) {
+    // The buses are the pre-balance chain outputs; the scratch lane event is deferred to here (M6), between the last bus and mix.
+    em.emit({ type: 'bus', section: index, bus: 'drums', peaks: peaks(buses.drums[0]!) });
+    em.emit({ type: 'bus', section: index, bus: 'bass', peaks: peaks(buses.bass[0]!) });
+    if (section.melody.some((m) => m !== null)) em.emit({ type: 'bus', section: index, bus: 'melody', peaks: peaks(buses.melody[0]!) });
+    em.emit({ type: 'lane', section: index, lane: 'scratch', peaks: peaks(scratch.buf), born: bornPeaks(scratch.buf, 0, barLen) });
+    em.emit({ type: 'mix', section: index, peaks: peaks(sum) });
+  }
+  return sum;
 }
 
 /** The starting bseed of every section: the song seed plus the bars before it. */
@@ -157,19 +240,31 @@ export function sectionSeeds(events: BarEvents): number[] {
 }
 
 /** joinSections -> applyTexture -> masterBus over the sections' mixes (null entries, bar-less sections, are skipped). */
-export function finishSong(sectionMixes: readonly (Float64Array | null)[], events: BarEvents, options: RenderSongOptions): Float64Array {
+export function finishSong(
+  sectionMixes: readonly (Float64Array | null)[], events: BarEvents, options: RenderSongOptions, ctx: RenderCtx = {},
+): Float64Array {
+  const em = ctx.em;
   const rate = events.params.rate as number;
   const seed = events.params.seed as number;
-  const textured = songMix.applyTexture(songMix.joinSections(sectionMixes.filter((m): m is Float64Array => m !== null)), rate, {
+  const joined = songMix.joinSections(sectionMixes.filter((m): m is Float64Array => m !== null));
+  if (em) em.emit({ type: 'join', peaks: peaks(joined) });
+  const textured = songMix.applyTexture(joined, rate, {
     style: options.style, seed, masterRev: options.masterRev ?? null, masterRevMix: options.masterRevMix ?? null,
   });
-  return Float64Array.from(busEffects.masterBus(textured, {}, rate), (v) => v / 127.0);
+  if (em) em.emit({ type: 'texture', peaks: peaks(textured) });
+  const out = Float64Array.from(busEffects.masterBus(textured, {}, rate), (v) => v / 127.0);
+  if (em) {
+    em.emit({ type: 'master', peaks: peaks(out) });
+    em.emit({ type: 'done', mode: 'render', samples: out.length });
+  }
+  return out;
 }
 
 /** hiphop.render_track for a song with no locked layers: the final float64 mix (int8 / 127.0). */
 export function renderSong(events: BarEvents, options: RenderSongOptions): Float64Array {
   const seeds = sectionSeeds(events);
-  return finishSong(events.sections.map((_, i) => renderSectionMix(events, i, seeds[i]!, options)), events, options);
+  const ctx = beginRender(events, options);
+  return finishSong(events.sections.map((_, i) => renderSectionMix(events, i, seeds[i]!, options, ctx)), events, options, ctx);
 }
 
 /** renderSong over a song file. */

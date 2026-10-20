@@ -13,6 +13,7 @@ import {
 import { pexp, psin } from '@/engine/dj/scratch/portableMath';
 import { bp, hp, lp, reverb } from '@/engine/dj/scratch/refDsp';
 import { linspace } from '@/engine/turntable/turntableSim';
+import type { Tap } from './r2Events';
 import { distort } from './synthDsp';
 
 export type HipHopStyle =
@@ -88,6 +89,11 @@ export const GHOST_ATTACK_MS = 3.0;
 
 export type DrumBank = Record<string, Float64Array>;
 
+/** A bank-wide stage tap: the voice a stage belongs to, then the Tap arguments. */
+export type BankTap = (voice: string, stage: string, buf: ArrayLike<number>, isEnv?: boolean) => void;
+const voiceTap = (bankTap: BankTap | undefined, voice: string): Tap | undefined =>
+  bankTap && ((stage, buf, isEnv) => bankTap(voice, stage, buf, isEnv));
+
 /** x + gain * y, the shorter one zero-padded (np.pad(a) + gain * np.pad(b)). */
 function padAdd(x: Float64Array, y: Float64Array, gain: number): Float64Array {
   const out = new Float64Array(Math.max(x.length, y.length));
@@ -99,27 +105,35 @@ function padAdd(x: Float64Array, y: Float64Array, gain: number): Float64Array {
  * hiphop._boombap_snare: a two-mode shell tone that leads, a band-limited wire buzz and a short snap, through a
  * small room and light tape saturation, normalised to 0.9.
  */
-export function boombapSnare(rate: number, { hard = false, dark = false }: BoombapSnareOpts = {}, seed = 2): Float64Array {
+export function boombapSnare(rate: number, { hard = false, dark = false }: BoombapSnareOpts = {}, seed = 2, tap?: Tap): Float64Array {
   const n = Math.trunc(0.22 * rate);
   const buzz = bp(demoNoise(n, seed), 1900, dark ? 3200 : 4200, rate);
   const snap = hp(demoNoise(n, seed + 5), 5000, rate);
   const mix = new Float64Array(n);
+  const shells = tap ? new Float64Array(n) : null;
   for (let t = 0; t < n; t++) {
     const shell = psin(2 * Math.PI * 185 * t / rate) * pexp(-t / (0.055 * rate))
       + 0.5 * psin(2 * Math.PI * 330 * t / rate) * pexp(-t / (0.040 * rate));
+    if (shells) shells[t] = shell;
     mix[t] = 0.9 * shell + 0.6 * (buzz[t]! * pexp(-t / (0.10 * rate))) + 0.28 * (snap[t]! * pexp(-t / (0.004 * rate)));
   }
-  const y = tapeSat(reverb(mix, rate, 'room', 0.15, 0.35), hard ? 1.2 : 1.1);
+  if (tap) { tap('shell', shells!); tap('buzz', buzz); tap('snap', snap); tap('mix', mix); }
+  const room = reverb(mix, rate, 'room', 0.15, 0.35);
+  if (tap) tap('room', room);
+  const y = tapeSat(room, hard ? 1.2 : 1.1);
+  if (tap) tap('tape_sat', y);
   let peak = 0;
   for (let i = 0; i < y.length; i++) peak = Math.max(peak, Math.abs(y[i]!));
   const d = peak + 1e-9;
   for (let i = 0; i < y.length; i++) y[i] = y[i]! / d * 0.9;
+  if (tap) tap('normalise', y);
   return y;
 }
 
-function styleKick(style: HipHopStyle, rate: number): Float64Array {
+function styleKick(style: HipHopStyle, rate: number, tap?: Tap): Float64Array {
+  const staged = (x: Float64Array, stage: string): Float64Array => { if (tap) tap(stage, x); return x; };
   const spec = KICK_SPEC[style];
-  if (spec) return kick808(spec, rate);
+  if (spec) return kick808(spec, rate, undefined, tap);
   const kk = STYLE_DRUMS[style].kick;
   switch (kk) {
     case 'boombap': case 'boombap_hard': case 'boombap_soft': {
@@ -127,70 +141,70 @@ function styleKick(style: HipHopStyle, rate: number): Float64Array {
       const kick = kick808({
         tune: 6, pitch_start: 20, amp_decay: soft ? 590 : 520, click: soft ? 0.05 : 0.12,
         drive: kk === 'boombap_hard' ? 0.18 : 0.12,
-      }, rate);
-      return lp(kick, soft ? 3000 : 4200, rate);
+      }, rate, undefined, tap);
+      return staged(lp(kick, soft ? 3000 : 4200, rate), 'lp');
     }
     case 'lofi':
-      return tapeSat(lp(kick808({ tune: 5, amp_decay: 460, click: 0.05, drive: 0.1 }, rate), 2400, rate), 1.4);
+      return staged(tapeSat(staged(lp(kick808({ tune: 5, amp_decay: 460, click: 0.05, drive: 0.1 }, rate, undefined, tap), 2400, rate), 'lp'), 1.4), 'tape_sat');
     case 'gfunk':
-      return kick808({ tune: 7, pitch_start: 18, amp_decay: 560, click: 0.08, drive: 0.08 }, rate);
+      return kick808({ tune: 7, pitch_start: 18, amp_decay: 560, click: 0.08, drive: 0.08 }, rate, undefined, tap);
     case 'drill':
-      return kick808({ tune: 10, pitch_start: 15, amp_decay: 135, click: 0.36, drive: 0.1 }, rate);
+      return kick808({ tune: 10, pitch_start: 15, amp_decay: 135, click: 0.36, drive: 0.1 }, rate, undefined, tap);
     case 'trap': case 'trap_hard':
-      return kick808({ tune: 9, pitch_start: 16, amp_decay: 180, click: 0.3, drive: kk === 'trap_hard' ? 0.12 : 0.08 }, rate);
+      return kick808({ tune: 9, pitch_start: 16, amp_decay: 180, click: 0.3, drive: kk === 'trap_hard' ? 0.12 : 0.08 }, rate, undefined, tap);
     case 'memphis':
-      return distort(kick808({ tune: 8, amp_decay: 200, click: 0.2, drive: 0.25 }, rate), 'rat', 2.0);
+      return staged(distort(kick808({ tune: 8, amp_decay: 200, click: 0.2, drive: 0.25 }, rate, undefined, tap), 'rat', 2.0), 'distort');
     case 'electro':
-      return kick808({ tune: 8, pitch_start: 22, amp_decay: 380, click: 0.15, drive: 0.1 }, rate);
+      return kick808({ tune: 8, pitch_start: 22, amp_decay: 380, click: 0.15, drive: 0.1 }, rate, undefined, tap);
     case 'industrial':
-      return distort(kick909({ drive: 0.4 }, rate), 'rat', 3.0);
+      return staged(distort(kick909({ drive: 0.4 }, rate, tap), 'rat', 3.0), 'distort');
     default:
-      return kick808({}, rate);
+      return kick808({}, rate, undefined, tap);
   }
 }
 
-function styleSnare(style: HipHopStyle, rate: number, seed: number): Float64Array {
+function styleSnare(style: HipHopStyle, rate: number, seed: number, tap?: Tap): Float64Array {
   const spec = SNARE_SPEC[style];
-  if (spec) return spec[0] === 'boombap' ? boombapSnare(rate, spec[1], seed + 2) : snare808(spec[1], rate);
+  if (spec) return spec[0] === 'boombap' ? boombapSnare(rate, spec[1], seed + 2, tap) : snare808(spec[1], rate, undefined, tap);
   const sn = STYLE_DRUMS[style].snare;
   switch (sn) {
     case 'boombap': case 'boombap_hard': case 'boombap_crack': case 'boombap_bright': {
-      const snare = boombapSnare(rate, { hard: sn === 'boombap_hard' || sn === 'boombap_bright', dark: sn === 'boombap_crack' }, seed + 2);
+      const snare = boombapSnare(rate, { hard: sn === 'boombap_hard' || sn === 'boombap_bright', dark: sn === 'boombap_crack' }, seed + 2, tap);
       return sn === 'boombap_bright' ? hp(snare, 380, rate) : snare; // crisp, less room
     }
     case 'lofi':
-      return lp(boombapSnare(rate, { dark: true }, seed + 2), 5000, rate);
+      return lp(boombapSnare(rate, { dark: true }, seed + 2, tap), 5000, rate);
     case 'westcoast': // snare + clap layer
-      return padAdd(snare909({ tune: 30, noise_amt: 0.7, drive: 0.15 }, rate), clap({ bright: 1.2 }, rate), 0.6);
+      return padAdd(snare909({ tune: 30, noise_amt: 0.7, drive: 0.15 }, rate, tap), clap({ bright: 1.2 }, rate), 0.6);
     case 'trap':
-      return clap({ bright: 1.3 }, rate);
+      return clap({ bright: 1.3 }, rate, undefined, tap);
     case 'memphis':
-      return distort(snare808({ tune: 32, noise_amt: 0.8, body_decay: 60, noise_decay: 70, drive: 0.2 }, rate), 'bitcrush', 5.0);
+      return distort(snare808({ tune: 32, noise_amt: 0.8, body_decay: 60, noise_decay: 70, drive: 0.2 }, rate, undefined, tap), 'bitcrush', 5.0);
     case 'electro':
-      return snare808({ tune: 29, noise_amt: 0.6, drive: 0.1 }, rate);
+      return snare808({ tune: 29, noise_amt: 0.6, drive: 0.1 }, rate, undefined, tap);
     default:
-      return snare808({}, rate);
+      return snare808({}, rate, undefined, tap);
   }
 }
 
 /** hiphop.drum_bank: the style's one-shot palette, in the host's key order. */
-export function drumBank(style: HipHopStyle, rate: number, seed = 0): DrumBank {
+export function drumBank(style: HipHopStyle, rate: number, seed = 0, bankTap?: BankTap): DrumBank {
   const kit = STYLE_DRUMS[style].kit;
   const machine: DrumMachine = kit === '808' || kit === 'electro' ? '808' : '909';
   const [htune, hlp, hnoise] = HAT_CHAR[style];
   return {
-    kick: styleKick(style, rate),
-    snare: styleSnare(style, rate, seed),
-    clap: clap({}, rate),
-    ch: lp(hat({ open_hat: false, tune: htune, machine, noise: hnoise }, rate), hlp, rate),
-    oh: lp(hat({ open_hat: true, tune: htune, machine, noise: hnoise }, rate), Math.max(8000, hlp - 1500), rate),
+    kick: styleKick(style, rate, voiceTap(bankTap, 'kick')),
+    snare: styleSnare(style, rate, seed, voiceTap(bankTap, 'snare')),
+    clap: clap({}, rate, undefined, voiceTap(bankTap, 'clap')),
+    ch: lp(hat({ open_hat: false, tune: htune, machine, noise: hnoise }, rate, voiceTap(bankTap, 'ch')), hlp, rate),
+    oh: lp(hat({ open_hat: true, tune: htune, machine, noise: hnoise }, rate, voiceTap(bankTap, 'oh')), Math.max(8000, hlp - 1500), rate),
     rim: rim({ machine }, rate),
     tom: tom({ machine }, rate),
     conga: conga({}, rate),
     cowbell: cowbell({}, rate),
     shaker: shaker({}, rate),
     tamb: tamb({}, rate),
-    metal: metalHit(rate),
+    metal: metalHit(rate, voiceTap(bankTap, 'metal')),
     ride: ride({}, rate),
   };
 }
@@ -219,5 +233,5 @@ export function addSnareGhost(bank: DrumBank, rate: number): DrumBank {
 }
 
 /** The bank _render_song plays: drum_bank, then the accent, then the ghost. _render_song passes the SONG seed (the seed the drums draw from). */
-export const songDrumBank = (style: HipHopStyle, rate: number, seed = 0): DrumBank =>
-  addSnareGhost(addSnareAccent(drumBank(style, rate, seed)), rate);
+export const songDrumBank = (style: HipHopStyle, rate: number, seed = 0, bankTap?: BankTap): DrumBank =>
+  addSnareGhost(addSnareAccent(drumBank(style, rate, seed, bankTap)), rate);
