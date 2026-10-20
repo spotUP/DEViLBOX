@@ -24,7 +24,13 @@ export interface VitalCommandTarget {
 /** Fetch a bundled preset file (lazy: only when picked). */
 export async function fetchBundledVitalPreset(entry: VitalPresetEntry): Promise<Uint8Array> {
   const res = await fetch(encodeURI(entry.path));
-  if (!res.ok) throw new Error(`Vital preset ${entry.id}: HTTP ${res.status}`);
+  // A missing bank is a 404, or index.html with 200 behind a dev-server SPA fallback.
+  const isHtml = (res.headers.get('content-type') ?? '').includes('text/html');
+  if (!res.ok || isHtml) {
+    throw new Error(
+      'the preset bank is not installed. Run "npm run presets:sync" (the devilbox-presets repository clones into public/data/presets).',
+    );
+  }
   return new Uint8Array(await res.arrayBuffer());
 }
 

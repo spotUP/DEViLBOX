@@ -85,7 +85,20 @@ mkdir -p "$EXTRACT_DIR"
 tar -xzf "$TARBALL" -C "$EXTRACT_DIR"
 
 # Sync to web root (rsync preserves permissions, atomically replaces changed files)
-rsync -a --delete "${EXTRACT_DIR}/" "${DIST_DIR}/"
+# data/presets is a symlink to the devilbox-presets clone, so --delete must not touch it.
+rsync -a --delete --exclude '/data/presets' "${EXTRACT_DIR}/" "${DIST_DIR}/"
+
+# Preset banks: separate public repo, cloned outside the dist and served at /data/presets/.
+PRESETS_DIR="${PRESETS_DIR:-/var/www/devilbox-presets}"
+PRESETS_REPO="https://github.com/spotUP/devilbox-presets.git"
+if [[ -d "${PRESETS_DIR}/.git" ]]; then
+  git -C "$PRESETS_DIR" pull --ff-only 2>&1 | tee -a "$LOG"
+else
+  git clone --depth 1 "$PRESETS_REPO" "$PRESETS_DIR" 2>&1 | tee -a "$LOG"
+fi
+mkdir -p "${DIST_DIR}/data"
+ln -sfn "$PRESETS_DIR" "${DIST_DIR}/data/presets"
+log "    Presets synced into ${PRESETS_DIR}"
 
 # Backend API: load the image CI built and restart the service on it.
 # BACKEND_COMPOSE_DIR holds docker-compose.yml and the .env with JWT_SECRET
