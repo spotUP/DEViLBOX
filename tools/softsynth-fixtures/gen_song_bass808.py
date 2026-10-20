@@ -8,12 +8,15 @@ lay["bass"] and there are events) and hiphop.bass_gain (the gain render_section 
 host's own two lines: sig - mean(sig), and bass_buf[:n] += g * sig[:n] into zeros of bars * bar_len + rate. A section
 with no call is all zeros; the generator asserts that against the section's layers instead of assuming it.
 Also dumps hiphop.style_808_profile for every style (profiles) and plan_kick_relationship at the classifier
-boundaries (plans). Each lane is {n, sha (sha256 of the little-endian float64 bytes, informational), stride (every 16th sample), head (base64 of the first 300
-samples), peak}; "layered" is the number of notes the host's plan softens.
+boundaries (plans). Each lane is {n, off, sha, peak}: the lane's samples sit at sample offset off in the companion file
+song_bass808.lanes.br (every lane of every case, concatenated as little-endian float64, byte-shuffled into eight planes
+of one byte per sample, brotli quality 11; full float64 lanes are 34 MB raw, 13.6 MB this way), sha is the sha256 of the
+lane's float64 bytes, so the test proves the decode before it compares. "layered" is the number of notes the host's
+plan softens.
   /opt/homebrew/bin/python3.11 -I tools/softsynth-fixtures/gen_song_bass808.py \
     /Users/spot/Code/UpRough/Up_Rough_Demo_System/tools src/engine/uprough/__tests__/fixtures/song_bass808.json
 """
-import base64
+import brotli
 import dataclasses
 import hashlib
 import importlib.util
@@ -39,14 +42,16 @@ hh = load("hiphop")
 t8 = hh._t8
 
 
-STRIDE = 16
+LANES = []
+LANES_OUT = OUT[:-len(".json")] + ".lanes.br"
 
 
 def arr(a):
-    b = np.asarray(a, dtype=np.float64).astype("<f8").tobytes()
-    return {"n": len(b) // 8, "sha": hashlib.sha256(b).hexdigest(), "head": base64.b64encode(b[:300 * 8]).decode(),
-            "stride": base64.b64encode(np.asarray(a, dtype=np.float64).astype("<f8")[::STRIDE].tobytes()).decode(),
-            "peak": float(np.max(np.abs(a))) if len(a) else 0.0}
+    v = np.asarray(a, dtype=np.float64).astype("<f8")
+    off = sum(len(x) for x in LANES)
+    LANES.append(v)
+    return {"n": len(v), "off": off, "sha": hashlib.sha256(v.tobytes()).hexdigest(),
+            "peak": float(np.max(np.abs(v))) if len(v) else 0.0}
 
 
 def expected_flags(events):
@@ -158,6 +163,9 @@ tie_t = (4 * sps + 8 * sps) / 2.0
 tie = t8.plan_kick_relationship([{"start_s": tie_t, "dur_s": 0.2, "semi": 36.0}], [8, 4], bpm=BPM, steps_per_bar=16, rate=22050)[0]
 plans.append({"d_ms": None, "start_s": tie_t, "kicks": [8, 4], "rel": tie["kick_relationship"], "soften": tie["soften_attack"], "soften_ms": tie["soften_attack_ms"], "offset_ms": tie["attack_offset_ms"]})
 
+planes = np.concatenate(LANES).view(np.uint8).reshape(-1, 8).T.copy().tobytes()
+with open(LANES_OUT, "wb") as f:
+    f.write(brotli.compress(planes, quality=11, lgwin=24))
 with open(OUT, "w", encoding="utf-8") as f:
     json.dump({"cases": cases, "profiles": profiles, "plans": plans, "plan_bpm": BPM}, f, separators=(",", ":"), allow_nan=False)
 for c in cases:
