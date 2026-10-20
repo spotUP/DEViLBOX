@@ -19,6 +19,7 @@ import type { SampleConfig } from '@typedefs/instrument';
 import type { SampleEdit } from '@/lib/song/sampleEdit';
 import type { SaveFormat } from '@lib/import/wasm/OpenMPTSoundlib';
 import { mapNoteToOpenMPT } from '@lib/import/wasm/OpenMPTConverter';
+import { foldEffectColumnsForXM } from '@/lib/tracker/volumeColumn';
 
 let _dirty = false;
 let _loaded = false;
@@ -104,7 +105,7 @@ async function writeCell(
   cell: TrackerCell,
 ): Promise<void> {
   const note = mapNoteToOpenMPT(cell.note, _format);
-  const { volcmd, volval } = mapVolumeToOpenMPT(cell.volume);
+  let volume = cell.volume;
 
   let command: number;
   let param: number;
@@ -119,10 +120,24 @@ async function writeCell(
     command = slot >= 0 ? 31 : 0;
     param   = slot >= 0 ? (0x80 | slot) : 0;
   } else {
-    const fx = mapEffectToOpenMPT(cell.effTyp, cell.eff);
+    // An XM cell holds one command plus the volume column, so effect columns
+    // 2-8 are folded into those two slots rather than silently ignored.
+    const folded = foldEffectColumnsForXM(cell.volume, [
+      { effTyp: cell.effTyp, eff: cell.eff },
+      { effTyp: cell.effTyp2, eff: cell.eff2 },
+      { effTyp: cell.effTyp3 ?? 0, eff: cell.eff3 ?? 0 },
+      { effTyp: cell.effTyp4 ?? 0, eff: cell.eff4 ?? 0 },
+      { effTyp: cell.effTyp5 ?? 0, eff: cell.eff5 ?? 0 },
+      { effTyp: cell.effTyp6 ?? 0, eff: cell.eff6 ?? 0 },
+      { effTyp: cell.effTyp7 ?? 0, eff: cell.eff7 ?? 0 },
+      { effTyp: cell.effTyp8 ?? 0, eff: cell.eff8 ?? 0 },
+    ]);
+    volume = folded.volume;
+    const fx = mapEffectToOpenMPT(folded.command.effTyp, folded.command.eff);
     command = fx.cmd;
     param   = fx.param;
   }
+  const { volcmd, volval } = mapVolumeToOpenMPT(volume);
 
   await osl.setPatternCell(patternIndex, rowIndex, channelIndex, {
     note,
