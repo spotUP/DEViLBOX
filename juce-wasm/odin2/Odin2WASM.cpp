@@ -380,6 +380,7 @@ public:
         for (int v = 0; v < VOICES; v++) {
             voice_[v].setTuningPtr(&tuning_);
             voice_[v].setSampleRate(sr);
+            attachWavetables(v);
             voice_[v].hardReset();
             voiceManager_.m_actual_voice_pointers[v] = &voice_[v];
 
@@ -923,6 +924,67 @@ public:
 #endif
 
 private:
+    // Odin2's oscillators and LFOs read their tables through a WavetableContainer
+    // that the plugin's OdinAudioProcessor constructor creates, hands to every
+    // oscillator and loads from the compiled-in table data. Without it the
+    // oscillators' current-table pointers are never set, so doOscillate() reads
+    // arbitrary WASM memory and the voice outputs ~1e33 noise at every note start.
+    // Mirrors PluginProcessorConstructor.cpp (container hand-out + loadWavetables).
+    void attachWavetables(int v) {
+        if (!wtLoaded_) {
+            wtContainer_.loadWavetablesFromConstData();
+            float drawValues[WAVEDRAW_STEPS_X];
+            float specValues[SPECDRAW_STEPS_X] = {0};
+            float chipValues[CHIPDRAW_STEPS_X] = {0};
+            specValues[0] = 1.0f;
+            for (int i = 0; i < WAVEDRAW_STEPS_X; ++i) {
+                drawValues[i] = sinf((float)i * 2.0f * (float)M_PI / WAVEDRAW_STEPS_X) * 0.9f;
+            }
+            for (int i = 0; i < CHIPDRAW_STEPS_X; ++i) {
+                chipValues[i] = (i < CHIPDRAW_STEPS_X / 2) ? 1.0f : -1.0f;
+            }
+            for (int osc = 0; osc < 3; ++osc) {
+                wtContainer_.createWavedrawTable(osc, drawValues, 44100);
+                wtContainer_.createChipdrawTable(osc, chipValues, 44100);
+                wtContainer_.createSpecdrawTable(osc, specValues, 44100);
+            }
+            wtLoaded_ = true;
+        }
+        ::Voice& vc = voice_[v];
+        for (int osc = 0; osc < 3; ++osc) {
+            vc.analog_osc[osc].setWavetableContainer(&wtContainer_);
+            vc.wavetable_osc[osc].setWavetableContainer(&wtContainer_);
+            vc.chiptune_osc[osc].setWavetableContainer(&wtContainer_);
+            vc.vector_osc[osc].setWavetableContainer(&wtContainer_);
+            vc.multi_osc[osc].setWavetableContainer(&wtContainer_);
+            vc.fm_osc[osc].setWavetableContainer(&wtContainer_);
+            vc.pm_osc[osc].setWavetableContainer(&wtContainer_);
+            vc.wavedraw_osc[osc].setWavetableContainer(&wtContainer_);
+            vc.chipdraw_osc[osc].setWavetableContainer(&wtContainer_);
+            vc.specdraw_osc[osc].setWavetableContainer(&wtContainer_);
+            vc.lfo[osc].setWavetableContainer(&wtContainer_);
+        }
+        vc.ring_mod[0].setWavetableContainer(&wtContainer_);
+        vc.ring_mod[1].setWavetableContainer(&wtContainer_);
+        for (int osc = 0; osc < 3; ++osc) {
+            vc.analog_osc[osc].loadWavetables();
+            vc.wavetable_osc[osc].loadWavetables();
+            vc.chiptune_osc[osc].loadWavetables();
+            vc.vector_osc[osc].loadWavetables();
+            vc.multi_osc[osc].loadWavetables();
+            vc.fm_osc[osc].loadWavetables();
+            vc.pm_osc[osc].loadWavetables();
+            vc.wavedraw_osc[osc].loadWavedrawTables(osc);
+            vc.chipdraw_osc[osc].loadChipdrawTables(osc);
+            vc.specdraw_osc[osc].loadSpecdrawTables(osc);
+            vc.lfo[osc].loadWavetables();
+        }
+        vc.ring_mod[0].loadWavetables();
+        vc.ring_mod[1].loadWavetables();
+        vc.ring_mod[0].selectWavetable(0);
+        vc.ring_mod[1].selectWavetable(0);
+    }
+
     // Helper: get osc param offsets per osc index
     static constexpr int oscTypeParam(int osc) {
         return (osc == 0) ? PARAM_OSC1_TYPE : (osc == 1) ? PARAM_OSC2_TYPE : PARAM_OSC3_TYPE;
@@ -1087,6 +1149,8 @@ private:
     }
 
     ::Voice voice_[VOICES];
+    WavetableContainer wtContainer_;
+    bool wtLoaded_ = false;
     ::VoiceManager voiceManager_;
     ::Tunings::Tuning tuning_;
 
