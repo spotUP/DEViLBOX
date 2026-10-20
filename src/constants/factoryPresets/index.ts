@@ -6,7 +6,8 @@
 
 import type { InstrumentPreset } from '../../types/instrument';
 import { TB303_PRESETS } from '../tb303Presets';
-import { ODIN2_PRESETS } from '../odin2Presets';
+import { ODIN2_PRESETS } from '../odin2PresetIndex';
+import { ODIN2_PRESET_PARAM_KEY } from '@engine/vstbridge/odin2Preset';
 import { FURNACE_PRESETS } from '../furnacePresets';
 import { DUB_SIREN_PRESETS } from '../dubSirenPresets';
 import { SPACE_LASER_PRESETS } from '../spaceLaserPresets';
@@ -82,15 +83,16 @@ const UPROUGH_SOFTSYNTH_FACTORY_PRESETS: InstrumentPreset['config'][] = GOLDEN_E
   upRoughSoftsynth: p.config,
 }));
 
-// Odin2 factory soundbank (GPL), converted from the plugin's .odin files by tools/convertOdinPresets.ts
+// Odin2 bundled banks (factory GPL bank + community packs): each entry names a .odin file that the
+// synth restores whole through its 'loadPreset' command (see engine/vstbridge/odin2Preset.ts).
 const ODIN2_FACTORY_PRESETS: InstrumentPreset['config'][] = ODIN2_PRESETS.map((p) => ({
   type: 'synth' as const,
-  name: `Odin2 ${p.category} - ${p.name}`,
+  name: p.name,
   synthType: 'Odin2' as const,
-  volume: -8,
+  volume: -12,
   pan: 0,
   effects: [],
-  odin2: p.params,
+  parameters: { [ODIN2_PRESET_PARAM_KEY]: p.id },
 }));
 
 export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
@@ -141,7 +143,7 @@ export const FACTORY_PRESETS: InstrumentPreset['config'][] = [
   ...SONIX_PRESETS,
   // Up Rough Softsynth Golden Era kit, derived from its one preset list
   ...UPROUGH_SOFTSYNTH_FACTORY_PRESETS,
-  // Odin2 factory soundbank, derived from its one preset list
+  // Odin2 bundled banks, derived from the one preset index
   ...ODIN2_FACTORY_PRESETS,
   // Player Init
   {

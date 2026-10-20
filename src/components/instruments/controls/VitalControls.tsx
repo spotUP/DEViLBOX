@@ -16,7 +16,7 @@ import type { InstrumentConfig } from '@typedefs/instrument';
 import type { VSTBridgeSynth } from '@engine/vstbridge/VSTBridgeSynth';
 import type { VSTBridgeParam } from '@engine/vstbridge/synth-registry';
 import { VSTBridgePanel } from './VSTBridgePanel';
-import { Button } from '@components/ui/Button';
+import { ImportPresetFileButton } from './ImportPresetFileButton';
 import { CustomSelect, type SelectOptionGroup } from '@components/common/CustomSelect';
 import { notify } from '@stores/useNotificationStore';
 import { VITAL_PRESETS } from '@constants/vitalPresetIndex';
@@ -184,7 +184,6 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
   const storedPresetId = (instrument.parameters as Record<string, unknown> | undefined)?.[VITAL_PRESET_PARAM_KEY];
   const [presetId, setPresetId] = useState<string>(typeof storedPresetId === 'string' ? storedPresetId : '');
   const [presetBusy, setPresetBusy] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   /** Single UI load path: send the bytes to the synth, then mirror the file's control values into the knobs. */
   const applyPresetBytes = useCallback(async (bytes: Uint8Array, label: string): Promise<boolean> => {
@@ -224,11 +223,8 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
     }
   }, [applyPresetBytes, instrument.parameters, onChange]);
 
-  const handleImportFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    const ok = await applyPresetBytes(new Uint8Array(await file.arrayBuffer()), file.name);
+  const handleImportFile = useCallback(async (bytes: Uint8Array, fileName: string) => {
+    const ok = await applyPresetBytes(bytes, fileName);
     if (ok) setPresetId('');
   }, [applyPresetBytes]);
 
@@ -262,16 +258,7 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
           disabled={presetBusy}
           className="w-64"
         />
-        <Button size="sm" loading={presetBusy} onClick={() => fileInputRef.current?.click()}>
-          Import Preset File
-        </Button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".vital"
-          className="hidden"
-          onChange={handleImportFile}
-        />
+        <ImportPresetFileButton accept=".vital" busy={presetBusy} onImport={handleImportFile} />
       </div>
 
       {/* Tab bar */}

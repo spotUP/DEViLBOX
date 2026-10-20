@@ -9,6 +9,7 @@
  */
 
 import { loadBundledVitalPreset, VITAL_PRESET_PARAM_KEY } from './vitalPreset';
+import { findOdin2Preset, loadBundledOdin2Preset, ODIN2_PRESET_PARAM_KEY } from './odin2Preset';
 import type { DevilboxSynth } from '@/types/synth';
 import type { InstrumentConfig } from '@/types/instrument';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
@@ -58,6 +59,11 @@ export class VSTBridgeSynth implements DevilboxSynth {
     }
 
     this._initPromise = this._initialize();
+  }
+
+  /** Per-preset loudness trim (dB) on top of the descriptor's volumeOffsetDb (see tools/convertOdinPresets.ts). */
+  setPresetGainTrimDb(trimDb: number): void {
+    this.output.gain.value = Math.pow(10, ((this._descriptor.volumeOffsetDb ?? 0) + trimDb) / 20);
   }
 
   /** Wait for WASM init to complete */
@@ -140,6 +146,16 @@ export class VSTBridgeSynth implements DevilboxSynth {
         await loadBundledVitalPreset(this, vitalPresetId).catch((err: unknown) => {
           console.error('[VSTBridgeSynth] Vital preset load failed:', err);
         });
+      }
+
+      // Odin2: start on the instrument's bundled preset (same load path as the preset picker)
+      const odin2PresetId = this._descriptor.id === 'Odin2'
+        ? (this._initialConfig?.parameters as Record<string, unknown> | undefined)?.[ODIN2_PRESET_PARAM_KEY]
+        : undefined;
+      if (typeof odin2PresetId === 'string') {
+        await loadBundledOdin2Preset(this, odin2PresetId)
+          .then((ok) => { if (ok) this.setPresetGainTrimDb(findOdin2Preset(odin2PresetId)?.gainTrimDb ?? 0); })
+          .catch((err: unknown) => { console.error('[VSTBridgeSynth] Odin2 preset load failed:', err); });
       }
 
       // Process any pending notes
