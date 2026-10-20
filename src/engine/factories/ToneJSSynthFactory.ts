@@ -1792,7 +1792,7 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
           // during live preview and would never fire the stop.
           const delay = Math.max(0, (time ?? Tone.now()) + duration - Tone.now());
           Tone.getContext().setTimeout(() => {
-            arpeggioEngine.stop(note);
+            arpeggioEngine?.stop(note);
           }, delay);
         }
       } else {
