@@ -13,7 +13,7 @@ import { useOscilloscopeStore, liveScopeFrame } from '@stores/useOscilloscopeSto
 import { useMixerStore } from '@stores/useMixerStore';
 import { useThemeStore } from '@stores/useThemeStore';
 import { getToneEngine } from '@engine/ToneEngine';
-import { channelLayout, scopeCells, originShiftFor, subscribeChannelLayout } from './channelLayout';
+import { channelLayout, scopeCells, subscribeChannelLayout } from './channelLayout';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 
 const STRIP_HEIGHT = 72;
@@ -149,9 +149,9 @@ export const TrackScopesStrip: React.FC<TrackScopesStripProps> = memo(({ channel
         } catch { /* engine not ready */ }
       }
 
-      const cells = scopeCells(nc, cw, channelLayout, originShiftFor(canvas, channelLayout));
+      const cells = scopeCells(nc, cw, channelLayout);
       for (let i = 0; i < nc; i++) {
-        // Over the channel's own pattern column (owner 2026-10-08)
+        // Fixed in the strip, in pattern-column order (owner 2026-10-20)
         const { x, w } = cells[i];
         if (w < 2 || x + w <= 0 || x >= cw) continue;
 
@@ -231,7 +231,7 @@ export const TrackScopesStrip: React.FC<TrackScopesStripProps> = memo(({ channel
     const nc = numChRef.current;
     if (nc <= 0 || rect.width <= 0) return;
     const px = e.clientX - rect.left;
-    const hit = scopeCells(nc, rect.width, channelLayout, originShiftFor(canvas, channelLayout)).findIndex((c) => px >= c.x && px < c.x + c.w);
+    const hit = scopeCells(nc, rect.width, channelLayout).findIndex((c) => px >= c.x && px < c.x + c.w);
     if (hit < 0) return;
     const ch = hit;
     const mixer = useMixerStore.getState();

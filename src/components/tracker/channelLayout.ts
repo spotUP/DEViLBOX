@@ -8,8 +8,6 @@ export interface ChannelLayout {
   widths: number[];
   scrollLeft: number;
   numChannels: number;
-  /** The editor element the offsets are measured from (its left edge is offset 0). */
-  origin?: HTMLElement | null;
 }
 
 export const channelLayout: ChannelLayout = {
@@ -34,33 +32,26 @@ export function subscribeChannelLayout(fn: () => void): () => void {
 export interface ScopeCell { x: number; w: number }
 
 /**
- * Where each channel's scope sits in the strip above the pattern editor: over
- * its own pattern column (the editor's offsets and widths, minus its scroll),
- * so a scope lines up with the notes it shows. Equal cells across the width
- * only while the editor has published no layout for these channels.
+ * Where each channel's scope sits in the strip above the pattern editor. The
+ * scopes span the strip edge to edge, each with its pattern column's share of
+ * the width, and stay put while the editor scrolls sideways (owner,
+ * 2026-10-20: "the scopes move when I scroll the channels"). Equal cells
+ * across the width only while the editor has published no layout for these
+ * channels.
  */
 export function scopeCells(
   numChannels: number,
   stripWidth: number,
-  layout: { offsets: readonly number[]; widths: readonly number[]; scrollLeft: number; numChannels: number },
-  /** Editor's left edge minus the strip's left edge, in px: the strip can sit
-   *  wider than the editor (over the order sidebar), so offsets shift by this. */
-  originShift = 0,
+  layout: { offsets: readonly number[]; widths: readonly number[]; numChannels: number },
 ): ScopeCell[] {
   const aligned = layout.numChannels === numChannels
     && layout.offsets.length >= numChannels && layout.widths.length >= numChannels;
   const cells: ScopeCell[] = [];
   const gap = 1;
-  // When every channel is on screen (no horizontal scroll), the scopes span the
-  // whole strip edge to edge (owner, 2026-10-14): each keeps its column's share
-  // of the width, so the order of channels and their relative widths still
-  // match the pattern columns below. A scrolled pattern keeps exact alignment.
   if (aligned && numChannels > 0) {
     const first = layout.offsets[0];
     const last = layout.offsets[numChannels - 1] + layout.widths[numChannels - 1];
-    const left = originShift + first - layout.scrollLeft;
-    const right = originShift + last - layout.scrollLeft;
-    if (layout.scrollLeft === 0 && left >= 0 && right <= stripWidth && last > first) {
+    if (last > first) {
       const scale = stripWidth / (last - first);
       for (let i = 0; i < numChannels; i++) {
         const x = Math.round((layout.offsets[i] - first) * scale);
@@ -70,22 +61,9 @@ export function scopeCells(
       return cells;
     }
   }
-  for (let i = 0; i < numChannels; i++) {
-    if (aligned) {
-      cells.push({ x: originShift + layout.offsets[i] - layout.scrollLeft, w: Math.max(0, layout.widths[i] - gap) });
-    } else {
-      const w = (stripWidth - (numChannels - 1) * gap) / numChannels;
-      cells.push({ x: i * (w + gap), w });
-    }
-  }
+  const w = (stripWidth - (numChannels - 1) * gap) / numChannels;
+  for (let i = 0; i < numChannels; i++) cells.push({ x: i * (w + gap), w });
   return cells;
-}
-
-/** How far the editor's left edge sits right of `strip`'s, in px (0 when unknown). */
-export function originShiftFor(strip: HTMLElement, layout: ChannelLayout): number {
-  const origin = layout.origin;
-  if (!origin || !origin.isConnected) return 0;
-  return origin.getBoundingClientRect().left - strip.getBoundingClientRect().left;
 }
 
 /**
