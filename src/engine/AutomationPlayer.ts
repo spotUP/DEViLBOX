@@ -6,6 +6,7 @@
 
 import * as Tone from 'tone';
 import { getToneEngine } from './ToneEngine';
+import { useAudioStore } from '@/stores/useAudioStore';
 import { DB303Synth as JC303Synth } from './db303/DB303Synth';
 import { getManualOverrideManager } from './ManualOverrideManager';
 import { getChannelFilterManager } from './ChannelFilterManager';
@@ -261,9 +262,13 @@ export class AutomationPlayer {
       try {
         switch (shortName) {
           case 'masterVolume': {
-            // 0-1 → -40..0 dB
+            // 0-1 → -40..0 dB. Through the store, never the engine
+            // directly: a direct write left the engine's master at the
+            // automated level while useAudioStore.masterVolume, and so the
+            // fader, still showed the old one (same class as the
+            // parameterRouter masterFx.masterVolume fix of 2026-09-22).
             const masterDb = -40 + value * 40;
-            engine.setMasterVolume(masterDb);
+            useAudioStore.getState().setMasterVolume(masterDb);
             break;
           }
           case 'bpm': {

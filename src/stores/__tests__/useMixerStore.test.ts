@@ -40,11 +40,6 @@ describe('useMixerStore', () => {
     expect(channels[3].soloed).toBe(true);
     expect(useMixerStore.getState().isSoloing).toBe(true);
   });
-
-  it('setMasterVolume updates master', () => {
-    useMixerStore.getState().setMasterVolume(0.8);
-    expect(useMixerStore.getState().master.volume).toBe(0.8);
-  });
 });
 
 describe('useMixerStore — solo/mute interaction (tracker convention)', () => {

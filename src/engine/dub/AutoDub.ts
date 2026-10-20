@@ -30,6 +30,7 @@ import {
 import { useDubStore } from '@/stores/useDubStore';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useMixerStore } from '@/stores/useMixerStore';
+import { useAudioStore } from '@/stores/useAudioStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useOscilloscopeStore } from '@/stores/useOscilloscopeStore';
 import { type ChannelRole } from '@/bridge/analysis/MusicAnalysis';
@@ -2487,14 +2488,15 @@ export async function runChannelAudioScrub(
     if (total > richestTotal) { richestTotal = total; richestIdx = i; }
   }
 
-  // Mute master output — user won't hear the scrub
-  const mixer = useMixerStore.getState();
-  // Read from the actual nested field. The previous cast looked for
-  // `masterVolume` (doesn't exist) which always defaulted to 1, so the
-  // restore at the end of scrub silently snapped the user's master volume
-  // to 1.0 even if they had it lower.
-  const priorVol = mixer.master?.volume ?? 1;
-  try { mixer.setMasterVolume(0); } catch { /* ok */ }
+  // Mute master output so the user does not hear the scrub. The mute flag,
+  // not the volume: the scrub used to drive a second master-volume copy in the
+  // mixer store (default 1.0) and restore from it, which snapped the engine's
+  // master to 0 dB while useAudioStore.masterVolume, the only owner, still
+  // showed the user's level.
+  const audio = useAudioStore.getState();
+  const priorMuted = audio.masterMuted;
+  const restoreMaster = () => { try { useAudioStore.getState().setMasterMuted(priorMuted); } catch { /* ok */ } };
+  try { audio.setMasterMuted(true); } catch { /* ok */ }
 
   // Seek to the first order position that plays the richest pattern (tempo-aware — engine processes Fxx up to this point)
   const richestPosition = Math.max(0, tracker.patternOrder.indexOf(richestIdx));
@@ -2502,7 +2504,7 @@ export async function runChannelAudioScrub(
 
   // Start silent playback
   try { await useTransportStore.getState().play(); } catch {
-    try { mixer.setMasterVolume(priorVol); } catch { /* ok */ }
+    restoreMaster();
     return;
   }
 
@@ -2532,7 +2534,7 @@ export async function runChannelAudioScrub(
   // Stop, restore, return to start
   try { useTransportStore.getState().stop(); } catch { /* ok */ }
   try { useTrackerStore.getState().setCurrentPosition(0); } catch { /* ok */ }
-  try { mixer.setMasterVolume(priorVol); } catch { /* ok */ }
+  restoreMaster();
 
   onProgress?.(true);
 }
