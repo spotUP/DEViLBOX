@@ -143,6 +143,10 @@ export class FluidSynthSynthEngine implements DevilboxSynth {
   private _worklet: AudioWorkletNode | null = null;
   private config: FluidSynthConfig;
   private isInitialized = false;
+  /** True once a SoundFont is loaded: FluidSynth renders silence for a note-on before that. */
+  private soundFontLoaded = false;
+  private _resolveSoundFont: (() => void) | null = null;
+  private _soundFontPromise: Promise<void> = new Promise<void>((resolve) => { this._resolveSoundFont = resolve; });
   private pendingNotes: Array<{ note: number; velocity: number }> = [];
 
   private static isWorkletLoaded = false;
@@ -156,7 +160,9 @@ export class FluidSynthSynthEngine implements DevilboxSynth {
   }
 
   public async ensureInitialized(): Promise<void> {
-    return this._initPromise;
+    await this._initPromise;
+    // Resolve only once the default SoundFont is in: a note before it is silent.
+    await this._soundFontPromise;
   }
 
   private async initialize(): Promise<void> {
@@ -205,15 +211,19 @@ export class FluidSynthSynthEngine implements DevilboxSynth {
           this.isInitialized = true;
           this.sendConfig(this.config);
           // Auto-load default SF2 so the synth produces sound immediately
-          this.loadDefaultSF2(baseUrl);
+          void this.loadDefaultSF2(baseUrl);
+        } else if (event.data.type === 'error') {
+          console.error('FluidSynth error:', event.data.message || event.data.error);
+          // Do not hold ensureInitialized() forever when no SoundFont can load.
+          this._resolveSoundFont?.();
+        } else if (event.data.type === 'sf2Loaded') {
+          console.log('FluidSynth: SF2 loaded, id:', event.data.id);
+          this.soundFontLoaded = true;
+          this._resolveSoundFont?.();
           for (const { note, velocity } of this.pendingNotes) {
             this._worklet!.port.postMessage({ type: 'noteOn', channel: 0, key: note, velocity });
           }
           this.pendingNotes = [];
-        } else if (event.data.type === 'error') {
-          console.error('FluidSynth error:', event.data.message || event.data.error);
-        } else if (event.data.type === 'sf2Loaded') {
-          console.log('FluidSynth: SF2 loaded, id:', event.data.id);
         }
       };
 
@@ -251,11 +261,12 @@ export class FluidSynthSynthEngine implements DevilboxSynth {
   private async loadDefaultSF2(baseUrl: string): Promise<void> {
     try {
       const res = await fetch(`${baseUrl}fluidsynth/default.sf2`);
-      if (!res.ok) return;
+      if (!res.ok) { this._resolveSoundFont?.(); return; }
       const data = await res.arrayBuffer();
       this.loadSF2(data, 'default.sf2');
     } catch {
       // No default SF2 available — user must load one manually
+      this._resolveSoundFont?.();
     }
   }
 
@@ -275,7 +286,7 @@ export class FluidSynthSynthEngine implements DevilboxSynth {
   triggerAttack(frequency: number | string, _time?: number, velocity?: number): this {
     const key = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
     const vel = Math.round((velocity ?? 0.8) * 127);
-    if (!this.isInitialized || !this._worklet) {
+    if (!this.isInitialized || !this._worklet || !this.soundFontLoaded) {
       this.pendingNotes.push({ note: key, velocity: vel });
       return this;
     }
@@ -284,7 +295,7 @@ export class FluidSynthSynthEngine implements DevilboxSynth {
   }
 
   triggerRelease(frequency?: number | string, _time?: number): this {
-    if (!this._worklet || !this.isInitialized) {
+    if (!this._worklet || !this.isInitialized || !this.soundFontLoaded) {
       // Clear pending notes to prevent stuck notes when noteOff arrives before init
       if (frequency !== undefined) {
         const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
