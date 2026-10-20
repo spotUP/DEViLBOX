@@ -300,6 +300,24 @@ export async function addPattern(numRows: number): Promise<number> {
   return m._osl_add_pattern(numRows);
 }
 
+/** Set the channel count; surviving channels keep their cells, added ones start empty. */
+export async function setNumChannels(numChannels: number): Promise<boolean> {
+  const m = await getModule();
+  return m._osl_set_num_channels(numChannels) === 1;
+}
+
+/** Set the number of pattern slots; trailing patterns are dropped, added slots are empty. */
+export async function setNumPatterns(numPatterns: number): Promise<void> {
+  const m = await getModule();
+  m._osl_set_num_patterns(numPatterns);
+}
+
+/** Set the order list length; entries past the end are dropped. */
+export async function setNumOrders(numOrders: number): Promise<void> {
+  const m = await getModule();
+  m._osl_set_num_orders(numOrders);
+}
+
 // ─── Speed / Tempo ─────────────────────────────────────────────────────────
 
 export async function setInitialSpeed(speed: number): Promise<void> {

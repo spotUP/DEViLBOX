@@ -26,6 +26,24 @@ let _loaded = false;
 let _format: SaveFormat = 'mod';
 let _hotReloadTimer: ReturnType<typeof setTimeout> | null = null;
 const HOT_RELOAD_DEBOUNCE_MS = 150;
+/** True once any edit reached the module; cleared only when a new module is adopted. */
+let _edited = false;
+/**
+ * The song buffers this module stands for: the bytes it was imported from or
+ * built as, and every serialization of it. A song carrying one of them is this
+ * module's song, so reloading it must keep the bridge (and its edits) active.
+ */
+let _owned = new WeakSet<ArrayBuffer>();
+/** Store pattern id held in each module pattern slot; null until known. */
+let _slotIds: string[] | null = null;
+/** Every module write runs on this chain, so a structural change and the cell edits after it land in order. */
+let _queue: Promise<unknown> = Promise.resolve();
+
+function enqueue<T>(op: () => Promise<T>): Promise<T> {
+  const run = _queue.then(op, op);
+  _queue = run.catch(() => undefined);
+  return run;
+}
 
 /** Debounced hot-reload: serialize the soundlib and send to LibopenmptEngine. */
 function scheduleHotReload(): void {
@@ -37,7 +55,7 @@ function scheduleHotReload(): void {
       const { LibopenmptEngine } = await import('@engine/libopenmpt/LibopenmptEngine');
       if (!LibopenmptEngine.hasInstance()) return;
       const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
-      const data = await osl.saveModule(_format);
+      const data = await enqueue(() => osl.saveModule(_format));
       if (data) {
         LibopenmptEngine.getInstance().hotReload(data);
         _dirty = false;
@@ -167,11 +185,29 @@ async function writePatternCells(
 // Public API
 // ---------------------------------------------------------------------------
 
-/** Mark the bridge as active after a successful parseWithOpenMPT import. */
-export function markLoaded(format: SaveFormat): void {
+/**
+ * Mark the bridge as active on a module that now holds the song: after a
+ * parseWithOpenMPT import or after building one. `source` is the song buffer
+ * the module stands for, `patternIds` the store pattern in each module slot.
+ */
+export function markLoaded(format: SaveFormat, source?: ArrayBuffer, patternIds?: string[]): void {
   _loaded = true;
   _dirty = false;
+  _edited = false;
   _format = format;
+  _owned = new WeakSet<ArrayBuffer>();
+  if (source) _owned.add(source);
+  _slotIds = patternIds ? [...patternIds] : null;
+}
+
+/** Whether `data` is a buffer this module stands for (see markLoaded). */
+export function ownsSongData(data: ArrayBuffer | undefined | null): boolean {
+  return _loaded && !!data && _owned.has(data);
+}
+
+/** Whether any edit reached the module since it was adopted. */
+export function hasEdits(): boolean {
+  return _edited;
 }
 
 /** Whether the soundlib module is loaded and the bridge is active. */
@@ -182,6 +218,13 @@ export function isActive(): boolean {
 /** Whether edits have been made since the last serialization. */
 export function isDirty(): boolean {
   return _dirty;
+}
+
+/** An edit reached the module: hot-reload it, and play it (not the import bytes) from now on. */
+function markEdited(): void {
+  _dirty = true;
+  _edited = true;
+  scheduleHotReload();
 }
 
 /** Mark the bridge as dirty (forces re-serialization on next play). */
@@ -233,10 +276,9 @@ export async function syncCellEdit(
 
   const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
 
-  await writeCell(osl, patternIndex, rowIndex, channelIndex, fullCell);
+  await enqueue(() => writeCell(osl, patternIndex, rowIndex, channelIndex, fullCell));
 
-  _dirty = true;
-  scheduleHotReload();
+  markEdited();
 }
 
 /**
@@ -250,17 +292,16 @@ export async function syncCellClear(
   if (!_loaded) return;
 
   const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
-  await osl.setPatternCell(patternIndex, rowIndex, channelIndex, {
+  await enqueue(() => osl.setPatternCell(patternIndex, rowIndex, channelIndex, {
     note: 0,
     instrument: 0,
     volcmd: 0,
     vol: 0,
     command: 0,
     param: 0,
-  });
+  }));
 
-  _dirty = true;
-  scheduleHotReload();
+  markEdited();
 }
 
 /**
@@ -276,10 +317,88 @@ export async function syncFullPattern(
 
   const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
 
-  await writePatternCells(osl, patternIndex, channels);
+  await enqueue(() => writePatternCells(osl, patternIndex, channels));
 
-  _dirty = true;
-  scheduleHotReload();
+  markEdited();
+}
+
+/** The song shape the module must match. */
+export interface SongStructure {
+  numChannels: number;
+  patterns: { id?: string; length: number; channels: { rows: TrackerCell[] }[] }[];
+  songPositions: number[];
+}
+
+/**
+ * Give the module the song's channel count, pattern slots, pattern lengths and
+ * order list. Returns the pattern indices whose cells the module no longer
+ * holds: new slots, resized patterns, slots now holding another store pattern,
+ * and every pattern when the channel count changed. `changed` also covers
+ * order list and slot count edits, which leave every cell in place.
+ */
+async function shapeModule(osl: Soundlib, song: SongStructure): Promise<{ stale: number[]; changed: boolean }> {
+  const stale = new Set<number>();
+  let changed = false;
+  const numCh = song.numChannels || song.patterns[0]?.channels.length || 4;
+  if ((await osl.getNumChannels()) !== numCh) {
+    await osl.setNumChannels(numCh);
+    song.patterns.forEach((_, i) => stale.add(i));
+  }
+  const numPat = Math.max(song.patterns.length, 1);
+  if ((await osl.getNumPatterns()) > numPat) {
+    await osl.setNumPatterns(numPat);
+    changed = true;
+  }
+  for (let i = 0; i < song.patterns.length; i++) {
+    const rows = song.patterns[i].length;
+    const have = await osl.getPatternNumRows(i);
+    if (have === 0) {
+      await osl.addPattern(rows);
+      stale.add(i);
+    } else if (have !== rows) {
+      await osl.resizePattern(i, rows);
+      stale.add(i);
+    }
+    const id = song.patterns[i].id;
+    if (_slotIds && id !== undefined && _slotIds[i] !== id) stale.add(i);
+  }
+  for (let i = 0; i < song.songPositions.length; i++) {
+    if ((await osl.getOrderPattern(i)) !== song.songPositions[i]) {
+      await osl.setOrderPattern(i, song.songPositions[i]);
+      changed = true;
+    }
+  }
+  if ((await osl.getNumOrders()) !== song.songPositions.length) {
+    await osl.setNumOrders(song.songPositions.length);
+    changed = true;
+  }
+  return { stale: [...stale], changed: changed || stale.size > 0 };
+}
+
+function patternIdsOf(song: SongStructure): string[] | null {
+  return song.patterns.every(p => p.id !== undefined) ? song.patterns.map(p => p.id as string) : null;
+}
+
+/**
+ * Bring the module's structure to the song after the store added, removed,
+ * cloned, reordered or resized patterns, changed the channel count or edited
+ * the order list, then rewrite the cells of every pattern that changed and
+ * hot-reload. Returns whether the module changed.
+ */
+export async function syncSongStructure(song: SongStructure): Promise<boolean> {
+  if (!_loaded) return false;
+  // A song sharing no pattern with the module is another song being loaded
+  // (the store takes its patterns before the replayer releases this module).
+  if (_slotIds && song.patterns.length > 0 && !song.patterns.some(p => p.id !== undefined && _slotIds!.includes(p.id))) return false;
+  const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
+  const changed = await enqueue(async () => {
+    const { stale, changed: shaped } = await shapeModule(osl, song);
+    for (const p of stale) await writePatternCells(osl, p, song.patterns[p].channels);
+    _slotIds = patternIdsOf(song);
+    return shaped;
+  });
+  if (changed) markEdited();
+  return changed;
 }
 
 /**
@@ -296,33 +415,28 @@ export async function syncFullPattern(
  * turned true while it was being built.
  */
 export async function createModuleForSong(
-  song: {
-    numChannels: number;
-    patterns: { length: number; channels: { rows: TrackerCell[] }[] }[];
-    songPositions: number[];
-  },
+  song: SongStructure,
   cancelled: () => boolean,
 ): Promise<ArrayBuffer | null> {
   const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
-  await osl.destroyModule();
-  const numPat = song.patterns.length || 1;
-  if (!(await osl.createNewModule(1 /* XM */, song.numChannels || 4, numPat))) return null;
-  // createNewModule makes 64-row patterns; without the resize an 8-row song
-  // would play 56 rows of silence before looping.
-  for (let i = 0; i < song.patterns.length; i++) {
-    const rows = song.patterns[i]?.length ?? 64;
-    if (rows !== 64) await osl.resizePattern(i, rows);
-  }
-  // createNewModule sets order = [0, 1, 2, ...]; the song may differ ([0, 1, 0, 2]).
-  for (let i = 0; i < song.songPositions.length; i++) {
-    await osl.setOrderPattern(i, song.songPositions[i]);
-  }
-  markLoaded('xm');
-  for (let p = 0; p < song.patterns.length; p++) {
-    await writePatternCells(osl, p, song.patterns[p].channels);
-  }
-  if (cancelled()) return null;
-  return osl.saveModule('xm');
+  return enqueue(async () => {
+    await osl.destroyModule();
+    const numPat = song.patterns.length || 1;
+    if (!(await osl.createNewModule(1 /* XM */, song.numChannels || 4, numPat))) return null;
+    markLoaded('xm');
+    // createNewModule makes 64-row patterns and order [0, 1, 2, ...]; the song's
+    // lengths (an 8-row song would play 56 rows of silence) and order list
+    // ([0, 1, 0, 2]) differ, so the module takes the song's shape first.
+    await shapeModule(osl, song);
+    for (let p = 0; p < song.patterns.length; p++) {
+      await writePatternCells(osl, p, song.patterns[p].channels);
+    }
+    _slotIds = patternIdsOf(song);
+    if (cancelled()) return null;
+    const data = await osl.saveModule('xm');
+    if (data) _owned.add(data);
+    return data;
+  });
 }
 
 /**
@@ -365,9 +479,10 @@ export async function serialize(): Promise<ArrayBuffer | null> {
   }
 
   const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
-  const result = await osl.saveModule(_format);
+  const result = await enqueue(() => osl.saveModule(_format));
   if (result) {
     _dirty = false;
+    _owned.add(result);
   }
   return result;
 }
@@ -388,7 +503,7 @@ export async function flush(): Promise<void> {
     const { LibopenmptEngine } = await import('@engine/libopenmpt/LibopenmptEngine');
     if (!LibopenmptEngine.hasInstance()) return;
     const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
-    const data = await osl.saveModule(_format);
+    const data = await enqueue(() => osl.saveModule(_format));
     if (data) {
       LibopenmptEngine.getInstance().hotReload(data);
       _dirty = false;
@@ -406,5 +521,8 @@ export function reset(): void {
   }
   _loaded = false;
   _dirty = false;
+  _edited = false;
   _format = 'mod';
+  _owned = new WeakSet<ArrayBuffer>();
+  _slotIds = null;
 }

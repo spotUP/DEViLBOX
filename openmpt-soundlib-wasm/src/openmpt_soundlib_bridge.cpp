@@ -27,6 +27,7 @@
 #include "common/FileReader.h"
 #include "common/mptFileType.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
@@ -231,7 +232,7 @@ int32_t osl_get_num_orders(void) {
 
 EMSCRIPTEN_KEEPALIVE
 int32_t osl_get_order_pattern(int32_t order) {
-    if (!g_sf || order < 0) return -1;
+    if (!g_sf || order < 0 || static_cast<ORDERINDEX>(order) >= g_sf->Order().GetLength()) return -1;
     return g_sf->Order()[static_cast<ORDERINDEX>(order)];
 }
 
@@ -328,6 +329,52 @@ int osl_add_pattern(int32_t numRows) {
     if (!g_sf || numRows < 1) return -1;
     PATTERNINDEX pat = g_sf->Patterns.InsertAny(static_cast<ROWINDEX>(numRows));
     return (pat == PATTERNINDEX_INVALID) ? -1 : static_cast<int>(pat);
+}
+
+/**
+ * Set the module's channel count. Every pattern keeps its rows and the cells
+ * of the channels that survive; added channels start empty with default
+ * settings. Pattern storage is rows x GetNumChannels(), so each pattern's data
+ * is re-laid out before ChnSettings changes the stride.
+ */
+EMSCRIPTEN_KEEPALIVE
+int osl_set_num_channels(int32_t numChannels) {
+    if (!g_sf || numChannels < 1 || numChannels > MAX_BASECHANNELS) return 0;
+    const CHANNELINDEX oldCh = g_sf->GetNumChannels();
+    const CHANNELINDEX newCh = static_cast<CHANNELINDEX>(numChannels);
+    if (newCh == oldCh) return 1;
+    const CHANNELINDEX keep = std::min(oldCh, newCh);
+    std::vector<std::vector<ModCommand>> relaid(g_sf->Patterns.Size());
+    for (PATTERNINDEX pat = 0; pat < g_sf->Patterns.Size(); pat++) {
+        if (!g_sf->Patterns.IsValidPat(pat)) continue;
+        const CPattern &p = g_sf->Patterns[pat];
+        const ROWINDEX rows = p.GetNumRows();
+        const std::vector<ModCommand> &old = p.GetData();
+        std::vector<ModCommand> data(static_cast<size_t>(rows) * newCh);
+        for (ROWINDEX r = 0; r < rows; r++)
+            for (CHANNELINDEX c = 0; c < keep; c++)
+                data[static_cast<size_t>(r) * newCh + c] = old[static_cast<size_t>(r) * oldCh + c];
+        relaid[pat] = std::move(data);
+    }
+    g_sf->ChnSettings.resize(newCh);
+    for (PATTERNINDEX pat = 0; pat < g_sf->Patterns.Size(); pat++) {
+        if (g_sf->Patterns.IsValidPat(pat)) g_sf->Patterns[pat].SetData(std::move(relaid[pat]));
+    }
+    return 1;
+}
+
+/** Set the number of pattern slots: drops trailing patterns, or adds empty slots. */
+EMSCRIPTEN_KEEPALIVE
+void osl_set_num_patterns(int32_t numPatterns) {
+    if (!g_sf || numPatterns < 0) return;
+    g_sf->Patterns.ResizeArray(static_cast<PATTERNINDEX>(numPatterns));
+}
+
+/** Set the order list length; entries past the end are dropped. */
+EMSCRIPTEN_KEEPALIVE
+void osl_set_num_orders(int32_t numOrders) {
+    if (!g_sf || numOrders < 0) return;
+    g_sf->Order().resize(static_cast<ORDERINDEX>(numOrders));
 }
 
 // ============================================================================
