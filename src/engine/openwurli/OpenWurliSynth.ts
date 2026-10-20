@@ -28,6 +28,9 @@ export class OpenWurliSynth implements DevilboxSynth {
   private audioContext: AudioContext;
   private _disposed = false;
   private _resolveInit: (() => void) | null = null;
+  private _initPromise: Promise<void>;
+  /** Messages (notes) sent before the worklet reported ready; the worklet drops them otherwise. */
+  private _pendingMessages: Array<Record<string, unknown>> = [];
   private _pendingParams: Array<{ paramId: number; value: number }> = [];
   private _ready = false;
 
@@ -36,11 +39,21 @@ export class OpenWurliSynth implements DevilboxSynth {
     this.output = this.audioContext.createGain();
     this.output.gain.value = 1.0;
 
-    new Promise<void>(resolve => {
+    this._initPromise = new Promise<void>(resolve => {
       this._resolveInit = resolve;
     });
 
-    this.initWorklet(config);
+    void this.initWorklet(config);
+  }
+
+  /** Resolves once the worklet has loaded the WASM engine (or failed to). */
+  async ensureInitialized(): Promise<void> {
+    return this._initPromise;
+  }
+
+  private post(msg: Record<string, unknown>) {
+    if (this._ready && this.workletNode) this.workletNode.port.postMessage(msg);
+    else this._pendingMessages.push(msg);
   }
 
   private async initWorklet(config?: OpenWurliConfig) {
@@ -66,9 +79,12 @@ export class OpenWurliSynth implements DevilboxSynth {
             this.workletNode?.port.postMessage({ type: 'setParam', paramId: p.paramId, value: p.value });
           }
           this._pendingParams = [];
+          for (const m of this._pendingMessages) this.workletNode?.port.postMessage(m);
+          this._pendingMessages = [];
           this._resolveInit?.();
         } else if (msg.type === 'error') {
           console.error('[OpenWurli]', msg.message);
+          this._resolveInit?.();
         }
       };
 
@@ -88,6 +104,7 @@ export class OpenWurliSynth implements DevilboxSynth {
       }
     } catch (err) {
       console.error('[OpenWurli] Init failed:', err);
+      this._resolveInit?.();
     }
   }
 
@@ -150,19 +167,19 @@ export class OpenWurliSynth implements DevilboxSynth {
   }
 
   triggerAttack(note: string | number, _time?: number, velocity = 1) {
-    if (!this.workletNode || this._disposed) return;
+    if (this._disposed) return;
     const midi = typeof note === 'string' ? noteToMidi(note) : note;
     const vel = Math.round(velocity * 127);
-    this.workletNode.port.postMessage({ type: 'noteOn', note: midi, velocity: vel });
+    this.post({ type: 'noteOn', note: midi, velocity: vel });
   }
 
   triggerRelease(note?: string | number, _time?: number) {
-    if (!this.workletNode || this._disposed) return;
+    if (this._disposed) return;
     if (note !== undefined) {
       const midi = typeof note === 'string' ? noteToMidi(note) : note;
-      this.workletNode.port.postMessage({ type: 'noteOff', note: midi });
+      this.post({ type: 'noteOff', note: midi });
     } else {
-      this.workletNode.port.postMessage({ type: 'allNotesOff' });
+      this.post({ type: 'allNotesOff' });
     }
   }
 
@@ -184,8 +201,8 @@ export class OpenWurliSynth implements DevilboxSynth {
   }
 
   sustainPedal(on: boolean) {
-    if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'sustainPedal', value: on });
+    if (this._disposed) return;
+    this.post({ type: 'sustainPedal', value: on });
   }
 
   dispose() {
