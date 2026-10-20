@@ -1918,7 +1918,7 @@ export class TrackerReplayer {
     // reload of the same song (a structural edit during playback reloads it)
     // must keep the bridge and the edits in its module; a reset here made the
     // next play load the original import bytes. A new song is re-activated by
-    // parseWithOpenMPT or by the Phase 5.4 module build.
+    // parseWithOpenMPT or by the fresh-song module build below.
     const songData = song.libopenmptFileData;
     import('@engine/libopenmpt/OpenMPTEditBridge').then(b => {
       if (!b.ownsSongData(songData)) b.reset();
