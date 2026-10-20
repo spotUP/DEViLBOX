@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useTrackerStore } from '../useTrackerStore';
 import { useCursorStore } from '../useCursorStore';
 import { resetStore } from './_harness';
+import { markBlock } from '@engine/keyboard/commands/cursor';
 
 /**
  * FT2 rule: an UNMODIFIED cursor move (plain arrow / nav) discards the block
@@ -112,5 +113,38 @@ describe('useCursorStore — moveCursorByField (Option+Left/Right)', () => {
     });
     useCursorStore.getState().moveCursorByField('left');
     expect(at()).toBe('0:volume:0');
+  });
+});
+
+/**
+ * FT2 Option+Shift+arrows (mark_block_*) extend the block mark one step per
+ * press. The handlers used to call moveCursor without preserveSelection, which
+ * discarded the mark they had just started, so the block never grew.
+ */
+describe('mark_block commands extend the block mark', () => {
+  beforeEach(() => {
+    resetStore(useTrackerStore);
+    useCursorStore.setState({
+      cursor: { channelIndex: 0, rowIndex: 2, noteColumnIndex: 0, columnType: 'note', digitIndex: 0 },
+      selection: null,
+    });
+  });
+
+  it('two presses down mark three rows from the starting cell', () => {
+    markBlock('down');
+    markBlock('down');
+
+    const sel = useCursorStore.getState().selection;
+    expect(sel).not.toBeNull();
+    expect(sel?.startRow).toBe(2);
+    expect(sel?.endRow).toBe(4);
+  });
+
+  it('a press right extends the mark across columns', () => {
+    markBlock('right');
+
+    const sel = useCursorStore.getState().selection;
+    expect(sel?.startColumn).toBe('note');
+    expect(sel?.endColumn).not.toBe('note');
   });
 });

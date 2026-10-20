@@ -31,7 +31,7 @@ import {
   cursorPageUp, cursorPageDown, cursorHome, cursorEnd,
   cursorPatternStart, cursorPatternEnd, nextChannel, prevChannel,
   nextColumn, prevColumn, jumpToRow0, jumpToRow16, jumpToRow32, jumpToRow48,
-  cursorRowStart, cursorRowEnd
+  cursorRowStart, cursorRowEnd, markBlock
 } from '@engine/keyboard/commands/cursor';
 import {
   deleteNote, deleteAndPull, insertRow, toggleEditMode,
@@ -1228,50 +1228,10 @@ function initializeRegistry() {
     { name: 'block_length_halve', contexts: ['pattern'], handler: halveBlockLength, description: 'Halve block length' },
 
     // === SELECTION EXTENDED ===
-    { name: 'mark_block_up', contexts: ['pattern'], handler: () => {
-      const cs = useCursorStore.getState();
-      if (!cs.selection) cs.startSelection();
-      cs.moveCursor('up');
-      const c = useCursorStore.getState().cursor;
-      const sel = useCursorStore.getState().selection;
-      if (sel) {
-        useCursorStore.setState({ selection: { ...sel, endRow: c.rowIndex, endChannel: c.channelIndex, endColumn: c.columnType } });
-      }
-      return true;
-    }, description: 'Extend selection up' },
-    { name: 'mark_block_down', contexts: ['pattern'], handler: () => {
-      const cs = useCursorStore.getState();
-      if (!cs.selection) cs.startSelection();
-      cs.moveCursor('down');
-      const c = useCursorStore.getState().cursor;
-      const sel = useCursorStore.getState().selection;
-      if (sel) {
-        useCursorStore.setState({ selection: { ...sel, endRow: c.rowIndex, endChannel: c.channelIndex, endColumn: c.columnType } });
-      }
-      return true;
-    }, description: 'Extend selection down' },
-    { name: 'mark_block_left', contexts: ['pattern'], handler: () => {
-      const cs = useCursorStore.getState();
-      if (!cs.selection) cs.startSelection();
-      cs.moveCursor('left');
-      const c = useCursorStore.getState().cursor;
-      const sel = useCursorStore.getState().selection;
-      if (sel) {
-        useCursorStore.setState({ selection: { ...sel, endRow: c.rowIndex, endChannel: c.channelIndex, endColumn: c.columnType } });
-      }
-      return true;
-    }, description: 'Extend selection left' },
-    { name: 'mark_block_right', contexts: ['pattern'], handler: () => {
-      const cs = useCursorStore.getState();
-      if (!cs.selection) cs.startSelection();
-      cs.moveCursor('right');
-      const c = useCursorStore.getState().cursor;
-      const sel = useCursorStore.getState().selection;
-      if (sel) {
-        useCursorStore.setState({ selection: { ...sel, endRow: c.rowIndex, endChannel: c.channelIndex, endColumn: c.columnType } });
-      }
-      return true;
-    }, description: 'Extend selection right' },
+    { name: 'mark_block_up', contexts: ['pattern'], handler: () => markBlock('up'), description: 'Extend selection up' },
+    { name: 'mark_block_down', contexts: ['pattern'], handler: () => markBlock('down'), description: 'Extend selection down' },
+    { name: 'mark_block_left', contexts: ['pattern'], handler: () => markBlock('left'), description: 'Extend selection left' },
+    { name: 'mark_block_right', contexts: ['pattern'], handler: () => markBlock('right'), description: 'Extend selection right' },
     { name: 'cut_pattern', contexts: ['pattern'], handler: () => {
       selectAll();
       cutSelection();
