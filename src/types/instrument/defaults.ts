@@ -444,7 +444,7 @@ export const DEFAULT_OSCILLATOR: OscillatorConfig = {
 export const DEFAULT_ENVELOPE: EnvelopeConfig = {
   attack: 10,
   decay: 500,
-  sustain: 0,  // Decay to silence (tracker-style)
+  sustain: 70,  // Holds while the key is down (live play must not fade to silence)
   release: 100,
 };
 
@@ -515,7 +515,7 @@ export const DEFAULT_WAVETABLE: WavetableConfig = {
   envelope: {
     attack: 10,
     decay: 500,
-    sustain: 0,  // Decay to silence (tracker-style)
+    sustain: 70,  // Holds while the key is down (live play must not fade to silence)
     release: 100,
   },
   filter: {
@@ -1051,7 +1051,7 @@ export const DEFAULT_SUPERSAW: SuperSawConfig = {
   envelope: {
     attack: 10,
     decay: 500,
-    sustain: 0,  // Decay to silence (tracker-style)
+    sustain: 70,  // Holds while the key is down (live play must not fade to silence)
     release: 100,
   },
   filter: {
@@ -1080,7 +1080,7 @@ export const DEFAULT_POLYSYNTH: PolySynthConfig = {
   envelope: {
     attack: 50,
     decay: 500,
-    sustain: 0,  // Decay to silence (tracker-style)
+    sustain: 70,  // Holds while the key is down (live play must not fade to silence)
     release: 100,
   },
   portamento: 0,
@@ -1193,7 +1193,7 @@ export const DEFAULT_CHIP_SYNTH: ChipSynthConfig = {
   envelope: {
     attack: 5,
     decay: 300,
-    sustain: 0,  // Decay to silence (tracker-style)
+    sustain: 70,  // Holds while the key is down (live play must not fade to silence)
     release: 50,
   },
   vibrato: {
@@ -1225,7 +1225,7 @@ export const DEFAULT_PWM_SYNTH: PWMSynthConfig = {
   envelope: {
     attack: 50,
     decay: 500,
-    sustain: 0,  // Decay to silence (tracker-style)
+    sustain: 70,  // Holds while the key is down (live play must not fade to silence)
     release: 100,
   },
   filter: {
@@ -1278,7 +1278,7 @@ export const DEFAULT_FORMANT_SYNTH: FormantSynthConfig = {
   envelope: {
     attack: 50,
     decay: 500,
-    sustain: 0,  // Decay to silence (tracker-style)
+    sustain: 70,  // Holds while the key is down (live play must not fade to silence)
     release: 100,
   },
   brightness: 70,
