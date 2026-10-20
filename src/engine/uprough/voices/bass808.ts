@@ -412,8 +412,26 @@ function applySlide(prevSemi: number, targetSemi: number, type: SlideType, durMs
   return render808Note(prevSemi, durS, rate, { profile, seed, decayMs: decMs, extraSemi: extra, gainEnv, accent: spec.gainLift > 0 });
 }
 
-/** trap808.render_mono_sequence (no kick_plan): mono law + choke + slides, summed into one buffer. */
-export function render808Sequence(events: readonly Event808[], profile: Partial<Profile808> = {}, rate = SOFTSYNTH_RATE, seed = 0): Float64Array {
+/**
+ * One record of trap808.plan_kick_relationship that render_mono_sequence reads: the event's start and semitone (its
+ * key), whether it layers on a kick, and the alignment recommendation. nearest_kick_s / kick_delta_ms are diagnostics
+ * the render never reads and are not carried.
+ */
+export interface KickPlanRecord {
+  startS: number; semi: number; layered: boolean;
+  softenAttack: boolean; softenAttackMs: number; attackOffsetMs: number;
+}
+
+/** Python round(x, digits) key: the decimal string is the exact round-half-even of the binary value in all but exact ties. */
+const alignKey = (startS: number, semi: number): string => `${startS.toFixed(9)}|${semi.toFixed(6)}`;
+
+/**
+ * trap808.render_mono_sequence: mono law + choke + slides, summed into one buffer. `kickPlan` is the s.23 kick
+ * alignment: a layered note with soften_attack rises over max(attack_ms, soften_attack_ms) with no click, one with an
+ * attack offset starts later. A note inside a slide pair is never aligned. Duplicate (start, semi) keys: last wins.
+ */
+export function render808Sequence(events: readonly Event808[], profile: Partial<Profile808> = {}, rate = SOFTSYNTH_RATE, seed = 0,
+  kickPlan: readonly KickPlanRecord[] | null = null): Float64Array {
   const p: Profile808 = { ...DEFAULT_PROFILE_808, ...profile };
   const norm = events.map((e) => ({ startS: e.startS, durS: e.durS, semi: e.semi, slide: !!e.slide }))
     .sort((a, b) => a.startS - b.startS);
@@ -429,6 +447,9 @@ export function render808Sequence(events: readonly Event808[], profile: Partial<
     }
     return { ...ev, cutAtS, slideTo };
   });
+
+  const alignMap = new Map<string, KickPlanRecord>();
+  if (kickPlan) for (const rec of kickPlan) alignMap.set(alignKey(rec.startS, rec.semi), rec);
 
   const rendered: { start: number; sig: Float64Array }[] = [];
   let total = 1;
@@ -450,10 +471,21 @@ export function render808Sequence(events: readonly Event808[], profile: Partial<
       total = Math.max(total, start + sig.length);
       return;
     }
-    let sig = render808Note(ev.semi, ev.durS, rate, { profile: p, seed: noteSeed });
+    // _align: only a KICK_LAYERED record acts; soften wins over the offset
+    const rec = alignMap.get(alignKey(ev.startS, ev.semi));
+    let offsetS = 0.0;
+    let softenMs: number | null = null;
+    if (rec && rec.layered) {
+      if (rec.softenAttack) softenMs = rec.softenAttackMs || null;
+      else offsetS = rec.attackOffsetMs * 1e-3;
+    }
+    let noteP = p;
+    if (softenMs !== null) noteP = { ...p, attack_ms: Math.max(p.attack_ms, softenMs), click_amt: 0.0 };
+    const noteStart = start + pyRound(offsetS * rate);
+    let sig = render808Note(ev.semi, ev.durS, rate, { profile: noteP, seed: noteSeed });
     if (ev.cutAtS !== null) sig = chokeTail(sig, Math.max(0.0, ev.cutAtS - ev.startS), rate);
-    rendered.push({ start, sig });
-    total = Math.max(total, start + sig.length);
+    rendered.push({ start: noteStart, sig });
+    total = Math.max(total, noteStart + sig.length);
   });
   const out = new Float64Array(total);
   for (const { start, sig } of rendered) for (let k = 0; k < sig.length; k++) out[start + k] = out[start + k]! + sig[k]!;
