@@ -195,10 +195,12 @@ function quantize(x: Float64Array, bits: number, peak: number, dither: boolean):
 /**
  * sampler `process`: input saturation, anti-alias, sample-rate reduction with controlled aliasing, quantise,
  * interpolation colour, output filter, wow, crackle, noise floor. `profile` names a SAMPLER_PROFILES entry
- * (unknown names run mpc60, as in Python).
+ * (unknown names run mpc60, as in Python). `over` is process(**over): knobs that replace the profile's.
  */
-export function samplerProcess(x: Signal, profile = 'mpc60', rate = 22050, dither = true, seed = 0): Float64Array {
-  const p = SAMPLER_PROFILES[profile] ?? SAMPLER_PROFILES.mpc60!;
+export function samplerProcess(
+  x: Signal, profile = 'mpc60', rate = 22050, dither = true, seed = 0, over: Partial<SamplerProfile> = {},
+): Float64Array {
+  const p: SamplerProfile = { ...(SAMPLER_PROFILES[profile] ?? SAMPLER_PROFILES.mpc60!), ...over };
   let y: Float64Array = Float64Array.from(x);
   const n = y.length;
   if (p.hp) y = hp(y, p.hp, rate);

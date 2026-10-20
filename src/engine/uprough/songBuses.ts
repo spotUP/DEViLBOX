@@ -12,7 +12,7 @@
 import { hp, lp } from '@/engine/dj/scratch/refDsp';
 import type { BarEvents } from '@/lib/uprough/barEvents';
 import {
-  chorus, drumBus, parallelDirt, reverb, samplerProcess, type SamplerReverbKind,
+  SAMPLER_PROFILES, chorus, drumBus, parallelDirt, reverb, samplerProcess, type SamplerProfile, type SamplerReverbKind,
 } from './effects/busEffects';
 import { busMakeup, busRms, echo, restoreDrumTrim, trimDrumsToPeak } from './mix/songMix';
 import { sectionBassOn } from './songBass';
@@ -70,9 +70,17 @@ export function cleanDirt(dc: DirtConfig): DirtConfig {
   return { ...dc, drumResample: null, drumDrive: 0.0, parallel: 0.0 };
 }
 
-/** sampler.apply_macros with dust 0 and no overrides: exactly `process` at the profile. */
-export function applyMacros(x: ArrayLike<number>, rate: number, profile: string, seed: number): Float64Array {
-  return samplerProcess(x, profile, rate, true, seed);
+/**
+ * sampler.apply_macros with no input_drive, alias, darkness or tape override. Dust 0 is exactly `process` at the
+ * profile; dust raises the alias mix by 0.4 (capped at 1), the noise floor by 0.01 and lowers the output lowpass by 30%
+ * per unit (a profile without one counts as 9000).
+ */
+export function applyMacros(x: ArrayLike<number>, rate: number, profile: string, seed: number, dust = 0): Float64Array {
+  const base = SAMPLER_PROFILES[profile] ?? SAMPLER_PROFILES.mpc60!;
+  const over: Partial<SamplerProfile> = dust
+    ? { alias: Math.min(1.0, base.alias + 0.4 * dust), noise: base.noise + 0.01 * dust, outLp: (base.outLp || 9000) * (1.0 - 0.3 * dust) }
+    : {};
+  return samplerProcess(x, profile, rate, true, seed, over);
 }
 
 const STRING_BASS_VOICES = ['sampled', 'electric', 'warmsub'];
