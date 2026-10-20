@@ -10,21 +10,27 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { installRealWebAudio } from '@/test/audio/realWebAudio';
 
 let Tone: typeof import('tone');
+let createWobbleBass: typeof import('../../factories/CommunitySynthFactory').createWobbleBass;
+let cutToneNote: typeof import('../toneNoteCut').cutToneNote;
+let DEFAULT_WOBBLE_BASS: typeof import('@/types/instrument/defaults').DEFAULT_WOBBLE_BASS;
 
+// The synth factory pulls in a large module graph; a cold transform (pre-commit snapshot) takes well over a minute,
+// so it loads here once instead of inside the first test's timeout.
 beforeAll(async () => {
   installRealWebAudio();
   Tone = await import('tone');
-}, 60000);
+  ({ createWobbleBass } = await import('../../factories/CommunitySynthFactory'));
+  ({ cutToneNote } = await import('../toneNoteCut'));
+  ({ DEFAULT_WOBBLE_BASS } = await import('@/types/instrument/defaults'));
+}, 300000);
 
 const ROW = 0.12;
 const NOTES: Array<[number, string]> = [[0, 'D4'], [4, 'G4'], [8, 'C5'], [12, 'B4']];
 const at = (row: number) => 0.05 + row * ROW;
 
-async function render(cut: boolean, attackNew = true) {
-  const { createWobbleBass } = await import('../../factories/CommunitySynthFactory');
-  const { cutToneNote } = await import('../toneNoteCut');
-  const { DEFAULT_WOBBLE_BASS } = await import('@/types/instrument/defaults');
+async function render(cut: boolean, attackNew = true, lookAhead = 0) {
   const buf = await Tone.Offline(() => {
+    Tone.getContext().lookAhead = lookAhead;
     const cfg = { ...DEFAULT_WOBBLE_BASS, envelope: { attack: 5, decay: 200, sustain: 80, release: 300 } };
     const wb = createWobbleBass({ id: 1, synthType: 'WobbleBass', wobbleBass: cfg } as never) as unknown as {
       connect: (d: unknown) => void;
@@ -63,6 +69,18 @@ describe('raw synth note on a channel that is already playing', () => {
     const sounding = rms(t - 0.03, t - 0.01);
     expect(sounding).toBeGreaterThan(0.05);
     expect(rms(t + 0.01, t + 0.03)).toBeLessThan(sounding * 0.02);
+  }, 60000);
+
+  // Live, the Tone context schedules 100 ms ahead and PolySynth voices are cut from a context timeout. The cut used
+  // to be queued at the new note's time and floored at now() (currentTime + lookAhead), so its ramp started after
+  // the new attack: the old note sounded over it and then dropped in 3 ms, which crackled. The WobbleBass chain
+  // delays its output by about 5.5 ms, so the ramp (ending at t) is over in the output by about t + 6 ms.
+  it('finishes the cut before the new note starts when the context schedules ahead (live lookAhead)', async () => {
+    const { rms } = await render(true, false, 0.1);
+    const t = at(NOTES[1][0]);
+    const sounding = rms(t - 0.03, t - 0.01);
+    expect(sounding).toBeGreaterThan(0.05);
+    expect(rms(t + 0.007, t + 0.012)).toBeLessThan(sounding * 0.02);
   }, 60000);
 
   it('keeps the old note sounding through its release when the note slides (no cut)', async () => {

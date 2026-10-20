@@ -23,6 +23,12 @@ import { voiceSourceOf } from './toneVoiceProbe';
 /** Length of the fade that cuts the old note (seconds). Short enough to read as a retrigger, long enough not to click. */
 export const CUT_RAMP_SECONDS = 0.003;
 
+/**
+ * How far ahead of its ramp a PolySynth cut is queued (seconds). Context timeouts fire on the ticker, so they run late
+ * by up to one tick; the lead keeps the ramp start in the future. See cutToneNote.
+ */
+export const POLY_CUT_LEAD_SECONDS = 0.02;
+
 const cutTargets = new WeakMap<object, object[]>();
 
 /** Tag a factory wrapper with every Tone node whose envelopes a hard retrigger must cut. Returns the wrapper. */
@@ -71,11 +77,13 @@ export function cutEnvelopesOf(
 }
 
 /**
- * Ramp one envelope to zero, ending at `time`. When the ramp can no longer start in time, it starts now; `minRamp`
- * then keeps it from collapsing into a click (only safe where the new note plays on another voice).
+ * Ramp one envelope to zero, ending at `time`. When the ramp can no longer start in time, it starts at the audio
+ * clock's current time; `minRamp` then keeps it from collapsing into a click (only safe where the new note plays on
+ * another voice). The floor is `immediate()`, not `now()`: `now()` adds the context lookAhead (100 ms live), which
+ * would push the ramp past `time`, so the old note kept sounding over the new attack and then dropped in 3 ms.
  */
 function cutEnvelope(env: Tone.Envelope, time: number, minRamp = 0): void {
-  const start = Math.max(time - CUT_RAMP_SECONDS, env.now());
+  const start = Math.max(time - CUT_RAMP_SECONDS, env.immediate());
   const release = env.release;
   const releaseCurve = env.releaseCurve;
   try {
@@ -104,10 +112,11 @@ function cutPolyVoices(poly: PolyLike, time: number): void {
  * A plain envelope is cut at once: its automation for the old note is already scheduled. A PolySynth defers every
  * future attack and release on its context clock (PolySynth._scheduleEvent runs them on a ticker once `now()` reaches
  * their time), and the replayer schedules rows up to 0.25 s ahead, so the voice of the previous note may not exist
- * yet when this is called. The cut joins the same queue at `time`, so it runs after the previous attack and before
- * the new one. Call it after the old note's release at `time`: that release holds the envelope at `time`
- * (cancelAndHoldAtTime) and would wipe a cut that ran before it. The ticker can run it late, but the PolySynth's own
- * attack for the new note is then just as late and plays on a fresh voice, so a late cut only shortens the old tail.
+ * yet when this is called. The cut joins the same queue POLY_CUT_LEAD_SECONDS before its ramp: late enough that the
+ * previous note's voice exists (its attack, a row earlier, is queued before it), early enough that the ticker runs it
+ * before the ramp must start. A cut queued at `time` itself always ran at or after `time`, so the old voice sounded
+ * over the new attack. The old note's release at `time` runs after the cut and holds the envelope at `time`
+ * (cancelAndHoldAtTime), where the ramp has already reached zero.
  */
 export function cutToneNote(instrument: object, time: number): void {
   const roots = cutTargets.get(instrument) ?? [voiceSourceOf(instrument)];
@@ -117,7 +126,7 @@ export function cutToneNote(instrument: object, time: number): void {
   for (const root of roots) cutEnvelopesOf(root, envelopes, seen, polys);
   for (const env of envelopes) cutEnvelope(env, time);
   for (const poly of polys) {
-    const delay = time - poly.now();
+    const delay = time - CUT_RAMP_SECONDS - POLY_CUT_LEAD_SECONDS - poly.now();
     if (delay <= 0) cutPolyVoices(poly, time);
     else poly.context.setTimeout(() => cutPolyVoices(poly, time), delay);
   }
