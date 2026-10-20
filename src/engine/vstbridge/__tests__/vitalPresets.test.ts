@@ -5,7 +5,7 @@
  * synth.handleCommand), sound differs from Init, wavetables in the file reach the audio,
  * and a new Vital instrument starts on the default bundled preset.
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { describe, it, expect } from 'vitest';
@@ -16,7 +16,9 @@ import { applySynthTypeDefaults } from '@stores/instrument/synthTypeDefaults';
 import type { InstrumentConfig } from '@typedefs/instrument';
 
 const PUBLIC = resolve(__dirname, '../../../../public');
-const PRESET_DIR = resolve(PUBLIC, 'data/vital-presets');
+const PRESET_DIR = resolve(PUBLIC, 'data/presets/vital');
+// The bank is a separate repo (npm run presets:sync); without it these suites cannot run.
+const HAVE_BANK = existsSync(PRESET_DIR);
 const FRAMES = 128;
 const BLOCKS = 750; // 2 s held
 const LIVE_VELOCITY = 127;
@@ -96,14 +98,14 @@ async function renderPreset(bytes: Uint8Array | null): Promise<{ result: Render;
   return { result: render(), handled };
 }
 
-describe('bundled Vital preset index', () => {
+describe.skipIf(!HAVE_BANK)('bundled Vital preset index', () => {
   it('lists exactly the shipped .vital files', () => {
     const shipped = readdirSync(PRESET_DIR, { recursive: true, encoding: 'utf8' })
       .filter((f) => f.endsWith('.vital'));
     expect(shipped.length).toBeGreaterThan(0);
     expect(VITAL_PRESETS.length).toBe(shipped.length);
     for (const p of VITAL_PRESETS) {
-      expect(shipped).toContain(decodeURI(p.path).replace('/data/vital-presets/', ''));
+      expect(shipped).toContain(decodeURI(p.path).replace('/data/presets/vital/', ''));
     }
     expect(new Set(VITAL_PRESETS.map((p) => p.id)).size).toBe(VITAL_PRESETS.length);
   });
@@ -118,7 +120,7 @@ describe('bundled Vital preset index', () => {
   });
 });
 
-describe('Vital loadPreset through the worklet command entry point', () => {
+describe.skipIf(!HAVE_BANK)('Vital loadPreset through the worklet command entry point', () => {
   it('renders non-silent, bounded audio that differs from Init for presets of three categories', async () => {
     const init = (await renderPreset(null)).result;
     const categories = ['Bass', 'Keys', 'Percussion'];
@@ -168,7 +170,7 @@ describe('Vital loadPreset through the worklet command entry point', () => {
   }, 60000);
 });
 
-describe('new Vital instrument', () => {
+describe.skipIf(!HAVE_BANK)('new Vital instrument', () => {
   it('starts on the default bundled preset', () => {
     const instrument = { id: 1, name: 'New', type: 'synth', synthType: 'Synth', effects: [], volume: -12, pan: 0 } as unknown as InstrumentConfig;
     applySynthTypeDefaults(instrument, 'Vital', false);

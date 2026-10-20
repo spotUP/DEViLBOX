@@ -44,6 +44,10 @@ jobs:
       - name: Install server dependencies
         run: npm ci --prefix server
 
+      # Preset banks live in their own public repo; the Vital preset suites need them.
+      - name: Fetch preset banks for tests
+        run: git clone --depth 1 https://github.com/spotUP/devilbox-presets.git public/data/presets
+
       # CI-safe tests only. Fixture-dependent parser tests (that read from the
       # local `Reference Music/` tree) still run locally via `npm test`, not here.
       - name: Type check
@@ -91,6 +95,10 @@ jobs:
             "https://raw.githubusercontent.com/lars76/swift-f0/d1ba77fe5331310b778ebe126b6cb3656d41d24f/LICENSE" \
             -o public/models/swift-f0/LICENSE
           test "$(wc -c < public/models/swift-f0/model.onnx)" -eq 135090
+
+      # The banks are served by the server from its own clone, not from the dist tarball.
+      - name: Drop preset banks from the build input
+        run: rm -rf public/data/presets
 
       - name: Build for custom server
         run: npm run build

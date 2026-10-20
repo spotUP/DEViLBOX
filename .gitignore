@@ -332,3 +332,6 @@ third-party/rtosc-build-wasm/
 nuade-wasm/build/
 !third-party/nuade/docs/
 tools/master-fx-claims-live.json
+
+# Preset banks: separate repo spotUP/devilbox-presets (npm run presets:sync)
+public/data/presets/
