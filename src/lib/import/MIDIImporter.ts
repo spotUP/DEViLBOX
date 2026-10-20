@@ -3,11 +3,19 @@
  *
  * All MIDI tracks become channels within the same pattern(s).  Long songs are
  * split into sequential patterns of `defaultPatternLength` rows, chained via
- * song positions.  Percussion tracks (MIDI ch 10) are expanded to one channel
- * per unique drum note.
+ * song positions.  A melodic track that plays chords is spread over as many
+ * channels as it has simultaneous voices, so no chord note is dropped.
+ * Percussion tracks (MIDI ch 10) are expanded to one channel per unique drum
+ * note.
+ *
+ * Timing: four rows per beat at replayer speed `MIDI_IMPORT_SPEED`, so the
+ * imported BPM equals the MIDI tempo.  Notes that fall late of their row keep
+ * their offset as an EDx note delay (one delay tick = 1/6 row) unless the
+ * caller asks for the notes to be snapped to a row grid (`quantize` >= 1).
+ * Notes shorter than a row keep their length as an ECx note cut.
  */
 
-import { Midi } from '@tonejs/midi';
+import { Midi, type Track } from '@tonejs/midi';
 import type { Pattern, TrackerCell, ChannelData } from '@typedefs/tracker';
 import { midiToXMNote } from '../xmConversions';
 import { gmProgramToInstrument, gmPercussionNoteToInstrument } from './GMSoundBank';
@@ -18,6 +26,7 @@ function generateId(prefix = 'id'): string {
 }
 
 export interface MIDIImportOptions {
+  /** 0 keeps sub-row timing as note delays; 1 snaps to rows; 2+ snaps to that many rows. */
   quantize?: number;
   /** @deprecated ignored — tracks are always merged as channels */
   mergeChannels?: boolean;
@@ -25,8 +34,20 @@ export interface MIDIImportOptions {
   defaultPatternLength?: number;
 }
 
-const DEFAULT_OPTIONS: Required<Omit<MIDIImportOptions, 'mergeChannels'>> = {
-  quantize: 1,
+/** Replayer speed (ticks per row) every imported MIDI song plays at. */
+export const MIDI_IMPORT_SPEED = 6;
+
+/** Rows per MIDI quarter note. With speed 6 this makes tracker BPM equal MIDI BPM. */
+const ROWS_PER_BEAT = 4;
+
+/** Drum trigger note for DrumMachine instruments (C-5). */
+const DRUM_TRIGGER_NOTE = 61;
+
+/** XM note-off. */
+const NOTE_OFF = 97;
+
+export const DEFAULT_MIDI_IMPORT_OPTIONS: Required<Omit<MIDIImportOptions, 'mergeChannels'>> = {
+  quantize: 0,
   velocityToVolume: true,
   defaultPatternLength: 64,
 };
@@ -34,7 +55,10 @@ const DEFAULT_OPTIONS: Required<Omit<MIDIImportOptions, 'mergeChannels'>> = {
 export interface MIDIImportResult {
   patterns: Pattern[];
   instruments: InstrumentConfig[];
+  /** MIDI tempo kept to two decimals; the replayer accepts fractional BPM. */
   bpm: number;
+  /** Replayer speed the patterns were laid out for (always MIDI_IMPORT_SPEED). */
+  speed: number;
   timeSignature: [number, number];
   metadata: {
     name: string;
@@ -54,7 +78,7 @@ export async function importMIDIFile(
   file: File,
   options: Partial<MIDIImportOptions> = {}
 ): Promise<MIDIImportResult> {
-  const opts = { ...DEFAULT_OPTIONS, ...options };
+  const opts = { ...DEFAULT_MIDI_IMPORT_OPTIONS, ...options };
 
   const arrayBuffer = await file.arrayBuffer();
   const midi = new Midi(arrayBuffer);
@@ -63,7 +87,7 @@ export async function importMIDIFile(
   if (ppq === 0) throw new Error('Invalid MIDI file: PPQ cannot be zero');
 
   const bpm = midi.header.tempos.length > 0
-    ? Math.round(midi.header.tempos[0].bpm)
+    ? Math.round(midi.header.tempos[0].bpm * 100) / 100
     : 120;
 
   const timeSignature: [number, number] = midi.header.timeSignatures.length > 0
@@ -71,7 +95,8 @@ export async function importMIDIFile(
        midi.header.timeSignatures[0].timeSignature[1]]
     : [4, 4];
 
-  const rowsPerBeat = 4;
+  const tracks = mergeSplitTracks(midi.tracks);
+  const timing: Timing = { ppq, quantize: opts.quantize };
 
   // ── Build full-length channel data for every track ────────────────────
 
@@ -79,42 +104,61 @@ export async function importMIDIFile(
   const fullChannels: FullChannel[] = [];
   let nextInstId = 1;
 
-  // Calculate total rows from all notes across all tracks
+  // Total rows cover the last note end and the last end-of-track marker,
+  // rounded up to a whole bar of the file's time signature.
   let maxTick = 0;
-  for (const track of midi.tracks) {
+  for (const track of tracks) {
     for (const note of track.notes) {
-      const endTick = note.ticks + note.durationTicks;
-      if (endTick > maxTick) maxTick = endTick;
+      maxTick = Math.max(maxTick, note.ticks + note.durationTicks);
+    }
+    if (track.notes.length > 0 && track.endOfTrackTicks !== undefined) {
+      maxTick = Math.max(maxTick, track.endOfTrackTicks);
     }
   }
-  // Fit total rows to content, rounded up to nearest 16 (1 bar at 4 rows/beat)
-  const contentRows = Math.ceil((maxTick / ppq) * rowsPerBeat);
-  const totalRows = Math.max(16, Math.ceil(contentRows / 16) * 16);
+  const rowsPerBar = Math.max(1, Math.round(timeSignature[0] * ROWS_PER_BEAT * 4 / timeSignature[1]));
+  const contentRows = Math.ceil((maxTick / ppq) * ROWS_PER_BEAT);
+  const totalRows = Math.max(rowsPerBar, Math.ceil(contentRows / rowsPerBar) * rowsPerBar);
 
-  // Non-percussion tracks — one channel each
-  for (let ti = 0; ti < midi.tracks.length; ti++) {
-    const track = midi.tracks[ti];
+  // Non-percussion tracks — one channel per simultaneous voice
+  for (let ti = 0; ti < tracks.length; ti++) {
+    const track = tracks[ti];
     if (track.notes.length === 0 || track.instrument.percussion) continue;
 
     const instId = nextInstId++;
     instruments.push(gmProgramToInstrument(track.instrument.number, instId, false));
 
-    const rows = makeEmptyRows(totalRows);
     const sustainIntervals = buildSustainIntervals(track.controlChanges[64]);
-    for (const note of track.notes) {
-      placeNote(rows, note, instId, ppq, rowsPerBeat, opts, sustainIntervals);
+    const voices: Voice[] = [];
+    const notes = [...track.notes].sort((a, b) => a.ticks - b.ticks || b.midi - a.midi);
+    for (const note of notes) {
+      const row = tickToRow(note.ticks, timing);
+      if (row < 0 || row >= totalRows) continue;
+      const offTick = adjustNoteOffForSustain(note.ticks + note.durationTicks, sustainIntervals);
+
+      let voice = voices.find((v) => v.busyUntilRow <= row);
+      if (!voice) {
+        voice = { rows: makeEmptyRows(totalRows), busyUntilRow: 0 };
+        voices.push(voice);
+      }
+      voice.busyUntilRow = placeNote(voice.rows, row, offTick, note, instId, timing, opts.velocityToVolume);
     }
-    placeTrackEffects(rows, track, ppq, rowsPerBeat, opts.quantize);
-    fullChannels.push({
-      name: track.name || `Track ${ti + 1}`,
-      instId,
-      rows,
+
+    const defaults = initialChannelDefaults(track);
+    placeTrackEffects(voices[0].rows, track, timing);
+    const baseName = track.name || `Channel ${track.channel + 1}`;
+    voices.forEach((voice, vi) => {
+      fullChannels.push({
+        name: voices.length === 1 ? baseName : `${baseName} ${vi + 1}`,
+        instId,
+        rows: voice.rows,
+        ...defaults,
+      });
     });
   }
 
   // Percussion tracks — one channel per unique drum note
-  for (let ti = 0; ti < midi.tracks.length; ti++) {
-    const track = midi.tracks[ti];
+  for (let ti = 0; ti < tracks.length; ti++) {
+    const track = tracks[ti];
     if (track.notes.length === 0 || !track.instrument.percussion) continue;
 
     const groups = new Map<number, typeof track.notes>();
@@ -123,6 +167,7 @@ export async function importMIDIFile(
       groups.get(note.midi)!.push(note);
     }
 
+    const defaults = initialChannelDefaults(track);
     for (const [midiNote, hits] of Array.from(groups.entries()).sort((a, b) => a[0] - b[0])) {
       const instId = nextInstId++;
       const inst = gmPercussionNoteToInstrument(midiNote, instId);
@@ -130,15 +175,16 @@ export async function importMIDIFile(
 
       const rows = makeEmptyRows(totalRows);
       for (const hit of hits) {
-        const row = tickToRow(hit.ticks, ppq, rowsPerBeat, opts.quantize);
+        const row = tickToRow(hit.ticks, timing);
         if (row < 0 || row >= totalRows) continue;
-        rows[row].note = 61; // C-5 — standard drum trigger note
+        rows[row].note = DRUM_TRIGGER_NOTE;
         rows[row].instrument = instId;
         if (opts.velocityToVolume) {
-          rows[row].volume = 0x10 + Math.round(velocityToVolume(hit.velocity * 127));
+          rows[row].volume = velocityToVolumeColumn(hit.velocity);
         }
+        placeNoteDelay(rows[row], hit.ticks, timing);
       }
-      fullChannels.push({ name: inst.name, instId, rows });
+      fullChannels.push({ name: inst.name, instId, rows, ...defaults });
     }
   }
 
@@ -162,8 +208,8 @@ export async function importMIDIFile(
       muted: false,
       solo: false,
       collapsed: false,
-      volume: 80,
-      pan: 0,
+      volume: fc.volume,
+      pan: fc.pan,
       rows: fc.rows.slice(startRow, endRow),
     }));
 
@@ -191,6 +237,7 @@ export async function importMIDIFile(
     patterns,
     instruments,
     bpm,
+    speed: MIDI_IMPORT_SPEED,
     timeSignature,
     metadata: {
       name: songName,
@@ -202,10 +249,22 @@ export async function importMIDIFile(
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+interface Timing { ppq: number; quantize: number }
+
 interface FullChannel {
   name: string;
   instId: number;
   rows: TrackerCell[];
+  /** Channel volume 0-100 (from CC 7 before the first note, else 80). */
+  volume: number;
+  /** Channel pan -100..100 (from CC 10 before the first note, MIDI 64 = centre, else 0). */
+  pan: number;
+}
+
+interface Voice {
+  rows: TrackerCell[];
+  /** First row this voice is free again (the row holding its note-off). */
+  busyUntilRow: number;
 }
 
 function makeEmptyRows(length: number): TrackerCell[] {
@@ -215,39 +274,98 @@ function makeEmptyRows(length: number): TrackerCell[] {
   }));
 }
 
-/** Place a melodic note (+ note-off) into a row array.
- *  Note-off is delayed past sustain pedal intervals if applicable. */
+/**
+ * @tonejs/midi splits every MIDI track at each program change, so the events
+ * that precede a track's first program change (track name, bank select,
+ * initial volume and pan) end up in a note-less track of their own and the
+ * track with the notes comes back nameless.  Fold each note-less track into
+ * the track with notes that directly follows it.
+ */
+function mergeSplitTracks(tracks: Track[]): Track[] {
+  const merged: Track[] = [];
+  for (let i = 0; i < tracks.length; i++) {
+    const track = tracks[i];
+    if (track.notes.length > 0) { merged.push(track); continue; }
+    // @tonejs/midi reports channel 0 for a split without notes whatever
+    // channel its events used, so the channel cannot pair the two halves.
+    // The splits of one MIDI track are emitted consecutively, so the
+    // note-less half is always followed directly by its own notes.
+    const target = tracks[i + 1];
+    if (!target || target.notes.length === 0) continue;
+    if (!target.name && track.name) target.name = track.name;
+    for (const [ccStr, events] of Object.entries(track.controlChanges)) {
+      const cc = parseInt(ccStr, 10);
+      const existing = target.controlChanges[cc] ?? [];
+      target.controlChanges[cc] = [...existing, ...events].sort((a, b) => a.ticks - b.ticks);
+    }
+    if (track.pitchBends.length > 0) {
+      target.pitchBends = [...track.pitchBends, ...target.pitchBends].sort((a, b) => a.ticks - b.ticks);
+    }
+    if (track.endOfTrackTicks !== undefined) {
+      target.endOfTrackTicks = Math.max(target.endOfTrackTicks ?? 0, track.endOfTrackTicks);
+    }
+  }
+  return merged;
+}
+
+/**
+ * CC 7 (volume) and CC 10 (pan) sent before the first note set up the mixer
+ * channel; they are the channel's volume and pan, not a row effect that would
+ * override the first note's velocity.
+ */
+function initialChannelDefaults(track: Track): { volume: number; pan: number } {
+  const firstNoteTick = track.notes.length > 0 ? track.notes[0].ticks : 0;
+  const initial = (cc: number): number | undefined => {
+    const events = (track.controlChanges[cc] ?? []).filter((ev) => ev.ticks <= firstNoteTick);
+    return events.length > 0 ? events[events.length - 1].value : undefined;
+  };
+  const volume = initial(7);
+  const pan = initial(10);
+  return {
+    volume: volume === undefined ? 80 : Math.round(volume * 100),
+    pan: pan === undefined ? 0 : Math.max(-100, Math.min(100, Math.round((pan * 127 - 64) / 63 * 100))),
+  };
+}
+
+/**
+ * Place a melodic note into a voice's row array and end it where the MIDI
+ * note ends.  A note that ends inside its own row (staccato shorter than a
+ * row) is ended with an ECx note cut on that row, x = replayer ticks played.
+ * A longer note gets a note-off on the row where it ends; a following note on
+ * that row simply replaces the note-off.  Returns the first row on which the
+ * voice is free again.
+ */
 function placeNote(
   rows: TrackerCell[],
-  note: { midi: number; velocity: number; ticks: number; durationTicks: number },
+  row: number,
+  offTick: number,
+  note: { midi: number; velocity: number; ticks: number },
   instId: number,
-  ppq: number,
-  rowsPerBeat: number,
-  opts: { quantize?: number; velocityToVolume?: boolean },
-  sustainIntervals?: SustainInterval[],
-): void {
-  const row = tickToRow(note.ticks, ppq, rowsPerBeat, opts.quantize);
-  if (row < 0 || row >= rows.length) return;
-
+  timing: Timing,
+  velocityToVolume: boolean,
+): number {
   const xmNote = midiToXMNote(note.midi);
-  if (!xmNote) return;
+  if (!xmNote) return row + 1;
 
   rows[row].note = xmNote;
   rows[row].instrument = instId;
+  if (velocityToVolume) {
+    rows[row].volume = velocityToVolumeColumn(note.velocity);
+  }
+  const delayTicks = placeNoteDelay(rows[row], note.ticks, timing);
 
-  if (opts.velocityToVolume) {
-    rows[row].volume = 0x10 + Math.round(velocityToVolume(note.velocity * 127));
+  const playedTicks = Math.round((tickToExactRow(offTick, timing.ppq) - row) * MIDI_IMPORT_SPEED);
+  if (playedTicks < MIDI_IMPORT_SPEED && delayTicks + 1 < MIDI_IMPORT_SPEED) {
+    const cutTick = Math.max(delayTicks + 1, playedTicks);
+    placeEffect(rows[row], 0xE, 0xC0 | cutTick);
+    return row + 1;
   }
 
-  // Note-off — delay past sustain pedal if held
-  let offTick = note.ticks + note.durationTicks;
-  if (sustainIntervals) {
-    offTick = adjustNoteOffForSustain(offTick, sustainIntervals);
+  const offRow = Math.max(row + 1, tickToRow(offTick, timing));
+  if (offRow < rows.length) {
+    rows[offRow].note = NOTE_OFF;
   }
-  const endRow = tickToRow(offTick, ppq, rowsPerBeat, opts.quantize);
-  if (endRow > row && endRow < rows.length) {
-    rows[endRow].note = 97; // XM note-off
-  }
+  return offRow;
 }
 
 // ── Sustain Pedal ────────────────────────────────────────────────────────────
@@ -293,9 +411,9 @@ function adjustNoteOffForSustain(offTick: number, intervals: SustainInterval[]):
  *   CC  2  Breath Controller    → Set Volume Cxx
  *   CC  4  Foot Pedal           → Set Volume Cxx
  *   CC  5  Portamento Time      → Tone Portamento speed 3xx
- *   CC  7  Volume               → Set Volume Cxx (0-64)
+ *   CC  7  Volume               → Set Volume Cxx (0-64); before the first note it is the channel volume instead
  *   CC  8  Balance              → Set Pan 8xx (0-255)
- *   CC 10  Pan                  → Set Pan 8xx (0-255)
+ *   CC 10  Pan                  → Set Pan 8xx (0-255); before the first note it is the channel pan instead
  *   CC 11  Expression           → Set Volume Cxx (scaled by last CC 7)
  *   CC 64  Damper/Sustain       → handled in note-off logic, not here
  *   CC 65  Portamento on/off    → Tone Portamento 3xx on/off
@@ -372,15 +490,17 @@ function mapCCToEffect(
 /**
  * Place all MIDI CC events and pitch bends as tracker effects on a channel.
  * Iterates every CC number present on the track and maps via mapCCToEffect().
+ * CC 7 and CC 10 up to the first note are the channel defaults (see
+ * initialChannelDefaults) and are not placed as effects.
  * Pitch bends are delta-encoded as pitch slide up/down (1xx/2xx).
  */
 function placeTrackEffects(
   rows: TrackerCell[],
-  track: { controlChanges: Record<number, Array<{ ticks: number; value: number }>>; pitchBends?: Array<{ ticks: number; value: number }> },
-  ppq: number,
-  rowsPerBeat: number,
-  quantize: number,
+  track: Track,
+  timing: Timing,
 ): void {
+  const firstNoteTick = track.notes.length > 0 ? track.notes[0].ticks : 0;
+
   // Track CC 7 value for expression scaling
   let lastVolume = 1.0;
 
@@ -395,6 +515,8 @@ function placeTrackEffects(
         // Track CC7 for expression scaling
         if (ccNum === 7) lastVolume = ev.value;
 
+        if ((ccNum === 7 || ccNum === 10) && ev.ticks <= firstNoteTick) continue;
+
         const mapped = mapCCToEffect(ccNum, ev.value, lastVolume);
         if (mapped) {
           events.push({ ticks: ev.ticks, effTyp: mapped[0], eff: mapped[1] });
@@ -402,9 +524,9 @@ function placeTrackEffects(
 
         // CC 123 → place note-off directly
         if (ccNum === 123) {
-          const row = tickToRow(ev.ticks, ppq, rowsPerBeat, quantize);
+          const row = tickToRow(ev.ticks, timing);
           if (row >= 0 && row < rows.length && rows[row].note === 0) {
-            rows[row].note = 97;
+            rows[row].note = NOTE_OFF;
           }
         }
       }
@@ -429,7 +551,7 @@ function placeTrackEffects(
   // Sort by tick and place into rows
   events.sort((a, b) => a.ticks - b.ticks);
   for (const ev of events) {
-    const row = tickToRow(ev.ticks, ppq, rowsPerBeat, quantize);
+    const row = tickToRow(ev.ticks, timing);
     if (row >= 0 && row < rows.length) {
       placeEffect(rows[row], ev.effTyp, ev.eff);
     }
@@ -448,14 +570,39 @@ function placeEffect(cell: TrackerCell, typ: number, param: number): void {
   // Both slots full → drop (could use volume column for volume/pan in future)
 }
 
-function tickToRow(tick: number, ppq: number, rowsPerBeat: number, quantize = 0): number {
-  if (ppq === 0) return 0;
-  const row = Math.round((tick / ppq) * rowsPerBeat);
-  return quantize > 0 ? Math.round(row / quantize) * quantize : row;
+/** Exact (fractional) row position of a MIDI tick. */
+function tickToExactRow(tick: number, ppq: number): number {
+  return (tick / ppq) * ROWS_PER_BEAT;
 }
 
-function velocityToVolume(velocity: number): number {
-  return (velocity / 127) * 0x40;
+function tickToRow(tick: number, { ppq, quantize }: Timing): number {
+  if (ppq === 0) return 0;
+  const row = Math.round(tickToExactRow(tick, ppq));
+  return quantize > 1 ? Math.round(row / quantize) * quantize : row;
+}
+
+/**
+ * Keep the part of a note's timing that row rounding threw away.  A note that
+ * sits late of its row by at least half a replayer tick gets an EDx note delay
+ * (x = whole replayer ticks, 1/6 row each).  Notes early of their row stay on
+ * the row: the tracker cannot play a note before its row.  Skipped when the
+ * caller asked for notes to be snapped to a grid.  Returns the delay placed.
+ */
+function placeNoteDelay(cell: TrackerCell, tick: number, { ppq, quantize }: Timing): number {
+  if (quantize >= 1) return 0;
+  const exact = tickToExactRow(tick, ppq);
+  const late = exact - Math.round(exact);
+  const delayTicks = Math.round(late * MIDI_IMPORT_SPEED);
+  if (delayTicks >= 1 && delayTicks < MIDI_IMPORT_SPEED) {
+    placeEffect(cell, 0xE, 0xD0 | delayTicks);
+    return delayTicks;
+  }
+  return 0;
+}
+
+/** MIDI velocity (0..1) to an XM volume-column "set volume" byte (0x10..0x50). */
+function velocityToVolumeColumn(velocity: number): number {
+  return 0x10 + Math.round(velocity * 0x40);
 }
 
 export function isMIDIFile(filename: string): boolean {

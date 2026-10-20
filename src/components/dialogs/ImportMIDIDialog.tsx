@@ -12,7 +12,7 @@ import { CustomSelect } from '@components/common/CustomSelect';
 import { Button } from '@components/ui/Button';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import type { ImportOptions } from './ImportModuleDialog';
-import type { MIDIImportOptions } from '@lib/import/MIDIImporter';
+import { DEFAULT_MIDI_IMPORT_OPTIONS, type MIDIImportOptions } from '@lib/import/MIDIImporter';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 import { useDialogTypingTrap } from '@hooks/useDialogTypingTrap';
 
@@ -32,7 +32,7 @@ interface ImportMIDIDialogProps {
 }
 
 const QUANTIZE_OPTIONS = [
-  { value: 0, label: 'None' },
+  { value: 0, label: 'None (keep note delays)' },
   { value: 1, label: '1 row' },
   { value: 2, label: '2 rows (½ beat)' },
   { value: 4, label: '4 rows (1 beat)' },
@@ -57,7 +57,7 @@ export const ImportMIDIDialog: React.FC<ImportMIDIDialogProps> = ({
   const [error, setError]           = useState<string | null>(null);
 
   // MIDI import options
-  const [quantize, setQuantize]                   = useState(1);
+  const [quantize, setQuantize]                   = useState(DEFAULT_MIDI_IMPORT_OPTIONS.quantize);
   const [velocityToVolume, setVelocityToVolume]   = useState(true);
   const [patternLength, setPatternLength]         = useState(64);
 
@@ -80,7 +80,7 @@ export const ImportMIDIDialog: React.FC<ImportMIDIDialogProps> = ({
       const midi = new Midi(buf);
 
       const bpm = midi.header.tempos.length > 0
-        ? Math.round(midi.header.tempos[0].bpm)
+        ? Math.round(midi.header.tempos[0].bpm * 100) / 100
         : 120;
       const timeSig: [number, number] = midi.header.timeSignatures.length > 0
         ? [midi.header.timeSignatures[0].timeSignature[0], midi.header.timeSignatures[0].timeSignature[1]]
