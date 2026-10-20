@@ -28,6 +28,7 @@
    "vel": 1.0
   },
   "bass_cut": 1.0,
+  "melody_voice": "bell",
   "rate": 22050,
   "tier": "a1200",
   "bars": 16,
