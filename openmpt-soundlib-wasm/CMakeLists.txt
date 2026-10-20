@@ -135,6 +135,7 @@ target_link_options(OpenMPTSoundlib PRIVATE
 '_osl_set_num_channels',\
 '_osl_set_initial_speed',\
 '_osl_set_initial_tempo',\
+'_osl_set_sample_preamp',\
 '_osl_get_midi_macro_string',\
 '_osl_set_midi_macro_string'\
 ]"

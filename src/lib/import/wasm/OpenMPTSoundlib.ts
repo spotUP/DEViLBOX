@@ -330,6 +330,12 @@ export async function setInitialTempo(tempo: number): Promise<void> {
   m._osl_set_initial_tempo(tempo);
 }
 
+/** Set the song's sample pre-amp (48 is the soundlib default); saved in the module. */
+export async function setSamplePreAmp(preAmp: number): Promise<void> {
+  const m = await getModule();
+  m._osl_set_sample_preamp(preAmp);
+}
+
 // ─── Sample data ───────────────────────────────────────────────────────────
 
 export async function getSampleInfo(sampleIndex: number): Promise<SampleInfo> {

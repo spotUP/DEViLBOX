@@ -21,6 +21,7 @@ import type { SaveFormat } from '@lib/import/wasm/OpenMPTSoundlib';
 import { mapNoteToOpenMPT } from '@lib/import/wasm/OpenMPTConverter';
 import { foldEffectColumnsForXM } from '@/lib/tracker/volumeColumn';
 import { noteToMidi, xmNoteToToneJS } from '@/lib/xmConversions';
+import { getNormalizedVolume, instrumentOffsetDb } from '@engine/factories/volumeNormalization';
 
 let _dirty = false;
 let _loaded = false;
@@ -43,8 +44,11 @@ let _slotIds: string[] | null = null;
  * (the WAV bytes or the saved URL, see samplerSource).
  */
 let _samplerSlots = new Map<number, ArrayBuffer | string>();
-/** The sample source last looked at per instrument id, so an unchanged instrument costs no module call. */
-let _samplerSeen = new Map<number, ArrayBuffer | string>();
+/**
+ * The sample source and volume last looked at per instrument id, so an
+ * unchanged instrument costs no module call and a volume change rewrites it.
+ */
+let _samplerSeen = new Map<number, { source: ArrayBuffer | string; volume: number | undefined }>();
 /** Every module write runs on this chain, so a structural change and the cell edits after it land in order. */
 let _queue: Promise<unknown> = Promise.resolve();
 
@@ -427,6 +431,41 @@ export async function syncSongStructure(song: SongStructure): Promise<boolean> {
  * Returns the serialized XM, or null when creation failed or `cancelled()`
  * turned true while it was being built.
  */
+/**
+ * The sample pre-amp at which libopenmpt plays a sample at volume 64 at the
+ * sample's own level (measured: 48, the soundlib default and OpenMPT's level
+ * for an imported XM, plays it at 0.187 of it; the mixer gain is linear in
+ * the pre-amp). OpenMPT's NormalSamplePreAmp for MixLevels::Compatible.
+ */
+const UNITY_SAMPLE_PREAMP = 256;
+
+/**
+ * The sample pre-amp of a module DEViLBOX builds from its own song. On a key a
+ * Sampler plays through ToneEngine at getNormalizedVolume: its volume (at most
+ * 0 dB) plus the Sampler's normalization offset. The pattern plays the same
+ * note through libopenmpt, which ignores the instrument volume, so at the
+ * default pre-amp the pattern sounded 12.5 dB under the key (reported
+ * 2026-10-21: "very silent"). This pre-amp carries the offset, the headroom a
+ * Sampler at full volume needs over its sample; samplerSampleGain carries the
+ * volume in the sample itself, so a pattern note at volume 64 plays at the
+ * key's level. The XM keeps the pre-amp in its SPA. chunk, so the saved song
+ * plays the same. Imported modules keep their own level.
+ */
+export function builtSongSamplePreAmp(): number {
+  return Math.round(UNITY_SAMPLE_PREAMP * Math.pow(10, instrumentOffsetDb('Sampler') / 20));
+}
+
+/**
+ * The gain a Sampler's PCM is written at in the play-time module: its key level
+ * (getNormalizedVolume) relative to the headroom builtSongSamplePreAmp holds.
+ * XM samples have no volume that multiplies the volume column, so the level
+ * lives in the PCM. At most 1, where the sample is written as it is.
+ */
+export function samplerSampleGain(inst: Pick<InstrumentConfig, 'synthType' | 'volume'>): number {
+  const db = getNormalizedVolume(inst.synthType, inst.volume) - instrumentOffsetDb('Sampler');
+  return Math.min(1, Math.pow(10, db / 20));
+}
+
 export async function createModuleForSong(
   song: SongStructure,
   cancelled: () => boolean,
@@ -437,6 +476,7 @@ export async function createModuleForSong(
     const numPat = song.patterns.length || 1;
     if (!(await osl.createNewModule(1 /* XM */, song.numChannels || 4, numPat))) return null;
     markLoaded('xm');
+    await osl.setSamplePreAmp(builtSongSamplePreAmp());
     // createNewModule makes 64-row patterns and order [0, 1, 2, ...]; the song's
     // lengths (an 8-row song would play 56 rows of silence) and order list
     // ([0, 1, 0, 2]) differ, so the module takes the song's shape first.
@@ -471,9 +511,10 @@ export function samplerC5Speed(wavRate: number, baseNote: string | undefined, ce
  * id, at the pitch ToneEngine gives it (samplerC5Speed), growing the sample list
  * when the slot is past the end. A module with XM/IT instruments refuses (its
  * instrument ids are not sample slots). Shared by the play-time module and the
- * exporter so both carry the same sample. Returns whether the slot was written.
+ * exporter so both carry the same sample; `gain` scales the PCM (the play-time
+ * module passes samplerSampleGain). Returns whether the slot was written.
  */
-export async function writeSamplerSlot(osl: Soundlib, inst: InstrumentConfig, cellFormat: SaveFormat): Promise<boolean> {
+export async function writeSamplerSlot(osl: Soundlib, inst: InstrumentConfig, cellFormat: SaveFormat, gain = 1): Promise<boolean> {
   if (inst.synthType !== 'Sampler' && inst.synthType !== 'Player') return false;
   const sample = inst.sample;
   if (!sample || !samplerSource(sample)) return false;
@@ -483,7 +524,7 @@ export async function writeSamplerSlot(osl: Soundlib, inst: InstrumentConfig, ce
   const { decodeWavBytes } = await import('@/bridge/analysis/SampleSpectrum');
   const wav = decodeWavBytes(bytes);
   if (!wav || wav.pcm.length === 0) return false;
-  const pcm = Int16Array.from(wav.pcm, (x) => Math.max(-32768, Math.min(32767, Math.round(x * 32767))));
+  const pcm = Int16Array.from(wav.pcm, (x) => Math.max(-32768, Math.min(32767, Math.round(x * gain * 32767))));
   if (!(await osl.setSampleData(inst.id, pcm, samplerC5Speed(wav.sampleRate, sample.baseNote, cellFormat), false))) return false;
   // The loop is written after the data: replacing the data leaves the old loop flags on the new length.
   const type = sample.loop ? (sample.loopType === 'pingpong' ? 'pingpong' : 'forward') : 'off';
@@ -524,13 +565,13 @@ async function writeSamplerInstrument(osl: Soundlib, inst: InstrumentConfig): Pr
   if (inst.synthType !== 'Sampler' && inst.synthType !== 'Player') return false;
   const source = inst.sample ? samplerSource(inst.sample) : null;
   if (source === null) return false;
-  _samplerSeen.set(inst.id, source);
+  _samplerSeen.set(inst.id, { source, volume: inst.volume });
   if (!_samplerSlots.has(inst.id)) {
     if (!(await osl.ensureSampleSlot(inst.id))) return false;
     const held = await osl.getSampleInfo(inst.id);
     if ((held?.length ?? 0) > 0) return false;
   }
-  if (!(await writeSamplerSlot(osl, inst, _format))) return false;
+  if (!(await writeSamplerSlot(osl, inst, _format, samplerSampleGain(inst)))) return false;
   _samplerSlots.set(inst.id, source);
   return true;
 }
@@ -547,7 +588,7 @@ export async function syncSamplerInstruments(instruments: readonly InstrumentCon
   const pending = instruments.filter((inst) =>
     (inst.synthType === 'Sampler' || inst.synthType === 'Player')
     && !!inst.sample && samplerSource(inst.sample) !== null
-    && _samplerSeen.get(inst.id) !== samplerSource(inst.sample));
+    && !sameSeen(_samplerSeen.get(inst.id), samplerSource(inst.sample), inst.volume));
   if (pending.length === 0) return false;
   const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
   const changed = await enqueue(async () => {
@@ -557,6 +598,11 @@ export async function syncSamplerInstruments(instruments: readonly InstrumentCon
   });
   if (changed) markEdited();
   return changed;
+}
+
+function sameSeen(seen: { source: ArrayBuffer | string; volume: number | undefined } | undefined,
+  source: ArrayBuffer | string | null, volume: number | undefined): boolean {
+  return !!seen && seen.source === source && seen.volume === volume;
 }
 
 /**
@@ -570,7 +616,7 @@ export async function syncSampleEdit(instrumentId: number, sample: SampleConfig,
   const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
   if (_samplerSlots.has(instrumentId)) {
     // A slot this bridge filled from a Sampler: write it the same way again, at the Sampler's pitch.
-    const config = { id: instrumentId, synthType: 'Sampler', sample } as InstrumentConfig;
+    const config = { id: instrumentId, synthType: 'Sampler', sample, volume: _samplerSeen.get(instrumentId)?.volume } as InstrumentConfig;
     if (await enqueue(() => writeSamplerInstrument(osl, config))) markEdited();
     return;
   }
