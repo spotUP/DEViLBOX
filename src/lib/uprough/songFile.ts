@@ -54,6 +54,11 @@ export function songBassCut(song: JsonObject): number {
   return song.bass_cut as number;
 }
 
+/** The style's resolved melody timbre (hiphop render_melody_bar: the render override, else the style's melody_voice), copied into song.melody_voice. */
+export function songMelodyVoice(song: JsonObject): string {
+  return song.melody_voice as string;
+}
+
 export interface SongFileDoc {
   format: string;
   schema: number;
@@ -126,14 +131,28 @@ export const VOICE_TO_SOFTSYNTH: Record<string, string> = {
   electric: 'bassElectric', warmsub: 'bassWarmsub',
 };
 
+/**
+ * The header's melody timbre (song.melody_voice) -> the softsynth voice the file voice "melody" plays. The host
+ * renders an unknown timbre as pluck; TS keeps no copy of the host STYLES table, so an unknown timbre is refused.
+ */
+export const MELODY_TIMBRE_SOFTSYNTH: Record<string, string> = {
+  piano: 'piano', epiano: 'melodyEpiano', bell: 'melodyBell', fmbell: 'melodyFmbell', darkbell: 'melodyDarkbell',
+  whistle: 'melodyWhistle', lead: 'melodyLead',
+};
+
+/** The softsynth voice a file voice plays; "melody" follows the header's timbre. */
+export function softsynthOfFileVoice(fileVoice: string, melodyTimbre: string): string | undefined {
+  return fileVoice === 'melody' ? MELODY_TIMBRE_SOFTSYNTH[melodyTimbre] : VOICE_TO_SOFTSYNTH[fileVoice];
+}
+
 const BASS_FILE_VOICES: readonly string[] = ['808', 'electro', 'reese', 'gfunk', 'sampled', 'electric', 'warmsub'];
 
 const BUS_OF_VOICE = (v: string): string => (v === 'bass808' || BASS_FILE_VOICES.includes(v) ? 'bass' : v === 'melody' ? 'melody' : 'drums');
 
 /** The file voice of an instrument: unchanged voice keeps the file's spelling, a changed one maps back by first match. */
-function fileVoiceOf(config: string, previous: string | undefined): string | undefined {
-  if (previous !== undefined && VOICE_TO_SOFTSYNTH[previous] === config) return previous;
-  return FILE_VOICES.find((v) => VOICE_TO_SOFTSYNTH[v] === config);
+function fileVoiceOf(config: string, previous: string | undefined, melodyTimbre: string): string | undefined {
+  if (previous !== undefined && softsynthOfFileVoice(previous, melodyTimbre) === config) return previous;
+  return FILE_VOICES.find((v) => softsynthOfFileVoice(v, melodyTimbre) === config);
 }
 
 // --- notes and cells ----------------------------------------------------------------------------------------------
@@ -175,7 +194,7 @@ const RENDER_PARAMS = [
   'voice_cfg',
 ];
 const TOP = ['format', 'schema', 'generator', 'song', 'instruments', 'sections', 'order', 'side', 'bus'];
-const SONG = ['name', 'style', 'seed', 'key', 'bpm', 'speed', 'groove', 'bass_cut', 'rate', 'tier', 'bars', 'rows_per_bar', 'render', 'motif', 'chord_roots'];
+const SONG = ['name', 'style', 'seed', 'key', 'bpm', 'speed', 'groove', 'bass_cut', 'melody_voice', 'rate', 'tier', 'bars', 'rows_per_bar', 'render', 'motif', 'chord_roots'];
 const GROOVE = ['swing', 'micro', 'vel'];
 const GROOVE_MICRO = ['kick', 'snare', 'ch', 'ghost', 'perc', 'chop'];
 const SECTION = ['id', 'header', 'lanes', 'bars', 'locked'];
@@ -241,6 +260,7 @@ export function parseSongFile(input: string | unknown): SongFileDoc {
     }
   }
   if (typeof d.song.bass_cut !== 'number' || !Number.isFinite(d.song.bass_cut) || d.song.bass_cut <= 0) throw new SongFileError(`Song field "bass_cut" is ${JSON.stringify(d.song.bass_cut)}, not a positive number.`);
+  if (typeof d.song.melody_voice !== 'string' || !(d.song.melody_voice in MELODY_TIMBRE_SOFTSYNTH)) throw new SongFileError(`Song field "melody_voice" is ${JSON.stringify(d.song.melody_voice)}, not a melody timbre the softsynth has (known: ${Object.keys(MELODY_TIMBRE_SOFTSYNTH).join(', ')}).`);
   if (d.song.rows_per_bar !== ROWS_PER_BAR) throw new SongFileError(`rows_per_bar is ${JSON.stringify(d.song.rows_per_bar)}; schema ${SCHEMA} is 16 rows per bar.`);
   if (typeof d.song.name !== 'string') throw new SongFileError(`Song name ${JSON.stringify(d.song.name)} is not text.`);
   if (d.song.speed !== SPEED) throw new SongFileError(`Song speed is ${JSON.stringify(d.song.speed)}; Up Rough songs play at speed 6 (16 rows per bar).`);
@@ -296,8 +316,8 @@ export function parseSongFile(input: string | unknown): SongFileDoc {
 
 // --- file -> song --------------------------------------------------------------------------------------------------
 
-function importInstrument(inst: SongFileInstrument, index: number): InstrumentConfig {
-  const voiceId = VOICE_TO_SOFTSYNTH[inst.voice]!;
+function importInstrument(inst: SongFileInstrument, index: number, melodyTimbre: string): InstrumentConfig {
+  const voiceId = softsynthOfFileVoice(inst.voice, melodyTimbre)!;
   const voice = getSoftsynthVoice(voiceId);
   return {
     id: index + 1, name: inst.name, type: 'synth', synthType: 'UpRoughSoftsynth', effects: [], volume: -6, pan: 0,
@@ -336,20 +356,20 @@ export function songFileToSong(doc: SongFileDoc): UpRoughSong {
       fileVoices: d.instruments.map((i) => i.voice),
     },
     patterns,
-    instruments: d.instruments.map(importInstrument),
+    instruments: d.instruments.map((inst, i) => importInstrument(inst, i, songMelodyVoice(d.song))),
     tempo: { bpm: d.song.bpm as number, speed: d.song.speed as number, name: d.song.name as string },
   };
 }
 
 // --- song -> file ------------------------------------------------------------------------------------------------
 
-function checkInstrument(inst: InstrumentConfig, i: number, previous: string | undefined): string {
+function checkInstrument(inst: InstrumentConfig, i: number, previous: string | undefined, melodyTimbre: string): string {
   const n = i + 1;
   if (inst.synthType !== 'UpRoughSoftsynth' || !inst.upRoughSoftsynth) {
     throw new SongFileError(`Instrument ${n} "${inst.name}" is ${inst.synthType}, not UpRoughSoftsynth. Up Rough songs play only softsynth voices: replace or remove it before export.`);
   }
   const cfg = inst.upRoughSoftsynth;
-  const fileVoice = fileVoiceOf(cfg.voice, previous);
+  const fileVoice = fileVoiceOf(cfg.voice, previous, melodyTimbre);
   if (fileVoice === undefined) {
     throw new SongFileError(`Instrument ${n} "${inst.name}" uses voice "${cfg.voice}", which the softsynth does not have (known: ${FILE_VOICES.join(', ')}).`);
   }
@@ -381,7 +401,7 @@ export function songToSongFile(song: UpRoughSong): SongFileDoc {
   }
   m.song.name = song.tempo.name;
   const instruments: SongFileInstrument[] = song.instruments.map((inst, i) => ({
-    name: inst.name, voice: checkInstrument(inst, i, m.fileVoices[i]), params: {}, seed: 0,
+    name: inst.name, voice: checkInstrument(inst, i, m.fileVoices[i], songMelodyVoice(m.song)), params: {}, seed: 0,
   }));
   const sections: SongFileSection[] = song.patterns.map((pat, si) => {
     const meta = m.sections[si];

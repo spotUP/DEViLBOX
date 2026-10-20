@@ -28,6 +28,7 @@
    "vel": 1.0
   },
   "bass_cut": 0.8,
+  "melody_voice": "piano",
   "rate": 22050,
   "tier": "a1200",
   "bars": 4,
