@@ -4,9 +4,9 @@
  * imperative-fastpath convention with Knob so a MIDI-driven fader gets
  * audio-rate visual updates without React re-renders.
  *
- * Dragging vertically ramps the value; the thumb snaps under the pointer
- * so hitting any point on the track jumps straight there. Unity (1.0)
- * gets a subtle notch tick so users can eyeball "100% dry" quickly.
+ * There is no thumb: the filled part of the track is the value, and the
+ * whole track is the handle. Dragging it moves the value from where it is by
+ * how far the hand travels; a full track's length covers the full range.
  */
 
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -71,10 +71,10 @@ interface FaderProps {
   doubleClickValue?: number;
 }
 
-const SIZE_PX: Record<NonNullable<FaderProps['size']>, { w: number; h: number; thumbH: number }> = {
-  sm: { w: 14, h: 56,  thumbH: 10 },
-  md: { w: 18, h: 80,  thumbH: 14 },
-  lg: { w: 22, h: 120, thumbH: 18 },
+const SIZE_PX: Record<NonNullable<FaderProps['size']>, { w: number; h: number }> = {
+  sm: { w: 14, h: 56 },
+  md: { w: 18, h: 80 },
+  lg: { w: 22, h: 120 },
 };
 
 /** The shared tone names, onto this component's own fill tokens. */
@@ -106,19 +106,13 @@ export const Fader: React.FC<FaderProps> = React.memo(({
   doubleClickValue,
 }) => {
   const horizontal = orientation === 'horizontal';
-  const { w, h: tableH, thumbH } = SIZE_PX[size];
+  const { w, h: tableH } = SIZE_PX[size];
   const h = horizontal ? (length ?? tableH) : tableH;
   const fillHeight = fillHeightProp && !horizontal;
   /** `tone` maps onto the existing token names; neither given means primary. */
   const fillToken = tone ? TONE_TO_FILL[tone] : (color ?? 'accent-primary');
 
-  /** Track length along the drag axis in px, live — `h` is only the fallback before first layout. */
-  const trackHeight = useCallback(() => {
-    const r = trackRef.current?.getBoundingClientRect();
-    return (horizontal ? r?.width : r?.height) || h;
-  }, [h, horizontal]);
   const trackRef = useRef<HTMLDivElement | null>(null);
-  const thumbRef = useRef<HTMLDivElement | null>(null);
   const fillRef = useRef<HTMLDivElement | null>(null);
   const [internalValue, setInternalValue] = useState(value);
   const internalRef = useRef(value);
@@ -132,7 +126,7 @@ export const Fader: React.FC<FaderProps> = React.memo(({
     return subscribe((n01) => {
       const v = min + n01 * (max - min);
       internalRef.current = v;
-      positionThumbAndFill(v);
+      positionFill(v);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subscribe, min, max]);
@@ -170,37 +164,18 @@ export const Fader: React.FC<FaderProps> = React.memo(({
   useLayoutEffect(() => {
     if (draggingRef.current) return;
     setInternalValue(value);
-    positionThumbAndFill(value);
+    positionFill(value);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
-  const positionThumbAndFill = useCallback((v: number) => {
-    const thumb = thumbRef.current;
+  // The fill is sized in % of the track, so it follows a stretched track by itself.
+  const positionFill = useCallback((v: number) => {
     const fill = fillRef.current;
-    if (!thumb || !fill) return;
+    if (!fill) return;
     const norm = Math.max(0, Math.min(1, (v - min) / (max - min)));
-    const availPx = Math.max(1, trackHeight() - thumbH);
-    const thumbTop = (1 - norm) * availPx;
-    if (horizontal) {
-      thumb.style.transform = `translateX(${norm * availPx}px)`;
-      fill.style.width = `${norm * 100}%`;
-      return;
-    }
-    thumb.style.transform = `translateY(${thumbTop}px)`;
-    fill.style.height = `${norm * 100}%`;
-  }, [trackHeight, thumbH, min, max, horizontal]);
-
-  // A stretched fader changes height with its container, and the thumb is
-  // positioned in px against that height. Without this it stays where the
-  // pre-layout fallback put it until the next drag.
-  useEffect(() => {
-    if (!fillHeight) return;
-    const track = trackRef.current;
-    if (!track || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => positionThumbAndFill(internalRef.current));
-    ro.observe(track);
-    return () => ro.disconnect();
-  }, [fillHeight, positionThumbAndFill]);
+    if (horizontal) fill.style.width = `${norm * 100}%`;
+    else fill.style.height = `${norm * 100}%`;
+  }, [min, max, horizontal]);
 
   const dragStartYRef = useRef(0);
   const dragStartValueRef = useRef(0);
@@ -210,18 +185,18 @@ export const Fader: React.FC<FaderProps> = React.memo(({
     const track = trackRef.current;
     if (!track) return startValue;
     const r = track.getBoundingClientRect();
-    const availPx = Math.max(1, (horizontal ? r.width : r.height) - thumbH);
+    const availPx = Math.max(1, horizontal ? r.width : r.height);
     // `startY`/`clientY` carry the pointer's X on a horizontal fader; a rightward drag raises it.
     return faderDragValue(startValue, horizontal ? clientY - startY : startY - clientY, availPx, min, max);
-  }, [thumbH, min, max, horizontal]);
+  }, [min, max, horizontal]);
 
   const commit = useCallback((v: number) => {
     const clamped = Math.max(min, Math.min(max, v));
     internalRef.current = clamped;
     setInternalValue(clamped);
-    positionThumbAndFill(clamped);
+    positionFill(clamped);
     onChange(clamped);
-  }, [min, max, onChange, positionThumbAndFill]);
+  }, [min, max, onChange, positionFill]);
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if (disabled) return;
@@ -253,8 +228,8 @@ export const Fader: React.FC<FaderProps> = React.memo(({
     // (`max` of every channel), where the finger left it is frequently not
     // where the state ended up.
     setInternalValue(valueRef.current);
-    positionThumbAndFill(valueRef.current);
-  }, [positionThumbAndFill]);
+    positionFill(valueRef.current);
+  }, [positionFill]);
 
   const onDoubleClick = useCallback(() => {
     if (disabled) return;
@@ -295,23 +270,11 @@ export const Fader: React.FC<FaderProps> = React.memo(({
         onPointerCancel={onPointerUp}
         onDoubleClick={onDoubleClick}
       >
-        {/* Fill — grows upward from the bottom of the track */}
+        {/* Fill: the value. Grows up from the bottom (rightwards when horizontal). */}
         <div
           ref={fillRef}
           className={`absolute ${horizontal ? 'top-0 bottom-0 left-0' : 'bottom-0 left-0 right-0'} ${COLOR_FILL[fillToken]} transition-none pointer-events-none`}
           style={horizontal ? { width: '0%' } : { height: '0%' }}
-        />
-        {/* Unity tick (only when min=0 / max=1 / default 1 is visible; cosmetic) */}
-        {!horizontal && min === 0 && max === 1 && (
-          <div className="absolute left-0 right-0 h-px bg-text-muted/30 pointer-events-none" style={{ top: `${thumbH / 2}px` }} />
-        )}
-        {/* Thumb */}
-        <div
-          ref={thumbRef}
-          className={'absolute rounded-sm bg-text-primary border border-dark-border pointer-events-none shadow-sm ' + (horizontal ? 'top-0 bottom-0' : 'left-0 right-0')}
-          style={horizontal
-            ? { width: `${thumbH}px`, transform: 'translateX(0)', willChange: 'transform' }
-            : { height: `${thumbH}px`, transform: 'translateY(0)', willChange: 'transform' }}
         />
       </div>
       {readoutText && (
