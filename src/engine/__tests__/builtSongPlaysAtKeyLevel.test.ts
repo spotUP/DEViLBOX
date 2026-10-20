@@ -39,14 +39,17 @@ async function keyLevel(volume: number): Promise<number> {
   return rms(out, SR * 0.1 | 0, SR * 0.5 | 0);
 }
 
-/** Build the module of a one-note song (C3 on row 0) and render it with libopenmpt. */
-async function patternLevel(volume: number): Promise<number> {
+/**
+ * Build the module of a one-note song (C3 on row 0) and render it with
+ * libopenmpt. Four channels build a MOD, more an XM.
+ */
+async function renderPattern(volume: number, numChannels = 4): Promise<Float32Array> {
   const empty = () => Array.from({ length: 16 }, () => cell());
   const rows = empty();
   rows[0] = cell({ note: 37, instrument: 1 });
   const song = {
-    numChannels: 4,
-    patterns: [{ length: 16, channels: [{ rows }, { rows: empty() }, { rows: empty() }, { rows: empty() }] }],
+    numChannels,
+    patterns: [{ length: 16, channels: [{ rows }, ...Array.from({ length: numChannels - 1 }, () => ({ rows: empty() }))] }],
     songPositions: [0],
     instruments: [sampler(volume)],
   };
@@ -70,7 +73,20 @@ async function patternLevel(volume: number): Promise<number> {
     n += k;
   }
   m._openmpt_module_destroy(h);
-  return rms(out, SR * 0.05 | 0, SR * 0.45 | 0);
+  return out;
+}
+
+async function patternLevel(volume: number): Promise<number> {
+  return rms(await renderPattern(volume), SR * 0.05 | 0, SR * 0.45 | 0);
+}
+
+/** Fundamental in Hz from the rising zero crossings between `from` and `to`. */
+function pitchHz(buf: Float32Array, from: number, to: number): number {
+  let first = -1, last = -1, n = 0;
+  for (let i = from + 1; i < to; i++) {
+    if (buf[i - 1] < 0 && buf[i] >= 0) { if (first < 0) first = i; last = i; n++; }
+  }
+  return n > 1 ? (n - 1) * SR / (last - first) : 0;
 }
 
 describe('a Sampler note in a built song plays at its key level', () => {
@@ -99,5 +115,16 @@ describe('a Sampler note in a built song plays at its key level', () => {
     expect(offset).toBeGreaterThan(0);
     const pattern = await patternLevel(-12);
     expect(Math.abs(20 * Math.log10(pattern / (key * dbToGain(offset))))).toBeLessThan(1);
+  }, 120000);
+
+  // Reported 2026-10-21: pattern Sampler notes played several octaves under
+  // the note. MOD and XM play a sample from its transpose and finetune, not
+  // its c5Speed, so a 44.1 kHz WAV played as 8363 Hz.
+  it.each([[4, 'MOD'], [8, 'XM']])('plays at the pitch of its key in a %i-channel song (%s)', async (numChannels) => {
+    const key = await renderKeys(sampler(0), [{ note: 'C3', at: 0.05 }], 0.6);
+    const keyHz = pitchHz(key, SR * 0.1 | 0, SR * 0.5 | 0);
+    const patternHz = pitchHz(await renderPattern(0, numChannels), SR * 0.05 | 0, SR * 0.45 | 0);
+    expect(keyHz).toBeGreaterThan(300);
+    expect(Math.abs(12 * Math.log2(patternHz / keyHz))).toBeLessThan(0.1);
   }, 120000);
 });
