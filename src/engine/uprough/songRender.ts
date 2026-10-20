@@ -109,6 +109,31 @@ const layerNames = (row: unknown): string[] =>
   Object.entries((row ?? {}) as Record<string, unknown>).filter(([, v]) => Boolean(v)).map(([k]) => k);
 
 /**
+ * Builds the song's drum bank with every voice stage observed and, with `announce`, emits `stage*` and `bank` per
+ * voice in bank order and an `attach` for each snare variant (act 1). The factory panel calls this for a Generate,
+ * where no render has started yet (R2f): the same events, from the same code, as a render's own bank build.
+ */
+export function buildBank(em: Emitter, style: HipHopStyle, rate: number, seed: number, announce = true): DrumBank {
+  const stages = new Map<string, { stage: string; peaks: Peaks; env?: Env }[]>();
+  const bank = songDrumBank(style, rate, seed, (voice, stage, buf, isEnv) => {
+    let list = stages.get(voice);
+    if (!list) stages.set(voice, list = []);
+    list.push(isEnv ? { stage, peaks: peaks(buf), env: envOf(buf) } : { stage, peaks: peaks(buf) });
+  });
+  if (announce) {
+    for (const [voice, buf] of Object.entries(bank)) {
+      if (voice === 'snare_accent' || voice === 'snare_ghost') {
+        em.emit({ type: 'attach', voice, parent: 'snare', peaks: peaks(buf) });
+        continue;
+      }
+      stages.get(voice)?.forEach((st, index) => em.emit({ type: 'stage', voice, index, ...st }));
+      em.emit({ type: 'bank', voice, peaks: peaks(buf), len: buf.length });
+    }
+  }
+  return bank;
+}
+
+/**
  * Starts a render's event stream: `start`, then (M1) the drum bank built ONCE for the song with every voice stage
  * observed, as `stage*` and `bank` per voice in bank order and an `attach` for each snare variant. Without a listener
  * it returns an empty ctx and builds nothing (the bank is built per call as before; same bytes, the bank is deterministic).
@@ -124,22 +149,7 @@ export function beginRender(events: BarEvents, options: RenderSongOptions): Rend
       name: String(row[0]), bars: events.sections[i]!.drums.length, layers: layerNames(row[2]),
     })),
   });
-  const stages = new Map<string, { stage: string; peaks: Peaks; env?: Env }[]>();
-  const bank = songDrumBank(events.params.style as HipHopStyle, rate, seed, (voice, stage, buf, isEnv) => {
-    let list = stages.get(voice);
-    if (!list) stages.set(voice, list = []);
-    list.push(isEnv ? { stage, peaks: peaks(buf), env: envOf(buf) } : { stage, peaks: peaks(buf) });
-  });
-  if (!options.bankSeen) {
-    for (const [voice, buf] of Object.entries(bank)) {
-      if (voice === 'snare_accent' || voice === 'snare_ghost') {
-        em.emit({ type: 'attach', voice, parent: 'snare', peaks: peaks(buf) });
-        continue;
-      }
-      stages.get(voice)?.forEach((st, index) => em.emit({ type: 'stage', voice, index, ...st }));
-      em.emit({ type: 'bank', voice, peaks: peaks(buf), len: buf.length });
-    }
-  }
+  const bank = buildBank(em, events.params.style as HipHopStyle, rate, seed, !options.bankSeen);
   return { em, bank };
 }
 
