@@ -58,4 +58,26 @@ describe('a fresh song module carries the typed commands', () => {
     expect(p0.channels[0].rows[0]).toMatchObject({ note: 49, instrument: 1, effTyp: 15, eff: 0x06 });
     expect(back.songPositions).toEqual([0, 1]);
   }, 60000);
+
+  it('a D00 typed in effect column 2 is in the module, with column 1 moved to the volume column', async () => {
+    const rows = (n: number) => Array.from({ length: n }, () => cell());
+    const ch0 = rows(16);
+    // A04 in column 1, D00 in column 2: the break wins the command slot and
+    // the volume slide goes to the volume column (0x64 = slide down 4).
+    ch0[5] = cell({ effTyp: 10, eff: 0x04, effTyp2: 13, eff2: 0x00 });
+    const song = {
+      numChannels: 1,
+      patterns: [{ length: 16, channels: [{ rows: ch0 }] }],
+      songPositions: [0],
+    };
+
+    const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
+    const data = await bridge.createModuleForSong(song, () => false);
+    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
+    const back = await parseWithOpenMPT(data!, 'fresh.xm');
+    const r = back.patterns[0].channels[0].rows[5];
+    const effects = [[r.effTyp, r.eff], [r.effTyp2, r.eff2]];
+    expect(effects).toContainEqual([13, 0x00]);
+    expect(r.volume).toBe(0x64);
+  }, 60000);
 });

@@ -80,3 +80,81 @@ export function decodeVolumeColumn(
 export function usesRawVolumeColumn(editorMode: string | null | undefined): boolean {
   return !!editorMode && RAW_LEVEL_EDITOR_MODES.has(editorMode);
 }
+
+/**
+ * The XM volume-column byte that plays the same as effect `effTyp`/`eff`, or 0
+ * when the volume column has no equivalent. XM holds one effect plus the
+ * volume column per cell, so this is how a second effect column survives the
+ * trip into an XM module.
+ */
+export function effectToVolumeColumnByte(effTyp: number, eff: number): number {
+  const x = (eff >> 4) & 0x0F;
+  const y = eff & 0x0F;
+  switch (effTyp) {
+    case 0x3: return 0xF0 + Math.min(x, 0x0F);      // tone portamento (speed / 16)
+    case 0x4: return y > 0 ? 0xB0 + y : 0;           // vibrato depth
+    case 0x8: return 0xC0 + x;                       // set panning (high nibble)
+    case 0xA:
+      if (x > 0) return 0x70 + x;                    // volume slide up (up wins, as in FT2)
+      if (y > 0) return 0x60 + y;                    // volume slide down
+      return 0;
+    case 0xC: return 0x10 + Math.min(eff, 0x40);     // set volume
+    case 0xE:
+      if (x === 0xA) return 0x90 + y;                // fine volume slide up (EAx)
+      if (x === 0xB) return 0x80 + y;                // fine volume slide down (EBx)
+      return 0;
+    default: return 0;
+  }
+}
+
+/** One effect column of a TrackerCell: XM effect type number and parameter. */
+export interface EffectSlot { effTyp: number; eff: number }
+
+/**
+ * Effects that change song flow (jump, break, speed/tempo, pattern loop and
+ * delay, global volume). A replayer ignores them only at the cost of playing
+ * the wrong rows, so they win the single XM command slot over everything else.
+ */
+function isFlowEffect(slot: EffectSlot): boolean {
+  const x = (slot.eff >> 4) & 0x0F;
+  switch (slot.effTyp) {
+    case 0xB: case 0xD: case 0xF: case 0x10: case 0x11: return true;
+    case 0xE: return x === 0x6 || x === 0xE;
+    default: return false;
+  }
+}
+
+/**
+ * Fold a cell's eight effect columns into what one XM cell can hold: one
+ * command and one volume-column byte.
+ *
+ * The command slot takes column 1 when it carries a flow effect, else the
+ * first flow effect in columns 2-8, else column 1, else the first other
+ * non-empty column. When the cell has no volume of its own, the volume slot
+ * takes the first remaining effect that has a volume-column form. Anything
+ * left over has no place in an XM cell and is dropped.
+ */
+export function foldEffectColumnsForXM(
+  volume: number,
+  slots: readonly EffectSlot[],
+): { volume: number; command: EffectSlot } {
+  const used = slots.filter((s) => s.effTyp !== 0 || s.eff !== 0);
+  const empty: EffectSlot = { effTyp: 0, eff: 0 };
+  if (used.length === 0) return { volume, command: empty };
+
+  const first = slots[0];
+  const firstUsed = first !== undefined && (first.effTyp !== 0 || first.eff !== 0);
+  const command =
+    (firstUsed && isFlowEffect(first) ? first : undefined) ??
+    used.find(isFlowEffect) ??
+    (firstUsed ? first : undefined) ??
+    used[0];
+
+  if (volume !== 0) return { volume, command };
+  for (const s of used) {
+    if (s === command) continue;
+    const byte = effectToVolumeColumnByte(s.effTyp, s.eff);
+    if (byte !== 0) return { volume: byte, command };
+  }
+  return { volume, command };
+}

@@ -5,6 +5,7 @@
 
 import type { Pattern, TrackerCell, ImportMetadata, EnvelopePoints } from '../../types/tracker';
 import type { InstrumentConfig } from '../../types/instrument';
+import { effectToVolumeColumnByte } from '../tracker/volumeColumn';
 // EnvelopeConverter import removed - not currently used but available for future envelope export
 
 export interface XMExportOptions {
@@ -239,7 +240,7 @@ function convertCellToXMNote(cell: TrackerCell): XMNoteData {
     volume = 0x10 + Math.min(cell.volume, 0x40);
   } else if ((cell.effTyp2 !== undefined && cell.effTyp2 !== 0) || (cell.eff2 !== undefined && cell.eff2 !== 0)) {
     // Convert numeric effTyp2/eff2 back to volume column effect
-    volume = convertEffectToVolumeColumnNumeric(cell.effTyp2 ?? 0, cell.eff2 ?? 0);
+    volume = effectToVolumeColumnByte(cell.effTyp2 ?? 0, cell.eff2 ?? 0);
   }
 
   // Convert main effect
@@ -295,42 +296,6 @@ function parseEffect(effect: string): { type: number; param: number } {
     type: type === -1 ? 0 : type,
     param: isNaN(param) ? 0 : param,
   };
-}
-
-/**
- * Convert numeric effTyp2/eff2 back to XM volume column byte
- */
-function convertEffectToVolumeColumnNumeric(effTyp: number, eff: number): number {
-  if (effTyp === 0xA) {
-    // Volume slide
-    const x = (eff >> 4) & 0x0F;
-    const y = eff & 0x0F;
-
-    if (x > 0) return 0x70 + x; // Volume slide up
-    if (y > 0) return 0x60 + y; // Volume slide down
-  }
-
-  if (effTyp === 0xE) {
-    const x = (eff >> 4) & 0x0F;
-    const y = eff & 0x0F;
-
-    if (x === 0xA) return 0x90 + y; // Fine volume up (EAx)
-    if (x === 0xB) return 0x80 + y; // Fine volume down (EBx)
-  }
-
-  if (effTyp === 0x4) {
-    // Vibrato depth
-    const y = eff & 0x0F;
-    return 0xB0 + y;
-  }
-
-  if (effTyp === 0x3) {
-    // Tone portamento
-    const speed = Math.floor(eff / 16);
-    return 0xF0 + Math.min(speed, 0x0F);
-  }
-
-  return 0;
 }
 
 /**
