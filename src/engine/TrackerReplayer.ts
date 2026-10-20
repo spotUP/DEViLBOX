@@ -37,6 +37,7 @@ import { setCellInPattern } from '@/stores/tracker/patternEditActions';
 import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { useFormatStore } from '@/stores/useFormatStore';
+import { decodeVolumeColumn } from '@/lib/tracker/volumeColumn';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { useOscilloscopeStore } from '@/stores/useOscilloscopeStore';
@@ -784,10 +785,6 @@ export class TrackerReplayer {
   // Kept separate from ToneEngine's global mute states so each deck is independent.
   private channelMuteMask = 0xFFFF;   // All 16 channels enabled by default
 
-  // Pre-allocated VU meter trigger callbacks (avoid closure allocation per note)
-  private meterCallbacks: (() => void)[] | null = null;
-  private meterStaging = new Float64Array(64);
-
   // External playback engines for formats that don't use standard tracker playback
   private c64SidEngine: C64SIDEngine | null = null;
   private sf2Engine: SF2Engine | null = null;
@@ -1213,17 +1210,6 @@ export class TrackerReplayer {
    */
   private triggerVUMetersForRow(time: number): void {
     if (!this._suppressNotes || !this.song) return;
-    const engine = getToneEngine();
-    if (!this.meterCallbacks) {
-      this.meterCallbacks = [];
-      this.meterStaging = new Float64Array(64);
-      for (let i = 0; i < 64; i++) {
-        const ch = i;
-        this.meterCallbacks[i] = () => {
-          engine.triggerChannelMeter(ch, this.meterStaging[ch]);
-        };
-      }
-    }
     // Read pattern data live from the tracker store so user edits are visible
     const storePatterns = useTrackerStore.getState().patterns;
     const patternNum = this.song.songPositions[this.songPos];
@@ -1231,13 +1217,18 @@ export class TrackerReplayer {
     if (!livePattern) return;
     for (let ch = 0; ch < Math.min(this.channels.length, livePattern.channels.length); ch++) {
       const row = livePattern.channels[ch]?.rows[this.pattPos];
-      if (row && isPitchedNote(row.note)) {
-        const vol = (row.volume !== undefined && row.volume !== null && row.volume <= 64)
-          ? row.volume / 64 : 0.7;
-        this.meterStaging[ch] = vol;
-        Tone.Draw.schedule(this.meterCallbacks[ch], time);
-      }
+      if (row && isPitchedNote(row.note)) this.scheduleChannelMeter(ch, rowMeterLevel(row.volume), time);
     }
+  }
+
+  /**
+   * Flash channel `ch`'s VU meter at `level` when the audio clock reaches `time`. Each call carries its own level: the
+   * replayer schedules rows ahead, so a shared per-channel slot would be overwritten by a later row (or by a second
+   * writer for the same note) before the frame that reads it.
+   */
+  private scheduleChannelMeter(ch: number, level: number, time: number): void {
+    const engine = getToneEngine();
+    Tone.Draw.schedule(() => engine.triggerChannelMeter(ch, level), time);
   }
 
   /** Compute and apply a mute mask to the active WASM engine.
@@ -1636,27 +1627,7 @@ export class TrackerReplayer {
       }
     }
 
-    // Trigger VU meters
-    const engine = getToneEngine();
-    if (!this.meterCallbacks) {
-      this.meterCallbacks = [];
-      this.meterStaging = new Float64Array(64);
-      for (let i = 0; i < 64; i++) {
-        const idx = i;
-        this.meterCallbacks[i] = () => {
-          engine.triggerChannelMeter(idx, this.meterStaging[idx]);
-        };
-      }
-    }
-    for (let ch = 0; ch < Math.min(this.channels.length, livePattern.channels.length); ch++) {
-      const row = livePattern.channels[ch]?.rows[this.pattPos];
-      if (row && isPitchedNote(row.note)) {
-        const vol = (row.volume !== undefined && row.volume !== null && row.volume <= 64)
-          ? row.volume / 64 : 0.7;
-        this.meterStaging[ch] = vol;
-        Tone.Draw.schedule(this.meterCallbacks[ch], time);
-      }
-    }
+    // VU meters: triggerNote (via processHybridRow) flashes the meter of every note it plays.
   }
 
   // ==========================================================================
@@ -3338,24 +3309,11 @@ export class TrackerReplayer {
 
     // Schedule VU meter trigger at audio playback time.
     // Uses Tone.Draw.schedule to defer the visual trigger to the nearest
-    // animation frame matching the audio time. Pre-allocated per-channel
-    // callbacks avoid closure allocation per note.
+    // animation frame matching the audio time. This is the meter of every
+    // note the TS scheduler plays.
     // Add a small offset (+30ms) so the VU flash lands ON or just AFTER the
     // audible note rather than one rAF ahead of it.
-    if (channelIndex !== undefined) {
-      if (!this.meterCallbacks) {
-        this.meterCallbacks = [];
-        this.meterStaging = new Float64Array(64);
-        for (let i = 0; i < 64; i++) {
-          const ch = i;
-          this.meterCallbacks[i] = () => {
-            engine.triggerChannelMeter(ch, this.meterStaging[ch]);
-          };
-        }
-      }
-      this.meterStaging[channelIndex] = velocity;
-      Tone.Draw.schedule(this.meterCallbacks[channelIndex], safeTime + 0.03);
-    }
+    if (channelIndex !== undefined) this.scheduleChannelMeter(channelIndex, velocity, safeTime + 0.03);
 
     // Check if this is a synth instrument (has synthType) or sample-based
     if (ch.instrument.synthType && ch.instrument.synthType !== 'Sampler') {
@@ -3687,19 +3645,7 @@ export class TrackerReplayer {
 
       // VU meters for per-channel native engines (MusicLine)
       if (this._suppressNotes && chTick === 0 && row && isPitchedNote(row.note)) {
-        const engine = getToneEngine();
-        if (!this.meterCallbacks) {
-          this.meterCallbacks = [];
-          this.meterStaging = new Float64Array(64);
-          for (let i = 0; i < 64; i++) {
-            const c = i;
-            this.meterCallbacks[i] = () => { engine.triggerChannelMeter(c, this.meterStaging[c]); };
-          }
-        }
-        const vol = (row.volume !== undefined && row.volume !== null && row.volume <= 64)
-          ? row.volume / 64 : 0.7;
-        this.meterStaging[ch] = vol;
-        Tone.Draw.schedule(this.meterCallbacks[ch], time);
+        this.scheduleChannelMeter(ch, rowMeterLevel(row.volume), time);
       }
 
       // Advance this channel's counter; when it overflows, advance its position.
@@ -4260,6 +4206,11 @@ export class TrackerReplayer {
 // ============================================================================
 
 /** Returns true if any effect column in the cell is an EDx note delay with delay > 0. */
+/** The meter level a row's note shows when nothing plays it through triggerNote: its volume column, else 0.7. */
+function rowMeterLevel(volume: number | null | undefined): number {
+  return decodeVolumeColumn(volume, useFormatStore.getState().editorMode) ?? 0.7;
+}
+
 function hasEdNoteDelay(row: TrackerCell): boolean {
   const check = (effTyp: number | undefined, eff: number | undefined) =>
     effTyp === 0xE && eff !== undefined && (eff >> 4) === 0xD && (eff & 0xF) > 0;
