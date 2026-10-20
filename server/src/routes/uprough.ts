@@ -64,12 +64,47 @@ function runSongFile(script: string, args: string[], signal?: AbortSignal, cwd: 
   });
 }
 
-/** The style names the generator knows, asked of the generator itself. */
-async function listStyles(script: string, signal?: AbortSignal): Promise<string[]> {
-  const r = await runSongFile(script, ['styles'], signal);
-  if (r.code !== 0) throw new Error(`song_file.py styles failed: ${r.stderr.trim()}`);
-  return JSON.parse(r.stdout) as string[];
+/** mtime of the generator module that defines the styles, or undefined when it cannot be read. */
+function stylesVersion(script: string): number | undefined {
+  try {
+    return fs.statSync(path.join(path.dirname(script), 'hiphop.py')).mtimeMs;
+  } catch {
+    return undefined;
+  }
 }
+
+/** One cached style list per script; the in-flight Promise is cached so concurrent callers share one spawn. */
+let stylesCache: { script: string; version: number; styles: Promise<string[]> } | undefined;
+
+/**
+ * The style names the generator knows, asked of the generator itself. The ask
+ * costs seconds (the python import), so the answer is kept until hiphop.py,
+ * where the styles live, changes on disk. A failed ask is never kept.
+ */
+function listStyles(script: string): Promise<string[]> {
+  const version = stylesVersion(script);
+  if (version !== undefined && stylesCache?.script === script && stylesCache.version === version) {
+    return stylesCache.styles;
+  }
+  const styles = (async () => {
+    const r = await runSongFile(script, ['styles']);
+    if (r.code !== 0) throw new Error(`song_file.py styles failed: ${r.stderr.trim()}`);
+    return JSON.parse(r.stdout) as string[];
+  })();
+  if (version === undefined) return styles;
+  const entry = { script, version, styles };
+  stylesCache = entry;
+  styles.catch(() => { if (stylesCache === entry) stylesCache = undefined; });
+  return styles;
+}
+
+/** Fill the style cache at startup so the first GET /styles does not wait for python. */
+function warmStyles(): void {
+  const { script } = songFileScript();
+  if (!script) return;
+  listStyles(script).catch((e: Error) => console.error(`[uprough] style warm-up failed: ${e.message}`));
+}
+warmStyles();
 
 router.get('/styles', async (req: Request, res: Response) => {
   const { script, error } = songFileScript();
@@ -99,7 +134,7 @@ router.post('/generate', async (req: Request, res: Response) => {
   res.on('close', () => { if (!res.writableEnded) ac.abort(); });
 
   try {
-    const styles = await listStyles(script, ac.signal);
+    const styles = await listStyles(script);
     if (!styles.includes(style)) {
       return res.status(400).json({ error: `unknown style "${style}"`, styles });
     }
