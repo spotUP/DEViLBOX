@@ -23,7 +23,7 @@ import { BD_EFFECT_GLYPH } from '@/lib/import/formats/benDaglishEffectGlyphs';
 import { RH_EFFECT_GLYPH } from '@/lib/import/formats/robHubbardEffectGlyphs';
 import { FP_EFFECT_GLYPH } from '@/lib/import/formats/fpEffectGlyphs';
 import { MA_EFFECT_GLYPH } from '@/lib/import/formats/maEffectGlyphs';
-import { computeCaretRect } from '@/lib/tracker/caretGeometry';
+import { computeCaretRect, computeFieldRect, FIELD_OUTLINE_STYLE } from '@/lib/tracker/caretGeometry';
 import { effectCellWidth, emptyEffectText, furnaceEffectText } from '@/lib/tracker/effectNotation';
 import { anySoloActive, isChannelDimmed } from '@/lib/tracker/channelDim';
 import { noteValueToPitch, pitchName } from '@/lib/tracker/noteValue';
@@ -610,6 +610,8 @@ export class TrackerGLRenderer {
 
       let caretOffX = 0;
       let caretW    = CHAR_WIDTH;
+      let fieldOffX = 0;
+      let fieldW    = CHAR_WIDTH;
       let cursorX: number;
 
       if (!isNaN(colIdx) && chColumns) {
@@ -620,6 +622,8 @@ export class TrackerGLRenderer {
           caretOffX += chColumns[ci].charWidth * CHAR_WIDTH + COL_GAP;
         }
         caretW = (chColumns[colIdx]?.charWidth ?? 1) * CHAR_WIDTH;
+        fieldOffX = caretOffX;
+        fieldW = caretW;
       } else {
         // FIXED-COLUMN CURSOR
         const cursorEffectCols = chData?.effectCols ?? 2;
@@ -633,7 +637,7 @@ export class TrackerGLRenderer {
         const hasAcidC  = chData?.rows[0]?.flag1 !== undefined
                        || chData?.rows[0]?.flag2 !== undefined;
         // Per-nibble caret geometry — shared with the Canvas2D fallback.
-        const rect = computeCaretRect({
+        const caretInput = {
           columnType: cursor.columnType,
           digitIndex: cursor.digitIndex,
           noteColumnIndex: cursor.noteColumnIndex ?? 0,
@@ -642,14 +646,29 @@ export class TrackerGLRenderer {
           effectCols: cursorEffectCols,
           effectNotation: cursorNotation,
           hasAcid: hasAcidC,
-        });
+        };
+        const rect = computeCaretRect(caretInput);
         caretOffX = rect.offX;
         caretW = rect.width;
+        const field = computeFieldRect(caretInput);
+        fieldOffX = field.offX;
+        fieldW = field.width;
       }
 
       const caretX = cursorX + caretOffX;
       const caretY = centerLineTop;
+      // Field outline: lights up the whole field the caret is in.
+      const { borderAlpha, fillAlpha, pad } = FIELD_OUTLINE_STYLE;
+      const [cr, cg, cb] = colors.cursor;
+      const fx = cursorX + fieldOffX - pad;
+      const fw = fieldW + pad * 2;
+      this.addRect(fx, caretY, fw, rowH, [cr, cg, cb, fillAlpha]);
       this.addRect(caretX, caretY, caretW, rowH, colors.cursor);
+      const border: [number, number, number, number] = [cr, cg, cb, borderAlpha];
+      this.addRect(fx, caretY, fw, 1, border);
+      this.addRect(fx, caretY + rowH - 1, fw, 1, border);
+      this.addRect(fx, caretY, 1, rowH, border);
+      this.addRect(fx + fw - 1, caretY, 1, rowH, border);
     }
 
     // Channel separators and left stripes (full height)

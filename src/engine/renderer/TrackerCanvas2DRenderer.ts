@@ -20,7 +20,7 @@ import { BD_EFFECT_GLYPH } from '@/lib/import/formats/benDaglishEffectGlyphs';
 import { RH_EFFECT_GLYPH } from '@/lib/import/formats/robHubbardEffectGlyphs';
 import { FP_EFFECT_GLYPH } from '@/lib/import/formats/fpEffectGlyphs';
 import { MA_EFFECT_GLYPH } from '@/lib/import/formats/maEffectGlyphs';
-import { computeCaretRect } from '@/lib/tracker/caretGeometry';
+import { computeCaretRect, computeFieldRect, FIELD_OUTLINE_STYLE } from '@/lib/tracker/caretGeometry';
 import { emptyEffectText, furnaceEffectText } from '@/lib/tracker/effectNotation';
 import { anySoloActive, isChannelDimmed } from '@/lib/tracker/channelDim';
 import {
@@ -419,6 +419,8 @@ export class TrackerCanvas2DRenderer {
 
       let caretX: number;
       let caretW: number;
+      let fieldX: number;
+      let fieldW: number;
       if (!isNaN(colIdx) && chColumns) {
         // DATA-DRIVEN column caret — span the numeric column.
         let offX = 0;
@@ -427,10 +429,12 @@ export class TrackerCanvas2DRenderer {
         }
         caretX = chanX + 2 + offX;
         caretW = (chColumns[colIdx]?.charWidth ?? 1) * cw;
+        fieldX = caretX;
+        fieldW = caretW;
       } else {
         // FIXED-COLUMN per-nibble caret from the shared geometry helper.
         const hasAcid = chan?.rows[0]?.flag1 !== undefined || chan?.rows[0]?.flag2 !== undefined;
-        const rect = computeCaretRect({
+        const caretInput = {
           columnType: cursor.columnType,
           digitIndex: cursor.digitIndex,
           noteColumnIndex: cursor.noteColumnIndex ?? 0,
@@ -439,10 +443,26 @@ export class TrackerCanvas2DRenderer {
           effectCols: chan?.effectCols ?? 2,
           effectNotation: chan?.effectNotation,
           hasAcid,
-        });
+        };
+        const rect = computeCaretRect(caretInput);
         caretX = chanX + 2 + rect.offX;
         caretW = rect.width;
+        const field = computeFieldRect(caretInput);
+        fieldX = chanX + 2 + field.offX;
+        fieldW = field.width;
       }
+      // Field outline: lights up the whole field the caret is in.
+      const { borderAlpha, fillAlpha, pad } = FIELD_OUTLINE_STYLE;
+      const fx = fieldX - pad;
+      const fw = Math.min(fieldW + pad * 2, W - fx);
+      ctx.fillStyle = theme.accent;
+      ctx.globalAlpha = fillAlpha;
+      ctx.fillRect(fx, curY, fw, rowH);
+      ctx.globalAlpha = borderAlpha;
+      ctx.strokeStyle = theme.accent;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(fx + 0.5, curY + 0.5, fw - 1, rowH - 1);
+      ctx.globalAlpha = 1;
       // Clamp caret to canvas bounds (channel may be wider than viewport on mobile)
       const clampedW = Math.min(caretW, W - caretX - 2);
       ctx.strokeStyle = theme.accent;

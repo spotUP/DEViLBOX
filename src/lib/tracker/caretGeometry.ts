@@ -62,3 +62,28 @@ export function computeCaretRect(input: CaretGeometryInput): CaretRect {
     default:           return { offX: effBase, width: cw };
   }
 }
+
+/**
+ * The whole field (note, instrument, volume, one effect slot, flag, probability)
+ * the caret sits in. Both renderers outline it so the field being edited stays
+ * visible even when blank-empty-cells mode draws nothing for empty fields; the
+ * per-nibble caret alone gave no hint of which field a digit belonged to.
+ */
+export function computeFieldRect(input: CaretGeometryInput): CaretRect {
+  const cw = input.charWidth;
+  const effW = effectCellWidth(cw, input.effectNotation) - 4;
+  const caret = computeCaretRect({ ...input, digitIndex: 0 });
+  switch (input.columnType) {
+    case 'instrument':
+    case 'volume':
+    case 'probability': return { offX: caret.offX, width: cw * 2 };
+    case 'effTyp':
+    case 'effParam':    return { offX: computeCaretRect({ ...input, columnType: 'effTyp', digitIndex: 0 }).offX, width: effW };
+    case 'effTyp2':
+    case 'effParam2':   return { offX: computeCaretRect({ ...input, columnType: 'effTyp2', digitIndex: 0 }).offX, width: effW };
+    default:            return caret;
+  }
+}
+
+/** Shared look of the field outline: border and fill alpha over the theme accent, outline padding in px. */
+export const FIELD_OUTLINE_STYLE = { borderAlpha: 0.85, fillAlpha: 0.12, pad: 1 } as const;
