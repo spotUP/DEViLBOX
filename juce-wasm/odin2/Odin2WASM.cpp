@@ -538,6 +538,11 @@ public:
                              1.0f,   // unison gain reduction
                              false,  // unison active
                              0.0f, 0.0f);  // arp mods
+            // Amplifier::doAmplifier scales by (1 - velAmount + velAmount * m_MIDI_vel);
+            // m_MIDI_vel starts at 0 and Voice::start does not set it (the plugin's
+            // PluginProcessorMidi does), so with the default velocity amount of 1 the
+            // voice is multiplied by 0 and renders silence.
+            voice_[vi].amp.setMIDIVelocity(velocity);
             voiceManager_.voice_busy[vi] = true;
         }
         lastMidiNote_ = midiNote;

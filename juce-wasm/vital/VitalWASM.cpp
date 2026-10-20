@@ -24,6 +24,10 @@
 // Vital synthesis engine
 #include "synthesis/synth_engine/sound_engine.h"
 #include "common/synth_parameters.h"
+#include "synthesis/lookups/wavetable.h"
+#include "synthesis/producers/sample_source.h"
+#include "synthesis/lookups/wave_frame.h"
+#include "common/line_generator.h"
 
 #include <vector>
 #include <cstring>
@@ -54,6 +58,33 @@ public:
         for (auto& pair : controls) {
             controlMap_[pair.first] = pair.second;
         }
+
+        initDefaultSources();
+    }
+
+    // Vital's SynthBase::initEngine() fills the engine's oscillator wavetables,
+    // sample and LFO shapes with the init patch. A bare SoundEngine starts with
+    // an all-zero wavetable (one blank frame), so every oscillator renders
+    // silence. Reproduce the init patch sources here (the default group is a
+    // single sawtooth frame, see WavetableGroup::loadDefaultGroup).
+    void initDefaultSources() {
+        vital::WaveFrame saw;
+        for (int i = 0; i < vital::WaveFrame::kWaveformSize; ++i) {
+            float t = i / (vital::WaveFrame::kWaveformSize - 1.0f);
+            int shifted = (i + vital::WaveFrame::kWaveformSize / 2) % vital::WaveFrame::kWaveformSize;
+            saw.time_domain[shifted] = 1.0f - 2.0f * t;
+        }
+        saw.toFrequencyDomain();
+        for (int osc = 0; osc < vital::kNumOscillators; ++osc) {
+            vital::Wavetable* table = engine_->getWavetable(osc);
+            table->setName("Init");
+            table->setNumFrames(1);
+            table->loadWaveFrame(&saw, 0);
+            table->postProcess(0.0f);
+        }
+        engine_->getSample()->init();
+        for (int lfo = 0; lfo < vital::kNumLfos; ++lfo)
+            engine_->getLfoSource(lfo)->initTriangle();
     }
 
     void noteOn(int midiNote, int velocity) override {

@@ -109,7 +109,8 @@ run_vitest_suites() {
 #   public/tumult/samples 254 MB  impulse-response samples fetched by the browser
 #   public/projectm/presets 115 MB / 9 795 files  Milkdrop presets fetched by the browser
 #   public/models       140 MB  glTF / glb, except guitarml (read by guitarMLWorkletDispose)
-#   public/{odin2,surge,monique,kissofshame} 96 MB  hardware-UI wasm bundles
+#   public/{odin2/Odin2UI.*,surge,monique,kissofshame} 96 MB  hardware-UI wasm bundles
+#   (public/odin2/Odin2.{js,wasm}, the synth itself, stays: vstbridgeSynthsSoundOnNoteOn reads it)
 SNAPSHOT_SKIPPED_PATHS=(
   /third-party/furnace-master/
   /third-party/vital-main/
@@ -126,7 +127,7 @@ SNAPSHOT_SKIPPED_PATHS=(
   /public/models/vestax/
   /public/models/turntable.glb
   /public/models/vestax-mixer.glb
-  /public/odin2/
+  /public/odin2/Odin2UI.*
   /public/surge/
   /public/monique/
   /public/kissofshame/
