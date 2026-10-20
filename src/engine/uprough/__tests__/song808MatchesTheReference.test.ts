@@ -1,6 +1,8 @@
 /**
- * songBass808 against tools/hiphop.py render_section's whole-808 block (plan 2026-10-19 O6f). Every section lane compares
- * to 1e-9 per sample (head of 300 plus every 16th sample; same tolerance and cause as bass808PianoMatchTheReference: V8 sin/exp/tanh differ from libm in the last ulps, and the filters carry it). The
+ * songBass808 against tools/hiphop.py render_section's whole-808 block (plan 2026-10-19 O6f). Every sample of every section
+ * lane compares to 1e-9 (same tolerance and cause as bass808PianoMatchTheReference: V8 sin/exp/tanh differ from libm in the
+ * last ulps, and the filters carry it). The reference samples live in fixtures/song_bass808.lanes.br (byte-shuffled float64,
+ * brotli; layout in the generator), and each decoded lane must hash to the sha the generator recorded before it is used. The
  * reference lane is rebuilt from the host's own render_808 return and bass_gain (captured by wrapping them) with the host's
  * two lines, sig - mean(sig) and bass_buf[:n] += g * sig[:n]; a section the host never called render_808 for is zeros.
  * Cases cover seven styles on five subgenre rows (deep, drill, boombap, hard, melodic, rage, cloud), bass_cut 0.72 .. 1.1,
@@ -11,6 +13,10 @@
  * render808Sequence (one call per section the host rendered) and a count of the notes the plan softens.
  * Regenerate with tools/softsynth-fixtures/gen_song_bass808.py.
  */
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { brotliDecompressSync } from 'node:zlib';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import fixture from './fixtures/song_bass808.json';
 import { songFileToBarEvents, type BarEvents } from '@/lib/uprough/barEvents';
@@ -20,11 +26,22 @@ import { DEFAULT_PROFILE_808, type KickPlanRecord } from '../voices/bass808';
 import { STYLE_808_PROFILE, classifyKickRelationship, kickTimesS, planKickRelationship, style808Profile } from '../voices/bass808Section';
 import { songBass808 } from '../songBass808';
 
-interface Arr { n: number; sha: string; head: string; stride: string; peak: number }
+interface Arr { n: number; off: number; sha: string; peak: number }
 
 const TOL = 1e-9;
-const STRIDE = 16;
-const f64 = (b64: string): Float64Array => new Float64Array(new Uint8Array(Buffer.from(b64, 'base64')).buffer);
+// undo the generator's byte shuffle: plane k holds byte k of every sample
+const lanesBytes = ((): Uint8Array => {
+  const planes = brotliDecompressSync(readFileSync(join(__dirname, 'fixtures/song_bass808.lanes.br')));
+  const n = planes.length / 8;
+  const out = new Uint8Array(planes.length);
+  for (let k = 0; k < 8; k++) for (let i = 0; i < n; i++) out[i * 8 + k] = planes[k * n + i]!;
+  return out;
+})();
+const laneOf = (a: Arr): Float64Array => {
+  const bytes = lanesBytes.slice(a.off * 8, (a.off + a.n) * 8);
+  expect(createHash('sha256').update(bytes).digest('hex')).toBe(a.sha);
+  return new Float64Array(bytes.buffer);
+};
 interface Lane { called: boolean; bars: number; drops: unknown[]; layered: number; buf: Arr }
 interface Case {
   name: string; style: string; rate: number; bpm: number; doc: SongFileDoc | null; events: BarEvents | null;
@@ -50,10 +67,7 @@ describe('songBass808 matches the hiphop section bass_buf', () => {
       lanes.forEach((lane, i) => {
         const want = c.lanes[i]!;
         expect(lane.length).toBe(want.buf.n);
-        const head = f64(want.buf.head);
-        const strided = f64(want.buf.stride);
-        expect(maxErr(lane.subarray(0, head.length), head)).toBeLessThan(TOL);
-        expect(maxErr(Float64Array.from({ length: strided.length }, (_, k) => lane[k * STRIDE]!), strided)).toBeLessThan(TOL);
+        expect(maxErr(lane, laneOf(want.buf))).toBeLessThan(TOL);
       });
     });
   }
