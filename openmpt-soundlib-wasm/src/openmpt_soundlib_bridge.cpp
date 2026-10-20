@@ -650,6 +650,13 @@ void osl_set_initial_tempo(int32_t tempo) {
     if (g_sf) g_sf->Order().SetDefaultTempoInt(static_cast<uint32_t>(tempo));
 }
 
+// Sample pre-amp of the song (48 by default, up to MAX_PREAMP). The XM writer
+// stores it in the SPA. extension chunk, so a saved module keeps its level.
+EMSCRIPTEN_KEEPALIVE
+void osl_set_sample_preamp(int32_t preamp) {
+    if (g_sf && preamp > 0) g_sf->m_nSamplePreAmp = std::min(static_cast<uint32_t>(preamp), MAX_PREAMP);
+}
+
 // ============================================================================
 // Save / Export
 // ============================================================================
