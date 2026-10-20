@@ -13,7 +13,6 @@ import type { EffectDescriptor } from '../EffectDescriptor';
 import { EffectRegistry } from '../EffectRegistry';
 import { createEq3Bands } from '../../factories/eq3Bands';
 import { paramNumber } from './paramNumber';
-import { createBitCrusher } from '../../tone/bitCrusher';
 
 const tonejs: EffectDescriptor[] = [
   // ── Distortion ──────────────────────────────────────────────────────────
@@ -52,7 +51,9 @@ const tonejs: EffectDescriptor[] = [
     id: 'BitCrusher', name: 'BitCrusher', category: 'tonejs', group: 'Distortion',
     loadMode: 'eager',
     create: async (c: EffectConfig) => {
-      return createBitCrusher(Number(c.parameters.bits) || 4, c.wet / 100);
+      const node = new Tone.BitCrusher(Number(c.parameters.bits) || 4);
+      node.wet.value = c.wet / 100;
+      return node;
     },
     getDefaultParameters: () => ({ bits: 4 }),
     presets: [

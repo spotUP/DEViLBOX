@@ -70,7 +70,6 @@ import { ExpanderEffect } from '../effects/ExpanderEffect';
 import { SwedishChainsawEffect } from '../effects/SwedishChainsawEffect';
 import { RE201Effect } from '../effects/RE201Effect';
 import { AnotherDelayEffect } from '../effects/AnotherDelayEffect';
-import { isBitCrusher, setBitCrusherBits } from './bitCrusher';
 
 export const EFFECT_RAMP_TIME = 0.02;
 
@@ -136,7 +135,7 @@ export function applyEffectParametersDiff(
       break;
 
     case 'BitCrusher':
-      if (isBitCrusher(node) && 'bits' in changed) setBitCrusherBits(node, Number(changed.bits));
+      if (node instanceof Tone.BitCrusher && 'bits' in changed) node.bits.value = Number(changed.bits) || 4;
       break;
 
     case 'PingPongDelay':

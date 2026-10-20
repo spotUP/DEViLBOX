@@ -16,7 +16,6 @@ import {
 } from '@/types/instrument';
 import { ArpeggioEngine } from '../ArpeggioEngine';
 import { getNormalizedVolume } from './volumeNormalization';
-import { createBitCrusher, setBitCrusherBits } from '../tone/bitCrusher';
 import { registerVoiceSource } from '../tone/toneVoiceProbe';
 import { createToneSynthNode, toneVoiceOptions } from '../tone/toneSynthKnobs';
 
@@ -1685,7 +1684,7 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
     });
 
     // Add bit crusher for 8-bit sound
-    const bitCrusher = createBitCrusher(chipConfig.bitDepth);
+    const bitCrusher = new Tone.BitCrusher(chipConfig.bitDepth);
     noise.connect(bitCrusher);
 
     return registerVoiceSource({
@@ -1719,7 +1718,7 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
             release: env.release / 1000,
           }
         });
-        setBitCrusherBits(bitCrusher, Number(csc.bitDepth));
+        bitCrusher.bits.value = Number(csc.bitDepth);
       },
       volume: noise.volume,
     } as unknown as Tone.ToneAudioNode, noise);
@@ -1741,7 +1740,7 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
   });
 
   // Add bit crusher for 8-bit character
-  const bitCrusher = createBitCrusher(chipConfig.bitDepth);
+  const bitCrusher = new Tone.BitCrusher(chipConfig.bitDepth);
   synth.connect(bitCrusher);
 
   // Create ArpeggioEngine only if arpeggio is ENABLED (not just configured)
@@ -1832,7 +1831,7 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
           release: env.release / 1000,
         }
       });
-      setBitCrusherBits(bitCrusher, Number(csc.bitDepth));
+      bitCrusher.bits.value = Number(csc.bitDepth);
     },
     volume: synth.volume,
     // Expose methods for real-time arpeggio updates
