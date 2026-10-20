@@ -916,7 +916,7 @@ export class TrackerReplayer {
     this.songPos = songPos;
     this.pattPos = pattPos;
     this.currentTick = 0;
-    this.nextScheduleTime = Tone.now();
+    this.resyncTimelineForJump();
     // Tell usePatternPlayback to skip its next stop/restart cycle
     this.skipNextReload = true;
 
@@ -1702,6 +1702,21 @@ export class TrackerReplayer {
   setPitchMultiplier(m: number): void {
     this.pitchMultiplier = m;
     this.updateAllPlaybackRates();
+  }
+
+  /** Place the timeline for a user jump (Shift restart, seek) while playing.
+   *  Ticks up to scheduleAheadTime ahead were already handed to the synths and
+   *  cannot be recalled. Rewinding to now made the jump's first notes land on
+   *  top of them: ToneEngine.getSafeTime clamps every trigger after the last
+   *  queued one, so a restarted row-00 snare sounded 0.5 ms after the old
+   *  queued snare and the two phased into half a snare. So the new position
+   *  starts where the queue ends. When libopenmpt or a WASM dispatch owns the
+   *  clock it seeks instantly, and the timeline has to follow it to now. */
+  private resyncTimelineForJump(): void {
+    const externalClock = this.useLibopenmptPlayback || this.coordinator.hasActiveDispatch;
+    this.nextScheduleTime = externalClock
+      ? Tone.now()
+      : Math.max(this.nextScheduleTime, Tone.now());
   }
 
   /** Re-sync the scheduler timeline to now so the next tick fires immediately.
@@ -3940,11 +3955,8 @@ export class TrackerReplayer {
         this.speed = (this.pattPos % 2 === 0) ? this.song.initialSpeed : this.speed2;
       }
 
-      // Re-sync scheduler timing to NOW so the next tick fires immediately
-      // from the new position instead of waiting for the old schedule.
-      // This is the ONLY place nextScheduleTime is set to Tone.now() — and
-      // only for user-initiated seeks, never for natural pattern advancement.
-      this.nextScheduleTime = Tone.now();
+      // Start the new position where the already-queued audio ends.
+      this.resyncTimelineForJump();
 
       // Clear queued display states so old position updates don't flicker the UI
       this.clearStateQueue();
