@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * Every VSTBridge synth's default patch (C4, velocity 100) lands on the same
+ * Every VSTBridge synth's default patch (C4, velocity 127) lands on the same
  * level as the project's other synths.
  *
  * Target definition (src/test-runner.ts TARGET_PEAK): peak -10 dBFS at the
@@ -13,7 +13,8 @@ import { existsSync, readFileSync, appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { describe, it, expect } from 'vitest';
-import { SYNTH_REGISTRY } from '../synth-registry';
+import { SYNTH_REGISTRY, type VSTBridgeDescriptor } from '../synth-registry';
+import { DEFAULT_MONIQUE } from '../../monique/MoniqueSynth';
 
 const TARGET_PEAK_DB = -10;
 const CONFIG_VOLUME_DB = -12; // DEFAULT_INSTRUMENT_VOLUME_DB
@@ -24,11 +25,18 @@ const SKIPPED: Record<string, string> = {};
 interface SynthInstance {
   initialize(sampleRate: number): boolean | void;
   noteOn(note: number, velocity: number): void;
+  setParameter(id: number, value: number): void;
   process(l: number, r: number, n: number): void;
 }
 interface WasmModule { _malloc(n: number): number; [key: string]: unknown }
 
-async function rawPeak(dir: string, file: string, factory: string, cls: string): Promise<number> {
+/** Live note velocity: tracker cells at default channel volume 64 and keyboard input both pass 1.0, which VSTBridgeSynth.triggerAttack maps to 127. */
+const LIVE_VELOCITY = 127;
+/** Config a live instrument applies on init (VSTBridgeSynth.applyConfig through the descriptor's paramMapping). */
+const LIVE_CONFIG: Record<string, Record<string, number>> = { monique: DEFAULT_MONIQUE as unknown as Record<string, number> };
+
+async function rawPeak(desc: VSTBridgeDescriptor): Promise<number> {
+  const { wasmDir: dir, wasmFile: file, moduleFactoryName: factory, synthClassName: cls } = desc;
   const root = resolve(__dirname, '../../../../public', dir);
   const wasmBinary = readFileSync(resolve(root, `${file}.wasm`));
   let memory: WebAssembly.Memory | null = null;
@@ -52,7 +60,11 @@ async function rawPeak(dir: string, file: string, factory: string, cls: string):
   const frames = 128;
   const l = mod._malloc(frames * 4);
   const r = mod._malloc(frames * 4);
-  synth.noteOn(60, 100);
+  const cfg = desc.configKey ? LIVE_CONFIG[desc.configKey] : undefined;
+  if (cfg && desc.paramMapping) {
+    for (const [k, v] of Object.entries(cfg)) if (typeof v === 'number' && k in desc.paramMapping) synth.setParameter(desc.paramMapping[k], v);
+  }
+  synth.noteOn(60, LIVE_VELOCITY);
   let peak = 0;
   for (let b = 0; b < 750; b++) { // 2 s held
     synth.process(l, r, frames);
@@ -76,7 +88,7 @@ describe('VSTBridge default-patch level sits on the target', () => {
     const present = existsSync(resolve(__dirname, '../../../../public', desc.wasmDir, `${desc.wasmFile}.wasm`));
     it.skipIf(!present)(`${desc.id}: raw peak + volume + offset is within ${TOLERANCE_DB} dB of ${TARGET_PEAK_DB} dBFS`, async () => {
       if (SKIPPED[desc.id]) return;
-      const raw = await rawPeak(desc.wasmDir, desc.wasmFile, desc.moduleFactoryName, desc.synthClassName);
+      const raw = await rawPeak(desc);
       if (process.env.VSTB_CAL_OUT) appendFileSync(process.env.VSTB_CAL_OUT, `${desc.id}\t${raw.toFixed(2)}\t${desc.volumeOffsetDb ?? 0}\n`);
       expect(Number.isFinite(raw), `${desc.id} raw peak ${raw}`).toBe(true);
       const level = raw + CONFIG_VOLUME_DB + (desc.volumeOffsetDb ?? 0);

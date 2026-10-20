@@ -78,7 +78,7 @@ registerVSTBridge({
   wasmFile: 'Odin2',
   synthClassName: 'Odin2Synth',
   moduleFactoryName: 'createOdin2Module',
-  volumeOffsetDb: 15,
+  volumeOffsetDb: 13,
   panelComponent: 'Odin2Controls',
   commands: ['loadPatch'],
 });
@@ -94,7 +94,7 @@ registerVSTBridge({
   wasmFile: 'Surge',
   synthClassName: 'SurgeSynth',
   moduleFactoryName: 'createSurgeModule',
-  volumeOffsetDb: 9,
+  volumeOffsetDb: 10,
   panelComponent: 'SurgeControls',
   commands: ['loadPatch', 'loadWavetable'],
 });
@@ -110,7 +110,7 @@ registerVSTBridge({
   wasmFile: 'Tonewheel',
   synthClassName: 'TonewheelOrganSynth',
   moduleFactoryName: 'createTonewheelModule',
-  volumeOffsetDb: 15,
+  volumeOffsetDb: 13,
 });
 
 // ---------------------------------------------------------------------------
@@ -124,7 +124,7 @@ registerVSTBridge({
   wasmFile: 'Melodica',
   synthClassName: 'MelodicaWASMSynth',
   moduleFactoryName: 'createMelodicaModule',
-  volumeOffsetDb: 5,
+  volumeOffsetDb: 3,
 });
 
 // ---------------------------------------------------------------------------
@@ -138,7 +138,7 @@ registerVSTBridge({
   wasmFile: 'Monique',
   synthClassName: 'MoniqueSynth',
   moduleFactoryName: 'createMoniqueModule',
-  volumeOffsetDb: 11,
+  volumeOffsetDb: 10,
   configKey: 'monique',
   // Maps MoniqueConfig keys → WASM param IDs (C++ MoniqueParams enum, 0-119)
   paramMapping: {
@@ -223,7 +223,7 @@ registerVSTBridge({
   wasmFile: 'Sorcer',
   synthClassName: 'SorcerSynth',
   moduleFactoryName: 'createSorcerModule',
-  volumeOffsetDb: 34,
+  volumeOffsetDb: 32,
 });
 
 // ---------------------------------------------------------------------------
