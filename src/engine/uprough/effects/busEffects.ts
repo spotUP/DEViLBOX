@@ -161,6 +161,8 @@ export const SAMPLER_PROFILES: Readonly<Record<string, SamplerProfile>> = {
   s950: { bits: 12, decim: 2, aaCut: 8000, alias: 0.12, inDrive: 0.03, outLp: 7500, interp: 'dark_linear', noise: 0.002, peak: 0.8 },
   amiga: { bits: 8, decim: 1, aaCut: 9000, alias: 0.28, inDrive: 0.04, outLp: 9000, interp: 'linear', noise: 0.003, peak: 0.82 },
   cassette: { bits: 12, decim: 1, aaCut: 6000, alias: 0.20, inDrive: 0.06, outLp: 6000, interp: 'dark_linear', noise: 0.008, wow: 0.4, peak: 0.78 },
+  // hiphop_subgenre.py:993 registers it at import: cassette with decim 2. Not in SAMPLER_PROFILE_IDS (the UI list).
+  lofi_cassette: { bits: 12, decim: 2, aaCut: 6000, alias: 0.20, inDrive: 0.06, outLp: 6000, interp: 'dark_linear', noise: 0.008, wow: 0.4, peak: 0.78 },
   vinyl: { bits: 12, decim: 1, aaCut: 8000, alias: 0.20, inDrive: 0.04, outLp: 8000, interp: 'dark_linear', noise: 0.016, wow: 0.2, crackle: true, peak: 0.8 },
   radio: { bits: 10, decim: 2, aaCut: 4200, alias: 0.22, inDrive: 0.07, outLp: 3800, hp: 500, interp: 'hold', noise: 0.006, peak: 0.78 },
   clean: { bits: 16, decim: 1, aaCut: null, alias: 0.0, inDrive: 0.0, outLp: null, interp: 'linear', noise: 0.0, peak: 0.9 },

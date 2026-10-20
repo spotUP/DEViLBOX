@@ -21,7 +21,7 @@ export const DEFAULT_HAT_POOL_SIZE = 8;
 export interface SongDrumsOptions { hatPoolSize?: number }
 
 /** The layers a section plays: the arrangement row, the params.section fast path, then params.stem isolates one. */
-function sectionDrumsOn(events: BarEvents, index: number): boolean {
+export function sectionDrumsOn(events: BarEvents, index: number): boolean {
   const { section, stem } = events.params;
   if (stem) return stem === 'drums';
   if (section) return section !== 'breakdown';
