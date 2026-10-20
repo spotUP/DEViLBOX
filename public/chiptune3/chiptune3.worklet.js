@@ -429,20 +429,7 @@ class MPT extends AudioWorkletProcessor {
 				// If no module is loaded yet, load PAUSED so we don't accidentally
 				// start playback (which would emit position=0 and steal the cursor).
 				if (!this.modulePtr) { this.play(v, true); break }
-				{
-					const stack = libopenmpt.stackSave ? libopenmpt.stackSave() : 0
-					// Save current position
-					const curOrder = libopenmpt._openmpt_module_get_current_order(this.modulePtr)
-					const curRow = libopenmpt._openmpt_module_get_current_row(this.modulePtr)
-					const wasPaused = this.paused
-					// Reload (preserve paused/playing state)
-					this.play(v, wasPaused)
-					// Restore position
-					if (this.modulePtr) {
-						libopenmpt._openmpt_module_set_position_order_row(this.modulePtr, curOrder, curRow)
-					}
-					if (stack) libopenmpt.stackRestore(stack)
-				}
+				this.hotReload_(v)
 				break
 			case 'setMuteMask':
 				// User mute/solo mask — combine with isolation exclusion
@@ -580,7 +567,49 @@ class MPT extends AudioWorkletProcessor {
 		this.stop()
 	}
 
-	play(buffer, paused = false) {
+	/**
+	 * Swap in the module rebuilt after an edit, keeping everything the song
+	 * had around it.
+	 *
+	 * The edit bridge hot-reloads on every cell change. play() is the
+	 * new-song path: it destroys the isolation slots, the dub slots and the
+	 * oscilloscope instances, resets the user mute mask and announces
+	 * 'playReady'. Run on every edit, that silently unmuted the channels the
+	 * user had muted, froze the scopes (only the engine's play() asks for
+	 * them again) and made the engine rebuild every insert effect and dub
+	 * send per keystroke. Nothing about those changes when a cell does, so
+	 * they are captured here and recreated at the restored position — the
+	 * slots seek to the main module's position when they are created.
+	 */
+	hotReload_(buffer) {
+		const stack = libopenmpt.stackSave ? libopenmpt.stackSave() : 0
+		const curOrder = libopenmpt._openmpt_module_get_current_order(this.modulePtr)
+		const curRow = libopenmpt._openmpt_module_get_current_row(this.modulePtr)
+		const kept = {
+			userMuteMask: this.userMuteMask,
+			isolatedBits: this.isolatedBits,
+			isolationMasks: this.isolationSlots.map(slot => slot ? slot.channelMask : null),
+			dubChannels: this.dubSlots.map(slot => !!slot),
+			osc: this.oscEnabled,
+		}
+		this.play(buffer, this.paused, false)
+		if (this.modulePtr) {
+			libopenmpt._openmpt_module_set_position_order_row(this.modulePtr, curOrder, curRow)
+			// play() learns the channel count only through meta(), which a
+			// paused load skips; the masks and the scopes need it.
+			this.channels = libopenmpt._openmpt_module_get_num_channels(this.modulePtr)
+			this.userMuteMask = kept.userMuteMask
+			this.isolatedBits = kept.isolatedBits
+			kept.isolationMasks.forEach((mask, i) => { if (mask !== null) this.addIsolationSlot_(i, mask) })
+			kept.dubChannels.forEach((on, ch) => { if (on) this.addDubSlot_(ch) })
+			this.recomputeMainMask_()
+			this.reapplyIsolationMasks_()
+			if (kept.osc) this.createOscModule_()
+		}
+		if (stack) libopenmpt.stackRestore(stack)
+	}
+
+	play(buffer, paused = false, announce = true) {
 		this.teardownAllIsolation_()
 		this.teardownAllDubSlots_()
 		this.stop()
@@ -671,7 +700,7 @@ class MPT extends AudioWorkletProcessor {
 		// of the song and every capture-and-play move (reverseEcho,
 		// backwardReverb, delayTimeThrow) recorded silence. Reported
 		// 2026-09-21 and again 2026-09-22.
-		this.port.postMessage({ cmd: 'playReady' })
+		if (announce) this.port.postMessage({ cmd: 'playReady' })
 	}
 	stop() {
 		this.destroyOscModule_()
