@@ -1035,6 +1035,18 @@ private:
             applyOscPitchChanges();
             break;
 
+        // --- Osc waveform select: analog wave, and wavetable index for wavetable/multi oscs ---
+        case PARAM_OSC1_WAVE: case PARAM_OSC2_WAVE: case PARAM_OSC3_WAVE: {
+            const int osc = (paramId == PARAM_OSC1_WAVE) ? 0 : (paramId == PARAM_OSC2_WAVE) ? 1 : 2;
+            const int idx = (int)(value + 0.5f);
+            for (int v = 0; v < VOICES; v++) {
+                voice_[v].analog_osc[osc].selectWavetable(idx);
+                voice_[v].wavetable_osc[osc].selectWavetable(idx);
+                voice_[v].multi_osc[osc].selectWavetable(idx);
+            }
+            break;
+        }
+
         // --- Osc1 params ---
         case PARAM_OSC1_PW:
             for (int v = 0; v < VOICES; v++) voice_[v].analog_osc[0].setPWMDuty(value);
@@ -1177,4 +1189,33 @@ private:
 
 } // namespace devilbox
 
-EXPORT_WASM_SYNTH_EXTENDED_EX(Odin2Synth, devilbox::Odin2Synth, "Odin2Synth")
+// Explicit bindings instead of EXPORT_WASM_SYNTH_EXTENDED_EX: that macro takes member pointers of the
+// unregistered base WASMSynthBase (isInitialized, getSampleRate, getParameterNameJS, handleCommandJS,
+// programChange), and embind then never installs those methods on the JS class. VSTBridge.worklet.js
+// needs getParameterName to publish parameter metadata, so without it the parameter list was empty
+// and name-based config (factory presets) could not reach the synth. Lambdas bind them to Odin2Synth.
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_BINDINGS(Odin2Synth_bindings) {
+    using S = devilbox::Odin2Synth;
+    emscripten::class_<S>("Odin2Synth")
+        .constructor<>()
+        .function("initialize", &S::initialize)
+        .function("isInitialized", +[](const S& s) { return s.isInitialized(); })
+        .function("getSampleRate", +[](const S& s) { return s.getSampleRate(); })
+        .function("noteOn", &S::noteOn)
+        .function("noteOff", &S::noteOff)
+        .function("allNotesOff", &S::allNotesOff)
+        .function("setParameter", &S::setParameter)
+        .function("getParameter", &S::getParameter)
+        .function("controlChange", &S::controlChange)
+        .function("pitchBend", &S::pitchBend)
+        .function("programChange", +[](S& s, int program) { s.programChange(program); })
+        .function("getParameterCount", &S::getParameterCount)
+        .function("getParameterName", +[](const S& s, int id) { return s.getParameterNameJS(id); })
+        .function("getParameterMin", &S::getParameterMin)
+        .function("getParameterMax", &S::getParameterMax)
+        .function("getParameterDefault", &S::getParameterDefault)
+        .function("handleCommand", +[](S& s, const std::string& type, emscripten::val data) { return s.handleCommandJS(type, data); })
+        .function("process", &S::processJS);
+}
+#endif
