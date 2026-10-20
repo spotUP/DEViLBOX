@@ -1609,9 +1609,9 @@ export const useTrackerStore = create<TrackerStore>()(
         return;
       }
       set((state) => {
-        // Use the scheme-specific maxChannels, falling back to global MAX_CHANNELS
-        const behaviorMax = useEditorStore.getState().activeBehavior.maxChannels;
-        const maxChannels = Math.min(behaviorMax, MAX_CHANNELS);
+        // The keyboard scheme never caps channels: the song format does (the
+        // getActiveFormatLimits check above); only the global MAX_CHANNELS applies here.
+        const maxChannels = MAX_CHANNELS;
         // Get available colors (excluding null)
         const availableColors = CHANNEL_COLORS.filter((c) => c !== null) as string[];
         // Pick a random color for the new channel
@@ -1622,7 +1622,7 @@ export const useTrackerStore = create<TrackerStore>()(
           // At limit — show message but don't add
           if (typeof window !== 'undefined') {
             import('@stores/useUIStore').then(({ useUIStore }) => {
-              useUIStore.getState().setStatusMessage(`MAX ${maxChannels} CHANNELS (${useEditorStore.getState().activeBehavior.name})`);
+              useUIStore.getState().setStatusMessage(`MAX ${maxChannels} CHANNELS`);
             });
           }
           return;
