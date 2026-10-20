@@ -13,6 +13,12 @@ import { CustomSelect } from '@components/common/CustomSelect';
 import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
 import { fetchStyles, generateSong } from '@/lib/uprough/generateClient';
 import { openUpRoughSong } from '@/lib/uprough/openUpRoughSong';
+import { FactoryPanel } from '@components/uprough/FactoryPanel';
+import { useFactoryStore, factoryOnEvent } from '@/lib/uprough/factory/useFactoryStore';
+import { attachR2Bridge } from '@/lib/uprough/factory/r2Bridge';
+import { runActOne } from '@/lib/uprough/factory/actOne';
+import { replayEvents, scriptedGenerateEvents } from '@/lib/uprough/factory/scriptedRun';
+import { STYLE_DRUMS, type HipHopStyle } from '@/engine/uprough/drumBank';
 
 export interface UpRoughGenerateDialogProps {
   isOpen: boolean;
@@ -42,6 +48,24 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
   const busy = phase !== 'idle';
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // The synth factory shows the build; it stays after the song loads so the render events (acts 2 and 3) can finish.
+  const [showFactory, setShowFactory] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const stopReplay = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    return attachR2Bridge();
+  }, [isOpen]);
+
+  useEffect(() => () => stopReplay.current?.(), []);
+
+  const handleReplay = () => {
+    stopReplay.current?.();
+    useFactoryStore.getState().reset();
+    setShowFactory(true);
+    stopReplay.current = replayEvents(scriptedGenerateEvents((style || 'boom_bap') as HipHopStyle, seed), factoryOnEvent);
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -83,12 +107,19 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
     abortRef.current = ac;
     setPhase('generating');
     setError(null);
+    stopReplay.current?.();
+    useFactoryStore.getState().reset();
+    setShowFactory(true);
+    setLoaded(false);
     try {
-      const text = await generateSong({ style, seed, key, ...(barsCount !== undefined && { bars: barsCount }) }, ac.signal);
+      const pending = generateSong({ style, seed, key, ...(barsCount !== undefined && { bars: barsCount }) }, ac.signal);
+      // Act 1 runs here while the server works: the same TS drum bank the render builds, every stage observed.
+      if (style in STYLE_DRUMS) runActOne(style as HipHopStyle, seed);
+      const text = await pending;
       setPhase('loading');
       await openUpRoughSong(text);
       setPhase('idle');
-      onClose();
+      setLoaded(true);
     } catch (e) {
       setPhase('idle');
       if (!ac.signal.aborted) setError(e instanceof Error ? e.message : String(e));
@@ -106,7 +137,7 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
     <Modal
       isOpen={isOpen}
       onClose={handleCancel}
-      size="sm"
+      size={showFactory ? 'xl' : 'sm'}
       theme="modern"
       backdropOpacity="medium"
       closeOnBackdropClick={!busy}
@@ -189,11 +220,17 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
         )}
 
         {error && <p role="alert" className="text-xs font-mono text-accent-error">{error}</p>}
+
+        {showFactory && (
+          <div style={{ maxHeight: '55vh', overflowY: 'auto' }}>
+            <FactoryPanel onReplay={handleReplay} />
+          </div>
+        )}
       </div>
 
       <ModalFooter theme="modern" align="right">
         <Button variant="ghost" onClick={handleCancel}>
-          Cancel {shortcuts.cancel && <span className="text-xs opacity-70 ml-2">{shortcuts.cancel}</span>}
+          {loaded ? 'Close' : 'Cancel'} {shortcuts.cancel && <span className="text-xs opacity-70 ml-2">{shortcuts.cancel}</span>}
         </Button>
         <Button variant="primary" onClick={handleGenerate} disabled={!canGenerate}>
           {busy ? 'Generating...' : 'Generate'}
