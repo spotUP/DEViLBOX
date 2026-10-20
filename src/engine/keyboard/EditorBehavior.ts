@@ -142,8 +142,6 @@ export interface EditorBehavior {
   readonly itThreeNoteTypes: boolean;
   /** Impulse Tracker: space copies last note data from mask when on empty cell */
   readonly itSpaceCopyMask: boolean;
-  /** Maximum number of channels */
-  readonly maxChannels: number;
 }
 
 // ── Behavior profiles ───────────────────────────────────────────────────────
@@ -190,7 +188,6 @@ const ft2Behavior: EditorBehavior = {
   itMaskVariables: false,
   itThreeNoteTypes: false,
   itSpaceCopyMask: false,
-  maxChannels: 32,
 };
 
 const protrackerBehavior: EditorBehavior = {
@@ -235,7 +232,6 @@ const protrackerBehavior: EditorBehavior = {
   itMaskVariables: false,
   itThreeNoteTypes: false,
   itSpaceCopyMask: false,
-  maxChannels: 4,
 };
 
 const impulseTrackerBehavior: EditorBehavior = {
@@ -280,7 +276,6 @@ const impulseTrackerBehavior: EditorBehavior = {
   itMaskVariables: true,
   itThreeNoteTypes: true,
   itSpaceCopyMask: true,
-  maxChannels: 64,
 };
 
 const renoIseBehavior: EditorBehavior = {
@@ -325,7 +320,6 @@ const renoIseBehavior: EditorBehavior = {
   itMaskVariables: false,
   itThreeNoteTypes: false,
   itSpaceCopyMask: false,
-  maxChannels: 64,
 };
 
 const openmptBehavior: EditorBehavior = {
@@ -370,7 +364,6 @@ const openmptBehavior: EditorBehavior = {
   itMaskVariables: true,
   itThreeNoteTypes: true,
   itSpaceCopyMask: false,
-  maxChannels: 127,
 };
 
 const octamedBehavior: EditorBehavior = {
@@ -415,7 +408,6 @@ const octamedBehavior: EditorBehavior = {
   itMaskVariables: false,
   itThreeNoteTypes: false,
   itSpaceCopyMask: false,
-  maxChannels: 16,
 };
 
 // ── Registry ────────────────────────────────────────────────────────────────

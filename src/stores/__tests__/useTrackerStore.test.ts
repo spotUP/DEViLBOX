@@ -213,3 +213,28 @@ describe('useTrackerStore — undo restores the step\'s own patterns', () => {
     expect(useHistoryStore.getState().undoStack.length).toBe(0);
   });
 });
+
+describe('useTrackerStore — addChannel cap comes from the song format, not the keyboard scheme', () => {
+  beforeEach(async () => {
+    resetStore(useTrackerStore);
+    const { useFormatStore } = await import('../useFormatStore');
+    resetStore(useFormatStore);
+  });
+
+  it('adds a 6th channel to a 5-channel song with the ProTracker scheme active and no native module data', async () => {
+    const { useEditorStore } = await import('../useEditorStore');
+    useEditorStore.getState().setActiveBehavior('protracker');
+    expect(useEditorStore.getState().activeBehavior.name).toBe('protracker');
+
+    // A 5-channel song, as an Up Rough generated song loads (no addChannel: it is the thing under test).
+    useTrackerStore.setState((s) => {
+      s.patterns.forEach((p) => {
+        while (p.channels.length < 5) p.channels.push(JSON.parse(JSON.stringify(p.channels[0])));
+      });
+    });
+    expect(useTrackerStore.getState().patterns[0].channels.length).toBe(5);
+
+    useTrackerStore.getState().addChannel();
+    expect(useTrackerStore.getState().patterns[0].channels.length).toBe(6);
+  });
+});
