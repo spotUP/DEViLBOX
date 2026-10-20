@@ -39,11 +39,12 @@ let _owned = new WeakSet<ArrayBuffer>();
 let _slotIds: string[] | null = null;
 /**
  * Sample slots this bridge filled from an editor Sampler instrument (never an
- * imported sample), keyed by instrument id, with the WAV buffer written.
+ * imported sample), keyed by instrument id, with the sample source written
+ * (the WAV bytes or the saved URL, see samplerSource).
  */
-let _samplerSlots = new Map<number, ArrayBuffer>();
-/** The WAV buffer last looked at per instrument id, so an unchanged instrument costs no module call. */
-let _samplerSeen = new Map<number, ArrayBuffer>();
+let _samplerSlots = new Map<number, ArrayBuffer | string>();
+/** The sample source last looked at per instrument id, so an unchanged instrument costs no module call. */
+let _samplerSeen = new Map<number, ArrayBuffer | string>();
 /** Every module write runs on this chain, so a structural change and the cell edits after it land in order. */
 let _queue: Promise<unknown> = Promise.resolve();
 
@@ -475,11 +476,12 @@ export function samplerC5Speed(wavRate: number, baseNote: string | undefined, ce
 export async function writeSamplerSlot(osl: Soundlib, inst: InstrumentConfig, cellFormat: SaveFormat): Promise<boolean> {
   if (inst.synthType !== 'Sampler' && inst.synthType !== 'Player') return false;
   const sample = inst.sample;
-  const buf = sample?.audioBuffer;
-  if (!sample || !buf || buf.byteLength === 0) return false;
+  if (!sample || !samplerSource(sample)) return false;
   if (!(await osl.ensureSampleSlot(inst.id))) return false;
+  const bytes = await samplerWavBytes(sample);
+  if (!bytes) return false;
   const { decodeWavBytes } = await import('@/bridge/analysis/SampleSpectrum');
-  const wav = decodeWavBytes(new Uint8Array(buf));
+  const wav = decodeWavBytes(bytes);
   if (!wav || wav.pcm.length === 0) return false;
   const pcm = Int16Array.from(wav.pcm, (x) => Math.max(-32768, Math.min(32767, Math.round(x * 32767))));
   if (!(await osl.setSampleData(inst.id, pcm, samplerC5Speed(wav.sampleRate, sample.baseNote, cellFormat), false))) return false;
@@ -490,22 +492,46 @@ export async function writeSamplerSlot(osl: Soundlib, inst: InstrumentConfig, ce
 }
 
 /**
+ * What a Sampler instrument's sample data comes from: the WAV bytes the editor
+ * decoded, or the URL the sample was saved with. A restored song carries only
+ * the URL (snapshotSong drops the bytes), so the URL is the persisted truth and
+ * the bytes a cache of it. Null when the instrument has neither.
+ */
+function samplerSource(sample: SampleConfig): ArrayBuffer | string | null {
+  if (sample.audioBuffer && sample.audioBuffer.byteLength > 0) return sample.audioBuffer;
+  return sample.url ? sample.url : null;
+}
+
+/** The WAV bytes of a Sampler sample, read from the URL when the bytes are not in memory. */
+async function samplerWavBytes(sample: SampleConfig): Promise<Uint8Array | null> {
+  const source = samplerSource(sample);
+  if (source === null) return null;
+  if (typeof source !== 'string') return new Uint8Array(source);
+  try {
+    const response = await fetch(source);
+    return response.ok ? new Uint8Array(await response.arrayBuffer()) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * writeSamplerSlot for the play-time module, which leaves a slot holding an
  * imported sample alone and remembers which slots it filled. Runs inside enqueue.
  * Returns whether the module changed.
  */
 async function writeSamplerInstrument(osl: Soundlib, inst: InstrumentConfig): Promise<boolean> {
   if (inst.synthType !== 'Sampler' && inst.synthType !== 'Player') return false;
-  const buf = inst.sample?.audioBuffer;
-  if (!buf || buf.byteLength === 0) return false;
-  _samplerSeen.set(inst.id, buf);
+  const source = inst.sample ? samplerSource(inst.sample) : null;
+  if (source === null) return false;
+  _samplerSeen.set(inst.id, source);
   if (!_samplerSlots.has(inst.id)) {
     if (!(await osl.ensureSampleSlot(inst.id))) return false;
     const held = await osl.getSampleInfo(inst.id);
     if ((held?.length ?? 0) > 0) return false;
   }
   if (!(await writeSamplerSlot(osl, inst, _format))) return false;
-  _samplerSlots.set(inst.id, buf);
+  _samplerSlots.set(inst.id, source);
   return true;
 }
 
@@ -513,14 +539,15 @@ async function writeSamplerInstrument(osl: Soundlib, inst: InstrumentConfig): Pr
  * Give the module the samples of Sampler instruments added or reloaded in the
  * editor after it was built: libopenmpt plays Sampler notes (ToneEngine leaves
  * them to it), so an instrument missing from the module is silent in the song.
- * Instruments whose WAV buffer is unchanged since the last call cost nothing.
+ * Instruments whose sample source is unchanged since the last call cost nothing.
  * Returns whether the module changed (then it hot-reloads).
  */
 export async function syncSamplerInstruments(instruments: readonly InstrumentConfig[]): Promise<boolean> {
   if (!_loaded) return false;
   const pending = instruments.filter((inst) =>
     (inst.synthType === 'Sampler' || inst.synthType === 'Player')
-    && !!inst.sample?.audioBuffer && _samplerSeen.get(inst.id) !== inst.sample.audioBuffer);
+    && !!inst.sample && samplerSource(inst.sample) !== null
+    && _samplerSeen.get(inst.id) !== samplerSource(inst.sample));
   if (pending.length === 0) return false;
   const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
   const changed = await enqueue(async () => {

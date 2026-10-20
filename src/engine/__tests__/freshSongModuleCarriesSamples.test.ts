@@ -9,6 +9,10 @@
  * The builder now writes each Sampler's WAV into the slot at its id, and an
  * instrument added after the build is written by syncSamplerInstruments.
  *
+ * A restored song (reported 2026-10-21: "it plays silent" after a reload)
+ * carries each sample only as its saved data URL, since snapshotSong drops the
+ * WAV bytes; the module reads the sample from the URL then.
+ *
  * Measured on the module the player receives. Fails on revert: without the
  * slot write the sample at the instrument id has length 0.
  */
@@ -89,5 +93,19 @@ describe('a fresh song module carries its Sampler samples', () => {
     expect((await osl.getSampleInfo(5)).length).toBe(700);
     // The same buffer again changes nothing.
     expect(await bridge.syncSamplerInstruments([added])).toBe(false);
+  }, 60000);
+
+  it('a Sampler restored from a saved song (data URL, no WAV bytes) is written into the module', async () => {
+    const rows = Array.from({ length: 16 }, () => cell());
+    rows[0] = cell({ note: 49, instrument: 88 });
+    const restored = sampler(88, 900);
+    const url = `data:audio/wav;base64,${Buffer.from(restored.sample!.audioBuffer!).toString('base64')}`;
+    restored.sample = { ...restored.sample!, audioBuffer: undefined, url };
+    const song = { numChannels: 4, patterns: [{ length: 16, channels: [{ rows }, { rows }, { rows }, { rows }] }], songPositions: [0], instruments: [restored] };
+
+    const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
+    expect(await bridge.createModuleForSong(song, () => false)).not.toBeNull();
+    const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
+    expect((await osl.getSampleInfo(88)).length).toBe(900);
   }, 60000);
 });
