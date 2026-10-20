@@ -10,6 +10,7 @@ import {
 import { useFormatStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { useAudioStore } from '@stores/useAudioStore';
+import { Fader } from '@components/controls/Fader';
 
 interface SIDTransportBarProps {
   className?: string;
@@ -160,15 +161,16 @@ export const SIDTransportBar: React.FC<SIDTransportBarProps> = ({ className }) =
 
       {/* Volume */}
       <Volume2 size={14} className="text-text-muted shrink-0" />
-      <input
-        type="range"
+      <Fader
+        orientation="horizontal"
+        size="sm"
+        length={80}
         min={-60}
         max={0}
-        step={1}
         value={masterVolume}
-        onChange={(e) => setMasterVolume(Number(e.target.value))}
-        className="w-20"
-        title={`Volume: ${masterVolume} dB`}
+        onChange={(v) => setMasterVolume(Math.round(v))}
+        doubleClickValue={0}
+        title={`Master Volume: ${Math.round(masterVolume)} dB`}
       />
     </div>
   );

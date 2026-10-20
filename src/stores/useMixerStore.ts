@@ -1,5 +1,6 @@
 /**
- * Mixer Store — 16-channel + master volume/pan/mute/solo state
+ * Mixer Store — 16-channel volume/pan/mute/solo state. Master volume is NOT
+ * here: useAudioStore.masterVolume (dB) is its only owner.
  *
  * For WASM engines, per-channel audio routing doesn't exist — they output a
  * single mixed stream. We forward channel gain/mute to the active WASM engine:
@@ -862,7 +863,6 @@ function defaultSendBuses(): SendBusState[] {
 
 interface MixerStoreState {
   channels: MixerChannelState[];
-  master: { volume: number };
   sendBuses: SendBusState[];
   domPanelVisible: boolean;
   isSoloing: boolean;
@@ -874,7 +874,6 @@ interface MixerStoreActions {
   setChannelMute: (ch: number, muted: boolean, opts?: DubWriteOrigin) => void;
   setChannelSolo: (ch: number, soloed: boolean) => void;
   setChannelEffect: (ch: number, slot: 0 | 1, type: string | null) => void;
-  setMasterVolume: (vol: number) => void;
   toggleDomPanel: () => void;
   getInitialState: () => MixerStoreState;
 
@@ -939,6 +938,12 @@ interface MixerStoreActions {
 /** Serializable mixer snapshot for .dbx persistence */
 export interface MixerSnapshot {
   channels: Partial<MixerChannelState>[];
+  /**
+   * Written by saves made before 2026-10-20 and ignored on load. Master volume
+   * belongs to useAudioStore.masterVolume alone; these saves almost always
+   * carry the untouched default 1 (0 dB), and applying it reset the engine's
+   * master to 0 dB behind the store, so the slider and the output disagreed.
+   */
   master?: { volume: number };
   sendBuses?: Partial<SendBusState>[];
 }
@@ -948,7 +953,6 @@ type MixerStore = MixerStoreState & MixerStoreActions;
 function buildInitialState(): MixerStoreState {
   return {
     channels: defaultChannels(),
-    master: { volume: 1 },
     sendBuses: defaultSendBuses(),
     domPanelVisible: false,
     isSoloing: false,
@@ -1077,15 +1081,6 @@ export const useMixerStore = create<MixerStore>()(
         if (state.channels[ch]) {
           state.channels[ch].effects[slot] = type;
         }
-      });
-    },
-
-    setMasterVolume(vol: number): void {
-      applyToEngine(() => {
-        getToneEngine().setMasterVolume(toDb(vol));
-      });
-      batch('master-vol', (state) => {
-        state.master.volume = vol;
       });
     },
 
@@ -1530,9 +1525,6 @@ export const useMixerStore = create<MixerStore>()(
         for (let i = 0; i < Math.min(snapshot.channels.length, state.channels.length); i++) {
           state.channels[i] = { ...defaults[i < defaults.length ? i : 0], ...migrateMixerChannelShape(snapshot.channels[i]) };
         }
-        if (snapshot.master?.volume != null) {
-          state.master.volume = snapshot.master.volume;
-        }
         if (snapshot.sendBuses) {
           const defaultBuses = defaultSendBuses();
           for (let i = 0; i < Math.min(snapshot.sendBuses.length, state.sendBuses.length); i++) {
@@ -1542,10 +1534,9 @@ export const useMixerStore = create<MixerStore>()(
         state.isSoloing = state.channels.some(c => c.soloed);
       });
       // Apply loaded state to audio engine
-      const { channels, master, isSoloing } = get();
+      const { channels, isSoloing } = get();
       applyToEngine(() => {
         const engine = getToneEngine();
-        engine.setMasterVolume(toDb(master.volume));
         channels.forEach((c, i) => {
           engine.setMixerChannelVolume(i, toDb(c.volume));
           engine.setMixerChannelPan(i, c.pan);

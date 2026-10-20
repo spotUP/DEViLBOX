@@ -23,6 +23,7 @@ import { useFormatStore } from '@/stores/useFormatStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { SubsongSelector } from './SubsongSelector';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { Fader } from '@components/controls/Fader';
 import { SIDSubsongSelector } from './SIDSubsongSelector';
 import { UADESubsongSelector } from './UADESubsongSelector';
 import { AVPSubsongSelector } from './AVPSubsongSelector';
@@ -221,17 +222,22 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
   return (
     <div className="flex-shrink flex items-center justify-between px-2 py-1 bg-dark-bgTertiary border-b border-dark-border min-h-[28px] overflow-hidden">
       <div className="flex items-center gap-2 flex-1 min-w-0 overflow-x-auto scrollbar-hidden">
-        {/* Master Volume */}
-        <input
-          type="range"
-          value={masterVolume}
-          onChange={(e) => setMasterVolume(Number(e.target.value))}
-          min="-60"
-          max="0"
-          step="1"
-          className="w-16 max-w-[4rem] shrink-0 grow-0"
-          title={`Volume: ${masterVolume} dB`}
-        />
+        {/* Master Volume. A Fader, not a range input: it takes no keyboard
+            focus, so PageDown meant for the pattern can never lower the
+            master (the owner found it at -36 dB, 2026-10-20). */}
+        <div className="shrink-0 grow-0">
+          <Fader
+            orientation="horizontal"
+            size="sm"
+            length={64}
+            min={-60}
+            max={0}
+            value={masterVolume}
+            onChange={(v) => setMasterVolume(Math.round(v))}
+            doubleClickValue={0}
+            title={`Master Volume: ${Math.round(masterVolume)} dB`}
+          />
+        </div>
 
         {/* Master Limiter Toggle */}
         <button

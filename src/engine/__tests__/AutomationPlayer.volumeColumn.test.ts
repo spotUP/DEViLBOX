@@ -28,6 +28,12 @@ vi.mock('@/stores/storeAccess', () => ({
   getFormatStoreRefOrNull: () => null,
 }));
 
+// AutomationPlayer writes global.masterVolume through useAudioStore; stub it
+// for the same reason, so the store graph stays unloaded.
+vi.mock('@/stores/useAudioStore', () => ({
+  useAudioStore: { getState: () => ({ setMasterVolume: () => {} }) },
+}));
+
 vi.mock('@/engine/ManualOverrideManager', () => ({
   getManualOverrideManager: () => ({
     isOverridden: () => false,

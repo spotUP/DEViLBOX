@@ -126,7 +126,6 @@ export function snapshotSong(): SavedSongFields {
     // Mixer state — channel volumes, pans, mutes, solos, dub sends, send buses
     mixer: {
       channels: useMixerStore.getState().channels,
-      master: useMixerStore.getState().master,
       sendBuses: useMixerStore.getState().sendBuses,
     },
     // Dub bus tuning — character preset + coloring params
