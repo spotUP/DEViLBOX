@@ -1661,7 +1661,8 @@ export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode 
 
 export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
   const chipConfig = config.chipSynth || DEFAULT_CHIP_SYNTH;
-  const arpeggioConfig = chipConfig.arpeggio;
+  // Live arpeggio config: presets and the editor change it after build (applyConfig/updateArpeggio).
+  let arpeggioConfig = chipConfig.arpeggio;
 
   // Create base oscillator based on channel type
   // Note: 'pulse' channels use 'square' since Tone.Synth doesn't support pulse width
@@ -1747,7 +1748,8 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
   let arpeggioEngine: InstanceType<typeof ArpeggioEngine> | null = null;
   let lastArpNote: string | null = null;
 
-  if (arpeggioConfig?.enabled) {
+  const ensureArpeggioEngine = (): void => {
+    if (arpeggioEngine || !arpeggioConfig) return;
     arpeggioEngine = new ArpeggioEngine({
       config: arpeggioConfig,
       onNoteOn: (note: string, velocity: number, duration: number) => {
@@ -1765,7 +1767,18 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
         }
       },
     });
-  }
+  };
+  if (arpeggioConfig?.enabled) ensureArpeggioEngine();
+
+  // A preset or editor edit can turn the arpeggio on after the voice was built: create the
+  // engine on demand, and release held arp notes when it is turned off.
+  const applyArpeggio = (newConfig: typeof arpeggioConfig): void => {
+    if (!newConfig) return;
+    arpeggioConfig = newConfig;
+    if (newConfig.enabled) ensureArpeggioEngine();
+    else if (arpeggioEngine) { arpeggioEngine.stopAll(); lastArpNote = null; }
+    arpeggioEngine?.updateConfig(newConfig);
+  };
 
   // Wrapper object with arpeggio support
   const chipSynthWrapper = {
@@ -1832,14 +1845,11 @@ export function createChipSynth(config: InstrumentConfig): Tone.ToneAudioNode {
         }
       });
       bitCrusher.bits.value = Number(csc.bitDepth);
+      applyArpeggio(csc.arpeggio as typeof arpeggioConfig);
     },
     volume: synth.volume,
     // Expose methods for real-time arpeggio updates
-    updateArpeggio: (newConfig: typeof arpeggioConfig) => {
-      if (arpeggioEngine && newConfig) {
-        arpeggioEngine.updateConfig(newConfig);
-      }
-    },
+    updateArpeggio: (newConfig: typeof arpeggioConfig) => applyArpeggio(newConfig),
     getArpeggioEngine: () => arpeggioEngine,
     getCurrentArpeggioStep: () => arpeggioEngine?.getCurrentStep() ?? 0,
     isArpeggioPlaying: () => arpeggioEngine?.getIsPlaying() ?? false,
