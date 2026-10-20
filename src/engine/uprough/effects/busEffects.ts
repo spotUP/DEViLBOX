@@ -161,6 +161,8 @@ export const SAMPLER_PROFILES: Readonly<Record<string, SamplerProfile>> = {
   s950: { bits: 12, decim: 2, aaCut: 8000, alias: 0.12, inDrive: 0.03, outLp: 7500, interp: 'dark_linear', noise: 0.002, peak: 0.8 },
   amiga: { bits: 8, decim: 1, aaCut: 9000, alias: 0.28, inDrive: 0.04, outLp: 9000, interp: 'linear', noise: 0.003, peak: 0.82 },
   cassette: { bits: 12, decim: 1, aaCut: 6000, alias: 0.20, inDrive: 0.06, outLp: 6000, interp: 'dark_linear', noise: 0.008, wow: 0.4, peak: 0.78 },
+  // hiphop_subgenre.py:993 registers it at import: cassette with decim 2. Not in SAMPLER_PROFILE_IDS (the UI list).
+  lofi_cassette: { bits: 12, decim: 2, aaCut: 6000, alias: 0.20, inDrive: 0.06, outLp: 6000, interp: 'dark_linear', noise: 0.008, wow: 0.4, peak: 0.78 },
   vinyl: { bits: 12, decim: 1, aaCut: 8000, alias: 0.20, inDrive: 0.04, outLp: 8000, interp: 'dark_linear', noise: 0.016, wow: 0.2, crackle: true, peak: 0.8 },
   radio: { bits: 10, decim: 2, aaCut: 4200, alias: 0.22, inDrive: 0.07, outLp: 3800, hp: 500, interp: 'hold', noise: 0.006, peak: 0.78 },
   clean: { bits: 16, decim: 1, aaCut: null, alias: 0.0, inDrive: 0.0, outLp: null, interp: 'linear', noise: 0.0, peak: 0.9 },
@@ -193,10 +195,12 @@ function quantize(x: Float64Array, bits: number, peak: number, dither: boolean):
 /**
  * sampler `process`: input saturation, anti-alias, sample-rate reduction with controlled aliasing, quantise,
  * interpolation colour, output filter, wow, crackle, noise floor. `profile` names a SAMPLER_PROFILES entry
- * (unknown names run mpc60, as in Python).
+ * (unknown names run mpc60, as in Python). `over` is process(**over): knobs that replace the profile's.
  */
-export function samplerProcess(x: Signal, profile = 'mpc60', rate = 22050, dither = true, seed = 0): Float64Array {
-  const p = SAMPLER_PROFILES[profile] ?? SAMPLER_PROFILES.mpc60!;
+export function samplerProcess(
+  x: Signal, profile = 'mpc60', rate = 22050, dither = true, seed = 0, over: Partial<SamplerProfile> = {},
+): Float64Array {
+  const p: SamplerProfile = { ...(SAMPLER_PROFILES[profile] ?? SAMPLER_PROFILES.mpc60!), ...over };
   let y: Float64Array = Float64Array.from(x);
   const n = y.length;
   if (p.hp) y = hp(y, p.hp, rate);

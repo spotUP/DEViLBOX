@@ -24,8 +24,13 @@ export interface SongBassOptions {
   bassBusLevel?: number;
 }
 
+/** hiphop.bass_gain: the bass bus gain, MIX_GAINS.bass scaled by the view's bass_bus_level. */
+export function bassBusGain(bassBusLevel = 1.0): number {
+  return MIX_GAINS.bass * bassBusLevel;
+}
+
 /** The layers a section plays: the stem isolates one, the params.section fast path, else the arrangement row. */
-function sectionBassOn(events: BarEvents, index: number): boolean {
+export function sectionBassOn(events: BarEvents, index: number): boolean {
   const { section, stem } = events.params;
   if (stem) return stem === 'bass';
   if (section) return section !== 'breakdown';
@@ -49,7 +54,7 @@ export function songBass(events: BarEvents, bpm: number, options: SongBassOption
   const rate = events.params.rate as number;
   const whole808 = isWhole808(events);
   const barLen = Math.trunc(rate * 60 / (bpm * 4)) * 16;
-  const bassGain = MIX_GAINS.bass * (options.bassBusLevel ?? 1.0);
+  const bassGain = bassBusGain(options.bassBusLevel);
   const lanes: Float64Array[] = [];
   let bseed = seed;
   events.sections.forEach((section, i) => {
