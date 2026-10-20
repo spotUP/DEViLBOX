@@ -18,7 +18,11 @@ import { renderDrumBar, type BarEventInput } from './renderDrumBar';
 /** The hat_pool_size knob of hiphop._apply_params (STYLES[style]["phrase"]); a song file does not carry it. */
 export const DEFAULT_HAT_POOL_SIZE = 8;
 
-export interface SongDrumsOptions { hatPoolSize?: number }
+export interface SongDrumsOptions {
+  hatPoolSize?: number;
+  /** The drum bank's seed when it is not events.params.seed (a one-section slice of a song starts at its own bseed). */
+  bankSeed?: number;
+}
 
 /** The layers a section plays: the arrangement row, the params.section fast path, then params.stem isolates one. */
 export function sectionDrumsOn(events: BarEvents, index: number): boolean {
@@ -37,7 +41,7 @@ export function songDrums(events: BarEvents, bpm: number, options: SongDrumsOpti
   const seed = events.params.seed as number;
   const rate = events.params.rate as number;
   const fast = Boolean(events.params.section);
-  const bank = songDrumBank(style, rate, seed);
+  const bank = songDrumBank(style, rate, options.bankSeed ?? seed);
   const barLen = Math.trunc(rate * 60 / (bpm * 4)) * 16;
   const poolSize = options.hatPoolSize ?? DEFAULT_HAT_POOL_SIZE;
   const lanes: Float64Array[] = [];
