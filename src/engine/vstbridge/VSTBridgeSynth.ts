@@ -8,6 +8,7 @@
  * Synth-specific details come from the VSTBridgeDescriptor — no subclassing needed.
  */
 
+import { loadBundledVitalPreset, VITAL_PRESET_PARAM_KEY } from './vitalPreset';
 import type { DevilboxSynth } from '@/types/synth';
 import type { InstrumentConfig } from '@/types/instrument';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
@@ -129,6 +130,16 @@ export class VSTBridgeSynth implements DevilboxSynth {
         if (synthConfig && typeof synthConfig === 'object') {
           this.applyConfig(synthConfig as Record<string, number>);
         }
+      }
+
+      // Vital: start on the instrument's bundled preset (same load path as the preset picker)
+      const vitalPresetId = this._descriptor.id === 'Vital'
+        ? (this._initialConfig?.parameters as Record<string, unknown> | undefined)?.[VITAL_PRESET_PARAM_KEY]
+        : undefined;
+      if (typeof vitalPresetId === 'string') {
+        await loadBundledVitalPreset(this, vitalPresetId).catch((err: unknown) => {
+          console.error('[VSTBridgeSynth] Vital preset load failed:', err);
+        });
       }
 
       // Process any pending notes
