@@ -24,6 +24,7 @@
 // Must come before any soundlib headers.
 #include "common/stdafx.h"
 #include "soundlib/Sndfile.h"
+#include "soundlib/mod_specifications.h"
 #include "common/FileReader.h"
 #include "common/mptFileType.h"
 
@@ -579,6 +580,32 @@ int osl_set_sample_loop(int32_t sampleIdx, uint32_t loopStart, uint32_t loopEnd,
         if (loopType == 2) smp.uFlags.set(CHN_PINGPONGLOOP);
     }
     smp.PrecomputeLoops(*g_sf, false);
+    return 1;
+}
+
+/**
+ * Grow the sample list so slot sampleIdx exists (new slots start empty, with
+ * the module type's defaults). Lets an instrument added in the editor reach a
+ * module built by osl_create_new: osl_set_sample_data refuses an index past
+ * GetNumSamples().
+ * Only for modules without instruments: there XM/IT instrument n plays
+ * sample n, so the editor's instrument id is the sample slot. A module with
+ * instruments maps notes to samples through its keyboard tables, where the
+ * same index would overwrite an unrelated sample; returns 0 then.
+ * Returns 1 when the slot exists afterwards.
+ */
+EMSCRIPTEN_KEEPALIVE
+int osl_ensure_sample_slot(int32_t sampleIdx) {
+    if (!g_sf || sampleIdx < 1 || sampleIdx >= static_cast<int32_t>(MAX_SAMPLES)) return 0;
+    if (g_sf->GetNumInstruments() > 0) return 0;
+    const SAMPLEINDEX target = static_cast<SAMPLEINDEX>(sampleIdx);
+    if (target <= g_sf->GetNumSamples()) return 1;
+    if (target > g_sf->GetModSpecifications().samplesMax) return 0;
+    for (SAMPLEINDEX i = g_sf->GetNumSamples() + 1; i <= target; i++) {
+        g_sf->GetSample(i).Initialize(g_sf->GetType());
+        g_sf->m_szNames[i] = "";
+    }
+    g_sf->m_nSamples = target;
     return 1;
 }
 
