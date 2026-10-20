@@ -229,6 +229,50 @@ function checkEbass(e: unknown, path: string): void {
   }
 }
 
+const HAT = ['kind', 'vel', 'micro_ms', 'sub'];
+const E808 = ['start_s', 'dur_s', 'semi', 'slide', 'role', 'kind'];
+
+/** Each named field of `o` must hold `kind`: a finite number, text, true/false or a list. */
+function checkFields(o: Record<string, unknown>, keys: readonly string[], kind: 'number' | 'string' | 'boolean' | 'array', path: string): void {
+  for (const k of keys) {
+    const v = o[k];
+    const ok = kind === 'number' ? typeof v === 'number' && Number.isFinite(v)
+      : kind === 'array' ? Array.isArray(v) : typeof v === kind;
+    if (!ok) throw new SongFileError(`Field "${path}.${k}" in Up Rough song file schema ${SCHEMA} is not ${kind === 'number' ? 'a number' : kind === 'string' ? 'text' : kind === 'boolean' ? 'true or false' : 'a list'}.`);
+  }
+}
+
+/** One side entry: the drum hit's vel / role, the melody note's dur, a hat's own record, an 808 note's timing, a bass note's numbers.
+ *  Host validate() checks none of these past the key names; songFileToBarEvents reads every one, so a wrong type is refused here. */
+function checkSideEntry(entry: Record<string, unknown>, path: string): void {
+  for (const k of Object.keys(entry)) {
+    if (!SIDE_KEYS.includes(k)) throw new SongFileError(`Unknown field "${path}.${k}" in Up Rough song file schema ${SCHEMA}.`);
+  }
+  if ('vel' in entry) checkFields(entry, ['vel'], 'number', path);
+  if ('role' in entry) checkFields(entry, ['role'], 'string', path);
+  if ('dur' in entry) {
+    const dur = entry.dur;
+    if (typeof dur !== 'number' || !Number.isInteger(dur) || dur < 1) throw new SongFileError(`Field "${path}.dur" in Up Rough song file schema ${SCHEMA} is not a whole number of rows.`);
+  }
+  if ('hat' in entry) {
+    const p = `${path}.hat`;
+    checkKeys(entry.hat, HAT, p);
+    const h = entry.hat as Record<string, unknown>;
+    checkFields(h, ['vel', 'micro_ms'], 'number', p);
+    checkFields(h, ['kind'], 'string', p);
+    checkFields(h, ['sub'], 'array', p);
+  }
+  if ('e808' in entry) {
+    const p = `${path}.e808`;
+    checkKeys(entry.e808, E808, p);
+    const e = entry.e808 as Record<string, unknown>;
+    checkFields(e, ['start_s', 'dur_s', 'semi'], 'number', p);
+    checkFields(e, ['slide'], 'boolean', p);
+    checkFields(e, ['role', 'kind'], 'string', p);
+  }
+  if ('ebass' in entry) checkEbass(entry.ebass, `${path}.ebass`);
+}
+
 const refuseNotSongFile = (v: unknown): never => {
   throw new SongFileError(`Not an Up Rough song file: format is "${typeof v === 'string' ? v : 'null'}", expected "${FORMAT}".`);
 };
@@ -302,10 +346,7 @@ export function parseSongFile(input: string | unknown): SongFileDoc {
     if (!ids.has(sid)) throw new SongFileError(`Side table names section "${sid}", which does not exist.`);
     for (const [cell, entry] of Object.entries(entries)) {
       if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) throw new SongFileError(`Side entry ${sid}.${cell} is not an object.`);
-      for (const k of Object.keys(entry)) {
-        if (!SIDE_KEYS.includes(k)) throw new SongFileError(`Unknown field "side.${sid}.${cell}.${k}" in Up Rough song file schema ${SCHEMA}.`);
-      }
-      if ('ebass' in entry) checkEbass((entry as { ebass: unknown }).ebass, `side.${sid}.${cell}.ebass`);
+      checkSideEntry(entry as Record<string, unknown>, `side.${sid}.${cell}`);
     }
   }
   for (const o of d.order) {
