@@ -13,9 +13,11 @@ import type { RenderSongOptions } from '@engine/uprough/songRender';
 import type { BarEvents } from './barEvents';
 import { buildCurrentSong } from './currentSongRender';
 import type { SectionEvent } from './songRenderJob';
+import type { R2Event } from '@engine/uprough/r2Events';
+import { useUpRoughR2Store } from '@stores/useUpRoughR2Store';
 
 export interface RenderBackend {
-  render(events: BarEvents, options: RenderSongOptions, onSection: (e: SectionEvent) => void): Promise<Float64Array>;
+  render(events: BarEvents, options: RenderSongOptions, onSection: (e: SectionEvent) => void, onR2?: (e: R2Event) => void): Promise<Float64Array>;
 }
 export interface RenderedSong { mix: Float64Array; rate: number; bpm: number; version: number }
 
@@ -26,7 +28,7 @@ function workerBackend(): RenderBackend {
   let worker: Worker | null = null;
   let nextId = 0;
   return {
-    async render(events, options, onSection) {
+    async render(events, options, onSection, onR2) {
       if (!worker) {
         const { default: Factory } = await import('@/workers/uprough-render.worker.ts?worker');
         worker = new Factory();
@@ -37,7 +39,8 @@ function workerBackend(): RenderBackend {
         w.onmessage = (e: MessageEvent<import('@/workers/uprough-render.worker').RenderResponse>) => {
           const m = e.data;
           if (m.id !== id) return;
-          if (m.type === 'section') onSection(m.event);
+          if ('kind' in m) onR2?.(m.event);
+          else if (m.type === 'section') onSection(m.event);
           else if (m.type === 'done') resolve(m.mix);
           else reject(new Error(m.message));
         };
@@ -54,6 +57,8 @@ let inFlight: Promise<RenderedSong> | null = null;
 let rerun = false;
 let debounce: ReturnType<typeof setTimeout> | null = null;
 let debounceMs = DEBOUNCE_MS;
+/** Bumped by every reset: events of a render started before it are dropped (a cancelled render posts no more events). */
+let epoch = 0;
 const listeners = new Set<(song: RenderedSong) => void>();
 
 export function setRenderBackendForTests(b: RenderBackend | null, ms = DEBOUNCE_MS): void { backend = b; debounceMs = ms; resetUpRoughSong(); }
@@ -61,7 +66,7 @@ export function onUpRoughSongRendered(fn: (song: RenderedSong) => void): () => v
 export function currentRenderedSong(): RenderedSong | null { return current; }
 
 export function resetUpRoughSong(): void {
-  current = null; inFlight = null; rerun = false;
+  current = null; inFlight = null; rerun = false; epoch++;
   if (debounce) clearTimeout(debounce);
   debounce = null;
   useUpRoughRenderStore.getState().set({ status: 'idle', sectionsDone: 0, sectionCount: 0, error: null });
@@ -70,11 +75,13 @@ export function resetUpRoughSong(): void {
 async function renderOnce(): Promise<RenderedSong> {
   const store = useUpRoughRenderStore.getState();
   store.set({ status: 'rendering', sectionsDone: 0, sectionCount: 0, error: null });
+  const mine = epoch;
+  useUpRoughR2Store.getState().begin();
   try {
     const song = buildCurrentSong();
     const mix = await (backend ??= workerBackend()).render(song.events, song.options, (e) => {
       useUpRoughRenderStore.getState().set({ sectionsDone: e.section + 1, sectionCount: e.sectionCount });
-    });
+    }, (event) => { if (epoch === mine) useUpRoughR2Store.getState().append(event); });
     const out: RenderedSong = { mix, rate: song.rate, bpm: song.bpm, version: useUpRoughRenderStore.getState().version + 1 };
     current = out;
     useUpRoughRenderStore.getState().set({ status: 'ready', version: out.version });

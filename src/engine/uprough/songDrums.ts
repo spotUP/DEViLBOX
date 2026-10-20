@@ -10,7 +10,7 @@
  * all zeros. MIX_GAINS.drums is applied as the host adds each bar in, so the lane equals the host's drums_buf bit for bit.
  */
 import type { BarEvents } from '@/lib/uprough/barEvents';
-import { songDrumBank, type HipHopStyle } from './drumBank';
+import { songDrumBank, type DrumBank, type HipHopStyle } from './drumBank';
 import { ProbabilityMemory, buildHatPool } from './hatPath';
 import { MIX_GAINS } from './mix/songMix';
 import { renderDrumBar, type BarEventInput } from './renderDrumBar';
@@ -22,6 +22,10 @@ export interface SongDrumsOptions {
   hatPoolSize?: number;
   /** The drum bank's seed when it is not events.params.seed (a one-section slice of a song starts at its own bseed). */
   bankSeed?: number;
+  /** A bank built by the caller (the render builds it once per render so its stages can be observed); same bytes as the per-call build. */
+  bank?: DrumBank;
+  /** Called with each drums-on section's hat pool (local section index) right after it is built. */
+  onHatPool?: (local: number, pool: Float64Array[]) => void;
 }
 
 /** The layers a section plays: the arrangement row, the params.section fast path, then params.stem isolates one. */
@@ -41,7 +45,7 @@ export function songDrums(events: BarEvents, bpm: number, options: SongDrumsOpti
   const seed = events.params.seed as number;
   const rate = events.params.rate as number;
   const fast = Boolean(events.params.section);
-  const bank = songDrumBank(style, rate, options.bankSeed ?? seed);
+  const bank = options.bank ?? songDrumBank(style, rate, options.bankSeed ?? seed);
   const barLen = Math.trunc(rate * 60 / (bpm * 4)) * 16;
   const poolSize = options.hatPoolSize ?? DEFAULT_HAT_POOL_SIZE;
   const lanes: Float64Array[] = [];
@@ -52,6 +56,7 @@ export function songDrums(events: BarEvents, bpm: number, options: SongDrumsOpti
     const buf = new Float64Array(bars * barLen + Math.trunc(1.0 * rate));
     if (sectionDrumsOn(events, i)) {
       const pool = buildHatPool(style, rate, bseed, poolSize);
+      options.onHatPool?.(i, pool);
       const pm = new ProbabilityMemory(pool.length);
       section.drums.forEach((bar, b) => {
         if (bar.hit_seed !== bseed + b) throw new Error(`songDrums: section ${i} bar ${b} records hit_seed ${bar.hit_seed}, the render seed is ${bseed + b}`);
