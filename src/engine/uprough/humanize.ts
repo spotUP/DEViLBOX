@@ -58,6 +58,13 @@ export function linspaceAt(start: number, stop: number, num: number, i: number):
 
 /** hiphop._vary_hit(smp, h, tighten). `rate` is the engine rate (the Python uses the literal 22050). */
 export function varyHit(smp: ArrayLike<number>, h: HitHumanize, tighten = 1.0, rate = 22050): Float64Array {
+  return varyHitTyped(smp, h, tighten, rate).out;
+}
+
+/** varyHit plus the dtype of the host's result: `float32` when numpy returns float32 (resampled, attack untouched). */
+export function varyHitTyped(
+  smp: ArrayLike<number>, h: HitHumanize, tighten = 1.0, rate = 22050,
+): { out: Float64Array; float32: boolean } {
   const cents = h.cents * tighten;
   const gain = 1.0 + (h.gain - 1.0) * tighten;
   let out: Float64Array = Float64Array.from(smp);
@@ -73,5 +80,5 @@ export function varyHit(smp: ArrayLike<number>, h: HitHumanize, tighten = 1.0, r
   }
   const g = float32 ? Math.fround(gain) : gain;
   for (let i = 0; i < out.length; i++) out[i] = float32 ? Math.fround(out[i]! * g) : out[i]! * g;
-  return out;
+  return { out, float32 };
 }

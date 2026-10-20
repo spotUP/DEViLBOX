@@ -122,7 +122,7 @@ export function performanceProfile(style: HipHopStyle): Performance {
 }
 
 /** One drum event as the bar events carry it (the host's tuples and phrase_engine Notes, flattened). */
-export interface DrumEvent { voice: string; step: number; vel: number; role: string; microMs?: number; isNote?: boolean }
+export interface DrumEvent { voice: string; step: number; vel: number; role: string; microMs?: number; isNote?: boolean; sub?: readonly (readonly unknown[])[] }
 
 export interface DrumBarContext { swingAmt: number; kickSteps: Set<number>; rnd: Lfsr }
 
