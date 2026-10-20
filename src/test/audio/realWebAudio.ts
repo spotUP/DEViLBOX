@@ -10,7 +10,7 @@
  */
 import * as webAudio from 'node-web-audio-api';
 import { dirname, join } from 'node:path';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { readFile } from 'node:fs/promises';
 import { resolveObjectURL } from 'node:buffer';
@@ -137,6 +137,32 @@ const DETERMINISTIC_PRELUDE = `{
 }
 `;
 
+const WORKLET_DIR_PREFIX = 'devilbox-worklets-';
+const OWNER_FILE = '.owner';
+
+/**
+ * Removes worklet copy directories left by test processes that have exited:
+ * one whose owner pid is gone, or an ownerless one (older format) over an hour
+ * old. Vitest workers end without running `exit` handlers, and every one used
+ * to leave its directory behind (531 in TMPDIR on 2026-10-20).
+ */
+export function pruneStaleWorkletDirs(base = tmpdir()): void {
+  let names: string[];
+  try { names = readdirSync(base); } catch { return; }
+  for (const name of names) {
+    if (!name.startsWith(WORKLET_DIR_PREFIX)) continue;
+    const dir = join(base, name);
+    let stale: boolean;
+    try {
+      const pid = Number(readFileSync(join(dir, OWNER_FILE), 'utf8'));
+      try { process.kill(pid, 0); stale = false; } catch (e) { stale = (e as NodeJS.ErrnoException).code === 'ESRCH'; }
+    } catch {
+      try { stale = Date.now() - statSync(dir).mtimeMs > 3600_000; } catch { continue; }
+    }
+    if (stale) rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 /**
  * The app loads worklets by site path (`/worklets/x.worklet.js`), which the
  * dev server serves out of `public/`. Load those files from disk instead, with
@@ -147,9 +173,11 @@ export function resolveWorkletsFromPublic(root = process.cwd()): void {
   const proto = (webAudio as unknown as { AudioWorklet: { prototype: { addModule(url: string): Promise<void> } } }).AudioWorklet.prototype;
   const original = proto.addModule;
   if ((original as { _public?: boolean })._public) return;
-  const outDir = mkdtempSync(join(tmpdir(), 'devilbox-worklets-'));
-  // One directory per test process; without this every vitest worker left its
-  // copied worklets behind in TMPDIR (576 directories on 2026-10-19).
+  pruneStaleWorkletDirs();
+  const outDir = mkdtempSync(join(tmpdir(), WORKLET_DIR_PREFIX));
+  writeFileSync(join(outDir, OWNER_FILE), String(process.pid));
+  // One directory per test process. The exit hook does not fire in vitest
+  // workers, so pruneStaleWorkletDirs is what actually bounds the count.
   process.on('exit', () => rmSync(outDir, { recursive: true, force: true }));
   const patched = function (this: unknown, url: string): Promise<void> {
     // Tone.js registers its processors (comb filter, bit crusher) from a Blob URL.
