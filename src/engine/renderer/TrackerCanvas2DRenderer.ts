@@ -23,6 +23,10 @@ import { MA_EFFECT_GLYPH } from '@/lib/import/formats/maEffectGlyphs';
 import { computeCaretRect } from '@/lib/tracker/caretGeometry';
 import { emptyEffectText, furnaceEffectText } from '@/lib/tracker/effectNotation';
 import { anySoloActive, isChannelDimmed } from '@/lib/tracker/channelDim';
+import {
+  CHANNEL_COLOR_TINT_ALPHA, CHANNEL_STRIPE_ALPHA, CURSOR_CHANNEL_TINT_ALPHA,
+  MUTED_OVERLAY_ALPHA, MUTED_TEXT_ALPHA, isStripedChannel,
+} from './channelOverlayStyle';
 import { noteValueToPitch, pitchName } from '@/lib/tracker/noteValue';
 
 const ROW_HEIGHT   = 24;
@@ -195,7 +199,6 @@ export class TrackerCanvas2DRenderer {
 
     // Mute / solo dimming
     const anySolo = anySoloActive(pattern.channels);
-    const MUTED_ALPHA = 0.3;
 
     // ── Row backgrounds ─────────────────────────────────────────────────────
     for (let r = startRow; r < endRow; r++) {
@@ -279,16 +282,22 @@ export class TrackerCanvas2DRenderer {
       const chan   = pattern.channels[ch];
       if (!chan) continue;
 
-      // Muted / non-solo darkening overlay
+      // Full-height channel overlays, the same set and strengths as the WebGL renderer
+      const chW = chanWidths[ch] ?? cw * 9;
       const isDimmed = isChannelDimmed(!!chan.muted, !!chan.solo, anySolo);
-      if (isDimmed) {
-        const chW = chanWidths[ch] ?? cw * 9;
-        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      const overlay = (fill: string, alpha: number) => {
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = fill;
         ctx.fillRect(chanX, 0, chW, H);
-      }
+      };
+      if (isStripedChannel(ch)) overlay('#000000', CHANNEL_STRIPE_ALPHA);
+      if (ch === cursor.channelIndex) overlay(theme.accent, CURSOR_CHANNEL_TINT_ALPHA);
+      if (chan.color) overlay(chan.color, CHANNEL_COLOR_TINT_ALPHA);
+      if (isDimmed) overlay('#000000', MUTED_OVERLAY_ALPHA);
+      ctx.globalAlpha = 1;
 
       // Dim text alpha for muted/non-solo channels
-      if (isDimmed) ctx.globalAlpha = MUTED_ALPHA;
+      if (isDimmed) ctx.globalAlpha = MUTED_TEXT_ALPHA;
 
       for (let r = startRow; r < endRow; r++) {
         // Unreachable rows (past D00 break) render at reduced alpha
