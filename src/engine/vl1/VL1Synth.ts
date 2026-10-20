@@ -364,7 +364,10 @@ export class VL1SynthEngine implements DevilboxSynth {
         if (event.data.type === 'ready') {
           console.log('[VL1Synth] Worklet ready');
           this.isInitialized = true;
-          this.applyConfig(this.config);
+          // A fresh worklet runs on its own hardcoded defaults (envelope sustain etc.
+          // that are silent), so push the FULL config. applyConfig() diffs against
+          // this.config, which already equals the config and would send nothing.
+          this.pushFullConfig();
           for (const { note, velocity } of this.pendingNotes) {
             this._worklet!.port.postMessage({ type: 'noteOn', note, velocity });
           }
@@ -387,6 +390,17 @@ export class VL1SynthEngine implements DevilboxSynth {
     } catch (error) {
       console.error('Failed to initialize VL1Synth:', error);
       throw error;
+    }
+  }
+
+  /** Send every parameter to the worklet, regardless of what was sent before. */
+  private pushFullConfig(): void {
+    if (!this._worklet) return;
+    for (const [key, index] of Object.entries(PARAM_INDEX)) {
+      const value = (this.config as Record<string, number | undefined>)[key];
+      if (value !== undefined) {
+        this._worklet.port.postMessage({ type: 'setParam', index, value });
+      }
     }
   }
 
