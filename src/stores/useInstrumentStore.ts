@@ -2,6 +2,8 @@
  * Instrument Store - Instrument Bank & Preset Management
  */
 
+import { setbfreeConfigFromNativeValues } from '@engine/setbfree/SetBfreeSynth';
+import { SETBFREE_NATIVE_FACTORY_PRESETS } from '@engine/setbfree/setbfreeNativePresets';
 import { adoptCz101TonesFrom } from './useCz101UserPatchStore';
 import { classifySampleEdit, propagateSampleEditToSong } from '@/lib/song/sampleEdit';
 import { keepAcrossHmr } from '@/lib/dev/keepAcrossHmr';
@@ -375,6 +377,12 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     updateInstrument: (id, updates) => {
+      // A native setBfree preset is the instrument's setbfree config: the editor and later knob moves read it from there.
+      const bfreePreset = (updates as { setbfreeNativePatch?: string }).setbfreeNativePatch;
+      if (bfreePreset) {
+        const patch = SETBFREE_NATIVE_FACTORY_PRESETS.find((p) => p.name === bfreePreset);
+        if (patch) updates = { ...updates, setbfree: setbfreeConfigFromNativeValues(patch.values) };
+      }
       // Refresh the live WASM re-export (Cinter4 Shrinkler size + playback). Debounced and
       // format-gated, so no-op edits / non-Cinter songs coalesce or skip cheaply.
       triggerWasmReexport();
