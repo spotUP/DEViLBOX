@@ -5,7 +5,7 @@
  */
 import { create } from 'zustand';
 import type { R2Event } from '@/engine/uprough/r2Events';
-import { carriesBank, initialFactoryState, reduceFactory, type FactoryState } from './factoryModel';
+import { initialFactoryState, reduceFactory, type FactoryState } from './factoryModel';
 import { beginPatternFill, fillDecide } from './patternFill';
 
 interface FactoryStoreState {
@@ -26,7 +26,7 @@ export const useFactoryStore = create<FactoryStoreState>((set, get) => ({
     else if (ev.type === 'decide' && state.mode === 'generate') written = fillDecide(ev);
     set({
       state: reduceFactory(state, ev, written),
-      startedAt: ev.type === 'start' && !carriesBank(state, ev) ? performance.now() : get().startedAt,
+      startedAt: ev.type === 'start' ? performance.now() : get().startedAt,
     });
   },
   reset: () => set({ state: initialFactoryState(), startedAt: 0 }),

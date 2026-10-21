@@ -1,16 +1,15 @@
 /**
- * Act 1 on a Generate (R2f): the TS bank is built locally with every stage observed (no audio goes over the wire),
- * and the events go through the factory seam. The build runs at full speed; the panel paces the presentation.
+ * Act 1 on a Generate (R2f): the TS bank is built locally (no audio goes over the wire) and kept for audition audio.
+ * It emits nothing: on the streamed host Generate the host is the only source of bank and stage events (R2c-09c).
  */
-import { createEmitter } from '@/engine/uprough/r2Events';
-import { buildBank } from '@/engine/uprough/songRender';
-import type { HipHopStyle } from '@/engine/uprough/drumBank';
-import { factoryOnEvent } from './useFactoryStore';
+import { songDrumBank, type DrumBank, type HipHopStyle } from '@/engine/uprough/drumBank';
+import { keepBank } from './voiceAudition';
 
 export const FACTORY_RATE = 22050;
 
-export function runActOne(style: HipHopStyle, seed: number, rate = FACTORY_RATE): void {
-  const em = createEmitter(factoryOnEvent)!;
-  em.emit({ type: 'start', mode: 'render', rate, style, seed, sections: [] });
-  buildBank(em, style, rate, seed);
+/** Builds the song's drum bank at `style` and `seed` and keeps it for audition (R2f-15a). */
+export function runActOne(style: HipHopStyle, seed: number, rate = FACTORY_RATE): DrumBank {
+  const bank = songDrumBank(style, rate, seed);
+  keepBank(bank, rate);
+  return bank;
 }

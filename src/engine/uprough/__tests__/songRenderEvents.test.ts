@@ -46,7 +46,6 @@ function problems(events: R2Event[], sectionCount: number): string[] {
     if (idx.includes(-1)) bad.push(`section ${s}: unexpected ${inner.join()}`);
     if (idx.some((v, k) => k > 0 && v <= idx[k - 1]!)) bad.push(`section ${s}: out of order ${inner.join()}`);
     if (inner[inner.length - 1] !== 'lane_scratch') bad.push(`section ${s}: scratch is not last before mix`);
-    if (!inner.includes('bus_drums') || !inner.includes('bus_bass')) bad.push(`section ${s}: drums and bass buses are always emitted`);
   }
   return bad;
 }

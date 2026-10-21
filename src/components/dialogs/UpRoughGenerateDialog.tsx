@@ -12,17 +12,20 @@ import { Button } from '@components/ui/Button';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
 import { fetchStyles, generateSong } from '@/lib/uprough/generateClient';
+import type { R2Event } from '@/engine/uprough/r2Events';
 import { openUpRoughSong } from '@/lib/uprough/openUpRoughSong';
 import { FactoryPanel } from '@components/uprough/FactoryPanel';
 import { useFactoryStore, factoryOnEvent } from '@/lib/uprough/factory/useFactoryStore';
 import { attachR2Bridge } from '@/lib/uprough/factory/r2Bridge';
-import { runActOne } from '@/lib/uprough/factory/actOne';
 import { replayEvents, scriptedGenerateEvents } from '@/lib/uprough/factory/scriptedRun';
 import { STYLE_DRUMS, type HipHopStyle } from '@/engine/uprough/drumBank';
+import { runActOne } from '@/lib/uprough/factory/actOne';
 
 export interface UpRoughGenerateDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Also receives every host generate event the dialog streams into the factory panel (R2c). */
+  onEvent?: (event: R2Event) => void;
 }
 
 const KEY_PATTERN = /^[A-G][#b]?m?$/;
@@ -34,7 +37,7 @@ const PHASE_TEXT: Record<Exclude<Phase, 'idle'>, string> = {
   loading: 'Loading into the tracker',
 };
 
-export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ isOpen, onClose }) => {
+export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ isOpen, onClose, onEvent }) => {
   const [styles, setStyles] = useState<string[]>([]);
   const [style, setStyle] = useState('');
   const [seed, setSeed] = useState(1);
@@ -112,10 +115,14 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
     setShowFactory(true);
     setLoaded(false);
     try {
-      const pending = generateSong({ style, seed, key, ...(barsCount !== undefined && { bars: barsCount }) }, ac.signal);
-      // Act 1 runs here while the server works: the same TS drum bank the render builds, every stage observed.
+      // Act 1 locally: the bank is kept for audition audio (the wire carries none); its events come from the host.
       if (style in STYLE_DRUMS) runActOne(style as HipHopStyle, seed);
-      const text = await pending;
+      // The host streams the whole build (act 1 bank, sections, decides) into the factory store as it happens.
+      const streamed = (ev: R2Event) => {
+        factoryOnEvent(ev);
+        onEvent?.(ev);
+      };
+      const text = await generateSong({ style, seed, key, ...(barsCount !== undefined && { bars: barsCount }) }, ac.signal, { onEvent: streamed });
       setPhase('loading');
       await openUpRoughSong(text);
       setPhase('idle');

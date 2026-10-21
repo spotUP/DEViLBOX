@@ -86,10 +86,6 @@ function voiceView(slot: SlotView, voice: string): VoiceView {
   return v;
 }
 
-/** True when this `start` is the host's generate start arriving after the local act 1 already built the bank. */
-export const carriesBank = (prev: FactoryState, ev: R2Event): boolean =>
-  ev.type === 'start' && ev.mode === 'generate' && prev.mode === 'render' && prev.voiceOrder.length > 0 && !prev.done;
-
 /** Fold one event in. Returns a new state; slots and sections touched are copied, the rest is shared. */
 export function reduceFactory(prev: FactoryState, ev: R2Event, cellsWritten = 0): FactoryState {
   const s: FactoryState = {
@@ -100,9 +96,9 @@ export function reduceFactory(prev: FactoryState, ev: R2Event, cellsWritten = 0)
   const slotOf = (voice: string): SlotView | undefined => s.slots.find((x) => x.id === SLOT_OF_VOICE[voice]);
   switch (ev.type) {
     case 'start':
-      // A new run starts from empty slots, except the host's generate start after the local act 1: it keeps the bank shown.
+      // A new run starts from empty slots.
       return {
-        ...initialFactoryState(), ...(carriesBank(prev, ev) && { slots: s.slots, voiceOrder: prev.voiceOrder }),
+        ...initialFactoryState(),
         mode: ev.mode, rate: ev.rate, style: ev.style, seed: ev.seed,
         eventCount: 1, lastType: 'start', caption: `Starting ${ev.style}, seed ${ev.seed}`,
         sections: ev.sections.map((x, index) => ({
