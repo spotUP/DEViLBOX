@@ -34,6 +34,7 @@ import { computeSongDBHash, lookupSongDB } from '@/lib/songdb';
 import { clearExplicitlySaved } from '@/lib/persistence/explicitSave';
 import { applySong } from '@/lib/song/applySong';
 import { emptyPattern } from '@/lib/import/formats/Sc68Parser';
+import { nativeGridHasNotes } from '@/lib/import/uadeScanQuality';
 import type { PreparedModule, PrepareHooks } from '@/lib/import/prepareModuleImport';
 import { isSongFormat, type FileLoadOptions, type FileLoadResult } from '@/lib/file/UnifiedFileLoader';
 
@@ -553,11 +554,16 @@ export async function loadSongFile(file: File, options: FileLoadOptions, preRead
       return { success: true, message: importedMessage };
     }
 
-    const existingPatterns = options.replacePatterns ? [] : useTrackerStore.getState().patterns;
-    const allPatterns = [...existingPatterns, ...importedPatterns];
-    loadPatterns(allPatterns);
+    // A song without a note is the blank song a session starts with: appending
+    // after it played its empty pattern before the TD-3 one. The imported
+    // patterns take its place; a song with notes keeps its own order and gains
+    // the imported patterns at the end of it.
+    const tracker = useTrackerStore.getState();
+    const existingPatterns = options.replacePatterns || !nativeGridHasNotes(tracker) ? [] : tracker.patterns;
+    const existingOrder = existingPatterns.length > 0 ? tracker.patternOrder : [];
+    loadPatterns([...existingPatterns, ...importedPatterns]);
     setCurrentPattern(existingPatterns.length);
-    setPatternOrder(allPatterns.map((_, i) => i));
+    setPatternOrder([...existingOrder, ...importedPatterns.map((_, i) => existingPatterns.length + i)]);
 
     return { success: true, message: importedMessage };
   }
