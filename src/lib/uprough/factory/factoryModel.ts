@@ -4,6 +4,7 @@
  */
 import type { Env, Peaks } from '@/engine/uprough/r2Peaks';
 import type { R2Event, R2Mode } from '@/engine/uprough/r2Events';
+import { chopsSummary, vocalsSummary, type ChopsSummary, type VocalsSummary } from './decideToCells';
 import { LANE_LABEL, LANES, type Lane } from '../songFile';
 
 /** The slot a drum voice lives in (the golden draft's grouping; hat holds the open hat, ride and the hat pool). */
@@ -42,6 +43,9 @@ export interface SectionView {
   decided: Record<string, number>;
   /** The section strip lights when its section event arrives (act 3). */
   lit: boolean;
+  /** Host-only lanes (no TS renderer, no tracker home): a summary per bar whose decide event was non-empty. */
+  chops: Record<number, ChopsSummary>;
+  vocals: Record<number, VocalsSummary>;
   stems: Partial<Record<StemLane, Peaks>>;
   buses: Record<string, Peaks>;
   mix?: Peaks;
@@ -91,7 +95,7 @@ export function reduceFactory(prev: FactoryState, ev: R2Event, cellsWritten = 0)
   const s: FactoryState = {
     ...prev, eventCount: prev.eventCount + 1, lastType: ev.type, cellsWritten: prev.cellsWritten + cellsWritten,
     slots: prev.slots.map((x) => ({ ...x, voices: x.voices.map((v) => ({ ...v, stages: [...v.stages] })), attachments: [...x.attachments], hatVariants: [...x.hatVariants] })),
-    sections: prev.sections.map((x) => ({ ...x, decided: { ...x.decided }, stems: { ...x.stems }, buses: { ...x.buses } })),
+    sections: prev.sections.map((x) => ({ ...x, decided: { ...x.decided }, chops: { ...x.chops }, vocals: { ...x.vocals }, stems: { ...x.stems }, buses: { ...x.buses } })),
   };
   const slotOf = (voice: string): SlotView | undefined => s.slots.find((x) => x.id === SLOT_OF_VOICE[voice]);
   switch (ev.type) {
@@ -102,7 +106,7 @@ export function reduceFactory(prev: FactoryState, ev: R2Event, cellsWritten = 0)
         mode: ev.mode, rate: ev.rate, style: ev.style, seed: ev.seed,
         eventCount: 1, lastType: 'start', caption: `Starting ${ev.style}, seed ${ev.seed}`,
         sections: ev.sections.map((x, index) => ({
-          index, name: x.name, bars: x.bars, layers: x.layers, cached: false, decided: {}, lit: false, stems: {}, buses: {},
+          index, name: x.name, bars: x.bars, layers: x.layers, cached: false, decided: {}, lit: false, chops: {}, vocals: {}, stems: {}, buses: {},
         })),
       };
     case 'stage': {
@@ -142,6 +146,8 @@ export function reduceFactory(prev: FactoryState, ev: R2Event, cellsWritten = 0)
     case 'decide': {
       const sec = s.sections[ev.section];
       if (sec) sec.decided[ev.lane] = Math.max(sec.decided[ev.lane] ?? 0, ev.bar + 1);
+      if (sec && ev.lane === 'chops') { const c = chopsSummary(ev.cells); if (c) sec.chops[ev.bar] = c; }
+      if (sec && ev.lane === 'vocals') { const v = vocalsSummary(ev.cells); if (v) sec.vocals[ev.bar] = v; }
       s.caption = `Deciding ${sec?.name ?? 'section'} bar ${ev.bar + 1}: ${ev.lane}`;
       return s;
     }

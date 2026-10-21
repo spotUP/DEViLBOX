@@ -2,6 +2,7 @@
  * Factory motion (R2f): the damped spring every cartoony move rides on, and its reduced-motion twin.
  * Pure: the panel steps it with the frame delta; tests step it with fixed deltas.
  */
+import type { Peaks } from '@/engine/uprough/r2Peaks';
 
 /** Stiffness and damping of the spring: low damping overshoots (the pop), high damping settles. */
 export interface SpringTuning { k: number; c: number }
@@ -93,4 +94,22 @@ export function popIn(elapsed: number, reduced: boolean): { scale: number; alpha
 export function stampBounce(elapsed: number, reduced: boolean): number {
   if (reduced || elapsed <= 0) return 0;
   return Math.exp(-9 * elapsed) * Math.abs(Math.cos(18 * elapsed));
+}
+
+/**
+ * The record press (R2f-32): the texture waveform grows into the master waveform. `t` is a Spring's value (0 = the texture
+ * peaks, 1 = the master peaks; clamped, so a spring overshoot never draws past the master). Reduced motion returns the
+ * master peaks at once. Buckets are interpolated in the int8 domain the wire carries; the ends return the inputs themselves.
+ */
+export function growHeights(from: Peaks, to: Peaks, t: number, reduced = prefersReducedMotion()): Peaks {
+  if (reduced || t >= 1) return to;
+  if (t <= 0) return from;
+  const at = (a: readonly number[], n: number, i: number): number => (a.length === 0 ? 0 : a[Math.min(a.length - 1, Math.floor((i / n) * a.length))]!);
+  const lerp = (a: number, b: number): number => a + (b - a) * t;
+  const n = to.n;
+  return {
+    n, len: to.len, scale: lerp(from.scale, to.scale),
+    min: Array.from({ length: n }, (_, i) => lerp(at(from.min, n, i), to.min[i]!)),
+    max: Array.from({ length: n }, (_, i) => lerp(at(from.max, n, i), to.max[i]!)),
+  };
 }

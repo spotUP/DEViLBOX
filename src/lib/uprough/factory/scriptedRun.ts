@@ -11,8 +11,8 @@ import { FACTORY_RATE } from './actOne';
 
 const SECTIONS = [
   { name: 'intro', bars: 2, layers: ['drums', 'bass'] },
-  { name: 'verse', bars: 4, layers: ['drums', 'bass', 'melody'] },
-  { name: 'hook', bars: 2, layers: ['drums', 'bass', 'melody'] },
+  { name: 'verse', bars: 4, layers: ['drums', 'bass', 'melody', 'sample'] },
+  { name: 'hook', bars: 2, layers: ['drums', 'bass', 'melody', 'vocal'] },
 ];
 
 /** Host-shaped drum cells [voice, step, velocity, role] for one bar. */
@@ -37,6 +37,16 @@ export function scriptedGenerateEvents(style: HipHopStyle, seed: number): R2Even
     for (let bar = 0; bar < sec.bars; bar++) {
       em.emit({ type: 'decide', section, bar, lane: 'drums', cells: drumCells(bar) });
       if (sec.layers.includes('bass')) em.emit({ type: 'decide', section, bar, lane: 'bass', cells: [[0, 0, 4, null, 1], [7, 8, 4, null, 1]] });
+      // Host-shaped chops (a real-break bar, then chopped bars; bar 3 has no sample) and vocals (bar 1 of the hook is empty).
+      if (sec.layers.includes('sample') && bar < 3) {
+        em.emit({
+          type: 'decide', section, bar, lane: 'chops',
+          cells: [bar === 0 ? { length: 57520, brk_seed: 2991, kick_steps: [0, 8] } : { triggers: [{ slice_index: 0 }, { slice_index: 1 }], offers: [], ops: ['reverse', 0, false] }],
+        });
+      }
+      if (sec.layers.includes('vocal')) {
+        em.emit({ type: 'decide', section, bar, lane: 'vocals', cells: bar === 0 ? [['she', [6], 1, false, true, 0, 0], ['said', [4], 1, false, true, 6, 0]] : [] });
+      }
       if (sec.layers.includes('melody')) em.emit({ type: 'decide', section, bar, lane: 'melody', cells: [[60, 0, 4], [63, 8, 4]] });
     }
   });
