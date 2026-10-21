@@ -33,6 +33,8 @@ import { computeSongDBHash, lookupSongDB } from '@/lib/songdb';
 
 import { clearExplicitlySaved } from '@/lib/persistence/explicitSave';
 import { applySong } from '@/lib/song/applySong';
+import { installUpRoughAutoRender } from '@/lib/uprough/upRoughSongService';
+import { parseSongFile, songFileToSong } from '@/lib/uprough/songFile';
 import { emptyPattern } from '@/lib/import/formats/Sc68Parser';
 import { nativeGridHasNotes } from '@/lib/import/uadeScanQuality';
 import type { PreparedModule, PrepareHooks } from '@/lib/import/prepareModuleImport';
@@ -839,6 +841,26 @@ export async function loadSongFile(file: File, options: FileLoadOptions, preRead
   }
 
   return { success: false, error: `Unsupported song format: ${file.name}` };
+}
+
+/**
+ * Load a .uprough-song.json file: patterns, order and instruments (a malformed
+ * file throws SongFileError by name; openSong reports it). The outgoing song is
+ * already unloaded by openSong's withSongLoad.
+ */
+export async function loadUpRoughSong(file: File): Promise<FileLoadResult> {
+  const song = songFileToSong(parseSongFile(await file.text()));
+  await applySong({
+    instruments: song.instruments, patterns: song.patterns, order: song.meta.order,
+    bpm: song.tempo.bpm, speed: song.tempo.speed,
+    metadata: { name: song.tempo.name },
+    originalModuleData: null,
+    engine: {},
+  }, 'import');
+  // After applySong: loadPatterns clears upRoughMeta.
+  installUpRoughAutoRender(); // before the meta lands: the subscription renders the song ahead of Play
+  useTrackerStore.setState({ upRoughMeta: song.meta });
+  return { success: true, message: `Loaded ${file.name}` };
 }
 
 /**
