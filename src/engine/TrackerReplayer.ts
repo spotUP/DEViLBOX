@@ -15,7 +15,7 @@
 
 import { applyEditorCellEdit } from '@lib/import/furnaceEditorCells';
 import { outputLatencySec } from './audioLatency';
-import { isReplacedInstrument, synthNoteVelocity } from './replayer/hybridInstruments';
+import { isReplacedInstrument, noteVolumeIsVelocity, synthNoteVelocity } from './replayer/hybridInstruments';
 import { isTonePortamentoEffect } from './replayer/SynthEffectProcessor';
 import { isPerChannelNativeSynthType } from './perChannelNativeSynths';
 import { isLowOctaveNote, isPitchedNote, noteValueToPitch } from '@/lib/tracker/noteValue';
@@ -1478,9 +1478,11 @@ export class TrackerReplayer {
       ch.lastPlayedNoteName = newNoteName;
 
       // Trigger the synth note. A per-channel native synth gets its channel volume from the
-      // SynthEffectProcessor on its lane level, so the velocity leaves it out.
+      // SynthEffectProcessor on its lane level, so the velocity leaves it out; a SoundFont or
+      // SFZ player keeps it in the velocity.
+      const synthType = ch.instrument?.synthType;
       this.triggerNote(ch, time, 0, chIndex, accent, slideActive, effectiveSlide, hammer,
-        isPerChannelNativeSynthType(ch.instrument?.synthType));
+        isPerChannelNativeSynthType(synthType) && !noteVolumeIsVelocity(synthType));
 
       // Update slide flag for next row
       ch.previousSlideFlag = (slide || hammer) ?? false;
@@ -2550,6 +2552,8 @@ export class TrackerReplayer {
                 try { getToneEngine().applySynthFrequency(instrumentId, frequency, channelIndex, rampTime); }
                 catch { /* ToneEngine not ready */ }
               },
+              noteVolumeIsVelocity: (instrumentId) =>
+                noteVolumeIsVelocity(replayer.instrumentMap.get(instrumentId)?.synthType),
               getInstrumentDefaultVolume: (instrumentId) =>
                 replayer.instrumentMap.get(instrumentId)?.metadata?.modPlayback?.defaultVolume ?? 64,
               setChannelGain: (channelIndex, gain, time) => {
@@ -2588,7 +2592,8 @@ export class TrackerReplayer {
                 if (!inst?.synthType || inst.synthType === 'Sampler') return;
                 if (replayer.isChannelMuted(channelIndex)) return;
                 try {
-                  getToneEngine().triggerNote(inst.id, ch.lastPlayedNoteName ?? 'C4', 0, time, 1, inst, false, false, channelIndex);
+                  const velocity = noteVolumeIsVelocity(inst.synthType) ? ch.currentVelocity ?? 1 : 1;
+                  getToneEngine().triggerNote(inst.id, ch.lastPlayedNoteName ?? 'C4', 0, time, velocity, inst, false, false, channelIndex);
                 } catch { /* ignored */ }
               },
               triggerDelayedNote: (channelIndex, xmNote, instrumentId, volume, time) => {
@@ -2605,7 +2610,8 @@ export class TrackerReplayer {
                     ch.gainNode?.gain.setValueAtTime(volume / 64, time);
                   }
                   ch.lastPlayedNoteName = noteName;
-                  getToneEngine().triggerNote(inst.id, noteName, 0, time, 1, inst, false, false, channelIndex);
+                  const velocity = noteVolumeIsVelocity(inst.synthType) ? Math.min(1, volume / 64) : 1;
+                  getToneEngine().triggerNote(inst.id, noteName, 0, time, velocity, inst, false, false, channelIndex);
                 } catch { /* ignored */ }
               },
             });
