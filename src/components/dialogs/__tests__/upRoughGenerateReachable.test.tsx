@@ -1,6 +1,6 @@
 /** UPROUGH-GENERATE: hamburger item -> dialog -> server generate -> the tracker holds the generated song. */
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, cleanup, act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { render, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import fixture from '@/lib/uprough/__tests__/fixtures/e6.uprough-song.json';
 
 vi.mock('@engine/ToneEngine', () => {
@@ -45,8 +45,6 @@ import { useFactoryStore } from '@/lib/uprough/factory/useFactoryStore';
 import { bankVoice } from '@/lib/uprough/factory/voiceAudition';
 import { songDrumBank } from '@/engine/uprough/drumBank';
 import { setRenderBackendForTests, type RenderBackend } from '@/lib/uprough/upRoughSongService';
-import { setPlayerAudioForTests, setListenWhileBuilding, stopUpRoughSong, upRoughPreviewState, type PlayerAudio } from '@/lib/uprough/upRoughSongPlayer';
-import type { PartialMix } from '@/lib/uprough/songRenderJob';
 
 /** The scripted host stream with the song on the done line, as the server sends it. */
 function scriptedStream(): { events: R2Event[]; text: string } {
@@ -206,8 +204,8 @@ describe('Generate dialog says when the song is in the tracker', () => {
   });
 });
 
-describe('R2h-01: one Generate run reaches the store, the tracker, the preview and the audition chip', () => {
-  it('counts every NDJSON line, writes the decide cells, previews then swaps once, and plays the kept bank voice on a chip click', async () => {
+describe('R2h-01: one Generate run reaches the store, the tracker, no render and the audition chip', () => {
+  it('counts every NDJSON line, writes the decide cells, starts no whole-song render, and plays the kept bank voice on a chip click', async () => {
     const { events, text } = scriptedStream();
     const lineCount = text.split('\n').filter((l) => l.trim() !== '').length;
     const enc = new TextEncoder().encode(text);
@@ -228,35 +226,19 @@ describe('R2h-01: one Generate run reaches the store, the tracker, the preview a
       expectedCells += decideToCells(ev.lane, ev.bar, ev.cells, taken.get(key)).length;
     }
 
-    // Player audio and render backend fakes: the preview starts are counted, the render is held by hand.
-    let previewStarts = 0;
-    setPlayerAudioForTests({
-      context: {
-        currentTime: 0,
-        createBuffer: (_c: number, length: number, sampleRate: number) => ({ length, sampleRate, getChannelData: () => new Float32Array(length) }) as unknown as AudioBuffer,
-        createBufferSource: () => ({
-          buffer: null, loop: false, connect: () => undefined, disconnect: () => undefined, stop: () => undefined,
-          start: () => { previewStarts++; },
-        }) as unknown as AudioBufferSourceNode,
-      },
-      destination: {} as AudioNode,
-    } satisfies PlayerAudio);
-    let onPartial: ((p: PartialMix) => void) | undefined;
-    let finish: ((m: Float64Array) => void) | undefined;
+    // Render backend spy: generated songs play live, so no whole-song render may be requested.
+    const renderCalls = vi.fn();
     const backend: RenderBackend = {
-      render(_e, _o, _s, _r, p) { onPartial = p; return new Promise<Float64Array>((r) => { finish = r; }); },
+      render(...args) { renderCalls(...args); return new Promise<Float64Array>(() => undefined); },
     };
-    setRenderBackendForTests(backend, 5);
-    setListenWhileBuilding(true);
+    setRenderBackendForTests(backend);
 
     let eventsAtDone = -1;
-    let startsAtDone = -1;
     let cellsAtDone = -1;
     const onEvent = (e: R2Event) => {
       if (e.type !== 'done') return;
       eventsAtDone = useFactoryStore.getState().state.eventCount;
       cellsAtDone = useFactoryStore.getState().state.cellsWritten;
-      startsAtDone = previewStarts;
     };
     try {
       render(<UpRoughGenerateDialog isOpen onClose={() => undefined} onEvent={onEvent} />);
@@ -274,16 +256,9 @@ describe('R2h-01: one Generate run reaches the store, the tracker, the preview a
       expect(cellsAtDone).toBe(expectedCells);
       expect(useFactoryStore.getState().state.cellsWritten).toBe(expectedCells);
 
-      // (c) the song load starts the render; with Listen while building on, a landed section plays before the mastered mix.
-      await waitFor(() => expect(onPartial).toBeDefined(), { timeout: 5_000 });
-      expect(previewStarts).toBe(startsAtDone === -1 ? 0 : startsAtDone); // nothing played by the stream itself
-      act(() => { onPartial!({ section: 0, start: 0, mix: new Float64Array(22050).fill(0.1) }); });
-      expect(previewStarts).toBeGreaterThanOrEqual(1);
-      const beforeSwap = previewStarts;
-      expect(upRoughPreviewState()).toBe('preview');
-      await act(async () => { finish!(new Float64Array(44100).fill(0.9)); await new Promise((r) => setTimeout(r, 20)); });
-      expect(upRoughPreviewState()).toBe('mastered');
-      expect(previewStarts).toBe(beforeSwap + 1); // exactly one swap
+      // (c) the song load starts no whole-song render: not at once, not after the old debounce has passed.
+      await new Promise((r) => setTimeout(r, 700));
+      expect(renderCalls).not.toHaveBeenCalled();
 
       // (d) the chip plays the kept bank voice once, without rebuilding the bank.
       const kept = bankVoice('kick');
@@ -296,10 +271,7 @@ describe('R2h-01: one Generate run reaches the store, the tracker, the preview a
       expect(vi.mocked(songDrumBank).mock.calls.length).toBe(builds);
       expect(bankVoice('kick')!.samples).toBe(kept!.samples);
     } finally {
-      stopUpRoughSong();
-      setListenWhileBuilding(false);
       setRenderBackendForTests(null);
-      setPlayerAudioForTests(null);
     }
   }, 30_000);
 });

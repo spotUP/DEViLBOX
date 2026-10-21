@@ -49,7 +49,7 @@ import { TrackerReplayer, type TrackerSong } from '../TrackerReplayer';
 import { openUpRoughSong } from '@/lib/uprough/openUpRoughSong';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
-import * as player from '@/lib/uprough/upRoughSongPlayer';
+import { setRenderBackendForTests } from '@/lib/uprough/upRoughSongService';
 
 /** The tracker's song for what the opener loaded into the stores (the notes are on the grid; only play() decides who sounds). */
 function loadedTrackerSong(): TrackerSong {
@@ -66,8 +66,8 @@ beforeAll(async () => {
 }, 60000);
 
 describe('a loaded Up Rough song plays its notes live through the softsynth instruments, so channel mute and solo act on it', () => {
-  it('play() feeds notes on several channels to the synths, nothing is suppressed, the whole-song player never starts, and a muted channel stays silent', async () => {
-    const startSpy = vi.spyOn(player, 'startUpRoughSong');
+  it('play() feeds notes on several channels to the synths, nothing is suppressed, no whole-song render runs, and a muted channel stays silent', async () => {
+    const startSpy = vi.fn(); setRenderBackendForTests({ render: startSpy });
     const replayer = new TrackerReplayer();
     try {
       expect(useTrackerStore.getState().upRoughMeta).not.toBeNull();
@@ -97,7 +97,7 @@ describe('a loaded Up Rough song plays its notes live through the softsynth inst
       expect(startSpy).toHaveBeenCalledTimes(0);
     } finally {
       replayer.stop();
-      startSpy.mockRestore();
+      setRenderBackendForTests(null);
       synthCalls.muted.clear();
       await vi.dynamicImportSettled();
     }

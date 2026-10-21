@@ -3,7 +3,7 @@
  * R2 event source feeds through `factoryOnEvent`; nothing here pretends work, every visual is set by an event.
  * Act 1 (the drum bank) is paced for the eye from the voices' real stage buffers; acts 2 and 3 show events as they land.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Lock, Volume2, VolumeX, RotateCcw } from 'lucide-react';
 import { useFactoryStore } from '@/lib/uprough/factory/useFactoryStore';
 import { actOneSchedule, FAN_SECONDS, stageAtTime, type VoiceTimeline } from '@/lib/uprough/factory/pacing';
@@ -15,8 +15,6 @@ import { slotGrid, SLOT_GAP, WAVE_MIN, type SlotGrid } from '@/lib/uprough/facto
 import { playCue, type Cue } from '@/lib/uprough/factory/factorySfx';
 import { hasLocalPreview, playVoice } from '@/lib/uprough/factory/voiceAudition';
 import { Button } from '@components/ui/Button';
-import { useUpRoughRenderStore } from '@stores/useUpRoughRenderStore';
-import { onUpRoughPreviewState, setListenWhileBuilding, upRoughPreviewState } from '@/lib/uprough/upRoughSongPlayer';
 import { SLOT_OF_VOICE, spoken, STEM_LANES, type FactoryState, type SectionView, type SlotView, type VoiceView } from '@/lib/uprough/factory/factoryModel';
 import type { Peaks } from '@/engine/uprough/r2Peaks';
 
@@ -93,7 +91,6 @@ function useSlotGrid(ref: React.RefObject<HTMLDivElement | null>, count: number)
 /** The finished voice is drawn this much below the box edge (the draft's +15 percent), leaving headroom for the pump-up. */
 export const ABSOLUTE_HEADROOM = 1.15;
 
-export const PREVIEW_CAPTION = 'Preview before mastering';
 
 /** Chip thumbnail height in CSS pixels (the draft's 22 px, G11). */
 export const CHIP_THUMB_HEIGHT = 22;
@@ -273,9 +270,6 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
   const until = useMemo(() => Math.max(0, ...[...lines.values()].map((l) => l.chipAt)), [lines]);
   const t = useClock(state.done, startedAt, until, state.eventCount);
   const active = state.eventCount > 0 && !state.done;
-  const listen = useUpRoughRenderStore((x) => x.listenWhileBuilding);
-  const rendering = useUpRoughRenderStore((x) => x.status === 'rendering');
-  const previewState = useSyncExternalStore(onUpRoughPreviewState, upRoughPreviewState);
 
   // Cues: act 1 on timeline crossings, the other acts on the event that arrived.
   const cued = useRef(new Set<string>());
@@ -380,13 +374,6 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
             <Button variant="default" size="sm" icon={<RotateCcw size={12} />} onClick={onReplay}>Replay scripted run</Button>
           )}
           <Button
-            variant={listen ? 'primary' : 'default'} size="sm" aria-pressed={listen} disabled={!rendering && !listen}
-            onClick={() => setListenWhileBuilding(!listen)}
-            title="Play the song's sections as they are rendered, before texture and mastering"
-          >
-            Listen while building
-          </Button>
-          <Button
             variant={sound ? 'primary' : 'default'} size="sm" aria-pressed={sound} onClick={() => setSound((v) => !v)}
             icon={sound ? <Volume2 size={12} /> : <VolumeX size={12} />}
           >
@@ -394,9 +381,6 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
           </Button>
         </div>
       </div>
-      {previewState === 'preview' && (
-        <div data-testid="factory-preview-caption" className="text-xs text-accent-warning mb-1">{PREVIEW_CAPTION}</div>
-      )}
       {!preview && state.eventCount > 0 && (
         <div data-testid="factory-no-preview" className="text-xs text-text-muted mb-1">{NO_PREVIEW}</div>
       )}
