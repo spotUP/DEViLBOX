@@ -32,6 +32,7 @@ import nksRoutes from './routes/nks';
 import bridgeRoutes from './routes/bridge';
 import devilboxPresetRoutes from './routes/devilbox-presets';
 import uproughRoutes from './routes/uprough';
+import genreRoutes from './routes/genre';
 import { handleStreamConnection, checkFfmpeg } from './routes/stream';
 import { initDataDirectories } from './utils/fileSystem';
 import { initModlandIndex, scheduleModlandUpdates } from './services/modlandIndexer';
@@ -73,6 +74,14 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth/', authLimiter as unknown as express.RequestHandler);
 
+// Genre lookups can cost a ModArchive request each; one client plays a few modules a minute.
+const genreLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 120,
+  message: 'Too many genre lookups, please try again later'
+});
+app.use('/api/genre/', genreLimiter as unknown as express.RequestHandler);
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/files', filesRoutes);
@@ -92,6 +101,7 @@ app.use('/api/nks', nksRoutes);
 app.use('/api/bridge', bridgeRoutes);
 app.use('/api/devilbox-presets', devilboxPresetRoutes);
 app.use('/api/uprough', uproughRoutes);
+app.use('/api/genre', genreRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
