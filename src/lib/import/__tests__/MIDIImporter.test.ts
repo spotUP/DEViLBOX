@@ -116,6 +116,22 @@ describe('importMIDIFile on real General MIDI songs', () => {
   });
 });
 
+describe('importMIDIFile key re-struck on one MIDI channel', () => {
+  // death_in_the_arena.mid: the chords track strikes 8 keys twice at the same tick
+  // (43 note-ons, 35 distinct). A SoundFont synth re-strikes the key, so one voice
+  // sounds; one channel per note-on played both, 6 dB too loud on those chords.
+  it('death_in_the_arena.mid plays a doubled chord key once, on one channel', async () => {
+    const r = await load('death_in_the_arena.mid');
+    const chs = r.patterns[0].channels;
+    const chords = voices(chs, 'chords');
+    expect(chords.reduce((n, c) => n + noteOns(c), 0)).toBe(35);
+    for (let row = 0; row < r.patterns[0].length; row++) {
+      const keys = chords.map((c) => c.rows[row].note).filter((n) => n > 0 && n < 97);
+      expect(new Set(keys).size, `row ${row}`).toBe(keys.length);
+    }
+  });
+});
+
 describe('importMIDIFile tempo map', () => {
   /** Quarter notes on every beat for `beats` beats; tempos = [beat, bpm][]. */
   async function build(tempos: Array<[number, number]>, beats: number) {
