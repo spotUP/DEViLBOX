@@ -407,6 +407,11 @@ export function chooseLength(ctx: {
 
 export interface StyleScore { style: TransitionStyle; score: number; reason: string }
 
+/** Styles that only work with the two grids locked: with no beatmatch (tempoMethod 'avoid') none may be chosen. */
+const BEATMATCHED_STYLES: readonly TransitionStyle[] = [
+  'longBlend', 'bassSwap', 'EQSwap', 'breakdownMix', 'dropMix', 'drumIntroMix', 'vocalSwap', 'percussionSwap', 'loopExit', 'juggleTransition',
+];
+
 export function scoreStyles(ctx: {
   outSection: DJSection | undefined; inSection: DJSection | undefined; outgoing: DJTrackAnalysis; incoming: DJTrackAnalysis;
   vocalRisk: number; outgoingVocalEnding: boolean; drumScore: number; bothBassHeavy: boolean; energyDelta: number; clashRisk: number;
@@ -425,11 +430,19 @@ export function scoreStyles(ctx: {
   const fx = ctx.style.fxUsage;
   const add = (style: TransitionStyle, score: number, reason: string) => out.push({ style, score: score - rep(style), reason });
   const lowConf = ctx.confidence < 0.5;
+  // The tempo verdict is a trigger of its own: a gap too wide to beatmatch asks for a short move or a
+  // punctuated exit (echo, reverb, cut), never a long grid-locked blend (owner 2026-10-11, DJ-K).
+  const noBeatmatch = ctx.tempoMethod === 'avoid';
 
   // Always available: the blends.
   add('longBlend', 0.5 + ctx.drumScore * 0.3 + (ctx.outroRoomBars >= 16 ? 0.2 : 0) - Math.abs(ctx.energyDelta) * 0.4 - ctx.vocalRisk * 0.3 - ctx.clashRisk * 0.3, 'drums and keys compatible, room on both tracks');
   add('shortBlend', 0.45 + Math.max(0, Math.abs(ctx.energyDelta) - 0.15) * 0.6 + ctx.vocalRisk * 0.2 + ctx.clashRisk * 0.2 + (ctx.outroRoomBars < 4 ? 0.25 : 0), 'a quick move: a big energy change, vocals or little room');
-  if (lowConf) return out; // Low confidence: only the robust blends (plan section 35).
+  if (noBeatmatch) {
+    out.push({ style: 'shortBlend', score: 0.9 - rep('shortBlend'), reason: 'no beatmatch across this tempo gap: a short move' });
+    add('echoOut', 0.6 + ctx.style.fxUsage * 0.4, 'no beatmatch across this tempo gap: echo the outgoing out');
+    add('reverbOut', 0.55 + ctx.style.fxUsage * 0.3, 'no beatmatch across this tempo gap: reverb the outgoing out');
+  }
+  if (lowConf) return noBeatmatch ? out.filter((x) => !BEATMATCHED_STYLES.includes(x.style)) : out; // Low confidence: only the robust blends (plan section 35).
 
   // Bass handling.
   if (ctx.bothBassHeavy || (ctx.drumScore > 0.6 && ctx.clashRisk < 0.3)) add('bassSwap', 0.55 + (ctx.bothBassHeavy ? 0.25 : 0) + (ctx.style.bassBehaviour === 'swap' ? 0.15 : 0), ctx.bothBassHeavy ? 'two heavy basses: hand the low end over at a phrase boundary' : 'compatible drums: swap the bass at the phrase');
@@ -476,7 +489,7 @@ export function scoreStyles(ctx: {
     const top = out.reduce((m, s) => Math.max(m, s.score), 0);
     out.push({ style: 'juggleTransition', score: top + 0.05, reason: 'compatible grids, keys and drums, juggle budget open: trade the tracks into the drop' });
   }
-  return out;
+  return noBeatmatch ? out.filter((x) => !BEATMATCHED_STYLES.includes(x.style)) : out;
 }
 
 // ── Curves ──────────────────────────────────────────────────────────────────
