@@ -9,6 +9,7 @@ import type { UpRoughSoftsynthConfig } from '@/types/instrument';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { DEVILBOX_TO_HOST_MIDI, SOFTSYNTH_RATE, voiceDefaults, type SoftsynthVoice } from './softsynthVoice';
 import { getSoftsynthVoice, SOFTSYNTH_VOICES } from './voiceRegistry';
+import { recordNoteTrigger } from '@/engine/debug/noteTriggerLog';
 
 const CACHE_MAX = 256;
 const NATURAL_DUR_SEC = 2;
@@ -98,7 +99,11 @@ export class UpRoughSoftsynth implements DevilboxSynth {
       this.playing.delete(entry);
       try { src.disconnect(); gain.disconnect(); } catch { /* already gone */ }
     };
-    src.start(time ?? this.ctx.currentTime);
+    const startAt = time ?? this.ctx.currentTime;
+    // Voice-level entry: the scheduled start beside the clock, so a late or repeated start shows up next to
+    // the ToneEngine.triggerNote entry that asked for it.
+    recordNoteTrigger(`UpRoughSoftsynth.start ${this.voiceId} at=${startAt.toFixed(4)} now=${this.ctx.currentTime.toFixed(4)}`, -1, String(note));
+    src.start(startAt);
   }
 
   triggerAttack(note: string | number, time?: number, velocity = 1): void {
