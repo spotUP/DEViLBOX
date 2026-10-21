@@ -237,6 +237,35 @@ export function setChannelStripDestination(ctx: ChannelRoutingContext, channelIn
   out.channel.connect(next);
 }
 
+/**
+ * A second, parallel destination for a channel strip: the channel's dub send
+ * (ChannelRoutedEffectsManager). The dub send was fed only by the playing
+ * engine's per-channel dub output, so a channel whose sound is a Tone synth (a
+ * MIDI import, sequenced by libopenmpt through a module without samples) sent
+ * silence to the dub bus. Unlike the strip destination this is added next to
+ * the strip's route, never instead of it. Kept across strip rebuilds the same way.
+ */
+const stripDubTaps = new WeakMap<ChannelRoutingContext['channelOutputs'], Map<number, Tone.InputNode>>();
+
+function stripDubTapsOf(ctx: ChannelRoutingContext): Map<number, Tone.InputNode> {
+  let m = stripDubTaps.get(ctx.channelOutputs);
+  if (!m) { m = new Map(); stripDubTaps.set(ctx.channelOutputs, m); }
+  return m;
+}
+
+/** Also send a channel strip's post-fader audio into `tap`, or stop with null. */
+export function setChannelStripDubTap(ctx: ChannelRoutingContext, channelIndex: number, tap: Tone.InputNode | null): void {
+  const taps = stripDubTapsOf(ctx);
+  const previous = taps.get(channelIndex) ?? null;
+  if (previous === tap) return;
+  if (tap) taps.set(channelIndex, tap);
+  else taps.delete(channelIndex);
+  const out = ctx.channelOutputs.get(channelIndex);
+  if (!out) return;
+  if (previous) { try { out.channel.disconnect(previous); } catch { /* already gone */ } }
+  if (tap) out.channel.connect(tap);
+}
+
 export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: number): Tone.Gain {
   if (!ctx.channelOutputs.has(channelIndex)) {
     // Create channel audio chain with metering
@@ -257,7 +286,7 @@ export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: numbe
     const filterOutput = filterMgr.getOutput(channelIndex);
 
     // Connect: input → voiceDelay → join (+ synth lane) → [effect chain] → HPF → LPF
-    //          → channel → scope + masterInput
+    //          → channel → scope + masterInput (+ the dub send, see setChannelStripDubTap)
     // (or the channel's routed effects, see setChannelStripDestination)
     input.connect(voiceDelay);
     voiceDelay.connect(join);
@@ -266,6 +295,8 @@ export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: numbe
     connectAudio(filterOutput, channel);
     channel.connect(scope);
     channel.connect(stripDestinationsOf(ctx).get(channelIndex) ?? ctx.masterInput);
+    const dubTap = stripDubTapsOf(ctx).get(channelIndex);
+    if (dubTap) channel.connect(dubTap);
 
     ctx.channelOutputs.set(channelIndex, {
       input,
