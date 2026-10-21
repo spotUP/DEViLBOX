@@ -195,3 +195,23 @@ describe('G11 type sizes', () => {
     expect((chip.querySelector('canvas') as HTMLCanvasElement).style.height).toBe('22px');
   });
 });
+
+const statusText = (): string => document.querySelector('[data-testid="factory-status"]')!.textContent ?? '';
+const statusLog = (steps: number, stepMs: number): string[] => {
+  const seen: string[] = [];
+  for (let i = 0; i < steps; i++) { runClock(stepMs); const s = statusText(); if (seen.at(-1) !== s) seen.push(s); }
+  return seen;
+};
+
+describe('G13 act-1 status line', () => {
+  it('walks Building, Stage k of S, the hat fan-out and Act 1 finished from the act-1 clock, not from the last event', () => {
+    render(<FactoryPanel />);
+    feed(scriptedGenerateEvents('trap', 3).filter((e) => e.type !== 'done'));
+    const seen = statusLog(400, 25);
+    expect(seen.some((x) => /^Building kick/.test(x))).toBe(true);
+    expect(seen.some((x) => /^Stage 1 of \d+: /.test(x))).toBe(true);
+    expect(seen.some((x) => /^Hat slot fans out the \d+ variants/.test(x))).toBe(true);
+    expect(seen.some((x) => /^Act 1 finished/.test(x))).toBe(true);
+    expect(seen.indexOf(seen.find((x) => /^Building/.test(x))!)).toBeLessThan(seen.findIndex((x) => /^Act 1 finished/.test(x)));
+  });
+});
