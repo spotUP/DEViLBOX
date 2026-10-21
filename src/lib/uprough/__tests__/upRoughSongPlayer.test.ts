@@ -1,7 +1,7 @@
 /**
  * The Up Rough song player (plan 2026-10-20 O6k2): the tracker plays the rendered mix as ONE whole-song source.
  * The render backend here is the worker's own job (runRenderJob) over a shared cache, run in-process; the audio side is
- * a recording fake. The ONE reachability test (TrackerReplayer.play() -> startUpRoughSong, buffer == renderSong) lives in
+ * a recording fake. The ONE reachability test (TrackerReplayer.play() plays the notes live through the softsynths) lives in
  * src/engine/__tests__/upRoughReplayerPlay.test.ts; this file holds the behaviours at the player and service.
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -29,7 +29,7 @@ import {
 } from '@/lib/uprough/upRoughSongService';
 import {
   setPlayerAudioForTests, startUpRoughSong, stopUpRoughSong, upRoughPlayheadSample,
-  upRoughSongOwnsPlayback, isUpRoughSongPlaying, startUpRoughPreview, isUpRoughPreviewPlaying, upRoughPreviewState,
+  isUpRoughSongPlaying, startUpRoughPreview, isUpRoughPreviewPlaying, upRoughPreviewState,
   type PlayerAudio,
 } from '@/lib/uprough/upRoughSongPlayer';
 
@@ -111,17 +111,6 @@ describe('start offset', () => {
   });
 });
 
-describe('whole-song path', () => {
-  it('(a) is chosen only when upRoughMeta is set', () => {
-    expect(useTrackerStore.getState().upRoughMeta).not.toBeNull();
-    expect(upRoughSongOwnsPlayback()).toBe(true);
-    const meta = useTrackerStore.getState().upRoughMeta;
-    useTrackerStore.setState({ upRoughMeta: null });
-    expect(upRoughSongOwnsPlayback()).toBe(false);
-    useTrackerStore.setState({ upRoughMeta: meta });
-    expect(upRoughSongOwnsPlayback()).toBe(true);
-  });
-});
 
 describe('play, edit, swap', () => {
   it('(c) one edited pattern note re-renders exactly one section', async () => {

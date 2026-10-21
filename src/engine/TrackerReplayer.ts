@@ -33,7 +33,7 @@ import { getAutomationPlayer } from './AutomationPlayer';
 import { syncCaptureToStore, resetCaptureSync } from './automation/AutomationCaptureSync';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
-import { startUpRoughSong, stopUpRoughSong, upRoughSongOwnsPlayback, isUpRoughSongPlaying } from '@/lib/uprough/upRoughSongPlayer';
+import { stopUpRoughSong } from '@/lib/uprough/upRoughSongPlayer';
 import { setCellInPattern } from '@/stores/tracker/patternEditActions';
 import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useCursorStore } from '@/stores/useCursorStore';
@@ -2279,8 +2279,6 @@ export class TrackerReplayer {
       _playLog('startNativeEngines');
       if (gen !== this._playGeneration) return;
       if (result.suppressNotes) this._suppressNotes = true;
-      // An Up Rough song plays as one rendered buffer; the scheduler stays on for the playhead only.
-      if (upRoughSongOwnsPlayback()) this._suppressNotes = true;
       if (result.c64SidEngine) this.c64SidEngine = result.c64SidEngine;
       if (result.sf2Engine) this.sf2Engine = result.sf2Engine;
       // Wire the active WASM engine for hybrid playback mute mask updates.
@@ -2755,7 +2753,6 @@ export class TrackerReplayer {
       return;
     }
 
-    if (upRoughSongOwnsPlayback()) void startUpRoughSong(this.songPos, this.pattPos);
     _playLog('startScheduler (total)');
     this.startScheduler();
     this._hasPlayedOnce = true;
@@ -3839,7 +3836,6 @@ export class TrackerReplayer {
       this.songPos = Math.max(0, Math.min(songPos, this.song.songLength - 1));
       this.pattPos = Math.max(0, pattPos);
       this.currentTick = 0;
-      if (isUpRoughSongPlaying()) void startUpRoughSong(this.songPos, this.pattPos);
 
       // Forward seek to libopenmpt worklet
       if (this.useLibopenmptPlayback) {
