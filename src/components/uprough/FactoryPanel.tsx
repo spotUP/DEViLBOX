@@ -9,6 +9,7 @@ import { useFactoryStore } from '@/lib/uprough/factory/useFactoryStore';
 import { actOneSchedule, FAN_SECONDS, stageAtTime, type VoiceTimeline } from '@/lib/uprough/factory/pacing';
 import { bandBusy, CONVEYOR_SPEED, chipPosition, growHeights, popIn, prefersReducedMotion, SETTLE, Spring, stampBounce } from '@/lib/uprough/factory/motion';
 import { drawConveyor, drawEnvelope, drawEyes, drawGear, drawPlayhead, PLATE_SECONDS, drawStamp, drawWave, fitCanvas, readTokens, type FactoryColors } from '@/lib/uprough/factory/draw';
+import { actOneStatus } from '@/lib/uprough/factory/statusLine';
 import { slotGrid, SLOT_GAP, WAVE_MIN, type SlotGrid } from '@/lib/uprough/factory/layout';
 import { playCue, type Cue } from '@/lib/uprough/factory/factorySfx';
 import { hasLocalPreview, playVoice } from '@/lib/uprough/factory/voiceAudition';
@@ -345,7 +346,7 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
       onKeyDown={() => { userScrolledAt.current = performance.now(); }} style={{ color: 'var(--color-text)' }}>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2 shrink-0">
         <div role="status" aria-live="polite" data-testid="factory-status" className="text-sm font-bold text-accent-highlight min-h-[1.5em]">
-          {state.caption}
+          {actOneStatus(lines, state, t) ?? state.caption}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {onReplay && (
