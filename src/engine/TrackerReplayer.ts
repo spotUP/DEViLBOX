@@ -1444,6 +1444,14 @@ export class TrackerReplayer {
       }
     }
 
+    // A volume-column level sets the channel volume at tick 0, as Cxx does. A SoundFont or SFZ
+    // note carries that volume in its velocity, so it must be in ch.volume before the trigger;
+    // every other synth gets the volume column on its lane from the SynthEffectProcessor.
+    if (noteVolumeIsVelocity(ch.instrument?.synthType)) {
+      const level = decodeVolumeColumn(row.volume, useFormatStore.getState().editorMode);
+      if (level !== null) ch.volume = Math.round(level * 64);
+    }
+
     // Normal note trigger
     if (hasNote && !probabilitySkip) {
       ch.xmNote = noteValue;
