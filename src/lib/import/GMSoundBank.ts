@@ -130,14 +130,14 @@ function guitarPreset(program: number, id: number): InstrumentConfig {
   };
 }
 
-/** Bass (32–39): MonoSynth at octave -1, tight envelope */
+/** Bass (32–39): MonoSynth at the note's own pitch (GM bass parts are written where they sound), tight envelope */
 function bassPreset(program: number, id: number): InstrumentConfig {
   const isSynth = program >= 38; // Synth Bass 1 & 2
   return {
     ...BASE, id,
     name: GM2_NAMES[program],
     synthType: 'MonoSynth',
-    oscillator: osc(isSynth ? 'square' : 'sawtooth', -1),
+    oscillator: osc(isSynth ? 'square' : 'sawtooth'),
     envelope: env(5, isSynth ? 400 : 200, 20, 100),
     filter: lpf(isSynth ? 800 : 1500, isSynth ? 4 : 1),
     monophonic: true,
