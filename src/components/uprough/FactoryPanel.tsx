@@ -9,7 +9,7 @@ import { useFactoryStore } from '@/lib/uprough/factory/useFactoryStore';
 import { actOneSchedule, FAN_SECONDS, stageAtTime, type VoiceTimeline } from '@/lib/uprough/factory/pacing';
 import { bandBusy, CONVEYOR_SPEED, chipPosition, growHeights, popIn, prefersReducedMotion, SETTLE, Spring, stampBounce } from '@/lib/uprough/factory/motion';
 import { drawConveyor, drawEnvelope, drawEyes, drawGear, drawPlayhead, PLATE_SECONDS, drawStamp, drawWave, fitCanvas, readTokens, type FactoryColors } from '@/lib/uprough/factory/draw';
-import { actOneStatus } from '@/lib/uprough/factory/statusLine';
+import { actOneEnd, actOneStatus } from '@/lib/uprough/factory/statusLine';
 import { slotGrid, SLOT_GAP, WAVE_MIN, type SlotGrid } from '@/lib/uprough/factory/layout';
 import { playCue, type Cue } from '@/lib/uprough/factory/factorySfx';
 import { hasLocalPreview, playVoice } from '@/lib/uprough/factory/voiceAudition';
@@ -123,8 +123,8 @@ function voiceTimelines(state: FactoryState): Map<string, VoiceTimeline> {
   return new Map(actOneSchedule(voices, state.rate).map((l) => [l.voice, l]));
 }
 
-function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => void; slot: SlotView; lines: Map<string, VoiceTimeline>; t: number; reduced: boolean; timeSec: number; preview: boolean; waveHeight: number; rate: number }): React.ReactElement {
-  const { slot, lines, t, reduced, timeSec, preview, register, waveHeight, rate } = props;
+function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => void; slot: SlotView; lines: Map<string, VoiceTimeline>; t: number; reduced: boolean; timeSec: number; preview: boolean; waveHeight: number; rate: number; finaleAt?: number }): React.ReactElement {
+  const { slot, lines, t, reduced, timeSec, preview, register, waveHeight, rate, finaleAt } = props;
   const voice: VoiceView | undefined = slot.voices.find((v) => {
     const line = lines.get(v.voice);
     return !line || t >= line.start;
@@ -142,7 +142,8 @@ function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => 
   // Card state (G10): waiting (dim, dashed), building (glowing), built. Squash and stretch kicks when the build starts.
   const building = !!line && t >= line.start && !stamped;
   const state = stamped || slot.born ? 'built' : building ? 'building' : 'waiting';
-  const kick = line ? popIn(t - line.start, reduced).scale : 1;
+  // Finale (G20): at the act-1 clock's end every slot kicks together.
+  const kick = finaleAt !== undefined && t >= finaleAt ? popIn(t - finaleAt, reduced).scale : line ? popIn(t - line.start, reduced).scale : 1;
   // Bass and melody wait for the first rendered bar (G18).
   const placeholder = !cur && !slot.born && /^(bass|melody)/.test(slot.id);
   // Playhead (G5): sweeps the finished one-shot while its audition plays.
@@ -337,6 +338,17 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
       : state.sectionEvents.length < prev.length ? [] : prev));
   }, [state.eventCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Finale (G20): when the act-1 clock ends, every slot kicks (finaleAt) and the view scrolls back to the first slot, once.
+  const finaleAt = useMemo(() => actOneEnd(lines, state), [lines, state]);
+  const finaleScrolled = useRef(false);
+  useEffect(() => { finaleScrolled.current = false; }, [startedAt]);
+  useEffect(() => {
+    if (finaleAt === undefined || t < finaleAt || finaleScrolled.current) return;
+    finaleScrolled.current = true;
+    const first = state.slots[0] && slotEls.current.get(state.slots[0].id);
+    first?.scrollIntoView?.({ block: 'start', behavior: reduced ? 'auto' : 'smooth' });
+  }, [t, finaleAt, state.slots, reduced]);
+
   const gridRef = useRef<HTMLDivElement>(null);
   const grid = useSlotGrid(gridRef, state.slots.length);
   const timeSec = performance.now() / 1000;
@@ -376,7 +388,7 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
       <div className="shrink-0"><Machinery timeSec={timeSec} busy={active} bandBusy={bandBusy(performance.now(), lastEventAt.current)} chips={chips} /></div>
       <div ref={gridRef} data-testid="factory-slots" className="flex-1 min-h-0 grid"
         style={{ gap: SLOT_GAP, gridTemplateColumns: `repeat(${grid.cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${grid.rows}, minmax(0, 1fr))` }}>
-        {state.slots.map((slot) => <SlotCard key={slot.id} register={registerSlot} slot={slot} lines={lines} t={t} reduced={reduced} timeSec={timeSec} preview={preview} waveHeight={grid.wave} rate={state.rate} />)}
+        {state.slots.map((slot) => <SlotCard key={slot.id} finaleAt={finaleAt} register={registerSlot} slot={slot} lines={lines} t={t} reduced={reduced} timeSec={timeSec} preview={preview} waveHeight={grid.wave} rate={state.rate} />)}
       </div>
       {state.sections.length > 0 && (
         <div className="mt-2 shrink-0" data-testid="factory-sections">

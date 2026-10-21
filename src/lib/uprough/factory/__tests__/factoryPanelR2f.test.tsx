@@ -174,7 +174,7 @@ describe('R2f-56 conveyor chips and idle band', () => {
 describe('R2f-59 auto-scroll and controls', () => {
   it('scrolls each building voice slot into view once, in build order, and never after done', () => {
     const order: string[] = [];
-    Element.prototype.scrollIntoView = vi.fn(function (this: Element) { order.push(this.getAttribute('data-testid')!); });
+    Element.prototype.scrollIntoView = vi.fn(function (this: Element, o?: boolean | ScrollIntoViewOptions) { if (typeof o === 'object' && o.block === 'nearest') order.push(this.getAttribute('data-testid')!); }); // the finale scroll to the top (G20) uses block 'start'
     render(<FactoryPanel />);
     const evs = scriptedGenerateEvents('trap', 3);
     feed(evs.filter((e) => e.type !== 'done'));
