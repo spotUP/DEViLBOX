@@ -6,7 +6,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Lock, Volume2, VolumeX, RotateCcw } from 'lucide-react';
 import { useFactoryStore } from '@/lib/uprough/factory/useFactoryStore';
-import { actOneSchedule, stageAtTime, type VoiceTimeline } from '@/lib/uprough/factory/pacing';
+import { actOneSchedule, FAN_SECONDS, stageAtTime, type VoiceTimeline } from '@/lib/uprough/factory/pacing';
 import { bandBusy, CONVEYOR_SPEED, chipPosition, growHeights, popIn, prefersReducedMotion, SETTLE, Spring, stampBounce } from '@/lib/uprough/factory/motion';
 import { drawConveyor, drawEnvelope, drawEyes, drawGear, drawPlayhead, PLATE_SECONDS, drawStamp, drawWave, fitCanvas, readTokens, type FactoryColors } from '@/lib/uprough/factory/draw';
 import { slotGrid, SLOT_GAP, WAVE_MIN, type SlotGrid } from '@/lib/uprough/factory/layout';
@@ -145,6 +145,9 @@ function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => 
   const playLen = voice?.bank && rate > 0 ? voice.bank.len / rate : 0;
   const playhead = preview && line && stamped && playLen > 0 && t - line.stampAt < playLen ? (t - line.stampAt) / playLen : undefined;
   const plate = line && voice && stamped && t - line.stampAt < PLATE_SECONDS ? { name: spoken(voice.voice), since: t - line.stampAt, squash: bounce } : undefined;
+  // Chip pop-in (G15) and hat fan-out (G14): attachment and hat chips pop like the voice chips, one FAN_SECONDS after each other.
+  const fanBase = Math.max(0, ...slot.voices.map((v) => lines.get(v.voice)?.chipAt ?? 0));
+  const fanned = (i: number): { scale: number; alpha: number } => (fanBase > 0 ? popIn(t - fanBase - i * FAN_SECONDS, reduced) : { scale: 1, alpha: 1 });
   return (
     <div
       data-testid={`factory-slot-${slot.id}`} data-state={state} ref={(el) => register(slot.id, el)}
@@ -167,8 +170,8 @@ function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => 
         {stamped && voice?.bank && slot.voices.filter((v) => v.bank).map((v) => (
           <Chip key={v.voice} voice={v.voice} label={spoken(v.voice)} peaks={v.bank!} alpha={chip.alpha} scale={chip.scale} preview={preview} />
         ))}
-        {slot.attachments.map((a) => <Chip key={a.voice} voice={a.voice} label={spoken(a.voice)} peaks={a.peaks} accent alpha={1} scale={1} preview={preview} />)}
-        {slot.hatVariants.map((h) => <Chip key={h.name} voice={h.name} label={spoken(h.name)} peaks={h.peaks} alpha={1} scale={1} preview={preview} />)}
+        {slot.attachments.map((a, i) => <Chip key={a.voice} voice={a.voice} label={spoken(a.voice)} peaks={a.peaks} accent alpha={fanned(i).alpha} scale={fanned(i).scale} preview={preview} />)}
+        {slot.hatVariants.map((h, i) => <Chip key={h.name} voice={h.name} label={spoken(h.name)} peaks={h.peaks} alpha={fanned(i).alpha} scale={fanned(i).scale} preview={preview} />)}
       </div>
     </div>
   );
