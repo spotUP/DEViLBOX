@@ -242,7 +242,8 @@ export function injectMouthPatterns(): void {
 
   // ⑤ Park the cursor on the mouth's centre row; the editor scrolls to it
   savedCursorRow = useCursorStore.getState().cursor.rowIndex;
-  useCursorStore.getState().moveCursorToRow(MOUTH_CENTER_ROW);
+  // The cursor only parks: a playhead seek here would move playback (row 0 retrigger).
+  useCursorStore.getState().placeCursorRow(MOUTH_CENTER_ROW);
 
   // ⑥ Start rAF loop — schedule next frame first so teardown can always cancel
   startedAt = performance.now();
@@ -322,7 +323,8 @@ export function teardownMouthPatterns(): void {
 
   // Put the cursor back where the user had it
   if (savedCursorRow !== null) {
-    useCursorStore.getState().moveCursorToRow(savedCursorRow);
+    // A view restore, not a seek: a song started during the jingle keeps playing where it is.
+    useCursorStore.getState().placeCursorRow(savedCursorRow);
   }
 
   savedOriginalChannelCount = 0;
