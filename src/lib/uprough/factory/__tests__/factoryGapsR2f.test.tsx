@@ -8,12 +8,14 @@ import type { Peaks } from '@/engine/uprough/r2Peaks';
 
 const stampCalls: { name: string; since: number }[] = [];
 const playheadCalls: number[] = [];
+const eyeTimes: number[] = [];
 const waveCalls: { peaks: Peaks | undefined; reference: number | undefined; tallest: number }[] = [];
 vi.mock('@/lib/uprough/factory/draw', async (orig) => {
   const m = await orig<typeof import('@/lib/uprough/factory/draw')>();
   return {
     ...m,
     drawStamp: vi.fn((...a: Parameters<typeof m.drawStamp>) => { stampCalls.push({ name: a[2], since: a[3] }); m.drawStamp(...a); }),
+    drawEyes: vi.fn((...a: Parameters<typeof m.drawEyes>) => { eyeTimes.push(a[3]); m.drawEyes(...a); }),
     drawPlayhead: vi.fn((...a: Parameters<typeof m.drawPlayhead>) => { playheadCalls.push(a[3]); m.drawPlayhead(...a); }),
     drawWave: vi.fn((...a: Parameters<typeof m.drawWave>) => {
       let top = a[2] / 2;
@@ -31,7 +33,7 @@ vi.mock('@/utils/audio-context', () => ({ getDevilboxAudioContext: () => undefin
 
 import { blinkStarts } from '@/lib/uprough/factory/eyeMotion';
 import { drawEyes, drawStamp, eyeOpenness, PLATE_SECONDS } from '@/lib/uprough/factory/draw';
-import { FactoryPanel, ABSOLUTE_HEADROOM, CHIP_THUMB_HEIGHT } from '@components/uprough/FactoryPanel';
+import { FactoryPanel, ABSOLUTE_HEADROOM, CLOCK_KEEP_ALIVE_AFTER_DONE_MS, CHIP_THUMB_HEIGHT } from '@components/uprough/FactoryPanel';
 import { useFactoryStore, factoryOnEvent } from '../useFactoryStore';
 import { scriptedGenerateEvents } from '../scriptedRun';
 import type { R2Event } from '@/engine/uprough/r2Events';
@@ -45,7 +47,7 @@ beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as never);
   vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'setTimeout', 'clearTimeout'] });
   vi.advanceTimersByTime(5);
-  cueCalls.length = 0; waveCalls.length = 0; stampCalls.length = 0; playheadCalls.length = 0; previewOn = false;
+  cueCalls.length = 0; waveCalls.length = 0; stampCalls.length = 0; playheadCalls.length = 0; eyeTimes.length = 0; previewOn = false;
   useFactoryStore.getState().reset();
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
@@ -258,5 +260,24 @@ describe('G16 sound cues', () => {
     expect(Math.max(...stages.map((c) => c.step ?? 0))).toBeGreaterThanOrEqual(2);
     expect(stages.some((c) => c.step === 0)).toBe(true);
     expect(cueCalls.filter((c) => c.cue === 'tick')).toHaveLength(st.slots.find((s) => s.hatVariants.length > 0)!.hatVariants.length);
+  });
+});
+
+describe('panel clock after done', () => {
+  it('eyes and fidget keep moving until CLOCK_KEEP_ALIVE_AFTER_DONE_MS after the done event, then the clock stops', () => {
+    expect(CLOCK_KEEP_ALIVE_AFTER_DONE_MS).toBe(10_000);
+    render(<FactoryPanel />);
+    feed(scriptedGenerateEvents('trap', 3));
+    expect(useFactoryStore.getState().state.done).toBe(true);
+    const doneAt = performance.now();
+    const elapsed = (): number => performance.now() - doneAt;
+    runClock(9_000 - elapsed());
+    const at9 = eyeTimes.at(-1)!;
+    runClock(500);
+    expect(eyeTimes.at(-1)!).toBeGreaterThan(at9);
+    runClock(11_000 - elapsed());
+    const at11 = eyeTimes.length;
+    runClock(2_000);
+    expect(eyeTimes.length).toBe(at11);
   });
 });

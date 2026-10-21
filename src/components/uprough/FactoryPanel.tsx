@@ -24,16 +24,22 @@ export interface FactoryPanelProps {
   className?: string;
 }
 
-/** Seconds since the act-1 start, ticking while events arrive or the act-1 timeline (`until` seconds) still plays. */
+/** How long the panel clock keeps ticking after the run's done event, so the eyes keep blinking and the cards keep fidgeting (heat trade-off). */
+export const CLOCK_KEEP_ALIVE_AFTER_DONE_MS = 10_000;
+
+/** Seconds since the act-1 start, ticking while events arrive, while the act-1 timeline (`until` seconds) still plays, and for CLOCK_KEEP_ALIVE_AFTER_DONE_MS after done. */
 function useClock(done: boolean, startedAt: number, until: number, eventCount: number): number {
   const [now, setNow] = useState(0);
+  const doneAtMs = useRef<number | null>(null);
   useEffect(() => {
     if (!startedAt) return;
+    if (!done) doneAtMs.current = null;
+    else if (doneAtMs.current === null) doneAtMs.current = performance.now();
     let raf = 0;
     const loop = (): void => {
       const t = (performance.now() - startedAt) / 1000;
       setNow(t);
-      if (!done || t < until + 1) raf = requestAnimationFrame(loop);
+      if (!done || t < until + 1 || performance.now() - (doneAtMs.current ?? 0) < CLOCK_KEEP_ALIVE_AFTER_DONE_MS) raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
