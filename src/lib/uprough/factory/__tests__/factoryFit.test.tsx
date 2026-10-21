@@ -17,7 +17,7 @@ vi.mock('@/lib/uprough/factory/draw', async (orig) => {
 
 import { FactoryPanel } from '@components/uprough/FactoryPanel';
 import { useFactoryStore } from '../useFactoryStore';
-import { slotGrid, WAVE_MAX, WAVE_MIN } from '../layout';
+import { slotGrid, SLOT_CHROME, WAVE_MAX, WAVE_MIN } from '../layout';
 
 let fire: (w: number, h: number) => void = () => undefined;
 class FakeRO {
@@ -80,7 +80,7 @@ describe('factory fits the dialog without scrolling', () => {
   it('slotGrid uses the draft 270 px columns where the width allows and still fits the rows into the height', () => {
     const g = slotGrid(1500, 700, 11);
     expect(g.cols).toBe(Math.floor((1500 + 12) / (270 + 12)));
-    const total = g.rows * (g.wave + 104) + 12 * (g.rows - 1);
+    const total = g.rows * (g.wave + SLOT_CHROME) + 12 * (g.rows - 1);
     expect(total).toBeLessThanOrEqual(700);
   });
 });
