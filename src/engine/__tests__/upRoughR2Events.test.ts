@@ -1,5 +1,5 @@
 /**
- * R2d: the render events of an Up Rough song reach the R2 store from the render service entry, ensureUpRoughSong
+ * R2d: the render events of an Up Rough song reach the R2 store from the render service entry, renderUpRoughSong
  * (the tracker plays live and no longer renders on play()). ONE reachability test (the event grammar is tested in uprough/__tests__/songRenderEvents.test.ts).
  * Sentinel: the count of events the backend's onR2 callback received, which must equal the store's log; the log must
  * run start ... done with the 13 bank voices.
@@ -44,7 +44,7 @@ import { openUpRoughSong } from '@/lib/uprough/openUpRoughSong';
 import type { SectionMixCache } from '@engine/uprough/songRenderCache';
 import { useUpRoughR2Store } from '@stores/useUpRoughR2Store';
 import { runRenderJob } from '@/lib/uprough/songRenderJob';
-import { ensureUpRoughSong, setRenderBackendForTests, type RenderBackend } from '@/lib/uprough/upRoughSongService';
+import { renderUpRoughSong, setRenderBackendForTests, type RenderBackend } from '@/lib/uprough/upRoughSongService';
 
 const cache: SectionMixCache = new Map();
 let onR2Calls = 0;
@@ -55,16 +55,16 @@ const backend: RenderBackend = {
   },
 };
 beforeAll(async () => {
-  setRenderBackendForTests(backend, 5);
+  setRenderBackendForTests(backend);
   await openUpRoughSong(JSON.stringify(fixture));
 }, 60000);
 afterAll(() => { setRenderBackendForTests(null); });
 
-describe('ensureUpRoughSong fills the R2 event log', () => {
+describe('renderUpRoughSong fills the R2 event log', () => {
   it('rendering the song and the store holds start, 13 bank voices, ..., done, equal to what the backend emitted', async () => {
     {
-      // The tracker no longer renders on play (it plays live); the render service is entered by ensureUpRoughSong.
-      await ensureUpRoughSong();
+      // The tracker no longer renders on play (it plays live); the render service is entered by renderUpRoughSong.
+      await renderUpRoughSong();
       const log = useUpRoughR2Store.getState().events;
       expect(onR2Calls).toBeGreaterThan(0);
       expect(log).toHaveLength(onR2Calls);

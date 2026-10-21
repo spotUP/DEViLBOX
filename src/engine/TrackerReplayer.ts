@@ -33,7 +33,6 @@ import { getAutomationPlayer } from './AutomationPlayer';
 import { syncCaptureToStore, resetCaptureSync } from './automation/AutomationCaptureSync';
 import { useTransportStore, cancelPendingRowUpdate } from '@/stores/useTransportStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
-import { stopUpRoughSong } from '@/lib/uprough/upRoughSongPlayer';
 import { setCellInPattern } from '@/stores/tracker/patternEditActions';
 import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useCursorStore } from '@/stores/useCursorStore';
@@ -2785,7 +2784,6 @@ export class TrackerReplayer {
 
     this.playing = false;
     this._playGeneration++; // Invalidate any in-flight async play()
-    stopUpRoughSong();
 
     // Stop WASM sequencer if active
     if (this.useWasmSequencer) {
@@ -2936,7 +2934,6 @@ export class TrackerReplayer {
       this.schedulerTimerId = null;
     }
     this.playing = false;
-    stopUpRoughSong();
 
     // Pause WASM sequencer
     if (this.useWasmSequencer) {
