@@ -186,7 +186,12 @@ export function dancehallInstrumentName(voice: string): string {
   const parts = voice.slice(DH_PREFIX.length).split(':');
   const words = (w: string): string => DH_NAME_WORDS[w] ?? w.split('_').map(titleCase).join(' ');
   if (parts[0] === 'perc') return `Percussion ${words(parts[1]!)} ${words(parts[2]!)}`;
-  if (parts[0] === 'keys') return `Keys ${words(parts[1]!.replace(/^dancehall_/, ''))} ${words(parts[2]!)}`;
+  if (parts[0] === 'keys') {
+    // The plain articulation adds no word; any other is named as one, so
+    // "chord_stab:stab" never reads "Chord Stab Stab" and the two stay apart.
+    const name = `Keys ${words(parts[1]!.replace(/^dancehall_/, ''))}`;
+    return parts[2] === 'normal' ? name : `${name} (${words(parts[2]!)} Articulation)`;
+  }
   return words(parts[0]!);
 }
 

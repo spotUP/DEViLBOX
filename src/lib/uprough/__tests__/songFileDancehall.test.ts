@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import fixture from './fixtures/dancehall_classic_seed1.uprough-song.json';
-import { LANE_LABEL, parseSongFile, songFileToSong, songToSongFile, type SongFileDoc } from '../songFile';
+import { LANE_LABEL, dancehallInstrumentName, parseSongFile, songFileToSong, songToSongFile, type SongFileDoc } from '../songFile';
 import { moveBlock } from '../songEdits';
 
 const load = (): SongFileDoc => structuredClone(fixture) as unknown as SongFileDoc;
 const open = () => songFileToSong(parseSongFile(load()));
 
 describe('dancehall song file (D4d)', () => {
+  it('names each dancehall keys instrument once, with no doubled word', () => {
+    const names = load().instruments.map((i) => dancehallInstrumentName(i.voice));
+    expect(new Set(names).size).toBe(names.length);
+    expect(names.filter((n) => /\b(\w+) \1\b/i.test(n))).toEqual([]);
+    expect(dancehallInstrumentName('dh:keys:dancehall_90s_chord_stab:stab')).toBe('Keys 90s Chord Stab (Stab Articulation)');
+    expect(dancehallInstrumentName('dh:keys:dancehall_90s_hollow_keys:normal')).toBe('Keys 90s Hollow Keys');
+  });
   it('imports the dancehall lanes with full-word names and exports the unedited file unchanged', () => {
     const f = load();
     const song = open();
