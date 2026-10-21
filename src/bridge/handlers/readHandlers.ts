@@ -1449,6 +1449,18 @@ export async function clearPerformanceJournal(): Promise<Record<string, unknown>
   return { ok: true };
 }
 
+/** Last N note triggers recorded by ToneEngine (ring buffer, cap 512). `clear: true` empties the buffer and turns
+ *  on call-stack capture for the entries that follow. */
+export async function getNoteTriggerLog(args: { clear?: boolean; limit?: number }): Promise<Record<string, unknown>> {
+  const { getNoteTriggerLog: get, clearNoteTriggerLog: clear } = await import('../../engine/debug/noteTriggerLog');
+  if (args?.clear) {
+    clear();
+    return { ok: true, cleared: true, stackCapture: true };
+  }
+  const entries = get(args?.limit);
+  return { count: entries.length, stackCapture: (globalThis as { __noteTriggerLogEnabled?: boolean }).__noteTriggerLogEnabled === true, entries };
+}
+
 /** Clears the Auto Dub fire log ring buffer. */
 export async function clearAutoDubFireLog(): Promise<Record<string, unknown>> {
   const { clearAutoDubFireLog: clear } = await import('../../engine/dub/AutoDub');

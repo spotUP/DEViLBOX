@@ -37,6 +37,7 @@ import { FurnaceSynth } from './FurnaceSynth';
 import { OPL3Synth } from './opl3/OPL3Synth';
 import { normalizeUrl } from '@utils/urlUtils';
 import { getNativeAudioNode, setDevilboxAudioContext, noteToMidi } from '@utils/audio-context';
+import { recordNoteTrigger } from './debug/noteTriggerLog';
 import { globalSingleton, clearGlobalSingleton } from '@utils/globalSingleton';
 import { SAFETY_LIMITER, makeupCancelGain, createToneSafetyLimiter } from './dj/djLimiter';
 import { VinylNoiseEffect } from './effects/VinylNoiseEffect';
@@ -3069,6 +3070,7 @@ export class ToneEngine {
     channelIndex?: number,
     hammer?: boolean
   ): void {
+    recordNoteTrigger('triggerNoteAttack', instrumentId, note, channelIndex);
     velocity = keyboardVelocity(config.metadata?.modPlayback, velocity, this.amigaPeriodSong, period);
     period = keyboardPeriod(config.metadata?.modPlayback, note, this.amigaPeriodSong, period);
     if (ToneEngine.NOTE_DEBUG) {
@@ -3624,6 +3626,7 @@ export class ToneEngine {
     accent: boolean = false,
     slide: boolean = false
   ): void {
+    recordNoteTrigger('triggerPolyNoteAttack', instrumentId, note);
     if (config.synthType === 'SuperCollider') {
       console.log('[SC:ToneEngine] triggerPolyNoteAttack called — id:', instrumentId, 'note:', note, 'synthType:', config.synthType, 'binary:', config.superCollider?.binary ? `${config.superCollider.binary.length}b` : 'EMPTY');
     }
@@ -3939,6 +3942,7 @@ export class ToneEngine {
     nnaAction: number = 0,  // IT New Note Action: 0=Cut, 1=Cont, 2=Off, 3=Fade
     hammer?: boolean        // TT-303 hammer: legato without pitch glide
   ): void {
+    recordNoteTrigger('triggerNote', instrumentId, note, channelIndex);
     velocity = keyboardVelocity(config.metadata?.modPlayback, velocity, this.amigaPeriodSong, period);
     period = keyboardPeriod(config.metadata?.modPlayback, note, this.amigaPeriodSong, period);
     const safeTime = this.getSafeTime(time);

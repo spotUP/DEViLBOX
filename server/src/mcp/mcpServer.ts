@@ -944,6 +944,13 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
   );
 
   server.tool(
+    'get_note_trigger_log',
+    'Read-only. Return the last N note triggers (ring buffer, cap 512) recorded at ToneEngine.triggerNote, triggerNoteAttack and triggerPolyNoteAttack: { t, audioTime, source, instrumentId, note, channel, caller }. Use to count how many times a row starts a voice (double-trigger hunts). { clear: true } empties the buffer and switches on call-stack capture (caller = first 4 app frames); { limit } takes the newest N.',
+    { clear: z.boolean().optional(), limit: z.number().optional() },
+    (args: { clear?: boolean; limit?: number }) => call('get_note_trigger_log', args),
+  );
+
+  server.tool(
     'get_performance_journal',
     'Return the performance journal: what was played and WHY. Each entry carries the move, channel, row and bar, plus - for the AI\'s own fires - the intention, the target and the reason the planner recorded. The user\'s moves appear in the same document, in the order they happened, with no invented reasoning. Optional { limit } (default 60, max 500) takes the most recent entries.',
     { limit: z.number().optional() },
@@ -2298,6 +2305,7 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
           { tool: 'dj_vj_action', description: 'Execute DJ/VJ soak-test action (dev-only)' },
           { tool: 'get_frame_stats', description: 'Frame-time percentiles from rAF recorder (dev-only)' },
           { tool: 'get_gpu_stats', description: 'GPU info from WebGL context (dev-only)' },
+          { tool: 'get_note_trigger_log', description: 'Ring buffer of note triggers at ToneEngine entry points; clear:true empties and enables caller stacks' },
         ],
         'Utility': [
           { tool: 'get_mcp_help', description: 'This help listing' },
