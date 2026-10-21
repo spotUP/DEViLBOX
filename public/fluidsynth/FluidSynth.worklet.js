@@ -7,7 +7,11 @@
  *   - fluidsynth_process() pulls interleaved stereo float samples
  *
  * Messages from main thread:
- *   init       { sampleRate, wasmBinary, jsCode }
+ *   init       { sampleRate, wasmBinary, jsCode, multi?, midiChannels?, audioGroups? }
+ *              multi: true creates the synth with audioGroups dry groups; the node
+ *              must have audioGroups+1 stereo outputs (i < G dry, G shared fx return)
+ *   getChannelBank { channel }  -> { type: 'channelBank', channel, bank } (-1 = no preset)
+ *   setChannelType { channel, channelType }   0 melodic, 1 drum ('type' is the message tag)
  *   loadSF2    { data: Uint8Array, filename: string }
  *   noteOn     { channel, key, velocity }
  *   noteOff    { channel, key }
@@ -38,18 +42,25 @@ class FluidSynthProcessor extends AudioWorkletProcessor {
     this._wasmBinary = null;
     this._wasmCrashed = false;
     this._sf2Loaded = false;
+    this._multi = false;
+    this._groups = 1;
+    this._midiChannels = 16;
+    this._outPtrsPtr = 0;
+    this._groupPtrs = [];
+    this._fxLPtr = 0;
+    this._fxRPtr = 0;
 
     this.port.onmessage = (event) => {
       const { type } = event.data;
       if (type === 'init') {
-        this._initWasm(event.data.sampleRate, event.data.wasmBinary, event.data.jsCode);
+        this._initWasm(event.data.sampleRate, event.data.wasmBinary, event.data.jsCode, event.data);
       } else {
         this._handleMessage(event.data);
       }
     };
   }
 
-  async _initWasm(sr, wasmBinary, jsCode) {
+  async _initWasm(sr, wasmBinary, jsCode, opts) {
     try {
       this._sampleRate = sr;
 
@@ -106,11 +117,30 @@ class FluidSynthProcessor extends AudioWorkletProcessor {
       const m = this.module;
 
       // Create the synth engine
-      m._fluidsynth_create(sr);
-
-      // Allocate left/right render buffers
-      this._leftPtr = m._malloc(RENDER_FRAMES * 4);
-      this._rightPtr = m._malloc(RENDER_FRAMES * 4);
+      this._multi = !!(opts && opts.multi);
+      if (this._multi) {
+        const G = opts.audioGroups || 64;
+        this._groups = G;
+        this._midiChannels = opts.midiChannels || 64;
+        m._fluidsynth_create_ex(sr, this._midiChannels, G);
+        // 2*G dry buffers (L,R per group) + one fx pair, plus the pointer table
+        this._outPtrsPtr = m._malloc(2 * G * 4);
+        this._groupPtrs = [];
+        for (let i = 0; i < 2 * G; i++) {
+          const p = m._malloc(RENDER_FRAMES * 4);
+          this._groupPtrs.push(p);
+        }
+        this._fxLPtr = m._malloc(RENDER_FRAMES * 4);
+        this._fxRPtr = m._malloc(RENDER_FRAMES * 4);
+        // Fill the table after all mallocs (memory growth detaches earlier views)
+        const table = new Uint32Array(m.HEAPF32.buffer, this._outPtrsPtr, 2 * G);
+        for (let i = 0; i < 2 * G; i++) table[i] = this._groupPtrs[i];
+      } else {
+        m._fluidsynth_create(sr);
+        // Allocate left/right render buffers
+        this._leftPtr = m._malloc(RENDER_FRAMES * 4);
+        this._rightPtr = m._malloc(RENDER_FRAMES * 4);
+      }
 
       this._wasmBinary = wasmBuffer;
       this._wasmCrashed = false;
@@ -179,11 +209,19 @@ class FluidSynthProcessor extends AudioWorkletProcessor {
         m._fluidsynth_channel_pressure(data.channel || 0, data.val);
         break;
 
+      case 'setChannelType':
+        m._fluidsynth_set_channel_type(data.channel || 0, data.channelType ? 1 : 0);
+        break;
+
+      case 'getChannelBank':
+        this.port.postMessage({ type: 'channelBank', channel: data.channel || 0, bank: m._fluidsynth_get_channel_bank(data.channel || 0) });
+        break;
+
       case 'allNotesOff':
         if (data.channel != null && data.channel >= 0) {
           m._fluidsynth_all_notes_off(data.channel);
         } else {
-          for (let ch = 0; ch < 16; ch++) m._fluidsynth_all_notes_off(ch);
+          for (let ch = 0; ch < this._midiChannels; ch++) m._fluidsynth_all_notes_off(ch);
         }
         break;
 
@@ -191,7 +229,7 @@ class FluidSynthProcessor extends AudioWorkletProcessor {
         if (data.channel != null && data.channel >= 0) {
           m._fluidsynth_all_sounds_off(data.channel);
         } else {
-          for (let ch = 0; ch < 16; ch++) m._fluidsynth_all_sounds_off(ch);
+          for (let ch = 0; ch < this._midiChannels; ch++) m._fluidsynth_all_sounds_off(ch);
         }
         break;
 
@@ -265,8 +303,40 @@ class FluidSynthProcessor extends AudioWorkletProcessor {
     }
   }
 
+  _processMulti(outputs) {
+    const first = outputs[0];
+    if (!first || first.length === 0) return true;
+    const frames = first[0].length;
+    try {
+      const m = this.module;
+      const G = this._groups;
+      m._fluidsynth_process_multi(this._outPtrsPtr, this._fxLPtr, this._fxRPtr, frames);
+      const buf = m.HEAPF32.buffer;
+      for (let g = 0; g < G; g++) {
+        const out = outputs[g];
+        if (!out || out.length === 0) continue;
+        out[0].set(new Float32Array(buf, this._groupPtrs[2 * g], frames));
+        if (out.length > 1) out[1].set(new Float32Array(buf, this._groupPtrs[2 * g + 1], frames));
+      }
+      const fx = outputs[G];
+      if (fx && fx.length > 0) {
+        fx[0].set(new Float32Array(buf, this._fxLPtr, frames));
+        if (fx.length > 1) fx[1].set(new Float32Array(buf, this._fxRPtr, frames));
+      }
+    } catch (err) {
+      if (!this._wasmCrashed) {
+        console.error('[FluidSynth Worklet] Process error:', err);
+        this._wasmCrashed = true;
+        this.port.postMessage({ type: 'error', message: 'WASM crash: ' + err.message });
+      }
+    }
+    return true;
+  }
+
   process(_inputs, outputs, _parameters) {
     if (!this.initialized || !this.module || this._wasmCrashed) return true;
+
+    if (this._multi) return this._processMulti(outputs);
 
     const output = outputs[0];
     if (!output || output.length === 0) return true;
