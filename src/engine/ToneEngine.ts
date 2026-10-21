@@ -37,6 +37,7 @@ import { FurnaceSynth } from './FurnaceSynth';
 import { OPL3Synth } from './opl3/OPL3Synth';
 import { normalizeUrl } from '@utils/urlUtils';
 import { getNativeAudioNode, setDevilboxAudioContext, noteToMidi } from '@utils/audio-context';
+import { FluidSynthHost } from './fluidsynth/FluidSynthHost';
 import { globalSingleton, clearGlobalSingleton } from '@utils/globalSingleton';
 import { SAFETY_LIMITER, makeupCancelGain, createToneSafetyLimiter } from './dj/djLimiter';
 import { VinylNoiseEffect } from './effects/VinylNoiseEffect';
@@ -2690,6 +2691,11 @@ export class ToneEngine {
       case 'Monique':
       case 'VL1': {
         instrument = InstrumentFactory.createInstrument(config);
+        if (instrument && config.synthType === 'FluidSynth' && isDevilboxSynth(instrument)) {
+          // Song-wide reverb/chorus of the shared FluidSynth worklet; the dry signal goes per channel.
+          const busNode = getNativeAudioNode(this.synthBus as unknown as Record<string, unknown>);
+          if (busNode) FluidSynthHost.peek(instrument.output.context)?.connectFxReturn(busNode);
+        }
         if (instrument) {
           console.log('[ToneEngine] Zynthian synth created:', config.synthType,
             'isDevilbox:', isDevilboxSynth(instrument),

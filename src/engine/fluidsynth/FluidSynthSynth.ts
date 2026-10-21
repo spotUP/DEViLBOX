@@ -1,17 +1,15 @@
 /**
- * FluidSynthSynth.ts - FluidSynth SF2 player WASM engine for DEViLBOX
+ * FluidSynthSynth.ts - FluidSynth SF2 instrument for DEViLBOX
  *
- * Features:
- * - SF2 SoundFont loading
- * - Reverb (room size, damping, width, level)
- * - Chorus (voices, level, speed, depth, type)
- * - Program/bank selection for GM sounds
- * - Tuning and transpose
- * - ~15 parameters
+ * Each instrument is a facade over one MIDI channel ("slot") of the shared
+ * FluidSynthHost worklet: one WASM synth and one SoundFont per AudioContext.
+ * Program and bank are per slot; reverb, chorus, gain and polyphony are
+ * synth-wide (last writer wins). Transpose is applied to the key here.
  */
 
 import type { DevilboxSynth } from '@/types/synth';
-import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import { noteToMidi } from '@/utils/audio-context';
+import { FluidSynthHost } from './FluidSynthHost';
 
 export const FluidSynthParam = {
   REVERB_ROOM_SIZE: 0, REVERB_DAMPING: 1, REVERB_WIDTH: 2, REVERB_LEVEL: 3,
@@ -128,220 +126,133 @@ export const FLUIDSYNTH_PRESETS: Record<string, FluidSynthConfig> = {
   },
 };
 
-const CONFIG_KEYS: (keyof FluidSynthConfig)[] = [
+/** Bridge setParam ids 0-10, applied to every channel of the synth. */
+const SYNTH_WIDE_KEYS: (keyof FluidSynthConfig)[] = [
   'reverbRoomSize', 'reverbDamping', 'reverbWidth', 'reverbLevel',
   'chorusVoices', 'chorusLevel', 'chorusSpeed', 'chorusDepth', 'chorusType',
   'gain', 'polyphony',
-  'program', 'bank',
-  'tuning', 'transpose',
 ];
+
+const DRUM_BANK = 128;
+
+const toMidiKey = (frequency: number | string): number =>
+  typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
 
 export class FluidSynthSynthEngine implements DevilboxSynth {
   readonly name = 'FluidSynthSynthEngine';
   readonly output: GainNode;
 
-  private _worklet: AudioWorkletNode | null = null;
-  private config: FluidSynthConfig;
-  private isInitialized = false;
-  /** True once a SoundFont is loaded: FluidSynth renders silence for a note-on before that. */
-  private soundFontLoaded = false;
-  private _resolveSoundFont: (() => void) | null = null;
-  private _soundFontPromise: Promise<void> = new Promise<void>((resolve) => { this._resolveSoundFont = resolve; });
-  private pendingNotes: Array<{ note: number; velocity: number }> = [];
-
-  private static isWorkletLoaded = false;
-  private static workletLoadPromise: Promise<void> | null = null;
-  private _initPromise: Promise<void>;
+  protected config: FluidSynthConfig;
+  private host: FluidSynthHost | null;
+  /** MIDI channel and audio group of the shared synth this instrument plays on. */
+  readonly slot: number;
+  private readonly slotOut: GainNode;
+  private drum: boolean;
+  /** Sounding key per played MIDI note, so a transpose change cannot strand a note. */
+  private readonly held = new Map<number, number>();
 
   constructor(config: Partial<FluidSynthConfig> = {}) {
-    this.output = getDevilboxAudioContext().createGain();
     this.config = { ...DEFAULT_FLUIDSYNTH, ...config };
-    this._initPromise = this.initialize();
+    const host = FluidSynthHost.acquire();
+    this.host = host;
+    this.output = host.ctx.createGain();
+    this.drum = this.config.bank === DRUM_BANK;
+    this.slot = host.allocSlot(this.drum);
+    this.slotOut = host.slotOutput(this.slot);
+    this.slotOut.connect(this.output);
+    this.sendConfig();
   }
 
   public async ensureInitialized(): Promise<void> {
-    await this._initPromise;
-    // Resolve only once the default SoundFont is in: a note before it is silent.
-    await this._soundFontPromise;
+    if (!this.host) return;
+    await this.host.ready;
+    // A note before the SoundFont is in is held by the host, not lost.
+    await this.host.sfReady;
   }
 
-  private async initialize(): Promise<void> {
-    try {
-      const rawContext = getDevilboxAudioContext();
-      const baseUrl = import.meta.env.BASE_URL || '/';
-
-      if (!FluidSynthSynthEngine.isWorkletLoaded) {
-        if (!FluidSynthSynthEngine.workletLoadPromise) {
-          FluidSynthSynthEngine.workletLoadPromise = rawContext.audioWorklet.addModule(
-            `${baseUrl}fluidsynth/FluidSynth.worklet.js`
-          );
-        }
-        await FluidSynthSynthEngine.workletLoadPromise;
-        FluidSynthSynthEngine.isWorkletLoaded = true;
-      }
-
-      const [wasmResponse, jsResponse] = await Promise.all([
-        fetch(`${baseUrl}fluidsynth/FluidSynth.wasm`),
-        fetch(`${baseUrl}fluidsynth/FluidSynth.js`)
-      ]);
-
-      if (!wasmResponse.ok) throw new Error(`Failed to load FluidSynth.wasm: ${wasmResponse.status}`);
-      if (!jsResponse.ok) throw new Error(`Failed to load FluidSynth.js: ${jsResponse.status}`);
-
-      const [wasmBinary, jsCodeRaw] = await Promise.all([
-        wasmResponse.arrayBuffer(),
-        jsResponse.text()
-      ]);
-
-      const urlPolyfill = 'if(typeof URL==="undefined"){globalThis.URL=class{constructor(p,b){this.href=(b||"")+p;this.pathname=p;}};}\n';
-      const jsCode = urlPolyfill + jsCodeRaw
-        .replace(/import\.meta\.url/g, `"${baseUrl}fluidsynth/"`)
-        .replace(/export\s+default\s+\w+;?\s*$/, '')
-        .replace(/if\s*\(ENVIRONMENT_IS_NODE\)\s*\{[^}]*await\s+import\([^)]*\)[^}]*\}/g, '')
-        .replace(/(wasmMemory\s*=\s*wasmExports\[['"][\w]+['"]\])/, '$1;Module["wasmMemory"]=wasmMemory')
-        .replace(/new\s+URL\(([^,]+),\s*([^)]+)\)\.href/g, '($2 + $1)');
-
-      this._worklet = new AudioWorkletNode(rawContext, 'fluidsynth-processor', {
-        outputChannelCount: [2],
-        numberOfOutputs: 1,
-      });
-
-      this._worklet.port.onmessage = (event) => {
-        if (event.data.type === 'ready') {
-          this.isInitialized = true;
-          this.sendConfig(this.config);
-          // Auto-load default SF2 so the synth produces sound immediately
-          void this.loadDefaultSF2(baseUrl);
-        } else if (event.data.type === 'error') {
-          console.error('FluidSynth error:', event.data.message || event.data.error);
-          // Do not hold ensureInitialized() forever when no SoundFont can load.
-          this._resolveSoundFont?.();
-        } else if (event.data.type === 'sf2Loaded') {
-          console.log('FluidSynth: SF2 loaded, id:', event.data.id);
-          this.soundFontLoaded = true;
-          this._resolveSoundFont?.();
-          for (const { note, velocity } of this.pendingNotes) {
-            this._worklet!.port.postMessage({ type: 'noteOn', channel: 0, key: note, velocity });
-          }
-          this.pendingNotes = [];
-        }
-      };
-
-      this._worklet.port.postMessage({
-        type: 'init', wasmBinary, jsCode, sampleRate: rawContext.sampleRate,
-      });
-
-      this._worklet.connect(this.output);
-
-      try {
-        const keepalive = rawContext.createGain();
-        keepalive.gain.value = 0;
-        this._worklet.connect(keepalive);
-        keepalive.connect(rawContext.destination);
-      } catch { /* keepalive failed */ }
-
-    } catch (error) {
-      console.error('Failed to initialize FluidSynth:', error);
-      throw error;
+  /** Post the whole config. The host holds it until the SoundFont is in. */
+  private sendConfig(): void {
+    for (let i = 0; i < SYNTH_WIDE_KEYS.length; i++) {
+      const value = this.config[SYNTH_WIDE_KEYS[i]];
+      if (value !== undefined) this.host?.post({ type: 'setParam', index: i, value });
     }
+    this.sendProgram();
   }
 
-  /** Post the whole config to the worklet. Values set before 'ready' were only stored, so no diff here. */
-  private sendConfig(config: FluidSynthConfig): void {
-    if (!this._worklet || !this.isInitialized) return;
-    for (let i = 0; i < CONFIG_KEYS.length; i++) {
-      const value = config[CONFIG_KEYS[i]];
-      if (value !== undefined) {
-        this._worklet.port.postMessage({ type: 'setParam', index: i, value });
-      }
+  /** Bank then program on this slot; a move to or from the drum bank switches the channel type. */
+  private sendProgram(): void {
+    const host = this.host;
+    if (!host) return;
+    const bank = this.config.bank ?? 0;
+    const drum = bank === DRUM_BANK;
+    if (drum !== this.drum) {
+      this.drum = drum;
+      host.post({ type: 'setChannelType', channel: this.slot, channelType: drum ? 1 : 0 });
     }
-  }
-
-  private async loadDefaultSF2(baseUrl: string): Promise<void> {
-    try {
-      const res = await fetch(`${baseUrl}fluidsynth/default.sf2`);
-      if (!res.ok) { this._resolveSoundFont?.(); return; }
-      const data = await res.arrayBuffer();
-      this.loadSF2(data, 'default.sf2');
-    } catch {
-      // No default SF2 available — user must load one manually
-      this._resolveSoundFont?.();
-    }
+    host.post({ type: 'bankSelect', channel: this.slot, bank });
+    host.post({ type: 'programChange', channel: this.slot, program: this.config.program ?? 0 });
   }
 
   loadSF2(data: ArrayBuffer | Uint8Array, filename?: string): void {
-    if (!this._worklet) {
-      console.warn('FluidSynth: worklet not ready, cannot load SF2');
-      return;
-    }
-    const u8 = data instanceof Uint8Array ? data : new Uint8Array(data);
-    const buf = u8.buffer.byteLength === u8.length ? u8.buffer : u8.slice().buffer;
-    this._worklet.port.postMessage(
-      { type: 'loadSF2', data: new Uint8Array(buf), filename: filename || 'soundfont.sf2' },
-      [buf]
-    );
+    this.host?.loadSoundFont(data, filename);
   }
 
   triggerAttack(frequency: number | string, _time?: number, velocity?: number): this {
-    const key = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
-    const vel = Math.round((velocity ?? 0.8) * 127);
-    if (!this.isInitialized || !this._worklet || !this.soundFontLoaded) {
-      this.pendingNotes.push({ note: key, velocity: vel });
-      return this;
-    }
-    this._worklet.port.postMessage({ type: 'noteOn', channel: 0, key, velocity: vel });
+    if (!this.host) return this;
+    const note = toMidiKey(frequency);
+    const key = Math.max(0, Math.min(127, note + (this.config.transpose ?? 0)));
+    this.held.set(note, key);
+    this.host.post({ type: 'noteOn', channel: this.slot, key, velocity: Math.round((velocity ?? 0.8) * 127) });
     return this;
   }
 
   triggerRelease(frequency?: number | string, _time?: number): this {
-    if (!this._worklet || !this.isInitialized || !this.soundFontLoaded) {
-      // Clear pending notes to prevent stuck notes when noteOff arrives before init
-      if (frequency !== undefined) {
-        const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
-        this.pendingNotes = this.pendingNotes.filter(p => p.note !== note);
-      } else {
-        this.pendingNotes = [];
-      }
+    if (!this.host) return this;
+    if (frequency === undefined) {
+      this.held.clear();
+      this.host.post({ type: 'allNotesOff', channel: this.slot });
       return this;
     }
-    if (frequency !== undefined) {
-      const key = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
-      this._worklet.port.postMessage({ type: 'noteOff', channel: 0, key });
-    } else {
-      this._worklet.port.postMessage({ type: 'allNotesOff' });
-    }
+    const note = toMidiKey(frequency);
+    const key = this.held.get(note) ?? Math.max(0, Math.min(127, note + (this.config.transpose ?? 0)));
+    this.held.delete(note);
+    this.host.post({ type: 'noteOff', channel: this.slot, key });
     return this;
   }
 
   set(param: string, value: number): void {
-    const index = CONFIG_KEYS.indexOf(param as keyof FluidSynthConfig);
+    if (!(param in DEFAULT_FLUIDSYNTH)) return;
+    const key = param as keyof FluidSynthConfig;
+    this.config[key] = value;
+    const index = SYNTH_WIDE_KEYS.indexOf(key);
     if (index >= 0) {
-      (this.config as Record<string, number>)[param] = value;
-      if (this._worklet && this.isInitialized) {
-        this._worklet.port.postMessage({ type: 'setParam', index, value });
-      }
+      this.host?.post({ type: 'setParam', index, value });
+    } else if (key === 'program' || key === 'bank') {
+      this.sendProgram();
     }
+    // transpose is read at note time; tuning has no bridge support.
   }
 
   get(param: string): number | undefined {
-    return (this.config as Record<string, number | undefined>)[param];
+    return this.config[param as keyof FluidSynthConfig];
   }
 
   setPreset(name: string): void {
     const preset = FLUIDSYNTH_PRESETS[name];
     if (preset) {
       this.config = { ...preset };
-      this.sendConfig(this.config);
+      this.sendConfig();
     }
   }
 
   dispose(): void {
-    if (this._worklet) {
-      this._worklet.port.postMessage({ type: 'dispose' });
-      this._worklet.disconnect();
-      this._worklet = null;
-    }
-    this.isInitialized = false;
+    const host = this.host;
+    if (!host) return;
+    this.host = null;
+    host.post({ type: 'allNotesOff', channel: this.slot });
+    try { this.slotOut.disconnect(this.output); } catch { /* not connected */ }
+    host.freeSlot(this.slot);
+    host.release();
   }
 }
 
@@ -351,9 +262,8 @@ export class FluidSynthSynthImpl extends FluidSynthSynthEngine {
   }
 
   applyConfig(config: Partial<FluidSynthConfig>): void {
-    const prev = (this as any).config as Record<string, number | undefined>;
     for (const [key, value] of Object.entries(config)) {
-      if (typeof value === 'number' && value !== prev[key]) {
+      if (typeof value === 'number' && value !== this.get(key)) {
         this.set(key, value);
       }
     }
