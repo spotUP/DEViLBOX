@@ -14,7 +14,7 @@
  */
 import type { InstrumentConfig } from '@/types/instrument';
 import type { Pattern } from '@/types';
-import { instrumentChannelUsage } from './instrumentChannelUsage';
+import { instrumentChannelUsage, instrumentNoteUsage } from './instrumentChannelUsage';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { useMixerStore } from '@stores/useMixerStore';
@@ -222,7 +222,7 @@ export async function applySong(song: SongToApply, source: SongSource): Promise<
   if (routesThroughLibopenmpt(song.engine)) void warmLibopenmptPlayback();
 
   if (song.preload !== false && song.instruments.some((i) => i.synthType && i.synthType !== 'Synth')) {
-    await engine.preloadInstruments(song.instruments, instrumentChannelUsage(song.patterns));
+    await engine.preloadInstruments(song.instruments, instrumentChannelUsage(song.patterns), instrumentNoteUsage(song.patterns));
   }
   // The song's starting sends, decided once, after the song's own mixer has
   // loaded (a send the file set is kept). Closing every send above starves a

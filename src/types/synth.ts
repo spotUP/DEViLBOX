@@ -27,8 +27,12 @@ export interface DevilboxSynth {
    * no mute was silent for every synth (release envelopes outlive it, native
    * engines have outputs beside `output`). A synth that measurably needs
    * priming does it here, in whatever way makes no sound.
+   *
+   * `notes` are the note names (as triggerAttack receives them) the song plays
+   * on this instrument, when the load knows them. A synth that renders per note
+   * renders these here, so no render runs on the trigger path.
    */
-  warmUp?(): void;
+  warmUp?(notes?: readonly string[]): void;
   /** Set a named parameter */
   set?(param: string, value: number): void;
   /** Get a named parameter value */

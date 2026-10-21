@@ -5,7 +5,7 @@
  * instrument for a note without one. A note off never triggers anything.
  */
 import { describe, it, expect } from 'vitest';
-import { instrumentChannelUsage } from '../instrumentChannelUsage';
+import { instrumentChannelUsage, instrumentNoteUsage } from '../instrumentChannelUsage';
 import type { Pattern, TrackerCell } from '@/types';
 
 const cell = (over: Partial<TrackerCell>): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, ...over } as TrackerCell);
@@ -36,5 +36,22 @@ describe('instrumentChannelUsage', () => {
   it('multi-note cells count their extra instrument columns', () => {
     const usage = instrumentChannelUsage([pattern([{ instrumentId: null, rows: [cell({ note: 49, instrument: 1, instrument2: 3, instrument3: 4 })] }])]);
     expect([1, 3, 4].map((id) => [...usage.get(id)!])).toEqual([[0], [0], [0]]);
+  });
+});
+
+describe('instrumentNoteUsage', () => {
+  it('collects each instrument\'s notes: cell instrument, else channel default; note off adds nothing', () => {
+    const usage = instrumentNoteUsage([
+      pattern([
+        { instrumentId: 5, rows: [cell({ note: 37 }), cell({ note: 40, instrument: 2 }), cell({ note: 97 }), cell({ note: 37 })] },
+      ]),
+    ]);
+    expect([...usage.get(5)!]).toEqual([37]);
+    expect([...usage.get(2)!]).toEqual([40]);
+  });
+  it('an extra note column plays on its own instrument column, else on the cell\'s instrument', () => {
+    const usage = instrumentNoteUsage([pattern([{ instrumentId: null, rows: [cell({ note: 49, instrument: 1, note2: 52, note3: 56, instrument3: 4 })] }])]);
+    expect([...usage.get(1)!].sort()).toEqual([49, 52]);
+    expect([...usage.get(4)!]).toEqual([56]);
   });
 });
