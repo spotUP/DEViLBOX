@@ -19,7 +19,7 @@ const STEP_FIELDS: readonly string[] = ['note', 'instrument', 'ctrl', 'volume', 
  */
 const editedFiles = new WeakSet<ArrayBuffer>();
 
-function markEdited(): void {
+export function markEdited(): void {
   const file = useFormatStore.getState().klysFileData;
   if (file) editedFiles.add(file);
 }
