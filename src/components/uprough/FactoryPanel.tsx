@@ -86,6 +86,9 @@ function useSlotGrid(ref: React.RefObject<HTMLDivElement | null>, count: number)
   return useMemo(() => (size ? slotGrid(size.w, size.h, count) : { cols: 1, rows: Math.max(1, count), wave: WAVE_MIN }), [size, count]);
 }
 
+/** The finished voice is drawn this much below the box edge (the draft's +15 percent), leaving headroom for the pump-up. */
+export const ABSOLUTE_HEADROOM = 1.15;
+
 export const PREVIEW_CAPTION = 'Preview before mastering';
 
 export const NO_PREVIEW = 'No local preview for this style';
@@ -128,6 +131,8 @@ function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => 
   const stamped = !!voice?.bank && (!line || t >= line.stampAt);
   const bounce = line && stamped ? stampBounce(t - line.stampAt, reduced) : 0;
   const lit = slot.alive && (!line || t >= line.start || !!slot.born);
+  // Absolute scale (G2): every stage is drawn against the finished voice's peak plus 15 percent, so early stages are small and grow.
+  const reference = voice?.bank ? voice.bank.scale * ABSOLUTE_HEADROOM : undefined;
   const chip = line ? popIn(t - line.chipAt, reduced) : { scale: 1, alpha: 1 };
   return (
     <div
@@ -138,7 +143,7 @@ function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => 
       {slot.born ? (
         <Wave a={slot.born} height={waveHeight} eyes={timeSec} final />
       ) : (
-        <Wave a={stamped ? voice?.bank : cur?.peaks} height={waveHeight} b={stamped ? undefined : next?.peaks} frac={shown.frac} final={stamped} eyes={timeSec}
+        <Wave a={stamped ? voice?.bank : cur?.peaks} height={waveHeight} b={stamped ? undefined : next?.peaks} frac={shown.frac} final={stamped} eyes={timeSec} reference={reference}
           env={cur?.env} envLabel={cur ? spoken(cur.stage) : ''} />
       )}
       <div className="text-[10px] font-mono text-text-secondary min-h-[1.4em] truncate" style={{ transform: `translateY(${bounce * 4}px)` }}>
