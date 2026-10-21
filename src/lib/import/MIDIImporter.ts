@@ -151,12 +151,18 @@ export async function importMIDIFile(
       if (row < 0 || row >= totalRows) continue;
       const offTick = adjustNoteOffForSustain(note.ticks + note.durationTicks, sustainIntervals);
 
-      let voice = voices.find((v) => v.busyUntilRow <= row);
+      // A key struck again while it still sounds re-strikes it: a MIDI synth
+      // ends the old voice, so the note goes on the voice that holds that key.
+      // A new voice would sound both (a same-tick duplicate played 6 dB loud).
+      let voice = voices.find((v) => v.busyUntilRow > row && v.midi === note.midi)
+        ?? voices.find((v) => v.busyUntilRow <= row);
       if (!voice) {
-        voice = { rows: makeEmptyRows(totalRows), busyUntilRow: 0 };
+        voice = { rows: makeEmptyRows(totalRows), busyUntilRow: 0, midi: -1 };
         voices.push(voice);
       }
-      voice.busyUntilRow = placeNote(voice.rows, row, offTick, note, instId, timing, opts.velocityToVolume);
+      const freeRow = placeNote(voice.rows, row, offTick, note, instId, timing, opts.velocityToVolume);
+      voice.busyUntilRow = Math.max(freeRow, voice.busyUntilRow > row ? voice.busyUntilRow : 0);
+      voice.midi = note.midi;
     }
 
     const defaults = initialChannelDefaults(track);
@@ -304,6 +310,8 @@ interface Voice {
   rows: TrackerCell[];
   /** First row this voice is free again (the row holding its note-off). */
   busyUntilRow: number;
+  /** MIDI key of the last note placed on this voice. */
+  midi: number;
 }
 
 function makeEmptyRows(length: number): TrackerCell[] {
