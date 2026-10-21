@@ -8,6 +8,7 @@ import { Lock, Volume2, VolumeX, RotateCcw } from 'lucide-react';
 import { useFactoryStore } from '@/lib/uprough/factory/useFactoryStore';
 import { actOneSchedule, FAN_SECONDS, stageAtTime, type VoiceTimeline } from '@/lib/uprough/factory/pacing';
 import { bandBusy, CONVEYOR_SPEED, chipPosition, growHeights, popIn, prefersReducedMotion, SETTLE, Spring, stampBounce } from '@/lib/uprough/factory/motion';
+import { fidgetOffset, gazeAt, gazeFocus } from '@/lib/uprough/factory/eyeMotion';
 import { drawConveyor, drawEnvelope, drawEyes, drawGear, drawPlayhead, PLATE_SECONDS, drawStamp, drawWave, fitCanvas, readTokens, type FactoryColors } from '@/lib/uprough/factory/draw';
 import { actOneEnd, actOneStatus, hatFanStart } from '@/lib/uprough/factory/statusLine';
 import { slotGrid, SLOT_GAP, WAVE_MIN, type SlotGrid } from '@/lib/uprough/factory/layout';
@@ -54,8 +55,8 @@ function useRedrawOnResize(ref: React.RefObject<HTMLCanvasElement | null>): void
   }, [ref]);
 }
 
-function Wave(props: { a?: Peaks; b?: Peaks; frac?: number; reveal?: number; reference?: number; height?: number; final?: boolean; env?: { values: number[]; n: number }; envLabel?: string; eyes?: number; idle?: boolean; plate?: { name: string; since: number; squash: number }; playhead?: number }): React.ReactElement {
-  const { a, b, frac = 0, reveal = 1, reference, height = 56, final = false, env, envLabel, eyes, idle = false, plate, playhead } = props;
+function Wave(props: { a?: Peaks; b?: Peaks; frac?: number; reveal?: number; reference?: number; height?: number; final?: boolean; env?: { values: number[]; n: number }; envLabel?: string; eyes?: number; eyeSeed?: number; gaze?: { x: number; y: number }; idle?: boolean; plate?: { name: string; since: number; squash: number }; playhead?: number }): React.ReactElement {
+  const { a, b, frac = 0, reveal = 1, reference, height = 56, final = false, env, envLabel, eyes, eyeSeed = 0, gaze, idle = false, plate, playhead } = props;
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const cv = ref.current;
@@ -67,7 +68,7 @@ function Wave(props: { a?: Peaks; b?: Peaks; frac?: number; reveal?: number; ref
     if (env) drawEnvelope(ctx, w, h, env, envLabel ?? '', c);
     if (playhead !== undefined) drawPlayhead(ctx, w, h, playhead, c.text);
     if (plate) drawStamp(ctx, w, plate.name, plate.since, plate.squash, c);
-    if (eyes !== undefined) drawEyes(ctx, w - 24, 12, eyes, 0, c, idle);
+    if (eyes !== undefined) drawEyes(ctx, w - 24, 12, eyes, eyeSeed, c, idle, gaze);
   });
   useRedrawOnResize(ref);
   return <canvas ref={ref} width={240} height={height} className="w-full block" style={{ height }} />;
@@ -123,24 +124,29 @@ function voiceTimelines(state: FactoryState): Map<string, VoiceTimeline> {
   return new Map(actOneSchedule(voices, state.rate).map((l) => [l.voice, l]));
 }
 
-function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => void; slot: SlotView; lines: Map<string, VoiceTimeline>; t: number; reduced: boolean; timeSec: number; preview: boolean; waveHeight: number; rate: number; finaleAt?: number }): React.ReactElement {
-  const { slot, lines, t, reduced, timeSec, preview, register, waveHeight, rate, finaleAt } = props;
+/** The voice a slot shows at clock `t`, and whether it is stamped (finished) or building right now. */
+function slotProgress(slot: SlotView, lines: Map<string, VoiceTimeline>, t: number): { voice: VoiceView | undefined; line: VoiceTimeline | undefined; stamped: boolean; building: boolean } {
   const voice: VoiceView | undefined = slot.voices.find((v) => {
     const line = lines.get(v.voice);
     return !line || t >= line.start;
   }) ?? slot.voices[0];
   const line = voice ? lines.get(voice.voice) : undefined;
+  const stamped = !!voice?.bank && (!line || t >= line.stampAt);
+  return { voice, line, stamped, building: !!line && t >= line.start && !stamped };
+}
+
+function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => void; slot: SlotView; lines: Map<string, VoiceTimeline>; t: number; reduced: boolean; timeSec: number; preview: boolean; waveHeight: number; rate: number; finaleAt?: number; slotIndex: number; cols: number; buildingIndex?: number; chipRiding: boolean }): React.ReactElement {
+  const { slot, lines, t, reduced, timeSec, preview, register, waveHeight, rate, finaleAt, slotIndex, cols, buildingIndex, chipRiding } = props;
+  const { voice, line, stamped, building } = slotProgress(slot, lines, t);
   const shown = line ? stageAtTime(line, t) : { index: voice ? voice.stages.length - 1 : -1, frac: 1 };
   const stages = voice?.stages ?? [];
   const cur = stages[Math.max(0, shown.index)];
   const next = stages[shown.index + 1];
-  const stamped = !!voice?.bank && (!line || t >= line.stampAt);
   const bounce = line && stamped ? stampBounce(t - line.stampAt, reduced) : 0;
   // Absolute scale (G2): every stage is drawn against the finished voice's peak plus 15 percent, so early stages are small and grow.
   const reference = voice?.bank ? voice.bank.scale * ABSOLUTE_HEADROOM : undefined;
   const chip = line ? popIn(t - line.chipAt, reduced) : { scale: 1, alpha: 1 };
   // Card state (G10): waiting (dim, dashed), building (glowing), built. Squash and stretch kicks when the build starts.
-  const building = !!line && t >= line.start && !stamped;
   const state = stamped || slot.born ? 'built' : building ? 'building' : 'waiting';
   // Finale (G20): at the act-1 clock's end every slot kicks together.
   const kick = finaleAt !== undefined && t >= finaleAt ? popIn(t - finaleAt, reduced).scale : line ? popIn(t - line.start, reduced).scale : 1;
@@ -153,17 +159,20 @@ function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => 
   // Chip pop-in (G15) and hat fan-out (G14): attachment and hat chips pop like the voice chips, one FAN_SECONDS after each other.
   const fanBase = Math.max(0, ...slot.voices.map((v) => lines.get(v.voice)?.chipAt ?? 0));
   const fanned = (i: number): { scale: number; alpha: number } => (fanBase > 0 ? popIn(t - fanBase - i * FAN_SECONDS, reduced) : { scale: 1, alpha: 1 });
+  // Eyes (R2f): each slot blinks, glances and fidgets on its own seed (its index); gaze goes to what is happening.
+  const gaze = gazeAt(timeSec, slotIndex, gazeFocus({ slotIndex, cols, buildingIndex, playhead, chipRiding }));
+  const fidget = reduced ? { x: 0, y: 0, rot: 0 } : fidgetOffset(timeSec, slotIndex);
   return (
     <div
       data-testid={`factory-slot-${slot.id}`} data-state={state} ref={(el) => register(slot.id, el)}
-      style={{ transform: `scale(${1 - (1 - kick) * 0.08})` }}
+      style={{ transform: `translate(${fidget.x.toFixed(2)}px, ${fidget.y.toFixed(2)}px) rotate(${fidget.rot.toFixed(3)}deg) scale(${1 - (1 - kick) * 0.08})` }}
       className={`rounded-md p-2 flex flex-col gap-1 min-h-0 min-w-0 overflow-hidden bg-dark-bgSecondary border ${state === 'waiting' ? 'border-dashed border-dark-borderLight opacity-[.55]' : state === 'building' ? 'border-solid border-accent-primary ring-1 ring-accent-primary' : 'border-solid border-accent-primary'}`}
     >
       <div data-testid={`factory-heading-${slot.id}`} className="text-lg font-extrabold leading-tight text-text-primary truncate">{slot.label}</div>
       {slot.born ? (
-        <Wave a={slot.born} height={waveHeight} eyes={timeSec} final />
+        <Wave a={slot.born} height={waveHeight} eyes={timeSec} eyeSeed={slotIndex} gaze={gaze} final />
       ) : (
-        <Wave a={stamped ? voice?.bank : cur?.peaks} height={waveHeight} b={stamped ? undefined : next?.peaks} frac={shown.frac} final={stamped} eyes={timeSec} reference={reference} idle={state === 'waiting'} plate={plate} playhead={playhead}
+        <Wave a={stamped ? voice?.bank : cur?.peaks} height={waveHeight} b={stamped ? undefined : next?.peaks} frac={shown.frac} final={stamped} eyes={timeSec} eyeSeed={slotIndex} gaze={gaze} reference={reference} idle={state === 'waiting'} plate={plate} playhead={playhead}
           env={cur?.env} envLabel={cur ? spoken(cur.stage) : ''} />
       )}
       <div data-testid={`factory-caption-${slot.id}`} className="text-[13px] font-mono text-text-secondary min-h-[2.6em] line-clamp-2" style={{ transform: `translateY(${bounce * 4}px)` }}>
@@ -357,6 +366,7 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
   const gridRef = useRef<HTMLDivElement>(null);
   const grid = useSlotGrid(gridRef, state.slots.length);
   const timeSec = performance.now() / 1000;
+  const buildingIndex = state.slots.findIndex((s) => slotProgress(s, lines, t).building);
   return (
     <div className={`h-full flex flex-col min-h-0 ${className ?? ''}`} data-testid="factory-panel"
       onWheel={() => { userScrolledAt.current = performance.now(); }} onTouchMove={() => { userScrolledAt.current = performance.now(); }}
@@ -393,7 +403,7 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
       <div className="shrink-0"><Machinery timeSec={timeSec} busy={active} bandBusy={bandBusy(performance.now(), lastEventAt.current)} chips={chips} /></div>
       <div ref={gridRef} data-testid="factory-slots" className="flex-1 min-h-0 grid"
         style={{ gap: SLOT_GAP, gridTemplateColumns: `repeat(${grid.cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${grid.rows}, minmax(0, 1fr))` }}>
-        {state.slots.map((slot) => <SlotCard key={slot.id} finaleAt={finaleAt} register={registerSlot} slot={slot} lines={lines} t={t} reduced={reduced} timeSec={timeSec} preview={preview} waveHeight={grid.wave} rate={state.rate} />)}
+        {state.slots.map((slot, i) => <SlotCard key={slot.id} slotIndex={i} cols={grid.cols} buildingIndex={buildingIndex >= 0 ? buildingIndex : undefined} chipRiding={chips.length > 0 && bandBusy(performance.now(), lastEventAt.current)} finaleAt={finaleAt} register={registerSlot} slot={slot} lines={lines} t={t} reduced={reduced} timeSec={timeSec} preview={preview} waveHeight={grid.wave} rate={state.rate} />)}
       </div>
       {state.sections.length > 0 && (
         <div className="mt-2 shrink-0" data-testid="factory-sections">

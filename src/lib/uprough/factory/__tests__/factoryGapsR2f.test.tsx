@@ -29,6 +29,7 @@ const cueCalls: { cue: string; step: number | undefined }[] = [];
 vi.mock('@/lib/uprough/factory/factorySfx', async (orig) => ({ ...(await orig<typeof import('@/lib/uprough/factory/factorySfx')>()), playCue: (cue: string, step?: number) => { cueCalls.push({ cue, step }); } }));
 vi.mock('@/utils/audio-context', () => ({ getDevilboxAudioContext: () => undefined }));
 
+import { blinkStarts } from '@/lib/uprough/factory/eyeMotion';
 import { drawEyes, drawStamp, eyeOpenness, PLATE_SECONDS } from '@/lib/uprough/factory/draw';
 import { FactoryPanel, ABSOLUTE_HEADROOM, CHIP_THUMB_HEIGHT } from '@components/uprough/FactoryPanel';
 import { useFactoryStore, factoryOnEvent } from '../useFactoryStore';
@@ -142,11 +143,9 @@ describe('G5 playhead', () => {
 });
 
 describe('G9 eyes', () => {
-  it('open eyes blink every 4.5 s, an idle slot is a half-closed slit, and the eyes are bigger than the old 5x6 px', () => {
-    expect(eyeOpenness(0.05, 0, false)).toBeLessThan(0.2);
-    expect(eyeOpenness(2, 0, false)).toBe(1);
-    expect(eyeOpenness(4.5 + 0.05, 0, false)).toBeLessThan(0.2);
-    expect(eyeOpenness(3.7, 0, false)).toBe(1);
+  it('open eyes blink on their own per-slot schedule (see eyeMotion.test), an idle slot is a half-closed slit, and the eyes are bigger than the old 5x6 px', () => {
+    expect(eyeOpenness(blinkStarts(0, 3)[0] + 0.05, 0, false)).toBeLessThan(0.2);
+    expect(eyeOpenness(blinkStarts(0, 3)[0] + 0.5, 0, false)).toBe(1);
     expect(eyeOpenness(2, 0, true)).toBeLessThan(0.5);
     const { ctx, log } = recordingCtx();
     drawEyes(ctx, 10, 10, 2, 0, { line: '', wave: '', final: '', env: '', dim: '', eye: 'y', plate: '', text: '', inverse: '' }, false);
