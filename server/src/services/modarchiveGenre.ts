@@ -69,11 +69,11 @@ export class GenreLookupError extends Error {
 }
 
 /**
- * Filename as ModArchive stores it: no path, lower case, no archive wrapper, Amiga prefix
+ * Filename as ModArchive stores it: no path, lower case, spaces as underscores, no archive wrapper, Amiga prefix
  * `mod.name` turned into `name.mod`. Null when the name carries no ModArchive format.
  */
 export function normaliseModuleName(name: string): string | null {
-  const base = (name.split(/[/:\\]/).pop() ?? '').trim().toLowerCase();
+  const base = (name.split(/[/:\\]/).pop() ?? '').trim().toLowerCase().replace(/\s+/g, '_');
   const parts = base.split('.');
   while (parts.length > 1 && ARCHIVE_EXTS.has(parts[parts.length - 1])) parts.pop();
   if (parts.length < 2 || parts.some((p) => p === '')) return null;
@@ -210,7 +210,10 @@ export function createGenreService(opts: GenreServiceOptions = {}): GenreService
     }
     if (!res.ok) throw new GenreLookupError(`ModArchive answered ${res.status}`, 502);
     const xml = await res.text();
-    if (/<error>/i.test(xml)) throw new GenreLookupError('ModArchive refused the search', 502);
+    // ModArchive reports an empty result set as an error element; that is a miss, not a refusal.
+    const error = /<error>([\s\S]*?)<\/error>/i.exec(xml);
+    if (error && /no results/i.test(error[1])) return '';
+    if (error) throw new GenreLookupError('ModArchive refused the search', 502);
     return xml;
   }
 
