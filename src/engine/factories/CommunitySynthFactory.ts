@@ -985,13 +985,14 @@ export function createSetBfree(config: InstrumentConfig): Tone.ToneAudioNode {
   const bfreeConfig = config.setbfree || {};
   const synth = new SetBfreeSynthImpl();
   void synth.init();
-  synth.applyConfig(bfreeConfig);
 
-  // Check for native patch preset (complete organ registration from upstream default.pgm)
+  // The native patch is the base (instruments saved before the store derived setbfree from it carry only the patch);
+  // instrument.setbfree holds the preset values plus every later knob edit, so it is applied on top and wins.
   const nativePresetName = (config as unknown as Record<string, unknown>).setbfreeNativePatch;
   if (typeof nativePresetName === 'string') {
     synth.loadNativePreset(nativePresetName);
   }
+  synth.applyConfig(bfreeConfig);
 
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('SetBfree', config.volume));
   return synth as unknown as Tone.ToneAudioNode;
