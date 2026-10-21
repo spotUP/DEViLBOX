@@ -16,6 +16,21 @@ export interface SongMelodyOptions {
   melodyVoice: string;
 }
 
+/**
+ * hiphop.render_section's lay["melody"]: the layer the melody bus event is gated on (the lane event is gated on notes instead).
+ * The stem isolates one layer, the params.section fast path plays it in hook/A/B/A2, else the arrangement row; the layer is
+ * off when melody_from_bar reaches the section's bars (melody_windows).
+ */
+export function sectionMelodyOn(events: BarEvents, index: number): boolean {
+  const { section, stem } = events.params;
+  const bars = events.sections[index]!.drums.length;
+  const from = events.melody_windows?.[index];
+  if (from !== undefined && from !== null && (from as number) >= bars) return false;
+  if (stem) return stem === 'melody';
+  if (section) return ['hook', 'A', 'B', 'A2'].includes(section as string);
+  return Boolean((events.arrangement[index]![2] as { melody: number }).melody);
+}
+
 export function songMelody(events: BarEvents, bpm: number, options: SongMelodyOptions): Float64Array[] {
   const seed = events.params.seed as number;
   const rate = events.params.rate as number;

@@ -29,7 +29,7 @@ import { bassBusGain, sectionBassOn, songBass } from './songBass';
 import type { BassVoice } from './voices/bassSynth';
 import { applyMacros, cleanDirt, dirtConfig, songBuses } from './songBuses';
 import { songDrums, sectionDrumsOn } from './songDrums';
-import { songMelody } from './songMelody';
+import { sectionMelodyOn, songMelody } from './songMelody';
 import { songDrumBank, type DrumBank, type HipHopStyle } from './drumBank';
 import { createEmitter, type Emitter, type OnEvent } from './r2Events';
 import { envOf, peaks, type Env, type Peaks } from './r2Peaks';
@@ -234,9 +234,10 @@ export function renderSectionMix(
   const sum = songMix.sumBalanced(balanced, { length, bassGain, hasDrums, rate, scratch });
   if (em) {
     // The buses are the pre-balance chain outputs; the scratch lane event is deferred to here (M6), between the last bus and mix.
-    em.emit({ type: 'bus', section: index, bus: 'drums', peaks: peaks(buses.drums[0]!) });
-    em.emit({ type: 'bus', section: index, bus: 'bass', peaks: peaks(buses.bass[0]!) });
-    if (section.melody.some((m) => m !== null)) em.emit({ type: 'bus', section: index, bus: 'melody', peaks: peaks(buses.melody[0]!) });
+    // Host gates each bus on its layer (lay[...]); the sample bus is host-only (M7) and sits between drums and bass there.
+    if (hasDrums) em.emit({ type: 'bus', section: index, bus: 'drums', peaks: peaks(buses.drums[0]!) });
+    if (sectionBassOn(one, 0)) em.emit({ type: 'bus', section: index, bus: 'bass', peaks: peaks(buses.bass[0]!) });
+    if (sectionMelodyOn(one, 0)) em.emit({ type: 'bus', section: index, bus: 'melody', peaks: peaks(buses.melody[0]!) });
     em.emit({ type: 'lane', section: index, lane: 'scratch', peaks: peaks(scratch.buf), born: bornPeaks(scratch.buf, 0, barLen) });
     em.emit({ type: 'mix', section: index, peaks: peaks(sum) });
   }

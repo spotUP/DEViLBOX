@@ -4,6 +4,7 @@
  */
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { SOFTSYNTH_RATE, voiceDefaults, type SoftsynthVoice } from '@/engine/uprough/softsynthVoice';
+import { oneShotBuffer } from './voiceAudition';
 import { cowbellVoice, hatClosedVoice, metalVoice, rimVoice, shakerVoice, tambVoice, tomVoice } from '@/engine/uprough/voices/drums';
 
 export type Cue = 'pop' | 'attach' | 'stage' | 'stamp' | 'gear' | 'conveyor' | 'finish';
@@ -28,8 +29,7 @@ function bufferOf(ctx: BaseAudioContext, cue: Cue): AudioBuffer {
   if (!buf) {
     const c = CUES[cue];
     const data = c.voice.render(voiceDefaults(c.voice), { midi: c.midi, durSec: c.dur, velocity: 0.8 }, SOFTSYNTH_RATE, 7);
-    buf = ctx.createBuffer(1, data.length, SOFTSYNTH_RATE);
-    buf.copyToChannel(Float32Array.from(data), 0);
+    buf = oneShotBuffer(ctx, data, SOFTSYNTH_RATE);
     cache.set(cue, buf);
   }
   return buf;
