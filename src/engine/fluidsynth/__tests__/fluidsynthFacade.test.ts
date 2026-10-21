@@ -154,4 +154,16 @@ describe('FluidSynth instrument facade', () => {
 
     expect(onSlot(node, synth.slot, 'programChange').at(-1)).toMatchObject({ program: FLUIDSYNTH_PRESETS.Organ.program });
   });
+  it('an init still waiting for the worklet survives dispose during a song load', async () => {
+    const { FluidSynthSynthImpl } = await import('../FluidSynthSynth');
+    const synth = new FluidSynthSynthImpl();
+    const init = synth.init();
+    await flush();
+    const node = nodes[0];
+    node.reply({ type: 'ready' });
+    synth.dispose();
+    node.reply({ type: 'sf2Loaded' });
+
+    await expect(init).resolves.toBeUndefined();
+  });
 });
