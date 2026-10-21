@@ -60,8 +60,7 @@ Object.assign(SETBFREE_RANGES, {
   overdriveEnable: ['PARAM_OVERDRIVE_DRIVE', 35, 0, 1, false],
   reverbMix: ['PARAM_REVERB_MIX', 38, 0, 1, false],
   volume: ['PARAM_VOLUME', 39, 0, 1, false],
-  // Exemption: the engine reads (int)value, so a knob below 1.0 truncates to off. The range 0..1 is right; the control type is not
-  // (recorded in thoughts/spot/todos.md, not changed here because it moves the default sound).
+  // The bridge reads (int)value, so the control must be a toggle (0 or 1); a 0..1 knob left 0.5 off.
   keyClick: ['PARAM_KEY_CLICK', 40, 0, 1, true],
 });
 
@@ -95,6 +94,25 @@ describe('setBfree layout bounds equal the bridge ranges (LAYOUT-BOUNDS-VS-ENGIN
   it('bridge drawbar clamp and parameter count are what the table assumes', () => {
     expect(bridge).toMatch(/if \(value > 8\) value = 8;/);
     expect(bridge).toMatch(/NUM_PARAMS\s*=\s*44/);
+  });
+
+  it('keyClick is a toggle whose default and presets are 0 or 1, and the default equals the bridge default (on)', () => {
+    expect(layout.get('keyClick')?.type).toBe('toggle');
+    expect(bridge).toMatch(/PARAM_KEY_CLICK\]\s*=\s*1;/);
+    expect(bridge).toMatch(/setKeyClick\(s->inst\.synth, \(int\)value\)/);
+    expect(DEFAULT_SETBFREE.keyClick).toBe(1);
+    for (const p of Object.values(SETBFREE_PRESETS)) if (p.keyClick !== undefined) expect([0, 1]).toContain(p.keyClick);
+  });
+
+  it('percVolume and leslieSpeed labels and defaults follow the bridge semantics (0=soft/1=normal; 0=slow/1=stop/2=fast)', () => {
+    expect(bridge).toMatch(/PARAM_PERC_VOLUME\s*=\s*28,\s*\/\* 0=soft, 1=normal \*\//);
+    expect(bridge).toMatch(/PARAM_LESLIE_SPEED\s*=\s*34,\s*\/\* 0=slow, 1=stop, 2=fast \*\//);
+    const vol = layout.get('percVolume');
+    expect(vol?.type === 'toggle' && vol.labels).toEqual(['SOFT', 'NORMAL']);
+    const speed = layout.get('leslieSpeed');
+    expect(speed?.type === 'select' && speed.options.map((o) => `${o.value}=${o.label}`)).toEqual(['0=Slow', '1=Stop', '2=Fast']);
+    expect(DEFAULT_SETBFREE.percVolume).toBe(1);  // bridge default: normal
+    expect(DEFAULT_SETBFREE.leslieSpeed).toBe(0); // bridge default: slow
   });
 
   it('every default and preset value for the mapped keys lies inside the engine range', () => {
