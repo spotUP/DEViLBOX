@@ -153,3 +153,26 @@ describe('G9 eyes', () => {
     expect(e.args[3]).toBeGreaterThanOrEqual(6);
   });
 });
+
+describe('G14 hat fan-out and G15 chip pop-in', () => {
+  it('hat variant chips pop one after another, FAN_SECONDS apart, not all at once', () => {
+    previewOn = true;
+    render(<FactoryPanel />);
+    feed(scriptedGenerateEvents('trap', 3).filter((e) => e.type !== 'done'));
+    const hatVoice = useFactoryStore.getState().state.slots.find((s) => s.id === 'hat')!;
+    expect(hatVoice.hatVariants.length).toBeGreaterThan(1);
+    // Step the clock until the hat voice's chips begin to pop, then compare first and last variant chips.
+    let seen = false;
+    for (let i = 0; i < 2400 && !seen; i++) {
+      runClock(10);
+      const chips = [...document.querySelectorAll('[data-testid="factory-chips-hat"] button')] as HTMLElement[];
+      const op = chips.map((c) => Number(c.style.opacity));
+      const variantOps = op.slice(-hatVoice.hatVariants.length);
+      if (variantOps.some((o) => o > 0) && variantOps.some((o) => o === 0)) {
+        seen = true;
+        expect(variantOps[0]!).toBeGreaterThanOrEqual(variantOps.at(-1)!);
+      }
+    }
+    expect(seen).toBe(true);
+  });
+});
