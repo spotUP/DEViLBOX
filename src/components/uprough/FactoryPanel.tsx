@@ -3,16 +3,16 @@
  * R2 event source feeds through `factoryOnEvent`; nothing here pretends work, every visual is set by an event.
  * Act 1 (the drum bank) is paced for the eye from the voices' real stage buffers; acts 2 and 3 show events as they land.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Volume2, VolumeX, RotateCcw } from 'lucide-react';
 import { useFactoryStore } from '@/lib/uprough/factory/useFactoryStore';
 import { actOneSchedule, stageAtTime, type VoiceTimeline } from '@/lib/uprough/factory/pacing';
-import { popIn, prefersReducedMotion, stampBounce } from '@/lib/uprough/factory/motion';
+import { growHeights, popIn, prefersReducedMotion, SETTLE, Spring, stampBounce } from '@/lib/uprough/factory/motion';
 import { drawConveyor, drawEnvelope, drawEyes, drawGear, drawWave, readTokens, type FactoryColors } from '@/lib/uprough/factory/draw';
 import { playCue, type Cue } from '@/lib/uprough/factory/factorySfx';
 import { hasLocalPreview, playVoice } from '@/lib/uprough/factory/voiceAudition';
 import { Button } from '@components/ui/Button';
-import { spoken, STEM_LANES, type FactoryState, type SlotView, type VoiceView } from '@/lib/uprough/factory/factoryModel';
+import { SLOT_OF_VOICE, spoken, STEM_LANES, type FactoryState, type SectionView, type SlotView, type VoiceView } from '@/lib/uprough/factory/factoryModel';
 import type { Peaks } from '@/engine/uprough/r2Peaks';
 
 export interface FactoryPanelProps {
@@ -79,8 +79,8 @@ function voiceTimelines(state: FactoryState): Map<string, VoiceTimeline> {
   return new Map(actOneSchedule(voices, state.rate).map((l) => [l.voice, l]));
 }
 
-function SlotCard(props: { slot: SlotView; lines: Map<string, VoiceTimeline>; t: number; reduced: boolean; timeSec: number; preview: boolean }): React.ReactElement {
-  const { slot, lines, t, reduced, timeSec, preview } = props;
+function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => void; slot: SlotView; lines: Map<string, VoiceTimeline>; t: number; reduced: boolean; timeSec: number; preview: boolean }): React.ReactElement {
+  const { slot, lines, t, reduced, timeSec, preview, register } = props;
   const voice: VoiceView | undefined = slot.voices.find((v) => {
     const line = lines.get(v.voice);
     return !line || t >= line.start;
@@ -96,7 +96,7 @@ function SlotCard(props: { slot: SlotView; lines: Map<string, VoiceTimeline>; t:
   const chip = line ? popIn(t - line.chipAt, reduced) : { scale: 1, alpha: 1 };
   return (
     <div
-      data-testid={`factory-slot-${slot.id}`}
+      data-testid={`factory-slot-${slot.id}`} ref={(el) => register(slot.id, el)}
       className="rounded p-2 flex flex-col gap-1"
       style={{
         background: 'var(--color-bg-secondary)', borderRadius: 6,
@@ -138,6 +138,55 @@ function Machinery(props: { timeSec: number; busy: boolean }): React.ReactElemen
     drawConveyor(ctx, cv.width, 34, props.busy ? props.timeSec * 30 : 0, c.dim);
   });
   return <canvas ref={ref} width={240} height={40} className="w-full" style={{ height: 40 }} />;
+}
+
+/** Tooltip and aria-label of a host-only strip cell (the plan's wording). */
+const chopsLabel = (bar: number, c: NonNullable<SectionView['chops'][number]>): string =>
+  c.kind === 'break' ? `Bar ${bar + 1}: 1 break loop` : `Bar ${bar + 1}: ${c.triggers} triggers, operation ${c.op ?? 'none'}`;
+const vocalsLabel = (bar: number, v: NonNullable<SectionView['vocals'][number]>): string =>
+  `Bar ${bar + 1}: ${v.words} words${v.first ? `, starting "${v.first}"` : ''}`;
+
+/** One strip row of a section: a cell per bar, filled when that bar's decide event carried data. Never touches the tracker. */
+function StripRow(props: { testId: string; title: string; bars: number; labels: Record<number, string> }): React.ReactElement {
+  return (
+    <div data-testid={props.testId} className="flex items-center gap-1 mt-1">
+      <div className="text-[10px] w-20 shrink-0 text-text-muted">{props.title}</div>
+      <div className="flex gap-0.5">
+        {Array.from({ length: props.bars }, (_, bar) => {
+          const label = props.labels[bar];
+          return (
+            <div key={bar} data-filled={label !== undefined} title={label} aria-label={label ?? `Bar ${bar + 1}: empty`} role="img"
+              className={`h-3 w-3 rounded-sm border ${label !== undefined ? 'bg-accent-primary/60 border-accent-primary' : 'bg-dark-bgTertiary border-dark-border'}`} />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** The master waveform growing out of the texture waveform on a spring (R2f-32); reduced motion shows the master at once. */
+function GrowWave(props: { from?: Peaks; to: Peaks; reduced: boolean }): React.ReactElement {
+  const { from, to, reduced } = props;
+  const [t, setT] = useState(reduced ? 1 : 0);
+  useEffect(() => {
+    if (reduced) { setT(1); return; }
+    const spring = new Spring(0, SETTLE);
+    spring.to(1);
+    setT(0);
+    let raf = 0;
+    let last = performance.now();
+    const loop = (): void => {
+      const now = performance.now();
+      const v = spring.step((now - last) / 1000);
+      last = now;
+      if (spring.settled) { setT(1); return; }
+      setT(v);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [to, reduced]);
+  return <Wave a={growHeights(from ?? to, to, t, reduced)} height={36} final />;
 }
 
 export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className }) => {
@@ -185,9 +234,33 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
     });
   }, [t, lines, preview, state.slots]);
 
+  // Auto-scroll (R2f-59a): each voice's slot card scrolls into view once, when that voice starts building (act 1), and a
+  // bass or melody slot when its first bar is born (act 3). Never after done, never within 2 s of the user scrolling.
+  const slotEls = useRef(new Map<string, HTMLDivElement>());
+  const registerSlot = useCallback((id: string, el: HTMLDivElement | null): void => {
+    if (el) slotEls.current.set(id, el); else slotEls.current.delete(id);
+  }, []);
+  const userScrolledAt = useRef(-Infinity);
+  const scrolled = useRef(new Set<string>());
+  useEffect(() => { scrolled.current.clear(); }, [startedAt]);
+  useEffect(() => {
+    if (state.done) return;
+    const go = (key: string, slotId: string): void => {
+      if (scrolled.current.has(key)) return;
+      scrolled.current.add(key);
+      if (performance.now() - userScrolledAt.current < 2000) return;
+      slotEls.current.get(slotId)?.scrollIntoView?.({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' });
+    };
+    [...lines.values()].filter((l) => t >= l.start).sort((a, b) => a.start - b.start)
+      .forEach((l) => go(`voice:${l.voice}`, SLOT_OF_VOICE[l.voice] ?? l.voice));
+    state.slots.filter((s) => s.born).forEach((s) => go(`born:${s.id}`, s.id));
+  }, [t, lines, state.slots, state.done, reduced]);
+
   const timeSec = performance.now() / 1000;
   return (
-    <div className={className} data-testid="factory-panel" style={{ color: 'var(--color-text)' }}>
+    <div className={className} data-testid="factory-panel"
+      onWheel={() => { userScrolledAt.current = performance.now(); }} onTouchMove={() => { userScrolledAt.current = performance.now(); }}
+      onKeyDown={() => { userScrolledAt.current = performance.now(); }} style={{ color: 'var(--color-text)' }}>
       <div className="flex items-center justify-between mb-2">
         <div role="status" aria-live="polite" data-testid="factory-status" className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
           {state.caption}
@@ -211,7 +284,7 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
       )}
       <Machinery timeSec={timeSec} busy={active} />
       <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))' }}>
-        {state.slots.map((slot) => <SlotCard key={slot.id} slot={slot} lines={lines} t={t} reduced={reduced} timeSec={timeSec} preview={preview} />)}
+        {state.slots.map((slot) => <SlotCard key={slot.id} register={registerSlot} slot={slot} lines={lines} t={t} reduced={reduced} timeSec={timeSec} preview={preview} />)}
       </div>
       {state.sections.length > 0 && (
         <div className="mt-3" data-testid="factory-sections">
@@ -226,6 +299,14 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
                   <div style={{ color: 'var(--color-text-muted)' }}>{decidedBars} of {sec.bars} bars decided</div>
                   <div className="flex flex-col gap-0.5 mt-1">
                     {STEM_LANES.map((lane) => sec.stems[lane] && <Wave key={lane} a={sec.stems[lane]} height={14} />)}
+                    {sec.layers.includes('sample') && (
+                      <StripRow testId={`factory-chops-${sec.index}`} title="Sample chops" bars={sec.bars}
+                        labels={Object.fromEntries(Object.entries(sec.chops).map(([b, c]) => [b, chopsLabel(Number(b), c)]))} />
+                    )}
+                    {(sec.layers.includes('vocal') || sec.layers.includes('vocals')) && (
+                      <StripRow testId={`factory-vocals-${sec.index}`} title="Vocals" bars={sec.bars}
+                        labels={Object.fromEntries(Object.entries(sec.vocals).map(([b, v]) => [b, vocalsLabel(Number(b), v)]))} />
+                    )}
                   </div>
                 </div>
               );
@@ -240,7 +321,7 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
             {(['join', 'texture', 'master'] as const).map((k) => (
               <div key={k}>
                 <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{k === 'join' ? 'Joined' : k === 'texture' ? 'Texture' : 'Master'}</div>
-                {state.press[k] ? <Wave a={state.press[k]} height={36} final={k === 'master'} /> : <div style={{ height: 36, border: '1px dashed var(--color-border)', borderRadius: 6 }} />}
+                {state.press[k] ? (k === 'master' ? <GrowWave from={state.press.texture} to={state.press[k]!} reduced={reduced} /> : <Wave a={state.press[k]} height={36} />) : <div style={{ height: 36, border: '1px dashed var(--color-border)', borderRadius: 6 }} />}
               </div>
             ))}
           </div>
