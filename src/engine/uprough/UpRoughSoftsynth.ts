@@ -1,8 +1,10 @@
 /**
  * UpRoughSoftsynth: a tracker instrument that plays one Up Rough voice (808 bass, piano, a drum).
  * Each note is rendered whole by the voice's pure render function at SOFTSYNTH_RATE, cached per
- * (voice, params, seed, midi, duration, velocity), copied into an AudioBuffer and played through a
- * BufferSource into `output`. The buffer's own rate is 22050 Hz; the context resamples.
+ * (voice, params, seed, midi, duration, velocity) as an AudioBuffer and played through a BufferSource
+ * into `output`. The buffer's own rate is 22050 Hz; the context resamples. The cache is shared by every
+ * instance (one per tracker channel), and `warmUp` fills it with the song's notes at load, so a trigger
+ * starts a cached buffer and no render runs on the trigger path.
  */
 import type { DevilboxSynth } from '@/types/synth';
 import type { UpRoughSoftsynthConfig } from '@/types/instrument';
@@ -11,7 +13,7 @@ import { DEVILBOX_TO_HOST_MIDI, SOFTSYNTH_RATE, voiceDefaults, type SoftsynthVoi
 import { getSoftsynthVoice, SOFTSYNTH_VOICES } from './voiceRegistry';
 import { recordNoteTrigger } from '@/engine/debug/noteTriggerLog';
 
-const CACHE_MAX = 256;
+const CACHE_MAX = 512;
 const NATURAL_DUR_SEC = 2;
 const RELEASE_FADE_SEC = 0.05;
 /** Voices whose tail a note-off cuts; drums ring out. */
@@ -24,6 +26,9 @@ export function resetSoftsynthRenderCount(): void { renderCount = 0; }
 
 interface Playing { src: AudioBufferSourceNode; gain: GainNode }
 
+/** Rendered notes, least recently used first. Module-level: every instance of a voice shares them. */
+const cache = new Map<string, AudioBuffer>();
+
 export class UpRoughSoftsynth implements DevilboxSynth {
   readonly name = 'UpRoughSoftsynth';
   readonly output: GainNode;
@@ -32,7 +37,6 @@ export class UpRoughSoftsynth implements DevilboxSynth {
   private voiceId: string;
   private params: Record<string, number>;
   private seed: number;
-  private cache = new Map<string, Float64Array>();
   /** Triggers rendered with humanize on; folded into the humanize seed and the cache key so each hit differs. */
   private hitCounter = 0;
   private playing = new Set<Playing>();
@@ -64,30 +68,43 @@ export class UpRoughSoftsynth implements DevilboxSynth {
     return midi - DEVILBOX_TO_HOST_MIDI;
   }
 
-  private render(midi: number, durSec: number, velocity: number): Float64Array {
+  private merged(): Record<string, number> {
+    return { ...voiceDefaults(this.voice()), ...this.params };
+  }
+
+  private render(midi: number, durSec: number, velocity: number): AudioBuffer {
     const voice = this.voice();
-    const merged: Record<string, number> = { ...voiceDefaults(voice), ...this.params };
+    const merged = this.merged();
     // Humanize on: every trigger is a new hit (counter -> seed and cache key, see humanize.ts); off: one render per key.
     if ((merged.humanize ?? 0) > 0) merged.hit = this.hitCounter++;
     const key = `${voice.id}|${JSON.stringify(merged)}|${this.seed}|${midi}|${durSec}|${velocity}`;
-    const hit = this.cache.get(key);
+    const hit = cache.get(key);
     if (hit) {
-      this.cache.delete(key);
-      this.cache.set(key, hit);
+      cache.delete(key);
+      cache.set(key, hit);
       return hit;
     }
     renderCount++;
-    const out = voice.render(merged, { midi, durSec, velocity }, SOFTSYNTH_RATE, this.seed);
-    this.cache.set(key, out);
-    if (this.cache.size > CACHE_MAX) this.cache.delete(this.cache.keys().next().value as string);
-    return out;
+    const samples = voice.render(merged, { midi, durSec, velocity }, SOFTSYNTH_RATE, this.seed);
+    const buf = this.ctx.createBuffer(1, Math.max(1, samples.length), SOFTSYNTH_RATE);
+    buf.copyToChannel(Float32Array.from(samples), 0);
+    cache.set(key, buf);
+    if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value as string);
+    return buf;
+  }
+
+  /**
+   * Render the song's notes now, at the length and velocity a tracker note triggers with, so the
+   * trigger finds them cached. Silent: nothing is played. A humanized voice renders a new hit per
+   * trigger, so there is nothing to render ahead for it.
+   */
+  warmUp(notes?: readonly string[]): void {
+    if (!notes || (this.merged().humanize ?? 0) > 0) return;
+    for (const note of notes) this.render(this.midiOf(note), NATURAL_DUR_SEC, 1);
   }
 
   private play(note: string | number, durSec: number, time: number | undefined, velocity: number): void {
-    const samples = this.render(this.midiOf(note), durSec, velocity);
-    const buf = this.ctx.createBuffer(1, Math.max(1, samples.length), SOFTSYNTH_RATE);
-    const ch = buf.getChannelData(0);
-    for (let i = 0; i < samples.length; i++) ch[i] = samples[i]!;
+    const buf = this.render(this.midiOf(note), durSec, velocity);
     const src = this.ctx.createBufferSource();
     src.buffer = buf;
     const gain = this.ctx.createGain();
@@ -145,7 +162,6 @@ export class UpRoughSoftsynth implements DevilboxSynth {
       try { src.stop(); src.disconnect(); gain.disconnect(); } catch { /* already stopped */ }
     }
     this.playing.clear();
-    this.cache.clear();
     this.output.disconnect();
   }
 }

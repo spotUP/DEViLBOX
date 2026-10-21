@@ -172,6 +172,7 @@ import {
   attachVoiceSource,
 } from './tone/InstrumentEffectsChain';
 import { connectAudio } from './tone/connectAudio';
+import { xmNoteToNoteName } from './replayer/PeriodTables';
 
 // Module-level frequency cache: avoids creating transient Tone.Frequency objects on every call.
 // Note name strings (e.g. "C4", "D#3") are finite and reused, so this cache stays small.
@@ -1102,8 +1103,14 @@ export class ToneEngine {
    * instances a per-channel native synth gets: one per used channel, so the
    * channel strip (volume, pan, mute, channel effects) reaches each one. An
    * instrument with no usage entry keeps the single shared `-1` instance.
+   * `notes` (instrument id -> XM notes it plays, from `instrumentNoteUsage`)
+   * reach each synth's `warmUp`, so a per-note renderer renders them at load.
    */
-  public async preloadInstruments(configs: InstrumentConfig[], usage?: ReadonlyMap<number, ReadonlySet<number>>): Promise<void> {
+  public async preloadInstruments(
+    configs: InstrumentConfig[],
+    usage?: ReadonlyMap<number, ReadonlySet<number>>,
+    notes?: ReadonlyMap<number, ReadonlySet<number>>,
+  ): Promise<void> {
     // Bump generation to invalidate any in-flight preload
     const generation = ++this.preloadGeneration;
 
@@ -1269,13 +1276,16 @@ export class ToneEngine {
     //
     // There is no place to mute a note that is silent for every synth, so
     // the engine does not play one. A synth that measurably needs priming
-    // implements `warmUp()` and does it silently, on its own terms. None do
-    // today; the WASM engines were already `ensureInitialized()` above and
-    // their worklets are rendering.
+    // implements `warmUp()` and does it silently, on its own terms. The WASM
+    // engines were already `ensureInitialized()` above and their worklets are
+    // rendering. UpRoughSoftsynth renders the song's notes here: a render on
+    // the trigger path made the first row start late, one channel after another.
     for (const config of configs) {
+      const songNotes = notes?.get(config.id);
+      const noteNames = songNotes ? [...songNotes].map(xmNoteToNoteName).filter((n): n is string => !!n) : undefined;
       for (const instrument of this.instancesOf(config.id)) {
         if (isDevilboxSynth(instrument)) {
-          try { (instrument as DevilboxSynth).warmUp?.(); } catch { /* a warm-up must never break a load */ }
+          try { (instrument as DevilboxSynth).warmUp?.(noteNames); } catch { /* a warm-up must never break a load */ }
         }
       }
     }
