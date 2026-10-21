@@ -17,17 +17,20 @@ vi.mock('@stores/useInstrumentTypeStore', () => ({
 
 import { openUpRoughSong } from '@/lib/uprough/openUpRoughSong';
 import * as songRender from '@engine/uprough/songRender';
+import type { PartialMix } from '@/lib/uprough/songRenderJob';
 import type { SectionMixCache } from '@engine/uprough/songRenderCache';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useUpRoughRenderStore } from '@stores/useUpRoughRenderStore';
 import { buildCurrentSong, startSample, stepSamples } from '@/lib/uprough/currentSongRender';
 import { runRenderJob, type SectionEvent } from '@/lib/uprough/songRenderJob';
 import {
-  ensureUpRoughSong, renderUpRoughSong, setRenderBackendForTests, type RenderBackend,
+  currentPartialMix, currentRenderedSong, ensureUpRoughSong, onUpRoughSongPartial, renderUpRoughSong, setRenderBackendForTests,
+  type RenderBackend,
 } from '@/lib/uprough/upRoughSongService';
 import {
   setPlayerAudioForTests, startUpRoughSong, stopUpRoughSong, upRoughPlayheadSample,
-  upRoughSongOwnsPlayback, isUpRoughSongPlaying, type PlayerAudio,
+  upRoughSongOwnsPlayback, isUpRoughSongPlaying, startUpRoughPreview, isUpRoughPreviewPlaying, upRoughPreviewState,
+  type PlayerAudio,
 } from '@/lib/uprough/upRoughSongPlayer';
 
 const text = JSON.stringify(fixture);
@@ -155,4 +158,82 @@ describe('play, edit, swap', () => {
     stopUpRoughSong();
     expect(isUpRoughSongPlaying()).toBe(false);
   }, 120000);
+});
+
+/** A backend whose partials and final mix the test delivers by hand. */
+function manualBackend(): { backend: RenderBackend; partial: (p: PartialMix) => void; finish: (mix: Float64Array) => void } {
+  let onPartial: ((p: PartialMix) => void) | undefined;
+  let resolve: ((m: Float64Array) => void) | undefined;
+  return {
+    backend: { render(_e, _o, _s, _r, p) { onPartial = p; return new Promise<Float64Array>((r) => { resolve = r; }); } },
+    partial: (p) => onPartial!(p),
+    finish: (mix) => resolve!(mix),
+  };
+}
+const ramp = (n: number, v: number): Float64Array => new Float64Array(n).fill(v);
+
+describe('listen while building (service)', () => {
+  it('assembles three partials into the prefix and leaves the final mix untouched until done', async () => {
+    const m = manualBackend();
+    setRenderBackendForTests(m.backend, 5);
+    const seen: number[] = [];
+    const off = onUpRoughSongPartial((p) => seen.push(p.section));
+    const run = renderUpRoughSong();
+    expect(currentPartialMix()).toBeNull();
+    const a = ramp(100, 0.1), b = ramp(50, 0.2), c = ramp(70, 0.3);
+    m.partial({ section: 0, start: 0, mix: a });
+    m.partial({ section: 1, start: 100, mix: b });
+    m.partial({ section: 2, start: 150, mix: c });
+    expect(seen).toEqual([0, 1, 2]);
+    expect(Array.from(currentPartialMix()!)).toEqual([...a, ...b, ...c]);
+    expect(currentRenderedSong()).toBeNull();
+    m.finish(ramp(220, 0.9));
+    await run;
+    expect(currentRenderedSong()!.mix).toHaveLength(220);
+    off();
+  });
+});
+
+describe('listen while building (player)', () => {
+  it('schedules section N+1 at the end of section N', async () => {
+    const m = manualBackend();
+    setRenderBackendForTests(m.backend, 5);
+    stopUpRoughSong(); started.length = 0; clock.now = 20;
+    const run = renderUpRoughSong();
+    startUpRoughPreview(0);
+    const rate = 22050;
+    expect(isUpRoughPreviewPlaying()).toBe(false); // nothing has landed yet
+    m.partial({ section: 0, start: 0, mix: ramp(rate, 0.1) });
+    expect(isUpRoughPreviewPlaying()).toBe(true);
+    m.partial({ section: 1, start: rate, mix: ramp(rate / 2, 0.2) });
+    m.partial({ section: 2, start: rate * 1.5, mix: ramp(rate, 0.3) });
+    expect(started.map((s) => s.when)).toEqual([20, 21, 21.5]);
+    expect(started.map((s) => s.length)).toEqual([rate, rate / 2, rate]);
+    expect(started.every((s) => s.offset === 0)).toBe(true);
+    m.finish(ramp(rate * 3, 0.9)); await run;
+    stopUpRoughSong();
+  });
+
+  it('preview swaps to the mastered mix at the same playhead sample', async () => {
+    const m = manualBackend();
+    setRenderBackendForTests(m.backend, 5);
+    stopUpRoughSong(); started.length = 0; clock.now = 20;
+    const run = renderUpRoughSong();
+    startUpRoughPreview(0);
+    const rate = 22050;
+    m.partial({ section: 0, start: 0, mix: ramp(rate * 2, 0.1) });
+    clock.now = 21;
+    expect(upRoughPlayheadSample()).toBe(Math.round(1.0 * rate));
+    expect(upRoughPreviewState()).toBe('preview');
+    m.finish(ramp(rate * 4, 0.9)); await run;
+    expect(started).toHaveLength(2);
+    expect(started[1]!.offset).toBe(Math.round(1.0 * rate) / rate);
+    expect(started[1]!.when).toBe(21);
+    expect(started[0]!.stoppedAt).toBe(21); // same ctx time as the new start
+    expect(started[1]!.length).toBe(rate * 4);
+    expect(upRoughPreviewState()).toBe('mastered');
+    expect(isUpRoughPreviewPlaying()).toBe(false);
+    stopUpRoughSong();
+    expect(upRoughPreviewState()).toBe('idle');
+  });
 });
