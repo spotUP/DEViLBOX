@@ -215,3 +215,31 @@ describe('G13 act-1 status line', () => {
     expect(seen.indexOf(seen.find((x) => /^Building/.test(x))!)).toBeLessThan(seen.findIndex((x) => /^Act 1 finished/.test(x)));
   });
 });
+
+describe('G20 finale', () => {
+  it('at the act-1 clock end every slot kicks together and the view scrolls back to the first slot, once', () => {
+    const calls: { id: string | null; block: string | undefined }[] = [];
+    Element.prototype.scrollIntoView = function (this: Element, o?: boolean | ScrollIntoViewOptions): void {
+      calls.push({ id: this.getAttribute('data-testid'), block: typeof o === 'object' ? o.block : undefined });
+    };
+    render(<FactoryPanel />);
+    feed(scriptedGenerateEvents('trap', 3).filter((e) => e.type !== 'done'));
+    // Land inside the finale kick: the clock end of the act-1 schedule, plus a few frames.
+    const first = document.querySelector('[data-testid^="factory-slot-"]')!.getAttribute('data-testid');
+    runClock(60_000);
+    expect(calls.filter((c) => c.block === 'start' && c.id === first)).toHaveLength(1);
+    expect(calls.at(-1)).toEqual({ id: first, block: 'start' });
+  });
+  it('kicks every slot card at the end (their scale leaves 1 together)', () => {
+    render(<FactoryPanel />);
+    feed(scriptedGenerateEvents('trap', 3).filter((e) => e.type !== 'done'));
+    const seen = new Set<string>();
+    for (let i = 0; i < 2400; i++) {
+      runClock(25);
+      const cards = [...document.querySelectorAll('[data-testid^="factory-slot-"]')] as HTMLElement[];
+      const built = cards.filter((c) => c.getAttribute('data-state') === 'built');
+      if (built.length >= 3 && built.every((c) => Math.abs(scaleOf(c) - 1) > 0.004)) { seen.add('all'); break; }
+    }
+    expect(seen.has('all')).toBe(true);
+  });
+});
