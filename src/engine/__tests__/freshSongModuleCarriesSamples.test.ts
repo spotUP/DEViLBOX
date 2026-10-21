@@ -78,7 +78,9 @@ describe('a fresh song module carries its Sampler samples', () => {
     const info = await osl.getSampleInfo(3);
     expect(info.length).toBe(1000);
     // Base note C3 is one octave below the note libopenmpt plays at c5Speed.
-    expect(info.c5Speed).toBe(44100);
+    // A MOD holds the pitch as transpose and finetune, so the c5Speed read back
+    // is the nearest one those reach: within a cent of 44100.
+    expect(Math.abs(1200 * Math.log2(info.c5Speed / 44100))).toBeLessThan(1);
   }, 60000);
 
   it('a Sampler added after the module was built is written into it', async () => {
