@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 
 const starts: { length: number; data: Float32Array }[] = [];
+// The factory cues (on by default, G16) are not under test here: only the audition one-shots are counted.
+vi.mock('@/lib/uprough/factory/factorySfx', () => ({ playCue: () => undefined }));
 vi.mock('@/utils/audio-context', () => {
   const dest = {};
   const ctx = {

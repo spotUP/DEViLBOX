@@ -9,7 +9,7 @@ import { useFactoryStore } from '@/lib/uprough/factory/useFactoryStore';
 import { actOneSchedule, FAN_SECONDS, stageAtTime, type VoiceTimeline } from '@/lib/uprough/factory/pacing';
 import { bandBusy, CONVEYOR_SPEED, chipPosition, growHeights, popIn, prefersReducedMotion, SETTLE, Spring, stampBounce } from '@/lib/uprough/factory/motion';
 import { drawConveyor, drawEnvelope, drawEyes, drawGear, drawPlayhead, PLATE_SECONDS, drawStamp, drawWave, fitCanvas, readTokens, type FactoryColors } from '@/lib/uprough/factory/draw';
-import { actOneEnd, actOneStatus } from '@/lib/uprough/factory/statusLine';
+import { actOneEnd, actOneStatus, hatFanStart } from '@/lib/uprough/factory/statusLine';
 import { slotGrid, SLOT_GAP, WAVE_MIN, type SlotGrid } from '@/lib/uprough/factory/layout';
 import { playCue, type Cue } from '@/lib/uprough/factory/factorySfx';
 import { hasLocalPreview, playVoice } from '@/lib/uprough/factory/voiceAudition';
@@ -258,7 +258,7 @@ function GrowWave(props: { from?: Peaks; to: Peaks; reduced: boolean; reference?
 export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className }) => {
   const state = useFactoryStore((s) => s.state);
   const startedAt = useFactoryStore((s) => s.startedAt);
-  const [sound, setSound] = useState(false);
+  const [sound, setSound] = useState(true);
   const reduced = useMemo(() => prefersReducedMotion(), []);
   const lines = useMemo(() => voiceTimelines(state), [state]);
   const until = useMemo(() => Math.max(0, ...[...lines.values()].map((l) => l.chipAt)), [lines]);
@@ -273,12 +273,17 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
   useEffect(() => { cued.current.clear(); }, [startedAt]);
   useEffect(() => {
     if (!sound) return;
-    const once = (key: string, cue: Cue): void => { if (!cued.current.has(key)) { cued.current.add(key); playCue(cue); } };
+    const once = (key: string, cue: Cue, step = 0): void => { if (!cued.current.has(key)) { cued.current.add(key); playCue(cue, step); } };
     lines.forEach((l, v) => {
+      if (t >= l.start) once(`${v}:start`, 'pop');
       if (t >= l.stampAt) once(`${v}:stamp`, 'stamp');
-      l.stageAt.forEach((at, j) => { if (t >= at) once(`${v}:s${j}`, 'stage'); });
+      l.stageAt.forEach((at, j) => { if (t >= at) once(`${v}:s${j}`, 'stage', j); });
     });
-  }, [t, lines, sound]);
+    // Hat fan-out (G14, G16): one tick per variant, FAN_SECONDS apart.
+    const fan = hatFanStart(lines, state);
+    const variants = state.slots.find((s) => s.hatVariants.length > 0)?.hatVariants.length ?? 0;
+    if (fan !== undefined) for (let i = 0; i < variants; i++) if (t >= fan + i * FAN_SECONDS) once(`hat:${i}`, 'tick');
+  }, [t, lines, sound, state.slots]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!sound) return;
     const cue: Partial<Record<NonNullable<FactoryState['lastType']>, Cue>> = {
