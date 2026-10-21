@@ -3,6 +3,7 @@
  * by `readTokens`, so no colour is written here.
  */
 import type { Env, Peaks } from '@/engine/uprough/r2Peaks';
+import { isBlinking } from './eyeMotion';
 
 export interface FactoryColors { line: string; wave: string; final: string; env: string; dim: string; eye: string; plate: string; text: string; inverse: string }
 
@@ -87,23 +88,31 @@ export function drawEnvelope(ctx: CanvasRenderingContext2D, w: number, h: number
   ctx.fillText(label, 3, 11);
 }
 
-/** Eye size and blink period (the draft's big eyes: wide open 4.5 s, a 0.14 s blink). */
-export const EYE_BLINK_SECONDS = 4.5;
-const EYE_BLINK_CLOSED = 0.14;
-
-/** Eye openness 0..1 at `timeSec`: 1 open, 0 shut in the blink; an idle (not yet built) slot sits half-closed at a slit. */
-export function eyeOpenness(timeSec: number, phase: number, idle: boolean): number {
+/** Eye openness 0..1 at `timeSec`: 1 open, 0.1 shut in a blink (irregular per slot seed, see eyeMotion); an idle (not yet built) slot sits half-closed at a slit. */
+export function eyeOpenness(timeSec: number, seed: number, idle: boolean): number {
   if (idle) return 0.3;
-  return ((timeSec + phase) % EYE_BLINK_SECONDS) < EYE_BLINK_CLOSED ? 0.1 : 1;
+  return isBlinking(timeSec, seed) ? 0.1 : 1;
 }
 
-/** Two big eyes that blink every 4.5 s; a slot waiting to be built shows half-closed slits. */
-export function drawEyes(ctx: CanvasRenderingContext2D, x: number, y: number, timeSec: number, phase: number, c: FactoryColors, idle = false): void {
-  const open = eyeOpenness(timeSec, phase, idle);
-  ctx.fillStyle = c.eye;
+const EYE_RX = 4.5;
+const EYE_RY = 8;
+const PUPIL_RX = 2.2;
+
+/**
+ * Two big eyes: an eye-coloured ellipse, a pupil (plate colour) inside it that sits at `gaze` (each axis -1..1) while the
+ * eye is open, blinking on this slot's own schedule. A slot waiting to be built shows half-closed slits without pupils.
+ */
+export function drawEyes(ctx: CanvasRenderingContext2D, x: number, y: number, timeSec: number, seed: number, c: FactoryColors, idle = false, gaze: { x: number; y: number } = { x: 0, y: 0 }): void {
+  const open = eyeOpenness(timeSec, seed, idle);
   for (const dx of [0, 14]) {
+    ctx.fillStyle = c.eye;
     ctx.beginPath();
-    ctx.ellipse(x + dx, y, 4.5, 8 * open, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + dx, y, EYE_RX, EYE_RY * open, 0, 0, Math.PI * 2);
+    ctx.fill();
+    if (idle || open < 0.5) continue;
+    ctx.fillStyle = c.plate;
+    ctx.beginPath();
+    ctx.ellipse(x + dx + gaze.x * (EYE_RX - PUPIL_RX), y + gaze.y * (EYE_RY * open - PUPIL_RX * 1.4), PUPIL_RX, PUPIL_RX * 1.4, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 }
