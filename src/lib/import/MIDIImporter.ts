@@ -188,6 +188,10 @@ export async function importMIDIFile(
     }
   }
 
+  // ── Tempo map: initial BPM is tempos[0]; every later change becomes Fxx ──
+
+  placeTempoChanges(fullChannels, midi.header.tempos, bpm, timing, totalRows);
+
   // ── Split full-length channels into patterns ──────────────────────────
 
   const patLen = opts.defaultPatternLength;
@@ -554,6 +558,72 @@ function placeTrackEffects(
     const row = tickToRow(ev.ticks, timing);
     if (row >= 0 && row < rows.length) {
       placeEffect(rows[row], ev.effTyp, ev.eff);
+    }
+  }
+}
+
+/**
+ * XM Fxx: 01-1F sets speed (ticks per row), 20-FF sets BPM (EffectCommands.ts).
+ * A row lasts speed * 2.5 / BPM seconds, so a tempo outside 32..255 BPM at the
+ * import speed is re-expressed as another speed with a proportionally scaled
+ * BPM (same row duration).  Fxx carries whole BPM only, so fractional tempos
+ * are rounded.  Speed also scales the tick unit of the ECx/EDx note cut/delay
+ * effects, so the speed only leaves MIDI_IMPORT_SPEED when the BPM is out of
+ * range.  Tempos no speed can express are clamped to the nearest BPM.
+ */
+function tempoToFxx(bpm: number): { speed: number; param: number } {
+  let best = { speed: MIDI_IMPORT_SPEED, param: Math.max(32, Math.min(255, Math.round(bpm))) };
+  let bestDist = Infinity;
+  for (let speed = 1; speed < 32; speed++) {
+    const scaled = Math.round((bpm * speed) / MIDI_IMPORT_SPEED);
+    if (scaled < 32 || scaled > 255) continue;
+    const dist = Math.abs(speed - MIDI_IMPORT_SPEED);
+    if (dist < bestDist) { bestDist = dist; best = { speed, param: scaled }; }
+  }
+  return best;
+}
+
+/** Put a song-level effect in the first free effect slot on `row` at/after channel `fromChannel`. Returns that channel index, or -1. */
+function placeSongEffect(
+  channels: FullChannel[], row: number, fromChannel: number, typ: number, param: number,
+): number {
+  for (let c = fromChannel; c < channels.length; c++) {
+    const cell = channels[c].rows[row];
+    if (cell.effTyp === 0 || cell.effTyp2 === 0) {
+      placeEffect(cell, typ, param);
+      return c;
+    }
+  }
+  console.warn(`[MIDIImporter] no free effect slot on row ${row}; tempo change dropped`);
+  return -1;
+}
+
+function placeTempoChanges(
+  channels: FullChannel[],
+  tempos: { ticks: number; bpm: number }[],
+  initialBpm: number,
+  timing: Timing,
+  totalRows: number,
+): void {
+  if (channels.length === 0 || tempos.length < 2) return;
+  const byRow = new Map<number, number>(); // last tempo on a row wins
+  for (const t of tempos.slice(1)) {
+    const row = tickToRow(t.ticks, timing);
+    if (row >= 0 && row < totalRows) byRow.set(row, t.bpm);
+  }
+  let currentSpeed = MIDI_IMPORT_SPEED;
+  let currentBpm = initialBpm;
+  for (const row of [...byRow.keys()].sort((a, b) => a - b)) {
+    const target = tempoToFxx(byRow.get(row)!);
+    let ch = 0;
+    const speedChanged = target.speed !== currentSpeed;
+    if (speedChanged) {
+      ch = placeSongEffect(channels, row, 0, 0xF, target.speed);
+      if (ch < 0) continue;
+      currentSpeed = target.speed;
+    }
+    if (speedChanged || target.param !== currentBpm) {
+      if (placeSongEffect(channels, row, ch, 0xF, target.param) >= 0) currentBpm = target.param;
     }
   }
 }

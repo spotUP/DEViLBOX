@@ -9,6 +9,7 @@
  */
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { Midi } from '@tonejs/midi';
 import { describe, expect, it } from 'vitest';
 import { importMIDIFile, MIDI_IMPORT_SPEED } from '@lib/import/MIDIImporter';
 import type { ChannelData, TrackerCell } from '@typedefs/tracker';
@@ -112,5 +113,56 @@ describe('importMIDIFile on real General MIDI songs', () => {
     const hats = channel(r.patterns[0].channels, 'Closed Hi-Hat');
     expect(noteOns(hats)).toBe(32);
     expect(hats.rows.some((c) => (c.effTyp === 0xE && (c.eff & 0xF0) === 0xD0))).toBe(false);
+  });
+});
+
+describe('importMIDIFile tempo map', () => {
+  /** Quarter notes on every beat for `beats` beats; tempos = [beat, bpm][]. */
+  async function build(tempos: Array<[number, number]>, beats: number) {
+    const midi = new Midi();
+    midi.header.setTempo(tempos[0][1]);
+    midi.header.tempos.length = 0;
+    for (const [beat, bpm] of tempos) midi.header.tempos.push({ ticks: beat * midi.header.ppq, bpm });
+    const track = midi.addTrack();
+    for (let b = 0; b < beats; b++) track.addNote({ midi: 60, ticks: b * midi.header.ppq, durationTicks: midi.header.ppq });
+    const bytes = midi.toArray();
+    return importMIDIFile(new File([new Uint8Array(bytes)], 'tempo.mid'));
+  }
+
+  const fxxCells = (r: Awaited<ReturnType<typeof importMIDIFile>>) => {
+    const out: Array<{ row: number; param: number }> = [];
+    let base = 0;
+    for (const pat of r.patterns) {
+      for (const ch of pat.channels) {
+        ch.rows.forEach((c, i) => {
+          if (c.effTyp === 0xF) out.push({ row: base + i, param: c.eff });
+          if (c.effTyp2 === 0xF) out.push({ row: base + i, param: c.eff2 });
+        });
+      }
+      base += pat.length;
+    }
+    return out.sort((a, b) => a.row - b.row);
+  };
+
+  it('120 -> 60 BPM at beat 8 writes F3C at row 32 and keeps 120 as the initial BPM', async () => {
+    const r = await build([[0, 120], [8, 60]], 16);
+    expect(r.bpm).toBe(120);
+    expect(fxxCells(r)).toEqual([{ row: 32, param: 0x3C }]);
+  });
+
+  it('writes every later tempo change at its own row', async () => {
+    const r = await build([[0, 100], [4, 140], [8, 90], [12, 200]], 16);
+    expect(r.bpm).toBe(100);
+    expect(fxxCells(r)).toEqual([
+      { row: 16, param: 140 },
+      { row: 32, param: 90 },
+      { row: 48, param: 200 },
+    ]);
+  });
+
+  it('a tempo below 32 BPM keeps the row duration by raising speed and BPM together', async () => {
+    const r = await build([[0, 120], [4, 24]], 8);
+    // 24 BPM at speed 6 == 32 BPM at speed 8 (same speed * 2.5 / BPM)
+    expect(fxxCells(r)).toEqual([{ row: 16, param: 8 }, { row: 16, param: 32 }]);
   });
 });
