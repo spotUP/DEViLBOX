@@ -1,7 +1,7 @@
 /**
- * Plays the rendered Up Rough mix as ONE whole-song source (plan 2026-10-20 O6k2), the way a whole-song synth owns the
- * mix: the replayer keeps its scheduler for the playhead but its per-channel notes are suppressed for this song.
- * start() begins at (order, row); a new mix that lands while playing replaces the source at the same playhead sample.
+ * Plays the rendered Up Rough mix as ONE whole-song source for the factory "Listen while building" preview. The tracker
+ * itself does NOT use it: a loaded Up Rough song plays live through the UpRoughSoftsynth instruments, so mute, solo,
+ * VU and scopes act per channel. start() begins at (order, row); a new mix that lands while playing replaces the source at the same playhead sample.
  */
 import * as Tone from 'tone';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -59,9 +59,6 @@ export function upRoughPreviewState(): UpRoughPreviewState { return previewState
 export function isUpRoughPreviewPlaying(): boolean { return previewState === 'preview'; }
 /** Fires on every change: 'preview' when the first section starts, 'mastered' at the swap, 'idle' on stop. */
 export function onUpRoughPreviewState(fn: (s: UpRoughPreviewState) => void): () => void { previewListeners.add(fn); return () => previewListeners.delete(fn); }
-
-/** True when the tracker's play must go through this player instead of the per-channel notes. */
-export function upRoughSongOwnsPlayback(): boolean { return useTrackerStore.getState().upRoughMeta !== null; }
 
 export function isUpRoughSongPlaying(): boolean { return playing; }
 export function upRoughMixPlayed(): Float64Array | null { return lastMix; }
