@@ -52,6 +52,8 @@ const Q = { key: '0123456789ab', name: 'DH0:Mods/mod.Chemical_Emotion', size: 56
 describe('normaliseModuleName', () => {
   it.each([
     ['DH0:Mods/mod.Chemical_Emotion', 'chemical_emotion.mod'],
+    ['pub/modules/Protracker/James/chemical emotion.mod', 'chemical_emotion.mod'],
+    ['mod.Chemical  Emotion', 'chemical_emotion.mod'],
     ['Foo.XM.lha', 'foo.xm'],
     ['C:\\music\\tune.S3M', 'tune.s3m'],
     ['mdat.song', null],
@@ -143,6 +145,13 @@ describe('createGenreService', () => {
     expect(err.status).toBe(502);
     expect(String(err.message)).not.toContain(API_KEY);
     expect(database.prepare('SELECT COUNT(*) AS n FROM module_genres').get()).toEqual({ n: 0 });
+  });
+
+  it('a no-results <error> answer is stored as a miss and not asked again', async () => {
+    const { service, fetchFn } = setup({ body: '<modarchive><error>Sorry, no results were found.</error></modarchive>' });
+    expect((await service.lookup(Q)).source).toBe('miss');
+    expect((await service.lookup(Q)).source).toBe('miss');
+    expect(fetchFn).toHaveBeenCalledTimes(1);
   });
 
   it('an <error> answer is 502', async () => {
