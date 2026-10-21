@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { SynthEffectProcessor, type EffectPatternCell, type SynthEffectDeps } from '../SynthEffectProcessor';
-import { synthNoteVelocity } from '../hybridInstruments';
+import { noteVolumeIsVelocity, synthNoteVelocity } from '../hybridInstruments';
 
 const INST = 3;
 const TICK = 2.5 / 125;
@@ -18,7 +18,7 @@ function note(instrument = INST, effTyp = 0, eff = 0, volume = 0): EffectPattern
 }
 
 /** Run rows through the processor; return the last gain sent on each row. */
-function rowGains(rows: EffectPatternCell[], defaultVolume = 64): (number | undefined)[] {
+function rowGains(rows: EffectPatternCell[], defaultVolume = 64, synthType = 'TR909'): (number | undefined)[] {
   let last: number | undefined;
   const perRow: (number | undefined)[] = [];
   const deps: SynthEffectDeps = {
@@ -27,6 +27,7 @@ function rowGains(rows: EffectPatternCell[], defaultVolume = 64): (number | unde
     getChannelCount: () => 1,
     getEditorMode: () => 'classic',
     getInstrumentDefaultVolume: () => defaultVolume,
+    noteVolumeIsVelocity: () => noteVolumeIsVelocity(synthType),
     applySynthFrequency: () => {},
     setChannelGain: (_ch, gain) => { last = gain; },
     setChannelPan: () => {},
@@ -78,5 +79,43 @@ describe('synth note volume has one owner', () => {
     expect(synthNoteVelocity(32, 0, true)).toBe(1);
     expect(synthNoteVelocity(32, 0, false)).toBe(0.5);
     expect(synthNoteVelocity(64, 0.2, false)).toBe(1);
+  });
+});
+
+/**
+ * A SoundFont player takes the note row's volume as MIDI velocity, as OpenMPT gives a plugin
+ * instrument. Before the fix every FluidSynth note was sent at velocity 127 and the volume went
+ * to the lane as a linear gain, so the SoundFont's velocity curve never applied: a General MIDI
+ * organ chord at velocity 20-95 flooded the mix at full velocity.
+ */
+describe('a SoundFont note volume rides the note velocity', () => {
+  /** What the replayer passes as volumeOnLane for a per-channel native synth of this type. */
+  const volumeOnLane = (synthType: string): boolean => !noteVolumeIsVelocity(synthType);
+
+  it('sends a FluidSynth note at its volume-column velocity, not full velocity', () => {
+    expect(synthNoteVelocity(16, 0, volumeOnLane('FluidSynth'))).toBe(0.25);
+    expect(synthNoteVelocity(16, 0, volumeOnLane('Sfizz'))).toBe(0.25);
+    expect(synthNoteVelocity(16, 0, volumeOnLane('TR909'))).toBe(1);
+  });
+
+  it('leaves the lane neutral on a FluidSynth note row so the volume is not applied twice', () => {
+    const g = rowGains([note(INST, 0, 0, 0x20)], 64, 'FluidSynth');
+    expect(g[0]).toBeCloseTo(1, 6);
+  });
+
+  it('applies a Cxx inside a FluidSynth note relative to the note velocity', () => {
+    const g = rowGains([note(INST, 0, 0, 0x30), { ...note(0, FX_SET_VOLUME, 0x10), note: 0 }], 64, 'FluidSynth');
+    expect(g[0]).toBeCloseTo(1, 6);
+    expect(g[1]).toBeCloseTo(16 / 32, 6);
+  });
+
+  it('cuts a FluidSynth note to silence', () => {
+    const g = rowGains([note(INST, 0, 0, 0x30), { ...note(0, FX_EXTENDED, 0xC0), note: 0 }], 64, 'FluidSynth');
+    expect(g[1]).toBe(0);
+  });
+
+  it('gives a delayed FluidSynth note a neutral lane', () => {
+    const g = rowGains([note(INST, FX_SET_VOLUME, 0x20), note(INST, FX_EXTENDED, 0xD2)], 64, 'FluidSynth');
+    expect(g[1]).toBeCloseTo(1, 6);
   });
 });
