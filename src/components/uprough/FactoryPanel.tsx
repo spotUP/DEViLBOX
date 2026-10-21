@@ -10,6 +10,8 @@ import { actOneSchedule, stageAtTime, type VoiceTimeline } from '@/lib/uprough/f
 import { popIn, prefersReducedMotion, stampBounce } from '@/lib/uprough/factory/motion';
 import { drawConveyor, drawEnvelope, drawEyes, drawGear, drawWave, readTokens, type FactoryColors } from '@/lib/uprough/factory/draw';
 import { playCue, type Cue } from '@/lib/uprough/factory/factorySfx';
+import { hasLocalPreview, playVoice } from '@/lib/uprough/factory/voiceAudition';
+import { Button } from '@components/ui/Button';
 import { spoken, STEM_LANES, type FactoryState, type SlotView, type VoiceView } from '@/lib/uprough/factory/factoryModel';
 import type { Peaks } from '@/engine/uprough/r2Peaks';
 
@@ -51,18 +53,21 @@ function Wave(props: { a?: Peaks; b?: Peaks; frac?: number; reveal?: number; hei
   return <canvas ref={ref} width={240} height={height} className="w-full" style={{ height }} />;
 }
 
-function Chip(props: { label: string; peaks: Peaks; accent?: boolean; alpha: number; scale: number }): React.ReactElement {
+export const NO_PREVIEW = 'No local preview for this style';
+
+/** A finished one-shot: a native button, so the keyboard reaches it. Click plays the kept local audio (R2f-61). */
+function Chip(props: { voice: string; label: string; peaks: Peaks; accent?: boolean; alpha: number; scale: number; preview: boolean }): React.ReactElement {
+  const { voice, label, preview } = props;
   return (
-    <div
-      className="rounded px-1 py-0.5 text-xs"
-      style={{
-        background: 'var(--color-bg-tertiary)', color: 'var(--color-text-secondary)', opacity: props.alpha,
-        transform: `scale(${props.scale})`, border: `1px solid var(${props.accent ? '--color-synth-accent' : '--color-border'})`,
-      }}
+    <Button
+      variant="ghost" size="sm" aria-label={`Play ${label}`} aria-disabled={!preview} title={preview ? `Play ${label}` : NO_PREVIEW}
+      onClick={() => { if (preview) playVoice(voice); }}
+      className={`flex-col !px-1 !py-0.5 text-xs bg-dark-bgTertiary text-text-secondary border ${props.accent ? 'border-accent-secondary' : 'border-dark-border'} ${preview ? '' : 'cursor-not-allowed'}`}
+      style={{ opacity: preview ? props.alpha : 0.6, transform: `scale(${props.scale})` }}
     >
       <Wave a={props.peaks} height={18} />
-      {props.label}
-    </div>
+      {label}
+    </Button>
   );
 }
 
@@ -74,8 +79,8 @@ function voiceTimelines(state: FactoryState): Map<string, VoiceTimeline> {
   return new Map(actOneSchedule(voices, state.rate).map((l) => [l.voice, l]));
 }
 
-function SlotCard(props: { slot: SlotView; lines: Map<string, VoiceTimeline>; t: number; reduced: boolean; timeSec: number }): React.ReactElement {
-  const { slot, lines, t, reduced, timeSec } = props;
+function SlotCard(props: { slot: SlotView; lines: Map<string, VoiceTimeline>; t: number; reduced: boolean; timeSec: number; preview: boolean }): React.ReactElement {
+  const { slot, lines, t, reduced, timeSec, preview } = props;
   const voice: VoiceView | undefined = slot.voices.find((v) => {
     const line = lines.get(v.voice);
     return !line || t >= line.start;
@@ -106,14 +111,14 @@ function SlotCard(props: { slot: SlotView; lines: Map<string, VoiceTimeline>; t:
           env={cur?.env} envLabel={cur ? spoken(cur.stage) : ''} />
       )}
       <div className="text-xs" style={{ color: 'var(--color-text-muted)', transform: `translateY(${bounce * 4}px)` }}>
-        {stamped && voice ? `Stamped ${spoken(voice.voice)}` : cur ? spoken(cur.stage) : slot.born ? 'Bar one rendered' : 'Empty'}
+        {stamped && voice ? `Stamped ${spoken(voice.voice)}` : cur ? spoken(cur.stage) : slot.born ? 'First bar rendered with the song' : 'Empty'}
       </div>
       <div className="flex flex-wrap gap-1">
-        {stamped && voice?.bank && slot.voices.length > 1 && slot.voices.filter((v) => v.bank).map((v) => (
-          <Chip key={v.voice} label={spoken(v.voice)} peaks={v.bank!} alpha={chip.alpha} scale={chip.scale} />
+        {stamped && voice?.bank && slot.voices.filter((v) => v.bank).map((v) => (
+          <Chip key={v.voice} voice={v.voice} label={spoken(v.voice)} peaks={v.bank!} alpha={chip.alpha} scale={chip.scale} preview={preview} />
         ))}
-        {slot.attachments.map((a) => <Chip key={a.voice} label={spoken(a.voice)} peaks={a.peaks} accent alpha={1} scale={1} />)}
-        {slot.hatVariants.map((h) => <Chip key={h.name} label={spoken(h.name)} peaks={h.peaks} alpha={1} scale={1} />)}
+        {slot.attachments.map((a) => <Chip key={a.voice} voice={a.voice} label={spoken(a.voice)} peaks={a.peaks} accent alpha={1} scale={1} preview={preview} />)}
+        {slot.hatVariants.map((h) => <Chip key={h.name} voice={h.name} label={spoken(h.name)} peaks={h.peaks} alpha={1} scale={1} preview={preview} />)}
       </div>
     </div>
   );
@@ -165,6 +170,21 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
     if (c) playCue(c);
   }, [state.eventCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Audition: each voice plays once when its slot presents it (the stamp), the snare variants right after the snare.
+  // Independent of the sound toggle; the cues above sit 10 dB under these. Bass and melody have no one-shot.
+  const preview = hasLocalPreview(state.style);
+  const played = useRef(new Set<string>());
+  useEffect(() => { played.current.clear(); }, [startedAt]);
+  useEffect(() => {
+    if (!preview) return;
+    const once = (v: string): void => { if (!played.current.has(v)) { played.current.add(v); playVoice(v); } };
+    lines.forEach((l, v) => {
+      if (t < l.stampAt) return;
+      once(v);
+      if (v === 'snare') state.slots.find((s) => s.id === 'snare')?.attachments.forEach((a) => once(a.voice));
+    });
+  }, [t, lines, preview, state.slots]);
+
   const timeSec = performance.now() / 1000;
   return (
     <div className={className} data-testid="factory-panel" style={{ color: 'var(--color-text)' }}>
@@ -186,9 +206,12 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
           </button>
         </div>
       </div>
+      {!preview && state.eventCount > 0 && (
+        <div data-testid="factory-no-preview" className="text-xs text-text-muted mb-1">{NO_PREVIEW}</div>
+      )}
       <Machinery timeSec={timeSec} busy={active} />
       <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))' }}>
-        {state.slots.map((slot) => <SlotCard key={slot.id} slot={slot} lines={lines} t={t} reduced={reduced} timeSec={timeSec} />)}
+        {state.slots.map((slot) => <SlotCard key={slot.id} slot={slot} lines={lines} t={t} reduced={reduced} timeSec={timeSec} preview={preview} />)}
       </div>
       {state.sections.length > 0 && (
         <div className="mt-3" data-testid="factory-sections">

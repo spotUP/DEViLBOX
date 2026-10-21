@@ -18,8 +18,7 @@ import { FactoryPanel } from '@components/uprough/FactoryPanel';
 import { useFactoryStore, factoryOnEvent } from '@/lib/uprough/factory/useFactoryStore';
 import { attachR2Bridge } from '@/lib/uprough/factory/r2Bridge';
 import { replayEvents, scriptedGenerateEvents } from '@/lib/uprough/factory/scriptedRun';
-import { STYLE_DRUMS, type HipHopStyle } from '@/engine/uprough/drumBank';
-import { runActOne } from '@/lib/uprough/factory/actOne';
+import type { HipHopStyle } from '@/engine/uprough/drumBank';
 
 export interface UpRoughGenerateDialogProps {
   isOpen: boolean;
@@ -115,8 +114,6 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
     setShowFactory(true);
     setLoaded(false);
     try {
-      // Act 1 locally: the bank is kept for audition audio (the wire carries none); its events come from the host.
-      if (style in STYLE_DRUMS) runActOne(style as HipHopStyle, seed);
       // The host streams the whole build (act 1 bank, sections, decides) into the factory store as it happens.
       const streamed = (ev: R2Event) => {
         factoryOnEvent(ev);
