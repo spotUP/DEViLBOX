@@ -10,7 +10,7 @@ import { initialFactoryState, reduceFactory, type FactoryState } from './factory
 import { STYLE_DRUMS, type HipHopStyle } from '@/engine/uprough/drumBank';
 import { runActOne } from './actOne';
 import { clearBank } from './voiceAudition';
-import { beginPatternFill, fillDecide } from './patternFill';
+import { beginPatternFill, endPatternFill, fillDecide } from './patternFill';
 
 /** Where an event comes from: the host (or the TS render bridge), or the scripted Replay of the panel. */
 export type FactorySource = 'host' | 'replay';
@@ -39,7 +39,9 @@ export const useFactoryStore = create<FactoryStoreState>((set, get) => ({
       if (ev.style in STYLE_DRUMS) runActOne(ev.style as HipHopStyle, ev.seed, ev.rate);
       else clearBank();
     }
-    if (ev.type === 'start' && fillTracker) beginPatternFill(ev);
+    if (ev.type === 'start' && fillTracker) {
+      beginPatternFill(ev).catch((err: unknown) => console.error('[factory] the blank song for the fill did not load:', err));
+    } else if (ev.type === 'done' && fillTracker) endPatternFill();
     else if (ev.type === 'decide' && fillTracker && state.mode === 'generate') written = fillDecide(ev);
     set({
       fillTracker,

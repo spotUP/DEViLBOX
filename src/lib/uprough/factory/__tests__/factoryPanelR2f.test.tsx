@@ -25,9 +25,13 @@ vi.mock('@/lib/uprough/factory/draw', async (orig) => {
   };
 });
 vi.mock('@/utils/audio-context', () => ({ getDevilboxAudioContext: () => undefined }));
+// The fill opens its blank song through applySong: jsdom has no AudioContext and no Worker.
+vi.mock('@engine/ToneEngine', () => import('@/test/mocks/silentToneEngine'));
+vi.mock('@stores/useInstrumentTypeStore', () => import('@/test/mocks/inertInstrumentTypeStore'));
 
 import { FactoryPanel } from '@components/uprough/FactoryPanel';
 import { useFactoryStore, factoryOnEvent } from '../useFactoryStore';
+import { patternFillLoaded } from '../patternFill';
 import { scriptedGenerateEvents } from '../scriptedRun';
 import { SLOT_OF_VOICE } from '../factoryModel';
 import { bandBusy, chipPosition, growHeights } from '../motion';
@@ -36,6 +40,12 @@ import type { R2Event } from '@/engine/uprough/r2Events';
 import { peaks } from '@/engine/uprough/r2Peaks';
 
 const feed = (evs: readonly R2Event[]): void => { act(() => { for (const ev of evs) factoryOnEvent(ev); }); };
+/** A generate run the way the host streams it: the blank song lands after the start line, before the decides. */
+const feedRun = async (evs: readonly R2Event[]): Promise<void> => {
+  feed(evs.slice(0, 1));
+  await act(() => patternFillLoaded());
+  feed(evs.slice(1));
+};
 const runClock = (ms = 60_000): void => { act(() => { vi.advanceTimersByTime(ms); }); };
 const cellCount = (): number => useTrackerStore.getState().patterns.reduce((n, p) => n + p.channels.reduce((m, c) => m + c.rows.filter((r) => r.note > 0).length, 0), 0);
 
@@ -48,10 +58,15 @@ beforeEach(() => {
   drawn.length = 0; waveCalls.length = 0; bandCalls.length = 0;
   useFactoryStore.getState().reset();
 });
-afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
+// A start event loads the run's blank song; finish it inside the file, or its instrument load lands after
+// teardown, when the module mocks are gone, and reaches the real classifier Worker.
+afterEach(async () => {
+  await act(() => patternFillLoaded());
+  cleanup(); vi.useRealTimers(); vi.restoreAllMocks();
+});
 
 describe('R2f-24c host-only strip rows', () => {
-  it('the Sample chops and Vocals rows count the non-empty decides and never write the tracker', () => {
+  it('the Sample chops and Vocals rows count the non-empty decides and never write the tracker', async () => {
     render(<FactoryPanel />);
     const evs = scriptedGenerateEvents('trap', 3);
     const chops = evs.filter((e) => e.type === 'decide' && e.lane === 'chops' && e.cells.length > 0).length;
@@ -60,12 +75,12 @@ describe('R2f-24c host-only strip rows', () => {
     expect(vocals).toBe(1);
 
     // Sentinel: replay the run without the host-only lanes, then with them; the tracker cells must not differ.
-    feed(evs.filter((e) => !(e.type === 'decide' && (e.lane === 'chops' || e.lane === 'vocals'))));
+    await feedRun(evs.filter((e) => !(e.type === 'decide' && (e.lane === 'chops' || e.lane === 'vocals'))));
     const without = cellCount();
     expect(without).toBeGreaterThan(0);
     expect(screen.getAllByText('Sample chops')).toHaveLength(1);
     expect(screen.getByTestId('factory-chops-1').querySelectorAll('[data-filled="true"]')).toHaveLength(0);
-    feed(evs);
+    await feedRun(evs);
     expect(cellCount()).toBe(without);
 
     const chopCells = screen.getByTestId('factory-chops-1').querySelectorAll('[data-filled="true"]');
