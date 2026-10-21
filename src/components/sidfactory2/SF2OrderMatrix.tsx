@@ -1,8 +1,8 @@
 /**
  * SF2OrderMatrix - SID Factory II data adapter over the shared SongOrderMatrix.
  *
- * Rows = order positions, three columns per track: sequence index, transposition (raw
- * byte, 0xA0 = none, as the SF2 editor shows it) and a loop marker. Edits go through the
+ * Rows = order positions, three columns per track: sequence index, transposition (signed
+ * semitones, +3 / -2; stored as the raw byte, 0xA0 = none) and a loop marker. Edits go through the
  * store's own order-list actions (setOrderEntry / setOrderLoopPoint, both undoable).
  */
 
@@ -16,10 +16,21 @@ const NO_TRANSPOSE = 0xA0;
 
 const hex2 = (v: number) => v.toString(16).toUpperCase().padStart(2, '0');
 
-/** Raw transposition byte as the signed semitone offset (0xA0 = none); typing still writes the raw byte. */
+/** Raw transposition byte as the signed semitone offset (0xA0 = none). */
 export function sf2TransposeToString(raw: number): string {
   const off = raw - NO_TRANSPOSE;
   return off === 0 ? '..' : `${off > 0 ? '+' : ''}${off}`;
+}
+
+/**
+ * Typed text ("+3", "-2", "5") to the raw transposition byte: the inverse of sf2TransposeToString. An unsigned number
+ * is positive. Null when the text is not a number or the byte leaves SF2's 0x80..0xFD transposition range.
+ */
+export function sf2TransposeFromString(text: string): number | null {
+  const m = /^([+-]?)(\d{1,3})$/.exec(text.trim());
+  if (!m) return null;
+  const raw = NO_TRANSPOSE + (m[1] === '-' ? -1 : 1) * parseInt(m[2], 10);
+  return raw >= 0x80 && raw <= 0xFD ? raw : null;
 }
 
 export const SF2_ORDER_COLUMNS: ColumnDef[] = [
@@ -32,6 +43,7 @@ export const SF2_ORDER_COLUMNS: ColumnDef[] = [
     key: 'transpose', label: 'Trn', charWidth: 3, type: 'hex', hexDigits: 2,
     color: '#ffcc00', emptyColor: '#444', emptyValue: NO_TRANSPOSE, // only a real transposition lights up
     formatter: sf2TransposeToString,
+    parseTyped: sf2TransposeFromString,
   },
   {
     key: 'loop', label: 'Lp', charWidth: 1, type: 'hex', hexDigits: 1,
