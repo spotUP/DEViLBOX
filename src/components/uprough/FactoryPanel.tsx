@@ -7,7 +7,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Volume2, VolumeX, RotateCcw } from 'lucide-react';
 import { useFactoryStore } from '@/lib/uprough/factory/useFactoryStore';
 import { actOneSchedule, stageAtTime, type VoiceTimeline } from '@/lib/uprough/factory/pacing';
-import { growHeights, popIn, prefersReducedMotion, SETTLE, Spring, stampBounce } from '@/lib/uprough/factory/motion';
+import { bandBusy, CONVEYOR_SPEED, chipPosition, growHeights, popIn, prefersReducedMotion, SETTLE, Spring, stampBounce } from '@/lib/uprough/factory/motion';
 import { drawConveyor, drawEnvelope, drawEyes, drawGear, drawWave, readTokens, type FactoryColors } from '@/lib/uprough/factory/draw';
 import { playCue, type Cue } from '@/lib/uprough/factory/factorySfx';
 import { hasLocalPreview, playVoice } from '@/lib/uprough/factory/voiceAudition';
@@ -38,15 +38,15 @@ function useClock(done: boolean, startedAt: number, until: number, eventCount: n
   return now;
 }
 
-function Wave(props: { a?: Peaks; b?: Peaks; frac?: number; reveal?: number; height?: number; final?: boolean; env?: { values: number[]; n: number }; envLabel?: string; eyes?: number }): React.ReactElement {
-  const { a, b, frac = 0, reveal = 1, height = 56, final = false, env, envLabel, eyes } = props;
+function Wave(props: { a?: Peaks; b?: Peaks; frac?: number; reveal?: number; reference?: number; height?: number; final?: boolean; env?: { values: number[]; n: number }; envLabel?: string; eyes?: number }): React.ReactElement {
+  const { a, b, frac = 0, reveal = 1, reference, height = 56, final = false, env, envLabel, eyes } = props;
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const cv = ref.current;
     const ctx = cv?.getContext('2d');
     if (!cv || !ctx) return;
     const c: FactoryColors = readTokens(cv);
-    drawWave(ctx, cv.width, cv.height, a, b, frac, final ? c.final : c.wave, c.line, reveal);
+    drawWave(ctx, cv.width, cv.height, a, b, frac, final ? c.final : c.wave, c.line, reveal, reference);
     if (env) drawEnvelope(ctx, cv.width, cv.height, env, envLabel ?? '', c);
     if (eyes !== undefined) drawEyes(ctx, cv.width - 22, 10, eyes, 0, c);
   });
@@ -124,7 +124,10 @@ function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => 
   );
 }
 
-function Machinery(props: { timeSec: number; busy: boolean }): React.ReactElement {
+/** A section chip on the conveyor: born when its real `section` event was first seen. */
+export interface RidingChip { id: number; label: string; bornAtSec: number }
+
+function Machinery(props: { timeSec: number; busy: boolean; bandBusy: boolean; chips: readonly RidingChip[] }): React.ReactElement {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const cv = ref.current;
@@ -135,7 +138,10 @@ function Machinery(props: { timeSec: number; busy: boolean }): React.ReactElemen
     const spin = props.busy ? props.timeSec : 0;
     drawGear(ctx, 16, 18, 11, 8, spin * 2, c.dim);
     drawGear(ctx, 36, 24, 8, 6, -spin * 2.6, c.line);
-    drawConveyor(ctx, cv.width, 34, props.busy ? props.timeSec * 30 : 0, c.dim);
+    const riding = props.chips.map((k) => ({ k, x: chipPosition(k.bornAtSec, props.timeSec, cv.width, CONVEYOR_SPEED) }))
+      .filter(({ k }) => (props.timeSec - k.bornAtSec) * CONVEYOR_SPEED < cv.width)
+      .map(({ k, x }) => ({ x, label: k.label }));
+    drawConveyor(ctx, cv.width, 34, props.bandBusy ? props.timeSec * 30 : 0, c.dim, riding, c.plate, c.text);
   });
   return <canvas ref={ref} width={240} height={40} className="w-full" style={{ height: 40 }} />;
 }
@@ -165,8 +171,8 @@ function StripRow(props: { testId: string; title: string; bars: number; labels: 
 }
 
 /** The master waveform growing out of the texture waveform on a spring (R2f-32); reduced motion shows the master at once. */
-function GrowWave(props: { from?: Peaks; to: Peaks; reduced: boolean }): React.ReactElement {
-  const { from, to, reduced } = props;
+function GrowWave(props: { from?: Peaks; to: Peaks; reduced: boolean; reference?: number }): React.ReactElement {
+  const { from, to, reduced, reference } = props;
   const [t, setT] = useState(reduced ? 1 : 0);
   useEffect(() => {
     if (reduced) { setT(1); return; }
@@ -186,7 +192,7 @@ function GrowWave(props: { from?: Peaks; to: Peaks; reduced: boolean }): React.R
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, [to, reduced]);
-  return <Wave a={growHeights(from ?? to, to, t, reduced)} height={36} final />;
+  return <Wave a={growHeights(from ?? to, to, t, reduced)} height={36} final reference={reference} />;
 }
 
 export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className }) => {
@@ -256,6 +262,19 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
     state.slots.filter((s) => s.born).forEach((s) => go(`born:${s.id}`, s.id));
   }, [t, lines, state.slots, state.done, reduced]);
 
+  // Conveyor (R2f-56): one chip per real section event, born when the panel first sees it; the band moves only for an
+  // event that arrived in the last BAND_IDLE_MS.
+  const lastEventAt = useRef<number | undefined>(undefined);
+  const [chips, setChips] = useState<RidingChip[]>([]);
+  useEffect(() => {
+    if (state.eventCount === 0) { lastEventAt.current = undefined; setChips([]); return; }
+    const nowMs = performance.now();
+    lastEventAt.current = nowMs;
+    setChips((prev) => (state.sectionEvents.length > prev.length
+      ? [...prev, ...state.sectionEvents.slice(prev.length).map((s, i) => ({ id: prev.length + i, label: s.name, bornAtSec: nowMs / 1000 }))]
+      : state.sectionEvents.length < prev.length ? [] : prev));
+  }, [state.eventCount]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const timeSec = performance.now() / 1000;
   return (
     <div className={className} data-testid="factory-panel"
@@ -282,7 +301,7 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
       {!preview && state.eventCount > 0 && (
         <div data-testid="factory-no-preview" className="text-xs text-text-muted mb-1">{NO_PREVIEW}</div>
       )}
-      <Machinery timeSec={timeSec} busy={active} />
+      <Machinery timeSec={timeSec} busy={active} bandBusy={bandBusy(performance.now(), lastEventAt.current)} chips={chips} />
       <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))' }}>
         {state.slots.map((slot) => <SlotCard key={slot.id} register={registerSlot} slot={slot} lines={lines} t={t} reduced={reduced} timeSec={timeSec} preview={preview} />)}
       </div>
@@ -321,7 +340,7 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
             {(['join', 'texture', 'master'] as const).map((k) => (
               <div key={k}>
                 <div className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{k === 'join' ? 'Joined' : k === 'texture' ? 'Texture' : 'Master'}</div>
-                {state.press[k] ? (k === 'master' ? <GrowWave from={state.press.texture} to={state.press[k]!} reduced={reduced} /> : <Wave a={state.press[k]} height={36} />) : <div style={{ height: 36, border: '1px dashed var(--color-border)', borderRadius: 6 }} />}
+                {state.press[k] ? (k === 'master' ? <GrowWave from={state.press.texture} to={state.press[k]!} reduced={reduced} reference={state.press.master?.scale} /> : <Wave a={state.press[k]} height={36} reference={state.press.master?.scale} />) : <div style={{ height: 36, border: '1px dashed var(--color-border)', borderRadius: 6 }} />}
               </div>
             ))}
           </div>

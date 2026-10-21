@@ -113,3 +113,20 @@ export function growHeights(from: Peaks, to: Peaks, t: number, reduced = prefers
     max: Array.from({ length: n }, (_, i) => lerp(at(from.max, n, i), to.max[i]!)),
   };
 }
+
+/** Pixels per second the conveyor ticks and its chips travel. */
+export const CONVEYOR_SPEED = 60;
+/** A chip is 40 px wide; it rides from the left edge to the right edge of the band. */
+export const CHIP_WIDTH = 40;
+/** The band is busy while an event arrived within this many milliseconds. */
+export const BAND_IDLE_MS = 1000;
+
+/** Left edge of a chip born at `bornAtSec`: 0 at birth, rising with `speed` (px/s), capped where its right edge meets `widthPx`. */
+export function chipPosition(bornAtSec: number, nowSec: number, widthPx: number, speed: number): number {
+  return Math.min(Math.max(0, widthPx - CHIP_WIDTH), Math.max(0, (nowSec - bornAtSec) * speed));
+}
+
+/** True while the last real event arrived less than `idleMs` ago: the band never moves on a bare `busy` flag (R2f-56b). */
+export function bandBusy(nowMs: number, lastEventAtMs: number | undefined, idleMs = BAND_IDLE_MS): boolean {
+  return lastEventAtMs !== undefined && nowMs - lastEventAtMs < idleMs;
+}
