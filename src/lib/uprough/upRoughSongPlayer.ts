@@ -4,6 +4,8 @@
  * start() begins at (order, row); a new mix that lands while playing replaces the source at the same playhead sample.
  */
 import * as Tone from 'tone';
+import { getToneEngine } from '@engine/ToneEngine';
+import { getNativeAudioNode } from '@/utils/audio-context';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useUpRoughRenderStore } from '@stores/useUpRoughRenderStore';
 import { startSample } from './currentSongRender';
@@ -21,7 +23,11 @@ export function setPlayerAudioForTests(a: PlayerAudio | null): void { audioOverr
 function audio(): PlayerAudio {
   if (audioOverride) return audioOverride;
   const ctx = Tone.getContext().rawContext as AudioContext;
-  return { context: ctx, destination: Tone.getDestination().input as unknown as AudioNode };
+  // A whole-song source enters the master chain where the other whole-song engines do: ToneEngine.nativeInput (behind
+  // the voice delay, then master effects, limiter and export tap). A native source can only connect to a native node.
+  const destination = getNativeAudioNode(getToneEngine().nativeInput);
+  if (!destination) throw new Error('Up Rough player: the engine native input has no native AudioNode');
+  return { context: ctx, destination };
 }
 
 let source: AudioBufferSourceNode | null = null;
