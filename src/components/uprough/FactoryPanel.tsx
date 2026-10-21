@@ -9,6 +9,7 @@ import { useFactoryStore } from '@/lib/uprough/factory/useFactoryStore';
 import { actOneSchedule, stageAtTime, type VoiceTimeline } from '@/lib/uprough/factory/pacing';
 import { bandBusy, CONVEYOR_SPEED, chipPosition, growHeights, popIn, prefersReducedMotion, SETTLE, Spring, stampBounce } from '@/lib/uprough/factory/motion';
 import { drawConveyor, drawEnvelope, drawEyes, drawGear, drawWave, fitCanvas, readTokens, type FactoryColors } from '@/lib/uprough/factory/draw';
+import { slotGrid, SLOT_GAP, WAVE_MIN, type SlotGrid } from '@/lib/uprough/factory/layout';
 import { playCue, type Cue } from '@/lib/uprough/factory/factorySfx';
 import { hasLocalPreview, playVoice } from '@/lib/uprough/factory/voiceAudition';
 import { Button } from '@components/ui/Button';
@@ -69,8 +70,21 @@ function Wave(props: { a?: Peaks; b?: Peaks; frac?: number; reveal?: number; ref
   return <canvas ref={ref} width={240} height={height} className="w-full block" style={{ height }} />;
 }
 
-/** A slot's waveform height in CSS pixels, compact so all eleven slots fit one screen with the modal. */
-const SLOT_WAVE_HEIGHT = 64;
+/** The slot grid's columns, rows and waveform height, derived from the room its element has (no scrolling, ever). */
+function useSlotGrid(ref: React.RefObject<HTMLDivElement | null>, count: number): SlotGrid {
+  const [size, setSize] = useState<{ w: number; h: number } | undefined>(undefined);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect;
+      if (r) setSize((p) => (p && p.w === r.width && p.h === r.height ? p : { w: r.width, h: r.height }));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref]);
+  return useMemo(() => (size ? slotGrid(size.w, size.h, count) : { cols: 1, rows: Math.max(1, count), wave: WAVE_MIN }), [size, count]);
+}
 
 export const PREVIEW_CAPTION = 'Preview before mastering';
 
@@ -100,8 +114,8 @@ function voiceTimelines(state: FactoryState): Map<string, VoiceTimeline> {
   return new Map(actOneSchedule(voices, state.rate).map((l) => [l.voice, l]));
 }
 
-function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => void; slot: SlotView; lines: Map<string, VoiceTimeline>; t: number; reduced: boolean; timeSec: number; preview: boolean }): React.ReactElement {
-  const { slot, lines, t, reduced, timeSec, preview, register } = props;
+function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => void; slot: SlotView; lines: Map<string, VoiceTimeline>; t: number; reduced: boolean; timeSec: number; preview: boolean; waveHeight: number }): React.ReactElement {
+  const { slot, lines, t, reduced, timeSec, preview, register, waveHeight } = props;
   const voice: VoiceView | undefined = slot.voices.find((v) => {
     const line = lines.get(v.voice);
     return !line || t >= line.start;
@@ -118,13 +132,13 @@ function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => 
   return (
     <div
       data-testid={`factory-slot-${slot.id}`} ref={(el) => register(slot.id, el)}
-      className={`rounded-md p-2 flex flex-col gap-1 bg-dark-bgSecondary border ${lit ? 'border-solid border-accent-primary' : 'border-dashed border-dark-borderLight opacity-70'}`}
+      className={`rounded-md p-2 flex flex-col gap-1 min-h-0 min-w-0 overflow-hidden bg-dark-bgSecondary border ${lit ? 'border-solid border-accent-primary' : 'border-dashed border-dark-borderLight opacity-70'}`}
     >
       <div className="text-xs font-bold text-text-primary">{slot.label}</div>
       {slot.born ? (
-        <Wave a={slot.born} height={SLOT_WAVE_HEIGHT} eyes={timeSec} final />
+        <Wave a={slot.born} height={waveHeight} eyes={timeSec} final />
       ) : (
-        <Wave a={stamped ? voice?.bank : cur?.peaks} height={SLOT_WAVE_HEIGHT} b={stamped ? undefined : next?.peaks} frac={shown.frac} final={stamped} eyes={timeSec}
+        <Wave a={stamped ? voice?.bank : cur?.peaks} height={waveHeight} b={stamped ? undefined : next?.peaks} frac={shown.frac} final={stamped} eyes={timeSec}
           env={cur?.env} envLabel={cur ? spoken(cur.stage) : ''} />
       )}
       <div className="text-[10px] font-mono text-text-secondary min-h-[1.4em] truncate" style={{ transform: `translateY(${bounce * 4}px)` }}>
@@ -298,12 +312,14 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
       : state.sectionEvents.length < prev.length ? [] : prev));
   }, [state.eventCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const gridRef = useRef<HTMLDivElement>(null);
+  const grid = useSlotGrid(gridRef, state.slots.length);
   const timeSec = performance.now() / 1000;
   return (
-    <div className={className} data-testid="factory-panel"
+    <div className={`h-full flex flex-col min-h-0 ${className ?? ''}`} data-testid="factory-panel"
       onWheel={() => { userScrolledAt.current = performance.now(); }} onTouchMove={() => { userScrolledAt.current = performance.now(); }}
       onKeyDown={() => { userScrolledAt.current = performance.now(); }} style={{ color: 'var(--color-text)' }}>
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2 shrink-0">
         <div role="status" aria-live="polite" data-testid="factory-status" className="text-sm font-bold text-accent-highlight min-h-[1.5em]">
           {state.caption}
         </div>
@@ -332,14 +348,15 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
       {!preview && state.eventCount > 0 && (
         <div data-testid="factory-no-preview" className="text-xs text-text-muted mb-1">{NO_PREVIEW}</div>
       )}
-      <Machinery timeSec={timeSec} busy={active} bandBusy={bandBusy(performance.now(), lastEventAt.current)} chips={chips} />
-      <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 200px), 1fr))' }}>
-        {state.slots.map((slot) => <SlotCard key={slot.id} register={registerSlot} slot={slot} lines={lines} t={t} reduced={reduced} timeSec={timeSec} preview={preview} />)}
+      <div className="shrink-0"><Machinery timeSec={timeSec} busy={active} bandBusy={bandBusy(performance.now(), lastEventAt.current)} chips={chips} /></div>
+      <div ref={gridRef} data-testid="factory-slots" className="flex-1 min-h-0 grid"
+        style={{ gap: SLOT_GAP, gridTemplateColumns: `repeat(${grid.cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${grid.rows}, minmax(0, 1fr))` }}>
+        {state.slots.map((slot) => <SlotCard key={slot.id} register={registerSlot} slot={slot} lines={lines} t={t} reduced={reduced} timeSec={timeSec} preview={preview} waveHeight={grid.wave} />)}
       </div>
       {state.sections.length > 0 && (
-        <div className="mt-3" data-testid="factory-sections">
+        <div className="mt-2 shrink-0" data-testid="factory-sections">
           <div className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>Sections</div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2 overflow-hidden">
             {state.sections.map((sec) => {
               const decidedBars = Math.max(0, ...Object.values(sec.decided));
               return (
@@ -365,7 +382,7 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
         </div>
       )}
       {(state.press.join || state.press.texture || state.press.master) && (
-        <div className="mt-3" data-testid="factory-press">
+        <div className="mt-2 shrink-0" data-testid="factory-press">
           <div className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>Record press</div>
           <div className="grid grid-cols-3 gap-2">
             {(['join', 'texture', 'master'] as const).map((k) => (
@@ -377,7 +394,7 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
           </div>
         </div>
       )}
-      <div className="mt-2 text-xs" style={{ color: 'var(--color-text-muted)' }} data-testid="factory-cells">
+      <div className="mt-1 text-xs shrink-0" style={{ color: 'var(--color-text-muted)' }} data-testid="factory-cells">
         {state.cellsWritten > 0 ? `${state.cellsWritten} pattern cells written` : ''}
       </div>
     </div>
