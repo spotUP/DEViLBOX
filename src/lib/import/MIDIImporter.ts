@@ -173,10 +173,18 @@ export async function importMIDIFile(
       const inst = gmPercussionNoteToInstrument(midiNote, instId);
       instruments.push(inst);
 
-      const rows = makeEmptyRows(totalRows);
+      // One cell holds one hit.  Two hits of the same drum that quantize to
+      // the same row (a flam, a 32nd-note roll) go to an overflow voice
+      // channel of the same instrument instead of overwriting each other.
+      const voiceRows: TrackerCell[][] = [];
       for (const hit of hits) {
         const row = tickToRow(hit.ticks, timing);
         if (row < 0 || row >= totalRows) continue;
+        let rows = voiceRows.find((r) => r[row].note === 0);
+        if (!rows) {
+          rows = makeEmptyRows(totalRows);
+          voiceRows.push(rows);
+        }
         rows[row].note = DRUM_TRIGGER_NOTE;
         rows[row].instrument = instId;
         if (opts.velocityToVolume) {
@@ -184,7 +192,13 @@ export async function importMIDIFile(
         }
         placeNoteDelay(rows[row], hit.ticks, timing);
       }
-      fullChannels.push({ name: inst.name, instId, rows, ...defaults });
+      if (voiceRows.length === 0) voiceRows.push(makeEmptyRows(totalRows));
+      voiceRows.forEach((rows, vi) => {
+        fullChannels.push({
+          name: vi === 0 ? inst.name : `${inst.name} ${vi + 1}`,
+          instId, rows, ...defaults,
+        });
+      });
     }
   }
 

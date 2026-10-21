@@ -166,3 +166,17 @@ describe('importMIDIFile tempo map', () => {
     expect(fxxCells(r)).toEqual([{ row: 16, param: 8 }, { row: 16, param: 32 }]);
   });
 });
+
+describe('importMIDIFile drum hits that share a row', () => {
+  it('fade_away.mid keeps all 552 note-ons: two Low Tom hits in one row get an overflow voice', async () => {
+    const buf = readFileSync(resolve(__dirname, '../../../../public/data/songs/midi/fade_away.mid'));
+    const raw = new Midi(buf).tracks.reduce((n, t) => n + t.notes.length, 0);
+    expect(raw).toBe(552);
+    const r = await importMIDIFile(new File([buf], 'fade_away.mid'));
+    let total = 0;
+    for (const p of r.patterns) for (const ch of p.channels) total += noteOns(ch);
+    expect(total).toBe(552);
+    const lowTom = r.patterns.flatMap((p) => p.channels).filter((c) => c.name.startsWith('Low Tom'));
+    expect(new Set(lowTom.map((c) => c.name))).toEqual(new Set(['Low Tom', 'Low Tom 2']));
+  });
+});
