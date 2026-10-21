@@ -69,8 +69,8 @@ function Wave(props: { a?: Peaks; b?: Peaks; frac?: number; reveal?: number; ref
   return <canvas ref={ref} width={240} height={height} className="w-full block" style={{ height }} />;
 }
 
-/** A slot's waveform height in CSS pixels, the golden draft's. */
-const SLOT_WAVE_HEIGHT = 170;
+/** A slot's waveform height in CSS pixels, compact so all eleven slots fit one screen with the modal. */
+const SLOT_WAVE_HEIGHT = 64;
 
 export const PREVIEW_CAPTION = 'Preview before mastering';
 
@@ -118,19 +118,19 @@ function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => 
   return (
     <div
       data-testid={`factory-slot-${slot.id}`} ref={(el) => register(slot.id, el)}
-      className={`rounded-md p-3 flex flex-col gap-2 bg-dark-bgSecondary border ${lit ? 'border-solid border-accent-primary' : 'border-dashed border-dark-borderLight opacity-70'}`}
+      className={`rounded-md p-2 flex flex-col gap-1 bg-dark-bgSecondary border ${lit ? 'border-solid border-accent-primary' : 'border-dashed border-dark-borderLight opacity-70'}`}
     >
-      <div className="text-sm font-bold text-text-primary">{slot.label}</div>
+      <div className="text-xs font-bold text-text-primary">{slot.label}</div>
       {slot.born ? (
         <Wave a={slot.born} height={SLOT_WAVE_HEIGHT} eyes={timeSec} final />
       ) : (
         <Wave a={stamped ? voice?.bank : cur?.peaks} height={SLOT_WAVE_HEIGHT} b={stamped ? undefined : next?.peaks} frac={shown.frac} final={stamped} eyes={timeSec}
           env={cur?.env} envLabel={cur ? spoken(cur.stage) : ''} />
       )}
-      <div className="text-xs font-mono text-text-secondary min-h-[2.6em]" style={{ transform: `translateY(${bounce * 4}px)` }}>
+      <div className="text-[10px] font-mono text-text-secondary min-h-[1.4em] truncate" style={{ transform: `translateY(${bounce * 4}px)` }}>
         {stamped && voice ? `Stamped ${spoken(voice.voice)}` : cur ? spoken(cur.stage) : slot.born ? 'First bar rendered with the song' : 'Empty'}
       </div>
-      <div className="flex flex-wrap gap-2 min-h-[40px]">
+      <div className="flex flex-wrap gap-1 min-h-[28px]">
         {stamped && voice?.bank && slot.voices.filter((v) => v.bank).map((v) => (
           <Chip key={v.voice} voice={v.voice} label={spoken(v.voice)} peaks={v.bank!} alpha={chip.alpha} scale={chip.scale} preview={preview} />
         ))}
@@ -332,7 +332,7 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
         <div data-testid="factory-no-preview" className="text-xs text-text-muted mb-1">{NO_PREVIEW}</div>
       )}
       <Machinery timeSec={timeSec} busy={active} bandBusy={bandBusy(performance.now(), lastEventAt.current)} chips={chips} />
-      <div className="grid gap-x-4 gap-y-5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 270px), 1fr))' }}>
+      <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 200px), 1fr))' }}>
         {state.slots.map((slot) => <SlotCard key={slot.id} register={registerSlot} slot={slot} lines={lines} t={t} reduced={reduced} timeSec={timeSec} preview={preview} />)}
       </div>
       {state.sections.length > 0 && (
