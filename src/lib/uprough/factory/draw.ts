@@ -4,7 +4,7 @@
  */
 import type { Env, Peaks } from '@/engine/uprough/r2Peaks';
 
-export interface FactoryColors { line: string; wave: string; final: string; env: string; dim: string; eye: string; plate: string; text: string }
+export interface FactoryColors { line: string; wave: string; final: string; env: string; dim: string; eye: string; plate: string; text: string; inverse: string }
 
 /** Reads the design tokens off an element (a canvas inside the themed document). */
 export function readTokens(el: Element): FactoryColors {
@@ -12,7 +12,7 @@ export function readTokens(el: Element): FactoryColors {
   const t = (name: string): string => cs.getPropertyValue(name).trim() || 'currentColor';
   return {
     line: t('--color-border'), wave: t('--color-accent'), final: t('--color-cell-instrument'), env: t('--color-synth-envelope'),
-    dim: t('--color-text-muted'), eye: t('--color-text'), plate: t('--color-bg-tertiary'), text: t('--color-text-secondary'),
+    dim: t('--color-text-muted'), eye: t('--color-text'), plate: t('--color-bg-tertiary'), text: t('--color-text-secondary'), inverse: t('--color-text-inverse'),
   };
 }
 
@@ -87,15 +87,52 @@ export function drawEnvelope(ctx: CanvasRenderingContext2D, w: number, h: number
   ctx.fillText(label, 3, 11);
 }
 
-/** Two eyes that blink: closed for 0.12 s every 3.6 s, offset by `phase`. */
-export function drawEyes(ctx: CanvasRenderingContext2D, x: number, y: number, timeSec: number, phase: number, c: FactoryColors): void {
-  const closed = ((timeSec + phase) % 3.6) < 0.12;
+/** Eye size and blink period (the draft's big eyes: wide open 4.5 s, a 0.14 s blink). */
+export const EYE_BLINK_SECONDS = 4.5;
+const EYE_BLINK_CLOSED = 0.14;
+
+/** Eye openness 0..1 at `timeSec`: 1 open, 0 shut in the blink; an idle (not yet built) slot sits half-closed at a slit. */
+export function eyeOpenness(timeSec: number, phase: number, idle: boolean): number {
+  if (idle) return 0.3;
+  return ((timeSec + phase) % EYE_BLINK_SECONDS) < EYE_BLINK_CLOSED ? 0.1 : 1;
+}
+
+/** Two big eyes that blink every 4.5 s; a slot waiting to be built shows half-closed slits. */
+export function drawEyes(ctx: CanvasRenderingContext2D, x: number, y: number, timeSec: number, phase: number, c: FactoryColors, idle = false): void {
+  const open = eyeOpenness(timeSec, phase, idle);
   ctx.fillStyle = c.eye;
-  for (const dx of [0, 9]) {
+  for (const dx of [0, 14]) {
     ctx.beginPath();
-    ctx.ellipse(x + dx, y, 2.5, closed ? 0.6 : 3, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + dx, y, 4.5, 8 * open, 0, 0, Math.PI * 2);
     ctx.fill();
   }
+}
+
+/** The stamp plate: it drops onto the wave's top-right, squashes, tilts, and is gone after PLATE_SECONDS. */
+export const PLATE_SECONDS = 0.6;
+export function drawStamp(ctx: CanvasRenderingContext2D, w: number, name: string, sinceSec: number, squash: number, c: FactoryColors): void {
+  if (sinceSec < 0 || sinceSec >= PLATE_SECONDS) return;
+  const drop = Math.min(1, sinceSec / 0.16);
+  const pw = 96, ph = 22 * (1 - squash * 0.25);
+  const px = w - pw - 6, py = 2 - (1 - drop) * 34;
+  ctx.save();
+  ctx.translate(px + pw / 2, py + ph / 2);
+  ctx.rotate(-0.05);
+  ctx.translate(-pw / 2, -ph / 2);
+  ctx.beginPath();
+  ctx.roundRect(0, 0, pw, ph, 7);
+  ctx.fillStyle = c.wave; ctx.fill();
+  ctx.lineWidth = 1.5; ctx.strokeStyle = c.line; ctx.stroke();
+  ctx.fillStyle = c.inverse; ctx.font = '700 11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(name.toUpperCase(), pw / 2, ph / 2 + 1);
+  ctx.restore();
+}
+
+/** A vertical cursor at fraction `frac` (0..1) of the width: where the one-shot is playing now. */
+export function drawPlayhead(ctx: CanvasRenderingContext2D, w: number, h: number, frac: number, color: string): void {
+  if (frac < 0 || frac > 1) return;
+  ctx.fillStyle = color;
+  ctx.fillRect(Math.min(w - 1, Math.round(frac * w)), 0, 1.5, h);
 }
 
 /** A gear with `teeth` teeth turning at angle `a`. */
