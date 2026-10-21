@@ -143,6 +143,7 @@ import {
   disposeChannelOutputs as _disposeChannelOutputs,
   setChannelStripDestination as _setChannelStripDestination,
   getChannelLevels as _getChannelLevels,
+  getChannelWaveform as _getChannelWaveform,
   updateChannelEnvelopes as _updateChannelEnvelopes,
   setChannelKeyOff as _setChannelKeyOff,
   updateRealtimeChannelLevels as _updateRealtimeChannelLevels,
@@ -5576,6 +5577,11 @@ export class ToneEngine {
   public getMasterLevel(): number { return this.masterMeter.getValue() as number; }
   /** Get the synthBus level (0-1) for WASM engines that bypass per-channel routing */
   public getSynthBusLevel(): number { return this.synthBusMeter.getValue() as number; }
+
+  /** A channel's post-fader waveform (Tone.js voices and synth lanes), null when its strip is unbuilt. */
+  public getChannelWaveform(channelIndex: number): Float32Array | null {
+    return _getChannelWaveform(this._channelCtx, channelIndex);
+  }
 
   /** Get channel output by index (for send bus wiring) */
   public getChannelOutputByIndex(channelIndex: number): ChannelOutput | null {

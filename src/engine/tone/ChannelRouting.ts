@@ -41,7 +41,14 @@ export interface ChannelOutput {
   /** Post-delay join: delayed voices plus the channel's synth lane, into the effect chain. */
   join: Tone.Gain;
   channel: Tone.Channel;
-  meter: Tone.Meter;
+  /**
+   * Post-fader waveform of the channel: the channel scope draws it and the
+   * channel level is its RMS. It is the same 256-sample analyser a Tone.Meter
+   * wraps, so one node serves both.
+   */
+  scope: Tone.Analyser;
+  /** Smoothed RMS of `scope` (Tone.Meter's falling-only smoothing). */
+  rms: number;
 }
 
 export interface ChannelRoutingContext {
@@ -237,7 +244,7 @@ export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: numbe
     const voiceDelay = new Tone.Delay({ delayTime: ctx.sampleDelaySec(), maxDelay: MAX_VOICE_DELAY_SEC });
     const join = new Tone.Gain(1);
     const channel = new Tone.Channel({ volume: 0, pan: 0 });
-    const meter = new Tone.Meter({ smoothing: 0.15 });
+    const scope = new Tone.Analyser({ type: 'waveform', size: 256 });
 
     // Get per-channel effect chain (creates passthrough if no effects exist)
     const mgr = getChannelEffectsManager();
@@ -250,14 +257,14 @@ export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: numbe
     const filterOutput = filterMgr.getOutput(channelIndex);
 
     // Connect: input → voiceDelay → join (+ synth lane) → [effect chain] → HPF → LPF
-    //          → channel → meter + masterInput
+    //          → channel → scope + masterInput
     // (or the channel's routed effects, see setChannelStripDestination)
     input.connect(voiceDelay);
     voiceDelay.connect(join);
     join.connect(chainInput);
     connectAudio(chainOutput, filterInput);
     connectAudio(filterOutput, channel);
-    channel.connect(meter);
+    channel.connect(scope);
     channel.connect(stripDestinationsOf(ctx).get(channelIndex) ?? ctx.masterInput);
 
     ctx.channelOutputs.set(channelIndex, {
@@ -265,7 +272,8 @@ export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: numbe
       voiceDelay,
       join,
       channel,
-      meter,
+      scope,
+      rms: 0,
     });
 
     // State the mixer set before the chain existed.
@@ -739,9 +747,9 @@ export function disposeChannelOutputs(ctx: ChannelRoutingContext): void {
 
   ctx.channelOutputs.forEach((channelOutput, channelIndex) => {
     try {
-      channelOutput.meter.dispose();
+      channelOutput.scope.dispose();
     } catch (e) {
-      console.warn(`[ToneEngine] Failed to dispose meter for channel ${channelIndex}:`, e);
+      console.warn(`[ToneEngine] Failed to dispose scope for channel ${channelIndex}:`, e);
     }
     try {
       channelOutput.channel.dispose();
@@ -757,6 +765,28 @@ export function disposeChannelOutputs(ctx: ChannelRoutingContext): void {
     }
   });
   ctx.channelOutputs.clear();
+}
+
+/** Falling-only smoothing of the channel RMS, Tone.Meter's rule at smoothing 0.15. */
+const LEVEL_SMOOTHING = 0.15;
+
+function channelRms(out: ChannelOutput): number {
+  const wave = out.scope.getValue() as Float32Array;
+  let sum = 0;
+  for (let i = 0; i < wave.length; i++) sum += wave[i] * wave[i];
+  out.rms = Math.max(Math.sqrt(sum / wave.length), out.rms * LEVEL_SMOOTHING);
+  return out.rms;
+}
+
+/**
+ * The channel's current post-fader waveform (256 samples, -1..1), or null
+ * when its strip was never built. Tone.js voices and per-channel synth lanes
+ * play here; a WASM engine's own channels do not (they feed the
+ * oscilloscope store).
+ */
+export function getChannelWaveform(ctx: ChannelRoutingContext, channelIndex: number): Float32Array | null {
+  const out = ctx.channelOutputs.get(channelIndex);
+  return out ? (out.scope.getValue() as Float32Array) : null;
 }
 
 /**
@@ -775,9 +805,8 @@ export function getChannelLevels(ctx: ChannelRoutingContext, numChannels: number
   for (let i = 0; i < numChannels; i++) {
     const channelOutput = ctx.channelOutputs.get(i);
     if (channelOutput) {
-      // Meter returns dB value, convert to 0-1 range
-      // -60dB = 0, 0dB = 1
-      const db = channelOutput.meter.getValue() as number;
+      // Level in dB, mapped to 0-1: -60dB = 0, 0dB = 1
+      const db = Tone.gainToDb(channelRms(channelOutput));
       const normalized = Math.max(0, Math.min(1, (db + 60) / 60));
       levels[i] = normalized > NOISE_FLOOR ? normalized : 0;
     } else {
