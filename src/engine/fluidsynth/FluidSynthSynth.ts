@@ -246,13 +246,12 @@ export class FluidSynthSynthEngine implements DevilboxSynth {
     }
   }
 
+  /** Post the whole config to the worklet. Values set before 'ready' were only stored, so no diff here. */
   private sendConfig(config: FluidSynthConfig): void {
     if (!this._worklet || !this.isInitialized) return;
     for (let i = 0; i < CONFIG_KEYS.length; i++) {
-      const key = CONFIG_KEYS[i];
-      const value = config[key];
-      if (value !== undefined && value !== this.config[key]) {
-        this.config[key] = value;
+      const value = config[CONFIG_KEYS[i]];
+      if (value !== undefined) {
         this._worklet.port.postMessage({ type: 'setParam', index: i, value });
       }
     }
