@@ -4,11 +4,11 @@
  * Act 1 (the drum bank) is paced for the eye from the voices' real stage buffers; acts 2 and 3 show events as they land.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { Volume2, VolumeX, RotateCcw } from 'lucide-react';
+import { Lock, Volume2, VolumeX, RotateCcw } from 'lucide-react';
 import { useFactoryStore } from '@/lib/uprough/factory/useFactoryStore';
 import { actOneSchedule, stageAtTime, type VoiceTimeline } from '@/lib/uprough/factory/pacing';
 import { bandBusy, CONVEYOR_SPEED, chipPosition, growHeights, popIn, prefersReducedMotion, SETTLE, Spring, stampBounce } from '@/lib/uprough/factory/motion';
-import { drawConveyor, drawEnvelope, drawEyes, drawGear, drawWave, fitCanvas, readTokens, type FactoryColors } from '@/lib/uprough/factory/draw';
+import { drawConveyor, drawEnvelope, drawEyes, drawGear, drawPlayhead, PLATE_SECONDS, drawStamp, drawWave, fitCanvas, readTokens, type FactoryColors } from '@/lib/uprough/factory/draw';
 import { slotGrid, SLOT_GAP, WAVE_MIN, type SlotGrid } from '@/lib/uprough/factory/layout';
 import { playCue, type Cue } from '@/lib/uprough/factory/factorySfx';
 import { hasLocalPreview, playVoice } from '@/lib/uprough/factory/voiceAudition';
@@ -53,8 +53,8 @@ function useRedrawOnResize(ref: React.RefObject<HTMLCanvasElement | null>): void
   }, [ref]);
 }
 
-function Wave(props: { a?: Peaks; b?: Peaks; frac?: number; reveal?: number; reference?: number; height?: number; final?: boolean; env?: { values: number[]; n: number }; envLabel?: string; eyes?: number }): React.ReactElement {
-  const { a, b, frac = 0, reveal = 1, reference, height = 56, final = false, env, envLabel, eyes } = props;
+function Wave(props: { a?: Peaks; b?: Peaks; frac?: number; reveal?: number; reference?: number; height?: number; final?: boolean; env?: { values: number[]; n: number }; envLabel?: string; eyes?: number; idle?: boolean; plate?: { name: string; since: number; squash: number }; playhead?: number }): React.ReactElement {
+  const { a, b, frac = 0, reveal = 1, reference, height = 56, final = false, env, envLabel, eyes, idle = false, plate, playhead } = props;
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const cv = ref.current;
@@ -64,7 +64,9 @@ function Wave(props: { a?: Peaks; b?: Peaks; frac?: number; reveal?: number; ref
     const { w, h } = fitCanvas(cv, ctx, height, 240);
     drawWave(ctx, w, h, a, b, frac, final ? c.final : c.wave, c.line, reveal, reference);
     if (env) drawEnvelope(ctx, w, h, env, envLabel ?? '', c);
-    if (eyes !== undefined) drawEyes(ctx, w - 22, 10, eyes, 0, c);
+    if (playhead !== undefined) drawPlayhead(ctx, w, h, playhead, c.text);
+    if (plate) drawStamp(ctx, w, plate.name, plate.since, plate.squash, c);
+    if (eyes !== undefined) drawEyes(ctx, w - 24, 12, eyes, 0, c, idle);
   });
   useRedrawOnResize(ref);
   return <canvas ref={ref} width={240} height={height} className="w-full block" style={{ height }} />;
@@ -117,8 +119,8 @@ function voiceTimelines(state: FactoryState): Map<string, VoiceTimeline> {
   return new Map(actOneSchedule(voices, state.rate).map((l) => [l.voice, l]));
 }
 
-function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => void; slot: SlotView; lines: Map<string, VoiceTimeline>; t: number; reduced: boolean; timeSec: number; preview: boolean; waveHeight: number }): React.ReactElement {
-  const { slot, lines, t, reduced, timeSec, preview, register, waveHeight } = props;
+function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => void; slot: SlotView; lines: Map<string, VoiceTimeline>; t: number; reduced: boolean; timeSec: number; preview: boolean; waveHeight: number; rate: number }): React.ReactElement {
+  const { slot, lines, t, reduced, timeSec, preview, register, waveHeight, rate } = props;
   const voice: VoiceView | undefined = slot.voices.find((v) => {
     const line = lines.get(v.voice);
     return !line || t >= line.start;
@@ -130,24 +132,35 @@ function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => 
   const next = stages[shown.index + 1];
   const stamped = !!voice?.bank && (!line || t >= line.stampAt);
   const bounce = line && stamped ? stampBounce(t - line.stampAt, reduced) : 0;
-  const lit = slot.alive && (!line || t >= line.start || !!slot.born);
   // Absolute scale (G2): every stage is drawn against the finished voice's peak plus 15 percent, so early stages are small and grow.
   const reference = voice?.bank ? voice.bank.scale * ABSOLUTE_HEADROOM : undefined;
   const chip = line ? popIn(t - line.chipAt, reduced) : { scale: 1, alpha: 1 };
+  // Card state (G10): waiting (dim, dashed), building (glowing), built. Squash and stretch kicks when the build starts.
+  const building = !!line && t >= line.start && !stamped;
+  const state = stamped || slot.born ? 'built' : building ? 'building' : 'waiting';
+  const kick = line ? popIn(t - line.start, reduced).scale : 1;
+  // Bass and melody wait for the first rendered bar (G18).
+  const placeholder = !cur && !slot.born && /^(bass|melody)/.test(slot.id);
+  // Playhead (G5): sweeps the finished one-shot while its audition plays.
+  const playLen = voice?.bank && rate > 0 ? voice.bank.len / rate : 0;
+  const playhead = preview && line && stamped && playLen > 0 && t - line.stampAt < playLen ? (t - line.stampAt) / playLen : undefined;
+  const plate = line && voice && stamped && t - line.stampAt < PLATE_SECONDS ? { name: spoken(voice.voice), since: t - line.stampAt, squash: bounce } : undefined;
   return (
     <div
-      data-testid={`factory-slot-${slot.id}`} ref={(el) => register(slot.id, el)}
-      className={`rounded-md p-2 flex flex-col gap-1 min-h-0 min-w-0 overflow-hidden bg-dark-bgSecondary border ${lit ? 'border-solid border-accent-primary' : 'border-dashed border-dark-borderLight opacity-70'}`}
+      data-testid={`factory-slot-${slot.id}`} data-state={state} ref={(el) => register(slot.id, el)}
+      style={{ transform: `scale(${1 - (1 - kick) * 0.08})` }}
+      className={`rounded-md p-2 flex flex-col gap-1 min-h-0 min-w-0 overflow-hidden bg-dark-bgSecondary border ${state === 'waiting' ? 'border-dashed border-dark-borderLight opacity-[.55]' : state === 'building' ? 'border-solid border-accent-primary ring-1 ring-accent-primary' : 'border-solid border-accent-primary'}`}
     >
       <div className="text-xs font-bold text-text-primary">{slot.label}</div>
       {slot.born ? (
         <Wave a={slot.born} height={waveHeight} eyes={timeSec} final />
       ) : (
-        <Wave a={stamped ? voice?.bank : cur?.peaks} height={waveHeight} b={stamped ? undefined : next?.peaks} frac={shown.frac} final={stamped} eyes={timeSec} reference={reference}
+        <Wave a={stamped ? voice?.bank : cur?.peaks} height={waveHeight} b={stamped ? undefined : next?.peaks} frac={shown.frac} final={stamped} eyes={timeSec} reference={reference} idle={state === 'waiting'} plate={plate} playhead={playhead}
           env={cur?.env} envLabel={cur ? spoken(cur.stage) : ''} />
       )}
       <div className="text-[10px] font-mono text-text-secondary min-h-[1.4em] truncate" style={{ transform: `translateY(${bounce * 4}px)` }}>
-        {stamped && voice ? `Stamped ${spoken(voice.voice)}` : cur ? spoken(cur.stage) : slot.born ? 'First bar rendered with the song' : 'Empty'}
+        {placeholder && <Lock size={10} className="inline mr-1 align-[-1px]" aria-hidden />}
+        {stamped && voice ? `Stamped ${spoken(voice.voice)}` : cur ? spoken(cur.stage) : slot.born ? 'First bar rendered with the song' : placeholder ? 'Comes alive at the first rendered bar' : 'Empty'}
       </div>
       {/* One row whatever the count (a hat pool brings eight): chips share the width, so a slot never grows taller. */}
       <div data-testid={`factory-chips-${slot.id}`} className="grid grid-flow-col auto-cols-fr gap-1 min-h-[28px]">
@@ -356,7 +369,7 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
       <div className="shrink-0"><Machinery timeSec={timeSec} busy={active} bandBusy={bandBusy(performance.now(), lastEventAt.current)} chips={chips} /></div>
       <div ref={gridRef} data-testid="factory-slots" className="flex-1 min-h-0 grid"
         style={{ gap: SLOT_GAP, gridTemplateColumns: `repeat(${grid.cols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${grid.rows}, minmax(0, 1fr))` }}>
-        {state.slots.map((slot) => <SlotCard key={slot.id} register={registerSlot} slot={slot} lines={lines} t={t} reduced={reduced} timeSec={timeSec} preview={preview} waveHeight={grid.wave} />)}
+        {state.slots.map((slot) => <SlotCard key={slot.id} register={registerSlot} slot={slot} lines={lines} t={t} reduced={reduced} timeSec={timeSec} preview={preview} waveHeight={grid.wave} rate={state.rate} />)}
       </div>
       {state.sections.length > 0 && (
         <div className="mt-2 shrink-0" data-testid="factory-sections">

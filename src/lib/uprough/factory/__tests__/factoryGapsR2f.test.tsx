@@ -6,11 +6,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render } from '@testing-library/react';
 import type { Peaks } from '@/engine/uprough/r2Peaks';
 
+const stampCalls: { name: string; since: number }[] = [];
+const playheadCalls: number[] = [];
 const waveCalls: { peaks: Peaks | undefined; reference: number | undefined; tallest: number }[] = [];
 vi.mock('@/lib/uprough/factory/draw', async (orig) => {
   const m = await orig<typeof import('@/lib/uprough/factory/draw')>();
   return {
     ...m,
+    drawStamp: vi.fn((...a: Parameters<typeof m.drawStamp>) => { stampCalls.push({ name: a[2], since: a[3] }); m.drawStamp(...a); }),
+    drawPlayhead: vi.fn((...a: Parameters<typeof m.drawPlayhead>) => { playheadCalls.push(a[3]); m.drawPlayhead(...a); }),
     drawWave: vi.fn((...a: Parameters<typeof m.drawWave>) => {
       let top = a[2] / 2;
       const rec = new Proxy(a[0], { get: (t, k) => (k === 'fillRect' ? (x: number, y: number, w: number, h: number) => { top = Math.min(top, y); t.fillRect(x, y, w, h); } : Reflect.get(t, k) as unknown) });
@@ -19,8 +23,11 @@ vi.mock('@/lib/uprough/factory/draw', async (orig) => {
     }),
   };
 });
+vi.mock('@/lib/uprough/factory/voiceAudition', async (orig) => ({ ...(await orig<typeof import('@/lib/uprough/factory/voiceAudition')>()), hasLocalPreview: () => previewOn, playVoice: vi.fn() }));
+let previewOn = false;
 vi.mock('@/utils/audio-context', () => ({ getDevilboxAudioContext: () => undefined }));
 
+import { drawEyes, drawStamp, eyeOpenness, PLATE_SECONDS } from '@/lib/uprough/factory/draw';
 import { FactoryPanel, ABSOLUTE_HEADROOM } from '@components/uprough/FactoryPanel';
 import { useFactoryStore, factoryOnEvent } from '../useFactoryStore';
 import { scriptedGenerateEvents } from '../scriptedRun';
@@ -35,7 +42,7 @@ beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as never);
   vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'setTimeout', 'clearTimeout'] });
   vi.advanceTimersByTime(5);
-  waveCalls.length = 0;
+  waveCalls.length = 0; stampCalls.length = 0; playheadCalls.length = 0; previewOn = false;
   useFactoryStore.getState().reset();
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
@@ -56,5 +63,93 @@ describe('G2 absolute scale', () => {
     const fin = mine.filter((c) => c.peaks === kick.bank).at(-1)!;
     expect(fin.tallest).toBeCloseTo((maxOf(kick.bank!) / 127) / ABSOLUTE_HEADROOM, 1);
     expect(fin.tallest).toBeLessThan(0.9);
+  });
+});
+
+const slotEl = (id: string): HTMLElement => document.querySelector(`[data-testid="factory-slot-${id}"]`) as HTMLElement;
+const scaleOf = (el: HTMLElement): number => Number(/scale\(([\d.]+)\)/.exec(el.style.transform)?.[1] ?? 1);
+const recordingCtx = (): { ctx: CanvasRenderingContext2D; log: { fn: string; args: unknown[] }[] } => {
+  const log: { fn: string; args: unknown[] }[] = [];
+  const ctx = new Proxy({}, { get: (_t, k) => (...args: unknown[]) => { log.push({ fn: String(k), args }); }, set: () => true }) as unknown as CanvasRenderingContext2D;
+  return { ctx, log };
+};
+
+describe('G10 card squash, dimming and glow; G18 placeholder', () => {
+  it('a slot waits dim and dashed, glows while it builds, and ends built at full size; the card squashes when its build starts', () => {
+    render(<FactoryPanel />);
+    feed(scriptedGenerateEvents('trap', 3).filter((e) => e.type !== 'done'));
+    expect(slotEl('snare').dataset.state).toBe('waiting');
+    expect(slotEl('snare').className).toContain('border-dashed');
+    expect(slotEl('kick').dataset.state).toBe('building');
+    expect(slotEl('kick').className).toContain('ring-accent-primary');
+    expect(scaleOf(slotEl('kick'))).toBeLessThan(1);
+    runClock(60_000);
+    expect(slotEl('kick').dataset.state).toBe('built');
+    expect(scaleOf(slotEl('kick'))).toBe(1);
+  });
+
+  it('bass and melody show a lock and "Comes alive at the first rendered bar" until their first bar is born', () => {
+    render(<FactoryPanel />);
+    feed(scriptedGenerateEvents('trap', 3).slice(0, 1));
+    const bass = slotEl('bass');
+    expect(bass.textContent).toContain('Comes alive at the first rendered bar');
+    expect(bass.querySelector('svg.lucide-lock')).not.toBeNull();
+    expect(slotEl('kick').textContent).toContain('Empty');
+    expect(slotEl('kick').querySelector('svg.lucide-lock')).toBeNull();
+  });
+});
+
+describe('G6 stamp plate', () => {
+  it('drawStamp writes the voice name in capitals and only during the plate window', () => {
+    const { ctx, log } = recordingCtx();
+    const c = { line: 'l', wave: 'w', final: 'f', env: 'e', dim: 'd', eye: 'y', plate: 'p', text: 't', inverse: 'i' };
+    drawStamp(ctx, 240, 'snare ghost', 0.2, 0, c);
+    expect(log.find((e) => e.fn === 'fillText')?.args[0]).toBe('SNARE GHOST');
+    log.length = 0;
+    drawStamp(ctx, 240, 'snare', PLATE_SECONDS + 0.01, 0, c);
+    expect(log.length).toBe(0);
+  });
+  it('the panel drops the kick plate when the kick is stamped', () => {
+    render(<FactoryPanel />);
+    feed(scriptedGenerateEvents('trap', 3).filter((e) => e.type !== 'done'));
+    for (let i = 0; i < 1200; i++) runClock(50);
+    const kick = stampCalls.filter((s) => s.name === 'kick');
+    expect(kick.length).toBeGreaterThan(0);
+    expect(kick.every((s) => s.since >= 0 && s.since < PLATE_SECONDS)).toBe(true);
+  });
+});
+
+describe('G5 playhead', () => {
+  it('sweeps the wave from 0 toward 1 while the one-shot audition plays, and never without a local preview', () => {
+    previewOn = true;
+    render(<FactoryPanel />);
+    feed(scriptedGenerateEvents('trap', 3).filter((e) => e.type !== 'done'));
+    for (let i = 0; i < 1200; i++) runClock(50);
+    expect(playheadCalls.length).toBeGreaterThan(3);
+    expect(Math.min(...playheadCalls)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...playheadCalls)).toBeLessThanOrEqual(1);
+    expect(Math.max(...playheadCalls)).toBeGreaterThan(Math.min(...playheadCalls));
+  });
+  it('draws no playhead when there is no local preview', () => {
+    previewOn = false;
+    render(<FactoryPanel />);
+    feed(scriptedGenerateEvents('trap', 3).filter((e) => e.type !== 'done'));
+    for (let i = 0; i < 400; i++) runClock(50);
+    expect(playheadCalls.length).toBe(0);
+  });
+});
+
+describe('G9 eyes', () => {
+  it('open eyes blink every 4.5 s, an idle slot is a half-closed slit, and the eyes are bigger than the old 5x6 px', () => {
+    expect(eyeOpenness(0.05, 0, false)).toBeLessThan(0.2);
+    expect(eyeOpenness(2, 0, false)).toBe(1);
+    expect(eyeOpenness(4.5 + 0.05, 0, false)).toBeLessThan(0.2);
+    expect(eyeOpenness(3.7, 0, false)).toBe(1);
+    expect(eyeOpenness(2, 0, true)).toBeLessThan(0.5);
+    const { ctx, log } = recordingCtx();
+    drawEyes(ctx, 10, 10, 2, 0, { line: '', wave: '', final: '', env: '', dim: '', eye: 'y', plate: '', text: '', inverse: '' }, false);
+    const e = log.find((x) => x.fn === 'ellipse')!;
+    expect(e.args[2]).toBeGreaterThanOrEqual(4);
+    expect(e.args[3]).toBeGreaterThanOrEqual(6);
   });
 });
