@@ -10,6 +10,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { X, Upload, Music, FileAudio, AlertCircle } from 'lucide-react';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { Button } from '@components/ui/Button';
+import { Toggle } from '@components/controls/Toggle';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import type { ImportOptions } from './ImportModuleDialog';
 import { DEFAULT_MIDI_IMPORT_OPTIONS, type MIDIImportOptions } from '@lib/import/MIDIImporter';
@@ -60,6 +61,7 @@ export const ImportMIDIDialog: React.FC<ImportMIDIDialogProps> = ({
   const [quantize, setQuantize]                   = useState(DEFAULT_MIDI_IMPORT_OPTIONS.quantize);
   const [velocityToVolume, setVelocityToVolume]   = useState(true);
   const [patternLength, setPatternLength]         = useState(64);
+  const [gmSoundFont, setGMSoundFont]             = useState(DEFAULT_MIDI_IMPORT_OPTIONS.soundFont === 'gm');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -129,6 +131,7 @@ export const ImportMIDIDialog: React.FC<ImportMIDIDialogProps> = ({
       quantize,
       velocityToVolume,
       defaultPatternLength: patternLength,
+      soundFont: gmSoundFont ? 'gm' : 'synth',
     };
 
     const info: ModuleInfo = {
@@ -148,7 +151,7 @@ export const ImportMIDIDialog: React.FC<ImportMIDIDialogProps> = ({
 
     onImport(info, { useLibopenmpt: false, midiOptions });
     onClose();
-  }, [moduleFile, preview, quantize, velocityToVolume, patternLength, onImport, onClose]);
+  }, [moduleFile, preview, quantize, velocityToVolume, patternLength, gmSoundFont, onImport, onClose]);
 
   const handleClose = useCallback(() => {
     setPreview(null);
@@ -297,6 +300,15 @@ export const ImportMIDIDialog: React.FC<ImportMIDIDialogProps> = ({
                 className="w-4 h-4 accent-accent-primary"
               />
             </label>
+
+            {/* General MIDI SoundFont */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-text-primary">General MIDI SoundFont</p>
+                <p className="text-xs text-text-muted">Play each program and the drum kit from the GM SoundFont; off uses built-in synths</p>
+              </div>
+              <Toggle label="General MIDI SoundFont" hideLabel size="sm" value={gmSoundFont} onChange={setGMSoundFont} />
+            </div>
 
             {/* Merge Channels option removed — tracks always become channels */}
           </div>

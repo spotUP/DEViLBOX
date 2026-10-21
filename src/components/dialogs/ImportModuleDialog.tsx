@@ -26,17 +26,14 @@ import { useModalClose } from '@hooks/useDialogKeyboard';
 import type { OpenOrigin } from '@/lib/song/openSong';
 import { companionRelativeName } from '@lib/import/companionRelativeName';
 import { useDialogTypingTrap } from '@hooks/useDialogTypingTrap';
+import type { MIDIImportOptions } from '@lib/import/MIDIImporter';
 
 export interface ImportOptions {
   useLibopenmpt: boolean;     // Use libopenmpt for sample-accurate playback
   subsong?: number;           // UADE subsong index (0-based)
   uadeMetadata?: UADEMetadata; // Pre-scanned UADE metadata (avoids double scan on import)
   companionFiles?: Map<string, ArrayBuffer>; // Companion files for multi-file formats (name → buffer)
-  midiOptions?: {             // MIDI-specific import settings
-    quantize?: number;
-    velocityToVolume?: boolean;
-    defaultPatternLength?: number;
-  };
+  midiOptions?: MIDIImportOptions;             // MIDI-specific import settings
   /** Who asked. A 'subsong' reopen is a tune switch, not an import: it raises no success toast. */
   origin?: OpenOrigin;
 }

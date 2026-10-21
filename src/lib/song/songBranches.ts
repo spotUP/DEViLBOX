@@ -434,6 +434,7 @@ export async function loadSongFile(file: File, options: FileLoadOptions, preRead
       quantize: options.midiOptions?.quantize ?? 1,
       velocityToVolume: options.midiOptions?.velocityToVolume ?? true,
       defaultPatternLength: options.midiOptions?.defaultPatternLength ?? 64,
+      soundFont: options.midiOptions?.soundFont,
     });
 
     if (result.patterns.length === 0) {

@@ -6,7 +6,7 @@
  * and fisherman.mid).
  */
 import { describe, it, expect } from 'vitest';
-import { gmProgramToInstrument } from '../GMSoundBank';
+import { gmProgramToInstrument, gmFluidInstrument, GM_DRUM_BANK } from '../GMSoundBank';
 import { toneRigSettings } from '@engine/tone/toneSynthKnobs';
 
 describe('GM sound bank pitch', () => {
@@ -18,5 +18,16 @@ describe('GM sound bank pitch', () => {
       if (cents !== 0) shifted.push(`${program} ${config.name}: ${cents} cents`);
     }
     expect(shifted).toEqual([]);
+  });
+});
+
+describe('GM SoundFont instrument', () => {
+  it('carries program, bank and the GM SoundFont, with the program clamped to 0-127', () => {
+    const piano = gmFluidInstrument(0, 0, 1, 'Acoustic Grand Piano');
+    expect(piano).toMatchObject({ id: 1, name: 'Acoustic Grand Piano', synthType: 'FluidSynth' });
+    expect(piano.fluidsynth).toMatchObject({ program: 0, bank: 0, soundFont: 'gm' });
+    expect(gmFluidInstrument(200, 0, 2, 'x').fluidsynth?.program).toBe(127);
+    expect(gmFluidInstrument(-3, 0, 3, 'x').fluidsynth?.program).toBe(0);
+    expect(gmFluidInstrument(0, GM_DRUM_BANK, 4, 'Drums').fluidsynth?.bank).toBe(128);
   });
 });

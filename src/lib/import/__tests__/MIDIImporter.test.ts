@@ -180,3 +180,35 @@ describe('importMIDIFile drum hits that share a row', () => {
     expect(new Set(lowTom.map((c) => c.name))).toEqual(new Set(['Low Tom', 'Low Tom 2']));
   });
 });
+
+describe('importMIDIFile sound source', () => {
+  const buf = () => readFileSync(resolve(FIXTURES, 'queen_majesty.mid'));
+
+  it('defaults to the GM SoundFont: FluidSynth per track program, drums on bank 128 at their GM key', async () => {
+    const r = await importMIDIFile(new File([buf()], 'queen_majesty.mid'));
+    const chs = r.patterns[0].channels;
+    const instOf = (ch: ChannelData) => r.instruments.find((i) => i.id === ch.instrumentId)!;
+
+    const bass = instOf(channel(chs, 'bass'));
+    expect(bass.synthType).toBe('FluidSynth');
+    // The file names its tracks on separate name-only tracks; the bass notes carry program 34 (Electric Bass, pick).
+    expect(bass.fluidsynth).toMatchObject({ program: 34, bank: 0, soundFont: 'gm' });
+
+    const hats = channel(chs, 'Closed Hi-Hat');
+    expect(instOf(hats).fluidsynth).toMatchObject({ bank: 128, soundFont: 'gm' });
+    expect(instOf(hats).name).toBe('Closed Hi-Hat');
+    // GM key 42 sounds the closed hi-hat; XM note = MIDI - 11.
+    expect(hats.rows[0].note).toBe(42 - 11);
+    expect(channel(chs, 'Chinese Cymbal').rows.find((c) => c.note > 0)!.note).toBe(52 - 11);
+  });
+
+  it("'synth' keeps the built-in synths and the fixed drum trigger note", async () => {
+    const r = await importMIDIFile(new File([buf()], 'queen_majesty.mid'), { soundFont: 'synth' });
+    const chs = r.patterns[0].channels;
+    const instOf = (ch: ChannelData) => r.instruments.find((i) => i.id === ch.instrumentId)!;
+    expect(instOf(channel(chs, 'bass')).synthType).not.toBe('FluidSynth');
+    const hats = channel(chs, 'Closed Hi-Hat');
+    expect(instOf(hats).synthType).not.toBe('FluidSynth');
+    expect(hats.rows[0].note).toBe(61);
+  });
+});
