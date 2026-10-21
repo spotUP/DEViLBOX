@@ -27,7 +27,7 @@ import { registerChannelMeterSink } from './tone/channelMeterFeed';
 import { chipChannelFor, LIVE_VOICE_BASE_CHANNEL } from './furnace-dispatch/chipChannel';
 import { soundingToneVoices, trackToneVoices, untrackToneVoices } from './tone/toneVoiceProbe';
 import { cutToneNote } from './tone/toneNoteCut';
-import { createToneSynthNode } from './tone/toneSynthKnobs';
+import { createToneSynthNode, toneVoiceTypeOf } from './tone/toneSynthKnobs';
 import { TrackerEnvelope } from './TrackerEnvelope';
 import { InstrumentAnalyser } from './InstrumentAnalyser';
 import { FurnaceChipEngine } from './chips/FurnaceChipEngine';
@@ -2443,7 +2443,13 @@ export class ToneEngine {
 
       // New synths - use InstrumentFactory for complex synths
       // For tracker channels, PolySynth/SuperSaw create MonoSynth for pitch effects
-      case 'PolySynth':
+      case 'PolySynth': {
+        // The Synth family's creation path: top-level oscillator / envelope / filter / octave, a MonoSynth on tracker channels.
+        instrument = isTrackerChannel
+          ? createToneSynthNode(toneVoiceTypeOf(config), config, { monophonic: true })
+          : InstrumentFactory.createInstrument(config);
+        break;
+      }
       case 'SuperSaw': {
         if (isTrackerChannel) {
           const oscType = config.polySynth?.oscillator?.type || config.oscillator?.type || 'sawtooth';

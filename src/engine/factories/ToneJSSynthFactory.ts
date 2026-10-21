@@ -17,7 +17,7 @@ import {
 import { ArpeggioEngine } from '../ArpeggioEngine';
 import { getNormalizedVolume } from './volumeNormalization';
 import { registerVoiceSource } from '../tone/toneVoiceProbe';
-import { createToneSynthNode, toneVoiceOptions } from '../tone/toneSynthKnobs';
+import { createToneSynthNode, toneVoiceOptions, toneVoiceTypeOf } from '../tone/toneSynthKnobs';
 
 
 /**
@@ -369,80 +369,14 @@ export function createSuperSaw(config: InstrumentConfig): Tone.ToneAudioNode {
   } as unknown as Tone.ToneAudioNode, synth, { filter });
 }
 
+/**
+ * PolySynth plays what the editor shows: the top-level oscillator, envelope, filter, octave and modulation of `config`
+ * (`polySynth` only chooses the voice type, voice count, portamento and steal mode), through the one rigged voice
+ * builder every Tone core synth uses.
+ */
 export function createPolySynth(config: InstrumentConfig): Tone.ToneAudioNode {
   const psConfig = config.polySynth || DEFAULT_POLYSYNTH;
-
-  // Select voice type
-  let VoiceClass: typeof Tone.Synth | typeof Tone.FMSynth | typeof Tone.AMSynth = Tone.Synth;
-  if (psConfig.voiceType === 'FMSynth') VoiceClass = Tone.FMSynth;
-  else if (psConfig.voiceType === 'ToneAM') VoiceClass = Tone.AMSynth;
-
-  const synth = new Tone.PolySynth(VoiceClass as any, {
-    oscillator: {
-      type: psConfig.oscillator?.type || 'sawtooth',
-    } as Partial<Tone.OmniOscillatorOptions>,
-    envelope: {
-      attack: (psConfig.envelope?.attack || 50) / 1000,
-      decay: (psConfig.envelope?.decay || 200) / 1000,
-      sustain: (psConfig.envelope?.sustain ?? 70) / 100,
-      release: (psConfig.envelope?.release || 500) / 1000,
-    },
-    volume: getNormalizedVolume('PolySynth', config.volume),
-  });
-  synth.maxPolyphony = psConfig.voiceCount;
-
-  // Setup pitch envelope if enabled
-  const pitchEnv = config.pitchEnvelope;
-  const hasPitchEnv = pitchEnv?.enabled && pitchEnv.amount !== 0;
-
-  // If no pitch envelope, return wrapped synth with voice leak prevention
-  if (!hasPitchEnv) {
-    return registerVoiceSource({
-      triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
-        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
-        synth.triggerAttackRelease(note, duration, time, velocity);
-      },
-      triggerAttack: (note: string, time?: number, velocity?: number) => {
-        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
-        synth.triggerAttack(note, time, velocity);
-      },
-      triggerRelease: (note: string, time?: number) => synth.triggerRelease(note, time),
-      releaseAll: () => synth.releaseAll(),
-      connect: (dest: Tone.InputNode) => synth.connect(dest),
-      disconnect: () => synth.disconnect(),
-      dispose: () => synth.dispose(),
-      volume: synth.volume,
-    } as unknown as Tone.ToneAudioNode, synth);
-  }
-
-  // Wrap synth to add pitch envelope support
-  return registerVoiceSource({
-    triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
-      const t = time ?? Tone.now();
-      try { synth.triggerRelease(note, t); } catch { /* ignore */ }
-      applyPitchEnvelope(synth, pitchEnv!, t, duration);
-      synth.triggerAttackRelease(note, duration, t, velocity);
-    },
-    triggerAttack: (note: string, time?: number, velocity?: number) => {
-      const t = time ?? Tone.now();
-      try { synth.triggerRelease(note, t); } catch { /* ignore */ }
-      triggerPitchEnvelopeAttack(synth, pitchEnv!, t);
-      synth.triggerAttack(note, t, velocity);
-    },
-    triggerRelease: (note: string, time?: number) => {
-      const t = time ?? Tone.now();
-      triggerPitchEnvelopeRelease(synth, pitchEnv!, t);
-      synth.triggerRelease(note, t);
-    },
-    releaseAll: () => {
-      synth.set({ detune: 0 });
-      synth.releaseAll();
-    },
-    connect: (dest: Tone.InputNode) => synth.connect(dest),
-    disconnect: () => synth.disconnect(),
-    dispose: () => synth.dispose(),
-    volume: synth.volume,
-  } as unknown as Tone.ToneAudioNode, synth);
+  return polyWrapper(createToneSynthNode(toneVoiceTypeOf(config), config, { polyphony: psConfig.voiceCount }) as Tone.PolySynth);
 }
 
 /**

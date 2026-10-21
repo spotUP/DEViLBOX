@@ -4,8 +4,8 @@ import { DB303Synth, DB303Synth as JC303Synth } from '../db303';
 import { MAMESynth } from '../MAMESynth';
 import { MAMEBaseSynth } from '../mame/MAMEBaseSynth';
 import { WAMSynth } from '../wam/WAMSynth';
-import { applyToneVoiceOptions } from './toneSynthKnobs';
-import { voiceSourceOf } from './toneVoiceProbe';
+import { applyToneVoiceOptions, staticFilterOptions, toneVoiceTypeOf } from './toneSynthKnobs';
+import { voiceFilterOf, voiceSourceOf } from './toneVoiceProbe';
 import { getNormalizedVolume } from '../factories/volumeNormalization';
 
 /** Ramp time for smooth parameter transitions (seconds) */
@@ -582,7 +582,13 @@ export function updateToneJsSynthInPlace(ctx: SynthUpdateContext, instrumentId: 
     if (ctx.instrumentIdFromKey(key) !== instrumentId) return;
 
     // Factories wrap some Tone nodes in plain objects; the probe registry knows the node behind the wrapper.
-    try { applyToneVoiceOptions(voiceSourceOf(instrument), config.synthType, config); } catch { /* a voice that rejects an option keeps the rest */ }
+    const voiceType = toneVoiceTypeOf(config);
+    try { applyToneVoiceOptions(voiceSourceOf(instrument), voiceType, config); } catch { /* a voice that rejects an option keeps the rest */ }
+    // The static filter of the Synth family (poly / FM / AM voices): type, cutoff and Q follow the editor.
+    const staticFilter = voiceFilterOf(instrument);
+    if (staticFilter?.set && config.filter) {
+      try { staticFilter.set(staticFilterOptions(config)); } catch { /* keep the rest */ }
+    }
 
     // Update volume (with ramp)
     const volume = (instrument as { volume?: Tone.Param<'decibels'> }).volume;
