@@ -3,7 +3,7 @@
  * R2 event source feeds through `factoryOnEvent`; nothing here pretends work, every visual is set by an event.
  * Act 1 (the drum bank) is paced for the eye from the voices' real stage buffers; acts 2 and 3 show events as they land.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Volume2, VolumeX, RotateCcw } from 'lucide-react';
 import { useFactoryStore } from '@/lib/uprough/factory/useFactoryStore';
 import { actOneSchedule, stageAtTime, type VoiceTimeline } from '@/lib/uprough/factory/pacing';
@@ -12,6 +12,8 @@ import { drawConveyor, drawEnvelope, drawEyes, drawGear, drawWave, readTokens, t
 import { playCue, type Cue } from '@/lib/uprough/factory/factorySfx';
 import { hasLocalPreview, playVoice } from '@/lib/uprough/factory/voiceAudition';
 import { Button } from '@components/ui/Button';
+import { useUpRoughRenderStore } from '@stores/useUpRoughRenderStore';
+import { onUpRoughPreviewState, setListenWhileBuilding, upRoughPreviewState } from '@/lib/uprough/upRoughSongPlayer';
 import { SLOT_OF_VOICE, spoken, STEM_LANES, type FactoryState, type SectionView, type SlotView, type VoiceView } from '@/lib/uprough/factory/factoryModel';
 import type { Peaks } from '@/engine/uprough/r2Peaks';
 
@@ -52,6 +54,8 @@ function Wave(props: { a?: Peaks; b?: Peaks; frac?: number; reveal?: number; ref
   });
   return <canvas ref={ref} width={240} height={height} className="w-full" style={{ height }} />;
 }
+
+export const PREVIEW_CAPTION = 'Preview before mastering';
 
 export const NO_PREVIEW = 'No local preview for this style';
 
@@ -204,6 +208,9 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
   const until = useMemo(() => Math.max(0, ...[...lines.values()].map((l) => l.chipAt)), [lines]);
   const t = useClock(state.done, startedAt, until, state.eventCount);
   const active = state.eventCount > 0 && !state.done;
+  const listen = useUpRoughRenderStore((x) => x.listenWhileBuilding);
+  const rendering = useUpRoughRenderStore((x) => x.status === 'rendering');
+  const previewState = useSyncExternalStore(onUpRoughPreviewState, upRoughPreviewState);
 
   // Cues: act 1 on timeline crossings, the other acts on the event that arrived.
   const cued = useRef(new Set<string>());
@@ -290,6 +297,13 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
               <RotateCcw size={12} /> Replay scripted run
             </button>
           )}
+          <Button
+            variant="ghost" size="sm" aria-pressed={listen} disabled={!rendering && !listen}
+            onClick={() => setListenWhileBuilding(!listen)}
+            title="Play the song's sections as they are rendered, before texture and mastering"
+          >
+            Listen while building
+          </Button>
           <button
             type="button" aria-pressed={sound} onClick={() => setSound((v) => !v)}
             className="px-2 py-1 rounded text-xs flex items-center gap-1" style={{ background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border)' }}
@@ -298,6 +312,9 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
           </button>
         </div>
       </div>
+      {previewState === 'preview' && (
+        <div data-testid="factory-preview-caption" className="text-xs text-accent-warning mb-1">{PREVIEW_CAPTION}</div>
+      )}
       {!preview && state.eventCount > 0 && (
         <div data-testid="factory-no-preview" className="text-xs text-text-muted mb-1">{NO_PREVIEW}</div>
       )}

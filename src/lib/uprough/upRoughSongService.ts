@@ -104,10 +104,10 @@ export function resetUpRoughSong(): void {
 
 async function renderOnce(): Promise<RenderedSong> {
   const store = useUpRoughRenderStore.getState();
-  store.set({ status: 'rendering', sectionsDone: 0, sectionCount: 0, error: null });
   const mine = epoch;
+  clearPartials(); // before 'rendering' is announced: a preview that starts on it must not see the last render's sections
+  store.set({ status: 'rendering', sectionsDone: 0, sectionCount: 0, error: null });
   useUpRoughR2Store.getState().begin();
-  clearPartials();
   try {
     const song = buildCurrentSong();
     const mix = await (backend ??= workerBackend()).render(song.events, song.options, (e) => {
