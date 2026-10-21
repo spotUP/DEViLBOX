@@ -141,7 +141,7 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
     <Modal
       isOpen={isOpen}
       onClose={handleCancel}
-      size={showFactory ? 'xl' : 'sm'}
+      size={showFactory ? '2xl' : 'sm'}
       theme="modern"
       backdropOpacity="medium"
       closeOnBackdropClick={!busy}
@@ -159,7 +159,9 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
           Generate a song with the Up Rough generator. It plays the same on the device as it does here.
         </p>
 
-        <div>
+        {/* With the factory open the dialog is wide, so Style joins Seed, Key and Bars on one row to leave the height to the factory. */}
+        <div className={`grid gap-3 items-start ${showFactory ? 'grid-cols-4' : 'grid-cols-3'}`}>
+        <div className={showFactory ? '' : 'col-span-3'}>
           <span className="block text-[10px] font-mono text-text-muted mb-1">Style</span>
           <CustomSelect
             value={style}
@@ -170,8 +172,6 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
             className="w-full px-2 py-1.5 bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs focus:outline-none focus:ring-1 focus:ring-accent-primary disabled:opacity-50"
           />
         </div>
-
-        <div className="grid grid-cols-3 gap-3 items-start">
           <div>
             <label htmlFor="uprough-seed" className="block text-[10px] font-mono text-text-muted mb-1">Seed (0 to 9999)</label>
             <input
