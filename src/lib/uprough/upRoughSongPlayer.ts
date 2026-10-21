@@ -5,6 +5,7 @@
  */
 import * as Tone from 'tone';
 import { useTrackerStore } from '@stores/useTrackerStore';
+import { useUpRoughRenderStore } from '@stores/useUpRoughRenderStore';
 import { startSample } from './currentSongRender';
 import {
   currentPartialMix, currentPartialRate, ensureUpRoughSong, onUpRoughSongPartial, onUpRoughSongRendered, type RenderedSong,
@@ -164,3 +165,17 @@ export function startUpRoughPreview(fromSample = 0): void {
     setPreviewState('mastered');
   });
 }
+
+/**
+ * The Listen while building switch (R2f-33d). The one place its state lives is the render store; this is the only
+ * writer. Switching on during a render starts the preview now, and every later render (Generate, an edit's re-render)
+ * starts it as the render begins; switching off ends a preview in progress.
+ */
+export function setListenWhileBuilding(on: boolean): void {
+  useUpRoughRenderStore.getState().set({ listenWhileBuilding: on });
+  if (on && useUpRoughRenderStore.getState().status === 'rendering') startUpRoughPreview(0);
+  else if (!on && previewState === 'preview') stopUpRoughSong();
+}
+useUpRoughRenderStore.subscribe((s, prev) => {
+  if (s.listenWhileBuilding && s.status === 'rendering' && prev.status !== 'rendering') startUpRoughPreview(0);
+});

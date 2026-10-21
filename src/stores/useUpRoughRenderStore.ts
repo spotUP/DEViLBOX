@@ -11,10 +11,12 @@ interface UpRoughRenderState {
   /** Bumped each time a new mix lands. */
   version: number;
   error: string | null;
+  /** Listen while building (R2f-33d): play the pre-master sections of every render as they land. Off by default; set it through setListenWhileBuilding (the player). */
+  listenWhileBuilding: boolean;
   set: (patch: Partial<Omit<UpRoughRenderState, 'set'>>) => void;
 }
 
 export const useUpRoughRenderStore = create<UpRoughRenderState>((set) => ({
-  status: 'idle', sectionsDone: 0, sectionCount: 0, version: 0, error: null,
+  status: 'idle', sectionsDone: 0, sectionCount: 0, version: 0, error: null, listenWhileBuilding: false,
   set: (patch) => set(patch),
 }));
