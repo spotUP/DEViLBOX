@@ -1,0 +1,448 @@
+{
+ "_source": "Captured 2026-10-21 from ~/Code/urds-r2e (python3.11, read-only host use). drums, chops_break, melody: song_file.py new --style boom_bap --seed 3 --bars 8 --events. vocals, chops_chopped: the same with --style east_coast. bass_list: hiphop.generate_events('golden_era', 3, bars=4, use_trap808=False), the song of ../../__tests__/fixtures/ebass_sampled.uprough-song.json (every host style is an 808 style, so the list only appears with use_trap808=False). bass_trap808: generate_events('trap', 1, bars=16), the song of ../../__tests__/fixtures/e6.uprough-song.json. Each is the first non-empty decide of its kind.",
+ "drums": {
+  "seq": 58,
+  "type": "decide",
+  "section": 0,
+  "bar": 0,
+  "lane": "drums",
+  "cells": [
+   [
+    "kick",
+    0,
+    0.95,
+    "main"
+   ],
+   [
+    "kick",
+    3,
+    0.775,
+    "main"
+   ],
+   [
+    "kick",
+    10,
+    0.775,
+    "main"
+   ],
+   [
+    "kick",
+    14,
+    0.775,
+    "secondary"
+   ],
+   [
+    "snare",
+    4,
+    1.0,
+    "backbeat"
+   ],
+   [
+    "snare",
+    12,
+    1.0,
+    "backbeat"
+   ],
+   [
+    "snare_ghost",
+    7,
+    0.369,
+    "ghost"
+   ],
+   [
+    "snare_ghost",
+    13,
+    0.369,
+    "ghost"
+   ],
+   {
+    "step": 0,
+    "voice": "ch",
+    "kind": "accent",
+    "vel": 127,
+    "micro_ms": -1.07,
+    "sub": []
+   },
+   {
+    "step": 2,
+    "voice": "ch",
+    "kind": "single",
+    "vel": 62,
+    "micro_ms": -4.279,
+    "sub": []
+   },
+   {
+    "step": 4,
+    "voice": "ch",
+    "kind": "pedal",
+    "vel": 110,
+    "micro_ms": 2.059,
+    "sub": [
+     [
+      11.304200326637034,
+      0.28754823541777813
+     ]
+    ]
+   },
+   {
+    "step": 6,
+    "voice": "ch",
+    "kind": "pedal",
+    "vel": 24,
+    "micro_ms": -1.978,
+    "sub": []
+   },
+   {
+    "step": 8,
+    "voice": "ch",
+    "kind": "pedal",
+    "vel": 90,
+    "micro_ms": 4.388,
+    "sub": []
+   },
+   {
+    "step": 10,
+    "voice": "ch",
+    "kind": "double",
+    "vel": 56,
+    "micro_ms": 0.691,
+    "sub": [
+     [
+      17.814080990594007,
+      0.2041445937601688
+     ]
+    ]
+   },
+   {
+    "step": 12,
+    "voice": "ch",
+    "kind": "single",
+    "vel": 49,
+    "micro_ms": 2.809,
+    "sub": [
+     [
+      10.385061409547262,
+      0.3160329647671715
+     ]
+    ]
+   },
+   {
+    "step": 14,
+    "voice": "ch",
+    "kind": "pedal",
+    "vel": 26,
+    "micro_ms": -5.014,
+    "sub": [
+     [
+      12.280379441008305,
+      0.20599277602263116
+     ]
+    ]
+   }
+  ]
+ },
+ "bass_trap808": {
+  "seq": 57,
+  "type": "decide",
+  "section": 0,
+  "bar": 0,
+  "lane": "bass",
+  "cells": [
+   {
+    "trap808": [
+     {
+      "start_s": 0.0,
+      "dur_s": 0.10714285714285714,
+      "semi": 9.0,
+      "slide": false,
+      "role": "ANCHOR",
+      "kind": "short",
+      "step": 0,
+      "bar": 0
+     },
+     {
+      "start_s": 0.6428571428571428,
+      "dur_s": 0.42857142857142855,
+      "semi": 9.0,
+      "slide": false,
+      "role": "RESPONSE",
+      "kind": "medium",
+      "step": 6,
+      "bar": 0
+     },
+     {
+      "start_s": 1.0714285714285714,
+      "dur_s": 0.10714285714285714,
+      "semi": 9.0,
+      "slide": false,
+      "role": "RESPONSE",
+      "kind": "short",
+      "step": 10,
+      "bar": 0
+     },
+     {
+      "start_s": 1.5,
+      "dur_s": 0.2132857142857142,
+      "semi": 19.0,
+      "slide": false,
+      "role": "RESPONSE",
+      "kind": "slide",
+      "step": 14,
+      "bar": 0
+     }
+    ],
+    "profile": "deep",
+    "root_semi": 9
+   }
+  ]
+ },
+ "bass_list": {
+  "seq": 59,
+  "type": "decide",
+  "section": 0,
+  "bar": 0,
+  "lane": "bass",
+  "cells": [
+   [
+    45,
+    1,
+    6,
+    null,
+    1.0
+   ],
+   [
+    45,
+    10,
+    6,
+    null,
+    1.0
+   ]
+  ]
+ },
+ "vocals": {
+  "seq": 65,
+  "type": "decide",
+  "section": 0,
+  "bar": 1,
+  "lane": "vocals",
+  "cells": [
+   [
+    "she",
+    [
+     6
+    ],
+    1,
+    false,
+    true,
+    0.016449908291012946,
+    0.016449908291012946
+   ],
+   [
+    "hold",
+    [
+     5
+    ],
+    1,
+    false,
+    true,
+    0.9626919262205679,
+    0.9626919262205679
+   ],
+   [
+    "your",
+    [
+     5
+    ],
+    1,
+    false,
+    true,
+    1.875143431691799,
+    1.875143431691799
+   ],
+   [
+    "force",
+    [
+     4
+    ],
+    1,
+    false,
+    true,
+    2.89883600235937,
+    2.89883600235937
+   ],
+   [
+    "and",
+    [
+     1
+    ],
+    1,
+    true,
+    true,
+    4.91556535493078,
+    4.91556535493078
+   ],
+   [
+    "through",
+    [
+     3
+    ],
+    1,
+    false,
+    true,
+    6.020499431020626,
+    6.020499431020626
+   ],
+   [
+    "this",
+    [
+     3
+    ],
+    1,
+    false,
+    true,
+    6.883713637026639,
+    6.883713637026639
+   ],
+   [
+    "pressure",
+    [
+     2,
+     -1
+    ],
+    2,
+    false,
+    true,
+    7.878207804798991,
+    7.878207804798991
+   ],
+   [
+    "when",
+    [
+     1
+    ],
+    1,
+    false,
+    true,
+    11.001415003088775,
+    11.001415003088775
+   ],
+   [
+    "trace",
+    [
+     -3
+    ],
+    1,
+    false,
+    true,
+    12.912619071439941,
+    12.912619071439941
+   ]
+  ]
+ },
+ "chops_break": {
+  "seq": 61,
+  "type": "decide",
+  "section": 0,
+  "bar": 0,
+  "lane": "chops",
+  "cells": [
+   {
+    "length": 57520,
+    "brk_seed": 2991,
+    "kick_steps": [
+     0,
+     8
+    ]
+   }
+  ]
+ },
+ "chops_chopped": {
+  "seq": 61,
+  "type": "decide",
+  "section": 0,
+  "bar": 0,
+  "lane": "chops",
+  "cells": [
+   {
+    "triggers": [
+     {
+      "slice_index": 0,
+      "start": 0,
+      "length": 13780,
+      "gain": 0.68,
+      "role": "anchor",
+      "reverse": false,
+      "start_offset": 0.007811245899137865,
+      "choke_ms": 6.315678644998855,
+      "lp": 4800,
+      "ring": null,
+      "filter_seed": 21
+     },
+     {
+      "slice_index": 1,
+      "start": 27560,
+      "length": 13780,
+      "gain": 0.68,
+      "role": "anchor",
+      "reverse": false,
+      "start_offset": 0.003534905012588693,
+      "choke_ms": 7.991851682307164,
+      "lp": 4800,
+      "ring": null,
+      "filter_seed": 23
+     }
+    ],
+    "offers": [
+     [
+      0,
+      4.0,
+      "answer",
+      "REJECT",
+      "bar 0 (section_start) is full of sample_chop (cap 0.30)"
+     ],
+     [
+      0,
+      12.0,
+      "fill",
+      "REJECT",
+      "bar 0 (section_start) is full of sample_chop (cap 0.30)"
+     ]
+    ],
+    "ops": [
+     "FULL_LOOP",
+     0,
+     false
+    ]
+   }
+  ]
+ },
+ "melody": {
+  "seq": 74,
+  "type": "decide",
+  "section": 1,
+  "bar": 0,
+  "lane": "melody",
+  "cells": [
+   [
+    62,
+    3,
+    3
+   ],
+   [
+    64,
+    6,
+    2
+   ],
+   [
+    64,
+    9,
+    2
+   ],
+   [
+    62,
+    11,
+    2
+   ]
+  ]
+ }
+}

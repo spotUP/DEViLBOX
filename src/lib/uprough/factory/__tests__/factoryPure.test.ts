@@ -5,6 +5,11 @@ import { initialFactoryState, reduceFactory, SLOT_OF_VOICE } from '../factoryMod
 import { popIn, REDUCED_FADE_SECONDS, Spring, SETTLE, stampBounce } from '../motion';
 import { peaks } from '@/engine/uprough/r2Peaks';
 import type { R2Event } from '@/engine/uprough/r2Events';
+import { songFileToBarEvents } from '../../barEvents';
+import { noteFromText, ROWS_PER_BAR, type SongFileDoc } from '../../songFile';
+import records from './fixtures/decideRecords.json';
+import trapSong from '../../__tests__/fixtures/e6.uprough-song.json';
+import listSong from '../../__tests__/fixtures/ebass_sampled.uprough-song.json';
 
 const tone = (n: number, decay: number): Float64Array => Float64Array.from({ length: n }, (_, i) => Math.sin(i / 5) * Math.exp(-i / decay));
 
@@ -52,9 +57,26 @@ describe('decide events to cells', () => {
     expect(cells.map((c) => c.lane)).toEqual(['perc1', 'perc2']);
   });
 
-  it('bass tuple lists and melody notes map to bass and melody lanes, overlap spreads', () => {
-    const bass = decideToCells('bass', 0, [[[0, 0, 4, 0, 1], [7, 8, 4, 0, 1]]]);
-    expect(bass.map((c) => [c.lane, c.row])).toEqual([['bass', 0], ['bass', 8]]);
+  it('bass decide cells equal the song file\'s bass cells', () => {
+    // Each record is the host's decide for the same song as the song file fixture (decideRecords.json `_source`).
+    const cases = [[records.bass_trap808, trapSong], [records.bass_list, listSong]] as const;
+    for (const [r, song] of cases) {
+      const doc = structuredClone(song) as unknown as SongFileDoc;
+      const e = r as unknown as Extract<R2Event, { type: 'decide' }>;
+      const bev = songFileToBarEvents(structuredClone(doc)).sections[e.section]!.bass[e.bar]!.bev;
+      expect(Array.isArray(bev) ? bev : [bev]).toEqual(e.cells);
+      const lane = (doc.sections[e.section]!.lanes as Record<string, ([string, ...unknown[]] | null)[]>).bass!;
+      const fileCells: [number, number][] = [];
+      for (let row = e.bar * ROWS_PER_BAR; row < (e.bar + 1) * ROWS_PER_BAR; row++) {
+        const cell = lane[row];
+        if (cell) fileCells.push([row, noteFromText(cell[0])]);
+      }
+      expect(fileCells.length).toBeGreaterThan(0);
+      expect(decideToCells('bass', e.bar, e.cells).map((c) => [c.row, c.note])).toEqual(fileCells);
+    }
+  });
+
+  it('melody notes spread overlapping notes over the melody lanes', () => {
     const mel = decideToCells('melody', 0, [[60, 0, 8], [64, 0, 8]]);
     expect(mel.map((c) => c.lane)).toEqual(['melody1', 'melody2']);
   });

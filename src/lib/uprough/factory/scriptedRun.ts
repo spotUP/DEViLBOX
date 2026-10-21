@@ -36,7 +36,7 @@ export function scriptedGenerateEvents(style: HipHopStyle, seed: number): R2Even
   SECTIONS.forEach((sec, section) => {
     for (let bar = 0; bar < sec.bars; bar++) {
       em.emit({ type: 'decide', section, bar, lane: 'drums', cells: drumCells(bar) });
-      if (sec.layers.includes('bass')) em.emit({ type: 'decide', section, bar, lane: 'bass', cells: [[[0, 0, 4, 0, 1], [7, 8, 4, 0, 1]]] });
+      if (sec.layers.includes('bass')) em.emit({ type: 'decide', section, bar, lane: 'bass', cells: [[0, 0, 4, null, 1], [7, 8, 4, null, 1]] });
       if (sec.layers.includes('melody')) em.emit({ type: 'decide', section, bar, lane: 'melody', cells: [[60, 0, 4], [63, 8, 4]] });
     }
   });
