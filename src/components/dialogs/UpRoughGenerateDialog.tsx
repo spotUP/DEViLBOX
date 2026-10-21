@@ -15,7 +15,7 @@ import { fetchStyles, generateSong } from '@/lib/uprough/generateClient';
 import type { R2Event } from '@/engine/uprough/r2Events';
 import { openUpRoughSong } from '@/lib/uprough/openUpRoughSong';
 import { FactoryPanel } from '@components/uprough/FactoryPanel';
-import { useFactoryStore, factoryOnEvent } from '@/lib/uprough/factory/useFactoryStore';
+import { useFactoryStore, factoryOnEvent, factoryReplayEvent } from '@/lib/uprough/factory/useFactoryStore';
 import { attachR2Bridge } from '@/lib/uprough/factory/r2Bridge';
 import { replayEvents, scriptedGenerateEvents } from '@/lib/uprough/factory/scriptedRun';
 import type { HipHopStyle } from '@/engine/uprough/drumBank';
@@ -66,7 +66,7 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
     stopReplay.current?.();
     useFactoryStore.getState().reset();
     setShowFactory(true);
-    stopReplay.current = replayEvents(scriptedGenerateEvents((style || 'boom_bap') as HipHopStyle, seed), factoryOnEvent);
+    stopReplay.current = replayEvents(scriptedGenerateEvents((style || 'boom_bap') as HipHopStyle, seed), factoryReplayEvent);
   };
 
   useEffect(() => {

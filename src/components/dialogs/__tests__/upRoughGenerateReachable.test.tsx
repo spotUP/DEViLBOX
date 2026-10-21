@@ -158,6 +158,31 @@ describe('Generate dialog streams the host events (R2c)', () => {
   });
 });
 
+describe('Replay after a Generate keeps the loaded song', () => {
+  it('the scripted Replay drives the panel only: the tracker keeps the generated patterns and their instrument ids', async () => {
+    const { text } = scriptedStream();
+    vi.stubGlobal('fetch', vi.fn(async (url: string) =>
+      url === '/api/uprough/styles'
+        ? new Response(JSON.stringify({ styles: ['trap'] }), { status: 200 })
+        : new Response(text, { status: 200 })));
+    useTrackerStore.setState({ upRoughMeta: null });
+    render(<UpRoughGenerateDialog isOpen onClose={() => undefined} />);
+    const style = await screen.findByTitle('Style');
+    await waitFor(() => expect(style.textContent).toContain('trap'));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
+    await waitFor(() => expect(useTrackerStore.getState().upRoughMeta?.song.style).toBe('trap'), { timeout: 10_000 });
+    const loaded = useTrackerStore.getState().patterns;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Replay scripted run' }));
+    await waitFor(() => expect(useFactoryStore.getState().state.done).toBe(true), { timeout: 10_000 });
+
+    // Before the fix the replay's start event replaced the song's patterns with blank ones and its decides wrote
+    // provisional instrument ids (16, 17) that match no instrument of the loaded song: silent channels.
+    expect(useTrackerStore.getState().patterns).toBe(loaded);
+    expect(useFactoryStore.getState().state.cellsWritten).toBe(0);
+  });
+});
+
 describe('R2h-01: one Generate run reaches the store, the tracker, the preview and the audition chip', () => {
   it('counts every NDJSON line, writes the decide cells, previews then swaps once, and plays the kept bank voice on a chip click', async () => {
     const { events, text } = scriptedStream();
