@@ -125,6 +125,7 @@ import {
   MAX_VOICE_DELAY_SEC,
   createVoice as _createVoice,
   stopVoice as _stopVoice,
+  disposeVoiceNodes,
   setChannelVolume as _setChannelVolume,
   channelVolumeDbToGain,
   setChannelFilterCutoff as _setChannelFilterCutoff,
@@ -2037,7 +2038,7 @@ export class ToneEngine {
       'MdaEPiano', 'MdaJX10', 'MdaDX10', 'Amsynth', 'RaffoSynth', 'CalfMono',
       'SetBfree', 'SynthV1', 'TalNoizeMaker', 'Aeolus', 'FluidSynth', 'Sfizz',
       'ZynAddSubFX', 'Monique', 'VL1',
-      'DX7', 'OPL3', 'OpenWurli',
+      'DX7', 'OPL3', 'OpenWurli', 'ReRebirth303', 'ReRebirth808', 'ReRebirth909',
     ].includes(config.synthType || '');
     const isVSTBridge = !isWASMSynth && typeof config.synthType === 'string' && SYNTH_REGISTRY.has(config.synthType);
     // Standalone native synths get one instance per tracker channel so the
@@ -3554,6 +3555,7 @@ export class ToneEngine {
         config.synthType === 'TB303' ||
         config.synthType === 'DubSiren' ||
         config.synthType === 'Synare' ||
+        config.synthType === 'ReRebirth303' ||
         config.synthType === 'Furnace' ||
         // Buzzmachine generators (monophonic, no note parameter)
         config.synthType === 'BuzzKick' ||
@@ -3664,7 +3666,7 @@ export class ToneEngine {
       // Single-voice generators
       'MAMECM3394', 'MAMETMS36XX', 'MAMESN76477', 'MAMEUPD931', 'MAMEUPD933',
       // Monophonic synths
-      'MonoSynth', 'DuoSynth', 'TB303', 'Buzz3o3', 'DB303', 'DubSiren', 'SpaceLaser', 'Synare',
+      'MonoSynth', 'DuoSynth', 'TB303', 'Buzz3o3', 'DB303', 'DubSiren', 'SpaceLaser', 'Synare', 'ReRebirth303',
       // Zynthian mono synths (single-voice WASM engines)
       'RaffoSynth', 'CalfMono', 'Monique', 'VL1',
     ]);
@@ -3916,6 +3918,7 @@ export class ToneEngine {
                         synthType === 'BuzzDynamite6' ||
                         synthType === 'BuzzM3' ||
                         synthType === 'DubSiren' ||
+                        synthType === 'ReRebirth303' ||
                         synthType === 'Synare';
 
     try {
@@ -4625,10 +4628,14 @@ export class ToneEngine {
 
     // Stop all active voice clones (critical for 'Synth' type which creates per-note clones
     // that aren't in this.instruments — without this, cloned voices keep playing forever)
+    // A mono voice IS a registered instrument, already released by the loop above: only its
+    // routing nodes are torn down here, so Stop sends that instrument one all-notes-off, not two.
+    const registered = new Set<unknown>(this.instruments.values());
     this.activeVoices.forEach((voices) => {
       for (const voice of voices) {
         try {
-          this.stopVoice(voice, now);
+          if (registered.has(voice.instrument)) disposeVoiceNodes(voice);
+          else this.stopVoice(voice, now);
         } catch { /* ignored */ }
       }
     });
