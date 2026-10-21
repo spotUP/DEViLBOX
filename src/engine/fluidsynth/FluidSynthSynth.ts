@@ -169,10 +169,12 @@ export class FluidSynthSynthEngine implements DevilboxSynth {
   }
 
   public async ensureInitialized(): Promise<void> {
-    if (!this.host) return;
-    await this.host.ready;
+    // Hold the host across the awaits: dispose() during a song load nulls this.host.
+    const host = this.host;
+    if (!host) return;
+    await host.ready;
     // A note before the SoundFont is in is held by the host, not lost.
-    await this.host.sfReady;
+    await host.sfReady;
   }
 
   /** Post the whole config. The host holds it until the SoundFont is in. */
