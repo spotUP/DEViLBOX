@@ -117,6 +117,11 @@ export function voiceSourceOf(instrument: object): object {
   return registrations.get(instrument)?.source ?? instrument;
 }
 
+/** The static filter a factory registered for `instrument` (a Tone.Filter the voice sounds through), else null. */
+export function voiceFilterOf(instrument: object): (FilterLike & { set?: (o: Record<string, unknown>) => unknown }) | null {
+  return registrations.get(instrument)?.extras.filter ?? registrations.get(voiceSourceOf(instrument))?.extras.filter ?? null;
+}
+
 /**
  * The Tone voices that sound now: the held (unreleased) voices of a PolySynth, else the wrapped mono instrument itself.
  * Pitch effects bend these (a PolySynth's _activeVoices entries are `{ midi, voice, released }`, not voices).
