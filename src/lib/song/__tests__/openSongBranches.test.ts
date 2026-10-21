@@ -46,6 +46,7 @@ import { applySong } from '@/lib/song/applySong';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { compressProject } from '@/lib/projectCompression';
+import { emptyPattern } from '@/lib/import/formats/Sc68Parser';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const bytesOf = (rel: string): ArrayBuffer => {
@@ -191,6 +192,34 @@ describe('every branch behind openSong is reached through it', { timeout: 120000
       expect(vi.mocked(applySong)).not.toHaveBeenCalled();
       expect(useTrackerStore.getState().patterns.length).toBeGreaterThan(patternsBefore);
       expect(useInstrumentStore.getState().instruments.length).toBe(instrumentsBefore + 1);
+    });
+
+    // Reported 2026-10-21: appending to a new song played one empty pattern, then the TD-3 one.
+    it('append mode onto a blank song plays the TD-3 pattern first, not the blank pattern', async () => {
+      const tracker = useTrackerStore.getState();
+      tracker.loadPatterns([emptyPattern(4, 64)]);
+      tracker.setPatternOrder([0]);
+
+      expect((await openTD3(false)).ok).toBe(true);
+
+      const { patterns, patternOrder } = useTrackerStore.getState();
+      expect(patternOrder[0]).toBe(0);
+      expect(patterns[0].channels[0].rows.some((r) => r.note > 0)).toBe(true);
+      expect(patternOrder.every((i) => patterns[i].channels.some((c) => c.rows.some((r) => r.note > 0)))).toBe(true);
+    });
+
+    it('append mode onto a song with notes keeps its own order and adds the TD-3 patterns at the end', async () => {
+      expect((await open('drum_song.mid', bytesOf('public/data/songs/midi/drum_song.mid'))).ok).toBe(true);
+      const tracker = useTrackerStore.getState();
+      const orderBefore = [tracker.patternOrder[0], tracker.patternOrder[0]];
+      tracker.setPatternOrder(orderBefore);
+      const patternsBefore = tracker.patterns.length;
+
+      expect((await openTD3(false)).ok).toBe(true);
+
+      const { patterns, patternOrder } = useTrackerStore.getState();
+      expect(patternOrder.slice(0, 2)).toEqual(orderBefore);
+      expect(patternOrder.slice(2)).toEqual(patterns.slice(patternsBefore).map((_, i) => patternsBefore + i));
     });
   });
 });
