@@ -93,6 +93,9 @@ export const ABSOLUTE_HEADROOM = 1.15;
 
 export const PREVIEW_CAPTION = 'Preview before mastering';
 
+/** Chip thumbnail height in CSS pixels (the draft's 22 px, G11). */
+export const CHIP_THUMB_HEIGHT = 22;
+
 export const NO_PREVIEW = 'No local preview for this style';
 
 /** A finished one-shot: a native button, so the keyboard reaches it. Click plays the kept local audio (R2f-61). */
@@ -102,10 +105,10 @@ function Chip(props: { voice: string; label: string; peaks: Peaks; accent?: bool
     <Button
       variant="ghost" size="sm" aria-label={`Play ${label}`} aria-disabled={!preview} title={preview ? `Play ${label}` : NO_PREVIEW}
       onClick={() => { if (preview) playVoice(voice); }}
-      className={`flex-col min-w-0 overflow-hidden !px-1 !py-0.5 text-xs bg-dark-bgTertiary text-text-secondary border ${props.accent ? 'border-accent-secondary' : 'border-dark-border'} ${preview ? '' : 'cursor-not-allowed'}`}
+      className={`flex-col min-w-0 overflow-hidden !px-1 !py-0.5 text-xs bg-dark-bgTertiary text-text-secondary border-[3px] ${props.accent ? 'border-accent-secondary' : 'border-dark-border'} ${preview ? '' : 'cursor-not-allowed'}`}
       style={{ opacity: preview ? props.alpha : 0.6, transform: `scale(${props.scale})` }}
     >
-      <Wave a={props.peaks} height={18} />
+      <Wave a={props.peaks} height={CHIP_THUMB_HEIGHT} />
       <span className="block w-full truncate">{label}</span>
     </Button>
   );
@@ -154,19 +157,19 @@ function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => 
       style={{ transform: `scale(${1 - (1 - kick) * 0.08})` }}
       className={`rounded-md p-2 flex flex-col gap-1 min-h-0 min-w-0 overflow-hidden bg-dark-bgSecondary border ${state === 'waiting' ? 'border-dashed border-dark-borderLight opacity-[.55]' : state === 'building' ? 'border-solid border-accent-primary ring-1 ring-accent-primary' : 'border-solid border-accent-primary'}`}
     >
-      <div className="text-xs font-bold text-text-primary">{slot.label}</div>
+      <div data-testid={`factory-heading-${slot.id}`} className="text-lg font-extrabold leading-tight text-text-primary truncate">{slot.label}</div>
       {slot.born ? (
         <Wave a={slot.born} height={waveHeight} eyes={timeSec} final />
       ) : (
         <Wave a={stamped ? voice?.bank : cur?.peaks} height={waveHeight} b={stamped ? undefined : next?.peaks} frac={shown.frac} final={stamped} eyes={timeSec} reference={reference} idle={state === 'waiting'} plate={plate} playhead={playhead}
           env={cur?.env} envLabel={cur ? spoken(cur.stage) : ''} />
       )}
-      <div className="text-[10px] font-mono text-text-secondary min-h-[1.4em] truncate" style={{ transform: `translateY(${bounce * 4}px)` }}>
+      <div data-testid={`factory-caption-${slot.id}`} className="text-[13px] font-mono text-text-secondary min-h-[2.6em] line-clamp-2" style={{ transform: `translateY(${bounce * 4}px)` }}>
         {placeholder && <Lock size={10} className="inline mr-1 align-[-1px]" aria-hidden />}
         {stamped && voice ? `Stamped ${spoken(voice.voice)}` : cur ? spoken(cur.stage) : slot.born ? 'First bar rendered with the song' : placeholder ? 'Comes alive at the first rendered bar' : 'Empty'}
       </div>
       {/* One row whatever the count (a hat pool brings eight): chips share the width, so a slot never grows taller. */}
-      <div data-testid={`factory-chips-${slot.id}`} className="grid grid-flow-col auto-cols-fr gap-1 min-h-[28px]">
+      <div data-testid={`factory-chips-${slot.id}`} className="grid grid-flow-col auto-cols-fr gap-1 min-h-[40px]">
         {stamped && voice?.bank && slot.voices.filter((v) => v.bank).map((v) => (
           <Chip key={v.voice} voice={v.voice} label={spoken(v.voice)} peaks={v.bank!} alpha={chip.alpha} scale={chip.scale} preview={preview} />
         ))}

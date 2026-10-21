@@ -10,7 +10,7 @@ const FALLBACK_WIDTHS = [270, 230, 200, 170, 140] as const;
 /** Gap between slot cards in CSS pixels. */
 export const SLOT_GAP = 12;
 /** Height of a slot card apart from its waveform: padding, heading, caption, chip row and the gaps between them. */
-export const SLOT_CHROME = 104;
+export const SLOT_CHROME = 140;
 export const WAVE_MIN = 28;
 export const WAVE_MAX = 170;
 /** A wave this tall is comfortable; the layout adds columns (narrower cards) only until it reaches it. */

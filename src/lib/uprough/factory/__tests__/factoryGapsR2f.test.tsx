@@ -28,7 +28,7 @@ let previewOn = false;
 vi.mock('@/utils/audio-context', () => ({ getDevilboxAudioContext: () => undefined }));
 
 import { drawEyes, drawStamp, eyeOpenness, PLATE_SECONDS } from '@/lib/uprough/factory/draw';
-import { FactoryPanel, ABSOLUTE_HEADROOM } from '@components/uprough/FactoryPanel';
+import { FactoryPanel, ABSOLUTE_HEADROOM, CHIP_THUMB_HEIGHT } from '@components/uprough/FactoryPanel';
 import { useFactoryStore, factoryOnEvent } from '../useFactoryStore';
 import { scriptedGenerateEvents } from '../scriptedRun';
 import type { R2Event } from '@/engine/uprough/r2Events';
@@ -174,5 +174,24 @@ describe('G14 hat fan-out and G15 chip pop-in', () => {
       }
     }
     expect(seen).toBe(true);
+  });
+});
+
+describe('G11 type sizes', () => {
+  it('slot heading is 18 px extra bold, caption 13 px two lines, chips have a 3 px border and a 22 px thumbnail', () => {
+    render(<FactoryPanel />);
+    feed(scriptedGenerateEvents('trap', 3).filter((e) => e.type !== 'done'));
+    runClock(60_000);
+    const heading = document.querySelector('[data-testid="factory-heading-kick"]')!;
+    expect(heading.className).toContain('text-lg');
+    expect(heading.className).toContain('font-extrabold');
+    const caption = document.querySelector('[data-testid="factory-caption-kick"]')!;
+    expect(caption.className).toContain('text-[13px]');
+    expect(caption.className).toContain('min-h-[2.6em]');
+    expect(caption.className).toContain('line-clamp-2');
+    const chip = document.querySelector('[data-testid="factory-chips-kick"] button')!;
+    expect(chip.className).toContain('border-[3px]');
+    expect(CHIP_THUMB_HEIGHT).toBe(22);
+    expect((chip.querySelector('canvas') as HTMLCanvasElement).style.height).toBe('22px');
   });
 });
