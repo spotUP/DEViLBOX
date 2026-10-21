@@ -5,7 +5,7 @@
  * loop region, cue marker, position marker, near-end warning pulse.
  */
 
-import type { OverviewMsg, OverviewState, DeckColors } from '../engine/renderer/worker-types';
+import type { OverviewMsg, OverviewState, OverviewScalars, DeckColors } from '../engine/renderer/worker-types';
 import { clockNowMs, positionAtFrame, type ClockAnchor } from '../engine/audioLatency';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -105,6 +105,10 @@ self.onmessage = (e: MessageEvent<OverviewMsg>) => {
       applyStateMsg(msg);
       dirty = true;
       break;
+    case 'position':
+      applyScalars(msg);
+      dirty = true;
+      break;
     case 'resize':
       dpr = msg.dpr; width = msg.w; height = msg.h;
       if (offCanvas) {
@@ -121,6 +125,12 @@ self.onmessage = (e: MessageEvent<OverviewMsg>) => {
 };
 
 function applyStateMsg(msg: OverviewState): void {
+  applyScalars(msg);
+  waveformPeaks    = msg.waveformPeaks;
+  frequencyPeaks   = msg.frequencyPeaks;
+}
+
+function applyScalars(msg: OverviewScalars): void {
   playbackMode     = msg.playbackMode;
   songPos          = msg.songPos;
   totalPositions   = msg.totalPositions;
@@ -130,8 +140,6 @@ function applyStateMsg(msg: OverviewState): void {
   patternLoopEnd   = msg.patternLoopEnd;
   anchor           = msg.anchor;
   durationMs       = msg.durationMs;
-  waveformPeaks    = msg.waveformPeaks;
-  frequencyPeaks   = msg.frequencyPeaks;
 }
 
 // ─── RAF loop ─────────────────────────────────────────────────────────────────

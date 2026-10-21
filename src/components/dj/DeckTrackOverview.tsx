@@ -18,7 +18,7 @@ interface DeckTrackOverviewProps {
 }
 
 import { deckAccent } from '@lib/deckIdentity';
-import type { OverviewMsg, OverviewState, DeckColors } from '@engine/renderer/worker-types';
+import type { OverviewMsg, OverviewScalars, OverviewState, DeckColors } from '@engine/renderer/worker-types';
 
 const BAR_HEIGHT = 24;
 
@@ -33,7 +33,9 @@ function snapshotColors(el: HTMLElement, deckId: string): DeckColors {
   };
 }
 
-function snapshotDeck(d: ReturnType<typeof useDJStore.getState>['decks']['A']): OverviewState {
+type DeckState = ReturnType<typeof useDJStore.getState>['decks']['A'];
+
+function snapshotScalars(d: DeckState): OverviewScalars {
   return {
     playbackMode:     d.playbackMode,
     songPos:          d.songPos,
@@ -44,6 +46,12 @@ function snapshotDeck(d: ReturnType<typeof useDJStore.getState>['decks']['A']): 
     patternLoopEnd:   d.patternLoopEnd,
     anchor:           d.positionAnchor,
     durationMs:       d.durationMs,
+  };
+}
+
+function snapshotDeck(d: DeckState): OverviewState {
+  return {
+    ...snapshotScalars(d),
     // Convert Float32Array → plain number[] for structured clone
     waveformPeaks:    d.waveformPeaks ? Array.from(d.waveformPeaks) : null,
     frequencyPeaks:   d.frequencyPeaks
@@ -98,7 +106,7 @@ export const DeckTrackOverview: React.FC<DeckTrackOverviewProps> = ({ deckId }) 
       },
       () => {
         const d = useDJStore.getState().decks[deckId];
-        bridgeRef.current?.post({ type: 'state', ...snapshotDeck(d) });
+        bridgeRef.current?.post({ type: 'position', ...snapshotScalars(d) });
       },
       { equalityFn: (a, b) => a.anchor === b.anchor && a.songPos === b.songPos && a.totalPositions === b.totalPositions },
     );
