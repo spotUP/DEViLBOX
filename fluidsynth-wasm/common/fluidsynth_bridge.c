@@ -19,6 +19,33 @@ static fluid_settings_t *g_settings = NULL;
 static fluid_synth_t *g_synth = NULL;
 static int g_sfont_id = -1;
 
+static int g_audio_groups = 1;
+
+/*
+ * Multi-slot create. midiChannels MIDI channels, audioGroups stereo dry
+ * groups (channel c renders into group c % audioGroups) plus one shared
+ * effects (reverb/chorus) group.
+ */
+EXPORT void *fluidsynth_create_ex(int sampleRate, int midiChannels, int audioGroups) {
+    if (g_synth) return g_synth;
+
+    g_settings = new_fluid_settings();
+    fluid_settings_setnum(g_settings, "synth.sample-rate", (double)sampleRate);
+    fluid_settings_setint(g_settings, "synth.polyphony", 256);
+    fluid_settings_setint(g_settings, "synth.midi-channels", midiChannels);
+    fluid_settings_setint(g_settings, "synth.audio-groups", audioGroups);
+    fluid_settings_setint(g_settings, "synth.audio-channels", audioGroups);
+    fluid_settings_setint(g_settings, "synth.effects-groups", 1);
+    fluid_settings_setstr(g_settings, "synth.reverb.active", "yes");
+    fluid_settings_setstr(g_settings, "synth.chorus.active", "yes");
+    /* No audio driver in WASM - we pull samples manually */
+    fluid_settings_setstr(g_settings, "audio.driver", "none");
+
+    g_audio_groups = audioGroups;
+    g_synth = new_fluid_synth(g_settings);
+    return g_synth;
+}
+
 EXPORT void *fluidsynth_create(int sampleRate) {
     if (g_synth) return g_synth;
 
@@ -28,11 +55,26 @@ EXPORT void *fluidsynth_create(int sampleRate) {
     fluid_settings_setint(g_settings, "synth.midi-channels", 16);
     fluid_settings_setstr(g_settings, "synth.reverb.active", "yes");
     fluid_settings_setstr(g_settings, "synth.chorus.active", "yes");
-    /* No audio driver in WASM — we pull samples manually */
+    /* No audio driver in WASM - we pull samples manually */
     fluid_settings_setstr(g_settings, "audio.driver", "none");
 
+    g_audio_groups = 1;
     g_synth = new_fluid_synth(g_settings);
     return g_synth;
+}
+
+EXPORT void fluidsynth_set_channel_type(int channel, int type) {
+    if (!g_synth) return;
+    fluid_synth_set_channel_type(g_synth, channel,
+        type ? CHANNEL_TYPE_DRUM : CHANNEL_TYPE_MELODIC);
+}
+
+/* Bank of the preset currently resolved on a channel, or -1 when none. */
+EXPORT int fluidsynth_get_channel_bank(int channel) {
+    if (!g_synth) return -1;
+    fluid_preset_t *preset = fluid_synth_get_channel_preset(g_synth, channel);
+    if (!preset) return -1;
+    return fluid_preset_get_banknum(preset);
 }
 
 EXPORT void fluidsynth_destroy(void) {
@@ -56,6 +98,21 @@ EXPORT int fluidsynth_load_sf2(const char *path) {
 EXPORT void fluidsynth_process(float *left, float *right, int nframes) {
     if (!g_synth) return;
     fluid_synth_write_float(g_synth, nframes, left, 0, 1, right, 0, 1);
+}
+
+/*
+ * outPtrs: array of 2*audioGroups float* (L0,R0,L1,R1,...) each nframes long.
+ * fxL/fxR: the shared reverb/chorus return. All buffers are zeroed first
+ * because fluid_synth_process mixes into them.
+ */
+EXPORT void fluidsynth_process_multi(float **outPtrs, float *fxL, float *fxR, int nframes) {
+    if (!g_synth) return;
+    int nout = 2 * g_audio_groups;
+    float *fx[2] = { fxL, fxR };
+    for (int i = 0; i < nout; i++) memset(outPtrs[i], 0, (size_t)nframes * sizeof(float));
+    memset(fxL, 0, (size_t)nframes * sizeof(float));
+    memset(fxR, 0, (size_t)nframes * sizeof(float));
+    fluid_synth_process(g_synth, nframes, 2, fx, nout, outPtrs);
 }
 
 EXPORT void fluidsynth_note_on(int channel, int key, int velocity) {
@@ -165,7 +222,15 @@ EXPORT void fluidsynth_set_param(int id, float value) {
             fluid_synth_program_change(g_synth, 0, (int)value);
             break;
         case 12:
-            fluid_synth_bank_select(g_synth, 0, (int)value);
+            {
+                /* bank_select only takes effect at the next program change, and
+                 * the program is posted before the bank: re-issue the current
+                 * program so the new bank applies. */
+                unsigned int sf = 0, bk = 0, pr = 0;
+                fluid_synth_bank_select(g_synth, 0, (int)value);
+                fluid_synth_get_program(g_synth, 0, &sf, &bk, &pr);
+                fluid_synth_program_change(g_synth, 0, (int)pr);
+            }
             break;
         default:
             break;
