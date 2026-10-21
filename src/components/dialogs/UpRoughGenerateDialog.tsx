@@ -154,7 +154,7 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
         theme="modern"
       />
 
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-4 flex-1 min-h-0 overflow-y-auto">
         <p className="text-xs text-text-muted">
           Generate a song with the Up Rough generator. It plays the same on the device as it does here.
         </p>
@@ -171,49 +171,52 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
           />
         </div>
 
-        <div>
-          <label htmlFor="uprough-seed" className="block text-[10px] font-mono text-text-muted mb-1">Seed (0 to 9999)</label>
-          <input
-            id="uprough-seed"
-            type="number"
-            min={0}
-            max={9999}
-            step={1}
-            value={seed}
-            onChange={(e) => setSeed(e.target.valueAsNumber)}
-            disabled={busy}
-            className="w-full px-2 py-1.5 bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs focus:outline-none focus:ring-1 focus:ring-accent-primary disabled:opacity-50"
-          />
-          {!seedValid && <p className="text-[10px] font-mono text-accent-warning mt-1">Seed must be a whole number from 0 to 9999.</p>}
-        </div>
+        <div className="grid grid-cols-3 gap-3 items-start">
+          <div>
+            <label htmlFor="uprough-seed" className="block text-[10px] font-mono text-text-muted mb-1">Seed (0 to 9999)</label>
+            <input
+              id="uprough-seed"
+              type="number"
+              min={0}
+              max={9999}
+              step={1}
+              value={seed}
+              onChange={(e) => setSeed(e.target.valueAsNumber)}
+              disabled={busy}
+              className="w-full px-2 py-1.5 bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs focus:outline-none focus:ring-1 focus:ring-accent-primary disabled:opacity-50"
+            />
+            {!seedValid && <p className="text-[10px] font-mono text-accent-warning mt-1">Seed must be a whole number from 0 to 9999.</p>}
+          </div>
 
-        <div>
-          <label htmlFor="uprough-key" className="block text-[10px] font-mono text-text-muted mb-1">Key</label>
-          <input
-            id="uprough-key"
-            type="text"
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            disabled={busy}
-            className="w-full px-2 py-1.5 bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs focus:outline-none focus:ring-1 focus:ring-accent-primary disabled:opacity-50"
-          />
-          {!keyValid && <p className="text-[10px] font-mono text-accent-warning mt-1">Key looks like Am, C or F#m.</p>}
-        </div>
+          <div>
+            <label htmlFor="uprough-key" className="block text-[10px] font-mono text-text-muted mb-1">Key</label>
+            <input
+              id="uprough-key"
+              type="text"
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              disabled={busy}
+              className="w-full px-2 py-1.5 bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs focus:outline-none focus:ring-1 focus:ring-accent-primary disabled:opacity-50"
+            />
+            {!keyValid && <p className="text-[10px] font-mono text-accent-warning mt-1">Key looks like Am, C or F#m.</p>}
+          </div>
 
-        <div>
-          <label htmlFor="uprough-bars" className="block text-[10px] font-mono text-text-muted mb-1">Bars (empty for the whole song)</label>
-          <input
-            id="uprough-bars"
-            type="number"
-            min={1}
-            max={999}
-            step={1}
-            value={bars}
-            onChange={(e) => setBars(e.target.value)}
-            disabled={busy}
-            className="w-full px-2 py-1.5 bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs focus:outline-none focus:ring-1 focus:ring-accent-primary disabled:opacity-50"
-          />
-          {!barsValid && <p className="text-[10px] font-mono text-accent-warning mt-1">Bars must be a whole number from 1 to 999.</p>}
+          <div>
+            <label htmlFor="uprough-bars" className="block text-[10px] font-mono text-text-muted mb-1">Bars</label>
+            <input
+              id="uprough-bars"
+              type="number"
+              min={1}
+              max={999}
+              step={1}
+              value={bars}
+              placeholder="Whole song"
+              onChange={(e) => setBars(e.target.value)}
+              disabled={busy}
+              className="w-full px-2 py-1.5 bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs focus:outline-none focus:ring-1 focus:ring-accent-primary disabled:opacity-50"
+            />
+            {!barsValid && <p className="text-[10px] font-mono text-accent-warning mt-1">Bars must be a whole number from 1 to 999.</p>}
+          </div>
         </div>
 
         {busy && (
@@ -223,12 +226,10 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
           </p>
         )}
 
-        {error && <p role="alert" className="text-xs font-mono text-accent-error">{error}</p>}
+        {error && <p role="alert" className="text-xs font-mono text-accent-error whitespace-pre-wrap break-words">{error}</p>}
 
         {showFactory && (
-          <div style={{ maxHeight: '55vh', overflowY: 'auto' }}>
-            <FactoryPanel onReplay={handleReplay} />
-          </div>
+          <FactoryPanel onReplay={handleReplay} />
         )}
       </div>
 

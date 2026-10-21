@@ -80,7 +80,7 @@ describe('Generate Up Rough Song from the hamburger menu', () => {
 
     const style = await screen.findByTitle('Style');
     await waitFor(() => expect(style.textContent).toContain('trap'));
-    fireEvent.change(screen.getByLabelText('Bars (empty for the whole song)'), { target: { value: '16' } });
+    fireEvent.change(screen.getByLabelText('Bars'), { target: { value: '16' } });
     fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
 
     expect(await screen.findByText('Generating on the server... 0 s', { exact: false })).toBeTruthy();
@@ -254,4 +254,29 @@ describe('R2h-01: one Generate run reaches the store, the tracker, the preview a
       setPlayerAudioForTests(null);
     }
   }, 30_000);
+});
+
+describe('Generate dialog layout (owner look test)', () => {
+  it('scrolls its body inside the modal and wraps a long host error, so the header and the whole error stay readable', async () => {
+    const hostError = 'song_file.py: error: unrecognized arguments: --events -\nusage: song_file.py new [-h] --style STYLE';
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error(hostError); }));
+    render(<UpRoughGenerateDialog isOpen onClose={() => undefined} />);
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toBe(hostError);
+    expect(alert.className).toContain('whitespace-pre-wrap');
+    expect(alert.className).toContain('break-words');
+
+    // The body, not the modal, is the scroll container: flex-1 + min-h-0 lets it shrink below its content.
+    const body = alert.closest('.overflow-y-auto');
+    expect(body).not.toBeNull();
+    expect(body!.className).toContain('min-h-0');
+    expect(body!.className).toContain('flex-1');
+
+    // Seed, Key and Bars share one row.
+    const row = screen.getByLabelText('Bars').closest('.grid');
+    expect(row).not.toBeNull();
+    expect(row!.className).toContain('grid-cols-3');
+    expect(row!.contains(screen.getByLabelText('Seed (0 to 9999)'))).toBe(true);
+  });
 });

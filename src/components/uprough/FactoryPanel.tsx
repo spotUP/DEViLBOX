@@ -69,6 +69,9 @@ function Wave(props: { a?: Peaks; b?: Peaks; frac?: number; reveal?: number; ref
   return <canvas ref={ref} width={240} height={height} className="w-full block" style={{ height }} />;
 }
 
+/** A slot's waveform height in CSS pixels, the golden draft's. */
+const SLOT_WAVE_HEIGHT = 170;
+
 export const PREVIEW_CAPTION = 'Preview before mastering';
 
 export const NO_PREVIEW = 'No local preview for this style';
@@ -115,23 +118,19 @@ function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => 
   return (
     <div
       data-testid={`factory-slot-${slot.id}`} ref={(el) => register(slot.id, el)}
-      className="rounded p-2 flex flex-col gap-1"
-      style={{
-        background: 'var(--color-bg-secondary)', borderRadius: 6,
-        border: `1px ${lit ? 'solid' : 'dashed'} var(${lit ? '--color-accent' : '--color-border'})`, opacity: lit ? 1 : 0.55,
-      }}
+      className={`rounded-md p-3 flex flex-col gap-2 bg-dark-bgSecondary border ${lit ? 'border-solid border-accent-primary' : 'border-dashed border-dark-borderLight opacity-70'}`}
     >
-      <div className="text-xs font-semibold" style={{ color: 'var(--color-text)' }}>{slot.label}</div>
+      <div className="text-sm font-bold text-text-primary">{slot.label}</div>
       {slot.born ? (
-        <Wave a={slot.born} eyes={timeSec} final />
+        <Wave a={slot.born} height={SLOT_WAVE_HEIGHT} eyes={timeSec} final />
       ) : (
-        <Wave a={stamped ? voice?.bank : cur?.peaks} b={stamped ? undefined : next?.peaks} frac={shown.frac} final={stamped} eyes={timeSec}
+        <Wave a={stamped ? voice?.bank : cur?.peaks} height={SLOT_WAVE_HEIGHT} b={stamped ? undefined : next?.peaks} frac={shown.frac} final={stamped} eyes={timeSec}
           env={cur?.env} envLabel={cur ? spoken(cur.stage) : ''} />
       )}
-      <div className="text-xs" style={{ color: 'var(--color-text-muted)', transform: `translateY(${bounce * 4}px)` }}>
+      <div className="text-xs font-mono text-text-secondary min-h-[2.6em]" style={{ transform: `translateY(${bounce * 4}px)` }}>
         {stamped && voice ? `Stamped ${spoken(voice.voice)}` : cur ? spoken(cur.stage) : slot.born ? 'First bar rendered with the song' : 'Empty'}
       </div>
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-2 min-h-[40px]">
         {stamped && voice?.bank && slot.voices.filter((v) => v.bank).map((v) => (
           <Chip key={v.voice} voice={v.voice} label={spoken(v.voice)} peaks={v.bank!} alpha={chip.alpha} scale={chip.scale} preview={preview} />
         ))}
@@ -303,29 +302,27 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
     <div className={className} data-testid="factory-panel"
       onWheel={() => { userScrolledAt.current = performance.now(); }} onTouchMove={() => { userScrolledAt.current = performance.now(); }}
       onKeyDown={() => { userScrolledAt.current = performance.now(); }} style={{ color: 'var(--color-text)' }}>
-      <div className="flex items-center justify-between mb-2">
-        <div role="status" aria-live="polite" data-testid="factory-status" className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div role="status" aria-live="polite" data-testid="factory-status" className="text-sm font-bold text-accent-highlight min-h-[1.5em]">
           {state.caption}
         </div>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap items-center gap-2">
           {onReplay && (
-            <button type="button" onClick={onReplay} className="px-2 py-1 rounded text-xs flex items-center gap-1" style={{ background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border)' }}>
-              <RotateCcw size={12} /> Replay scripted run
-            </button>
+            <Button variant="default" size="sm" icon={<RotateCcw size={12} />} onClick={onReplay}>Replay scripted run</Button>
           )}
           <Button
-            variant="ghost" size="sm" aria-pressed={listen} disabled={!rendering && !listen}
+            variant={listen ? 'primary' : 'default'} size="sm" aria-pressed={listen} disabled={!rendering && !listen}
             onClick={() => setListenWhileBuilding(!listen)}
             title="Play the song's sections as they are rendered, before texture and mastering"
           >
             Listen while building
           </Button>
-          <button
-            type="button" aria-pressed={sound} onClick={() => setSound((v) => !v)}
-            className="px-2 py-1 rounded text-xs flex items-center gap-1" style={{ background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border)' }}
+          <Button
+            variant={sound ? 'primary' : 'default'} size="sm" aria-pressed={sound} onClick={() => setSound((v) => !v)}
+            icon={sound ? <Volume2 size={12} /> : <VolumeX size={12} />}
           >
-            {sound ? <Volume2 size={12} /> : <VolumeX size={12} />} Factory sounds {sound ? 'on' : 'off'}
-          </button>
+            Factory sounds {sound ? 'on' : 'off'}
+          </Button>
         </div>
       </div>
       {previewState === 'preview' && (
@@ -335,7 +332,7 @@ export const FactoryPanel: React.FC<FactoryPanelProps> = ({ onReplay, className 
         <div data-testid="factory-no-preview" className="text-xs text-text-muted mb-1">{NO_PREVIEW}</div>
       )}
       <Machinery timeSec={timeSec} busy={active} bandBusy={bandBusy(performance.now(), lastEventAt.current)} chips={chips} />
-      <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))' }}>
+      <div className="grid gap-x-4 gap-y-5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 270px), 1fr))' }}>
         {state.slots.map((slot) => <SlotCard key={slot.id} register={registerSlot} slot={slot} lines={lines} t={t} reduced={reduced} timeSec={timeSec} preview={preview} />)}
       </div>
       {state.sections.length > 0 && (
