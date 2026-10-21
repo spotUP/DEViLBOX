@@ -43,7 +43,7 @@ async function keyLevel(volume: number): Promise<number> {
  * Build the module of a one-note song (C3 on row 0) and render it with
  * libopenmpt. Four channels build a MOD, more an XM.
  */
-async function renderPattern(volume: number, numChannels = 4): Promise<Float32Array> {
+async function renderPattern(volume: number, numChannels = 4, inst = sampler(volume)): Promise<Float32Array> {
   const empty = () => Array.from({ length: 16 }, () => cell());
   const rows = empty();
   rows[0] = cell({ note: 37, instrument: 1 });
@@ -51,7 +51,7 @@ async function renderPattern(volume: number, numChannels = 4): Promise<Float32Ar
     numChannels,
     patterns: [{ length: 16, channels: [{ rows }, ...Array.from({ length: numChannels - 1 }, () => ({ rows: empty() }))] }],
     songPositions: [0],
-    instruments: [sampler(volume)],
+    instruments: [inst],
   };
   const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
   const data = await bridge.createModuleForSong(song as never, () => false);
@@ -126,5 +126,21 @@ describe('a Sampler note in a built song plays at its key level', () => {
     const patternHz = pitchHz(await renderPattern(0, numChannels), SR * 0.05 | 0, SR * 0.45 | 0);
     expect(keyHz).toBeGreaterThan(300);
     expect(Math.abs(12 * Math.log2(patternHz / keyHz))).toBeLessThan(0.1);
+  }, 120000);
+
+  // Reported 2026-10-21: an MP3 dropped on the app played on the keyboard and
+  // was silent in the pattern. The play-time module read the Sampler's bytes
+  // as WAV only, so an MP3's slot stayed empty.
+  it('plays a dropped MP3 in the pattern at its key level', async () => {
+    const mp3 = readFileSync(resolve(ROOT, 'public/data/samples/packs/sammy-blammy/Laser 1.mp3'));
+    const inst = {
+      ...sampler(0),
+      sample: { audioBuffer: mp3.buffer.slice(mp3.byteOffset, mp3.byteOffset + mp3.byteLength), url: '', baseNote: 'C3', loop: false, loopStart: 0, loopEnd: 0 },
+    } as unknown as InstrumentConfig;
+    // The laser starts 0.32 s into the file; the key sounds 0.05 s after the pattern's row 0.
+    const key = rms(await renderKeys(inst, [{ note: 'C3', at: 0.05 }], 0.6), SR * 0.4 | 0, SR * 0.55 | 0);
+    const pattern = rms(await renderPattern(0, 4, inst), SR * 0.35 | 0, SR * 0.5 | 0);
+    expect(key).toBeGreaterThan(0.01);
+    expect(Math.abs(20 * Math.log10(pattern / key))).toBeLessThan(1);
   }, 120000);
 });
