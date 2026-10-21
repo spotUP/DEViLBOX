@@ -6,6 +6,9 @@
 import { create } from 'zustand';
 import type { R2Event } from '@/engine/uprough/r2Events';
 import { initialFactoryState, reduceFactory, type FactoryState } from './factoryModel';
+import { STYLE_DRUMS, type HipHopStyle } from '@/engine/uprough/drumBank';
+import { runActOne } from './actOne';
+import { clearBank } from './voiceAudition';
 import { beginPatternFill, fillDecide } from './patternFill';
 
 interface FactoryStoreState {
@@ -22,6 +25,12 @@ export const useFactoryStore = create<FactoryStoreState>((set, get) => ({
   onEvent: (ev) => {
     const { state } = get();
     let written = 0;
+    // The wire carries no audio: the local bank at the start event's style and seed is the audition audio (same bytes as
+    // the host by the parity suite). The one place the bank is built; a style with no local bank leaves nothing to play.
+    if (ev.type === 'start') {
+      if (ev.style in STYLE_DRUMS) runActOne(ev.style as HipHopStyle, ev.seed, ev.rate);
+      else clearBank();
+    }
     if (ev.type === 'start' && ev.mode === 'generate') beginPatternFill(ev);
     else if (ev.type === 'decide' && state.mode === 'generate') written = fillDecide(ev);
     set({
