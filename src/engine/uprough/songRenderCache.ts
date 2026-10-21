@@ -27,6 +27,12 @@ export function renderSongCached(
   events: BarEvents, options: RenderSongOptions, cache: SectionMixCache,
   /** Called once per section, in order, after its mix is known (`cached` = it came from the cache). */
   onSection?: (index: number, cached: boolean) => void,
+  /**
+   * Called right after `onSection` with the section's PRE-master mix (no join, no texture, no master bus: its level
+   * differs from the final). Cached sections included; bar-less (null) sections are skipped, as the join skips them.
+   * The array is the cache's own: a caller that keeps or transfers it copies it. Never changes the returned mix.
+   */
+  onSectionMix?: (index: number, mix: Float64Array) => void,
 ): Float64Array {
   const seeds = sectionSeeds(events);
   const keys = events.sections.map((_, i) => sectionKey(events, i, seeds[i]!, options));
@@ -40,7 +46,9 @@ export function renderSongCached(
       cache.set(key, renderSectionMix(events, i, seeds[i]!, options, ctx));
     }
     onSection?.(i, cached);
-    return cache.get(key)!;
+    const mix = cache.get(key)!;
+    if (mix) onSectionMix?.(i, mix);
+    return mix;
   });
   return finishSong(mixes, events, options, ctx);
 }
