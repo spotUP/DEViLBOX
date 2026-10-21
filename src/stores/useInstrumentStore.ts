@@ -749,17 +749,15 @@ export const useInstrumentStore = create<InstrumentStore>()(
               for (const [patchKey, method] of Object.entries(nativePatchKeyMap)) {
                 const patchName = (updates as any)[patchKey];
                 if (patchName) {
-                  // Try to load on running instance first
-                  const instruments = (engine as any).instruments as Map<number, any>;
+                  // Load on EVERY running instance: a per-channel native synth has one per tracker channel plus the
+                  // shared keyboard one, and the one that sounds is not necessarily the first in the map.
                   let loaded = false;
-                  if (instruments) {
-                    for (const [key, synth] of instruments.entries()) {
-                      if ((key >>> 16) === id && synth?.[method]) {
-                        console.log(`[InstrumentStore] Native patch: calling ${method}('${patchName}') on ${updatedInstrument.synthType} id=${id}, isInitialized=${synth.isInitialized}`);
-                        synth[method](patchName);
-                        loaded = true;
-                        break;
-                      }
+                  for (const synth of engine.instancesOf(id) as unknown as Array<Record<string, unknown>>) {
+                    const load = synth?.[method];
+                    if (typeof load === 'function') {
+                      console.log(`[InstrumentStore] Native patch: calling ${method}('${patchName}') on ${updatedInstrument.synthType} id=${id}, isInitialized=${synth.isInitialized}`);
+                      load.call(synth, patchName);
+                      loaded = true;
                     }
                   }
                   if (!loaded) {
