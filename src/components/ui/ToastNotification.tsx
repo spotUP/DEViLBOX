@@ -22,7 +22,7 @@ const colorMap: Record<NotificationType, string> = {
 };
 
 export const ToastNotification: React.FC = () => {
-  const { notifications, removeNotification } = useNotificationStore();
+  const { notifications, removeNotification, pauseDismiss, resumeDismiss } = useNotificationStore();
 
   if (notifications.length === 0) return null;
 
@@ -37,6 +37,10 @@ export const ToastNotification: React.FC = () => {
             ${colorMap[notification.type]}
           `}
           role="alert"
+          onMouseEnter={() => pauseDismiss(notification.id)}
+          onMouseLeave={() => resumeDismiss(notification.id)}
+          onFocus={() => pauseDismiss(notification.id)}
+          onBlur={() => resumeDismiss(notification.id)}
         >
           <span className="flex-shrink-0 mt-0.5">
             {iconMap[notification.type]}
