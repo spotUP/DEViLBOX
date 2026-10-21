@@ -44,7 +44,6 @@ import { decideToCells } from '@/lib/uprough/factory/decideToCells';
 import { useFactoryStore } from '@/lib/uprough/factory/useFactoryStore';
 import { bankVoice } from '@/lib/uprough/factory/voiceAudition';
 import { songDrumBank } from '@/engine/uprough/drumBank';
-import { setRenderBackendForTests, type RenderBackend } from '@/lib/uprough/upRoughSongService';
 
 /** The scripted host stream with the song on the done line, as the server sends it. */
 function scriptedStream(): { events: R2Event[]; text: string } {
@@ -226,12 +225,9 @@ describe('R2h-01: one Generate run reaches the store, the tracker, no render and
       expectedCells += decideToCells(ev.lane, ev.bar, ev.cells, taken.get(key)).length;
     }
 
-    // Render backend spy: generated songs play live, so no whole-song render may be requested.
-    const renderCalls = vi.fn();
-    const backend: RenderBackend = {
-      render(...args) { renderCalls(...args); return new Promise<Float64Array>(() => undefined); },
-    };
-    setRenderBackendForTests(backend);
+    // Worker spy: generated songs play live, so no whole-song render worker may be constructed.
+    const workerCtor = vi.fn();
+    vi.stubGlobal('Worker', workerCtor);
 
     let eventsAtDone = -1;
     let cellsAtDone = -1;
@@ -258,7 +254,7 @@ describe('R2h-01: one Generate run reaches the store, the tracker, no render and
 
       // (c) the song load starts no whole-song render: not at once, not after the old debounce has passed.
       await new Promise((r) => setTimeout(r, 700));
-      expect(renderCalls).not.toHaveBeenCalled();
+      expect(workerCtor).not.toHaveBeenCalled();
 
       // (d) the chip plays the kept bank voice once, without rebuilding the bank.
       const kept = bankVoice('kick');
@@ -271,7 +267,7 @@ describe('R2h-01: one Generate run reaches the store, the tracker, no render and
       expect(vi.mocked(songDrumBank).mock.calls.length).toBe(builds);
       expect(bankVoice('kick')!.samples).toBe(kept!.samples);
     } finally {
-      setRenderBackendForTests(null);
+      vi.unstubAllGlobals();
     }
   }, 30_000);
 });

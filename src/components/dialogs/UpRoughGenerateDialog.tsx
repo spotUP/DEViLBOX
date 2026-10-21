@@ -16,7 +16,6 @@ import type { R2Event } from '@/engine/uprough/r2Events';
 import { openUpRoughSong } from '@/lib/uprough/openUpRoughSong';
 import { FactoryPanel } from '@components/uprough/FactoryPanel';
 import { useFactoryStore, factoryOnEvent, factoryReplayEvent } from '@/lib/uprough/factory/useFactoryStore';
-import { attachR2Bridge } from '@/lib/uprough/factory/r2Bridge';
 import { replayEvents, scriptedGenerateEvents } from '@/lib/uprough/factory/scriptedRun';
 import type { HipHopStyle } from '@/engine/uprough/drumBank';
 
@@ -54,11 +53,6 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
   const [showFactory, setShowFactory] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const stopReplay = useRef<(() => void) | null>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    return attachR2Bridge();
-  }, [isOpen]);
 
   useEffect(() => () => stopReplay.current?.(), []);
 
