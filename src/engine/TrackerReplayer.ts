@@ -897,6 +897,8 @@ export class TrackerReplayer {
   /** Guard flag: when true, usePatternPlayback should not stop/restart the replayer.
    *  Set by forcePosition, cleared after one React render cycle. */
   public skipNextReload = false;
+  private static readonly SKIP_RELOAD_WINDOW_MS = 500;
+  private _skipReloadTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** One-shot request: force the next usePatternPlayback effect run to RELOAD the
    *  song even during natural playback. Used for live Play Song <-> Play Pattern
@@ -916,8 +918,16 @@ export class TrackerReplayer {
     this.pattPos = pattPos;
     this.currentTick = 0;
     this.resyncTimelineForJump();
-    // Tell usePatternPlayback to skip its next stop/restart cycle
+    // Tell usePatternPlayback to skip the stop/restart cycle THIS seek causes. The flag is
+    // only meant for the effect run that follows within one render cycle; a seek while
+    // playing may cause no run at all, and a leftover flag would swallow a later Stop or
+    // skip a needed reload. Expire it so it cannot outlive that cycle.
     this.skipNextReload = true;
+    if (this._skipReloadTimer) clearTimeout(this._skipReloadTimer);
+    this._skipReloadTimer = setTimeout(() => {
+      this._skipReloadTimer = null;
+      this.skipNextReload = false;
+    }, TrackerReplayer.SKIP_RELOAD_WINDOW_MS);
 
     // Forward to libopenmpt synchronously if active (zero-latency seek)
     if (this.useLibopenmptPlayback) {
