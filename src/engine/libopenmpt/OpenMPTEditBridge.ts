@@ -521,8 +521,7 @@ export async function writeSamplerSlot(osl: Soundlib, inst: InstrumentConfig, ce
   if (!(await osl.ensureSampleSlot(inst.id))) return false;
   const bytes = await samplerWavBytes(sample);
   if (!bytes) return false;
-  const { decodeWavBytes } = await import('@/bridge/analysis/SampleSpectrum');
-  const wav = decodeWavBytes(bytes);
+  const wav = await samplerPcm(bytes);
   if (!wav || wav.pcm.length === 0) return false;
   const pcm = Int16Array.from(wav.pcm, (x) => Math.max(-32768, Math.min(32767, Math.round(x * gain * 32767))));
   if (!(await osl.setSampleData(inst.id, pcm, samplerC5Speed(wav.sampleRate, sample.baseNote, cellFormat), false))) return false;
@@ -541,6 +540,30 @@ export async function writeSamplerSlot(osl: Soundlib, inst: InstrumentConfig, ce
 function samplerSource(sample: SampleConfig): ArrayBuffer | string | null {
   if (sample.audioBuffer && sample.audioBuffer.byteLength > 0) return sample.audioBuffer;
   return sample.url ? sample.url : null;
+}
+
+/**
+ * The mono PCM of a Sampler sample's bytes. A WAV is read as it is; any other
+ * file the keyboard plays (an MP3, OGG or FLAC dropped on the app) is decoded by
+ * ToneEngine's decoder, the one the keyboard plays it through, at that decoder's
+ * rate. Null when neither can read the bytes.
+ */
+async function samplerPcm(bytes: Uint8Array): Promise<{ pcm: Float32Array; sampleRate: number } | null> {
+  const { decodeWavBytes } = await import('@/bridge/analysis/SampleSpectrum');
+  const wav = decodeWavBytes(bytes);
+  if (wav) return wav;
+  try {
+    const { getToneEngine } = await import('@engine/ToneEngine');
+    const buffer = await getToneEngine().decodeAudioData(bytes);
+    const pcm = new Float32Array(buffer.length);
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const channel = buffer.getChannelData(c);
+      for (let i = 0; i < pcm.length; i++) pcm[i] += channel[i] / buffer.numberOfChannels;
+    }
+    return { pcm, sampleRate: buffer.sampleRate };
+  } catch {
+    return null;
+  }
 }
 
 /** The WAV bytes of a Sampler sample, read from the URL when the bytes are not in memory. */
