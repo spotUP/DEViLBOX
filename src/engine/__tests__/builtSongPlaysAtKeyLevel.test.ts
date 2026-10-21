@@ -50,7 +50,7 @@ async function renderPattern(volume: number, numChannels = 4, inst = sampler(vol
   const song = {
     numChannels,
     patterns: [{ length: 16, channels: [{ rows }, ...Array.from({ length: numChannels - 1 }, () => ({ rows: empty() }))] }],
-    songPositions: [0],
+    songPositions: [0], initialSpeed: 6, initialBPM: 125,
     instruments: [inst],
   };
   const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
