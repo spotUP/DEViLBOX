@@ -184,7 +184,7 @@ export const ZYNADDSUBFX_LAYOUT: SynthPanelLayout = {
           label: 'DISTORTION',
           controls: [
             { type: 'knob', key: 'distortionWet', label: 'WET', color: '#ff3366', min: 0, max: 1, defaultValue: 0, formatValue: fmtPct },
-            { type: 'knob', key: 'distortionDrive', label: 'PRESET', color: '#ff3366', min: 0, max: 7, defaultValue: 0, formatValue: (v: number) => `${Math.round(v)}` },
+            { type: 'knob', key: 'distortionDrive', label: 'PRESET', color: '#ff3366', min: 0, max: 1, defaultValue: 0.3, formatValue: (v: number) => `${Math.round(v * 7)}` },
           ],
         },
       ],
