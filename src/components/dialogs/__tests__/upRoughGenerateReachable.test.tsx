@@ -42,6 +42,7 @@ import type { R2Event } from '@/engine/uprough/r2Events';
 import { scriptedGenerateEvents, toNdjson } from '@/lib/uprough/factory/scriptedRun';
 import { decideToCells } from '@/lib/uprough/factory/decideToCells';
 import { useFactoryStore } from '@/lib/uprough/factory/useFactoryStore';
+import { patternFillLoaded } from '@/lib/uprough/factory/patternFill';
 import { bankVoice } from '@/lib/uprough/factory/voiceAudition';
 import { songDrumBank } from '@/engine/uprough/drumBank';
 
@@ -49,6 +50,31 @@ import { songDrumBank } from '@/engine/uprough/drumBank';
 function scriptedStream(): { events: R2Event[]; text: string } {
   const events = scriptedGenerateEvents('trap', 1).map((e) => (e.type === 'done' ? { ...e, song: fixture } : e));
   return { events, text: toNdjson(events) };
+}
+
+/**
+ * The host response body in chunks cut at `cuts`. After the chunk that completes the start line it waits until
+ * the run's blank song is in the tracker, as with the real host, whose decides follow seconds later.
+ * Not inside act: the panel clock ticks every frame while the run is live, so an async act never drains.
+ */
+function hostBody(enc: Uint8Array, cuts: readonly number[]): ReadableStream<Uint8Array> {
+  const startLineEnd = enc.indexOf(10) + 1;
+  return new ReadableStream<Uint8Array>({
+    async start(c) {
+      let from = 0;
+      let landed = false;
+      for (const to of cuts) {
+        c.enqueue(enc.slice(from, to));
+        from = to;
+        if (!landed && from >= startLineEnd) {
+          landed = true;
+          await vi.waitUntil(() => useFactoryStore.getState().state.eventCount > 0, { timeout: 5_000 });
+          await patternFillLoaded();
+        }
+      }
+      c.close();
+    },
+  });
 }
 
 afterEach(() => {
@@ -100,9 +126,7 @@ describe('Generate dialog streams the host events (R2c)', () => {
     const fetchMock = vi.fn(async (url: string, _init?: RequestInit) =>
       url === '/api/uprough/styles'
         ? new Response(JSON.stringify({ styles: ['trap'] }), { status: 200 })
-        : new Response(new ReadableStream<Uint8Array>({
-          start(c) { let from = 0; for (const to of cuts) { c.enqueue(enc.slice(from, to)); from = to; } c.close(); },
-        }), { status: 200 }),
+        : new Response(hostBody(enc, cuts), { status: 200 }),
     );
     vi.stubGlobal('fetch', fetchMock);
     useTrackerStore.setState({ upRoughMeta: null });
@@ -211,7 +235,7 @@ describe('R2h-01: one Generate run reaches the store, the tracker, no render and
     vi.stubGlobal('fetch', vi.fn(async (url: string, _init?: RequestInit) =>
       url === '/api/uprough/styles'
         ? new Response(JSON.stringify({ styles: ['trap'] }), { status: 200 })
-        : new Response(new ReadableStream<Uint8Array>({ start(c) { c.enqueue(enc); c.close(); } }), { status: 200 }),
+        : new Response(hostBody(enc, [enc.indexOf(10) + 1, enc.length]), { status: 200 }),
     ));
     useTrackerStore.setState({ upRoughMeta: null });
 
