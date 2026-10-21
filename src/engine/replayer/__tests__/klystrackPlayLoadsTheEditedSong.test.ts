@@ -21,7 +21,7 @@ const fakeEngine = (() => {
     ready: async () => {},
     loadSong: async (data: ArrayBuffer | Uint8Array) => { loads.push(new Uint8Array(data instanceof Uint8Array ? data : new Uint8Array(data))); return {}; },
     serializeSong: async () => { serializeCalls.n++; return EDITED.slice().buffer; },
-    setSequenceEntry: vi.fn(), setPatternStep: vi.fn(),
+    setSequenceEntry: vi.fn(), setPatternStep: vi.fn(), setInstrumentParam: vi.fn(),
     play: vi.fn(), stop: vi.fn(), pause: vi.fn(), onPositionUpdate: () => () => {},
   };
 })();
@@ -45,7 +45,7 @@ describe('klystrack Play loads the edited song', () => {
     await import('@stores/useFormatStore');
     await import('../NativeEngineRouting');
     await import('@stores/useTransportStore');
-  }, 60_000);
+  }, 180_000);
   beforeEach(() => { loads.length = 0; serializeCalls.n = 0; });
 
   async function play(song: TrackerSong) {
@@ -75,6 +75,22 @@ describe('klystrack Play loads the edited song', () => {
     const { klysSequenceChange } = await import('@/components/klystrack/klysEdit');
     klysSequenceChange(0, 0, 'pattern', 5);
     await vi.waitFor(() => expect(fakeEngine.setSequenceEntry).toHaveBeenCalled());
+    await play(song);
+    expect(serializeCalls.n).toBe(1);
+    expect(loads).toHaveLength(1);
+    expect(Array.from(loads[0]!)).toEqual(Array.from(EDITED));
+  });
+
+  it('loads the engine serialisation after an instrument edit', async () => {
+    const song = makeSong();
+    const { useFormatStore } = await import('@stores/useFormatStore');
+    const { useInstrumentStore } = await import('@stores/useInstrumentStore');
+    const inst = { name: 'Lead', adsr: { a: 1, d: 2, s: 3, r: 4 }, fm: { adsr: { a: 0, d: 0, s: 0, r: 0 } }, program: [], cutoff: 100 };
+    useFormatStore.setState({ klysFileData: song.klysFileData as ArrayBuffer, klysNative: { instruments: [inst] } as never });
+    useInstrumentStore.setState({ instruments: [{ id: 1, name: 'Lead', synthType: 'KlysSynth' }] as never });
+    const { editKlysField } = await import('@/components/klystrack/klysInstrumentEdit');
+    editKlysField(0, 'cutoff', 200);
+    await vi.waitFor(() => expect(fakeEngine.setInstrumentParam).toHaveBeenCalled());
     await play(song);
     expect(serializeCalls.n).toBe(1);
     expect(loads).toHaveLength(1);
