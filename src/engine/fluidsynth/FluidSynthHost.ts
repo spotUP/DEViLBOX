@@ -256,6 +256,25 @@ export class FluidSynthHost {
     this.queue = this.queue.filter((q) => !pred(q.msg));
   }
 
+  /**
+   * The preset name each program of bank resolves to in the loaded SoundFonts
+   * (newest font first), '' where none does. Replies come back in post order.
+   */
+  async presetNames(bank: number): Promise<string[]> {
+    await this.sfReady;
+    const names = new Array<string>(128).fill('');
+    if (this.disposed) return names;
+    return new Promise((resolve) => {
+      let left = 128;
+      const off = this.onMessage((data) => {
+        if (data.type !== 'presetName' || data.bank !== bank) return;
+        names[Number(data.program)] = String(data.name ?? '');
+        if (--left === 0) { off(); resolve(names); }
+      });
+      for (let program = 0; program < 128; program++) this.post({ type: 'getPresetName', bank, program });
+    });
+  }
+
   /** Subscribe to worklet replies (presetName, channelBank, ...). Returns the unsubscribe. */
   onMessage(listener: Listener): () => void {
     this.listeners.add(listener);
