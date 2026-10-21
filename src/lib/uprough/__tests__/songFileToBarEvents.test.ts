@@ -35,7 +35,7 @@ describe('songFileToBarEvents', () => {
 
   it('refuses a bar order naming an empty cell', () => {
     const d = doc('lofi');
-    d.sections[0]!.bars[0]!.order.push('kick:15');
+    d.sections[0]!.bars![0]!.order.push('kick:15');
     d.sections[0]!.lanes.kick![15] = null;
     expect(() => songFileToBarEvents(d)).toThrow('Bar order names cell kick:15, which is empty.');
   });

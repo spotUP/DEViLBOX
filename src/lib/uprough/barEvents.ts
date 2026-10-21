@@ -95,6 +95,7 @@ export function songFileToBarEvents(input: SongFileDoc): BarEvents {
   const windows: Json[] = [];
   for (const idx of doc.order) {
     const sec = doc.sections[idx]!;
+    if (sec.dancehall) throw new SongFileError(`Section ${sec.id} is a dancehall section: its playback is not wired to the softsynth yet (D4e). The lanes can be viewed, edited and exported.`);
     const side = doc.side[sec.id] ?? {};
     const { layers, melody_from_bar: fromBar, ...hdr } = sec.header;
     windows.push(fromBar!);
@@ -102,7 +103,7 @@ export function songFileToBarEvents(input: SongFileDoc): BarEvents {
     const drums: DrumBar[] = [];
     const bass: (BassBar | null)[] = [];
     const melody: (MelodyNote[] | null)[] = [];
-    sec.bars.forEach((bar, b) => {
+    sec.bars!.forEach((bar, b) => {
       const cells = barCells(sec, b);
       const at = (k: string): { cell: SongFileCell; step: number; e: JsonObject } =>
         ({ cell: cells.get(k)!, step: rowOf(k) - b * ROWS_PER_BAR, e: side[k] ?? {} });
@@ -161,7 +162,7 @@ export function songFileToBarEvents(input: SongFileDoc): BarEvents {
       }
     });
     sections.push({
-      header: hdr, drums, bass, chops: sec.locked.chops!, melody, scratch: sec.locked.scratch!, vocals: sec.locked.vocals!,
+      header: hdr, drums, bass, chops: sec.locked!.chops!, melody, scratch: sec.locked!.scratch!, vocals: sec.locked!.vocals!,
     });
   }
   return {

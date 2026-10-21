@@ -36,9 +36,13 @@ export interface SongFileSection {
   id: string;
   header: JsonObject;
   lanes: Record<string, (SongFileCell | null)[]>;
-  bars: SongFileBar[];
-  locked: JsonObject;
+  /** Hip-hop sections only; a dancehall section has `dancehall` instead. */
+  bars?: SongFileBar[];
+  locked?: JsonObject;
+  dancehall?: SongFileDancehall;
 }
+/** A dancehall section's block (D4b): the generator's event count, the hit placement order and the bass keys per bar. */
+export interface SongFileDancehall { n: number; order: string[]; bass_bars: string[][] }
 export interface SongFileInstrument { name: string; voice: string; params: Record<string, number>; seed: number }
 export type SideEntry = JsonObject;
 export type SideTable = Record<string, Record<string, SideEntry>>;
@@ -64,9 +68,9 @@ export function songMelodyVoice(song: JsonObject): string {
 
 /** The style's bass_voice (render_bass_bar's voice), which the exporter writes into every non-808 bar as bass.voice;
  *  null when no bar plays the per-bar bass. */
-export function songBassVoice(doc: { sections: { bars: { bass: Json }[] }[] }): string | null {
+export function songBassVoice(doc: { sections: { bars?: { bass: Json }[] }[] }): string | null {
   for (const sec of doc.sections) {
-    for (const bar of sec.bars) {
+    for (const bar of sec.bars ?? []) {
       const bb = bar.bass as JsonObject | null;
       if (bb !== null && typeof bb.voice === 'string') return bb.voice;
     }
@@ -96,7 +100,7 @@ export interface SongMeta {
   side: SideTable;
   bus: JsonObject;
   /** Per section (same index as the patterns). */
-  sections: { id: string; header: JsonObject; bars: SongFileBar[]; locked: JsonObject }[];
+  sections: { id: string; header: JsonObject; bars: SongFileBar[]; locked: JsonObject; dancehall?: SongFileDancehall }[];
   /** The file's voice id of each instrument (same index as the instruments); see VOICE_TO_SOFTSYNTH. */
   fileVoices: string[];
 }
@@ -155,8 +159,40 @@ export const MELODY_TIMBRE_SOFTSYNTH: Record<string, string> = {
   whistle: 'melodyWhistle', lead: 'melodyLead',
 };
 
+// --- dancehall voices (D4b) --------------------------------------------------------------------------------------
+
+export const DH_PREFIX = 'dh:';
+const DH_DRUMS: Record<string, string> = {
+  kick: 'kick', snare: 'snare808', rim: 'rim', tom: 'tom', clap: 'clap', hat_c: 'hatClosed', hat_o: 'hatOpen',
+};
+/** dh:kick, dh:perc:<voice>:<kind>, dh:keys:<name>:<articulation>, dh:bass. */
+export function isDancehallVoice(voice: string): boolean {
+  if (!voice.startsWith(DH_PREFIX)) return false;
+  const parts = voice.slice(DH_PREFIX.length).split(':');
+  if (parts.length === 1) return parts[0] === 'bass' || parts[0]! in DH_DRUMS;
+  return parts.length === 3 && parts[1]!.length > 0 && parts[2]!.length > 0 && (parts[0] === 'perc' || parts[0] === 'keys');
+}
+function softsynthOfDancehallVoice(voice: string, melodyTimbre: string): string | undefined {
+  const parts = voice.slice(DH_PREFIX.length).split(':');
+  if (parts[0] === 'bass') return 'bass808';
+  if (parts[0] === 'keys') return MELODY_TIMBRE_SOFTSYNTH[melodyTimbre];
+  if (parts[0] === 'perc') return VOICE_TO_SOFTSYNTH[parts[1]!] ?? 'tamb';
+  return DH_DRUMS[parts[0]!];
+}
+const titleCase = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1);
+const DH_NAME_WORDS: Record<string, string> = { hat_c: 'Closed Hat', hat_o: 'Open Hat' };
+/** The name a dancehall instrument shows in full words; the file keeps the dh: id. */
+export function dancehallInstrumentName(voice: string): string {
+  const parts = voice.slice(DH_PREFIX.length).split(':');
+  const words = (w: string): string => DH_NAME_WORDS[w] ?? w.split('_').map(titleCase).join(' ');
+  if (parts[0] === 'perc') return `Percussion ${words(parts[1]!)} ${words(parts[2]!)}`;
+  if (parts[0] === 'keys') return `Keys ${words(parts[1]!.replace(/^dancehall_/, ''))} ${words(parts[2]!)}`;
+  return words(parts[0]!);
+}
+
 /** The softsynth voice a file voice plays; "melody" follows the header's timbre. */
 export function softsynthOfFileVoice(fileVoice: string, melodyTimbre: string): string | undefined {
+  if (isDancehallVoice(fileVoice)) return softsynthOfDancehallVoice(fileVoice, melodyTimbre);
   return fileVoice === 'melody' ? MELODY_TIMBRE_SOFTSYNTH[melodyTimbre] : VOICE_TO_SOFTSYNTH[fileVoice];
 }
 
@@ -213,10 +249,13 @@ const SONG = ['name', 'style', 'seed', 'key', 'bpm', 'speed', 'groove', 'bass_cu
 const GROOVE = ['swing', 'micro', 'vel'];
 const GROOVE_MICRO = ['kick', 'snare', 'ch', 'ghost', 'perc', 'chop'];
 const SECTION = ['id', 'header', 'lanes', 'bars', 'locked'];
+const DH_SECTION = ['id', 'header', 'lanes', 'dancehall'];
+const DH_HEADER = ['section', 'bars', 'seed', 'layers', 'melody_from_bar'];
+const DH_BLOCK = ['n', 'order', 'bass_bars'];
 const HEADER = ['style', 'section', 'bars', 'seed', 'drum_seed', 'bar_offset', 'fill_pending', 'carry_fill', 'layers', 'melody_from_bar'];
 const BAR = ['drop', 'fill', 'bass', 'melody', 'order'];
 const INSTRUMENT = ['name', 'voice', 'params', 'seed'];
-const SIDE_KEYS = ['vel', 'role', 'hat', 'e808', 'dur', 'ebass'];
+const SIDE_KEYS = ['vel', 'role', 'hat', 'e808', 'dur', 'ebass', 't', 'gain', 'semis', 'dur_s', 'dhbass'];
 
 function checkKeys(obj: unknown, allowed: readonly string[], path: string): void {
   if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
@@ -286,6 +325,16 @@ function checkSideEntry(entry: Record<string, unknown>, path: string): void {
     checkFields(e, ['role', 'kind'], 'string', p);
   }
   if ('ebass' in entry) checkEbass(entry.ebass, `${path}.ebass`);
+  // Dancehall (D4b): exact time, gain and the keys / bass numbers of a cell.
+  if ('t' in entry) checkFields(entry, ['t'], 'number', path);
+  if ('gain' in entry) checkFields(entry, ['gain'], 'number', path);
+  if ('dur_s' in entry) checkFields(entry, ['dur_s'], 'number', path);
+  if ('semis' in entry) checkFields(entry, ['semis'], 'array', path);
+  if ('dhbass' in entry) {
+    if (typeof entry.dhbass !== 'object' || entry.dhbass === null || Array.isArray(entry.dhbass)) {
+      throw new SongFileError(`Field "${path}.dhbass" in Up Rough song file schema ${SCHEMA} is not an object.`);
+    }
+  }
 }
 
 const refuseNotSongFile = (v: unknown): never => {
@@ -326,7 +375,7 @@ export function parseSongFile(input: string | unknown): SongFileDoc {
   if (typeof d.song.bpm !== 'number' || !Number.isInteger(d.song.bpm) || d.song.bpm <= 0) throw new SongFileError(`Song tempo is ${JSON.stringify(d.song.bpm)} BPM; the ${String(d.song.style)} style renders at a whole number of BPM.`);
   d.instruments.forEach((inst, i) => {
     checkKeys(inst, INSTRUMENT, `instruments[${i}]`);
-    if (!(FILE_VOICES as readonly string[]).includes(inst.voice)) {
+    if (!(FILE_VOICES as readonly string[]).includes(inst.voice) && !isDancehallVoice(inst.voice)) {
       throw new SongFileError(`Instrument ${i + 1} "${inst.name}" uses voice "${inst.voice}", which the softsynth does not have (known: ${FILE_VOICES.join(', ')}).`);
     }
     if (Object.keys(inst.params).length > 0 || inst.seed) {
@@ -337,9 +386,11 @@ export function parseSongFile(input: string | unknown): SongFileDoc {
   const ids = new Set<string>();
   d.sections.forEach((sec, si) => {
     const where = `sections[${si}]`;
-    checkKeys(sec, SECTION, where);
-    checkKeys(sec.header, HEADER, `${where}.header`);
-    checkKeys(sec.locked, ['chops', 'scratch', 'vocals'], `${where}.locked`);
+    const dh = 'dancehall' in sec;
+    checkKeys(sec, dh ? DH_SECTION : SECTION, where);
+    checkKeys(sec.header, dh ? DH_HEADER : HEADER, `${where}.header`);
+    if (dh) checkKeys(sec.dancehall, DH_BLOCK, `${where}.dancehall`);
+    else checkKeys(sec.locked, ['chops', 'scratch', 'vocals'], `${where}.locked`);
     ids.add(sec.id);
     const nrows = (sec.header.bars as number) * ROWS_PER_BAR;
     for (const [lane, cells] of Object.entries(sec.lanes)) {
@@ -354,8 +405,10 @@ export function parseSongFile(input: string | unknown): SongFileDoc {
         if (fx !== null) throw new SongFileError(`Cell ${lane}:${row} in ${sec.id} has an effect; schema ${SCHEMA} renders no effect column.`);
       });
     }
-    if (sec.bars.length !== sec.header.bars) throw new SongFileError(`${sec.id} has ${sec.bars.length} bar records, expected ${String(sec.header.bars)}`);
-    sec.bars.forEach((bar, b) => checkKeys(bar, BAR, `${where}.bars[${b}]`));
+    if (dh) return;
+    const bars = sec.bars!;
+    if (bars.length !== sec.header.bars) throw new SongFileError(`${sec.id} has ${bars.length} bar records, expected ${String(sec.header.bars)}`);
+    bars.forEach((bar, b) => checkKeys(bar, BAR, `${where}.bars[${b}]`));
   });
   for (const [sid, entries] of Object.entries(d.side)) {
     if (!ids.has(sid)) throw new SongFileError(`Side table names section "${sid}", which does not exist.`);
@@ -376,7 +429,7 @@ function importInstrument(inst: SongFileInstrument, index: number, melodyTimbre:
   const voiceId = softsynthOfFileVoice(inst.voice, melodyTimbre)!;
   const voice = getSoftsynthVoice(voiceId);
   return {
-    id: index + 1, name: inst.name, type: 'synth', synthType: 'UpRoughSoftsynth', effects: [], volume: -6, pan: 0,
+    id: index + 1, name: isDancehallVoice(inst.voice) ? dancehallInstrumentName(inst.voice) : inst.name, type: 'synth', synthType: 'UpRoughSoftsynth', effects: [], volume: -6, pan: 0,
     upRoughSoftsynth: { voice: voice ? voiceId : 'kick', params: { ...inst.params }, seed: inst.seed },
   } as InstrumentConfig;
 }
@@ -409,7 +462,9 @@ export function songFileToSong(doc: SongFileDoc): UpRoughSong {
   return {
     meta: {
       format: d.format, schema: d.schema, generator: d.generator, song: d.song, order: d.order, side: d.side, bus: d.bus,
-      sections: d.sections.map((s) => ({ id: s.id, header: s.header, bars: s.bars, locked: s.locked })),
+      sections: d.sections.map((s) => (s.dancehall
+        ? { id: s.id, header: s.header, bars: [], locked: {}, dancehall: s.dancehall }
+        : { id: s.id, header: s.header, bars: s.bars!, locked: s.locked! })),
       fileVoices: d.instruments.map((i) => i.voice),
     },
     patterns,
@@ -467,6 +522,39 @@ function melodyTimbreOf(song: UpRoughSong, header: string): string {
 
 const sideOf = (song: UpRoughSong, sid: string): Record<string, SideEntry> => song.meta.side[sid] ?? {};
 
+/**
+ * A dancehall section's block after edits (D5 rule in D4b): order keeps the file's hit placement for the cells that
+ * are still there and appends new cells in lane then row order; bass keeps its per-bar grouping. A bass or keys cell
+ * with no side entry (moved, added) cannot be written back: its exact numbers live in the side entry.
+ */
+function dancehallBlock(block: SongFileDancehall, lanes: Record<string, (SongFileCell | null)[]>, side: Record<string, SideEntry>, sid: string): SongFileDancehall {
+  const present = new Set<string>();
+  for (const [lane, cells] of Object.entries(lanes)) {
+    cells.forEach((c, row) => {
+      if (c === null) return;
+      const key = cellKey(lane, row);
+      present.add(key);
+      if (lane === 'bass' && !side[key]?.dhbass) throw new SongFileError(`Bass cell ${key} in ${sid} has no side entry (a moved or new bass note): the dancehall bass line keeps its exact timing there. Put the note back or clear it.`);
+      if ((MELODY_LANES as readonly string[]).includes(lane) && !side[key]?.semis) throw new SongFileError(`Keys cell ${key} in ${sid} has no side entry (a moved or new keys note): the dancehall keys keep their chord and length there. Put the note back or clear it.`);
+    });
+  }
+  const bassKeys = new Set(block.bass_bars.flat());
+  const order = block.order.filter((k) => present.has(k));
+  const named = new Set(order);
+  for (const key of [...present].filter((k) => !k.startsWith('bass:') && !named.has(k)).sort(compareCellKeys)) order.push(key);
+  const bass_bars = block.bass_bars.map((bar) => bar.filter((k) => present.has(k)));
+  for (const key of [...present].filter((k) => k.startsWith('bass:') && !bassKeys.has(k))) {
+    const bar = Math.floor(splitCellKey(key)[1] / ROWS_PER_BAR);
+    (bass_bars[bar] ??= []).push(key);
+  }
+  return { n: block.n, order, bass_bars };
+}
+const splitCellKey = (key: string): [string, number] => { const i = key.lastIndexOf(':'); return [key.slice(0, i), Number(key.slice(i + 1))]; };
+const compareCellKeys = (a: string, b: string): number => {
+  const [la, ra] = splitCellKey(a); const [lb, rb] = splitCellKey(b);
+  return LANES.indexOf(la as Lane) - LANES.indexOf(lb as Lane) || ra - rb;
+};
+
 /** Patterns + instruments -> file. Refuses by name what the schema cannot hold (D1a, D5). */
 export function songToSongFile(song: UpRoughSong): SongFileDoc {
   const m = structuredClone(song.meta);
@@ -483,9 +571,12 @@ export function songToSongFile(song: UpRoughSong): SongFileDoc {
     m.song.melody_voice = timbre;
     (m.song.render as JsonObject).melody_voice = timbre;
   }
-  const instruments: SongFileInstrument[] = song.instruments.map((inst, i) => ({
-    name: inst.name, voice: checkInstrument(inst, i, m.fileVoices[i], timbre), params: {}, seed: 0,
-  }));
+  const instruments: SongFileInstrument[] = song.instruments.map((inst, i) => {
+    const voice = checkInstrument(inst, i, m.fileVoices[i], timbre);
+    // A dancehall instrument shows its full-word name; the file keeps the dh: id unless the user renamed it.
+    const name = isDancehallVoice(voice) && inst.name === dancehallInstrumentName(voice) ? voice : inst.name;
+    return { name, voice, params: {}, seed: 0 };
+  });
   const sections: SongFileSection[] = song.patterns.map((pat, si) => {
     const meta = m.sections[si];
     if (!meta) throw new SongFileError(`Pattern ${si} "${pat.name}" is not an Up Rough section.`);
@@ -513,6 +604,7 @@ export function songToSongFile(song: UpRoughSong): SongFileDoc {
       });
       if (cells.some((x) => x !== null)) lanes[lane] = cells;
     });
+    if (meta.dancehall) return { id: meta.id, header: meta.header, lanes, dancehall: dancehallBlock(meta.dancehall, lanes, side, meta.id) };
     return { id: meta.id, header: meta.header, lanes, bars: meta.bars, locked: meta.locked };
   });
   return {

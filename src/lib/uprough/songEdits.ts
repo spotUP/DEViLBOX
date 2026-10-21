@@ -23,12 +23,30 @@ const splitKey = (key: string): [string, number] => {
   return [key.slice(0, i), Number(key.slice(i + 1))];
 };
 
+/** A dancehall section keeps one flat hit order plus its bass keys per bar (D4b), not per-bar hip-hop records. */
+const isDancehall = (song: UpRoughSong, p: number): boolean => song.meta.sections[p]!.dancehall !== undefined;
+
+/** Rewrite every order list of a section through `fn` (hip-hop: each bar's order; dancehall: hit order and bass bars). */
+function mapOrders(song: UpRoughSong, p: number, fn: (keys: string[]) => string[]): void {
+  const sec = song.meta.sections[p]!;
+  for (const bar of sec.bars) bar.order = fn(bar.order);
+  if (sec.dancehall) {
+    sec.dancehall.order = fn(sec.dancehall.order);
+    sec.dancehall.bass_bars = sec.dancehall.bass_bars.map(fn);
+  }
+}
 function dropOrder(song: UpRoughSong, p: number, key: string): void {
-  for (const bar of song.meta.sections[p]!.bars) bar.order = bar.order.filter((k) => k !== key);
+  mapOrders(song, p, (keys) => keys.filter((k) => k !== key));
 }
 function addOrder(song: UpRoughSong, p: number, key: string): void {
-  const [, row] = splitKey(key);
-  const bar = song.meta.sections[p]!.bars[Math.floor(row / ROWS_PER_BAR)];
+  const [lane, row] = splitKey(key);
+  const sec = song.meta.sections[p]!;
+  if (sec.dancehall) {
+    const list = lane === 'bass' ? (sec.dancehall.bass_bars[Math.floor(row / ROWS_PER_BAR)] ??= []) : sec.dancehall.order;
+    if (!list.includes(key)) list.push(key);
+    return;
+  }
+  const bar = sec.bars[Math.floor(row / ROWS_PER_BAR)];
   if (bar && !bar.order.includes(key)) bar.order.push(key);
 }
 
@@ -44,19 +62,18 @@ function remapLane(song: UpRoughSong, p: number, lane: string, map: (row: number
       const entry = side[key]!;
       delete side[key];
       const to = map(row);
-      if (to !== null) moved.push([cellKey(lane, to), entry]);
+      // A dancehall side entry holds the cell's exact time: a cell on another row plays its row time (D5).
+      if (to !== null && (to === row || !isDancehall(song, p))) moved.push([cellKey(lane, to), entry]);
     }
     for (const [k, e] of moved) side[k] = e;
     if (Object.keys(side).length === 0) delete song.meta.side[sid];
   }
-  for (const bar of song.meta.sections[p]!.bars) {
-    bar.order = bar.order.flatMap((key) => {
-      const [l, row] = splitKey(key);
-      if (l !== lane) return [key];
-      const to = map(row);
-      return to === null ? [] : [cellKey(lane, to)];
-    });
-  }
+  mapOrders(song, p, (keys) => keys.flatMap((key) => {
+    const [l, row] = splitKey(key);
+    if (l !== lane) return [key];
+    const to = map(row);
+    return to === null ? [] : [cellKey(lane, to)];
+  }));
   // A key that crossed a bar boundary belongs to the bar of its new row.
   const bars = song.meta.sections[p]!.bars;
   bars.forEach((bar, b) => {
@@ -161,7 +178,7 @@ export function moveBlock(song: UpRoughSong, p: number, lane: string, from: numb
     if (dest >= ch.rows.length) break;
     ch.rows[dest] = block[i]!;
     if (block[i]!.note !== 0) addOrder(out, p, cellKey(lane, dest));
-    const e = entries[i];
+    const e = isDancehall(out, p) ? undefined : entries[i];
     if (e) (out.meta.side[sid] ??= {})[cellKey(lane, dest)] = structuredClone(e);
   }
   return out;

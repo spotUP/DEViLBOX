@@ -69,8 +69,8 @@ describe('renderSongCached', () => {
     renderSongCached(pick.ev, options, cache);
     const doc = structuredClone(pick.c.doc);
     const first = doc.sections[0]!;
-    first.bars.push({ ...structuredClone(first.bars[first.bars.length - 1]!), order: [] });
-    first.header.bars = first.bars.length;
+    first.bars!.push({ ...structuredClone(first.bars![first.bars!.length - 1]!), order: [] });
+    first.header.bars = first.bars!.length;
     for (const cells of Object.values(first.lanes)) cells.push(...new Array(16).fill(null));
     // the file records each section's seed (hit_seed = header.seed + bar), so the later sections' seeds move with the bar
     doc.sections.slice(1).forEach((sec) => { sec.header.seed = (sec.header.seed as number) + 1; });

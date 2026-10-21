@@ -17,7 +17,7 @@ describe('song file round trip', () => {
     const f = load();
     const sec = f.sections[1]!;
     sec.lanes.perc2 = Array.from({ length: (sec.header.bars as number) * 16 }, (_, r) => (r === 4 ? ['C-4', 6, 40, null] : null));
-    sec.bars[0]!.order.push('perc2:4');
+    sec.bars![0]!.order.push('perc2:4');
     const song = songFileToSong(parseSongFile(structuredClone(f)));
     expect(songToSongFile(song)).toEqual(f);
   });

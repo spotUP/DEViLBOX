@@ -1,0 +1,4006 @@
+{
+ "format": "uprough-softsynth-song",
+ "schema": 3,
+ "generator": {
+  "tool": "hiphop",
+  "version": "57c1c0b6a"
+ },
+ "song": {
+  "name": "dancehall_classic 1",
+  "style": "dancehall_classic",
+  "seed": 1,
+  "key": {
+   "tonic": 9,
+   "mode": "minor"
+  },
+  "bpm": 88,
+  "speed": 6,
+  "groove": {
+   "swing": 0.12,
+   "micro": {
+    "kick": 1,
+    "snare": 14,
+    "ch": 5,
+    "ghost": -10,
+    "perc": 8,
+    "chop": 4
+   },
+   "vel": 1.0
+  },
+  "bass_cut": 0.9,
+  "melody_voice": "piano",
+  "rate": 22050,
+  "tier": "a1200",
+  "bars": 8,
+  "rows_per_bar": 16,
+  "render": {
+   "section": null,
+   "sample": null,
+   "sample_age": null,
+   "stem": null,
+   "break_pitch": null,
+   "use_source_record": true,
+   "use_real_break": false,
+   "real_break_kick_gain": 0.8,
+   "real_break_lp": 7000,
+   "real_break_mode": "straight",
+   "vintage": true,
+   "scratch_cfg": null,
+   "melody_voice": null,
+   "use_trap808": null,
+   "voice_cfg": null
+  },
+  "motif": [],
+  "chord_roots": []
+ },
+ "instruments": [
+  {
+   "name": "dh:kick",
+   "voice": "dh:kick",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "dh:tom",
+   "voice": "dh:tom",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "dh:hat_c",
+   "voice": "dh:hat_c",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "dh:perc:shaker:soft",
+   "voice": "dh:perc:shaker:soft",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "dh:perc:conga:high",
+   "voice": "dh:perc:conga:high",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "dh:bass",
+   "voice": "dh:bass",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "dh:keys:dancehall_90s_chord_stab:stab",
+   "voice": "dh:keys:dancehall_90s_chord_stab:stab",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "dh:keys:dancehall_90s_hollow_keys:normal",
+   "voice": "dh:keys:dancehall_90s_hollow_keys:normal",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "dh:rim",
+   "voice": "dh:rim",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "dh:keys:dancehall_90s_digital_keys:normal",
+   "voice": "dh:keys:dancehall_90s_digital_keys:normal",
+   "params": {},
+   "seed": 0
+  },
+  {
+   "name": "dh:keys:dancehall_90s_chord_stab:normal",
+   "voice": "dh:keys:dancehall_90s_chord_stab:normal",
+   "params": {},
+   "seed": 0
+  }
+ ],
+ "sections": [
+  {
+   "id": "intro_0",
+   "header": {
+    "section": "intro",
+    "bars": 1,
+    "seed": 1,
+    "layers": {
+     "drums": 1,
+     "bass": 1,
+     "sample": 0,
+     "melody": 0,
+     "vocal": 0,
+     "energy": 0.5,
+     "filter": [
+      0.1,
+      0.6
+     ],
+     "transition": 1
+    },
+    "melody_from_bar": 0
+   },
+   "lanes": {
+    "kick": [
+     [
+      "C-4",
+      1,
+      32,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      27,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "hat": [
+     [
+      "C-4",
+      3,
+      13,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      5,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      14,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      16,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      6,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      14,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      13,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      6,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      14,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      13,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      5,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      15,
+      null
+     ],
+     null
+    ],
+    "perc1": [
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      3,
+      null
+     ],
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      5,
+      5,
+      null
+     ],
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null
+    ],
+    "perc2": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      4,
+      3,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "bass": [
+     [
+      "A-3",
+      6,
+      29,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "G-4",
+      6,
+      32,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "E-4",
+      6,
+      29,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "A-4",
+      6,
+      28,
+      null
+     ],
+     null
+    ]
+   },
+   "dancehall": {
+    "n": 82186,
+    "order": [
+     "kick:0",
+     "kick:8",
+     "perc1:0",
+     "perc1:3",
+     "perc1:6",
+     "perc1:11",
+     "perc1:14",
+     "hat:0",
+     "hat:1",
+     "hat:2",
+     "hat:4",
+     "hat:5",
+     "hat:6",
+     "hat:8",
+     "hat:9",
+     "hat:10",
+     "hat:12",
+     "hat:13",
+     "hat:14",
+     "perc1:2",
+     "perc1:10",
+     "perc2:10"
+    ],
+    "bass_bars": [
+     [
+      "bass:0",
+      "bass:6",
+      "bass:10",
+      "bass:14"
+     ]
+    ]
+   }
+  },
+  {
+   "id": "verse_1",
+   "header": {
+    "section": "verse",
+    "bars": 1,
+    "seed": 2,
+    "layers": {
+     "drums": 1,
+     "bass": 1,
+     "sample": 1,
+     "melody": 0,
+     "vocal": 0,
+     "energy": 0.7
+    },
+    "melody_from_bar": 0
+   },
+   "lanes": {
+    "kick": [
+     [
+      "C-4",
+      1,
+      32,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      19,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      27,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      19,
+      null
+     ],
+     null,
+     null,
+     null
+    ],
+    "hat": [
+     [
+      "C-4",
+      3,
+      15,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      6,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      15,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      15,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      6,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      16,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      14,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      5,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      17,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      14,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      6,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      14,
+      null
+     ],
+     null
+    ],
+    "perc1": [
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      3,
+      null
+     ],
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      5,
+      5,
+      null
+     ],
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null
+    ],
+    "perc2": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      4,
+      3,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "bass": [
+     [
+      "A-3",
+      6,
+      28,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "G-4",
+      6,
+      28,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "E-4",
+      6,
+      28,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "A-4",
+      6,
+      27,
+      null
+     ],
+     null
+    ],
+    "melody1": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-4",
+      7,
+      10,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-4",
+      7,
+      10,
+      null
+     ],
+     null
+    ],
+    "melody2": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-5",
+      8,
+      8,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-5",
+      8,
+      8,
+      null
+     ],
+     null
+    ]
+   },
+   "dancehall": {
+    "n": 82186,
+    "order": [
+     "kick:0",
+     "kick:4",
+     "kick:8",
+     "kick:12",
+     "perc1:0",
+     "perc1:3",
+     "perc1:6",
+     "perc1:11",
+     "perc1:14",
+     "hat:0",
+     "hat:1",
+     "hat:2",
+     "hat:4",
+     "hat:5",
+     "hat:6",
+     "hat:8",
+     "hat:9",
+     "hat:10",
+     "hat:12",
+     "hat:13",
+     "hat:14",
+     "perc1:2",
+     "perc1:10",
+     "perc2:10",
+     "melody1:6",
+     "melody1:14",
+     "melody2:6",
+     "melody2:14"
+    ],
+    "bass_bars": [
+     [
+      "bass:0",
+      "bass:6",
+      "bass:10",
+      "bass:14"
+     ]
+    ]
+   }
+  },
+  {
+   "id": "prechorus_2",
+   "header": {
+    "section": "prechorus",
+    "bars": 1,
+    "seed": 3,
+    "layers": {
+     "drums": 1,
+     "bass": 1,
+     "sample": 1,
+     "melody": 0,
+     "vocal": 0,
+     "energy": 0.85,
+     "lift": 1,
+     "filter": [
+      0.3,
+      1.0
+     ]
+    },
+    "melody_from_bar": 0
+   },
+   "lanes": {
+    "kick": [
+     [
+      "C-4",
+      1,
+      32,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      19,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "hat": [
+     [
+      "C-4",
+      3,
+      18,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      7,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      19,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      17,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      6,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      17,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      15,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      7,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      17,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      15,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      6,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      17,
+      null
+     ],
+     null
+    ],
+    "perc1": [
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      4,
+      null
+     ],
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      5,
+      6,
+      null
+     ],
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     [
+      "C-4",
+      9,
+      9,
+      null
+     ],
+     [
+      "C-4",
+      9,
+      10,
+      null
+     ],
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     [
+      "C-4",
+      9,
+      13,
+      null
+     ]
+    ],
+    "perc2": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      4,
+      3,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      9,
+      12,
+      null
+     ],
+     null
+    ],
+    "bass": [
+     [
+      "D-3",
+      6,
+      27,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      6,
+      30,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      6,
+      29,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "D-4",
+      6,
+      28,
+      null
+     ],
+     null
+    ],
+    "melody1": [
+     null,
+     null,
+     [
+      "D-5",
+      8,
+      9,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "D-4",
+      7,
+      10,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "D-4",
+      7,
+      13,
+      null
+     ],
+     null,
+     [
+      "D-4",
+      7,
+      13,
+      null
+     ],
+     null,
+     [
+      "D-4",
+      7,
+      10,
+      null
+     ],
+     [
+      "D-4",
+      7,
+      13,
+      null
+     ]
+    ],
+    "melody2": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "D-5",
+      8,
+      9,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "dancehall": {
+    "n": 82186,
+    "order": [
+     "kick:0",
+     "kick:4",
+     "perc1:0",
+     "perc1:3",
+     "perc1:6",
+     "perc1:11",
+     "perc1:14",
+     "perc1:12",
+     "perc1:13",
+     "perc2:14",
+     "perc1:15",
+     "hat:0",
+     "hat:1",
+     "hat:2",
+     "hat:4",
+     "hat:5",
+     "hat:6",
+     "hat:8",
+     "hat:9",
+     "hat:10",
+     "hat:12",
+     "hat:13",
+     "hat:14",
+     "perc1:2",
+     "perc1:10",
+     "perc2:10",
+     "melody1:6",
+     "melody1:14",
+     "melody1:10",
+     "melody1:12",
+     "melody1:15",
+     "melody1:2",
+     "melody2:10"
+    ],
+    "bass_bars": [
+     [
+      "bass:0",
+      "bass:6",
+      "bass:10",
+      "bass:14"
+     ]
+    ]
+   }
+  },
+  {
+   "id": "hook_3",
+   "header": {
+    "section": "hook",
+    "bars": 2,
+    "seed": 4,
+    "layers": {
+     "drums": 1,
+     "bass": 1,
+     "sample": 1,
+     "melody": 1,
+     "vocal": 0,
+     "energy": 0.95,
+     "extra": 1
+    },
+    "melody_from_bar": 0
+   },
+   "lanes": {
+    "kick": [
+     [
+      "C-4",
+      1,
+      32,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      19,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      1,
+      22,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      1,
+      27,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      1,
+      22,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      1,
+      19,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      1,
+      24,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      1,
+      32,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      19,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      1,
+      22,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      1,
+      27,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      1,
+      22,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      1,
+      19,
+      null
+     ],
+     null,
+     null,
+     null
+    ],
+    "hat": [
+     [
+      "C-4",
+      3,
+      15,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      7,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      18,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      19,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      7,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      18,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      18,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      7,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      18,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      19,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      7,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      20,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      17,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      8,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      18,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      16,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      7,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      17,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      18,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      6,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      20,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      18,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      7,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      19,
+      null
+     ],
+     null
+    ],
+    "perc1": [
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      3,
+      null
+     ],
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      5,
+      6,
+      null
+     ],
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      4,
+      null
+     ],
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null
+    ],
+    "bass": [
+     [
+      "E-3",
+      6,
+      28,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "D-4",
+      6,
+      31,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "B-3",
+      6,
+      28,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "B-3",
+      6,
+      28,
+      null
+     ],
+     null,
+     [
+      "A-3",
+      6,
+      31,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "G-4",
+      6,
+      30,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "E-4",
+      6,
+      30,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "A-4",
+      6,
+      30,
+      null
+     ],
+     null
+    ],
+    "melody1": [
+     null,
+     null,
+     null,
+     [
+      "D-6",
+      10,
+      6,
+      null
+     ],
+     null,
+     null,
+     [
+      "E-4",
+      7,
+      11,
+      null
+     ],
+     null,
+     [
+      "E-6",
+      8,
+      9,
+      null
+     ],
+     null,
+     null,
+     [
+      "B-5",
+      10,
+      6,
+      null
+     ],
+     [
+      "D#5",
+      8,
+      9,
+      null
+     ],
+     null,
+     [
+      "E-4",
+      7,
+      11,
+      null
+     ],
+     [
+      "E-4",
+      7,
+      13,
+      null
+     ],
+     null,
+     null,
+     [
+      "A-5",
+      8,
+      9,
+      null
+     ],
+     [
+      "E-6",
+      10,
+      6,
+      null
+     ],
+     null,
+     null,
+     [
+      "A-4",
+      11,
+      11,
+      null
+     ],
+     null,
+     [
+      "A-5",
+      8,
+      9,
+      null
+     ],
+     null,
+     [
+      "A-5",
+      8,
+      9,
+      null
+     ],
+     [
+      "G-6",
+      10,
+      6,
+      null
+     ],
+     [
+      "D#6",
+      8,
+      9,
+      null
+     ],
+     null,
+     [
+      "A-4",
+      11,
+      11,
+      null
+     ],
+     null
+    ],
+    "melody2": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "E-5",
+      8,
+      9,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "E-5",
+      8,
+      9,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "dancehall": {
+    "n": 142322,
+    "order": [
+     "kick:0",
+     "kick:4",
+     "kick:6",
+     "kick:8",
+     "kick:10",
+     "kick:12",
+     "kick:14",
+     "perc1:0",
+     "perc1:3",
+     "perc1:6",
+     "perc1:11",
+     "perc1:14",
+     "hat:0",
+     "hat:1",
+     "hat:2",
+     "hat:4",
+     "hat:5",
+     "hat:6",
+     "hat:8",
+     "hat:9",
+     "hat:10",
+     "hat:12",
+     "hat:13",
+     "hat:14",
+     "perc1:2",
+     "perc1:13",
+     "melody1:6",
+     "melody1:14",
+     "melody1:15",
+     "melody2:6",
+     "melody2:14",
+     "melody1:8",
+     "melody1:12",
+     "melody1:3",
+     "melody1:11",
+     "kick:16",
+     "kick:20",
+     "kick:22",
+     "kick:24",
+     "kick:26",
+     "kick:28",
+     "perc1:16",
+     "perc1:19",
+     "perc1:22",
+     "perc1:27",
+     "perc1:30",
+     "hat:16",
+     "hat:17",
+     "hat:18",
+     "hat:20",
+     "hat:21",
+     "hat:22",
+     "hat:24",
+     "hat:25",
+     "hat:26",
+     "hat:28",
+     "hat:29",
+     "hat:30",
+     "perc1:18",
+     "melody1:22",
+     "melody1:30",
+     "melody1:18",
+     "melody1:26",
+     "melody1:24",
+     "melody1:28",
+     "melody1:19",
+     "melody1:27"
+    ],
+    "bass_bars": [
+     [
+      "bass:0",
+      "bass:6",
+      "bass:10",
+      "bass:14"
+     ],
+     [
+      "bass:16",
+      "bass:22",
+      "bass:26",
+      "bass:30"
+     ]
+    ]
+   }
+  },
+  {
+   "id": "breakdown_4",
+   "header": {
+    "section": "breakdown",
+    "bars": 1,
+    "seed": 6,
+    "layers": {
+     "drums": 0,
+     "bass": 1,
+     "sample": 1,
+     "melody": 1,
+     "vocal": 0,
+     "energy": 0.35,
+     "filter": [
+      0.2,
+      0.2
+     ],
+     "transition": 1
+    },
+    "melody_from_bar": 0
+   },
+   "lanes": {
+    "bass": [
+     [
+      "A-3",
+      6,
+      30,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "G-4",
+      6,
+      31,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "E-4",
+      6,
+      31,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "A-4",
+      6,
+      27,
+      null
+     ],
+     null
+    ],
+    "melody1": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-4",
+      7,
+      8,
+      null
+     ],
+     null,
+     [
+      "E-6",
+      8,
+      7,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "F#6",
+      8,
+      7,
+      null
+     ],
+     null,
+     [
+      "A-4",
+      7,
+      8,
+      null
+     ],
+     null
+    ],
+    "melody2": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-5",
+      8,
+      7,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "A-5",
+      8,
+      7,
+      null
+     ],
+     null
+    ]
+   },
+   "dancehall": {
+    "n": 82186,
+    "order": [
+     "melody1:6",
+     "melody1:14",
+     "melody2:6",
+     "melody2:14",
+     "melody1:8",
+     "melody1:12"
+    ],
+    "bass_bars": [
+     [
+      "bass:0",
+      "bass:6",
+      "bass:10",
+      "bass:14"
+     ]
+    ]
+   }
+  },
+  {
+   "id": "hook_5",
+   "header": {
+    "section": "hook",
+    "bars": 1,
+    "seed": 7,
+    "layers": {
+     "drums": 1,
+     "bass": 1,
+     "sample": 1,
+     "melody": 1,
+     "vocal": 0,
+     "energy": 1.0,
+     "extra": 1
+    },
+    "melody_from_bar": 0
+   },
+   "lanes": {
+    "kick": [
+     [
+      "C-4",
+      1,
+      32,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      19,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      1,
+      22,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      1,
+      27,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      1,
+      22,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      1,
+      19,
+      null
+     ],
+     null,
+     null,
+     null
+    ],
+    "hat": [
+     [
+      "C-4",
+      3,
+      21,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      7,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      18,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      16,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      8,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      18,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      17,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      8,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      19,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      19,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      8,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      17,
+      null
+     ],
+     null
+    ],
+    "perc1": [
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      4,
+      null
+     ],
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null
+    ],
+    "bass": [
+     [
+      "D-3",
+      6,
+      29,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      6,
+      32,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "A-3",
+      6,
+      30,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "D-4",
+      6,
+      30,
+      null
+     ],
+     null
+    ],
+    "melody1": [
+     null,
+     null,
+     [
+      "D-5",
+      8,
+      10,
+      null
+     ],
+     [
+      "A-5",
+      10,
+      6,
+      null
+     ],
+     null,
+     null,
+     [
+      "D-4",
+      7,
+      11,
+      null
+     ],
+     null,
+     [
+      "C-6",
+      8,
+      10,
+      null
+     ],
+     null,
+     [
+      "D-5",
+      8,
+      10,
+      null
+     ],
+     [
+      "C-6",
+      10,
+      6,
+      null
+     ],
+     [
+      "C#6",
+      8,
+      10,
+      null
+     ],
+     null,
+     [
+      "D-4",
+      7,
+      11,
+      null
+     ],
+     null
+    ]
+   },
+   "dancehall": {
+    "n": 82186,
+    "order": [
+     "kick:0",
+     "kick:4",
+     "kick:6",
+     "kick:8",
+     "kick:10",
+     "kick:12",
+     "perc1:0",
+     "perc1:3",
+     "perc1:6",
+     "perc1:11",
+     "perc1:14",
+     "hat:0",
+     "hat:1",
+     "hat:2",
+     "hat:4",
+     "hat:5",
+     "hat:6",
+     "hat:8",
+     "hat:9",
+     "hat:10",
+     "hat:12",
+     "hat:13",
+     "hat:14",
+     "perc1:2",
+     "melody1:6",
+     "melody1:14",
+     "melody1:2",
+     "melody1:10",
+     "melody1:8",
+     "melody1:12",
+     "melody1:3",
+     "melody1:11"
+    ],
+    "bass_bars": [
+     [
+      "bass:0",
+      "bass:6",
+      "bass:10",
+      "bass:14"
+     ]
+    ]
+   }
+  },
+  {
+   "id": "outro_6",
+   "header": {
+    "section": "outro",
+    "bars": 1,
+    "seed": 8,
+    "layers": {
+     "drums": 1,
+     "bass": 0,
+     "sample": 1,
+     "melody": 0,
+     "vocal": 0,
+     "energy": 0.4
+    },
+    "melody_from_bar": 0
+   },
+   "lanes": {
+    "kick": [
+     [
+      "C-4",
+      1,
+      32,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      27,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      1,
+      24,
+      null
+     ],
+     null
+    ],
+    "hat": [
+     [
+      "C-4",
+      3,
+      13,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      5,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      15,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      13,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      5,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      12,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      15,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      5,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      16,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      3,
+      15,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      5,
+      null
+     ],
+     [
+      "C-4",
+      3,
+      15,
+      null
+     ],
+     null
+    ],
+    "perc1": [
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      4,
+      3,
+      null
+     ],
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     null,
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      5,
+      5,
+      null
+     ],
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null,
+     [
+      "C-4",
+      5,
+      4,
+      null
+     ],
+     [
+      "C-4",
+      2,
+      23,
+      null
+     ],
+     null
+    ],
+    "perc2": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "C-4",
+      4,
+      3,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "melody1": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "E-4",
+      7,
+      8,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "E-4",
+      7,
+      8,
+      null
+     ],
+     [
+      "E-4",
+      7,
+      10,
+      null
+     ]
+    ],
+    "melody2": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "E-5",
+      8,
+      7,
+      null
+     ],
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     [
+      "E-5",
+      8,
+      7,
+      null
+     ],
+     null
+    ]
+   },
+   "dancehall": {
+    "n": 82186,
+    "order": [
+     "kick:0",
+     "kick:8",
+     "kick:14",
+     "perc1:0",
+     "perc1:3",
+     "perc1:6",
+     "perc1:11",
+     "perc1:14",
+     "hat:0",
+     "hat:1",
+     "hat:2",
+     "hat:4",
+     "hat:5",
+     "hat:6",
+     "hat:8",
+     "hat:9",
+     "hat:10",
+     "hat:12",
+     "hat:13",
+     "hat:14",
+     "perc1:2",
+     "perc1:10",
+     "perc2:10",
+     "perc1:13",
+     "melody1:6",
+     "melody1:14",
+     "melody1:15",
+     "melody2:6",
+     "melody2:14"
+    ],
+    "bass_bars": []
+   }
+  }
+ ],
+ "order": [
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  6
+ ],
+ "side": {
+  "intro_0": {
+   "kick:0": {
+    "t": 0.0,
+    "gain": 1.0
+   },
+   "kick:8": {
+    "t": 1.3636363636363635,
+    "gain": 0.85
+   },
+   "perc1:0": {
+    "t": 0.0,
+    "gain": 0.7200000000000001
+   },
+   "perc1:3": {
+    "t": 0.5113636363636364,
+    "gain": 0.7200000000000001
+   },
+   "perc1:6": {
+    "t": 1.0227272727272727,
+    "gain": 0.7200000000000001
+   },
+   "perc1:11": {
+    "t": 1.8749999999999998,
+    "gain": 0.7200000000000001
+   },
+   "perc1:14": {
+    "t": 2.3863636363636362,
+    "gain": 0.7200000000000001
+   },
+   "hat:0": {
+    "t": 0.0017148266836013394,
+    "gain": 0.40247221298333813
+   },
+   "hat:1": {
+    "t": 0.19400405495626918,
+    "gain": 0.1638137157261911
+   },
+   "hat:2": {
+    "t": 0.3387932762788954,
+    "gain": 0.45017815561343383
+   },
+   "hat:4": {
+    "t": 0.6844547299245164,
+    "gain": 0.49569411046420464
+   },
+   "hat:5": {
+    "t": 0.877791987587189,
+    "gain": 0.202623775362089
+   },
+   "hat:6": {
+    "t": 1.0229176092541288,
+    "gain": 0.4459266046072351
+   },
+   "hat:8": {
+    "t": 1.366472323861194,
+    "gain": 0.40387303152249626
+   },
+   "hat:9": {
+    "t": 1.5584911429377297,
+    "gain": 0.1801496995888147
+   },
+   "hat:10": {
+    "t": 1.7028984751601126,
+    "gain": 0.4245845779882569
+   },
+   "hat:12": {
+    "t": 2.0437982180001018,
+    "gain": 0.40955920166186427
+   },
+   "hat:13": {
+    "t": 2.238759282431579,
+    "gain": 0.15855461562077766
+   },
+   "hat:14": {
+    "t": 2.3845768334108874,
+    "gain": 0.4675965310133748
+   },
+   "perc1:2": {
+    "t": 0.338719816851273,
+    "gain": 0.09187201501586532
+   },
+   "perc1:10": {
+    "t": 1.7021730770781283,
+    "gain": 0.16970863902784408
+   },
+   "perc2:10": {
+    "t": 1.7035716842074076,
+    "gain": 0.08980708169533885
+   },
+   "bass:0": {
+    "dhbass": {
+     "start_s": 0.0,
+     "dur_s": 0.6818181818181818,
+     "semi": 9,
+     "kind": "long",
+     "velocity": 0.9107421125797267
+    }
+   },
+   "bass:6": {
+    "dhbass": {
+     "start_s": 1.0227272727272727,
+     "dur_s": 0.6818181818181818,
+     "semi": 19,
+     "kind": "long",
+     "velocity": 0.9914608450901362
+    }
+   },
+   "bass:10": {
+    "dhbass": {
+     "start_s": 1.7045454545454544,
+     "dur_s": 0.6818181818181818,
+     "semi": 16,
+     "kind": "long",
+     "velocity": 0.9178163094929999
+    }
+   },
+   "bass:14": {
+    "dhbass": {
+     "start_s": 2.3863636363636362,
+     "dur_s": 0.3409090909090909,
+     "semi": 21,
+     "kind": "long",
+     "velocity": 0.8895846350514598
+    }
+   }
+  },
+  "verse_1": {
+   "kick:0": {
+    "t": 0.0,
+    "gain": 1.0
+   },
+   "kick:4": {
+    "t": 0.6818181818181818,
+    "gain": 0.6
+   },
+   "kick:8": {
+    "t": 1.3636363636363635,
+    "gain": 0.85
+   },
+   "kick:12": {
+    "t": 2.0454545454545454,
+    "gain": 0.6
+   },
+   "perc1:0": {
+    "t": 0.0,
+    "gain": 0.7200000000000001
+   },
+   "perc1:3": {
+    "t": 0.5113636363636364,
+    "gain": 0.7200000000000001
+   },
+   "perc1:6": {
+    "t": 1.0227272727272727,
+    "gain": 0.7200000000000001
+   },
+   "perc1:11": {
+    "t": 1.8749999999999998,
+    "gain": 0.7200000000000001
+   },
+   "perc1:14": {
+    "t": 2.3863636363636362,
+    "gain": 0.7200000000000001
+   },
+   "hat:0": {
+    "t": 0.0016928445860776467,
+    "gain": 0.4792073834065446
+   },
+   "hat:1": {
+    "t": 0.1962323800266099,
+    "gain": 0.19326078143205466
+   },
+   "hat:2": {
+    "t": 0.3433726464742283,
+    "gain": 0.47233463566183437
+   },
+   "hat:4": {
+    "t": 0.6835385750847074,
+    "gain": 0.47128948855334357
+   },
+   "hat:5": {
+    "t": 0.877710725405637,
+    "gain": 0.19482805931460015
+   },
+   "hat:6": {
+    "t": 1.0249323231134149,
+    "gain": 0.5024633978503558
+   },
+   "hat:8": {
+    "t": 1.362708203027664,
+    "gain": 0.44137511110432925
+   },
+   "hat:9": {
+    "t": 1.562482773423548,
+    "gain": 0.16744350932602062
+   },
+   "hat:10": {
+    "t": 1.7030117277293961,
+    "gain": 0.524755635324958
+   },
+   "hat:12": {
+    "t": 2.043499353463185,
+    "gain": 0.43609131649237765
+   },
+   "hat:13": {
+    "t": 2.243631993336721,
+    "gain": 0.17949516888477773
+   },
+   "hat:14": {
+    "t": 2.383636385242523,
+    "gain": 0.4318856086203433
+   },
+   "perc1:2": {
+    "t": 0.33815354429707123,
+    "gain": 0.10487358315046248
+   },
+   "perc1:10": {
+    "t": 1.7025266378524115,
+    "gain": 0.1716021431979202
+   },
+   "perc2:10": {
+    "t": 1.7032775883078575,
+    "gain": 0.10707248111348706
+   },
+   "melody1:6": {
+    "t": 1.0227272727272727,
+    "gain": 0.29919999999999997,
+    "semis": [
+     57,
+     60,
+     64
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody1:14": {
+    "t": 2.3863636363636362,
+    "gain": 0.29919999999999997,
+    "semis": [
+     57,
+     60,
+     64
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody2:6": {
+    "t": 1.0227272727272727,
+    "gain": 0.26399999999999996,
+    "semis": [
+     69,
+     72,
+     76
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "melody2:14": {
+    "t": 2.3863636363636362,
+    "gain": 0.26399999999999996,
+    "semis": [
+     69,
+     72,
+     76
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "bass:0": {
+    "dhbass": {
+     "start_s": 0.0,
+     "dur_s": 0.6818181818181818,
+     "semi": 9,
+     "kind": "long",
+     "velocity": 0.8874580683926195
+    }
+   },
+   "bass:6": {
+    "dhbass": {
+     "start_s": 1.0227272727272727,
+     "dur_s": 0.6818181818181818,
+     "semi": 19,
+     "kind": "long",
+     "velocity": 0.8888896130101318
+    }
+   },
+   "bass:10": {
+    "dhbass": {
+     "start_s": 1.7045454545454544,
+     "dur_s": 0.6818181818181818,
+     "semi": 16,
+     "kind": "long",
+     "velocity": 0.8775495141550705
+    }
+   },
+   "bass:14": {
+    "dhbass": {
+     "start_s": 2.3863636363636362,
+     "dur_s": 0.3409090909090909,
+     "semi": 21,
+     "kind": "long",
+     "velocity": 0.8560009926413922
+    }
+   }
+  },
+  "prechorus_2": {
+   "kick:0": {
+    "t": 0.0,
+    "gain": 1.0
+   },
+   "kick:4": {
+    "t": 0.6818181818181818,
+    "gain": 0.6
+   },
+   "perc1:0": {
+    "t": 0.0,
+    "gain": 0.7200000000000001
+   },
+   "perc1:3": {
+    "t": 0.5113636363636364,
+    "gain": 0.7200000000000001
+   },
+   "perc1:6": {
+    "t": 1.0227272727272727,
+    "gain": 0.7200000000000001
+   },
+   "perc1:11": {
+    "t": 1.8749999999999998,
+    "gain": 0.7200000000000001
+   },
+   "perc1:14": {
+    "t": 2.3863636363636362,
+    "gain": 0.7200000000000001
+   },
+   "perc1:12": {
+    "t": 2.0454545454545454,
+    "gain": 0.27999999999999997
+   },
+   "perc1:13": {
+    "t": 2.215909090909091,
+    "gain": 0.32000000000000006
+   },
+   "perc2:14": {
+    "t": 2.3863636363636362,
+    "gain": 0.36000000000000004
+   },
+   "perc1:15": {
+    "t": 2.5568181818181817,
+    "gain": 0.4
+   },
+   "hat:0": {
+    "t": -0.0024873802887382737,
+    "gain": 0.5722308578878493
+   },
+   "hat:1": {
+    "t": 0.19306477310280837,
+    "gain": 0.23001768262852554
+   },
+   "hat:2": {
+    "t": 0.33991122876168856,
+    "gain": 0.5956503033066379
+   },
+   "hat:4": {
+    "t": 0.6812999626114031,
+    "gain": 0.5328266631120538
+   },
+   "hat:5": {
+    "t": 0.8770807913516824,
+    "gain": 0.18528104105558077
+   },
+   "hat:6": {
+    "t": 1.0246561541202075,
+    "gain": 0.5233108692561526
+   },
+   "hat:8": {
+    "t": 1.3624788302154258,
+    "gain": 0.47552449976621236
+   },
+   "hat:9": {
+    "t": 1.5624078658924947,
+    "gain": 0.21808124092802061
+   },
+   "hat:10": {
+    "t": 1.7048745248861228,
+    "gain": 0.5359130666272623
+   },
+   "hat:12": {
+    "t": 2.0484164945467036,
+    "gain": 0.47715153046458836
+   },
+   "hat:13": {
+    "t": 2.243632369057034,
+    "gain": 0.19474801494851549
+   },
+   "hat:14": {
+    "t": 2.3858949988149565,
+    "gain": 0.5336434185610062
+   },
+   "perc1:2": {
+    "t": 0.3398386619604944,
+    "gain": 0.11374950819715764
+   },
+   "perc1:10": {
+    "t": 1.70327918213883,
+    "gain": 0.1768342276029572
+   },
+   "perc2:10": {
+    "t": 1.7072615692325133,
+    "gain": 0.10662660531351044
+   },
+   "melody1:6": {
+    "t": 1.0227272727272727,
+    "gain": 0.3196,
+    "semis": [
+     50,
+     53,
+     57
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody1:14": {
+    "t": 2.3863636363636362,
+    "gain": 0.3196,
+    "semis": [
+     50,
+     53,
+     57
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody1:10": {
+    "t": 1.7045454545454544,
+    "gain": 0.41548,
+    "semis": [
+     50,
+     53,
+     57
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody1:12": {
+    "t": 2.0454545454545454,
+    "gain": 0.41548,
+    "semis": [
+     50,
+     53,
+     57
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody1:15": {
+    "t": 2.5568181818181817,
+    "gain": 0.41548,
+    "semis": [
+     50,
+     53,
+     57
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody1:2": {
+    "t": 0.3409090909090909,
+    "gain": 0.282,
+    "semis": [
+     62,
+     65,
+     69
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "melody2:10": {
+    "t": 1.7045454545454544,
+    "gain": 0.282,
+    "semis": [
+     62,
+     65,
+     69
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "bass:0": {
+    "dhbass": {
+     "start_s": 0.0,
+     "dur_s": 0.6818181818181818,
+     "semi": 2,
+     "kind": "long",
+     "velocity": 0.8507282136455611
+    }
+   },
+   "bass:6": {
+    "dhbass": {
+     "start_s": 1.0227272727272727,
+     "dur_s": 0.6818181818181818,
+     "semi": 12,
+     "kind": "long",
+     "velocity": 0.939308454830546
+    }
+   },
+   "bass:10": {
+    "dhbass": {
+     "start_s": 1.7045454545454544,
+     "dur_s": 0.6818181818181818,
+     "semi": 9,
+     "kind": "long",
+     "velocity": 0.9141049729795403
+    }
+   },
+   "bass:14": {
+    "dhbass": {
+     "start_s": 2.3863636363636362,
+     "dur_s": 0.3409090909090909,
+     "semi": 14,
+     "kind": "long",
+     "velocity": 0.8797754889971686
+    }
+   }
+  },
+  "hook_3": {
+   "kick:0": {
+    "t": 0.0,
+    "gain": 1.0
+   },
+   "kick:4": {
+    "t": 0.6818181818181818,
+    "gain": 0.6
+   },
+   "kick:6": {
+    "t": 1.0227272727272727,
+    "gain": 0.7
+   },
+   "kick:8": {
+    "t": 1.3636363636363635,
+    "gain": 0.85
+   },
+   "kick:10": {
+    "t": 1.7045454545454544,
+    "gain": 0.7
+   },
+   "kick:12": {
+    "t": 2.0454545454545454,
+    "gain": 0.6
+   },
+   "kick:14": {
+    "t": 2.3863636363636362,
+    "gain": 0.75
+   },
+   "perc1:0": {
+    "t": 0.0,
+    "gain": 0.7200000000000001
+   },
+   "perc1:3": {
+    "t": 0.5113636363636364,
+    "gain": 0.7200000000000001
+   },
+   "perc1:6": {
+    "t": 1.0227272727272727,
+    "gain": 0.7200000000000001
+   },
+   "perc1:11": {
+    "t": 1.8749999999999998,
+    "gain": 0.7200000000000001
+   },
+   "perc1:14": {
+    "t": 2.3863636363636362,
+    "gain": 0.7200000000000001
+   },
+   "hat:0": {
+    "t": -0.0017928033085161115,
+    "gain": 0.47949857742325286
+   },
+   "hat:1": {
+    "t": 0.19744548654476343,
+    "gain": 0.20673213869200877
+   },
+   "hat:2": {
+    "t": 0.34370620397352314,
+    "gain": 0.5686880958200514
+   },
+   "hat:4": {
+    "t": 0.6799028225667532,
+    "gain": 0.5969365420872904
+   },
+   "hat:5": {
+    "t": 0.8768075862779687,
+    "gain": 0.23205412638381703
+   },
+   "hat:6": {
+    "t": 1.0199215936138042,
+    "gain": 0.5495435197848243
+   },
+   "hat:8": {
+    "t": 1.3655009845593757,
+    "gain": 0.5540737137271482
+   },
+   "hat:9": {
+    "t": 1.5578697283915344,
+    "gain": 0.2091375292549494
+   },
+   "hat:10": {
+    "t": 1.7043933082619769,
+    "gain": 0.5684625835529358
+   },
+   "hat:12": {
+    "t": 2.047036047678188,
+    "gain": 0.5791100111715088
+   },
+   "hat:13": {
+    "t": 2.244143289943636,
+    "gain": 0.2144929280424441
+   },
+   "hat:14": {
+    "t": 2.3888566231881017,
+    "gain": 0.609718571591083
+   },
+   "perc1:2": {
+    "t": 0.33928718988032885,
+    "gain": 0.10933275115870203
+   },
+   "perc1:13": {
+    "t": 2.2161495257263626,
+    "gain": 0.17656233527589685
+   },
+   "melody1:6": {
+    "t": 1.0227272727272727,
+    "gain": 0.3332,
+    "semis": [
+     52,
+     55,
+     59
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody1:14": {
+    "t": 2.3863636363636362,
+    "gain": 0.3332,
+    "semis": [
+     52,
+     55,
+     59
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody1:15": {
+    "t": 2.5568181818181817,
+    "gain": 0.4165,
+    "semis": [
+     52,
+     55,
+     59
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody2:6": {
+    "t": 1.0227272727272727,
+    "gain": 0.294,
+    "semis": [
+     64,
+     67,
+     71
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "melody2:14": {
+    "t": 2.3863636363636362,
+    "gain": 0.294,
+    "semis": [
+     64,
+     67,
+     71
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "melody1:8": {
+    "t": 1.3636363636363635,
+    "gain": 0.294,
+    "semis": [
+     76
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "melody1:12": {
+    "t": 2.0454545454545454,
+    "gain": 0.294,
+    "semis": [
+     63
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "melody1:3": {
+    "t": 0.5113636363636364,
+    "gain": 0.196,
+    "semis": [
+     74
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody1:11": {
+    "t": 1.8749999999999998,
+    "gain": 0.196,
+    "semis": [
+     71
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "kick:16": {
+    "t": 2.727272727272727,
+    "gain": 1.0
+   },
+   "kick:20": {
+    "t": 3.4090909090909087,
+    "gain": 0.6
+   },
+   "kick:22": {
+    "t": 3.75,
+    "gain": 0.7
+   },
+   "kick:24": {
+    "t": 4.090909090909091,
+    "gain": 0.85
+   },
+   "kick:26": {
+    "t": 4.431818181818182,
+    "gain": 0.7
+   },
+   "kick:28": {
+    "t": 4.7727272727272725,
+    "gain": 0.6
+   },
+   "perc1:16": {
+    "t": 2.727272727272727,
+    "gain": 0.7200000000000001
+   },
+   "perc1:19": {
+    "t": 3.2386363636363633,
+    "gain": 0.7200000000000001
+   },
+   "perc1:22": {
+    "t": 3.75,
+    "gain": 0.7200000000000001
+   },
+   "perc1:27": {
+    "t": 4.602272727272727,
+    "gain": 0.7200000000000001
+   },
+   "perc1:30": {
+    "t": 5.113636363636363,
+    "gain": 0.7200000000000001
+   },
+   "hat:16": {
+    "t": 2.7300687805776276,
+    "gain": 0.5218171502085195
+   },
+   "hat:17": {
+    "t": 2.92537668375687,
+    "gain": 0.2398751861398348
+   },
+   "hat:18": {
+    "t": 3.0663589301107192,
+    "gain": 0.562738270209132
+   },
+   "hat:20": {
+    "t": 3.409921022731025,
+    "gain": 0.4892401322178047
+   },
+   "hat:21": {
+    "t": 3.604901115747237,
+    "gain": 0.22313670287025042
+   },
+   "hat:22": {
+    "t": 3.750238726798018,
+    "gain": 0.5275274888702719
+   },
+   "hat:24": {
+    "t": 4.0881065718078595,
+    "gain": 0.5776441351802025
+   },
+   "hat:25": {
+    "t": 4.286701732270625,
+    "gain": 0.20308296892865157
+   },
+   "hat:26": {
+    "t": 4.430691620519401,
+    "gain": 0.6235700187914841
+   },
+   "hat:28": {
+    "t": 4.773542762082073,
+    "gain": 0.5526664906884238
+   },
+   "hat:29": {
+    "t": 4.971647266586404,
+    "gain": 0.22329266198833161
+   },
+   "hat:30": {
+    "t": 5.115797772307503,
+    "gain": 0.5988702503293397
+   },
+   "perc1:18": {
+    "t": 3.065954125404605,
+    "gain": 0.11007294194683434
+   },
+   "melody1:22": {
+    "t": 3.75,
+    "gain": 0.3332,
+    "semis": [
+     57,
+     60,
+     64
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody1:30": {
+    "t": 5.113636363636363,
+    "gain": 0.3332,
+    "semis": [
+     57,
+     60,
+     64
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody1:18": {
+    "t": 3.068181818181818,
+    "gain": 0.294,
+    "semis": [
+     69,
+     72,
+     76
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "melody1:26": {
+    "t": 4.431818181818182,
+    "gain": 0.294,
+    "semis": [
+     69,
+     72,
+     76
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "melody1:24": {
+    "t": 4.090909090909091,
+    "gain": 0.294,
+    "semis": [
+     69
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "melody1:28": {
+    "t": 4.7727272727272725,
+    "gain": 0.294,
+    "semis": [
+     75
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "melody1:19": {
+    "t": 3.2386363636363633,
+    "gain": 0.196,
+    "semis": [
+     76
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody1:27": {
+    "t": 4.602272727272727,
+    "gain": 0.196,
+    "semis": [
+     79
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "bass:0": {
+    "dhbass": {
+     "start_s": 0.0,
+     "dur_s": 0.6818181818181818,
+     "semi": 4,
+     "kind": "long",
+     "velocity": 0.8747970274774054
+    }
+   },
+   "bass:6": {
+    "dhbass": {
+     "start_s": 1.0227272727272727,
+     "dur_s": 0.6818181818181818,
+     "semi": 14,
+     "kind": "long",
+     "velocity": 0.9843545945951435
+    }
+   },
+   "bass:10": {
+    "dhbass": {
+     "start_s": 1.7045454545454544,
+     "dur_s": 0.6818181818181818,
+     "semi": 11,
+     "kind": "long",
+     "velocity": 0.8861221547500584
+    }
+   },
+   "bass:14": {
+    "dhbass": {
+     "start_s": 2.3863636363636362,
+     "dur_s": 0.3409090909090909,
+     "semi": 11,
+     "kind": "long",
+     "velocity": 0.8659849060254883
+    }
+   },
+   "bass:16": {
+    "dhbass": {
+     "start_s": 2.727272727272727,
+     "dur_s": 0.6818181818181818,
+     "semi": 9,
+     "kind": "long",
+     "velocity": 0.9554296806085835
+    }
+   },
+   "bass:22": {
+    "dhbass": {
+     "start_s": 3.75,
+     "dur_s": 0.6818181818181818,
+     "semi": 19,
+     "kind": "long",
+     "velocity": 0.9497734799858331
+    }
+   },
+   "bass:26": {
+    "dhbass": {
+     "start_s": 4.431818181818182,
+     "dur_s": 0.6818181818181818,
+     "semi": 16,
+     "kind": "long",
+     "velocity": 0.933559115084577
+    }
+   },
+   "bass:30": {
+    "dhbass": {
+     "start_s": 5.113636363636363,
+     "dur_s": 0.3409090909090909,
+     "semi": 21,
+     "kind": "long",
+     "velocity": 0.9355123555300286
+    }
+   }
+  },
+  "breakdown_4": {
+   "melody1:6": {
+    "t": 1.0227272727272727,
+    "gain": 0.2516,
+    "semis": [
+     57,
+     60,
+     64
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody1:14": {
+    "t": 2.3863636363636362,
+    "gain": 0.2516,
+    "semis": [
+     57,
+     60,
+     64
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody2:6": {
+    "t": 1.0227272727272727,
+    "gain": 0.222,
+    "semis": [
+     69,
+     72,
+     76
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "melody2:14": {
+    "t": 2.3863636363636362,
+    "gain": 0.222,
+    "semis": [
+     69,
+     72,
+     76
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "melody1:8": {
+    "t": 1.3636363636363635,
+    "gain": 0.222,
+    "semis": [
+     76
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "melody1:12": {
+    "t": 2.0454545454545454,
+    "gain": 0.222,
+    "semis": [
+     78
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "bass:0": {
+    "dhbass": {
+     "start_s": 0.0,
+     "dur_s": 0.6818181818181818,
+     "semi": 9,
+     "kind": "long",
+     "velocity": 0.9247903056431268
+    }
+   },
+   "bass:6": {
+    "dhbass": {
+     "start_s": 1.0227272727272727,
+     "dur_s": 0.6818181818181818,
+     "semi": 19,
+     "kind": "long",
+     "velocity": 0.9600120912946108
+    }
+   },
+   "bass:10": {
+    "dhbass": {
+     "start_s": 1.7045454545454544,
+     "dur_s": 0.6818181818181818,
+     "semi": 16,
+     "kind": "long",
+     "velocity": 0.9726309683864027
+    }
+   },
+   "bass:14": {
+    "dhbass": {
+     "start_s": 2.3863636363636362,
+     "dur_s": 0.3409090909090909,
+     "semi": 21,
+     "kind": "long",
+     "velocity": 0.8588772692824036
+    }
+   }
+  },
+  "hook_5": {
+   "kick:0": {
+    "t": 0.0,
+    "gain": 1.0
+   },
+   "kick:4": {
+    "t": 0.6818181818181818,
+    "gain": 0.6
+   },
+   "kick:6": {
+    "t": 1.0227272727272727,
+    "gain": 0.7
+   },
+   "kick:8": {
+    "t": 1.3636363636363635,
+    "gain": 0.85
+   },
+   "kick:10": {
+    "t": 1.7045454545454544,
+    "gain": 0.7
+   },
+   "kick:12": {
+    "t": 2.0454545454545454,
+    "gain": 0.6
+   },
+   "perc1:0": {
+    "t": 0.0,
+    "gain": 0.7200000000000001
+   },
+   "perc1:3": {
+    "t": 0.5113636363636364,
+    "gain": 0.7200000000000001
+   },
+   "perc1:6": {
+    "t": 1.0227272727272727,
+    "gain": 0.7200000000000001
+   },
+   "perc1:11": {
+    "t": 1.8749999999999998,
+    "gain": 0.7200000000000001
+   },
+   "perc1:14": {
+    "t": 2.3863636363636362,
+    "gain": 0.7200000000000001
+   },
+   "hat:0": {
+    "t": 0.001828393702502587,
+    "gain": 0.6496324599356241
+   },
+   "hat:1": {
+    "t": 0.19671528325003734,
+    "gain": 0.21338733631394216
+   },
+   "hat:2": {
+    "t": 0.34377661575011265,
+    "gain": 0.5601020282394364
+   },
+   "hat:4": {
+    "t": 0.6828744608263285,
+    "gain": 0.49616312428553805
+   },
+   "hat:5": {
+    "t": 0.8752282488388398,
+    "gain": 0.23780224772483682
+   },
+   "hat:6": {
+    "t": 1.0239997016701825,
+    "gain": 0.5539816855627098
+   },
+   "hat:8": {
+    "t": 1.3642361959025635,
+    "gain": 0.5175460082774695
+   },
+   "hat:9": {
+    "t": 1.5583699854048534,
+    "gain": 0.24649858104394728
+   },
+   "hat:10": {
+    "t": 1.7020175415700316,
+    "gain": 0.579204555656879
+   },
+   "hat:12": {
+    "t": 2.0479060255937207,
+    "gain": 0.5999395230965654
+   },
+   "hat:13": {
+    "t": 2.2417523760947837,
+    "gain": 0.2526815098567835
+   },
+   "hat:14": {
+    "t": 2.388163407720477,
+    "gain": 0.5250425619692772
+   },
+   "perc1:2": {
+    "t": 0.34229219083460277,
+    "gain": 0.11720390590853773
+   },
+   "melody1:6": {
+    "t": 1.0227272727272727,
+    "gain": 0.34,
+    "semis": [
+     50,
+     53,
+     57
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody1:14": {
+    "t": 2.3863636363636362,
+    "gain": 0.34,
+    "semis": [
+     50,
+     53,
+     57
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody1:2": {
+    "t": 0.3409090909090909,
+    "gain": 0.3,
+    "semis": [
+     62,
+     65,
+     69
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "melody1:10": {
+    "t": 1.7045454545454544,
+    "gain": 0.3,
+    "semis": [
+     62,
+     65,
+     69
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "melody1:8": {
+    "t": 1.3636363636363635,
+    "gain": 0.3,
+    "semis": [
+     72
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "melody1:12": {
+    "t": 2.0454545454545454,
+    "gain": 0.3,
+    "semis": [
+     73
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "melody1:3": {
+    "t": 0.5113636363636364,
+    "gain": 0.2,
+    "semis": [
+     69
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody1:11": {
+    "t": 1.8749999999999998,
+    "gain": 0.2,
+    "semis": [
+     72
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "bass:0": {
+    "dhbass": {
+     "start_s": 0.0,
+     "dur_s": 0.6818181818181818,
+     "semi": 2,
+     "kind": "long",
+     "velocity": 0.9079853306751002
+    }
+   },
+   "bass:6": {
+    "dhbass": {
+     "start_s": 1.0227272727272727,
+     "dur_s": 0.6818181818181818,
+     "semi": 12,
+     "kind": "long",
+     "velocity": 0.9932999695308937
+    }
+   },
+   "bass:10": {
+    "dhbass": {
+     "start_s": 1.7045454545454544,
+     "dur_s": 0.6818181818181818,
+     "semi": 9,
+     "kind": "long",
+     "velocity": 0.9504852767605413
+    }
+   },
+   "bass:14": {
+    "dhbass": {
+     "start_s": 2.3863636363636362,
+     "dur_s": 0.3409090909090909,
+     "semi": 14,
+     "kind": "long",
+     "velocity": 0.9222384754727017
+    }
+   }
+  },
+  "outro_6": {
+   "kick:0": {
+    "t": 0.0,
+    "gain": 1.0
+   },
+   "kick:8": {
+    "t": 1.3636363636363635,
+    "gain": 0.85
+   },
+   "kick:14": {
+    "t": 2.3863636363636362,
+    "gain": 0.75
+   },
+   "perc1:0": {
+    "t": 0.0,
+    "gain": 0.7200000000000001
+   },
+   "perc1:3": {
+    "t": 0.5113636363636364,
+    "gain": 0.7200000000000001
+   },
+   "perc1:6": {
+    "t": 1.0227272727272727,
+    "gain": 0.7200000000000001
+   },
+   "perc1:11": {
+    "t": 1.8749999999999998,
+    "gain": 0.7200000000000001
+   },
+   "perc1:14": {
+    "t": 2.3863636363636362,
+    "gain": 0.7200000000000001
+   },
+   "hat:0": {
+    "t": -0.002094182989356721,
+    "gain": 0.4118656041147077
+   },
+   "hat:1": {
+    "t": 0.19471150509577015,
+    "gain": 0.16974969885632682
+   },
+   "hat:2": {
+    "t": 0.3403673337115642,
+    "gain": 0.4704919301706422
+   },
+   "hat:4": {
+    "t": 0.6834129889121558,
+    "gain": 0.41158765761952393
+   },
+   "hat:5": {
+    "t": 0.8755276788242574,
+    "gain": 0.1570774652446327
+   },
+   "hat:6": {
+    "t": 1.0252359858143245,
+    "gain": 0.3899491300069853
+   },
+   "hat:8": {
+    "t": 1.360669614206758,
+    "gain": 0.46040193935201046
+   },
+   "hat:9": {
+    "t": 1.5586405902473763,
+    "gain": 0.14581620820419694
+   },
+   "hat:10": {
+    "t": 1.7038230388911686,
+    "gain": 0.49024881629828904
+   },
+   "hat:12": {
+    "t": 2.046865808728633,
+    "gain": 0.4552473417288668
+   },
+   "hat:13": {
+    "t": 2.241739095568168,
+    "gain": 0.16593851485814018
+   },
+   "hat:14": {
+    "t": 2.38930294048077,
+    "gain": 0.45556059675835847
+   },
+   "perc1:2": {
+    "t": 0.34302252268797956,
+    "gain": 0.09712708856585321
+   },
+   "perc1:10": {
+    "t": 1.7066218996625435,
+    "gain": 0.15603216585793767
+   },
+   "perc2:10": {
+    "t": 1.7038184542668113,
+    "gain": 0.08516734162701274
+   },
+   "perc1:13": {
+    "t": 2.217633444071489,
+    "gain": 0.1403151030644168
+   },
+   "melody1:6": {
+    "t": 1.0227272727272727,
+    "gain": 0.2584,
+    "semis": [
+     52,
+     55,
+     59
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody1:14": {
+    "t": 2.3863636363636362,
+    "gain": 0.2584,
+    "semis": [
+     52,
+     55,
+     59
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody1:15": {
+    "t": 2.5568181818181817,
+    "gain": 0.323,
+    "semis": [
+     52,
+     55,
+     59
+    ],
+    "dur_s": 0.2556818181818182
+   },
+   "melody2:6": {
+    "t": 1.0227272727272727,
+    "gain": 0.22799999999999998,
+    "semis": [
+     64,
+     67,
+     71
+    ],
+    "dur_s": 0.3409090909090909
+   },
+   "melody2:14": {
+    "t": 2.3863636363636362,
+    "gain": 0.22799999999999998,
+    "semis": [
+     64,
+     67,
+     71
+    ],
+    "dur_s": 0.3409090909090909
+   }
+  }
+ },
+ "bus": {}
+}
