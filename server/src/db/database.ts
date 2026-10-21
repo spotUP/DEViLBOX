@@ -270,4 +270,8 @@ export function initDatabase() {
   console.log('[DB] Database initialized at:', DB_PATH);
 }
 
+// Build the schema on load: route modules call db.prepare() at import time, and ES imports
+// are hoisted, so a call from index.ts would run after them on a fresh database.
+initDatabase();
+
 export default db;
