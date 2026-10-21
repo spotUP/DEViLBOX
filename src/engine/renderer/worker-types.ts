@@ -270,7 +270,7 @@ export type TurntableMsg =
 
 // ─── Track Overview ──────────────────────────────────────────────────────────
 
-export interface OverviewState {
+export interface OverviewScalars {
   playbackMode: string;
   songPos: number;
   totalPositions: number;
@@ -281,6 +281,10 @@ export interface OverviewState {
   /** Heard-position clock; the worker extrapolates it to each frame (positionAtFrame). */
   anchor: ClockAnchor;
   durationMs: number;
+}
+
+/** Scalars plus the analysis peaks; the peaks change only on track load / analysis. */
+export interface OverviewState extends OverviewScalars {
   waveformPeaks: number[] | null;
   /** 3-band frequency peaks: [low[], mid[], high[]] — null until analysis completes */
   frequencyPeaks: number[][] | null;
@@ -289,6 +293,8 @@ export interface OverviewState {
 export type OverviewMsg =
   | { type: 'init'; canvas: OffscreenCanvas; dpr: number; width: number; height: number; colors: DeckColors } & OverviewState
   | { type: 'state' } & OverviewState
+  /** Position-rate update: scalars only, the worker keeps its stored peaks. */
+  | { type: 'position' } & OverviewScalars
   | { type: 'resize'; w: number; h: number; dpr: number }
   | { type: 'colors'; colors: DeckColors };
 
