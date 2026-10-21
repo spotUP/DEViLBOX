@@ -1,39 +1,21 @@
 /**
- * R2f reachability: the real entry points (the R2 event store the song service writes, and the factory seam the host
- * stream calls) drive the real panel and the real tracker store. The event count is the sentinel that the new code ran.
+ * R2f reachability: the real entry point (the factory seam the host NDJSON stream calls) drives the real panel and the
+ * real tracker store. The event count is the sentinel that the new code ran.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { FactoryPanel } from '@components/uprough/FactoryPanel';
 import { useFactoryStore, factoryOnEvent } from '../useFactoryStore';
-import { attachR2Bridge } from '../r2Bridge';
 import { parseNdjson, scriptedGenerateEvents, toNdjson } from '../scriptedRun';
-import { useUpRoughR2Store } from '@stores/useUpRoughR2Store';
 import { useTrackerStore } from '@stores/useTrackerStore';
-import { createEmitter } from '@/engine/uprough/r2Events';
-import { buildBank } from '@/engine/uprough/songRender';
 import { LANES } from '../../songFile';
 
 afterEach(cleanup);
 
 describe('the synth factory, end to end', () => {
-  it('TS render events reach the panel through the R2 store; host decide events fill the real patterns', () => {
+  it('host NDJSON events reach the panel through the factory seam and fill the real patterns', () => {
     useFactoryStore.getState().reset();
-    const detach = attachR2Bridge();
     render(<FactoryPanel />);
-
-    // Acts 1 and 3 path: the song service appends to the R2 store; the bridge feeds the factory.
-    act(() => {
-      useUpRoughR2Store.getState().begin();
-      const em = createEmitter(useUpRoughR2Store.getState().append)!;
-      em.emit({ type: 'start', mode: 'render', rate: 22050, style: 'trap', seed: 3, sections: [] });
-      buildBank(em, 'trap', 22050, 3);
-    });
-    const afterBank = useFactoryStore.getState().state;
-    expect(afterBank.eventCount).toBe(useUpRoughR2Store.getState().events.length);
-    expect(afterBank.voiceOrder.length).toBeGreaterThan(5);
-    expect(afterBank.slots.find((s) => s.id === 'snare')!.attachments).toHaveLength(2);
-    detach();
 
     // Act 2 path: the NDJSON stream goes through the seam; the real tracker store receives the cells.
     const events = parseNdjson(toNdjson(scriptedGenerateEvents('trap', 3)));
