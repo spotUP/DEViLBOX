@@ -9,6 +9,8 @@ import { parseSongFile } from '../songFile';
 import { readNdjson } from '../generateClient';
 import type { R2Event } from '@/engine/uprough/r2Events';
 import { useFactoryStore } from '../factory/useFactoryStore';
+import { decideToCells } from '../factory/decideToCells';
+import { useTrackerStore } from '@stores/useTrackerStore';
 
 // Runs the route against the REAL host generator (tools/song_file.py --events -).
 // Set UPROUGH_HOST_ROOT to an Up Rough checkout that has the R2b emitter; skipped otherwise.
@@ -63,5 +65,31 @@ describe.skipIf(!present)('POST /api/uprough/generate events:true against the re
     expect(state.sections).toHaveLength(kinds.section!);
     const decided = state.sections.reduce((n, sec) => n + Object.values(sec.decided).reduce((a, b) => a + b, 0), 0);
     expect(decided).toBe(kinds.decide);
+
+    // R2h-02 (a): the sentinel counts every line the host emitted, none dropped.
+    expect(state.eventCount).toBeGreaterThan(0);
+    expect(state.eventCount).toBe(lines.length);
+    // R2h-02 (b): the tracker holds the cells decideToCells yields over the received decides (the fill's own rule:
+    // one taken set per section and bar). The done line is not applied here, so the tracker still holds the fill.
+    const taken = new Map<string, Set<string>>();
+    const expectedKeys = new Set<string>();
+    let expectedCells = 0;
+    for (const l of lines) {
+      const ev = l.ev as R2Event;
+      if (ev.type !== 'decide') continue;
+      const key = `${ev.section}:${ev.bar}`;
+      if (!taken.has(key)) taken.set(key, new Set());
+      const cells = decideToCells(ev.lane, ev.bar, ev.cells, taken.get(key));
+      expectedCells += cells.length;
+      for (const c of cells) expectedKeys.add(`${ev.section}:${c.lane}:${c.row}`);
+    }
+    let trackerCells = 0;
+    for (const p of useTrackerStore.getState().patterns) {
+      for (const ch of p.channels) trackerCells += ch.rows.filter((cell) => cell.note > 0).length;
+    }
+    console.log('R2H02', JSON.stringify({ events: state.eventCount, decides: kinds.decide, expectedCells, distinct: expectedKeys.size, trackerCells }));
+    expect(expectedCells).toBeGreaterThan(0);
+    expect(state.cellsWritten).toBe(expectedCells);
+    expect(trackerCells).toBe(expectedKeys.size);
   }, 180_000);
 });
