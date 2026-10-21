@@ -466,8 +466,15 @@ export function samplerSampleGain(inst: Pick<InstrumentConfig, 'synthType' | 'vo
   return Math.min(1, Math.pow(10, db / 20));
 }
 
+/** A song to build a module from: its shape plus the tempo the module starts at. */
+export interface ModuleSong extends SongStructure {
+  initialSpeed: number;
+  /** XM stores whole BPM; a fractional tempo is rounded. */
+  initialBPM: number;
+}
+
 export async function createModuleForSong(
-  song: SongStructure,
+  song: ModuleSong,
   cancelled: () => boolean,
 ): Promise<ArrayBuffer | null> {
   const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
@@ -477,6 +484,10 @@ export async function createModuleForSong(
     if (!(await osl.createNewModule(1 /* XM */, song.numChannels || 4, numPat))) return null;
     markLoaded('xm');
     await osl.setSamplePreAmp(builtSongSamplePreAmp());
+    // libopenmpt sequences the song from this module, so it starts at the
+    // song's tempo, not the XM default of 125 BPM / speed 6.
+    await osl.setInitialSpeed(song.initialSpeed);
+    await osl.setInitialTempo(Math.round(song.initialBPM));
     // createNewModule makes 64-row patterns and order [0, 1, 2, ...]; the song's
     // lengths (an 8-row song would play 56 rows of silence) and order list
     // ([0, 1, 0, 2]) differ, so the module takes the song's shape first.

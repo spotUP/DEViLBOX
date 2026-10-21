@@ -66,7 +66,7 @@ describe('a fresh song module carries its Sampler samples', () => {
     const song = {
       numChannels: 4,
       patterns: [{ length: 16, channels: [{ rows }, { rows: rows.map(() => cell()) }, { rows: rows.map(() => cell()) }, { rows: rows.map(() => cell()) }] }],
-      songPositions: [0],
+      songPositions: [0], initialSpeed: 6, initialBPM: 125,
       instruments: [sampler(3, 1000)],
     };
 
@@ -85,7 +85,7 @@ describe('a fresh song module carries its Sampler samples', () => {
 
   it('a Sampler added after the module was built is written into it', async () => {
     const rows = Array.from({ length: 16 }, () => cell());
-    const song = { numChannels: 1, patterns: [{ length: 16, channels: [{ rows }] }], songPositions: [0], instruments: [] };
+    const song = { numChannels: 1, patterns: [{ length: 16, channels: [{ rows }] }], songPositions: [0], initialSpeed: 6, initialBPM: 125, instruments: [] };
 
     const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
     await bridge.createModuleForSong(song, () => false);
@@ -103,7 +103,7 @@ describe('a fresh song module carries its Sampler samples', () => {
     const restored = sampler(88, 900);
     const url = `data:audio/wav;base64,${Buffer.from(restored.sample!.audioBuffer!).toString('base64')}`;
     restored.sample = { ...restored.sample!, audioBuffer: undefined, url };
-    const song = { numChannels: 4, patterns: [{ length: 16, channels: [{ rows }, { rows }, { rows }, { rows }] }], songPositions: [0], instruments: [restored] };
+    const song = { numChannels: 4, patterns: [{ length: 16, channels: [{ rows }, { rows }, { rows }, { rows }] }], songPositions: [0], initialSpeed: 6, initialBPM: 125, instruments: [restored] };
 
     const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
     expect(await bridge.createModuleForSong(song, () => false)).not.toBeNull();

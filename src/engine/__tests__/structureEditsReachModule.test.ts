@@ -42,7 +42,7 @@ describe('structural edits reach the libopenmpt module', () => {
     const built = await bridge.createModuleForSong({
       numChannels: 2,
       patterns: [{ length: 16, channels: [{ rows: ch0 }, { rows: rows(16) }] }],
-      songPositions: [0],
+      songPositions: [0], initialSpeed: 6, initialBPM: 125,
     }, () => false);
 
     // Import it: the song's bytes are the module's own from here on.
