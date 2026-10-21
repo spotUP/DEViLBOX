@@ -4,13 +4,14 @@
  * the same lane homes, the same volume rounding, the same note numbering as tools/song_file.py export.
  *
  *   drums   dev_merged entry [voice, step, vel, role] or a hat object {step, voice, vel, ...}
- *   bass    bev: the 808 dict {trap808: [{step, semi}], ...} or the gen_bass tuple list [semi, step, dur, glide, vel]
+ *   bass    [the 808 dict {trap808: [{step, semi}], ...}] or the gen_bass tuple list itself, [[semi, step, dur, glide, vel], ...]
  *   melody  notes [midi, step, len]
- * `chops` and `vocals` are not grid lanes: they write no cells.
+ * `chops` and `vocals` are not grid lanes: they write no cells; chopsSummary / vocalsSummary give the panel's strip text.
  */
 import { roundHalfEven } from '@/engine/dj/scratch/scratchGrit';
 import { FILE_VOICES, LANES, ROWS_PER_BAR, noteFromText, type Lane } from '../songFile';
 import { hostNoteName } from '../barEvents';
+import type { ChopsBreak, ChopsChopped, VocalWord } from '@/engine/uprough/r2Events';
 
 export interface FillCell { lane: Lane; row: number; note: number; instrument: number; volume: number }
 
@@ -52,12 +53,13 @@ export function decideToCells(
       out.push({ lane: placeDrum(voice, row, taken), row, note: noteFromText(DRUM_NOTE), instrument: provisionalInstrument(voice), volume: VOLUME_BASE + volume });
     }
   } else if (lane === 'bass') {
-    for (const bev of asList(cells)) {
+    // `cells` is the bar's bev as the host's _cells hands it over: [the 808 dict], or the gen_bass tuple list itself
+    // (each entry one [semi, step, dur, glide, vel] note), never a list of tuple lists.
+    for (const entry of asList(cells)) {
       const events: { semi: number; step: number }[] = [];
-      if (bev && !Array.isArray(bev) && typeof bev === 'object' && Array.isArray((bev as { trap808?: unknown }).trap808)) {
-        for (const e of (bev as { trap808: { semi: number; step: number }[] }).trap808) events.push({ semi: e.semi, step: e.step });
-      } else if (Array.isArray(bev)) {
-        for (const e of bev) if (Array.isArray(e)) events.push({ semi: Number(e[0]), step: Number(e[1]) });
+      if (Array.isArray(entry)) events.push({ semi: Number(entry[0]), step: Number(entry[1]) });
+      else if (entry && typeof entry === 'object' && Array.isArray((entry as { trap808?: unknown }).trap808)) {
+        for (const e of (entry as { trap808: { semi: number; step: number }[] }).trap808) events.push({ semi: e.semi, step: e.step });
       }
       for (const e of events) {
         out.push({ lane: 'bass', row: base + e.step, note: noteFromText(hostNoteName(36 + e.semi)), instrument: provisionalInstrument('bass808'), volume: VOLUME_BASE + 64 });
@@ -77,4 +79,26 @@ export function decideToCells(
     }
   }
   return out;
+}
+
+/** A chops bar for the panel strip: a real-break bar is one break loop, a chopped bar its trigger count and first op. */
+export interface ChopsSummary { kind: 'break' | 'chopped'; triggers: number; op: string | null }
+
+export function chopsSummary(cells: readonly unknown[]): ChopsSummary | null {
+  const rec = cells[0];
+  if (!rec || typeof rec !== 'object') return null;
+  if (Array.isArray((rec as ChopsChopped).triggers)) {
+    const c = rec as ChopsChopped;
+    return { kind: 'chopped', triggers: c.triggers.length, op: Array.isArray(c.ops) && typeof c.ops[0] === 'string' ? c.ops[0] : null };
+  }
+  if (typeof (rec as ChopsBreak).brk_seed === 'number') return { kind: 'break', triggers: 1, op: null };
+  return null;
+}
+
+/** A vocals bar for the panel strip: its word count and first word. */
+export interface VocalsSummary { words: number; first: string | null }
+
+export function vocalsSummary(cells: readonly unknown[]): VocalsSummary | null {
+  const words = cells.filter((w): w is VocalWord => Array.isArray(w) && typeof w[0] === 'string');
+  return words.length ? { words: words.length, first: words[0]![0] } : null;
 }
