@@ -226,6 +226,10 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
           </p>
         )}
 
+        {loaded && !busy && (
+          <p role="status" className="text-xs font-mono text-accent-success">Song loaded into the tracker.</p>
+        )}
+
         {error && <p role="alert" className="text-xs font-mono text-accent-error whitespace-pre-wrap break-words">{error}</p>}
 
         {showFactory && (
@@ -236,10 +240,10 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
       </div>
 
       <ModalFooter theme="modern" align="right">
-        <Button variant="ghost" onClick={handleCancel}>
+        <Button variant={loaded ? 'primary' : 'ghost'} onClick={handleCancel}>
           {loaded ? 'Close' : 'Cancel'} {shortcuts.cancel && <span className="text-xs opacity-70 ml-2">{shortcuts.cancel}</span>}
         </Button>
-        <Button variant="primary" onClick={handleGenerate} disabled={!canGenerate}>
+        <Button variant={loaded ? 'default' : 'primary'} onClick={handleGenerate} disabled={!canGenerate}>
           {busy ? 'Generating...' : 'Generate'}
         </Button>
       </ModalFooter>

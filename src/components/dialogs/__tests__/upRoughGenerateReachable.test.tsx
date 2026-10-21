@@ -183,6 +183,29 @@ describe('Replay after a Generate keeps the loaded song', () => {
   });
 });
 
+describe('Generate dialog says when the song is in the tracker', () => {
+  it('shows the loaded status and makes Close the primary action once the song loads, never before', async () => {
+    const { text } = scriptedStream();
+    vi.stubGlobal('fetch', vi.fn(async (url: string) =>
+      url === '/api/uprough/styles'
+        ? new Response(JSON.stringify({ styles: ['trap'] }), { status: 200 })
+        : new Response(text, { status: 200 })));
+    useTrackerStore.setState({ upRoughMeta: null });
+    render(<UpRoughGenerateDialog isOpen onClose={() => undefined} />);
+    const style = await screen.findByTitle('Style');
+    await waitFor(() => expect(style.textContent).toContain('trap'));
+    expect(screen.queryByText('Song loaded into the tracker.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
+    await waitFor(() => expect(useTrackerStore.getState().upRoughMeta?.song.style).toBe('trap'), { timeout: 10_000 });
+    await screen.findByText('Song loaded into the tracker.');
+    const close = screen.getByText('Close', { selector: 'button' });
+    const generate = screen.getByRole('button', { name: 'Generate' });
+    expect(close.className).not.toBe(generate.className);
+    expect(close.className).toContain('accent-primary');
+    expect(generate.className).not.toContain('bg-accent-primary');
+  });
+});
+
 describe('R2h-01: one Generate run reaches the store, the tracker, the preview and the audition chip', () => {
   it('counts every NDJSON line, writes the decide cells, previews then swaps once, and plays the kept bank voice on a chip click', async () => {
     const { events, text } = scriptedStream();
