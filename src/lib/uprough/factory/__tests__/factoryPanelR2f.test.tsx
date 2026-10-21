@@ -191,6 +191,21 @@ describe('R2f-59 auto-scroll and controls', () => {
     expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', behavior: 'smooth' });
   });
 
+  it('a hat pool of eight keeps the hat chips on one row, so the slot does not grow taller', () => {
+    render(<FactoryPanel />);
+    const pk = peaks(new Float64Array(256).map((_, i) => Math.sin(i / 4)));
+    act(() => {
+      for (const e of scriptedGenerateEvents('trap', 3)) {
+        factoryOnEvent(e.type === 'hatpool' ? { ...e, variants: Array.from({ length: 8 }, (_, i) => ({ name: `hat_${i}`, peaks: pk })) } : e);
+      }
+    });
+    const row = screen.getByTestId('factory-chips-hat');
+    expect(row.querySelectorAll('button[aria-label^="Play"]').length).toBeGreaterThanOrEqual(8);
+    // One row whatever the count: a column-flow grid never wraps; a wrapping flex row grows the card per extra line.
+    expect(row.className).toContain('grid-flow-col');
+    expect(row.className).not.toContain('flex-wrap');
+  });
+
   it('keeps the status line, sound toggle and Replay button', () => {
     const replay = vi.fn();
     render(<FactoryPanel onReplay={replay} />);

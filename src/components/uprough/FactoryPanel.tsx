@@ -83,11 +83,11 @@ function Chip(props: { voice: string; label: string; peaks: Peaks; accent?: bool
     <Button
       variant="ghost" size="sm" aria-label={`Play ${label}`} aria-disabled={!preview} title={preview ? `Play ${label}` : NO_PREVIEW}
       onClick={() => { if (preview) playVoice(voice); }}
-      className={`flex-col !px-1 !py-0.5 text-xs bg-dark-bgTertiary text-text-secondary border ${props.accent ? 'border-accent-secondary' : 'border-dark-border'} ${preview ? '' : 'cursor-not-allowed'}`}
+      className={`flex-col min-w-0 overflow-hidden !px-1 !py-0.5 text-xs bg-dark-bgTertiary text-text-secondary border ${props.accent ? 'border-accent-secondary' : 'border-dark-border'} ${preview ? '' : 'cursor-not-allowed'}`}
       style={{ opacity: preview ? props.alpha : 0.6, transform: `scale(${props.scale})` }}
     >
       <Wave a={props.peaks} height={18} />
-      {label}
+      <span className="block w-full truncate">{label}</span>
     </Button>
   );
 }
@@ -130,7 +130,8 @@ function SlotCard(props: { register: (id: string, el: HTMLDivElement | null) => 
       <div className="text-[10px] font-mono text-text-secondary min-h-[1.4em] truncate" style={{ transform: `translateY(${bounce * 4}px)` }}>
         {stamped && voice ? `Stamped ${spoken(voice.voice)}` : cur ? spoken(cur.stage) : slot.born ? 'First bar rendered with the song' : 'Empty'}
       </div>
-      <div className="flex flex-wrap gap-1 min-h-[28px]">
+      {/* One row whatever the count (a hat pool brings eight): chips share the width, so a slot never grows taller. */}
+      <div data-testid={`factory-chips-${slot.id}`} className="grid grid-flow-col auto-cols-fr gap-1 min-h-[28px]">
         {stamped && voice?.bank && slot.voices.filter((v) => v.bank).map((v) => (
           <Chip key={v.voice} voice={v.voice} label={spoken(v.voice)} peaks={v.bank!} alpha={chip.alpha} scale={chip.scale} preview={preview} />
         ))}

@@ -141,7 +141,7 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
     <Modal
       isOpen={isOpen}
       onClose={handleCancel}
-      size={showFactory ? '2xl' : 'sm'}
+      size={showFactory ? 'fullscreen' : 'sm'}
       theme="modern"
       backdropOpacity="medium"
       closeOnBackdropClick={!busy}
