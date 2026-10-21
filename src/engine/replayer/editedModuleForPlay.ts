@@ -67,10 +67,29 @@ function patchedByVariableLayout(song: TrackerSong, desc: NativeEngineDescriptor
   return patched > 0 ? buf : null;
 }
 
+/**
+ * Klystrack edits (pattern steps, sequence entries) live in the engine's own memory (klysEdit.ts), not in the
+ * grid the baseline compares: the module to play is the engine's serialisation, the one the .kt export writes.
+ * Null when nothing was edited (the loaded bytes play).
+ */
+async function klysEditedModule(song: TrackerSong): Promise<ArrayBuffer | null> {
+  const { klysFileIsEdited } = await import('@/components/klystrack/klysEdit');
+  if (!klysFileIsEdited(song.klysFileData)) return null;
+  const { KlysEngine } = await import('@/engine/klystrack/KlysEngine');
+  if (!KlysEngine.hasInstance()) return null;
+  try {
+    return await KlysEngine.getInstance().serializeSong();
+  } catch (err) {
+    console.warn('[editedModuleForPlay] Klystrack: the edited song could not be serialised, playing the loaded one:', err);
+    return null;
+  }
+}
+
 export async function editedModuleForPlay(
   song: TrackerSong,
   desc: NativeEngineDescriptor,
 ): Promise<ArrayBuffer | Uint8Array | null> {
+  if (desc.key === 'Klystrack') return klysEditedModule(song);
   if (NOT_RELOADABLE.has(desc.key) || !(gridIsEdited(song.patterns) || sampleIsEdited())) return null;
   const loaded = song[desc.fileDataKey] as ArrayBuffer | Uint8Array | undefined;
   const carriesEdit = (d: ArrayBuffer | Uint8Array | null | undefined): d is ArrayBuffer | Uint8Array => {
