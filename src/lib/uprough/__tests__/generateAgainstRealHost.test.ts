@@ -24,7 +24,9 @@ describe.skipIf(!present)('POST /api/uprough/generate events:true against the re
     process.env.UPROUGH_ROOT = HOST;
     const app = express();
     app.use(express.json());
-    app.use('/api/uprough', uproughRoutes);
+    // The router comes from the server package (express 4 types), the app from the root (express 5 types); at run time a
+    // router is a plain (req, res, next) handler, so mount it through one.
+    app.use('/api/uprough', (req, res, next) => uproughRoutes(req as never, res as never, next));
     server = app.listen(0);
     base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   });

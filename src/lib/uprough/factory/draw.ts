@@ -16,6 +16,23 @@ export function readTokens(el: Element): FactoryColors {
   };
 }
 
+/**
+ * Sizes a canvas's backing store to its displayed width times the device pixel ratio and maps the context to CSS pixels,
+ * so a drawing keeps its proportions (round gears) and stays sharp however wide the panel is. Returns the logical
+ * (CSS pixel) size every draw function takes; `fallbackWidth` covers a canvas not laid out yet.
+ */
+export function fitCanvas(
+  cv: HTMLCanvasElement, ctx: CanvasRenderingContext2D, height: number, fallbackWidth: number, dpr: number = window.devicePixelRatio || 1,
+): { w: number; h: number } {
+  const w = Math.max(1, Math.round(cv.clientWidth || fallbackWidth));
+  const bw = Math.round(w * dpr);
+  const bh = Math.round(height * dpr);
+  if (cv.width !== bw) cv.width = bw;
+  if (cv.height !== bh) cv.height = bh;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { w, h: height };
+}
+
 /** The bucket value at fractional position u in 0..1: min and max in -1..1. */
 function at(p: Peaks, u: number, reference?: number): { lo: number; hi: number } {
   if (p.n === 0) return { lo: 0, hi: 0 };

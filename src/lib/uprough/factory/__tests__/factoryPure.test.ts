@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { actOneSchedule, fallSeconds, stageAtTime, BUILD_SECONDS, MAX_WAIT_SECONDS } from '../pacing';
 import { decideToCells } from '../decideToCells';
 import { initialFactoryState, reduceFactory, SLOT_OF_VOICE } from '../factoryModel';
+import { fitCanvas } from '../draw';
 import { popIn, REDUCED_FADE_SECONDS, Spring, SETTLE, stampBounce } from '../motion';
 import { peaks } from '@/engine/uprough/r2Peaks';
 import type { R2Event } from '@/engine/uprough/r2Events';
@@ -133,5 +134,25 @@ describe('motion', () => {
     expect(popIn(0.1, false).scale).not.toBe(1);
     expect(stampBounce(0.05, true)).toBe(0);
     expect(stampBounce(0.05, false)).toBeGreaterThan(0);
+  });
+});
+
+describe('fitCanvas', () => {
+  it('sizes the backing store to the displayed width times the pixel ratio, so a stretched panel keeps round gears', () => {
+    // A 240 px backing store shown 878 px wide stretched every drawing 3.7x sideways (smeared gears, owner screenshot).
+    const transforms: number[][] = [];
+    const cv = { clientWidth: 878, width: 240, height: 40 } as unknown as HTMLCanvasElement;
+    const ctx = { setTransform: (...m: number[]) => { transforms.push(m); } } as unknown as CanvasRenderingContext2D;
+    expect(fitCanvas(cv, ctx, 40, 240, 2)).toEqual({ w: 878, h: 40 });
+    expect(cv.width).toBe(1756);
+    expect(cv.height).toBe(80);
+    expect(transforms).toEqual([[2, 0, 0, 2, 0, 0]]);
+  });
+
+  it('falls back to the given width before layout', () => {
+    const cv = { clientWidth: 0, width: 0, height: 0 } as unknown as HTMLCanvasElement;
+    const ctx = { setTransform: () => undefined } as unknown as CanvasRenderingContext2D;
+    expect(fitCanvas(cv, ctx, 56, 240, 1)).toEqual({ w: 240, h: 56 });
+    expect(cv.width).toBe(240);
   });
 });

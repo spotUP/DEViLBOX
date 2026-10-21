@@ -8,7 +8,7 @@ import { Volume2, VolumeX, RotateCcw } from 'lucide-react';
 import { useFactoryStore } from '@/lib/uprough/factory/useFactoryStore';
 import { actOneSchedule, stageAtTime, type VoiceTimeline } from '@/lib/uprough/factory/pacing';
 import { bandBusy, CONVEYOR_SPEED, chipPosition, growHeights, popIn, prefersReducedMotion, SETTLE, Spring, stampBounce } from '@/lib/uprough/factory/motion';
-import { drawConveyor, drawEnvelope, drawEyes, drawGear, drawWave, readTokens, type FactoryColors } from '@/lib/uprough/factory/draw';
+import { drawConveyor, drawEnvelope, drawEyes, drawGear, drawWave, fitCanvas, readTokens, type FactoryColors } from '@/lib/uprough/factory/draw';
 import { playCue, type Cue } from '@/lib/uprough/factory/factorySfx';
 import { hasLocalPreview, playVoice } from '@/lib/uprough/factory/voiceAudition';
 import { Button } from '@components/ui/Button';
@@ -40,6 +40,18 @@ function useClock(done: boolean, startedAt: number, until: number, eventCount: n
   return now;
 }
 
+/** Re-renders when the canvas's displayed width changes, so its draw effect refits the backing store to the new width. */
+function useRedrawOnResize(ref: React.RefObject<HTMLCanvasElement | null>): void {
+  const [, setWidth] = useState(0);
+  useEffect(() => {
+    const cv = ref.current;
+    if (!cv || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setWidth(cv.clientWidth));
+    ro.observe(cv);
+    return () => ro.disconnect();
+  }, [ref]);
+}
+
 function Wave(props: { a?: Peaks; b?: Peaks; frac?: number; reveal?: number; reference?: number; height?: number; final?: boolean; env?: { values: number[]; n: number }; envLabel?: string; eyes?: number }): React.ReactElement {
   const { a, b, frac = 0, reveal = 1, reference, height = 56, final = false, env, envLabel, eyes } = props;
   const ref = useRef<HTMLCanvasElement>(null);
@@ -48,11 +60,13 @@ function Wave(props: { a?: Peaks; b?: Peaks; frac?: number; reveal?: number; ref
     const ctx = cv?.getContext('2d');
     if (!cv || !ctx) return;
     const c: FactoryColors = readTokens(cv);
-    drawWave(ctx, cv.width, cv.height, a, b, frac, final ? c.final : c.wave, c.line, reveal, reference);
-    if (env) drawEnvelope(ctx, cv.width, cv.height, env, envLabel ?? '', c);
-    if (eyes !== undefined) drawEyes(ctx, cv.width - 22, 10, eyes, 0, c);
+    const { w, h } = fitCanvas(cv, ctx, height, 240);
+    drawWave(ctx, w, h, a, b, frac, final ? c.final : c.wave, c.line, reveal, reference);
+    if (env) drawEnvelope(ctx, w, h, env, envLabel ?? '', c);
+    if (eyes !== undefined) drawEyes(ctx, w - 22, 10, eyes, 0, c);
   });
-  return <canvas ref={ref} width={240} height={height} className="w-full" style={{ height }} />;
+  useRedrawOnResize(ref);
+  return <canvas ref={ref} width={240} height={height} className="w-full block" style={{ height }} />;
 }
 
 export const PREVIEW_CAPTION = 'Preview before mastering';
@@ -138,16 +152,18 @@ function Machinery(props: { timeSec: number; busy: boolean; bandBusy: boolean; c
     const ctx = cv?.getContext('2d');
     if (!cv || !ctx) return;
     const c = readTokens(cv);
-    ctx.clearRect(0, 0, cv.width, cv.height);
+    const { w, h } = fitCanvas(cv, ctx, 40, 240);
+    ctx.clearRect(0, 0, w, h);
     const spin = props.busy ? props.timeSec : 0;
     drawGear(ctx, 16, 18, 11, 8, spin * 2, c.dim);
     drawGear(ctx, 36, 24, 8, 6, -spin * 2.6, c.line);
-    const riding = props.chips.map((k) => ({ k, x: chipPosition(k.bornAtSec, props.timeSec, cv.width, CONVEYOR_SPEED) }))
-      .filter(({ k }) => (props.timeSec - k.bornAtSec) * CONVEYOR_SPEED < cv.width)
+    const riding = props.chips.map((k) => ({ k, x: chipPosition(k.bornAtSec, props.timeSec, w, CONVEYOR_SPEED) }))
+      .filter(({ k }) => (props.timeSec - k.bornAtSec) * CONVEYOR_SPEED < w)
       .map(({ k, x }) => ({ x, label: k.label }));
-    drawConveyor(ctx, cv.width, 34, props.bandBusy ? props.timeSec * 30 : 0, c.dim, riding, c.plate, c.text);
+    drawConveyor(ctx, w, 34, props.bandBusy ? props.timeSec * 30 : 0, c.dim, riding, c.plate, c.text);
   });
-  return <canvas ref={ref} width={240} height={40} className="w-full" style={{ height: 40 }} />;
+  useRedrawOnResize(ref);
+  return <canvas ref={ref} width={240} height={40} className="w-full block" style={{ height: 40 }} />;
 }
 
 /** Tooltip and aria-label of a host-only strip cell (the plan's wording). */
