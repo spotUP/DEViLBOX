@@ -415,13 +415,22 @@ export function createVoice(ctx: ChannelRoutingContext, channelIndex: number, in
  * Helper to stop a specific voice
  */
 export function stopVoice(voice: VoiceState, time: number): void {
+  releaseVoice(voice, time);
+  disposeVoiceNodes(voice);
+}
+
+/** Release the voice's note on its instrument (no node teardown). */
+export function releaseVoice(voice: VoiceState, time: number): void {
   if ((voice.instrument as any).stop) (voice.instrument as any).stop(time);
   else if (isDevilboxSynth(voice.instrument)) {
     // A DevilboxSynth takes (note?, time?). Tone's triggerRelease(time) put the time in the note slot:
     // a DX7 received noteOff 84.13, never released the real note, and the voice kept sounding.
     voice.instrument.triggerRelease?.(undefined, time);
   } else if ((voice.instrument as any).triggerRelease) (voice.instrument as any).triggerRelease(time);
+}
 
+/** Tear down the voice's routing nodes after a short delay. */
+export function disposeVoiceNodes(voice: VoiceState): void {
   // Dispose nodes after a short delay to allow for audio tail/clipping prevention
   setTimeout(() => {
     // Drop the inbound edge first: a GainNode that still has a connected
