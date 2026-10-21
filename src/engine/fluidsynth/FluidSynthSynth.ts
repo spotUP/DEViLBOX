@@ -45,6 +45,8 @@ export interface FluidSynthConfig {
   bank?: number;            // 0-128
   tuning?: number;          // 430-450 Hz
   transpose?: number;       // -24 to 24
+  /** 'gm' stacks the General MIDI SoundFont (GeneralUser GS) on the shared synth. */
+  soundFont?: 'default' | 'gm';
 }
 
 export const DEFAULT_FLUIDSYNTH: FluidSynthConfig = {
@@ -126,8 +128,10 @@ export const FLUIDSYNTH_PRESETS: Record<string, FluidSynthConfig> = {
   },
 };
 
+type NumericKey = Exclude<keyof FluidSynthConfig, 'soundFont'>;
+
 /** Bridge setParam ids 0-10, applied to every channel of the synth. */
-const SYNTH_WIDE_KEYS: (keyof FluidSynthConfig)[] = [
+const SYNTH_WIDE_KEYS: NumericKey[] = [
   'reverbRoomSize', 'reverbDamping', 'reverbWidth', 'reverbLevel',
   'chorusVoices', 'chorusLevel', 'chorusSpeed', 'chorusDepth', 'chorusType',
   'gain', 'polyphony',
@@ -160,6 +164,7 @@ export class FluidSynthSynthEngine implements DevilboxSynth {
     this.slot = host.allocSlot(this.drum);
     this.slotOut = host.slotOutput(this.slot);
     this.slotOut.connect(this.output);
+    if (this.config.soundFont === 'gm') host.requestGMSoundFont();
     this.sendConfig();
   }
 
@@ -193,6 +198,12 @@ export class FluidSynthSynthEngine implements DevilboxSynth {
     host.post({ type: 'programChange', channel: this.slot, program: this.config.program ?? 0 });
   }
 
+  /** The GM SoundFont stays loaded host-wide once requested; 'default' does not unload it. */
+  protected useGMSoundFont(): void {
+    this.config.soundFont = 'gm';
+    this.host?.requestGMSoundFont();
+  }
+
   loadSF2(data: ArrayBuffer | Uint8Array, filename?: string): void {
     this.host?.loadSoundFont(data, filename);
   }
@@ -222,7 +233,7 @@ export class FluidSynthSynthEngine implements DevilboxSynth {
 
   set(param: string, value: number): void {
     if (!(param in DEFAULT_FLUIDSYNTH)) return;
-    const key = param as keyof FluidSynthConfig;
+    const key = param as NumericKey;
     this.config[key] = value;
     const index = SYNTH_WIDE_KEYS.indexOf(key);
     if (index >= 0) {
@@ -234,7 +245,7 @@ export class FluidSynthSynthEngine implements DevilboxSynth {
   }
 
   get(param: string): number | undefined {
-    return this.config[param as keyof FluidSynthConfig];
+    return this.config[param as NumericKey];
   }
 
   setPreset(name: string): void {
@@ -262,6 +273,7 @@ export class FluidSynthSynthImpl extends FluidSynthSynthEngine {
   }
 
   applyConfig(config: Partial<FluidSynthConfig>): void {
+    if (config.soundFont === 'gm') this.useGMSoundFont();
     for (const [key, value] of Object.entries(config)) {
       if (typeof value === 'number' && value !== this.get(key)) {
         this.set(key, value);

@@ -17,6 +17,7 @@
  */
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { loadGMSoundFont, GM_SOUNDFONT_FILE } from './gmSoundFont';
 
 /** Dry output groups (= MIDI channels) of the shared synth. */
 export const FLUID_GROUPS = 64;
@@ -98,6 +99,7 @@ export class FluidSynthHost {
   private readonly slotGains = new Array<GainNode | null>(FLUID_GROUPS).fill(null);
   private readonly listeners = new Set<Listener>();
   private fxDestination: AudioNode | null = null;
+  private gmRequested = false;
 
   private constructor(ctx: BaseAudioContext) {
     this.ctx = ctx;
@@ -210,6 +212,21 @@ export class FluidSynthHost {
       // No default SoundFont: the user loads one by hand.
       this.markSoundFontIn();
     }
+  }
+
+  /**
+   * Stack the General MIDI SoundFont on top of default.sf2, once per host.
+   * Notes before it lands play from default.sf2 where it has the preset;
+   * after it, every channel's preset re-resolves to the GM bank.
+   */
+  requestGMSoundFont(): void {
+    if (this.gmRequested || this.disposed) return;
+    this.gmRequested = true;
+    void (async () => {
+      await this.sfReady;
+      const bytes = await loadGMSoundFont();
+      if (bytes && !this.disposed) this.loadSoundFont(bytes, GM_SOUNDFONT_FILE);
+    })();
   }
 
   /** Load a SoundFont into the shared synth (newest font wins; channel presets re-resolve). */
