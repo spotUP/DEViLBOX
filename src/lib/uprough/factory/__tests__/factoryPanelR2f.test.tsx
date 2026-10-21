@@ -7,9 +7,22 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { Peaks } from '@/engine/uprough/r2Peaks';
 
 const drawn: (Peaks | undefined)[] = [];
+const waveCalls: { peaks: Peaks | undefined; reference: number | undefined; tallest: number }[] = [];
+const bandCalls: { offset: number; chips: number }[] = [];
 vi.mock('@/lib/uprough/factory/draw', async (orig) => {
   const m = await orig<typeof import('@/lib/uprough/factory/draw')>();
-  return { ...m, drawWave: vi.fn((...a: Parameters<typeof m.drawWave>) => { drawn.push(a[3]); return m.drawWave(...a); }) };
+  return {
+    ...m,
+    drawWave: vi.fn((...a: Parameters<typeof m.drawWave>) => {
+      drawn.push(a[3]);
+      // Measure what is really drawn: the tallest bar above the centre line, as a fraction of the half box.
+      let top = a[2] / 2;
+      const rec = new Proxy(a[0], { get: (t, k) => (k === 'fillRect' ? (x: number, y: number, w: number, h: number) => { top = Math.min(top, y); t.fillRect(x, y, w, h); } : Reflect.get(t, k) as unknown) });
+      m.drawWave(rec, ...(a.slice(1) as [never, never, never, never, never, never, never, never?, never?]));
+      waveCalls.push({ peaks: a[3], reference: a[9], tallest: (a[2] / 2 - top) / (a[2] / 2 - 1) });
+    }),
+    drawConveyor: vi.fn((...a: Parameters<typeof m.drawConveyor>) => { bandCalls.push({ offset: a[3], chips: a[5]?.length ?? 0 }); return m.drawConveyor(...a); }),
+  };
 });
 vi.mock('@/utils/audio-context', () => ({ getDevilboxAudioContext: () => undefined }));
 
@@ -17,7 +30,7 @@ import { FactoryPanel } from '@components/uprough/FactoryPanel';
 import { useFactoryStore, factoryOnEvent } from '../useFactoryStore';
 import { scriptedGenerateEvents } from '../scriptedRun';
 import { SLOT_OF_VOICE } from '../factoryModel';
-import { growHeights } from '../motion';
+import { bandBusy, chipPosition, growHeights } from '../motion';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import type { R2Event } from '@/engine/uprough/r2Events';
 import { peaks } from '@/engine/uprough/r2Peaks';
@@ -32,7 +45,7 @@ beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as never);
   vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'setTimeout', 'clearTimeout'] });
   vi.advanceTimersByTime(5);
-  drawn.length = 0;
+  drawn.length = 0; waveCalls.length = 0; bandCalls.length = 0;
   useFactoryStore.getState().reset();
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
@@ -96,6 +109,65 @@ describe('R2f-32 record press growth', () => {
     runClock(5000);
     const last = drawn.filter((p): p is Peaks => !!p).at(-1)!;
     expect(maxOf(last)).toBe(maxOf(master));
+  });
+
+  it('the press draws in absolute amplitude: t=0 is texture.scale/master.scale of the master height, t=1 the master height', () => {
+    expect(tex.scale).toBeLessThan(master.scale);
+    render(<FactoryPanel />);
+    feed([{ seq: 0, type: 'start', mode: 'render', rate: 22050, style: 'trap', seed: 3, sections: [] },
+      { seq: 1, type: 'texture', peaks: tex }]);
+    waveCalls.length = 0;
+    feed([{ seq: 2, type: 'master', peaks: master }]);
+    const height = (c: { tallest: number }): number => c.tallest;
+    const press = (): typeof waveCalls => waveCalls.filter((c) => c.peaks && c.reference !== undefined);
+    const start = height(press().find((c) => c.peaks!.scale === tex.scale)!);
+    runClock(5000);
+    const end = height(press().at(-1)!);
+    expect(end).toBeCloseTo(maxOf(master) / 127, 1);
+    expect(start / end).toBeCloseTo(tex.scale / master.scale, 2);
+  });
+});
+
+describe('R2f-56 conveyor chips and idle band', () => {
+  it('chipPosition: 0 at birth, monotone, capped so the chip stays on the band', () => {
+    expect(chipPosition(10, 10, 240, 60)).toBe(0);
+    expect(chipPosition(10, 10.5, 240, 60)).toBe(30);
+    let prev = -1;
+    for (let t = 10; t < 20; t += 0.25) { const x = chipPosition(10, t, 240, 60); expect(x).toBeGreaterThanOrEqual(prev); prev = x; }
+    expect(chipPosition(10, 1000, 240, 60)).toBeLessThanOrEqual(240);
+    expect(chipPosition(10, 9, 240, 60)).toBe(0);
+  });
+
+  it('bandBusy: only an event inside the window makes the band busy', () => {
+    expect(bandBusy(5000, undefined)).toBe(false);
+    expect(bandBusy(5000, 4500)).toBe(true);
+    expect(bandBusy(5000, 2000)).toBe(false);
+  });
+
+  it('a chip rides for each of 7 real section events, and none ride without section events', () => {
+    render(<FactoryPanel />);
+    feed([{ seq: 0, type: 'start', mode: 'render', rate: 22050, style: 'trap', seed: 3, sections: [] }]);
+    runClock(100);
+    expect(Math.max(...bandCalls.map((c) => c.chips))).toBe(0);
+    const sections = Array.from({ length: 7 }, (_, i) => ({ name: `s${i}`, bars: 4, layers: [] as string[] }));
+    feed([{ seq: 1, type: 'start', mode: 'render', rate: 22050, style: 'trap', seed: 3, sections },
+      ...sections.map((s, i): R2Event => ({ seq: 2 + i, type: 'section', section: i, name: s.name, bars: 4, cached: false }))]);
+    bandCalls.length = 0;
+    runClock(50);
+    expect(Math.max(...bandCalls.map((c) => c.chips))).toBe(7);
+  });
+
+  it('the band does not advance with busy true but no event for 2 s', () => {
+    render(<FactoryPanel />);
+    feed([{ seq: 0, type: 'start', mode: 'render', rate: 22050, style: 'trap', seed: 3, sections: [] }]);
+    runClock(100);
+    expect(useFactoryStore.getState().state.done).toBe(false);
+    expect(bandCalls.some((c) => c.offset > 0)).toBe(true);
+    runClock(2000);
+    bandCalls.length = 0;
+    runClock(500);
+    expect(bandCalls.length).toBeGreaterThan(0);
+    expect(new Set(bandCalls.map((c) => c.offset))).toEqual(new Set([0]));
   });
 });
 

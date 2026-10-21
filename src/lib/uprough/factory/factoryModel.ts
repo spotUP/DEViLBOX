@@ -69,6 +69,8 @@ export interface FactoryState {
   eventCount: number;
   /** The kind of the last event folded in, for the sound cue. */
   lastType: R2Event['type'] | null;
+  /** One entry per real `section` event, in arrival order: what the conveyor chips are made from (R2f-56). */
+  sectionEvents: { index: number; name: string }[];
   cellsWritten: number;
   done: boolean;
 }
@@ -78,7 +80,7 @@ const newSlots = (): SlotView[] =>
 
 export const initialFactoryState = (): FactoryState => ({
   mode: null, rate: 22050, style: '', seed: 0, slots: newSlots(), voiceOrder: [], sections: [],
-  press: {}, caption: 'Waiting for a song', eventCount: 0, lastType: null, cellsWritten: 0, done: false,
+  press: {}, caption: 'Waiting for a song', eventCount: 0, lastType: null, sectionEvents: [], cellsWritten: 0, done: false,
 });
 
 /** Word-case a stage or voice name for a caption: tape_sat -> tape sat. */
@@ -157,6 +159,7 @@ export function reduceFactory(prev: FactoryState, ev: R2Event, cellsWritten = 0)
     case 'section': {
       const sec = s.sections[ev.section];
       if (sec) { sec.lit = true; sec.cached = ev.cached; }
+      s.sectionEvents = [...s.sectionEvents, { index: ev.section, name: ev.name }];
       s.caption = `Rendering ${ev.name}`;
       return s;
     }

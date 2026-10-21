@@ -17,19 +17,23 @@ export function readTokens(el: Element): FactoryColors {
 }
 
 /** The bucket value at fractional position u in 0..1: min and max in -1..1. */
-function at(p: Peaks, u: number): { lo: number; hi: number } {
+function at(p: Peaks, u: number, reference?: number): { lo: number; hi: number } {
   if (p.n === 0) return { lo: 0, hi: 0 };
   const i = Math.min(p.n - 1, Math.max(0, Math.floor(u * p.n)));
-  return { lo: p.min[i]! / 127, hi: p.max[i]! / 127 };
+  // Absolute amplitude: the int8 buckets are normalised per buffer, `scale` is the buffer's real max |sample|.
+  const gain = reference !== undefined && reference > 0 ? p.scale / reference : 1;
+  return { lo: (p.min[i]! / 127) * gain, hi: (p.max[i]! / 127) * gain };
 }
 
 /**
  * The min/max bars of `a` morphing into `b` (frac 0..1), over a centre line. `reveal` 0..1 draws only the left part
- * (the one-shot growing). Returns nothing; draws into the whole canvas box.
+ * (the one-shot growing). `reference`, when given, draws in absolute amplitude: a bucket's height is (value/127)*scale/reference,
+ * so waves of different real loudness keep their relative size (the record press, R2f-32). Without it every wave fills the
+ * box (its own normalised look). Returns nothing; draws into the whole canvas box.
  */
 export function drawWave(
   ctx: CanvasRenderingContext2D, w: number, h: number, a: Peaks | undefined, b: Peaks | undefined, frac: number,
-  color: string, lineColor: string, reveal = 1,
+  color: string, lineColor: string, reveal = 1, reference?: number,
 ): void {
   ctx.clearRect(0, 0, w, h);
   ctx.strokeStyle = lineColor;
@@ -40,8 +44,8 @@ export function drawWave(
   ctx.fillStyle = color;
   for (let x = 0; x < cols; x++) {
     const u = x / w;
-    const pa = a ? at(a, u) : { lo: 0, hi: 0 };
-    const pb = b ? at(b, u) : pa;
+    const pa = a ? at(a, u, reference) : { lo: 0, hi: 0 };
+    const pb = b ? at(b, u, reference) : pa;
     const lo = pa.lo + (pb.lo - pa.lo) * frac;
     const hi = pa.hi + (pb.hi - pa.hi) * frac;
     const y0 = h / 2 - hi * (h / 2 - 1);
@@ -94,9 +98,22 @@ export function drawGear(ctx: CanvasRenderingContext2D, cx: number, cy: number, 
   ctx.restore();
 }
 
-/** A conveyor band: scrolling ticks along the bottom edge. */
-export function drawConveyor(ctx: CanvasRenderingContext2D, w: number, y: number, offset: number, color: string): void {
+/** A section chip riding the conveyor (R2f-56): `x` is its left edge from `chipPosition`. */
+export interface ConveyorChip { x: number; label: string }
+
+/** A conveyor band: scrolling ticks along the bottom edge, with a chip per real section event riding on it. */
+export function drawConveyor(
+  ctx: CanvasRenderingContext2D, w: number, y: number, offset: number, color: string,
+  chips: readonly ConveyorChip[] = [], plateColor: string = color, textColor: string = color,
+): void {
   ctx.fillStyle = color;
   ctx.fillRect(0, y, w, 1);
   for (let x = -(offset % 10); x < w; x += 10) ctx.fillRect(x, y + 2, 2, 3);
+  ctx.font = '9px sans-serif';
+  for (const chip of chips) {
+    ctx.fillStyle = plateColor;
+    ctx.fillRect(chip.x, y - 12, 40, 11);
+    ctx.fillStyle = textColor;
+    ctx.fillText(chip.label.slice(0, 8), chip.x + 2, y - 3);
+  }
 }
