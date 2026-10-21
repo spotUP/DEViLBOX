@@ -18,7 +18,10 @@
 import { Midi, type Track } from '@tonejs/midi';
 import type { Pattern, TrackerCell, ChannelData } from '@typedefs/tracker';
 import { midiToXMNote } from '../xmConversions';
-import { gmProgramToInstrument, gmPercussionNoteToInstrument } from './GMSoundBank';
+import {
+  gmProgramToInstrument, gmPercussionNoteToInstrument, gmFluidInstrument, gmPercussionName,
+  GM2_NAMES, GM_DRUM_BANK,
+} from './GMSoundBank';
 import type { InstrumentConfig } from '@typedefs/instrument';
 
 function generateId(prefix = 'id'): string {
@@ -32,6 +35,11 @@ export interface MIDIImportOptions {
   mergeChannels?: boolean;
   velocityToVolume?: boolean;
   defaultPatternLength?: number;
+  /**
+   * 'gm' plays every track on the General MIDI SoundFont through FluidSynth;
+   * 'synth' uses DEViLBOX's built-in stand-in synths and drum machines.
+   */
+  soundFont?: 'gm' | 'synth';
 }
 
 /** Replayer speed (ticks per row) every imported MIDI song plays at. */
@@ -40,7 +48,7 @@ export const MIDI_IMPORT_SPEED = 6;
 /** Rows per MIDI quarter note. With speed 6 this makes tracker BPM equal MIDI BPM. */
 const ROWS_PER_BEAT = 4;
 
-/** Drum trigger note for DrumMachine instruments (C-5). */
+/** Drum trigger note for the 'synth' DrumMachine instruments (C-5). */
 const DRUM_TRIGGER_NOTE = 61;
 
 /** XM note-off. */
@@ -50,6 +58,7 @@ export const DEFAULT_MIDI_IMPORT_OPTIONS: Required<Omit<MIDIImportOptions, 'merg
   quantize: 0,
   velocityToVolume: true,
   defaultPatternLength: 64,
+  soundFont: 'gm',
 };
 
 export interface MIDIImportResult {
@@ -78,7 +87,11 @@ export async function importMIDIFile(
   file: File,
   options: Partial<MIDIImportOptions> = {}
 ): Promise<MIDIImportResult> {
-  const opts = { ...DEFAULT_MIDI_IMPORT_OPTIONS, ...options };
+  const opts = {
+    ...DEFAULT_MIDI_IMPORT_OPTIONS, ...options,
+    // Callers pass the field through as undefined when unset; that keeps the default.
+    soundFont: options.soundFont ?? DEFAULT_MIDI_IMPORT_OPTIONS.soundFont,
+  };
 
   const arrayBuffer = await file.arrayBuffer();
   const midi = new Midi(arrayBuffer);
@@ -125,7 +138,10 @@ export async function importMIDIFile(
     if (track.notes.length === 0 || track.instrument.percussion) continue;
 
     const instId = nextInstId++;
-    instruments.push(gmProgramToInstrument(track.instrument.number, instId, false));
+    const program = track.instrument.number;
+    instruments.push(opts.soundFont === 'gm'
+      ? gmFluidInstrument(program, 0, instId, GM2_NAMES[program] ?? `Program ${program}`)
+      : gmProgramToInstrument(program, instId, false));
 
     const sustainIntervals = buildSustainIntervals(track.controlChanges[64]);
     const voices: Voice[] = [];
@@ -170,7 +186,12 @@ export async function importMIDIFile(
     const defaults = initialChannelDefaults(track);
     for (const [midiNote, hits] of Array.from(groups.entries()).sort((a, b) => a[0] - b[0])) {
       const instId = nextInstId++;
-      const inst = gmPercussionNoteToInstrument(midiNote, instId);
+      // On the GM SoundFont every drum is the track's kit, played at its GM key.
+      const gm = opts.soundFont === 'gm';
+      const inst = gm
+        ? gmFluidInstrument(track.instrument.number, GM_DRUM_BANK, instId, gmPercussionName(midiNote))
+        : gmPercussionNoteToInstrument(midiNote, instId);
+      const cellNote = gm ? midiToXMNote(midiNote) : DRUM_TRIGGER_NOTE;
       instruments.push(inst);
 
       // One cell holds one hit.  Two hits of the same drum that quantize to
@@ -185,7 +206,7 @@ export async function importMIDIFile(
           rows = makeEmptyRows(totalRows);
           voiceRows.push(rows);
         }
-        rows[row].note = DRUM_TRIGGER_NOTE;
+        rows[row].note = cellNote;
         rows[row].instrument = instId;
         if (opts.velocityToVolume) {
           rows[row].volume = velocityToVolumeColumn(hit.velocity);

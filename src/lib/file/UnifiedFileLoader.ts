@@ -15,6 +15,7 @@ import { notify } from '@/stores/useNotificationStore';
 import { isSupportedFormat } from '@/lib/import/FormatRegistry';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 import { suppressFormatChecks, restoreFormatChecks } from '@/lib/formatCompatibility';
+import type { MIDIImportOptions } from '@lib/import/MIDIImporter';
 
 
 export interface FileLoadOptions {
@@ -25,11 +26,7 @@ export interface FileLoadOptions {
   /** Pre-scanned UADE metadata — avoids a redundant scan when the dialog already ran one */
   uadeMetadata?: UADEMetadata;
   /** MIDI-specific import settings */
-  midiOptions?: {
-    quantize?: number;
-    velocityToVolume?: boolean;
-    defaultPatternLength?: number;
-  };
+  midiOptions?: MIDIImportOptions;
   /** Companion files (e.g. Sonix .ss/.instr) for multi-file formats */
   companionFiles?: Map<string, ArrayBuffer>;
   /** TD-3: if true, clear existing patterns before importing */

@@ -7,6 +7,7 @@
  * Reference: https://en.wikipedia.org/wiki/General_MIDI_Level_2
  */
 
+import { DEFAULT_FLUIDSYNTH } from '@/engine/fluidsynth/FluidSynthSynth';
 import type { InstrumentConfig, OscillatorConfig, EnvelopeConfig, FilterConfig, DrumType, DrumMachineType } from '@typedefs/instrument';
 
 // ─── Shared building blocks ─────────────────────────────────────────────────
@@ -369,7 +370,7 @@ export const GM_PERCUSSION_MAP: Partial<Record<number, PercussionEntry>> = {
  */
 export function gmPercussionNoteToInstrument(midiNote: number, id: number): InstrumentConfig {
   const entry = GM_PERCUSSION_MAP[midiNote] ?? {
-    name: `Perc ${midiNote}`,
+    name: gmPercussionName(midiNote),
     drumType: 'snare' as DrumType,
     machineType: '808' as DrumMachineType,
   };
@@ -382,6 +383,33 @@ export function gmPercussionNoteToInstrument(midiNote: number, id: number): Inst
       machineType: entry.machineType,
     },
   };
+}
+
+// ─── General MIDI SoundFont (FluidSynth) ─────────────────────────────────────
+
+/** SoundFont bank that holds the GM drum kits. */
+export const GM_DRUM_BANK = 128;
+
+/**
+ * A FluidSynth instrument on the General MIDI SoundFont: the real GM sound for
+ * a program (bank 0) or a drum kit (bank 128, program = kit number).
+ */
+export function gmFluidInstrument(program: number, bank: number, id: number, name: string): InstrumentConfig {
+  return {
+    ...BASE, id, name,
+    synthType: 'FluidSynth',
+    fluidsynth: {
+      ...DEFAULT_FLUIDSYNTH,
+      program: Math.max(0, Math.min(127, program)),
+      bank,
+      soundFont: 'gm',
+    },
+  };
+}
+
+/** Name of a GM percussion note, as the drum channel shows it. */
+export function gmPercussionName(midiNote: number): string {
+  return GM_PERCUSSION_MAP[midiNote]?.name ?? `Perc ${midiNote}`;
 }
 
 // ─── Main lookup ─────────────────────────────────────────────────────────────

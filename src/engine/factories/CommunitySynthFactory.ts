@@ -1053,10 +1053,9 @@ export function createVL1(config: InstrumentConfig): Tone.ToneAudioNode {
 }
 
 export function createFluidSynth(config: InstrumentConfig): Tone.ToneAudioNode {
-  const fsConfig = config.fluidsynth || {};
-  const synth = new FluidSynthSynthImpl();
+  // The constructor takes the config so a drum-bank instrument gets a drum slot.
+  const synth = new FluidSynthSynthImpl(config.fluidsynth || {});
   void synth.init();
-  synth.applyConfig(fsConfig);
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('FluidSynth', config.volume));
   return synth as unknown as Tone.ToneAudioNode;
 }
