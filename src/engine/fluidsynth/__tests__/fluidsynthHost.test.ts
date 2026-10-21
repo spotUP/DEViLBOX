@@ -183,4 +183,23 @@ describe('FluidSynthHost', () => {
     const fresh = mod.FluidSynthHost.acquire(ctx);
     expect(fresh).not.toBe(host);
   });
+  it('presetNames asks the worklet for all 128 programs of a bank, empty where no preset exists', async () => {
+    const { host, node } = await bootedHost();
+    const pending = host.presetNames(128);
+    await flush();
+    const asks = node.posted.filter((m) => m.type === 'getPresetName');
+    expect(asks).toHaveLength(128);
+    expect(asks.every((m) => m.bank === 128)).toBe(true);
+    // Another bank's reply must not count toward this one.
+    node.reply({ type: 'presetName', bank: 0, program: 0, name: 'Grand Piano' });
+    for (const m of asks) {
+      const name = m.program === 0 ? 'Standard 1' : m.program === 25 ? '808/909' : '';
+      node.reply({ type: 'presetName', bank: 128, program: m.program, name });
+    }
+    const names = await pending;
+    expect(names).toHaveLength(128);
+    expect(names[0]).toBe('Standard 1');
+    expect(names[25]).toBe('808/909');
+    expect(names[5]).toBe('');
+  });
 });
