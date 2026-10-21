@@ -154,7 +154,7 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
         theme="modern"
       />
 
-      <div className="p-4 space-y-4 flex-1 min-h-0 overflow-y-auto">
+      <div className={`p-4 flex-1 min-h-0 ${showFactory ? 'flex flex-col gap-3 overflow-hidden' : 'space-y-4 overflow-y-auto'}`}>
         <p className="text-xs text-text-muted">
           Generate a song with the Up Rough generator. It plays the same on the device as it does here.
         </p>
@@ -229,7 +229,9 @@ export const UpRoughGenerateDialog: React.FC<UpRoughGenerateDialogProps> = ({ is
         {error && <p role="alert" className="text-xs font-mono text-accent-error whitespace-pre-wrap break-words">{error}</p>}
 
         {showFactory && (
-          <FactoryPanel onReplay={handleReplay} />
+          <div className="flex-1 min-h-0">
+            <FactoryPanel onReplay={handleReplay} />
+          </div>
         )}
       </div>
 
