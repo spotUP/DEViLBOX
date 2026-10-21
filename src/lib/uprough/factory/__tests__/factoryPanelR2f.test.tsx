@@ -213,9 +213,9 @@ describe('R2f-59 auto-scroll and controls', () => {
     expect(status.getAttribute('role')).toBe('status');
     expect(status.getAttribute('aria-live')).toBe('polite');
     const toggle = screen.getByRole('button', { name: /Factory sounds/ });
-    expect(toggle.getAttribute('aria-pressed')).toBe('false');
-    fireEvent.click(toggle);
     expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
     fireEvent.click(screen.getByRole('button', { name: /Replay scripted run/ }));
     expect(replay).toHaveBeenCalledTimes(1);
   });

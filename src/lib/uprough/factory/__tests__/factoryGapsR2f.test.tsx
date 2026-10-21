@@ -25,6 +25,8 @@ vi.mock('@/lib/uprough/factory/draw', async (orig) => {
 });
 vi.mock('@/lib/uprough/factory/voiceAudition', async (orig) => ({ ...(await orig<typeof import('@/lib/uprough/factory/voiceAudition')>()), hasLocalPreview: () => previewOn, playVoice: vi.fn() }));
 let previewOn = false;
+const cueCalls: { cue: string; step: number | undefined }[] = [];
+vi.mock('@/lib/uprough/factory/factorySfx', async (orig) => ({ ...(await orig<typeof import('@/lib/uprough/factory/factorySfx')>()), playCue: (cue: string, step?: number) => { cueCalls.push({ cue, step }); } }));
 vi.mock('@/utils/audio-context', () => ({ getDevilboxAudioContext: () => undefined }));
 
 import { drawEyes, drawStamp, eyeOpenness, PLATE_SECONDS } from '@/lib/uprough/factory/draw';
@@ -42,7 +44,7 @@ beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as never);
   vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame', 'performance', 'setTimeout', 'clearTimeout'] });
   vi.advanceTimersByTime(5);
-  waveCalls.length = 0; stampCalls.length = 0; playheadCalls.length = 0; previewOn = false;
+  cueCalls.length = 0; waveCalls.length = 0; stampCalls.length = 0; playheadCalls.length = 0; previewOn = false;
   useFactoryStore.getState().reset();
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
@@ -241,5 +243,21 @@ describe('G20 finale', () => {
       if (built.length >= 3 && built.every((c) => Math.abs(scaleOf(c) - 1) > 0.004)) { seen.add('all'); break; }
     }
     expect(seen.has('all')).toBe(true);
+  });
+});
+
+describe('G16 sound cues', () => {
+  it('sound is on by default: a pop at each voice start, stage cues rising with k, one tick per hat variant', () => {
+    render(<FactoryPanel />);
+    expect([...document.querySelectorAll('button')].find((b) => /Factory sounds/.test(b.textContent ?? ''))!.getAttribute('aria-pressed')).toBe('true');
+    feed(scriptedGenerateEvents('trap', 3).filter((e) => e.type !== 'done'));
+    runClock(60_000);
+    const st = useFactoryStore.getState().state;
+    expect(cueCalls.filter((c) => c.cue === 'pop')).toHaveLength(st.voiceOrder.length);
+    const stages = cueCalls.filter((c) => c.cue === 'stage');
+    expect(stages.length).toBeGreaterThan(st.voiceOrder.length);
+    expect(Math.max(...stages.map((c) => c.step ?? 0))).toBeGreaterThanOrEqual(2);
+    expect(stages.some((c) => c.step === 0)).toBe(true);
+    expect(cueCalls.filter((c) => c.cue === 'tick')).toHaveLength(st.slots.find((s) => s.hatVariants.length > 0)!.hatVariants.length);
   });
 });
