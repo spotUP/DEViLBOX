@@ -184,10 +184,23 @@ describe('createGenreService', () => {
     expect(results[1]).toMatchObject({ status: 'rejected', reason: { status: 503 } });
   });
 
-  it('a name without a ModArchive format is stored as unsupported without a request', async () => {
+  it('a name without a ModArchive format answers unsupported without a request', async () => {
     const { service, fetchFn } = setup();
     expect((await service.lookup({ ...Q, name: 'mdat.song' })).source).toBe('unsupported');
     expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('an unusable name does not block a later usable name for the same module', async () => {
+    const { service, fetchFn } = setup();
+    expect((await service.lookup({ ...Q, name: 'Chemical-Emotion' })).source).toBe('unsupported');
+    expect(await service.lookup(Q)).toMatchObject({ source: 'modarchive', modarchiveId: 100721 });
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('an old stored unsupported row is looked up again', async () => {
+    const { service, database } = setup();
+    database.prepare("INSERT INTO module_genres (key, source, checked_at) VALUES (?, 'unsupported', ?)").run(Q.key, Date.now());
+    expect((await service.lookup(Q)).source).toBe('modarchive');
   });
 
   it('an ambiguous row is settled when a later client sends the md5', async () => {

@@ -224,7 +224,9 @@ export function createGenreService(opts: GenreServiceOptions = {}): GenreService
 
   async function resolve(q: GenreQuery): Promise<GenreAnswer> {
     const query = normaliseModuleName(q.name);
-    if (!query) return store(q.key, { source: 'unsupported', genre: null, modarchiveId: null, md5: null });
+    // Not stored: unsupported describes this request's name, not the module, and a later client
+    // may send a usable name for the same key.
+    if (!query) return { key: q.key, genre: null, source: 'unsupported', modarchiveId: null };
     const key = apiKey();
     if (!key) throw new GenreLookupError('ModArchive lookup is not configured', 503);
     const xml = await throttled(() => search(query, key));
@@ -236,7 +238,8 @@ export function createGenreService(opts: GenreServiceOptions = {}): GenreService
   return {
     lookup(q) {
       const row = sql().get.get(q.key) as GenreRow | undefined;
-      const fresh = row && (row.source === 'modarchive' || now() - row.checked_at < RECHECK_MS);
+      const fresh = row && row.source !== 'unsupported'
+        && (row.source === 'modarchive' || now() - row.checked_at < RECHECK_MS);
       // An ambiguous name match can be settled by an md5 that the earlier client did not send.
       if (row && fresh && !(row.source === 'ambiguous' && q.md5)) {
         return Promise.resolve({ key: row.key, genre: row.genre, source: row.source, modarchiveId: row.modarchive_id });
