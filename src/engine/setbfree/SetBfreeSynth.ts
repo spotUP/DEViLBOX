@@ -275,6 +275,13 @@ const CONFIG_KEYS: (keyof SetBfreeConfig)[] = [
   'volume', 'keyClick', 'tuning', 'outputLevel', 'swellPedal',
 ];
 
+/** A native patch's value array as a SetBfreeConfig, through CONFIG_KEYS (single mapping for engine and store). */
+export function setbfreeConfigFromNativeValues(values: readonly number[]): SetBfreeConfig {
+  const config: Record<string, number> = {};
+  for (let i = 0; i < Math.min(values.length, CONFIG_KEYS.length); i++) config[CONFIG_KEYS[i]] = values[i];
+  return config as SetBfreeConfig;
+}
+
 /** Map CONFIG_KEYS index → WASM param index.
  *  WASM has 44 params (NUM_PARAMS). CONFIG_KEYS has 53 entries.
  *  9 TypeScript-only params (percGain, vibratoFreq, leslieBrake, horn/drum RPM/Accel,
@@ -492,8 +499,8 @@ export class SetBfreeSynthEngine implements DevilboxSynth {
     if (preset) {
       // Apply via set() which maps CONFIG_KEYS → WASM indices correctly
       // (loadPatch sends raw indices which don't match WASM param ordering)
-      for (let i = 0; i < Math.min(preset.values.length, CONFIG_KEYS.length); i++) {
-        this.set(CONFIG_KEYS[i], preset.values[i]);
+      for (const [key, value] of Object.entries(setbfreeConfigFromNativeValues(preset.values))) {
+        this.set(key, value);
       }
     } else {
       console.warn(`[SetBfree] Native preset not found: ${name}`);
