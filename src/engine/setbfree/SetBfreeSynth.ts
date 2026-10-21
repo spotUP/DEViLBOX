@@ -69,7 +69,7 @@ export interface SetBfreeConfig {
   pedal2?: number; pedal135?: number; pedal113?: number; pedal1?: number;
   // Percussion
   percEnable?: number;    // 0=off, 1=on
-  percVolume?: number;    // 0=normal, 1=soft
+  percVolume?: number;    // 0=soft, 1=normal (bridge: PARAM_PERC_VOLUME)
   percDecay?: number;     // 0=slow, 1=fast
   percHarmonic?: number;  // 0=2nd, 1=3rd
   percGain?: number;      // 0-22
@@ -79,7 +79,7 @@ export interface SetBfreeConfig {
   vibratoLower?: number;  // 0-1
   vibratoFreq?: number;   // 4-22 Hz
   // Leslie
-  leslieSpeed?: number;   // 0=stop, 1=slow, 2=fast
+  leslieSpeed?: number;   // 0=slow, 1=stop, 2=fast (bridge: PARAM_LESLIE_SPEED)
   leslieBrake?: number;   // 0-1
   hornSlowRpm?: number;   // 5-200
   hornFastRpm?: number;   // 100-900
@@ -94,7 +94,7 @@ export interface SetBfreeConfig {
   reverbWet?: number;           // 0-1
   // Global
   volume?: number;        // 0-1
-  keyClick?: number;      // 0-1
+  keyClick?: number;      // 0=off, 1=on (bridge reads (int)value)
   tuning?: number;        // 220-880 Hz
   outputLevel?: number;   // 0-1
   swellPedal?: number;    // 0-1
@@ -111,17 +111,17 @@ export const DEFAULT_SETBFREE: SetBfreeConfig = {
   pedal16: 8, pedal513: 0, pedal8: 4, pedal4: 0, pedal223: 0,
   pedal2: 0, pedal135: 0, pedal113: 0, pedal1: 0,
   // Percussion
-  percEnable: 1, percVolume: 0, percDecay: 1, percHarmonic: 0, percGain: 11,
+  percEnable: 1, percVolume: 1, percDecay: 1, percHarmonic: 0, percGain: 11,
   // Vibrato/Chorus
   vibratoType: 5, vibratoUpper: 1, vibratoLower: 0, vibratoFreq: 7,
   // Leslie
-  leslieSpeed: 1, leslieBrake: 0,
+  leslieSpeed: 0, leslieBrake: 0,
   hornSlowRpm: 40, hornFastRpm: 400, hornAccel: 0.161,
   drumSlowRpm: 36, drumFastRpm: 357, drumAccel: 4.127,
   // Effects
   overdriveEnable: 0, overdriveCharacter: 0, reverbMix: 0.1, reverbWet: 0.1,
   // Global
-  volume: 0.8, keyClick: 0.5, tuning: 440, outputLevel: 0.8, swellPedal: 1,
+  volume: 0.8, keyClick: 1, tuning: 440, outputLevel: 0.8, swellPedal: 1,
 };
 
 export const SETBFREE_PRESETS: Record<string, SetBfreeConfig> = {
@@ -129,16 +129,16 @@ export const SETBFREE_PRESETS: Record<string, SetBfreeConfig> = {
     ...DEFAULT_SETBFREE,
     upper16: 8, upper513: 8, upper8: 8, upper4: 0, upper223: 0,
     upper2: 0, upper135: 0, upper113: 0, upper1: 0,
-    percEnable: 1, percVolume: 0, percDecay: 1, percHarmonic: 1, percGain: 14,
+    percEnable: 1, percVolume: 1, percDecay: 1, percHarmonic: 1, percGain: 14,
     leslieSpeed: 2, vibratoType: 5, vibratoUpper: 1,
   },
   'Jazz Combo': {
     ...DEFAULT_SETBFREE,
     upper16: 8, upper513: 3, upper8: 8, upper4: 0, upper223: 0,
     upper2: 0, upper135: 0, upper113: 0, upper1: 0,
-    percEnable: 1, percVolume: 1, percDecay: 1, percHarmonic: 0, percGain: 8,
+    percEnable: 1, percVolume: 0, percDecay: 1, percHarmonic: 0, percGain: 8,
     vibratoType: 6, vibratoUpper: 1,
-    leslieSpeed: 1, overdriveEnable: 0, reverbMix: 0.2, reverbWet: 0.15,
+    leslieSpeed: 0, overdriveEnable: 0, reverbMix: 0.2, reverbWet: 0.15,
   },
   'Classic Rock': {
     ...DEFAULT_SETBFREE,
@@ -152,34 +152,34 @@ export const SETBFREE_PRESETS: Record<string, SetBfreeConfig> = {
     ...DEFAULT_SETBFREE,
     upper16: 0, upper513: 0, upper8: 8, upper4: 8, upper223: 0,
     upper2: 0, upper135: 0, upper113: 0, upper1: 0,
-    percEnable: 1, percVolume: 1, percDecay: 0, percHarmonic: 0, percGain: 6,
+    percEnable: 1, percVolume: 0, percDecay: 0, percHarmonic: 0, percGain: 6,
     vibratoType: 3, vibratoUpper: 1,
-    leslieSpeed: 1, reverbMix: 0.5, reverbWet: 0.4,
+    leslieSpeed: 0, reverbMix: 0.5, reverbWet: 0.4,
   },
   'Jimmy Smith': {
     ...DEFAULT_SETBFREE,
     upper16: 8, upper513: 8, upper8: 8, upper4: 0, upper223: 0,
     upper2: 0, upper135: 0, upper113: 0, upper1: 0,
-    percEnable: 1, percVolume: 0, percDecay: 1, percHarmonic: 0, percGain: 14,
+    percEnable: 1, percVolume: 1, percDecay: 1, percHarmonic: 0, percGain: 14,
     leslieSpeed: 2, vibratoType: 5, vibratoUpper: 1,
-    overdriveEnable: 0, keyClick: 0.7,
+    overdriveEnable: 0, keyClick: 1,
   },
   'Blues': {
     ...DEFAULT_SETBFREE,
     upper16: 8, upper513: 8, upper8: 6, upper4: 0, upper223: 0,
     upper2: 0, upper135: 0, upper113: 0, upper1: 0,
-    percEnable: 1, percVolume: 0, percDecay: 1, percHarmonic: 0, percGain: 12,
-    leslieSpeed: 1, vibratoType: 5, vibratoUpper: 1,
+    percEnable: 1, percVolume: 1, percDecay: 1, percHarmonic: 0, percGain: 12,
+    leslieSpeed: 0, vibratoType: 5, vibratoUpper: 1,
     overdriveEnable: 1, overdriveCharacter: 40,
-    keyClick: 0.5,
+    keyClick: 1,
   },
   'Booker T Green Onions': {
     ...DEFAULT_SETBFREE,
     upper16: 8, upper513: 8, upper8: 8, upper4: 8, upper223: 0,
     upper2: 0, upper135: 0, upper113: 0, upper1: 0,
-    percEnable: 1, percVolume: 0, percDecay: 1, percHarmonic: 0, percGain: 14,
-    leslieSpeed: 1, vibratoType: 5, vibratoUpper: 1,
-    overdriveEnable: 0, keyClick: 0.6,
+    percEnable: 1, percVolume: 1, percDecay: 1, percHarmonic: 0, percGain: 14,
+    leslieSpeed: 0, vibratoType: 5, vibratoUpper: 1,
+    overdriveEnable: 0, keyClick: 1,
   },
   'Keith Emerson': {
     ...DEFAULT_SETBFREE,
@@ -188,22 +188,22 @@ export const SETBFREE_PRESETS: Record<string, SetBfreeConfig> = {
     percEnable: 0, percGain: 0,
     overdriveEnable: 1, overdriveCharacter: 100,
     leslieSpeed: 2, vibratoType: 5, vibratoUpper: 1,
-    keyClick: 0.3,
+    keyClick: 1,
   },
   'Percussive Click': {
     ...DEFAULT_SETBFREE,
     upper16: 8, upper513: 0, upper8: 8, upper4: 0, upper223: 0,
     upper2: 0, upper135: 0, upper113: 0, upper1: 0,
-    percEnable: 1, percVolume: 0, percDecay: 1, percHarmonic: 1, percGain: 18,
-    leslieSpeed: 0, vibratoType: 0,
-    keyClick: 1.0,
+    percEnable: 1, percVolume: 1, percDecay: 1, percHarmonic: 1, percGain: 18,
+    leslieSpeed: 1, vibratoType: 0,
+    keyClick: 1,
   },
   'Theatre Organ': {
     ...DEFAULT_SETBFREE,
     upper16: 0, upper513: 0, upper8: 6, upper4: 0, upper223: 2,
     upper2: 0, upper135: 3, upper113: 0, upper1: 0,
     percEnable: 0, percGain: 0,
-    leslieSpeed: 0, vibratoType: 3, vibratoUpper: 1,
+    leslieSpeed: 1, vibratoType: 3, vibratoUpper: 1,
     reverbMix: 0.6, reverbWet: 0.5,
   },
   'Cathedral': {
@@ -211,38 +211,38 @@ export const SETBFREE_PRESETS: Record<string, SetBfreeConfig> = {
     upper16: 8, upper513: 4, upper8: 8, upper4: 4, upper223: 2,
     upper2: 4, upper135: 2, upper113: 0, upper1: 0,
     percEnable: 0, percGain: 0,
-    leslieSpeed: 0, vibratoType: 3, vibratoUpper: 1,
+    leslieSpeed: 1, vibratoType: 3, vibratoUpper: 1,
     reverbMix: 0.8, reverbWet: 0.7,
   },
   'Soul Jazz': {
     ...DEFAULT_SETBFREE,
     upper16: 8, upper513: 4, upper8: 8, upper4: 0, upper223: 0,
     upper2: 0, upper135: 0, upper113: 0, upper1: 0,
-    percEnable: 1, percVolume: 1, percDecay: 0, percHarmonic: 0, percGain: 10,
-    leslieSpeed: 1, vibratoType: 5, vibratoUpper: 1,
+    percEnable: 1, percVolume: 0, percDecay: 0, percHarmonic: 0, percGain: 10,
+    leslieSpeed: 0, vibratoType: 5, vibratoUpper: 1,
     overdriveEnable: 0, reverbMix: 0.3, reverbWet: 0.2,
   },
   'Reggae Skank': {
     ...DEFAULT_SETBFREE,
     upper16: 0, upper513: 0, upper8: 8, upper4: 8, upper223: 0,
     upper2: 8, upper135: 0, upper113: 0, upper1: 0,
-    percEnable: 1, percVolume: 0, percDecay: 1, percHarmonic: 1, percGain: 12,
-    leslieSpeed: 0, vibratoType: 0,
-    keyClick: 0.8,
+    percEnable: 1, percVolume: 1, percDecay: 1, percHarmonic: 1, percGain: 12,
+    leslieSpeed: 1, vibratoType: 0,
+    keyClick: 1,
   },
   'Whiter Shade': {
     ...DEFAULT_SETBFREE,
     upper16: 6, upper513: 8, upper8: 8, upper4: 6, upper223: 0,
     upper2: 0, upper135: 0, upper113: 0, upper1: 0,
     percEnable: 0, percGain: 0,
-    leslieSpeed: 1, vibratoType: 5, vibratoUpper: 1,
+    leslieSpeed: 0, vibratoType: 5, vibratoUpper: 1,
     reverbMix: 0.4, reverbWet: 0.35,
   },
   'Full Leslie': {
     ...DEFAULT_SETBFREE,
     upper16: 8, upper513: 6, upper8: 8, upper4: 4, upper223: 3,
     upper2: 2, upper135: 0, upper113: 0, upper1: 0,
-    percEnable: 1, percVolume: 0, percDecay: 1, percHarmonic: 0, percGain: 12,
+    percEnable: 1, percVolume: 1, percDecay: 1, percHarmonic: 0, percGain: 12,
     leslieSpeed: 2, vibratoType: 5, vibratoUpper: 1,
     hornFastRpm: 700, drumFastRpm: 400,
     overdriveEnable: 0, reverbMix: 0.25, reverbWet: 0.2,

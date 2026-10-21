@@ -30,7 +30,7 @@ export const SETBFREE_LAYOUT: SynthPanelLayout = {
           label: 'PERCUSSION',
           controls: [
             { type: 'toggle', key: 'percEnable', label: 'PERC', labels: ['OFF', 'ON'] },
-            { type: 'toggle', key: 'percVolume', label: 'VOL', labels: ['NORM', 'SOFT'] },
+            { type: 'toggle', key: 'percVolume', label: 'VOLUME', labels: ['SOFT', 'NORMAL'] },
             { type: 'toggle', key: 'percDecay', label: 'DECAY', labels: ['SLOW', 'FAST'] },
             { type: 'toggle', key: 'percHarmonic', label: 'HARM', labels: ['2ND', '3RD'] },
             { type: 'knob', key: 'percGain', label: 'GAIN', color: '#ff9900', min: 0, max: 22, defaultValue: 11, formatValue: (v) => `${Math.round(v)}` },
@@ -40,7 +40,7 @@ export const SETBFREE_LAYOUT: SynthPanelLayout = {
           label: 'LESLIE',
           controls: [
             { type: 'select', key: 'leslieSpeed', label: 'SPEED', options: [
-              { value: '0', label: 'Stop' }, { value: '1', label: 'Slow' }, { value: '2', label: 'Fast' },
+              { value: '0', label: 'Slow' }, { value: '1', label: 'Stop' }, { value: '2', label: 'Fast' },
             ]},
             { type: 'toggle', key: 'leslieBrake', label: 'BRAKE', labels: ['OFF', 'ON'] },
           ],
@@ -52,7 +52,7 @@ export const SETBFREE_LAYOUT: SynthPanelLayout = {
             { type: 'knob', key: 'overdriveCharacter', label: 'CHAR', color: '#ff3366', min: 0, max: 127, defaultValue: 0, formatValue: (v) => `${Math.round(v)}` },
             { type: 'knob', key: 'reverbMix', label: 'REVERB', color: '#cc66ff', min: 0, max: 1, defaultValue: 0.1, formatValue: fmtPct },
             { type: 'knob', key: 'reverbWet', label: 'REV WET', color: '#cc66ff', min: 0, max: 1, defaultValue: 0.1, formatValue: fmtPct },
-            { type: 'knob', key: 'keyClick', label: 'CLICK', color: '#ff9900', min: 0, max: 1, defaultValue: 0.5, formatValue: fmtPct },
+            { type: 'toggle', key: 'keyClick', label: 'CLICK', labels: ['OFF', 'ON'] },
             { type: 'knob', key: 'volume', label: 'VOLUME', color: '#00ff99', min: 0, max: 1, defaultValue: 0.8, formatValue: fmtPct },
           ],
         },
