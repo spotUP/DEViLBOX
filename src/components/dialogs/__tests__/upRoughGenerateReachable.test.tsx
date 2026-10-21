@@ -1,6 +1,6 @@
 /** UPROUGH-GENERATE: hamburger item -> dialog -> server generate -> the tracker holds the generated song. */
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import { render, cleanup, act, fireEvent, screen, waitFor } from '@testing-library/react';
 import fixture from '@/lib/uprough/__tests__/fixtures/e6.uprough-song.json';
 
 vi.mock('@engine/ToneEngine', () => {
@@ -14,6 +14,27 @@ vi.mock('@stores/useInstrumentTypeStore', () => {
   const hook = (sel: (s: typeof state) => unknown) => sel(state);
   return { useInstrumentTypeStore: Object.assign(hook, { getState: () => state }) };
 });
+// The voice chips play through the Devilbox context; count their start() calls (the preview uses the player's own fake).
+const chipStarts: { length: number }[] = [];
+vi.mock('@/utils/audio-context', () => {
+  const dest = {};
+  const ctx = {
+    destination: dest,
+    createBuffer: (_c: number, length: number) => ({ length, copyToChannel: () => undefined }),
+    createGain: () => ({ gain: { value: 1 }, connect: () => dest }),
+    createBufferSource: () => {
+      const node: { buffer: { length: number } | null; connect: (g: unknown) => unknown; start: () => void } = {
+        buffer: null, connect: (g) => g, start: () => { if (node.buffer) chipStarts.push(node.buffer); },
+      };
+      return node;
+    },
+  };
+  return { getDevilboxAudioContext: () => ctx };
+});
+vi.mock('@/engine/uprough/drumBank', async (orig) => {
+  const m = await orig<typeof import('@/engine/uprough/drumBank')>();
+  return { ...m, songDrumBank: vi.fn(m.songDrumBank) };
+});
 import { FT2Toolbar } from '@components/tracker/FT2Toolbar/FT2Toolbar';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { UpRoughGenerateDialog } from '../UpRoughGenerateDialog';
@@ -22,6 +43,10 @@ import { scriptedGenerateEvents, toNdjson } from '@/lib/uprough/factory/scripted
 import { decideToCells } from '@/lib/uprough/factory/decideToCells';
 import { useFactoryStore } from '@/lib/uprough/factory/useFactoryStore';
 import { bankVoice } from '@/lib/uprough/factory/voiceAudition';
+import { songDrumBank } from '@/engine/uprough/drumBank';
+import { setRenderBackendForTests, type RenderBackend } from '@/lib/uprough/upRoughSongService';
+import { setPlayerAudioForTests, setListenWhileBuilding, stopUpRoughSong, upRoughPreviewState, type PlayerAudio } from '@/lib/uprough/upRoughSongPlayer';
+import type { PartialMix } from '@/lib/uprough/songRenderJob';
 
 /** The scripted host stream with the song on the done line, as the server sends it. */
 function scriptedStream(): { events: R2Event[]; text: string } {
@@ -131,4 +156,102 @@ describe('Generate dialog streams the host events (R2c)', () => {
     const post = fetchMock.mock.calls.find((c) => c[0] === '/api/uprough/generate')!;
     expect(JSON.parse((post[1] as RequestInit).body as string).events).toBe(true);
   });
+});
+
+describe('R2h-01: one Generate run reaches the store, the tracker, the preview and the audition chip', () => {
+  it('counts every NDJSON line, writes the decide cells, previews then swaps once, and plays the kept bank voice on a chip click', async () => {
+    const { events, text } = scriptedStream();
+    const lineCount = text.split('\n').filter((l) => l.trim() !== '').length;
+    const enc = new TextEncoder().encode(text);
+    vi.stubGlobal('fetch', vi.fn(async (url: string, _init?: RequestInit) =>
+      url === '/api/uprough/styles'
+        ? new Response(JSON.stringify({ styles: ['trap'] }), { status: 200 })
+        : new Response(new ReadableStream<Uint8Array>({ start(c) { c.enqueue(enc); c.close(); } }), { status: 200 }),
+    ));
+    useTrackerStore.setState({ upRoughMeta: null });
+
+    // Expected cells: summed from decideToCells the way the fill builds them (one taken set per section and bar).
+    let expectedCells = 0;
+    const taken = new Map<string, Set<string>>();
+    for (const ev of events) {
+      if (ev.type !== 'decide') continue;
+      const key = `${ev.section}:${ev.bar}`;
+      if (!taken.has(key)) taken.set(key, new Set());
+      expectedCells += decideToCells(ev.lane, ev.bar, ev.cells, taken.get(key)).length;
+    }
+
+    // Player audio and render backend fakes: the preview starts are counted, the render is held by hand.
+    let previewStarts = 0;
+    setPlayerAudioForTests({
+      context: {
+        currentTime: 0,
+        createBuffer: (_c: number, length: number, sampleRate: number) => ({ length, sampleRate, getChannelData: () => new Float32Array(length) }) as unknown as AudioBuffer,
+        createBufferSource: () => ({
+          buffer: null, loop: false, connect: () => undefined, disconnect: () => undefined, stop: () => undefined,
+          start: () => { previewStarts++; },
+        }) as unknown as AudioBufferSourceNode,
+      },
+      destination: {} as AudioNode,
+    } satisfies PlayerAudio);
+    let onPartial: ((p: PartialMix) => void) | undefined;
+    let finish: ((m: Float64Array) => void) | undefined;
+    const backend: RenderBackend = {
+      render(_e, _o, _s, _r, p) { onPartial = p; return new Promise<Float64Array>((r) => { finish = r; }); },
+    };
+    setRenderBackendForTests(backend, 5);
+    setListenWhileBuilding(true);
+
+    let eventsAtDone = -1;
+    let startsAtDone = -1;
+    let cellsAtDone = -1;
+    const onEvent = (e: R2Event) => {
+      if (e.type !== 'done') return;
+      eventsAtDone = useFactoryStore.getState().state.eventCount;
+      cellsAtDone = useFactoryStore.getState().state.cellsWritten;
+      startsAtDone = previewStarts;
+    };
+    try {
+      render(<UpRoughGenerateDialog isOpen onClose={() => undefined} onEvent={onEvent} />);
+      const style = await screen.findByTitle('Style');
+      await waitFor(() => expect(style.textContent).toContain('trap'));
+      fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
+
+      // (a) every line reached the factory store, and there was something to count.
+      await waitFor(() => expect(useTrackerStore.getState().upRoughMeta?.song.style).toBe('trap'), { timeout: 10_000 });
+      expect(lineCount).toBeGreaterThan(0);
+      expect(eventsAtDone).toBe(lineCount);
+      expect(useFactoryStore.getState().state.eventCount).toBe(lineCount);
+      // (b) the cells written equal the decide cells.
+      expect(expectedCells).toBeGreaterThan(0);
+      expect(cellsAtDone).toBe(expectedCells);
+      expect(useFactoryStore.getState().state.cellsWritten).toBe(expectedCells);
+
+      // (c) the song load starts the render; with Listen while building on, a landed section plays before the mastered mix.
+      await waitFor(() => expect(onPartial).toBeDefined(), { timeout: 5_000 });
+      expect(previewStarts).toBe(startsAtDone === -1 ? 0 : startsAtDone); // nothing played by the stream itself
+      act(() => { onPartial!({ section: 0, start: 0, mix: new Float64Array(22050).fill(0.1) }); });
+      expect(previewStarts).toBeGreaterThanOrEqual(1);
+      const beforeSwap = previewStarts;
+      expect(upRoughPreviewState()).toBe('preview');
+      await act(async () => { finish!(new Float64Array(44100).fill(0.9)); await new Promise((r) => setTimeout(r, 20)); });
+      expect(upRoughPreviewState()).toBe('mastered');
+      expect(previewStarts).toBe(beforeSwap + 1); // exactly one swap
+
+      // (d) the chip plays the kept bank voice once, without rebuilding the bank.
+      const kept = bankVoice('kick');
+      expect(kept).toBeDefined();
+      const builds = vi.mocked(songDrumBank).mock.calls.length;
+      const before = chipStarts.length;
+      fireEvent.click(screen.getByRole('button', { name: 'Play kick' }));
+      expect(chipStarts).toHaveLength(before + 1);
+      expect(chipStarts[before]!.length).toBe(kept!.samples.length);
+      expect(vi.mocked(songDrumBank).mock.calls.length).toBe(builds);
+      expect(bankVoice('kick')!.samples).toBe(kept!.samples);
+    } finally {
+      stopUpRoughSong();
+      setListenWhileBuilding(false);
+      setRenderBackendForTests(null);
+      setPlayerAudioForTests(null);
+    }
+  }, 30_000);
 });
