@@ -272,7 +272,9 @@ export function getChannelOutput(ctx: ChannelRoutingContext, channelIndex: numbe
     const input = new Tone.Gain(1);
     const voiceDelay = new Tone.Delay({ delayTime: ctx.sampleDelaySec(), maxDelay: MAX_VOICE_DELAY_SEC });
     const join = new Tone.Gain(1);
-    const channel = new Tone.Channel({ volume: 0, pan: 0 });
+    // channelCount: 2 keeps the strip stereo. Tone's default (1, explicit) downmixes to mono and the
+    // equal-power centre pan then costs 3 dB, so a note on a channel played quieter than its key preview.
+    const channel = new Tone.Channel({ volume: 0, pan: 0, channelCount: 2 });
     const scope = new Tone.Analyser({ type: 'waveform', size: 256 });
 
     // Get per-channel effect chain (creates passthrough if no effects exist)
@@ -366,7 +368,8 @@ export function createVoice(ctx: ChannelRoutingContext, channelIndex: number, in
     });
   }
   
-  const panner = new Tone.Panner(0);
+  // channelCount: 2 for the same reason as the strip channel in getChannelOutput (no mono downmix, no -3 dB).
+  const panner = new Tone.Panner({ pan: 0, channelCount: 2 });
 
   // Connect: Voice → gain → filter → panner → channelInput
   if (filter instanceof Tone.Filter) {
