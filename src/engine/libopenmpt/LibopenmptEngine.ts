@@ -254,7 +254,13 @@ export class LibopenmptEngine {
         // see the comment beside the postMessage in chiptune3.worklet.js.
         // The backstop timer must not run a second rebuild for the same play.
         this._clearIsolationBackstop();
-        this._rebuildIsolationAfterPlay();
+        if (this._pendingLoad !== null) {
+          const token = this._pendingLoad;
+          this._pendingLoad = null;
+          void this._startAfterIsolation(token);
+        } else {
+          this._rebuildIsolationAfterPlay();
+        }
         break;
       case 'diagState': {
         const pending = this._diagStateWaiters;
@@ -368,28 +374,33 @@ export class LibopenmptEngine {
       return;
     }
     console.log('[LibopenmptEngine] play(): sending', data.byteLength, 'bytes to worklet');
-    // Clear isolation state — worklet's play() destroys all slots
+    // Clear isolation state — worklet's load destroys all slots
     this._isolationSlotMasks.fill(null);
     // Restore gain (muted by stop())
     try { if (this.gainNode) this.gainNode.gain.setValueAtTime(1, 0); } catch { /* best effort */ }
-    this.workletNode.port.postMessage({ cmd: 'play', val: data });
+    // Load PAUSED: the worklet creates the module and answers playReady
+    // without rendering. The channels' slots and the master chain are built
+    // then (awaited), and only after that does the module start. A play that
+    // rendered at once ran the effects aimed at channels on the whole mix, or
+    // left the channels dry, for the 100-500 ms the async build took — every
+    // play distorted for its first 1-3 rows (2026-10-22). A seek posted right
+    // after play() lands before the slots exist, and each slot module starts
+    // at the main module's position, which has not rendered since the seek.
+    const token = ++this._playToken;
+    this._pendingLoad = token;
+    this.workletNode.port.postMessage({ cmd: 'load', val: data });
     this._playing = true;
 
-    // The worklet answers with 'playReady' once the module exists, and that
-    // is what drives the rebuild (see handleMessage). This timer stays only as
-    // a backstop for a cached worklet build that predates that message —
-    // worklets are hand-maintained and a stale one would otherwise never
-    // restore the dub sends at all. playReady cancels it: the rebuild is NOT
-    // idempotent. It tears down every isolation slot, disposes the slot
-    // effects and makes new ones, and the new slot module joins the main one
-    // at the start of its row, not at its sample. Running both rebuilt the
-    // slots a second time about 350 ms into every play, and the effected
-    // channels distorted for the first 1-3 rows (2026-10-22).
+    // A cached worklet build older than 'load' never answers: play it the old
+    // way rather than stay silent.
     this._clearIsolationBackstop();
     this._isolationBackstop = setTimeout(() => {
       this._isolationBackstop = null;
+      if (this._pendingLoad !== token) return;
+      this._pendingLoad = null;
+      this.workletNode?.port.postMessage({ cmd: 'play', val: data });
       this._rebuildIsolationAfterPlay();
-    }, 400);
+    }, 1000);
 
     // Enable per-channel oscilloscope after worklet creates the module
     setTimeout(() => {
@@ -404,6 +415,30 @@ export class LibopenmptEngine {
    * (either mixer insert effects or master effects with selectedChannels).
    */
   private _isolationBackstop: ReturnType<typeof setTimeout> | null = null;
+  /** Bumped by every play() and stop(): a stale start never unpauses a newer one. */
+  private _playToken = 0;
+  /** The play whose paused load awaits playReady. */
+  private _pendingLoad: number | null = null;
+
+  /**
+   * The module exists, paused. Build the routing every effect aimed at
+   * channels needs (master chain, isolation slots and their effects), then
+   * start rendering. A failed build still starts the song.
+   */
+  private async _startAfterIsolation(token: number): Promise<void> {
+    try {
+      const { settleChannelIsolationBeforeRender } = await import('../tone/ChannelRoutedEffects');
+      await settleChannelIsolationBeforeRender();
+    } catch (e) {
+      console.warn('[LibopenmptEngine] isolation build before the first sample failed:', e);
+    }
+    if (token !== this._playToken || !this._playing || !this.workletNode) return;
+    this.workletNode.port.postMessage({ cmd: 'unpause' });
+    // Dub sends: the load destroyed the worklet's dub slots too.
+    void import('../tone/ChannelRoutedEffects').then(({ getChannelRoutedEffectsManager }) => {
+      try { void getChannelRoutedEffectsManager()?.rebuildDubConnections(); } catch { /* ok */ }
+    }).catch(() => { /* ok */ });
+  }
 
   private _clearIsolationBackstop(): void {
     if (this._isolationBackstop === null) return;
@@ -428,6 +463,10 @@ export class LibopenmptEngine {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({ cmd: 'stop' });
     this._playing = false;
+    this._playToken++;
+    this._pendingLoad = null;
+    // The worklet's stop destroys its slot modules; the effects stay (ChannelRoutedEffects).
+    this._isolationSlotMasks.fill(null);
     this._clearIsolationBackstop();
     useOscilloscopeStore.getState().clear();
     // Immediately mute output to prevent audio leaking while the async
@@ -670,6 +709,10 @@ export class LibopenmptEngine {
    */
   addIsolation(slotIndex: number, channelMask: number): void {
     if (!this.workletNode || !this.context || slotIndex < 0 || slotIndex >= LibopenmptEngine.MAX_ISOLATION_SLOTS) return;
+    // The worklet has this slot already: re-adding recreates its module, which
+    // restarts the slot at the start of the row. Load, stop and the worklet's
+    // isolationError clear the mask, so a slot the worklet lost is re-added.
+    if (this._isolationSlotMasks[slotIndex] === channelMask) return;
 
     this._isolationSlotMasks[slotIndex] = channelMask;
 

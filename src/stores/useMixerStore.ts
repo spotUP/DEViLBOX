@@ -51,13 +51,33 @@ export interface DubWriteOrigin {
 let _wasmRebuildTimer: ReturnType<typeof setTimeout> | null = null;
 let _wasmRebuildRunning = false;
 let _wasmRebuildAgain = false;
+/** The rebuild running now, so an awaited one can queue behind it. */
+let _wasmRebuildCurrent: Promise<void> = Promise.resolve();
+
 export function scheduleWasmEffectRebuild(): void {
   if (_wasmRebuildTimer) clearTimeout(_wasmRebuildTimer);
   _wasmRebuildTimer = setTimeout(() => {
     _wasmRebuildTimer = null;
     if (_wasmRebuildRunning) { _wasmRebuildAgain = true; return; }
-    _wasmRebuildRunning = true;
-    void (async () => {
+    void startWasmEffectRebuild();
+  }, 50);
+}
+
+/**
+ * Rebuild the per-channel slots now and resolve when they are built: a play
+ * awaits this before its engine renders, so effects aimed at channels are in
+ * their slots from the first sample. A pending debounced rebuild is folded in.
+ */
+export async function rebuildWasmEffectsNow(): Promise<void> {
+  if (_wasmRebuildTimer) { clearTimeout(_wasmRebuildTimer); _wasmRebuildTimer = null; }
+  while (_wasmRebuildRunning) await _wasmRebuildCurrent;
+  _wasmRebuildAgain = false;
+  await startWasmEffectRebuild();
+}
+
+function startWasmEffectRebuild(): Promise<void> {
+  _wasmRebuildRunning = true;
+  _wasmRebuildCurrent = (async () => {
       try {
         const { refreshChannelIsolation } = await import('../engine/tone/ChannelRoutedEffects');
         // The same answer the master chain used to decide where each effect
@@ -123,7 +143,7 @@ export function scheduleWasmEffectRebuild(): void {
         }
       }
     })();
-  }, 50);
+  return _wasmRebuildCurrent;
 }
 
 // Forward effective mute state to TrackerReplayer's channelMuteMask.

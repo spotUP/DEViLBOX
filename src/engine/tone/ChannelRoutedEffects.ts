@@ -944,8 +944,15 @@ export class ChannelRoutedEffectsManager {
       return;
     }
 
+    // The same slots for the same worklet: keep the effects. A play (or a
+    // stop) destroys the worklet's slot modules, never the effect nodes or
+    // their connections, so re-posting the masks is all a play needs. Tearing
+    // them down made every play start the channels' effects cold (2026-10-22).
+    if (this.reattachSlots(engine, workletNode, channelEffects, routedEffects)) return;
+
     // Tear down existing slots
     this.teardown(engine);
+    this.slotsWorklet = workletNode;
 
     let slotIdx = 0;
     // Sidechain-keyed effects in the slots, wired once every slot is assigned
@@ -1104,6 +1111,43 @@ export class ChannelRoutedEffectsManager {
    * Tear down all isolation slots and disconnect effects.
    * Sidechain consumer requests are preserved so taps are re-established on rebuild.
    */
+  /** The worklet node the current slots are wired to; their effects can be kept only on it. */
+  private slotsWorklet: AudioWorkletNode | null = null;
+
+  /**
+   * When the wanted slots are exactly the ones built (same channels, same
+   * effect configs, in slot order, on the same worklet node), re-post each
+   * slot's channel mask and keep its effect nodes. The engine skips a mask
+   * its worklet already has, so a running slot is never recreated. Sidechain
+   * taps hold slots of their own and take the full rebuild.
+   */
+  private reattachSlots(
+    engine: IsolationCapableEngine,
+    workletNode: AudioWorkletNode,
+    channelEffects: ReadonlyMap<number, EffectConfig[]>,
+    routedEffects: ReadonlyMap<number, EffectConfig[]>,
+  ): boolean {
+    if (this.slotsWorklet !== workletNode || this.sidechainTaps.size > 0 || this.sidechainConsumers.size > 0) return false;
+    const wanted: Array<{ channelIndex: number; effects: EffectConfig[] }> = [];
+    for (const channelIndex of new Set([...channelEffects.keys(), ...routedEffects.keys()])) {
+      const effects = [
+        ...(channelEffects.get(channelIndex) ?? []).filter(e => e.enabled),
+        ...(routedEffects.get(channelIndex) ?? []).filter(e => e.enabled),
+      ];
+      if (effects.length > 0) wanted.push({ channelIndex, effects });
+    }
+    const built = this.slots.filter((s): s is IsolationSlot => s !== null);
+    if (wanted.length === 0 || built.length !== wanted.length) return false;
+    for (const [i, w] of wanted.entries()) {
+      const slot = this.slots[i];
+      if (!slot || slot.channels.length !== 1 || slot.channels[0] !== w.channelIndex) return false;
+      if (w.effects.some(e => e.sidechainSource !== undefined || e.parameters?.sidechainSource !== undefined)) return false;
+      if (JSON.stringify(slot.effectConfigs) !== JSON.stringify(w.effects)) return false;
+    }
+    for (const slot of built) engine.addIsolation(slot.slotIndex, slot.channelMask);
+    return true;
+  }
+
   teardown(engine?: { removeIsolation: (slotIndex: number) => void }): void {
     // Tear down per-channel effect slots
     for (let i = 0; i < this.slots.length; i++) {
@@ -1273,7 +1317,23 @@ export function getPlayingIsolationEngine(): IsolationCapableEngine | null {
 export function setPlayingIsolationEngine(engine: IsolationCapableEngine | null): void {
   const changed = engine !== _playingIsolationEngine;
   _playingIsolationEngine = engine;
-  if (changed) void rebuildForNewEngine(engine !== null);
+  if (changed) _engineRebuild = rebuildForNewEngine(engine !== null);
+}
+
+/** The master-chain rebuild the last engine change started (it never rejects). */
+let _engineRebuild: Promise<void> = Promise.resolve();
+
+/**
+ * Put every effect aimed at channels where it plays before the engine renders
+ * a sample: the master chain the last engine change rebuilds, then the
+ * isolation slots and their effects, awaited. A play that rendered first ran
+ * the whole mix through those effects, or the channels dry, for the 100-500 ms
+ * the async build took (2026-10-22).
+ */
+export async function settleChannelIsolationBeforeRender(): Promise<void> {
+  await _engineRebuild;
+  const { rebuildWasmEffectsNow } = await import('../../stores/useMixerStore');
+  await rebuildWasmEffectsNow();
 }
 
 /**

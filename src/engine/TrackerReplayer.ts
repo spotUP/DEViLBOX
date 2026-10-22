@@ -77,8 +77,8 @@ import {
   preInitMusicLine,
   rowPreviewRoute,
   previewNativeRow,
-  registerPlayingEngine,
-  unregisterPlayingEngine,
+  registerLoadedSongEngine,
+  releaseLoadedSongEngine,
 } from './replayer/NativeEngineRouting';
 // ============================================================================
 // CONSTANTS (imported from replayer/PeriodTables.ts)
@@ -774,6 +774,8 @@ export class TrackerReplayer {
   // Synchronous cleanup for libopenmpt engine — nulls callbacks and stops the
   // worklet without a deferred import. Set during play(), called during stop().
   private _libopenmptCleanup: (() => void) | null = null;
+  /** The module bytes the registered libopenmpt isolation engine plays (registerLoadedSongEngine). */
+  private _isolationTune: ArrayBuffer | null = null;
 
   // AdPlug streaming player: when active, audio comes from AdPlug WASM worklet.
   // Set when an OPL3-only song has extracted patterns + streaming player loaded.
@@ -1877,6 +1879,12 @@ export class TrackerReplayer {
     // Skip native engine stop — startNativeEngines will handle reload. Stopping
     // them here destroys WASM state that the subsequent play() needs.
     this.stop(false, true);
+    // A different tune: the module engine stops answering for its channels
+    // (a reload of the same tune keeps it, the module is the same).
+    if (!this.isDJDeck && (song !== this.song && (!song.libopenmptFileData || song.libopenmptFileData !== this._isolationTune))) {
+      releaseLoadedSongEngine();
+      this._isolationTune = null;
+    }
     this._hasPlayedOnce = false;
     this._replacedInstruments.clear();
     this._activeWasmEngine = null;
@@ -2488,6 +2496,11 @@ export class TrackerReplayer {
           this.routedNativeEngines.add('LibopenmptSynth');
         }
 
+        // The isolation engine of this song, as a native engine is, and it
+        // belongs to the loaded song: Stop keeps it, loading another tune
+        // releases it (loadSong). Registered BEFORE the module renders: the
+        // engine's play() awaits the master chain and slot build, then starts.
+        if (!this.isDJDeck) registerLoadedSongEngine(mptEngine);
         const result = await mptEngine.startWithCoordinator(this.coordinator, {
           song: this.song,
           destination,
@@ -2495,24 +2508,23 @@ export class TrackerReplayer {
           initialPattPos: this.pattPos,
           startMuted: this._muted,
         });
+        if (!result.started && !this.isDJDeck) releaseLoadedSongEngine();
         if (gen !== this._playGeneration) return;
 
         if (result.started) {
+          if (!this.isDJDeck) this._isolationTune = this.song.libopenmptFileData ?? null;
           this.useLibopenmptPlayback = true;
           this._suppressNotes = true;
           this._activeWasmEngine = mptEngine; // for updateWasmMuteMask()
           this.coordinator.markDispatchActive();
           // Synchronous cleanup closure — avoids the deferred import().then() race
           // that could null callbacks AFTER the next play() sets new ones.
-          // The isolation engine of this song, as a native engine is: master and
-          // mixer effects aimed at channels play in its slots from now until stop.
-          if (!this.isDJDeck) registerPlayingEngine(mptEngine);
+          // Stop leaves the isolation registration alone: it is the loaded song's.
           this._libopenmptCleanup = () => {
             mptEngine.onPosition = null;
             mptEngine.onPositionTick = null;
             mptEngine.onEnded = null;
             mptEngine.stop();
-            if (!this.isDJDeck) unregisterPlayingEngine(mptEngine);
           };
           // Warm the cached reference for zero-latency forcePosition seeks
           getLibopenmptSync();

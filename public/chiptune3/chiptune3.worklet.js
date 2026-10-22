@@ -365,6 +365,20 @@ class MPT extends AudioWorkletProcessor {
 			case 'play':
 				this.play(v, false)
 				break
+			case 'load':
+				// Create the module PAUSED. The main thread builds the channel
+				// isolation slots and their effects, then sends 'unpause': the
+				// first sample is rendered with every effect aimed at channels
+				// already on its channels (2026-10-22, every Play distorted for
+				// its first 1-3 rows). Slots added while paused inherit paused
+				// and start with main from the same position.
+				this.play(v, true, false)
+				if (this.modulePtr) {
+					this.channels = libopenmpt._openmpt_module_get_num_channels(this.modulePtr)
+					this.meta()
+				}
+				this.port.postMessage({ cmd: 'playReady' })
+				break
 			case 'pause':
 				this.paused = true
 				this.forEachIsolationSlot_(s => { s.paused = true })

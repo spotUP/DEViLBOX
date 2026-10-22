@@ -5,13 +5,16 @@
  * cold, and the new slot module joins the main module at the start of its row. So the channels with
  * effects restarted their row with cold effects about 350 ms into the play.
  * Real LibopenmptEngine.play() and handleMessage; the worklet port and the mixer store are stubs.
+ * play() now loads the module paused and builds the slots once, on playReady, before it unpauses
+ * (playStartKeepsChannelEffectsIsolated.test.ts is the wiring test).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const scheduleWasmEffectRebuild = vi.fn();
 vi.mock('@stores/useMixerStore', () => ({ scheduleWasmEffectRebuild }));
 vi.mock('../../stores/useMixerStore', () => ({ scheduleWasmEffectRebuild }));
-vi.mock('../../tone/ChannelRoutedEffects', () => ({ getChannelRoutedEffectsManager: () => null }));
+const settleChannelIsolationBeforeRender = vi.fn(async () => undefined);
+vi.mock('../../tone/ChannelRoutedEffects', () => ({ getChannelRoutedEffectsManager: () => null, settleChannelIsolationBeforeRender }));
 
 type EngineInternals = {
   _available: boolean;
@@ -32,6 +35,7 @@ describe('a play builds the channel isolation slots once', () => {
   beforeEach(async () => {
     vi.useFakeTimers();
     scheduleWasmEffectRebuild.mockClear();
+    settleChannelIsolationBeforeRender.mockClear();
     const { LibopenmptEngine } = await import('../LibopenmptEngine');
     engine = Object.create(LibopenmptEngine.prototype) as EngineInternals;
     Object.assign(engine, {
@@ -39,6 +43,9 @@ describe('a play builds the channel isolation slots once', () => {
       _pendingData: new ArrayBuffer(16),
       _isolationSlotMasks: [null, null, null, null],
       _isolationBackstop: null,
+      _playToken: 0,
+      _pendingLoad: null,
+      _playing: false,
       gainNode: null,
       workletNode: { port: { postMessage: () => undefined } },
     });
@@ -46,20 +53,21 @@ describe('a play builds the channel isolation slots once', () => {
 
   afterEach(() => { vi.useRealTimers(); });
 
-  it('playReady rebuilds, and the 400 ms backstop does not rebuild again', async () => {
+  it('playReady builds once before rendering, and the backstop does not build again', async () => {
     engine.play();
     engine.handleMessage({ data: { cmd: 'playReady' } });
     await flush();
-    expect(scheduleWasmEffectRebuild, 'playReady drives the rebuild').toHaveBeenCalledTimes(1);
+    expect(settleChannelIsolationBeforeRender, 'playReady drives the build').toHaveBeenCalledTimes(1);
 
-    vi.advanceTimersByTime(500);
+    vi.advanceTimersByTime(1500);
     await flush();
-    expect(scheduleWasmEffectRebuild, 'the backstop rebuilt the slots a second time').toHaveBeenCalledTimes(1);
+    expect(settleChannelIsolationBeforeRender, 'the backstop built the slots a second time').toHaveBeenCalledTimes(1);
+    expect(scheduleWasmEffectRebuild, 'the backstop rebuilt the slots a second time').toHaveBeenCalledTimes(0);
   });
 
-  it('a worklet that never sends playReady is still rebuilt by the backstop', async () => {
+  it('a worklet that never sends playReady is still played and rebuilt by the backstop', async () => {
     engine.play();
-    vi.advanceTimersByTime(500);
+    vi.advanceTimersByTime(1500);
     await flush();
     expect(scheduleWasmEffectRebuild).toHaveBeenCalledTimes(1);
   });
