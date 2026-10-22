@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
+import { testCpuLimits } from '../vitest.limits';
 
 export default defineConfig({
-  test: { include: ['src/**/*.test.ts'], environment: 'node' },
+  test: { ...testCpuLimits(), include: ['src/**/*.test.ts'], environment: 'node' },
 });

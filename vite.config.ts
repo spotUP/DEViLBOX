@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import fs from 'fs'
+import { testCpuLimits } from './vitest.limits';
 
 // Test tiers (tools/test-tiers/heavy.json, measured from CI): the fast tier
 // (VITEST_TIER=fast, npm run test:ci) runs on every push and leaves the
@@ -135,12 +136,8 @@ export default defineConfig({
     exclude: ['node_modules', 'Reference Code/**', 'dist', 'src/__tests__/ci/**', ...(testTier === 'fast' ? heavyTestFiles : [])],
     environment: 'happy-dom',
     setupFiles: ['src/test/nuadeNodeProbe.setup.ts'],
-    // Cap worker pool HARD. Each worker is a full-core node process; on an
-    // 8-core dev machine the old cap of 4 pinned half the CPU on every run
-    // (and every commit/push hook), which "grinds the computer" during normal
-    // work. 2 workers keeps local runs responsive; CI overrides via
-    // VITEST_MAX_WORKERS when it wants more parallelism.
-    maxWorkers: process.env.VITEST_MAX_WORKERS ? Number(process.env.VITEST_MAX_WORKERS) : 2,
+    // Worker cap and low CPU priority shared by every vitest config: vitest.limits.ts.
+    ...testCpuLimits(),
     // A timeout is a hang detector, not a speed assertion. Vitest's 5 s default
     // failed working tests in the pre-push gate when two workers share a busy
     // machine: a first import that lazy-loads a route (Hippel ST 915 ms idle)
