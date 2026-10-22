@@ -2,6 +2,7 @@
  * Default constants, InstrumentConfig, and aggregate types
  */
 
+import { drumKitDefaults, REBIRTH_808_LAYOUT, REBIRTH_909_LAYOUT } from '../../engine/rebirthdrums/rebirthDrumLayout';
 import type { BeatSlice, BeatSliceConfig } from '../beatSlicer';
 import type { EnvelopePoints, AutoVibrato } from '../tracker';
 import type { PinkTromboneConfig } from '@engine/pinktrombone/PinkTromboneSynth';
@@ -58,6 +59,9 @@ import type {
   MAMEConfig,
   SuperColliderConfig,
   OpenWurliConfig,
+  ReBirth303Config,
+  ReBirth808Config,
+  ReBirth909Config,
   OPL3Config,
   DX7Config,
 } from './tonejs';
@@ -377,6 +381,9 @@ export interface InstrumentConfig {
   // SuperCollider scripted synthesis
   superCollider?: SuperColliderConfig;
   openWurli?: OpenWurliConfig;
+  rebirth303?: ReBirth303Config;
+  rebirth808?: ReBirth808Config;
+  rebirth909?: ReBirth909Config;
   opl3?: OPL3Config;
   dx7?: DX7Config;
   // Sampler config
@@ -1747,6 +1754,20 @@ export const DEFAULT_SUPERCOLLIDER: SuperColliderConfig = {
 })`,
   binary: 'U0NnZgAAAAIAAQdteVN5bnRoAAAACwAAAAA/gAAAQAAAAEBAAADCxgAAPCPXCkCgAADAgAAAPzMzMz3MzM0/AAAAAAAAA0PcAAA/AAAAP4AAAAAAAAMEZnJlcQAAAAADYW1wAAAAAQRnYXRlAAAAAgAAAAYHQ29udHJvbAEAAAAAAAAAAwAAAQEBBlNpbk9zYwIAAAACAAAAAQAAAAAAAAAAAAD/////AAAAAAIMQmluYXJ5T3BVR2VuAgAAAAIAAAABAAIAAAABAAAAAAAAAAAAAAABAgZFbnZHZW4BAAAAFQAAAAEAAAAAAAAAAAAC/////wAAAAH/////AAAAAP////8AAAAB/////wAAAAL/////AAAAAP////8AAAAD/////wAAAAL/////AAAABP////8AAAAB/////wAAAAX/////AAAABv////8AAAAH/////wAAAAj/////AAAACf////8AAAAG/////wAAAAf/////AAAAAP////8AAAAK/////wAAAAb/////AAAABwEMQmluYXJ5T3BVR2VuAgAAAAIAAAABAAIAAAACAAAAAAAAAAMAAAAAAgNPdXQCAAAAAwAAAAAAAP////8AAAAAAAAABAAAAAAAAAAEAAAAAAAA',
   params: [],
+};
+
+export const DEFAULT_REBIRTH808: ReBirth808Config = drumKitDefaults(REBIRTH_808_LAYOUT);
+export const DEFAULT_REBIRTH909: ReBirth909Config = drumKitDefaults(REBIRTH_909_LAYOUT);
+
+export const DEFAULT_REBIRTH303: ReBirth303Config = {
+  tuning: 0.5,
+  cutoff: 0.35,
+  resonance: 0.78,
+  envmod: 0.55,
+  decay: 0.4,
+  accent: 0.7,
+  volume: 0.8,
+  waveform: 0,
 };
 
 export const DEFAULT_OPENWURLI: OpenWurliConfig = {

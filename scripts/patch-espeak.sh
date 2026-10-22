@@ -3,6 +3,9 @@
 # Languages kept: en, en-US, de, sv, fr, es, ja
 # Run automatically via postinstall, or manually after npm install
 
+# Also apply the node-web-audio-api patch (kept here so the existing postinstall reaches it)
+node scripts/patch-node-web-audio.mjs || exit 1
+
 PATCH_SRC="public/espeak-ng.js"
 PATCH_DATA="public/espeak-ng.data"
 TARGET_JS="node_modules/@echogarden/espeak-ng-emscripten/espeak-ng.js"

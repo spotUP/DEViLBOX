@@ -7,11 +7,11 @@
 
 import React, { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { useGTUltraStore } from '@stores/useGTUltraStore';
-import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
+import type { InstrumentConfig, EffectConfig, ReBirth303Config, ReBirth808Config, ReBirth909Config } from '@typedefs/instrument';
 import { DEFAULT_TB303 } from '@typedefs/instrument';
 import type { GTUltraConfig } from '@typedefs/instrument/exotic';
 import {
-  DEFAULT_FURNACE, DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH, DEFAULT_SYNARE,
+  DEFAULT_FURNACE, DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH, DEFAULT_SYNARE, DEFAULT_REBIRTH303, DEFAULT_REBIRTH808, DEFAULT_REBIRTH909,
   DEFAULT_MAME_VFX, DEFAULT_MAME_DOC, DEFAULT_SAM,
   DEFAULT_HARMONIC_SYNTH as DEFAULT_HARMONIC_SYNTH_VAL,
   DEFAULT_UPROUGH_SOFTSYNTH,
@@ -105,6 +105,9 @@ const V2SpeechControls = lazy(() => import('../controls/V2SpeechControls').then(
 const SAMControls = lazy(() => import('../controls/SAMControls').then(m => ({ default: m.SAMControls })));
 const PinkTromboneControls = lazy(() => import('../controls/PinkTromboneControls').then(m => ({ default: m.PinkTromboneControls })));
 const DECtalkControls = lazy(() => import('../controls/DECtalkControls').then(m => ({ default: m.DECtalkControls })));
+const ReBirth808Controls = lazy(() => import('../controls/ReBirth808Controls').then(m => ({ default: m.ReBirth808Controls })));
+const ReBirth909Controls = lazy(() => import('../controls/ReBirth909Controls').then(m => ({ default: m.ReBirth909Controls })));
+const ReBirth303Controls = lazy(() => import('../controls/ReBirth303Controls').then(m => ({ default: m.ReBirth303Controls })));
 const SynareControls = lazy(() => import('../controls/SynareControls').then(m => ({ default: m.SynareControls })));
 const GeonkickControls = lazy(() => import('../controls/GeonkickControls').then(m => ({ default: m.GeonkickControls })));
 const MAMEControls = lazy(() => import('../controls/MAMEControls').then(m => ({ default: m.MAMEControls })));
@@ -204,7 +207,7 @@ const WavetableListEditor = lazy(() => import('./WavetableEditor').then(m => ({ 
 
 
 // Types
-export type EditorMode = 'generic' | 'layout' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'geonkick' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'uproughsoftsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'sidfactory2' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth' | 'opl3' | 'ronklaren' | 'cheesecutter' | 'pretracker' | 'sawteeth' | 'fmplayer' | 'eupmini' | 'cinter4' | 'klystrack' | 'sonix' | 'wasm-param' | 'wasm-info';
+export type EditorMode = 'generic' | 'layout' | 'tb303' | 'furnace' | 'buzzmachine' | 'sample' | 'dubsiren' | 'spacelaser' | 'granular' | 'v2' | 'sam' | 'pinktrombone' | 'dectalk' | 'synare' | 'rebirth303' | 'rebirth808' | 'rebirth909' | 'geonkick' | 'mame' | 'mamechip' | 'dexed' | 'obxd' | 'mdaEPiano' | 'mdaJX10' | 'mdaDX10' | 'toneAM' | 'raffo' | 'calfMono' | 'setbfree' | 'synthv1' | 'moniqueSynth' | 'vl1Synth' | 'talNoizeMaker' | 'aeolus' | 'fluidsynth' | 'sfizz' | 'zynaddsubfx' | 'wam' | 'tonewheelOrgan' | 'melodica' | 'vital' | 'odin2' | 'surge' | 'vstbridge' | 'harmonicsynth' | 'uproughsoftsynth' | 'modular' | 'sunvox-modular' | 'hively' | 'gtultra' | 'jamcracker' | 'sidfactory2' | 'soundmon' | 'sidmon' | 'digmug' | 'fc' | 'deltamusic1' | 'deltamusic2' | 'fred' | 'tfmx' | 'octamed' | 'sidmon1' | 'hippelcoso' | 'robhubbard' | 'steveturner' | 'davidwhittaker' | 'sonic-arranger' | 'instereo2' | 'musicline' | 'supercollider' | 'wobblebass' | 'startrekker-am' | 'futureplayer' | 'symphonie' | 'xrns-synth' | 'sunvox-synth' | 'opl3' | 'ronklaren' | 'cheesecutter' | 'pretracker' | 'sawteeth' | 'fmplayer' | 'eupmini' | 'cinter4' | 'klystrack' | 'sonix' | 'wasm-param' | 'wasm-info';
 
 export interface SynthTypeDispatcherProps {
   editorMode: EditorMode;
@@ -461,6 +464,28 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
       v2: { ...currentV2, ...updates },
     });
   }, [instrument.v2, handleChange]);
+
+  // Handle re-rebirth 303 config updates
+  const handleReBirth808Change = useCallback((updates: Partial<ReBirth808Config>) => {
+    const current = instrument.rebirth808 || DEFAULT_REBIRTH808;
+    handleChange({
+      rebirth808: { ...current, ...updates },
+    });
+  }, [instrument.rebirth808, handleChange]);
+
+  const handleReBirth909Change = useCallback((updates: Partial<ReBirth909Config>) => {
+    const current = instrument.rebirth909 || DEFAULT_REBIRTH909;
+    handleChange({
+      rebirth909: { ...current, ...updates },
+    });
+  }, [instrument.rebirth909, handleChange]);
+
+  const handleReBirth303Change = useCallback((updates: Partial<ReBirth303Config>) => {
+    const current = instrument.rebirth303 || DEFAULT_REBIRTH303;
+    handleChange({
+      rebirth303: { ...current, ...updates },
+    });
+  }, [instrument.rebirth303, handleChange]);
 
   // Handle Synare config updates
   const handleSynareChange = useCallback((updates: Partial<typeof instrument.synare>) => {
@@ -2320,6 +2345,42 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             instrumentId={instrument.id}
             onChange={(updates) => handleChange({ dectalk: { ...instrument.dectalk!, ...updates } })}
           />
+        </Suspense>
+      </div>
+    );
+  }
+  if (editorMode === 'rebirth808' || editorMode === 'rebirth909') {
+    const is808 = editorMode === 'rebirth808';
+    const rebirthDrumConfig808 = deepMerge(DEFAULT_REBIRTH808, instrument.rebirth808 || {});
+    const rebirthDrumConfig909 = deepMerge(DEFAULT_REBIRTH909, instrument.rebirth909 || {});
+    return (
+      <div className="synth-editor-container bg-dark-bg">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          {is808
+            ? <ReBirth808Controls config={rebirthDrumConfig808} onChange={handleReBirth808Change} />
+            : <ReBirth909Controls config={rebirthDrumConfig909} onChange={handleReBirth909Change} />}
+        </Suspense>
+      </div>
+    );
+  }
+  if (editorMode === 'rebirth303') {
+    const rebirth303Config = deepMerge(DEFAULT_REBIRTH303, instrument.rebirth303 || {});
+    return (
+      <div className="synth-editor-container bg-dark-bg">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+        />
+        <Suspense fallback={<LoadingControls />}>
+          <ReBirth303Controls config={rebirth303Config} onChange={handleReBirth303Change} />
         </Suspense>
       </div>
     );

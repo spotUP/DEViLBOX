@@ -84,7 +84,7 @@ const FORMAT_CHANNELS: { [key: string]: number } = {
 /**
  * Parse MOD file from ArrayBuffer
  */
-export async function parseMOD(buffer: ArrayBuffer): Promise<{
+export async function parseMOD(buffer: ArrayBuffer, filename: string): Promise<{
   header: MODHeader;
   patterns: MODNote[][][]; // [pattern][row][channel]
   instruments: ParsedInstrument[];
@@ -168,7 +168,7 @@ export async function parseMOD(buffer: ArrayBuffer): Promise<{
   // Build metadata
   const metadata: ImportMetadata = {
     sourceFormat: 'MOD',
-    sourceFile: header.title,
+    sourceFile: filename,
     importedAt: new Date().toISOString(),
     originalChannelCount: header.channelCount,
     originalPatternCount: header.patternCount,
@@ -504,7 +504,7 @@ export function isMODFormat(buffer: ArrayBuffer): boolean {
  * gets this same song.
  */
 export async function parseMODFile(buffer: ArrayBuffer, filename: string): Promise<TrackerSong> {
-  const { header, patterns: modPatterns, instruments: parsedInstruments, metadata } = await parseMOD(buffer);
+  const { header, patterns: modPatterns, instruments: parsedInstruments, metadata } = await parseMOD(buffer, filename);
   const converted = convertMODModule(
     modPatterns, header.channelCount, metadata, parsedInstruments.map((i) => i.name), buffer,
   );

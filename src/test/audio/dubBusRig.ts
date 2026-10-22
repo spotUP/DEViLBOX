@@ -205,7 +205,10 @@ export async function makeDubBusRig(seconds: number): Promise<DubBusRig> {
     // node-web-audio-api registers a suspend asynchronously: one started in
     // the same tick as startRendering() is sometimes rejected (4 in 1480
     // under load; none after a real tick). A suspend must never be skipped
-    // silently, so a rejection fails the render.
+    // silently, so a rejection fails the render. Measured 2026-10-22: with this
+    // delay removed, 1 of 90 dubBusKnobReachability knobs fails per full run
+    // with InvalidStateError (the in-tick suspend race). The startRendering
+    // hang under faked timers is fixed separately by scripts/patch-node-web-audio.mjs.
     await realDelay(10);
     const rendered = await ctx.startRendering();
     if (suspendFailure) throw new Error(`audio-locked clock broke: ${String(suspendFailure)}`);

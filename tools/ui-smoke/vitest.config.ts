@@ -1,5 +1,6 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vitest/config';
+import { testCpuLimits } from '../../vitest.limits';
 import path from 'path';
 
 // Dedicated Vitest config for the ui-smoke suite. These tests live under
@@ -7,6 +8,7 @@ import path from 'path';
 // run on their own — not as part of `npm run test:ci` / `npm test`.
 export default defineConfig({
   test: {
+    ...testCpuLimits(),
     include: ['tools/ui-smoke/*.test.ts'],
     environment: 'node',
     testTimeout: 90000,

@@ -453,6 +453,9 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
     name: '🎹 Retromulator',
     description: 'Classic keyboard and FM synth emulations via Retromulator/Gearmulator WASM',
     synths: [
+      SYNTH_INFO.ReRebirth303,
+      SYNTH_INFO.ReRebirth808,
+      SYNTH_INFO.ReRebirth909,
       SYNTH_INFO.OpenWurli,
       SYNTH_INFO.OPL3,
       SYNTH_INFO.DX7,

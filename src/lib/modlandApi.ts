@@ -8,6 +8,7 @@ import { API_URL } from './apiBase';
 
 import { gatherCompanions, type CompanionIO } from './import/companionFetch';
 import { modlandListing } from './import/companionResolver';
+import { markKnownSource } from './modland/knownSource';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -112,6 +113,8 @@ export async function downloadModlandFile(fullPath: string, onProgress?: (progre
     const err = await response.json().catch(() => ({ error: 'Download failed' }));
     throw new Error(err.error || 'Download failed');
   }
+  // It came from Modland: never a contribution candidate, whichever caller asked for it.
+  markKnownSource(fullPath.split('/').pop() ?? fullPath);
   return readBodyWithProgress(response, onProgress);
 }
 

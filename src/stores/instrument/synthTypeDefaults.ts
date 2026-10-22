@@ -18,6 +18,9 @@ import {
   DEFAULT_V2_SPEECH,
   DEFAULT_SYNARE,
   DEFAULT_OPENWURLI,
+  DEFAULT_REBIRTH303,
+  DEFAULT_REBIRTH808,
+  DEFAULT_REBIRTH909,
   DEFAULT_OPL3,
   DEFAULT_DX7,
 } from '@typedefs/instrument';
@@ -124,6 +127,15 @@ export function applySynthTypeDefaults(instrument: InstrumentConfig, pickedType:
   }
 
   // Auto-initialize Retromulator synth configs
+  if (newType === 'ReRebirth303' && !instrument.rebirth303) {
+    instrument.rebirth303 = { ...DEFAULT_REBIRTH303 };
+  }
+  if (newType === 'ReRebirth808' && !instrument.rebirth808) {
+    instrument.rebirth808 = { ...DEFAULT_REBIRTH808 };
+  }
+  if (newType === 'ReRebirth909' && !instrument.rebirth909) {
+    instrument.rebirth909 = { ...DEFAULT_REBIRTH909 };
+  }
   if (newType === 'OpenWurli' && !instrument.openWurli) {
     instrument.openWurli = { ...DEFAULT_OPENWURLI };
   }

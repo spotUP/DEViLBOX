@@ -1,5 +1,8 @@
 import type { SynthInfo } from './types';
 
+// Credit shown with every re-rebirth synth description.
+const REREBIRTH_CREDIT = ' Tribute to ReBirth RB-338 by Propellerhead; not affiliated.';
+
 export const pluginSynthEntries: Record<string, SynthInfo> = {
   // Demoscene 4k/64k intro synths
   WaveSabreSlaughter: {
@@ -337,6 +340,33 @@ export const pluginSynthEntries: Record<string, SynthInfo> = {
     bestFor: ['Algorithmic composition', 'Live coding', 'Experimental'],
     icon: 'Code2',
     color: 'text-lime-400',
+  },
+  ReRebirth303: {
+    type: 'ReRebirth303',
+    name: 're-rebirth 303',
+    shortName: 're-rebirth 303',
+    description: 'Acid bass line synthesizer after the ReBirth RB-338 bass voice - sawtooth or square oscillator, resonant lowpass, accent and slide' + REREBIRTH_CREDIT,
+    bestFor: ['Acid', 'Bass', 'Techno', 'Slide', 'Squelch'],
+    icon: 'Waves',
+    color: 'text-accent-primary',
+  },
+  ReRebirth808: {
+    type: 'ReRebirth808',
+    name: 're-rebirth 808',
+    shortName: 're-rebirth 808',
+    description: 'Analog rhythm machine after the re-rebirth 808 - bass drum, snare, toms, congas, rim shot, claves, clap, maracas, cowbell, cymbal and hats on General MIDI drum notes' + REREBIRTH_CREDIT,
+    bestFor: ['Drums', 'Hip Hop', 'Electro', 'Percussion'],
+    icon: 'Waves',
+    color: 'text-accent-primary',
+  },
+  ReRebirth909: {
+    type: 'ReRebirth909',
+    name: 're-rebirth 909',
+    shortName: 're-rebirth 909',
+    description: 'Rhythm composer after the re-rebirth 909 - bass drum, snare, toms, rim shot, clap, hats, crash and ride on General MIDI drum notes' + REREBIRTH_CREDIT,
+    bestFor: ['Drums', 'House', 'Techno', 'Percussion'],
+    icon: 'Waves',
+    color: 'text-accent-primary',
   },
   // Retromulator WASM synths
   OpenWurli: {

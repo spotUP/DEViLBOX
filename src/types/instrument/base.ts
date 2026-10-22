@@ -175,6 +175,9 @@ export type SynthType =
   | 'RadioRiser'       // Bandpass-swept pink noise riser (extracted from dub bus)
   | 'SubSwell'         // One-octave-down sine sub swell (extracted from dub bus)
   | 'SpaceLaser'       // Space Laser (FM + Pitch Sweep)
+  | 'ReRebirth303'       // re-rebirth 303 acid bass (port of re-rebirth BassVoice, unlicensed)
+  | 'ReRebirth808'       // re-rebirth 808 drum machine (port of re-rebirth, unlicensed)
+  | 'ReRebirth909'       // re-rebirth 909 drum machine (port of re-rebirth, unlicensed)
   | 'OpenWurli'        // Wurlitzer 200A Electric Piano (Physical Model)
   | 'OPL3'             // Nuked OPL3 (YMF262) 18-channel FM
   | 'DX7'              // VDX7 Yamaha DX7 (cycle-accurate)
