@@ -36,6 +36,7 @@ describe('ToneEngine.releaseAll', () => {
     internals['instruments'] = new Map<number, unknown>([[(7 << 16) | 0, synth]]);
     internals['releaseRestoreTimeouts'] = new Map();
     internals['releaseRestoreVolumeDb'] = new Map();
+    internals['releaseRestores'] = new Map();
     for (const m of ['activeVoices', 'channelActivePlayer', 'channelPitchState', 'slicePlayersMap', 'nativeEngineRouting']) {
       internals[m] = new Map();
     }

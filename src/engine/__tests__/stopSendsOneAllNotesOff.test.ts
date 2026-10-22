@@ -43,6 +43,7 @@ describe('Stop (PatternScheduler.stop -> ToneEngine.releaseAll)', () => {
     internals['activeVoices'] = new Map([[0, [{ instrument: synth, nodes: voiceNodes }]]]);
     internals['releaseRestoreTimeouts'] = new Map();
     internals['releaseRestoreVolumeDb'] = new Map();
+    internals['releaseRestores'] = new Map();
     for (const m of ['channelActivePlayer', 'channelPitchState', 'slicePlayersMap', 'nativeEngineRouting']) {
       internals[m] = new Map();
     }
