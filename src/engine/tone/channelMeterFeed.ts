@@ -45,6 +45,30 @@ export class ChannelMeterFeed {
   private prevStarts: number[] = [];
   /** Channels whose counted note has not sounded yet (envelope delay / attack from silence). */
   private pending: boolean[] = [];
+  /** Reports measured ahead of when they are heard, oldest first (reportAt). */
+  private queue: Array<{ at: number; levels: number[]; noteStarts: number[] | null }> = [];
+
+  /**
+   * report() for levels an engine measures before they are heard: a worklet
+   * renders ahead of the output by its lead and the output latency, and fed
+   * on arrival the meters ran that far ahead of the sound (2026-10-23, a
+   * hybrid song's 32 ms lead made it visible). The report is held until
+   * `now` reaches `at`, both on the audio clock. Of the reports due, only the
+   * newest is fed: levels are a snapshot and note-start counts are
+   * cumulative, so a skipped report loses no note.
+   */
+  reportAt(levels: ArrayLike<number>, noteStarts: ArrayLike<number> | null, at: number, now: number): void {
+    this.queue.push({ at, levels: Array.from(levels), noteStarts: noteStarts ? Array.from(noteStarts) : null });
+    let due = -1;
+    while (due + 1 < this.queue.length && this.queue[due + 1].at <= now) due++;
+    if (due < 0) return;
+    const entry = this.queue[due];
+    this.queue.splice(0, due + 1);
+    this.report(entry.levels, entry.noteStarts);
+  }
+
+  /** Drop held reports: a stop or a new song must not feed the old song's levels. */
+  clearHeld(): void { this.queue.length = 0; }
 
   /**
    * One engine level report to the app's meters: counted when the engine
