@@ -252,6 +252,8 @@ export class LibopenmptEngine {
         // moment at which restoring them is safe. Doing it on a timer raced
         // the teardown and left the dub bus starved for the whole song —
         // see the comment beside the postMessage in chiptune3.worklet.js.
+        // The backstop timer must not run a second rebuild for the same play.
+        this._clearIsolationBackstop();
         this._rebuildIsolationAfterPlay();
         break;
       case 'diagState': {
@@ -377,9 +379,17 @@ export class LibopenmptEngine {
     // is what drives the rebuild (see handleMessage). This timer stays only as
     // a backstop for a cached worklet build that predates that message —
     // worklets are hand-maintained and a stale one would otherwise never
-    // restore the dub sends at all. `rebuildDubConnections` is idempotent, so
-    // running both costs a redundant reconnect and nothing else.
-    setTimeout(() => this._rebuildIsolationAfterPlay(), 400);
+    // restore the dub sends at all. playReady cancels it: the rebuild is NOT
+    // idempotent. It tears down every isolation slot, disposes the slot
+    // effects and makes new ones, and the new slot module joins the main one
+    // at the start of its row, not at its sample. Running both rebuilt the
+    // slots a second time about 350 ms into every play, and the effected
+    // channels distorted for the first 1-3 rows (2026-10-22).
+    this._clearIsolationBackstop();
+    this._isolationBackstop = setTimeout(() => {
+      this._isolationBackstop = null;
+      this._rebuildIsolationAfterPlay();
+    }, 400);
 
     // Enable per-channel oscilloscope after worklet creates the module
     setTimeout(() => {
@@ -393,6 +403,14 @@ export class LibopenmptEngine {
    * After a new song starts, recreate isolation slots if any per-channel effects exist
    * (either mixer insert effects or master effects with selectedChannels).
    */
+  private _isolationBackstop: ReturnType<typeof setTimeout> | null = null;
+
+  private _clearIsolationBackstop(): void {
+    if (this._isolationBackstop === null) return;
+    clearTimeout(this._isolationBackstop);
+    this._isolationBackstop = null;
+  }
+
   private _rebuildIsolationAfterPlay(): void {
     try {
       void import('../../stores/useMixerStore').then(({ scheduleWasmEffectRebuild }) => {
@@ -410,6 +428,7 @@ export class LibopenmptEngine {
     if (!this.workletNode) return;
     this.workletNode.port.postMessage({ cmd: 'stop' });
     this._playing = false;
+    this._clearIsolationBackstop();
     useOscilloscopeStore.getState().clear();
     // Immediately mute output to prevent audio leaking while the async
     // stop message is processed by the worklet thread.

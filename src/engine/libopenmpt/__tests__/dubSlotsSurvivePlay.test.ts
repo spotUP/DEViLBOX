@@ -56,7 +56,7 @@ describe('dub slots are restored after the worklet rebuilds the module', () => {
   it('the timer is a backstop for a stale worklet, not the primary trigger', () => {
     // Worklets are hand-maintained files that HMR never touches, so a cached
     // build with no playReady must still recover — just later.
-    expect(ENGINE).toContain('setTimeout(() => this._rebuildIsolationAfterPlay(), 400)');
+    expect(ENGINE).toMatch(/this._isolationBackstop = setTimeout\(\(\) => \{[^}]*this._rebuildIsolationAfterPlay\(\);\s*\}, 400\)/);
     expect(ENGINE, 'a 100 ms timer is the race this fix removes')
       .not.toContain('this._rebuildIsolationAfterPlay(), 100');
   });
