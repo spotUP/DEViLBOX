@@ -1008,17 +1008,12 @@ class MPT extends AudioWorkletProcessor {
 
 		setAmigaResampler(modulePtr)
 
-		// Seek to main module's current position for sync
-		if (this.modulePtr) {
-			const order = libopenmpt._openmpt_module_get_current_order(this.modulePtr)
-			const row = libopenmpt._openmpt_module_get_current_row(this.modulePtr)
-			libopenmpt._openmpt_module_set_position_order_row(modulePtr, order, row)
-		}
-
 		// Allocate render buffers
 		const maxFramesPerChunk = 128
 		const leftPtr = libopenmpt._malloc(4 * maxFramesPerChunk)
 		const rightPtr = libopenmpt._malloc(4 * maxFramesPerChunk)
+
+		this.syncToMain_(modulePtr, leftPtr, rightPtr)
 
 		const slot = {
 			modulePtr,
@@ -1170,16 +1165,12 @@ class MPT extends AudioWorkletProcessor {
 		libopenmpt._openmpt_module_set_render_param(modulePtr, OPENMPT_MODULE_RENDER_INTERPOLATIONFILTER_LENGTH, this.config.interpolationFilter)
 		setAmigaResampler(modulePtr)
 
-		// Sync to main module's current position so audio is in lockstep.
-		if (this.modulePtr) {
-			const order = libopenmpt._openmpt_module_get_current_order(this.modulePtr)
-			const row = libopenmpt._openmpt_module_get_current_row(this.modulePtr)
-			libopenmpt._openmpt_module_set_position_order_row(modulePtr, order, row)
-		}
-
 		const maxFramesPerChunk = 128
 		const leftPtr = libopenmpt._malloc(4 * maxFramesPerChunk)
 		const rightPtr = libopenmpt._malloc(4 * maxFramesPerChunk)
+
+		// Sync to main module's current sample so audio is in lockstep.
+		this.syncToMain_(modulePtr, leftPtr, rightPtr)
 
 		const soloMask = (1 << channelIndex) & this.userMuteMask
 		this.applyChannelIsolation_(extPtr, muteFunc, volumeFunc, soloMask)
@@ -1238,12 +1229,10 @@ class MPT extends AudioWorkletProcessor {
 
 		const size = this.moduleBuffer.byteLength
 		const count = Math.min(this.channels, MAX_OSC_CHANNELS, Math.max(1, Math.floor(OSC_MEMORY_BUDGET / Math.max(1, size))))
-		const mainOrder = this.modulePtr ? libopenmpt._openmpt_module_get_current_order(this.modulePtr) : 0
-		const mainRow = this.modulePtr ? libopenmpt._openmpt_module_get_current_row(this.modulePtr) : 0
 		const modules = []
 
 		for (let ch = 0; ch < count; ch++) {
-			const inst = this.createOscInstance_(ch, mainOrder, mainRow)
+			const inst = this.createOscInstance_(ch)
 			if (!inst) { // partial set is useless for the channels that failed, keep what exists
 				break
 			}
@@ -1263,7 +1252,7 @@ class MPT extends AudioWorkletProcessor {
 	}
 
 	/** One oscilloscope instance playing only channel `ch` (all others muted before its first tick). */
-	createOscInstance_(ch, order, row) {
+	createOscInstance_(ch) {
 		const byteArray = new Int8Array(this.moduleBuffer)
 		const ptrToFile = libopenmpt._malloc(byteArray.byteLength)
 		libopenmpt.HEAPU8.set(byteArray, ptrToFile)
@@ -1305,14 +1294,36 @@ class MPT extends AudioWorkletProcessor {
 		libopenmpt._openmpt_module_set_render_param(modulePtr, OPENMPT_MODULE_RENDER_INTERPOLATIONFILTER_LENGTH, this.config.interpolationFilter)
 		setAmigaResampler(modulePtr)
 
-		if (order > 0 || row > 0) {
-			libopenmpt._openmpt_module_set_position_order_row(modulePtr, order, row)
-		}
+		const leftPtr = libopenmpt._malloc(4 * 128)
+		const rightPtr = libopenmpt._malloc(4 * 128)
+		this.syncToMain_(modulePtr, leftPtr, rightPtr)
 
-		return {
-			modulePtr, extPtr,
-			leftPtr: libopenmpt._malloc(4 * 128),
-			rightPtr: libopenmpt._malloc(4 * 128),
+		return { modulePtr, extPtr, leftPtr, rightPtr }
+	}
+
+	/**
+	 * Put a secondary module (isolation slot, dub slot, scope instance) on the
+	 * exact sample main renders next. A seek lands only on the start of a row,
+	 * and main is usually part way through it: a slot made while the song
+	 * plays (an effect retargeted mid-play) used to start its channel up to a
+	 * row behind the rest of the mix. libopenmpt counts the position in
+	 * rendered seconds, so the frames main is past its row start are rendered
+	 * into the slot's buffers and discarded.
+	 */
+	syncToMain_(modulePtr, leftPtr, rightPtr) {
+		if (!this.modulePtr) return
+		const mainSeconds = libopenmpt._openmpt_module_get_position_seconds(this.modulePtr)
+		if (mainSeconds <= 0) return
+		libopenmpt._openmpt_module_set_position_order_row(
+			modulePtr,
+			libopenmpt._openmpt_module_get_current_order(this.modulePtr),
+			libopenmpt._openmpt_module_get_current_row(this.modulePtr),
+		)
+		let frames = Math.round((mainSeconds - libopenmpt._openmpt_module_get_position_seconds(modulePtr)) * sampleRate)
+		while (frames > 0) {
+			const n = libopenmpt._openmpt_module_read_float_stereo(modulePtr, sampleRate, Math.min(128, frames), leftPtr, rightPtr)
+			if (n <= 0) break
+			frames -= n
 		}
 	}
 
