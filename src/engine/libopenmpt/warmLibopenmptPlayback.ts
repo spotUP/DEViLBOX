@@ -12,6 +12,12 @@
  * ~500 ms late on the first play only (findings doc 2026-10-15_dx7-double,
  * "First-play 500 ms delay"). Every step below is cached by its owner, so
  * play() then awaits work that is already done.
+ *
+ * A song without module data also builds its module on every play()
+ * (OpenMPTEditBridge.createModuleForSong); the first build after a page load
+ * held the main thread ~60-80 ms inside createNewModule, so the first notes of
+ * the first play stuttered on every synth (2026-10-23). One throw-away build
+ * at open pays that cost here.
  */
 
 /** The song fields that decide how it plays (applySong's SongEngineData). */
@@ -39,14 +45,17 @@ export function routesThroughLibopenmpt(song: LibopenmptRoutingFields): boolean 
 }
 
 /** Start the one-time libopenmpt work now; play() awaits the same cached promises. */
-export async function warmLibopenmptPlayback(): Promise<void> {
+export async function warmLibopenmptPlayback(song: LibopenmptRoutingFields): Promise<void> {
   try {
-    const [osl, { LibopenmptEngine }] = await Promise.all([
+    const [osl, { LibopenmptEngine }, bridge] = await Promise.all([
       import('@lib/import/wasm/OpenMPTSoundlib'),
       import('@engine/libopenmpt/LibopenmptEngine'),
+      import('@engine/libopenmpt/OpenMPTEditBridge'),
       import('@engine/replayer/SynthEffectProcessor'),
     ]);
     await Promise.all([osl.preloadSoundlib(), LibopenmptEngine.getInstance().ready()]);
+    // A song with module data plays that module; only the empty-XM path builds one.
+    if (!song.libopenmptFileData) await bridge.warmModuleBuild();
   } catch (err) {
     // play() still does the same work itself, so a failed warm-up only costs time.
     console.warn('[warmLibopenmptPlayback] warm-up failed:', err);
