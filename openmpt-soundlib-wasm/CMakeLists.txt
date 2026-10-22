@@ -118,6 +118,7 @@ target_link_options(OpenMPTSoundlib PRIVATE
 '_osl_get_sample_data_size',\
 '_osl_set_sample_data',\
 '_osl_set_sample_loop',\
+'_osl_ensure_sample_slot',\
 '_osl_save_mod',\
 '_osl_save_xm',\
 '_osl_save_it',\
@@ -134,6 +135,7 @@ target_link_options(OpenMPTSoundlib PRIVATE
 '_osl_set_num_channels',\
 '_osl_set_initial_speed',\
 '_osl_set_initial_tempo',\
+'_osl_set_sample_preamp',\
 '_osl_get_midi_macro_string',\
 '_osl_set_midi_macro_string'\
 ]"

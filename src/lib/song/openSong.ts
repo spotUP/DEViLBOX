@@ -30,7 +30,7 @@ import { whenStartupJingleDone } from '@lib/startup/startupSequence';
 import { whenBootRestoreDone } from '@lib/startup/bootRestore';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
 import { isSongFormat, isAudioFile, type FileLoadOptions, type FileLoadResult } from '@/lib/file/UnifiedFileLoader';
-import { loadSongFile, loadV2MFile, loadAdPlugFile, importModuleFile, prepareModuleFile } from '@/lib/song/songBranches';
+import { loadSongFile, loadV2MFile, loadUpRoughSong, loadAdPlugFile, importModuleFile, prepareModuleFile } from '@/lib/song/songBranches';
 import type { ModuleInfo } from '@/lib/import/ModuleLoader';
 import type { PrepareHooks } from '@/lib/import/prepareModuleImport';
 import type { SIDHeaderInfo } from '@/lib/sid/SIDHeaderParser';
@@ -145,7 +145,7 @@ export const START_BY_ORIGIN: Record<OpenOrigin, false | 'song'> = {
 /** Origins where a person is at a dialog and may be asked something. */
 const INTERACTIVE_ORIGINS: ReadonlySet<OpenOrigin> = new Set(['drop', 'filebrowser', 'dialog']);
 
-export type SongKind = 'v2m' | 'goatTracker' | 'adplug' | 'sunvox' | 'td3' | 'project' | 'module' | 'header';
+export type SongKind = 'upRough' | 'v2m' | 'goatTracker' | 'adplug' | 'sunvox' | 'td3' | 'project' | 'module' | 'header';
 
 /**
  * What a file is, or null when it is not a song. THE routing rule for song
@@ -157,6 +157,7 @@ export type SongKind = 'v2m' | 'goatTracker' | 'adplug' | 'sunvox' | 'td3' | 'pr
 export async function classifySong(file: File): Promise<SongKind | null> {
   const filename = file.name.toLowerCase();
   if (filename.endsWith('.v2m')) return 'v2m';
+  if (filename.endsWith('.uprough-song.json')) return 'upRough';
 
   const byContent = (filename.endsWith('.sng') || isAdPlugWasmFormat(filename) || filename.endsWith('.pmd'))
     ? detectFormatFromContent(filename, new Uint8Array(await file.arrayBuffer()))
@@ -247,6 +248,7 @@ async function route(kind: SongKind, file: File, o: OpenOptions, companions?: Ma
     return { success: true, message: `Loaded ${file.name}` };
   }
   switch (kind) {
+    case 'upRough': return loadUpRoughSong(file);
     case 'v2m': return loadV2MFile(file);
     case 'adplug': return loadAdPlugFile(file, companions);
     case 'goatTracker': return loadSongFile(file, options, await file.arrayBuffer());

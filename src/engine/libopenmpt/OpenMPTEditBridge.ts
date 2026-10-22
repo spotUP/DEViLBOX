@@ -15,11 +15,13 @@
  */
 
 import type { TrackerCell } from '@/types/tracker';
-import type { SampleConfig } from '@typedefs/instrument';
+import type { InstrumentConfig, SampleConfig } from '@typedefs/instrument';
 import type { SampleEdit } from '@/lib/song/sampleEdit';
 import type { SaveFormat } from '@lib/import/wasm/OpenMPTSoundlib';
 import { mapNoteToOpenMPT } from '@lib/import/wasm/OpenMPTConverter';
 import { foldEffectColumnsForXM } from '@/lib/tracker/volumeColumn';
+import { noteToMidi, xmNoteToToneJS } from '@/lib/xmConversions';
+import { getNormalizedVolume, instrumentOffsetDb } from '@engine/factories/volumeNormalization';
 
 let _dirty = false;
 let _loaded = false;
@@ -36,6 +38,17 @@ let _edited = false;
 let _owned = new WeakSet<ArrayBuffer>();
 /** Store pattern id held in each module pattern slot; null until known. */
 let _slotIds: string[] | null = null;
+/**
+ * Sample slots this bridge filled from an editor Sampler instrument (never an
+ * imported sample), keyed by instrument id, with the sample source written
+ * (the WAV bytes or the saved URL, see samplerSource).
+ */
+let _samplerSlots = new Map<number, ArrayBuffer | string>();
+/**
+ * The sample source and volume last looked at per instrument id, so an
+ * unchanged instrument costs no module call and a volume change rewrites it.
+ */
+let _samplerSeen = new Map<number, { source: ArrayBuffer | string; volume: number | undefined }>();
 /** Every module write runs on this chain, so a structural change and the cell edits after it land in order. */
 let _queue: Promise<unknown> = Promise.resolve();
 
@@ -198,6 +211,8 @@ export function markLoaded(format: SaveFormat, source?: ArrayBuffer, patternIds?
   _owned = new WeakSet<ArrayBuffer>();
   if (source) _owned.add(source);
   _slotIds = patternIds ? [...patternIds] : null;
+  _samplerSlots = new Map();
+  _samplerSeen = new Map();
 }
 
 /** Whether `data` is a buffer this module stands for (see markLoaded). */
@@ -327,6 +342,8 @@ export interface SongStructure {
   numChannels: number;
   patterns: { id?: string; length: number; channels: { rows: TrackerCell[] }[] }[];
   songPositions: number[];
+  /** The song's instruments; createModuleForSong writes the Sampler ones' samples. */
+  instruments?: readonly InstrumentConfig[];
 }
 
 /**
@@ -414,8 +431,50 @@ export async function syncSongStructure(song: SongStructure): Promise<boolean> {
  * Returns the serialized XM, or null when creation failed or `cancelled()`
  * turned true while it was being built.
  */
+/**
+ * The sample pre-amp at which libopenmpt plays a sample at volume 64 at the
+ * sample's own level (measured: 48, the soundlib default and OpenMPT's level
+ * for an imported XM, plays it at 0.187 of it; the mixer gain is linear in
+ * the pre-amp). OpenMPT's NormalSamplePreAmp for MixLevels::Compatible.
+ */
+const UNITY_SAMPLE_PREAMP = 256;
+
+/**
+ * The sample pre-amp of a module DEViLBOX builds from its own song. On a key a
+ * Sampler plays through ToneEngine at getNormalizedVolume: its volume (at most
+ * 0 dB) plus the Sampler's normalization offset. The pattern plays the same
+ * note through libopenmpt, which ignores the instrument volume, so at the
+ * default pre-amp the pattern sounded 12.5 dB under the key (reported
+ * 2026-10-21: "very silent"). This pre-amp carries the offset, the headroom a
+ * Sampler at full volume needs over its sample; samplerSampleGain carries the
+ * volume in the sample itself, so a pattern note at volume 64 plays at the
+ * key's level. The XM keeps the pre-amp in its SPA. chunk, so the saved song
+ * plays the same. Imported modules keep their own level.
+ */
+export function builtSongSamplePreAmp(): number {
+  return Math.round(UNITY_SAMPLE_PREAMP * Math.pow(10, instrumentOffsetDb('Sampler') / 20));
+}
+
+/**
+ * The gain a Sampler's PCM is written at in the play-time module: its key level
+ * (getNormalizedVolume) relative to the headroom builtSongSamplePreAmp holds.
+ * XM samples have no volume that multiplies the volume column, so the level
+ * lives in the PCM. At most 1, where the sample is written as it is.
+ */
+export function samplerSampleGain(inst: Pick<InstrumentConfig, 'synthType' | 'volume'>): number {
+  const db = getNormalizedVolume(inst.synthType, inst.volume) - instrumentOffsetDb('Sampler');
+  return Math.min(1, Math.pow(10, db / 20));
+}
+
+/** A song to build a module from: its shape plus the tempo the module starts at. */
+export interface ModuleSong extends SongStructure {
+  initialSpeed: number;
+  /** XM stores whole BPM; a fractional tempo is rounded. */
+  initialBPM: number;
+}
+
 export async function createModuleForSong(
-  song: SongStructure,
+  song: ModuleSong,
   cancelled: () => boolean,
 ): Promise<ArrayBuffer | null> {
   const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
@@ -424,6 +483,11 @@ export async function createModuleForSong(
     const numPat = song.patterns.length || 1;
     if (!(await osl.createNewModule(1 /* XM */, song.numChannels || 4, numPat))) return null;
     markLoaded('xm');
+    await osl.setSamplePreAmp(builtSongSamplePreAmp());
+    // libopenmpt sequences the song from this module, so it starts at the
+    // song's tempo, not the XM default of 125 BPM / speed 6.
+    await osl.setInitialSpeed(song.initialSpeed);
+    await osl.setInitialTempo(Math.round(song.initialBPM));
     // createNewModule makes 64-row patterns and order [0, 1, 2, ...]; the song's
     // lengths (an 8-row song would play 56 rows of silence) and order list
     // ([0, 1, 0, 2]) differ, so the module takes the song's shape first.
@@ -432,11 +496,147 @@ export async function createModuleForSong(
       await writePatternCells(osl, p, song.patterns[p].channels);
     }
     _slotIds = patternIdsOf(song);
+    for (const inst of song.instruments ?? []) await writeSamplerInstrument(osl, inst);
     if (cancelled()) return null;
     const data = await osl.saveModule('xm');
     if (data) _owned.add(data);
     return data;
   });
+}
+
+/**
+ * The c5Speed at which libopenmpt plays a Sampler's WAV at the pitch ToneEngine
+ * gives it. ToneEngine plays the WAV at its own rate on `baseNote` (C4 when
+ * unset) and scales by the note distance; libopenmpt plays c5Speed on OpenMPT
+ * note 61. The cell reaching note 61 comes from mapNoteToOpenMPT and its
+ * ToneEngine name from xmNoteToToneJS, so the two routes agree by construction.
+ */
+export function samplerC5Speed(wavRate: number, baseNote: string | undefined, cellFormat: SaveFormat): number {
+  const cellAt61 = 61 - (mapNoteToOpenMPT(1, cellFormat) - 1);
+  const semitones = noteToMidi(xmNoteToToneJS(cellAt61)) - noteToMidi(baseNote || 'C4');
+  return Math.round(wavRate * Math.pow(2, semitones / 12));
+}
+
+/**
+ * Write a Sampler instrument's WAV into the current module's sample slot at its
+ * id, at the pitch ToneEngine gives it (samplerC5Speed), growing the sample list
+ * when the slot is past the end. A module with XM/IT instruments refuses (its
+ * instrument ids are not sample slots). Shared by the play-time module and the
+ * exporter so both carry the same sample; `gain` scales the PCM (the play-time
+ * module passes samplerSampleGain). Returns whether the slot was written.
+ */
+export async function writeSamplerSlot(osl: Soundlib, inst: InstrumentConfig, cellFormat: SaveFormat, gain = 1): Promise<boolean> {
+  if (inst.synthType !== 'Sampler' && inst.synthType !== 'Player') return false;
+  const sample = inst.sample;
+  if (!sample || !samplerSource(sample)) return false;
+  if (!(await osl.ensureSampleSlot(inst.id))) return false;
+  const bytes = await samplerWavBytes(sample);
+  if (!bytes) return false;
+  const wav = await samplerPcm(bytes);
+  if (!wav || wav.pcm.length === 0) return false;
+  const pcm = Int16Array.from(wav.pcm, (x) => Math.max(-32768, Math.min(32767, Math.round(x * gain * 32767))));
+  if (!(await osl.setSampleData(inst.id, pcm, samplerC5Speed(wav.sampleRate, sample.baseNote, cellFormat), false))) return false;
+  // The loop is written after the data: replacing the data leaves the old loop flags on the new length.
+  const type = sample.loop ? (sample.loopType === 'pingpong' ? 'pingpong' : 'forward') : 'off';
+  await osl.setSampleLoop(inst.id, sample.loopStart || 0, sample.loopEnd || 0, type);
+  return true;
+}
+
+/**
+ * What a Sampler instrument's sample data comes from: the WAV bytes the editor
+ * decoded, or the URL the sample was saved with. A restored song carries only
+ * the URL (snapshotSong drops the bytes), so the URL is the persisted truth and
+ * the bytes a cache of it. Null when the instrument has neither.
+ */
+function samplerSource(sample: SampleConfig): ArrayBuffer | string | null {
+  if (sample.audioBuffer && sample.audioBuffer.byteLength > 0) return sample.audioBuffer;
+  return sample.url ? sample.url : null;
+}
+
+/**
+ * The mono PCM of a Sampler sample's bytes. A WAV is read as it is; any other
+ * file the keyboard plays (an MP3, OGG or FLAC dropped on the app) is decoded by
+ * ToneEngine's decoder, the one the keyboard plays it through, at that decoder's
+ * rate. Null when neither can read the bytes.
+ */
+async function samplerPcm(bytes: Uint8Array): Promise<{ pcm: Float32Array; sampleRate: number } | null> {
+  const { decodeWavBytes } = await import('@/bridge/analysis/SampleSpectrum');
+  const wav = decodeWavBytes(bytes);
+  if (wav) return wav;
+  try {
+    const { getToneEngine } = await import('@engine/ToneEngine');
+    const buffer = await getToneEngine().decodeAudioData(bytes);
+    const pcm = new Float32Array(buffer.length);
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const channel = buffer.getChannelData(c);
+      for (let i = 0; i < pcm.length; i++) pcm[i] += channel[i] / buffer.numberOfChannels;
+    }
+    return { pcm, sampleRate: buffer.sampleRate };
+  } catch {
+    return null;
+  }
+}
+
+/** The WAV bytes of a Sampler sample, read from the URL when the bytes are not in memory. */
+async function samplerWavBytes(sample: SampleConfig): Promise<Uint8Array | null> {
+  const source = samplerSource(sample);
+  if (source === null) return null;
+  if (typeof source !== 'string') return new Uint8Array(source);
+  try {
+    const response = await fetch(source);
+    return response.ok ? new Uint8Array(await response.arrayBuffer()) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * writeSamplerSlot for the play-time module, which leaves a slot holding an
+ * imported sample alone and remembers which slots it filled. Runs inside enqueue.
+ * Returns whether the module changed.
+ */
+async function writeSamplerInstrument(osl: Soundlib, inst: InstrumentConfig): Promise<boolean> {
+  if (inst.synthType !== 'Sampler' && inst.synthType !== 'Player') return false;
+  const source = inst.sample ? samplerSource(inst.sample) : null;
+  if (source === null) return false;
+  _samplerSeen.set(inst.id, { source, volume: inst.volume });
+  if (!_samplerSlots.has(inst.id)) {
+    if (!(await osl.ensureSampleSlot(inst.id))) return false;
+    const held = await osl.getSampleInfo(inst.id);
+    if ((held?.length ?? 0) > 0) return false;
+  }
+  if (!(await writeSamplerSlot(osl, inst, _format, samplerSampleGain(inst)))) return false;
+  _samplerSlots.set(inst.id, source);
+  return true;
+}
+
+/**
+ * Give the module the samples of Sampler instruments added or reloaded in the
+ * editor after it was built: libopenmpt plays Sampler notes (ToneEngine leaves
+ * them to it), so an instrument missing from the module is silent in the song.
+ * Instruments whose sample source is unchanged since the last call cost nothing.
+ * Returns whether the module changed (then it hot-reloads).
+ */
+export async function syncSamplerInstruments(instruments: readonly InstrumentConfig[]): Promise<boolean> {
+  if (!_loaded) return false;
+  const pending = instruments.filter((inst) =>
+    (inst.synthType === 'Sampler' || inst.synthType === 'Player')
+    && !!inst.sample && samplerSource(inst.sample) !== null
+    && !sameSeen(_samplerSeen.get(inst.id), samplerSource(inst.sample), inst.volume));
+  if (pending.length === 0) return false;
+  const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
+  const changed = await enqueue(async () => {
+    let any = false;
+    for (const inst of pending) if (await writeSamplerInstrument(osl, inst)) any = true;
+    return any;
+  });
+  if (changed) markEdited();
+  return changed;
+}
+
+function sameSeen(seen: { source: ArrayBuffer | string; volume: number | undefined } | undefined,
+  source: ArrayBuffer | string | null, volume: number | undefined): boolean {
+  return !!seen && seen.source === source && seen.volume === volume;
 }
 
 /**
@@ -448,6 +648,12 @@ export async function createModuleForSong(
 export async function syncSampleEdit(instrumentId: number, sample: SampleConfig, edit: SampleEdit): Promise<void> {
   if (!_loaded) return;
   const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
+  if (_samplerSlots.has(instrumentId)) {
+    // A slot this bridge filled from a Sampler: write it the same way again, at the Sampler's pitch.
+    const config = { id: instrumentId, synthType: 'Sampler', sample, volume: _samplerSeen.get(instrumentId)?.volume } as InstrumentConfig;
+    if (await enqueue(() => writeSamplerInstrument(osl, config))) markEdited();
+    return;
+  }
   if (edit.data && sample.audioBuffer && sample.audioBuffer.byteLength > 0) {
     const { decodeWavBytes } = await import('@/bridge/analysis/SampleSpectrum');
     const wav = decodeWavBytes(new Uint8Array(sample.audioBuffer));
@@ -525,4 +731,6 @@ export function reset(): void {
   _format = 'mod';
   _owned = new WeakSet<ArrayBuffer>();
   _slotIds = null;
+  _samplerSlots = new Map();
+  _samplerSeen = new Map();
 }

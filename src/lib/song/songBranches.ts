@@ -33,7 +33,9 @@ import { computeSongDBHash, lookupSongDB } from '@/lib/songdb';
 
 import { clearExplicitlySaved } from '@/lib/persistence/explicitSave';
 import { applySong } from '@/lib/song/applySong';
+import { parseSongFile, songFileToSong } from '@/lib/uprough/songFile';
 import { emptyPattern } from '@/lib/import/formats/Sc68Parser';
+import { nativeGridHasNotes } from '@/lib/import/uadeScanQuality';
 import type { PreparedModule, PrepareHooks } from '@/lib/import/prepareModuleImport';
 import { isSongFormat, type FileLoadOptions, type FileLoadResult } from '@/lib/file/UnifiedFileLoader';
 
@@ -433,6 +435,7 @@ export async function loadSongFile(file: File, options: FileLoadOptions, preRead
       quantize: options.midiOptions?.quantize ?? 1,
       velocityToVolume: options.midiOptions?.velocityToVolume ?? true,
       defaultPatternLength: options.midiOptions?.defaultPatternLength ?? 64,
+      soundFont: options.midiOptions?.soundFont,
     });
 
     if (result.patterns.length === 0) {
@@ -442,13 +445,13 @@ export async function loadSongFile(file: File, options: FileLoadOptions, preRead
     const songPositions = result.patterns.map((_: unknown, i: number) => i);
     await applySong({
       instruments: result.instruments, patterns: result.patterns, order: songPositions,
-      bpm: result.bpm, speed: 6,
+      bpm: result.bpm, speed: result.speed,
       metadata: { name: result.metadata.name, description: `Imported from ${file.name} (${result.metadata.tracks} tracks)` },
       originalModuleData: {
         base64: '',
         format: 'XM' as 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN',
         initialBPM: result.bpm,
-        initialSpeed: 6,
+        initialSpeed: result.speed,
         songLength: songPositions.length,
       } as never,
       engine: {},
@@ -553,11 +556,16 @@ export async function loadSongFile(file: File, options: FileLoadOptions, preRead
       return { success: true, message: importedMessage };
     }
 
-    const existingPatterns = options.replacePatterns ? [] : useTrackerStore.getState().patterns;
-    const allPatterns = [...existingPatterns, ...importedPatterns];
-    loadPatterns(allPatterns);
+    // A song without a note is the blank song a session starts with: appending
+    // after it played its empty pattern before the TD-3 one. The imported
+    // patterns take its place; a song with notes keeps its own order and gains
+    // the imported patterns at the end of it.
+    const tracker = useTrackerStore.getState();
+    const existingPatterns = options.replacePatterns || !nativeGridHasNotes(tracker) ? [] : tracker.patterns;
+    const existingOrder = existingPatterns.length > 0 ? tracker.patternOrder : [];
+    loadPatterns([...existingPatterns, ...importedPatterns]);
     setCurrentPattern(existingPatterns.length);
-    setPatternOrder(allPatterns.map((_, i) => i));
+    setPatternOrder([...existingOrder, ...importedPatterns.map((_, i) => existingPatterns.length + i)]);
 
     return { success: true, message: importedMessage };
   }
@@ -832,6 +840,25 @@ export async function loadSongFile(file: File, options: FileLoadOptions, preRead
   }
 
   return { success: false, error: `Unsupported song format: ${file.name}` };
+}
+
+/**
+ * Load a .uprough-song.json file: patterns, order and instruments (a malformed
+ * file throws SongFileError by name; openSong reports it). The outgoing song is
+ * already unloaded by openSong's withSongLoad.
+ */
+export async function loadUpRoughSong(file: File): Promise<FileLoadResult> {
+  const song = songFileToSong(parseSongFile(await file.text()));
+  await applySong({
+    instruments: song.instruments, patterns: song.patterns, order: song.meta.order,
+    bpm: song.tempo.bpm, speed: song.tempo.speed,
+    metadata: { name: song.tempo.name },
+    originalModuleData: null,
+    engine: {},
+  }, 'import');
+  // After applySong: loadPatterns clears upRoughMeta.
+  useTrackerStore.setState({ upRoughMeta: song.meta });
+  return { success: true, message: `Loaded ${file.name}` };
 }
 
 /**

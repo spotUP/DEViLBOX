@@ -27,7 +27,7 @@ import { registerChannelMeterSink } from './tone/channelMeterFeed';
 import { chipChannelFor, LIVE_VOICE_BASE_CHANNEL } from './furnace-dispatch/chipChannel';
 import { soundingToneVoices, trackToneVoices, untrackToneVoices } from './tone/toneVoiceProbe';
 import { cutToneNote } from './tone/toneNoteCut';
-import { createToneSynthNode } from './tone/toneSynthKnobs';
+import { createToneSynthNode, toneVoiceTypeOf } from './tone/toneSynthKnobs';
 import { TrackerEnvelope } from './TrackerEnvelope';
 import { InstrumentAnalyser } from './InstrumentAnalyser';
 import { FurnaceChipEngine } from './chips/FurnaceChipEngine';
@@ -38,6 +38,7 @@ import { OPL3Synth } from './opl3/OPL3Synth';
 import { normalizeUrl } from '@utils/urlUtils';
 import { getNativeAudioNode, setDevilboxAudioContext, noteToMidi } from '@utils/audio-context';
 import { recordNoteTrigger } from './debug/noteTriggerLog';
+import { FluidSynthHost } from './fluidsynth/FluidSynthHost';
 import { globalSingleton, clearGlobalSingleton } from '@utils/globalSingleton';
 import { SAFETY_LIMITER, makeupCancelGain, createToneSafetyLimiter } from './dj/djLimiter';
 import { VinylNoiseEffect } from './effects/VinylNoiseEffect';
@@ -125,6 +126,7 @@ import {
   MAX_VOICE_DELAY_SEC,
   createVoice as _createVoice,
   stopVoice as _stopVoice,
+  disposeVoiceNodes,
   setChannelVolume as _setChannelVolume,
   channelVolumeDbToGain,
   setChannelFilterCutoff as _setChannelFilterCutoff,
@@ -143,7 +145,9 @@ import {
   isChannelMuted as _isChannelMuted,
   disposeChannelOutputs as _disposeChannelOutputs,
   setChannelStripDestination as _setChannelStripDestination,
+  setChannelStripDubTap as _setChannelStripDubTap,
   getChannelLevels as _getChannelLevels,
+  getChannelWaveform as _getChannelWaveform,
   updateChannelEnvelopes as _updateChannelEnvelopes,
   setChannelKeyOff as _setChannelKeyOff,
   updateRealtimeChannelLevels as _updateRealtimeChannelLevels,
@@ -2045,7 +2049,7 @@ export class ToneEngine {
       'MdaEPiano', 'MdaJX10', 'MdaDX10', 'Amsynth', 'RaffoSynth', 'CalfMono',
       'SetBfree', 'SynthV1', 'TalNoizeMaker', 'Aeolus', 'FluidSynth', 'Sfizz',
       'ZynAddSubFX', 'Monique', 'VL1',
-      'DX7', 'OPL3', 'OpenWurli',
+      'DX7', 'OPL3', 'OpenWurli', 'ReRebirth303', 'ReRebirth808', 'ReRebirth909',
     ].includes(config.synthType || '');
     const isVSTBridge = !isWASMSynth && typeof config.synthType === 'string' && SYNTH_REGISTRY.has(config.synthType);
     // Standalone native synths get one instance per tracker channel so the
@@ -2454,7 +2458,13 @@ export class ToneEngine {
 
       // New synths - use InstrumentFactory for complex synths
       // For tracker channels, PolySynth/SuperSaw create MonoSynth for pitch effects
-      case 'PolySynth':
+      case 'PolySynth': {
+        // The Synth family's creation path: top-level oscillator / envelope / filter / octave, a MonoSynth on tracker channels.
+        instrument = isTrackerChannel
+          ? createToneSynthNode(toneVoiceTypeOf(config), config, { monophonic: true })
+          : InstrumentFactory.createInstrument(config);
+        break;
+      }
       case 'SuperSaw': {
         if (isTrackerChannel) {
           const oscType = config.polySynth?.oscillator?.type || config.oscillator?.type || 'sawtooth';
@@ -2693,6 +2703,11 @@ export class ToneEngine {
       case 'Monique':
       case 'VL1': {
         instrument = InstrumentFactory.createInstrument(config);
+        if (instrument && config.synthType === 'FluidSynth' && isDevilboxSynth(instrument)) {
+          // Song-wide reverb/chorus of the shared FluidSynth worklet; the dry signal goes per channel.
+          const busNode = getNativeAudioNode(this.synthBus as unknown as Record<string, unknown>);
+          if (busNode) FluidSynthHost.peek(instrument.output.context)?.connectFxReturn(busNode);
+        }
         if (instrument) {
           console.log('[ToneEngine] Zynthian synth created:', config.synthType,
             'isDevilbox:', isDevilboxSynth(instrument),
@@ -3552,6 +3567,7 @@ export class ToneEngine {
         config.synthType === 'TB303' ||
         config.synthType === 'DubSiren' ||
         config.synthType === 'Synare' ||
+        config.synthType === 'ReRebirth303' ||
         config.synthType === 'Furnace' ||
         // Buzzmachine generators (monophonic, no note parameter)
         config.synthType === 'BuzzKick' ||
@@ -3663,7 +3679,7 @@ export class ToneEngine {
       // Single-voice generators
       'MAMECM3394', 'MAMETMS36XX', 'MAMESN76477', 'MAMEUPD931', 'MAMEUPD933',
       // Monophonic synths
-      'MonoSynth', 'DuoSynth', 'TB303', 'Buzz3o3', 'DB303', 'DubSiren', 'SpaceLaser', 'Synare',
+      'MonoSynth', 'DuoSynth', 'TB303', 'Buzz3o3', 'DB303', 'DubSiren', 'SpaceLaser', 'Synare', 'ReRebirth303',
       // Zynthian mono synths (single-voice WASM engines)
       'RaffoSynth', 'CalfMono', 'Monique', 'VL1',
     ]);
@@ -3915,6 +3931,7 @@ export class ToneEngine {
                         synthType === 'BuzzDynamite6' ||
                         synthType === 'BuzzM3' ||
                         synthType === 'DubSiren' ||
+                        synthType === 'ReRebirth303' ||
                         synthType === 'Synare';
 
     try {
@@ -4625,10 +4642,14 @@ export class ToneEngine {
 
     // Stop all active voice clones (critical for 'Synth' type which creates per-note clones
     // that aren't in this.instruments — without this, cloned voices keep playing forever)
+    // A mono voice IS a registered instrument, already released by the loop above: only its
+    // routing nodes are torn down here, so Stop sends that instrument one all-notes-off, not two.
+    const registered = new Set<unknown>(this.instruments.values());
     this.activeVoices.forEach((voices) => {
       for (const voice of voices) {
         try {
-          this.stopVoice(voice, now);
+          if (registered.has(voice.instrument)) disposeVoiceNodes(voice);
+          else this.stopVoice(voice, now);
         } catch { /* ignored */ }
       }
     });
@@ -5553,6 +5574,7 @@ export class ToneEngine {
   public clearChannelPitch(channelIndex: number): void { _clearChannelPitch(this._channelCtx, channelIndex); }
   public setChannelMute(channelIndex: number, muted: boolean): void { _setChannelMute(this._channelCtx, channelIndex, muted); }
   public setChannelStripDestination(channelIndex: number, destination: Tone.InputNode | null): void { _setChannelStripDestination(this._channelCtx, channelIndex, destination); }
+  public setChannelStripDubTap(channelIndex: number, tap: Tone.InputNode | null): void { _setChannelStripDubTap(this._channelCtx, channelIndex, tap); }
   public setMixerChannelVolume(channelIndex: number, volumeDb: number): void { _setMixerChannelVolume(this._channelCtx, channelIndex, volumeDb); }
   public setMixerChannelPan(channelIndex: number, pan: number): void { _setMixerChannelPan(this._channelCtx, channelIndex, pan); }
   public updateMuteStates(channels: { muted: boolean; solo: boolean }[]): void { _updateMuteStates(this._channelCtx, channels); }
@@ -5584,6 +5606,11 @@ export class ToneEngine {
   public getMasterLevel(): number { return this.masterMeter.getValue() as number; }
   /** Get the synthBus level (0-1) for WASM engines that bypass per-channel routing */
   public getSynthBusLevel(): number { return this.synthBusMeter.getValue() as number; }
+
+  /** A channel's post-fader waveform (Tone.js voices and synth lanes), null when its strip is unbuilt. */
+  public getChannelWaveform(channelIndex: number): Float32Array | null {
+    return _getChannelWaveform(this._channelCtx, channelIndex);
+  }
 
   /** Get channel output by index (for send bus wiring) */
   public getChannelOutputByIndex(channelIndex: number): ChannelOutput | null {

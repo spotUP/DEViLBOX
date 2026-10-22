@@ -5,19 +5,15 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
+import type { MIDIImportOptions } from '@lib/import/MIDIImporter';
 
-export interface MidiImportOptions {
-  quantize?: number;
-  velocityToVolume?: boolean;
-  defaultPatternLength?: number;
-}
-
-export async function parseMIDIFile(file: File, options?: MidiImportOptions): Promise<TrackerSong> {
+export async function parseMIDIFile(file: File, options?: MIDIImportOptions): Promise<TrackerSong> {
   const { importMIDIFile } = await import('@lib/import/MIDIImporter');
   const result = await importMIDIFile(file, {
     quantize: options?.quantize ?? 1,
     velocityToVolume: options?.velocityToVolume ?? true,
     defaultPatternLength: options?.defaultPatternLength ?? 64,
+    soundFont: options?.soundFont,
   });
 
   const order = result.patterns.map((_, i) => i);
@@ -31,7 +27,7 @@ export async function parseMIDIFile(file: File, options?: MidiImportOptions): Pr
     songLength: order.length,
     restartPosition: 0,
     numChannels: maxChannels,
-    initialSpeed: 6,
+    initialSpeed: result.speed,
     initialBPM: result.bpm,
   };
 }

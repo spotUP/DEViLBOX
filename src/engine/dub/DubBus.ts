@@ -41,6 +41,7 @@ import { getNativeAudioNode } from '@utils/audio-context';
 import type { DJMixerEngine } from '../dj/DJMixerEngine';
 import type { DeckId } from '../dj/DeckEngine';
 import { clearAllPendingThrows } from './DubActions';
+import { SidechainSourceRouter } from './SidechainSourceRouter';
 import { fireParamLiveSubscribers } from '@/midi/performance/parameterRouter';
 
 /**
@@ -1262,7 +1263,11 @@ export class DubBus {
    */
   setPlateStage(stage: DubBusSettings['plateStage']): void {
     console.log(`[DubBusCtrl] setPlateStage(${stage})`);
-    if (stage === this.settings.plateStage && this.plateStage !== null) return;
+    // Compared with what is INSTALLED, not with settings.plateStage: setSettings merges the new
+    // value into this.settings before it calls here, so that comparison was always true once a
+    // plate existed and every change of the stage was dropped.
+    const installed = this.plateStage === null ? 'off' : this.plateStage instanceof DattorroPlateEffect ? 'dattorro' : 'madprofessor';
+    if (stage === installed) return;
     this.settings = { ...this.settings, plateStage: stage };
     const currentPlate = this.plateStage;
     const currentSend = this.plateSend;
@@ -1569,6 +1574,9 @@ export class DubBus {
    * analyser path in a future revision.
    */
   getSidechainInput(): AudioNode { return this.sidechain; }
+
+  /** Keys the sidechain detector from `sidechainSource` / `sidechainChannelIndex` (D1). */
+  private readonly _sidechainRouter = new SidechainSourceRouter(() => this.sidechain);
 
   private echo: DubEchoEngine;
   private _currentEchoEngine: DubBusSettings['echoEngine'] = DEFAULT_DUB_BUS.echoEngine;
@@ -3622,8 +3630,13 @@ export class DubBus {
       release = () => { try { synth.triggerRelease(); } catch { /* ok */ } };
       if (released) release();
     });
+    // The siren drives the echo loop to the `sirenFeedback` setting while held
+    // (D2). setSirenFeedback is a move's own entry point; the setting is the
+    // level it lands on, and releasing the siren releases the loop.
+    const releaseFeedback = this.setSirenFeedback(this.settings.sirenFeedback);
     return () => {
       released = true;
+      releaseFeedback();
       if (release) release();
     };
   }
@@ -4418,6 +4431,9 @@ export class DubBus {
       }
     } catch { /* logging never breaks the setter */ }
     this.settings = merged;
+    if (settings.sidechainSource !== undefined || settings.sidechainChannelIndex !== undefined) {
+      this._sidechainRouter.apply(merged.sidechainSource, merged.sidechainChannelIndex);
+    }
     if (typeof settings.enabled === 'boolean') {
       // Turning the bus off must STOP what it is generating, not just
       // disconnect it. Cutting the input leaves the synth running, which is
@@ -8675,6 +8691,7 @@ export class DubBus {
   }
 
   dispose(): void {
+    this._sidechainRouter.dispose();
     this._releaseIdleTaps();
     this._stopTrimWatch();
     this._releasePreInsertProbe();

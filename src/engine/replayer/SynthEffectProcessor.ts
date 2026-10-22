@@ -80,6 +80,8 @@ export interface SynthEffectDeps {
   applySynthFrequency(instrumentId: number, frequency: number, channelIndex: number, rampTime?: number): void;
   /** The instrument's default volume (0-64): where a note with that instrument starts */
   getInstrumentDefaultVolume(instrumentId: number): number;
+  /** Does this instrument's note velocity carry the note's volume (a SoundFont or SFZ player)? */
+  noteVolumeIsVelocity(instrumentId: number): boolean;
   /** Set volume on a channel's gain node (0-1 linear) */
   setChannelGain(channelIndex: number, gain: number, time: number): void;
   /** Set panning on a channel (0=full left, 128=center, 255=full right) */
@@ -105,6 +107,8 @@ interface EffectChannelState {
   sentFrequency: number;
   baseVolume: number;       // 0-64
   currentVolume: number;    // 0-64
+  /** The volume the sounding note's velocity carries (0-64), or null when the lane carries it all. */
+  velocityVolume: number | null;
 
   // Portamento
   portaSpeed: number;
@@ -301,7 +305,7 @@ export class SynthEffectProcessor {
       // so every new note sets it: no Cxx, slide or tremolo from an earlier note carries
       // into the next one. A delayed note (EDx) sets it when it fires.
       if (hasNote && state.noteDelayTick === 0) {
-        this.deps.setChannelGain(ch, state.currentVolume / 64, time);
+        this.startNoteVolume(ch, state, cell.instrument || state.instrumentId, time);
       }
     }
   }
@@ -371,7 +375,7 @@ export class SynthEffectProcessor {
       case FX_SET_VOLUME:
         state.currentVolume = Math.min(64, param);
         state.baseVolume = state.currentVolume;
-        this.deps.setChannelGain(ch, state.currentVolume / 64, time);
+        this.sendVolume(ch, state, state.currentVolume, time);
         break;
 
       case FX_EXTENDED: {
@@ -412,18 +416,18 @@ export class SynthEffectProcessor {
           case EFX_FINE_VOLUME_UP:
             state.currentVolume = Math.min(64, state.currentVolume + subParam);
             state.baseVolume = state.currentVolume;
-            this.deps.setChannelGain(ch, state.currentVolume / 64, time);
+            this.sendVolume(ch, state, state.currentVolume, time);
             break;
           case EFX_FINE_VOLUME_DOWN:
             state.currentVolume = Math.max(0, state.currentVolume - subParam);
             state.baseVolume = state.currentVolume;
-            this.deps.setChannelGain(ch, state.currentVolume / 64, time);
+            this.sendVolume(ch, state, state.currentVolume, time);
             break;
           case EFX_NOTE_CUT:
             // EC0 fires immediately on tick 0 (FT2 behavior)
             if (subParam === 0) {
               state.currentVolume = 0;
-              this.deps.setChannelGain(ch, 0, time);
+              this.sendVolume(ch, state, 0, time);
             }
             break;
         }
@@ -475,7 +479,7 @@ export class SynthEffectProcessor {
           const subParam = state.effectParam & 0x0F;
           if (subCmd === EFX_NOTE_CUT && tick === subParam) {
             state.currentVolume = 0;
-            this.deps.setChannelGain(ch, 0, time);
+            this.sendVolume(ch, state, 0, time);
           }
           if (subCmd === EFX_NOTE_RETRIGGER && state.retriggerInterval > 0) {
             state.retriggerCounter--;
@@ -491,7 +495,7 @@ export class SynthEffectProcessor {
             state.noteDelayTick = 0;
             state.baseVolume = delayVol;
             state.currentVolume = delayVol;
-            this.deps.setChannelGain(ch, delayVol / 64, time);
+            this.startNoteVolume(ch, state, delayInst, time);
             this.deps.triggerDelayedNote(ch, delayNote, delayInst, delayVol, time);
           }
           break;
@@ -609,13 +613,30 @@ export class SynthEffectProcessor {
     }
 
     state.currentVolume = vol;
-    this.deps.setChannelGain(ch, vol / 64, time);
+    this.sendVolume(ch, state, vol, time);
+  }
+
+  /**
+   * A new note's volume. A SoundFont or SFZ player takes it as the note velocity (as OpenMPT
+   * gives a plugin instrument the note row's volume), so its velocity curve, filter and layers
+   * apply; the lane then stays neutral. Any other synth takes it on the lane.
+   */
+  private startNoteVolume(ch: number, state: EffectChannelState, instrumentId: number, time: number): void {
+    state.velocityVolume = this.deps.noteVolumeIsVelocity(instrumentId) ? state.currentVolume : null;
+    this.sendVolume(ch, state, state.currentVolume, time);
+  }
+
+  /** A 0-64 channel volume to the lane: relative to what the note velocity already carries. */
+  private sendVolume(ch: number, state: EffectChannelState, volume: number, time: number): void {
+    const carried = state.velocityVolume;
+    const gain = carried === null ? volume / 64 : carried > 0 ? volume / carried : 0;
+    this.deps.setChannelGain(ch, gain, time);
   }
 
   private processVolSlide(ch: number, state: EffectChannelState, time: number): void {
     state.currentVolume += state.volSlideSpeed;
     state.currentVolume = Math.max(0, Math.min(64, state.currentVolume));
-    this.deps.setChannelGain(ch, state.currentVolume / 64, time);
+    this.sendVolume(ch, state, state.currentVolume, time);
   }
 }
 
@@ -644,6 +665,7 @@ function createDefaultState(instrumentId: number): EffectChannelState {
     currentFrequency: 440,
     baseVolume: 64,
     currentVolume: 64,
+    velocityVolume: null,
     portaSpeed: 0,
     portaTarget: 0,
     portaActive: false,

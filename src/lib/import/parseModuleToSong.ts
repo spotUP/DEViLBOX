@@ -20,6 +20,7 @@ import { useSettingsStore, type FormatEnginePreferences } from '@/stores/useSett
 import { isAudioFile } from '@/lib/audioFileUtils';
 import { resolvedFormatEngines } from '@/engine/nuade/nuadeRouting';
 import { applyNuadeChoice } from './parsers/withNuade';
+import type { MIDIImportOptions } from './MIDIImporter';
 
 // Re-export state accessors from PatternExtractor for backwards compatibility
 export { getLastPatternHash, getLastLibOpenMPTMetadata } from './parsers/PatternExtractor';
@@ -32,11 +33,7 @@ function getFormatEngine(): FormatEnginePreferences {
 interface ParseOptions {
   subsong?: number;
   preScannedMeta?: UADEMetadata;
-  midiOptions?: {
-    quantize?: number;
-    velocityToVolume?: boolean;
-    defaultPatternLength?: number;
-  };
+  midiOptions?: MIDIImportOptions;
 }
 
 /**

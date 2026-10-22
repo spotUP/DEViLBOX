@@ -17,7 +17,7 @@ import {
 import { ArpeggioEngine } from '../ArpeggioEngine';
 import { getNormalizedVolume } from './volumeNormalization';
 import { registerVoiceSource } from '../tone/toneVoiceProbe';
-import { createToneSynthNode, toneVoiceOptions } from '../tone/toneSynthKnobs';
+import { createToneSynthNode, toneVoiceOptions, toneVoiceTypeOf } from '../tone/toneSynthKnobs';
 
 
 /**
@@ -369,93 +369,45 @@ export function createSuperSaw(config: InstrumentConfig): Tone.ToneAudioNode {
   } as unknown as Tone.ToneAudioNode, synth, { filter });
 }
 
+/**
+ * PolySynth plays what the editor shows: the top-level oscillator, envelope, filter, octave and modulation of `config`
+ * (`polySynth` only chooses the voice type, voice count, portamento and steal mode), through the one rigged voice
+ * builder every Tone core synth uses.
+ */
 export function createPolySynth(config: InstrumentConfig): Tone.ToneAudioNode {
   const psConfig = config.polySynth || DEFAULT_POLYSYNTH;
+  return polyWrapper(createToneSynthNode(toneVoiceTypeOf(config), config, { polyphony: psConfig.voiceCount }) as Tone.PolySynth);
+}
 
-  // Select voice type
-  let VoiceClass: typeof Tone.Synth | typeof Tone.FMSynth | typeof Tone.AMSynth = Tone.Synth;
-  if (psConfig.voiceType === 'FMSynth') VoiceClass = Tone.FMSynth;
-  else if (psConfig.voiceType === 'ToneAM') VoiceClass = Tone.AMSynth;
+/**
+ * Harmonic number of each drawbar (16', 5 1/3', 8', 4', 2 2/3', 2', 1 3/5', 1 1/3', 1') counted from the 16'
+ * sub-octave, the lowest pitch an organ voice sounds. The 8' drawbar (index 2) is the pitch of the key: harmonic 2.
+ */
+const DRAWBAR_HARMONICS = [1, 3, 2, 4, 6, 8, 10, 12, 16] as const;
 
-  const synth = new Tone.PolySynth(VoiceClass as any, {
-    oscillator: {
-      type: psConfig.oscillator?.type || 'sawtooth',
-    } as Partial<Tone.OmniOscillatorOptions>,
-    envelope: {
-      attack: (psConfig.envelope?.attack || 50) / 1000,
-      decay: (psConfig.envelope?.decay || 200) / 1000,
-      sustain: (psConfig.envelope?.sustain ?? 70) / 100,
-      release: (psConfig.envelope?.release || 500) / 1000,
-    },
-    volume: getNormalizedVolume('PolySynth', config.volume),
-  });
-  synth.maxPolyphony = psConfig.voiceCount;
+/**
+ * Tone custom-oscillator partials for a drawbar setting, as harmonics of the 16' sub-octave (play the voice an
+ * octave below the key, see organVoiceNote). Normalised so they never sum above 1.0: unnormalised, Rock Organ
+ * [8,8,8,0,0,0,0,0,0] peaks at 3.0 (+9.5 dB) and clips.
+ */
+export function organPartials(drawbars: readonly number[]): number[] {
+  const partials = new Array<number>(DRAWBAR_HARMONICS[DRAWBAR_HARMONICS.length - 1]).fill(0);
+  DRAWBAR_HARMONICS.forEach((harmonic, i) => { partials[harmonic - 1] = (drawbars[i] || 0) / 8; });
+  const sum = partials.reduce((a, b) => a + b, 0);
+  const scale = sum > 1 ? 1.0 / sum : 1.0;
+  return partials.map((p) => p * scale);
+}
 
-  // Setup pitch envelope if enabled
-  const pitchEnv = config.pitchEnvelope;
-  const hasPitchEnv = pitchEnv?.enabled && pitchEnv.amount !== 0;
-
-  // If no pitch envelope, return wrapped synth with voice leak prevention
-  if (!hasPitchEnv) {
-    return registerVoiceSource({
-      triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
-        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
-        synth.triggerAttackRelease(note, duration, time, velocity);
-      },
-      triggerAttack: (note: string, time?: number, velocity?: number) => {
-        try { synth.triggerRelease(note, time); } catch { /* ignore */ }
-        synth.triggerAttack(note, time, velocity);
-      },
-      triggerRelease: (note: string, time?: number) => synth.triggerRelease(note, time),
-      releaseAll: () => synth.releaseAll(),
-      connect: (dest: Tone.InputNode) => synth.connect(dest),
-      disconnect: () => synth.disconnect(),
-      dispose: () => synth.dispose(),
-      volume: synth.volume,
-    } as unknown as Tone.ToneAudioNode, synth);
-  }
-
-  // Wrap synth to add pitch envelope support
-  return registerVoiceSource({
-    triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
-      const t = time ?? Tone.now();
-      try { synth.triggerRelease(note, t); } catch { /* ignore */ }
-      applyPitchEnvelope(synth, pitchEnv!, t, duration);
-      synth.triggerAttackRelease(note, duration, t, velocity);
-    },
-    triggerAttack: (note: string, time?: number, velocity?: number) => {
-      const t = time ?? Tone.now();
-      try { synth.triggerRelease(note, t); } catch { /* ignore */ }
-      triggerPitchEnvelopeAttack(synth, pitchEnv!, t);
-      synth.triggerAttack(note, t, velocity);
-    },
-    triggerRelease: (note: string, time?: number) => {
-      const t = time ?? Tone.now();
-      triggerPitchEnvelopeRelease(synth, pitchEnv!, t);
-      synth.triggerRelease(note, t);
-    },
-    releaseAll: () => {
-      synth.set({ detune: 0 });
-      synth.releaseAll();
-    },
-    connect: (dest: Tone.InputNode) => synth.connect(dest),
-    disconnect: () => synth.disconnect(),
-    dispose: () => synth.dispose(),
-    volume: synth.volume,
-  } as unknown as Tone.ToneAudioNode, synth);
+/** The frequency the organ voice plays for a key: the 16' sub-octave, one octave below the key's pitch. */
+function organVoiceNote(note: Tone.Unit.Frequency): number {
+  return Tone.Frequency(note).toFrequency() / 2;
 }
 
 export function createOrgan(config: InstrumentConfig): Tone.ToneAudioNode {
   const orgConfig = config.organ || DEFAULT_ORGAN;
   const drawbars = orgConfig.drawbars || DEFAULT_ORGAN.drawbars;
   const output = new Tone.Gain(1);
-
-  // Build partials from drawbars, normalized so they don't sum above 1.0
-  // Without normalization, Rock Organ [8,8,8,0,0,0,0,0,0] peaks at 3.0 = +9.5dB → clipping
-  const rawPartials = drawbars.map((d: number) => d / 8);
-  const partialSum = rawPartials.reduce((a: number, b: number) => a + b, 0);
-  const scale = partialSum > 1 ? 1.0 / partialSum : 1.0;
-  const partials = rawPartials.map((p: number) => p * scale);
+  const partials = organPartials(drawbars);
 
   // Create polyphonic sine synth for organ tone
   const synth = new Tone.PolySynth(Tone.Synth, {
@@ -489,19 +441,21 @@ export function createOrgan(config: InstrumentConfig): Tone.ToneAudioNode {
     synth.connect(output);
   }
 
-  return {
+  return registerVoiceSource({
     triggerAttackRelease: (note: string, duration: number, time?: number, velocity?: number) => {
+      const voiceNote = organVoiceNote(note);
       // Release any existing voice for this note first to prevent voice leak
-      try { synth.triggerRelease(note, time); } catch { /* ignore */ }
-      synth.triggerAttackRelease(note, duration, time, velocity);
+      try { synth.triggerRelease(voiceNote, time); } catch { /* ignore */ }
+      synth.triggerAttackRelease(voiceNote, duration, time, velocity);
     },
     triggerAttack: (note: string, time?: number, velocity?: number) => {
+      const voiceNote = organVoiceNote(note);
       // Release any existing voice for this note first to prevent voice leak
-      try { synth.triggerRelease(note, time); } catch { /* ignore */ }
-      synth.triggerAttack(note, time, velocity);
+      try { synth.triggerRelease(voiceNote, time); } catch { /* ignore */ }
+      synth.triggerAttack(voiceNote, time, velocity);
     },
     triggerRelease: (note: string, time?: number) => {
-      synth.triggerRelease(note, time);
+      synth.triggerRelease(organVoiceNote(note), time);
     },
     releaseAll: () => synth.releaseAll(),
     connect: (dest: Tone.InputNode) => output.connect(dest),
@@ -513,13 +467,9 @@ export function createOrgan(config: InstrumentConfig): Tone.ToneAudioNode {
     },
     applyConfig: (newConfig: Record<string, unknown>) => {
       const oc = newConfig || DEFAULT_ORGAN;
-      const db = oc.drawbars as number[];
-      const rp = db.map((d: number) => (d || 0) / 8);
-      const ps = rp.reduce((a: number, b: number) => a + b, 0);
-      const sc = ps > 1 ? 1.0 / ps : 1.0;
       synth.set({
         oscillator: {
-          partials: rp.map((p: number) => p * sc),
+          partials: organPartials(oc.drawbars as number[]),
         }
       });
       if (rotary) {
@@ -527,7 +477,7 @@ export function createOrgan(config: InstrumentConfig): Tone.ToneAudioNode {
       }
     },
     volume: synth.volume,
-  } as unknown as Tone.ToneAudioNode;
+  } as unknown as Tone.ToneAudioNode, synth);
 }
 
 export function createDrumMachine(config: InstrumentConfig): Tone.ToneAudioNode {

@@ -7,6 +7,7 @@
  * Reference: https://en.wikipedia.org/wiki/General_MIDI_Level_2
  */
 
+import { DEFAULT_FLUIDSYNTH } from '@/engine/fluidsynth/FluidSynthSynth';
 import type { InstrumentConfig, OscillatorConfig, EnvelopeConfig, FilterConfig, DrumType, DrumMachineType } from '@typedefs/instrument';
 
 // ─── Shared building blocks ─────────────────────────────────────────────────
@@ -130,14 +131,14 @@ function guitarPreset(program: number, id: number): InstrumentConfig {
   };
 }
 
-/** Bass (32–39): MonoSynth at octave -1, tight envelope */
+/** Bass (32–39): MonoSynth at the note's own pitch (GM bass parts are written where they sound), tight envelope */
 function bassPreset(program: number, id: number): InstrumentConfig {
   const isSynth = program >= 38; // Synth Bass 1 & 2
   return {
     ...BASE, id,
     name: GM2_NAMES[program],
     synthType: 'MonoSynth',
-    oscillator: osc(isSynth ? 'square' : 'sawtooth', -1),
+    oscillator: osc(isSynth ? 'square' : 'sawtooth'),
     envelope: env(5, isSynth ? 400 : 200, 20, 100),
     filter: lpf(isSynth ? 800 : 1500, isSynth ? 4 : 1),
     monophonic: true,
@@ -351,18 +352,25 @@ export const GM_PERCUSSION_MAP: Partial<Record<number, PercussionEntry>> = {
   79: { name: 'Open Cuica',         drumType: 'conga',   machineType: '808' },
   80: { name: 'Mute Triangle',      drumType: 'hihat',   machineType: '808' },
   81: { name: 'Open Triangle',      drumType: 'hihat',   machineType: '808' },
+  // General MIDI Level 2 additions
+  82: { name: 'Shaker',             drumType: 'maracas', machineType: '808' },
+  83: { name: 'Jingle Bell',        drumType: 'hihat',   machineType: '808' },
+  84: { name: 'Belltree',           drumType: 'cymbal',  machineType: '808' },
+  85: { name: 'Castanets',          drumType: 'clave',   machineType: '808' },
+  86: { name: 'Mute Surdo',         drumType: 'tom',     machineType: '808' },
+  87: { name: 'Open Surdo',         drumType: 'tom',     machineType: '808' },
 };
 
 /**
  * Create an InstrumentConfig for a single GM percussion note (MIDI channel 10).
  * Each unique MIDI note number gets its own DrumMachine instrument (kick, snare, hihat…).
  *
- * @param midiNote  MIDI percussion note number (35–81)
+ * @param midiNote  MIDI percussion note number (35–87)
  * @param id        1-based instrument slot number
  */
 export function gmPercussionNoteToInstrument(midiNote: number, id: number): InstrumentConfig {
   const entry = GM_PERCUSSION_MAP[midiNote] ?? {
-    name: `Perc ${midiNote}`,
+    name: gmPercussionName(midiNote),
     drumType: 'snare' as DrumType,
     machineType: '808' as DrumMachineType,
   };
@@ -375,6 +383,33 @@ export function gmPercussionNoteToInstrument(midiNote: number, id: number): Inst
       machineType: entry.machineType,
     },
   };
+}
+
+// ─── General MIDI SoundFont (FluidSynth) ─────────────────────────────────────
+
+/** SoundFont bank that holds the GM drum kits. */
+export const GM_DRUM_BANK = 128;
+
+/**
+ * A FluidSynth instrument on the General MIDI SoundFont: the real GM sound for
+ * a program (bank 0) or a drum kit (bank 128, program = kit number).
+ */
+export function gmFluidInstrument(program: number, bank: number, id: number, name: string): InstrumentConfig {
+  return {
+    ...BASE, id, name,
+    synthType: 'FluidSynth',
+    fluidsynth: {
+      ...DEFAULT_FLUIDSYNTH,
+      program: Math.max(0, Math.min(127, program)),
+      bank,
+      soundFont: 'gm',
+    },
+  };
+}
+
+/** Name of a GM percussion note, as the drum channel shows it. */
+export function gmPercussionName(midiNote: number): string {
+  return GM_PERCUSSION_MAP[midiNote]?.name ?? `Perc ${midiNote}`;
 }
 
 // ─── Main lookup ─────────────────────────────────────────────────────────────

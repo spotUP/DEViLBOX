@@ -122,6 +122,25 @@ describe('DubBus, rendered', () => {
     stopSecond!();
   }, 60_000);
 
+  it('a held Sub Bass Bed is still sounding well after its 0.12 s fade-in', async () => {
+    // Regression: a stray `bed.gain.setTargetAtTime(0, ...)` at setup decayed
+    // the bed to silence 0.12 s after it fired, so every later reading was 0.
+    const rig = await makeDubBusRig(2);
+    feedTone(rig, 60, 0.4);
+    let stop: (() => void) | null = null;
+    let early = -1;
+    let late = -1;
+    await rig.render([
+      { at: 0, run: () => rig.bus.setSettings({ enabled: true }) },
+      { at: 0.2, run: () => { stop = rig.bus.startSubBassBed(1); } },
+      { at: 0.45, run: () => { early = rig.bus.getSubBedLevel(); } },
+      { at: 1.5, run: () => { late = rig.bus.getSubBedLevel(); } },
+    ]);
+    stop!();
+    expect(early, 'the bed never sounded').toBeGreaterThan(0.001);
+    expect(late, 'the bed decayed back to silence while held').toBeGreaterThan(early * 0.5);
+  }, 60_000);
+
   it('a held return processor lifts the wet so the toggle can be heard', async () => {
     // At Auto Dub's resting sends the return sat 30-40 dB under the music, so
     // Wide/Wobble/Liquid/Sweep/Ring/Starve/Ping-Pong changed a signal nobody

@@ -24,6 +24,7 @@
 // Must come before any soundlib headers.
 #include "common/stdafx.h"
 #include "soundlib/Sndfile.h"
+#include "soundlib/mod_specifications.h"
 #include "common/FileReader.h"
 #include "common/mptFileType.h"
 
@@ -482,7 +483,7 @@ const char *osl_get_sample_info_json(int32_t sampleIdx) {
         static_cast<unsigned>(smp.nLoopEnd),
         static_cast<unsigned>(smp.nSustainStart),
         static_cast<unsigned>(smp.nSustainEnd),
-        smp.nC5Speed,
+        smp.GetSampleRate(g_sf->GetType()),
         static_cast<unsigned>(smp.nGlobalVol),
         static_cast<unsigned>(smp.nVolume),
         static_cast<unsigned>(smp.nPan),
@@ -544,6 +545,16 @@ int osl_set_sample_data(int32_t sampleIdx, const void *data, int32_t numFrames,
     // Allocate and copy new data
     smp.nLength = static_cast<SmpLength>(numFrames);
     smp.nC5Speed = c5Speed;
+    // MOD, XM and the other finetune/transpose formats play a sample from
+    // RelativeTone + nFineTune and ignore nC5Speed, so a 44.1 kHz sample
+    // left at the default transpose plays as 8363 Hz (2-3 octaves low).
+    // Derive the transpose from the rate the same way ModSample::Convert does.
+    if (g_sf->UseFinetuneAndTranspose()) {
+        if (g_sf->GetType() == MOD_TYPE_MOD)
+            smp.nC5Speed = Util::muldivr_unsigned(smp.nC5Speed, 8363, 8287);
+        smp.FrequencyToTranspose();
+        smp.nC5Speed = c5Speed;
+    }
 
     if (bitsPerSample == 16) smp.uFlags.set(CHN_16BIT);
     else smp.uFlags.reset(CHN_16BIT);
@@ -579,6 +590,32 @@ int osl_set_sample_loop(int32_t sampleIdx, uint32_t loopStart, uint32_t loopEnd,
         if (loopType == 2) smp.uFlags.set(CHN_PINGPONGLOOP);
     }
     smp.PrecomputeLoops(*g_sf, false);
+    return 1;
+}
+
+/**
+ * Grow the sample list so slot sampleIdx exists (new slots start empty, with
+ * the module type's defaults). Lets an instrument added in the editor reach a
+ * module built by osl_create_new: osl_set_sample_data refuses an index past
+ * GetNumSamples().
+ * Only for modules without instruments: there XM/IT instrument n plays
+ * sample n, so the editor's instrument id is the sample slot. A module with
+ * instruments maps notes to samples through its keyboard tables, where the
+ * same index would overwrite an unrelated sample; returns 0 then.
+ * Returns 1 when the slot exists afterwards.
+ */
+EMSCRIPTEN_KEEPALIVE
+int osl_ensure_sample_slot(int32_t sampleIdx) {
+    if (!g_sf || sampleIdx < 1 || sampleIdx >= static_cast<int32_t>(MAX_SAMPLES)) return 0;
+    if (g_sf->GetNumInstruments() > 0) return 0;
+    const SAMPLEINDEX target = static_cast<SAMPLEINDEX>(sampleIdx);
+    if (target <= g_sf->GetNumSamples()) return 1;
+    if (target > g_sf->GetModSpecifications().samplesMax) return 0;
+    for (SAMPLEINDEX i = g_sf->GetNumSamples() + 1; i <= target; i++) {
+        g_sf->GetSample(i).Initialize(g_sf->GetType());
+        g_sf->m_szNames[i] = "";
+    }
+    g_sf->m_nSamples = target;
     return 1;
 }
 
@@ -621,6 +658,13 @@ void osl_set_initial_speed(int32_t speed) {
 EMSCRIPTEN_KEEPALIVE
 void osl_set_initial_tempo(int32_t tempo) {
     if (g_sf) g_sf->Order().SetDefaultTempoInt(static_cast<uint32_t>(tempo));
+}
+
+// Sample pre-amp of the song (48 by default, up to MAX_PREAMP). The XM writer
+// stores it in the SPA. extension chunk, so a saved module keeps its level.
+EMSCRIPTEN_KEEPALIVE
+void osl_set_sample_preamp(int32_t preamp) {
+    if (g_sf && preamp > 0) g_sf->m_nSamplePreAmp = std::min(static_cast<uint32_t>(preamp), MAX_PREAMP);
 }
 
 // ============================================================================

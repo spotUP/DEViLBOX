@@ -46,7 +46,7 @@ export interface FormatKeyHost {
   paste(): void;
   transpose(semitones: number): void;
   /** Hex-column typing: how many digits of the current cell are in. */
-  hexTyped: { current: { ch: number; row: number; col: number; digits: number } | null };
+  hexTyped: { current: { ch: number; row: number; col: number; digits: number; text?: string } | null };
   /** Held ArrowUp/ArrowDown scrolling. */
   heldArrow: { current: { dir: number } | null };
   arrowRaf: { current: number };
@@ -99,7 +99,8 @@ export function handleFormatKey(e: KeyboardEvent, host: FormatKeyHost): void {
     };
 
     // One octave for the jam (window handler) and the write: the editor store's.
-    if (e.key === '[' || e.key === '-') { e.preventDefault(); const ed = useEditorStore.getState(); ed.setCurrentOctave(ed.currentOctave - 1); return; }
+    // '-' is a sign, not octave-down, in a typed-entry column
+    if (e.key === '[' || (e.key === '-' && !col?.parseTyped)) { e.preventDefault(); const ed = useEditorStore.getState(); ed.setCurrentOctave(ed.currentOctave - 1); return; }
     if (e.key === ']' || e.key === '=') { e.preventDefault(); const ed = useEditorStore.getState(); ed.setCurrentOctave(ed.currentOctave + 1); return; }
 
     // Edit / record / jam follows the reference trackers (formatEntryPlan.ts, P14): edit off = nothing written
@@ -299,6 +300,32 @@ export function handleFormatKey(e: KeyboardEvent, host: FormatKeyHost): void {
         if (value !== null && plan.write) {
           host.onCellChange?.(pos.channelIndex, plan.row, col.key, value);
           stepCursorTo(plan.nextCursorRow);
+        }
+      }
+    } else if (col.parseTyped && (col.type === 'hex' || col.type === 'ctrl')) {
+      if (/^[0-9+-]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        host.setSelection(null);
+        const plan = planCursorEntry(entryContext());
+        if (!plan.write) return;
+        const prev = host.hexTyped.current;
+        const continuing = prev !== null && prev.text !== undefined && prev.ch === pos.channelIndex
+          && prev.row === plan.row && prev.col === pos.columnIndex && (e.key !== '+' && e.key !== '-');
+        let text = continuing ? prev.text + e.key : e.key;
+        if (e.key === '+' || e.key === '-') { // a sign alone writes nothing; the digits that follow do
+          host.hexTyped.current = { ch: pos.channelIndex, row: plan.row, col: pos.columnIndex, digits: 0, text };
+          return;
+        }
+        let value = col.parseTyped(text);
+        if (value === null) { text = e.key; value = col.parseTyped(text); } // too long or out of range: start over
+        if (value === null) return;
+        host.onCellChange?.(pos.channelIndex, plan.row, col.key, value);
+        const digits = text.replace(/[+-]/g, '').length;
+        if (digits >= 2) {
+          host.hexTyped.current = null;
+          stepCursorTo(plan.nextCursorRow);
+        } else {
+          host.hexTyped.current = { ch: pos.channelIndex, row: plan.row, col: pos.columnIndex, digits, text };
         }
       }
     } else if (col.type === 'hex' || col.type === 'ctrl') {

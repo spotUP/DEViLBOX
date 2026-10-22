@@ -33,6 +33,12 @@ export interface ColumnDef {
   hexDigits?: number;
   /** Function to format a value for display */
   formatter: (value: number) => string;
+  /**
+   * For type='hex': typed-text entry replacing hex digits, for a column whose display is not hex (a signed offset).
+   * Gets the characters typed so far (a sign and digits, e.g. "+3"); returns the raw value to store, or null when
+   * the text is out of range. The format module that owns `formatter` owns this too, so display and entry agree.
+   */
+  parseTyped?: (text: string) => number | null;
   /** For type='note': the value that means C-0 (default 0). Typing a note writes `noteBase + semitonesAboveC0`. */
   noteBase?: number;
   /** For type='note': the lowest note the format holds, in semitones above C-0 (default 0; JamCracker starts at C-1). */

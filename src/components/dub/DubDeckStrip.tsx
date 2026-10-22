@@ -787,73 +787,8 @@ export const DubDeckStrip: React.FC = () => {
   // is where it belonged: the rate the user picks is a DIVISION of the tempo,
   // and whether to sync at all depends on `bus.isRateOverridden()`.
 
-  // G13: sidechain source router. When sidechainSource flips between
-  // 'bus' and 'channel' (or the channel index changes), re-wire the
-  // isolation tap from ChannelRoutedEffects into the dub bus's sidechain
-  // detector. 'bus' mode removes any active tap (bus self-detects).
-  //
-  // 'drums' is the classifier key, matching the Master FX "Drums (auto)"
-  // option: resolveDrumKeyChannel() asks the channel classifier which channel
-  // is the kick (else a whole-kit channel, else any percussion channel). It is
-  // a promise about a song, not a channel number, so it has to be asked again
-  // whenever the song changes — the same `onSongChange` the Master FX key uses.
-  //
-  // When it resolves to -1 (no song loaded, or a song with no percussion) the
-  // key is left SILENT on purpose. Self-keying there is the failure mode
-  // Master FX already learned: a kick ducker with a 150 Hz key filter becomes a
-  // permanent bass compressor instead, measured at -11.4 dB at 100 Hz on
-  // 2026-09-29. An inaudible duck is recoverable; bass that vanishes is not.
-  const [drumKeySong, setDrumKeySong] = useState(0);
-  useEffect(() => {
-    if (dubBusSettings.sidechainSource !== 'drums') return;
-    let unsubscribe: (() => void) | null = null;
-    let stopped = false;
-    void import('@/engine/tone/sidechainKey').then(({ onSongChange }) => {
-      if (!stopped) unsubscribe = onSongChange(() => setDrumKeySong(n => n + 1));
-    });
-    return () => { stopped = true; unsubscribe?.(); };
-  }, [dubBusSettings.sidechainSource]);
-  useEffect(() => {
-    const source = dubBusSettings.sidechainSource;
-    const channelIndex = dubBusSettings.sidechainChannelIndex;
-    if (source === 'bus') return;
-    let scInputNode: AudioNode | null = null;
-    let activeChannel: number | null = null;
-    let cancelled = false;
-    (async () => {
-      try {
-        const bus = ensureDrumPadEngine().getDubBus();
-        scInputNode = bus.getSidechainInput();
-        const mgr = getChannelRoutedEffectsManager();
-        let tapChannel = channelIndex;
-        if (source === 'drums') {
-          const { resolveDrumKeyChannel } = await import('@/engine/tone/sidechainKey');
-          tapChannel = await resolveDrumKeyChannel();
-          if (cancelled) return;
-          if (tapChannel < 0) {
-            console.info('[DubDeckStrip] no drum channel classified — sidechain key left silent');
-            scInputNode = null;
-            return;
-          }
-        }
-        const ok = await mgr.addSidechainTap(tapChannel, scInputNode);
-        // Torn down while the tap was being added: take it straight back out,
-        // or it stays keyed on the old song's channel with nothing to remove it.
-        if (ok && cancelled) mgr.removeSidechainTap(tapChannel, scInputNode);
-        else if (ok) activeChannel = tapChannel;
-      } catch (e) {
-        console.warn('[DubDeckStrip] sidechain tap failed:', e);
-      }
-    })();
-    return () => {
-      cancelled = true;
-      if (activeChannel !== null && scInputNode) {
-        try {
-          getChannelRoutedEffectsManager().removeSidechainTap(activeChannel, scInputNode);
-        } catch { /* ok */ }
-      }
-    };
-  }, [dubBusSettings.sidechainSource, dubBusSettings.sidechainChannelIndex, drumKeySong]);
+  // The sidechain key (sidechainSource / sidechainChannelIndex) is applied by
+  // DubBus.setSettings through SidechainSourceRouter, not by this view.
 
   useEffect(() => {
     return startDubRecorder();

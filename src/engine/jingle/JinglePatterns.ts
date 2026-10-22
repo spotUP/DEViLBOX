@@ -26,6 +26,7 @@
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useCursorStore } from '@stores/useCursorStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
+import { useUIStore } from '@stores/useUIStore';
 import type { TrackerCell } from '@typedefs';
 import { EMPTY_CELL } from '@typedefs';
 import { getJingleEngine } from './JingleEngine';
@@ -104,6 +105,7 @@ let savedCursorRow: number | null = null;
 let injectedNumCh = 0;
 /** Fit-all-channels setting before the jingle; the lips force it on so all lip channels fit the width. */
 let savedFitAllChannels: boolean | null = null;
+let savedShowInstrumentPanel: boolean | null = null;
 /** Each pattern's lip-channel effect column counts before the jingle, [pattern][channel]; undefined = the default. */
 let savedEffectCols: (number | undefined)[][] | null = null;
 /** True between injectMouthPatterns and teardownMouthPatterns; makes teardown idempotent. */
@@ -210,6 +212,10 @@ export function injectMouthPatterns(): void {
   savedFitAllChannels = useSettingsStore.getState().fitAllChannelsTracker;
   useSettingsStore.getState().setFitAllChannelsTracker(true);
 
+  // The lips get the full width: collapse the instrument panel, restored at the end.
+  savedShowInstrumentPanel = useUIStore.getState().showInstrumentPanel;
+  useUIStore.getState().setShowInstrumentPanel(false);
+
   // The lips use only note, instrument and volume: drop the effect columns so the
   // fitted text can be larger (owner 2026-10-18). channelMeta drives the width maths
   // and the renderer alike, so both see the narrow channels.
@@ -242,7 +248,8 @@ export function injectMouthPatterns(): void {
 
   // ⑤ Park the cursor on the mouth's centre row; the editor scrolls to it
   savedCursorRow = useCursorStore.getState().cursor.rowIndex;
-  useCursorStore.getState().moveCursorToRow(MOUTH_CENTER_ROW);
+  // The cursor only parks: a playhead seek here would move playback (row 0 retrigger).
+  useCursorStore.getState().placeCursorRow(MOUTH_CENTER_ROW);
 
   // ⑥ Start rAF loop — schedule next frame first so teardown can always cancel
   startedAt = performance.now();
@@ -276,6 +283,11 @@ export function teardownMouthPatterns(): void {
   if (savedFitAllChannels !== null) {
     useSettingsStore.getState().setFitAllChannelsTracker(savedFitAllChannels);
     savedFitAllChannels = null;
+  }
+
+  if (savedShowInstrumentPanel !== null) {
+    useUIStore.getState().setShowInstrumentPanel(savedShowInstrumentPanel);
+    savedShowInstrumentPanel = null;
   }
 
   // Restore the effect columns, pattern by pattern (patterns may differ)
@@ -322,7 +334,8 @@ export function teardownMouthPatterns(): void {
 
   // Put the cursor back where the user had it
   if (savedCursorRow !== null) {
-    useCursorStore.getState().moveCursorToRow(savedCursorRow);
+    // A view restore, not a seek: a song started during the jingle keeps playing where it is.
+    useCursorStore.getState().placeCursorRow(savedCursorRow);
   }
 
   savedOriginalChannelCount = 0;

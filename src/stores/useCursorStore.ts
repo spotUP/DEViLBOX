@@ -65,7 +65,10 @@ interface CursorStore {
   moveCursor: (direction: 'up' | 'down' | 'left' | 'right', opts?: { preserveSelection?: boolean }) => void;
   /** Option+Left/Right: jump a whole field (note, instrument, volume, one effect slot) instead of one digit. */
   moveCursorByField: (direction: 'left' | 'right') => void;
+  /** A user cursor move: a playing replayer seeks to the row. */
   moveCursorToRow: (row: number) => void;
+  /** Put the cursor on a row without moving the playhead: a view restore, not a seek. */
+  placeCursorRow: (row: number) => void;
   /** The format editors' cursor: the same store, bounds clamped by the caller against the format's own channels. */
   setFormatCursor: (pos: { channelIndex: number; rowIndex: number; columnIndex: number }) => void;
   applyEntryAdvance: (columnType: CursorPosition['columnType'], digitIndex: number) => void;
@@ -314,7 +317,7 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
     const ts = getTrackerState();
     const pattern = ts.patterns[ts.currentPatternIndex];
     if (row >= 0 && row < pattern.length) {
-      set({ cursor: { ...get().cursor, rowIndex: row } });
+      get().placeCursorRow(row);
       // Only an existing, playing replayer follows the cursor. Constructing one
       // here would build the audio graph as a side effect of a cursor move
       // (the startup jingle parks the cursor before the engine exists).
@@ -323,6 +326,12 @@ export const useCursorStore = create<CursorStore>()((set, get) => ({
         replayer.seekTo(replayer.getCurrentPosition(), row);
       }
     }
+  },
+
+  placeCursorRow: (row) => {
+    const ts = getTrackerState();
+    const pattern = ts.patterns[ts.currentPatternIndex];
+    if (row >= 0 && row < pattern.length) set({ cursor: { ...get().cursor, rowIndex: row } });
   },
 
   // FT2 post-keystroke cursor move after a value/effect entry. Delegates the

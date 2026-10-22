@@ -22,6 +22,7 @@ import { getGroupedPresets } from '@/constants/systemPresets';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { SubsongSelector } from './SubsongSelector';
+import { Button } from '@components/ui/Button';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { Fader } from '@components/controls/Fader';
 import { SIDSubsongSelector } from './SIDSubsongSelector';
@@ -240,8 +241,9 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
         </div>
 
         {/* Master Limiter Toggle */}
-        <button
-          className={`shrink-0 px-1.5 h-5 rounded text-[9px] font-mono border transition-colors ${
+        <Button
+          variant="compact"
+          className={`shrink-0 px-1.5 h-5 ${
             limiterEnabled
               ? 'bg-accent-error/20 border-accent-error/40 text-accent-error'
               : 'bg-dark-bgSecondary border-dark-border text-text-muted hover:text-text-secondary'
@@ -250,7 +252,7 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
           onClick={() => setLimiterEnabled(!limiterEnabled)}
         >
           Limiter
-        </button>
+        </Button>
 
         {/* Hardware System Preset Selector */}
         <div className="flex items-center gap-1.5">
@@ -285,14 +287,15 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
 
 
         {/* Master FX */}
-        <button
+        <Button
+          variant="compact"
           onClick={() => { const s = useUIStore.getState(); if (s.modalOpen === 'masterFx') { s.closeModal(); } else { s.openModal('masterFx'); } }}
-          className={`flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors ${masterFx.toneClass}`}
+          className={`${masterFx.toneClass}`}
           title={masterFx.title}
           data-master-fx-active={masterFx.activeCount > 0 ? 'true' : 'false'}
         >
           {masterFx.label}
-        </button>
+        </Button>
 
         {/* Channel Selector (grid and piano roll views) */}
         {(viewMode === 'grid' || viewMode === 'pianoroll') && (
@@ -312,120 +315,98 @@ export const EditorControlsBar: React.FC<EditorControlsBarProps> = React.memo(({
 
         {/* Advanced Edit Toggle (tracker view only) */}
         {viewMode === 'tracker' && onToggleAdvancedEdit && (
-          <button
+          <Button
+            variant="compact"
             onClick={onToggleAdvancedEdit}
-            className={`
-              flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors
-              ${showAdvancedEdit
-                ? 'bg-accent-primary/20 text-accent-primary'
-                : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
-              }
-            `}
+            className={showAdvancedEdit ? 'bg-accent-primary/20 border-transparent text-accent-primary' : 'bg-dark-bgSecondary border-transparent text-text-secondary hover:text-text-primary'}
             title="Toggle Advanced Edit Panel"
           >
             <Zap size={12} />
             <span>Edit</span>
-          </button>
+          </Button>
         )}
 
         {/* Automation Editor Toggle (tracker view) */}
         {viewMode === 'tracker' && (
-          <button
+          <Button
+            variant="compact"
             onClick={c.handleShowAutoEditor}
-            className="flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors bg-dark-bgSecondary text-text-secondary hover:text-text-primary"
+            className="bg-dark-bgSecondary border-transparent text-text-secondary hover:text-text-primary"
             title="Open Automation Editor"
           >
             <Activity size={12} />
             <span>Automation</span>
-          </button>
+          </Button>
         )}
 
         {/* Song Cleanup Dialog */}
         {onShowCleanup && (
-          <button
+          <Button
+            variant="compact"
             onClick={onShowCleanup}
-            className="flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors bg-dark-bgSecondary text-text-secondary hover:text-text-primary"
+            className="bg-dark-bgSecondary border-transparent text-text-secondary hover:text-text-primary"
             title="Analyze song and remove unused data"
           >
             <Trash2 size={12} />
             <span>Cleanup</span>
-          </button>
+          </Button>
         )}
 
         {/* Find & Replace */}
         {onShowFindReplace && (
-          <button
+          <Button
+            variant="compact"
             onClick={onShowFindReplace}
-            className={`flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors ${
-              showFindReplace
-                ? 'bg-accent-primary/20 text-accent-primary'
-                : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
-            }`}
+            className={showFindReplace ? 'bg-accent-primary/20 border-transparent text-accent-primary' : 'bg-dark-bgSecondary border-transparent text-text-secondary hover:text-text-primary'}
             title="Find & replace (Ctrl+F)"
           >
             Find
-          </button>
+          </Button>
         )}
 
         {/* Voice to Notes */}
         {onToggleVoicePanel && (
-          <button
+          <Button
+            variant="compact"
             onClick={onToggleVoicePanel}
-            className={`flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded transition-colors ${
-              showVoicePanel
-                ? 'bg-accent-primary/20 text-accent-primary'
-                : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
-            }`}
+            className={showVoicePanel ? 'bg-accent-primary/20 border-transparent text-accent-primary' : 'bg-dark-bgSecondary border-transparent text-text-secondary hover:text-text-primary'}
             title="Record your voice and turn it into notes"
           >
             <Mic size={11} />
             Voice
-          </button>
+          </Button>
         )}
 
         {/* Rec Button */}
-        <button
+        <Button
+          variant="compact"
           onClick={c.handleToggleRecord}
-          className={`
-            px-2 py-1 text-[10px] font-mono rounded font-medium transition-colors flex items-center gap-1
-            ${c.recordMode
-              ? 'bg-accent-error text-text-primary animate-pulse'
-              : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
-            }
-          `}
+          className={c.recordMode ? 'bg-accent-error border-transparent text-text-primary animate-pulse' : 'bg-dark-bgSecondary border-transparent text-text-secondary hover:text-text-primary'}
           title="Toggle Recording Mode (Space)"
         >
           <div className={`w-2 h-2 rounded-full ${c.recordMode ? 'bg-white' : 'bg-accent-error'}`} />
           REC
-        </button>
+        </Button>
 
         {/* Mute Button */}
-        <button
+        <Button
+          variant="compact"
           onClick={c.handleToggleMute}
-          className={`
-            px-2 py-1 text-[10px] font-mono rounded font-medium transition-colors
-            ${c.masterMuted
-              ? 'bg-accent-error/20 text-accent-error'
-              : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
-            }
-          `}
+          className={c.masterMuted ? 'bg-accent-error/20 border-transparent text-accent-error' : 'bg-dark-bgSecondary border-transparent text-text-secondary hover:text-text-primary'}
           title={c.masterMuted ? 'Unmute master output' : 'Mute master output'}
         >
           {c.masterMuted ? 'Unmute' : 'Mute'}
-        </button>
+        </Button>
 
         {/* Groove Settings Button */}
-        <button
+        <Button
+          variant="compact"
           onClick={() => setShowGrooveSettings(true)}
-          className={`px-2 py-1 text-[10px] rounded font-mono font-bold transition-colors ${
-            c.grooveActive
-              ? 'bg-accent-primary/20 text-accent-primary'
-              : 'bg-dark-bgSecondary text-text-secondary hover:text-text-primary'
-          }`}
+          className={c.grooveActive ? 'bg-accent-primary/20 border-transparent text-accent-primary' : 'bg-dark-bgSecondary border-transparent text-text-secondary hover:text-text-primary'}
           title={`Groove Settings (Current: ${GROOVE_TEMPLATES.find(g => g.id === c.grooveTemplateId)?.name || 'None'})`}
         >
           Groove
-        </button>
+        </Button>
         {showGrooveSettings && <GrooveSettingsModal onClose={() => setShowGrooveSettings(false)} />}
 
         {/* Genre Analysis Badge */}
@@ -499,13 +480,13 @@ const VisualBgCycler: React.FC = () => {
 
   return (
     <div className="flex items-center gap-0.5 ml-1 pl-2 border-l border-dark-border">
-      <button onClick={prev} className="p-0.5 text-text-muted hover:text-text-primary" title="Previous visual mode">
+      <Button variant="compact" onClick={prev} className="p-0.5 border-transparent bg-transparent" title="Previous visual mode">
         <ChevronLeft size={12} />
-      </button>
+      </Button>
       <span className="text-[10px] font-mono text-text-secondary min-w-[60px] text-center">{label}</span>
-      <button onClick={next} className="p-0.5 text-text-muted hover:text-text-primary" title="Next visual mode">
+      <Button variant="compact" onClick={next} className="p-0.5 border-transparent bg-transparent" title="Next visual mode">
         <ChevronRight size={12} />
-      </button>
+      </Button>
     </div>
   );
 };

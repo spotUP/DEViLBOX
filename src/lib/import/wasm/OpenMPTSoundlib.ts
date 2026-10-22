@@ -330,6 +330,12 @@ export async function setInitialTempo(tempo: number): Promise<void> {
   m._osl_set_initial_tempo(tempo);
 }
 
+/** Set the song's sample pre-amp (48 is the soundlib default); saved in the module. */
+export async function setSamplePreAmp(preAmp: number): Promise<void> {
+  const m = await getModule();
+  m._osl_set_sample_preamp(preAmp);
+}
+
 // ─── Sample data ───────────────────────────────────────────────────────────
 
 export async function getSampleInfo(sampleIndex: number): Promise<SampleInfo> {
@@ -408,6 +414,16 @@ export async function setSampleLoop(
   const m = await getModule();
   const type = loopType === 'off' ? 0 : loopType === 'pingpong' ? 2 : 1;
   return m._osl_set_sample_loop(sampleIndex, Math.max(0, Math.round(loopStart)), Math.max(0, Math.round(loopEnd)), type) === 1;
+}
+
+/**
+ * Make sample slot sampleIndex exist (new slots start empty). Only modules
+ * without instruments allow it, where instrument n plays sample n; returns
+ * false for a module with instruments or an index past the format's limit.
+ */
+export async function ensureSampleSlot(sampleIndex: number): Promise<boolean> {
+  const m = await getModule();
+  return m._osl_ensure_sample_slot(sampleIndex) === 1;
 }
 
 // ─── Save / Export ─────────────────────────────────────────────────────────
