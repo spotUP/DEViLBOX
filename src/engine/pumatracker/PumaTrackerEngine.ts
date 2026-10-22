@@ -92,7 +92,7 @@ export class PumaTrackerEngine extends WASMSingletonBase {
           break;
 
         case 'chLevels':
-          meterFeed.report(data.levels, data.noteStarts);
+          meterFeed.reportFromWorklet(data, this.audioContext);
           break;
 
         case 'numPatterns':
@@ -130,6 +130,7 @@ export class PumaTrackerEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('PumaTrackerEngine not initialized');
+    meterFeed.clearHeld();
 
     this.workletNode.port.postMessage(
       { type: 'loadModule', moduleData: buffer },
@@ -141,6 +142,7 @@ export class PumaTrackerEngine extends WASMSingletonBase {
   }
 
   stop(): void {
+    meterFeed.clearHeld();
     this.workletNode?.port.postMessage({ type: 'stop' });
   }
 

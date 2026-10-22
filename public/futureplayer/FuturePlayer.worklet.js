@@ -451,7 +451,7 @@ class FuturePlayerProcessor extends AudioWorkletProcessor {
         this.wasm._fp_wasm_get_note_start_counts(this._noteStartsPtr, 4);
         noteStarts = Array.from(new Uint32Array(this.wasm.HEAPU8.buffer, this._noteStartsPtr, 4));
       }
-      this.port.postMessage({ type: 'chLevels', levels: [this.wasm.HEAPF32[off], this.wasm.HEAPF32[off+1], this.wasm.HEAPF32[off+2], this.wasm.HEAPF32[off+3]], noteStarts });
+      this.port.postMessage({ type: 'chLevels', levels: [this.wasm.HEAPF32[off], this.wasm.HEAPF32[off+1], this.wasm.HEAPF32[off+2], this.wasm.HEAPF32[off+3]], noteStarts, audioTime: currentTime });
     }
 
     return true;

@@ -157,7 +157,7 @@ export class JamCrackerEngine extends WASMSingletonBase {
           break;
 
         case 'chLevels':
-          meterFeed.report(data.levels, data.noteStarts);
+          meterFeed.reportFromWorklet(data, this.audioContext);
           break;
       }
     };
@@ -175,6 +175,7 @@ export class JamCrackerEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer): Promise<JamCrackerTuneInfo> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('JamCrackerEngine not initialized');
+    meterFeed.clearHeld();
 
     this._tunePromise = new Promise<JamCrackerTuneInfo>((resolve, reject) => {
       this._resolveTune = resolve;
@@ -198,6 +199,7 @@ export class JamCrackerEngine extends WASMSingletonBase {
   }
 
   stop(): void {
+    meterFeed.clearHeld();
     this.workletNode?.port.postMessage({ type: 'stop' });
   }
 

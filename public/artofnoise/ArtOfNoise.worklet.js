@@ -305,7 +305,7 @@ class ArtOfNoiseProcessor extends AudioWorkletProcessor {
             noteStarts = [];
             for (let i = 0; i < 8; i++) noteStarts.push(this.module.getValue(this._noteStartsPtr + i * 4, 'i32') >>> 0);
           }
-          this.port.postMessage({ type: 'chLevels', levels, noteStarts });
+          this.port.postMessage({ type: 'chLevels', levels, noteStarts, audioTime: currentTime });
         }
       }
     }

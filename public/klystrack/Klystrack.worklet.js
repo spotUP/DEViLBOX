@@ -681,7 +681,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
           this.wasm._klys_get_note_start_counts(this._noteStartsPtr, this.numChannels);
           noteStarts = Array.from(new Uint32Array(this.wasm.HEAPU8.buffer, this._noteStartsPtr, this.numChannels));
         }
-        this.port.postMessage({ type: 'chLevels', levels, noteStarts });
+        this.port.postMessage({ type: 'chLevels', levels, noteStarts, audioTime: currentTime });
       }
     }
 

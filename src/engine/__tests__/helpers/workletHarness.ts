@@ -43,6 +43,9 @@ export async function openWorklet(opts: { dir: string; name: string; factory: st
   (g.self as Record<string, unknown>).location ??= { href: `file:///${opts.dir}/${opts.name}.js` };
   g.WorkerGlobalScope ??= class {};
   g.sampleRate = SAMPLE_RATE;
+  // The AudioWorkletGlobalScope clock: the start time of the block being rendered.
+  let frames = 0;
+  Object.defineProperty(g, 'currentTime', { get: () => frames / SAMPLE_RATE, configurable: true });
   const posted: Array<Record<string, unknown>> = [];
   class FakeProcessor {
     port = { onmessage: null as ((e: { data: unknown }) => void) | null, postMessage: (m: unknown) => { posted.push(m as Record<string, unknown>); } };
@@ -78,6 +81,7 @@ export async function openWorklet(opts: { dir: string; name: string; factory: st
     for (let b = 0; b < blocks; b++) {
       const l = new Float32Array(BLOCK), r = new Float32Array(BLOCK);
       proc.process([], [[l, r]]);
+      frames += BLOCK;
       const both = new Float32Array(BLOCK * 2);
       both.set(l); both.set(r, BLOCK);
       out.push(both);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ChannelMeterFeed, registerChannelMeterSink } from '../channelMeterFeed';
 import { countRowNoteStarts } from '../../libopenmpt/LibopenmptEngine';
@@ -89,18 +89,99 @@ describe('libopenmpt flashes on the pattern rows, not on VU jumps', () => {
   });
 });
 
+describe('ChannelMeterFeed.reportFromWorklet', () => {
+  it('holds a worklet report until its block is heard, and feeds it on arrival with no context', () => {
+    const { levels, triggerChannelMeter, updateRealtimeChannelLevels } = sink();
+    registerChannelMeterSink({ triggerChannelMeter, updateRealtimeChannelLevels });
+    try {
+      const feed = new ChannelMeterFeed();
+      // The block was read at audio time 1.0 and takes 50 ms to reach the speakers.
+      feed.reportFromWorklet({ levels: [0.4], audioTime: 1.0 }, { currentTime: 1.0, outputLatency: 0.05 } as AudioContext);
+      expect(levels).toEqual([]);
+      // At 1.06 the first block is heard; the second (read at 1.06) is still held.
+      feed.reportFromWorklet({ levels: [0.2], audioTime: 1.06 }, { currentTime: 1.06, outputLatency: 0.05 } as AudioContext);
+      expect(levels).toEqual([[0.4]]);
+      feed.clearHeld();
+      const noContext = new ChannelMeterFeed();
+      noContext.reportFromWorklet({ levels: [0.7], audioTime: 5 }, null);
+      expect(levels[levels.length - 1]).toEqual([0.7]);
+    } finally {
+      registerChannelMeterSink(null);
+    }
+  });
+});
+
 describe('UADE meters show a block when it is heard', () => {
-  it('the engine holds each level report until its block reaches the speakers', () => {
+  it('the engine routes each level report through the shared hold and clears it on stop', () => {
     const src = readFileSync(resolve(__dirname, '../../uade/UADEEngine.ts'), 'utf8');
-    expect(src).toContain('meterFeed.reportAt(data.levels, data.noteStarts, (data.audioTime ?? ctx.currentTime) + outputLatencySec(ctx), ctx.currentTime)');
+    expect(src).toContain('meterFeed.reportFromWorklet(data, this.audioContext)');
     expect(src).toMatch(/stop\(\): void \{\n    meterFeed\.clearHeld\(\);/);
+  });
+});
+
+/** Every format engine under src/engine that takes channel levels from a worklet message. */
+function levelEngineFiles(): string[] {
+  const root = resolve(__dirname, '../..');
+  const out: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = resolve(dir, entry.name);
+      if (entry.isDirectory()) { if (entry.name !== '__tests__' && entry.name !== 'node_modules') walk(full); }
+      else if (/\.tsx?$/.test(entry.name) && /case '(chLevels|vu)'/.test(readFileSync(full, 'utf8'))) out.push(full);
+    }
+  };
+  walk(root);
+  return out;
+}
+
+describe('worklet level reports show a block when it is heard, in every engine', () => {
+  const engines = levelEngineFiles().filter((f) => /new ChannelMeterFeed\(\)/.test(readFileSync(f, 'utf8')));
+
+  it('finds the engines from the sources', () => {
+    expect(engines.length).toBeGreaterThanOrEqual(11);
+  });
+
+  it('each routes its level message through reportFromWorklet, never report() on arrival', () => {
+    for (const file of engines) {
+      const src = readFileSync(file, 'utf8');
+      expect(src, file).toContain('.reportFromWorklet(');
+      expect(src, file).not.toMatch(/[mM]eterFeed\.report\(/);
+    }
+  });
+
+  it('each clears the held reports on stop and on load', () => {
+    for (const file of engines) {
+      const src = readFileSync(file, 'utf8');
+      expect(src, file).toMatch(/stop\(\): void \{\s*(\/\/[^\n]*\n\s*)?(this\.)?[mM]eterFeed\.clearHeld\(\)/);
+      expect(src, file).toMatch(/async load(Tune|Song)\([^\n]*\{[^]*?[mM]eterFeed\.clearHeld\(\)/);
+    }
+  });
+
+  it('each worklet stamps its level posts with audioTime', () => {
+    const worklets = new Set<string>();
+    for (const file of engines) {
+      for (const m of readFileSync(file, 'utf8').matchAll(/[A-Za-z0-9]+\.worklet\.js/g)) worklets.add(m[0]);
+    }
+    const publicDir = resolve(__dirname, '../../../../public');
+    let checked = 0;
+    for (const dir of readdirSync(publicDir, { withFileTypes: true })) {
+      if (!dir.isDirectory()) continue;
+      for (const name of readdirSync(resolve(publicDir, dir.name))) {
+        if (!worklets.has(name)) continue;
+        const lines = readFileSync(resolve(publicDir, dir.name, name), 'utf8').split('\n')
+          .filter((l) => /postMessage\(\{ type: '(chLevels|vu)'/.test(l));
+        for (const line of lines) expect(line, `${dir.name}/${name}`).toContain('audioTime: currentTime');
+        checked += lines.length;
+      }
+    }
+    expect(checked).toBeGreaterThanOrEqual(engines.length);
   });
 });
 
 describe('engines feed per-frame levels through the split feed, never as note triggers', () => {
   it.each(ENGINES)('%s', (name) => {
     const src = readFileSync(resolve(__dirname, '../../', `${name}.ts`), 'utf8');
-    expect(src).toContain('meterFeed.report(');
+    expect(src).toMatch(/eterFeed\.reportFromWorklet\(/);
     expect(src).not.toMatch(/engine\.triggerChannelMeter\(/);
   });
 });

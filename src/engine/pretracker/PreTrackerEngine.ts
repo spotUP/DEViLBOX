@@ -294,7 +294,7 @@ export class PreTrackerEngine extends WASMSingletonBase implements IsolationCapa
           break;
 
         case 'chLevels':
-          meterFeed.report(data.levels, data.noteStarts);
+          meterFeed.reportFromWorklet(data, this.audioContext);
           break;
 
         case 'error':
@@ -340,6 +340,7 @@ export class PreTrackerEngine extends WASMSingletonBase implements IsolationCapa
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('PreTrackerEngine not initialized');
+    meterFeed.clearHeld();
 
     this._metadata = null;
     this.workletNode.port.postMessage(
@@ -352,6 +353,7 @@ export class PreTrackerEngine extends WASMSingletonBase implements IsolationCapa
   }
 
   stop(): void {
+    meterFeed.clearHeld();
     this.workletNode?.port.postMessage({ type: 'stop' });
   }
 

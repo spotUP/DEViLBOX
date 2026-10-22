@@ -90,7 +90,7 @@ export class SteveTurnerEngine extends WASMSingletonBase {
           break;
 
         case 'chLevels':
-          meterFeed.report(data.levels, data.noteStarts);
+          meterFeed.reportFromWorklet(data, this.audioContext);
           break;
 
         case 'instrumentParam':
@@ -122,6 +122,7 @@ export class SteveTurnerEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('SteveTurnerEngine not initialized');
+    meterFeed.clearHeld();
 
     this.workletNode.port.postMessage(
       { type: 'loadModule', moduleData: buffer },
@@ -151,6 +152,7 @@ export class SteveTurnerEngine extends WASMSingletonBase {
   }
 
   stop(): void {
+    meterFeed.clearHeld();
     // Pause instead of stop to keep module loaded for note preview
     this._songPlaying = false;
     this.workletNode?.port.postMessage({ type: 'pause' });

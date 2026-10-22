@@ -304,7 +304,7 @@ class SteveTurnerProcessor extends AudioWorkletProcessor {
           noteStarts = [];
           for (let i = 0; i < 4; i++) noteStarts.push(this.module.getValue(this._noteStartsPtr + i * 4, 'i32') >>> 0);
         }
-        this.port.postMessage({ type: 'chLevels', levels: [heapF32[off], heapF32[off+1], heapF32[off+2], heapF32[off+3]], noteStarts });
+        this.port.postMessage({ type: 'chLevels', levels: [heapF32[off], heapF32[off+1], heapF32[off+2], heapF32[off+3]], noteStarts, audioTime: currentTime });
       }
     }
 
