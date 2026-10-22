@@ -26,7 +26,7 @@ function loadFixture(name: string): ArrayBuffer {
 
 describe('parseMOD — real song fixture', () => {
   it('parses Mortimer Twang 2118bytes!.mod as a 4-channel M.K. module', async () => {
-    const out = await parseMOD(loadFixture('mortimer-twang-2118bytes.mod'));
+    const out = await parseMOD(loadFixture('mortimer-twang-2118bytes.mod'), 'test.mod');
     expect(out.header.formatTag).toBe('M.K.');
     expect(out.header.channelCount).toBe(4);
     expect(out.header.patternCount).toBeGreaterThanOrEqual(1);
@@ -34,14 +34,14 @@ describe('parseMOD — real song fixture', () => {
   });
 
   it('has at least one pattern with 64 rows on 4 channels', async () => {
-    const out = await parseMOD(loadFixture('mortimer-twang-2118bytes.mod'));
+    const out = await parseMOD(loadFixture('mortimer-twang-2118bytes.mod'), 'test.mod');
     const p = out.patterns[0];
     expect(p.length).toBe(64);
     expect(p[0].length).toBe(4);
   });
 
   it('decoded song order matches header songLength', async () => {
-    const out = await parseMOD(loadFixture('mortimer-twang-2118bytes.mod'));
+    const out = await parseMOD(loadFixture('mortimer-twang-2118bytes.mod'), 'test.mod');
     expect(out.metadata.modData?.songLength).toBe(out.header.songLength);
     expect(out.header.songLength).toBeGreaterThan(0);
   });
@@ -53,7 +53,7 @@ describe('parseMOD — malformed input', () => {
     let finished = false;
     let thrown: unknown = null;
     try {
-      const out = await parseMOD(nonsense);
+      const out = await parseMOD(nonsense, 'test.mod');
       // If it returns, it certainly shouldn't claim to be a valid M.K. song.
       expect(out.header.formatTag === 'M.K.' && out.header.patternCount > 0).toBe(false);
       finished = true;
@@ -70,7 +70,7 @@ describe('parseMOD — malformed input', () => {
     const truncated = full.slice(0, 500); // shorter than the 1084-byte header
     const start = Date.now();
     try {
-      await parseMOD(truncated);
+      await parseMOD(truncated, 'test.mod');
     } catch {
       /* ok — the point is we return, not that we succeed */
     }

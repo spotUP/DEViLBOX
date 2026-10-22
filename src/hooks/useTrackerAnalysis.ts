@@ -34,6 +34,7 @@ import {
   getCachedAnalysis,
   loadAllCachedAnalyses,
 } from '@/engine/TrackerAnalysisCache';
+import { lookupModuleGenre } from '@/lib/moduleGenre';
 
 // ── Hash Helper ──────────────────────────────────────────────────────────────
 
@@ -49,6 +50,26 @@ function computeContentHash(data: Uint8Array | ArrayBuffer): string {
     hash = (hash * 16777619) >>> 0; // FNV prime, keep as 32-bit
   }
   return hash.toString(16).padStart(8, '0');
+}
+
+// ── Server Genre ─────────────────────────────────────────────────────────────
+
+/**
+ * Ask the server for the file's ModArchive genre; a tag replaces the audio
+ * model's genre in the store. Needs the module's file name (the server searches
+ * ModArchive by it); a reply for a song no longer loaded is dropped.
+ */
+async function requestModuleGenre(
+  fileHash: string,
+  data: Uint8Array | ArrayBuffer,
+  isCurrent: () => boolean,
+): Promise<void> {
+  const { useTrackerStore } = await import('@/stores/useTrackerStore');
+  const fileName = useTrackerStore.getState().patterns[0]?.importMetadata?.sourceFile;
+  if (!fileName) return;
+  const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
+  const tag = await lookupModuleGenre(bytes, fileName);
+  if (tag && isCurrent()) useTrackerAnalysisStore.getState().setModuleGenre(fileHash, tag);
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -189,6 +210,10 @@ export function useTrackerAnalysis(): void {
     if (fileHash !== lastFileHash.current) {
       console.log(`[TrackerAnalysis] New song: ${songTitle} (${fileHash})`);
       lastFileHash.current = fileHash;
+
+      if (rawFileData) {
+        void requestModuleGenre(fileHash, rawFileData, () => lastFileHash.current === fileHash);
+      }
       
       // Stop any existing capture
       stopCapture();
@@ -216,16 +241,16 @@ export function useTrackerAnalysis(): void {
       // Reset state for new capture
       store.clearAnalysis();
     }
-  }, [fileHash, songTitle, editorMode, getCached]);
+  }, [fileHash, songTitle, editorMode, getCached, rawFileData]);
   
   // Effect: Start/stop capture based on playback
   useEffect(() => {
     if (!fileHash) {
-      if ((window as any).ANALYSIS_DEBUG) console.log('[TrackerAnalysis] No fileHash, skipping capture');
+      if ((window as Window & { ANALYSIS_DEBUG?: boolean }).ANALYSIS_DEBUG) console.log('[TrackerAnalysis] No fileHash, skipping capture');
       return;
     }
     
-    if ((window as any).ANALYSIS_DEBUG) console.log(`[TrackerAnalysis] Playback effect: isPlaying=${isPlaying}, state=${analysisState}, capturing=${isCurrentlyCapturing()}`);
+    if ((window as Window & { ANALYSIS_DEBUG?: boolean }).ANALYSIS_DEBUG) console.log(`[TrackerAnalysis] Playback effect: isPlaying=${isPlaying}, state=${analysisState}, capturing=${isCurrentlyCapturing()}`);
     
     if (isPlaying) {
       // Start capture if not already capturing/analyzed

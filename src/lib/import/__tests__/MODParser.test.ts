@@ -12,7 +12,7 @@ describe('MODParser', () => {
   describe('Header Parsing', () => {
     it('should parse standard M.K. MOD header', async () => {
       const buffer = createMinimalMOD({ formatTag: 'M.K.' });
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       expect(result.header.title).toBe('Test Module');
       expect(result.header.formatTag).toBe('M.K.');
@@ -23,7 +23,7 @@ describe('MODParser', () => {
 
     it('should detect 6-channel MOD format', async () => {
       const buffer = createMinimalMOD({ formatTag: '6CHN' });
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       expect(result.header.formatTag).toBe('6CHN');
       expect(result.header.channelCount).toBe(6);
@@ -31,7 +31,7 @@ describe('MODParser', () => {
 
     it('should detect 8-channel MOD format', async () => {
       const buffer = createMinimalMOD({ formatTag: '8CHN' });
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       expect(result.header.formatTag).toBe('8CHN');
       expect(result.header.channelCount).toBe(8);
@@ -40,14 +40,14 @@ describe('MODParser', () => {
     it('should handle unknown MOD signature by defaulting to 4 channels', async () => {
       // MOD parser doesn't throw - it defaults to 4 channels for unknown tags
       const buffer = createInvalidMOD();
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
       // Unknown format tag defaults to 4 channels
       expect(result.header.channelCount).toBe(4);
     });
 
     it('should handle extended channel formats (FLT4, FLT8)', async () => {
       const buffer = createMinimalMOD({ formatTag: 'FLT4' });
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       expect(result.header.formatTag).toBe('FLT4');
       expect(result.header.channelCount).toBe(4);
@@ -60,7 +60,7 @@ describe('MODParser', () => {
         { name: 'Bass', length: 5000, finetune: 0, volume: 64 },
         { name: 'Lead', length: 3000, finetune: 5, volume: 50 },
       ]);
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       expect(result.instruments.length).toBeGreaterThanOrEqual(2);
       expect(result.instruments[0].name).toBe('Bass');
@@ -83,7 +83,7 @@ describe('MODParser', () => {
           loopLength: 500,
         },
       ]);
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       const sample = result.instruments[0].samples[0];
       expect(sample.loopStart).toBe(100);
@@ -100,7 +100,7 @@ describe('MODParser', () => {
           loopLength: 1, // Loop length of 1 or 2 = no loop
         },
       ]);
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       expect(result.instruments[0].samples[0].loopType).toBe('none');
     });
@@ -113,7 +113,7 @@ describe('MODParser', () => {
           pcmData: new Int8Array(100).fill(64),
         },
       ]);
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       const pcm = result.instruments[0].samples[0].pcmData;
       expect(pcm).toBeInstanceOf(ArrayBuffer);
@@ -125,7 +125,7 @@ describe('MODParser', () => {
         { name: 'Finetune +7', finetune: 7 },
         { name: 'Finetune -8', finetune: -8 },
       ]);
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       expect(result.instruments[0].samples[0].finetune).toBe(7);
       expect(result.instruments[1].samples[0].finetune).toBe(-8);
@@ -140,7 +140,7 @@ describe('MODParser', () => {
           { note: 'E-2', instrument: 2, effect: 'C40' },
         ],
       });
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       expect(result.patterns[0].length).toBe(64); // MOD patterns are always 64 rows
       expect(result.patterns[0][0][0].period).toBe(428); // C-2 period
@@ -156,7 +156,7 @@ describe('MODParser', () => {
           { period: 339, instrument: 1 }, // E-2
         ],
       });
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       expect(result.patterns[0][0][0].period).toBe(428); // C-2
       expect(result.patterns[0][1][0].period).toBe(381); // D-2
@@ -167,7 +167,7 @@ describe('MODParser', () => {
       const buffer = createMODWithPattern({
         rows: [{ period: 0, instrument: 0, effect: '000' }],
       });
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       expect(result.patterns[0][0][0].period).toBe(0);
       expect(result.patterns[0][0][0].instrument).toBe(0);
@@ -182,7 +182,7 @@ describe('MODParser', () => {
           { note: 'F-2', effect: 'ED2' }, // Note delay
         ],
       });
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       // MODNote.effect is a number (the effect nibble), effectParam is the parameter byte
       expect(result.patterns[0][0][0].effect).toBe(0xA);
@@ -197,14 +197,14 @@ describe('MODParser', () => {
 
     it('should handle multiple patterns', async () => {
       const buffer = createMinimalMOD({ patternCount: 3 });
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       expect(result.patterns.length).toBe(3);
     });
 
     it('should use pattern order table', async () => {
       const buffer = createMODWithPatternOrder([0, 2, 1, 0]); // Pattern sequence
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       expect(result.header.songLength).toBe(4);
       // Pattern order table has 128 entries; compare only the first songLength
@@ -251,9 +251,17 @@ describe('MODParser', () => {
   });
 
   describe('Import Metadata', () => {
+    it('keeps the load filename as sourceFile, not the song title', async () => {
+      // The genre lookup and the Info dialog File row read sourceFile; a MOD
+      // title like "Chemical-Emotion" never matches the archive filename.
+      const song = await parseMODFile(createMinimalMOD({ formatTag: 'M.K.' }), 'chemical emotion.mod');
+      expect(song.patterns[0].importMetadata?.sourceFile).toBe('chemical emotion.mod');
+      expect(song.name).toBe('Test Module');
+    });
+
     it('should generate import metadata', async () => {
       const buffer = createMinimalMOD({ formatTag: 'M.K.' });
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       expect(result.metadata.sourceFormat).toBe('MOD');
       expect(result.metadata.originalChannelCount).toBe(4);
@@ -275,7 +283,7 @@ describe('MODParser', () => {
           loopLength: 200,
         },
       ]);
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       const preserved = result.metadata.originalSamples?.[1]; // MOD samples are 1-indexed
       expect(preserved).toBeDefined();
@@ -291,7 +299,7 @@ describe('MODParser', () => {
   describe('Edge Cases', () => {
     it('should handle MOD with no samples', async () => {
       const buffer = createMODWithSamples([]);
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       // MOD always has 31 sample slots, but they can be empty
       expect(result.instruments.length).toBeLessThanOrEqual(31);
@@ -299,21 +307,21 @@ describe('MODParser', () => {
 
     it('should handle MOD with max pattern count', async () => {
       const buffer = createMinimalMOD({ patternCount: 128 });
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       expect(result.header.patternCount).toBeLessThanOrEqual(128);
     });
 
     it('should handle truncated MOD file gracefully', async () => {
       const buffer = new ArrayBuffer(100); // Too small for valid MOD
-      await expect(parseMOD(buffer)).rejects.toThrow();
+      await expect(parseMOD(buffer, 'test.mod')).rejects.toThrow();
     });
 
     it('should handle empty pattern cells correctly', async () => {
       const buffer = createMODWithPattern({
         rows: Array(64).fill({ period: 0, instrument: 0, effect: '000' }),
       });
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, 'test.mod');
 
       // All cells should be empty
       result.patterns[0].forEach((row) => {
