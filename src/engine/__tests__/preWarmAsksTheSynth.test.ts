@@ -29,7 +29,8 @@ function preloadBody(): string {
 
 describe('song-load pre-warm never plays a note', () => {
   it('asks each DevilboxSynth to warm itself up', () => {
-    expect(preloadBody()).toContain('warmUp?.()');
+    // warmUp may take the song's notes (UpRoughSoftsynth renders them here).
+    expect(preloadBody()).toMatch(/\.warmUp\?\.\(/);
   });
 
   it('no longer triggers a muted note on any synth', () => {
