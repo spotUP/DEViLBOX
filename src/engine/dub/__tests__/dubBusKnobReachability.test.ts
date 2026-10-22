@@ -46,7 +46,7 @@ interface Case {
   exempt?: string;
 }
 
-const NOT_IN_BUS = (consumer: string) => `Not consumed by DubBus: ${consumer}. Consumer test NOT yet written (open).`;
+const NOT_IN_BUS = (consumer: string, proof: string) => `Not consumed by DubBus: ${consumer}. Proven below: ${proof}.`;
 
 const CASES: Record<Key, Case> = {
   enabled: { value: true },
@@ -59,13 +59,13 @@ const CASES: Record<Key, Case> = {
   sidechainAmount: { value: 0.8 },
   sidechainSource: { value: 'channel' },
   sidechainChannelIndex: { value: 4, needs: { sidechainSource: 'channel' } },
-  deckTapAmount: { value: 0.2, exempt: NOT_IN_BUS('DubActions engage handlers pass it to engine.throwDeck/openDeckTap/muteAndDub') },
-  throwBeats: { value: 2, exempt: NOT_IN_BUS('DubActions throw handlers scale the throw length by it') },
+  deckTapAmount: { value: 0.2, exempt: NOT_IN_BUS('DubActions engage handlers pass it to engine.throwDeck/openDeckTap/muteAndDub', "'deckTapAmount' describe, deck tap gain AudioParam through the real handler and DrumPadEngine") },
+  throwBeats: { value: 2, exempt: NOT_IN_BUS('DubActions throw handlers scale the throw length by it', "'throwBeats' describe, deck tap gain closes later") },
   sirenFeedback: { value: 0.5, siren: true },
-  filterDropHz: { value: 900, exempt: NOT_IN_BUS('DubActions dub_combo_drop passes it to engine.filterDrop') },
+  filterDropHz: { value: 900, exempt: NOT_IN_BUS('DubActions dub_combo_drop passes it to engine.filterDrop', "'filterDropHz' describe, return lowpass frequency AudioParam") },
   echoEngine: { value: 're201' },
-  echoSyncDivision: { value: '1/8', exempt: NOT_IN_BUS('DrumPadEngine.setDubBusSettings turns it into echoRateMs before the bus sees it') },
-  throwQuantize: { value: 'bar', exempt: NOT_IN_BUS('DubActions scheduleQuantizedThrow delays the throw to the beat grid') },
+  echoSyncDivision: { value: '1/8', exempt: NOT_IN_BUS('DrumPadEngine.startDubSettingsMirror turns it into echoRateMs before the bus sees it', "'echoSyncDivision' describe, through the real mirror into the echo delay AudioParam") },
+  throwQuantize: { value: 'bar', exempt: NOT_IN_BUS('DubActions scheduleQuantizedThrow delays the throw to the beat grid', "'throwQuantize' describe, deck tap opens later") },
   bassShelfGainDb: { value: 8 },
   bassShelfFreqHz: { value: 300 },
   bassShelfQ: { value: 3, exempt: 'Web Audio lowshelf ignores Q, so the ramp on bassShelf.Q cannot change the sound; the AudioParam value is not distinguished by the harness walker.' },
@@ -280,5 +280,134 @@ describe('pingPongSyncToBpm reaches the ping-pong delay AudioParam through the e
     expect(on90.pushedL).toBe(Math.round((60000 / 90) * 0.75));
     expect(differences(off.res, on.res), 'sync on vs off moved nothing').not.toHaveLength(0);
     expect(differences(on.res, on90.res), 'BPM change moved nothing').not.toHaveLength(0);
+  });
+});
+
+// deckTapAmount, throwBeats, throwQuantize, filterDropHz: the bus never sees them. DubActions
+// handlers read them from the settings and call the engine (the real DrumPadEngine delegators,
+// pointed at the rig's bus), which moves the deck tap gain / return lowpass AudioParams on the
+// bus. Sentinel: the tap gain / lowpass frequency is sampled at fixed audio times and must differ.
+describe('DubActions consumers move the bus AudioParams they drive', () => {
+  interface Sample { tapA: Record<string, number>; lpf: Record<string, number> }
+
+  async function actionRun(
+    handlerId: 'dub_throw_a' | 'dub_throw_all' | 'dub_combo_drop',
+    settings: Partial<DubBusSettings>,
+    times: number[],
+    bpm = 140,
+  ): Promise<Sample> {
+    const { DUB_ACTION_HANDLERS } = await import('@/engine/dub/DubActions');
+    const { DrumPadEngine } = await import('@/engine/drumpad/DrumPadEngine');
+    const { useDJStore } = await import('@/stores/useDJStore');
+    const { useTransportStore } = await import('@/stores/useTransportStore');
+    const prevDj = useDJStore.getState();
+    const prevBpm = useTransportStore.getState().bpm;
+    useTransportStore.setState({ bpm });
+    if (handlerId === 'dub_combo_drop') {
+      useDJStore.setState({ crossfaderPosition: 0, decks: { ...prevDj.decks, A: { ...prevDj.decks.A, isPlaying: true, volume: 1 } } });
+    }
+    try {
+      const rig = await makeDubBusRig(0.8);
+      rig.bus.setSettings({ enabled: true });
+      const engine = Object.assign(Object.create(DrumPadEngine.prototype), { dubBus: rig.bus }) as InstanceType<typeof DrumPadEngine>;
+      const full = { ...DEFAULT_DUB_BUS, enabled: true, ...settings };
+      const tap = () => rig.node<Map<string, GainNode>>('deckTaps').get('A')!.gain.value;
+      const lpf = () => rig.node<BiquadFilterNode>('lpf').frequency.value;
+      const out: Sample = { tapA: {}, lpf: {} };
+      const fired: string[] = [];
+      const actions = [
+        { at: 0.1, run: () => { fired.push(String(DUB_ACTION_HANDLERS[handlerId].engage?.(engine, full, bpm) !== undefined)); } },
+        ...times.map((t) => ({ at: t, run: () => { out.tapA[t] = tap(); out.lpf[t] = lpf(); } })),
+      ];
+      await rig.render(actions);
+      expect(fired, 'handler engage ran').toHaveLength(1);
+      return out;
+    } finally {
+      useDJStore.setState({ crossfaderPosition: prevDj.crossfaderPosition, decks: prevDj.decks });
+      useTransportStore.setState({ bpm: prevBpm });
+    }
+  }
+
+  describe('deckTapAmount', () => {
+    it('sets the level the deck tap opens to', { timeout: 60_000, retry: 4 }, async () => {
+      const lo = await actionRun('dub_throw_a', { deckTapAmount: 0.2 }, [0.2]);
+      const hi = await actionRun('dub_throw_a', { deckTapAmount: 0.9 }, [0.2]);
+      expect(lo.tapA[0.2]).toBeCloseTo(0.2, 2);
+      expect(hi.tapA[0.2]).toBeCloseTo(0.9, 2);
+    });
+  });
+
+  describe('throwBeats', () => {
+    it('sets how long the deck tap stays open', { timeout: 60_000, retry: 4 }, async () => {
+      // 140 BPM: 0.5 beat = 0.214 s hold, closed (after the 0.25 s release) by 0.6; 2 beats = 0.857 s, still open.
+      const short = await actionRun('dub_throw_a', { deckTapAmount: 0.8, throwBeats: 0.5 }, [0.6]);
+      const long = await actionRun('dub_throw_a', { deckTapAmount: 0.8, throwBeats: 2 }, [0.6]);
+      expect(short.tapA[0.6]).toBeLessThan(0.05);
+      expect(long.tapA[0.6]).toBeCloseTo(0.8, 2);
+    });
+  });
+
+  describe('throwQuantize', () => {
+    it('delays the deck tap opening to the beat grid', { timeout: 60_000, retry: 4 }, async () => {
+      // No deck playing: scheduleQuantizedThrow falls back to the transport BPM. 140 BPM: 1/8 = 0.214 s, bar = 1.71 s.
+      const now = await actionRun('dub_throw_all', { deckTapAmount: 0.8, throwBeats: 2, throwQuantize: 'off' }, [0.2]);
+      const eighth = await actionRun('dub_throw_all', { deckTapAmount: 0.8, throwBeats: 2, throwQuantize: '1/8' }, [0.2, 0.5]);
+      const bar = await actionRun('dub_throw_all', { deckTapAmount: 0.8, throwBeats: 2, throwQuantize: 'bar' }, [0.2, 0.5]);
+      expect(now.tapA[0.2]).toBeCloseTo(0.8, 2);
+      expect(eighth.tapA[0.2]).toBe(0);
+      expect(eighth.tapA[0.5]).toBeCloseTo(0.8, 2);
+      expect(bar.tapA[0.5]).toBe(0);
+    });
+  });
+
+  describe('filterDropHz', () => {
+    it('sets where the return lowpass drops to', { timeout: 60_000, retry: 4 }, async () => {
+      const low = await actionRun('dub_combo_drop', { filterDropHz: 120 }, [0.6]);
+      const high = await actionRun('dub_combo_drop', { filterDropHz: 1500 }, [0.6]);
+      expect(low.lpf[0.6]).toBeCloseTo(120, 0);
+      expect(high.lpf[0.6]).toBeCloseTo(1500, -1);
+    });
+  });
+});
+
+// echoSyncDivision: DrumPadEngine's settings mirror turns the division into echoRateMs (the BPM
+// divides a beat) and hands it to bus.setSettings; the echo delay AudioParam moves with it.
+describe('echoSyncDivision reaches the echo rate through the engine mirror', () => {
+  async function echoRun(division: DubBusSettings['echoSyncDivision'], bpm: number) {
+    const { useDrumPadStore } = await import('@/stores/useDrumPadStore');
+    const { useTransportStore } = await import('@/stores/useTransportStore');
+    const store = useDrumPadStore.getState();
+    const prevDub = store.dubBus;
+    const prevBpm = useTransportStore.getState().bpm;
+    useTransportStore.setState({ bpm });
+    store.setDubBus({ enabled: true, echoSyncDivision: division, echoRateMs: 600 });
+    const rig = await makeDubBusRig(0.8);
+    const { DrumPadEngine } = await import('@/engine/drumpad/DrumPadEngine');
+    const pushed: DubBusSettings[] = [];
+    const engine = Object.assign(Object.create(DrumPadEngine.prototype), {
+      _dubMirrorOff: null,
+      _dubMirrorTimer: null,
+      dubBus: rig.bus,
+      setDubBusSettings: (s: DubBusSettings) => { pushed.push(s); rig.bus.setSettings(s); },
+    }) as { startDubSettingsMirror(): void; _dubMirrorOff: (() => void) | null };
+    engine.startDubSettingsMirror();
+    engine._dubMirrorOff?.();
+    feedTone(rig, 110, 0.3);
+    const buf = await rig.render();
+    const res: Result = { snap: snapshot(rig.bus), audio: [buf.getChannelData(0).slice(), buf.getChannelData(1).slice()], taps: '' };
+    useDrumPadStore.setState({ dubBus: prevDub });
+    useTransportStore.setState({ bpm: prevBpm });
+    return { res, pushedMs: pushed.at(-1)?.echoRateMs };
+  }
+
+  it("'off' keeps the fixed ms; a division follows the BPM and moves the echo delay", { timeout: 60_000, retry: 4 }, async () => {
+    const off = await echoRun('off', 120);
+    const eighth = await echoRun('1/8', 120);
+    const eighth90 = await echoRun('1/8', 90);
+    expect(off.pushedMs).toBe(600);
+    expect(eighth.pushedMs).toBe(250);
+    expect(eighth90.pushedMs).toBeCloseTo(60000 / 90 * 0.5, 5);
+    expect(differences(off.res, eighth.res), 'division vs off moved nothing').not.toHaveLength(0);
+    expect(differences(eighth.res, eighth90.res), 'BPM change moved nothing').not.toHaveLength(0);
   });
 });
