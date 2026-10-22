@@ -10,6 +10,7 @@ import { testCpuLimits } from './vitest.limits';
 // heavy offline-render suites out; the heavy tier (VITEST_TIER=heavy,
 // npm run test:heavy) runs only those, nightly. Unset: every test.
 const testTier = process.env.VITEST_TIER as 'fast' | 'heavy' | undefined
+const ciDirRequested = process.argv.some((arg) => arg.replace(/\\/g, '/').replace(/^\.\//, '').startsWith('src/__tests__/ci'))
 const heavyTestFiles: string[] = testTier
   ? (JSON.parse(fs.readFileSync(path.resolve(__dirname, 'tools/test-tiers/heavy.json'), 'utf8')) as { files: { file: string }[] }).files.map((f) => f.file)
   : []
@@ -133,7 +134,11 @@ export default defineConfig({
   test: {
     // Vitest configuration
     include: testTier === 'heavy' ? heavyTestFiles : ['src/**/*.{test,spec}.{ts,tsx}'],
-    exclude: ['node_modules', 'Reference Code/**', 'dist', 'src/__tests__/ci/**', ...(testTier === 'fast' ? heavyTestFiles : [])],
+    // src/__tests__/ci/ stays out of a bare `vitest run`, but a command that
+    // names it (test:ci, test:ci:fast, test:all, the pre-push gate) must run it:
+    // vitest applies exclude after the CLI filters, so excluding it always made
+    // those commands find no files there and pass without running them.
+    exclude: ['node_modules', 'Reference Code/**', 'dist', ...(ciDirRequested ? [] : ['src/__tests__/ci/**']), ...(testTier === 'fast' ? heavyTestFiles : [])],
     environment: 'happy-dom',
     setupFiles: ['src/test/nuadeNodeProbe.setup.ts'],
     // Worker cap and low CPU priority shared by every vitest config: vitest.limits.ts.

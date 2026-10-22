@@ -211,12 +211,13 @@ describe('NativeEngineRouting integrity', () => {
     const path = await import('path');
 
     const routingTs = fs.readFileSync(
-      path.resolve(__dirname, '../../engine/replayer/NativeEngineRouting.ts'),
+      // The descriptor table moved out of NativeEngineRouting.ts.
+      path.resolve(__dirname, '../../engine/replayer/wasmEngineRegistry.ts'),
       'utf-8',
     );
 
-    // Extract engine descriptor blocks
-    const engineBlocks = routingTs.match(/\{\s*key:\s*'[^']+'/g) ?? [];
+    // One `key: '...'` per engine descriptor
+    const engineBlocks = routingTs.match(/\bkey:\s*'[^']+'/g) ?? [];
     expect(engineBlocks.length).toBeGreaterThan(5);
 
     // Every engine must have key, synthType, fileDataKey, loadMethod
