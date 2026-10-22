@@ -20,6 +20,7 @@ import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { KlysEngine } from '@/engine/klystrack/KlysEngine';
 import type { KlysNativeInstrument } from '@/types/tracker';
 import { klysInstrumentToEngine } from '@/engine/klystrack/klysSongData';
+import { markEdited } from './klysEdit';
 import { klysInitInstrument, type KlysPreset } from '@constants/klysPresets';
 import {
   KLYS_EMPTY_STEP,
@@ -109,9 +110,16 @@ function engine(): KlysEngine | null {
   return KlysEngine.hasInstance() ? KlysEngine.getInstance() : null;
 }
 
+/** The engine for a write into the loaded SONG's instrument: marks the song edited so Play loads the engine's serialisation (klysEdit). */
+function songEngine(): KlysEngine | null {
+  const e = engine();
+  if (e) markEdited();
+  return e;
+}
+
 function sendMember(index: number, member: KlysMemberKey, inst: Inst): void {
   if (isStandaloneKlysInstrument(index)) { sendStandalone(inst); return; }
-  engine()?.setInstrumentParam(index, KLYS_PARAM_IDS[member], KLYS_MEMBERS[member].get(inst));
+  songEngine()?.setInstrumentParam(index, KLYS_PARAM_IDS[member], KLYS_MEMBERS[member].get(inst));
 }
 
 /** The engine's one preview copy := this standalone instrument (also called by KlysSynth before each key). */
@@ -143,9 +151,9 @@ export function toggleKlysBit(index: number, word: KlysFlagWord, bit: number): v
 function writeProgram(index: number, inst: Inst, program: number[]): void {
   const before = paddedProgram(inst.program);
   queue(index, { ...inst, program });
-  const e = engine();
-  if (!e) return;
   if (isStandaloneKlysInstrument(index)) { sendStandalone({ ...inst, program }); return; }
+  const e = songEngine();
+  if (!e) return;
   for (let step = 0; step < KLYS_PROGRAM_LENGTH; step++) {
     if (program[step] !== before[step]) e.setInstrumentProgramStep(index, step, program[step]);
   }
@@ -187,13 +195,13 @@ export function renameKlysInstrument(index: number, name: string): void {
   const clipped = name.slice(0, KLYS_NAME_LENGTH);
   queue(index, { ...inst, name: clipped });
   if (isStandaloneKlysInstrument(index)) sendStandalone({ ...inst, name: clipped });
-  else engine()?.setInstrumentName(index, clipped);
+  else songEngine()?.setInstrumentName(index, clipped);
   useInstrumentStore.getState().updateInstrument(klysInstrumentId(index), { name: clipped });
 }
 
 /** Send every difference between two states of one instrument to the engine. */
 function sendDiff(index: number, from: Inst, to: Inst): void {
-  const e = engine();
+  const e = songEngine();
   if (!e) return;
   for (const member of Object.keys(KLYS_PARAM_IDS) as KlysMemberKey[]) {
     const v = KLYS_MEMBERS[member].get(to);
@@ -233,6 +241,6 @@ export function applyKlysPreset(index: number, preset: KlysPreset): void {
   const next: Inst = clone(preset.instrument);
   queue(index, next);
   if (isStandaloneKlysInstrument(index)) sendStandalone(next);
-  else engine()?.setInstrumentData(index, klysInstrumentToEngine(next));
+  else songEngine()?.setInstrumentData(index, klysInstrumentToEngine(next));
   useInstrumentStore.getState().updateInstrument(klysInstrumentId(index), { name: next.name });
 }

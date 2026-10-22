@@ -561,7 +561,10 @@ export class ChannelRoutedEffectsManager {
     this.perChannelFx.clear();
     for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) {
       const g = this.channelDubGains[ch];
-      if (g) { try { g.disconnect(); } catch { /* ok */ } }
+      if (g) {
+        void this._tapStrip(ch, null);
+        try { g.disconnect(); } catch { /* ok */ }
+      }
       this.channelDubGains[ch] = null;
     }
     this.dubLifecycle.clear();
@@ -719,6 +722,9 @@ export class ChannelRoutedEffectsManager {
       return 'unavailable';
     }
     this.channelDubPendingActivation.delete(channelIndex);
+    // The channel's synths play into its Tone strip, not the engine's dub
+    // output: feed the strip in as well, or a synth channel sends silence.
+    await this._tapStrip(channelIndex, gain);
 
     // Register with DubBus so echoThrow can find the tap — with the fader's
     // gain as the baseline, so a release lands on the fader, not on
@@ -731,6 +737,14 @@ export class ChannelRoutedEffectsManager {
     this.channelDubRetried.delete(channelIndex);
     console.log(`[ChannelRoutedEffects] Dub channel ${channelIndex} activated`);
     return 'wired';
+  }
+
+  /** Send the channel's Tone strip into its dub send too, or stop with null (setChannelStripDubTap). */
+  private async _tapStrip(channelIndex: number, gain: GainNode | null): Promise<void> {
+    try {
+      const { getToneEngine } = await import('../ToneEngine');
+      getToneEngine().setChannelStripDubTap(channelIndex, gain);
+    } catch { /* engine not ready */ }
   }
 
   private async _deactivateDubChannel(channelIndex: number): Promise<void> {
@@ -769,6 +783,7 @@ export class ChannelRoutedEffectsManager {
       }
       try { worklet.disconnect(gain, DUB_OUTPUT_BASE + channelIndex); } catch { /* ok */ }
     }
+    await this._tapStrip(channelIndex, null);
 
     try {
       const { getDrumPadEngine } = await import('../../hooks/drumpad/useMIDIPadRouting');

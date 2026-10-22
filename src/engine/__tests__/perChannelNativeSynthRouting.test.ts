@@ -113,13 +113,13 @@ function makeEngine() {
   shifts.length = 0;
   // Strips keyed by channel: the lane enters at `join`, after the voice delay.
   const strips = new Map<number, FakeGainNode>();
-  type Strip = { input: FakeGainNode; voiceDelay: { delayTime: { value: number } }; join: FakeGainNode; channel: FakeGainNode; meter: FakeGainNode };
+  type Strip = { input: FakeGainNode; voiceDelay: { delayTime: { value: number } }; join: FakeGainNode; channel: FakeGainNode; scope: FakeGainNode; rms: number };
   const stripFor = (ch: number) => {
     let join = strips.get(ch);
     if (!join) {
       join = new FakeGain();
       strips.set(ch, join);
-      Map.prototype.set.call(channelOutputs, ch, { input: new FakeGain(), voiceDelay: { delayTime: { value: 0 } }, join, channel: new FakeGain(), meter: new FakeGain() });
+      Map.prototype.set.call(channelOutputs, ch, { input: new FakeGain(), voiceDelay: { delayTime: { value: 0 } }, join, channel: new FakeGain(), scope: new FakeGain(), rms: 0 });
     }
     return join;
   };

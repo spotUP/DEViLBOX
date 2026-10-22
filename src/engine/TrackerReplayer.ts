@@ -15,7 +15,7 @@
 
 import { applyEditorCellEdit } from '@lib/import/furnaceEditorCells';
 import { outputLatencySec } from './audioLatency';
-import { isReplacedInstrument, synthNoteVelocity } from './replayer/hybridInstruments';
+import { isReplacedInstrument, noteVolumeIsVelocity, synthNoteVelocity } from './replayer/hybridInstruments';
 import { isTonePortamentoEffect } from './replayer/SynthEffectProcessor';
 import { isPerChannelNativeSynthType } from './perChannelNativeSynths';
 import { isLowOctaveNote, isPitchedNote, noteValueToPitch } from '@/lib/tracker/noteValue';
@@ -898,6 +898,8 @@ export class TrackerReplayer {
   /** Guard flag: when true, usePatternPlayback should not stop/restart the replayer.
    *  Set by forcePosition, cleared after one React render cycle. */
   public skipNextReload = false;
+  private static readonly SKIP_RELOAD_WINDOW_MS = 500;
+  private _skipReloadTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** One-shot request: force the next usePatternPlayback effect run to RELOAD the
    *  song even during natural playback. Used for live Play Song <-> Play Pattern
@@ -917,8 +919,16 @@ export class TrackerReplayer {
     this.pattPos = pattPos;
     this.currentTick = 0;
     this.resyncTimelineForJump();
-    // Tell usePatternPlayback to skip its next stop/restart cycle
+    // Tell usePatternPlayback to skip the stop/restart cycle THIS seek causes. The flag is
+    // only meant for the effect run that follows within one render cycle; a seek while
+    // playing may cause no run at all, and a leftover flag would swallow a later Stop or
+    // skip a needed reload. Expire it so it cannot outlive that cycle.
     this.skipNextReload = true;
+    if (this._skipReloadTimer) clearTimeout(this._skipReloadTimer);
+    this._skipReloadTimer = setTimeout(() => {
+      this._skipReloadTimer = null;
+      this.skipNextReload = false;
+    }, TrackerReplayer.SKIP_RELOAD_WINDOW_MS);
 
     // Forward to libopenmpt synchronously if active (zero-latency seek)
     if (this.useLibopenmptPlayback) {
@@ -1445,6 +1455,14 @@ export class TrackerReplayer {
       }
     }
 
+    // A volume-column level sets the channel volume at tick 0, as Cxx does. A SoundFont or SFZ
+    // note carries that volume in its velocity, so it must be in ch.volume before the trigger;
+    // every other synth gets the volume column on its lane from the SynthEffectProcessor.
+    if (noteVolumeIsVelocity(ch.instrument?.synthType)) {
+      const level = decodeVolumeColumn(row.volume, useFormatStore.getState().editorMode);
+      if (level !== null) ch.volume = Math.round(level * 64);
+    }
+
     // Normal note trigger
     if (hasNote && !probabilitySkip) {
       ch.xmNote = noteValue;
@@ -1479,9 +1497,11 @@ export class TrackerReplayer {
       ch.lastPlayedNoteName = newNoteName;
 
       // Trigger the synth note. A per-channel native synth gets its channel volume from the
-      // SynthEffectProcessor on its lane level, so the velocity leaves it out.
+      // SynthEffectProcessor on its lane level, so the velocity leaves it out; a SoundFont or
+      // SFZ player keeps it in the velocity.
+      const synthType = ch.instrument?.synthType;
       this.triggerNote(ch, time, 0, chIndex, accent, slideActive, effectiveSlide, hammer,
-        isPerChannelNativeSynthType(ch.instrument?.synthType));
+        isPerChannelNativeSynthType(synthType) && !noteVolumeIsVelocity(synthType));
 
       // Update slide flag for next row
       ch.previousSlideFlag = (slide || hammer) ?? false;
@@ -2559,6 +2579,8 @@ export class TrackerReplayer {
                 try { getToneEngine().applySynthFrequency(instrumentId, frequency, channelIndex, rampTime); }
                 catch { /* ToneEngine not ready */ }
               },
+              noteVolumeIsVelocity: (instrumentId) =>
+                noteVolumeIsVelocity(replayer.instrumentMap.get(instrumentId)?.synthType),
               getInstrumentDefaultVolume: (instrumentId) =>
                 replayer.instrumentMap.get(instrumentId)?.metadata?.modPlayback?.defaultVolume ?? 64,
               setChannelGain: (channelIndex, gain, time) => {
@@ -2597,7 +2619,8 @@ export class TrackerReplayer {
                 if (!inst?.synthType || inst.synthType === 'Sampler') return;
                 if (replayer.isChannelMuted(channelIndex)) return;
                 try {
-                  getToneEngine().triggerNote(inst.id, ch.lastPlayedNoteName ?? 'C4', 0, time, 1, inst, false, false, channelIndex);
+                  const velocity = noteVolumeIsVelocity(inst.synthType) ? ch.currentVelocity ?? 1 : 1;
+                  getToneEngine().triggerNote(inst.id, ch.lastPlayedNoteName ?? 'C4', 0, time, velocity, inst, false, false, channelIndex);
                 } catch { /* ignored */ }
               },
               triggerDelayedNote: (channelIndex, xmNote, instrumentId, volume, time) => {
@@ -2614,7 +2637,8 @@ export class TrackerReplayer {
                     ch.gainNode?.gain.setValueAtTime(volume / 64, time);
                   }
                   ch.lastPlayedNoteName = noteName;
-                  getToneEngine().triggerNote(inst.id, noteName, 0, time, 1, inst, false, false, channelIndex);
+                  const velocity = noteVolumeIsVelocity(inst.synthType) ? Math.min(1, volume / 64) : 1;
+                  getToneEngine().triggerNote(inst.id, noteName, 0, time, velocity, inst, false, false, channelIndex);
                 } catch { /* ignored */ }
               },
             });

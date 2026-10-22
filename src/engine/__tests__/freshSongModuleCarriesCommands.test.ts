@@ -42,7 +42,7 @@ describe('a fresh song module carries the typed commands', () => {
     const song = {
       numChannels: 2,
       patterns: [{ length: 16, channels: [{ rows: ch0 }, { rows: ch1 }] }, { length: 16, channels: [{ rows: rows(16) }, { rows: rows(16) }] }],
-      songPositions: [0, 1],
+      songPositions: [0, 1], initialSpeed: 6, initialBPM: 125,
     };
 
     const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');
@@ -68,7 +68,7 @@ describe('a fresh song module carries the typed commands', () => {
     const song = {
       numChannels: 1,
       patterns: [{ length: 16, channels: [{ rows: ch0 }] }],
-      songPositions: [0],
+      songPositions: [0], initialSpeed: 6, initialBPM: 125,
     };
 
     const bridge = await import('@engine/libopenmpt/OpenMPTEditBridge');

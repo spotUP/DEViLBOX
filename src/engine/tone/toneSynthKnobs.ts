@@ -316,8 +316,58 @@ export type ToneSettable = { set: (options: Record<string, unknown>) => unknown 
 export function applyToneVoiceOptions(target: unknown, synthType: string, config: InstrumentConfig): boolean {
   const settable = target as Partial<ToneSettable> | null;
   if (!settable || typeof settable.set !== 'function' || !TONE_KNOB_SYNTH_TYPES.has(synthType)) return false;
-  settable.set(toneVoiceOptions(synthType, config));
+  const options = toneVoiceOptions(synthType, config);
+  // A tracker-channel Synth is a MonoSynth whose own filter is the static filter (rolloff is creation-only).
+  if (synthType === 'Synth' && (target as { filterEnvelope?: unknown }).filterEnvelope) {
+    const { filter, filterEnvelope } = monoStaticFilter(config);
+    const { rolloff: _rolloff, ...liveFilter } = filter;
+    void _rolloff;
+    options.filter = liveFilter;
+    options.filterEnvelope = filterEnvelope;
+  }
+  settable.set(options);
   return true;
+}
+
+/** The Tone synth a config plays: a PolySynth is its `polySynth.voiceType` voice (Synth, FMSynth or ToneAM); other types are themselves. */
+export function toneVoiceTypeOf(config: InstrumentConfig): string {
+  if (config.synthType !== 'PolySynth') return config.synthType;
+  const t = config.polySynth?.voiceType;
+  return t === 'FMSynth' || t === 'ToneAM' ? t : 'Synth';
+}
+
+/**
+ * A MonoSynth's filter as the static filter of the Synth family: type, Q and slope from `config.filter`, the cutoff as a
+ * filterEnvelope that does not sweep (octaves 0). No `config.filter`: wide open, so a pattern voice sounds like a keyboard one.
+ */
+export function monoStaticFilter(config: InstrumentConfig): { filter: Record<string, unknown> & { rolloff: number }; filterEnvelope: { baseFrequency: number; octaves: number } } {
+  const f = config.filter;
+  return {
+    filter: { ...(f?.type ? { type: f.type } : {}), ...(typeof f?.Q === 'number' ? { Q: f.Q } : {}), rolloff: toneFilterRolloff(config) },
+    filterEnvelope: { baseFrequency: f ? num(f.frequency, 20000) : 20000, octaves: 0 },
+  };
+}
+
+/** The live values of a static Tone.Filter built from `config.filter`. */
+export function staticFilterOptions(config: InstrumentConfig): Record<string, unknown> {
+  const f = config.filter;
+  return f ? { type: f.type, frequency: num(f.frequency, 20000), Q: num(f.Q, 1) } : {};
+}
+
+/**
+ * Poly / FM / AM voices of the Synth family sound through a Tone.Filter when `config.filter` exists. The synth itself is
+ * returned (its connect / disconnect / dispose route through the filter), registered with the voice probe as `filter`.
+ */
+function attachStaticFilter(node: Tone.ToneAudioNode, config: InstrumentConfig): Tone.Filter {
+  const filter = new Tone.Filter({ ...staticFilterOptions(config), rolloff: toneFilterRolloff(config) } as never);
+  const baseConnect = node.connect.bind(node);
+  const baseDisconnect = node.disconnect.bind(node);
+  const baseDispose = node.dispose.bind(node);
+  baseConnect(filter);
+  node.connect = ((dest: Tone.InputNode, o?: number, i?: number) => { filter.connect(dest, o, i); return node; }) as typeof node.connect;
+  node.disconnect = ((dest?: Tone.InputNode, o?: number, i?: number) => { filter.disconnect(dest as never, o, i); return node; }) as typeof node.disconnect;
+  node.dispose = () => { baseDisconnect(); baseDispose(); filter.dispose(); return node; };
+  return filter;
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -565,6 +615,7 @@ export function createToneSynthNode(synthType: string, config: InstrumentConfig,
   const options = toneVoiceOptions(synthType, config);
   const volume = getNormalizedVolume(synthType, config.volume);
   let node: Tone.ToneAudioNode;
+  let staticFilter: Tone.Filter | undefined;
   if (synthType === 'MonoSynth') {
     const filter = { ...(options.filter as Record<string, unknown> | undefined), rolloff: toneFilterRolloff(config) };
     node = new (toneVoiceClass('MonoSynth'))({ ...options, filter, volume } as never);
@@ -572,16 +623,19 @@ export function createToneSynthNode(synthType: string, config: InstrumentConfig,
     node = new (toneVoiceClass('DuoSynth'))({ ...options, volume } as never);
   } else if (synthType === 'Synth' && create.monophonic) {
     // Tracker channels: a MonoSynth, so the engine can drive its frequency directly (arpeggio, portamento, vibrato).
-    node = new (toneVoiceClass('MonoSynth'))({ ...options, volume } as never);
+    // Its own filter is the static filter (no sweep), so a pattern note sounds like a keyboard note.
+    node = new (toneVoiceClass('MonoSynth'))({ ...options, ...monoStaticFilter(config), volume } as never);
   } else if (create.monophonic) {
     node = new (toneVoiceClass(synthType as 'FMSynth' | 'ToneAM'))({ ...options, volume } as never);
+    staticFilter = config.filter ? attachStaticFilter(node, config) : undefined;
   } else {
     const voice = toneVoiceClass(synthType as 'Synth' | 'FMSynth' | 'ToneAM');
     const poly = new (Tone.PolySynth as unknown as new (o: Record<string, unknown>) => Tone.PolySynth)({
       voice, options, volume, ...(create.polyphony !== undefined ? { maxPolyphony: create.polyphony } : {}),
     });
     node = poly;
+    staticFilter = config.filter ? attachStaticFilter(node, config) : undefined;
   }
-  registerVoiceSource(node, node, { modLfo: { rateHz: () => rigLfoRateHz(node) } });
+  registerVoiceSource(node, node, { modLfo: { rateHz: () => rigLfoRateHz(node) }, ...(staticFilter ? { filter: staticFilter } : {}) });
   return node;
 }

@@ -19,6 +19,7 @@
 import { vi } from 'vitest';
 import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch, audioLoadsSettled, realDelay } from './realWebAudio';
 import type { DubBus as DubBusClass } from '@/engine/dub/DubBus';
+import { _setSoundingForTest } from '@/engine/audio/signalPresence';
 
 export const RIG_SAMPLE_RATE = 48000;
 
@@ -160,6 +161,14 @@ export async function makeDubBusRig(seconds: number): Promise<DubBusRig> {
   // the middle of a render. Re-installing also drops the previous rig's timers.
   vi.useFakeTimers({ toFake: FAKED });
   seedMainThreadRandom();
+  // Each rig starts in a silent app; `feedTone` makes it sound. The app's
+  // sounding state (engine/audio/signalPresence.ts) is what joins every
+  // measuring tap the bus owns, and in the browser it comes from the idle-gate
+  // worklet watching Tone's destination - which this rig does not build. Left
+  // at its default, the app read silent forever and every tap stayed out: the
+  // phaser probe read 0, and the clip probes no longer pulled returnTrim, so
+  // the Sub Bass Bed behind it rendered silence (since 60ee5cc96).
+  _setSoundingForTest(false);
   const ctx = new OfflineAudioContext(2, Math.round(seconds * RIG_SAMPLE_RATE), RIG_SAMPLE_RATE);
   Tone.setContext(ctx);
   const master = ctx.createGain();
@@ -220,6 +229,8 @@ export function feedTone(rig: DubBusRig, hz = 220, gain = 0.3): void {
   osc.connect(level);
   level.connect(rig.node('input'));
   osc.start(0);
+  // The app now plays: what the idle gate reports on the first loud quantum.
+  _setSoundingForTest(true);
 }
 
 /** RMS over [from, to) seconds, both channels. */

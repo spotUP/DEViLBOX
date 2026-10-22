@@ -19,6 +19,10 @@ target_link_libraries(FluidSynth PRIVATE
 
 set(EXPORTED_FUNCTIONS
     "_fluidsynth_create"
+    "_fluidsynth_create_ex"
+    "_fluidsynth_set_channel_type"
+    "_fluidsynth_get_channel_bank"
+    "_fluidsynth_process_multi"
     "_fluidsynth_destroy"
     "_fluidsynth_load_sf2"
     "_fluidsynth_process"

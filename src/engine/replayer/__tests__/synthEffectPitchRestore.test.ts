@@ -23,6 +23,7 @@ function run(rows: EffectPatternCell[]) {
     getChannelCount: () => 1,
     getEditorMode: () => 'classic',
     getInstrumentDefaultVolume: () => 64,
+    noteVolumeIsVelocity: () => false,
     applySynthFrequency: (_id, freq) => { sent.push({ row, freq }); },
     setChannelGain: () => {},
     setChannelPan: () => {},

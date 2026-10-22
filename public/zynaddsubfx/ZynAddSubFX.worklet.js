@@ -50,7 +50,7 @@ const PARAM_MAP = [
   [53, 'uni'],     // 25: SUB_BANDWIDTH
   [54, 'uni'],     // 26: SUB_BANDWIDTH_SCALE
   [57, 'raw8'],    // 27: SUB_NUM_HARMONICS -> P_SUB_NUM_STAGES
-  [58, 'raw4'],    // 28: SUB_MAG_TYPE
+  [58, 'index'],    // 28: SUB_MAG_TYPE
   [160, 'uni'],    // 29: SUB_HARM_1 -> P_SUB_HMAG0
   [161, 'uni'],    // 30: SUB_HARM_2 -> P_SUB_HMAG1
   [162, 'uni'],    // 31: SUB_HARM_3 -> P_SUB_HMAG2
@@ -67,7 +67,7 @@ const PARAM_MAP = [
   null,            // 41: PAD_PROFILE_STRETCH (no separate WASM param — use padQuality)
   [64, 'oct'],     // 42: PAD_OCTAVE -> P_PAD_COARSE_DETUNE
   [63, 'detune'],  // 43: PAD_DETUNE
-  [67, 'raw4'],    // 44: PAD_QUALITY
+  [67, 'index'],    // 44: PAD_QUALITY
   // Global filter (TS 45-54)
   [70, 'index'],   // 45: FILTER_TYPE -> Ptype, the analog filter type index 0..8 (LPF1 HPF1 LPF2 HPF2 BPF2 NOTCH2 PEAK2 LOSHELF2 HISHELF2)
   [72, 'uni'],     // 46: FILTER_CUTOFF

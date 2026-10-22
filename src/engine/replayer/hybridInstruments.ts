@@ -51,9 +51,21 @@ export function isReplacedInstrument(inst: InstrumentConfig, furnaceSequencer: b
 }
 
 /**
+ * Synths whose note velocity carries the tracker note volume: SoundFont and SFZ players, whose
+ * instrument files map velocity to a level curve, filter and sample layers. A lane gain would
+ * skip all three (every General MIDI chord then played at full velocity).
+ */
+export const NOTE_VELOCITY_VOLUME_SYNTH_TYPES: ReadonlySet<string> = new Set(['FluidSynth', 'Sfizz']);
+
+export function noteVolumeIsVelocity(synthType: string | undefined): boolean {
+  return synthType !== undefined && NOTE_VELOCITY_VOLUME_SYNTH_TYPES.has(synthType);
+}
+
+/**
  * A synth note's velocity from the tracker channel volume (0-64) plus the groove offset.
  * On the hybrid path the SynthEffectProcessor applies the channel volume to a per-channel
- * synth's lane level, so that note's velocity must not scale it a second time.
+ * synth's lane level, so that note's velocity must not scale it a second time; a SoundFont
+ * or SFZ player is the exception (noteVolumeIsVelocity) and keeps it in the velocity.
  */
 export function synthNoteVelocity(channelVolume: number, grooveOffset: number, volumeOnLane: boolean): number {
   const level = volumeOnLane ? 1 : channelVolume / 64;

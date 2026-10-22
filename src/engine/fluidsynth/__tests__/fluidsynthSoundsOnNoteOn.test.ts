@@ -7,8 +7,10 @@
  * the first notes were lost. ensureInitialized() also resolved before the
  * SoundFont was in.
  *
- * Runs the real FluidSynthSynthEngine against the real FluidSynth.worklet.js
- * and WASM, wiring the engine's MessagePort traffic into the processor.
+ * Runs the real FluidSynthSynthEngine (a facade over the shared
+ * FluidSynthHost) against the real FluidSynth.worklet.js and WASM, wiring the
+ * host's MessagePort traffic into the processor, and reads the dry output of
+ * the engine's own slot.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -48,13 +50,13 @@ async function render(triggerAfterEnsure: boolean): Promise<number> {
 
   g.AudioWorkletNode = class {
     port: { postMessage(m: unknown): void; onmessage: ((e: { data: unknown }) => void) | null };
-    constructor() {
+    constructor(_ctx: unknown, _name: string, options: object) {
       const node = this;
       this.port = {
         onmessage: null,
         postMessage: (m) => processor.port.onmessage?.({ data: m }),
       };
-      processor = new ProcessorClass({});
+      processor = new ProcessorClass(options);
       processor.port.postMessage = (m) => queueMicrotask(() => node.port.onmessage?.({ data: m }));
     }
     connect() {}
@@ -74,11 +76,12 @@ async function render(triggerAfterEnsure: boolean): Promise<number> {
   synth.triggerAttack('C4', undefined, 0.8);
   // Let the SoundFont load and queued notes flush.
   for (let i = 0; i < 200; i++) await new Promise((r) => setTimeout(r, 5));
+  const { FLUID_GROUPS } = await import('../FluidSynthHost');
   let peak = 0;
   for (let b = 0; b < 300; b++) {
-    const out = [[new Float32Array(128), new Float32Array(128)]];
+    const out = Array.from({ length: FLUID_GROUPS + 1 }, () => [new Float32Array(128), new Float32Array(128)]);
     processor.process([], out);
-    for (const x of out[0][0]) peak = Math.max(peak, Math.abs(x));
+    for (const x of out[synth.slot][0]) peak = Math.max(peak, Math.abs(x));
   }
   return peak;
 }

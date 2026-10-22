@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 
-const { Gain, Channel, Meter, Delay } = vi.hoisted(() => {
+const { Gain, Channel, Analyser, Delay } = vi.hoisted(() => {
   class Param { value = 0; }
   class Node {
     targets: unknown[] = [];
@@ -19,11 +19,11 @@ const { Gain, Channel, Meter, Delay } = vi.hoisted(() => {
   }
   class Gain extends Node { gain = new Param(); }
   class Channel extends Node { volume = new Param(); pan = new Param(); mute = false; }
-  class Meter extends Node {}
+  class Analyser extends Node {}
   class Delay extends Node { delayTime = new Param(); }
-  return { Gain, Channel, Meter, Delay };
+  return { Gain, Channel, Analyser, Delay };
 });
-vi.mock('tone', () => ({ Gain, Channel, Meter, Delay }));
+vi.mock('tone', () => ({ Gain, Channel, Analyser, Delay }));
 vi.mock('../../ChannelEffectsManager', () => ({ getChannelEffectsManager: () => ({ getChainInput: () => new Gain(), getChainOutput: () => new Gain() }) }));
 vi.mock('../../ChannelFilterManager', () => ({ getChannelFilterManager: () => ({ getInput: () => ({}), getOutput: () => ({}), disposeAll: () => {} }) }));
 vi.mock('../connectAudio', () => ({ connectAudio: vi.fn() }));

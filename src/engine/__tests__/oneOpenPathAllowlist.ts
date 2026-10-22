@@ -35,6 +35,7 @@ export const ALLOWED_CALLERS: readonly AllowedCaller[] = [
   { file: 'src/lib/song/songBranches.ts', fn: 'importModuleFileUnloaded', callee: 'importTrackerModule', count: 1, why: BRANCH },
   { file: 'src/lib/song/songBranches.ts', fn: 'loadSongFile', callee: 'applySong', count: 6, why: `${BRANCH}: SunVox (two shapes), MIDI, .dbx project, GoatTracker, TD-3 replace` },
   { file: 'src/lib/song/songBranches.ts', fn: 'loadSongFile', callee: 'importTrackerModule', count: 1, why: `${BRANCH}: an unknown-name file routed by header` },
+  { file: 'src/lib/song/songBranches.ts', fn: 'loadUpRoughSong', callee: 'applySong', count: 1, why: `${BRANCH}: the .uprough-song.json branch` },
   { file: 'src/lib/song/songBranches.ts', fn: 'loadV2MFile', callee: 'applySong', count: 1, why: BRANCH },
   { file: 'src/lib/song/songBranches.ts', fn: 'applyAdPlugSong', callee: 'applySong', count: 1, why: BRANCH },
 

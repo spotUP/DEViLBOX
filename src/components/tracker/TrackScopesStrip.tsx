@@ -2,7 +2,8 @@
  * TrackScopesStrip — Renoise-style per-channel mini oscilloscopes.
  * Sits between the toolbar and pattern editor.
  * Aligns with actual pattern editor channel columns via shared channelLayout.
- * Shows per-channel waveforms for WASM/Furnace, master waveform fallback for others.
+ * Shows each channel's own waveform: the WASM engine's channel or the channel's
+ * Tone strip (channelScopeSource), master waveform fallback for the rest.
  */
 
 import React, { useEffect, useRef, memo, useCallback } from 'react';
@@ -14,6 +15,7 @@ import { useMixerStore } from '@stores/useMixerStore';
 import { useThemeStore } from '@stores/useThemeStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { channelLayout, scopeCells, subscribeChannelLayout } from './channelLayout';
+import { channelScopeSource } from './channelScopeSource';
 import { useVisualizationAnimation } from '@hooks/useVisualizationAnimation';
 
 const STRIP_HEIGHT = 72;
@@ -173,9 +175,14 @@ export const TrackScopesStrip: React.FC<TrackScopesStripProps> = memo(({ channel
         ctx.lineTo(x + w, y + h / 2);
         ctx.stroke();
 
-        // Per-channel WASM oscilloscope waveform
-        if (useOsc && oscSnapshot && oscSnapshot[i] && oscSnapshot[i]!.length > 0) {
-          drawWaveform(ctx, x, y, w, h, oscSnapshot[i]!, color, false);
+        // The channel's own waveform: WASM engine channel or Tone strip
+        let stripWaveform: Float32Array | null = null;
+        if (playing) {
+          try { stripWaveform = getToneEngine().getChannelWaveform(i); } catch { /* engine not ready */ }
+        }
+        const source = channelScopeSource(useOsc ? oscSnapshot?.[i] : null, stripWaveform);
+        if (source) {
+          drawWaveform(ctx, x, y, w, h, source.data, color, source.isFloat);
         }
         // Fallback: master waveform on channels with actual audio output only
         else if (masterWaveform && masterWaveform.length > 0) {

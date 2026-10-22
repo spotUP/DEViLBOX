@@ -2,6 +2,12 @@
  * Instrument Store - Instrument Bank & Preset Management
  */
 
+import { setbfreeConfigFromNativeValues } from '@engine/setbfree/SetBfreeSynth';
+import { SETBFREE_NATIVE_FACTORY_PRESETS } from '@engine/setbfree/setbfreeNativePresets';
+import { calfMonoConfigFromNativeValues } from '@engine/calf-mono/CalfMonoSynth';
+import { CALFMONO_NATIVE_FACTORY_PRESETS } from '@engine/calf-mono/calfMonoNativePresets';
+import { talConfigFromNativeValues } from '@engine/tal-noizemaker/TalNoizeMakerSynth';
+import { TAL_NATIVE_FACTORY_PRESETS } from '@engine/tal-noizemaker/talNativePresets';
 import { adoptCz101TonesFrom } from './useCz101UserPatchStore';
 import { classifySampleEdit, propagateSampleEditToSong } from '@/lib/song/sampleEdit';
 import { keepAcrossHmr } from '@/lib/dev/keepAcrossHmr';
@@ -33,6 +39,7 @@ import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
 import { getToneEngine } from '@engine/ToneEngine';
 import { touchesToneVoice } from '@engine/tone/toneSynthKnobs';
 import { peekTrackerReplayer } from '@engine/TrackerReplayer';
+import * as OpenMPTEditBridge from '@engine/libopenmpt/OpenMPTEditBridge';
 import { recognizeCinter4Instruments } from '@engine/cinter4/cinter4Recognize';
 import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } from '@/lib/formatCompatibility';
 import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
@@ -374,9 +381,26 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     updateInstrument: (id, updates) => {
+      // A native setBfree preset is the instrument's setbfree config: the editor and later knob moves read it from there.
+      const bfreePreset = (updates as { setbfreeNativePatch?: string }).setbfreeNativePatch;
+      if (bfreePreset) {
+        const patch = SETBFREE_NATIVE_FACTORY_PRESETS.find((p) => p.name === bfreePreset);
+        if (patch) updates = { ...updates, setbfree: setbfreeConfigFromNativeValues(patch.values) };
+      }
       // Refresh the live WASM re-export (Cinter4 Shrinkler size + playback). Debounced and
       // format-gated, so no-op edits / non-Cinter songs coalesce or skip cheaply.
       triggerWasmReexport();
+      // Same for Calf Monosynth and TAL-NoiseMaker: the preset's values become instrument.calfMono / instrument.talNoizeMaker.
+      const calfPreset = (updates as { calfMonoNativePatch?: string }).calfMonoNativePatch;
+      if (calfPreset) {
+        const patch = CALFMONO_NATIVE_FACTORY_PRESETS.find((p) => p.name === calfPreset);
+        if (patch) updates = { ...updates, calfMono: calfMonoConfigFromNativeValues(patch.values) };
+      }
+      const talPreset = (updates as { talNativePatch?: string }).talNativePatch;
+      if (talPreset) {
+        const patch = TAL_NATIVE_FACTORY_PRESETS.find((p) => p.name === talPreset);
+        if (patch) updates = { ...updates, talNoizeMaker: talConfigFromNativeValues(patch.values) };
+      }
       const currentInstrument = get().instruments.find((inst) => inst.id === id);
 
       // Format compat: synth type change — deferred to export-time validation
@@ -748,17 +772,15 @@ export const useInstrumentStore = create<InstrumentStore>()(
               for (const [patchKey, method] of Object.entries(nativePatchKeyMap)) {
                 const patchName = (updates as any)[patchKey];
                 if (patchName) {
-                  // Try to load on running instance first
-                  const instruments = (engine as any).instruments as Map<number, any>;
+                  // Load on EVERY running instance: a per-channel native synth has one per tracker channel plus the
+                  // shared keyboard one, and the one that sounds is not necessarily the first in the map.
                   let loaded = false;
-                  if (instruments) {
-                    for (const [key, synth] of instruments.entries()) {
-                      if ((key >>> 16) === id && synth?.[method]) {
-                        console.log(`[InstrumentStore] Native patch: calling ${method}('${patchName}') on ${updatedInstrument.synthType} id=${id}, isInitialized=${synth.isInitialized}`);
-                        synth[method](patchName);
-                        loaded = true;
-                        break;
-                      }
+                  for (const synth of engine.instancesOf(id) as unknown as Array<Record<string, unknown>>) {
+                    const load = synth?.[method];
+                    if (typeof load === 'function') {
+                      console.log(`[InstrumentStore] Native patch: calling ${method}('${patchName}') on ${updatedInstrument.synthType} id=${id}, isInitialized=${synth.isInitialized}`);
+                      load.call(synth, patchName);
+                      loaded = true;
                     }
                   }
                   if (!loaded) {
@@ -2301,6 +2323,15 @@ export const useInstrumentStore = create<InstrumentStore>()(
   };
   })
 );
+
+// libopenmpt plays every Sampler note of a song (ToneEngine leaves them to
+// it), so a Sampler added or reloaded after the song's module was built must
+// reach that module, or its notes are silent in the pattern while the keyboard
+// plays them. The bridge skips instruments whose sample buffer is unchanged.
+useInstrumentStore.subscribe((state, prev) => {
+  if (state.instruments === prev.instruments || !OpenMPTEditBridge.isActive()) return;
+  void OpenMPTEditBridge.syncSamplerInstruments(state.instruments);
+});
 
 /**
  * Dev only: carry this store's data over a hot reload.

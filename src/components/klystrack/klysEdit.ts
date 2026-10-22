@@ -13,12 +13,29 @@ import { klysCellAt, type KlysWindow } from './klysAdapter';
 type StepField = 'note' | 'instrument' | 'ctrl' | 'volume' | 'command';
 const STEP_FIELDS: readonly string[] = ['note', 'instrument', 'ctrl', 'volume', 'command'];
 
+/**
+ * Loaded files (klysFileData) whose song was edited in the running engine. The engine's memory then holds
+ * the edits and the file bytes do not: Play loads the engine's own serialisation instead (editedModuleForPlay).
+ */
+const editedFiles = new WeakSet<ArrayBuffer>();
+
+export function markEdited(): void {
+  const file = useFormatStore.getState().klysFileData;
+  if (file) editedFiles.add(file);
+}
+
+/** True when the song loaded from `file` was edited in the engine since it was opened. */
+export function klysFileIsEdited(file: ArrayBuffer | undefined): boolean {
+  return !!file && editedFiles.has(file);
+}
+
 /** Hand one pattern step to the running engine. No engine yet: the next load reads the edited store via export. */
 function pushStep(patternIdx: number, stepIdx: number): void {
   const step = useFormatStore.getState().klysNative?.patterns[patternIdx]?.steps[stepIdx];
   if (!step) return;
   void import('@/engine/klystrack/KlysEngine').then(({ KlysEngine }) => {
     if (!KlysEngine.hasInstance()) return;
+    markEdited();
     KlysEngine.getInstance().setPatternStep(
       patternIdx, stepIdx, step.note, step.instrument, step.ctrl, step.volume,
       step.command & 0xFF, (step.command >> 8) & 0xFF,
@@ -51,6 +68,7 @@ export function klysSequenceChange(ch: number, songRow: number, field: 'pattern'
   const e = entries[pos];
   void import('@/engine/klystrack/KlysEngine').then(({ KlysEngine }) => {
     if (!KlysEngine.hasInstance()) return;
+    markEdited();
     KlysEngine.getInstance().setSequenceEntry(ch, pos, e.position, e.pattern, e.noteOffset);
   });
 }

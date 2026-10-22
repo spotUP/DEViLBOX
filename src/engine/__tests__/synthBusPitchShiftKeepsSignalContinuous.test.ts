@@ -61,7 +61,7 @@ describe('synth bus pitch shift keeps the signal continuous', () => {
   it('setSynthBusPitchRate drives the bus and lane shifters, the strips\' voice delays and the native-input delay', () => {
     const synthBusPitchShift = new FakeShift();
     const laneShift = new FakeShift();
-    const strip = (ch: number) => [ch, { input: new FakeGain(), voiceDelay: { delayTime: { value: 0 } }, join: new FakeGain(), channel: new FakeGain(), meter: new FakeGain() }] as const;
+    const strip = (ch: number) => [ch, { input: new FakeGain(), voiceDelay: { delayTime: { value: 0 } }, join: new FakeGain(), channel: new FakeGain(), scope: new FakeGain(), rms: 0 }] as const;
     const channelOutputs = new Map([strip(0), strip(1), strip(2)]);
     const engine = Object.assign(Object.create(ToneEngine.prototype), {
       synthBus: new FakeGain(),
