@@ -4,6 +4,10 @@
 
 import { setbfreeConfigFromNativeValues } from '@engine/setbfree/SetBfreeSynth';
 import { SETBFREE_NATIVE_FACTORY_PRESETS } from '@engine/setbfree/setbfreeNativePresets';
+import { calfMonoConfigFromNativeValues } from '@engine/calf-mono/CalfMonoSynth';
+import { CALFMONO_NATIVE_FACTORY_PRESETS } from '@engine/calf-mono/calfMonoNativePresets';
+import { talConfigFromNativeValues } from '@engine/tal-noizemaker/TalNoizeMakerSynth';
+import { TAL_NATIVE_FACTORY_PRESETS } from '@engine/tal-noizemaker/talNativePresets';
 import { adoptCz101TonesFrom } from './useCz101UserPatchStore';
 import { classifySampleEdit, propagateSampleEditToSong } from '@/lib/song/sampleEdit';
 import { keepAcrossHmr } from '@/lib/dev/keepAcrossHmr';
@@ -386,6 +390,17 @@ export const useInstrumentStore = create<InstrumentStore>()(
       // Refresh the live WASM re-export (Cinter4 Shrinkler size + playback). Debounced and
       // format-gated, so no-op edits / non-Cinter songs coalesce or skip cheaply.
       triggerWasmReexport();
+      // Same for Calf Monosynth and TAL-NoiseMaker: the preset's values become instrument.calfMono / instrument.talNoizeMaker.
+      const calfPreset = (updates as { calfMonoNativePatch?: string }).calfMonoNativePatch;
+      if (calfPreset) {
+        const patch = CALFMONO_NATIVE_FACTORY_PRESETS.find((p) => p.name === calfPreset);
+        if (patch) updates = { ...updates, calfMono: calfMonoConfigFromNativeValues(patch.values) };
+      }
+      const talPreset = (updates as { talNativePatch?: string }).talNativePatch;
+      if (talPreset) {
+        const patch = TAL_NATIVE_FACTORY_PRESETS.find((p) => p.name === talPreset);
+        if (patch) updates = { ...updates, talNoizeMaker: talConfigFromNativeValues(patch.values) };
+      }
       const currentInstrument = get().instruments.find((inst) => inst.id === id);
 
       // Format compat: synth type change — deferred to export-time validation
