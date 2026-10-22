@@ -1,5 +1,6 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vitest/config';
+import { testCpuLimits } from '../../vitest.limits';
 import path from 'path';
 
 // Dedicated Vitest config for Furnace lock-step tests. They shell out to
@@ -7,6 +8,7 @@ import path from 'path';
 // locally (not in push-gated CI).
 export default defineConfig({
   test: {
+    ...testCpuLimits(),
     include: ['tools/furnace-audit/*.test.ts'],
     environment: 'node',
     testTimeout: 120000,

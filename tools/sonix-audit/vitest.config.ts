@@ -1,5 +1,6 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vitest/config';
+import { testCpuLimits } from '../../vitest.limits';
 
 // Dedicated Vitest config for the Sonix C-port lock-step audit. It shells out
 // to a C compiler to build the native harness (render-native.c) and renders a
@@ -7,6 +8,7 @@ import { defineConfig } from 'vitest/config';
 // furnace-audit pattern. Run with: npm run test:sonix
 export default defineConfig({
   test: {
+    ...testCpuLimits(),
     include: ['tools/sonix-audit/*.test.ts'],
     environment: 'node',
     testTimeout: 120000,
