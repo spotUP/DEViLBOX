@@ -12,6 +12,8 @@ export const NOTE_TRIGGER_LOG_CAP = 512;
 export interface NoteTriggerLogEntry {
   t: number;
   audioTime: number | null;
+  /** Audio-clock time the caller asked the note to start at; null when the entry point takes none. */
+  scheduledTime: number | null;
   source: string;
   instrumentId: number;
   note: string;
@@ -41,10 +43,11 @@ function audioNow(): number | null {
   }
 }
 
-export function recordNoteTrigger(source: string, instrumentId: number, note: string, channel?: number): void {
+export function recordNoteTrigger(source: string, instrumentId: number, note: string, channel?: number, scheduledTime?: number): void {
   entries.push({
     t: performance.now(),
     audioTime: audioNow(),
+    scheduledTime: scheduledTime ?? null,
     source,
     instrumentId,
     note,

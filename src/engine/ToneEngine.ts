@@ -291,7 +291,7 @@ export class ToneEngine {
   private _manualSynthGainDb: number = 0;
   /** Pending restore of the tail-kill mute set by stop(); null when none. */
   private _stopTailMuteTimer: ReturnType<typeof setTimeout> | null = null;
-  private _masterVolumeDb: number = -6;   // tracks intended master volume (avoids race in stop())
+  private _masterVolumeDb: number = 0;   // tracks intended master volume (avoids race in stop()); the master channel starts at it
   private _djModeActive = false;          // when true, masterChannel stays muted to prevent echo
 
   // Native AudioContext — owned by DEViLBOX, shared with Tone.js via Tone.setContext()
@@ -460,6 +460,8 @@ export class ToneEngine {
   private releaseRestoreTimeouts: Map<number, ReturnType<typeof setTimeout>> = new Map();
   /** dB level a pending release fade must return to; captured by the first release only, never mid-fade. */
   private releaseRestoreVolumeDb: Map<number, number> = new Map();
+  /** Ends a pending release fade now: puts the instrument back at its level and drops the timer. */
+  private releaseRestores: Map<number, () => void> = new Map();
 
   // Guard against concurrent preloadInstruments calls
   private preloadGeneration = 0;
@@ -508,7 +510,7 @@ export class ToneEngine {
     // Master output channel with volume/pan control
     // channelCount: 2 required to preserve stereo (default is 1 = mono downmix!)
     this.masterChannel = new Tone.Channel({
-      volume: 0,
+      volume: this._masterVolumeDb,
       pan: 0,
       channelCount: 2,
     }).toDestination();
@@ -1669,6 +1671,7 @@ export class ToneEngine {
     }
 
     this.endStopTailMute();
+    this.endReleaseFades();
     this._isPlaying = true;
     this._notifyNoiseEffectsPlaying(true);
     Tone.getTransport().start();
@@ -1731,6 +1734,15 @@ export class ToneEngine {
   }
 
   /**
+   * Ends every pending releaseAll fade at once, so playback that starts inside the 100 ms restore window
+   * plays at the instrument's level. Play Song stops the engine and starts again 60 ms later: without this
+   * the first notes landed on an instrument still held at -Infinity ("weaker, missing attack").
+   */
+  private endReleaseFades(): void {
+    for (const restore of [...this.releaseRestores.values()]) restore();
+  }
+
+  /**
    * End the tail-kill mute that stop() puts on the master channel.
    *
    * The mute exists to cut delay/reverb tails of the playback that just
@@ -1764,7 +1776,7 @@ export class ToneEngine {
     void import('../stores/useTransportStore').then(({ useTransportStore }) => {
       let last = useTransportStore.getState().isPlaying;
       const apply = (playing: boolean) => {
-        if (playing) this.endStopTailMute();
+        if (playing) { this.endStopTailMute(); this.endReleaseFades(); }
         this._isPlaying = playing;
         this._notifyNoiseEffectsPlaying(playing);
       };
@@ -3969,7 +3981,7 @@ export class ToneEngine {
     nnaAction: number = 0,  // IT New Note Action: 0=Cut, 1=Cont, 2=Off, 3=Fade
     hammer?: boolean        // TT-303 hammer: legato without pitch glide
   ): void {
-    recordNoteTrigger('triggerNote', instrumentId, note, channelIndex);
+    recordNoteTrigger('triggerNote', instrumentId, note, channelIndex, time);
     velocity = keyboardVelocity(config.metadata?.modPlayback, velocity, this.amigaPeriodSong, period);
     period = keyboardPeriod(config.metadata?.modPlayback, note, this.amigaPeriodSong, period);
     const safeTime = this.getSafeTime(time);
@@ -4609,9 +4621,11 @@ export class ToneEngine {
           if (prevTimeout) clearTimeout(prevTimeout);
           // Restore volume after fade for next playback
           this.releaseRestoreVolumeDb.set(key, currentVolume);
-          const timeout = setTimeout(() => {
+          const restore = () => {
+            clearTimeout(this.releaseRestoreTimeouts.get(key));
             this.releaseRestoreTimeouts.delete(key);
             this.releaseRestoreVolumeDb.delete(key);
+            this.releaseRestores.delete(key);
             try {
               if (instAny.volume) {
                 instAny.volume.value = currentVolume;
@@ -4619,8 +4633,9 @@ export class ToneEngine {
             } catch {
               // Instrument may be disposed
             }
-          }, 100);
-          this.releaseRestoreTimeouts.set(key, timeout);
+          };
+          this.releaseRestoreTimeouts.set(key, setTimeout(restore, 100));
+          this.releaseRestores.set(key, restore);
         } else if (isDevilboxSynth(instrument)) {
           // DevilboxSynths without .volume: ramp native GainNode to silence
           const outputGain = (instrument.output as GainNode).gain;
@@ -4632,8 +4647,19 @@ export class ToneEngine {
           // the restore goes back to that level, never to unity.
           const timeout = fadeOutThenRestoreInstrumentOutput(instrument, outputGain, now, () => {
             this.releaseRestoreTimeouts.delete(key);
+            this.releaseRestores.delete(key);
           });
           this.releaseRestoreTimeouts.set(key, timeout);
+          this.releaseRestores.set(key, () => {
+            clearTimeout(timeout);
+            this.releaseRestoreTimeouts.delete(key);
+            this.releaseRestores.delete(key);
+            try {
+              restoreInstrumentOutputGain(instrument, outputGain);
+            } catch {
+              // Instrument may be disposed
+            }
+          });
         }
       } catch (e) {
         console.warn(`[ToneEngine] Error releasing instrument ${key}:`, e);
@@ -4774,6 +4800,7 @@ export class ToneEngine {
     this.releaseRestoreTimeouts.forEach((timeout) => clearTimeout(timeout));
     this.releaseRestoreTimeouts.clear();
     this.releaseRestoreVolumeDb.clear();
+    this.releaseRestores.clear();
     this.instrumentOutputOverrides.clear();
     this._sunvoxOutputConnected = false;
     clearConnectedNativeOutputs();
