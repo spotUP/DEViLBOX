@@ -71,4 +71,29 @@ describe('a play builds the channel isolation slots once', () => {
     await flush();
     expect(scheduleWasmEffectRebuild).toHaveBeenCalledTimes(1);
   });
+
+  // The first notes of every Play stuttered (2026-10-23): an 'enableOsc' posted 150 ms into the
+  // play made the worklet parse the module once per channel on the audio thread while the song
+  // was audible. The worklet now builds the scopes inside the paused 'load'
+  // (firstNotesOfPlayDoNotStall.test.ts).
+  it('the first notes of a Play: no scope build is asked for while the song plays', async () => {
+    const sent: string[] = [];
+    engine.workletNode.port.postMessage = (m) => { sent.push((m as { cmd: string }).cmd); };
+    engine.play();
+    engine.handleMessage({ data: { cmd: 'playReady' } });
+    await flush();
+    vi.advanceTimersByTime(1500);
+    await flush();
+    expect(sent).toContain('unpause');
+    expect(sent).not.toContain('enableOsc');
+  });
+
+  it('a worklet without the paused load is still asked for its scopes by the backstop', async () => {
+    const sent: string[] = [];
+    engine.workletNode.port.postMessage = (m) => { sent.push((m as { cmd: string }).cmd); };
+    engine.play();
+    vi.advanceTimersByTime(1500);
+    await flush();
+    expect(sent).toEqual(expect.arrayContaining(['play', 'enableOsc']));
+  });
 });
