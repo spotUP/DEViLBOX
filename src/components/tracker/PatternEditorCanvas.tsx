@@ -46,6 +46,7 @@ import { getTrackerReplayer } from '@engine/TrackerReplayer';
 import { getTrackerScratchController } from '@engine/TrackerScratchController';
 import { getFormatPlaybackState, getClockPosition } from '@engine/FormatPlaybackState';
 import * as Tone from 'tone';
+import { heardContextTime } from '@engine/audioLatency';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { getEffectiveSmoothScrolling } from '@stores/effectiveSmoothScrolling';
 import type { CursorPosition } from '@typedefs';
@@ -2342,7 +2343,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             if (ss) { playRow = ss.row; playPatIdx = ss.pattern; smoothOffset = ss.smoothOffset; }
           } else {
             const replayer = getTrackerReplayer();
-            const audioTime = Tone.now() + 0.01;
+            const audioTime = heardContextTime(Tone.getContext().rawContext as AudioContext);
             const audioState = replayer.getStateAtTime(audioTime);
             if (audioState) {
               playRow = audioState.row;
@@ -2795,7 +2796,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           }
         } else {
           const replayer  = getTrackerReplayer();
-          const audioTime = Tone.now() + 0.01;
+          const audioTime = heardContextTime(Tone.getContext().rawContext as AudioContext);
           const audioState = replayer.getStateAtTime(audioTime);
 
           if (audioState) {
