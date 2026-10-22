@@ -117,11 +117,11 @@ function warmUpLibopenmpt() {
 //
 // Maximum number of isolation slots for per-channel effect routing.
 // Output 0 = main mix, outputs 1..MAX = isolation slots.
-const MAX_ISOLATION_SLOTS = 4
+const MAX_ISOLATION_SLOTS = 16
 // Per-channel dub sends — lazily allocated secondary instances that solo
 // one channel each and render into output[DUB_OUTPUT_BASE + ch].
 // Must match DUB_OUTPUT_BASE + MAX_DUB_CHANNELS in ChannelRoutedEffects.ts.
-const DUB_OUTPUT_BASE = 5
+const DUB_OUTPUT_BASE = 1 + MAX_ISOLATION_SLOTS
 const MAX_DUB_CHANNELS = 32
 // Per-channel oscilloscope instances: each is a full module copy rendered every quantum.
 const MAX_OSC_CHANNELS = 32

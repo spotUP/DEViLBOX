@@ -30,6 +30,7 @@ import { getMixerStoreRefOrNull, getTrackerStoreRef } from '@stores/storeAccess'
 import { useDubStore } from '@stores/useDubStore';
 import { effectiveDubSend } from '@/lib/dub/sendAudibility';
 import { connectAudio } from './connectAudio';
+import { DUB_OUTPUT_BASE, registerDubOutputBase, dubOutputBaseOf } from './dubOutputBase';
 // Type-only: erased at build time, so it adds no edge to the module graph.
 import type { MixerChannelState } from '@stores/useMixerStore';
 import type { ChannelShapeKind } from '@/lib/dub/channelShape';
@@ -54,8 +55,61 @@ export const DUB_SEND_RAMP_SEC = 0.02;
  */
 export const DUB_SEND_SEED_RAMP_SEC = 0.6;
 
-/** First worklet output index dedicated to per-channel dub sends. */
-export const DUB_OUTPUT_BASE = 5;
+/** First worklet output index dedicated to per-channel dub sends (default; see dubOutputBase.ts). */
+export { DUB_OUTPUT_BASE, registerDubOutputBase, dubOutputBaseOf };
+
+/** Isolation slots an engine offers when it does not say (UADE, Hively, Furnace...). */
+const DEFAULT_ISOLATION_SLOTS = 4;
+
+/** One isolation slot to build: the channels it renders and the chain they share. */
+export interface PlannedIsolationSlot {
+  channels: number[];
+  channelMask: number;
+  /** Enabled mixer inserts (the channel strip already runs these). */
+  inserts: EffectConfig[];
+  /** Enabled master effects aimed at the channels. */
+  routed: EffectConfig[];
+}
+
+/**
+ * Which isolation slots a set of channel effects needs.
+ *
+ * A channel with enabled inserts keeps a slot of its own (inserts, then its
+ * routed effects). Channels with no inserts and the same enabled routed
+ * effects (same ids, same order) share one slot: a master effect aimed at a
+ * channel subset is an effect on the SUM of those channels, so one instance on
+ * one slot is the right semantics and costs one libopenmpt module however many
+ * channels it covers. Before this each channel took a slot and only the first
+ * four had an effect ("Ambient Delay only works on 4 channels").
+ */
+export function planIsolationSlots(
+  channelEffects: ReadonlyMap<number, EffectConfig[]>,
+  routedEffects: ReadonlyMap<number, EffectConfig[]>,
+): PlannedIsolationSlot[] {
+  const plan: PlannedIsolationSlot[] = [];
+  const shared = new Map<string, PlannedIsolationSlot>();
+  for (const channelIndex of new Set([...channelEffects.keys(), ...routedEffects.keys()])) {
+    const inserts = (channelEffects.get(channelIndex) ?? []).filter(e => e.enabled);
+    const routed = (routedEffects.get(channelIndex) ?? []).filter(e => e.enabled);
+    if (inserts.length + routed.length === 0) continue;
+    const bit = 1 << channelIndex;
+    if (inserts.length > 0) {
+      plan.push({ channels: [channelIndex], channelMask: bit, inserts, routed });
+      continue;
+    }
+    const key = routed.map(e => e.id).join('\u0000');
+    const group = shared.get(key);
+    if (group) {
+      group.channels.push(channelIndex);
+      group.channelMask |= bit;
+    } else {
+      const slot: PlannedIsolationSlot = { channels: [channelIndex], channelMask: bit, inserts: [], routed };
+      shared.set(key, slot);
+      plan.push(slot);
+    }
+  }
+  return plan;
+}
 
 /**
  * The enable/disable message every engine's worklet understands.
@@ -104,6 +158,8 @@ export interface IsolationCapableEngine {
    * in C.
    */
   supportsIsolationSlots?(): boolean;
+  /** How many isolation slots (worklet outputs 1..N) the engine has. Absent means 4. */
+  maxIsolationSlots?(): number;
   addIsolation(slotIndex: number, channelMask: number): void;
   removeIsolation(slotIndex: number): void;
   diagIsolation?(): void;
@@ -131,7 +187,7 @@ export type ChannelStripRouter = (channelIndex: number, destination: AudioNode |
 type DubActivation = 'wired' | 'unavailable' | 'fallback' | 'cancelled';
 
 export class ChannelRoutedEffectsManager {
-  private slots: (IsolationSlot | null)[] = [null, null, null, null];
+  private slots: (IsolationSlot | null)[] = [];
   private masterEffectsInput: Tone.Gain;
 
   /**
@@ -271,7 +327,7 @@ export class ChannelRoutedEffectsManager {
         if (tap.slotIndex < 0) {
           // Copy tap: close the output unless the channel's dub send still uses it.
           if (tap.worklet) {
-            try { tap.worklet.disconnect(tap.outputGain, DUB_OUTPUT_BASE + channelIndex); } catch { /* */ }
+            try { tap.worklet.disconnect(tap.outputGain, dubOutputBaseOf(tap.worklet) + channelIndex); } catch { /* */ }
             if (!this.dubLifecycle.isDesired(channelIndex)) {
               tap.worklet.port.postMessage(dubChannelMessage('dubChannelDisable', channelIndex));
             }
@@ -302,7 +358,7 @@ export class ChannelRoutedEffectsManager {
     for (const tap of this.sidechainTaps.values()) usedSlots.add(tap.slotIndex);
 
     let freeSlot = -1;
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < (engine.maxIsolationSlots?.() ?? DEFAULT_ISOLATION_SLOTS); i++) {
       if (!usedSlots.has(i)) { freeSlot = i; break; }
     }
     if (freeSlot < 0) {
@@ -368,11 +424,11 @@ export class ChannelRoutedEffectsManager {
     const workletNode = engine.getWorkletNode();
     const audioContext = engine.getAudioContext();
     if (!workletNode || !audioContext) return false;
-    if (DUB_OUTPUT_BASE + channelIndex >= workletNode.numberOfOutputs) return false;
+    if (dubOutputBaseOf(workletNode) + channelIndex >= workletNode.numberOfOutputs) return false;
 
     const outputGain = audioContext.createGain();
     try {
-      workletNode.connect(outputGain, DUB_OUTPUT_BASE + channelIndex);
+      workletNode.connect(outputGain, dubOutputBaseOf(workletNode) + channelIndex);
     } catch (e) {
       console.warn('[ChannelRoutedEffects] Sidechain copy tap connect failed:', e);
       return false;
@@ -382,7 +438,7 @@ export class ChannelRoutedEffectsManager {
       try { outputGain.connect(node); } catch { /* */ }
     }
     this.sidechainTaps.set(channelIndex, { slotIndex: -1, outputGain, worklet: workletNode });
-    console.log(`[ChannelRoutedEffects] Sidechain key: ch${channelIndex + 1} copy output ${DUB_OUTPUT_BASE + channelIndex}`);
+    console.log(`[ChannelRoutedEffects] Sidechain key: ch${channelIndex + 1} copy output ${dubOutputBaseOf(workletNode) + channelIndex}`);
     return true;
   }
 
@@ -713,12 +769,12 @@ export class ChannelRoutedEffectsManager {
     // postMessage reaches any engine without branching per-engine here.
     // Engines declare only the dub outputs their voices can fill (each costs
     // audio-thread time, connected or not); a channel beyond them has no send.
-    if (DUB_OUTPUT_BASE + channelIndex >= worklet.numberOfOutputs) return 'unavailable';
+    if (dubOutputBaseOf(worklet) + channelIndex >= worklet.numberOfOutputs) return 'unavailable';
     worklet.port.postMessage(dubChannelMessage('dubChannelEnable', channelIndex));
     try {
-      worklet.connect(gain, DUB_OUTPUT_BASE + channelIndex);
+      worklet.connect(gain, dubOutputBaseOf(worklet) + channelIndex);
     } catch (e) {
-      console.warn(`[ChannelRoutedEffects] Failed to connect worklet output ${DUB_OUTPUT_BASE + channelIndex}:`, e);
+      console.warn(`[ChannelRoutedEffects] Failed to connect worklet output ${dubOutputBaseOf(worklet) + channelIndex}:`, e);
       return 'unavailable';
     }
     this.channelDubPendingActivation.delete(channelIndex);
@@ -781,7 +837,7 @@ export class ChannelRoutedEffectsManager {
       if ((this.sidechainTaps.get(channelIndex)?.slotIndex ?? 0) >= 0) {
         worklet.port.postMessage(dubChannelMessage('dubChannelDisable', channelIndex));
       }
-      try { worklet.disconnect(gain, DUB_OUTPUT_BASE + channelIndex); } catch { /* ok */ }
+      try { worklet.disconnect(gain, dubOutputBaseOf(worklet) + channelIndex); } catch { /* ok */ }
     }
     await this._tapStrip(channelIndex, null);
 
@@ -877,15 +933,15 @@ export class ChannelRoutedEffectsManager {
 
     for (let ch = 0; ch < MAX_DUB_CHANNELS; ch++) {
       if (this.effectiveDubSendOf(ch) <= 0) continue;
-      if (DUB_OUTPUT_BASE + ch >= worklet.numberOfOutputs) continue;
+      if (dubOutputBaseOf(worklet) + ch >= worklet.numberOfOutputs) continue;
       const gain = this._ensureDubChannel(ch);
       if (!gain) continue;
       // Fire enable + reconnect. Safe to disconnect first even if not
       // currently connected (try/catch eats the error).
       worklet.port.postMessage(dubChannelMessage('dubChannelEnable', ch));
-      try { worklet.disconnect(gain, DUB_OUTPUT_BASE + ch); } catch { /* first-time */ }
+      try { worklet.disconnect(gain, dubOutputBaseOf(worklet) + ch); } catch { /* first-time */ }
       try {
-        worklet.connect(gain, DUB_OUTPUT_BASE + ch);
+        worklet.connect(gain, dubOutputBaseOf(worklet) + ch);
         this.dubLifecycle.setDesired(ch, true);
         this.dubLifecycle.finish(ch, true);
         // Re-register with DubBus (channelTaps map is cleared on bus dispose)
@@ -975,18 +1031,19 @@ export class ChannelRoutedEffectsManager {
     // SidechainCompressor ignored its source channel and keyed on the channel
     // it sat on - "routing it to a channel kills it" (2026-09-29).
     const sidechainWiring: Array<{ node: Tone.ToneAudioNode; source: number }> = [];
-    const channels = [...new Set([...channelEffects.keys(), ...routedEffects.keys()])];
-    for (const channelIndex of channels) {
-      if (slotIdx >= 4) {
-        console.warn('[ChannelRoutedEffects] Only 4 isolation slots available, skipping remaining channels');
-        break;
-      }
-
-      const enabledInserts = (channelEffects.get(channelIndex) ?? []).filter(e => e.enabled);
-      const enabledEffects = [...enabledInserts, ...(routedEffects.get(channelIndex) ?? []).filter(e => e.enabled)];
-      if (enabledEffects.length === 0) continue;
-
-      const channelMask = 1 << channelIndex;
+    // Sidechain taps take free slots after the effects, so leave room for the
+    // ones already asked for.
+    const capacity = (engine.maxIsolationSlots?.() ?? DEFAULT_ISOLATION_SLOTS) - this.sidechainConsumers.size;
+    const plan = planIsolationSlots(channelEffects, routedEffects);
+    if (plan.length > capacity) {
+      const dropped = plan.slice(Math.max(capacity, 0)).flatMap(p => p.channels).map(c => `ch${c + 1}`);
+      console.warn(`[ChannelRoutedEffects] Only ${Math.max(capacity, 0)} isolation slots available, no effects on ${dropped.join(', ')}`);
+    }
+    for (const planned of plan.slice(0, Math.max(capacity, 0))) {
+      const { channelMask } = planned;
+      const channelIndex = planned.channels[0];
+      const enabledInserts = planned.inserts;
+      const enabledEffects = [...planned.inserts, ...planned.routed];
 
       // Tell worklet to create isolation module for this channel
       engine.addIsolation(slotIdx, channelMask);
@@ -1056,12 +1113,12 @@ export class ChannelRoutedEffectsManager {
         stripJunction = audioContext.createGain();
         stripJunction.gain.value = 1;
         connectAudio(stripJunction, effectNodes[insertNodeCount]);
-        this.stripRouter(channelIndex, stripJunction);
+        for (const ch of planned.channels) this.stripRouter(ch, stripJunction);
       }
 
       this.slots[slotIdx] = {
         slotIndex: slotIdx,
-        channels: [channelIndex],
+        channels: planned.channels,
         channelMask,
         effectConfigs: enabledEffects,
         effectNodes,
@@ -1069,7 +1126,7 @@ export class ChannelRoutedEffectsManager {
         stripJunction,
       };
 
-      console.log(`[ChannelRoutedEffects] Slot ${slotIdx}: ch${channelIndex + 1} → ${enabledEffects.map(e => e.type).join(' → ')} (mask=0x${channelMask.toString(16)}) via worklet output[${outputIndex}]`);
+      console.log(`[ChannelRoutedEffects] Slot ${slotIdx}: ch${planned.channels.map(c => c + 1).join('+')} → ${enabledEffects.map(e => e.type).join(' → ')} (mask=0x${channelMask.toString(16)}) via worklet output[${outputIndex}]`);
       slotIdx++;
     }
 
@@ -1143,21 +1200,15 @@ export class ChannelRoutedEffectsManager {
     routedEffects: ReadonlyMap<number, EffectConfig[]>,
   ): boolean {
     if (this.slotsWorklet !== workletNode || this.sidechainTaps.size > 0 || this.sidechainConsumers.size > 0) return false;
-    const wanted: Array<{ channelIndex: number; effects: EffectConfig[] }> = [];
-    for (const channelIndex of new Set([...channelEffects.keys(), ...routedEffects.keys()])) {
-      const effects = [
-        ...(channelEffects.get(channelIndex) ?? []).filter(e => e.enabled),
-        ...(routedEffects.get(channelIndex) ?? []).filter(e => e.enabled),
-      ];
-      if (effects.length > 0) wanted.push({ channelIndex, effects });
-    }
+    const wanted = planIsolationSlots(channelEffects, routedEffects);
     const built = this.slots.filter((s): s is IsolationSlot => s !== null);
     if (wanted.length === 0 || built.length !== wanted.length) return false;
     for (const [i, w] of wanted.entries()) {
       const slot = this.slots[i];
-      if (!slot || slot.channels.length !== 1 || slot.channels[0] !== w.channelIndex) return false;
-      if (w.effects.some(e => e.sidechainSource !== undefined || e.parameters?.sidechainSource !== undefined)) return false;
-      if (JSON.stringify(slot.effectConfigs) !== JSON.stringify(w.effects)) return false;
+      const effects = [...w.inserts, ...w.routed];
+      if (!slot || slot.channelMask !== w.channelMask) return false;
+      if (effects.some(e => e.sidechainSource !== undefined || e.parameters?.sidechainSource !== undefined)) return false;
+      if (JSON.stringify(slot.effectConfigs) !== JSON.stringify(effects)) return false;
     }
     for (const slot of built) engine.addIsolation(slot.slotIndex, slot.channelMask);
     return true;
@@ -1195,7 +1246,7 @@ export class ChannelRoutedEffectsManager {
       if (tap.slotIndex < 0) {
         // Copy tap: unhook it from the worklet; its output stays enabled for
         // the rebuild that follows (or for the channel's dub send).
-        try { tap.worklet?.disconnect(tap.outputGain, DUB_OUTPUT_BASE + channelIndex); } catch { /* */ }
+        try { tap.worklet?.disconnect(tap.outputGain, dubOutputBaseOf(tap.worklet) + channelIndex); } catch { /* */ }
       } else if (engine) {
         engine.removeIsolation(tap.slotIndex);
       }
