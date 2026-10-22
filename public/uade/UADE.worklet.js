@@ -2699,6 +2699,7 @@ class UADEProcessor extends AudioWorkletProcessor {
         }
       }
 
+      let levelsDue = false;
       // Post at ~20Hz (every ~50ms), not every render call
       if (currentTime - this._lastChannelPost > 0.05) {
         const channels = [];
@@ -2727,21 +2728,32 @@ class UADEProcessor extends AudioWorkletProcessor {
         // one the block its count moves (below).
         this._postPosition(currentTime, totalFrames);
 
-        // Post per-channel VU levels derived from Paula volume registers
-        const levels = new Float32Array(4);
-        for (let i = 0; i < 4; i++) {
-          levels[i] = channels[i].dma ? channels[i].volume / 64.0 : 0;
-        }
+        this._lastChannelPost = currentTime;
+        levelsDue = true;
+      }
+
+      // Channel meters: posted at the 20 Hz cadence and also the block a note
+      // starts in, so the meter feed can show each note when that block is heard.
+      // At 20 Hz alone a note reached the meters up to 50 ms (25 ms on average)
+      // after the block that started it, the lag the playhead had before it was
+      // posted per player tick. Levels come from the Paula volume registers.
+      let noteStarts = null;
+      if (this._wasm._uade_wasm_get_note_start_counts) {
+        if (this._noteStartBuf === undefined) this._noteStartBuf = this._wasm._malloc(16);
         // Cumulative note starts per channel, counted by the core on every player
         // tick with the same detector the pattern grid uses.
-        let noteStarts = null;
-        if (this._wasm._uade_wasm_get_note_start_counts) {
-          this._wasm._uade_wasm_get_note_start_counts(this._channelBuf);
-          noteStarts = Array.from(new Uint32Array(this._wasm.HEAPU8.buffer, this._channelBuf, 4));
+        this._wasm._uade_wasm_get_note_start_counts(this._noteStartBuf);
+        noteStarts = Array.from(new Uint32Array(this._wasm.HEAPU8.buffer, this._noteStartBuf, 4));
+        const prev = this._lastPostedNoteStarts;
+        if (!prev || noteStarts.some((n, i) => n !== prev[i])) levelsDue = true;
+      }
+      if (levelsDue) {
+        const levels = new Float32Array(4);
+        for (let i = 0; i < 4; i++) {
+          levels[i] = snap[i * 4 + 2] ? snap[i * 4 + 1] / 64.0 : 0;
         }
         this.port.postMessage({ type: 'chLevels', levels, noteStarts, audioTime: currentTime });
-
-        this._lastChannelPost = currentTime;
+        this._lastPostedNoteStarts = noteStarts;
       }
 
       // Live tick capture: drain tick snapshot ring buffer every ~500ms

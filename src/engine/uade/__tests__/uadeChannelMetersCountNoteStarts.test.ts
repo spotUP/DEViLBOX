@@ -35,4 +35,28 @@ describe('UADE channel meters', { timeout: 120_000 }, () => {
     expect(counted[2]).toBeGreaterThan(byLevel[2]);
     expect(counted.reduce((a, b) => a + b, 0)).toBeGreaterThan(byLevel.reduce((a, b) => a + b, 0));
   });
+
+  it('post the block a note starts in, not the next 20 Hz report', async () => {
+    const { proc, send, posted } = await startWorklet('uade', 'UADE', async (c) => (await import('@/engine/uade/UADEEngine')).uadeTransform(c), 'UADE', true);
+    await send({ type: 'load', buffer: songBuffer('public/data/songs/fashion-tracker/ivory tover ii.ex'), filenameHint: 'ex.ivory tover ii', skipScan: true, subsong: 0 });
+    await send({ type: 'play' });
+    const wasm = (proc as unknown as { _wasm: { _malloc(n: number): number; _uade_wasm_get_note_start_counts(p: number): void; HEAPU8: Uint8Array } })._wasm;
+    const buf = wasm._malloc(16);
+    let prev = [0, 0, 0, 0]; let starts = 0;
+    for (let q = 0; q < (48000 * 20) / 128; q++) {
+      (globalThis as { __workletClock?: number }).__workletClock = (q * 128) / 48000;
+      proc.process([], stereoOutputs(37));
+      wasm._uade_wasm_get_note_start_counts(buf);
+      const now = Array.from(new Uint32Array(wasm.HEAPU8.buffer, buf, 4));
+      const reports = posted.splice(0).filter((m) => (m as { type?: string }).type === 'chLevels') as { noteStarts?: number[] }[];
+      if (now.some((n, i) => n !== prev[i])) {
+        starts++;
+        // The count the core reached this block is posted this block.
+        expect(reports.map((m) => m.noteStarts)).toContainEqual(now);
+      }
+      prev = now;
+    }
+    // Sparse opening: channel 3 only starts its run of notes after 15 s.
+    expect(starts).toBeGreaterThan(10);
+  });
 });
