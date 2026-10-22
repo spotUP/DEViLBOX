@@ -19,6 +19,12 @@ import { ChannelMeterFeed } from '../tone/channelMeterFeed';
 
 const meterFeed = new ChannelMeterFeed();
 
+/** Seconds from the destination to the speakers (outputLatency, else baseLatency). */
+function outputLatencyOf(ctx: AudioContext): number {
+  const c = ctx as unknown as { outputLatency?: number; baseLatency?: number };
+  return c.outputLatency ?? c.baseLatency ?? 0;
+}
+
 /** Highest pattern note number libopenmpt reports for a played note (254 and 255 are cut and off). */
 const MAX_PLAYED_NOTE = 120;
 
@@ -203,8 +209,11 @@ export class LibopenmptEngine {
         // channel that is still sounding moves it by less than any jump threshold.
         if (chState) countRowNoteStarts(this._noteStarts, chState as ArrayLike<number>);
         if (chLevels) {
-          // Levels go to the level feed; note starts to the note feed
-          meterFeed.report(chLevels, this._noteStarts);
+          // Levels go to the level feed; note starts to the note feed. Held
+          // until this row is heard: audioTime is when the worklet's output
+          // reaches the destination, the output latency is the rest.
+          const rawCtx = this.output.context as AudioContext;
+          meterFeed.reportAt(chLevels, this._noteStarts, (audioTime ?? rawCtx.currentTime) + outputLatencyOf(rawCtx), rawCtx.currentTime);
         }
         if (chState && this._onChannelState) {
           const arr = chState as Float64Array;
@@ -223,10 +232,7 @@ export class LibopenmptEngine {
             });
           }
           const rawCtx = this.output.context as AudioContext;
-          const latency = (rawCtx as unknown as { outputLatency?: number; baseLatency?: number }).outputLatency
-            ?? (rawCtx as unknown as { baseLatency?: number }).baseLatency
-            ?? 0;
-          const time = rawCtx.currentTime + latency;
+          const time = rawCtx.currentTime + outputLatencyOf(rawCtx);
           this._onChannelState(state, time);
         }
         break;
@@ -342,6 +348,7 @@ export class LibopenmptEngine {
   /** Load a module file (raw binary) into the worklet. */
   async loadTune(data: ArrayBuffer): Promise<void> {
     this._noteStarts = [];
+    meterFeed.clearHeld();
     if (!this._available || !this.workletNode) {
       throw new Error('LibopenmptEngine not available');
     }
@@ -474,6 +481,7 @@ export class LibopenmptEngine {
     // The worklet's stop destroys its slot modules; the effects stay (ChannelRoutedEffects).
     this._isolationSlotMasks.fill(null);
     this._clearIsolationBackstop();
+    meterFeed.clearHeld();
     useOscilloscopeStore.getState().clear();
     // Immediately mute output to prevent audio leaking while the async
     // stop message is processed by the worklet thread.

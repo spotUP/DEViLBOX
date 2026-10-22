@@ -84,7 +84,7 @@ describe('libopenmpt flashes on the pattern rows, not on VU jumps', () => {
   });
   it('the engine reports the counts with its levels', () => {
     const src = readFileSync(resolve(__dirname, '../../libopenmpt/LibopenmptEngine.ts'), 'utf8');
-    expect(src).toContain('meterFeed.report(chLevels, this._noteStarts)');
+    expect(src).toContain('meterFeed.reportAt(chLevels, this._noteStarts,');
     expect(src).not.toContain('meterFeed.feed(');
   });
 });
