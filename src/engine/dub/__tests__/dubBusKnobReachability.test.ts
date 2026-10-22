@@ -88,7 +88,7 @@ const CASES: Record<Key, Case> = {
   pingPongRMs: { value: 700, ping: true },
   pingPongFeedback: { value: 0.8, ping: true, needs: { pingPongLMs: 100, pingPongRMs: 150, pingPongWet: 0.8 } },
   pingPongWet: { value: 0.2, ping: true },
-  pingPongSyncToBpm: { value: true, exempt: 'DEAD KNOB (bug, reported in todo C4): no engine or store code reads pingPongSyncToBpm; only the UI toggle and a preset write it.' },
+  pingPongSyncToBpm: { value: true, exempt: 'Not consumed by DubBus: DrumPadEngine.startDubSettingsMirror turns it into pingPongLMs/RMs from the active BPM before the bus sees it. Proven below through the real mirror into bus.setSettings -> startPingPong -> delay AudioParam.' },
   re201DelayMode: { value: 6, needs: { echoEngine: 're201' } },
   sirenPreset: { value: 'foghorn', siren: true, exempt: "Read when the siren starts; DubSirenSynth needs a ToneEngine that the offline rig does not create (logged 'AudioContext not initialized'). UNVERIFIED here." },
   echoMode: { value: 9 },
@@ -236,5 +236,49 @@ describe('every DubBusSettings knob is reachable', () => {
   // The offline rig occasionally hangs a render (a different knob each run, all pass alone):
   // a short timeout plus retries keeps a rig hang from reading as a dead knob. A dead knob
   // fails every attempt.
+  });
+});
+
+// pingPongSyncToBpm: the bus never sees the flag. DrumPadEngine's settings mirror derives
+// pingPongLMs/RMs from the active BPM and hands them to bus.setSettings; startPingPong then
+// reads them into the two delay nodes. Driven here through the real mirror (sentinel: the
+// pushed L time equals the BPM-derived value) and compared on the bus snapshot.
+describe('pingPongSyncToBpm reaches the ping-pong delay AudioParam through the engine mirror', () => {
+  async function pingRun(sync: boolean, bpm: number) {
+    const { useDrumPadStore } = await import('@/stores/useDrumPadStore');
+    const { useTransportStore } = await import('@/stores/useTransportStore');
+    const store = useDrumPadStore.getState();
+    const prevDub = store.dubBus;
+    const prevBpm = useTransportStore.getState().bpm;
+    useTransportStore.setState({ bpm });
+    store.setDubBus({ enabled: true, pingPongSyncToBpm: sync, pingPongLMs: 200, pingPongRMs: 700, pingPongFeedback: 0.8, pingPongWet: 0.2 });
+    const rig = await makeDubBusRig(0.8);
+    const { DrumPadEngine } = await import('@/engine/drumpad/DrumPadEngine');
+    const pushed: Array<{ pingPongLMs: number }> = [];
+    const engine = Object.assign(Object.create(DrumPadEngine.prototype), {
+      _dubMirrorOff: null,
+      _dubMirrorTimer: null,
+      dubBus: rig.bus,
+      setDubBusSettings: (s: DubBusSettings) => { pushed.push(s); rig.bus.setSettings(s); },
+    }) as { startDubSettingsMirror(): void; _dubMirrorOff: (() => void) | null };
+    engine.startDubSettingsMirror();
+    engine._dubMirrorOff?.();
+    feedTone(rig, 110, 0.3);
+    const buf = await rig.render([{ at: 0.1, run: () => { rig.bus.startPingPong(); } }]);
+    const res: Result = { snap: snapshot(rig.bus), audio: [buf.getChannelData(0).slice(), buf.getChannelData(1).slice()], taps: '' };
+    useDrumPadStore.setState({ dubBus: prevDub });
+    useTransportStore.setState({ bpm: prevBpm });
+    return { res, pushedL: pushed.at(-1)?.pingPongLMs };
+  }
+
+  it('on: follows the BPM (sentinel + delay param moves); off: keeps the fixed ms', { timeout: 60_000, retry: 4 }, async () => {
+    const off = await pingRun(false, 140);
+    const on = await pingRun(true, 140);
+    const on90 = await pingRun(true, 90);
+    expect(off.pushedL).toBe(200);
+    expect(on.pushedL).toBe(Math.round((60000 / 140) * 0.75));
+    expect(on90.pushedL).toBe(Math.round((60000 / 90) * 0.75));
+    expect(differences(off.res, on.res), 'sync on vs off moved nothing').not.toHaveLength(0);
+    expect(differences(on.res, on90.res), 'BPM change moved nothing').not.toHaveLength(0);
   });
 });
