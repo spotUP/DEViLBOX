@@ -23,6 +23,7 @@ import {
 } from '@/types/instrument';
 import { registerVoiceSource } from '../tone/toneVoiceProbe';
 import { registerCutTargets } from '../tone/toneNoteCut';
+import { createWobbleFilterDrive, createWobbleDistortion } from './wobbleBassSaturation';
 import { WavetableSynth } from '../WavetableSynth';
 import { DrumKitSynth } from '../DrumKitSynth';
 import { DubSirenSynth } from '../dub/DubSirenSynth';
@@ -466,14 +467,8 @@ export function createWobbleBass(config: InstrumentConfig): Tone.ToneAudioNode {
     rolloff: wbConfig.filter.rolloff,
   });
 
-  // Filter drive/saturation
-  let filterDrive: Tone.Distortion | null = null;
-  if (wbConfig.filter.drive > 0) {
-    filterDrive = new Tone.Distortion({
-      distortion: wbConfig.filter.drive / 100,
-      oversample: '2x',
-    });
-  }
+  // Filter drive/saturation (see wobbleBassSaturation.ts for why not Tone.Distortion)
+  const filterDrive = createWobbleFilterDrive(wbConfig.filter.drive);
 
   // === FILTER ENVELOPE ===
   const filterEnvAmount = wbConfig.filterEnvelope.amount / 100;
@@ -552,31 +547,7 @@ export function createWobbleBass(config: InstrumentConfig): Tone.ToneAudioNode {
   }
 
   // === DISTORTION SECTION ===
-  let distortion: Tone.ToneAudioNode | null = null;
-  if (wbConfig.distortion.enabled) {
-    switch (wbConfig.distortion.type) {
-      case 'soft':
-        distortion = new Tone.Distortion({
-          distortion: wbConfig.distortion.drive / 100,
-          oversample: '2x',
-        });
-        break;
-      case 'hard':
-        distortion = new Tone.Chebyshev({
-          order: Math.floor(1 + (wbConfig.distortion.drive / 100) * 50),
-        });
-        break;
-      case 'fuzz':
-        distortion = new Tone.Distortion({
-          distortion: 0.5 + (wbConfig.distortion.drive / 200),
-          oversample: '4x',
-        });
-        break;
-      case 'bitcrush':
-        distortion = new Tone.BitCrusher(Math.max(2, 12 - Math.floor(wbConfig.distortion.drive / 10)));
-        break;
-    }
-  }
+  const distortion = createWobbleDistortion(wbConfig.distortion);
 
   // Post-distortion tone control
   const toneFilter = new Tone.Filter({
