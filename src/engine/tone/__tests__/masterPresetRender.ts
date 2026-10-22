@@ -106,6 +106,11 @@ export async function freshContext(preset: Preset) {
   await trackReverbIr();
   const Tone = await import('tone');
   const ctx = new OfflineAudioContext(2, SR * SECONDS, SR);
+  // The app installs this in ToneEngine init; without it Tone builds BitCrusher's worklet through
+  // standardized-audio-context, which rejects a native context as an unhandled rejection.
+  // Imported here, not at the top: Tone must load after installRealWebAudio sets the globals.
+  const { installNativeContextWorklets } = await import('../nativeContextWorklets');
+  installNativeContextWorklets();
   Tone.setContext(ctx as never);
   const { useAudioStore } = await import('@/stores/useAudioStore');
   useAudioStore.setState({ presetGainCompensationDb: preset.gainCompensationDb ?? 0 });
