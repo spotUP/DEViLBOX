@@ -504,6 +504,39 @@ export async function createModuleForSong(
   });
 }
 
+/** The smallest song createModuleForSong builds: one empty 64-row pattern. */
+const WARM_UP_SONG: ModuleSong = {
+  numChannels: 4,
+  patterns: [{ length: 64, channels: [] }],
+  songPositions: [0],
+  initialSpeed: 6,
+  initialBPM: 125,
+};
+
+/**
+ * Run one throw-away module build, so the first play() after a page load does
+ * not pay the soundlib's one-time cost of its first build. Every play() of a
+ * song without module data builds its module (createModuleForSong); the first
+ * build after a load held the main thread ~60-80 ms inside createNewModule
+ * (profiled 2026-10-23), a later one does not. That task sat between Play and
+ * row 1, so the first notes of the first play stuttered on every synth. The
+ * warm-up leaves no module and an inactive bridge, as before it ran; it does
+ * nothing while the bridge holds a song's module.
+ */
+export async function warmModuleBuild(): Promise<void> {
+  if (_loaded) return;
+  const data = await createModuleForSong(WARM_UP_SONG, () => false);
+  if (!data) return;
+  const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
+  await enqueue(async () => {
+    // A build or an import after the warm-up replaced _owned (markLoaded): its
+    // module stays.
+    if (!_owned.has(data)) return;
+    reset();
+    await osl.destroyModule();
+  });
+}
+
 /**
  * The c5Speed at which libopenmpt plays a Sampler's WAV at the pitch ToneEngine
  * gives it. ToneEngine plays the WAV at its own rate on `baseNote` (C4 when

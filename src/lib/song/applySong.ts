@@ -217,9 +217,10 @@ export async function applySong(song: SongToApply, source: SongSource): Promise<
   // Undoing into the previous song is not meaningful.
   useHistoryStore.getState().clearHistory();
 
-  // The libopenmpt path's one-time costs (soundlib WASM, worklet, chunks) at
-  // open, not inside the first play() where they delayed row 1 by ~500 ms.
-  if (routesThroughLibopenmpt(song.engine)) void warmLibopenmptPlayback();
+  // The libopenmpt path's one-time costs (soundlib WASM, worklet, chunks, the
+  // first module build) at open, not inside the first play() where they
+  // delayed row 1 by ~500 ms and stuttered its first notes.
+  if (routesThroughLibopenmpt(song.engine)) void warmLibopenmptPlayback(song.engine);
 
   if (song.preload !== false && song.instruments.some((i) => i.synthType && i.synthType !== 'Synth')) {
     await engine.preloadInstruments(song.instruments, instrumentChannelUsage(song.patterns), instrumentNoteUsage(song.patterns));
