@@ -47,6 +47,11 @@ export class ChannelMeterFeed {
   private pending: boolean[] = [];
   /** Reports measured ahead of when they are heard, oldest first (reportAt). */
   private queue: Array<{ at: number; levels: number[]; noteStarts: number[] | null }> = [];
+  /** Feeds the oldest held report when it is due, if no newer report comes first. */
+  private drainTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The audio clock at the last reportAt, and performance.now() then: the timer's estimate of the audio clock. */
+  private clockAudio = 0;
+  private clockPerf = 0;
 
   /**
    * report() for levels an engine measures before they are heard: a worklet
@@ -56,19 +61,41 @@ export class ChannelMeterFeed {
    * `now` reaches `at`, both on the audio clock. Of the reports due, only the
    * newest is fed: levels are a snapshot and note-start counts are
    * cumulative, so a skipped report loses no note.
+   *
+   * A held report is also fed by a timer when it falls due: an engine that
+   * reports at 20 Hz (UADE) would otherwise show each report only when the
+   * next one arrives, up to 50 ms after it is heard, and the last report
+   * before a pause would never show.
    */
   reportAt(levels: ArrayLike<number>, noteStarts: ArrayLike<number> | null, at: number, now: number): void {
     this.queue.push({ at, levels: Array.from(levels), noteStarts: noteStarts ? Array.from(noteStarts) : null });
-    let due = -1;
-    while (due + 1 < this.queue.length && this.queue[due + 1].at <= now) due++;
-    if (due < 0) return;
-    const entry = this.queue[due];
-    this.queue.splice(0, due + 1);
-    this.report(entry.levels, entry.noteStarts);
+    this.clockAudio = now;
+    this.clockPerf = performance.now();
+    this.drainDue(now);
   }
 
   /** Drop held reports: a stop or a new song must not feed the old song's levels. */
-  clearHeld(): void { this.queue.length = 0; }
+  clearHeld(): void {
+    this.queue.length = 0;
+    if (this.drainTimer !== null) { clearTimeout(this.drainTimer); this.drainTimer = null; }
+  }
+
+  /** Feed the newest report due at `now`, and arm the timer for the oldest one still held. */
+  private drainDue(now: number): void {
+    let due = -1;
+    while (due + 1 < this.queue.length && this.queue[due + 1].at <= now) due++;
+    if (due >= 0) {
+      const entry = this.queue[due];
+      this.queue.splice(0, due + 1);
+      this.report(entry.levels, entry.noteStarts);
+    }
+    if (this.queue.length === 0 || this.drainTimer !== null) return;
+    const waitMs = Math.max(0, (this.queue[0].at - now) * 1000);
+    this.drainTimer = setTimeout(() => {
+      this.drainTimer = null;
+      this.drainDue(this.clockAudio + (performance.now() - this.clockPerf) / 1000);
+    }, waitMs);
+  }
 
   /**
    * One engine level report to the app's meters: counted when the engine

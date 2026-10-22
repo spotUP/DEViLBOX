@@ -89,6 +89,14 @@ describe('libopenmpt flashes on the pattern rows, not on VU jumps', () => {
   });
 });
 
+describe('UADE meters show a block when it is heard', () => {
+  it('the engine holds each level report until its block reaches the speakers', () => {
+    const src = readFileSync(resolve(__dirname, '../../uade/UADEEngine.ts'), 'utf8');
+    expect(src).toContain('meterFeed.reportAt(data.levels, data.noteStarts, (data.audioTime ?? ctx.currentTime) + outputLatencySec(ctx), ctx.currentTime)');
+    expect(src).toMatch(/stop\(\): void \{\n    meterFeed\.clearHeld\(\);/);
+  });
+});
+
 describe('engines feed per-frame levels through the split feed, never as note triggers', () => {
   it.each(ENGINES)('%s', (name) => {
     const src = readFileSync(resolve(__dirname, '../../', `${name}.ts`), 'utf8');
