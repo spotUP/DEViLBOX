@@ -21,6 +21,7 @@ import { useMixerStore } from '@stores/useMixerStore';
 import { useDJStore, type DeckId } from '@stores/useDJStore';
 import { AudioDataBus, type VJAudioFrame } from '@engine/vj/AudioDataBus';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { heardContextTime } from '@engine/audioLatency';
 import { getDJEngineIfActive } from '@engine/dj/DJEngine';
 import { getToneEngine } from '@engine/ToneEngine';
 import type { TrackerCell, Pattern } from '@/types/tracker';
@@ -350,7 +351,7 @@ export const VJPatternOverlay: React.FC<VJPatternOverlayProps> = React.memo(({ s
       anim.replayerPatIdx = -1;
       if (anyPlaying && snapshots[0].source === 'tracker') {
         const replayer = getTrackerReplayer();
-        const audioTime = Tone.now() + 0.01;
+        const audioTime = heardContextTime(Tone.getContext().rawContext as AudioContext);
         const audioState = replayer.getStateAtTime(audioTime);
         if (audioState) {
           anim.replayerRow = audioState.row;
