@@ -87,6 +87,7 @@ vi.mock('@/engine/ChannelFilterManager', () => {
 
 import { ToneEngine } from '../ToneEngine';
 import { perChannelInstanceChannels } from '../perChannelNativeSynths';
+import { SynthRegistry } from '../registry/SynthRegistry';
 
 type FakeGainNode = InstanceType<typeof FakeGain>;
 
@@ -299,5 +300,39 @@ describe('per-channel native synth routing (TB303 on tracker channel 3)', () => 
     expect(state.instruments.has(key(7, 100))).toBe(false);
     expect(reaches(instruments[1].output, state.synthBus.native)).toBe(true);
     expect(state.channelSynthLanes.size).toBe(0);
+  });
+});
+
+/**
+ * Owner 2026-10-22: a master effect aimed at a subset of channels did nothing on a
+ * generated Up Rough song. UpRoughSoftsynth was missing from the per-channel set, so
+ * song load built only the shared instance, which plays into synthBus and bypasses
+ * the channel strips that channel-aimed effects are fed from.
+ */
+describe('Up Rough softsynth reaches its channel strip', () => {
+  it('after song-load preload, a note on channel 3 plays into strip 3, not synthBus', async () => {
+    factory.createInstrument.mockReset();
+    const instruments: ReturnType<typeof fakeInstrument>[] = [];
+    factory.createInstrument.mockImplementation(() => { const i = fakeInstrument(); instruments.push(i); return i; });
+    vi.spyOn(SynthRegistry, 'knows').mockReturnValue(true);
+    vi.spyOn(SynthRegistry, 'get').mockReturnValue({} as never);
+    const upr = { id: 7, name: 'bass', synthType: 'UpRoughSoftsynth', effects: [] } as unknown as InstrumentConfig;
+    const { engine, state, strips } = makeEngine();
+
+    // Song-load path: preloadInstruments asks instanceChannels() for the keys it builds.
+    for (const channel of (engine as any).instanceChannels(upr, new Map([[7, new Set([0, 3])]]))) {
+      (engine as any).getInstrument(7, upr, channel);
+    }
+    await Promise.all([...state.pendingEffectChains.values()]);
+    await flush();
+    engine.triggerNote(7, 'C4', 0, 0, 1, upr, false, false, 3);
+    await Promise.all([...state.pendingEffectChains.values()]);
+    await flush();
+
+    const voice = instruments.find((i) => i.triggerAttack.mock.calls.length > 0);
+    expect(voice).toBeDefined();
+    expect(state.instruments.has(key(7, 3))).toBe(true);
+    expect(reaches(voice!.output, strips.get(3)!.native)).toBe(true);
+    expect(reaches(voice!.output, state.synthBus.native)).toBe(false);
   });
 });
