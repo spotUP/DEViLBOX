@@ -12,7 +12,7 @@
  *     in the UI input handler since the store accepts any number).
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { useDrumPadStore } from '../useDrumPadStore';
@@ -113,14 +113,48 @@ describe('useDrumPadStore — sidechain source fields (G13)', () => {
     expect(panel).toMatch(/value: 'drums', label: 'Drums \(auto\)'/);
   });
 
-  it('re-resolves the drum key when the song changes', () => {
+  it('re-resolves the drum key when the song changes', async () => {
     // A drum key is a promise about one song. Without re-resolving on a new
     // song the duck keys on whichever channel held the kick in the last one.
-    const strip = readFileSync(
-      resolve(import.meta.dirname, '..', '..', 'components', 'dub', 'DubDeckStrip.tsx'), 'utf8');
-    expect(strip).toMatch(/resolveDrumKeyChannel/);
-    expect(strip).toMatch(/onSongChange\(\(\) => setDrumKeySong\(/);
-    expect(strip).toMatch(/drumKeySong\]\);/);
+    // Real SidechainSourceRouter; the classifier and the channel taps are stubs.
+    vi.resetModules();
+    let songChanged: (() => void) | null = null;
+    const resolveDrumKeyChannel = vi.fn().mockResolvedValueOnce(2).mockResolvedValueOnce(5);
+    vi.doMock('../../engine/tone/sidechainKey', () => ({
+      onSongChange: (cb: () => void) => { songChanged = cb; return () => { songChanged = null; }; },
+      resolveDrumKeyChannel,
+    }));
+    const tapped: number[] = [];
+    const released: number[] = [];
+    vi.doMock('../../engine/tone/ChannelRoutedEffects', () => ({
+      getChannelRoutedEffectsManager: () => ({
+        addSidechainTap: async (ch: number) => { tapped.push(ch); return true; },
+        removeSidechainTap: (ch: number) => { released.push(ch); },
+      }),
+    }));
+    const flush = async (): Promise<void> => {
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+      await vi.dynamicImportSettled();
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+    };
+    try {
+      const { SidechainSourceRouter } = await import('../../engine/dub/SidechainSourceRouter');
+      const router = new SidechainSourceRouter(() => ({}) as AudioNode);
+      router.apply('drums', 7);
+      await flush();
+      expect(tapped, 'the first song keys on its drum channel').toEqual([2]);
+
+      expect(songChanged, 'the router listens for a song change').not.toBeNull();
+      songChanged!();
+      await flush();
+      expect(released, 'the old song\'s drum tap stays in').toEqual([2]);
+      expect(tapped, 'the new song keyed on the old song\'s drum channel').toEqual([2, 5]);
+      router.dispose();
+    } finally {
+      vi.doUnmock('../../engine/tone/sidechainKey');
+      vi.doUnmock('../../engine/tone/ChannelRoutedEffects');
+      vi.resetModules();
+    }
   });
 
   it('sees a new song even when it has as many patterns as the last one', async () => {

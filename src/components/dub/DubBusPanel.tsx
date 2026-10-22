@@ -528,7 +528,7 @@ export const DubBusPanel: React.FC<{ inline?: boolean }> = ({ inline = false }) 
               className="w-3.5 h-3.5 accent-accent-primary"
             />
             <span className="text-text-muted">
-              {dubBus.pingPongSyncToBpm ? 'BPM synced (3/8 L, 1/2 R — Ariwa SDE-3000)' : 'fixed ms values'}
+              {dubBus.pingPongSyncToBpm ? 'BPM synced (dotted eighth left, quarter right — Ariwa SDE-3000)' : 'fixed ms values'}
             </span>
           </label>
           <Slider
