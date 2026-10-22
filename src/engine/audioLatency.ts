@@ -100,6 +100,16 @@ export function deckPositionAt(deck: { positionAnchor: ClockAnchor; durationMs: 
   return positionAtFrame(deck.positionAnchor, frameMs, deck.durationMs > 0 ? deck.durationMs / 1000 : Infinity);
 }
 
+/**
+ * The audio-context time of the sample the listener hears now: the context's
+ * currentTime minus the output latency. A display ring stamped in context
+ * time (TrackerReplayer.getStateAtTime) is read at this time so the row on
+ * screen is the row in the ear, not one scheduled ahead of it.
+ */
+export function heardContextTime(ctx: LatencySource & { currentTime: number }): number {
+  return Math.max(0, ctx.currentTime - outputLatencySec(ctx));
+}
+
 /** Longest output latency a heard-signal delay covers, seconds. */
 export const HEARD_DELAY_MAX_SEC = 1;
 
