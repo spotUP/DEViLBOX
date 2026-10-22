@@ -140,10 +140,11 @@ export function ensureCompleteInstrumentConfig(inst: InstrumentConfig): Instrume
 }
 
 /**
- * Detect if a TrackerCell uses the old string-based format
+ * Detect if a TrackerCell uses the old format: a string note, a null note (the old empty cell) or a string effect.
+ * A cell in the current format always has a numeric note.
  */
 export function isOldFormatCell(cell: TrackerCell): boolean {
-  return typeof cell.note === 'string';
+  return typeof cell.note === 'string' || cell.note === null || cell.note === undefined || typeof cell.effect === 'string';
 }
 
 /**
@@ -173,6 +174,17 @@ export function migrateInstrumentId(oldId: number): number {
  */
 export function migrateCell(cell: TrackerCell): TrackerCell {
   const migratedCell: TrackerCell = { ...cell };
+
+  // A cell already in the current format keeps its values. Its instrument 0 is "no instrument" and its volume
+  // 0 is an empty volume column; the old-format conversions below would turn them into instrument 1 and
+  // "set volume 0" (0x10). A project migrates when any one instrument needs it, so its new cells come through here.
+  if (!isOldFormatCell(cell)) {
+    migratedCell.effTyp ??= 0;
+    migratedCell.eff ??= 0;
+    migratedCell.effTyp2 ??= 0;
+    migratedCell.eff2 ??= 0;
+    return migratedCell;
+  }
 
   // Migrate note (string → number)
   if (typeof cell.note === 'string') {
@@ -250,6 +262,13 @@ export function migrateCell(cell: TrackerCell): TrackerCell {
  * Migrate a pattern from old format to new XM format
  */
 export function migratePattern(pattern: Pattern): Pattern {
+  // A pattern already in the current format keeps its channel instruments as they are.
+  if (!pattern.channels.some(channel => channel.rows.some(cell => isOldFormatCell(cell)))) {
+    return {
+      ...pattern,
+      channels: pattern.channels.map(channel => ({ ...channel, rows: channel.rows.map(cell => migrateCell(cell)) })),
+    };
+  }
   return {
     ...pattern,
     channels: pattern.channels.map(channel => ({
