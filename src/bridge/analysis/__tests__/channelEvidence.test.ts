@@ -215,6 +215,7 @@ describe('against a real module', () => {
     const bytes = readFileSync(resolve(FIXTURES, 'mortimer-twang-2118bytes.mod'));
     const mod = await parseMOD(
       bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+      'test.mod',
     );
 
     // The parser hands back patterns as rows[64] of RAW MOD cells — Amiga

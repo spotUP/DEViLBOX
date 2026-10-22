@@ -17,7 +17,7 @@ describe('an unnamed instrument exports with an empty name', { timeout: 30_000 }
     const song = await parseMODFile(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer, 'micro15.mod');
     for (const inst of song.instruments) inst.name = '';
     const out = new Uint8Array(await (await exportSongToMOD(song)).blob.arrayBuffer());
-    const parsed = await parseMOD(out.buffer.slice(0) as ArrayBuffer);
+    const parsed = await parseMOD(out.buffer.slice(0) as ArrayBuffer, 'test.mod');
     expect(parsed.header.samples.map((s) => s.name.trim())).toEqual(new Array(31).fill(''));
   });
 
