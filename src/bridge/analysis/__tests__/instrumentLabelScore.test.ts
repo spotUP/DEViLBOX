@@ -65,7 +65,7 @@ describe('instrument verdicts match the owner\'s ear', () => {
     const { analyzeSong } = await import('../songAnalyzer');
     const bytes = readFileSync(resolve(__dirname, '../../../..', entry.song));
     const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-    const parsed = await parseMOD(arrayBuffer);
+    const parsed = await parseMOD(arrayBuffer, 'test.mod');
     await importTrackerModule({
       metadata: { title: 'micro15', type: 'MOD', channels: 4, patterns: 5, orders: 6, instruments: 16, samples: 16, duration: 0 },
       arrayBuffer, file: new File([bytes], 'micro15.mod'),

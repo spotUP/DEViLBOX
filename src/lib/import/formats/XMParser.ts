@@ -110,7 +110,7 @@ interface XMSampleHeader {
 /**
  * Parse XM file from ArrayBuffer
  */
-export async function parseXM(buffer: ArrayBuffer): Promise<{
+export async function parseXM(buffer: ArrayBuffer, filename: string): Promise<{
   header: XMHeader;
   patterns: XMNote[][][]; // [pattern][row][channel]
   instruments: ParsedInstrument[];
@@ -150,7 +150,7 @@ export async function parseXM(buffer: ArrayBuffer): Promise<{
   // Build metadata
   const metadata: ImportMetadata = {
     sourceFormat: 'XM',
-    sourceFile: header.moduleName,
+    sourceFile: filename,
     importedAt: new Date().toISOString(),
     originalChannelCount: header.channelCount,
     originalPatternCount: header.patternCount,
@@ -613,7 +613,7 @@ export function isXMFormat(buffer: ArrayBuffer): boolean {
 
 /** Parse XM and return a TrackerSong with real PCM instruments. */
 export async function parseXMFile(buffer: ArrayBuffer, filename: string): Promise<TrackerSong> {
-  const { header, patterns: xmPatterns, instruments: parsedInstruments, metadata } = await parseXM(buffer);
+  const { header, patterns: xmPatterns, instruments: parsedInstruments, metadata } = await parseXM(buffer, filename);
 
   // Re-scan pattern headers to get file offsets and packed data sizes for uadeVariableLayout.
   const filePatternAddrs: number[] = [];

@@ -27,7 +27,7 @@ describe('MOD export periods', { timeout: 30_000 }, () => {
     const src = bytesOf(MICRO15);
     const song = await parseMODFile(src, 'micro15.mod');
     const out = await u8((await exportSongToMOD(song)).blob);
-    const a = await parseMOD(src), b = await parseMOD(out.buffer.slice(0) as ArrayBuffer);
+    const a = await parseMOD(src, 'test.mod'), b = await parseMOD(out.buffer.slice(0) as ArrayBuffer, 'test.mod');
     let cells = 0;
     a.patterns.forEach((pat, p) => pat.forEach((row, r) => row.forEach((cell, c) => {
       if (!cell.period) return;
@@ -49,7 +49,7 @@ describe('MOD export periods', { timeout: 30_000 }, () => {
     expect(cell.period).toBeGreaterThan(0);          // imported with its period
     cell.note = 37;                                  // typed over with C-3 - period left as it was
     const out = await u8((await exportSongToMOD(song)).blob);
-    const b = await parseMOD(out.buffer.slice(0) as ArrayBuffer);
+    const b = await parseMOD(out.buffer.slice(0) as ArrayBuffer, 'test.mod');
     expect(b.patterns[song.songPositions[0]][row][0].period).toBe(214);
   });
 });
@@ -60,7 +60,7 @@ describe('one MOD writer (exportAsMOD is exportSongToMOD)', () => {
     const song = await parseMODFile(bytesOf(MICRO15), 'micro15.mod');
     const res = await exportAsMOD(song.patterns, song.instruments, { moduleName: 'micro15', songPositions: song.songPositions });
     const out = await u8(res.data);
-    const a = await parseMOD(bytesOf(MICRO15)), b = await parseMOD(out.buffer.slice(0) as ArrayBuffer);
+    const a = await parseMOD(bytesOf(MICRO15), 'test.mod'), b = await parseMOD(out.buffer.slice(0) as ArrayBuffer, 'test.mod');
     // The old writer wrote 0, 1, 2 ... here, read effects from a legacy field (all lost)
     // and put C00 into every cell without an effect.
     expect(b.header.patternOrderTable.slice(0, b.header.songLength)).toEqual(a.header.patternOrderTable.slice(0, a.header.songLength));
