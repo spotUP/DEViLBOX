@@ -1263,7 +1263,11 @@ export class DubBus {
    */
   setPlateStage(stage: DubBusSettings['plateStage']): void {
     console.log(`[DubBusCtrl] setPlateStage(${stage})`);
-    if (stage === this.settings.plateStage && this.plateStage !== null) return;
+    // Compared with what is INSTALLED, not with settings.plateStage: setSettings merges the new
+    // value into this.settings before it calls here, so that comparison was always true once a
+    // plate existed and every change of the stage was dropped.
+    const installed = this.plateStage === null ? 'off' : this.plateStage instanceof DattorroPlateEffect ? 'dattorro' : 'madprofessor';
+    if (stage === installed) return;
     this.settings = { ...this.settings, plateStage: stage };
     const currentPlate = this.plateStage;
     const currentSend = this.plateSend;
