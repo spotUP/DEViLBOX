@@ -14,6 +14,7 @@ import type { PlaybackCoordinator } from '@engine/PlaybackCoordinator';
 import type { TrackerSong } from '@engine/TrackerReplayer';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import { registerDubOutputBase } from '../tone/dubOutputBase';
 import { ChannelMeterFeed } from '../tone/channelMeterFeed';
 
 const meterFeed = new ChannelMeterFeed();
@@ -81,10 +82,10 @@ export class LibopenmptEngine {
   private _onTransportEvent: ((event: 'seek' | 'pause' | 'unpause' | 'stop', order?: number, row?: number) => void) | null = null;
 
   /** Per-channel effect isolation: tracks which slots are active and their channel masks. */
-  static readonly MAX_ISOLATION_SLOTS = 4;
+  static readonly MAX_ISOLATION_SLOTS = 16;
   /** Per-channel dub-send outputs. Indices [MAX_DUB_OFFSET + ch] on the worklet. */
   static readonly MAX_DUB_CHANNELS = 32;
-  static readonly DUB_OUTPUT_BASE = 1 + LibopenmptEngine.MAX_ISOLATION_SLOTS; // = 5
+  static readonly DUB_OUTPUT_BASE = 1 + LibopenmptEngine.MAX_ISOLATION_SLOTS; // = 17
   private _isolationSlotMasks: (number | null)[] = new Array(LibopenmptEngine.MAX_ISOLATION_SLOTS).fill(null);
   /** Pending getWorkletDiag() resolvers, settled by the 'diagState' reply. */
   private _diagStateWaiters: ((v: Record<string, unknown> | null) => void)[] = [];
@@ -149,8 +150,8 @@ export class LibopenmptEngine {
       return;
     }
 
-    // 37 stereo outputs: [0]=main mix, [1..4]=isolation slots for per-channel
-    // effects, [5..36]=per-channel dub sends (lazy — muted output costs nothing
+    // 37 stereo outputs: [0]=main mix, [1..16]=isolation slots for per-channel
+    // effects, [17..48]=per-channel dub sends (lazy — muted output costs nothing
     // in the worklet). See src/engine/tone/ChannelRoutedEffects.ts.
     const TOTAL_OUTPUTS = 1 + LibopenmptEngine.MAX_ISOLATION_SLOTS + LibopenmptEngine.MAX_DUB_CHANNELS;
     this.workletNode = new AudioWorkletNode(this.context, 'libopenmpt-processor', {
@@ -159,6 +160,7 @@ export class LibopenmptEngine {
       outputChannelCount: new Array(TOTAL_OUTPUTS).fill(2),
     });
 
+    registerDubOutputBase(this.workletNode, LibopenmptEngine.DUB_OUTPUT_BASE);
     this.workletNode.port.onmessage = this.handleMessage.bind(this);
 
     // Configure: repeat forever, 100% stereo separation, sinc interpolation
@@ -707,6 +709,10 @@ export class LibopenmptEngine {
    * @param slotIndex 0..MAX_ISOLATION_SLOTS-1
    * @param channelMask Bitmask where bit N=1 means channel N is audible in this slot
    */
+  maxIsolationSlots(): number {
+    return LibopenmptEngine.MAX_ISOLATION_SLOTS;
+  }
+
   addIsolation(slotIndex: number, channelMask: number): void {
     if (!this.workletNode || !this.context || slotIndex < 0 || slotIndex >= LibopenmptEngine.MAX_ISOLATION_SLOTS) return;
     // The worklet has this slot already: re-adding recreates its module, which
@@ -745,7 +751,7 @@ export class LibopenmptEngine {
 
   /**
    * Get the AudioWorkletNode (main worklet).
-   * Output 0 = main mix. Outputs 1..4 = isolation slots for per-channel effects.
+   * Output 0 = main mix. Outputs 1..16 = isolation slots for per-channel effects.
    */
   getWorkletNode(): AudioWorkletNode | null {
     return this.workletNode;
