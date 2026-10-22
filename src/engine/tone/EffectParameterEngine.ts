@@ -70,6 +70,7 @@ import { ExpanderEffect } from '../effects/ExpanderEffect';
 import { SwedishChainsawEffect } from '../effects/SwedishChainsawEffect';
 import { RE201Effect } from '../effects/RE201Effect';
 import { AnotherDelayEffect } from '../effects/AnotherDelayEffect';
+import { applyRebirthEffectParams, type RebirthParams } from '@engine/rebirtheffects/rebirthEffects';
 
 export const EFFECT_RAMP_TIME = 0.02;
 
@@ -84,6 +85,13 @@ export function applyEffectParametersDiff(
   const R = EFFECT_RAMP_TIME;
 
   switch (type) {
+    case 'ReRebirthDistortion':
+    case 'ReRebirthDelay':
+    case 'ReRebirthCompressor':
+    case 'ReRebirthPatternFilter':
+      applyRebirthEffectParams(node, changed as RebirthParams);
+      break;
+
     case 'Distortion':
       if (node instanceof Tone.Distortion) {
         if ('drive' in changed) node.distortion = changed.drive as number;

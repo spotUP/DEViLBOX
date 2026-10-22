@@ -881,6 +881,80 @@ export interface OpenWurliConfig {
   velocityCurve?: number;     // 0=Linear, 1=Soft, 2=Medium, 3=Hard, 4=Fixed
 }
 
+// ─── re-rebirth 303 (port of varyform/re-rebirth bass voice; no licence granted yet) ───
+export interface ReBirth303Config {
+  tuning?: number;     // 0-1 (centre 0.5 = in tune; upwards whole semitones to +1 octave)
+  cutoff?: number;     // 0-1 filter cutoff
+  resonance?: number;  // 0-1
+  envmod?: number;     // 0-1 filter envelope depth
+  decay?: number;      // 0-1 filter envelope decay
+  accent?: number;     // 0-1 accent depth
+  volume?: number;     // 0-1
+  waveform?: number;   // < 0.5 sawtooth, >= 0.5 pulse
+}
+
+// ─── re-rebirth 808 / 909 drum machines (port of varyform/re-rebirth drum machines; no licence granted yet) ───
+// Field = knob group id + capitalised knob key (see engine/rebirthdrums/rebirthDrumLayout.ts). All 0-1; *Alt = voice switch (< 0.5 first voice).
+export interface ReBirth808Config {
+  bdLevel?: number;
+  bdTone?: number;
+  bdDecay?: number;
+  sdLevel?: number;
+  sdTone?: number;
+  sdSnappy?: number;
+  ltLevel?: number;
+  ltTuning?: number;
+  ltAlt?: number;
+  mtLevel?: number;
+  mtTuning?: number;
+  mtAlt?: number;
+  htLevel?: number;
+  htTuning?: number;
+  htAlt?: number;
+  rsLevel?: number;
+  rsAlt?: number;
+  cpLevel?: number;
+  cpAlt?: number;
+  cbLevel?: number;
+  cyLevel?: number;
+  cyTone?: number;
+  cyDecay?: number;
+  ohLevel?: number;
+  ohDecay?: number;
+  chLevel?: number;
+  acLevel?: number;
+}
+
+export interface ReBirth909Config {
+  bdTune?: number;
+  bdLevel?: number;
+  bdAttack?: number;
+  bdDecay?: number;
+  sdTune?: number;
+  sdTone?: number;
+  sdSnappy?: number;
+  sdLevel?: number;
+  ltTune?: number;
+  ltDecay?: number;
+  ltLevel?: number;
+  mtTune?: number;
+  mtDecay?: number;
+  mtLevel?: number;
+  htTune?: number;
+  htDecay?: number;
+  htLevel?: number;
+  rsLevel?: number;
+  cpLevel?: number;
+  hhLevel?: number;
+  hhChDecay?: number;
+  hhOhDecay?: number;
+  cyCrLevel?: number;
+  cyCrTune?: number;
+  cyRdLevel?: number;
+  cyRdTune?: number;
+  acLevel?: number;
+}
+
 export interface OPL3Config {
   // Operator 1 (modulator)
   op1Attack?: number;         // 0-15

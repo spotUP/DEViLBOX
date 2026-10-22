@@ -39,7 +39,7 @@ export const PER_CHANNEL_NATIVE_SYNTH_TYPES: ReadonlySet<SynthType> = new Set<Sy
   'SpaceLaser', 'Synare', 'TR808', 'TR909', 'WaveSabreSynth', 'OidosSynth',
   'TunefishSynth', 'MdaEPiano', 'MdaJX10', 'MdaDX10', 'Amsynth', 'RaffoSynth', 'CalfMono',
   'SetBfree', 'SynthV1', 'TalNoizeMaker', 'Aeolus', 'FluidSynth', 'Sfizz', 'ZynAddSubFX',
-  'Monique', 'VL1', 'DX7', 'OpenWurli', 'WobbleBass',
+  'Monique', 'VL1', 'DX7', 'OpenWurli', 'ReRebirth303', 'ReRebirth808', 'ReRebirth909', 'WobbleBass',
 ]);
 
 /** Pooled Amiga per-note replayers: one engine singleton, fixed player pool. Shared across channels. */

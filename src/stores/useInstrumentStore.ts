@@ -32,6 +32,9 @@ import {
   DEFAULT_SPACE_LASER,
   DEFAULT_V2,
   DEFAULT_SYNARE,
+  DEFAULT_REBIRTH303,
+  DEFAULT_REBIRTH808,
+  DEFAULT_REBIRTH909,
   DEFAULT_BUZZMACHINE,
 } from '@typedefs/instrument';
 
@@ -260,7 +263,7 @@ const MONO_SYNTH_TYPES = new Set([
   // Acid/bass synths
   'TB303', 'Buzz3o3', 'DB303',
   // Simple monophonic synths
-  'DubSiren', 'SpaceLaser', 'Synare',
+  'DubSiren', 'SpaceLaser', 'Synare', 'ReRebirth303',
   // Speech synthesis chips (single voice)
   'MAMEMEA8000', 'MAMETMS5220', 'MAMESP0250', 'MAMEVotrax',
   'Sam', 'V2Speech',
@@ -387,9 +390,6 @@ export const useInstrumentStore = create<InstrumentStore>()(
         const patch = SETBFREE_NATIVE_FACTORY_PRESETS.find((p) => p.name === bfreePreset);
         if (patch) updates = { ...updates, setbfree: setbfreeConfigFromNativeValues(patch.values) };
       }
-      // Refresh the live WASM re-export (Cinter4 Shrinkler size + playback). Debounced and
-      // format-gated, so no-op edits / non-Cinter songs coalesce or skip cheaply.
-      triggerWasmReexport();
       // Same for Calf Monosynth and TAL-NoiseMaker: the preset's values become instrument.calfMono / instrument.talNoizeMaker.
       const calfPreset = (updates as { calfMonoNativePatch?: string }).calfMonoNativePatch;
       if (calfPreset) {
@@ -401,6 +401,9 @@ export const useInstrumentStore = create<InstrumentStore>()(
         const patch = TAL_NATIVE_FACTORY_PRESETS.find((p) => p.name === talPreset);
         if (patch) updates = { ...updates, talNoizeMaker: talConfigFromNativeValues(patch.values) };
       }
+      // Refresh the live WASM re-export (Cinter4 Shrinkler size + playback). Debounced and
+      // format-gated, so no-op edits / non-Cinter songs coalesce or skip cheaply.
+      triggerWasmReexport();
       const currentInstrument = get().instruments.find((inst) => inst.id === id);
 
       // Format compat: synth type change — deferred to export-time validation
@@ -487,6 +490,9 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.wavesabre ||
         updates.oidos ||
         updates.openWurli ||
+        updates.rebirth303 ||
+        updates.rebirth808 ||
+        updates.rebirth909 ||
         updates.opl3 ||
         updates.dx7 ||
         updates.pinkTrombone ||
@@ -702,6 +708,15 @@ export const useInstrumentStore = create<InstrumentStore>()(
             }
 
             // Retromulator WASM synths
+            if (updatedInstrument.synthType === 'ReRebirth303' && updatedInstrument.rebirth303 && updates.rebirth303) {
+              engine.updateComplexSynthParameters(id, updatedInstrument.rebirth303);
+            }
+            if (updatedInstrument.synthType === 'ReRebirth808' && updatedInstrument.rebirth808 && updates.rebirth808) {
+              engine.updateComplexSynthParameters(id, updatedInstrument.rebirth808);
+            }
+            if (updatedInstrument.synthType === 'ReRebirth909' && updatedInstrument.rebirth909 && updates.rebirth909) {
+              engine.updateComplexSynthParameters(id, updatedInstrument.rebirth909);
+            }
             if (updatedInstrument.synthType === 'OpenWurli' && updatedInstrument.openWurli && updates.openWurli) {
               engine.updateComplexSynthParameters(id, updatedInstrument.openWurli);
               return; // Handled
@@ -879,7 +894,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
           'MdaEPiano', 'MdaJX10', 'MdaDX10', 'Amsynth', 'RaffoSynth', 'CalfMono',
           'SetBfree', 'SynthV1', 'Monique', 'VL1', 'TalNoizeMaker', 'Aeolus',
           'FluidSynth', 'Sfizz',
-          'TunefishSynth', 'OidosSynth', 'WaveSabreSynth', 'OpenWurli', 'OPL3', 'DX7',
+          'TunefishSynth', 'OidosSynth', 'WaveSabreSynth', 'OpenWurli', 'ReRebirth303', 'ReRebirth808', 'ReRebirth909', 'OPL3', 'DX7',
           'PinkTrombone', 'DECtalk', 'Sam', 'V2', 'V2Speech', 'Synare',
           'TB303', 'Buzz3o3', 'DubSiren', 'SpaceLaser',
         ];
@@ -1030,6 +1045,15 @@ export const useInstrumentStore = create<InstrumentStore>()(
           if (variant) engine.updateComplexSynthParameters(id, variant);
         }
         // Retromulator
+        else if (mergedInst.synthType === 'ReRebirth303' && mergedInst.rebirth303 && updates.rebirth303) {
+          engine.updateComplexSynthParameters(id, mergedInst.rebirth303);
+        }
+        else if (mergedInst.synthType === 'ReRebirth808' && mergedInst.rebirth808 && updates.rebirth808) {
+          engine.updateComplexSynthParameters(id, mergedInst.rebirth808);
+        }
+        else if (mergedInst.synthType === 'ReRebirth909' && mergedInst.rebirth909 && updates.rebirth909) {
+          engine.updateComplexSynthParameters(id, mergedInst.rebirth909);
+        }
         else if (mergedInst.synthType === 'OpenWurli' && mergedInst.openWurli && updates.openWurli) {
           engine.updateComplexSynthParameters(id, mergedInst.openWurli);
         }
@@ -1294,6 +1318,12 @@ export const useInstrumentStore = create<InstrumentStore>()(
             instrument.v2 = { ...DEFAULT_V2 };
           } else if (currentSynthType === 'Synare') {
             instrument.synare = { ...DEFAULT_SYNARE };
+          } else if (currentSynthType === 'ReRebirth303') {
+            instrument.rebirth303 = { ...DEFAULT_REBIRTH303 };
+          } else if (currentSynthType === 'ReRebirth808') {
+            instrument.rebirth808 = { ...DEFAULT_REBIRTH808 };
+          } else if (currentSynthType === 'ReRebirth909') {
+            instrument.rebirth909 = { ...DEFAULT_REBIRTH909 };
           } else if (currentSynthType.startsWith('Furnace')) {
             const furnaceConfig = getDefaultFurnaceConfig(currentSynthType);
             if (furnaceConfig) {

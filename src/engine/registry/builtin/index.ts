@@ -15,3 +15,6 @@ import './dx7';
 import './geonkick';
 import './cinter4';
 import './sonix';
+import './rebirth303';
+import './rebirth808';
+import './rebirth909';

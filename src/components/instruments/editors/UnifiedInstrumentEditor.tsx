@@ -158,6 +158,9 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'PinkTrombone') return 'pinktrombone';
   if (synthType === 'DECtalk') return 'dectalk';
   if (isSynareType(synthType)) return 'synare';
+  if (synthType === 'ReRebirth303') return 'rebirth303';
+  if (synthType === 'ReRebirth808') return 'rebirth808';
+  if (synthType === 'ReRebirth909') return 'rebirth909';
   if (synthType === 'Geonkick') return 'geonkick';
   if (isMAMEChipType(synthType)) return 'mamechip';
   if (isMAMEType(synthType)) return 'mame';
