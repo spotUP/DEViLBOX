@@ -84,7 +84,7 @@ async function run(order: Order, releaseAt = 0.4) {
     const engine = Object.create(ToneEngineCls.prototype) as ReturnType<typeof import('../ToneEngine').getToneEngine>;
     const e = engine as unknown as Record<string, unknown>;
     e.instruments = new Map<number, unknown>([[(1 << 16) | 0xffff, w]]);
-    for (const m of ['releaseRestoreTimeouts', 'releaseRestoreVolumeDb', 'activeVoices', 'channelActivePlayer', 'channelPitchState', 'slicePlayersMap', 'nativeEngineRouting']) e[m] = new Map();
+    for (const m of ['releaseRestoreTimeouts', 'releaseRestoreVolumeDb', 'releaseRestores', 'activeVoices', 'channelActivePlayer', 'channelPitchState', 'slicePlayersMap', 'nativeEngineRouting']) e[m] = new Map();
 
     w.triggerAttack('C4');
     ctx.setTimeout(() => { out.volBefore = w.volume.value; }, 0.2);

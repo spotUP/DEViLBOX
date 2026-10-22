@@ -44,6 +44,7 @@ function makeEngine(): { engine: ToneEngine; master: { volume: { value: number }
   internals['_djModeActive'] = false;
   internals['_stopTailMuteTimer'] = null;
   internals['masterEffectConfigs'] = new Map();
+  internals['releaseRestores'] = new Map();
   internals['releaseAll'] = () => {};
   internals['clearChannelTriggerLevels'] = () => {};
   return { engine, master };
