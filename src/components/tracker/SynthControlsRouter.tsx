@@ -10,7 +10,7 @@ import type { InstrumentConfig, MAMEConfig } from '@typedefs/instrument';
 import { getToneEngine } from '@engine/ToneEngine';
 import {
   DEFAULT_DUB_SIREN, DEFAULT_SPACE_LASER, DEFAULT_V2, DEFAULT_V2_SPEECH,
-  DEFAULT_SYNARE, DEFAULT_SAM, DEFAULT_PINK_TROMBONE, DEFAULT_DECTALK,
+  DEFAULT_SYNARE, DEFAULT_REBIRTH303, DEFAULT_REBIRTH808, DEFAULT_REBIRTH909, DEFAULT_SAM, DEFAULT_PINK_TROMBONE, DEFAULT_DECTALK,
   DEFAULT_HARMONIC_SYNTH as DEFAULT_HARMONIC_SYNTH_VAL,
   DEFAULT_UPROUGH_SOFTSYNTH,
   DEFAULT_HIVELY, DEFAULT_JAMCRACKER,
@@ -69,6 +69,15 @@ const PinkTromboneControls = lazy(() =>
 );
 const DECtalkControls = lazy(() =>
   import('@components/instruments/controls/DECtalkControls').then(m => ({ default: m.DECtalkControls }))
+);
+const ReBirth808Controls = lazy(() =>
+  import('@components/instruments/controls/ReBirth808Controls').then(m => ({ default: m.ReBirth808Controls }))
+);
+const ReBirth909Controls = lazy(() =>
+  import('@components/instruments/controls/ReBirth909Controls').then(m => ({ default: m.ReBirth909Controls }))
+);
+const ReBirth303Controls = lazy(() =>
+  import('@components/instruments/controls/ReBirth303Controls').then(m => ({ default: m.ReBirth303Controls }))
 );
 const SynareControls = lazy(() =>
   import('@components/instruments/controls/SynareControls').then(m => ({ default: m.SynareControls }))
@@ -309,6 +318,20 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     if (synthType === 'DECtalk') {
       const cfg = deepMerge(DEFAULT_DECTALK, instrument.dectalk || {});
       return <DECtalkControls config={cfg} onChange={(u) => onUpdate({ dectalk: { ...cfg, ...u } })} />;
+    }
+
+    // ── re-rebirth 303 ─────────────────────────────────────────
+    if (synthType === 'ReRebirth808') {
+      const cfg = deepMerge(DEFAULT_REBIRTH808, instrument.rebirth808 || {});
+      return <ReBirth808Controls config={cfg} onChange={(u) => onUpdate({ rebirth808: { ...cfg, ...u } })} />;
+    }
+    if (synthType === 'ReRebirth909') {
+      const cfg = deepMerge(DEFAULT_REBIRTH909, instrument.rebirth909 || {});
+      return <ReBirth909Controls config={cfg} onChange={(u) => onUpdate({ rebirth909: { ...cfg, ...u } })} />;
+    }
+    if (synthType === 'ReRebirth303') {
+      const cfg = deepMerge(DEFAULT_REBIRTH303, instrument.rebirth303 || {});
+      return <ReBirth303Controls config={cfg} onChange={(u) => onUpdate({ rebirth303: { ...cfg, ...u } })} />;
     }
 
     // ── Synare ──────────────────────────────────────────────

@@ -48,6 +48,9 @@ import {
   DEFAULT_DUB_SIREN,
   DEFAULT_SPACE_LASER,
   DEFAULT_SYNARE,
+  DEFAULT_REBIRTH303,
+  DEFAULT_REBIRTH808,
+  DEFAULT_REBIRTH909,
   DEFAULT_DRUMKIT,
   DEFAULT_SAM,
   DEFAULT_V2,
@@ -807,6 +810,9 @@ function createTempInstrument(synthType: SynthType): InstrumentConfig {
       case 'DubSiren': base.dubSiren = { ...DEFAULT_DUB_SIREN }; break;
       case 'SpaceLaser': base.spaceLaser = { ...DEFAULT_SPACE_LASER }; break;
       case 'Synare': base.synare = { ...DEFAULT_SYNARE }; break;
+      case 'ReRebirth303': base.rebirth303 = { ...DEFAULT_REBIRTH303 }; break;
+      case 'ReRebirth808': base.rebirth808 = { ...DEFAULT_REBIRTH808 }; break;
+      case 'ReRebirth909': base.rebirth909 = { ...DEFAULT_REBIRTH909 }; break;
     }
   }
 

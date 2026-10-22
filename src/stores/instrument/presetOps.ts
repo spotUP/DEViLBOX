@@ -19,6 +19,9 @@ import {
   DEFAULT_V2,
   DEFAULT_SAM,
   DEFAULT_SYNARE,
+  DEFAULT_REBIRTH303,
+  DEFAULT_REBIRTH808,
+  DEFAULT_REBIRTH909,
   DEFAULT_BUZZMACHINE,
   DEFAULT_DRUM_MACHINE,
   DEFAULT_CHIP_SYNTH,
@@ -103,6 +106,15 @@ export function getInitialConfig(synthType: string): Partial<InstrumentConfig> {
       break;
     case 'Sam':
       base.sam = { ...DEFAULT_SAM };
+      break;
+    case 'ReRebirth303':
+      base.rebirth303 = { ...DEFAULT_REBIRTH303 };
+      break;
+    case 'ReRebirth808':
+      base.rebirth808 = { ...DEFAULT_REBIRTH808 };
+      break;
+    case 'ReRebirth909':
+      base.rebirth909 = { ...DEFAULT_REBIRTH909 };
       break;
     case 'Synare':
       base.synare = { ...DEFAULT_SYNARE };
