@@ -614,9 +614,11 @@ export class TalNoizeMakerEngine implements DevilboxSynth {
   readonly voiceHub = new WasmVoiceHub((m) => this._worklet?.port.postMessage(m));
   private readonly unregisterVoiceHub: () => void;
   private params: Record<number, number> = {};
-  private isInitialized = false;
+  protected isInitialized = false;
   private pendingNotes: Array<{ note: number; velocity: number }> = [];
   private pendingPatch: number[] | null = null;
+  /** applyConfig values received before the worklet is ready; sent on top of a pending native patch. */
+  protected pendingOverrides: Record<number, number> = {};
 
   private static isWorkletLoaded = false;
   private static workletLoadPromise: Promise<void> | null = null;
@@ -688,7 +690,9 @@ export class TalNoizeMakerEngine implements DevilboxSynth {
           this.isInitialized = true;
           this.voiceHub.resume();
           if (this.pendingPatch) {
-            void loadNativePatch(this._worklet!, this.pendingPatch).catch(() => {});
+            // The native patch is the base; the instrument's own config (preset values plus later knob edits) goes on top.
+            const worklet = this._worklet!;
+            void loadNativePatch(worklet, this.pendingPatch).catch(() => {}).then(() => this.sendPendingOverrides());
             this.pendingPatch = null;
           } else {
             this.sendAllParams();
@@ -802,6 +806,12 @@ export class TalNoizeMakerEngine implements DevilboxSynth {
    * Load a native patch (complete engine state snapshot).
    * If not yet initialized, queues the patch for loading on ready.
    */
+  protected sendPendingOverrides(): void {
+    const overrides = this.pendingOverrides;
+    this.pendingOverrides = {};
+    for (const [index, value] of Object.entries(overrides)) this.set(Number(index), value);
+  }
+
   loadPatch(values: number[]): void {
     if (this.isInitialized && this._worklet) {
       void loadNativePatch(this._worklet, values).catch(() => {});
@@ -858,6 +868,10 @@ export class TalNoizeMakerSynthImpl extends TalNoizeMakerEngine {
     for (const [key, value] of Object.entries(config as Record<string, unknown>)) {
       // A layout select hands over its option value as a string ('0.5'); the engine wants the number
       const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
+      const index = CONFIG_TO_INDEX[key];
+      if (!this.isInitialized && index !== undefined && typeof n === 'number' && Number.isFinite(n)) {
+        this.pendingOverrides[index] = n;
+      }
       if (typeof n === 'number' && Number.isFinite(n) && n !== this.get(key)) {
         this.set(key, n);
       }
@@ -868,6 +882,13 @@ export class TalNoizeMakerSynthImpl extends TalNoizeMakerEngine {
 // Compatibility aliases for existing code
 export const TalNoizeMakerParam = TalNMParam;
 export const TAL_NOIZEMAKER_PARAM_NAMES = TAL_NM_PARAM_NAMES;
+
+/** A native patch's value array as a TalNoizeMakerConfig, through CONFIG_TO_INDEX (single mapping for engine and store). */
+export function talConfigFromNativeValues(values: readonly number[]): Partial<TalNoizeMakerConfig> {
+  const config: Record<string, number> = {};
+  for (const [key, idx] of Object.entries(CONFIG_TO_INDEX)) if (values[idx] !== undefined) config[key] = values[idx];
+  return config as Partial<TalNoizeMakerConfig>;
+}
 
 /** Compat: config-key-based defaults for UI components */
 export const DEFAULT_TAL_NOIZEMAKER: TalNoizeMakerConfig = {

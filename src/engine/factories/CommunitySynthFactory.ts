@@ -972,11 +972,12 @@ export function createCalfMono(config: InstrumentConfig): Tone.ToneAudioNode {
   const calfConfig = config.calfMono || {};
   const synth = new CalfMonoSynthImpl();
   void synth.init();
-  synth.applyConfig(calfConfig);
+  // The native patch is the base; instrument.calfMono (preset values plus later knob edits) goes on top and wins.
   const nativePatch = (config as unknown as Record<string, unknown>).calfMonoNativePatch;
   if (typeof nativePatch === 'string') {
     synth.loadNativePreset(nativePatch);
   }
+  synth.applyConfig(calfConfig);
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('CalfMono', config.volume));
   return synth as unknown as Tone.ToneAudioNode;
 }
@@ -1002,11 +1003,11 @@ export function createSynthV1(config: InstrumentConfig): Tone.ToneAudioNode {
   const sv1Config = config.synthv1 || {};
   const synth = new SynthV1SynthImpl();
   void synth.init();
-  synth.applyConfig(sv1Config);
   const nativePatch = (config as unknown as Record<string, unknown>).synthv1NativePatch;
   if (typeof nativePatch === 'string') {
     synth.loadNativePreset(nativePatch);
   }
+  synth.applyConfig(sv1Config);
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('SynthV1', config.volume));
   return synth as unknown as Tone.ToneAudioNode;
 }
@@ -1015,7 +1016,6 @@ export function createTalNoizeMaker(config: InstrumentConfig): Tone.ToneAudioNod
   const talConfig = config.talNoizeMaker || {};
   const synth = new TalNoizeMakerSynthImpl();
   void synth.init();
-  synth.applyConfig(talConfig);
 
   // Check for native patch preset (complete engine state from upstream ProgramChunk.h)
   const nativePresetName = (config as unknown as Record<string, unknown>).talNativePatch;
@@ -1025,6 +1025,8 @@ export function createTalNoizeMaker(config: InstrumentConfig): Tone.ToneAudioNod
     // Load first native preset as default — WASM init state is silent without a patch
     synth.loadNativePreset('! Startup Juno Osc TAL');
   }
+  // The patch is the base; instrument.talNoizeMaker (preset values plus later knob edits) goes on top and wins.
+  synth.applyConfig(talConfig);
 
   synth.output.gain.value = Tone.dbToGain(getNormalizedVolume('TalNoizeMaker', config.volume));
   return synth as unknown as Tone.ToneAudioNode;

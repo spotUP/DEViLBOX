@@ -265,6 +265,13 @@ export const CALF_MONO_PRESETS: Record<string, Partial<CalfMonoConfig>> = {
 
 // Native factory presets re-exported above from calfMonoNativePresets.ts
 
+/** A native patch's value array as a CalfMonoConfig, through CONFIG_TO_PARAM (single mapping for engine and store). */
+export function calfMonoConfigFromNativeValues(values: readonly number[]): CalfMonoConfig {
+  const config: Record<string, number> = {};
+  for (const [key, idx] of CONFIG_TO_PARAM) if (values[idx] !== undefined) config[key] = values[idx];
+  return { ...DEFAULT_CALF_MONO, ...config };
+}
+
 export class CalfMonoSynthImpl implements DevilboxSynth {
   readonly name = 'CalfMonoSynth';
   readonly output: GainNode;
@@ -275,6 +282,8 @@ export class CalfMonoSynthImpl implements DevilboxSynth {
   private ready = false;
   private config: CalfMonoConfig;
   private pendingPatch: number[] | null = null;
+  /** applyConfig values received before the worklet is ready; sent on top of a pending native patch. */
+  private pendingOverrides: Partial<CalfMonoConfig> = {};
   private _initPromise: Promise<void> | null = null;
 
   constructor() {
@@ -357,7 +366,9 @@ export class CalfMonoSynthImpl implements DevilboxSynth {
     });
 
     if (this.pendingPatch) {
-      void loadNativePatch(this.node!, this.pendingPatch).catch(() => {});
+      // The native patch is the base; the instrument's own config (preset values plus later knob edits) goes on top.
+      const node = this.node!;
+      void loadNativePatch(node, this.pendingPatch).catch(() => {}).then(() => this.sendPendingOverrides());
       this.pendingPatch = null;
     } else {
       this.applyConfig(this.config);
@@ -390,7 +401,17 @@ export class CalfMonoSynthImpl implements DevilboxSynth {
 
   getConfig(): CalfMonoConfig { return { ...this.config }; }
 
+  private sendPendingOverrides(): void {
+    const overrides = this.pendingOverrides;
+    this.pendingOverrides = {};
+    for (const [key, idx] of CONFIG_TO_PARAM) {
+      const val = overrides[key];
+      if (val !== undefined) this.setParam(idx, val);
+    }
+  }
+
   applyConfig(cfg: Partial<CalfMonoConfig>): void {
+    if (!this.ready) Object.assign(this.pendingOverrides, cfg);
     const prev = this.config;
     this.config = { ...prev, ...cfg };
     // Only send params that actually changed — avoids audio glitches from redundant messages
