@@ -86,6 +86,14 @@ export class LibopenmptEngine {
   /** Per-channel dub-send outputs. Indices [MAX_DUB_OFFSET + ch] on the worklet. */
   static readonly MAX_DUB_CHANNELS = 32;
   static readonly DUB_OUTPUT_BASE = 1 + LibopenmptEngine.MAX_ISOLATION_SLOTS; // = 17
+  /**
+   * Output lead of a hybrid song (one with replaced or synth instruments), in seconds. The worklet holds
+   * every output back this long and stamps each row's `audioTime` that far ahead, so the row reaches the
+   * coordinator and its synth notes are scheduled before the row's samples are heard. Without it the first
+   * note of a song was scheduled at or after its own time (main-thread hop plus voice build, 6-10 ms) and
+   * lost its attack: a click. Sample-only songs run with lead 0.
+   */
+  static readonly HYBRID_POSITION_LEAD_SEC = 0.03;
   private _isolationSlotMasks: (number | null)[] = new Array(LibopenmptEngine.MAX_ISOLATION_SLOTS).fill(null);
   /** Pending getWorkletDiag() resolvers, settled by the 'diagState' reply. */
   private _diagStateWaiters: ((v: Record<string, unknown> | null) => void)[] = [];
@@ -597,6 +605,8 @@ export class LibopenmptEngine {
       initialPattPos: number;
       /** If true, loadTune but don't call play() (used when the replayer is muted). */
       startMuted: boolean;
+      /** Output lead in seconds (HYBRID_POSITION_LEAD_SEC for a hybrid song); default 0. */
+      positionLeadSec?: number;
     },
   ): Promise<{ started: boolean }> {
     await this.ready();
@@ -624,6 +634,8 @@ export class LibopenmptEngine {
     }
 
     await this.loadTune(tuneData);
+    // Per song: a sample-only song after a hybrid one must run without the lead.
+    this.workletNode?.port.postMessage({ cmd: 'setLead', val: opts.positionLeadSec ?? 0 });
 
     // Route output to the destination node (typically the stereo separation
     // chain's input). Reconnect every time — the TrackerReplayer may have been

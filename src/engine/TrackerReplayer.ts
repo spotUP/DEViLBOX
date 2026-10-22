@@ -2527,6 +2527,7 @@ export class TrackerReplayer {
           initialSongPos: this.songPos,
           initialPattPos: this.pattPos,
           startMuted: this._muted,
+          positionLeadSec: this._replacedInstruments.size > 0 ? LibopenmptEngine.HYBRID_POSITION_LEAD_SEC : 0,
         });
         if (!result.started && !this.isDJDeck) releaseLoadedSongEngine();
         if (gen !== this._playGeneration) return;
