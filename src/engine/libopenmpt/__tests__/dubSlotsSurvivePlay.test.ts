@@ -58,7 +58,7 @@ describe('dub slots are restored after the worklet rebuilds the module', () => {
     // build with no playReady must still recover — just later.
     // play() loads paused and waits for playReady (playStartKeepsChannelEffectsIsolated.test.ts); a worklet
     // that predates 'load' never answers, so the backstop plays it the old way and rebuilds.
-    expect(ENGINE).toMatch(/this._isolationBackstop = setTimeout\(\(\) => \{[\s\S]*?cmd: 'play', val: data \}\);\s*this._rebuildIsolationAfterPlay\(\);\s*\}, 1000\)/);
+    expect(ENGINE).toMatch(/this._isolationBackstop = setTimeout\(\(\) => \{[\s\S]*?cmd: 'play', val: data \}\);[\s\S]*?this._rebuildIsolationAfterPlay\(\);\s*\}, 1000\)/);
     expect(ENGINE, 'a 100 ms timer is the race this fix removes')
       .not.toContain('this._rebuildIsolationAfterPlay(), 100');
   });

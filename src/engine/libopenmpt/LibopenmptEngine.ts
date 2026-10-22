@@ -409,15 +409,11 @@ export class LibopenmptEngine {
       if (this._pendingLoad !== token) return;
       this._pendingLoad = null;
       this.workletNode?.port.postMessage({ cmd: 'play', val: data });
+      // The per-channel scopes are built inside the paused 'load', before any
+      // sample renders; a build without 'load' needs them asked for.
+      this.workletNode?.port.postMessage({ cmd: 'enableOsc' });
       this._rebuildIsolationAfterPlay();
     }, 1000);
-
-    // Enable per-channel oscilloscope after worklet creates the module
-    setTimeout(() => {
-      if (this._playing && this.workletNode) {
-        this.workletNode.port.postMessage({ cmd: 'enableOsc' });
-      }
-    }, 150);
   }
 
   /**

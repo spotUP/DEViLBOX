@@ -428,6 +428,14 @@ class MPT extends AudioWorkletProcessor {
 				if (this.modulePtr) {
 					this.channels = libopenmpt._openmpt_module_get_num_channels(this.modulePtr)
 					this.meta()
+					// The scopes cost one full module parse per channel (~21 ms
+					// for a 4-channel sample XM). Built here, nothing of the song
+					// is audible yet: the hybrid synth notes wait for this
+					// module's positions, and main sits at 0, so no instance
+					// renders to catch up. Built on an 'enableOsc' 150 ms into
+					// the play, the parse blocked the audio thread over the
+					// first notes of every Play (2026-10-23).
+					this.createOscModule_()
 				}
 				this.port.postMessage({ cmd: 'playReady' })
 				break
@@ -604,7 +612,12 @@ class MPT extends AudioWorkletProcessor {
 				})
 				break
 			case 'enableOsc':
-				this.createOscModule_()
+				// The scopes of the module now loaded are already built (the
+				// paused 'load' builds them; stop() destroys them with the
+				// module). A rebuild parses the module once per channel on the
+				// audio thread, 21-27 ms against a 2.67 ms render quantum: asked
+				// for while the song plays, it stalls the output (2026-10-23).
+				if (!this.oscModules) this.createOscModule_()
 				break
 			case 'disableOsc':
 				this.destroyOscModule_()
