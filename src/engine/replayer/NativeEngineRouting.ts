@@ -28,7 +28,7 @@ import { advanceNativeSubsong } from './nativeSubsongPlayback';
 import { useWasmPositionStore } from '../../stores/useWasmPositionStore';
 import { JamCrackerEngine } from '../jamcracker/JamCrackerEngine';
 import { getActiveDubBus } from '../dub/DubBus';
-import { asIsolationCapable, getPlayingIsolationEngine, setPlayingIsolationEngine } from '../tone/ChannelRoutedEffects';
+import { asIsolationCapable, getPlayingIsolationEngine, setPlayingIsolationEngine, type IsolationCapableEngine } from '../tone/ChannelRoutedEffects';
 import { needsPaulaOutputStage } from '@engine/paulaOutput';
 import { editedModuleForPlay } from './editedModuleForPlay';
 import { isRowClipPlayer } from '@engine/rowPreview/rowClipPlayer';
@@ -176,7 +176,31 @@ export async function reportPlaybackIsolation(
  * reaches it, and every dub toggle went silent.
  */
 export function registerPlayingEngine(instance: unknown): void {
+  _loadedSongEngine = null; // a native engine plays this song: no module engine owns it
   setPlayingIsolationEngine(asIsolationCapable(instance));
+}
+
+/**
+ * The isolation engine that belongs to the LOADED song, not to the transport
+ * (libopenmpt: the module stays loaded across stop and play). Stop keeps it;
+ * only loading a different tune releases it (releaseLoadedSongEngine). When
+ * Stop cleared it, every play started with the effects aimed at channels on
+ * the whole mix until the async rebuild moved them back: a Distortion aimed
+ * at four channels drove the summed mix for the first 1-3 rows (2026-10-22).
+ */
+let _loadedSongEngine: IsolationCapableEngine | null = null;
+
+export function registerLoadedSongEngine(instance: unknown): void {
+  const engine = asIsolationCapable(instance);
+  _loadedSongEngine = engine;
+  setPlayingIsolationEngine(engine);
+}
+
+/** A different tune was loaded: the old song's engine stops answering for channel isolation. */
+export function releaseLoadedSongEngine(): void {
+  const engine = _loadedSongEngine;
+  _loadedSongEngine = null;
+  if (engine && getPlayingIsolationEngine() === engine) setPlayingIsolationEngine(null);
 }
 
 /** The song stopped on this engine: it stops being the isolation engine, unless another took over already. */
@@ -1060,7 +1084,9 @@ export function stopNativeEngines(
 ): C64SIDEngine | null {
   // The next song's engine reports its own isolation capability.
   try { getActiveDubBus()?.setEngineIsolation(null); } catch { /* ok */ }
-  setPlayingIsolationEngine(null);
+  // A native engine's registration goes with its transport; the loaded song's
+  // module engine stays registered across stop (registerLoadedSongEngine).
+  if (getPlayingIsolationEngine() !== _loadedSongEngine) setPlayingIsolationEngine(null);
   // Save running keys before clearing (needed for async engine stop below)
   const wasRunning = new Set(_runningEngineKeys);
   // Clear the running engine guard so next play() can start fresh

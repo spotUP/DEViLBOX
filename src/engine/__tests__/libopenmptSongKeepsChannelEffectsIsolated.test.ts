@@ -3,8 +3,9 @@
  *
  * ONE wiring test through the product's entry point (TrackerReplayer.play / stop / loadSong) with the REAL replayer
  * and a stub LibopenmptEngine whose isPlaying() is false (the latched flag the old resolver trusted). Sentinel:
- * startWithCoordinator ran once. Numbers: the isolation engine is the stub while the song plays and null after stop,
- * after loadSong, and a DJ deck never registers.
+ * startWithCoordinator ran once. Numbers: the isolation engine is the stub while the song plays and after stop (it
+ * belongs to the loaded song: playStartKeepsChannelEffectsIsolated.test.ts), null after loadSong of a different
+ * tune, and a DJ deck never registers.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TrackerReplayer } from '../TrackerReplayer';
@@ -47,7 +48,7 @@ const makeSong = (): TrackerSong => ({
 describe('a libopenmpt song is the isolation engine while it plays', () => {
   beforeEach(() => { setPlayingIsolationEngine(null); stub.startWithCoordinator.mockClear(); });
 
-  it('registers on play, unregisters on stop and on loadSong; a DJ deck never registers', async () => {
+  it('registers on play, stays registered across stop, unregisters on loadSong of another tune; a DJ deck never registers', async () => {
     const replayer = new TrackerReplayer();
     replayer.loadSong(makeSong());
     await replayer.play();
@@ -57,7 +58,7 @@ describe('a libopenmpt song is the isolation engine while it plays', () => {
     expect(await getActiveIsolationEngine()).toBe(stub);
 
     replayer.stop();
-    expect(getPlayingIsolationEngine()).toBeNull();
+    expect(getPlayingIsolationEngine(), 'stop keeps the loaded song engine').toBe(stub);
 
     await replayer.play();
     expect(getPlayingIsolationEngine()).toBe(stub);
