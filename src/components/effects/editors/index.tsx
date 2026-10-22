@@ -34,6 +34,7 @@ import { AutoPannerEditor, AutoWahEditor, BitCrusherEditor, ChebyshevEditor, Fre
 import { VocoderEditor, AutoTuneEditor } from './VoiceEffectEditors';
 import { TapeDegradationEditor, AmbientDelayEditor, ShimmerReverbEditor, GranularFreezeEditor } from './AdditionalEffectEditors';
 import { NeuralEditor } from './NeuralEditor';
+import { ReBirthDistortionEditor, ReBirthDelayEditor, ReBirthCompressorEditor, ReBirthPatternFilterEditor } from './RebirthEffectEditors';
 import { GenericEffectEditor, WAMEffectEditor } from './WAMEffectEditor';
 import { EffectPresetSelector } from './EffectPresetSelector';
 
@@ -132,6 +133,10 @@ const EFFECT_EDITORS: Record<string, React.FC<VisualEffectEditorProps>> = {
   MonoComp: MonoCompEditor,
   Expander: ExpanderEditor,
   Clipper: ClipperEditor,
+  ReRebirthDistortion: ReBirthDistortionEditor,
+  ReRebirthDelay: ReBirthDelayEditor,
+  ReRebirthCompressor: ReBirthCompressorEditor,
+  ReRebirthPatternFilter: ReBirthPatternFilterEditor,
   DeEsser: DeEsserEditor,
   MultibandComp: MultibandCompEditor,
   TransientDesigner: TransientDesignerEditor,
@@ -295,6 +300,10 @@ export const ENCLOSURE_COLORS: Record<string, { bg: string; bgEnd: string; accen
   MultibandLimiter:    { bg: '#081a0a', bgEnd: '#041204', accent: '#10b981', border: '#0a2a0e' },
   SidechainLimiter:    { bg: '#081a0a', bgEnd: '#041204', accent: '#10b981', border: '#0a2a0e' },
   Clipper:             { bg: '#081a0a', bgEnd: '#041204', accent: '#10b981', border: '#0a2a0e' },
+  ReRebirthDistortion:   { bg: '#081a0a', bgEnd: '#041204', accent: '#10b981', border: '#0a2a0e' },
+  ReRebirthDelay:        { bg: '#081a0a', bgEnd: '#041204', accent: '#10b981', border: '#0a2a0e' },
+  ReRebirthCompressor:   { bg: '#081a0a', bgEnd: '#041204', accent: '#10b981', border: '#0a2a0e' },
+  ReRebirthPatternFilter: { bg: '#081a0a', bgEnd: '#041204', accent: '#10b981', border: '#0a2a0e' },
   DynamicsProc:        { bg: '#081a0a', bgEnd: '#041204', accent: '#10b981', border: '#0a2a0e' },
   X42Comp:             { bg: '#081a0a', bgEnd: '#041204', accent: '#10b981', border: '#0a2a0e' },
   Ducka:               { bg: '#081a0a', bgEnd: '#041204', accent: '#10b981', border: '#0a2a0e' },
@@ -461,6 +470,10 @@ export const VisualEffectEditorWrapper: React.FC<VisualEffectEditorWrapperProps>
     MultibandLimiter: <Gauge size={18} className="text-text-primary" />,
     SidechainLimiter: <Gauge size={18} className="text-text-primary" />,
     Clipper: <Gauge size={18} className="text-text-primary" />,
+    ReRebirthDistortion: <Gauge size={18} className="text-text-primary" />,
+    ReRebirthDelay: <Gauge size={18} className="text-text-primary" />,
+    ReRebirthCompressor: <Gauge size={18} className="text-text-primary" />,
+    ReRebirthPatternFilter: <Gauge size={18} className="text-text-primary" />,
     DynamicsProc: <Gauge size={18} className="text-text-primary" />,
     X42Comp: <Gauge size={18} className="text-text-primary" />,
     Ducka: <Gauge size={18} className="text-text-primary" />,

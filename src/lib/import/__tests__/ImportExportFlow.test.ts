@@ -18,7 +18,7 @@ describe('Import/Export Flow', () => {
       const originalBuffer = createTestXM();
 
       // Import
-      const imported = await parseXM(originalBuffer);
+      const imported = await parseXM(originalBuffer, 'test.xm');
       const convertedPatterns = convertXMModule(
         imported.patterns,
         imported.header.channelCount,
@@ -54,7 +54,7 @@ describe('Import/Export Flow', () => {
         { note: 54, effectType: 0x0E, effectParam: 0xD2 },
       ]);
 
-      const imported = await parseXM(buffer);
+      const imported = await parseXM(buffer, 'test.xm');
       const converted = convertXMModule(
         imported.patterns,
         imported.header.channelCount,
@@ -83,7 +83,7 @@ describe('Import/Export Flow', () => {
       // so we verify the converter handles an instrument with 0 samples gracefully
       const buffer = createTestXM();
 
-      const imported = await parseXM(buffer);
+      const imported = await parseXM(buffer, 'test.xm');
       const instruments = imported.instruments.flatMap((inst, idx) =>
         convertToInstrument(inst, idx, 'XM')
       );
@@ -98,7 +98,7 @@ describe('Import/Export Flow', () => {
       // so we verify the converter handles an instrument with no envelope gracefully
       const buffer = createTestXM();
 
-      const imported = await parseXM(buffer);
+      const imported = await parseXM(buffer, 'test.xm');
       const instruments = imported.instruments.flatMap((inst, idx) =>
         convertToInstrument(inst, idx, 'XM')
       );
@@ -112,7 +112,7 @@ describe('Import/Export Flow', () => {
       const originalBuffer = createTestMOD();
 
       // Import
-      const imported = await parseMOD(originalBuffer);
+      const imported = await parseMOD(originalBuffer, 'test.mod');
       const convertedPatterns = convertMODModule(
         imported.patterns,
         imported.header.channelCount,
@@ -142,7 +142,7 @@ describe('Import/Export Flow', () => {
         { period: 339, instrument: 1 }, // E-3
       ]);
 
-      const imported = await parseMOD(buffer);
+      const imported = await parseMOD(buffer, 'test.mod');
       const converted = convertMODModule(imported.patterns, 4, imported.metadata, []);
 
       // Notes should be numeric XM note values (not strings)
@@ -165,7 +165,7 @@ describe('Import/Export Flow', () => {
       // so we verify the converter handles zeroed sample headers gracefully
       const buffer = createTestMOD();
 
-      const imported = await parseMOD(buffer);
+      const imported = await parseMOD(buffer, 'test.mod');
       const instruments = imported.instruments.flatMap((inst, idx) =>
         convertToInstrument(inst, idx, 'MOD')
       );
@@ -178,7 +178,7 @@ describe('Import/Export Flow', () => {
     it('should warn about lossy XM->MOD conversion', async () => {
       // Create XM with 8 channels
       const buffer = createTestXM({ channelCount: 8 });
-      const imported = await parseXM(buffer);
+      const imported = await parseXM(buffer, 'test.xm');
       const patterns = convertXMModule(imported.patterns, 8, imported.metadata, []);
       const instruments = imported.instruments.flatMap((inst, idx) =>
         convertToInstrument(inst, idx, 'XM')
@@ -197,7 +197,7 @@ describe('Import/Export Flow', () => {
 
     it('should warn about pattern length truncation in MOD', async () => {
       const buffer = createTestXM();
-      const imported = await parseXM(buffer);
+      const imported = await parseXM(buffer, 'test.xm');
       const patterns = convertXMModule(imported.patterns, 4, imported.metadata, []);
       const instruments = imported.instruments.flatMap((inst, idx) =>
         convertToInstrument(inst, idx, 'XM')
@@ -289,7 +289,7 @@ describe('Import/Export Flow', () => {
   describe('Import Metadata Preservation', () => {
     it('should preserve import metadata for lossless export', async () => {
       const buffer = createTestXM();
-      const imported = await parseXM(buffer);
+      const imported = await parseXM(buffer, 'test.xm');
 
       // Check metadata exists
       expect(imported.metadata.sourceFormat).toBe('XM');
@@ -311,7 +311,7 @@ describe('Import/Export Flow', () => {
 
     it('should enable lossless export when metadata present', async () => {
       const buffer = createTestXM();
-      const imported = await parseXM(buffer);
+      const imported = await parseXM(buffer, 'test.xm');
       const patterns = convertXMModule(imported.patterns, 4, imported.metadata, []);
       const instruments = imported.instruments.flatMap((inst, idx) =>
         convertToInstrument(inst, idx, 'XM')
@@ -330,7 +330,7 @@ describe('Import/Export Flow', () => {
   describe('Edge Cases', () => {
     it('should handle empty patterns', async () => {
       const buffer = createXMWithEmptyPattern();
-      const imported = await parseXM(buffer);
+      const imported = await parseXM(buffer, 'test.xm');
       const patterns = convertXMModule(imported.patterns, 4, imported.metadata, []);
 
       expect(patterns.patterns.length).toBeGreaterThan(0);
@@ -339,7 +339,7 @@ describe('Import/Export Flow', () => {
 
     it('should handle modules with no instruments', async () => {
       const buffer = createXMWithNoInstruments();
-      const imported = await parseXM(buffer);
+      const imported = await parseXM(buffer, 'test.xm');
       const instruments = imported.instruments.flatMap((inst, idx) =>
         convertToInstrument(inst, idx, 'XM')
       );
@@ -349,7 +349,7 @@ describe('Import/Export Flow', () => {
 
     it('should handle max channel count (XM=32, MOD=8)', async () => {
       const buffer = createTestXM({ channelCount: 32 });
-      const imported = await parseXM(buffer);
+      const imported = await parseXM(buffer, 'test.xm');
 
       expect(imported.header.channelCount).toBe(32);
 

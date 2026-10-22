@@ -8,6 +8,7 @@
 
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { applyModuleGenre } from '@/lib/moduleGenre';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -52,6 +53,11 @@ interface TrackerAnalysisState {
   
   // In-memory cache (persisted separately to IndexedDB)
   cache: Map<string, FullAnalysisResult>;
+
+  // The server's ModArchive genre tag for a file (lib/moduleGenre.ts). It replaces
+  // the audio model's genre in currentAnalysis whenever fileHash is the current file;
+  // the cache keeps the audio result, so the tag is never persisted.
+  moduleGenre: { fileHash: string; tag: string } | null;
   
   // Actions
   startCapture: (fileHash: string) => void;
@@ -64,6 +70,17 @@ interface TrackerAnalysisState {
   getCached: (fileHash: string) => FullAnalysisResult | null;
   setCached: (fileHash: string, result: FullAnalysisResult) => void;
   loadCacheFromDB: (entries: Array<{ hash: string; result: FullAnalysisResult }>) => void;
+  setModuleGenre: (fileHash: string, tag: string) => void;
+}
+
+/** The analysis as shown: the audio result with the file's ModArchive genre, when known. */
+function withModuleGenre(
+  result: FullAnalysisResult,
+  fileHash: string | null,
+  moduleGenre: TrackerAnalysisState['moduleGenre'],
+): FullAnalysisResult {
+  if (!moduleGenre || moduleGenre.fileHash !== fileHash) return result;
+  return { ...result, genre: applyModuleGenre(result.genre, moduleGenre.tag) };
 }
 
 // ── Store ────────────────────────────────────────────────────────────────────
@@ -78,6 +95,7 @@ export const useTrackerAnalysisStore = create<TrackerAnalysisState>()(
     analysisProgress: 0,
     error: null,
     cache: new Map(),
+    moduleGenre: null,
     
     // Start capturing audio for a file
     startCapture: (fileHash: string) => {
@@ -85,7 +103,7 @@ export const useTrackerAnalysisStore = create<TrackerAnalysisState>()(
       const cached = get().cache.get(fileHash);
       if (cached) {
         set({
-          currentAnalysis: cached,
+          currentAnalysis: withModuleGenre(cached, fileHash, get().moduleGenre),
           currentFileHash: fileHash,
           analysisState: 'ready',
           captureProgress: 100,
@@ -128,7 +146,7 @@ export const useTrackerAnalysisStore = create<TrackerAnalysisState>()(
       }
       
       set({
-        currentAnalysis: result,
+        currentAnalysis: withModuleGenre(result, fileHash, get().moduleGenre),
         analysisState: 'ready',
         captureProgress: 100,
         analysisProgress: 100,
@@ -168,6 +186,15 @@ export const useTrackerAnalysisStore = create<TrackerAnalysisState>()(
         cache.set(hash, result);
       }
       set({ cache });
+    },
+
+    setModuleGenre: (fileHash: string, tag: string) => {
+      const moduleGenre = { fileHash, tag };
+      const { currentAnalysis, currentFileHash, cache } = get();
+      const audio = currentFileHash === fileHash ? cache.get(fileHash) ?? currentAnalysis : null;
+      set(audio
+        ? { moduleGenre, currentAnalysis: withModuleGenre(audio, fileHash, moduleGenre) }
+        : { moduleGenre });
     },
   })),
 );

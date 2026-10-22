@@ -8,14 +8,8 @@ import { extractPatternsFromLibOpenMPT, hashPatterns } from '../modland/PatternH
 import { useModlandResultStore } from '@/stores/useModlandResultStore';
 import type { ChiptuneMetadata } from '../import/ChiptunePlayer';
 
-/**
- * Files the app fetched from Modland itself (the Modland browser) or from its own song library: never a
- * "rare find", whatever the hash database says about this copy (it answered "no match" for corpus songs, so
- * the contribution prompt fired on a file that came from Modland). The loader asks before prompting.
- */
-const knownSourceNames = new Set<string>();
-export function markKnownSource(filename: string): void { knownSourceNames.add(filename.toLowerCase()); }
-export function isKnownSource(filename: string): boolean { return knownSourceNames.has(filename.toLowerCase()); }
+// The known-source set lives in knownSource.ts (modlandApi marks it); re-exported for the loader and tests.
+export { markKnownSource, isKnownSource } from './knownSource';
 
 export interface ModlandCheckResult {
   found: boolean;

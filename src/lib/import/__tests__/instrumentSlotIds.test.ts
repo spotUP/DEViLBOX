@@ -37,7 +37,7 @@ const parsed = (id: number): ParsedInstrument => ({ id, name: `s${id}`, samples:
 describe('instrument slot ids on import', () => {
   it('MOD keeps all 31 slots, empty ones included, and samples after an empty slot keep their slot number', async () => {
     const bytes = readFileSync(MICRO15);
-    const { instruments } = await parseMOD(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+    const { instruments } = await parseMOD(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), 'test.mod');
     const converted = convertParsedInstruments(instruments, 'MOD');
     expect(converted.map((i) => i.id)).toEqual(Array.from({ length: 31 }, (_, i) => i + 1));
     // Slot 16 is the 1960-byte hi-hat, not slot 19's 222-byte loop.
@@ -54,7 +54,7 @@ describe('instrument slot ids on import', () => {
     const { useTrackerStore } = await import('@/stores/useTrackerStore');
     const bytes = readFileSync(MICRO15);
     const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-    const parsedMod = await parseMOD(arrayBuffer);
+    const parsedMod = await parseMOD(arrayBuffer, 'test.mod');
     const info = {
       metadata: { title: 'micro15', type: 'MOD', channels: 4, patterns: 5, orders: 6, instruments: 16, samples: 16, duration: 0 },
       arrayBuffer, file: new File([bytes], 'micro15.mod'),

@@ -11,6 +11,7 @@ import { EffectRegistry } from '../EffectRegistry';
 import './tonejs';
 import './wasm';
 import './tumult';
+import './rebirth';
 import './tapesimulator';
 
 // ── Lazy: WAM 2.0 effects (11 effects) ───────────────────────────────────
