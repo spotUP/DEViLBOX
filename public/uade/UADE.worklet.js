@@ -2612,7 +2612,7 @@ class UADEProcessor extends AudioWorkletProcessor {
     }
     // Meter levels at the playback cadence (~20 Hz), and once more when the clip ends.
     if ((++this._clipQuanta % 8) === 0 || !this.clip.active) {
-      this.port.postMessage({ type: 'chLevels', levels: Float32Array.from([0, 1, 2, 3].map(v => this._clipPeaks[v] || 0)), noteStarts: null });
+      this.port.postMessage({ type: 'chLevels', levels: Float32Array.from([0, 1, 2, 3].map(v => this._clipPeaks[v] || 0)), noteStarts: null, audioTime: currentTime });
       this._clipPeaks = [];
     }
     // The clip is its own stretch of audio: its scope samples go out now and are not joined to what follows.
@@ -2739,7 +2739,7 @@ class UADEProcessor extends AudioWorkletProcessor {
           this._wasm._uade_wasm_get_note_start_counts(this._channelBuf);
           noteStarts = Array.from(new Uint32Array(this._wasm.HEAPU8.buffer, this._channelBuf, 4));
         }
-        this.port.postMessage({ type: 'chLevels', levels, noteStarts });
+        this.port.postMessage({ type: 'chLevels', levels, noteStarts, audioTime: currentTime });
 
         this._lastChannelPost = currentTime;
       }

@@ -67,6 +67,31 @@ describe('ChannelMeterFeed.reportAt', () => {
     expect(notes).toEqual([0]);
   });
 
+  it('a held report is fed when it falls due, not when the next report arrives', () => {
+    // UADE reports at 20 Hz: fed only on the next arrival, a level showed up to 50 ms after it was heard.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      const feed = new ChannelMeterFeed();
+      feed.reportAt([0.4], [1], 1.033, 1.0);
+      vi.advanceTimersByTime(30);
+      expect(levels, 'the meters moved before the report was heard').toEqual([]);
+      vi.advanceTimersByTime(4);
+      expect(levels).toEqual([[0.4]]);
+      expect(notes).toEqual([0]);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('clearHeld drops held reports and their timer, so a stop does not show the old song', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      const feed = new ChannelMeterFeed();
+      feed.reportAt([0.4], null, 1.0, 0.9);
+      feed.clearHeld();
+      vi.advanceTimersByTime(200);
+      expect(levels).toEqual([]);
+    } finally { vi.useRealTimers(); }
+  });
+
   it('clearHeld drops held reports, so a stop does not show the old song', () => {
     const feed = new ChannelMeterFeed();
     feed.reportAt([0.4], null, 1.0, 0.9);

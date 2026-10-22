@@ -16,14 +16,9 @@ import { useSettingsStore } from '@stores/useSettingsStore';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { registerDubOutputBase } from '../tone/dubOutputBase';
 import { ChannelMeterFeed } from '../tone/channelMeterFeed';
+import { outputLatencySec } from '../audioLatency';
 
 const meterFeed = new ChannelMeterFeed();
-
-/** Seconds from the destination to the speakers (outputLatency, else baseLatency). */
-function outputLatencyOf(ctx: AudioContext): number {
-  const c = ctx as unknown as { outputLatency?: number; baseLatency?: number };
-  return c.outputLatency ?? c.baseLatency ?? 0;
-}
 
 /** Highest pattern note number libopenmpt reports for a played note (254 and 255 are cut and off). */
 const MAX_PLAYED_NOTE = 120;
@@ -213,7 +208,7 @@ export class LibopenmptEngine {
           // until this row is heard: audioTime is when the worklet's output
           // reaches the destination, the output latency is the rest.
           const rawCtx = this.output.context as AudioContext;
-          meterFeed.reportAt(chLevels, this._noteStarts, (audioTime ?? rawCtx.currentTime) + outputLatencyOf(rawCtx), rawCtx.currentTime);
+          meterFeed.reportAt(chLevels, this._noteStarts, (audioTime ?? rawCtx.currentTime) + outputLatencySec(rawCtx), rawCtx.currentTime);
         }
         if (chState && this._onChannelState) {
           const arr = chState as Float64Array;
@@ -232,7 +227,7 @@ export class LibopenmptEngine {
             });
           }
           const rawCtx = this.output.context as AudioContext;
-          const time = rawCtx.currentTime + outputLatencyOf(rawCtx);
+          const time = rawCtx.currentTime + outputLatencySec(rawCtx);
           this._onChannelState(state, time);
         }
         break;

@@ -26,6 +26,7 @@ import { uadeEditableLoadArgs, uadeMask, uadeRowClock, uadeRowFrames, type UadeL
 import { tickGridPosition, playerTickGridPosition, type TickGrid } from '@/lib/tracker/tickGridPosition';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { ChannelMeterFeed } from '../tone/channelMeterFeed';
+import { outputLatencySec } from '../audioLatency';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -441,9 +442,14 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
           }
           break;
 
-        case 'chLevels':
-          meterFeed.report(data.levels, data.noteStarts);
+        case 'chLevels': {
+          // Levels are read after the block that starts at audioTime; held until
+          // that block is heard (the output latency later), not fed on arrival.
+          const ctx = this.audioContext;
+          if (ctx) meterFeed.reportAt(data.levels, data.noteStarts, (data.audioTime ?? ctx.currentTime) + outputLatencySec(ctx), ctx.currentTime);
+          else meterFeed.report(data.levels, data.noteStarts);
           break;
+        }
 
         case 'oscData':
           useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
@@ -705,6 +711,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
   async load(data: ArrayBuffer, filenameHint: string, skipScan = false, subsong = 0, scanTimeoutSec?: number, looping?: boolean, pinSubsong = false, companions?: UADECompanions, signal?: AbortSignal): Promise<UADEMetadata> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('UADEEngine not initialized');
+    meterFeed.clearHeld();
 
     // Clone buffer before transferring (caller may need it later for subsong switching)
     // Ensure we have a real ArrayBuffer — Uint8Array.slice() returns a Uint8Array,
@@ -830,6 +837,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
   }
 
   stop(): void {
+    meterFeed.clearHeld();
     this.workletNode?.port.postMessage({ type: 'stop' });
     this.workletNode?.port.postMessage({ type: 'disableOsc' });
     useOscilloscopeStore.getState().clear();

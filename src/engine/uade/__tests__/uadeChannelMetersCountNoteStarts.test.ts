@@ -22,8 +22,10 @@ describe('UADE channel meters', { timeout: 120_000 }, () => {
       (globalThis as { __workletClock?: number }).__workletClock = (q * 128) / 48000;
       proc.process([], stereoOutputs(37));
       while (posted.length) {
-        const m = posted.shift() as { type?: string; levels?: Float32Array; noteStarts?: number[] };
+        const m = posted.shift() as { type?: string; levels?: Float32Array; noteStarts?: number[]; audioTime?: number };
         if (m.type !== 'chLevels') continue;
+        // The block the levels were read after: the engine holds the report until it is heard.
+        expect(m.audioTime).toBe((q * 128) / 48000);
         countedFeed.feedCounted(sinkOf(counted), m.levels!, m.noteStarts!);
         levelFeed.feed(sinkOf(byLevel), m.levels!);
       }
