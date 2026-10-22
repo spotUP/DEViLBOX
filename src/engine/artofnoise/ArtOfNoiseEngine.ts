@@ -82,7 +82,7 @@ export class ArtOfNoiseEngine extends WASMSingletonBase {
             for (let ch = 0; ch < levels.length / 2; ch++) {
               peaks.push(Math.max(levels[ch * 2], levels[ch * 2 + 1]));
             }
-            meterFeed.report(peaks, data.noteStarts);
+            meterFeed.reportFromWorklet({ levels: peaks, noteStarts: data.noteStarts, audioTime: data.audioTime }, this.audioContext);
           }
           break;
 
@@ -105,6 +105,7 @@ export class ArtOfNoiseEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('ArtOfNoiseEngine not initialized');
+    meterFeed.clearHeld();
 
     this.workletNode.port.postMessage(
       { type: 'loadModule', moduleData: buffer },
@@ -116,6 +117,7 @@ export class ArtOfNoiseEngine extends WASMSingletonBase {
   }
 
   stop(): void {
+    meterFeed.clearHeld();
     this.workletNode?.port.postMessage({ type: 'stop' });
   }
 

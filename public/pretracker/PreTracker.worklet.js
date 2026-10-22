@@ -695,7 +695,7 @@ class PreTrackerProcessor extends AudioWorkletProcessor {
           const heapU8 = this.module.HEAPU8 || new Uint8Array(this.module.wasmMemory.buffer);
           noteStarts = Array.from(new Uint32Array(heapU8.buffer, this._noteStartsPtr, 4));
         }
-        this.port.postMessage({ type: 'chLevels', levels, noteStarts, position: pos, row });
+        this.port.postMessage({ type: 'chLevels', levels, noteStarts, position: pos, row, audioTime: currentTime });
       }
     }
 

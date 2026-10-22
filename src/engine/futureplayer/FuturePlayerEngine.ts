@@ -136,7 +136,7 @@ export class FuturePlayerEngine extends WASMSingletonBase {
         }
 
         case 'chLevels':
-          meterFeed.report(data.levels, data.noteStarts);
+          meterFeed.reportFromWorklet(data, this.audioContext);
           break;
 
         case 'pattern-data': {
@@ -186,6 +186,7 @@ export class FuturePlayerEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer, subsong = 0): Promise<FuturePlayerTuneInfo> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('FuturePlayerEngine not initialized');
+    meterFeed.clearHeld();
 
     // the importer's grid layout of the tune, from the same walk (the buffer is transferred below)
     const walk = walkFuturePlayer(fpCodeSection(new Uint8Array(buffer)), subsong);
@@ -211,6 +212,7 @@ export class FuturePlayerEngine extends WASMSingletonBase {
   }
 
   stop(): void {
+    meterFeed.clearHeld();
     this.workletNode?.port.postMessage({ type: 'stop' });
   }
 

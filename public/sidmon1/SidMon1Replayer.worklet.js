@@ -339,7 +339,7 @@ class SidMon1ReplayerProcessor extends AudioWorkletProcessor {
           this.module._player_get_note_start_counts(this.noteStartsPtr, 4);
           noteStarts = Array.from(new Uint32Array((this.module.HEAPU8 || new Uint8Array(this.module.wasmMemory.buffer)).buffer, this.noteStartsPtr, 4));
         }
-        this.port.postMessage({ type: 'chLevels', levels: [heapF32[off], heapF32[off+1], heapF32[off+2], heapF32[off+3]], noteStarts });
+        this.port.postMessage({ type: 'chLevels', levels: [heapF32[off], heapF32[off+1], heapF32[off+2], heapF32[off+3]], noteStarts, audioTime: currentTime });
       }
     }
 

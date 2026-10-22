@@ -276,7 +276,7 @@ export class KlysEngine extends WASMSingletonBase {
           break;
 
         case 'chLevels':
-          meterFeed.report(data.levels, data.noteStarts);
+          meterFeed.reportFromWorklet(data, this.audioContext);
           break;
 
         case 'oscData':
@@ -298,6 +298,7 @@ export class KlysEngine extends WASMSingletonBase {
   async loadSong(buffer: ArrayBuffer): Promise<KlysSongInfo> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('KlysEngine not initialized');
+    meterFeed.clearHeld();
 
     this._songPromise = new Promise<KlysSongInfo>((resolve, reject) => {
       this._resolveSong = resolve;
@@ -322,6 +323,7 @@ export class KlysEngine extends WASMSingletonBase {
   }
 
   stop(): void {
+    meterFeed.clearHeld();
     this.workletNode?.port.postMessage({ type: 'stop' });
     this.workletNode?.port.postMessage({ type: 'disableOsc' });
     useOscilloscopeStore.getState().clear();

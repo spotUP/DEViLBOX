@@ -94,7 +94,7 @@ export class MaEngine extends WASMSingletonBase {
           break;
         }
         case 'chLevels':
-          meterFeed.report(data.levels, data.noteStarts);
+          meterFeed.reportFromWorklet(data, this.audioContext);
           break;
         case 'trackLength':
         case 'cellData':
@@ -131,6 +131,7 @@ export class MaEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer, subsong = 0): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('MaEngine not initialized');
+    meterFeed.clearHeld();
     // the importer's grid layout of the tune, from the same walk
     const m = loadMaModule(new Uint8Array(buffer));
     const walk = m ? walkMusicAssembler(m, subsong) : null;
@@ -145,7 +146,7 @@ export class MaEngine extends WASMSingletonBase {
   }
 
   play(): void { this.workletNode?.port.postMessage({ type: 'play' }); }
-  stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
+  stop(): void { meterFeed.clearHeld(); this.workletNode?.port.postMessage({ type: 'stop' }); }
   pause(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
 
   /**

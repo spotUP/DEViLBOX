@@ -375,7 +375,7 @@ class PumaTrackerProcessor extends AudioWorkletProcessor {
           const heapU8 = this.module.HEAPU8 || new Uint8Array(this.module.wasmMemory.buffer);
           noteStarts = Array.from(new Uint32Array(heapU8.buffer, this._noteStartsPtr, 4));
         }
-        this.port.postMessage({ type: 'chLevels', levels: [heapF32[off], heapF32[off+1], heapF32[off+2], heapF32[off+3]], noteStarts });
+        this.port.postMessage({ type: 'chLevels', levels: [heapF32[off], heapF32[off+1], heapF32[off+2], heapF32[off+3]], noteStarts, audioTime: currentTime });
       }
     }
 

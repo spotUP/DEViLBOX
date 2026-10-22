@@ -398,7 +398,7 @@ class NuadeProcessor extends AudioWorkletProcessor {
     const m = this.module;
     const n = m._nw_vu(this.vuPtr, this.voices);
     const levels = Array.from(new Float32Array(m.HEAPU8.buffer, this.vuPtr, n));
-    this.port.postMessage({ type: 'vu', levels: this.maskedLevels(levels) });
+    this.port.postMessage({ type: 'vu', levels: this.maskedLevels(levels), audioTime: currentTime });
   }
 
   /**
@@ -445,7 +445,7 @@ class NuadeProcessor extends AudioWorkletProcessor {
       this.clipPeaks[v] = peak;
     }
     if ((++this.clipQuanta % VU_EVERY) === 0 || !this.clip.active) {
-      this.port.postMessage({ type: 'vu', levels: this.maskedLevels(this.clipPeaks.slice()) });
+      this.port.postMessage({ type: 'vu', levels: this.maskedLevels(this.clipPeaks.slice()), audioTime: currentTime });
       this.clipPeaks = [];
     }
     // The clip is its own stretch of audio: its scope samples go out now and are not joined to what follows.

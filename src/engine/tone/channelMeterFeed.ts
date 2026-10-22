@@ -13,6 +13,8 @@
  * A silent channel reports neither, so it stays dark.
  */
 
+import { outputLatencySec, type LatencySource } from '../audioLatency';
+
 /** Per-frame rise in a channel level that counts as a note starting. */
 export const VU_ONSET_RISE = 0.1;
 
@@ -72,6 +74,20 @@ export class ChannelMeterFeed {
     this.clockAudio = now;
     this.clockPerf = performance.now();
     this.drainDue(now);
+  }
+
+  /**
+   * A level message from an engine's worklet: held until the block it was read
+   * after is heard. The worklet stamps `audioTime` (its currentTime when it
+   * posted); the heard time is that plus the output latency. Without a context
+   * there is no clock to hold against, so the report is fed on arrival.
+   */
+  reportFromWorklet(
+    data: { levels: ArrayLike<number>; noteStarts?: ArrayLike<number> | null; audioTime?: number },
+    ctx: (BaseAudioContext & LatencySource) | null | undefined,
+  ): void {
+    if (ctx) this.reportAt(data.levels, data.noteStarts ?? null, (data.audioTime ?? ctx.currentTime) + outputLatencySec(ctx), ctx.currentTime);
+    else this.report(data.levels, data.noteStarts);
   }
 
   /** Drop held reports: a stop or a new song must not feed the old song's levels. */

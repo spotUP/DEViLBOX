@@ -26,7 +26,6 @@ import { uadeEditableLoadArgs, uadeMask, uadeRowClock, uadeRowFrames, type UadeL
 import { tickGridPosition, playerTickGridPosition, type TickGrid } from '@/lib/tracker/tickGridPosition';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { ChannelMeterFeed } from '../tone/channelMeterFeed';
-import { outputLatencySec } from '../audioLatency';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -445,9 +444,7 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
         case 'chLevels': {
           // Levels are read after the block that starts at audioTime; held until
           // that block is heard (the output latency later), not fed on arrival.
-          const ctx = this.audioContext;
-          if (ctx) meterFeed.reportAt(data.levels, data.noteStarts, (data.audioTime ?? ctx.currentTime) + outputLatencySec(ctx), ctx.currentTime);
-          else meterFeed.report(data.levels, data.noteStarts);
+          meterFeed.reportFromWorklet(data, this.audioContext);
           break;
         }
 

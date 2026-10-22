@@ -102,7 +102,7 @@ export class SidMon1ReplayerEngine extends WASMSingletonBase {
           break;
 
         case 'chLevels':
-          meterFeed.report(data.levels, data.noteStarts);
+          meterFeed.reportFromWorklet(data, this.audioContext);
           break;
 
         case 'instrumentParam':
@@ -134,6 +134,7 @@ export class SidMon1ReplayerEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('SidMon1ReplayerEngine not initialized');
+    meterFeed.clearHeld();
 
     this.workletNode.port.postMessage(
       { type: 'loadModule', moduleData: buffer },
@@ -174,6 +175,7 @@ export class SidMon1ReplayerEngine extends WASMSingletonBase {
   }
 
   stop(): void {
+    meterFeed.clearHeld();
     this.workletNode?.port.postMessage({ type: 'pause' });
   }
 

@@ -167,7 +167,7 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
       }
       case 'vu':
         // The same meter feed the other engines report to (what the channel meters and get_audio_level's callers read).
-        this.meterFeed.report(data.levels);
+        this.meterFeed.reportFromWorklet(data, this.audioContext);
         break;
       case 'oscData':
         useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
@@ -203,6 +203,7 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
   async loadTune(moduleData: ArrayBuffer, playerId?: string, fileName?: string, subsong?: number, companions?: Map<string, ArrayBuffer>): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('NuadeEngine not initialized');
+    this.meterFeed.clearHeld();
     if (!playerId) throw new Error('NuadeEngine: no player id');
     // The node is sized for this song: ask the player how many voices it has before the module goes to the worklet.
     const voices = (await nuadeVoiceCounter()(new Uint8Array(moduleData), fileName || playerId, playerId, companions))?.voices ?? null;
@@ -224,7 +225,7 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
     this.post({ type: 'play', latencyFrames: Math.round(latency * ctx.sampleRate) });
     this.afterPlay();
   }
-  stop(): void { this.post({ type: 'stop' }); }
+  stop(): void { this.meterFeed.clearHeld(); this.post({ type: 'stop' }); }
   pause(): void { this.post({ type: 'pause' }); }
 
   /** Bit N set = voice N audible - the mixer's solo/mute. */
