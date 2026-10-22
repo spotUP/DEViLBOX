@@ -19,6 +19,7 @@
  */
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest';
 import { loadDubBus, makeDubBusRig, releaseDubBusRigClock, feedTone } from '@/test/audio/dubBusRig';
+import { makeTapeSatCurve } from '@/lib/dub/tapeSatCurve';
 import { DEFAULT_DUB_BUS, type DubBusSettings } from '@/types/dub';
 
 const addSidechainTap = vi.fn(async (_ch: number, _node: AudioNode) => true);
@@ -68,9 +69,9 @@ const CASES: Record<Key, Case> = {
   throwQuantize: { value: 'bar', exempt: NOT_IN_BUS('DubActions scheduleQuantizedThrow delays the throw to the beat grid', "'throwQuantize' describe, deck tap opens later") },
   bassShelfGainDb: { value: 8 },
   bassShelfFreqHz: { value: 300 },
-  bassShelfQ: { value: 3, exempt: 'Web Audio lowshelf ignores Q, so the ramp on bassShelf.Q cannot change the sound; the AudioParam value is not distinguished by the harness walker.' },
-  masterBassDb: { value: 6, exempt: 'Acts only through the master trim when the master insert is active (private state); see masterBassOnlyMaster.test.ts. UNVERIFIED here.' },
-  masterBassPunchDb: { value: 6, exempt: 'Acts only through the master trim when the master insert is active (private state); see masterBassOnlyMaster.test.ts. UNVERIFIED here.' },
+  bassShelfQ: { value: 3, exempt: 'Not visible to the snapshot walker; proven in the knobs the snapshot walker cannot show, read at their consumer describe: bassShelf, both feedback shelf comps and masterBassPunch Q AudioParams move (DubBus.ts:4630-4645)' },
+  masterBassDb: { value: 6, exempt: 'Not visible to the snapshot walker; proven in the knobs the snapshot walker cannot show, read at their consumer describe: wireMasterInsert then lowDrive/lowOut change (DubBus.ts:5542-5648)' },
+  masterBassPunchDb: { value: 6, exempt: 'Not visible to the snapshot walker; proven in the knobs the snapshot walker cannot show, read at their consumer describe: wireMasterInsert then masterBassPunch.gain rises (DubBus.ts:5542-5648)' },
   midScoopGainDb: { value: -8 },
   midScoopFreqHz: { value: 1500, needs: { midScoopGainDb: -8 } },
   midScoopQ: { value: 4, needs: { midScoopGainDb: -8 } },
@@ -90,11 +91,11 @@ const CASES: Record<Key, Case> = {
   pingPongWet: { value: 0.2, ping: true },
   pingPongSyncToBpm: { value: true, exempt: 'Not consumed by DubBus: DrumPadEngine.startDubSettingsMirror turns it into pingPongLMs/RMs from the active BPM before the bus sees it. Proven below through the real mirror into bus.setSettings -> startPingPong -> delay AudioParam.' },
   re201DelayMode: { value: 6, needs: { echoEngine: 're201' } },
-  sirenPreset: { value: 'foghorn', siren: true, exempt: "Read when the siren starts; DubSirenSynth needs a ToneEngine that the offline rig does not create (logged 'AudioContext not initialized'). UNVERIFIED here." },
+  sirenPreset: { value: 'foghorn', siren: true, exempt: 'Not visible to the snapshot walker; proven in the knobs the snapshot walker cannot show, read at their consumer describe: startSiren plays a different note per preset (DubBus.ts:3587-3620)' },
   echoMode: { value: 9 },
-  echoFeedbackHpfHz: { value: 900, exempt: "Forwarded to the echo engine's feedback filter; not reached by the harness walker or too subtle in 0.8 s. UNVERIFIED here." },
-  echoFeedbackLpfHz: { value: 1800, exempt: "Forwarded to the echo engine's feedback filter; not reached by the harness walker or too subtle in 0.8 s. UNVERIFIED here." },
-  plateStage: { value: 'dattorro', exempt: 'The dattorro stage is async WASM, not available in the offline rig. UNVERIFIED here.' },
+  echoFeedbackHpfHz: { value: 900, exempt: 'Not visible to the snapshot walker; proven in the knobs the snapshot walker cannot show, read at their consumer describe: echo.fx.feedbackHpf.frequency moves (DubBus.ts:4690-4694)' },
+  echoFeedbackLpfHz: { value: 1800, exempt: 'Not visible to the snapshot walker; proven in the knobs the snapshot walker cannot show, read at their consumer describe: echo.fx.feedbackLpf.frequency moves (DubBus.ts:4690-4694)' },
+  plateStage: { value: 'dattorro', exempt: 'Not visible to the snapshot walker; proven in the knobs the snapshot walker cannot show, read at their consumer describe: bus swaps MadProfessor/Dattorro/off plate node (DubBus.ts setPlateStage; was a dead knob before the installed-kind guard)' },
   plateStageMix: { value: 0.9 },
   returnEqEnabled: { value: false, needs: { returnEqGain: 6 } },
   returnEqFreq: { value: 2000, needs: { returnEqGain: 6 } },
@@ -116,19 +117,19 @@ const CASES: Record<Key, Case> = {
   returnEqLpFreq: { value: 2000, needs: { returnEqLpEnabled: true } },
   returnEqLpQ: { value: 4, needs: { returnEqLpEnabled: true } },
   sweepMode: { value: 'phaser', needs: { sweepAmount: 0.6 } },
-  subHarmonicMode: { value: 'continuous', exempt: 'Read through a getter by the sub-harmonic move, not applied to a node by setSettings. UNVERIFIED here.' },
+  subHarmonicMode: { value: 'continuous', exempt: 'Not visible to the snapshot walker; proven in the knobs the snapshot walker cannot show, read at their consumer describe: subHarmonic.execute starts pulse vs bed (moves/subHarmonic.ts:42, getter DubBus.ts:3040)' },
   phaserRate: { value: 3, needs: { sweepAmount: 0.6, sweepMode: 'phaser' } },
   phaserDepth: { value: 0.2, needs: { sweepAmount: 0.6, sweepMode: 'phaser' } },
   phaserStages: { value: 10, needs: { sweepAmount: 0.6, sweepMode: 'phaser' } },
   phaserFeedback: { value: -0.6, needs: { sweepAmount: 0.6, sweepMode: 'phaser' } },
   postEchoSatEnabled: { value: true },
-  postEchoSatDrive: { value: 0.9, needs: { postEchoSatEnabled: true }, exempt: 'Coalesced to the end of a gesture; not applied inside the 0.8 s render. UNVERIFIED here.' },
+  postEchoSatDrive: { value: 0.9, needs: { postEchoSatEnabled: true }, exempt: 'Rig limit: the offline WaveShaperNode rejects a second curve assignment ("cannot assign curve twice"), which DubBus.ts:4829 swallows, so the rebuilt curve never lands on the node. Partly proven: the 60 ms timer fires and makeTapeSatCurve differs per drive (postEchoSatDrive test, consumer DubBus.ts:4809-4832).' },
   ringModEnabled: { value: true, needs: { ringModAmount: 0.8 } },
   ringModFreq: { value: 900, needs: { ringModEnabled: true, ringModAmount: 0.8 } },
   ringModWaveform: { value: 1, needs: { ringModEnabled: true, ringModAmount: 0.8 } },
   ringModMix: { value: 0.9, needs: { ringModEnabled: true, ringModAmount: 0.8 } },
   ringModAmount: { value: 0.8, needs: { ringModEnabled: true } },
-  lofiEnabled: { value: true, exempt: 'Ramps lofiBypass with setTargetAtTime; harness showed no difference. UNVERIFIED here.' },
+  lofiEnabled: { value: true, exempt: 'Not visible to the snapshot walker; proven in the knobs the snapshot walker cannot show, read at their consumer describe: lofiBypass.gain 1 to 0 and lofiSend.gain 0 to 1 (DubBus.ts:4846-4850)' },
   lofiBits: { value: 5, needs: { lofiEnabled: true } },
   extFeedbackGain: { value: 0.5 },
   extFeedbackEqFreq: { value: 3000, needs: { extFeedbackGain: 0.5, extFeedbackEqGain: 8 } },
@@ -138,8 +139,8 @@ const CASES: Record<Key, Case> = {
   clubSimPreset: { value: 'smallClub', needs: { clubSimEnabled: true } },
   clubSimMix: { value: 0.8, needs: { clubSimEnabled: true } },
   chainOrder: { value: 'parallel' },
-  autoEqStrength: { value: 0.2, exempt: 'Read by computeAutoEQ at analysis time, not applied by setSettings. UNVERIFIED here.' },
-  autoEqLastGenre: { value: 'dub', exempt: 'Output state written by the bus after analysis; not an input knob.' },
+  autoEqStrength: { value: 0.2, exempt: 'Not visible to the snapshot walker; proven in the knobs the snapshot walker cannot show, read at their consumer describe: _applyAutoEQ sets a larger returnEQ low-shelf gain at strength 1 than 0.2 (DubBus.ts:8639-8663)' },
+  autoEqLastGenre: { value: 'dub', exempt: 'Output state, not an input knob: written by _applyAutoEQ at DubBus.ts:8663, cleared at 2945-2946, never read by the audio path. Proven written back in the autoEq test of the consumer describe.' },
 };
 
 const NODE_PROPS = ['type', 'oversample', 'fftSize', 'channelCount', 'channelInterpretation'] as const;
@@ -409,5 +410,166 @@ describe('echoSyncDivision reaches the echo rate through the engine mirror', () 
     expect(eighth90.pushedMs).toBeCloseTo(60000 / 90 * 0.5, 5);
     expect(differences(off.res, eighth.res), 'division vs off moved nothing').not.toHaveLength(0);
     expect(differences(eighth.res, eighth90.res), 'BPM change moved nothing').not.toHaveLength(0);
+  });
+});
+
+// The twelve knobs the snapshot walker could not show: each is read directly off the node,
+// curve or call its consumer drives, after the real setSettings (or the real consumer).
+// The walker misses them because the nodes sit in private fields past its depth limit, or
+// because the effect lives behind a timer or a lazily-built stage.
+describe('knobs the snapshot walker cannot show, read at their consumer', () => {
+  type Priv = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const priv = (o: unknown): Priv => o as Priv;
+
+  async function withBus(settings: Partial<DubBusSettings>, seconds = 0.4) {
+    const rig = await makeDubBusRig(seconds);
+    rig.bus.setSettings({ enabled: true, ...settings });
+    feedTone(rig, 110, 0.3);
+    return rig;
+  }
+
+  it('bassShelfQ ramps the Q of the echo-input shelf, the feedback compensators and the master punch shelf', async () => {
+    const read = async (q: number) => {
+      const rig = await withBus({ bassShelfQ: q });
+      await rig.render();
+      const b = priv(rig.bus);
+      return [b.bassShelf.Q.value, b.feedbackShelfComp.Q.value, b.extFeedbackShelfComp.Q.value, b.masterBassPunch.Q.value];
+    };
+    const base = await read(DEFAULT_DUB_BUS.bassShelfQ);
+    const moved = await read(3);
+    expect(base[0]).toBeCloseTo(DEFAULT_DUB_BUS.bassShelfQ, 3);
+    for (const v of moved) expect(v).toBeCloseTo(3, 3);
+  });
+
+  it('echoFeedbackHpfHz and echoFeedbackLpfHz ramp the SpaceEcho feedback filters', async () => {
+    const read = async (s: Partial<DubBusSettings>) => {
+      const rig = await withBus(s);
+      await rig.render();
+      const fx = priv(rig.bus).echo.fx;
+      return [fx.feedbackHpf.frequency.value, fx.feedbackLpf.frequency.value];
+    };
+    const base = await read({});
+    const moved = await read({ echoFeedbackHpfHz: 900, echoFeedbackLpfHz: 1800 });
+    expect(base[0]).toBeCloseTo(DEFAULT_DUB_BUS.echoFeedbackHpfHz, 0);
+    expect(base[1]).toBeCloseTo(DEFAULT_DUB_BUS.echoFeedbackLpfHz, 0);
+    expect(moved[0]).toBeCloseTo(900, 0);
+    expect(moved[1]).toBeCloseTo(1800, 0);
+  });
+
+  it('lofiEnabled closes lofiBypass and opens lofiSend', async () => {
+    const read = async (on: boolean) => {
+      const rig = await withBus({ lofiEnabled: on });
+      await rig.render();
+      const b = priv(rig.bus);
+      return [b.lofiBypass.gain.value, b.lofiSend.gain.value];
+    };
+    const off = await read(false);
+    const on = await read(true);
+    expect(off[0]).toBeCloseTo(1, 2); expect(off[1]).toBeCloseTo(0, 2);
+    expect(on[0]).toBeCloseTo(0, 2); expect(on[1]).toBeCloseTo(1, 2);
+  });
+
+  it('postEchoSatDrive reaches the curve builder through the 60 ms timer (the node itself cannot be shown on this rig)', async () => {
+    // node-web-audio-api lets a WaveShaperNode.curve be assigned once ("cannot assign curve twice"), and
+    // DubBus swallows that error, so the rebuilt curve never lands on the rig node. What the rig can show:
+    // the knob drives the drive-tracking state, the coalescing timer fires, and the curve builder gives a
+    // different table for each drive.
+    const read = async (drive: number) => {
+      const rig = await withBus({ postEchoSatEnabled: true, postEchoSatDrive: drive }, 1);
+      await rig.render();
+      const b = priv(rig.bus);
+      return { last: b._lastPostEchoSatDrive as number, pending: b._postEchoSatCurvePending as unknown };
+    };
+    const soft = await read(0.1);
+    const hard = await read(0.9);
+    expect(soft.last).toBeCloseTo(0.1, 5); expect(hard.last).toBeCloseTo(0.9, 5);
+    expect(soft.pending).toBeNull(); expect(hard.pending).toBeNull();
+    const a = makeTapeSatCurve(soft.last), c = makeTapeSatCurve(hard.last);
+    let peak = 0;
+    for (let i = 0; i < a.length; i++) peak = Math.max(peak, Math.abs(a[i] - c[i]));
+    expect(peak).toBeGreaterThan(0.01);
+  });
+
+  it('plateStage swaps the plate node the bus owns', async () => {
+    const stage = async (s: DubBusSettings['plateStage']) => {
+      const rig = await withBus({ plateStage: s }, 1);
+      await rig.render();
+      return priv(rig.bus).plateStage;
+    };
+    const before = (await stage('madprofessor'))?.constructor?.name;
+    const after = (await stage('dattorro'))?.constructor?.name;
+    const none = await stage('off');
+    expect({ before, after, none }).toEqual({ before: 'MadProfessorPlateEffect', after: 'DattorroPlateEffect', none: null });
+  });
+
+  it('subHarmonicMode is what the subHarmonic move reads to choose the sub bed over the pulse', async () => {
+    const { subHarmonic } = await import('@/engine/dub/moves/subHarmonic');
+    const run = async (mode: 'pulse' | 'continuous') => {
+      const rig = await withBus({ subHarmonicMode: mode });
+      const calls: string[] = [];
+      priv(rig.bus).startSubBassBed = () => { calls.push('bed'); return () => {}; };
+      priv(rig.bus).startSubHarmonic = () => { calls.push('pulse'); return () => {}; };
+      subHarmonic.execute({ bus: rig.bus, params: {} } as never);
+      return calls;
+    };
+    expect(await run('pulse')).toEqual(['pulse']);
+    expect(await run('continuous')).toEqual(['bed']);
+  });
+
+  it('sirenPreset picks the note the siren synth is attacked with', async () => {
+    const run = async (preset: DubBusSettings['sirenPreset']) => {
+      const rig = await withBus({ sirenPreset: preset });
+      const notes: number[] = [];
+      const synth = { output: rig.ctx.createGain(), triggerAttack: (_t: unknown, n: number) => { notes.push(n); }, triggerRelease: () => {} };
+      priv(rig.bus)._ensureSirenSynth = async () => synth;
+      const stop = rig.bus.startSiren();
+      await vi.advanceTimersByTimeAsync(5);
+      stop();
+      return notes;
+    };
+    expect(await run('rasta')).toEqual([36]);
+    expect(await run('foghorn')).toEqual([24]);
+  });
+
+  it('masterBassDb and masterBassPunchDb reach the master punch shelf and the low band once the master insert is wired', async () => {
+    const read = async (s: Partial<DubBusSettings>) => {
+      const rig = await withBus(s);
+      const src = rig.ctx.createGain();
+      const dst = rig.ctx.createGain();
+      dst.connect(rig.ctx.destination);
+      const wiring = rig.bus.wireMasterInsert(src, dst);
+      await vi.advanceTimersByTimeAsync(50);
+      await wiring;
+      await rig.render();
+      const b = priv(rig.bus);
+      return { punch: b.masterBassPunch.gain.value as number, drive: b.lowDrive.gain.value as number, out: b.lowOut.gain.value as number };
+    };
+    const flat = await read({});
+    const punch = await read({ masterBassPunchDb: 6 });
+    const bass = await read({ masterBassDb: 6 });
+    expect(punch.punch).toBeGreaterThan(flat.punch + 1);
+    expect(bass.drive !== flat.drive || bass.out !== flat.out).toBe(true);
+  });
+
+  it('autoEqStrength scales the EQ the bus applies, and autoEqLastGenre is written back after analysis', async () => {
+    const analysis = {
+      bpm: 90, bpmConfidence: 0.9, musicalKey: 'C', keyConfidence: 0.8, rmsDb: -18, peakDb: -6, analyzedAt: 0,
+      genre: { primary: 'Reggae', subgenre: '', confidence: 0.8, mood: 'Chill', energy: 0.7, danceability: 0.6, bpm: 90, bpmConfidence: 0.9, musicalKey: 'C', keyConfidence: 0.8 },
+      frequencyPeaks: [],
+    };
+    const run = async (strength: number) => {
+      const rig = await withBus({ autoEqStrength: strength });
+      const gains: number[] = [];
+      const eq = priv(rig.bus).returnEQ;
+      const orig = eq.setLowShelf.bind(eq);
+      eq.setLowShelf = (e: boolean, f: number, g: number, q: number) => { gains.push(g); return orig(e, f, g, q); };
+      await priv(rig.bus)._applyAutoEQ(analysis);
+      return { gains, genre: priv(rig.bus).settings.autoEqLastGenre as string };
+    };
+    const weak = await run(0.2);
+    const strong = await run(1);
+    expect(weak.gains).toHaveLength(1);
+    expect(strong.gains[0]).toBeGreaterThan(weak.gains[0]);
+    expect(strong.genre).not.toBe('');
   });
 });
