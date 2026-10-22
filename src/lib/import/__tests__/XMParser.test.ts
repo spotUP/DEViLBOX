@@ -13,7 +13,7 @@ describe('XMParser', () => {
     it('should parse XM header correctly', async () => {
       // Create minimal valid XM file
       const buffer = createMinimalXM();
-      const result = await parseXM(buffer);
+      const result = await parseXM(buffer, 'test.xm');
 
       expect(result.header).toBeDefined();
       expect(result.header.moduleName).toBe('Test Module');
@@ -32,12 +32,12 @@ describe('XMParser', () => {
         view[i] = invalidSig.charCodeAt(i);
       }
 
-      await expect(parseXM(buffer)).rejects.toThrow('Invalid XM file: incorrect header signature');
+      await expect(parseXM(buffer, 'test.xm')).rejects.toThrow('Invalid XM file: incorrect header signature');
     });
 
     it('should handle XM files with tracker version info', async () => {
       const buffer = createMinimalXM({ version: 0x0104 });
-      const result = await parseXM(buffer);
+      const result = await parseXM(buffer, 'test.xm');
 
       expect(result.header.trackerName).toBeDefined(); // Check header was parsed
     });
@@ -50,7 +50,7 @@ describe('XMParser', () => {
           { note: 49, instrument: 1, volume: 0x40, effect: 'A0F' }, // C-4, inst 1, vol 64, vol slide
         ],
       });
-      const result = await parseXM(buffer);
+      const result = await parseXM(buffer, 'test.xm');
 
       expect(result.patterns[0][0][0].note).toBe(49); // C-4
       expect(result.patterns[0][0][0].instrument).toBe(1);
@@ -60,7 +60,7 @@ describe('XMParser', () => {
 
     it('should handle empty rows', async () => {
       const buffer = createXMWithPattern({ rows: [] });
-      const result = await parseXM(buffer);
+      const result = await parseXM(buffer, 'test.xm');
 
       // Should have 64 rows (default pattern length)
       expect(result.patterns[0].length).toBe(64);
@@ -71,7 +71,7 @@ describe('XMParser', () => {
     it('should decompress bit-flag pattern data', async () => {
       // XM patterns use bit-flag compression
       const buffer = createXMWithCompressedPattern();
-      const result = await parseXM(buffer);
+      const result = await parseXM(buffer, 'test.xm');
 
       expect(result.patterns[0].length).toBeGreaterThan(0);
     });
@@ -96,7 +96,7 @@ describe('XMParser', () => {
           },
         ],
       });
-      const result = await parseXM(buffer);
+      const result = await parseXM(buffer, 'test.xm');
 
       expect(result.instruments[0].name).toBe('Test Sample');
       expect(result.instruments[0].samples.length).toBe(1);
@@ -120,7 +120,7 @@ describe('XMParser', () => {
           loopEndPoint: null,
         },
       });
-      const result = await parseXM(buffer);
+      const result = await parseXM(buffer, 'test.xm');
 
       const env = result.instruments[0]?.volumeEnvelope;
       expect(env?.enabled).toBe(true);
@@ -139,7 +139,7 @@ describe('XMParser', () => {
           rate: 4,
         },
       });
-      const result = await parseXM(buffer);
+      const result = await parseXM(buffer, 'test.xm');
 
       const vibrato = result.instruments[0]?.autoVibrato;
       expect(vibrato?.type).toBe('sine');
@@ -149,7 +149,7 @@ describe('XMParser', () => {
 
     it('should handle delta-encoded samples', async () => {
       const buffer = createXMWithDeltaEncodedSample();
-      const result = await parseXM(buffer);
+      const result = await parseXM(buffer, 'test.xm');
 
       // Delta encoding should be decoded to PCM
       const sample = result.instruments[0].samples[0];
@@ -170,16 +170,21 @@ describe('XMParser', () => {
           },
         ],
       });
-      const result = await parseXM(buffer);
+      const result = await parseXM(buffer, 'test.xm');
 
       expect(result.instruments[0].samples[0].bitDepth).toBe(16);
     });
   });
 
   describe('Import Metadata', () => {
+    it('keeps the load filename as sourceFile, not the song title', async () => {
+      const song = await parseXMFile(createMinimalXM(), 'some song.xm');
+      expect(song.patterns[0].importMetadata?.sourceFile).toBe('some song.xm');
+    });
+
     it('should generate import metadata', async () => {
       const buffer = createMinimalXM();
-      const result = await parseXM(buffer);
+      const result = await parseXM(buffer, 'test.xm');
 
       expect(result.metadata.sourceFormat).toBe('XM');
       expect(result.metadata.originalChannelCount).toBe(4);
@@ -204,7 +209,7 @@ describe('XMParser', () => {
           },
         ],
       });
-      const result = await parseXM(buffer);
+      const result = await parseXM(buffer, 'test.xm');
 
       // XM samples get id = instrument index + 1 (1-indexed), so first instrument → key 1
       const preserved = result.metadata.originalSamples?.[1];
@@ -218,21 +223,21 @@ describe('XMParser', () => {
   describe('Edge Cases', () => {
     it('should handle XM with no instruments', async () => {
       const buffer = createMinimalXM({ instrumentCount: 0 });
-      const result = await parseXM(buffer);
+      const result = await parseXM(buffer, 'test.xm');
 
       expect(result.instruments.length).toBe(0);
     });
 
     it('should handle XM with max channels (32)', async () => {
       const buffer = createMinimalXM({ channelCount: 32 });
-      const result = await parseXM(buffer);
+      const result = await parseXM(buffer, 'test.xm');
 
       expect(result.header.channelCount).toBe(32);
     });
 
     it('should handle XM with max patterns (256)', async () => {
       const buffer = createMinimalXM({ patternCount: 256 });
-      const result = await parseXM(buffer);
+      const result = await parseXM(buffer, 'test.xm');
 
       expect(result.header.patternCount).toBe(256);
     });
@@ -245,7 +250,7 @@ describe('XMParser', () => {
         view[i] = sig.charCodeAt(i);
       }
 
-      await expect(parseXM(buffer)).rejects.toThrow();
+      await expect(parseXM(buffer, 'test.xm')).rejects.toThrow();
     });
   });
 });

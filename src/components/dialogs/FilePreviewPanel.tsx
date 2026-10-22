@@ -5,7 +5,6 @@
  */
 
 import { readFileBrowserMemory, updateFileBrowserMemory } from './fileBrowserMemory';
-import { markKnownSource } from '@/lib/modland/ModlandDetector';
 import { acquireModlandCompanions } from '@/lib/song/acquireSource';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Folder, FileAudio, ArrowLeft, Globe, Search, Loader2, Download, AlertCircle, Play, Square } from 'lucide-react';
@@ -140,7 +139,6 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
         const buffer = await downloadModlandFile(file.full_path, modlandProgress.report(file.full_path));
         const companions = await acquireModlandCompanions(file.full_path, buffer);
 
-        markKnownSource(file.filename);   // it came from Modland: not a contribution candidate
         await onLoadTrackerModule(buffer, file.filename, companions);
         onClose();
       } catch (err) {

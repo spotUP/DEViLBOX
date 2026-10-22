@@ -58,6 +58,7 @@ export interface ModuleInfo {
   // Native parser data (if available)
   nativeData?: {
     format: 'XM' | 'MOD' | 'FUR' | 'DMF' | 'XRNS';
+    title: string;  // Song title from the module header (importMetadata.sourceFile is the filename)
     importMetadata: ImportMetadata;
     instruments: ParsedInstrument[];
     patterns: unknown[][];  // XMNote[][] or MODNote[][] or converted patterns
@@ -157,7 +158,7 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
         if (useNativeParser) {
           console.log('[ModuleLoader] Trying native parser for', ext);
           try {
-            const nativeData = await loadWithNativeParser(arrayBuffer, ext);
+            const nativeData = await loadWithNativeParser(arrayBuffer, ext, file.name);
             console.log('[ModuleLoader] Native parser result:', {
               hasData: !!nativeData,
               format: nativeData?.format,
@@ -166,7 +167,7 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
             if (nativeData) {
               // Create metadata for compatibility
               const metadata: ModuleMetadata = {
-                title: nativeData.importMetadata.sourceFile,
+                title: nativeData.title,
                 type: isDefleMask ? 'DefleMask' : ext === '.fur' ? 'Furnace' : nativeData.format,
                 channels: nativeData.importMetadata.originalChannelCount,
                 patterns: nativeData.importMetadata.originalPatternCount,
@@ -270,13 +271,15 @@ export async function loadModuleFile(file: File): Promise<ModuleInfo> {
  */
 async function loadWithNativeParser(
   buffer: ArrayBuffer,
-  ext: string
+  ext: string,
+  filename: string
 ): Promise<ModuleInfo['nativeData'] | null> {
   try {
     if (ext === '.xm') {
-      const result = await parseXM(buffer);
+      const result = await parseXM(buffer, filename);
       return {
         format: 'XM',
+        title: result.header.moduleName,
         importMetadata: result.metadata,
         instruments: result.instruments,
         patterns: result.patterns as unknown[][],
@@ -284,9 +287,10 @@ async function loadWithNativeParser(
     } else if (ext === '.mod') {
       const { isMODFormat } = await import('./formats/MODParser');
       if (!isMODFormat(buffer)) return null; // No valid MOD signature — let UADE handle it
-      const result = await parseMOD(buffer);
+      const result = await parseMOD(buffer, filename);
       return {
         format: 'MOD',
+        title: result.header.title,
         importMetadata: result.metadata,
         instruments: result.instruments,
         patterns: result.patterns as unknown[][],
@@ -318,6 +322,7 @@ async function loadWithNativeParser(
 
       return {
         format: 'FUR', // Furnace format - patterns already converted
+        title: result.metadata.sourceFile,
         importMetadata: result.metadata,
         instruments: result.instruments,
         patterns: result.patterns as unknown[][],
@@ -339,6 +344,7 @@ async function loadWithNativeParser(
       });
       return {
         format: 'DMF', // DefleMask format - patterns already converted
+        title: result.metadata.sourceFile,
         importMetadata: result.metadata,
         instruments: result.instruments,
         patterns: result.patterns as unknown[][],
@@ -446,6 +452,7 @@ async function loadWithNativeParser(
       
       return {
         format: 'XRNS' as const,
+        title: xrns.name,
         importMetadata: metadata,
         instruments,
         patterns: convertedPatterns,

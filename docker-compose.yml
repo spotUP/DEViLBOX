@@ -14,6 +14,9 @@ services:
       - PORT=3001
       - JWT_SECRET=${JWT_SECRET}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      # Genre lookup (GET /api/genre/:key): ModArchive key and monthly request budget.
+      - MODARCHIVE_API_KEY=${MODARCHIVE_API_KEY:-}
+      - MODARCHIVE_MONTHLY_BUDGET=${MODARCHIVE_MONTHLY_BUDGET:-8000}
       # Live chain is Caddy -> nginx -> backend: two proxy hops, so req.ip is
       # the visitor and the per-IP AI limits are per visitor.
       - TRUST_PROXY_HOPS=${TRUST_PROXY_HOPS:-2}

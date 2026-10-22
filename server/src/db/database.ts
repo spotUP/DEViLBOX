@@ -41,6 +41,33 @@ export function migrateSongAnalysisExtended(database: Database.Database = db): b
 }
 
 // Create tables
+/**
+ * Module genre tables (GET /api/genre/:key). Exported so a test can build them in memory.
+ */
+export function createGenreTables(database: Database.Database = db): void {
+  database.exec(`
+    -- Module genres, filled on first lookup from ModArchive tags (shared by DEViLBOX and HippoPlayer).
+    -- key = uade songdb key: hex(XXH32(first 256 KB)) + hex(size & 0xFFFF), 12 hex chars.
+    -- source: modarchive (genre set) | untagged | miss | ambiguous | unsupported (genre NULL).
+    CREATE TABLE IF NOT EXISTS module_genres (
+      key TEXT PRIMARY KEY,
+      modarchive_id INTEGER,
+      md5 TEXT,
+      genre TEXT,
+      source TEXT NOT NULL,
+      checked_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_module_genres_genre ON module_genres(genre);
+
+    -- ModArchive API requests per month (YYYY-MM), so the budget survives restarts
+    CREATE TABLE IF NOT EXISTS modarchive_usage (
+      month TEXT PRIMARY KEY,
+      requests INTEGER NOT NULL
+    );
+  `);
+}
+
 export function initDatabase() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -238,8 +265,13 @@ export function initDatabase() {
   }
 
   migrateSongAnalysisExtended();
+  createGenreTables();
 
   console.log('[DB] Database initialized at:', DB_PATH);
 }
+
+// Build the schema on load: route modules call db.prepare() at import time, and ES imports
+// are hoisted, so a call from index.ts would run after them on a fresh database.
+initDatabase();
 
 export default db;
