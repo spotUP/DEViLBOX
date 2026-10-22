@@ -123,6 +123,9 @@ const MAX_ISOLATION_SLOTS = 16
 // Must match DUB_OUTPUT_BASE + MAX_DUB_CHANNELS in ChannelRoutedEffects.ts.
 const DUB_OUTPUT_BASE = 1 + MAX_ISOLATION_SLOTS
 const MAX_DUB_CHANNELS = 32
+// Frames per render quantum: what the worklet hands process() and what the
+// output lead is counted in.
+const RENDER_QUANTUM = 128
 // Per-channel oscilloscope instances: each is a full module copy rendered every quantum.
 const MAX_OSC_CHANNELS = 32
 const OSC_MEMORY_BUDGET = 96 * 1024 * 1024
@@ -153,6 +156,14 @@ class MPT extends AudioWorkletProcessor {
 		this.userMuteMask = 0xFFFFFFFF  // all channels active (no user mute)
 		this.isolatedBits = 0            // no channels isolated
 		this._diagCounter = 0
+		// Output lead (see applyLead_): whole render quanta every output lags
+		// behind the module, the same lag in seconds, one ring per output
+		// index, and which outputs this render wrote.
+		this._leadQuanta = 0
+		this._leadSec = 0
+		this._leadRings = {}
+		this._leadScratch = null
+		this._leadTouched = new Uint8Array(DUB_OUTPUT_BASE + MAX_DUB_CHANNELS)
 		// Per-channel oscilloscope: one module instance per channel, soloed from creation
 		this.oscModules = null  // [{ modulePtr, extPtr, leftPtr, rightPtr }] indexed by channel
 		this.oscEnabled = false
@@ -171,7 +182,7 @@ class MPT extends AudioWorkletProcessor {
 		this._renderCount = (this._renderCount || 0) + 1
 		if (!this.modulePtr) { this._silentReason = 'no-module'; return true }
 		if (!this.leftPtr || !this.rightPtr) { this._silentReason = 'no-buffers'; return true }
-		if (this.paused) { this._silentReason = 'paused'; return true }
+		if (this.paused) { this._silentReason = 'paused'; this.applyLead_(outputList); return true }
 
 		// Re-apply main mute + volume every render to guard against loop/seek resets
 		if (this.isolatedBits && this.muteFunc) {
@@ -192,11 +203,13 @@ class MPT extends AudioWorkletProcessor {
 			} else {
 				this.port.postMessage({cmd:'end'})
 			}
+			this.applyLead_(outputList) // the last quanta of the song are still in the rings
 			return true
 		}
 
 		left.set(libopenmpt.HEAPF32.subarray(this.leftPtr / 4, this.leftPtr / 4 + actualFramesPerChunk))
 		right.set(libopenmpt.HEAPF32.subarray(this.rightPtr / 4, this.rightPtr / 4 + actualFramesPerChunk))
+		this._leadTouched[0] = 1
 
 		// Sampled RMS of what the module actually produced. Distinguishes
 		// "rendering silence" (mask killed every channel at the source) from
@@ -219,7 +232,9 @@ class MPT extends AudioWorkletProcessor {
 			order: libopenmpt._openmpt_module_get_current_order(this.modulePtr),
 			pattern: libopenmpt._openmpt_module_get_current_pattern(this.modulePtr),
 			row: libopenmpt._openmpt_module_get_current_row(this.modulePtr),
-			audioTime: currentTime,
+			// When this row's audio reaches the output: the lead rings hold
+			// it back _leadSec after the module rendered it.
+			audioTime: currentTime + this._leadSec,
 			// Speed/tempo for tick-level synth effect processing
 			speed: libopenmpt._openmpt_module_get_current_speed(this.modulePtr),
 			tempo: libopenmpt._openmpt_module_get_current_tempo(this.modulePtr),
@@ -284,6 +299,7 @@ class MPT extends AudioWorkletProcessor {
 			if (frames > 0) {
 				outSlot[0].set(libopenmpt.HEAPF32.subarray(slot.leftPtr / 4, slot.leftPtr / 4 + frames))
 				outSlot[1].set(libopenmpt.HEAPF32.subarray(slot.rightPtr / 4, slot.rightPtr / 4 + frames))
+				this._leadTouched[s + 1] = 1
 			}
 		}
 
@@ -310,8 +326,11 @@ class MPT extends AudioWorkletProcessor {
 			if (frames > 0) {
 				outSlot[0].set(libopenmpt.HEAPF32.subarray(slot.leftPtr / 4, slot.leftPtr / 4 + frames))
 				outSlot[1].set(libopenmpt.HEAPF32.subarray(slot.rightPtr / 4, slot.rightPtr / 4 + frames))
+				this._leadTouched[outIdx] = 1
 			}
 		}
+
+		this.applyLead_(outputList)
 
 		// Periodic diagnostic logging (every ~2 seconds at 48kHz/128 = 375 renders/sec)
 		if (this.isolatedBits && ++this._diagCounter >= 750) {
@@ -340,6 +359,39 @@ class MPT extends AudioWorkletProcessor {
 		}
 
 		return true // def. needed for Chrome
+	}
+
+	// Output lead. Every output index lags _leadQuanta render quanta behind
+	// the module: the 'pos' message of a row (stamped currentTime + _leadSec)
+	// reaches the main thread before that row is heard, so a hybrid song's
+	// synth notes are scheduled ahead of their time instead of at it (the
+	// first note's main-thread hop and voice build ate its attack: a click).
+	// Each output has its own ring, so isolation slots and dub sends stay
+	// sample-aligned with the main mix. A ring is made when its output is
+	// first written and dropped once it has flushed; an output not written
+	// this render (a removed slot) pushes the silence Web Audio zero-filled.
+	applyLead_(outputList) {
+		const n = this._leadQuanta
+		const touched = this._leadTouched
+		if (!n) { touched.fill(0); return }
+		for (let idx = 0; idx < outputList.length; idx++) {
+			let ring = this._leadRings[idx]
+			if (!ring && !touched[idx]) continue
+			const out = outputList[idx]
+			if (!out || !out[0] || !out[1]) continue
+			const len = out[0].length
+			if (!ring || ring.l.length !== n * len) {
+				ring = this._leadRings[idx] = { i: 0, live: 0, l: new Float32Array(n * len), r: new Float32Array(n * len) }
+			}
+			if (!this._leadScratch || this._leadScratch.length !== len) this._leadScratch = new Float32Array(len)
+			const scratch = this._leadScratch
+			const off = ring.i * len
+			scratch.set(ring.l.subarray(off, off + len)); ring.l.set(out[0], off); out[0].set(scratch)
+			scratch.set(ring.r.subarray(off, off + len)); ring.r.set(out[1], off); out[1].set(scratch)
+			ring.i = (ring.i + 1) % n
+			if (touched[idx]) { ring.live = n; touched[idx] = 0 }
+			else if (--ring.live <= 0) delete this._leadRings[idx]
+		}
 	}
 
 	handleMessage_(msg) {
@@ -429,6 +481,14 @@ class MPT extends AudioWorkletProcessor {
 					libopenmpt._openmpt_module_set_position_seconds(s.modulePtr, v)
 				})
 				this.seekOscModules_(m => libopenmpt._openmpt_module_set_position_seconds(m, v))
+				break
+			case 'setLead':
+				// Seconds of output lead, rounded up to whole render quanta.
+				// Set per song by LibopenmptEngine.startWithCoordinator: the
+				// hybrid lead, or 0 for a sample-only song.
+				this._leadQuanta = v > 0 ? Math.ceil(v * sampleRate / RENDER_QUANTUM) : 0
+				this._leadSec = this._leadQuanta * RENDER_QUANTUM / sampleRate
+				this._leadRings = {}
 				break
 			case 'setOrderRow':
 				if (!this.modulePtr) return
@@ -635,7 +695,7 @@ class MPT extends AudioWorkletProcessor {
 		// Cache the raw buffer so isolation slots can create their own module instances
 		this.moduleBuffer = buffer.slice ? buffer.slice(0) : new Int8Array(buffer).buffer
 
-		const maxFramesPerChunk = 128	// thats what worklet is using
+		const maxFramesPerChunk = RENDER_QUANTUM
 		const byteArray = new Int8Array(buffer)
 		const ptrToFile = libopenmpt._malloc(byteArray.byteLength)
 		libopenmpt.HEAPU8.set(byteArray, ptrToFile)
@@ -739,6 +799,7 @@ class MPT extends AudioWorkletProcessor {
 		this.channels = 0
 		this.lastStateRow = -1
 		this.lastStateOrder = -1
+		this._leadRings = {} // the old song's tail does not play into the next
 	}
 	meta() {
 		this.port.postMessage({cmd: 'meta', meta: this.getMeta()})
