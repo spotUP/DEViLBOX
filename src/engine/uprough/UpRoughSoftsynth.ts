@@ -24,7 +24,7 @@ let renderCount = 0;
 export function softsynthRenderCount(): number { return renderCount; }
 export function resetSoftsynthRenderCount(): void { renderCount = 0; }
 
-interface Playing { src: AudioBufferSourceNode; gain: GainNode }
+interface Playing { src: AudioBufferSourceNode; gain: GainNode; midi: number; startAt: number; released: boolean }
 
 /** Rendered notes, least recently used first. Module-level: every instance of a voice shares them. */
 const cache = new Map<string, AudioBuffer>();
@@ -110,13 +110,13 @@ export class UpRoughSoftsynth implements DevilboxSynth {
     const gain = this.ctx.createGain();
     src.connect(gain);
     gain.connect(this.output);
-    const entry: Playing = { src, gain };
+    const startAt = time ?? this.ctx.currentTime;
+    const entry: Playing = { src, gain, midi: this.midiOf(note), startAt, released: false };
     this.playing.add(entry);
     src.onended = () => {
       this.playing.delete(entry);
       try { src.disconnect(); gain.disconnect(); } catch { /* already gone */ }
     };
-    const startAt = time ?? this.ctx.currentTime;
     // Voice-level entry: the scheduled start beside the clock, so a late or repeated start shows up next to
     // the ToneEngine.triggerNote entry that asked for it.
     recordNoteTrigger(`UpRoughSoftsynth.start ${this.voiceId} at=${startAt.toFixed(4)} now=${this.ctx.currentTime.toFixed(4)}`, -1, String(note));
@@ -131,13 +131,22 @@ export class UpRoughSoftsynth implements DevilboxSynth {
     this.play(note, duration, time, velocity);
   }
 
-  triggerRelease(_note?: string | number, time?: number): void {
+  /**
+   * Fade out the voices this release reaches: started by t, not yet released, and (when a note is given) that note.
+   * Each fades from its current level and stops, so a later release never touches it again (a re-set to 1 was a click).
+   */
+  triggerRelease(note?: string | number, time?: number): void {
     if (!RELEASABLE.has(this.voiceId)) return;
     const t = time ?? this.ctx.currentTime;
-    for (const { gain } of this.playing) {
-      gain.gain.cancelScheduledValues(t);
-      gain.gain.setValueAtTime(1, t);
-      gain.gain.linearRampToValueAtTime(0, t + RELEASE_FADE_SEC);
+    const midi = note === undefined ? undefined : this.midiOf(note);
+    for (const entry of this.playing) {
+      if (entry.released || entry.startAt > t || (midi !== undefined && entry.midi !== midi)) continue;
+      entry.released = true;
+      const param = entry.gain.gain;
+      if (typeof param.cancelAndHoldAtTime === 'function') param.cancelAndHoldAtTime(t);
+      else { param.cancelScheduledValues(t); param.setValueAtTime(param.value, t); }
+      param.linearRampToValueAtTime(0, t + RELEASE_FADE_SEC);
+      entry.src.stop(t + RELEASE_FADE_SEC);
     }
   }
 
