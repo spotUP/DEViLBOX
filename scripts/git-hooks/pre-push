@@ -190,9 +190,26 @@ base_of() {
 # runs the whole fast tier (test:ci), as a push with no known base does.
 GLOBAL_EFFECT_FILES="src/engine/nuade/nuadeVerdicts.ts src/stores/useSettingsStore.ts src/lib/import/parseModuleToSong.ts"
 
+# Files this push actually changes: those touched by commits no remote ref has yet,
+# plus the files a merge resolved by hand (--cc lists only those). A plain
+# `git diff base sha` also counts everything a merge of main brought in; main
+# already tested those files. Owner 2026-10-22: a feature branch with two merges of
+# main ran 1191 test files for 25 minutes and held every other session's gate.
+changed_files() {
+  local base=$1 sha=$2
+  if [ -n "$REMOTE" ]; then
+    {
+      git log --no-merges --format= --name-only "$sha" "^$base" --not --remotes="$REMOTE"
+      git log --merges --cc --format= --name-only "$sha" "^$base" --not --remotes="$REMOTE"
+    } | sed '/^$/d' | sort -u
+  else
+    git diff --name-only "$base" "$sha"
+  fi
+}
+
 affected_tests() {
   local base=$1 sha=$2 changed files g
-  changed="$(git diff --name-only "$base" "$sha")"
+  changed="$(changed_files "$base" "$sha")"
   for g in $GLOBAL_EFFECT_FILES; do
     case $'\n'"$changed"$'\n' in
       *$'\n'"$g"$'\n'*)
