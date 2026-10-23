@@ -58,3 +58,48 @@ export function engineFedMeterTarget(
 export function meterKilledByStop(playing: boolean, wasPlaying: boolean): boolean {
   return wasPlaying && !playing;
 }
+
+export interface ChannelMeterInput {
+  mode: 'trigger' | 'realtime';
+  /** The level of a note trigger that arrived this frame, or null when none did. */
+  trigger: number | null;
+  /** The channel's measured level (strip RMS merged with engine levels); 0 in trigger mode. */
+  realtimeLevel: number;
+  /** The level the engine reports for this channel, or null when the engine reports none. */
+  engineLevel: number | null;
+  /** The channel's waveform this frame, if a direct-routed engine captures one. */
+  waveform: ArrayLike<number> | null | undefined;
+  /** The waveform's full scale (see waveformVuLevel). */
+  fullScale: number;
+  /** The waveform level of the previous frame, for onset detection. */
+  prevSource: number;
+}
+
+/**
+ * The level a channel meter rises to this frame, and the waveform level to
+ * remember for the next frame's onset check. One rule for every meter:
+ *
+ * - Trigger mode follows note starts: the note trigger, or a waveform onset
+ *   for an engine that sends no triggers.
+ * - Realtime mode follows the measured level. A note trigger counts only on a
+ *   channel with no measured level (a synth that bypasses the channel strip),
+ *   so a measured meter never jumps to the note volume on top of its level.
+ *
+ * The waveform is read only when the engine reports no levels of its own. An
+ * engine that does report them already sends their onsets as triggers and
+ * merges them into the realtime level, so its waveform would count twice.
+ */
+export function channelMeterTarget(input: ChannelMeterInput): { target: number; source: number } {
+  const { mode, trigger, realtimeLevel, engineLevel, waveform } = input;
+  let source = input.prevSource;
+  let waveTarget = 0;
+  const hasWaveform = engineLevel === null && !!waveform && waveform.length > 0;
+  if (hasWaveform) {
+    source = waveformVuLevel(null, waveform, input.fullScale);
+    waveTarget = engineFedMeterTarget(mode, source, input.prevSource);
+  }
+  if (mode === 'trigger') return { target: Math.max(trigger ?? 0, waveTarget), source };
+  const measured = hasWaveform || engineLevel !== null || realtimeLevel > 0;
+  const target = Math.max(realtimeLevel, waveTarget, measured ? 0 : (trigger ?? 0));
+  return { target, source };
+}
