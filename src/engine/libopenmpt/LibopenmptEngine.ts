@@ -503,6 +503,18 @@ export class LibopenmptEngine {
     this.workletNode.port.postMessage({ cmd: 'hotReload', val: data });
   }
 
+  /** Write a flat op list (see EditOp in OpenMPTEditBridge) into the playing modules, no rebuild. */
+  applyEdits(ops: Int32Array): void {
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({ cmd: 'applyEdits', val: ops });
+  }
+
+  /** Replace only the stored song bytes (edits were already applied in place). */
+  updateBuffer(data: ArrayBuffer): void {
+    if (!this.workletNode) return;
+    this.workletNode.port.postMessage({ cmd: 'updateBuffer', val: data });
+  }
+
   /**
    * Ask the worklet what it is actually doing — module present, paused, the
    * mute/isolation masks it is applying, and the RMS of its last render.
