@@ -73,13 +73,14 @@ export async function openSelectaLink(link: SelectaLink): Promise<void> {
       notify.warning(`Shared song source "${link.source}" is not supported here`);
       return;
     }
-    const r = await openSong(src, { origin: link.source === 'hvsc' ? 'hvsc' : 'modland', subsong: link.sub, start: 'song' });
+    const r = await openSong(src, { origin: link.source === 'hvsc' ? 'hvsc' : 'modland', subsong: link.sub, start: 'song', startAtMs: link.tMs });
     if (!r.ok) {
       notify.error(`Could not open shared song: ${r.error}`);
       return;
     }
     // t is milliseconds. A family without a time seek (see seekPlaybackToMs) plays from the start.
-    if (link.tMs !== undefined && r.started) {
+    // The seek ran before play() when the engine allowed it; only engines that exist once playing seek here.
+    if (link.tMs !== undefined && r.started && !r.seeked) {
       const { seekPlaybackToMs } = await import('@engine/replayer/seekPlaybackToMs');
       seekPlaybackToMs(link.tMs);
     }
