@@ -13,6 +13,7 @@ import { useRomDialogStore } from '@/stores/useRomDialogStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { getToneEngine } from '@engine/ToneEngine';
 import { cacheRomImage, cacheUploadedRom, resolveUploadedRom, usesCombinedRomUpload } from '@engine/mame/MAMEROMLoader';
+import { Button } from './Button';
 import { HardDrive, Upload, Check, X, AlertTriangle } from 'lucide-react';
 import type JSZipType from 'jszip';
 
@@ -140,21 +141,21 @@ export const RomUploadDialog: React.FC = () => {
       <ModalHeader
         title="ROM Required"
         subtitle={`${chipName} needs ROM data to produce sound`}
-        icon={<HardDrive className="w-6 h-6 text-amber-400" />}
+        icon={<HardDrive className="w-6 h-6 text-accent-warning" />}
       />
 
       <div className="p-4 space-y-4">
         {/* Explanation */}
-        <div className="bg-amber-900/20 border border-amber-500/30 rounded-lg p-4">
+        <div className="bg-accent-warning/10 border border-accent-warning/30 rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <AlertTriangle size={18} className="text-amber-400 mt-0.5 shrink-0" />
+            <AlertTriangle size={18} className="text-accent-warning mt-0.5 shrink-0" />
             <div className="text-sm">
               <p className="text-text-primary">
                 This synth requires ROM files that couldn't be loaded automatically.
               </p>
               <p className="mt-2 text-text-secondary">
                 Without ROMs, the synth will be silent. You can upload the ROM file
-                below, or place it in <code className="text-amber-300 bg-black/30 px-1 rounded">/public/roms/</code> for auto-loading.
+                below, or place it in <code className="text-accent-warning bg-dark-bgTertiary px-1 rounded">/public/roms/</code> for auto-loading.
               </p>
             </div>
           </div>
@@ -165,7 +166,7 @@ export const RomUploadDialog: React.FC = () => {
           <div className="text-xs text-text-secondary uppercase tracking-wider mb-1">
             Expected ROM file
           </div>
-          <div className="font-mono text-sm text-amber-300">
+          <div className="font-mono text-sm text-accent-warning">
             {requiredZip}
           </div>
         </div>
@@ -173,7 +174,7 @@ export const RomUploadDialog: React.FC = () => {
         {/* Upload area */}
         <div className="flex flex-col items-center gap-3">
           {success ? (
-            <div className="flex items-center gap-2 text-green-400 py-4">
+            <div className="flex items-center gap-2 text-accent-success py-4">
               <Check size={20} />
               <span className="font-medium">ROMs loaded successfully!</span>
             </div>
@@ -183,10 +184,10 @@ export const RomUploadDialog: React.FC = () => {
                 border-2 border-dashed rounded-lg p-6
                 flex flex-col items-center gap-2 transition-colors
                 ${uploading
-                  ? 'border-amber-500/50 bg-amber-900/10'
-                  : 'border-dark-border hover:border-amber-400/50 hover:bg-amber-900/5'}
+                  ? 'border-accent-warning/50 bg-accent-warning/10'
+                  : 'border-dark-border hover:border-accent-warning/50 hover:bg-accent-warning/5'}
               `}>
-                <Upload size={24} className={uploading ? 'text-amber-400 animate-pulse' : 'text-text-secondary'} />
+                <Upload size={24} className={uploading ? 'text-accent-warning animate-pulse' : 'text-text-secondary'} />
                 <span className="text-sm text-text-secondary">
                   {uploading ? 'Loading ROM...' : 'Click to upload ROM file (.zip or raw ROM)'}
                 </span>
@@ -203,7 +204,7 @@ export const RomUploadDialog: React.FC = () => {
           )}
 
           {error && (
-            <div className="text-sm text-red-400 bg-red-900/20 border border-red-500/30 rounded px-3 py-2 w-full">
+            <div className="text-sm text-accent-error bg-accent-error/10 border border-accent-error/30 rounded px-3 py-2 w-full">
               {error}
             </div>
           )}
@@ -212,13 +213,9 @@ export const RomUploadDialog: React.FC = () => {
 
       <ModalFooter>
         <div className="flex justify-end w-full">
-          <button
-            onClick={handleDismiss}
-            className="flex items-center gap-2 px-4 py-2 bg-dark-bgSecondary hover:bg-dark-bgHover rounded transition-colors"
-          >
-            <X size={16} />
-            <span>{success ? 'Close' : 'Skip'}</span>
-          </button>
+          <Button onClick={handleDismiss} icon={<X size={16} />}>
+            {success ? 'Close' : 'Skip'}
+          </Button>
         </div>
       </ModalFooter>
     </Modal>
