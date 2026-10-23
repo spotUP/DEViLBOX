@@ -335,3 +335,6 @@ tools/master-fx-claims-live.json
 
 # Preset banks: separate repo spotUP/devilbox-presets (npm run presets:sync)
 public/data/presets/
+
+# CMake build artifacts
+CMakeFiles/
