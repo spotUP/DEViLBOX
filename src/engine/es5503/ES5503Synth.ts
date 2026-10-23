@@ -105,18 +105,24 @@ export class ES5503Synth extends MAMEBaseSynth {
 
     loadES5503ROMs().then(romData => {
       if (!romData) {
-        console.warn('[ES5503] Mirage wavetable ROM not found — using built-in waveforms only');
+        console.warn('[ES5503] Mirage wavetable ROM not found — asking for an upload');
+        this._updateRomStatus(false);
         return;
       }
-      this.loadWaveData(romData, 2048);  // Start at page 8 (offset 2048)
-      this.romLoaded = true;
+      this.loadROM(0, romData);
       this._updateRomStatus(true);
       console.log('[ES5503] Mirage wavetable ROM loaded successfully');
     }).catch(error => {
       console.error('[ES5503] ROM loading failed:', error);
       console.error('Place ROM files in /public/roms/es5503/ - see /public/roms/README.md');
-      // Synth works with 8 built-in waveforms without ROM
+      this._updateRomStatus(false);
     });
+  }
+
+  /** Take the combined Mirage wavetable image (disk, ROM cache or upload dialog). */
+  loadROM(_bank: number, data: Uint8Array): void {
+    this.loadWaveData(data, 2048);  // Start at page 8 (offset 2048)
+    this.romLoaded = true;
   }
 
   // ===========================================================================
