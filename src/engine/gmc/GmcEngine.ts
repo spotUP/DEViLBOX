@@ -4,6 +4,8 @@
  * Follows the BdEngine/SonicArrangerEngine pattern.
  */
 
+import { ChannelMeterFeed } from '../tone/channelMeterFeed';
+import { PositionCallbacks, type EnginePositionUpdate } from '@engine/wasm/PositionCallbacks';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
@@ -14,7 +16,7 @@ import {
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
 
-function gmcTransform(code: string): string {
+export function gmcTransform(code: string): string {
   return code
     .replace(/import\.meta\.url/g, "'.'")
     .replace(/export\s+default\s+\w+;?/g, '')
@@ -25,11 +27,14 @@ function gmcTransform(code: string): string {
     .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
 }
 
+const meterFeed = new ChannelMeterFeed();
+
 export class GmcEngine extends WASMChannelOutputsEngine {
   private static instance: GmcEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   private _songEndCallback: (() => void) | null = null;
+  private readonly _positions = new PositionCallbacks();
 
   private constructor() {
     super();
@@ -85,6 +90,12 @@ export class GmcEngine extends WASMChannelOutputsEngine {
         case 'oscData':
           useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
+        case 'position':
+          this._positions.emit(data);
+          break;
+        case 'chLevels':
+          meterFeed.reportFromWorklet(data, this.audioContext);
+          break;
         case 'songEnd':
           this._songEndCallback?.();
           break;
@@ -104,6 +115,7 @@ export class GmcEngine extends WASMChannelOutputsEngine {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('GmcEngine not initialized');
+    meterFeed.clearHeld();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
   }
 
@@ -111,11 +123,16 @@ export class GmcEngine extends WASMChannelOutputsEngine {
     this.workletNode?.port.postMessage({ type: 'play' });
     this.afterPlay();
   }
-  stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
+  stop(): void { meterFeed.clearHeld(); this.workletNode?.port.postMessage({ type: 'stop' }); }
   pause(): void { this.workletNode?.port.postMessage({ type: 'pause' }); }
 
   setMuteMask(mask: number): void {
     this.workletNode?.port.postMessage({ type: 'setChannelMask', mask });
+  }
+
+  /** The replayer's own playhead: song position (order index) and row. NativeEngineRouting wires it to the position store. */
+  onPositionUpdate(cb: (update: EnginePositionUpdate) => void): () => void {
+    return this._positions.add(cb);
   }
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
@@ -131,6 +148,7 @@ export class GmcEngine extends WASMChannelOutputsEngine {
   }
 
   override dispose(): void {
+    this._positions.clear();
     super.dispose();
     if (GmcEngine.instance === this) GmcEngine.instance = null;
   }
