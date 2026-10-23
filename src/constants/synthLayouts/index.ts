@@ -2,6 +2,9 @@
  * Synth panel layout registry — maps synth type to layout descriptor.
  */
 
+import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
+import { SYNTH_INFO } from '@constants/synthCategories/synthInfo';
+import { catalogKeyMatches } from '@constants/synthCategories/helpers';
 import type { SynthPanelLayout } from '@/types/synthPanel';
 import { DUB_SIREN_LAYOUT } from './dubSiren';
 import { CHIP_SYNTH_LAYOUT } from './chipSynth';
@@ -244,4 +247,21 @@ export const SYNTH_LAYOUTS: Record<string, SynthPanelLayout> = {
  */
 export function getSynthLayout(synthType: string): SynthPanelLayout | undefined {
   return SYNTH_LAYOUTS[synthType];
+}
+
+/**
+ * Get the layout for an instrument. A catalog variant (WaveSabre Slaughter/Falcon) shares one engine
+ * synthType, so the variant marker the catalog sets (`xrns.synthType`) selects its layout; resolving by
+ * synthType alone gave every WaveSabre variant the generic Falcon layout. Resolution goes through
+ * catalogKeyMatches, the same helper the synth picker uses. A variant with no layout of its own
+ * (WaveSabreAdultery) falls back to the engine type's layout.
+ */
+export function getInstrumentLayout(
+  instrument: Pick<InstrumentConfig, 'synthType' | 'xrns'>,
+): SynthPanelLayout | undefined {
+  for (const key of Object.keys(SYNTH_LAYOUTS)) {
+    const info = SYNTH_INFO[key as SynthType];
+    if (info && info.type !== key && catalogKeyMatches(key as SynthType, instrument)) return SYNTH_LAYOUTS[key];
+  }
+  return getSynthLayout(instrument.synthType);
 }

@@ -39,7 +39,7 @@ import { DEFAULT_ZYNADDSUBFX } from '@engine/zynaddsubfx/ZynAddSubFXSynth';
 import { deepMerge } from '@lib/migration';
 import { isMAMEChipType } from '@constants/chipParameters';
 import { SYNTH_REGISTRY } from '@engine/vstbridge/synth-registry';
-import { getSynthLayout } from '@/constants/synthLayouts';
+import { getInstrumentLayout } from '@/constants/synthLayouts';
 
 // ─── Lazy imports ────────────────────────────────────────────────────────────
 
@@ -628,7 +628,7 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     // ── Synths with declarative layouts (DOMSynthPanel) ──
     // Covers demoscene synths, Retromulator synths, and any other with SynthPanelLayout
     {
-      const declLayout = getSynthLayout(synthType);
+      const declLayout = getInstrumentLayout(instrument);
       if (declLayout) {
         return (
           <DOMSynthPanel
