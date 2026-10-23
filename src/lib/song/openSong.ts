@@ -26,6 +26,7 @@
  * same prepareSong, and its Import hands the choices back; it writes no
  * settings (D4).
  */
+import { startPlayback } from '@/lib/song/startPlayback';
 import { whenStartupJingleDone } from '@lib/startup/startupSequence';
 import { whenBootRestoreDone } from '@lib/startup/bootRestore';
 import type { UADEMetadata } from '@engine/uade/UADEEngine';
@@ -45,7 +46,6 @@ import type { DeckId } from '@/engine/dj/DeckEngine';
 import { withSongLoad } from '@/lib/song/songLifecycle';
 import { applySong, type SongToApply, type SongSource } from '@/lib/song/applySong';
 import { useSongLoadStore, setSongLoadPhase, throwIfSongLoadCancelled, type OpenPhase } from '@/stores/useSongLoadStore';
-import { useTransportStore } from '@/stores/useTransportStore';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { songWalks } from '@/lib/import/formats/songWalkClient';
@@ -111,6 +111,8 @@ export interface OpenOptions {
   target?: 'editor' | DeckTarget;
   /** Start playback after the load. Default: the origin's rule (START_BY_ORIGIN). */
   start?: false | 'song' | 'pattern';
+  /** With `start`: seek to this time (ms) before playback becomes audible (see startPlayback). */
+  startAtMs?: number;
   /** May this load raise questions (import dialog, contribution prompt)? Default: false for headless origins. */
   interactive?: boolean;
   useLibopenmpt?: boolean;
@@ -128,7 +130,9 @@ export interface OpenOptions {
 }
 
 export type OpenResult =
-  | { ok: true; name: string; message: string; engine: string; editorMode: string; kind: SongKind | 'saved'; started: boolean; companions: number;
+  | { ok: true; name: string; message: string; engine: string; editorMode: string; kind: SongKind | 'saved'; started: boolean;
+      /** `startAtMs` was applied before playback began. */
+      seeked?: boolean; companions: number;
       /** The importer already told the user (toast); callers must not announce it again. */
       notified: boolean }
   /** `cancelled`: the person cancelled (the dialog or the loading panel); no error to show. */
@@ -428,6 +432,7 @@ export async function openSong(src: SongSourceRef | StoredSongSource, o: OpenOpt
 
     let kind: SongKind | null = prepared?.songKind ?? null;
     let started = false;
+    let seeked = false;
     let companionCount = 0;
     const start = options.start ?? START_BY_ORIGIN[options.origin];
     let name = sourceName(source);
@@ -449,10 +454,7 @@ export async function openSong(src: SongSourceRef | StoredSongSource, o: OpenOpt
       await new Promise<void>((resolve) => queueMicrotask(resolve));
       if (result.success === true && start) {
         phase('start');
-        // The MCP play handler's rule: song mode does not loop, pattern mode does.
-        const transport = useTransportStore.getState();
-        transport.setIsLooping(start === 'pattern');
-        await transport.play();
+        seeked = (await startPlayback(start, options.startAtMs)).seeked;
         started = true;
       }
       return result;
@@ -473,6 +475,7 @@ export async function openSong(src: SongSourceRef | StoredSongSource, o: OpenOpt
       editorMode: format.editorMode,
       kind: kind as unknown as SongKind,
       started,
+      seeked,
       companions: companionCount,
       notified: kind === 'module' || kind === 'header' || !!prepared?.info,
     };

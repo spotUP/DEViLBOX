@@ -31,6 +31,7 @@ import genreRoutes from './routes/genre';
 import modarchiveRoutes from './routes/modarchive';
 import hipRoutes from './routes/hip';
 import loudnessRoutes from './routes/loudness';
+import lyricsRoutes from './routes/lyrics';
 import { handleStreamConnection, checkFfmpeg } from './routes/stream';
 import { initDataDirectories } from './utils/fileSystem';
 import { initModlandIndex, scheduleModlandUpdates } from './services/modlandIndexer';
@@ -88,6 +89,14 @@ const loudnessLimiter = rateLimit({
 });
 app.use('/api/loudness/', loudnessLimiter as unknown as express.RequestHandler);
 
+// Lyrics are small text blobs fetched once per song.
+const lyricsLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 300,
+  message: 'Too many lyrics requests, please try again later'
+});
+app.use('/api/lyrics/', lyricsLimiter as unknown as express.RequestHandler);
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/files', filesRoutes);
@@ -112,6 +121,7 @@ app.use('/api/modarchive', modarchiveRoutes);
 // Vote limits (per token and per IP) live in the hip service; k is never logged.
 app.use('/api/hip', hipRoutes);
 app.use('/api/loudness', loudnessRoutes);
+app.use('/api/lyrics', lyricsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
