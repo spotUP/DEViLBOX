@@ -57,12 +57,15 @@ function renderMulti(p: Processor, blocks: number): number[] {
 }
 
 describe('FluidSynth multi-slot bridge + worklet (real WASM)', () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     const g = globalThis as Record<string, unknown>;
     g.sampleRate = 48000;
+    g.currentTime = 0; // AudioWorkletGlobalScope global; the note queue stamps arrivals with it
     g.AudioWorkletProcessor = class { port: Processor['port'] = { postMessage(_m: unknown) {} }; };
     g.registerProcessor = (_n: string, c: new (o: object) => Processor) => { ProcessorClass = c; };
-    (0, eval)(readFileSync(resolve(PUBLIC, 'FluidSynth.worklet.js'), 'utf8'));
+    // The worklet is an ES module (it imports the shared timed-event queue), as Chrome loads it.
+    const path: string = '../../../../public/fluidsynth/FluidSynth.worklet.js';
+    await import(/* @vite-ignore */ path);
   });
 
   it('program then bank 128 via setParam resolves a bank-128 preset', async () => {
