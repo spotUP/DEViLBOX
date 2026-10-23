@@ -28,6 +28,9 @@ patch -p1 < "$HERE/devilbox-taps.patch"
 patch -p1 < "$HERE/devilbox-edit.patch"
 # emscripten 4.0.16 leaves Module.wasmTable undefined; see wasm-table.pre.js.
 echo "LDFLAGS += --pre-js $HERE/wasm-table.pre.js" >> build/make/config-emscripten.mk
+# -Oz makes emscripten 4.0.16 assume TextDecoder exists (TEXTDECODER=2). The tracker
+# worklet runs in AudioWorkletGlobalScope, which has none, so the factory threw at start-up.
+echo "LDFLAGS += -s TEXTDECODER=1" >> build/make/config-emscripten.mk
 TMPDIR="$TMP" make CONFIG=emscripten EMSCRIPTEN_TARGET=audioworkletprocessor -j"${JOBS:-4}" bin/libopenmpt.js
 cp bin/libopenmpt.js "$ROOT/public/chiptune3/libopenmpt.render.js"
 # The tracker worklet runs the same patched binary (in-place edit API, devilbox-edit.patch).
