@@ -15,6 +15,9 @@ class GmcProcessor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
     this.initializing = false;
+    this.levelsPtr = 0;
+    this.noteStartsPtr = 0;
+    this.reportCounter = 0;
     // Per-channel dub sends + isolation slots (worklets/channel-outputs.js).
     this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
@@ -116,6 +119,8 @@ class GmcProcessor extends AudioWorkletProcessor {
       const frameBytes = this.bufferSize * 4; // float32
       this.interleavedPtr = this.module._malloc(this.bufferSize * 2 * 4);
       for (let i = 0; i < 4; i++) this.chPtrs[i] = this.module._malloc(frameBytes);
+      this.levelsPtr = this.module._malloc(4 * 4);
+      this.noteStartsPtr = this.module._malloc(4 * 4);
       if (!this.interleavedPtr) { this.port.postMessage({ type: 'error', message: 'malloc failed for output buffer' }); return; }
       this.updateBufferViews();
       this.initialized = true;
@@ -143,6 +148,8 @@ class GmcProcessor extends AudioWorkletProcessor {
     if (this.module) {
       if (this.interleavedPtr) { this.module._free(this.interleavedPtr); this.interleavedPtr = 0; }
       for (let i = 0; i < 4; i++) { if (this.chPtrs[i]) { this.module._free(this.chPtrs[i]); this.chPtrs[i] = 0; } }
+      if (this.levelsPtr) { this.module._free(this.levelsPtr); this.levelsPtr = 0; }
+      if (this.noteStartsPtr) { this.module._free(this.noteStartsPtr); this.noteStartsPtr = 0; }
     }
     this.interleavedBuf = null; this.chBufs = null; this.module = null; this.initialized = false; this.playing = false; this.lastHeapBuffer = null;
   }
@@ -181,6 +188,28 @@ class GmcProcessor extends AudioWorkletProcessor {
       if (globalThis.DevilboxChannelStream) {
         this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
         this._stream.writeFloat32(this.chBufs.slice(0, 4), rendered);
+      }
+    }
+
+    // Playhead and per-channel levels every 8 process() calls, stamped with the
+    // audio clock so the meters can be held until the sound is heard.
+    if (++this.reportCounter >= 8) {
+      this.reportCounter = 0;
+      const m = this.module;
+      this.port.postMessage({
+        type: 'position',
+        songPos: m._gmc_get_song_pos(this.handle),
+        row: m._gmc_get_row(this.handle),
+        speed: m._gmc_get_speed(this.handle),
+        tick: m._gmc_get_tick(this.handle),
+      });
+      if (this.levelsPtr && this.noteStartsPtr) {
+        m._gmc_get_channel_levels(this.handle, this.levelsPtr);
+        m._gmc_get_note_start_counts(this.handle, this.noteStartsPtr, 4);
+        const heap = m.HEAPF32.buffer;
+        const levels = Array.from(new Float32Array(heap, this.levelsPtr, 4));
+        const noteStarts = Array.from(new Uint32Array(heap, this.noteStartsPtr, 4));
+        this.port.postMessage({ type: 'chLevels', levels, noteStarts, audioTime: currentTime });
       }
     }
 

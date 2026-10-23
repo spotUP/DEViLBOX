@@ -27,6 +27,14 @@ size_t gmc_render_multi(GmcModule* module, float* ch0, float* ch1, float* ch2, f
 
 bool gmc_has_ended(const GmcModule* module);
 
+// Playhead and meters (the worklet posts these for the editor and the VU meters)
+int gmc_get_song_pos(const GmcModule* module);
+int gmc_get_row(const GmcModule* module);
+int gmc_get_speed(const GmcModule* module);
+int gmc_get_tick(const GmcModule* module);
+void gmc_get_channel_levels(GmcModule* module, float* out4);
+void gmc_get_note_start_counts(const GmcModule* module, uint32_t* out, int n);
+
 // Edit API
 int gmc_get_instrument_count(const GmcModule* module);
 int gmc_get_num_patterns(const GmcModule* module);

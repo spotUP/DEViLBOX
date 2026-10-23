@@ -110,6 +110,12 @@ struct GmcModule {
     GmcChannelInfo       channel_info[4];
     bool                 end_reached;
 
+    // Meter state (kept outside the channels, which initialize_sound clears):
+    // peak output per channel since the last gmc_get_channel_levels call, and
+    // cumulative sample starts per channel.
+    float                ch_peak[4];
+    uint32_t             note_starts[4];
+
     // Position visited tracking
     uint8_t visited[256];
 
@@ -261,8 +267,9 @@ static void initialize_sound(GmcModule* m, int start_position) {
 // Set instrument
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static void set_instrument(GmcMixChannel* channel, GmcChannelInfo* chan_info,
+static bool set_instrument(GmcMixChannel* channel, GmcChannelInfo* chan_info,
                            const GmcTrackLine* track_line, const GmcSample* samples) {
+    bool started = false;
     if (track_line->sample != 0) {
         const GmcSample* sample = &samples[track_line->sample - 1];
 
@@ -272,6 +279,7 @@ static void set_instrument(GmcMixChannel* channel, GmcChannelInfo* chan_info,
 
         if (sample->data != nullptr) {
             ch_play_sample(channel, sample->data, 0, sample->length);
+            started = true;
 
             if (sample->loop_length > 0)
                 ch_set_loop(channel, sample->loop_start, sample->loop_length);
@@ -283,6 +291,7 @@ static void set_instrument(GmcMixChannel* channel, GmcChannelInfo* chan_info,
             ch_mute(channel);
         }
     }
+    return started;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -365,7 +374,8 @@ static void play_pattern_row(GmcModule* m) {
 
         const GmcTrackLine* track_line = &m->patterns[m->playing_info.current_pattern].tracks[i][m->playing_info.pattern_count];
 
-        set_instrument(channel, chan_info, track_line, m->samples);
+        if (set_instrument(channel, chan_info, track_line, m->samples))
+            m->note_starts[i]++;
         set_effect(m, chan_info, track_line);
     }
 }
@@ -633,6 +643,10 @@ size_t gmc_render_multi(GmcModule* module, float* ch0, float* ch1, float* ch2, f
             sample *= (float)c->volume / 64.0f;
 
             if (ch_out[ch]) ch_out[ch][f] = sample * 0.5f;
+            {
+                float level = (sample < 0.0f ? -sample : sample) * 0.5f;
+                if (level > module->ch_peak[ch]) module->ch_peak[ch] = level;
+            }
 
             c->position_fp += (uint64_t)(step * (double)(1 << SAMPLE_FRAC_BITS));
             uint32_t new_pos = (uint32_t)(c->position_fp >> SAMPLE_FRAC_BITS);
@@ -736,6 +750,41 @@ void gmc_set_channel_mask(GmcModule* module, uint32_t mask) {
 bool gmc_has_ended(const GmcModule* module) {
     if (!module) return true;
     return module->end_reached;
+}
+
+// Playhead. Before the first row has played the position counter sits at -1
+// and the row counter at 63: report the start of the song instead.
+int gmc_get_song_pos(const GmcModule* module) {
+    if (!module || module->playing_info.current_position < 0) return 0;
+    return module->playing_info.current_position;
+}
+
+int gmc_get_row(const GmcModule* module) {
+    if (!module || module->playing_info.current_position < 0) return 0;
+    return module->playing_info.pattern_count;
+}
+
+int gmc_get_speed(const GmcModule* module) {
+    return module ? module->playing_info.song_step : 0;
+}
+
+int gmc_get_tick(const GmcModule* module) {
+    return module ? module->playing_info.song_speed : 0;
+}
+
+// Peak output per channel since the last call; the peaks reset on read.
+void gmc_get_channel_levels(GmcModule* module, float* out4) {
+    if (!module || !out4) return;
+    for (int i = 0; i < 4; i++) {
+        out4[i] = module->ch_peak[i];
+        module->ch_peak[i] = 0.0f;
+    }
+}
+
+// Cumulative sample starts per channel (a new sample begins on the channel).
+void gmc_get_note_start_counts(const GmcModule* module, uint32_t* out, int n) {
+    if (!module || !out) return;
+    for (int i = 0; i < n && i < 4; i++) out[i] = module->note_starts[i];
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
