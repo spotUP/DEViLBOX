@@ -49,7 +49,10 @@ export function computeCaretRect(input: CaretGeometryInput): CaretRect {
   const d = input.digitIndex;
 
   switch (input.columnType) {
-    case 'note':       return { offX: noteColOffset, width: noteWidth };
+    // The note slot is noteWidth wide, but its last 4px are a spacer after the
+    // three left-aligned note glyphs. Covering the spacer left the note text
+    // off-centre in the block, so the caret spans the glyphs only.
+    case 'note':       return { offX: noteColOffset, width: cw * 3 };
     case 'instrument': return { offX: noteColOffset + paramBase + d * cw, width: cw };
     case 'volume':     return { offX: noteColOffset + paramBase + (cw * 2 + 4) + d * cw, width: cw };
     case 'effTyp':     return { offX: effBase + (typW > cw ? d * cw : 0), width: cw };
