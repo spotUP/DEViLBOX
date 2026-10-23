@@ -25,6 +25,9 @@ echo "$SHA256  $TMP/libopenmpt.tar.gz" | shasum -a 256 -c -
 tar xzf "$TMP/libopenmpt.tar.gz" -C "$TMP"
 cd "$TMP/libopenmpt-0.8.4+release"
 patch -p1 < "$HERE/devilbox-taps.patch"
+patch -p1 < "$HERE/devilbox-edit.patch"
 TMPDIR="$TMP" make CONFIG=emscripten EMSCRIPTEN_TARGET=audioworkletprocessor -j"${JOBS:-4}" bin/libopenmpt.js
 cp bin/libopenmpt.js "$ROOT/public/chiptune3/libopenmpt.render.js"
+# The tracker worklet runs the same patched binary (in-place edit API, devilbox-edit.patch).
+cp bin/libopenmpt.js "$ROOT/public/chiptune3/libopenmpt.worklet.js"
 echo "built $ROOT/public/chiptune3/libopenmpt.render.js ($(wc -c < "$ROOT/public/chiptune3/libopenmpt.render.js") bytes)"

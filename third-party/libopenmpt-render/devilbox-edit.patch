@@ -1,0 +1,201 @@
+diff -ruN a/build/make/config-emscripten.mk b/build/make/config-emscripten.mk
+--- a/build/make/config-emscripten.mk	2026-10-23 08:14:41
++++ b/build/make/config-emscripten.mk	2026-10-23 08:17:44
+@@ -111,7 +111,7 @@
+ CXXFLAGS += 
+ CFLAGS   += 
+ LDFLAGS  += -s WASM=1 -s WASM_ASYNC_COMPILATION=0 -s MODULARIZE=1 -s EXPORT_ES6=1 -s SINGLE_FILE=1
+-LDFLAGS  += -s EXPORTED_RUNTIME_METHODS="['stackSave','stackRestore','stackAlloc','wasmTable','HEAP8','HEAPU8','HEAP16','HEAP32','HEAPU32','HEAPF32','HEAPF64','UTF8ToString']"
++LDFLAGS  += -s EXPORTED_RUNTIME_METHODS="['stackSave','stackRestore','stackAlloc','wasmTable','HEAP8','HEAPU8','HEAP16','HEAPU16','HEAP32','HEAP64','HEAPU64','HEAPU32','HEAPF32','HEAPF64','UTF8ToString']"
+ 
+ LDFLAGS += -s ALLOW_MEMORY_GROWTH=1
+ 
+diff -ruN a/libopenmpt/libopenmpt.h b/libopenmpt/libopenmpt.h
+--- a/libopenmpt/libopenmpt.h	2026-10-23 08:14:41
++++ b/libopenmpt/libopenmpt.h	2026-10-23 08:14:30
+@@ -1274,6 +1274,18 @@
+ /* DEViLBOX: up to `count` frames of channel `channel`'s tap of the last read; returns the frames copied. */
+ LIBOPENMPT_API size_t openmpt_module_read_channel_tap( openmpt_module * mod, int32_t channel, size_t count, float * left, float * right );
+ 
++/* DEViLBOX: in-place edit API (hot reload without rebuilding the module). Same semantics as the
++ * soundlib bridge mutators. Return 1 on success, 0 on failure (invalid pattern, row, channel or argument). */
++LIBOPENMPT_API int openmpt_module_set_pattern_cell( openmpt_module * mod, int32_t pattern, int32_t row, int32_t channel, int32_t note, int32_t instr, int32_t volcmd, int32_t vol, int32_t command, int32_t param );
++LIBOPENMPT_API int openmpt_module_set_order_pattern( openmpt_module * mod, int32_t order, int32_t pattern );
++LIBOPENMPT_API int openmpt_module_set_num_orders( openmpt_module * mod, int32_t num_orders );
++LIBOPENMPT_API int openmpt_module_resize_pattern( openmpt_module * mod, int32_t pattern, int32_t rows );
++/* Returns the new pattern index, or -1. */
++LIBOPENMPT_API int32_t openmpt_module_add_pattern( openmpt_module * mod, int32_t rows );
++LIBOPENMPT_API int openmpt_module_set_initial_speed( openmpt_module * mod, int32_t speed );
++LIBOPENMPT_API int openmpt_module_set_initial_tempo( openmpt_module * mod, int32_t tempo );
++LIBOPENMPT_API int openmpt_module_set_midi_macro( openmpt_module * mod, int32_t index, const char * macro );
++
+ /*! \brief Get the number of sub-songs
+  *
+  * \param mod The module handle to work on.
+diff -ruN a/libopenmpt/libopenmpt_c.cpp b/libopenmpt/libopenmpt_c.cpp
+--- a/libopenmpt/libopenmpt_c.cpp	2026-10-23 08:14:41
++++ b/libopenmpt/libopenmpt_c.cpp	2026-10-23 08:14:30
+@@ -1113,6 +1113,79 @@
+ 	}
+ 	return 0;
+ }
++/* DEViLBOX: in-place edit API */
++int openmpt_module_set_pattern_cell( openmpt_module * mod, int32_t pattern, int32_t row, int32_t channel, int32_t note, int32_t instr, int32_t volcmd, int32_t vol, int32_t command, int32_t param ) {
++	try {
++		openmpt::interface::check_soundfile( mod );
++		return mod->impl->edit_set_pattern_cell( pattern, row, channel, note, instr, volcmd, vol, command, param );
++	} catch ( ... ) {
++		openmpt::report_exception( __func__, mod );
++	}
++	return 0;
++}
++int openmpt_module_set_order_pattern( openmpt_module * mod, int32_t order, int32_t pattern ) {
++	try {
++		openmpt::interface::check_soundfile( mod );
++		return mod->impl->edit_set_order_pattern( order, pattern );
++	} catch ( ... ) {
++		openmpt::report_exception( __func__, mod );
++	}
++	return 0;
++}
++int openmpt_module_set_num_orders( openmpt_module * mod, int32_t num_orders ) {
++	try {
++		openmpt::interface::check_soundfile( mod );
++		return mod->impl->edit_set_num_orders( num_orders );
++	} catch ( ... ) {
++		openmpt::report_exception( __func__, mod );
++	}
++	return 0;
++}
++int openmpt_module_resize_pattern( openmpt_module * mod, int32_t pattern, int32_t rows ) {
++	try {
++		openmpt::interface::check_soundfile( mod );
++		return mod->impl->edit_resize_pattern( pattern, rows );
++	} catch ( ... ) {
++		openmpt::report_exception( __func__, mod );
++	}
++	return 0;
++}
++int32_t openmpt_module_add_pattern( openmpt_module * mod, int32_t rows ) {
++	try {
++		openmpt::interface::check_soundfile( mod );
++		return mod->impl->edit_add_pattern( rows );
++	} catch ( ... ) {
++		openmpt::report_exception( __func__, mod );
++	}
++	return -1;
++}
++int openmpt_module_set_initial_speed( openmpt_module * mod, int32_t speed ) {
++	try {
++		openmpt::interface::check_soundfile( mod );
++		return mod->impl->edit_set_initial_speed( speed );
++	} catch ( ... ) {
++		openmpt::report_exception( __func__, mod );
++	}
++	return 0;
++}
++int openmpt_module_set_initial_tempo( openmpt_module * mod, int32_t tempo ) {
++	try {
++		openmpt::interface::check_soundfile( mod );
++		return mod->impl->edit_set_initial_tempo( tempo );
++	} catch ( ... ) {
++		openmpt::report_exception( __func__, mod );
++	}
++	return 0;
++}
++int openmpt_module_set_midi_macro( openmpt_module * mod, int32_t index, const char * macro ) {
++	try {
++		openmpt::interface::check_soundfile( mod );
++		return mod->impl->edit_set_midi_macro( index, macro );
++	} catch ( ... ) {
++		openmpt::report_exception( __func__, mod );
++	}
++	return 0;
++}
+ 
+ int32_t openmpt_module_get_num_subsongs( openmpt_module * mod ) {
+ 	try {
+diff -ruN a/libopenmpt/libopenmpt_impl.cpp b/libopenmpt/libopenmpt_impl.cpp
+--- a/libopenmpt/libopenmpt_impl.cpp	2026-10-23 08:14:41
++++ b/libopenmpt/libopenmpt_impl.cpp	2026-10-23 08:14:30
+@@ -1446,6 +1446,61 @@
+ 	return frames;
+ }
+ 
++// DEViLBOX: in-place edit API (mirrors the soundlib bridge mutators)
++int module_impl::edit_set_pattern_cell( std::int32_t pattern, std::int32_t row, std::int32_t channel, std::int32_t note, std::int32_t instr, std::int32_t volcmd, std::int32_t vol, std::int32_t command, std::int32_t param ) {
++	if ( pattern < 0 || row < 0 || channel < 0 ) return 0;
++	const OpenMPT::PATTERNINDEX pat = static_cast<OpenMPT::PATTERNINDEX>( pattern );
++	if ( !m_sndFile->Patterns.IsValidPat( pat ) ) return 0;
++	if ( static_cast<OpenMPT::ROWINDEX>( row ) >= m_sndFile->Patterns[pat].GetNumRows() || static_cast<OpenMPT::CHANNELINDEX>( channel ) >= m_sndFile->GetNumChannels() ) return 0;
++	OpenMPT::ModCommand * m = m_sndFile->Patterns[pat].GetpModCommand( static_cast<OpenMPT::ROWINDEX>( row ), static_cast<OpenMPT::CHANNELINDEX>( channel ) );
++	if ( !m ) return 0;
++	m->note = static_cast<OpenMPT::ModCommand::NOTE>( note );
++	m->instr = static_cast<OpenMPT::ModCommand::INSTR>( instr );
++	m->volcmd = static_cast<OpenMPT::VolumeCommand>( volcmd );
++	m->vol = static_cast<OpenMPT::ModCommand::VOL>( vol );
++	m->command = static_cast<OpenMPT::EffectCommand>( command );
++	m->param = static_cast<OpenMPT::ModCommand::PARAM>( param );
++	return 1;
++}
++int module_impl::edit_set_order_pattern( std::int32_t order, std::int32_t pattern ) {
++	if ( order < 0 ) return 0;
++	const OpenMPT::ORDERINDEX idx = static_cast<OpenMPT::ORDERINDEX>( order );
++	if ( idx >= m_sndFile->Order().GetLength() ) {
++		m_sndFile->Order().resize( idx + 1 );
++	}
++	m_sndFile->Order()[idx] = static_cast<OpenMPT::PATTERNINDEX>( pattern );
++	return 1;
++}
++int module_impl::edit_set_num_orders( std::int32_t num_orders ) {
++	if ( num_orders < 0 ) return 0;
++	m_sndFile->Order().resize( static_cast<OpenMPT::ORDERINDEX>( num_orders ) );
++	return 1;
++}
++int module_impl::edit_resize_pattern( std::int32_t pattern, std::int32_t rows ) {
++	if ( rows < 1 || rows > 1024 ) return 0;
++	const OpenMPT::PATTERNINDEX pat = static_cast<OpenMPT::PATTERNINDEX>( pattern );
++	if ( pattern < 0 || !m_sndFile->Patterns.IsValidPat( pat ) ) return 0;
++	return m_sndFile->Patterns[pat].Resize( static_cast<OpenMPT::ROWINDEX>( rows ) ) ? 1 : 0;
++}
++std::int32_t module_impl::edit_add_pattern( std::int32_t rows ) {
++	if ( rows < 1 ) return -1;
++	const OpenMPT::PATTERNINDEX pat = m_sndFile->Patterns.InsertAny( static_cast<OpenMPT::ROWINDEX>( rows ) );
++	return ( pat == OpenMPT::PATTERNINDEX_INVALID ) ? -1 : static_cast<std::int32_t>( pat );
++}
++int module_impl::edit_set_initial_speed( std::int32_t speed ) {
++	m_sndFile->Order().SetDefaultSpeed( static_cast<std::uint32_t>( speed ) );
++	return 1;
++}
++int module_impl::edit_set_initial_tempo( std::int32_t tempo ) {
++	m_sndFile->Order().SetDefaultTempoInt( static_cast<std::uint32_t>( tempo ) );
++	return 1;
++}
++int module_impl::edit_set_midi_macro( std::int32_t index, const char * macro ) {
++	if ( index < 0 || index >= 128 || !macro ) return 0;
++	m_sndFile->m_MidiCfg.Zxx[static_cast<std::size_t>( index )] = std::string_view( macro );
++	return 1;
++}
++
+ std::int32_t module_impl::get_num_subsongs() const {
+ 	std::unique_ptr<subsongs_type> subsongs_temp = has_subsongs_inited() ? std::unique_ptr<subsongs_type>() : std::make_unique<subsongs_type>( get_subsongs() );
+ 	const subsongs_type & subsongs = has_subsongs_inited() ? m_subsongs : *subsongs_temp;
+diff -ruN a/libopenmpt/libopenmpt_impl.hpp b/libopenmpt/libopenmpt_impl.hpp
+--- a/libopenmpt/libopenmpt_impl.hpp	2026-10-23 08:14:41
++++ b/libopenmpt/libopenmpt_impl.hpp	2026-10-23 08:14:30
+@@ -242,6 +242,15 @@
+ 	float get_current_channel_vu_rear_right( std::int32_t channel ) const;
+ 	// DEViLBOX: per-channel taps (CSoundFile::m_channelTaps)
+ 	void enable_channel_taps( std::int32_t count );
++	// DEViLBOX: in-place edit API
++	int edit_set_pattern_cell( int32_t pattern, int32_t row, int32_t channel, int32_t note, int32_t instr, int32_t volcmd, int32_t vol, int32_t command, int32_t param );
++	int edit_set_order_pattern( int32_t order, int32_t pattern );
++	int edit_set_num_orders( int32_t num_orders );
++	int edit_resize_pattern( int32_t pattern, int32_t rows );
++	int32_t edit_add_pattern( int32_t rows );
++	int edit_set_initial_speed( int32_t speed );
++	int edit_set_initial_tempo( int32_t tempo );
++	int edit_set_midi_macro( int32_t index, const char * macro );
+ 	std::size_t read_channel_tap( std::int32_t channel, std::size_t count, float * left, float * right ) const;
+ 	std::int32_t get_num_subsongs() const;
+ 	std::int32_t get_num_channels() const;
