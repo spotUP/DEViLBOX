@@ -164,7 +164,7 @@
       "exporter": "GameMusicCreatorExporter.exportGameMusicCreator",
       "tier": "pattern-data",
       "status": "pattern-match",
-      "matchPct": 0.6341,
+      "matchPct": 1,
       "cells": 768,
       "bytes": 3516
     },

@@ -25,7 +25,7 @@ import { parseGameMusicCreatorFile } from '../GameMusicCreatorParser';
 const FIXTURE = join(process.cwd(), 'public/data/songs/formats/knights_of_sky.gmc');
 
 describe('Game Music Creator pattern codec', () => {
-  it('encodeCell is a byte-exact inverse of decodeCell over every pattern cell', () => {
+  it('GMC edit/export round-trip is byte-exact over pattern data', () => {
     const b = readFileSync(FIXTURE);
     const raw = new Uint8Array(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
     const song = parseGameMusicCreatorFile(raw, 'knights_of_sky.gmc');
@@ -57,5 +57,35 @@ describe('Game Music Creator pattern codec', () => {
     expect(checked).toBeGreaterThan(0);
     expect(sawNote, 'fixture exercises a period the table round-trip mangled').toBe(true);
     expect(sawEffect, 'fixture exercises an effect byte the lossy map dropped').toBe(true);
+  });
+
+  it('GMC import shows the sample number from byte 2', () => {
+    const b = readFileSync(FIXTURE);
+    const raw = new Uint8Array(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
+    const song = parseGameMusicCreatorFile(raw, 'knights_of_sky.gmc');
+    const layout = song!.uadePatternLayout!;
+
+    // Ground truth (gmc-wasm/src/gmc.c): pattern 0 row 0 ch0 = 01 1d 18 0a -> sample 1.
+    const first = song!.patterns.find((pt) => pt.id === 'pattern-0')!;
+    expect(first.channels[0].rows[0].instrument).toBe(1);
+
+    let withSample = 0;
+    let checked = 0;
+    for (const pat of song!.patterns) {
+      const p = Number(pat.id.replace('pattern-', ''));
+      for (let r = 0; r < layout.rowsPerPattern; r++) {
+        for (let c = 0; c < layout.numChannels; c++) {
+          const off = getCellFileOffset(layout, p, r, c);
+          const src = raw.subarray(off, off + 4);
+          const cell = pat.channels[c].rows[r];
+          const cut = src[0] === 0xFF && src[1] === 0xFE;
+          expect(cell.instrument, `p${p} r${r} c${c}`).toBe(cut ? 0 : src[2] >> 4);
+          if (cell.instrument) withSample++;
+          checked++;
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+    expect(withSample).toBeGreaterThan(0);
   });
 });

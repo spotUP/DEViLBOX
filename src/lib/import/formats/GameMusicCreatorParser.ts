@@ -15,11 +15,10 @@
  *     orders[100] (u16BE each, multiples of 1024)
  *   Pattern data: numPatterns × (64 rows × 4 channels × 4 bytes/cell)
  *     Each cell: [byte0, byte1, cmd, param]
- *       byte0 & 0xF0 = high nibble of period (must be 0, except 0xFF/0xFE = note cut)
- *       byte0 & 0x0F = high nibble of sample
- *       byte1        = low byte of period
- *       cmd  & 0x0F  = GMC effect command (0-8)
- *       param        = effect parameter
+ *       bytes 0-1    = period u16BE (byte0 & 0xF0 must be 0, except 0xFFFE = note cut)
+ *       byte2 >> 4   = sample number (1-15)
+ *       byte2 & 0x0F = GMC effect command (0-8)
+ *       byte3        = effect parameter
  *   Sample data: 8-bit signed, little-endian (effectively unsigned by byte)
  *
  * Effect mapping (from Load_gmc.cpp):
@@ -42,8 +41,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig, UADEChipRamInfo } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeGameMusicCreatorCell } from '@/engine/uade/encoders/GameMusicCreatorEncoder';
-import { periodToPtNote } from '@/lib/amiga/periodNotes';
+import { encodeGameMusicCreatorCell, decodeGameMusicCreatorCell } from '@/engine/uade/encoders/GameMusicCreatorEncoder';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────────
 
@@ -63,16 +61,6 @@ const HEADER_SIZE     = NUM_SAMPLES * SAMPLE_HDR_SIZE + 3 + 1 + 100 * 2; // = 44
 // Standard ProTracker period table, finetune = 0.
 // Index 0 = C-1 (period 856) ... index 35 = B-3 (period 113)
 // Matches Load_gmc.cpp's use of ReadMODPatternEntry which uses this table.
-
-/**
- * Convert a ProTracker period value to a TrackerCell note number.
- * XM/DEViLBOX: note 1 = C-0. ProTracker octave 1 starts at note 13 (C-1).
- * Returns 0 (empty) if period is 0 or out of range.
- */
-function periodToNote(period: number): number {
-  // ProTracker naming, one table: src/lib/amiga/periodNotes.ts.
-  return periodToPtNote(period);
-}
 
 // ── Format detection ───────────────────────────────────────────────────────────
 
@@ -203,88 +191,26 @@ export function parseGameMusicCreatorFile(bytes: Uint8Array, filename: string): 
           continue;
         }
 
-        const b0  = u8(view, pos);
-        const b1  = u8(view, pos + 1);
-        const cmd = u8(view, pos + 2) & 0x0F;
-        const prm = u8(view, pos + 3);
+        const b0 = u8(view, pos);
+        const b1 = u8(view, pos + 1);
+        const raw = bytes.subarray(pos, pos + 4);
         pos += 4;
 
-        // Note cut: 0xFF/0xFE in bytes 0/1 per Load_gmc.cpp
-        const noteCut = (b0 === 0xFF && b1 === 0xFE);
-
-        // Sanity: high nibble of b0 must be 0 (except note cut)
-        if (!noteCut && (b0 & 0xF0) !== 0) {
-          // Corrupted data — treat as empty
+        // Note cut is 0xFFFE; otherwise a set high nibble of byte 0 is a period over
+        // 0x0FFF, which Load_gmc.cpp rejects as corrupt. Treat the cell as empty.
+        if (!(b0 === 0xFF && b1 === 0xFE) && (b0 & 0xF0) !== 0) {
           cells.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
           continue;
         }
 
-        // Reconstruct MOD 4-byte cell to extract period + sample
-        // Standard MOD cell layout:
-        //   b0 = (smp_hi & 0xF0) | (period >> 8)
-        //   b1 = period & 0xFF
-        //   b2 = (smp_lo & 0xF0) | (effect)   — GMC stores cmd here (low nibble)
-        //   b3 = param
-        // We parse sample from b0/b2, period from b0/b1
-        const sampleHi   = (noteCut ? 0 : b0) & 0xF0;
-        const periodHi   = (noteCut ? 0 : b0) & 0x0F;
-        const periodRaw  = (periodHi << 8) | b1;
-        // GMC stores sample nibble only in high nibble of b0 (no b2 contribution)
-        const sampleNum  = sampleHi >> 4;  // 0-15
-
-        let note = 0;
-        if (noteCut) {
-          note = 97;  // XM note-cut
-        } else if (periodRaw > 0) {
-          note = periodToNote(periodRaw);
-        }
-
-        // ── Effect mapping (Load_gmc.cpp switch) ──────────────────────────
-        let effTyp = 0;
-        let eff    = prm;
-
-        switch (cmd) {
-          case 0x00:  // Nothing
-            effTyp = 0; eff = 0;
-            break;
-          case 0x01:  // Portamento up
-            effTyp = 0x01;
-            break;
-          case 0x02:  // Portamento down
-            effTyp = 0x02;
-            break;
-          case 0x03:  // Volume (Cxx)
-            effTyp = 0x0C;
-            eff = prm & 0x7F;
-            break;
-          case 0x04:  // Pattern break (Dxx)
-            effTyp = 0x0D;
-            break;
-          case 0x05:  // Position jump (Bxx)
-            effTyp = 0x0B;
-            break;
-          case 0x06:  // LED filter on → E00
-            effTyp = 0x0E;
-            eff = 0x00;
-            break;
-          case 0x07:  // LED filter off → E01
-            effTyp = 0x0E;
-            eff = 0x01;
-            break;
-          case 0x08:  // Set speed (Fxx)
-            effTyp = 0x0F;
-            break;
-          default:
-            effTyp = 0; eff = 0;
-            break;
-        }
-
+        // One decoder (GameMusicCreatorEncoder.ts); the byte-exact carriers stay off the grid cell.
+        const d = decodeGameMusicCreatorCell(raw);
         cells.push({
-          note,
-          instrument: sampleNum,
+          note: d.note,
+          instrument: d.instrument,
           volume: 0,
-          effTyp,
-          eff,
+          effTyp: d.effTyp,
+          eff: d.eff,
           effTyp2: 0,
           eff2: 0,
         });
@@ -476,55 +402,7 @@ export function parseGameMusicCreatorFile(bytes: Uint8Array, filename: string): 
     numPatterns,
     moduleSize: bytes.byteLength,
     encodeCell: encodeGameMusicCreatorCell,
-    decodeCell: (bytes: Uint8Array): TrackerCell => {
-      // Inverse of parser's 4-byte GameMusicCreator cell decode
-      const b0  = bytes[0];
-      const b1  = bytes[1];
-      const cmd = bytes[2] & 0x0F;
-      const prm = bytes[3];
-
-      const noteCut = (b0 === 0xFF && b1 === 0xFE);
-
-      // Sample only from high nibble of b0
-      const sampleNum = noteCut ? 0 : (b0 & 0xF0) >> 4;
-
-      // Period from low nibble of b0 + b1
-      const periodHi  = noteCut ? 0 : b0 & 0x0F;
-      const periodRaw = (periodHi << 8) | b1;
-
-      let note = 0;
-      if (noteCut) {
-        note = 97; // XM note-cut
-      } else if (periodRaw > 0) {
-        note = periodToNote(periodRaw);
-      }
-
-      // Effect mapping (mirrors parser's switch)
-      let effTyp = 0;
-      let eff    = prm;
-      switch (cmd) {
-        case 0x00: effTyp = 0; eff = 0; break;
-        case 0x01: effTyp = 0x01; break;
-        case 0x02: effTyp = 0x02; break;
-        case 0x03: effTyp = 0x0C; eff = prm & 0x7F; break;
-        case 0x04: effTyp = 0x0D; break;
-        case 0x05: effTyp = 0x0B; break;
-        case 0x06: effTyp = 0x0E; eff = 0x00; break;
-        case 0x07: effTyp = 0x0E; eff = 0x01; break;
-        case 0x08: effTyp = 0x0F; break;
-        default:   effTyp = 0; eff = 0; break;
-      }
-
-      // Byte-exact carriers (fields the GMC grid loop never sets, so they stay private to
-      // the round-trip/chip-RAM path): period holds the exact source Amiga period (the MOD
-      // period table is lossy for off-table periods), pan holds the raw byte2 (preserves
-      // its high nibble and cmd-0/default params the XM effect view collapses to 0), cutoff
-      // holds the raw byte3 param.
-      return {
-        note, instrument: sampleNum, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0,
-        period: periodRaw, pan: bytes[2], cutoff: prm,
-      };
-    },
+    decodeCell: decodeGameMusicCreatorCell,
   };
 
   return {
