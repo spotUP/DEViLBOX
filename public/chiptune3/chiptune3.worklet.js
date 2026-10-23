@@ -515,6 +515,17 @@ class MPT extends AudioWorkletProcessor {
 				if (!this.modulePtr) { this.play(v, true); break }
 				this.hotReload_(v)
 				break
+			case 'applyEdits':
+				// Flat Int32 op list written into the running modules (no rebuild).
+				if (!this.modulePtr) break
+				this.applyEdits_(v)
+				break
+			case 'updateBuffer':
+				// Edits were applied in place; keep only the stored song bytes current,
+				// which slots and scope instances created later parse.
+				if (!this.modulePtr) { this.play(v, true); break }
+				this.moduleBuffer = v.slice ? v.slice(0) : new Int8Array(v).buffer
+				break
 			case 'setMuteMask':
 				// User mute/solo mask — combine with isolation exclusion
 				if (!this.modulePtr) break
@@ -533,17 +544,6 @@ class MPT extends AudioWorkletProcessor {
 				break
 			case 'updateIsolationMask':
 				// Change which channels an isolation slot renders.
-			case 'applyEdits':
-				// Flat Int32 op list written into the running modules (no rebuild).
-				if (!this.modulePtr) break
-				this.applyEdits_(v)
-				break
-			case 'updateBuffer':
-				// Edits were applied in place; keep only the stored song bytes current,
-				// which slots and scope instances created later parse.
-				if (!this.modulePtr) { this.play(v, true); break }
-				this.moduleBuffer = v.slice ? v.slice(0) : new Int8Array(v).buffer
-				break
 				// v = { slotIndex: number, channelMask: number }
 				this.updateIsolationMask_(v.slotIndex, v.channelMask)
 				break
@@ -685,6 +685,7 @@ class MPT extends AudioWorkletProcessor {
 		const stack = libopenmpt.stackSave ? libopenmpt.stackSave() : 0
 		const curOrder = libopenmpt._openmpt_module_get_current_order(this.modulePtr)
 		const curRow = libopenmpt._openmpt_module_get_current_row(this.modulePtr)
+		const curSeconds = libopenmpt._openmpt_module_get_position_seconds(this.modulePtr)
 		const kept = {
 			userMuteMask: this.userMuteMask,
 			isolatedBits: this.isolatedBits,
@@ -695,25 +696,6 @@ class MPT extends AudioWorkletProcessor {
 		this.play(buffer, this.paused, false)
 		if (this.modulePtr) {
 			libopenmpt._openmpt_module_set_position_order_row(this.modulePtr, curOrder, curRow)
-			// play() learns the channel count only through meta(), which a
-			// paused load skips; the masks and the scopes need it.
-			this.channels = libopenmpt._openmpt_module_get_num_channels(this.modulePtr)
-			this.userMuteMask = kept.userMuteMask
-			this.isolatedBits = kept.isolatedBits
-			kept.isolationMasks.forEach((mask, i) => { if (mask !== null) this.addIsolationSlot_(i, mask) })
-			kept.dubChannels.forEach((on, ch) => { if (on) this.addDubSlot_(ch) })
-			this.recomputeMainMask_()
-		const curSeconds = libopenmpt._openmpt_module_get_position_seconds(this.modulePtr)
-			this.reapplyIsolationMasks_()
-			if (kept.osc) this.createOscModule_()
-		}
-		if (stack) libopenmpt.stackRestore(stack)
-	}
-
-	play(buffer, paused = false, announce = true) {
-		this.teardownAllIsolation_()
-		this.teardownAllDubSlots_()
-		this.stop()
 			// Catch up to the exact sample inside the row, as syncToMain_ does.
 			if (curSeconds > 0 && this.leftPtr && this.rightPtr) {
 				let frames = Math.round((curSeconds - libopenmpt._openmpt_module_get_position_seconds(this.modulePtr)) * sampleRate)
@@ -723,20 +705,20 @@ class MPT extends AudioWorkletProcessor {
 					frames -= n
 				}
 			}
-		this.lastStateRow = -1
-		this.lastStateOrder = -1
-		this.userMuteMask = 0xFFFFFFFF  // reset mute state for new song
-		this.isolatedBits = 0
+			// play() learns the channel count only through meta(), which a
+			// paused load skips; the masks and the scopes need it.
+			this.channels = libopenmpt._openmpt_module_get_num_channels(this.modulePtr)
+			this.userMuteMask = kept.userMuteMask
+			this.isolatedBits = kept.isolatedBits
+			kept.isolationMasks.forEach((mask, i) => { if (mask !== null) this.addIsolationSlot_(i, mask) })
+			kept.dubChannels.forEach((on, ch) => { if (on) this.addDubSlot_(ch) })
+			this.recomputeMainMask_()
+			this.reapplyIsolationMasks_()
+			if (kept.osc) this.createOscModule_()
+		}
+		if (stack) libopenmpt.stackRestore(stack)
+	}
 
-		// Cache the raw buffer so isolation slots can create their own module instances
-		this.moduleBuffer = buffer.slice ? buffer.slice(0) : new Int8Array(buffer).buffer
-
-		const maxFramesPerChunk = RENDER_QUANTUM
-		const byteArray = new Int8Array(buffer)
-		const ptrToFile = libopenmpt._malloc(byteArray.byteLength)
-		libopenmpt.HEAPU8.set(byteArray, ptrToFile)
-
-		// Use ext module API for interactive features (channel mute/solo).
 	/**
 	 * Write a flat Int32 op list into the main module and every other live
 	 * instance (isolation slots, dub slots, scope instances), so an edit lands
@@ -770,6 +752,24 @@ class MPT extends AudioWorkletProcessor {
 		}
 	}
 
+	play(buffer, paused = false, announce = true) {
+		this.teardownAllIsolation_()
+		this.teardownAllDubSlots_()
+		this.stop()
+		this.lastStateRow = -1
+		this.lastStateOrder = -1
+		this.userMuteMask = 0xFFFFFFFF  // reset mute state for new song
+		this.isolatedBits = 0
+
+		// Cache the raw buffer so isolation slots can create their own module instances
+		this.moduleBuffer = buffer.slice ? buffer.slice(0) : new Int8Array(buffer).buffer
+
+		const maxFramesPerChunk = RENDER_QUANTUM
+		const byteArray = new Int8Array(buffer)
+		const ptrToFile = libopenmpt._malloc(byteArray.byteLength)
+		libopenmpt.HEAPU8.set(byteArray, ptrToFile)
+
+		// Use ext module API for interactive features (channel mute/solo).
 		// _openmpt_module_ext_create_from_memory returns an ext handle;
 		// _openmpt_module_ext_get_module extracts the regular module ptr.
 		this.extPtr = 0

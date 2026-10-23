@@ -58,6 +58,36 @@ function enqueue<T>(op: () => Promise<T>): Promise<T> {
   return run;
 }
 
+/**
+ * True once an edit the playing modules cannot take in place is pending: a
+ * channel-count change or sample data (a playing channel points into the old
+ * sample buffer, so freeing it in place is a use-after-free). Only then does
+ * the hot-reload rebuild the player; otherwise every edit was already written
+ * into the live modules and the reload only refreshes the stored song bytes.
+ */
+let _needsRebuild = false;
+
+/** applyEdits opcodes; the worklet's EDIT_OP_ARGS holds the argument counts. */
+const OP_CELL = 1;
+const OP_ORDER = 2;
+const OP_NUM_ORDERS = 3;
+const OP_RESIZE_PATTERN = 4;
+const OP_ADD_PATTERN = 5;
+
+/** Send ops to the playing modules at once (in place, no rebuild). */
+async function postOps(ops: number[]): Promise<void> {
+  if (ops.length === 0) return;
+  const { LibopenmptEngine } = await import('@engine/libopenmpt/LibopenmptEngine');
+  if (LibopenmptEngine.hasInstance()) LibopenmptEngine.getInstance().applyEdits(Int32Array.from(ops));
+}
+
+/** Deliver serialized bytes: a rebuild only when an edit needed one, else just refresh the stored bytes. */
+function deliver(engine: { hotReload(d: ArrayBuffer): void; updateBuffer(d: ArrayBuffer): void }, data: ArrayBuffer): void {
+  if (_needsRebuild) engine.hotReload(data);
+  else engine.updateBuffer(data);
+  _needsRebuild = false;
+}
+
 /** Debounced hot-reload: serialize the soundlib and send to LibopenmptEngine. */
 function scheduleHotReload(): void {
   if (_hotReloadTimer) clearTimeout(_hotReloadTimer);
@@ -70,7 +100,7 @@ function scheduleHotReload(): void {
       const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
       const data = await enqueue(() => osl.saveModule(_format));
       if (data) {
-        LibopenmptEngine.getInstance().hotReload(data);
+        deliver(LibopenmptEngine.getInstance(), data);
         _dirty = false;
       }
     } catch {
@@ -134,6 +164,7 @@ async function writeCell(
   rowIndex: number,
   channelIndex: number,
   cell: TrackerCell,
+  ops: number[] | null,
 ): Promise<void> {
   const note = mapNoteToOpenMPT(cell.note, _format);
   let volume = cell.volume;
@@ -148,6 +179,7 @@ async function writeCell(
     const bufLen   = cell.eff    & 0x7F;
     const feedback = cell.eff2   & 0x7F;
     const slot = await allocateDSPMacro(osl, type, bufLen, feedback);
+    _needsRebuild = true; // the macro table is not an in-place op
     command = slot >= 0 ? 31 : 0;
     param   = slot >= 0 ? (0x80 | slot) : 0;
   } else {
@@ -170,14 +202,21 @@ async function writeCell(
   }
   const { volcmd, volval } = mapVolumeToOpenMPT(volume);
 
-  await osl.setPatternCell(patternIndex, rowIndex, channelIndex, {
-    note,
-    instrument: cell.instrument,
-    volcmd,
-    vol: volval,
-    command,
-    param,
-  });
+  await writeModuleCell(osl, patternIndex, rowIndex, channelIndex,
+    { note, instrument: cell.instrument, volcmd, vol: volval, command, param }, ops);
+}
+
+/** Write one module cell into the soundlib and record the same write as an in-place op. */
+async function writeModuleCell(
+  osl: Soundlib,
+  patternIndex: number,
+  rowIndex: number,
+  channelIndex: number,
+  c: { note: number; instrument: number; volcmd: number; vol: number; command: number; param: number },
+  ops: number[] | null,
+): Promise<void> {
+  await osl.setPatternCell(patternIndex, rowIndex, channelIndex, c);
+  ops?.push(OP_CELL, patternIndex, rowIndex, channelIndex, c.note, c.instrument, c.volcmd, c.vol, c.command, c.param);
 }
 
 /** Write every cell of one pattern into the soundlib. */
@@ -185,11 +224,12 @@ async function writePatternCells(
   osl: Soundlib,
   patternIndex: number,
   channels: { rows: TrackerCell[] }[],
+  ops: number[] | null,
 ): Promise<void> {
   for (let ch = 0; ch < channels.length; ch++) {
     const rows = channels[ch].rows;
     for (let row = 0; row < rows.length; row++) {
-      await writeCell(osl, patternIndex, row, ch, rows[row]);
+      await writeCell(osl, patternIndex, row, ch, rows[row], ops);
     }
   }
 }
@@ -206,6 +246,7 @@ async function writePatternCells(
 export function markLoaded(format: SaveFormat, source?: ArrayBuffer, patternIds?: string[]): void {
   _loaded = true;
   _dirty = false;
+  _needsRebuild = false;
   _edited = false;
   _format = format;
   _owned = new WeakSet<ArrayBuffer>();
@@ -291,7 +332,11 @@ export async function syncCellEdit(
 
   const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
 
-  await enqueue(() => writeCell(osl, patternIndex, rowIndex, channelIndex, fullCell));
+  await enqueue(async () => {
+    const ops: number[] = [];
+    await writeCell(osl, patternIndex, rowIndex, channelIndex, fullCell, ops);
+    await postOps(ops);
+  });
 
   markEdited();
 }
@@ -307,14 +352,12 @@ export async function syncCellClear(
   if (!_loaded) return;
 
   const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
-  await enqueue(() => osl.setPatternCell(patternIndex, rowIndex, channelIndex, {
-    note: 0,
-    instrument: 0,
-    volcmd: 0,
-    vol: 0,
-    command: 0,
-    param: 0,
-  }));
+  await enqueue(async () => {
+    const ops: number[] = [];
+    await writeModuleCell(osl, patternIndex, rowIndex, channelIndex,
+      { note: 0, instrument: 0, volcmd: 0, vol: 0, command: 0, param: 0 }, ops);
+    await postOps(ops);
+  });
 
   markEdited();
 }
@@ -332,7 +375,11 @@ export async function syncFullPattern(
 
   const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
 
-  await enqueue(() => writePatternCells(osl, patternIndex, channels));
+  await enqueue(async () => {
+    const ops: number[] = [];
+    await writePatternCells(osl, patternIndex, channels, ops);
+    await postOps(ops);
+  });
 
   markEdited();
 }
@@ -353,12 +400,13 @@ export interface SongStructure {
  * and every pattern when the channel count changed. `changed` also covers
  * order list and slot count edits, which leave every cell in place.
  */
-async function shapeModule(osl: Soundlib, song: SongStructure): Promise<{ stale: number[]; changed: boolean }> {
+async function shapeModule(osl: Soundlib, song: SongStructure, ops: number[] | null): Promise<{ stale: number[]; changed: boolean }> {
   const stale = new Set<number>();
   let changed = false;
   const numCh = song.numChannels || song.patterns[0]?.channels.length || 4;
   if ((await osl.getNumChannels()) !== numCh) {
     await osl.setNumChannels(numCh);
+    _needsRebuild = true; // masks, slots and scopes are sized to the channel count
     song.patterns.forEach((_, i) => stale.add(i));
   }
   const numPat = Math.max(song.patterns.length, 1);
@@ -370,10 +418,13 @@ async function shapeModule(osl: Soundlib, song: SongStructure): Promise<{ stale:
     const rows = song.patterns[i].length;
     const have = await osl.getPatternNumRows(i);
     if (have === 0) {
-      await osl.addPattern(rows);
+      const added = await osl.addPattern(rows);
+      if (added !== i) _needsRebuild = true; // the live modules would append at another slot
+      ops?.push(OP_ADD_PATTERN, rows);
       stale.add(i);
     } else if (have !== rows) {
       await osl.resizePattern(i, rows);
+      ops?.push(OP_RESIZE_PATTERN, i, rows);
       stale.add(i);
     }
     const id = song.patterns[i].id;
@@ -382,11 +433,13 @@ async function shapeModule(osl: Soundlib, song: SongStructure): Promise<{ stale:
   for (let i = 0; i < song.songPositions.length; i++) {
     if ((await osl.getOrderPattern(i)) !== song.songPositions[i]) {
       await osl.setOrderPattern(i, song.songPositions[i]);
+      ops?.push(OP_ORDER, i, song.songPositions[i]);
       changed = true;
     }
   }
   if ((await osl.getNumOrders()) !== song.songPositions.length) {
     await osl.setNumOrders(song.songPositions.length);
+    ops?.push(OP_NUM_ORDERS, song.songPositions.length);
     changed = true;
   }
   return { stale: [...stale], changed: changed || stale.size > 0 };
@@ -409,9 +462,12 @@ export async function syncSongStructure(song: SongStructure): Promise<boolean> {
   if (_slotIds && song.patterns.length > 0 && !song.patterns.some(p => p.id !== undefined && _slotIds!.includes(p.id))) return false;
   const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
   const changed = await enqueue(async () => {
-    const { stale, changed: shaped } = await shapeModule(osl, song);
-    for (const p of stale) await writePatternCells(osl, p, song.patterns[p].channels);
+    const ops: number[] = [];
+    const { stale, changed: shaped } = await shapeModule(osl, song, ops);
+    for (const p of stale) await writePatternCells(osl, p, song.patterns[p].channels, ops);
     _slotIds = patternIdsOf(song);
+    // A channel-count change rebuilds the player; the ops would hit the old layout.
+    if (!_needsRebuild) await postOps(ops);
     return shaped;
   });
   if (changed) markEdited();
@@ -491,9 +547,9 @@ export async function createModuleForSong(
     // createNewModule makes 64-row patterns and order [0, 1, 2, ...]; the song's
     // lengths (an 8-row song would play 56 rows of silence) and order list
     // ([0, 1, 0, 2]) differ, so the module takes the song's shape first.
-    await shapeModule(osl, song);
+    await shapeModule(osl, song, null);
     for (let p = 0; p < song.patterns.length; p++) {
-      await writePatternCells(osl, p, song.patterns[p].channels);
+      await writePatternCells(osl, p, song.patterns[p].channels, null);
     }
     _slotIds = patternIdsOf(song);
     for (const inst of song.instruments ?? []) await writeSamplerInstrument(osl, inst);
@@ -663,7 +719,7 @@ export async function syncSamplerInstruments(instruments: readonly InstrumentCon
     for (const inst of pending) if (await writeSamplerInstrument(osl, inst)) any = true;
     return any;
   });
-  if (changed) markEdited();
+  if (changed) { _needsRebuild = true; markEdited(); }
   return changed;
 }
 
@@ -684,7 +740,7 @@ export async function syncSampleEdit(instrumentId: number, sample: SampleConfig,
   if (_samplerSlots.has(instrumentId)) {
     // A slot this bridge filled from a Sampler: write it the same way again, at the Sampler's pitch.
     const config = { id: instrumentId, synthType: 'Sampler', sample, volume: _samplerSeen.get(instrumentId)?.volume } as InstrumentConfig;
-    if (await enqueue(() => writeSamplerInstrument(osl, config))) markEdited();
+    if (await enqueue(() => writeSamplerInstrument(osl, config))) { _needsRebuild = true; markEdited(); }
     return;
   }
   if (edit.data && sample.audioBuffer && sample.audioBuffer.byteLength > 0) {
@@ -699,6 +755,7 @@ export async function syncSampleEdit(instrumentId: number, sample: SampleConfig,
   const type = sample.loop ? (sample.loopType === 'pingpong' ? 'pingpong' : 'forward') : 'off';
   await osl.setSampleLoop(instrumentId, sample.loopStart || 0, sample.loopEnd || 0, type);
   _dirty = true;
+  _needsRebuild = true;
   scheduleHotReload();
 }
 
@@ -744,7 +801,7 @@ export async function flush(): Promise<void> {
     const osl = await import('@lib/import/wasm/OpenMPTSoundlib');
     const data = await enqueue(() => osl.saveModule(_format));
     if (data) {
-      LibopenmptEngine.getInstance().hotReload(data);
+      deliver(LibopenmptEngine.getInstance(), data);
       _dirty = false;
     }
   } catch {
@@ -760,6 +817,7 @@ export function reset(): void {
   }
   _loaded = false;
   _dirty = false;
+  _needsRebuild = false;
   _edited = false;
   _format = 'mod';
   _owned = new WeakSet<ArrayBuffer>();
