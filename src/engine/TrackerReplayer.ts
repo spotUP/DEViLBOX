@@ -13,6 +13,7 @@
  * Format-specific behavior is handled by effect handlers.
  */
 
+import { songPositionAtMs } from '@/lib/tracker/timeToPosition';
 import { applyEditorCellEdit } from '@lib/import/furnaceEditorCells';
 import { outputLatencySec } from './audioLatency';
 import { isReplacedInstrument, noteVolumeIsVelocity, synthNoteVelocity } from './replayer/hybridInstruments';
@@ -997,6 +998,18 @@ export class TrackerReplayer {
   get isSuppressNotes(): boolean { return this._suppressNotes; }
 
   /** Jump to a specific position while playing */
+  /**
+   * Seek to a time in the song, in milliseconds. The one time-seek of the tracker replayer: the time is
+   * converted to (songPos, row) from the song's own speed/tempo timing, then seekTo moves there (libopenmpt
+   * included, which has no seconds seek in its worklet bridge). Returns the position seeked to, null without a song.
+   */
+  seekToMs(ms: number): { songPos: number; pattPos: number } | null {
+    if (!this.song) return null;
+    const at = songPositionAtMs(this.song, ms, this.useXMPeriods);
+    this.seekTo(at.songPos, at.pattPos);
+    return at;
+  }
+
   jumpToPosition(songPos: number, pattPos: number = 0): void {
     this.seekTo(songPos, pattPos);
   }
