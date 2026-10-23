@@ -26,9 +26,13 @@
 
 let processorRegistered = false;
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 class SetBfreeProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
+    // Notes sent ahead with a `time` wait here for their frame (see shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
 
     this.synth = null;
     this.isInitialized = false;
@@ -52,22 +56,20 @@ class SetBfreeProcessor extends AudioWorkletProcessor {
         break;
 
       case 'noteOn':
-        if (this.synth && this.isInitialized) {
-          this.Module._setbfree_note_on(this.synth, data.note, data.velocity || 100);
-        } else {
+        if (this.synth && this.isInitialized) { if (this.noteEvents.push(event.data, currentTime)) this.applyNoteEvent(event.data); } else {
           this.pendingMessages.push(event.data);
         }
         break;
 
       case 'noteOff':
-        if (this.synth && this.isInitialized) {
-          this.Module._setbfree_note_off(this.synth, data.note);
-        }
+        if (this.synth && this.isInitialized) { if (this.noteEvents.push(event.data, currentTime)) this.applyNoteEvent(event.data); }
         break;
 
       case 'allNotesOff':
+        // Cancels the notes scheduled at or after it: on Stop the replayer has already sent the coming rows
         if (this.synth && this.isInitialized) {
-          this.Module._setbfree_all_notes_off(this.synth);
+          this.noteEvents.cancelFrom(data.time ?? currentTime);
+          if (this.noteEvents.push(event.data, currentTime)) this.applyNoteEvent(event.data);
         }
         break;
 
@@ -236,6 +238,14 @@ class SetBfreeProcessor extends AudioWorkletProcessor {
     }
   }
 
+  applyNoteEvent(ev) {
+    switch (ev.type) {
+      case 'noteOn': this.Module._setbfree_note_on(this.synth, ev.note, ev.velocity || 100); break;
+      case 'noteOff': this.Module._setbfree_note_off(this.synth, ev.note); break;
+      case 'allNotesOff': this.Module._setbfree_all_notes_off(this.synth); break;
+    }
+  }
+
   process(inputs, outputs, parameters) {
     if (!this.synth || !this.isInitialized) {
       return true;
@@ -246,9 +256,16 @@ class SetBfreeProcessor extends AudioWorkletProcessor {
     const numSamples = outputL.length;
 
     try {
-      this.Module._setbfree_process(
-        this.synth, this.outputPtrL, this.outputPtrR, numSamples
-      );
+      // Render in segments so a queued note event keys the engine at its own frame, not at the block start
+      let done = 0;
+      while (done < numSamples) {
+        const now = currentTime + done / sampleRate;
+        this.noteEvents.drain(now, (ev) => this.applyNoteEvent(ev));
+        const off = this.noteEvents.nextOffset(now, numSamples - done, sampleRate);
+        const len = off > 0 ? off : numSamples - done;
+        this.Module._setbfree_process(this.synth, this.outputPtrL + done * 4, this.outputPtrR + done * 4, len);
+        done += len;
+      }
 
       // Recreate views if WASM memory was resized
       const currentBuffer = this._wasmMemory

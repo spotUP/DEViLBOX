@@ -377,21 +377,21 @@ export class CalfMonoSynthImpl implements DevilboxSynth {
 
   getNode(): AudioNode | null { return this.node; }
 
-  triggerAttack(note: string | number, _time?: number, velocity = 0.8): void {
+  triggerAttack(note: string | number, time?: number, velocity = 0.8): void {
     if (!this.ready || !this.node) return;
     const midi = typeof note === 'string' ? noteToMidi(note) : note;
-    this.node.port.postMessage({ type: 'noteOn', note: midi, velocity: Math.round(velocity * 127) });
+    this.node.port.postMessage({ type: 'noteOn', note: midi, velocity: Math.round(velocity * 127), time });
   }
 
-  triggerRelease(note?: string | number): void {
+  triggerRelease(note?: string | number, time?: number): void {
     if (!this.ready || !this.node) return;
-    if (note === undefined) { this.allNotesOff(); return; }
+    if (note === undefined) { this.allNotesOff(time); return; }
     const midi = typeof note === 'string' ? noteToMidi(note) : note;
-    this.node.port.postMessage({ type: 'noteOff', note: midi });
+    this.node.port.postMessage({ type: 'noteOff', note: midi, time });
   }
 
-  allNotesOff(): void {
-    this.node?.port.postMessage({ type: 'allNotesOff' });
+  allNotesOff(time?: number): void {
+    this.node?.port.postMessage({ type: 'allNotesOff', time });
   }
 
   setParam(index: number, value: number): void {

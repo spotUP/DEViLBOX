@@ -329,7 +329,7 @@ export class RaffoSynthEngine implements DevilboxSynth {
     }
   }
 
-  triggerAttack(frequency: number | string, _time?: number, velocity?: number): this {
+  triggerAttack(frequency: number | string, time?: number, velocity?: number): this {
     const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
     const vel = Math.round((velocity ?? 0.8) * 127);
     this._currentNote = note;
@@ -337,19 +337,19 @@ export class RaffoSynthEngine implements DevilboxSynth {
       this.pendingNotes.push({ note, velocity: vel });
       return this;
     }
-    this._worklet.port.postMessage({ type: 'noteOn', note, velocity: vel });
+    this._worklet.port.postMessage({ type: 'noteOn', note, velocity: vel, time });
     return this;
   }
 
   // RaffoSynth is monophonic (Minimoog clone) — always release current note
-  triggerRelease(_time?: number): this {
+  triggerRelease(time?: number): this {
     if (!this._worklet || !this.isInitialized) {
       // Clear pending notes to prevent stuck notes when noteOff arrives before init
       this.pendingNotes = [];
       return this;
     }
     if (this._currentNote >= 0) {
-      this._worklet.port.postMessage({ type: 'noteOff', note: this._currentNote });
+      this._worklet.port.postMessage({ type: 'noteOff', note: this._currentNote, time });
       this._currentNote = -1;
     }
     return this;
