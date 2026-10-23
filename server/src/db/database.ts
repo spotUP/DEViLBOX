@@ -94,6 +94,23 @@ export function createLoudnessTables(database: Database.Database = db): void {
   `);
 }
 
+/**
+ * Lyrics for the Selecta player (GET/POST /api/lyrics/:md5). md5 = MD5 of the song file bytes;
+ * one LRC text per md5, last writer wins. user_id records who wrote the current text.
+ */
+export function createLyricsTables(database: Database.Database = db): void {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS song_lyrics (
+      md5 TEXT PRIMARY KEY CHECK(length(md5) = 32),
+      lrc TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+}
+
 // Create tables
 /**
  * Module genre tables (GET /api/genre/:key). Exported so a test can build them in memory.
@@ -322,6 +339,7 @@ export function initDatabase() {
   createGenreTables();
   createHipVoteTables();
   createLoudnessTables();
+  createLyricsTables();
 
   console.log('[DB] Database initialized at:', DB_PATH);
 }
