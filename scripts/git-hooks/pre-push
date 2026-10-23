@@ -69,6 +69,16 @@ run_step() {
 PUSH_REFS=""
 [ -t 0 ] || PUSH_REFS="$(cat)"
 
+# Git leaves rejected refs (non-fast-forward, stale) and up-to-date refs out of
+# the list. Piped but empty means nothing will be pushed: there is nothing to
+# gate. Only an interactive run (stdin is a terminal) falls through to test
+# HEAD. 2026-10-23: a push to a remote that had moved ran all of test:ci for
+# ~25 min, held every other session's tests, then git rejected it anyway.
+if [ ! -t 0 ] && [ -z "$PUSH_REFS" ]; then
+  echo "${GRN}[pre-push] no refs to push (rejected or up to date) - nothing to gate.${RST}" >&2
+  exit 0
+fi
+
 is_docs_path() {
   case "$1" in
     *.md|thoughts/*|docs/*) return 0 ;;

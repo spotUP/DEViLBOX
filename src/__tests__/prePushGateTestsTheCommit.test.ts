@@ -182,6 +182,16 @@ describe('scripts/git-hooks/pre-push gates the pushed commit, not the working tr
     expect(r.status).toBe(1);
   });
 
+  it('runs nothing when git hands it an empty ref list (rejected or up-to-date push; 2026-10-23 ran all of test:ci for a push git then refused)', () => {
+    commitCheck('red\n'); // any gate step that ran would fail on this commit
+    const r = spawnSync('bash', [HOOK], {
+      cwd: repo, encoding: 'utf8', env: { ...env, TMPDIR: scratch }, input: '',
+    });
+    expect(r.stderr).toContain('no refs to push');
+    expect(r.stderr).not.toContain('type-check');
+    expect(r.status).toBe(0);
+  });
+
   it('leaves no snapshot directory behind, after a pass or a failure', () => {
     runHook(commitCheck('ok\n'));
     expect(snapshots()).toEqual([]);
