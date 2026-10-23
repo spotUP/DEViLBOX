@@ -90,9 +90,14 @@ export class ChannelMeterState {
   _realtimeLevelsTimestamp = 0; // performance.now() of last update
 }
 
+/**
+ * Flash a channel meter at a note start. The level is the note's own volume
+ * (0..1, so a C20 note is 0.5): the meter peaks where the volume says and is
+ * never boosted above it.
+ */
 export function triggerChannelMeter(state: ChannelMeterState, channelIndex: number, velocity: number): void {
   const s = state as any;
-  s._channelTriggerLevels.set(channelIndex, Math.min(1, velocity * 1.2));
+  s._channelTriggerLevels.set(channelIndex, Math.max(0, Math.min(1, velocity)));
   s._channelTriggerGens.set(channelIndex, ++s._triggerGenCounter);
 }
 
