@@ -126,11 +126,12 @@ export class ES5503Synth extends MAMEBaseSynth {
   /**
    * Write key-on to ES5503
    */
-  protected writeKeyOn(note: number, velocity: number): void {
+  protected writeKeyOn(note: number, velocity: number, time?: number): void {
     if (!this.workletNode || this._disposed) return;
 
     this.workletNode.port.postMessage({
       type: 'noteOn',
+      time,
       note,
       velocity: Math.floor(velocity * 127),
       osc: this.currentOsc,
@@ -140,10 +141,11 @@ export class ES5503Synth extends MAMEBaseSynth {
   /**
    * Write key-off to ES5503
    */
-  protected writeKeyOff(): void {
+  protected writeKeyOff(time?: number): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({
       type: 'noteOff',
+      time,
       note: this.currentNote,
       osc: this.currentOsc,
     });
