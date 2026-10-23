@@ -19,6 +19,9 @@
 #include "events.h"
 #include "memory.h"
 #include "custom.h"
+#ifdef UADE_WASM
+#include "paula_log.h"
+#endif
 #include "readcpu.h"
 #include "newcpu.h"
 #include "cia.h"
@@ -435,6 +438,9 @@ static void DMACON (uae_u16 v)
 	struct audio_channel_data *cdp = audio_channel + i;
 
 	cdp->dmaen = (dmacon & 0x200) && (dmacon & (1<<i));
+#ifdef UADE_WASM
+	uade_wasm_paula_state_changed(i);
+#endif
 	if (cdp->dmaen) {
 	    if (cdp->state == 0) {
 		cdp->state = 1;

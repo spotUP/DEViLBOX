@@ -59,4 +59,47 @@ describe('UADE channel meters', { timeout: 120_000 }, () => {
     // Sparse opening: channel 3 only starts its run of notes after 15 s.
     expect(starts).toBeGreaterThan(10);
   });
+  it('count a note in the tick it is written, not at the next tick poll', async () => {
+    // The tick snapshots poll Paula at the player tick overflow, before that
+    // tick's handler runs, so they see a note one tick after it was written.
+    // The meter count is taken at the register write: it must already have
+    // risen before the block of the poll that flags the note. Counting at the
+    // tick poll (the old way) rose in the poll's own block, about 20 ms late.
+    const { proc, send } = await startWorklet('uade', 'UADE', async (c) => (await import('@/engine/uade/UADEEngine')).uadeTransform(c), 'UADE', true);
+    await send({ type: 'load', buffer: songBuffer('public/data/songs/fashion-tracker/ivory tover ii.ex'), filenameHint: 'ex.ivory tover ii', skipScan: true, subsong: 0 });
+    await send({ type: 'play' });
+    const wasm = (proc as unknown as { _wasm: { _malloc(n: number): number; _uade_wasm_get_note_start_counts(p: number): void; _uade_wasm_enable_tick_snapshots(on: number): void; _uade_wasm_get_tick_snapshots(p: number, max: number): number; HEAPU8: Uint8Array } })._wasm;
+    const counts = wasm._malloc(16); const snaps = wasm._malloc(64 * 13 * 4);
+    wasm._uade_wasm_enable_tick_snapshots(1);
+    let prev = [0, 0, 0, 0];
+    // Block of the previous tick poll per channel, and whether the count rose since.
+    let lastPollBlock = -1; const roseSincePoll = [false, false, false, false];
+    let flagged = 0; let early = 0;
+    for (let q = 0; q < (48000 * 20) / 128; q++) {
+      (globalThis as { __workletClock?: number }).__workletClock = (q * 128) / 48000;
+      proc.process([], stereoOutputs(37));
+      const n = wasm._uade_wasm_get_tick_snapshots(snaps, 64);
+      const words = new Uint32Array(wasm.HEAPU8.buffer, snaps, n * 13);
+      wasm._uade_wasm_get_note_start_counts(counts);
+      const now = Array.from(new Uint32Array(wasm.HEAPU8.buffer, counts, 4));
+      if (n > 0 && lastPollBlock >= 0) {
+        for (let ch = 0; ch < 4; ch++) {
+          if (!(words[(n - 1) * 13 + 1 + ch * 3 + 2] & 1)) continue;
+          flagged++;
+          if (roseSincePoll[ch]) early++;
+        }
+      }
+      if (n > 0) { lastPollBlock = q; roseSincePoll.fill(false); }
+      // A rise in this block belongs to the handler that follows this block's poll.
+      now.forEach((c, ch) => { if (c !== prev[ch]) roseSincePoll[ch] = true; });
+      prev = now;
+    }
+    // Counting at the poll can never rise before it (measured 0 of 14). Counted
+    // at the write, a note rises in an earlier block whenever the write and the
+    // poll fall in different render calls (measured 8 of 14); the emulator
+    // renders in bursts, so the rest share one call and block order cannot
+    // tell them apart.
+    expect(flagged).toBeGreaterThan(10);
+    expect(early).toBeGreaterThanOrEqual(Math.ceil(flagged / 3));
+  });
 });
