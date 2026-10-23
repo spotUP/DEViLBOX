@@ -93,6 +93,8 @@ export class S14001ASynth extends MAMEBaseSynth {
     if (romData) {
       this.loadROM(0, romData);
       this._updateRomStatus(true);
+    } else {
+      this._updateRomStatus(false);
     }
   }
 

@@ -80,6 +80,7 @@ export class RolandSASynth extends MAMEBaseSynth {
 
       if (!romData) {
         console.warn('[RolandSA] ROM not found — synth will be silent until ROM is uploaded');
+        this._updateRomStatus(false);
         return;
       }
 
@@ -97,6 +98,7 @@ export class RolandSASynth extends MAMEBaseSynth {
     } catch (error) {
       console.error('[RolandSA] ROM loading failed:', error);
       console.error('Place ROM files in /public/roms/roland_sa/ - see /public/roms/README.md');
+      this._updateRomStatus(false);
       // Continue anyway - synth will initialize but be silent without samples
     }
   }

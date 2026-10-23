@@ -92,6 +92,7 @@ export class C352Synth extends MAMEBaseSynth {
 
       if (!romData) {
         console.warn('[C352] ROM not found — synth will be silent until ROM is uploaded');
+        this._updateRomStatus(false);
         return;
       }
 
@@ -104,6 +105,7 @@ export class C352Synth extends MAMEBaseSynth {
     } catch (error) {
       console.error('[C352] ROM loading failed:', error);
       console.error('Place ROM files in /public/roms/c352/ - see /public/roms/README.md');
+      this._updateRomStatus(false);
       // Continue anyway - synth will initialize but be silent without samples
     }
   }

@@ -34,6 +34,7 @@ export class KS0164Synth extends MAMEBaseSynth {
 
       if (!romData) {
         console.warn('[KS0164] ROM not found — synth will be silent until ROM is uploaded');
+        this._updateRomStatus(false);
         return;
       }
 
@@ -45,6 +46,7 @@ export class KS0164Synth extends MAMEBaseSynth {
     } catch (error) {
       console.error('[KS0164] ROM loading failed:', error);
       console.error('Place ROM files in /public/roms/ks0164/ — see /public/roms/README.md');
+      this._updateRomStatus(false);
     }
   }
 

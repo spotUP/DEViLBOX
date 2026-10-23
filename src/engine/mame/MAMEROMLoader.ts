@@ -241,6 +241,87 @@ export const ROLANDSA_ROM_CONFIG: ChipROMConfig = {
 };
 
 /**
+ * Build the combined ROM image for a chip from the bytes of a MAME-style .zip,
+ * placing each config.files entry at its offset. Returns null when the bytes are
+ * not a ZIP or a required file is missing. Shared by the disk fetch and by the
+ * upload dialog so both produce the layout loadChipROMs expects.
+ */
+export async function unpackRomZip(arrayBuffer: ArrayBuffer, config: ChipROMConfig): Promise<Uint8Array | null> {
+  // Extra safety: check ZIP magic bytes (PK\x03\x04)
+  if (arrayBuffer.byteLength < 4) {
+    console.log(`[${config.chipName}] File too small to be a ZIP: ${arrayBuffer.byteLength} bytes`);
+    return null;
+  }
+  const header = new Uint8Array(arrayBuffer, 0, 4);
+  if (header[0] !== 0x50 || header[1] !== 0x4B) {  // 'PK'
+    console.log(`[${config.chipName}] Not a ZIP file (magic: 0x${header[0].toString(16)}${header[1].toString(16)})`);
+    return null;
+  }
+
+  const JSZip = (await import('jszip')).default;
+  const zip = await JSZip.loadAsync(arrayBuffer);
+
+  // Calculate max size needed (only from files with known sizes)
+  const knownSizes = config.files.filter(f => f.size).map(f => f.offset + f.size!);
+  const initialSize = knownSizes.length > 0 ? Math.max(...knownSizes) :
+                     (config.combinedSize || 4 * 1024 * 1024); // Default 4MB
+  let combinedROM = new Uint8Array(initialSize);
+
+  let loadedCount = 0;
+
+  // Extract each file from the ZIP
+  for (const file of config.files) {
+    // Try exact match first, then search recursively for filename
+    let zipEntry = zip.file(file.name);
+
+    if (!zipEntry) {
+      // Search for the filename in any subdirectory
+      const allFiles = Object.keys(zip.files);
+      const matchingFile = allFiles.find(path => path.endsWith('/' + file.name) || path === file.name);
+      if (matchingFile) {
+        zipEntry = zip.file(matchingFile);
+      }
+    }
+
+    if (!zipEntry) {
+      if (file.required) {
+        console.error(`[${config.chipName}] Required file ${file.name} not found in ZIP`);
+        return null;
+      }
+      console.warn(`[${config.chipName}] Optional file ${file.name} not found in ZIP`);
+      continue;
+    }
+
+    const data = await zipEntry.async('uint8array');
+
+    if (file.size && data.length !== file.size) {
+      console.warn(
+        `[${config.chipName}] ${file.name} size mismatch: ` +
+        `expected ${file.size}, got ${data.length}`
+      );
+    }
+
+    // Grow buffer if needed
+    const requiredSize = file.offset + data.length;
+    if (requiredSize > combinedROM.length) {
+      console.log(`[${config.chipName}] Growing buffer from ${combinedROM.length} to ${requiredSize}`);
+      const newROM = new Uint8Array(requiredSize);
+      newROM.set(combinedROM);
+      combinedROM = newROM;
+    }
+
+    combinedROM.set(data, file.offset);
+    loadedCount++;
+    console.log(`✓ Extracted ${file.name}:`, data.length, `bytes from ZIP`);
+  }
+
+  if (loadedCount === 0) return null;
+
+  console.log(`✓ ${config.chipName} ROMs loaded from ZIP: ${loadedCount}/${config.files.length} files`);
+  return combinedROM;
+}
+
+/**
  * Load ROMs from a MAME-style .zip file
  */
 async function loadFromZip(zipPath: string, config: ChipROMConfig): Promise<Uint8Array | null> {
@@ -259,80 +340,7 @@ async function loadFromZip(zipPath: string, config: ChipROMConfig): Promise<Uint
     }
 
     const arrayBuffer = await response.arrayBuffer();
-
-    // Extra safety: check ZIP magic bytes (PK\x03\x04)
-    if (arrayBuffer.byteLength < 4) {
-      console.log(`[${config.chipName}] File too small to be a ZIP: ${arrayBuffer.byteLength} bytes`);
-      return null;
-    }
-    const header = new Uint8Array(arrayBuffer, 0, 4);
-    if (header[0] !== 0x50 || header[1] !== 0x4B) {  // 'PK'
-      console.log(`[${config.chipName}] Not a ZIP file at ${zipPath} (magic: 0x${header[0].toString(16)}${header[1].toString(16)})`);
-      return null;
-    }
-
-    const JSZip = (await import('jszip')).default;
-    const zip = await JSZip.loadAsync(arrayBuffer);
-
-    // Calculate max size needed (only from files with known sizes)
-    const knownSizes = config.files.filter(f => f.size).map(f => f.offset + f.size!);
-    const initialSize = knownSizes.length > 0 ? Math.max(...knownSizes) :
-                       (config.combinedSize || 4 * 1024 * 1024); // Default 4MB
-    let combinedROM = new Uint8Array(initialSize);
-
-    let loadedCount = 0;
-
-    // Extract each file from the ZIP
-    for (const file of config.files) {
-      // Try exact match first, then search recursively for filename
-      let zipEntry = zip.file(file.name);
-
-      if (!zipEntry) {
-        // Search for the filename in any subdirectory
-        const allFiles = Object.keys(zip.files);
-        const matchingFile = allFiles.find(path => path.endsWith('/' + file.name) || path === file.name);
-        if (matchingFile) {
-          zipEntry = zip.file(matchingFile);
-        }
-      }
-
-      if (!zipEntry) {
-        if (file.required) {
-          console.error(`[${config.chipName}] Required file ${file.name} not found in ZIP`);
-          return null;
-        }
-        console.warn(`[${config.chipName}] Optional file ${file.name} not found in ZIP`);
-        continue;
-      }
-
-      const data = await zipEntry.async('uint8array');
-
-      if (file.size && data.length !== file.size) {
-        console.warn(
-          `[${config.chipName}] ${file.name} size mismatch: ` +
-          `expected ${file.size}, got ${data.length}`
-        );
-      }
-
-      // Grow buffer if needed
-      const requiredSize = file.offset + data.length;
-      if (requiredSize > combinedROM.length) {
-        console.log(`[${config.chipName}] Growing buffer from ${combinedROM.length} to ${requiredSize}`);
-        const newROM = new Uint8Array(requiredSize);
-        newROM.set(combinedROM);
-        combinedROM = newROM;
-      }
-
-      combinedROM.set(data, file.offset);
-      loadedCount++;
-      console.log(`✓ Extracted ${file.name}:`, data.length, `bytes from ZIP`);
-    }
-
-    if (loadedCount === 0) return null;
-
-    console.log(`✓ ${config.chipName} ROMs loaded from ZIP: ${loadedCount}/${config.files.length} files`);
-    return combinedROM;
-
+    return await unpackRomZip(arrayBuffer, config);
   } catch (error) {
     console.warn(`[${config.chipName}] Failed to load ZIP file:`, error);
     return null;
@@ -772,4 +780,74 @@ export async function loadVLM5030ROMs(): Promise<Uint8Array | null> {
 
 export async function loadHC55516ROMs(): Promise<Uint8Array | null> {
   return loadChipROMs(HC55516_ROM_CONFIG);
+}
+
+/**
+ * Synth type -> ROM config, for every synth whose ROM loading goes through loadChipROMs
+ * (the load*ROMs helpers above). The upload dialog uses it to cache an uploaded ROM under
+ * the key loadChipROMs reads back.
+ */
+export const ROM_CONFIG_BY_SYNTH_TYPE: Readonly<Record<string, ChipROMConfig>> = {
+  MAMETR707: TR707_ROM_CONFIG,
+  MAMESP0250: SP0250_ROM_CONFIG,
+  MAMETMS5220: TMS5220_ROM_CONFIG,
+  MAMEVotrax: VOTRAX_ROM_CONFIG,
+  MAMEC352: C352_ROM_CONFIG,
+  MAMEK054539: K054539_ROM_CONFIG,
+  MAMEICS2115: ICS2115_ROM_CONFIG,
+  MAMERF5C400: RF5C400_ROM_CONFIG,
+  MAMEES5503: ES5503_ROM_CONFIG,
+  D50: D50_ROM_CONFIG,
+  MAMEVFX: VFX_ROM_CONFIG,
+  MAMERSA: ROLANDSA_ROM_CONFIG,
+  MAMEZSG2: ZSG2_ROM_CONFIG,
+  MAMEKS0164: KS0164_ROM_CONFIG,
+  MAMESWP00: SWP00_ROM_CONFIG,
+  MAMESWP20: SWP20_ROM_CONFIG,
+  MAMERolandGP: ROLANDGP_ROM_CONFIG,
+  MAMES14001A: S14001A_ROM_CONFIG,
+  MAMEVLM5030: VLM5030_ROM_CONFIG,
+  MAMEHC55516: HC55516_ROM_CONFIG,
+};
+
+/**
+ * Synth types whose engine takes the uploaded ROM files one bank per file (loadROM(bank, data)) rather
+ * than as the combined image. They are still cached in the combined layout.
+ */
+const BANKED_UPLOAD_SYNTH_TYPES: ReadonlySet<string> = new Set(['MAMERSA', 'D50', 'MAMEVFX']);
+
+/** True when the engine receives the uploaded ROM as one combined buffer at offset 0. */
+export function usesCombinedRomUpload(synthType: string): boolean {
+  return synthType in ROM_CONFIG_BY_SYNTH_TYPE && !BANKED_UPLOAD_SYNTH_TYPES.has(synthType);
+}
+
+/**
+ * Turn an uploaded file into the combined ROM image loadChipROMs expects: a .zip is unpacked at the
+ * config offsets, any other file is taken as the combined image as-is. Null when the synth type has no
+ * loadChipROMs-based config; throws when the zip lacks a required file.
+ */
+export async function resolveUploadedRom(synthType: string, fileName: string, bytes: ArrayBuffer): Promise<Uint8Array | null> {
+  const config = ROM_CONFIG_BY_SYNTH_TYPE[synthType];
+  if (!config) return null;
+  if (!fileName.toLowerCase().endsWith('.zip')) return new Uint8Array(bytes);
+  const data = await unpackRomZip(bytes, config);
+  if (!data) throw new Error(`${fileName} does not contain the ROM files ${config.chipName} needs`);
+  return data;
+}
+
+/** Store a combined ROM image so later sessions load it without another upload. */
+export async function cacheRomImage(synthType: string, data: Uint8Array): Promise<void> {
+  const config = ROM_CONFIG_BY_SYNTH_TYPE[synthType];
+  if (config) await saveROM(config.chipName, data);
+}
+
+/**
+ * Cache a ROM the user uploaded so later sessions load it without another upload.
+ * Resolves false when the synth type has no loadChipROMs-based config (nothing to cache).
+ */
+export async function cacheUploadedRom(synthType: string, fileName: string, bytes: ArrayBuffer): Promise<boolean> {
+  const data = await resolveUploadedRom(synthType, fileName, bytes);
+  if (!data) return false;
+  await cacheRomImage(synthType, data);
+  return true;
 }

@@ -31,6 +31,7 @@ export class ZSG2Synth extends MAMEBaseSynth {
 
       if (!romData) {
         console.warn('[ZSG2] ROM not found — synth will be silent until ROM is uploaded');
+        this._updateRomStatus(false);
         return;
       }
 
@@ -47,6 +48,7 @@ export class ZSG2Synth extends MAMEBaseSynth {
     } catch (error) {
       console.error('[ZSG2] ROM loading failed:', error);
       console.error('Place ROM files in /public/roms/zsg2/ — see /public/roms/README.md');
+      this._updateRomStatus(false);
     }
   }
 

@@ -340,11 +340,13 @@ function loadSynthROMInto(instrument: unknown, synthType: string, bank: number, 
     // RdPianoSynth / D50Synth: loadROM(romId, data)
     if (typeof synth.loadROM === 'function') {
       synth.loadROM(bank, data);
+      synth.romLoaded = true;
     }
   } else if (synthType === 'MAMESWP30') {
     // MU2000Synth: loadWaveROM(data) - single ROM bank
     if (typeof synth.loadWaveROM === 'function') {
       synth.loadWaveROM(data.buffer as ArrayBuffer);
+      synth.romLoaded = true;
     }
   } else if (SINGLE_ROM_CHIPS.has(synthType)) {
     // MultiPCM, ZSG2, KS0164, SWP00, SWP20, RolandGP: loadRom(data) single buffer
@@ -356,8 +358,10 @@ function loadSynthROMInto(instrument: unknown, synthType: string, bank: number, 
     // Generic fallback: try loadROM, then setRom
     if (typeof synth.loadROM === 'function') {
       synth.loadROM(bank, data);
+      synth.romLoaded = true;
     } else if (typeof synth.setRom === 'function') {
       synth.setRom(bank, data);
+      synth.romLoaded = true;
     }
   }
 }

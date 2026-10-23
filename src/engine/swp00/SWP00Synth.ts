@@ -30,6 +30,7 @@ export class SWP00Synth extends MAMEBaseSynth {
 
       if (!romData) {
         console.warn('[SWP00] ROM not found — synth will be silent until ROM is uploaded');
+        this._updateRomStatus(false);
         return;
       }
 
@@ -46,6 +47,7 @@ export class SWP00Synth extends MAMEBaseSynth {
     } catch (error) {
       console.error('[SWP00] ROM loading failed:', error);
       console.error('Place ROM files in /public/roms/swp00/ — see /public/roms/README.md');
+      this._updateRomStatus(false);
     }
   }
 

@@ -66,6 +66,7 @@ export class RF5C400Synth extends MAMEBaseSynth {
 
       if (!romData) {
         console.warn('[RF5C400] ROM not found — synth will be silent until ROM is uploaded');
+        this._updateRomStatus(false);
         return;
       }
 
@@ -78,6 +79,7 @@ export class RF5C400Synth extends MAMEBaseSynth {
     } catch (error) {
       console.error('[RF5C400] ROM loading failed:', error);
       console.error('Place ROM files in /public/roms/rf5c400/ - see /public/roms/README.md');
+      this._updateRomStatus(false);
       // Continue anyway - synth will initialize but be silent without samples
     }
   }
