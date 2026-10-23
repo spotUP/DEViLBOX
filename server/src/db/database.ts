@@ -71,6 +71,29 @@ export function createHipVoteTables(database: Database.Database = db): void {
   `);
 }
 
+/**
+ * Loudness submissions for the Selecta player (GET/PUT /api/loudness/:hash). hash = MD5 of the
+ * song file bytes; one row per (user, hash). method is r128 (EBU R128 integrated LUFS) or rms.
+ */
+export function createLoudnessTables(database: Database.Database = db): void {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS song_loudness (
+      user_id TEXT NOT NULL,
+      hash TEXT NOT NULL,
+      lufs REAL NOT NULL,
+      peak_db REAL NOT NULL,
+      method TEXT NOT NULL CHECK(method IN ('r128', 'rms')),
+      duration_ms INTEGER,
+      analyser TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (user_id, hash),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_song_loudness_hash ON song_loudness(hash);
+  `);
+}
+
 // Create tables
 /**
  * Module genre tables (GET /api/genre/:key). Exported so a test can build them in memory.
@@ -298,6 +321,7 @@ export function initDatabase() {
   migrateSongAnalysisExtended();
   createGenreTables();
   createHipVoteTables();
+  createLoudnessTables();
 
   console.log('[DB] Database initialized at:', DB_PATH);
 }
