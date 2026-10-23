@@ -8,7 +8,7 @@ import { useTrackerStore, useTransportStore, useThemeStore, useSettingsStore } f
 import { getToneEngine } from '@engine/ToneEngine';
 import { useShallow } from 'zustand/react/shallow';
 import { liveScopeFrame } from '@stores/useOscilloscopeStore';
-import { waveformVuLevel, engineFedMeterTarget } from '@components/tracker/waveformVuLevel';
+import { channelMeterTarget } from '@components/tracker/waveformVuLevel';
 
 interface ChannelLevelsCompactProps {
   height?: number;
@@ -171,25 +171,18 @@ export const ChannelLevelsCompact: React.FC<ChannelLevelsCompactProps> = ({
 
       // Update levels with smoothing
       for (let i = 0; i < nc; i++) {
-        // Always check trigger data (works for native WASM synths like DB303)
         const isNewTrigger = triggerGens[i] !== lastGensRef.current[i];
-        let trigger = isNewTrigger ? (triggerLevels[i] || 0) : 0;
         if (isNewTrigger) lastGensRef.current[i] = triggerGens[i];
-
-        // In realtime mode, also use per-channel audio levels (higher wins)
-        if (isRealtime && realtimeLevels) {
-          const rt = realtimeLevels[i] || 0;
-          if (rt > trigger) trigger = rt;
-        }
-        // Direct-routed WASM engines (Fred, Activision Pro, ...) send no note triggers:
-        // meter them from their channel waveform, on note starts only in trigger mode.
-        const oscD = oscChannelData ? oscChannelData[i] : null;
-        if (oscD && oscD.length > 0) {
-          const level = waveformVuLevel(engineLevels ? (engineLevels[i] || 0) : null, oscD);
-          const target = engineFedMeterTarget(isRealtime ? 'realtime' : 'trigger', level, prevSourceRef.current[i] || 0);
-          prevSourceRef.current[i] = level;
-          if (target > trigger) trigger = target;
-        }
+        const { target: trigger, source } = channelMeterTarget({
+          mode: isRealtime ? 'realtime' : 'trigger',
+          trigger: isNewTrigger ? (triggerLevels[i] || 0) : null,
+          realtimeLevel: isRealtime && realtimeLevels ? (realtimeLevels[i] || 0) : 0,
+          engineLevel: engineLevels ? (engineLevels[i] || 0) : null,
+          waveform: oscChannelData ? oscChannelData[i] : null,
+          fullScale: 32768,
+          prevSource: prevSourceRef.current[i] || 0,
+        });
+        prevSourceRef.current[i] = source;
         const current = levelStatesRef.current[i] || 0;
 
         if (trigger > current) {

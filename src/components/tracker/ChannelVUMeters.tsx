@@ -16,7 +16,7 @@ import { getToneEngine } from '@engine/ToneEngine';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useThemeStore } from '@stores/useThemeStore';
 import { liveScopeFrame } from '@stores/useOscilloscopeStore';
-import { waveformVuLevel, engineFedMeterTarget, meterKilledByStop } from './waveformVuLevel';
+import { channelMeterTarget, meterKilledByStop } from './waveformVuLevel';
 
 // VU meter timing constants - ProTracker style
 const DECAY_RATE = 0.92;       // per-frame decay at 60fps reference rate
@@ -239,34 +239,22 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
           meter.level *= decayFactor;
           if (meter.level < 0.01) meter.level = 0;
 
-          // Always check trigger data (works for all synths including native WASM like DB303)
+          let trigger: number | null = null;
           if (triggerGens && triggerGens[i] !== lastGensRef.current[i]) {
             lastGensRef.current[i] = triggerGens[i];
-            if (triggerLevels[i] > meter.level) {
-              meter.level = triggerLevels[i];
-            }
+            trigger = triggerLevels[i] || 0;
           }
-
-          // In realtime mode, also use per-channel audio meter data (higher wins)
-          if (isRealtime && realtimeLevels) {
-            const target = realtimeLevels[i] || 0;
-            if (target > meter.level) {
-              meter.level = target;
-            }
-          }
-
-          // WASM per-channel oscilloscope (Cinter, Furnace, Hively, …): those play
-          // via a direct-routed WASM engine so the ToneEngine channel meters above
-          // stay silent. Derive the level from the channel waveform peak instead.
-          // An engine that reports its own levels (libopenmpt) is metered from
-          // those: its waveform capture bleeds the neighbouring channels.
-          const oscD = oscChannelData ? oscChannelData[i] : null;
-          if (oscD && oscD.length > 0) {
-            const level = waveformVuLevel(engineLevels ? (engineLevels[i] || 0) : null, oscD, oscFullScale);
-            const target = engineFedMeterTarget(isRealtime ? 'realtime' : 'trigger', level, prevSourceRef.current[i] || 0);
-            prevSourceRef.current[i] = level;
-            if (target > meter.level) meter.level = target;
-          }
+          const { target, source } = channelMeterTarget({
+            mode: isRealtime ? 'realtime' : 'trigger',
+            trigger,
+            realtimeLevel: isRealtime && realtimeLevels ? (realtimeLevels[i] || 0) : 0,
+            engineLevel: engineLevels ? (engineLevels[i] || 0) : null,
+            waveform: oscChannelData ? oscChannelData[i] : null,
+            fullScale: oscFullScale,
+            prevSource: prevSourceRef.current[i] || 0,
+          });
+          prevSourceRef.current[i] = source;
+          if (target > meter.level) meter.level = target;
         }
 
         // Calculate channel center X
