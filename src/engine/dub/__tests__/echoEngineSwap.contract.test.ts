@@ -250,3 +250,24 @@ describe('DubBus — NaN-scrubber contract on feedback tap', () => {
 });
 
 
+
+describe('DubBus.setChainOrder — two reorders inside the fade window', () => {
+  /* A second reorder before the first one's 25 ms timeout read the half-faded
+     input / return / feedback gains off the nodes and restored those: the bus
+     stayed near silent. The input restores to what the bus should have now;
+     return and feedback to the gains held when the first reorder began. */
+  const src = read('src/engine/dub/DubBus.ts');
+  const start = src.indexOf('  setChainOrder(order:');
+  const fn = src.slice(start, src.indexOf('\n  }\n', start));
+
+  it('restores `input.gain` to the gain the bus should have NOW, never a captured one', () => {
+    expect(fn).toMatch(/this\.input\.gain\.linearRampToValueAtTime\(\s*this\._inputGainTarget\(\)/);
+    expect(fn).not.toMatch(/priorInputGain/);
+  });
+
+  it('takes the prior return and feedback gains from the reorder already in flight, not the faded nodes', () => {
+    expect(fn).toMatch(/const\s+priorFeedbackGain\s*=\s*held\?\.feedback\s*\?\?\s*this\.feedback\.gain\.value/);
+    expect(fn).toMatch(/const\s+priorReturnGain\s*=\s*held\?\.ret\s*\?\?\s*this\.return_\.gain\.value/);
+    expect(fn).toMatch(/this\._chainOrderHeldGains\s*=\s*null/);
+  });
+});
