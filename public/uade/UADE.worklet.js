@@ -2740,8 +2740,9 @@ class UADEProcessor extends AudioWorkletProcessor {
       let noteStarts = null;
       if (this._wasm._uade_wasm_get_note_start_counts) {
         if (this._noteStartBuf === undefined) this._noteStartBuf = this._wasm._malloc(16);
-        // Cumulative note starts per channel, counted by the core on every player
-        // tick with the same detector the pattern grid uses.
+        // Cumulative note starts per channel, counted by the core at each Paula
+        // register write (AUDxLCL, AUDxPER, AUDxVOL, DMACON), so a count moves in
+        // the block the note is written, not at the next player tick.
         this._wasm._uade_wasm_get_note_start_counts(this._noteStartBuf);
         noteStarts = Array.from(new Uint32Array(this._wasm.HEAPU8.buffer, this._noteStartBuf, 4));
         const prev = this._lastPostedNoteStarts;
