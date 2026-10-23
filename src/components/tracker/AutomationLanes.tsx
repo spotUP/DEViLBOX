@@ -122,8 +122,9 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
 
   // Resolve per-channel active parameters (multi-lane support)
   // Combines explicitly active params with any params that already have curve data
-  const channelParameterLists = useMemo(() => {
+  const channelParameterData = useMemo(() => {
     const result: string[][] = [];
+    const reserved: number[] = [];
     for (let i = 0; i < channelCount; i++) {
       const lane = channelLanes.get(i);
       const explicit = lane?.activeParameters?.length
@@ -140,9 +141,14 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
         if (!merged.includes(p)) merged.push(p);
       }
       result.push(merged.length > 0 ? merged : [parameter]);
+      reserved.push(merged.length);
     }
-    return result;
+    return { lists: result, reserved };
   }, [channelCount, channelLanes, parameter, allCurves, patternId]);
+  const channelParameterLists = channelParameterData.lists;
+  /** Lanes each channel actually reserves width for (0 when none in use);
+   *  the same count PatternEditorCanvas feeds into automationLaneReserve. */
+  const channelReservedLanes = channelParameterData.reserved;
 
   // Legacy single-param alias for backward compatibility
   const channelParameters = useMemo(
@@ -430,9 +436,11 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
 
       // Position in the dedicated automation area at the right edge
       const group = channelCurveGroups.get(channelIndex);
-      const laneCount = group ? Math.max(1, group.length) : 1;
-      // Match usePatternEditor layout formula
+      // Ghost curves from neighbouring patterns share the current pattern's
+      // layout: a channel with no lane in use reserves no width, so nothing is drawn.
+      const laneCount = Math.max(group?.length ?? 0, channelReservedLanes[channelIndex] ?? 0);
       const autoArea = automationLaneReserve(laneCount);
+      if (autoArea === 0) return null;
       const areaLeft = chOffset + chWidth - autoArea;
       const perLane = Math.floor(autoArea / laneCount);
       const effectiveLaneWidth = laneCount > 1 ? Math.max(4, perLane - 2) : LANE_WIDTH;
