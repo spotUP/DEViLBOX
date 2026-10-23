@@ -246,7 +246,8 @@ export class MdaDX10Synth implements DevilboxSynth {
     }
   }
 
-  triggerAttack(frequency: number | string, _time?: number, velocity?: number): this {
+  // `time` (AudioContext seconds) travels with the note: the worklet holds a note sent ahead until its frame
+  triggerAttack(frequency: number | string, time?: number, velocity?: number): this {
     const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
     const vel = Math.round((velocity ?? 0.8) * 127);
 
@@ -257,11 +258,11 @@ export class MdaDX10Synth implements DevilboxSynth {
       return this;
     }
 
-    this._worklet.port.postMessage({ type: 'noteOn', note, velocity: vel });
+    this._worklet.port.postMessage({ type: 'noteOn', note, velocity: vel, time });
     return this;
   }
 
-  triggerRelease(frequency?: number | string, _time?: number): this {
+  triggerRelease(frequency?: number | string, time?: number): this {
     if (!this._worklet || !this.isInitialized) {
       // Clear pending notes to prevent stuck notes when noteOff arrives before init
       if (frequency !== undefined) {
@@ -275,9 +276,9 @@ export class MdaDX10Synth implements DevilboxSynth {
 
     if (frequency !== undefined) {
       const note = typeof frequency === 'string' ? noteToMidi(frequency) : Math.round(12 * Math.log2(frequency / 440) + 69);
-      this._worklet.port.postMessage({ type: 'noteOff', note });
+      this._worklet.port.postMessage({ type: 'noteOff', note, time });
     } else {
-      this._worklet.port.postMessage({ type: 'allNotesOff' });
+      this._worklet.port.postMessage({ type: 'allNotesOff', time });
     }
     return this;
   }
