@@ -359,7 +359,7 @@ export const DubDeckStrip: React.FC = () => {
   const liveReturnGain = useLiveDubParam('dub.returnGain', dubBusSettings.returnGain, undefined, heldLiveParam === 'returnGain');
   const liveSweepAmount = useLiveDubParam('dub.sweepAmount', dubBusSettings.sweepAmount, undefined, heldLiveParam === 'sweepAmount');
   // Moves modulate echo feedback constantly (every throw), so this follows the
-  // performer the same way FX WET does.
+  // performer the same way the Return Gain slider does.
   const liveEchoIntensity = useLiveDubParam('dub.echoIntensity', dubBusSettings.echoIntensity, undefined, heldLiveParam === 'echoIntensity');
   const liveSweepRateHz = useLiveDubParam(
     'dub.sweepRateHz', dubBusSettings.sweepRateHz, denormalizeSweepRate, heldLiveParam === 'sweepRateHz',
