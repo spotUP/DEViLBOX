@@ -598,6 +598,8 @@ export class DubBus {
   private _chainOrder: 'echoSpring' | 'springEcho' | 'parallel' = 'echoSpring';
   /** Monotonic version counter for racing setChainOrder / worklet loads. */
   private _routingVersion = 0;
+  /** Return and feedback gains held while a setChainOrder fade is in flight (null when none). */
+  private _chainOrderHeldGains: { ret: number; feedback: number } | null = null;
 
   // ─── Liquid sweep — parallel comb filter with LFO ─────────────────────
   // Flanger-family short-delay comb (1-10 ms modulated delay + feedback)
@@ -8228,9 +8230,14 @@ export class DubBus {
     this._snap(`pre-setChainOrder(${order})`);
 
     const ctx = this.context;
-    const priorReturnGain = this.return_.gain.value;
-    const priorInputGain = this.input.gain.value;
-    const priorFeedbackGain = this.feedback.gain.value;
+    // A second reorder inside the fade window reads the half-faded gains off
+    // the nodes; restoring those left the bus near silent. The gains held when
+    // the first reorder began are the ones to restore, so a reorder already in
+    // flight hands them on. The input restores to what the bus should have NOW.
+    const held = this._chainOrderHeldGains;
+    const priorReturnGain = held?.ret ?? this.return_.gain.value;
+    const priorFeedbackGain = held?.feedback ?? this.feedback.gain.value;
+    this._chainOrderHeldGains = { ret: priorReturnGain, feedback: priorFeedbackGain };
     const RAMP_SEC = 0.02;
     const SWAP_DELAY_MS = RAMP_SEC * 1000 + 5;
     const version = ++this._routingVersion;
@@ -8243,7 +8250,7 @@ export class DubBus {
       this.return_.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
 
       this.input.gain.cancelScheduledValues(now);
-      this.input.gain.setValueAtTime(priorInputGain, now);
+      this.input.gain.setValueAtTime(this.input.gain.value, now);
       this.input.gain.linearRampToValueAtTime(0, now + RAMP_SEC);
 
       this.feedback.gain.cancelScheduledValues(now);
@@ -8287,6 +8294,7 @@ export class DubBus {
         this.feedback.gain.setValueAtTime(0, now2);
         this.feedback.gain.linearRampToValueAtTime(priorFeedbackGain, now2 + RAMP_SEC);
       } catch { /* ok */ }
+      this._chainOrderHeldGains = null;
     }, SWAP_DELAY_MS);
   }
 
