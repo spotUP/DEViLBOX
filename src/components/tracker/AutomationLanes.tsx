@@ -9,7 +9,7 @@ import { interpolateAutomationValue } from '@typedefs/automation';
 import type { AutomationCurve } from '@typedefs/automation';
 import { getSectionColor } from '@hooks/useChannelAutomationParams';
 import { getNKSParametersForSynth } from '@/midi/performance/synthParameterMaps';
-import { AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN } from '@hooks/views/usePatternEditor';
+import { automationLaneReserve } from '@hooks/views/automationLaneReserve';
 import type { SynthType } from '@typedefs/instrument';
 import { useLaneEditing } from './useLaneEditing';
 
@@ -291,7 +291,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
       if (chWidth < 40) return null;
 
       const laneCount = group.length;
-      const autoArea = Math.max(AUTOMATION_LANE_WIDTH, laneCount * AUTOMATION_LANE_MIN + 4);
+      const autoArea = automationLaneReserve(laneCount);
       const areaLeft = chOffset + chWidth - autoArea;
       const perLane = Math.floor(autoArea / laneCount);
 
@@ -432,8 +432,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
       const group = channelCurveGroups.get(channelIndex);
       const laneCount = group ? Math.max(1, group.length) : 1;
       // Match usePatternEditor layout formula
-      const autoArea = laneCount <= 1 ? AUTOMATION_LANE_WIDTH
-        : Math.max(AUTOMATION_LANE_WIDTH, laneCount * AUTOMATION_LANE_MIN + 4);
+      const autoArea = automationLaneReserve(laneCount);
       const areaLeft = chOffset + chWidth - autoArea;
       const perLane = Math.floor(autoArea / laneCount);
       const effectiveLaneWidth = laneCount > 1 ? Math.max(4, perLane - 2) : LANE_WIDTH;

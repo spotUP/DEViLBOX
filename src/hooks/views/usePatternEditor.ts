@@ -20,6 +20,7 @@
  * showMacroLanes, useInstrumentStore.
  */
 
+import { AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN, automationLaneReserve } from './automationLaneReserve';
 import { useRef, useEffect, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
@@ -39,11 +40,7 @@ import { effectCellWidth } from '@/lib/tracker/effectNotation';
 // ─── Layout constants (must match PatternEditorCanvas) ───────────────────────
 const CHAR_WIDTH = 10;
 const LINE_NUMBER_WIDTH = 40;
-export const AUTOMATION_LANE_WIDTH = 56; // base width for a single automation lane
-// Minimum per-lane width when multiple lanes share space.
-// Set to ~LANE_WIDTH so each lane in a multi-lane channel gets its own full
-// dedicated draw width instead of being squeezed into the single-lane area.
-export const AUTOMATION_LANE_MIN = 52;
+export { AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN };
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -124,7 +121,7 @@ export function usePatternEditor() {
           explicit.add(c.parameter);
         }
       }
-      counts.push(Math.max(1, explicit.size));
+      counts.push(explicit.size);
     }
     return counts;
   }));
@@ -225,10 +222,7 @@ export function usePatternEditor() {
       const isCollapsed = channel?.collapsed;
       const noteCols = channel?.channelMeta?.noteCols ?? 1;
       // Per-channel automation area: scale with lane count
-      const laneCount = showAutomationLanes ? (channelLaneCounts[ch] ?? 1) : 0;
-      const autoLaneExtra = laneCount <= 0 ? 0
-        : laneCount === 1 ? AUTOMATION_LANE_WIDTH
-        : Math.max(AUTOMATION_LANE_WIDTH, laneCount * AUTOMATION_LANE_MIN + 4);
+      const autoLaneExtra = showAutomationLanes ? automationLaneReserve(channelLaneCounts[ch] ?? 0) : 0;
 
       if (isCollapsed) {
         const cw = noteWidth + Math.round(40 * zoomFactor) + autoLaneExtra;
