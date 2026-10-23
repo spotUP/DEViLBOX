@@ -577,15 +577,21 @@ static bool sfx_load(SfxModule* m, const uint8_t* data, size_t size) {
     SfxReader reader;
     reader_init(&reader, data, size);
 
-    // Read the sample size table
-    uint32_t sample_sizes[31];
-    for (int i = 0; i < 31; i++)
+    // Version 1.x ("SONG" after 15 sizes) has 15 samples; version 2.0 ("SO31" after 31 sizes) has 31.
+    // Sizes of the slots a version lacks stay 0, so the rest of the loader is shared.
+    if (size < 64) return false;
+    int num_samples;
+    if (memcmp(data + 60, "SONG", 4) == 0) num_samples = 15;
+    else num_samples = 31;
+
+    uint32_t sample_sizes[31] = {0};
+    for (int i = 0; i < num_samples; i++)
         sample_sizes[i] = reader_read_b_uint32(&reader);
 
     // Check the mark
     uint8_t mark[4];
     reader_read(&reader, mark, 4);
-    if (memcmp(mark, "SO31", 4) != 0)
+    if (memcmp(mark, num_samples == 15 ? "SONG" : "SO31", 4) != 0)
         return false;
 
     // Read the delay value
@@ -595,7 +601,7 @@ static bool sfx_load(SfxModule* m, const uint8_t* data, size_t size) {
     reader_skip(&reader, 14);
 
     // Read the sample information
-    for (int i = 0; i < 31; i++) {
+    for (int i = 0; i < num_samples; i++) {
         SfxSample* sample = &m->samples[i];
 
         // Skip the name (22 bytes)
@@ -645,7 +651,7 @@ static bool sfx_load(SfxModule* m, const uint8_t* data, size_t size) {
     if (bytes_read < 128)
         return false;
 
-    reader_skip(&reader, 4);
+    if (num_samples == 31) reader_skip(&reader, 4);
 
     // Find highest pattern number
     m->max_pattern = 0;

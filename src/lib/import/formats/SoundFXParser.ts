@@ -694,5 +694,6 @@ export async function parseSoundFXFile(
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
     uadePatternLayout,
+    soundFxFileData: buffer.slice(0) as ArrayBuffer,
   };
 }

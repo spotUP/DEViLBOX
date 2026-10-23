@@ -337,8 +337,11 @@ export async function tryRouteFormat(
   }
 
   // ── Sound-FX ──────────────────────────────────────────────────────────────
-  // .sfx/.sfx2 — OpenMPT
+  // .sfx/.sfx2 — our SoundFX replayer (owner, 2026-10-23); libopenmpt only
+  // takes what the native parser refuses.
   if (matchesExt(filename, ['sfx', 'sfx2'])) {
+    const { isSoundFXFormat, parseSoundFXFile } = await import('@lib/import/formats/SoundFXParser');
+    if (isSoundFXFormat(buffer)) return parseSoundFXFile(buffer, originalFileName);
     const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
     const song = await parseWithOpenMPT(buffer, originalFileName);
     song.libopenmptFileData = buffer.slice(0);
@@ -931,8 +934,12 @@ export async function tryRouteFormat(
   }
 
   // ── Game Music Creator (.gmc) ─────────────────────────────────────────────
-  // .gmc files — OpenMPT
+  // .gmc — our GMC replayer (owner, 2026-10-23); libopenmpt only takes what
+  // the native parser refuses.
   if (matchesExt(filename, ['gmc'])) {
+    const { parseGameMusicCreatorFile } = await import('@lib/import/formats/GameMusicCreatorParser');
+    const native = parseGameMusicCreatorFile(new Uint8Array(buffer), originalFileName);
+    if (native) return native;
     const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
     const song = await parseWithOpenMPT(buffer, originalFileName);
     song.libopenmptFileData = buffer.slice(0);
