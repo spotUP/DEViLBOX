@@ -74,14 +74,15 @@ function wired() {
     HEAPF32: new Float32Array(BLOCK),
   };
   const origProcess = proc.process.bind(proc);
-  proc.process = (i, o) => { rendered = 0; return origProcess(i, o); };
+  const blockFrames: number[] = [];
+  proc.process = (i, o) => { rendered = 0; const r = origProcess(i, o); blockFrames.push(rendered); return r; };
 
   // The engine and synth without their AudioWorkletNode: posted messages go to the real worklet message handler.
   const engine = Object.create(KlysEngine.prototype) as KlysEngine;
   Object.assign(engine, { workletNode: { port: { postMessage: (m: object) => proc.port.onmessage?.({ data: m }) } } });
   const synth = Object.create(KlysSynth.prototype) as KlysSynth;
   Object.assign(synth, { engine, instrumentId: 1, _disposed: false });
-  return { proc, keyed, synth, engine };
+  return { proc, keyed, synth, engine, blockFrames };
 }
 
 function renderBlocks(proc: Proc, seconds: number) {
@@ -123,5 +124,27 @@ describe('note scheduled ahead keeps its time on Klystrack', () => {
     synth.releaseAll();
     renderBlocks(proc, 0.2);
     expect(keyed.map((k) => k.ev)).toEqual(['off']);
+  });
+
+  it('an idle worklet keys a note due mid-block at its frame and renders the frames after it', () => {
+    const { proc, keyed, synth, blockFrames } = wired();
+    proc.previewing = false;
+    renderBlocks(proc, 0.01);
+    // Nothing sounds, so the silent blocks before the note are skipped
+    expect(blockFrames.every((n) => n === 0)).toBe(true);
+    const t0 = now;
+    // 0.05 s is 2400 frames: 18 whole blocks plus 96 frames, so the note is due mid-block
+    synth.triggerAttack(62, t0 + 0.05, 0.8);
+    expect(keyed).toEqual([]);
+    blockFrames.length = 0;
+    renderBlocks(proc, 0.1);
+    expect(keyed.map((k) => k.ev)).toEqual(['on']);
+    const noteBlock = Math.floor((0.05 * RATE) / BLOCK);
+    // The harness stamps a key with the frames rendered so far; an idle segment renders none, so the stamp is the block start.
+    // The key's frame is proven by the frames rendered after it below.
+    expect(keyed[0].at).toBeCloseTo(t0 + (noteBlock * BLOCK) / RATE, 6);
+    expect(blockFrames.slice(0, noteBlock).every((n) => n === 0)).toBe(true);
+    expect(blockFrames[noteBlock]).toBe(BLOCK - ((0.05 * RATE) % BLOCK));
+    expect(blockFrames[noteBlock + 1]).toBe(BLOCK);
   });
 });
