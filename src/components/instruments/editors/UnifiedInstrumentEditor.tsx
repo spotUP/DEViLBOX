@@ -28,7 +28,7 @@ import { HardwareUIWrapper, hasHardwareUI } from '../hardware/HardwareUIWrapper'
 
 // Extracted sub-modules
 import { SynthTypeDispatcher, type EditorMode } from './SynthTypeDispatcher';
-import { getSynthLayout } from '@/constants/synthLayouts';
+import { getInstrumentLayout, getSynthLayout } from '@/constants/synthLayouts';
 
 // ============================================================================
 // SYNTH TYPE CATEGORIZATION HELPERS
@@ -144,8 +144,9 @@ function isInStereo2Type(synthType: SynthType): boolean {
   return synthType === 'InStereo2Synth' || synthType === 'InStereo1Synth';
 }
 
-/** Get the editor mode for a synth type */
-function getEditorMode(synthType: SynthType): EditorMode {
+/** Get the editor mode for an instrument */
+function getEditorMode(instrument: Pick<InstrumentConfig, 'synthType' | 'xrns'>): EditorMode {
+  const { synthType } = instrument;
   if (synthType === 'TB303' || synthType === 'Buzz3o3') return 'tb303';
   if (isFurnaceType(synthType)) return 'furnace';
   if (isBuzzmachineType(synthType)) return 'buzzmachine';
@@ -263,7 +264,7 @@ function getEditorMode(synthType: SynthType): EditorMode {
   if (synthType === 'MusicLineSynth') return 'musicline';
   if (isOPL3Type(synthType)) return 'opl3';
   // The demoscene synths have real layouts (knobs and curves); the XRNS info panel is only for one without.
-  if (synthType === 'WaveSabreSynth' || synthType === 'OidosSynth' || synthType === 'TunefishSynth') return getSynthLayout(synthType) ? 'layout' : 'xrns-synth';
+  if (synthType === 'WaveSabreSynth' || synthType === 'OidosSynth' || synthType === 'TunefishSynth') return getInstrumentLayout(instrument) ? 'layout' : 'xrns-synth';
   if (synthType === 'SunVoxSynth') return 'sunvox-synth';
   if (synthType === 'StartrekkerAMSynth') return 'startrekker-am';
   if (synthType === 'WobbleBass') return 'wobblebass';
@@ -329,7 +330,7 @@ export const UnifiedInstrumentEditor: React.FC<UnifiedInstrumentEditorProps> = (
 
   const cheeseCutterLoaded = useCheeseCutterStore(s => s.loaded);
 
-  const synthEditorMode = getEditorMode(instrument.synthType);
+  const synthEditorMode = getEditorMode(instrument);
   const editorMode: EditorMode = instrument.metadata?.mlSynthConfig
     ? 'musicline'
     : (cheeseCutterLoaded && instrument.synthType === 'C64SID')
