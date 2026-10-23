@@ -30,6 +30,7 @@ import uproughRoutes from './routes/uprough';
 import genreRoutes from './routes/genre';
 import modarchiveRoutes from './routes/modarchive';
 import hipRoutes from './routes/hip';
+import loudnessRoutes from './routes/loudness';
 import { handleStreamConnection, checkFfmpeg } from './routes/stream';
 import { initDataDirectories } from './utils/fileSystem';
 import { initModlandIndex, scheduleModlandUpdates } from './services/modlandIndexer';
@@ -79,6 +80,14 @@ const genreLimiter = rateLimit({
 });
 app.use('/api/genre/', genreLimiter as unknown as express.RequestHandler);
 
+// Loudness submissions are tiny; one client analyses a few songs a minute.
+const loudnessLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 300,
+  message: 'Too many loudness requests, please try again later'
+});
+app.use('/api/loudness/', loudnessLimiter as unknown as express.RequestHandler);
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/files', filesRoutes);
@@ -102,6 +111,7 @@ app.use('/api/genre', genreRoutes);
 app.use('/api/modarchive', modarchiveRoutes);
 // Vote limits (per token and per IP) live in the hip service; k is never logged.
 app.use('/api/hip', hipRoutes);
+app.use('/api/loudness', loudnessRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
