@@ -28,6 +28,7 @@ import bridgeRoutes from './routes/bridge';
 import devilboxPresetRoutes from './routes/devilbox-presets';
 import uproughRoutes from './routes/uprough';
 import genreRoutes from './routes/genre';
+import modarchiveRoutes from './routes/modarchive';
 import { handleStreamConnection, checkFfmpeg } from './routes/stream';
 import { initDataDirectories } from './utils/fileSystem';
 import { initModlandIndex, scheduleModlandUpdates } from './services/modlandIndexer';
@@ -97,6 +98,7 @@ app.use('/api/bridge', bridgeRoutes);
 app.use('/api/devilbox-presets', devilboxPresetRoutes);
 app.use('/api/uprough', uproughRoutes);
 app.use('/api/genre', genreRoutes);
+app.use('/api/modarchive', modarchiveRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
