@@ -106,7 +106,6 @@ import {
   updateToneJsSynthInPlace as _updateToneJsSynthInPlace,
   updateBuzzmachineParameters as _updateBuzzmachineParameters,
   updateTB303Pedalboard as _updateTB303Pedalboard,
-  updateChipSynthArpeggio as _updateChipSynthArpeggio,
   getChipSynthArpeggioStep as _getChipSynthArpeggioStep,
   isChipSynthArpeggioPlaying as _isChipSynthArpeggioPlaying,
   updateSonicArrangerParameters as _updateSonicArrangerParameters,
@@ -5287,7 +5286,6 @@ export class ToneEngine {
   public updateSonicArrangerParameters(instrumentId: number, config: NonNullable<InstrumentConfig['sonicArranger']>): void { _updateSonicArrangerParameters(this._synthCtx, instrumentId, config); }
   public updateNativeSynthConfig(instrumentId: number, config: unknown): void { _updateNativeSynthConfig(this._synthCtx, instrumentId, config); }
   public async updateTB303Pedalboard(instrumentId: number, pedalboard: NonNullable<InstrumentConfig['tb303']>['pedalboard']): Promise<void> { return _updateTB303Pedalboard(this._synthCtx, instrumentId, pedalboard); }
-  public updateChipSynthArpeggio(instrumentId: number, arpeggioConfig: NonNullable<InstrumentConfig['chipSynth']>['arpeggio']): void { _updateChipSynthArpeggio(this._synthCtx, instrumentId, arpeggioConfig); }
   public getChipSynthArpeggioStep(instrumentId: number): number { return _getChipSynthArpeggioStep(this._synthCtx, instrumentId); }
   public isChipSynthArpeggioPlaying(instrumentId: number): boolean { return _isChipSynthArpeggioPlaying(this._synthCtx, instrumentId); }
 

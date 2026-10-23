@@ -671,22 +671,6 @@ export async function updateTB303Pedalboard(ctx: SynthUpdateContext, instrumentI
 }
 
 /**
- * Update ChipSynth arpeggio configuration in real-time
- * @param instrumentId - Instrument ID
- * @param arpeggioConfig - New arpeggio configuration
- */
-export function updateChipSynthArpeggio(ctx: SynthUpdateContext, instrumentId: number, arpeggioConfig: NonNullable<InstrumentConfig['chipSynth']>['arpeggio']): void {
-  if (!arpeggioConfig) return;
-
-  // Find all channel instances of this instrument
-  ctx.instruments.forEach((instrument, key) => {
-    if ((key >> 16) === instrumentId && (instrument as any).updateArpeggio) {
-      (instrument as any).updateArpeggio(arpeggioConfig);
-    }
-  });
-}
-
-/**
  * Get current arpeggio step for a ChipSynth instrument (for UI visualization)
  * @param instrumentId - Instrument ID
  * @returns Current step index or 0 if not found/playing
