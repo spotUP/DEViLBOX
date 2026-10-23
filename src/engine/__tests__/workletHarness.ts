@@ -22,6 +22,12 @@ export type WorkletProc = {
 };
 
 /** Evaluate the shared worklet helpers (channel-stream.js, channel-outputs.js) once. */
+/** A worklet module's `import { X } from '../shared/x.js'` becomes the imported file's text (a stand-in scope has no module loader). */
+export function inlineWorkletImports(src: string, dir: string): string {
+  return src.replace(/^import \{[^}]*\} from '([^']+)';$/gm, (_m, rel: string) =>
+    readFileSync(resolve(ROOT, 'public', dir, rel), 'utf8').replace(/^export /gm, ''));
+}
+
 export function loadSharedWorkletScripts(): void {
   for (const f of ['public/worklets/channel-stream.js', 'public/worklets/channel-outputs.js', 'public/worklets/row-clip.js']) {
     new Function(readFileSync(resolve(ROOT, f), 'utf8'))();
@@ -46,7 +52,7 @@ export async function startWorklet(dir: string, stem: string, transform?: JsTran
     registerProcessor: (_n: string, cls: new () => WorkletProc) => { Processor = cls; },
     sampleRate: 48000, currentTime: 0,
   };
-  new Function(...Object.keys(scope), (clocked ? readFileSync(resolve(ROOT, `public/${dir}/${stem}.worklet.js`), 'utf8').replace(/\bcurrentTime\b/g, 'globalThis.__workletClock') : readFileSync(resolve(ROOT, `public/${dir}/${stem}.worklet.js`), 'utf8')))(...Object.values(scope));
+  new Function(...Object.keys(scope), inlineWorkletImports(clocked ? readFileSync(resolve(ROOT, `public/${dir}/${stem}.worklet.js`), 'utf8').replace(/\bcurrentTime\b/g, 'globalThis.__workletClock') : readFileSync(resolve(ROOT, `public/${dir}/${stem}.worklet.js`), 'utf8'), dir))(...Object.values(scope));
   const proc = new Processor();
   const send = async (m: unknown) => { await (proc.handleMessage ?? proc._handleMessage ?? proc._onMessage)!.call(proc, m); };
   const versions = Object.getOwnPropertyDescriptor(process, 'versions')!;
