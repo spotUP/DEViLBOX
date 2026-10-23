@@ -199,6 +199,8 @@ class GTUltraProcessor extends AudioWorkletProcessor {
 
       case 'jamNoteOn':
       case 'jamNoteOff':
+      case 'playTestNote':
+      case 'releaseNote':
         // The synth chose the channel, so a queued noteOff reaches the channel of its noteOn
         if (this.noteEvents.push(msg, currentTime)) this.applyNoteEvent(msg);
         break;
@@ -206,20 +208,6 @@ class GTUltraProcessor extends AudioWorkletProcessor {
       case 'cancelNotes':
         this.noteEvents.cancelFrom(-Infinity);
         break;
-
-      case 'playTestNote': {
-        if (!this.ready) return;
-        this._playTestNote(msg.channel, msg.note, msg.instrument);
-        this.jamActive = true;
-        break;
-      }
-
-      case 'releaseNote': {
-        if (!this.ready) return;
-        this._releaseNote(msg.channel);
-        this.jamReleaseCountdown = 172;
-        break;
-      }
 
       case 'setSidModel': {
         if (!this.ready) return;
@@ -554,8 +542,12 @@ class GTUltraProcessor extends AudioWorkletProcessor {
     if (ev.type === 'jamNoteOn') {
       this._jamNoteOn(ev.channel, ev.note, ev.instrument);
       this.jamActive = true;
+    } else if (ev.type === 'playTestNote') {
+      this._playTestNote(ev.channel, ev.note, ev.instrument);
+      this.jamActive = true;
     } else {
-      this._jamNoteOff(ev.channel);
+      if (ev.type === 'releaseNote') this._releaseNote(ev.channel);
+      else this._jamNoteOff(ev.channel);
       // Keep jamActive for ~500ms so the release envelope plays out (44100 * 0.5 / 128 ≈ 172 blocks)
       this.jamReleaseCountdown = 172;
     }

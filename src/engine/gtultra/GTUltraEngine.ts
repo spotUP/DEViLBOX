@@ -255,14 +255,22 @@ export class GTUltraEngine {
     this.post({ type: 'cancelNotes' });
   }
 
-  /** Play a test note with proper instrument init (works even when stopped) */
-  playTestNote(channel: number, note: number, instrument: number): void {
-    this.post({ type: 'playTestNote', channel, note, instrument });
+  /** Audio-clock time, for scheduling test notes ahead. */
+  get currentTime(): number {
+    return this.context.currentTime;
   }
 
-  /** Release a test note */
-  releaseTestNote(channel: number): void {
-    this.post({ type: 'releaseNote', channel });
+  /**
+   * Play a test note with proper instrument init (works even when stopped).
+   * With a time, the worklet keys it at that audio-clock frame.
+   */
+  playTestNote(channel: number, note: number, instrument: number, time?: number): void {
+    this.post({ type: 'playTestNote', channel, note, instrument, time });
+  }
+
+  /** Release a test note, at `time` on the audio clock when given. */
+  releaseTestNote(channel: number, time?: number): void {
+    this.post({ type: 'releaseNote', channel, time });
   }
 
   // --- Configuration ---
