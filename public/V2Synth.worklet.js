@@ -5,12 +5,18 @@
  * Real-time synthesizer with note-on/off, CC, and patch control.
  */
 
+import { TimedEventQueue } from './shared/timedEventQueue.js';
+
+const RENDER_FRAMES = 128;
+
 class V2SynthProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.module = null;
     this.initialized = false;
     this.renderBuffer = null;
+    // Notes scheduled ahead wait here until their frame (public/shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
     
     this.port.onmessage = (e) => this.handleMessage(e.data);
   }
@@ -29,10 +35,10 @@ class V2SynthProcessor extends AudioWorkletProcessor {
         break;
       case 'noteOn':
         // console.log('[V2Synth] noteOn ch:', msg.channel, 'note:', msg.note, 'vel:', msg.velocity, 'init:', this.initialized);
-        this.noteOn(msg.channel, msg.note, msg.velocity);
+        if (this.noteEvents.push(msg, currentTime)) this.applyNoteEvent(msg);
         break;
       case 'noteOff':
-        this.noteOff(msg.channel, msg.note);
+        if (this.noteEvents.push(msg, currentTime)) this.applyNoteEvent(msg);
         break;
       case 'controlChange':
         this.controlChange(msg.channel, msg.cc, msg.value);
@@ -44,6 +50,7 @@ class V2SynthProcessor extends AudioWorkletProcessor {
         this.programChange(msg.channel, msg.program);
         break;
       case 'allNotesOff':
+        this.noteEvents.cancelFrom(-Infinity, (e) => e.channel === msg.channel);
         this.allNotesOff(msg.channel);
         break;
     }
@@ -80,7 +87,7 @@ class V2SynthProcessor extends AudioWorkletProcessor {
       if (result === 0 || result === 1) {
         this.initialized = true;
         // Pre-allocate render buffer for 128 stereo samples
-        this.renderBuffer = this.module._malloc(128 * 2 * 4);
+        this.renderBuffer = this.module._malloc(RENDER_FRAMES * 2 * 4);
         this.port.postMessage({ type: 'initialized' });
         console.log('[V2Synth] Initialized at', sampleRate, 'Hz');
       } else {
@@ -129,6 +136,11 @@ class V2SynthProcessor extends AudioWorkletProcessor {
     }
   }
   
+  applyNoteEvent(ev) {
+    if (ev.type === 'noteOn') this.noteOn(ev.channel, ev.note, ev.velocity);
+    else this.noteOff(ev.channel, ev.note);
+  }
+
   noteOn(channel, note, velocity) {
     if (!this.initialized) return;
     this.module._v2synth_note_on(channel, note, velocity);
@@ -177,19 +189,25 @@ class V2SynthProcessor extends AudioWorkletProcessor {
       return true;
     }
     
-    // Render audio from V2 synth
-    this.module._v2synth_render(this.renderBuffer, numSamples);
-
-    // Copy from WASM buffer to output (interleaved stereo F32)
+    // Render in segments so a queued note keys the synth at its own frame, not at the block start
     const heapF32 = this.module.HEAPF32;
     const offset = this.renderBuffer / 4; // F32 offset
-
     let maxSample = 0;
-    for (let i = 0; i < numSamples; i++) {
-      left[i] = heapF32[offset + i * 2];
-      right[i] = heapF32[offset + i * 2 + 1];
-      const abs = Math.abs(left[i]);
-      if (abs > maxSample) maxSample = abs;
+    let done = 0;
+    while (done < numSamples) {
+      const now = currentTime + done / sampleRate;
+      this.noteEvents.drain(now, (ev) => this.applyNoteEvent(ev));
+      const at = this.noteEvents.nextOffset(now, numSamples - done, sampleRate);
+      const len = Math.min(at > 0 ? at : numSamples - done, RENDER_FRAMES);
+      this.module._v2synth_render(this.renderBuffer, len);
+      // Copy from WASM buffer to output (interleaved stereo F32)
+      for (let i = 0; i < len; i++) {
+        left[done + i] = heapF32[offset + i * 2];
+        right[done + i] = heapF32[offset + i * 2 + 1];
+        const abs = Math.abs(left[done + i]);
+        if (abs > maxSample) maxSample = abs;
+      }
+      done += len;
     }
 
     // Debug: log first frame that has audio
