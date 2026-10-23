@@ -37,7 +37,7 @@ import { setCellInPattern } from '@/stores/tracker/patternEditActions';
 import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { useFormatStore } from '@/stores/useFormatStore';
-import { decodeVolumeColumn } from '@/lib/tracker/volumeColumn';
+import { decodeVolumeColumn, noteStartLevel } from '@/lib/tracker/volumeColumn';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { useOscilloscopeStore } from '@/stores/useOscilloscopeStore';
@@ -1220,6 +1220,12 @@ export class TrackerReplayer {
    * For non-suppressNotes formats the meters fire naturally from
    * triggerNote() inside processRow — this method is a no-op there.
    */
+  /** The meter level a row's note shows when nothing plays it through triggerNote: the level it starts at. */
+  private rowMeterLevel(row: TrackerCell): number {
+    const instrumentVolume = this.instrumentMap.get(row.instrument)?.metadata?.modPlayback?.defaultVolume;
+    return noteStartLevel(row, useFormatStore.getState().editorMode, instrumentVolume);
+  }
+
   private triggerVUMetersForRow(time: number): void {
     if (!this._suppressNotes || !this.song) return;
     // Read pattern data live from the tracker store so user edits are visible
@@ -1229,7 +1235,7 @@ export class TrackerReplayer {
     if (!livePattern) return;
     for (let ch = 0; ch < Math.min(this.channels.length, livePattern.channels.length); ch++) {
       const row = livePattern.channels[ch]?.rows[this.pattPos];
-      if (row && isPitchedNote(row.note)) this.scheduleChannelMeter(ch, rowMeterLevel(row.volume), time);
+      if (row && isPitchedNote(row.note)) this.scheduleChannelMeter(ch, this.rowMeterLevel(row), time);
     }
   }
 
@@ -3682,7 +3688,7 @@ export class TrackerReplayer {
 
       // VU meters for per-channel native engines (MusicLine)
       if (this._suppressNotes && chTick === 0 && row && isPitchedNote(row.note)) {
-        this.scheduleChannelMeter(ch, rowMeterLevel(row.volume), time);
+        this.scheduleChannelMeter(ch, this.rowMeterLevel(row), time);
       }
 
       // Advance this channel's counter; when it overflows, advance its position.
@@ -4243,11 +4249,6 @@ export class TrackerReplayer {
 // ============================================================================
 
 /** Returns true if any effect column in the cell is an EDx note delay with delay > 0. */
-/** The meter level a row's note shows when nothing plays it through triggerNote: its volume column, else 0.7. */
-function rowMeterLevel(volume: number | null | undefined): number {
-  return decodeVolumeColumn(volume, useFormatStore.getState().editorMode) ?? 0.7;
-}
-
 function hasEdNoteDelay(row: TrackerCell): boolean {
   const check = (effTyp: number | undefined, eff: number | undefined) =>
     effTyp === 0xE && eff !== undefined && (eff >> 4) === 0xD && (eff & 0xF) > 0;
