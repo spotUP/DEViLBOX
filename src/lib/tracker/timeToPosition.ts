@@ -18,6 +18,9 @@ export type TimedSong = Pick<TrackerSong, 'initialSpeed' | 'initialBPM' | 'songP
 
 export interface SongPosition { songPos: number; pattPos: number }
 
+/** A position with the timing in force there: speed (ticks per row) and BPM after the row's own Fxx. */
+export interface SongState extends SongPosition { speed: number; bpm: number }
+
 type EffectPair = [number | undefined, number | undefined];
 
 function effectsOf(cell: TrackerCell): EffectPair[] {
@@ -28,6 +31,12 @@ function effectsOf(cell: TrackerCell): EffectPair[] {
 }
 
 export function songPositionAtMs(song: TimedSong, ms: number, xmBreakRows = false): SongPosition {
+  const { songPos, pattPos } = songStateAtMs(song, ms, xmBreakRows);
+  return { songPos, pattPos };
+}
+
+/** songPositionAtMs plus the speed and BPM the walk holds at that row (Fxx earlier in the song). */
+export function songStateAtMs(song: TimedSong, ms: number, xmBreakRows = false): SongState {
   let speed = song.initialSpeed || 6;
   let bpm = song.initialBPM || 125;
   let remaining = Math.max(0, ms);
@@ -35,7 +44,7 @@ export function songPositionAtMs(song: TimedSong, ms: number, xmBreakRows = fals
   let songPos = 0;
   let row = 0;
   const last = Math.min(song.songLength, song.songPositions.length);
-  let at: SongPosition = { songPos: 0, pattPos: 0 };
+  let at: SongState = { songPos: 0, pattPos: 0, speed, bpm };
   // Replayer state: pBreakPos is shared by Dxx and E6x and reset only at an order change.
   let pBreakPos = 0;
   let pBreakFlag = false;
@@ -80,7 +89,7 @@ export function songPositionAtMs(song: TimedSong, ms: number, xmBreakRows = fals
       });
     }
 
-    at = { songPos, pattPos: row };
+    at = { songPos, pattPos: row, speed, bpm };
     const rowMs = (speed * 2500) / bpm;
     if (remaining < rowMs) return at;
     remaining -= rowMs;

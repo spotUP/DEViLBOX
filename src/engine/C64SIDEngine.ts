@@ -329,12 +329,11 @@ export class C64SIDEngine {
   }
 
   /**
-   * Seek to time position (JSIDPlay2 only)
+   * Seek to a time position. True when the engine seeked: websid and websidplay do (emu_seek_position); jssid,
+   * tinyrsid and JSIDPlay2 have no seek (JSIDPlay2Engine.seek only records the time), so they keep playing from 0.
    */
-  seek(timeSeconds: number): void {
-    if (this.engine && this.engine instanceof JSIDPlay2Engine) {
-      this.engine.seek(timeSeconds);
-    }
+  seek(timeSeconds: number): boolean {
+    return this.engine instanceof ScriptNodePlayerEngine ? this.engine.seek(timeSeconds) : false;
   }
 
   /**

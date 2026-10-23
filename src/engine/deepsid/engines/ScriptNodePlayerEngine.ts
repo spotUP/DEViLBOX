@@ -295,6 +295,17 @@ export class ScriptNodePlayerEngine {
   }
 
   /**
+   * Native time seek: the websid and websidplay backends export emu_seek_position (milliseconds, reached through
+   * ScriptNodePlayer.seekPlaybackPosition, muted while it runs). tinyrsid has no seek and keeps playing from 0.
+   * False when this backend cannot seek or nothing plays yet.
+   */
+  seek(timeSeconds: number): boolean {
+    if (!this.player || (this.engineType !== 'websid' && this.engineType !== 'websidplay')) return false;
+    this.player.seekPlaybackPosition(Math.round(Math.max(0, timeSeconds) * 1000));
+    return true;
+  }
+
+  /**
    * Stop playback
    */
   stop(): void {

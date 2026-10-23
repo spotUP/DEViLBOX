@@ -261,6 +261,9 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
   /** Move playback to an output frame (restart and silent render up to it). */
   seek(frame: number): void { this.post({ type: 'seek', frame }); }
 
+  /** seek() by time: the frame is counted at the context's output rate, the rate the worklet renders at. */
+  seekToMs(ms: number): void { this.seek(Math.round((Math.max(0, ms) / 1000) * this.audioContext.sampleRate)); }
+
   /**
    * Start subsong `index` (0-based). Resolves to the subsong started, or -1.
    */

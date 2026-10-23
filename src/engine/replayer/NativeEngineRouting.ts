@@ -263,6 +263,28 @@ export interface NativeEngineStartResult {
 /** Track which engine keys are currently running to prevent duplicate starts */
 const _runningEngineKeys = new Set<string>();
 
+/**
+ * Engines with a native time seek (an engine instance method `seekToMs`). nuade: _nw_seek, restart and silent render
+ * to the frame. UADE, Hively, MusicLine and JamCracker export none (I180d report), so they are not listed.
+ */
+const NATIVE_TIME_SEEK_KEYS = new Set(['Nuade']);
+/** A seek asked before the engine plays (a share link seeks, then plays): applied right before its play(). */
+const _pendingStartMs = new Map<string, number>();
+
+/**
+ * Seek the native engine `key` to `ms`. Running: seeks now. Not yet started (the engine loads inside play()): kept and
+ * applied between the load and the first play(), so position 0 is never heard. False when `key` has no native seek.
+ */
+export function seekNativeEngineToMs(key: string, ms: number): boolean {
+  if (!NATIVE_TIME_SEEK_KEYS.has(key)) return false;
+  if (_runningEngineKeys.has(key)) {
+    void runningEngineInstance(key).then((i) => (i as { seekToMs?(ms: number): void } | null)?.seekToMs?.(ms));
+  } else {
+    _pendingStartMs.set(key, ms);
+  }
+  return true;
+}
+
 /** The registry engine `key` while it plays the current song, else null. */
 export async function runningEngineInstance(key: string): Promise<unknown> {
   if (!_runningEngineKeys.has(key)) return null;
@@ -625,6 +647,9 @@ export async function startNativeEngines(
 
       if (!muted) {
         openEngineOutputGain(instance);
+        const startMs = _pendingStartMs.get(desc.key);
+        _pendingStartMs.delete(desc.key);
+        if (startMs !== undefined) (instance as unknown as { seekToMs?(ms: number): void }).seekToMs?.(startMs);
         instance.play();
         console.log(`[NativeEngineRouting] ${desc.key} loaded & playing`);
         // The tracker pitch slider (and Key Lock), as it stands now: a song

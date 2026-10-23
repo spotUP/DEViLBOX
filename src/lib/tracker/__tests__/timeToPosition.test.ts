@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { songPositionAtMs, type TimedSong } from '../timeToPosition';
+import { songPositionAtMs, songStateAtMs, type TimedSong } from '../timeToPosition';
 import type { TrackerCell } from '@/types/tracker';
 
 const empty = { effTyp: 0, eff: 0 } as unknown as TrackerCell;
@@ -54,5 +54,17 @@ describe('songPositionAtMs', () => {
     expect(songPositionAtMs(t, 3 * 120 - 1, true)).toEqual({ songPos: 0, pattPos: 1 });
     expect(songPositionAtMs(t, 3 * 120, true)).toEqual({ songPos: 0, pattPos: 2 });
     expect(songPositionAtMs(t, 3 * 120, false)).toEqual({ songPos: 0, pattPos: 3 });
+  });
+});
+
+describe('songStateAtMs', () => {
+  it('holds the speed set by an earlier Fxx at the target row (speed 3 from row 2, tempo 125)', () => {
+    expect(songStateAtMs(song, 300)).toEqual({ songPos: 0, pattPos: 3, speed: 3, bpm: 125 });
+    expect(songStateAtMs(song, 0)).toEqual({ songPos: 0, pattPos: 0, speed: 6, bpm: 125 });
+  });
+
+  it('holds the tempo set by an earlier Fxx >= 32', () => {
+    const t = { ...song, patterns: [pattern(8, { 1: cell(0xF, 150) }), pattern(8, {})] } as unknown as TimedSong;
+    expect(songStateAtMs(t, 600)).toMatchObject({ speed: 6, bpm: 150 });
   });
 });

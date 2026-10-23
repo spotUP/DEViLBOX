@@ -13,7 +13,7 @@
  * Format-specific behavior is handled by effect handlers.
  */
 
-import { songPositionAtMs } from '@/lib/tracker/timeToPosition';
+import { songStateAtMs } from '@/lib/tracker/timeToPosition';
 import { applyEditorCellEdit } from '@lib/import/furnaceEditorCells';
 import { outputLatencySec } from './audioLatency';
 import { isReplacedInstrument, noteVolumeIsVelocity, synthNoteVelocity } from './replayer/hybridInstruments';
@@ -1005,9 +1005,15 @@ export class TrackerReplayer {
    */
   seekToMs(ms: number): { songPos: number; pattPos: number } | null {
     if (!this.song) return null;
-    const at = songPositionAtMs(this.song, ms, this.useXMPeriods);
+    const at = songStateAtMs(this.song, ms, this.useXMPeriods);
     this.seekTo(at.songPos, at.pattPos);
-    return at;
+    // The walk passed every Fxx before the target row: take the speed and tempo in force there, not the ones the
+    // replayer held where it was (the start of the song for a link). The transport BPM is synced back each tick.
+    this.speed = at.speed;
+    this.bpm = at.bpm;
+    useTransportStore.getState().setSpeed(at.speed);
+    useTransportStore.getState().setBPM(at.bpm);
+    return { songPos: at.songPos, pattPos: at.pattPos };
   }
 
   jumpToPosition(songPos: number, pattPos: number = 0): void {
