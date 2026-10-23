@@ -55,10 +55,33 @@ describe('/api/modarchive', () => {
     expect(url).toContain('type=filename_or_songtitle');
   });
 
-  it('searches by artist and rejects an empty query', async () => {
-    await fetch(`${base}/search?author=Jester`);
-    expect(upstream.mock.calls[upstream.mock.calls.length - 1][0]).toContain('type=guessed_artist');
+  it('searches by artist through the artist id, since the API has no artist name search type', async () => {
+    // Mirrors the live API: an unknown search type is an error; artists resolve to ids first.
+    upstream.mockImplementation(async (url: string) => {
+      if (/type=guessed_artist/.test(url)) return new Response('<modarchive><error>Invalid Search Type</error></modarchive>');
+      if (/request=search_artist/.test(url)) {
+        return new Response('<modarchive><items><item><id>9</id><alias>jester-fan</alias></item>'
+          + '<item><id>5</id><alias>Jester</alias></item></items></modarchive>');
+      }
+      if (/request=view_modules_by_artistid&query=5&/.test(url)) return new Response(XML);
+      return new Response('<modarchive><error>Invalid Search Type</error></modarchive>');
+    });
+    try {
+      const res = await fetch(`${base}/search?author=jester`);
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.results.map((r: { id: number }) => r.id)).toEqual([100721, 7]);
+      expect(json.totalPages).toBe(3);
+    } finally {
+      upstream.mockImplementation(async () => new Response(XML));
+    }
     expect((await fetch(`${base}/search`)).status).toBe(400);
+  });
+
+  it('answers no results when no artist matches', async () => {
+    upstream.mockResolvedValueOnce(new Response('<modarchive><error>No results found.</error></modarchive>'));
+    const json = await (await fetch(`${base}/search?author=nobody`)).json();
+    expect(json.results).toEqual([]);
   });
 
   it('never leaks the key when the upstream fetch fails', async () => {
