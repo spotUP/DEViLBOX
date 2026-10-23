@@ -87,7 +87,8 @@ export function createLoudnessTables(database: Database.Database = db): void {
       analyser TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
-      PRIMARY KEY (user_id, hash)
+      PRIMARY KEY (user_id, hash),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_song_loudness_hash ON song_loudness(hash);
   `);

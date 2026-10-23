@@ -21,6 +21,12 @@ const body = (o: object = {}) => ({ lufs: -14, peakDb: -1, method: 'r128', ...o 
 
 describe('/api/loudness/:hash', () => {
   const database = new Database(':memory:');
+  database.pragma('foreign_keys = ON');
+  // Same shape as the users table in initDatabase: song_loudness rows belong to a user.
+  database.exec('CREATE TABLE users (id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, created_at INTEGER NOT NULL, last_login INTEGER)');
+  for (const id of ['user-a', 'user-b', 'user-gone']) {
+    database.prepare('INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, 0)').run(id, id, 'x');
+  }
   createLoudnessTables(database);
   let server: Server;
   let base = '';
@@ -89,5 +95,12 @@ describe('/api/loudness/:hash', () => {
   ])('rejects %s', async (_n, o) => {
     expect((await put('d'.repeat(32), body(o), tokenA)).status).toBe(400);
     expect((await fetch(`${base}/${'d'.repeat(32)}`)).status).toBe(404);
+  });
+
+  it('drops a user\'s submissions when the user is deleted', async () => {
+    const h = 'e'.repeat(32);
+    expect((await put(h, body({ lufs: -20 }), generateToken('user-gone'))).status).toBe(200);
+    database.prepare('DELETE FROM users WHERE id = ?').run('user-gone');
+    expect((await fetch(`${base}/${h}`)).status).toBe(404);
   });
 });
