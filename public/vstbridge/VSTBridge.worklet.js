@@ -19,6 +19,8 @@ if (typeof performance === 'undefined') {
   globalThis.performance = { now: () => currentTime * 1000 };
 }
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 // Track processor registration
 let processorRegistered = false;
 
@@ -34,6 +36,8 @@ class VSTBridgeProcessor extends AudioWorkletProcessor {
     this.synth = null;
     this.isInitialized = false;
     this.pendingMessages = [];
+    // Notes scheduled ahead wait here until their frame (see public/shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
     this.outputBufferL = null;
     this.outputBufferR = null;
 
@@ -50,7 +54,7 @@ class VSTBridgeProcessor extends AudioWorkletProcessor {
 
       case 'noteOn':
         if (this.synth && this.isInitialized) {
-          this.synth.noteOn(data.note, data.velocity || 100);
+          if (this.noteEvents.push({ type, ...data }, currentTime)) this.applyNoteEvent({ type, ...data });
         } else {
           this.pendingMessages.push(event.data);
         }
@@ -58,13 +62,15 @@ class VSTBridgeProcessor extends AudioWorkletProcessor {
 
       case 'noteOff':
         if (this.synth && this.isInitialized) {
-          this.synth.noteOff(data.note);
+          if (this.noteEvents.push({ type, ...data }, currentTime)) this.applyNoteEvent({ type, ...data });
         }
         break;
 
       case 'allNotesOff':
         if (this.synth && this.isInitialized) {
-          this.synth.allNotesOff();
+          // Cancels the notes scheduled at or after it: on Stop the replayer has already sent the coming rows
+          this.noteEvents.cancelFrom(data.time ?? currentTime);
+          if (this.noteEvents.push({ type, ...data }, currentTime)) this.applyNoteEvent({ type, ...data });
         }
         break;
 
@@ -264,6 +270,13 @@ class VSTBridgeProcessor extends AudioWorkletProcessor {
     }
   }
 
+  applyNoteEvent(ev) {
+    if (!this.synth || !this.isInitialized) return;
+    if (ev.type === 'noteOn') this.synth.noteOn(ev.note, ev.velocity || 100);
+    else if (ev.type === 'noteOff') this.synth.noteOff(ev.note);
+    else this.synth.allNotesOff();
+  }
+
   process(inputs, outputs, parameters) {
     if (!this.synth || !this.isInitialized) {
       return true;
@@ -274,8 +287,16 @@ class VSTBridgeProcessor extends AudioWorkletProcessor {
     const numSamples = outputL.length;
 
     try {
-      // Process audio through WASM
-      this.synth.process(this.outputPtrL, this.outputPtrR, numSamples);
+      // Process audio through WASM in segments so a queued note keys the synth at its own frame
+      let done = 0;
+      while (done < numSamples) {
+        const now = currentTime + done / sampleRate;
+        this.noteEvents.drain(now, (ev) => this.applyNoteEvent(ev));
+        const off = this.noteEvents.nextOffset(now, numSamples - done, sampleRate);
+        const len = off > 0 ? off : numSamples - done;
+        this.synth.process(this.outputPtrL + done * 4, this.outputPtrR + done * 4, len);
+        done += len;
+      }
 
       // Copy from WASM memory to output
       // Need to recreate views if WASM memory was resized

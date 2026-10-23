@@ -40,17 +40,17 @@ export class GeonkickSynth implements DevilboxSynth {
     }
   }
 
-  triggerAttack(note: string | number, _time?: number, velocity = 0.8): void {
+  triggerAttack(note: string | number, time?: number, velocity = 0.8): void {
     if (this._disposed) return;
     const midi = noteToMidi(note);
     const vel127 = Math.round(Math.max(0, Math.min(1, velocity)) * 127);
-    this.engine.triggerNote(midi, vel127);
+    this.engine.triggerNote(midi, vel127, time);
   }
 
-  triggerRelease(note?: string | number, _time?: number): void {
+  triggerRelease(note?: string | number, time?: number): void {
     if (this._disposed) return;
     const midi = note !== undefined ? noteToMidi(note) : 69;
-    this.engine.releaseNote(midi);
+    this.engine.releaseNote(midi, time);
   }
 
   triggerAttackRelease(

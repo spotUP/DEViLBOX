@@ -163,19 +163,21 @@ export class GeonkickEngine extends WASMSingletonBase {
   }
 
   /** Trigger a note. Note is MIDI number; velocity is 0-127. */
-  triggerNote(note: number, velocity = 127): void {
+  triggerNote(note: number, velocity = 127, time?: number): void {
     this.workletNode?.port.postMessage({
       type: 'noteOn',
       note: note | 0,
       velocity: Math.max(0, Math.min(127, velocity | 0)),
+      time,
     });
   }
 
   /** Release a note. Most kick presets ignore note-off (one-shot). */
-  releaseNote(note: number): void {
+  releaseNote(note: number, time?: number): void {
     this.workletNode?.port.postMessage({
       type: 'noteOff',
       note: note | 0,
+      time,
     });
   }
 

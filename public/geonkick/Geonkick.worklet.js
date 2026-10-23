@@ -10,6 +10,8 @@
  * via port messages and renders into the worklet output each quantum.
  */
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 class GeonkickProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -23,6 +25,9 @@ class GeonkickProcessor extends AudioWorkletProcessor {
     // Shared across all envelope writes; the bridge copies before returning.
     this.envPtr = 0;
     this.envMaxPoints = 256;
+
+    // Notes scheduled ahead wait here until their frame (see public/shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
 
     this.port.onmessage = (event) => this.handleMessage(event.data);
   }
@@ -39,10 +44,8 @@ class GeonkickProcessor extends AudioWorkletProcessor {
 
     switch (data.type) {
       case 'noteOn':
-        w._gk_wasm_key_pressed(h, 1, data.note | 0, data.velocity | 0);
-        break;
       case 'noteOff':
-        w._gk_wasm_key_pressed(h, 0, data.note | 0, 0);
+        if (this.noteEvents.push(data, currentTime)) this.applyNoteEvent(data);
         break;
       case 'setLength':
         w._gk_wasm_set_length(h, Number(data.seconds) || 0.3);
@@ -208,6 +211,12 @@ class GeonkickProcessor extends AudioWorkletProcessor {
     }
   }
 
+  applyNoteEvent(ev) {
+    if (!this.initialized || !this.handle) return;
+    if (ev.type === 'noteOn') this.wasm._gk_wasm_key_pressed(this.handle, 1, ev.note | 0, ev.velocity | 0);
+    else this.wasm._gk_wasm_key_pressed(this.handle, 0, ev.note | 0, 0);
+  }
+
   /**
    * Copy a points Float32Array (interleaved [x, y, ctrl, x, y, ctrl, ...])
    * into the preallocated envelope scratch buffer, clamping to the max
@@ -266,8 +275,17 @@ class GeonkickProcessor extends AudioWorkletProcessor {
       return true;
     }
 
-    // Render mono from geonkick into WASM heap.
-    this.wasm._gk_wasm_render_mono(this.handle, this.outPtr, blockSize);
+    // Render in segments so a queued note keys the engine at its own frame, not at the block start.
+    // gk_wasm_render_mono accepts any frame count (it loops in GK_RENDER_CHUNK pieces).
+    let done = 0;
+    while (done < blockSize) {
+      const now = currentTime + done / sampleRate;
+      this.noteEvents.drain(now, (ev) => this.applyNoteEvent(ev));
+      const off = this.noteEvents.nextOffset(now, blockSize - done, sampleRate);
+      const len = off > 0 ? off : blockSize - done;
+      this.wasm._gk_wasm_render_mono(this.handle, this.outPtr + done * 4, len);
+      done += len;
+    }
 
     // Copy to both L and R. HEAPF32 is exposed via EXPORTED_RUNTIME_METHODS.
     const heap = this.wasm.HEAPF32;
