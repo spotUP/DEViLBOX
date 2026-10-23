@@ -12,6 +12,7 @@ import { ModalFooter } from './ModalFooter';
 import { useRomDialogStore } from '@/stores/useRomDialogStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { getToneEngine } from '@engine/ToneEngine';
+import { cacheRomImage, cacheUploadedRom, resolveUploadedRom, usesCombinedRomUpload } from '@engine/mame/MAMEROMLoader';
 import { HardDrive, Upload, Check, X, AlertTriangle } from 'lucide-react';
 import type JSZipType from 'jszip';
 
@@ -34,8 +35,21 @@ export const RomUploadDialog: React.FC = () => {
     try {
       const engine = getToneEngine();
       const { instrumentId, synthType } = pendingRomRequest;
+      let cacheError: string | null = null;
 
-      if (file.name.toLowerCase().endsWith('.zip')) {
+      if (usesCombinedRomUpload(synthType)) {
+        // The engine takes one combined image at offset 0, the same one that is cached
+        const buffer = await file.arrayBuffer();
+        const combined = await resolveUploadedRom(synthType, file.name, buffer);
+        if (!combined) throw new Error('No ROM data in the uploaded file');
+        engine.loadSynthROM(instrumentId, synthType, 0, combined);
+        try {
+          await cacheRomImage(synthType, combined);
+        } catch (cacheErr) {
+          console.error('[RomUpload] Caching failed:', cacheErr);
+          cacheError = cacheErr instanceof Error ? cacheErr.message : 'Failed to cache ROM';
+        }
+      } else if (file.name.toLowerCase().endsWith('.zip')) {
         // Extract files from ZIP and load as ROM banks
         const JSZip = (await import('jszip')).default;
         const zip = new JSZip();
@@ -62,12 +76,28 @@ export const RomUploadDialog: React.FC = () => {
         engine.loadSynthROM(instrumentId, synthType, 0, data);
       }
 
+      // Banked synths: cache the combined layout too; a failure leaves the ROM loaded for this session
+      if (!usesCombinedRomUpload(synthType)) {
+        try {
+          await cacheUploadedRom(synthType, file.name, await file.arrayBuffer());
+        } catch (cacheErr) {
+          console.error('[RomUpload] Caching failed:', cacheErr);
+          cacheError = cacheErr instanceof Error ? cacheErr.message : 'Failed to cache ROM';
+        }
+      }
+
       // Update instrument store to reflect ROM loaded
       const inst = instruments.find(i => i.id === instrumentId);
       if (inst) {
         updateInstrument(instrumentId, {
           parameters: { ...inst.parameters, _romsLoaded: 1 },
         });
+      }
+
+      if (cacheError) {
+        setError(`ROM loaded for this session but not saved for next time: ${cacheError}`);
+        setUploading(false);
+        return;
       }
 
       setSuccess(true);

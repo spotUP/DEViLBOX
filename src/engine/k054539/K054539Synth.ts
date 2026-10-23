@@ -80,6 +80,7 @@ export class K054539Synth extends MAMEBaseSynth {
 
       if (!romData) {
         console.warn('[K054539] ROM not found — synth will be silent until ROM is uploaded');
+        this._updateRomStatus(false);
         return;
       }
 
@@ -92,6 +93,7 @@ export class K054539Synth extends MAMEBaseSynth {
     } catch (error) {
       console.error('[K054539] ROM loading failed:', error);
       console.error('Place ROM files in /public/roms/k054539/ - see /public/roms/README.md');
+      this._updateRomStatus(false);
       // Continue anyway - synth will initialize but be silent without samples
     }
   }

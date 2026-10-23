@@ -66,6 +66,7 @@ export class ICS2115Synth extends MAMEBaseSynth {
 
       if (!romData) {
         console.warn('[ICS2115] ROM not found — synth will be silent until ROM is uploaded');
+        this._updateRomStatus(false);
         return;
       }
 
@@ -78,6 +79,7 @@ export class ICS2115Synth extends MAMEBaseSynth {
     } catch (error) {
       console.error('[ICS2115] ROM loading failed:', error);
       console.error('Place ROM files in /public/roms/ics2115/ - see /public/roms/README.md');
+      this._updateRomStatus(false);
       // Continue anyway - synth will initialize but be silent without wavetables
     }
   }

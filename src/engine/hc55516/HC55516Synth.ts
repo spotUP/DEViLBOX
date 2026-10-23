@@ -90,6 +90,8 @@ export class HC55516Synth extends MAMEBaseSynth {
     if (romData) {
       this.loadROM(0, romData);
       this._updateRomStatus(true);
+    } else {
+      this._updateRomStatus(false);
     }
   }
 

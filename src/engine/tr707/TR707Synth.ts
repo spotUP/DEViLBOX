@@ -112,6 +112,7 @@ export class TR707Synth extends MAMEBaseSynth {
 
       if (!romData) {
         console.warn('[TR707] ROM not found — synth will be silent until ROM is uploaded');
+        this._updateRomStatus(false);
         return;
       }
 
@@ -134,6 +135,7 @@ export class TR707Synth extends MAMEBaseSynth {
     } catch (error) {
       console.error('[TR707] ROM loading failed:', error);
       console.error('Place ROM files in /public/roms/tr707/ - see /public/roms/README.md');
+      this._updateRomStatus(false);
       // Continue anyway - synth will work but be silent
     }
   }

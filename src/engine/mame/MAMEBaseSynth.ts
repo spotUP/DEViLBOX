@@ -77,6 +77,7 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
   protected _updateRomStatus(loaded: boolean): void {
     if (this._romStatusUpdated) return; // Prevent render loop
     this._romStatusUpdated = true;
+    this._romMissing = !loaded;
 
     const chipName = this.chipName;
     const synthType = `MAME${chipName}`;
@@ -91,6 +92,9 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
         );
         if (inst) {
           const params = (inst as { parameters?: Record<string, unknown> }).parameters;
+          // A chip that could not find its ROM asks the user for it, same dialog as song preload.
+          // Opened even when _romsLoaded is already 0 (the default), which says nothing about the prompt.
+          if (!loaded) this._requestRomDialog(inst.id, inst.synthType ?? '');
           if (params?._romsLoaded === (loaded ? 1 : 0)) return;
           store.updateInstrument(inst.id, {
             parameters: { ...params, _romsLoaded: loaded ? 1 : 0 },
@@ -105,6 +109,24 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
     queueMicrotask(() => tryUpdate(5)); // Retry up to 5 times over 2.5s
   }
   private _romStatusUpdated = false;
+  /** Set when the chip reported its ROM missing; every later note asks for the ROM again until one loads (romLoaded). */
+  private _romMissing = false;
+
+  private _requestRomDialog(instrumentId: number, synthType: string): void {
+    import('../../stores/useRomDialogStore')
+      .then(({ showRomDialogForInstrument }) => showRomDialogForInstrument(instrumentId, synthType))
+      .catch(() => {});
+  }
+
+  /** Playing a ROM-missing chip re-opens the upload dialog (no-op while one is pending for the instrument). */
+  private _promptForMissingRom(): void {
+    const altTypes = [`MAME${this.chipName}`, this.chipName];
+    import('../../stores/useInstrumentStore').then(({ useInstrumentStore }) => {
+      const inst = useInstrumentStore.getState().instruments.find((i: { synthType?: string }) =>
+        altTypes.includes(i.synthType ?? ''));
+      if (inst) this._requestRomDialog(inst.id, inst.synthType ?? '');
+    }).catch(() => {});
+  }
 
   // Note state
   protected currentNote: number = 60;  // MIDI note
@@ -253,6 +275,7 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
    */
   triggerAttack(note: string | number, time?: number, velocity: number = 1): void {
     if (this._disposed) return;
+    if (this._romMissing && !this.romLoaded) this._promptForMissingRom();
 
     // If worklet isn't ready yet, queue the note attack
     if (!this._isReady || !this.workletNode) {

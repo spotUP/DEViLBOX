@@ -68,7 +68,7 @@ import {
 import { DeckKeyLock } from './dj/DeckKeyLock';
 import { WAMSynth } from './wam/WAMSynth';
 import { CHIP_SYNTH_DEFS } from '../constants/chipParameters';
-import { useRomDialogStore } from '../stores/useRomDialogStore';
+import { showRomDialogForInstrument } from '../stores/useRomDialogStore';
 import { BlepManager } from './blep/BlepManager';
 import { preloadTR909Resources } from './tr909/TR909Synth';
 import { SynthRegistry } from './registry/SynthRegistry';
@@ -1321,13 +1321,7 @@ export class ToneEngine {
 
         if (!loaded) {
           // Show ROM upload dialog for the first failed chip
-          useRomDialogStore.getState().showRomDialog({
-            instrumentId: config.id,
-            synthType: config.synthType || '',
-            chipName: chipDef.name,
-            requiredZip: chipDef.romConfig.requiredZip,
-            bankCount: chipDef.romConfig.bankCount,
-          });
+          showRomDialogForInstrument(config.id, config.synthType || '');
           break; // Only show one dialog at a time
         }
       }
