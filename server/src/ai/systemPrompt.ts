@@ -22,6 +22,7 @@ export function buildSystemPrompt(context?: {
     '- Audio Analysis: get_audio_analysis, get_audio_level',
     '- AI Composition: analyze_song, generate_pattern, transform_pattern',
     '- Modland: search_modland, load_modland (190K+ tracker modules)',
+    '- The Mod Archive: search_modarchive, load_modarchive',
     '- HVSC: search_hvsc, load_hvsc (80K+ C64 SID tunes)',
     '- File: load_file',
     '- Batch: batch (execute multiple tools atomically)',

@@ -35,6 +35,7 @@ Call `get_mcp_help` for the full runtime listing, or `get_mcp_help(category: "tr
 | `set_cell` | Write a note/instrument/volume/effect to a cell |
 | `get_audio_state` | Audio engine diagnostics |
 | `search_modland` / `load_modland` | Find and play Modland modules |
+| `search_modarchive` / `load_modarchive` | Find and play The Mod Archive modules |
 | `search_hvsc` / `load_hvsc` | Find and play HVSC SID tunes |
 | `load_file` | Load any music file from disk |
 | `batch` | Execute multiple tools atomically |

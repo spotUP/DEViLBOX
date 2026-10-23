@@ -1976,6 +1976,69 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
   );
 
   // ═══════════════════════════════════════════════════════════════════════════════
+  // THE MOD ARCHIVE SEARCH & LOAD (key stays server-side, in /api/modarchive)
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  server.tool(
+    'search_modarchive',
+    'Search The Mod Archive (modarchive.org) by module name/title or by artist. Returns id, filename, title, author, format and genre. Use load_modarchive with the id to play a result.',
+    {
+      query: z.string().optional().describe('Module filename or song title'),
+      author: z.string().optional().describe('Artist name (used instead of query when given)'),
+      page: z.number().optional().describe('Result page, starting at 1 (default 1)'),
+    },
+    async (p) => {
+      try {
+        const params = new URLSearchParams();
+        if (p.query) params.set('q', p.query);
+        if (p.author) params.set('author', p.author);
+        params.set('page', String(p.page ?? 1));
+        const resp = await fetch(`${API_BASE}/api/modarchive/search?${params}`);
+        if (!resp.ok) return textResult({ error: `Search API returned ${resp.status}: ${await resp.text()}` });
+        return textResult(await resp.json());
+      } catch (e) {
+        return textResult({ error: `search_modarchive failed: ${(e as Error).message}` });
+      }
+    },
+  );
+
+  server.tool(
+    'load_modarchive',
+    'Download a module from The Mod Archive and load it into DEViLBOX for playback. Use search_modarchive first to find the id and filename.',
+    {
+      id: z.number().describe('The id from a search_modarchive result'),
+      filename: z.string().optional().describe('The filename from the search result (its extension picks the format)'),
+      subsong: z.number().optional().describe('Subsong index for multi-song formats (default 0)'),
+      autoplay: z.boolean().optional().describe('Automatically start playback after loading (default true)'),
+    },
+    async (p) => {
+      try {
+        const params = new URLSearchParams({ id: String(p.id) });
+        if (p.filename) params.set('filename', p.filename);
+        const downloadResp = await fetch(`${API_BASE}/api/modarchive/download?${params}`);
+        if (!downloadResp.ok) {
+          return textResult({ error: `Download failed (${downloadResp.status}): ${await downloadResp.text()}` });
+        }
+        const buffer = Buffer.from(await downloadResp.arrayBuffer());
+        const filename = p.filename?.split(/[/\\]/).pop() || `${p.id}.mod`;
+        const loadResult = await callBrowser('load_file', { filename, data: buffer.toString('base64'), subsong: p.subsong });
+        if (p.autoplay !== false) {
+          try { await callBrowser('play', { mode: 'song' }); } catch { /* ignore play errors */ }
+        }
+        return textResult({
+          ...((typeof loadResult === 'object' && loadResult !== null) ? loadResult : { result: loadResult }),
+          source: 'modarchive',
+          id: p.id,
+          filename,
+          autoplay: p.autoplay !== false,
+        });
+      } catch (e) {
+        return textResult({ error: `load_modarchive failed: ${(e as Error).message}` });
+      }
+    },
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════════
   // HVSC (HIGH VOLTAGE SID COLLECTION) — C64 SID TUNES
   // ═══════════════════════════════════════════════════════════════════════════════
 
