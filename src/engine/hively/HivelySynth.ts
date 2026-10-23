@@ -47,7 +47,7 @@ export class HivelySynth implements DevilboxSynth {
    * pre-warm (attack, release 50 ms later) did exactly this on every AHX
    * load — 2026-09-23, "a ringing sound that dont go away" before Play.
    */
-  private _queuedAttack: { note?: string | number; velocity?: number } | null = null;
+  private _queuedAttack: { note?: string | number; velocity?: number; time?: number } | null = null;
 
   /**
    * Track whether the singleton engine output is already connected to a
@@ -198,7 +198,7 @@ export class HivelySynth implements DevilboxSynth {
     return buf.buffer;
   }
 
-  triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
+  triggerAttack(note?: string | number, time?: number, velocity?: number): void {
     if (this._disposed) return;
 
     // Lazy setup: if we have a pending config but haven't finished setup yet,
@@ -226,18 +226,20 @@ export class HivelySynth implements DevilboxSynth {
         handle: this._playerHandle,
         note: hvlNote,
         velocity: vel,
+        time,
       });
     } else if (this._setupPromise) {
       // Setup still in progress — park this note until the player exists.
       // A release before then clears the slot, and only the note still in
       // the slot fires: a release must always be able to take an attack back.
-      const queued = { note, velocity };
+      const queued = { note, velocity, time };
       this._queuedAttack = queued;
       this._setupPromise.then(() => {
         if (this._queuedAttack !== queued) return;
         this._queuedAttack = null;
         if (!this._disposed && this._playerHandle >= 0) {
-          this.triggerAttack(queued.note, undefined, queued.velocity);
+          // Keeps its time: a retry whose time has passed plays at once in the worklet
+          this.triggerAttack(queued.note, queued.time, queued.velocity);
         }
       });
     } else if (note === undefined) {
@@ -247,7 +249,7 @@ export class HivelySynth implements DevilboxSynth {
     }
   }
 
-  triggerRelease(_note?: string | number, _time?: number): void {
+  triggerRelease(_note?: string | number, time?: number): void {
     if (this._disposed) return;
 
     // Whatever was waiting for the player is released before it ever plays.
@@ -262,6 +264,7 @@ export class HivelySynth implements DevilboxSynth {
         this.engine.sendMessage({
           type: 'noteOff',
           handle: this._playerHandle,
+          time,
         });
       }
     } else {
@@ -273,6 +276,8 @@ export class HivelySynth implements DevilboxSynth {
    * Release all voices / stop playback (panic button, song stop, etc.)
    */
   releaseAll(): void {
+    // Rows already sent ahead must not key after the panic
+    if (this._playerHandle >= 0) this.engine.sendMessage({ type: 'cancelNotes' });
     this.triggerRelease();
   }
 

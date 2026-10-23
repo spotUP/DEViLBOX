@@ -5,6 +5,8 @@
  * for 128-sample AudioWorklet blocks.
  */
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 class HivelyProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -13,6 +15,8 @@ class HivelyProcessor extends AudioWorkletProcessor {
     this.playing = false;
     this.tuneLoaded = false;
     this.looping = true;
+    // Instrument notes scheduled ahead wait here until their frame (public/shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
 
     // Ring buffer for bridging 960-sample frames to 128-sample blocks
     this.ringSize = 8192;
@@ -160,6 +164,7 @@ class HivelyProcessor extends AudioWorkletProcessor {
       case 'destroyPlayer': {
         if (!this.wasm) break;
         const h = data.handle;
+        this.noteEvents.cancelFrom(-Infinity, (e) => e.handle === h);
         if (this.playerOutPtrs && this.playerOutPtrs[h]) {
           this.wasm._free(this.playerOutPtrs[h].l);
           this.wasm._free(this.playerOutPtrs[h].r);
@@ -181,16 +186,13 @@ class HivelyProcessor extends AudioWorkletProcessor {
       }
 
       case 'noteOn':
-        if (this.wasm) {
-          this.port.postMessage({ type: 'debug', msg: 'noteOn handle=' + data.handle + ' note=' + data.note + ' vel=' + (data.velocity || 127) + ' players=' + JSON.stringify(this.playerOutPtrs ? Object.keys(this.playerOutPtrs) : null) });
-          this.wasm._hively_player_note_on(data.handle, data.note, data.velocity || 127);
-        }
+      case 'noteOff':
+        // Queued by `time`; the handle is chosen by the synth, so a queued noteOff reaches its noteOn's player
+        if (this.noteEvents.push(data, currentTime)) this.applyNoteEvent(data);
         break;
 
-      case 'noteOff':
-        if (this.wasm) {
-          this.wasm._hively_player_note_off(data.handle);
-        }
+      case 'cancelNotes':
+        this.noteEvents.cancelFrom(-Infinity);
         break;
 
       // Playback speed as a fraction of normal. Pitch follows tempo, because
@@ -694,6 +696,49 @@ class HivelyProcessor extends AudioWorkletProcessor {
     }
   }
 
+  applyNoteEvent(ev) {
+    if (!this.wasm) return;
+    if (ev.type === 'noteOn') {
+      this.port.postMessage({ type: 'debug', msg: 'noteOn handle=' + ev.handle + ' note=' + ev.note + ' vel=' + (ev.velocity || 127) + ' players=' + JSON.stringify(this.playerOutPtrs ? Object.keys(this.playerOutPtrs) : null) });
+      this.wasm._hively_player_note_on(ev.handle, ev.note, ev.velocity || 127);
+    } else {
+      this.wasm._hively_player_note_off(ev.handle);
+    }
+  }
+
+  renderPlayers(instL, instR, start, len) {
+    for (const h of Object.keys(this.playerOutPtrs || {})) {
+      const hi = parseInt(h);
+      const ptrs = this.playerOutPtrs[hi];
+      if (!ptrs) continue;
+
+      // Re-read HEAPF32 in case render caused memory growth
+      const currentHeap = this.wasm.HEAPF32;
+      const n = this.wasm._hively_player_render(hi, ptrs.l, ptrs.r, len);
+      // Re-read again after render (malloc inside render may grow heap)
+      const heapAfter = this.wasm.HEAPF32;
+      if (n > 0) {
+        const offL = ptrs.l >> 2;
+        const offR = ptrs.r >> 2;
+        let maxSample = 0;
+        for (let i = 0; i < n; i++) {
+          const sL = heapAfter[offL + i];
+          const sR = heapAfter[offR + i];
+          instL[start + i] += sL;
+          instR[start + i] += sR;
+          const abs = Math.abs(sL) + Math.abs(sR);
+          if (abs > maxSample) maxSample = abs;
+        }
+        // No heartbeat here. A once-a-second 'render player=0 ... max=0'
+        // debug post ran for the life of every instrument player, idle or
+        // not, and reached the console as a warning — hundreds of lines in
+        // every log the owner pasted on 2026-09-23. createPlayer and noteOn
+        // still announce themselves; those are events.
+        void maxSample; void currentHeap;
+      }
+    }
+  }
+
   process(inputs, outputs, parameters) {
     if (!this.initialized) return true;
 
@@ -811,37 +856,16 @@ class HivelyProcessor extends AudioWorkletProcessor {
     const instL = instOut && instOut[0] ? instOut[0] : null;
     const instR = instOut ? (instOut[1] || instOut[0]) : null;
     if (instL) { instL.fill(0); instR.fill(0); }
-    if (this.wasm && this.playerOutPtrs && instL) {
-      const heapF32 = this.wasm.HEAPF32;
-      for (const h of Object.keys(this.playerOutPtrs)) {
-        const hi = parseInt(h);
-        const ptrs = this.playerOutPtrs[hi];
-        if (!ptrs) continue;
-
-        // Re-read HEAPF32 in case render caused memory growth
-        const currentHeap = this.wasm.HEAPF32;
-        const n = this.wasm._hively_player_render(hi, ptrs.l, ptrs.r, numSamples);
-        // Re-read again after render (malloc inside render may grow heap)
-        const heapAfter = this.wasm.HEAPF32;
-        if (n > 0) {
-          const offL = ptrs.l >> 2;
-          const offR = ptrs.r >> 2;
-          let maxSample = 0;
-          for (let i = 0; i < n; i++) {
-            const sL = heapAfter[offL + i];
-            const sR = heapAfter[offR + i];
-            instL[i] += sL;
-            instR[i] += sR;
-            const abs = Math.abs(sL) + Math.abs(sR);
-            if (abs > maxSample) maxSample = abs;
-          }
-          // No heartbeat here. A once-a-second 'render player=0 ... max=0'
-          // debug post ran for the life of every instrument player, idle or
-          // not, and reached the console as a warning — hundreds of lines in
-          // every log the owner pasted on 2026-09-23. createPlayer and noteOn
-          // still announce themselves; those are events.
-          void maxSample; void currentHeap;
-        }
+    if (this.wasm && instL) {
+      // Render in segments so a queued note keys at its own frame, not at the block start
+      let done = 0;
+      while (done < numSamples) {
+        const now = currentTime + done / sampleRate;
+        this.noteEvents.drain(now, (ev) => this.applyNoteEvent(ev));
+        const at = this.noteEvents.nextOffset(now, numSamples - done, sampleRate);
+        const len = at > 0 ? at : numSamples - done;
+        this.renderPlayers(instL, instR, done, len);
+        done += len;
       }
     }
 
