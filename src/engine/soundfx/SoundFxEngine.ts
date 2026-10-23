@@ -13,13 +13,18 @@ import {
   type WASMAssetsCache,
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
+import { PositionCallbacks, type EnginePositionUpdate } from '@engine/wasm/PositionCallbacks';
+import { ChannelMeterFeed } from '../tone/channelMeterFeed';
 import { soundfxTransform } from './soundfxTransform';
+
+const meterFeed = new ChannelMeterFeed();
 
 export class SoundFxEngine extends WASMChannelOutputsEngine {
   private static instance: SoundFxEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   private _songEndCallback: (() => void) | null = null;
+  private readonly _positions = new PositionCallbacks();
 
   private constructor() {
     super();
@@ -75,6 +80,12 @@ export class SoundFxEngine extends WASMChannelOutputsEngine {
         case 'oscData':
           useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
+        case 'position':
+          this._positions.emit(data);
+          break;
+        case 'chLevels':
+          meterFeed.reportFromWorklet(data, this.audioContext);
+          break;
         case 'songEnd':
           this._songEndCallback?.();
           break;
@@ -101,11 +112,16 @@ export class SoundFxEngine extends WASMChannelOutputsEngine {
     this.workletNode?.port.postMessage({ type: 'play' });
     this.afterPlay();
   }
-  stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
+  stop(): void { meterFeed.clearHeld(); this.workletNode?.port.postMessage({ type: 'stop' }); }
   pause(): void { this.workletNode?.port.postMessage({ type: 'pause' }); }
 
   setMuteMask(mask: number): void {
     this.workletNode?.port.postMessage({ type: 'setChannelMask', mask });
+  }
+
+  /** The order index and row the replayer is on, as the grid shows them. */
+  onPositionUpdate(cb: (update: EnginePositionUpdate) => void): () => void {
+    return this._positions.add(cb);
   }
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
@@ -121,6 +137,8 @@ export class SoundFxEngine extends WASMChannelOutputsEngine {
   }
 
   override dispose(): void {
+    meterFeed.clearHeld();
+    this._positions.clear();
     super.dispose();
     if (SoundFxEngine.instance === this) SoundFxEngine.instance = null;
   }
