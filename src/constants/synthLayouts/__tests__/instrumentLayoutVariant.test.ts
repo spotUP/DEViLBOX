@@ -25,6 +25,10 @@ describe('getInstrumentLayout', () => {
     expect(getInstrumentLayout(pick('WaveSabreFalcon'))).toBe(getSynthLayout('WaveSabreFalcon'));
   });
 
+  it('gives an Adultery instrument no layout, not the Falcon layout of the shared engine type', () => {
+    expect(getInstrumentLayout(pick('WaveSabreAdultery'))).toBeUndefined();
+  });
+
   it('falls back to the engine type layout for a non-variant instrument', () => {
     expect(getInstrumentLayout(pick('DubSiren'))).toBe(getSynthLayout('DubSiren'));
   });

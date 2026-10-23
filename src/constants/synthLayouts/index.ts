@@ -254,14 +254,14 @@ export function getSynthLayout(synthType: string): SynthPanelLayout | undefined 
  * synthType, so the variant marker the catalog sets (`xrns.synthType`) selects its layout; resolving by
  * synthType alone gave every WaveSabre variant the generic Falcon layout. Resolution goes through
  * catalogKeyMatches, the same helper the synth picker uses. A variant with no layout of its own
- * (WaveSabreAdultery) falls back to the engine type's layout.
+ * (WaveSabreAdultery) gets none: the engine type's layout belongs to another variant, so the editor
+ * shows its info panel instead.
  */
 export function getInstrumentLayout(
   instrument: Pick<InstrumentConfig, 'synthType' | 'xrns'>,
 ): SynthPanelLayout | undefined {
-  for (const key of Object.keys(SYNTH_LAYOUTS)) {
-    const info = SYNTH_INFO[key as SynthType];
-    if (info && info.type !== key && catalogKeyMatches(key as SynthType, instrument)) return SYNTH_LAYOUTS[key];
+  for (const key of Object.keys(SYNTH_INFO) as SynthType[]) {
+    if (SYNTH_INFO[key].type !== key && catalogKeyMatches(key, instrument)) return SYNTH_LAYOUTS[key];
   }
   return getSynthLayout(instrument.synthType);
 }
