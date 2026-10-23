@@ -5,6 +5,8 @@
  * since klystron renders arbitrary sample counts via cyd_output_buffer_stereo).
  */
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 // The audition channel (KlysWrapper.c KLYS_PREVIEW_CHANNEL) belongs to no song channel: the mixer's mute
 // state and mute mask never apply to it, or a key would play silence.
 const PREVIEW_CHANNEL = 31;
@@ -18,6 +20,8 @@ class KlystrackProcessor extends AudioWorkletProcessor {
     this.songLoaded = false;
     this.hiddenSong = false; // the engine's empty song, made only so the audition path runs with no song loaded
     this.looping = true;
+    // Audition notes scheduled ahead wait here until their frame (public/shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
     this.previewing = false; // audition note sounding with the song stopped
     this.watchProgram = false;
     this.watchVoices = false;
@@ -69,6 +73,7 @@ class KlystrackProcessor extends AudioWorkletProcessor {
         break;
 
       case 'stop':
+        this.noteEvents.cancelFrom(-Infinity);
         if (this.wasm) this.wasm._klys_stop();
         this.playing = false;
         break;
@@ -139,12 +144,9 @@ class KlystrackProcessor extends AudioWorkletProcessor {
       }
 
       case 'previewNoteOn':
-        // With the transport stopped the audition must not start the song.
-        if (this.wasm && this.songLoaded && !this.playing) this.wasm._klys_set_song_running(0);
-        if (this.wasm && this.songLoaded && this.wasm._klys_preview_note_on(data.inst, data.note)) {
-          this.previewing = true;
-          this.wasm._klys_pause(0);
-        }
+      case 'previewNoteOnData':
+      case 'previewNoteOff':
+        if (this.noteEvents.push(data, currentTime)) this.applyNoteEvent(data);
         break;
 
       // A standalone instrument (no klystrack song owns it): the instrument value lives in the project, the engine holds
@@ -158,24 +160,6 @@ class KlystrackProcessor extends AudioWorkletProcessor {
         this.wasm._free(ptr);
         break;
       }
-
-      case 'previewNoteOnData':
-        if (!this.wasm || !this.initialized || typeof this.wasm._klys_preview_note_on_data !== 'function') break;
-        if (!this.songLoaded && this.wasm._klys_new_song()) {
-          this.songLoaded = true;
-          this.hiddenSong = true;
-          this.playing = false;
-        }
-        if (this.songLoaded && !this.playing) this.wasm._klys_set_song_running(0);
-        if (this.songLoaded && this.wasm._klys_preview_note_on_data(data.note)) {
-          this.previewing = true;
-          this.wasm._klys_pause(0);
-        }
-        break;
-
-      case 'previewNoteOff':
-        if (this.wasm && this.songLoaded) this.wasm._klys_preview_note_off();
-        break;
 
       case 'watchVoices':
         this.watchVoices = !!data.on;
@@ -328,6 +312,35 @@ class KlystrackProcessor extends AudioWorkletProcessor {
     } catch (err) {
       console.error('[Klystrack Worklet] Init failed:', err);
       this.port.postMessage({ type: 'error', message: err.message || String(err) });
+    }
+  }
+
+  applyNoteEvent(ev) {
+    switch (ev.type) {
+      case 'previewNoteOn':
+        // With the transport stopped the audition must not start the song.
+        if (this.wasm && this.songLoaded && !this.playing) this.wasm._klys_set_song_running(0);
+        if (this.wasm && this.songLoaded && this.wasm._klys_preview_note_on(ev.inst, ev.note)) {
+          this.previewing = true;
+          this.wasm._klys_pause(0);
+        }
+        break;
+      case 'previewNoteOnData':
+        if (!this.wasm || !this.initialized || typeof this.wasm._klys_preview_note_on_data !== 'function') break;
+        if (!this.songLoaded && this.wasm._klys_new_song()) {
+          this.songLoaded = true;
+          this.hiddenSong = true;
+          this.playing = false;
+        }
+        if (this.songLoaded && !this.playing) this.wasm._klys_set_song_running(0);
+        if (this.songLoaded && this.wasm._klys_preview_note_on_data(ev.note)) {
+          this.previewing = true;
+          this.wasm._klys_pause(0);
+        }
+        break;
+      case 'previewNoteOff':
+        if (this.wasm && this.songLoaded) this.wasm._klys_preview_note_off();
+        break;
     }
   }
 
@@ -569,31 +582,17 @@ class KlystrackProcessor extends AudioWorkletProcessor {
     }
   }
 
-  process(inputs, outputs, parameters) {
-    if (!this.initialized) return true;
-
-    const output = outputs[0];
-    if (!output || output.length === 0) return true;
-
-    const outputL = output[0];
-    const outputR = output[1] || output[0];
-    const numSamples = outputL.length;
-
-    outputL.fill(0);
-    outputR.fill(0);
-
+  renderSegment(outputL, outputR, start, len) {
     if ((this.playing || this.previewing) && this.songLoaded) {
-      this.ensureDecodeBuffers(numSamples);
-
-      const decoded = this.wasm._klys_decode(this.decodePtrL, this.decodePtrR, numSamples);
+      const decoded = this.wasm._klys_decode(this.decodePtrL, this.decodePtrR, len);
       if (!this.playing && decoded <= 0) this.previewing = false;
       if (decoded > 0) {
         const heapF32 = this.wasm.HEAPF32;
         const offL = this.decodePtrL >> 2;
         const offR = this.decodePtrR >> 2;
         for (let i = 0; i < decoded; i++) {
-          outputL[i] = heapF32[offL + i];
-          outputR[i] = heapF32[offR + i];
+          outputL[start + i] = heapF32[offL + i];
+          outputR[start + i] = heapF32[offR + i];
         }
 
         // Every sample each channel rendered (the engine's per-channel tap),
@@ -612,6 +611,33 @@ class KlystrackProcessor extends AudioWorkletProcessor {
           }
         }
       }
+    }
+  }
+
+  process(inputs, outputs, parameters) {
+    if (!this.initialized) return true;
+
+    const output = outputs[0];
+    if (!output || output.length === 0) return true;
+
+    const outputL = output[0];
+    const outputR = output[1] || output[0];
+    const numSamples = outputL.length;
+
+    outputL.fill(0);
+    outputR.fill(0);
+
+    // Render in segments so a queued audition note keys the engine at its own frame, not at the block start.
+    // klys_decode accepts any frame count (ensure_mix_buffer / tap buffers grow to numSamples).
+    this.ensureDecodeBuffers(numSamples);
+    let done = 0;
+    while (done < numSamples) {
+      const now = currentTime + done / sampleRate;
+      this.noteEvents.drain(now, (ev) => this.applyNoteEvent(ev));
+      const off = this.noteEvents.nextOffset(now, numSamples - done, sampleRate);
+      const len = off > 0 ? off : numSamples - done;
+      this.renderSegment(outputL, outputR, done, len);
+      done += len;
     }
 
     // Report position periodically

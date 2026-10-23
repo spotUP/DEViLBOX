@@ -47,7 +47,8 @@ describe('keys on klystrack instruments', () => {
     calls.length = 0;
     s.triggerAttack('C4'); s.triggerRelease('C4'); s.triggerAttack(72); s.triggerRelease(72);
     expect(calls.filter((c) => /^(play|stop|pause|resume)/.test(c)), 'engine transport calls').toEqual([]);
-    expect(calls).toEqual(['previewNoteOn(2)', 'previewNoteOff', 'previewNoteOn(2)', 'previewNoteOff']);
+    // The stub records argument counts: instrument, note and the audio time (undefined here) are three; the release carries its time
+    expect(calls).toEqual(['previewNoteOn(3)', 'previewNoteOff(1)', 'previewNoteOn(3)', 'previewNoteOff(1)']);
     expect(told).toEqual([]);
   });
   it('a MIDI note maps to the klystrack note the grid prints with the same name (C4 -> 48 = C-4, clamped to 0..95)', () => {

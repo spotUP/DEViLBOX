@@ -42,7 +42,7 @@ export class KlysSynth implements DevilboxSynth {
    * A key auditions THIS synth's instrument on the engine's spare preview channel; it never starts or stops the song.
    * A number is a MIDI note (as the other native synths read it), a string a note name.
    */
-  triggerAttack(note?: string | number, _time?: number, _velocity?: number): void {
+  triggerAttack(note?: string | number, time?: number, _velocity?: number): void {
     if (this._disposed) return;
     const midi = typeof note === 'number' ? note : noteToMidi(note ?? 'C4');
     const index = klysInstrumentIndex(this.instrumentId);
@@ -51,15 +51,15 @@ export class KlysSynth implements DevilboxSynth {
       const own = readKlysInstrument(index);
       if (!own) return;
       sendStandalone(own);
-      this.engine.previewNoteOnData(klysNoteFromMidi(midi));
+      this.engine.previewNoteOnData(klysNoteFromMidi(midi), time);
       return;
     }
-    this.engine.previewNoteOn(index, klysNoteFromMidi(midi));
+    this.engine.previewNoteOn(index, klysNoteFromMidi(midi), time);
   }
 
-  triggerRelease(_note?: string | number, _time?: number): void {
+  triggerRelease(_note?: string | number, time?: number): void {
     if (this._disposed) return;
-    this.engine.previewNoteOff();
+    this.engine.previewNoteOff(time);
   }
 
   /** Panic / song stop: stops the player and the preview voice. */

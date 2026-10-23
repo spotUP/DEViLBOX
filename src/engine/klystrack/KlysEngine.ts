@@ -425,17 +425,17 @@ export class KlysEngine extends WASMSingletonBase {
   }
 
   /** Audition the preview copy (setPreviewInstrument); with no song loaded the worklet makes the empty one first. */
-  previewNoteOnData(note: number): void {
-    this.sendMessage({ type: 'previewNoteOnData', note });
+  previewNoteOnData(note: number, time?: number): void {
+    this.sendMessage({ type: 'previewNoteOnData', note, time });
   }
 
   /** Audition instrument inst on the spare channel; never starts or stops the song. */
-  previewNoteOn(inst: number, note: number): void {
-    this.sendMessage({ type: 'previewNoteOn', inst, note });
+  previewNoteOn(inst: number, note: number, time?: number): void {
+    this.sendMessage({ type: 'previewNoteOn', inst, note, time });
   }
 
-  previewNoteOff(): void {
-    this.sendMessage({ type: 'previewNoteOff' });
+  previewNoteOff(time?: number): void {
+    this.sendMessage({ type: 'previewNoteOff', time });
   }
 
   /** Per-channel program state with every position report; the worklet watches only while subscribed. */
