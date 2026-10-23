@@ -26,6 +26,12 @@ size_t sfx_render(SfxModule* module, float* interleaved_stereo, size_t frames);
 size_t sfx_render_multi(SfxModule* module, float* ch0, float* ch1, float* ch2, float* ch3, size_t frames);
 
 bool sfx_has_ended(const SfxModule* module);
+int sfx_get_song_pos(const SfxModule* module);
+int sfx_get_row(const SfxModule* module);
+int sfx_get_speed(const SfxModule* module);
+int sfx_get_tick(const SfxModule* module);
+void sfx_get_channel_levels(SfxModule* module, float* out4);
+void sfx_get_note_start_counts(const SfxModule* module, uint32_t* out, int n);
 
 // Edit API
 int sfx_get_instrument_count(const SfxModule* module);

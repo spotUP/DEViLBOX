@@ -15,6 +15,10 @@ class SoundFxProcessor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
     this.initializing = false;
+    // Position and per-channel level reports, every 8th process() call like the other replayers
+    this.levelsPtr = 0;
+    this.noteStartsPtr = 0;
+    this.reportCounter = 0;
     // Per-channel dub sends + isolation slots (worklets/channel-outputs.js).
     this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
@@ -116,6 +120,8 @@ class SoundFxProcessor extends AudioWorkletProcessor {
       const frameBytes = this.bufferSize * 4; // float32
       this.interleavedPtr = this.module._malloc(this.bufferSize * 2 * 4);
       for (let i = 0; i < 4; i++) this.chPtrs[i] = this.module._malloc(frameBytes);
+      this.levelsPtr = this.module._malloc(4 * 4);
+      this.noteStartsPtr = this.module._malloc(4 * 4);
       if (!this.interleavedPtr) { this.port.postMessage({ type: 'error', message: 'malloc failed for output buffer' }); return; }
       this.updateBufferViews();
       this.initialized = true;
@@ -143,6 +149,8 @@ class SoundFxProcessor extends AudioWorkletProcessor {
     if (this.module) {
       if (this.interleavedPtr) { this.module._free(this.interleavedPtr); this.interleavedPtr = 0; }
       for (let i = 0; i < 4; i++) { if (this.chPtrs[i]) { this.module._free(this.chPtrs[i]); this.chPtrs[i] = 0; } }
+      if (this.levelsPtr) { this.module._free(this.levelsPtr); this.levelsPtr = 0; }
+      if (this.noteStartsPtr) { this.module._free(this.noteStartsPtr); this.noteStartsPtr = 0; }
     }
     this.interleavedBuf = null; this.chBufs = null; this.module = null; this.initialized = false; this.playing = false; this.lastHeapBuffer = null;
   }
@@ -182,6 +190,24 @@ class SoundFxProcessor extends AudioWorkletProcessor {
         this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
         this._stream.writeFloat32(this.chBufs.slice(0, 4), rendered);
       }
+    }
+
+    if (++this.reportCounter >= 8) {
+      this.reportCounter = 0;
+      const m = this.module;
+      this.port.postMessage({
+        type: 'position',
+        songPos: m._sfx_get_song_pos(this.handle),
+        row: m._sfx_get_row(this.handle),
+        speed: m._sfx_get_speed(this.handle),
+        tick: m._sfx_get_tick(this.handle),
+      });
+      // Peak per channel since the last report, plus cumulative sample starts (the Paula DMA edges)
+      m._sfx_get_channel_levels(this.handle, this.levelsPtr);
+      m._sfx_get_note_start_counts(this.handle, this.noteStartsPtr, 4);
+      const off = this.levelsPtr >> 2;
+      const noteStarts = Array.from(new Uint32Array(m.HEAPU8.buffer, this.noteStartsPtr, 4));
+      this.port.postMessage({ type: 'chLevels', levels: [m.HEAPF32[off], m.HEAPF32[off + 1], m.HEAPF32[off + 2], m.HEAPF32[off + 3]], noteStarts, audioTime: currentTime });
     }
 
     if (this.module._sfx_has_ended(this.handle)) this.port.postMessage({ type: 'songEnd' });

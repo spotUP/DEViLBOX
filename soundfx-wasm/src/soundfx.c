@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #ifndef __cplusplus
 #ifndef nullptr
@@ -71,6 +72,10 @@ typedef struct SfxChannel {
     uint64_t position_fp;
     bool active;
     bool muted;
+
+    // Meter feed: DMA-style sample starts since init, peak level since last read
+    uint32_t note_starts;
+    float peak;
 } SfxChannel;
 
 typedef struct SfxGlobalPlayingInfo {
@@ -154,6 +159,10 @@ struct SfxModule {
     uint16_t delay;
     uint16_t max_pattern;
 
+    // Order and row of the line most recently played (what the ear is on)
+    uint32_t played_pos;
+    uint32_t played_row;
+
     uint32_t** patterns;  // max_pattern arrays, each 4*64 uint32s
 
     SfxGlobalPlayingInfo playing_info;
@@ -201,6 +210,7 @@ static void ch_play_sample(SfxChannel* ch, short sample_number, int8_t* sample_d
     ch->ch_loop_length = 0;
     ch->position_fp = (uint64_t)start_offset << SAMPLE_FRAC_BITS;
     ch->active = true;
+    ch->note_starts++;
     (void)sample_number;
 }
 
@@ -468,6 +478,8 @@ static void sfx_play_note(SfxModule* m, SfxChannel* channel, uint32_t pattern_da
 
 static void sfx_play_sound(SfxModule* m) {
     uint32_t* pattern_adr = m->patterns[m->orders[m->playing_info.track_pos]];
+    m->played_pos = m->playing_info.track_pos;
+    m->played_row = m->playing_info.pos_counter / 4;
 
     sfx_play_note(m, &m->channels[0], pattern_adr[m->playing_info.pos_counter]);
     sfx_play_note(m, &m->channels[1], pattern_adr[m->playing_info.pos_counter + 1]);
@@ -518,6 +530,8 @@ static void play_tick(SfxModule* m) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void initialize_sound(SfxModule* m, int start_position) {
+    m->played_pos = (uint32_t)start_position;
+    m->played_row = 0;
     m->playing_info.timer = 0;
     m->playing_info.track_pos = (uint32_t)start_position;
     m->playing_info.pos_counter = 0;
@@ -554,6 +568,8 @@ static void initialize_sound(SfxModule* m, int start_position) {
         ch->position_fp = 0;
         ch->active = false;
         ch->muted = false;
+        ch->note_starts = 0;
+        ch->peak = 0.0f;
     }
 
     // Calculate the frequency to play with
@@ -732,6 +748,7 @@ size_t sfx_render(SfxModule* module, float* interleaved_stereo, size_t frames) {
                 sample = (float)c->ch_sample_data[pos] / 128.0f;
 
             sample *= (float)c->ch_volume / 64.0f;
+            if (fabsf(sample) > c->peak) c->peak = fabsf(sample);
 
             if (ch == 0 || ch == 3)
                 left += sample;
@@ -805,6 +822,7 @@ size_t sfx_render_multi(SfxModule* module, float* ch0, float* ch1, float* ch2, f
                 sample = (float)c->ch_sample_data[pos] / 128.0f;
 
             sample *= (float)c->ch_volume / 64.0f;
+            if (fabsf(sample) > c->peak) c->peak = fabsf(sample);
 
             if (ch_out[ch]) ch_out[ch][f] = sample * 0.5f;
 
@@ -990,4 +1008,26 @@ size_t sfx_export(const SfxModule* module, uint8_t* out, size_t max_size) {
     if (max_size < total) return 0;
     memcpy(out, module->original_data, total);
     return total;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Position and meter feed (read by the worklet to drive the editor playhead and channel meters)
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int sfx_get_song_pos(const SfxModule* module) { return module ? (int)module->played_pos : 0; }
+int sfx_get_row(const SfxModule* module) { return module ? (int)module->played_row : 0; }
+int sfx_get_speed(const SfxModule* module) { (void)module; return 6; }
+int sfx_get_tick(const SfxModule* module) { return module ? (int)module->playing_info.timer : 0; }
+
+// Per-channel peak level since the last call (resets the peaks)
+void sfx_get_channel_levels(SfxModule* module, float* out4) {
+    for (int i = 0; i < 4; i++) {
+        out4[i] = module ? module->channels[i].peak : 0.0f;
+        if (module) module->channels[i].peak = 0.0f;
+    }
+}
+
+// Cumulative sample starts per channel since init
+void sfx_get_note_start_counts(const SfxModule* module, uint32_t* out, int n) {
+    for (int i = 0; i < n; i++) out[i] = (module && i < 4) ? module->channels[i].note_starts : 0;
 }
