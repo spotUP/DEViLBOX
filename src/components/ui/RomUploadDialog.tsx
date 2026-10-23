@@ -79,7 +79,9 @@ export const RomUploadDialog: React.FC = () => {
       // Banked synths: cache the combined layout too; a failure leaves the ROM loaded for this session
       if (!usesCombinedRomUpload(synthType)) {
         try {
-          await cacheUploadedRom(synthType, file.name, await file.arrayBuffer());
+          if (!(await cacheUploadedRom(synthType, file.name, await file.arrayBuffer()))) {
+            cacheError = `${pendingRomRequest.chipName} has no saved ROM slot`;
+          }
         } catch (cacheErr) {
           console.error('[RomUpload] Caching failed:', cacheErr);
           cacheError = cacheErr instanceof Error ? cacheErr.message : 'Failed to cache ROM';
