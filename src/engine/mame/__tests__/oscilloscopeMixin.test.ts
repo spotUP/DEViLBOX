@@ -8,9 +8,9 @@
  * flat line at silence. The mixin must accumulate across quanta and send only
  * full buffers.
  *
- * The mixin is inlined in every committed worklet (they share one
+ * The mixin is inlined in the shared base and any worklet not yet on it (they share one
  * AudioWorkletGlobalScope; first definition wins), so this test extracts the
- * block from the TMS5220 worklet and also asserts every other worklet carries
+ * block from the shared base worklet (mameChipWorklet.js) and also asserts every other worklet carries
  * the identical copy — a stale inline in ANY file can win the race.
  */
 import { describe, it, expect } from 'vitest';
@@ -54,7 +54,7 @@ interface ScopeProc {
 }
 
 describe('worklet OscilloscopeMixin', () => {
-  it.each(['mame-worklet-init.js', 'TMS5220.worklet.js'])(
+  it.each(['mame-worklet-init.js', 'mameChipWorklet.js'])(
     '%s accumulates 128-sample quanta into a full 256-sample buffer', (file) => {
     const mixin = loadMixin(file);
     const posted: Float32Array[] = [];
@@ -88,7 +88,7 @@ describe('worklet OscilloscopeMixin', () => {
   it('the loader-served mixin and the inline fallbacks agree on accumulation', () => {
     // Not textually identical (the init file is the documented long form), but
     // both must accumulate rather than zero-pad.
-    for (const file of ['mame-worklet-init.js', 'TMS5220.worklet.js']) {
+    for (const file of ['mame-worklet-init.js', 'mameChipWorklet.js']) {
       const block = extractMixin(readFileSync(join(MAME_DIR, file), 'utf8'))!;
       expect(block, `${file} still zero-pads the scope buffer`).not.toMatch(/= 0;\s*\n\s*}\s*\n\s*\/\/ Send/);
       expect(block, `${file} does not accumulate`).toContain('oscFill');
@@ -96,7 +96,7 @@ describe('worklet OscilloscopeMixin', () => {
   });
 
   it('every worklet inlines the identical mixin', () => {
-    const reference = extractMixin(readFileSync(join(MAME_DIR, 'TMS5220.worklet.js'), 'utf8'));
+    const reference = extractMixin(readFileSync(join(MAME_DIR, 'mameChipWorklet.js'), 'utf8'));
     for (const file of readdirSync(MAME_DIR).filter((f) => f.endsWith('.worklet.js'))) {
       const block = extractMixin(readFileSync(join(MAME_DIR, file), 'utf8'));
       if (block === null) continue; // MAMEChips.worklet.js consumes without defining

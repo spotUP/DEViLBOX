@@ -69,6 +69,7 @@ if (!globalThis.OscilloscopeMixin) {
  *  - set `deleteSynthOnCleanup = true` when the embind object must be deleted on cleanup,
  *  - override `handleChipMessage(data)`: called first for every message, return true when it handled it
  *    (chip-only messages, or chip-specific replacements of a common one),
+ *  - override `initializeSynth(data)` when the embind synth takes the rate through setSampleRate, not initialize,
  *  - override `cleanupChip()` to free chip-owned WASM allocations.
  */
 export class MameChipProcessor extends AudioWorkletProcessor {
@@ -162,6 +163,11 @@ export class MameChipProcessor extends AudioWorkletProcessor {
     return new this.module[this.synthClass || this.chip + 'Synth']();
   }
 
+  /** Hand the sample rate to the new synth. Override when the chip calls it setSampleRate. */
+  initializeSynth(data) {
+    this.synth.initialize(data.sampleRate);
+  }
+
   async initSynth(data) {
     try {
       this.cleanup();
@@ -169,7 +175,7 @@ export class MameChipProcessor extends AudioWorkletProcessor {
       this.module = await globalThis.initMAMEWasmModule(data.wasmBinary, data.jsCode, 'create' + this.chip + 'Module');
 
       this.synth = this.createSynth();
-      this.synth.initialize(data.sampleRate);
+      this.initializeSynth(data);
 
       this.outputPtrL = this.module._malloc(this.bufferSize * 4);
       this.outputPtrR = this.module._malloc(this.bufferSize * 4);

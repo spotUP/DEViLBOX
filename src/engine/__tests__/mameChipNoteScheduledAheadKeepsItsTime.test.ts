@@ -22,6 +22,9 @@ import { inlineWorkletImports } from '@/engine/__tests__/workletHarness';
 import { TIASynth } from '@/engine/tia/TIASynth';
 import { MSM5232Synth } from '@/engine/msm5232/MSM5232Synth';
 import { TR707Synth } from '@/engine/tr707/TR707Synth';
+import { ES5503Synth } from '@/engine/es5503/ES5503Synth';
+import { SN76477Synth } from '@/engine/sn76477/SN76477Synth';
+import { S14001ASynth } from '@/engine/s14001a/S14001ASynth';
 
 const ROOT = resolve(__dirname, '../../..');
 const RATE = 48000;
@@ -51,6 +54,8 @@ const CASES: Case[] = [
   { name: 'TIA', file: 'public/mame/TIA.worklet.js', Synth: TIASynth },
   { name: 'MSM5232 (chip-specific handler)', file: 'public/mame/MSM5232.worklet.js', Synth: MSM5232Synth, chipMsg: { msg: { type: 'setFeetMix', value: 3 }, call: 'setFeetMix' } },
   { name: 'TR707 (key-off is All Notes Off)', file: 'public/mame/TR707.worklet.js', Synth: TR707Synth },
+  { name: 'ES5503', file: 'public/mame/ES5503.worklet.js', Synth: ES5503Synth },
+  { name: 'SN76477', file: 'public/mame/SN76477.worklet.js', Synth: SN76477Synth },
 ];
 
 function wired(c: Case) {
@@ -72,6 +77,7 @@ function wired(c: Case) {
     allNotesOff: () => keyed.push({ ev: 'alloff', at: at() }),
     process: (_l: number, _r: number, n: number) => { rendered += n; },
     setFeetMix: () => chipCalls.push('setFeetMix'),
+    setNoiseMode: () => chipCalls.push('setNoiseMode'),
   };
   proc.module = {};
   proc.initialized = true;
@@ -169,5 +175,38 @@ describe('a gate release that is All Notes Off keeps later notes (TR707)', () =>
     synth.triggerAttack('C4', t0 + 0.2, 0.8);
     renderBlocks(proc, 0.3);
     expect(keyed.map((k) => k.ev)).toEqual(['on', 'alloff', 'on']);
+  });
+});
+
+describe('speech chips keep the timed note path on the shared base', () => {
+  const TMS = { name: 'TMS5220', file: 'public/mame/TMS5220.worklet.js', Synth: S14001ASynth } as Case;
+  const S14 = { name: 'S14001A', file: 'public/mame/S14001A.worklet.js', Synth: S14001ASynth } as Case;
+
+  it('TMS5220 worklet holds a timed noteOn and noteOff until their frames, and handles its own messages', () => {
+    const { proc, keyed, deliver, chipCalls } = wired(TMS);
+    renderBlocks(proc, 0.01);
+    const t0 = clock.now;
+    deliver({ type: 'noteOn', note: 60, velocity: 100, time: t0 + 0.05 });
+    deliver({ type: 'noteOff', note: 60, time: t0 + 0.1 });
+    deliver({ type: 'setNoiseMode', value: 1 });
+    expect(keyed).toEqual([]);
+    expect(chipCalls).toEqual(['setNoiseMode']);
+    renderBlocks(proc, 0.2);
+    expect(keyed.map((k) => k.ev)).toEqual(['on', 'off']);
+    expect(Math.abs(keyed[0].at - (t0 + 0.05))).toBeLessThanOrEqual(1 / RATE);
+    expect(Math.abs(keyed[1].at - (t0 + 0.1))).toBeLessThanOrEqual(1 / RATE);
+  });
+
+  it('S14001A synth sends the key-off time and the worklet keys off at that frame', () => {
+    const { proc, keyed, synth, deliver } = wired(S14);
+    renderBlocks(proc, 0.01);
+    const t0 = clock.now;
+    deliver({ type: 'noteOn', note: 60, velocity: 100 });
+    synth.triggerRelease(t0 + 0.15);
+    expect(keyed.filter((k) => k.ev === 'off')).toEqual([]);
+    renderBlocks(proc, 0.3);
+    const off = keyed.find((k) => k.ev === 'off');
+    expect(off).toBeDefined();
+    expect(Math.abs(off!.at - (t0 + 0.15))).toBeLessThanOrEqual(1 / RATE);
   });
 });

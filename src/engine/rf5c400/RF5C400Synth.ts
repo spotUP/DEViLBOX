@@ -86,11 +86,12 @@ export class RF5C400Synth extends MAMEBaseSynth {
   // MAMEBaseSynth Abstract Method Implementations
   // ===========================================================================
 
-  protected writeKeyOn(note: number, velocity: number): void {
+  protected writeKeyOn(note: number, velocity: number, time?: number): void {
     if (!this.workletNode || this._disposed) return;
 
     this.workletNode.port.postMessage({
       type: 'noteOn',
+      time,
       note,
       velocity: Math.floor(velocity * 127),
       voice: this.currentVoice,
@@ -118,10 +119,11 @@ export class RF5C400Synth extends MAMEBaseSynth {
     });
   }
 
-  protected writeKeyOff(): void {
+  protected writeKeyOff(time?: number): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({
       type: 'noteOff',
+      time,
       note: 0,
       voice: this.currentVoice,
     });

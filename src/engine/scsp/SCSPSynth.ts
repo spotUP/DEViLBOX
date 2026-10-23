@@ -57,11 +57,12 @@ export class SCSPSynth extends MAMEBaseSynth {
   /**
    * Write key-on to SCSP
    */
-  protected writeKeyOn(note: number, velocity: number): void {
+  protected writeKeyOn(note: number, velocity: number, time?: number): void {
     if (!this.workletNode || this._disposed) return;
 
     this.workletNode.port.postMessage({
       type: 'noteOn',
+      time,
       note,
       velocity: Math.floor(velocity * 127),
       slot: this.currentSlot,
@@ -71,10 +72,11 @@ export class SCSPSynth extends MAMEBaseSynth {
   /**
    * Write key-off to SCSP
    */
-  protected writeKeyOff(): void {
+  protected writeKeyOff(time?: number): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({
       type: 'noteOff',
+      time,
       note: this.currentNote,
       slot: this.currentSlot,
     });
