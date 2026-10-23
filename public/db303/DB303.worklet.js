@@ -355,7 +355,8 @@ class DB303Processor extends AudioWorkletProcessor {
       case 'noteOn':
         // Real TB-303 behavior: new note trigger cancels any pending gate-off
         // This ensures the sequencer's note always takes priority
-        this.eventQueue = this.eventQueue.filter(e => e.type !== 'gateOff');
+        // Only gate-offs due at or after this note: an earlier note's gate-off scheduled before it still ends that note.
+        this.eventQueue = this.eventQueue.filter(e => e.type !== 'gateOff' || (data.time !== undefined && e.time < data.time));
         if (data.time !== undefined) {
           this.eventQueue.push(data);
           this.eventQueue.sort((a, b) => a.time - b.time);
@@ -942,8 +943,10 @@ class DB303Processor extends AudioWorkletProcessor {
       let samplesToProcess;
       if (nextEvent) {
         // Calculate samples to render before the event
-        const eventSampleOffset = Math.max(0, (nextEvent.time - currentTime) / sampleTime - processedSamples);
-        samplesToProcess = Math.min(numSamples - processedSamples, Math.floor(eventSampleOffset));
+        // Whole frames: currentTime is always a frame boundary, so rounding it and taking the event's first frame
+        // at or after its time keys the note on that frame without float drift moving it one frame late.
+        const eventSampleOffset = Math.max(0, Math.ceil(nextEvent.time * sampleRate) - Math.round(currentTime * sampleRate) - processedSamples);
+        samplesToProcess = Math.min(numSamples - processedSamples, eventSampleOffset);
       } else {
         samplesToProcess = numSamples - processedSamples;
       }

@@ -256,7 +256,7 @@ export class DB303Synth implements DevilboxSynth {
   // Track current MIDI note for pitchBend-based setFrequency
   private _currentMidiNote: number = 69; // A4
 
-  triggerAttack(note: string | number, _time?: number, velocity: number = 1, accent: boolean = false, slide: boolean = false, hammer: boolean = false): void {
+  triggerAttack(note: string | number, time?: number, velocity: number = 1, accent: boolean = false, slide: boolean = false, hammer: boolean = false): void {
     if (!this.workletNode || this._disposed) return;
 
     // Cancel any pending release from previous note — prevents gate-off
@@ -302,7 +302,7 @@ export class DB303Synth implements DevilboxSynth {
     // Pass slide flag to worklet for proper 303 slide behavior
     // When slide=true: worklet keeps previous note held → DB303 slideToNote (legato)
     // When slide=false: worklet releases previous note first → DB303 triggerNote (retrigger)
-    const safeTime = _time ?? audioNow();
+    const safeTime = time ?? audioNow();
     this.workletNode.port.postMessage({
       type: 'noteOn',
       time: safeTime, // Always pass time for consistent queuing
@@ -377,7 +377,7 @@ export class DB303Synth implements DevilboxSynth {
     this._releaseTimeout = setTimeout(() => {
       this._releaseTimeout = null;
       if (!this._disposed) {
-        this.triggerRelease();
+        this.triggerRelease(safeTime + d);
       }
     }, Math.max(0, delayMs)) as unknown as ReturnType<typeof setTimeout>;
   }
