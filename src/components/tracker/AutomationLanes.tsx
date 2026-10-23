@@ -281,6 +281,12 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
     return null; // Don't render anything if no automation data
   }
 
+  /** The one lane-index lookup: a parameter's slot in the channel's lane list
+   *  (the same list automationLaneReserve counts). Primary, ghost and
+   *  multi-lane curves all take their row from here. */
+  const laneSlot = (channelIndex: number, param: string): number =>
+    Math.max(0, (channelParameterLists[channelIndex] ?? []).indexOf(param));
+
   // Helper: render additional (non-primary) curves for a curve group
   const renderMultiLaneCurves = (
     groups: Map<number, Array<{ curve: AutomationCurve; param: string }>>,
@@ -303,14 +309,11 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
       const autoArea = automationLaneReserve(laneCount);
       const areaLeft = chOffset + chWidth - autoArea;
       const perLane = Math.floor(autoArea / laneCount);
-      const laneParams = channelParameterLists[channelIndex] ?? [];
 
-      return group.slice(1).map((entry, groupIdx) => {
+      return group.slice(1).map((entry) => {
         const { curve, param } = entry;
-        const slot = laneParams.indexOf(param);
-        const laneIdx = slot >= 1 ? slot - 1 : groupIdx;
         const laneWidth = Math.max(4, perLane - 2);
-        const laneLeft = areaLeft + (laneIdx + 1) * perLane + 1;
+        const laneLeft = areaLeft + laneSlot(channelIndex, param) * perLane + 1;
         const pHeight = pLength * rowHeight;
         const yOffset = startVirtualRow * rowHeight;
 
@@ -371,7 +374,7 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
 
         return (
           <div
-            key={`${keyPrefix}-multi-${channelIndex}-${laneIdx}`}
+            key={`${keyPrefix}-multi-${channelIndex}-${param}`}
             title={`CH ${(channelIndex + 1).toString().padStart(2, '0')} — ${resolveParamLabel(param, channelIndex)}`}
             style={{
               position: 'absolute',
@@ -450,8 +453,11 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
       const areaLeft = chOffset + chWidth - autoArea;
       const perLane = Math.floor(autoArea / laneCount);
       const effectiveLaneWidth = laneCount > 1 ? Math.max(4, perLane - 2) : LANE_WIDTH;
-      // Primary lane is always at slot 0 (leftmost in the automation area)
-      const laneLeft = laneCount > 1 ? areaLeft + 1 : areaLeft + (autoArea - LANE_WIDTH) / 2;
+      // The first curve with points sits in its own parameter's slot, not
+      // necessarily slot 0 (lane 1 may have no points).
+      const laneLeft = laneCount > 1
+        ? areaLeft + laneSlot(channelIndex, curve.parameter) * perLane + 1
+        : areaLeft + (autoArea - LANE_WIDTH) / 2;
       const pHeight = pLength * rowHeight;
       const yOffset = startVirtualRow * rowHeight;
 
