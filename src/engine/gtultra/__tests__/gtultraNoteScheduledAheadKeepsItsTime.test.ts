@@ -18,6 +18,7 @@ vi.mock('../../../stores/useGTUltraStore', () => ({ useGTUltraStore: { getState:
 import { inlineWorkletImports } from '@/engine/__tests__/workletHarness';
 import { GTUltraSynth } from '@/engine/gtultra/GTUltraSynth';
 import { GTUltraEngine } from '@/engine/gtultra/GTUltraEngine';
+import { SIDDubSynths } from '@/engine/dub/SIDDubSynths';
 
 const testEngine = vi.hoisted(() => ({ current: null as unknown }));
 
@@ -64,6 +65,8 @@ function wired() {
   proc._jamNoteOn = (ch: number, note: number) => { keyed.push({ ev: 'on', ch, note, at: now + rendered / RATE }); };
   proc._jamNoteOff = (ch: number) => { keyed.push({ ev: 'off', ch, at: now + rendered / RATE }); };
   proc._render = (_l: number, _r: number, n: number) => { rendered += n; };
+  proc._playTestNote = (ch: number, note: number) => { keyed.push({ ev: 'test-on', ch, note, at: now + rendered / RATE }); };
+  proc._releaseNote = (ch: number) => { keyed.push({ ev: 'test-off', ch, at: now + rendered / RATE }); };
   proc._stop = () => {};
   // Position report the worklet posts after each block
   proc._getCurrentRow = () => 0;
@@ -73,10 +76,13 @@ function wired() {
 
   // The engine and synth without their AudioWorkletNode: posted messages go to the real worklet message handler.
   const engine = Object.create(GTUltraEngine.prototype) as GTUltraEngine;
-  Object.assign(engine, { workletNode: { port: { postMessage: (m: object) => proc.port.onmessage?.({ data: m }) } } });
+  Object.assign(engine, {
+    workletNode: { port: { postMessage: (m: object) => proc.port.onmessage?.({ data: m }) } },
+    context: { get currentTime() { return now; } },
+  });
   testEngine.current = engine;
   const synth = new GTUltraSynth();
-  return { proc, keyed, synth };
+  return { proc, keyed, synth, engine };
 }
 
 function renderBlocks(proc: Proc, seconds: number) {
@@ -132,5 +138,37 @@ describe('note scheduled ahead keeps its time on GTUltra', () => {
     synth.releaseAll();
     renderBlocks(proc, 0.2);
     expect(keyed.map((k) => k.ev)).toEqual(['off']);
+  });
+});
+
+/**
+ * The SID dub one-shots (ping, snare, laser and others) released with setTimeout(durationMs), so a main-thread
+ * stall stretched the hit. They now send the attack and the release with audio-clock times, and the worklet keys
+ * both at their frames.
+ */
+describe('SID dub one-shot releases at attack plus duration on the audio clock', () => {
+  it('a ping keys and releases at its frames, with no timer', () => {
+    const { proc, keyed, engine } = wired();
+    const dub = Object.create(SIDDubSynths.prototype) as SIDDubSynths;
+    Object.assign(dub, { engine });
+    renderBlocks(proc, 0.01);
+    const t0 = now;
+    const timer = vi.spyOn(globalThis, 'setTimeout');
+    dub.firePing(0x80, 120);
+    expect(timer).not.toHaveBeenCalled();
+    timer.mockRestore();
+    // The attack is due now, so it keys on arrival; the release waits in the worklet.
+    expect(keyed.map((k) => k.ev)).toEqual(['test-on']);
+    renderBlocks(proc, 0.3);
+    expect(keyed.map((k) => k.ev)).toEqual(['test-on', 'test-off']);
+    expect(Math.abs(keyed[1].at - (t0 + 0.12))).toBeLessThanOrEqual(1 / RATE);
+  });
+
+  it('a test note with no time keys at once, as the instrument list preview needs', () => {
+    const { proc, keyed, engine } = wired();
+    renderBlocks(proc, 0.01);
+    engine.playTestNote(0, 0x80, 1);
+    engine.releaseTestNote(0);
+    expect(keyed.map((k) => k.ev)).toEqual(['test-on', 'test-off']);
   });
 });

@@ -282,16 +282,18 @@ export class SIDDubSynths {
   firePing(note = 0x80, durationMs = 500): void {
     const engine = this.engine;
     if (!engine) return;
-    engine.playTestNote(CH_ONESHOT, note, INST.PING);
-    setTimeout(() => engine.releaseTestNote(CH_ONESHOT), durationMs);
+    const t = engine.currentTime;
+    engine.playTestNote(CH_ONESHOT, note, INST.PING, t);
+    engine.releaseTestNote(CH_ONESHOT, t + durationMs / 1000);
   }
 
   // ── Snare Crack: Noise burst ──────────────────────────────────────────
   fireSnare(durationMs = 200): void {
     const engine = this.engine;
     if (!engine) return;
-    engine.playTestNote(CH_ONESHOT, 0x80, INST.SNARE);
-    setTimeout(() => engine.releaseTestNote(CH_ONESHOT), durationMs);
+    const t = engine.currentTime;
+    engine.playTestNote(CH_ONESHOT, 0x80, INST.SNARE, t);
+    engine.releaseTestNote(CH_ONESHOT, t + durationMs / 1000);
   }
 
   // ── Osc Bass: Sustaining sawtooth ─────────────────────────────────────
@@ -314,48 +316,54 @@ export class SIDDubSynths {
   fireSubSwell(note = 0x60, durationMs = 2000): void {
     const engine = this.engine;
     if (!engine) return;
-    engine.playTestNote(CH_ONESHOT, note, INST.SUB_SWELL);
-    setTimeout(() => engine.releaseTestNote(CH_ONESHOT), durationMs);
+    const t = engine.currentTime;
+    engine.playTestNote(CH_ONESHOT, note, INST.SUB_SWELL, t);
+    engine.releaseTestNote(CH_ONESHOT, t + durationMs / 1000);
   }
 
   // ── Radio Riser: Noise with slow attack ───────────────────────────────
   fireRadioRiser(durationMs = 3000): void {
     const engine = this.engine;
     if (!engine) return;
-    engine.playTestNote(CH_ONESHOT, 0x80, INST.RISER);
-    setTimeout(() => engine.releaseTestNote(CH_ONESHOT), durationMs);
+    const t = engine.currentTime;
+    engine.playTestNote(CH_ONESHOT, 0x80, INST.RISER, t);
+    engine.releaseTestNote(CH_ONESHOT, t + durationMs / 1000);
   }
 
   // ── Laser Zap: Fast sawtooth burst ────────────────────────────────────
   fireLaser(note = 0xA0, durationMs = 150): void {
     const engine = this.engine;
     if (!engine) return;
-    engine.playTestNote(CH_ONESHOT, note, INST.LASER);
-    setTimeout(() => engine.releaseTestNote(CH_ONESHOT), durationMs);
+    const t = engine.currentTime;
+    engine.playTestNote(CH_ONESHOT, note, INST.LASER, t);
+    engine.releaseTestNote(CH_ONESHOT, t + durationMs / 1000);
   }
 
   // ── Hi-Hat: Tight noise tick ──────────────────────────────────────────
   fireHiHat(durationMs = 80): void {
     const engine = this.engine;
     if (!engine) return;
-    engine.playTestNote(CH_ONESHOT, 0x80, INST.HIHAT);
-    setTimeout(() => engine.releaseTestNote(CH_ONESHOT), durationMs);
+    const t = engine.currentTime;
+    engine.playTestNote(CH_ONESHOT, 0x80, INST.HIHAT, t);
+    engine.releaseTestNote(CH_ONESHOT, t + durationMs / 1000);
   }
 
   // ── Clap: Medium noise burst ──────────────────────────────────────────
   fireClap(durationMs = 350): void {
     const engine = this.engine;
     if (!engine) return;
-    engine.playTestNote(CH_ONESHOT, 0x80, INST.CLAP);
-    setTimeout(() => engine.releaseTestNote(CH_ONESHOT), durationMs);
+    const t = engine.currentTime;
+    engine.playTestNote(CH_ONESHOT, 0x80, INST.CLAP, t);
+    engine.releaseTestNote(CH_ONESHOT, t + durationMs / 1000);
   }
 
   // ── Bell: Long triangle ring ──────────────────────────────────────────
   fireBell(note = 0x90, durationMs = 2500): void {
     const engine = this.engine;
     if (!engine) return;
-    engine.playTestNote(CH_ONESHOT, note, INST.BELL);
-    setTimeout(() => engine.releaseTestNote(CH_ONESHOT), durationMs);
+    const t = engine.currentTime;
+    engine.playTestNote(CH_ONESHOT, note, INST.BELL, t);
+    engine.releaseTestNote(CH_ONESHOT, t + durationMs / 1000);
   }
 
   // ── Sub Bass: Pure triangle sub ───────────────────────────────────────
@@ -370,8 +378,9 @@ export class SIDDubSynths {
   fireStab(note = 0x70, durationMs = 250): void {
     const engine = this.engine;
     if (!engine) return;
-    engine.playTestNote(CH_BASS, note, INST.STAB);
-    setTimeout(() => engine.releaseTestNote(CH_BASS), durationMs);
+    const t = engine.currentTime;
+    engine.playTestNote(CH_BASS, note, INST.STAB, t);
+    engine.releaseTestNote(CH_BASS, t + durationMs / 1000);
   }
 
   /**
@@ -383,8 +392,9 @@ export class SIDDubSynths {
   fireSubBooster(note = 0x50, durationMs = 120): void {
     const engine = this.engine;
     if (!engine) return;
-    engine.playTestNote(CH_ONESHOT, note, INST.SUB_BASS);
-    setTimeout(() => engine.releaseTestNote(CH_ONESHOT), durationMs);
+    const t = engine.currentTime;
+    engine.playTestNote(CH_ONESHOT, note, INST.SUB_BASS, t);
+    engine.releaseTestNote(CH_ONESHOT, t + durationMs / 1000);
   }
 
   /**
@@ -398,13 +408,12 @@ export class SIDDubSynths {
     const engine = this.engine;
     if (!engine) return;
     // Metal shang: short noise burst on CH_ONESHOT
-    engine.playTestNote(CH_ONESHOT, 0x80, INST.SNARE);
+    const t = engine.currentTime;
+    engine.playTestNote(CH_ONESHOT, 0x80, INST.SNARE, t);
     // Tank whump: low triangle on CH_BASS (instant attack, full sustain)
-    engine.playTestNote(CH_BASS, 0x48, INST.SUB_BASS);
-    setTimeout(() => {
-      engine.releaseTestNote(CH_ONESHOT);
-      engine.releaseTestNote(CH_BASS);
-    }, durationMs);
+    engine.playTestNote(CH_BASS, 0x48, INST.SUB_BASS, t);
+    engine.releaseTestNote(CH_ONESHOT, t + durationMs / 1000);
+    engine.releaseTestNote(CH_BASS, t + durationMs / 1000);
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────
