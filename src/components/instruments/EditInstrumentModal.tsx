@@ -11,8 +11,9 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { useInstrumentStore } from '@stores/useInstrumentStore';
-import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo, catalogSynthConfig } from '@constants/synthCategories';
+import { useInstrumentStore, buildInstrumentConfig } from '@stores/useInstrumentStore';
+import { applySynthTypeDefaults } from '@stores/instrument/synthTypeDefaults';
+import { SYNTH_INFO, ALL_SYNTH_TYPES, getSynthInfo } from '@constants/synthCategories';
 import { UnifiedInstrumentEditor } from './editors';
 import { TestKeyboard, CategorizedSynthSelector } from './shared';
 import { InstrumentEffectsPanel } from '@components/effects/InstrumentEffectsPanel';
@@ -25,53 +26,13 @@ import { useUIStore } from '@stores/useUIStore';
 import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 import { focusPopout } from '@components/ui/PopOutWindow';
 import { CollapsedPanelStrip } from '@components/ui/CollapsedPanelStrip';
-import type { InstrumentConfig, SynthType, BuzzmachineType } from '@typedefs/instrument';
-import {
-  DEFAULT_OSCILLATOR,
-  DEFAULT_ENVELOPE,
-  DEFAULT_FILTER,
-  DEFAULT_TB303,
-  DEFAULT_DRUM_MACHINE,
-  DEFAULT_CHIP_SYNTH,
-  DEFAULT_PWM_SYNTH,
-  DEFAULT_WAVETABLE,
-  DEFAULT_GRANULAR,
-  DEFAULT_SUPERSAW,
-  DEFAULT_POLYSYNTH,
-  DEFAULT_ORGAN,
-  DEFAULT_STRING_MACHINE,
-  DEFAULT_FORMANT_SYNTH,
-  DEFAULT_FURNACE,
-  DEFAULT_BUZZMACHINE,
-  defaultBuzzmachineFor,
-  DEFAULT_WOBBLE_BASS,
-  DEFAULT_DUB_SIREN,
-  DEFAULT_SPACE_LASER,
-  DEFAULT_SYNARE,
-  DEFAULT_REBIRTH303,
-  DEFAULT_REBIRTH808,
-  DEFAULT_REBIRTH909,
-  DEFAULT_DRUMKIT,
-  DEFAULT_SAM,
-  DEFAULT_V2,
-} from '@typedefs/instrument';
+import type { InstrumentConfig, SynthType } from '@typedefs/instrument';
 import { ToneEngine } from '@engine/ToneEngine';
-import { getFirstPresetForSynthType } from '@constants/factoryPresets';
 import { instrumentDisplayName } from '@/lib/instruments/instrumentDisplayName';
 
 // ============================================================================
 // SYNTH TYPE CATEGORIZATION HELPERS
 // ============================================================================
-
-/** Check if synth type uses Furnace chip emulation editor */
-function isFurnaceType(synthType: SynthType): boolean {
-  return synthType === 'Furnace' || synthType.startsWith('Furnace');
-}
-
-/** Check if synth type uses Buzzmachine editor */
-function isBuzzmachineType(synthType: SynthType): boolean {
-  return synthType === 'Buzzmachine' || synthType.startsWith('Buzz');
-}
 
 type EditorTab = 'sound' | 'effects';
 
@@ -744,104 +705,17 @@ const InstrumentEditor: React.FC<InstrumentEditorProps> = ({ instrument, onChang
  * Always applies the first available factory preset so synths produce
  * musically useful sound out of the box (e.g. V2 needs patch data, MAME chips need _program).
  */
-function createTempInstrument(synthType: SynthType): InstrumentConfig {
-  const base: InstrumentConfig = {
-    id: -1,
+export function createTempInstrument(synthType: SynthType): InstrumentConfig {
+  // Same construction as a synth switch in the store (applySynthTypeDefaults): structural sub-configs,
+  // variant markers and the first factory preset all come from that one place.
+  const base = buildInstrumentConfig(-1, {
     name: getSynthInfo(synthType).name,
-    type: 'synth' as const,
-    ...catalogSynthConfig(synthType),
+    type: 'synth',
     volume: -6,
     pan: 0,
-    oscillator: DEFAULT_OSCILLATOR,
-    envelope: DEFAULT_ENVELOPE,
-    filter: DEFAULT_FILTER,
     effects: [],
-  };
-
-  // --- Set type-specific defaults (structural setup) ---
-
-  if (synthType === 'TB303' || synthType === 'Buzz3o3') {
-    base.tb303 = { ...DEFAULT_TB303 };
-    if (synthType === 'Buzz3o3') {
-      base.buzzmachine = {
-        ...DEFAULT_BUZZMACHINE,
-        machineType: 'OomekAggressor' as BuzzmachineType,
-        parameters: {
-          0: 0, 1: 0x78, 2: 0x40, 3: 0x40, 4: 0x40, 5: 0x40, 6: 100, 7: 100,
-        }
-      };
-    }
-  } else if (isFurnaceType(synthType)) {
-    base.furnace = { ...DEFAULT_FURNACE };
-    const chipTypeMap: Partial<Record<SynthType, number>> = {
-      'Furnace': 1, 'FurnaceOPN': 0, 'FurnaceOPNA': 13, 'FurnaceOPNB': 14,
-      'FurnaceOPM': 1, 'FurnaceOPL': 2, 'FurnaceOPLL': 23, 'FurnaceOPL4': 26,
-      'FurnaceOPZ': 24, 'FurnaceESFM': 25, 'FurnaceNES': 3, 'FurnaceGB': 4,
-      'FurnaceC64': 5, 'FurnaceSID6581': 5, 'FurnaceSID8580': 5, 'FurnaceAY': 6,
-      'FurnacePSG': 7, 'FurnaceTIA': 8, 'FurnaceVERA': 9, 'FurnaceSAA': 10,
-      'FurnaceVIC': 11, 'FurnaceLynx': 12,
-    };
-    if (chipTypeMap[synthType] !== undefined) {
-      base.furnace.chipType = chipTypeMap[synthType]!;
-    }
-  } else if (isBuzzmachineType(synthType)) {
-    base.buzzmachine = defaultBuzzmachineFor(synthType);
-  } else if (synthType === 'GranularSynth') {
-    base.granular = { ...DEFAULT_GRANULAR };
-  } else if (synthType === 'DrumKit') {
-    base.drumKit = { ...DEFAULT_DRUMKIT };
-  } else if (synthType === 'Sam') {
-    base.sam = { ...DEFAULT_SAM };
-  } else if (synthType === 'V2') {
-    base.v2 = { ...DEFAULT_V2 };
-  } else if (synthType !== 'Sampler' && synthType !== 'Player' && synthType !== 'ChiptuneModule') {
-    // Standard synth types
-    switch (synthType) {
-      case 'DrumMachine': base.drumMachine = { ...DEFAULT_DRUM_MACHINE }; break;
-      case 'ChipSynth': base.chipSynth = { ...DEFAULT_CHIP_SYNTH }; break;
-      case 'PWMSynth': base.pwmSynth = { ...DEFAULT_PWM_SYNTH }; break;
-      case 'Wavetable': base.wavetable = { ...DEFAULT_WAVETABLE }; break;
-      case 'SuperSaw': base.superSaw = { ...DEFAULT_SUPERSAW }; break;
-      case 'PolySynth': base.polySynth = { ...DEFAULT_POLYSYNTH }; break;
-      case 'Organ': base.organ = { ...DEFAULT_ORGAN }; break;
-      case 'StringMachine': base.stringMachine = { ...DEFAULT_STRING_MACHINE }; break;
-      case 'FormantSynth': base.formantSynth = { ...DEFAULT_FORMANT_SYNTH }; break;
-      case 'WobbleBass': base.wobbleBass = { ...DEFAULT_WOBBLE_BASS }; break;
-      case 'DubSiren': base.dubSiren = { ...DEFAULT_DUB_SIREN }; break;
-      case 'SpaceLaser': base.spaceLaser = { ...DEFAULT_SPACE_LASER }; break;
-      case 'Synare': base.synare = { ...DEFAULT_SYNARE }; break;
-      case 'ReRebirth303': base.rebirth303 = { ...DEFAULT_REBIRTH303 }; break;
-      case 'ReRebirth808': base.rebirth808 = { ...DEFAULT_REBIRTH808 }; break;
-      case 'ReRebirth909': base.rebirth909 = { ...DEFAULT_REBIRTH909 }; break;
-    }
-  }
-
-  // --- Auto-apply first factory preset for ALL synth types ---
-  // This ensures synths get musically useful settings out of the box.
-  // Critical for V2 (needs patch data), MAME chips (need _program), TB303 (better defaults).
-  const savedFurnaceChipType = base.furnace?.chipType;
-  const savedBuzzMachineType = base.buzzmachine?.machineType;
-
-  const firstPreset = getFirstPresetForSynthType(synthType);
-  if (firstPreset) {
-    const presetRecord = { ...(firstPreset as Record<string, unknown>) };
-    delete presetRecord.name;
-    delete presetRecord.type;
-    delete presetRecord.synthType;
-    Object.assign(base, presetRecord);
-    // Preserve structural fields that must match the selected synthType
-    base.synthType = synthType;
-    base.id = -1;
-    base.name = getSynthInfo(synthType).name;
-    // Restore Furnace chipType (preset may be generic Furnace, but user chose specific chip)
-    if (savedFurnaceChipType !== undefined && base.furnace) {
-      base.furnace.chipType = savedFurnaceChipType;
-    }
-    // Restore Buzzmachine machineType
-    if (savedBuzzMachineType && base.buzzmachine) {
-      base.buzzmachine.machineType = savedBuzzMachineType;
-    }
-  }
-
+    synthType,
+  });
+  applySynthTypeDefaults(base, synthType, false);
   return base;
 }
