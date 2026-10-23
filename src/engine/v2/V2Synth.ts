@@ -11,9 +11,8 @@ export class V2Synth implements DevilboxSynth {
   private _worklet: AudioWorkletNode | null = null;
   private _initialized: boolean = false;
   private _initPromise: Promise<void>;
-  private _pendingNotes: Array<{note: number, vel: number}> = [];
+  private _pendingNotes: Array<{note: number, vel: number, time?: number}> = [];
   private _activeNotes: Map<number, number> = new Map(); // note → velocity
-  private _releaseTimers: Set<ReturnType<typeof setTimeout>> = new Set();
   private _config: V2Config;
 
   constructor(config?: V2Config) {
@@ -124,7 +123,7 @@ export class V2Synth implements DevilboxSynth {
             this._worklet!.port.postMessage({ type: 'controlChange', channel: ch, cc: 7, value: 127 });
           }
           // Flush any pending notes that were queued during init
-          this._pendingNotes.forEach(n => this._noteOn(0, n.note, n.vel));
+          this._pendingNotes.forEach(n => this._noteOn(0, n.note, n.vel, n.time));
           this._pendingNotes = [];
           resolve();
         } else if (event.data.type === 'error') {
@@ -152,25 +151,25 @@ export class V2Synth implements DevilboxSynth {
     return this._initPromise;
   }
 
-  public triggerAttack(note: string | number, _time?: number, velocity: number = 1) {
+  public triggerAttack(note: string | number, time?: number, velocity: number = 1) {
     const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
     const vel = Math.floor(velocity * 127);
 
     if (!this._initialized) {
       // Queue note for when init completes instead of dropping silently
-      this._pendingNotes.push({ note: midiNote, vel });
+      this._pendingNotes.push({ note: midiNote, vel, time });
       return;
     }
 
-    this._noteOn(0, midiNote, vel);
+    this._noteOn(0, midiNote, vel, time);
   }
 
-  public triggerRelease(noteOrTime?: string | number) {
+  public triggerRelease(noteOrTime?: string | number, time?: number) {
     if (!this._initialized || !this._worklet) return;
     if (typeof noteOrTime === 'string') {
       const midiNote = noteToMidi(noteOrTime);
       this._activeNotes.delete(midiNote);
-      this._noteOff(0, midiNote);
+      this._noteOff(0, midiNote, time);
     } else {
       this._activeNotes.clear();
       this._worklet!.port.postMessage({ type: 'allNotesOff', channel: 0 });
@@ -183,18 +182,13 @@ export class V2Synth implements DevilboxSynth {
     this._worklet.port.postMessage({ type: 'allNotesOff', channel: 0 });
   }
 
-  public triggerAttackRelease(note: string | number, duration: number, _time?: number, velocity: number = 1) {
-    this.triggerAttack(note, undefined, velocity);
+  public triggerAttackRelease(note: string | number, duration: number, time?: number, velocity: number = 1) {
+    this.triggerAttack(note, time, velocity);
     const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
     const d = typeof duration === 'number' ? duration : parseFloat(String(duration));
-    const timer = setTimeout(() => {
-      this._releaseTimers.delete(timer);
-      if (this._initialized && this._worklet) {
-        this._activeNotes.delete(midiNote);
-        this._worklet.port.postMessage({ type: 'noteOff', channel: 0, note: midiNote });
-      }
-    }, d * 1000);
-    this._releaseTimers.add(timer);
+    // The worklet holds the release until its frame; untimed notes release from the audio clock
+    const start = Number.isFinite(time) ? (time as number) : (this._worklet?.context.currentTime ?? 0);
+    this._noteOff(0, midiNote, start + d);
   }
 
   public setParameter(_index: number, _value: number) {
@@ -223,17 +217,17 @@ export class V2Synth implements DevilboxSynth {
     }
   }
 
-  private _noteOn(channel: number, note: number, velocity: number) {
+  private _noteOn(channel: number, note: number, velocity: number, time?: number) {
     if (this._worklet && this._initialized) {
       this._activeNotes.set(note, velocity);
-      this._worklet.port.postMessage({ type: 'noteOn', channel, note, velocity });
+      this._worklet.port.postMessage({ type: 'noteOn', channel, note, velocity, time });
     }
   }
 
-  private _noteOff(channel: number, note: number) {
+  private _noteOff(channel: number, note: number, time?: number) {
     if (this._worklet && this._initialized) {
       this._activeNotes.delete(note);
-      this._worklet.port.postMessage({ type: 'noteOff', channel, note });
+      this._worklet.port.postMessage({ type: 'noteOff', channel, note, time });
     }
   }
 
@@ -270,9 +264,6 @@ export class V2Synth implements DevilboxSynth {
   }
 
   public dispose(): void {
-    // Clear all pending release timers to prevent memory leaks
-    this._releaseTimers.forEach(timer => clearTimeout(timer));
-    this._releaseTimers.clear();
     this._initialized = false;
 
     if (this._worklet) {
