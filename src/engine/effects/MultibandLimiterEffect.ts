@@ -44,6 +44,8 @@ export class MultibandLimiterEffect extends Tone.ToneAudioNode {
   private passthroughGain: Tone.Gain;
   private workletNode: AudioWorkletNode | null = null;
   private isWasmReady = false;
+  /** True once the worklet output feeds wetGain: the WASM then owns the dry/wet mix. */
+  private wasmOwnsMix = false;
   private pendingParams: Array<{ param: string; value: number }> = [];
 
   private _lowCross: number;
@@ -115,6 +117,11 @@ export class MultibandLimiterEffect extends Tone.ToneAudioNode {
             this.workletNode!.connect(rawWet);
             // Now safe to disconnect passthrough
             this.passthroughGain.gain.value = 0;
+            // The WASM's dry side carries the bands' split phase and their 64-sample
+            // lookahead delay; the raw input on dryGain arrived early and combed
+            // against the delayed bands at wet < 1. Mix inside the WASM instead.
+            this.wasmOwnsMix = true;
+            this.applyMix();
             // Keepalive: ensure Chrome schedules the worklet
             const rawCtx = Tone.getContext().rawContext as AudioContext;
             const keepalive = rawCtx.createGain();
@@ -141,6 +148,7 @@ export class MultibandLimiterEffect extends Tone.ToneAudioNode {
       this.sendParam('midGain', this._midGain);
       this.sendParam('highGain', this._highGain);
       this.sendParam('release', this._release);
+      this.sendParam('mix', this._wet);
     } catch (err) {
       console.warn('[MultibandLimiter] Worklet init failed:', err);
     }
@@ -196,8 +204,19 @@ export class MultibandLimiterEffect extends Tone.ToneAudioNode {
   get wet(): number { return this._wet; }
   set wet(value: number) {
     this._wet = clamp(value, 0, 1);
-    this.wetGain.gain.value = this._wet;
-    this.dryGain.gain.value = 1 - this._wet;
+    this.applyMix();
+  }
+
+  /** Before the WASM is live the passthrough path mixes here; after, the WASM mixes (aligned dry). */
+  private applyMix(): void {
+    if (this.wasmOwnsMix) {
+      this.wetGain.gain.value = 1;
+      this.dryGain.gain.value = 0;
+      this.sendParam('mix', this._wet);
+    } else {
+      this.wetGain.gain.value = this._wet;
+      this.dryGain.gain.value = 1 - this._wet;
+    }
   }
 
   setParam(param: string, value: number): void {
