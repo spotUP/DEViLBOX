@@ -296,13 +296,19 @@ export const AutomationLanes: React.FC<AutomationLanesProps> = React.memo(({
       const chWidth = channelWidths[channelIndex];
       if (chWidth < 40) return null;
 
-      const laneCount = group.length;
+      // Same lane count PatternEditorCanvas reserves width for: active lanes
+      // without a curve yet still take a row. Each curve sits in the slot of
+      // its parameter's position in the channel's lane list.
+      const laneCount = Math.max(group.length, channelReservedLanes[channelIndex] ?? 0);
       const autoArea = automationLaneReserve(laneCount);
       const areaLeft = chOffset + chWidth - autoArea;
       const perLane = Math.floor(autoArea / laneCount);
+      const laneParams = channelParameterLists[channelIndex] ?? [];
 
-      return group.slice(1).map((entry, laneIdx) => {
+      return group.slice(1).map((entry, groupIdx) => {
         const { curve, param } = entry;
+        const slot = laneParams.indexOf(param);
+        const laneIdx = slot >= 1 ? slot - 1 : groupIdx;
         const laneWidth = Math.max(4, perLane - 2);
         const laneLeft = areaLeft + (laneIdx + 1) * perLane + 1;
         const pHeight = pLength * rowHeight;
