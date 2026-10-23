@@ -360,6 +360,12 @@ export class VL1SynthEngine implements DevilboxSynth {
         processorOptions: { sampleRate: rawContext.sampleRate },
       });
 
+      // ensureInitialized() must not resolve before the worklet reports ready:
+      // applyConfig() and the param push are no-ops until then.
+      let markReady!: () => void;
+      let failReady!: (err: Error) => void;
+      const ready = new Promise<void>((resolve, reject) => { markReady = resolve; failReady = reject; });
+
       this._worklet.port.onmessage = (event) => {
         if (event.data.type === 'ready') {
           console.log('[VL1Synth] Worklet ready');
@@ -372,8 +378,10 @@ export class VL1SynthEngine implements DevilboxSynth {
             this._worklet!.port.postMessage({ type: 'noteOn', note, velocity });
           }
           this.pendingNotes = [];
+          markReady();
         } else if (event.data.type === 'error') {
           console.error('[VL1Synth] Worklet error:', event.data.error);
+          failReady(new Error(`VL1 worklet error: ${event.data.error}`));
         }
       };
 
@@ -387,6 +395,7 @@ export class VL1SynthEngine implements DevilboxSynth {
         keepalive.connect(rawContext.destination);
       } catch { /* keepalive failed */ }
 
+      await ready;
     } catch (error) {
       console.error('Failed to initialize VL1Synth:', error);
       throw error;
