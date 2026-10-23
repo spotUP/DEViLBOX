@@ -119,6 +119,12 @@ export interface TrackerCell {
   saEffect?: number;
   saEffectArg?: number;
 
+  /** SoundFX only: raw effect nibble (0-9) and param byte of the source cell. Carrier for
+   *  byte-exact round-trip: encode writes them verbatim while the displayed effTyp/eff
+   *  still equal their decode; once the user edits the effect, it is re-encoded from XM. */
+  sfxEffect?: number;
+  sfxEffectArg?: number;
+
   /** SunTronic V1.3 only: exact source bytes of this grammar group (opcode
    *  stream until 0x00 terminator). Carrier for byte-exact round-trip: when the
    *  cell's decoded note/instrument/effects still match this, export emits it

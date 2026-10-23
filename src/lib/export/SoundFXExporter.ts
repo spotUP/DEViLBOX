@@ -63,7 +63,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types/instrument/defaults';
-import { encodeSoundFXCell } from '@/engine/uade/encoders/SoundFXEncoder';
+import { encodeSoundFXCell } from '@/engine/uade/encoders/soundfxCellCodec';
 
 export interface SoundFXExportResult {
   data: Blob;

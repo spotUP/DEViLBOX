@@ -19,8 +19,8 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import type { UADEChipRamInfo } from '@/types/instrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeSoundFXCell } from '@/engine/uade/encoders/SoundFXEncoder';
-import { createSamplerInstrument, periodToNoteIndex } from './AmigaUtils';
+import { decodeSoundFXCell, encodeSoundFXCell } from '@/engine/uade/encoders/soundfxCellCodec';
+import { createSamplerInstrument } from './AmigaUtils';
 
 // -- SoundFX period table (from FlodJS FXPlayer.PERIODS) ---------------------
 // 67 entries: 3 octaves of Amiga periods plus padding, ending with -1 sentinel.
@@ -35,10 +35,6 @@ function readUint32BE(buf: DataView, off: number): number {
 
 function readUint16BE(buf: DataView, off: number): number {
   return buf.getUint16(off, false);
-}
-
-function readInt16BE(buf: DataView, off: number): number {
-  return buf.getInt16(off, false);
 }
 
 function readUint8(buf: DataView, off: number): number {
@@ -67,30 +63,6 @@ interface SFXSample {
 }
 
 // -- SoundFX pattern row (raw parsed) -----------------------------------------
-
-interface SFXRow {
-  note: number;        // signed 16-bit Amiga period (negative = special)
-  sample: number;      // sample number (0 = none)
-  effect: number;      // effect type (0-9)
-  param: number;       // effect parameter
-}
-
-// -- Period to XM note conversion ---------------------------------------------
-
-/**
- * Convert a SoundFX period value to an XM note number.
- * SoundFX uses standard Amiga periods (same table as ProTracker).
- * Returns 0 for empty, 97 for note-off/special.
- */
-function sfxPeriodToNote(period: number): number {
-  if (period === 0) return 0;
-  if (period < 0) return 0; // negative periods are special commands, handled separately
-  // Use the shared periodToNoteIndex which does closest-match
-  const noteIdx = periodToNoteIndex(period);
-  if (noteIdx === 0) return 0;
-  // periodToNoteIndex returns 1-based (1 = C-1), XM note 13 = "C-1"
-  return noteIdx + 12;
-}
 
 // -- Format detection ---------------------------------------------------------
 
@@ -248,46 +220,10 @@ export async function parseSoundFXFile(
   // FlodJS: higher += 256; patterns.length = higher;
   const totalPatternEntries = (highestPosition + 1) * 256;
 
-  const rawRows: SFXRow[] = [];
-  let readPos = patternDataOffset;
-
-  for (let i = 0; i < totalPatternEntries; i++) {
-    if (readPos + 4 > buffer.byteLength) {
-      // Pad with empty rows if file is truncated
-      rawRows.push({ note: 0, sample: 0, effect: 0, param: 0 });
-      readPos += 4;
-      continue;
-    }
-
-    const note = readInt16BE(view, readPos);
-    const byte3 = readUint8(view, readPos + 2);
-    const param = readUint8(view, readPos + 3);
-    const effect = byte3 & 0x0F;
-    let sampleNum = byte3 >> 4;
-
-    // v2.0: bit 12 of note extends sample number to 16-31
-    if (version === 'v2') {
-      if (note & 0x1000) {
-        sampleNum += 16;
-        // Clear the extension bit from the note if positive
-        // (FlodJS: if (row.note > 0) row.note &= 0xefff)
-      }
-    }
-
-    // Validate sample number
-    if (sampleNum >= numSampleSlots || samples[sampleNum] == null) {
-      sampleNum = 0;
-    }
-
-    rawRows.push({
-      note: (version === 'v2' && (note & 0x1000) && note > 0) ? (note & 0xEFFF) : note,
-      sample: sampleNum,
-      effect,
-      param,
-    });
-
-    readPos += 4;
-  }
+  // Pattern region is read straight from the file by the shared cell codec
+  // (soundfxCellCodec.ts); entry = patNum * 256 + row * 4 + channel.
+  const patternBytes = new Uint8Array(buffer);
+  const readPos = patternDataOffset + totalPatternEntries * 4;
 
   // -- Extract sample PCM data ------------------------------------------------
   // Sample data follows pattern data in the file
@@ -390,160 +326,10 @@ export async function parseSoundFXFile(
         // patternPos increments by 4 each row, voice.index is 0-3
         // So: entry = baseRow + (row * 4) + ch
         const entryIdx = baseRow + (row * 4) + ch;
-        const raw = entryIdx < rawRows.length
-          ? rawRows[entryIdx]
-          : { note: 0, sample: 0, effect: 0, param: 0 };
-
-        let xmNote = 0;
-        let instrument = 0;
-        let volume = 0;
-        let effTyp = 0;
-        let eff = 0;
-
-        // -- Handle note --
-        if (raw.note === -3) {
-          // Note -3 = "skip" / no action (FlodJS treats this as no effect)
-          // Leave empty
-        } else if (raw.note === -2) {
-          // Note -2 = volume off (chan.volume = 0)
-          xmNote = 97; // note off
-        } else if (raw.note === -4) {
-          // Note -4 = pattern break / jump flag
-          effTyp = 0x0D; // Pattern break (Dxx)
-          eff = 0;
-        } else if (raw.note === -5) {
-          // Note -5 = continue (no action but not skip)
-          // Leave empty
-        } else if (raw.note > 0) {
-          xmNote = sfxPeriodToNote(raw.note);
-        }
-
-        // -- Handle sample --
-        if (raw.sample > 0) {
-          instrument = raw.sample;
-          // Set volume from sample's default volume
-          const smp = samples[raw.sample];
-          if (smp) {
-            volume = 0x10 + Math.min(smp.volume, 64);
-          }
-        }
-
-        // -- Handle volume effects (5 = vol up, 6 = vol down) --
-        // These modify volume on the same row as the note
-        if (raw.effect === 5 && raw.sample > 0) {
-          // Volume increase: add param to sample volume
-          const smp = samples[raw.sample];
-          if (smp) {
-            volume = 0x10 + Math.min(smp.volume + raw.param, 64);
-          }
-        } else if (raw.effect === 6 && raw.sample > 0) {
-          // Volume decrease: subtract param from sample volume
-          const smp = samples[raw.sample];
-          if (smp) {
-            volume = 0x10 + Math.max(smp.volume - raw.param, 0);
-          }
-        }
-
-        // -- Map SoundFX effects to XM effect codes --
-        if (effTyp === 0) {
-          // Only map effects if we haven't already set one (e.g., pattern break)
-          switch (raw.effect) {
-            case 0:
-              // No effect
-              break;
-
-            case 1:
-              // Arpeggio -> XM effect 0xx (arpeggio)
-              if (raw.param !== 0) {
-                effTyp = 0x00;
-                eff = raw.param;
-              }
-              break;
-
-            case 2:
-              // Pitch bend (combined up/down based on param nibbles)
-              // High nibble > 0: period += high nibble (pitch down)
-              // High nibble == 0: period -= low nibble (pitch up)
-              {
-                const hi = raw.param >> 4;
-                const lo = raw.param & 0x0F;
-                if (hi > 0) {
-                  effTyp = 0x02; // Portamento down (period increase = pitch down)
-                  eff = hi;
-                } else if (lo > 0) {
-                  effTyp = 0x01; // Portamento up (period decrease = pitch up)
-                  eff = lo;
-                }
-              }
-              break;
-
-            case 3:
-              // Filter on -> XM E0x (set filter), param=1 (on)
-              effTyp = 0x0E;
-              eff = 0x01; // E01 = filter on
-              break;
-
-            case 4:
-              // Filter off -> XM E0x, param=0 (off)
-              effTyp = 0x0E;
-              eff = 0x00; // E00 = filter off
-              break;
-
-            case 5:
-              // Volume up - already handled in volume column above
-              break;
-
-            case 6:
-              // Volume down - already handled in volume column above
-              break;
-
-            case 7:
-              // Step up (portamento up to target) -> approximate as portamento up
-              {
-                const speed = raw.param & 0x0F;
-                if (speed > 0) {
-                  effTyp = 0x01; // Portamento up
-                  eff = speed;
-                }
-              }
-              break;
-
-            case 8:
-              // Step down (portamento down to target) -> approximate as portamento down
-              {
-                const speed = raw.param & 0x0F;
-                if (speed > 0) {
-                  effTyp = 0x02; // Portamento down
-                  eff = speed;
-                }
-              }
-              break;
-
-            case 9:
-              // Auto slide -> approximate as portamento down (auto-oscillating slide)
-              // The auto slide oscillates between two points, which has no direct XM
-              // equivalent. Approximate with a simple portamento.
-              if (raw.param !== 0) {
-                effTyp = 0x02; // Portamento down
-                eff = raw.param & 0x0F;
-              }
-              break;
-
-            default:
-              break;
-          }
-        }
-
-        rows.push({
-          note: xmNote,
-          instrument,
-          volume,
-          effTyp,
-          eff,
-          effTyp2: 0,
-          eff2: 0,
-          period: raw.note > 0 ? raw.note : undefined,
-        });
+        const off = patternDataOffset + entryIdx * 4;
+        rows.push(off + 4 <= patternBytes.length
+          ? decodeSoundFXCell(patternBytes.subarray(off, off + 4), version)
+          : { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
       }
 
       // Amiga LRRL panning
@@ -630,53 +416,8 @@ export async function parseSoundFXFile(
     numChannels: 4,
     numPatterns: highestPosition + 1,
     moduleSize: buffer.byteLength,
-    encodeCell: encodeSoundFXCell,
-    decodeCell: (bytes: Uint8Array): TrackerCell => {
-      // Inverse of encodeSoundFXCell
-      // Byte 0-1: signed int16 BE period
-      const period = ((bytes[0] << 8) | bytes[1]) | 0;
-      const signedPeriod = period > 0x7FFF ? period - 0x10000 : period;
-
-      // Byte 2: (sampleHi << 4) | effect
-      const instr = (bytes[2] >> 4) & 0x0F;
-      const sfxEff = bytes[2] & 0x0F;
-
-      // Byte 3: effect param
-      const param = bytes[3];
-
-      // Decode note
-      let note = 0;
-      if (signedPeriod === -2) {
-        note = 97; // note off
-      } else if (signedPeriod > 0) {
-        note = sfxPeriodToNote(signedPeriod);
-      }
-
-      // Decode effect (inverse of reverseEffect in SoundFXEncoder)
-      let effTyp = 0;
-      let eff = 0;
-      if (sfxEff !== 0 || param !== 0) {
-        switch (sfxEff) {
-          case 0: effTyp = 0x00; eff = param; break; // arpeggio
-          case 1: effTyp = 0x01; eff = param; break; // portamento up
-          case 2: effTyp = 0x02; eff = param; break; // portamento down
-          case 3: effTyp = 0x0E; eff = param; break; // filter/extended
-          case 5: effTyp = 0x0A; eff = param; break; // volume slide
-          case 6: effTyp = 0x0C; eff = param; break; // set volume
-          case 9: effTyp = 0x0F; eff = param; break; // set speed
-          default: break;
-        }
-      }
-
-      // Preserve the exact Amiga period. SoundFX stores raw periods, some of which have no
-      // ProTracker-table match (sfxPeriodToNote returns 0 for those), so the note field alone
-      // cannot reconstruct them — keep the source period for a byte-exact round-trip. Matches
-      // the build path (which sets `period` on every note row) so display + write-back agree.
-      return {
-        note, instrument: instr, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0,
-        period: signedPeriod > 0 ? signedPeriod : undefined,
-      };
-    },
+    encodeCell: (cell: TrackerCell) => encodeSoundFXCell(cell, version),
+    decodeCell: (bytes: Uint8Array): TrackerCell => decodeSoundFXCell(bytes, version),
   };
 
   return {
