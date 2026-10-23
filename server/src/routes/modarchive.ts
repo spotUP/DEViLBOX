@@ -86,21 +86,39 @@ export function createModArchiveRouter(opts: ModArchiveRouterOptions = {}): Rout
     const key = apiKey();
     if (!key) return res.status(503).json({ error: 'ModArchive search is not configured' });
 
-    const url = `${SEARCH_URL}?key=${encodeURIComponent(key)}&request=search`
-      + `&type=${author ? 'guessed_artist' : 'filename_or_songtitle'}`
-      + `&query=${encodeURIComponent(query)}&page=${page}`;
-    let upstream: globalThis.Response;
-    try {
-      upstream = await doFetch(url);
-    } catch {
-      // The error text can carry the URL, which carries the key.
-      return res.status(502).json({ error: 'ModArchive is unreachable' });
+    const call = async (params: string): Promise<{ xml: string } | { status: number; error: string }> => {
+      let upstream: globalThis.Response;
+      try {
+        upstream = await doFetch(`${SEARCH_URL}?key=${encodeURIComponent(key)}&${params}`);
+      } catch {
+        // The error text can carry the URL, which carries the key.
+        return { status: 502, error: 'ModArchive is unreachable' };
+      }
+      if (!upstream.ok) return { status: 502, error: `ModArchive answered ${upstream.status}` };
+      const xml = await upstream.text();
+      const error = /<error>([\s\S]*?)<\/error>/i.exec(xml);
+      if (error && /no results/i.test(error[1])) return { xml: '' };
+      if (error) return { status: 502, error: 'ModArchive refused the search' };
+      return { xml };
+    };
+    const empty = () => res.json({ results: [], page, totalPages: 0, query });
+
+    let params = `request=search&type=filename_or_songtitle&query=${encodeURIComponent(query)}&page=${page}`;
+    if (author) {
+      // The API has no module search by artist name: resolve the artist, then list that artist's modules.
+      const artists = await call(`request=search_artist&query=${encodeURIComponent(author)}`);
+      if ('error' in artists) return res.status(artists.status).json({ error: artists.error });
+      const items = artists.xml.match(/<item>[\s\S]*?<\/item>/g) ?? [];
+      const wanted = author.toLowerCase();
+      const artist = items.find((it) => tag(it, 'alias').toLowerCase() === wanted) ?? items[0];
+      const artistId = artist ? tag(artist, 'id') : '';
+      if (!/^\d+$/.test(artistId)) return empty();
+      params = `request=view_modules_by_artistid&query=${artistId}&page=${page}`;
     }
-    if (!upstream.ok) return res.status(502).json({ error: `ModArchive answered ${upstream.status}` });
-    const xml = await upstream.text();
-    const error = /<error>([\s\S]*?)<\/error>/i.exec(xml);
-    if (error && /no results/i.test(error[1])) return res.json({ results: [], page, totalPages: 0, query });
-    if (error) return res.status(502).json({ error: 'ModArchive refused the search' });
+    const found = await call(params);
+    if ('error' in found) return res.status(found.status).json({ error: found.error });
+    if (!found.xml) return empty();
+    const xml = found.xml;
     const { results, totalPages } = parseResults(xml);
     res.json({ results, page, totalPages, query });
   });
