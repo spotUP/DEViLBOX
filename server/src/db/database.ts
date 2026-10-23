@@ -40,6 +40,37 @@ export function migrateSongAnalysisExtended(database: Database.Database = db): b
   return changed;
 }
 
+/**
+ * HippoPlayer vote tables (GET /api/hip/vote). A device token (hashed) is the identity;
+ * module_key is the same 12 hex uade key as module_genres. Separate from module_ratings.
+ */
+export function createHipVoteTables(database: Database.Database = db): void {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS hip_tokens (
+      token_hash TEXT PRIMARY KEY,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS hip_votes (
+      token_hash TEXT NOT NULL,
+      module_key TEXT NOT NULL,
+      rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (token_hash, module_key),
+      FOREIGN KEY (token_hash) REFERENCES hip_tokens(token_hash)
+    );
+    CREATE INDEX IF NOT EXISTS idx_hip_votes_module ON hip_votes(module_key);
+
+    CREATE TABLE IF NOT EXISTS hip_module_names (
+      module_key TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      player TEXT,
+      first_seen INTEGER NOT NULL
+    );
+  `);
+}
+
 // Create tables
 /**
  * Module genre tables (GET /api/genre/:key). Exported so a test can build them in memory.
@@ -266,6 +297,7 @@ export function initDatabase() {
 
   migrateSongAnalysisExtended();
   createGenreTables();
+  createHipVoteTables();
 
   console.log('[DB] Database initialized at:', DB_PATH);
 }
