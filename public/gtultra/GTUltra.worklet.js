@@ -3,6 +3,8 @@
  * Runs the GoatTracker engine at audio rate, renders SID audio via reSID WASM
  */
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 class GTUltraProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -10,6 +12,8 @@ class GTUltraProcessor extends AudioWorkletProcessor {
     this.ready = false;
     this.playing = false;
     this.jamActive = false; // True when jam notes need audio processing
+    // Jam notes scheduled ahead wait here until their frame (public/shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
     this.posCounter = 0;
     // Per-voice audio for the oscilloscopes and channel meters (enableOsc)
     this.oscEnabled = false;
@@ -185,6 +189,7 @@ class GTUltraProcessor extends AudioWorkletProcessor {
 
       case 'stop': {
         if (!this.ready) return;
+        this.noteEvents.cancelFrom(-Infinity);
         this._stop();
         this.playing = false;
         // The audio stops being one stream: never join it to the next play
@@ -192,20 +197,15 @@ class GTUltraProcessor extends AudioWorkletProcessor {
         break;
       }
 
-      case 'jamNoteOn': {
-        if (!this.ready) return;
-        this._jamNoteOn(msg.channel, msg.note, msg.instrument);
-        this.jamActive = true;
+      case 'jamNoteOn':
+      case 'jamNoteOff':
+        // The synth chose the channel, so a queued noteOff reaches the channel of its noteOn
+        if (this.noteEvents.push(msg, currentTime)) this.applyNoteEvent(msg);
         break;
-      }
 
-      case 'jamNoteOff': {
-        if (!this.ready) return;
-        this._jamNoteOff(msg.channel);
-        // Keep jamActive for ~500ms so the release envelope plays out (44100 * 0.5 / 128 ≈ 172 blocks)
-        this.jamReleaseCountdown = 172;
+      case 'cancelNotes':
+        this.noteEvents.cancelFrom(-Infinity);
         break;
-      }
 
       case 'playTestNote': {
         if (!this.ready) return;
@@ -549,32 +549,30 @@ class GTUltraProcessor extends AudioWorkletProcessor {
     }
   }
 
-  process(inputs, outputs) {
-    if (!this.ready) return true;
-
-    // Count down jam release and deactivate when done
-    if (this.jamReleaseCountdown > 0) {
-      this.jamReleaseCountdown--;
-      if (this.jamReleaseCountdown === 0) this.jamActive = false;
+  applyNoteEvent(ev) {
+    if (!this.ready) return;
+    if (ev.type === 'jamNoteOn') {
+      this._jamNoteOn(ev.channel, ev.note, ev.instrument);
+      this.jamActive = true;
+    } else {
+      this._jamNoteOff(ev.channel);
+      // Keep jamActive for ~500ms so the release envelope plays out (44100 * 0.5 / 128 ≈ 172 blocks)
+      this.jamReleaseCountdown = 172;
     }
+  }
 
-    if (!this.playing && !this.jamActive) return true;
-
-    const outL = outputs[0][0];
-    const outR = outputs[0][1] || outL;
-    const frames = outL.length; // typically 128
-
+  renderSegment(outL, outR, start, len) {
     // Render audio into pre-allocated WASM buffers
-    this._render(this._ptrL, this._ptrR, frames);
+    this._render(this._ptrL, this._ptrR, len);
 
     // Copy from WASM heap to output
     const heapF32 = new Float32Array(this.module.HEAPU8.buffer);
     const offL = this._ptrL >> 2;
     const offR = this._ptrR >> 2;
 
-    for (let i = 0; i < frames; i++) {
-      outL[i] = heapF32[offL + i];
-      if (outR !== outL) outR[i] = heapF32[offR + i];
+    for (let i = 0; i < len; i++) {
+      outL[start + i] = heapF32[offL + i];
+      if (outR !== outL) outR[start + i] = heapF32[offR + i];
     }
 
     // Per-voice audio (worklets/channel-stream.js): the voices reSID just
@@ -592,6 +590,33 @@ class GTUltraProcessor extends AudioWorkletProcessor {
         this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
         this._stream.writeInt16(views, n);
       }
+    }
+  }
+
+  process(inputs, outputs) {
+    if (!this.ready) return true;
+
+    // Count down jam release and deactivate when done
+    if (this.jamReleaseCountdown > 0) {
+      this.jamReleaseCountdown--;
+      if (this.jamReleaseCountdown === 0) this.jamActive = false;
+    }
+
+    if (!this.playing && !this.jamActive && this.noteEvents.events.length === 0) return true;
+
+    const outL = outputs[0][0];
+    const outR = outputs[0][1] || outL;
+    const frames = outL.length; // typically 128
+
+    // Render in segments so a queued note keys at its own frame, not at the block start
+    let done = 0;
+    while (done < frames) {
+      const now = currentTime + done / sampleRate;
+      this.noteEvents.drain(now, (ev) => this.applyNoteEvent(ev));
+      const at = this.noteEvents.nextOffset(now, frames - done, sampleRate);
+      const len = at > 0 ? at : frames - done;
+      if (this.playing || this.jamActive) this.renderSegment(outL, outR, done, len);
+      done += len;
     }
 
     // Send position updates every 2 blocks (~5.8ms at 44.1kHz) for smooth scrolling

@@ -242,12 +242,17 @@ export class GTUltraEngine {
 
   // --- Jam mode ---
 
-  jamNoteOn(channel: number, note: number, instrument: number): void {
-    this.post({ type: 'jamNoteOn', channel, note, instrument });
+  jamNoteOn(channel: number, note: number, instrument: number, time?: number): void {
+    this.post({ type: 'jamNoteOn', channel, note, instrument, time });
   }
 
-  jamNoteOff(channel: number): void {
-    this.post({ type: 'jamNoteOff', channel });
+  jamNoteOff(channel: number, time?: number): void {
+    this.post({ type: 'jamNoteOff', channel, time });
+  }
+
+  /** Drop jam notes already sent ahead that have not keyed yet. */
+  cancelJamNotes(): void {
+    this.post({ type: 'cancelNotes' });
   }
 
   /** Play a test note with proper instrument init (works even when stopped) */
