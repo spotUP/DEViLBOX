@@ -2,6 +2,8 @@
  * MAMEEngine - TypeScript wrapper for the MAME WASM modules
  * Supports multiple instances via handles.
  */
+import { getDevilboxAudioContext } from '@/utils/audio-context';
+
 export const MAMESynthType = {
   VFX: 'vfx',           // ES5506 (Ensoniq VFX/TS-10)
   DOC: 'doc',           // ES5503 (Ensoniq DOC/Mirage)
@@ -41,10 +43,49 @@ interface EmscriptenMAMEModule {
   [key: string]: unknown;
 }
 
+/** Seconds of slack in the due test, as in public/shared/timedEventQueue.js: a frame-exact event must not wait a frame. */
+const DUE_SLACK = 1e-7;
+
+/**
+ * Register writes that carry a future `time` (AudioContext seconds) wait here until their frame. The replayer
+ * schedules rows ahead; a main-thread stall delivers them late and bunched, so applying them on arrival turns
+ * that into flams. Same contract as public/shared/timedEventQueue.js, which worklets import as a module (src has
+ * no allowJs, so the main-thread render path cannot import it): untimed, unusable or past events apply at once.
+ */
+class TimedActionQueue {
+  private events: { time: number; apply: () => void }[] = [];
+
+  /** Queue `apply` when `time` is still ahead of `now`, otherwise return true: the caller applies it now. */
+  push(time: number | undefined, now: number, apply: () => void): boolean {
+    if (time === undefined || !Number.isFinite(time) || time <= now) return true;
+    let i = this.events.length;
+    while (i > 0 && this.events[i - 1].time > time) i--;
+    this.events.splice(i, 0, { time, apply });
+    return false;
+  }
+
+  get size(): number { return this.events.length; }
+
+  clear(): void { this.events = []; }
+
+  /** Frames from the block start (at `now`) to the next queued event inside `frames`, or -1. */
+  nextOffset(now: number, frames: number, rate: number): number {
+    if (this.events.length === 0) return -1;
+    const off = Math.ceil((this.events[0].time - now - DUE_SLACK) * rate);
+    return off < frames ? Math.max(0, off) : -1;
+  }
+
+  /** Run the events due at `now`. */
+  drain(now: number): void {
+    while (this.events.length > 0 && this.events[0].time <= now + DUE_SLACK) this.events.shift()!.apply();
+  }
+}
+
 export class MAMEEngine {
   private static instance: MAMEEngine;
   private module: EmscriptenMAMEModule | null = null;
   private isInitialized: boolean = false;
+  private timed = new Map<number, TimedActionQueue>();
   // heapU8 intentionally removed — always use fresh Uint8Array(module.wasmMemory.buffer)
   // after each _malloc to handle WASM heap growth correctly.
 
@@ -132,6 +173,7 @@ export class MAMEEngine {
    */
   public deleteInstance(handle: number): void {
     if (!this.isInitialized || handle === 0 || !this.module) return;
+    this.cancelScheduled(handle);
     this.module._mame_delete_instance(handle);
   }
 
@@ -223,7 +265,7 @@ export class MAMEEngine {
     const processor = context.createScriptProcessor(bufferSize, 0, 2);
     processor.onaudioprocess = (e: AudioProcessingEvent) => {
       if (handle === 0) return;
-      const { left, right } = this.render(handle, bufferSize);
+      const { left, right } = this.render(handle, bufferSize, e.playbackTime, context.sampleRate);
       e.outputBuffer.getChannelData(0).set(left);
       e.outputBuffer.getChannelData(1).set(right);
     };
@@ -232,9 +274,50 @@ export class MAMEEngine {
   }
 
   /**
-   * Render audio
+   * Run `apply` (register writes for a note) at `time` in AudioContext seconds. It waits in the chip's queue and
+   * render() applies it on its own frame; no time, a past time or an unusable one applies at once.
    */
-  public render(handle: number, numSamples: number = 128): { left: Float32Array, right: Float32Array } {
+  public scheduleAt(handle: number, time: number | undefined, apply: () => void): void {
+    let queue = this.timed.get(handle);
+    if (!queue) this.timed.set(handle, (queue = new TimedActionQueue()));
+    if (queue.push(time, getDevilboxAudioContext().currentTime, apply)) apply();
+  }
+
+  /** Drop the events still waiting for a chip (panic, dispose). */
+  public cancelScheduled(handle: number): void {
+    this.timed.get(handle)?.clear();
+  }
+
+  /**
+   * Render audio. `blockTime` is the AudioContext time of the first frame; with queued events the block is
+   * rendered in segments so each applies at its own frame.
+   */
+  public render(
+    handle: number,
+    numSamples: number = 128,
+    blockTime?: number,
+    sampleRate: number = 44100,
+  ): { left: Float32Array, right: Float32Array } {
+    const queue = this.timed.get(handle);
+    if (!queue || queue.size === 0) return this.renderFrames(handle, numSamples);
+    const start = blockTime ?? getDevilboxAudioContext().currentTime;
+    const left = new Float32Array(numSamples);
+    const right = new Float32Array(numSamples);
+    let done = 0;
+    while (done < numSamples) {
+      const now = start + done / sampleRate;
+      queue.drain(now);
+      const off = queue.nextOffset(now, numSamples - done, sampleRate);
+      const n = off > 0 ? off : numSamples - done;
+      const seg = this.renderFrames(handle, n);
+      left.set(seg.left, done);
+      right.set(seg.right, done);
+      done += n;
+    }
+    return { left, right };
+  }
+
+  private renderFrames(handle: number, numSamples: number): { left: Float32Array, right: Float32Array } {
     if (!this.isInitialized || handle === 0 || !this.module || !this.module.wasmMemory) {
       return { left: new Float32Array(numSamples), right: new Float32Array(numSamples) };
     }
