@@ -57,6 +57,7 @@ import { GlobalDragDropHandler } from '@components/ui/GlobalDragDropHandler';
 import { notify } from '@stores/useNotificationStore';
 import { loadFile } from '@lib/file/UnifiedFileLoader';
 import { openSong, classifySong } from '@lib/song/openSong';
+import { handleSelectaLinkOnBoot } from '@/lib/share/selectaLink';
 import { openUserSong } from '@lib/song/openUserSong';
 import { pickCompanionsFromDrop } from '@lib/import/companionDrop';
 import { expectedCompanionNames } from '@lib/import/companionResolver';
@@ -120,6 +121,8 @@ function AppRouter() {
         useUIStore.getState().setActiveView(requestedView as never);
       }, 500);
     }
+    // Selecta share links: ?song=<source/path>&sub=&t= and ?playlist= (view is handled above)
+    handleSelectaLinkOnBoot(window.location.search);
   }, []);
 
   // Embed mode: ?embed=pattern-editor — minimal pattern editor for iframe embedding
