@@ -168,13 +168,13 @@ export class VSTBridgeSynth implements DevilboxSynth {
     }
   }
 
-  triggerAttack(frequency: number | string, _time?: number, velocity = 1): this {
+  triggerAttack(frequency: number | string, time?: number, velocity = 1): this {
     const midiNote = noteToMidi(frequency);
     const vel = Math.round(velocity * 127);
     this._currentMidiNote = midiNote;
 
     if (this._worklet && this._isReady) {
-      this._worklet.port.postMessage({ type: 'noteOn', note: midiNote, velocity: vel });
+      this._worklet.port.postMessage({ type: 'noteOn', note: midiNote, velocity: vel, time });
     } else {
       this._pendingNotes.push({ note: midiNote, velocity: vel });
     }
@@ -182,14 +182,13 @@ export class VSTBridgeSynth implements DevilboxSynth {
   }
 
   triggerRelease(frequency?: number | string, time?: number): this {
-    void time;
     if (!this._worklet) return this;
 
     if (frequency !== undefined) {
       const midiNote = noteToMidi(frequency);
-      this._worklet.port.postMessage({ type: 'noteOff', note: midiNote });
+      this._worklet.port.postMessage({ type: 'noteOff', note: midiNote, time });
     } else {
-      this._worklet.port.postMessage({ type: 'allNotesOff' });
+      this._worklet.port.postMessage({ type: 'allNotesOff', time });
     }
     return this;
   }
@@ -201,7 +200,8 @@ export class VSTBridgeSynth implements DevilboxSynth {
     velocity = 1
   ): this {
     this.triggerAttack(frequency, _time, velocity);
-    setTimeout(() => this.triggerRelease(frequency), duration * 1000);
+    if (_time !== undefined && Number.isFinite(_time)) this.triggerRelease(frequency, _time + duration);
+    else setTimeout(() => this.triggerRelease(frequency), duration * 1000);
     return this;
   }
 
