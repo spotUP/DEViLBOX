@@ -1,5 +1,5 @@
 /**
- * NS-4 the format table (81 replace + 40 dual rows) and NS-0 the declared voice count, measured over its corpus.
+ * NS-4 the format table (80 replace + 41 dual rows) and NS-0 the declared voice count, measured over its corpus.
  */
 import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
@@ -12,8 +12,8 @@ import { resolvedFormatEngines } from '../nuadeRouting';
 
 const ROOT = join(__dirname, '../../../..');
 
-const REPLACE_WAVES = `amcomposer amos andrewparton aprosys artandmagic ashleyhogg audiosculpture cinemaware dariuszendeh davidhanney desire dirkbialluch dsc dynamicsynthesizer earache ems emsv6 fashiontracker forgottenworlds fredgray gluemon howiedavies infogrames jankomrsicflogel jasonbrooke jasonpage jeroentel jesperolsen kimchristensen krishatlelid laxity legglessmusiceditor majortom maniacsofnoise markcooksey markcooksey_old markii maximumeffect mcmd medley mikedavies mmdc musicalenlightenment ntsp onescapee paulrobotham paulshields paulsummers peterverswyvelen pierreadane pokeynoise professionalsoundartists protracker4 quartet richardjoseph riffraff robhubbard robhubbardst scumm seanconnolly seanconran silmarils soundfx soundimages soundmaster specialfx speedya1system speedysystem spl stevebarrett synthdream synthpack syntracker thomashermann timetracker timfollin tomytracker tronic ufo voodoo zoundmonitor`.split(' ');
-const DUAL = `actionamics activisionpro bendaglish davidwhittaker deltamusic1 deltamusic2 digmug dss facethemusic fred_np futurecomposer hippel hippel7v instereo1 instereo2 jamcracker musicassembler musicmaker oktalyzer pumatracker quadracomposer ronklaren sidmon2 sonicarranger sonix soundcontrol soundfactory soundmon suntronic synthesis hippelhip fcbsi gmc andersoland beathoven bendaglishsid coredesign davelowe scottjohnston wallybeben`.split(' ');
+const REPLACE_WAVES = `amcomposer amos andrewparton aprosys artandmagic ashleyhogg audiosculpture cinemaware dariuszendeh davidhanney desire dirkbialluch dsc dynamicsynthesizer earache ems emsv6 fashiontracker forgottenworlds fredgray gluemon howiedavies infogrames jankomrsicflogel jasonbrooke jasonpage jeroentel jesperolsen kimchristensen krishatlelid laxity legglessmusiceditor majortom maniacsofnoise markcooksey markcooksey_old markii maximumeffect mcmd medley mikedavies mmdc musicalenlightenment ntsp onescapee paulrobotham paulshields paulsummers peterverswyvelen pierreadane pokeynoise professionalsoundartists protracker4 quartet richardjoseph riffraff robhubbard robhubbardst scumm seanconnolly seanconran silmarils soundimages soundmaster specialfx speedya1system speedysystem spl stevebarrett synthdream synthpack syntracker thomashermann timetracker timfollin tomytracker tronic ufo voodoo zoundmonitor`.split(' ');
+const DUAL = `actionamics activisionpro bendaglish davidwhittaker deltamusic1 deltamusic2 digmug dss facethemusic fred_np futurecomposer hippel hippel7v instereo1 instereo2 jamcracker musicassembler musicmaker oktalyzer pumatracker quadracomposer ronklaren sidmon2 sonicarranger sonix soundcontrol soundfactory soundmon suntronic synthesis hippelhip fcbsi gmc soundfx andersoland beathoven bendaglishsid coredesign davelowe scottjohnston wallybeben`.split(' ');
 
 describe('the node declares the measured voice maximum', () => {
   it('before a song is open the node is declared for NUADE_NODE_VOICES, the corpus maximum; a song then sizes it (nuadeNodeVoices.test.ts)', () => {
@@ -54,11 +54,11 @@ describe('NS-4 nuade format table', () => {
     expect(NUADE_FORMATS.stevebarrett!.extensions).toContain('sb');
   });
 
-  it('holds exactly the 81 replace rows (R01-R84 less R09 gmc, R46 fcbsi, R48 hippelhip) the 33 dual rows AB01-AB33 of the plan and the seven EaglePlayer dual rows (NUADE-EAGLEPLAYER-7)', () => {
+  it('holds exactly the 80 replace rows (R01-R84 less R09 gmc, R14 soundfx, R46 fcbsi, R48 hippelhip) the 34 dual rows AB01-AB34 of the plan and the seven EaglePlayer dual rows (NUADE-EAGLEPLAYER-7)', () => {
     const replace = NUADE_FORMAT_LIST.filter((f) => f.role === 'replace').map((f) => f.id).sort();
     const dual = NUADE_FORMAT_LIST.filter((f) => f.role === 'dual').map((f) => f.id).sort();
-    expect(REPLACE_WAVES.length).toBe(81);
-    expect(DUAL.length).toBe(40);
+    expect(REPLACE_WAVES.length).toBe(80);
+    expect(DUAL.length).toBe(41);
     expect(replace).toEqual([...REPLACE_WAVES].sort());
     expect(dual).toEqual([...DUAL].sort());
   });

@@ -3,8 +3,9 @@
  * source: the router, the selector (store, Settings tab, instrument panel) and the MCP all read it.
  *
  *   role 'replace'  nuade replaces UADE playback (84 rows R01-R84); our parser / encoder stay.
- *   role 'dual'     the format has an engine of ours; both stay selectable (33 rows AB01-AB33; AB31-AB33 hippelhip, fcbsi, gmc
- *                   were found on our engines by the NR-0 audit and moved out of the replace list).
+ *   role 'dual'     the format has an engine of ours; both stay selectable (34 rows AB01-AB34; AB31-AB33 hippelhip, fcbsi, gmc
+ *                   were found on our engines by the NR-0 audit and moved out of the replace list; AB34 soundfx (R14)
+ *                   moved when it got its own replayer).
  *
  * The measured fields (uadeEnvelopeCorrelation, ownEnvelopeCorrelation, endAgrees, defaultEngine, heldBecause) are
  * written by tools/nuade/apply-verdicts.ts from the comparison batch, never by hand. Until a row has a verdict its
@@ -168,7 +169,7 @@ export const NUADE_FORMATS: Readonly<Record<string, NuadeFormat>> = {
   sonix: row({ id: 'sonix', label: 'Sonix Music Driver', prefKey: 'iffSmus', registryKeys: ['iffSmus'], extensions: ['snx', 'smus', 'tiny'], role: 'dual', corpus: ['public/data/songs/formats/radiokomppi.smus', 'public/data/songs/iff-smus/- unknown/42/42.smus', 'public/data/songs/iff-smus/- unknown/4th/4th.smus'], followBy: 'tick', legacyEngine: 'native' }),
   soundcontrol: row({ id: 'soundcontrol', label: 'Sound Control', prefKey: 'soundControl', registryKeys: ['soundControl'], extensions: ['sc', 'sct'], role: 'dual', corpus: ['public/data/songs/formats/north_sea_inferno.sc', 'public/data/songs/soundcontrol/north sea inferno ongame1.sc'], followBy: 'tick', legacyEngine: 'uade' }),
   soundfactory: row({ id: 'soundfactory', label: 'Sound Factory', prefKey: 'soundFactory', registryKeys: ['soundFactory'], extensions: ['psf'], role: 'dual', corpus: ['public/data/songs/formats/goldrunner.psf', 'public/data/songs/soundfactory/im maien.psf', 'public/data/songs/soundfactory/oriental.psf'], followBy: 'tick', legacyEngine: 'native' }),
-  soundfx: row({ id: 'soundfx', label: 'SoundFX', prefKey: 'soundfx', registryKeys: ['soundfx'], extensions: ['sfx'], role: 'replace', corpus: ['public/data/songs/formats/bottle popper.mms', 'public/data/songs/formats/operation_stealth.sfx', 'public/data/songs/multimedia-sound/bottle popper.mms'], followBy: 'orderRow', legacyEngine: 'native' }),
+  soundfx: row({ id: 'soundfx', label: 'SoundFX', prefKey: 'soundfx', registryKeys: ['soundfx'], extensions: ['sfx'], role: 'dual', corpus: ['public/data/songs/formats/bottle popper.mms', 'public/data/songs/formats/operation_stealth.sfx', 'public/data/songs/multimedia-sound/bottle popper.mms'], followBy: 'orderRow', legacyEngine: 'native' }),
   soundimages: row({ id: 'soundimages', label: 'Sound Images', prefKey: 'soundimages', registryKeys: ['uade_tw'], extensions: ['tw'], role: 'replace', corpus: ['public/data/songs/formats/blinkys scary school-sfx.tw','public/data/songs/formats/future basketball main.tw'], followBy: 'tick', legacyEngine: 'uade' }),
   soundmaster: row({ id: 'soundmaster', label: 'Sound Master', prefKey: 'soundMaster', registryKeys: ['soundMaster'], extensions: ['sm', 'sm1', 'sm2', 'sm3', 'smpro'], role: 'replace', corpus: ["public/data/songs/formats/rackney'sisland_4.sm", 'public/data/songs/sound-master-ii-v1/futureshock-level 3.smpro', 'public/data/songs/sound-master-ii-v3/doofus 3.sm3'], followBy: 'tick', legacyEngine: 'uade' }),
   soundmon: row({ id: 'soundmon', label: 'BP SoundMon', prefKey: 'soundmon', registryKeys: ['soundmon'], extensions: ['bp', 'bp2', 'bp3'], role: 'dual', corpus: ['public/data/songs/formats/antidust.bp3', 'public/data/songs/formats/aquarivs.bp', 'public/data/songs/bp-soundmon-2/nicktune1.bp'], followBy: 'orderRow', legacyEngine: 'native' }),
