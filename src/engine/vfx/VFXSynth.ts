@@ -226,7 +226,7 @@ export class VFXSynth implements DevilboxSynth {
     console.log('[VFXSynth] Initialized with ES5506 handle:', this.handle);
 
     // Start audio rendering before ROM load so the ScriptProcessor is connected
-    this.startRendering();
+    this.mameEngine.attachRenderer(this.handle, this.audioContext, this.output);
 
     // Auto-load sample ROM banks
     try {
@@ -244,28 +244,6 @@ export class VFXSynth implements DevilboxSynth {
       console.error('Place ROM files in /public/roms/vfx/ - see /public/roms/README.md');
       // Continue anyway - synth will initialize but won't produce sound without ROMs
     }
-  }
-
-  /**
-   * Connect a ScriptProcessorNode to render MAME ES5506 audio into the output GainNode.
-   * Called once after WASM init. ScriptProcessor is deprecated but works for non-worklet synths.
-   */
-  private startRendering(): void {
-    const bufferSize = 512;
-    if (!this.audioContext.createScriptProcessor) {
-      console.warn('[VFXSynth] ScriptProcessorNode not available');
-      return;
-    }
-    const processor = this.audioContext.createScriptProcessor(bufferSize, 0, 2);
-    processor.onaudioprocess = (e: AudioProcessingEvent) => {
-      if (!this.isInitialized || this.handle === 0) return;
-      const outL = e.outputBuffer.getChannelData(0);
-      const outR = e.outputBuffer.getChannelData(1);
-      const { left, right } = this.mameEngine.render(this.handle, bufferSize);
-      outL.set(left);
-      outR.set(right);
-    };
-    processor.connect(this.output);
   }
 
   /**
