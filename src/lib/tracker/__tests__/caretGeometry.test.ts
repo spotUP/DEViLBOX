@@ -14,9 +14,12 @@ const base: CaretGeometryInput = {
 };
 
 describe('computeCaretRect — per-nibble caret geometry', () => {
-  it('note caret spans the whole note field', () => {
+  it('note caret covers the three note glyphs so the note sits centred in the block', () => {
     expect(computeCaretRect({ ...base, columnType: 'note' }))
-      .toEqual({ offX: 0, width: 34 });
+      .toEqual({ offX: 0, width: 30 });
+    // Field outline matches the caret: no extra space on the right of the note.
+    expect(computeFieldRect({ ...base, columnType: 'note' }))
+      .toEqual({ offX: 0, width: 30 });
   });
 
   it('instrument caret is one char wide and steps per nibble', () => {
@@ -64,7 +67,7 @@ describe('computeCaretRect — per-nibble caret geometry', () => {
 
   it('a second note column shifts the caret by one group width', () => {
     expect(computeCaretRect({ ...base, columnType: 'note', noteColumnIndex: 1 }))
-      .toEqual({ offX: 86, width: 34 });
+      .toEqual({ offX: 86, width: 30 });
   });
 });
 
