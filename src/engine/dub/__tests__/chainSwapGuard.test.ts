@@ -48,7 +48,7 @@ describe('DubBus.setChainOrder — self-oscillation guard', () => {
   });
 
   it('ramps the return back to where the bus is now (the captured value only while a move owns it)', () => {
-    expect(body).toMatch(/priorReturnGain\s*=\s*this\.return_\.gain\.value/);
+    expect(body).toMatch(/priorReturnGain\s*=\s*held\?\.ret\s*\?\?\s*this\.return_\.gain\.value/);
     expect(body).toMatch(/this\._ownedSettingKeys\.has\('returnGain'\) \? priorReturnGain : this\._returnGainTarget\(\)/);
   });
 
