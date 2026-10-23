@@ -4,9 +4,13 @@
  * Port of sfztools/sfizz (BSD-2-Clause)
  */
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 class SfizzProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
+    // Notes sent ahead with a `time` wait here for their frame (see shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
     this.engine = null;
     this.module = null;
     this.outputPtrL = 0;
@@ -51,15 +55,16 @@ class SfizzProcessor extends AudioWorkletProcessor {
         break;
 
       case 'noteOn':
-        if (this.engine) {
-          this.module._sfizz_bridge_note_on(this.engine, data.delay || 0, data.note, data.velocity);
-        }
+        if (this.engine && this.noteEvents.push(data, currentTime)) this.applyNoteEvent(data);
         break;
 
       case 'noteOff':
-        if (this.engine) {
-          this.module._sfizz_bridge_note_off(this.engine, data.delay || 0, data.note, data.velocity || 0);
-        }
+        if (this.engine && this.noteEvents.push(data, currentTime)) this.applyNoteEvent(data);
+        break;
+
+      case 'allNotesOff':
+        // Cancels the notes scheduled at or after it: on Stop the replayer has already sent the coming rows
+        this.noteEvents.cancelFrom(data.time ?? currentTime);
         break;
 
       case 'cc':
@@ -424,6 +429,13 @@ class SfizzProcessor extends AudioWorkletProcessor {
     this.lastHeapBuffer = null;
   }
 
+  applyNoteEvent(ev) {
+    switch (ev.type) {
+      case 'noteOn': this.module._sfizz_bridge_note_on(this.engine, ev.delay || 0, ev.note, ev.velocity); break;
+      case 'noteOff': this.module._sfizz_bridge_note_off(this.engine, ev.delay || 0, ev.note, ev.velocity || 0); break;
+    }
+  }
+
   process(inputs, outputs, parameters) {
     if (!this.initialized || !this.engine || this.initializing) {
       return true;
@@ -447,7 +459,16 @@ class SfizzProcessor extends AudioWorkletProcessor {
     this.outputBufferR.fill(0);
 
     // Render audio
-    this.module._sfizz_bridge_render(this.engine, this.outputPtrL, this.outputPtrR, frames);
+    // Render in segments so a queued note event keys the engine at its own frame, not at the block start
+    let done = 0;
+    while (done < frames) {
+      const now = currentTime + done / sampleRate;
+      this.noteEvents.drain(now, (ev) => this.applyNoteEvent(ev));
+      const off = this.noteEvents.nextOffset(now, frames - done, sampleRate);
+      const len = off > 0 ? off : frames - done;
+      this.module._sfizz_bridge_render(this.engine, this.outputPtrL + done * 4, this.outputPtrR + done * 4, len);
+      done += len;
+    }
 
     // Copy to output
     outL.set(this.outputBufferL.subarray(0, frames));

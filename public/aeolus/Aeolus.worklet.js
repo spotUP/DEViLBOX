@@ -23,9 +23,13 @@
 //   30:    Direct Level 0-1
 //   31:    Reflection Level 0-1
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 class AeolusProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
+    // Notes sent ahead with a `time` wait here for their frame (see shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
     this.synth = null;
     this.isInitialized = false;
     this.pendingMessages = [];
@@ -47,24 +51,22 @@ class AeolusProcessor extends AudioWorkletProcessor {
         break;
 
       case 'noteOn':
-        if (this.synth && this.isInitialized) {
-          this.Module._aeolus_note_on(this.synth, data.note, data.velocity || 100);
-        } else {
+        if (this.synth && this.isInitialized) { if (this.noteEvents.push(event.data, currentTime)) this.applyNoteEvent(event.data); } else {
           this.pendingMessages.push(event.data);
         }
         break;
 
       case 'noteOff':
-        if (this.synth && this.isInitialized) {
-          this.Module._aeolus_note_off(this.synth, data.note);
-        } else {
+        if (this.synth && this.isInitialized) { if (this.noteEvents.push(event.data, currentTime)) this.applyNoteEvent(event.data); } else {
           this.pendingMessages.push(event.data);
         }
         break;
 
       case 'allNotesOff':
+        // Cancels the notes scheduled at or after it: on Stop the replayer has already sent the coming rows
         if (this.synth && this.isInitialized) {
-          this.Module._aeolus_all_notes_off(this.synth);
+          this.noteEvents.cancelFrom(data.time ?? currentTime);
+          if (this.noteEvents.push(event.data, currentTime)) this.applyNoteEvent(event.data);
         }
         break;
 
@@ -148,6 +150,14 @@ class AeolusProcessor extends AudioWorkletProcessor {
     }
   }
 
+  applyNoteEvent(ev) {
+    switch (ev.type) {
+      case 'noteOn': this.Module._aeolus_note_on(this.synth, ev.note, ev.velocity || 100); break;
+      case 'noteOff': this.Module._aeolus_note_off(this.synth, ev.note); break;
+      case 'allNotesOff': this.Module._aeolus_all_notes_off(this.synth); break;
+    }
+  }
+
   process(inputs, outputs, parameters) {
     const output = outputs[0];
     if (!output || output.length < 2) return true;
@@ -163,7 +173,16 @@ class AeolusProcessor extends AudioWorkletProcessor {
     }
 
     // Process audio through WASM
-    this.Module._aeolus_process(this.synth, this.outputPtrL, this.outputPtrR, frames);
+    // Render in segments so a queued note event keys the engine at its own frame, not at the block start
+    let done = 0;
+    while (done < frames) {
+      const now = currentTime + done / sampleRate;
+      this.noteEvents.drain(now, (ev) => this.applyNoteEvent(ev));
+      const off = this.noteEvents.nextOffset(now, frames - done, sampleRate);
+      const len = off > 0 ? off : frames - done;
+      this.Module._aeolus_process(this.synth, this.outputPtrL + done * 4, this.outputPtrR + done * 4, len);
+      done += len;
+    }
 
     // Copy from WASM heap to output arrays
     const heapF32 = this.Module.HEAPF32 ||

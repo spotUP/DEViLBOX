@@ -5,9 +5,13 @@
  * modulation matrix, portamento, unison, pulse width modulation
  */
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 class CalfMonoSynthProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
+    // Notes sent ahead with a `time` wait here for their frame (see shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
     this.engine = null;
     this.module = null;
     this.outputPtrL = 0;
@@ -35,14 +39,10 @@ class CalfMonoSynthProcessor extends AudioWorkletProcessor {
         await this.initEngine(data.sampleRate, data.wasmBinary, data.jsCode);
         break;
       case 'noteOn':
-        if (this.engine) {
-          this.module._calf_mono_note_on(this.engine, data.note, data.velocity);
-        }
+        if (this.engine) { if (this.noteEvents.push(data, currentTime)) this.applyNoteEvent(data); }
         break;
       case 'noteOff':
-        if (this.engine) {
-          this.module._calf_mono_note_off(this.engine, data.note);
-        }
+        if (this.engine) { if (this.noteEvents.push(data, currentTime)) this.applyNoteEvent(data); }
         break;
       case 'setParam':
         if (this.engine) {
@@ -60,8 +60,10 @@ class CalfMonoSynthProcessor extends AudioWorkletProcessor {
         }
         break;
       case 'allNotesOff':
+        // Cancels the notes scheduled at or after it: on Stop the replayer has already sent the coming rows
         if (this.engine) {
-          this.module._calf_mono_all_notes_off(this.engine);
+          this.noteEvents.cancelFrom(data.time ?? currentTime);
+          if (this.noteEvents.push(data, currentTime)) this.applyNoteEvent(data);
         }
         break;
       case 'loadPatch':
@@ -256,6 +258,14 @@ class CalfMonoSynthProcessor extends AudioWorkletProcessor {
     this.lastHeapBuffer = null;
   }
 
+  applyNoteEvent(ev) {
+    switch (ev.type) {
+      case 'noteOn': this.module._calf_mono_note_on(this.engine, ev.note, ev.velocity); break;
+      case 'noteOff': this.module._calf_mono_note_off(this.engine, ev.note); break;
+      case 'allNotesOff': this.module._calf_mono_all_notes_off(this.engine); break;
+    }
+  }
+
   process(inputs, outputs, parameters) {
     if (!this.initialized || !this.engine) {
       return true;
@@ -279,7 +289,16 @@ class CalfMonoSynthProcessor extends AudioWorkletProcessor {
     this.outputBufferL.fill(0);
     this.outputBufferR.fill(0);
 
-    this.module._calf_mono_process(this.engine, this.outputPtrL, this.outputPtrR, numSamples);
+    // Render in segments so a queued note event keys the engine at its own frame, not at the block start
+    let done = 0;
+    while (done < numSamples) {
+      const now = currentTime + done / sampleRate;
+      this.noteEvents.drain(now, (ev) => this.applyNoteEvent(ev));
+      const off = this.noteEvents.nextOffset(now, numSamples - done, sampleRate);
+      const len = off > 0 ? off : numSamples - done;
+      this.module._calf_mono_process(this.engine, this.outputPtrL + done * 4, this.outputPtrR + done * 4, len);
+      done += len;
+    }
 
     outputL.set(this.outputBufferL.subarray(0, numSamples));
     outputR.set(this.outputBufferR.subarray(0, numSamples));

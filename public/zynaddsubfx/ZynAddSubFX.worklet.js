@@ -120,9 +120,13 @@ function transformValue(value, type) {
   }
 }
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 class ZynAddSubFXProcessor extends AudioWorkletProcessor {
   constructor(options) {
     super(options);
+    // Notes sent ahead with a `time` wait here for their frame (see shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
     this.ready = false;
     this.instance = null;
     this.module = null;
@@ -218,13 +222,17 @@ class ZynAddSubFXProcessor extends AudioWorkletProcessor {
         this.watchVoices = !!data.on;
         break;
       case 'noteOn':
-        if (this.ready) this.module._zasfx_note_on(this.instance, data.note, data.velocity);
+        if (this.ready) { if (this.noteEvents.push(data, currentTime)) this.applyNoteEvent(data); }
         break;
       case 'noteOff':
-        if (this.ready) this.module._zasfx_note_off(this.instance, data.note);
+        if (this.ready) { if (this.noteEvents.push(data, currentTime)) this.applyNoteEvent(data); }
         break;
       case 'allNotesOff':
-        if (this.ready) this.module._zasfx_all_notes_off(this.instance);
+        // Cancels the notes scheduled at or after it: on Stop the replayer has already sent the coming rows
+        if (this.ready) {
+          this.noteEvents.cancelFrom(data.time ?? currentTime);
+          if (this.noteEvents.push(data, currentTime)) this.applyNoteEvent(data);
+        }
         break;
       case 'setParam': {
         if (!this.ready) break;
@@ -285,6 +293,14 @@ class ZynAddSubFXProcessor extends AudioWorkletProcessor {
     }
   }
 
+  applyNoteEvent(ev) {
+    switch (ev.type) {
+      case 'noteOn': this.module._zasfx_note_on(this.instance, ev.note, ev.velocity); break;
+      case 'noteOff': this.module._zasfx_note_off(this.instance, ev.note); break;
+      case 'allNotesOff': this.module._zasfx_all_notes_off(this.instance); break;
+    }
+  }
+
   process(inputs, outputs) {
     if (!this.ready || !this.instance) return true;
     const output = outputs[0];
@@ -294,7 +310,16 @@ class ZynAddSubFXProcessor extends AudioWorkletProcessor {
     const right = output[1];
     const n = left.length;
 
-    this.module._zasfx_process(this.instance, this.leftPtr, this.rightPtr, n);
+    // Render in segments so a queued note event keys the engine at its own frame, not at the block start
+    let done = 0;
+    while (done < n) {
+      const now = currentTime + done / sampleRate;
+      this.noteEvents.drain(now, (ev) => this.applyNoteEvent(ev));
+      const off = this.noteEvents.nextOffset(now, n - done, sampleRate);
+      const len = off > 0 ? off : n - done;
+      this.module._zasfx_process(this.instance, this.leftPtr + done * 4, this.rightPtr + done * 4, len);
+      done += len;
+    }
 
     const heap = this.module.HEAPF32 ||
       (this.module.wasmMemory && new Float32Array(this.module.wasmMemory.buffer));
