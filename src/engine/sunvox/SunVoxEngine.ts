@@ -556,12 +556,12 @@ export class SunVoxEngine extends WASMSingletonBase {
 
   // ── Convenience fire-and-forget helpers ────────────────────────────────────
 
-  noteOn(handle: number, moduleId: number, note: number, vel: number): void {
-    this.sendMessage({ type: 'noteOn', handle, moduleId, note, vel });
+  noteOn(handle: number, moduleId: number, note: number, vel: number, time?: number): void {
+    this.sendMessage({ type: 'noteOn', handle, moduleId, note, vel, time });
   }
 
-  noteOff(handle: number, moduleId: number): void {
-    this.sendMessage({ type: 'noteOff', handle, moduleId });
+  noteOff(handle: number, moduleId: number, time?: number): void {
+    this.sendMessage({ type: 'noteOff', handle, moduleId, time });
   }
 
   setControl(handle: number, moduleId: number, ctlId: number, value: number): void {
