@@ -12,6 +12,7 @@
 import * as Tone from 'tone';
 import { getDevilboxAudioContext, getNativeAudioNode } from '@/utils/audio-context';
 import { WAMSynth } from './WAMSynth';
+import { engageWamPluginStatus } from './wamPluginStatus';
 
 /** Minimal WAM 2.0 plugin instance interface */
 interface WAMInstance {
@@ -163,6 +164,9 @@ export class WAMEffectNode extends Tone.ToneAudioNode {
       if (!this._wamNode) {
         throw new Error('Failed to create WAM audio node');
       }
+
+      // Put plugins with their own enable/bypass state into the enabled state (dry gain 0)
+      engageWamPluginStatus(this._wamNode);
 
       // 5. Connect wet path: input → WAM → wetGain → output
       // Use getNativeAudioNode() to bridge Tone.js/SAC nodes to native WAM AudioNode
