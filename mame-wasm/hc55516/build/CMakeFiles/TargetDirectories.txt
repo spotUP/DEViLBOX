@@ -1,3 +1,0 @@
-/Users/spot/Code/DEViLBOX/mame-wasm/hc55516/build/CMakeFiles/HC55516_WASM.dir
-/Users/spot/Code/DEViLBOX/mame-wasm/hc55516/build/CMakeFiles/edit_cache.dir
-/Users/spot/Code/DEViLBOX/mame-wasm/hc55516/build/CMakeFiles/rebuild_cache.dir
