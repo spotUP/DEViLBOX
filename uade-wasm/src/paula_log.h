@@ -50,4 +50,5 @@ typedef struct {
 
 #ifdef UADE_WASM
 extern void uade_wasm_log_paula_write(uint8_t channel, uint8_t reg, uint16_t value);
+extern void uade_wasm_paula_state_changed(int channel);
 #endif

@@ -123,8 +123,8 @@ static uint32_t g_prev_lc[4]     = {0, 0, 0, 0};
 static uint8_t  g_prev_dma[4]    = {0, 0, 0, 0};
 static uint16_t g_prev_period[4] = {0, 0, 0, 0};
 static uint16_t g_prev_volume[4] = {0, 0, 0, 0};
-/* Cumulative note starts per channel, counted on every player tick whether or
- * not tick snapshots are enabled: the live channel meters read it. Separate
+/* Cumulative note starts per channel, counted at each Paula register write
+ * whether or not tick snapshots are enabled: the live channel meters read it. Separate
  * previous-state from the snapshot detector, which resets when scans start. */
 static uint32_t g_meter_notes[4]   = {0, 0, 0, 0};
 static uint32_t g_meter_prev_lc[4] = {0, 0, 0, 0};
@@ -672,18 +672,23 @@ static int paula_note_start(uint32_t lc, uint8_t dma, uint16_t per, uint16_t vol
     return vol > 0 && pvol == 0 && pdma;
 }
 
-static void meter_count_note_starts(void) {
-    for (int ch = 0; ch < 4; ch++) {
-        uint32_t lc = (uint32_t)audio_channel[ch].lc;
-        uint8_t dma = dmaen(1 << ch) ? 1 : 0;
-        uint16_t per = (uint16_t)(audio_channel[ch].per & 0xFFFF);
-        uint16_t vol = (uint16_t)(audio_channel[ch].vol & 0xFFFF);
-        if (paula_note_start(lc, dma, per, vol, g_meter_prev_lc[ch], g_meter_prev_dma[ch],
-                             g_meter_prev_per[ch], g_meter_prev_vol[ch]))
-            g_meter_notes[ch]++;
-        g_meter_prev_lc[ch] = lc; g_meter_prev_dma[ch] = dma;
-        g_meter_prev_per[ch] = per; g_meter_prev_vol[ch] = vol;
-    }
+/* Called from audio.c and custom.c right after a Paula register write has
+ * updated channel ch (AUDxLCL, AUDxPER, AUDxVOL, DMACON). Counting here, at
+ * the write, puts the note start in the audio block where the note begins.
+ * Polling once per player tick counted it one tick late (the poll runs before
+ * that tick's interrupt handler) and missed a DMA off/on pair inside one tick.
+ * AUDxLCH is not hooked: the pointer is only complete after the LCL write. */
+void uade_wasm_paula_state_changed(int ch) {
+    if (ch < 0 || ch > 3) return;
+    uint32_t lc = (uint32_t)audio_channel[ch].lc;
+    uint8_t dma = dmaen(1 << ch) ? 1 : 0;
+    uint16_t per = (uint16_t)(audio_channel[ch].per & 0xFFFF);
+    uint16_t vol = (uint16_t)(audio_channel[ch].vol & 0xFFFF);
+    if (paula_note_start(lc, dma, per, vol, g_meter_prev_lc[ch], g_meter_prev_dma[ch],
+                         g_meter_prev_per[ch], g_meter_prev_vol[ch]))
+        g_meter_notes[ch]++;
+    g_meter_prev_lc[ch] = lc; g_meter_prev_dma[ch] = dma;
+    g_meter_prev_per[ch] = per; g_meter_prev_vol[ch] = vol;
 }
 
 /* out[ch] = cumulative note starts of Paula channel ch since the song loaded. */
@@ -698,7 +703,6 @@ void uade_wasm_get_note_start_counts(uint32_t *out) {
  * (skyfox2.cus: 1). */
 void uade_wasm_on_player_tick(void) {
     g_player_tick_count++;
-    meter_count_note_starts();
 
     /* Real-time channel state logging (always runs when enabled) */
     rt_channel_log_tick();

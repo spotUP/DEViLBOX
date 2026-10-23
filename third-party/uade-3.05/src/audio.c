@@ -771,6 +771,9 @@ void AUDxLCL (int nr, uae_u16 v)
     update_audio ();
 
     audio_channel[nr].lc = (audio_channel[nr].lc & ~0xffff) | (v & 0xFFFE);
+#ifdef UADE_WASM
+    uade_wasm_paula_state_changed(nr);
+#endif
 }
 
 
@@ -800,6 +803,9 @@ void AUDxPER (int nr, uae_u16 v)
 	v = 16;
     }
     audio_channel[nr].per = v;
+#ifdef UADE_WASM
+    uade_wasm_paula_state_changed(nr);
+#endif
 }
 
 
@@ -834,6 +840,9 @@ void AUDxVOL (int nr, uae_u16 v)
     update_audio ();
 
     audio_channel[nr].vol = v2;
+#ifdef UADE_WASM
+    uade_wasm_paula_state_changed(nr);
+#endif
 }
 
 /* ---- Per-channel isolation buffer accessors ---- */
