@@ -30,6 +30,7 @@ import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useUIStore } from '@stores/useUIStore';
+import { useAutomationStore } from '@stores/useAutomationStore';
 
 const WIDTH = 1900; // narrower than 12 channels at full size, wider than they need at the font floor (10 px)
 /** The container width jsdom reports; a test may narrow it. */
@@ -139,6 +140,8 @@ describe('the tracker pattern view fits every channel to the width', () => {
     width = 400; // fit off and too narrow to stretch: the widths are the channels' own
     useSettingsStore.setState({ fitAllChannelsTracker: false });
     withChannels(10);
+    // A channel reserves lane width only while it has a lane in use (automationLaneReserve).
+    act(() => { for (let ch = 0; ch < 10; ch++) useAutomationStore.getState().addActiveParameter(ch, 'cutoff'); });
     act(() => { useUIStore.setState({ showAutomationLanes: true }); });
     let view = await mount();
     const withLanes = lastLayout().widths[0];
@@ -155,5 +158,6 @@ describe('the tracker pattern view fits every channel to the width', () => {
     expect(lastLayout().widths[0]).toBe(noLanes);
     view.unmount(); cleanup();
     act(() => { useUIStore.setState({ showAutomationLanes: false, jingleActive: false }); });
+    act(() => { useAutomationStore.setState({ channelLanes: new Map() }); });
   });
 });

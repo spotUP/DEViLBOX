@@ -79,7 +79,8 @@ describe('the klystrack view', () => {
     const connectedToSpeakers = vi.fn();
     const engine = Object.create(KlysEngine.prototype) as Record<string, unknown>;
     Object.assign(engine, {
-      audioContext: { sampleRate: 48000 },
+      // currentTime is the worklet's rendered time: engine level reports are held against the context clock.
+      audioContext: { sampleRate: 48000, get currentTime() { return (globalThis as { currentTime?: number }).currentTime ?? 0; } },
       output: { connect: connectedToSpeakers, context: { destination: {} } },
       _positions: new PositionCallbacks(), _songEndCallbacks: new Set(), _songDataCallbacks: new Set(),
       ready: async () => {},
@@ -170,6 +171,8 @@ describe('the klystrack view', () => {
     expect(scope.numChannels).toBe(native.channels);
     const sounding = scope.channelData.filter((d) => d && d.some((s) => Math.abs(s) > 300)).length;
     expect(sounding, 'channel scopes show audio').toBeGreaterThanOrEqual(3);
+    // Level reports are held until their block is heard (ChannelMeterFeed.reportFromWorklet): let the held ones drain.
+    for (let i = 0; i < 150 && levels.length === 0; i++) await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     const peak = new Array(native.channels).fill(0);
     for (const l of levels) l.forEach((v, c) => { peak[c] = Math.max(peak[c], v); });
     expect(peak.filter((p) => p > 0.01).length, `channel meter peaks ${peak.map((p) => p.toFixed(3))}`).toBeGreaterThanOrEqual(3);
