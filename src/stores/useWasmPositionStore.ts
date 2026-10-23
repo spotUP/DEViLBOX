@@ -70,8 +70,28 @@ export const useWasmPositionStore = create<WasmPositionState>()((set, _get) => (
   },
 }));
 
-/** Coalesce position writes into one store update per frame; the latest wins. */
+/** Store fields for one reported position. */
+function positionState(p: PendingPos): Partial<WasmPositionState> {
+  return {
+    active: true, row: p.row,
+    ...(p.songPos !== undefined ? { songPos: p.songPos } : {}),
+    ...(p.channelRows ? { channelRows: p.channelRows } : {}),
+    ...(p.channelPositions ? { channelPositions: p.channelPositions } : {}),
+  };
+}
+
+/**
+ * Coalesce position writes into one store update per frame; the latest wins.
+ * A hidden tab runs no animation frames, so there the write goes through at
+ * once; otherwise background readers (MCP, export) would see no position.
+ */
 function queuePosition(set: (s: Partial<WasmPositionState>) => void, pos: PendingPos): void {
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+    if (_posRaf) { cancelAnimationFrame(_posRaf); _posRaf = 0; }
+    _pendingPos = null;
+    set(positionState(pos));
+    return;
+  }
   _pendingPos = pos;
   if (_posRaf) return;
   _posRaf = requestAnimationFrame(() => {
@@ -79,11 +99,6 @@ function queuePosition(set: (s: Partial<WasmPositionState>) => void, pos: Pendin
     const p = _pendingPos;
     if (!p) return;
     _pendingPos = null;
-    set({
-      active: true, row: p.row,
-      ...(p.songPos !== undefined ? { songPos: p.songPos } : {}),
-      ...(p.channelRows ? { channelRows: p.channelRows } : {}),
-      ...(p.channelPositions ? { channelPositions: p.channelPositions } : {}),
-    });
+    set(positionState(p));
   });
 }
