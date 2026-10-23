@@ -540,5 +540,6 @@ export function parseGameMusicCreatorFile(bytes: Uint8Array, filename: string): 
     initialBPM:      125,
     linearPeriods:   false,
     uadePatternLayout,
+    gmcFileData:     bytes.slice().buffer as ArrayBuffer,
   };
 }

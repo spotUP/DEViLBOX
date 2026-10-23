@@ -51,6 +51,7 @@ export const OWN_ENGINES: Readonly<Record<string, OwnEngine>> = {
   ronklaren: { dir: 'ronklaren', stem: 'RonKlaren' },
   sidmon2: { dir: 'sidmon2', stem: 'Sd2' },
   soundcontrol: { dir: 'soundcontrol', stem: 'SoundControl' },
+  soundfx: { dir: 'soundfx', stem: 'SoundFx' },
   soundfactory: { dir: 'soundfactory', stem: 'SoundFactory2' },
   soundmon: { dir: 'soundmon', stem: 'SoundMon' },
   sonicarranger: { dir: 'sonic-arranger', stem: 'SonicArranger' },
@@ -174,7 +175,7 @@ export async function renderOwn(rowId: string, songPath: string, seconds: number
     if (e.load === 'suntronic') return await renderSunTronic(songPath, seconds);
     if (e.load === 'eagle') return await renderEagle(rowId, songPath, seconds);
     loadSharedWorkletScripts();
-    const transform = e.load === 'tfmx' ? (await import('../../src/engine/tfmx/TFMXEngine')).tfmxTransform : undefined;
+    const transform = e.load === 'tfmx' ? (await import('../../src/engine/tfmx/TFMXEngine')).tfmxTransform : rowId === 'soundfx' ? (await import('../../src/engine/soundfx/soundfxTransform')).soundfxTransform : undefined;
     const { proc, send, posted } = await startWorklet(e.dir, e.stem, transform, e.wasmStem ?? e.stem);
     const module = songBuffer(songPath);
     if (e.load === 'tfmx') { await send({ type: 'loadModule', mdatBuffer: module, smplBuffer: null, subsong: 0 }); await send({ type: 'modulePlay' }); }
