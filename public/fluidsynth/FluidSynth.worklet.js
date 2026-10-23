@@ -29,11 +29,15 @@
  *   destroy    {}
  */
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 const RENDER_FRAMES = 128;
 
 class FluidSynthProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
+    // Notes sent ahead with a `time` wait here for their frame (see shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
     this.module = null;
     this.initialized = false;
     this._sampleRate = 48000;
@@ -178,11 +182,8 @@ class FluidSynthProcessor extends AudioWorkletProcessor {
         break;
 
       case 'noteOn':
-        m._fluidsynth_note_on(data.channel || 0, data.key != null ? data.key : data.note, data.velocity);
-        break;
-
       case 'noteOff':
-        m._fluidsynth_note_off(data.channel || 0, data.key != null ? data.key : data.note);
+        if (this.noteEvents.push(data, currentTime)) this._applyNoteEvent(data);
         break;
 
       case 'cc':
@@ -217,13 +218,13 @@ class FluidSynthProcessor extends AudioWorkletProcessor {
         this.port.postMessage({ type: 'channelBank', channel: data.channel || 0, bank: m._fluidsynth_get_channel_bank(data.channel || 0) });
         break;
 
-      case 'allNotesOff':
-        if (data.channel != null && data.channel >= 0) {
-          m._fluidsynth_all_notes_off(data.channel);
-        } else {
-          for (let ch = 0; ch < this._midiChannels; ch++) m._fluidsynth_all_notes_off(ch);
-        }
+      case 'allNotesOff': {
+        // Cancels this channel's notes scheduled at or after it: on Stop the replayer has already sent the coming rows
+        const ch = data.channel != null && data.channel >= 0 ? data.channel : -1;
+        this.noteEvents.cancelFrom(data.time ?? currentTime, (e) => ch < 0 || (e.channel || 0) === ch);
+        if (this.noteEvents.push(data, currentTime)) this._applyNoteEvent(data);
         break;
+      }
 
       case 'allSoundsOff':
         if (data.channel != null && data.channel >= 0) {
@@ -260,6 +261,37 @@ class FluidSynthProcessor extends AudioWorkletProcessor {
 
       default:
         break;
+    }
+  }
+
+  _applyNoteEvent(ev) {
+    const m = this.module;
+    switch (ev.type) {
+      case 'noteOn': m._fluidsynth_note_on(ev.channel || 0, ev.key != null ? ev.key : ev.note, ev.velocity); break;
+      case 'noteOff': m._fluidsynth_note_off(ev.channel || 0, ev.key != null ? ev.key : ev.note); break;
+      case 'allNotesOff':
+        if (ev.channel != null && ev.channel >= 0) {
+          m._fluidsynth_all_notes_off(ev.channel);
+        } else {
+          for (let ch = 0; ch < this._midiChannels; ch++) m._fluidsynth_all_notes_off(ch);
+        }
+        break;
+    }
+  }
+
+  /**
+   * Render the block in segments so a queued note event keys the engine at its own frame. The render
+   * export writes to the pointers it is given, so a segment is the same buffers moved on by `done` frames.
+   */
+  _renderSegments(frames, renderSegment) {
+    let done = 0;
+    while (done < frames) {
+      const now = currentTime + done / sampleRate;
+      this.noteEvents.drain(now, (ev) => this._applyNoteEvent(ev));
+      const off = this.noteEvents.nextOffset(now, frames - done, sampleRate);
+      const len = off > 0 ? off : frames - done;
+      renderSegment(done, len);
+      done += len;
     }
   }
 
@@ -310,7 +342,12 @@ class FluidSynthProcessor extends AudioWorkletProcessor {
     try {
       const m = this.module;
       const G = this._groups;
-      m._fluidsynth_process_multi(this._outPtrsPtr, this._fxLPtr, this._fxRPtr, frames);
+      // The pointer table is rewritten per segment (after any memory growth the view is fresh)
+      this._renderSegments(frames, (done, len) => {
+        const table = new Uint32Array(m.HEAPF32.buffer, this._outPtrsPtr, 2 * G);
+        for (let i = 0; i < 2 * G; i++) table[i] = this._groupPtrs[i] + done * 4;
+        m._fluidsynth_process_multi(this._outPtrsPtr, this._fxLPtr + done * 4, this._fxRPtr + done * 4, len);
+      });
       const buf = m.HEAPF32.buffer;
       for (let g = 0; g < G; g++) {
         const out = outputs[g];
@@ -347,7 +384,9 @@ class FluidSynthProcessor extends AudioWorkletProcessor {
 
     try {
       const m = this.module;
-      m._fluidsynth_process(this._leftPtr, this._rightPtr, frames);
+      this._renderSegments(frames, (done, len) => {
+        m._fluidsynth_process(this._leftPtr + done * 4, this._rightPtr + done * 4, len);
+      });
 
       // Copy from WASM heap to output buffers
       const leftArr = new Float32Array(m.HEAPF32.buffer, this._leftPtr, frames);

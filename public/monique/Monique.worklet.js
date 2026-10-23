@@ -8,6 +8,8 @@ if (typeof performance === 'undefined') {
   globalThis.performance = { now: () => currentTime * 1000 };
 }
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 class MoniqueProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -15,6 +17,8 @@ class MoniqueProcessor extends AudioWorkletProcessor {
     this.Module = null;
     this.isInitialized = false;
     this.pendingMessages = [];
+    // Notes sent ahead with a `time` wait here for their frame (see shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
     this.outputPtrL = 0;
     this.outputPtrR = 0;
     this.outputBufferL = null;
@@ -35,9 +39,7 @@ class MoniqueProcessor extends AudioWorkletProcessor {
 
       case 'noteOn':
         if (this.synth && this.isInitialized) {
-          console.log('[Monique Worklet] noteOn:', data.note, 'vel:', data.velocity || 100);
-          this.synth.noteOn(data.note, data.velocity || 100);
-          this._audioDetected = false; // Reset to detect audio from this note
+          if (this.noteEvents.push(event.data, currentTime)) this.applyNoteEvent(event.data);
         } else {
           this.pendingMessages.push(event.data);
         }
@@ -45,14 +47,15 @@ class MoniqueProcessor extends AudioWorkletProcessor {
 
       case 'noteOff':
         if (this.synth && this.isInitialized) {
-          console.log('[Monique Worklet] noteOff:', data.note);
-          this.synth.noteOff(data.note);
+          if (this.noteEvents.push(event.data, currentTime)) this.applyNoteEvent(event.data);
         }
         break;
 
       case 'allNotesOff':
         if (this.synth && this.isInitialized) {
-          this.synth.allNotesOff();
+          // Cancels the notes scheduled at or after it: on Stop the replayer has already sent the coming rows
+          this.noteEvents.cancelFrom(data.time ?? currentTime);
+          if (this.noteEvents.push(event.data, currentTime)) this.applyNoteEvent(event.data);
         }
         break;
 
@@ -67,6 +70,18 @@ class MoniqueProcessor extends AudioWorkletProcessor {
       case 'dispose':
         this.cleanup();
         break;
+    }
+  }
+
+  applyNoteEvent(ev) {
+    if (!this.synth) return;
+    switch (ev.type) {
+      case 'noteOn':
+        this.synth.noteOn(ev.note, ev.velocity || 100);
+        this._audioDetected = false; // Reset to detect audio from this note
+        break;
+      case 'noteOff': this.synth.noteOff(ev.note); break;
+      case 'allNotesOff': this.synth.allNotesOff(); break;
     }
   }
 
@@ -187,7 +202,16 @@ class MoniqueProcessor extends AudioWorkletProcessor {
     const numSamples = outputL.length;
 
     try {
-      this.synth.process(this.outputPtrL, this.outputPtrR, numSamples);
+      // Render in segments so a queued note event keys the synth at its own frame, not at the block start
+      let done = 0;
+      while (done < numSamples) {
+        const now = currentTime + done / sampleRate;
+        this.noteEvents.drain(now, (ev) => this.applyNoteEvent(ev));
+        const off = this.noteEvents.nextOffset(now, numSamples - done, sampleRate);
+        const len = off > 0 ? off : numSamples - done;
+        this.synth.process(this.outputPtrL + done * 4, this.outputPtrR + done * 4, len);
+        done += len;
+      }
 
       // Refresh views if WASM memory was resized
       const currentBuffer = this._wasmMemory

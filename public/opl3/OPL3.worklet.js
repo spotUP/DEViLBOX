@@ -3,6 +3,8 @@
  * WASM JS code passed as string from main thread.
  */
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 // A voice report every ~10 ms at 48 kHz.
 const REPORT_EVERY_FRAMES = 512;
 
@@ -17,7 +19,19 @@ class OPL3Processor extends AudioWorkletProcessor {
     this.watchVoices = false;
     this.voicePtr = 0;
     this.framesSinceReport = 0;
+    // Notes sent ahead with a `time` wait here for their frame (see shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
     this.port.onmessage = (e) => this.handleMessage(e.data);
+  }
+
+  /** Key a note message on the synth now */
+  applyNote(msg) {
+    switch (msg.type) {
+      case 'noteOn': this.module._oplNoteOn(msg.note, msg.velocity); break;
+      case 'noteOff': this.module._oplNoteOff(msg.note); break;
+      case 'chNoteOn': this.module._oplChannelNoteOn(msg.ch, msg.note, msg.velocity); break;
+      case 'chNoteOff': this.module._oplChannelNoteOff(msg.ch); break;
+    }
   }
 
   async handleMessage(msg) {
@@ -26,10 +40,10 @@ class OPL3Processor extends AudioWorkletProcessor {
         await this.initWasm(msg.sampleRate, msg.wasmBinary, msg.jsCode);
         break;
       case 'noteOn':
-        if (this.ready) this.module._oplNoteOn(msg.note, msg.velocity);
+        if (this.ready && this.noteEvents.push(msg, currentTime)) this.applyNote(msg);
         break;
       case 'noteOff':
-        if (this.ready) this.module._oplNoteOff(msg.note);
+        if (this.ready && this.noteEvents.push(msg, currentTime)) this.applyNote(msg);
         break;
       case 'sustainPedal':
         if (this.ready) this.module._oplSustainPedal(msg.value ? 1 : 0);
@@ -38,7 +52,10 @@ class OPL3Processor extends AudioWorkletProcessor {
         if (this.ready) this.module._oplPitchBend(msg.semitones);
         break;
       case 'allNotesOff':
-        if (this.ready) this.module._oplAllNotesOff();
+        if (this.ready) {
+          this.noteEvents.cancelFrom(msg.time ?? currentTime);
+          this.module._oplAllNotesOff();
+        }
         break;
       case 'loadSbi':
         if (this.ready) this.loadSbiData(msg.data);
@@ -57,10 +74,10 @@ class OPL3Processor extends AudioWorkletProcessor {
         }
         break;
       case 'chNoteOn':
-        if (this.ready) this.module._oplChannelNoteOn(msg.ch, msg.note, msg.velocity);
+        if (this.ready && this.noteEvents.push(msg, currentTime)) this.applyNote(msg);
         break;
       case 'chNoteOff':
-        if (this.ready) this.module._oplChannelNoteOff(msg.ch);
+        if (this.ready && this.noteEvents.push(msg, currentTime)) this.applyNote(msg);
         break;
       case 'watchVoices':
         this.watchVoices = !!msg.on;
@@ -173,11 +190,21 @@ class OPL3Processor extends AudioWorkletProcessor {
     const outL = output[0], outR = output[1];
     const n = outL.length;
 
-    this.module._oplProcess(this.outPtrL, this.outPtrR, n);
-
-    const heap = this.module.HEAPF32 || new Float32Array(this.module.wasmMemory.buffer);
-    outL.set(heap.subarray(this.outPtrL >> 2, (this.outPtrL >> 2) + n));
-    outR.set(heap.subarray(this.outPtrR >> 2, (this.outPtrR >> 2) + n));
+    // Render in segments so a queued note event keys the synth at its own frame, not at the block start
+    let done = 0;
+    while (done < n) {
+      const now = currentTime + done / sampleRate;
+      this.noteEvents.drain(now, (ev) => this.applyNote(ev));
+      const off = this.noteEvents.nextOffset(now, n - done, sampleRate);
+      const len = off > 0 ? off : n - done;
+      this.module._oplProcess(this.outPtrL + done * 4, this.outPtrR + done * 4, len);
+      const heap = this.module.HEAPF32 || new Float32Array(this.module.wasmMemory.buffer);
+      const offL = (this.outPtrL >> 2) + done;
+      const offR = (this.outPtrR >> 2) + done;
+      outL.set(heap.subarray(offL, offL + len), done);
+      outR.set(heap.subarray(offR, offR + len), done);
+      done += len;
+    }
 
     if (this.watchVoices && typeof this.module._oplGetChannelEnvelopes === 'function') {
       this.framesSinceReport += n;

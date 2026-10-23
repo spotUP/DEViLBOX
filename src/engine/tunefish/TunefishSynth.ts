@@ -240,21 +240,21 @@ export class TunefishSynth implements DevilboxSynth {
 
   private _currentMidiNote = 69;
 
-  noteOn(note: string | number, velocity: number = 1, _time?: number): void {
+  noteOn(note: string | number, velocity: number = 1, time?: number): void {
     const midi = typeof note === 'string' ? this.noteToMidi(note) : note;
     this._currentMidiNote = midi;
     const vel = Math.round(velocity * 127);
     this.workletNode?.port.postMessage({
       type: 'noteOn',
-      data: { note: midi, velocity: vel },
+      data: { note: midi, velocity: vel, time },
     });
   }
 
-  noteOff(note: string | number, _time?: number): void {
+  noteOff(note: string | number, time?: number): void {
     const midi = typeof note === 'string' ? this.noteToMidi(note) : note;
     this.workletNode?.port.postMessage({
       type: 'noteOff',
-      data: { note: midi },
+      data: { note: midi, time },
     });
   }
 
@@ -306,12 +306,13 @@ export class TunefishSynth implements DevilboxSynth {
     return midi;
   }
 
-  triggerAttack(note: string | number, velocity: number = 1, _time?: number): void {
-    this.noteOn(note, velocity);
+  // (note, time, velocity) is the DevilboxSynth order every caller uses
+  triggerAttack(note: string | number, time?: number, velocity: number = 1): void {
+    this.noteOn(note, velocity, time);
   }
 
-  triggerRelease(note: string | number, _time?: number): void {
-    this.noteOff(note);
+  triggerRelease(note: string | number, time?: number): void {
+    this.noteOff(note, time);
   }
 
   triggerAttackRelease(

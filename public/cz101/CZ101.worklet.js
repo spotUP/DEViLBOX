@@ -7,6 +7,8 @@
  * minified import/export names are the glue's business, not ours.
  */
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 // The chip's pitch table assumes a 40 kHz sample clock (4.48 MHz / 112 clocks
 // per sample); the chip renders at that rate and process() resamples it.
 const CHIP_CLOCK = 4480000;
@@ -21,6 +23,8 @@ class CZ101Processor extends AudioWorkletProcessor {
     this.isInitialized = false;
     this.bufferPtr = 0;
     this.pendingWrites = [];
+    // Register writes and envelopes sent ahead with a `time` wait here for their frame (see shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
     // Envelope stage sequencers, one per (envelope kind, voice): the CZ-101's
     // firmware loads each next step when the chip raises its stage interrupt;
     // the chip alone only runs the single step it was last given.
@@ -43,13 +47,18 @@ class CZ101Processor extends AudioWorkletProcessor {
         break;
 
       case 'writeReg':
-        // Queued; applied at the start of the next process() block
-        this.pendingWrites.push({ register: data.register, value: data.value });
+        // Untimed or past: queued, applied at the start of the next process() block. Ahead: applied at its frame.
+        if (this.noteEvents.push(data, currentTime)) this.pendingWrites.push({ register: data.register, value: data.value });
         break;
 
       case 'envelope':
       case 'keyOff':
-        this.pendingWrites.push(data);
+        if (this.noteEvents.push(data, currentTime)) this.pendingWrites.push(data);
+        break;
+
+      case 'cancelFrom':
+        // All Notes Off: the rows already sent for later never sound
+        this.noteEvents.cancelFrom(data.time ?? currentTime);
         break;
     }
   }
@@ -180,6 +189,30 @@ class CZ101Processor extends AudioWorkletProcessor {
     return this.chipBuf[this.chipIdx++];
   }
 
+  /** Apply one queued message to the chip */
+  applyMsg(msg) {
+    if (msg.type === 'envelope') this.startEnvelope(msg.kind, msg.voice, msg.stages);
+    else if (msg.type === 'keyOff') this.keyOff(msg.voice & 7);
+    else this.writeRegister(msg.register, msg.value);
+  }
+
+  /** Render output frames [from, to) */
+  renderRange(left, right, from, to) {
+    // Streaming linear resample from the chip's rate to the context rate
+    const step = CHIP_RATE / sampleRate;
+    for (let i = from; i < to; i++) {
+      this.phase += step;
+      while (this.phase >= 1) {
+        this.phase -= 1;
+        this.prev = this.next;
+        this.next = this.pullChipSample();
+      }
+      const s = this.prev + (this.next - this.prev) * this.phase;
+      left[i] = s;
+      right[i] = s;
+    }
+  }
+
   process(inputs, outputs) {
     const output = outputs[0];
     if (!output || output.length === 0) return true;
@@ -193,25 +226,17 @@ class CZ101Processor extends AudioWorkletProcessor {
       return true;
     }
 
-    while (this.pendingWrites.length > 0) {
-      const msg = this.pendingWrites.shift();
-      if (msg.type === 'envelope') this.startEnvelope(msg.kind, msg.voice, msg.stages);
-      else if (msg.type === 'keyOff') this.keyOff(msg.voice & 7);
-      else this.writeRegister(msg.register, msg.value);
-    }
+    while (this.pendingWrites.length > 0) this.applyMsg(this.pendingWrites.shift());
 
-    // Streaming linear resample from the chip's rate to the context rate
-    const step = CHIP_RATE / sampleRate;
-    for (let i = 0; i < left.length; i++) {
-      this.phase += step;
-      while (this.phase >= 1) {
-        this.phase -= 1;
-        this.prev = this.next;
-        this.next = this.pullChipSample();
-      }
-      const s = this.prev + (this.next - this.prev) * this.phase;
-      left[i] = s;
-      right[i] = s;
+    // Render in segments so a queued write or key-off lands at its own frame, not at the block start
+    let done = 0;
+    while (done < left.length) {
+      const now = currentTime + done / sampleRate;
+      this.noteEvents.drain(now, (ev) => this.applyMsg(ev));
+      const off = this.noteEvents.nextOffset(now, left.length - done, sampleRate);
+      const len = off > 0 ? off : left.length - done;
+      this.renderRange(left, right, done, done + len);
+      done += len;
     }
     return true;
   }

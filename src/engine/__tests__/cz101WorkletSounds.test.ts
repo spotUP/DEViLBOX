@@ -184,7 +184,7 @@ describe('CZ-101 worklet', () => {
     rig.synth.triggerAttack('C4' as unknown as number, undefined, 0.8);
     await settle();
     expect(rms(rig.render(0.3))).toBeGreaterThan(0.002);
-    rig.synth.triggerRelease('C4', 1234.5);
+    rig.synth.triggerRelease('C4', 0);   // the harness's audio clock (currentTime) is 0: a time on the worklet's own clock, due at once
     await settle();
     rig.render(0.5);
     expect(rms(rig.render(0.2))).toBeLessThan(0.0005);

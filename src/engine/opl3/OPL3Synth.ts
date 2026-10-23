@@ -134,7 +134,7 @@ export class OPL3Synth implements DevilboxSynth {
 
   private _currentMidiNote = 69;
 
-  triggerAttack(note: string | number, _time?: number, velocity = 1) {
+  triggerAttack(note: string | number, time?: number, velocity = 1) {
     if (!this._unmuted) {
       this.output.gain.value = 1.0;
       this._unmuted = true;
@@ -142,20 +142,20 @@ export class OPL3Synth implements DevilboxSynth {
     const midi = typeof note === 'string' ? noteToMidi(note) : note;
     this._currentMidiNote = midi;
     if (this._channelIndex >= 0) {
-      this.send({ type: 'chNoteOn', ch: this._channelIndex, note: midi, velocity: Math.round(velocity * 127) });
+      this.send({ type: 'chNoteOn', ch: this._channelIndex, note: midi, velocity: Math.round(velocity * 127), time });
     } else {
-      this.send({ type: 'noteOn', note: midi, velocity: Math.round(velocity * 127) });
+      this.send({ type: 'noteOn', note: midi, velocity: Math.round(velocity * 127), time });
     }
   }
 
-  triggerRelease(note?: string | number, _time?: number) {
+  triggerRelease(note?: string | number, time?: number) {
     if (this._channelIndex >= 0) {
-      this.send({ type: 'chNoteOff', ch: this._channelIndex });
+      this.send({ type: 'chNoteOff', ch: this._channelIndex, time });
     } else if (note !== undefined) {
       const midi = typeof note === 'string' ? noteToMidi(note) : note;
-      this.send({ type: 'noteOff', note: midi });
+      this.send({ type: 'noteOff', note: midi, time });
     } else {
-      this.send({ type: 'allNotesOff' });
+      this.send({ type: 'allNotesOff', time });
     }
   }
 

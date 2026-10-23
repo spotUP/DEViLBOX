@@ -16,8 +16,8 @@ export class TimedEventQueue {
     return false;
   }
 
-  /** Drop queued events at or after `time`: All Notes Off cancels rows already sent ahead. */
-  cancelFrom(time) { this.events = this.events.filter((e) => e.time < time); }
+  /** Drop queued events at or after `time`: All Notes Off cancels rows already sent ahead. `match` limits it to some events (one channel). */
+  cancelFrom(time, match) { this.events = this.events.filter((e) => e.time < time || (match && !match(e))); }
 
   /** Frames from the block start (at `now`) to the next queued event inside `frames`, or -1. */
   nextOffset(now, frames, rate) {

@@ -8,6 +8,8 @@ if (typeof performance === 'undefined') {
   };
 }
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 let Module = null;
 let synth = null;
 let ready = false;
@@ -42,7 +44,9 @@ let voicePtr = 0;
 class TunefishProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    
+    // Notes sent ahead with a `time` wait here for their frame (see shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
+
     this.port.onmessage = (e) => {
       const { type, data } = e.data;
       
@@ -54,17 +58,18 @@ class TunefishProcessor extends AudioWorkletProcessor {
           this.initWasm(data.wasmBytes);
           break;
         case 'noteOn':
-          if (ready && tunefish_note_on) {
+          if (ready && tunefish_note_on && this.noteEvents.push({ type, ...data }, currentTime)) {
             tunefish_note_on(synth, data.note, data.velocity);
           }
           break;
         case 'noteOff':
-          if (ready && tunefish_note_off) {
+          if (ready && tunefish_note_off && this.noteEvents.push({ type, ...data }, currentTime)) {
             tunefish_note_off(synth, data.note);
           }
           break;
         case 'allNotesOff':
           if (ready && tunefish_all_notes_off) {
+            this.noteEvents.cancelFrom((data && data.time) ?? currentTime);
             tunefish_all_notes_off(synth);
           }
           break;
@@ -156,17 +161,27 @@ class TunefishProcessor extends AudioWorkletProcessor {
     const right = output[1] || left;
     const blockSize = left.length;
 
-    // Render audio from Tunefish
-    tunefish_render(synth, outputPtrL, outputPtrR, blockSize);
+    // Render in segments so a queued note event keys the synth at its own frame, not at the block start
+    let done = 0;
+    while (done < blockSize) {
+      const now = currentTime + done / sampleRate;
+      this.noteEvents.drain(now, (ev) => {
+        if (ev.type === 'noteOn') tunefish_note_on(synth, ev.note, ev.velocity);
+        else tunefish_note_off(synth, ev.note);
+      });
+      const off = this.noteEvents.nextOffset(now, blockSize - done, sampleRate);
+      const len = off > 0 ? off : blockSize - done;
+      tunefish_render(synth, outputPtrL + done * 4, outputPtrR + done * 4, len);
 
-    // Copy from WASM memory to output
-    const heapF32 = Module.HEAPF32;
-    const offsetL = outputPtrL / 4;
-    const offsetR = outputPtrR / 4;
-    
-    for (let i = 0; i < blockSize; i++) {
-      left[i] = heapF32[offsetL + i];
-      right[i] = heapF32[offsetR + i];
+      // Copy from WASM memory to output (heap view re-read: render may grow memory)
+      const heapF32 = Module.HEAPF32;
+      const offsetL = (outputPtrL + done * 4) / 4;
+      const offsetR = (outputPtrR + done * 4) / 4;
+      for (let i = 0; i < len; i++) {
+        left[done + i] = heapF32[offsetL + i];
+        right[done + i] = heapF32[offsetR + i];
+      }
+      done += len;
     }
 
     if (watchVoices && tunefish_get_voices && ++voiceCounter >= 6) {

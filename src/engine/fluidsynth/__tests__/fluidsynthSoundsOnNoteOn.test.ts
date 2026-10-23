@@ -15,6 +15,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
+import { inlineWorkletImports } from '@/engine/__tests__/workletHarness';
 
 vi.mock('@/utils/audio-context', () => {
   const node = () => ({ connect() {}, disconnect() {}, gain: { value: 0 } });
@@ -42,11 +43,12 @@ async function render(triggerAfterEnsure: boolean): Promise<number> {
   let ProcessorClass!: new (o: object) => Processor;
   const g = globalThis as Record<string, unknown>;
   g.sampleRate = 48000;
+  g.currentTime = 0;   // the worklet queues notes by the audio clock; this stand-in clock stays at 0 so every note is due at once
   g.AudioWorkletProcessor = class {
     port: Processor['port'] = { postMessage(_m: unknown) {} };
   };
   g.registerProcessor = (_n: string, c: new (o: object) => Processor) => { ProcessorClass = c; };
-  (0, eval)(readFileSync(resolve(PUBLIC, 'FluidSynth.worklet.js'), 'utf8'));
+  (0, eval)(inlineWorkletImports(readFileSync(resolve(PUBLIC, 'FluidSynth.worklet.js'), 'utf8'), PUBLIC.split('/').pop()!));
 
   g.AudioWorkletNode = class {
     port: { postMessage(m: unknown): void; onmessage: ((e: { data: unknown }) => void) | null };

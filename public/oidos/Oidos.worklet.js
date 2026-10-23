@@ -1,6 +1,8 @@
 // Oidos Synth AudioWorklet
 // Wraps the WASM Oidos additive synth for real-time audio
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 let wasm = null;
 let synth = null;
 let ready = false;
@@ -105,6 +107,8 @@ class OidosProcessor extends AudioWorkletProcessor {
     this.outputBuffer = new Float32Array(128);
     this.watchVoices = false;
     this.voiceCounter = 0;
+    // Notes sent ahead with a `time` wait here for their frame (see shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
     
     this.port.onmessage = (e) => {
       const { type, data } = e.data;
@@ -115,12 +119,10 @@ class OidosProcessor extends AudioWorkletProcessor {
           this.initWasm(data.wasmBytes);
           break;
         case 'noteOn':
-          console.log('[Oidos] noteOn:', data.note, 'vel:', data.velocity, 'synth:', !!synth);
-          if (synth) synth.noteOn(data.note, data.velocity);
+          if (synth && this.noteEvents.push({ type, ...data }, currentTime)) synth.noteOn(data.note, data.velocity);
           break;
         case 'noteOff':
-          console.log('[Oidos] noteOff:', data.note);
-          if (synth) synth.noteOff(data.note);
+          if (synth && this.noteEvents.push({ type, ...data }, currentTime)) synth.noteOff(data.note);
           break;
         case 'watchVoices':
           this.watchVoices = !!e.data.on;
@@ -180,6 +182,11 @@ class OidosProcessor extends AudioWorkletProcessor {
     }
   }
 
+  /** Render output frames [from, from + len) into outputBuffer */
+  renderSegment(from, len) {
+    synth.process(this.outputBuffer.subarray(from, from + len));
+  }
+
   process(inputs, outputs, parameters) {
     if (!ready || !synth) {
       return true;
@@ -197,8 +204,19 @@ class OidosProcessor extends AudioWorkletProcessor {
       this.outputBuffer = new Float32Array(blockSize);
     }
 
-    // Generate mono audio
-    synth.process(this.outputBuffer);
+    // Generate mono audio in segments so a queued note event keys the synth at its own frame, not at the block start
+    let done = 0;
+    while (done < blockSize) {
+      const now = currentTime + done / sampleRate;
+      this.noteEvents.drain(now, (ev) => {
+        if (ev.type === 'noteOn') synth.noteOn(ev.note, ev.velocity);
+        else synth.noteOff(ev.note);
+      });
+      const off = this.noteEvents.nextOffset(now, blockSize - done, sampleRate);
+      const len = off > 0 ? off : blockSize - done;
+      this.renderSegment(done, len);
+      done += len;
+    }
 
     // Copy to stereo output
     for (let i = 0; i < blockSize; i++) {

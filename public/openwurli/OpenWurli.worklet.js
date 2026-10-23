@@ -8,6 +8,8 @@
  * via Function constructor (AudioWorklets don't support dynamic import).
  */
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 class OpenWurliProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -16,6 +18,8 @@ class OpenWurliProcessor extends AudioWorkletProcessor {
     this.outPtrL = 0;
     this.outPtrR = 0;
     this.blockSize = 128;
+    // Notes sent ahead with a `time` wait here for their frame (see shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
 
     this.port.onmessage = (e) => this.handleMessage(e.data);
   }
@@ -26,16 +30,19 @@ class OpenWurliProcessor extends AudioWorkletProcessor {
         await this.initWasm(msg.sampleRate, msg.wasmBinary, msg.jsCode);
         break;
       case 'noteOn':
-        if (this.ready) this.module._owNoteOn(msg.note, msg.velocity);
+        if (this.ready && this.noteEvents.push(msg, currentTime)) this.module._owNoteOn(msg.note, msg.velocity);
         break;
       case 'noteOff':
-        if (this.ready) this.module._owNoteOff(msg.note);
+        if (this.ready && this.noteEvents.push(msg, currentTime)) this.module._owNoteOff(msg.note);
         break;
       case 'sustainPedal':
         if (this.ready) this.module._owSustainPedal(msg.value ? 1 : 0);
         break;
       case 'allNotesOff':
-        if (this.ready) this.module._owAllNotesOff();
+        if (this.ready) {
+          this.noteEvents.cancelFrom(msg.time ?? currentTime);
+          this.module._owAllNotesOff();
+        }
         break;
       case 'setParam':
         if (this.ready) this.module._owSetParam(msg.paramId, msg.value);
@@ -154,16 +161,26 @@ class OpenWurliProcessor extends AudioWorkletProcessor {
     const outR = output[1];
     const numSamples = outL.length;
 
-    // Process through WASM
-    this.module._owProcess(this.outPtrL, this.outPtrR, numSamples);
+    // Process through WASM in segments so a queued note event keys the synth at its own frame, not at the block start
+    let done = 0;
+    while (done < numSamples) {
+      const now = currentTime + done / sampleRate;
+      this.noteEvents.drain(now, (ev) => {
+        if (ev.type === 'noteOn') this.module._owNoteOn(ev.note, ev.velocity);
+        else this.module._owNoteOff(ev.note);
+      });
+      const off = this.noteEvents.nextOffset(now, numSamples - done, sampleRate);
+      const len = off > 0 ? off : numSamples - done;
+      this.module._owProcess(this.outPtrL + done * 4, this.outPtrR + done * 4, len);
 
-    // Copy from WASM heap to output buffers
-    const heap = this.module.HEAPF32 || new Float32Array(this.module.wasmMemory.buffer);
-    const offL = this.outPtrL >> 2;
-    const offR = this.outPtrR >> 2;
-
-    outL.set(heap.subarray(offL, offL + numSamples));
-    outR.set(heap.subarray(offR, offR + numSamples));
+      // Copy from WASM heap to output buffers
+      const heap = this.module.HEAPF32 || new Float32Array(this.module.wasmMemory.buffer);
+      const offL = (this.outPtrL >> 2) + done;
+      const offR = (this.outPtrR >> 2) + done;
+      outL.set(heap.subarray(offL, offL + len), done);
+      outR.set(heap.subarray(offR, offR + len), done);
+      done += len;
+    }
 
     return true;
   }

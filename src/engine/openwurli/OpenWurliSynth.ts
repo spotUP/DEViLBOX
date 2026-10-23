@@ -166,20 +166,20 @@ export class OpenWurliSynth implements DevilboxSynth {
     this.sendParam(OPENWURLI_PARAM_IDS.velocityCurve, config.velocityCurve ?? 2);
   }
 
-  triggerAttack(note: string | number, _time?: number, velocity = 1) {
+  triggerAttack(note: string | number, time?: number, velocity = 1) {
     if (this._disposed) return;
     const midi = typeof note === 'string' ? noteToMidi(note) : note;
     const vel = Math.round(velocity * 127);
-    this.post({ type: 'noteOn', note: midi, velocity: vel });
+    this.post({ type: 'noteOn', note: midi, velocity: vel, time });
   }
 
-  triggerRelease(note?: string | number, _time?: number) {
+  triggerRelease(note?: string | number, time?: number) {
     if (this._disposed) return;
     if (note !== undefined) {
       const midi = typeof note === 'string' ? noteToMidi(note) : note;
-      this.post({ type: 'noteOff', note: midi });
+      this.post({ type: 'noteOff', note: midi, time });
     } else {
-      this.post({ type: 'allNotesOff' });
+      this.post({ type: 'allNotesOff', time });
     }
   }
 
