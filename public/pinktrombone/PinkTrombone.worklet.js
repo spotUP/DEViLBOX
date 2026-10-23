@@ -4,6 +4,8 @@
  * Supports 8 polyphonic voices with per-voice parameter control.
  */
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 // ── Utils ──────────────────────────────────────────────────────────────────
 function clamp(x, min, max) {
   return x < min ? min : x > max ? max : x;
@@ -602,31 +604,23 @@ class PinkTromboneProcessor extends AudioWorkletProcessor {
       constrictionIndex: 25,
       constrictionDiameter: 3,
     };
+    // Notes sent ahead with a `time` wait here for their frame (see shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
     this.port.onmessage = (e) => this.handleMessage(e.data);
     this.port.postMessage({ type: 'ready' });
   }
 
   handleMessage(msg) {
     switch (msg.type) {
-      case 'noteOn': {
-        const voice = this.allocateVoice(msg.note);
-        voice.noteOn(msg.note, msg.velocity || 1, this.params);
+      case 'noteOn':
+      case 'noteOff':
+        if (this.noteEvents.push(msg, currentTime)) this.applyNoteEvent(msg);
         break;
-      }
-      case 'noteOff': {
-        for (const v of this.voices) {
-          if (v.active && v.note === msg.note) {
-            v.noteOff(sampleRate);
-          }
-        }
+      case 'allNotesOff':
+        // Cancels the notes scheduled at or after it: on Stop the replayer has already sent the coming rows
+        this.noteEvents.cancelFrom(msg.time ?? currentTime);
+        if (this.noteEvents.push(msg, currentTime)) this.applyNoteEvent(msg);
         break;
-      }
-      case 'allNotesOff': {
-        for (const v of this.voices) {
-          if (v.active) v.noteOff(sampleRate);
-        }
-        break;
-      }
       case 'param': {
         if (msg.key in this.params) {
           this.params[msg.key] = msg.value;
@@ -674,6 +668,51 @@ class PinkTromboneProcessor extends AudioWorkletProcessor {
     return this.voices[0];
   }
 
+  applyNoteEvent(msg) {
+    switch (msg.type) {
+      case 'noteOn': {
+        const voice = this.allocateVoice(msg.note);
+        voice.noteOn(msg.note, msg.velocity || 1, this.params);
+        break;
+      }
+      case 'noteOff':
+        for (const v of this.voices) {
+          if (v.active && v.note === msg.note) v.noteOff(sampleRate);
+        }
+        break;
+      case 'allNotesOff':
+        for (const v of this.voices) {
+          if (v.active) v.noteOff(sampleRate);
+        }
+        break;
+    }
+  }
+
+  /** Mix every active voice into buf[from, from + segLen) */
+  renderSegment(buf, tempBuf, from, segLen) {
+    const seg = tempBuf.subarray(from, from + segLen);
+    for (const voice of this.voices) {
+      if (!voice.active) continue;
+
+      // Render this voice
+      seg.fill(0);
+      voice.synth.synthesize(seg);
+
+      // Mix into output with velocity and release envelope
+      for (let i = 0; i < segLen; i++) {
+        if (voice.releasing) {
+          voice.releaseGain -= voice.releaseRate;
+          if (voice.releaseGain <= 0) {
+            voice.releaseGain = 0;
+            voice.active = false;
+            break;
+          }
+        }
+        buf[from + i] += seg[i] * voice.velocity * voice.releaseGain;
+      }
+    }
+  }
+
   process(inputs, outputs) {
     const output = outputs[0];
     if (!output || !output[0]) return true;
@@ -685,25 +724,15 @@ class PinkTromboneProcessor extends AudioWorkletProcessor {
 
     const tempBuf = new Float32Array(len);
 
-    for (const voice of this.voices) {
-      if (!voice.active) continue;
-
-      // Render this voice
-      tempBuf.fill(0);
-      voice.synth.synthesize(tempBuf);
-
-      // Mix into output with velocity and release envelope
-      for (let i = 0; i < len; i++) {
-        if (voice.releasing) {
-          voice.releaseGain -= voice.releaseRate;
-          if (voice.releaseGain <= 0) {
-            voice.releaseGain = 0;
-            voice.active = false;
-            break;
-          }
-        }
-        buf[i] += tempBuf[i] * voice.velocity * voice.releaseGain;
-      }
+    // Render in segments so a queued note event keys the voices at its own frame, not at the block start
+    let done = 0;
+    while (done < len) {
+      const now = currentTime + done / sampleRate;
+      this.noteEvents.drain(now, (ev) => this.applyNoteEvent(ev));
+      const off = this.noteEvents.nextOffset(now, len - done, sampleRate);
+      const segLen = off > 0 ? off : len - done;
+      this.renderSegment(buf, tempBuf, done, segLen);
+      done += segLen;
     }
 
     return true;

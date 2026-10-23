@@ -6,6 +6,8 @@
  * All DSP runs at 16x internal oversampling, matching the original.
  */
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const WAVETABLE_SIZE = 32;
@@ -748,6 +750,9 @@ class VL1Processor extends AudioWorkletProcessor {
     // Current note for monophonic tracking
     this.currentNote = -1;
 
+    // Notes sent ahead with a `time` wait here for their frame (see shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
+
     this.port.onmessage = this.handleMessage.bind(this);
     this.port.postMessage({ type: 'ready' });
   }
@@ -755,22 +760,14 @@ class VL1Processor extends AudioWorkletProcessor {
   handleMessage(event) {
     const { type, ...data } = event.data;
     switch (type) {
-      case 'noteOn': {
-        const note = Math.max(0, Math.min(127, data.note));
-        const vel = (data.velocity ?? 100) / 127.0;
-        this.currentNote = note;
-        this.voice.noteOn(this.freqTable[note], vel);
-        break;
-      }
+      case 'noteOn':
       case 'noteOff':
-        if (data.note === undefined || data.note === this.currentNote) {
-          this.voice.noteOff();
-          this.currentNote = -1;
-        }
+        if (this.noteEvents.push(event.data, currentTime)) this.applyNoteEvent(event.data);
         break;
       case 'allNotesOff':
-        this.voice.noteOff();
-        this.currentNote = -1;
+        // Cancels the notes scheduled at or after it: on Stop the replayer has already sent the coming rows
+        this.noteEvents.cancelFrom(data.time ?? currentTime);
+        if (this.noteEvents.push(event.data, currentTime)) this.applyNoteEvent(event.data);
         break;
       case 'setParam':
         this.setParam(data.index, data.value);
@@ -844,13 +841,31 @@ class VL1Processor extends AudioWorkletProcessor {
     }
   }
 
-  process(inputs, outputs) {
-    const output = outputs[0];
-    if (!output || !output[0]) return true;
-    const outL = output[0];
-    const outR = output[1] || outL;
+  applyNoteEvent(ev) {
+    switch (ev.type) {
+      case 'noteOn': {
+        const note = Math.max(0, Math.min(127, ev.note));
+        const vel = (ev.velocity ?? 100) / 127.0;
+        this.currentNote = note;
+        this.voice.noteOn(this.freqTable[note], vel);
+        break;
+      }
+      case 'noteOff':
+        if (ev.note === undefined || ev.note === this.currentNote) {
+          this.voice.noteOff();
+          this.currentNote = -1;
+        }
+        break;
+      case 'allNotesOff':
+        this.voice.noteOff();
+        this.currentNote = -1;
+        break;
+    }
+  }
 
-    for (let i = 0; i < outL.length; i++) {
+  /** Render output frames [from, to) */
+  renderRange(outL, outR, from, to) {
+    for (let i = from; i < to; i++) {
       // Tempo clock
       this.tempoCounter++;
       if (this.tempoCounter >= this.tempoSamples) {
@@ -875,6 +890,25 @@ class VL1Processor extends AudioWorkletProcessor {
       const out = this.volume * synth;
       outL[i] = out;
       outR[i] = out;
+    }
+  }
+
+  process(inputs, outputs) {
+    const output = outputs[0];
+    if (!output || !output[0]) return true;
+    const outL = output[0];
+    const outR = output[1] || outL;
+
+    // Render in segments so a queued note event keys the voice at its own frame, not at the block start
+    const numSamples = outL.length;
+    let done = 0;
+    while (done < numSamples) {
+      const now = currentTime + done / sampleRate;
+      this.noteEvents.drain(now, (ev) => this.applyNoteEvent(ev));
+      const off = this.noteEvents.nextOffset(now, numSamples - done, sampleRate);
+      const len = off > 0 ? off : numSamples - done;
+      this.renderRange(outL, outR, done, done + len);
+      done += len;
     }
 
     return true;

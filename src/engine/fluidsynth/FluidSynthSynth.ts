@@ -210,26 +210,26 @@ export class FluidSynthSynthEngine implements DevilboxSynth {
     this.host?.loadSoundFont(data, filename);
   }
 
-  triggerAttack(frequency: number | string, _time?: number, velocity?: number): this {
+  triggerAttack(frequency: number | string, time?: number, velocity?: number): this {
     if (!this.host) return this;
     const note = toMidiKey(frequency);
     const key = Math.max(0, Math.min(127, note + (this.config.transpose ?? 0)));
     this.held.set(note, key);
-    this.host.post({ type: 'noteOn', channel: this.slot, key, velocity: Math.round((velocity ?? 0.8) * 127) });
+    this.host.post({ type: 'noteOn', channel: this.slot, key, velocity: Math.round((velocity ?? 0.8) * 127), time });
     return this;
   }
 
-  triggerRelease(frequency?: number | string, _time?: number): this {
+  triggerRelease(frequency?: number | string, time?: number): this {
     if (!this.host) return this;
     if (frequency === undefined) {
       this.held.clear();
-      this.host.post({ type: 'allNotesOff', channel: this.slot });
+      this.host.post({ type: 'allNotesOff', channel: this.slot, time });
       return this;
     }
     const note = toMidiKey(frequency);
     const key = this.held.get(note) ?? Math.max(0, Math.min(127, note + (this.config.transpose ?? 0)));
     this.held.delete(note);
-    this.host.post({ type: 'noteOff', channel: this.slot, key });
+    this.host.post({ type: 'noteOff', channel: this.slot, key, time });
     return this;
   }
 

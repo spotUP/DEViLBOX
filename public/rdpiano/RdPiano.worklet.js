@@ -4,6 +4,8 @@
  * Output-only synth processor with ROM loading support
  */
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 let processorRegistered = false;
 
 class RdPianoProcessor extends AudioWorkletProcessor {
@@ -19,6 +21,8 @@ class RdPianoProcessor extends AudioWorkletProcessor {
     this.outputBufferR = null;
     // Store ROM pointers to prevent use-after-free
     this.romPointers = [];
+    // Notes sent ahead with a `time` wait here for their frame (see shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
     this.port.onmessage = this.handleMessage.bind(this);
   }
 
@@ -97,7 +101,7 @@ class RdPianoProcessor extends AudioWorkletProcessor {
 
       case 'noteOn':
         if (this.synth && this.isInitialized) {
-          this.synth.noteOn(data.note, data.velocity || 100);
+          if (this.noteEvents.push({ type, ...data }, currentTime)) this.synth.noteOn(data.note, data.velocity || 100);
         } else {
           this.pendingMessages.push(event.data);
         }
@@ -105,12 +109,13 @@ class RdPianoProcessor extends AudioWorkletProcessor {
 
       case 'noteOff':
         if (this.synth && this.isInitialized) {
-          this.synth.noteOff(data.note);
+          if (this.noteEvents.push({ type, ...data }, currentTime)) this.synth.noteOff(data.note);
         }
         break;
 
       case 'allNotesOff':
         if (this.synth && this.isInitialized) {
+          this.noteEvents.cancelFrom(data.time ?? currentTime);
           this.synth.allNotesOff();
         }
         break;
@@ -330,19 +335,29 @@ class RdPianoProcessor extends AudioWorkletProcessor {
     const numSamples = outputL.length;
 
     try {
-      // Generate audio through WASM
-      this.synth.processJS(this.outputPtrL, this.outputPtrR, numSamples);
+      // Render in segments so a queued note event keys the synth at its own frame, not at the block start
+      let done = 0;
+      while (done < numSamples) {
+        const now = currentTime + done / sampleRate;
+        this.noteEvents.drain(now, (ev) => {
+          if (ev.type === 'noteOn') this.synth.noteOn(ev.note, ev.velocity || 100);
+          else this.synth.noteOff(ev.note);
+        });
+        const off = this.noteEvents.nextOffset(now, numSamples - done, sampleRate);
+        const len = off > 0 ? off : numSamples - done;
+        this.synth.processJS(this.outputPtrL + done * 4, this.outputPtrR + done * 4, len);
 
-      // Handle WASM memory growth (buffer may have been reallocated)
-      const currentBuffer = this._wasmMemory ? this._wasmMemory.buffer : (this.Module.HEAPF32 ? this.Module.HEAPF32.buffer : null);
-      if (currentBuffer && this.outputBufferL.buffer !== currentBuffer) {
-        this.outputBufferL = new Float32Array(currentBuffer, this.outputPtrL, 128);
-        this.outputBufferR = new Float32Array(currentBuffer, this.outputPtrR, 128);
+        // Handle WASM memory growth (buffer may have been reallocated)
+        const currentBuffer = this._wasmMemory ? this._wasmMemory.buffer : (this.Module.HEAPF32 ? this.Module.HEAPF32.buffer : null);
+        if (currentBuffer && this.outputBufferL.buffer !== currentBuffer) {
+          this.outputBufferL = new Float32Array(currentBuffer, this.outputPtrL, 128);
+          this.outputBufferR = new Float32Array(currentBuffer, this.outputPtrR, 128);
+        }
+
+        outputL.set(this.outputBufferL.subarray(done, done + len), done);
+        outputR.set(this.outputBufferR.subarray(done, done + len), done);
+        done += len;
       }
-
-      // Copy to output
-      outputL.set(this.outputBufferL.subarray(0, numSamples));
-      outputR.set(this.outputBufferR.subarray(0, numSamples));
     } catch (error) {
       // Silence on error
     }

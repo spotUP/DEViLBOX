@@ -173,13 +173,14 @@ export class CZ101Synth implements DevilboxSynth {
   /**
    * Write a register value to the UPD933
    */
-  private writeReg(register: number, value: number): void {
+  private writeReg(register: number, value: number, time?: number): void {
     if (!this.workletNode) return;
 
     this.workletNode.port.postMessage({
       type: 'writeReg',
       register,
-      value
+      value,
+      time,
     });
   }
 
@@ -199,19 +200,19 @@ export class CZ101Synth implements DevilboxSynth {
   }
 
   /** Register word for voice `v`: its own waveform plus, on even voices, the modulation bits of the voice it controls. */
-  private writeWaveformRegister(v: number): void {
+  private writeWaveformRegister(v: number, time?: number): void {
     const modulated = (v & 1) === 0 ? this.modBits[(v + 6) & 7] : 0;
-    this.writeReg(UPD933_REG.WAVEFORM + v, this.waveBits[v] | modulated);
+    this.writeReg(UPD933_REG.WAVEFORM + v, this.waveBits[v] | modulated, time);
   }
 
   /** Point voice `v` at `line`; `modulation` = ring (bit 5) and pitch-mod (bits 4-3) bits aimed at this voice. */
-  private assignLine(v: number, line: CZLine, lineNumber: 1 | 2, modulation: number): void {
+  private assignLine(v: number, line: CZLine, lineNumber: 1 | 2, modulation: number, time?: number): void {
     this.voiceLine[v] = lineNumber;
     this.waveBits[v] = CZ101Synth.waveBitsFor(line);
-    this.writeWaveformRegister(v);
+    this.writeWaveformRegister(v, time);
     if ((v & 1) === 0 && this.modBits[v] !== modulation) {
       this.modBits[v] = modulation;
-      this.writeWaveformRegister((v + 2) & 7); // the register that controls voice v
+      this.writeWaveformRegister((v + 2) & 7, time); // the register that controls voice v
     }
   }
 
@@ -299,7 +300,7 @@ export class CZ101Synth implements DevilboxSynth {
   /**
    * Trigger a note on
    */
-  triggerAttack(note: string | number, _time?: number, velocity: number = 0.8): void {
+  triggerAttack(note: string | number, time?: number, velocity: number = 0.8): void {
     // Numbers above 127 are frequencies in Hz (the engine's convention for chip synths)
     const midiNote = typeof note === 'string' || note > 127 ? noteToMidi(note) : note;
     if (!this.workletNode) return;
@@ -312,32 +313,33 @@ export class CZ101Synth implements DevilboxSynth {
     // Stealing a voice: its partner (if it was a pair) is silenced too
     const keyedVelocity = Math.floor(Math.max(0, Math.min(1, velocity)) * 127);
     voices.forEach((v, i) => {
-      if (this.voices[v].active) this.workletNode!.port.postMessage({ type: 'keyOff', voice: v });
+      if (this.voices[v].active) this.workletNode!.port.postMessage({ type: 'keyOff', voice: v, time });
       this.voices[v] = { note: midiNote, velocity: keyedVelocity, active: true, age: ++this.allocationCounter };
       const line = lines[i];
       // Line 2 is the even voice: ring modulation (bit 5) and noise pitch modulation (bits 4-3 = 3)
       const modulation = i === 1 ? (patch.ringMod ? 0x20 : 0) | (patch.noiseMode ? 0x18 : 0) | (patch.ringOnly ? 0x04 : 0) : 0;
-      this.assignLine(v, line, i === 1 ? 2 : 1, modulation);
+      this.assignLine(v, line, i === 1 ? 2 : 1, modulation, time);
 
       const detuneUnits = (patch.detune ?? 0) * 4 + (line.detune ?? 0) * CENTS_TO_PITCH_UNITS;
-      this.writeReg(UPD933_REG.PITCH + v, this.midiNoteToPitch(midiNote + 12 * (patch.octave ?? 0), detuneUnits));
-      this.writeReg(UPD933_REG.PHASE + v, 0);
+      this.writeReg(UPD933_REG.PITCH + v, this.midiNoteToPitch(midiNote + 12 * (patch.octave ?? 0), detuneUnits), time);
+      this.writeReg(UPD933_REG.PHASE + v, 0, time);
 
-      this.sendEnvelope(0, v, line.dcaEnvelope, keyedVelocity / 127);
-      this.sendEnvelope(1, v, line.dcwEnvelope, 1);
+      this.sendEnvelope(0, v, line.dcaEnvelope, keyedVelocity / 127, time);
+      this.sendEnvelope(1, v, line.dcwEnvelope, 1, time);
       // Always sent, empty or not: it also returns this voice's pitch envelope to zero, which a voice that last played
       // a patch with a pitch envelope would otherwise keep (the next note would sound that many semitones off)
-      this.sendEnvelope(2, v, line.dcoEnvelope ?? [], 1);
+      this.sendEnvelope(2, v, line.dcoEnvelope ?? [], 1, time);
     });
   }
 
   /** Patch levels are 0-99 on the CZ-101's panel; the chip's DCA/DCW level field is 7 bits. */
-  private sendEnvelope(kind: 0 | 1 | 2, voice: number, stages: CZEnvelopeStage[], scale: number): void {
+  private sendEnvelope(kind: 0 | 1 | 2, voice: number, stages: CZEnvelopeStage[], scale: number, time?: number): void {
     const toChip = kind === 2 ? 1 : 127 / 99;
     this.workletNode?.port.postMessage({
       type: 'envelope',
       kind,
       voice,
+      time,
       stages: stages.map((st) => ({
         rate: Math.min(127, Math.max(0, Math.round(st.rate))),
         level: Math.min(kind === 2 ? 63 : 127, Math.round(st.level * toChip * scale)),
@@ -350,14 +352,17 @@ export class CZ101Synth implements DevilboxSynth {
    * Trigger a note off. With no note (the engine's mono-style release) every sounding
    * voice is released.
    */
-  triggerRelease(note?: string | number, _time?: number): void {
+  triggerRelease(note?: string | number, time?: number): void {
     const midiNote = note === undefined ? undefined : (typeof note === 'string' ? noteToMidi(note) : note);
     if (!this.workletNode) return;
+
+    // All Notes Off cancels the rows already sent for later (on Stop); the key-offs below follow it
+    if (midiNote === undefined) this.workletNode.port.postMessage({ type: 'cancelFrom', time });
 
     this.voices.forEach((voice, v) => {
       if (!voice.active || (midiNote !== undefined && voice.note !== midiNote)) return;
       voice.active = false;
-      this.workletNode!.port.postMessage({ type: 'keyOff', voice: v });
+      this.workletNode!.port.postMessage({ type: 'keyOff', voice: v, time });
     });
   }
 

@@ -342,7 +342,7 @@ export class PinkTromboneSynth implements DevilboxSynth {
     return typeof val === 'number' ? val : undefined;
   }
 
-  public triggerAttack(note: string | number, _time?: number, velocity: number = 1): void {
+  public triggerAttack(note: string | number, time?: number, velocity: number = 1): void {
     if (!this._workletNode) return;
     const midi = typeof note === 'string' ? noteToMidi(note) : note;
     // Scale tenseness with velocity for expressive playing
@@ -351,6 +351,7 @@ export class PinkTromboneSynth implements DevilboxSynth {
       type: 'noteOn',
       note: midi,
       velocity,
+      time,
     });
     // Update tenseness based on velocity
     if (this._workletNode) {
@@ -359,10 +360,10 @@ export class PinkTromboneSynth implements DevilboxSynth {
     }
   }
 
-  public triggerRelease(_time?: number): void {
+  public triggerRelease(time?: number): void {
     if (!this._workletNode) return;
     // Engine calls triggerRelease(time) with no note — release all voices
-    this._workletNode.port.postMessage({ type: 'allNotesOff' });
+    this._workletNode.port.postMessage({ type: 'allNotesOff', time });
   }
 
   public triggerAttackRelease(note: string | number, _duration: number | string, _time?: number, velocity: number = 1): void {

@@ -4,7 +4,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { ROOT, startWorklet, stereoOutputs, type WorkletMsg, type WorkletProc } from '@/engine/__tests__/workletHarness';
+import { ROOT, inlineWorkletImports, startWorklet, stereoOutputs, type WorkletMsg, type WorkletProc } from '@/engine/__tests__/workletHarness';
 import { decodeVoices, type WasmVoice } from '@/engine/voiceStatus/wasmVoiceStatus';
 
 export const SAMPLE_RATE = 48000;
@@ -93,7 +93,7 @@ export async function makeCustomRig(
     registerProcessor: (_n: string, cls: new () => WorkletProc) => { Processor = cls; },
     sampleRate: SAMPLE_RATE, currentTime: 0,
   };
-  new Function(...Object.keys(scope), readFileSync(resolve(ROOT, workletFile), 'utf8'))(...Object.values(scope));
+  new Function(...Object.keys(scope), inlineWorkletImports(readFileSync(resolve(ROOT, workletFile), 'utf8'), workletFile.split('/')[1]))(...Object.values(scope));
   const proc = new Processor();
   const send = async (m: unknown): Promise<void> => {
     if (delivery === 'handleMessage') await (proc.handleMessage as (d: unknown) => Promise<void>).call(proc, m);

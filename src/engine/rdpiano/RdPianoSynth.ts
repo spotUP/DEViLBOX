@@ -421,7 +421,7 @@ export class RdPianoSynth implements DevilboxSynth {
 
   private _currentMidiNote = 69;
 
-  triggerAttack(frequency: number | string, _time?: number, velocity = 1): void {
+  triggerAttack(frequency: number | string, time?: number, velocity = 1): void {
     const midiNote = typeof frequency === 'string'
       ? noteToMidi(frequency)
       : noteToMidi(frequency);
@@ -439,11 +439,11 @@ export class RdPianoSynth implements DevilboxSynth {
       type: 'noteOn',
       note: midiNote,
       velocity: vel,
+      time,
     });
   }
 
   triggerRelease(frequency?: number | string, time?: number): void {
-    void time;
     if (!this._worklet) return;
 
     if (frequency !== undefined) {
@@ -453,9 +453,10 @@ export class RdPianoSynth implements DevilboxSynth {
       this._worklet.port.postMessage({
         type: 'noteOff',
         note: midiNote,
+        time,
       });
     } else {
-      this._worklet.port.postMessage({ type: 'allNotesOff' });
+      this._worklet.port.postMessage({ type: 'allNotesOff', time });
     }
   }
 

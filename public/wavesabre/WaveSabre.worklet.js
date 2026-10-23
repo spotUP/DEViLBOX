@@ -1,6 +1,8 @@
 // WaveSabre Synth AudioWorklet
 // Wraps Falcon and Slaughter synths from WaveSabre
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 // Polyfill performance.now() for AudioWorklet context
 if (typeof performance === 'undefined') {
   globalThis.performance = {
@@ -48,6 +50,8 @@ class WaveSabreProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.synthType = SYNTH_FALCON; // Default
+    // Notes sent ahead with a `time` wait here for their frame (see shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
     
     this.port.onmessage = (e) => {
       const { type, data } = e.data;
@@ -65,12 +69,12 @@ class WaveSabreProcessor extends AudioWorkletProcessor {
           break;
         case 'noteOn':
           console.log('[WaveSabre] noteOn:', data.note, 'vel:', data.velocity, 'ready:', ready);
-          if (ready && wavesabre_note_on) {
+          if (ready && wavesabre_note_on && this.noteEvents.push({ type, ...data }, currentTime)) {
             wavesabre_note_on(synth, data.note, data.velocity, 0);
           }
           break;
         case 'noteOff':
-          if (ready && wavesabre_note_off) {
+          if (ready && wavesabre_note_off && this.noteEvents.push({ type, ...data }, currentTime)) {
             wavesabre_note_off(synth, data.note);
           }
           break;
@@ -208,23 +212,32 @@ class WaveSabreProcessor extends AudioWorkletProcessor {
     const right = output[1] || left;
     const blockSize = left.length;
 
-    // Render audio
-    wavesabre_render(synth, outputPtrL, outputPtrR, blockSize);
-
-    // Copy from WASM memory to output
+    // Render in segments so a queued note event keys the synth at its own frame, not at the block start
     const heapF32 = Module.HEAPF32;
-    const offsetL = outputPtrL / 4;
-    const offsetR = outputPtrR / 4;
-    
-    // Debug: check if WASM is outputting non-zero samples
     let maxSample = 0;
-    for (let i = 0; i < blockSize; i++) {
-      left[i] = heapF32[offsetL + i];
-      right[i] = heapF32[offsetR + i];
-      const absL = Math.abs(left[i]);
-      if (absL > maxSample) maxSample = absL;
+    let done = 0;
+    while (done < blockSize) {
+      const now = currentTime + done / sampleRate;
+      this.noteEvents.drain(now, (ev) => {
+        if (ev.type === 'noteOn') wavesabre_note_on(synth, ev.note, ev.velocity, 0);
+        else wavesabre_note_off(synth, ev.note);
+      });
+      const off = this.noteEvents.nextOffset(now, blockSize - done, sampleRate);
+      const len = off > 0 ? off : blockSize - done;
+      wavesabre_render(synth, outputPtrL + done * 4, outputPtrR + done * 4, len);
+
+      // Copy from WASM memory to output
+      const offsetL = (outputPtrL + done * 4) / 4;
+      const offsetR = (outputPtrR + done * 4) / 4;
+      for (let i = 0; i < len; i++) {
+        left[done + i] = heapF32[offsetL + i];
+        right[done + i] = heapF32[offsetR + i];
+        const absL = Math.abs(left[done + i]);
+        if (absL > maxSample) maxSample = absL;
+      }
+      done += len;
     }
-    
+
     if (watchVoices && wavesabre_get_voices && ++voiceCounter >= 6) {
       voiceCounter = 0;
       if (!voicePtr) voicePtr = Module._malloc(MAX_REPORTED_VOICES * 8 * 4);

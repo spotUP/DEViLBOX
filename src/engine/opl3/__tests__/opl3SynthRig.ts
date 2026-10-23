@@ -5,7 +5,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { ROOT, stereoOutputs, type WorkletProc } from '@/engine/__tests__/workletHarness';
+import { ROOT, inlineWorkletImports, stereoOutputs, type WorkletProc } from '@/engine/__tests__/workletHarness';
 
 export const SAMPLE_RATE = 48000;
 
@@ -43,7 +43,7 @@ export function installOpl3Globals(): void {
         registerProcessor: (_n: string, cls: new () => WorkletProc) => { Processor = cls; },
         sampleRate: SAMPLE_RATE, currentTime: 0,
       };
-      new Function(...Object.keys(scope), readFileSync(resolve(ROOT, 'public/opl3/OPL3.worklet.js'), 'utf8'))(...Object.values(scope));
+      new Function(...Object.keys(scope), inlineWorkletImports(readFileSync(resolve(ROOT, 'public/opl3/OPL3.worklet.js'), 'utf8'), 'opl3'))(...Object.values(scope));
       this.proc = new Processor();
       // main thread -> worklet: serialised, with process.versions hidden so Emscripten takes its browser path
       let chain: Promise<void> = Promise.resolve();
