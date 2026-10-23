@@ -73,7 +73,7 @@ import { SpaceLaserHeader, V2Header, DubSirenHeader, SynareHeader, type SynthHea
 import { DOMSynthPanel } from '../controls/DOMSynthPanel';
 import { DX7LayoutPanel } from '../controls/DX7LayoutPanel';
 import { OPL3LayoutPanel } from '../controls/OPL3LayoutPanel';
-import { getSynthLayout } from '@/constants/synthLayouts';
+import { getInstrumentLayout } from '@/constants/synthLayouts';
 import { applyKlysPreset, renameKlysInstrument } from '@/components/klystrack/klysInstrumentEdit';
 import { klysPresetById } from '@constants/klysPresets';
 import { klysInstrumentIndex } from '@/engine/klystrack/klysInstrumentFields';
@@ -3716,7 +3716,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             />
           </Suspense>
         ) : (() => {
-          const declLayout = getSynthLayout(instrument.synthType);
+          const declLayout = getInstrumentLayout(instrument);
           if (declLayout) {
             const configKey = declLayout.configKey;
             // Use dedicated config property if available (e.g. instrument.monique, instrument.amsynth),
@@ -3994,7 +3994,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
 
   // Layout descriptor fallback — synths with SYNTH_LAYOUTS entries but no dedicated editor mode
   if (editorMode === 'layout') {
-    const layout = getSynthLayout(instrument.synthType);
+    const layout = getInstrumentLayout(instrument);
     if (layout) {
       const configKey = layout.configKey;
       const config = configKey
