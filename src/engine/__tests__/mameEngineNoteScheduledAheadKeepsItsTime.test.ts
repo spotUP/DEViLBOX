@@ -16,6 +16,7 @@ vi.mock('@/utils/audio-context', () => ({
 import { MAMEEngine } from '@/engine/MAMEEngine';
 import { D50Synth } from '@/engine/d50/D50Synth';
 import { VFXSynth } from '@/engine/vfx/VFXSynth';
+import { MU2000Synth } from '@/engine/mu2000/MU2000Synth';
 import { MAMESynth } from '@/engine/MAMESynth';
 
 const RATE = 48000;
@@ -65,6 +66,15 @@ function wiredD50(engine: MAMEEngine) {
   return synth as D50Synth;
 }
 
+function wiredMu2000(engine: MAMEEngine) {
+  const synth = Object.create(MU2000Synth.prototype);
+  Object.assign(synth, {
+    mameEngine: engine, handle: HANDLE, isInitialized: true, romLoaded: true, audioContext: { get currentTime() { return ctxNow; } },
+    voices: Array.from({ length: 4 }, () => ({ note: 0, velocity: 0, channel: 0, active: false, startTime: 0 })),
+  });
+  return synth as MU2000Synth;
+}
+
 function wiredVfx(engine: MAMEEngine) {
   const synth = Object.create(VFXSynth.prototype);
   Object.assign(synth, {
@@ -87,7 +97,7 @@ const near = (a: number, b: number) => Math.abs(a - b) <= 1 / RATE;
 
 beforeEach(() => { ctxNow = 0; });
 
-for (const [name, wire] of [['D50', wiredD50], ['VFX', wiredVfx], ['MAMESynth', wiredMameSynth]] as const) {
+for (const [name, wire] of [['D50', wiredD50], ['VFX', wiredVfx], ['MU2000', wiredMu2000], ['MAMESynth', wiredMameSynth]] as const) {
   describe(`note scheduled ahead keeps its time on ${name}`, () => {
     it('a note with a future time writes the chip at that frame, not on arrival', () => {
       const engine = wiredEngine();
@@ -126,7 +136,7 @@ for (const [name, wire] of [['D50', wiredD50], ['VFX', wiredVfx], ['MAMESynth', 
   });
 }
 
-for (const [name, wire] of [['D50', wiredD50], ['VFX', wiredVfx]] as const) {
+for (const [name, wire] of [['D50', wiredD50], ['VFX', wiredVfx], ['MU2000', wiredMu2000]] as const) {
   describe(`triggerAttackRelease on ${name} releases at time plus duration`, () => {
     it('queues the release with the attack, with no timer', () => {
       const engine = wiredEngine();
