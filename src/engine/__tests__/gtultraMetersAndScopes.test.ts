@@ -14,7 +14,7 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve, basename } from 'node:path';
-import { loadSharedWorkletScripts, ROOT, type WorkletProc } from './workletHarness';
+import { inlineWorkletImports, loadSharedWorkletScripts, ROOT, type WorkletProc } from './workletHarness';
 
 vi.mock('@/engine/ToneEngine', () => {
   const engine = {
@@ -49,7 +49,7 @@ function installWorkletNode(): { processor: () => WorkletProc } {
     registerProcessor: (_n: string, cls: new () => WorkletProc) => { Processor = cls; },
     sampleRate: 48000, currentTime: 0,
   };
-  new Function(...Object.keys(scope), readFileSync(resolve(ROOT, 'public/gtultra/GTUltra.worklet.js'), 'utf8'))(...Object.values(scope));
+  new Function(...Object.keys(scope), inlineWorkletImports(readFileSync(resolve(ROOT, 'public/gtultra/GTUltra.worklet.js'), 'utf8'), 'gtultra'))(...Object.values(scope));
   let node!: { port: { postMessage: (m: unknown) => void; onmessage: ((e: { data: unknown }) => void) | null }; connect: () => void };
   vi.stubGlobal('AudioWorkletNode', class {
     port = {

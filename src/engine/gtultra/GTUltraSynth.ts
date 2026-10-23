@@ -68,7 +68,7 @@ export class GTUltraSynth implements DevilboxSynth {
     engine.setInstrumentTablePtr(i, 3, config.speedPtr);   // speed
   }
 
-  triggerAttack(note: string | number, _time?: number, _velocity?: number): void {
+  triggerAttack(note: string | number, time?: number, _velocity?: number): void {
     const engine = useGTUltraStore.getState().engine;
     if (!engine) return;
 
@@ -77,14 +77,21 @@ export class GTUltraSynth implements DevilboxSynth {
     GTUltraSynth._channelAlloc++;
     this._lastChannel = channel;
 
-    engine.jamNoteOn(channel, toGTNote(note), this._instrumentIndex);
+    // The channel is chosen here, not in the worklet, so a queued noteOff hits the channel of its noteOn
+    engine.jamNoteOn(channel, toGTNote(note), this._instrumentIndex, time);
   }
 
-  triggerRelease(_note?: string | number, _time?: number): void {
+  triggerRelease(_note?: string | number, time?: number): void {
     const engine = useGTUltraStore.getState().engine;
     if (!engine || this._lastChannel < 0) return;
 
-    engine.jamNoteOff(this._lastChannel);
+    engine.jamNoteOff(this._lastChannel, time);
+  }
+
+  releaseAll(): void {
+    // Rows already sent ahead must not key after the panic
+    useGTUltraStore.getState().engine?.cancelJamNotes();
+    this.triggerRelease();
   }
 
   set(param: string, value: number): void {
