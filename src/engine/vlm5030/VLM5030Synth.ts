@@ -92,6 +92,8 @@ export class VLM5030Synth extends MAMEBaseSynth {
       this.loadROM(0, romData);
       // Update instrument store so UI shows "ROMS READY"
       this._updateRomStatus(true);
+    } else {
+      this._updateRomStatus(false);
     }
   }
 

@@ -221,13 +221,24 @@ export class TMS5220Synth extends MAMEBaseSynth {
   /** Try to load Speak & Spell VSM ROMs on init */
   private async _loadROMs(): Promise<void> {
     try {
-      this._romData = await loadTMS5220ROMs();
+      const data = await loadTMS5220ROMs();
 
-      if (!this._romData) {
+      if (!data) {
         console.warn('[TMS5220] VSM ROMs not found — text-to-speech unavailable until ROM is uploaded');
+        this._updateRomStatus(false);
         return;
       }
+      this.loadROM(0, data);
+    } catch {
+      console.log('[TMS5220] VSM ROMs not available');
+      this._updateRomStatus(false);
+    }
+  }
 
+  /** Take the combined VSM image (from disk, the ROM cache or the upload dialog) and index its words. */
+  loadROM(_bank: number, data: Uint8Array): void {
+    try {
+      this._romData = data;
       // The VSM carries its own directory: system phrases plus four spelling lists.
       this._romWords = parseVSMDirectory(this._romData);
       if (this._romWords.length < 26) {
@@ -261,7 +272,8 @@ export class TMS5220Synth extends MAMEBaseSynth {
         this._sendROMToWasm();
       }
     } catch {
-      console.log('[TMS5220] VSM ROMs not available (optional for text-to-speech)');
+      console.log('[TMS5220] VSM ROM could not be indexed');
+      this._updateRomStatus(false);
     }
   }
 
