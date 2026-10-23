@@ -110,7 +110,7 @@ export const NUADE_VERDICTS: Readonly<Record<string, NuadeVerdict>> = {
   sonix: {"uadeEnvelopeCorrelation":0,"endAgrees":true,"defaultEngine":"native","ownNote":"not comparable: _uade_wasm_load failed (ret=-1)"},
   soundcontrol: {"uadeEnvelopeCorrelation":0.9948,"ownEnvelopeCorrelation":0.9947,"endAgrees":true,"defaultEngine":"uade"},
   soundfactory: {"uadeEnvelopeCorrelation":0.9249,"ownEnvelopeCorrelation":0.8903,"endAgrees":true,"defaultEngine":"native"},
-  soundfx: {"uadeEnvelopeCorrelation":0.9616,"endAgrees":false,"defaultEngine":"native","heldBecause":"operation_stealth.sfx: UADE ends at 9.9 s, nuade ends at 19.8 s"},
+  soundfx: {"uadeEnvelopeCorrelation":0.9616,"endAgrees":false,"defaultEngine":"native","ownNote":"our engine not measured yet"},
   soundimages: {"uadeEnvelopeCorrelation":0.9905,"endAgrees":false,"defaultEngine":"uade","heldBecause":"blinkys scary school-sfx.tw: UADE ends at 9.7 s, nuade ends at 1.9 s"},
   soundmaster: {"uadeEnvelopeCorrelation":0.9805,"endAgrees":true,"defaultEngine":"nuade"},
   soundmon: {"uadeEnvelopeCorrelation":0.9656,"ownEnvelopeCorrelation":0.9338,"endAgrees":true,"defaultEngine":"nuade"},
