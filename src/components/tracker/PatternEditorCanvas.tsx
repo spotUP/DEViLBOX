@@ -28,7 +28,8 @@ import { AutomationParameterPicker } from '../automation/AutomationParameterPick
 import { MacroLanes } from './MacroLanes';
 import { useUIStore } from '@stores/useUIStore';
 import { useShallow } from 'zustand/react/shallow';
-import { usePatternEditor, AUTOMATION_LANE_WIDTH, AUTOMATION_LANE_MIN } from '@hooks/views/usePatternEditor';
+import { usePatternEditor, AUTOMATION_LANE_WIDTH } from '@hooks/views/usePatternEditor';
+import { automationLaneReserve } from '@hooks/views/automationLaneReserve';
 import { ChannelVUMeter } from './ChannelVUMeter';
 import { ChannelVUMeters } from './ChannelVUMeters';
 import { ChannelColorPicker } from './ChannelColorPicker';
@@ -84,7 +85,6 @@ function lightenHex(hex: string, add: number): string {
   const b = Math.min(255, parseInt(h.substring(4, 6), 16) + add);
   return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
 }
-const AUTOMATION_LANE_W = AUTOMATION_LANE_WIDTH; // Re-export alias for readability
 /** Width of the GLOBAL FX lane column rendered to the left of channel 1.
  *  Reserved when automation lanes are visible; pushes channels right by
  *  this much. Matches AUTOMATION_LANE_WIDTH so the column lines up
@@ -405,7 +405,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           explicit.add(c.parameter);
         }
       }
-      counts.push(Math.max(1, explicit.size));
+      counts.push(explicit.size);
     }
     return counts;
   }));
@@ -465,10 +465,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const showAcid = columnVisibility.flag1 || columnVisibility.flag2;
     const showProb = columnVisibility.probability;
     const autoLaneExtra = (ch: number) => {
-      if (!showAutomationLanes) return 0;
-      const lc = channelLaneCounts[ch] ?? 1;
-      return lc <= 1 ? AUTOMATION_LANE_W
-        : Math.max(AUTOMATION_LANE_W, lc * AUTOMATION_LANE_MIN + 4);
+      return showAutomationLanes ? automationLaneReserve(channelLaneCounts[ch] ?? 0) : 0;
     };
 
     // Calculate per-channel minimum widths based on effectCols
