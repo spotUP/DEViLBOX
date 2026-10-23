@@ -95,23 +95,30 @@ export class DECtalkSynth implements DevilboxSynth {
     return this._readyPromise;
   }
 
-  private _stopSource(): void {
-    if (this._sourceNode) {
-      try { this._sourceNode.stop(); } catch { /* already stopped */ }
-      this._sourceNode.disconnect();
+  /** Stop the current utterance at `time` (now when omitted). A stop in the future
+   *  leaves the node connected so it keeps sounding until then; onended disconnects it. */
+  private _stopSource(time?: number): void {
+    const source = this._sourceNode;
+    if (source) {
+      const now = this.audioContext.currentTime;
+      const at = time !== undefined && time > now ? time : undefined;
+      try { source.stop(at ?? now); } catch { /* already stopped */ }
+      if (at === undefined) source.disconnect();
+      else source.addEventListener('ended', () => source.disconnect());
       this._sourceNode = null;
     }
     if (this._isPlaying) useSpeechActivityStore.getState().speechStop();
     this._isPlaying = false;
   }
 
-  private _startSource(time?: number): void {
+  private _startSource(time?: number, playbackRate: number = 1): void {
     if (!this._buffer) return;
-    this._stopSource();
+    this._stopSource(time);
 
     const source = this.audioContext.createBufferSource();
     source.buffer = this._buffer;
     source.loop = false;
+    source.playbackRate.value = playbackRate;
     source.connect(this._playerGain);
     source.onended = () => {
       if (this._sourceNode === source) {
@@ -212,7 +219,7 @@ export class DECtalkSynth implements DevilboxSynth {
     if (!this._buffer) {
       console.log('[DECtalk] triggerAttack: buffer not ready, rendering first...');
       this._render().then(() => {
-        if (this._buffer) this.triggerAttack(note, undefined, velocity);
+        if (this._buffer) this.triggerAttack(note, time, velocity);
       });
       return;
     }
@@ -221,26 +228,13 @@ export class DECtalkSynth implements DevilboxSynth {
     // Map pitch: MIDI 60 = normal, higher = faster/chipmunk, lower = deeper
     const ratio = Math.pow(2, (midi - 60) / 12) * (0.5 + this._config.pitch);
 
-    this._playerGain.gain.cancelScheduledValues(this.audioContext.currentTime);
-    this._playerGain.gain.value = velocity * this._config.volume;
+    // Gain and the cut of the previous utterance land at the note's own time, so a
+    // note scheduled ahead does not change what is sounding now.
+    const at = Math.max(time ?? 0, this.audioContext.currentTime);
+    this._playerGain.gain.cancelScheduledValues(at);
+    this._playerGain.gain.setValueAtTime(velocity * this._config.volume, at);
 
-    this._stopSource();
-    const source = this.audioContext.createBufferSource();
-    source.buffer = this._buffer;
-    source.loop = false;
-    source.playbackRate.value = ratio;
-    source.connect(this._playerGain);
-    source.onended = () => {
-      if (this._sourceNode === source) {
-        if (this._isPlaying) useSpeechActivityStore.getState().speechStop();
-        this._isPlaying = false;
-        this._sourceNode = null;
-      }
-    };
-    this._sourceNode = source;
-    source.start(time ?? this.audioContext.currentTime);
-    this._isPlaying = true;
-    useSpeechActivityStore.getState().speechStart();
+    this._startSource(at, ratio);
   }
 
   public triggerRelease(_note?: string | number, _time?: number): void {
