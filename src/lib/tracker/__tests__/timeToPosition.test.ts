@@ -38,4 +38,21 @@ describe('songPositionAtMs', () => {
   it('holds the last row reached when the time is past the song end', () => {
     expect(songPositionAtMs(song, 10_000_000)).toEqual({ songPos: 1, pattPos: 7 });
   });
+
+  // 120 ms per row. E60 at row 1, E62 at row 3: rows 0-3, then two more passes over 1-3, then row 4.
+  it('honours E6x pattern loops (loop start row, loop count)', () => {
+    const t = { ...song, patterns: [pattern(8, { 1: cell(0xE, 0x60), 3: cell(0xE, 0x62) }), pattern(8, {})] } as unknown as TimedSong;
+    expect(songPositionAtMs(t, 3 * 120)).toEqual({ songPos: 0, pattPos: 3 });
+    expect(songPositionAtMs(t, 4 * 120)).toEqual({ songPos: 0, pattPos: 1 });
+    expect(songPositionAtMs(t, 9 * 120)).toEqual({ songPos: 0, pattPos: 3 });
+    expect(songPositionAtMs(t, 10 * 120)).toEqual({ songPos: 0, pattPos: 4 });
+  });
+
+  // XM: EE2 at row 1 holds the row for 2 row-times in total (replayer: pattDelTime 2 gives one repeat).
+  it('honours EEx pattern delay on XM songs and ignores it for MOD', () => {
+    const t = { ...song, patterns: [pattern(8, { 1: cell(0xE, 0xE2) }), pattern(8, {})] } as unknown as TimedSong;
+    expect(songPositionAtMs(t, 3 * 120 - 1, true)).toEqual({ songPos: 0, pattPos: 1 });
+    expect(songPositionAtMs(t, 3 * 120, true)).toEqual({ songPos: 0, pattPos: 2 });
+    expect(songPositionAtMs(t, 3 * 120, false)).toEqual({ songPos: 0, pattPos: 3 });
+  });
 });
