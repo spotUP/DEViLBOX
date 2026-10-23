@@ -142,7 +142,7 @@ export class MAMESynth implements DevilboxSynth {
       const outL = e.outputBuffer.getChannelData(0);
       const outR = e.outputBuffer.getChannelData(1);
 
-      const { left, right } = this.engine.render(this.handle, bufferSize);
+      const { left, right } = this.engine.render(this.handle, bufferSize, e.playbackTime, rawContext.sampleRate);
 
       outL.set(left);
       outR.set(right);
@@ -196,8 +196,13 @@ export class MAMESynth implements DevilboxSynth {
   /**
    * Trigger a note (maps to synth-specific register writes)
    */
-  public triggerAttack(note: string, _time?: number, velocity: number = 1.0): this {
+  public triggerAttack(note: string, time?: number, velocity: number = 1.0): this {
     if (!this.isInitialized || this.handle === 0) return this;
+    this.engine.scheduleAt(this.handle, time, () => this.keyOn(note, velocity));
+    return this;
+  }
+
+  private keyOn(note: string, velocity: number): void {
 
     const freq = noteToFrequency(note);
     const voice = this.findFreeVoice();
@@ -265,16 +270,17 @@ export class MAMESynth implements DevilboxSynth {
       const pitch = Math.floor((freq * 1024) / 44100); // Very rough guess
       this.engine.write16(this.handle, chan_base | 0x0a, pitch);
     }
-
-    return this;
   }
 
   public triggerRelease(note: string, time?: number): this {
-    void time;
     if (!this.isInitialized || this.handle === 0) return this;
-    
+    this.engine.scheduleAt(this.handle, time, () => this.keyOff(note));
+    return this;
+  }
+
+  private keyOff(note: string): void {
     const voice = this.voices.find(v => v.active && v.note === note);
-    if (!voice) return this;
+    if (!voice) return;
 
     voice.active = false;
     const vIdx = voice.voiceIndex;
@@ -291,8 +297,6 @@ export class MAMESynth implements DevilboxSynth {
         this.engine.write(this.handle, mem_offset + 5, 0xFF); // Max speed ramp down (bit 7 set)
       }
     }
-    
-    return this;
   }
 
   /**
@@ -301,6 +305,7 @@ export class MAMESynth implements DevilboxSynth {
   public releaseAll(): void {
     if (!this.isInitialized || this.handle === 0) return;
     
+    this.engine.cancelScheduled(this.handle);
     for (const voice of this.voices.filter(v => v.active)) {
       this.triggerRelease(voice.note);
     }

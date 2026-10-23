@@ -331,11 +331,15 @@ export class VFXSynth implements DevilboxSynth {
    * Low page (PAGE=voiceIdx): CONTROL, FC, LVOL, RVOL.
    * High page (PAGE=voiceIdx+0x20): START, END.
    */
-  triggerAttack(note: string | number, _time?: number, velocity: number = 0.8): void {
+  triggerAttack(note: string | number, time?: number, velocity: number = 0.8): void {
     if (!this.isInitialized) {
       console.warn('[VFXSynth] Not ready');
       return;
     }
+    this.mameEngine.scheduleAt(this.handle, time, () => this.keyOn(note, velocity));
+  }
+
+  private keyOn(note: string | number, velocity: number): void {
 
     const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
     const voiceIndex = this.allocateVoice();
@@ -395,22 +399,23 @@ export class VFXSynth implements DevilboxSynth {
   /**
    * Trigger a note with automatic release
    */
-  triggerAttackRelease(note: string | number, duration: string | number = 0.5, _time?: number, velocity: number = 0.8): void {
-    this.triggerAttack(note, _time, velocity);
+  triggerAttackRelease(note: string | number, duration: string | number = 0.5, time?: number, velocity: number = 0.8): void {
+    this.triggerAttack(note, time, velocity);
 
-    // Schedule release
+    // The release is queued like the attack, at the attack time plus the duration
     const durationSeconds = typeof duration === 'string' ? timeToSeconds(duration) : duration;
-    setTimeout(() => {
-      this.triggerRelease(note);
-    }, durationSeconds * 1000);
+    this.triggerRelease(note, (time ?? this.audioContext.currentTime) + durationSeconds);
   }
 
   /**
    * Trigger a note off
    */
   triggerRelease(note: string | number, time?: number): void {
-    void time;
     if (!this.isInitialized) return;
+    this.mameEngine.scheduleAt(this.handle, time, () => this.keyOff(note));
+  }
+
+  private keyOff(note: string | number): void {
 
     const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
     const voiceIndex = this.voices.findIndex(v => v.active && v.note === midiNote);
@@ -430,6 +435,7 @@ export class VFXSynth implements DevilboxSynth {
    */
   releaseAll(): void {
     if (!this.isInitialized) return;
+    this.mameEngine.cancelScheduled(this.handle);
     for (const voice of this.voices.filter(v => v.active)) {
       this.triggerRelease(voice.note);
     }
