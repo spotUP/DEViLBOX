@@ -24,7 +24,10 @@ describe('Hively instrument players have their own output', () => {
   it('the worklet mixes players into the instrument output, not the tune output', () => {
     const mix = WORKLET.slice(WORKLET.indexOf('Mix in standalone instrument players'), WORKLET.indexOf('// Report position periodically'));
     expect(mix).toContain('const INSTRUMENT_OUTPUT = 37;');
-    expect(mix).toContain('instL[i] += sL;');
+    // The segmented render mixes through renderPlayers, handed the instrument buffers (not outputL)
+    expect(mix).toContain('this.renderPlayers(instL, instR,');
+    expect(WORKLET).toContain('instL[start + i] += sL;');
+    expect(WORKLET).toContain('instR[start + i] += sR;');
     expect(mix, 'players are back in the tune output').not.toContain('outputL[i] += sL;');
   });
 

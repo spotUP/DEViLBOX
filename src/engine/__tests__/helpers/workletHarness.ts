@@ -12,6 +12,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { inlineWorkletImports } from '../workletHarness';
 
 const ROOT = resolve(__dirname, '../../../..');
 
@@ -51,7 +52,7 @@ export async function openWorklet(opts: { dir: string; name: string; factory: st
     port = { onmessage: null as ((e: { data: unknown }) => void) | null, postMessage: (m: unknown) => { posted.push(m as Record<string, unknown>); } };
   }
   let Registered: (new () => Processor) | null = null;
-  const source = readFileSync(resolve(ROOT, 'public', opts.dir, opts.worklet ?? `${opts.name}.worklet.js`), 'utf8');
+  const source = inlineWorkletImports(readFileSync(resolve(ROOT, 'public', opts.dir, opts.worklet ?? `${opts.name}.worklet.js`), 'utf8'), opts.dir);
   new Function('AudioWorkletProcessor', 'registerProcessor', 'sampleRate', source)(
     FakeProcessor, (_n: string, cls: new () => Processor) => { Registered = cls; }, SAMPLE_RATE,
   );
