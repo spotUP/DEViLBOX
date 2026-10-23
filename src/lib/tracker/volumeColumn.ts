@@ -21,6 +21,7 @@
  * Callers pass the editor mode so the field is read the way its writer meant
  * it. Anything reading `cell.volume` as a level should come through here.
  */
+import type { TrackerCell } from '@/types/tracker';
 
 /**
  * Editor modes whose volume column is a raw 0-64 level rather than an XM
@@ -157,4 +158,37 @@ export function foldEffectColumnsForXM(
     if (byte !== 0) return { volume: byte, command };
   }
   return { volume, command };
+}
+
+/** The cell fields that set a note's starting volume. */
+export type NoteVolumeCell = Pick<TrackerCell, 'volume' | 'effTyp' | 'eff' | 'effTyp2' | 'eff2'
+  | 'effTyp3' | 'eff3' | 'effTyp4' | 'eff4' | 'effTyp5' | 'eff5' | 'effTyp6' | 'eff6'
+  | 'effTyp7' | 'eff7' | 'effTyp8' | 'eff8'>;
+
+/**
+ * The level (0..1) a row's note starts at, in the order the replayer applies
+ * them at tick 0: the instrument's default volume, overridden by a Cxx in any
+ * effect slot (the last one wins), overridden by a volume-column level.
+ *
+ * Meters for engines the TS replayer does not play (UADE, libopenmpt, ...)
+ * flash from the pattern row. Reading the volume column alone sent every note
+ * with an empty column to a fixed 0.7, whatever its Cxx or instrument volume.
+ */
+export function noteStartLevel(
+  cell: NoteVolumeCell,
+  editorMode: string | null | undefined,
+  /** The instrument's default volume, 0..64 (64 when unknown). */
+  instrumentVolume = VOLUME_COLUMN_MAX,
+): number {
+  const column = decodeVolumeColumn(cell.volume, editorMode);
+  if (column !== null) return column;
+  let level = Math.min(Math.max(instrumentVolume, 0), VOLUME_COLUMN_MAX) / VOLUME_COLUMN_MAX;
+  const slots: Array<[number | undefined, number | undefined]> = [
+    [cell.effTyp, cell.eff], [cell.effTyp2, cell.eff2], [cell.effTyp3, cell.eff3], [cell.effTyp4, cell.eff4],
+    [cell.effTyp5, cell.eff5], [cell.effTyp6, cell.eff6], [cell.effTyp7, cell.eff7], [cell.effTyp8, cell.eff8],
+  ];
+  for (const [typ, val] of slots) {
+    if (typ === 0xC && val !== undefined) level = Math.min(val, VOLUME_COLUMN_MAX) / VOLUME_COLUMN_MAX;
+  }
+  return level;
 }
