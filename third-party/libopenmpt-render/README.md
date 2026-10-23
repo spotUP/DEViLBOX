@@ -21,6 +21,14 @@ every libopenmpt format with (XM, S3M, IT, MPTM, ...; MOD goes to UADE).
     master gain);
   - `build/make/config-emscripten.mk`: the runtime methods the worker uses
     (`stackSave`, `stackAlloc`, `wasmTable`, `HEAP*`, `UTF8ToString`).
+- `devilbox-edit.patch` (applied after the taps patch): in-place edit C API on
+  `openmpt_module*` so the tracker worklet edits a playing module without rebuilding it:
+  `openmpt_module_set_pattern_cell`, `_set_order_pattern`, `_set_num_orders`,
+  `_resize_pattern`, `_add_pattern`, `_set_initial_speed`, `_set_initial_tempo`,
+  `_set_midi_macro` (same semantics as `openmpt_soundlib_bridge.cpp`), plus the
+  `HEAPU16`/`HEAP64`/`HEAPU64` runtime methods. `build.sh` also writes the result to
+  `public/chiptune3/libopenmpt.worklet.js`. Measured 2026-10-23: 30 s renders of a MOD
+  and an XM are byte-identical to the previous shipped worklet binary.
 - Measured 2026-10-13 (30 s renders, Node): taps on, the mix stays within
   5e-6 (-106 dBFS) of the shipped binary (each tapped channel keeps its own
   end-of-sample click-removal tail, which decays in integer steps), and the taps
