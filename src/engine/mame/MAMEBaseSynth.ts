@@ -112,6 +112,8 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
   protected currentVelocity: number = 1.0;  // 0-1
   protected isNoteOn = false;
   protected noteOnTime: number = 0;
+  /** Audio-clock time (seconds) the current note was scheduled to key on. */
+  protected noteStartAudioTime: number = 0;
 
   // Gate enforcement
   protected static MIN_GATE_TIME = 50;  // 50ms minimum gate
@@ -249,13 +251,13 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
   /**
    * Trigger attack
    */
-  triggerAttack(note: string | number, _time?: number, velocity: number = 1): void {
+  triggerAttack(note: string | number, time?: number, velocity: number = 1): void {
     if (this._disposed) return;
 
     // If worklet isn't ready yet, queue the note attack
     if (!this._isReady || !this.workletNode) {
       console.log(`[${this.chipName}] triggerAttack: not ready (ready=${this._isReady}, worklet=${!!this.workletNode}), queueing note ${note}`);
-      this._pendingCalls.push({ method: 'triggerAttack', args: [note, _time, velocity] });
+      this._pendingCalls.push({ method: 'triggerAttack', args: [note, time, velocity] });
       return;
     }
 
@@ -273,6 +275,7 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
     this.currentVelocity = velocity;
     this.isNoteOn = true;
     this.noteOnTime = Date.now();
+    this.noteStartAudioTime = time ?? getDevilboxAudioContext().currentTime;
 
     // Reset macros
     this.resetMacros();
@@ -281,7 +284,7 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
     this.effectRouter.resetChannel(this.channelIndex);
 
     // Write to worklet
-    this.writeKeyOn(this.currentNote, velocity);
+    this.writeKeyOn(this.currentNote, velocity, time);
   }
 
   /**
@@ -289,6 +292,16 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
    */
   triggerRelease(time?: number): void {
     if (this._disposed) return;
+
+    // Scheduled release: the worklet keys off at the audio-clock time, held at
+    // least MIN_GATE_TIME after the note's own start time. No wall-clock wait.
+    if (time !== undefined) {
+      const releaseAt = Math.max(time, this.noteStartAudioTime + MAMEBaseSynth.MIN_GATE_TIME / 1000);
+      this.isNoteOn = false;
+      this.releaseMacros();
+      this.writeKeyOff(releaseAt);
+      return;
+    }
 
     // Enforce minimum gate time
     const elapsed = Date.now() - this.noteOnTime;
@@ -318,18 +331,26 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
     const capturedNote = this.currentNote;
 
     const d = timeToSeconds(duration);
+
+    // The chip key-off is sent now, stamped with its audio-clock time; the
+    // worklet applies it at that frame. Held at least MIN_GATE_TIME.
+    if (!this._isReady || !this.workletNode) return;
+    const now = getDevilboxAudioContext().currentTime;
+    const releaseAt = Math.max((time ?? now) + d, this.noteStartAudioTime + MAMEBaseSynth.MIN_GATE_TIME / 1000);
+    // Send noteOff directly with the captured note, not this.currentNote
+    // which may point to a newer note by now
+    this.workletNode.port.postMessage({ type: 'noteOff', note: capturedNote, time: releaseAt });
+
+    // Macro release and flag bookkeeping at the same moment, on the wall clock.
     setTimeout(() => {
       if (!this._disposed && this.workletNode) {
         this.releaseMacros();
-        // Send noteOff directly with the captured note, not this.currentNote
-        // which may point to a newer note by now
-        this.workletNode.port.postMessage({ type: 'noteOff', note: capturedNote });
         // Only clear isNoteOn if we're releasing the current note
         if (this.currentNote === capturedNote) {
           this.isNoteOn = false;
         }
       }
-    }, d * 1000);
+    }, Math.max(0, (releaseAt - now) * 1000));
   }
 
   /**
@@ -410,12 +431,12 @@ export abstract class MAMEBaseSynth implements DevilboxSynth, MAMEEffectTarget {
   /**
    * Write key-on to chip
    */
-  protected abstract writeKeyOn(note: number, velocity: number): void;
+  protected abstract writeKeyOn(note: number, velocity: number, time?: number): void;
 
   /**
    * Write key-off to chip
    */
-  protected abstract writeKeyOff(): void;
+  protected abstract writeKeyOff(time?: number): void;
 
   /**
    * Write frequency to chip
