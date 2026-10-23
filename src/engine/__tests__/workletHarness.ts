@@ -4,7 +4,7 @@
  * process() calls and read what the worklet posts and writes.
  */
 import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // import.meta.url, not __dirname: a worker thread (the hang watchdogs) loads
@@ -24,8 +24,11 @@ export type WorkletProc = {
 /** Evaluate the shared worklet helpers (channel-stream.js, channel-outputs.js) once. */
 /** A worklet module's `import { X } from '../shared/x.js'` becomes the imported file's text (a stand-in scope has no module loader). */
 export function inlineWorkletImports(src: string, dir: string): string {
-  return src.replace(/^import \{[^}]*\} from '([^']+)';$/gm, (_m, rel: string) =>
-    readFileSync(resolve(ROOT, 'public', dir, rel), 'utf8').replace(/^export /gm, ''));
+  // Imports nest (a MAME chip worklet imports the base, which imports the queue): resolve each against its own file's folder
+  return src.replace(/^import \{[^}]*\} from '([^']+)';$/gm, (_m, rel: string) => {
+    const file = resolve(ROOT, 'public', dir, rel);
+    return inlineWorkletImports(readFileSync(file, 'utf8'), relative(resolve(ROOT, 'public'), dirname(file))).replace(/^export /gm, '');
+  });
 }
 
 export function loadSharedWorkletScripts(): void {

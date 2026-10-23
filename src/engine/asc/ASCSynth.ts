@@ -74,21 +74,23 @@ export class ASCSynth extends MAMEBaseSynth {
   // MAMEBaseSynth Abstract Method Implementations
   // ===========================================================================
 
-  protected writeKeyOn(note: number, velocity: number): void {
+  protected writeKeyOn(note: number, velocity: number, time?: number): void {
     if (!this.workletNode || this._disposed) return;
 
     this.workletNode.port.postMessage({
       type: 'noteOn',
       note,
       velocity: Math.floor(velocity * 127),
+      time,
     });
   }
 
-  protected writeKeyOff(): void {
+  protected writeKeyOff(time?: number): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({
       type: 'noteOff',
       note: 0,
+      time,
     });
   }
 

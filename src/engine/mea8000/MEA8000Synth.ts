@@ -116,9 +116,9 @@ export class MEA8000Synth extends MAMEBaseSynth {
     }
   }
 
-  protected writeKeyOff(): void {
+  protected writeKeyOff(time?: number): void {
     if (!this.workletNode || this._disposed) return;
-    this.workletNode.port.postMessage({ type: 'noteOff', note: this.currentNote });
+    this.workletNode.port.postMessage({ type: 'noteOff', note: this.currentNote, time });
   }
 
   protected writeFrequency(freq: number): void {

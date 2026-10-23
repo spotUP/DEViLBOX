@@ -103,13 +103,14 @@ export class YMF271Synth extends MAMEBaseSynth {
   /**
    * Write key-on to YMF271
    */
-  protected writeKeyOn(note: number, velocity: number): void {
+  protected writeKeyOn(note: number, velocity: number, time?: number): void {
     if (!this.workletNode || this._disposed) return;
 
     this.workletNode.port.postMessage({
       type: 'noteOn',
       note,
       velocity: Math.floor(velocity * 127),
+      time,
       group: this.currentGroup,
     });
   }
@@ -117,11 +118,12 @@ export class YMF271Synth extends MAMEBaseSynth {
   /**
    * Write key-off to YMF271
    */
-  protected writeKeyOff(): void {
+  protected writeKeyOff(time?: number): void {
     if (!this.workletNode || this._disposed) return;
     this.workletNode.port.postMessage({
       type: 'noteOff',
       note: this.currentNote,
+      time,
       group: this.currentGroup,
     });
   }
