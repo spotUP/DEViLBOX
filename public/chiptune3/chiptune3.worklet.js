@@ -126,6 +126,8 @@ const MAX_DUB_CHANNELS = 32
 // Frames per render quantum: what the worklet hands process() and what the
 // output lead is counted in.
 const RENDER_QUANTUM = 128
+/** Argument count per applyEdits opcode (see applyEdits_). */
+const EDIT_OP_ARGS = { 1: 9, 2: 2, 3: 1, 4: 2, 5: 1, 6: 1, 7: 1 }
 // Per-channel oscilloscope instances: each is a full module copy rendered every quantum.
 const MAX_OSC_CHANNELS = 32
 const OSC_MEMORY_BUDGET = 96 * 1024 * 1024
@@ -531,6 +533,17 @@ class MPT extends AudioWorkletProcessor {
 				break
 			case 'updateIsolationMask':
 				// Change which channels an isolation slot renders.
+			case 'applyEdits':
+				// Flat Int32 op list written into the running modules (no rebuild).
+				if (!this.modulePtr) break
+				this.applyEdits_(v)
+				break
+			case 'updateBuffer':
+				// Edits were applied in place; keep only the stored song bytes current,
+				// which slots and scope instances created later parse.
+				if (!this.modulePtr) { this.play(v, true); break }
+				this.moduleBuffer = v.slice ? v.slice(0) : new Int8Array(v).buffer
+				break
 				// v = { slotIndex: number, channelMask: number }
 				this.updateIsolationMask_(v.slotIndex, v.channelMask)
 				break
@@ -690,6 +703,7 @@ class MPT extends AudioWorkletProcessor {
 			kept.isolationMasks.forEach((mask, i) => { if (mask !== null) this.addIsolationSlot_(i, mask) })
 			kept.dubChannels.forEach((on, ch) => { if (on) this.addDubSlot_(ch) })
 			this.recomputeMainMask_()
+		const curSeconds = libopenmpt._openmpt_module_get_position_seconds(this.modulePtr)
 			this.reapplyIsolationMasks_()
 			if (kept.osc) this.createOscModule_()
 		}
@@ -700,6 +714,15 @@ class MPT extends AudioWorkletProcessor {
 		this.teardownAllIsolation_()
 		this.teardownAllDubSlots_()
 		this.stop()
+			// Catch up to the exact sample inside the row, as syncToMain_ does.
+			if (curSeconds > 0 && this.leftPtr && this.rightPtr) {
+				let frames = Math.round((curSeconds - libopenmpt._openmpt_module_get_position_seconds(this.modulePtr)) * sampleRate)
+				while (frames > 0) {
+					const n = libopenmpt._openmpt_module_read_float_stereo(this.modulePtr, sampleRate, Math.min(RENDER_QUANTUM, frames), this.leftPtr, this.rightPtr)
+					if (n <= 0) break
+					frames -= n
+				}
+			}
 		this.lastStateRow = -1
 		this.lastStateOrder = -1
 		this.userMuteMask = 0xFFFFFFFF  // reset mute state for new song
@@ -714,6 +737,39 @@ class MPT extends AudioWorkletProcessor {
 		libopenmpt.HEAPU8.set(byteArray, ptrToFile)
 
 		// Use ext module API for interactive features (channel mute/solo).
+	/**
+	 * Write a flat Int32 op list into the main module and every other live
+	 * instance (isolation slots, dub slots, scope instances), so an edit lands
+	 * in all copies without rebuilding any of them. Op layout (opcode, args):
+	 * 1 cell(pat,row,ch,note,instr,volcmd,vol,cmd,param), 2 order(order,pat),
+	 * 3 numOrders(n), 4 resizePattern(pat,rows), 5 addPattern(rows),
+	 * 6 initialSpeed(n), 7 initialTempo(n).
+	 */
+	applyEdits_(ops) {
+		const mods = [this.modulePtr]
+		this.forEachIsolationSlot_(s => mods.push(s.modulePtr))
+		this.seekOscModules_(m => mods.push(m))
+		const lib = libopenmpt
+		for (let i = 0; i < ops.length;) {
+			const op = ops[i]
+			const n = EDIT_OP_ARGS[op]
+			if (n === undefined) break
+			const a = ops.subarray ? ops.subarray(i + 1, i + 1 + n) : ops.slice(i + 1, i + 1 + n)
+			for (const m of mods) {
+				switch (op) {
+					case 1: lib._openmpt_module_set_pattern_cell(m, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]); break
+					case 2: lib._openmpt_module_set_order_pattern(m, a[0], a[1]); break
+					case 3: lib._openmpt_module_set_num_orders(m, a[0]); break
+					case 4: lib._openmpt_module_resize_pattern(m, a[0], a[1]); break
+					case 5: lib._openmpt_module_add_pattern(m, a[0]); break
+					case 6: lib._openmpt_module_set_initial_speed(m, a[0]); break
+					case 7: lib._openmpt_module_set_initial_tempo(m, a[0]); break
+				}
+			}
+			i += 1 + n
+		}
+	}
+
 		// _openmpt_module_ext_create_from_memory returns an ext handle;
 		// _openmpt_module_ext_get_module extracts the regular module ptr.
 		this.extPtr = 0
