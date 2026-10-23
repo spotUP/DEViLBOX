@@ -15,7 +15,7 @@
  */
 
 import type { DevilboxSynth } from '@/types/synth';
-import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
+import { getDevilboxAudioContext, noteToMidi, timeToSeconds } from '@/utils/audio-context';
 import { MAMEEngine, MAMESynthType } from '../MAMEEngine';
 
 // XG/GM2 Voice categories
@@ -159,6 +159,9 @@ export class MU2000Synth implements DevilboxSynth {
 
     this.isInitialized = true;
     console.log('[MU2000Synth] Initialized with SWP30 handle:', this.handle);
+
+    // Nothing else pulls audio from the chip: render it into this.output.
+    this.mameEngine.attachRenderer(this.handle, this.audioContext, this.output);
   }
 
   /**
@@ -247,11 +250,15 @@ export class MU2000Synth implements DevilboxSynth {
   /**
    * Trigger a note on
    */
-  triggerAttack(note: string | number, _time?: number, velocity: number = 0.8, channel: number = 0): void {
+  triggerAttack(note: string | number, time?: number, velocity: number = 0.8, channel: number = 0): void {
     if (!this.isInitialized || !this.romLoaded) {
       console.warn('[MU2000Synth] Not ready (initialized:', this.isInitialized, ', ROM:', this.romLoaded, ')');
       return;
     }
+    this.mameEngine.scheduleAt(this.handle, time, () => this.keyOn(note, velocity, channel));
+  }
+
+  private keyOn(note: string | number, velocity: number, channel: number): void {
 
     const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
     const voiceIndex = this.allocateVoice(channel);
@@ -284,8 +291,33 @@ export class MU2000Synth implements DevilboxSynth {
    * Trigger a note off
    */
   triggerRelease(note: string | number, time?: number): void {
-    void time;
     if (!this.isInitialized) return;
+    this.mameEngine.scheduleAt(this.handle, time, () => this.keyOff(note));
+  }
+
+  /**
+   * Trigger a note with automatic release
+   */
+  triggerAttackRelease(note: string | number, duration: string | number = 0.5, time?: number, velocity: number = 0.8, channel: number = 0): void {
+    this.triggerAttack(note, time, velocity, channel);
+
+    // The release is queued like the attack, at the attack time plus the duration
+    const durationSeconds = typeof duration === 'string' ? timeToSeconds(duration) : duration;
+    this.triggerRelease(note, (time ?? this.audioContext.currentTime) + durationSeconds);
+  }
+
+  /**
+   * Release every active voice and drop notes still queued ahead
+   */
+  releaseAll(): void {
+    if (!this.isInitialized) return;
+    this.mameEngine.cancelScheduled(this.handle);
+    for (const voice of this.voices.filter(v => v.active)) {
+      this.triggerRelease(voice.note);
+    }
+  }
+
+  private keyOff(note: string | number): void {
 
     const midiNote = typeof note === 'string' ? noteToMidi(note) : note;
 
