@@ -13,6 +13,8 @@
  *     setControl, play, stop, getPatterns, getModuleGraph
  */
 
+import { TimedEventQueue } from '../shared/timedEventQueue.js';
+
 const MAX_FRAMES = 128;
 
 // SunVox Library constants
@@ -36,6 +38,8 @@ class SunVoxProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.svlib = null;       // Emscripten module instance
+    // Synth-mode notes scheduled ahead wait here until their frame (public/shared/timedEventQueue.js)
+    this.noteEvents = new TimedEventQueue();
     this.initialized = false;
     this._svInited = false;  // sv_init() called
     this._sampleRate = 48000;
@@ -406,12 +410,12 @@ class SunVoxProcessor extends AudioWorkletProcessor {
       // ── Playback control ───────────────────────────────────────────────────
 
       case 'noteOn':
-        // SunVox send_event: note (1-based), vel (1-129), module (1-based, 0=none)
-        if (m) m._sv_send_event(data.handle, 0, data.note, data.vel, data.moduleId + 1, 0, 0);
+      case 'noteOff':
+        if (this.noteEvents.push(data, currentTime)) this.applyNoteEvent(data);
         break;
 
-      case 'noteOff':
-        if (m) m._sv_send_event(data.handle, 0, NOTECMD_NOTE_OFF, 0, data.moduleId + 1, 0, 0);
+      case 'cancelNotes':
+        this.noteEvents.cancelFrom(-Infinity, (e) => e.handle === data.handle && e.moduleId === data.moduleId);
         break;
 
       case 'setControl':
@@ -557,6 +561,7 @@ class SunVoxProcessor extends AudioWorkletProcessor {
         break;
 
       case 'stop':
+        this.noteEvents.cancelFrom(-Infinity, (e) => e.handle === data.handle);
         if (m) m._sv_stop(data.handle);
         break;
 
@@ -759,6 +764,17 @@ class SunVoxProcessor extends AudioWorkletProcessor {
     }
   }
 
+  applyNoteEvent(ev) {
+    const m = this.svlib;
+    if (!m) return;
+    if (ev.type === 'noteOn') {
+      // SunVox send_event: note (1-based), vel (1-129), module (1-based, 0=none)
+      m._sv_send_event(ev.handle, 0, ev.note, ev.vel, ev.moduleId + 1, 0, 0);
+    } else {
+      m._sv_send_event(ev.handle, 0, NOTECMD_NOTE_OFF, 0, ev.moduleId + 1, 0, 0);
+    }
+  }
+
   process(_inputs, outputs, _parameters) {
     if (!this.initialized || !this.svlib) return true;
 
@@ -778,17 +794,23 @@ class SunVoxProcessor extends AudioWorkletProcessor {
     if (Object.keys(this.handles).length === 0) return true;
 
     try {
-      // sv_audio_callback renders ALL active slots at once
+      // sv_audio_callback renders ALL active slots at once, in segments so a queued note
+      // keys the module at its own frame, not at the block start.
       // Output is interleaved stereo float32: LRLRLR...
-      const ticks = m._sv_get_ticks();
-      m._sv_audio_callback(this._renderBuf, numSamples, 0, ticks);
-
-      // De-interleave stereo output
       const heapF32 = m.HEAPF32;
       const off = this._renderBuf >> 2;
-      for (let i = 0; i < numSamples; i++) {
-        outputL[i] = heapF32[off + i * 2];
-        outputR[i] = heapF32[off + i * 2 + 1];
+      let done = 0;
+      while (done < numSamples) {
+        const now = currentTime + done / sampleRate;
+        this.noteEvents.drain(now, (ev) => this.applyNoteEvent(ev));
+        const at = this.noteEvents.nextOffset(now, numSamples - done, sampleRate);
+        const len = Math.min(at > 0 ? at : numSamples - done, this._renderBufFrames);
+        m._sv_audio_callback(this._renderBuf, len, 0, m._sv_get_ticks());
+        for (let i = 0; i < len; i++) {
+          outputL[done + i] = heapF32[off + i * 2];
+          outputR[done + i] = heapF32[off + i * 2 + 1];
+        }
+        done += len;
       }
     } catch (err) {
       console.error('[SunVox Worklet] Render crash:', err.message);

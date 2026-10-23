@@ -107,7 +107,7 @@ export class SunVoxSynth implements DevilboxSynth {
 
   // ── DevilboxSynth interface ───────────────────────────────────────────────
 
-  triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
+  triggerAttack(note?: string | number, time?: number, velocity?: number): void {
     if (this._disposed) return;
     if (this._handle < 0) return;
 
@@ -136,10 +136,11 @@ export class SunVoxSynth implements DevilboxSynth {
       moduleId: this._moduleId,
       note: midiNote,
       vel,
+      time,
     });
   }
 
-  triggerRelease(_note?: string | number, _time?: number): void {
+  triggerRelease(_note?: string | number, time?: number): void {
     if (this._disposed) return;
     if (this._handle < 0) return;
 
@@ -153,10 +154,15 @@ export class SunVoxSynth implements DevilboxSynth {
       type: 'noteOff',
       handle: this._handle,
       moduleId: this._moduleId,
+      time,
     });
   }
 
   releaseAll(): void {
+    // Rows already sent ahead for this module must not key after the panic
+    if (!this._disposed && this._handle >= 0 && this._moduleId >= 0) {
+      this.engine.sendMessage({ type: 'cancelNotes', handle: this._handle, moduleId: this._moduleId });
+    }
     this.triggerRelease();
   }
 
