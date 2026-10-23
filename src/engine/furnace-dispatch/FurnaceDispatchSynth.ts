@@ -242,7 +242,6 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   private currentChannel = 0;
   private platformType: number;
   private activeNotes: Map<number, number> = new Map(); // midiNote -> channel
-  private _releaseTimeouts: Map<number, ReturnType<typeof setTimeout>> = new Map(); // chan -> pending release timeout
   // Volume normalization is handled per-chip by the worklet's POST_AMP table
   // (matching upstream Furnace 1:1). No JS-side offset on the shared gain node.
   private furnaceInstrumentIndex = 0; // Which Furnace instrument slot this synth uses
@@ -1158,15 +1157,6 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     // Use channel 0 for now (can be made smarter later)
     const chan = this.currentChannel;
 
-    // Cancel any pending release timeout on this channel.
-    // Without this, the PREVIOUS note's scheduled noteOff kills the
-    // CURRENT note because they share the same chip channel.
-    const pendingRelease = this._releaseTimeouts.get(chan);
-    if (pendingRelease) {
-      clearTimeout(pendingRelease);
-      this._releaseTimeouts.delete(chan);
-    }
-
     const pt = this.platformType;
     // Set the instrument for this channel BEFORE playing the note.
     // Use force=true so insChanged is always set — the instrument data
@@ -1195,21 +1185,10 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     velocity: number = 1,
   ): void {
     this.triggerAttack(note, time, velocity);
-    // Schedule release using timestamped dispatch for sample-accurate timing
+    // The worklet applies the timed note-off at its exact sample position.
     const ctx = this.engine.getNativeCtx();
     if (ctx) {
-      const chan = this.currentChannel;
-      const releaseTime = (time ?? ctx.currentTime) + duration;
-      // Send note-off with scheduled time — the worklet will apply it
-      // at the exact sample position, avoiding setTimeout's ±15ms jitter
-      const timeoutId = setTimeout(() => {
-        this._releaseTimeouts.delete(chan);
-        // Fallback: if the scheduled command wasn't processed yet, release now
-        this.triggerRelease(note);
-      }, Math.max(0, (releaseTime - ctx.currentTime) * 1000) + 50); // +50ms grace
-      this._releaseTimeouts.set(chan, timeoutId);
-      // Also send the release as a scheduled command for sample-accurate timing
-      this.triggerRelease(note, releaseTime);
+      this.triggerRelease(note, (time ?? ctx.currentTime) + duration);
     }
   }
 
@@ -1239,12 +1218,6 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   }
 
   releaseAll(): void {
-    // Clear any pending release timeouts
-    for (const [, timeout] of this._releaseTimeouts) {
-      clearTimeout(timeout);
-    }
-    this._releaseTimeouts.clear();
-
     // Release tracked notes
     this.triggerRelease();
 
@@ -1431,11 +1404,6 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   dispose(): void {
     this._disposed = true;
     this.activeNotes.clear();
-    // Cancel all pending release timeouts
-    for (const timeout of this._releaseTimeouts.values()) {
-      clearTimeout(timeout);
-    }
-    this._releaseTimeouts.clear();
 
     // The _nativeGain is the engine's shared gain node — don't fully disconnect it
     // here as other synths may still be using it. Only remove the tap to this.output.
