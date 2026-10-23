@@ -24,6 +24,9 @@ const KNOB_CC_BASE = 70;
 // Pad → note mapping (pads 0-15 → notes 36-51, standard GM drum layout)
 const PAD_NOTE_BASE = 36;
 
+// Timed reconnects after a connected bridge drops (USB replug, bridge restart).
+const MAX_RETRIES_AFTER_DROP = 15;
+
 // Button → note mapping (buttons on ch 14, pads on ch 15 to avoid collision)
 // Maps every MK2 button name to a unique MIDI note for learn/mapping system
 const BUTTON_NOTES: Record<string, number> = {
@@ -92,6 +95,9 @@ class MaschineHIDBridge {
   private ws: WebSocket | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private connected = false;
+  /** Timed retries left. Spent only after a live bridge drops, so a machine with no bridge logs one failure, not one every 2 s. */
+  private retriesLeft = 0;
+  private focusListening = false;
   private deviceModel: 'mk2' | 'mk3' = 'mk2';
 
   private constructor() {}
@@ -110,7 +116,13 @@ class MaschineHIDBridge {
   }
 
   connect(): void {
-    if (this.ws?.readyState === WebSocket.OPEN) return;
+    if (!this.focusListening && typeof window !== 'undefined') {
+      // A bridge started after page load connects when the user comes back to the tab.
+      window.addEventListener('focus', () => this.connect());
+      this.focusListening = true;
+    }
+    const state = this.ws?.readyState;
+    if (state === WebSocket.OPEN || state === WebSocket.CONNECTING) return;
     this.attemptConnect();
   }
 
@@ -120,6 +132,7 @@ class MaschineHIDBridge {
 
       this.ws.addEventListener('open', () => {
         this.connected = true;
+        this.retriesLeft = MAX_RETRIES_AFTER_DROP;
         console.log('[MaschineHID] Connected to bridge');
         if (this.reconnectTimer) {
           clearTimeout(this.reconnectTimer);
@@ -143,8 +156,8 @@ class MaschineHIDBridge {
       });
 
       this.ws.addEventListener('close', () => {
+        if (this.connected) console.log('[MaschineHID] Bridge disconnected, retrying in 2s...');
         this.connected = false;
-        console.log('[MaschineHID] Bridge disconnected, retrying in 2s...');
         this.scheduleReconnect();
       });
 
@@ -157,7 +170,8 @@ class MaschineHIDBridge {
   }
 
   private scheduleReconnect(): void {
-    if (this.reconnectTimer) return;
+    if (this.reconnectTimer || this.retriesLeft <= 0) return;
+    this.retriesLeft--;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.attemptConnect();
