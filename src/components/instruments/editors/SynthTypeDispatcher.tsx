@@ -151,6 +151,7 @@ const WasmParamEditorWrapper = lazy(() => import('../controls/WasmParamEditorWra
 const WasmInfoEditor = lazy(() => import('../controls/WasmInfoEditor').then(m => ({ default: m.WasmInfoEditor })));
 const Cinter4Controls = lazy(() => import('../controls/Cinter4Controls').then(m => ({ default: m.Cinter4Controls })));
 import { CZ101PatchBrowser } from '../controls/CZ101PatchBrowser';
+import { FurnaceLoadInstrumentButton } from '../controls/FurnaceLoadInstrumentButton';
 const KlysControls = lazy(() => import('../controls/KlysControls').then(m => ({ default: m.KlysControls })));
 const SonixControls = lazy(() => import('../controls/SonixControls').then(m => ({ default: m.SonixControls })));
 const GTUltraControls = lazy(() => import('../controls/GTUltraControls').then(m => ({ default: m.GTUltraControls })));
@@ -858,7 +859,9 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           onVizModeChange={setVizMode}
           showHelpButton={false}
           customHeaderControls={
-            hasFurnaceHardware ? (
+            <>
+            <FurnaceLoadInstrumentButton synthType={instrument.synthType} instrumentId={instrument.id} />
+            {hasFurnaceHardware ? (
               <button
                 onClick={() => setUIMode(uiMode === 'simple' ? 'hardware' : 'simple')}
                 className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
@@ -873,7 +876,8 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
                   {uiMode === 'hardware' ? 'Hardware UI' : 'Simple UI'}
                 </span>
               </button>
-            ) : undefined
+            ) : null}
+            </>
           }
         />
 

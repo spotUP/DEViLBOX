@@ -191,8 +191,10 @@ interface InstrumentStore {
 
   // Import
   loadInstruments: (instruments: InstrumentConfig[], options?: { skipPreload?: boolean; sourceSong?: string }) => void;
-  loadFurnaceInstrument: (buffer: ArrayBuffer) => void;
-  loadDefleMaskInstrument: (buffer: ArrayBuffer) => void;
+  /** Parse a .fui. With targetId the patch replaces that instrument's Furnace config in place; without it a new instrument is added. */
+  loadFurnaceInstrument: (buffer: ArrayBuffer, targetId?: number) => void;
+  /** Parse a .dmp. Same targetId semantics as loadFurnaceInstrument. */
+  loadDefleMaskInstrument: (buffer: ArrayBuffer, targetId?: number) => void;
   loadDefleMaskWavetable: (buffer: ArrayBuffer) => void;
 
   // Transformation (MOD/XM import)
@@ -1852,9 +1854,20 @@ export const useInstrumentStore = create<InstrumentStore>()(
       });
     },
 
-    loadFurnaceInstrument: (buffer) => {
+    loadFurnaceInstrument: (buffer, targetId) => {
       try {
         const { name, config } = FurnaceParser.parse(buffer);
+        if (targetId !== undefined) {
+          set((state) => {
+            const inst = state.instruments.find((x) => x.id === targetId);
+            if (!inst) return;
+            inst.furnace = config;
+            // A stale raw Furnace blob would override the freshly parsed config in the hardware editor.
+            delete inst.rawBinaryData;
+            if (name) inst.name = name;
+          });
+          return;
+        }
         const existingIds = get().instruments.map((i) => i.id);
         const newId = findNextId(existingIds);
 
@@ -1877,10 +1890,21 @@ export const useInstrumentStore = create<InstrumentStore>()(
       }
     },
 
-    loadDefleMaskInstrument: (buffer) => {
+    loadDefleMaskInstrument: (buffer, targetId) => {
       try {
         const result = DefleMaskParser.parse(buffer, 'dmp') as { name: string; config: FurnaceConfig };
         const { name, config } = result;
+        if (targetId !== undefined) {
+          set((state) => {
+            const inst = state.instruments.find((x) => x.id === targetId);
+            if (!inst) return;
+            inst.furnace = config;
+            // A stale raw Furnace blob would override the freshly parsed config in the hardware editor.
+            delete inst.rawBinaryData;
+            if (name) inst.name = name;
+          });
+          return;
+        }
         const existingIds = get().instruments.map((i) => i.id);
         const newId = findNextId(existingIds);
 
