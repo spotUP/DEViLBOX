@@ -10,11 +10,12 @@ describe('CZ-101 patch browser (the Simple UI)', () => {
     useCz101UserPatchStore.setState({ patches: [] });
     const changes: Array<[string, number]> = [];
     const texts: Array<[string, string]> = [];
-    const { container } = render(<CZ101PatchBrowser parameters={{}} onParamChange={(k, v) => changes.push([k, v])} onTextParamChange={(k, v) => texts.push([k, v])} />);
-    expect(screen.getByRole('button', { name: /Load SysEx File/i })).toBeTruthy();
+    render(<CZ101PatchBrowser parameters={{}} onParamChange={(k, v) => changes.push([k, v])} onTextParamChange={(k, v) => texts.push([k, v])} />);
+    fireEvent.click(screen.getByRole('button', { name: /Load SysEx File/i }));
     const bytes = encodeCzSysex(CZ101_PRESET_BANK[0].patch);
     const file = new File([bytes.slice().buffer], 'My Patch.syx');
-    const input = container.querySelector('input[type=file]') as HTMLInputElement;
+    // The load button opens the in-app browser; its From Disk input is the OS-file route.
+    const input = await screen.findByTestId('patch-from-disk-input');
     fireEvent.change(input, { target: { files: [file] } });
     await waitFor(() => expect(useCz101UserPatchStore.getState().patches.length).toBe(1));
     expect(texts.some(([k, v]) => k === CZ101_TONE_PARAM && v.length > 0), 'the imported patch becomes the instrument\'s own sound').toBe(true);

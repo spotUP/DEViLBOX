@@ -2,12 +2,13 @@
  * The CZ-101's patch handling in one place: the factory bank and the User patches imported from Casio SysEx dumps.
  * The Hardware UI and the Simple UI both use it, so the load button is in either view.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CZ101_PRESET_BANK, cz101PresetParameters, cz101PatchParameters } from '@engine/cz101/cz101Presets';
 import { CZ101_TONE_NAME_PARAM, CZ101_TONE_PARAM, czToneFromBase64, czToneToBase64, decodeCzSysexFile, decodeCzTone } from '@engine/cz101/cz101Sysex';
 import { adoptCz101Tone, useCz101UserPatchStore } from '@stores/useCz101UserPatchStore';
 import { notify } from '@stores/useNotificationStore';
 import { Button } from '@components/ui/Button';
+import { PatchLoadButton } from '@components/instruments/controls/PatchLoadButton';
 
 /**
  * `onTextParamChange` carries the instrument's own patch (`_cz101Tone`, the 128 tone bytes in base64, and its
@@ -31,7 +32,6 @@ export function useCz101Patches(
     try { return decodeCzTone(czToneFromBase64(ownTone), ownName).patch; } catch { return undefined; }
   })();
   const current = ownPatch ? { patch: ownPatch } : (CZ101_PRESET_BANK[program] ?? CZ101_PRESET_BANK[0]);
-  const fileInput = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
   // A song that carries a patch lists it in this browser's User library
@@ -81,11 +81,7 @@ export function useCz101Patches(
     selectTone(last.name, last.tone);
   };
 
-  const onFilesPicked = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files ?? []);
-    event.target.value = '';
-    if (files.length > 0) void importFiles(files);
-  };
+  const onPatchLoaded = (buffer: ArrayBuffer, name: string) => { void importFiles([new File([buffer], name)]); };
 
   const onDrop = (event: React.DragEvent) => {
     event.preventDefault();
@@ -95,7 +91,7 @@ export function useCz101Patches(
   };
 
 
-  return { program, ownPatch, userPatches, activeUser, current, fileInput, dragOver, setDragOver, chooseFactory, chooseUser, onFilesPicked, onDrop, removePatch };
+  return { program, ownPatch, userPatches, activeUser, current, dragOver, setDragOver, chooseFactory, chooseUser, onPatchLoaded, onDrop, removePatch };
 }
 
 /** The Factory and User patch picker with the SysEx load button, in the design-system look (the Simple UI). */
@@ -133,7 +129,7 @@ export const CZ101PatchBrowser: React.FC<{
             {p.activeUser && (
               <Button size="sm" variant="ghost" onClick={() => { p.removePatch(p.activeUser!.id); p.chooseFactory(0); }}>Remove Selected</Button>
             )}
-            <Button size="sm" onClick={() => p.fileInput.current?.click()}>Load SysEx File(s)</Button>
+            <PatchLoadButton synthType="CZ101" label="Load SysEx File" onLoad={p.onPatchLoaded} />
           </div>
         </div>
         {p.userPatches.length === 0 ? (
@@ -149,7 +145,6 @@ export const CZ101PatchBrowser: React.FC<{
             ))}
           </div>
         )}
-        <input ref={p.fileInput} type="file" accept=".syx,audio/sysex,application/octet-stream" multiple className="hidden" onChange={p.onFilesPicked} />
       </section>
     </div>
   );

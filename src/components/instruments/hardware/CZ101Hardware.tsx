@@ -9,6 +9,7 @@
 import React from 'react';
 import { CZ101_PRESET_BANK, CZ101_KNOB_NEUTRAL, cz101PatchParameters } from '@engine/cz101/cz101Presets';
 import { useCz101Patches } from '@components/instruments/controls/CZ101PatchBrowser';
+import { usePatchPicker } from '@components/instruments/controls/usePatchPicker';
 
 interface CZ101HardwareProps {
   parameters: Record<string, number>;
@@ -125,8 +126,9 @@ export const CZ101Hardware: React.FC<CZ101HardwareProps> = ({
   onParamChange,
   onTextParamChange,
 }) => {
-  const { program, ownPatch, userPatches, activeUser, current, fileInput, dragOver, setDragOver, chooseFactory, chooseUser, onFilesPicked, onDrop, removePatch } =
+  const { program, ownPatch, userPatches, activeUser, current, dragOver, setDragOver, chooseFactory, chooseUser, onPatchLoaded, onDrop, removePatch } =
     useCz101Patches(parameters, onParamChange, onTextParamChange);
+  const { openPicker, picker } = usePatchPicker('CZ101', onPatchLoaded);
 
   const waveform = parameters.waveform1 ?? cz101PatchParameters(current.patch).waveform1;
   const windowValue = parameters.window ?? 0;
@@ -190,12 +192,12 @@ export const CZ101Hardware: React.FC<CZ101HardwareProps> = ({
               </div>
             )}
             <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-1">
-              <CZ101Button label="LOAD SYSEX FILE(S)..." fill color="orange" onClick={() => fileInput.current?.click()} />
+              <CZ101Button label="LOAD SYSEX FILE(S)..." fill color="orange" onClick={openPicker} />
               {activeUser && (
                 <CZ101Button label="REMOVE THIS PATCH" small fill onClick={() => { removePatch(activeUser.id); chooseFactory(0); }} />
               )}
             </div>
-            <input ref={fileInput} type="file" accept=".syx,audio/sysex,application/octet-stream" multiple className="hidden" onChange={onFilesPicked} />
+            {picker}
           </div>
         </div>
 

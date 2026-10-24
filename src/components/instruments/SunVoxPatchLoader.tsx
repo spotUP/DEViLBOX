@@ -2,11 +2,11 @@
  * SunVoxPatchLoader — Load Patch action for the SunVox instrument editor.
  * Applies a .sunsynth file to THIS instrument (SunVoxImportDialog creates a new one).
  */
-import React, { useRef } from 'react';
+import React from 'react';
 import type { SunVoxConfig } from '@typedefs/instrument';
-import { Button } from '@components/ui/Button';
 import { notify } from '@stores/useNotificationStore';
-import { sunvoxPatchConfigFromFile, SUNVOX_PATCH_ACCEPT } from '@/engine/sunvox/sunvoxPatchConfig';
+import { sunvoxPatchConfigFromFile } from '@/engine/sunvox/sunvoxPatchConfig';
+import { PatchLoadButton } from './controls/PatchLoadButton';
 
 export interface SunVoxPatchLoaderProps {
   hasPatch: boolean;
@@ -14,14 +14,9 @@ export interface SunVoxPatchLoaderProps {
 }
 
 export const SunVoxPatchLoader: React.FC<SunVoxPatchLoaderProps> = ({ hasPatch, onLoad }) => {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
+  const handleFile = async (buffer: ArrayBuffer, fileName: string) => {
     try {
-      const { config } = await sunvoxPatchConfigFromFile(file);
+      const { config } = await sunvoxPatchConfigFromFile(new File([buffer], fileName));
       onLoad(config);
     } catch (err) {
       notify.error(`Could not read SunVox patch: ${err instanceof Error ? err.message : String(err)}`);
@@ -35,17 +30,7 @@ export const SunVoxPatchLoader: React.FC<SunVoxPatchLoaderProps> = ({ hasPatch, 
           This instrument is silent until a patch is loaded.
         </p>
       )}
-      <Button variant="primary" size="sm" onClick={() => inputRef.current?.click()}>
-        Load Patch
-      </Button>
-      <input
-        ref={inputRef}
-        type="file"
-        accept={SUNVOX_PATCH_ACCEPT}
-        onChange={handleFile}
-        className="hidden"
-        data-testid="sunvox-patch-input"
-      />
+      <PatchLoadButton synthType="SunVoxSynth" variant="primary" onLoad={handleFile} />
     </div>
   );
 };
