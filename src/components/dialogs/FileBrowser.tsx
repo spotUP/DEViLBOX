@@ -6,7 +6,7 @@
  * - Server API (jailed to data/ directory)
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { X, Folder, FolderOpen, FileAudio, ArrowLeft, Trash2, File, Cloud, HardDrive, History, RotateCcw, Globe, Search } from 'lucide-react';
 import '@cubone/react-file-manager/dist/style.css';
 import { hasElectronFS } from '@utils/electron';
@@ -14,17 +14,27 @@ import { useFileNavigation, isTrackerModule, type FileSource, getLastFileSource,
 import { OnlinePanel } from './FilePreviewPanel';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 import { useDialogTypingTrap } from '@hooks/useDialogTypingTrap';
+import { Button } from '@components/ui/Button';
 
 interface FileBrowserProps {
   isOpen: boolean;
   onClose: () => void;
-  onLoad: (data: object, filename: string) => void;
+  /** Song / project loads. Not used in pick-file mode (onPickFile set). */
+  onLoad?: (data: object, filename: string) => void;
   onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => Promise<void>;
   onSave?: (getData: () => object) => void;
   mode?: 'load' | 'save';
   currentProjectData?: () => object;
   suggestedFilename?: string;
+  /** Pick-file mode: open at this folder under public/data instead of the remembered song path. */
+  startDir?: string;
+  /** Pick-file mode: extensions listed, and offered by the From Disk picker (e.g. ['.sunsynth']). */
+  extensions?: string[];
+  /** Pick-file mode: receives the raw bytes and name of the chosen bundled or From Disk file. */
+  onPickFile?: (buffer: ArrayBuffer, filename: string) => void | Promise<void>;
 }
+
+const noopLoad = (): void => {};
 
 export const FileBrowser: React.FC<FileBrowserProps> = ({
   isOpen,
@@ -34,22 +44,37 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
   mode,
   currentProjectData,
   suggestedFilename = 'untitled.dbx',
+  startDir,
+  extensions,
+  onPickFile,
 }) => {
   useModalClose({ isOpen, onClose });
-  const [fileSource, _setFileSource] = useState<FileSource>(getLastFileSource);
-  const setFileSource = (s: FileSource) => { setLastFileSource(s); _setFileSource(s); };
+  const pickMode = !!onPickFile;
+  const [fileSource, _setFileSource] = useState<FileSource>(() => (pickMode ? 'demo' : getLastFileSource()));
+  const setFileSource = (s: FileSource) => { if (!pickMode) setLastFileSource(s); _setFileSource(s); };
+  const diskInputRef = useRef<HTMLInputElement | null>(null);
+  const handleDiskFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !onPickFile) return;
+    await onPickFile(await file.arrayBuffer(), file.name);
+    onClose();
+  }, [onPickFile, onClose]);
   const navKeyRef = useRef<(e: KeyboardEvent) => void>(() => {});
   const typingTrap = useDialogTypingTrap((e) => navKeyRef.current(e));
 
   const nav = useFileNavigation({
     isOpen,
     fileSource,
-    onLoad,
+    onLoad: onLoad ?? noopLoad,
     onLoadTrackerModule,
     onClose,
     currentProjectData,
     mode,
     suggestedFilename,
+    startDir,
+    extensions,
+    onPickFile,
   });
 
   navKeyRef.current = nav.handleQuickNavKey;
@@ -65,7 +90,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
         {/* Header */}
         <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-dark-border">
           <h2 className="text-lg font-bold text-text-primary">
-            {mode === 'load' ? 'Load Module' : 'Save Module'}
+            {pickMode ? 'Load Patch' : mode === 'load' ? 'Load Module' : 'Save Module'}
           </h2>
           <button
             onClick={onClose}
@@ -95,7 +120,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           </button>
 
           {/* Cloud Files Tab - only shown when logged in */}
-          {nav.user && nav.isServerAvailable && (
+          {!pickMode && nav.user && nav.isServerAvailable && (
             <button
               onClick={() => {
                 setFileSource('cloud');
@@ -114,7 +139,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           )}
 
           {/* Online Tab — unified Modland + HVSC (only in load mode) */}
-          {mode === 'load' && onLoadTrackerModule && (
+          {!pickMode && mode === 'load' && onLoadTrackerModule && (
             <button
               onClick={() => {
                 setFileSource('online');
@@ -135,7 +160,20 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           <div className="flex-1" />
 
           {/* Browse Files button - opens native file picker */}
-          {mode === 'load' && (
+          {pickMode && (
+            <div className="flex items-center px-2">
+              <Button size="sm" onClick={() => diskInputRef.current?.click()}>From Disk</Button>
+              <input
+                ref={diskInputRef}
+                type="file"
+                accept={(extensions ?? []).join(',')}
+                className="hidden"
+                onChange={handleDiskFile}
+                data-testid="patch-from-disk-input"
+              />
+            </div>
+          )}
+          {!pickMode && mode === 'load' && (
             <button
               onClick={nav.handleBrowseFiles}
               className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
@@ -145,7 +183,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
           )}
           
           {/* Open Folder button (when Web FS API available) */}
-          {!hasElectronFS() && fileSource === 'demo' && (
+          {!pickMode && !hasElectronFS() && fileSource === 'demo' && (
             <button
               onClick={nav.handleRequestFilesystemAccess}
               className="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
@@ -274,7 +312,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
               ) : (
                 <div className="grid grid-cols-1 gap-2">
                   {/* Back button when in subdirectory (not for cloud files) */}
-                  {nav.currentPath !== '' && fileSource === 'demo' && (
+                  {nav.currentPath !== '' && nav.currentPath !== (pickMode ? startDir : '') && fileSource === 'demo' && (
                     <div
                       onClick={() => {
                         if (hasElectronFS() && nav.currentPath) {
@@ -357,7 +395,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                           <History size={14} />
                         </button>
                       )}
-                      <button
+                      {!pickMode && <button
                         onClick={(e) => {
                           e.stopPropagation();
                           nav.handleDelete(file);
@@ -367,7 +405,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                         aria-label="Delete"
                       >
                         <Trash2 size={14} />
-                      </button>
+                      </button>}
                     </div>
                   ))}
                 </div>
