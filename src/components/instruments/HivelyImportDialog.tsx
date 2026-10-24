@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import type { HivelyConfig } from '@typedefs/instrument';
 import { extractInstrumentsFromHvl } from '@lib/import/formats/HivelyParser';
 import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
+import { PatchLoadButton } from './controls/PatchLoadButton';
 
 interface HivelyImportEntry {
   name: string;
@@ -24,12 +25,9 @@ export const HivelyImportDialog: React.FC<HivelyImportDialogProps> = ({ onClose,
   const [filename, setFilename] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setFilename(file.name);
+  const handleFile = (buffer: ArrayBuffer, fileName: string) => {
+    setFilename(fileName);
     try {
-      const buffer = await file.arrayBuffer();
       const found = extractInstrumentsFromHvl(buffer);
       setEntries(found.map(i => ({ ...i, selected: false })));
       setError(null);
@@ -63,12 +61,9 @@ export const HivelyImportDialog: React.FC<HivelyImportDialogProps> = ({ onClose,
           Import Instruments from HVL / AHX
         </h2>
 
-        <input
-          type="file"
-          accept=".hvl,.ahx"
-          onChange={handleFile}
-          className="block w-full mb-3 text-ft2-text text-xs font-mono cursor-pointer"
-        />
+        <div className="mb-3">
+          <PatchLoadButton synthType="HivelySynth" onLoad={handleFile} label="Choose Song" />
+        </div>
 
         {filename && !error && (
           <p className="text-ft2-textDim text-xs font-mono mb-2">{filename}</p>

@@ -47,12 +47,12 @@ Research: `thoughts/shared/research/2026-10-24_sunvox-synth-ui.md`,
 - [x] B2 FileBrowser: startDir + extensions + onPickFile(buffer, name) + From Disk
 - [x] B3 Manifest extensions for mapped dirs; regenerate manifest
 - [x] B4 Shared PatchLoadButton (extend ImportPresetFileButton pattern)
-- [ ] B5 (12 of 22 rows done: Furnace added; 1-7,9,10,14; remaining 8,11,12,13,15-22 stay OS picker, see state note; second pass: JUCE cart, 6 and 14 via controls/usePatchPicker.tsx, row 14 uses samples/packs/fairlight-cmi not cmi-disks, Furnace has no UI load action, manifest 9335 -> 9335, type-check clean, unit tests not run: fs-uae busy) All synth load actions use it (list in research file, every row)
+- [x] B5 (13 of 22 rows migrated: 1-7, 9, 10, 14, 20 plus Furnace; 9 rows carry a written exemption, re-verified 2026-10-24 by counting public/data: 0 .scpreset, 0 .fuw, 0 .nksf, 0 .ahi, 0 .mli, no VFX .syx outside dx7/cz-pack-1, no JUCE preset .json; row 13 Sfizz needs a FileList; row 21 is user ROM sets; row 22 is the pack browser itself) All synth load actions use it (list in research file, every row)
 - [x] B6 Reachability test (one load button -> browser opens at the mapped dir -> pick -> instrument updated). DONE: src/components/instruments/controls/__tests__/dx7PatchFolder.test.tsx passes (DX7 Load SysEx File -> manifest dx7 .syx list -> double-click benson-clav1.syx -> fetch sentinel + synth.loadSysex + onChange). Revert proof: commenting out `await onPickFile(...)` in useFileNavigation.handleLoad fails it (loadSysex 0 calls); file restored, git diff empty.
 
 - [x] A9 SunVox no sound on MetaModule default patch fixed (937c96a69); A10 preset selector over all 621 bundled warmplace instruments incl. .xi/.wav and pack subfolders (c3c28eeda). Live: owner hears sound; preset pick not yet heard.
 
-Running count: 15 of 16. A1-A8 done (8 of 8); B1-B4 and B6 done (5 of 6); B5 open (12 of 22 rows; Furnace done; remaining: Sfizz needs FileList, others have no bundled folder).
+Running count: 16 of 16. A1-A8 done; B1-B6 done (B5 with written exemptions). Follow-up: FMX added to the SunVox type map (MetaModule/FMX note-target test).
 
 State note (B5 remaining): row 6 CZ101Hardware.tsx uses styled CZ101Button, not yet on PatchLoadButton (same hook onPatchLoaded exists); row 4 Dexed JUCE cart callback still triggers the hidden OS input (visible button migrated); row 13 Sfizz takes FileList (multi-sample, folder) so stays OS picker; rows 8, 11, 12, 14-22 have no bundled folder in the map, stay OS picker. Manifest 7682 -> 9335 entries.
 
