@@ -74,7 +74,7 @@ export const SUNVOX_MODULE_TYPES: SunVoxModuleType[] = [
   { typeString: 'Output',     displayName: 'Output',     category: 'io', color: '#e0e04a', isGenerator: false },
 
   // ── Misc (utility) ────────────────────────────────────────────────────
-  { typeString: 'MetaModule',              displayName: 'MetaModule',              category: 'utility', color: '#707070', isGenerator: false },
+  { typeString: 'MetaModule',              displayName: 'MetaModule',              category: 'utility', color: '#707070', isGenerator: true },
   { typeString: 'Side Chain Compressor',   displayName: 'Side Chain Compressor',   category: 'utility', color: '#686868', isGenerator: false },
 ];
 
