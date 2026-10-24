@@ -27,6 +27,7 @@ import { GlobalLaneHeader } from './GlobalLaneHeader';
 import { AutomationParameterPicker } from '../automation/AutomationParameterPicker';
 import { MacroLanes } from './MacroLanes';
 import { useUIStore } from '@stores/useUIStore';
+import { editRowTop, editRowWindow } from '@/lib/tracker/editRowAnchor';
 import { useShallow } from 'zustand/react/shallow';
 import { usePatternEditor, AUTOMATION_LANE_WIDTH } from '@hooks/views/usePatternEditor';
 import { automationLaneReserve } from '@hooks/views/automationLaneReserve';
@@ -528,6 +529,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const fitScaleRef = useRef(fitScale);
   const dimensionsRef = useRef(dimensions);
   dimensionsRef.current = dimensions;
+  // The grid's height with the dub deck closed: the deck takes its height from
+  // the editor column, so grid + deck is what the grid had before it opened.
+  // The edit row keeps its deck-closed position against it (see editRowTop).
+  const dubDeckHeight = useUIStore(s => s.dubDeckHeight);
+  const referenceHeight = dimensions.height + dubDeckHeight;
+  const referenceHeightRef = useRef(referenceHeight);
+  referenceHeightRef.current = referenceHeight;
   const lnwPxRef = useRef(lnwPx);
   fitScaleRef.current = fitScale;
   lnwPxRef.current = lnwPx;
@@ -640,7 +648,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
     // Adjust for scrollY (which is baseY in render)
     // We want to know which row is at relativeY. The currentRow is at centerLineTop.
-    const centerLineTop = Math.floor(dimensions.height / 2) - rowHeightRef.current / 2;
+    const centerLineTop = editRowTop(dimensions.height, rowHeightRef.current, referenceHeightRef.current);
     const rowOffset = Math.floor((relativeY - centerLineTop) / rowHeightRef.current);
     
     const transportState = useTransportStore.getState();
@@ -825,7 +833,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       const containerHeight = container.clientHeight;
       const ROW_H = rowHeightRef.current;
       const currentDisplayRow = resolveScrollRow(formatIsPlayingRef.current, useEditorStore.getState().followPlayback, formatCurrentRowRef.current, formatCursor.rowIndex);
-      const centerLineTop = Math.floor(containerHeight / 2) - ROW_H / 2;
+      const centerLineTop = editRowTop(containerHeight, ROW_H, referenceHeightRef.current);
       const rowOffset = Math.floor((relY - centerLineTop) / ROW_H);
       const rowIdx = Math.max(0, Math.min(numRows - 1, currentDisplayRow + rowOffset));
 
@@ -1043,7 +1051,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         }
       }
       const ROW_H = rowHeightRef.current;
-      const centerLineTop = Math.floor(containerRef.current.clientHeight / 2) - ROW_H / 2;
+      const centerLineTop = editRowTop(containerRef.current.clientHeight, ROW_H, referenceHeightRef.current);
       const currentDisplayRow = resolveScrollRow(formatIsPlayingRef.current, useEditorStore.getState().followPlayback, formatCurrentRowRef.current, formatCursor.rowIndex);
       const rowOffset = Math.floor((relY - centerLineTop) / ROW_H);
       const rowIndex = Math.max(0, currentDisplayRow + rowOffset);
@@ -1645,6 +1653,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     type: 'layout',
     w: Math.max(1, dimensionsRef.current.width),
     h: Math.max(1, dimensionsRef.current.height),
+    referenceH: Math.max(1, referenceHeightRef.current),
     dpr: window.devicePixelRatio || 1,
     scale: fitScaleRef.current,
     uiState: snapshotUIRef.current(),
@@ -2054,6 +2063,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           dpr,
           width:              w,
           height:             h,
+          referenceHeight:    h + useUIStore.getState().dubDeckHeight,
           theme:              snapshotTheme(),
           uiState:            snapshotUI(),
           patterns:           isFormatMode ? snapshotFormatPatterns() : snapshotPatterns(),
@@ -2507,7 +2517,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   }, []);
 
   // Every non-layout input of the layout message, folded into one dependency.
-  const layoutKey = `${dimensions.width}x${dimensions.height}@${fitScale}#${layoutTick}`;
+  const layoutKey = `${dimensions.width}x${dimensions.height}+${dubDeckHeight}@${fitScale}#${layoutTick}`;
   const postedLayoutKeyRef = useRef('');
 
   // Forward layout changes to worker when channel widths/offsets change
@@ -2729,7 +2739,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         const cursorRow = useCursorStore.getState().cursor.rowIndex;
         const h = dimensions.height;
         const rh = rowHeightRef.current;
-        const centerLineTop = Math.floor(h / 2) - rh / 2;
+        const centerLineTop = editRowTop(h, rh, referenceHeightRef.current);
         const overlayTop = centerLineTop - cursorRow * rh;
         // Keep the value React renders from in step with what we write here,
         // so a re-render lands on the same pixel instead of snapping back.
@@ -2850,10 +2860,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
 
       const h = dimensions.height;
       const rh = rowHeightRef.current;
-      const visibleLines = Math.ceil(h / rh) + 2;
-      const topLines     = Math.floor(visibleLines / 2);
+      const { centerLineTop, topLines } = editRowWindow(h, rh, referenceHeightRef.current);
       const vStart       = currentRow - topLines;
-      const centerLineTop = Math.floor(h / 2) - rh / 2;
       const baseY        = centerLineTop - topLines * rh - smoothOffset;
       const overlayTop   = centerLineTop - currentRow * rh - smoothOffset;
 

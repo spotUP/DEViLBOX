@@ -151,6 +151,8 @@ export interface LayoutMsg {
   type: 'layout';
   w: number;
   h: number;
+  /** Grid height with the dub deck closed (`h` + the deck's height); see editRowTop. */
+  referenceH: number;
   dpr: number;
   scale: number;
   uiState: UIStateSnapshot;
@@ -169,6 +171,8 @@ export type TrackerWorkerMsg =
       dpr: number;
       width: number;
       height: number;
+      /** Grid height with the dub deck closed; `height` when absent. */
+      referenceHeight?: number;
       theme: ThemeSnapshot;
       uiState: UIStateSnapshot;
       patterns: PatternSnapshot[];

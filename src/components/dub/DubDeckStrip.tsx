@@ -261,6 +261,19 @@ const SUB_HARMONIC_MODE_OPTIONS = [
 ];
 
 export const DubDeckStrip: React.FC = () => {
+  // Publish the strip's own height so the pattern editor can keep its edit row
+  // where it sat with the deck closed (editRowTop). 0 when the strip unmounts.
+  const deckRef = useRef<HTMLDivElement>(null);
+  const setDubDeckHeight = useUIStore(s => s.setDubDeckHeight);
+  useEffect(() => {
+    const el = deckRef.current;
+    if (!el) return;
+    const publish = () => setDubDeckHeight(el.offsetHeight);
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    publish();
+    return () => { observer.disconnect(); setDubDeckHeight(0); };
+  }, [setDubDeckHeight]);
   const armed = useDubStore(s => s.armed);
   const setArmed = useDubStore(s => s.setArmed);
   const lastCapturedAt = useDubStore(s => s.lastCapturedAt);
@@ -1781,7 +1794,7 @@ export const DubDeckStrip: React.FC = () => {
      * visible rather than the one `vh` imagines. Three quarters, not 60 %:
      * the owner would rather have full-size buttons on the channel cards
      * than a taller pattern editor while the deck is open (2026-09-23). */
-    <div className="shrink-0 flex flex-col gap-1.5 px-2 py-1.5 bg-dark-bgSecondary border-t border-dark-border font-mono overflow-y-auto max-h-[calc(var(--app-vh)*0.75)]">
+    <div ref={deckRef} className="shrink-0 flex flex-col gap-1.5 px-2 py-1.5 bg-dark-bgSecondary border-t border-dark-border font-mono overflow-y-auto max-h-[calc(var(--app-vh)*0.75)]">
       {/* Header row */}
       {/* The header row.
           It had no `flex-wrap`, and its parent scrolls vertically only, so on a

@@ -27,6 +27,7 @@ import { computeCaretRect, computeFieldRect, FIELD_OUTLINE_STYLE } from '@/lib/t
 import { effectCellWidth, emptyEffectText, furnaceEffectText } from '@/lib/tracker/effectNotation';
 import { anySoloActive, isChannelDimmed } from '@/lib/tracker/channelDim';
 import { noteValueToPitch, pitchName } from '@/lib/tracker/noteValue';
+import { editRowWindow } from '@/lib/tracker/editRowAnchor';
 import type {
   PatternSnapshot,
   ThemeSnapshot,
@@ -252,6 +253,8 @@ export class TrackerGLRenderer {
   // Canvas size in logical CSS pixels
   private width = 1;
   private height = 1;
+  /** Grid height with the dub deck closed (see editRowTop); the height itself when no deck is open. */
+  private referenceHeight = 1;
   private dpr = 1;
 
   // Cached parsed theme colors — only re-parsed when theme object changes
@@ -382,9 +385,10 @@ export class TrackerGLRenderer {
 
   // ─── Public API ─────────────────────────────────────────────────────────────
 
-  resize(logicalW: number, logicalH: number, dpr: number): void {
+  resize(logicalW: number, logicalH: number, dpr: number, referenceH: number = logicalH): void {
     this.width  = logicalW;
     this.height = logicalH;
+    this.referenceHeight = referenceH;
     this.dpr    = dpr;
     // Set physical pixel dimensions on the backing store — without this the
     // OffscreenCanvas stays at its default 300×150 and gets stretched to fill
@@ -474,11 +478,9 @@ export class TrackerGLRenderer {
 
     // Visible rows
     const rowH = ui.rowHeight ?? 24;
-    const visibleLines = Math.ceil(height / rowH) + 2;
-    const topLines = Math.floor(visibleLines / 2);
+    const { centerLineTop, topLines, visibleLines } = editRowWindow(height, rowH, this.referenceHeight);
     const vStart = currentRow - topLines;
     const visibleEnd = vStart + visibleLines;
-    const centerLineTop = Math.floor(height / 2) - rowH / 2;
     const baseY = centerLineTop - topLines * rowH - smoothOffset;
     const hlInterval = ui.rowHighlightInterval ?? 4;
     const hl2Interval = ui.rowSecondaryHighlightInterval ?? 0;
