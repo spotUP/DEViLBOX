@@ -17,6 +17,7 @@ import type { DubBusSettings } from '@/types/dub';
 import { needsMigration, migrateProject } from '@/lib/migration';
 import { migrateGridOctaveBias, migrateSunVoxModularInstruments } from '@/lib/persistence/migrations';
 import { decodeNativeEngineFields, type SerializedCompanionFiles } from '@/lib/export/exporters';
+import { toTypedJson, fromTypedJson } from '@/lib/persistence/typedJson';
 import type { SongToApply, ProjectExtras } from './applySong';
 import type { GridBaseline } from './gridBaseline';
 
@@ -65,9 +66,22 @@ function flattenNestedAutomation(nested: Record<string, unknown>): AutomationCur
   return curves;
 }
 
+/**
+ * The JSON text of a saved song (.dbx body). Instruments carry ArrayBuffers
+ * (SunVox patchData) that JSON turns into `{}`; every .dbx writer goes through
+ * here so they are tagged. savedSongToApply is the matching reader.
+ */
+export function savedSongToJson(song: object, prettify = false): string {
+  const instruments = (song as { instruments?: unknown }).instruments;
+  const tagged = Array.isArray(instruments) ? { ...song, instruments: toTypedJson(instruments) } : song;
+  return prettify ? JSON.stringify(tagged, null, 2) : JSON.stringify(tagged);
+}
+
 /** The song a saved project or .dbx describes. Migrates old pattern/instrument formats in place. */
 export function savedSongToApply(data: SavedSongFields): SongToApply {
-  let { patterns, instruments } = data;
+  let { patterns } = data;
+  // Tagged buffers back to ArrayBuffers; untagged (old .dbx) and structured-clone data pass through.
+  let instruments = fromTypedJson<SavedSongFields['instruments']>(data.instruments);
   if (needsMigration(patterns, instruments)) {
     const migrated = migrateProject(patterns, instruments);
     patterns = migrated.patterns;

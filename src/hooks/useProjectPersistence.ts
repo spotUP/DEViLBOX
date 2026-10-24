@@ -17,7 +17,7 @@ import type { EffectConfig } from '@typedefs/instrument';
 import { CURRENT_SCHEMA, MIN_LOADABLE_SCHEMA, migrateSavedProject } from '@/lib/persistence/migrations';
 import { hasNativeEngineData, type SerializedCompanionFiles } from '@/lib/export/exporters';
 import { openSavedSong } from '@/lib/song/openSong';
-import { savedSongToApply } from '@/lib/song/savedSong';
+import { savedSongToApply, savedSongToJson } from '@/lib/song/savedSong';
 import { setRestoredEditsPending } from '@/lib/song/gridBaseline';
 import { restoreFromStoredBytes } from '@/lib/song/restoreFromStoredBytes';
 import { snapshotSong } from '@/lib/song/snapshotSong';
@@ -562,7 +562,7 @@ export async function clearSavedProject(): Promise<void> {
  */
 export function serializeProjectToBlob(): Blob {
   const savedProject = buildSavedProject();
-  const json = JSON.stringify(savedProject);
+  const json = savedSongToJson(savedProject);
   const compressed = compressProject(json);
   return new Blob([compressed], { type: 'application/octet-stream' });
 }

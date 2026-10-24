@@ -736,7 +736,8 @@ export function useFileNavigation({
 
       // Compress project data using DVBZ format
       const { compressProject } = await import('@/lib/projectCompression');
-      const compressed = compressProject(JSON.stringify(data));
+      const { savedSongToJson } = await import('@/lib/song/savedSong');
+      const compressed = compressProject(savedSongToJson(data));
 
       if (fileSource === 'cloud' && isAuthenticated()) {
         await saveCloudFile(filename, data, 'songs');
