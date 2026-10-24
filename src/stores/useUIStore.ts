@@ -131,6 +131,13 @@ interface UIStore {
    */
   dubDeckShape: string;
 
+  /**
+   * Measured height of the open dub deck strip in px, 0 when it is hidden or
+   * unmounted. Transient (not persisted): the pattern editor adds it to its own
+   * height to find where its edit row sat with the deck closed.
+   */
+  dubDeckHeight: number;
+
   // View Exposé (macOS Mission Control style view switcher)
   viewExposeActive: boolean;
   viewExposeSelectedIdx: number;
@@ -215,6 +222,7 @@ interface UIStore {
   setTrackerViewMode: (mode: TrackerViewMode) => void;
   setGridChannelIndex: (index: number) => void;
   setDubDeckShape: (shape: string) => void;
+  setDubDeckHeight: (height: number) => void;
   setShowInstrumentPanel: (show: boolean) => void;
   toggleInstrumentPanel: () => void;
 
@@ -333,6 +341,7 @@ export const useUIStore = create<UIStore>()(
 
       // Dub Deck shape — follow the hardware unless the user says otherwise.
       dubDeckShape: 'automatic',
+      dubDeckHeight: 0,
 
       // Layout presets
       layoutPresets: [null, null, null, null],
@@ -701,6 +710,8 @@ export const useUIStore = create<UIStore>()(
         set((state) => { state.gridChannelIndex = index; }),
       setDubDeckShape: (shape) =>
         set((state) => { state.dubDeckShape = shape; }),
+      setDubDeckHeight: (height) =>
+        set((state) => { state.dubDeckHeight = height; }),
       setShowInstrumentPanel: (show) =>
         set((state) => { state.showInstrumentPanel = show; }),
       toggleInstrumentPanel: () =>

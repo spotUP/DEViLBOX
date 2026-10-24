@@ -16,6 +16,7 @@ import { TrackerGLRenderer } from '../engine/renderer/TrackerGLRenderer';
 import { TrackerCanvas2DRenderer } from '../engine/renderer/TrackerCanvas2DRenderer';
 import { LayoutHold } from '../engine/renderer/layoutHold';
 import { LayoutTween } from '../engine/renderer/layoutTween';
+import { editRowTop } from '../lib/tracker/editRowAnchor';
 import type {
   TrackerWorkerMsg,
   TrackerWorkerReply,
@@ -39,6 +40,8 @@ const LINE_NUMBER_WIDTH = 40;
 let renderer: TrackerGLRenderer | TrackerCanvas2DRenderer | null = null;
 let width  = 800;
 let height = 600;
+/** Grid height with the dub deck closed (see editRowTop); `height` when no deck is open. */
+let referenceHeight = 600;
 let dpr    = 1;
 /** Pattern scale (fit all channels): the renderer draws in canvas px / scale at dpr * scale. */
 let scale  = 1;
@@ -97,6 +100,7 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
     case 'init': {
       width   = msg.width;
       height  = msg.height;
+      referenceHeight = msg.referenceHeight ?? msg.height;
       dpr     = msg.dpr;
       theme   = msg.theme;
       ui      = msg.uiState;
@@ -113,7 +117,7 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
       let glErr: unknown = null;
       try {
         renderer = new TrackerGLRenderer(msg.canvas);
-        renderer.resize(width / scale, height / scale, dpr * scale);
+        renderer.resize(width / scale, height / scale, dpr * scale, referenceHeight / scale);
       } catch (err) {
         glErr = err;
       }
@@ -121,7 +125,7 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
       if (!renderer) {
         try {
           renderer = new TrackerCanvas2DRenderer(msg.canvas);
-          renderer.resize(width / scale, height / scale, dpr * scale);
+          renderer.resize(width / scale, height / scale, dpr * scale, referenceHeight / scale);
         } catch (c2dErr) {
           console.error('[TrackerWorker] Canvas2D init also failed:', c2dErr);
           (self as unknown as Worker).postMessage({
@@ -182,9 +186,9 @@ self.onmessage = (e: MessageEvent<TrackerWorkerMsg>) => {
       // sliding, a window drag): the box is the animation, and a tween
       // restarted on every frame of it would trail the box. The grid follows
       // the size 1:1; only a channel-count change keeps its fade.
-      const sizeChanged = msg.w !== width || msg.h !== height;
+      const sizeChanged = msg.w !== width || msg.h !== height || msg.referenceH !== referenceHeight;
       if (sizeChanged || msg.dpr !== dpr || msg.scale !== scale) {
-        width = msg.w; height = msg.h; dpr = msg.dpr; scale = msg.scale;
+        width = msg.w; height = msg.h; referenceHeight = msg.referenceH; dpr = msg.dpr; scale = msg.scale;
         pendingResize = true;
       }
       ui = msg.uiState;
@@ -255,7 +259,7 @@ function startRAF(): void {
 function applyPendingResize(): void {
   if (!pendingResize || tween.fadingOut) return;
   pendingResize = false;
-  renderer?.resize(width / scale, height / scale, dpr * scale);
+  renderer?.resize(width / scale, height / scale, dpr * scale, referenceHeight / scale);
 }
 
 function renderFrame(): void {
@@ -347,7 +351,7 @@ function hitTest(
   const pattern = patterns[currentPatternIndex];
   if (!pattern) return null;
 
-  const centerLineTop = Math.floor(height / 2) - ROW_HEIGHT / 2;
+  const centerLineTop = editRowTop(height, ROW_HEIGHT, referenceHeight);
   const rowOffset = Math.floor((relY - centerLineTop) / ROW_HEIGHT);
   const row = (playback.isPlaying ? playback.row : cursor.rowIndex) + rowOffset;
   const rowIndex = Math.max(0, Math.min(row, pattern.length - 1));

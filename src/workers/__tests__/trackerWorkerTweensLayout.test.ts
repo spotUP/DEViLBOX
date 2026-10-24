@@ -63,7 +63,7 @@ function initMsg(extra: Record<string, unknown> = {}, offsets = OFF4) {
   };
 }
 const layoutMsg = (rowHeight: number, offsets: number[], width: number, extra: Record<string, unknown> = {}) => ({
-  type: 'layout', w: 800, h: 600, dpr: 1, scale: 1, uiState: ui(rowHeight), channelLayout: lay(offsets, width), ...extra,
+  type: 'layout', w: 800, h: 600, referenceH: 600, dpr: 1, scale: 1, uiState: ui(rowHeight), channelLayout: lay(offsets, width), ...extra,
 });
 
 describe('tracker worker tweens layout', () => {

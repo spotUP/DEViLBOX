@@ -8,6 +8,7 @@
  */
 
 import type { TrackerRenderInput } from './worker-types';
+import { editRowTop } from '@/lib/tracker/editRowAnchor';
 import { SUN_EFFECT_GLYPH } from '@/lib/import/formats/sunEffectGlyphs';
 import { SNX_EFFECT_GLYPH } from '@/lib/import/formats/sonixEffectGlyphs';
 import { SPL_EFFECT_GLYPH } from '@/lib/import/formats/soundPlayerEffectGlyphs';
@@ -100,6 +101,8 @@ export class TrackerCanvas2DRenderer {
   private readonly ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
   width  = 800;
   height = 600;
+  /** Grid height with the dub deck closed (see editRowTop); the height itself when no deck is open. */
+  referenceHeight = 600;
   private dpr = 1;
   private readonly mobile: boolean;
   // Resolved constants based on mobile flag
@@ -114,6 +117,7 @@ export class TrackerCanvas2DRenderer {
     this.ctx = ctx as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
     this.width  = canvas.width;
     this.height = canvas.height;
+    this.referenceHeight = this.height;
     this.mobile = mobile;
     this.cw     = mobile ? M_CHAR_WIDTH : CHAR_WIDTH;
     this.lnw    = mobile ? M_LINE_NUM_W : LINE_NUMBER_WIDTH;
@@ -121,9 +125,10 @@ export class TrackerCanvas2DRenderer {
     this.colGap = mobile ? M_COL_GAP : COL_GAP;
   }
 
-  resize(w: number, h: number, dpr: number): void {
+  resize(w: number, h: number, dpr: number, referenceH: number = h): void {
     this.width  = w;
     this.height = h;
+    this.referenceHeight = referenceH;
     this.dpr    = dpr;
     this.ctx.canvas.width  = Math.round(w * dpr);
     this.ctx.canvas.height = Math.round(h * dpr);
@@ -168,7 +173,7 @@ export class TrackerCanvas2DRenderer {
 
     // Scroll so cursor/playback row is centered
     const centerRow = isPlaying ? playRow : cursor.rowIndex;
-    const halfVisible = Math.floor(H / rowH / 2);
+    const halfVisible = Math.floor((editRowTop(H, rowH, this.referenceHeight) + rowH / 2) / rowH);
     const scrollRow = Math.max(0, Math.min(centerRow - halfVisible, numRows - 1));
     const startRow = Math.max(0, scrollRow);
     const endRow   = Math.min(numRows, startRow + visibleRows);
@@ -471,7 +476,7 @@ export class TrackerCanvas2DRenderer {
     }
 
     // ── Center line ─────────────────────────────────────────────────────────
-    const centerY = Math.floor(H / 2);
+    const centerY = editRowTop(H, rowH, this.referenceHeight) + rowH / 2;
     ctx.strokeStyle = theme.accentGlow;
     ctx.lineWidth   = 1;
     ctx.globalAlpha = 0.4;
