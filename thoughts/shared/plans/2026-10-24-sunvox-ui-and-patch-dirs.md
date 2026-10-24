@@ -23,6 +23,10 @@ Research: `thoughts/shared/research/2026-10-24_sunvox-synth-ui.md`,
   OS picker. Covers all synth load actions; fold CZ-101 / DX7 lists in.
 - Bundled SunVox patches: public/data/instruments/sunvox (commit 4a8fd6823).
 
+## Owner decision 2026-10-24 (later)
+- Furnace: add Load Instrument button on the Furnace editor, opening public/data/instruments/furnace/<chip> (.fui/.dmp), applied to the current instrument. DONE: FurnaceLoadInstrumentButton in the Furnace EditorHeader; 73 Furnace types mapped to chip folders, 45 fall back to instruments/furnace (no chip folder); test furnaceLoadInstrument.test.tsx (revert proof passed); manifest 9335 -> 10006.
+- .dbx ArrayBuffer loss fixed in 716f115db (savedSongToJson / savedSongToApply, typedJson ArrayBuffer tag).
+
 ## Checklist
 
 ### A. SunVox one editor (agent A)
@@ -43,10 +47,10 @@ Research: `thoughts/shared/research/2026-10-24_sunvox-synth-ui.md`,
 - [x] B2 FileBrowser: startDir + extensions + onPickFile(buffer, name) + From Disk
 - [x] B3 Manifest extensions for mapped dirs; regenerate manifest
 - [x] B4 Shared PatchLoadButton (extend ImportPresetFileButton pattern)
-- [ ] B5 (11 of 22 rows done: 1-7,9,10,14; remaining 8,11,12,13,15-22 stay OS picker, see state note; second pass: JUCE cart, 6 and 14 via controls/usePatchPicker.tsx, row 14 uses samples/packs/fairlight-cmi not cmi-disks, Furnace has no UI load action, manifest 9335 -> 9335, type-check clean, unit tests not run: fs-uae busy) All synth load actions use it (list in research file, every row)
+- [ ] B5 (12 of 22 rows done: Furnace added; 1-7,9,10,14; remaining 8,11,12,13,15-22 stay OS picker, see state note; second pass: JUCE cart, 6 and 14 via controls/usePatchPicker.tsx, row 14 uses samples/packs/fairlight-cmi not cmi-disks, Furnace has no UI load action, manifest 9335 -> 9335, type-check clean, unit tests not run: fs-uae busy) All synth load actions use it (list in research file, every row)
 - [x] B6 Reachability test (one load button -> browser opens at the mapped dir -> pick -> instrument updated). DONE: src/components/instruments/controls/__tests__/dx7PatchFolder.test.tsx passes (DX7 Load SysEx File -> manifest dx7 .syx list -> double-click benson-clav1.syx -> fetch sentinel + synth.loadSysex + onChange). Revert proof: commenting out `await onPickFile(...)` in useFileNavigation.handleLoad fails it (loadSysex 0 calls); file restored, git diff empty.
 
-Running count: 13 of 14. A1-A8 done (8 of 8); B1-B4 and B6 done (5 of 6); B5 open (11 of 22 rows; remaining rows need owner scope: Furnace has no UI load action, Sfizz needs FileList, others have no bundled folder).
+Running count: 13 of 14. A1-A8 done (8 of 8); B1-B4 and B6 done (5 of 6); B5 open (12 of 22 rows; Furnace done; remaining: Sfizz needs FileList, others have no bundled folder).
 
 State note (B5 remaining): row 6 CZ101Hardware.tsx uses styled CZ101Button, not yet on PatchLoadButton (same hook onPatchLoaded exists); row 4 Dexed JUCE cart callback still triggers the hidden OS input (visible button migrated); row 13 Sfizz takes FileList (multi-sample, folder) so stays OS picker; rows 8, 11, 12, 14-22 have no bundled folder in the map, stay OS picker. Manifest 7682 -> 9335 entries.
 
