@@ -10,13 +10,11 @@
 import type { ModularPatchConfig, ModularModuleInstance, ModularConnection } from '@/types/modular';
 import type { SunVoxModuleGraphEntry } from '@/engine/sunvox/SunVoxEngine';
 import { SUNVOX_MODULE_TYPE_MAP } from './SunVoxModuleTypes';
+import { resolveSunVoxCtlMeta, type SunVoxCtlMeta } from '@/engine/sunvox/sunvoxControlMeta';
 
 /** Per-module control metadata, keyed by module UI id */
-export interface SunVoxControlMeta {
+export interface SunVoxControlMeta extends SunVoxCtlMeta {
   id: number;
-  name: string;
-  min: number;
-  max: number;
 }
 
 /** Stored globally so the ModulePanel can access control names/ranges */
@@ -40,7 +38,7 @@ function buildModule(entry: SunVoxModuleGraphEntry, x: number, y: number): {
   for (let c = 0; c < entry.controls.length; c++) {
     const ctl = entry.controls[c];
     parameters[`ctl_${c}`] = ctl.value;
-    meta.push({ id: c, name: ctl.name, min: ctl.min, max: ctl.max });
+    meta.push({ id: c, ...resolveSunVoxCtlMeta(entry.typeName, c, ctl) });
   }
 
   return {

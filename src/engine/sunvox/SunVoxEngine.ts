@@ -25,6 +25,10 @@ export interface SunVoxControl {
   min: number;
   max: number;
   value: number;
+  /** sv_get_module_ctl_type: 0 = continuous, 1 = selector (enum). */
+  type: number;
+  /** sv_get_module_ctl_group: the controller group SunVox shows it in. */
+  group: number;
 }
 
 export interface SunVoxModuleInfo {

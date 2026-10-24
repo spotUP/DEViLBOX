@@ -154,6 +154,42 @@ class SunVoxProcessor extends AudioWorkletProcessor {
     return ptr;
   }
 
+  // NUL-terminated UTF-8 copy of a JS string in WASM memory (caller frees). The glue exports only
+  // UTF8ToString, and AudioWorkletGlobalScope has no TextEncoder, so the encoding is done here.
+  _allocCString(str) {
+    const bytes = [];
+    for (const ch of String(str)) {
+      const c = ch.codePointAt(0);
+      if (c < 0x80) bytes.push(c);
+      else if (c < 0x800) bytes.push(0xc0 | (c >> 6), 0x80 | (c & 63));
+      else if (c < 0x10000) bytes.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+      else bytes.push(0xf0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+    }
+    bytes.push(0);
+    return this._allocBytes(new Uint8Array(bytes));
+  }
+
+  // Run a graph change under sv_lock_slot / sv_unlock_slot, as the SunVox API requires for
+  // sv_new_module, sv_remove_module, sv_connect_module and sv_disconnect_module.
+  _locked(handle, fn) {
+    const m = this.svlib;
+    m._sv_lock_slot(handle);
+    try { return fn(); } finally { m._sv_unlock_slot(handle); }
+  }
+
+  // name/min/max/value plus the controller type (0 = continuous, 1 = selector) and group.
+  _readCtl(handle, moduleId, c) {
+    const m = this.svlib;
+    return {
+      name: m.UTF8ToString(m._sv_get_module_ctl_name(handle, moduleId, c)),
+      min: m._sv_get_module_ctl_min(handle, moduleId, c, 0),
+      max: m._sv_get_module_ctl_max(handle, moduleId, c, 0),
+      value: m._sv_get_module_ctl_value(handle, moduleId, c, 0),
+      type: m._sv_get_module_ctl_type(handle, moduleId, c),
+      group: m._sv_get_module_ctl_group(handle, moduleId, c),
+    };
+  }
+
   async handleMessage(data) {
     const m = this.svlib;
 
@@ -395,14 +431,7 @@ class SunVoxProcessor extends AudioWorkletProcessor {
         if (!m) break;
         const ctlCount = m._sv_get_number_of_module_ctls(data.handle, data.moduleId);
         const controls = [];
-        for (let i = 0; i < ctlCount; i++) {
-          controls.push({
-            name: m.UTF8ToString(m._sv_get_module_ctl_name(data.handle, data.moduleId, i)),
-            min: m._sv_get_module_ctl_min(data.handle, data.moduleId, i, 0),
-            max: m._sv_get_module_ctl_max(data.handle, data.moduleId, i, 0),
-            value: m._sv_get_module_ctl_value(data.handle, data.moduleId, i, 0),
-          });
-        }
+        for (let i = 0; i < ctlCount; i++) controls.push(this._readCtl(data.handle, data.moduleId, i));
         this.port.postMessage({ type: 'controls', handle: data.handle, moduleId: data.moduleId, controls });
         break;
       }
@@ -669,17 +698,46 @@ class SunVoxProcessor extends AudioWorkletProcessor {
           // Get controls
           const ctlCount = Math.min(m._sv_get_number_of_module_ctls(data.handle, i), 32);
           const controls = [];
-          for (let c = 0; c < ctlCount; c++) {
-            controls.push({
-              name: m.UTF8ToString(m._sv_get_module_ctl_name(data.handle, i, c)),
-              min: m._sv_get_module_ctl_min(data.handle, i, c, 0),
-              max: m._sv_get_module_ctl_max(data.handle, i, c, 0),
-              value: m._sv_get_module_ctl_value(data.handle, i, c, 0),
-            });
-          }
+          for (let c = 0; c < ctlCount; c++) controls.push(this._readCtl(data.handle, i, c));
           graphModules.push({ id: i, name, typeName, flags, inputs, outputs, controls });
         }
         this.port.postMessage({ type: 'moduleGraph', handle: data.handle, modules: graphModules });
+        break;
+      }
+
+      // ── Module graph edits (modular editor) ───────────────────────────────
+      // Replies carry the keys SunVoxEngine resolves on; a negative moduleId/result is the
+      // SunVox error code and is passed through for the caller to check.
+
+      case 'newModule': {
+        if (!m) break;
+        const name = this._allocCString(data.moduleType);
+        let moduleId;
+        try {
+          moduleId = this._locked(data.handle, () => m._sv_new_module(data.handle, name, name, 0, 0, 0));
+        } finally {
+          m._free(name);
+        }
+        this.port.postMessage({ type: 'moduleCreated', handle: data.handle, moduleId });
+        break;
+      }
+
+      case 'removeModule': {
+        if (!m) break;
+        const result = this._locked(data.handle, () => m._sv_remove_module(data.handle, data.moduleId));
+        this.port.postMessage({ type: 'moduleRemoved', handle: data.handle, moduleId: data.moduleId, result });
+        break;
+      }
+
+      case 'connectModules':
+      case 'disconnectModules': {
+        if (!m) break;
+        const fn = data.type === 'connectModules' ? m._sv_connect_module : m._sv_disconnect_module;
+        const result = this._locked(data.handle, () => fn(data.handle, data.sourceId, data.destId));
+        this.port.postMessage({
+          type: data.type === 'connectModules' ? 'modulesConnected' : 'modulesDisconnected',
+          handle: data.handle, sourceId: data.sourceId, destId: data.destId, result,
+        });
         break;
       }
     }
