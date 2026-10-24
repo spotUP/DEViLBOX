@@ -4,6 +4,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import type { SunVoxConfig } from '@typedefs/instrument';
+import { sunvoxPatchConfigFromFile, SUNVOX_PATCH_ACCEPT } from '@/engine/sunvox/sunvoxPatchConfig';
 import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
 
 interface SunVoxImportDialogProps {
@@ -27,14 +28,11 @@ export const SunVoxImportDialog: React.FC<SunVoxImportDialogProps> = ({ onClose,
   // Auto-load the initial file when provided (drag-drop path)
   useEffect(() => {
     if (!initialFile) return;
-    const name = initialFile.name.replace(/\.sunsynth$/i, '');
     setFilename(initialFile.name);
 
     const load = async () => {
       try {
-        const buffer = await initialFile.arrayBuffer();
-        const config: SunVoxConfig = { patchData: buffer, patchName: name, isSong: false, controlValues: {} };
-        setPending({ name, config });
+        setPending(await sunvoxPatchConfigFromFile(initialFile));
         setError(null);
       } catch (err) {
         setPending(null);
@@ -49,15 +47,7 @@ export const SunVoxImportDialog: React.FC<SunVoxImportDialogProps> = ({ onClose,
     if (!file) return;
     setFilename(file.name);
     try {
-      const buffer = await file.arrayBuffer();
-      const name = file.name.replace(/\.sunsynth$/i, '');
-      const config: SunVoxConfig = {
-        patchData: buffer,
-        patchName: name,
-        isSong: false,
-        controlValues: {},
-      };
-      setPending({ name, config });
+      setPending(await sunvoxPatchConfigFromFile(file));
       setError(null);
     } catch (err) {
       setPending(null);
@@ -86,7 +76,7 @@ export const SunVoxImportDialog: React.FC<SunVoxImportDialogProps> = ({ onClose,
         {!initialFile && (
           <input
             type="file"
-            accept=".sunsynth"
+            accept={SUNVOX_PATCH_ACCEPT}
             onChange={handleFile}
             className="block w-full mb-3 text-ft2-text text-xs font-mono cursor-pointer"
           />

@@ -45,6 +45,7 @@ import { ChannelOscilloscope } from '../../visualization/ChannelOscilloscope';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getChipSynthDef, resolveChipParameters } from '@constants/chipParameters';
 import { getChipCapabilities } from '@engine/mame/MAMEMacroTypes';
+import { SunVoxPatchLoader } from '../SunVoxPatchLoader';
 import { Radio, MessageSquare, Music, Mic, Monitor, Cpu, SlidersHorizontal } from 'lucide-react';
 import { HardwareUIWrapper, hasHardwareUI } from '../hardware/HardwareUIWrapper';
 import type { MacroData } from './MAMEMacroEditor';
@@ -3941,6 +3942,10 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           {instrument.sunvox?.noteTargetModuleId != null && (
             <p className="mt-1 text-xs opacity-60">Target module ID: {instrument.sunvox.noteTargetModuleId}</p>
           )}
+          <SunVoxPatchLoader
+            hasPatch={!!instrument.sunvox?.patchData}
+            onLoad={(config) => handleChange({ sunvox: { ...instrument.sunvox, ...config } })}
+          />
         </div>
       </div>
     );
