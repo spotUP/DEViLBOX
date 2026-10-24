@@ -1,6 +1,6 @@
 /**
  * SunVox editor Load Patch reachability: a new SunVoxSynth instrument was silent (no patch) and its editor had no way
- * to load one. Route: UnifiedInstrumentEditor -> 'sunvox-synth' branch -> SunVoxPatchLoader file input ->
+ * to load one. Route: UnifiedInstrumentEditor -> 'sunvox-synth' branch -> SunVoxPatchLoader Load Patch -> in-app browser From Disk ->
  * sunvoxPatchConfigFromFile -> handleChange -> useInstrumentStore.updateInstrument -> ToneEngine.invalidateInstrument
  * (the next build runs InstrumentFactory, which calls setModule with the patch).
  */
@@ -27,10 +27,10 @@ describe('the SunVox editor Load Patch', () => {
     };
     render(<Host />);
     expect(screen.getByText(/silent until a patch is loaded/i)).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Load Patch' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Load Patch' }));
 
     const bytes = new Uint8Array([9, 8, 7]);
-    fireEvent.change(screen.getByTestId('sunvox-patch-input'), { target: { files: [new File([bytes], 'Lead.sunsynth')] } });
+    fireEvent.change(await screen.findByTestId('patch-from-disk-input'), { target: { files: [new File([bytes], 'Lead.sunsynth')] } });
 
     await waitFor(() => expect(useInstrumentStore.getState().instruments[0].sunvox!.patchName).toBe('Lead'));
     const stored = useInstrumentStore.getState().instruments[0];
