@@ -2,6 +2,7 @@
  * Instrument Store - Instrument Bank & Preset Management
  */
 
+import { isSelfSavedSunVoxPatch } from '@/engine/sunvox-modular/selfSavedPatches';
 import { setbfreeConfigFromNativeValues } from '@engine/setbfree/SetBfreeSynth';
 import { SETBFREE_NATIVE_FACTORY_PRESETS } from '@engine/setbfree/setbfreeNativePresets';
 import { calfMonoConfigFromNativeValues } from '@engine/calf-mono/CalfMonoSynth';
@@ -465,7 +466,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
         updates.octamed ||
         updates.davidWhittaker ||
         updates.symphonie ||
-        updates.sunvox ||
+        // The live SunVox graph saving its own handle is not a new patch: no rebuild.
+        (updates.sunvox && !isSelfSavedSunVoxPatch(updates.sunvox.patchData)) ||
         updates.modularSynth ||
         updates.parameters ||
         updates.sample ||

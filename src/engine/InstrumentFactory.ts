@@ -12,7 +12,9 @@ import type { InstrumentConfig, EffectConfig } from '@typedefs/instrument';
 import type { DevilboxSynth } from '@typedefs/synth';
 import {
   DEFAULT_SUPERCOLLIDER,
+  DEFAULT_SUNVOX_SYNTH_PATCH,
 } from '@/types/instrument';
+import { isSunVoxSongPlayer } from './sunvox/sunvoxPatchConfig';
 import { HivelySynth } from './hively/HivelySynth';
 import { GTUltraSynth } from './gtultra/GTUltraSynth';
 import { KlysSynth } from './klystrack/KlysSynth';
@@ -781,16 +783,27 @@ export class InstrumentFactory {
       }
 
       case 'SunVoxSynth': {
-        const svSynth = new SunVoxSynth();
-        if (config.sunvox?.patchData) {
-          const loader = config.sunvox.isSong
-            ? svSynth.setSong(config.sunvox.patchData)
-            : svSynth.setModule(config.sunvox.patchData);
-          loader.catch((err: unknown) =>
-            console.error('[InstrumentFactory] SunVox patch load failed:', err)
+        if (isSunVoxSongPlayer(config.sunvox)) {
+          // A whole .sunvox song played by its own sequencer (no graph to edit).
+          const svSynth = new SunVoxSynth();
+          svSynth.setSong(config.sunvox!.patchData!).catch((err: unknown) =>
+            console.error('[InstrumentFactory] SunVox song load failed:', err)
           );
+          instrument = svSynth;
+          break;
         }
-        instrument = svSynth;
+        // Editable instrument graph: saved bytes, a .sunsynth, or the
+        // Generator -> Output recipe (or a migrated SunVoxModular patch).
+        instrument = new SunVoxModularSynth(
+          config.sunvoxModular ?? DEFAULT_SUNVOX_SYNTH_PATCH,
+          null,
+          config.sunvox?.noteTargetModuleId,
+          {
+            instrumentId: config.id,
+            patchData: config.sunvox?.patchData ?? null,
+            isSong: config.sunvox?.isSong === true,
+          },
+        );
         break;
       }
 

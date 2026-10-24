@@ -405,7 +405,6 @@ export const SYNTH_CATEGORIES: SynthCategory[] = [
       SYNTH_INFO.Sfizz,
       SYNTH_INFO.ZynAddSubFX,
       SYNTH_INFO.SunVoxSynth,
-      SYNTH_INFO.SunVoxModular,
     ],
   },
   {
