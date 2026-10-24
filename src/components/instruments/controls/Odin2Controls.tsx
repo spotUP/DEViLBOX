@@ -18,7 +18,7 @@ import type { InstrumentConfig } from '@typedefs/instrument';
 import type { VSTBridgeSynth } from '@engine/vstbridge/VSTBridgeSynth';
 import type { VSTBridgeParam } from '@engine/vstbridge/synth-registry';
 import { VSTBridgePanel } from './VSTBridgePanel';
-import { ImportPresetFileButton } from './ImportPresetFileButton';
+import { PatchLoadButton } from './PatchLoadButton';
 import { CustomSelect, type SelectOptionGroup } from '@components/common/CustomSelect';
 import { notify } from '@stores/useNotificationStore';
 import { ODIN2_PRESETS } from '@constants/odin2PresetIndex';
@@ -281,7 +281,7 @@ export const Odin2Controls: React.FC<Odin2ControlsProps> = ({ instrument, onChan
           disabled={presetBusy}
           className="w-72"
         />
-        <ImportPresetFileButton accept=".odin" busy={presetBusy} onImport={handleImportFile} />
+        <PatchLoadButton synthType="Odin2" label="Import Preset File" busy={presetBusy} onLoad={(buffer, name) => handleImportFile(new Uint8Array(buffer), name)} />
       </div>
       <div className="p-4 grid grid-cols-1 xl:grid-cols-2 gap-3">
         {section('Master', <NamedKnobs specs={MASTER_KNOBS} ctx={ctx} />)}

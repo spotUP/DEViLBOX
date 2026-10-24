@@ -16,6 +16,8 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { getToneEngine } from '../../../engine/ToneEngine';
 import { unpackDX7Voice, toBulkSysex } from '../../../engine/dx7/dx7sysex';
 import { consumePendingPresetData } from '../../../lib/pendingPresetData';
+import { Button } from '@components/ui/Button';
+import { usePatchPicker } from '@components/instruments/controls/usePatchPicker';
 
 interface DexedUIModule {
   _dexed_ui_init: () => void;
@@ -83,7 +85,7 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [patchInfo, setPatchInfo] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const openPickerRef = useRef<() => void>(() => {});
 
   /** Load sysex data into both the UI WASM and audio engine */
   const loadSysexData = useCallback((buffer: ArrayBuffer, sourceLabel: string) => {
@@ -156,11 +158,8 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
     }
   }, [loadSysexFile]);
 
-  const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) loadSysexFile(file);
-    e.target.value = '';
-  }, [loadSysexFile]);
+  const { openPicker, picker } = usePatchPicker('DX7', (buffer, name) => loadSysexFile(new File([buffer], name)));
+  openPickerRef.current = openPicker;
 
 
   useEffect(() => {
@@ -357,10 +356,10 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
           } catch { /* engine not ready */ }
         };
 
-        // Cart button callback: JUCE cart button → JS file picker
+        // Cart button callback: JUCE cart button -> the in-app browser at the DX7 sysex folder
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any)._dexedUICartCallback = () => {
-          fileInputRef.current?.click();
+          openPickerRef.current();
         };
 
         eventCleanups.push(() => {
@@ -481,25 +480,11 @@ export const DexedHardwareUI: React.FC<DexedHardwareUIProps> = ({
       />
       {loaded && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            style={{
-              background: '#333', color: '#ccc', border: '1px solid #555',
-              borderRadius: 4, padding: '3px 10px', fontSize: 11, cursor: 'pointer',
-            }}
-          >
-            Load .SYX
-          </button>
+          <Button size="sm" onClick={openPicker}>Load .SYX</Button>
           {patchInfo && (
             <span style={{ color: '#8f8', fontSize: 11, fontFamily: 'monospace' }}>{patchInfo}</span>
           )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".syx,.SYX"
-            onChange={handleFileInput}
-            style={{ display: 'none' }}
-          />
+          {picker}
         </div>
       )}
     </div>

@@ -16,7 +16,7 @@ import type { InstrumentConfig } from '@typedefs/instrument';
 import type { VSTBridgeSynth } from '@engine/vstbridge/VSTBridgeSynth';
 import type { VSTBridgeParam } from '@engine/vstbridge/synth-registry';
 import { VSTBridgePanel } from './VSTBridgePanel';
-import { ImportPresetFileButton } from './ImportPresetFileButton';
+import { PatchLoadButton } from './PatchLoadButton';
 import { CustomSelect, type SelectOptionGroup } from '@components/common/CustomSelect';
 import { notify } from '@stores/useNotificationStore';
 import { VITAL_PRESETS } from '@constants/vitalPresetIndex';
@@ -258,7 +258,7 @@ export const VitalControls: React.FC<VitalControlsProps> = ({
           disabled={presetBusy}
           className="w-64"
         />
-        <ImportPresetFileButton accept=".vital" busy={presetBusy} onImport={handleImportFile} />
+        <PatchLoadButton synthType="Vital" label="Import Preset File" busy={presetBusy} onLoad={(buffer, name) => handleImportFile(new Uint8Array(buffer), name)} />
       </div>
 
       {/* Tab bar */}

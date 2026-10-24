@@ -4,7 +4,8 @@
  */
 import React, { useState, useEffect } from 'react';
 import type { SunVoxConfig } from '@typedefs/instrument';
-import { sunvoxPatchConfigFromFile, SUNVOX_PATCH_ACCEPT } from '@/engine/sunvox/sunvoxPatchConfig';
+import { sunvoxPatchConfigFromFile } from '@/engine/sunvox/sunvoxPatchConfig';
+import { PatchLoadButton } from '@components/instruments/controls/PatchLoadButton';
 import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
 
 interface SunVoxImportDialogProps {
@@ -42,12 +43,10 @@ export const SunVoxImportDialog: React.FC<SunVoxImportDialogProps> = ({ onClose,
     void load();
   }, [initialFile]);
 
-  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setFilename(file.name);
+  const handleFile = async (buffer: ArrayBuffer, name: string) => {
+    setFilename(name);
     try {
-      setPending(await sunvoxPatchConfigFromFile(file));
+      setPending(await sunvoxPatchConfigFromFile(new File([buffer], name)));
       setError(null);
     } catch (err) {
       setPending(null);
@@ -74,12 +73,9 @@ export const SunVoxImportDialog: React.FC<SunVoxImportDialogProps> = ({ onClose,
         </h2>
 
         {!initialFile && (
-          <input
-            type="file"
-            accept={SUNVOX_PATCH_ACCEPT}
-            onChange={handleFile}
-            className="block w-full mb-3 text-ft2-text text-xs font-mono cursor-pointer"
-          />
+          <div className="mb-3">
+            <PatchLoadButton synthType="SunVoxSynth" onLoad={handleFile} />
+          </div>
         )}
 
         {filename && !error && (

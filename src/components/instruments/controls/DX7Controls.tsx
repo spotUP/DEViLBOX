@@ -9,7 +9,7 @@
 
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import { CustomSelect } from '@components/common/CustomSelect';
-import { Button } from '@components/ui/Button';
+import { PatchLoadButton } from '@components/instruments/controls/PatchLoadButton';
 import { SectionLabel } from '@components/instruments/shared/SectionLabel';
 import { DX7Synth, type DX7PatchManifest } from '../../../engine/dx7/DX7Synth';
 import { getToneEngine } from '../../../engine/ToneEngine';
@@ -46,7 +46,6 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange, 
   const [library, setLibrary] = useState<DX7LibraryManifest | null>(null);
   const [importStatus, setImportStatus] = useState('');
   const [loading, setLoading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const synthRef = useRef<DX7Synth | null>(null);
 
   useEffect(() => {
@@ -220,17 +219,9 @@ export const DX7Controls: React.FC<DX7ControlsProps> = ({ instrument, onChange, 
       >
         <SectionLabel label="SysEx File" color="var(--color-accent-primary)" />
         <div className="flex items-center gap-3 flex-wrap">
-          <Button size="sm" onClick={() => fileInputRef.current?.click()}>Load SysEx File</Button>
+          <PatchLoadButton synthType="DX7" label="Load SysEx File" onLoad={(buffer, name) => void handleFile(new File([buffer], name))} />
           <span className="text-text-muted text-[10px] font-mono">{importStatus || 'A 32-voice bulk dump or a single-voice dump; drop a file here too'}</span>
         </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".syx,.SYX"
-          data-testid="dx7-sysex-input"
-          onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleFile(file); e.target.value = ''; }}
-          style={{ display: 'none' }}
-        />
       </div>
     </div>
   );

@@ -18,6 +18,7 @@ import {
   fmtInt, fmtWave, fmtCutoff, fmtTrack,
 } from '@engine/cmi/useCMIPanel';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { usePatchPicker } from '@components/instruments/controls/usePatchPicker';
 
 // ── Colors ───────────────────────────────────────────────────────────────────
 
@@ -206,7 +207,6 @@ const CMIControls: React.FC<CMIControlsProps> = ({
     externalOnChange: onParamChange,
     instrumentId,
   });
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -214,11 +214,7 @@ const CMIControls: React.FC<CMIControlsProps> = ({
     if (file) cmi.loadSampleFromFile(file);
   }, [cmi]);
 
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) cmi.loadSampleFromFile(file);
-    e.target.value = ''; // reset for re-select
-  }, [cmi]);
+  const { openPicker, picker } = usePatchPicker('MAMECMI', (buffer, name) => cmi.loadSampleFromFile(new File([buffer], name)));
 
   const VIS_W = 420;
   const BAR_H = 140;
@@ -375,7 +371,7 @@ const CMIControls: React.FC<CMIControlsProps> = ({
                 style={{ border: `1px dashed ${CMI_GREEN_DIM}`, width: VIS_W, height: 80 }}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleFileDrop}
-                onClick={() => fileInputRef.current?.click()}
+                onClick={openPicker}
               >
                 {cmi.sampleLoaded && cmi.sampleWaveform ? (
                   <WaveformCanvas waveform={cmi.sampleWaveform} width={VIS_W} height={80} />
@@ -390,7 +386,7 @@ const CMIControls: React.FC<CMIControlsProps> = ({
                   </div>
                 )}
               </div>
-              <input ref={fileInputRef} type="file" accept=".wav,.aiff,.aif,.mp3,.ogg,.flac" className="hidden" onChange={handleFileSelect} />
+              {picker}
               <div className="flex items-center gap-2">
                 <div className="text-xs font-mono font-bold" style={{ color: CMI_GREEN }}>
                   {cmi.sampleLoaded ? cmi.sampleName : `BANK ${cmi.waveBank}: ${WAVE_NAMES[cmi.waveBank] ?? '?'}`}
