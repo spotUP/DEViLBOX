@@ -20,6 +20,7 @@ export const SUNVOX_MODULE_TYPES: SunVoxModuleType[] = [
   { typeString: 'Analog generator', displayName: 'Analog Generator', category: 'source', color: '#4a9de0', isGenerator: true },
   { typeString: 'Generator',        displayName: 'Generator',        category: 'source', color: '#5aade0', isGenerator: true },
   { typeString: 'FM',               displayName: 'FM',               category: 'source', color: '#6abde0', isGenerator: true },
+  { typeString: 'FMX',              displayName: 'FMX',              category: 'source', color: '#6ab5e0', isGenerator: true },
   { typeString: 'Kicker',           displayName: 'Kicker',           category: 'source', color: '#3a8dd0', isGenerator: true },
   { typeString: 'DrumSynth',        displayName: 'DrumSynth',        category: 'source', color: '#2a7dc0', isGenerator: true },
   { typeString: 'Sampler',          displayName: 'Sampler',          category: 'source', color: '#7acde0', isGenerator: true },

@@ -129,10 +129,11 @@ describe('the SunVox graph editor', () => {
     expect(fake.calls.filter((c) => c.fn === 'loadSong').length).toBe(1);
   });
 
-  it('plays a saved MetaModule instrument whose stored note target is -1', async () => {
+  // FMX (SunVox 2 FM generator) was missing from the type map: an FMX patch had no note target.
+  it.each(['MetaModule', 'FMX'])('plays a saved %s instrument whose stored note target is -1', async (typeName) => {
     const graph = [
       { id: 0, name: 'Output', typeName: 'Output', flags: 0, inputs: [1], outputs: [], controls: [] },
-      { id: 1, name: 'MetaModule', typeName: 'MetaModule', flags: 0, inputs: [], outputs: [0], controls: [] },
+      { id: 1, name: typeName, typeName, flags: 0, inputs: [], outputs: [0], controls: [] },
     ];
     const patchData = new TextEncoder().encode(JSON.stringify(graph)).buffer;
     const config = { id: ID, name: 'SunVox', synthType: 'SunVoxSynth', effects: [], volume: -6, pan: 0,
