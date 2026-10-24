@@ -31,11 +31,12 @@ Research: `thoughts/shared/research/2026-10-24_sunvox-synth-ui.md`,
 - [x] A2 Controller metadata table for the 14 open modules (extractor script + TS table)
 - [x] A3 Runtime metadata for closed modules (name/min/max/type/group)
       Proof A1-A3: sunvoxWorkletGraphEdits.test.ts (3) + sunvoxControlMeta.test.ts (7) pass; with the new worklet cases and ctl type/group removed, all 3 worklet tests fail with 'HANG'. Table: 14 types, 112 controllers (research doc's 109 was a mis-sum).
-- [ ] A4 One storage format for SunVoxSynth + SunVoxModular, migration
-- [ ] A5 New SunVoxSynth instrument = Generator -> Output, audible by default
-- [ ] A6 SunVoxSynth editor renders the modular editor; loaded patch = editable graph
-- [ ] A7 Edits persist into the patch saved with the song (round trip)
-- [ ] A8 Reachability test (create instrument -> editor -> add module -> knob -> engine ctl set), regression tests
+- [x] A4 One storage format for SunVoxSynth + SunVoxModular, migration (schema 25 -> 26, migrateSunVoxModularInstruments in migrations/index.ts, also applied in savedSongToApply)
+- [x] A5 New SunVoxSynth instrument = Generator -> Output, audible by default (InstrumentFactory builds a bound SunVoxModularSynth from DEFAULT_SUNVOX_SYNTH_PATCH; song players keep SunVoxSynth.setSong via isSunVoxSongPlayer)
+- [x] A6 SunVoxSynth editor renders the modular editor; loaded patch = editable graph (graph view derived from getModuleGraph; SunVoxPatchLoader deleted; SunVoxModular removed from the synth picker)
+- [x] A7 Edits persist into the patch saved with the song (round trip) (debounced 300 ms saveSong -> sunvox.patchData, isSong true; self-saved bytes do not rebuild the voice)
+- [x] A8 Reachability test (create instrument -> editor -> add module -> knob -> engine ctl set), regression tests
+      Proof A4-A8: src/components/instruments/__tests__/sunvoxGraphEditor.test.tsx (2 pass: reachability + round trip, schema 26 migration). Revert proofs, each fails then restored byte-identical: editor route (sunvox-synth not routed), factory graph path (forced song player), _scheduleSave no-op (stored graph lacks the Filter), migration step removed. type-check rc 0. Superseded B test sunvoxEditorLoadPatch.test.tsx removed (tested the old silent-until-loaded Load Patch flow).
 
 ### B. Patch folders (agent B)
 - [x] B1 `src/constants/synthPatchDirs.ts` single map
@@ -43,13 +44,13 @@ Research: `thoughts/shared/research/2026-10-24_sunvox-synth-ui.md`,
 - [x] B3 Manifest extensions for mapped dirs; regenerate manifest
 - [x] B4 Shared PatchLoadButton (extend ImportPresetFileButton pattern)
 - [ ] B5 (11 of 22 rows done: 1-7,9,10,14; remaining 8,11,12,13,15-22 stay OS picker, see state note; second pass: JUCE cart, 6 and 14 via controls/usePatchPicker.tsx, row 14 uses samples/packs/fairlight-cmi not cmi-disks, Furnace has no UI load action, manifest 9335 -> 9335, type-check clean, unit tests not run: fs-uae busy) All synth load actions use it (list in research file, every row)
-- [ ] B6 Reachability test (one load button -> browser opens at the mapped dir -> pick -> instrument updated)
+- [x] B6 Reachability test (one load button -> browser opens at the mapped dir -> pick -> instrument updated). DONE: src/components/instruments/controls/__tests__/dx7PatchFolder.test.tsx passes (DX7 Load SysEx File -> manifest dx7 .syx list -> double-click benson-clav1.syx -> fetch sentinel + synth.loadSysex + onChange). Revert proof: commenting out `await onPickFile(...)` in useFileNavigation.handleLoad fails it (loadSysex 0 calls); file restored, git diff empty.
 
-Running count: A1-A3 done (3 of 8 in A); B1-B4 done (4); B5 and B6 open (B6 test written in sunvoxEditorLoadPatch.test.tsx, run pending: machine busy with fs-uae).
+Running count: 13 of 14. A1-A8 done (8 of 8); B1-B4 and B6 done (5 of 6); B5 open (11 of 22 rows; remaining rows need owner scope: Furnace has no UI load action, Sfizz needs FileList, others have no bundled folder).
 
 State note (B5 remaining): row 6 CZ101Hardware.tsx uses styled CZ101Button, not yet on PatchLoadButton (same hook onPatchLoaded exists); row 4 Dexed JUCE cart callback still triggers the hidden OS input (visible button migrated); row 13 Sfizz takes FileList (multi-sample, folder) so stays OS picker; rows 8, 11, 12, 14-22 have no bundled folder in the map, stay OS picker. Manifest 7682 -> 9335 entries.
 
-## A4-A7 design (agent A, 2026-10-24; not implemented)
+## A4-A7 design (agent A, 2026-10-24; implemented, see A4-A8 proof)
 
 Evidence:
 - Two storage shapes today. SunVoxSynth: `config.sunvox: SunVoxConfig {patchData, patchName, isSong, controlValues, noteTargetModuleId}` (src/types/instrument/exotic.ts:683, default src/types/instrument/defaults.ts:1001, empty patch = silent). SunVoxModular: `config.sunvoxModular: ModularPatchConfig` (src/types/modular.ts:190, default defaults.ts:1038 = Output + analog generator + filter, a DEViLBOX-side description rebuilt into SunVox modules by src/engine/sunvox-modular/SunVoxModularSynth.ts, newModule at :197 and :238).

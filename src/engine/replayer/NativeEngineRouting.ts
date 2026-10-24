@@ -34,6 +34,7 @@ import { editedModuleForPlay } from './editedModuleForPlay';
 import { isRowClipPlayer } from '@engine/rowPreview/rowClipPlayer';
 import { rowPreviewSupports } from '@engine/rowPreview/supportedEngines';
 import { registerPitchEngine, unregisterPitchEngine } from './nativeEnginePitch';
+import { isSunVoxSongPlayer } from '@/engine/sunvox/sunvoxPatchConfig';
 import { WASM_ENGINES, shouldActivate, songFromStores, type NativeEngineDescriptor, type WASMSingletonStatic, type WASMSingletonEngine } from './wasmEngineRegistry';
 
 export { WASM_ENGINES, shouldActivate, playsOnDedicatedEngine } from './wasmEngineRegistry';
@@ -1007,7 +1008,7 @@ export async function startNativeEngines(
   if (!muted) {
     // Old SunVoxSynth: keep original behavior (suppress notes, internal sequencer)
     const svSynthInsts = song.instruments.filter(
-      i => i.synthType === 'SunVoxSynth' && i.sunvox?.isSong === true,
+      i => i.synthType === 'SunVoxSynth' && isSunVoxSongPlayer(i.sunvox),
     );
     if (svSynthInsts.length > 0) {
       suppressNotes = true;
@@ -1193,7 +1194,7 @@ export function stopNativeEngines(
   if (song) {
     const toneEngine = getToneEngine();
     const sunvoxSongInsts = song.instruments.filter(
-      i => (i.synthType === 'SunVoxSynth' || i.synthType === 'SunVoxModular') && i.sunvox?.isSong === true,
+      i => (i.synthType === 'SunVoxSynth' && isSunVoxSongPlayer(i.sunvox)) || (i.synthType === 'SunVoxModular' && i.sunvox?.isSong === true),
     );
     for (const inst of sunvoxSongInsts) {
       try {

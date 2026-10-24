@@ -14,6 +14,8 @@ import { SV_ID_TO_TYPE_STRING } from './SunVoxModuleDescriptors';
 import { registerSunVoxMuteBridge, unregisterSunVoxMuteBridge } from '@/stores/useMixerStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
+import { DEFAULT_SUNVOX } from '@/types/instrument/defaults';
+import { markSelfSavedSunVoxPatch } from './selfSavedPatches';
 
 const GENERATOR_TYPES = new Set([
   'Analog generator', 'Generator', 'FM', 'Kicker', 'DrumSynth',
@@ -90,6 +92,23 @@ export function donatePreloadedHandle(handle: number): void {
   });
 }
 
+/**
+ * A SunVox instrument that owns its handle and stores its graph as
+ * `config.sunvox.patchData` (sv_save_to_memory bytes, isSong true).
+ * - patchData + isSong: the saved graph is loaded back into the handle.
+ * - patchData, not isSong: a .sunsynth file, loaded and wired to Output.
+ * - no patchData: the recipe (default Generator -> Output) is built.
+ * After init and after every graph edit the handle is saved back to the store.
+ */
+export interface SunVoxInstrumentBinding {
+  instrumentId: number;
+  patchData: ArrayBuffer | null;
+  isSong: boolean;
+}
+
+/** Debounce for writing graph edits back into config.sunvox.patchData. */
+export const SUNVOX_PATCH_SAVE_DEBOUNCE_MS = 300;
+
 export class SunVoxModularSynth implements DevilboxSynth {
   readonly name = 'SunVoxModularSynth';
   readonly output: GainNode;
@@ -106,11 +125,14 @@ export class SunVoxModularSynth implements DevilboxSynth {
   private svToUi = new Map<number, string>();
   private _noteTargetSvId = -1;
   private _songData: ArrayBuffer | null = null;
+  private _instrumentId: number | null = null;
+  private _saveTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     patchConfig: ModularPatchConfig,
     songData?: ArrayBuffer | null,
     noteTargetModuleId?: number,
+    binding?: SunVoxInstrumentBinding,
   ) {
     this.audioContext = getDevilboxAudioContext();
     this.engine = SunVoxEngine.getInstance();
@@ -121,7 +143,10 @@ export class SunVoxModularSynth implements DevilboxSynth {
       this._noteTargetSvId = noteTargetModuleId;
     }
 
-    if (this._songData) {
+    if (binding) {
+      this._instrumentId = binding.instrumentId;
+      this._initPromise = this._initInstrument(patchConfig, binding);
+    } else if (this._songData) {
       this._initPromise = this._loadSongShared(this._songData, patchConfig);
     } else {
       this._initPromise = this._buildGraph(patchConfig);
@@ -178,6 +203,70 @@ export class SunVoxModularSynth implements DevilboxSynth {
         }
       }
     }
+  }
+
+  private async _initInstrument(recipe: ModularPatchConfig, binding: SunVoxInstrumentBinding): Promise<void> {
+    if (binding.patchData && binding.isSong) {
+      await this.engine.ready();
+      this._handle = await this.engine.createHandle(this.audioContext.sampleRate);
+      await this.engine.loadSong(this._handle, binding.patchData);
+      await this._mapGraphIds();
+      return;
+    }
+    if (binding.patchData) {
+      await this.engine.ready();
+      this._handle = await this.engine.createHandle(this.audioContext.sampleRate);
+      const modId = await this.engine.loadSynth(this._handle, binding.patchData);
+      if (modId > 0) await this.engine.connectModules(this._handle, modId, 0);
+    } else {
+      await this._buildGraph(recipe);
+    }
+    // First save turns the recipe / .sunsynth into the one stored format.
+    await this._mapGraphIds();
+    await this._persistPatch();
+  }
+
+  /** Key the graph by SunVox ids (sv_m{id}), the ids sunvoxGraphToConfig gives the editor. */
+  private async _mapGraphIds(): Promise<void> {
+    const graph = await this.engine.getModuleGraph(this._handle);
+    this.uiToSv.clear();
+    this.svToUi.clear();
+    for (const entry of graph) {
+      this.uiToSv.set(`sv_m${entry.id}`, entry.id);
+      this.svToUi.set(entry.id, `sv_m${entry.id}`);
+    }
+    if (this._noteTargetSvId < 0 || !graph.some(e => e.id === this._noteTargetSvId)) {
+      this._noteTargetSvId = graph.find(e => e.id > 0 && this._isGenerator(e.typeName))?.id ?? -1;
+    }
+  }
+
+  /** Save the handle and write the bytes to config.sunvox.patchData. */
+  private async _persistPatch(): Promise<void> {
+    if (this._instrumentId === null || this._disposed || this._handle < 0) return;
+    const bytes = await this.engine.saveSong(this._handle);
+    if (this._disposed) return;
+    markSelfSavedSunVoxPatch(bytes);
+    const store = useInstrumentStore.getState();
+    const inst = store.instruments.find(i => i.id === this._instrumentId);
+    if (!inst) return;
+    store.updateInstrument(this._instrumentId, {
+      sunvox: {
+        ...(inst.sunvox ?? DEFAULT_SUNVOX),
+        patchData: bytes,
+        isSong: true,
+        noteTargetModuleId: this._noteTargetSvId,
+      },
+      sunvoxModular: undefined,
+    });
+  }
+
+  private _scheduleSave(): void {
+    if (this._instrumentId === null) return;
+    if (this._saveTimer) clearTimeout(this._saveTimer);
+    this._saveTimer = setTimeout(() => {
+      this._saveTimer = null;
+      void this._persistPatch().catch(err => console.error('[SunVoxModularSynth] Patch save failed:', err));
+    }, SUNVOX_PATCH_SAVE_DEBOUNCE_MS);
   }
 
   private async _buildGraph(config: ModularPatchConfig): Promise<void> {
@@ -242,6 +331,7 @@ export class SunVoxModularSynth implements DevilboxSynth {
     if (this._noteTargetSvId < 0 && this._isGenerator(typeString)) {
       this._noteTargetSvId = svModId;
     }
+    this._scheduleSave();
     return svModId;
   }
 
@@ -253,6 +343,7 @@ export class SunVoxModularSynth implements DevilboxSynth {
     this.uiToSv.delete(uiId);
     this.svToUi.delete(svModId);
     if (this._noteTargetSvId === svModId) this._noteTargetSvId = -1;
+    this._scheduleSave();
   }
 
   async addConnection(sourceUiId: string, targetUiId: string): Promise<void> {
@@ -261,6 +352,7 @@ export class SunVoxModularSynth implements DevilboxSynth {
     const dstSvId = this.uiToSv.get(targetUiId);
     if (srcSvId === undefined || dstSvId === undefined) return;
     await this.engine.connectModules(this._handle, srcSvId, dstSvId);
+    this._scheduleSave();
   }
 
   async removeConnection(sourceUiId: string, targetUiId: string): Promise<void> {
@@ -269,6 +361,7 @@ export class SunVoxModularSynth implements DevilboxSynth {
     const dstSvId = this.uiToSv.get(targetUiId);
     if (srcSvId === undefined || dstSvId === undefined) return;
     await this.engine.disconnectModules(this._handle, srcSvId, dstSvId);
+    this._scheduleSave();
   }
 
   async updatePatch(oldConfig: ModularPatchConfig, newConfig: ModularPatchConfig): Promise<void> {
@@ -323,7 +416,15 @@ export class SunVoxModularSynth implements DevilboxSynth {
   async loadSunsynthModule(buffer: ArrayBuffer): Promise<number> {
     await this._initPromise;
     if (this._disposed || this._handle < 0) throw new Error('[SunVoxModularSynth] No slot');
-    return this.engine.loadSynth(this._handle, buffer);
+    const moduleId = await this.engine.loadSynth(this._handle, buffer);
+    if (moduleId > 0 && this._instrumentId !== null) {
+      this.uiToSv.set(`sv_m${moduleId}`, moduleId);
+      this.svToUi.set(moduleId, `sv_m${moduleId}`);
+      await this.engine.connectModules(this._handle, moduleId, 0);
+      if (this._noteTargetSvId < 0) await this._mapGraphIds();
+      this._scheduleSave();
+    }
+    return moduleId;
   }
 
   // ── Save/Load ───────────────────────────────────────────────────────────
@@ -379,6 +480,7 @@ export class SunVoxModularSynth implements DevilboxSynth {
     const svModId = this.uiToSv.get(uiModId);
     if (svModId === undefined) return;
     this.engine.setModuleControl(this._handle, svModId, ctlId, value);
+    this._scheduleSave();
   }
 
   get(_param: string): number | undefined {
@@ -399,6 +501,8 @@ export class SunVoxModularSynth implements DevilboxSynth {
   dispose(): void {
     if (this._disposed) return;
     this._disposed = true;
+    if (this._saveTimer) clearTimeout(this._saveTimer);
+    this._saveTimer = null;
 
     if (this._usesSharedHandle) {
       // Only touch the shared handle if this instance belongs to the CURRENT epoch.

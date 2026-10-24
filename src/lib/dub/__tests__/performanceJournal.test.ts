@@ -192,7 +192,9 @@ describe('M1 persistence — additive in both directions', () => {
   });
 
   it('bumps the schema without raising the minimum loadable version', () => {
-    expect(migrations).toContain('export const CURRENT_SCHEMA = 25;');
+    // The journal bump was 25; later migrations may raise it further.
+    const current = Number(/export const CURRENT_SCHEMA = (\d+);/.exec(migrations)?.[1]);
+    expect(current).toBeGreaterThanOrEqual(25);
     // A purely additive field must NOT make older projects unloadable.
     expect(migrations).toContain('export const MIN_LOADABLE_SCHEMA = 21;');
   });

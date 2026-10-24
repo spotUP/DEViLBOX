@@ -31,7 +31,7 @@ export const MIN_LOADABLE_SCHEMA = 21;
  * every save and gates loads against it. Kept here so the migration chain and
  * the writer share one source of truth.
  */
-export const CURRENT_SCHEMA = 25;
+export const CURRENT_SCHEMA = 26;
 
 /**
  * Forward-migrate a saved project in place from `fromVersion` up to the current
@@ -68,6 +68,14 @@ export function migrateSavedProject(
   if (fromVersion < 25) {
     const klys = (project as { nativeEngineMeta?: { klysNative?: { instrumentsFrom?: string } } }).nativeEngineMeta?.klysNative;
     if (klys && klys.instrumentsFrom === undefined) klys.instrumentsFrom = 'engine';
+  }
+
+  // 25 → 26: SunVox has one instrument format. A non-song `SunVoxModular` instrument (graph stored as a DEViLBOX
+  //          ModularPatchConfig) becomes a `SunVoxSynth` whose graph is `sunvox.patchData` (sv_save_to_memory bytes).
+  //          The old patch stays as the build recipe; the engine builds it once and replaces it with the bytes.
+  if (fromVersion < 26) {
+    const instruments = (project as { instruments?: Array<Record<string, unknown>> }).instruments;
+    if (Array.isArray(instruments)) migrateSunVoxModularInstruments(instruments);
   }
 
   // CZ-101 instruments carry their own patch as the string parameters `_cz101Tone` (128 tone bytes, base64) and
@@ -135,4 +143,23 @@ export function migrateGridOctaveBias<P extends { channels: Array<{ rows: Array<
     }
   }
   return { patterns, instruments, shifted };
+}
+
+/**
+ * Fold non-song `SunVoxModular` instruments into `SunVoxSynth` (schema 26).
+ *
+ * The instrument keeps `sunvoxModular` as the recipe and gets a `sunvox` config with no bytes yet:
+ * SunVoxModularSynth builds the recipe in its own handle, saves it into `sunvox.patchData` and drops
+ * `sunvoxModular`. Song-import instruments (`sunvox.isSong` with the song bytes, one shared handle) stay
+ * `SunVoxModular`. Idempotent; also applied by `savedSongToApply` for .dbx files and song tabs.
+ */
+export function migrateSunVoxModularInstruments<I extends object>(instruments: I[]): I[] {
+  for (const inst of instruments as Array<Record<string, unknown>>) {
+    if (inst.synthType !== 'SunVoxModular') continue;
+    const sunvox = inst.sunvox as { isSong?: boolean; patchData?: unknown } | undefined;
+    if (sunvox?.isSong === true && sunvox.patchData) continue;
+    inst.synthType = 'SunVoxSynth';
+    inst.sunvox = { patchData: null, patchName: typeof inst.name === 'string' ? inst.name : '', controlValues: {} };
+  }
+  return instruments;
 }

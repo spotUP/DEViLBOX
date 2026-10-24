@@ -318,7 +318,7 @@ export const pluginSynthEntries: Record<string, SynthInfo> = {
     type: 'SunVoxSynth',
     name: 'SunVox',
     shortName: 'SVX',
-    description: 'SunVox WASM modular synth patch player (.sunsynth / .sunvox)',
+    description: 'SunVox modular synth: build a module graph with patch cables or load a .sunsynth (41 SunVox module types)',
     bestFor: ['Modular synth', 'SunVox patches', 'Complex synthesis'],
     icon: 'Sun',
     color: 'text-yellow-400',

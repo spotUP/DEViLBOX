@@ -45,7 +45,6 @@ import { ChannelOscilloscope } from '../../visualization/ChannelOscilloscope';
 import { getToneEngine } from '@engine/ToneEngine';
 import { getChipSynthDef, resolveChipParameters } from '@constants/chipParameters';
 import { getChipCapabilities } from '@engine/mame/MAMEMacroTypes';
-import { SunVoxPatchLoader } from '../SunVoxPatchLoader';
 import { Radio, MessageSquare, Music, Mic, Monitor, Cpu, SlidersHorizontal } from 'lucide-react';
 import { HardwareUIWrapper, hasHardwareUI } from '../hardware/HardwareUIWrapper';
 import type { MacroData } from './MAMEMacroEditor';
@@ -3900,61 +3899,9 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   }
 
   // ============================================================================
-  // SUNVOX SYNTH EDITOR (single patch, not modular)
+  // SUNVOX EDITOR: SunVoxSynth graphs and SunVoxModular song modules share one editor
   // ============================================================================
-  if (editorMode === 'sunvox-synth') {
-    const patchName = instrument.sunvox?.patchName || 'Untitled Patch';
-    const controlCount = instrument.sunvox?.controlValues ? Object.keys(instrument.sunvox.controlValues).length : 0;
-    const isSong = instrument.sunvox?.isSong ?? false;
-    return (
-      <div className="synth-editor-container bg-gradient-to-b from-[#1a1a1a] to-[#121212]">
-        <EditorHeader
-          instrument={instrument}
-          onChange={handleChange}
-          vizMode={vizMode}
-          onVizModeChange={setVizMode}
-          onBake={handleBake}
-          onBakePro={handleBakePro}
-          onUnbake={handleUnbake}
-          isBaked={isBaked}
-          isBaking={isBaking}
-          customHeader={
-            <div className="synth-editor-header px-4 py-3 bg-gradient-to-r from-[#1a2a1a] to-[#142a14] border-b border-[#2a4a2a]">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gradient-to-br from-green-600 to-green-800 shadow-lg text-text-primary">
-                  <Music size={20} />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold tracking-wide text-green-300">SunVox</h2>
-                  <p className="text-[10px] uppercase tracking-widest text-green-600">
-                    {isSong ? 'Song' : 'Patch'} · {patchName}
-                  </p>
-                </div>
-              </div>
-            </div>
-          }
-        />
-        <div className="px-4 py-6 text-text-secondary text-sm">
-          <p>SunVox {isSong ? 'song' : 'instrument patch'}: <span className="text-text-primary font-medium">{patchName}</span></p>
-          {controlCount > 0 && (
-            <p className="mt-1">{controlCount} control{controlCount !== 1 ? 's' : ''} mapped</p>
-          )}
-          {instrument.sunvox?.noteTargetModuleId != null && (
-            <p className="mt-1 text-xs opacity-60">Target module ID: {instrument.sunvox.noteTargetModuleId}</p>
-          )}
-          <SunVoxPatchLoader
-            hasPatch={!!instrument.sunvox?.patchData}
-            onLoad={(config) => handleChange({ sunvox: { ...instrument.sunvox, ...config } })}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // ============================================================================
-  // SUNVOX MODULAR EDITOR
-  // ============================================================================
-  if (editorMode === 'sunvox-modular') {
+  if (editorMode === 'sunvox-modular' || editorMode === 'sunvox-synth') {
     return (
       <div className="synth-editor-container flex flex-col h-full">
         <SunVoxModularEditor config={instrument} onChange={handleChange} />

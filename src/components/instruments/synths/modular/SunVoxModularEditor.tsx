@@ -7,14 +7,17 @@
  * Syncs UI changes to the live SunVoxModularSynth via updatePatch().
  */
 
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { InstrumentConfig } from '@/types/instrument';
 import type { ModularPatchConfig } from '@/types/modular';
-import { DEFAULT_SUNVOX_MODULAR_PATCH } from '@/types/instrument/defaults';
+import { DEFAULT_SUNVOX_SYNTH_PATCH } from '@/types/instrument/defaults';
 import { registerSunVoxModules } from '@/engine/sunvox-modular/SunVoxModuleDescriptors';
+import { sunvoxGraphToConfig } from '@/engine/sunvox-modular/graphToConfig';
 import { useTransportStore } from '@/stores/useTransportStore';
+import { getToneEngine } from '@engine/ToneEngine';
 import type { SunVoxModularSynth } from '@/engine/sunvox-modular/SunVoxModularSynth';
 import { PatchLoadButton } from '@components/instruments/controls/PatchLoadButton';
+import { Button } from '@components/ui/Button';
 import { ModularToolbar } from './ModularToolbar';
 import { ModularRackView } from './views/ModularRackView';
 import { ModularCanvasView } from './views/ModularCanvasView';
@@ -23,65 +26,88 @@ import { ModularMatrixView } from './views/ModularMatrixView';
 // Register once at module level (idempotent)
 registerSunVoxModules();
 
-interface SunVoxModularEditorProps {
+export interface SunVoxModularEditorProps {
   config: InstrumentConfig;
+  /** Kept for the dispatcher contract; the graph is persisted by the engine (sunvox.patchData), not here. */
   onChange: (updates: Partial<InstrumentConfig>) => void;
 }
 
-export const SunVoxModularEditor: React.FC<SunVoxModularEditorProps> = ({ config, onChange }) => {
-  const patchConfig = config.sunvoxModular || DEFAULT_SUNVOX_MODULAR_PATCH;
-  const prevPatchRef = useRef<ModularPatchConfig>(patchConfig);
-  const isPlaying = useTransportStore(s => s.isPlaying);
+/** The live SunVox graph engine of this instrument (SunVoxSynth graph or SunVoxModular song module). */
+async function getGraphSynth(config: InstrumentConfig): Promise<SunVoxModularSynth | null> {
+  const synth = getToneEngine().getInstrument(config.id, config);
+  return synth && typeof synth === 'object' && 'getModuleGraph' in synth ? (synth as SunVoxModularSynth) : null;
+}
 
-  // Sync UI patch changes to the live SunVoxModularSynth
+/**
+ * The view of the graph is derived from the engine handle (getModuleGraph), never stored: the
+ * single source of truth is the SunVox handle, saved by the engine into `config.sunvox.patchData`.
+ */
+export const SunVoxModularEditor: React.FC<SunVoxModularEditorProps> = ({ config }) => {
+  const [patchConfig, setPatchConfig] = useState<ModularPatchConfig>(config.sunvoxModular ?? DEFAULT_SUNVOX_SYNTH_PATCH);
+  const patchRef = useRef(patchConfig);
+  patchRef.current = patchConfig;
+  const isPlaying = useTransportStore(s => s.isPlaying);
   const configRef = useRef(config);
   configRef.current = config;
 
+  const refreshFromEngine = useCallback(async () => {
+    const synth = await getGraphSynth(configRef.current);
+    if (!synth) return;
+    const graph = await synth.getModuleGraph();
+    if (graph.length === 0) return;
+    setPatchConfig({ ...sunvoxGraphToConfig(graph), viewMode: patchRef.current.viewMode });
+  }, []);
+
   useEffect(() => {
-    const prev = prevPatchRef.current;
-    prevPatchRef.current = patchConfig;
-    if (prev === patchConfig) return;
+    void refreshFromEngine().catch(() => { /* ToneEngine not ready yet */ });
+  }, [config.id, refreshFromEngine]);
 
+  const handlePatchChange = useCallback((newPatch: ModularPatchConfig) => {
+    const prev = patchRef.current;
+    patchRef.current = newPatch;
+    setPatchConfig(newPatch);
     void (async () => {
-      try {
-        const { getToneEngine } = await import('@/engine/ToneEngine');
-        const toneEngine = getToneEngine();
-        const synth = toneEngine.getInstrument(configRef.current.id, configRef.current) as SunVoxModularSynth | null;
-        if (synth && typeof synth === 'object' && 'updatePatch' in synth) {
-          await (synth as SunVoxModularSynth).updatePatch(prev, patchConfig);
-        }
-      } catch {
-        // ToneEngine not ready yet
-      }
-    })();
-  }, [patchConfig]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handlePatchChange = useCallback(
-    (newPatch: ModularPatchConfig) => {
-      // Push parameter changes to WASM in real-time
-      const prev = prevPatchRef.current;
+      const synth = await getGraphSynth(configRef.current);
+      if (!synth) return;
+      // Controller moves go straight to the module; structure edits through updatePatch.
       for (const mod of newPatch.modules) {
         const prevMod = prev.modules.find(m => m.id === mod.id);
         if (!prevMod) continue;
         for (const [key, val] of Object.entries(mod.parameters)) {
           if (prevMod.parameters[key] !== val && key.startsWith('ctl_')) {
-            const ctlId = parseInt(key.slice(4), 10);
-            void (async () => {
-              try {
-                const { getToneEngine } = await import('@/engine/ToneEngine');
-                const synth = getToneEngine().getInstrument(configRef.current.id, configRef.current);
-                if (synth && 'set' in synth) {
-                  (synth as SunVoxModularSynth).set(`${mod.id}.${ctlId}`, val as number);
-                }
-              } catch { /* ToneEngine not ready */ }
-            })();
+            synth.set(`${mod.id}.${parseInt(key.slice(4), 10)}`, val as number);
           }
         }
       }
-      onChange({ sunvoxModular: { ...newPatch, backend: 'sunvox' } });
-    },
-    [onChange]
-  );
+      await synth.updatePatch(prev, newPatch);
+    })().catch(err => console.error('[SunVoxModularEditor] Graph edit failed:', err));
+  }, []);
+
+  const handleLoadSunsynth = useCallback(async (buffer: ArrayBuffer) => {
+    try {
+      const synth = await getGraphSynth(configRef.current);
+      if (!synth) return;
+      if (await synth.loadSunsynthModule(buffer) >= 0) await refreshFromEngine();
+    } catch (err) {
+      console.error('[SunVoxModularEditor] Load .sunsynth failed:', err);
+    }
+  }, [refreshFromEngine]);
+
+  const handleSave = useCallback(async () => {
+    try {
+      const synth = await getGraphSynth(configRef.current);
+      if (!synth) return;
+      const data = await synth.save();
+      const url = URL.createObjectURL(new Blob([data], { type: 'application/octet-stream' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${configRef.current.name || 'patch'}.sunvox`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('[SunVoxModularEditor] Save failed:', err);
+    }
+  }, []);
 
   return (
     <div className="flex flex-col h-full bg-dark-bg">
@@ -104,64 +130,8 @@ export const SunVoxModularEditor: React.FC<SunVoxModularEditorProps> = ({ config
         <span>Modules: {patchConfig.modules.length}</span>
         <span>Connections: {patchConfig.connections.length}</span>
         <div className="flex-1" />
-        <PatchLoadButton
-          synthType="SunVoxModular"
-          label="Load .sunsynth"
-          onLoad={async (buffer) => {
-            try {
-              const { getToneEngine } = await import('@/engine/ToneEngine');
-              const synth = getToneEngine().getInstrument(configRef.current.id, configRef.current) as SunVoxModularSynth | null;
-              if (!synth || !('loadSunsynthModule' in synth)) return;
-              const moduleId = await synth.loadSunsynthModule(buffer);
-              if (moduleId >= 0) {
-                const graph = await synth.getModuleGraph();
-                const newMod = graph.find(m => m.id === moduleId);
-                if (newMod) {
-                  const uiId = `sv_m${moduleId}`;
-                  const newModule = {
-                    id: uiId,
-                    descriptorId: `sv_${newMod.typeName.toLowerCase().replace(/\s+/g, '_')}`,
-                    label: newMod.name || newMod.typeName,
-                    parameters: {} as Record<string, number>,
-                    rackSlot: patchConfig.modules.length,
-                  };
-                  for (let c = 0; c < newMod.controls.length; c++) {
-                    newModule.parameters[`ctl_${c}`] = newMod.controls[c].value;
-                  }
-                  handlePatchChange({
-                    ...patchConfig,
-                    modules: [...patchConfig.modules, newModule],
-                  });
-                }
-              }
-            } catch (err) {
-              console.error('[SunVoxModularEditor] Load .sunsynth failed:', err);
-            }
-          }}
-        />
-        <button
-          onClick={async () => {
-            try {
-              const { getToneEngine } = await import('@/engine/ToneEngine');
-              const synth = getToneEngine().getInstrument(configRef.current.id, configRef.current);
-              if (synth && 'save' in synth) {
-                const data = await (synth as SunVoxModularSynth).save();
-                const blob = new Blob([data], { type: 'application/octet-stream' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${configRef.current.name || 'patch'}.sunvox`;
-                a.click();
-                URL.revokeObjectURL(url);
-              }
-            } catch (err) {
-              console.error('[SunVoxModularEditor] Save failed:', err);
-            }
-          }}
-          className="px-2 py-0.5 bg-dark-bgTertiary border border-dark-border rounded hover:bg-accent-primary/20 hover:border-accent-primary transition-colors text-text-secondary hover:text-text-primary"
-        >
-          Save .sunvox
-        </button>
+        <PatchLoadButton synthType="SunVoxSynth" label="Load .sunsynth" onLoad={handleLoadSunsynth} />
+        <Button variant="default" onClick={() => void handleSave()}>Save .sunvox</Button>
       </div>
     </div>
   );

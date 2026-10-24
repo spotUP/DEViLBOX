@@ -15,7 +15,7 @@ import type { ProjectMetadata } from '@/types/project';
 import type { MixerSnapshot } from '@stores/useMixerStore';
 import type { DubBusSettings } from '@/types/dub';
 import { needsMigration, migrateProject } from '@/lib/migration';
-import { migrateGridOctaveBias } from '@/lib/persistence/migrations';
+import { migrateGridOctaveBias, migrateSunVoxModularInstruments } from '@/lib/persistence/migrations';
 import { decodeNativeEngineFields, type SerializedCompanionFiles } from '@/lib/export/exporters';
 import type { SongToApply, ProjectExtras } from './applySong';
 import type { GridBaseline } from './gridBaseline';
@@ -78,6 +78,8 @@ export function savedSongToApply(data: SavedSongFields): SongToApply {
     patterns as unknown as Array<{ channels: Array<{ rows: Array<Record<string, unknown>> }> }>,
     instruments as unknown as Array<{ metadata?: Record<string, unknown> }>,
   );
+  // SunVoxModular instruments are SunVoxSynth graphs now (schema 26).
+  migrateSunVoxModularInstruments(instruments);
 
   // Tag the first pattern with its source format so the replayer gets it.
   if (data.trackerFormat && patterns.length > 0 && !patterns[0].importMetadata?.sourceFormat) {
