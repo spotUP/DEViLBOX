@@ -1,11 +1,17 @@
 /**
- * HivelyImportDialog — Pick instruments from a .hvl or .ahx file and import
- * them into the current song.
+ * HivelyImportDialog — Pick instruments from a .hvl or .ahx song and import
+ * them into the current song. Opened from the Hively editor header.
  */
 import React, { useState } from 'react';
+import { ListPlus } from 'lucide-react';
 import type { HivelyConfig } from '@typedefs/instrument';
 import { extractInstrumentsFromHvl } from '@lib/import/formats/HivelyParser';
-import { useDialogKeyboard } from '@hooks/useDialogKeyboard';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
+import { Modal } from '@components/ui/Modal';
+import { ModalHeader } from '@components/ui/ModalHeader';
+import { ModalFooter } from '@components/ui/ModalFooter';
+import { Button } from '@components/ui/Button';
+import { Toggle } from '@components/controls/Toggle';
 import { PatchLoadButton } from './controls/PatchLoadButton';
 
 interface HivelyImportEntry {
@@ -14,7 +20,7 @@ interface HivelyImportEntry {
   selected: boolean;
 }
 
-interface HivelyImportDialogProps {
+export interface HivelyImportDialogProps {
   onClose: () => void;
   /** Called with the selected instruments in order; caller inserts them. */
   onImport: (instruments: Array<{ name: string; config: HivelyConfig }>) => void;
@@ -41,94 +47,97 @@ export const HivelyImportDialog: React.FC<HivelyImportDialogProps> = ({ onClose,
     setEntries(prev => prev.map(e => ({ ...e, selected })));
   };
 
+  const selectedCount = entries.filter(e => e.selected).length;
+
   const handleConfirm = () => {
     const selected = entries.filter(e => e.selected).map(({ name, config }) => ({ name, config }));
     if (selected.length > 0) onImport(selected);
     onClose();
   };
 
-  useDialogKeyboard({ isOpen: true, onConfirm: handleConfirm, onCancel: onClose });
-
-  const selectedCount = entries.filter(e => e.selected).length;
-
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[99990]" onClick={onClose}>
-      <div
-        className="bg-ft2-bg border border-ft2-border p-4 rounded min-w-[340px] max-w-[500px] shadow-xl"
-        onClick={e => e.stopPropagation()}
-      >
-        <h2 className="text-ft2-highlight font-mono font-bold text-sm mb-3">
-          Import Instruments from HVL / AHX
-        </h2>
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      onConfirm={handleConfirm}
+      confirmDisabled={selectedCount === 0}
+      size="sm"
+      backdropOpacity="dark"
+    >
+      <ModalHeader
+        title="Import Instruments"
+        subtitle="From a HivelyTracker or AHX song"
+        icon={<ListPlus size={18} />}
+        onClose={onClose}
+      />
 
-        <div className="mb-3">
-          <PatchLoadButton synthType="HivelySynth" onLoad={handleFile} label="Choose Song" />
-        </div>
+      <div className="p-4 space-y-2">
+        <PatchLoadButton synthType="HivelySynth" onLoad={handleFile} label="Choose Song" />
 
         {filename && !error && (
-          <p className="text-ft2-textDim text-xs font-mono mb-2">{filename}</p>
+          <p className="text-[10px] font-mono text-text-muted">{filename}</p>
         )}
 
         {error && (
-          <p className="text-red-400 text-xs font-mono mb-2">{error}</p>
+          <p className="text-[10px] font-mono text-accent-error">{error}</p>
         )}
 
         {entries.length > 0 && (
           <>
-            <div className="flex gap-2 mb-1">
-              <button
-                onClick={() => toggleAll(true)}
-                className="text-xs text-ft2-highlight underline"
-              >all</button>
-              <button
-                onClick={() => toggleAll(false)}
-                className="text-xs text-ft2-highlight underline"
-              >none</button>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={() => toggleAll(true)}>Select All</Button>
+              <Button variant="ghost" size="sm" onClick={() => toggleAll(false)}>Select None</Button>
             </div>
-            <div className="max-h-52 overflow-y-auto border border-ft2-border divide-y divide-ft2-border mb-3">
+            <div className="max-h-52 overflow-y-auto border border-dark-border rounded divide-y divide-dark-border">
               {entries.map((entry, idx) => (
-                <label
-                  key={idx}
-                  className="flex items-center gap-2 px-2 py-1 cursor-pointer hover:bg-ft2-header select-none"
-                >
-                  <input
-                    type="checkbox"
-                    checked={entry.selected}
-                    onChange={() =>
-                      setEntries(prev =>
-                        prev.map((x, i) => i === idx ? { ...x, selected: !x.selected } : x)
-                      )
+                <div key={idx} className="flex items-center gap-2 px-2 py-1 hover:bg-dark-bgHover">
+                  <Toggle
+                    label={entry.name || 'Unnamed'}
+                    hideLabel
+                    size="sm"
+                    value={entry.selected}
+                    onChange={selected =>
+                      setEntries(prev => prev.map((x, i) => (i === idx ? { ...x, selected } : x)))
                     }
-                    className="accent-ft2-highlight"
                   />
-                  <span className="text-xs font-mono text-ft2-textDim w-5 shrink-0">
+                  <span className="text-[10px] font-mono text-text-muted w-5 shrink-0">
                     {(idx + 1).toString().padStart(2, '0')}
                   </span>
-                  <span className="text-xs font-mono text-ft2-text truncate">
+                  <span className="text-[10px] font-mono text-text-primary truncate">
                     {entry.name || '(unnamed)'}
                   </span>
-                </label>
+                </div>
               ))}
             </div>
           </>
         )}
-
-        <div className="flex gap-2 justify-end">
-          <button
-            onClick={onClose}
-            className="px-3 py-1 text-xs font-mono text-ft2-text border border-ft2-border hover:border-ft2-highlight transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={selectedCount === 0}
-            className="px-3 py-1 text-xs font-mono bg-ft2-highlight text-ft2-bg disabled:opacity-40 disabled:cursor-default"
-          >
-            Import {selectedCount > 0 ? `(${selectedCount})` : ''}
-          </button>
-        </div>
       </div>
-    </div>
+
+      <ModalFooter align="right">
+        <Button variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button variant="primary" onClick={handleConfirm} disabled={selectedCount === 0}>
+          Import{selectedCount > 0 ? ` (${selectedCount})` : ''}
+        </Button>
+      </ModalFooter>
+    </Modal>
+  );
+};
+
+/** Hively editor header button: opens the dialog and adds each picked instrument to the song. */
+export const HivelySongImportButton: React.FC = () => {
+  const [open, setOpen] = useState(false);
+  const handleImport = (instruments: Array<{ name: string; config: HivelyConfig }>) => {
+    const { createInstrument } = useInstrumentStore.getState();
+    for (const { name, config: hively } of instruments) {
+      createInstrument({ name, synthType: 'HivelySynth', hively });
+    }
+  };
+  return (
+    <>
+      <Button variant="default" size="sm" icon={<ListPlus size={14} />} onClick={() => setOpen(true)}>
+        Import from Song
+      </Button>
+      {open && <HivelyImportDialog onClose={() => setOpen(false)} onImport={handleImport} />}
+    </>
   );
 };

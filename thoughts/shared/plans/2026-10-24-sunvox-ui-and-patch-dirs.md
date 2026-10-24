@@ -52,7 +52,7 @@ Research: `thoughts/shared/research/2026-10-24_sunvox-synth-ui.md`,
 
 - [x] A9 SunVox no sound on MetaModule default patch fixed (937c96a69); A10 preset selector over all 621 bundled warmplace instruments incl. .xi/.wav and pack subfolders (c3c28eeda). Live: owner hears sound; preset pick not yet heard.
 
-Running count: 16 of 16. A1-A8 done; B1-B6 done (B5 with written exemptions). Follow-up: FMX added to the SunVox type map (MetaModule/FMX note-target test).
+Running count: 16 of 16. A1-A8 done; B1-B6 done (B5 with written exemptions). Follow-up: FMX added to the SunVox type map (MetaModule/FMX note-target test). Correction: row 20 (Hively) was unreachable at fb9f589cc because HivelyImportDialog had no caller since 3eb2efea6; the Hively editor header now carries "Import from Song" (reachability test hivelySongImport.test.tsx).
 
 State note (B5 remaining): row 6 CZ101Hardware.tsx uses styled CZ101Button, not yet on PatchLoadButton (same hook onPatchLoaded exists); row 4 Dexed JUCE cart callback still triggers the hidden OS input (visible button migrated); row 13 Sfizz takes FileList (multi-sample, folder) so stays OS picker; rows 8, 11, 12, 14-22 have no bundled folder in the map, stay OS picker. Manifest 7682 -> 9335 entries.
 
