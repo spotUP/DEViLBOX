@@ -30,6 +30,8 @@ export const SYNTH_PATCH_DIRS: Partial<Record<SynthType, SynthPatchDir>> = {
   // Fairlight CMI sample loader takes one audio file; the bundled library is the sample pack, not the disk images in cmi-disks.
   MAMECMI: { dir: 'samples/packs/fairlight-cmi', extensions: ['.wav'] },
   Sfizz: { dir: 'samples/sfz', extensions: ['.sfz', '.wav'] },
+  // Hively instruments are imported from a song (.hvl / .ahx); the bundled AHX songs sit next door in songs/ahx.
+  HivelySynth: { dir: 'songs/hivelytracker', extensions: ['.hvl', '.ahx'] },
   // Furnace chips: one entry per synth type, the chip's own folder under instruments/furnace (.fui Furnace instruments, .dmp DefleMask patches).
   // A Furnace type without its own bundled chip folder opens the furnace root, which holds every chip folder.
   Furnace: { dir: 'instruments/furnace', extensions: ['.fui', '.dmp'] },
