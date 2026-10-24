@@ -2,7 +2,7 @@
  * SunVox one editor (plan 2026-10-24 A4-A8).
  *
  * Reachability: a new SunVoxSynth instrument -> UnifiedInstrumentEditor ('sunvox-synth' branch) -> SunVoxModularEditor
- * -> ToneEngine.getInstrument -> InstrumentFactory builds SunVoxModularSynth bound to the instrument (Generator -> Output)
+ * -> ToneEngine.getInstrument -> InstrumentFactory builds SunVoxModularSynth bound to the instrument (bundled default patch)
  * -> Add Module -> knob -> engine.setModuleControl. Round trip: the debounced saveSong writes the handle bytes into
  * `sunvox.patchData`; a rebuild from the stored config has the same graph. Migration: schema 26 folds SunVoxModular.
  */
@@ -63,16 +63,21 @@ import { DEFAULT_SUNVOX, DEFAULT_SUNVOX_SYNTH_PATCH } from '@typedefs/instrument
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { SunVoxModularSynth } from '@/engine/sunvox-modular/SunVoxModularSynth';
 import { CURRENT_SCHEMA, migrateSavedProject } from '@/lib/persistence/migrations';
+import { DEFAULT_SUNVOX_PATCH_URL } from '@/engine/sunvox/sunvoxPatchConfig';
 
 fake.create = (config) => InstrumentFactory.createInstrument(config);
 const ID = 7;
 const stored = () => useInstrumentStore.getState().instruments.find((i) => i.id === ID)!;
 const types = (g: Entry[]) => g.map((m) => `${m.id}:${m.typeName}>${m.outputs.join(',')}`).sort();
 
-beforeEach(() => { fake.calls.length = 0; fake.handles.clear(); fake.synths.clear(); });
+const PRESET = new Uint8Array([0x53, 0x56, 0x4f, 0x58]).buffer;
+const fetchMock = vi.fn(async () => new Response(PRESET));
+vi.stubGlobal('fetch', fetchMock);
+
+beforeEach(() => { fake.calls.length = 0; fake.handles.clear(); fake.synths.clear(); fetchMock.mockClear(); });
 
 describe('the SunVox graph editor', () => {
-  it('builds Generator -> Output for a new instrument, adds a module and sends a knob move to the engine, then round-trips', async () => {
+  it('starts a new instrument from the bundled default patch, adds a module and sends a knob move to the engine, then round-trips', async () => {
     const inst = { id: ID, name: 'SunVox', synthType: 'SunVoxSynth', sunvox: { ...DEFAULT_SUNVOX }, effects: [], volume: -6, pan: 0 } as unknown as InstrumentConfig;
     useInstrumentStore.setState({ instruments: [inst] });
     const Host = () => {
@@ -81,9 +86,13 @@ describe('the SunVox graph editor', () => {
     };
     render(<Host />);
 
-    // A5: audible with no file. The engine built Generator -> Output and saved it into the instrument.
+    // A5: a real sound with no user file. The bundled default .sunsynth is fetched, loaded into the handle and saved.
     await waitFor(() => expect(stored().sunvox?.patchData).toBeTruthy());
-    expect(fake.calls.filter((c) => c.fn === 'newModule').map((c) => c.args[1])).toEqual(['Generator']);
+    expect(fetchMock).toHaveBeenCalledWith(DEFAULT_SUNVOX_PATCH_URL);
+    const loads = fake.calls.filter((c) => c.fn === 'loadSynth');
+    expect(loads.length, 'sentinel: default patch loaded').toBe(1);
+    expect(new Uint8Array(loads[0].args[1] as ArrayBuffer)).toEqual(new Uint8Array(PRESET));
+    expect(fake.calls.filter((c) => c.fn === 'newModule')).toEqual([]);
     expect(stored().sunvox?.isSong).toBe(true);
     expect(stored().sunvox?.noteTargetModuleId).toBe(1);
 
@@ -91,8 +100,8 @@ describe('the SunVox graph editor', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'rack' }));
     fireEvent.click(screen.getByRole('button', { name: /Add Module/ }));
     fireEvent.click(screen.getAllByRole('button', { name: /^Filter\b/ })[0]);
-    await waitFor(() => expect(fake.calls.filter((c) => c.fn === 'newModule').length).toBe(2));
-    const filterId = fake.calls.filter((c) => c.fn === 'newModule')[1];
+    await waitFor(() => expect(fake.calls.filter((c) => c.fn === 'newModule').length).toBe(1));
+    const filterId = fake.calls.filter((c) => c.fn === 'newModule')[0];
     expect(filterId.args[1]).toMatch(/Filter/);
 
     const knobs = await screen.findAllByRole('slider');

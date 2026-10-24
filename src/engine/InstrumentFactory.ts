@@ -14,7 +14,7 @@ import {
   DEFAULT_SUPERCOLLIDER,
   DEFAULT_SUNVOX_SYNTH_PATCH,
 } from '@/types/instrument';
-import { isSunVoxSongPlayer } from './sunvox/sunvoxPatchConfig';
+import { DEFAULT_SUNVOX_PATCH_URL, isSunVoxSongPlayer } from './sunvox/sunvoxPatchConfig';
 import { HivelySynth } from './hively/HivelySynth';
 import { GTUltraSynth } from './gtultra/GTUltraSynth';
 import { KlysSynth } from './klystrack/KlysSynth';
@@ -792,8 +792,8 @@ export class InstrumentFactory {
           instrument = svSynth;
           break;
         }
-        // Editable instrument graph: saved bytes, a .sunsynth, or the
-        // Generator -> Output recipe (or a migrated SunVoxModular patch).
+        // Editable instrument graph: saved bytes, a .sunsynth, a migrated
+        // SunVoxModular patch, or (new instrument) the bundled default patch.
         instrument = new SunVoxModularSynth(
           config.sunvoxModular ?? DEFAULT_SUNVOX_SYNTH_PATCH,
           null,
@@ -802,6 +802,7 @@ export class InstrumentFactory {
             instrumentId: config.id,
             patchData: config.sunvox?.patchData ?? null,
             isSong: config.sunvox?.isSong === true,
+            defaultPatchUrl: config.sunvoxModular ? undefined : DEFAULT_SUNVOX_PATCH_URL,
           },
         );
         break;

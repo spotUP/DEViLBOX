@@ -3,9 +3,16 @@
  * Used by the import dialog (new instrument) and the SunVox editor's Load Patch (this instrument).
  */
 import type { SunVoxConfig } from '@typedefs/instrument';
+import { SYNTH_PATCH_DIRS } from '@/constants/synthPatchDirs';
+import { normalizeUrl } from '@/utils/urlUtils';
 
 /** Extensions routed to the SunVox patch loader (UnifiedFileLoader routes .sunsynth). */
 export const SUNVOX_PATCH_ACCEPT = '.sunsynth';
+
+/** The bundled patch a new SunVox instrument starts from, so the first note is a real sound, not a bare oscillator. */
+export const DEFAULT_SUNVOX_PATCH_URL = normalizeUrl(
+  `/data/${SYNTH_PATCH_DIRS.SunVoxSynth!.dir}/instruments/keyboard/ACheney Analog Synth.sunsynth`,
+);
 
 export async function sunvoxPatchConfigFromFile(file: File): Promise<{ name: string; config: SunVoxConfig }> {
   const patchData = await file.arrayBuffer();

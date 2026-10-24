@@ -104,6 +104,8 @@ export interface SunVoxInstrumentBinding {
   instrumentId: number;
   patchData: ArrayBuffer | null;
   isSong: boolean;
+  /** No saved bytes and no migrated recipe: start from this bundled .sunsynth (a new instrument). */
+  defaultPatchUrl?: string;
 }
 
 /** Debounce for writing graph edits back into config.sunvox.patchData. */
@@ -206,6 +208,16 @@ export class SunVoxModularSynth implements DevilboxSynth {
   }
 
   private async _initInstrument(recipe: ModularPatchConfig, binding: SunVoxInstrumentBinding): Promise<void> {
+    if (!binding.patchData && binding.defaultPatchUrl) {
+      try {
+        const res = await fetch(binding.defaultPatchUrl);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        binding = { ...binding, patchData: await res.arrayBuffer(), isSong: false };
+      } catch (err) {
+        // Offline or missing file: the Generator -> Output recipe still gives a playable instrument.
+        console.error('[SunVoxModularSynth] Default patch fetch failed:', binding.defaultPatchUrl, err);
+      }
+    }
     if (binding.patchData && binding.isSong) {
       await this.engine.ready();
       this._handle = await this.engine.createHandle(this.audioContext.sampleRate);
