@@ -138,7 +138,6 @@ const HarmonicSynthControls = lazy(() => import('../controls/HarmonicSynthContro
 const ModularSynthControls = lazy(() => import('../synths/modular/ModularSynthControls').then(m => ({ default: m.ModularSynthControls })));
 import { SunVoxModularEditor } from '../synths/modular/SunVoxModularEditor';
 import { SunVoxPresetSelect } from '../synths/modular/SunVoxPresetSelect';
-import { HivelySongImportButton } from '../HivelyImportDialog';
 const TonewheelOrganControls = lazy(() => import('../controls/TonewheelOrganControls').then(m => ({ default: m.TonewheelOrganControls })));
 const MelodicaControls = lazy(() => import('../controls/MelodicaControls').then(m => ({ default: m.MelodicaControls })));
 const VitalControls = lazy(() => import('../controls/VitalControls').then(m => ({ default: m.VitalControls })));
@@ -1810,7 +1809,6 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
           onVizModeChange={setVizMode}
           customHeaderControls={
             <div className="flex items-center gap-2">
-              <HivelySongImportButton />
               <button
                 className={`p-1.5 rounded transition-all flex items-center gap-1.5 px-2 ${
                   uiMode === 'hardware'
