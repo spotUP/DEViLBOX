@@ -17,13 +17,17 @@ import { join } from 'node:path';
  */
 const SRC = readFileSync(join(process.cwd(), 'src/components/dub/DubDeckStrip.tsx'), 'utf-8');
 
-/** The deck's root element — the first div of the component's return. */
-const rootClasses = (): string => {
-  const at = SRC.indexOf('bg-dark-bgSecondary border-t border-dark-border font-mono');
+/** The classes of one prop on the deck's root, the HeightGlide the component returns. */
+const rootProp = (prop: 'className' | 'contentClassName'): string => {
+  const at = SRC.indexOf('<HeightGlide\n      ref={deckRef}');
   expect(at, 'the deck root moved').toBeGreaterThan(-1);
-  const open = SRC.lastIndexOf('className="', at);
-  return SRC.slice(open + 'className="'.length, SRC.indexOf('"', open + 'className="'.length));
+  const open = SRC.indexOf(`${prop}="`, at) + `${prop}="`.length;
+  return SRC.slice(open, SRC.indexOf('"', open));
 };
+/** The box the editor column lays out: the gliding shell. */
+const rootClasses = (): string => rootProp('className');
+/** The box sized by the deck's content, which scrolls past the cap. */
+const contentClasses = (): string => rootProp('contentClassName');
 
 describe('the dub deck is sized by its content', () => {
   it('does not shrink below what it needs', () => {
@@ -34,7 +38,7 @@ describe('the dub deck is sized by its content', () => {
   });
 
   it('keeps a last-resort cap so a tall deck cannot fill the window', () => {
-    const classes = rootClasses();
+    const classes = contentClasses();
     expect(classes).toContain('overflow-y-auto');
     expect(classes).toMatch(/max-h-\[/);
   });
@@ -42,7 +46,7 @@ describe('the dub deck is sized by its content', () => {
   it('the cap measures the viewport that is actually visible', () => {
     // Plain `vh` on iOS is the height with the browser toolbar hidden, so a
     // 60vh cap is bigger than the screen. See src/index.css --app-vh.
-    const classes = rootClasses();
+    const classes = contentClasses();
     expect(classes).toContain('var(--app-vh)');
     expect(classes, 'a bare vh unit is wrong on a phone').not.toMatch(/max-h-\[\d+vh\]/);
   });

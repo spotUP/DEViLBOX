@@ -41,6 +41,7 @@ import { moveButtonStyle, MOVE_COLOR, type MoveColor } from './moveButtonStyle';
 import { resolveDubTarget, isDubTargetChannel, describeDubTarget } from './dubTarget';
 import { useControllerLamps } from '@/hooks/useControllerLamps';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { HeightGlide } from '@components/ui/HeightGlide';
 import { ChannelShapeSelect, ChannelShapeKnob } from './ChannelShapeSlot';
 import { CONTROLLER_LAYOUTS } from '@/midi/controllerLayouts';
 import { getDJControllerMapper } from '@/midi/DJControllerMapper';
@@ -1793,8 +1794,18 @@ export const DubDeckStrip: React.FC = () => {
      * `--app-vh`, so on iOS it is a share of the viewport that is really
      * visible rather than the one `vh` imagines. Three quarters, not 60 %:
      * the owner would rather have full-size buttons on the channel cards
-     * than a taller pattern editor while the deck is open (2026-09-23). */
-    <div ref={deckRef} className="shrink-0 flex flex-col gap-1.5 px-2 py-1.5 bg-dark-bgSecondary border-t border-dark-border font-mono overflow-y-auto max-h-[calc(var(--app-vh)*0.75)]">
+     * than a taller pattern editor while the deck is open (2026-09-23).
+     *
+     * The height glides rather than jumps when a tab or the bus power changes
+     * what the deck holds ("we need to animate when i click those tabs",
+     * 2026-10-24). The glide is on the outer box, which is what the pattern
+     * editor gives way to and what deckRef publishes, so the editor follows it
+     * frame by frame with its edit row held in place. */
+    <HeightGlide
+      ref={deckRef}
+      className="shrink-0 bg-dark-bgSecondary"
+      contentClassName="flex flex-col gap-1.5 px-2 py-1.5 border-t border-dark-border font-mono overflow-y-auto max-h-[calc(var(--app-vh)*0.75)]"
+    >
       {/* Header row */}
       {/* The header row.
           It had no `flex-wrap`, and its parent scrolls vertically only, so on a
@@ -2501,6 +2512,6 @@ export const DubDeckStrip: React.FC = () => {
       )}
       </>
       )}
-    </div>
+    </HeightGlide>
   );
 };
