@@ -11,16 +11,12 @@ import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { SunVoxEngine } from '@/engine/sunvox/SunVoxEngine';
 import type { SunVoxModuleGraphEntry } from '@/engine/sunvox/SunVoxEngine';
 import { SV_ID_TO_TYPE_STRING } from './SunVoxModuleDescriptors';
+import { SUNVOX_MODULE_TYPE_MAP } from './SunVoxModuleTypes';
 import { registerSunVoxMuteBridge, unregisterSunVoxMuteBridge } from '@/stores/useMixerStore';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { DEFAULT_SUNVOX } from '@/types/instrument/defaults';
 import { markSelfSavedSunVoxPatch } from './selfSavedPatches';
-
-const GENERATOR_TYPES = new Set([
-  'Analog generator', 'Generator', 'FM', 'Kicker', 'DrumSynth',
-  'Sampler', 'SpectraVoice', 'Vorbis player', 'Input',
-]);
 
 /** Shared song-mode handle: all SunVoxModularSynth instances for the same song reuse this */
 let _sharedSongHandle = -1;
@@ -229,7 +225,11 @@ export class SunVoxModularSynth implements DevilboxSynth {
       await this.engine.ready();
       this._handle = await this.engine.createHandle(this.audioContext.sampleRate);
       const modId = await this.engine.loadSynth(this._handle, binding.patchData);
-      if (modId > 0) await this.engine.connectModules(this._handle, modId, 0);
+      if (modId > 0) {
+        await this.engine.connectModules(this._handle, modId, 0);
+        // The loaded .sunsynth module is the instrument, whatever its type.
+        this._noteTargetSvId = modId;
+      }
     } else {
       await this._buildGraph(recipe);
     }
@@ -316,7 +316,7 @@ export class SunVoxModularSynth implements DevilboxSynth {
   }
 
   private _isGenerator(typeString: string): boolean {
-    return GENERATOR_TYPES.has(typeString);
+    return SUNVOX_MODULE_TYPE_MAP.get(typeString)?.isGenerator ?? false;
   }
 
   async ensureInitialized(): Promise<void> {
@@ -433,7 +433,7 @@ export class SunVoxModularSynth implements DevilboxSynth {
       this.uiToSv.set(`sv_m${moduleId}`, moduleId);
       this.svToUi.set(moduleId, `sv_m${moduleId}`);
       await this.engine.connectModules(this._handle, moduleId, 0);
-      if (this._noteTargetSvId < 0) await this._mapGraphIds();
+      if (this._noteTargetSvId < 0) this._noteTargetSvId = moduleId;
       this._scheduleSave();
     }
     return moduleId;

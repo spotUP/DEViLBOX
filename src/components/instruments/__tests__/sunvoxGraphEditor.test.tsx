@@ -31,7 +31,10 @@ const fake = vi.hoisted(() => {
     getModuleGraph: async (h: number) => structuredClone(handles.get(h) ?? []),
     saveSong: async (h: number) => new TextEncoder().encode(JSON.stringify(handles.get(h))).buffer,
     loadSong: async (h: number, data: ArrayBuffer) => { handles.set(h, JSON.parse(new TextDecoder().decode(data))); },
-    loadSynth: async (h: number) => engine.newModule(h, 'Generator'),
+    // Bundled .sunsynth presets are MetaModules (ACheney Analog Synth: STYP MetaModule).
+    loadSynth: async (h: number) => engine.newModule(h, 'MetaModule'),
+    noteOn: () => {},
+    noteOff: () => {},
     sendMessage: () => {},
   };
   const recorded = new Proxy(engine, {
@@ -95,6 +98,9 @@ describe('the SunVox graph editor', () => {
     expect(fake.calls.filter((c) => c.fn === 'newModule')).toEqual([]);
     expect(stored().sunvox?.isSong).toBe(true);
     expect(stored().sunvox?.noteTargetModuleId).toBe(1);
+    // The loaded MetaModule is the instrument: a note reaches it (was silent: no note target).
+    (fake.synths.get(ID) as SunVoxModularSynth).triggerAttack('C4');
+    expect(fake.calls.filter((c) => c.fn === 'noteOn').map((c) => c.args.slice(1, 3)), 'sentinel: note sent').toEqual([[1, 60]]);
 
     // A6: the editor shows the engine graph; add a module through the shelf, then move its knob in the rack.
     fireEvent.click(await screen.findByRole('button', { name: 'rack' }));
@@ -121,6 +127,21 @@ describe('the SunVox graph editor', () => {
     const rebuilt = InstrumentFactory.createInstrument(reloaded) as unknown as SunVoxModularSynth;
     expect(types(await rebuilt.getModuleGraph())).toEqual(edited);
     expect(fake.calls.filter((c) => c.fn === 'loadSong').length).toBe(1);
+  });
+
+  it('plays a saved MetaModule instrument whose stored note target is -1', async () => {
+    const graph = [
+      { id: 0, name: 'Output', typeName: 'Output', flags: 0, inputs: [1], outputs: [], controls: [] },
+      { id: 1, name: 'MetaModule', typeName: 'MetaModule', flags: 0, inputs: [], outputs: [0], controls: [] },
+    ];
+    const patchData = new TextEncoder().encode(JSON.stringify(graph)).buffer;
+    const config = { id: ID, name: 'SunVox', synthType: 'SunVoxSynth', effects: [], volume: -6, pan: 0,
+      sunvox: { ...DEFAULT_SUNVOX, patchData, isSong: true, noteTargetModuleId: -1 } } as unknown as InstrumentConfig;
+    const synth = InstrumentFactory.createInstrument(config) as unknown as SunVoxModularSynth;
+    await synth.getModuleGraph();
+    synth.triggerAttack('C4');
+    expect(fake.calls.filter((c) => c.fn === 'noteOn').map((c) => c.args[1])).toEqual([1]);
+    synth.dispose();
   });
 });
 
