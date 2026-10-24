@@ -11,7 +11,7 @@ import {
   channelShapeMoveTarget,
   channelShapeEffectIndex,
 } from '../channelShape';
-import { migrateMixerChannelShape, migrateSavedProject } from '@/lib/persistence/migrations';
+import { CURRENT_SCHEMA, migrateMixerChannelShape, migrateSavedProject } from '@/lib/persistence/migrations';
 import { useMixerStore } from '@/stores/useMixerStore';
 
 describe('a saved channel filter loads as the same shaping slot', () => {
@@ -30,7 +30,7 @@ describe('a saved channel filter loads as the same shaping slot', () => {
   it('a schema-23 project is migrated to the slot and stamped with the current schema', () => {
     const project = { schemaVersion: 23, mixer: { channels: [{ dubFilterMode: 'hpf', dubFilterHz: 150 }] } };
     migrateSavedProject(project, 23);
-    expect(project.schemaVersion).toBe(25);
+    expect(project.schemaVersion).toBe(CURRENT_SCHEMA);
     expect(project.mixer.channels[0]).toEqual({ dubShape: 'hpf', dubShapeValue: 150 });
   });
   it('a legacy snapshot loaded into the mixer store comes up with the slot', () => {
