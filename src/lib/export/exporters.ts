@@ -18,6 +18,7 @@ import { encodeMaxTrax, parseMaxTrax } from '@lib/import/formats/maxtrax/maxtrax
 import { useSF2Store, sf2PayloadOf } from '@stores/useSF2Store';
 import { useCheeseCutterStore, cheeseCutterPayloadOf } from '@stores/useCheeseCutterStore';
 import { toTypedJson, fromTypedJson } from '@/lib/persistence/typedJson';
+import { savedSongToJson } from '@/lib/song/savedSong';
 
 // ── Binary FileData field names in useFormatStore ──
 // Single source of truth lives in `src/engine/formatFileDataFields.ts` and is
@@ -347,9 +348,7 @@ export function exportSong(options: ExportOptions = {}): void {
     sequence: (song.patternOrder ?? []).map((i) => song.patterns[i]?.id).filter((id): id is string => !!id),
   } as SongExport;
 
-  const json = options.prettify
-    ? JSON.stringify(songData, null, 2)
-    : JSON.stringify(songData);
+  const json = savedSongToJson(songData, options.prettify);
 
   const compressed = compressProject(json);
   const blob = new Blob([compressed], { type: 'application/octet-stream' });
