@@ -142,6 +142,12 @@ interface UseFileNavigationOptions {
   currentProjectData?: () => object;
   mode?: 'load' | 'save';
   suggestedFilename: string;
+  /** Pick-file mode: open at this folder (relative to public/data) instead of the remembered song path. */
+  startDir?: string;
+  /** Pick-file mode: only files with these extensions are listed (folders stay). */
+  extensions?: string[];
+  /** Pick-file mode: receives the raw bytes of the chosen file instead of onLoad / onLoadTrackerModule. */
+  onPickFile?: (buffer: ArrayBuffer, filename: string) => void | Promise<void>;
 }
 
 // Module-level cache so the dialog remembers its last state across open/close.
@@ -171,14 +177,21 @@ export function useFileNavigation({
   onClose,
   currentProjectData,
   suggestedFilename,
+  startDir,
+  extensions,
+  onPickFile,
 }: UseFileNavigationOptions) {
+  /* Pick-file mode never touches the song browser's remembered path, folder or search. */
+  const pickMode = !!onPickFile;
   const [rawFiles, setFiles] = useState<FileItem[]>([]);
-  const [searchQuery, _setSearchQuery] = useState<string>(_lastState.searchQuery);
+  const [searchQuery, _setSearchQuery] = useState<string>(pickMode ? '' : _lastState.searchQuery);
   const setSearchQuery = useCallback((q: string) => {
-    _lastState.searchQuery = q;
-    try { if (q) localStorage.setItem(_SEARCH_KEY, q); else localStorage.removeItem(_SEARCH_KEY); } catch { /* ok */ }
+    if (!pickMode) {
+      _lastState.searchQuery = q;
+      try { if (q) localStorage.setItem(_SEARCH_KEY, q); else localStorage.removeItem(_SEARCH_KEY); } catch { /* ok */ }
+    }
     _setSearchQuery(q);
-  }, []);
+  }, [pickMode]);
   const files = useMemo(() => {
     if (!searchQuery.trim()) return rawFiles;
     const q = searchQuery.toLowerCase();
@@ -195,19 +208,19 @@ export function useFileNavigation({
   const [saveFilename, setSaveFilename] = useState(suggestedFilename);
   const [hasFilesystemAccess, setHasFilesystemAccess] = useState(false);
   const [hasServerFS, setHasServerFS] = useState(false);
-  const [currentPath, _setCurrentPath] = useState<string>(() => readFileBrowserMemory().currentPath);
-  const [electronDirectory, _setElectronDirectory] = useState<string | null>(() => readFileBrowserMemory().electronDirectory);
+  const [currentPath, _setCurrentPath] = useState<string>(() => (pickMode ? (startDir ?? '') : readFileBrowserMemory().currentPath));
+  const [electronDirectory, _setElectronDirectory] = useState<string | null>(() => (pickMode ? null : readFileBrowserMemory().electronDirectory));
   const [cloudFiles, setCloudFiles] = useState<ServerFile[]>([]);
 
   // Wrap setters to persist to module-level cache
   const setCurrentPath = useCallback((p: string) => {
-    updateFileBrowserMemory({ currentPath: p });
+    if (!pickMode) updateFileBrowserMemory({ currentPath: p });
     _setCurrentPath(p);
-  }, []);
+  }, [pickMode]);
   const setElectronDirectory = useCallback((d: string | null) => {
-    updateFileBrowserMemory({ electronDirectory: d });
+    if (!pickMode) updateFileBrowserMemory({ electronDirectory: d });
     _setElectronDirectory(d);
-  }, []);
+  }, [pickMode]);
 
   // Revision history state
   const [showRevisions, setShowRevisions] = useState(false);
@@ -336,7 +349,7 @@ export function useFileNavigation({
       }
 
       // Demo files / filesystem mode
-      if (hasElectronFS() && window.electron?.fs) {
+      if (hasElectronFS() && window.electron?.fs && !pickMode) {
         if (!electronDirectory) {
           setIsLoading(false);
           return;
@@ -399,13 +412,17 @@ export function useFileNavigation({
           }
         }
 
+        if (extensions) {
+          items = items.filter(i => i.isDirectory || extensions.includes(i.name.slice(i.name.lastIndexOf('.')).toLowerCase()));
+        }
+
         items.sort((a, b) => {
           if (a.isDirectory && !b.isDirectory) return -1;
           if (!a.isDirectory && b.isDirectory) return 1;
           return a.name.localeCompare(b.name);
         });
 
-        if (items.length === 0) {
+        if (items.length === 0 && !pickMode) {
           const dirHandle = getCurrentDirectory();
           if (dirHandle) {
             const entries = await listDirectory(dirHandle, []);
@@ -430,7 +447,7 @@ export function useFileNavigation({
     } finally {
       setIsLoading(false);
     }
-  }, [currentPath, electronDirectory, hasServerFS, fileSource]);
+  }, [currentPath, electronDirectory, hasServerFS, fileSource, pickMode, extensions]);
 
   useEffect(() => {
     if (isOpen) {
@@ -584,6 +601,21 @@ export function useFileNavigation({
     setError(null);
 
     try {
+      if (onPickFile) {
+        // Pick-file mode: bundled bytes (static first, then server API) go to the caller untouched.
+        let picked: ArrayBuffer | null = null;
+        if (selectedFile.path && isManifestAvailable()) {
+          try { picked = await readStaticFile(selectedFile.path); } catch { /* not in static bundle */ }
+        }
+        if (!picked && selectedFile.path && hasServerFS) {
+          try { picked = await readServerFile(selectedFile.path); } catch { /* server doesn't have it */ }
+        }
+        if (!picked) throw new Error('Cannot read file');
+        await onPickFile(picked, selectedFile.name);
+        onClose();
+        return;
+      }
+
       // Handle cloud file loading
       if (selectedFile.source === 'cloud' && selectedFile.cloudId) {
         const cloudFile = await getCloudFile(selectedFile.cloudId);

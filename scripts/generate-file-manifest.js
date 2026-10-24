@@ -29,6 +29,19 @@ const EXTENSIONS = [
   '.wav', '.mp3', '.ogg', '.flac', '.aif', '.aiff'
 ];
 
+// Extensions of the bundled patch folders live in src/constants/synthPatchDirs.ts (single source). This script
+// is plain Node and cannot import TypeScript, so read that file as text and collect its `extensions: [...]` literals.
+function patchDirExtensions() {
+  const src = fs.readFileSync(path.join(__dirname, '../src/constants/synthPatchDirs.ts'), 'utf8');
+  const out = [];
+  for (const m of src.matchAll(/extensions:\s*\[([^\]]*)\]/g)) {
+    for (const e of m[1].matchAll(/'(\.[a-z0-9]+)'/gi)) out.push(e[1].toLowerCase());
+  }
+  return out;
+}
+const PATCH_EXTENSIONS = patchDirExtensions();
+if (PATCH_EXTENSIONS.length === 0) throw new Error('synthPatchDirs.ts: no extensions found');
+
 function scanDirectory(dir, baseDir = dir) {
   const files = [];
   
@@ -46,7 +59,7 @@ function scanDirectory(dir, baseDir = dir) {
       files.push(...scanDirectory(fullPath, baseDir));
     } else if (entry.isFile()) {
       const ext = path.extname(entry.name).toLowerCase();
-      if (EXTENSIONS.includes(ext)) {
+      if (EXTENSIONS.includes(ext) || PATCH_EXTENSIONS.includes(ext)) {
         // Store as /public/data/... path for consistency with import.meta.glob format
         files.push(`/public/data/${relativePath.replace(/\\/g, '/')}`);
       }
