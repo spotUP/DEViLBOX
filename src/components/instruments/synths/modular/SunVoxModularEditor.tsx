@@ -58,9 +58,10 @@ export const SunVoxModularEditor: React.FC<SunVoxModularEditorProps> = ({ config
     setPatchConfig({ ...sunvoxGraphToConfig(graph), viewMode: patchRef.current.viewMode });
   }, []);
 
+  // A preset or loaded patch rebuilds the engine with a new graph: re-read it.
   useEffect(() => {
     void refreshFromEngine().catch(() => { /* ToneEngine not ready yet */ });
-  }, [config.id, refreshFromEngine]);
+  }, [config.id, config.sunvox?.patchName, refreshFromEngine]);
 
   const handlePatchChange = useCallback((newPatch: ModularPatchConfig) => {
     const prev = patchRef.current;
@@ -130,7 +131,7 @@ export const SunVoxModularEditor: React.FC<SunVoxModularEditorProps> = ({ config
         <span>Modules: {patchConfig.modules.length}</span>
         <span>Connections: {patchConfig.connections.length}</span>
         <div className="flex-1" />
-        <PatchLoadButton synthType="SunVoxSynth" label="Load .sunsynth" onLoad={handleLoadSunsynth} />
+        <PatchLoadButton synthType="SunVoxSynth" onLoad={handleLoadSunsynth} />
         <Button variant="default" onClick={() => void handleSave()}>Save .sunvox</Button>
       </div>
     </div>

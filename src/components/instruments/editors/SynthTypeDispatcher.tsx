@@ -137,6 +137,7 @@ const UpRoughSoftsynthControls = lazy(() => import('../controls/UpRoughSoftsynth
 const HarmonicSynthControls = lazy(() => import('../controls/HarmonicSynthControls').then(m => ({ default: m.HarmonicSynthControls })));
 const ModularSynthControls = lazy(() => import('../synths/modular/ModularSynthControls').then(m => ({ default: m.ModularSynthControls })));
 import { SunVoxModularEditor } from '../synths/modular/SunVoxModularEditor';
+import { SunVoxPresetSelect } from '../synths/modular/SunVoxPresetSelect';
 const TonewheelOrganControls = lazy(() => import('../controls/TonewheelOrganControls').then(m => ({ default: m.TonewheelOrganControls })));
 const MelodicaControls = lazy(() => import('../controls/MelodicaControls').then(m => ({ default: m.MelodicaControls })));
 const VitalControls = lazy(() => import('../controls/VitalControls').then(m => ({ default: m.VitalControls })));
@@ -3908,6 +3909,14 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
   if (editorMode === 'sunvox-modular' || editorMode === 'sunvox-synth') {
     return (
       <div className="synth-editor-container flex flex-col h-full">
+        <EditorHeader
+          instrument={instrument}
+          onChange={handleChange}
+          vizMode={vizMode}
+          onVizModeChange={setVizMode}
+          showHelpButton={false}
+          customHeaderControls={<SunVoxPresetSelect instrument={instrument} onChange={handleChange} />}
+        />
         <SunVoxModularEditor config={instrument} onChange={handleChange} />
       </div>
     );

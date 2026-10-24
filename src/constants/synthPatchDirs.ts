@@ -17,7 +17,8 @@ export interface SynthPatchDir {
   extensions: string[];
 }
 
-const SUNVOX: SynthPatchDir = { dir: 'instruments/sunvox', extensions: ['.sunsynth'] };
+// sv_load_module_from_memory loads .sunsynth patches and .xi / .wav sample instruments alike.
+const SUNVOX: SynthPatchDir = { dir: 'instruments/sunvox', extensions: ['.sunsynth', '.xi', '.wav'] };
 
 export const SYNTH_PATCH_DIRS: Partial<Record<SynthType, SynthPatchDir>> = {
   SunVoxSynth: SUNVOX,
