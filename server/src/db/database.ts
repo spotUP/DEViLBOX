@@ -5,6 +5,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { createUserDirectory } from '../utils/fileSystem';
 
 const DB_DIR = process.env.DB_DIR || path.join(__dirname, '../../data');
 const DB_PATH = path.join(DB_DIR, 'devilbox.db');
@@ -329,5 +330,31 @@ export function initDatabase() {
 // Build the schema on load: route modules call db.prepare() at import time, and ES imports
 // are hoisted, so a call from index.ts would run after them on a fresh database.
 initDatabase();
+
+/**
+ * hippoplayer.se owns accounts. Files, DJ sets and shared playlists still key on
+ * a local users row, so every login or signup that came back through the forward
+ * leaves a shadow row (same id, same username, no usable local password hash).
+ * `path` is the request path without the query.
+ */
+export const SHADOW_PASSWORD_HASH = '!hippoplayer.se';
+export function upsertShadowUser(path: string, status: number, body: unknown, database: Database.Database = db): void {
+  if (path !== '/api/auth/login' && path !== '/api/auth/signup') return;
+  const user = (body as { user?: { id?: unknown; username?: unknown; createdAt?: unknown } } | null)?.user;
+  if (!user || typeof user.id !== 'string' || typeof user.username !== 'string') return;
+  const now = Date.now();
+  const createdAt = typeof user.createdAt === 'number' ? user.createdAt : now;
+  database.prepare(`
+    INSERT INTO users (id, username, password_hash, created_at, last_login) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET username = excluded.username, last_login = excluded.last_login
+  `).run(user.id, user.username, SHADOW_PASSWORD_HASH, createdAt, now);
+  if (status === 201) {
+    try {
+      createUserDirectory(user.id);
+    } catch (error) {
+      console.error('[Auth] Failed to create user directory:', error);
+    }
+  }
+}
 
 export default db;
