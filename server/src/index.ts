@@ -7,7 +7,6 @@ import 'dotenv/config';
 
 import express from 'express';
 import cors from 'cors';
-import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/auth';
 import filesRoutes from './routes/files';
 import modlandRoutes from './routes/modland';
@@ -36,8 +35,10 @@ import { initDataDirectories } from './utils/fileSystem';
 import { initModlandIndex, scheduleModlandUpdates } from './services/modlandIndexer';
 import { initSongDB, scheduleSongDBUpdates } from './services/songdbIndexer';
 import { startRelay as startMcpRelay } from './mcp/wsRelay';
+import { createHippoForward, hippoFreeze, HIPPO_FORWARD_PATHS } from './services/hippoForward';
+import { upsertShadowUser } from './db/database';
 
-const app = express();
+export const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
@@ -61,32 +62,23 @@ app.set('trust proxy', trustProxyHops());
 // for the JSON envelope around a 64 KB tool result.
 app.use('/api/ai', express.json({ limit: '256kb' }));
 app.use('/api/ai', createAiGuards());
+// HiP and account APIs are served by hippoplayer.se. Mounted before the JSON
+// parser so the request body reaches the upstream as the exact bytes received.
+const hippoForwardBase = process.env.HIPPO_FORWARD_BASE;
+if (hippoForwardBase) {
+  const secret = process.env.HIPPO_FORWARD_SECRET;
+  if (!secret) throw new Error('HIPPO_FORWARD_BASE is set but HIPPO_FORWARD_SECRET is empty');
+  app.use(
+    HIPPO_FORWARD_PATHS,
+    express.raw({ type: () => true, limit: '1mb' }),
+    createHippoForward({ base: hippoForwardBase, secret, onJson: upsertShadowUser }),
+  );
+} else if (process.env.HIPPO_FREEZE === '1') {
+  app.use(hippoFreeze);
+}
 app.use(express.json({ limit: '10mb' }));
 
-// Rate limiting
-// Rate limiting only for auth endpoints (brute-force protection)
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: 'Too many auth attempts, please try again later'
-});
-app.use('/api/auth/', authLimiter as unknown as express.RequestHandler);
-
-// Genre lookups can cost a ModArchive request each; one client plays a few modules a minute.
-const genreLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 120,
-  message: 'Too many genre lookups, please try again later'
-});
-app.use('/api/genre/', genreLimiter as unknown as express.RequestHandler);
-
-// Loudness submissions are tiny; one client analyses a few songs a minute.
-const loudnessLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 300,
-  message: 'Too many loudness requests, please try again later'
-});
-app.use('/api/loudness/', loudnessLimiter as unknown as express.RequestHandler);
+// The auth, genre and loudness rate limits live in hippoplayer.se now (cygnus).
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -206,47 +198,54 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-// Initialize file system (DB already initialized at top of file)
-initDataDirectories();
+// Importing this module (tests) builds the app without starting anything.
+if (require.main === module) {
+  startServer();
+}
 
-// Initialize Modland index (non-blocking — runs in background)
-initModlandIndex().catch((err) => {
-  console.error('[Modland] Init failed:', err);
-});
-scheduleModlandUpdates();
+function startServer(): void {
+  // Initialize file system (DB already initialized at top of file)
+  initDataDirectories();
 
-// Initialize SongDB index (non-blocking — runs in background)
-initSongDB().catch((err) => {
-  console.error('[SongDB] Init failed:', err);
-});
-scheduleSongDBUpdates();
+  // Initialize Modland index (non-blocking — runs in background)
+  initModlandIndex().catch((err) => {
+    console.error('[Modland] Init failed:', err);
+  });
+  scheduleModlandUpdates();
 
-// Start MCP WebSocket relay (port 4003) so the AI panel can control any browser
-startMcpRelay();
+  // Initialize SongDB index (non-blocking — runs in background)
+  initSongDB().catch((err) => {
+    console.error('[SongDB] Init failed:', err);
+  });
+  scheduleSongDBUpdates();
 
-// Start server
-const server = app.listen(PORT, () => {
-  console.log(`[Server] DEViLBOX API running on port ${PORT}`);
-  console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`[Server] Data root: ${process.env.DATA_ROOT || '/var/www/devilbox/data'}`);
-  if (checkFfmpeg()) {
-    console.log(`[Server] ffmpeg available — live streaming enabled`);
-  } else {
-    console.log(`[Server] ffmpeg not found — live streaming disabled`);
-  }
-});
+  // Start MCP WebSocket relay (port 4003) so the AI panel can control any browser
+  startMcpRelay();
 
-// WebSocket upgrade handler for live stream relay
-server.on('upgrade', (req, socket, head) => {
-  const url = new URL(req.url || '', `http://localhost:${PORT}`);
-  if (url.pathname === '/api/stream/ingest') {
-    const { WebSocketServer } = require('ws') as typeof import('ws');
-    const wss = new WebSocketServer({ noServer: true });
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      const streamKey = url.searchParams.get('key') || '';
-      const platform = url.searchParams.get('platform') || 'youtube';
-      handleStreamConnection(ws, streamKey, platform);
-    });
-  }
-  // Other WebSocket upgrades (MCP relay) are handled by their own server on port 4003
-});
+  // Start server
+  const server = app.listen(PORT, () => {
+    console.log(`[Server] DEViLBOX API running on port ${PORT}`);
+    console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`[Server] Data root: ${process.env.DATA_ROOT || '/var/www/devilbox/data'}`);
+    if (checkFfmpeg()) {
+      console.log(`[Server] ffmpeg available — live streaming enabled`);
+    } else {
+      console.log(`[Server] ffmpeg not found — live streaming disabled`);
+    }
+  });
+
+  // WebSocket upgrade handler for live stream relay
+  server.on('upgrade', (req, socket, head) => {
+    const url = new URL(req.url || '', `http://localhost:${PORT}`);
+    if (url.pathname === '/api/stream/ingest') {
+      const { WebSocketServer } = require('ws') as typeof import('ws');
+      const wss = new WebSocketServer({ noServer: true });
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        const streamKey = url.searchParams.get('key') || '';
+        const platform = url.searchParams.get('platform') || 'youtube';
+        handleStreamConnection(ws, streamKey, platform);
+      });
+    }
+    // Other WebSocket upgrades (MCP relay) are handled by their own server on port 4003
+  });
+}

@@ -20,6 +20,10 @@ services:
       # Live chain is Caddy -> nginx -> backend: two proxy hops, so req.ip is
       # the visitor and the per-IP AI limits are per visitor.
       - TRUST_PROXY_HOPS=${TRUST_PROXY_HOPS:-2}
+      # HiP and account APIs are served by hippoplayer.se when the base is set.
+      - HIPPO_FORWARD_BASE=${HIPPO_FORWARD_BASE:-}
+      - HIPPO_FORWARD_SECRET=${HIPPO_FORWARD_SECRET:-}
+      - HIPPO_FREEZE=${HIPPO_FREEZE:-}
       - CORS_ORIGIN=https://devilbox.uprough.net
       - DATA_ROOT=/data
       - DB_DIR=/data/db
