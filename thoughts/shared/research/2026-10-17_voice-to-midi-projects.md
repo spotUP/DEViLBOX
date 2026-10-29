@@ -67,3 +67,40 @@ Decisive trade-off: needs a training step and a licence check on AVP (unverified
 ## Sources
 
 arXiv 2508.01488 (PESTO); github.com/SonyCSLParis/pesto; arXiv 2508.18440 and github.com/lars76/swift-f0 (SwiftF0); github.com/marl/crepe; github.com/spotify/basic-pitch; arXiv 2203.09893; arXiv 2110.05580 (vocadito); NLP4MusA 2021 Li et al.; code.soundsoftware.ac.uk Tony/pYIN; github.com/DamRsn/NeuralNote; arXiv 2009.11737 (AVP); arXiv 1811.02406 (LVT); github.com/RamakanthRGunishetty/Voice-Maestro.
+
+## Open items resolved (2026-10-17)
+
+### 1. SwiftF0 (github.com/lars76/swift-f0, pip swift-f0)
+
+Sources: README https://github.com/lars76/swift-f0 ; code read from https://raw.githubusercontent.com/lars76/swift-f0/main/swift_f0/core.py and .../music.py ; model downloaded and measured.
+
+- Parameters: 14,386 (README states it).
+- Model file: swift_f0/model.onnx, 135,090 bytes (about 132 KB, measured by download). Raw URL: https://raw.githubusercontent.com/lars76/swift-f0/main/swift_f0/model.onnx . Licence: MIT (LICENSE file, 1076 bytes, and README).
+- Input spec (core.py): mono float32 audio at 16000 Hz; hop 256 samples = 16 ms = 62.5 frames per second. Session inputs by name: "audio" (shape [1, samples]), "fmin" (float32 scalar), "fmax" (float32 scalar). Outputs: "pitch" (Hz per frame) and "confidence" (0-1 per frame). The Python wrapper adds a third derived series, loudness_db, computed outside the graph from the raw hops.
+- Range: FMIN 46.875 Hz, FMAX 2093.75 Hz (95 log-spaced pitch steps). Caller may narrow with fmin/fmax. Voiced when confidence >= 0.5.
+- Preprocessing: no STFT outside the graph. The ONNX takes raw audio; the STFT (matrix-product STFT, resampled onto the 95 log steps) is inside the graph (ONNX contains an STFT doc string and 18 Conv nodes; the article describes 512/1024/2048 windows). The Python wrapper only resamples to 16 kHz (soxr), sets confidence to 0 where a hop peaks below 1e-3 (digital silence guard), and windows long files in 1875-frame chunks with 11 frames left context and 10 frames lookahead. Receptive field is 2815 samples each way, so a streamed frame is final after 10 later frames (about 176 ms lookahead).
+- Browser demo: https://swift-f0.github.io/ (repo swift-f0/swift-f0.github.io, MIT), "runs entirely client-side with ONNX Runtime Web". Read from its minified bundle: microphone via getUserMedia (echoCancellation off, noiseSuppression off, autoGainControl on, mono), an AudioContext created at 16000 Hz, captured through an AudioWorkletNode named "capture" (ScriptProcessor 4096 fallback), chunks appended to a growing buffer; files via decodeAudioData / OfflineAudioContext. It runs on the whole recorded buffer and then draws pitch, confidence, loudness and notes (not a live streaming path). Unverified: exact onnxruntime-web execution provider.
+
+### segment_notes algorithm (music.py, read verbatim)
+
+Signature: segment_notes(result, *, pitch_hold_ms=80.0). Constants: FRAME_PERIOD 16 ms; pitch_hold_ms 80; beta = 80/16 = 5 frame-costs; clip of confidence to [0.01, 0.99]; offpitch cap 2 semitones; quiet margin 10*log10(2) = 3.01 dB; neighbourhood 64 ms (4 frames each side, symmetric padding).
+
+1. Validate: timestamps finite, non-negative, spaced exactly 16 ms; confidence in [0,1]; loudness finite. No valid pitch (finite and > 0) anywhere: return no notes.
+2. Per frame convert pitch to fractional MIDI m = 69 + 12*log2(f/440). Weight w = confidence for valid frames, 0 otherwise (a frame without pitch has w = 0).
+3. Per-frame cost q = unvoiced + quiet. unvoiced = -ln(c/(1-c)) with c = clip(w, 0.01, 0.99); this is negative (a reward) for confident frames and positive for unconfident ones. quiet = max(0, min(L, R) - level - 3.01 dB), where L and R are the maximum loudness_db over the 5 frames ending at / starting at this frame (the 64 ms window on each side); a frame that is more than 3 dB below the loudest frames on both sides pays the shortfall in dB. This is what splits repeated same-pitch notes at a loudness dip.
+4. Candidate note pitches mu = every distinct observed frame pitch in semitones, rounded to a cent (0.01 semitone).
+5. Objective: J = sum over notes of [beta + sum over its frames of (offpitch + unvoiced + quiet)], frames outside any note (gaps) cost nothing. offpitch = w * min(|m - mu|, 2). Each note has exactly one mu.
+6. Solve exactly with dynamic programming over frames t: keep for each candidate mu the best open-note cost vn[mu]; at each frame the option to open a new note costs best_so_far + beta (kept if cheaper than continuing, recording the start frame); add this frame's cost to every open candidate; if the best open candidate beats the best so far (best < 0 initially 0, i.e. the note has net negative cost), close the note there and record its start and candidate; otherwise extend the gap.
+7. Backtrack from the last frame to recover (start frame, end frame, mu) per note. start = timestamp of first frame; end = timestamp of last frame + 16 ms; pitch_hz = 440 * 2^((mu - 69)/12).
+8. MIDI export (export_to_midi): note number = floor(69 + 12*log2(f/440) + 0.5), clamped 0..127; default velocity 80 fixed (no per-note velocity), tempo 120, 480 ticks per beat, minimum one tick per note.
+
+Behaviour notes from the docstring: at 0 ms every pitch change starts a note and frames at or below confidence 0.5 are dropped; a one-semitone change must last more than 80 ms; two semitones or more need half that; returning to the old pitch needs twice as long; 5 minutes of audio take about 0.2 s. Notes carry no velocity or loudness; only start, end, pitch_hz.
+
+### 2. AVP dataset and LVT
+
+- AVP (Amateur Vocal Percussion), https://zenodo.org/records/3250230 : licence CC BY 4.0; one archive AVP_Dataset.zip, 229.6 MB; 280 audio files; 9,780 utterances; four classes (kick, snare, closed hi-hat, open hi-hat); 28 participants with little or no beatboxing experience; recorded on a MacBook Pro built-in microphone, indoors (the recording description on the Zenodo page; paper: https://arxiv.org/abs/2009.11737 notes varied mics/conditions, so treat as partly unverified). Audio file format and sample rate not stated on the Zenodo page: unverified (inspect the zip).
+- LVT (Live Vocalised Transcription) is by Ramires, Penha, Davies (INESC TEC), not Delgado; paper https://arxiv.org/abs/1811.02406 . It is a Max for Live device: onset detection, features, k-NN, user-trained. The only code repo found, https://github.com/aframires/Live-Vocalised-Drum-Transcription, is EMPTY (GitHub API: "This repository is empty", last push 2019-04-21) and has no licence. Treat LVT code as unavailable; use the paper only. Delgado et al. (QMUL/Roli) are the AVP authors; their 2022 work lists a code implementation, which I did not locate (unverified).
+
+### 3. Published vocal note-level F1
+
+- Not found. SwiftF0's paper (https://arxiv.org/abs/2508.18440) reports frame-level pitch metrics only (e.g. 91.80 % harmonic mean at 10 dB SNR; Basic Pitch is a baseline on vocadito, Bach10-mf0-synth, SpeechSynth), not note F1. PESTO and Basic Pitch note-level F1 on vocadito / MIR-ST500 did not appear in searches. The vocadito paper (https://arxiv.org/abs/2110.05580) has baseline note results for other algorithms, but I could not read its table (PDF unreadable via fetch): unverified which algorithms and values. SwiftF0's own note segmenter has no published note F1 that I found.
