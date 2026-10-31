@@ -23,7 +23,7 @@ const router = Router();
 
 // ── Download rate limiting (10/min sliding window to modland) ───────────────
 
-export const downloadLimiter = createDownloadLimiter(10);
+const downloadLimiter = createDownloadLimiter(10);
 
 // ── GET /api/modland/status ─────────────────────────────────────────────────
 
