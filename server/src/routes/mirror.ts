@@ -2,15 +2,17 @@
  * GET /api/mirror/<source>/<path> - plain-HTTP-reachable mirror for clients
  * without TLS (the Selecta Amiga build, design D9). The Amiga asks this route
  * for every source file; the server fetches the real https upstream through
- * the shared cached download proxy (same cache and outbound limiter as
- * /api/modland/download). Source roots mirror BUILTIN in Selecta's
+ * the shared cached download proxy (same cache as /api/modland/download, its
+ * own outbound limiter so Amiga browsing does not starve the modland route). Source roots mirror BUILTIN in Selecta's
  * src/library/net/mirrors.c.
  */
 import { Router, Request, Response } from 'express';
-import { sendCachedRemoteFile } from '../services/cachedRemoteDownload';
-import { downloadLimiter } from './modland';
+import { createDownloadLimiter, sendCachedRemoteFile } from '../services/cachedRemoteDownload';
 
 const router = Router();
+
+/** Uncached upstream fetches per minute across all mirror sources. */
+const mirrorLimiter = createDownloadLimiter(30);
 
 interface MirrorSource {
   root: string;
@@ -56,7 +58,7 @@ router.get(/^\/([^/]+)\/(.+)$/, async (req: Request, res: Response) => {
     cacheKey: match[1] === 'modland' ? decoded : `mirror/${match[1]}/${decoded}`,
     upstreamUrl: `${source.root}${encodedPath}`,
     filename: decoded.split('/').pop() || 'download',
-    limiter: downloadLimiter,
+    limiter: mirrorLimiter,
     label: `Mirror ${match[1]}`,
   });
 });
