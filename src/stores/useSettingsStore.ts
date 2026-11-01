@@ -168,7 +168,7 @@ export const useSettingsStore = create<SettingsStore>()(
         novoTradePacker: 'uade',      // NovoTradePackerParser — dedicated NovoPacker support
         alcatrazPacker: 'uade',       // AlcatrazPackerParser — dedicated Alcatraz Packer support
         bladePacker: 'uade',          // BladePackerParser — dedicated Blade Packer support
-        imagesMusicSystem: 'uade',    // ImagesMusicSystemParser — dedicated IMS prefix support
+        imagesMusicSystem: 'uade',    // IMSParser: full pattern decode with chip-RAM layout
         multiMediaSound: 'uade',      // MultiMediaSoundParser — dedicated MultiMedia Sound support
         titanicsPacker: 'uade',       // TitanicsPackerParser — dedicated Titanics Packer support
         moshPacker: 'uade',           // MoshPackerParser — dedicated Mosh Packer support
