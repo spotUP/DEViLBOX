@@ -2211,7 +2211,7 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
           { tool: 'set_tracker_key_lock', description: 'Tracker Key Lock on/off (tempo-only pitch slider)' },
           { tool: 'toggle_metronome', description: 'Toggle metronome click' },
           { tool: 'set_looping', description: 'Enable/disable pattern looping' },
-          { tool: 'new_song', description: 'Start a blank song in a new tab (the open song stays in its tab)' },
+          { tool: 'new_song', description: 'Start a blank song in a new tab, optionally in a format or system preset (the open song stays in its tab)' },
           { tool: 'seek_to', description: 'Seek to a position' },
           { tool: 'get_playback_state', description: 'Get playback state (playing, position, BPM)' },
           { tool: 'get_playback_silence', description: 'Diagnose playing-but-silent (engine rendering silence)' },
@@ -2602,9 +2602,13 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
 
   server.tool(
     'new_song',
-    'Start a blank song in a new tab, as the New Song wizard does for an empty song. The open song stays in its own tab: build tests here, never in the song that was open.',
-    {},
-    () => call('new_song', {}),
+    'Start a blank song in a new tab, as the New Song wizard does. The open song stays in its own tab: build tests here, never in the song that was open. Without params: an empty song. format: a blank song in that editable format (own editor, player, native export). preset: a system preset. An unknown id returns the list of valid ids.',
+    {
+      format: z.string().optional().describe('Editable format id, e.g. "mod", "monotone"'),
+      preset: z.string().optional().describe('System preset id, e.g. "nes"'),
+      loadInstruments: z.boolean().optional().describe('With preset: also load its starter instruments'),
+    },
+    (p) => call('new_song', p),
   );
 
   server.tool(

@@ -39,4 +39,15 @@ describe('new_song MCP tool', () => {
     // Sentinel: the shared startNewSong ran to its end.
     expect(useUIStore.getState().statusMessage).toBe('New project');
   });
+
+  it('names the valid ids when the format or preset is unknown', async () => {
+    const before = useTabsStore.getState().tabs.length;
+    const bad = await newSong({ format: 'no-such-format' });
+    expect(bad.ok).toBe(false);
+    expect(bad.validFormats).toContain('mod');
+    const badPreset = await newSong({ preset: 'no-such-preset' });
+    expect(badPreset.ok).toBe(false);
+    expect((badPreset.validPresets as string[]).length).toBeGreaterThan(0);
+    expect(useTabsStore.getState().tabs.length).toBe(before);
+  });
 });

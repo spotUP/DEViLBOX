@@ -7,6 +7,7 @@ import { join } from 'path';
 import type { TrackerSong } from '@engine/TrackerReplayer';
 import { detectFormatFromContent } from '@lib/import/FormatRegistry';
 import { LAYOUT_EXPORTERS } from '../nativeExportRouter';
+import type { EditableFormatDescriptor } from '@lib/formats/EditableFormatRegistry';
 
 const ROOT = process.cwd();
 
@@ -79,6 +80,16 @@ export async function normalizeExport(raw: ExportOut): Promise<Uint8Array> {
   if ('data' in raw) return normalizeExport(raw.data);
   if ('blob' in raw) return normalizeExport(raw.blob);
   throw new Error('unrecognized exporter output shape');
+}
+
+/** Invoke an editable-format descriptor's own exporter (`exporter.module` / `exporter.fn`). */
+export async function runDescriptorExporter(d: EditableFormatDescriptor, song: TrackerSong): Promise<Uint8Array> {
+  const ref = d.exporter;
+  if (!ref) throw new Error(`${d.formatId} has no exporter`);
+  const mod = (await import(/* @vite-ignore */ `../${ref.module}`)) as Record<string, unknown>;
+  const fn = mod[ref.fn];
+  if (typeof fn !== 'function') throw new Error(`exporter ${ref.module}.${ref.fn} missing`);
+  return normalizeExport(await Promise.resolve((fn as (s: TrackerSong) => ExportOut | Promise<ExportOut>)(song)));
 }
 
 /** Invoke the LAYOUT_EXPORTERS serializer for a layout-keyed format. */

@@ -1,0 +1,293 @@
+{
+  "actionamics": {
+    "status": "skipped",
+    "file": "templates/actionamics.ast",
+    "reason": "descriptor already has newSong"
+  },
+  "monotone": {
+    "status": "written",
+    "file": "templates/monotone.mon",
+    "source": "src/lib/import/__tests__/fixtures/monotone/PRELUDE.MON",
+    "variant": "cleared-all-patterns",
+    "bytes": 12127
+  },
+  "activisionPro": {
+    "status": "written",
+    "file": "templates/activisionPro.avp",
+    "source": "public/data/songs/activision-pro/gettysburg.avp",
+    "variant": "trimmed-1-pattern",
+    "bytes": 50942
+  },
+  "adplug": {
+    "status": "skipped",
+    "file": "templates/adplug.rad",
+    "reason": "descriptor already has newSong"
+  },
+  "amosMusicBank": {
+    "status": "skipped",
+    "file": "templates/amosMusicBank.abk",
+    "reason": "descriptor already has newSong"
+  },
+  "benDaglish": {
+    "status": "skipped",
+    "file": "templates/benDaglish.bd",
+    "reason": "descriptor already has newSong"
+  },
+  "c67": {
+    "status": "skipped",
+    "file": "templates/c67.c67",
+    "reason": "descriptor already has newSong"
+  },
+  "chuckBiscuits": {
+    "status": "written",
+    "file": "templates/chuckBiscuits.cba",
+    "source": "blank song built by the generator (no committed fixture)",
+    "variant": "blank-song",
+    "bytes": 1660
+  },
+  "composer667": {
+    "status": "written",
+    "file": "templates/composer667.667",
+    "source": "public/data/songs/composer-667/speed fighter.667",
+    "variant": "trimmed-1-pattern",
+    "bytes": 376918
+  },
+  "davidWhittaker": {
+    "status": "skipped",
+    "file": "templates/davidWhittaker.dw",
+    "reason": "descriptor already has newSong"
+  },
+  "deltaMusic1": {
+    "status": "skipped",
+    "file": "templates/deltaMusic1.dm",
+    "reason": "descriptor already has newSong"
+  },
+  "deltaMusic2": {
+    "status": "skipped",
+    "file": "templates/deltaMusic2.dm2",
+    "reason": "descriptor already has newSong"
+  },
+  "digiBoosterPro": {
+    "status": "skipped",
+    "file": "templates/digiBoosterPro.dbm",
+    "reason": "descriptor already has newSong"
+  },
+  "digitalMugician": {
+    "status": "skipped",
+    "file": "templates/digitalMugician.dmu",
+    "reason": "descriptor already has newSong"
+  },
+  "digitalSymphony": {
+    "status": "skipped",
+    "file": "templates/digitalSymphony.dsym",
+    "reason": "descriptor already has newSong"
+  },
+  "digitalSonixChrome": {
+    "status": "skipped",
+    "file": "templates/digitalSonixChrome.dsc",
+    "reason": "descriptor already has newSong"
+  },
+  "dsm_dyn": {
+    "status": "skipped",
+    "file": "templates/dsm_dyn.dsm",
+    "reason": "descriptor already has newSong"
+  },
+  "earAche": {
+    "status": "skipped",
+    "file": "templates/earAche.ea",
+    "reason": "descriptor already has newSong"
+  },
+  "faceTheMusic": {
+    "status": "skipped",
+    "file": "templates/faceTheMusic.ftm",
+    "reason": "descriptor already has newSong"
+  },
+  "fredEditor": {
+    "status": "skipped",
+    "file": "templates/fredEditor.fred",
+    "reason": "descriptor already has newSong"
+  },
+  "futurePlayer": {
+    "status": "written",
+    "file": "templates/futurePlayer.fp",
+    "source": "public/data/songs/formats/hybris.fp",
+    "variant": "cleared-all-patterns",
+    "bytes": 22716
+  },
+  "gameMusicCreator": {
+    "status": "skipped",
+    "file": "templates/gameMusicCreator.gmc",
+    "reason": "descriptor already has newSong"
+  },
+  "hippelCoSo": {
+    "status": "skipped",
+    "file": "templates/hippelcoso.coso",
+    "reason": "descriptor already has newSong"
+  },
+  "jochenHippelST": {
+    "status": "written",
+    "file": "templates/jochenHippelST.hst",
+    "source": "public/data/songs/hippel-st/crown arabia.hst",
+    "variant": "cleared-all-patterns",
+    "bytes": 3444,
+    "name": "Jochen Hippel ST"
+  },
+  "iffSmus": {
+    "status": "skipped",
+    "file": "templates/iffSmus.smus",
+    "reason": "descriptor already has newSong"
+  },
+  "ims": {
+    "status": "written",
+    "file": "templates/ims.ims",
+    "source": "public/data/songs/images-music-system/chip5.ims",
+    "variant": "trimmed-1-pattern",
+    "bytes": 48532
+  },
+  "inStereo2": {
+    "status": "skipped",
+    "file": "templates/inStereo2.is20",
+    "reason": "descriptor already has newSong"
+  },
+  "kris": {
+    "status": "skipped",
+    "file": "templates/kris.kris",
+    "reason": "descriptor already has newSong"
+  },
+  "musicAssembler": {
+    "status": "written",
+    "file": "templates/musicAssembler.ma",
+    "source": "public/data/songs/music-assembler/thanatos.ma",
+    "variant": "cleared-all-patterns",
+    "bytes": 2864
+  },
+  "musicLine": {
+    "status": "skipped",
+    "file": "templates/musicLine.ml",
+    "reason": "descriptor already has newSong"
+  },
+  "nru": {
+    "status": "skipped",
+    "file": "templates/nru.nru",
+    "reason": "descriptor already has newSong"
+  },
+  "preTracker": {
+    "status": "skipped",
+    "reason": "store-dependent exporter"
+  },
+  "quadraComposer": {
+    "status": "skipped",
+    "file": "templates/quadraComposer.emod",
+    "reason": "descriptor already has newSong"
+  },
+  "robHubbard": {
+    "status": "written",
+    "file": "templates/robHubbard.rh",
+    "source": "public/data/songs/rob-hubbard/skateordie.rh",
+    "variant": "cleared-all-patterns",
+    "bytes": 271846
+  },
+  "sawteeth": {
+    "status": "skipped",
+    "file": "templates/sawteeth.st",
+    "reason": "descriptor already has newSong"
+  },
+  "scumm": {
+    "status": "skipped",
+    "file": "templates/scumm.scumm",
+    "reason": "descriptor already has newSong"
+  },
+  "sidmon1": {
+    "status": "skipped",
+    "file": "templates/sidmon1.sid1",
+    "reason": "descriptor already has newSong"
+  },
+  "sonicArranger": {
+    "status": "skipped",
+    "file": "templates/sonicArranger.sa",
+    "reason": "descriptor already has newSong"
+  },
+  "soundControl": {
+    "status": "written",
+    "file": "templates/soundControl.sc",
+    "source": "public/data/songs/soundcontrol/north sea inferno ongame1.sc",
+    "variant": "cleared-all-patterns",
+    "bytes": 64994
+  },
+  "soundFactory": {
+    "status": "skipped",
+    "file": "templates/soundFactory.psf",
+    "reason": "descriptor already has newSong"
+  },
+  "soundfx": {
+    "status": "skipped",
+    "file": "templates/soundfx.sfx",
+    "reason": "descriptor already has newSong"
+  },
+  "soundMaster": {
+    "status": "skipped",
+    "file": "templates/soundMaster.sm3",
+    "reason": "descriptor already has newSong"
+  },
+  "stp": {
+    "status": "skipped",
+    "file": "templates/stp.stp",
+    "reason": "descriptor already has newSong"
+  },
+  "sunTronic": {
+    "status": "written",
+    "file": "templates/sunTronic.src",
+    "source": "public/data/songs/formats/SUNTronicTunes/mule.src",
+    "variant": "cleared-all-patterns",
+    "bytes": 9108
+  },
+  "synthesis": {
+    "status": "skipped",
+    "file": "templates/synthesis.syn",
+    "reason": "descriptor already has newSong"
+  },
+  "tcbTracker": {
+    "status": "skipped",
+    "file": "templates/tcbTracker.tcb",
+    "reason": "descriptor already has newSong"
+  },
+  "tfmx": {
+    "status": "written",
+    "file": "templates/tfmx.rocknroll",
+    "source": "public/data/songs/formats/mdat.rocknroll",
+    "variant": "trimmed-1-pattern",
+    "bytes": 9344
+  },
+  "unic": {
+    "status": "written",
+    "file": "templates/unic.unic",
+    "source": "public/data/songs/formats/african dreams.unic",
+    "variant": "trimmed-1-pattern",
+    "bytes": 86350,
+    "name": "UNIC Tracker"
+  },
+  "xmf": {
+    "status": "written",
+    "file": "templates/xmf.xmf",
+    "source": "blank song built by the generator (no committed fixture)",
+    "variant": "blank-song",
+    "bytes": 5959
+  },
+  "zoundMonitor": {
+    "status": "skipped",
+    "file": "templates/zoundMonitor.sng",
+    "reason": "descriptor already has newSong"
+  },
+  "ansiMusic": {
+    "status": "skipped",
+    "file": "templates/ansimusic.ans",
+    "reason": "descriptor already has newSong"
+  },
+  "pumaTracker": {
+    "status": "written",
+    "file": "templates/pumatracker.puma",
+    "source": "public/data/songs/pumatracker/liquid kids - lv1a.puma",
+    "variant": "trimmed-1-pattern",
+    "bytes": 11482
+  }
+}

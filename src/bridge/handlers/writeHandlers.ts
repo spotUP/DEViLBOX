@@ -271,12 +271,36 @@ export function setLooping(params: Record<string, unknown>): Record<string, unkn
 }
 
 /**
- * new_song - start a blank song the way the New Song wizard's "Empty Song"
- * does. The open song stays in its own tab, so a test never builds inside it.
+ * new_song - start a blank song in a new tab, as the New Song wizard does.
+ * `format` (an editable format id) opens a blank song in that format;
+ * `preset` (a system preset id) applies that preset; neither gives an empty
+ * song. The open song stays in its own tab, so a test never builds inside it.
  */
-export async function newSong(): Promise<Record<string, unknown>> {
-  const { startNewSong } = await import('../../lib/song/startNewSong');
-  await startNewSong('empty', false, '');
+export async function newSong(params: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
+  const [{ startNewSong }, { listNewSongFormats }, { SYSTEM_PRESETS }] = await Promise.all([
+    import('../../lib/song/startNewSong'),
+    import('../../lib/formats/EditableFormatRegistry'),
+    import('../../constants/systemPresets'),
+  ]);
+  const format = typeof params.format === 'string' ? params.format : undefined;
+  const preset = typeof params.preset === 'string' ? params.preset : undefined;
+  if (format && preset) return { ok: false, error: 'Pass format or preset, not both' };
+  if (format) {
+    const formats = listNewSongFormats();
+    if (!formats.some((f) => f.formatId === format)) {
+      return { ok: false, error: `Unknown format "${format}"`, validFormats: formats.map((f) => f.formatId) };
+    }
+    await startNewSong({ kind: 'format', formatId: format });
+    return { ok: true, format };
+  }
+  if (preset) {
+    if (!SYSTEM_PRESETS.some((p) => p.id === preset)) {
+      return { ok: false, error: `Unknown preset "${preset}"`, validPresets: SYSTEM_PRESETS.map((p) => p.id) };
+    }
+    await startNewSong({ kind: 'preset', presetId: preset, loadInstruments: params.loadInstruments === true });
+    return { ok: true, preset };
+  }
+  await startNewSong({ kind: 'empty' });
   return { ok: true };
 }
 
