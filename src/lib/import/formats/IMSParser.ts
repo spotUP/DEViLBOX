@@ -31,6 +31,7 @@ import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/type
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeIMSCell } from '@/engine/uade/encoders/IMSEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { imsIndexToNote } from './IMSNotes';
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
 
@@ -127,21 +128,6 @@ export function isIMSFormat(buffer: ArrayBuffer): boolean {
 }
 
 // ── Note index → XM note ──────────────────────────────────────────────────────
-
-/**
- * Convert an IMS note index (0–47) to an XM note number.
- *   IMS note 0  → C-0 in the module = XM note 37 (C-3 in standard XM octave numbering)
- *   IMS note 47 → the highest note = XM note 84
- *   IMS note 63 → empty cell (XM note 0)
- *   Any other value is invalid.
- *
- * Returns -1 on invalid (caller should throw).
- */
-function imsNoteToXM(noteIdx: number): number {
-  if (noteIdx === 63) return 0;          // empty cell
-  if (noteIdx < 48)  return 13 + noteIdx; // valid note range
-  return -1;                              // invalid
-}
 
 // ── Main parser ───────────────────────────────────────────────────────────────
 
@@ -250,7 +236,7 @@ export async function parseIMSFile(
           );
         }
 
-        const xmNote = imsNoteToXM(noteIdx);
+        const xmNote = imsIndexToNote(noteIdx);
         if (xmNote === -1) {
           throw new Error(
             `IMSParser: invalid note index ${noteIdx} at pattern ${pIdx} row ${row} ch ${ch}`,
@@ -375,11 +361,7 @@ export async function parseIMSFile(
       const effTyp     = b1 & 0x0F;
       const eff        = b2;
 
-      // imsNoteToXM: 63=empty(0), 0-47 → 13+noteIdx
-      let note = 0;
-      if (noteIdx !== 63 && noteIdx < 48) {
-        note = 13 + noteIdx;
-      }
+      const note = Math.max(0, imsIndexToNote(noteIdx));
 
       return { note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
     },

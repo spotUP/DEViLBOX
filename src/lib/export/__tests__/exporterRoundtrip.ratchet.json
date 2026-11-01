@@ -205,8 +205,8 @@
       "tier": "pattern-data",
       "status": "pattern-match",
       "matchPct": 1,
-      "cells": 256,
-      "bytes": 48532
+      "cells": 1024,
+      "bytes": 50836
     },
     "inStereo1": {
       "exporter": "IS10 (InStereo1Exporter)",

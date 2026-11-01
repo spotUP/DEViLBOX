@@ -6,26 +6,14 @@
  *   b1 = [instrLo:4 | effTyp:4]
  *   b2 = effParam
  *
- * Note mapping (reverse of imsNoteToXM):
- *   XM note 0       → IMS noteIdx 63 (empty)
- *   XM note 37..84  → IMS noteIdx 0..47
- *   Other XM notes  → IMS noteIdx 63 (clamp to empty)
+ * Note mapping: noteToImsIndex (IMSNotes.ts), shared with IMSParser.
  *
  * This is the exact reverse of IMSParser's decode logic.
  */
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-
-/**
- * Convert XM note back to IMS note index.
- */
-function xmNoteToIMS(xmNote: number): number {
-  if (xmNote === 0) return 63; // empty cell
-  const imsIdx = xmNote - 37;
-  if (imsIdx >= 0 && imsIdx < 48) return imsIdx;
-  return 63; // out of range → empty
-}
+import { noteToImsIndex } from '@/lib/import/formats/IMSNotes';
 
 /**
  * Encode a TrackerCell to IMS binary format (3 bytes).
@@ -33,7 +21,7 @@ function xmNoteToIMS(xmNote: number): number {
 function encodeIMSCell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(3);
 
-  const noteIdx = xmNoteToIMS(cell.note ?? 0);
+  const noteIdx = noteToImsIndex(cell.note ?? 0);
   const instr = cell.instrument ?? 0;
   const effTyp = cell.effTyp ?? 0;
   const eff = cell.eff ?? 0;
