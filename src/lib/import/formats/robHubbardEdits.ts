@@ -6,11 +6,11 @@
  * that is (cellSources). An edited cell is a byte patch of that command, never a re-pack, so the
  * module keeps its length and every other byte:
  *   - note: the command's note byte, the table index whose period (scaled by the sample the voice
- *     plays it with) names the edited note; a note turned into a rest (and back) swaps the two
+ *     plays it with) names the edited note; a note turned into a rest (a removed note, or a note-off) and back swaps the two
  *     bytes of the same two-byte command: [duration, note] <-> [-126, duration];
  *   - instrument: the sample-change command in force in the note's block (its byte is index - 1).
  * A command is shared by every tick that replays its block, so the edit shows wherever the block
- * plays. Edits that need a longer block (a note on a blank row, a removed note) come back as
+ * plays. Edits that need a longer block (a note on a blank row) come back as
  * warnings, never as a half-edit. Release markers are display only and are not edits.
  */
 import type { Pattern } from '@/types';
@@ -39,16 +39,17 @@ function growBlocks(
   source: Uint8Array, grid: RhGridResult, adds: RhAdd[],
   noteByte: (n: number, sample: number) => number, warnings: string[],
 ): { data: Uint8Array; patched: number } {
-  // per voice, the command each row is inside of: the last note or rest command at or before it
-  const perChannel = (ch: number): Array<{ src: NonNullable<RhGridResult['cellSources'][number][number][number]>; row: number }> => {
-    const out: Array<{ src: NonNullable<RhGridResult['cellSources'][number][number][number]>; row: number }> = [];
-    grid.cellSources.forEach((pat, p) => pat[ch]?.forEach((s, r) => { if (s) out.push({ src: s, row: p * ROWS + r }); }));
+  // per voice, the command each row is inside of: the last note or rest command at or before it. Silent
+  // rests count (commandSources), so a row of a cleared song is inside the rest that fills it.
+  const perChannel = (ch: number): Array<{ src: NonNullable<RhGridResult['commandSources'][number][number][number]>; row: number }> => {
+    const out: Array<{ src: NonNullable<RhGridResult['commandSources'][number][number][number]>; row: number }> = [];
+    grid.commandSources.forEach((pat, p) => pat[ch]?.forEach((s, r) => { if (s) out.push({ src: s, row: p * ROWS + r }); }));
     return out;
   };
   const cover = new Map<string, { fp: number; cmd: number; add: Array<{ k: number; note: number; sample: number; ins: number }> }>();
   for (const a of adds) {
     const at = a.p * ROWS + a.row;
-    const before = perChannel(a.ch).filter((e) => e.row < at).pop();
+    const before = perChannel(a.ch).filter((e) => e.row <= at).pop();
     if (!before) { warnings.push(`${a.where}: no command of the module covers this row; not written`); continue; }
     const carrier = grid.blockRows[before.src.fp][before.src.cmd];
     const dur = carrier.period === REST ? (carrier.pan ?? 0) : (carrier.period ?? 0);
@@ -77,7 +78,9 @@ function growBlocks(
       const isRest = old[0] === REST;
       const total = isRest ? old[1] : old[0];
       const adding = g.add.sort((x, y) => x.k - y.k);
-      const seq: number[][] = [isRest ? [REST, adding[0].k] : [adding[0].k, old[1]]];
+      // the part of the split command before the first new note; none when the note starts on the command's row
+      // (only a silent rest gets here at k 0: a drawn command's row is a cell edit, not an add)
+      const seq: number[][] = adding[0].k === 0 ? [] : [isRest ? [REST, adding[0].k] : [adding[0].k, old[1]]];
       let inForce = adding[0].ins;
       adding.forEach((a, i) => {
         const len = (i + 1 < adding.length ? adding[i + 1].k : total) - a.k;
@@ -164,8 +167,11 @@ export function applyRhGridEdits(source: Uint8Array, edited: Pattern[], subsong 
         const isRest = carrier.period === REST;
         if (dNote) {
           const n = c.note ?? 0;
-          if (n < 1 || n > 97) warnings.push(`${where}: a removed note needs a shorter block; not written`);
-          else if (n === 97) {
+          if (n < 0 || n > 97) warnings.push(`${where}: note ${n} is out of range; not written`);
+          else if (n === 0) {
+            // a removed note keeps its duration as a rest: [duration, note] -> [REST, duration], the same two bytes
+            if (!isRest) { want(o, REST, `${where} removed note`); want(o + 1, carrier.period ?? 0, `${where} removed note`); }
+          } else if (n === 97) {
             if (!isRest) { want(o, REST, `${where} rest`); want(o + 1, carrier.period ?? 0, `${where} rest`); }
           } else {
             const sample = dIns ? Math.max(0, (c.instrument ?? 1) - 1) : src.sample;
@@ -178,7 +184,7 @@ export function applyRhGridEdits(source: Uint8Array, edited: Pattern[], subsong 
             } else want(o + 1, nb, `${where} note`);
           }
         }
-        if (dIns) {
+        if (dIns && (c.note ?? 0) !== 0) {
           const ins = c.instrument ?? 0;
           let sc = -1;
           for (let k = src.cmd - 1; k >= 0; k--) if (grid.blockRows[src.fp][k].period === SAMPLE_CHANGE) { sc = k; break; }

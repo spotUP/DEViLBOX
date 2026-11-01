@@ -54,7 +54,7 @@ import type { RobHubbardConfig, UADEChipRamInfo } from '@/types/instrument';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { DEFAULT_ROB_HUBBARD } from '@/types/instrument';
 import { robHubbardEncoder } from '@/engine/uade/encoders/RobHubbardEncoder';
-import { loadRhModule, rhCommandLength, walkRobHubbard, type RhWalk } from './rhWalk';
+import { loadRhModule, rhCommandLength, walkRobHubbard, RH_WALK, type RhWalk } from './rhWalk';
 import { chooseFileSubsong, fileSubsongFormatByKey, fileSubsongsField, type FileSubsongs } from '../fileSubsongs';
 import { buildRHGridFromWalk, type RHCellSource, type RhGrid } from './robHubbardGrid';
 
@@ -353,6 +353,8 @@ interface RHVariableResult {
   blockRows: TrackerCell[][];
   /** Per pattern, voice and row: the block command the cell shows (robHubbardEdits.ts writes edits to it); null where the cell is blank. */
   cellSources: RhGrid['cellSources'];
+  /** Per pattern, voice and row: the note or rest command starting there, drawn or not (see RhGrid). */
+  commandSources: RhGrid['commandSources'];
   /** Interrupts per grid row (the song's speed). */
   speed: number;
   /** The module tables the walk read (period table, sample scales, command set). */
@@ -399,8 +401,9 @@ function buildRHVariablePatterns(buf: Uint8Array, numChannels: number, tune = 0)
     const cmd = cmdAt[fp].get(off);
     return cmd === undefined ? null : { fp, cmd };
   });
-  const noteCount = grid.patterns.reduce((n, p) => n + p.channels.reduce((m, c) => m + c.rows.filter((r) => r.note > 0 && r.note < 97).length, 0), 0);
-  if (noteCount === 0) return { unmatched: 'the walk plays no note' };
+  // a song whose notes were all cleared plays only rests (no grid cell): the walk still matched
+  const played = walk.events.some((e) => e.kind === RH_WALK.note || e.kind === RH_WALK.rest);
+  if (!played) return { unmatched: 'the walk plays no note or rest' };
   if (grid.unnamedNotes > 0) return { unmatched: `${grid.unnamedNotes} notes the walk plays have a period no note names` };
 
   return {
@@ -410,6 +413,7 @@ function buildRHVariablePatterns(buf: Uint8Array, numChannels: number, tune = 0)
     trackMap: grid.blockAtStart.map((row) => row.map((addr) => (addr >= 0 ? (addrToFp.get(addr) ?? -1) : -1))),
     blockRows,
     cellSources: grid.cellSources,
+    commandSources: grid.commandSources,
     speed: walk.speed,
     walk,
   };
