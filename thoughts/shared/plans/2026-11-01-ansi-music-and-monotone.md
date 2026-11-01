@@ -1,7 +1,7 @@
 ---
 date: 2026-11-01
 topic: Import ANSI music (.ANS) and MONOTONE (.MON) PC-speaker songs
-status: Part A in progress (2026-11-01); Part B waits for D4 and D6 file location
+status: Part A in progress (2026-11-01); Part B waits for the dctelnet vector file and the invalid-char decision
 research:
   - thoughts/shared/research/2026-11-01-ansi-music.md
   - thoughts/shared/research/2026-11-01-ansi-music-spec-sources.md
@@ -26,8 +26,19 @@ research:
   CTerm: 0-71, N0 = C0) and dots (GW: cumulative, 1.5x per dot; CTerm: not
   cumulative). Gate confirmed in GW source: MN 7/8, MS 3/4, ML full, remainder
   is a rest. Semantics choice: see D5.
-- D4. ANSI tests: first fixture built from the real LOGO.ANS string in the
-  Terminate ANSMUSIC.DOC; search for whole real files continues. (Pending.)
+- D4. ANSI tests: 4 real files found (discmaster.textfiles.com), committed in
+  `src/lib/import/__tests__/fixtures/ansi-music/`:
+  - `MUSIC_pavt199.ANS` (61 B, ctrom5b PAVT199/MUSIC.ANS): 1 block, clean;
+    same tune as LOGO.ANS written with `<` `>`. First reachability fixture.
+  - `!ANSIMUS.ANS` (3375 B, PC World Interactive 1 1997, ansi.zip): 4 blocks, clean.
+  - `RELIGIOU.MUS` (7019 B, Wildcat Files 2, alotmusi.zip): 52 blocks; 10 hold
+    CR/LF inside the string (strings wrap lines) and one `"`. A CTerm-strict
+    parser voids them; an import that treats CR/LF as whitespace plays them.
+  - `ANSIPL20_INTRO.ANS` (16650 B, megacd_rom_1 MUSIC/ANSIPL20.ZIP): 23 blocks,
+    22 hold `;` (SMILE `MF freq;dur;cycles;delay;var` sound effects, D-SMILE
+    out of scope). Proves the void rule matters.
+  Open before B1 (owner): does an invalid char void the block on import, and
+  is CR/LF inside a string whitespace or invalid?
 - D5. ANSI semantics follow GW-BASIC (owner, 2026-11-01): N 0-84, N0 = rest,
   N1 = C in O0; dots cumulative (1.5x per dot). Pitch: GW-BASIC table with
   its integer round-up. 90s terminals copied BASIC PLAY.
@@ -37,8 +48,13 @@ research:
   event Hz (whole Hz after GW round-up), duration ms, gate ms, rest yes/no;
   optional `"void": true` for strings that must not play, with a per-host flag
   where vtcon (CTerm character set) and DEViLBOX (GW) differ. vtcon ledger row
-  ANSI-MUSIC-VECTORS waits for the file path. Open before B7: where the file
-  lives (both repos must read the same copy).
+  ANSI-MUSIC-VECTORS waits for the file path. DCTelnet (dctelnet-db, src/ansimusic.c)
+  joined 2026-11-01 and writes the vector file; DEViLBOX does not write a
+  second one. File location (owner, 2026-11-01):
+  DEViLBOX repo, `src/lib/import/__tests__/fixtures/ansi-music/vectors.json`;
+  vtcon, DCTelnet and AmiExpress read it from there. (First proposed
+  `test-data/ansi-music/`, but `test-data/` is gitignored, so the file would
+  never be committed and DEViLBOX tests could not read it in CI.)
 - D7. Part A starts now (owner, 2026-11-01), while the ANSI file search runs.
 
 ## Checklist
@@ -122,6 +138,14 @@ reference.
   top-level import entry with the fixture file, asserting note count, BPM 120
   and the first note's pitch (LOGO.ANS starts O3 C = 523.25 Hz).
 - B8. Live check via MCP: load_file the fixture, get_audio_level, stop.
+
+### Part C - ANSI music in the AmiExpress BBS (owner, 2026-11-01)
+
+- C1. After Part B lands: add ANSI music playback to the BBS project
+  /Users/spot/Code/AmiExpress/amiexpress-web (its own repo and rules; read its
+  CLAUDE.md / RULES.md first). Research where it renders ANSI (web client
+  terminal, `web/`, `packages/`) before planning. Same rules (D5) and the
+  shared golden vectors (D6). Not started; no files touched there yet.
 
 ## Automated verification
 

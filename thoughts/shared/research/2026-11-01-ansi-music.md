@@ -127,8 +127,9 @@ Terminate/SMILE ANSMUSIC.DOC. Full notes: session scratchpad
   portable, out of scope.
 - PC speaker as Telix/Qmodem playback device: not stated in fetched docs.
 
-Real fixtures: none found yet. 16colo.rs 1993-96 packs (~200 scanned) contain no
-music blocks. Real string from the Terminate doc (LOGO.ANS):
+Real fixtures: 4 found on discmaster.textfiles.com, now in
+`src/lib/import/__tests__/fixtures/ansi-music/` (details in plan D4).
+16colo.rs 1993-96 packs (~200 scanned) contain no music blocks. Real string from the Terminate doc (LOGO.ANS):
 `ESC[MB O3 T120 L2CO4CO3L6BGABO4L2CO3L2CL2AL1GL2CFL4EL6CDEL4FL3DL6O2BO3CDL4EL2C` 0x0E.
 Untried leads: discmaster.textfiles.com (megacd_rom_1 MUSIC/ANSIPL20.ZIP),
 demo files in ter61.zip.
