@@ -1174,7 +1174,9 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     // So dispatch note = midiNote - 12.
     this.engine.noteOn(chan, midiNote - 12, pt, _time);
 
-    // Track active note
+    // Track active note. The NOTE_ON replaced whatever the channel played, so drop that note's entry: a later
+    // release of the old note must not send a NOTE_OFF that cuts this one.
+    for (const [n, c] of this.activeNotes) if (c === chan) this.activeNotes.delete(n);
     this.activeNotes.set(midiNote, chan);
   }
 

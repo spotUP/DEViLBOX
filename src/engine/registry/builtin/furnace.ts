@@ -84,6 +84,7 @@ const dispatchChipDescs: SynthDescriptor[] = DISPATCH_CHIPS.map(id => ({
     return instrument;
   },
   onTriggerRelease: furnaceReleaseHook,
+  attackRestartsVoice: true,
 }));
 
 // ── Register all (unified under FurnaceDispatchSynth) ─────────────────────────

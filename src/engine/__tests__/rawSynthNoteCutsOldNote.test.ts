@@ -4,12 +4,17 @@
  * portamento (3xx, 5xx) keep the old note: the replayer only releases it, as before. A 303 slide neither cuts nor
  * releases.
  *
+ * Owner 2026-11-01: an ANSI music song on the PC speaker played only its first note. A Furnace chip restarts its voice
+ * on a lone NOTE_ON, and the chips latch keyOn/keyOff until the next tick, so the cut sent just before the new note
+ * won and silenced it. Furnace synths carry attackRestartsVoice and get neither a cut nor a release.
+ *
  * Drives TrackerReplayer.processHybridRow (the row entry point for synth channels) with a stub ToneEngine that records
  * which of triggerNoteCut / triggerNoteRelease ran.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TrackerReplayer } from '../TrackerReplayer';
 import type { TrackerCell } from '@/types';
+import '../registry/builtin/furnace';
 
 const engine = vi.hoisted(() => ({
   triggerNoteCut: vi.fn(), triggerNoteRelease: vi.fn(),
@@ -28,16 +33,17 @@ vi.mock('../ToneEngine', () => {
   const proxy = new Proxy(engine as Record<string, unknown>, { get: (t, k) => (k in t ? t[k as string] : () => undefined) });
   return { getToneEngine: () => proxy };
 });
+vi.mock('../furnace-dispatch', () => ({ FurnaceDispatchSynth: class {} }));
 vi.mock('@/stores/useNotificationStore', () => ({ notify: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() } }));
 
 interface HybridRow { processHybridRow(chIndex: number, ch: unknown, row: TrackerCell, time: number): void; triggerNote(): void; song: unknown }
 
-function playSecondNote(row: Partial<TrackerCell>, previousSlideFlag = false) {
+function playSecondNote(row: Partial<TrackerCell>, previousSlideFlag = false, synthType = 'WobbleBass') {
   const replayer = new TrackerReplayer() as unknown as HybridRow;
   replayer.song = {};
   replayer.triggerNote = vi.fn();
   const ch = {
-    instrument: { id: 1, synthType: 'WobbleBass' }, lastPlayedNoteName: 'D4', previousSlideFlag,
+    instrument: { id: 1, synthType }, lastPlayedNoteName: 'D4', previousSlideFlag,
     volume: 64, gainNode: { gain: { setValueAtTime() {} } },
   };
   replayer.processHybridRow(0, ch, { note: 56, instrument: 0, volume: 0, effTyp: 0, eff: 0, ...row } as TrackerCell, 1);
@@ -71,5 +77,12 @@ describe('a new synth note on a channel that is already playing', () => {
     playSecondNote({}, true);
     expect(engine.triggerNoteRelease).not.toHaveBeenCalled();
     expect(engine.triggerNoteCut).not.toHaveBeenCalled();
+  });
+
+  it('neither cuts nor releases on a Furnace chip, where the new note alone restarts the voice', () => {
+    const trigger = playSecondNote({}, false, 'FurnacePCSPKR');
+    expect(trigger, 'the new note was triggered').toHaveBeenCalledTimes(1);
+    expect(engine.triggerNoteCut).not.toHaveBeenCalled();
+    expect(engine.triggerNoteRelease).not.toHaveBeenCalled();
   });
 });
