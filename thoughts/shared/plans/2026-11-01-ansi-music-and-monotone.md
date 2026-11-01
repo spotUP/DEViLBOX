@@ -1,7 +1,7 @@
 ---
 date: 2026-11-01
 topic: Import ANSI music (.ANS) and MONOTONE (.MON) PC-speaker songs
-status: Part A A0-A9 done, A10-A11 open; Part B B1-B7 done, B8 open (2026-11-01)
+status: Part A A0-A11 done; Part B B1-B7 done, B8 open (live playback silent, root cause under investigation) (2026-11-01)
 research:
   - thoughts/shared/research/2026-11-01-ansi-music.md
   - thoughts/shared/research/2026-11-01-ansi-music-spec-sources.md
@@ -86,6 +86,16 @@ commit): real PRELUDE.MON and LOGO.ANS through parseModuleToSong, sentinel is a
 passthrough spy on parseMonotoneFile / parseAnsiMusicFile; both tests fail with
 their dispatch disabled; plain ART.ANS stays out. Deviation: the sentinel proves
 the parser ran, not the WASM player; the WASM run is proven live in A11.
+Progress: A10 done (monotonePitch.test.ts): the shipped Monotone.wasm renders
+PRELUDE row 0 headless with divisor 4554 and a measured square-wave period of
+262.0 Hz (1193182 / 4554 = 262.01). A11 done live in Chrome via MCP: load_file
+PRELUDE.MON gives engine MonotoneReplayer, 23 patterns; play gives rmsAvg 0.21,
+no console errors; stopped. Owner listening check still open.
+B8 open: ANSIPL20_INTRO.ANS loads (1 channel, FurnacePCSPKR instrument) and
+triggerNote fires for all 9 notes during playback, but the output is silent
+(rms 0 on replay; a first play gave only a blip, rmsMax 0.12). trigger_note on
+the same instrument outside playback is loud (rmsAvg 0.49). Root cause hunt
+findings: scratchpad ansi-silence-findings.md (to be copied here).
 Notes from A1: API prefix is `mt_`; output in `public/monotone/` (like
 `public/actionamics/`); PRELUDE first note 262 Hz, divisor 4554; unedited
 export byte-identical for all 3 fixtures; PITfreq 1193182 still unverified;
