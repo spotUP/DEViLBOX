@@ -68,4 +68,43 @@ describe('Rob Hubbard: a note on a blank row', { timeout: 60000 }, () => {
     edited[at.p].channels[at.ch].rows[at.row].note = 97;
     expect(applyRhGridEdits(bytes, edited).warnings.length).toBeGreaterThan(0);
   });
+
+  it('removing notes (every cell cleared) rewrites them as rests of the same length and the reloaded grid has no notes', () => {
+    const edited = structuredClone(grid.patterns);
+    let removed = 0;
+    for (const pat of edited) for (const ch of pat.channels) for (const cell of ch.rows) {
+      if ((cell.note ?? 0) > 0 && (cell.note ?? 0) < 97) { cell.note = 0; cell.instrument = 0; removed++; }
+    }
+    expect(removed, 'the song has notes to clear (sentinel)').toBeGreaterThan(0);
+    const r = applyRhGridEdits(bytes, edited);
+    expect(r.warnings, r.warnings.join(' ; ')).toEqual([]);
+    expect(r.data.length, 'a rest replaces a note byte for byte').toBe(bytes.length);
+    const back = buildRobHubbardGrid(r.data)!;
+    expect(back.patterns.length).toBe(grid.patterns.length);
+    for (const pat of back.patterns) for (const ch of pat.channels) for (const cell of ch.rows) {
+      expect((cell.note ?? 0) === 0 || cell.note === 97, `unexpected note ${cell.note}`).toBe(true);
+    }
+  });
+});
+
+describe('Rob Hubbard: a note typed into the New Song template', { timeout: 60000 }, () => {
+  // The template is a real song with every note cleared to a rest of the same length.
+  const bytes = new Uint8Array(readFileSync('public/templates/robHubbard.rh'));
+  const grid = buildRobHubbardGrid(bytes)!;
+
+  // row 0 is where the template's rests start (the new note replaces the rest), row 4 is inside one (it splits it)
+  it.each([0, 4])('is written on row %i of every voice and the reloaded grid shows it there', (row) => {
+    const edited = structuredClone(grid.patterns);
+    for (const ch of edited[0].channels) expect(ch.rows.every((c) => !c.note || c.note === 97), 'template has no notes').toBe(true);
+    const note = 37;
+    for (let ch = 0; ch < edited[0].channels.length; ch++) {
+      edited[0].channels[ch].rows[row] = { ...edited[0].channels[ch].rows[row], note, instrument: 1 };
+    }
+    const r = applyRhGridEdits(bytes, edited);
+    expect(r.warnings, r.warnings.join(' ; ')).toEqual([]);
+    const back = buildRobHubbardGrid(r.data)!;
+    for (let ch = 0; ch < back.patterns[0].channels.length; ch++) {
+      expect(back.patterns[0].channels[ch].rows[row].note, `voice ${ch}`).toBe(note);
+    }
+  });
 });

@@ -78,6 +78,12 @@ export interface RhGrid {
   rows: number;
   /** Per pattern, voice and row: the block command the cell shows; null where the cell is blank or a command has no note-on or note-off cell. */
   cellSources: Array<Array<Array<RHCellSource | null>>>;
+  /**
+   * Per pattern, voice and row: the note or rest command that starts on the row, drawn or not. A rest that
+   * stops no sounding voice draws no cell but still covers rows (a cleared song is only such rests), so a
+   * note typed on a blank row finds the command it splits here.
+   */
+  commandSources: Array<Array<Array<RHCellSource | null>>>;
   /** For each pattern and voice, the block playing on the pattern's first row (-1: none yet). */
   blockAtStart: number[][];
   /** Notes whose period names no tracker note (the grid would show nothing for a note the player plays). */
@@ -93,6 +99,7 @@ export function buildRHGridFromWalk(walk: RhWalk, locate: RhCommandLocator): RhG
   const rows = Math.max(1, Math.ceil(walk.ticks / speed));
   const grid: TrackerCell[][] = Array.from({ length: channels }, () => Array.from({ length: rows }, emptyCell));
   const src: Array<Array<RHCellSource | null>> = Array.from({ length: channels }, () => new Array<RHCellSource | null>(rows).fill(null));
+  const cmdSrc: Array<Array<RHCellSource | null>> = Array.from({ length: channels }, () => new Array<RHCellSource | null>(rows).fill(null));
   const slots: number[][] = Array.from({ length: channels }, () => new Array<number>(rows).fill(0));
   const blockAt: number[][] = Array.from({ length: channels }, () => new Array<number>(rows).fill(-1));
   const sounding = new Array<boolean>(channels).fill(false);
@@ -116,12 +123,14 @@ export function buildRHGridFromWalk(walk: RhWalk, locate: RhCommandLocator): RhG
         cell.note = n;
         cell.instrument = (e.a < 0 ? 0 : e.a) + 1;
         sounding[e.voice] = true;
-        if (at) src[e.voice][r] = { ...at, sample: e.a < 0 ? 0 : e.a };
+        if (at) src[e.voice][r] = cmdSrc[e.voice][r] = { ...at, sample: e.a < 0 ? 0 : e.a };
       } else if (e.kind === RH_WALK.rest) {
         // a rest is a note-off only where it stops a sounding voice
+        const restSrc = at ? { ...at, sample: e.sample < 0 ? 0 : e.sample } : null;
+        if (restSrc) cmdSrc[e.voice][r] = restSrc;
         if (sounding[e.voice]) {
           cell.note = 97;
-          if (at) src[e.voice][r] = { ...at, sample: e.sample < 0 ? 0 : e.sample };
+          if (restSrc) src[e.voice][r] = restSrc;
         }
         sounding[e.voice] = false;
       } else {
@@ -141,6 +150,7 @@ export function buildRHGridFromWalk(walk: RhWalk, locate: RhCommandLocator): RhG
   const patterns: Pattern[] = [];
   const songPositions: number[] = [];
   const cellSources: RhGrid['cellSources'] = [];
+  const commandSources: RhGrid['commandSources'] = [];
   const blockAtStart: number[][] = [];
   for (let start = 0, p = 0; start < rows; start += ROWS_PER_PATTERN, p++) {
     const len = Math.min(ROWS_PER_PATTERN, rows - start);
@@ -153,7 +163,8 @@ export function buildRHGridFromWalk(walk: RhWalk, locate: RhCommandLocator): RhG
     patterns.push({ id: `pattern-${p}`, name: `Pattern ${p}`, length: len, channels: chData });
     songPositions.push(p);
     cellSources.push(src.map((s) => s.slice(start, start + len)));
+    commandSources.push(cmdSrc.map((s) => s.slice(start, start + len)));
     blockAtStart.push(blockAt.map((b) => b[start]));
   }
-  return { patterns, songPositions, rows, cellSources, blockAtStart, unnamedNotes, overflowRows };
+  return { patterns, songPositions, rows, cellSources, commandSources, blockAtStart, unnamedNotes, overflowRows };
 }
