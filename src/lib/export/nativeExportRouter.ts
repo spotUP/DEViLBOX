@@ -285,6 +285,10 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
     // ANSI music: channel 0 written as one BASIC PLAY block (no original bytes needed).
     const { exportAnsiMusic } = await import('./AnsiMusicExporter');
     result = exportAnsiMusic(song);
+  } else if (format === 'SAW') {
+    // Sawteeth: the parser sets no chip-RAM layout, so LAYOUT_EXPORTERS (keyed by layout id) never reached it.
+    const { exportSawteeth } = await import('./SawteethExporter');
+    result = await exportSawteeth(song);
   } else if (format === 'AST' && song.actionamicsFileData) {
     // Actionamics: its module (with the grid's edits) is the export.
     const { exportActionamics } = await import('./ActionamicsExporter');
@@ -313,7 +317,8 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
   } else if (format === 'SIDMON2' || format === 'SidMon2' || layoutFormatId === 'sidMon2') {
     const { exportSidMon2File } = await import('./SidMon2Exporter');
     result = { data: await exportSidMon2File(song), filename: `${baseName}.sd2`, warnings: [] };
-  } else if (format === 'PumaTracker') {
+  } else if (format === 'PumaTracker' || layoutFormatId === 'pumaTracker') {
+    // PumaTrackerParser keeps format 'MOD'; its variable layout id names the format.
     const { exportPumaTrackerFile } = await import('./PumaTrackerExporter');
     result = { data: exportPumaTrackerFile(song), filename: `${baseName}.puma`, warnings: [] };
   } else if (format === 'OctaMED') {
