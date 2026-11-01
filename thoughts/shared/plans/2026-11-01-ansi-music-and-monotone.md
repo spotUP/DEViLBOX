@@ -1,7 +1,7 @@
 ---
 date: 2026-11-01
 topic: Import ANSI music (.ANS) and MONOTONE (.MON) PC-speaker songs
-status: Part A in progress (2026-11-01); Part B waits for the dctelnet vector file and the invalid-char decision
+status: Part A in progress (2026-11-01); Part B waits for the dctelnet vector file (void rule decided, D8)
 research:
   - thoughts/shared/research/2026-11-01-ansi-music.md
   - thoughts/shared/research/2026-11-01-ansi-music-spec-sources.md
@@ -21,7 +21,8 @@ research:
   PC speaker output only (Tandy/Adlib modes not in scope).
 - D3. ANSI pitch: checked against Microsoft's GW-BASIC source (GWSTS.ASM NOTTAB):
   same table as CTerm, A440 = O2 A, C0..C6 = 65.4..4186 Hz. No octave shift.
-  GW-BASIC rounds each divided frequency up to an integer (`ADC BX,0`).
+  GW-BASIC rounds each divided frequency half up (`ADC BX,0` adds the bit
+  shifted out): 1046.5 -> 1047, 3951 stays 3951.
   GW-BASIC vs CTerm still differ on N (GW: 0-84, N0 = rest, N1 = C in O0;
   CTerm: 0-71, N0 = C0) and dots (GW: cumulative, 1.5x per dot; CTerm: not
   cumulative). Gate confirmed in GW source: MN 7/8, MS 3/4, ML full, remainder
@@ -37,8 +38,12 @@ research:
   - `ANSIPL20_INTRO.ANS` (16650 B, megacd_rom_1 MUSIC/ANSIPL20.ZIP): 23 blocks,
     22 hold `;` (SMILE `MF freq;dur;cycles;delay;var` sound effects, D-SMILE
     out of scope). Proves the void rule matters.
-  Open before B1 (owner): does an invalid char void the block on import, and
-  is CR/LF inside a string whitespace or invalid?
+- D8. Void rule (owner, 2026-11-01): match vtcon. Inside a PLAY string, skip
+  CR, LF, `"` and any other byte outside the PLAY set, and keep playing; no
+  block is voided. SO (0x0E) ends the string; ESC, CAN and SUB end it early.
+  A string that contains `;` is a SMILE sound effect: it imports as no
+  subsong (zero notes), same as vtcon's zero-note expectation in the vectors.
+  All 10 wrapped RELIGIOU.MUS blocks import.
 - D5. ANSI semantics follow GW-BASIC (owner, 2026-11-01): N 0-84, N0 = rest,
   N1 = C in O0; dots cumulative (1.5x per dot). Pitch: GW-BASIC table with
   its integer round-up. 90s terminals copied BASIC PLAY.
@@ -120,9 +125,10 @@ title "" or the filename fallback.
   CSI M / CSI N / CSI | (accept all three on import: a file is not a live
   terminal, so the Delete Line clash only needs the CSI M disambiguation rule:
   first char in `BbFfLlSs` or `N/n` without digit = M-command, anything that
-  is a PLAY char = music, else not music). Allowed char set per cterm.txt;
-  an invalid char voids that block. Terminator 0x0E (also accept ESC or end of
-  line as SMILE does). SAUCE record gives title/author when present.
+  is a PLAY char = music, else not music). Bytes outside the PLAY set are
+  skipped, never void (D8); a `;` block is SMILE and yields no subsong.
+  Terminator 0x0E; ESC, CAN, SUB end the string early. SAUCE record gives
+  title/author when present.
 - B2. PLAY interpreter: A-G with stacked #/+/-, length digits, dots (1.5x,
   cumulative per D5), O 0-6 clamped, < >, N 0-84 with N0 = rest (D5),
   L 1-64, P, T 32-255 clamped, MN/ML/MS gate (7/8, 3/4, full; GW source),
@@ -139,7 +145,8 @@ title "" or the filename fallback.
   plain ANSI art does not open as an empty song. Do not touch `.asc` (ZX AY,
   formatRegistryData.ts:1999). Dispatch branch in ChipDumpParsers.ts:86-89.
 - B7. Tests: interpreter unit tests (lengths, dots, gate, tempo, octave clamp,
-  invalid-char void) on the LOGO.ANS string; reachability test through the
+  CR/LF skip on RELIGIOU, SMILE `;` block yields no subsong on ANSIPL20)
+  on the LOGO.ANS string; reachability test through the
   top-level import entry with the fixture file, asserting note count, BPM 120
   and the first note's pitch (LOGO.ANS starts O3 C = 523.25 Hz).
 - B8. Live check via MCP: load_file the fixture, get_audio_level, stop.
