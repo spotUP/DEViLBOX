@@ -66,4 +66,27 @@ describe('TFMX note edits', { timeout: 120000 }, () => {
     expect(back.patterns[at!.p].channels[at!.ch].rows[at!.row].note).toBe(above.note);
 
   });
+
+  it('a cleared note is written as the one-jiffy wait F3 00 and reads back as an empty cell', async () => {
+    const song = await parseTFMXFile(bytes.slice(0), 'mdat.hbtitle') as unknown as Parameters<typeof exportTFMX>[0];
+    (song as { tfmxFileData?: ArrayBuffer }).tfmxFileData = bytes.slice(0);
+    setGridBaseline(baselineOf(song.patterns));
+    const layout = song.uadePatternLayout!;
+    let at: { p: number; ch: number; row: number } | null = null;
+    outer: for (let p = 0; p < 4; p++) for (let ch = 0; ch < 4; ch++) {
+      const rows = song.patterns[p]?.channels[ch]?.rows ?? [];
+      for (let row = 1; row < rows.length; row++) {
+        const off = layout.getCellFileOffset!(p, row, ch);
+        if (off >= 0 && rows[row].note > 0 && rows[row].note < 97) { at = { p, ch, row }; break outer; }
+      }
+    }
+    expect(at, 'a note cell in the first patterns (sentinel)').not.toBeNull();
+    song.patterns[at!.p].channels[at!.ch].rows[at!.row] = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+    const out = new Uint8Array(await (await exportTFMX(song)).data.arrayBuffer());
+    const off = layout.getCellFileOffset!(at!.p, at!.row, at!.ch);
+    expect(Array.from(out.slice(off, off + 4)), 'cleared cell is F3 00 00 00').toEqual([0xf3, 0, 0, 0]);
+    const back = await parseTFMXFile(out.slice().buffer as ArrayBuffer, 'mdat.hbtitle');
+    const cell = back.patterns[at!.p].channels[at!.ch].rows[at!.row];
+    expect([cell.note, cell.instrument, cell.effTyp, cell.eff]).toEqual([0, 0, 0, 0]);
+  });
 });
