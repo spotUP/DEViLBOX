@@ -437,10 +437,7 @@
      "gate": 437.5,
      "rest": false
     }
-   ],
-   "hosts": {
-    "vtcon": "unconfirmed: does the command being read play?"
-   }
+   ]
   },
   {
    "name": "end-by-can",
@@ -454,10 +451,7 @@
      "gate": 437.5,
      "rest": false
     }
-   ],
-   "hosts": {
-    "vtcon": "unconfirmed"
-   }
+   ]
   },
   {
    "name": "logo-ans",
