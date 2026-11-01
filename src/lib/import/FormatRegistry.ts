@@ -10,6 +10,7 @@
 
 import { isGoatTrackerSong } from './formats/GoatTrackerDetect';
 import { isSunTronicV13Format } from './formats/SunTronicV13';
+import { hasMonotoneSignature } from './formats/monotoneGrid';
 import { FORMAT_REGISTRY, type FormatDefinition } from './formatRegistryData';
 import { firstSegment, getBasename } from './formatFilenameMatcher';
 
@@ -124,6 +125,11 @@ export function detectFormatFromContent(filename: string, bytes: Uint8Array): Fo
       // Amiga formats that share `.snd` have neither. Every SNDH collection
       // names its files `.snd`, and all of them went to UADE (2026-10-05).
       if (ascii(12, 'SNDH') || ascii(0, 'ICE!')) return byKey('sndh');
+      break;
+    case 'mon':
+      // MONOTONE (PC speaker tracker) starts with the Pascal string "MONOTONE";
+      // Maniacs of Noise has no magic and is the name-only answer for .mon.
+      if (hasMonotoneSignature(bytes)) return byKey('monotone');
       break;
     case 'pmd':
       // Studio Pixel PiyoPiyo starts 'PMD'; PC-98 PMD98 files start with a version byte.

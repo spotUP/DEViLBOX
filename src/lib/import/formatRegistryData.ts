@@ -691,18 +691,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
   {
-    key: 'monotone',
-    label: 'MONOTONE',
-    description: 'MONOTONE (PC speaker tracker) — native parser and own WASM player. Shares .mon with Maniacs of Noise: told apart by the MONOTONE header.',
-    family: 'amiga-native',
-    matchMode: 'extension',
-    extRegex: /\.mon$/i,
-    prefKey: 'monotone',
-    nativeParser: { module: '@lib/import/formats/MonotoneParser', parseFn: 'parseMonotoneFile', detectFn: 'isMonotoneFormat' },
-    uadeFallback: true,
-    customDispatch: true, // Content check first, then the Maniacs of Noise (.mon) dispatch
-  },
-  {
     key: 'activisionPro',
     label: 'Activision Pro',
     description: 'Activision Pro — native parser or UADE',
@@ -1656,6 +1644,18 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     nativeParser: { module: '@lib/import/formats/ManiacsOfNoiseParser', parseFn: 'parseManiacsOfNoiseFile', detectFn: 'isManiacsOfNoiseFormat' },
     uadeFallback: true,
     customDispatch: true, // Must exclude mon_old.* (handled by jeroenTel)
+  },
+  {
+    key: 'monotone',
+    label: 'MONOTONE',
+    description: 'MONOTONE (PC speaker tracker) — native parser and own WASM player. Shares .mon with Maniacs of Noise, which owns the name-only answer (this entry sits after it); detectFormatFromContent and the import dispatch pick MONOTONE by its header.',
+    family: 'amiga-native',
+    matchMode: 'extension',
+    extRegex: /\.mon$/i,
+    prefKey: 'monotone',
+    nativeParser: { module: '@lib/import/formats/MonotoneParser', parseFn: 'parseMonotoneFile', detectFn: 'isMonotoneFormat' },
+    uadeFallback: true,
+    customDispatch: true, // Content check first, then the Maniacs of Noise (.mon) dispatch
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
