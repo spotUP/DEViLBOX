@@ -80,4 +80,29 @@ describe('SunTronic recompile on length change', () => {
     expect(Array.from(new Uint8Array(res.data)))
       .toEqual(Array.from(new Uint8Array(song.uadeEditableFileData!)));
   });
+
+  it('grid-driven export: notes cleared in song.patterns (no provenance) reach the bytes', () => {
+    const song = parseSunTronicFile(readFixture('ready'), 'ready');
+    const notes = (patterns: typeof song.patterns): number =>
+      patterns.reduce((n, p) => n + p.channels.reduce((m, ch) => m + ch.rows.filter((c) => c.note > 0).length, 0), 0);
+    const effects = (patterns: typeof song.patterns): number =>
+      patterns.reduce((n, p) => n + p.channels.reduce((m, ch) => m + ch.rows.filter((c) => c.effTyp > 0 || c.eff > 0).length, 0), 0);
+    const before = notes(song.patterns);
+    expect(before).toBeGreaterThan(0);
+    expect(effects(song.patterns)).toBeGreaterThan(0);
+    // The grid alone changes: blank every note on cells that lost their provenance (as a cleared template does).
+    const cleared = {
+      ...song,
+      patterns: song.patterns.map((p) => ({
+        ...p,
+        channels: p.channels.map((ch) => ({ ...ch, rows: ch.rows.map((c) => ({ ...c, note: 0, instrument: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, sunBlockIndex: undefined, sunRowInBlock: undefined, sunPosition: undefined })) })),
+      })),
+    };
+    const res = exportAsSunTronic(cleared);
+    const reparsed = parseSunTronicFile(res.data.buffer.slice(res.data.byteOffset, res.data.byteOffset + res.data.byteLength) as ArrayBuffer, 'ready');
+    expect(notes(reparsed.patterns)).toBe(0);
+    expect(effects(reparsed.patterns)).toBe(0);
+    // the song's own pool was not mutated by the export
+    expect(notes(song.patterns)).toBe(before);
+  });
 });

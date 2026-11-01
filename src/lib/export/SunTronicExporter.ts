@@ -44,6 +44,9 @@ import {
   writeHunks,
   parseSunTronicV13Score,
 } from '@/lib/import/formats/SunTronicV13';
+import { parseSunTronicFile } from '@/lib/import/formats/SunTronicParser';
+import { applySunNoteEdit } from '@/lib/import/formats/sunReproject';
+import type { SunTronicNativeData } from '@/lib/import/formats/sunNativeData';
 
 // ── Small binary helpers ─────────────────────────────────────────────────────
 
@@ -330,6 +333,60 @@ function recompileWithLengthChange(
   return out;
 }
 
+/**
+ * Grid-driven authoring: write the grid's note edits into the shared block pool.
+ *
+ * The pool (`sunTronicNative.blocks`) is what the encoder re-emits, so a grid that
+ * was changed without going through the editor's cell handlers (a cleared template,
+ * a pasted pattern, a script) never reached the bytes. The grid as parsed from the
+ * original file is rebuilt (it carries the block/row/position provenance a blanked
+ * grid has lost), and every note of `song.patterns` that differs from it is applied
+ * to the pool with applySunNoteEdit (idempotent for edits the editor already made). Patterns are
+ * matched by id. Unedited grids differ nowhere, so the export stays byte-exact.
+ *
+ * Returns a private copy of the pool (the song's own is not mutated), or
+ * undefined when the song carries no pool to compare against.
+ */
+const SUN_COLUMN_FIELDS = [
+  'instrument', 'effTyp', 'eff', 'effTyp2', 'eff2', 'effTyp3', 'eff3', 'effTyp4', 'eff4', 'effTyp5', 'eff5',
+] as const;
+
+function poolWithGridEdits(song: TrackerSong, original: Uint8Array): SunTronicNativeData | undefined {
+  const live = song.sunTronicNative;
+  if (!live) return undefined;
+  const native = structuredClone(live);
+  const ab = original.buffer.slice(original.byteOffset, original.byteOffset + original.byteLength) as ArrayBuffer;
+  const baseline = parseSunTronicFile(ab, song.name || 'song');
+  const edited = new Map(song.patterns.map((p) => [p.id, p]));
+  for (const bp of baseline.patterns) {
+    const ep = edited.get(bp.id);
+    if (!ep) continue;
+    for (let ch = 0; ch < Math.min(4, bp.channels.length, ep.channels.length); ch++) {
+      const brows = bp.channels[ch].rows;
+      const erows = ep.channels[ch].rows;
+      for (let r = 0; r < Math.min(brows.length, erows.length); r++) {
+        const b = brows[r];
+        const bi = b.sunBlockIndex, ri = b.sunRowInBlock, pos = b.sunPosition;
+        if (bi === undefined || bi < 0 || ri === undefined || pos === undefined) continue;
+        const e = erows[r];
+        if ((e.note ?? 0) !== b.note) applySunNoteEdit(native, bi, ri, ch, e.note ?? 0, pos);
+        // Instrument and effect columns carry no transpose: copy the edited fields onto the pool cell
+        // and drop its carrier so the encoder re-emits the group from them.
+        const poolCell = native.blocks[bi]?.[ri];
+        if (!poolCell) continue;
+        let touched = false;
+        for (const f of SUN_COLUMN_FIELDS) {
+          if ((e[f] ?? 0) === (b[f] ?? 0)) continue;
+          poolCell[f] = e[f] ?? 0;
+          touched = true;
+        }
+        if (touched) poolCell.sunRaw = undefined;
+      }
+    }
+  }
+  return native;
+}
+
 // ── Public entry point ─────────────────────────────────────────────────────────
 
 /**
@@ -358,9 +415,10 @@ export function exportAsSunTronic(song: TrackerSong): NativeExportResult {
   // are kept in sync (the editor writes both); we drive off `blockRows` because that
   // is what the encoder consumes and the pool-index order matches `score.blocks`.
   const encodedBlocks: Uint8Array[] = [];
+  const pool = poolWithGridEdits(song, orig);
   for (let fp = 0; fp < layout.numFilePatterns; fp++) {
     // The live pool the editor mutates (a grid edit lands there), else the layout's parse-time carriers.
-    const rows = song.sunTronicNative?.blocks[fp] ?? layout.blockRows[fp];
+    const rows = pool?.blocks[fp] ?? layout.blockRows[fp];
     const raw = layout.blockRawBytes[fp];
     // sunTronicV13Encoder is a pure carrier re-emitter and ignores the channel
     // argument (blocks are per-(position,voice) streams, not per-channel grids).
