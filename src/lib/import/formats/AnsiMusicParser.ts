@@ -115,6 +115,9 @@ export function parseAnsiMusicFile(buffer: ArrayBuffer, filename = 'song', subso
   };
   let row = 0;
   let tempo = initialTempo;
+  // A note-off ends a sounding note; silence before the first note or after a
+  // note-off needs no cell (a run of rests is one silence, not many note-offs).
+  let sounding = false;
   for (const e of events) {
     if (e.tempo !== tempo) {
       const raw = (e.tempo * speed * r) / 96;
@@ -124,11 +127,14 @@ export function parseAnsiMusicFile(buffer: ArrayBuffer, filename = 'song', subso
     const len = Math.max(1, Math.round(e.whole * r));
     if (e.rest) {
       const prev = cells.get(row);
-      if (!prev || prev.note === undefined) put(row, { note: NOTE_OFF });
+      if (sounding && (!prev || prev.note === undefined)) put(row, { note: NOTE_OFF });
+      sounding = false;
     } else {
       put(row, { note: e.semi + 1, instrument: 1 });
       const gateRows = Math.round(e.whole * r * (e.ms > 0 ? e.gate / e.ms : 1));
-      if (gateRows > 0 && gateRows < len) put(row + gateRows, { note: NOTE_OFF });
+      const gated = gateRows > 0 && gateRows < len;
+      if (gated) put(row + gateRows, { note: NOTE_OFF });
+      sounding = !gated;
     }
     row += len;
   }

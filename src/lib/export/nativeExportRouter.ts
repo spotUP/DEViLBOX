@@ -281,6 +281,10 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
     // MONOTONE: its module (with the grid's edits) is the export.
     const { exportMonotone } = await import('./MonotoneExporter');
     result = await exportMonotone(song);
+  } else if (format === 'AnsiMusic') {
+    // ANSI music: channel 0 written as one BASIC PLAY block (no original bytes needed).
+    const { exportAnsiMusic } = await import('./AnsiMusicExporter');
+    result = exportAnsiMusic(song);
   } else if (format === 'AST' && song.actionamicsFileData) {
     // Actionamics: its module (with the grid's edits) is the export.
     const { exportActionamics } = await import('./ActionamicsExporter');

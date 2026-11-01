@@ -56,4 +56,16 @@ describe('AnsiMusicParser on real fixtures', () => {
     expect(isAnsiMusicFormat(art.buffer as ArrayBuffer)).toBe(false);
     expect(await tryChipDumpParse(art.buffer as ArrayBuffer, 'art.ans', 'art.ans')).toBeNull();
   });
+
+  it('a run of rests is silence, not a note-off per rest', () => {
+    // ESC [ M F T120 ML P1 P1 C1 P1 P1 SO: only the rest that ends the C gets a note-off.
+    const text = '\x1b[MFT120MLP1P1C1P1P1\x0e';
+    const bytes = Uint8Array.from(Array.from(text, (ch) => ch.charCodeAt(0)));
+    const song = parseAnsiMusicFile(bytes.buffer as ArrayBuffer, 'rests.ans');
+    const notes: number[] = [];
+    for (let pos = 0; pos < song.songLength; pos++) {
+      for (const c of song.patterns[song.songPositions[pos]].channels[0].rows) if (c.note) notes.push(c.note);
+    }
+    expect(notes).toEqual([49, 97]);
+  });
 });
