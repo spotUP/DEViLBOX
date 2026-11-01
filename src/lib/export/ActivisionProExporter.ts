@@ -15,7 +15,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
-import { applyActivisionProGridEdits, type AvpGridEdit, AVP_ROWS_PER_PATTERN } from '@lib/import/formats/activisionProGrid';
+import { applyActivisionProGridEdits, avpGridNeedsRewrite, avpGridRowSpan, decodeAndWalk, rewriteActivisionProFromGrid, type AvpGridEdit, AVP_ROWS_PER_PATTERN } from '@lib/import/formats/activisionProGrid';
 
 export async function exportActivisionPro(
   song: TrackerSong,
@@ -26,11 +26,24 @@ export async function exportActivisionPro(
   song.patterns.forEach((pattern, p) => pattern.channels.forEach((channel, ch) => channel.rows.forEach((cell, row) => {
     if (row < AVP_ROWS_PER_PATTERN) edits.push({ pattern: p, row, channel: ch, cell });
   })));
-  const data = applyActivisionProGridEdits(new Uint8Array(src), edits);
+  const rowCount = song.patterns.length * AVP_ROWS_PER_PATTERN;
+  const cellAt = (voice: number, row: number) => song.patterns[Math.floor(row / AVP_ROWS_PER_PATTERN)]?.channels[voice]?.rows[row % AVP_ROWS_PER_PATTERN];
+  const walked = decodeAndWalk(new Uint8Array(src));
+  const warnings: string[] = [];
+  let data: Uint8Array;
+  const span = walked ? avpGridRowSpan(walked, cellAt, rowCount) : 0;
+  if (walked && avpGridNeedsRewrite(walked, cellAt, span)) {
+    // The grid starts or ends events the tracks do not hold: re-encode the tracks from it.
+    try {
+      data = rewriteActivisionProFromGrid(new Uint8Array(src), cellAt, span);
+    } catch (err) {
+      throw new Error(`Activision Pro export: ${(err as Error).message}`);
+    }
+  } else data = applyActivisionProGridEdits(new Uint8Array(src), edits);
   const base = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
   return {
     data: new Blob([data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer], { type: 'application/octet-stream' }),
     filename: `${base}.avp`,
-    warnings: [],
+    warnings,
   };
 }

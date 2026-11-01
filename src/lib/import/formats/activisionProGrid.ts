@@ -24,6 +24,7 @@ import {
   decodeActivisionProModule, encodeActivisionProModule, encodeAvpEvent,
   type ActivisionProModule, type AvpEvent, type AvpOp, type AvpOpKind,
 } from './ActivisionProModule';
+import type { AvpTrack } from './ActivisionProModule';
 import { AVP_FX_BASE, AVP_FX_MAX, AVP_FX_MIN } from './activisionProEffectGlyphs';
 
 /** The table the replayer reads (avp_periods): index = note + transposes. */
@@ -87,6 +88,8 @@ const emptyCell = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTy
 const s8 = (v: number): number => (v < 128 ? v : v - 256);
 
 interface Voice {
+  /** Whether the voice has started a sample yet: a held-sample event before that plays nothing. */
+  started: boolean;
   list: Uint8Array;
   pos: number;
   loopOn: boolean;
@@ -170,7 +173,7 @@ export function walkActivisionPro(m: ActivisionProModule, subsong = 0, maxSteps 
   const voices: Voice[] = song.positionLists.map((list) => {
     const v: Voice = {
       list, pos: -1, loopOn: false, loopCount: 0, loopStart: 0, trackNumber: 0, loopTrack: 0, eventIndex: 0,
-      counter: 1, instrument: version >= 3 ? 0 : -1, transpose: 0, done: false,
+      counter: 1, instrument: version >= 3 ? 0 : -1, transpose: 0, done: false, started: false,
     };
     nextPosition(v);
     return v;
@@ -208,6 +211,8 @@ export function walkActivisionPro(m: ActivisionProModule, subsong = 0, maxSteps 
       const heldBefore = v.instrument;
       if (setInstrument >= 0 && setInstrument !== v.instrument) { v.instrument = setInstrument; hold = false; }
       const retrigger = !hold;
+      const silent = hold && !v.started && !event.ops.some((o) => o.kind === 'mute');
+      if (retrigger) v.started = true;
       let instIdx = v.instrument < 0 ? 0 : v.instrument;
       if (instIdx >= m.instruments.length) instIdx = 0;
       if (retrigger) v.transpose = m.instruments[instIdx]?.transpose ?? 0;
@@ -220,10 +225,13 @@ export function walkActivisionPro(m: ActivisionProModule, subsong = 0, maxSteps 
       const noteName = isMute ? 97 : periodToNote(period);
       const cell = avpEventCell(version, event, noteName);
       // Version 1/2 instruments are named by the event; a held instrument is not repeated.
-      walk.starts[vi][step] = {
-        voice: vi, track: v.trackNumber, eventIndex: v.eventIndex, event, step, index, period, added,
-        instrument: instIdx, heldBefore, retrigger, cell,
-      };
+      // A held-sample event before any sample started plays nothing: the step stays a rest.
+      if (!silent) {
+        walk.starts[vi][step] = {
+          voice: vi, track: v.trackNumber, eventIndex: v.eventIndex, event, step, index, period, added,
+          instrument: instIdx, heldBefore, retrigger, cell,
+        };
+      }
 
       v.counter = event.duration === 0 ? 256 : event.duration;
       if (v.eventIndex + 1 >= track.events.length) {
@@ -296,7 +304,7 @@ function indexForNote(note: number, current: number): number {
 }
 
 /** The event a cell turns `at.event` into, or null when the module cannot express the cell there. */
-export function cellToAvpEvent(version: number, at: AvpEventStart, cell: TrackerCell): AvpEvent | null {
+export function cellToAvpEvent(version: number, at: AvpEventStart, cell: TrackerCell, inPlace = true): AvpEvent | null {
   const e = at.event;
   if (!cell.note || cell.note === 97) return null;
   const index = indexForNote(cell.note, at.index);
@@ -333,7 +341,7 @@ export function cellToAvpEvent(version: number, at: AvpEventStart, cell: Tracker
   }
   const next: AvpEvent = { ...e, ops, note, holdSample };
   const enc = encodeAvpEvent(version, next);
-  if (!enc || enc.length !== e.bytes.length) return null;   // tracks are written in place
+  if (!enc || (inPlace && enc.length !== e.bytes.length)) return null;   // in place: the track keeps its size
   return next;
 }
 
@@ -359,4 +367,125 @@ export function applyActivisionProGridEdits(bytes: Uint8Array, edits: readonly A
     changed = true;
   }
   return changed ? encodeActivisionProModule(m) : bytes;
+}
+
+/** Whether the grid starts or ends events the module's tracks do not: a note on a row inside an event, or an event's row emptied. */
+export function avpGridNeedsRewrite(walk: AvpWalk, rows: (voice: number, row: number) => TrackerCell | undefined, rowCount = walk.rows): boolean {
+  for (let v = 0; v < 4; v++) {
+    for (let r = 0; r < Math.max(walk.rows, rowCount); r++) {
+      const cell = rows(v, r);
+      if (!cell) continue;
+      if (Boolean(walk.starts[v][r]) !== (cell.note !== 0)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Rows the grid spans: the walked song length, extended to the last row carrying a note so notes typed past the end
+ * of a short (or empty) song are kept. At most `rowCount`.
+ */
+export function avpGridRowSpan(walk: AvpWalk, rows: (voice: number, row: number) => TrackerCell | undefined, rowCount: number): number {
+  let span = Math.min(rowCount, walk.rows);
+  for (let v = 0; v < 4; v++) for (let r = rowCount - 1; r >= span; r--) if ((rows(v, r)?.note ?? 0) !== 0) { span = r + 1; break; }
+  return span;
+}
+
+/** Split an event that lasts `span` steps into events the version can encode, the continuations keeping the sample playing. */
+function splitEvent(version: number, base: AvpEvent, span: number): AvpEvent[] {
+  const out: AvpEvent[] = [];
+  let left = span;
+  let first = true;
+  while (left > 0) {
+    let d = Math.min(left, 256);
+    const make = (dur: number): AvpEvent => {
+      const e: AvpEvent = { ...base, duration: dur === 256 ? 0 : dur, bytes: [] };
+      if (!first) {
+        if (version <= 3) e.holdSample = true;
+        else if (!e.ops.some((o) => o.kind === 'noRetrigger')) e.ops = [...e.ops.filter((o) => o.kind !== 'instrument'), { kind: 'noRetrigger', value: 0, code: 0 }];
+        else e.ops = e.ops.filter((o) => o.kind !== 'instrument');
+      }
+      return e;
+    };
+    while (d > 1 && !encodeAvpEvent(version, make(d))) d--;
+    const e = make(d);
+    if (!encodeAvpEvent(version, e)) throw new RangeError('event cannot be encoded in this track version');
+    out.push(e);
+    left -= d;
+    first = false;
+  }
+  return out;
+}
+
+/**
+ * The module re-encoded from the grid: each voice becomes one new track holding an event per note-bearing row, lasting until the
+ * next one, and a position list that plays it once and wraps. The old tracks are dropped and the new ones packed into the track
+ * region (encodeActivisionProModule), which grows when they need more room. An all-empty grid ends the song at once. A rest
+ * before a voice's first note, and a voice with no note beside voices that have some, are silent steps: versions 4 and 5 write
+ * a mute event, versions 1 to 3 (which have no mute) an event that keeps the playing sample while none has started, which the
+ * player leaves silent (walkActivisionPro shows it as an empty step).
+ */
+export function rewriteActivisionProFromGrid(
+  bytes: Uint8Array,
+  rows: (voice: number, row: number) => TrackerCell | undefined,
+  rowCount: number,
+  subsong = 0,
+): Uint8Array {
+  const m = decodeActivisionProModule(bytes);
+  if (!m) return bytes;
+  const version = m.info.parseTrackVersion;
+  const walk = walkActivisionPro(m, subsong);
+  const song = m.subsongs[subsong];
+  if (!song) return bytes;
+  const tracks: AvpTrack[] = [];
+  const noteRows: number[][] = [0, 1, 2, 3].map((v) => {
+    const r: number[] = [];
+    for (let row = 0; row < rowCount; row++) if ((rows(v, row)?.note ?? 0) !== 0) r.push(row);
+    return r;
+  });
+  const anyNotes = noteRows.some((r) => r.length > 0);
+  for (let v = 0; v < 4; v++) {
+    if (!anyNotes) { song.positionLists[v] = new Uint8Array([0xfe, 0]); continue; }
+    const events: AvpEvent[] = [];
+    const silence: AvpEvent = version >= 4
+      ? { ops: [{ kind: 'mute', value: 0, code: 0 }], note: -1, holdSample: false, duration: 0, bytes: [] }
+      : { ops: [], note: 0, holdSample: true, duration: 0, bytes: [] };
+    if (noteRows[v].length === 0) {
+      events.push(...splitEvent(version, silence, rowCount));
+      tracks.push({ fileOffset: 0, events });
+      song.positionLists[v] = new Uint8Array([1, v, 0xff, 0]);
+      continue;
+    }
+    if (noteRows[v][0] > 0) events.push(...splitEvent(version, silence, noteRows[v][0]));
+    let prev: AvpEventStart | null = null;
+    for (let k = 0; k < noteRows[v].length; k++) {
+      const row = noteRows[v][k];
+      const cell = rows(v, row)!;
+      const found: AvpEventStart | null = walk.starts[v][row] ?? prev ?? walk.starts[v].find((s) => s) ?? null;
+      // A module with no event on this voice (the blank template): a plain event the cell's columns then fill in.
+      const inst = Math.max(0, (cell.instrument || 1) - 1);
+      const blank: AvpEventStart = {
+        voice: v, track: 0, eventIndex: 0, step: row, index: 0, period: 0, added: m.instruments[inst]?.transpose ?? 0, instrument: inst,
+        heldBefore: -1, retrigger: true, cell, event: { ops: [], note: 0, holdSample: false, duration: 0, bytes: [] },
+      };
+      const origin: AvpEventStart = found ?? blank;
+      let event: AvpEvent;
+      if (cell.note === 97) event = { ops: [{ kind: 'mute', value: 0, code: 0 }], note: -1, holdSample: false, duration: 0, bytes: [] };
+      else event = cellToAvpEvent(version, origin, cell, false) ?? origin.event;
+      const end = k + 1 < noteRows[v].length ? noteRows[v][k + 1] : rowCount;
+      events.push(...splitEvent(version, event, end - row));
+      prev = walk.starts[v][row] ?? origin;
+    }
+    tracks.push({ fileOffset: 0, events });
+    song.positionLists[v] = new Uint8Array([1, v, 0xff, 0]);
+  }
+  m.tracks = m.tracks.map((_, i) => tracks[i] ?? null);
+  if (m.tracks.length < tracks.length) throw new RangeError('the module has fewer track slots than voices');
+  return encodeActivisionProModule(m);
+}
+
+/** The module decoded and walked from sub-song `subsong`, or null when `bytes` is no Activision Pro module. */
+export function decodeAndWalk(bytes: Uint8Array, subsong = 0): AvpWalk | null {
+  const m = decodeActivisionProModule(bytes);
+  return m ? walkActivisionPro(m, subsong) : null;
 }
