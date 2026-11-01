@@ -195,6 +195,11 @@ function isValidPatternCell(v: DataView, off: number, lastSample: number): boole
 
 // ── Format detection ──────────────────────────────────────────────────────────
 
+/** Whether the file name claims the format: `unic.*` or `*.unic`. */
+function hasUNICName(filename?: string): boolean {
+  return filename !== undefined && /(^|[/\\])unic\.[^/\\]*$|\.unic$/i.test(filename);
+}
+
 /**
  * Returns true if the buffer passes all UNIC Tracker v1 structural checks.
  *
@@ -209,7 +214,10 @@ function isValidPatternCell(v: DataView, off: number, lastSample: number): boole
  * Additionally (matching OpenMPT's ReadUNIC post-parse check):
  *  7. numNotes ≥ 16 and at least one instrument used across the first pattern
  */
-export function isUNICFormat(buffer: ArrayBuffer): boolean {
+export function isUNICFormat(buffer: ArrayBuffer, filename?: string): boolean {
+  // A file named .unic (or unic.*) is claimed by the format on its name; the note/instrument heuristic below exists only to tell
+  // an unnamed MOD-like file from UNIC, so it is skipped for a named file (a New Song template has no notes at all).
+  const named = hasUNICName(filename);
   // Minimum: full header + first pattern
   if (buffer.byteLength < HEADER_SIZE + BYTES_PER_PATTERN) return false;
 
@@ -278,7 +286,7 @@ export function isUNICFormat(buffer: ArrayBuffer): boolean {
   }
 
   // ── 7. Note / instrument sanity ────────────────────────────────────────────
-  if (numNotes < 16 || allInstrs === 0) return false;
+  if (!named && (numNotes < 16 || allInstrs === 0)) return false;
 
   // ── 8. Buffer large enough for all patterns + sample data ─────────────────
   const patternDataSize = numPatterns * BYTES_PER_PATTERN;
@@ -298,7 +306,7 @@ export async function parseUNICFile(
   buffer: ArrayBuffer,
   filename: string,
 ): Promise<TrackerSong> {
-  if (!isUNICFormat(buffer)) {
+  if (!isUNICFormat(buffer, filename)) {
     throw new Error('UNICParser: file does not pass UNIC format validation');
   }
 
@@ -451,7 +459,7 @@ export async function parseUNICFile(
   }
 
   // Post-parse sanity check (matches OpenMPT's numNotes/allInstrs check)
-  if (numNotes < 16 || allInstrs === 0) {
+  if (!hasUNICName(filename) && (numNotes < 16 || allInstrs === 0)) {
     throw new Error('UNICParser: insufficient note/instrument data across all patterns');
   }
 
