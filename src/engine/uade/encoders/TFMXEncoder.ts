@@ -87,8 +87,9 @@ function encodeTFMXCell(cell: TrackerCell): Uint8Array {
     return out;
   }
 
-  // Empty cell or unrecognised → NOP (0xFF)
-  out[0] = 0xFF;
+  // Empty cell: the pattern command that waits one jiffy (F3 00), the length of every row. The parser reads F3 00 back as the
+  // empty cell. A zero word would be a note (macro 0, note 0) and an FF word is no command the player defines.
+  out[0] = 0xF3;
   return out;
 }
 

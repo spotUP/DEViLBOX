@@ -233,7 +233,8 @@ function decodeTFMXPattern(buf: Uint8Array, patDataOffset: number): DecodedTFMXC
       if (cmdType === 3) {
         // F3 = Wait (b1+1 jiffies) — show as speed effect
         commands.push({
-          cell: { note: 0, instrument: 0, volume: 0, effTyp: 0x0F, eff: (b1 + 1) & 0xFF, effTyp2: 0, eff2: 0 },
+          // A wait of exactly one jiffy is the length of every row: it is the empty cell (TFMXEncoder writes an empty cell as F3 00).
+          cell: { note: 0, instrument: 0, volume: 0, effTyp: b1 === 0 ? 0 : 0x0F, eff: b1 === 0 ? 0 : (b1 + 1) & 0xFF, effTyp2: 0, eff2: 0 },
           fileOffset,
         });
         continue;
@@ -806,7 +807,7 @@ export function parseTFMXFile(
         // Pattern commands (F0=end, F1=loop, F3=wait, F5=key-up, etc.)
         if (b0 === 0xF5) return { note: 97, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, ...carriers };
         if (b0 === 0xF0) return { note: 0, instrument: 0, volume: 0, effTyp: 0x0D, eff: 0, effTyp2: 0, eff2: 0, ...carriers };
-        if (b0 === 0xF3) return { note: 0, instrument: 0, volume: 0, effTyp: 0x0F, eff: (b1 + 1), effTyp2: 0, eff2: 0, ...carriers };
+        if (b0 === 0xF3) return { note: 0, instrument: 0, volume: 0, effTyp: b1 === 0 ? 0 : 0x0F, eff: b1 === 0 ? 0 : (b1 + 1), effTyp2: 0, eff2: 0, ...carriers };
         return { note: 0, instrument: 0, volume: 0, effTyp: b0 & 0x0F, eff: b1, effTyp2: 0, eff2: 0, ...carriers };
       }
       if (b0 >= 0xC0) {
