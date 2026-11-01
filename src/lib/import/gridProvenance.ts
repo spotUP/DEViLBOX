@@ -465,6 +465,8 @@ export const DIRECT_GRIDS: readonly string[] = [
   'imagoOrpheus', 'cdfm67', 'easyTrax', 'karlMorton', 'xmf', 'madTracker2', 'psm', 'unic', 'mtm',
   '669', 'far', 'plm', 'ult', 'rtm', 'dsm', 'dtm', 'stm', 'stx', 'nru', 'ptm', 'gdm', 'stk', 'stp',
   'mdl', 'amf', 'j2b', 'mo3', 'itp', 'nst', 'wow', 'kt', 'xrns', 'mod', 'xm', 'it', 's3m',
+  // MONOTONE stores 4-track patterns; ANSI music stores one PLAY string the parser lays on rows.
+  'monotone', 'ansiMusic',
 ];
 
 export function gridProvenanceOf(key: string): GridProvenance | null {

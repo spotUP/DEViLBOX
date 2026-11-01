@@ -15,7 +15,7 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
-import { FORMAT_REGISTRY } from '@/lib/import/FormatRegistry';
+import { FORMAT_REGISTRY, detectFormatFromContent } from '@/lib/import/FormatRegistry';
 import { WALK_GRIDS, DIRECT_GRIDS, LIVE_EDIT, LIVE_WHILE_PLAYING, LIVE_WHILE_PLAYING_WHY, ADD_ON_EMPTY_ROW, type LiveEditStatus } from '@/lib/import/gridProvenance';
 import { pickDscNote } from './helpers/pickDscNote';
 import { openUade, PaulaSession, chipRamEngine } from './gridOracle';
@@ -100,10 +100,15 @@ const UADE_NAME: Record<string, (n: string) => string> = { jochenHippelST: () =>
 function registryFile(key: string): string | undefined {
   const def = FORMAT_REGISTRY.find((f) => f.key === key);
   if (!def) return undefined;
+  // A name match is this format's song only when content detection (what a dropped file gets) agrees:
+  // `.mon` names both Maniacs of Noise and MONOTONE, and the corpus .mon is Maniacs of Noise.
   return files.find((rel) => {
     const b = basename(rel).toLowerCase();
-    return (def.extRegex && def.matchMode !== 'prefix' && def.extRegex.test(b))
+    const named = (def.extRegex && def.matchMode !== 'prefix' && def.extRegex.test(b))
       || (def.prefixes && def.matchMode !== 'extension' && def.prefixes.some((p) => b.startsWith(p)));
+    if (!named) return false;
+    const detected = detectFormatFromContent(basename(rel), new Uint8Array(readFileSync(join(SONGS, rel))));
+    return !detected || detected.key === key;
   });
 }
 
