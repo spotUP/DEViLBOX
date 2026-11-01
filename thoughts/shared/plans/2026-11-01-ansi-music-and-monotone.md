@@ -1,7 +1,7 @@
 ---
 date: 2026-11-01
 topic: Import ANSI music (.ANS) and MONOTONE (.MON) PC-speaker songs
-status: Part A in progress (2026-11-01); Part B in progress (vectors committed bc0151473, c64612586)
+status: Part A A0-A9 done, A10-A11 open; Part B B1-B7 done, B8 open (2026-11-01)
 research:
   - thoughts/shared/research/2026-11-01-ansi-music.md
   - thoughts/shared/research/2026-11-01-ansi-music-spec-sources.md
@@ -81,6 +81,11 @@ edits, MonotoneExporter; PRELUDE.MON exports byte-exact; worklet replaceModule
 now calls mt_replace_song). Note 88: kept as is. MON notes 1-87 map to grid
 10-96; note 88 lies past the grid's last note, so the editable range ends at
 87 and an unedited note-88 cell keeps its raw word. Fxx data 0 still open.
+Progress: A9 + B7 reachability done (monotoneAnsiReachability.test.ts, this
+commit): real PRELUDE.MON and LOGO.ANS through parseModuleToSong, sentinel is a
+passthrough spy on parseMonotoneFile / parseAnsiMusicFile; both tests fail with
+their dispatch disabled; plain ART.ANS stays out. Deviation: the sentinel proves
+the parser ran, not the WASM player; the WASM run is proven live in A11.
 Notes from A1: API prefix is `mt_`; output in `public/monotone/` (like
 `public/actionamics/`); PRELUDE first note 262 Hz, divisor 4554; unedited
 export byte-identical for all 3 fixtures; PITfreq 1193182 still unverified;
