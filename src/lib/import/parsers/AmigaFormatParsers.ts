@@ -1025,7 +1025,7 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['unic'])) {
     try {
       const { isUNICFormat, parseUNICFile } = await import('@lib/import/formats/UNICParser');
-      if (isUNICFormat(buffer)) {
+      if (isUNICFormat(buffer, filename)) {
         const song = await parseUNICFile(buffer, originalFileName);
         song.libopenmptFileData = buffer.slice(0);
         return song;

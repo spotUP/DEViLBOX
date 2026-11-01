@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { parseUNICFile } from '../UNICParser';
+import { isUNICFormat, parseUNICFile } from '../UNICParser';
 
 const FIXTURE = join(process.cwd(), 'public/data/songs/formats/african dreams.unic');
 
@@ -48,5 +48,20 @@ describe('UNIC Tracker pattern codec', () => {
     }
     expect(checked).toBeGreaterThan(0);
     expect(sawNote, 'fixture exercises a note byte the offset mismatch rewrote').toBe(true);
+  });
+
+  it('a .unic file with every pattern cell cleared is recognised by its name, not by its notes', async () => {
+    const b = readFileSync(FIXTURE);
+    const raw = new Uint8Array(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
+    let maxPat = 0;
+    for (let i = 0; i < 128; i++) maxPat = Math.max(maxPat, raw[952 + i]);
+    raw.fill(0, 1084, 1084 + (maxPat + 1) * 768);
+    expect(isUNICFormat(raw.buffer, 'blank.bin'), 'no .unic name: the note heuristic still applies').toBe(false);
+    expect(isUNICFormat(raw.buffer), 'no name at all').toBe(false);
+    expect(isUNICFormat(raw.buffer, 'unic.blank'), 'unic. prefix').toBe(true);
+    const song = await parseUNICFile(raw.buffer, 'blank.unic');
+    expect(song.patterns.length).toBeGreaterThan(0);
+    const notes = song.patterns.reduce((n, pat) => n + pat.channels.reduce((m, ch) => m + ch.rows.filter((c) => c.note > 0).length, 0), 0);
+    expect(notes).toBe(0);
   });
 });
