@@ -48,9 +48,6 @@ export interface SystemPreset {
   amigaFormat?: boolean;       // true → Amiga hardware limits apply
   defaultBpm?: number;         // Override default 125 BPM
   compatibleSynthTypes?: string[]; // Allowed synth types for instrument filtering
-  /** Path to a minimal binary template file (relative to public/).
-   *  When set, "New Song" loads this file into UADE instead of creating a blank TrackerSong. */
-  templateFile?: string;
 }
 
 // Helper to generate numbered FM channels
@@ -1085,7 +1082,6 @@ export const SYSTEM_PRESETS: SystemPreset[] = [
     fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
     isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
     amigaFormat: true, defaultBpm: 125,
-    templateFile: 'templates/protracker.mod',
     compatibleSynthTypes: ['Sampler'],
     channelDefs: [
       { name: 'Paula L1', shortName: 'L1', type: DivChanType.PCM },
@@ -1134,7 +1130,6 @@ export const SYSTEM_PRESETS: SystemPreset[] = [
     fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
     isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
     amigaFormat: true, defaultBpm: 125,
-    templateFile: 'templates/soundmon.bp',
     compatibleSynthTypes: ['SoundMonSynth', 'Sampler'],
     channelDefs: [
       { name: 'SoundMon L1', shortName: 'SL', type: DivChanType.PCM },
@@ -1150,7 +1145,6 @@ export const SYSTEM_PRESETS: SystemPreset[] = [
     fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
     isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
     amigaFormat: true, defaultBpm: 125,
-    templateFile: 'templates/sidmon2.sd2',
     compatibleSynthTypes: ['SidMonSynth', 'Sampler'],
     channelDefs: [
       { name: 'SIDMon L1', shortName: 'SL', type: DivChanType.PCM },
@@ -1166,7 +1160,6 @@ export const SYSTEM_PRESETS: SystemPreset[] = [
     fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
     isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
     amigaFormat: true, defaultBpm: 125,
-    templateFile: 'templates/futurecomposer.fc',
     compatibleSynthTypes: ['Sampler'],
     channelDefs: [
       { name: 'FC Tone 1', shortName: 'T1', type: DivChanType.PCM },
@@ -1182,7 +1175,6 @@ export const SYSTEM_PRESETS: SystemPreset[] = [
     fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
     isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
     amigaFormat: true, defaultBpm: 125,
-    templateFile: 'templates/hippelcoso.coso',
     compatibleSynthTypes: ['Sampler'],
     channelDefs: [
       { name: 'HiC L1', shortName: 'HL', type: DivChanType.PCM },
@@ -1198,7 +1190,6 @@ export const SYSTEM_PRESETS: SystemPreset[] = [
     fileID: 0, fileID_DMF: 0, channels: 8, minChans: 4, maxChans: 8,
     isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
     amigaFormat: true, defaultBpm: 125,
-    templateFile: 'templates/octamed.mmd0',
     compatibleSynthTypes: ['Sampler'],
     channelDefs: [
       { name: 'MED L1', shortName: 'M1', type: DivChanType.PCM },
@@ -1218,7 +1209,6 @@ export const SYSTEM_PRESETS: SystemPreset[] = [
     fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
     isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
     amigaFormat: true, defaultBpm: 125,
-    templateFile: 'templates/jamcracker.jam',
     compatibleSynthTypes: ['Sampler'],
     channelDefs: [
       { name: 'JC L1', shortName: 'JL', type: DivChanType.PCM },
@@ -1234,7 +1224,6 @@ export const SYSTEM_PRESETS: SystemPreset[] = [
     fileID: 0, fileID_DMF: 0, channels: 4, minChans: 4, maxChans: 4,
     isFM: false, isSTD: true, isCompound: false, waveWidth: 0, waveHeight: 256, vgmVersion: 0,
     amigaFormat: true, defaultBpm: 125,
-    templateFile: 'templates/pumatracker.puma',
     compatibleSynthTypes: ['Sampler'],
     channelDefs: [
       { name: 'Puma L1', shortName: 'PL', type: DivChanType.PCM },

@@ -14,16 +14,31 @@ import { getGroupedPresets, SYSTEM_PRESETS } from '@constants/systemPresets';
 import type { SystemPreset } from '@constants/systemPresets';
 import { getInstrumentPresetsForSystem } from '@constants/uadeInstrumentPresets';
 import { startNewSong } from '@/lib/song/startNewSong';
-import type { NewSongMode } from '@/lib/song/startNewSong';
+import { listNewSongFormats } from '@/lib/formats/EditableFormatRegistry';
+import '@lib/formats/EditableFormatRegistry.builtins';
+import { notify } from '@stores/useNotificationStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type WizardStep = 1 | 2 | 3;
-export type StartMode = NewSongMode;
+/** Step 1 choice: a blank generic song, or pick a format / system in step 2. */
+export type StartMode = 'empty' | 'browse';
+/** Step 2 choice: a song format (real file in that format) or a system preset. */
+export type WizardSelection = { kind: 'format'; formatId: string } | { kind: 'preset'; presetId: string };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 export const GROUPED_PRESETS = getGroupedPresets();
+
+/** The browser's first group: every format a new song can start in. */
+export const NEW_SONG_FORMATS = listNewSongFormats();
+
+const DEFAULT_SELECTION: WizardSelection = { kind: 'preset', presetId: 'amiga_protracker' };
+
+function defaultSelection(): WizardSelection {
+  const first = NEW_SONG_FORMATS[0];
+  return first ? { kind: 'format', formatId: first.formatId } : DEFAULT_SELECTION;
+}
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -33,29 +48,34 @@ export function useNewSongWizard() {
 
   const [step, setStep] = useState<WizardStep>(1);
   const [startMode, setStartMode] = useState<StartMode>('empty');
-  const [selectedPresetId, setSelectedPresetId] = useState<string>('amiga_protracker');
+  const [selection, setSelection] = useState<WizardSelection>(defaultSelection);
   const [withPresetInstruments, setWithPresetInstruments] = useState(true);
+  const selectedPresetId = selection.kind === 'preset' ? selection.presetId : '';
 
   // ── Reset helper ───────────────────────────────────────────────────────────
 
   const resetWizardState = useCallback(() => {
     setStep(1);
     setStartMode('empty');
-    setSelectedPresetId('amiga_protracker');
+    setSelection(defaultSelection());
     setWithPresetInstruments(true);
   }, []);
 
-  /**
-   * DOM finish — no template-file support.
-   */
+  /** Starts the song for the given choice, then closes the wizard. */
   const finish = useCallback(
     (mode: StartMode, loadInstruments: boolean) => {
-      const presetId = selectedPresetId;
-      void startNewSong(mode, loadInstruments, presetId);
+      const req = mode === 'empty'
+        ? { kind: 'empty' as const }
+        : selection.kind === 'format'
+          ? selection
+          : { kind: 'preset' as const, presetId: selection.presetId, loadInstruments };
+      startNewSong(req).catch((err: unknown) => {
+        notify.error(`New song failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
       resetWizardState();
       close();
     },
-    [selectedPresetId, resetWizardState, close]
+    [selection, resetWizardState, close]
   );
 
   // ── Derived values ─────────────────────────────────────────────────────────
@@ -70,7 +90,7 @@ export function useNewSongWizard() {
 
   const starterInstruments = getInstrumentPresetsForSystem(selectedPresetId);
 
-  const stepCount = startMode === 'preset' ? (hasStarterInstruments ? 3 : 2) : 1;
+  const stepCount = startMode === 'browse' ? (hasStarterInstruments ? 3 : 2) : 1;
 
   const nextLabel =
     step === 1
@@ -94,7 +114,7 @@ export function useNewSongWizard() {
       if (hasStarterInstruments) {
         setStep(3);
       } else {
-        finish('preset', false);
+        finish('browse', false);
       }
     }
   }, [step, startMode, hasStarterInstruments, finish]);
@@ -110,7 +130,7 @@ export function useNewSongWizard() {
   }, [resetWizardState, close]);
 
   const handleFinish = useCallback(() => {
-    finish('preset', withPresetInstruments);
+    finish('browse', withPresetInstruments);
   }, [finish, withPresetInstruments]);
 
   // ── Return ─────────────────────────────────────────────────────────────────
@@ -125,8 +145,9 @@ export function useNewSongWizard() {
     setStep,
     startMode,
     setStartMode,
+    selection,
+    setSelection,
     selectedPresetId,
-    setSelectedPresetId,
     withPresetInstruments,
     setWithPresetInstruments,
 

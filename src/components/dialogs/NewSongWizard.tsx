@@ -1,23 +1,24 @@
 /**
  * NewSongWizard — Multi-step wizard for creating a new song.
  *
- * Step 1: "Start From" — Empty Song or System Preset
- * Step 2: Preset Browser — grouped system preset selection
- * Step 3: Starter Instruments — load preset or start empty
+ * Step 1: "Start From" — Empty Song or Format / System
+ * Step 2: Browser — "Formats" group first (a real song in that format, opened
+ *         from its template through openSong), then the system preset groups
+ * Step 3: Starter Instruments — system presets that have them only
  *
- * On Finish: resets stores, applies preset + Amiga settings,
- * optionally loads starter instruments, tracks active system.
+ * On Finish: startNewSong with the chosen request.
  *
  * Shared logic lives in: src/hooks/dialogs/useNewSongWizard.ts
  */
 
 import React, { useState, useMemo } from 'react';
 import { X, Music2, Cpu, ChevronRight, ChevronLeft, Check, Search } from 'lucide-react';
+import type { NewSongFormat } from '@/lib/formats/EditableFormatRegistry';
 import { SYSTEM_PRESETS } from '@constants/systemPresets';
 import { getInstrumentPresetsForSystem } from '@constants/uadeInstrumentPresets';
 import { useModalClose } from '@hooks/useDialogKeyboard';
-import { useNewSongWizard, GROUPED_PRESETS } from '@hooks/dialogs/useNewSongWizard';
-import type { StartMode } from '@hooks/dialogs/useNewSongWizard';
+import { useNewSongWizard, GROUPED_PRESETS, NEW_SONG_FORMATS } from '@hooks/dialogs/useNewSongWizard';
+import type { StartMode, WizardSelection } from '@hooks/dialogs/useNewSongWizard';
 
 export const NewSongWizard: React.FC = () => {
   const {
@@ -26,8 +27,8 @@ export const NewSongWizard: React.FC = () => {
     step,
     startMode,
     setStartMode,
-    selectedPresetId,
-    setSelectedPresetId,
+    selection,
+    setSelection,
     withPresetInstruments,
     setWithPresetInstruments,
     selectedPreset,
@@ -74,8 +75,8 @@ export const NewSongWizard: React.FC = () => {
           )}
           {step === 2 && (
             <StepPresetBrowser
-              selectedPresetId={selectedPresetId}
-              onSelectPreset={setSelectedPresetId}
+              selection={selection}
+              onSelect={setSelection}
             />
           )}
           {step === 3 && (
@@ -159,18 +160,18 @@ const StepStart: React.FC<StepStartProps> = ({ startMode, onSelectMode }) => (
       </button>
 
       <button
-        onClick={() => onSelectMode('preset')}
+        onClick={() => onSelectMode('browse')}
         className={`flex flex-col items-center gap-3 p-6 rounded-lg border-2 transition-all ${
-          startMode === 'preset'
+          startMode === 'browse'
             ? 'border-accent-primary bg-accent-primary/10 text-text-primary'
             : 'border-dark-border bg-dark-bg text-text-muted hover:border-dark-borderLight hover:text-text-primary'
         }`}
       >
-        <Cpu size={28} className={startMode === 'preset' ? 'text-accent-primary' : ''} />
+        <Cpu size={28} className={startMode === 'browse' ? 'text-accent-primary' : ''} />
         <div className="text-center">
-          <div className="text-sm font-semibold">System Preset</div>
+          <div className="text-sm font-semibold">Song Format or System</div>
           <div className="text-xs text-text-muted mt-1">
-            Hardware-specific channels and format
+            A song in a tracker format, or hardware-specific channels
           </div>
         </div>
       </button>
@@ -181,18 +182,29 @@ const StepStart: React.FC<StepStartProps> = ({ startMode, onSelectMode }) => (
 /* ──────────────────────── Step 2: Preset Browser ────────────────────────── */
 
 interface StepPresetBrowserProps {
-  selectedPresetId: string;
-  onSelectPreset: (id: string) => void;
+  selection: WizardSelection;
+  onSelect: (selection: WizardSelection) => void;
 }
 
+const FORMATS_GROUP_LABEL = 'Song Formats';
+
 const StepPresetBrowser: React.FC<StepPresetBrowserProps> = ({
-  selectedPresetId,
-  onSelectPreset,
+  selection,
+  onSelect,
 }) => {
   const [filter, setFilter] = useState('');
+  const selectedPresetId = selection.kind === 'preset' ? selection.presetId : '';
   const selected = SYSTEM_PRESETS.find((p) => p.id === selectedPresetId);
+  const selectedFormat: NewSongFormat | undefined = selection.kind === 'format'
+    ? NEW_SONG_FORMATS.find((f) => f.formatId === selection.formatId)
+    : undefined;
   const hasPresetInstruments =
     (getInstrumentPresetsForSystem(selectedPresetId).length) > 0;
+
+  const q = filter.trim().toLowerCase();
+  const filteredFormats = q && !FORMATS_GROUP_LABEL.toLowerCase().includes(q)
+    ? NEW_SONG_FORMATS.filter((f) => f.name.toLowerCase().includes(q))
+    : NEW_SONG_FORMATS;
 
   const filteredGroups = useMemo(() => {
     const sorted = GROUPED_PRESETS.map((group) => ({
@@ -211,6 +223,13 @@ const StepPresetBrowser: React.FC<StepPresetBrowserProps> = ({
       .filter((g) => g.presets.length > 0);
   }, [filter]);
 
+  const rowClass = (active: boolean) => `w-full text-left px-3 py-2 text-xs transition-colors ${
+    active
+      ? 'bg-accent-primary/20 text-text-primary border-l-2 border-accent-primary'
+      : 'text-text-muted hover:bg-dark-border hover:text-text-primary'
+  }`;
+  const groupHeaderClass = 'px-3 py-1.5 text-[10px] font-bold text-text-muted uppercase tracking-wider bg-dark-bg border-b border-dark-border sticky top-0';
+
   return (
     <div className="flex h-full min-h-0">
       {/* Left: Search + Group + preset list */}
@@ -222,34 +241,44 @@ const StepPresetBrowser: React.FC<StepPresetBrowserProps> = ({
               type="text"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              placeholder="Filter presets..."
+              placeholder="Filter formats and systems..."
               className="w-full pl-7 pr-2 py-1.5 text-xs bg-dark-bg border border-dark-border rounded text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-primary"
               autoFocus
             />
           </div>
         </div>
         <div className="flex-1 overflow-y-auto min-h-0">
+          {filteredFormats.length > 0 && (
+            <div>
+              <div className={groupHeaderClass}>{FORMATS_GROUP_LABEL}</div>
+              {filteredFormats.map((format) => (
+                <button
+                  key={format.formatId}
+                  onClick={() => onSelect({ kind: 'format', formatId: format.formatId })}
+                  className={rowClass(selectedFormat?.formatId === format.formatId)}
+                >
+                  {format.name}
+                </button>
+              ))}
+            </div>
+          )}
           {filteredGroups.map((group) => (
             <div key={group.label}>
-              <div className="px-3 py-1.5 text-[10px] font-bold text-text-muted uppercase tracking-wider bg-dark-bg border-b border-dark-border sticky top-0">
+              <div className={groupHeaderClass}>
                 {group.label}
               </div>
               {group.presets.map((preset) => (
                 <button
                   key={preset.id}
-                  onClick={() => onSelectPreset(preset.id)}
-                  className={`w-full text-left px-3 py-2 text-xs transition-colors ${
-                    selectedPresetId === preset.id
-                      ? 'bg-accent-primary/20 text-text-primary border-l-2 border-accent-primary'
-                      : 'text-text-muted hover:bg-dark-border hover:text-text-primary'
-                  }`}
+                  onClick={() => onSelect({ kind: 'preset', presetId: preset.id })}
+                  className={rowClass(selectedPresetId === preset.id)}
                 >
                   {preset.name}
                 </button>
               ))}
             </div>
           ))}
-          {filteredGroups.length === 0 && (
+          {filteredGroups.length === 0 && filteredFormats.length === 0 && (
             <div className="text-xs text-text-muted text-center py-6">No matches</div>
           )}
         </div>
@@ -257,7 +286,17 @@ const StepPresetBrowser: React.FC<StepPresetBrowserProps> = ({
 
       {/* Right: Preset details */}
       <div className="flex-1 p-5 overflow-y-auto">
-        {selected ? (
+        {selectedFormat ? (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold text-text-primary">{selectedFormat.name}</h3>
+              <p className="text-xs text-text-muted mt-1">
+                A blank song in this format. It opens in the format's own editor, plays on its own
+                player and exports back to a native {selectedFormat.name} file.
+              </p>
+            </div>
+          </div>
+        ) : selected ? (
           <div className="space-y-4">
             <div>
               <h3 className="text-sm font-semibold text-text-primary">{selected.name}</h3>
@@ -320,7 +359,7 @@ const StepPresetBrowser: React.FC<StepPresetBrowserProps> = ({
           </div>
         ) : (
           <div className="flex items-center justify-center h-full text-text-muted text-sm">
-            Select a preset
+            Select a format or system
           </div>
         )}
       </div>

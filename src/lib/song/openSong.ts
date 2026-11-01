@@ -81,7 +81,7 @@ export type SongSourceRef =
 
 export type OpenOrigin = 'drop' | 'filebrowser' | 'dialog' | 'mcp' | 'jukebox' | 'tour'
   | 'embed' | 'hvsc' | 'modland' | 'restore' | 'tab' | 'sync' | 'dj' | 'preview'
-  | 'project' | 'revision' | 'export' | 'subsong';
+  | 'project' | 'revision' | 'export' | 'subsong' | 'new-song';
 
 /** A DJ deck as the target of an open. `deck` is absent for a background render that loads to no deck. */
 export interface DeckTarget { deck?: DeckId }
@@ -138,7 +138,7 @@ export type OpenResult =
 export const START_BY_ORIGIN: Record<OpenOrigin, false | 'song'> = {
   drop: false, filebrowser: false, dialog: false, mcp: false, hvsc: false, modland: false,
   restore: false, tab: false, sync: false, dj: false, preview: false,
-  project: false, revision: false, export: false, subsong: false,
+  project: false, revision: false, export: false, subsong: false, 'new-song': false,
   jukebox: 'song', tour: 'song', embed: 'song',
 };
 
