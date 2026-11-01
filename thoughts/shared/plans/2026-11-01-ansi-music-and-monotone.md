@@ -1,7 +1,7 @@
 ---
 date: 2026-11-01
 topic: Import ANSI music (.ANS) and MONOTONE (.MON) PC-speaker songs
-status: Part A in progress (2026-11-01); Part B waits for the dctelnet vector file (void rule decided, D8)
+status: Part A in progress (2026-11-01); Part B in progress (vectors committed bc0151473, c64612586)
 research:
   - thoughts/shared/research/2026-11-01-ansi-music.md
   - thoughts/shared/research/2026-11-01-ansi-music-spec-sources.md
@@ -68,7 +68,14 @@ research:
 
 Progress (tick here, with commit): A0 copy MONOTONE source (Unlicense) from the
 session scratchpad into `monotone-wasm/reference/` so the port has a durable
-reference. Done: A0 (5dedbd1ae), A1 + A2 (217ca4b24). Running: A3 + A4 + A8.
+reference. Done: A0 (5dedbd1ae), A1 + A2 (217ca4b24), A3 + A4 + A8 (this commit).
+Open from A4: MONOTONE note 88 maps to grid note 97 (notes map n+9), which is
+NOTE_OFF. Unedited cells keep their word, so imports and unedited exports are
+exact, but a grid edit cannot tell note 88 from note off. Fix in A5 together
+with the engine: the grid needs a note range that ends before 97 or a
+separate note-off value. Also open: Fxx with data 0 (MT_SONG.PAS stores 1);
+'MON' must join the TrackerFormat union and the song needs a raw file data
+field for the engine (A5).
 Notes from A1: API prefix is `mt_`; output in `public/monotone/` (like
 `public/actionamics/`); PRELUDE first note 262 Hz, divisor 4554; unedited
 export byte-identical for all 3 fixtures; PITfreq 1193182 still unverified;
@@ -133,6 +140,11 @@ title "" or the filename fallback.
   cumulative per D5), O 0-6 clamped, < >, N 0-84 with N0 = rest (D5),
   L 1-64, P, T 32-255 clamped, MN/ML/MS gate (7/8, 3/4, full; GW source),
   MF/MB ignored.
+Progress: B1 + B2 done (ansiMusic.ts, 37 tests, all 32 vectors pass).
+Open from B2: the octave-6 table between C 4186 and B 7902 uses equal-temperament
+values; the vectors pin only C and B, so GWSTS.ASM NOTTAB is not yet checked
+for those notes.
+
 - B3. Grid: one channel, ticks per row derived from the finest length in the
   block (whole note = 64 or 96 x dot factor), BPM from T; T changes become
   0x0F effect on channel 0 (MDXParser.ts:542-559 pattern, rowTempo.ts helper);
