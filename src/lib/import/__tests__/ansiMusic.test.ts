@@ -20,7 +20,7 @@ const fromHex = (h: string): Uint8Array => Uint8Array.from(h.match(/../g) ?? [],
 const toHex = (b: Uint8Array): string => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
 
 describe('ANSI music golden vectors (scan + interpret)', () => {
-  it('has 32 vectors', () => expect(spec.vectors.length).toBe(32));
+  it('has 34 vectors', () => expect(spec.vectors.length).toBe(34));
   for (const v of spec.vectors) {
     it(v.name, () => {
       const scan = scanAnsiMusicBlocks(fromHex(v.input_hex));

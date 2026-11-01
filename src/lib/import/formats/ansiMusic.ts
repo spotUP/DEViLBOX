@@ -40,6 +40,12 @@ export interface PlayEvent {
   /** Milliseconds of sound (articulation), 3 decimals. */
   gate: number;
   rest: boolean;
+  /** Semitone 0 (O0 C) .. 83 (O6 B) after clamping; -1 for a rest. The same value semitoneToHz was given. */
+  semi: number;
+  /** Tempo (T, quarter notes per minute) in force when the event played. */
+  tempo: number;
+  /** Length in whole notes before articulation (dots included): 1 / L x dot factor. */
+  whole: number;
 }
 
 const isDigit = (b: number): boolean => b >= 0x30 && b <= 0x39;
@@ -48,8 +54,9 @@ const upper = (b: number): number => (b >= 0x61 && b <= 0x7a ? b - 0x20 : b);
 /** CSI M is music only when the first non-space byte starts a PLAY command (plan B1 / vector about). */
 function csiMStartsMusic(bytes: Uint8Array, from: number): { music: boolean; prefixM: boolean; at: number } {
   let i = from;
-  while (i < bytes.length && bytes[i] === 0x20) i++;
-  if (i >= bytes.length) return { music: false, prefixM: false, at: i };
+  // vtcon and DCTelnet look past at most 8 spaces; a 9th space means Delete Line.
+  while (i < bytes.length && bytes[i] === 0x20 && i - from < 8) i++;
+  if (i >= bytes.length || bytes[i] === 0x20) return { music: false, prefixM: false, at: i };
   const c = upper(bytes[i]);
   if (c === SO) return { music: true, prefixM: false, at: i };
   if (c === 0x42 || c === 0x46 || c === 0x4c || c === 0x53) return { music: true, prefixM: true, at: i }; // B F L S
@@ -157,8 +164,17 @@ export function interpretPlay(payload: Uint8Array): PlayEvent[] {
     return f;
   };
   const lengthMs = (len: number, dots: number): number => (240000 / (tempo * len)) * dots;
-  const push = (hz: number, ms: number, rest: boolean): void => {
-    events.push({ hz, ms: round3(ms), gate: rest ? 0 : round3(ms * gateFrac), rest });
+  const push = (semi: number, len: number, dots: number, rest: boolean): void => {
+    const ms = lengthMs(len, dots);
+    events.push({
+      hz: rest ? 0 : semitoneToHz(semi),
+      ms: round3(ms),
+      gate: rest ? 0 : round3(ms * gateFrac),
+      rest,
+      semi: rest ? -1 : Math.max(0, Math.min(83, semi)),
+      tempo,
+      whole: dots / len,
+    });
   };
 
   while (i < n) {
@@ -172,17 +188,17 @@ export function interpretPlay(payload: Uint8Array): PlayEvent[] {
       }
       const len = readNumber();
       const l = len === null ? defLen : clamp(len, 1, 64);
-      push(semitoneToHz(semi), lengthMs(l, readDots()), false);
+      push(semi, l, readDots(), false);
     } else if (c === 0x4e) {
       const v = readNumber();
       if (v === null || v > 84) continue;
       const dots = readDots();
-      if (v === 0) push(0, lengthMs(defLen, dots), true);
-      else push(semitoneToHz(v - 1), lengthMs(defLen, dots), false);
+      if (v === 0) push(0, defLen, dots, true);
+      else push(v - 1, defLen, dots, false);
     } else if (c === 0x50) {
       const len = readNumber();
       const l = len === null ? defLen : clamp(len, 1, 64);
-      push(0, lengthMs(l, readDots()), true);
+      push(0, l, readDots(), true);
     } else if (c === 0x4f) {
       const v = readNumber();
       if (v !== null) octave = clamp(v, 0, 6);
