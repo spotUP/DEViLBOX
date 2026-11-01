@@ -264,6 +264,14 @@
       "cells": 7168,
       "bytes": 108458
     },
+    "monotone": {
+      "exporter": "MonotoneExporter.exportMonotone",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 12127,
+      "bytes": 12127
+    },
     "musicAssembler": {
       "exporter": "MusicAssemblerExporter.exportAsMusicAssembler",
       "tier": "byte-exact",

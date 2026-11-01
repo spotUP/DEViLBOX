@@ -58,6 +58,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   earAche: 'public/data/songs/earache/bladerunner.ea',
   iffSmus: 'public/data/songs/formats/radiokomppi.smus',
   actionamics: 'public/data/songs/actionamics/dynablaster.ast',
+  monotone: 'src/lib/import/__tests__/fixtures/monotone/PRELUDE.MON',
   soundFactory: 'public/data/songs/soundfactory/im maien.psf',
   soundControl: 'public/data/songs/soundcontrol/north sea inferno ongame1.sc',
   c67: 'public/data/songs/formats/amnesia_credits.c67',

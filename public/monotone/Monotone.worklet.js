@@ -48,7 +48,7 @@ class MonotoneProcessor extends AudioWorkletProcessor {
         const ptr = this.module._malloc(bytes.length);
         if (!ptr) break;
         this.module.HEAPU8.set(bytes, ptr);
-        this.module._mt_free_replace && 0;
+        if (!this.module._mt_replace_song(this.handle, ptr, bytes.length)) this.port.postMessage({ type: 'error', message: 'mt_replace_song refused the edited module' });
         this.module._free(ptr);
         break;
       }

@@ -691,6 +691,18 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
   {
+    key: 'monotone',
+    label: 'MONOTONE',
+    description: 'MONOTONE (PC speaker tracker) — native parser and own WASM player. Shares .mon with Maniacs of Noise: told apart by the MONOTONE header.',
+    family: 'amiga-native',
+    matchMode: 'extension',
+    extRegex: /\.mon$/i,
+    prefKey: 'monotone',
+    nativeParser: { module: '@lib/import/formats/MonotoneParser', parseFn: 'parseMonotoneFile', detectFn: 'isMonotoneFormat' },
+    uadeFallback: true,
+    customDispatch: true, // Content check first, then the Maniacs of Noise (.mon) dispatch
+  },
+  {
     key: 'activisionPro',
     label: 'Activision Pro',
     description: 'Activision Pro — native parser or UADE',
@@ -1847,6 +1859,16 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.mdx$/i,
     nativeOnly: true,
     nativeParser: { module: '@lib/import/formats/MDXParser', parseFn: 'parseMDXFile' },
+  },
+  {
+    key: 'ansiMusic',
+    label: 'ANSI Music',
+    description: 'ANSI art file with BASIC PLAY music blocks (PC speaker, import only)',
+    family: 'chip-dump',
+    matchMode: 'extension',
+    extRegex: /\.ans$/i,
+    nativeOnly: true,
+    nativeParser: { module: '@lib/import/formats/AnsiMusicParser', parseFn: 'parseAnsiMusicFile', detectFn: 'isAnsiMusicFormat' },
   },
   {
     key: 'sndh',

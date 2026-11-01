@@ -7,7 +7,7 @@
  * offset 0, version 1, and a file size of exactly 351 + patterns*64*tracks*2.
  * Reference: monotone-wasm/reference/MT_SONG.PAS, MT_PLAY.PAS.
  */
-import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
+import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern } from '@/types';
 import { decodeMonotoneModule, isMonotoneModule, monWordToCell, monWordIndex, MON_ROWS, type MonotoneModule } from './monotoneGrid';
 
@@ -18,14 +18,14 @@ export function isMonotoneFormat(bytes: Uint8Array): boolean {
 export function parseMonotoneFile(bytes: Uint8Array, filename: string): TrackerSong | null {
   try {
     const m = decodeMonotoneModule(bytes);
-    return m ? buildSong(m, filename) : null;
+    return m ? buildSong(m, filename, bytes) : null;
   } catch (e) {
     console.warn('[MonotoneParser] Parse failed:', e);
     return null;
   }
 }
 
-function buildSong(m: MonotoneModule, filename: string): TrackerSong {
+function buildSong(m: MonotoneModule, filename: string, bytes: Uint8Array): TrackerSong {
   const fallback = filename.replace(/\.[^/.]+$/, '');
 
   const patterns: Pattern[] = Array.from({ length: m.patterns }, (_, p) => ({
@@ -57,7 +57,7 @@ function buildSong(m: MonotoneModule, filename: string): TrackerSong {
   const positions = m.order.filter((p) => p < m.patterns);
   return {
     name: m.title.trim() || fallback,
-    format: 'MON' as TrackerFormat,
+    format: 'MON',
     patterns,
     instruments: [],
     songPositions: positions,
@@ -68,5 +68,7 @@ function buildSong(m: MonotoneModule, filename: string): TrackerSong {
     initialSpeed: Math.max(m.tracks, 4),
     initialBPM: 125,
     linearPeriods: false,
+    // Native playback: the MONOTONE WASM replayer (MonotoneReplayer in wasmEngineRegistry.ts).
+    monotoneFileData: bytes.slice().buffer as ArrayBuffer,
   };
 }

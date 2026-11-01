@@ -53,7 +53,7 @@ export function playingDescriptor(song: TrackerSong): NativeEngineDescriptor | n
 
 /** Where a grid edit of a song goes (one per branch of sendCellEditsToEngine). */
 export type LiveEditRoute =
-  | 'fred-module' | 'actionamics-module' | 'activisionPro-module'
+  | 'fred-module' | 'actionamics-module' | 'monotone-module' | 'activisionPro-module'
   | 'track-index' | 'grid-cell' | 'engine-swap' | 'eagleplayer-module' | 'hippelst-module' | 'chip-ram' | 'uade-module' | 'none';
 
 /**
@@ -67,6 +67,7 @@ export function liveEditRoute(song: TrackerSong): { route: LiveEditRoute; engine
   const at = (route: LiveEditRoute) => ({ route, engine });
   if (desc?.key === 'FredReplayer2') return at('fred-module');
   if (desc?.key === 'ActionamicsReplayer') return at('actionamics-module');
+  if (desc?.key === 'MonotoneReplayer') return at('monotone-module');
   if (desc?.key === 'ActivisionProReplayer') return at('activisionPro-module');
   if (desc && isTrackIndexEngine(desc.key)) return at('track-index');
   if (desc?.gridCellEdits || desc?.gridCellEditsWhen?.(song)) return at('grid-cell');
@@ -93,6 +94,12 @@ export async function sendCellEditsToEngine(
     case 'fred-module': {
       const { applyFredModuleEdits } = await import('../fred-replayer/fredModuleEdits');
       await applyFredModuleEdits(song, edits);
+      return;
+    }
+    // MONOTONE: a grid cell is a word of the file; the edit rewrites the module and the replayer swaps it in.
+    case 'monotone-module': {
+      const { applyMonotoneModuleEdits } = await import('../monotone/monotoneModuleEdits');
+      await applyMonotoneModuleEdits(song, edits);
       return;
     }
     // Actionamics: a grid cell is a row of a voice's track; the edit re-encodes the module.
