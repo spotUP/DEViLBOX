@@ -63,7 +63,12 @@ research:
 
 Progress (tick here, with commit): A0 copy MONOTONE source (Unlicense) from the
 session scratchpad into `monotone-wasm/reference/` so the port has a durable
-reference.
+reference. Done: A0 (5dedbd1ae), A1 + A2 (217ca4b24). Running: A3 + A4 + A8.
+Notes from A1: API prefix is `mt_`; output in `public/monotone/` (like
+`public/actionamics/`); PRELUDE first note 262 Hz, divisor 4554; unedited
+export byte-identical for all 3 fixtures; PITfreq 1193182 still unverified;
+the 3 fixtures have empty titles (header bytes 9..91 are zero), so A9 asserts
+title "" or the filename fallback.
 
 - A1. `monotone-wasm/src/monotone.c|h`: port of MT_PLAY.PAS player + MT_OUTP.PAS
   PC-speaker output. 60 Hz tick, speed = max(tracks,4) at start, one track per
@@ -77,7 +82,7 @@ reference.
   creates PPCSpeakerSimple with Init(MyPlayer,false) (MT_EDIT.PAS:205; the
   true variant is commented out at :204).
 - A2. `monotone-wasm/build.sh` modelled on `actionamics-wasm/build.sh`; output
-  `public/Monotone.js`, `public/Monotone.wasm`, `public/Monotone.worklet.js`.
+  `public/monotone/Monotone.js`, `.wasm`, `.worklet.js`.
 - A3. `src/lib/import/formats/MonotoneParser.ts`: header (offset 0 length byte
   0x08 + "MONOTONE", title 41 B at 9, comment 41 B at 50, version 91,
   patterns 92, tracks 93, cellsize 94, 256-byte order list at 95, 0xFF end,
