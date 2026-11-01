@@ -14,9 +14,10 @@
  * Grid mapping: notes are tracker notes (A0 = 10, so MONOTONE note n shows as
  * n + 9), note off is 97, the commands use their standard effTyp (0 1 2 3 4 B D F)
  * and the argument byte verbatim, except 0xy and 4xy whose two 3-bit nibbles
- * show as the usual x<<4|y. MONOTONE notes 88 (cell 97, shows as note off) is
- * the one note the grid cannot tell from note off; edits never rewrite a cell
- * whose shown form did not change, so such a cell survives untouched.
+ * show as the usual x<<4|y. Grid note 97 is the tracker's note off, so MONOTONE
+ * notes 88..100 (maxNote = 3 + 8*12 + 1 = 100, MT_GLOB.PAS) skip it and show as
+ * n + 10 (98..110); only the display of those top notes (4.2 kHz and up) is one
+ * semitone high, the word is exact both ways.
  */
 import type { TrackerCell } from '@/types';
 
@@ -27,6 +28,19 @@ export const MON_ORDER_SIZE = 256;
 export const MON_NOTE_OFF = 127;
 export const MON_NOTE_OFFSET = 9;
 const GRID_NOTE_OFF = 97;
+/** Highest MONOTONE note: maxNote = 3 + numOctaves*IBO + 1 (MT_GLOB.PAS). */
+export const MON_MAX_NOTE = 100;
+/** First MONOTONE note whose grid note would collide with note off (97). */
+const MON_FIRST_SKIPPED = GRID_NOTE_OFF - MON_NOTE_OFFSET;
+
+/** The grid note a MONOTONE note shows as; the note-off value 97 is never produced. */
+const monNoteToGrid = (n: number): number => (n >= MON_FIRST_SKIPPED ? n + MON_NOTE_OFFSET + 1 : n + MON_NOTE_OFFSET);
+/** The MONOTONE note of a grid note, 0 when it holds none. */
+const gridToMonNote = (g: number): number => {
+  if (g === GRID_NOTE_OFF) return MON_NOTE_OFF;
+  const n = g > GRID_NOTE_OFF ? g - MON_NOTE_OFFSET - 1 : g - MON_NOTE_OFFSET;
+  return n >= 1 && n <= MON_MAX_NOTE ? n : 0;
+};
 const ID = 'MONOTONE';
 
 /** Effect index (word bits 6..8) to the grid effTyp. */
@@ -103,7 +117,7 @@ export const monWordIndex = (m: MonotoneModule, pattern: number, row: number, tr
 export function monWordToCell(word: number): TrackerCell {
   const note = word >> 9, idx = (word >> 6) & 7, data = word & 63;
   const cell: TrackerCell = { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
-  cell.note = note === 0 ? 0 : note === MON_NOTE_OFF ? GRID_NOTE_OFF : note + MON_NOTE_OFFSET;
+  cell.note = note === 0 ? 0 : note === MON_NOTE_OFF ? GRID_NOTE_OFF : note <= MON_MAX_NOTE ? monNoteToGrid(note) : 0;
   if (idx !== 0 || data !== 0) {
     cell.effTyp = MON_EFFECT_TYPES[idx];
     cell.eff = idx === 0 || idx === 4 ? ((data >> 3) << 4) | (data & 7) : data;
@@ -113,8 +127,7 @@ export function monWordToCell(word: number): TrackerCell {
 
 /** The word a grid cell is. Notes outside what a word holds, and effects MONOTONE lacks, become empty. */
 export function monCellToWord(cell: TrackerCell): number {
-  const n = cell.note ?? 0;
-  const note = n === GRID_NOTE_OFF ? MON_NOTE_OFF : n - MON_NOTE_OFFSET >= 1 && n - MON_NOTE_OFFSET <= 100 ? n - MON_NOTE_OFFSET : 0;
+  const note = gridToMonNote(cell.note ?? 0);
   const idx = MON_EFFECT_TYPES.indexOf(cell.effTyp ?? 0);
   const eff = cell.eff ?? 0;
   let data = 0;
