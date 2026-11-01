@@ -136,7 +136,7 @@ export interface FormatEnginePreferences {
   alcatrazPacker: FormatEngineChoice;   // alp.* → AlcatrazPackerParser vs UADE
   bladePacker: FormatEngineChoice;      // uds.* → BladePackerParser vs UADE
   tomyTracker?: FormatEngineChoice;      // sg.* → TomyTrackerParser vs UADE
-  imagesMusicSystem: FormatEngineChoice; // ims.* (prefix form) → ImagesMusicSystemParser vs UADE
+  imagesMusicSystem: FormatEngineChoice; // ims.* (prefix form) → IMSParser vs UADE
   fashionTracker?: FormatEngineChoice;   // ex.* → FashionTrackerParser vs UADE
   multiMediaSound: FormatEngineChoice;  // mms.*/sfx20.* → MultiMediaSoundParser vs UADE
   seanConran?: FormatEngineChoice;       // scr.* → SeanConranParser vs UADE

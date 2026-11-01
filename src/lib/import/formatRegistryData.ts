@@ -588,7 +588,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     extRegex: /\.ims$/i,
     prefixes: ['ims.'],
     prefKey: 'imagesMusicSystem',
-    nativeParser: { module: '@lib/import/formats/ImagesMusicSystemParser', parseFn: 'parseImagesMusicSystemFile', detectFn: 'isImagesMusicSystemFormat' },
+    nativeParser: { module: '@lib/import/formats/IMSParser', parseFn: 'parseIMSFile', detectFn: 'isIMSFormat' },
     uadeFallback: true,
   },
   {

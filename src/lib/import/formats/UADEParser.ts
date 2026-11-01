@@ -473,8 +473,8 @@ export async function parseUADEFile(
         return parseTMEFile(buffer, filename);
       },
       'ImagesMusicSystem': async () => {
-        const { parseImagesMusicSystemFile } = await import('./ImagesMusicSystemParser');
-        return parseImagesMusicSystemFile(buffer, filename);
+        const { parseIMSFile } = await import('./IMSParser');
+        return parseIMSFile(buffer, filename);
       },
       'FashionTracker': async () => {
         const { parseFashionTrackerFile } = await import('./FashionTrackerParser');
