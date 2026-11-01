@@ -1,0 +1,141 @@
+---
+date: 2026-11-01
+topic: Import ANSI music (.ANS) and MONOTONE (.MON) PC-speaker songs
+status: Part A in progress (2026-11-01); Part B waits for D4 and D6 file location
+research:
+  - thoughts/shared/research/2026-11-01-ansi-music.md
+  - thoughts/shared/research/2026-11-01-ansi-music-spec-sources.md
+  - thoughts/shared/research/2026-11-01-monotone-mon-format.md
+  - thoughts/shared/research/2026-11-01-ansi-mon-codebase-map.md
+  - thoughts/shared/research/2026-11-01-mon-samples/ (PRELUDE, NO_ROADS, SWINGIN1 .MON)
+---
+
+# ANSI music + MONOTONE import
+
+## Owner decisions (2026-11-01)
+
+- D1. ANSI music: import only, no export. One subsong per music block.
+- D2. .MON: port MONOTONE's own player (MT_PLAY.PAS / MT_OUTP.PAS, Unlicense)
+  to C, build to WASM, own engine. Track rotation, one-tick output delay and
+  Hz-per-tick slides must match the original. Grid edits save back byte-exact.
+  PC speaker output only (Tandy/Adlib modes not in scope).
+- D3. ANSI pitch: checked against Microsoft's GW-BASIC source (GWSTS.ASM NOTTAB):
+  same table as CTerm, A440 = O2 A, C0..C6 = 65.4..4186 Hz. No octave shift.
+  GW-BASIC rounds each divided frequency up to an integer (`ADC BX,0`).
+  GW-BASIC vs CTerm still differ on N (GW: 0-84, N0 = rest, N1 = C in O0;
+  CTerm: 0-71, N0 = C0) and dots (GW: cumulative, 1.5x per dot; CTerm: not
+  cumulative). Gate confirmed in GW source: MN 7/8, MS 3/4, ML full, remainder
+  is a rest. Semantics choice: see D5.
+- D4. ANSI tests: first fixture built from the real LOGO.ANS string in the
+  Terminate ANSMUSIC.DOC; search for whole real files continues. (Pending.)
+- D5. ANSI semantics follow GW-BASIC (owner, 2026-11-01): N 0-84, N0 = rest,
+  N1 = C in O0; dots cumulative (1.5x per dot). Pitch: GW-BASIC table with
+  its integer round-up. 90s terminals copied BASIC PLAY.
+- D6. ANSI rules shared with vtcon (UP-Term, engine/ansimusic.c) as rules +
+  golden test vectors, not shared code (owner, 2026-11-01). Each project keeps
+  its own parser. Vector file: JSON, per vector the PLAY string bytes, then per
+  event Hz (whole Hz after GW round-up), duration ms, gate ms, rest yes/no;
+  optional `"void": true` for strings that must not play, with a per-host flag
+  where vtcon (CTerm character set) and DEViLBOX (GW) differ. vtcon ledger row
+  ANSI-MUSIC-VECTORS waits for the file path. Open before B7: where the file
+  lives (both repos must read the same copy).
+- D7. Part A starts now (owner, 2026-11-01), while the ANSI file search runs.
+
+## Checklist
+
+### Part A - MONOTONE (.MON)
+
+Progress (tick here, with commit): A0 copy MONOTONE source (Unlicense) from the
+session scratchpad into `monotone-wasm/reference/` so the port has a durable
+reference.
+
+- A1. `monotone-wasm/src/monotone.c|h`: port of MT_PLAY.PAS player + MT_OUTP.PAS
+  PC-speaker output. 60 Hz tick, speed = max(tracks,4) at start, one track per
+  tick rotating, rotation reset at row start, equalShare=false behaviour
+  (inactive track keeps previous pitch), output one tick late, 8 sub-steps per
+  semitone note table with the original integer rounding, square wave at
+  PIT clock / divisor. Effects 0xy 1xx 2xx 3xx 4xy Bxx Dxx Fxx exactly as the
+  Pascal. Before coding verify: PITfreq comes from Trixter's TInterrupts unit
+  (not in the MONOTONE repo; believed $1234DD = 1193181, unverified; find
+  Trixter's TInterrupts source). equalShare = false is verified: the editor
+  creates PPCSpeakerSimple with Init(MyPlayer,false) (MT_EDIT.PAS:205; the
+  true variant is commented out at :204).
+- A2. `monotone-wasm/build.sh` modelled on `actionamics-wasm/build.sh`; output
+  `public/Monotone.js`, `public/Monotone.wasm`, `public/Monotone.worklet.js`.
+- A3. `src/lib/import/formats/MonotoneParser.ts`: header (offset 0 length byte
+  0x08 + "MONOTONE", title 41 B at 9, comment 41 B at 50, version 91,
+  patterns 92, tracks 93, cellsize 94, 256-byte order list at 95, 0xFF end,
+  patterns from 351: pattern, row (64), track, 16-bit LE `nnnnnnne eedddddd`).
+  Note 0 none, 1 = A0, 127 = note off (maps to NOTE_OFF 97). Reject files whose
+  size is not 351 + patterns*64*tracks*2 or version != 1.
+- A4. `src/lib/import/formats/monotoneGrid.ts` + effect glyphs: carrier for
+  byte-exact round trip, following `actionamicsGrid.ts` /
+  `docs/FORMAT_COMMAND_STREAM_GRID.md`.
+- A5. Engine `src/engine/monotone/MonotoneEngine.ts` + `monotoneModuleEdits.ts`,
+  mirroring `src/engine/actionamics/` file by file. Register in
+  `src/types/formatEngine.ts` and the native engine routing so
+  `playingEngineFor()` on a real .MON returns the Monotone engine.
+- A6. Registry entry in `src/lib/import/formatRegistryData.ts` (ext `mon`,
+  content check on the "MONOTONE" ID - `.mon` may clash; grep the registry
+  before adding), dispatch next to the Actionamics branch, editable-format
+  entry in `src/lib/formats/EditableFormatRegistry.builtins.ts`.
+- A7. Exporter `src/lib/export/MonotoneExporter.ts` + `nativeExportRouter.ts`
+  entry: writes the edited grid back to .MON bytes.
+- A8. Tests: parser + round trip on all 3 real .MON fixtures (byte-identical
+  re-export unedited); copy fixtures to `src/lib/import/__tests__/fixtures/`.
+- A9. Reachability test: real .MON through the top-level import entry
+  (`importTrackerModule` path, see `oneParsePath.contract.test.ts`), asserts
+  engine = Monotone, a sentinel proves the WASM player ran, and title, track
+  count (PRELUDE 4, SWINGIN1 3) and pattern count match the header.
+- A10. Pitch proof: render PRELUDE's first row in the WASM, measure the output
+  period, compare with the Pascal table value for note 40 (one number, stated
+  in the test).
+- A11. Live check via MCP in Chrome (load_file PRELUDE.MON, get_audio_level,
+  stop). Owner listens: Blocked-on-me item with URL.
+
+### Part B - ANSI music (.ANS)
+
+- B1. `src/lib/import/formats/AnsiMusicParser.ts`: byte scanner for intros
+  CSI M / CSI N / CSI | (accept all three on import: a file is not a live
+  terminal, so the Delete Line clash only needs the CSI M disambiguation rule:
+  first char in `BbFfLlSs` or `N/n` without digit = M-command, anything that
+  is a PLAY char = music, else not music). Allowed char set per cterm.txt;
+  an invalid char voids that block. Terminator 0x0E (also accept ESC or end of
+  line as SMILE does). SAUCE record gives title/author when present.
+- B2. PLAY interpreter: A-G with stacked #/+/-, length digits, dots (1.5x,
+  cumulative per D5), O 0-6 clamped, < >, N 0-84 with N0 = rest (D5),
+  L 1-64, P, T 32-255 clamped, MN/ML/MS gate (7/8, 3/4, full; GW source),
+  MF/MB ignored.
+- B3. Grid: one channel, ticks per row derived from the finest length in the
+  block (whole note = 64 or 96 x dot factor), BPM from T; T changes become
+  0x0F effect on channel 0 (MDXParser.ts:542-559 pattern, rowTempo.ts helper);
+  gate becomes NOTE_OFF 97 at the gate end row.
+- B4. Instrument: existing FurnacePCSPKR preset
+  (`src/constants/furnaceChipPresets.ts:286-294`), no new synth.
+- B5. Subsongs: one per music block via the `subsong` argument of
+  `tryChipDumpParse` (ChipDumpParsers.ts:19-40, as parseGameMusicFile).
+- B6. Registry: `.ans` with a content check that a music block exists, so
+  plain ANSI art does not open as an empty song. Do not touch `.asc` (ZX AY,
+  formatRegistryData.ts:1999). Dispatch branch in ChipDumpParsers.ts:86-89.
+- B7. Tests: interpreter unit tests (lengths, dots, gate, tempo, octave clamp,
+  invalid-char void) on the LOGO.ANS string; reachability test through the
+  top-level import entry with the fixture file, asserting note count, BPM 120
+  and the first note's pitch (LOGO.ANS starts O3 C = 523.25 Hz).
+- B8. Live check via MCP: load_file the fixture, get_audio_level, stop.
+
+## Automated verification
+
+- `npm run type-check`
+- `nice -n 19 npx vitest run src/lib/import/__tests__/<new tests> --maxWorkers=2`
+- `monotone-wasm/build.sh` exits 0 and writes the three public files.
+
+## Manual verification (owner)
+
+- Listen to PRELUDE.MON and NO_ROADS.MON at http://localhost:5174 against
+  the original (DOSBox MONOTONE or a recording).
+- Listen to the ANSI fixture.
+
+## Order
+
+Part A first (real fixtures in hand, decisions final). Part B starts after D3
+and D4 report.
