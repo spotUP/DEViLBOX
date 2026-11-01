@@ -89,6 +89,14 @@ export async function tryChipDumpParse(
     return parseMDXFile(buffer);
   }
 
+  // ── ANSI music — BASIC PLAY strings in .ANS art files (PC speaker) ───────
+  // Opens only when the file holds a music block that plays a note, so plain
+  // ANSI art falls through. `.mus` stays with Karl Morton / UFO (customDispatch).
+  if (/\.ans$/.test(filename)) {
+    const { isAnsiMusicFormat, parseAnsiMusicFile } = await import('@lib/import/formats/AnsiMusicParser');
+    if (isAnsiMusicFormat(buffer)) return parseAnsiMusicFile(buffer, originalFileName, subsong);
+  }
+
   // ── PiyoPiyo — Studio Pixel .pmd ('PMD' magic), before PC-98 PMD claims the extension ──
   if (/\.pmd$/.test(filename)) {
     const { isPiyoPiyoFormat, parsePiyoPiyoFile } = await import('@lib/import/formats/PiyoPiyoParser');

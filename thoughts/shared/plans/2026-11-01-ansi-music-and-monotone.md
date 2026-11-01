@@ -76,6 +76,11 @@ with the engine: the grid needs a note range that ends before 97 or a
 separate note-off value. Also open: Fxx with data 0 (MT_SONG.PAS stores 1);
 'MON' must join the TrackerFormat union and the song needs a raw file data
 field for the engine (A5).
+Progress: A5-A7 done (MonotoneEngine, monotoneFileData, monotone-module live
+edits, MonotoneExporter; PRELUDE.MON exports byte-exact; worklet replaceModule
+now calls mt_replace_song). Note 88: kept as is. MON notes 1-87 map to grid
+10-96; note 88 lies past the grid's last note, so the editable range ends at
+87 and an unedited note-88 cell keeps its raw word. Fxx data 0 still open.
 Notes from A1: API prefix is `mt_`; output in `public/monotone/` (like
 `public/actionamics/`); PRELUDE first note 262 Hz, divisor 4554; unedited
 export byte-identical for all 3 fixtures; PITfreq 1193182 still unverified;
@@ -143,7 +148,14 @@ title "" or the filename fallback.
 Progress: B1 + B2 done (ansiMusic.ts, 37 tests, all 32 vectors pass).
 Open from B2: the octave-6 table between C 4186 and B 7902 uses equal-temperament
 values; the vectors pin only C and B, so GWSTS.ASM NOTTAB is not yet checked
-for those notes.
+for those notes. vtcon (c21dc2ae) holds at most 8 spaces after a bare CSI M
+before deciding M-command vs music. Resolved under D8 (match vtcon): the
+scanner now skips at most 8 spaces; vectors intro-m-8-spaces and
+intro-m-9-spaces pin it (34 vectors).
+Progress: B3-B6 done (AnsiMusicParser.ts, .ans registry entry, subsongs via
+tryChipDumpParse, 7 tests). .mus is not registered: it clashes with Karl
+Morton and UFO/MicroProse. Known loss: a gate end is rounded to a row, so at
+coarse grids a 7/8 gate can round to the full row and lose its note-off.
 
 - B3. Grid: one channel, ticks per row derived from the finest length in the
   block (whole note = 64 or 96 x dot factor), BPM from T; T changes become
