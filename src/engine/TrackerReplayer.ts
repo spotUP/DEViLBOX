@@ -26,6 +26,7 @@ import { setFormatPlaybackPlaying } from './FormatPlaybackState';
 import type { InstrumentConfig } from '@/types/instrument';
 import { PatternAccessor } from './PatternAccessor';
 import { getToneEngine } from './ToneEngine';
+import { SynthRegistry } from './registry/SynthRegistry';
 import { StereoSeparationNode } from './StereoSeparationNode';
 import { resolvePt2NodeSeparation } from './stereoSeparationPolicy';
 // getNativeAudioNode used in audio-context utilities
@@ -1493,7 +1494,10 @@ export class TrackerReplayer {
 
       // Release previous synth note (unless sliding). A raw note (no 303 slide or hammer, no tone
       // portamento) is a hard retrigger, as in FT2: the old note is cut so the new one starts from zero.
-      if (!slideActive && ch.lastPlayedNoteName && ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler') {
+      // A synth whose attack restarts the channel voice (Furnace chips) gets the new attack alone: a note-off in the
+      // same chip tick as the note-on cancels it on chips that latch keyOn/keyOff.
+      if (!slideActive && ch.lastPlayedNoteName && ch.instrument?.synthType && ch.instrument.synthType !== 'Sampler'
+        && !SynthRegistry.get(ch.instrument.synthType)?.attackRestartsVoice) {
         try {
           const engine = getToneEngine();
           if (!hammer && !isTonePortamentoEffect(effect)) {

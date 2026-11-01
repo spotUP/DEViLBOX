@@ -1,7 +1,7 @@
 ---
 date: 2026-11-01
 topic: Import ANSI music (.ANS) and MONOTONE (.MON) PC-speaker songs
-status: Part A A0-A11 done; Part B B1-B7 done, B8 open (live playback silent, root cause under investigation) (2026-11-01)
+status: Part A A0-A11 done; Part B B1-B8 done (2026-11-01)
 research:
   - thoughts/shared/research/2026-11-01-ansi-music.md
   - thoughts/shared/research/2026-11-01-ansi-music-spec-sources.md
@@ -91,11 +91,20 @@ PRELUDE row 0 headless with divisor 4554 and a measured square-wave period of
 262.0 Hz (1193182 / 4554 = 262.01). A11 done live in Chrome via MCP: load_file
 PRELUDE.MON gives engine MonotoneReplayer, 23 patterns; play gives rmsAvg 0.21,
 no console errors; stopped. Owner listening check still open.
-B8 open: ANSIPL20_INTRO.ANS loads (1 channel, FurnacePCSPKR instrument) and
-triggerNote fires for all 9 notes during playback, but the output is silent
-(rms 0 on replay; a first play gave only a blip, rmsMax 0.12). trigger_note on
-the same instrument outside playback is loud (rmsAvg 0.49). Root cause hunt
-findings: scratchpad ansi-silence-findings.md (to be copied here).
+B8 done. Symptom: ANSIPL20_INTRO.ANS played only its first note. Root cause:
+TrackerReplayer's hard retrigger (FT2 semantics, 2026-10-20) sent
+triggerNoteCut for the old note before every new synth note. On a Furnace chip
+that became NOTE_OFF, followed 0.5 ms later by NOTE_ON. The dispatch worklet
+runs all due commands of a 128-sample block back to back before the next tick,
+and pcspkr.cpp (also pet, pong, ay) latches keyOn/keyOff and resolves keyOff
+last in tick(), so the OFF won and every later note was silent. Furnace's own
+playback.cpp:1619 sends a lone NOTE_ON for a new note. Fix: SynthDescriptor
+field attackRestartsVoice, set on all Furnace dispatch chips; the replayer
+skips cut and release for such synths. FurnaceDispatchSynth.triggerAttack also
+drops stale activeNotes entries on the same channel so a late release of the
+old note cannot cut the new one. Regression test: rawSynthNoteCutsOldNote
+(fails with the flag off). Live: rmsAvg 0.34 over 3 s; owner confirmed it
+plays.
 Notes from A1: API prefix is `mt_`; output in `public/monotone/` (like
 `public/actionamics/`); PRELUDE first note 262 Hz, divisor 4554; unedited
 export byte-identical for all 3 fixtures; PITfreq 1193182 still unverified;
@@ -188,7 +197,7 @@ coarse grids a 7/8 gate can round to the full row and lose its note-off.
   on the LOGO.ANS string; reachability test through the
   top-level import entry with the fixture file, asserting note count, BPM 120
   and the first note's pitch (LOGO.ANS starts O3 C = 523.25 Hz).
-- B8. Live check via MCP: load_file the fixture, get_audio_level, stop.
+- [x] B8. Live check via MCP: load_file the fixture, get_audio_level, stop.
 
 ### Part C - ANSI music in the AmiExpress BBS (owner, 2026-11-01)
 

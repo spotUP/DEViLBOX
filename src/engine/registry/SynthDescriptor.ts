@@ -62,6 +62,13 @@ export interface SynthDescriptor {
   // Trigger hooks — replace ToneEngine instanceof checks
   onTriggerAttack?: (synth: any, note: string, time: number, velocity: number, opts: TriggerOptions) => boolean;
   onTriggerRelease?: (synth: any, note: string | undefined, time: number, opts: TriggerOptions) => boolean;
+  /**
+   * true = a new attack on a channel restarts that channel's voice by itself, so a new note must not be preceded by
+   * a separate release or cut of the old one. Furnace chips work this way: Furnace's own playback sends a lone
+   * NOTE_ON for a new note (playback.cpp), and many chips latch keyOn/keyOff until the next tick, so a NOTE_OFF sent
+   * in the same tick as the NOTE_ON wins and the new note never sounds.
+   */
+  attackRestartsVoice?: boolean;
 
   // UI
   controlsComponent?: string;
