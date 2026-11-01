@@ -49,6 +49,8 @@ export interface MaWalkEvent {
   envelope: boolean;
   /** Position index and track the voice was on, and the event's byte offset in the track. */
   position: number;
+  /** File offset of the position-list entry (2 bytes: track number, then transpose in the high nibble and repeat in the low) the event ran under. */
+  positionOffset: number;
   track: number;
   trackOffset: number;
   /** Release events: the voice's level when the event ran. */
@@ -302,7 +304,7 @@ export function walkMusicAssembler(m: MaModuleData, subsong = 0, opts: MaWalkOpt
 
     const ev: MaWalkEvent = {
       tick, voice: ch, kind: MA_WALK.note, a: 0, played: 0, setInstrument: -1, instr: v.instr, pv: 0, delay: 0, envelope: true,
-      position: v.pos, track: info.trackNumber, trackOffset: start, level: v.volume, tableIndex: 0, transpose: v.transpose, synth: false,
+      position: v.pos, positionOffset: info.fileOffset, track: info.trackNumber, trackOffset: start, level: v.volume, tableIndex: 0, transpose: v.transpose, synth: false,
     };
     if (start === 0) {
       events.push({ ...ev, kind: MA_WALK.trackStart, a: info.trackNumber, played: v.transpose });
