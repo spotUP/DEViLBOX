@@ -407,7 +407,7 @@ export interface ImportMetadata {
     | 'DigitalSymphony' | 'DM1' | 'DM2' | 'DSM' | 'DSS' | 'DTM' | 'ETX'
     | 'FaceTheMusic' | 'FMT' | 'GameMusicCreator' | 'GDM' | 'GMC'
     | 'GraoumfTracker' | 'GraoumfTracker2' | 'ICE' | 'IMF' | 'IMS' | 'IS10' | 'IS20'
-    | 'JamCracker' | 'KRIS' | 'MFP' | 'MTM' | 'MUS' | 'NRU' | 'PLM' | 'PSF' | 'PTM'
+    | 'JamCracker' | 'KRIS' | 'MFP' | 'MON' | 'MTM' | 'MUS' | 'NRU' | 'PLM' | 'PSF' | 'PTM'
     | 'PumaTracker' | 'QuadraComposer' | 'RK' | 'RTM' | 'SAW' | 'SC'
     | 'SonicArranger' | 'STK' | 'STM' | 'STP' | 'Symphonie' | 'TCBTracker' | 'ULT' | 'UNIC'
     // PC tracker formats
