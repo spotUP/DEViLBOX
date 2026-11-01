@@ -14,6 +14,7 @@
 import { registerEditableFormat } from './EditableFormatRegistry';
 
 registerEditableFormat({ formatId: "actionamics", label: "", patternCodec: { kind: "variable" }, exporter: { module: "ActionamicsExporter", fn: "exportActionamics", byLayout: true } });
+registerEditableFormat({ formatId: "monotone", label: "MONOTONE", patternCodec: { kind: "fixed" }, exporter: { module: "MonotoneExporter", fn: "exportMonotone", byLayout: true } });
 registerEditableFormat({ formatId: "activisionPro", label: "Activision Pro", patternCodec: { kind: "fixed" }, exporter: { module: "ActivisionProExporter", fn: "exportActivisionPro", byLayout: true } });
 registerEditableFormat({ formatId: "adplug", label: "AdPlug", exporter: { module: "AdPlugExporter", fn: "exportAdPlug" } });
 registerEditableFormat({ formatId: "amf", label: "", patternCodec: { kind: "fixed" } });

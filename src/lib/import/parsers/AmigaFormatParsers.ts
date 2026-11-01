@@ -2723,6 +2723,17 @@ export async function tryRouteFormat(
       'MusicMakerParser/8V', { injectUADE: true });
   }
 
+  // ── MONOTONE (.mon, PC speaker tracker) ───────────────────────────────────
+  // .mon is also Maniacs of Noise (below): the "MONOTONE" header decides, anything else falls through.
+  if (matchesExt(filename, ['mon'])) {
+    const { isMonotoneFormat, parseMonotoneFile } = await import('@lib/import/formats/MonotoneParser');
+    if (isMonotoneFormat(new Uint8Array(ctx.buffer))) {
+      return withNativeThenUADE('monotone', ctx,
+        (bytes: Uint8Array | ArrayBuffer, name: string) => parseMonotoneFile(bytes as Uint8Array, name),
+        'MonotoneParser', { isFormat: isMonotoneFormat, usesBytes: true, injectUADE: true });
+    }
+  }
+
   // ── Maniacs of Noise (mon.* prefix) ──────────────────────────────────────
   // eagleplayer.conf: ManiacsOfNoise  prefixes=mon
   // mon_old.* is handled above by the JeroenTel block.

@@ -127,6 +127,7 @@ export interface FormatStore {
   quadraComposerFileData: ArrayBuffer | null;  bdFileData: ArrayBuffer | null;
   ronKlarenFileData: ArrayBuffer | null;
   actionamicsFileData: ArrayBuffer | null;
+  monotoneFileData: ArrayBuffer | null;
   activisionProFileData: ArrayBuffer | null;
   activisionProSubsongCount: number;
   activisionProCurrentSubsong: number;
@@ -620,6 +621,7 @@ export const useFormatStore = create<FormatStore>()(
     pmdFileData: null,
     ronKlarenFileData: null,
     actionamicsFileData: null,
+    monotoneFileData: null,
     activisionProFileData: null,
     activisionProSubsongCount: 0,
     activisionProCurrentSubsong: 0,
@@ -1253,6 +1255,7 @@ export const useFormatStore = create<FormatStore>()(
         state.pmdFileData = (song as any).pmdFileData ?? null;
         state.ronKlarenFileData = (song as any).ronKlarenFileData ?? null;
         state.actionamicsFileData = (song as any).actionamicsFileData ?? null;
+        state.monotoneFileData = (song as any).monotoneFileData ?? null;
         state.activisionProFileData = (song as any).activisionProFileData ?? null;
         state.synthesisFileData = (song as any).synthesisFileData ?? null;
         state.dssFileData = (song as any).dssFileData ?? null;
@@ -1611,6 +1614,7 @@ export const useFormatStore = create<FormatStore>()(
       state.songFormat = null;
       state.ronKlarenFileData = null;
       state.actionamicsFileData = null;
+      state.monotoneFileData = null;
       state.activisionProFileData = null;
       state.activisionProSubsongCount = 0;
       state.activisionProCurrentSubsong = 0;

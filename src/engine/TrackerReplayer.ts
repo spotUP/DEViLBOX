@@ -92,6 +92,7 @@ const PLAYERS_PER_CHANNEL = 2; // Double-buffered pool for overlap-free note tra
 
 export type TrackerFormat =
   | 'MOD' | 'XM' | 'IT' | 'S3M' | 'HVL' | 'AHX' | 'ML'
+  | 'MON'   // MONOTONE (PC speaker tracker, own WASM player)
   // Exotic Amiga formats (Phase 2 full editing)
   | 'OKT'   // Oktalyzer
   | 'MED'   // OctaMED / MED
@@ -126,6 +127,7 @@ export type TrackerFormat =
   | 'GYM'  // Sega Mega Drive GYM register log (YM2612 + SN76489)
   | 'ZXTune' // ZX Spectrum / Atari ST formats played by the ZXTune engine (PT3, STC, VTX, PSG, YM, ...)
   | 'MDX'  // Sharp X68000 MDX (YM2151 OPM + ADPCM, native note data)
+  | 'AnsiMusic' // ANSI music (BASIC PLAY strings in .ANS files, PC speaker)
   | 'JamCracker'       // JamCracker Pro (.jam, .jc)
   | 'FuturePlayer'     // Future Player (Wanted Team, .fp)
   | 'PMD'              // PC-98 Professional Music Driver (YM2608/OPNA)
@@ -478,6 +480,7 @@ export interface TrackerSong {
   nativeSamplePlayback?: boolean;
   ronKlarenFileData?: ArrayBuffer;
   actionamicsFileData?: ArrayBuffer;
+  monotoneFileData?: ArrayBuffer;
   activisionProFileData?: ArrayBuffer;
   synthesisFileData?: ArrayBuffer;
   dssFileData?: ArrayBuffer;

@@ -277,6 +277,10 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
     // Fred Editor keeps format 'MOD'; its module (with the grid's edits) is the export.
     const { exportFredEditor } = await import('./FredEditorExporter');
     result = await exportFredEditor(song);
+  } else if (format === 'MON' && song.monotoneFileData) {
+    // MONOTONE: its module (with the grid's edits) is the export.
+    const { exportMonotone } = await import('./MonotoneExporter');
+    result = await exportMonotone(song);
   } else if (format === 'AST' && song.actionamicsFileData) {
     // Actionamics: its module (with the grid's edits) is the export.
     const { exportActionamics } = await import('./ActionamicsExporter');

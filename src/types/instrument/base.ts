@@ -313,6 +313,7 @@ export type SynthType =
   | 'BenDaglishSynth'          // Ben Daglish (WASM replayer)
   | 'SoundControlWasmSynth'    // Sound Control (WASM replayer)
   | 'ActionamicsWasmSynth'     // Actionamics (WASM replayer)
+  | 'MonotoneWasmSynth'        // MONOTONE (WASM replayer)
   | 'ActivisionProWasmSynth'   // Activision Pro (WASM replayer)
   | 'FaceTheMusicWasmSynth'    // Face The Music (WASM replayer)
   // Phase 3/4 — Playback-only WASM replayer formats

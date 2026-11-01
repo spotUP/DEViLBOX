@@ -93,6 +93,7 @@ export const FILE_DATA_FIELDS = [
   'quadraComposerFileData',
   'ronKlarenFileData',
   'actionamicsFileData',
+  'monotoneFileData',
   'activisionProFileData',
   'synthesisFileData',
   'dssFileData',
