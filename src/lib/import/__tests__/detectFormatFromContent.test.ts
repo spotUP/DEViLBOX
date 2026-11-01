@@ -52,6 +52,13 @@ describe('detectFormatFromContent', () => {
     // An Amiga .snd without the SNDH header still goes to UADE.
     expect(isUADEExclusiveFile('tune.snd', new Uint8Array(64))).toBe(true);
   });
+  it('a Maniacs of Noise .mon stays Maniacs of Noise; a MONOTONE .mon is told apart by its header', () => {
+    expect(detectFormat('gyroscope.mon')?.key).toBe('maniacsOfNoise'); // by name alone
+    expect(keyOf('formats/gyroscope.mon')).toBe('maniacsOfNoise');
+    expect(detectFormat('PRELUDE.MON')?.key).toBe('maniacsOfNoise'); // the name cannot tell them apart
+    const prelude = new Uint8Array(readFileSync(join(process.cwd(), 'src/lib/import/__tests__/fixtures/monotone/PRELUDE.MON')));
+    expect(detectFormatFromContent('PRELUDE.MON', prelude.subarray(0, 128))?.key).toBe('monotone');
+  });
   it('a name with no collision keeps its name-only answer', () => {
     expect(keyOf('formats/mdat.turrican_bonus')).toBe(detectFormat('mdat.turrican_bonus')?.key);
   });

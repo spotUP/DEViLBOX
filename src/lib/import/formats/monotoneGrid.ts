@@ -54,10 +54,20 @@ function pascalString(b: Uint8Array, at: number): string {
   return s;
 }
 
+/**
+ * The file starts with the Pascal string "MONOTONE". Needs only the first 9 bytes, so the
+ * name-plus-content detection can tell a MONOTONE .mon from a Maniacs of Noise .mon on a
+ * header slice.
+ */
+export function hasMonotoneSignature(bytes: Uint8Array): boolean {
+  if (bytes.length < 1 + ID.length || bytes[0] !== ID.length) return false;
+  for (let i = 0; i < ID.length; i++) if (bytes[1 + i] !== ID.charCodeAt(i)) return false;
+  return true;
+}
+
 /** The module, or null when it is not a version 1, 2-byte-cell MONOTONE file of exactly the size its header implies. */
 export function decodeMonotoneModule(bytes: Uint8Array): MonotoneModule | null {
-  if (bytes.length < MON_HEADER_SIZE || bytes[0] !== ID.length) return null;
-  for (let i = 0; i < ID.length; i++) if (bytes[1 + i] !== ID.charCodeAt(i)) return null;
+  if (bytes.length < MON_HEADER_SIZE || !hasMonotoneSignature(bytes)) return null;
   const version = bytes[91], patterns = bytes[92], tracks = bytes[93], cellSize = bytes[94];
   if (version !== 1 || cellSize !== 2 || tracks < 1 || patterns < 1) return null;
   const count = patterns * MON_ROWS * tracks;
