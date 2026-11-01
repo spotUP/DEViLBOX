@@ -1863,7 +1863,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   {
     key: 'ansiMusic',
     label: 'ANSI Music',
-    description: 'ANSI art file with BASIC PLAY music blocks (PC speaker, import only)',
+    description: 'ANSI art file with BASIC PLAY music blocks (PC speaker; channel 1 exports as one PLAY block)',
     family: 'chip-dump',
     matchMode: 'extension',
     extRegex: /\.ans$/i,
