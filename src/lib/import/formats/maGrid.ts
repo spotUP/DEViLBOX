@@ -43,6 +43,17 @@ export interface MaGrid {
   layout: WalkLayout;
   /** Per pattern, voice and row: what a note cell was drawn from (null where the cell shows no note). */
   cellSources: Array<Array<Array<MACellSource | null>>>;
+  /**
+   * Per pattern, voice and row: the track event that starts on the row, whatever it draws (a note, a legato note or a
+   * release/rest, which draws nothing). A note typed on a blank row finds the rest that covers it here.
+   */
+  commandSources: Array<Array<Array<MACellSource | null>>>;
+  /**
+   * Per pattern, voice and row: the position-list entries a shown transpose command stands for (null where the cell shows none).
+   * A transpose is shown only where it changes, so the entries are the one that changed it and every later entry of the voice
+   * that kept it; taking the command off the cell takes it off all of them.
+   */
+  transposeSources: Array<Array<Array<number[] | null>>>;
   /** Rows where more commands ran on one voice than the cell has effect columns. */
   overflowRows: number;
 }
@@ -60,6 +71,9 @@ export function buildMaGridFromWalk(walk: MaWalk, m: MaModuleData): MaGrid {
   const rows = layout.rows;
   const grid: TrackerCell[][] = Array.from({ length: channels }, () => Array.from({ length: rows }, emptyCell));
   const src: Array<Array<MACellSource | null>> = Array.from({ length: channels }, () => new Array<MACellSource | null>(rows).fill(null));
+  const csrc: Array<Array<MACellSource | null>> = Array.from({ length: channels }, () => new Array<MACellSource | null>(rows).fill(null));
+  const tsrc: Array<Array<number[] | null>> = Array.from({ length: channels }, () => new Array<number[] | null>(rows).fill(null));
+  const lastShown: Array<number[] | null> = new Array<number[] | null>(channels).fill(null);
   const slots: number[][] = Array.from({ length: channels }, () => new Array<number>(rows).fill(0));
   const transpose = new Array<number>(channels).fill(0);
   let overflowRows = 0;
@@ -79,7 +93,11 @@ export function buildMaGridFromWalk(walk: MaWalk, m: MaModuleData): MaGrid {
     };
     if (e.kind === MA_WALK.trackStart) {
       // the position's transpose, shown where it changes
-      if (e.played !== transpose[e.voice]) { put(MA_FX.transpose, e.played & 0xff); transpose[e.voice] = e.played; }
+      if (e.played !== transpose[e.voice]) {
+        put(MA_FX.transpose, e.played & 0xff);
+        transpose[e.voice] = e.played;
+        lastShown[e.voice] = tsrc[e.voice][r] = [e.positionOffset];
+      } else lastShown[e.voice]?.push(e.positionOffset);
       continue;
     }
     if (e.kind === MA_WALK.note || e.kind === MA_WALK.legato) {
@@ -89,8 +107,9 @@ export function buildMaGridFromWalk(walk: MaWalk, m: MaModuleData): MaGrid {
         if (!e.envelope) put(MA_FX.keepEnvelope, 0);
       } else put(MA_FX.legato, 0);
       if (e.pv !== 0) put(MA_FX.portamento, e.pv & 0xff);
-      src[e.voice][r] = { track: e.track, trackOffset: e.trackOffset, instr: e.instr, transpose: e.transpose, synth: e.synth };
+      src[e.voice][r] = csrc[e.voice][r] = { track: e.track, trackOffset: e.trackOffset, instr: e.instr, transpose: e.transpose, synth: e.synth };
     } else if (e.kind === MA_WALK.release) {
+      csrc[e.voice][r] = { track: e.track, trackOffset: e.trackOffset, instr: e.instr, transpose: e.transpose, synth: e.synth };
       // a release event stops a sounding voice only where the instrument's release is not zero
       const ins = m.instruments[e.instr];
       if (e.level > 0 && ins && ins.release > 0) cell.note = 97;
@@ -100,6 +119,8 @@ export function buildMaGridFromWalk(walk: MaWalk, m: MaModuleData): MaGrid {
   const patterns: Pattern[] = [];
   const songPositions: number[] = [];
   const cellSources: MaGrid['cellSources'] = [];
+  const commandSources: MaGrid['commandSources'] = [];
+  const transposeSources: MaGrid['transposeSources'] = [];
   let start = 0;
   layout.patternLengths.forEach((len, p) => {
     const chData: ChannelData[] = grid.map((cells, ch) => ({
@@ -112,7 +133,9 @@ export function buildMaGridFromWalk(walk: MaWalk, m: MaModuleData): MaGrid {
     patterns.push({ id: `pattern-${p}`, name: `Pattern ${p}`, length: len, channels: chData });
     songPositions.push(p);
     cellSources.push(src.map((s) => s.slice(start, start + len)));
+    commandSources.push(csrc.map((s) => s.slice(start, start + len)));
+    transposeSources.push(tsrc.map((s) => s.slice(start, start + len)));
     start += len;
   });
-  return { patterns, songPositions, layout, cellSources, overflowRows };
+  return { patterns, songPositions, layout, cellSources, commandSources, transposeSources, overflowRows };
 }

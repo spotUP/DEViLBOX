@@ -12,7 +12,7 @@ import { hippelPlayedKey, type HippelPlayed } from './HippelTfmxWalk';
 import type { MaTickWrite, MaWalk, MaWalkEvent } from './maWalk';
 import type { FpWalk, FpWalkEvent } from './fpWalk';
 
-const MA_EVENT_FIELDS = 17;
+const MA_EVENT_FIELDS = 18;
 const MA_WRITE_FIELDS = 3;
 const FP_EVENT_FIELDS = 13;
 
@@ -31,7 +31,7 @@ export function packMaWalk(w: MaWalk): PackedMaWalk {
   const e = new Float64Array(events.length * MA_EVENT_FIELDS);
   events.forEach((v, i) => {
     e.set([v.tick, v.voice, v.kind, v.a, v.played, v.setInstrument, v.instr, v.transpose, v.synth ? 1 : 0, v.pv, v.delay,
-      v.envelope ? 1 : 0, v.position, v.track, v.trackOffset, v.level, v.tableIndex], i * MA_EVENT_FIELDS);
+      v.envelope ? 1 : 0, v.position, v.track, v.trackOffset, v.level, v.tableIndex, v.positionOffset], i * MA_EVENT_FIELDS);
   });
   const ws = writes.map((list) => {
     const a = new Float64Array(list.length * MA_WRITE_FIELDS);
@@ -48,7 +48,7 @@ export function unpackMaWalk(p: PackedMaWalk): MaWalk {
     events[i] = {
       tick: e[o], voice: e[o + 1], kind: e[o + 2], a: e[o + 3], played: e[o + 4], setInstrument: e[o + 5], instr: e[o + 6],
       transpose: e[o + 7], synth: e[o + 8] === 1, pv: e[o + 9], delay: e[o + 10], envelope: e[o + 11] === 1,
-      position: e[o + 12], track: e[o + 13], trackOffset: e[o + 14], level: e[o + 15], tableIndex: e[o + 16],
+      position: e[o + 12], track: e[o + 13], trackOffset: e[o + 14], level: e[o + 15], tableIndex: e[o + 16], positionOffset: e[o + 17],
     };
   }
   const writes = p.writes.map((a) => {

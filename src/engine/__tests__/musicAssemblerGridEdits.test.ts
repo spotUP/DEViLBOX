@@ -7,8 +7,10 @@
  *    that cell, with every other cell unchanged except the cells that replay the same event (a shared track);
  *  - a changed instrument patches the instrument byte of an instrument+note event, the note keeps its pitch under
  *    the new instrument's wave rate, and re-importing shows the new instrument;
- *  - an edit that needs a longer event (a note on a blank row, a removed note, a note-off, an instrument on a note
- *    event that carries none) is a warning and writes nothing.
+ *  - a note on a blank row is cut into the rest or held note that covers the row;
+ *  - a removed note is a track rewrite (the row re-imports empty);
+ *  - an edit that needs a longer event (a note-off, an instrument on a note event that carries none) is a
+ *    warning and writes nothing.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -100,23 +102,69 @@ describe.each(MA_FILES.map((f) => [f.split('/').pop()!, f] as const))('Music Ass
     void src;
   });
 
-  it('an edit that needs a longer event is a warning and writes nothing', async () => {
+  /** The command (note, legato or release event) that covers a row, and how many rows after its start the row is. */
+  function coverOf(p: number, v: number, r: number): { src: NonNullable<typeof grid.commandSources[0][0][0]>; delta: number } | null {
+    let at = r;
+    while (at >= 0 && !grid.commandSources[p][v][at]) at--;
+    return at >= 0 ? { src: grid.commandSources[p][v][at]!, delta: r - at } : null;
+  }
+
+  it.each([['a plain note event', 0x00], ['an instrument+note event', 0xc0]] as const)('a note typed on a blank row inside %s is cut into it and re-imports there, other rows unchanged', async (_label, kindBits) => {
+    let blank: { p: number; v: number; r: number } | null = null;
+    let c: ReturnType<typeof coverOf> = null;
+    for (let p = 0; p < grid.cellSources.length && !blank; p++) for (let v = 0; v < 4 && !blank; v++) for (let r = 0; r < grid.cellSources[p][v].length && !blank; r++) {
+      if (grid.cellSources[p][v][r] || song.patterns[p].channels[v].rows[r].note !== 0) continue;
+      const cv = coverOf(p, v, r);
+      if (cv && (m.tracks[cv.src.track]![cv.src.trackOffset] & 0xc0) === kindBits) { blank = { p, v, r }; c = cv; }
+    }
+    if (!blank || !c) return; // the song has no held note of this kind
+    const e = clone(song);
+    const cell = e.patterns[blank.p].channels[blank.v].rows[blank.r];
+    cell.note = 30;
+    cell.instrument = 1;
+    const { data, warnings } = await bytesOf(e);
+    expect(warnings).toEqual([]);
+    const again = parseMusicAssemblerFile(data, name) as TrackerSong;
+    expect(again.gridUnmatchedReason).toBeUndefined();
+    expect(again.patterns[blank.p].channels[blank.v].rows[blank.r].note, 'the typed note').toBe(30);
+    expect(again.patterns[blank.p].channels[blank.v].rows[blank.r].instrument).toBe(1);
+    // every other row is unchanged, except the rows that replay the same event of the shared track
+    let moved = 0;
+    for (let p = 0; p < song.patterns.length; p++) for (let v = 0; v < 4; v++) for (let r = 0; r < song.patterns[p].length; r++) {
+      const a = song.patterns[p].channels[v].rows[r], b = again.patterns[p].channels[v].rows[r];
+      if (a.note === b.note && a.instrument === b.instrument) continue;
+      moved++;
+      const cv = coverOf(p, v, r);
+      const same = cv !== null && cv.src.track === c.src.track && cv.src.trackOffset === c.src.trackOffset && cv.delta === c.delta;
+      expect(same, `row ${p}/${v}/${r} changed but does not replay the typed row`).toBe(true);
+      expect(b.note).toBe(30);
+    }
+    expect(moved).toBeGreaterThanOrEqual(1);
+  });
+
+  it('a removed note leaves its row empty on re-import and every other row unchanged; a note-off is a warning and writes nothing', async () => {
     const at = find(false) ?? find(true)!;
+    const src = grid.cellSources[at.p][at.v][at.r]!;
     const removed = clone(song);
     removed.patterns[at.p].channels[at.v].rows[at.r].note = 0;
-    let blank: { p: number; v: number; r: number } | null = null;
-    for (let p = 0; p < grid.cellSources.length && !blank; p++) for (let v = 0; v < 4 && !blank; v++) for (let r = 0; r < grid.cellSources[p][v].length && !blank; r++) {
-      if (!grid.cellSources[p][v][r] && song.patterns[p].channels[v].rows[r].note === 0) blank = { p, v, r };
+    const r1 = await bytesOf(removed);
+    expect(r1.warnings).toEqual([]);
+    const re = parseMusicAssemblerFile(r1.data, name) as TrackerSong;
+    expect(re.gridUnmatchedReason).toBeUndefined();
+    expect(re.patterns[at.p].channels[at.v].rows[at.r].note, 'the removed row is empty').toBe(0);
+    for (let p = 0; p < song.patterns.length; p++) for (let v = 0; v < 4; v++) for (let r = 0; r < song.patterns[p].length; r++) {
+      const a = song.patterns[p].channels[v].rows[r], b = re.patterns[p].channels[v].rows[r];
+      if (a.note === b.note) continue;
+      const s2 = grid.cellSources[p][v][r];
+      expect(s2 !== null && s2.track === src.track && s2.trackOffset === src.trackOffset, `row ${p}/${v}/${r} changed but does not replay the removed event`).toBe(true);
+      expect(b.note).toBe(0);
     }
-    removed.patterns[blank!.p].channels[blank!.v].rows[blank!.r].note = 30;
-    const noteOff = clone(removed);
+    const noteOff = clone(song);
     noteOff.patterns[at.p].channels[at.v].rows[at.r].note = 97;
-    for (const s of [removed, noteOff]) {
-      const { data, warnings } = await bytesOf(s);
-      expect(warnings.length).toBeGreaterThanOrEqual(1);
-      expect(data.every((b, i) => b === bytes[i])).toBe(true);
-    }
-    // an instrument on a plain note event (no instrument byte)
+    const r2 = await bytesOf(noteOff);
+    expect(r2.warnings.length).toBeGreaterThanOrEqual(1);
+    expect(r2.data.every((b, i) => b === bytes[i])).toBe(true);
+    // an instrument on a plain note event (no instrument byte) is a warning and writes nothing
     const plain = find(false);
     if (plain) {
       const e = clone(song);
