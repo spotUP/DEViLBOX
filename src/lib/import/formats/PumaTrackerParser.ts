@@ -693,3 +693,24 @@ export async function parsePumaTrackerFile(
     uadeVariableLayout: variableLayout,
   };
 }
+
+/**
+ * The PumaTracker layout of a song that holds no module (the New Song wizard's
+ * system preset path): it names the format (formatId) so the native export
+ * router reaches the PumaTracker writer, which builds the module from the
+ * grid. The one id literal and encoder parsePumaTrackerFile's own layout uses.
+ */
+export function emptyPumaTrackerLayout(): UADEVariablePatternLayout {
+  return {
+    formatId: 'pumaTracker',
+    numChannels: 4,
+    numFilePatterns: 0,
+    rowsPerPattern: NUM_ROWS,
+    moduleSize: 0,
+    encoder: pumaTrackerEncoder,
+    filePatternAddrs: [],
+    filePatternSizes: [],
+    trackMap: [],
+    blockRows: [],
+  };
+}

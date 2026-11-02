@@ -196,17 +196,27 @@ function extractOriginalData(originalData: ArrayBuffer): {
 
 /**
  * Export a TrackerSong to PumaTracker (.puma) format.
- * Requires the original file data to be stored as pumaTrackerFileData on the song.
  * Pattern data is rebuilt from the TrackerSong; instrument scripts and samples
- * are copied from the original file.
+ * are copied from the original file (pumaTrackerFileData). A song that holds no
+ * module (a New Song from the system preset) has no instrument scripts or
+ * samples to copy: it is written with none, the module's terminating "inst"
+ * marker only.
  */
 export function exportPumaTrackerFile(song: TrackerSong): Uint8Array {
   const originalData = song.pumaTrackerFileData;
-  if (!originalData) {
-    throw new Error('PumaTracker export requires original file data');
-  }
-
-  const { instrData, sampleEntries, numInstruments } = extractOriginalData(originalData);
+  const { instrData, sampleEntries, numInstruments } = originalData
+    ? extractOriginalData(originalData)
+    : {
+        // One silent instrument (the format needs at least one): "inst" + volume
+        // script ending B0, "insf" + pitch script ending B0, then the terminating "inst".
+        instrData: new Uint8Array([
+          0x69, 0x6E, 0x73, 0x74, 0xB0, 0x00, 0x00, 0x00,
+          0x69, 0x6E, 0x73, 0x66, 0xB0, 0x00, 0x00, 0x00,
+          0x69, 0x6E, 0x73, 0x74,
+        ]),
+        sampleEntries: Array.from({ length: 10 }, () => ({ offset: 0, length: 0, data: new Uint8Array(0) })),
+        numInstruments: 1,
+      };
 
   const numOrders = song.songLength;
 
