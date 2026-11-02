@@ -68,7 +68,7 @@ import type {
 } from '@engine/renderer/worker-types';
 import TrackerWorkerFactory from '@/workers/tracker-render.worker.ts?worker';
 import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
-import { attachFormatKeyboard, type FormatKeyHost, type FormatCursor } from './formatKeyboard';
+import { attachFormatKeyboard, formatKeyOwnedBy, POSITION_MATRIX_ATTR, type FormatKeyHost, type FormatCursor } from './formatKeyboard';
 import { formatChannelLayout } from './formatChannelLayout';
 import { toColumnSpec, formatChannelsToSnapshot, pasteFormatRows } from '@/components/shared/format-editor-types';
 import { transposeFormatNote } from './formatTranspose';
@@ -200,7 +200,9 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // preventScroll: true — never let the browser auto-scroll a parent container
   // when we focus, otherwise the pattern editor jumps when the menu opens.
   useEffect(() => {
-    if (isFormatMode) containerRef.current?.focus({ preventScroll: true });
+    // a position matrix never takes focus on mount: the pattern editor beside it owns the keys until the matrix is clicked
+    if (isFormatMode && !formatRowsArePositions) containerRef.current?.focus({ preventScroll: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFormatMode]);
 
   // Keep refs in sync with props on every render
@@ -276,25 +278,34 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const activeChannelIndex = useCursorStore((s) => s.cursor.channelIndex);
   // The format editors share the tracker's ONE cursor (useCursorStore: row, channel, formatColumnIndex), so the
   // window key handler, Tab, the click handler and this canvas move and draw the same position (P14f).
-  const storedCursorRow = useCursorStore((s) => (isFormatMode ? s.cursor.rowIndex : 0));
-  const storedCursorCol = useCursorStore((s) => (isFormatMode ? (s.cursor.formatColumnIndex ?? 0) : 0));
+  // A position matrix (formatRowsArePositions) is a separate editor next to the pattern editor: its rows are song
+  // positions, not pattern rows, so it keeps its own cursor. Sharing the tracker cursor made a click or scroll in the
+  // pattern editor scroll the matrix, and a pattern row past the last position pinned the matrix row to the bottom.
+  const sharesTrackerCursor = !formatRowsArePositions;
+  const [ownCursor, setOwnCursor] = useState<FormatCursor>({ channelIndex: 0, rowIndex: 0, columnIndex: 0 });
+  const storedCursorRow = useCursorStore((s) => (isFormatMode && sharesTrackerCursor ? s.cursor.rowIndex : 0));
+  const storedCursorCol = useCursorStore((s) => (isFormatMode && sharesTrackerCursor ? (s.cursor.formatColumnIndex ?? 0) : 0));
+  const cursorChannel = sharesTrackerCursor ? activeChannelIndex : ownCursor.channelIndex;
+  const cursorRow = sharesTrackerCursor ? storedCursorRow : ownCursor.rowIndex;
+  const cursorCol = sharesTrackerCursor ? storedCursorCol : ownCursor.columnIndex;
   const formatCursor = useMemo(() => {
     const chs = formatChannels ?? [];
-    const channelIndex = Math.max(0, Math.min(chs.length - 1, activeChannelIndex));
+    const channelIndex = Math.max(0, Math.min(chs.length - 1, cursorChannel));
     const ch = chs[channelIndex];
     return {
       channelIndex,
-      rowIndex: Math.max(0, Math.min((ch?.patternLength ?? 1) - 1, storedCursorRow)),
-      columnIndex: Math.max(0, Math.min((ch?.columns ?? formatColumns ?? []).length - 1, storedCursorCol)),
+      rowIndex: Math.max(0, Math.min((ch?.patternLength ?? 1) - 1, cursorRow)),
+      columnIndex: Math.max(0, Math.min((ch?.columns ?? formatColumns ?? []).length - 1, cursorCol)),
     };
-  }, [formatChannels, formatColumns, activeChannelIndex, storedCursorRow, storedCursorCol]);
+  }, [formatChannels, formatColumns, cursorChannel, cursorRow, cursorCol]);
   const formatCursorRef = useRef(formatCursor);
   formatCursorRef.current = formatCursor;
   const setFormatCursor = useCallback((next: FormatCursor | ((p: FormatCursor) => FormatCursor)) => {
     const prev = formatCursorRef.current;
     const value = typeof next === 'function' ? next(prev) : next;
     formatCursorRef.current = value;
-    useCursorStore.getState().setFormatCursor(value);
+    if (formatRowsArePositionsRef.current) setOwnCursor(value);
+    else useCursorStore.getState().setFormatCursor(value);
   }, []);
   // Notify parent of cursor changes (so SF2/GT stores stay in sync)
   const onFormatCursorChangeRef = useRef(onFormatCursorChange);
@@ -533,7 +544,10 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // the editor column, so grid + deck is what the grid had before it opened.
   // The edit row keeps its deck-closed position against it (see editRowTop).
   const dubDeckHeight = useUIStore(s => s.dubDeckHeight);
-  const referenceHeight = dimensions.height + dubDeckHeight;
+  // The deck takes its height from the pattern editor only; a position matrix keeps its height, so its edit row
+  // centres in its own height (the deck offset pinned the matrix row to the bottom edge).
+  const deckOffset = formatRowsArePositions ? 0 : dubDeckHeight;
+  const referenceHeight = dimensions.height + deckOffset;
   const referenceHeightRef = useRef(referenceHeight);
   referenceHeightRef.current = referenceHeight;
   const lnwPxRef = useRef(lnwPx);
@@ -1183,7 +1197,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   } : null;
   useEffect(() => {
     if (!isFormatMode) return;
-    return attachFormatKeyboard(() => formatHostRef.current);
+    return attachFormatKeyboard(() =>
+      (formatKeyOwnedBy(containerRef.current, formatRowsArePositionsRef.current) ? formatHostRef.current : null));
   }, [isFormatMode]);
 
   // Handle tap on pattern canvas - move cursor to tapped cell
@@ -2063,7 +2078,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           dpr,
           width:              w,
           height:             h,
-          referenceHeight:    h + useUIStore.getState().dubDeckHeight,
+          referenceHeight:    h + (formatRowsArePositionsRef.current ? 0 : useUIStore.getState().dubDeckHeight),
           theme:              snapshotTheme(),
           uiState:            snapshotUI(),
           patterns:           isFormatMode ? snapshotFormatPatterns() : snapshotPatterns(),
@@ -2517,7 +2532,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   }, []);
 
   // Every non-layout input of the layout message, folded into one dependency.
-  const layoutKey = `${dimensions.width}x${dimensions.height}+${dubDeckHeight}@${fitScale}#${layoutTick}`;
+  const layoutKey = `${dimensions.width}x${dimensions.height}+${deckOffset}@${fitScale}#${layoutTick}`;
   const postedLayoutKeyRef = useRef('');
 
   // Forward layout changes to worker when channel widths/offsets change
@@ -3594,6 +3609,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   ref={containerRef}
                   className={`flex-1 relative overflow-hidden touch-none focus:outline-none focus:ring-1 focus:ring-accent-primary/30 ${trackerVisualBg ? 'bg-transparent' : 'bg-dark-bg'} ${recordModeBorderClass(recordMode)}`}
                   data-pattern-editor="true"
+                  {...(formatRowsArePositions ? { [POSITION_MATRIX_ATTR]: 'true' } : {})}
         style={{ minHeight: 200 }}
         tabIndex={0}
         onContextMenu={handleContextMenu}
