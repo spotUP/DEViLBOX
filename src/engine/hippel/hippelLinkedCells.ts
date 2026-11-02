@@ -10,6 +10,7 @@
 import type { TrackerCell } from '@/types';
 import type { HippelCellSpans } from './hippelCellSpans';
 import { mapHippelCells } from './rebuildHippelModule';
+import { noteValueToPitch, pitchToNoteValue } from '@/lib/tracker/noteValue';
 
 export interface GridPos { pattern: number; channel: number; row: number }
 
@@ -61,13 +62,20 @@ export function hippelLinkedEdits(
       // Steps carry their own note and instrument transposes, so one block shows as different values: a changed note or
       // instrument moves every copy by the same interval. A typed value onto, or a clear of, an empty field has no
       // interval and is copied as typed. Fields the edit left alone stay as each copy shows them.
-      const shift = (f: 'note' | 'instrument'): number => {
-        if ((old[f] ?? 0) === (cell[f] ?? 0)) return there[f] ?? 0;
-        const moved = (old[f] ?? 0) > 0 && (cell[f] ?? 0) > 0 && (there[f] ?? 0) > 0;
-        return moved ? (there[f] ?? 0) + ((cell[f] ?? 0) - (old[f] ?? 0)) : (cell[f] ?? 0);
+      // A note interval is counted in pitch: the octave below C-0 is stored -12..-1, so stored values skip 0.
+      const shiftNote = (): number => {
+        const [o, c, t] = [old.note ?? 0, cell.note ?? 0, there.note ?? 0];
+        if (o === c) return t;
+        const [po, pc, pt] = [noteValueToPitch(o), noteValueToPitch(c), noteValueToPitch(t)];
+        return po !== null && pc !== null && pt !== null ? pitchToNoteValue(pt + pc - po) : c;
+      };
+      const shiftInstrument = (): number => {
+        const [o, c, t] = [old.instrument ?? 0, cell.instrument ?? 0, there.instrument ?? 0];
+        if (o === c) return t;
+        return o > 0 && c > 0 && t > 0 ? t + c - o : c;
       };
       out.set(`${pos.pattern}:${pos.channel}:${pos.row}`, {
-        ...pos, values: { note: shift('note'), instrument: shift('instrument'), volume: (old.volume ?? 0) === (cell.volume ?? 0) ? there.volume : cell.volume },
+        ...pos, values: { note: shiftNote(), instrument: shiftInstrument(), volume: (old.volume ?? 0) === (cell.volume ?? 0) ? there.volume : cell.volume },
       });
     }
   }));
