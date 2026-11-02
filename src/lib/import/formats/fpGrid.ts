@@ -88,12 +88,42 @@ export interface FPCellSource {
   retrigger: boolean;
 }
 
+/** A row inside a rest that started on an earlier row: where a note typed there would split the rest. */
+export interface FPRestCover {
+  /** Code offset of the rest command (rest byte 0 at +0, duration byte at +1). */
+  off: number;
+  /** The rest's length in rows (the duration byte without its top bit). */
+  rows: number;
+  /** The row's distance from the rest's first row (0 .. rows - 1). */
+  k: number;
+  /** Return address of the innermost call in force (see FpWalkEvent.ret): which reference brought the voice into the rest's block. */
+  ret: number;
+  delta: number;
+  /** Instrument pointer in force at the rest (0 when none ran on the voice yet). */
+  instr: number;
+  instrCmd: number;
+}
+
+/** A command shown in a cell's effect column: its id, the code offset of its first byte and its length in bytes. */
+export interface FPEffectSource { typ: number; off: number; size: number }
+
+/** Byte length of the commands the effect columns show (command byte, argument byte, then the operand). */
+export const FP_COMMAND_SIZE: Readonly<Record<number, number>> = {
+  [FP_FX.portamento]: 4, [FP_FX.arpTable]: 6, [FP_FX.arpReset]: 2, [FP_FX.transpose1]: 2, [FP_FX.transpose2]: 2,
+};
+
 export interface FpGrid {
   patterns: Pattern[];
   songPositions: number[];
   layout: FpLayout;
   /** Per pattern, voice and row: what the cell was drawn from (null for cells that show no note). */
   cellSources: Array<Array<Array<FPCellSource | null>>>;
+  /** Per pattern, voice and row: every note or rest command that starts on the row, shown or not (a note typed on a blank row finds its rest here). */
+  commandSources: Array<Array<Array<FPCellSource | null>>>;
+  /** Per pattern, voice and row: the rest the row lies inside, when the rest started on an earlier row (null elsewhere). */
+  restCover: Array<Array<Array<FPRestCover | null>>>;
+  /** Per pattern, voice and row: the commands the effect columns show and where they sit in the code (null where none). */
+  effectSources: Array<Array<Array<FPEffectSource[] | null>>>;
   /** Notes whose period names no tracker note. */
   unnamedNotes: number;
   /** Rows where more commands ran on one voice than the cell has effect columns. */
@@ -130,6 +160,9 @@ export function buildFpGridFromWalk(walk: FpWalk, ctx: FpGridContext): FpGrid {
   const rows = layout.rows;
   const grid: TrackerCell[][] = Array.from({ length: channels }, () => Array.from({ length: rows }, emptyCell));
   const src: Array<Array<FPCellSource | null>> = Array.from({ length: channels }, () => new Array<FPCellSource | null>(rows).fill(null));
+  const csrc: Array<Array<FPCellSource | null>> = Array.from({ length: channels }, () => new Array<FPCellSource | null>(rows).fill(null));
+  const cover: Array<Array<FPRestCover | null>> = Array.from({ length: channels }, () => new Array<FPRestCover | null>(rows).fill(null));
+  const esrc: Array<Array<FPEffectSource[] | null>> = Array.from({ length: channels }, () => new Array<FPEffectSource[] | null>(rows).fill(null));
   const slots: number[][] = Array.from({ length: channels }, () => new Array<number>(rows).fill(0));
   const sounding = new Array<boolean>(channels).fill(false);
   const instrCmd = new Array<number>(channels).fill(-1);
@@ -158,23 +191,35 @@ export function buildFpGridFromWalk(walk: FpWalk, ctx: FpGridContext): FpGrid {
       if (retrigger) cell.instrument = ctx.instrId(e.b);
       else put(FP_FX.legato, 0);
       sounding[e.voice] = true;
-      src[e.voice][r] = { off: e.off, delta: e.delta, instr: e.b, instrCmd: instrCmd[e.voice], retrigger };
+      src[e.voice][r] = csrc[e.voice][r] = { off: e.off, delta: e.delta, instr: e.b, instrCmd: instrCmd[e.voice], retrigger };
     } else if (e.kind === FP_WALK.rest) {
       // a rest releases the envelope: the voice stops only where the instrument's release rate is not zero
       if (sounding[e.voice] && fpReleaseRate(ctx.code, e.b) > 0) cell.note = 97;
       sounding[e.voice] = false;
+      csrc[e.voice][r] = { off: e.off, delta: e.delta, instr: e.b, instrCmd: instrCmd[e.voice], retrigger: (e.dur & 0x80) === 0 };
+      const restRows = e.dur & 0x7f;
+      for (let k = 0; k < restRows && r + k < rows; k++) {
+        cover[e.voice][r + k] = { off: e.off, rows: restRows, k, delta: e.delta, instr: e.b, instrCmd: instrCmd[e.voice], ret: e.ret ?? 0 };
+      }
     } else {
       if (e.kind === FP_WALK.end) {
         if (sounding[e.voice]) cell.note = 97;
         sounding[e.voice] = false;
       }
-      for (const [typ, val] of fpEventEffects(e, ctx)) put(typ, val);
+      for (const [typ, val] of fpEventEffects(e, ctx)) {
+        put(typ, val);
+        const size = FP_COMMAND_SIZE[typ];
+        if (size !== undefined) (esrc[e.voice][r] ??= []).push({ typ, off: e.off, size });
+      }
     }
   }
 
   const patterns: Pattern[] = [];
   const songPositions: number[] = [];
   const cellSources: FpGrid['cellSources'] = [];
+  const effectSources: FpGrid['effectSources'] = [];
+  const commandSources: FpGrid['commandSources'] = [];
+  const restCover: FpGrid['restCover'] = [];
   let start = 0;
   layout.patternLengths.forEach((len, p) => {
     const chData: ChannelData[] = grid.map((cells, ch) => ({
@@ -186,7 +231,10 @@ export function buildFpGridFromWalk(walk: FpWalk, ctx: FpGridContext): FpGrid {
     patterns.push({ id: `pattern-${p}`, name: `Pattern ${p}`, length: len, channels: chData });
     songPositions.push(p);
     cellSources.push(src.map((s) => s.slice(start, start + len)));
+    commandSources.push(csrc.map((s) => s.slice(start, start + len)));
+    restCover.push(cover.map((s) => s.slice(start, start + len)));
+    effectSources.push(esrc.map((s) => s.slice(start, start + len)));
     start += len;
   });
-  return { patterns, songPositions, layout, cellSources, unnamedNotes, overflowRows };
+  return { patterns, songPositions, layout, cellSources, commandSources, restCover, effectSources, unnamedNotes, overflowRows };
 }

@@ -90,8 +90,9 @@ the 8 missing-fixture SCRATCH exporters built from a blank song. preTracker (sto
 - [ ] N12 Live MCP check in Chrome: new_song format=monotone and format=mod, write a note, play, audio level
       above 0, export_native round-trips. stop + release_all_notes.
 - [x] N8-avp Activision Pro: blank template takes typed notes on every voice (commit 54997cb9e).
-- [x] N8-ma Music Assembler: a note typed on any covered blank row is cut into the covering held-note or rest event; removal is written; note-off and instrument-only edits still warn. Rows before the voice's first event warn (no covering command). Commit pending (after FP agent).
-- [ ] N8-fp Future Player: rows where a rest starts done (uncommitted). Open: a note inside a long rest needs stream growth; a voice with no stream needs one allocated. Both need command-stream relocation (absolute u32 pointers, gosub/jump). User decision N8 = track rewriter, so build it.
+- [x] N8-ma (commit 1330a0653) Music Assembler: a note typed on any covered blank row is cut into the covering held-note or rest event; removal is written; note-off and instrument-only edits still warn. Rows before the voice's first event warn (no covering command). Commit pending (after FP agent).
+- [x] N8-mon (commit b46c714d5) MONOTONE note 88 shows as a note (was note off); F00, note-off rows and Hz table pinned by monotoneDefects.test.ts as correct.
+- [x] N8-fp Future Player (commit pending, 2026-11-02): notes typed inside long rests split the rest into a copied stream (no global repoint; only the one reference gets a cloned header; restart jumps in the copy enter the copy), a voice with no stream gets one that loops in step, replayed-row notes refused, grown module re-walked for length. Walker takes the whole-song restart as loop point; template loops to row 0 (27088 bytes). Open: no test proves per-occurrence split or no-repoint copy at grid level (template no longer shares blocks; needs a Hybris shared-block grid test).
 - [ ] N13 Manual test by user (Blocked on me): wizard Formats group, pick 3 formats, play a typed note.
 
 ## Template table

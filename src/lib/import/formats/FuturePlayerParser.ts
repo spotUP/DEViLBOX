@@ -104,13 +104,13 @@ interface FPRow {
 // returns its real byte size, its decoded baseline rows, and the call/jump
 // targets it references (so the parser can enumerate the whole reachable graph).
 
-interface DecodedBlock {
+export interface DecodedBlock {
   size: number;         // real byte length [start, start+size)
   rows: FPRow[];        // decoded baseline rows (carrier truth)
   targets: number[];    // cmd6/cmd7 target seq pointers (code-relative)
 }
 
-function decodeBlock(
+export function decodeBlock(
   code: Uint8Array,
   start: number,
   instrumentMap: Map<number, number>,

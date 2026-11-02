@@ -111,8 +111,8 @@
     "status": "written",
     "file": "templates/futurePlayer.fp",
     "source": "public/data/songs/formats/hybris.fp",
-    "variant": "cleared-all-patterns",
-    "bytes": 22716
+    "variant": "trimmed-1-pattern",
+    "bytes": 27088
   },
   "gameMusicCreator": {
     "status": "skipped",
