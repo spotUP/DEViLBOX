@@ -138,6 +138,27 @@ function cosoNoteToXM(cosoNote: number, trackTranspose: number): number {
 
 // ── Format detection ─────────────────────────────────────────────────────────
 
+
+/**
+ * The CoSo layout of a song that holds no module (the New Song wizard's system
+ * preset path): it names the format (formatId) so the native export router
+ * reaches the CoSo serializer, and holds no file patterns. The one id literal
+ * the parser's own layout (parseHippelCoSoFile) uses.
+ */
+export function emptyHippelCoSoLayout(): UADEVariablePatternLayout {
+  return {
+    formatId: 'hippelCoSo',
+    numChannels: 4,
+    numFilePatterns: 0,
+    rowsPerPattern: COSO_ROWS_PER_STEP,
+    moduleSize: 0,
+    encoder: hippelCoSoEncoder,
+    filePatternAddrs: [],
+    filePatternSizes: [],
+    trackMap: [],
+    blockRows: [],
+  };
+}
 /**
  * Detect whether the buffer contains a Jochen Hippel CoSo module.
  * JHPlayer.js reads "COSO" at position 0 of the stream.
