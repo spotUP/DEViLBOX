@@ -11,7 +11,7 @@
  * the raw bytes VERBATIM when the block's rows still equal the baseline (unedited
  * → byte-exact), and falls back to the real ULTEncoder packer the moment any cell
  * differs (edited → re-pack). This is wired into the live chip-RAM rewrite path
- * (UADEChipEditor.rewriteVariablePattern) so the harness measures the same path
+ * (patchModuleByVariableLayout) so the harness measures the same path
  * the editor uses.
  *
  * This test asserts BOTH branches so the carrier can't degenerate into gaming the

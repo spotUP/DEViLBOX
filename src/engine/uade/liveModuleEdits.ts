@@ -14,8 +14,18 @@ export function applyEditedModuleToChipRam(song: TrackerSong): Promise<LiveModul
     if (!UADEEngine.hasInstance()) return null;
     const { exportNativeSong } = await import('@/lib/export/nativeExportRouter');
     const out = await exportNativeSong(null, {});
-    if (!out) return null;
-    const result = await writeEditedModuleLive(song, out.data, UADEEngine.getInstance());
+    let edited: Uint8Array | null = out?.data ?? null;
+    // No exporter for this format: a variable-length layout still places each edited block in the loaded module (G6).
+    if (!edited && song.uadeVariableLayout && song.uadeEditableFileData) {
+      const { patchModuleByVariableLayout } = await import('@/lib/export/layoutPatch');
+      const patch = patchModuleByVariableLayout(song.uadeEditableFileData, song.uadeVariableLayout, song.patterns);
+      for (const r of patch.refused) {
+        console.warn(`[liveModuleEdits] pattern ${r.pattern} voice ${r.channel + 1}: the edited block (${r.encoded} bytes) does not fit its ${r.slot}-byte slot; not written`);
+      }
+      edited = patch.bytes;
+    }
+    if (!edited) return null;
+    const result = await writeEditedModuleLive(song, edited, UADEEngine.getInstance());
     if (result.status === 'next-play' || result.status === 'unplaced') {
       console.warn(`[liveModuleEdits] ${result.status}: ${result.why}; the next play carries the edit`);
     }

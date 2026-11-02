@@ -209,7 +209,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   fur: 'n/a',
   futurePlayer: 'fail',
   gdm: 'n/a',
-  hippelCoso: 'fail',
+  hippelCoso: 'pass',
   hvl: 'pass',
   inStereo2: 'pass',
   inStereoAmbiguous: 'pass',
