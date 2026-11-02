@@ -759,6 +759,11 @@ function parseDigitalSymphonyFileImpl(bytes: Uint8Array, filename: string): Trac
     });
   }
 
+  // Slots the file holds no audio for are not instruments of the song: the
+  // exporter writes a missing slot as an empty virtual entry. Trailing ones are
+  // not listed (a slot in the middle keeps its place, pattern cells name slots).
+  while (instruments.length > 1 && !instruments[instruments.length - 1].sample?.audioBuffer) instruments.pop();
+
   // ── Info chunk (song message, optional) ───────────────────────────────────
   // We read and discard it (or could attach it to the song name).
   if (infoLen > 0 && pos < bytes.length) {
