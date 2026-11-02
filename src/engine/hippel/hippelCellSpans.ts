@@ -92,6 +92,33 @@ export function patchEditedCells(
   const bytes = original.slice();
   const refused: string[] = [];
   let written = 0;
+  // A block the module reuses (one CoSo / 7V pattern behind several steps or voices) has one set of bytes for every grid
+  // cell it shows up as. Writing it in place changes all of them, so it is written only when those cells agree; otherwise
+  // the edit is refused, never written over the cells that still show the old value.
+  const sharers = new Map<number, Array<{ cell: TrackerCell; base: TrackerCell }>>();
+  for (let p = 0; p < patterns.length; p++) {
+    const channels = patterns[p]?.channels ?? [];
+    for (let ch = 0; ch < channels.length; ch++) {
+      const rows = channels[ch]?.rows ?? [];
+      for (let r = 0; r < rows.length; r++) {
+        const span = spans[p]?.[ch]?.[r];
+        const cell = rows[r];
+        if (!span || !cell) continue;
+        const list = sharers.get(span.offset);
+        const entry = { cell, base: span.baselineFor?.(cell) ?? span.baseline };
+        if (list) list.push(entry); else sharers.set(span.offset, [entry]);
+      }
+    }
+  }
+  // Each step has its own note transpose, so copies show one block as different pitches: they agree when they moved by the
+  // same interval from what each decoded as (the linked edit keeps them so), not when they show the same pitch.
+  // A cleared field has no interval: every copy of a cleared field agrees.
+  const step = (v: number | undefined, b: number | undefined) => ((v ?? 0) === 0 ? 'clear' : (v ?? 0) - (b ?? 0));
+  const agreeNote = (offset: number, cell: TrackerCell, base: TrackerCell): boolean =>
+    (sharers.get(offset) ?? []).every((o) => step(o.cell.instrument, o.base.instrument) === step(cell.instrument, base.instrument)
+      && step(o.cell.note, o.base.note) === step(cell.note, base.note));
+  const agreeVolume = (offset: number, cell: TrackerCell): boolean =>
+    (sharers.get(offset) ?? []).every((o) => !volumeDiffers(cell, o.cell));
   for (let p = 0; p < patterns.length; p++) {
     const channels = patterns[p]?.channels ?? [];
     for (let ch = 0; ch < channels.length; ch++) {
@@ -105,6 +132,7 @@ export function patchEditedCells(
           continue;
         }
         if (differs(cell, span.baselineFor?.(cell) ?? span.baseline)) {
+          if (!agreeNote(span.offset, cell, span.baselineFor?.(cell) ?? span.baseline)) { refused.push(`${p}:${ch}:${r}`); continue; }
           const seq = cell.hippelSeq === undefined && (span.baseline.note ?? 0) === 0 ? keySeq(cell.instrument ?? 0) : 0;
           const enc = span.encode(seq !== 0 ? { ...cell, hippelSeq: seq } : cell, bytes);
           if (!enc || enc.length !== span.length) { refused.push(`${p}:${ch}:${r}`); continue; }
@@ -113,6 +141,7 @@ export function patchEditedCells(
         }
         if (volumeDiffers(cell, span.baseline)) {
           const aux = span.aux;
+          if (aux && !agreeVolume(span.offset, cell)) { refused.push(`${p}:${ch}:${r}`); continue; }
           const enc = aux ? aux.encode(cell, bytes) : null;
           if (!aux || !enc || enc.length !== aux.length) { refused.push(`${p}:${ch}:${r}`); continue; }
           bytes.set(enc, aux.offset);

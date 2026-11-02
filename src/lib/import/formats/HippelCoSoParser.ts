@@ -117,7 +117,7 @@ const PT_PERIODS: number[] = [
  * CoSo note 0 → PERIODS[0] = 1712 Hz (very low, sub C-1).
  * CoSo note 12 → PERIODS[12] = 856 = C-1 = XM note 13.
  */
-function cosoNoteToXM(cosoNote: number, trackTranspose: number): number {
+export function cosoNoteToXM(cosoNote: number, trackTranspose: number): number {
   const idx = cosoNote + trackTranspose;
   const clampedIdx = Math.max(0, Math.min(83, idx));
   const period = PERIODS[clampedIdx];
@@ -774,7 +774,7 @@ export function mapHippelCoSoCells(buf: Uint8Array, instrumentCount: number, sub
 const COSO_ROWS_PER_STEP = 16;
 
 /** The CoSo note index that `cosoNoteToXM(index, 0)` shows as `xmNote`, or null. */
-function cosoIndexForXM(xmNote: number): number | null {
+export function cosoIndexForXM(xmNote: number): number | null {
   for (let i = 0; i <= 83; i++) if (cosoNoteToXM(i, 0) === xmNote) return i;
   return null;
 }

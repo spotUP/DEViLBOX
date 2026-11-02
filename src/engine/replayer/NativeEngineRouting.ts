@@ -720,11 +720,20 @@ export async function startNativeEngines(
         if (desc.key === 'Hippel' && song.hippelFileData) {
           const { mapHippelCells } = await import('@/engine/hippel/rebuildHippelModule');
           const { hippelRowAt } = await import('@/engine/hippel/hippelCellSpans');
-          const spans = mapHippelCells(song.hippelFileData, song.instruments.length, song.fileSubsongs?.current ?? 0);
+          const tfmx = instance as unknown as import('@/engine/tfmx/TFMXEngine').TFMXEngine;
+          const subsong = song.fileSubsongs?.current ?? 0;
+          let spans = mapHippelCells(song.hippelFileData, song.instruments.length, subsong);
+          // The offsets are the playing module's: a grid edit can reload a CoSo song laid out again from the grid.
+          let spansFor: ArrayBuffer | null = tfmx.currentModule;
           if (spans) {
-            trackSubscription((instance as unknown as import('@/engine/tfmx/TFMXEngine').TFMXEngine).onPositionUpdate((u) => {
+            trackSubscription(tfmx.onPositionUpdate((u) => {
               if (u.step === undefined || u.step < 0 || u.patternOffset === undefined || u.patternOffset < 0) return;
-              reportEnginePosition(desc.key, hippelRowAt(spans, u.step, u.patternOffset), u.step);
+              const playing = tfmx.currentModule;
+              if (playing && playing !== spansFor) {
+                spansFor = playing;
+                spans = mapHippelCells(playing, song.instruments.length, subsong) ?? spans;
+              }
+              if (spans) reportEnginePosition(desc.key, hippelRowAt(spans, u.step, u.patternOffset), u.step);
             }));
             console.log(`[NativeEngineRouting] Hippel position sync wired (${spans.length} steps)`);
           }
