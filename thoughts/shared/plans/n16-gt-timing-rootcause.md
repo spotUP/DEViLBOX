@@ -149,3 +149,65 @@ notes. Next steps, in order:
    cutting at 16/32/64 frames, which shrinks programs and lifts the cap.
 3. Cluster notes per inferred instrument by program content (not first note),
    up to the 63-instrument limit, before falling back to shared.
+
+### Done (2026-11-02): items 1-3 built
+
+1. **Pitch-relative frequency programs.** Shared programs write vibrato as
+   speed-table rows `[0x80, shift]` (note-relative speed, FreqMode `relative` in
+   the wave rows), so one program serves every pitch. Test: "serves a
+   pitch-relative vibrato at every pitch from one shared program". Fail-before:
+   with the speed table removed from the relative path, 534 freq misses
+   (limit 24).
+2. **Looping periodic tails.** `periodicLoop` finds the repeating tail of a wave
+   or pulse program (scan 512 frames) and closes it with a 0xFF jump row
+   (`waveLoopRows`, `pulseLoopRows`). Test: "loops a repeating vibrato and pulse
+   sweep past the program length". Fail-before proven by the previous agent
+   (~350 freq and ~340 pulse misses without loops).
+3. **Group by program content.** `clusterPrograms` builds every note's relative
+   program, clusters notes per inferred instrument by content, picks each
+   instrument's fallback (top 16 candidates by note count) by note-weighted
+   agreed register changes, then admits other clusters as extra instruments by
+   gain = notes x (own changes - changes agreed with the fallback) while the
+   wave/pulse tables and 63 instruments fit. Test: "groups shared programs by
+   content, not by the first note of an instrument". Fail-before: with the
+   first-note fallback and no admission, 492 freq misses (limit 24).
+
+### Corpus before / after (exact score, first 3000 frames)
+
+| Tune | Plan "after" | Before items 1-3 | Items 1-2 | Items 1-3 |
+|------|------|------|------|------|
+| starfish | 0.579 | 0.579 | 0.5888 | 0.6475 |
+| dmc4 | 0.191 | 0.191 | 0.1855 | 0.2186 |
+| jchnewplayer20 | 0.463 | 0.463 | 0.4879 | 0.5421 |
+| fog | 0.249 | 0.249 | 0.3193 | 0.3171 |
+| wizball | 0.225 | 0.232 | 0.2315 | 0.2315 |
+| commando | 0.462 | 0.462 | 0.4625 | 0.5276 |
+| awry | 0.575 | 0.575 | 0.6292 | 0.6566 |
+| tyne | 0.512 | 0.512 | 0.5114 | 0.5442 |
+| last-ninja | 0.075 | 0.118 | 0.3633 | 0.3633 |
+| proton | 0.607 | 0.607 | 0.6027 | 0.6096 |
+| tel | 0.439 | 0.439 | 0.4637 | 0.4884 |
+
+Fallback/admission variants tried for item 3 (sum of the 11 scores): note-count
+fallback + note-count admission 5.0615 (better awry 0.708, proton 0.624, fog
+0.342, but tel falls to 0.388 as its pulse drops 0.785 to 0.523);
+frame-agreement 5.1479; frame-agreement + gain per row 5.1274;
+change-agreement 5.1465 (kept: within 0.002 of the best and counts register
+changes, which is what the scorer counts); change-agreement + gain per row
+5.1386.
+
+### Open: what still blocks 0.9
+
+- **freq exact is low** on dmc4 (0.01), tyne (0.06), fog (0.10), starfish (0.10):
+  the per-pitch tuning offset is unreachable in relative mode, plus the
+  note-init and waveform-change frames where GT writes freqtbl[note].
+- **filter exact is 0** on starfish, dmc4, jchnewplayer20, tyne, tel: only
+  global filter programs started by a voice-0 note are supported ("filter used
+  but no note starts it" on dmc4).
+- **Table budget**: 217 to 889 distinct note-relative programs per tune against
+  63 instruments and 255 rows per table (proton keeps 63 of 440).
+- **Note segmentation**: wizball decodes 1 note, last-ninja 4; their score is
+  register-copy noise, not conversion.
+- **pulse** is low on commando (0.17) and dmc4 (0.34).
+- tyne hits "pattern limit reached: song truncated".
+- Editing design steps 4-7 stay unbuilt.
