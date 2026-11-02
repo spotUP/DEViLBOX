@@ -13,7 +13,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { X, Music2, Cpu, ChevronRight, ChevronLeft, Check, Search } from 'lucide-react';
-import type { NewSongFormat } from '@/lib/formats/EditableFormatRegistry';
+import { newSongFormatMatches, type NewSongFormat } from '@/lib/formats/EditableFormatRegistry';
 import { SYSTEM_PRESETS } from '@constants/systemPresets';
 import { getInstrumentPresetsForSystem } from '@constants/uadeInstrumentPresets';
 import { useModalClose } from '@hooks/useDialogKeyboard';
@@ -203,7 +203,7 @@ const StepPresetBrowser: React.FC<StepPresetBrowserProps> = ({
 
   const q = filter.trim().toLowerCase();
   const filteredFormats = q && !FORMATS_GROUP_LABEL.toLowerCase().includes(q)
-    ? NEW_SONG_FORMATS.filter((f) => f.name.toLowerCase().includes(q))
+    ? NEW_SONG_FORMATS.filter((f) => newSongFormatMatches(f, q))
     : NEW_SONG_FORMATS;
 
   const filteredGroups = useMemo(() => {
