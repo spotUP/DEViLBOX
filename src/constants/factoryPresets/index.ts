@@ -28,6 +28,7 @@ import { MAKK_FACTORY_PRESETS } from '../makkPresets';
 import { HARMONIC_PRESETS } from '../harmonicPresets';
 import { GOLDEN_ERA_KIT } from '../synthPresets/upRoughSoftsynth';
 import { DJ_ONE_SHOT_PRESETS } from '../djOneShotPresets';
+import { NOSTALGICPLAYER_BANKS } from '../nostalgicPlayerPresets';
 import { ZYNTHIAN_PRESETS } from '../zynthianPresets';
 import { HIVELY_PRESETS } from '../hivelyPresets';
 import { KLYS_FACTORY_PRESETS } from '../klysPresets';
@@ -214,6 +215,7 @@ export const PRESET_CATEGORIES = {
   'DJ FX': DJ_ONE_SHOT_PRESETS,
   'Up Rough': UPROUGH_SOFTSYNTH_FACTORY_PRESETS,
   Odin2: ODIN2_FACTORY_PRESETS,
+  ...NOSTALGICPLAYER_BANKS,
 };
 
 export type PresetCategory = keyof typeof PRESET_CATEGORIES;
