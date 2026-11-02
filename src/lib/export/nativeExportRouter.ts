@@ -114,15 +114,30 @@ export async function exportNativeSong(
     return raw ? normalize(raw) : null;
   }
 
+  const resolved = await resolveNativeExportSong(song);
+  if (!resolved) return null;
+  if (resolved === 'cinter') {
+    const raw = await exportCinterCrunchedFromStores();
+    return raw ? normalize(raw) : null;
+  }
+  const resolvedSong = resolved;
+
+  const raw = await dispatchNativeExport(resolvedSong);
+  return raw ? normalize(raw) : null;
+}
+
+/**
+ * The song an export works on: the replayer's `song`, or (null) the one the stores hold, with the module bytes the
+ * exporters read put back under their names. `'cinter'` when no song exists but a Cinter MOD is loaded (its export
+ * reads the stores directly). Builds the song; never serializes it. Shared by the export and the availability question.
+ */
+async function resolveNativeExportSong(song: TrackerSong | null): Promise<TrackerSong | 'cinter' | null> {
   // No replayer song: a Cinter MOD is still a native Cinter export; otherwise try to
   // reconstruct a song from the format store (hively/klystrack/jamcracker) so callers
   // that never triggered playback still export.
   let resolvedSong = song;
   if (!resolvedSong) {
-    if (await isCinterLoaded()) {
-      const raw = await exportCinterCrunchedFromStores();
-      return raw ? normalize(raw) : null;
-    }
+    if (await isCinterLoaded()) return 'cinter';
     resolvedSong = await reconstructSongFromFormatStore();
     if (!resolvedSong) return null;
   }
@@ -166,9 +181,22 @@ export async function exportNativeSong(
       resolvedSong = { ...resolvedSong, maxTraxFileData: fmtData } as TrackerSong;
     }
   }
+  return resolvedSong;
+}
 
-  const raw = await dispatchNativeExport(resolvedSong);
-  return raw ? normalize(raw) : null;
+/**
+ * Is there a Native export for this song (null: the one the stores hold)? Answered by the same table and the same
+ * fallback preconditions the export dispatches with, without serializing anything. True also when the export would
+ * refuse the song (a note the format cannot hold): the option stays and the refusal is shown when it is chosen.
+ */
+export async function nativeExportAvailable(song: TrackerSong | null): Promise<boolean> {
+  const resolved = await resolveNativeExportSong(song);
+  if (!resolved) return false;
+  if (resolved === 'cinter') return true;
+  if (selectNativeExporter(resolved)) return true;
+  if (layoutPatchSource(resolved)) return true;
+  if (songLayoutFormatId(resolved)) return (await chipRamModuleSize(resolved)) > 0;
+  return rawOriginalAvailable();
 }
 
 // ── Cinter paths (operate on the live stores, not a replayer song) ─────────────
@@ -235,12 +263,154 @@ function isMaxTrax(song: TrackerSong): boolean {
   return b[0] === 0x4d && b[1] === 0x58 && b[2] === 0x54 && b[3] === 0x58; // 'MXTX'
 }
 
-async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult | null> {
-  const format = song.format as string;
+/** One dedicated serializer: which songs it takes, and how it writes them. The ONE table both the export and
+ *  the question "is there a Native export for this song?" read, so the two cannot drift. Order matters: first match wins. */
+interface NativeExporterEntry {
+  id: string;
+  matches: (song: TrackerSong) => boolean;
+  run: (song: TrackerSong, baseName: string) => Promise<RawExportResult | null>;
+}
+
+const songIds = (song: TrackerSong) => ({
+  format: song.format as string,
+  layoutFormatId: songLayoutFormatId(song),
+  formatId: songFormatId(song),
+});
+
+const NATIVE_EXPORTERS: NativeExporterEntry[] = [
+  { id: 'jamcracker', matches: (s) => songIds(s).format === 'JamCracker',
+    run: async (s) => { const { exportAsJamCracker } = await import('./JamCrackerExporter'); return exportAsJamCracker(s); } },
+  // The parser reports format 'MOD' (so UADE routes it); the layout names the format.
+  { id: 'soundMon', matches: (s) => songIds(s).format === 'SMON' || songIds(s).layoutFormatId === 'soundMon',
+    run: async (s) => { const { exportAsSoundMon } = await import('./SoundMonExporter'); return exportAsSoundMon(s); } },
+  // SynTracker keeps format 'MOD' for UADE routing; dispatch on its magic so it doesn't fall through to the MOD exporter.
+  // exportSynTrackerFile writes the edited cells back into a copy of the original module (byte-exact for unedited).
+  { id: 'synTracker', matches: isSynTracker,
+    run: async (s, baseName) => { const { exportSynTrackerFile } = await import('./SynTrackerExporter'); return { data: exportSynTrackerFile(s), filename: `${baseName}.synmod`, warnings: [] }; } },
+  // MaxTrax keeps format 'MOD'; dispatch on the MXTX magic. Use the live edited MaxTraxData from the store when present
+  // (preserves edits); fall back to re-parsing the original bytes only when no edited model exists.
+  { id: 'maxTrax', matches: isMaxTrax,
+    run: async (s, baseName) => {
+      const { encodeMaxTrax, parseMaxTrax } = await import('@lib/import/formats/maxtrax/maxtraxFormat');
+      const { useFormatStore } = await import('@stores/useFormatStore');
+      const live = useFormatStore.getState().maxTraxData;
+      const data = live ?? parseMaxTrax(new Uint8Array(s.maxTraxFileData!));
+      return { data: encodeMaxTrax(data), filename: `${baseName}.mxtx`, warnings: [] };
+    } },
+  // Fred Editor keeps format 'MOD'; its module (with the grid's edits) is the export.
+  { id: 'fredEditor', matches: (s) => songIds(s).formatId === 'fredEditor',
+    run: async (s) => { const { exportFredEditor } = await import('./FredEditorExporter'); return exportFredEditor(s); } },
+  // MONOTONE: its module (with the grid's edits) is the export.
+  { id: 'monotone', matches: (s) => songIds(s).format === 'MON' && !!s.monotoneFileData,
+    run: async (s) => { const { exportMonotone } = await import('./MonotoneExporter'); return exportMonotone(s); } },
+  // ANSI music: channel 0 written as one BASIC PLAY block (no original bytes needed).
+  { id: 'ansiMusic', matches: (s) => songIds(s).format === 'AnsiMusic',
+    run: async (s) => { const { exportAnsiMusic } = await import('./AnsiMusicExporter'); return exportAnsiMusic(s); } },
+  // Sawteeth: the parser sets no chip-RAM layout, so LAYOUT_EXPORTERS (keyed by layout id) never reached it.
+  { id: 'sawteeth', matches: (s) => songIds(s).format === 'SAW',
+    run: async (s) => { const { exportSawteeth } = await import('./SawteethExporter'); return exportSawteeth(s); } },
+  { id: 'actionamics', matches: (s) => songIds(s).formatId === 'actionamics',
+    run: async (s) => { const { exportActionamics } = await import('./ActionamicsExporter'); return exportActionamics(s); } },
+  { id: 'activisionPro', matches: (s) => songIds(s).formatId === 'activisionPro',
+    run: async (s) => { const { exportActivisionPro } = await import('./ActivisionProExporter'); return exportActivisionPro(s); } },
+  { id: 'tfmMusicMaker', matches: (s) => !!s.tfmFileData,
+    run: async (s) => { const { exportTfmMusicMaker } = await import('./TfmMusicMakerExporter'); return exportTfmMusicMaker(s); } },
+  // Digital Sound Studio keeps format 'MOD' (no chip-RAM layout: its samples are native Sampler instruments); the grid's edits are the export.
+  { id: 'dss', matches: (s) => !!s.dssFileData,
+    run: async (s) => {
+      const { exportDssEdited } = await import('./DSSExporter');
+      const out = await exportDssEdited(s);
+      return { data: out.data, filename: out.filename, warnings: out.warnings };
+    } },
+  { id: 'mod', matches: (s) => songIds(s).format === 'MOD' && !songIds(s).layoutFormatId,
+    run: async (s) => {
+      const { exportSongToMOD } = await import('./modExport');
+      const modResult = await exportSongToMOD(s, { bakeSynths: true });
+      return { data: modResult.blob, filename: modResult.filename, warnings: modResult.warnings };
+    } },
+  { id: 'fc', matches: (s) => songIds(s).format === 'FC',
+    run: async (s, baseName) => { const { exportFC } = await import('./FCExporter'); return { data: exportFC(s), filename: `${baseName}.fc`, warnings: [] }; } },
+  { id: 'sidMon2', matches: (s) => { const i = songIds(s); return i.format === 'SIDMON2' || i.format === 'SidMon2' || i.layoutFormatId === 'sidMon2'; },
+    run: async (s, baseName) => { const { exportSidMon2File } = await import('./SidMon2Exporter'); return { data: await exportSidMon2File(s), filename: `${baseName}.sd2`, warnings: [] }; } },
+  // PumaTrackerParser keeps format 'MOD'; its variable layout id names the format.
+  { id: 'pumaTracker', matches: (s) => songIds(s).format === 'PumaTracker' || songIds(s).layoutFormatId === 'pumaTracker',
+    run: async (s, baseName) => { const { exportPumaTrackerFile } = await import('./PumaTrackerExporter'); return { data: exportPumaTrackerFile(s), filename: `${baseName}.puma`, warnings: [] }; } },
+  { id: 'med', matches: (s) => songIds(s).format === 'MED',
+    run: async (s, baseName) => { const { exportMED } = await import('./MEDExporter'); return { data: exportMED(s), filename: `${baseName}.mmd0`, warnings: [] }; } },
+  { id: 'preTracker', matches: (s) => songIds(s).format === 'PreTracker',
+    run: async (_s, baseName) => { const { exportAsPreTracker } = await import('./PreTrackerExporter'); return exportAsPreTracker(baseName); } },
+  { id: 'hively', matches: (s) => { const i = songIds(s); return i.format === 'HVL' || i.format === 'AHX' || i.layoutFormatId === 'hivelyHVL' || i.layoutFormatId === 'hivelyAHX'; },
+    run: async (s) => {
+      const { exportAsHively } = await import('./HivelyExporter');
+      const { useFormatStore } = await import('@stores/useFormatStore');
+      const i = songIds(s);
+      const hvlFmt = (i.format === 'AHX' || i.layoutFormatId === 'hivelyAHX') ? 'ahx' : 'hvl';
+      return exportAsHively(s, { format: hvlFmt, nativeOverride: useFormatStore.getState().hivelyNative });
+    } },
+  { id: 'digiBooster', matches: (s) => songIds(s).format === 'DIGI' || songIds(s).layoutFormatId === 'digiBooster',
+    run: async (s, baseName) => { const { exportDigiBooster } = await import('./DigiBoosterExporter'); return { data: exportDigiBooster(s), filename: `${baseName}.dbm`, warnings: [] }; } },
+  { id: 'oktalyzer', matches: (s) => songIds(s).format === 'OKT' || songIds(s).layoutFormatId === 'oktalyzer',
+    run: async (s, baseName) => { const { exportOktalyzer } = await import('./OktalyzerExporter'); return { data: exportOktalyzer(s), filename: `${baseName}.okt`, warnings: [] }; } },
+  { id: 'klystrack', matches: (s) => songIds(s).format === 'KT' || songIds(s).layoutFormatId === 'klystrack',
+    run: async (s) => { const { exportAsKlystrack } = await import('./KlysExporter'); return exportAsKlystrack(s); } },
+  { id: 'inStereo1', matches: (s) => songIds(s).format === 'IS10' || songIds(s).layoutFormatId === 'inStereo1',
+    run: async (s) => { const { exportInStereo1 } = await import('./InStereo1Exporter'); return exportInStereo1(s); } },
+  { id: 'adPlug', matches: (s) => songIds(s).format === 'AdPlug',
+    run: async (s) => { const { exportAdPlug } = await import('./AdPlugExporter'); return exportAdPlug(s, 'rad'); } },
+  // The module as loaded with the grid's edits patched in - the same bytes the TFMX decoder plays. Byte-exact where nothing was
+  // edited, and it keeps the samples the from-scratch CoSo serializer cannot rebuild.
+  { id: 'hippel', matches: (s) => !!s.hippelFileData && (songIds(s).layoutFormatId === 'hippelCoSo' || songIds(s).layoutFormatId === 'tfmx7v'),
+    run: async (s, baseName) => {
+      const { rebuildHippelSong, hippelRefusedWarnings } = await import('@engine/hippel/rebuildHippelModule');
+      const rebuilt = rebuildHippelSong(s);
+      if (!rebuilt) return null;
+      const warnings = hippelRefusedWarnings(rebuilt.refused);
+      return { data: rebuilt.bytes, filename: `${baseName}.${songIds(s).layoutFormatId === 'hippelCoSo' ? 'hipc' : 'hip7'}`, warnings };
+    } },
+  { id: 'symphoniePro', matches: (s) => songIds(s).layoutFormatId === 'symphoniePro' || !!s.symphonieFileData,
+    run: async (s, baseName) => { const { exportSymphonieProFile } = await import('./SymphonieProExporter'); return { data: exportSymphonieProFile(s), filename: `${baseName}.symmod`, warnings: [] }; } },
+  // Every format flagged `exporter.byLayout` in the EditableFormatRegistry.
+  { id: 'layoutExporter', matches: (s) => !!LAYOUT_EXPORTERS[songIds(s).layoutFormatId],
+    run: async (s, baseName) => {
+      const entry = LAYOUT_EXPORTERS[songIds(s).layoutFormatId];
+      const mod = await import(/* @vite-ignore */ `./${entry.module}`);
+      const exportFn = mod[entry.fn] as (song: TrackerSong) => unknown;
+      return normalizeLayoutOutput(await exportFn(s), baseName, entry.ext);
+    } },
+];
+
+/** The dedicated serializer a song takes, or null. Pure: it never serializes. */
+export function selectNativeExporter(song: TrackerSong): { id: string } | null {
+  return NATIVE_EXPORTERS.find((e) => e.matches(song)) ?? null;
+}
+
+/** The module a layout-only format is patched from (the fallback below), or null when it has no such layout. */
+function layoutPatchSource(song: TrackerSong): ArrayBuffer | Uint8Array | null {
   const layoutFormatId = songLayoutFormatId(song);
-  const formatId = songFormatId(song);
+  if (!layoutFormatId || !song.uadePatternLayout?.encodeCell || song.uadePatternLayout.writeCell) return null;
+  return (song.uadeEditableFileData ?? song.eaglePlayerFileData ?? song.nuadeFileData ?? null) as ArrayBuffer | Uint8Array | null;
+}
+
+/** Size of the module the live UADE chip RAM holds for this song; 0 when no engine runs or the size is unknown. */
+async function chipRamModuleSize(song: TrackerSong): Promise<number> {
+  const { UADEEngine } = await import('@engine/uade/UADEEngine');
+  if (!UADEEngine.hasInstance()) return 0;
+  const { useFormatStore } = await import('@stores/useFormatStore');
+  const moduleSize = useFormatStore.getState().uadeEditableFileData?.byteLength ?? 0;
+  if (moduleSize > 0) return moduleSize;
+  return (song.instruments || []).find((i) => i.uadeChipRam)?.uadeChipRam?.moduleSize ?? 0;
+}
+
+/** True when the format store holds the original module bytes (the last fallback). */
+async function rawOriginalAvailable(): Promise<boolean> {
+  const { useFormatStore } = await import('@stores/useFormatStore');
+  const fmt = useFormatStore.getState();
+  return !!(fmt.uadeEditableFileData || fmt.libopenmptFileData);
+}
+
+async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult | null> {
+  const { format, layoutFormatId } = songIds(song);
   const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
-  let result: RawExportResult | null = null;
 
   // The octave below C-0 (noteValue.ts) is held only by the writers that name notes by the pitch their player
   // plays: Hippel (TFMX/7V and CoSo, patched in place; an unplayable note comes back in `refused`) and Future
@@ -252,131 +422,16 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
     if (refusal) throw new Error(refusal);
   }
 
-  if (format === 'JamCracker') {
-    const { exportAsJamCracker } = await import('./JamCrackerExporter');
-    result = await exportAsJamCracker(song);
-  } else if (format === 'SMON' || layoutFormatId === 'soundMon') {
-    // The parser reports format 'MOD' (so UADE routes it); the layout names the format.
-    const { exportAsSoundMon } = await import('./SoundMonExporter');
-    result = await exportAsSoundMon(song);
-  } else if (isSynTracker(song)) {
-    // SynTracker keeps format 'MOD' for UADE routing; dispatch on its magic so it
-    // doesn't fall through to the MOD exporter. exportSynTrackerFile writes the
-    // edited cells back into a copy of the original module (byte-exact for unedited).
-    const { exportSynTrackerFile } = await import('./SynTrackerExporter');
-    result = { data: exportSynTrackerFile(song), filename: `${baseName}.synmod`, warnings: [] };
-  } else if (isMaxTrax(song)) {
-    // MaxTrax keeps format 'MOD'; dispatch on the MXTX magic. Use the live edited
-    // MaxTraxData from the store when present (preserves edits); fall back to
-    // re-parsing the original bytes only when no edited model exists.
-    const { encodeMaxTrax, parseMaxTrax } = await import('@lib/import/formats/maxtrax/maxtraxFormat');
-    const { useFormatStore } = await import('@stores/useFormatStore');
-    const live = useFormatStore.getState().maxTraxData;
-    const data = live ?? parseMaxTrax(new Uint8Array(song.maxTraxFileData!));
-    result = { data: encodeMaxTrax(data), filename: `${baseName}.mxtx`, warnings: [] };
-  } else if (formatId === 'fredEditor') {
-    // Fred Editor keeps format 'MOD'; its module (with the grid's edits) is the export.
-    const { exportFredEditor } = await import('./FredEditorExporter');
-    result = await exportFredEditor(song);
-  } else if (format === 'MON' && song.monotoneFileData) {
-    // MONOTONE: its module (with the grid's edits) is the export.
-    const { exportMonotone } = await import('./MonotoneExporter');
-    result = await exportMonotone(song);
-  } else if (format === 'AnsiMusic') {
-    // ANSI music: channel 0 written as one BASIC PLAY block (no original bytes needed).
-    const { exportAnsiMusic } = await import('./AnsiMusicExporter');
-    result = exportAnsiMusic(song);
-  } else if (format === 'SAW') {
-    // Sawteeth: the parser sets no chip-RAM layout, so LAYOUT_EXPORTERS (keyed by layout id) never reached it.
-    const { exportSawteeth } = await import('./SawteethExporter');
-    result = await exportSawteeth(song);
-  } else if (formatId === 'actionamics') {
-    // Actionamics: its module (with the grid's edits) is the export.
-    const { exportActionamics } = await import('./ActionamicsExporter');
-    result = await exportActionamics(song);
-  } else if (formatId === 'activisionPro') {
-    // Activision Pro: its module (with the grid's edits) is the export.
-    const { exportActivisionPro } = await import('./ActivisionProExporter');
-    result = await exportActivisionPro(song);
-  } else if (song.tfmFileData) {
-    // TFM Music Maker: its module (with the grid's edits) is the export.
-    const { exportTfmMusicMaker } = await import('./TfmMusicMakerExporter');
-    result = exportTfmMusicMaker(song);
-  } else if (song.dssFileData) {
-    // Digital Sound Studio keeps format 'MOD' (no chip-RAM layout: its samples are native Sampler
-    // instruments); the grid's edits are the export.
-    const { exportDssEdited } = await import('./DSSExporter');
-    const out = await exportDssEdited(song);
-    result = { data: out.data, filename: out.filename, warnings: out.warnings };
-  } else if (format === 'MOD' && !layoutFormatId) {
-    const { exportSongToMOD } = await import('./modExport');
-    const modResult = await exportSongToMOD(song, { bakeSynths: true });
-    result = { data: modResult.blob, filename: modResult.filename, warnings: modResult.warnings };
-  } else if (format === 'FC') {
-    const { exportFC } = await import('./FCExporter');
-    result = { data: exportFC(song), filename: `${baseName}.fc`, warnings: [] };
-  } else if (format === 'SIDMON2' || format === 'SidMon2' || layoutFormatId === 'sidMon2') {
-    const { exportSidMon2File } = await import('./SidMon2Exporter');
-    result = { data: await exportSidMon2File(song), filename: `${baseName}.sd2`, warnings: [] };
-  } else if (format === 'PumaTracker' || layoutFormatId === 'pumaTracker') {
-    // PumaTrackerParser keeps format 'MOD'; its variable layout id names the format.
-    const { exportPumaTrackerFile } = await import('./PumaTrackerExporter');
-    result = { data: exportPumaTrackerFile(song), filename: `${baseName}.puma`, warnings: [] };
-  } else if (format === 'MED') {
-    const { exportMED } = await import('./MEDExporter');
-    result = { data: exportMED(song), filename: `${baseName}.mmd0`, warnings: [] };
-  } else if (format === 'PreTracker') {
-    const { exportAsPreTracker } = await import('./PreTrackerExporter');
-    result = await exportAsPreTracker(baseName);
-  } else if (format === 'HVL' || format === 'AHX' || layoutFormatId === 'hivelyHVL' || layoutFormatId === 'hivelyAHX') {
-    const { exportAsHively } = await import('./HivelyExporter');
-    const { useFormatStore } = await import('@stores/useFormatStore');
-    const hvlFmt = (format === 'AHX' || layoutFormatId === 'hivelyAHX') ? 'ahx' : 'hvl';
-    result = exportAsHively(song, { format: hvlFmt, nativeOverride: useFormatStore.getState().hivelyNative });
-  } else if (format === 'DIGI' || layoutFormatId === 'digiBooster') {
-    const { exportDigiBooster } = await import('./DigiBoosterExporter');
-    result = { data: exportDigiBooster(song), filename: `${baseName}.dbm`, warnings: [] };
-  } else if (format === 'OKT' || layoutFormatId === 'oktalyzer') {
-    const { exportOktalyzer } = await import('./OktalyzerExporter');
-    result = { data: exportOktalyzer(song), filename: `${baseName}.okt`, warnings: [] };
-  } else if (format === 'KT' || layoutFormatId === 'klystrack') {
-    const { exportAsKlystrack } = await import('./KlysExporter');
-    result = await exportAsKlystrack(song);
-  } else if (format === 'IS10' || layoutFormatId === 'inStereo1') {
-    const { exportInStereo1 } = await import('./InStereo1Exporter');
-    result = await exportInStereo1(song);
-  } else if (format === 'AdPlug') {
-    const { exportAdPlug } = await import('./AdPlugExporter');
-    result = exportAdPlug(song, 'rad');
-  } else if (song.hippelFileData && (layoutFormatId === 'hippelCoSo' || layoutFormatId === 'tfmx7v')) {
-    // The module as loaded with the grid's edits patched in — the same bytes
-    // the TFMX decoder plays. Byte-exact where nothing was edited, and it keeps
-    // the samples the from-scratch CoSo serializer cannot rebuild.
-    const { rebuildHippelSong, hippelRefusedWarnings } = await import('@engine/hippel/rebuildHippelModule');
-    const rebuilt = rebuildHippelSong(song);
-    if (rebuilt) {
-      const warnings = hippelRefusedWarnings(rebuilt.refused);
-      result = { data: rebuilt.bytes, filename: `${baseName}.${layoutFormatId === 'hippelCoSo' ? 'hipc' : 'hip7'}`, warnings };
-    }
-  } else if (layoutFormatId === 'symphoniePro' || song.symphonieFileData) {
-    const { exportSymphonieProFile } = await import('./SymphonieProExporter');
-    result = { data: exportSymphonieProFile(song), filename: `${baseName}.symmod`, warnings: [] };
-  } else {
-    const entry = LAYOUT_EXPORTERS[layoutFormatId];
-    if (entry) {
-      const mod = await import(/* @vite-ignore */ `./${entry.module}`);
-      const exportFn = mod[entry.fn] as (s: TrackerSong) => unknown;
-      result = normalizeLayoutOutput(await exportFn(song), baseName, entry.ext);
-    }
-  }
+  const exporter = NATIVE_EXPORTERS.find((e) => e.matches(song));
+  let result: RawExportResult | null = exporter ? await exporter.run(song, baseName) : null;
 
   // A format with a fixed cell layout and no exporter of its own (Dave Lowe, Sound Player ...): the module the song was loaded from with
   // each edited cell's bytes written where the layout puts it - the file Stop and Play would load, and the one a reload reads.
-  if (!result && layoutFormatId && song.uadePatternLayout?.encodeCell && !song.uadePatternLayout.writeCell) {
-    const source = song.uadeEditableFileData ?? song.eaglePlayerFileData ?? song.nuadeFileData;
+  if (!result) {
+    const source = layoutPatchSource(song);
     if (source) {
       const { patchModuleByLayout } = await import('./layoutPatch');
-      const patched = patchModuleByLayout(source, song.uadePatternLayout, song.patterns);
+      const patched = patchModuleByLayout(source, song.uadePatternLayout!, song.patterns);
       const ext = (song.uadeEditableFileName ?? '').split('.').pop() || 'bin';
       result = {
         data: patched.bytes,
@@ -428,13 +483,8 @@ async function readbackFromChipRam(song: TrackerSong, baseName: string): Promise
     if (!UADEEngine.hasInstance()) return null;
     const chipEditor = new UADEChipEditor(UADEEngine.getInstance());
     const { useFormatStore } = await import('@stores/useFormatStore');
-    const fmtData = useFormatStore.getState().uadeEditableFileData;
     const fmtFileName = useFormatStore.getState().uadeEditableFileName;
-    let moduleSize = fmtData?.byteLength ?? 0;
-    if (moduleSize === 0) {
-      const chipInfo = (song.instruments || []).find((i) => i.uadeChipRam)?.uadeChipRam;
-      moduleSize = chipInfo?.moduleSize ?? 0;
-    }
+    const moduleSize = await chipRamModuleSize(song);
     if (moduleSize <= 0) return null;
     const bytes = await chipEditor.readEditedModule(moduleSize);
     const ext = (fmtFileName || song.name || '').split('.').pop() || 'bin';

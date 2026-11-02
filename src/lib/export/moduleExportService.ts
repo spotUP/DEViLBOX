@@ -43,6 +43,15 @@ export async function exportNativeFile(options: ExportNativeOptions = {}): Promi
   return exportNativeSong(null, options);
 }
 
+/**
+ * Is there a Native export for the song the stores hold? Asked of the router's own exporter table: nothing is
+ * serialized, so a dialog can ask on open and on every edit.
+ */
+export async function nativeExportAvailableForLiveSong(): Promise<boolean> {
+  const { nativeExportAvailable } = await import('./nativeExportRouter');
+  return nativeExportAvailable(null);
+}
+
 /** The ProTracker MOD writer with synth voices baked to samples, from the live song. */
 export async function exportBakedMod(options: { channelCount?: 4 | 6 | 8; moduleName?: string } = {}): Promise<ModExportResult> {
   return exportSongToMOD(liveTrackerSong(), { ...options, bakeSynths: true });
