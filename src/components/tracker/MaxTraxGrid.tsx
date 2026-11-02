@@ -8,6 +8,8 @@
  */
 
 import React, { useState, useRef, useLayoutEffect } from 'react';
+import { useTransportStore } from '@stores/useTransportStore';
+import { handleMaxTraxKey, type MaxTraxCursor } from '@/lib/maxtrax/maxtraxKeyboard';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type {
   MaxTraxGrid as MaxTraxGridType,
@@ -89,13 +91,19 @@ interface MaxTraxGridProps {
     setNoteField(eventIndex: number, patch: { pitch?: number; velocity?: number; duration?: number; offset?: number }): void;
     setEffectField(eventIndex: number, patch: { command?: number; data?: number; stopTime?: number }): void;
     setNoteOffset(eventIndex: number, newOffset: number): void;
+    typeNote(column: number, row: number, pitch: number): void;
   };
 }
 
 export const MaxTraxGrid: React.FC<MaxTraxGridProps> = React.memo(({ grid, edit }) => {
   const { rowCount, columns, noteCells, effectCells } = grid;
 
-  const [cursorRow, setCursorRow] = useState(0);
+  const [cursor, setCursor] = useState<MaxTraxCursor>({ column: 0, row: 0 });
+  const cursorRow = cursor.row;
+  const cursorRef = useRef(cursor);
+  cursorRef.current = cursor;
+  const isPlaying = useTransportStore(s => s.isPlaying);
+  const playbackRow = useTransportStore(s => s.currentRow);
   const [cellEdit, setCellEdit] = useState<CellEditState | null>(null);
 
   // ── Virtual scrolling ────────────────────────────────────────────────────────
@@ -184,6 +192,18 @@ export const MaxTraxGrid: React.FC<MaxTraxGridProps> = React.memo(({ grid, edit 
     setCellEdit(null);
   };
 
+  const handleGridKeyDown = (e: React.KeyboardEvent) => {
+    if (cellEdit) return; // the inline field editor owns its own keys
+    handleMaxTraxKey(e, {
+      grid,
+      getCursor: () => cursorRef.current,
+      setCursor,
+      isPlaying: () => isPlaying,
+      playbackRow: () => playbackRow,
+      edit,
+    });
+  };
+
   const handleFieldKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') { e.preventDefault(); commitCellEdit(); }
     if (e.key === 'Escape') { setCellEdit(null); }
@@ -206,7 +226,7 @@ export const MaxTraxGrid: React.FC<MaxTraxGridProps> = React.memo(({ grid, edit 
         key={row}
         className={`${rowBg} hover:bg-dark-bgHover cursor-pointer`}
         style={{ height: ROW_H }}
-        onClick={() => setCursorRow(row)}
+        onClick={() => setCursor(c => ({ ...c, row }))}
       >
         {/* Row number */}
         <td className="px-1 text-right text-text-muted border-r border-dark-borderLight sticky left-0 bg-dark-bg z-10 tabular-nums">
@@ -346,7 +366,7 @@ export const MaxTraxGrid: React.FC<MaxTraxGridProps> = React.memo(({ grid, edit 
       : 0;
 
   return (
-    <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto bg-dark-bg font-mono text-[10px] text-text-primary select-none">
+    <div ref={scrollRef} tabIndex={0} onKeyDown={handleGridKeyDown} className="flex-1 min-h-0 overflow-auto outline-none bg-dark-bg font-mono text-[10px] text-text-primary select-none">
       <table className="border-collapse" style={{ minWidth: 'max-content' }}>
         <thead ref={theadRef} className="sticky top-0 z-10 bg-dark-bgSecondary">
           <tr>

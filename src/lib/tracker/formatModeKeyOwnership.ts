@@ -84,14 +84,16 @@ export function formatModeOwnsEditKey(
  *   'window'  the view draws the tracker store, so the classic window handler (useTrackerInput) writes it
  *   'canvas'  the view draws the format's own native data, and PatternEditorCanvas.handleFormatKeyDown
  *             writes it through the view's onFormatCellChange; the window handler may only jam
- *   'none'    the view has no keyboard entry (a visualiser, or a grid edited by double click); typing only jams
+ *   'view'    a DOM view with its own focused key handler writes the native data (MaxTraxGrid through
+ *             handleMaxTraxKey); the window handler may only jam
+ *   'none'    the view has no keyboard entry (a visualiser, or a view without keyboard entry); typing only jams
  *
  * A Record over EditorMode: adding a mode without deciding who owns its keys is a type error. Before this,
  * the window handler wrote the tracker store in EVERY mode, so a Hively edit landed in a grid the Hively
  * view does not draw (owner 2026-10-07, amanda.ahx).
  */
 
-export type EntryOwner = 'window' | 'canvas' | 'none';
+export type EntryOwner = 'window' | 'canvas' | 'view' | 'none';
 
 export const ENTRY_OWNER: Record<EditorMode, EntryOwner> = {
   classic: 'window',
@@ -105,7 +107,7 @@ export const ENTRY_OWNER: Record<EditorMode, EntryOwner> = {
   cheesecutter: 'canvas',
   musicline: 'canvas',
   goattracker: 'canvas',
-  maxtrax: 'none',
+  maxtrax: 'view',
   sc68: 'none',
 };
 
