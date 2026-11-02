@@ -45,9 +45,9 @@ function argOffset(typ: number): number | null {
   }
 }
 
-/** The commands that end a read run and time themselves with the wait in force: a note, and a mute (0x82). */
+/** The commands that end a read run and time themselves with the wait in force: a note, a mute (0x82) and a hold (0x83). */
 function isNoteSlot(e: DwWalkEvent): boolean {
-  return e.kind === DW_WALK.note || e.kind === DW_WALK.mute;
+  return e.kind === DW_WALK.note || e.kind === DW_WALK.mute || e.kind === DW_WALK.waitRow;
 }
 
 /** A note put on a row the replayer runs no note on (G5). */
@@ -195,9 +195,9 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
         if (!c) continue;
         const events = at.get(`${ch}:${p * ROWS_PER_PATTERN + row}`) ?? [];
         const where = `pattern ${p} voice ${ch + 1} row ${row}`;
-        // A mute is a note slot too: one byte that ends the read run and times itself with the wait in force, so a typed
-        // note replaces it in place (a blank module is all mutes; a note-off row likewise).
-        const noteEv = events.find((e) => e.kind === DW_WALK.note) ?? events.find((e) => e.kind === DW_WALK.mute);
+        // A mute or a hold is a note slot too: one byte that ends the read run and times itself with the wait in force, so
+        // a typed note replaces it in place (the New Song template is all holds; a note-off row is a mute).
+        const noteEv = events.find((e) => e.kind === DW_WALK.note) ?? events.find((e) => e.kind === DW_WALK.mute) ?? events.find((e) => e.kind === DW_WALK.waitRow);
 
         if ((c.note ?? 0) !== (b.note ?? 0)) {
           const n = c.note ?? 0;

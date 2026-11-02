@@ -732,9 +732,9 @@ export async function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: str
       const stray = walk.events.find((e) => e.block !== 0xffffffff && !known.has(e.block));
       if (stray) unmatched = `the replayer ran a block at ${stray.block.toString(16)} the module scan does not know`;
       else if (grid.overflowRows > 0) unmatched = `${grid.overflowRows} rows run more commands on one voice than a cell has effect columns`;
-      // A blank module (the New Song template: every note a mute) is still a grid: its mutes are the note slots a
-      // typed note is written into. Only a walk with neither runs nothing a grid could show.
-      else if (walk.events.every((e) => e.kind !== DW_WALK.note && e.kind !== DW_WALK.mute)) unmatched = 'the replayer starts no note and runs no mute';
+      // A blank module (the New Song template: every note a mute or a hold) is still a grid: its mutes and holds are the
+      // note slots a typed note is written into. Only a walk with none of them runs nothing a grid could show.
+      else if (walk.events.every((e) => e.kind !== DW_WALK.note && e.kind !== DW_WALK.mute && e.kind !== DW_WALK.waitRow)) unmatched = 'the replayer starts no note and runs no mute or hold';
       else {
         patterns = grid.patterns;
         songPositions = grid.songPositions;
