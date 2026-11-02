@@ -49,6 +49,13 @@ export class TFMXEngine extends WASMChannelOutputsEngine {
   /** The subsong loadTune started; a reload (a macro edit, a grid edit) keeps it. */
   private _subsong = 0;
   private _smplData: ArrayBuffer | null = null;
+  /** The module the decoder plays now: the one loadTune started, or the last reloadModule. */
+  private _mdatData: ArrayBuffer | null = null;
+
+  /** The module the decoder plays now (a grid edit can reload a CoSo song laid out again, at other offsets). */
+  get currentModule(): ArrayBuffer | null {
+    return this._mdatData;
+  }
 
   private constructor() {
     super();
@@ -183,6 +190,7 @@ export class TFMXEngine extends WASMChannelOutputsEngine {
     await this._initPromise;
     this._subsong = subsong;
     this._smplData = smplData ?? null;
+    this._mdatData = mdatData;
     if (!this.workletNode) throw new Error('TFMXEngine not initialized');
 
     const mdatCopy = mdatData.slice(0);
@@ -220,6 +228,7 @@ export class TFMXEngine extends WASMChannelOutputsEngine {
 
   reloadModule(mdatData: ArrayBuffer, smplData?: ArrayBuffer | null): void {
     if (!this.workletNode) return;
+    this._mdatData = mdatData;
     const mdatCopy = mdatData.slice(0);
     const smplCopy = smplData ? smplData.slice(0) : null;
     const transfers: Transferable[] = [mdatCopy];

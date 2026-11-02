@@ -84,7 +84,11 @@ describe('a Hippel song', { timeout: 60000 }, () => {
     };
     const { p, ch, r } = transposedNote(song, (b) => mapHippelCoSoCells(b, n), (b, pp, cc) => (b[stepAt(b, pp, cc) + 1] << 24) >> 24);
     const cell = song.patterns[p].channels[ch].rows[r];
+    const unedited = structuredClone(song.patterns);
     cell.note += 2;
+    const { hippelLinkedEdits } = await import('../hippel/hippelLinkedCells');
+    const spans = mapHippelCoSoCells(new Uint8Array(song.hippelFileData!), n);
+    for (const e of hippelLinkedEdits(spans, p, unedited[p], song.patterns[p], song.patterns)) Object.assign(song.patterns[e.pattern].channels[e.channel].rows[e.row], e.values);
     const out = rebuildHippelModule(song.hippelFileData!, song.patterns, n)!;
     expect(out.refused).toEqual([]);
     expect(out.written).toBeGreaterThan(0);
@@ -94,8 +98,9 @@ describe('a Hippel song', { timeout: 60000 }, () => {
 
     // CoSo has no rest byte, and a -2/-3 row is a length command read with
     // the next note: clearing a note, or typing onto a command row, would
-    // change the song's timing. Both are refused and the bytes stay.
-    cell.note = 0;
+    // change the song's timing. Both are refused and the bytes stay (the patcher alone: no linked copies here).
+    song.patterns = structuredClone(unedited);
+    song.patterns[p].channels[ch].rows[r].note = 0;
     const cmdRow = song.patterns[p].channels[ch].rows.findIndex((c, i) => c.note === 0 && mapHippelCoSoCells(new Uint8Array(song.hippelFileData!), n)[p][ch][i]);
     if (cmdRow >= 0) song.patterns[p].channels[ch].rows[cmdRow].note = 49;
     const refused = rebuildHippelModule(song.hippelFileData!, song.patterns, n)!;
@@ -120,6 +125,8 @@ describe('a Hippel song', { timeout: 60000 }, () => {
     const { useTrackerStore } = await import('@stores/useTrackerStore');
     const { useInstrumentStore } = await import('@stores/useInstrumentStore');
     useInstrumentStore.setState({ instruments: song.instruments });
+    const { useFormatStore } = await import('@stores/useFormatStore');
+    useFormatStore.setState({ hippelFileData: song.hippelFileData });
     useTrackerStore.getState().loadPatterns(song.patterns);
     useTrackerStore.getState().setCurrentPattern(p);
     const target = song.patterns[p].channels[ch].rows[r].note + 3;
@@ -132,5 +139,65 @@ describe('a Hippel song', { timeout: 60000 }, () => {
 
     const heard = await parseHippel7VPlayed(reloads[0], 'ghostbattle_gameover.hip7');
     expect(heard.patterns[p].channels[ch].rows[r].note).toBe(target);
+  });
+
+  it('edits every grid copy of a reused 7V block through the store, and one undo puts all copies back', async () => {
+    const song = await parse('7v');
+    const { mapJochenHippel7VCells } = await import('@lib/import/formats/JochenHippel7VParser');
+    const spans = mapJochenHippel7VCells(new Uint8Array(song.hippelFileData!));
+    const where = new Map<number, Array<[number, number, number]>>();
+    song.patterns.forEach((pat, p) => pat.channels.forEach((c, ch) => c.rows.forEach((cell, r) => {
+      const span = spans[p]?.[ch]?.[r];
+      if (!span || cell.note < 13 || cell.note > 40 || cell.hippelSeq) return;
+      const list = where.get(span.offset);
+      if (list) list.push([p, ch, r]); else where.set(span.offset, [[p, ch, r]]);
+    })));
+    const copies = [...where.values()].find((l) => l.length > 1);
+    expect(copies, 'a block the song reuses (sentinel)').toBeDefined();
+    const [p, ch, r] = copies![0];
+    const noteBefore = copies!.map(([pp, cc, rr]) => song.patterns[pp].channels[cc].rows[rr].note);
+
+    loaded = song;
+    const { useTrackerStore } = await import('@stores/useTrackerStore');
+    const { useInstrumentStore } = await import('@stores/useInstrumentStore');
+    const { useFormatStore } = await import('@stores/useFormatStore');
+    useInstrumentStore.setState({ instruments: song.instruments });
+    useFormatStore.setState({ hippelFileData: song.hippelFileData });
+    useTrackerStore.getState().loadPatterns(structuredClone(song.patterns));
+    useTrackerStore.getState().setCurrentPattern(p);
+
+    vi.useFakeTimers();
+    useTrackerStore.getState().setCell(ch, r, { note: noteBefore[0] + 2 });
+    vi.useRealTimers();
+    const shown = () => copies!.map(([pp, cc, rr]) => useTrackerStore.getState().patterns[pp].channels[cc].rows[rr].note);
+    expect(shown(), 'every copy moved by the typed interval').toEqual(noteBefore.map((n) => n + 2));
+
+    useTrackerStore.getState().undoEdit();
+    expect(shown(), 'one undo restores every copy').toEqual(noteBefore);
+  });
+
+  it('refuses a typed note above B-3 in a CoSo song and names the top note', async () => {
+    const song = await parse('coso');
+    loaded = song;
+    const { useTrackerStore } = await import('@stores/useTrackerStore');
+    const { useInstrumentStore } = await import('@stores/useInstrumentStore');
+    const { useFormatStore } = await import('@stores/useFormatStore');
+    const { notify } = await import('@stores/useNotificationStore');
+    const warn = vi.spyOn(notify, 'warning');
+    useInstrumentStore.setState({ instruments: song.instruments });
+    useFormatStore.setState({ hippelFileData: song.hippelFileData });
+    useTrackerStore.getState().loadPatterns(structuredClone(song.patterns));
+    useTrackerStore.getState().setCurrentPattern(0);
+    const noteAt = () => useTrackerStore.getState().patterns[0].channels[0].rows[1].note;
+    const was = noteAt();
+
+    vi.useFakeTimers();
+    useTrackerStore.getState().setCell(0, 1, { note: 49 });
+    expect(noteAt(), 'B-3 + 1 is not stored').toBe(was);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('B-3'));
+    useTrackerStore.getState().setCell(0, 1, { note: 48 });
+    expect(noteAt(), 'B-3 itself is stored').toBe(48);
+    vi.useRealTimers();
+    warn.mockRestore();
   });
 });

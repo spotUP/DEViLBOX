@@ -28,7 +28,8 @@ import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { HippelCoSoConfig, HippelCoSoSampleData } from '@/types/instrument/exotic';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
-import { isCoSo, rebuildHippelSong, hippelRefusedWarnings } from '@/engine/hippel/rebuildHippelModule';
+import { isCoSo, rebuildHippelSong } from '@/engine/hippel/rebuildHippelModule';
+import { cosoIndexForXM } from '@lib/import/formats/HippelCoSoParser';
 
 export interface HippelCoSoExportResult {
   data: Blob;
@@ -61,41 +62,6 @@ function writeString(buf: Uint8Array, off: number, str: string, len: number): vo
 }
 
 function s8toByte(v: number): number { return v < 0 ? v + 256 : v & 0xFF; }
-
-// ── Note conversion ─────────────────────────────────────────────────────────
-
-const PT_PERIODS = [
-  856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
-  428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
-  214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113,
-  107, 101,  95,  90,  85,  80,  76,  72,  68,  64,  60,  57,
-];
-
-const COSO_PERIODS = [
-  1712,1616,1524,1440,1356,1280,1208,1140,1076,1016,960,906,
-  856,808,762,720,678,640,604,570,538,508,480,453,
-  428,404,381,360,339,320,302,285,269,254,240,226,
-  214,202,190,180,170,160,151,143,135,127,120,113,
-  107,101,95,90,85,80,76,72,68,64,60,57,
-  54,51,48,45,43,40,38,36,34,32,30,28,
-  27,25,24,23,21,20,19,18,17,16,15,14,
-];
-
-function xmNoteToCoSo(xmNote: number): number {
-  if (xmNote <= 0 || xmNote > 96) return 0;
-  const ptIdx = xmNote - 13;
-  if (ptIdx < 0 || ptIdx >= PT_PERIODS.length) {
-    return Math.max(0, Math.min(83, xmNote - 1));
-  }
-  const period = PT_PERIODS[ptIdx];
-  let bestIdx = 0;
-  let bestDist = Infinity;
-  for (let i = 0; i < COSO_PERIODS.length; i++) {
-    const d = Math.abs(COSO_PERIODS[i] - period);
-    if (d < bestDist) { bestDist = d; bestIdx = i; }
-  }
-  return bestIdx;
-}
 
 // ── From-scratch serializer ─────────────────────────────────────────────────
 
@@ -228,7 +194,7 @@ function buildCoSoFile(song: TrackerSong): { data: Uint8Array; warnings: string[
 
   // ── Encode patterns ───────────────────────────────────────────────────
   // Each TrackerSong pattern → up to 4 CoSo pattern streams (one per channel)
-  // Deduplicate pattern streams across the song
+  // Pattern streams are not deduplicated (see below)
   const patternPool: Uint8Array[] = [];
   // For each (trackerPattern, channel) → index into patternPool
   const patternMap: number[][] = []; // [patIdx][ch] = poolIdx
@@ -242,7 +208,13 @@ function buildCoSoFile(song: TrackerSong): { data: Uint8Array; warnings: string[
       const bytes: number[] = [];
       for (let r = 0; r < (pat?.length ?? 16); r++) {
         const cell = rows[r];
-        if (!cell || (cell.note ?? 0) <= 0) {
+        // CoSo plays 36 notes (C-1 to B-3). A note outside them has no CoSo index: it is written as a rest and reported,
+        // never as a different pitch.
+        const cosoNote = cell && (cell.note ?? 0) > 0 ? cosoIndexForXM(cell.note) : null;
+        if (cell && (cell.note ?? 0) > 0 && cosoNote === null) {
+          warnings.push(`Pattern ${p} voice ${ch} row ${r}: note ${cell.note} is outside C-1 to B-3, the notes CoSo plays; written as a rest.`);
+        }
+        if (!cell || cosoNote === null) {
           // Rest row. CoSo note byte 0 is a REAL sub-bass note (decodes to xmNote
           // 13), so an empty cell must be the -2 "rest" command (parser: v===-2 →
           // skip 2 bytes, emit an empty cell). One 2-byte event per row keeps the
@@ -250,7 +222,6 @@ function buildCoSoFile(song: TrackerSong): { data: Uint8Array; warnings: string[
           bytes.push(s8toByte(-2)); // rest command
           bytes.push(0);            // param (ignored)
         } else {
-          const cosoNote = xmNoteToCoSo(cell.note);
           bytes.push(s8toByte(cosoNote));
           const volseqIdx = Math.max(0, ((cell.instrument ?? 1) - 1)) & 0x1F;
           bytes.push(volseqIdx);
@@ -259,22 +230,10 @@ function buildCoSoFile(song: TrackerSong): { data: Uint8Array; warnings: string[
       bytes.push(s8toByte(-1)); // end marker
 
       const encoded = new Uint8Array(bytes);
-      // Check for duplicate
-      let found = -1;
-      for (let i = 0; i < patternPool.length; i++) {
-        const existing = patternPool[i];
-        if (existing.length === encoded.length &&
-            existing.every((v, j) => v === encoded[j])) {
-          found = i;
-          break;
-        }
-      }
-      if (found >= 0) {
-        chIndices.push(found);
-      } else {
-        chIndices.push(patternPool.length);
-        patternPool.push(encoded);
-      }
+      // One block per step and voice, never shared: the grid shows a copy per cell, and a block shared by cells the user
+      // never linked would carry the next edit to all of them (G29).
+      chIndices.push(patternPool.length);
+      patternPool.push(encoded);
     }
     patternMap.push(chIndices);
   }
@@ -409,31 +368,33 @@ function buildCoSoFile(song: TrackerSong): { data: Uint8Array; warnings: string[
 
 // ── Public export function ──────────────────────────────────────────────────
 
+/**
+ * The CoSo module a song plays and saves as: the loaded module with the grid edits patched in place when every edit fits,
+ * else the module written again from the grid. The one source for live playback and export, so what is heard is what is
+ * saved. Null when the song has no loaded CoSo module or the from-scratch writer produced nothing.
+ */
+export function hippelCoSoModule(song: TrackerSong): { bytes: Uint8Array; warnings: string[]; fromGrid: boolean } | null {
+  // The from-scratch writer keeps only what the grid and instruments show, so the loaded bytes (with their track
+  // transposes and effects) are kept whenever the patcher can write every edit; edits it refuses (a block shared by several steps or voices, a
+  // longer encoding, a cleared note) need the module laid out again from the grid.
+  const rebuilt = song.hippelFileData && isCoSo(new Uint8Array(song.hippelFileData)) ? rebuildHippelSong(song) : null;
+  if (rebuilt && rebuilt.refused.length === 0) return { bytes: rebuilt.bytes, warnings: [], fromGrid: false };
+  const result = buildCoSoFile(song);
+  return result.data.length > 0 ? { bytes: result.data, warnings: result.warnings, fromGrid: true } : null;
+}
+
 export async function exportAsHippelCoSo(song: TrackerSong): Promise<HippelCoSoExportResult> {
   const warnings: string[] = [];
   const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
 
-  // 1. The loaded module with the grid edits patched in place: the from-scratch
-  //    writer below has no sample bank, so a sample-playing song loses its PCM there.
-  //    Edits the in-place patcher refuses (cleared notes, structure) fall through
-  //    to the from-scratch writer, which copies the same sample bank.
-  const rebuilt = song.hippelFileData && isCoSo(new Uint8Array(song.hippelFileData)) ? rebuildHippelSong(song) : null;
-  if (rebuilt && rebuilt.refused.length === 0) {
-    return {
-      data: new Blob([rebuilt.bytes as unknown as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' }),
-      filename: `${baseName}.hipc`,
-      warnings: hippelRefusedWarnings(rebuilt.refused),
-    };
-  }
-
-  // 2. Build from TrackerSong data
+  // 1. The loaded module with the grid edits patched in place, or written again from the grid (hippelCoSoModule).
   try {
-    const result = buildCoSoFile(song);
-    if (result.data.length > 0) {
+    const module = hippelCoSoModule(song);
+    if (module) {
       return {
-        data: new Blob([result.data as unknown as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' }),
-        filename: `${baseName}.coso`,
-        warnings: [...warnings, ...result.warnings],
+        data: new Blob([module.bytes as unknown as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' }),
+        filename: `${baseName}.hipc`,
+        warnings: module.warnings,
       };
     }
     warnings.push('From-scratch build returned empty data.');

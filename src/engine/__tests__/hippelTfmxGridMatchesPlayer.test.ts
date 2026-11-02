@@ -32,6 +32,7 @@ import { hippelPlayedPitch } from '@/lib/import/formats/hippelPlayedPitch';
 import { periodToPitch } from '@/lib/amiga/periodNotes';
 import { pitchToNoteValue } from '@/lib/tracker/noteValue';
 import { mapHippelCells, rebuildHippelModule } from '@/engine/hippel/rebuildHippelModule';
+import { hippelLinkedEdits } from '@/engine/hippel/hippelLinkedCells';
 import { hippelRowAt } from '@/engine/hippel/hippelCellSpans';
 import { loadTfmxWalkModule, HIPPEL_TFMX_CORPUS, type TfmxWalkHost } from './helpers/tfmxWalkHost';
 
@@ -180,7 +181,11 @@ describe('Hippel Amiga TFMX grid is the decoder walk', () => {
     expect(at, 'a row to edit').not.toBeNull();
     const [p, r, note] = at!;
     const edited = song.patterns.map((pat) => ({ channels: pat.channels.map((c) => ({ rows: c.rows.map((x) => ({ ...x })) })) }));
+    const spans = mapHippelCells(song.hippelFileData!, song.instruments.length)!;
+    const unedited = edited.map((pat) => ({ channels: pat.channels.map((c) => ({ rows: c.rows.map((x) => ({ ...x })) })) }));
     edited[p].channels[1].rows[r].note = note + 2;
+    // A block the module reuses is one pattern behind several steps: the edit reaches every copy (hippelLinkedEdits).
+    for (const e of hippelLinkedEdits(spans, p, unedited[p], edited[p], edited)) Object.assign(edited[e.pattern].channels[e.channel].rows[e.row], e.values);
     const out = rebuildHippelModule(song.hippelFileData!, edited, song.instruments.length)!;
     expect(out.refused).toEqual([]);
     expect(out.written).toBeGreaterThan(0);
