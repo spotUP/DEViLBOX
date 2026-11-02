@@ -12,7 +12,7 @@
  *   DEVILBOX_GEN_TEMPLATES=1 [DEVILBOX_GEN_FORCE=<formatId>[,<formatId>|all]] \
  *     nice -n 19 npx vitest run src/lib/export/__tests__/makeNewSongTemplates.test.ts --maxWorkers=2
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import type { TrackerSong } from '@engine/TrackerReplayer';
@@ -23,6 +23,8 @@ import { FP_FX } from '@lib/import/formats/fpEffectGlyphs';
 import { FpHunkModule, cloneHeader } from '@lib/import/formats/fpModuleGrow';
 import { fpSongs } from '@lib/import/formats/fpWalk';
 import { buildFuturePlayerGrid } from '@lib/import/formats/FuturePlayerParser';
+import { walkDavidWhittaker, dwSubsongCount, DW_WALK } from '@lib/import/formats/DavidWhittakerWasmExtractor';
+import { installDwNodeFetch } from '@lib/import/__tests__/helpers/dwNodeFetch';
 import { detectFormat, detectFormatFromContent } from '@lib/import/FormatRegistry';
 import { FORMAT_REGISTRY } from '@lib/import/formatRegistryData';
 import { listEditableFormats, type EditableFormatDescriptor } from '@lib/formats/EditableFormatRegistry';
@@ -73,6 +75,12 @@ function isEmptyCell(c: TrackerCell | undefined, row = 1): boolean {
 function nonEmptyCells(song: TrackerSong): number {
   let n = 0;
   for (const p of song.patterns) for (const ch of p.channels) ch.rows.forEach((c, row) => { if (!isEmptyCell(c, row)) n++; });
+  return n;
+}
+
+function noteCells(song: TrackerSong): number {
+  let n = 0;
+  for (const p of song.patterns) for (const ch of p.channels) for (const c of ch.rows) if (c.note > 0 && c.note < 97) n++;
   return n;
 }
 
@@ -171,7 +179,50 @@ function fpOnePassTemplate(file: Uint8Array, positions: number): Uint8Array {
     mod.code.set([(header >>> 24) & 0xff, (header >>> 16) & 0xff, (header >>> 8) & 0xff, header & 0xff], at + jumpAt);
     mod.addReloc(at + jumpAt);
   }
+  // Keep subsong 0 only: the table ends at the first zero song pointer (fpSongs, as the replayer reads it). With the
+  // source's other subsongs left in, subsong 0 (all rests) probes silent and the import's subsong chooser opens the
+  // first tune that sounds, so the New Song opened as the source song. The entry's pointer loses its relocation, else
+  // the loader adds the code base to the 0 and the table never ends.
+  const SECOND_ENTRY = 32 + 8;
+  mod.code.fill(0, SECOND_ENTRY, SECOND_ENTRY + 8);
+  mod.relocs = mod.relocs.filter((o) => o < SECOND_ENTRY || o >= SECOND_ENTRY + 8);
   return mod.build();
+}
+
+/** The David Whittaker track command that silences the voice and ends its row read (davidwhittaker.c DW_EFFECT_MUTE). */
+const DW_MUTE_COMMAND = 0x80 | 2;
+
+/**
+ * David Whittaker: turn every note the replayer reads into a mute. The grid comes from the replayer's walk, and a
+ * DW block has no rest byte; the grid edits cannot remove a note (applyDwGridEdits), so the cleared source exports
+ * as the source. A note and the mute are both one byte that ends the voice's row read, so every wait, sample,
+ * envelope and arpeggio command (and the timing they make) stays, and the module's samples stay as instruments.
+ * A mute on a silent voice is no grid cell, so every subsong walks blank. Proved on the patched bytes: no subsong
+ * plays a note, and every patched byte walks as a mute (not a sample, envelope or arpeggio command of this module).
+ */
+async function dwBlankTemplate(file: Uint8Array): Promise<Uint8Array> {
+  const out = new Uint8Array(file);
+  const ab = (b: Uint8Array) => b.slice().buffer as ArrayBuffer;
+  const subsongs = await dwSubsongCount(ab(out));
+  const patched = new Set<number>();
+  for (let s = 0; s < subsongs; s++) {
+    const walk = await walkDavidWhittaker(ab(file), undefined, s);
+    for (const e of walk.events) {
+      if (e.kind !== DW_WALK.note || e.block === 0xffffffff) continue;
+      out[e.block + e.pos] = DW_MUTE_COMMAND;
+      patched.add(e.block + e.pos);
+    }
+  }
+  const mutes = new Set<number>();
+  for (let s = 0; s < subsongs; s++) {
+    const walk = await walkDavidWhittaker(ab(out), undefined, s);
+    for (const e of walk.events) {
+      if (e.kind === DW_WALK.note) throw new Error(`David Whittaker template: subsong ${s} still plays a note at ${e.block + e.pos}`);
+      if (e.kind === DW_WALK.mute) mutes.add(e.block + e.pos);
+    }
+  }
+  for (const at of patched) if (!mutes.has(at)) throw new Error(`David Whittaker template: byte ${at} does not walk as a mute`);
+  return out;
 }
 
 /** Candidate file names, best first; first one the app's detection resolves to `wantKey` wins. */
@@ -240,6 +291,8 @@ async function generate(d: EditableFormatDescriptor): Promise<Verdict> {
       out = await runExporter(d, s);
       // Future Player: every row its own rest, played once (fpOnePassTemplate).
       if (id === 'futurePlayer') out = fpOnePassTemplate(out, FP_TEMPLATE_POSITIONS);
+      // David Whittaker: every note a mute (dwBlankTemplate).
+      if (id === 'davidWhittaker') out = await dwBlankTemplate(out);
     } catch (e) {
       errors.push(`${variant}: export: ${(e as Error).message}`);
       continue;
@@ -255,7 +308,9 @@ async function generate(d: EditableFormatDescriptor): Promise<Verdict> {
       continue;
     }
     if (re.patterns.length < 1) { errors.push(`${variant}: reparse has no patterns`); continue; }
-    const filled = nonEmptyCells(re);
+    // David Whittaker: the blank keeps each voice's sample and envelope selects (the instrument a typed note plays with),
+    // which the walk's grid shows as effect columns; blank there means no note starts.
+    const filled = id === 'davidWhittaker' ? noteCells(re) : nonEmptyCells(re);
     if (filled > 0) { errors.push(`${variant}: reparsed template still has ${filled} non-empty cells`); continue; }
     mkdirSync(OUT_DIR, { recursive: true });
     writeFileSync(join(OUT_DIR, file), out);
@@ -268,6 +323,11 @@ async function generate(d: EditableFormatDescriptor): Promise<Verdict> {
 }
 
 describe.skipIf(!ENABLED)('new-song template generator', () => {
+  // The David Whittaker import walks the module in its WASM replayer; without it the song opens with no grid, so a
+  // template full of notes passed the blank check.
+  let restoreFetch: () => void = () => {};
+  beforeAll(() => { restoreFetch = installDwNodeFetch(); });
+  afterAll(() => restoreFetch());
   it('writes one blank template per exporter format and records every verdict', async () => {
     const verdicts = loadVerdicts();
     const targets = listEditableFormats().filter((d) => d.exporter);

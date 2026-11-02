@@ -21,7 +21,6 @@ import { tryChipDumpParse } from './ChipDumpParsers';
 import { tryUADEPrefixParse } from './UADEPrefixParsers';
 import { tryPCTrackerParse } from './PCTrackerParsers';
 import { songWalks, WalkCancelledError, type SongWalkClient } from '@/lib/import/formats/songWalkClient';
-import { gridOpensInScopeView } from '@/lib/tracker/gridOpensInScopeView';
 import { chooseFileSubsong, fileSubsongFormatByKey } from '@/lib/import/fileSubsongs';
 
 /**
@@ -674,13 +673,11 @@ export async function tryRouteFormat(
       try {
         const { parseDavidWhittakerFile } = await import('@lib/import/formats/DavidWhittakerParser');
         const dwResult = await parseDavidWhittakerFile(buffer, originalFileName, 0, requestedSubsong);
-        // A song the replayer's walk could not be matched to opens in the scope view (no guessed grid);
-        // check if native parser produced any notes; if not, fall to UADE
-        const dwNotes = dwResult.patterns.reduce((sum: number, p: any) =>
-          sum + p.channels.reduce((cs: number, ch: any) =>
-            cs + ch.rows.filter((r: any) => r.note > 0).length, 0), 0);
-        if (dwNotes > 0 || gridOpensInScopeView(dwResult)) return dwResult;
-        console.warn(`[DavidWhittakerParser] 0 notes extracted, falling back to UADE`);
+        // The parser either matched the replayer's walk (editable grid + uadeVariableLayout) or set
+        // gridUnmatchedReason (scope view). Both are its own answer. A matched grid with 0 notes is a
+        // real song too: the blank New Song template is all mutes, and a note typed on it must reach
+        // applyDwGridEdits, which UADE's read-only view never does. So no note-count fallback here.
+        return dwResult;
       } catch (err) {
         console.warn(`[DavidWhittakerParser] Native parse failed for ${filename}, falling back to UADE:`, err);
       }

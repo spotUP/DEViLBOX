@@ -54,6 +54,14 @@ describe('New Song templates open through the product import without UADE', () =
       const song = await parseModuleToSong(new File([new Uint8Array(raw)], name));
       expect(uadeCalls.slice(before), `${template} reached UADE`).toEqual([]);
       expect(song.patterns.length).toBeGreaterThan(0);
+      // Live: the Future Player New Song opened with 1599 notes of Hybris. Its template kept the source's
+      // other subsongs, subsong 0 (all rests) probed silent, and the import's subsong chooser took the
+      // first tune that sounds. A New Song is blank on every open path, so no template holds a note.
+      const notes = song.patterns.reduce(
+        (n, p) => n + p.channels.reduce((m, ch) => m + ch.rows.filter((c) => c.note > 0 && c.note < 97).length, 0),
+        0,
+      );
+      expect(notes, `${template} opens with notes`).toBe(0);
     },
     120_000,
   );

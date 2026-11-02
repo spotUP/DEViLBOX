@@ -45,6 +45,11 @@ function argOffset(typ: number): number | null {
   }
 }
 
+/** The commands that end a read run and time themselves with the wait in force: a note, and a mute (0x82). */
+function isNoteSlot(e: DwWalkEvent): boolean {
+  return e.kind === DW_WALK.note || e.kind === DW_WALK.mute;
+}
+
 /** A note put on a row the replayer runs no note on (G5). */
 interface DwAdd { ch: number; tick: number; note: number; instrument: number; where: string }
 
@@ -80,7 +85,7 @@ function growBlocks(
       const e = walk.events[i];
       if (e.channel !== a.ch || e.block === NO_BLOCK) continue;
       if (e.tick >= a.tick) break;
-      if (e.kind === DW_WALK.note) coverIdx = i;
+      if (isNoteSlot(e)) coverIdx = i;
     }
     const cover = coverIdx >= 0 ? walk.events[coverIdx] : null;
     let wait: DwWalkEvent | null = null;
@@ -173,7 +178,7 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
     const list = at.get(key);
     if (list) list.push(e); else at.set(key, [e]);
     if (e.kind === DW_WALK.sample) lastSample[e.channel] = e;
-    else if (e.kind === DW_WALK.note) noteSample.set(e, lastSample[e.channel]);
+    else if (isNoteSlot(e)) noteSample.set(e, lastSample[e.channel]);
   }
   const adds: DwAdd[] = [];
   const cmdOffset = (e: DwWalkEvent): number => (e.block === NO_BLOCK ? -1 : e.block + e.pos);
@@ -190,7 +195,9 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
         if (!c) continue;
         const events = at.get(`${ch}:${p * ROWS_PER_PATTERN + row}`) ?? [];
         const where = `pattern ${p} voice ${ch + 1} row ${row}`;
-        const noteEv = events.find((e) => e.kind === DW_WALK.note);
+        // A mute is a note slot too: one byte that ends the read run and times itself with the wait in force, so a typed
+        // note replaces it in place (a blank module is all mutes; a note-off row likewise).
+        const noteEv = events.find((e) => e.kind === DW_WALK.note) ?? events.find((e) => e.kind === DW_WALK.mute);
 
         if ((c.note ?? 0) !== (b.note ?? 0)) {
           const n = c.note ?? 0;
