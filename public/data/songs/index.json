@@ -1,8 +1,8 @@
 {
-  "generated": "2026-10-08T10:51:01.520Z",
+  "generated": "2026-11-02T13:05:19.683Z",
   "perEntry": 6,
-  "registryTotal": 279,
-  "covered": 168,
+  "registryTotal": 281,
+  "covered": 182,
   "entries": [
     {
       "id": "actionamics",
@@ -400,6 +400,27 @@
       "dir": "/data/songs/follin-player-ii"
     },
     {
+      "id": "formats-unknown",
+      "label": "formats",
+      "formatKey": null,
+      "files": [
+        "/data/songs/formats/tpu.timelock ingame"
+      ],
+      "total": 1,
+      "dir": "/data/songs/formats"
+    },
+    {
+      "id": "formats-aProSys",
+      "label": "formats / A-Pro-Sys",
+      "formatKey": "aProSys",
+      "files": [
+        "/data/songs/formats/action.aps",
+        "/data/songs/formats/actionfiltersound.aps"
+      ],
+      "total": 2,
+      "dir": "/data/songs/formats"
+    },
+    {
       "id": "formats-amf",
       "label": "formats / Advanced Music Format",
       "formatKey": "amf",
@@ -418,10 +439,11 @@
         "/data/songs/formats/audiosculpture_smallest.adsc",
         "/data/songs/formats/blazing_thunder.hd",
         "/data/songs/formats/jamespond2aga-title.ins",
-        "/data/songs/formats/m-bison.dln",
-        "/data/songs/formats/silmarils_smallest.mok"
+        "/data/songs/formats/krymini jingle 1.amc",
+        "/data/songs/formats/krymini title.amc",
+        "/data/songs/formats/m-bison.dln"
       ],
-      "total": 5,
+      "total": 7,
       "dir": "/data/songs/formats"
     },
     {
@@ -444,6 +466,27 @@
         "/data/songs/formats/primemover_09.hot"
       ],
       "total": 3,
+      "dir": "/data/songs/formats"
+    },
+    {
+      "id": "formats-uade_arp",
+      "label": "formats / ARP",
+      "formatKey": "uade_arp",
+      "files": [
+        "/data/songs/formats/pseudofever.arp"
+      ],
+      "total": 1,
+      "dir": "/data/songs/formats"
+    },
+    {
+      "id": "formats-artAndMagic",
+      "label": "formats / Art and Magic",
+      "formatKey": "artAndMagic",
+      "files": [
+        "/data/songs/formats/agony-level1.aam",
+        "/data/songs/formats/agony-level2.aam"
+      ],
+      "total": 2,
       "dir": "/data/songs/formats"
     },
     {
@@ -499,6 +542,28 @@
         "/data/songs/formats/drwho_final4.dsym"
       ],
       "total": 1,
+      "dir": "/data/songs/formats"
+    },
+    {
+      "id": "formats-uade_dns",
+      "label": "formats / Dynamic Synthesizer",
+      "formatKey": "uade_dns",
+      "files": [
+        "/data/songs/formats/dns.ptc"
+      ],
+      "total": 1,
+      "dir": "/data/songs/formats"
+    },
+    {
+      "id": "formats-uade_ems",
+      "label": "formats / EMS",
+      "formatKey": "uade_ems",
+      "files": [
+        "/data/songs/formats/ballade.song.ems",
+        "/data/songs/formats/je taime.ems",
+        "/data/songs/formats/perception.ems"
+      ],
+      "total": 3,
       "dir": "/data/songs/formats"
     },
     {
@@ -759,6 +824,27 @@
       "dir": "/data/songs/formats"
     },
     {
+      "id": "formats-maximumEffect",
+      "label": "formats / Maximum Effect",
+      "formatKey": "maximumEffect",
+      "files": [
+        "/data/songs/formats/MAX.DinosaurDetective gamedat",
+        "/data/songs/formats/MAX.DinosaurDetective jingle1"
+      ],
+      "total": 2,
+      "dir": "/data/songs/formats"
+    },
+    {
+      "id": "formats-uade_mcmd",
+      "label": "formats / MCMD",
+      "formatKey": "uade_mcmd",
+      "files": [
+        "/data/songs/formats/ep-trmonsterbusiness.mcmd"
+      ],
+      "total": 1,
+      "dir": "/data/songs/formats"
+    },
+    {
       "id": "formats-Michel Winogradoff",
       "label": "formats / Michel Winogradoff",
       "formatKey": "midiLoriciel",
@@ -916,6 +1002,37 @@
       "formatKey": "paulSummers",
       "files": [
         "/data/songs/formats/everton_fc_-_jingles.snk"
+      ],
+      "total": 1,
+      "dir": "/data/songs/formats"
+    },
+    {
+      "id": "formats-peterVerswyvelenPacker",
+      "label": "formats / Peter Verswyvelen Packer",
+      "formatKey": "peterVerswyvelenPacker",
+      "files": [
+        "/data/songs/formats/zarathrusta title.pvp"
+      ],
+      "total": 1,
+      "dir": "/data/songs/formats"
+    },
+    {
+      "id": "formats-pierreAdane",
+      "label": "formats / Pierre Adane",
+      "formatKey": "pierreAdane",
+      "files": [
+        "/data/songs/formats/Ivanhoe_ivanhoe - bonus.pap",
+        "/data/songs/formats/Ivanhoe_ivanhoe - hiscore.pap"
+      ],
+      "total": 2,
+      "dir": "/data/songs/formats"
+    },
+    {
+      "id": "formats-uade_pn",
+      "label": "formats / Pokeynoise",
+      "formatKey": "uade_pn",
+      "files": [
+        "/data/songs/formats/pn.tetris"
       ],
       "total": 1,
       "dir": "/data/songs/formats"
@@ -1162,6 +1279,16 @@
       "dir": "/data/songs/formats"
     },
     {
+      "id": "formats-uade_spl",
+      "label": "formats / Sound Programming Language",
+      "formatKey": "uade_spl",
+      "files": [
+        "/data/songs/formats/boulderdash.spl"
+      ],
+      "total": 1,
+      "dir": "/data/songs/formats"
+    },
+    {
       "id": "formats-soundmon",
       "label": "formats / SoundMon",
       "formatKey": "soundmon",
@@ -1287,6 +1414,16 @@
       "dir": "/data/songs/formats"
     },
     {
+      "id": "formats-thomasHermann",
+      "label": "formats / Thomas Hermann",
+      "formatKey": "thomasHermann",
+      "files": [
+        "/data/songs/formats/thm.blueangel69"
+      ],
+      "total": 1,
+      "dir": "/data/songs/formats"
+    },
+    {
       "id": "formats-tme",
       "label": "formats / TME",
       "formatKey": "tme",
@@ -1304,6 +1441,28 @@
         "/data/songs/formats/irrepressible intro.sg"
       ],
       "total": 1,
+      "dir": "/data/songs/formats"
+    },
+    {
+      "id": "formats-tronic",
+      "label": "formats / Tronic",
+      "formatKey": "tronic",
+      "files": [
+        "/data/songs/formats/crystal.dp",
+        "/data/songs/formats/locomotion.dp"
+      ],
+      "total": 2,
+      "dir": "/data/songs/formats"
+    },
+    {
+      "id": "formats-uade_tw",
+      "label": "formats / TW",
+      "formatKey": "uade_tw",
+      "files": [
+        "/data/songs/formats/blinkys scary school-sfx.tw",
+        "/data/songs/formats/future basketball main.tw"
+      ],
+      "total": 2,
       "dir": "/data/songs/formats"
     },
     {
@@ -1808,20 +1967,20 @@
       "dir": "/data/songs/gbs"
     },
     {
-      "id": "Goat Tracker Ultra-Linus",
-      "label": "Goat Tracker Ultra / Linus",
+      "id": "goat-tracker-ultra-Linus",
+      "label": "goat-tracker-ultra / Linus",
       "formatKey": "goatTracker",
       "subformat": "Linus",
       "files": [
-        "/data/songs/Goat Tracker Ultra/Linus/$3Cold-War-Generation.sng",
-        "/data/songs/Goat Tracker Ultra/Linus/$3Space_Beer.sng",
-        "/data/songs/Goat Tracker Ultra/Linus/$3childhood-ends.sng",
-        "/data/songs/Goat Tracker Ultra/Linus/$3elevate-me-to-the-gallows.sng",
-        "/data/songs/Goat Tracker Ultra/Linus/$3heavy-weight-blues-beard.sng",
-        "/data/songs/Goat Tracker Ultra/Linus/$3modern-love-classics.sng"
+        "/data/songs/goat-tracker-ultra/Linus/$3Cold-War-Generation.sng",
+        "/data/songs/goat-tracker-ultra/Linus/$3Space_Beer.sng",
+        "/data/songs/goat-tracker-ultra/Linus/$3childhood-ends.sng",
+        "/data/songs/goat-tracker-ultra/Linus/$3elevate-me-to-the-gallows.sng",
+        "/data/songs/goat-tracker-ultra/Linus/$3heavy-weight-blues-beard.sng",
+        "/data/songs/goat-tracker-ultra/Linus/$3modern-love-classics.sng"
       ],
       "total": 8,
-      "dir": "/data/songs/Goat Tracker Ultra/Linus"
+      "dir": "/data/songs/goat-tracker-ultra/Linus"
     },
     {
       "id": "gym",
@@ -2094,9 +2253,14 @@
       "label": "sid",
       "formatKey": "c64sid",
       "files": [
-        "/data/songs/sid/abaddon-starfish-test.sid"
+        "/data/songs/sid/abaddon-starfish-test.sid",
+        "/data/songs/sid/bax-hc-dmc4.sid",
+        "/data/songs/sid/cmp-dns-jchnewplayer20.sid",
+        "/data/songs/sid/eco-fog-goattracker2.sid",
+        "/data/songs/sid/galway-wizball.sid",
+        "/data/songs/sid/hubbard-commando.sid"
       ],
-      "total": 1,
+      "total": 11,
       "dir": "/data/songs/sid"
     },
     {
@@ -2376,99 +2540,6 @@
     }
   ],
   "dirs": {
-    "/data/songs/Goat Tracker Ultra/Jammer": {
-      "siblings": [
-        "$3GarysGlitteringSaliva_4x.sng",
-        "$3LastNight_Jammer.sng",
-        "$3TrippyTrappy.sng",
-        "$6Boileroom_2SID.sng",
-        "$6StarsAreUs_2SID.sng"
-      ]
-    },
-    "/data/songs/Goat Tracker Ultra": {
-      "siblings": [],
-      "subdirs": {
-        "Jammer": [
-          "$3GarysGlitteringSaliva_4x.sng",
-          "$3LastNight_Jammer.sng",
-          "$3TrippyTrappy.sng",
-          "$6Boileroom_2SID.sng",
-          "$6StarsAreUs_2SID.sng"
-        ],
-        "JasonPage": [
-          "RType_Amiga2SID.sng"
-        ],
-        "LMan": [
-          "$3LMan-Rivalry-Dubs.sng",
-          "$3LMan-SID-Chip-Club-Menu.sng"
-        ],
-        "Linus": [
-          "$3Cold-War-Generation.sng",
-          "$3Space_Beer.sng",
-          "$3childhood-ends.sng",
-          "$3elevate-me-to-the-gallows.sng",
-          "$3heavy-weight-blues-beard.sng",
-          "$3modern-love-classics.sng",
-          "$3pissholes-in-the-snow.sng",
-          "$3sys64738-days.sng"
-        ],
-        "Mibri": [
-          "$3Mibri - A Tune for Unity [8580].sng",
-          "$3Mibri - Brigade Akin Eco [8580].sng",
-          "$3Mibri - Ebisu [8580].sng",
-          "$3Mibri - I Can't Go On I'll Go On [2x speed 8580].sng",
-          "$3Mibri - Lydia on Speed Dial [8580].sng",
-          "$3Mibri - Psychic Carpet Bombing [3x speed 8580].sng"
-        ],
-        "Shogoon": [
-          "$3In-clouds.sng",
-          "$3jammar-akhbar.sng",
-          "$6Oum-Le-Dauphin.sng",
-          "$6To-Norah.sng"
-        ]
-      }
-    },
-    "/data/songs/Goat Tracker Ultra/JasonPage": {
-      "siblings": [
-        "RType_Amiga2SID.sng"
-      ]
-    },
-    "/data/songs/Goat Tracker Ultra/LMan": {
-      "siblings": [
-        "$3LMan-Rivalry-Dubs.sng",
-        "$3LMan-SID-Chip-Club-Menu.sng"
-      ]
-    },
-    "/data/songs/Goat Tracker Ultra/Linus": {
-      "siblings": [
-        "$3Cold-War-Generation.sng",
-        "$3Space_Beer.sng",
-        "$3childhood-ends.sng",
-        "$3elevate-me-to-the-gallows.sng",
-        "$3heavy-weight-blues-beard.sng",
-        "$3modern-love-classics.sng",
-        "$3pissholes-in-the-snow.sng",
-        "$3sys64738-days.sng"
-      ]
-    },
-    "/data/songs/Goat Tracker Ultra/Mibri": {
-      "siblings": [
-        "$3Mibri - A Tune for Unity [8580].sng",
-        "$3Mibri - Brigade Akin Eco [8580].sng",
-        "$3Mibri - Ebisu [8580].sng",
-        "$3Mibri - I Can't Go On I'll Go On [2x speed 8580].sng",
-        "$3Mibri - Lydia on Speed Dial [8580].sng",
-        "$3Mibri - Psychic Carpet Bombing [3x speed 8580].sng"
-      ]
-    },
-    "/data/songs/Goat Tracker Ultra/Shogoon": {
-      "siblings": [
-        "$3In-clouds.sng",
-        "$3jammar-akhbar.sng",
-        "$6Oum-Le-Dauphin.sng",
-        "$6To-Norah.sng"
-      ]
-    },
     "/data/songs/SUNTronicTunes": {
       "siblings": [
         "Bass-test.src",
@@ -2845,14 +2916,6 @@
       ],
       "subdirs": {
         "Digital Sonix And Chrome": [],
-        "Goat Tracker Ultra": [
-          "Jammer",
-          "JasonPage",
-          "LMan",
-          "Linus",
-          "Mibri",
-          "Shogoon"
-        ],
         "SUNTronicTunes": [
           "Bass-test.src",
           "Bio-1.src",
@@ -3474,6 +3537,10 @@
           "45.okta",
           "64_conversion.tme",
           "Epic Pinball - Song 0 - Title.psm",
+          "Ivanhoe_ivanhoe - bonus.pap",
+          "Ivanhoe_ivanhoe - hiscore.pap",
+          "MAX.DinosaurDetective gamedat",
+          "MAX.DinosaurDetective jingle1",
           "Michel Winogradoff",
           "MusicMaker V8 Old",
           "SUNTronicTunes",
@@ -3483,9 +3550,13 @@
           "a sleep so deep.mod",
           "absm chain mod.it",
           "aces_high.ahx",
+          "action.aps",
           "action_section.aon",
+          "actionfiltersound.aps",
           "adept.smod",
           "african dreams.unic",
+          "agony-level1.aam",
+          "agony-level2.aam",
           "almighty.sa",
           "amnesia_credits.c67",
           "analogue_vibes.jam",
@@ -3504,16 +3575,19 @@
           "astra_2.rk",
           "audiosculpture_smallest.adsc",
           "avoid.amf",
+          "ballade.song.ems",
           "baseheads.ma",
           "batmanreturns.dsr",
           "battleships.rho",
           "beathoven_smallest.bss",
           "blazing_thunder.hd",
+          "blinkys scary school-sfx.tw",
           "bob4.ins",
           "bob4e.dum",
           "bomb jack.fred",
           "boogie.mus",
           "bottle popper.mms",
+          "boulderdash.spl",
           "bounty hunter - outro (remixed).mmd3",
           "breakin's chipsong.gdm",
           "bruno_time.sid2",
@@ -3528,7 +3602,9 @@
           "comic.mus",
           "count_duckula.scr",
           "crusaders1.dm",
+          "crystal.dp",
           "dawnpatrol-sad.dat",
+          "dns.ptc",
           "doink.mus",
           "doxtro3.dss",
           "dragon'sbreath_fanfares.dsc",
@@ -3538,6 +3614,7 @@
           "dynamite_dux.core",
           "easystyleofmsx.mm4",
           "eco.gray",
+          "ep-trmonsterbusiness.mcmd",
           "everton_fc_-_jingles.snk",
           "fantasi8.is",
           "flight.dmu",
@@ -3546,6 +3623,7 @@
           "fonetag.669",
           "fonetag.669.wav",
           "funky nightmare.mmd1",
+          "future basketball main.tw",
           "futurebrain.stx",
           "fuzzball-title.fred",
           "gettysburg.avp",
@@ -3568,10 +3646,14 @@
           "invisibility.dbm",
           "irrepressible intro.sg",
           "jamespond2aga-title.ins",
+          "je taime.ems",
           "jpn.virocop-14",
           "jug-hiscore.ps",
           "kernel.ams",
           "knights_of_sky.gmc",
+          "krymini jingle 1.amc",
+          "krymini title.amc",
+          "locomotion.dp",
           "lollypop-subgame_01.jo",
           "m-bison.dln",
           "m31.far",
@@ -3593,10 +3675,13 @@
           "operation_stealth.sfx",
           "parity_error.plm",
           "pauker_rap_2.ss",
+          "perception.ems",
+          "pn.tetris",
           "prehistoric_tale.hipc",
           "primemover_01.hot",
           "primemover_09.hot",
           "pseudo oops.sun",
+          "pseudofever.arp",
           "rackney'sisland_4.sm",
           "radiokomppi.smus",
           "rebels.fred",
@@ -3631,6 +3716,8 @@
           "the punisher - title.psa",
           "the_day_after.digi",
           "the_plague_game_end.cm",
+          "thm.blueangel69",
+          "tpu.timelock ingame",
           "tristar_cracktro.bss",
           "unic.mk.eagleplayerintro",
           "universal monsters - dracula.mmd0",
@@ -3639,7 +3726,8 @@
           "warlock_the_avenger.sqt",
           "wicked.wb",
           "wildwheels_ingame.jd",
-          "zaktitle.scumm"
+          "zaktitle.scumm",
+          "zarathrusta title.pvp"
         ],
         "fred-gray": [
           "eco.gray"
@@ -3705,7 +3793,13 @@
           "gnu-song.glue"
         ],
         "goat-tracker-ultra": [
-          "$3jammar-akhbar.sng"
+          "$3jammar-akhbar.sng",
+          "Jammer",
+          "JasonPage",
+          "LMan",
+          "Linus",
+          "Mibri",
+          "Shogoon"
         ],
         "graoumf-tracker-2": [
           "living-on-video.gt2"
@@ -4077,7 +4171,17 @@
           "count duckula.scr"
         ],
         "sid": [
-          "abaddon-starfish-test.sid"
+          "abaddon-starfish-test.sid",
+          "bax-hc-dmc4.sid",
+          "cmp-dns-jchnewplayer20.sid",
+          "eco-fog-goattracker2.sid",
+          "galway-wizball.sid",
+          "hubbard-commando.sid",
+          "jch-awry-sidfactory2.sid",
+          "jch-tyne-cheesecutter2.sid",
+          "lees-last-ninja.sid",
+          "proton-cybernoid-goattracker2.sid",
+          "tel-cybernoid-futurecomposer.sid"
         ],
         "sid-factory-2": [
           "Driver 11 Test - Filter.sf2"
@@ -9560,14 +9664,22 @@
         "45.okta",
         "64_conversion.tme",
         "Epic Pinball - Song 0 - Title.psm",
+        "Ivanhoe_ivanhoe - bonus.pap",
+        "Ivanhoe_ivanhoe - hiscore.pap",
+        "MAX.DinosaurDetective gamedat",
+        "MAX.DinosaurDetective jingle1",
         "SnareDrum.ss",
         "WantedTeam.bin",
         "a sleep so deep.mod",
         "absm chain mod.it",
         "aces_high.ahx",
+        "action.aps",
         "action_section.aon",
+        "actionfiltersound.aps",
         "adept.smod",
         "african dreams.unic",
+        "agony-level1.aam",
+        "agony-level2.aam",
         "almighty.sa",
         "amnesia_credits.c67",
         "analogue_vibes.jam",
@@ -9586,16 +9698,19 @@
         "astra_2.rk",
         "audiosculpture_smallest.adsc",
         "avoid.amf",
+        "ballade.song.ems",
         "baseheads.ma",
         "batmanreturns.dsr",
         "battleships.rho",
         "beathoven_smallest.bss",
         "blazing_thunder.hd",
+        "blinkys scary school-sfx.tw",
         "bob4.ins",
         "bob4e.dum",
         "bomb jack.fred",
         "boogie.mus",
         "bottle popper.mms",
+        "boulderdash.spl",
         "bounty hunter - outro (remixed).mmd3",
         "breakin's chipsong.gdm",
         "bruno_time.sid2",
@@ -9610,7 +9725,9 @@
         "comic.mus",
         "count_duckula.scr",
         "crusaders1.dm",
+        "crystal.dp",
         "dawnpatrol-sad.dat",
+        "dns.ptc",
         "doink.mus",
         "doxtro3.dss",
         "dragon'sbreath_fanfares.dsc",
@@ -9620,6 +9737,7 @@
         "dynamite_dux.core",
         "easystyleofmsx.mm4",
         "eco.gray",
+        "ep-trmonsterbusiness.mcmd",
         "everton_fc_-_jingles.snk",
         "fantasi8.is",
         "flight.dmu",
@@ -9628,6 +9746,7 @@
         "fonetag.669",
         "fonetag.669.wav",
         "funky nightmare.mmd1",
+        "future basketball main.tw",
         "futurebrain.stx",
         "fuzzball-title.fred",
         "gettysburg.avp",
@@ -9650,10 +9769,14 @@
         "invisibility.dbm",
         "irrepressible intro.sg",
         "jamespond2aga-title.ins",
+        "je taime.ems",
         "jpn.virocop-14",
         "jug-hiscore.ps",
         "kernel.ams",
         "knights_of_sky.gmc",
+        "krymini jingle 1.amc",
+        "krymini title.amc",
+        "locomotion.dp",
         "lollypop-subgame_01.jo",
         "m-bison.dln",
         "m31.far",
@@ -9675,10 +9798,13 @@
         "operation_stealth.sfx",
         "parity_error.plm",
         "pauker_rap_2.ss",
+        "perception.ems",
+        "pn.tetris",
         "prehistoric_tale.hipc",
         "primemover_01.hot",
         "primemover_09.hot",
         "pseudo oops.sun",
+        "pseudofever.arp",
         "rackney'sisland_4.sm",
         "radiokomppi.smus",
         "rebels.fred",
@@ -9713,6 +9839,8 @@
         "the punisher - title.psa",
         "the_day_after.digi",
         "the_plague_game_end.cm",
+        "thm.blueangel69",
+        "tpu.timelock ingame",
         "tristar_cracktro.bss",
         "unic.mk.eagleplayerintro",
         "universal monsters - dracula.mmd0",
@@ -9721,7 +9849,8 @@
         "warlock_the_avenger.sqt",
         "wicked.wb",
         "wildwheels_ingame.jd",
-        "zaktitle.scumm"
+        "zaktitle.scumm",
+        "zarathrusta title.pvp"
       ],
       "subdirs": {
         "Michel Winogradoff": [
@@ -11676,9 +11805,99 @@
         "gnu-song.glue"
       ]
     },
+    "/data/songs/goat-tracker-ultra/Jammer": {
+      "siblings": [
+        "$3GarysGlitteringSaliva_4x.sng",
+        "$3LastNight_Jammer.sng",
+        "$3TrippyTrappy.sng",
+        "$6Boileroom_2SID.sng",
+        "$6StarsAreUs_2SID.sng"
+      ]
+    },
     "/data/songs/goat-tracker-ultra": {
       "siblings": [
         "$3jammar-akhbar.sng"
+      ],
+      "subdirs": {
+        "Jammer": [
+          "$3GarysGlitteringSaliva_4x.sng",
+          "$3LastNight_Jammer.sng",
+          "$3TrippyTrappy.sng",
+          "$6Boileroom_2SID.sng",
+          "$6StarsAreUs_2SID.sng"
+        ],
+        "JasonPage": [
+          "RType_Amiga2SID.sng"
+        ],
+        "LMan": [
+          "$3LMan-Rivalry-Dubs.sng",
+          "$3LMan-SID-Chip-Club-Menu.sng"
+        ],
+        "Linus": [
+          "$3Cold-War-Generation.sng",
+          "$3Space_Beer.sng",
+          "$3childhood-ends.sng",
+          "$3elevate-me-to-the-gallows.sng",
+          "$3heavy-weight-blues-beard.sng",
+          "$3modern-love-classics.sng",
+          "$3pissholes-in-the-snow.sng",
+          "$3sys64738-days.sng"
+        ],
+        "Mibri": [
+          "$3Mibri - A Tune for Unity [8580].sng",
+          "$3Mibri - Brigade Akin Eco [8580].sng",
+          "$3Mibri - Ebisu [8580].sng",
+          "$3Mibri - I Can't Go On I'll Go On [2x speed 8580].sng",
+          "$3Mibri - Lydia on Speed Dial [8580].sng",
+          "$3Mibri - Psychic Carpet Bombing [3x speed 8580].sng"
+        ],
+        "Shogoon": [
+          "$3In-clouds.sng",
+          "$3jammar-akhbar.sng",
+          "$6Oum-Le-Dauphin.sng",
+          "$6To-Norah.sng"
+        ]
+      }
+    },
+    "/data/songs/goat-tracker-ultra/JasonPage": {
+      "siblings": [
+        "RType_Amiga2SID.sng"
+      ]
+    },
+    "/data/songs/goat-tracker-ultra/LMan": {
+      "siblings": [
+        "$3LMan-Rivalry-Dubs.sng",
+        "$3LMan-SID-Chip-Club-Menu.sng"
+      ]
+    },
+    "/data/songs/goat-tracker-ultra/Linus": {
+      "siblings": [
+        "$3Cold-War-Generation.sng",
+        "$3Space_Beer.sng",
+        "$3childhood-ends.sng",
+        "$3elevate-me-to-the-gallows.sng",
+        "$3heavy-weight-blues-beard.sng",
+        "$3modern-love-classics.sng",
+        "$3pissholes-in-the-snow.sng",
+        "$3sys64738-days.sng"
+      ]
+    },
+    "/data/songs/goat-tracker-ultra/Mibri": {
+      "siblings": [
+        "$3Mibri - A Tune for Unity [8580].sng",
+        "$3Mibri - Brigade Akin Eco [8580].sng",
+        "$3Mibri - Ebisu [8580].sng",
+        "$3Mibri - I Can't Go On I'll Go On [2x speed 8580].sng",
+        "$3Mibri - Lydia on Speed Dial [8580].sng",
+        "$3Mibri - Psychic Carpet Bombing [3x speed 8580].sng"
+      ]
+    },
+    "/data/songs/goat-tracker-ultra/Shogoon": {
+      "siblings": [
+        "$3In-clouds.sng",
+        "$3jammar-akhbar.sng",
+        "$6Oum-Le-Dauphin.sng",
+        "$6To-Norah.sng"
       ]
     },
     "/data/songs/graoumf-tracker-2": {
@@ -28520,7 +28739,17 @@
     },
     "/data/songs/sid": {
       "siblings": [
-        "abaddon-starfish-test.sid"
+        "abaddon-starfish-test.sid",
+        "bax-hc-dmc4.sid",
+        "cmp-dns-jchnewplayer20.sid",
+        "eco-fog-goattracker2.sid",
+        "galway-wizball.sid",
+        "hubbard-commando.sid",
+        "jch-awry-sidfactory2.sid",
+        "jch-tyne-cheesecutter2.sid",
+        "lees-last-ninja.sid",
+        "proton-cybernoid-goattracker2.sid",
+        "tel-cybernoid-futurecomposer.sid"
       ]
     },
     "/data/songs/sid-factory-2": {
@@ -31285,10 +31514,6 @@
   },
   "gaps": [
     {
-      "formatKey": "aProSys",
-      "label": "A-Pro-Sys"
-    },
-    {
       "formatKey": "actionamics",
       "label": "Actionamics"
     },
@@ -31321,12 +31546,8 @@
       "label": "Andrew Parton"
     },
     {
-      "formatKey": "uade_arp",
-      "label": "ARP"
-    },
-    {
-      "formatKey": "artAndMagic",
-      "label": "Art and Magic"
+      "formatKey": "ansiMusic",
+      "label": "ANSI Music"
     },
     {
       "formatKey": "asap-native",
@@ -31389,16 +31610,8 @@
       "label": "DSIK Sound Module"
     },
     {
-      "formatKey": "uade_dns",
-      "label": "Dynamic Synthesizer"
-    },
-    {
       "formatKey": "easyTrax",
       "label": "EasyTrax"
-    },
-    {
-      "formatKey": "uade_ems",
-      "label": "EMS"
     },
     {
       "formatKey": "uade_emsv6",
@@ -31501,20 +31714,12 @@
       "label": "Martin Walker"
     },
     {
-      "formatKey": "maximumEffect",
-      "label": "Maximum Effect"
-    },
-    {
       "formatKey": "uade_mxt",
       "label": "MaxTrax"
     },
     {
       "formatKey": "uade_mxtx",
       "label": "MaxTrax"
-    },
-    {
-      "formatKey": "uade_mcmd",
-      "label": "MCMD"
     },
     {
       "formatKey": "medley",
@@ -31539,6 +31744,10 @@
     {
       "formatKey": "wow",
       "label": "Mod's Grave WOW"
+    },
+    {
+      "formatKey": "monotone",
+      "label": "MONOTONE"
     },
     {
       "formatKey": "moshPacker",
@@ -31581,20 +31790,8 @@
       "label": "Paul Tonge"
     },
     {
-      "formatKey": "peterVerswyvelenPacker",
-      "label": "Peter Verswyvelen Packer"
-    },
-    {
-      "formatKey": "pierreAdane",
-      "label": "Pierre Adane"
-    },
-    {
       "formatKey": "pmd",
       "label": "PMD"
-    },
-    {
-      "formatKey": "uade_pn",
-      "label": "Pokeynoise"
     },
     {
       "formatKey": "pt36",
@@ -31645,10 +31842,6 @@
       "label": "Sonic Arranger P"
     },
     {
-      "formatKey": "uade_spl",
-      "label": "Sound Programming Language"
-    },
-    {
       "formatKey": "uade_st",
       "label": "SoundTracker prefix"
     },
@@ -31685,10 +31878,6 @@
       "label": "THN"
     },
     {
-      "formatKey": "thomasHermann",
-      "label": "Thomas Hermann"
-    },
-    {
       "formatKey": "timeTracker",
       "label": "Time Tracker"
     },
@@ -31699,14 +31888,6 @@
     {
       "formatKey": "uade_tomy",
       "label": "TomyTracker"
-    },
-    {
-      "formatKey": "tronic",
-      "label": "Tronic"
-    },
-    {
-      "formatKey": "uade_tw",
-      "label": "TW"
     },
     {
       "formatKey": "uax",
