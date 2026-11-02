@@ -29,11 +29,78 @@ function readStr(buf: Uint8Array, off: number, len: number): string {
 /** Per-frame register snapshot of every voice (chips * 3). */
 type FrameState = VoiceFrame[];
 
+/** The per-frame register trace of a SID tune: what `traceSid` returns. */
+export interface SidTrace {
+  /** [voice][frame], voice = chip * 3 + voice-in-chip. */
+  voices: VoiceFrame[][];
+  /** [frame] = the 32 raw register bytes of every chip, chip after chip (chips * 32 bytes). */
+  chipRegs: Uint8Array[];
+  frameRate: number;
+  chips: number;
+  chipBases: number[];
+  chipModels: string[];
+  /** SID clock in Hz (PAL 985248, NTSC 1022727). */
+  clock: number;
+  frames: number;
+}
+
+interface SidSetup {
+  loadAddrField: number; loadAddr: number; initAddr: number; playAddr: number;
+  codeOffset: number; chipBases: number[]; chipModels: string[]; isNTSC: boolean;
+}
+
+/** Header fields the emulation and the song builder both need. */
+function readSidSetup(buf: Uint8Array): SidSetup {
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const dataOffset = dv.getUint16(6, false);
+  const loadAddrField = dv.getUint16(8, false);
+  const initAddr = dv.getUint16(10, false);
+  const playAddr = dv.getUint16(12, false);
+  const header = parseSIDHeader(buf);
+  const chipModels = header?.chipModels ?? ['Unknown'];
+  const chipBases = [0xD400];
+  if (header?.secondSID) chipBases.push(0xD000 + buf[0x7A] * 16);
+  if (header?.thirdSID) chipBases.push(0xD000 + buf[0x7B] * 16);
+  let loadAddr = loadAddrField;
+  if (loadAddr === 0 && buf.length > dataOffset + 1) loadAddr = buf[dataOffset] | (buf[dataOffset + 1] << 8);
+  return {
+    loadAddrField, loadAddr, initAddr, playAddr,
+    codeOffset: loadAddrField === 0 ? dataOffset + 2 : dataOffset,
+    chipBases, chipModels, isNTSC: header?.clockSpeed === 'NTSC',
+  };
+}
+
+/**
+ * Run the tune's 6502 code and return the per-frame SID register trace.
+ * Pure: no cache, no song building. Null when the file is not a PSID/RSID or
+ * has no init/play code to run. The one trace loop (parseSIDFile and the
+ * GoatTracker builder both read it).
+ */
+export function traceSid(buffer: ArrayBuffer): SidTrace | null {
+  if (!isSIDFormat(buffer)) return null;
+  const buf = new Uint8Array(buffer);
+  const st = readSidSetup(buf);
+  if (!(st.loadAddr > 0 && st.initAddr > 0)) return null;
+  const run = runSIDEmulation(buf, st.loadAddr, st.initAddr, st.playAddr, st.codeOffset, st.chipBases);
+  if (run.frameStates.length === 0) return null;
+  const numVoices = st.chipBases.length * 3;
+  return {
+    voices: Array.from({ length: numVoices }, (_, v) => run.frameStates.map((fs) => fs[v])),
+    chipRegs: run.chipRegs,
+    frameRate: st.isNTSC ? 60 : 50,
+    chips: st.chipBases.length,
+    chipBases: st.chipBases,
+    chipModels: st.chipModels,
+    clock: st.isNTSC ? 1022727 : 985248,
+    frames: run.frameStates.length,
+  };
+}
+
 function runSIDEmulation(
   buf: Uint8Array,
   loadAddr: number, initAddr: number, playAddr: number,
   dataOffset: number, chipBases: number[],
-): FrameState[] {
+): { frameStates: FrameState[]; chipRegs: Uint8Array[] } {
   const numVoices = chipBases.length * 3;
   // 18000 frames ≈ 6 min PAL / 5 min NTSC — covers most SID tunes
   const FRAMES = 18000;
@@ -99,9 +166,10 @@ function runSIDEmulation(
       effectivePlayAddr = irqAddr;
     }
   }
-  if (effectivePlayAddr === 0) return [];
+  if (effectivePlayAddr === 0) return { frameStates: [], chipRegs: [] };
 
   const frameStates: FrameState[] = [];
+  const chipRegs: Uint8Array[] = [];
   let totalCycles = 0;
 
   for (let f = 0; f < FRAMES && totalCycles < MAX_TOTAL_CYCLES; f++) {
@@ -125,9 +193,10 @@ function runSIDEmulation(
       });
     }
     frameStates.push(voiceFrames);
+    chipRegs.push(sidRegs.slice());
   }
 
-  return frameStates;
+  return { frameStates, chipRegs };
 }
 
 // ── Notes on the fitted row grid ──
@@ -319,27 +388,13 @@ export function isSIDFormat(buffer: ArrayBuffer): boolean {
 export async function parseSIDFile(buffer: ArrayBuffer, filename: string): Promise<TrackerSong> {
   if (!isSIDFormat(buffer)) throw new Error('Not a valid SID file');
   const buf = new Uint8Array(buffer);
-  const dv  = new DataView(buffer);
 
-  const dataOffset = dv.getUint16(6, false);
-  const loadAddrField = dv.getUint16(8, false);
-  const initAddr   = dv.getUint16(10, false);
-  const playAddr   = dv.getUint16(12, false);
   const title      = readStr(buf, 22, 32);
   const author     = readStr(buf, 54, 32);
   // Chips, models and clock from the one header reader (SIDHeaderParser).
-  const header = parseSIDHeader(buf);
-  const chipModels = header?.chipModels ?? ['Unknown'];
-  const chipBases = [0xD400];
-  if (header?.secondSID) chipBases.push(0xD000 + buf[0x7A] * 16);
-  if (header?.thirdSID) chipBases.push(0xD000 + buf[0x7B] * 16);
-  const isNTSC = header?.clockSpeed === 'NTSC';
+  const setup = readSidSetup(buf);
+  const { chipModels, chipBases, isNTSC } = setup;
   const frameRate = isNTSC ? 60 : 50;
-
-  let loadAddr = loadAddrField;
-  if (loadAddr === 0 && buf.length > dataOffset + 1) {
-    loadAddr = buf[dataOffset] | (buf[dataOffset + 1] << 8);
-  }
 
   const voiceInstruments: InstrumentConfig[] = [];
   const chips = chipBases.length;
@@ -361,7 +416,6 @@ export async function parseSIDFile(buffer: ArrayBuffer, filename: string): Promi
   const channelNames = voiceInstruments.map((i) => i.name);
   let instruments: InstrumentConfig[] = voiceInstruments;
   const sidClock = isNTSC ? 1022727 : 985248;
-  const codeOffset = loadAddrField === 0 ? dataOffset + 2 : dataOffset;
 
   // ── Try cache first ──
   let patterns: Pattern[];
@@ -390,15 +444,15 @@ export async function parseSIDFile(buffer: ArrayBuffer, filename: string): Promi
       })),
     });
 
-    if (loadAddr > 0 && initAddr > 0) {
+    if (setup.loadAddr > 0 && setup.initAddr > 0) {
       try {
-        const frameStates = runSIDEmulation(buf, loadAddr, initAddr, playAddr, codeOffset, chipBases);
+        const trace = traceSid(buffer);
 
-        if (frameStates.length > 0) {
+        if (trace) {
           bpm = Math.round(frameRate * 5 / 2);
 
           // Gate-segmented notes, one instrument per distinct sound, rows fitted to the note starts.
-          const voices = Array.from({ length: numCh }, (_, v) => frameStates.map((fs) => fs[v]));
+          const voices = trace.voices;
           const decoded = segmentNotes(voices, sidClock);
           const reps = inferInstruments(decoded);
           if (reps.length > 0) {
@@ -407,7 +461,7 @@ export async function parseSIDFile(buffer: ArrayBuffer, filename: string): Promi
           const grid = fitGrid(decoded);
           speed = grid.framesPerRow;
 
-          let rows = notesToRows(decoded, grid, frameStates.length, numCh);
+          let rows = notesToRows(decoded, grid, trace.frames, numCh);
           rows = trimTrailingSilence(rows);
 
           if (rows.length > 0) {
