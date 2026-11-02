@@ -960,3 +960,22 @@ export async function parseSidMon2File(
     uadeVariableLayout: variableLayout,
   };
 }
+
+/**
+ * The variable-length layout of a SidMon II song with no file behind it (the New Song preset): it names the format to the
+ * export router, which builds the module from the grid (SidMon2Writer).
+ */
+export function emptySidMon2Layout(): UADEVariablePatternLayout {
+  return {
+    formatId: 'sidMon2',
+    numChannels: 4,
+    numFilePatterns: 0,
+    rowsPerPattern: 64,
+    moduleSize: 0,
+    encoder: sidMon2Encoder,
+    filePatternAddrs: [],
+    filePatternSizes: [],
+    trackMap: [],
+    blockRows: [],
+  };
+}

@@ -12,6 +12,7 @@
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { Sd2Engine } from '@/engine/sidmon2/Sd2Engine';
 import { editedCells } from '@/lib/song/gridBaseline';
+import { buildSidMon2File } from './SidMon2Writer';
 
 /** The module with the note edits of `song` written into its note commands. Returns the bytes and what was not written. */
 export function writeSidMon2NoteEdits(song: TrackerSong, module: ArrayBuffer, loaded: ArrayBuffer | null = song.sd2FileData ?? null): { data: ArrayBuffer; warnings: string[] } {
@@ -50,6 +51,7 @@ export async function exportSidMon2File(song: TrackerSong): Promise<ArrayBuffer>
     if (data && data.byteLength > 0) module = data;
   }
   module ??= song.sd2FileData ?? null;
-  if (!module) throw new Error('SidMon II export requires either a running Sd2Engine or stored file data');
+  // No module to patch (a New Song): the file is built from the song.
+  if (!module) return buildSidMon2File(song).data;
   return writeSidMon2NoteEdits(song, module).data;
 }
