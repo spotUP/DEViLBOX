@@ -230,3 +230,27 @@ Causes found:
 Attempted fix (not committed, saved as thoughts/shared/plans/n16-vibrato-wip.patch, 263 lines): vibratoOf() detects a GT instrument vibrato per note (sign pattern of gplay.c CMD_VIBRATO from vibtime 0, holds on tick-0 frames, vibdelay counted from frame start + 2), forces a wavetable note row on frame start + 1 to reset vibtime, writes plain wave rows from the vibrato start, and sets ins.ptr[STBL] = [cmp, speed] and ins.vibdelay. Detection finds the right parameters for the first voice-3 note (cmp 2, speed 3, delay 1), but only 5 of 2152 eco-fog notes qualify (cause 2), and the end-to-end regression test in the patch fails: the replayed first note matches only 23 percent of frames. Unverified why: likely the shared (clustered) program build keeps a fallback program without the vibrato for this note, or the GT tick-0 phase in the rebuild differs from the source. Scores with the patch: eco-fog 0.325 (freq exact 0.116, tolerant 0.235), proton 0.609 (unchanged).
 
 Next, in order: (a) find why the rebuilt first note does not replay the vibrato (check which program and instrument the note is assigned, and the GT tick of frame start + 2); (b) fix segmentation so wavetable gate rises do not start notes (decoder level, biggest eco-fog share); (c) absolute and negative wavetable notes for proton; then filter.
+
+## 2026-11-02 late: re-gates inside one note (open item b)
+
+Violated invariant: a decoded note is a GoatTracker note init. A GT note init rewrites the frequency (gplay.c note init), restarts the wave and pulse programs, and (unless gatetimer 0x40) gates off and writes adparam `gatetimer` frames before. A gate rise that does none of this is not a note init; GT makes it with a pattern KEYON (0xbf, gplay.c GETNEWNOTES `cptr->gate = 0xff`, read at the same tick as KEYOFF) after a KEYOFF, or the wavetable with a gate bit.
+
+Level: the decoder (sidTraceDecode.ts segmentNotes), which starts a note at every gate rise. The builder then has to express the continuation as KEYOFF/KEYON rows instead of a new note.
+
+Decisive measurement (eco-fog voice 3, trace dump frames 0-1200): gate rises at 7 (wave 0x09 then 0x41, AD/SR loaded: a real note), falls at 581, rises at 773, falls at 869, rises at 965. Across 581..773 and 869..965 the frequency keeps its vibrato (771 468, 772 465, 773 462, 774 465 ...), the pulse sweep continues (2080 -> 2080 -> 2072), AD/SR stay e0/9e (no adparam 0f00 hard restart), the waveform stays 0x4. So 773 and 965 are KEYONs of the note from frame 7, not new notes.
+
+Rule built: a gate rise continues the voice's previous note when (1) no AD/SR change in the gate-off gap (no hard restart, no ADSR load), (2) the waveform nibble is unchanged and the test bit is clear at the rise, (3) the frequency and pulse steps at the rise are no larger than the largest step in the 4 frames before, and (4) at least one of them was moving in those frames (a static held tone stays a separate note: no evidence either way, old behaviour kept). Such rises become `regates` on the note; the builder writes KEYOFF/KEYON rows and keeps the gate bit set in the program's wave rows across the gap.
+
+Result (3000 frames, sidTraceScore corpus test, before -> after):
+
+| tune | notes | score | freq exact |
+|------|-------|-------|------------|
+| eco-fog | 2152 -> 2147 | 0.3171 -> 0.3212 | 0.096 -> 0.110 (n 5557) |
+| proton | 4365 -> 4365 | 0.6096 -> 0.6096 | 0.259 -> 0.259 (n 8103) |
+| wizball | 1 -> 1 | 0.2315 -> 0.2315 | 0.286 |
+| last-ninja | 4 -> 4 | 0.3633 -> 0.3633 | 0.392 |
+
+The rule fires where measured (eco-fog voice 2: regates 581->677 and 869->965; voice 3: 581->773 and 869->965, the frame-7 note now runs to 1061), but eco-fog has only five such rises in 3000 frames. Most eco-fog notes are short (voice 1: 4-frame notes, voice 3: 22-frame notes after frame 1543) and are real note inits. So item (b) is correct but small; the earlier estimate that it is the 'biggest eco-fog share' was wrong. The freq gap is dominated by item (a), the missing instrument vibrato, and by (c) absolute wavetable notes. wizball and last-ninja have almost no gate rises: their notes change inside one held gate, a different segmentation problem (pitch-change splitting), not addressed here.
+
+Regression test: sidTraceScore.test.ts 'GoatTracker re-gates inside one note' (synthetic 4 notes with vibrato, pulse sweep and a gate gap). With the rule: 4 notes, 4 KEYON rows, freq exact >= 0.9. With continuesAcrossGate forced false: 8 notes, test fails.
+

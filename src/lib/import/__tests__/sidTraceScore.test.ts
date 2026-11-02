@@ -160,6 +160,35 @@ describe('GoatTracker looping programs', () => {
   });
 });
 
+describe('GoatTracker re-gates inside one note', () => {
+  it('keeps a gate rise that restarts nothing inside the note, as KEYOFF and KEYON rows', async () => {
+    // eco-fog voice 3 shape: the gate falls and rises again while the vibrato and the pulse
+    // sweep run on and no hard restart happens. A GT note init there would reset the pitch
+    // to freqtbl[note] and restart the vibrato phase; GT makes it with KEYOFF / KEYON.
+    const vib = [0, 4, 8, 12, 8, 4, 0, -4, -8, -4];
+    const v0: Array<Partial<VoiceFrame>> = [];
+    for (let i = 0; i < 40; i++) v0.push({});
+    // Note lengths share an 8-frame row; the gate gap spans two rows so KEYOFF and KEYON land on
+    // separate rows.
+    for (const [gt, len] of [[36, 48], [38, 56], [40, 40], [41, 64]]) {
+      for (let t = 0; t < len; t++) {
+        const gated = t < 8 || (t >= 24 && t < len - 2);
+        v0.push({ freq: gtFreq(gt) + vib[t % vib.length], pulse: 0x400 + 8 * t, control: gated ? 0x41 : 0x40, ad: 0x09, sr: 0xa0 });
+      }
+    }
+    for (let i = 0; i < 40; i++) v0.push({ pulse: 0x800, control: 0x40, ad: 0x09, sr: 0xa0 });
+    const trace = synthTrace(v0);
+    const built = sidTraceToGoatTracker(trace);
+    expect(built.framesPerRow).toBe(8);
+    expect(built.noteCount).toBe(4);
+    const voice0 = built.song.orderlists[0][0].slice(0, -2).flatMap((p) => built.song.patterns[p].map((row) => row[0]));
+    expect(voice0.filter((x) => x === 0xbf)).toHaveLength(4);
+    const s = scoreSidTrace(trace, built, await createHeadlessGT());
+    expect(s.perClass.freq.changes).toBeGreaterThan(100);
+    expect(s.perClass.freq.exact / s.perClass.freq.changes).toBeGreaterThanOrEqual(0.9);
+  });
+});
+
 describe('GoatTracker conversion of a SID trace replays in the GTUltra core', () => {
   for (const file of readdirSync(DIR).filter((f) => f.endsWith('.sid')).sort()) {
     it(`${file}: replay score`, async () => {

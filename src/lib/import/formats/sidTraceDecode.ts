@@ -37,6 +37,11 @@ export interface DecodedNote {
   instrument: number;   // 1-based, assigned by inferInstruments
   frame: VoiceFrame;    // registers at note start (after settling)
   program: SoundProgram;
+  /**
+   * Gate fall / rise pairs inside the note that are not note inits: the pitch,
+   * pulse and envelope run on across them (a GoatTracker KEYOFF then KEYON).
+   */
+  regates: Array<{ off: number; on: number }>;
 }
 
 export interface SoundProgram {
@@ -99,30 +104,80 @@ function programOf(frames: VoiceFrame[], start: number, end: number): SoundProgr
   };
 }
 
+/** Frames before a gate rise whose steps bound a continuing modulation. */
+const CONTINUE_WINDOW = 4;
+
+/**
+ * True when the gate rise at `on` (gate off since `off`) is not a note init:
+ * a player note init rewrites the frequency, restarts the wave and pulse
+ * programs and usually hard-restarts the envelope. Here nothing restarts: the
+ * envelope registers are unchanged across the gap, the waveform is the same
+ * without the test bit, and the frequency and pulse steps at the rise are no
+ * larger than the steps of a modulation that was moving just before. A held,
+ * unmodulated tone gives no evidence and stays a new note.
+ */
+function continuesAcrossGate(frames: VoiceFrame[], off: number, on: number): boolean {
+  const at = frames[on];
+  if (off < 1 || on - off < 1 || (at.control & 0x08) !== 0) return false;
+  if ((at.control >> 4) !== (frames[on - 1].control >> 4) || at.freq === 0) return false;
+  for (let f = off - 1; f < on; f++) {
+    if (frames[f].ad !== at.ad || frames[f].sr !== at.sr) return false;
+  }
+  const from = Math.max(1, on - CONTINUE_WINDOW);
+  let freqStep = 0, pulseStep = 0;
+  for (let f = from; f < on; f++) {
+    freqStep = Math.max(freqStep, Math.abs(frames[f].freq - frames[f - 1].freq));
+    pulseStep = Math.max(pulseStep, Math.abs(frames[f].pulse - frames[f - 1].pulse));
+  }
+  if (freqStep === 0 && pulseStep === 0) return false;
+  return Math.abs(at.freq - frames[on - 1].freq) <= freqStep
+    && Math.abs(at.pulse - frames[on - 1].pulse) <= pulseStep;
+}
+
+/**
+ * The control register a note's own program writes at frame f: inside a
+ * re-gate gap the gate is cleared by the pattern (KEYOFF), not by the program,
+ * so the program keeps the gate bit.
+ */
+export function programControl(n: DecodedNote, frames: VoiceFrame[], f: number): number {
+  const c = frames[f].control;
+  return n.regates.some((r) => f >= r.off && f < r.on) ? c | 1 : c;
+}
+
 /**
  * Segment each voice by its gate: a note runs from a gate rise to the gate
  * fall. Pitch is read from the first settled frame (freq non-zero within three
  * frames of the rise) and snapped to the recovered tuning. Arpeggio, vibrato
- * and slides inside a held gate stay inside the one note.
+ * and slides inside a held gate stay inside the one note, and so does a gate
+ * rise that restarts nothing (continuesAcrossGate): it is a re-gate of the
+ * previous note, recorded in `regates`.
  */
 export function segmentNotes(voices: VoiceFrame[][], clock: number): DecodedNote[] {
   const tuning = recoverTuning(voices, clock);
   const notes: DecodedNote[] = [];
   voices.forEach((frames, voice) => {
     let open: DecodedNote | null = null;
+    let last: DecodedNote | null = null;
     for (let f = 0; f < frames.length; f++) {
       const gate = (frames[f].control & 1) !== 0;
       const prevGate = f > 0 && (frames[f - 1].control & 1) !== 0;
       if (gate && !prevGate) {
         if (open) open.end = f;
+        if (!open && last && last.end !== null && continuesAcrossGate(frames, last.end, f)) {
+          last.regates.push({ off: last.end, on: f });
+          last.end = null;
+          open = last;
+          continue;
+        }
         let settle = f;
         while (settle < f + 3 && settle < frames.length - 1 && frames[settle].freq === 0) settle++;
         const note = noteFromFreq(frames[settle].freq, clock, tuning);
         open = {
           voice, start: f, end: null, note, signature: '', instrument: 0,
-          frame: frames[settle], program: programOf(frames, f, frames.length),
+          frame: frames[settle], program: programOf(frames, f, frames.length), regates: [],
         };
         notes.push(open);
+        last = open;
       } else if (!gate && prevGate && open) {
         open.end = f;
         open = null;
