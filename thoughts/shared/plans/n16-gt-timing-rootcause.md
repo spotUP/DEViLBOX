@@ -91,3 +91,61 @@ Eco-fog: freq 0.195, pulse 0.211, control 0.498, ADSR 0.725, filter 1.0.
   gatetimer with HR) and the filter program kept.
 - Fail-before not re-checked by reverting (expected to fail: old code had gatetimer 0x40,
   no throw, no mask, filter warning).
+
+## Speed tables and program dedup
+
+Date: 2026-11-02. Scores from `sidTraceScore.test.ts` (3000 frames per tune).
+
+### Done: exact frequency tracking through wavetable portamento rows
+
+Root cause of the low `freq` class: the wave program only ever wrote integer
+semitone note rows, so vibrato, slides, non-semitone arpeggios and the source
+player's tuning (its frequency table differs from GT's `freqtbl`) were never
+reproduced. Fix in `waveRows`: the GT channel frequency is modelled frame by
+frame (note init writes `freqtbl[note]`, a note row writes
+`freqtbl[note + offset]`), and every frame whose traced frequency differs from
+the model while the waveform holds becomes a wavetable command row 0xF1
+(portamento up) or 0xF2 (down). Its speed-table entry is the exact 16-bit delta;
+gplay.c WAVEEXEC adds it to `cptr->freq` on that frame, then advances and skips
+the tick effects. Speed-table rows are deduplicated by content (`addRows`); when
+the speed table is full, the frame falls back to the plain row.
+
+Two misses per note stay structural: the note-init frame (GT runs no table on
+it) and a frame that changes both waveform and frequency (one wavetable row per
+frame, the waveform row wins).
+
+Regression test: `GoatTracker frequency programs` in `sidTraceScore.test.ts`
+(synthetic tuned vibrato, real headless GT replay). With tracking reverted it
+misses 101 frequency changes; with the fix 8 (2 per note). Checked both ways.
+
+| tune | before | after | freq exact before / after | programs |
+|------|--------|-------|---------------------------|----------|
+| abaddon | 0.579 | 0.579 | 0.074 / 0.074 | 16, shared |
+| bax | 0.191 | 0.191 | 0.010 / 0.010 | 64, shared |
+| cmp-dns | 0.463 | 0.463 | 0.129 / 0.129 | 32, shared |
+| eco-fog | 0.249 | 0.249 | 0.195 / 0.195 | 16, shared |
+| galway | 0.225 | 0.232 | 0.143 / 0.286 | 64, per note |
+| hubbard | 0.462 | 0.462 | 0.489 / 0.489 | 64, shared |
+| jch-awry | 0.575 | 0.575 | 0.298 / 0.298 | 64, shared |
+| jch-tyne | 0.512 | 0.512 | 0.070 / 0.070 | 64, shared |
+| lees | 0.075 | 0.118 | 0.049 / 0.167 | 64, per note |
+| proton | 0.607 | 0.607 | 0.275 / 0.275 | 64, shared |
+| tel | 0.439 | 0.439 | unchanged (not recorded) | 64, shared |
+
+### Open: why nine of eleven tunes do not move
+
+Nine tunes build in shared mode ("more than 63 distinct programs"): every note
+of one inferred instrument plays the program of the instrument's first note.
+Exact frequency tracking is per pitch, so it is disabled in shared mode (a
+tuning delta from one pitch is wrong for every other pitch). The real limit is
+the table budget: 255 rows per GT table and 63 instruments for thousands of
+notes. Next steps, in order:
+
+1. Pitch-relative frequency programs: express vibrato as a GT speed-table
+   vibrato entry with note-relative speed (`cmp | 0x80`, shift right) and
+   slides as note-relative portamento, so one program serves every pitch of an
+   instrument. Tuning offset per note stays unreachable without per-pitch rows.
+2. Loop the periodic tail of wave/pulse programs with a 0xFF jump row instead of
+   cutting at 16/32/64 frames, which shrinks programs and lifts the cap.
+3. Cluster notes per inferred instrument by program content (not first note),
+   up to the 63-instrument limit, before falling back to shared.
