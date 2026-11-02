@@ -336,10 +336,12 @@ export async function engineLoadArgs(
   song: TrackerSong,
   desc: NativeEngineDescriptor,
   isDJDeck: boolean,
-): Promise<{ data: ArrayBuffer | Uint8Array; args: unknown[] }> {
+): Promise<{ data: ArrayBuffer; args: unknown[] }> {
   const fileData = (isDJDeck ? null : await editedModuleForPlay(song, desc))
     ?? song[desc.fileDataKey] as ArrayBuffer | Uint8Array;
-  const data = fileData instanceof Uint8Array ? fileData.slice(0) : (fileData as ArrayBuffer).slice(0);
+  // Engines load (and transfer to their worklet) an ArrayBuffer of their own: an edited module comes back as a
+  // Uint8Array (the layout writers), and a view in a postMessage transfer list is a DataCloneError (N12i).
+  const data = (fileData instanceof Uint8Array ? fileData.slice().buffer : (fileData as ArrayBuffer).slice(0)) as ArrayBuffer;
   return { data, args: desc.getLoadArgs?.(song) ?? [] };
 }
 

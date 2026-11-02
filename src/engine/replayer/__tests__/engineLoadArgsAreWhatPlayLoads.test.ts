@@ -55,6 +55,8 @@ describe('the engine load args are what a play loads', () => {
       routing.clearRunningEngineKeys();
       await routing.startNativeEngines(song, {} as never, false, false, new Set());
       expect(loads).toHaveLength(1);
+      // N12i: the engine transfers what it loads to its worklet; a Uint8Array (an edited module) there is a DataCloneError.
+      expect(Object.prototype.toString.call(loads[0]!.data)).toBe('[object ArrayBuffer]');
 
       const got = await routing.engineLoadArgs(song, await descOf(), false);
       expect(Array.from(new Uint8Array(got.data as ArrayBuffer))).toEqual(Array.from(new Uint8Array(loads[0]!.data as ArrayBuffer)));

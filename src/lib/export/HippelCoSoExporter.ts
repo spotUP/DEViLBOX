@@ -260,8 +260,11 @@ function buildCoSoFile(song: TrackerSong): { data: Uint8Array; warnings: string[
   const songSteps = song.patterns.length || 1;
   const tracksSectionSize = songSteps * 12;
 
-  // ── Build songs (6 bytes each, just 1 subsong) ────────────────────────
-  const songsSectionSize = 6;
+  // ── Build songs (6 bytes each: 1 subsong, then the all-zero end entry) ─
+  // Real COSO files close the song table with an empty 6-byte entry, and the
+  // nuade / UADE player counts subsongs as (samples - songs) / 6 - 1: a table
+  // without it has 0 subsongs and the player refuses the module (N12i).
+  const songsSectionSize = 12;
 
   // ── Headers + Samples: the loaded module's sample bank, verbatim ─────
   // Header pointers are relative to the sample data section, and fseqs name
