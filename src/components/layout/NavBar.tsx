@@ -96,7 +96,7 @@ const NavBarComponent: React.FC = () => {
   }, [showUserMenu]);
 
   const handleAddTab = () => {
-    n.addTab();
+    void n.addTab();
   };
 
   const handleCloseTab = (e: React.MouseEvent, tabId: string) => {

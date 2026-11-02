@@ -179,9 +179,14 @@ export function debouncedWasmEngineReexport(): void {
 
 /** Grid cells to the engine playing the loaded song (see liveCellEdits). */
 function sendCellEdits(edits: LiveCellEdit[]): void {
-  let song: import('@engine/TrackerReplayer').TrackerSong | null = null;
-  song = peekTrackerReplayer()?.getSong() ?? null;
-  void sendCellEditsToEngine(song, edits).catch((err) => {
+  // The replayer holds the song only once it has played; before the first play
+  // the loaded song is the stores' (a note typed in a fresh New Song must still
+  // reach its module, which play then loads from the format store).
+  const playing = peekTrackerReplayer()?.getSong() ?? null;
+  const song = playing
+    ? Promise.resolve(playing)
+    : import('@/lib/song/liveSong').then((m) => m.liveTrackerSong());
+  void song.then((s) => sendCellEditsToEngine(s, edits)).catch((err) => {
     console.warn('[TrackerStore] live cell edit failed:', err);
   });
 }

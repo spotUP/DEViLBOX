@@ -41,7 +41,11 @@ export async function unloadSong(): Promise<void> {
   getToneEngine().releaseAll();
   try {
     const { getTrackerReplayer } = await import('@/engine/TrackerReplayer');
-    getTrackerReplayer().stop();
+    const replayer = getTrackerReplayer();
+    replayer.stop();
+    // The outgoing song leaves the replayer too: grid edits read the replayer's
+    // song to pick their engine, and the new song only reaches it at play.
+    replayer.releaseSong();
   } catch { /* replayer not initialized yet */ }
   try {
     const { getAdPlugPlayer } = await import('@/lib/import/AdPlugPlayer');
