@@ -211,6 +211,22 @@ export function listNewSongFormats(): NewSongFormat[] {
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/**
+ * Wizard search: a query matches a New Song format by its name, its formatId or
+ * its template's file extension, so "dw" finds David Whittaker and "coso" finds
+ * the Hippel CoSo format. `query` is matched case-insensitively; an empty query
+ * matches every format.
+ */
+export function newSongFormatMatches(format: NewSongFormat, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const dot = format.template.lastIndexOf('.');
+  const ext = dot >= 0 ? format.template.slice(dot + 1).toLowerCase() : '';
+  return format.name.toLowerCase().includes(q)
+    || format.formatId.toLowerCase().includes(q)
+    || ext === q;
+}
+
 // ── Derived capability views (consumed by FormatCapabilities) ──────────────────
 
 /**
