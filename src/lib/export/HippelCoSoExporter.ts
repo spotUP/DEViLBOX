@@ -14,18 +14,21 @@
  *   [Patterns: pointer table + encoded pattern bytes]
  *   [Tracks: 12 bytes per song step (4ch × 3 bytes)]
  *   [Songs: 6 bytes per subsong]
- *   [Headers: empty — sample metadata, not used for synth-only songs]
- *   [Samples: empty — no PCM data for synth-only songs]
+ *   [Headers: empty — the from-scratch writer has no sample bank]
+ *   [Samples: empty]
  *
  * Priority chain:
- *   1. From-scratch TS serializer — builds from TrackerSong data
- *   2. UADE chip RAM readback — fallback for runtime-edited modules
+ *   1. The loaded module (`song.hippelFileData`) with the grid edits written in
+ *      (rebuildHippelSong) — keeps the TFMX block, sample headers and PCM.
+ *   2. From-scratch TS serializer — songs that carry no CoSo module
+ *   3. UADE chip RAM readback — fallback for runtime-edited modules
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { HippelCoSoConfig } from '@/types/instrument/exotic';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
+import { isCoSo, rebuildHippelSong, hippelRefusedWarnings } from '@/engine/hippel/rebuildHippelModule';
 
 export interface HippelCoSoExportResult {
   data: Blob;
@@ -96,10 +99,27 @@ function xmNoteToCoSo(xmNote: number): number {
 
 // ── From-scratch serializer ─────────────────────────────────────────────────
 
+/** Sample headers + PCM of the loaded COSO module (empty when there is none). */
+function sourceSampleBank(song: TrackerSong): { headers: Uint8Array; pcm: Uint8Array; count: number } {
+  const empty = { headers: new Uint8Array(0), pcm: new Uint8Array(0), count: 0 };
+  if (!song.hippelFileData) return empty;
+  const src = new Uint8Array(song.hippelFileData);
+  if (src.length < 0x34 || !isCoSo(src)) return empty;
+  const dv = new DataView(src.buffer, src.byteOffset, src.byteLength);
+  const headersOff = dv.getUint32(24);
+  const samplesOff = dv.getUint32(28);
+  if (headersOff === 0 || headersOff > samplesOff || samplesOff > src.length) return empty;
+  const hasTfmx = String.fromCharCode(src[0x20], src[0x21], src[0x22], src[0x23]) === 'TFMX';
+  const count = hasTfmx ? dv.getUint16(0x32) : Math.max(0, Math.floor((samplesOff - headersOff) / 10) - 1);
+  return { headers: src.slice(headersOff, samplesOff), pcm: src.slice(samplesOff), count };
+}
+
 function buildCoSoFile(song: TrackerSong): { data: Uint8Array; warnings: string[] } {
   const warnings: string[] = [];
   const CHANNELS = 4;
-  const HEADER_SIZE = 32;
+  // COSO header (32 bytes) + TFMX count block at 0x20 (32 bytes); the decoder
+  // (libtfmxaudiodecoder COSO_detect) requires "TFMX" at +0x20.
+  const HEADER_SIZE = 64;
 
   // ── Extract instrument configs ──────────────────────────────────────────
   const hcConfigs: (HippelCoSoConfig | null)[] = [];
@@ -243,9 +263,12 @@ function buildCoSoFile(song: TrackerSong): { data: Uint8Array; warnings: string[
   // ── Build songs (6 bytes each, just 1 subsong) ────────────────────────
   const songsSectionSize = 6;
 
-  // ── Headers + Samples (empty for synth-only songs) ────────────────────
-  const headersSectionSize = 0;
-  const samplesSectionSize = 0;
+  // ── Headers + Samples: the loaded module's sample bank, verbatim ─────
+  // Header pointers are relative to the sample data section, and fseqs name
+  // samples by index, so the bank stays valid when copied as-is.
+  const bank = sourceSampleBank(song);
+  const headersSectionSize = bank.headers.length;
+  const samplesSectionSize = bank.pcm.length;
 
   // ── Compute offsets ───────────────────────────────────────────────────
   const frqseqsOff  = HEADER_SIZE;
@@ -268,6 +291,15 @@ function buildCoSoFile(song: TrackerSong): { data: Uint8Array; warnings: string[
   writeU32BE(output, 20, songsOff);
   writeU32BE(output, 24, headersOff);
   writeU32BE(output, 28, samplesOff);
+  writeString(output, 0x20, 'TFMX', 4);
+  writeU16BE(output, 0x24, Math.max(0, nFseqs - 1));
+  writeU16BE(output, 0x26, Math.max(0, nVolseqs - 1));
+  writeU16BE(output, 0x28, Math.max(0, nPatterns - 1));
+  writeU16BE(output, 0x2a, Math.max(0, songSteps - 1));
+  writeU16BE(output, 0x30, 1);
+  writeU16BE(output, 0x32, bank.count);
+  output.set(bank.headers, headersOff);
+  output.set(bank.pcm, samplesOff);
 
   // ── Write freq sequences ──────────────────────────────────────────────
   // Pointer table: each entry is absolute offset into file
@@ -343,12 +375,25 @@ function buildCoSoFile(song: TrackerSong): { data: Uint8Array; warnings: string[
 
 export async function exportAsHippelCoSo(song: TrackerSong): Promise<HippelCoSoExportResult> {
   const warnings: string[] = [];
+  const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
 
-  // 1. Build from TrackerSong data
+  // 1. The loaded module with the grid edits patched in place: the from-scratch
+  //    writer below has no sample bank, so a sample-playing song loses its PCM there.
+  //    Edits the in-place patcher refuses (cleared notes, structure) fall through
+  //    to the from-scratch writer, which copies the same sample bank.
+  const rebuilt = song.hippelFileData && isCoSo(new Uint8Array(song.hippelFileData)) ? rebuildHippelSong(song) : null;
+  if (rebuilt && rebuilt.refused.length === 0) {
+    return {
+      data: new Blob([rebuilt.bytes as unknown as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' }),
+      filename: `${baseName}.hipc`,
+      warnings: hippelRefusedWarnings(rebuilt.refused),
+    };
+  }
+
+  // 2. Build from TrackerSong data
   try {
     const result = buildCoSoFile(song);
     if (result.data.length > 0) {
-      const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
       return {
         data: new Blob([result.data as unknown as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' }),
         filename: `${baseName}.coso`,
@@ -360,7 +405,7 @@ export async function exportAsHippelCoSo(song: TrackerSong): Promise<HippelCoSoE
     warnings.push(`From-scratch build failed: ${(e as Error).message}.`);
   }
 
-  // 2. Fallback: UADE chip RAM readback
+  // 3. Fallback: UADE chip RAM readback
   try {
     const moduleSize = song.instruments?.[0]?.uadeChipRam?.moduleSize;
     if (moduleSize && moduleSize > 0) {
@@ -368,7 +413,6 @@ export async function exportAsHippelCoSo(song: TrackerSong): Promise<HippelCoSoE
       const chipData = await chipEditor.readEditedModule(moduleSize);
       if (chipData && chipData.byteLength > 0) {
         warnings.push('Exported from UADE chip RAM (runtime state).');
-        const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
         return {
           data: new Blob([chipData as unknown as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' }),
           filename: `${baseName}.coso`,

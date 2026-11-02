@@ -7,12 +7,13 @@
  * else in the file changes. Formats without an editable grid return null.
  */
 import type { TrackerCell } from '@/types';
+import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { mapHippelCoSoCells } from '@lib/import/formats/HippelCoSoParser';
 import { isJochenHippel7VFormat, mapJochenHippel7VCells } from '@lib/import/formats/JochenHippel7VParser';
 import { findHippelTfmxHeader } from '@lib/import/formats/HippelTfmxWalk';
 import { patchEditedCells, type HippelCellSpans, type HippelPatchResult } from './hippelCellSpans';
 
-function isCoSo(buf: Uint8Array): boolean {
+export function isCoSo(buf: Uint8Array): boolean {
   return buf.length >= 4 && buf[0] === 0x43 && buf[1] === 0x4F && buf[2] === 0x53 && buf[3] === 0x4F; // 'COSO'
 }
 
@@ -47,4 +48,29 @@ export function rebuildHippelModule(
   const buf = fileData instanceof Uint8Array ? fileData : new Uint8Array(fileData);
   const spans = mapHippelCells(buf, instrumentCount, subsong);
   return spans ? patchEditedCells(buf, spans, patterns, keySeq) : null;
+}
+
+/**
+ * A loaded Hippel song's module with its grid edits written in, or null when the
+ * song carries no module (`hippelFileData`) or the module has no editable grid.
+ * The one save path for CoSo / TFMX songs: the samples, TFMX block and every
+ * byte the grid does not show stay as loaded.
+ */
+export function rebuildHippelSong(song: TrackerSong): HippelPatchResult | null {
+  if (!song.hippelFileData) return null;
+  // A song with no grid (the scope view, gridUnmatchedReason) has no edits: its placeholder pattern is not one.
+  return rebuildHippelModule(
+    song.hippelFileData,
+    song.gridUnmatchedReason ? [] : song.patterns,
+    song.instruments.length,
+    song.fileSubsongs?.current ?? 0,
+    (n) => song.instruments.find((x) => x.id === n)?.metadata?.hippelKeySeq ?? 0,
+  );
+}
+
+/** The export warning for edits that had no room in the module. */
+export function hippelRefusedWarnings(refused: readonly string[]): string[] {
+  return refused.length > 0
+    ? [`${refused.length} edit(s) have no room in the module and were not saved (pattern:channel:row ${refused.slice(0, 8).join(', ')})`]
+    : [];
 }
