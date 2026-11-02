@@ -362,6 +362,23 @@ export function formatKeyIsForUs(e: KeyboardEvent): boolean {
   return true;
 }
 
+/** Marks a position matrix's grid container, so the pattern editor beside it can leave the matrix's keys alone. */
+export const POSITION_MATRIX_ATTR = 'data-position-matrix';
+
+/**
+ * Which format canvas a window key belongs to. A position matrix is a separate editor from the pattern editor next
+ * to it: it takes keys only while focus is inside it (it was clicked), and the pattern editor takes every key except
+ * those. Without this both canvases moved on every arrow key.
+ */
+export function formatKeyOwnedBy(
+  container: Element | null,
+  isPositionMatrix: boolean,
+  focused: Element | null = typeof document !== 'undefined' ? document.activeElement : null,
+): boolean {
+  if (isPositionMatrix) return !!container && !!focused && container.contains(focused);
+  return !focused?.closest?.(`[${POSITION_MATRIX_ATTR}="true"]`);
+}
+
 /** Listen on the window for as long as a format canvas is mounted. Returns the detach function. */
 export function attachFormatKeyboard(getHost: () => FormatKeyHost | null): () => void {
   const down = (e: KeyboardEvent) => {
