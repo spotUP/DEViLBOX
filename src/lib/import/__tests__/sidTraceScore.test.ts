@@ -3,7 +3,7 @@ import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { traceSid, type SidTrace } from '../formats/SIDParser';
 import type { VoiceFrame } from '../formats/sidTraceDecode';
-import { sidTraceToGoatTracker } from '../formats/sidTraceToGoatTracker';
+import { sidTraceToGoatTracker, gtFreq } from '../formats/sidTraceToGoatTracker';
 import { writeGoatTrackerSng } from '../formats/GoatTrackerSid';
 import { scoreSidTrace, createHeadlessGT, type HeadlessGT } from '../formats/sidTraceScore';
 
@@ -90,6 +90,73 @@ describe('GoatTracker frequency programs', () => {
     // Without frequency tracking 101 of the changes miss.
     expect(s.perClass.freq.changes).toBeGreaterThan(60);
     expect(s.perClass.freq.changes - s.perClass.freq.exact).toBeLessThanOrEqual(8);
+  });
+});
+
+/**
+ * Voice-0 notes on GT-table pitches, each with a vibrato whose per-frame step is a fraction
+ * of the semitone step at its pitch (a GT-style pitch-relative vibrato): `depth(note)` is the
+ * step shift (null: no vibrato), starting `delay` frames after the gate rise.
+ */
+function relativeVibratoTrace(notes: Array<{ gt: number; shift: number | null }>, len: number, delay = 4, pulseAt: (t: number) => number = () => 0x800): SidTrace {
+  const shape = [1, 1, -1, -1, -1, -1, 1, 1];
+  const v0: Array<Partial<VoiceFrame>> = [];
+  for (let i = 0; i < 40; i++) v0.push({});
+  for (const { gt, shift } of notes) {
+    const sp = shift === null ? 0 : (gtFreq(gt + 1) - gtFreq(gt)) >> shift;
+    let dev = 0;
+    for (let t = 0; t < len; t++) {
+      if (t >= delay) dev += shape[(t - delay) % 8] * sp;
+      v0.push({ freq: gtFreq(gt) + dev, pulse: pulseAt(t), control: t < len - 2 ? 0x41 : 0x40, ad: 0x09, sr: 0xa0 });
+    }
+  }
+  for (let i = 0; i < 40; i++) v0.push({ pulse: 0x800, control: 0x40, ad: 0x09, sr: 0xa0 });
+  return synthTrace(v0);
+}
+
+describe('GoatTracker pitch-relative frequency programs', () => {
+  it('serves a pitch-relative vibrato at every pitch from one shared program', async () => {
+    // Six pitches of 60 frames overflow the wave table per note (exact deltas are per pitch),
+    // so the build falls back to shared programs: one program must carry the vibrato for all.
+    const notes = [36, 38, 40, 41, 43, 45, 36, 38, 40, 41, 43, 45].map((gt) => ({ gt, shift: 4 }));
+    const trace = relativeVibratoTrace(notes, 60);
+    const built = sidTraceToGoatTracker(trace);
+    expect(built.sharedPrograms).toBe(true);
+    const s = scoreSidTrace(trace, built, await createHeadlessGT());
+    // Note-relative speed rows ([0x80, shift] in the speed table) reproduce every vibrato frame;
+    // misses are the note-init frame and the gate-off frame of each note. Without them ~650 miss.
+    expect(s.perClass.freq.changes).toBeGreaterThan(600);
+    expect(s.perClass.freq.changes - s.perClass.freq.exact).toBeLessThanOrEqual(2 * notes.length);
+  });
+
+  it('groups shared programs by content, not by the first note of an instrument', async () => {
+    // One inferred instrument (vibrato depth is not in its signature): the first note is plain,
+    // the other eleven vibrate. A shared program taken from the first note drops every vibrato.
+    const notes = [36, 38, 40, 41, 43, 45, 36, 38, 40, 41, 43, 45].map((gt, i) => ({ gt, shift: i === 0 ? null : 4 }));
+    const trace = relativeVibratoTrace(notes, 60);
+    const built = sidTraceToGoatTracker(trace);
+    expect(built.sharedPrograms).toBe(true);
+    const s = scoreSidTrace(trace, built, await createHeadlessGT());
+    // Without grouping ~550 vibrato frames miss; with it the note-init and gate-off frames do.
+    expect(s.perClass.freq.changes).toBeGreaterThan(500);
+    expect(s.perClass.freq.changes - s.perClass.freq.exact).toBeLessThanOrEqual(2 * notes.length);
+  });
+});
+
+describe('GoatTracker looping programs', () => {
+  it('loops a repeating vibrato and pulse sweep past the program length', async () => {
+    // 240-frame notes: a program cut at 64 frames stops the vibrato and the sweep after that.
+    const sweep = (t: number): number => 0x800 + 8 * (t % 32 < 16 ? t % 32 : 32 - (t % 32));
+    const trace = relativeVibratoTrace([{ gt: 36, shift: 4 }, { gt: 43, shift: 4 }], 240, 4, sweep);
+    const built = sidTraceToGoatTracker(trace);
+    expect(built.sharedPrograms).toBe(false);
+    const s = scoreSidTrace(trace, built, await createHeadlessGT());
+    // Misses: the note-init and gate-off frames of each note. Without loops ~350 freq and
+    // ~340 pulse changes miss.
+    expect(s.perClass.freq.changes).toBeGreaterThan(400);
+    expect(s.perClass.freq.changes - s.perClass.freq.exact).toBeLessThanOrEqual(4);
+    expect(s.perClass.pulse.changes).toBeGreaterThan(400);
+    expect(s.perClass.pulse.changes - s.perClass.pulse.exact).toBeLessThanOrEqual(4);
   });
 });
 
