@@ -9,6 +9,7 @@ import { useEditorStore } from '../../stores/useEditorStore';
 import { useMIDIStore } from '../../stores/useMIDIStore';
 import { useVocoderStore } from '../../stores/useVocoderStore';
 import { getDJEngine } from '../../engine/dj/DJEngine';
+import { TYPING_OCTAVE_HIGHEST, TYPING_OCTAVE_LOWEST } from '@/lib/tracker/noteValue';
 
 /**
  * Register all editor action handlers for MIDI button control
@@ -81,7 +82,7 @@ export function useButtonMappings(): void {
     cleanups.push(
       manager.registerAction('octave.up', () => {
         const { currentOctave, setCurrentOctave } = useEditorStore.getState();
-        if (currentOctave < 8) {
+        if (currentOctave < TYPING_OCTAVE_HIGHEST) {
           setCurrentOctave(currentOctave + 1);
         }
       })
@@ -90,7 +91,7 @@ export function useButtonMappings(): void {
     cleanups.push(
       manager.registerAction('octave.down', () => {
         const { currentOctave, setCurrentOctave } = useEditorStore.getState();
-        if (currentOctave > 0) {
+        if (currentOctave > TYPING_OCTAVE_LOWEST) {
           setCurrentOctave(currentOctave - 1);
         }
       })

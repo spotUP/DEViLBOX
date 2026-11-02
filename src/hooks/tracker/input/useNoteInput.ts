@@ -11,7 +11,7 @@ import { useEditorStore } from '@stores/useEditorStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useUIStore } from '@stores/useUIStore';
 import { getToneEngine } from '@engine/ToneEngine';
-import { stringNoteToXM } from '@/lib/xmConversions';
+import { keyNoteValue } from '@/lib/tracker/noteValue';
 import { NOTE_MAP, type HeldNote, type TrackerInputRefs } from './inputConstants';
 import { validateEdit } from '@/lib/import/formatConstraints';
 import { notify } from '@/stores/useNotificationStore';
@@ -111,8 +111,7 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
       if (!instrument) return;
 
       const fullNote = `${note}${octave}`;
-      const noteStr = `${note}-${octave}`;
-      const xmNote = stringNoteToXM(noteStr);
+      const xmNote = keyNoteValue(note, octave);
 
       if (heldNotesRef.current.has(key)) {
         return;
@@ -180,11 +179,10 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
   // Enter note into cell (respects noteColumnIndex for chord columns)
   const enterNote = useCallback(
     (note: string, octave: number, targetChannelOverride?: number) => {
-      const noteStr = `${note}-${octave}`;
-      const xmNote = stringNoteToXM(noteStr);
+      const xmNote = keyNoteValue(note, octave);
 
       if (xmNote === 0) {
-        console.warn(`Invalid note: ${noteStr}`);
+        console.warn(`Invalid note: ${note} octave ${octave}`);
         return;
       }
 

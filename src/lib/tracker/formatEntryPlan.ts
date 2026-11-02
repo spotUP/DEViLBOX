@@ -59,12 +59,13 @@ export function planCursorEntry(c: EntryContext): EntryPlan {
 }
 
 import { NOTE_MAP } from '@/hooks/tracker/input/inputConstants';
-import { stringNoteToXM } from '@/lib/xmConversions';
+import { keyNoteValue, noteValueToPitch } from '@/lib/tracker/noteValue';
 
 /** Semitones above C-0 of the note a piano key types at `octave` (FT2 layout), or null for a non-note key. */
 export function typedPitch(key: string, octave: number): number | null {
   const m = NOTE_MAP[key.toLowerCase()];
   if (!m) return null;
-  const xm = stringNoteToXM(`${m.note}-${octave + m.octaveOffset}`); // 1 = C-0, 0 = out of range
-  return xm > 0 ? xm - 1 : null;
+  const v = keyNoteValue(m.note, octave + m.octaveOffset);
+  const p = v === 0 ? null : noteValueToPitch(v); // 1 = C-0
+  return p === null ? null : p - 1;
 }

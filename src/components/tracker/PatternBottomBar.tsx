@@ -12,6 +12,7 @@ import type { ColumnVisibility } from '@typedefs/tracker';
 import { useUIStore } from '@stores/useUIStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { PatternZoomControl } from './PatternZoomControl';
+import { TYPING_OCTAVE_HIGHEST, TYPING_OCTAVE_LOWEST } from '@/lib/tracker/noteValue';
 
 const COLUMN_TOGGLES: { key: keyof ColumnVisibility; label: string; title: string }[] = [
   { key: 'note', label: 'Not', title: 'Note column' },
@@ -74,7 +75,7 @@ export const PatternBottomBar: React.FC = () => {
         <div className="flex items-center">
           <button
             onClick={() => setOctave(octave - 1)}
-            disabled={octave <= 1}
+            disabled={octave <= TYPING_OCTAVE_LOWEST}
             className="px-0.5 text-ft2-textDim hover:text-text-primary disabled:opacity-30 transition-colors"
           >
             <ChevronDown size={10} />
@@ -84,7 +85,7 @@ export const PatternBottomBar: React.FC = () => {
           </span>
           <button
             onClick={() => setOctave(octave + 1)}
-            disabled={octave >= 7}
+            disabled={octave >= TYPING_OCTAVE_HIGHEST}
             className="px-0.5 text-ft2-textDim hover:text-text-primary disabled:opacity-30 transition-colors"
           >
             <ChevronUp size={10} />

@@ -31,6 +31,7 @@ import {
   MASK_EFFECT2,
   MASK_ALL,
 } from './editorMasks';
+import { TYPING_OCTAVE_HIGHEST, TYPING_OCTAVE_LOWEST } from '@/lib/tracker/noteValue';
 
 const _toggleMaskBit = (mask: number, bit: number): number => mask ^ bit;
 
@@ -205,7 +206,7 @@ export const useEditorStore = create<EditorStore>()(
 
     setCurrentOctave: (octave) =>
       set((state) => {
-        state.currentOctave = Math.max(1, Math.min(7, octave));
+        state.currentOctave = Math.max(TYPING_OCTAVE_LOWEST, Math.min(TYPING_OCTAVE_HIGHEST, octave));
       }),
 
     toggleRecordMode: () =>

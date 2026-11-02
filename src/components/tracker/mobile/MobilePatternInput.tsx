@@ -9,6 +9,7 @@ import { useCursorStore } from '@stores';
 import { useEditorStore } from '@stores/useEditorStore';
 import { Piano, Delete, ChevronLeft, ChevronRight, Copy, Scissors, ChevronDown, ChevronUp } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
+import { TYPING_OCTAVE_HIGHEST, TYPING_OCTAVE_LOWEST } from '@/lib/tracker/noteValue';
 
 interface MobilePatternInputProps {
   onNoteInput: (note: number) => void;
@@ -68,14 +69,14 @@ export const MobilePatternInput: React.FC<MobilePatternInputProps> = ({
 
   // Handle octave change
   const handleOctaveDown = useCallback(() => {
-    if (currentOctave > 0) {
+    if (currentOctave > TYPING_OCTAVE_LOWEST) {
       haptics.light();
       setCurrentOctave(currentOctave - 1);
     }
   }, [currentOctave, setCurrentOctave]);
 
   const handleOctaveUp = useCallback(() => {
-    if (currentOctave < 7) {
+    if (currentOctave < TYPING_OCTAVE_HIGHEST) {
       haptics.light();
       setCurrentOctave(currentOctave + 1);
     }
