@@ -2727,10 +2727,12 @@ export async function tryRouteFormat(
   // .mon is also Maniacs of Noise (below): the "MONOTONE" header decides, anything else falls through.
   if (matchesExt(filename, ['mon'])) {
     const { isMonotoneFormat, parseMonotoneFile } = await import('@lib/import/formats/MonotoneParser');
+    // MONOTONE plays on its own WASM replayer and UADE has no player for it, so
+    // a song with no notes yet (a New Song template) must not fall back to UADE.
     if (isMonotoneFormat(new Uint8Array(ctx.buffer))) {
-      return withNativeThenUADE('monotone', ctx,
-        (bytes: Uint8Array | ArrayBuffer, name: string) => parseMonotoneFile(bytes as Uint8Array, name),
-        'MonotoneParser', { isFormat: isMonotoneFormat, usesBytes: true, injectUADE: true });
+      const song = parseMonotoneFile(new Uint8Array(ctx.buffer), ctx.originalFileName);
+      if (song) return song;
+      throw new Error(`MONOTONE header found but the module did not decode: ${ctx.originalFileName}`);
     }
   }
 

@@ -188,7 +188,8 @@ export type AddOnEmptyRow = 'pass' | 'fail' | 'n/a';
 export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   '669': 'n/a',
   actionamics: 'pass',
-  activisionPro: 'fail',
+  // activisionPro: a note on a blank row is cut into the covering rest or held-note event (activisionProGrid.ts).
+  activisionPro: 'pass',
   amf: 'n/a',
   benDaglish: 'fail',
   cheesecutter: 'n/a',

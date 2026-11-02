@@ -28,6 +28,8 @@
  * the accessors below must also import the builtins barrel to populate the map.
  */
 
+import type { TrackerSong } from '@engine/TrackerReplayer';
+
 // ── Descriptor ────────────────────────────────────────────────────────────────
 
 export interface EditableExporterRef {
@@ -108,6 +110,37 @@ export function registerEditableFormat(d: EditableFormatDescriptor): void {
 /** Get the descriptor for a formatId, or undefined. */
 export function getEditableFormat(formatId: string): EditableFormatDescriptor | undefined {
   return registry.get(formatId);
+}
+
+/** The layout formatId a parsed song carries: the key of its descriptor and of the native export dispatch. */
+export function songLayoutFormatId(song: Pick<TrackerSong, 'uadePatternLayout' | 'uadeVariableLayout'>): string {
+  return song.uadePatternLayout?.formatId || song.uadeVariableLayout?.formatId || '';
+}
+
+/**
+ * Formats whose parser sets no layout: the song carries its module in a field
+ * of its own, and the native export router dispatches on that field.
+ */
+type CarrierSong = Pick<TrackerSong, 'format' | 'actionamicsFileData' | 'activisionProFileData' | 'fredReplayerFileData'>;
+const CARRIER_FORMAT_IDS: ReadonlyArray<readonly [formatId: string, carries: (song: CarrierSong) => boolean]> = [
+  ['fredEditor', (song) => !!song.fredReplayerFileData],
+  ['actionamics', (song) => (song.format as string) === 'AST' && !!song.actionamicsFileData],
+  ['activisionPro', (song) => (song.format as string) === 'AVP' && !!song.activisionProFileData],
+];
+
+/** The editable formatId of a parsed song: its layout formatId, else the format its module carrier names. */
+export function songFormatId(song: Pick<TrackerSong, 'uadePatternLayout' | 'uadeVariableLayout'> & CarrierSong): string {
+  return songLayoutFormatId(song) || (CARRIER_FORMAT_IDS.find(([, carries]) => carries(song))?.[0] ?? '');
+}
+
+/**
+ * Did a complete parser produce this song? True when its format has a native
+ * exporter: the product edits that format and writes it back, so its parser
+ * reads the whole file. Zero notes from such a parser is an empty song (a New
+ * Song template), not a stub parser's placeholder grid.
+ */
+export function parsedByExportableFormat(song: Parameters<typeof songFormatId>[0]): boolean {
+  return !!getEditableFormat(songFormatId(song))?.exporter;
 }
 
 /** List every registered descriptor (insertion order). */
