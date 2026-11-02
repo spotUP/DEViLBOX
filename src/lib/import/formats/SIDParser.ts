@@ -10,6 +10,11 @@ import type { Pattern, TrackerCell, ChannelData, InstrumentConfig } from '@/type
 import { Cpu6502, type MemoryMap } from '@/lib/import/cpu/Cpu6502';
 import { getCachedPatterns, cachePatterns } from '@/lib/import/formats/SIDPatternCache';
 import { parseSIDHeader } from '@/lib/sid/SIDHeaderParser';
+import { DEFAULT_FURNACE } from '@/types/instrument/defaults';
+import {
+  segmentNotes, inferInstruments, fitGrid, rowOfFrame,
+  type VoiceFrame, type DecodedNote,
+} from '@/lib/import/formats/sidTraceDecode';
 
 function emptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
@@ -21,24 +26,13 @@ function readStr(buf: Uint8Array, off: number, len: number): string {
   return s.trim();
 }
 
-// SID frequency: freq_hz = freqReg * clock / 16777216
-function sidFreqToNote(freqReg: number, clock = 985248): number {
-  if (freqReg === 0) return 0;
-  const freq = freqReg * clock / 16777216;
-  if (freq < 20 || freq > 20000) return 0;
-  const note = Math.round(12 * Math.log2(freq / 440) + 69);
-  return note >= 1 && note <= 96 ? note : 0;
-}
-
-interface FrameState {
-  notes: (number | null)[];
-  regs: number[]; // 21 SID register values for change detection
-}
+/** Per-frame register snapshot of every voice (chips * 3). */
+type FrameState = VoiceFrame[];
 
 function runSIDEmulation(
   buf: Uint8Array,
   loadAddr: number, initAddr: number, playAddr: number,
-  dataOffset: number, chipBases: number[], sidClock: number
+  dataOffset: number, chipBases: number[],
 ): FrameState[] {
   const numVoices = chipBases.length * 3;
   // 18000 frames ≈ 6 min PAL / 5 min NTSC — covers most SID tunes
@@ -115,117 +109,59 @@ function runSIDEmulation(
     cpu.callSubroutine(effectivePlayAddr);
     totalCycles += 5000; // approximate
 
-    const notes: (number | null)[] = new Array(numVoices).fill(null);
-    const regs: number[] = [];
-
+    const voiceFrames: VoiceFrame[] = [];
     for (let v = 0; v < numVoices; v++) {
-      const base = Math.floor(v / 3) * 0x20 + (v % 3) * 7;
-      const freqLo  = sidRegs[base + 0];
-      const freqHi  = sidRegs[base + 1];
-      const control = sidRegs[base + 4];
-      const gate    = (control & 0x01) !== 0;
-      const freqReg = (freqHi << 8) | freqLo;
-      notes[v] = gate && freqReg > 0 ? sidFreqToNote(freqReg, sidClock) : null;
+      const chip = Math.floor(v / 3) * 0x20;
+      const base = chip + (v % 3) * 7;
+      voiceFrames.push({
+        freq: (sidRegs[base + 1] << 8) | sidRegs[base + 0],
+        pulse: ((sidRegs[base + 3] & 0x0F) << 8) | sidRegs[base + 2],
+        control: sidRegs[base + 4],
+        ad: sidRegs[base + 5],
+        sr: sidRegs[base + 6],
+        cutoff: sidRegs[chip + 22],
+        resRoute: sidRegs[chip + 23],
+        modeVol: sidRegs[chip + 24],
+      });
     }
-
-    // Snapshot first 21 SID registers for change detection
-    for (let r = 0; r < 21; r++) regs.push(sidRegs[r]);
-
-    frameStates.push({ notes, regs });
+    frameStates.push(voiceFrames);
   }
 
   return frameStates;
 }
 
-// ── Speed detection ──
+// ── Notes on the fitted row grid ──
 
-function gcd(a: number, b: number): number {
-  a = Math.abs(a); b = Math.abs(b);
-  while (b) { [a, b] = [b, a % b]; }
-  return a;
-}
-
-/** Detect frames-per-row by analyzing note change intervals */
-function detectSpeed(frames: FrameState[]): number {
-  // Track frames where a note-on or note change occurs on ANY voice.
-  // Only look at note values (derived from freq regs + gate), NOT filter/volume.
-  const changeFrames: number[] = [];
-  const prevNotes: (number | null)[] = [];
-
-  for (let f = 0; f < frames.length; f++) {
-    let changed = false;
-    for (let v = 0; v < frames[f].notes.length; v++) {
-      const n = frames[f].notes[v];
-      if (f === 0) { prevNotes[v] = n; continue; }
-      if (n !== prevNotes[v]) {
-        // A voice changed note (new note, note-off, or pitch change)
-        changed = true;
-        prevNotes[v] = n;
-      }
+/** Lay gate-segmented notes on rows of `framesPerRow` frames from `origin`. */
+function notesToRows(
+  notes: DecodedNote[], grid: { framesPerRow: number; origin: number },
+  frameCount: number, numCh: number,
+): TrackerCell[][] {
+  const totalRows = rowOfFrame(grid, frameCount - 1) + 1;
+  const rows: TrackerCell[][] = Array.from({ length: totalRows }, () =>
+    Array.from({ length: numCh }, emptyCell));
+  const byVoice: DecodedNote[][] = Array.from({ length: numCh }, () => []);
+  for (const n of notes) if (n.voice < numCh) byVoice[n.voice].push(n);
+  for (let v = 0; v < numCh; v++) {
+    const list = byVoice[v];
+    for (let i = 0; i < list.length; i++) {
+      const n = list[i];
+      const row = rowOfFrame(grid, n.start);
+      if (row >= totalRows) continue;
+      const cell = rows[row][v];
+      cell.note = n.note;
+      cell.instrument = n.instrument;
     }
-    if (changed && f > 0) changeFrames.push(f);
-  }
-
-  if (changeFrames.length < 3) return 6;
-
-  // Compute intervals between consecutive note-change frames
-  const intervals: number[] = [];
-  for (let i = 1; i < changeFrames.length; i++) {
-    const iv = changeFrames[i] - changeFrames[i - 1];
-    if (iv > 0 && iv <= 24) intervals.push(iv);
-  }
-  if (intervals.length === 0) return 6;
-
-  // Build histogram of intervals
-  const hist = new Map<number, number>();
-  for (const iv of intervals) hist.set(iv, (hist.get(iv) || 0) + 1);
-
-  // Try GCD of the most common intervals (skip rare outliers)
-  const sorted = [...hist.entries()].sort((a, b) => b[1] - a[1]);
-  // Take intervals that appear in at least 10% of samples
-  const threshold = intervals.length * 0.1;
-  const common = sorted.filter(([, count]) => count >= threshold).map(([iv]) => iv);
-
-  if (common.length > 0) {
-    let g = common[0];
-    for (let i = 1; i < common.length; i++) g = gcd(g, common[i]);
-    if (g >= 2 && g <= 12) return g;
-  }
-
-  // Fallback: most common interval in the typical range
-  let bestIv = 6, bestCount = 0;
-  for (const [iv, count] of hist) {
-    if (iv >= 2 && iv <= 12 && count > bestCount) {
-      bestCount = count; bestIv = iv;
+    // Note-off at the gate fall, unless the next note starts within two
+    // frames (hard restart) or its row is taken.
+    for (let i = 0; i < list.length; i++) {
+      const n = list[i];
+      if (n.end === null) continue;
+      const next = list[i + 1];
+      if (next && next.start - n.end <= 2) continue;
+      const row = rowOfFrame(grid, n.end);
+      if (row < totalRows && rows[row][v].note === 0) rows[row][v].note = 97;
     }
-  }
-  return bestIv;
-}
-
-// ── Frame → Row conversion ──
-
-function framesToRows(frames: FrameState[], speed: number, numCh: number): TrackerCell[][] {
-  const totalRows = Math.floor(frames.length / speed);
-  const rows: TrackerCell[][] = [];
-  const lastNote = new Array(numCh).fill(0);
-
-  for (let row = 0; row < totalRows; row++) {
-    const fs = frames[row * speed];
-    const cells: TrackerCell[] = [];
-    for (let ch = 0; ch < numCh; ch++) {
-      const cell = emptyCell();
-      const n = ch < fs.notes.length ? fs.notes[ch] : null;
-      if (n !== null && n > 0 && n !== lastNote[ch]) {
-        cell.note = n;
-        cell.instrument = ch + 1;
-        lastNote[ch] = n;
-      } else if (n === null && lastNote[ch] > 0) {
-        cell.note = 97; // note-off
-        lastNote[ch] = 0;
-      }
-      cells.push(cell);
-    }
-    rows.push(cells);
   }
   return rows;
 }
@@ -260,7 +196,7 @@ function rowFingerprint(row: TrackerCell[]): string {
 function splitIntoPatterns(
   allRows: TrackerCell[][],
   numCh: number,
-  instruments: InstrumentConfig[],
+  channelNames: string[],
   patternLength: number,
 ): { patterns: Pattern[]; songPositions: number[] } {
   const numChunks = Math.ceil(allRows.length / patternLength);
@@ -294,7 +230,7 @@ function splitIntoPatterns(
       fpToIdx.set(fp, idx);
       const channels: ChannelData[] = Array.from({ length: numCh }, (_, ch): ChannelData => ({
         id: `ch${ch}`,
-        name: instruments[ch]?.name || `SID ${ch + 1}`,
+        name: channelNames[ch] || `SID ${ch + 1}`,
         muted: false, solo: false, collapsed: false,
         volume: 100, pan: 0, instrumentId: null, color: null,
         rows: chunks[p].map(row => ({ ...row[ch] })),
@@ -347,6 +283,32 @@ function detectLoop(positions: number[]): { trimEnd: number; restartPos: number 
   return { trimEnd: len, restartPos: 0 };
 }
 
+function makeSidInstrument(id: number, n: DecodedNote, model: string): InstrumentConfig {
+  const p = n.program;
+  const wave = (bit: number) => p.waves.some((w) => (w & bit) !== 0);
+  return {
+    id,
+    name: `Instrument ${id}`,
+    type: 'synth', synthType: 'C64SID',
+    effects: [], volume: 0, pan: 0,
+    furnace: {
+      ...DEFAULT_FURNACE,
+      chipType: 3,
+      c64: {
+        triOn: wave(1), sawOn: wave(2), pulseOn: wave(4), noiseOn: wave(8),
+        a: n.frame.ad >> 4, d: n.frame.ad & 15, s: n.frame.sr >> 4, r: n.frame.sr & 15,
+        duty: p.pulseStart,
+        ringMod: (p.ringSync & 4) !== 0, oscSync: (p.ringSync & 2) !== 0,
+        toFilter: p.toFilter,
+        filterLP: (p.filterMode & 1) !== 0, filterBP: (p.filterMode & 2) !== 0, filterHP: (p.filterMode & 4) !== 0,
+        filterResonance: p.resonance,
+        filterCutoff: n.frame.cutoff << 3,
+      },
+    },
+    metadata: { sidModel: model },
+  } as unknown as InstrumentConfig;
+}
+
 export function isSIDFormat(buffer: ArrayBuffer): boolean {
   const b = new Uint8Array(buffer);
   return b.length >= 4 &&
@@ -379,14 +341,14 @@ export async function parseSIDFile(buffer: ArrayBuffer, filename: string): Promi
     loadAddr = buf[dataOffset] | (buf[dataOffset + 1] << 8);
   }
 
-  const instruments: InstrumentConfig[] = [];
+  const voiceInstruments: InstrumentConfig[] = [];
   const chips = chipBases.length;
   let id = 1;
   for (let chip = 0; chip < chips; chip++) {
     const model = chipModels[chip] === '8580' ? '8580' : '6581';
     const label = chip > 0 ? `SID${chip + 1}` : 'SID';
     for (let v = 1; v <= 3; v++) {
-      instruments.push({
+      voiceInstruments.push({
         id: id++,
         name: `${label} Voice ${v} (${model})`,
         type: 'synth', synthType: 'C64SID',
@@ -395,7 +357,9 @@ export async function parseSIDFile(buffer: ArrayBuffer, filename: string): Promi
     }
   }
 
-  const numCh = instruments.length;
+  const numCh = voiceInstruments.length;
+  const channelNames = voiceInstruments.map((i) => i.name);
+  let instruments: InstrumentConfig[] = voiceInstruments;
   const sidClock = isNTSC ? 1022727 : 985248;
   const codeOffset = loadAddrField === 0 ? dataOffset + 2 : dataOffset;
 
@@ -412,13 +376,14 @@ export async function parseSIDFile(buffer: ArrayBuffer, filename: string): Promi
     songPositions = cached.songPositions;
     restartPosition = cached.restartPosition;
     speed = cached.speed;
+    if (cached.instruments && cached.instruments.length > 0) instruments = cached.instruments;
     bpm = cached.bpm;
   } else {
     // ── Run 6502 emulation and build patterns ──
     const emptyPat = (): Pattern => ({
       id: 'p0', name: 'Pattern 1', length: 16,
       channels: Array.from({ length: numCh }, (_, i): ChannelData => ({
-        id: `ch${i}`, name: instruments[i]?.name || `SID ${i + 1}`,
+        id: `ch${i}`, name: channelNames[i] || `SID ${i + 1}`,
         muted: false, solo: false, collapsed: false,
         volume: 100, pan: 0, instrumentId: null, color: null,
         rows: Array.from({ length: 16 }, emptyCell),
@@ -427,18 +392,27 @@ export async function parseSIDFile(buffer: ArrayBuffer, filename: string): Promi
 
     if (loadAddr > 0 && initAddr > 0) {
       try {
-        const frameStates = runSIDEmulation(buf, loadAddr, initAddr, playAddr, codeOffset, chipBases, sidClock);
+        const frameStates = runSIDEmulation(buf, loadAddr, initAddr, playAddr, codeOffset, chipBases);
 
         if (frameStates.length > 0) {
-          speed = detectSpeed(frameStates);
           bpm = Math.round(frameRate * 5 / 2);
 
-          let rows = framesToRows(frameStates, speed, numCh);
+          // Gate-segmented notes, one instrument per distinct sound, rows fitted to the note starts.
+          const voices = Array.from({ length: numCh }, (_, v) => frameStates.map((fs) => fs[v]));
+          const decoded = segmentNotes(voices, sidClock);
+          const reps = inferInstruments(decoded);
+          if (reps.length > 0) {
+            instruments = reps.map((n, i) => makeSidInstrument(i + 1, n, chipModels[Math.floor(n.voice / 3)] === '8580' ? '8580' : '6581'));
+          }
+          const grid = fitGrid(decoded);
+          speed = grid.framesPerRow;
+
+          let rows = notesToRows(decoded, grid, frameStates.length, numCh);
           rows = trimTrailingSilence(rows);
 
           if (rows.length > 0) {
             const patLen = chooseBestPatternLength(rows.length);
-            const result = splitIntoPatterns(rows, numCh, instruments, patLen);
+            const result = splitIntoPatterns(rows, numCh, channelNames, patLen);
             patterns = result.patterns;
             songPositions = result.songPositions;
 
@@ -470,7 +444,7 @@ export async function parseSIDFile(buffer: ArrayBuffer, filename: string): Promi
     }
 
     // Fire-and-forget cache write
-    void cachePatterns(buffer, patterns, songPositions, restartPosition, speed, bpm);
+    void cachePatterns(buffer, patterns, songPositions, restartPosition, speed, bpm, instruments);
   }
 
   // Add import metadata to all patterns

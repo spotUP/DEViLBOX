@@ -5,12 +5,12 @@
  * 18 000-frame 6502 emulation on subsequent loads of the same file.
  */
 
-import type { Pattern } from '@/types';
+import type { Pattern, InstrumentConfig } from '@/types';
 
 const DB_NAME = 'DEViLBOX_SIDPatternCache';
 const DB_VERSION = 1;
 const STORE_NAME = 'patterns';
-const CACHE_VERSION = 2; // bump when parser algorithm changes (2: every chip's voices of a 2SID/3SID)
+const CACHE_VERSION = 3; // 3: trace-decoded instruments + gate notes + fitted grid; bump when parser algorithm changes (2: every chip's voices of a 2SID/3SID)
 const MAX_ENTRIES = 500;
 
 export interface CachedSIDPatterns {
@@ -21,6 +21,7 @@ export interface CachedSIDPatterns {
   restartPosition: number;
   speed: number;
   bpm: number;
+  instruments?: InstrumentConfig[];
   timestamp: number;
 }
 
@@ -79,6 +80,7 @@ export async function cachePatterns(
   restartPosition: number,
   speed: number,
   bpm: number,
+  instruments?: InstrumentConfig[],
 ): Promise<void> {
   try {
     const database = await initDB();
@@ -86,7 +88,7 @@ export async function cachePatterns(
 
     const entry: CachedSIDPatterns = {
       hash, cacheVersion: CACHE_VERSION,
-      patterns, songPositions, restartPosition, speed, bpm,
+      patterns, songPositions, restartPosition, speed, bpm, instruments,
       timestamp: Date.now(),
     };
 
