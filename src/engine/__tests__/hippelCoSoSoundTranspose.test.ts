@@ -36,7 +36,8 @@ describe('Hippel CoSo grid instrument', () => {
         let at = sp.offset;
         while (buf[at] === 0xFE) at += 2;
         const env = ((buf[at + 1] & 31) + cur[ch]) & 0xFF;
-        expect(cell.instrument).toBe(env < n ? env + 1 : 1);
+        // A note byte with bit 7 set changes pitch without an instrument trigger (hippel.c step_voice).
+        expect(cell.instrument).toBe(buf[at] & 0x80 ? 0 : env < n ? env + 1 : 1);
         checked++;
         if (cur[ch] > 0) transposed++;
         // Writing the shown cell back reproduces the info byte (the note byte
