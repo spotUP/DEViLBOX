@@ -36,12 +36,14 @@ describe('sidTraceToGoatTracker', () => {
     expect(r.framesPerRow).toBe(6);
     expect(r.noteCount).toBe(12);
     const wave = r.song.tables[0];
-    // First program: pulse+gate, then +4 and +7 semitones, back to 0, ... gate fall on the last frame.
-    expect(wave.left.slice(0, 6)).toEqual([0x41, 0x41, 0x41, 0x41, 0x41, 0x40]);
-    expect(wave.right.slice(0, 6)).toEqual([0x80, 4, 7, 0, 4, 7]);
+    // GT skips the tables on the note-init frame: row 0 is the frame after the gate rise
+    // (+4 semitones), then +7, 0, +4, +7 with the gate fall on the last frame.
+    expect(wave.left.slice(0, 6)).toEqual([0x41, 0x41, 0x41, 0x41, 0x40, 0xff]);
+    expect(wave.right.slice(0, 5)).toEqual([4, 7, 0, 4, 7]);
     const pulse = r.song.tables[1];
     expect(pulse.left[0]).toBe(0x88);
-    expect(pulse.left[1]).toBe(5);
+    expect(pulse.right[0]).toBe(0x10);
+    expect(pulse.left[1]).toBe(4);
     expect(pulse.right[1]).toBe(16);
     const ins = r.song.instruments[1];
     expect(ins.ad).toBe(0x09);
@@ -68,5 +70,18 @@ describe('sidTraceToGoatTracker', () => {
     const r = sidTraceToGoatTracker(trace!);
     expect(r.noteCount).toBeGreaterThan(8);
     expect(r.song.orderlists[0]).toHaveLength(trace!.voices.length);
+  });
+
+  it('models the GoatTracker 2 hard restart and finds the filter owner of a real GT2 tune', () => {
+    const bytes = readFileSync('public/data/songs/sid/eco-fog-goattracker2.sid');
+    const trace = traceSid(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer)!;
+    const r = sidTraceToGoatTracker(trace);
+    // The trace gates off with AD 0f SR 00 before each note: GT2's default hard restart.
+    expect(r.settings.adparam).toBe(0x0f00);
+    const used = r.song.instruments.slice(1).filter((i) => i.ptr[0] > 0);
+    expect(used.some((i) => (i.gatetimer & 0xc0) === 0 && (i.gatetimer & 0x3f) > 0)).toBe(true);
+    // Routing starts a frame after the owner's gate rise: the filter program is kept.
+    expect(r.warnings.some((w) => w.includes('filter'))).toBe(false);
+    expect(r.song.instruments.some((i) => i.ptr[2] > 0)).toBe(true);
   });
 });
