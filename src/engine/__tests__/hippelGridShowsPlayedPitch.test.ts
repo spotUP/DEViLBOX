@@ -21,7 +21,8 @@ import { parseJochenHippelAmigaSogFile } from '@/lib/import/formats/JochenHippel
 import { hippelPlayedPitch } from '@/lib/import/formats/hippelPlayedPitch';
 import { periodToPitch } from '@/lib/amiga/periodNotes';
 import { isLowOctaveNote, noteValueToPitch, pitchToNoteValue } from '@/lib/tracker/noteValue';
-import { rebuildHippelModule } from '@/engine/hippel/rebuildHippelModule';
+import { mapHippelCells, rebuildHippelModule } from '@/engine/hippel/rebuildHippelModule';
+import { hippelLinkedEdits } from '@/engine/hippel/hippelLinkedCells';
 import { loadTfmxWalkModule, HIPPEL_TFMX_CORPUS, type TfmxWalkHost } from './helpers/tfmxWalkHost';
 
 const ROOT = join(process.cwd(), 'public/data/songs');
@@ -112,14 +113,21 @@ describe('Hippel grid note is the pitch the decoder plays', () => {
     ].filter((s): s is NonNullable<typeof s> => !!s);
     expect(targets.length, 'a start to edit').toBeGreaterThan(0);
     if (rel.startsWith('hippel/warp')) expect(targets.some((t) => periodToPitch(t.period) < 0), 'warp: an edit inside the octave below C-0').toBe(true);
+    const spans = mapHippelCells(song.hippelFileData!, song.instruments.length)!;
     for (const t of targets) {
-      const patterns = song.patterns.map((p) => ({ channels: p.channels.map((c) => ({ rows: c.rows.map((x): TrackerCell => ({ ...x })) })) }));
+      const copy = () => song.patterns.map((p) => ({ channels: p.channels.map((c) => ({ rows: c.rows.map((x): TrackerCell => ({ ...x })) })) }));
+      const patterns = copy();
+      const unedited = copy();
       const cell = patterns[t.pattern].channels[t.voice].rows[t.row];
       const typed = pitchToNoteValue(noteValueToPitch(cell.note)! + 1);
       cell.note = typed;
+      // G29: a block the module reuses is one pattern behind several steps; the edit reaches every copy (hippelLinkedEdits),
+      // as the store edit path does. An edit to one copy alone is refused by the patcher, never written over the others.
+      const linked = hippelLinkedEdits(spans, t.pattern, unedited[t.pattern], patterns[t.pattern], patterns);
+      for (const e of linked) Object.assign(patterns[e.pattern].channels[e.channel].rows[e.row], e.values);
       const rebuilt = rebuildHippelModule(song.hippelFileData!, patterns, song.instruments.length)!;
       expect(rebuilt.refused, 'the edit has room').toEqual([]);
-      expect(rebuilt.written).toBe(1);
+      expect(rebuilt.written, 'the edited cell and each linked copy').toBe(1 + linked.length);
       const after = host.walk(rebuilt.bytes, 0, t.tick + 2).records.find((r) => r[1] === 2 && r[0] === t.tick && r[2] === t.voice)!;
       expect(after, 'sentinel: the decoder started the note').toBeDefined();
       expect(pitchToNoteValue(periodToPitch(after[5])), `${rel}: the decoder now plays the typed note`).toBe(typed);
