@@ -19,6 +19,12 @@ import {
   type ModlandStatus,
 } from '@/lib/modlandApi';
 import {
+  searchModArchive,
+  downloadModArchiveFile,
+  modArchiveDisplayName,
+  type ModArchiveFile,
+} from '@/lib/modarchiveApi';
+import {
   browseHVSC,
   downloadHVSCFile,
   searchHVSC,
@@ -674,16 +680,18 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
 
 // ── Unified Online Panel ─────────────────────────────────────────────────
 
-type SearchSource = 'all' | 'modland' | 'hvsc';
+type SearchSource = 'all' | 'modland' | 'hvsc' | 'modarchive';
 
 interface OnlineResult {
-  source: 'modland' | 'hvsc';
+  source: 'modland' | 'hvsc' | 'modarchive';
   key: string;
   filename: string;
   format: string;
   author: string;
   avg_rating?: number;
   vote_count?: number;
+  /** The Mod Archive only: the real file name (filename above carries the title). */
+  archiveFilename?: string;
 }
 
 function modlandToResult(f: ModlandFile): OnlineResult {
@@ -692,6 +700,10 @@ function modlandToResult(f: ModlandFile): OnlineResult {
 
 function hvscToResult(e: HVSCEntry): OnlineResult {
   return { source: 'hvsc', key: e.path, filename: e.name, format: 'SID', author: e.author || '', avg_rating: e.avg_rating, vote_count: e.vote_count };
+}
+
+function modarchiveToResult(f: ModArchiveFile): OnlineResult {
+  return { source: 'modarchive', key: String(f.id), filename: modArchiveDisplayName(f), format: f.format || f.extension.toUpperCase(), author: f.author, archiveFilename: f.filename };
 }
 
 interface OnlinePanelProps {
@@ -746,7 +758,7 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
   }, [isOpen]);
 
   const doSearch = useCallback(async (q: string, fmt: string, src: SearchSource, newOffset: number, append: boolean) => {
-    if (!q && !fmt) {
+    if (!q && (!fmt || src === 'modarchive')) {
       if (!append) setResults([]);
       return;
     }
@@ -768,6 +780,14 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
           combined.push(...hvscResults.filter(e => !e.isDirectory).map(hvscToResult));
           if (hvscResults.length === ONLINE_LIMIT) moreResults = true;
         } catch { /* HVSC may be unavailable */ }
+      }
+
+      // Explicit only: the Mod Archive API is key-gated and rate limited, so "All Sources" never calls it.
+      if (src === 'modarchive' && q) {
+        const page = newOffset / ONLINE_LIMIT + 1;
+        const data = await searchModArchive({ q, page });
+        combined.push(...data.results.map(modarchiveToResult));
+        moreResults = page < data.totalPages;
       }
 
       if (src === 'all') combined.sort((a, b) => a.filename.localeCompare(b.filename));
@@ -848,6 +868,13 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
       const normalized = normalizeHVSCDownload(raw, filename);
       buffer = normalized.buffer;
       filename = normalized.filename;
+    } else if (item.source === 'modarchive') {
+      filename = item.archiveFilename ?? item.filename;
+      try {
+        buffer = await downloadModArchiveFile(Number(item.key), filename, onProgress);
+      } catch (fetchErr) {
+        throw new Error(`The Mod Archive download failed: ${(fetchErr as Error).message}`);
+      }
     } else {
       try {
         buffer = await downloadModlandFile(item.key, onProgress);
@@ -1010,9 +1037,10 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
             { value: 'all', label: 'All Sources' },
             { value: 'modland', label: 'Modland' },
             { value: 'hvsc', label: 'HVSC (SID)' },
+            { value: 'modarchive', label: 'The Mod Archive' },
           ]}
         />
-        {source !== 'hvsc' && (
+        {(source === 'all' || source === 'modland') && (
           <CustomSelect
             value={format}
             onChange={(v) => setFormat(v)}
@@ -1061,11 +1089,11 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
                     <div className="flex gap-3 text-xs text-text-muted items-center">
                       <span className={item.source === 'hvsc' ? 'text-accent-highlight/70' : 'text-accent-success/70'}>{item.format}</span>
                       <span>{item.author}</span>
-                      <span className="text-text-muted/40">{item.source === 'hvsc' ? 'HVSC' : 'Modland'}</span>
+                      <span className="text-text-muted/40">{item.source === 'hvsc' ? 'HVSC' : item.source === 'modarchive' ? 'The Mod Archive' : 'Modland'}</span>
                     </div>
                   </div>
 
-                  {(() => {
+                  {item.source !== 'modarchive' && (() => {
                     const r = ratings[item.key];
                     const avg = r?.avg ?? item.avg_rating ?? 0;
                     const count = r?.count ?? item.vote_count ?? 0;

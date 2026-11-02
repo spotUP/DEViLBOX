@@ -14,7 +14,7 @@ export type RememberedFileSource = 'demo' | 'cloud' | 'online' | 'modland' | 'hv
 
 export interface OnlineMemory {
   query: string;
-  source: 'all' | 'modland' | 'hvsc';
+  source: 'all' | 'modland' | 'hvsc' | 'modarchive';
   format: string;
   results: unknown[];
   offset: number;
