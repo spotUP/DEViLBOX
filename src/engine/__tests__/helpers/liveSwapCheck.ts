@@ -39,6 +39,20 @@ export interface LiveSwapResult {
 }
 
 const settle = () => new Promise((r) => setTimeout(r, 200));
+/** How long the store's send (export, parse, swap) may take before the swap counts as missing. */
+const SWAP_WAIT_MS = 10_000;
+
+const isSwap = (m: Record<string, unknown>) => m.type === 'moduleSwapped' || (m.type === 'moduleReloaded' && m.ok === true);
+
+/**
+ * Wait for the store's own send of a keystroke (sendCellEdits: export, parse, swapModule) to reach the worklet. The test
+ * must not send the edit itself as well: two sends race for one swap and the newer drops the older.
+ */
+export async function awaitSwap(live: Pick<WorkletHarness, 'posted'>): Promise<boolean> {
+  for (let waited = 0; waited < SWAP_WAIT_MS && !live.posted.some(isSwap); waited += 50) await new Promise((r) => setTimeout(r, 50));
+  await settle();
+  return live.posted.some(isSwap);
+}
 
 async function play(spec: LiveSwapSpec, bytes: ArrayBuffer): Promise<WorkletHarness> {
   const h = await openWorklet(spec.worklet);
@@ -65,7 +79,7 @@ export async function measureLiveSwap(spec: LiveSwapSpec, at: { p: number; ch: n
   const bytes = await importSong(spec.file);
   const { useTrackerStore } = await import('@/stores/useTrackerStore');
   const { liveTrackerSong } = await import('@/lib/song/liveSong');
-  const { liveEditRoute, sendCellEditsToEngine, playingDescriptor } = await import('@/engine/replayer/liveCellEdits');
+  const { liveEditRoute, playingDescriptor } = await import('@/engine/replayer/liveCellEdits');
   const { editedModuleForPlay } = await import('@/engine/replayer/editedModuleForPlay');
   const routeIs = liveEditRoute(liveTrackerSong()).route;
 
@@ -78,10 +92,10 @@ export async function measureLiveSwap(spec: LiveSwapSpec, at: { p: number; ch: n
   };
   const before = live.render(spec.pre);
   useTrackerStore.getState().setCurrentPattern(at.p);
+  // The keystroke alone: the store sends the edit to the engine (sendCellEdits), as in the product. Sending it here as
+  // well raced the store's send for the same swap, and the newer call dropped the older one.
   edit();
-  await sendCellEditsToEngine(liveTrackerSong(), [{ pattern: at.p, row: at.row, channel: at.ch, cell: useTrackerStore.getState().patterns[at.p].channels[at.ch].rows[at.row] }]);
-  await settle();
-  const swapped = live.posted.some((m) => m.type === 'moduleSwapped' || (m.type === 'moduleReloaded' && m.ok === true));
+  const swapped = await awaitSwap(live);
   if (!swapped && process.env.LS_DEBUG) console.log('[ls] not swapped; worklet posted', JSON.stringify(live.posted.map((m) => [m.type, m.message])), 'swap error', swapError);
   const after = live.render(spec.post);
   (globalThis as { __liveEngine?: unknown }).__liveEngine = undefined;
