@@ -3,6 +3,7 @@
  * Replaces the flat grid with organized categories
  */
 
+import { useAllowedSynthTypes } from '@hooks/useAllowedSynthTypes';
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { SYNTH_CATEGORIES, getSynthInfo, type SynthInfo } from '@constants/synthCategories';
@@ -47,6 +48,7 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
   compact = false,
   createMode = false,
 }) => {
+  const synthLock = useAllowedSynthTypes();
   // Use selectors for proper reactivity - don't use the getter!
   const currentInstrumentId = useInstrumentStore(state => state.currentInstrumentId);
   const instruments = useInstrumentStore(state => state.instruments);
@@ -203,6 +205,7 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
 
   // Handle synth selection
   const handleSelectSynth = (synthType: SynthType) => {
+    if (!synthLock.isAllowed(synthType)) return;
     // In create mode, just fire callback — caller handles instrument creation
     if (createMode) {
       onSelect?.(synthType);
@@ -301,10 +304,13 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
         key={synth.name}
         data-synth-type={synth.type}
         onClick={() => handleSelectSynth(synth.type)}
+        title={synthLock.disabledReason(synth.type) || undefined}
+        aria-disabled={!synthLock.isAllowed(synth.type)}
         onMouseEnter={() => setHoveredSynth(synth.type)}
         onMouseLeave={() => setHoveredSynth(null)}
         className={`
           relative p-4 rounded-lg border cursor-pointer transition-all
+          ${synthLock.isAllowed(synth.type) ? '' : 'opacity-40 cursor-not-allowed'}
           ${isSelected
             ? 'bg-accent-primary/15 border-accent-primary'
             : 'bg-dark-bgSecondary border-dark-border hover:border-text-muted hover:bg-dark-bgHover'
@@ -389,7 +395,10 @@ export const CategorizedSynthSelector: React.FC<CategorizedSynthSelectorProps> =
                 key={synth.name}
                 data-synth-type={synth.type}
                 onClick={() => handleSelectSynth(synth.type)}
+                disabled={!synthLock.isAllowed(synth.type)}
+                title={synthLock.disabledReason(synth.type) || undefined}
                 className={`
+                  disabled:opacity-40 disabled:cursor-not-allowed
                   flex items-center gap-2 p-2 rounded-lg border text-left transition-all
                   ${isSelected
                     ? 'bg-accent-primary/15 border-accent-primary'

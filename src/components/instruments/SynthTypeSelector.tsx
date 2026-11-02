@@ -3,6 +3,7 @@
  * Shows all 22 synth engines in a clean grid layout with search
  */
 
+import { useAllowedSynthTypes } from '@hooks/useAllowedSynthTypes';
 import React, { useState, useMemo } from 'react';
 import * as LucideIcons from 'lucide-react';
 import { Search, X } from 'lucide-react';
@@ -18,6 +19,7 @@ interface SynthTypeSelectorProps {
 export const SynthTypeSelector: React.FC<SynthTypeSelectorProps> = ({ instrument }) => {
   const updateInstrument = useInstrumentStore((s) => s.updateInstrument);
   const [searchQuery, setSearchQuery] = useState('');
+  const synthLock = useAllowedSynthTypes();
 
   // Filter synths based on search query
   const filteredSynths = useMemo(() => {
@@ -40,6 +42,7 @@ export const SynthTypeSelector: React.FC<SynthTypeSelectorProps> = ({ instrument
   }, [searchQuery]);
 
   const handleTypeChange = (type: SynthType) => {
+    if (!synthLock.isAllowed(type)) return;
     updateInstrument(instrument.id, {
       synthType: type,
       // Reset synth-specific configs when changing type
@@ -94,6 +97,7 @@ export const SynthTypeSelector: React.FC<SynthTypeSelectorProps> = ({ instrument
             synthType={synthType}
             isActive={catalogKeyMatches(synthType, instrument)}
             onSelect={handleTypeChange}
+            disabledReason={synthLock.disabledReason(synthType)}
           />
         ))}
       </div>
@@ -146,12 +150,16 @@ const SynthGridItem: React.FC<{
   synthType: SynthType;
   isActive: boolean;
   onSelect: (type: SynthType) => void;
-}> = ({ synthType, isActive, onSelect }) => {
+  disabledReason: string;
+}> = ({ synthType, isActive, onSelect, disabledReason }) => {
   const synth = SYNTH_INFO[synthType];
   return (
     <button
       onClick={() => onSelect(synthType)}
+      disabled={disabledReason !== ''}
+      title={disabledReason || undefined}
       className={`
+        disabled:opacity-40 disabled:cursor-not-allowed
         p-3 border rounded-lg transition-all text-left
         ${isActive
           ? 'bg-accent-primary/15 border-accent-primary'

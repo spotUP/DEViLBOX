@@ -38,6 +38,7 @@ import {
   DEFAULT_REBIRTH909,
   DEFAULT_BUZZMACHINE,
 } from '@typedefs/instrument';
+import type { SynthType } from '@typedefs/instrument';
 
 import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -45,6 +46,9 @@ import { touchesToneVoice } from '@engine/tone/toneSynthKnobs';
 import { peekTrackerReplayer } from '@engine/TrackerReplayer';
 import * as OpenMPTEditBridge from '@engine/libopenmpt/OpenMPTEditBridge';
 import { recognizeCinter4Instruments } from '@engine/cinter4/cinter4Recognize';
+import { getFormatStoreRefOrNull } from './storeAccess';
+import { isSynthAllowed, formatDisplayName } from '@/lib/formats/EditableFormatRegistry';
+import { notify } from './useNotificationStore';
 import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } from '@/lib/formatCompatibility';
 import { FurnaceParser } from '@/lib/import/formats/FurnaceParser';
 import { DefleMaskParser } from '@/lib/import/formats/DefleMaskParser';
@@ -133,10 +137,24 @@ function triggerWasmReexport(): void {
 }
 
 /**
- * Check if adding/changing to a synth instrument breaks native format compatibility.
- * Returns true if the user confirmed (or no warning needed), false if cancelled.
- * Called from ALL store entry points that can change synthType.
+ * Format instrument lock (N14). Null = the synth type may be created now; else
+ * the full-English reason. Reads the loaded format late-bound (useFormatStore
+ * imports this store, so a static import would cycle).
  */
+export function synthRefusal(synthType: SynthType): string | null {
+  const formatId = (getFormatStoreRefOrNull()?.getState() as { activeFormatId?: string | null } | undefined)?.activeFormatId ?? null;
+  if (isSynthAllowed(formatId, synthType)) return null;
+  return `${formatDisplayName(formatId as string)} cannot hold ${synthType} instruments. Only the instrument types of this format can be added.`;
+}
+
+/** Refuse (with a visible warning) a synth type the loaded format cannot hold. Called from every store entry that creates or retypes an instrument. */
+function refuseSynth(synthType: SynthType | undefined): boolean {
+  if (!synthType) return false;
+  const reason = synthRefusal(synthType);
+  if (reason) notify.warning(reason);
+  return reason !== null;
+}
+
 /** Re-export for backward compat (called from TrackerReplayer.loadSong) */
 export { resetFormatViolations as resetFormatCompatFlag } from '@/lib/formatCompatibility';
 
@@ -387,6 +405,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     updateInstrument: (id, updates) => {
+      const retyped = get().instruments.find((inst) => inst.id === id);
+      if (updates.synthType && retyped && updates.synthType !== retyped.synthType && refuseSynth(updates.synthType)) return;
       // A native setBfree preset is the instrument's setbfree config: the editor and later knob moves read it from there.
       const bfreePreset = (updates as { setbfreeNativePatch?: string }).setbfreeNativePatch;
       if (bfreePreset) {
@@ -1132,6 +1152,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     createInstrument: (config) => {
+      if (refuseSynth(buildInstrumentConfig(0, config).synthType)) return -1;
       const currentCount = get().instruments.length;
       const limits = getActiveFormatLimits();
       if (limits && currentCount >= limits.maxInstruments && !isViolationConfirmed('instrumentCount')) {
@@ -1156,6 +1177,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     addInstrument: (config) => {
+      if (refuseSynth(config.synthType)) return;
       // Format compat: synth instrument — deferred to export-time validation
       // (synth instruments still work in DEViLBOX; only matters when exporting to native format)
       set((state) => {
@@ -1248,6 +1270,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
     cloneInstrument: (id) => {
       const original = get().instruments.find((inst) => inst.id === id);
       if (!original) return id;
+      if (refuseSynth(original.synthType)) return -1;
 
       const existingIds = get().instruments.map((i) => i.id);
       const newId = findNextId(existingIds);
@@ -1727,6 +1750,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
     // Presets
     loadPreset: (preset, targetInstrumentId) => {
+      if (refuseSynth(preset.config.synthType)) return;
       set((state) => {
         const instrument = state.instruments.find((inst) => inst.id === targetInstrumentId);
         if (instrument) {
@@ -1855,6 +1879,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     loadFurnaceInstrument: (buffer, targetId) => {
+      if (refuseSynth('Furnace')) return;
       try {
         const { name, config } = FurnaceParser.parse(buffer);
         if (targetId !== undefined) {
@@ -1891,6 +1916,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
     },
 
     loadDefleMaskInstrument: (buffer, targetId) => {
+      if (refuseSynth('Furnace')) return;
       try {
         const result = DefleMaskParser.parse(buffer, 'dmp') as { name: string; config: FurnaceConfig };
         const { name, config } = result;
@@ -1949,6 +1975,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
 
     // Transform sample instrument to synth (MOD/XM import feature)
     transformInstrument: (instrumentId, targetSynthType, mappingStrategy) => {
+      if (refuseSynth(targetSynthType)) return;
       const instrument = get().instruments.find((inst) => inst.id === instrumentId);
 
       if (!instrument) {
