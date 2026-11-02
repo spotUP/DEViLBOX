@@ -168,11 +168,10 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     }
   }, [isOpen, modalData]);
 
-  // The one call of the native export router in this dialog: the Export button and the question
-  // "is there a Native export for this song?" both ask it. The router (not a list of editor modes
-  // kept here, which missed SunTronic mule.src and Ben Daglish) is what knows which exporter a
-  // song takes, so the Native option is offered when it returns a result. Loaded when asked: it
-  // pulls in every exporter. The song is the one the stores hold (null): the replayer's copy is only
+  // The one export call of the native export router in this dialog (the Export button). Whether the
+  // Native option is offered is asked separately (nativeExportAvailableForLiveSong below): the router's
+  // exporter table (not a list of editor modes kept here, which missed SunTronic mule.src and Ben
+  // Daglish) knows which exporter a song takes. Loaded when asked: it pulls in every exporter. The song is the one the stores hold (null): the replayer's copy is only
   // rebuilt when playback starts, so an edit made since the last play was missing.
   const runNativeExport = useCallback(async () => {
     const { exportNativeFile } = await import('@lib/export/moduleExportService');
@@ -183,11 +182,14 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
   useEffect(() => {
     if (!isOpen) return;
     let current = true;
-    // A refusal (a note the format cannot hold) is the router reaching a format's own writer: the
-    // option stays and the refusal is shown when it is chosen.
-    runNativeExport().then((r) => r !== null, () => true).then((available) => { if (current) setNativeAvailable(available); });
+    // The router answers from its own exporter table without serializing the song; the real export runs
+    // only when the Export button asks (runNativeExport).
+    import('@lib/export/moduleExportService')
+      .then((m) => m.nativeExportAvailableForLiveSong())
+      .catch(() => false)
+      .then((available) => { if (current) setNativeAvailable(available); });
     return () => { current = false; };
-  }, [isOpen, patterns, editorMode, uadeEditableFileData, runNativeExport]);
+  }, [isOpen, patterns, editorMode, uadeEditableFileData]);
 
   // ── Shared handler: export song ─────────────────────────────────────────────
 
