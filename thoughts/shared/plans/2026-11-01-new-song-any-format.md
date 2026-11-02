@@ -87,8 +87,11 @@ the 8 missing-fixture SCRATCH exporters built from a blank song. preTracker (sto
       pattern count and channel count.
 - [x] N11 (done: src/lib/song/__tests__/newSongInFormat.test.ts passes; both tests fail with the format branch disabled) Reachability test: drives `startNewSong({kind:'format', formatId:'mod'})` (the wizard's and MCP's
       only entry), spies openSong (call count 1), asserts the store song format and editor mode.
-- [ ] N12 Live MCP check in Chrome: new_song format=monotone and format=mod, write a note, play, audio level
-      above 0, export_native round-trips. stop + release_all_notes.
+- [x] N12 (done 2026-11-02, live MCP in Chrome) Live MCP check in Chrome: new_song format=monotone and format=mod, write a note, play, audio level
+      above 0, export_native round-trips. stop + release_all_notes. Results: monotone rms 0.2976, export 12127 bytes;
+      ansiMusic rms 0.49, Untitled.ans 141 bytes; ims rms 0.1135, Untitled.ims after N12c fix (967295522);
+      futurePlayer rms 0.15, Untitled.fp 27088 bytes (clickPerMillion 1097, not judged by ear);
+      mod export via export_mod 2108 bytes with the typed cell, play silent because template sample 1 is empty.
 - [x] N8-avp Activision Pro: blank template takes typed notes on every voice (commit 54997cb9e).
 - [x] N8-ma (commit 1330a0653) Music Assembler: a note typed on any covered blank row is cut into the covering held-note or rest event; removal is written; note-off and instrument-only edits still warn. Rows before the voice's first event warn (no covering command). Commit pending (after FP agent).
 - [x] N8-mon (commit b46c714d5) MONOTONE note 88 shows as a note (was note off); F00, note-off rows and Hz table pinned by monotoneDefects.test.ts as correct.
