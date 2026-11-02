@@ -20,6 +20,8 @@ import type { FormatEnginePreferences } from '@/stores/useSettingsStore';
 import { playsOnDedicatedEngine } from '@/engine/replayer/wasmEngineRegistry';
 import { gridOpensInScopeView } from '@/lib/tracker/gridOpensInScopeView';
 import { levelSamplerForUade } from '@/lib/import/uadeKeyLevel';
+import { parsedByExportableFormat } from '@/lib/formats/EditableFormatRegistry';
+import '@/lib/formats/EditableFormatRegistry.builtins';
 
 /** Common context passed through all fallback helpers */
 export interface FallbackContext {
@@ -96,12 +98,22 @@ export function dedicatedEngineSynthType(inst: {
 
 type NativeParser = (buffer: ArrayBuffer, filename: string) => Promise<TrackerSong> | TrackerSong;
 
-/** Note cells across the whole grid. Zero means a stub parser's placeholder. */
+/** Note cells across the whole grid. */
 export function countNotes(song: Pick<TrackerSong, 'patterns'>): number {
   return song.patterns.reduce((sum, p) =>
     sum + p.channels.reduce((cSum, ch) =>
       cSum + ch.rows.filter((r) => r.note > 0).length, 0), 0);
 }
+/**
+ * A grid with no notes that a stub parser left: UADE builds the grid instead.
+ * Not a stub: a song flagged for the scope view (gridUnmatchedReason), or a
+ * song in a format with a native exporter, whose parser reads the whole file;
+ * zero notes there is an empty song, e.g. a New Song template.
+ */
+export function isStubGrid(song: TrackerSong): boolean {
+  return countNotes(song) === 0 && !gridOpensInScopeView(song) && !parsedByExportableFormat(song);
+}
+
 type NativeParserWithBytes = (bytes: Uint8Array, filename: string) => Promise<TrackerSong | null> | TrackerSong | null;
 
 /** Call UADE as fallback */
@@ -179,7 +191,7 @@ export async function withNativeThenUADE(
         // ..., ledger F6). The `native` branch below already falls through on
         // zero notes; this branch did not.
         // A song flagged unmatched (gridUnmatchedReason) is the scope-view answer: keep it and its reason.
-        if (result && countNotes(result) === 0 && !gridOpensInScopeView(result)) {
+        if (result && isStubGrid(result)) {
           console.warn(`[${parserName}] Native parser returned 0 notes for ${ctx.originalFileName}; UADE builds the grid`);
           return callUADE(ctx);
         }
@@ -263,7 +275,7 @@ export async function withNativeThenUADE(
         // Defense-in-depth: if native parser returned 0 notes across all patterns,
         // it's likely a stub parser that couldn't actually parse the file.
         // Fall through to UADE instead of returning empty data.
-        if (countNotes(result) === 0 && !gridOpensInScopeView(result)) {
+        if (isStubGrid(result)) {
           console.warn(`[${parserName}] Native parser returned 0 notes for ${ctx.originalFileName}, falling back to UADE`);
           return callUADE(ctx);
         }

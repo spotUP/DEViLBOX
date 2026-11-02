@@ -109,7 +109,7 @@ registerEditableFormat({ formatId: "soundFactory", label: "Sound Factory", newSo
 registerEditableFormat({ formatId: "soundFactoryStub", label: "", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "soundfx", label: "Sound-FX", newSong: { template: "templates/soundfx.sfx" }, patternCodec: { kind: "fixed" }, exporter: { module: "SoundFXExporter", fn: "exportSoundFX", byLayout: true } });
 registerEditableFormat({ formatId: "soundMaster", label: "Sound Master", newSong: { template: "templates/soundMaster.sm3" }, patternCodec: { kind: "fixed" }, exporter: { module: "SoundMasterExporter", fn: "exportSoundMaster", byLayout: true } });
-registerEditableFormat({ formatId: "soundMon", label: "SoundMon", patternCodec: { kind: "fixed" }, newSong: { template: "templates/soundmon.bp" } });
+registerEditableFormat({ formatId: "soundMon", label: "SoundMon", patternCodec: { kind: "fixed" }, newSong: { template: "templates/soundmon.bp" }, exporter: { module: "SoundMonExporter", fn: "exportAsSoundMon" } });
 registerEditableFormat({ formatId: "startrekkerAM", label: "", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "steveTurner", label: "", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "stk", label: "", patternCodec: { kind: "fixed" } });

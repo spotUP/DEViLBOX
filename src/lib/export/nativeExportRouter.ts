@@ -25,7 +25,7 @@
 
 import type { TrackerSong } from '@engine/TrackerReplayer';
 import '@lib/formats/EditableFormatRegistry.builtins';
-import { getLayoutExporters, type LayoutExporterEntry } from '@lib/formats/EditableFormatRegistry';
+import { getLayoutExporters, songFormatId, songLayoutFormatId, type LayoutExporterEntry } from '@lib/formats/EditableFormatRegistry';
 import { lowOctaveExportRefusal } from '@/lib/tracker/noteValue';
 
 export type { LayoutExporterEntry };
@@ -237,7 +237,8 @@ function isMaxTrax(song: TrackerSong): boolean {
 
 async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult | null> {
   const format = song.format as string;
-  const layoutFormatId = song.uadePatternLayout?.formatId || song.uadeVariableLayout?.formatId || '';
+  const layoutFormatId = songLayoutFormatId(song);
+  const formatId = songFormatId(song);
   const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
   let result: RawExportResult | null = null;
 
@@ -273,7 +274,7 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
     const live = useFormatStore.getState().maxTraxData;
     const data = live ?? parseMaxTrax(new Uint8Array(song.maxTraxFileData!));
     result = { data: encodeMaxTrax(data), filename: `${baseName}.mxtx`, warnings: [] };
-  } else if (song.fredReplayerFileData) {
+  } else if (formatId === 'fredEditor') {
     // Fred Editor keeps format 'MOD'; its module (with the grid's edits) is the export.
     const { exportFredEditor } = await import('./FredEditorExporter');
     result = await exportFredEditor(song);
@@ -289,11 +290,11 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
     // Sawteeth: the parser sets no chip-RAM layout, so LAYOUT_EXPORTERS (keyed by layout id) never reached it.
     const { exportSawteeth } = await import('./SawteethExporter');
     result = await exportSawteeth(song);
-  } else if (format === 'AST' && song.actionamicsFileData) {
+  } else if (formatId === 'actionamics') {
     // Actionamics: its module (with the grid's edits) is the export.
     const { exportActionamics } = await import('./ActionamicsExporter');
     result = await exportActionamics(song);
-  } else if (format === 'AVP' && song.activisionProFileData) {
+  } else if (formatId === 'activisionPro') {
     // Activision Pro: its module (with the grid's edits) is the export.
     const { exportActivisionPro } = await import('./ActivisionProExporter');
     result = await exportActivisionPro(song);

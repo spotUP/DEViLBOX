@@ -12,7 +12,7 @@
  */
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { EAGLE_PLAYER_FORMATS } from '@/engine/eagleplayer/eaglePlayerFormats';
-import { callUADE, countNotes, type FallbackContext } from './withFallback';
+import { callUADE, isStubGrid, type FallbackContext } from './withFallback';
 
 type NativeParse = (buffer: ArrayBuffer, name: string) => Promise<TrackerSong | null> | TrackerSong | null;
 
@@ -76,7 +76,7 @@ export async function withEaglePlayer(
   } catch (e) {
     console.warn(`[withEaglePlayer] ${formatId} parser refused ${ctx.originalFileName}: ${(e as Error).message}`);
   }
-  if (!song || countNotes(song) === 0) {
+  if (!song || isStubGrid(song)) {
     try {
       song = await callUADE({ ...ctx, originalFileName: uadeFileName });
     } catch (e) {
