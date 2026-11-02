@@ -46,7 +46,9 @@ vi.mock('@engine/TrackerReplayer', async (orig) => {
 interface Case {
   id: string; prefKey: string; file: string;
   /** The edited cell: grid pattern, channel, row (a note the first minute plays). */
-  pattern: number; channel: number; row: number;
+  /** `row` is a grid row, or 'first-note': the first row of that pattern and channel holding a note, so the site
+   *  follows the parsed grid when the format's row layout changes (Hippel CoSo speed changes take no row). */
+  pattern: number; channel: number; row: number | 'first-note';
   swapAt: number; endAt: number;
   /** When the raised note starts to sound, in nuade's own render of the edited module (s). */
   heardAt: number;
@@ -57,7 +59,7 @@ interface Case {
 const CASES: Case[] = [
   { id: 'robhubbard', prefKey: 'robHubbard', file: 'public/data/songs/formats/centurion_battle.rh', pattern: 0, channel: 0, row: 48, swapAt: 2, endAt: 4, heardAt: 2.86 },
   { id: 'soundmaster', prefKey: 'soundMaster', file: "public/data/songs/formats/rackney'sisland_4.sm", pattern: 12, channel: 1, row: 0, swapAt: 6.5, endAt: 9, heardAt: 7.66 },
-  { id: 'hippel', prefKey: 'hippelCoso', file: 'public/data/songs/formats/prehistoric_tale.hipc', pattern: 3, channel: 3, row: 1, swapAt: 6, endAt: 8.5, heardAt: 6.84 },
+  { id: 'hippel', prefKey: 'hippelCoso', file: 'public/data/songs/formats/prehistoric_tale.hipc', pattern: 3, channel: 3, row: 'first-note', swapAt: 6, endAt: 8.5, heardAt: 6.84 },
   { id: 'instereo1', prefKey: 'inStereo1', file: 'public/data/songs/formats/fantasi8.is', pattern: 8, channel: 1, row: 0, swapAt: 6.5, endAt: 9, heardAt: 7.68 },
   { id: 'sidmon2', prefKey: 'sidmon2', file: 'public/data/songs/formats/bruno_time.sid2', pattern: 2, channel: 1, row: 2, swapAt: 14.5, endAt: 17, heardAt: 15.7 },
   { id: 'soundmon', prefKey: 'soundmon', file: 'public/data/songs/formats/antidust.bp3', pattern: 4, channel: 0, row: 0, swapAt: 6.5, endAt: 9, heardAt: 7.68 },
@@ -134,13 +136,15 @@ describe('an edit on a song playing on nuade is heard where it was made', () => 
       mark = rig.posted.length;
       const b1 = render(c.swapAt);
       const { useTrackerStore } = await import('@/stores/useTrackerStore');
-      const before = useTrackerStore.getState().patterns[c.pattern].channels[c.channel].rows[c.row];
+      const siteRows = useTrackerStore.getState().patterns[c.pattern].channels[c.channel].rows;
+      const row = c.row === 'first-note' ? siteRows.findIndex((r) => r.note > 0) : c.row;
+      const before = siteRows[row];
       expect(before.note, 'the site holds a note').toBeGreaterThan(0);
       const swap = vi.spyOn(engine, 'swapModule');
       const swapped = rig.posted.length;
       useTrackerStore.getState().setCurrentPattern(c.pattern);
       const editedAt = Date.now();
-      useTrackerStore.getState().setCell(c.channel, c.row, { note: before.note + 2 });
+      useTrackerStore.getState().setCell(c.channel, row, { note: before.note + 2 });
       // The worklet takes the edited module at once and hands over while it renders (it catches the module up to the
       // played frame across render quanta), so the swap completes inside the render below.
       await until(() => swap.mock.calls.length > 0 || rig.posted.slice(swapped).some((m) => m.type === 'error'), 60_000);
