@@ -92,7 +92,9 @@ function waveRows(trace: SidTrace, n: DecodedNote, last: number): Array<[number,
   const base = n.frame.freq;
   const rows: Array<[number, number]> = [];
   let cur = 0;
-  for (let f = n.start; f < last; f++) {
+  // GT skips the wave and pulse tables on the note-init frame (gplay.c NEXTCHN
+  // after note init): row 0 runs one frame after the gate rise.
+  for (let f = n.start + 1; f < last; f++) {
     const fr = frames[f];
     let right = 0x80;
     if (fr.freq > 0 && base > 0) {
@@ -116,7 +118,8 @@ function waveRows(trace: SidTrace, n: DecodedNote, last: number): Array<[number,
 function pulseRows(trace: SidTrace, n: DecodedNote, last: number): Array<[number, number]> {
   const frames = trace.voices[n.voice];
   const p: number[] = [];
-  for (let f = n.start; f < last; f++) p.push(frames[f].pulse & 0xfff);
+  for (let f = n.start + 1; f < last; f++) p.push(frames[f].pulse & 0xfff);
+  if (p.length === 0) return [[0xff, 0]];
   let end = p.length;
   while (end > 1 && p[end - 1] === p[end - 2]) end--;
   const rows: Array<[number, number]> = [[0x80 | (p[0] >> 8), p[0] & 0xff]];
@@ -147,7 +150,13 @@ function programOf(trace: SidTrace, n: DecodedNote, nextStart: number, maxLen: n
   return { wave, pulse: pulseRows(trace, n, last), firstwave: frames[n.start].control };
 }
 
-/** Global filter program of chip 0, started by one chosen note. */
+/**
+ * Global filter program of chip 0, started by one chosen note. The GT filter
+ * table runs before the channel loop (gplay.c), so row 0 executes one frame
+ * after the owner's note-init frame. Each set row pair ([0x80|type, route] +
+ * [0, cutoff]) or modulation step consumes one frame; the GT cutoff is an
+ * unsigned byte, so deltas wrap mod 256.
+ */
 function filterProgram(trace: SidTrace, notes: DecodedNote[]): { rows: Array<[number, number]>; owner: DecodedNote } | null {
   const v = trace.voices[0];
   if (!v) return null;
@@ -156,38 +165,74 @@ function filterProgram(trace: SidTrace, notes: DecodedNote[]): { rows: Array<[nu
   if (fs < 0) return null;
   let owner: DecodedNote | null = null;
   for (const n of notes) {
-    if (n.voice >= 3 || (v[Math.min(n.start, v.length - 1)].resRoute & (1 << n.voice)) === 0) continue;
-    if (!owner || Math.abs(n.start - fs) < Math.abs(owner.start - fs)) owner = n;
+    // Routing is checked where the filter starts: a player may route a frame after the gate rise.
+    if (n.voice >= 3 || n.start + 1 > fs || (v[fs].resRoute & (1 << n.voice)) === 0) continue;
+    if (!owner || n.start > owner.start) owner = n;
   }
-  if (!owner || Math.abs(owner.start - fs) > 8) return null;
+  if (!owner || fs - owner.start > 8) return null;
   const rows: Array<[number, number]> = [];
-  let f = Math.max(fs, owner.start);
-  if (owner.start < fs) {
-    let lead = fs - owner.start;
-    while (lead > 0) { const k = Math.min(lead, 0x7f); rows.push([k, 0]); lead -= k; }
-  }
-  let curType = -1, curCtrl = -1;
+  let lead = fs - (owner.start + 1);
+  while (lead > 0) { const k = Math.min(lead, 0x7f); rows.push([k, 0]); lead -= k; }
+  let curType = -1, curCtrl = -1, cutoff = 0;
+  const sameMode = (g: number) => (v[g].modeVol & 0x70) === curType && v[g].resRoute === curCtrl;
+  let f = fs;
   while (f < v.length && rows.length < TABLE_LIMIT - 3) {
-    const typ = v[f].modeVol & 0x70, ctrl = v[f].resRoute;
-    if (typ !== curType || ctrl !== curCtrl) {
-      rows.push([0x80 | typ, ctrl], [0, v[f].cutoff]);
-      curType = typ; curCtrl = ctrl;
+    if (!sameMode(f)) {
+      curType = v[f].modeVol & 0x70; curCtrl = v[f].resRoute; cutoff = v[f].cutoff;
+      rows.push([0x80 | curType, curCtrl], [0, cutoff]);
       f++;
       continue;
     }
-    const d = v[Math.min(f + 1, v.length - 1)].cutoff - v[f].cutoff;
-    const sameMode = (g: number) => (v[g].modeVol & 0x70) === curType && v[g].resRoute === curCtrl;
-    if (f + 1 >= v.length || !sameMode(f + 1)) { f++; continue; }
-    if (d < -128 || d > 127) { rows.push([0, v[f + 1].cutoff]); f++; continue; }
-    let run = 1;
-    while (f + run + 1 < v.length && run < 0x7f && sameMode(f + run + 1) && v[f + run + 1].cutoff - v[f + run].cutoff === d) run++;
-    rows.push([run, d & 0xff]);
-    f += run;
+    const d = (v[f].cutoff - cutoff) & 0xff;
+    let k = 1;
+    while (f + k < v.length && k < 0x7f && sameMode(f + k) && ((v[f + k].cutoff - v[f + k - 1].cutoff) & 0xff) === d) k++;
+    rows.push([k, d]);
+    cutoff = v[f + k - 1].cutoff;
+    f += k;
   }
   // Trailing zero-delta modulation rows hold the last state: drop them.
   while (rows.length > 0 && rows[rows.length - 1][1] === 0 && rows[rows.length - 1][0] > 0 && rows[rows.length - 1][0] < 0x80) rows.pop();
   rows.push([0xff, 0]);
   return { rows, owner };
+}
+
+/**
+ * Frame of the first row's note init in a GT replay: the play routine's first
+ * call only initialises the song, and the channel tick starts at 6 - 1
+ * (gplay.c song init, multiplier 1), so row 0 starts at the 6th call (index 5).
+ */
+export const GT_FIRST_ROW_FRAME = 5;
+
+/** Hard restart before one note: frames of gate-off with a fixed ADSR before the gate rise. */
+interface HardRestart { frames: number; adsr: number; gateOn: boolean }
+
+function hardRestartOf(trace: SidTrace, n: DecodedNote, maxFrames: number): HardRestart {
+  const v = trace.voices[n.voice];
+  if (n.start === 0) return { frames: 0, adsr: -1, gateOn: false };
+  const prev = v[n.start - 1];
+  if (prev.control & 1) return { frames: 0, adsr: -1, gateOn: true };
+  const adsr = (prev.ad << 8) | prev.sr;
+  let k = 0;
+  while (k < maxFrames && n.start - 1 - k >= 0) {
+    const fr = v[n.start - 1 - k];
+    if ((fr.control & 1) || ((fr.ad << 8) | fr.sr) !== adsr) break;
+    k++;
+  }
+  // The ADSR must have been written k frames before the note (a change, not a held value).
+  const before = n.start - 1 - k >= 0 ? v[n.start - 1 - k] : null;
+  const written = before !== null && ((before.ad << 8) | before.sr) !== adsr;
+  return { frames: written ? k : 0, adsr: written ? adsr : -1, gateOn: false };
+}
+
+function mostCommon(values: number[]): number | null {
+  const count = new Map<number, number>();
+  let best: number | null = null, bestN = 0;
+  for (const x of values) {
+    const c = (count.get(x) ?? 0) + 1;
+    count.set(x, c);
+    if (c > bestN) { bestN = c; best = x; }
+  }
+  return best;
 }
 
 export function sidTraceToGoatTracker(trace: SidTrace, name = 'Imported SID'): SidTraceGoatTracker {
@@ -201,7 +246,23 @@ export function sidTraceToGoatTracker(trace: SidTrace, name = 'Imported SID'): S
     fpr = 3;
   }
   const g: RowGrid = { framesPerRow: fpr, origin: grid.origin };
-  const frameOffset = g.origin;
+  // Trace frame of GT replay snapshot 0: row 0 (trace frame origin) plays at GT_FIRST_ROW_FRAME.
+  const frameOffset = g.origin - GT_FIRST_ROW_FRAME;
+
+  // Hard restart: GT reads a row `gatetimer` frames before its note init and
+  // then (gplay.c GETNEWNOTES) gates off and writes adparam, unless the
+  // instrument's gatetimer has 0x40 (no hard restart) or 0x80 (gate off only).
+  // The gatetimer must not exceed tempo - 1, or GT stops the song.
+  const hr = new Map<DecodedNote, HardRestart>();
+  for (const n of notes) hr.set(n, hardRestartOf(trace, n, Math.max(1, fpr - 1)));
+  const hrNotes = notes.filter((n) => hr.get(n)!.frames > 0);
+  const gateFrames = mostCommon(hrNotes.map((n) => hr.get(n)!.frames)) ?? 1;
+  const adparam = mostCommon(hrNotes.filter((n) => hr.get(n)!.frames === gateFrames).map((n) => hr.get(n)!.adsr)) ?? 0x0f00;
+  const gatetimerOf = (n: DecodedNote): number => {
+    const h = hr.get(n)!;
+    if (h.gateOn) return 0x40 | gateFrames;
+    return (h.frames > 0 && h.adsr === adparam ? 0 : 0x80) | gateFrames;
+  };
 
   // Next note start per note on the same voice.
   const nextStart = new Map<DecodedNote, number>();
@@ -233,7 +294,8 @@ export function sidTraceToGoatTracker(trace: SidTrace, name = 'Imported SID'): S
         if (wp < 0 || pp < 0) { ok = false; why = `${maxLen}/${shared} wave ${wtbl.left.length}+${prog.wave.length} pulse ${ptbl.left.length}+${prog.pulse.length}`; break; }
         const isFilterOwner = filter !== null && filter.owner === n;
         const fp = isFilterOwner ? ftbl.index.get(filter!.rows.map((r) => `${r[0]}.${r[1]}`).join(',')) ?? 0 : 0;
-        const key = `${src.frame.ad}.${src.frame.sr}.${prog.firstwave}.${wp}.${pp}.${fp}`;
+        const gate = gatetimerOf(n);
+        const key = `${src.frame.ad}.${src.frame.sr}.${prog.firstwave}.${wp}.${pp}.${fp}.${gate}`;
         let idx = keyIndex.get(key);
         if (idx === undefined) {
           idx = instruments.length;
@@ -241,7 +303,7 @@ export function sidTraceToGoatTracker(trace: SidTrace, name = 'Imported SID'): S
           const ins = emptyGTInstrument();
           ins.ad = src.frame.ad; ins.sr = src.frame.sr;
           ins.ptr = [wp, pp, fp, 0];
-          ins.gatetimer = 0x40;
+          ins.gatetimer = gate;
           ins.firstwave = prog.firstwave >= 0xfe ? 0x09 : prog.firstwave;
           ins.name = `SID ${idx}`.slice(0, 16);
           instruments.push(ins);
@@ -258,7 +320,7 @@ export function sidTraceToGoatTracker(trace: SidTrace, name = 'Imported SID'): S
 
   // Rows
   const lastFrame = trace.frames;
-  const totalRows = Math.max(1, Math.ceil((lastFrame - frameOffset) / fpr));
+  const totalRows = Math.max(1, Math.ceil((lastFrame - g.origin) / fpr));
   const channels = trace.voices.length;
   const grids: number[][][] = [];
   for (let c = 0; c < channels; c++) {
@@ -270,7 +332,10 @@ export function sidTraceToGoatTracker(trace: SidTrace, name = 'Imported SID'): S
   }
   for (const n of notes) {
     if (n.end === null) continue;
-    const row = Math.min(totalRows - 1, rowOfFrame(g, n.end));
+    // A gate fall that is the next note's hard restart is not a key-off.
+    if (n.end >= (nextStart.get(n) ?? trace.frames) - gateFrames) continue;
+    // GT reads a key-off row `gateFrames` frames before the row frame.
+    const row = Math.min(totalRows - 1, rowOfFrame(g, n.end + gateFrames));
     if (row > rowOfFrame(g, n.start) && grids[n.voice][row][0] === GT_REST) grids[n.voice][row][0] = GT_KEYOFF;
   }
   grids[0][0] = [grids[0][0][0], grids[0][0][1], CMD_SETTEMPO, fpr];
@@ -307,7 +372,7 @@ export function sidTraceToGoatTracker(trace: SidTrace, name = 'Imported SID'): S
   };
   return {
     song,
-    settings: { ntsc: trace.clock > 1_000_000, multiplier: 1, adparam: 0x0f00 },
+    settings: { ntsc: trace.clock > 1_000_000, multiplier: 1, adparam },
     framesPerRow: fpr, frameOffset, rows: totalRows, noteCount: notes.length,
     instrumentCount: built.instruments.filter((i) => i.ad || i.sr || i.ptr.some((p) => p)).length,
     programFrames: built.maxLen, sharedPrograms: built.shared, warnings,

@@ -32,9 +32,14 @@ export interface SidTraceScore {
   firstMisses: Array<{ frame: number; chip: number; reg: number; want: number; got: number }>;
 }
 
-/** Minimal headless GT engine: one SID register snapshot per frame. */
+/**
+ * Minimal headless GT engine: one SID register snapshot per frame. One engine
+ * plays ONE song: the bridge's load/play/init never reset the channel state
+ * (gplay.c initchannels is not called), so a second song would start with the
+ * first song's freq, pulse and wave state. Create a new engine per song.
+ */
 export interface HeadlessGT {
-  /** Registers of every chip per frame (chips * 32 bytes), `frames` frames of the song. */
+  /** Registers of every chip per frame (chips * 32 bytes), `frames` frames of the song. Throws on a second call. */
   play(sng: Uint8Array, frames: number, chips: number, ntsc: boolean): Uint8Array[];
 }
 
@@ -66,8 +71,11 @@ export async function createHeadlessGT(root = process.cwd()): Promise<HeadlessGT
   const render = m.cwrap('gt_render_audio', null, ['number', 'number', 'number']);
   const regs = m.cwrap('gt_get_sid_registers', 'number', ['number']);
   init(44100, 0);
+  let used = false;
   return {
     play(sng, frames, chips, ntsc) {
+      if (used) throw new Error('HeadlessGT plays one song: create a new engine per song (channel state is not reset between songs)');
+      used = true;
       const ptr = m._malloc(sng.length);
       b.heap().set(sng, ptr);
       const ok = load(ptr, sng.length);
@@ -94,7 +102,18 @@ export async function createHeadlessGT(root = process.cwd()): Promise<HeadlessGT
   };
 }
 
-function scoreAtLag(orig: Uint8Array[], got: Uint8Array[], lag: number, chips: number, firstMisses: SidTraceScore['firstMisses'] | null): Omit<SidTraceScore, 'lag' | 'firstMisses' | 'frames'> {
+/**
+ * Bits the SID ignores: GT writes the pan nibble into the pulse-high registers
+ * (gplay.c) and players leave garbage in their high nibble; 0x15 holds only
+ * cutoff bits 0..2.
+ */
+function regMask(reg: number): number {
+  if (reg === 3 || reg === 10 || reg === 17) return 0x0f;
+  if (reg === 21) return 0x07;
+  return 0xff;
+}
+
+function scoreAtLag(orig: Uint8Array[], got: Uint8Array[], lag: number, chips: number, frameBase: number, firstMisses: SidTraceScore['firstMisses'] | null): Omit<SidTraceScore, 'lag' | 'firstMisses' | 'frames'> {
   const perClass = {} as Record<RegisterClass, ClassScore>;
   for (const c of REGISTER_CLASSES) perClass[c] = { changes: 0, exact: 0, tolerant: 0 };
   let changes = 0, exact = 0, tolerant = 0;
@@ -104,17 +123,18 @@ function scoreAtLag(orig: Uint8Array[], got: Uint8Array[], lag: number, chips: n
     for (let chip = 0; chip < chips; chip++) {
       for (let reg = 0; reg < 25; reg++) {
         const i = chip * 32 + reg;
-        const want = orig[f][i];
-        const before = f > 0 ? orig[f - 1][i] : 0;
+        const mask = regMask(reg);
+        const want = orig[f][i] & mask;
+        const before = f > 0 ? orig[f - 1][i] & mask : 0;
         if (want === before) continue;
         changes++;
         const cls = perClass[classOf(reg)];
         cls.changes++;
-        const hit = got[g][i] === want;
-        const near = hit || (g > 0 && got[g - 1][i] === want) || (g + 1 < got.length && got[g + 1][i] === want);
+        const hit = (got[g][i] & mask) === want;
+        const near = hit || (g > 0 && (got[g - 1][i] & mask) === want) || (g + 1 < got.length && (got[g + 1][i] & mask) === want);
         if (hit) { exact++; cls.exact++; }
         if (near) { tolerant++; cls.tolerant++; }
-        if (!hit && firstMisses && firstMisses.length < 12) firstMisses.push({ frame: f, chip, reg, want, got: got[g][i] });
+        if (!hit && firstMisses && firstMisses.length < 12) firstMisses.push({ frame: f + frameBase, chip, reg, want, got: got[g][i] & mask });
       }
     }
   }
@@ -124,14 +144,19 @@ function scoreAtLag(orig: Uint8Array[], got: Uint8Array[], lag: number, chips: n
 export function scoreSidTrace(trace: SidTrace, built: SidTraceGoatTracker, gt: HeadlessGT, maxFrames = trace.frames): SidTraceScore {
   const frames = Math.min(trace.frames, maxFrames);
   const sng = writeGoatTrackerSng(built.song, built.settings);
-  const got = gt.play(sng, Math.max(0, frames - built.frameOffset + 4), trace.chips, built.settings.ntsc);
-  const orig = trace.chipRegs.slice(built.frameOffset, built.frameOffset + frames);
+  // GT snapshot i is trace frame i + frameOffset; the offset is negative when
+  // the replay's startup latency is longer than the trace's lead-in.
+  const off = built.frameOffset;
+  const all = gt.play(sng, Math.max(0, frames - off + 4), trace.chips, built.settings.ntsc);
+  const got = all.slice(Math.max(0, -off));
+  const frameBase = Math.max(0, off);
+  const orig = trace.chipRegs.slice(frameBase, frames);
   let bestLag = 0, best = -1;
   for (let lag = -3; lag <= 3; lag++) {
-    const s = scoreAtLag(orig, got, lag, trace.chips, null);
+    const s = scoreAtLag(orig, got, lag, trace.chips, frameBase, null);
     if (s.score > best) { best = s.score; bestLag = lag; }
   }
   const firstMisses: SidTraceScore['firstMisses'] = [];
-  const r = scoreAtLag(orig, got, bestLag, trace.chips, firstMisses);
+  const r = scoreAtLag(orig, got, bestLag, trace.chips, frameBase, firstMisses);
   return { ...r, lag: bestLag, frames: orig.length, firstMisses };
 }
