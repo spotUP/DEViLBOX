@@ -282,4 +282,4 @@ No regression. Wizball and Last Ninja are not GT songs and have 1-4 decoded note
 
 **Open.** Delayed vibratos whose delay exceeds the note's first changes, vibratos that start mid-note after a slide, and fine vibrato (usefinevib) are not detected. Proton freq exact is still 0.33: the rest of its misses are not instrument vibrato (next item).
 
-Commit: see `git log -- thoughts/shared/plans/n16-gt-timing-rootcause.md` (the commit that adds this section).
+Commit: 0fa98697b.
