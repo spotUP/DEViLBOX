@@ -881,3 +881,22 @@ export function parseTFMXFile(
     tfmxNative,
   };
 }
+
+/**
+ * The TFMX layout of a song that holds no module (the New Song wizard's system
+ * preset path): it names the format (formatId) so the native export router
+ * reaches the TFMX serializer, which builds the module from the grid. The one
+ * id literal and cell encoder the parser's own layout (parseTFMXFile) uses.
+ */
+export function emptyTFMXLayout(): UADEPatternLayout {
+  return {
+    formatId: 'tfmx',
+    patternDataFileOffset: 0,
+    bytesPerCell: 4,
+    rowsPerPattern: 1,
+    numChannels: NUM_CHANNELS,
+    numPatterns: 0,
+    moduleSize: 0,
+    encodeCell: encodeTFMXCell,
+  };
+}
