@@ -888,13 +888,13 @@ export function parseTFMXFile(
  * reaches the TFMX serializer, which builds the module from the grid. The one
  * id literal and cell encoder the parser's own layout (parseTFMXFile) uses.
  */
-export function emptyTFMXLayout(): UADEPatternLayout {
+export function emptyTFMXLayout(numChannels: number = NUM_CHANNELS): UADEPatternLayout {
   return {
     formatId: 'tfmx',
     patternDataFileOffset: 0,
     bytesPerCell: 4,
     rowsPerPattern: 1,
-    numChannels: NUM_CHANNELS,
+    numChannels,
     numPatterns: 0,
     moduleSize: 0,
     encodeCell: encodeTFMXCell,

@@ -36,7 +36,8 @@ const TFMX_MAGIC = new Uint8Array([
 ]); // "TFMX-SONG "
 
 const HEADER_SIZE = 0x200; // Fixed header occupies first 512 bytes
-const NUM_CHANNELS = 4;
+const NUM_CHANNELS = 4; // voices written for a song with no more
+const MAX_VOICES = 8; // a trackstep row holds 8 voices (TFMX 7-Voice songs use 7)
 const TRACKSTEP_ENTRY_SIZE = 16; // 8 voices × 2 bytes (we use 4 + 4 padding)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -81,13 +82,14 @@ export async function exportTFMX(song: TrackerSong): Promise<TFMXExportResult> {
   }
 
   // ── 1. Collect TFMX patterns from all tracker patterns ──────────────────
-  // Each tracker pattern has NUM_CHANNELS channels. Each channel's rows become
+  // Each tracker pattern has `voices` channels. Each channel's rows become
   // a separate TFMX pattern (command stream). We build a flat list of TFMX
   // pattern command buffers and track the mapping.
   //
   // tfmxPatterns[i] = Uint8Array of 4-byte commands for TFMX pattern i
   // patMap[trackerPatIdx][channel] = tfmxPatternIndex
 
+  const voices = Math.min(MAX_VOICES, Math.max(NUM_CHANNELS, song.numChannels ?? 0));
   const tfmxPatterns: Uint8Array[] = [];
   const patMap: number[][] = [];
 
@@ -95,7 +97,7 @@ export async function exportTFMX(song: TrackerSong): Promise<TFMXExportResult> {
     const pat = song.patterns[p];
     const chMap: number[] = [];
 
-    for (let ch = 0; ch < NUM_CHANNELS; ch++) {
+    for (let ch = 0; ch < voices; ch++) {
       const rows = pat.channels[ch]?.rows ?? [];
       const tfmxIdx = tfmxPatterns.length;
       chMap.push(tfmxIdx);
@@ -156,7 +158,7 @@ export async function exportTFMX(song: TrackerSong): Promise<TFMXExportResult> {
     const trackerPatIdx = song.songPositions[i] ?? 0;
     const entry = new Uint8Array(TRACKSTEP_ENTRY_SIZE);
 
-    for (let ch = 0; ch < NUM_CHANNELS; ch++) {
+    for (let ch = 0; ch < voices; ch++) {
       const tfmxPatNum = patMap[trackerPatIdx]?.[ch] ?? 0;
       if (tfmxPatNum >= numTfmxPatterns) {
         entry[ch * 2] = 0xFE; // stop voice
@@ -166,8 +168,8 @@ export async function exportTFMX(song: TrackerSong): Promise<TFMXExportResult> {
         entry[ch * 2 + 1] = 0; // transpose = 0
       }
     }
-    // Voices 4-7: mark as stopped (0xFE)
-    for (let ch = NUM_CHANNELS; ch < 8; ch++) {
+    // The voices the song does not use: mark as stopped (0xFE)
+    for (let ch = voices; ch < MAX_VOICES; ch++) {
       entry[ch * 2] = 0xFE;
       entry[ch * 2 + 1] = 0;
     }

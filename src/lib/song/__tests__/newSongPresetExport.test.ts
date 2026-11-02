@@ -45,10 +45,13 @@ vi.mock('@lib/export/HippelCoSoExporter', async (orig) => spied(await orig<Recor
 vi.mock('@lib/export/TFMXExporter', async (orig) => spied(await orig<Record<string, unknown>>(), 'exportTFMX', 'tfmx'));
 vi.mock('@lib/export/SoundMonExporter', async (orig) => spied(await orig<Record<string, unknown>>(), 'exportAsSoundMon', 'soundmon'));
 vi.mock('@lib/export/FCExporter', async (orig) => spied(await orig<Record<string, unknown>>(), 'exportFC', 'fc'));
+vi.mock('@lib/export/PumaTrackerExporter', async (orig) => spied(await orig<Record<string, unknown>>(), 'exportPumaTrackerFile', 'puma'));
+vi.mock('@lib/export/MEDExporter', async (orig) => spied(await orig<Record<string, unknown>>(), 'exportMED', 'med'));
 vi.mock('@lib/export/JamCrackerExporter', async (orig) => spied(await orig<Record<string, unknown>>(), 'exportAsJamCracker', 'jam'));
 
 import '@stores/useCursorStore';
 import { startNewSong } from '@/lib/song/startNewSong';
+import { isPumaTrackerFormat } from '@lib/import/formats/PumaTrackerParser';
 import { exportNativeSong } from '@lib/export/nativeExportRouter';
 
 const ascii = (b: Uint8Array, at: number, n: number) => String.fromCharCode(...b.subarray(at, at + n));
@@ -60,8 +63,12 @@ const ROWS: ReadonlyArray<readonly [presetId: string, key: string, magic: (b: Ui
   ['uade_soundmon', 'soundmon', (b) => ascii(b, 26, 3)],
   ['uade_futurecomposer', 'fc', (b) => ascii(b, 0, 4)],
   ['uade_jamcracker', 'jam', (b) => ascii(b, 0, 4)],
+  ['uade_tfmx7', 'tfmx', (b) => ascii(b, 0, 10)],
+  ['uade_octamed', 'med', (b) => ascii(b, 0, 4)],
+  // PumaTracker has no magic string: the format's own detector is the check.
+  ['uade_pumatracker', 'puma', (b) => (isPumaTrackerFormat(b.slice().buffer) ? 'PUMA' : 'not a PumaTracker file')],
 ];
-const MAGIC: Record<string, string> = { uade_hippelcoso: 'COSO', uade_tfmx: 'TFMX-SONG ', uade_soundmon: 'V.2', uade_futurecomposer: 'FC14', uade_jamcracker: 'BeEp' };
+const MAGIC: Record<string, string> = { uade_hippelcoso: 'COSO', uade_tfmx: 'TFMX-SONG ', uade_soundmon: 'V.2', uade_futurecomposer: 'FC14', uade_jamcracker: 'BeEp', uade_tfmx7: 'TFMX-SONG ', uade_octamed: 'MMD0', uade_pumatracker: 'PUMA' };
 
 describe('wizard preset path: a fixed-format New Song exports as its format', () => {
   it.each(ROWS)('%s: startNewSong preset with instruments, then exportNativeSong, runs the %s serializer', async (presetId, key, magic) => {

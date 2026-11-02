@@ -322,7 +322,7 @@ async function dispatchNativeExport(song: TrackerSong): Promise<RawExportResult 
     // PumaTrackerParser keeps format 'MOD'; its variable layout id names the format.
     const { exportPumaTrackerFile } = await import('./PumaTrackerExporter');
     result = { data: exportPumaTrackerFile(song), filename: `${baseName}.puma`, warnings: [] };
-  } else if (format === 'OctaMED') {
+  } else if (format === 'MED') {
     const { exportMED } = await import('./MEDExporter');
     result = { data: exportMED(song), filename: `${baseName}.mmd0`, warnings: [] };
   } else if (format === 'PreTracker') {
