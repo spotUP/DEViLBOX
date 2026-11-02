@@ -32,14 +32,17 @@ describe('Hippel CoSo grid instrument', () => {
       rows[s][ch].forEach((cell, r) => {
         const sp = spans[s][ch][r];
         if (!sp || cell.note === 0) return;
-        const env = ((buf[sp.offset + 1] & 31) + cur[ch]) & 0xFF;
+        // The span starts at the speed changes (FE n) in front of the note.
+        let at = sp.offset;
+        while (buf[at] === 0xFE) at += 2;
+        const env = ((buf[at + 1] & 31) + cur[ch]) & 0xFF;
         expect(cell.instrument).toBe(env < n ? env + 1 : 1);
         checked++;
         if (cur[ch] > 0) transposed++;
         // Writing the shown cell back reproduces the info byte (the note byte
         // of an out-of-table note is clamped by the display, a separate matter).
         const out = sp.encode({ ...cell }, buf);
-        if (out) expect(out[1]).toBe(buf[sp.offset + 1]);
+        if (out) expect(out[at - sp.offset + 1]).toBe(buf[at + 1]);
       });
     }
     expect(checked).toBeGreaterThan(0);

@@ -96,12 +96,11 @@ describe('a Hippel song', { timeout: 60000 }, () => {
     expect(again.patterns[p].channels[ch].rows[r].note).toBe(cell.note);
     expect(again.patterns[p].channels[ch].rows[r].instrument).toBe(cell.instrument);
 
-    // CoSo has no rest byte, and a -2/-3 row is a length command read with
-    // the next note: clearing a note, or typing onto a command row, would
+    // CoSo has no rest byte, and a -3 (FD) row is a speed change that waits a step: clearing a note, or typing onto a command row, would
     // change the song's timing. Both are refused and the bytes stay (the patcher alone: no linked copies here).
     song.patterns = structuredClone(unedited);
     song.patterns[p].channels[ch].rows[r].note = 0;
-    const cmdRow = song.patterns[p].channels[ch].rows.findIndex((c, i) => c.note === 0 && mapHippelCoSoCells(new Uint8Array(song.hippelFileData!), n)[p][ch][i]);
+    const cmdRow = song.patterns[p].channels[ch].rows.findIndex((c, i) => i !== r && c.note === 0 && mapHippelCoSoCells(new Uint8Array(song.hippelFileData!), n)[p][ch][i]);
     if (cmdRow >= 0) song.patterns[p].channels[ch].rows[cmdRow].note = 49;
     const refused = rebuildHippelModule(song.hippelFileData!, song.patterns, n)!;
     expect(refused.written).toBe(0);
