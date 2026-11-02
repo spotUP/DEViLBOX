@@ -9,6 +9,7 @@
  * - Level meter
  */
 
+import { useAllowedSynthTypes } from '@hooks/useAllowedSynthTypes';
 import React from 'react';
 import * as LucideIcons from 'lucide-react';
 import { Activity, BarChart2, HelpCircle, Layers, User, Radio, Flame, History, Loader2, Download, Zap } from 'lucide-react';
@@ -220,6 +221,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
   isBaked,
   isBaking,
 }) => {
+  const synthLock = useAllowedSynthTypes();
   const synthInfo = getSynthInfo(instrument.synthType);
   const synthHelp = getSynthHelp(instrument.synthType);
 
@@ -263,6 +265,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
                     .map((synth) => ({
                       value: synth.type,
                       label: synth.name,
+                      disabled: !synthLock.isAllowed(synth.type),
                     })),
                 }))}
               />

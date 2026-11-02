@@ -11,7 +11,8 @@
  * historical FormatCapabilities behavior.
  */
 
-import { registerEditableFormat } from './EditableFormatRegistry';
+import { registerEditableFormat, setFormatInstruments } from './EditableFormatRegistry';
+import type { SynthType } from '@typedefs/instrument';
 
 registerEditableFormat({ formatId: "actionamics", label: "", newSong: { template: "templates/actionamics.ast", name: "Actionamics" }, patternCodec: { kind: "variable" }, exporter: { module: "ActionamicsExporter", fn: "exportActionamics", byLayout: true } });
 registerEditableFormat({ formatId: "monotone", label: "MONOTONE", newSong: { template: "templates/monotone.mon" }, patternCodec: { kind: "fixed" }, exporter: { module: "MonotoneExporter", fn: "exportMonotone", byLayout: true } });
@@ -127,3 +128,48 @@ registerEditableFormat({ formatId: "wantedTeamDaveLowe", label: "", patternCodec
 registerEditableFormat({ formatId: "xm", label: "XM", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "xmf", label: "XMF", newSong: { template: "templates/xmf.xmf" }, patternCodec: { kind: "fixed" }, exporter: { module: "XMFExporter", fn: "exportXMF", byLayout: true } });
 registerEditableFormat({ formatId: "zoundMonitor", label: "Zound Monitor", newSong: { template: "templates/zoundMonitor.sng" }, patternCodec: { kind: "fixed" }, exporter: { module: "ZoundMonitorExporter", fn: "exportZoundMonitor", byLayout: true } });
+
+// -- Instrument kinds each format can hold (N14). Formats not listed stay unlocked.
+// Sample-only trackers hold sampled instruments; synth trackers add their own
+// engine kind (native and WASM variants). Verified against every fixture by
+// src/lib/formats/__tests__/formatInstrumentSets.test.ts.
+const SAMPLED: SynthType[] = ['Sampler', 'Player'];
+const SAMPLE_ONLY = ['c67', 'chuckBiscuits', 'composer667', 'digiBoosterPro', 'digitalSymphony', 'dsm_dyn', 'iffSmus', 'ims', 'kris', 'mod', 'stp', 'tcbTracker', 'unic', 'xmf', 'amosMusicBank'];
+for (const id of SAMPLE_ONLY) setFormatInstruments(id, SAMPLED);
+const WITH_SYNTH: Record<string, SynthType[]> = {
+  activisionPro: ['ActivisionProWasmSynth'],
+  actionamics: ['ActionamicsWasmSynth'],
+  benDaglish: ['BenDaglishSynth'],
+  davidWhittaker: ['DavidWhittakerSynth', 'DavidWhittakerWasmSynth'],
+  deltaMusic1: ['DeltaMusic1Synth', 'DeltaMusic1WasmSynth', 'Synth'],
+  deltaMusic2: ['DeltaMusic2Synth', 'DeltaMusic2WasmSynth'],
+  digitalMugician: ['DigMugSynth', 'DigMugWasmSynth'],
+  digitalSonixChrome: ['SonixSynth'],
+  faceTheMusic: ['FaceTheMusicWasmSynth'],
+  fredEditor: ['FredSynth', 'FredReplayerWasmSynth2'],
+  futureComposer: ['FCSynth', 'FutureComposerWasmSynth'],
+  futurePlayer: ['FuturePlayerSynth'],
+  hippelCoSo: ['HippelCoSoSynth', 'HippelSynth'],
+  jochenHippelST: ['HippelStSynth', 'HippelSynth'],
+  inStereo2: ['InStereo2Synth', 'InStereo2WasmSynth'],
+  jamCracker: ['JamCrackerSynth'],
+  monotone: ['MonotoneWasmSynth'],
+  musicAssembler: ['MusicAssemblerSynth'],
+  musicLine: ['MusicLineSynth'],
+  gameMusicCreator: ['GmcWasmSynth'],
+  soundfx: ['SoundFxWasmSynth'],
+  med_mmd0: ['OctaMEDSynth'],
+  octamed_mmd0: ['OctaMEDSynth'],
+  pumaTracker: ['PumaTrackerSynth'],
+  quadraComposer: ['QuadraComposerWasmSynth'],
+  robHubbard: ['RobHubbardSynth'],
+  sawteeth: ['SawteethSynth'],
+  sidmon1: ['SidMon1Synth'],
+  sidMon2: ['SidMonSynth', 'SidMon2Synth'],
+  sonicArranger: ['SonicArrangerSynth', 'SonicArrangerWasmSynth'],
+  soundControl: ['SoundControlWasmSynth'],
+  soundMon: ['SoundMonSynth', 'SoundMonWasmSynth', 'Synth'],
+  sunTronic: ['SunTronicSynth', 'Synth'],
+  tfmx: ['TFMXSynth', 'TFMXModuleSynth'],
+};
+for (const [id, types] of Object.entries(WITH_SYNTH)) setFormatInstruments(id, [...SAMPLED, ...types]);

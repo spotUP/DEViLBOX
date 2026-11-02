@@ -32,6 +32,7 @@ import { subsongStartField, normalizeSubsongs, type NativeSubsongs } from '@/lib
 import { useCheeseCutterStore } from './useCheeseCutterStore';
 import { useEditorStore } from './useEditorStore';
 import { useUIStore } from './useUIStore';
+import { lockFormatId } from '../lib/formats/EditableFormatRegistry';
 import { applySunNoteEdit, reprojectSunGrid } from '../lib/import/formats/sunReproject';
 import { getTrackerStoreRef } from './storeAccess';
 import { useInstrumentStore } from './useInstrumentStore';
@@ -243,6 +244,8 @@ export interface FormatStore {
    * silence (2026-10-05 broken-formats sweep). Recorded once at apply time.
    */
   songFormat: string | null;
+  /** EditableFormatRegistry formatId of the loaded song; null = generic project (no instrument lock). */
+  activeFormatId: string | null;
   sidMetadata: { format: string; version: number; title: string; author: string; copyright: string; chipModel: '6581' | '8580' | 'Unknown'; clockSpeed: 'PAL' | 'NTSC' | 'Unknown'; subsongs: number; defaultSubsong: number; currentSubsong: number; secondSID: boolean; thirdSID: boolean } | null;
 
   // Hively track step undo/redo
@@ -668,6 +671,7 @@ export const useFormatStore = create<FormatStore>()(
     originalModuleData: null,
     songDBInfo: null,
     songFormat: null,
+    activeFormatId: null,
     sidMetadata: null,
     hivelyUndoStack: [],
     hivelyRedoStack: [],
@@ -1167,7 +1171,10 @@ export const useFormatStore = create<FormatStore>()(
     setOriginalModuleData: (data) => set((state) => { state.originalModuleData = data; }),
 
     applyEditorMode: (song) => {
-      set((state) => { state.songFormat = song.format ?? null; });
+      set((state) => {
+        state.songFormat = song.format ?? null;
+        state.activeFormatId = lockFormatId(song) || null;
+      });
       useEditorStore.getState().setLinearPeriods(song.linearPeriods ?? false);
       // Clear automation capture data from previous song
       import('../engine/automation/AutomationCapture').then(m => m.getAutomationCapture().clear());
@@ -1612,6 +1619,7 @@ export const useFormatStore = create<FormatStore>()(
       state.mdxminiFileData = null;
       state.pmdFileData = null;
       state.songFormat = null;
+      state.activeFormatId = null;
       state.ronKlarenFileData = null;
       state.actionamicsFileData = null;
       state.monotoneFileData = null;

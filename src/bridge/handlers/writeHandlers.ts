@@ -13,7 +13,8 @@ import { useUIStore } from '../../stores/useUIStore';
 import { resolveViewTarget, VIEW_TARGETS } from '../../stores/uiViews';
 import { useAudioStore } from '../../stores/useAudioStore';
 import { useMixerStore } from '../../stores/useMixerStore';
-import { useInstrumentStore } from '../../stores/useInstrumentStore';
+import type { SynthType } from '@typedefs/instrument';
+import { useInstrumentStore, synthRefusal, buildInstrumentConfig } from '../../stores/useInstrumentStore';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useSynthErrorStore } from '../../stores/useSynthErrorStore';
 import { closeStartDialog } from '../../lib/startup/startupSequence';
@@ -1304,6 +1305,8 @@ export function createInstrument(params: Record<string, unknown>): Record<string
   const config = (params.config as Record<string, unknown>) ?? {};
   if (params.name && !config.name) config.name = params.name;
   if (params.synthType && !config.synthType) config.synthType = params.synthType;
+  const refusal = synthRefusal(buildInstrumentConfig(0, config).synthType);
+  if (refusal) return { ok: false, error: refusal };
   const id = useInstrumentStore.getState().createInstrument(config);
   return { ok: true, instrumentId: id };
 }
@@ -1311,6 +1314,10 @@ export function createInstrument(params: Record<string, unknown>): Record<string
 export function updateInstrument(params: Record<string, unknown>): Record<string, unknown> {
   const id = params.id as number;
   const updates = params.updates as Record<string, unknown>;
+  const current = useInstrumentStore.getState().instruments.find((inst) => inst.id === id);
+  const newType = updates?.synthType as SynthType | undefined;
+  const refusal = newType && current && newType !== current.synthType ? synthRefusal(newType) : null;
+  if (refusal) return { ok: false, error: refusal };
   useInstrumentStore.getState().updateInstrument(id, updates);
   return { ok: true };
 }
@@ -1321,6 +1328,9 @@ export function deleteInstrument(params: Record<string, unknown>): Record<string
 }
 
 export function cloneInstrument(params: Record<string, unknown>): Record<string, unknown> {
+  const source = useInstrumentStore.getState().instruments.find((inst) => inst.id === (params.id as number));
+  const refusal = source ? synthRefusal(source.synthType) : null;
+  if (refusal) return { ok: false, error: refusal };
   const newId = useInstrumentStore.getState().cloneInstrument(params.id as number);
   return { ok: true, newInstrumentId: newId };
 }
