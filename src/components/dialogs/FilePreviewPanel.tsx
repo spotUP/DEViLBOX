@@ -997,6 +997,8 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
   }, [previewingKey, stopPreview, downloadItem, downloadProgress.report, downloadProgress.clear]);
 
   const handleRate = useCallback(async (item: OnlineResult, star: number) => {
+    // The ratings service knows Modland and HVSC only; archive rows show no stars.
+    if (item.source === 'modarchive') return;
     if (!isLoggedIn) { setShowAuthModal(true); return; }
     try {
       if (star === 0) {
