@@ -8,6 +8,8 @@ import { useInstrumentStore } from '@stores';
 import { usePresetStore, type PresetCategory as UserPresetCategory } from '@stores/usePresetStore';
 import { notify } from '@stores/useNotificationStore';
 import { PRESET_CATEGORIES, type PresetCategory } from '@constants/factoryPresets';
+import { visibleFactoryCategories } from '@constants/factoryPresets/visibleCategories';
+import { useAllowedSynthTypes } from '@hooks/useAllowedSynthTypes';
 import { getSynthInfo } from '@constants/synthCategories';
 import { getToneEngine } from '@engine/ToneEngine';
 import * as LucideIcons from 'lucide-react';
@@ -50,7 +52,8 @@ export const LoadPresetModal: React.FC<LoadPresetModalProps> = ({ onClose, embed
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nksfInputRef = useRef<HTMLInputElement>(null);
 
-  const factoryCategories = Object.keys(PRESET_CATEGORIES) as PresetCategory[];
+  const { allowed } = useAllowedSynthTypes();
+  const factoryCategories = visibleFactoryCategories(allowed);
   const userCategories: (UserPresetCategory | 'All')[] = ['All', 'Bass', 'Lead', 'Pad', 'Drum', 'FX', 'User'];
 
   // Handle mode change
