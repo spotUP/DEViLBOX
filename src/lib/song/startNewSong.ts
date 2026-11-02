@@ -18,6 +18,7 @@ import { useFormatStore, type FormatStore } from '@stores/useFormatStore';
 import { emptyHippelCoSoLayout } from '@lib/import/formats/HippelCoSoParser';
 import { emptyTFMXLayout } from '@lib/import/formats/TFMXParser';
 import { emptyPumaTrackerLayout } from '@lib/import/formats/PumaTrackerParser';
+import { emptySidMon2Layout } from '@lib/import/formats/SidMon2Parser';
 
 export type NewSongMode = 'empty' | 'preset' | 'format';
 
@@ -43,6 +44,7 @@ const PRESET_FORMAT_STATE: Readonly<Record<string, () => Partial<FormatStore>>> 
   uade_tfmx: () => ({ uadePatternLayout: emptyTFMXLayout() }),
   // TFMX 7-Voice is a TFMX song using seven of the module's eight voices: the same serializer, seven channels.
   uade_tfmx7: () => ({ uadePatternLayout: emptyTFMXLayout(7) }),
+  uade_sidmon2: () => ({ uadeVariableLayout: emptySidMon2Layout() }),
   uade_pumatracker: () => ({ uadeVariableLayout: emptyPumaTrackerLayout() }),
   // The format tag the OctaMED importer sets (importMetadata.sourceFormat) and the router's MED branch tests.
   uade_octamed: () => ({ songFormat: 'MED' }),

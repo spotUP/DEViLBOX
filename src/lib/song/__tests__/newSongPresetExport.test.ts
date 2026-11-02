@@ -47,10 +47,12 @@ vi.mock('@lib/export/SoundMonExporter', async (orig) => spied(await orig<Record<
 vi.mock('@lib/export/FCExporter', async (orig) => spied(await orig<Record<string, unknown>>(), 'exportFC', 'fc'));
 vi.mock('@lib/export/PumaTrackerExporter', async (orig) => spied(await orig<Record<string, unknown>>(), 'exportPumaTrackerFile', 'puma'));
 vi.mock('@lib/export/MEDExporter', async (orig) => spied(await orig<Record<string, unknown>>(), 'exportMED', 'med'));
+vi.mock('@lib/export/SidMon2Writer', async (orig) => spied(await orig<Record<string, unknown>>(), 'buildSidMon2File', 'sd2'));
 vi.mock('@lib/export/JamCrackerExporter', async (orig) => spied(await orig<Record<string, unknown>>(), 'exportAsJamCracker', 'jam'));
 
 import '@stores/useCursorStore';
 import { startNewSong } from '@/lib/song/startNewSong';
+import { isSidMon2Format } from '@lib/import/formats/SidMon2Parser';
 import { isPumaTrackerFormat } from '@lib/import/formats/PumaTrackerParser';
 import { exportNativeSong } from '@lib/export/nativeExportRouter';
 
@@ -66,9 +68,10 @@ const ROWS: ReadonlyArray<readonly [presetId: string, key: string, magic: (b: Ui
   ['uade_tfmx7', 'tfmx', (b) => ascii(b, 0, 10)],
   ['uade_octamed', 'med', (b) => ascii(b, 0, 4)],
   // PumaTracker has no magic string: the format's own detector is the check.
+  ['uade_sidmon2', 'sd2', (b) => (isSidMon2Format(b.slice().buffer) ? 'SIDMON2' : 'not a SidMon II file')],
   ['uade_pumatracker', 'puma', (b) => (isPumaTrackerFormat(b.slice().buffer) ? 'PUMA' : 'not a PumaTracker file')],
 ];
-const MAGIC: Record<string, string> = { uade_hippelcoso: 'COSO', uade_tfmx: 'TFMX-SONG ', uade_soundmon: 'V.2', uade_futurecomposer: 'FC14', uade_jamcracker: 'BeEp', uade_tfmx7: 'TFMX-SONG ', uade_octamed: 'MMD0', uade_pumatracker: 'PUMA' };
+const MAGIC: Record<string, string> = { uade_hippelcoso: 'COSO', uade_tfmx: 'TFMX-SONG ', uade_soundmon: 'V.2', uade_futurecomposer: 'FC14', uade_jamcracker: 'BeEp', uade_tfmx7: 'TFMX-SONG ', uade_octamed: 'MMD0', uade_pumatracker: 'PUMA', uade_sidmon2: 'SIDMON2' };
 
 describe('wizard preset path: a fixed-format New Song exports as its format', () => {
   it.each(ROWS)('%s: startNewSong preset with instruments, then exportNativeSong, runs the %s serializer', async (presetId, key, magic) => {
