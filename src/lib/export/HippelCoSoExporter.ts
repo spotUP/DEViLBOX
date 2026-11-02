@@ -215,12 +215,13 @@ function buildCoSoFile(song: TrackerSong): { data: Uint8Array; warnings: string[
           warnings.push(`Pattern ${p} voice ${ch} row ${r}: note ${cell.note} is outside C-1 to B-3, the notes CoSo plays; written as a rest.`);
         }
         if (!cell || cosoNote === null) {
-          // Rest row. CoSo note byte 0 is a REAL sub-bass note (decodes to xmNote
-          // 13), so an empty cell must be the -2 "rest" command (parser: v===-2 →
-          // skip 2 bytes, emit an empty cell). One 2-byte event per row keeps the
-          // exporter's row grid aligned with the parser's note-event scan.
-          bytes.push(s8toByte(-2)); // rest command
-          bytes.push(0);            // param (ignored)
+          // Empty row. CoSo note byte 0 is a REAL sub-bass note (decodes to xmNote 13), so an empty row is the
+          // FD n "set row speed and wait" command with n = 0: the voice holds what it plays for one step and every
+          // later event keeps lasting one step. Never FE n: FE sets the row speed and reads on in the SAME step,
+          // so a pattern of FE rows takes no time and the player runs through the whole song in one step (the New
+          // Song playhead stuck between positions 0 and 1). The parser reads both as one 2-byte empty row.
+          bytes.push(s8toByte(-3)); // FD: set row speed, wait
+          bytes.push(0);            // row speed 0: one step per event
         } else {
           bytes.push(s8toByte(cosoNote));
           const volseqIdx = Math.max(0, ((cell.instrument ?? 1) - 1)) & 0x1F;
