@@ -107,10 +107,10 @@
     "digitalSymphony": {
       "exporter": "DigitalSymphonyExporter.exportDigitalSymphony",
       "tier": "pattern-data",
-      "status": "missing-fixture",
-      "matchPct": 0,
-      "cells": 0,
-      "bytes": 0
+      "status": "pattern-match",
+      "matchPct": 1,
+      "cells": 3584,
+      "bytes": 59867
     },
     "dsm_dyn": {
       "exporter": "DSMDynExporter.exportDSMDyn",
@@ -251,10 +251,10 @@
     "kris": {
       "exporter": "KRISExporter.exportKRIS",
       "tier": "pattern-data",
-      "status": "missing-fixture",
-      "matchPct": 0,
-      "cells": 0,
-      "bytes": 0
+      "status": "pattern-match",
+      "matchPct": 1,
+      "cells": 6912,
+      "bytes": 41632
     },
     "mod": {
       "exporter": "MOD bake (modExport)",
@@ -525,9 +525,7 @@
     "adPlug",
     "amosMusicBank",
     "chuckBiscuits",
-    "digitalSymphony",
     "dsm_dyn",
-    "kris",
     "synthesis",
     "xmf"
   ]

@@ -95,3 +95,18 @@ describe('parseDigitalSymphonyFile — crafted buffer', () => {
     expect(report.numChannels).toBeGreaterThan(0);
   });
 });
+
+// Live: every Digital Symphony song played silent and exported without
+// samples. The parser put the sample WAV in a field InstrumentConfig does not
+// have (samplerConfig), so the sampler and the exporter never saw it.
+describe('Digital Symphony samples reach the instrument', () => {
+  it('drwho_final4.dsym instruments carry their sample audio', async () => {
+    const { readFileSync } = await import('fs');
+    const bytes = new Uint8Array(readFileSync('public/data/songs/formats/drwho_final4.dsym'));
+    const song = parseDigitalSymphonyFile(bytes, 'drwho_final4.dsym');
+    expect(song).not.toBeNull();
+    const withAudio = song!.instruments.filter((i) => (i.sample?.audioBuffer?.byteLength ?? 0) > 44);
+    expect(withAudio.length).toBeGreaterThan(0);
+  });
+});
+

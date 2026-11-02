@@ -149,8 +149,29 @@ export function createSamplerInstrument(
   loopStart: number,
   loopEnd: number
 ): InstrumentConfig {
-  const hasLoop = loopEnd > loopStart && loopEnd > 2;
   const wavBuf = pcm8ToWAV(pcm, sampleRate, loopStart, loopEnd);
+  return createSamplerInstrumentFromWav(id, name, wavBuf, pcm.length, volume, sampleRate, loopStart, loopEnd);
+}
+
+/**
+ * The instrument shape of createSamplerInstrument for a format whose samples
+ * are already a WAV (16-bit or decoded PCM). Every sampler instrument a parser
+ * builds goes through here, so the replayer and the exporters read one shape:
+ * `sample.audioBuffer` + `sample.url`, loop points in sample frames, volume
+ * 0-64 in `metadata.modPlayback.defaultVolume`.
+ */
+export function createSamplerInstrumentFromWav(
+  id: number,
+  name: string,
+  wavBuf: ArrayBuffer,
+  frames: number,
+  volume: number,
+  sampleRate: number,
+  loopStart: number,
+  loopEnd: number,
+  finetune = 0,
+): InstrumentConfig {
+  const hasLoop = loopEnd > loopStart && loopEnd > 2;
 
   // Convert WAV to base64 data URL so the sample survives project save/reload.
   // Persistence strips sample.audioBuffer (not JSON-serializable) but keeps
@@ -179,7 +200,7 @@ export function createSamplerInstrument(
       loop: hasLoop,
       loopType: hasLoop ? 'forward' as const : 'off' as const,
       loopStart: loopStart,
-      loopEnd: loopEnd > 0 ? loopEnd : pcm.length,
+      loopEnd: loopEnd > 0 ? loopEnd : frames,
       sampleRate,
       reverse: false,
       playbackRate: 1.0,
@@ -188,7 +209,7 @@ export function createSamplerInstrument(
       modPlayback: {
         usePeriodPlayback: true,      // Amiga samples use period-based frequency (not note-name)
         periodMultiplier: 3546895,    // AMIGA_PALFREQUENCY_HALF (PAL: 3546895, NTSC: 3579545)
-        finetune: 0,
+        finetune,
         defaultVolume: volume,        // Instrument default volume (0-64) for MOD channel init
       },
     },

@@ -31,10 +31,11 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   musicLine: 'public/data/songs/formats/harmonic disorder.ml',
   musicAssembler: 'public/data/songs/music-assembler/thanatos.ma',
   futurePlayer: 'public/data/songs/formats/hybris.fp',
-  // NOTE: DigitalSymphony's native ext is .dsym; the only committed candidate
-  // (binary reality.dss) is a DIFFERENT format (Digital Sound Studio) — omitted so the
-  // harness reports digitalSymphony as missing-fixture rather than mis-attributing a
-  // wrong-format parse failure. Task 1.3 to supply a real .dsym fixture.
+  // binary reality.dss is Digital Sound Studio, not Digital Symphony; drwho_final4.dsym
+  // carries the real BASSTRAK magic.
+  digitalSymphony: 'public/data/songs/formats/drwho_final4.dsym',
+  // A ChipTracker song saved with a .mod name: the KRIS magic sits at offset 952.
+  kris: 'public/data/songs/chiptracker/chuck rock - chuckrock.mod',
   hippelCoSo: 'public/data/songs/formats/prehistoric_tale.hipc',
   inStereo2: 'public/data/songs/instereo!-2.0/spaceflight.is20',
   deltaMusic1: 'public/data/songs/delta-music/triplex1.dm',
@@ -74,7 +75,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   robHubbard: 'public/data/songs/rob-hubbard/skateordie.rh',
   benDaglish: 'public/data/songs/ben-daglish/motorhead-titleandingame.bd',
   // No committed fixture found (reported missing-fixture by the harness — Task 1.3):
-  //   amosMusicBank, synthesis, chuckBiscuits, kris, dsm_dyn, xmf, digitalSymphony (.dsym)
+  //   amosMusicBank, synthesis, chuckBiscuits, dsm_dyn, xmf
 };
 
 export interface NamedExporterTarget {

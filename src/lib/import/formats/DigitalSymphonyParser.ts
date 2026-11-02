@@ -67,6 +67,8 @@ import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/type
 import type { UADEChipRamInfo } from '@/types/instrument';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { digitalSymphonyEncoder } from '@/engine/uade/encoders/DigitalSymphonyEncoder';
+import { createSamplerInstrumentFromWav } from './AmigaUtils';
+import { decompressDSymLZW } from '@/lib/compression/DSymLZW';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -131,109 +133,6 @@ class BitReader {
     this.bitsLeft -= n;
     return result;
   }
-}
-
-// ── LZW decompression (13-bit, as used by Digital Symphony) ──────────────────
-
-/**
- * Decompress a DSym LZW-compressed chunk.
- * Mirrors DecompressDSymLZW() in Load_dsym.cpp exactly.
- *
- * @param data       - Source bytes starting at the compressed data
- * @param startPos   - Offset into `data` where compressed bits begin
- * @param size       - Expected decompressed size in bytes
- * @returns { output: Uint8Array, endPos: number } where endPos is aligned to 4 bytes from startPos
- */
-function decompressDSymLZW(data: Uint8Array, startPos: number, size: number): { output: Uint8Array; endPos: number } {
-  const MAX_NODES = 1 << 13; // 8192
-  const RESET_DICT = 256;
-  const END_OF_STREAM = 257;
-
-  const dictPrev  = new Uint16Array(MAX_NODES);
-  const dictValue = new Uint8Array(MAX_NODES);
-  const match     = new Uint8Array(MAX_NODES);
-
-  // Initialise literal dictionary entries
-  for (let i = 0; i < 256; i++) {
-    dictPrev[i]  = MAX_NODES;
-    dictValue[i] = i;
-  }
-
-  let codeSize  = 9;
-  let prevCode  = 0;
-  let nextIndex = 257;
-
-  const output  = new Uint8Array(size);
-  let outPos    = 0;
-
-  const bits = new BitReader(data, startPos);
-
-  outer: while (outPos < size) {
-    const newCode = bits.readBits(codeSize);
-
-    if (newCode === END_OF_STREAM || newCode > nextIndex) break;
-
-    if (newCode === RESET_DICT) {
-      codeSize  = 9;
-      prevCode  = 0;
-      nextIndex = 257;
-      continue;
-    }
-
-    // Walk dictionary chain to reconstruct string
-    let code       = (newCode < nextIndex) ? newCode : prevCode;
-    let writeOffset = MAX_NODES;
-
-    do {
-      match[--writeOffset] = dictValue[code];
-      code = dictPrev[code];
-    } while (code < MAX_NODES);
-
-    const matchLen = MAX_NODES - writeOffset;
-
-    // KwKwK: if newCode == nextIndex, append first char of match
-    const copyLen = (newCode === nextIndex) ? matchLen + 1 : matchLen;
-    if (outPos + copyLen > size) {
-      // Only copy what fits
-      for (let i = writeOffset; i < MAX_NODES && outPos < size; i++) {
-        output[outPos++] = match[i];
-      }
-      if (newCode === nextIndex && outPos < size) {
-        output[outPos++] = match[writeOffset];
-      }
-      break outer;
-    }
-
-    for (let i = writeOffset; i < MAX_NODES; i++) {
-      output[outPos++] = match[i];
-    }
-    if (newCode === nextIndex) {
-      output[outPos++] = match[writeOffset];
-    }
-
-    // Add entry to dictionary
-    if (nextIndex < MAX_NODES) {
-      // Special case: don't add entry when output is already done
-      // (matches FULLEFFECT/NARCOSIS/NEWDANCE comment in original)
-      if (outPos < size) {
-        dictValue[nextIndex] = match[writeOffset];
-        dictPrev[nextIndex]  = prevCode;
-
-        nextIndex++;
-        if (nextIndex !== MAX_NODES && nextIndex === (1 << codeSize)) {
-          codeSize++;
-        }
-      }
-    }
-
-    prevCode = newCode;
-  }
-
-  // Align to 4 bytes from startPos (mirrors OpenMPT's file seek)
-  const bitEndPos = bits.position;
-  const endPos = startPos + (((bitEndPos - startPos) + 3) & ~3);
-
-  return { output, endPos };
 }
 
 // ── Sigma-delta decompression ────────────────────────────────────────────────
@@ -744,9 +643,8 @@ function parseDigitalSymphonyFileImpl(bytes: Uint8Array, filename: string): Trac
     const loopLenBytes   = (bytes[pos] | (bytes[pos + 1] << 8) | (bytes[pos + 2] << 16)) << 1;
     pos += 3;
     const volume    = Math.min(bytes[pos++], 64);
-    const fineTune  = bytes[pos++]; // MOD finetune nibble (0-15 unsigned = -8 to +7 signed)
-
-    void fineTune; // unused in WAV sample rate; would need to be applied separately
+    const fineTuneNibble = bytes[pos++] & 0x0F; // MOD finetune nibble (0-15 unsigned = -8 to +7 signed)
+    const fineTune = fineTuneNibble > 7 ? fineTuneNibble - 16 : fineTuneNibble;
 
     // Has sustain loop?
     const hasLoop = loopLenBytes > 2;
@@ -849,32 +747,16 @@ function parseDigitalSymphonyFileImpl(bytes: Uint8Array, filename: string): Trac
     const loopEndSamples   = hasLoop ? loopEnd : 0;
 
     const wavBuf = int16ToWAV(pcmInt16, 8287, loopStartSamples, loopEndSamples);
-    const instName = smpName.trim() || '';
-
+    // The shared sampler shape: the replayer and every exporter read
+    // sample.audioBuffer. This parser once wrote a private samplerConfig field
+    // that nothing read, so every Digital Symphony sample was dropped on play
+    // and on export.
     instruments.push({
-      id:        smp,
-      name:      instName,
-      type:      'sample' as const,
-      synthType: 'Sampler' as const,
-      effects:   [],
-      volume:    volume === 0 ? -60 : Math.round((volume / 64) * 60) - 60,
-      pan:       0,
-      samplerConfig: {
-        audioBuffer: wavBuf,
-        baseNote:    'C3',
-        loopStart:   hasLoop ? loopStartSamples / pcmInt16.length : 0,
-        loopEnd:     hasLoop ? loopEndSamples   / pcmInt16.length : 0,
-        loopMode:    hasLoop ? 'sustain' : 'none',
-        loopEnabled: hasLoop,
-        volume:      volume / 64,
-        pan:         0,
-        attack:      0,
-        decay:       0,
-        sustain:     1,
-        release:     0,
-      },
+      ...createSamplerInstrumentFromWav(
+        smp, smpName, wavBuf, pcmInt16.length, volume, 8287, loopStartSamples, loopEndSamples, fineTune,
+      ),
       uadeChipRam: { moduleBase: 0, moduleSize: bytes.length, instrBase: _dsymEntryStart, instrSize: 9 } as UADEChipRamInfo,
-    } as unknown as InstrumentConfig);
+    });
   }
 
   // ── Info chunk (song message, optional) ───────────────────────────────────

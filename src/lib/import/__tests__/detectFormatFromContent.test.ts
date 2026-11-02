@@ -62,4 +62,12 @@ describe('detectFormatFromContent', () => {
   it('a name with no collision keeps its name-only answer', () => {
     expect(keyOf('formats/mdat.turrican_bonus')).toBe(detectFormat('mdat.turrican_bonus')?.key);
   });
+  // Live: the only real ChipTracker song in the corpus is named .mod; the
+  // MOD parser refused it (KRIS sits at 952, not M.K. at 1080) and OpenMPT
+  // failed, so it never opened.
+  it('a ChipTracker song named .mod (KRIS at 952) is KRIS, a ProTracker .mod stays MOD', () => {
+    const whole = (rel: string): Uint8Array => new Uint8Array(readFileSync(join(SONGS, rel)));
+    expect(detectFormatFromContent('chuckrock.mod', whole('chiptracker/chuck rock - chuckrock.mod'))?.key).toBe('kris');
+    expect(detectFormatFromContent('shortsong1.mod', whole('formats/shortsong1.mod'))?.key).toBe(detectFormat('shortsong1.mod')?.key);
+  });
 });

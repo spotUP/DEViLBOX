@@ -131,6 +131,12 @@ export function detectFormatFromContent(filename: string, bytes: Uint8Array): Fo
       // Maniacs of Noise has no magic and is the name-only answer for .mon.
       if (hasMonotoneSignature(bytes)) return byKey('monotone');
       break;
+    case 'mod':
+      // ChipTracker (KRIS) modules circulate named .mod; they carry 'KRIS' at
+      // offset 952 where a ProTracker module has sample headers, and the MOD
+      // parser rejects them.
+      if (ascii(952, 'KRIS')) return byKey('kris');
+      break;
     case 'pmd':
       // Studio Pixel PiyoPiyo starts 'PMD'; PC-98 PMD98 files start with a version byte.
       if (ascii(0, 'PMD')) return byKey('piyoPiyo');

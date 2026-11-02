@@ -20,6 +20,7 @@ import { withNativeDefault, withNativeThenUADE, callUADE, getBasename, injectUAD
 import { tryChipDumpParse } from './ChipDumpParsers';
 import { tryUADEPrefixParse } from './UADEPrefixParsers';
 import { tryPCTrackerParse } from './PCTrackerParsers';
+import { detectFormatFromContent } from '@lib/import/FormatRegistry';
 import { songWalks, WalkCancelledError, type SongWalkClient } from '@/lib/import/formats/songWalkClient';
 import { chooseFileSubsong, fileSubsongFormatByKey } from '@/lib/import/fileSubsongs';
 
@@ -916,7 +917,8 @@ export async function tryRouteFormat(
   // back into the module and export writes .kris. OpenMPT parsed this
   // extension before, ignored the 'native' engine preference, and failed to
   // load the blank New Song template at all.
-  if (matchesExt(filename, ['kris'])) {
+  // A ChipTracker module named .mod is routed here by its content.
+  if (matchesExt(filename, ['kris']) || detectFormatFromContent(filename, new Uint8Array(buffer))?.key === 'kris') {
     const { isKRISFormat, parseKRISFile } = await import('@lib/import/formats/KRISParser');
     return withNativeThenUADE('kris', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isKRISFormat(buf as ArrayBuffer)) return parseKRISFile(buf as ArrayBuffer, name); return null; },
