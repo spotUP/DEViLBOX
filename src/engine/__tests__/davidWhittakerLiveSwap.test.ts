@@ -15,6 +15,7 @@ import { resolve } from 'node:path';
 import { installDwNodeFetch } from '@/lib/import/__tests__/helpers/dwNodeFetch';
 import { walkDavidWhittaker, DW_WALK } from '@/lib/import/formats/DavidWhittakerWasmExtractor';
 import { openWorklet, sameAudio, type WorkletHarness } from './helpers/workletHarness';
+import { awaitSwap } from './helpers/liveSwapCheck';
 
 vi.mock('@/engine/ToneEngine', () => {
   const engine = new Proxy({}, { get: () => () => Promise.resolve() });
@@ -42,7 +43,6 @@ const FILE = 'public/data/songs/david-whittaker/garfield2+.dw';
 const PRE = 300;   // blocks played before the edit (0.87 s = 43 ticks)
 const POST = 700;  // blocks heard after it
 const worklet = { dir: 'davidwhittaker', name: 'DavidWhittaker', factory: 'createDavidWhittaker' };
-const settle = () => new Promise((r) => setTimeout(r, 200));
 
 let restoreFetch = () => {};
 beforeAll(() => { restoreFetch = installDwNodeFetch(); });
@@ -74,7 +74,7 @@ async function liveEdit(edit: (ch: number, row: number, note: number) => void, a
   const { bytes } = await loadSong();
   const { useTrackerStore } = await import('@/stores/useTrackerStore');
   const { liveTrackerSong } = await import('@/lib/song/liveSong');
-  const { liveEditRoute, sendCellEditsToEngine, playingDescriptor } = await import('@/engine/replayer/liveCellEdits');
+  const { liveEditRoute, playingDescriptor } = await import('@/engine/replayer/liveCellEdits');
   const { editedModuleForPlay } = await import('@/engine/replayer/editedModuleForPlay');
   expect(liveEditRoute(liveTrackerSong()).route, 'the song is edited through the engine-swap route').toBe('engine-swap');
 
@@ -85,9 +85,7 @@ async function liveEdit(edit: (ch: number, row: number, note: number) => void, a
   const before = live.render(PRE);
   useTrackerStore.getState().setCurrentPattern(at.p);
   edit(at.ch, at.row, at.note);
-  await sendCellEditsToEngine(liveTrackerSong(), [{ pattern: at.p, row: at.row, channel: at.ch, cell: useTrackerStore.getState().patterns[at.p].channels[at.ch].rows[at.row] }]);
-  await settle();
-  const swapped = live.posted.some((m) => m.type === 'moduleSwapped');
+  const swapped = await awaitSwap(live); // the store sends the keystroke to the engine, as in the product
   const after = live.render(POST);
   (globalThis as { __dwEngine?: unknown }).__dwEngine = undefined;
 
