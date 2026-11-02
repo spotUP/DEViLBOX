@@ -130,3 +130,48 @@ export function moveNote(score: MaxTraxScore, eventIndex: number, newAbsTick: nu
   }
   return { events };
 }
+
+/**
+ * Insert a new note event at newAbsTick. startTime is a delta, so the new event takes the gap to its predecessor
+ * and the event after it gives up the same amount: every other absolute tick stays where it was. The new event goes
+ * after every event at or before newAbsTick but never after the end marker (an end marker at or before the tick
+ * pulls the new note in front of it).
+ */
+export function insertNote(
+  score: MaxTraxScore,
+  note: { absTick: number; pitch: number; velocity: number; channel: number; duration: number },
+): MaxTraxScore {
+  const abs = absoluteTicksOf(score);
+  const events = cloneEvents(score);
+  let at = 0;
+  while (at < events.length && abs[at] <= note.absTick && events[at].command !== CMD_END) at++;
+  const prevAbs = at > 0 ? abs[at - 1] : 0;
+  const delta = clampU16(Math.max(prevAbs, note.absTick) - prevAbs);
+  const created: MaxTraxEvent = {
+    command: note.pitch & NOTE_MAX,
+    data: ((note.velocity & 0x0f) << 4) | (note.channel & 0x0f),
+    startTime: delta,
+    stopTime: Math.max(1, clampU16(note.duration)),
+  };
+  if (at < events.length) events[at].startTime = clampU16(events[at].startTime - delta);
+  events.splice(at, 0, created);
+  return { events };
+}
+
+/** Velocity a keyboard-entered note starts with (the format's maximum, 4 bits). */
+export const TYPED_NOTE_VELOCITY = 0x0f;
+
+/**
+ * Type a note at a grid cell: on an existing note-on the pitch changes (the same setNoteField the field editor
+ * uses), on an empty cell a note of one row length is inserted in that column's channel. Returns the new score, or
+ * null when the cell is not a place a note can go (past the last column, or inside a note-off marker).
+ */
+export function typeNoteAt(score: MaxTraxScore, grid: MaxTraxGrid, columnIndex: number, row: number, pitch: number): MaxTraxScore | null {
+  const column = grid.columns[columnIndex];
+  if (!column) return null;
+  const cells = grid.noteCells.filter((c) => c.column === columnIndex && c.row === row);
+  const on = cells.find((c) => c.kind === 'noteOn');
+  if (on) return setNoteField(score, on.eventIndex, { pitch });
+  if (cells.length > 0) return null;
+  return insertNote(score, { absTick: row * grid.ticksPerRow, pitch, velocity: TYPED_NOTE_VELOCITY, channel: column.channel, duration: grid.ticksPerRow });
+}

@@ -7,6 +7,7 @@ import {
   moveNote,
   setNoteField,
   setEffectField,
+  typeNoteAt,
 } from '@/lib/maxtrax/maxtraxGrid';
 import type { MaxTraxGrid } from '@/lib/maxtrax/maxtraxGrid.types';
 import { MaxTraxEngine } from '@/engine/maxtrax/MaxTraxEngine';
@@ -23,6 +24,8 @@ export function useMaxTraxGrid(
     setNoteField(eventIndex: number, patch: Parameters<typeof setNoteField>[2]): void;
     setEffectField(eventIndex: number, patch: Parameters<typeof setEffectField>[2]): void;
     setNoteOffset(eventIndex: number, newOffset: number): void;
+    /** Keyboard note entry: change the pitch of the note at the cell, or insert one on an empty cell. */
+    typeNote(column: number, row: number, pitch: number): void;
   };
 } {
   // Primary re-render signal: maxTraxRev increments on every mutateMaxTraxScore call.
@@ -72,6 +75,10 @@ export function useMaxTraxGrid(
       s.events.push(...next.events);
     });
 
+    // The WASM player holds a fixed event array: a structural edit (insert) cannot be projected by index. The store
+    // is the authority; the live player picks the new event list up at the next load.
+    if (next.events.length !== current.events.length) return;
+
     // Project each changed event to the live WASM worklet only — the store write above
     // is the single authority update; projectEventToWorklet skips the store entirely.
     const engine = MaxTraxEngine.getInstance();
@@ -93,6 +100,11 @@ export function useMaxTraxGrid(
     },
     setEffectField: (eventIndex: number, patch: Parameters<typeof setEffectField>[2]) => {
       if (score !== null) apply(score, setEffectField(score, eventIndex, patch));
+    },
+    typeNote: (column: number, row: number, pitch: number) => {
+      if (score === null || grid === null) return;
+      const next = typeNoteAt(score, grid, column, row, pitch);
+      if (next !== null) apply(score, next);
     },
     setNoteOffset: (i: number, newOffset: number) => {
       if (!score) return;
