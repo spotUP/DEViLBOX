@@ -84,4 +84,19 @@ describe('sidTraceToGoatTracker', () => {
     expect(r.warnings.some((w) => w.includes('filter'))).toBe(false);
     expect(r.song.instruments.some((i) => i.ptr[2] > 0)).toBe(true);
   });
+
+  it('picks a pattern length that fits every row of a tune whose repeats do not align to 32 rows', () => {
+    // At 32 rows this tune needs more than the 208 unique patterns GT allows.
+    const bytes = readFileSync('public/data/songs/sid/jch-tyne-cheesecutter2.sid');
+    const trace = traceSid(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer)!;
+    const r = sidTraceToGoatTracker(trace);
+    expect(r.warnings.some((w) => w.includes('limit reached'))).toBe(false);
+    expect(r.song.patterns.length).toBeLessThanOrEqual(208);
+    const patRows = r.song.patterns[0].length;
+    for (const order of r.song.orderlists[0]) {
+      // Orderlist entries up to the loop marker (0xff) cover the whole song.
+      const entries = order.filter((_, k) => k < order.length - 2);
+      expect(entries.length * patRows).toBeGreaterThanOrEqual(r.rows);
+    }
+  });
 });
