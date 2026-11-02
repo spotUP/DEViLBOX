@@ -23,13 +23,15 @@ import {
 } from './GoatTrackerSid';
 import type { SidTrace } from './SIDParser';
 import {
-  segmentNotes, inferInstruments, fitGrid, rowOfFrame, MAX_INFERRED_INSTRUMENTS,
+  segmentNotes, inferInstruments, fitGrid, rowOfFrame, programControl, MAX_INFERRED_INSTRUMENTS,
   type DecodedNote, type RowGrid,
 } from './sidTraceDecode';
 
 const TABLE_LIMIT = 255;
 /** Pattern note byte that clears the gate (GoatTracker key-off). */
 const GT_KEYOFF = 0xbe;
+/** Pattern note byte that sets the gate again without a note init (GoatTracker key-on). */
+const GT_KEYON = 0xbf;
 /** Pattern lengths tried in order; the first that fits the pattern and orderlist limits wins (32 is the GT default). */
 const PATTERN_ROWS_CANDIDATES = [32, 16, 64, 8];
 const MAX_PATTERNS = 208;
@@ -188,6 +190,7 @@ function waveRows(trace: SidTrace, n: DecodedNote, last: number, stbl: Tables | 
   // after note init): row 0 runs one frame after the gate rise.
   for (let f = n.start + 1; f < last; f++) {
     const fr = frames[f];
+    const control = programControl(n, frames, f);
     let right = 0x80;
     let off = cur;
     if (fr.freq > 0 && base > 0) {
@@ -200,7 +203,7 @@ function waveRows(trace: SidTrace, n: DecodedNote, last: number, stbl: Tables | 
     }
     if (mode === 'relative' && f === n.start + 1 && right === 0x80) right = cur;
     const noteFreq = right === 0x80 ? model : gtFreq(gtNote + right);
-    if (stbl && mode === 'exact' && fr.control === wave && fr.freq !== noteFreq) {
+    if (stbl && mode === 'exact' && control === wave && fr.freq !== noteFreq) {
       const d = (fr.freq - model) & 0xffff;
       const up = d < 0x8000;
       const speed = up ? d : 0x10000 - d;
@@ -211,7 +214,7 @@ function waveRows(trace: SidTrace, n: DecodedNote, last: number, stbl: Tables | 
         continue;
       }
     }
-    if (stbl && mode === 'relative' && right === 0x80 && fr.control === wave && fr.freq > 0 && lastnote < 95) {
+    if (stbl && mode === 'relative' && right === 0x80 && control === wave && fr.freq > 0 && lastnote < 95) {
       const target = Math.round(fr.freq * scale);
       const step = gtFreq(lastnote + 1) - gtFreq(lastnote);
       let best = Math.abs(target - model), bestShift = -1, bestUp = true;
@@ -231,8 +234,8 @@ function waveRows(trace: SidTrace, n: DecodedNote, last: number, stbl: Tables | 
       }
     }
     if (right !== 0x80) { cur = off; model = noteFreq; lastnote = gtNote + right; }
-    wave = fr.control;
-    rows.push([waveLeft(fr.control), right]);
+    wave = control;
+    rows.push([waveLeft(control), right]);
   }
   while (trim && rows.length > 1) {
     const a = rows[rows.length - 1], b = rows[rows.length - 2];
@@ -706,6 +709,17 @@ export function sidTraceToGoatTracker(trace: SidTrace, name = 'Imported SID'): S
     // GT reads a key-off row `gateFrames` frames before the row frame.
     const row = Math.min(totalRows - 1, rowOfFrame(g, n.end + gateFrames));
     if (row > rowOfFrame(g, n.start) && grids[n.voice][row][0] === GT_REST) grids[n.voice][row][0] = GT_KEYOFF;
+  }
+  // A re-gate inside a note: KEYOFF then KEYON, read at the same tick as a key-off.
+  for (const n of notes) {
+    for (const { off, on } of n.regates) {
+      const offRow = Math.min(totalRows - 1, rowOfFrame(g, off + gateFrames));
+      const onRow = Math.min(totalRows - 1, rowOfFrame(g, on + gateFrames));
+      if (offRow <= rowOfFrame(g, n.start) || onRow <= offRow) continue;
+      if (grids[n.voice][offRow][0] !== GT_REST || grids[n.voice][onRow][0] !== GT_REST) continue;
+      grids[n.voice][offRow][0] = GT_KEYOFF;
+      grids[n.voice][onRow][0] = GT_KEYON;
+    }
   }
   grids[0][0] = [grids[0][0][0], grids[0][0][1], CMD_SETTEMPO, fpr];
 
