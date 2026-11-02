@@ -34,7 +34,8 @@ interface TabsStore {
   activeTabId: string;
 
   // Actions
-  addTab: () => void;
+  /** Resolves once the new tab's blank song is in place. */
+  addTab: () => Promise<void>;
   closeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
   updateTabName: (tabId: string, name: string) => void;
@@ -53,8 +54,13 @@ const captureCurrentState = (): TabState => ({
  * outgoing song (native replayers included), resets per-song state, applies
  * the song and its editor mode.
  */
-const restoreState = (state: TabState) => {
-  void (async () => {
+/**
+ * Open a tab's song. Resolves once the song is in place: a caller that opens
+ * another song next (startNewSong) must wait, or the tab's song loads inside
+ * that song's load, skips its unload and can land after it.
+ */
+const restoreState = (state: TabState): Promise<void> => {
+  return (async () => {
     try {
       const { openSavedSong } = await import('@/lib/song/openSong');
       await openSavedSong({ name: state.song.metadata?.name || 'tab', source: 'tab', song: () => savedSongToApply(structuredClone(state.song)) });
@@ -158,7 +164,7 @@ export const useTabsStore = create<TabsStore>()(
 
       // Reset stores to fresh state for new tab
       const freshState = getInitialState();
-      restoreState(freshState);
+      return restoreState(freshState);
     },
 
     closeTab: (tabId) => {
@@ -201,7 +207,7 @@ export const useTabsStore = create<TabsStore>()(
 
       // Restore state if we switched tabs
       if (needsRestore && stateToRestore) {
-        restoreState(stateToRestore);
+        void restoreState(stateToRestore);
       }
     },
 
@@ -239,7 +245,7 @@ export const useTabsStore = create<TabsStore>()(
 
       // Restore target tab's state
       if (stateToRestore) {
-        restoreState(stateToRestore);
+        void restoreState(stateToRestore);
       }
     },
 

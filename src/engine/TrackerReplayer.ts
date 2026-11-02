@@ -984,6 +984,13 @@ export class TrackerReplayer {
   /** Get loaded song data */
   getSong(): TrackerSong | null { return this.song; }
 
+  /**
+   * Let go of the song after stop(), when the song leaves (songLifecycle.unloadSong).
+   * The next song reaches the replayer only at play, so a song kept here routed
+   * grid edits of the new song to the old song's engine.
+   */
+  releaseSong(): void { this.song = null; }
+
   /** Update a single instrument in the replayer's cached instrument map.
    *  Called when the user replaces/edits an instrument while a song is loaded. */
   updateInstrument(config: InstrumentConfig): void {

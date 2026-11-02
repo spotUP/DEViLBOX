@@ -42,7 +42,7 @@ async function startFormatSong(formatId: string): Promise<void> {
   const res = await fetch(`${import.meta.env.BASE_URL ?? '/'}${template}`);
   if (!res.ok) throw new Error(`New-song template ${template}: HTTP ${res.status}`);
   const bytes = await res.arrayBuffer();
-  useTabsStore.getState().addTab();
+  await useTabsStore.getState().addTab();
   const name = template.slice(template.lastIndexOf('/') + 1);
   const result = await openSong({ kind: 'bytes', name, bytes }, { origin: 'new-song' });
   if (!result.ok) throw new Error(`New-song template ${template}: ${result.error}`);
@@ -51,43 +51,33 @@ async function startFormatSong(formatId: string): Promise<void> {
   useUIStore.getState().setStatusMessage('New project', false, 1500);
 }
 
-function startGenericSong(preset: { presetId: string; loadInstruments: boolean } | null): Promise<void> {
+async function startGenericSong(preset: { presetId: string; loadInstruments: boolean } | null): Promise<void> {
   const presetId = preset?.presetId ?? '';
   const loadInstruments = preset?.loadInstruments ?? false;
-  // 1. addTab() saves current project state and resets stores to blank.
-  //    NOTE: addTab → restoreState → loadInstruments uses queueMicrotask to
-  //    defer the instrument state reset. We must defer our work too, otherwise
-  //    the microtask overwrites any instruments we create synchronously here.
-  useTabsStore.getState().addTab();
+  // 1. addTab() saves the current song in its tab and opens a blank one; the
+  //    preset applies only once that blank song is in place.
+  await useTabsStore.getState().addTab();
 
-  return new Promise((resolve) => {
-    // Defer preset application so it runs AFTER loadInstruments' microtask.
-    queueMicrotask(() => {
-      // 2. Apply system preset (channel names, colors, count)
-      if (presetId) {
-        useTrackerStore.getState().applySystemPreset(presetId);
+  // 2. Apply system preset (channel names, colors, count)
+  if (presetId) {
+    useTrackerStore.getState().applySystemPreset(presetId);
 
-        // 3. Apply Amiga song settings (hard-panning + BPM) if Amiga format
-        if (AMIGA_UADE_PRESET_IDS.has(presetId)) {
-          useTrackerStore.getState().applyAmigaSongSettings(presetId);
-        }
-      }
+    // 3. Apply Amiga song settings (hard-panning + BPM) if Amiga format
+    if (AMIGA_UADE_PRESET_IDS.has(presetId)) {
+      useTrackerStore.getState().applyAmigaSongSettings(presetId);
+    }
+  }
 
-      // 4. Load starter instruments
-      if (loadInstruments && presetId) {
-        const presets = getInstrumentPresetsForSystem(presetId);
-        presets.forEach((inst) => {
-          useInstrumentStore.getState().createInstrument(inst);
-        });
-      }
-
-      // 5. Track active system for filtering
-      useUIStore.getState().setActiveSystemPreset(
-        presetId || null
-      );
-
-      useUIStore.getState().setStatusMessage('New project', false, 1500);
-      resolve();
+  // 4. Load starter instruments
+  if (loadInstruments && presetId) {
+    const presets = getInstrumentPresetsForSystem(presetId);
+    presets.forEach((inst) => {
+      useInstrumentStore.getState().createInstrument(inst);
     });
-  });
+  }
+
+  // 5. Track active system for filtering
+  useUIStore.getState().setActiveSystemPreset(presetId || null);
+
+  useUIStore.getState().setStatusMessage('New project', false, 1500);
 }
