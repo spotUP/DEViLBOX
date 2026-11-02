@@ -30,7 +30,8 @@ import {
 const TABLE_LIMIT = 255;
 /** Pattern note byte that clears the gate (GoatTracker key-off). */
 const GT_KEYOFF = 0xbe;
-const PATTERN_ROWS = 32;
+/** Pattern lengths tried in order; the first that fits the pattern and orderlist limits wins (32 is the GT default). */
+const PATTERN_ROWS_CANDIDATES = [32, 16, 64, 8];
 const MAX_PATTERNS = 208;
 const MAX_ORDERLIST = 254;
 const CMD_SETTEMPO = 0x0f;
@@ -563,6 +564,36 @@ function mostCommon(values: number[]): number | null {
   return best;
 }
 
+/**
+ * Chunk every channel's row grid into patterns of `rows` rows and dedupe them.
+ * Reports whether the GT limits (208 patterns, 254 orderlist bytes) were exceeded.
+ */
+function packPatterns(grids: number[][][], totalRows: number, rows: number): { patterns: number[][][]; orders: number[][]; overflow: 'pattern' | 'orderlist' | null } {
+  const patterns: number[][][] = [];
+  const patIndex = new Map<string, number>();
+  const orders: number[][] = [];
+  let overflow: 'pattern' | 'orderlist' | null = null;
+  for (const grid of grids) {
+    const order: number[] = [];
+    for (let r = 0; r < totalRows; r += rows) {
+      const chunk = grid.slice(r, r + rows);
+      while (chunk.length < rows) chunk.push([GT_REST, 0, 0, 0]);
+      const key = chunk.map((x) => x.join('.')).join('|');
+      let idx = patIndex.get(key);
+      if (idx === undefined) {
+        if (patterns.length >= MAX_PATTERNS) { overflow = overflow ?? 'pattern'; break; }
+        idx = patterns.length;
+        patterns.push(chunk);
+        patIndex.set(key, idx);
+      }
+      if (order.length >= MAX_ORDERLIST - 2) { overflow = overflow ?? 'orderlist'; break; }
+      order.push(idx);
+    }
+    orders.push(order);
+  }
+  return { patterns, orders, overflow };
+}
+
 export function sidTraceToGoatTracker(trace: SidTrace, name = 'Imported SID'): SidTraceGoatTracker {
   const warnings: string[] = [];
   const notes = segmentNotes(trace.voices, trace.clock).filter((n) => gtNoteIndex(n.note) >= 0 && gtNoteIndex(n.note) <= 95);
@@ -678,27 +709,17 @@ export function sidTraceToGoatTracker(trace: SidTrace, name = 'Imported SID'): S
   }
   grids[0][0] = [grids[0][0][0], grids[0][0][1], CMD_SETTEMPO, fpr];
 
-  const patterns: number[][][] = [];
-  const patIndex = new Map<string, number>();
-  const orderlists: number[][] = [];
-  for (let c = 0; c < channels; c++) {
-    const order: number[] = [];
-    for (let r = 0; r < totalRows; r += PATTERN_ROWS) {
-      const chunk = grids[c].slice(r, r + PATTERN_ROWS);
-      while (chunk.length < PATTERN_ROWS) chunk.push([GT_REST, 0, 0, 0]);
-      const key = chunk.map((x) => x.join('.')).join('|');
-      let idx = patIndex.get(key);
-      if (idx === undefined) {
-        if (patterns.length >= MAX_PATTERNS) { warnings.push('pattern limit reached: song truncated'); break; }
-        idx = patterns.length;
-        patterns.push(chunk);
-        patIndex.set(key, idx);
-      }
-      if (order.length >= MAX_ORDERLIST - 2) { warnings.push('orderlist limit reached: song truncated'); break; }
-      order.push(idx);
-    }
-    orderlists.push([...order, GT_LOOPSONG, 0]);
+  // Pattern length is a free choice: a tune whose repeats do not align to 32 rows
+  // can exceed the 208-pattern limit at 32 and fit at 16 or 8.
+  let packed = packPatterns(grids, totalRows, PATTERN_ROWS_CANDIDATES[0]);
+  for (const rows of PATTERN_ROWS_CANDIDATES) {
+    const trial = packPatterns(grids, totalRows, rows);
+    if (trial.overflow === null) { packed = trial; break; }
   }
+  if (packed.overflow === 'pattern') warnings.push('pattern limit reached: song truncated');
+  if (packed.overflow === 'orderlist') warnings.push('orderlist limit reached: song truncated');
+  const patterns = packed.patterns;
+  const orderlists = packed.orders.map((order) => [...order, GT_LOOPSONG, 0]);
 
   const instruments = built.instruments;
   const song: GTSongData = {
