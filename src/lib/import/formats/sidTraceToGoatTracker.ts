@@ -86,30 +86,83 @@ function waveLeft(control: number): number {
   return control;
 }
 
-/** Wave rows: one per frame, trailing frames that repeat the last row dropped. */
-function waveRows(trace: SidTrace, n: DecodedNote, last: number): Array<[number, number]> {
+/** GT frequency table (gtultra-wasm/src/gplay.c freqtbllo/freqtblhi), 96 notes. */
+const GT_FREQ_LO = [
+  0x17, 0x27, 0x39, 0x4b, 0x5f, 0x74, 0x8a, 0xa1, 0xba, 0xd4, 0xf0, 0x0e,
+  0x2d, 0x4e, 0x71, 0x96, 0xbe, 0xe8, 0x14, 0x43, 0x74, 0xa9, 0xe1, 0x1c,
+  0x5a, 0x9c, 0xe2, 0x2d, 0x7c, 0xcf, 0x28, 0x85, 0xe8, 0x52, 0xc1, 0x37,
+  0xb4, 0x39, 0xc5, 0x5a, 0xf7, 0x9e, 0x4f, 0x0a, 0xd1, 0xa3, 0x82, 0x6e,
+  0x68, 0x71, 0x8a, 0xb3, 0xee, 0x3c, 0x9e, 0x15, 0xa2, 0x46, 0x04, 0xdc,
+  0xd0, 0xe2, 0x14, 0x67, 0xdd, 0x79, 0x3c, 0x29, 0x44, 0x8d, 0x08, 0xb8,
+  0xa1, 0xc5, 0x28, 0xcd, 0xba, 0xf1, 0x78, 0x53, 0x87, 0x1a, 0x10, 0x71,
+  0x42, 0x89, 0x4f, 0x9b, 0x74, 0xe2, 0xf0, 0xa6, 0x0e, 0x33, 0x20, 0xff,
+];
+const GT_FREQ_HI = [
+  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x02,
+  0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x03, 0x03, 0x03, 0x03, 0x03, 0x04,
+  0x04, 0x04, 0x04, 0x05, 0x05, 0x05, 0x06, 0x06, 0x06, 0x07, 0x07, 0x08,
+  0x08, 0x09, 0x09, 0x0a, 0x0a, 0x0b, 0x0c, 0x0d, 0x0d, 0x0e, 0x0f, 0x10,
+  0x11, 0x12, 0x13, 0x14, 0x15, 0x17, 0x18, 0x1a, 0x1b, 0x1d, 0x1f, 0x20,
+  0x22, 0x24, 0x27, 0x29, 0x2b, 0x2e, 0x31, 0x34, 0x37, 0x3a, 0x3e, 0x41,
+  0x45, 0x49, 0x4e, 0x52, 0x57, 0x5c, 0x62, 0x68, 0x6e, 0x75, 0x7c, 0x83,
+  0x8b, 0x93, 0x9c, 0xa5, 0xaf, 0xb9, 0xc4, 0xd0, 0xdd, 0xea, 0xf8, 0xff,
+];
+export function gtFreq(index: number): number { return GT_FREQ_LO[index] | (GT_FREQ_HI[index] << 8); }
+
+const WAVE_CMD_PORTAUP = 0xf1;
+const WAVE_CMD_PORTADOWN = 0xf2;
+
+/**
+ * Wave rows: one per frame, trailing frames that repeat the last row dropped.
+ * With a speed table, the GT channel frequency is modelled frame by frame
+ * (note init writes freqtbl[note]; a note row writes freqtbl[note + offset])
+ * and every frame whose traced frequency differs from the model, while the
+ * waveform holds, becomes a wavetable portamento row (0xF1 up / 0xF2 down)
+ * whose 16-bit speed-table entry is the exact delta (gplay.c WAVEEXEC adds
+ * the speed to the frequency on that frame). This carries vibrato, slides,
+ * non-semitone arpeggios and the source player's tuning.
+ */
+function waveRows(trace: SidTrace, n: DecodedNote, last: number, stbl: Tables | null): Array<[number, number]> {
   const frames = trace.voices[n.voice];
   const base = n.frame.freq;
+  const gtNote = gtNoteIndex(n.note);
   const rows: Array<[number, number]> = [];
   let cur = 0;
+  let model = gtFreq(gtNote);
+  let wave = frames[n.start].control;
   // GT skips the wave and pulse tables on the note-init frame (gplay.c NEXTCHN
   // after note init): row 0 runs one frame after the gate rise.
   for (let f = n.start + 1; f < last; f++) {
     const fr = frames[f];
     let right = 0x80;
+    let off = cur;
     if (fr.freq > 0 && base > 0) {
       const semis = 12 * Math.log2(fr.freq / base);
-      const off = Math.round(semis);
-      if (Math.abs(semis - off) < 0.3 && off !== cur && off >= 0 && gtNoteIndex(n.note) + off <= 95) {
-        right = off;
-        cur = off;
+      const r = Math.round(semis);
+      if (Math.abs(semis - r) < 0.3 && r !== cur && r >= 0 && gtNote + r <= 95) {
+        right = r;
+        off = r;
       }
     }
+    const noteFreq = right === 0x80 ? model : gtFreq(gtNote + right);
+    if (stbl && fr.control === wave && fr.freq !== noteFreq) {
+      const d = (fr.freq - model) & 0xffff;
+      const up = d < 0x8000;
+      const speed = up ? d : 0x10000 - d;
+      const idx = speed > 0 && speed < 0x8000 ? addRows(stbl, [[speed >> 8, speed & 0xff]]) : -1;
+      if (idx > 0) {
+        rows.push([up ? WAVE_CMD_PORTAUP : WAVE_CMD_PORTADOWN, idx]);
+        model = fr.freq;
+        continue;
+      }
+    }
+    if (right !== 0x80) { cur = off; model = noteFreq; }
+    wave = fr.control;
     rows.push([waveLeft(fr.control), right]);
   }
   while (rows.length > 1) {
     const a = rows[rows.length - 1], b = rows[rows.length - 2];
-    if (a[0] === b[0] && a[1] === 0x80) rows.pop(); else break;
+    if (a[0] < 0xf0 && a[0] === b[0] && a[1] === 0x80) rows.pop(); else break;
   }
   return rows;
 }
@@ -140,12 +193,12 @@ function pulseRows(trace: SidTrace, n: DecodedNote, last: number): Array<[number
   return rows;
 }
 
-function programOf(trace: SidTrace, n: DecodedNote, nextStart: number, maxLen: number): NoteProgram {
+function programOf(trace: SidTrace, n: DecodedNote, nextStart: number, maxLen: number, stbl: Tables | null): NoteProgram {
   const frames = trace.voices[n.voice];
   let last = Math.min(nextStart, frames.length, n.start + maxLen);
   // A gate fall beyond the program is written as a key-off pattern row.
   if (last <= n.start) last = n.start + 1;
-  const wave = waveRows(trace, n, last);
+  const wave = waveRows(trace, n, last, stbl);
   wave.push([0xff, 0]);
   return { wave, pulse: pulseRows(trace, n, last), firstwave: frames[n.start].control };
 }
@@ -289,7 +342,8 @@ export function sidTraceToGoatTracker(trace: SidTrace, name = 'Imported SID'): S
       if (filter && addRows(ftbl, filter.rows) < 0) { ok = false; why = `filter ${filter.rows.length}`; }
       for (const n of notes) {
         const src = shared ? repOf.get(n.instrument)! : n;
-        const prog = programOf(trace, src, nextStart.get(src) ?? trace.frames, maxLen);
+        // Exact frequency tracking is per pitch, so shared programs keep relative notes only.
+        const prog = programOf(trace, src, nextStart.get(src) ?? trace.frames, maxLen, shared ? null : stbl);
         const wp = addRows(wtbl, prog.wave), pp = addRows(ptbl, prog.pulse);
         if (wp < 0 || pp < 0) { ok = false; why = `${maxLen}/${shared} wave ${wtbl.left.length}+${prog.wave.length} pulse ${ptbl.left.length}+${prog.pulse.length}`; break; }
         const isFilterOwner = filter !== null && filter.owner === n;
