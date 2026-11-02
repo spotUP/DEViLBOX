@@ -19,7 +19,7 @@ const keyOf = (rel: string): string | undefined => detectFormatFromContent(rel.s
 
 describe('detectFormatFromContent', () => {
   it('a GoatTracker .sng is GoatTracker, not Zound Monitor', () => {
-    const rel = 'Goat Tracker Ultra/LMan/$3LMan-SID-Chip-Club-Menu.sng';
+    const rel = 'goat-tracker-ultra/LMan/$3LMan-SID-Chip-Club-Menu.sng';
     expect(detectFormat('$3LMan-SID-Chip-Club-Menu.sng')?.key).toBe('zoundMonitor'); // by name alone
     expect(keyOf(rel)).toBe('goatTracker');
   });

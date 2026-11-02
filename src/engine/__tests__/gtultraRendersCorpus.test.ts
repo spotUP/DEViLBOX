@@ -13,7 +13,7 @@ import { loadWebBundle, type WebBundle } from '@/test/wasm/webBundle';
 
 const ROOT = process.cwd();
 const GT_DIR = join(ROOT, 'public/gtultra');
-const SONGS = join(ROOT, 'public/data/songs/Goat Tracker Ultra');
+const SONGS = join(ROOT, 'public/data/songs/goat-tracker-ultra');
 
 interface GTModule {
   cwrap: (name: string, ret: string | null, args: string[]) => (...a: number[]) => number;
