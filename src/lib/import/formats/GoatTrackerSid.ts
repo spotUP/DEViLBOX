@@ -194,7 +194,7 @@ export function writeGoatTrackerSng(song: GTSongData, settings?: GTPlaySettings)
  */
 export function gtUltraSettingsBlock(settings: GTPlaySettings): number[] {
   const le32 = (v: number): number[] => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255];
-  return [0x1f, 0, 0, 0, settings.ntsc ? 1 : 0, 0, ...le32(settings.adparam), ...le32(settings.multiplier), ...le32(3), 0];
+  return [0x1f, 0, 0, settings.optimizeRealtime ? 1 : 0, settings.ntsc ? 1 : 0, 0, ...le32(settings.adparam), ...le32(settings.multiplier), ...le32(3), 0];
 }
 
 // ---------------------------------------------------------------------------
@@ -297,6 +297,12 @@ export interface GTPlaySettings {
   multiplier: number;
   ntsc: boolean;
   adparam: number;
+  /**
+   * Realtime optimization (gplay.c editorInfo.optimizerealtime, GoatTracker 2's
+   * relocator default): no tick effects on tick 0, so an instrument vibrato
+   * holds on the first frame of every row. Absent = off.
+   */
+  optimizeRealtime?: boolean;
 }
 
 export interface GT2SidDecode {

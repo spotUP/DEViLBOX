@@ -189,6 +189,52 @@ describe('GoatTracker re-gates inside one note', () => {
   });
 });
 
+/**
+ * Voice-0 notes that vibrate the way a GT instrument vibrato does (gplay.c CMD_DONOTHING into
+ * CMD_VIBRATO, optimizerealtime): the note init and the next frame hold the note's frequency,
+ * tick-0 frames hold, the first `delay - 1` other frames hold, then each one steps +-speed.
+ * The last note vibrates on for 40 frames after its gate goes off.
+ */
+function gtVibratoTrace(notes: Array<{ gt: number; len: number }>, cmp: number, speed: number, delay: number, fpr: number): SidTrace {
+  const v0: Array<Partial<VoiceFrame>> = [];
+  for (let i = 0; i < 40; i++) v0.push({});
+  notes.forEach(({ gt, len }, i) => {
+    let freq = gtFreq(gt), vibtime = 0, wait = delay;
+    // GT keeps running the vibrato after the gate goes off: the last note vibrates on to the end.
+    const frames = i === notes.length - 1 ? len + 40 : len;
+    for (let t = 0; t < frames; t++) {
+      if (t >= 2 && t % fpr !== 0) {
+        if (wait > 1) wait--;
+        else {
+          if (vibtime < 0x80 && vibtime > cmp) vibtime ^= 0xff;
+          vibtime = (vibtime + 2) & 0xff;
+          freq += vibtime & 1 ? -speed : speed;
+        }
+      }
+      v0.push({ freq, pulse: 0x800, control: t < len - 2 ? 0x41 : 0x40, ad: 0x09, sr: 0xa0 });
+    }
+  });
+  return synthTrace(v0);
+}
+
+describe('GoatTracker instrument vibrato', () => {
+  it('rebuilds a GT instrument vibrato as speed-table vibrato plus vibdelay for the whole note', async () => {
+    // eco-fog voice 3 shape at a larger depth: a 72-frame vibrato period (60 steps over 5 of every
+    // 6 frames) does not loop inside a 64-frame program, so wavetable rows freeze the pitch after it.
+    const notes = [36, 41, 43, 38, 36, 45].map((gt, i) => ({ gt, len: [198, 222, 246, 186, 210, 234][i] }));
+    const trace = gtVibratoTrace(notes, 5, 24, 3, 6);
+    const built = sidTraceToGoatTracker(trace);
+    expect(built.framesPerRow).toBe(6);
+    const vibrato = built.song.instruments.filter((ins) => ins.ptr[3] > 0);
+    expect(vibrato.length).toBeGreaterThan(0);
+    for (const ins of vibrato) expect(ins.vibdelay).toBe(3);
+    const s = scoreSidTrace(trace, built, await createHeadlessGT());
+    // Without the instrument vibrato ~800 of the ~1100 frequency changes miss.
+    expect(s.perClass.freq.changes).toBeGreaterThan(1000);
+    expect(s.perClass.freq.exact / s.perClass.freq.changes).toBeGreaterThanOrEqual(0.99);
+  });
+});
+
 describe('GoatTracker conversion of a SID trace replays in the GTUltra core', () => {
   for (const file of readdirSync(DIR).filter((f) => f.endsWith('.sid')).sort()) {
     it(`${file}: replay score`, async () => {

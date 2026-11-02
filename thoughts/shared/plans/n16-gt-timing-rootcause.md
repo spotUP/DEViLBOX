@@ -254,3 +254,32 @@ The rule fires where measured (eco-fog voice 2: regates 581->677 and 869->965; v
 
 Regression test: sidTraceScore.test.ts 'GoatTracker re-gates inside one note' (synthetic 4 notes with vibrato, pulse sweep and a gate gap). With the rule: 4 notes, 4 KEYON rows, freq exact >= 0.9. With continuesAcrossGate forced false: 8 notes, test fails.
 
+
+## 2026-11-03: instrument vibrato (open item a)
+
+**Invariant.** The rebuilt GT song reproduces every traced frequency write. A traced GoatTracker instrument vibrato must be rebuilt as an instrument vibrato that runs for the whole note, not as per-frame wavetable portamento rows that stop at the program length (8-16 frames on eco-fog / proton) and the 255-row table budget.
+
+**Root-cause level.** Two places, neither the decoder nor the scorer:
+1. The builder's program vocabulary (sidTraceToGoatTracker.ts): it had no instrument vibrato (ins.ptr[STBL] + vibdelay), so a vibrating note froze once its wavetable program ended.
+2. The .sng settings block (GoatTrackerSid.ts gtUltraSettingsBlock) always wrote optimizerealtime = 0. GoatTracker 2 packs with realtime optimization on (gt2reloc default 1): no tick effects on tick 0, so the vibrato holds on every row's first frame. With 0 the replay vibrated every frame and drifted off the trace.
+
+**Measurement (eco-fog voice 3, first note frames 7-1061).** Frame 8 = 468 (note row), then 471, 474, 471, 468, hold, 465 ...; a hold every 6 frames (tick 0, tempo 6). Fit: cmp 2, speed 3, vibdelay 1.
+
+**Rule.** vibratoOf (per note): find the first frequency change after the note row; its size is the speed, the live (non-tick-0) frames before it the delay, the run of equal steps the cmp. Try cmp 2(up-1) and 2(up-1)+1, absolute speed (<= 0xff) and, when the note is in GT tuning, the relative form (cmp | 0x80, semitone step >> shift). Simulate gplay.c CMD_DONOTHING/CMD_VIBRATO over the whole note; accept only an exact match of every frame with at least 4 steps. The speed-table row is deduped through addRows; null when the table is full. The program then keeps a note row at start+1 (vibtime reset) and plain 0x80 rows after it, and the vibrato is part of the program key, so clustering and the instrument key keep it. The converter sets optimizeRealtime: true in the settings block (GTPlaySettings.optimizeRealtime, optional, absent = old behaviour for the SID importers).
+
+**Corpus (3000 frames, only these four tunes).**
+
+| tune | notes | score before | score after | freq exact before | freq exact after (n) |
+|---|---|---|---|---|---|
+| eco-fog | 2147 | 0.3212 | 0.5213 | 0.110 | 0.599 (5557) |
+| proton | 4365 | 0.6096 | 0.6587 | 0.259 | 0.331 (8103) |
+| galway-wizball | 1 | 0.2315 | 0.2315 | 0.286 | 0.286 (42) |
+| lees-last-ninja | 4 | 0.3633 | 0.3633 | 0.392 | 0.392 (6257) |
+
+No regression. Wizball and Last Ninja are not GT songs and have 1-4 decoded notes, so no note vibrato is detected there.
+
+**Regression test.** sidTraceScore.test.ts 'GoatTracker instrument vibrato' > 'rebuilds a GT instrument vibrato as speed-table vibrato plus vibdelay for the whole note': six synthetic notes of 186-246 frames, cmp 5, speed 24, vibdelay 3, tempo 6, replayed headless in GT. Asserts an instrument with ptr[STBL] > 0 and vibdelay 3, and freq exact >= 0.99 (1.0 measured). With vibratoOf returning null it fails (no speed-table instrument).
+
+**Open.** Delayed vibratos whose delay exceeds the note's first changes, vibratos that start mid-note after a slide, and fine vibrato (usefinevib) are not detected. Proton freq exact is still 0.33: the rest of its misses are not instrument vibrato (next item).
+
+Commit: see `git log -- thoughts/shared/plans/n16-gt-timing-rootcause.md` (the commit that adds this section).

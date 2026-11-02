@@ -61,7 +61,17 @@ interface NoteProgram {
   waveLoop: number;
   pulseLoop: number;
   firstwave: number;
+  /** GT instrument vibrato that runs for the whole note, or null. */
+  vib: Vibrato | null;
 }
+
+/**
+ * One GT instrument vibrato (gplay.c CMD_DONOTHING into CMD_VIBRATO): speed
+ * table row [cmp, speed] (cmp | 0x80 makes the speed a right shift of the
+ * semitone step at the playing note) and the instrument vibdelay. `ptr` is the
+ * 1-based speed table row, `steps` the frequency changes it makes over the note.
+ */
+interface Vibrato { cmp: number; speed: number; delay: number; ptr: number; steps: number }
 
 interface Tables {
   left: number[];
@@ -176,7 +186,7 @@ const MAX_REL_SHIFT = 8;
  * and the move whose result is nearest is chosen. lastnote is only set by a
  * wavetable note row (gplay.c WAVEEXEC), so frame 1 is a note row (offset 0).
  */
-function waveRows(trace: SidTrace, n: DecodedNote, last: number, stbl: Tables | null, mode: FreqMode = 'exact', trim = true): Array<[number, number]> {
+function waveRows(trace: SidTrace, n: DecodedNote, last: number, stbl: Tables | null, mode: FreqMode = 'exact', trim = true, vib: Vibrato | null = null): Array<[number, number]> {
   const frames = trace.voices[n.voice];
   const base = n.frame.freq;
   const gtNote = gtNoteIndex(n.note);
@@ -202,6 +212,12 @@ function waveRows(trace: SidTrace, n: DecodedNote, last: number, stbl: Tables | 
       }
     }
     if (mode === 'relative' && f === n.start + 1 && right === 0x80) right = cur;
+    if (vib) {
+      // Instrument vibrato: a note row resets vibtime and lastnote (gplay.c
+      // WAVEEXEC), then plain rows let the tick effects run every frame.
+      rows.push([waveLeft(control), f === n.start + 1 ? 0 : 0x80]);
+      continue;
+    }
     const noteFreq = right === 0x80 ? model : gtFreq(gtNote + right);
     if (stbl && mode === 'exact' && control === wave && fr.freq !== noteFreq) {
       const d = (fr.freq - model) & 0xffff;
@@ -242,6 +258,85 @@ function waveRows(trace: SidTrace, n: DecodedNote, last: number, stbl: Tables | 
     if (a[0] < 0xf0 && a[0] === b[0] && a[1] === 0x80) rows.pop(); else break;
   }
   return rows;
+}
+
+/** Fewest frequency changes a note must show before it is rebuilt as an instrument vibrato. */
+const MIN_VIBRATO_STEPS = 4;
+
+/** Frequency deltas of a GT vibrato from vibtime 0 (gplay.c CMD_VIBRATO), +1 or -1 per step. */
+function vibratoSign(cmp: number, vibtime: number): { sign: number; vibtime: number } {
+  let t = vibtime;
+  if (t < 0x80 && t > cmp) t ^= 0xff;
+  t = (t + 2) & 0xff;
+  return { sign: t & 1 ? -1 : 1, vibtime: t };
+}
+
+/**
+ * The GT instrument vibrato that reproduces every traced frequency of a note,
+ * or null. The rebuilt program has a note row one frame after the note init
+ * (vibtime 0, tick effects skipped) and plain rows after it, so from the
+ * second frame on GT runs the tick effects on every frame whose tick is not 0
+ * (optimizerealtime): the first vibdelay - 1 of them hold, then each one steps
+ * the frequency by +-speed. The note init is tick 0 (tempo `fpr`). The speed
+ * is absolute when it fits a byte, else a right shift of the semitone step at
+ * the note (cmp | 0x80), which needs the source in GT tuning. The speed table
+ * row is added to `stbl`; null when it is full.
+ */
+function vibratoOf(trace: SidTrace, n: DecodedNote, end: number, fpr: number, stbl: Tables | null): Vibrato | null {
+  if (!stbl) return null;
+  const frames = trace.voices[n.voice];
+  const last = Math.min(end, frames.length);
+  const s1 = n.start + 1;
+  if (last - s1 < 3 || frames[s1].freq === 0) return null;
+  const base = frames[s1].freq;
+  const gtNote = gtNoteIndex(n.note);
+  const live = (f: number) => (f - n.start) % fpr !== 0;
+  // First change: its size is the speed, its eligible-frame count the delay.
+  let a0 = -1, eligible = 0;
+  for (let f = s1 + 1; f < last; f++) {
+    if (live(f)) eligible++;
+    if (frames[f].freq !== frames[f - 1].freq) { a0 = f; break; }
+  }
+  if (a0 < 0 || !live(a0) || eligible > 0xff) return null;
+  const d = frames[a0].freq - frames[a0 - 1].freq;
+  if (d <= 0) return null;
+  // Rising steps before the first fall: floor(cmp / 2) + 1 of them.
+  let up = 0;
+  for (let f = a0; f < last && up < 0x40; f++) {
+    if (!live(f)) continue;
+    const step = frames[f].freq - frames[f - 1].freq;
+    if (step === d) up++; else break;
+  }
+  const speeds: Array<{ left: number; right: number; speed: number }> = [];
+  for (const cmp of [2 * (up - 1), 2 * (up - 1) + 1]) {
+    if (cmp < 0 || cmp > 0x7f) continue;
+    if (d <= 0xff) speeds.push({ left: cmp, right: d, speed: d });
+    if (gtNote >= 0 && gtNote < 95 && base === gtFreq(gtNote)) {
+      const step = gtFreq(gtNote + 1) - gtFreq(gtNote);
+      for (let sh = 0; sh <= MAX_REL_SHIFT; sh++) if ((step >> sh) === d) speeds.push({ left: 0x80 | cmp, right: sh, speed: d });
+    }
+  }
+  for (const c of speeds) {
+    const cmp = c.left & 0x7f;
+    let freq = base, vibtime = 0, delay = eligible, steps = 0, ok = true;
+    for (let f = s1 + 1; f < last && ok; f++) {
+      if (live(f)) {
+        if (delay > 1) delay--;
+        else {
+          const v = vibratoSign(cmp, vibtime);
+          vibtime = v.vibtime;
+          freq = (freq + v.sign * c.speed) & 0xffff;
+          steps++;
+        }
+      }
+      ok = frames[f].freq === freq;
+    }
+    if (!ok || steps < MIN_VIBRATO_STEPS) continue;
+    const ptr = addRows(stbl, [[c.left, c.right]]);
+    if (ptr < 0) return null;
+    return { cmp: c.left, speed: c.right, delay: eligible, ptr, steps };
+  }
+  return null;
 }
 
 /** GT pulse modulation wraps at 12 bits (gplay.c PULSEEXEC: pulse &= 0xfff). */
@@ -310,42 +405,49 @@ function pulseLoopRows(trace: SidTrace, n: DecodedNote, scanEnd: number, maxLen:
  * The scan runs on a copy of the speed table; the kept rows are then rebuilt
  * against the real one (waveRows is causal, so the indices match).
  */
-function waveLoopRows(trace: SidTrace, n: DecodedNote, scanEnd: number, maxLen: number, stbl: Tables | null, mode: FreqMode): { rows: Array<[number, number]>; loop: number } | null {
-  const scan = waveRows(trace, n, scanEnd, stbl ? cloneTable(stbl) : null, mode, false);
+function waveLoopRows(trace: SidTrace, n: DecodedNote, scanEnd: number, maxLen: number, stbl: Tables | null, mode: FreqMode, vib: Vibrato | null): { rows: Array<[number, number]>; loop: number } | null {
+  const scan = waveRows(trace, n, scanEnd, stbl ? cloneTable(stbl) : null, mode, false, vib);
   const tail = periodicLoop(scan.map((r) => `${r[0]}.${r[1]}`), maxLen);
   if (!tail) return null;
   const period = scan.slice(tail.start, tail.start + tail.period);
   const still = period.every((r) => r[0] < 0xf0 && r[1] === 0x80 && r[0] === period[0][0]);
   if (still) return null;
-  const rows = waveRows(trace, n, n.start + 1 + tail.start + tail.period, stbl, mode, false);
+  const rows = waveRows(trace, n, n.start + 1 + tail.start + tail.period, stbl, mode, false, vib);
   rows.push([0xff, 0]);
   return { rows, loop: tail.start };
 }
 
-function programOf(trace: SidTrace, n: DecodedNote, nextStart: number, maxLen: number, stbl: Tables | null, mode: FreqMode = 'exact'): NoteProgram {
+function programOf(trace: SidTrace, n: DecodedNote, nextStart: number, maxLen: number, fpr: number, stbl: Tables | null, mode: FreqMode = 'exact'): NoteProgram {
   const frames = trace.voices[n.voice];
   let last = Math.min(nextStart, frames.length, n.start + maxLen);
   // A gate fall beyond the program is written as a key-off pattern row.
   if (last <= n.start) last = n.start + 1;
   const scanEnd = Math.min(nextStart, frames.length, n.start + 1 + LOOP_SCAN_FRAMES);
   const firstwave = frames[n.start].control;
+  // A vibrato GT can play runs for the whole note from the instrument, not from table rows.
+  const vib = vibratoOf(trace, n, nextStart, fpr, stbl);
   // A repeating tail loops with a 0xFF jump row instead of stopping at maxLen.
-  const wl = waveLoopRows(trace, n, scanEnd, maxLen, stbl, mode);
+  const wl = waveLoopRows(trace, n, scanEnd, maxLen, stbl, mode, vib);
   const pl = pulseLoopRows(trace, n, scanEnd, maxLen);
   let wave: Array<[number, number]>;
   if (wl) wave = wl.rows;
-  else { wave = waveRows(trace, n, last, stbl, mode); wave.push([0xff, 0]); }
+  else { wave = waveRows(trace, n, last, stbl, mode, true, vib); wave.push([0xff, 0]); }
   return {
     wave, waveLoop: wl ? wl.loop : -1,
     pulse: pl ? pl.rows : pulseRows(trace, n, last), pulseLoop: pl ? pl.loop : -1,
-    firstwave,
+    firstwave, vib,
   };
 }
 
 /** Content key of a program as the tables store it (rows plus loop target). */
 function programKey(src: DecodedNote, prog: NoteProgram): string {
   const rows = (r: Array<[number, number]>) => r.map((x) => `${x[0]}.${x[1]}`).join(',');
-  return `${src.frame.ad}.${src.frame.sr}.${prog.firstwave}|${rows(prog.wave)}@${prog.waveLoop}|${rows(prog.pulse)}@${prog.pulseLoop}`;
+  return `${src.frame.ad}.${src.frame.sr}.${prog.firstwave}|${rows(prog.wave)}@${prog.waveLoop}|${rows(prog.pulse)}@${prog.pulseLoop}|${vibKey(prog.vib)}`;
+}
+
+/** Instrument part of a vibrato: speed table row and vibdelay. */
+function vibKey(vib: Vibrato | null): string {
+  return vib ? `${vib.ptr}.${vib.delay}` : '-';
 }
 
 /** Append rows; on a later failure `undo` takes them out again. */
@@ -390,7 +492,9 @@ function agreedChanges(a: Array<[number, number]>, b: Array<[number, number]>, p
 /** Register changes of `own` that `other` makes the same way from the note start (ADSR and first waveform must match). */
 function programAgreement(own: { src: DecodedNote; prog: NoteProgram }, other: { src: DecodedNote; prog: NoteProgram }): number {
   if (own.src.frame.ad !== other.src.frame.ad || own.src.frame.sr !== other.src.frame.sr || own.prog.firstwave !== other.prog.firstwave) return 0;
-  return agreedChanges(own.prog.wave, other.prog.wave, false) + agreedChanges(own.prog.pulse, other.prog.pulse, true);
+  // A vibrato plays its frequency changes only from a program with the same vibrato.
+  const vib = own.prog.vib && vibKey(own.prog.vib) === vibKey(other.prog.vib) ? own.prog.vib.steps : 0;
+  return vib + agreedChanges(own.prog.wave, other.prog.wave, false) + agreedChanges(own.prog.pulse, other.prog.pulse, true);
 }
 
 /** Clusters of one instrument tried as its fallback, by note count. */
@@ -408,13 +512,13 @@ const FALLBACK_CANDIDATES = 16;
  * not fit.
  */
 function clusterPrograms(
-  trace: SidTrace, notes: DecodedNote[], nextStart: Map<DecodedNote, number>, maxLen: number,
+  trace: SidTrace, notes: DecodedNote[], nextStart: Map<DecodedNote, number>, maxLen: number, fpr: number,
   wtbl: Tables, ptbl: Tables, stbl: Tables, instrKeyOf: (n: DecodedNote) => string,
 ): { play: Map<DecodedNote, { src: DecodedNote; prog: NoteProgram }>; clusters: number; distinct: number } | null {
   const clusters = new Map<string, { src: DecodedNote; prog: NoteProgram; notes: DecodedNote[]; instrument: number }>();
   const clusterOf = new Map<DecodedNote, string>();
   for (const n of notes) {
-    const prog = programOf(trace, n, nextStart.get(n) ?? trace.frames, maxLen, stbl, 'relative');
+    const prog = programOf(trace, n, nextStart.get(n) ?? trace.frames, maxLen, fpr, stbl, 'relative');
     // The cluster is per inferred instrument: its fallback must cover every note of it.
     const key = `${n.instrument}#${programKey(n, prog)}`;
     let c = clusters.get(key);
@@ -651,25 +755,26 @@ export function sidTraceToGoatTracker(trace: SidTrace, name = 'Imported SID'): S
       // Exact frequency tracking is per pitch, so shared programs use note-relative speeds,
       // grouped by content.
       const clustered = ok && shared
-        ? clusterPrograms(trace, notes, nextStart, maxLen, wtbl, ptbl, stbl, (n) => `${filterPtrOf(n, ftbl)}.${gatetimerOf(n)}`)
+        ? clusterPrograms(trace, notes, nextStart, maxLen, fpr, wtbl, ptbl, stbl, (n) => `${filterPtrOf(n, ftbl)}.${gatetimerOf(n)}`)
         : null;
       if (ok && shared && !clustered) { ok = false; why = `${maxLen}/shared: fallback programs do not fit`; }
       for (const n of ok ? notes : []) {
         const { src, prog } = clustered
           ? clustered.play.get(n)!
-          : { src: n, prog: programOf(trace, n, nextStart.get(n) ?? trace.frames, maxLen, stbl, 'exact') };
+          : { src: n, prog: programOf(trace, n, nextStart.get(n) ?? trace.frames, maxLen, fpr, stbl, 'exact') };
         const wp = addRows(wtbl, prog.wave, prog.waveLoop), pp = addRows(ptbl, prog.pulse, prog.pulseLoop);
         if (wp < 0 || pp < 0) { ok = false; why = `${maxLen}/${shared} wave ${wtbl.left.length}+${prog.wave.length} pulse ${ptbl.left.length}+${prog.pulse.length}`; break; }
         const fp = filterPtrOf(n, ftbl);
         const gate = gatetimerOf(n);
-        const key = `${src.frame.ad}.${src.frame.sr}.${prog.firstwave}.${wp}.${pp}.${fp}.${gate}`;
+        const key = `${src.frame.ad}.${src.frame.sr}.${prog.firstwave}.${wp}.${pp}.${fp}.${gate}.${vibKey(prog.vib)}`;
         let idx = keyIndex.get(key);
         if (idx === undefined) {
           idx = instruments.length;
           if (idx > MAX_INFERRED_INSTRUMENTS) { ok = false; why = `instruments ${idx}`; break; }
           const ins = emptyGTInstrument();
           ins.ad = src.frame.ad; ins.sr = src.frame.sr;
-          ins.ptr = [wp, pp, fp, 0];
+          ins.ptr = [wp, pp, fp, prog.vib ? prog.vib.ptr : 0];
+          ins.vibdelay = prog.vib ? prog.vib.delay : 0;
           ins.gatetimer = gate;
           ins.firstwave = prog.firstwave >= 0xfe ? 0x09 : prog.firstwave;
           ins.name = `SID ${idx}`.slice(0, 16);
@@ -745,7 +850,9 @@ export function sidTraceToGoatTracker(trace: SidTrace, name = 'Imported SID'): S
   };
   return {
     song,
-    settings: { ntsc: trace.clock > 1_000_000, multiplier: 1, adparam },
+    // Realtime optimization on, as GoatTracker 2 packs by default: the
+    // instrument vibrato (vibratoOf) holds on tick 0 like the traced players.
+    settings: { ntsc: trace.clock > 1_000_000, multiplier: 1, adparam, optimizeRealtime: true },
     framesPerRow: fpr, frameOffset, rows: totalRows, noteCount: notes.length,
     instrumentCount: built.instruments.filter((i) => i.ad || i.sr || i.ptr.some((p) => p)).length,
     programFrames: built.maxLen, sharedPrograms: built.shared, warnings,
