@@ -231,15 +231,15 @@ export function exportDigitalSymphony(song: TrackerSong): ArrayBuffer {
     const pcm8 = extractPCM8FromWAV(cfg.audioBuffer!);
     const nLength = pcm8 ? pcm8.length : 0;
 
+    // Loop points are sample frames, as createSamplerInstrument writes them.
     const loopEnabled = cfg.loop && cfg.loopType !== 'off';
-    const loopStart = loopEnabled ? Math.round((cfg.loopStart ?? 0) * nLength) : 0;
-    const loopEnd = loopEnabled ? Math.round((cfg.loopEnd ?? 0) * nLength) : 0;
+    const loopStart = loopEnabled ? Math.min(Math.round(cfg.loopStart ?? 0), nLength) : 0;
+    const loopEnd = loopEnabled ? Math.min(Math.round(cfg.loopEnd ?? 0), nLength) : 0;
     const loopLength = loopEnabled ? Math.max(loopEnd - loopStart, 0) : 0;
 
-    // Volume: instrument volume is in dB (-60..0) → 0..64
-    const volDb = instr.volume ?? 0;
-    const volLin = Math.round(((volDb + 60) / 60) * 64);
-    const volume = Math.max(0, Math.min(64, volLin));
+    // Volume 0-64 and finetune -8..7 live in the shared modPlayback metadata.
+    const volume = Math.max(0, Math.min(64, Math.round(instr.metadata?.modPlayback?.defaultVolume ?? 64)));
+    const fineTune = (instr.metadata?.modPlayback?.finetune ?? 0) & 0x0F;
 
     sampleEntries.push({
       name: instr.name || '',
@@ -248,7 +248,7 @@ export function exportDigitalSymphony(song: TrackerSong): ArrayBuffer {
       loopStart,
       loopLength,
       volume,
-      fineTune: 0,
+      fineTune,
       pcm8,
     });
   }
@@ -330,15 +330,14 @@ export function exportDigitalSymphony(song: TrackerSong): ArrayBuffer {
   u8[pos++] = 0;
   u8[pos++] = 0;
 
-  // Sample name length array (63 bytes)
+  // Sample name length + length, interleaved per sample (OpenMPT Load_dsym):
+  // a nameLen byte (bit 7 = virtual), then for a non-virtual sample its
+  // u24LE half-length. Writing all 63 nameLen bytes first, then the lengths,
+  // shifts every later field and the file no longer opens.
   for (let smp = 0; smp < MAX_SAMPLES; smp++) {
     const s = sampleEntries[smp];
     const nameLen = Math.min(s.name.length, 63) & 0x3F;
     u8[pos++] = s.isVirtual ? (nameLen | 0x80) : nameLen;
-  }
-
-  // Sample length entries (3 bytes each for non-virtual)
-  for (const s of sampleEntries) {
     if (!s.isVirtual) {
       const len24 = s.length >> 1; // stored as half-length
       u8[pos++] = len24 & 0xFF;

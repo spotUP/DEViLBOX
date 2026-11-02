@@ -84,4 +84,16 @@ describe('New Song templates open through the product import without UADE', () =
     const out = await exportNativeSong(song);
     expect(out?.filename).toMatch(ext);
   }, 120_000);
+
+  // Live: a note typed on the Digital Symphony and KRIS New Song templates was
+  // silent. The DSym template had no sample audio (the parser dropped it and
+  // the export never reopened), and KRIS had no template at all.
+  it.each(['digitalSymphony', 'kris'])('%s: the template opens with a sample a typed note can play', async (formatId) => {
+    const template = listNewSongFormats().find((f) => f.formatId === formatId)!.template;
+    const raw = readFileSync(join('public', template));
+    const song = await parseModuleToSong(new File([new Uint8Array(raw)], template.split('/').pop()!));
+    const withAudio = song.instruments.filter((i) => (i.sample?.audioBuffer?.byteLength ?? 0) > 44);
+    expect(withAudio.length, `${template} has no sample audio`).toBeGreaterThan(0);
+  }, 120_000);
 });
+

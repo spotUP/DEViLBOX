@@ -80,9 +80,11 @@
     "reason": "descriptor already has newSong"
   },
   "digitalSymphony": {
-    "status": "skipped",
+    "status": "written",
     "file": "templates/digitalSymphony.dsym",
-    "reason": "descriptor already has newSong"
+    "source": "public/data/songs/formats/drwho_final4.dsym",
+    "variant": "trimmed-1-pattern",
+    "bytes": 58407
   },
   "digitalSonixChrome": {
     "status": "skipped",
@@ -126,7 +128,7 @@
     "file": "templates/hippelCoSo.hipc",
     "source": "public/data/songs/formats/prehistoric_tale.hipc",
     "variant": "cleared-all-patterns",
-    "bytes": 24932,
+    "bytes": 24938,
     "name": "Hippel-CoSo"
   },
   "jochenHippelST": {
@@ -155,9 +157,11 @@
     "reason": "descriptor already has newSong"
   },
   "kris": {
-    "status": "skipped",
+    "status": "written",
     "file": "templates/kris.kris",
-    "reason": "descriptor already has newSong"
+    "source": "public/data/songs/chiptracker/chuck rock - chuckrock.mod",
+    "variant": "trimmed-1-pattern",
+    "bytes": 33952
   },
   "musicAssembler": {
     "status": "written",

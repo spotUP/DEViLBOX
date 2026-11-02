@@ -67,7 +67,7 @@ registerEditableFormat({ formatId: "it", label: "IT", patternCodec: { kind: "var
 registerEditableFormat({ formatId: "jamCracker", label: "JamCracker Pro", patternCodec: { kind: "fixed" }, newSong: { template: "templates/jamcracker.jam" } });
 registerEditableFormat({ formatId: "karlMorton", label: "", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "klystrack", label: "Klystrack", patternCodec: { kind: "fixed" } });
-registerEditableFormat({ formatId: "kris", label: "KRIS / ChipTracker", newSong: { template: "templates/kris.kris" }, patternCodec: { kind: "fixed" }, exporter: { module: "KRISExporter", fn: "exportKRIS", byLayout: true } });
+registerEditableFormat({ formatId: "kris", label: "KRIS / ChipTracker", newSong: { template: "templates/kris.kris" }, patternCodec: { kind: "fixed" }, exporter: { module: "KRISExporter", fn: "exportKRIS", ext: "kris", byLayout: true } });
 registerEditableFormat({ formatId: "leggless", label: "", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "markII", label: "Mark II", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "mdl", label: "", patternCodec: { kind: "variable" } });

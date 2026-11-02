@@ -59,16 +59,9 @@ class BitWriter {
  * The output is padded to 4-byte alignment.
  */
 export function compressDSymLZW(input: Uint8Array): Uint8Array {
-  if (input.length === 0) {
-    // Just emit END_OF_STREAM
-    const writer = new BitWriter();
-    writer.writeBits(END_OF_STREAM, INITIAL_CODE_SIZE);
-    const raw = writer.finish();
-    // Pad to 4 bytes
-    const padded = new Uint8Array(((raw.length + 3) & ~3));
-    padded.set(raw);
-    return padded;
-  }
+  // The reader stops after the chunk's known size, so an empty chunk takes
+  // no bytes at all.
+  if (input.length === 0) return new Uint8Array(0);
 
   const writer = new BitWriter();
 
@@ -141,8 +134,9 @@ export function compressDSymLZW(input: Uint8Array): Uint8Array {
   // Output the final code
   writer.writeBits(currentCode, codeSize);
 
-  // Output END_OF_STREAM
-  writer.writeBits(END_OF_STREAM, codeSize);
+  // No END_OF_STREAM: the reader (Digital Symphony, OpenMPT, our parser)
+  // stops once it has the chunk's known size and aligns from there, so an
+  // end code would add a word and shift every chunk after this one.
 
   const raw = writer.finish();
 
