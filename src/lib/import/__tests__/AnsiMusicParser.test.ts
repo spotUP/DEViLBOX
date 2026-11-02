@@ -68,4 +68,21 @@ describe('AnsiMusicParser on real fixtures', () => {
     }
     expect(notes).toEqual([49, 97]);
   });
+
+  it('the New Song template (rests only, SO-terminated PLAY) is ANSI music', () => {
+    const raw = readFileSync(join('public', 'templates', 'ansimusic.ans'));
+    const buf = new Uint8Array(raw).buffer;
+    expect(isAnsiMusicFormat(buf)).toBe(true);
+  });
+
+  it('Delete Line followed by text and SO is still not music', () => {
+    const enc = (t: string): ArrayBuffer => Uint8Array.from([...t].map((c) => c.charCodeAt(0))).buffer;
+    // ESC[M then text and CP437 0x0E (a note glyph in art). The text has no
+    // note letter A-G, so only the syntax check can tell it from a blank song.
+    expect(isAnsiMusicFormat(enc('\x1b[MSilly\x0e'))).toBe(false);
+    expect(isAnsiMusicFormat(enc('\x1b[MLoop P1\x0e'))).toBe(false);
+    // The same shape with valid PLAY syntax is accepted.
+    expect(isAnsiMusicFormat(enc('\x1b[MFT120P4\x0e'))).toBe(true);
+  });
 });
+

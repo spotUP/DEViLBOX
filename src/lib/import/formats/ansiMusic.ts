@@ -116,6 +116,54 @@ export function scanAnsiMusicBlocks(bytes: Uint8Array): AnsiMusicScan {
   return { blocks, text: Uint8Array.from(text) };
 }
 
+/**
+ * True when every byte of a PLAY payload is PLAY syntax: notes A-G (with #, +
+ * or - and an optional length and dots), N, P, O, L and T with a number, the
+ * octave steps < and >, the MN/ML/MS/MF/MB modes, and spaces. An empty payload
+ * is not. A block that plays only rests (a blank song) is music when its
+ * payload passes this and SO ends it; plain ANSI art after ESC[M (Delete Line)
+ * fails on its first non-PLAY letter.
+ */
+export function isPlaySyntax(payload: Uint8Array): boolean {
+  let i = 0;
+  let seen = false;
+  const digits = (): void => { while (i < payload.length && isDigit(payload[i])) i++; };
+  const dots = (): void => { while (i < payload.length && payload[i] === 0x2e) i++; };
+  while (i < payload.length) {
+    const c = upper(payload[i]);
+    i++;
+    if (c === 0x20) continue;
+    seen = true;
+    if (c >= 0x41 && c <= 0x47) {
+      // A-G
+      if (i < payload.length && (payload[i] === 0x23 || payload[i] === 0x2b || payload[i] === 0x2d)) i++;
+      digits();
+      dots();
+    } else if (c === 0x4e || c === 0x50) {
+      // N, P
+      const from = i;
+      digits();
+      if (i === from) return false;
+      dots();
+    } else if (c === 0x4f || c === 0x4c || c === 0x54) {
+      // O, L, T
+      const from = i;
+      digits();
+      if (i === from) return false;
+    } else if (c === 0x3c || c === 0x3e) {
+      // < >
+    } else if (c === 0x4d) {
+      if (i >= payload.length) return false;
+      const m = upper(payload[i]);
+      if (m !== 0x4e && m !== 0x53 && m !== 0x4c && m !== 0x42 && m !== 0x46) return false;
+      i++;
+    } else {
+      return false;
+    }
+  }
+  return seen;
+}
+
 /** GW-BASIC NOTTAB, octave 6, whole Hz, C..B. Lower octaves shift right with round-half-up. */
 const OCTAVE6_HZ = [4186, 4435, 4699, 4978, 5274, 5588, 5920, 6272, 6645, 7040, 7459, 7902];
 const NOTE_INDEX: Record<number, number> = { 0x43: 0, 0x44: 2, 0x45: 4, 0x46: 5, 0x47: 7, 0x41: 9, 0x42: 11 };
