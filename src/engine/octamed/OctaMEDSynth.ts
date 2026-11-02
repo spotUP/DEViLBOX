@@ -129,7 +129,7 @@ export class OctaMEDSynth implements DevilboxSynth {
     );
   }
 
-  triggerAttack(note?: string | number, _time?: number, _velocity?: number): void {
+  triggerAttack(note?: string | number, time?: number, _velocity?: number): void {
     if (this._disposed || this._playerHandle < 0) return;
 
     let midiNote: number;
@@ -143,17 +143,19 @@ export class OctaMEDSynth implements DevilboxSynth {
 
     this.engine.sendMessage({
       type: 'noteOn',
+      atTime: time,
       handle: this._playerHandle,
       note: midiNote,
       velocity: 127,
     });
   }
 
-  triggerRelease(_note?: string | number, _time?: number): void {
+  triggerRelease(_note?: string | number, time?: number): void {
     if (this._disposed || this._playerHandle < 0) return;
     this.engine.sendMessage({
       type: 'noteOff',
       handle: this._playerHandle,
+      atTime: time,
     });
   }
 

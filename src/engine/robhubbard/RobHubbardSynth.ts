@@ -88,7 +88,7 @@ export class RobHubbardSynth implements DevilboxSynth {
     );
   }
 
-  triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
+  triggerAttack(note?: string | number, time?: number, velocity?: number): void {
     if (this._disposed || this._playerHandle < 0) return;
     this.cancelPendingRelease();
 
@@ -105,6 +105,7 @@ export class RobHubbardSynth implements DevilboxSynth {
 
     this.engine.sendMessage({
       type: 'noteOn',
+      atTime: time,
       handle: this._playerHandle,
       note: midiNote,
       velocity: vel,
