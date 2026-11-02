@@ -28,6 +28,7 @@ import { songToSongFile, type SongMeta } from '@lib/uprough/songFile';
 import { isSynthCompatibleWithChannel, getChannelBadge, getSynthBadge } from '../constants/channelTypeCompat';
 import { hippelLinkedEdits, hippelSpansFor } from '@/engine/hippel/hippelLinkedCells';
 import { isCoSo } from '@/engine/hippel/rebuildHippelModule';
+import { moduleHeldIn } from '@/engine/formatFileDataFields';
 import { cosoIndexForXM } from '@lib/import/formats/HippelCoSoParser';
 import { useHistoryStore, type HistoryAction, type PatternChange } from './useHistoryStore';
 // Late-bound access to the sibling stores that used to form an import cycle
@@ -201,7 +202,7 @@ const UNLINKED_EDITS = new Set(['INSERT_ROW', 'DELETE_ROW', 'RESIZE_PATTERN', 'P
 function cosoRefusesNote(cellUpdate: Partial<TrackerCell>): boolean {
   const note = cellUpdate.note ?? 0;
   if (note <= 0 || note > 96) return false;
-  const data = useFormatStore.getState().hippelFileData;
+  const data = moduleHeldIn(useFormatStore.getState(), 'hippelFileData');
   if (!data || !isCoSo(new Uint8Array(data)) || cosoIndexForXM(note) !== null) return false;
   notify.warning('CoSo plays notes from C-1 to B-3: the top note is B-3.');
   return true;
@@ -222,7 +223,10 @@ function pushEditAction(
 ): void {
   const history = useHistoryStore.getState();
   const fmt = useFormatStore.getState();
-  const spans = !UNLINKED_EDITS.has(type) && fmt.hippelFileData ? hippelSpansFor(fmt.hippelFileData, useInstrumentStore.getState().instruments.length, fmt.fileSubsongs?.current ?? 0) : null;
+  // On nuade the module sits in nuadeFileData (playOnNuade): without it the copies never moved and every edit to a reused
+  // block was refused by the patcher, so playback swapped in a module laid out again from the grid.
+  const hippelModule = UNLINKED_EDITS.has(type) ? null : moduleHeldIn(fmt, 'hippelFileData');
+  const spans = hippelModule ? hippelSpansFor(hippelModule, useInstrumentStore.getState().instruments.length, fmt.fileSubsongs?.current ?? 0) : null;
   const linked = spans ? hippelLinkedEdits(spans, patternIndex, before, after, useTrackerStore.getState().patterns) : [];
   if (linked.length === 0) { history.pushAction(type, description, patternIndex, before, after); return; }
   const others = [...new Set(linked.map((e) => e.pattern))];

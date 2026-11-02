@@ -27,6 +27,7 @@ import type { TrackerSong } from '@engine/TrackerReplayer';
 import '@lib/formats/EditableFormatRegistry.builtins';
 import { getLayoutExporters, songFormatId, songLayoutFormatId, type LayoutExporterEntry } from '@lib/formats/EditableFormatRegistry';
 import { lowOctaveExportRefusal } from '@/lib/tracker/noteValue';
+import { moduleHeldIn } from '@/engine/formatFileDataFields';
 
 export type { LayoutExporterEntry };
 
@@ -158,7 +159,7 @@ async function resolveNativeExportSong(song: TrackerSong | null): Promise<Tracke
   if (resolvedSong.nuadeFileData && resolvedSong.nuadeModuleFields?.length) {
     const restored: Record<string, unknown> = {};
     for (const field of resolvedSong.nuadeModuleFields) {
-      if (!(resolvedSong as unknown as Record<string, unknown>)[field]) restored[field] = resolvedSong.nuadeFileData;
+      if (!(resolvedSong as unknown as Record<string, unknown>)[field]) restored[field] = moduleHeldIn(resolvedSong, field);
     }
     if (restored.uadeEditableFileData && !resolvedSong.uadeEditableFileName) restored.uadeEditableFileName = resolvedSong.nuadeFileName;
     resolvedSong = { ...resolvedSong, ...restored } as TrackerSong;

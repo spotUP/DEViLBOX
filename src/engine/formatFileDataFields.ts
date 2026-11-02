@@ -111,3 +111,20 @@ export const FILE_DATA_FIELDS = [
 ] as const satisfies readonly (keyof TrackerSong)[];
 
 export type FileDataField = (typeof FILE_DATA_FIELDS)[number];
+
+/** What holds a module: a song, or the format store beside the grid. */
+export interface ModuleHolder {
+  nuadeFileData?: ArrayBuffer | null;
+  nuadeModuleFields?: readonly string[] | null;
+}
+
+/**
+ * The module a format's own field holds, also when the song plays on nuade. playOnNuade moves the module out of the
+ * format's field (hippelFileData, uadeEditableFileData ...) into nuadeFileData and names the fields it came from in
+ * nuadeModuleFields; whoever reads the format's module (its exporter, its cell spans) gets it back from there.
+ */
+export function moduleHeldIn(holder: ModuleHolder, field: string): ArrayBuffer | null {
+  const own = (holder as Record<string, unknown>)[field];
+  if (own instanceof ArrayBuffer) return own;
+  return holder.nuadeFileData && holder.nuadeModuleFields?.includes(field) ? holder.nuadeFileData : null;
+}
