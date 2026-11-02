@@ -11,6 +11,8 @@
 import type { DeepPartial, InstrumentConfig, SoundMonConfig, SidMonConfig, SynthType } from '@typedefs/instrument';
 import { createSamplerInstrument } from '@lib/import/formats/AmigaUtils';
 import { DEFAULT_SOUNDMON, DEFAULT_SIDMON } from '@typedefs/instrument';
+import type { HippelCoSoConfig } from '@typedefs/instrument';
+import hippelCosoStarters from './data/hippelCosoStarters.json';
 
 type PresetPartial = DeepPartial<InstrumentConfig>;
 
@@ -110,6 +112,31 @@ function samp(name: string): PresetPartial {
   return inst;
 }
 
+/**
+ * Jochen Hippel CoSo starters: instruments of a real CoSo song, built by the CoSo parser
+ * (src/constants/__tests__/hippelCosoStarters.test.ts regenerates the asset). Each carries
+ * its frequency and volume sequences and the sample data the sequences switch to, so a
+ * typed note is played by the CoSo voice and the song exports natively as CoSo.
+ */
+export const HIPPEL_COSO_STARTER_SOURCE = {
+  /** Path under public/data/songs. */
+  file: 'hippel-coso/wings of death (level 3).hipc',
+  /** 1-based instrument numbers of that song. */
+  instruments: [1, 2, 3, 5],
+} as const;
+
+export const HIPPEL_COSO_STARTER_INSTRUMENTS: PresetPartial[] = (
+  hippelCosoStarters as { name: string; hippelCoso: HippelCoSoConfig }[]
+).map((s) => ({
+  name: s.name,
+  type: 'synth' as const,
+  synthType: 'HippelCoSoSynth' as const,
+  hippelCoso: s.hippelCoso,
+  effects: [],
+  volume: -6,
+  pan: 0,
+}));
+
 /** SoundMon wavetable synth starter */
 function sm(name: string, overrides: Partial<SoundMonConfig>): PresetPartial {
   return {
@@ -189,13 +216,8 @@ export const UADE_INSTRUMENT_PRESETS: Record<string, PresetPartial[]> = {
     samp('Percussion'),
   ],
 
-  // --- Jochen Hippel CoSo (Sampler-based) ---
-  uade_hippelcoso: [
-    samp('Lead'),
-    samp('Bass'),
-    samp('Arp'),
-    samp('Perc'),
-  ],
+  // --- Jochen Hippel CoSo (real CoSo instruments from a real song) ---
+  uade_hippelcoso: HIPPEL_COSO_STARTER_INSTRUMENTS,
 
   // --- OctaMED 8-channel (Sampler-based) ---
   uade_octamed: [

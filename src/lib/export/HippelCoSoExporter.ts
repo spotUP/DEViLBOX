@@ -25,7 +25,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
-import type { HippelCoSoConfig } from '@/types/instrument/exotic';
+import type { HippelCoSoConfig, HippelCoSoSampleData } from '@/types/instrument/exotic';
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 import { isCoSo, rebuildHippelSong, hippelRefusedWarnings } from '@/engine/hippel/rebuildHippelModule';
@@ -102,7 +102,7 @@ function xmNoteToCoSo(xmNote: number): number {
 /** Sample headers + PCM of the loaded COSO module (empty when there is none). */
 function sourceSampleBank(song: TrackerSong): { headers: Uint8Array; pcm: Uint8Array; count: number } {
   const empty = { headers: new Uint8Array(0), pcm: new Uint8Array(0), count: 0 };
-  if (!song.hippelFileData) return empty;
+  if (!song.hippelFileData) return instrumentSampleBank(song);
   const src = new Uint8Array(song.hippelFileData);
   if (src.length < 0x34 || !isCoSo(src)) return empty;
   const dv = new DataView(src.buffer, src.byteOffset, src.byteLength);
@@ -112,6 +112,39 @@ function sourceSampleBank(song: TrackerSong): { headers: Uint8Array; pcm: Uint8A
   const hasTfmx = String.fromCharCode(src[0x20], src[0x21], src[0x22], src[0x23]) === 'TFMX';
   const count = hasTfmx ? dv.getUint16(0x32) : Math.max(0, Math.floor((samplesOff - headersOff) / 10) - 1);
   return { headers: src.slice(headersOff, samplesOff), pcm: src.slice(samplesOff), count };
+}
+
+/**
+ * A song with no loaded module (a New Song with CoSo starter instruments) carries each
+ * instrument's sample data in its config. The bank is rebuilt from those: one 10-byte
+ * header per sample index (pointer into the PCM section, length and repeat in words, loop
+ * start), a sample used by several instruments written once, unused indices left empty,
+ * and the closing empty header the player's count (headers - 1) expects.
+ */
+function instrumentSampleBank(song: TrackerSong): { headers: Uint8Array; pcm: Uint8Array; count: number } {
+  const byIndex = new Map<number, HippelCoSoSampleData>();
+  for (const inst of song.instruments) {
+    const hc = (inst as unknown as Record<string, unknown>).hippelCoso as HippelCoSoConfig | undefined;
+    for (const smp of hc?.samples ?? []) if (!byIndex.has(smp.index)) byIndex.set(smp.index, smp);
+  }
+  if (byIndex.size === 0) return { headers: new Uint8Array(0), pcm: new Uint8Array(0), count: 0 };
+  const count = Math.max(...byIndex.keys()) + 1;
+  const headers = new Uint8Array((count + 1) * 10);
+  const pcmParts: number[][] = [];
+  let pcmLen = 0;
+  for (const [index, smp] of byIndex) {
+    const dv = new DataView(headers.buffer, index * 10, 10);
+    dv.setUint32(0, pcmLen);
+    dv.setUint16(4, smp.length >> 1);
+    dv.setUint16(6, smp.loopStart);
+    dv.setUint16(8, smp.repeatLength >> 1);
+    pcmParts.push(smp.pcm);
+    pcmLen += smp.pcm.length;
+  }
+  const pcm = new Uint8Array(pcmLen);
+  let at = 0;
+  for (const part of pcmParts) { pcm.set(part, at); at += part.length; }
+  return { headers, pcm, count };
 }
 
 function buildCoSoFile(song: TrackerSong): { data: Uint8Array; warnings: string[] } {

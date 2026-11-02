@@ -108,16 +108,14 @@ describe('New Song templates open through the product import without UADE', () =
     expect(silent.map((i) => i.id), `${template} lists silent instruments`).toEqual([]);
   }, 120_000);
 
-  // N13c: the New Song wizard's "with instruments" choice for a system preset
-  // (Jochen Hippel CoSo) created Sampler instruments with no sample: silent.
-  it('every starter instrument a system preset offers carries audio', async () => {
+  // N13c: the New Song wizard's "with instruments" choice for a system preset (Jochen Hippel CoSo)
+  // offers real CoSo instruments (HippelCoSoSynth, from a real CoSo song), not Sampler saws.
+  // Sequences, export and rendering are judged in src/constants/__tests__/hippelCosoStarters.test.ts.
+  it('the CoSo system preset offers CoSo instruments', async () => {
     const { getInstrumentPresetsForSystem } = await import('@constants/uadeInstrumentPresets');
     const starters = getInstrumentPresetsForSystem('uade_hippelcoso');
     expect(starters.length).toBeGreaterThan(0);
-    for (const inst of starters) {
-      expect((inst.sample?.audioBuffer as ArrayBuffer | undefined)?.byteLength ?? 0, `${inst.name} has no audio`).toBeGreaterThan(44);
-      expect(inst.sample?.loop, `${inst.name} must loop`).toBe(true);
-    }
+    expect(starters.map((i) => i.synthType)).toEqual(starters.map(() => 'HippelCoSoSynth'));
   });
 });
 
