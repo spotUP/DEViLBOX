@@ -53,7 +53,7 @@ registerEditableFormat({ formatId: "gmc", label: "Game Music Creator", patternCo
 registerEditableFormat({ formatId: "graoumfTracker2_gt2", label: "Graoumf Tracker 2", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "graoumfTracker2_gtk4", label: "Graoumf Tracker 2", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "graoumfTracker2_gtk5", label: "Graoumf Tracker 2", patternCodec: { kind: "fixed" } });
-registerEditableFormat({ formatId: "hippelCoSo", label: "", patternCodec: { kind: "variable" }, exporter: { module: "HippelCoSoExporter", fn: "exportAsHippelCoSo", byLayout: true }, newSong: { template: "templates/hippelcoso.coso", name: "Jochen Hippel CoSo" } });
+registerEditableFormat({ formatId: "hippelCoSo", label: "", patternCodec: { kind: "variable" }, exporter: { module: "HippelCoSoExporter", fn: "exportAsHippelCoSo", byLayout: true }, newSong: { template: "templates/hippelCoSo.hipc", name: "Jochen Hippel CoSo" } });
 registerEditableFormat({ formatId: "jochenHippelST", label: "", newSong: { template: "templates/jochenHippelST.hst", name: "Jochen Hippel ST" }, patternCodec: { kind: "fixed" }, exporter: { module: "JochenHippelSTExporter", fn: "exportJochenHippelST", byLayout: true } });
 registerEditableFormat({ formatId: "hivelyAHX", label: "HivelyTracker", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "hivelyHVL", label: "HivelyTracker", patternCodec: { kind: "variable" } });

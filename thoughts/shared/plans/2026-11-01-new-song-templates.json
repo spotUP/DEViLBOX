@@ -53,9 +53,11 @@
     "bytes": 376918
   },
   "davidWhittaker": {
-    "status": "skipped",
+    "status": "written",
     "file": "templates/davidWhittaker.dw",
-    "reason": "descriptor already has newSong"
+    "source": "public/data/songs/formats/apb.dw",
+    "variant": "trimmed-1-pattern",
+    "bytes": 45810
   },
   "deltaMusic1": {
     "status": "skipped",
@@ -112,7 +114,7 @@
     "file": "templates/futurePlayer.fp",
     "source": "public/data/songs/formats/hybris.fp",
     "variant": "trimmed-1-pattern",
-    "bytes": 27088
+    "bytes": 27084
   },
   "gameMusicCreator": {
     "status": "skipped",
@@ -120,9 +122,12 @@
     "reason": "descriptor already has newSong"
   },
   "hippelCoSo": {
-    "status": "skipped",
-    "file": "templates/hippelcoso.coso",
-    "reason": "descriptor already has newSong"
+    "status": "written",
+    "file": "templates/hippelCoSo.hipc",
+    "source": "public/data/songs/formats/prehistoric_tale.hipc",
+    "variant": "cleared-all-patterns",
+    "bytes": 24932,
+    "name": "Hippel-CoSo"
   },
   "jochenHippelST": {
     "status": "written",
@@ -289,5 +294,10 @@
     "source": "public/data/songs/pumatracker/liquid kids - lv1a.puma",
     "variant": "trimmed-1-pattern",
     "bytes": 11482
+  },
+  "soundMon": {
+    "status": "skipped",
+    "file": "templates/soundmon.bp",
+    "reason": "descriptor already has newSong"
   }
 }

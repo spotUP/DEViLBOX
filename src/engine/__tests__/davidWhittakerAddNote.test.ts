@@ -14,6 +14,8 @@ import { buildDWGridFromWalk } from '@/lib/import/formats/davidWhittakerGrid';
 import { applyDwGridEdits } from '@/lib/import/formats/davidWhittakerEdits';
 import { installDwNodeFetch } from '@/lib/import/__tests__/helpers/dwNodeFetch';
 import { paulaEventStream, eventsOfVoice } from './gridOracle';
+import { parseAs } from '@/lib/export/__tests__/exporterHarness.shared';
+import { exportDavidWhittaker } from '@/lib/export/DavidWhittakerExporter';
 
 const ROWS = 64;
 const FILE = 'david-whittaker/garfield2+.dw';
@@ -85,5 +87,35 @@ describe('David Whittaker: a note on a row no note starts on', { timeout: 120000
       else expect(sampleStarts(b), `voice ${v}: every sample start kept`).toEqual(sampleStarts(a));
     }
     expect(edited.length, 'the voice that plays the new note differs from the typed row on').toBeGreaterThanOrEqual(1);
+  });
+
+  it('a note typed on the blank New Song template sounds: the song opens with a grid and the mute becomes the note', async () => {
+    // The New Song template (makeNewSongTemplates) turns every note into the 0x82 mute. Two things made a typed note
+    // silent: the parser opened a walk without notes in the scope view (no layout, so export wrote nothing back), and the
+    // edit path looked only for note commands. A mute is a note slot: one byte that ends the read run, timed by the
+    // wait in force, so the typed note replaces it in place.
+    const bytes = new Uint8Array(readFileSync(resolve(process.cwd(), 'public/templates/davidWhittaker.dw')));
+    const song = await parseAs('davidWhittaker.dw', bytes);
+    expect(song.gridUnmatchedReason, 'the blank opens with a grid').toBeUndefined();
+    expect(song.patterns.flatMap((p) => p.channels.flatMap((c) => c.rows)).filter((c) => c.note > 0).length, 'and is blank').toBe(0);
+    const walk = await walkDavidWhittaker(bytes.slice().buffer as ArrayBuffer);
+    const mute = walk.events.find((e) => e.channel === 0 && e.kind === DW_WALK.mute);
+    expect(mute, 'voice 1 runs a mute').toBeDefined();
+    const cell = song.patterns[Math.floor(mute!.tick / ROWS)].channels[0].rows[mute!.tick % ROWS];
+    cell.note = 37; cell.instrument = 1;
+    const ex = await exportDavidWhittaker(song);
+    expect(ex.warnings).toEqual([]);
+    const out = new Uint8Array(await ex.data.arrayBuffer());
+    expect(out[mute!.block + mute!.pos]).toBe(37 - 25);
+    const walk2 = await walkDavidWhittaker(out.slice().buffer as ArrayBuffer);
+    const typed = walk2.events.find((e) => e.kind === DW_WALK.note && e.channel === 0 && e.tick === mute!.tick);
+    expect(typed?.b, 'the walk plays the typed note on its row').toBe(37 - 25);
+    expect(typed?.a, 'with instrument 1').toBe(0);
+    // The original player starts a sample for it; the blank template starts none.
+    const starts = (ev: string[]) => ev.filter((e) => e.split(':')[2] === '0').length;
+    const was = await paulaEventStream(bytes, 'davidWhittaker.dw', 2);
+    const now = await paulaEventStream(out, 'davidWhittaker.dw', 2);
+    expect(now.length, 'the player ran (sentinel)').toBeGreaterThan(0);
+    expect(starts(now), 'sample starts after the typed note').toBeGreaterThan(starts(was));
   });
 });
