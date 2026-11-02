@@ -9,6 +9,7 @@
  */
 
 import type { DeepPartial, InstrumentConfig, SoundMonConfig, SidMonConfig, SynthType } from '@typedefs/instrument';
+import { createSamplerInstrument } from '@lib/import/formats/AmigaUtils';
 import { DEFAULT_SOUNDMON, DEFAULT_SIDMON } from '@typedefs/instrument';
 
 type PresetPartial = DeepPartial<InstrumentConfig>;
@@ -94,9 +95,19 @@ export function getInstrumentPresetsForSystem(presetId: string): PresetPartial[]
   return [];
 }
 
-/** Sampler starter — just a named empty slot */
+/**
+ * One cycle of a sawtooth, 8-bit signed PCM (stored as bytes). A starter that carried no
+ * sample was a Sampler with nothing to play: every typed note was silent.
+ */
+const STARTER_CYCLE_FRAMES = 128;
+const STARTER_SAMPLE_RATE = 8287;
+
+/** Sampler starter: a named instrument that loops one saw cycle, so a typed note sounds. */
 function samp(name: string): PresetPartial {
-  return { name, synthType: 'Sampler' };
+  const pcm = new Uint8Array(STARTER_CYCLE_FRAMES);
+  for (let i = 0; i < STARTER_CYCLE_FRAMES; i++) pcm[i] = Math.round((i / (STARTER_CYCLE_FRAMES - 1)) * 160 - 80) & 0xff;
+  const { id: _id, ...inst } = createSamplerInstrument(0, name, pcm, 64, STARTER_SAMPLE_RATE, 0, STARTER_CYCLE_FRAMES);
+  return inst;
 }
 
 /** SoundMon wavetable synth starter */

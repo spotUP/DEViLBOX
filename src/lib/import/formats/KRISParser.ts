@@ -75,7 +75,8 @@ interface KRISSample {
   volume:    number;     // 0–64
   loopStart: number;     // in words
   loopLen:   number;     // in words (>1 means loop)
-  isSynth:   boolean;    // name[0] === 0
+  isSynth:   boolean;    // name[0] === 0 and not an unused slot
+  emptySlot?: boolean;   // all-zero header: the file defines no instrument here
 }
 
 // ── Format detection ──────────────────────────────────────────────────────────
@@ -118,9 +119,13 @@ export async function parseKRISFile(
     const volume   = Math.min(u8(v, base + 25), 64);
     const loopStart = u16(v, base + 26);
     const loopLen   = u16(v, base + 28);
-    const isSynth   = nameRaw[0] === 0;
+    // An all-zero header (no name, no length) is an unused slot, which is how
+    // the exporter writes a slot the song does not define. A synth instrument
+    // also starts with a zero byte but carries its parameters in the name bytes.
+    const emptySlot = length === 0 && nameRaw.every((b) => b === 0);
+    const isSynth   = nameRaw[0] === 0 && !emptySlot;
 
-    samples.push({ name, nameRaw, length, finetune, volume, loopStart, loopLen, isSynth });
+    samples.push({ name, nameRaw, length, finetune, volume, loopStart, loopLen, isSynth, emptySlot });
   }
 
   // ── Song header ─────────────────────────────────────────────────────────────
@@ -280,7 +285,7 @@ export async function parseKRISFile(
   }
 
   // ── Build instruments ─────────────────────────────────────────────────────────
-  const instruments: InstrumentConfig[] = samples.map((samp, i) => {
+  const allInstruments: InstrumentConfig[] = samples.map((samp, i) => {
     const id = i + 1;
 
     // Synthetic instrument — no PCM data, return silent placeholder
@@ -335,6 +340,12 @@ export async function parseKRISFile(
       hasLoop ? loopEnd : 0,
     );
   });
+
+  // Unused trailing slots are not instruments of the song (the exporter writes
+  // a missing slot as an all-zero header), so they are not listed.
+  let usedSlots = samples.length;
+  while (usedSlots > 1 && samples[usedSlots - 1].emptySlot) usedSlots--;
+  const instruments = allInstruments.slice(0, usedSlots);
 
   const uadePatternLayout: UADEPatternLayout = {
     formatId: 'kris',

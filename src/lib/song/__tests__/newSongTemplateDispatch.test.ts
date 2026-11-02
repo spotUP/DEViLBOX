@@ -95,5 +95,29 @@ describe('New Song templates open through the product import without UADE', () =
     const withAudio = song.instruments.filter((i) => (i.sample?.audioBuffer?.byteLength ?? 0) > 44);
     expect(withAudio.length, `${template} has no sample audio`).toBeGreaterThan(0);
   }, 120_000);
+
+  // N13a/N13b: the KRIS and Digital Symphony templates listed every unused slot
+  // as an instrument (23 silent 'Synthetic' entries; 63 slots with 7 filled).
+  // The listed instruments are exactly the ones the file defines.
+  it.each(['kris', 'digitalSymphony'])('%s: the template lists only instruments that hold audio', async (formatId) => {
+    const template = listNewSongFormats().find((f) => f.formatId === formatId)!.template;
+    const raw = readFileSync(join('public', template));
+    const song = await parseModuleToSong(new File([new Uint8Array(raw)], template.split('/').pop()!));
+    const silent = song.instruments.filter((i) => (i.sample?.audioBuffer?.byteLength ?? 0) <= 44);
+    expect(song.instruments.length).toBeGreaterThan(0);
+    expect(silent.map((i) => i.id), `${template} lists silent instruments`).toEqual([]);
+  }, 120_000);
+
+  // N13c: the New Song wizard's "with instruments" choice for a system preset
+  // (Jochen Hippel CoSo) created Sampler instruments with no sample: silent.
+  it('every starter instrument a system preset offers carries audio', async () => {
+    const { getInstrumentPresetsForSystem } = await import('@constants/uadeInstrumentPresets');
+    const starters = getInstrumentPresetsForSystem('uade_hippelcoso');
+    expect(starters.length).toBeGreaterThan(0);
+    for (const inst of starters) {
+      expect((inst.sample?.audioBuffer as ArrayBuffer | undefined)?.byteLength ?? 0, `${inst.name} has no audio`).toBeGreaterThan(44);
+      expect(inst.sample?.loop, `${inst.name} must loop`).toBe(true);
+    }
+  });
 });
 
