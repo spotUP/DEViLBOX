@@ -889,14 +889,15 @@ export async function tryRouteFormat(
   }
 
   // ── Images Music System (.ims) ────────────────────────────────────────────
-  // .ims files — OpenMPT
+  // IMSParser decodes the grid and carries the chip-RAM pattern layout, so a
+  // note typed in the grid is encoded back into the module and export writes
+  // .ims. OpenMPT parsed this extension before and labelled the song MOD, so
+  // an IMS song exported as a .mod. UADE plays the module.
   if (matchesExt(filename, ['ims'])) {
-    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
-    const song = await parseWithOpenMPT(buffer, originalFileName);
-    song.libopenmptFileData = buffer.slice(0);
-    song.uadeEditableFileData = buffer.slice(0) as ArrayBuffer;
-    song.uadeEditableFileName = originalFileName;
-    return song;
+    const { isIMSFormat, parseIMSFile } = await import('@lib/import/formats/IMSParser');
+    return withNativeThenUADE('imagesMusicSystem', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isIMSFormat(buf as ArrayBuffer)) return parseIMSFile(buf as ArrayBuffer, name); return null; },
+      'IMSParser', { injectUADE: true });
   }
 
   // ── ICE Tracker / SoundTracker 2.6 (.ice) ────────────────────────────────

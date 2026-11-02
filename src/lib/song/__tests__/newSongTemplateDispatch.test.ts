@@ -35,7 +35,7 @@ import { parseModuleToSong } from '@lib/import/parseModuleToSong';
  * here. SCUMM's template is the real song zaktitle.scumm; its parser is a stub
  * whose magic check rejects that file, so UADE builds the grid by design.
  */
-const NOT_JUDGED = new Set(['digiBoosterPro', 'digitalSymphony', 'ims', 'kris', 'scumm']);
+const NOT_JUDGED = new Set(['digiBoosterPro', 'digitalSymphony', 'kris', 'scumm']);
 
 const formats = listNewSongFormats().filter((f) => !NOT_JUDGED.has(f.formatId));
 
@@ -58,4 +58,16 @@ describe('New Song templates open through the product import without UADE', () =
     },
     120_000,
   );
+
+  // Live: an IMS New Song exported as Untitled.mod. The .ims extension went to
+  // OpenMPT, which labels the song MOD, so the export picked the MOD writer.
+  it('ims: the template exports as .ims through the product import', async () => {
+    const template = listNewSongFormats().find((f) => f.formatId === 'ims')!.template;
+    const raw = readFileSync(join('public', template));
+    const song = await parseModuleToSong(new File([new Uint8Array(raw)], template.split('/').pop()!));
+    expect(song.uadePatternLayout?.formatId).toBe('ims');
+    const { exportNativeSong } = await import('@lib/export/nativeExportRouter');
+    const out = await exportNativeSong(song);
+    expect(out?.filename).toMatch(/\.ims$/);
+  }, 120_000);
 });
