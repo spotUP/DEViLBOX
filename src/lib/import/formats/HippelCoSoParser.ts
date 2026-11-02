@@ -245,19 +245,19 @@ function extractVseq(buf: Uint8Array, offset: number, maxLen = 128): number[] {
 /**
  * Length in bytes of one CoSo pattern-stream command at `pos` (see the pattern
  * grammar in the decode loop below):
- *   note (v >= 0)   : 2, or 3 when the info byte has any of bits 5-7 set (infoPrev)
+ *   note (0x00-0xFC): 2, or 3 when the info byte has any of bits 5-7 set (infoPrev).
+ *                     0x80-0xFC is a note without an instrument trigger (hippel.c
+ *                     step_voice: every byte below FD is note + info; bit 7 only
+ *                     skips start_instrument).
  *   -1 (0xFF)       : 1  (end-of-pattern terminator)
- *   -2 / -3         : 2  (repeat / loop command + param)
- *   any other byte  : 1  (unknown — consume one byte, never desync)
+ *   -2 / -3         : 2  (speed / speed-and-wait command + param)
  */
 function cosoCommandLen(buf: Uint8Array, pos: number): number {
   const v = s8(buf, pos);
-  if (v >= 0) {
-    const info = pos + 1 < buf.length ? u8(buf, pos + 1) : 0;
-    return (info & 0xE0) !== 0 ? 3 : 2;
-  }
+  if (v === -1) return 1;
   if (v === -2 || v === -3) return 2;
-  return 1;
+  const info = pos + 1 < buf.length ? u8(buf, pos + 1) : 0;
+  return (info & 0xE0) !== 0 ? 3 : 2;
 }
 
 /**
@@ -832,7 +832,10 @@ export function decodeCoSoGrid(
             const baseline = emptyCell();
             chRows.push(baseline);
             chSpans.push(cosoSpan(at, pos - at, eventAt, baseline, trackTransp, false, sndT));
-          } else if (v >= 0) {
+          } else {
+            // Every other byte is a note event (hippel.c step_voice). Bit 7 set: the pitch
+            // changes without an instrument trigger, so the cell shows the note and no instrument.
+            const noTrigger = v < 0;
             speedFrom = -1;
             pos++;
             let infoVal = 0;
@@ -841,20 +844,14 @@ export function decodeCoSoGrid(
             // The replayer plays envelope (info & 31) + sound transpose, byte
             // wrapped, and falls back to envelope 0 when that is past the table.
             const envIdx = ((infoVal & 31) + sndT) & 0xFF;
-            const instrNum = envIdx < instrumentCount ? envIdx + 1 : 1;
+            const instrNum = noTrigger ? 0 : envIdx < instrumentCount ? envIdx + 1 : 1;
             const baseline: TrackerCell = {
-              note: cosoNoteToXM(v, trackTransp),
+              note: cosoNoteToXM(v & 0x7F, trackTransp),
               instrument: instrNum,
               volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
             };
             chRows.push(baseline);
             chSpans.push(cosoSpan(at, pos - at, eventAt, baseline, trackTransp, true, sndT));
-          } else {
-            pos++; // unknown command: one byte, shown as an empty row
-            speedFrom = -1;
-            const baseline = emptyCell();
-            chRows.push(baseline);
-            chSpans.push({ offset: at, length: pos - at, baseline, encode: () => null });
           }
         }
       }
@@ -885,12 +882,16 @@ function cosoSpan(
       if (!isNote || (cell.note ?? 0) === 0) return null;
       const idx = cosoIndexForXM(cell.note);
       if (idx === null) return null;
-      const noteByte = idx - trackTransp;
-      if (noteByte < 0 || noteByte > 0x7F) return null;
+      const noteVal = idx - trackTransp;
+      if (noteVal < 0 || noteVal > 0x7F) return null;
+      // A note without an instrument trigger (bit 7) stays one; its info byte is kept as it is.
+      const noTrigger = file[eventAt] & 0x80;
+      const noteByte = noTrigger | noteVal;
+      if (noteByte >= 0xFD) return null;
       const oldInfo = file[eventAt + 1];
       const inst = cell.instrument ?? 0;
       // The cell shows envelope + sound transpose, so write it back less it.
-      const low = inst > 0 ? (inst - 1 - soundTransp) & 0xFF : oldInfo & 31;
+      const low = inst > 0 && !noTrigger ? (inst - 1 - soundTransp) & 0xFF : oldInfo & 31;
       if (low > 31) return null;
       const info = (oldInfo & 0xE0) | low;
       // The speed changes in front of the event stay as they are.
