@@ -14,9 +14,9 @@ import { useProjectStore } from '@stores/useProjectStore';
 import { getEditableFormat } from '@/lib/formats/EditableFormatRegistry';
 import '@lib/formats/EditableFormatRegistry.builtins';
 import { openSong } from '@/lib/song/openSong';
-import { useFormatStore } from '@stores/useFormatStore';
+import { useFormatStore, type FormatStore } from '@stores/useFormatStore';
 import { emptyHippelCoSoLayout } from '@lib/import/formats/HippelCoSoParser';
-import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { emptyTFMXLayout } from '@lib/import/formats/TFMXParser';
 
 export type NewSongMode = 'empty' | 'preset' | 'format';
 
@@ -31,12 +31,18 @@ export type NewSongRequest =
   | { kind: 'format'; formatId: string };
 
 /**
- * System presets whose song has a format of its own: the layout a song of that
- * format carries, which names it to the native export router (a preset song
- * without one is exported as no format at all).
+ * System presets whose song has a format of its own: the format-store state a
+ * song of that format carries, which names it to the native export router (a
+ * preset song without one is exported as no format at all). Each entry is the
+ * route that format's importer sets: its layout, or the song format tag its
+ * exporter branch tests.
  */
-const PRESET_VARIABLE_LAYOUT: Readonly<Record<string, () => UADEVariablePatternLayout>> = {
-  uade_hippelcoso: emptyHippelCoSoLayout,
+const PRESET_FORMAT_STATE: Readonly<Record<string, () => Partial<FormatStore>>> = {
+  uade_hippelcoso: () => ({ uadeVariableLayout: emptyHippelCoSoLayout() }),
+  uade_tfmx: () => ({ uadePatternLayout: emptyTFMXLayout() }),
+  uade_soundmon: () => ({ songFormat: 'SMON' }),
+  uade_futurecomposer: () => ({ songFormat: 'FC' }),
+  uade_jamcracker: () => ({ songFormat: 'JamCracker' }),
 };
 
 export const NEW_SONG_NAME = 'Untitled';
@@ -89,8 +95,8 @@ async function startGenericSong(preset: { presetId: string; loadInstruments: boo
   }
 
   // 4b. Name the song's format to the export router
-  const layout = PRESET_VARIABLE_LAYOUT[presetId];
-  if (layout) useFormatStore.setState({ uadeVariableLayout: layout() });
+  const formatState = PRESET_FORMAT_STATE[presetId];
+  if (formatState) useFormatStore.setState(formatState());
 
   // 5. Track active system for filtering
   useUIStore.getState().setActiveSystemPreset(presetId || null);
