@@ -15,6 +15,7 @@
  * edit made through another step sharing the same pattern).
  */
 import type { TrackerCell } from '@/types';
+import { noteValueToPitch } from '@/lib/tracker/noteValue';
 
 export interface HippelCellSpan {
   /** File offset of the cell's bytes. */
@@ -113,10 +114,16 @@ export function patchEditedCells(
   // Each step has its own note transpose, so copies show one block as different pitches: they agree when they moved by the
   // same interval from what each decoded as (the linked edit keeps them so), not when they show the same pitch.
   // A cleared field has no interval: every copy of a cleared field agrees.
+  // A note interval is counted in pitch (the octave below C-0 is stored -12..-1, so stored values skip 0).
   const step = (v: number | undefined, b: number | undefined) => ((v ?? 0) === 0 ? 'clear' : (v ?? 0) - (b ?? 0));
+  const noteStep = (v: number | undefined, b: number | undefined) => {
+    const pv = noteValueToPitch(v ?? 0);
+    const pb = noteValueToPitch(b ?? 0);
+    return pv !== null && pb !== null ? pv - pb : step(v, b);
+  };
   const agreeNote = (offset: number, cell: TrackerCell, base: TrackerCell): boolean =>
     (sharers.get(offset) ?? []).every((o) => step(o.cell.instrument, o.base.instrument) === step(cell.instrument, base.instrument)
-      && step(o.cell.note, o.base.note) === step(cell.note, base.note));
+      && noteStep(o.cell.note, o.base.note) === noteStep(cell.note, base.note));
   const agreeVolume = (offset: number, cell: TrackerCell): boolean =>
     (sharers.get(offset) ?? []).every((o) => !volumeDiffers(cell, o.cell));
   for (let p = 0; p < patterns.length; p++) {
