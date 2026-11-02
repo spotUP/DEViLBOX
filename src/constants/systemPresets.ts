@@ -1282,42 +1282,46 @@ export interface PresetGroup {
   presets: SystemPreset[];
 }
 
-export function getGroupedPresets(): PresetGroup[] {
-  // Build groups by scanning the array — categories match the comment order
-  const groupDefs: { label: string; startId: string }[] = [
-    { label: 'Yamaha FM', startId: 'ymu759' },
-    { label: 'Yamaha OPL', startId: 'opl' },
-    { label: 'Console', startId: 'nes' },
-    { label: 'Commodore', startId: 'sid6581' },
-    { label: 'Atari', startId: 'pokey' },
-    { label: 'AY/PSG', startId: 'ay8910' },
-    { label: 'Sampler', startId: 'amiga' },
-    { label: 'Famicom Expansion', startId: 'vrc6' },
-    { label: 'Konami', startId: 'scc' },
-    { label: 'Namco', startId: 'n163' },
-    { label: 'OKI', startId: 'msm6258' },
-    { label: 'Other', startId: 'dave' },
-    { label: 'Fantasy', startId: 'tildearrow_sound_unit' },
-    { label: 'Amiga / UADE', startId: 'amiga_protracker' },
-    { label: 'Compound', startId: 'genesis' },
-    { label: 'Debug/Test', startId: 'pong' },
-  ];
+/**
+ * Optgroup start ids, in display order. A group holds the presets from its start
+ * id up to the next group's start in SYSTEM_PRESETS array order, so every preset
+ * (except the leading 'none') lands in exactly one group.
+ */
+const PRESET_GROUP_STARTS: { label: string; startId: string }[] = [
+  { label: 'Yamaha FM', startId: 'ymu759' },
+  { label: 'Yamaha OPL', startId: 'opl' },
+  { label: 'Console', startId: 'sms' },
+  { label: 'Commodore', startId: 'c64_6581' },
+  { label: 'Atari', startId: 'tia' },
+  { label: 'AY/PSG', startId: 'ay8910' },
+  { label: 'Sampler', startId: 'amiga' },
+  { label: 'Famicom Expansion', startId: 'vrc6' },
+  { label: 'Konami', startId: 'scc' },
+  { label: 'Namco', startId: 'namco' },
+  { label: 'OKI', startId: 'msm5232' },
+  { label: 'Other', startId: 'vera' },
+  { label: 'Fantasy', startId: 'sound_unit' },
+  { label: 'Amiga / UADE', startId: 'amiga_protracker' },
+  { label: 'Compound', startId: 'genesis' },
+  { label: 'Debug/Test', startId: 'pong' },
+];
 
-  const groups: PresetGroup[] = [];
+export function getGroupedPresets(): PresetGroup[] {
   const idToIndex = new Map<string, number>();
   SYSTEM_PRESETS.forEach((p, i) => idToIndex.set(p.id, i));
 
-  for (let g = 0; g < groupDefs.length; g++) {
-    const startIdx = idToIndex.get(groupDefs[g].startId);
-    if (startIdx === undefined) continue;
-    const endIdx = g + 1 < groupDefs.length
-      ? idToIndex.get(groupDefs[g + 1].startId) ?? SYSTEM_PRESETS.length
-      : SYSTEM_PRESETS.length;
-    const presets = SYSTEM_PRESETS.slice(startIdx, endIdx);
-    if (presets.length > 0) {
-      groups.push({ label: groupDefs[g].label, presets });
-    }
-  }
+  const starts = PRESET_GROUP_STARTS.map(({ label, startId }) => {
+    const index = idToIndex.get(startId);
+    if (index === undefined) throw new Error(`getGroupedPresets: no system preset '${startId}' to start group '${label}'`);
+    return { label, index };
+  });
+  const sortedStarts = starts.map((s) => s.index).sort((a, b) => a - b);
 
+  const groups: PresetGroup[] = [];
+  for (const { label, index } of starts) {
+    const end = sortedStarts.find((i) => i > index) ?? SYSTEM_PRESETS.length;
+    const presets = SYSTEM_PRESETS.slice(index, end);
+    if (presets.length > 0) groups.push({ label, presets });
+  }
   return groups;
 }
