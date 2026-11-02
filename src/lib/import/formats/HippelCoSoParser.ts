@@ -815,16 +815,25 @@ export function decodeCoSoGrid(
         const sndT = soundTransp[ch];
         const patPtrOff = patternsOff + patIdx * 2;
         let pos = patPtrOff + 2 <= buf.length ? u16BE(buf, patPtrOff) : 0;
+        // Where the speed changes (FE n) read since the last row start: they take no time of their own, so
+        // they belong to the row of the event that follows them (hippel.c step_voice reads on in the same step).
+        let speedFrom = -1;
         while (chRows.length < COSO_ROWS_PER_STEP && pos < buf.length) {
           const v = s8(buf, pos);
-          const at = pos;
+          const at = speedFrom >= 0 ? speedFrom : pos;
+          const eventAt = pos;
           if (v === -1) break; // end of pattern
-          if (v === -2 || v === -3) {
+          if (v === -2) {
+            speedFrom = at;
             pos += 2;
+          } else if (v === -3) {
+            pos += 2;
+            speedFrom = -1;
             const baseline = emptyCell();
             chRows.push(baseline);
-            chSpans.push(cosoSpan(at, 2, baseline, trackTransp, false, sndT));
+            chSpans.push(cosoSpan(at, pos - at, eventAt, baseline, trackTransp, false, sndT));
           } else if (v >= 0) {
+            speedFrom = -1;
             pos++;
             let infoVal = 0;
             if (pos < buf.length) { infoVal = s8(buf, pos); pos++; }
@@ -839,12 +848,13 @@ export function decodeCoSoGrid(
               volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
             };
             chRows.push(baseline);
-            chSpans.push(cosoSpan(at, pos - at, baseline, trackTransp, true, sndT));
+            chSpans.push(cosoSpan(at, pos - at, eventAt, baseline, trackTransp, true, sndT));
           } else {
             pos++; // unknown command: one byte, shown as an empty row
+            speedFrom = -1;
             const baseline = emptyCell();
             chRows.push(baseline);
-            chSpans.push({ offset: at, length: 1, baseline, encode: () => null });
+            chSpans.push({ offset: at, length: pos - at, baseline, encode: () => null });
           }
         }
       }
@@ -859,14 +869,15 @@ export function decodeCoSoGrid(
 }
 
 /**
- * A span holding a note event (`isNote`) or a -2/-3 command. The commands
- * are not rows to the player: they set the next note's length and are read
- * with it in the same tick; the grid shows each as an empty row. CoSo has no
+ * A span holding a note event (`isNote`) or a -3 (FD) command, with the -2 (FE)
+ * speed changes in front of it (`offset` .. `eventAt`). FE takes no time: it is
+ * read with the event after it in the same step, so it is no row of its own. FD
+ * is a row (speed change and wait one step), shown as an empty row. CoSo has no
  * rest byte either. So only a note event can be rewritten, only with another
  * note, and a note keeps the info byte's top bits (and so its length).
  */
 function cosoSpan(
-  offset: number, length: number, baseline: TrackerCell, trackTransp: number, isNote: boolean, soundTransp: number,
+  offset: number, length: number, eventAt: number, baseline: TrackerCell, trackTransp: number, isNote: boolean, soundTransp: number,
 ): HippelCellSpan {
   return {
     offset, length, baseline,
@@ -876,14 +887,15 @@ function cosoSpan(
       if (idx === null) return null;
       const noteByte = idx - trackTransp;
       if (noteByte < 0 || noteByte > 0x7F) return null;
-      const oldInfo = file[offset + 1];
+      const oldInfo = file[eventAt + 1];
       const inst = cell.instrument ?? 0;
       // The cell shows envelope + sound transpose, so write it back less it.
       const low = inst > 0 ? (inst - 1 - soundTransp) & 0xFF : oldInfo & 31;
       if (low > 31) return null;
       const info = (oldInfo & 0xE0) | low;
-      const out = [noteByte, info];
-      if ((info & 0xE0) !== 0) out.push(file[offset + 2]);
+      // The speed changes in front of the event stay as they are.
+      const out = [...file.subarray(offset, eventAt), noteByte, info];
+      if ((info & 0xE0) !== 0) out.push(file[eventAt + 2]);
       return out.length === length ? new Uint8Array(out) : null;
     },
   };
