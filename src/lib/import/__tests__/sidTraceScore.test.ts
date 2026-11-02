@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { traceSid } from '../formats/SIDParser';
+import { traceSid, type SidTrace } from '../formats/SIDParser';
+import type { VoiceFrame } from '../formats/sidTraceDecode';
 import { sidTraceToGoatTracker } from '../formats/sidTraceToGoatTracker';
 import { writeGoatTrackerSng } from '../formats/GoatTrackerSid';
 import { scoreSidTrace, createHeadlessGT, type HeadlessGT } from '../formats/sidTraceScore';
@@ -46,6 +47,49 @@ describe('SID trace scorer', () => {
     const s = scoreSidTrace(trace, built, perfect, FRAMES);
     expect(s.lag).toBe(0);
     expect(s.score).toBe(1);
+  });
+});
+
+const CLOCK = 985248;
+const freqOf = (midi: number) => Math.round(440 * 2 ** ((midi - 69) / 12) * 16777216 / CLOCK);
+
+/** Synthetic voice-0 trace with register snapshots; voices 1 and 2 silent. */
+function synthTrace(v0: Array<Partial<VoiceFrame>>): SidTrace {
+  const blank: VoiceFrame = { freq: 0, pulse: 0, control: 0, ad: 0, sr: 0, cutoff: 0, resRoute: 0, modeVol: 0x0f };
+  const voice = v0.map((o) => ({ ...blank, ...o }));
+  const silent = voice.map(() => ({ ...blank }));
+  const chipRegs = voice.map((f) => {
+    const r = new Uint8Array(32);
+    r.set([f.freq & 0xff, f.freq >> 8, f.pulse & 0xff, f.pulse >> 8, f.control, f.ad, f.sr]);
+    r[24] = 0x0f;
+    return r;
+  });
+  return {
+    voices: [voice, silent, silent], chipRegs,
+    frameRate: 50, chips: 1, chipBases: [0xd400], chipModels: ['6581'], clock: CLOCK, frames: voice.length,
+  };
+}
+
+describe('GoatTracker frequency programs', () => {
+  it('reproduces vibrato and an off-table tuning exactly through wavetable portamento rows', async () => {
+    // Four 24-frame notes (gate 22 frames), tuned 3 above the GT table, with a +-12 triangle vibrato.
+    const vib = [0, 6, 12, 6, 0, -6, -12, -6];
+    const v0: Array<Partial<VoiceFrame>> = [];
+    for (let i = 0; i < 40; i++) v0.push({});
+    for (const midi of [48, 50, 52, 53]) {
+      for (let t = 0; t < 24; t++) {
+        v0.push({ freq: freqOf(midi) + 3 + vib[t % 8], pulse: 0x800, control: t < 22 ? 0x41 : 0x40, ad: 0x09, sr: 0xa0 });
+      }
+    }
+    for (let i = 0; i < 40; i++) v0.push({ pulse: 0x800, control: 0x40, ad: 0x09, sr: 0xa0 });
+    const trace = synthTrace(v0);
+    const built = sidTraceToGoatTracker(trace);
+    const s = scoreSidTrace(trace, built, await createHeadlessGT());
+    // Two misses per note are structural: the note-init frame (GT writes freqtbl[note]) and the
+    // gate-off frame (one wavetable row per frame: the waveform row wins over the portamento row).
+    // Without frequency tracking 101 of the changes miss.
+    expect(s.perClass.freq.changes).toBeGreaterThan(60);
+    expect(s.perClass.freq.changes - s.perClass.freq.exact).toBeLessThanOrEqual(8);
   });
 });
 
