@@ -89,33 +89,33 @@ describe('David Whittaker: a note on a row no note starts on', { timeout: 120000
     expect(edited.length, 'the voice that plays the new note differs from the typed row on').toBeGreaterThanOrEqual(1);
   });
 
-  it('a note typed on the blank New Song template sounds: the song opens with a grid and the mute becomes the note', async () => {
-    // The New Song template (makeNewSongTemplates) turns every note into the 0x82 mute. Two things made a typed note
-    // silent: the parser opened a walk without notes in the scope view (no layout, so export wrote nothing back), and the
-    // edit path looked only for note commands. A mute is a note slot: one byte that ends the read run, timed by the
-    // wait in force, so the typed note replaces it in place.
+  it('a note typed on ANY row of the blank New Song template is written and sounds (rows 0, 1, 4, 8, 12)', async () => {
+    // The New Song template (makeNewSongTemplates) blanks the source by turning notes into slots. Built from apb.dw as it
+    // was (speed 3, the global delay counter, 2 unit waits), its slots fell every 6 or 7 rows: rows 4, 8 and 12 were
+    // refused ("between them"), and a split had to grow a track past the 32 KiB a 16-bit pointer reaches. The template
+    // now plays subsong 0 at speed 1, delay speed 0 and 1 unit waits, with the 0x83 hold in every slot, so every row
+    // (one replayer tick) reads a slot, and a typed note replaces its hold in place and sounds until the next note.
     const bytes = new Uint8Array(readFileSync(resolve(process.cwd(), 'public/templates/davidWhittaker.dw')));
     const song = await parseAs('davidWhittaker.dw', bytes);
     expect(song.gridUnmatchedReason, 'the blank opens with a grid').toBeUndefined();
     expect(song.patterns.flatMap((p) => p.channels.flatMap((c) => c.rows)).filter((c) => c.note > 0).length, 'and is blank').toBe(0);
     const walk = await walkDavidWhittaker(bytes.slice().buffer as ArrayBuffer);
-    const mute = walk.events.find((e) => e.channel === 0 && e.kind === DW_WALK.mute);
-    expect(mute, 'voice 1 runs a mute').toBeDefined();
-    const cell = song.patterns[Math.floor(mute!.tick / ROWS)].channels[0].rows[mute!.tick % ROWS];
-    cell.note = 37; cell.instrument = 1;
+    const rows = [0, 1, 4, 8, 12];
+    const slots = rows.map((t) => walk.events.find((e) => e.channel === 0 && e.tick === t && e.kind === DW_WALK.waitRow));
+    expect(slots.map((e) => e !== undefined), 'voice 1 reads a hold on every typed row').toEqual(rows.map(() => true));
+    for (const t of rows) { const cell = song.patterns[Math.floor(t / ROWS)].channels[0].rows[t % ROWS]; cell.note = 37 + t; cell.instrument = 1; }
     const ex = await exportDavidWhittaker(song);
     expect(ex.warnings).toEqual([]);
     const out = new Uint8Array(await ex.data.arrayBuffer());
-    expect(out[mute!.block + mute!.pos]).toBe(37 - 25);
+    expect(slots.map((e) => out[e!.block + e!.pos]), 'each hold byte became its note').toEqual(rows.map((t) => 37 + t - 25));
     const walk2 = await walkDavidWhittaker(out.slice().buffer as ArrayBuffer);
-    const typed = walk2.events.find((e) => e.kind === DW_WALK.note && e.channel === 0 && e.tick === mute!.tick);
-    expect(typed?.b, 'the walk plays the typed note on its row').toBe(37 - 25);
-    expect(typed?.a, 'with instrument 1').toBe(0);
-    // The original player starts a sample for it; the blank template starts none.
+    const played = rows.map((t) => walk2.events.find((e) => e.kind === DW_WALK.note && e.channel === 0 && e.tick === t)?.b);
+    expect(played, 'the walk plays each typed note on its row').toEqual(rows.map((t) => 37 + t - 25));
+    // The original player starts a sample for each typed note; the blank template starts none on voice 1.
     const starts = (ev: string[]) => ev.filter((e) => e.split(':')[2] === '0').length;
     const was = await paulaEventStream(bytes, 'davidWhittaker.dw', 2);
     const now = await paulaEventStream(out, 'davidWhittaker.dw', 2);
     expect(now.length, 'the player ran (sentinel)').toBeGreaterThan(0);
-    expect(starts(now), 'sample starts after the typed note').toBeGreaterThan(starts(was));
+    expect(starts(now) - starts(was), 'a sample start per typed note').toBeGreaterThanOrEqual(rows.length);
   });
 });

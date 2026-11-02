@@ -1929,6 +1929,12 @@ static bool do_track_command(DwModule* m, DwChannelInfo* ch, DwMixerChannel* mc,
 static void read_track_commands(DwModule* m, DwChannelInfo* ch, DwMixerChannel* mc) {
     ch->slide_enabled = false;
 
+    // A voice with no position list (a zero pointer, or a list whose track the loader refused) has no track to read.
+    // It stands on the one-byte empty track, whose end-of-track command wraps to the same empty track, so reading it
+    // never reaches a command that ends the voice's row and the tick never returns. The keyboard preview also runs
+    // with no position list, but on its own one-note tracks, so only the empty-track sentinel marks a voice with none.
+    if (ch->position_list_length == 0 && ch->track_data == empty_track) return;
+
     for (;;) {
         if (ch->track_data_position >= ch->track_data_length) {
             // Safety: avoid reading past track data

@@ -222,6 +222,94 @@ async function dwBlankTemplate(file: Uint8Array): Promise<Uint8Array> {
     }
   }
   for (const at of patched) if (!mutes.has(at)) throw new Error(`David Whittaker template: byte ${at} does not walk as a mute`);
+  return dwEveryRowASlot(out);
+}
+
+/** davidwhittaker.c DW_EFFECT_WAIT_UNTIL_NEXT_ROW: ends the voice's row read like a note, and does not silence it. */
+const DW_HOLD_COMMAND = 0x80 | 3;
+/** A wait command is 0xe0 + speed units - 1; this one waits 1 unit. */
+const DW_WAIT_ONE_UNIT = 0xe0;
+/** davidwhittaker.c end-of-track command. */
+const DW_END_OF_TRACK = 0x80;
+/** Rows of the New Song pattern: one hold slot each, in one track per voice. */
+const DW_TEMPLATE_ROWS = 64;
+/** The real song the David Whittaker template is built from (owner decision 2026-11-02). */
+const DW_TEMPLATE_SOURCE = 'public/data/songs/david-whittaker/garfield2+.dw';
+
+/**
+ * David Whittaker: give each voice of the first subsong (the one New Song opens) its own track of DW_TEMPLATE_ROWS
+ * hold slots, so every grid row is a slot that takes a typed note and no row shares a command byte with another.
+ * A grid row is one replayer tick, so the header gets speed 1 and delay speed 0 (the delay counter never skips a
+ * frame) and the track waits 1 unit. The track starts with the commands the voice's own first track gave before its
+ * first wait or note (its sample, envelope, transpose), so a typed note plays with the song's own instrument. The
+ * tracks are appended to the file (a 16-bit pointer reaches 32 KiB, the source is 14 KiB) and a one-entry position
+ * list is written over each voice's own list; the other subsongs are untouched (dwBlankTemplate silenced them).
+ * Proved on the patched bytes: no note plays, and every voice reads a hold on every tick of the first pass.
+ */
+async function dwEveryRowASlot(file: Uint8Array): Promise<Uint8Array> {
+  const ab = (b: Uint8Array) => b.slice().buffer as ArrayBuffer;
+  const walk = await walkDavidWhittaker(ab(file), undefined, 0);
+  if (walk.layout.pointerWidth !== 2 || walk.layout.startOffset !== 0) throw new Error('David Whittaker template: needs 16-bit pointers from file start');
+  if (walk.events.some((e) => e.kind === DW_WALK.speed || e.kind === DW_WALK.delaySpeed)) throw new Error('David Whittaker template: subsong 0 changes its speed in a track');
+  const word = (i: number) => (file[i] << 8) | file[i + 1];
+  const firstBlock: number[] = [];
+  for (let ch = 0; ch < walk.channels; ch++) {
+    const e = walk.events.find((x) => x.channel === ch && x.block !== 0xffffffff);
+    if (!e) throw new Error(`David Whittaker template: voice ${ch + 1} reads no track`);
+    firstBlock.push(e.block);
+  }
+  // The subsong header: u8 speed, u8 delay speed, then one position-list pointer per voice (each names a list entry).
+  let header = -1;
+  for (let i = 2; i + walk.channels * 2 <= file.length && header < 0; i++) {
+    if (file[i - 2] !== walk.speed || file[i - 1] !== 0) continue;
+    let all = true;
+    for (let k = 0; k < walk.channels; k++) {
+      const entry = walk.layout.entries.find((x) => x.at === word(i + k * 2));
+      if (!entry || entry.track !== firstBlock[k]) all = false;
+    }
+    if (all) header = i;
+  }
+  if (header < 0) throw new Error(`David Whittaker template: subsong 0 header (speed ${walk.speed}) not found`);
+  const prologueEnd = new Set<number>([DW_WALK.note, DW_WALK.wait, DW_WALK.mute, DW_WALK.waitRow, DW_WALK.endOfTrack]);
+  const appended: number[] = [];
+  const listAt: number[] = [];
+  const listTrack: number[] = [];
+  for (let ch = 0; ch < walk.channels; ch++) {
+    const block = firstBlock[ch];
+    const stop = Math.min(...walk.events.filter((x) => x.channel === ch && x.block === block && prologueEnd.has(x.kind)).map((x) => x.pos));
+    // The vibrato start is left out of the copy: with the loop, envelope, transpose and row wait it is the sixth
+    // entry on the tick a voice wraps, and a cell has five effect columns (the song would open without a grid).
+    const own = walk.events.filter((x) => x.channel === ch && x.block === block && x.pos < stop).sort((a, b) => a.pos - b.pos);
+    const prologue: number[] = [];
+    own.forEach((x, i) => {
+      const end = i + 1 < own.length ? own[i + 1].pos : stop;
+      if (x.kind !== DW_WALK.vibrato) prologue.push(...file.slice(block + x.pos, block + end));
+    });
+    const track = [...prologue, DW_WAIT_ONE_UNIT, ...new Array<number>(DW_TEMPLATE_ROWS).fill(DW_HOLD_COMMAND), DW_END_OF_TRACK];
+    const trackAt = file.length + appended.length;
+    appended.push(...track);
+    if (appended.length % 2) appended.push(0);
+    listAt.push(word(header + ch * 2));
+    listTrack.push(trackAt);
+  }
+  // Two spare bytes: the replayer's track loader refuses a track whose last byte is the file's last byte.
+  appended.push(0, 0);
+  const out = new Uint8Array(file.length + appended.length);
+  out.set(file);
+  out.set(appended, file.length);
+  if (out.length >= 0x8000) throw new Error(`David Whittaker template: ${out.length} bytes is past what a 16-bit pointer reaches`);
+  out[header - 2] = 1; out[header - 1] = 0;
+  // The one-entry position list goes over the voice's own list, in place: the replayer ends the subsong table where
+  // the lowest position list starts, so the header pointers must keep naming the original (low) addresses.
+  listAt.forEach((at, k) => { out[at] = listTrack[k] >> 8; out[at + 1] = listTrack[k] & 0xff; out[at + 2] = 0; out[at + 3] = 0; });
+  const re = await walkDavidWhittaker(ab(out), undefined, 0);
+  if (re.speed !== 1) throw new Error(`David Whittaker template: subsong 0 walks at speed ${re.speed}`);
+  if (re.ticks < DW_TEMPLATE_ROWS) throw new Error(`David Whittaker template: subsong 0 walks only ${re.ticks} ticks`);
+  for (let ch = 0; ch < re.channels; ch++) {
+    const ticks = new Set(re.events.filter((e) => e.channel === ch && e.kind === DW_WALK.waitRow).map((e) => e.tick));
+    if (re.events.some((e) => e.channel === ch && (e.kind === DW_WALK.note || e.kind === DW_WALK.mute))) throw new Error(`David Whittaker template: voice ${ch} still plays a note or mute`);
+    for (let t = 0; t < DW_TEMPLATE_ROWS; t++) if (!ticks.has(t)) throw new Error(`David Whittaker template: voice ${ch} reads no slot on row ${t}`);
+  }
   return out;
 }
 
@@ -250,7 +338,7 @@ function extOf(fmtExt: RegExp | undefined): string | undefined {
 
 async function generate(d: EditableFormatDescriptor): Promise<Verdict> {
   const id = d.formatId;
-  const fixture = fixtureFor(id);
+  const fixture = id === 'davidWhittaker' ? DW_TEMPLATE_SOURCE : fixtureFor(id);
   let song: TrackerSong;
   let source: string;
   let wantKey: string | undefined;
