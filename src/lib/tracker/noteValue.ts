@@ -88,6 +88,24 @@ export function noteValueName(v: number): string | null {
 
 const SEMITONE: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 
+/** The lowest typing octave: its bottom keyboard row types the octave below C-0 (c_1..b_1). */
+export const TYPING_OCTAVE_LOWEST = -1;
+/** The highest typing octave. */
+export const TYPING_OCTAVE_HIGHEST = 7;
+
+/**
+ * The stored value a typed key plays: `note` is a letter with an optional
+ * sharp ('C', 'C#'), `octave` may be -1 (the octave below C-0). Computed from
+ * numbers, never through a note-name string, because no name spells octave -1
+ * with a dash. 0 when the grid has no such note.
+ */
+export function keyNoteValue(note: string, octave: number): number {
+  const base = SEMITONE[note.charAt(0).toUpperCase()];
+  if (base === undefined) return 0;
+  const semitone = base + (note.charAt(1) === '#' ? 1 : 0);
+  return pitchToNoteValue(octave * 12 + semitone + 1);
+}
+
 /**
  * The stored value a note name stands for, or null when the text is no note
  * name. Accepts the grid's own names (C-4, C#4, c_1, c+1; the low octave in

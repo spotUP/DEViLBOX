@@ -10,6 +10,7 @@ import { getCCMapManager } from '../midi/CCMapManager';
 import { useTrackerStore, useTransportStore, useInstrumentStore } from '../stores';
 import { useEditorStore } from '../stores/useEditorStore';
 import { getToneEngine } from '../engine/ToneEngine';
+import { TYPING_OCTAVE_HIGHEST, TYPING_OCTAVE_LOWEST } from '@/lib/tracker/noteValue';
 
 /**
  * Hook to handle MIDI-triggered tracker actions and TB-303 parameters
@@ -96,12 +97,12 @@ export function useMIDIActions() {
 
         // Editing
         case 'edit.octaveUp':
-          if (currentOctave < 8) {
+          if (currentOctave < TYPING_OCTAVE_HIGHEST) {
             setCurrentOctave(currentOctave + 1);
           }
           break;
         case 'edit.octaveDown':
-          if (currentOctave > 0) {
+          if (currentOctave > TYPING_OCTAVE_LOWEST) {
             setCurrentOctave(currentOctave - 1);
           }
           break;

@@ -4,13 +4,14 @@
 
 import { useEditorStore } from '@stores/useEditorStore';
 import { useUIStore } from '@stores/useUIStore';
+import { TYPING_OCTAVE_HIGHEST, TYPING_OCTAVE_LOWEST } from '@/lib/tracker/noteValue';
 
 /**
  * Decrease octave by 1
  */
 export function prevOctave(): boolean {
   const { currentOctave, setCurrentOctave } = useEditorStore.getState();
-  const newOctave = Math.max(0, currentOctave - 1);
+  const newOctave = Math.max(TYPING_OCTAVE_LOWEST, currentOctave - 1);
   setCurrentOctave(newOctave);
   useUIStore.getState().setStatusMessage(`Octave ${newOctave}`, false, 1000);
   return true;
@@ -21,7 +22,7 @@ export function prevOctave(): boolean {
  */
 export function nextOctave(): boolean {
   const { currentOctave, setCurrentOctave } = useEditorStore.getState();
-  const newOctave = Math.min(9, currentOctave + 1);
+  const newOctave = Math.min(TYPING_OCTAVE_HIGHEST, currentOctave + 1);
   setCurrentOctave(newOctave);
   useUIStore.getState().setStatusMessage(`Octave ${newOctave}`, false, 1000);
   return true;
