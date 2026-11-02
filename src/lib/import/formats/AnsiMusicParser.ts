@@ -18,7 +18,7 @@ import type { Pattern, TrackerCell } from '@/types';
 import type { InstrumentConfig } from '@/types/instrument';
 import { FURNACE_CHIP_PRESETS } from '@/constants/furnaceChipPresets';
 import { emptyPattern } from './Sc68Parser';
-import { scanAnsiMusicBlocks, interpretPlay, type PlayEvent } from './ansiMusic';
+import { scanAnsiMusicBlocks, interpretPlay, isPlaySyntax, type PlayEvent } from './ansiMusic';
 
 const NOTE_OFF = 97;
 const PATTERN_ROWS = 64;
@@ -36,9 +36,18 @@ function musicBlocks(bytes: Uint8Array): { events: PlayEvent[] }[] {
     .map((b) => ({ events: interpretPlay(b.payload) }));
 }
 
-/** True when the file holds at least one non-SMILE music block that plays a note. */
+/**
+ * True when the file holds a non-SMILE music block that plays a note, or one
+ * that SO ends and that is PLAY syntax throughout. The second case is a song
+ * of rests only, such as the New Song template.
+ */
 export function isAnsiMusicFormat(buffer: ArrayBuffer): boolean {
-  return musicBlocks(new Uint8Array(buffer)).some((b) => b.events.some((e) => !e.rest));
+  const bytes = new Uint8Array(buffer);
+  return scanAnsiMusicBlocks(bytes).blocks.some((b) => {
+    if (b.smile) return false;
+    if (interpretPlay(b.payload).some((e) => !e.rest)) return true;
+    return b.end > b.start && bytes[b.end - 1] === 0x0e && isPlaySyntax(b.payload);
+  });
 }
 
 /** Number of subsongs (non-SMILE music blocks). */
