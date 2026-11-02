@@ -305,7 +305,7 @@ function rowsUnedited(rows: TrackerCell[], baseline: TrackerCell[]): boolean {
  * Any edit makes `rows` diverge from the baseline, so the real packer runs instead.
  *
  * Used by BOTH the round-trip harness and the live chip-RAM rewrite path
- * (`UADEChipEditor.rewriteVariablePattern`) so the measured behaviour and the
+ * (`patchModuleByVariableLayout`) so the measured behaviour and the
  * exported behaviour are the same.
  */
 export function encodeVariableBlock(

@@ -13,9 +13,8 @@
  */
 import type { TrackerSong } from '../TrackerReplayer';
 import type { NativeEngineDescriptor } from './wasmEngineRegistry';
-import { encodeVariableBlock } from '../uade/UADEPatternEncoder';
-import { patchModuleByLayout } from '@/lib/export/layoutPatch';
-import { gridIsEdited, sampleIsEdited, editedCells } from '@/lib/song/gridBaseline';
+import { patchModuleByLayout, patchModuleByVariableLayout } from '@/lib/export/layoutPatch';
+import { gridIsEdited, sampleIsEdited } from '@/lib/song/gridBaseline';
 
 /** Engines whose module is not a file the exporter writes (a one-way crunch), so a reload is not the engine's data. */
 const NOT_RELOADABLE = new Set(['Cinter4']);
@@ -34,37 +33,16 @@ function patchedByLayout(song: TrackerSong, desc: NativeEngineDescriptor): Uint8
   return patched > 0 ? bytes : null;
 }
 
-/**
- * A format of variable-length packed blocks and no exporter that carries the edit: each block an edited
- * cell belongs to is re-encoded (the raw carrier when the block is unedited) and written over its slot,
- * the bytes behind it zero-filled. A block that no longer fits its slot is refused here, as the chip-RAM
- * route (UADEChipEditor.rewriteVariablePattern) refuses it; growing a block needs the format's pointers
- * moved, which only the format's own exporter knows (G5).
- */
+/** A format of variable-length packed blocks and no exporter that carries the edit: see patchModuleByVariableLayout. */
 function patchedByVariableLayout(song: TrackerSong, desc: NativeEngineDescriptor): Uint8Array | null {
   const layout = song.uadeVariableLayout;
   const source = song[desc.fileDataKey] as ArrayBuffer | Uint8Array | undefined;
   if (!layout || !source) return null;
-  const buf = new Uint8Array(source instanceof Uint8Array ? source : new Uint8Array(source)).slice();
-  const blocks = new Set<string>();
-  for (const { pattern, channel } of editedCells(song.patterns)) blocks.add(`${pattern}:${channel}`);
-  let patched = 0;
-  for (const key of blocks) {
-    const [pattern, channel] = key.split(':').map(Number);
-    const fp = layout.trackMap[pattern]?.[channel];
-    const addr = fp == null || fp < 0 ? undefined : layout.filePatternAddrs[fp];
-    const size = fp == null || fp < 0 ? undefined : layout.filePatternSizes[fp];
-    if (addr == null || size == null || addr + size > buf.length) continue;
-    const encoded = encodeVariableBlock(layout, fp!, song.patterns[pattern].channels[channel].rows, channel);
-    if (encoded.length > size) {
-      console.warn(`[editedModuleForPlay] pattern ${pattern} voice ${channel + 1}: the edited block (${encoded.length} bytes) does not fit its ${size}-byte slot; not written`);
-      continue;
-    }
-    const padded = new Uint8Array(size);
-    padded.set(encoded);
-    for (let i = 0; i < size; i++) if (buf[addr + i] !== padded[i]) { buf[addr + i] = padded[i]; patched++; }
+  const { bytes, patched, refused } = patchModuleByVariableLayout(source, layout, song.patterns);
+  for (const r of refused) {
+    console.warn(`[editedModuleForPlay] pattern ${r.pattern} voice ${r.channel + 1}: the edited block (${r.encoded} bytes) does not fit its ${r.slot}-byte slot; not written`);
   }
-  return patched > 0 ? buf : null;
+  return patched > 0 ? bytes : null;
 }
 
 /**

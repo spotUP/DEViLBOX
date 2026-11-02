@@ -31,7 +31,7 @@
  *      would land in whatever song UADE last held.
  *
  * Variable-length layouts (`song.uadeVariableLayout`) are re-encoded per channel
- * via `UADEChipEditor.rewriteVariablePattern`, not per cell, so they are not a
+ * via `patchModuleByVariableLayout` (liveModuleEdits), not per cell, so they are not a
  * concern of this per-cell helper.
  *
  * Safe no-op when no layout/engine is present (matches the previous guard
