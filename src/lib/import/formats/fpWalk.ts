@@ -16,6 +16,15 @@
  * good. The walk ends where the joint state of the four voices repeats (the song loops through a
  * jump) or when every voice has ended, or at the row cap.
  *
+ * The loop point: the state is compared at row boundaries, before a row's reads, and a voice that
+ * jumps back to its start does the jump inside the next row's read. So a song whose voices all
+ * return to their start together repeats the joint state only one row after the restart, and the
+ * restart row would be walked twice (once as row 0, once as the last row): two rows of the grid
+ * for one stretch of the song, and a note typed on either would sound on both. The walk moves the
+ * loop back while the row before the loop's start and the last row read the same events into the
+ * same state (rotateLoop), so one pass of the song is each row once and the loop is the song's
+ * own restart, not a replay.
+ *
  * ZERO imports on purpose beyond the module's own reader: the grid builder and the tests share it.
  */
 
@@ -71,13 +80,15 @@ export interface FpWalkEvent {
   off: number;
   /** Notes, legato notes and rests: the duration byte as stored (top bit: no retrigger), else 0. */
   dur: number;
-  /** Notes and legato notes: what the player adds to the note byte for the period table (see fpNoteDelta). */
+  /** Notes, legato notes and rests (a rest: what it would add to a note typed over it): what the player adds to the note byte for the period table (see fpNoteDelta). */
   delta: number;
   /** Notes, legato notes and rests: the transposes, arpeggio table pointer and portamento rate in force. */
   t1: number;
   t2: number;
   arp: number;
   porta: number;
+  /** Rests: the return address of the innermost call in force (the call command's pointer sits 4 bytes before it), 0 at the top level. */
+  ret?: number;
 }
 
 export interface FpInstrumentRef {
@@ -94,7 +105,7 @@ export interface FpWalk {
   /** Ticks walked (rows * speed). */
   ticks: number;
   events: FpWalkEvent[];
-  /** Row the song returns to when the joint state repeats; -1: no repeat found (every voice ended, or the cap). */
+  /** Row the song returns to when the joint state repeats, moved back to the earliest row the song restarts at (see rotateLoop); -1: no repeat found (every voice ended, or the cap). */
   loopRow: number;
   /** Rows of the loop body (rows - loopRow) when loopRow >= 0. */
   loopRows: number;
@@ -255,7 +266,7 @@ export interface FpWalkOptions {
   /** Most rows to walk (default FP_MAX_ROWS). */
   maxRows?: number;
   /**
-   * Called after each row's reads with the voices' state and, per voice, the table period the player writes on each tick
+   * Called after each row's reads (also for the rows the loop rotation drops: they read the loop's first rows again) with the voices' state and, per voice, the table period the player writes on each tick
    * of the row (empty where the model does not apply: portamento, a wavetable instrument, a voice that has ended).
    */
   onRow?: (row: number, voices: ReadonlyArray<Readonly<FpVoiceState>>, tickPeriods: number[][]) => void;
@@ -264,6 +275,30 @@ export interface FpWalkOptions {
 /** Joint state of the four voices at a row boundary. */
 function stateKey(vs: FpVoiceState[]): string {
   return vs.map((v) => v.ended ? 'E' : [v.seq, v.depth, v.timer, v.instr, v.arp, v.porta, v.t1, v.t2, v.curNote, v.stack.slice(0, (v.depth >> 2) + 1).join('.'), v.loopAddr.join('.'), v.loopCount.join('.')].join(',')).join('|');
+}
+
+/** What a row's reads did, tick aside: equal for two rows that read the same commands into the same voice state. */
+function rowSig(events: FpWalkEvent[], from: number, to: number): string {
+  let sig = '';
+  for (let i = from; i < to; i++) {
+    const e = events[i];
+    sig += `${e.voice},${e.kind},${e.a},${e.b},${e.period},${e.off},${e.dur},${e.delta},${e.t1},${e.t2},${e.arp},${e.porta},${e.ret ?? ''};`;
+  }
+  return sig;
+}
+
+/**
+ * Move a found loop back to the song's own restart. The joint state at the boundary before row `rows` equals the one
+ * before row `loopRow`; when row `rows - 1` read the same events as row `loopRow - 1` (both ended in that same state),
+ * the last row is the loop's row `loopRow - 1` played again, so the loop starts one row earlier and the walk is one
+ * row shorter. Repeats while it holds. `rowStart[r]` is the index of row r's first event. Returns [loopRow, rows].
+ */
+function rotateLoop(events: FpWalkEvent[], rowStart: number[], loopRow: number, rows: number): [number, number] {
+  while (loopRow > 0 && rowSig(events, rowStart[rows - 1], rowStart[rows]) === rowSig(events, rowStart[loopRow - 1], rowStart[loopRow])) {
+    loopRow--;
+    rows--;
+  }
+  return [loopRow, rows];
 }
 
 /**
@@ -282,6 +317,8 @@ export function walkFuturePlayer(code: Uint8Array, subsong = 0, opts: FpWalkOpti
   const vs = song.voiceSeqPtrs.map(newVoice);
   const events: FpWalkEvent[] = [];
   const seen = new Map<string, number>();
+  /** Index of each walked row's first event. */
+  const rowStart: number[] = [];
   let loopRow = -1;
   let stop: FpWalk['stop'] = 'cap';
   let rows = 0;
@@ -350,7 +387,7 @@ export function walkFuturePlayer(code: Uint8Array, subsong = 0, opts: FpWalkOpti
         const retrigger = (d1 & 0x80) === 0;
         v.timer = d1 & 0x80 ? d1 & 0x7f : d1;
         if (d0 === 0) {
-          if (!skipping) events.push({ tick: tick0, voice: ch, kind: FP_WALK.rest, a: 0, b: v.instr, period: 0, off, dur: d1, delta: 0, t1: v.t1, t2: v.t2, arp: v.arp, porta: v.porta });
+          if (!skipping) events.push({ tick: tick0, voice: ch, kind: FP_WALK.rest, a: 0, b: v.instr, period: 0, off, dur: d1, delta: fpNoteDelta(code, v, 0), t1: v.t1, t2: v.t2, arp: v.arp, porta: v.porta, ret: v.depth > 0 ? v.stack[(v.depth >> 2) - 1] : 0 });
           v.sounding = false;
         } else {
           if (retrigger) v.arpIdx = 0;
@@ -376,9 +413,16 @@ export function walkFuturePlayer(code: Uint8Array, subsong = 0, opts: FpWalkOpti
     if (vs.every((v) => v.ended)) { stop = 'ended'; break; }
     const key = stateKey(vs);
     const was = seen.get(key);
-    if (was !== undefined) { loopRow = was; stop = 'loop'; break; }
+    if (was !== undefined) {
+      rowStart[row] = events.length;
+      [loopRow, rows] = rotateLoop(events, rowStart, was, rows);
+      events.length = rowStart[rows];
+      stop = 'loop';
+      break;
+    }
     seen.set(key, row);
     rows = row + 1;
+    rowStart[row] = events.length;
     readPass(1 + row * speed);
     // update_audio, once per tick of the row: the period of the tick, then the arpeggio step (it moves only without portamento)
     const tickPeriods: number[][] = vs.map(() => []);

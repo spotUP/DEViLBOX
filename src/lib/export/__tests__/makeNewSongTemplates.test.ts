@@ -20,6 +20,9 @@ import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import { EMPTY_CELL } from '@/types/tracker';
 import { RH_FX } from '@lib/import/formats/robHubbardEffectGlyphs';
 import { FP_FX } from '@lib/import/formats/fpEffectGlyphs';
+import { FpHunkModule, cloneHeader } from '@lib/import/formats/fpModuleGrow';
+import { fpSongs } from '@lib/import/formats/fpWalk';
+import { buildFuturePlayerGrid } from '@lib/import/formats/FuturePlayerParser';
 import { detectFormat, detectFormatFromContent } from '@lib/import/FormatRegistry';
 import { FORMAT_REGISTRY } from '@lib/import/formatRegistryData';
 import { listEditableFormats, type EditableFormatDescriptor } from '@lib/formats/EditableFormatRegistry';
@@ -126,6 +129,51 @@ function blankSong(channels: number, silentSample = false): TrackerSong {
   };
 }
 
+/** Song positions of the Future Player template (64 rows each). */
+const FP_TEMPLATE_POSITIONS = 16;
+
+/**
+ * Future Player: give voices 0-2 of subsong 0 one straight stream each, so every row is its own rest and plays once.
+ * The cleared source song keeps its call graph (voices 0 and 1 loop around one shared rest block, voice 2 restarts),
+ * so one rest stands for many rows and a note typed on it would sound at every replay; the exporter refuses those.
+ * Each stream: set-instrument commands (voice 0 sets every instrument the source sets, in the source's order, so the
+ * instrument list and numbering stay; voices 1 and 2 set instrument 1), then `positions` blocks of rests (voices 0 and 1
+ * one row each, voice 2 two of 32 rows), then a jump (command 7) back to the stream's start through its own voice
+ * header. Every voice restarts on the same row, like a real Future Player song looping, so the walk finds the loop at
+ * row 0 after exactly positions * 64 rows (fpWalk rotateLoop): one pass plays every row once. Voice 3 keeps no stream
+ * (a note typed there gets one that restarts in step, fpGridEdits addVoiceStream). The new streams are appended to the
+ * code (fpModuleGrow); each song data slot is moved to its own copy of
+ * the voice header (cloneHeader); the old streams stay for the other subsongs. Code, header and instruments are kept.
+ */
+function fpOnePassTemplate(file: Uint8Array, positions: number): Uint8Array {
+  const mod = FpHunkModule.parse(file);
+  const { instrumentMap } = buildFuturePlayerGrid(file);
+  const instrs = [...instrumentMap.entries()].sort((a, b) => a[1] - b[1]).map(([ptr]) => ptr);
+  if (instrs.length === 0) throw new Error('the Future Player source sets no instrument');
+  const song = fpSongs(mod.code)[0];
+  const ROWS = 64;
+  for (let voice = 0; voice < 3; voice++) {
+    const slot = song.songDataPtr + 8 + voice * 4;
+    const bytes: number[] = [];
+    const relocAt: number[] = [];
+    for (const ptr of voice === 0 ? [...instrs, instrs[0]] : [instrs[0]]) {
+      relocAt.push(bytes.length + 2);
+      bytes.push(0x81, 0, (ptr >>> 24) & 0xff, (ptr >>> 16) & 0xff, (ptr >>> 8) & 0xff, ptr & 0xff);
+    }
+    const restRows = voice === 2 ? 32 : 1;
+    const rests = (positions * ROWS) / restRows;
+    for (let i = 0; i < rests; i++) bytes.push(0, restRows);
+    const jumpAt = bytes.length + 2;
+    bytes.push(0x87, 0, 0, 0, 0, 0); // jump back to the start; the pointer (this voice's header) is written below
+    const at = mod.append(bytes);
+    for (const r of relocAt) mod.addReloc(at + r);
+    const header = cloneHeader(mod, slot, at);
+    mod.code.set([(header >>> 24) & 0xff, (header >>> 16) & 0xff, (header >>> 8) & 0xff, header & 0xff], at + jumpAt);
+    mod.addReloc(at + jumpAt);
+  }
+  return mod.build();
+}
+
 /** Candidate file names, best first; first one the app's detection resolves to `wantKey` wins. */
 function pickFileName(id: string, ext: string | undefined, prefix: string | undefined, bytes: Uint8Array, wantKey: string | undefined): string | undefined {
   const cands: string[] = [];
@@ -190,6 +238,8 @@ async function generate(d: EditableFormatDescriptor): Promise<Verdict> {
     let out: Uint8Array;
     try {
       out = await runExporter(d, s);
+      // Future Player: every row its own rest, played once (fpOnePassTemplate).
+      if (id === 'futurePlayer') out = fpOnePassTemplate(out, FP_TEMPLATE_POSITIONS);
     } catch (e) {
       errors.push(`${variant}: export: ${(e as Error).message}`);
       continue;
