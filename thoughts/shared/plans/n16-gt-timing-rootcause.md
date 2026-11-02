@@ -211,3 +211,22 @@ changes, which is what the scorer counts); change-agreement + gain per row
 - **pulse** is low on commando (0.17) and dmc4 (0.34).
 - tyne hits "pattern limit reached: song truncated".
 - Editing design steps 4-7 stay unbuilt.
+
+## 2026-11-02 evening: why freq exact is low on eco-fog and proton
+
+Baseline (3000 frames): eco-fog score 0.317, freq exact 0.096 (n 5557); proton score 0.610, freq exact 0.259 (n 8103).
+
+Violated invariant: the rebuilt GT song must reproduce every traced frequency write. Level of the root cause: the builder (sidTraceToGoatTracker.ts) for the program vocabulary, and the decoder (sidTraceDecode.ts segmentNotes) for note boundaries. Not the scorer, not the GT player emulation.
+
+Decisive measurement (temporary probe, freq misses at lag 0 classified by note age):
+- eco-fog: 3551 misses beyond the 8-frame program (384 hits), 300 in-program misses, 932 with no decoded note.
+- proton: 2234 in-program misses (974 hits), 1248 beyond the program.
+
+Causes found:
+1. eco-fog uses GT instrument vibrato (voice 3: cmp 2, speed 3, vibdelay 1; the frequency holds on every tick-0 frame because the GT player skips tick effects there, gplay.c `if (!optimizerealtime || cptr->tick)`). The builder never emits instrument vibrato (ins.ptr[STBL] is always 0, vibdelay never set); it writes per-frame wavetable portamento rows, which stop at the program length (8) and the table budget, so the rebuilt note freezes.
+2. Most eco-fog vibrato misses are on decoded "notes" that are not GT note inits: the trace shows a gate rise while the frequency and the vibrato phase continue (voice 3 notes at frames 773 and 965, 192 and 578 frames long). A GT note init always rewrites freq (gplay.c line 523), so the rebuild restarts the pitch there. This is a segmentation (decoder) fault: gate rises made by the wavetable, not by the pattern, must not start a note. It ties in with the open wizball/last-ninja segmentation item.
+3. proton drum voice uses absolute wavetable notes (0x81-0xDF) and negative relative offsets (0x60-0x7F): age 1 writes 65535 (gtFreq(95)), then 2807, 1768, 1114, 884, 788, 744, 702 whatever the base note. The builder only writes relative offsets r >= 0, so these become approximate portamento rows that are wrong at other pitches.
+
+Attempted fix (not committed, saved as thoughts/shared/plans/n16-vibrato-wip.patch, 263 lines): vibratoOf() detects a GT instrument vibrato per note (sign pattern of gplay.c CMD_VIBRATO from vibtime 0, holds on tick-0 frames, vibdelay counted from frame start + 2), forces a wavetable note row on frame start + 1 to reset vibtime, writes plain wave rows from the vibrato start, and sets ins.ptr[STBL] = [cmp, speed] and ins.vibdelay. Detection finds the right parameters for the first voice-3 note (cmp 2, speed 3, delay 1), but only 5 of 2152 eco-fog notes qualify (cause 2), and the end-to-end regression test in the patch fails: the replayed first note matches only 23 percent of frames. Unverified why: likely the shared (clustered) program build keeps a fallback program without the vibrato for this note, or the GT tick-0 phase in the rebuild differs from the source. Scores with the patch: eco-fog 0.325 (freq exact 0.116, tolerant 0.235), proton 0.609 (unchanged).
+
+Next, in order: (a) find why the rebuilt first note does not replay the vibrato (check which program and instrument the note is assigned, and the GT tick of frame start + 2); (b) fix segmentation so wavetable gate rises do not start notes (decoder level, biggest eco-fog share); (c) absolute and negative wavetable notes for proton; then filter.
