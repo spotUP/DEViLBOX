@@ -128,6 +128,12 @@ export async function loadWASMAssets(
     } catch {
       /* Already in this scope — not fatal. */
     }
+    // Audio-clock scheduling of port messages (`atTime`): wraps registerProcessor, so it loads before the engine worklet.
+    try {
+      await context.audioWorklet.addModule(`${baseUrl}worklets/scheduled-messages.js`);
+    } catch {
+      /* Already in this scope — not fatal. */
+    }
     // The row-clip player (DevilboxRowClip): a previewed row, played through the engine's own output code.
     try {
       await context.audioWorklet.addModule(`${baseUrl}worklets/row-clip.js`);

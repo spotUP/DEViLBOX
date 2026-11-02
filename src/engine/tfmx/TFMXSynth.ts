@@ -108,7 +108,7 @@ export class TFMXSynth implements DevilboxSynth {
     );
   }
 
-  triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
+  triggerAttack(note?: string | number, time?: number, velocity?: number): void {
     if (this._disposed) return;
     if (this._macroIndex >= 0) {
       // TFMX Professional: the replayer's own note command and macro interpreter, sequencer off
@@ -131,17 +131,18 @@ export class TFMXSynth implements DevilboxSynth {
 
     this.engine.sendMessage({
       type: 'noteOn',
+      atTime: time,
       handle: this._playerHandle,
       note: hippelKeyNoteByte(midiNote, this._keySeq),
       velocity: vel,
     });
   }
 
-  triggerRelease(_note?: string | number, _time?: number): void {
+  triggerRelease(_note?: string | number, time?: number): void {
     if (this._disposed) return;
     if (this._macroIndex >= 0) { this.engine.keyOff(); return; }
     if (this._playerHandle < 0) return;
-    this.engine.sendMessage({ type: 'noteOff', handle: this._playerHandle });
+    this.engine.sendMessage({ type: 'noteOff', handle: this._playerHandle, atTime: time });
   }
 
   releaseAll(): void {
