@@ -725,12 +725,15 @@ export async function tryRouteFormat(
   }
 
   // ── Digital Symphony ──────────────────────────────────────────────────────
-  // .dsym files — OpenMPT
+  // DigitalSymphonyParser carries the variable pattern layout, so a typed note
+  // is encoded back into the module and export writes .dsym. OpenMPT parsed
+  // this extension before and ignored the 'native' engine preference, so a
+  // Digital Symphony song opened as a classic XM with no native exporter.
   if (matchesExt(filename, ['dsym'])) {
-    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
-    const song = await parseWithOpenMPT(buffer, originalFileName);
-    song.libopenmptFileData = buffer.slice(0);
-    return song;
+    const { isDigitalSymphonyFormat, parseDigitalSymphonyFile } = await import('@lib/import/formats/DigitalSymphonyParser');
+    return withNativeThenUADE('digitalSymphony', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => parseDigitalSymphonyFile(buf as Uint8Array, name),
+      'DigitalSymphonyParser', { isFormat: isDigitalSymphonyFormat, usesBytes: true });
   }
 
   // ── Graoumf Tracker 1/2 ───────────────────────────────────────────────────
@@ -772,13 +775,15 @@ export async function tryRouteFormat(
   }
 
   // ── DigiBooster Pro ───────────────────────────────────────────────────────
-  // .dbm files — OpenMPT
+  // DigiBoosterProParser carries the variable pattern layout, so a typed note
+  // is encoded back into the module and export writes .dbm. OpenMPT parsed
+  // this extension before and ignored the 'native' engine preference.
   // NOTE: .digi (DigiBooster 1.x) is handled separately above; this is DBM Pro only.
   if (matchesExt(filename, ['dbm'])) {
-    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
-    const song = await parseWithOpenMPT(buffer, originalFileName);
-    song.libopenmptFileData = buffer.slice(0);
-    return song;
+    const { isDigiBoosterProFormat, parseDigiBoosterProFile } = await import('@lib/import/formats/DigiBoosterProParser');
+    return withNativeThenUADE('digiBoosterPro', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => parseDigiBoosterProFile(buf as Uint8Array, name),
+      'DigiBoosterProParser', { isFormat: isDigiBoosterProFormat, usesBytes: true });
   }
 
   // ── PumaTracker ───────────────────────────────────────────────────────────
@@ -910,12 +915,15 @@ export async function tryRouteFormat(
   }
 
   // ── ChipTracker (.kris) ───────────────────────────────────────────────────
-  // .kris files — OpenMPT
+  // KRISParser carries the chip-RAM pattern layout, so a typed note is encoded
+  // back into the module and export writes .kris. OpenMPT parsed this
+  // extension before, ignored the 'native' engine preference, and failed to
+  // load the blank New Song template at all.
   if (matchesExt(filename, ['kris'])) {
-    const { parseWithOpenMPT } = await import('@lib/import/wasm/OpenMPTConverter');
-    const song = await parseWithOpenMPT(buffer, originalFileName);
-    song.libopenmptFileData = buffer.slice(0);
-    return song;
+    const { isKRISFormat, parseKRISFile } = await import('@lib/import/formats/KRISParser');
+    return withNativeThenUADE('kris', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => { if (isKRISFormat(buf as ArrayBuffer)) return parseKRISFile(buf as ArrayBuffer, name); return null; },
+      'KRISParser');
   }
 
   // ── MusicLine Editor (.ml) ───────────────────────────────────────────────
