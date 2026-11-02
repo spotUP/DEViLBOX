@@ -14,6 +14,9 @@ import { useProjectStore } from '@stores/useProjectStore';
 import { getEditableFormat } from '@/lib/formats/EditableFormatRegistry';
 import '@lib/formats/EditableFormatRegistry.builtins';
 import { openSong } from '@/lib/song/openSong';
+import { useFormatStore } from '@stores/useFormatStore';
+import { emptyHippelCoSoLayout } from '@lib/import/formats/HippelCoSoParser';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 
 export type NewSongMode = 'empty' | 'preset' | 'format';
 
@@ -26,6 +29,15 @@ export type NewSongRequest =
   | { kind: 'empty' }
   | { kind: 'preset'; presetId: string; loadInstruments: boolean }
   | { kind: 'format'; formatId: string };
+
+/**
+ * System presets whose song has a format of its own: the layout a song of that
+ * format carries, which names it to the native export router (a preset song
+ * without one is exported as no format at all).
+ */
+const PRESET_VARIABLE_LAYOUT: Readonly<Record<string, () => UADEVariablePatternLayout>> = {
+  uade_hippelcoso: emptyHippelCoSoLayout,
+};
 
 export const NEW_SONG_NAME = 'Untitled';
 
@@ -75,6 +87,10 @@ async function startGenericSong(preset: { presetId: string; loadInstruments: boo
       useInstrumentStore.getState().createInstrument(inst);
     });
   }
+
+  // 4b. Name the song's format to the export router
+  const layout = PRESET_VARIABLE_LAYOUT[presetId];
+  if (layout) useFormatStore.setState({ uadeVariableLayout: layout() });
 
   // 5. Track active system for filtering
   useUIStore.getState().setActiveSystemPreset(presetId || null);
