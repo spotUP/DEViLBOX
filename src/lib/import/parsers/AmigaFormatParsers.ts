@@ -2474,15 +2474,16 @@ export async function tryRouteFormat(
       'SoundProgrammingLanguageParser', { injectUADE: true });
   }
   if (matchesExt(filename, ['riff'])) {
+    // Riff Raff: read-only time-aligned grid (riffRaffGrid.ts); UADE keeps playing the module
     const wtCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['riff']) };
-    const { isWantedTeamDaveLoweFormat, parseWantedTeamDaveLoweFile } =
-      await import('@lib/import/formats/WantedTeamDaveLoweParser');
+    const { isRiffRaffFormat, parseRiffRaffFile } =
+      await import('@lib/import/formats/RiffRaffParser');
     return withNativeThenUADE('riffRaff', wtCtx,
       (buf: Uint8Array | ArrayBuffer, name: string) => {
-        if (isWantedTeamDaveLoweFormat(buf)) return parseWantedTeamDaveLoweFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
+        if (isRiffRaffFormat(buf)) return parseRiffRaffFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
         return null;
       },
-      'WantedTeamDaveLoweParser', { injectUADE: true });
+      'RiffRaffParser', { injectUADE: true });
   }
   if (matchesExt(filename, ['hd'])) {
     const wtCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['hd']) };

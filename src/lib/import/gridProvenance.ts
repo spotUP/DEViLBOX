@@ -134,6 +134,7 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
   beathoven: 'pass',
   soundProgrammingLanguage: 'pass',
   dynamicSynthesizer: 'pass',
+  riffRaff: 'pass',
   synthesis: 'pass',
   tcbTracker: 'pass',
   tfmMusicMaker: 'pass',
@@ -254,6 +255,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   beathoven: 'fail',
   soundProgrammingLanguage: 'fail',
   dynamicSynthesizer: 'fail',
+  riffRaff: 'fail',
   synthesis: 'pass',
   tcbTracker: 'pass',
   tfmMusicMaker: 'pass',
@@ -419,7 +421,6 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   uade_mok: 'G11-uade-only',
   uade_mso: 'G11-uade-only',
   uade_pn: 'G11-uade-only',
-  uade_riff: 'G11-uade-only',
   uade_sa_p: 'G11-uade-only',
   uade_lion: 'G11-uade-only',
   uade_sa_old: 'G11-uade-only',
@@ -482,6 +483,8 @@ export const DIRECT_GRIDS: readonly string[] = [
   'soundProgrammingLanguage',
   // Dynamic Synthesizer: the command streams decode to a read-only tick grid (dynamicSynthesizerGrid.ts), no oracle yet.
   'dynamicSynthesizer',
+  // Riff Raff: the pattern and track list streams decode to a read-only tick grid (riffRaffGrid.ts), no oracle yet.
+  'riffRaff',
 ];
 
 export function gridProvenanceOf(key: string): GridProvenance | null {
