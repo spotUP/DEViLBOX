@@ -125,6 +125,7 @@ const FORMATS: FormatRow[] = [
   { key: 'actionamics', rig: 'paula', files: corpus(['.ast', '.act']) },
   { key: 'soundMaster', rig: 'paula', files: corpus(['.sm']) },
   { key: 'digitalSonixChrome', rig: 'paula', sampleEvery: 4, files: corpus(['.dsc']), pick: pickDscNote, noteSelectsSample: true },
+  { key: 'dynamicSynthesizer', rig: 'paula', files: corpus(['.ptc']) },
   { key: 'sidmon1', rig: 'paula', files: [...corpus(['.sid1']), ...corpus(['.sid'], 'sidmon-1')] },
 ];
 
@@ -189,7 +190,8 @@ const sampled = (fmt: FormatRow, rel: string): boolean =>
 const originals = new Map<string, Trace | null>();
 /** Files UADE's own player does not take (it refuses them): no render stage for these. Any other refusal is a failure. */
 const NO_RIG = new Set<string>();
-const EXPECTED_NO_RIG: string[] = ['formats/fuzzball-title.fred'];
+// dns.ptc: a Dynamic Synthesizer song plays from its dns. module plus an smp. sample companion; the corpus has no smp.ptc, so UADE refuses it and only bytes and grid are held.
+const EXPECTED_NO_RIG: string[] = ['formats/dns.ptc', 'formats/fuzzball-title.fred'];
 /**
  * Files UADE takes but plays as noise, so its stream says nothing about the song: the .sog is the
  * Hippel ST SOURCE the editor packs for the player (the Compress step of jochenHippelSTGridMatchesPlayer),
