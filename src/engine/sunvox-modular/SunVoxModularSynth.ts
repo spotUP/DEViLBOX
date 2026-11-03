@@ -465,7 +465,7 @@ export class SunVoxModularSynth implements DevilboxSynth {
 
   // ── DevilboxSynth interface ─────────────────────────────────────────────
 
-  triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
+  triggerAttack(note?: string | number, time?: number, velocity?: number): void {
     if (this._disposed || this._handle < 0 || this._noteTargetSvId < 0) return;
 
     let midiNote: number;
@@ -474,12 +474,12 @@ export class SunVoxModularSynth implements DevilboxSynth {
     else midiNote = 60;
 
     const vel = Math.max(1, Math.min(128, Math.round((velocity ?? 1) * 127) + 1));
-    this.engine.noteOn(this._handle, this._noteTargetSvId, midiNote, vel);
+    this.engine.noteOn(this._handle, this._noteTargetSvId, midiNote, vel, time);
   }
 
-  triggerRelease(_note?: string | number, _time?: number): void {
+  triggerRelease(_note?: string | number, time?: number): void {
     if (this._disposed || this._handle < 0 || this._noteTargetSvId < 0) return;
-    this.engine.noteOff(this._handle, this._noteTargetSvId);
+    this.engine.noteOff(this._handle, this._noteTargetSvId, time);
   }
 
   set(param: string, value: number): void {

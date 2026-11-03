@@ -235,17 +235,18 @@ export class MusicLineEngine extends WASMSingletonBase {
     this.workletNode?.port.postMessage({ type: 'setMuteMask', mask });
   }
 
-  previewNoteOn(instIdx: number, midiNote: number, velocity: number): void {
+  previewNoteOn(instIdx: number, midiNote: number, velocity: number, atTime?: number): void {
     this.workletNode?.port.postMessage({
       type: 'preview-note-on',
+      atTime,
       instIdx,
       midiNote,
       velocity,
     });
   }
 
-  previewNoteOff(instIdx: number): void {
-    this.workletNode?.port.postMessage({ type: 'preview-note-off', instIdx });
+  previewNoteOff(instIdx: number, atTime?: number): void {
+    this.workletNode?.port.postMessage({ type: 'preview-note-off', instIdx, atTime });
   }
 
   previewStop(): void {

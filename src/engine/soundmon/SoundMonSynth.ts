@@ -65,15 +65,15 @@ export class SoundMonSynth {
    * note - 11 (xmConversions.noteToMidi), which the player holds as a note value.
    * A song on nuade is not in this replayer: the key runs on a keyboard copy of its module.
    */
-  triggerAttack(note?: string | number, _time?: number, _velocity?: number): void {
+  triggerAttack(note?: string | number, time?: number, _velocity?: number): void {
     if (this._slot < 1) return;
     const midi = typeof note === 'number' ? note : noteToMidi(note ?? 'C-4');
     const value = noteToBpNote(midi - 11);
     if (value === 0) return;
     const copy = keyboardModuleOnNuade('soundMonFileData');
     if (copy) this.engine.keyboardCopy(copy);
-    this.engine.previewNoteOn(this._slot, value);
+    this.engine.previewNoteOn(this._slot, value, undefined, time);
   }
-  triggerRelease(): void { this.engine.previewNoteOff(); }
+  triggerRelease(_note?: string | number, time?: number): void { this.engine.previewNoteOff(time); }
   dispose(): void {}
 }

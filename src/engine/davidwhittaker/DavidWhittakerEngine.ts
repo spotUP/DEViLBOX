@@ -129,10 +129,10 @@ export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
     this.workletNode?.port.postMessage({ type: 'previewLoad', buffer });
   }
   /** One key: `sample` (0-based) at the replayer's note `note`, with the envelope and arpeggio the song pairs with it. */
-  noteOn(sample: number, note: number): void {
-    this.workletNode?.port.postMessage({ type: 'noteOn', sample, note });
+  noteOn(sample: number, note: number, atTime?: number): void {
+    this.workletNode?.port.postMessage({ type: 'noteOn', atTime, sample, note });
   }
-  noteOff(): void { this.workletNode?.port.postMessage({ type: 'noteOff' }); }
+  noteOff(atTime?: number): void { this.workletNode?.port.postMessage({ type: 'noteOff', atTime }); }
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
 

@@ -146,11 +146,11 @@ export class HippelStEngine extends WASMSingletonBase {
   }
 
   /** Start instrument `instrument` (0-based volume sequence) on the pattern note byte `note`. */
-  keyNote(instrument: number, note: number): void {
-    this.sendMessage({ type: 'keyNote', instrument, note });
+  keyNote(instrument: number, note: number, atTime?: number): void {
+    this.sendMessage({ type: 'keyNote', atTime, instrument, note });
   }
 
-  keyOff(): void { this.sendMessage({ type: 'keyOff' }); }
+  keyOff(atTime?: number): void { this.sendMessage({ type: 'keyOff', atTime }); }
 
   override dispose(): void {
     super.dispose();

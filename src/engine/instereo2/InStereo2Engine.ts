@@ -132,10 +132,10 @@ export class InStereo2Engine extends WASMChannelOutputsEngine {
     this.workletNode?.port.postMessage({ type: 'previewLoad', buffer });
   }
   /** One key: the replayer's instrument number (1-63 synth, 64-127 sample) at its note (index into its period table, 1-108). */
-  noteOn(instrument: number, note: number): void {
-    this.workletNode?.port.postMessage({ type: 'noteOn', instrument, note });
+  noteOn(instrument: number, note: number, atTime?: number): void {
+    this.workletNode?.port.postMessage({ type: 'noteOn', atTime, instrument, note });
   }
-  noteOff(): void { this.workletNode?.port.postMessage({ type: 'noteOff' }); }
+  noteOff(atTime?: number): void { this.workletNode?.port.postMessage({ type: 'noteOff', atTime }); }
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
 

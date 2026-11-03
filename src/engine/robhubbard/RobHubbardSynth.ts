@@ -21,7 +21,7 @@
 
 import type { DevilboxSynth } from '@/types/synth';
 import type { RobHubbardConfig } from '@/types/instrument';
-import { getDevilboxAudioContext, noteToMidi, audioNow } from '@/utils/audio-context';
+import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { RobHubbardEngine } from './RobHubbardEngine';
 
 export class RobHubbardSynth implements DevilboxSynth {
@@ -32,8 +32,6 @@ export class RobHubbardSynth implements DevilboxSynth {
   private audioContext: AudioContext;
   private _disposed = false;
   private _playerHandle = -1;
-  /** A release scheduled for a future audio time (the worklet's noteOff message carries no time). */
-  private _releaseTimer: ReturnType<typeof setTimeout> | null = null;
 
   private static _engineConnectedToSynth = false;
   private _ownsEngineConnection = false;
@@ -90,7 +88,6 @@ export class RobHubbardSynth implements DevilboxSynth {
 
   triggerAttack(note?: string | number, time?: number, velocity?: number): void {
     if (this._disposed || this._playerHandle < 0) return;
-    this.cancelPendingRelease();
 
     let midiNote: number;
     if (typeof note === 'string') {
@@ -113,34 +110,12 @@ export class RobHubbardSynth implements DevilboxSynth {
   }
 
   /**
-   * Release at audio time `time` (default: now). The worklet's noteOff takes effect on arrival, so a future
-   * time is honoured by deferring the message, as the other message-driven synths do (Tunefish, DB303):
-   * a held note with a duration (MCP trigger_note, scheduled song notes) must not be cut at once.
+   * Release at audio time `time` (default: now): the time rides on the message as `atTime` and the shared
+   * worklet scheduler holds it, so a held note with a duration is not cut at once.
    */
   triggerRelease(_note?: string | number, time?: number): void {
     if (this._disposed || this._playerHandle < 0) return;
-    this.cancelPendingRelease();
-    const delayMs = time === undefined ? 0 : (time - audioNow()) * 1000;
-    if (delayMs > 1) {
-      this._releaseTimer = setTimeout(() => {
-        this._releaseTimer = null;
-        this.sendNoteOff();
-      }, delayMs);
-      return;
-    }
-    this.sendNoteOff();
-  }
-
-  private sendNoteOff(): void {
-    if (this._disposed || this._playerHandle < 0) return;
-    this.engine.sendMessage({ type: 'noteOff', handle: this._playerHandle });
-  }
-
-  private cancelPendingRelease(): void {
-    if (this._releaseTimer !== null) {
-      clearTimeout(this._releaseTimer);
-      this._releaseTimer = null;
-    }
+    this.engine.sendMessage({ type: 'noteOff', handle: this._playerHandle, atTime: time });
   }
 
   releaseAll(): void {
@@ -189,7 +164,6 @@ export class RobHubbardSynth implements DevilboxSynth {
 
   dispose(): void {
     this._disposed = true;
-    this.cancelPendingRelease();
 
     if (this._playerHandle >= 0) {
       this.engine.sendMessage({ type: 'destroyPlayer', handle: this._playerHandle });

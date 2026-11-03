@@ -50,7 +50,7 @@ export class SteveTurnerSynth implements DevilboxSynth {
     this.instrumentIndex = index;
   }
 
-  triggerAttack(note: string | number, _time?: number, velocity = 1): void {
+  triggerAttack(note: string | number, time?: number, velocity = 1): void {
     let midi: number;
     if (typeof note === 'string') {
       midi = noteToMidi(note);
@@ -65,13 +65,13 @@ export class SteveTurnerSynth implements DevilboxSynth {
       const { useFormatStore } = await import('@/stores/useFormatStore');
       const module = useFormatStore.getState().steveTurnerFileData;
       if (module) await engine.loadPreviewModule(module as ArrayBuffer);
-      engine.noteOn(this.instrumentIndex, stNote, vel);
+      engine.noteOn(this.instrumentIndex, stNote, vel, time);
     }).catch(() => {});
   }
 
-  triggerRelease(): void {
+  triggerRelease(_note?: string | number, time?: number): void {
     if (SteveTurnerEngine.hasInstance()) {
-      SteveTurnerEngine.getInstance().noteOff();
+      SteveTurnerEngine.getInstance().noteOff(time);
     }
   }
 
