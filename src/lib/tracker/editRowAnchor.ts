@@ -10,6 +10,9 @@
  * rows below it are cropped first. Once the deck reaches the row, the row pins
  * to the bottom edge of the grid instead of being cropped away.
  */
+/** Unscaled row height, in logical px, of a grid drawn at tracker zoom 1 (the read-only views always). */
+export const BASE_ROW_HEIGHT = 24;
+
 export function editRowTop(height: number, rowH: number, referenceHeight: number = height): number {
   return Math.min(Math.floor(referenceHeight / 2) - rowH / 2, height - rowH);
 }
@@ -28,4 +31,21 @@ export function editRowWindow(
   const topLines = Math.max(0, Math.ceil(centerLineTop / rowH)) + 1;
   const visibleLines = topLines + Math.ceil((height - centerLineTop) / rowH) + 1;
   return { centerLineTop, topLines, visibleLines };
+}
+
+/**
+ * The edit bar in CSS px of the grid element, as the renderer draws it. The
+ * renderer lays the grid out in logical px (every length divided by `scale`)
+ * and draws it `scale` times larger, so the bar's screen edges are the logical
+ * edges times `scale`. `rowHeightPx` is the on-screen row height. Overlays that
+ * must line up with the bar (the channel meters) take their edges from here.
+ */
+export function editRowBand(
+  height: number,
+  rowHeightPx: number,
+  referenceHeight: number = height,
+  scale: number = 1,
+): { top: number; bottom: number } {
+  const top = editRowTop(height / scale, rowHeightPx / scale, referenceHeight / scale) * scale;
+  return { top, bottom: top + rowHeightPx };
 }

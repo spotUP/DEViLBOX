@@ -10,7 +10,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, act, cleanup } from '@testing-library/react';
 
-type Msg = { type: string; scale?: number; channelLayout?: { offsets: number[]; widths: number[] } };
+type Msg = {
+  type: string; scale?: number; channelLayout?: { offsets: number[]; widths: number[] };
+  h?: number; referenceH?: number; uiState?: { rowHeight?: number };
+};
 const posted: Msg[] = [];
 vi.mock('@engine/renderer/OffscreenBridge', () => ({
   TrackerOffscreenBridge: class { constructor(_f: unknown, _o: unknown) {} post(m: Msg) { posted.push(m); } dispose() {} },
@@ -36,6 +39,7 @@ import { useTrackerStore } from '@stores/useTrackerStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useUIStore } from '@stores/useUIStore';
 import { _setSoundingForTest } from '@/engine/audio/signalPresence';
+import { editRowWindow } from '@/lib/tracker/editRowAnchor';
 
 const WIDTH = 1900;
 
@@ -56,7 +60,7 @@ function runFrames(count: number) {
   }
 }
 
-interface Fill { canvas: HTMLCanvasElement; x: number; w: number }
+interface Fill { canvas: HTMLCanvasElement; x: number; y: number; w: number; h: number }
 const fills: Fill[] = [];
 
 describe('tracker channel VU meters at a fitted pattern scale', () => {
@@ -78,7 +82,7 @@ describe('tracker channel VU meters at a fitted pattern scale', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (this: HTMLCanvasElement) {
       return {
         setTransform: () => {}, clearRect: () => {}, fillStyle: '',
-        fillRect: (x: number, _y: number, w: number) => { fills.push({ canvas: this, x, w }); },
+        fillRect: (x: number, y: number, w: number, h: number) => { fills.push({ canvas: this, x, y, w, h }); },
       } as never;
     });
   });
@@ -115,5 +119,32 @@ describe('tracker channel VU meters at a fitted pattern scale', () => {
       covered.add(nearest);
     }
     expect(covered.size).toBe(12); // one meter per column, none lost
+  });
+
+  // VU-METER-OFFSET (owner 2026-11-03: "the channel vu meters are offset from the pattern editor bar, they
+  // should touch the pattern editor bar"). The meters sat at height/2 - 12 (a 24 px row at scale 1) while the
+  // worker draws the bar from editRowWindow with the fitted row height: at any other scale they floated off it.
+  it('the meters touch the top edge of the edit bar the worker draws, at a fitted scale', async () => {
+    withChannels(12);
+    render(<div style={{ width: WIDTH, height: 600 }}><PatternEditorCanvas /></div>);
+    await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
+    act(() => runFrames(3));
+
+    // The grid geometry the worker lays the bar out from: the last 'layout' message (jsdom's canvas
+    // reports height 1 in 'init', so only the layout message carries the real size).
+    const layout = [...posted].reverse().find((m) => m.type === 'layout')!;
+    const scale = layout.scale!;
+    const height = layout.h!;
+    const referenceHeight = layout.referenceH ?? height;
+    const rowHeight = layout.uiState!.rowHeight!;
+    expect(scale).toBeLessThan(1);
+    // The bar as the worker draws it: laid out in logical px, drawn scale times larger.
+    const barTop = editRowWindow(height / scale, rowHeight / scale, referenceHeight / scale).centerLineTop * scale;
+
+    const vu = document.querySelector('canvas.vu-meters-canvas') as HTMLCanvasElement;
+    const meters = fills.filter((f) => f.canvas === vu);
+    expect(meters.length).toBeGreaterThan(0); // the meters ran (sentinel)
+    const meterBottom = Math.max(...meters.map((m) => m.y + m.h));
+    expect(Math.abs(meterBottom - barTop)).toBeLessThanOrEqual(1);
   });
 });

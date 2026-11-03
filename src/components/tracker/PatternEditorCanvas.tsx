@@ -27,7 +27,7 @@ import { GlobalLaneHeader } from './GlobalLaneHeader';
 import { AutomationParameterPicker } from '../automation/AutomationParameterPicker';
 import { MacroLanes } from './MacroLanes';
 import { useUIStore } from '@stores/useUIStore';
-import { editRowTop, editRowWindow } from '@/lib/tracker/editRowAnchor';
+import { editRowBand, editRowTop, editRowWindow } from '@/lib/tracker/editRowAnchor';
 import { useShallow } from 'zustand/react/shallow';
 import { usePatternEditor, AUTOMATION_LANE_WIDTH } from '@hooks/views/usePatternEditor';
 import { automationLaneReserve } from '@hooks/views/automationLaneReserve';
@@ -3639,7 +3639,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             channelOffsets={channelOffsets}
             channelWidths={channelWidths}
             scrollLeft={scrollLeft}
-            editRowY={dimensions.height / 2}
+            editRowBand={editRowBand(dimensions.height, rowHeight, referenceHeight, fitScale)}
             channelCount={isFormatMode ? numChannels : undefined}
             scale={fitScale}
           />

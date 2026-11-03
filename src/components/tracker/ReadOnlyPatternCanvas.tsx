@@ -22,6 +22,7 @@ import { useThemeStore } from '@stores';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { fitAndStretchChannelWidths } from './channelLayout';
 import { ChannelVUMeters, type ChannelMeterFeed } from './ChannelVUMeters';
+import { BASE_ROW_HEIGHT, editRowBand } from '@/lib/tracker/editRowAnchor';
 import ReadOnlyWorkerFactory from '@/workers/readonly-pattern.worker.ts?worker';
 
 const LINE_NUMBER_WIDTH = 40;
@@ -317,7 +318,7 @@ export const ReadOnlyPatternCanvas: React.FC<ReadOnlyPatternCanvasProps> = React
           <ChannelVUMeters
             channelOffsets={vuLayout.offsets}
             channelWidths={vuLayout.widths}
-            editRowY={dimensions.height / 2}
+            editRowBand={editRowBand(dimensions.height, BASE_ROW_HEIGHT * vuLayout.scale, dimensions.height, vuLayout.scale)}
             channelCount={numChannels}
             feed={vuFeed}
             scale={vuLayout.scale}

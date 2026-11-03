@@ -8,6 +8,7 @@
  */
 
 import { TrackerGLRenderer } from '../engine/renderer/TrackerGLRenderer';
+import { BASE_ROW_HEIGHT } from '../lib/tracker/editRowAnchor';
 import type {
   PatternSnapshot,
   ThemeSnapshot,
@@ -156,7 +157,7 @@ function renderFrame(): void {
       columnVisibility: { flag1: false, flag2: false, probability: false },
       trackerVisualBg: false,
       recordMode: false,
-      rowHeight: 24,
+      rowHeight: BASE_ROW_HEIGHT,
       rowHighlightInterval: 4,
       rowSecondaryHighlightInterval: 16,
       showBeatLabels: false,
