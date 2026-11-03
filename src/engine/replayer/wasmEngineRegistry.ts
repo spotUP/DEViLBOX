@@ -91,6 +91,12 @@ export interface NativeEngineDescriptor {
   /** Optional post-start hook for engine-specific setup (e.g., Klys onSongData) */
   onStarted?: (instance: WASMSingletonEngine, song: TrackerSong) => void;
   /**
+   * Start-position seam: move the loaded engine to output frame `frame` of the song, called once before play() when the
+   * transport starts away from song position 0 row 0 (NativeEngineRouting resolves the frame from the grid row with the
+   * row-preview search, rowStartFrame). Absent: the engine starts at the top of the song.
+   */
+  startAt?: (instance: WASMSingletonEngine, frame: number) => void;
+  /**
    * How the tracker pitch slider (and its Key Lock) reaches this engine natively. applyNativeEnginePitch
    * (nativeEnginePitch.ts) drives it from computeTempoPitchSplit while the engine plays, and again when it starts.
    * Absent: the slider does not reach the engine natively. A direct-routed engine then does not follow the slider at
@@ -539,6 +545,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/nuade/NuadeEngine')).NuadeEngine as unknown as WASMSingletonStatic,
     // The player reports its order and row (or tick count); the grid it maps onto is this song's.
     onStarted: (instance, song) => (instance as unknown as import('@/engine/nuade/NuadeEngine').NuadeEngine).setGrid(song as never),
+    startAt: (instance, frame) => (instance as unknown as import('@/engine/nuade/NuadeEngine').NuadeEngine).seek(frame),
   },
   {
     // MusicMaker V8 (.sdata + .ip, Amiga): a worklet replayer built from the

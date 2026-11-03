@@ -2322,6 +2322,7 @@ export class TrackerReplayer {
         this.isDJDeck,
         this._muted,
         this.routedNativeEngines,
+        { songPos: this.songPos, row: this.pattPos },
       );
       _playLog('startNativeEngines');
       if (gen !== this._playGeneration) return;

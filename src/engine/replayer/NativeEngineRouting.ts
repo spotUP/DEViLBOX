@@ -542,12 +542,29 @@ async function nativeRowRequest(song: TrackerSong, songPos: number, row: number)
   };
 }
 
+/**
+ * The output frame of the song at which grid row (`songPos`, `row`) starts, found with the row-preview forward search
+ * (the stream previewNativeRow renders clips with; the clip's startFrame is the row's first frame). Null when the engine
+ * has no row preview or the song never reaches the row.
+ */
+export async function rowStartFrame(song: TrackerSong, songPos: number, row: number): Promise<number | null> {
+  const prepared = await nativeRowRequest(song, songPos, row);
+  if (!prepared) return null;
+  const { getRowPreviewClient } = await import('@engine/rowPreview/rowPreviewClient');
+  const result = await getRowPreviewClient().request(prepared.request);
+  return result.kind === 'clip' ? result.clip.startFrame : null;
+}
+
+/** Where the transport starts: the replayer's song position (order index) and pattern row. */
+export interface NativeStartPosition { songPos: number; row: number }
+
 export async function startNativeEngines(
   song: TrackerSong,
   separationInputTone: Tone.ToneAudioNode,
   isDJDeck: boolean,
   muted: boolean,
   routedNativeEngines: Set<string>,
+  startPosition?: NativeStartPosition,
 ): Promise<NativeEngineStartResult> {
   // Wait for any pending async engine stops from the previous song to complete.
   // Prevents race conditions during rapid song switching where the old engine's
@@ -628,6 +645,12 @@ export async function startNativeEngines(
 
       if (!muted) {
         openEngineOutputGain(instance);
+        // A start away from the top of the song (Play / Play Pattern at the cursor): the engine plays the song from its
+        // start unless told, so move it to the position's frame first. Position 0 row 0 stays the plain play path.
+        if (desc.startAt && startPosition && (startPosition.songPos > 0 || startPosition.row > 0)) {
+          const frame = await rowStartFrame(song, startPosition.songPos, startPosition.row);
+          if (frame !== null && frame > 0) desc.startAt(instance, frame);
+        }
         instance.play();
         console.log(`[NativeEngineRouting] ${desc.key} loaded & playing`);
         // The tracker pitch slider (and Key Lock), as it stands now: a song
