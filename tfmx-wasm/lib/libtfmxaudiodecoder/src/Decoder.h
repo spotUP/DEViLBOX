@@ -74,6 +74,16 @@ public:
     virtual const int* walkData() { return 0; }
     
     virtual ubyte getVoices() { return 0; }
+
+    /**
+     * DEViLBOX extension: the editor-grid channels a song lays out, one
+     * oscilloscope each, and the channel that voice v plays for right now
+     * (-1 for none). By default a channel is a voice. A decoder whose grid
+     * columns are sequencer tracks routing notes to voices (TFMX) overrides
+     * both, so each column's scope shows the voice its own notes drive.
+     */
+    virtual int getScopeChannels() { return getVoices(); }
+    virtual int getVoiceChannel(ubyte v) { return v; }
     virtual int getSongs() { return 0; }
 
     const std::string getFormatName() { return formatName; }

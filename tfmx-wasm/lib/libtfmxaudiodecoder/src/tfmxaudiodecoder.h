@@ -149,6 +149,11 @@ extern "C" {
     /* Only to be called after initialization.
        Return number of voices. */
     int tfmxdec_voices(void* decoder);
+
+    /* DEViLBOX extension: the editor-grid channels (one scope each), and the
+       channel voice `voice` plays for right now, -1 for none. */
+    int tfmxdec_scope_channels(void* decoder);
+    int tfmxdec_voice_channel(void* decoder, unsigned int voice);
     
     /* With the number of voices retrieved via tfmxdec_get_voices,
        use this to mute/unmute individual voices. */

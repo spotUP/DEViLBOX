@@ -65,6 +65,8 @@ class DecoderProxy {
     // "artist", "title", "game" since some TFMX-MOD files provide these.
     const char* getInfoString(const std::string);
     int getVoices();
+    int getScopeChannels();
+    int getVoiceChannel(ubyte v);
 
     int run();
 

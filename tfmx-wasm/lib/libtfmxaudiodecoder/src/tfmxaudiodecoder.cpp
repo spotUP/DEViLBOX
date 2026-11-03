@@ -111,6 +111,16 @@ int tfmxdec_voices(void* decoder) {
     return p->dec.getVoices();
 }
 
+int tfmxdec_scope_channels(void* decoder) {
+    TFMX_DECLARE_DECODER;
+    return p->dec.getScopeChannels();
+}
+
+int tfmxdec_voice_channel(void* decoder, unsigned int voice) {
+    TFMX_DECLARE_DECODER;
+    return p->dec.getVoiceChannel((ubyte)voice);
+}
+
 const char* tfmxdec_get_name(void* decoder) {
     TFMX_DECLARE_DECODER;
     return p->dec.getInfoString("name");

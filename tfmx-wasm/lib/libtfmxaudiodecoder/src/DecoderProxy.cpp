@@ -78,6 +78,14 @@ int DecoderProxy::getVoices() {
     return pDecoder->getVoices();
 }
 
+int DecoderProxy::getScopeChannels() {
+    return pDecoder ? pDecoder->getScopeChannels() : 0;
+}
+
+int DecoderProxy::getVoiceChannel(ubyte v) {
+    return pDecoder ? pDecoder->getVoiceChannel(v) : -1;
+}
+
 int DecoderProxy::run() {
     return pDecoder->run();
 }

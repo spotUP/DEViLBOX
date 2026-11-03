@@ -410,6 +410,10 @@ static uint64_t gSamplesRendered = 0;
 // oscilloscopes and the per-channel role classifier. Voice v at v*SCOPE_LEN.
 static const uint32_t SCOPE_LEN = 128;
 static int16_t gScope[8 * SCOPE_LEN];
+// The same output per editor-grid channel: each voice's block is added to the
+// channel it plays for (tfmxdec_voice_channel), so a TFMX track column shows
+// the voices its own notes drive. Channel c at c*SCOPE_LEN.
+static int16_t gChannelScope[8 * SCOPE_LEN];
 
 /**
  * Load a full TFMX module (mdat + smpl) for streaming playback.
@@ -534,6 +538,22 @@ void tfmx_module_render(void* /*ctx*/, float* outL, float* outR, int numSamples)
     outR[i] = tmp[i * 2 + 1] * (1.0f / 32768.0f);
   }
 
+  memset(gChannelScope, 0, sizeof(gChannelScope));
+  const int voices = tfmxdec_voices(p.decoder);
+  const int channels = tfmxdec_scope_channels(p.decoder);
+  const int n = numSamples < (int)SCOPE_LEN ? numSamples : (int)SCOPE_LEN;
+  for (int v = 0; v < voices && v < 8; v++) {
+    const int c = tfmxdec_voice_channel(p.decoder, (unsigned int)v);
+    if (c < 0 || c >= channels || c >= 8) continue;
+    // A track's notes may name several voices: its channel is their sum.
+    int16_t* dst = gChannelScope + c * SCOPE_LEN;
+    const int16_t* src = gScope + v * SCOPE_LEN;
+    for (int i = 0; i < n; i++) {
+      const int sum = dst[i] + src[i];
+      dst[i] = (int16_t)(sum > 32767 ? 32767 : sum < -32768 ? -32768 : sum);
+    }
+  }
+
   gSamplesRendered += (uint64_t)numSamples;
 }
 
@@ -607,6 +627,29 @@ void tfmx_module_seek(void* /*ctx*/, int ms) {
 EMSCRIPTEN_KEEPALIVE
 int16_t* tfmx_module_scope(void* /*ctx*/) {
   return gScope;
+}
+
+/**
+ * DEViLBOX extension: the editor-grid channels of the loaded module, one
+ * oscilloscope each: the tracks for TFMX (8, whatever the voice count), the
+ * voices for the other decoders.
+ */
+EMSCRIPTEN_KEEPALIVE
+int tfmx_module_scope_channels(void* /*ctx*/) {
+  TFMXPlayer& p = gPlayers[0];
+  if (!p.decoder) return 0;
+  const int c = tfmxdec_scope_channels(p.decoder);
+  return c > 8 ? 8 : c;
+}
+
+/**
+ * DEViLBOX extension: the last module render per editor-grid channel, int16,
+ * channel c at c*128: the output of the voice that channel's notes drive,
+ * silence for a channel driving none. Valid for tfmx_module_scope_channels().
+ */
+EMSCRIPTEN_KEEPALIVE
+int16_t* tfmx_module_channel_scope(void* /*ctx*/) {
+  return gChannelScope;
 }
 
 /**
