@@ -92,7 +92,7 @@ describe('HippoPlayer playlist converter keeps every source', () => {
     expect(parsePrgEntries(IMBASILLE_3)).toHaveLength(8);
   });
 
-  it('keeps the first seed ids, dots included, so persisted copies still match', () => {
+  it('keeps the first seed ids, dots included, the ids the server serves', () => {
     expect(playlistFromPrg('NE7s_Faves_Vol._1.prg', latin1('HiPPrg\n')).id).toBe('playlist-prg-ne7s-faves-vol.-1');
   });
 

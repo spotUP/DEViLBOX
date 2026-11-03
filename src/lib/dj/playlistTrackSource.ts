@@ -47,11 +47,6 @@ export function decodePathEscapes(path: string): string {
   }
 }
 
-/** What identifies an entry across source changes: its file name, unescaped, lower-cased. */
-function sourceKey(fileName: string): string {
-  return decodePathEscapes(sourceBaseName(fileName)).toLowerCase();
-}
-
 /** `pub/modules/<format>/<author>` of a Modland full path. */
 function modlandAuthorDir(fullPath: string): string {
   return fullPath.split('/').slice(0, 4).join('/');
@@ -110,48 +105,6 @@ interface RepairableTrack {
 interface RepairablePlaylist {
   id: string;
   tracks: RepairableTrack[];
-}
-
-/**
- * Bring persisted copies of the bundled seed playlists up to the seed's
- * sources. An entry whose source the seed no longer holds — a bare name (no
- * source, never loads), a Modland path that moved, a basename guess the seed
- * has since replaced with the playlist's own URL — takes the seed source with
- * the same file name, when exactly one seed source has that name. Its bad
- * flag, earned because it could not load, is cleared. `local:` entries the
- * user added are never touched. Mutates `playlists` in place (Immer-draft safe).
- *
- * @returns the number of entries repaired
- */
-export function repairSourcesFromSeed(
-  playlists: RepairablePlaylist[],
-  seed: readonly { id: string; tracks: readonly { fileName: string }[] }[],
-): number {
-  let repaired = 0;
-  for (const seedPlaylist of seed) {
-    const playlist = playlists.find((p) => p.id === seedPlaylist.id);
-    if (!playlist) continue;
-    const seedSources = new Set(seedPlaylist.tracks.map((t) => t.fileName));
-    const sourcesByKey = new Map<string, Set<string>>();
-    for (const source of seedSources) {
-      const key = sourceKey(source);
-      const set = sourcesByKey.get(key);
-      if (set) set.add(source);
-      else sourcesByKey.set(key, new Set([source]));
-    }
-    for (const track of playlist.tracks) {
-      if (seedSources.has(track.fileName) || /^local:/.test(track.fileName)) continue;
-      const candidates = sourcesByKey.get(sourceKey(track.fileName));
-      if (candidates?.size !== 1) continue;
-      track.fileName = candidates.values().next().value as string;
-      track.isBad = false;
-      track.badReason = undefined;
-      track.badTimestamp = undefined;
-      track.badFailCount = 0;
-      repaired++;
-    }
-  }
-  return repaired;
 }
 
 /**
