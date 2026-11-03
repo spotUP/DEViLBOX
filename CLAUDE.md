@@ -14,7 +14,7 @@
 | Test (interactive watch) | `npm run test` |
 | Test (CI mode, headless) | `npm run test:ci` |
 | Build production | `npm run build` |
-| Deploy | `git push origin main` (CI build + Hetzner pull auto — never `gh-pages`) |
+| Deploy | `git push origin main` (CI build + server pull auto — never `gh-pages`) |
 | Sound check (headless, silent, resumable) | `npm run sound-check` — tables every song in `public/data/songs/formats` via UADE WASM; rows to `test-data/uade-corpus-sweep.json` |
 | Sync preset banks (clone/pull devilbox-presets into public/data/presets) | `npm run presets:sync` |
 | Format status tracker | `npx tsx tools/format-server.ts &` (serve on :4444) |
@@ -37,9 +37,9 @@ MCP say "No browser connected" — check `lsof -nP -iTCP:4003 -sTCP:LISTEN` conf
 
 **Always stop playback when test done.** Playing song keep audio graph, WASM engines, render loop hot — heat + battery drain. After any MCP test start playback (`play`, `play_fur`, `load_file`+play, `trigger_note`), finish with `stop` (plus `release_all_notes` if notes triggered) before task end.
 
-### Deployment — Hetzner, NOT GitHub Pages
+### Deployment — NOT GitHub Pages
 
-Host at `devilbox.uprough.net`. Deploy full auto on `git push origin main` — CI build via `.github/workflows/deploy.yml`, make GitHub Release with `devilbox-dist.tar.gz`, webhook trigger Hetzner server pull + deploy.
+Host at `devilbox.uprough.net`. Deploy full auto on `git push origin main` — CI build via `.github/workflows/deploy.yml`, make GitHub Release with `devilbox-dist.tar.gz`, webhook trigger server pull + deploy.
 
 **Never** `gh-pages` / `npx gh-pages -d dist` — publish wrong host. CI fail → fix root code (type error / missing file / etc.), push again. Server setup: `scripts/server-setup.sh`.
 

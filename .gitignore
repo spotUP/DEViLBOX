@@ -282,7 +282,7 @@ sonic-arranger-wasm/test_sa
 sonic-arranger-wasm/test_sa.dSYM/
 sonic-arranger-wasm/test_sa.c
 
-# Test songs (deployed separately to Hetzner)
+# Test songs (deployed separately to the live server)
 public/data/songs/test-songs/
 
 # Python bytecode (RE tooling)

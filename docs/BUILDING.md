@@ -44,7 +44,7 @@ them. Reference copies of upstream sources live outside the repo at
 | Lint | `npm run lint` |
 | Test (watch) | `npm run test` |
 | Test (CI) | `npm run test:ci` |
-| Deploy | `git push origin main` (CI builds + Hetzner pulls automatically) |
+| Deploy | `git push origin main` (CI builds + the server pulls automatically) |
 
 `npm run dev` and `npm run build` first run `asbuild` (the AssemblyScript modules) — no extra
 toolchain required, it's an npm dependency.

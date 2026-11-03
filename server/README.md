@@ -38,7 +38,7 @@ cp .env.example .env
 npm run dev
 ```
 
-## Production Deployment on Hetzner
+## Production Deployment
 
 ### 1. Upload Server Code
 

@@ -24,7 +24,7 @@ import type {
 } from './types';
 import { STEM_NAMES_4S, STEM_NAMES_6S } from './types';
 
-// ── Model URLs (hosted on our CDN or Hetzner) ──────────────────────────────
+// ── Model URLs (hosted on our CDN or the live server) ──────────────────────────────
 
 const MODEL_URLS: Record<DemucsModelType, string> = {
   '4s': 'https://devilbox.uprough.net/models/ggml-model-htdemucs-4s-f16.bin',

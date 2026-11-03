@@ -5,7 +5,7 @@
  * POST /api/analysis/cache         — Store analysis results
  * GET  /api/analysis/status        — Cache statistics
  *
- * When ANALYSIS_DB_MODE=remote, proxies requests to the live Hetzner server
+ * When ANALYSIS_DB_MODE=remote, proxies requests to the live devilbox.uprough.net server
  * so local dev uses the production analysis database.
  */
 
