@@ -29,6 +29,7 @@ import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/type
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeDigiBoosterCell } from '@/engine/uade/encoders/DigiBoosterEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { scanDigi1, decodeDigi1Cell, encodeDigi1Cell, DIGI1_ROWS, DIGI1_HEADER_SIZE } from './DigiBooster1Layout';
 
 const TEXT_DECODER = new TextDecoder('iso-8859-1');
 
@@ -419,11 +420,9 @@ function mapDBMEffect(cmd: number, param: number): { effTyp: number; effParam: n
 //   642-1571: sampleNames[31][30]
 //   1572+: pattern data, then sample data
 
-import { periodToNoteIndex } from './AmigaUtils';
 
 function parseOriginalDigiBooster(buf: Uint8Array, filename: string): TrackerSong {
   const numChannels = buf[25] || 4;
-  const packed = buf[26] !== 0;
   const numPatterns = (buf[46] & 0xff) + 1;
   const songLength = (buf[47] & 0xff) + 1;
   const versionByte = buf[24];
@@ -467,95 +466,17 @@ function parseOriginalDigiBooster(buf: Uint8Array, filename: string): TrackerSon
 
   const songName = readStr(buf, 610, 32);
 
-  // Pattern data starts at offset 1572
-  let off = 1572;
-  const trackerPatterns: Pattern[] = [];
-
-  for (let patIdx = 0; patIdx < numPatterns; patIdx++) {
-    const rows = 64;
-    // Each pattern: numChannels channels × 64 rows × 4 bytes
-    // Unpacked: channels are interleaved (ch0-row0, ch1-row0, ..., ch0-row1, ...)
-    //   Actually: channels 0-3 first (64 rows each), then channels 4-7
-
-    const cells: Array<Array<{ period: number; sample: number; effect: number; param: number }>> = [];
-    for (let ch = 0; ch < numChannels; ch++) cells.push([]);
-
-    if (!packed) {
-      // Unpacked: all channels sequentially, each channel has 64 rows × 4 bytes
-      for (let ch = 0; ch < numChannels; ch++) {
-        for (let row = 0; row < rows; row++) {
-          if (off + 4 > buf.length) {
-            cells[ch].push({ period: 0, sample: 0, effect: 0, param: 0 });
-            continue;
-          }
-          const data = u32(buf, off); off += 4;
-          const period = (data >>> 16) & 0x0fff;
-          const sample = ((data >>> 24) & 0xf0) | ((data >>> 12) & 0x0f);
-          const effect = (data >>> 8) & 0x0f;
-          const param = data & 0xff;
-          cells[ch].push({ period, sample, effect, param });
-        }
-      }
-    } else {
-      // Packed: u16 BE patternLength, then 64-byte bitmask, then variable data
-      if (off + 2 > buf.length) break;
-      const patLen = u16(buf, off); off += 2;
-      const patEnd = off + patLen;
-
-      // 64-byte bitmask: one byte per row, bits 7..0 = channels 0..7
-      const bitmask: number[] = [];
-      for (let row = 0; row < rows; row++) {
-        bitmask.push(off < buf.length ? buf[off++] : 0);
-      }
-
-      // Initialize empty cells
-      for (let ch = 0; ch < numChannels; ch++) {
-        for (let row = 0; row < rows; row++) {
-          cells[ch].push({ period: 0, sample: 0, effect: 0, param: 0 });
-        }
-      }
-
-      // Read packed data
-      for (let row = 0; row < rows; row++) {
-        const mask = bitmask[row];
-        for (let ch = 0; ch < numChannels; ch++) {
-          const bit = 7 - ch; // bit 7 = ch0, bit 6 = ch1, etc.
-          if (mask & (1 << bit)) {
-            if (off + 4 > buf.length) continue;
-            const data = u32(buf, off); off += 4;
-            const period = (data >>> 16) & 0x0fff;
-            const sample = ((data >>> 24) & 0xf0) | ((data >>> 12) & 0x0f);
-            const effect = (data >>> 8) & 0x0f;
-            const param = data & 0xff;
-            cells[ch][row] = { period, sample, effect, param };
-          }
-        }
-      }
-
-      // Advance to end of pattern data
-      off = Math.max(off, patEnd);
-    }
-
-    // Convert to TrackerSong pattern format
+  // Patterns: the layout module scans the file once; the same offsets serve the grid, the encoder and the exporter.
+  const scan = scanDigi1(buf);
+  if (!scan) throw new Error('Not a DigiBooster 1.x module');
+  const trackerPatterns: Pattern[] = scan.patterns.map((pat, patIdx) => {
     const channels: ChannelData[] = [];
     for (let ch = 0; ch < numChannels; ch++) {
-      const channelCells: TrackerCell[] = cells[ch].map(c => {
-        let note = 0;
-        if (c.period > 0) {
-          const noteIdx = periodToNoteIndex(c.period);
-          note = noteIdx >= 0 ? noteIdx + 1 : 0;
-        }
-        const mapped = mapDBMEffect(c.effect, c.param);
-        return {
-          note,
-          instrument: c.sample,
-          volume: 0,
-          effTyp: mapped.effTyp,
-          eff: mapped.effParam,
-          effTyp2: 0,
-          eff2: 0,
-        };
-      });
+      const channelCells: TrackerCell[] = [];
+      for (let row = 0; row < DIGI1_ROWS; row++) {
+        const o = pat.cellOffsets[ch * DIGI1_ROWS + row]!;
+        channelCells.push(decodeDigi1Cell(o >= 0 ? buf.subarray(o, o + 4) : new Uint8Array(4)));
+      }
       channels.push({
         id: `ch-${ch}`,
         name: `Ch ${ch + 1}`,
@@ -569,22 +490,22 @@ function parseOriginalDigiBooster(buf: Uint8Array, filename: string): TrackerSon
         color: null,
       });
     }
-
-    trackerPatterns.push({
+    return {
       id: `pattern-${patIdx}`,
       name: `Pattern ${patIdx}`,
-      length: rows,
+      length: DIGI1_ROWS,
       channels,
       importMetadata: {
-        sourceFormat: 'DIGI',
+        sourceFormat: 'DIGI' as const,
         sourceFile: filename,
         importedAt: new Date().toISOString(),
         originalChannelCount: numChannels,
         originalPatternCount: numPatterns,
         originalInstrumentCount: 31,
       },
-    });
-  }
+    };
+  });
+  let off = scan.dataEnd;
 
   // Sample data follows patterns
   const instruments: InstrumentConfig[] = [];
@@ -643,5 +564,19 @@ function parseOriginalDigiBooster(buf: Uint8Array, filename: string): TrackerSon
     linearPeriods: false,
     uadeEditableFileData: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer,
     uadeEditableFileName: filename,
+    uadePatternLayout: {
+      formatId: 'digiBooster1',
+      patternDataFileOffset: DIGI1_HEADER_SIZE,
+      bytesPerCell: 4,
+      rowsPerPattern: DIGI1_ROWS,
+      numChannels,
+      numPatterns: scan.patterns.length,
+      moduleSize: buf.length,
+      encodeCell: encodeDigi1Cell,
+      encodeOverStored: true,
+      decodeCell: decodeDigi1Cell,
+      getCellFileOffset: (pattern: number, row: number, channel: number): number =>
+        scan.patterns[pattern]?.cellOffsets[channel * DIGI1_ROWS + row] ?? -1,
+    },
   };
 }

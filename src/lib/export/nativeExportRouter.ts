@@ -349,7 +349,7 @@ const NATIVE_EXPORTERS: NativeExporterEntry[] = [
       return exportAsHively(s, { format: hvlFmt, nativeOverride: useFormatStore.getState().hivelyNative });
     } },
   { id: 'digiBooster', matches: (s) => songIds(s).format === 'DIGI' || songIds(s).layoutFormatId === 'digiBooster',
-    run: async (s, baseName) => { const { exportDigiBooster } = await import('./DigiBoosterExporter'); return { data: exportDigiBooster(s), filename: `${baseName}.dbm`, warnings: [] }; } },
+    run: async (s, baseName) => { const { exportDigiBooster } = await import('./DigiBoosterExporter'); return { data: exportDigiBooster(s), filename: `${baseName}.${s.uadePatternLayout?.formatId === 'digiBooster1' ? 'digi' : 'dbm'}`, warnings: [] }; } },
   { id: 'oktalyzer', matches: (s) => songIds(s).format === 'OKT' || songIds(s).layoutFormatId === 'oktalyzer',
     run: async (s, baseName) => { const { exportOktalyzer } = await import('./OktalyzerExporter'); return { data: exportOktalyzer(s), filename: `${baseName}.okt`, warnings: [] }; } },
   { id: 'klystrack', matches: (s) => songIds(s).format === 'KT' || songIds(s).layoutFormatId === 'klystrack',

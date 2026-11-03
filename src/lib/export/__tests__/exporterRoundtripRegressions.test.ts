@@ -309,7 +309,7 @@ describe('exporter round-trip regressions', () => {
     expect(matched).toBe(cells);
   });
 
-  it('DigiBooster export round-trips every representable cell; the only losses are octave -1 notes DBM0 cannot store', async () => {
+  it('DigiBooster 1.x export patches the original module: every cell round-trips, octave -1 notes included', async () => {
     const { parseDigiBoosterFile } = await import('@lib/import/formats/DigiBoosterParser');
     const { exportDigiBooster } = await import('../DigiBoosterExporter');
     const raw = fixture('public/data/songs/digibooster/the day after.digi');
@@ -349,11 +349,10 @@ describe('exporter round-trip regressions', () => {
     expect(cells).toBeGreaterThan(10000);
     // No mismatch may be anything other than a dropped octave-(-1) note.
     expect(badMismatch).toBe(0);
-    // The fixture has octave-(-1) bass notes, so this documents (not hides) the floor.
-    expect(lostLowNote).toBeGreaterThan(0);
-    // True max for this cross-format bake: everything except the unrepresentable notes.
-    expect(matched / cells).toBeGreaterThanOrEqual(0.9994);
-    expect(matched + lostLowNote).toBe(cells);
+    // The fixture is a DIGI Booster 1.x module: the exporter writes the grid back into the original bytes (period-coded
+    // notes), so octave -1 notes survive and nothing is lost.
+    expect(lostLowNote).toBe(0);
+    expect(matched).toBe(cells);
   });
 
   it('NRU export writes the full 0..255 note byte and the 0x0C empty-effect slot (was dropping notes >72 and forcing tone-porta)', async () => {
