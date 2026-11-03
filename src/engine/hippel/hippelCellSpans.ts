@@ -97,6 +97,9 @@ export function patchEditedCells(
   // cell it shows up as. Writing it in place changes all of them, so it is written only when those cells agree; otherwise
   // the edit is refused, never written over the cells that still show the old value.
   const sharers = new Map<number, Array<{ cell: TrackerCell; base: TrackerCell }>>();
+  // The volume column lives in other bytes (aux: in 7V the step's voice-volume command), shared by the cells that show
+  // the same aux bytes, not by the cells that share the block.
+  const volumeSharers = new Map<number, TrackerCell[]>();
   for (let p = 0; p < patterns.length; p++) {
     const channels = patterns[p]?.channels ?? [];
     for (let ch = 0; ch < channels.length; ch++) {
@@ -108,6 +111,10 @@ export function patchEditedCells(
         const list = sharers.get(span.offset);
         const entry = { cell, base: span.baselineFor?.(cell) ?? span.baseline };
         if (list) list.push(entry); else sharers.set(span.offset, [entry]);
+        if (span.aux) {
+          const vol = volumeSharers.get(span.aux.offset);
+          if (vol) vol.push(cell); else volumeSharers.set(span.aux.offset, [cell]);
+        }
       }
     }
   }
@@ -124,8 +131,8 @@ export function patchEditedCells(
   const agreeNote = (offset: number, cell: TrackerCell, base: TrackerCell): boolean =>
     (sharers.get(offset) ?? []).every((o) => step(o.cell.instrument, o.base.instrument) === step(cell.instrument, base.instrument)
       && noteStep(o.cell.note, o.base.note) === noteStep(cell.note, base.note));
-  const agreeVolume = (offset: number, cell: TrackerCell): boolean =>
-    (sharers.get(offset) ?? []).every((o) => !volumeDiffers(cell, o.cell));
+  const agreeVolume = (auxOffset: number, cell: TrackerCell): boolean =>
+    (volumeSharers.get(auxOffset) ?? []).every((o) => !volumeDiffers(cell, o));
   for (let p = 0; p < patterns.length; p++) {
     const channels = patterns[p]?.channels ?? [];
     for (let ch = 0; ch < channels.length; ch++) {
@@ -148,7 +155,7 @@ export function patchEditedCells(
         }
         if (volumeDiffers(cell, span.baseline)) {
           const aux = span.aux;
-          if (aux && !agreeVolume(span.offset, cell)) { refused.push(`${p}:${ch}:${r}`); continue; }
+          if (aux && !agreeVolume(aux.offset, cell)) { refused.push(`${p}:${ch}:${r}`); continue; }
           const enc = aux ? aux.encode(cell, bytes) : null;
           if (!aux || !enc || enc.length !== aux.length) { refused.push(`${p}:${ch}:${r}`); continue; }
           bytes.set(enc, aux.offset);
