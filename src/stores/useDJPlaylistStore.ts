@@ -118,7 +118,7 @@ interface DJPlaylistState {
   canRedo: boolean;
 
   // ── Playlist CRUD ─────────────────────────────────────────────────────
-  createPlaylist: (name: string) => string;
+  createPlaylist: (name: string, visibility?: 'private' | 'public') => string;
   deletePlaylist: (playlistId: string) => void;
   renamePlaylist: (playlistId: string, name: string) => void;
   setActivePlaylist: (playlistId: string | null) => void;
@@ -223,7 +223,7 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
 
       // ── Playlist CRUD ─────────────────────────────────────────────────
 
-      createPlaylist: (name: string) => {
+      createPlaylist: (name: string, visibility: 'private' | 'public' = 'private') => {
         const id = `playlist-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const now = Date.now();
         set((state) => {
@@ -234,6 +234,7 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
             createdAt: now,
             updatedAt: now,
             tracks: [],
+            visibility,
           });
           state.activePlaylistId = id;
         });

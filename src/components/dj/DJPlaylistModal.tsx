@@ -946,13 +946,11 @@ const PlaylistSidebarItem: React.FC<PlaylistSidebarItemProps> = React.memo(({
       <div className="flex-1 min-w-0">
         <div className="text-[11px] font-mono truncate flex items-center gap-1">
           {playlist.name}
-          {playlist.cloudId && (
-            <span title={playlist.visibility === 'public' ? 'Public' : 'Private'}>
-              {playlist.visibility === 'public'
-                ? <Globe size={9} className="text-accent-success/60 shrink-0" />
-                : <Lock size={9} className="text-text-muted/40 shrink-0" />}
-            </span>
-          )}
+          <span title={playlist.visibility === 'public' ? 'Public' : 'Private'}>
+            {playlist.visibility === 'public'
+              ? <Globe size={9} className="text-accent-success/60 shrink-0" />
+              : <Lock size={9} className="text-text-muted/40 shrink-0" />}
+          </span>
           {analyzing && (
             <span title={`Analyzing… ${analysisPct}%`} className="shrink-0 inline-flex">
               <BarChart3 size={9} className="text-accent-primary animate-pulse" />
@@ -982,17 +980,15 @@ const PlaylistSidebarItem: React.FC<PlaylistSidebarItemProps> = React.memo(({
             >
               {isSaving ? <RefreshCw size={10} /> : playlist.cloudId ? <Cloud size={10} /> : <Upload size={10} />}
             </button>
-            {playlist.cloudId && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onToggleVisibility(); }}
-                className="p-0.5 text-text-muted/40 hover:text-text-primary transition-colors"
-                title={playlist.visibility === 'public' ? 'Make private' : 'Make public'}
-              >
-                {playlist.visibility === 'public' ? <Globe size={10} /> : <Lock size={10} />}
-              </button>
-            )}
           </>
         )}
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleVisibility(); }}
+          className="p-0.5 text-text-muted/40 hover:text-text-primary transition-colors"
+          title={playlist.visibility === 'public' ? 'Make private' : 'Make public'}
+        >
+          {playlist.visibility === 'public' ? <Globe size={10} /> : <Lock size={10} />}
+        </button>
         <button onClick={(e) => { e.stopPropagation(); onStartEdit(); }} className="p-0.5 text-text-muted/40 hover:text-text-primary" title="Rename">
           <Edit3 size={10} />
         </button>
@@ -1198,6 +1194,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
   // ── Local state ──────────────────────────────────────────────────────────
   const [isCreating, setIsCreating] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newVisibility, setNewVisibility] = useState<'private' | 'public'>('private');
   const [editingPlaylistId, setEditingPlaylistId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [loadingTrackIndex, setLoadingTrackIndex] = useState<number | null>(null);
@@ -1598,10 +1595,11 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
 
   const handleCreate = useCallback(() => {
     if (!newName.trim()) return;
-    createPlaylist(newName.trim());
+    createPlaylist(newName.trim(), newVisibility);
     setNewName('');
+    setNewVisibility('private');
     setIsCreating(false);
-  }, [newName, createPlaylist]);
+  }, [newName, newVisibility, createPlaylist]);
 
   const handleRename = useCallback((id: string) => {
     if (!editName.trim()) {
@@ -1654,8 +1652,12 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
   }, [savingPlaylistId, setPlaylistCloudId]);
 
   const handleToggleVisibility = useCallback(async (playlist: DJPlaylist) => {
-    if (!playlist.cloudId) return;
     const newVis = playlist.visibility === 'public' ? 'private' : 'public';
+    if (!playlist.cloudId) {
+      // Not saved to cloud yet: local state only, sent on the first cloud save.
+      setPlaylistVisibilityStore(playlist.id, newVis);
+      return;
+    }
     try {
       await apiSetVisibility(playlist.cloudId, newVis);
       setPlaylistVisibilityStore(playlist.id, newVis);
@@ -2862,8 +2864,15 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
       },
     ];
 
+    items.push({ type: 'divider' });
+    items.push({
+      id: 'toggle-visibility',
+      label: activePlaylist.visibility === 'public' ? 'Make private' : 'Make public',
+      icon: activePlaylist.visibility === 'public' ? <Lock size={12} /> : <Globe size={12} />,
+      onClick: () => { handleToggleVisibility(activePlaylist); },
+    });
+
     if (isLoggedIn) {
-      items.push({ type: 'divider' });
       items.push({
         id: 'cloud-save',
         label: cloud ? 'Update in cloud' : 'Save to cloud',
@@ -2871,14 +2880,6 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
         onClick: () => { handleCloudSave(activePlaylist); },
         disabled: savingPlaylistId === activePlaylistId,
       });
-      if (cloud) {
-        items.push({
-          id: 'toggle-visibility',
-          label: activePlaylist.visibility === 'public' ? 'Make private' : 'Make public',
-          icon: activePlaylist.visibility === 'public' ? <Lock size={12} /> : <Globe size={12} />,
-          onClick: () => { handleToggleVisibility(activePlaylist); },
-        });
-      }
     }
 
     const maintenanceItems: MenuItemType[] = [];
@@ -3009,7 +3010,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                   <Upload size={11} />
                 </button>
                 <button
-                  onClick={() => { setIsCreating(true); setNewName(''); }}
+                  onClick={() => { setIsCreating(true); setNewName(''); setNewVisibility('private'); }}
                   className="p-1 text-text-muted/50 hover:text-accent-primary transition-colors"
                   title="New playlist"
                 >
@@ -3148,6 +3149,26 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                   placeholder="Playlist name..."
                   className="w-full px-2 py-1 text-[11px] font-mono bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary placeholder:text-text-muted/30"
                 />
+                <div className="flex items-center gap-1 mt-1">
+                  <Button
+                    variant={newVisibility === 'private' ? 'primary' : 'ghost'}
+                    size="sm"
+                    icon={<Lock size={10} />}
+                    title="Only you can see this playlist"
+                    onClick={() => setNewVisibility('private')}
+                  >
+                    Private
+                  </Button>
+                  <Button
+                    variant={newVisibility === 'public' ? 'primary' : 'ghost'}
+                    size="sm"
+                    icon={<Globe size={10} />}
+                    title="Everyone can see this playlist once saved to the cloud"
+                    onClick={() => setNewVisibility('public')}
+                  >
+                    Public
+                  </Button>
+                </div>
                 <div className="flex justify-end gap-1 mt-1">
                   <Button variant="ghost" size="sm" onClick={() => setIsCreating(false)}>Cancel</Button>
                   <Button variant="primary" size="sm" onClick={handleCreate} disabled={!newName.trim()}>Create</Button>
