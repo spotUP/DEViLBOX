@@ -2281,6 +2281,20 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
 
+  // ── Beathoven Synthesizer (.bss) ─────────────────────────────────────────
+  {
+    key: 'beathoven',
+    label: 'Beathoven Synthesizer',
+    description: 'Beathoven Synthesizer (.bss) - read-only command-stream grid, EaglePlayer / nuade plays the module',
+    family: 'amiga-native',
+    matchMode: 'both',
+    extRegex: /\.bss$/i,
+    prefixes: ['bss.'],
+    prefKey: 'beathovenSynthesizer',
+    nativeParser: { module: '@lib/import/formats/BeathovenParser', parseFn: 'parseBeathovenFile', detectFn: 'isBeathovenFormat' },
+    uadeFallback: true,
+  },
+
   // ── SynthDream (sdr.* prefix) ────────────────────────────────────────────
   {
     key: 'synthDream',
@@ -2451,7 +2465,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   // ═══════════════════════════════════════════════════════════════════════════
   ...([
     ['abk', 'AMOS'], ['agi', 'Sierra AGI'],
-    ['ast', 'ActionAmics prefix'], ['bss', 'Beathoeven Synthesizer'],
+    ['ast', 'ActionAmics prefix'],
     ['bfc', 'FutureComposer-BSI'], ['bsi', 'BSI'], ['fc-bsi', 'FC-BSI'],
     ['cus', 'Custom'], ['cust', 'Custom'], ['custom', 'Custom'],
     ['dh', 'David Hanney'], ['dns', 'Dynamic Synthesizer'], ['dz', 'Darius Zendeh'],

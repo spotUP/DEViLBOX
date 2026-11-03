@@ -130,6 +130,7 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
   stx: 'n/a',
   suntronic: 'pass',
   synthDream: 'pass',
+  beathoven: 'pass',
   synthesis: 'pass',
   tcbTracker: 'pass',
   tfmMusicMaker: 'pass',
@@ -210,7 +211,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   fur: 'n/a',
   futurePlayer: 'fail',
   gdm: 'n/a',
-  hippelCoso: 'pass',
+  hippelCoso: 'n/a',
   hvl: 'pass',
   inStereo2: 'pass',
   inStereoAmbiguous: 'pass',
@@ -246,6 +247,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   stx: 'n/a',
   suntronic: 'pass',
   synthDream: 'fail',
+  beathoven: 'fail',
   synthesis: 'pass',
   tcbTracker: 'pass',
   tfmMusicMaker: 'pass',
@@ -390,7 +392,6 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   uade_abk: 'G11-uade-only',
   uade_agi: 'G11-uade-only',
   uade_ast: 'G11-uade-only',
-  uade_bss: 'U28',
   uade_bfc: 'G11-uade-only',
   uade_bsi: 'G11-uade-only',
   uade_fc_bsi: 'G11-uade-only',
@@ -471,6 +472,8 @@ export const DIRECT_GRIDS: readonly string[] = [
   'monotone', 'ansiMusic',
   // SynthDream: the command streams decode to a read-only tick grid (synthDreamGrid.ts), no oracle yet.
   'synthDream',
+  // Beathoven Synthesizer: the command streams decode to a read-only tick grid (beathovenGrid.ts), no oracle yet.
+  'beathoven',
 ];
 
 export function gridProvenanceOf(key: string): GridProvenance | null {

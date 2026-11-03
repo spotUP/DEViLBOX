@@ -2482,11 +2482,10 @@ export async function tryRouteFormat(
   // Beathoven Synthesizer: the BeathovenSynthesizer eagleplayer plays it on
   // the Musashi host (EaglePlayerEngine); the grid as before.
   if (matchesExt(filename, ['bss'])) {
-    const { isWantedTeamDaveLoweFormat, parseWantedTeamDaveLoweFile } =
-      await import('@lib/import/formats/WantedTeamDaveLoweParser');
+    const { isBeathovenFormat, parseBeathovenFile } = await import('@lib/import/formats/BeathovenParser');
     const { withEaglePlayer } = await import('./withEaglePlayer');
     return withEaglePlayer('BeathovenSynthesizer', ctx,
-      (buf, name) => (isWantedTeamDaveLoweFormat(buf) ? parseWantedTeamDaveLoweFile(buf, name) : null),
+      (buf, name) => (isBeathovenFormat(buf) ? parseBeathovenFile(buf, name) : null),
       toUADEPrefixName(originalFileName, ['bss']));
   }
   // ── Sean Connolly — native parser provides detection; UADE handles audio.
