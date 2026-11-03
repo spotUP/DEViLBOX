@@ -471,6 +471,10 @@ export class TrackerScratchController {
   triggerElectronicBrake(onComplete?: () => void): void {
     const replayer = getTrackerReplayer();
     if (!replayer.isPlaying()) {
+      // Nothing for the platter to spin down, but the transport may still be
+      // playing: an opaque UADE song plays in UADESynth with the replayer idle.
+      // Stop means stop, so stop the transport chain without a spindown.
+      this.stopWithoutSpindown();
       onComplete?.();
       return;
     }
@@ -481,7 +485,7 @@ export class TrackerScratchController {
     if (!this.scratchBufferReady) {
       this._pendingStop = true;
       this.initScratchBuffer().then(() => {
-        if (!replayer.isPlaying()) { this._pendingStop = false; onComplete?.(); return; }
+        if (!replayer.isPlaying()) { this._pendingStop = false; this.stopWithoutSpindown(); onComplete?.(); return; }
         if (!this._isActive) this.enterScratchMode(replayer);
         this.physics.triggerElectronicBrake(() => {
           this._pendingStop = false;
@@ -490,9 +494,7 @@ export class TrackerScratchController {
         });
       }).catch(() => {
         // Buffer init failed — stop immediately without spin-down
-        replayer.stop();
-        useTransportStore.getState().stop();
-        getToneEngine().stop();
+        this.stopWithoutSpindown();
         onComplete?.();
       });
       return;
@@ -515,6 +517,13 @@ export class TrackerScratchController {
    * Used when power-cut spindown completes — the record has stopped,
    * no point resuming normal playback.
    */
+  /** Stop the replayer and the full transport chain at once, with no platter spindown. */
+  private stopWithoutSpindown(): void {
+    getTrackerReplayer().stop();
+    useTransportStore.getState().stop();
+    getToneEngine().stop();
+  }
+
   private exitScratchModeAndStop(): void {
     this._isActive = false;
     this._pendingStop = false;
