@@ -86,6 +86,7 @@ import { showConfirm } from '@/stores/useConfirmStore';
 import { Modal } from '@/components/ui/Modal';
 import { ModalHeader } from '@/components/ui/ModalHeader';
 import { Button } from '@/components/ui/Button';
+import { fetchHippoPlaylist, fetchHippoPlaylistSummaries, type HippoPlaylistSummary } from '@/lib/dj/hippoPlaylistApi';
 import { PlaylistVisibilitySwitch } from './PlaylistVisibilitySwitch';
 import { useAuthStore } from '@/stores/useAuthStore';
 import {
@@ -1218,6 +1219,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
   const [showCommunity, setShowCommunity] = useState(false);
   const [loadingCommunity, setLoadingCommunity] = useState(false);
   const [importingCloudId, setImportingCloudId] = useState<string | null>(null);
+  const [hippoPlaylists, setHippoPlaylists] = useState<HippoPlaylistSummary[]>([]);
   const [sidebarSearch, setSidebarSearch] = useState('');
   const [rightPaneTab, setRightPaneTab] = useState<'tracks' | 'online'>('tracks');
   const clipboardRef = useRef<{ tracks: PlaylistTrack[]; isCut: boolean }>({ tracks: [], isCut: false });
@@ -1688,10 +1690,29 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
       setCommunityPlaylists(result.playlists);
     } catch (err) {
       console.error('Failed to load community playlists:', err);
+    }
+    try {
+      setHippoPlaylists(await fetchHippoPlaylistSummaries());
+    } catch (err) {
+      console.error('Failed to load HippoPlayer playlists:', err);
     } finally {
       setLoadingCommunity(false);
     }
   }, []);
+
+  const handleImportHippoPlaylist = useCallback(async (id: string) => {
+    setImportingCloudId(id);
+    try {
+      const full = await fetchHippoPlaylist(id);
+      if (!full) return;
+      const newId = createPlaylist(full.name);
+      addTracks(newId, full.tracks.map((t) => ({ ...t, id: undefined })));
+    } catch (err) {
+      console.error('Failed to import HippoPlayer playlist:', err);
+    } finally {
+      setImportingCloudId(null);
+    }
+  }, [createPlaylist, addTracks]);
 
   const handleImportCommunityPlaylist = useCallback(async (cloudId: string) => {
     setImportingCloudId(cloudId);
@@ -3085,7 +3106,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
               <button
                 onClick={() => {
                   setShowCommunity(!showCommunity);
-                  if (!showCommunity && communityPlaylists.length === 0) loadCommunityPlaylists();
+                  if (!showCommunity && communityPlaylists.length === 0 && hippoPlaylists.length === 0) loadCommunityPlaylists();
                 }}
                 className="w-full px-3 py-2 flex items-center justify-between text-[10px] font-mono text-text-muted uppercase tracking-wider hover:bg-dark-bgHover transition-colors"
               >
@@ -3103,12 +3124,38 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                       <RefreshCw size={12} className="animate-spin text-text-muted/40 mx-auto" />
                       <p className="text-[9px] font-mono text-text-muted/40 mt-1">Loading…</p>
                     </div>
-                  ) : communityPlaylists.length === 0 ? (
+                  ) : communityPlaylists.length === 0 && hippoPlaylists.length === 0 ? (
                     <div className="px-3 py-3 text-center">
                       <p className="text-[9px] font-mono text-text-muted/40">No public playlists yet</p>
                     </div>
                   ) : (
-                    communityPlaylists.map((cp) => (
+                    <>
+                    {hippoPlaylists.length > 0 && (
+                      <div className="px-3 pt-1.5 pb-0.5 text-[9px] font-mono text-text-muted/60 uppercase tracking-wider">
+                        HippoPlayer ({hippoPlaylists.length}, read only)
+                      </div>
+                    )}
+                    {hippoPlaylists.map((hp) => (
+                      <div
+                        key={hp.id}
+                        className="flex items-center gap-2 px-3 py-1.5 hover:bg-dark-bgHover transition-colors group"
+                      >
+                        <Lock size={10} className="text-text-muted/40 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[10px] font-mono text-text-secondary truncate">{hp.name}</div>
+                          <div className="text-[9px] font-mono text-text-muted/40">{hp.trackCount} tracks · HippoPlayer</div>
+                        </div>
+                        <button
+                          onClick={() => handleImportHippoPlaylist(hp.id)}
+                          disabled={importingCloudId === hp.id}
+                          className="p-0.5 text-text-muted/40 hover:text-accent-primary transition-colors opacity-0 group-hover:opacity-100"
+                          title="Import to my playlists"
+                        >
+                          {importingCloudId === hp.id ? <RefreshCw size={10} className="animate-spin" /> : <Download size={10} />}
+                        </button>
+                      </div>
+                    ))}
+                    {communityPlaylists.map((cp) => (
                       <div
                         key={cp.id}
                         className="flex items-center gap-2 px-3 py-1.5 hover:bg-dark-bgHover transition-colors group"
@@ -3129,7 +3176,8 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                           {importingCloudId === cp.id ? <RefreshCw size={10} className="animate-spin" /> : <Download size={10} />}
                         </button>
                       </div>
-                    ))
+                    ))}
+                    </>
                   )}
                   <div className="px-3 py-1 border-t border-dark-border/30">
                     <button

@@ -30,6 +30,7 @@ import uproughRoutes from './routes/uprough';
 import genreRoutes from './routes/genre';
 import modarchiveRoutes from './routes/modarchive';
 import hipRoutes from './routes/hip';
+import hipPlaylistsRoutes from './routes/hipPlaylists';
 import loudnessRoutes from './routes/loudness';
 import { handleStreamConnection, checkFfmpeg } from './routes/stream';
 import { initDataDirectories } from './utils/fileSystem';
@@ -63,6 +64,8 @@ app.set('trust proxy', trustProxyHops());
 // for the JSON envelope around a 64 KB tool result.
 app.use('/api/ai', express.json({ limit: '256kb' }));
 app.use('/api/ai', createAiGuards());
+// HippoPlayer playlists are ours (read-only files); mounted before the forward, which would take all of /api/hip.
+app.use('/api/hip/playlists', hipPlaylistsRoutes);
 // HiP and account APIs are served by hippoplayer.se. Mounted before the JSON
 // parser so the request body reaches the upstream as the exact bytes received.
 const hippoForwardBase = process.env.HIPPO_FORWARD_BASE;
