@@ -40,6 +40,7 @@ import {
   removeRating,
   type RatingMap,
 } from '@/lib/ratingsApi';
+import { useRatingsStore } from '@/stores/useRatingsStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { AuthModal } from '@/components/dialogs/AuthModal';
 import { StarRating } from '@/components/shared/StarRating';
@@ -271,9 +272,11 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
     });
     try {
       if (star === 0) {
-        await removeRating(ratingSource, itemKey);
+        const res = await removeRating(ratingSource, itemKey);
+        useRatingsStore.getState().record(ratingSource, itemKey, { avg: res.avg, count: res.count });
       } else {
-        await setRating(ratingSource, itemKey, star);
+        const res = await setRating(ratingSource, itemKey, star);
+        useRatingsStore.getState().record(ratingSource, itemKey, { avg: res.avg, count: res.count, userRating: res.userRating });
       }
     } catch {
       batchGetRatings(ratingSource, [itemKey]).then(rm => {
