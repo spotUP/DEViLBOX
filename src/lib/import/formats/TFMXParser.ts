@@ -862,6 +862,7 @@ export function parseTFMXFile(
     lastStep,
     macros,
     macroPointerTableOffset: macroPtrTable,
+    trackstepOffset: trackstepOff,
   };
 
   return {

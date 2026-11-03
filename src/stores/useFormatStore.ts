@@ -484,6 +484,43 @@ const clearNative = (state: any) => {
  * throws any other unexpected error as a console warning (same policy as the
  * former inline block in setSunTronicPositionCell).
  */
+/**
+ * After a trackstep edit patched the TFMX module bytes: decode the grid again from those bytes, so the
+ * pattern editor, the play check and the exporter see the new arrangement, and hand the module to the
+ * running tune. Grid cell edits not yet in the bytes (TFMX cell edits reach the module only at play or
+ * export) are written into the bytes first, so the decode keeps them; the grid is then the new baseline,
+ * and the next play loads the patched bytes as they are.
+ */
+async function reprojectTFMXFromBytes(get: () => FormatStore): Promise<void> {
+  try {
+    const [{ parseTFMXFile }, { writeEditedTFMXCells }, gridBaseline] = await Promise.all([
+      import('@/lib/import/formats/TFMXParser'),
+      import('@/lib/export/TFMXExporter'),
+      import('@/lib/song/gridBaseline'),
+    ]);
+    const fmt = get();
+    if (!fmt.tfmxFileData || !fmt.tfmxNative) return;
+    const trackerStore = getTrackerStoreRef();
+    const tracker = trackerStore.getState() as ReturnType<typeof _TrackerStoreType.getState>;
+    if (fmt.uadePatternLayout) writeEditedTFMXCells(new Uint8Array(fmt.tfmxFileData), fmt.uadePatternLayout, tracker.patterns, []);
+
+    const song = parseTFMXFile(fmt.tfmxFileData, fmt.uadeEditableFileName ?? 'mdat.edited', fmt.tfmxNative.activeSubsong);
+    const samplesEdited = gridBaseline.sampleIsEdited();
+    gridBaseline.setGridBaseline(gridBaseline.baselineOf(song.patterns));
+    if (samplesEdited) gridBaseline.markSampleEdited();
+    useFormatStore.setState({ uadePatternLayout: song.uadePatternLayout ?? null, tfmxTimingTable: song.tfmxTimingTable ?? null } as Partial<FormatStore>);
+    const update: { patterns: typeof song.patterns; patternOrder?: number[] } = { patterns: song.patterns };
+    if (song.songPositions.length !== tracker.patternOrder.length) update.patternOrder = [...song.songPositions];
+    trackerStore.setState(update);
+
+    // The running tune takes the patched module and plays on from where it is
+    const { TFMXEngine } = await import('@/engine/tfmx/TFMXEngine');
+    if (TFMXEngine.hasInstance()) TFMXEngine.getInstance().swapModule(fmt.tfmxFileData.slice(0));
+  } catch (err) {
+    console.warn('[setTFMXTrackstepVoice] grid re-projection failed:', err);
+  }
+}
+
 function runSunTronicReproject(
   get: () => FormatStore,
   context: string,
@@ -756,14 +793,24 @@ export const useFormatStore = create<FormatStore>()(
       state.maxTraxRev += 1;
     }),
     setFurnaceNative: (data) => set((state) => { state.furnaceNative = data; }),
-    setFurnaceOrderEntry: (channel, position, patternIndex) => set((state) => {
-      if (!state.furnaceNative) return;
-      const sub = state.furnaceNative.subsongs[state.furnaceNative.activeSubsong];
-      if (!sub) return;
-      if (channel < 0 || channel >= sub.orders.length) return;
-      if (position < 0 || position >= sub.ordersLen) return;
-      sub.orders[channel][position] = patternIndex;
-    }),
+    setFurnaceOrderEntry: (channel, position, patternIndex) => {
+      let applied = false;
+      set((state) => {
+        if (!state.furnaceNative) return;
+        const sub = state.furnaceNative.subsongs[state.furnaceNative.activeSubsong];
+        if (!sub) return;
+        if (channel < 0 || channel >= sub.orders.length) return;
+        if (position < 0 || position >= sub.ordersLen) return;
+        sub.orders[channel][position] = patternIndex;
+        applied = true;
+      });
+      if (!applied) return;
+      // The next play uploads the edited orders; a running WASM sequencer gets the
+      // entry now, so the tune already playing follows the matrix edit too.
+      void import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
+        if (FurnaceDispatchEngine.hasInstance()) FurnaceDispatchEngine.getInstance().seqSetOrder(channel, position, patternIndex);
+      }).catch(() => {});
+    },
     insertFurnaceOrderRow: (position) => set((state) => {
       if (!state.furnaceNative) return;
       const sub = state.furnaceNative.subsongs[state.furnaceNative.activeSubsong];
@@ -1414,16 +1461,31 @@ export const useFormatStore = create<FormatStore>()(
     // TFMX mutations
     setTFMXNative: (data) => set((state) => { state.tfmxNative = data; }),
     setTFMXSelectedPattern: (idx) => set((state) => { state.tfmxSelectedPattern = idx; }),
-    setTFMXTrackstepVoice: (stepIdx, voiceIdx, patNum, transpose) => set((state) => {
-      if (!state.tfmxNative) return;
-      const step = state.tfmxNative.tracksteps.find(s => s.stepIndex === stepIdx);
-      if (!step || step.isEFFE || voiceIdx >= step.voices.length) return;
-      const voice = step.voices[voiceIdx];
-      voice.patternNum = patNum;
-      voice.transpose = transpose;
-      voice.isHold = false;
-      voice.isStop = patNum < 0;
-    }),
+    setTFMXTrackstepVoice: (stepIdx, voiceIdx, patNum, transpose) => {
+      let patched = false;
+      set((state) => {
+        if (!state.tfmxNative) return;
+        const step = state.tfmxNative.tracksteps.find(s => s.stepIndex === stepIdx);
+        if (!step || step.isEFFE || voiceIdx >= step.voices.length) return;
+        const voice = step.voices[voiceIdx];
+        voice.patternNum = patNum;
+        voice.transpose = transpose;
+        voice.isHold = false;
+        voice.isStop = patNum < 0;
+        // The module bytes are what play loads: patch the trackstep entry in place (pattern byte, transpose byte)
+        const base = state.tfmxNative.trackstepOffset;
+        if (state.tfmxFileData && base !== undefined) {
+          const view = new Uint8Array(state.tfmxFileData);
+          const off = base + stepIdx * 16 + voiceIdx * 2;
+          if (off >= 0 && off + 1 < view.length) {
+            view[off] = patNum < 0 ? 0xFF : patNum & 0xFF;
+            view[off + 1] = transpose & 0xFF;
+            patched = true;
+          }
+        }
+      });
+      if (patched) void reprojectTFMXFromBytes(get);
+    },
     insertTFMXTrackstep: (idx) => set((state) => {
       if (!state.tfmxNative) return;
       const steps = state.tfmxNative.tracksteps;

@@ -58,6 +58,28 @@ export interface TFMXExportResult {
   warnings: string[];
 }
 
+/**
+ * Write each grid cell that differs from the decoded baseline into `out` (module bytes) at its command word.
+ * The writer the exporter uses, and the one a trackstep edit uses to keep unsaved grid edits when the grid is
+ * decoded again from the bytes.
+ */
+export function writeEditedTFMXCells(
+  out: Uint8Array,
+  layout: NonNullable<TrackerSong['uadePatternLayout']>,
+  patterns: TrackerSong['patterns'],
+  warnings: string[],
+): void {
+  if (!layout.encodeCell || !layout.getCellFileOffset) return;
+  for (const { pattern, row, channel, cell } of editedCells(patterns)) {
+    const at = layout.getCellFileOffset(pattern, row, channel);
+    if (at < 0 || at + 4 > out.length) {
+      if ((cell.note ?? 0) > 0) warnings.push(`pattern ${pattern} voice ${channel + 1} row ${row}: a note on a row no command word covers needs a longer pattern; not written`);
+      continue;
+    }
+    out.set(layout.encodeCell(cell), at);
+  }
+}
+
 export async function exportTFMX(song: TrackerSong): Promise<TFMXExportResult> {
   const warnings: string[] = [];
 
@@ -69,14 +91,7 @@ export async function exportTFMX(song: TrackerSong): Promise<TFMXExportResult> {
   const layout = song.uadePatternLayout;
   if (loaded && layout?.encodeCell && layout.getCellFileOffset) {
     const out = new Uint8Array(loaded.slice(0));
-    for (const { pattern, row, channel, cell } of editedCells(song.patterns)) {
-      const at = layout.getCellFileOffset(pattern, row, channel);
-      if (at < 0 || at + 4 > out.length) {
-        if ((cell.note ?? 0) > 0) warnings.push(`pattern ${pattern} voice ${channel + 1} row ${row}: a note on a row no command word covers needs a longer pattern; not written`);
-        continue;
-      }
-      out.set(layout.encodeCell(cell), at);
-    }
+    writeEditedTFMXCells(out, layout, song.patterns, warnings);
     const name = (song.name || 'untitled').replace(/[^a-zA-Z0-9_.-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || 'untitled';
     return { data: new Blob([out.slice().buffer as ArrayBuffer], { type: 'application/octet-stream' }), filename: `mdat.${name}`, warnings };
   }
