@@ -1,230 +1,199 @@
 /**
- * DavidHanneyParser.ts — David Hanney Amiga music format native parser
+ * David Hanney (.dh) parser.
  *
- * David Hanney composed music for Amiga games in the early 1990s. Files use
- * the "dh." prefix (e.g., "dh.tearaway"). The format uses a chunked layout
- * with a fixed 256-byte header followed by "INFO" and "BLK" chunks.
+ * Format (from third-party/nuade/players/davidhanney/davidhanney.c): a 4-byte "DSNG" tag, then chunks of
+ * tag(4) + size(4) + data. SEQU holds one pattern number per order (a byte each), INFO holds the order count
+ * (u16 at +0) and the speed (u16 at +4), and each "BLK" + pattern number chunk holds a u16 row count followed by
+ * rows of 4 voices x 3 bytes: note, instrument, (effect << 4 | parameter).
  *
- * Detection:
- *   bytes[0..7] == "DSNGSEQU" (0x44 0x53 0x4E 0x47 0x53 0x45 0x51 0x55)
- *   Minimum file size: 272 bytes (256-byte header + INFO chunk + size field)
+ * Note bytes: 0 empty, 1 stops the voice, 2 releases it, n >= 3 plays period table entry n - 2. Entry 36 is the
+ * 856 period (C-1), which is grid note 13, so grid note = byte - 25. Bytes below 26 lie under the grid's range;
+ * encodeCell keeps the stored byte whenever the cell's grid note is unchanged, so the file stays byte-exact.
  *
- * File structure (observed from test files and player disassembly):
- *   Offset  Size     Description
- *   ------  ----     -----------
- *   0x000   8        Magic: "DSNGSEQU"
- *   0x008   4        Version / flags (e.g. 0x00000100 = version 1.0)
- *   0x00C   4        Unknown header fields
- *   0x010   240      Reserved / zero-padded header
- *   0x100   varies   INFO chunk: 4-byte id "INFO" + 4-byte size + data
- *                      INFO data (10 bytes):
- *                        0x00 u16BE: unknown field
- *                        0x02 u16BE: unknown field
- *                        0x04 u16BE: num_channels (typically 4)
- *                        0x06 u16BE: unknown field
- *                        0x08 u16BE: unknown field
- *   0x???   varies   BLK chunks: 4-byte id "BLK\0" + 4-byte size + data
- *
- * UADE eagleplayer.conf: DavidHanney  prefixes=dh
- * Player credit: "(c) 1992 by David Hanney, adapted by Mr.Larmer/Wanted Team & DEFECT"
- *
- * Actual audio playback is delegated to UADE.
- *
- * References:
- *   third-party/uade-3.05/players/DavidHanney (player binary)
- *   third-party/uade-3.05/eagleplayer.conf (prefixes=dh)
+ * Playback stays with UADE; edits are written into the module bytes through uadePatternLayout.
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, TrackerCell } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 
-// ── Constants ──────────────────────────────────────────────────────────────
-
-/** Minimum file size for the full header + INFO chunk header. */
-const MIN_FILE_SIZE = 272;
-
-/** Offset of the first chunk area (after the fixed 256-byte header). */
-const CHUNK_AREA_OFFSET = 0x100;
-
-/** Default channel count if INFO chunk is absent or unreadable. */
-const DEFAULT_CHANNELS = 4;
-
-// ── Binary helpers ─────────────────────────────────────────────────────────
+const FIRST_CHUNK = 4;
+const CHUNK_HEADER = 8;
+const ROW_COUNT_BYTES = 2;
+const CELL_BYTES = 3;
+const VOICES = 4;
+const ROW_BYTES = VOICES * CELL_BYTES;
+const NOTE_STOP = 1;
+const NOTE_TABLE_BIAS = 2;
+const NOTE_TO_GRID = 25;
+const GRID_NOTE_OFF = 97;
+const DEFAULT_SPEED = 6;
+const INSTRUMENT_COUNT = 16;
 
 function u16BE(buf: Uint8Array, off: number): number {
   return ((buf[off] << 8) | buf[off + 1]) >>> 0;
 }
 
 function u32BE(buf: Uint8Array, off: number): number {
-  return (
-    ((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0
-  );
+  return ((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]) >>> 0;
 }
 
-function matchesId(buf: Uint8Array, off: number, id: string): boolean {
-  if (off + id.length > buf.length) return false;
-  for (let i = 0; i < id.length; i++) {
-    if (buf[off + i] !== id.charCodeAt(i)) return false;
-  }
-  return true;
+function tagAt(buf: Uint8Array, off: number): string {
+  return String.fromCharCode(buf[off], buf[off + 1], buf[off + 2], buf[off + 3]);
 }
 
-// ── Format detection ───────────────────────────────────────────────────────
-
-/**
- * Return true if the buffer is a David Hanney module.
- *
- * Detection: bytes[0..7] == "DSNGSEQU".
- * The 8-byte combined magic is unique to this format.
- */
+/** True when the file starts with the "DSNG" tag followed by the SEQU chunk. */
 export function isDavidHanneyFormat(buffer: ArrayBuffer | Uint8Array): boolean {
   const buf = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
-  if (buf.length < MIN_FILE_SIZE) return false;
-  return (
-    buf[0] === 0x44 && // D
-    buf[1] === 0x53 && // S
-    buf[2] === 0x4e && // N
-    buf[3] === 0x47 && // G
-    buf[4] === 0x53 && // S
-    buf[5] === 0x45 && // E
-    buf[6] === 0x51 && // Q
-    buf[7] === 0x55    // U
-  );
+  return buf.length >= 16 && tagAt(buf, 0) === 'DSNG' && tagAt(buf, FIRST_CHUNK) === 'SEQU';
 }
 
-// ── Chunk reader ───────────────────────────────────────────────────────────
-
-interface InfoChunk {
-  numChannels: number;
+interface Chunk {
+  tag: string;
+  data: number;
+  size: number;
+  /** Fourth tag byte: the pattern number of a BLK chunk. */
+  id: number;
 }
 
-/**
- * Parse the INFO chunk from the chunk area (starting at CHUNK_AREA_OFFSET).
- * Returns null if the INFO chunk is not found within the first 32 bytes
- * after the chunk area offset.
- */
-function readInfoChunk(buf: Uint8Array): InfoChunk | null {
-  // The INFO chunk may have a small variable-length gap before it.
-  // Search up to 32 bytes into the chunk area for the "INFO" identifier.
-  const searchLimit = Math.min(CHUNK_AREA_OFFSET + 32, buf.length - 8);
-  for (let off = CHUNK_AREA_OFFSET; off <= searchLimit; off++) {
-    if (!matchesId(buf, off, 'INFO')) continue;
-
-    const sizeOff = off + 4;
-    if (sizeOff + 4 > buf.length) break;
-
-    const size = u32BE(buf, sizeOff);
-    const dataOff = sizeOff + 4;
-
-    if (dataOff + size > buf.length || size < 6) break;
-
-    // Word at offset 4 in the INFO data = num_channels
-    const numChannels = u16BE(buf, dataOff + 4);
-    return {
-      numChannels: numChannels > 0 && numChannels <= 32 ? numChannels : DEFAULT_CHANNELS,
-    };
+function readChunks(buf: Uint8Array): Chunk[] {
+  const chunks: Chunk[] = [];
+  let off = FIRST_CHUNK;
+  while (off + CHUNK_HEADER <= buf.length) {
+    const size = u32BE(buf, off + 4);
+    const data = off + CHUNK_HEADER;
+    if (data + size > buf.length) break;
+    chunks.push({ tag: tagAt(buf, off).slice(0, 3), data, size, id: buf[off + 3] });
+    off = data + size;
   }
-  return null;
+  return chunks;
 }
 
-// ── Main parser ────────────────────────────────────────────────────────────
+/** Stored cell bytes to a grid cell. Inverse of encodeDavidHanneyCell for every cell the grid can show. */
+export function decodeDavidHanneyCell(bytes: Uint8Array): TrackerCell {
+  const b = bytes[0];
+  let note = 0;
+  if (b === NOTE_STOP) note = GRID_NOTE_OFF;
+  else if (b > NOTE_TABLE_BIAS && b - NOTE_TO_GRID >= 1 && b - NOTE_TO_GRID < GRID_NOTE_OFF) note = b - NOTE_TO_GRID;
+  return {
+    note,
+    instrument: bytes[1],
+    volume: 0,
+    effTyp: bytes[2] >> 4,
+    eff: bytes[2] & 0x0f,
+    effTyp2: 0,
+    eff2: 0,
+  };
+}
 
 /**
- * Parse a David Hanney module file into a TrackerSong.
- *
- * Extracts channel count from the INFO chunk when available.
- * Actual audio playback is always delegated to UADE.
- *
- * @param buffer   Raw file bytes (ArrayBuffer)
- * @param filename Original filename (used to derive the module name)
+ * Grid cell to stored bytes. When the grid note is what the stored note byte already decodes to, the stored byte
+ * is kept (release, stop and notes below the grid's range survive an edit of another field).
  */
+export function encodeDavidHanneyCell(cell: TrackerCell, stored?: Uint8Array): Uint8Array {
+  const out = new Uint8Array(CELL_BYTES);
+  const keep = stored !== undefined && decodeDavidHanneyCell(stored).note === cell.note;
+  if (keep) out[0] = stored[0];
+  else if (cell.note === 0) out[0] = 0;
+  else if (cell.note === GRID_NOTE_OFF) out[0] = NOTE_STOP;
+  else out[0] = Math.min(255, cell.note + NOTE_TO_GRID);
+  out[1] = cell.instrument & 0xff;
+  out[2] = ((cell.effTyp & 0x0f) << 4) | (cell.eff & 0x0f);
+  return out;
+}
+
 export function parseDavidHanneyFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
-
-  if (!isDavidHanneyFormat(buf)) {
-    throw new Error('Not a David Hanney module');
-  }
-
-  // ── Module name from filename ─────────────────────────────────────────────
+  if (!isDavidHanneyFormat(buf)) throw new Error('Not a David Hanney module');
 
   const baseName = filename.split('/').pop() ?? filename;
   const moduleName = baseName.replace(/^dh\./i, '').replace(/\.dh$/i, '') || baseName;
 
-  // ── Metadata from INFO chunk ──────────────────────────────────────────────
+  const chunks = readChunks(buf);
+  const sequ = chunks.find(c => c.tag === 'SEQ');
+  const info = chunks.find(c => c.tag === 'INF');
+  const blocks = chunks.filter(c => c.tag === 'BLK');
+  if (!sequ || !info || info.size < 6 || blocks.length === 0) throw new Error('David Hanney module: missing chunks');
 
-  const info = readInfoChunk(buf);
-  const numChannels = info?.numChannels ?? DEFAULT_CHANNELS;
+  const orderCount = Math.min(u16BE(buf, info.data), sequ.size);
+  const speed = u16BE(buf, info.data + 4) || DEFAULT_SPEED;
 
-  // ── Stereo panning (LRRL for 4-channel; extend symmetrically for more) ────
+  const blockIndex = new Map<number, number>();
+  blocks.forEach((c, i) => blockIndex.set(c.id, i));
+  const blockBase = blocks.map(c => c.data);
+  const blockRows = blocks.map(c => Math.min(u16BE(buf, c.data), Math.floor((c.size - ROW_COUNT_BYTES) / ROW_BYTES)));
 
-  const channelPans = Array.from({ length: numChannels }, (_, i) => {
-    const pos = i % 4;
-    return pos === 0 || pos === 3 ? -50 : 50;
-  });
-
-  // ── Stub pattern (UADE handles audio) ─────────────────────────────────────
-
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0,
-    instrument: 0,
-    volume: 0,
-    effTyp: 0,
-    eff: 0,
-    effTyp2: 0,
-    eff2: 0,
-  }));
-
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: numChannels }, (_, ch) => ({
+  const patterns = blocks.map((c, p) => ({
+    id: `pattern-${p}`,
+    name: `Pattern ${c.id}`,
+    length: blockRows[p],
+    channels: Array.from({ length: VOICES }, (_, ch) => ({
       id: `channel-${ch}`,
       name: `Channel ${ch + 1}`,
       muted: false,
       solo: false,
       collapsed: false,
       volume: 100,
-      pan: channelPans[ch],
+      pan: ch === 0 || ch === 3 ? -50 : 50,
       instrumentId: null,
       color: null,
-      rows: emptyRows,
+      rows: Array.from({ length: blockRows[p] }, (_, row) => {
+        const off = blockBase[p] + ROW_COUNT_BYTES + row * ROW_BYTES + ch * CELL_BYTES;
+        return decodeDavidHanneyCell(buf.subarray(off, off + CELL_BYTES));
+      }),
     })),
     importMetadata: {
       sourceFormat: 'MOD' as const,
       sourceFile: filename,
       importedAt: new Date().toISOString(),
-      originalChannelCount: numChannels,
-      originalPatternCount: 1,
-      originalInstrumentCount: 0,
+      originalChannelCount: VOICES,
+      originalPatternCount: blocks.length,
+      originalInstrumentCount: INSTRUMENT_COUNT,
     },
-  };
+  }));
 
-  const instruments: InstrumentConfig[] = [
-    {
-      id: 1,
-      name: '',
-      type: 'synth' as const,
-      synthType: 'Synth' as const,
-      effects: [],
-      volume: 0,
-      pan: 0,
-    } as InstrumentConfig,
-  ];
+  const songPositions: number[] = [];
+  for (let o = 0; o < orderCount; o++) songPositions.push(blockIndex.get(buf[sequ.data + o]) ?? 0);
+
+  const instruments: InstrumentConfig[] = Array.from({ length: INSTRUMENT_COUNT }, (_, i) => ({
+    id: i + 1,
+    name: '',
+    type: 'synth' as const,
+    synthType: 'Synth' as const,
+    effects: [],
+    volume: 0,
+    pan: 0,
+  } as InstrumentConfig));
+
+  const layout: UADEPatternLayout = {
+    formatId: 'davidHanney',
+    patternDataFileOffset: blockBase[0] + ROW_COUNT_BYTES,
+    bytesPerCell: CELL_BYTES,
+    rowsPerPattern: Math.max(...blockRows),
+    numChannels: VOICES,
+    numPatterns: blocks.length,
+    moduleSize: buffer.byteLength,
+    encodeCell: encodeDavidHanneyCell,
+    encodeOverStored: true,
+    decodeCell: decodeDavidHanneyCell,
+    getCellFileOffset: (pattern, row, channel) =>
+      blockBase[pattern] + ROW_COUNT_BYTES + row * ROW_BYTES + channel * CELL_BYTES,
+  };
 
   return {
     name: `${moduleName} [DavidHanney]`,
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
+    patterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions,
+    songLength: songPositions.length,
     restartPosition: 0,
-    numChannels,
-    initialSpeed: 6,
+    numChannels: VOICES,
+    initialSpeed: speed,
     initialBPM: 125,
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    uadePatternLayout: layout,
   };
 }
