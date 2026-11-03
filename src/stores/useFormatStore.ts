@@ -294,6 +294,8 @@ export interface FormatStore {
   setTFMXSelectedPattern: (idx: number) => void;
   /** Update a voice assignment in the TFMX trackstep matrix */
   setTFMXTrackstepVoice: (stepIdx: number, voiceIdx: number, patNum: number, transpose: number) => void;
+  /** Decode the TFMX grid again from tfmxFileData: rows are pattern ticks, so an edit that changes how long a command holds moves every later row */
+  reprojectTFMXGrid: () => Promise<void>;
   /** Insert a new trackstep (copy of current) at the given index */
   insertTFMXTrackstep: (idx: number) => void;
   /** Delete the trackstep at the given index */
@@ -1521,6 +1523,7 @@ export const useFormatStore = create<FormatStore>()(
     // TFMX mutations
     setTFMXNative: (data) => set((state) => { state.tfmxNative = data; }),
     setTFMXSelectedPattern: (idx) => set((state) => { state.tfmxSelectedPattern = idx; }),
+    reprojectTFMXGrid: () => reprojectTFMXFromBytes(get),
     setTFMXTrackstepVoice: (stepIdx, voiceIdx, patNum, transpose) => {
       let patched = false;
       set((state) => {
