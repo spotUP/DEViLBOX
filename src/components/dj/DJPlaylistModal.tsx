@@ -86,6 +86,7 @@ import { showConfirm } from '@/stores/useConfirmStore';
 import { Modal } from '@/components/ui/Modal';
 import { ModalHeader } from '@/components/ui/ModalHeader';
 import { Button } from '@/components/ui/Button';
+import { PlaylistVisibilitySwitch } from './PlaylistVisibilitySwitch';
 import { useAuthStore } from '@/stores/useAuthStore';
 import {
   savePlaylistToCloud,
@@ -1651,8 +1652,8 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
     }
   }, [savingPlaylistId, setPlaylistCloudId]);
 
-  const handleToggleVisibility = useCallback(async (playlist: DJPlaylist) => {
-    const newVis = playlist.visibility === 'public' ? 'private' : 'public';
+  const handleSetVisibility = useCallback(async (playlist: DJPlaylist, newVis: 'private' | 'public') => {
+    if (newVis === (playlist.visibility || 'private')) return;
     if (!playlist.cloudId) {
       // Not saved to cloud yet: local state only, sent on the first cloud save.
       setPlaylistVisibilityStore(playlist.id, newVis);
@@ -1662,9 +1663,14 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
       await apiSetVisibility(playlist.cloudId, newVis);
       setPlaylistVisibilityStore(playlist.id, newVis);
     } catch (err) {
-      console.error('Failed to toggle visibility:', err);
+      console.error('Failed to change visibility:', err);
     }
   }, [setPlaylistVisibilityStore]);
+
+  const handleToggleVisibility = useCallback(
+    (playlist: DJPlaylist) => handleSetVisibility(playlist, playlist.visibility === 'public' ? 'private' : 'public'),
+    [handleSetVisibility],
+  );
 
   const handleSaveAs = useCallback(() => {
     if (!activePlaylist) return;
@@ -3149,25 +3155,8 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                   placeholder="Playlist name..."
                   className="w-full px-2 py-1 text-[11px] font-mono bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary placeholder:text-text-muted/30"
                 />
-                <div className="flex items-center gap-1 mt-1">
-                  <Button
-                    variant={newVisibility === 'private' ? 'primary' : 'ghost'}
-                    size="sm"
-                    icon={<Lock size={10} />}
-                    title="Only you can see this playlist"
-                    onClick={() => setNewVisibility('private')}
-                  >
-                    Private
-                  </Button>
-                  <Button
-                    variant={newVisibility === 'public' ? 'primary' : 'ghost'}
-                    size="sm"
-                    icon={<Globe size={10} />}
-                    title="Everyone can see this playlist once saved to the cloud"
-                    onClick={() => setNewVisibility('public')}
-                  >
-                    Public
-                  </Button>
+                <div className="mt-1">
+                  <PlaylistVisibilitySwitch value={newVisibility} onChange={setNewVisibility} />
                 </div>
                 <div className="flex justify-end gap-1 mt-1">
                   <Button variant="ghost" size="sm" onClick={() => setIsCreating(false)}>Cancel</Button>
@@ -3250,6 +3239,11 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                           {activePlaylist.tracks.length} tracks
                           {totalDuration > 0 && ` · ${formatTotalDuration(totalDuration)}`}
                         </span>
+                        <PlaylistVisibilitySwitch
+                          value={activePlaylist.visibility || 'private'}
+                          onChange={(v) => handleSetVisibility(activePlaylist, v)}
+                          disabled={!!activePlaylist.cloudId && !isLoggedIn}
+                        />
                       </>
                     )}
                   </div>
