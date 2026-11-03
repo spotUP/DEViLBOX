@@ -1061,6 +1061,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/uade/UADEEngine')).UADEEngine as unknown as WASMSingletonStatic,
+    startAt: (instance, frame) => (instance as unknown as import('@/engine/uade/UADEEngine').UADEEngine).seek(frame),
     onStarted: (_instance, song) => {
       // After UADE loads, read pattern data from chip RAM for formats with a decoder
       const layout = song.uadePatternLayout;

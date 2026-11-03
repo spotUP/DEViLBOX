@@ -631,6 +631,27 @@ int uade_wasm_render(float *out_l, float *out_r, int frames) {
     return 1;
 }
 
+/*
+ * Fast-forward: run the emulation `frames` output frames ahead and discard the PCM (start-at-position seek).
+ * Same read path as uade_wasm_render, so the song, tick counters and Paula state end exactly where playing that far
+ * would leave them; nothing is sent to the output. Returns the frames skipped (less than asked if the song ended).
+ */
+EMSCRIPTEN_KEEPALIVE
+int uade_wasm_skip_frames(int frames) {
+    if (!s_state || !s_playing) return 0;
+    int16_t tmp[4096 * 2];
+    int done = 0;
+    while (done < frames) {
+        int chunk = frames - done;
+        if (chunk > 4096) chunk = 4096;
+        ssize_t nbytes = guarded_read(tmp, chunk * 4);
+        if (nbytes <= 0) { s_playing = 0; break; }
+        done += (int)(nbytes / 4);
+    }
+    s_total_frames += done;
+    return done;
+}
+
 /* ── Paula channel state for live pattern display ──────────────────────── */
 
 /*

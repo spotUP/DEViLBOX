@@ -35,6 +35,7 @@ class UADEProcessor extends AudioWorkletProcessor {
     this._paused = false;
     this._lastData = null;       // Last loaded file bytes (for subsong re-scan)
     this._lastHint = '';
+    this._seekFrame = 0;         // Output frames to fast-forward on the next play (seek)
     this._currentSubsong = 0;    // Last requested subsong index (preserved across reloads)
     this._companionFiles = new Map();  // filename → Uint8Array, survives WASM reinit
     this._pendingCompanions = new Set(); // companions sent since the last load: they belong to the NEXT song
@@ -147,8 +148,18 @@ class UADEProcessor extends AudioWorkletProcessor {
             break;
           }
         }
+        // Start-at-position: run the emulation to the asked frame silently (after any reload, which restarts the song).
+        if (this._seekFrame > 0 && this._wasm && this._ready) {
+          this._wasm._uade_wasm_skip_frames(this._seekFrame);
+        }
+        this._seekFrame = 0;
         this._playing = true;
         this._paused = false;
+        break;
+
+      case 'seek':
+        // Held until the next 'play', which fast-forwards to it (a stopped song reloads on play and would undo a seek now).
+        this._seekFrame = Math.max(0, Math.floor(data.frame) || 0);
         break;
 
       case 'stop':
