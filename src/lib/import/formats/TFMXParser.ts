@@ -578,6 +578,21 @@ export function parseTFMXFile(
   // Track command 7VOICE (EFFE0003) switches the decoder to 8 voices (TFMXDecoder::adjustTraitsPost).
   const sevenVoice = nativeTracksteps.some((s) => s.isEFFE && s.effeCommand === 0x0003);
 
+  // Decoder timing (TFMXDecoder::restart / trackCmd_Speed): a pattern tick passes once every
+  // (speed + 1) player calls; the player runs at rateHz. CIA tempo words (>= 0x10) set the rate to
+  // bpm*2/5 Hz with speed 0, otherwise the rate is 50 Hz and the word is the speed. One tick is
+  // therefore (speed + 1) * 50 / rateHz vertical-blank jiffies. EFFE0002 changes speed (and the
+  // rate, in Hz*256 like Decoder::setRate) as the step walk passes it.
+  // Not modelled: variant.bpmSpeed5 (selected by module checksum in the decoder).
+  let walkSpeed = tempo;
+  let walkRateHz = 50;
+  if (tempo >= 0x10) {
+    walkRateHz = (tempo * 2) / 5;
+    walkSpeed = 0;
+  }
+  // stepJiffiesPerTick[trackerPatIdx] = jiffies one pattern tick lasts for that grid pattern
+  const stepJiffiesPerTick: number[] = [];
+
   for (let stepIdx = firstStep; stepIdx <= lastStep; stepIdx++) {
     const stepOff = trackstepOff + stepIdx * TFMX_TRACKSTEP_ENTRY_SIZE;
     if (stepOff + TFMX_TRACKSTEP_ENTRY_SIZE > buf.length) break;
@@ -587,6 +602,14 @@ export function parseTFMXFile(
     if (firstWord === 0xEFFE) {
       const cmd = (buf[stepOff + 2] << 8) | buf[stepOff + 3];
       if (cmd === 0x0000) break; // EFFE0000 = stop player
+      if (cmd === 0x0002) {
+        walkSpeed = (buf[stepOff + 4] << 8) | buf[stepOff + 5];
+        let arg2 = 0x81ff & ((buf[stepOff + 6] << 8) | buf[stepOff + 7]);
+        if (arg2 !== 0 && arg2 < 0x200) {
+          if (arg2 < 32) arg2 = 125;
+          walkRateHz = arg2 / 256;
+        }
+      }
       // EFFE0001 = loop section, EFFE0002 = set tempo, EFFE0003/0004 = volume fade
       // Skip command lines — they don't produce pattern rows
       continue;
@@ -664,6 +687,7 @@ export function parseTFMXFile(
 
     channelOffsetMaps.push(offsetMap);
     gridSteps.push(stepIdx);
+    stepJiffiesPerTick.push(((walkSpeed + 1) * 50) / walkRateHz);
 
     trackerPatterns.push({
       id:     `pattern-${trackerPatterns.length}`,
@@ -699,6 +723,7 @@ export function parseTFMXFile(
     }];
     channelOffsetMaps.push(Array.from({ length: NUM_CHANNELS }, () => [-1]));
     gridSteps.push(-1);
+    stepJiffiesPerTick.push(1);
     gridRowTicks.push([0]);
     trackerPatterns.push({
       id:     'pattern-0',
@@ -727,16 +752,18 @@ export function parseTFMXFile(
     });
   }
 
-  // Build TFMX timing table: cumulative pattern ticks -> (patternIndex, row). Rows are ticks
+  // Build TFMX timing table: cumulative 50 Hz jiffies -> (patternIndex, row). Rows are ticks
   // (gridRowTicks), so a row's time is its step's start plus its tick; a step lasts to its last tick.
+  // Ticks convert to jiffies with the decoder's speed/rate (stepJiffiesPerTick).
   const tfmxTimingTable: { patternIndex: number; row: number; cumulativeJiffies: number }[] = [];
   let cumulativeJiffies = 0;
   for (let patIdx = 0; patIdx < trackerPatterns.length; patIdx++) {
     const ticks = gridRowTicks[patIdx] ?? [];
+    const perTick = stepJiffiesPerTick[patIdx] ?? 1;
     for (let row = 0; row < ticks.length; row++) {
-      tfmxTimingTable.push({ patternIndex: patIdx, row, cumulativeJiffies: cumulativeJiffies + ticks[row] });
+      tfmxTimingTable.push({ patternIndex: patIdx, row, cumulativeJiffies: cumulativeJiffies + ticks[row] * perTick });
     }
-    cumulativeJiffies += (ticks[ticks.length - 1] ?? 0) + 1;
+    cumulativeJiffies += ((ticks[ticks.length - 1] ?? 0) + 1) * perTick;
   }
 
   // 8. Determine initial BPM/speed from tempo value
