@@ -205,6 +205,33 @@ export function tfmxCommandTicks(buf: Uint8Array, offset: number): number {
 }
 
 /**
+ * The Paula voice a pattern command plays on, as the decoder routes it (Chris/TFMXDecoder.cpp
+ * noteCmd: channelToVoiceMap[cd & 7]), or -1 for a command that names no voice. Notes,
+ * portamento, key-up (F5), vibrato (F6), envelope (F7) and lock (FC) name one in the low nibble
+ * of their third byte. Four-voice TFMX maps it AND 3; 7V maps 0-2 to 0-2, 3 to 7 and 4-7 to 3-6.
+ */
+export function tfmxCommandVoice(buf: Uint8Array, offset: number, sevenVoice: boolean): number {
+  if (offset < 0 || offset + 3 >= buf.length) return -1;
+  const aa = buf[offset];
+  if (aa >= 0xF0 && aa !== 0xF5 && aa !== 0xF6 && aa !== 0xF7 && aa !== 0xFC) return -1;
+  const c = buf[offset + 2] & 7;
+  if (!sevenVoice) return c & 3;
+  return c < 3 ? c : c === 3 ? 7 : c - 1;
+}
+
+/**
+ * Point a voiced pattern command at the Paula voice of the grid column it sits in: the inverse of
+ * tfmxCommandVoice. Four-voice: cd & 3 = voice. 7V: voice 0-2 -> cd 0-2, voice 7 -> cd 3, voice 3-6 -> cd 4-7.
+ * A command that names no voice is returned as it is. Returns `bytes` itself, edited in place.
+ */
+export function tfmxSetCommandVoice(bytes: Uint8Array, voice: number, sevenVoice: boolean): Uint8Array {
+  if (bytes.length < 3 || tfmxCommandVoice(bytes, 0, sevenVoice) < 0 || voice < 0 || voice > 7) return bytes;
+  const c = !sevenVoice ? voice & 3 : voice < 3 ? voice : voice === 7 ? 3 : voice + 1;
+  bytes[2] = (bytes[2] & ~7) | c;
+  return bytes;
+}
+
+/**
  * Decode a TFMX pattern's command stream starting at the given file offset.
  * Reads 4-byte longwords until an F0 (end) or F4 (stop) command is found.
  */
@@ -548,6 +575,8 @@ export function parseTFMXFile(
   const gridSteps: number[] = [];
   // gridRowTicks[trackerPatIdx][row] = the pattern tick (from the step's start) that row plays at
   const gridRowTicks: number[][] = [];
+  // Track command 7VOICE (EFFE0003) switches the decoder to 8 voices (TFMXDecoder::adjustTraitsPost).
+  const sevenVoice = nativeTracksteps.some((s) => s.isEFFE && s.effeCommand === 0x0003);
 
   for (let stepIdx = firstStep; stepIdx <= lastStep; stepIdx++) {
     const stepOff = trackstepOff + stepIdx * TFMX_TRACKSTEP_ENTRY_SIZE;
@@ -588,15 +617,27 @@ export function parseTFMXFile(
     // tick; the tick has as many rows as its busiest voice. Every command keeps its own row and
     // file offset, so a cell edit stays a byte-exact 4-byte write. Rows a voice spends waiting
     // are empty and not editable (offset -1). Loops and gotos are shown once, as written.
-    const voiceTicks: Map<number, DecodedTFMXCommand[]>[] = [];
+    //
+    // A column is a Paula voice, not a trackstep track: the decoder sends a note to the voice its
+    // command names (tfmxCommandVoice), so a track's pattern can play on any voice (Turrican's drum
+    // patterns run on tracks 0-2 and play on voice 3). A command that names no voice (wait, loop,
+    // end, ...) sits in the column of the voice its track last played, or will first play.
+    const voiceTicks: Map<number, DecodedTFMXCommand[]>[] = Array.from({ length: NUM_CHANNELS }, () => new Map());
     let lastTick = 0;
-    for (let ch = 0; ch < NUM_CHANNELS; ch++) {
-      const patNum = voicePatNums[ch] ?? -1;
-      const byTick = new Map<number, DecodedTFMXCommand[]>();
-      voiceTicks.push(byTick);
+    for (let track = 0; track < NUM_CHANNELS; track++) {
+      const patNum = voicePatNums[track] ?? -1;
       if (patNum < 0 || patNum >= decodedPatterns.length) continue;
+      const cmds = decodedPatterns[patNum];
+      let column = track;
+      for (const cmd of cmds) {
+        const first = tfmxCommandVoice(buf, cmd.fileOffset, sevenVoice);
+        if (first >= 0) { column = first; break; }
+      }
       let tick = 0;
-      for (const cmd of decodedPatterns[patNum]) {
+      for (const cmd of cmds) {
+        const voice = tfmxCommandVoice(buf, cmd.fileOffset, sevenVoice);
+        if (voice >= 0) column = voice;
+        const byTick = voiceTicks[column];
         const at = byTick.get(tick);
         if (at) at.push(cmd); else byTick.set(tick, [cmd]);
         lastTick = Math.max(lastTick, tick);
@@ -789,7 +830,11 @@ export function parseTFMXFile(
     numChannels: NUM_CHANNELS,
     numPatterns: trackerPatterns.length,
     moduleSize: buf.length,
-    encodeCell: encodeTFMXCell,
+    // The column a cell sits in is the voice the decoder plays it on (grid columns = decoder voices).
+    encodeCell: (cell, _stored, channel) => {
+      const bytes = encodeTFMXCell(cell);
+      return channel === undefined ? bytes : tfmxSetCommandVoice(bytes, channel, sevenVoice);
+    },
     decodeCell: (raw: Uint8Array): TrackerCell => {
       const b0 = raw[0], b1 = raw[1], b2 = raw[2], b3 = raw[3];
 

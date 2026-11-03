@@ -30,7 +30,7 @@ export function patchModuleByLayout(source: ArrayBuffer | Uint8Array, layout: UA
       continue;
     }
     const stored = layout.encodeOverStored ? buf.slice(offset, offset + layout.bytesPerCell) : undefined;
-    const encoded = layout.encodeCell(cell, stored);
+    const encoded = layout.encodeCell(cell, stored, channel);
     for (let i = 0; i < encoded.length; i++) if (buf[offset + i] !== encoded[i]) { buf[offset + i] = encoded[i]; patched++; }
   }
   return { bytes: buf, patched, unplaced };
