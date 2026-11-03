@@ -431,6 +431,11 @@ export class HivelyEngine extends WASMSingletonBase implements IsolationCapableE
     });
   }
 
+  /** Set one channel of one song position: the track it plays and its transpose (the position matrix). */
+  setPosition(position: number, channel: number, track: number, transpose: number): void {
+    this.workletNode?.port.postMessage({ type: 'setPosition', position, channel, track, transpose });
+  }
+
   // ========== IsolationCapableEngine interface ==========
 
   isAvailable(): boolean {

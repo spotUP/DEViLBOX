@@ -77,6 +77,29 @@ export function editHivelyCell(position: number, channelIdx: number, rowIdx: num
   pushHivelyTrackToEngine(trackIdx, [rowIdx]);
 }
 
+/**
+ * Edit one channel of one song position (the position matrix): the track it plays or its transpose.
+ * The tracker grid holds one pattern per position with the transpose folded in, so the position's channel is
+ * projected again from its (new) track; without that the song looked unedited and the next play loaded the
+ * module as opened (owner 2026-11-03: "my matrix edits look like they change the pattern but pressing play
+ * plays the unchanged song"). The running tune gets the same position (hively_set_position).
+ */
+export function editHivelyPosition(position: number, channelIdx: number, columnKey: 'track' | 'transpose', value: number): void {
+  const fmt = useFormatStore.getState();
+  if (!fmt.hivelyNative?.positions[position]) return;
+  fmt.setHivelyPositionCell(position, channelIdx, columnKey, value);
+  const native = useFormatStore.getState().hivelyNative;
+  const pos = native?.positions[position];
+  const track = pos ? native?.tracks[pos.track[channelIdx]] : undefined;
+  if (!pos || !track) return;
+  const transpose = pos.transpose[channelIdx] ?? 0;
+  const tracker = useTrackerStore.getState();
+  track.steps.forEach((step, r) => tracker.setCell(channelIdx, r, hivelyStepToCell(step, transpose), position));
+  void import('@/engine/hively/HivelyEngine').then(({ HivelyEngine }) => {
+    if (HivelyEngine.hasInstance()) HivelyEngine.getInstance().setPosition(position, channelIdx, pos.track[channelIdx], transpose);
+  });
+}
+
 /** Undo / redo the last native step edit and project the track it touched. Returns false when there was nothing. */
 export function undoHively(): boolean {
   const fmt = useFormatStore.getState();
