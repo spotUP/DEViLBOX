@@ -387,6 +387,49 @@ function poolWithGridEdits(song: TrackerSong, original: Uint8Array): SunTronicNa
   return native;
 }
 
+/**
+ * Write the position matrix (`sunTronicNative.positions`, subsong 0) into the
+ * sequence entries of `data`. Each entry is 0x14 bytes in hunk#1: four u32BE
+ * trackPtrs (h1-relative, RELOC32 values) then four s8 transposes.
+ *
+ * `positions[].blockIndex` indexes the pool of the module the editor loaded. The
+ * pool order survives the grid splice and the length-change recompile (both keep
+ * block order), so block `bi` starts at `blocks[bi].h1Offset` of `data`'s own score.
+ * A voice whose trackPtr is 0 has no RELOC32 slot, so it is never pointed at a block.
+ *
+ * Returns the patched copy, or null when the matrix already matches `data`.
+ */
+function writeSunPositions(data: Uint8Array, native: SunTronicNativeData): Uint8Array | null {
+  const score = parseSunTronicV13Score(data);
+  const sub = score.subsongs[0];
+  if (!sub) return null;
+  let out: Uint8Array | null = null;
+  const n = Math.min(sub.entries.length, native.positions.length);
+  for (let ei = 0; ei < n; ei++) {
+    const entry = sub.entries[ei];
+    const pos = native.positions[ei];
+    const fileOff = score.h1FileOffset + sub.sequenceOff + ei * 0x14;
+    for (let v = 0; v < 4; v++) {
+      const bi = pos.blockIndex[v];
+      const block = bi >= 0 ? score.blocks[bi] : undefined;
+      if (block && entry.trackPtrs[v] > 0 && block.h1Offset !== entry.trackPtrs[v]) {
+        out ??= data.slice();
+        const o = fileOff + v * 4;
+        out[o] = (block.h1Offset >>> 24) & 0xff;
+        out[o + 1] = (block.h1Offset >>> 16) & 0xff;
+        out[o + 2] = (block.h1Offset >>> 8) & 0xff;
+        out[o + 3] = block.h1Offset & 0xff;
+      }
+      const tr = Math.max(-128, Math.min(127, pos.transpose[v] | 0));
+      if (tr !== entry.transposes[v]) {
+        out ??= data.slice();
+        out[fileOff + 0x10 + v] = tr & 0xff;
+      }
+    }
+  }
+  return out;
+}
+
 // ── Public entry point ─────────────────────────────────────────────────────────
 
 /**
@@ -431,17 +474,19 @@ export function exportAsSunTronic(song: TrackerSong): NativeExportResult {
     else out.set(encoded, layout.filePatternAddrs[fp]);
   }
 
-  if (!edited) {
+  // Outcome 3: at least one block changed length → re-lay the pool + rebuild the
+  // sequence trackPtrs (and grow the hunk if the pool grew). Outcome 2 (all edits
+  // same length) already spliced in-place above. Unedited blocks keep the original.
+  const pooled = !edited ? orig : lengthChanged
+    ? recompileWithLengthChange(orig, encodedBlocks)
+    : out;
+  // The position matrix goes in last, against the final block offsets.
+  const withPositions = pool ? writeSunPositions(pooled, pool) : null;
+  if (!edited && !withPositions) {
     // Unedited fast path: byte-exact verbatim original.
     return { data: orig, filename, warnings };
   }
-
-  // Outcome 3: at least one block changed length → re-lay the pool + rebuild the
-  // sequence trackPtrs (and grow the hunk if the pool grew). Outcome 2 (all edits
-  // same length) already spliced in-place above.
-  const data = lengthChanged
-    ? recompileWithLengthChange(orig, encodedBlocks)
-    : out;
+  const data = withPositions ?? pooled;
 
   const companions = buildCompanions(song);
   const result: NativeExportResult = { data, filename, warnings };

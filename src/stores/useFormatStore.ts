@@ -521,6 +521,52 @@ async function reprojectTFMXFromBytes(get: () => FormatStore): Promise<void> {
   }
 }
 
+/**
+ * After a SunTronic position-matrix edit (block or transpose of one voice): write the matrix into the
+ * module bytes (exportAsSunTronic patches the sequence entries), hand the bytes to the running UADE tune
+ * (chip-RAM diff against the module it plays), then decode the grid again from the new bytes. The grid
+ * is a replayer walk, so a block change can change the pattern count; the decode is the only projection
+ * that stays right. Pending grid edits are in the export, so the decode keeps them; the grid is then the
+ * new baseline, and the next play loads the new bytes as they are (owner 2026-11-03: matrix edits looked
+ * applied but play played the unchanged song).
+ */
+async function rebuildSunTronicFromPositions(get: () => FormatStore): Promise<void> {
+  try {
+    const [{ exportAsSunTronic }, { parseSunTronicFile }, { liveTrackerSong }, gridBaseline] = await Promise.all([
+      import('@/lib/export/SunTronicExporter'),
+      import('@/lib/import/formats/SunTronicParser'),
+      import('@/lib/song/liveSong'),
+      import('@/lib/song/gridBaseline'),
+    ]);
+    const fmt = get();
+    if (!fmt.uadeEditableFileData || !fmt.sunTronicNative) return;
+    const song = liveTrackerSong();
+    const bytes = exportAsSunTronic(song).data;
+
+    // The running tune first: the chip-RAM diff keys on the module object the song was loaded with.
+    const { UADEEngine } = await import('@/engine/uade/UADEEngine');
+    if (UADEEngine.hasInstance()) {
+      const { applyEditedModuleToChipRam } = await import('@/engine/uade/liveModuleEdits');
+      await applyEditedModuleToChipRam(song);
+    }
+
+    const buffer = bytes.slice().buffer as ArrayBuffer;
+    const parsed = parseSunTronicFile(buffer.slice(0), fmt.uadeEditableFileName ?? song.name ?? 'song');
+    const samplesEdited = gridBaseline.sampleIsEdited();
+    gridBaseline.setGridBaseline(gridBaseline.baselineOf(parsed.patterns));
+    if (samplesEdited) gridBaseline.markSampleEdited();
+    useFormatStore.setState({
+      uadeEditableFileData: buffer,
+      ...(fmt.sunTronicSongFileData ? { sunTronicSongFileData: buffer.slice(0) } : {}),
+      sunTronicNative: parsed.sunTronicNative ?? fmt.sunTronicNative,
+      uadeVariableLayout: parsed.uadeVariableLayout ?? fmt.uadeVariableLayout,
+    } as Partial<FormatStore>);
+    getTrackerStoreRef().setState({ patterns: parsed.patterns, patternOrder: [...parsed.songPositions] });
+  } catch (err) {
+    console.warn('[setSunTronicPositionCell] module rebuild failed:', err);
+  }
+}
+
 function runSunTronicReproject(
   get: () => FormatStore,
   context: string,
@@ -845,21 +891,29 @@ export const useFormatStore = create<FormatStore>()(
       }
     }),
     setSunTronicPositionCell: (pos, ch, field, value) => {
-      // blockIndex changes require a full per-voice re-linearization (re-running
-      // the block-walk that builds the display grid from scratch). reprojectSunGrid
-      // only re-bakes transpose; it cannot remap provenance from a different block.
-      // Until a grid-rebuild subsystem is implemented, blockIndex is display-only.
-      if (field === 'blockIndex') return;
-
-      // 1. Mutate the native data atomically inside immer (transpose only).
+      let changed = false;
       set((state) => {
-        if (!state.sunTronicNative) return;
-        const p = state.sunTronicNative.positions[pos];
+        const native = state.sunTronicNative;
+        if (!native) return;
+        const p = native.positions[pos];
         if (!p || ch < 0 || ch > 3) return;
-        p.transpose[ch] = Math.max(-128, Math.min(127, value));
+        if (field === 'blockIndex') {
+          // A voice with no block (-1: trackPtr 0, no RELOC32 slot) stays empty.
+          if (p.blockIndex[ch] < 0 || native.blocks.length === 0) return;
+          const bi = Math.max(0, Math.min(native.blocks.length - 1, value));
+          if (bi === p.blockIndex[ch]) return;
+          p.blockIndex[ch] = bi;
+        } else {
+          const tr = Math.max(-128, Math.min(127, value));
+          if (tr === p.transpose[ch]) return;
+          p.transpose[ch] = tr;
+        }
+        changed = true;
       });
-      // 2. Re-project display grid via shared helper.
-      runSunTronicReproject(get, '[setSunTronicPositionCell]');
+      if (!changed) return;
+      // The grid shows a transpose at once; the bytes, the running tune and a block change follow the rebuild.
+      if (field === 'transpose') runSunTronicReproject(get, '[setSunTronicPositionCell]');
+      void rebuildSunTronicFromPositions(get);
     },
     applySunTronicGridNote: (blockIndex, rowInBlock, voice, displayNote, position) => {
       // 1. Mutate pool block inside the immer set() so the store's frozen proxy is
