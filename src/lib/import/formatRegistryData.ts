@@ -2295,6 +2295,20 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
 
+  // ── Sound Programming Language (.spl) ────────────────────────────────────
+  {
+    key: 'soundProgrammingLanguage',
+    label: 'Sound Programming Language',
+    description: 'Sound Programming Language (.spl) - read-only command-stream grid, nuade / UADE plays the module',
+    family: 'amiga-native',
+    matchMode: 'both',
+    extRegex: /\.spl$/i,
+    prefixes: ['spl.'],
+    prefKey: 'soprol',
+    nativeParser: { module: '@lib/import/formats/SoundProgrammingLanguageParser', parseFn: 'parseSoundProgrammingLanguageFile', detectFn: 'isSoundProgrammingLanguageFormat' },
+    uadeFallback: true,
+  },
+
   // ── SynthDream (sdr.* prefix) ────────────────────────────────────────────
   {
     key: 'synthDream',
@@ -2493,7 +2507,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     ['pn', 'Pokeynoise'],
     ['riff', 'RiffRaff'],
     ['sa-p', 'Sonic Arranger P'], ['lion', 'Lion'], ['sa_old', 'Sonic Arranger Old'],
-    ['spl', 'Sound Programming Language'], ['tw', 'TW'],
+    ['tw', 'TW'],
     ['sun', 'SUN-Tronic'], ['synmod', 'SynTracker'],
     ['thx', 'AHX/THX prefix'],
     ['tfhd1.5', 'TFMX HD 1.5'], ['tfhd7v', 'TFMX HD 7V'], ['tfhdpro', 'TFMX HD Pro'],
