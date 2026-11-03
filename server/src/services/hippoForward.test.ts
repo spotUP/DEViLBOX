@@ -67,7 +67,9 @@ describe('DEViLBOX app forwarding to hippoplayer.se', () => {
       const s = app.listen(0, '127.0.0.1', () => resolve(s));
     });
     base = `http://127.0.0.1:${(appServer.address() as AddressInfo).port}`;
-  });
+    // Importing the whole app transforms every route module: about 30 s on a
+    // loaded machine, so the 10 s default hook timeout is too short.
+  }, 120_000);
 
   afterAll(async () => {
     appServer?.close();
