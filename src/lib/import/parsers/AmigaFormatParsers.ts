@@ -916,6 +916,19 @@ export async function tryRouteFormat(
       'SynthDreamParser', { injectUADE: true });
   }
 
+  // ── Tim Follin (tf.* prefix) ──────────────────────────────────────────────
+  // TimFollinParser decodes the command streams into a read-only tick grid (phase A);
+  // nuade / UADE plays the module.
+  if (matchesExt(filename, ['tf'])) {
+    const { isTimFollinFormat, parseTimFollinFile } = await import('@lib/import/formats/TimFollinParser');
+    return withNativeThenUADE('timfollin', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        const ab = buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer;
+        return isTimFollinFormat(ab, name) ? parseTimFollinFile(ab, name, requestedSubsong) : null;
+      },
+      'TimFollinParser', { injectUADE: true });
+  }
+
   // ── ICE Tracker / SoundTracker 2.6 (.ice) ────────────────────────────────
   // .ice files — OpenMPT
   if (matchesExt(filename, ['ice'])) {
