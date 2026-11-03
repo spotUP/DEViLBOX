@@ -29,7 +29,7 @@ interface Edit { pattern: number; channel: number; row: number; note: number; of
 
 const where = (e: { pattern: number; channel: number; row: number }): string => `voice ${e.channel + 1}, pattern ${e.pattern}, row ${e.row}`;
 
-function otherFieldsDiffer(a: TrackerCell, b: TrackerCell): boolean {
+export function otherFieldsDiffer(a: TrackerCell, b: TrackerCell): boolean {
   const x = a as unknown as Record<string, number | undefined>;
   const y = b as unknown as Record<string, number | undefined>;
   for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) {

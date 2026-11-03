@@ -122,6 +122,7 @@ registerEditableFormat({ formatId: "symphoniePro", label: "Symphonie Pro", patte
 registerEditableFormat({ formatId: "synthDream", label: "SynthDream", patternCodec: { kind: "variable" }, exporter: { module: "SynthDreamExporter", fn: "exportSynthDream", byLayout: true } });
 registerEditableFormat({ formatId: "soundProgrammingLanguage", label: "Sound Programming Language", patternCodec: { kind: "variable" }, exporter: { module: "SoundProgrammingLanguageExporter", fn: "exportSoundProgrammingLanguage", byLayout: true } });
 registerEditableFormat({ formatId: "timFollin", label: "Tim Follin", patternCodec: { kind: "variable" }, exporter: { module: "TimFollinExporter", fn: "exportTimFollin", byLayout: true } });
+registerEditableFormat({ formatId: "beathoven", label: "Beathoven Synthesizer", patternCodec: { kind: "variable" }, exporter: { module: "BeathovenExporter", fn: "exportBeathoven", byLayout: true } });
 registerEditableFormat({ formatId: "howieDavies", label: "Howie Davies", patternCodec: { kind: "variable" }, exporter: { module: "HowieDaviesExporter", fn: "exportHowieDavies", byLayout: true } });
 registerEditableFormat({ formatId: "riffRaff", label: "Riff Raff", patternCodec: { kind: "variable" }, exporter: { module: "RiffRaffExporter", fn: "exportRiffRaff", byLayout: true } });
 registerEditableFormat({ formatId: "dynamicSynthesizer", label: "Dynamic Synthesizer", patternCodec: { kind: "variable" }, exporter: { module: "DynamicSynthesizerExporter", fn: "exportDynamicSynthesizer", byLayout: true } });

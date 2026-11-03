@@ -79,6 +79,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   soundProgrammingLanguage: 'public/data/songs/formats/boulderdash.spl',
   riffRaff: 'public/data/songs/formats/riffraff_smallest.riff',
   timFollin: 'public/data/songs/formats/follin_smallest.tf',
+  beathoven: 'public/data/songs/formats/beathoven_smallest.bss',
   howieDavies: 'public/data/songs/formats/blazing_thunder.hd',
   // No committed fixture found (reported missing-fixture by the harness — Task 1.3):
   //   amosMusicBank, synthesis, chuckBiscuits, dsm_dyn, xmf
