@@ -2461,14 +2461,17 @@ export async function tryRouteFormat(
   // Native parser extracts song title + instrument names; UADE classic for audio.
   if (matchesExt(filename, ['spl'])) {
     const wtCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['spl']) };
-    const { isWantedTeamDaveLoweFormat, parseWantedTeamDaveLoweFile } =
+    // SPL: read-only command-stream grid (soundProgrammingLanguageGrid.ts); UADE keeps playing the module
+    const { isWantedTeamDaveLoweFormat } =
       await import('@lib/import/formats/WantedTeamDaveLoweParser');
+    const { parseSoundProgrammingLanguageFile } =
+      await import('@lib/import/formats/SoundProgrammingLanguageParser');
     return withNativeThenUADE('soprol', wtCtx,
       (buf: Uint8Array | ArrayBuffer, name: string) => {
-        if (isWantedTeamDaveLoweFormat(buf)) return parseWantedTeamDaveLoweFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
+        if (isWantedTeamDaveLoweFormat(buf)) return parseSoundProgrammingLanguageFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
         return null;
       },
-      'WantedTeamDaveLoweParser', { injectUADE: true });
+      'SoundProgrammingLanguageParser', { injectUADE: true });
   }
   if (matchesExt(filename, ['riff'])) {
     const wtCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['riff']) };
