@@ -23,7 +23,7 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeOktalyzerCell } from '@/engine/uade/encoders/OktalyzerEncoder';
+import { encodeOktalyzerCell, decodeOktalyzerCell, mapOKTEffect } from '@/engine/uade/encoders/OktalyzerEncoder';
 import { amigaNoteToXM, createSamplerInstrument } from './AmigaUtils';
 
 const TEXT_DECODER = new TextDecoder('iso-8859-1');
@@ -262,22 +262,8 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
     numPatterns: trackerPatterns.length,
     moduleSize: buffer.byteLength,
     encodeCell: encodeOktalyzerCell,
-    decodeCell: (bytes: Uint8Array): TrackerCell => {
-      // Inverse of encodeOktalyzerCell
-      // Byte 0: raw Amiga note index → XM note via amigaNoteToXM (raw + 12)
-      const rawNote = bytes[0];
-      const note = amigaNoteToXM(rawNote);
-
-      // Byte 1: sample index
-      const instrument = bytes[1];
-
-      // Byte 2-3: effect command + data
-      const cmd = bytes[2];
-      const data = bytes[3];
-      const { effTyp, eff } = mapOKTEffect(cmd, data);
-
-      return { note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 };
-    },
+    encodeOverStored: true,
+    decodeCell: decodeOktalyzerCell,
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const cellDataStart = patternFileOffsets[pattern];
       if (cellDataStart === undefined) return 0;
@@ -302,18 +288,3 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
   };
 }
 
-/** Map Oktalyzer effect commands to XM-compatible effect codes */
-function mapOKTEffect(cmd: number, data: number): { effTyp: number; eff: number } {
-  switch (cmd) {
-    case 0:  return { effTyp: 0, eff: 0 };           // No effect
-    case 1:  return { effTyp: 0x0F, eff: data };      // Set speed
-    case 2:  return { effTyp: 0x0B, eff: data };      // Position jump
-    case 10: return { effTyp: 0x0C, eff: data };      // Set volume
-    case 11: return { effTyp: 0x01, eff: data };      // Portamento up
-    case 12: return { effTyp: 0x02, eff: data };      // Portamento down
-    case 13: return { effTyp: 0x03, eff: data };      // Tone portamento
-    case 17: return { effTyp: 0x0A, eff: data };      // Volume slide
-    case 30: return { effTyp: 0x0E, eff: (0xC << 4) | (data & 0xF) }; // Cut note (EC)
-    default: return { effTyp: 0, eff: 0 };
-  }
-}

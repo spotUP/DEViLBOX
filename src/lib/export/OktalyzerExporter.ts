@@ -52,7 +52,21 @@ function mapXMEffectToOKT(effTyp: number, eff: number): [number, number] {
   }
 }
 
+/** A song parsed from an Oktalyzer file: the edited cells go back into a copy of the original module (byte-exact when unedited). */
+function patchOktalyzerModule(song: TrackerSong): ArrayBuffer | null {
+  const layout = song.uadePatternLayout;
+  if (!song.oktalyzerFileData || layout?.formatId !== 'oktalyzer' || !layout.getCellFileOffset) return null;
+  const out = new Uint8Array(song.oktalyzerFileData.slice(0));
+  song.patterns.forEach((pat, p) => pat.channels.forEach((chan, ch) => chan.rows.forEach((cell, row) => {
+    const off = layout.getCellFileOffset!(p, row, ch);
+    out.set(layout.encodeCell(cell, out.subarray(off, off + 4)), off);
+  })));
+  return out.buffer;
+}
+
 export function exportOktalyzer(song: TrackerSong): ArrayBuffer {
+  const patched = patchOktalyzerModule(song);
+  if (patched) return patched;
   const chunks: Uint8Array[] = [];
 
   // ── CMOD chunk ──────────────────────────────────────────────────────────
