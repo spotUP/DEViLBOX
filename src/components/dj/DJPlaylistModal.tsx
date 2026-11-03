@@ -86,7 +86,7 @@ import { showConfirm } from '@/stores/useConfirmStore';
 import { Modal } from '@/components/ui/Modal';
 import { ModalHeader } from '@/components/ui/ModalHeader';
 import { Button } from '@/components/ui/Button';
-import { fetchHippoPlaylist, fetchHippoPlaylistSummaries, type HippoPlaylistSummary } from '@/lib/dj/hippoPlaylistApi';
+import { fetchHippoPlaylistSummaries, type HippoPlaylistSummary } from '@/lib/dj/hippoPlaylistApi';
 import { PlaylistVisibilitySwitch } from './PlaylistVisibilitySwitch';
 import { useAuthStore } from '@/stores/useAuthStore';
 import {
@@ -123,6 +123,9 @@ import { getStemStatus, subscribeStemStatus, type StemJobStatus } from '@/engine
 import { hashFile, getCachedAudioByFilename } from '@/engine/dj/DJAudioCache';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Track context menu entries a public (read only) playlist keeps: loading and reading, no edits. */
+const READ_ONLY_TRACK_MENU_IDS: ReadonlySet<string> = new Set(['play-from-here', 'load-1', 'load-2', 'load-3', 'copy-info']);
 
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -1052,8 +1055,8 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
   }, []);
 
   // ── Store bindings (consolidated with useShallow to prevent re-render storms) ──
-  const { playlists, activePlaylistId } = useDJPlaylistStore(
-    useShallow((s) => ({ playlists: s.playlists, activePlaylistId: s.activePlaylistId }))
+  const { playlists, activePlaylistId, publicPlaylists } = useDJPlaylistStore(
+    useShallow((s) => ({ playlists: s.playlists, activePlaylistId: s.activePlaylistId, publicPlaylists: s.publicPlaylists }))
   );
   const {
     createPlaylist, deletePlaylist, renamePlaylist, setActivePlaylist,
@@ -1219,7 +1222,9 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
   const [showCommunity, setShowCommunity] = useState(false);
   const [loadingCommunity, setLoadingCommunity] = useState(false);
   const [importingCloudId, setImportingCloudId] = useState<string | null>(null);
-  const [hippoPlaylists, setHippoPlaylists] = useState<HippoPlaylistSummary[]>([]);
+  const [publicSummaries, setPublicSummaries] = useState<HippoPlaylistSummary[]>([]);
+  const [showPublic, setShowPublic] = useState(true);
+  const [openingPublicId, setOpeningPublicId] = useState<string | null>(null);
   const [sidebarSearch, setSidebarSearch] = useState('');
   const [rightPaneTab, setRightPaneTab] = useState<'tracks' | 'online'>('tracks');
   const clipboardRef = useRef<{ tracks: PlaylistTrack[]; isCut: boolean }>({ tracks: [], isCut: false });
@@ -1253,7 +1258,10 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
     return () => document.removeEventListener('mousedown', handler);
   }, [showSortMenu, showExportMenu]);
 
-  const activePlaylist = playlists.find((p) => p.id === activePlaylistId) ?? null;
+  const ownPlaylist = playlists.find((p) => p.id === activePlaylistId);
+  const activePlaylist = ownPlaylist ?? publicPlaylists.find((p) => p.id === activePlaylistId) ?? null;
+  /** A public playlist from the server: playable and exportable, never edited. */
+  const readOnly = activePlaylist !== null && !ownPlaylist;
   const selectedSet = useMemo(() => new Set(selectedTrackIndices), [selectedTrackIndices]);
 
   const filteredPlaylists = useMemo(() => {
@@ -1690,29 +1698,36 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
       setCommunityPlaylists(result.playlists);
     } catch (err) {
       console.error('Failed to load community playlists:', err);
-    }
-    try {
-      setHippoPlaylists(await fetchHippoPlaylistSummaries());
-    } catch (err) {
-      console.error('Failed to load HippoPlayer playlists:', err);
     } finally {
       setLoadingCommunity(false);
     }
   }, []);
 
-  const handleImportHippoPlaylist = useCallback(async (id: string) => {
-    setImportingCloudId(id);
+  useEffect(() => {
+    let cancelled = false;
+    fetchHippoPlaylistSummaries()
+      .then((list) => { if (!cancelled) setPublicSummaries(list); })
+      .catch((err) => console.error('Failed to load public playlists:', err));
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleOpenPublicPlaylist = useCallback(async (id: string) => {
+    setOpeningPublicId(id);
     try {
-      const full = await fetchHippoPlaylist(id);
-      if (!full) return;
-      const newId = createPlaylist(full.name);
-      addTracks(newId, full.tracks.map((t) => ({ ...t, id: undefined })));
+      await useDJPlaylistStore.getState().openPublicPlaylist(id);
     } catch (err) {
-      console.error('Failed to import HippoPlayer playlist:', err);
+      console.error('Failed to open public playlist:', err);
     } finally {
-      setImportingCloudId(null);
+      setOpeningPublicId(null);
     }
-  }, [createPlaylist, addTracks]);
+  }, []);
+
+  const handleCopyPublicPlaylist = useCallback(() => {
+    if (!activePlaylist) return;
+    const newId = createPlaylist(`${activePlaylist.name} (Copy)`);
+    addTracks(newId, activePlaylist.tracks.map((t) => ({ ...t, id: undefined })));
+    setActivePlaylist(newId);
+  }, [activePlaylist, createPlaylist, addTracks, setActivePlaylist]);
 
   const handleImportCommunityPlaylist = useCallback(async (cloudId: string) => {
     setImportingCloudId(cloudId);
@@ -2594,8 +2609,8 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
       });
     }
 
-    return items;
-  }, [activePlaylist, activePlaylistId, contextMenuTrackIndex, playlists, selectedTrackIndices, thirdDeckActive, loadTrackWithProgress, moveSelectedTracks, copySelectedTracks, removeSelectedTracks, removeTrack, reorderTrack, runAnalyze, analysisProgress]);
+    return readOnly ? items.filter((it) => 'id' in it && READ_ONLY_TRACK_MENU_IDS.has(it.id)) : items;
+  }, [readOnly, activePlaylist, activePlaylistId, contextMenuTrackIndex, playlists, selectedTrackIndices, thirdDeckActive, loadTrackWithProgress, moveSelectedTracks, copySelectedTracks, removeSelectedTracks, removeTrack, reorderTrack, runAnalyze, analysisProgress]);
 
   // ── Keyboard navigation ─────────────────────────────────────────────────
 
@@ -2990,8 +3005,15 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
       onClick: () => { handleDeletePlaylist(activePlaylist); },
     });
 
+    if (readOnly) {
+      return [
+        { id: 'copy-public', label: 'Copy to my playlists', icon: <Copy size={12} />, onClick: handleCopyPublicPlaylist },
+        ...items.filter((it) => 'id' in it && (it.id === 'export-json' || it.id === 'export-m3u')),
+      ];
+    }
     return items;
   }, [
+    readOnly, handleCopyPublicPlaylist,
     activePlaylist, activePlaylistId, isLoggedIn, savingPlaylistId,
     needsAnalysis, failedAnalysisCount, analysisProgress, uncachedCount, precacheProgress,
     badTrackCount, retestingBad, playedCount,
@@ -3106,7 +3128,7 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
               <button
                 onClick={() => {
                   setShowCommunity(!showCommunity);
-                  if (!showCommunity && communityPlaylists.length === 0 && hippoPlaylists.length === 0) loadCommunityPlaylists();
+                  if (!showCommunity && communityPlaylists.length === 0) loadCommunityPlaylists();
                 }}
                 className="w-full px-3 py-2 flex items-center justify-between text-[10px] font-mono text-text-muted uppercase tracking-wider hover:bg-dark-bgHover transition-colors"
               >
@@ -3124,37 +3146,12 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                       <RefreshCw size={12} className="animate-spin text-text-muted/40 mx-auto" />
                       <p className="text-[9px] font-mono text-text-muted/40 mt-1">Loading…</p>
                     </div>
-                  ) : communityPlaylists.length === 0 && hippoPlaylists.length === 0 ? (
+                  ) : communityPlaylists.length === 0 ? (
                     <div className="px-3 py-3 text-center">
                       <p className="text-[9px] font-mono text-text-muted/40">No public playlists yet</p>
                     </div>
                   ) : (
                     <>
-                    {hippoPlaylists.length > 0 && (
-                      <div className="px-3 pt-1.5 pb-0.5 text-[9px] font-mono text-text-muted/60 uppercase tracking-wider">
-                        HippoPlayer ({hippoPlaylists.length}, read only)
-                      </div>
-                    )}
-                    {hippoPlaylists.map((hp) => (
-                      <div
-                        key={hp.id}
-                        className="flex items-center gap-2 px-3 py-1.5 hover:bg-dark-bgHover transition-colors group"
-                      >
-                        <Lock size={10} className="text-text-muted/40 shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[10px] font-mono text-text-secondary truncate">{hp.name}</div>
-                          <div className="text-[9px] font-mono text-text-muted/40">{hp.trackCount} tracks · HippoPlayer</div>
-                        </div>
-                        <button
-                          onClick={() => handleImportHippoPlaylist(hp.id)}
-                          disabled={importingCloudId === hp.id}
-                          className="p-0.5 text-text-muted/40 hover:text-accent-primary transition-colors opacity-0 group-hover:opacity-100"
-                          title="Import to my playlists"
-                        >
-                          {importingCloudId === hp.id ? <RefreshCw size={10} className="animate-spin" /> : <Download size={10} />}
-                        </button>
-                      </div>
-                    ))}
                     {communityPlaylists.map((cp) => (
                       <div
                         key={cp.id}
@@ -3188,6 +3185,38 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                       ↻ Refresh
                     </button>
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── Public Playlists Section (server, read only) ───────── */}
+            <div className="border-t border-dark-border" data-testid="public-playlists">
+              <button
+                onClick={() => setShowPublic(!showPublic)}
+                className="w-full px-3 py-2 flex items-center justify-between text-[10px] font-mono text-text-muted uppercase tracking-wider hover:bg-dark-bgHover transition-colors"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Lock size={10} />
+                  Public ({publicSummaries.length}, read only)
+                </span>
+                {showPublic ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+              </button>
+              {showPublic && (
+                <div className="max-h-48 overflow-y-auto">
+                  {publicSummaries.map((hp) => (
+                    <button
+                      key={hp.id}
+                      onClick={() => handleOpenPublicPlaylist(hp.id)}
+                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-dark-bgHover transition-colors ${hp.id === activePlaylistId ? 'bg-dark-bgActive' : ''}`}
+                    >
+                      <Lock size={10} className="text-text-muted/40 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[10px] font-mono text-text-secondary truncate">{hp.name}</div>
+                        <div className="text-[9px] font-mono text-text-muted/40">{hp.trackCount} tracks</div>
+                      </div>
+                      {openingPublicId === hp.id && <RefreshCw size={10} className="animate-spin text-text-muted/40" />}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -3268,12 +3297,14 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                     ) : (
                       <>
                         <span
-                          onClick={() => {
+                          onClick={readOnly ? undefined : () => {
                             setEditingPlaylistId(activePlaylistId);
                             setEditName(activePlaylist.name);
                           }}
-                          className="text-[13px] font-mono font-bold text-text-primary truncate cursor-text hover:text-accent-primary transition-colors"
-                          title="Click to rename"
+                          className={readOnly
+                            ? 'text-[13px] font-mono font-bold text-text-primary truncate'
+                            : 'text-[13px] font-mono font-bold text-text-primary truncate cursor-text hover:text-accent-primary transition-colors'}
+                          title={readOnly ? 'Public playlist, read only' : 'Click to rename'}
                         >
                           {activePlaylist.name}
                         </span>
@@ -3287,11 +3318,18 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                           {activePlaylist.tracks.length} tracks
                           {totalDuration > 0 && ` · ${formatTotalDuration(totalDuration)}`}
                         </span>
-                        <PlaylistVisibilitySwitch
-                          value={activePlaylist.visibility || 'private'}
-                          onChange={(v) => handleSetVisibility(activePlaylist, v)}
-                          disabled={!!activePlaylist.cloudId && !isLoggedIn}
-                        />
+                        {readOnly ? (
+                          <span className="flex items-center gap-1 text-[10px] font-mono text-text-muted/60 shrink-0">
+                            <Lock size={10} />
+                            Public, read only
+                          </span>
+                        ) : (
+                          <PlaylistVisibilitySwitch
+                            value={activePlaylist.visibility || 'private'}
+                            onChange={(v) => handleSetVisibility(activePlaylist, v)}
+                            disabled={!!activePlaylist.cloudId && !isLoggedIn}
+                          />
+                        )}
                       </>
                     )}
                   </div>
@@ -3388,9 +3426,9 @@ const DJPlaylistModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) 
                   <div className="w-px h-5 bg-dark-border/30" />
 
                   {/* Add files */}
-                  <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isLoadingFile} icon={<Plus size={12} />} title="Add files (drag & drop also works)">
+                  {!readOnly && <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isLoadingFile} icon={<Plus size={12} />} title="Add files (drag & drop also works)">
                     Add
-                  </Button>
+                  </Button>}
 
                   {/* Export */}
                   <div ref={exportMenuRef} className="relative">

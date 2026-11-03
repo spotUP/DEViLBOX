@@ -18,8 +18,9 @@ import type { EffectConfig } from '@/types/instrument/effects';
 import type { DJEnvironment } from '@/types/djEnvironment';
 import type { DJTrackSummary } from '@/engine/dj/autodj/types';
 import { useAudioStore } from '@/stores/useAudioStore';
-import { fetchHippoPlaylists } from '@/lib/dj/hippoPlaylistApi';
-import { applyLoadOutcome, isBareFileName, repairSourcesFromSeed } from '@/lib/dj/playlistTrackSource';
+import { fetchHippoPlaylist } from '@/lib/dj/hippoPlaylistApi';
+import { dropServerHippoPlaylists } from '@/lib/persistence/migrations/hippoPlaylistsServerOnly';
+import { applyLoadOutcome } from '@/lib/dj/playlistTrackSource';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -105,8 +106,12 @@ export interface DJPlaylist {
 interface DJPlaylistState {
   playlists: DJPlaylist[];
   activePlaylistId: string | null;
-  /** The seed-sources revision persisted seed playlists were last repaired to (see SEED_SOURCES_REVISION). */
-  seedSourcesRevision: number;
+  /**
+   * Public, read-only playlists served by the server (HippoPlayer). Never persisted, never in
+   * `playlists`: every edit action looks up `playlists` by id, so none of them can touch these.
+   * Filled one playlist at a time by `openPublicPlaylist`.
+   */
+  publicPlaylists: DJPlaylist[];
 
   // ── Selection (ephemeral, not persisted) ──────────────────────────────
   selectedTrackIndices: number[];
@@ -152,8 +157,8 @@ interface DJPlaylistState {
   clearTrackBadFlag: (playlistId: string, index: number) => void;
   clearAllBadFlags: (playlistId: string) => void;
   importPlaylists: (playlists: DJPlaylist[]) => void;
-  /** Bring persisted seed playlists up to the bundled seed's sources and record the revision. Returns the count repaired. */
-  repairSourcesFromSeed: (seed: DJPlaylist[], revision: number) => number;
+  /** Fetch a public playlist from the server (once), keep it in `publicPlaylists` and make it the active one. */
+  openPublicPlaylist: (playlistId: string) => Promise<void>;
   setPlaylistMasterEffects: (playlistId: string, effects: EffectConfig[] | undefined) => void;
   /** Save current DJ environment snapshot to the active playlist */
   saveEnvironmentToPlaylist: (playlistId: string) => void;
@@ -210,7 +215,7 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
     immer((set, _get) => ({
       playlists: [],
       activePlaylistId: null,
-      seedSourcesRevision: 0,
+      publicPlaylists: [],
 
       // Ephemeral state
       selectedTrackIndices: [],
@@ -630,17 +635,13 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
         });
       },
 
-      repairSourcesFromSeed: (seed: DJPlaylist[], revision: number) => {
-        let repaired = 0;
-        set((state) => {
-          repaired = repairSourcesFromSeed(state.playlists, seed);
-          state.seedSourcesRevision = revision;
-        });
-        if (repaired > 0) {
-          console.log(`[DJPlaylistStore] Repaired ${repaired} seed playlist entries to the seed's sources`);
-          syncPlaylists();
+      openPublicPlaylist: async (playlistId: string) => {
+        if (!_get().publicPlaylists.some((p) => p.id === playlistId)) {
+          const full = await fetchHippoPlaylist(playlistId);
+          if (!full) return;
+          set((state) => { state.publicPlaylists.push(full); });
         }
-        return repaired;
+        _get().setActivePlaylist(playlistId);
       },
 
       setPlaylistMasterEffects: (playlistId: string, effects: EffectConfig[] | undefined) => {
@@ -815,14 +816,16 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
     })),
     {
       name: 'devilbox-dj-playlists',
-      version: 3,
+      version: 4,
       // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       // !! NEVER SET state.playlists = [] IN A MIGRATION.                !!
       // !! On 2026-04-13, a destructive migration wiped 3 user playlists !!
       // !! that took hours to create. Migrations MUST preserve all data. !!
       // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      migrate: (persisted: unknown) => {
-        const state = persisted as Record<string, unknown>;
+      migrate: (persisted: unknown, version: number) => {
+        let state = persisted as Record<string, unknown>;
+        // v4: the HippoPlayer playlists are served read only by the server, not kept as local copies.
+        if (version < 4) state = dropServerHippoPlaylists(state);
         // Preserve existing playlists during migration; only init if missing
         if (!state.playlists) state.playlists = [];
         if (!state.activePlaylistId) state.activePlaylistId = null;
@@ -832,7 +835,6 @@ export const useDJPlaylistStore = create<DJPlaylistState>()(
       partialize: (state) => ({
         playlists: state.playlists,
         activePlaylistId: state.activePlaylistId,
-        seedSourcesRevision: state.seedSourcesRevision,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
@@ -908,53 +910,6 @@ function pushUndo(state: DJPlaylistState): void {
   state._redoStack = [];
   state.canUndo = true;
   state.canRedo = false;
-}
-
-// ── HippoPlayer seed playlists (served by the server): import on first launch, repair afterwards ──
-
-/**
- * Bump whenever the seed's sources change, so persisted copies are repaired
- * once. 1: bare names resolved through Modland/HVSC (ce3de53e4). 2: the seed
- * rebuilt from the HippoPlayer playlists with every entry's own source
- * (tools/convert-hippo-playlists.ts).
- */
-export const SEED_SOURCES_REVISION = 2;
-const SEED_PLAYLIST_ID_PREFIX = 'playlist-prg-';
-let bundledImportAttempted = false;
-
-/**
- * First launch: import the bundled seed playlists. Later launches: when the
- * seed's sources changed since the last repair (or an entry has no source at
- * all), bring persisted seed playlists up to the seed's sources. See
- * `repairSourcesFromSeed` in `src/lib/dj/playlistTrackSource.ts`.
- * Called once at app start (main.tsx), never on import: a store import (a unit test) does not fetch.
- */
-export async function syncBundledPlaylists(): Promise<void> {
-  if (bundledImportAttempted) return;
-  bundledImportAttempted = true;
-
-  const { playlists, seedSourcesRevision } = useDJPlaylistStore.getState();
-  const needsImport = playlists.length === 0;
-  const needsRepair =
-    (seedSourcesRevision < SEED_SOURCES_REVISION && playlists.some((p) => p.id.startsWith(SEED_PLAYLIST_ID_PREFIX)))
-    || playlists.some((p) => p.tracks.some((t) => isBareFileName(t.fileName)));
-  if (!needsImport && !needsRepair) return;
-
-  try {
-    const data = await fetchHippoPlaylists();
-    if (!Array.isArray(data) || data.length === 0) return;
-    if (needsImport) {
-      useDJPlaylistStore.getState().importPlaylists(data);
-      useDJPlaylistStore.setState({ seedSourcesRevision: SEED_SOURCES_REVISION });
-      const first = useDJPlaylistStore.getState().playlists[0];
-      if (first) useDJPlaylistStore.getState().setActivePlaylist(first.id);
-      console.log(`[DJPlaylistStore] Imported ${data.length} bundled playlists`);
-    } else {
-      useDJPlaylistStore.getState().repairSourcesFromSeed(data, SEED_SOURCES_REVISION);
-    }
-  } catch {
-    // Server not reachable — no problem, retried on the next launch
-  }
 }
 
 // ── Debounced server sync ────────────────────────────────────────────────────
