@@ -24,6 +24,7 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import type { OctaMEDConfig, UADEChipRamInfo } from '@/types/instrument';
+import { mapXMEffectToMED } from '@/lib/export/MEDExporter';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeMED4Cell, encodeMED3Cell } from '@/engine/uade/encoders/MEDEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
@@ -76,7 +77,8 @@ function playbackData(
   if (UADE_MED_MAGICS.includes(magic)) {
     return { uadeEditableFileData: buffer.slice(0), uadeEditableFileName: filename, uadePatternLayout };
   }
-  return { libopenmptFileData: buffer.slice(0) };
+  // The grid is still editable (export patches the module); only libopenmpt plays it, which has no live cell write.
+  return { libopenmptFileData: buffer.slice(0), uadePatternLayout };
 }
 
 export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong {
@@ -667,6 +669,33 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
       if (!info) return 0;
       return info.dataStart + (row * info.nTracks + channel) * medBytesPerCell;
     },
+  };
+
+  // Re-encode against the module's own bytes: a field the edit left alone keeps its stored bits, so an unedited
+  // module round-trips byte-exact (the effect mapping and note transposes are not one-to-one).
+  uadePatternLayout.encodeCell = (cell: TrackerCell, stored?: Uint8Array): Uint8Array => {
+    const raw = new Uint8Array(medBytesPerCell);
+    if (stored) raw.set(stored.subarray(0, medBytesPerCell));
+    const was = uadePatternLayout.decodeCell!(raw);
+    const noteRaw = (n: number) => n - noteBaseTranspose - playTranspose;
+    if (cell.note !== was.note) {
+      if (isMMD1Plus) raw[0] = cell.note === 97 ? 0x80 : cell.note > 0 ? Math.max(1, Math.min(0x7F, noteRaw(cell.note))) : 0;
+      else raw[0] = (raw[0] & 0xC0) | (cell.note > 0 ? Math.max(1, Math.min(0x3F, noteRaw(cell.note))) : 0);
+    }
+    if (cell.instrument !== was.instrument) {
+      const inst = cell.instrument ?? 0;
+      if (isMMD1Plus) raw[1] = inst & 0xFF;
+      else {
+        raw[1] = (raw[1] & 0x0F) | ((inst & 0x0F) << 4);
+        raw[0] = (raw[0] & 0x3F) | ((inst & 0x10) << 3) | ((inst & 0x20) << 1);
+      }
+    }
+    if (cell.effTyp !== was.effTyp || cell.eff !== was.eff) {
+      const [e, p] = mapXMEffectToMED(cell.effTyp ?? 0, cell.eff ?? 0);
+      if (isMMD1Plus) { raw[2] = e; raw[3] = p; }
+      else { raw[1] = (raw[1] & 0xF0) | (e & 0x0F); raw[2] = p; }
+    }
+    return raw;
   };
 
   return {
