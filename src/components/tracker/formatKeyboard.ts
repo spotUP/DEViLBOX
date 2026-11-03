@@ -19,6 +19,7 @@ import { isKeyHandled } from '@/lib/tracker/keyHandledSentinel';
 import { stepRow, jumpRow, startHeldRepeat } from '@/lib/tracker/cursorNavigation';
 import { isManualRowNavAllowed } from '@/lib/tracker/playbackNavigation';
 import { nextTabChannel } from '@/lib/tracker/tabNavigation';
+import { stepChannel } from '@/lib/tracker/visibleChannels';
 import { planNoteEntry, planCursorEntry, typedPitch, type EntryContext } from '@/lib/tracker/formatEntryPlan';
 import { undoHively, redoHively, insertHivelyRow, deleteHivelyRow } from '@/components/hively/hivelyEdit';
 import { typedNoteValue } from '@/components/shared/format-editor-types';
@@ -63,6 +64,25 @@ export function handleFormatKey(e: KeyboardEvent, host: FormatKeyHost): void {
     // ── Helper: move cursor and optionally extend/clear selection ──
     const moveCursor = (delta: { channelIndex?: number; rowIndex?: number; columnIndex?: number }, extend?: boolean) => {
       host.setCursor(prev => {
+        // Like the pattern editor (useCursorStore 'left'/'right'): a column step past a channel's first or last
+        // column lands on the neighbouring channel's last or first column, wrapping at the ends. A shift-extended
+        // selection stays in its channel: the format selection is one channel's columns.
+        const colStep = delta.columnIndex ?? 0;
+        if (colStep !== 0 && !delta.channelIndex && !extend && host.channels.length > 1) {
+          const curNumCols = (host.channels[prev.channelIndex]?.columns ?? host.columns).length;
+          const target = prev.columnIndex + colStep;
+          if (target < 0 || target >= curNumCols) {
+            const ch = stepChannel([], prev.channelIndex, colStep < 0 ? -1 : 1, host.channels.length);
+            const chNumCols = (host.channels[ch]?.columns ?? host.columns).length;
+            const chNumRows = host.channels[ch]?.patternLength ?? 0;
+            host.setSelection(null);
+            return {
+              channelIndex: ch,
+              rowIndex: Math.max(0, Math.min(chNumRows - 1, prev.rowIndex)),
+              columnIndex: colStep < 0 ? Math.max(0, chNumCols - 1) : 0,
+            };
+          }
+        }
         const newChIdx = Math.max(0, Math.min(host.channels.length - 1,
             prev.channelIndex + (delta.channelIndex ?? 0)));
         const newChCols = host.channels[newChIdx]?.columns ?? host.columns;
