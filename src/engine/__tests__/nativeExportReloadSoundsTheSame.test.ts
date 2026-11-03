@@ -126,6 +126,7 @@ const FORMATS: FormatRow[] = [
   { key: 'soundMaster', rig: 'paula', files: corpus(['.sm']) },
   { key: 'digitalSonixChrome', rig: 'paula', sampleEvery: 4, files: corpus(['.dsc']), pick: pickDscNote, noteSelectsSample: true },
   { key: 'dynamicSynthesizer', rig: 'paula', files: corpus(['.ptc']) },
+  { key: 'riffRaff', rig: 'paula', files: corpus(['.riff']) },
   { key: 'sidmon1', rig: 'paula', files: [...corpus(['.sid1']), ...corpus(['.sid'], 'sidmon-1')] },
 ];
 

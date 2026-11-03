@@ -63,6 +63,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   digitalSonixChrome: 'pass',
   sidmon1: 'pass',
   dynamicSynthesizer: 'pass',
+  riffRaff: 'pass',
 };
 
 /**
