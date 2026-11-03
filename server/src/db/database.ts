@@ -319,6 +319,14 @@ export function initDatabase() {
     console.log('[DB] Migration: added type column to files table');
   }
 
+  // Migration: companion flag on the Modland index (filled at index build; the
+  // schema version bump in modlandIndexer forces the rebuild that fills it)
+  const mlCols = db.prepare("PRAGMA table_info(modland_files)").all() as { name: string }[];
+  if (!mlCols.some(c => c.name === 'is_companion')) {
+    db.exec('ALTER TABLE modland_files ADD COLUMN is_companion INTEGER NOT NULL DEFAULT 0');
+    console.log('[DB] Migration: added is_companion column to modland_files');
+  }
+
   migrateSongAnalysisExtended();
   createGenreTables();
   createHipVoteTables();

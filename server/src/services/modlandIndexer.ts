@@ -10,8 +10,9 @@ import fs from 'fs';
 import path from 'path';
 import db from '../db/database';
 import { isSupportedFormat } from '../../../src/lib/import/formatFilenameMatcher';
+import { companionPathsIn, type ListedFile } from './modlandCompanions';
 
-const MODLAND_INDEX_SCHEMA_VERSION = '2';
+const MODLAND_INDEX_SCHEMA_VERSION = '3';
 
 // ── Format whitelist (modland folder name → file extension) ─────────────────
 
@@ -317,10 +318,19 @@ function indexEntries(text: string): number {
   // Start a transaction for the full replace
   const deleteAll = db.prepare('DELETE FROM modland_files');
   const insert = db.prepare(
-    'INSERT OR IGNORE INTO modland_files (format, author, filename, full_path, extension) VALUES (?, ?, ?, ?, ?)'
+    'INSERT OR IGNORE INTO modland_files (format, author, filename, full_path, extension, is_companion) VALUES (?, ?, ?, ?, ?, ?)'
   );
 
   let totalInserted = 0;
+
+  // The companion verdict needs each directory's whole listing, including the
+  // lines the playable filter drops (songplay, smp.set): read every line once.
+  const listed: ListedFile[] = [];
+  for (const line of lines) {
+    const m = line.trim().match(LINE_REGEX);
+    if (m) listed.push({ format: m[1], author: m[2], filename: m[3] });
+  }
+  const companions = companionPathsIn(listed);
 
   db.transaction(() => {
     // Clear old data
@@ -342,7 +352,7 @@ function indexEntries(text: string): number {
 
       if (batch.length >= BATCH_SIZE) {
         for (const e of batch) {
-          insert.run(e.format, e.author, e.filename, e.fullPath, e.extension);
+          insert.run(e.format, e.author, e.filename, e.fullPath, e.extension, companions.has(e.fullPath) ? 1 : 0);
         }
         totalInserted += batch.length;
         batch = [];
@@ -352,7 +362,7 @@ function indexEntries(text: string): number {
     // Flush remaining
     if (batch.length > 0) {
       for (const e of batch) {
-        insert.run(e.format, e.author, e.filename, e.fullPath, e.extension);
+        insert.run(e.format, e.author, e.filename, e.fullPath, e.extension, companions.has(e.fullPath) ? 1 : 0);
       }
       totalInserted += batch.length;
     }
@@ -445,7 +455,7 @@ export function getFormats(): { format: string; count: number }[] {
   if (cachedFormats) return cachedFormats;
 
   const rows = db.prepare(
-    'SELECT format, COUNT(*) as count FROM modland_files GROUP BY format ORDER BY count DESC'
+    'SELECT format, COUNT(*) as count FROM modland_files WHERE is_companion = 0 GROUP BY format ORDER BY count DESC'
   ).all() as { format: string; count: number }[];
 
   cachedFormats = rows;

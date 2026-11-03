@@ -18,7 +18,7 @@ describe('modland indexing contracts', () => {
 
   it('forces a fresh index when the matching logic version changes', () => {
     const source = read('server/src/services/modlandIndexer.ts');
-    expect(source).toContain("const MODLAND_INDEX_SCHEMA_VERSION = '2';");
+    expect(source).toContain("const MODLAND_INDEX_SCHEMA_VERSION = '3';");
     expect(source).toContain("const schemaVersion = getMeta('index_schema_version');");
     expect(source).toContain("if (hours < 24 && schemaVersion === MODLAND_INDEX_SCHEMA_VERSION) {");
     expect(source).toContain("setMeta('index_schema_version', MODLAND_INDEX_SCHEMA_VERSION);");
