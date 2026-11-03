@@ -903,6 +903,19 @@ export async function tryRouteFormat(
       'IMSParser', { injectUADE: true });
   }
 
+  // ── SynthDream (sdr.* prefix) ─────────────────────────────────────────────
+  // SynthDreamParser decodes the command streams into a read-only tick grid (phase A);
+  // nuade / UADE plays the module. Samples live in the smp.* companion (companionResolver).
+  if (matchesExt(filename, ['sdr'])) {
+    const { isSynthDreamFormat, parseSynthDreamFile } = await import('@lib/import/formats/SynthDreamParser');
+    return withNativeThenUADE('synthdream', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        const ab = buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer;
+        return isSynthDreamFormat(ab, name) ? parseSynthDreamFile(ab, name, requestedSubsong) : null;
+      },
+      'SynthDreamParser', { injectUADE: true });
+  }
+
   // ── ICE Tracker / SoundTracker 2.6 (.ice) ────────────────────────────────
   // .ice files — OpenMPT
   if (matchesExt(filename, ['ice'])) {
