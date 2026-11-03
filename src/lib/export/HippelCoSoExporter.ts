@@ -29,7 +29,7 @@ import type { HippelCoSoConfig, HippelCoSoSampleData } from '@/types/instrument/
 import { UADEChipEditor } from '@/engine/uade/UADEChipEditor';
 import { UADEEngine } from '@/engine/uade/UADEEngine';
 import { isCoSo, rebuildHippelSong } from '@/engine/hippel/rebuildHippelModule';
-import { cosoIndexForXM } from '@lib/import/formats/HippelCoSoParser';
+import { cosoIndexForXM, COSO_SPEED_EFFECT } from '@lib/import/formats/HippelCoSoParser';
 
 export interface HippelCoSoExportResult {
   data: Blob;
@@ -220,9 +220,12 @@ function buildCoSoFile(song: TrackerSong): { data: Uint8Array; warnings: string[
           // later event keeps lasting one step. Never FE n: FE sets the row speed and reads on in the SAME step,
           // so a pattern of FE rows takes no time and the player runs through the whole song in one step (the New
           // Song playhead stuck between positions 0 and 1). The parser reads both as one 2-byte empty row.
+          // The row speed the grid carries in the effect column (the parser's FD n) is written back; none = 0.
           bytes.push(s8toByte(-3)); // FD: set row speed, wait
-          bytes.push(0);            // row speed 0: one step per event
+          bytes.push(cell?.effTyp === COSO_SPEED_EFFECT ? cell.eff & 0xFF : 0);
         } else {
+          // A note row's speed is the FE n in front of it (hippel.c step_voice reads it on into the same step).
+          if (cell.effTyp === COSO_SPEED_EFFECT) { bytes.push(s8toByte(-2)); bytes.push(cell.eff & 0xFF); }
           bytes.push(s8toByte(cosoNote));
           const volseqIdx = Math.max(0, ((cell.instrument ?? 1) - 1)) & 0x1F;
           bytes.push(volseqIdx);

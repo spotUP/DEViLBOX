@@ -818,6 +818,7 @@ export function decodeCoSoGrid(
         // Where the speed changes (FE n) read since the last row start: they take no time of their own, so
         // they belong to the row of the event that follows them (hippel.c step_voice reads on in the same step).
         let speedFrom = -1;
+        let speedN = -1; // the last FE n read since the last row start; -1 = none
         while (chRows.length < COSO_ROWS_PER_STEP && pos < buf.length) {
           const v = s8(buf, pos);
           const at = speedFrom >= 0 ? speedFrom : pos;
@@ -825,11 +826,15 @@ export function decodeCoSoGrid(
           if (v === -1) break; // end of pattern
           if (v === -2) {
             speedFrom = at;
+            speedN = pos + 1 < buf.length ? buf[pos + 1] : 0;
             pos += 2;
           } else if (v === -3) {
+            // FD n: the row speed n is the row's speed effect (n = 0 is the plain empty row).
+            const fdN = pos + 1 < buf.length ? buf[pos + 1] : 0;
             pos += 2;
             speedFrom = -1;
-            const baseline = emptyCell();
+            speedN = -1;
+            const baseline = fdN > 0 ? speedCell(emptyCell(), fdN) : emptyCell();
             chRows.push(baseline);
             chSpans.push(cosoSpan(at, pos - at, eventAt, baseline, trackTransp, false, sndT));
           } else {
@@ -837,6 +842,8 @@ export function decodeCoSoGrid(
             // changes without an instrument trigger, so the cell shows the note and no instrument.
             const noTrigger = v < 0;
             speedFrom = -1;
+            const feN = speedN;
+            speedN = -1;
             pos++;
             let infoVal = 0;
             if (pos < buf.length) { infoVal = s8(buf, pos); pos++; }
@@ -845,11 +852,11 @@ export function decodeCoSoGrid(
             // wrapped, and falls back to envelope 0 when that is past the table.
             const envIdx = ((infoVal & 31) + sndT) & 0xFF;
             const instrNum = noTrigger ? 0 : envIdx < instrumentCount ? envIdx + 1 : 1;
-            const baseline: TrackerCell = {
+            const baseline = speedCell({
               note: cosoNoteToXM(v & 0x7F, trackTransp),
               instrument: instrNum,
               volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-            };
+            }, feN);
             chRows.push(baseline);
             chSpans.push(cosoSpan(at, pos - at, eventAt, baseline, trackTransp, true, sndT));
           }
@@ -903,6 +910,14 @@ function cosoSpan(
 }
 
 // ── Helper functions ─────────────────────────────────────────────────────────
+
+/** The effect type that carries a CoSo row speed (FE n / FD n) in the grid; the effect value is n. */
+export const COSO_SPEED_EFFECT = 0x0F;
+
+/** `cell` showing row speed `n` (VBlanks per row) in its effect column; n < 0 = no speed byte. */
+function speedCell(cell: TrackerCell, n: number): TrackerCell {
+  return n < 0 ? cell : { ...cell, effTyp: COSO_SPEED_EFFECT, eff: n };
+}
 
 function emptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
