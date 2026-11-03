@@ -1,0 +1,21 @@
+--- a/src/nuade_song.c	2026-11-03 23:57:51
++++ b/src/nuade_song.c	2026-11-03 23:57:51
+@@ -375,11 +375,16 @@
+ #define NUADE_MAX_EMPTY_TICKS 1024
+ 
+ // The clock the display follows for a player with a row grid and no position hook of its own: ticks per row, and how
+-// many ticks have run. Not running (ticks_per_row 0) for any other player.
++// many ticks have run. A player with neither a position hook nor a row grid reports nothing of where it is: its clock
++// runs at one tick per row, so a host that knows the player's tick length follows the song by the tick count. Not
++// running (ticks_per_row 0) for a player that reports its own position.
+ static NuadeGridClock grid_clock(const NuadeSong* song) {
+     const NuadePlayer* player = song->player;
+-    if (player->grid_ticks == nullptr || player->position != nullptr) {
++    if (player->position != nullptr) {
+         return (NuadeGridClock) { 0 };
++    }
++    if (player->grid_ticks == nullptr) {
++        return (NuadeGridClock) { .ticks_per_row = 1, .ticks_run = song->ticks_run };
+     }
+     return (NuadeGridClock) { .ticks_per_row = player->grid_ticks(song->user_data, song->subsong),
+                               .ticks_run = song->ticks_run };
