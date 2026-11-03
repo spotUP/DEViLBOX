@@ -30,6 +30,7 @@ const CASES: Array<{ file: string; label: string }> = [
   { file: 'zaktitle.scumm', label: 'SCUMM' },
   { file: 'mickey_mouse.bd', label: 'Ben Daglish' },
   { file: 'dns.ptc', label: 'Dynamic Synthesizer' },
+  { file: 'riffraff_smallest.riff', label: 'Riff Raff' },
 ];
 
 describe('import dialog capability matches the export router', () => {

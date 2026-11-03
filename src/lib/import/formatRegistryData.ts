@@ -2313,7 +2313,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   {
     key: 'riffRaff',
     label: 'Riff Raff',
-    description: 'Riff Raff (.riff) - read-only time-aligned grid, nuade / UADE plays the module',
+    description: 'Riff Raff (.riff) - time-aligned grid, note and instrument edits saved in place; nuade / UADE plays the module',
     family: 'amiga-native',
     matchMode: 'both',
     extRegex: /\.riff$/i,
