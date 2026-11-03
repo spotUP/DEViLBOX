@@ -118,7 +118,7 @@ const NO_PATTERN_DISPLAY_LABELS = new Set([
   'PMD',             // PC-98
   'MDX',             // X68000
   // Not in FormatRegistry — matched by extension fallback:
-  'Ben Daglish', 'Hippel ST', 'Sonix Music Driver',
+  'Hippel ST', 'Sonix Music Driver',
   'PxTone', 'Organya', 'EUP', 'IXS', 'Psycle',
   'ZXTune',
 ]);
