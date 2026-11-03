@@ -74,9 +74,14 @@ export function hippelLinkedEdits(
         if (o === c) return t;
         return o > 0 && c > 0 && t > 0 ? t + c - o : c;
       };
-      out.set(`${pos.pattern}:${pos.channel}:${pos.row}`, {
-        ...pos, values: { note: shiftNote(), instrument: shiftInstrument(), volume: (old.volume ?? 0) === (cell.volume ?? 0) ? there.volume : cell.volume },
-      });
+      // Volume is not block bytes (7V: the step's voice-volume command, span.aux): only a copy showing the same step
+      // command takes the edited volume.
+      const thereSpan = spans[pos.pattern]?.[pos.channel]?.[pos.row];
+      const sameVolumeBytes = !!span.aux && thereSpan?.aux?.offset === span.aux.offset;
+      const volume = (old.volume ?? 0) !== (cell.volume ?? 0) && sameVolumeBytes ? cell.volume : there.volume;
+      const values = { note: shiftNote(), instrument: shiftInstrument(), volume };
+      if (FIELDS.every((f) => (values[f] ?? 0) === (there[f] ?? 0))) continue;
+      out.set(`${pos.pattern}:${pos.channel}:${pos.row}`, { ...pos, values });
     }
   }));
   // An edit that already touched a sharer in this pattern (a paste over several copies) stays as typed.

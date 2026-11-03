@@ -156,7 +156,15 @@ describe('a Hippel 7V grid', { timeout: 60000 }, () => {
     const stepOff = tt.tracks + (tt.first + p) * 28;
     const st = (b[stepOff + v * 4 + 2] << 24) >> 24;
     const target = Math.max(1, Math.min(tt.nVol, st + 3));
+    // The step's block may play at other steps too: the edit reaches every copy, as the editor's linked path does.
+    const { mapHippelCells } = await import('../hippel/rebuildHippelModule');
+    const { hippelLinkedEdits } = await import('../hippel/hippelLinkedCells');
+    const unedited = structuredClone(song.patterns[p]);
     song.patterns[p].channels[v].rows[r].instrument = target;
+    const spans = mapHippelCells(ab, song.instruments.length)!;
+    for (const e of hippelLinkedEdits(spans, p, unedited, song.patterns[p], song.patterns)) {
+      Object.assign(song.patterns[e.pattern].channels[e.channel].rows[e.row], e.values);
+    }
     const out = rebuildHippelModule(ab, song.patterns, song.instruments.length)!;
     expect(out.refused).toEqual([]);
     const off = tt.patterns + b[stepOff + v * 4] * 64 + r * 2 + 1;

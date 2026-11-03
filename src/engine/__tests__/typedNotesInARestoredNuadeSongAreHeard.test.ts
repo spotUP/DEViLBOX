@@ -45,12 +45,14 @@ vi.mock('@/lib/import/parseModuleToSong', async (orig) => {
   };
 });
 
-interface Case { id: string; prefKey: string; file: string; pattern: number; channel: number; row: number }
+/** `row` is a grid row, or 'first-note': the first row of that pattern and channel holding a note, so the site follows
+ *  the parsed grid when the format's row layout changes (Hippel CoSo speed changes take no row). */
+interface Case { id: string; prefKey: string; file: string; pattern: number; channel: number; row: number | 'first-note' }
 // The NUADE-EDIT-PATH sites (nuadeEditsAreHeard.test.ts).
 const CASES: Case[] = [
   { id: 'robhubbard', prefKey: 'robHubbard', file: 'public/data/songs/formats/centurion_battle.rh', pattern: 0, channel: 0, row: 48 },
   { id: 'soundmaster', prefKey: 'soundMaster', file: "public/data/songs/formats/rackney'sisland_4.sm", pattern: 12, channel: 1, row: 0 },
-  { id: 'hippel', prefKey: 'hippelCoso', file: 'public/data/songs/formats/prehistoric_tale.hipc', pattern: 3, channel: 3, row: 1 },
+  { id: 'hippel', prefKey: 'hippelCoso', file: 'public/data/songs/formats/prehistoric_tale.hipc', pattern: 3, channel: 3, row: 'first-note' },
   { id: 'instereo1', prefKey: 'inStereo1', file: 'public/data/songs/formats/fantasi8.is', pattern: 8, channel: 1, row: 0 },
   { id: 'sidmon2', prefKey: 'sidmon2', file: 'public/data/songs/formats/bruno_time.sid2', pattern: 2, channel: 1, row: 2 },
   { id: 'soundmon', prefKey: 'soundmon', file: 'public/data/songs/formats/antidust.bp3', pattern: 4, channel: 0, row: 0 },
@@ -92,10 +94,12 @@ describe('a note typed into a restored song that plays on nuade is heard', () =>
 
       // A note typed through the pattern editor's store action.
       const { useTrackerStore } = await import('@/stores/useTrackerStore');
-      const before = useTrackerStore.getState().patterns[c.pattern].channels[c.channel].rows[c.row];
+      const siteRows = useTrackerStore.getState().patterns[c.pattern].channels[c.channel].rows;
+      const row = c.row === 'first-note' ? siteRows.findIndex((r) => r.note > 0) : c.row;
+      const before = siteRows[row];
       expect(before.note, 'the site holds a note').toBeGreaterThan(0);
       useTrackerStore.getState().setCurrentPattern(c.pattern);
-      useTrackerStore.getState().setCell(c.channel, c.row, { note: before.note + 2 });
+      useTrackerStore.getState().setCell(c.channel, row, { note: before.note + 2 });
 
       // The module the live swap (and the next Play) hands nuade.
       const song = liveTrackerSong();
