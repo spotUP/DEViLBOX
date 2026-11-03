@@ -232,4 +232,6 @@ export interface TFMXNativeData {
   macros: TFMXMacro[];
   /** File offset of the macro pointer table */
   macroPointerTableOffset: number;
+  /** File offset of trackstep 0 (an entry is 16 bytes: 8 voices of pattern byte + transpose byte) */
+  trackstepOffset?: number;
 }
