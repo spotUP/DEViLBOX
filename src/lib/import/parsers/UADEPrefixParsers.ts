@@ -20,8 +20,8 @@ const UADE_ONLY_PREFIXES = [
   'aam.', 'abk.', 'agi.',
   // AshleyHogg
   'ah.',
-  // ActionAmics (prefix form), BeathovenSynthesizer
-  'ast.', 'bss.', 'bvs.',
+  // BeathovenSynthesizer (ActionAmics ast.* is routed to ActionamicsParser)
+  'bss.', 'bvs.',
   // ChipTracker (Chuck Biscuits Archive)
   'chip.', 'cba.',
   // CoreDesign
