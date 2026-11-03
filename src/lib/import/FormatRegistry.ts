@@ -12,13 +12,13 @@ import { isGoatTrackerSong } from './formats/GoatTrackerDetect';
 import { isSunTronicV13Format } from './formats/SunTronicV13';
 import { hasMonotoneSignature } from './formats/monotoneGrid';
 import { FORMAT_REGISTRY, type FormatDefinition } from './formatRegistryData';
-import { firstSegment, getBasename } from './formatFilenameMatcher';
+import { detectFormat } from './formatFilenameMatcher';
 
 // The data and the filename matcher live in leaf modules the API server can
 // reach without this file's app graph; they are re-exported so every existing
 // importer keeps its import path.
 export * from './formatRegistryData';
-export { getFormatExtensions, isSupportedFormat } from './formatFilenameMatcher';
+export { getFormatExtensions, isSupportedFormat, detectFormat } from './formatFilenameMatcher';
 
 /**
  * Content-magic fallback for files whose NAME reveals nothing (extensionless
@@ -29,52 +29,6 @@ export { getFormatExtensions, isSupportedFormat } from './formatFilenameMatcher'
  */
 export function isSupportedByHeader(bytes: Uint8Array): boolean {
   return isSunTronicV13Format(bytes);
-}
-
-/**
- * Detect the format of a file by name (and optionally buffer for magic bytes).
- * Returns the first matching FormatDefinition or null.
- * Replaces detectNativeFormat() in ImportModuleDialog.
- */
-export function detectFormat(filename: string): FormatDefinition | null {
-  const lower = filename.toLowerCase();
-  const base = getBasename(lower);
-  const ext = lower.slice(lower.lastIndexOf('.') + 1);
-  const head = firstSegment(base);
-
-  // Pass 1 — what the registry DECLARES. An explicit declaration always wins,
-  // which is what keeps the ten genuine ambiguities resolving the way their
-  // author meant: `ml.tune` is MusicLine while `tune.ml` is Medley, `fc.tune`
-  // is FutureComposer while `tune.fc` is ASAP, and so on.
-  for (const fmt of FORMAT_REGISTRY) {
-    if (fmt.matchMode === 'extension' || fmt.matchMode === 'both') {
-      if (fmt.extRegex?.test(lower)) return fmt;
-    }
-    if (fmt.matchMode === 'prefix' || fmt.matchMode === 'both') {
-      // Match both prefix form (prefix.songname) and extension form (songname.prefix)
-      if (fmt.prefixes?.some(p => base.startsWith(p) || p === `${ext}.`)) return fmt;
-    }
-  }
-
-  // Pass 2 — every format answers to BOTH spellings. The Amiga scene names the
-  // same module either way round, and both live side by side in one directory:
-  // `mdat.rocknroll` next to `primemover_01.hot`, `jpn.virocop-14` next to
-  // `gyroscope.mon`. 121 registry entries declare prefixes, 75 declare only an
-  // extension, and those 75 simply did not answer to their own name written
-  // first — 192 spellings that resolved to nothing (audited 2026-09-24).
-  //
-  // The extension regex is the authority on a format's tokens, so the head of
-  // the name is tested against it as if it were the extension. Running this
-  // only after pass 1 means an implicit match can never take a file away from
-  // a format that asked for it by name.
-  if (head) {
-    const asExt = `.${head}`;
-    for (const fmt of FORMAT_REGISTRY) {
-      if (fmt.matchMode === 'prefix') continue;
-      if (fmt.extRegex?.test(asExt)) return fmt;
-    }
-  }
-  return null;
 }
 
 /**

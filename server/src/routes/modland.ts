@@ -94,7 +94,7 @@ router.get('/search', (req: Request, res: Response) => {
           FROM module_ratings WHERE source = 'modland'
           GROUP BY item_key
         ) r ON r.item_key = f.full_path
-        WHERE modland_fts MATCH ?
+        WHERE modland_fts MATCH ? AND f.is_companion = 0
       `;
       const params: any[] = [ftsQuery];
 
@@ -123,7 +123,7 @@ router.get('/search', (req: Request, res: Response) => {
           FROM module_ratings WHERE source = 'modland'
           GROUP BY item_key
         ) r ON r.item_key = f.full_path
-        WHERE 1=1
+        WHERE f.is_companion = 0
       `;
       const params: any[] = [];
 
