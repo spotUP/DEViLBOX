@@ -1,5 +1,5 @@
 /**
- * Beathoven Synthesizer (.bss) - the time-aligned, read-only grid (phase A) and its byte-exact stream carriers.
+ * Beathoven Synthesizer (.bss) - the time-aligned, read-only grid (phase A; beathovenEdits.ts writes note edits back, phase B) and its byte-exact stream carriers.
  *
  * Three layers (docs/FORMAT_COMMAND_STREAM_GRID.md): the stream bytes in the file are the truth; `blockRows` holds
  * one carrier cell per 16-bit stream word (cutoff 2, period = the word) so the encoder rebuilds the bytes; the display
@@ -77,7 +77,8 @@ export function readBthParams(buf: Uint8Array): BthParams | string {
 }
 
 export interface BthStream { offset: number; size: number; broken: boolean }
-export type BthRowSource = { stream: number; offset: number; length: number } | null;
+/** The event a row's note was read from: the 16-bit note number sits at `noteOffset`, played under `base`. */
+export type BthRowSource = { stream: number; offset: number; length: number; noteOffset: number; noteNum: number; base: number } | null;
 
 export interface BthGrid {
   patterns: Pattern[];
@@ -89,7 +90,14 @@ export interface BthGrid {
   streamAtStart: number[][];
 }
 
-interface Placed { tick: number; note: number; instrument: number; stream: number; offset: number; length: number }
+interface Placed { tick: number; note: number; instrument: number; stream: number; offset: number; length: number; noteOffset: number; noteNum: number; base: number }
+
+/** The tracker note a note number shows under `base` (0 when the table holds no period there). */
+export function bthShownNote(buf: Uint8Array, prm: BthParams, num: number, base: number): number {
+  const idx = prm.legacy ? num + base - prm.origin : num - 1 + base + prm.bias;
+  const p = idx < 0 ? 0 : u16(buf, prm.table + CODE + idx * 2);
+  return p > 0 ? periodToNote(p) : 0;
+}
 
 export function isBthModule(buf: Uint8Array): boolean {
   return typeof readBthParams(buf) !== 'string';
@@ -101,11 +109,6 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
   const streams: BthStream[] = [];
   const streamIndex = new Map<number, number>();
   const instruments = new Map<number, number>();
-  const tableWord = (idx: number): number => (idx < 0 ? 0 : u16(buf, prm.table + CODE + idx * 2));
-  const pitch = (num: number, base: number): number => {
-    const p = tableWord(prm.legacy ? num + base - prm.origin : num - 1 + base + prm.bias);
-    return p > 0 ? periodToNote(p) : 0;
-  };
 
   /** Command size in bytes of the word at `o`, or 0 for the stream end. */
   const cmdSize = (o: number): number => {
@@ -168,8 +171,8 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
         const sz = cmdSize(o);
         const op = u16(buf, o + 2);
         if (w === 0) break;
-        const place = (note: number, len: number): void => {
-          placed.push({ tick: row, note, instrument, stream: si, offset: o, length: sz });
+        const place = (num: number, numAt: number, len: number): void => {
+          placed.push({ tick: row, note: bthShownNote(buf, prm, num, base), instrument, stream: si, offset: o, length: sz, noteOffset: numAt, noteNum: num, base });
           row += len * rowUnit;
         };
         const dur = (v: number): number => (prm.legacy ? (prm.scaled ? (v >> 2) * 5 : v) : v);
@@ -178,17 +181,17 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
           if (!instruments.has(rec)) instruments.set(rec, instruments.size + 1);
           instrument = instruments.get(rec) ?? 0;
         } else if (prm.legacy) {
-          if (w === 0x81) place(pitch(u16(buf, o + 6), base), dur(op));
+          if (w === 0x81) place(u16(buf, o + 6), o + 6, dur(op));
           else if (w === 0x82) { row += dur(op); }
-          else place(pitch(w, base), dur(op));
+          else place(w, o, dur(op));
         } else if (w === 0x81 || w === 0x82 || w === 0x85) {
           // slide, legato and note bias change the sound, not the timeline
         } else if (w === 0x83) {
           row += op;
         } else if (w === 0x84) {
-          place(pitch(u16(buf, o + 6), base), op);
+          place(u16(buf, o + 6), o + 6, op);
         } else {
-          place(pitch(w, base), op);
+          place(w, o, op);
         }
         o += sz;
       }
@@ -210,7 +213,7 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
       const cell = grid[v][p.tick];
       cell.note = p.note || NOTE_OFF_UNUSED;
       if (p.note > 0) cell.instrument = p.instrument;
-      sources[v][p.tick] = { stream: p.stream, offset: p.offset, length: p.length };
+      sources[v][p.tick] = { stream: p.stream, offset: p.offset, length: p.length, noteOffset: p.noteOffset, noteNum: p.noteNum, base: p.base };
       const endTick = Math.min(rows, i + 1 < placed.length ? placed[i + 1].tick : rows);
       for (let t = p.tick; t < endTick; t++) streamAtTick[v][t] = p.stream;
     }

@@ -544,6 +544,14 @@
       "cells": 25010,
       "bytes": 25010
     },
+    "beathoven": {
+      "exporter": "BeathovenExporter.exportBeathoven",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 22264,
+      "bytes": 22264
+    },
     "howieDavies": {
       "exporter": "HowieDaviesExporter.exportHowieDavies",
       "tier": "byte-exact",
