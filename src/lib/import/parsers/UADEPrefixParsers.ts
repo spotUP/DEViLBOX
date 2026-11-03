@@ -41,7 +41,7 @@ const UADE_ONLY_PREFIXES = [
   // FuturePlayer2 (fp2 prefix, also pat. follin)
   'fp2.',
   // HowieDavies, MajorTom variants
-  'hd.', 'hn.', 'thn.', 'mtp2.', 'arp.',
+  'hn.', 'thn.', 'mtp2.', 'arp.',
   // JochenHippel base (hip.*, mcmd.*, sog.*) — different from CoSo and 7V
   'hip.', 'mcmd.', 'sog.',
   // MarkII, MusiclineEditor (MikeDavies handled by AmigaFormatParsers with classic mode)

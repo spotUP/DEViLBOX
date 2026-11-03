@@ -137,6 +137,7 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
   soundProgrammingLanguage: 'pass',
   dynamicSynthesizer: 'pass',
   riffRaff: 'pass',
+  howieDavies: 'pass',
   synthesis: 'pass',
   tcbTracker: 'pass',
   tfmMusicMaker: 'pass',
@@ -258,6 +259,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   soundProgrammingLanguage: 'fail',
   dynamicSynthesizer: 'fail',
   riffRaff: 'fail',
+  howieDavies: 'fail',
   synthesis: 'pass',
   tcbTracker: 'pass',
   tfmMusicMaker: 'pass',
@@ -412,7 +414,6 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   uade_mg: 'G11-uade-only',
   uade_ems: 'U28',
   uade_emsv6: 'G11-uade-only',
-  uade_hd: 'G11-uade-only',
   uade_hn: 'G11-uade-only',
   uade_thn: 'G11-uade-only',
   uade_mtp2: 'G11-uade-only',
@@ -487,6 +488,8 @@ export const DIRECT_GRIDS: readonly string[] = [
   'dynamicSynthesizer',
   // Riff Raff: the pattern and track list streams decode to a read-only tick grid (riffRaffGrid.ts), no oracle yet.
   'riffRaff',
+  // Howie Davies: the position lists and patterns decode to a read-only tick grid (howieDaviesGrid.ts), no oracle yet.
+  'howieDavies',
 ];
 
 export function gridProvenanceOf(key: string): GridProvenance | null {
