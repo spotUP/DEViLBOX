@@ -59,7 +59,7 @@ export class MusicLineSynth implements DevilboxSynth {
     this._instrument = inst;
   }
 
-  triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
+  triggerAttack(note?: string | number, time?: number, velocity?: number): void {
     if (this._disposed) return;
 
     const inst = this._instrument;
@@ -85,11 +85,11 @@ export class MusicLineSynth implements DevilboxSynth {
       }
 
       const vel = Math.round((velocity ?? 1) * 127);
-      this.engine.previewNoteOn(instIdx, midiNote, vel);
+      this.engine.previewNoteOn(instIdx, midiNote, vel, time);
     }
   }
 
-  triggerRelease(_note?: string | number, _time?: number): void {
+  triggerRelease(_note?: string | number, time?: number): void {
     if (this._disposed) return;
 
     const inst = this._instrument;
@@ -101,7 +101,7 @@ export class MusicLineSynth implements DevilboxSynth {
     } else {
       // Instrument preview mode
       const instIdx: number = inst?.metadata?.mlInstIdx ?? 0;
-      this.engine.previewNoteOff(instIdx);
+      this.engine.previewNoteOff(instIdx, time);
     }
   }
 

@@ -91,12 +91,12 @@ export class SonicArrangerSynth {
    * effects (sonic_arranger.c: sa_preview_note), on a second copy of the module held by the
    * engine's worklet, so it sounds as the song plays it and never starts the song.
    */
-  triggerAttack(note?: string | number, _time?: number, _velocity?: number): void {
+  triggerAttack(note?: string | number, time?: number, _velocity?: number): void {
     if (this.instrumentNumber <= 0 || note === undefined) return;
     this.loadModule();
-    this.engine.noteOn(this.instrumentNumber, saNoteForKey(typeof note === 'string' ? noteToMidi(note) : note));
+    this.engine.noteOn(this.instrumentNumber, saNoteForKey(typeof note === 'string' ? noteToMidi(note) : note), time);
   }
-  triggerRelease(): void { this.engine.noteOff(); }
+  triggerRelease(_note?: string | number, time?: number): void { this.engine.noteOff(time); }
   releaseAll(): void { this.engine.noteOff(); }
   dispose(): void {
     if (!this._ownsEngineConnection) return;

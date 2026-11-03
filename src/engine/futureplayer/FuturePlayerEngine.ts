@@ -232,13 +232,13 @@ export class FuturePlayerEngine extends WASMSingletonBase {
   }
 
   /** Trigger a single instrument for preview (instrPtr = raw binary offset, note 1-96, velocity 0-127) */
-  noteOn(instrPtr: number, note: number, velocity: number): void {
-    this.workletNode?.port.postMessage({ type: 'noteOn', instrPtr, note, velocity });
+  noteOn(instrPtr: number, note: number, velocity: number, atTime?: number): void {
+    this.workletNode?.port.postMessage({ type: 'noteOn', atTime, instrPtr, note, velocity });
   }
 
   /** Stop preview note */
-  noteOff(): void {
-    this.workletNode?.port.postMessage({ type: 'noteOff' });
+  noteOff(atTime?: number): void {
+    this.workletNode?.port.postMessage({ type: 'noteOff', atTime });
   }
 
   /**

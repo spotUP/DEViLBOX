@@ -45,13 +45,13 @@ export class StartrekkerAMSynth implements DevilboxSynth {
     this.loadedFor = mod;
   }
 
-  triggerAttack(note?: string | number, _time?: number, _velocity?: number): void {
+  triggerAttack(note?: string | number, time?: number, _velocity?: number): void {
     if (this.instrument <= 0 || note === undefined) return;
     this.loadModule();
     const period = stPeriodForKey(typeof note === 'string' ? noteToMidi(note) : note);
-    if (period > 0) this.engine.noteOn(this.instrument, period);
+    if (period > 0) this.engine.noteOn(this.instrument, period, time);
   }
-  triggerRelease(): void { this.engine.noteOff(); }
+  triggerRelease(_note?: string | number, time?: number): void { this.engine.noteOff(time); }
   releaseAll(): void { this.engine.noteOff(); }
   set(_param: string, _value: number): void {}
   dispose(): void {

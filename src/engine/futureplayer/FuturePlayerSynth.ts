@@ -36,7 +36,7 @@ export class FuturePlayerSynth implements DevilboxSynth {
     }
   }
 
-  triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
+  triggerAttack(note?: string | number, time?: number, velocity?: number): void {
     if (this._disposed) return;
 
     if (note !== undefined && this._instrumentPtr > 0) {
@@ -50,7 +50,7 @@ export class FuturePlayerSynth implements DevilboxSynth {
       // The key stands for the pitch MIDI - 11 (C-0 = 12; MIDI 0..11 = the octave below C-0); the grid shows the
       // pitch the player plays, so the key plays the period table entry of that pitch
       const vol = Math.round((velocity ?? 0.8) * 127);
-      this.engine.noteOn(this._instrumentPtr, fpKeyIndexForMidi(midiNote), vol);
+      this.engine.noteOn(this._instrumentPtr, fpKeyIndexForMidi(midiNote), vol, time);
     } else if (note === undefined) {
       // Whole-song playback: only an explicit play with no note. A typed key
       // on an instrument without a pointer must stay silent, never start the
@@ -59,9 +59,9 @@ export class FuturePlayerSynth implements DevilboxSynth {
     }
   }
 
-  triggerRelease(_note?: string | number, _time?: number): void {
+  triggerRelease(_note?: string | number, time?: number): void {
     if (this._disposed) return;
-    this.engine.noteOff();
+    this.engine.noteOff(time);
   }
 
   releaseAll(): void {

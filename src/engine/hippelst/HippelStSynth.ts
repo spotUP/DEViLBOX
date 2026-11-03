@@ -42,19 +42,19 @@ export class HippelStSynth implements DevilboxSynth {
     if (image) await this.engine.keyLoad(image);
   }
 
-  triggerAttack(note?: string | number, _time?: number, _velocity?: number): void {
+  triggerAttack(note?: string | number, time?: number, _velocity?: number): void {
     if (this._disposed) return;
     const midi = typeof note === 'string' ? noteToMidi(note) : (note ?? 48);
     const image = useFormatStore.getState().hippelStFileData;
     if (!image) return;
     // keyLoad is a no-op for an image the keyboard player already holds
     void this.engine.keyLoad(image).then(() => {
-      if (!this._disposed) this.engine.keyNote(this._instrument, hippelStNoteForKey(midi));
+      if (!this._disposed) this.engine.keyNote(this._instrument, hippelStNoteForKey(midi), time);
     });
   }
 
-  triggerRelease(_note?: string | number, _time?: number): void {
-    if (!this._disposed) this.engine.keyOff();
+  triggerRelease(_note?: string | number, time?: number): void {
+    if (!this._disposed) this.engine.keyOff(time);
   }
 
   releaseAll(): void { this.triggerRelease(); }

@@ -55,13 +55,13 @@ export class DavidWhittakerSynth implements DevilboxSynth {
     this.loadedFor = data;
   }
 
-  triggerAttack(note?: string | number, _time?: number, _velocity?: number): void {
+  triggerAttack(note?: string | number, time?: number, _velocity?: number): void {
     if (this.sampleIndex < 0 || note === undefined) return;
     this.loadModule();
     const midi = typeof note === 'string' ? noteToMidi(note) : note;
-    this.engine.noteOn(this.sampleIndex, dwNoteForKey(midi));
+    this.engine.noteOn(this.sampleIndex, dwNoteForKey(midi), time);
   }
-  triggerRelease(): void { this.engine.noteOff(); }
+  triggerRelease(_note?: string | number, time?: number): void { this.engine.noteOff(time); }
   releaseAll(): void { this.engine.noteOff(); }
   dispose(): void {
     if (!this._ownsEngineConnection) return;

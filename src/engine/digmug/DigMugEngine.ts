@@ -129,10 +129,10 @@ export class DigMugEngine extends WASMChannelOutputsEngine {
     this.workletNode?.port.postMessage({ type: 'previewLoad', buffer });
   }
   /** One key: the 1-based instrument (the cell's sample byte) at the replayer's note byte. */
-  noteOn(instrument: number, note: number): void {
-    this.workletNode?.port.postMessage({ type: 'noteOn', instrument, note });
+  noteOn(instrument: number, note: number, atTime?: number): void {
+    this.workletNode?.port.postMessage({ type: 'noteOn', atTime, instrument, note });
   }
-  noteOff(): void { this.workletNode?.port.postMessage({ type: 'noteOff' }); }
+  noteOff(atTime?: number): void { this.workletNode?.port.postMessage({ type: 'noteOff', atTime }); }
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
 

@@ -47,12 +47,12 @@ export class DeltaMusic2Synth implements DevilboxSynth {
     this.loadedFor = data;
   }
 
-  triggerAttack(note?: string | number, _time?: number, _velocity?: number): void {
+  triggerAttack(note?: string | number, time?: number, _velocity?: number): void {
     if (this.instrumentIndex < 0 || note === undefined) return;
     this.loadModule();
-    this.engine.noteOn(this.instrumentIndex, dm2NoteForKey(typeof note === 'string' ? noteToMidi(note) : note));
+    this.engine.noteOn(this.instrumentIndex, dm2NoteForKey(typeof note === 'string' ? noteToMidi(note) : note), time);
   }
-  triggerRelease(): void { this.engine.noteOff(); }
+  triggerRelease(_note?: string | number, time?: number): void { this.engine.noteOff(time); }
   releaseAll(): void { this.engine.noteOff(); }
   dispose(): void {
     if (!this._ownsEngineConnection) return;

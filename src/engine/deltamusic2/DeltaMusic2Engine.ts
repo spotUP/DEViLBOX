@@ -123,10 +123,10 @@ export class DeltaMusic2Engine extends WASMChannelOutputsEngine {
     this.workletNode?.port.postMessage({ type: 'previewLoad', buffer });
   }
   /** One key: the 0-based instrument at the replayer's note (a period-table index). */
-  noteOn(instrument: number, note: number): void {
-    this.workletNode?.port.postMessage({ type: 'noteOn', instrument, note });
+  noteOn(instrument: number, note: number, atTime?: number): void {
+    this.workletNode?.port.postMessage({ type: 'noteOn', atTime, instrument, note });
   }
-  noteOff(): void { this.workletNode?.port.postMessage({ type: 'noteOff' }); }
+  noteOff(atTime?: number): void { this.workletNode?.port.postMessage({ type: 'noteOff', atTime }); }
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
 

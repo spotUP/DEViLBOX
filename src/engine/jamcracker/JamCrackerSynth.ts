@@ -35,7 +35,7 @@ export class JamCrackerSynth implements DevilboxSynth {
     }
   }
 
-  triggerAttack(note?: string | number, _time?: number, velocity?: number): void {
+  triggerAttack(note?: string | number, time?: number, velocity?: number): void {
     if (this._disposed) return;
 
     if (note !== undefined) {
@@ -49,16 +49,16 @@ export class JamCrackerSynth implements DevilboxSynth {
       // Convert MIDI note to JamCracker note (1-36): JC note 1 = C-1 = MIDI 24
       const jcNote = Math.max(1, Math.min(36, midiNote - 23));
       const vol = Math.round((velocity ?? 0.8) * 64);
-      this.engine.noteOn(this._instrumentIndex, jcNote, vol);
+      this.engine.noteOn(this._instrumentIndex, jcNote, vol, time);
     } else {
       // Whole-song playback
       this.engine.play();
     }
   }
 
-  triggerRelease(_note?: string | number, _time?: number): void {
+  triggerRelease(_note?: string | number, time?: number): void {
     if (this._disposed) return;
-    this.engine.noteOff();
+    this.engine.noteOff(time);
   }
 
   releaseAll(): void {

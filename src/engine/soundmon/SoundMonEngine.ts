@@ -159,12 +159,12 @@ export class SoundMonEngine extends WASMChannelOutputsEngine {
    * holds (see SoundMonNotes noteToBpNote); `volume` 0-64 or omitted for the
    * instrument's own.
    */
-  previewNoteOn(instrument: number, note: number, volume?: number): void {
-    this.workletNode?.port.postMessage({ type: 'previewNoteOn', instrument, note, volume });
+  previewNoteOn(instrument: number, note: number, volume?: number, atTime?: number): void {
+    this.workletNode?.port.postMessage({ type: 'previewNoteOn', atTime, instrument, note, volume });
   }
 
-  previewNoteOff(): void {
-    this.workletNode?.port.postMessage({ type: 'previewNoteOff' });
+  previewNoteOff(atTime?: number): void {
+    this.workletNode?.port.postMessage({ type: 'previewNoteOff', atTime });
   }
 
   /** The row and song-order index the replayer is on, as the grid shows them. */

@@ -175,12 +175,12 @@ export class SteveTurnerEngine extends WASMSingletonBase {
     this.workletNode?.port.postMessage({ type: 'setInstrumentParam', inst, paramId, value });
   }
 
-  noteOn(instrument: number, note: number, velocity = 127): void {
-    this.workletNode?.port.postMessage({ type: 'noteOn', instrument, note, velocity });
+  noteOn(instrument: number, note: number, velocity = 127, atTime?: number): void {
+    this.workletNode?.port.postMessage({ type: 'noteOn', atTime, instrument, note, velocity });
   }
 
-  noteOff(): void {
-    this.workletNode?.port.postMessage({ type: 'noteOff' });
+  noteOff(atTime?: number): void {
+    this.workletNode?.port.postMessage({ type: 'noteOff', atTime });
   }
 
   async getInstrumentParam(inst: number, paramId: number): Promise<number> {
