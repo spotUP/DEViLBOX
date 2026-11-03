@@ -3,7 +3,7 @@
  *
  * Mounted at /api/hip/playlists, before the hippoplayer.se forward that owns the rest of /api/hip.
  * GET /api/hip/playlists              [{ id, name, trackCount, revision }]
- * GET /api/hip/playlists?tracks=1     full playlists (id, name, tracks, ...) for the DJ seed import/repair
+ * GET /api/hip/playlists?tracks=1     full playlists (id, name, tracks, ...) in one response
  * GET /api/hip/playlists/:id          one full playlist, 404 when unknown
  * ETag + Cache-Control; If-None-Match answers 304.
  */

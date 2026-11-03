@@ -1,6 +1,6 @@
 /**
  * HippoPlayer playlists, served read-only by our server (server/src/routes/hipPlaylists.ts).
- * The one fetch path for them: the DJ seed import/repair and the Community "HippoPlayer" group.
+ * The one fetch path for them: the read-only Public section of the DJ playlist panel.
  */
 import { API_URL } from '@lib/apiBase';
 import type { DJPlaylist } from '@/stores/useDJPlaylistStore';
@@ -23,11 +23,6 @@ async function getJson<T>(url: string): Promise<T | null> {
 /** Summaries for the Community list. */
 export async function fetchHippoPlaylistSummaries(): Promise<HippoPlaylistSummary[]> {
   return (await getJson<HippoPlaylistSummary[]>(BASE)) ?? [];
-}
-
-/** Every playlist with its tracks (seed import and source repair). */
-export async function fetchHippoPlaylists(): Promise<DJPlaylist[]> {
-  return (await getJson<DJPlaylist[]>(`${BASE}?tracks=1`)) ?? [];
 }
 
 export async function fetchHippoPlaylist(id: string): Promise<DJPlaylist | null> {
