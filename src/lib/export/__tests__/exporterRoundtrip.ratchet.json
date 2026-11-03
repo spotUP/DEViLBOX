@@ -520,6 +520,14 @@
       "cells": 14096,
       "bytes": 14096
     },
+    "riffRaff": {
+      "exporter": "RiffRaffExporter.exportRiffRaff",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 20976,
+      "bytes": 20976
+    },
     "synthDream": {
       "exporter": "SynthDreamExporter.exportSynthDream",
       "tier": "byte-exact",
