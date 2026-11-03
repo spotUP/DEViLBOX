@@ -131,8 +131,15 @@ export class TFMXEngine extends WASMChannelOutputsEngine {
           break;
 
         case 'moduleLoaded':
+          // One scope per editor-grid channel: the decoder streams one per TFMX
+          // track (tracks route notes onto the 4 or 8 voices) and one per voice
+          // for Hippel. Where scopes and voices differ in count the scopes carry
+          // the grid's own channel names, so none are given here.
           useOscilloscopeStore.getState().setChipInfo(
-            data.voices, 0, Array.from({ length: data.voices }, (_: unknown, v: number) => `Paula ${v}`),
+            data.scopeChannels ?? data.voices, 0,
+            (data.scopeChannels ?? data.voices) === data.voices
+              ? Array.from({ length: data.voices }, (_: unknown, v: number) => `Paula ${v}`)
+              : undefined,
           );
           if (this._moduleLoadedResolvers.length > 0) {
             const resolve = this._moduleLoadedResolvers.shift()!;

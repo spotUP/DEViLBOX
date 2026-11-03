@@ -182,10 +182,14 @@ class TFMXProcessor extends AudioWorkletProcessor {
           this._sampleRate = sampleRate;
           const voices = this.wasm._tfmx_module_voices(this.ctx);
           this._moduleVoices = voices;
+          // The editor-grid channels, one scope each: TFMX tracks, else the voices.
+          const scopeChannels = this.wasm._tfmx_module_scope_channels
+            ? this.wasm._tfmx_module_scope_channels(this.ctx) : voices;
+          this._scopeChannels = scopeChannels;
           const songs = this.wasm._tfmx_module_songs(this.ctx);
           const duration = this.wasm._tfmx_module_duration(this.ctx);
           this._moduleDuration = duration;
-          this.port.postMessage({ type: 'moduleLoaded', voices, songs, duration });
+          this.port.postMessage({ type: 'moduleLoaded', voices, scopeChannels, songs, duration });
         } else {
           this.port.postMessage({ type: 'error', message: 'tfmx_load_module failed: ' + ret });
         }
@@ -403,17 +407,24 @@ class TFMXProcessor extends AudioWorkletProcessor {
         outputR[i] += heapF32[offR + i];
       }
 
-      // Every sample of each voice's own output: for the oscilloscopes and
-      // per-channel role classifiers (worklets/channel-stream.js), and as
-      // each voice's dub send (worklets/channel-outputs.js, outputs 5+v).
+      // Every sample of each voice's own output, as each voice's dub send
+      // (worklets/channel-outputs.js, outputs 5+v); and of each editor-grid
+      // channel (a TFMX track: the voices its notes drive) for the
+      // oscilloscopes and per-channel role classifiers (worklets/channel-stream.js).
       if (this.wasm._tfmx_module_scope && this._moduleVoices > 0) {
         const base = this.wasm._tfmx_module_scope(this.ctx) >> 1;
         const heap16 = new Int16Array(this.wasm.HEAPU8.buffer);
         const views = [];
         for (let v = 0; v < this._moduleVoices; v++) views.push(heap16.subarray(base + v * 128, base + v * 128 + numSamples));
         if (globalThis.DevilboxChannelStream) {
+          let scopeViews = views;
+          if (this.wasm._tfmx_module_channel_scope && this._scopeChannels > 0) {
+            const cbase = this.wasm._tfmx_module_channel_scope(this.ctx) >> 1;
+            scopeViews = [];
+            for (let c = 0; c < this._scopeChannels; c++) scopeViews.push(heap16.subarray(cbase + c * 128, cbase + c * 128 + numSamples));
+          }
           this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
-          this._stream.writeInt16(views, numSamples);
+          this._stream.writeInt16(scopeViews, numSamples);
         }
         if (this._outs) this._outs.write(outputs, views, numSamples, (v) => (v % 4 === 1 || v % 4 === 2 ? 1 : 0), TFMX_VOICE_GAIN);
       }

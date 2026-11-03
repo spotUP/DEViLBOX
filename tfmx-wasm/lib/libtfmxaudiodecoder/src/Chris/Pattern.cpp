@@ -54,6 +54,8 @@ void TFMXDecoder::processPattern(Track& tr) {
             }
             if ( tr.on ) {
                 noteCmd();
+                // DEViLBOX extension: this track now drives the voice (getVoiceChannel).
+                voiceTrack[channelToVoiceMap[cmd.cd & (sizeof(channelToVoiceMap)-1)]] = (sbyte)(&tr - track);
             }
             if (aaBak >= 0xc0 || aaBak < 0x7f) {
                 tr.pattern.step++;

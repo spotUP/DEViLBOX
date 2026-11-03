@@ -78,6 +78,10 @@ void TFMXDecoder::reset() {
         tr.pattern.loops = -1;
     }
 
+    for (ubyte v=0; v<VOICES_MAX; v++) {
+        voiceTrack[v] = -1;
+    }
+
     for (ubyte v=0; v<voices; v++) {
         VoiceVars& voice = voiceVars[v];
         

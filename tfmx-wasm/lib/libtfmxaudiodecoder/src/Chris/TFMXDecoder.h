@@ -42,6 +42,9 @@ class TFMXDecoder : public Decoder {
 
     int getSongs() override;
     ubyte getVoices() override;
+    /** DEViLBOX extension: the grid columns are the tracks; a voice plays for the track whose note last started it. */
+    int getScopeChannels() override { return sequencer.tracks; }
+    int getVoiceChannel(ubyte v) override { return v < VOICES_MAX ? voiceTrack[v] : -1; }
 
     void setPaulaVoice(ubyte,PaulaVoice*) override;
 
@@ -157,6 +160,8 @@ class TFMXDecoder : public Decoder {
     } fade;
 
     ubyte channelToVoiceMap[VOICES_MAX];
+    /** DEViLBOX extension: the track whose pattern note last started each voice, -1 for none. */
+    sbyte voiceTrack[VOICES_MAX];
 
     struct VoiceVars {
         PaulaVoice *ch;  // paula and mixer interface
