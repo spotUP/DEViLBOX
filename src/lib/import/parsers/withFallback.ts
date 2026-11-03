@@ -126,13 +126,18 @@ export async function callUADE(ctx: FallbackContext): Promise<TrackerSong> {
   );
 }
 
+/** libopenmpt plays the song (MMD3: UADE rejects it); its grid stays editable through the layout, UADE gets no bytes. */
+function playsOnLibopenmpt(song: Partial<TrackerSong>): boolean {
+  return !!(song as { libopenmptFileData?: ArrayBuffer }).libopenmptFileData;
+}
+
 /**
  * If a native parser result has uadePatternLayout, inject the raw file binary
  * so UADE can handle playback while the native parser provides pattern display.
  */
 export function injectUADEPlayback(result: TrackerSong, ctx: FallbackContext): TrackerSong {
   const ra = result as any;
-  if (ra.uadePatternLayout && !ra.uadeEditableFileData && !playsOnDedicatedEngine(result)) {
+  if (ra.uadePatternLayout && !ra.uadeEditableFileData && !playsOnDedicatedEngine(result) && !playsOnLibopenmpt(result)) {
     (result as any).uadeEditableFileData = ctx.buffer.slice(0);
     (result as any).uadeEditableFileName = ctx.originalFileName;
   }
@@ -199,7 +204,7 @@ export async function withNativeThenUADE(
           // Skip UADE injection if a dedicated WASM engine handles audio
           const r = result as any;
           const dedicated = playsOnDedicatedEngine(result);
-          if (!r.uadeEditableFileData && !dedicated) {
+          if (!r.uadeEditableFileData && !dedicated && !playsOnLibopenmpt(result)) {
             (result as any).uadeEditableFileData = ctx.buffer.slice(0);
             (result as any).uadeEditableFileName = ctx.originalFileName;
           }

@@ -29,7 +29,7 @@ function writeStr(view: DataView, off: number, str: string, len: number): void {
  * decode reproduces the XM effect for the rest. Commands whose forward decode is
  * genuinely ambiguous (0x0C volume BCD/hex, 0x0F tempo conversion) are best-effort.
  */
-function mapXMEffectToMED(effTyp: number, eff: number): [number, number] {
+export function mapXMEffectToMED(effTyp: number, eff: number): [number, number] {
   switch (effTyp) {
     case 0x00: return [0x0, eff];          // arpeggio / none
     case 0x01: return [0x1, eff];          // portamento up
@@ -54,7 +54,25 @@ function mapXMEffectToMED(effTyp: number, eff: number): [number, number] {
   }
 }
 
+/**
+ * A song parsed from an OctaMED MMD0-MMD3 file: the edited cells go back into a copy of the original module,
+ * so an unedited song is the file unchanged. Null for a song that did not come from a MED file.
+ */
+export function patchMedModule(song: TrackerSong): ArrayBuffer | null {
+  const layout = song.uadePatternLayout;
+  const src = song.uadeEditableFileData ?? song.libopenmptFileData;
+  if (!src || (layout?.formatId !== 'med_mmd0' && layout?.formatId !== 'med_mmd1') || !layout.getCellFileOffset) return null;
+  const out = new Uint8Array(src.slice(0));
+  song.patterns.forEach((pat, p) => pat.channels.forEach((chan, ch) => chan.rows.forEach((cell, row) => {
+    const off = layout.getCellFileOffset!(p, row, ch);
+    if (off > 0) out.set(layout.encodeCell(cell, out.subarray(off, off + layout.bytesPerCell)), off);
+  })));
+  return out.buffer;
+}
+
 export function exportMED(song: TrackerSong): ArrayBuffer {
+  const patched = patchMedModule(song);
+  if (patched) return patched;
   const nChannels = Math.min(4, song.numChannels);
   const nBlocks   = song.patterns.length;
   const nInstrs   = Math.min(63, song.instruments.length);
