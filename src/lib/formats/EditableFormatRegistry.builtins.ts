@@ -120,6 +120,7 @@ registerEditableFormat({ formatId: "stx", label: "", patternCodec: { kind: "vari
 registerEditableFormat({ formatId: "sunTronic", label: "SunTronic", newSong: { template: "templates/sunTronic.src" }, patternCodec: { kind: "variable" }, exporter: { module: "SunTronicExporter", fn: "exportAsSunTronic", byLayout: true, ext: "src" } });
 registerEditableFormat({ formatId: "symphoniePro", label: "Symphonie Pro", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "synthDream", label: "SynthDream", patternCodec: { kind: "variable" }, exporter: { module: "SynthDreamExporter", fn: "exportSynthDream", byLayout: true } });
+registerEditableFormat({ formatId: "soundProgrammingLanguage", label: "Sound Programming Language", patternCodec: { kind: "variable" }, exporter: { module: "SoundProgrammingLanguageExporter", fn: "exportSoundProgrammingLanguage", byLayout: true } });
 registerEditableFormat({ formatId: "riffRaff", label: "Riff Raff", patternCodec: { kind: "variable" }, exporter: { module: "RiffRaffExporter", fn: "exportRiffRaff", byLayout: true } });
 registerEditableFormat({ formatId: "dynamicSynthesizer", label: "Dynamic Synthesizer", patternCodec: { kind: "variable" }, exporter: { module: "DynamicSynthesizerExporter", fn: "exportDynamicSynthesizer", byLayout: true } });
 registerEditableFormat({ formatId: "synthesis", label: "Synthesis", newSong: { template: "templates/synthesis.syn" }, patternCodec: { kind: "fixed" }, exporter: { module: "SynthesisExporter", fn: "exportSynthesis", byLayout: true } });

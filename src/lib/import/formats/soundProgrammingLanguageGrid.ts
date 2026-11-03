@@ -46,6 +46,8 @@ interface SplBuildInfo {
   periodTable: number;
   transpose: number;
   streams: number[];
+  /** Hash with the first byte of every decoded note zeroed: identifies the build after note edits (see readSplBuild). */
+  noteMaskedHash: bigint;
 }
 
 const BUILDS: SplBuildInfo[] = [
@@ -57,6 +59,7 @@ const BUILDS: SplBuildInfo[] = [
     periodTable: 0x2f6,
     transpose: 9,
     streams: [0xa26, 0xabe, 0xbbe, 0xc96],
+    noteMaskedHash: 0x1f0bde0087d5762en,
   },
 ];
 
@@ -84,25 +87,36 @@ export function readSplHunk(buf: Uint8Array): SplHunk | string {
 }
 
 /** spl_module.c build_hash: FNV-1a over size, code prefix, relocation count and relocations. */
-function buildHash(buf: Uint8Array, hunk: SplHunk, prefixEnd: number): bigint {
+function buildHash(buf: Uint8Array, hunk: SplHunk, prefixEnd: number, zeroed?: ReadonlySet<number>): bigint {
   let h = FNV_OFFSET;
   const feed = (byte: number): void => { h = ((h ^ BigInt(byte)) * FNV_PRIME) & MASK64; };
   const feed32 = (v: number): void => { feed(v >>> 24); feed((v >>> 16) & 0xff); feed((v >>> 8) & 0xff); feed(v & 0xff); };
   feed32(hunk.size);
-  for (let i = 0; i < prefixEnd; i++) feed(u8(buf, CODE + i));
+  for (let i = 0; i < prefixEnd; i++) feed(zeroed?.has(CODE + i) ? 0 : u8(buf, CODE + i));
   feed32(hunk.relocations.length);
   for (const r of hunk.relocations) feed32(r);
   return h;
 }
 
-/** The known build of a module, or why the module cannot be decoded. */
-export function readSplBuild(buf: Uint8Array): { build: SplBuildInfo; hunk: SplHunk; timer: number } | string {
+/**
+ * The known build of a module, or why the module cannot be decoded. A build is told apart by the FNV hash of the code
+ * prefix; in this build the prefix also holds the command streams, so a note edit would change the hash and the saved
+ * module would no longer be recognised. A module whose plain hash differs is therefore accepted when the build's
+ * streams decode and the hash with every note's first byte zeroed matches (a note byte stays below 0xC0, so an edit
+ * never changes the stream's structure).
+ */
+export function readSplBuild(buf: Uint8Array): { build: SplBuildInfo; hunk: SplHunk; timer: number; edited: boolean } | string {
   const hunk = readSplHunk(buf);
   if (typeof hunk === 'string') return hunk;
+  const timer = u32(buf, CODE + 0x34);
   for (const build of BUILDS) {
-    if (build.prefixEnd <= hunk.size && buildHash(buf, hunk, build.prefixEnd) === build.hash) {
-      return { build, hunk, timer: u32(buf, CODE + 0x34) };
-    }
+    if (build.prefixEnd > hunk.size) continue;
+    if (buildHash(buf, hunk, build.prefixEnd) === build.hash) return { build, hunk, timer, edited: false };
+  }
+  for (const build of BUILDS) {
+    if (build.prefixEnd > hunk.size) continue;
+    const grid = decodeSpl(buf, build, hunk, timer);
+    if (typeof grid !== 'string' && buildHash(buf, hunk, build.prefixEnd, new Set(grid.noteOffsets)) === build.noteMaskedHash) return { build, hunk, timer, edited: true };
   }
   return 'the replayer build is not one of the decoded builds';
 }
@@ -112,9 +126,12 @@ export function isSplModule(buf: Uint8Array): boolean {
 }
 
 export interface SplStream { offset: number; size: number }
-export type SplRowSource = { stream: number; offset: number; length: number } | null;
+/** Where a note starts: file offset of its first note byte, bytes it spans, and the octave / transposition its period lookup used. */
+export type SplRowSource = { stream: number; offset: number; length: number; octave: number; steps: number } | null;
 
 export interface SplGrid {
+  /** file offset of the first byte of every decoded note */
+  noteOffsets: number[];
   patterns: Pattern[];
   songPositions: number[];
   rows: number;
@@ -125,9 +142,11 @@ export interface SplGrid {
   /** BPM that makes one grid row last one replayer step at speed 1 */
   bpm: number;
   buildName: string;
+  /** The tracker note a stream note byte plays under an instrument record's octave and transposition (the grid's own lookup). */
+  noteForByte: (byte: number, octave: number, steps: number) => number;
 }
 
-interface Placed { tick: number; note: number; instrument: number; run: number; offset: number; length: number }
+interface Placed { tick: number; note: number; instrument: number; run: number; offset: number; length: number; octave: number; steps: number }
 interface Run { start: number; end: number }
 
 /** transpose_note: octave in the high nibble, semitone in the low. */
@@ -143,7 +162,10 @@ function transposeNote(note: number, steps: number): number {
 export function buildSplGrid(buf: Uint8Array): SplGrid | string {
   const found = readSplBuild(buf);
   if (typeof found === 'string') return found;
-  const { build, hunk, timer } = found;
+  return decodeSpl(buf, found.build, found.hunk, found.timer);
+}
+
+function decodeSpl(buf: Uint8Array, build: SplBuildInfo, hunk: SplHunk, timer: number): SplGrid | string {
   const at = (hunkOffset: number): number => CODE + hunkOffset;
   const inHunk = (hunkOffset: number, n = 1): boolean => hunkOffset >= 0 && hunkOffset + n <= hunk.size;
 
@@ -211,7 +233,7 @@ export function buildSplGrid(buf: Uint8Array): SplGrid | string {
         const more = (rec.flags & 1) === 0 ? 0 : (rec.flags & 0x20) !== 0 ? 3 : 1;
         const moved = transposeNote(b, build.transpose + rec.transpose);
         const period = periodOf(moved, rec.octave);
-        placed.push({ tick: row, note: period > 0 ? periodToNote(period) : 0, instrument, run, offset: at(pos), length: 1 + more });
+        placed.push({ tick: row, note: period > 0 ? periodToNote(period) : 0, instrument, run, offset: at(pos), length: 1 + more, octave: rec.octave, steps: build.transpose + rec.transpose });
         pos += 1 + more;
         touch(pos);
         row += Math.max(reload, 1);
@@ -234,7 +256,7 @@ export function buildSplGrid(buf: Uint8Array): SplGrid | string {
       const cell = grid[v][p.tick];
       cell.note = p.note;
       if (p.note > 0) cell.instrument = p.instrument;
-      sources[v][p.tick] = { stream: p.run, offset: p.offset, length: p.length };
+      sources[v][p.tick] = { stream: p.run, offset: p.offset, length: p.length, octave: p.octave, steps: p.steps };
       const endTick = Math.min(rows, i + 1 < placed.length ? placed[i + 1].tick : rows);
       for (let t = p.tick; t < endTick; t++) runAtTick[v][t] = p.run;
     }
@@ -267,5 +289,7 @@ export function buildSplGrid(buf: Uint8Array): SplGrid | string {
   // one step every (reload + 1) / 2 ticks of TIMEBASE_HZ / timer Hz; at speed 1 a row is one tick of 2.5 / BPM seconds
   const ticksPerStep = (build.dividerReload + 1) / 2;
   const bpm = Math.max(32, Math.min(255, Math.round((2.5 * TIMEBASE_HZ) / (timer * ticksPerStep))));
-  return { patterns, songPositions, rows, streams, blockRows, rowSources, streamAtStart, bpm, buildName: build.name };
+  const noteOffsets = voices.flatMap((p) => p.map((n) => n.offset));
+  return { noteOffsets, patterns, songPositions, rows, streams, blockRows, rowSources, streamAtStart, bpm, buildName: build.name,
+    noteForByte: (byte, octave, steps) => { const period = periodOf(transposeNote(byte, steps), octave); return period > 0 ? periodToNote(period) : 0; } };
 }
