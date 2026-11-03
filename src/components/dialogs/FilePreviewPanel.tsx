@@ -37,6 +37,7 @@ import {
   removeRating,
   type RatingMap,
 } from '@/lib/ratingsApi';
+import { useRatingsStore } from '@/stores/useRatingsStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { StarRating } from '@/components/shared/StarRating';
 import { AuthModal } from '@/components/dialogs/AuthModal';
@@ -166,9 +167,11 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
     try {
       if (star === 0) {
         const res = await removeRating('modland', key);
+        useRatingsStore.getState().record('modland', key, { avg: res.avg, count: res.count });
         setModlandRatings(prev => ({ ...prev, [key]: { avg: res.avg, count: res.count } }));
       } else {
         const res = await setRating('modland', key, star);
+        useRatingsStore.getState().record('modland', key, { avg: res.avg, count: res.count, userRating: res.userRating });
         setModlandRatings(prev => ({ ...prev, [key]: { avg: res.avg, count: res.count, userRating: res.userRating } }));
       }
     } catch { /* ignore */ }
@@ -461,9 +464,11 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
     try {
       if (star === 0) {
         const res = await removeRating('hvsc', key);
+        useRatingsStore.getState().record('hvsc', key, { avg: res.avg, count: res.count });
         setHvscRatings(prev => ({ ...prev, [key]: { avg: res.avg, count: res.count } }));
       } else {
         const res = await setRating('hvsc', key, star);
+        useRatingsStore.getState().record('hvsc', key, { avg: res.avg, count: res.count, userRating: res.userRating });
         setHvscRatings(prev => ({ ...prev, [key]: { avg: res.avg, count: res.count, userRating: res.userRating } }));
       }
     } catch { /* ignore */ }

@@ -13,6 +13,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { camelotDisplay, camelotColor, keyCompatibility, keyCompatibilityColor } from '@/engine/dj/DJKeyUtils';
 import { DeckBeatPhase } from './DeckBeatPhase';
 import { TapTempoButton } from '@components/ui/TapTempoButton';
+import { SongScore } from '@/components/shared/SongScore';
 
 interface DeckTrackInfoProps {
   deckId: 'A' | 'B' | 'C';
@@ -148,6 +149,7 @@ export const DeckTrackInfo: React.FC<DeckTrackInfoProps> = ({ deckId }) => {
             <span className="text-text-muted ml-1.5">— {displayAuthor}</span>
           )}
         </div>
+        <SongScore fileName={fileName} />
         {analysisIndicator && (
           <span className={`text-[9px] font-bold ${analysisIndicator.color} animate-pulse tracking-wider flex-shrink-0`}>
             {analysisIndicator.text}
