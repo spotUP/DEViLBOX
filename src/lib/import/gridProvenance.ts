@@ -65,6 +65,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   dynamicSynthesizer: 'pass',
   riffRaff: 'pass',
   howieDavies: 'pass',
+  soundProgrammingLanguage: 'pass',
 };
 
 /**

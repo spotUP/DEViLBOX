@@ -32,6 +32,7 @@ const CASES: Array<{ file: string; label: string }> = [
   { file: 'dns.ptc', label: 'Dynamic Synthesizer' },
   { file: 'riffraff_smallest.riff', label: 'Riff Raff' },
   { file: 'blazing_thunder.hd', label: 'Howie Davies' },
+  { file: 'boulderdash.spl', label: 'Sound Programming Language' },
 ];
 
 describe('import dialog capability matches the export router', () => {
