@@ -93,4 +93,37 @@ describe('TFMX: a trackstep matrix edit is what the next play plays', { timeout:
     const live = parseTFMXFile(swapModule.mock.calls.at(-1)![0] as ArrayBuffer, 'mdat.hbtitle').tfmxNative!;
     expect(live.tracksteps.find((s) => s.stepIndex === a.stepIndex)!.voices[0].patternNum).toBe(to);
   });
+  // Owner 2026-11-03: "i can only eddit channel 1 and 2 in the matrix for tfmx". turrican_bonus starts on two of
+  // eight voices; the matrix dropped every edit on a stopped (--) or held (HD) cell, so voices 3-8 took nothing.
+  it('a pattern typed on a stopped voice is what the next play plays (mdat.turrican_bonus)', async () => {
+    const { openSong } = await import('@/lib/song/openSong');
+    const r = await openSong({
+      kind: 'bytes', name: 'mdat.turrican_bonus', bytes: bytesOf('public/data/songs/formats/mdat.turrican_bonus'),
+      companions: new Map([['smpl.turrican_bonus', bytesOf('public/data/songs/formats/smpl.turrican_bonus')]]),
+    }, { origin: 'mcp' });
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+
+    const { useFormatStore } = await import('@stores/useFormatStore');
+    const { tfmxTrackstepCellEdit } = await import('@/components/tfmx/tfmxAdapter');
+    const native = useFormatStore.getState().tfmxNative!;
+    const first = native.tracksteps.find((s) => s.stepIndex === native.firstStep)!;
+    expect(first.voices[3].isStop, 'voice 4 is stopped on the first step').toBe(true);
+    const to = first.voices[0].patternNum;
+
+    // the matrix's own cell edit on voice 4, pattern column (and a transpose typed there first has nothing to move)
+    expect(tfmxTrackstepCellEdit(first, 3, 'trans', 0x05)).toBeNull();
+    const edit = tfmxTrackstepCellEdit(first, 3, 'pat', to)!;
+    expect(edit).toEqual({ patNum: to, transpose: 0 });
+    useFormatStore.getState().setTFMXTrackstepVoice(first.stepIndex, 3, edit.patNum, edit.transpose);
+    await settle();
+
+    const { liveTrackerSong } = await import('@/lib/song/liveSong');
+    const { playingDescriptor } = await import('@/engine/replayer/liveCellEdits');
+    const { engineLoadArgs } = await import('@/engine/replayer/NativeEngineRouting');
+    const { parseTFMXFile } = await import('@/lib/import/formats/TFMXParser');
+    const song = liveTrackerSong();
+    const { data } = await engineLoadArgs(song, playingDescriptor(song)!, false);
+    const played = parseTFMXFile(data, 'mdat.turrican_bonus').tfmxNative!.tracksteps.find((s) => s.stepIndex === first.stepIndex)!;
+    expect(played.voices[3]).toMatchObject({ patternNum: to, transpose: 0, isStop: false, isHold: false });
+  });
 });
