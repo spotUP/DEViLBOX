@@ -86,7 +86,7 @@ export async function writeCellToChipRam(
       if (offset >= 0) {
         const buf = new Uint8Array(song.tfmxFileData);
         const stored = layout.encodeOverStored ? buf.slice(offset, offset + layout.bytesPerCell) : undefined;
-        const encoded = layout.encodeCell(cell, stored);
+        const encoded = layout.encodeCell(cell, stored, channel);
         for (let i = 0; i < encoded.length && offset + i < buf.length; i++) {
           buf[offset + i] = encoded[i];
         }

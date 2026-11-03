@@ -76,7 +76,7 @@ export function writeEditedTFMXCells(
       if ((cell.note ?? 0) > 0) warnings.push(`pattern ${pattern} voice ${channel + 1} row ${row}: a note on a row no command word covers needs a longer pattern; not written`);
       continue;
     }
-    out.set(layout.encodeCell(cell), at);
+    out.set(layout.encodeCell(cell, undefined, channel), at);
   }
 }
 

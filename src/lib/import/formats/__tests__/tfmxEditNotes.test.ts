@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { parseTFMXFile } from '../TFMXParser';
+import { parseTFMXFile, tfmxCommandVoice, tfmxSetCommandVoice } from '../TFMXParser';
 import { exportTFMX } from '@/lib/export/TFMXExporter';
 import { setGridBaseline, baselineOf } from '@/lib/song/gridBaseline';
 
@@ -64,6 +64,13 @@ describe('TFMX note edits', { timeout: 120000 }, () => {
     expect(grown[off + 3], 'the wait of the F3 it replaced').toBe(new Uint8Array(bytes)[off + 1] + 1);
     const back = await parseTFMXFile(grown.slice().buffer as ArrayBuffer, 'mdat.hbtitle');
     expect(back.patterns[at!.p].channels[at!.ch].rows[at!.row].note).toBe(above.note);
+    // The column is the voice: the command names the Paula voice of the column it was typed in (it was voice 0 whatever the column).
+    expect(tfmxCommandVoice(grown, off, false), `a note typed in column ${at!.ch} plays on voice ${at!.ch}`).toBe(at!.ch);
+    // Typed in the last column, and in a 7-voice song (voice 3 = command nibble 4, voice 7 = nibble 3).
+    const layout4 = layout.encodeCell(song.patterns[at!.p].channels[at!.ch].rows[at!.row], undefined, 3);
+    expect(tfmxCommandVoice(layout4, 0, false)).toBe(3);
+    expect(tfmxCommandVoice(tfmxSetCommandVoice(new Uint8Array([0x10, 0, 0, 0]), 3, true), 0, true)).toBe(3);
+    expect(tfmxCommandVoice(tfmxSetCommandVoice(new Uint8Array([0x10, 0, 0, 0]), 7, true), 0, true)).toBe(7);
 
   });
 

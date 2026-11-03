@@ -35,10 +35,10 @@ describe('TFMX: the grid follows the decoder position (mdat.turrican_bonus)', ()
         for (let ch = 0; ch < layout.numChannels; ch++) {
           const offset = layout.getCellFileOffset!(p, row, ch);
           if (offset < 0) continue;
-          // the step the grid pattern stands for really plays this command on this voice (independent of gridSteps' own order)
+          // the step the grid pattern stands for really plays this command on one of its tracks (independent of gridSteps' own order);
+          // the column is the Paula voice the command plays on, not the track (tfmxGridVoiceColumns.test.ts)
           const step = native.tracksteps.find((t) => t.stepIndex === gridSteps[p])!;
-          const voice = step.voices[ch];
-          expect(native.patterns[voice.patternNum]?.some((c) => c.fileOffset === offset), `step ${gridSteps[p]} voice ${ch} plays offset ${offset}`).toBe(true);
+          expect(step.voices.some((v) => native.patterns[v.patternNum]?.some((c) => c.fileOffset === offset)), `step ${gridSteps[p]} column ${ch} plays offset ${offset}`).toBe(true);
           const at = tfmxGridPositionAt(layout, gridSteps, native.gridRowTicks, rowCount, gridSteps[p], offset, -1);
           expect(at, `pattern ${p} row ${row} voice ${ch}`).toEqual({ pattern: p, row });
           checked++;
@@ -78,10 +78,11 @@ describe('TFMX: the grid follows the decoder position (mdat.turrican_bonus)', ()
         const voice = step.voices[ch];
         if (!voice || voice.isStop || voice.isHold) continue;
         let tick = 0;
-        let row = 0;
         for (const cmd of native.patterns[voice.patternNum] ?? []) {
-          while (row < ticks.length && layout.getCellFileOffset!(p, row, ch) !== cmd.fileOffset) row++;
-          expect(row, `step ${step.stepIndex} voice ${ch} shows offset ${cmd.fileOffset}`).toBeLessThan(ticks.length);
+          // a track's command sits in the column of the voice it plays on, so look in every column
+          let row = 0;
+          while (row < ticks.length && !Array.from({ length: layout.numChannels }, (_, c) => layout.getCellFileOffset!(p, row, c)).includes(cmd.fileOffset)) row++;
+          expect(row, `step ${step.stepIndex} track ${ch} shows offset ${cmd.fileOffset}`).toBeLessThan(ticks.length);
           expect(ticks[row], `step ${step.stepIndex} voice ${ch} offset ${cmd.fileOffset}`).toBe(tick);
           tick += holds(cmd.fileOffset);
           compared++;
