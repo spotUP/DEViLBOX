@@ -666,52 +666,22 @@ export async function startNativeEngines(
           musicLineEngine = instance as unknown as MusicLineEngine;
         }
 
-        // TFMX module position sync: use timing table (cumulativeJiffies → row/pattern)
-        if (desc.key === 'TFMXModule' && 'onPositionUpdate' in instance) {
-          const timingTable = song.tfmxTimingTable as
-            { patternIndex: number; row: number; cumulativeJiffies: number }[] | undefined;
-
-          // Get tempo from the song's initialBPM/initialSpeed (set by TFMXParser from tempo value)
-          // TFMXParser: CIA mode (tempo>=16) → initialBPM = tempo*2.5/24
-          // VBlank mode (tempo<16) → initialBPM=125, initialSpeed=tempo+1
-          // For jiffy conversion: use 20ms/jiffy as default (VBlank rate)
-          // The timing table already encodes per-row jiffy durations from the actual TFMX commands
-          const msPerJiffy = 20; // VBlank: 1/50s. For CIA, the timing table jiffies are already scaled.
-          const sr = Tone.context.sampleRate || 44100;
-
-          let _posLogCount = 0;
-          trackSubscription((instance as any).onPositionUpdate((update: { samplesRendered: number; elapsedMs?: number; songEnd: boolean }) => {
-            if (!timingTable || timingTable.length === 0) return;
-
-            // Compute elapsed ms from samplesRendered (more reliable than worklet's elapsedMs)
-            const elapsedMs = (update.samplesRendered / sr) * 1000;
-            const currentJiffies = elapsedMs / msPerJiffy;
-
-            // Binary search for the last entry where cumulativeJiffies <= currentJiffies
-            let lo = 0, hi = timingTable.length - 1;
-            while (lo < hi) {
-              const mid = (lo + hi + 1) >>> 1;
-              if (timingTable[mid].cumulativeJiffies <= currentJiffies) {
-                lo = mid;
-              } else {
-                hi = mid - 1;
-              }
-            }
-
-            const entry = timingTable[lo];
-            const row = entry.row;
-            const position = entry.patternIndex;
-
-            if (_posLogCount < 3) {
-              _posLogCount++;
-              console.log(`[TFMXModule] pos #${_posLogCount}: elapsed=${elapsedMs.toFixed(0)}ms jiffies=${currentJiffies.toFixed(1)} → pat=${position} row=${row} (of ${timingTable.length} entries)`);
-            }
-
-            if (Number.isFinite(row) && Number.isFinite(position)) {
-              reportEnginePosition(desc.key, row, position);
-            }
+        // TFMX module position sync: the decoder reports the trackstep it plays and the
+        // file offset of the command its first playing voice is on; the grid row is the
+        // cell at that offset. Layout and step list are read live: a matrix edit re-projects them.
+        if (desc.key === 'TFMXModule') {
+          const tfmx = instance as unknown as import('@/engine/tfmx/TFMXEngine').TFMXEngine;
+          const { tfmxGridPositionAt } = await import('@/engine/tfmx/tfmxPlayPosition');
+          const { useFormatStore } = await import('@stores/useFormatStore');
+          const { useTrackerStore } = await import('@stores/useTrackerStore');
+          trackSubscription(tfmx.onPositionUpdate((u) => {
+            if (u.step === undefined || u.step < 0 || u.patternOffset === undefined || u.patternOffset < 0) return;
+            const { uadePatternLayout: layout, tfmxNative } = useFormatStore.getState();
+            if (!layout || !tfmxNative) return;
+            const patterns = useTrackerStore.getState().patterns;
+            const at = tfmxGridPositionAt(layout, tfmxNative.gridSteps, (p) => patterns[p]?.length ?? 0, u.step, u.patternOffset);
+            if (at) reportEnginePosition(desc.key, at.row, at.pattern);
           }));
-          console.log(`[NativeEngineRouting] TFMXModule position sync wired (${timingTable?.length ?? 0} entries, msPerJiffy=${msPerJiffy})`);
         }
 
         // Hippel position sync: the decoder reports voice 0's track step and

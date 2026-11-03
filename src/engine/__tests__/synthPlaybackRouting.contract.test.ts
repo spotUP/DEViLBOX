@@ -78,11 +78,13 @@ describe('Synth playback routing — libopenmpt creation contract', () => {
   });
 
   it('TFMX playback uses the wasm position store directly, not the global FormatPlaybackState singleton', () => {
-    const tfmxBlockMatch = nativeRouting.match(/if\s*\(desc\.key === 'TFMXModule'[\s\S]*?console\.log\(`\[NativeEngineRouting\] TFMXModule position sync wired[\s\S]*?\n\s*\}/);
+    const tfmxBlockMatch = nativeRouting.match(/if\s*\(desc\.key === 'TFMXModule'[\s\S]*?\}\)\);\s*\n\s*\}/);
     expect(tfmxBlockMatch, 'TFMXModule position sync block should exist').not.toBeNull();
     const tfmxBlock = tfmxBlockMatch![0];
-    // Through reportEnginePosition, which writes useWasmPositionStore while TFMX is the running engine.
-    expect(tfmxBlock).toContain('reportEnginePosition(desc.key, row, position);');
+    // Through reportEnginePosition, which writes useWasmPositionStore while TFMX is the running engine;
+    // the row and pattern come from the decoder's play position (tfmxGridPositionAt), not a timer.
+    expect(tfmxBlock).toContain('reportEnginePosition(desc.key, at.row, at.pattern);');
+    expect(tfmxBlock).toContain('tfmxGridPositionAt(');
     expect(tfmxBlock).not.toContain('setFormatPlaybackPlaying(true)');
     expect(tfmxBlock).not.toContain('setFormatPlaybackRow(row)');
   });

@@ -853,4 +853,23 @@ const uword TFMXDecoder::periods[0xd+0x40] = {
     0x00d6, 0x00ca, 0x00bf, 0x00b4
 };
 
+// DEViLBOX extension. pattern.step already points past the command being
+// played (it is advanced when the command is read), so the current one is one
+// back. The offset is reported relative to the mdat data, as the editor
+// grid addresses it (offsets.header is the merged-file prefix).
+bool TFMXDecoder::getPlayPosition(int& step, udword& offset) {
+    if (!admin.initialized) return false;
+    for (int t = 0; t < sequencer.tracks && t < TRACKS_MAX; t++) {
+        const Track& tr = track[t];
+        if (tr.PT >= 0x80) continue;
+        const uword cmdIdx = tr.pattern.step > 0 ? tr.pattern.step - 1 : 0;
+        const udword abs = tr.pattern.offset + ((udword)cmdIdx << 2);
+        if (abs < offsets.header) return false;
+        step = sequencer.step.current;
+        offset = abs - offsets.header;
+        return true;
+    }
+    return false;
+}
+
 }  // namespace

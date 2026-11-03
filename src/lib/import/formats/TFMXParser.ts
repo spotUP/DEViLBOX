@@ -530,6 +530,8 @@ export function parseTFMXFile(
   //   channelOffsetMaps[trackerPatIdx][channel][row] = file offset of that command
   const trackerPatterns: Pattern[] = [];
   const channelOffsetMaps: (number | -1)[][][] = [];
+  // gridSteps[trackerPatIdx] = the trackstep that grid pattern shows (-1: none)
+  const gridSteps: number[] = [];
 
   for (let stepIdx = firstStep; stepIdx <= lastStep; stepIdx++) {
     const stepOff = trackstepOff + stepIdx * TFMX_TRACKSTEP_ENTRY_SIZE;
@@ -602,6 +604,7 @@ export function parseTFMXFile(
     }
 
     channelOffsetMaps.push(offsetMap);
+    gridSteps.push(stepIdx);
 
     trackerPatterns.push({
       id:     `pattern-${trackerPatterns.length}`,
@@ -636,6 +639,7 @@ export function parseTFMXFile(
       note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
     }];
     channelOffsetMaps.push(Array.from({ length: NUM_CHANNELS }, () => [-1]));
+    gridSteps.push(-1);
     trackerPatterns.push({
       id:     'pattern-0',
       name:   'Pattern 0',
@@ -863,6 +867,7 @@ export function parseTFMXFile(
     macros,
     macroPointerTableOffset: macroPtrTable,
     trackstepOffset: trackstepOff,
+    gridSteps,
   };
 
   return {
