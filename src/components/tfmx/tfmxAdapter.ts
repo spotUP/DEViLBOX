@@ -278,3 +278,30 @@ export function tfmxPatternToChannels(
  * Get a human-readable effect description for a pattern command.
  */
 export { commandEffectString as tfmxCommandEffectString };
+
+/**
+ * What a trackstep matrix cell edit writes for one voice: the pattern number and signed transpose
+ * setTFMXTrackstepVoice takes, or null when the edit has nothing to write (EFFE command step, or a
+ * transpose typed on a voice with no pattern).
+ *
+ * A stopped (--) or held (HD) voice takes a pattern typed into it: it plays that pattern from this
+ * step, untransposed. Songs that start with only some voices running (turrican_bonus starts on two
+ * of eight) need this to put patterns on the other voices.
+ */
+export function tfmxTrackstepCellEdit(
+  step: TFMXTrackstepEntry,
+  voiceIdx: number,
+  columnKey: string,
+  value: number,
+): { patNum: number; transpose: number } | null {
+  if (step.isEFFE) return null;
+  const voice = step.voices[voiceIdx];
+  if (!voice) return null;
+  const silent = voice.isStop || voice.isHold;
+  if (columnKey === 'pat') return { patNum: value & 0xFF, transpose: silent ? 0 : voice.transpose };
+  if (columnKey === 'trans') {
+    if (silent) return null;
+    return { patNum: voice.patternNum, transpose: ((value & 0x100) ? -1 : 1) * (value & 0xFF) };
+  }
+  return null;
+}

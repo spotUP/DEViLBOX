@@ -11,6 +11,7 @@ import { SongOrderMatrix, MATRIX_COLLAPSED_HEIGHT } from '@/components/shared/So
 import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
 import { useFormatStore } from '@stores';
 import type { TFMXNativeData } from '@/types/tfmxNative';
+import { tfmxTrackstepCellEdit } from './tfmxAdapter';
 
 export const TFMX_MATRIX_HEIGHT = 200;
 export const TFMX_MATRIX_COLLAPSED_HEIGHT = MATRIX_COLLAPSED_HEIGHT;
@@ -91,16 +92,11 @@ export const TFMXTrackstepMatrix: React.FC<TFMXTrackstepMatrixProps> = ({
 
   const handleCellChange = useCallback<OnCellChange>((channelIdx, rowIdx, columnKey, value) => {
     const step = steps[rowIdx];
-    if (!step || step.isEFFE) return;
-    const voice = step.voices[channelIdx];
-    if (!voice || voice.isStop || voice.isHold) return;
-    if (columnKey === 'pat') {
-      setTrackstepVoice(step.stepIndex, channelIdx, value & 0xFF, voice.transpose);
-      onSelectPattern(value & 0xFF);
-    } else if (columnKey === 'trans') {
-      const sign = (value & 0x100) ? -1 : 1;
-      setTrackstepVoice(step.stepIndex, channelIdx, voice.patternNum, sign * (value & 0xFF));
-    }
+    if (!step) return;
+    const edit = tfmxTrackstepCellEdit(step, channelIdx, columnKey, value);
+    if (!edit) return;
+    setTrackstepVoice(step.stepIndex, channelIdx, edit.patNum, edit.transpose);
+    if (columnKey === 'pat') onSelectPattern(edit.patNum);
   }, [steps, setTrackstepVoice, onSelectPattern]);
 
   return (
