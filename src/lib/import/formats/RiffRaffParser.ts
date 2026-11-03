@@ -16,6 +16,9 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { riffRaffEncoder } from '@/engine/uade/encoders/RiffRaffEncoder';
+import { buildRiffRaffGrid } from './riffRaffGrid';
 import { createSamplerInstrument } from './AmigaUtils';
 import { findHunkCodeSection, matchWTMagic, readString, u32BE, scanForMagic } from './WantedTeamUtils';
 
@@ -100,12 +103,47 @@ export function parseRiffRaffFile(buffer: ArrayBuffer, filename: string): Tracke
 
   const displayName = authorName ? `${moduleName} — ${authorName} [RiffRaff]` : `${moduleName} [RiffRaff]`;
 
-  return {
+  let patterns: TrackerSong['patterns'] = [{ id: 'pattern-0', name: 'Pattern 0', length: 64, channels: Array.from({ length: 4 }, (_, ch) => ({ id: `channel-${ch}`, name: `Channel ${ch + 1}`, muted: false, solo: false, collapsed: false, volume: 100, pan: ch === 0 || ch === 3 ? -50 : 50, instrumentId: null, color: null, rows: Array.from({ length: 64 }, () => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 })) })) }];
+  let songPositions = [0];
+  let speed = 6;
+  let layout: UADEVariablePatternLayout | undefined;
+  let unmatched: string | null = null;
+
+  // Read-only time-aligned grid (phase A): one row is `ticksPerRow` replayer ticks; playback stays on UADE / nuade.
+  const grid = buildRiffRaffGrid(buf);
+  if (typeof grid === 'string') {
+    unmatched = grid;
+  } else {
+    patterns = grid.patterns;
+    songPositions = grid.songPositions;
+    speed = grid.ticksPerRow;
+    layout = {
+      formatId: 'riffRaff',
+      numChannels: 4,
+      numFilePatterns: grid.streams.length,
+      rowsPerPattern: patterns.map((p) => p.length),
+      moduleSize: buf.length,
+      encoder: riffRaffEncoder,
+      filePatternAddrs: grid.streams.map((s) => s.offset),
+      filePatternSizes: grid.streams.map((s) => s.size),
+      trackMap: grid.streamAtStart,
+      blockRows: grid.blockRows,
+    };
+  }
+  patterns[0].importMetadata = {
+    sourceFormat: 'MOD' as const, sourceFile: filename, importedAt: new Date().toISOString(),
+    originalChannelCount: 4, originalPatternCount: patterns.length, originalInstrumentCount: instruments.length,
+  };
+
+  const result: TrackerSong = {
     name: displayName,
     format: 'MOD' as TrackerFormat,
-    patterns: [{ id: 'pattern-0', name: 'Pattern 0', length: 64, channels: Array.from({ length: 4 }, (_, ch) => ({ id: `channel-${ch}`, name: `Channel ${ch + 1}`, muted: false, solo: false, collapsed: false, volume: 100, pan: ch === 0 || ch === 3 ? -50 : 50, instrumentId: null, color: null, rows: Array.from({ length: 64 }, () => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 })) })) }],
-    instruments, songPositions: [0], songLength: 1, restartPosition: 0,
-    numChannels: 4, initialSpeed: 6, initialBPM: 125, linearPeriods: false,
+    patterns,
+    instruments, songPositions, songLength: songPositions.length, restartPosition: 0,
+    numChannels: 4, initialSpeed: speed, initialBPM: 125, linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer, uadeEditableFileName: filename,
   };
+  if (layout) (result as unknown as { uadeVariableLayout: UADEVariablePatternLayout }).uadeVariableLayout = layout;
+  else result.gridUnmatchedReason = unmatched ?? 'the grid was not matched to the replayer';
+  return result;
 }
