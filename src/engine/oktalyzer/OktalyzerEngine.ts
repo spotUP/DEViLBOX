@@ -4,6 +4,7 @@
  * Follows the BdEngine/SonicArrangerEngine pattern.
  */
 
+import { encodeOktalyzerCell } from '@/engine/uade/encoders/OktalyzerEncoder';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
@@ -124,9 +125,10 @@ export class OktalyzerEngine extends WASMChannelOutputsEngine {
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
 
-  /** Edit a pattern cell in the WASM replayer */
-  setCell(index: number, row: number, channel: number, note: number, instrument: number, effect: number, effectArg: number): void {
-    this.workletNode?.port.postMessage({ type: 'setCell', index, row, channel, note, instrument, effect, effectArg });
+  /** Edit a pattern cell in the WASM replayer. Takes the grid's terms; the replayer stores the module's own note index and effect command. */
+  setCell(index: number, row: number, channel: number, note: number, instrument: number, effTyp: number, eff: number, _volume = 0): void {
+    const raw = encodeOktalyzerCell({ note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 });
+    this.workletNode?.port.postMessage({ type: 'setCell', index, row, channel, note: raw[0], instrument: raw[1], effect: raw[2], effectArg: raw[3] });
   }
 
   /** Set an instrument parameter by name */
