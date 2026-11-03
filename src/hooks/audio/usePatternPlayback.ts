@@ -22,6 +22,7 @@ import type { UADEEngine } from '@engine/uade/UADEEngine';
 import { liveTrackerSong, liveSongFormat } from '@/lib/song/liveSong';
 import { playsAsOpaqueUADE } from '@engine/replayer/wasmEngineRegistry';
 import { OPAQUE_UADE_FRAMES_PER_ROW } from '@engine/uade/uadeLoadArgs';
+import { playOpaqueUadeFrom } from '@engine/uade/opaqueUadeStart';
 import { computePlaybackFollow } from '@/lib/tracker/playbackFollow';
 import { computeEffectiveSongOrder } from '@/lib/tracker/playbackOrder';
 
@@ -251,9 +252,13 @@ export const usePatternPlayback = () => {
             }
             if (synth && 'getEngine' in synth) {
               const uadeEngine = (synth as { getEngine: () => UADEEngine }).getEngine();
+              // The position Play started at, read now (the follow below moves the store once the song runs).
+              const startPos = currentPositionIndexRef.current;
+              const startRow = useTransportStore.getState().currentRow;
               uadeEngine.ready().then(() => {
                 if ((window as any).PLAYBACK_DEBUG) console.log('[Playback] UADE engine ready, starting playback');
-                uadeEngine.play();
+                // Play / Play Pattern at the cursor: the song starts at the transport's position, not the top.
+                playOpaqueUadeFrom(uadeEngine, liveTrackerSong(), { songPos: startPos, row: startRow }, uadeEngine.output.context.sampleRate);
 
                 // Subscribe to channel data for playback position tracking.
                 // Pattern data is pre-populated at import time via scan — we just
