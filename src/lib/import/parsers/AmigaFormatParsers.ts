@@ -2282,6 +2282,13 @@ export async function tryRouteFormat(
   // Not decoded (provenance row 'hip'): one empty pattern, audio from
   // libtfmxaudiodecoder via hippelFileData.
   if (matchesExt(filename, ['hip', 'mcmd'])) {
+    // MCMD (the "MCMD" magic): its pattern pool is a fixed-size cell grid; UADE plays it.
+    const { isMcmdFormat, parseMcmdFile } = await import('@lib/import/formats/MCMDParser');
+    if (isMcmdFormat(buffer)) {
+      return withNativeThenUADE('mcmd', ctx,
+        (buf: Uint8Array | ArrayBuffer, name: string) => parseMcmdFile(buf as ArrayBuffer, name),
+        'MCMDParser', { injectUADE: true });
+    }
     if (prefs.jochenHippelST !== 'uade') {
       try {
         const { isJochenHippelAmigaSogFormat, parseJochenHippelAmigaSogFile } = await import('@lib/import/formats/JochenHippelSTParser');

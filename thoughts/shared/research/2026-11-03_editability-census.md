@@ -33,7 +33,7 @@ replayer, no stored cells. Difficulty is an estimate except for David Hanney (do
 | uade_spl | Sound Programming Language | uade-only | 1 | boulderdash.spl | CMD | M | song: hunk + `!SOPROL!`, 71584 B; nuade spl/spl_module.c exists |
 | uade_pn | Pokeynoise | uade-only | 1 | pn.tetris | CMD | M | song (header only): 3696 B Atari POKEY data (`ffff` binary load); nuade pokeynoise/pn_info.c exists |
 | uade_nt | NoiseTracker | uade-only | 0 (n/a) | shortsong1.mod.nt | n/a | n/a | COMPANION: Startrekker AM (ST1.2 ModuleINFO, 264 B, no cells); song is shortsong1.mod |
-| uade_mcmd | MCMD | uade-only | 1 | ep-trmonsterbusiness.mcmd | CMD | M | song: `MCMD` magic, 9102 B, command words; nuade mcmd/mcmd.c exists |
+| uade_mcmd | MCMD | uade-only | 1 | ep-trmonsterbusiness.mcmd | CMD | M | song: `MCMD` magic, 9102 B, command words; nuade mcmd/mcmd.c exists | DONE 2026-11-03: MCMDParser.ts grid = first subsong, one pattern per track row, 4 voices, 2-byte pattern-pool rows (note, info); export = generic layout patch (formatId `mcmd`). Note shown = index+1 (bijection 2..95); portamento/alt-fseq flags, param bytes, no-instrument bit kept from stored bytes. Shared pool patterns: an edit hits every use. Test `mcmdEditable.test.ts`; audio still UADE (no nuade engine wiring) |
 | uade_dns | Dynamic Synthesizer | uade-only | 1 | dns.ptc | CMD | M | song: `6000` bra table + "PTC music by Chris Huelsbeck", 14096 B; nuade dynamicsynthesizer/dns_module.c exists |
 | uade_dh | David Hanney | uade-only | 1 | tearaway_thomas.dh | SPD (done) | S (done) | settled |
 | uade_cus | Custom | uade-only | 1 | skyfox2.cus | CMD | L | song: hunk + `DELIRIUM`, 22272 B; compiled per-tune player, no nuade dir |
