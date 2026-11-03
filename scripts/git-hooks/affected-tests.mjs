@@ -133,6 +133,11 @@ for (const t of sourceTextTests(sources)) set.add(t);
 const pushOnlyPath = join(root, 'tools/test-tiers/push-only.json');
 const pushOnly = new Set(existsSync(pushOnlyPath) ? JSON.parse(readFileSync(pushOnlyPath, 'utf8')).files.map((f) => f.file) : []);
 
+// src/__tests__/ci/ is push tier by directory: a bare `vitest run` excludes it (vite.config.ts) and test:ci
+// names the directory at pre-push. Its suites import whole engine graphs cold (regression.test.ts takes ~18 s
+// for InstrumentFactory alone) and time out beside a second worker, so the commit gate never runs them.
+const CI_DIR = 'src/__tests__/ci/';
+
 // Only emit files that still exist on disk (a deleted test can appear staged).
-const files = [...set].filter((f) => existsSync(join(root, f)) && !pushOnly.has(f));
+const files = [...set].filter((f) => existsSync(join(root, f)) && !pushOnly.has(f) && !f.startsWith(CI_DIR));
 process.stdout.write(files.join('\n'));

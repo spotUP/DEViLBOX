@@ -26,6 +26,15 @@ describe('push-only suites leave the pre-commit gate to the push', () => {
     expect(picked).toContain(neighbour);
   });
 
+  it('a staged engine registry does not pull the CI directory into the commit gate; test:ci still runs it', () => {
+    // wasmEngineRegistry.ts is named in src/__tests__/ci/regression.test.ts, so the source-text rule picked
+    // that suite. Its cold InstrumentFactory import timed out beside a second worker and failed the commit.
+    const picked = affected('src/engine/replayer/wasmEngineRegistry.ts');
+    expect(picked.length).toBeGreaterThan(0);
+    expect(picked.filter((f) => f.startsWith('src/__tests__/ci/'))).toEqual([]);
+    expect(json('package.json').scripts['test:ci'].split(' ')).toContain('src/__tests__/ci/');
+  });
+
   it('every push-only suite runs in test:ci at pre-push and is not in the nightly heavy tier', () => {
     const pushOnly: string[] = json('tools/test-tiers/push-only.json').files.map((f: { file: string }) => f.file);
     const heavy: string[] = json('tools/test-tiers/heavy.json').files.map((f: { file: string }) => f.file);
