@@ -21,16 +21,17 @@ function module(stream: number[]) {
 }
 
 describe('CoSo grid: FE n takes no row', () => {
-  it('FE 03, note, FD 00, note is three rows: note, rest, note (not five)', () => {
+  it('FE 03, note, FD 00, note is time-aligned: note, FE 3 gives 4 steps, FD 0 one rest step, note', () => {
     const { buf, patternsOff, songPointer } = module([0xFE, 3, 0x18, 0x01, 0xFD, 0, 0x1A, 0x01, 0xFF]);
     const { rows, spans } = decodeCoSoGrid(buf, patternsOff, songPointer, 1, 4);
     const voice = rows[0][0];
-    expect(voice.slice(0, 3).map((c) => c.note > 0)).toEqual([true, false, true]);
-    expect(voice.slice(3).every((c) => c.note === 0)).toBe(true);
+    // Note at step 0 lasts 4 steps (row speed 3), the FD 0 row one step, the next note starts at step 5.
+    expect(voice.slice(0, 6).map((c) => c.note > 0)).toEqual([true, false, false, false, false, true]);
+    expect(voice.slice(6).every((c) => c.note === 0)).toBe(true);
     // The first row's bytes include the FE in front of the note
     expect(spans[0][0][0]).toMatchObject({ offset: 8, length: 4 });
-    expect(spans[0][0][1]).toMatchObject({ offset: 12, length: 2 });
-    expect(spans[0][0][2]).toMatchObject({ offset: 14, length: 2 });
+    expect(spans[0][0][4]).toMatchObject({ offset: 12, length: 2 });
+    expect(spans[0][0][5]).toMatchObject({ offset: 14, length: 2 });
   });
 
   it('typing over the note keeps the FE in front of it', () => {
