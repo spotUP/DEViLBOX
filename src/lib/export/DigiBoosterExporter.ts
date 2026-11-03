@@ -4,6 +4,7 @@
  * Produces a minimal valid DBM0 file. Only sample-based instruments are exported.
  */
 
+import { patchDigi1Module } from '@/lib/import/formats/DigiBooster1Layout';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 function writeStr(buf: Uint8Array, offset: number, str: string, len: number): void {
@@ -31,7 +32,15 @@ function iffChunk(id: string, data: Uint8Array): Uint8Array {
   return result;
 }
 
+/** A DigiBooster 1.x song: the module it was loaded from with the grid's edits written in (patterns repacked when packed). */
+export function patchDigiBooster1Module(song: TrackerSong): Uint8Array | null {
+  if (song.uadePatternLayout?.formatId !== 'digiBooster1' || !song.uadeEditableFileData) return null;
+  return patchDigi1Module(new Uint8Array(song.uadeEditableFileData), song.patterns);
+}
+
 export function exportDigiBooster(song: TrackerSong): ArrayBuffer {
+  const patched = patchDigiBooster1Module(song);
+  if (patched) return patched.buffer.slice(patched.byteOffset, patched.byteOffset + patched.byteLength) as ArrayBuffer;
   const nChannels = song.numChannels;
   const nPatterns = song.patterns.length;
   const nInstrs   = Math.min(255, song.instruments.length);
