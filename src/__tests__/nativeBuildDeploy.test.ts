@@ -66,7 +66,7 @@ describe('Electron CI has no native module to rebuild', () => {
   });
 });
 
-// ─── 2. The release job waits for the electron artifacts ─────────────────────
+// ─── 2. The web release does not wait for the desktop builds ────────────────
 
 describe('deploy.yml release attaches desktop binaries', () => {
   const workflow = readFileSync(
@@ -74,25 +74,34 @@ describe('deploy.yml release attaches desktop binaries', () => {
     'utf-8',
   );
 
-  // Pull the `needs:` line of the `release:` job. Slice from the `release:`
-  // header to the next top-level (2-space) job header, then read its `needs:`.
-  const releaseNeeds = (() => {
-    const start = workflow.indexOf('\n  release:');
+  // Slice one top-level (2-space) job block, from its header to the next job.
+  const jobBlock = (name: string): string => {
+    const start = workflow.indexOf(`\n  ${name}:`);
     if (start === -1) return '';
     const rest = workflow.slice(start + 1);
     const nextJob = rest.slice(1).search(/\n {2}\w/);
-    const block = nextJob === -1 ? rest : rest.slice(0, nextJob + 1);
-    return block.match(/^\s*needs:\s*(.+)$/m)?.[1] ?? '';
-  })();
+    return nextJob === -1 ? rest : rest.slice(0, nextJob + 1);
+  };
+  const needsOf = (name: string): string =>
+    jobBlock(name).match(/^\s*needs:\s*(.+)$/m)?.[1] ?? '';
 
   it('release needs build-server so the deploy is gated on a green server build', () => {
-    expect(releaseNeeds).toContain('build-server');
+    expect(needsOf('release')).toContain('build-server');
   });
 
-  it('release needs electron so binaries exist before the release/deploy fires', () => {
-    // Teeth: reverting `needs: [build-server, electron]` back to
-    // `needs: [build-server]` makes this fail — the race that published a
-    // release with no desktop binaries.
-    expect(releaseNeeds).toContain('electron');
+  it('the web deploy does not wait for the desktop builds', () => {
+    // A missing macOS runner cancelled the electron job and skipped the whole
+    // deploy while release needed it. Teeth: adding electron back to release's
+    // needs makes this fail.
+    expect(needsOf('release')).not.toContain('electron');
+  });
+
+  it('desktop-release attaches the binaries after both release and electron', () => {
+    const needs = needsOf('desktop-release');
+    expect(needs).toContain('release');
+    expect(needs).toContain('electron');
+    // Runs even when an electron leg failed, as long as the release exists.
+    expect(jobBlock('desktop-release')).toMatch(/if:.*always\(\).*needs\.release\.result == 'success'/);
+    expect(jobBlock('desktop-release')).toContain('gh release upload latest');
   });
 });
