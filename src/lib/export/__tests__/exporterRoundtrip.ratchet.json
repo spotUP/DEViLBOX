@@ -536,6 +536,14 @@
       "cells": 20976,
       "bytes": 20976
     },
+    "timFollin": {
+      "exporter": "TimFollinExporter.exportTimFollin",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 25010,
+      "bytes": 25010
+    },
     "howieDavies": {
       "exporter": "HowieDaviesExporter.exportHowieDavies",
       "tier": "byte-exact",

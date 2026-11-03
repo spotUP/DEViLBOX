@@ -12,7 +12,7 @@
  * Three layers (docs/FORMAT_COMMAND_STREAM_GRID.md): the stream bytes (truth), `blockRows` (one carrier cell per
  * byte of every event the voices run: cutoff = 1, period = the byte), and the display grid on the replayer's tick
  * timeline (one row = one 50 Hz tick: a note on the tick it starts, its hold as empty rows). The source span of
- * every note is recorded per row. This file only reads; nothing is written back (phase A).
+ * every note is recorded per row. This file only reads; timFollinEdits.ts writes note edits back (phase B).
  */
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import { periodToNote } from '@/lib/amiga/periodNotes';
@@ -161,7 +161,7 @@ export function timFollinShownNote(noteByte: number): number {
 export interface TfolRegion { offset: number; size: number }
 
 /** The event a row's note was read from. */
-export type TfolRowSource = { region: number; offset: number; length: number; noteByte: number } | null;
+export type TfolRowSource = { region: number; offset: number; length: number; noteByte: number; base: number } | null;
 
 export interface TfolGrid {
   patterns: Pattern[];
@@ -179,7 +179,7 @@ export interface TfolGrid {
   noteCounts: number[];
 }
 
-interface PlacedNote { tick: number; offset: number; length: number; noteByte: number; shown: number; instrument: number }
+interface PlacedNote { tick: number; offset: number; length: number; noteByte: number; base: number; shown: number; instrument: number }
 
 interface VoiceRun { notes: PlacedNote[]; pass: number; spans: Array<[number, number]> }
 
@@ -204,14 +204,14 @@ function runVoice(b: Uint8Array, m: TfolModuleInfo, stream: number, active: bool
       run.spans.push([ev.start, ev.next]);
       pc = ev.next;
       if (ev.isNote) {
-        let note = skipTranspose ? 0 : transpose;
+        const base = skipTranspose ? 0 : transpose;
         skipTranspose = false;
-        note = (note + ev.note) & 0xff;
+        let note = (base + ev.note) & 0xff;
         if (portamentoRate !== 0) note = curNote;
         curNote = note;
         const length = noteLength !== 0 ? noteLength : ev.args[0] ?? 0;
         run.notes.push({
-          tick, offset: ev.start, length: ev.next - ev.start, noteByte: ev.note,
+          tick, offset: ev.start, length: ev.next - ev.start, noteByte: ev.note, base,
           shown: timFollinShownNote(note), instrument: instrument + 1,
         });
         tick += length === 0 ? NOTE_COUNTER_ZERO : length;
@@ -286,7 +286,7 @@ export function buildTimFollinGrid(b: Uint8Array, subsong = 0): TfolGrid | null 
       grid[v][n.tick].note = n.shown;
       grid[v][n.tick].instrument = n.instrument;
       const region = regionOf(n.offset);
-      sources[v][n.tick] = { region, offset: n.offset, length: n.length, noteByte: n.noteByte };
+      sources[v][n.tick] = { region, offset: n.offset, length: n.length, noteByte: n.noteByte, base: n.base };
       const end = Math.min(rows, i + 1 < run.notes.length ? run.notes[i + 1].tick : rows);
       for (let t = n.tick; t < end; t++) regionAtTick[v][t] = region;
     });
