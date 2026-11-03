@@ -186,9 +186,12 @@ jobs:
             dist_electron/*.tar.gz
           if-no-files-found: warn
 
-  # Create a GitHub Release with all desktop app binaries + trigger pull-based deploy
+  # Create the GitHub Release with the web build + backend image, then trigger the
+  # pull-based deploy. The web deploy does not wait for the desktop builds: a missing
+  # GitHub macOS runner used to cancel the electron job and skip the whole deploy.
+  # Desktop binaries are attached afterwards by the desktop-release job.
   release:
-    needs: [build-server, backend-image, electron]
+    needs: [build-server, backend-image]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -197,14 +200,6 @@ jobs:
       - name: Get version from package.json
         id: version
         run: echo "version=$(node -p 'require("./package.json").version')" >> $GITHUB_OUTPUT
-
-      - name: Download all Electron artifacts
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          path: release-assets
-          pattern: electron-*
-          merge-multiple: true
 
       - name: Download server build artifact
         uses: actions/download-artifact@v4
@@ -262,3 +257,30 @@ jobs:
             -H "X-Deploy-Token: ${DEPLOY_SECRET}" \
             -d '{"sha":"${{ github.sha }}"}' \
             --max-time 30 || echo "Webhook trigger failed (non-fatal)"
+
+  # Attach whichever desktop builds finished to the release the web deploy created.
+  # Runs even when an electron matrix leg was cancelled or failed (e.g. no macOS runner).
+  desktop-release:
+    needs: [release, electron]
+    if: ${{ always() && needs.release.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all Electron artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: desktop-assets
+          pattern: electron-*
+          merge-multiple: true
+
+      - name: Upload desktop binaries to the latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          files=(desktop-assets/*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No desktop builds finished; release keeps web assets only"
+            exit 0
+          fi
+          gh release upload latest "${files[@]}" --clobber --repo "${{ github.repository }}"
