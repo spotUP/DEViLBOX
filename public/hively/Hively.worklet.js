@@ -348,6 +348,12 @@ class HivelyProcessor extends AudioWorkletProcessor {
           );
         }
         break;
+
+      case 'setPosition':
+        if (this.wasm) {
+          this.wasm._hively_set_position(data.position, data.channel, data.track, data.transpose);
+        }
+        break;
     }
   }
 

@@ -63,6 +63,7 @@ if(EMSCRIPTEN)
         "_hively_player_note_off"
         "_hively_player_render"
         "_hively_set_track_step"
+        "_hively_set_position"
         "_hively_set_channel_gain"
         "_hively_tick_frame"
         "_hively_render_frame"

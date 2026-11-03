@@ -5,9 +5,9 @@
  * Each channel has: track (2 hex digits) + transpose (signed 2 hex digits).
  */
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import type { HivelyNativeData } from '@/types/tracker';
-import { useFormatStore } from '@stores';
+import { editHivelyPosition } from './hivelyEdit';
 import { SongOrderMatrix, MATRIX_COLLAPSED_HEIGHT } from '@/components/shared/SongOrderMatrix';
 import type { ColumnDef, FormatChannel, OnCellChange } from '@/components/shared/format-editor-types';
 
@@ -45,13 +45,17 @@ interface Props {
   onToggleCollapse?: () => void;
 }
 
+/** A matrix cell edit goes through the Hively write path, which projects it into the grid the next play exports. */
+const handleCellChange: OnCellChange = (channelIdx, rowIdx, columnKey, value) => {
+  if (columnKey === 'track' || columnKey === 'transpose') editHivelyPosition(rowIdx, channelIdx, columnKey, value);
+};
+
 export const HivelyPositionEditor: React.FC<Props> = ({
   width, height, nativeData, currentPosition, isPlaying, onPositionChange: _onPositionChange,
   collapsed, onToggleCollapse,
 }) => {
   const numPos = nativeData.positions.length;
   const numCh = nativeData.channels;
-  const setCell = useFormatStore(s => s.setHivelyPositionCell);
 
   const formatColumns = useMemo<ColumnDef[]>(() => [makeTrackColumn(), makeTransposeColumn()], []);
 
@@ -67,11 +71,6 @@ export const HivelyPositionEditor: React.FC<Props> = ({
     }
     return channels;
   }, [nativeData, numPos, numCh]);
-
-  const handleCellChange = useCallback<OnCellChange>((channelIdx, rowIdx, columnKey, value) => {
-    if (columnKey === 'track') setCell(rowIdx, channelIdx, 'track', value);
-    else if (columnKey === 'transpose') setCell(rowIdx, channelIdx, 'transpose', value);
-  }, [setCell]);
 
   return (
     <SongOrderMatrix

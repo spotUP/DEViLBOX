@@ -883,6 +883,19 @@ void hively_set_track_step(int32 trackIdx, int32 stepIdx,
     s->stp_FXbParam   = fxbParam;
 }
 
+/*
+ * Set one channel of one song position (the position matrix): the track it plays and its transpose.
+ * The replayer reads ht_Positions when it enters a position, so the edit is heard the next time the
+ * song reaches that position, with no restart.
+ */
+void hively_set_position(int32 posIdx, int32 chan, int32 track, int32 transpose) {
+    if (!g_tune || posIdx < 0 || posIdx >= g_tune->ht_PositionNr) return;
+    if (chan < 0 || chan >= g_tune->ht_Channels) return;
+    if (track < 0 || track > g_tune->ht_TrackNr) return;
+    g_tune->ht_Positions[posIdx].pos_Track[chan] = (uint8)track;
+    g_tune->ht_Positions[posIdx].pos_Transpose[chan] = (int8)transpose;
+}
+
 /* ---- Per-voice parameter automation ---- */
 
 /*
