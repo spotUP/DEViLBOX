@@ -154,6 +154,12 @@ export async function sendCellEditsToEngine(
     }
     // A native worklet engine that takes the whole edited module and runs on from the position played.
     case 'engine-swap': {
+      // TFMX rows are pattern ticks: an edit that changes how long a command holds its voice lays the grid out
+      // again from the edited bytes (which also hands the running tune the module).
+      if (desc!.key === 'TFMXModule') {
+        const { editChangesTfmxTicks, relayoutTfmxGrid } = await import('../tfmx/tfmxWaitRelayout');
+        if (editChangesTfmxTicks(song, edits)) { await relayoutTfmxGrid(); return; }
+      }
       const { applyEditedModuleToEngine } = await import('./engineModuleSwap');
       await applyEditedModuleToEngine(song, desc!);
       return;
