@@ -886,7 +886,14 @@ function cosoSpan(
   return {
     offset, length, baseline,
     encode(cell, file) {
-      if (!isNote || (cell.note ?? 0) === 0) return null;
+      // The row speed is the cell's speed effect. n of 0 / none on a note row is no FE byte.
+      const wantSpeed = cell.effTyp === COSO_SPEED_EFFECT ? cell.eff ?? 0 : 0;
+      if (!isNote) {
+        // FD n is the whole row: only the speed can change, and only on a row that stays empty.
+        if ((cell.note ?? 0) !== 0 || (cell.instrument ?? 0) !== 0 || wantSpeed > 0xFF) return null;
+        return new Uint8Array([0xFD, wantSpeed]);
+      }
+      if ((cell.note ?? 0) === 0) return null;
       const idx = cosoIndexForXM(cell.note);
       if (idx === null) return null;
       const noteVal = idx - trackTransp;
@@ -902,7 +909,16 @@ function cosoSpan(
       if (low > 31) return null;
       const info = (oldInfo & 0xE0) | low;
       // The speed changes in front of the event stay as they are.
-      const out = [...file.subarray(offset, eventAt), noteByte, info];
+      const prefix = [...file.subarray(offset, eventAt)];
+      // The last FE n in front of the event is the row's speed. A changed speed is written into that byte; adding or
+      // removing an FE would change the span length, which the in-place patch refuses (null) so the rebuild takes over.
+      const feAt = prefix.length - 1;
+      const haveSpeed = feAt >= 1 && prefix[feAt - 1] === 0xFE;
+      if (haveSpeed) {
+        if (wantSpeed > 0xFF || (wantSpeed === 0 && prefix[feAt] !== 0)) return null;
+        prefix[feAt] = wantSpeed;
+      } else if (wantSpeed > 0) return null;
+      const out = [...prefix, noteByte, info];
       if ((info & 0xE0) !== 0) out.push(file[eventAt + 2]);
       return out.length === length ? new Uint8Array(out) : null;
     },
