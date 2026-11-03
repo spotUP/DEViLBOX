@@ -129,6 +129,7 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
   stp: 'n/a',
   stx: 'n/a',
   suntronic: 'pass',
+  synthDream: 'pass',
   synthesis: 'pass',
   tcbTracker: 'pass',
   tfmMusicMaker: 'pass',
@@ -244,6 +245,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   stp: 'n/a',
   stx: 'n/a',
   suntronic: 'pass',
+  synthDream: 'fail',
   synthesis: 'pass',
   tcbTracker: 'pass',
   tfmMusicMaker: 'pass',
@@ -416,7 +418,6 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   uade_sa_p: 'G11-uade-only',
   uade_lion: 'G11-uade-only',
   uade_sa_old: 'G11-uade-only',
-  uade_sdr: 'G11-uade-only',
   uade_spl: 'G11-uade-only',
   uade_tw: 'G11-uade-only',
   uade_sun: 'G11-uade-only',
@@ -468,6 +469,8 @@ export const DIRECT_GRIDS: readonly string[] = [
   'mdl', 'amf', 'j2b', 'mo3', 'itp', 'nst', 'wow', 'kt', 'xrns', 'mod', 'xm', 'it', 's3m',
   // MONOTONE stores 4-track patterns; ANSI music stores one PLAY string the parser lays on rows.
   'monotone', 'ansiMusic',
+  // SynthDream: the command streams decode to a read-only tick grid (synthDreamGrid.ts), no oracle yet.
+  'synthDream',
 ];
 
 export function gridProvenanceOf(key: string): GridProvenance | null {

@@ -2281,6 +2281,20 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
 
+  // ── SynthDream (sdr.* prefix) ────────────────────────────────────────────
+  {
+    key: 'synthDream',
+    label: 'SynthDream',
+    description: 'SynthDream (sdr.* prefix) - read-only command-stream grid, nuade / UADE plays the module',
+    family: 'amiga-native',
+    matchMode: 'both',
+    extRegex: /\.sdr$/i,
+    prefixes: ['sdr.'],
+    prefKey: 'synthdream',
+    nativeParser: { module: '@lib/import/formats/SynthDreamParser', parseFn: 'parseSynthDreamFile', detectFn: 'isSynthDreamFormat' },
+    uadeFallback: true,
+  },
+
   // ── GlueMon ─────────────────────────────────────────────────────────────
   {
     key: 'gluemon',
@@ -2451,7 +2465,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     ['pn', 'Pokeynoise'],
     ['riff', 'RiffRaff'],
     ['sa-p', 'Sonic Arranger P'], ['lion', 'Lion'], ['sa_old', 'Sonic Arranger Old'],
-    ['sdr', 'SynthDream'],
     ['spl', 'Sound Programming Language'], ['tw', 'TW'],
     ['sun', 'SUN-Tronic'], ['synmod', 'SynTracker'],
     ['tf', 'Tim Follin'],

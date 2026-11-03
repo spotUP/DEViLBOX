@@ -66,8 +66,8 @@ const UADE_ONLY_PREFIXES = [
   'rkl.',
   // SonicArranger variants, SpeedyA1System
   'sa-p.', 'lion.', 'sa_old.', 'sas.',
-  // SCUMM, SynthDream
-  'scumm.', 'sdr.',
+  // SCUMM (SynthDream is routed to SynthDreamParser in AmigaFormatParsers)
+  'scumm.',
   // SoundProgrammingLanguage, SoundImages
   'spl.', 'tw.',
   // SUN-Tronic, SynTracker, StoneTracker
