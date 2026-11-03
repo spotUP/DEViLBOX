@@ -32,6 +32,7 @@ const CASES: Array<{ file: string; label: string }> = [
   { file: 'dns.ptc', label: 'Dynamic Synthesizer' },
   { file: 'riffraff_smallest.riff', label: 'Riff Raff' },
   { file: 'blazing_thunder.hd', label: 'Howie Davies' },
+  { file: 'follin_smallest.tf', label: 'Tim Follin' },
   { file: 'boulderdash.spl', label: 'Sound Programming Language' },
 ];
 

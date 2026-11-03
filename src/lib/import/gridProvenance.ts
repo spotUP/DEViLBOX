@@ -66,6 +66,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   riffRaff: 'pass',
   howieDavies: 'pass',
   soundProgrammingLanguage: 'pass',
+  timFollin: 'pass',
 };
 
 /**
