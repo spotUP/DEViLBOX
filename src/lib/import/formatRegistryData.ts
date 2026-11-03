@@ -2309,6 +2309,20 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
 
+  // ── Tim Follin (tf.* prefix) ─────────────────────────────────────────────
+  {
+    key: 'timFollin',
+    label: 'Tim Follin',
+    description: 'Tim Follin (tf.* prefix) - read-only command-stream tick grid; nuade / UADE plays the module',
+    family: 'amiga-native',
+    matchMode: 'both',
+    extRegex: /\.tf$/i,
+    prefixes: ['tf.'],
+    prefKey: 'timfollin',
+    nativeParser: { module: '@lib/import/formats/TimFollinParser', parseFn: 'parseTimFollinFile', detectFn: 'isTimFollinFormat' },
+    uadeFallback: true,
+  },
+
   // ── GlueMon ─────────────────────────────────────────────────────────────
   {
     key: 'gluemon',
@@ -2481,7 +2495,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     ['sa-p', 'Sonic Arranger P'], ['lion', 'Lion'], ['sa_old', 'Sonic Arranger Old'],
     ['spl', 'Sound Programming Language'], ['tw', 'TW'],
     ['sun', 'SUN-Tronic'], ['synmod', 'SynTracker'],
-    ['tf', 'Tim Follin'],
     ['thx', 'AHX/THX prefix'],
     ['tfhd1.5', 'TFMX HD 1.5'], ['tfhd7v', 'TFMX HD 7V'], ['tfhdpro', 'TFMX HD Pro'],
     ['tfmx1.5', 'TFMX 1.5'], ['tfmx7v', 'TFMX 7V'], ['tfmxpro', 'TFMX Pro'],

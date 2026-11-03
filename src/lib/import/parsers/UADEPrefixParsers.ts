@@ -72,8 +72,6 @@ const UADE_ONLY_PREFIXES = [
   'spl.', 'tw.',
   // SUN-Tronic, SynTracker, StoneTracker
   'sun.', 'synmod.', 'st.',
-  // TimFollin
-  'tf.',
   // AHX thx prefix (AbyssHighestExperience — thx.* prefix form of AHX)
   'thx.',
   // TFMX variant prefixes (all handled by UADE)
