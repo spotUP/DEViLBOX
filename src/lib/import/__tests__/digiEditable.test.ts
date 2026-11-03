@@ -39,7 +39,7 @@ describe('DigiBooster 1.x editable grid', () => {
     expect(((changed[1572]! << 8) | changed[1573]!)).toBe(size0 + 4);
     expect(Buffer.from(changed.subarray(end0 + 4)).equals(Buffer.from(bytes.subarray(end0)))).toBe(true);
     expect(Buffer.from(changed.subarray(0, 1572)).equals(Buffer.from(bytes.subarray(0, 1572)))).toBe(true);
-    const again = await parseModuleToSong(new File([changed], 'the_day_after.digi'));
+    const again = await parseModuleToSong(new File([changed.buffer.slice(changed.byteOffset, changed.byteOffset + changed.byteLength) as ArrayBuffer], 'the_day_after.digi'));
     const got = again.patterns[0]!.channels[7]!.rows[row]!;
     expect([got.note, got.instrument]).toEqual([37, 5]);
 
