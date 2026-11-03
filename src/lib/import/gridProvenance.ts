@@ -399,7 +399,7 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   uade_dz: 'U27',
   uade_mkiio: 'G11-uade-only',
   uade_mg: 'G11-uade-only',
-  uade_ems: 'G11-uade-only',
+  uade_ems: 'U28',
   uade_emsv6: 'G11-uade-only',
   uade_hd: 'G11-uade-only',
   uade_hn: 'G11-uade-only',
