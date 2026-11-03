@@ -818,6 +818,11 @@ export class UADEEngine extends WASMSingletonBase implements IsolationCapableEng
     this._loadPromise = null;
   }
 
+  /** Start-at-position: the next play() fast-forwards the emulation silently to output frame `frame` of the song. */
+  seek(frame: number): void {
+    this.workletNode?.port.postMessage({ type: 'seek', frame });
+  }
+
   play(): void {
     // Restore gain (muted by stop())
     try { this.output.gain.setValueAtTime(1, 0); } catch { /* best effort */ }

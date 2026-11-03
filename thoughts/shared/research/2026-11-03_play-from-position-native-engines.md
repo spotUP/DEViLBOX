@@ -44,3 +44,13 @@ http://localhost:5174, load prehistoric_tale.hipc, click order position 5, press
 - Nuade descriptor: `startAt` = `NuadeEngine.seek(frame)`.
 - UADE seam: add a `startAt` to the UADE descriptor once a worklet seek exists (UADE is not in WASM_ENGINES for the opaque classic route: it needs its own call site next to `uadeEngine` capture).
 - Test: `src/engine/replayer/__tests__/nuadePlayStartsAtThePosition.test.ts`.
+
+## Done: item 2, classic UADE (2026-11-03)
+
+- C: `uade_wasm_skip_frames(frames)` (uade-wasm/src/entry.c, next to `uade_wasm_render`) reads and discards PCM through the same `guarded_read` path, so tick counters and Paula state end where playing that far would leave them. Exported in uade-wasm/build.sh. WASM rebuilt with the repo script; public/uade/UADE.js and UADE.wasm are tracked and updated.
+- Worklet (public/uade/UADE.worklet.js): `seek` message stores `_seekFrame`; `play` applies it AFTER the stopped-song reload (a reload restarts the song and would undo an early skip), then clears it.
+- TS: `UADEEngine.seek(frame)` posts `seek`; the `UADEEditable` descriptor got `startAt` -> `seek`, so the existing `startNativeEngines` seam (rowStartFrame, position 0 row 0 stays plain) covers it. No separate call site was needed: UADEEditable IS a registry descriptor.
+- Test: src/engine/replayer/__tests__/uadePlayStartsAtThePosition.test.ts (fails with the `startAt` line removed, verified).
+- Not verified live (no browser run): audible start at the position on a real UADE song, and that the preview frame rate equals the worklet's render rate. Owner test: http://localhost:5174, load a classic UADE module, click order position 5, Play; hard reload first (worklet + wasm changed).
+- Other UADE routes not through UADEEditable (if any) are untouched.
+- Commit status: NOT committed. The pre-commit gate fails on src/__tests__/ci/regression.test.ts (dynamic imports of useInstrumentStore / useFormatStore / effect defaults hang to the 30 s timeout), which also hangs with the UADE edits reverted, so it is not from this change (likely another agent's WIP in the import graph). Work is in the tree, uncommitted: commit by path once that suite is green.
