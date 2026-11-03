@@ -58,6 +58,13 @@ function findWords(b: Uint8Array, from: number, to: number, pattern: readonly nu
   return NOT_FOUND;
 }
 
+/** The note and instrument a pattern word shows under a position's adds (the decode in buildDnsGrid, once). */
+export function dnsShownCell(word: number, noteAdd: number, sampleAdd: number, tableNotes: readonly number[]): { note: number; instrument: number } {
+  if (word === 0) return { note: 0, instrument: 0 };
+  if (word === NOTE_OFF_WORD) return { note: NOTE_OFF, instrument: 0 };
+  return { note: tableNotes[(((word >> 8) + noteAdd + 1) & 0xff) % PERIOD_COUNT], instrument: ((word & 0xf) + sampleAdd) & 0xff };
+}
+
 export type DnsSequencer = 'fixedPatterns' | 'patternTable' | 'rows';
 
 interface DnsTables {
@@ -144,7 +151,14 @@ function locate(b: Uint8Array): DnsTables | string {
 
 export interface DnsStream { offset: number; size: number }
 
+/** Where a row's note comes from: the pattern word, and the position's adds the replayer applies to it. */
+export interface DnsRowSource { wordAt: number; noteAdd: number; sampleAdd: number }
+
 export interface DnsGrid {
+  /** rowSources[pattern][channel][row], null where the track has no pattern */
+  rowSources: Array<Array<Array<DnsRowSource | null>>>;
+  /** Tracker note of each of the 64 period table entries (index = the note the replayer looks up modulo 64). */
+  tableNotes: number[];
   patterns: Pattern[];
   songPositions: number[];
   rows: number;
@@ -180,15 +194,17 @@ export function buildDnsGrid(buf: Uint8Array): DnsGrid | string {
     return a >= t.linkBase ? a - t.linkBase : 0;
   };
 
+  const tableNotes = Array.from({ length: PERIOD_COUNT }, (_, i) => periodToNote(u16(buf, t.periods + 2 * i)));
   const noteAdd = new Array<number>(TRACKS).fill(0);
   const sampleAdd = new Array<number>(TRACKS).fill(0);
   const streamIndex = new Map<number, number>();
   const streams: DnsStream[] = [];
-  const positions: Array<{ cells: TrackerCell[][]; streams: number[] }> = [];
+  const positions: Array<{ cells: TrackerCell[][]; streams: number[]; sources: Array<Array<DnsRowSource | null>> }> = [];
   let rows = 0;
   for (let position = first, n = 0; n < MAX_POSITIONS && rows < MAX_ROWS; n++) {
     const cells: TrackerCell[][] = [];
     const used: number[] = [];
+    const sources: Array<Array<DnsRowSource | null>> = [];
     for (let tr = 0; tr < TRACKS; tr++) {
       const index = (position << 16) >> 16;
       const tab = t.tracks[tr];
@@ -197,22 +213,25 @@ export function buildDnsGrid(buf: Uint8Array): DnsGrid | string {
       if (num !== 0) { noteAdd[tr] = u8(buf, tab.noteAdds + index); sampleAdd[tr] = u8(buf, tab.sampleAdds + index); }
       const col = Array.from({ length: stepsPerPosition }, emptyCell);
       let stream = -1;
+      const src: Array<DnsRowSource | null> = new Array(stepsPerPosition).fill(null);
       if (pat > 0 && pat + stepsPerPosition * 2 <= buf.length) {
         stream = streamIndex.get(pat) ?? -1;
         if (stream < 0) { stream = streams.length; streams.push({ offset: pat, size: stepsPerPosition * 2 }); streamIndex.set(pat, stream); }
         for (let s = 0; s < stepsPerPosition; s++) {
           const word = u16(buf, pat + s * 2);
+          src[s] = { wordAt: pat + s * 2, noteAdd: noteAdd[tr], sampleAdd: sampleAdd[tr] };
           if (word === 0) continue;
           if (word === NOTE_OFF_WORD) { col[s].note = NOTE_OFF; continue; }
-          const note = ((word >> 8) + noteAdd[tr] + 1) & 0xff;
-          col[s].note = periodToNote(u16(buf, t.periods + 2 * (note % PERIOD_COUNT)));
-          col[s].instrument = ((word & 0xf) + sampleAdd[tr]) & 0xff;
+          const shown = dnsShownCell(word, noteAdd[tr], sampleAdd[tr], tableNotes);
+          col[s].note = shown.note;
+          col[s].instrument = shown.instrument;
         }
       }
       cells.push(col);
       used.push(stream);
+      sources.push(src);
     }
-    positions.push({ cells, streams: used });
+    positions.push({ cells, streams: used, sources });
     rows += stepsPerPosition;
     position = (position + 1) & 0xffff;
     const atEnd = fixed ? endPosition === position : ((endPosition << 16) >> 16) < ((position << 16) >> 16);
@@ -237,6 +256,8 @@ export function buildDnsGrid(buf: Uint8Array): DnsGrid | string {
   // tick length: 50 Hz (100 Hz for the fixed patterns replayer); at BPM 125 a tracker tick is 20 ms
   const bpm = fixed ? 250 : 125;
   return {
+    rowSources: positions.map((p) => p.sources),
+    tableNotes,
     patterns, songPositions: patterns.map((_, i) => i), rows, streams, blockRows,
     streamAtStart: positions.map((p) => p.streams), speed, bpm, sequencer: t.sequencer,
   };

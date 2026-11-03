@@ -2309,11 +2309,25 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
 
+  // ── Riff Raff (.riff) ────────────────────────────────────────────────────
+  {
+    key: 'riffRaff',
+    label: 'Riff Raff',
+    description: 'Riff Raff (.riff) - read-only time-aligned grid, nuade / UADE plays the module',
+    family: 'amiga-native',
+    matchMode: 'both',
+    extRegex: /\.riff$/i,
+    prefixes: ['riff.'],
+    prefKey: 'riffRaff',
+    nativeParser: { module: '@lib/import/formats/RiffRaffParser', parseFn: 'parseRiffRaffFile', detectFn: 'isRiffRaffFormat' },
+    uadeFallback: true,
+  },
+
   // ── Dynamic Synthesizer (dns.*) ──────────────────────────────────────────
   {
     key: 'dynamicSynthesizer',
     label: 'Dynamic Synthesizer',
-    description: 'Dynamic Synthesizer (dns.*) - read-only command-stream grid, nuade / UADE plays the module',
+    description: 'Dynamic Synthesizer (dns.*) - pattern grid, note and instrument edits saved in place; nuade / UADE plays the module',
     family: 'amiga-native',
     matchMode: 'prefix',
     prefixes: ['dns.'],
@@ -2517,7 +2531,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     ['hip', 'Jochen Hippel base'], ['mcmd', 'MCMD'], ['sog', 'SOG'],
     ['mok', 'Silmarils'], ['mso', 'Medley SO'],
     ['pn', 'Pokeynoise'],
-    ['riff', 'RiffRaff'],
     ['sa-p', 'Sonic Arranger P'], ['lion', 'Lion'], ['sa_old', 'Sonic Arranger Old'],
     ['tw', 'TW'],
     ['sun', 'SUN-Tronic'], ['synmod', 'SynTracker'],

@@ -75,6 +75,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   robHubbard: 'public/data/songs/rob-hubbard/skateordie.rh',
   benDaglish: 'public/data/songs/ben-daglish/motorhead-titleandingame.bd',
   synthDream: 'public/data/songs/formats/sdr.monsterbusiness_5',
+  dynamicSynthesizer: 'public/data/songs/formats/dns.ptc',
   // No committed fixture found (reported missing-fixture by the harness — Task 1.3):
   //   amosMusicBank, synthesis, chuckBiscuits, dsm_dyn, xmf
 };

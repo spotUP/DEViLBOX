@@ -512,6 +512,14 @@
       "cells": 45810,
       "bytes": 45810
     },
+    "dynamicSynthesizer": {
+      "exporter": "DynamicSynthesizerExporter.exportDynamicSynthesizer",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 14096,
+      "bytes": 14096
+    },
     "synthDream": {
       "exporter": "SynthDreamExporter.exportSynthDream",
       "tier": "byte-exact",
