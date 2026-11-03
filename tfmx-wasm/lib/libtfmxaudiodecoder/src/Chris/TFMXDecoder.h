@@ -68,7 +68,7 @@ class TFMXDecoder : public Decoder {
 
     /** DEViLBOX extension: the trackstep playing and the file offset of the
      *  pattern command the first playing voice is on (same contract as Hippel). */
-    bool getPlayPosition(int& step, udword& offset) override;
+    bool getPlayPosition(int& step, udword& offset, int& wait) override;
 
  private:
     bool previewOnly = false;

@@ -39,7 +39,7 @@ describe('TFMX: the grid follows the decoder position (mdat.turrican_bonus)', ()
           const step = native.tracksteps.find((t) => t.stepIndex === gridSteps[p])!;
           const voice = step.voices[ch];
           expect(native.patterns[voice.patternNum]?.some((c) => c.fileOffset === offset), `step ${gridSteps[p]} voice ${ch} plays offset ${offset}`).toBe(true);
-          const at = tfmxGridPositionAt(layout, gridSteps, rowCount, gridSteps[p], offset);
+          const at = tfmxGridPositionAt(layout, gridSteps, native.gridRowTicks, rowCount, gridSteps[p], offset, -1);
           expect(at, `pattern ${p} row ${row} voice ${ch}`).toEqual({ pattern: p, row });
           checked++;
           lastPattern = p;
@@ -55,7 +55,65 @@ describe('TFMX: the grid follows the decoder position (mdat.turrican_bonus)', ()
     const layout = song.uadePatternLayout!;
     const gridSteps = song.tfmxNative!.gridSteps;
     const rowCount = (p: number) => song.patterns[p]?.length ?? 0;
-    expect(tfmxGridPositionAt(layout, gridSteps, rowCount, -5, 0)).toBeNull();
-    expect(tfmxGridPositionAt(layout, gridSteps, rowCount, gridSteps[0], 0x7fffffff)).toBeNull();
+    expect(tfmxGridPositionAt(layout, gridSteps, song.tfmxNative!.gridRowTicks, rowCount, -5, 0, -1)).toBeNull();
+    expect(tfmxGridPositionAt(layout, gridSteps, song.tfmxNative!.gridRowTicks, rowCount, gridSteps[0], 0x7fffffff, -1)).toBeNull();
+  });
+
+  // Owner 2026-11-03: "whould the individual channels scroll separately in tfmx or why is it acting weird?"
+  // Rows were command indexes per voice, so row N was a different moment on each voice and one cursor
+  // could only be right for one voice. Rows are now pattern ticks: a command sits on the tick it plays.
+  it('a grid row is the same pattern tick on every voice: each command sits on the tick the decoder plays it', () => {
+    const layout = song.uadePatternLayout!;
+    const native = song.tfmxNative!;
+    const buf = new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    // Decoder rule, written out here (Chris/Pattern.cpp): Note+wait 0x7F..0xBF holds ee + 1 ticks, F3 holds bb + 1.
+    const holds = (o: number) => (buf[o] >= 0x7f && buf[o] < 0xc0 ? buf[o + 3] + 1 : buf[o] === 0xf3 ? buf[o + 1] + 1 : 0);
+    let compared = 0;
+    for (let p = 0; p < song.patterns.length; p++) {
+      const ticks = native.gridRowTicks[p];
+      expect(ticks.length).toBe(song.patterns[p].length);
+      for (let r = 1; r < ticks.length; r++) expect(ticks[r]).toBeGreaterThanOrEqual(ticks[r - 1]);
+      const step = native.tracksteps.find((t) => t.stepIndex === native.gridSteps[p])!;
+      for (let ch = 0; ch < layout.numChannels; ch++) {
+        const voice = step.voices[ch];
+        if (!voice || voice.isStop || voice.isHold) continue;
+        let tick = 0;
+        let row = 0;
+        for (const cmd of native.patterns[voice.patternNum] ?? []) {
+          while (row < ticks.length && layout.getCellFileOffset!(p, row, ch) !== cmd.fileOffset) row++;
+          expect(row, `step ${step.stepIndex} voice ${ch} shows offset ${cmd.fileOffset}`).toBeLessThan(ticks.length);
+          expect(ticks[row], `step ${step.stepIndex} voice ${ch} offset ${cmd.fileOffset}`).toBe(tick);
+          tick += holds(cmd.fileOffset);
+          compared++;
+        }
+      }
+    }
+    expect(compared).toBeGreaterThan(song.patterns.length * 4);
+  });
+
+  it('while a voice waits on a note, the cursor moves down the ticks of that wait', () => {
+    const layout = song.uadePatternLayout!;
+    const native = song.tfmxNative!;
+    const rowCount = (p: number) => song.patterns[p]?.length ?? 0;
+    let checked = 0;
+    for (let p = 0; p < song.patterns.length && checked < 50; p++) {
+      const ticks = native.gridRowTicks[p];
+      for (let row = 0; row < ticks.length; row++) {
+        const offset = layout.getCellFileOffset!(p, row, 0);
+        if (offset < 0) continue;
+        let next = row + 1;
+        while (next < ticks.length && layout.getCellFileOffset!(p, next, 0) < 0) next++;
+        const duration = next < ticks.length ? ticks[next] - ticks[row] : 0;
+        if (duration < 3) continue;
+        // decoder wait counts down duration - 1 .. 0 while the voice holds this command
+        for (let wait = duration - 1; wait >= 0; wait--) {
+          const at = tfmxGridPositionAt(layout, native.gridSteps, native.gridRowTicks, rowCount, native.gridSteps[p], offset, wait)!;
+          expect(at.pattern).toBe(p);
+          expect(ticks[at.row], `pattern ${p} row ${row} wait ${wait}`).toBe(ticks[row] + duration - 1 - wait);
+        }
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(10);
   });
 });

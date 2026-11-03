@@ -237,4 +237,7 @@ export interface TFMXNativeData {
   /** The trackstep index each grid pattern shows, by grid pattern index (EFFE lines and
    *  all-stop steps get no grid pattern). Maps the step the decoder plays to the grid. */
   gridSteps: number[];
+  /** Rows are pattern ticks: gridRowTicks[gridPattern][row] is the tick (from the step's
+   *  start) that row plays at. Commands on the same tick share a tick's rows on every voice. */
+  gridRowTicks: number[][];
 }

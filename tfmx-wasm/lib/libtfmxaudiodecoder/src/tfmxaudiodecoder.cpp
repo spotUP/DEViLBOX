@@ -161,11 +161,11 @@ void tfmxdec_set_scope_capture(void* decoder, int16_t* buf, uint32_t capacity) {
     p->mixer.setScopeCapture(buf, capacity);
 }
 
-int tfmxdec_get_play_position(void* decoder, int32_t* step, uint32_t* offset) {
+int tfmxdec_get_play_position(void* decoder, int32_t* step, uint32_t* offset, int32_t* wait) {
     TFMX_DECLARE_DECODER;
-    int s = 0; udword o = 0;
-    if (!p->dec.getPlayPosition(s, o)) return 0;
-    *step = s; *offset = o;
+    int s = 0, w = -1; udword o = 0;
+    if (!p->dec.getPlayPosition(s, o, w)) return 0;
+    *step = s; *offset = o; *wait = w;
     return 1;
 }
 

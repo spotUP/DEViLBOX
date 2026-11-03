@@ -611,14 +611,15 @@ int16_t* tfmx_module_scope(void* /*ctx*/) {
 
 /**
  * DEViLBOX extension: the module player's play position, for following it in
- * the tracker grid. Writes [step, fileOffset] to `out`; returns 0 when none.
+ * the tracker grid. Writes [step, fileOffset, wait] to `out` (wait: ticks the
+ * command still holds, -1 when the decoder does not count them); returns 0 when none.
  */
 EMSCRIPTEN_KEEPALIVE
 int tfmx_module_position(void* /*ctx*/, int32_t* out) {
   TFMXPlayer& p = gPlayers[0];
   if (!p.decoder) return 0;
   uint32_t off = 0;
-  if (!tfmxdec_get_play_position(p.decoder, &out[0], &off)) return 0;
+  if (!tfmxdec_get_play_position(p.decoder, &out[0], &off, &out[2])) return 0;
   out[1] = (int32_t)off;
   return 1;
 }

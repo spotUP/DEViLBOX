@@ -857,7 +857,10 @@ const uword TFMXDecoder::periods[0xd+0x40] = {
 // played (it is advanced when the command is read), so the current one is one
 // back. The offset is reported relative to the mdat data, as the editor
 // grid addresses it (offsets.header is the merged-file prefix).
-bool TFMXDecoder::getPlayPosition(int& step, udword& offset) {
+// wait is the ticks the track still waits on that command (Note+wait ee or
+// F3 bb count down to 0 one per pattern tick), so ee - wait ticks of it have
+// played: the editor grid places the cursor on that tick.
+bool TFMXDecoder::getPlayPosition(int& step, udword& offset, int& wait) {
     if (!admin.initialized) return false;
     for (int t = 0; t < sequencer.tracks && t < TRACKS_MAX; t++) {
         const Track& tr = track[t];
@@ -867,6 +870,7 @@ bool TFMXDecoder::getPlayPosition(int& step, udword& offset) {
         if (abs < offsets.header) return false;
         step = sequencer.step.current;
         offset = abs - offsets.header;
+        wait = tr.pattern.wait;
         return true;
     }
     return false;

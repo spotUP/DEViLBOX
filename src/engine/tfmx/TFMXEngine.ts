@@ -36,6 +36,8 @@ export interface TFMXModulePosition {
   step?: number;
   /** Hippel decoders: file offset of voice 0's next pattern byte; -1 otherwise. */
   patternOffset?: number;
+  /** TFMX decoder: ticks the playing command still waits (Note+wait ee, F3 bb count down); -1 otherwise. */
+  wait?: number;
 }
 
 export class TFMXEngine extends WASMChannelOutputsEngine {
@@ -144,7 +146,7 @@ export class TFMXEngine extends WASMChannelOutputsEngine {
 
         case 'modulePosition':
           for (const cb of this._positionCallbacks) {
-            cb({ samplesRendered: data.samplesRendered, elapsedMs: data.elapsedMs, songEnd: data.songEnd, step: data.step, patternOffset: data.patternOffset });
+            cb({ samplesRendered: data.samplesRendered, elapsedMs: data.elapsedMs, songEnd: data.songEnd, step: data.step, patternOffset: data.patternOffset, wait: data.wait });
           }
           break;
 

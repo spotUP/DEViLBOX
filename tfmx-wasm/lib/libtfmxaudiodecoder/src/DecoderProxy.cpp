@@ -82,8 +82,8 @@ int DecoderProxy::run() {
     return pDecoder->run();
 }
 
-bool DecoderProxy::getPlayPosition(int& step, udword& offset) {
-    return pDecoder ? pDecoder->getPlayPosition(step, offset) : false;
+bool DecoderProxy::getPlayPosition(int& step, udword& offset, int& wait) {
+    return pDecoder ? pDecoder->getPlayPosition(step, offset, wait) : false;
 }
 
 bool DecoderProxy::walkEnable(bool on) {
