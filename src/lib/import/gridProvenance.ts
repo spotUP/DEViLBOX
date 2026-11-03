@@ -133,6 +133,7 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
   timFollin: 'pass',
   beathoven: 'pass',
   soundProgrammingLanguage: 'pass',
+  dynamicSynthesizer: 'pass',
   synthesis: 'pass',
   tcbTracker: 'pass',
   tfmMusicMaker: 'pass',
@@ -213,7 +214,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   fur: 'n/a',
   futurePlayer: 'fail',
   gdm: 'n/a',
-  hippelCoso: 'n/a',
+  hippelCoso: 'pass',
   hvl: 'pass',
   inStereo2: 'pass',
   inStereoAmbiguous: 'pass',
@@ -226,7 +227,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   med: 'n/a',
   mod: 'n/a',
   mtm: 'n/a',
-  musicAssembler: 'n/a',
+  musicAssembler: 'pass',
   okt: 'pass',
   plm: 'n/a',
   psm: 'n/a',
@@ -252,6 +253,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   timFollin: 'fail',
   beathoven: 'fail',
   soundProgrammingLanguage: 'fail',
+  dynamicSynthesizer: 'fail',
   synthesis: 'pass',
   tcbTracker: 'pass',
   tfmMusicMaker: 'pass',
@@ -395,14 +397,12 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   amiga_formats_catchall: 'G11-amiga_formats_catchall',
   uade_abk: 'G11-uade-only',
   uade_agi: 'G11-uade-only',
-  uade_ast: 'G11-uade-only',
   uade_bfc: 'G11-uade-only',
   uade_bsi: 'G11-uade-only',
   uade_fc_bsi: 'G11-uade-only',
   uade_cust: 'G11-uade-only',
   uade_custom: 'G11-uade-only',
   uade_dh: 'U28',
-  uade_dns: 'G11-uade-only',
   uade_dz: 'U27',
   uade_mkiio: 'G11-uade-only',
   uade_mg: 'G11-uade-only',
@@ -480,6 +480,8 @@ export const DIRECT_GRIDS: readonly string[] = [
   'beathoven',
   // Sound Programming Language: the command streams decode to a read-only tick grid (soundProgrammingLanguageGrid.ts), no oracle yet.
   'soundProgrammingLanguage',
+  // Dynamic Synthesizer: the command streams decode to a read-only tick grid (dynamicSynthesizerGrid.ts), no oracle yet.
+  'dynamicSynthesizer',
 ];
 
 export function gridProvenanceOf(key: string): GridProvenance | null {
