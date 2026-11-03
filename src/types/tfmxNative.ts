@@ -234,4 +234,7 @@ export interface TFMXNativeData {
   macroPointerTableOffset: number;
   /** File offset of trackstep 0 (an entry is 16 bytes: 8 voices of pattern byte + transpose byte) */
   trackstepOffset?: number;
+  /** The trackstep index each grid pattern shows, by grid pattern index (EFFE lines and
+   *  all-stop steps get no grid pattern). Maps the step the decoder plays to the grid. */
+  gridSteps: number[];
 }
