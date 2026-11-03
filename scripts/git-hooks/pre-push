@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # DEViLBOX pre-push — full gate (~125 s, deterministic).
 #
-# Push to `main` triggers Hetzner deploy + GitHub Actions. Block here
+# Push to `main` triggers the server deploy + GitHub Actions. Block here
 # before the slow remote path fails.
 #
 # Runs SERIALLY, fail-fast. The jobs used to run in parallel, but on an

@@ -3,7 +3,7 @@
 # DEViLBOX Pull-Based Deploy — One-Time Server Setup
 # =============================================================================
 #
-# Run this ONCE on the Hetzner server to set up webhook-based pull deployment.
+# Run this ONCE on the devilbox.uprough.net server to set up webhook-based pull deployment.
 #
 # Prerequisites:
 #   export DEPLOY_SECRET="your-random-secret-here"

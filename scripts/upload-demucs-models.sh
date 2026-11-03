@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Upload Demucs GGML model weights to the Hetzner server
+# Upload Demucs GGML model weights to the devilbox.uprough.net server
 # =============================================================================
 #
 # Downloads htdemucs 4-stem and 6-stem models from HuggingFace, then
