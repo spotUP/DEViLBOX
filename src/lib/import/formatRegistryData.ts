@@ -2323,6 +2323,20 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
 
+  // ── Howie Davies (.hd) ───────────────────────────────────────────────────
+  {
+    key: 'howieDavies',
+    label: 'Howie Davies',
+    description: 'Howie Davies (.hd) - time-aligned grid, note and instrument edits saved in place; nuade / UADE plays the module',
+    family: 'amiga-native',
+    matchMode: 'both',
+    extRegex: /\.hd$/i,
+    prefixes: ['hd.'],
+    prefKey: 'howieDavies',
+    nativeParser: { module: '@lib/import/formats/HowieDaviesParser', parseFn: 'parseHowieDaviesFile', detectFn: 'isHowieDaviesFormat' },
+    uadeFallback: true,
+  },
+
   // ── Dynamic Synthesizer (dns.*) ──────────────────────────────────────────
   {
     key: 'dynamicSynthesizer',
@@ -2526,7 +2540,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     ['mkiio', 'Mark II (O)'],
     ['mg', 'MG'], ['ems', 'EMS'], ['emsv6', 'EMS v6'],
     ['fw', 'Forgotten Worlds'],
-    ['hd', 'Howie Davies'], ['hn', 'HN'], ['thn', 'THN'],
+    ['hn', 'HN'], ['thn', 'THN'],
     ['mtp2', 'MajorTom 2'], ['arp', 'ARP'],
     ['hip', 'Jochen Hippel base'], ['mcmd', 'MCMD'], ['sog', 'SOG'],
     ['mok', 'Silmarils'], ['mso', 'Medley SO'],

@@ -2487,14 +2487,15 @@ export async function tryRouteFormat(
   }
   if (matchesExt(filename, ['hd'])) {
     const wtCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['hd']) };
-    const { isWantedTeamDaveLoweFormat, parseWantedTeamDaveLoweFile } =
-      await import('@lib/import/formats/WantedTeamDaveLoweParser');
+    // Howie Davies: read-only time-aligned grid (howieDaviesGrid.ts); UADE keeps playing the module
+    const { isHowieDaviesFormat, parseHowieDaviesFile } =
+      await import('@lib/import/formats/HowieDaviesParser');
     return withNativeThenUADE('howieDavies', wtCtx,
       (buf: Uint8Array | ArrayBuffer, name: string) => {
-        if (isWantedTeamDaveLoweFormat(buf)) return parseWantedTeamDaveLoweFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
+        if (isHowieDaviesFormat(buf)) return parseHowieDaviesFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name);
         return null;
       },
-      'WantedTeamDaveLoweParser', { injectUADE: true });
+      'HowieDaviesParser', { injectUADE: true });
   }
   // Beathoven Synthesizer: the BeathovenSynthesizer eagleplayer plays it on
   // the Musashi host (EaglePlayerEngine); the grid as before.
