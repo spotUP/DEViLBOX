@@ -2285,7 +2285,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   {
     key: 'synthDream',
     label: 'SynthDream',
-    description: 'SynthDream (sdr.* prefix) - read-only command-stream grid, nuade / UADE plays the module',
+    description: 'SynthDream (sdr.* prefix) - command-stream grid, note and instrument edits saved in place; nuade / UADE plays the module',
     family: 'amiga-native',
     matchMode: 'both',
     extRegex: /\.sdr$/i,

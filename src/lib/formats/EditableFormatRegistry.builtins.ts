@@ -119,6 +119,7 @@ registerEditableFormat({ formatId: "stp", label: "", newSong: { template: "templ
 registerEditableFormat({ formatId: "stx", label: "", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "sunTronic", label: "SunTronic", newSong: { template: "templates/sunTronic.src" }, patternCodec: { kind: "variable" }, exporter: { module: "SunTronicExporter", fn: "exportAsSunTronic", byLayout: true, ext: "src" } });
 registerEditableFormat({ formatId: "symphoniePro", label: "Symphonie Pro", patternCodec: { kind: "fixed" } });
+registerEditableFormat({ formatId: "synthDream", label: "SynthDream", patternCodec: { kind: "variable" }, exporter: { module: "SynthDreamExporter", fn: "exportSynthDream", byLayout: true } });
 registerEditableFormat({ formatId: "synthesis", label: "Synthesis", newSong: { template: "templates/synthesis.syn" }, patternCodec: { kind: "fixed" }, exporter: { module: "SynthesisExporter", fn: "exportSynthesis", byLayout: true } });
 registerEditableFormat({ formatId: "tcbTracker", label: "TCB Tracker", newSong: { template: "templates/tcbTracker.tcb" }, patternCodec: { kind: "fixed" }, exporter: { module: "TCBTrackerExporter", fn: "exportTCBTracker", byLayout: true } });
 registerEditableFormat({ formatId: "tfmx", label: "TFMX", newSong: { template: "templates/tfmx.rocknroll" }, patternCodec: { kind: "fixed" }, exporter: { module: "TFMXExporter", fn: "exportTFMX", byLayout: true } });
