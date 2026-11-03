@@ -520,6 +520,14 @@
       "cells": 14096,
       "bytes": 14096
     },
+    "soundProgrammingLanguage": {
+      "exporter": "SoundProgrammingLanguageExporter.exportSoundProgrammingLanguage",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 71584,
+      "bytes": 71584
+    },
     "riffRaff": {
       "exporter": "RiffRaffExporter.exportRiffRaff",
       "tier": "byte-exact",

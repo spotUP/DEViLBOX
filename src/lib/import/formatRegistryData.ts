@@ -2299,7 +2299,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   {
     key: 'soundProgrammingLanguage',
     label: 'Sound Programming Language',
-    description: 'Sound Programming Language (.spl) - read-only command-stream grid, nuade / UADE plays the module',
+    description: 'Sound Programming Language (.spl) - command-stream grid, note edits saved in place; nuade / UADE plays the module',
     family: 'amiga-native',
     matchMode: 'both',
     extRegex: /\.spl$/i,
