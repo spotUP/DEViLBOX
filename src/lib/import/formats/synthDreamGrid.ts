@@ -10,7 +10,7 @@
  * Three layers (docs/FORMAT_COMMAND_STREAM_GRID.md): the stream bytes (truth), `blockRows` (one carrier cell per
  * word: cutoff = 2, period = the word), and the display grid on a shared tick timeline (row === replayer tick).
  * Each command's source span (stream, byte offset, byte length) is recorded per row in `rowSources`.
- * Phase A is read-only: nothing here writes bytes.
+ * This file only reads; synthDreamEdits.ts writes grid edits back into those bytes (phase B).
  */
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 
@@ -64,6 +64,9 @@ export interface SdrCommand {
   duration?: number;
   note?: number;
   instrument?: number;
+  /** Byte offsets of the note and instrument words inside the command (where an edit is written). */
+  noteAt?: number;
+  instrumentAt?: number;
   rest: boolean;
 }
 
@@ -98,10 +101,10 @@ export function decodeSdrStream(buf: Uint8Array, offset: number): SdrStream {
       const f = FORMS[first / 2];
       cmd.rest = !!f.rest;
       if (f.duration) cmd.duration = next();
-      if (f.note) cmd.note = next();
+      if (f.note) { cmd.noteAt = pos; cmd.note = next(); }
       if (f.glide) { next(); next(); next(); }
       if (f.noteCut) next();
-      if (f.instrument) cmd.instrument = next();
+      if (f.instrument) { cmd.instrumentAt = pos; cmd.instrument = next(); }
     } else {
       pos += 2; // a modifier first in an entry has its word read as the command word and skips one more
       pos += 2 * modifierParams(first);
@@ -140,6 +143,17 @@ export function readSdrTrack(buf: Uint8Array, subsong: number, voice: number): {
   return { entries, loops: buf[at] === TRACK_LOOP };
 }
 
+/** The tracker note a note word shows under the entry's transposition (96 at most, C-1 = 13 at least). */
+export function sdrShownNote(note: number, transpose: number, fixedPitch: boolean): number {
+  const base = fixedPitch ? note : (note & 0xff00) | ((note + transpose) & 0xff);
+  return Math.min(96, Math.max(0, (base & 0xff) - NOTE_C1) + TRACKER_C1);
+}
+
+/** The instrument number a command's instrument word selects under the entry's substitution (sdr_read_track_entry). */
+export function sdrSubstitutedInstrument(word: number, substituteOf: number, substituteBy: number): number {
+  return (word & 0xff) === substituteOf ? substituteBy : word & 0xff;
+}
+
 /** The first byte of the instrument record's fixed-pitch flag (sdr_read_instrument): transposition is not applied to such notes. */
 function isFixedPitch(buf: Uint8Array, number: number): boolean {
   const table = u32(buf, 0);
@@ -147,7 +161,16 @@ function isFixedPitch(buf: Uint8Array, number: number): boolean {
   return (buf[at + 1] ?? 0) !== 0;
 }
 
-export type SdrRowSource = { stream: number; offset: number; length: number } | null;
+/**
+ * The command starting on a row, the stream bytes it was read from, and the state its cell was shown under: the
+ * bytes of the note and instrument words that set the note and instrument in force (they can sit in an earlier
+ * command or stream), the entry's transposition and instrument substitution, and whether the instrument is fixed-pitch.
+ */
+export type SdrRowSource = {
+  stream: number; offset: number; length: number;
+  noteAt: number; instrumentAt: number;
+  transpose: number; fixedPitch: boolean; substituteOf: number; substituteBy: number;
+} | null;
 
 export interface SdrGrid {
   patterns: Pattern[];
@@ -167,7 +190,10 @@ function emptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
 }
 
-interface Placed { tick: number; stream: number; cmd: SdrCommand; note: number; instrument: number }
+interface Placed {
+  tick: number; stream: number; cmd: SdrCommand; note: number; instrument: number;
+  noteAt: number; instrumentAt: number; transpose: number; fixedPitch: boolean; substituteOf: number; substituteBy: number;
+}
 
 /** Decode the module's subsong into per-voice command lists on the tick timeline. */
 export function buildSdrGrid(buf: Uint8Array, subsong = 0): SdrGrid | null {
@@ -191,6 +217,8 @@ export function buildSdrGrid(buf: Uint8Array, subsong = 0): SdrGrid | null {
     let note = 0;
     let instrumentNumber = -1;
     let fixedPitch = false;
+    let noteAt = -1;
+    let instrumentAt = -1;
     let passTicks = -1;
     // the voice's state persists across the loop, as the replayer's does
     for (let pass = 0; pass < (track.loops ? MAX_ROWS : 1) && tick < MAX_ROWS && track.entries.length > 0; pass++) {
@@ -202,20 +230,23 @@ export function buildSdrGrid(buf: Uint8Array, subsong = 0): SdrGrid | null {
             if (cmd.end || tick >= MAX_ROWS) break;
             if (cmd.word < FIRST_MODIFIER) {
               if (cmd.duration !== undefined) duration = cmd.duration;
-              if (cmd.note !== undefined) note = cmd.note;
+              if (cmd.note !== undefined) { note = cmd.note; noteAt = cmd.noteAt ?? -1; }
               if (cmd.instrument !== undefined) {
                 let n = cmd.instrument;
                 if ((n & 0xff) === entry.substituteOf) n = (n & 0xff00) | entry.substituteBy;
                 instrumentNumber = n & 0xff;
+                instrumentAt = cmd.instrumentAt ?? -1;
                 fixedPitch = isFixedPitch(buf, n);
               }
             }
             let shown = 0;
             if (!cmd.rest && cmd.word < FIRST_MODIFIER) {
-              const base = fixedPitch ? note : (note & 0xff00) | ((note + entry.transpose) & 0xff);
-              shown = Math.min(96, Math.max(0, (base & 0xff) - NOTE_C1) + TRACKER_C1);
+              shown = sdrShownNote(note, entry.transpose, fixedPitch);
             }
-            placed.push({ tick, stream: si, cmd, note: cmd.rest ? NOTE_OFF : shown, instrument: instrumentNumber + 1 });
+            placed.push({
+              tick, stream: si, cmd, note: cmd.rest ? NOTE_OFF : shown, instrument: instrumentNumber + 1,
+              noteAt, instrumentAt, transpose: entry.transpose, fixedPitch, substituteOf: entry.substituteOf, substituteBy: entry.substituteBy,
+            });
             tick += duration === 0 ? 0x10000 : duration;
           }
         }
@@ -240,7 +271,10 @@ export function buildSdrGrid(buf: Uint8Array, subsong = 0): SdrGrid | null {
       const cell = grid[v][p.tick];
       cell.note = p.note;
       if (p.note > 0 && p.note < NOTE_OFF) cell.instrument = p.instrument;
-      sources[v][p.tick] = { stream: p.stream, offset: p.cmd.offset, length: p.cmd.length };
+      sources[v][p.tick] = {
+        stream: p.stream, offset: p.cmd.offset, length: p.cmd.length, noteAt: p.noteAt, instrumentAt: p.instrumentAt,
+        transpose: p.transpose, fixedPitch: p.fixedPitch, substituteOf: p.substituteOf, substituteBy: p.substituteBy,
+      };
       const endTick = Math.min(rows, i + 1 < placed.length ? placed[i + 1].tick : rows);
       for (let t = p.tick; t < endTick; t++) streamAtTick[v][t] = p.stream;
     }
