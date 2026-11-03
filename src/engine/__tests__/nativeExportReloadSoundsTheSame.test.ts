@@ -91,6 +91,21 @@ beforeAll(() => {
   });
 });
 
+/**
+ * The first row of a run loads the whole app graph (song import, tracker store, export router,
+ * parser) through vite's transform: measured 16 s on an idle machine and up to 94 s beside busy
+ * emulators, all of it inside the first row's 120 s timeout. Do that import once here, under its
+ * own timeout, so a row's timeout bounds the row's own work (about 1.5 s for a fred song).
+ */
+beforeAll(async () => {
+  await Promise.all([
+    import('@/lib/song/songBranches'),
+    import('@/stores/useTrackerStore'),
+    import('@/lib/export/nativeExportRouter'),
+    import('@/lib/import/parseModuleToSong'),
+  ]);
+}, 300000);
+
 /** Every distinct SunTronic V1.3 module of both corpus folders (the walk test's corpus). */
 function sunTronicCorpus(): string[] {
   const seen = new Set<string>();
@@ -128,6 +143,7 @@ const FORMATS: FormatRow[] = [
   { key: 'dynamicSynthesizer', rig: 'paula', files: corpus(['.ptc']) },
   { key: 'riffRaff', rig: 'paula', files: corpus(['.riff']) },
   { key: 'howieDavies', rig: 'paula', files: corpus(['.hd']) },
+  { key: 'soundProgrammingLanguage', rig: 'paula', files: corpus(['.spl']) },
   { key: 'sidmon1', rig: 'paula', files: [...corpus(['.sid1']), ...corpus(['.sid'], 'sidmon-1')] },
 ];
 
