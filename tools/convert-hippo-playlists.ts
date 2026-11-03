@@ -6,7 +6,7 @@
  * Every URL entry becomes one track that keeps its source (see
  * src/lib/dj/hippoPlaylist.ts): Modland -> `modland:<path>`, HVSC ->
  * `hvsc:<path>`, anything else -> the URL itself. Playlists are written in
- * byte order of their file names to public/data/playlists/imported-prg.json.
+ * byte order of their file names to server/src/data/hippo-playlists.json.
  *
  * Modland URLs are partly %-escaped ("a prehistoric tale %28intro%29.hipc"):
  * the Modland index (server/data/devilbox.db, `modland_files`) decides
@@ -25,7 +25,7 @@ import { playlistFromPrg, type SeedPlaylist } from '../src/lib/dj/hippoPlaylist'
 import { resolveBareFileName, sourceBaseName, type SourceIndex } from '../src/lib/dj/playlistTrackSource';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SEED = path.join(ROOT, 'public/data/playlists/imported-prg.json');
+const SEED = path.join(ROOT, 'server/src/data/hippo-playlists.json');
 // better-sqlite3 is a server dependency; load it from there.
 const Database = createRequire(path.join(ROOT, 'server/package.json'))('better-sqlite3') as typeof import('better-sqlite3');
 

@@ -14,7 +14,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { DJPlaylist } from '../useDJPlaylistStore';
 
-const SEED_PATH = path.resolve(__dirname, '../../../public/data/playlists/imported-prg.json');
+const SEED_PATH = path.resolve(__dirname, '../../../server/src/data/hippo-playlists.json');
 const seed = JSON.parse(fs.readFileSync(SEED_PATH, 'utf-8')) as DJPlaylist[];
 const PLAYLIST_ID = 'playlist-prg-anathema-imbasille-3';
 const HIPPO = 'http://hippoplayer.se/data/Modules/Protracker';
@@ -67,6 +67,11 @@ describe('DJ seed playlist entries carry a loadable source', () => {
     useDJPlaylistStore.setState({ playlists: [persistedImbasille3()], seedSourcesRevision: 0 });
 
     await syncBundledPlaylists();
+
+    // Reachability: the seed came through the server route, exactly once, and not from a static file.
+    const urls = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => String(c[0]));
+    expect(urls).toHaveLength(1);
+    expect(urls[0]).toMatch(/\/hip\/playlists\?tracks=1$/);
 
     const tracks = useDJPlaylistStore.getState().playlists[0].tracks;
     expect(tracks.slice(2).map((t) => t.fileName)).toEqual(HIPPO_SOURCES);

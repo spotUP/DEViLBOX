@@ -14,7 +14,7 @@
  * never load.
  *
  * Used by `tools/convert-hippo-playlists.ts`, which builds
- * `public/data/playlists/imported-prg.json`.
+ * `server/src/data/hippo-playlists.json`.
  */
 
 import { decodePathEscapes } from './playlistTrackSource';

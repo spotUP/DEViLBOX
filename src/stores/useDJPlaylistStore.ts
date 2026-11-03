@@ -18,6 +18,7 @@ import type { EffectConfig } from '@/types/instrument/effects';
 import type { DJEnvironment } from '@/types/djEnvironment';
 import type { DJTrackSummary } from '@/engine/dj/autodj/types';
 import { useAudioStore } from '@/stores/useAudioStore';
+import { fetchHippoPlaylists } from '@/lib/dj/hippoPlaylistApi';
 import { applyLoadOutcome, isBareFileName, repairSourcesFromSeed } from '@/lib/dj/playlistTrackSource';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -909,9 +910,8 @@ function pushUndo(state: DJPlaylistState): void {
   state.canRedo = false;
 }
 
-// ── Bundled seed playlists: import on first launch, repair afterwards ───────
+// ── HippoPlayer seed playlists (served by the server): import on first launch, repair afterwards ──
 
-const BUNDLED_PLAYLISTS_URL = '/data/playlists/imported-prg.json';
 /**
  * Bump whenever the seed's sources change, so persisted copies are repaired
  * once. 1: bare names resolved through Modland/HVSC (ce3de53e4). 2: the seed
@@ -941,9 +941,7 @@ export async function syncBundledPlaylists(): Promise<void> {
   if (!needsImport && !needsRepair) return;
 
   try {
-    const resp = await fetch(BUNDLED_PLAYLISTS_URL);
-    if (!resp.ok) return;
-    const data: DJPlaylist[] = await resp.json();
+    const data = await fetchHippoPlaylists();
     if (!Array.isArray(data) || data.length === 0) return;
     if (needsImport) {
       useDJPlaylistStore.getState().importPlaylists(data);
@@ -955,7 +953,7 @@ export async function syncBundledPlaylists(): Promise<void> {
       useDJPlaylistStore.getState().repairSourcesFromSeed(data, SEED_SOURCES_REVISION);
     }
   } catch {
-    // Bundled file not available — no problem
+    // Server not reachable — no problem, retried on the next launch
   }
 }
 

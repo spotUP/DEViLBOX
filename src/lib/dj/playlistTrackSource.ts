@@ -15,7 +15,7 @@
  * loads when that exact name happens to be cached in this browser's
  * IndexedDB, so a bare entry that came from anywhere other than this
  * browser's file picker can never load. The bundled seed playlists
- * (`public/data/playlists/imported-prg.json`) shipped 1295 such entries:
+ * (`server/src/data/hippo-playlists.json`) shipped 1295 such entries:
  * whoever built the seed fell back to the bare name whenever its Modland
  * lookup missed.
  *

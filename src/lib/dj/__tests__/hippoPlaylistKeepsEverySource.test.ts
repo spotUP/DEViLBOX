@@ -1,5 +1,5 @@
 /**
- * Regression: the first DJ seed (public/data/playlists/imported-prg.json) was
+ * Regression: the first DJ seed (server/src/data/hippo-playlists.json) was
  * built from the owner's HippoPlayer playlists by a converter that kept only
  * the bare file name of every non-Modland URL. 515 entries lost their source
  * and could never load; "Anathema-Imbasille 3" played two of its eight.
@@ -97,7 +97,7 @@ describe('HippoPlayer playlist converter keeps every source', () => {
   });
 
   it('the bundled seed has no bare entry and Imbasille 3 carries the six hippoplayer.se sources', () => {
-    const seedPath = path.resolve(__dirname, '../../../../public/data/playlists/imported-prg.json');
+    const seedPath = path.resolve(__dirname, '../../../../server/src/data/hippo-playlists.json');
     const seed = JSON.parse(fs.readFileSync(seedPath, 'utf-8')) as Array<{ id: string; tracks: Array<{ fileName: string }> }>;
     expect(seed).toHaveLength(74);
     expect(seed.flatMap((p) => p.tracks).filter((t) => isBareFileName(t.fileName))).toEqual([]);
