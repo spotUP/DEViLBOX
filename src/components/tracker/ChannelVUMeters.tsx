@@ -60,7 +60,8 @@ interface ChannelVUMetersProps {
   channelOffsets?: number[];
   channelWidths?: number[];
   scrollLeft?: number;
-  editRowY?: number;  // CSS-px Y of the edit row center line
+  /** Edit bar edges in CSS px of this overlay (editRowBand): meters rise from `top`, the mirror falls from `bottom`. */
+  editRowBand?: { top: number; bottom: number };
   /** Channels drawn. A format editor (GoatTracker) owns its channels; the tracker pattern is a blank. */
   channelCount?: number;
   /** Meter this source instead of the tracker's engine (a DJ deck). */
@@ -73,7 +74,7 @@ interface ChannelVUMetersProps {
   scale?: number;
 }
 
-export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOffsets = [], channelWidths = [], scrollLeft: scrollLeftProp = 0, editRowY: editRowYProp, channelCount, feed, scale: scaleProp = 1 }) => {
+export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOffsets = [], channelWidths = [], scrollLeft: scrollLeftProp = 0, editRowBand: editRowBandProp, channelCount, feed, scale: scaleProp = 1 }) => {
   const { patterns, currentPatternIndex } = useTrackerStore(useShallow(s => ({
     patterns: s.patterns,
     currentPatternIndex: s.currentPatternIndex
@@ -93,7 +94,7 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
   const scrollLeftRef = useRef(scrollLeftProp);
   const channelOffsetsRef = useRef(channelOffsets);
   const channelWidthsRef = useRef(channelWidths);
-  const editRowYRef = useRef(editRowYProp ?? 0);
+  const editRowBandRef = useRef(editRowBandProp ?? { top: 0, bottom: 0 });
   const scaleRef = useRef(scaleProp);
   useEffect(() => { scaleRef.current = scaleProp; }, [scaleProp]);
   const feedRef = useRef(feed);
@@ -102,7 +103,7 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
   useEffect(() => { scrollLeftRef.current = scrollLeftProp; }, [scrollLeftProp]);
   useEffect(() => { channelOffsetsRef.current = channelOffsets; }, [channelOffsets]);
   useEffect(() => { channelWidthsRef.current = channelWidths; }, [channelWidths]);
-  useEffect(() => { editRowYRef.current = editRowYProp ?? 0; }, [editRowYProp]);
+  useEffect(() => { editRowBandRef.current = editRowBandProp ?? { top: 0, bottom: 0 }; }, [editRowBandProp]);
 
   // Initialize meter states
   useEffect(() => {
@@ -270,8 +271,9 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
         const channelW = widths[i] || 260 * sc;
         const channelX = offsets[i] !== undefined ? offsets[i] - gutter - sl : i * 260 * sc - sl;
 
-        // Edit row Y — segments extrude from this line, offset up to avoid drawing over the edit bar
-        const ery = editRowYRef.current - 12;
+        // Edit bar edges: meters touch the bar's top edge, the mirror touches its bottom edge.
+        const ery = editRowBandRef.current.top;
+        const erb = editRowBandRef.current.bottom;
 
         if (vuStyle === 'fill') {
           // Fill style: theme-colored rectangle, very subtle
@@ -282,7 +284,7 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
             ctx.fillRect(Math.round(channelX), ery - fillHeight, channelW, fillHeight);
             if (mirrorEnabled) {
               // Mirrored downward from edit row
-              ctx.fillRect(Math.round(channelX), ery, channelW, fillHeight);
+              ctx.fillRect(Math.round(channelX), erb, channelW, fillHeight);
             }
           }
         } else {
@@ -311,12 +313,12 @@ export const ChannelVUMeters: React.FC<ChannelVUMetersProps> = memo(({ channelOf
 
             ctx.fillStyle = color;
             // Segments grow upward from edit row
-            const segYUp = ery - (s + 1) * segStep;
+            const segYUp = ery - s * segStep - segH;
             ctx.fillRect(Math.round(meterX), Math.round(segYUp), meterW, segH);
 
             if (mirrorEnabled) {
               // Mirrored: segments grow downward from edit row
-              const segYDown = ery + s * segStep;
+              const segYDown = erb + s * segStep;
               ctx.fillRect(Math.round(meterX), Math.round(segYDown), meterW, segH);
             }
           }
