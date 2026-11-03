@@ -684,8 +684,8 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     description: 'Actionamics — native parser or UADE',
     family: 'amiga-native',
     matchMode: 'both',
-    extRegex: /\.act$/i,
-    prefixes: ['act.'],
+    extRegex: /\.(act|ast)$/i,
+    prefixes: ['act.', 'ast.'],
     prefKey: 'actionamics',
     nativeParser: { module: '@lib/import/formats/ActionamicsParser', parseFn: 'parseActionamicsFile', detectFn: 'isActionamicsFormat' },
     uadeFallback: true,
@@ -2506,7 +2506,6 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   // ═══════════════════════════════════════════════════════════════════════════
   ...([
     ['abk', 'AMOS'], ['agi', 'Sierra AGI'],
-    ['ast', 'ActionAmics prefix'],
     ['bfc', 'FutureComposer-BSI'], ['bsi', 'BSI'], ['fc-bsi', 'FC-BSI'],
     ['cus', 'Custom'], ['cust', 'Custom'], ['custom', 'Custom'],
     ['dh', 'David Hanney'], ['dz', 'Darius Zendeh'],
