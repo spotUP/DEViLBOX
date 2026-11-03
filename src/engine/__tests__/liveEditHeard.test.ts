@@ -267,10 +267,13 @@ describe('an edit in the grid is heard on the next play', { timeout: 180000 }, (
         type Cand = { p: number; ch: number; r: number; any: number };
         const after: Cand[] = [];
         const other: Cand[] = [];
+        // The first pattern with more than one row and a note (a time-aligned grid can lead with a one-row placeholder pattern).
+        const hasNote = (pat: typeof s2.patterns[number]) => pat.channels.some((c) => c.rows.some((cell: Cell) => cell.note > 0));
+        const pi = Math.max(0, s2.patterns.findIndex((pat) => (pat.channels[0]?.rows.length ?? 0) > 1 && hasNote(pat)));
         let anyNote = 0;
         s2.patterns.forEach((pat) => pat.channels.forEach((c) => c.rows.forEach((cell: Cell) => { if (cell.note > 0 && !anyNote) anyNote = cell.note; })));
         s2.patterns.forEach((pat, p) => pat.channels.forEach((c, ch) => c.rows.forEach((cell: Cell, r) => {
-          if (p !== 0 || r === 0 || cell.note !== 0) return;
+          if (p !== pi || r === 0 || cell.note !== 0) return;
           const prev = c.rows[r - 1];
           if (prev.note > 0 && prev.note < 97) after.push({ p, ch, r, any: prev.note });
           else other.push({ p, ch, r, any: anyNote });
@@ -278,10 +281,10 @@ describe('an edit in the grid is heard on the next play', { timeout: 180000 }, (
         // The blank run after the first note that has one: its rows one by one (a format that times a note in units of N rows takes a note on the Nth).
         const run: Cand[] = [];
         for (const c of after) {
-          const rows = s2.patterns[0].channels[c.ch].rows;
+          const rows = s2.patterns[pi].channels[c.ch].rows;
           let n = 0;
           while (c.r + n < rows.length && rows[c.r + n].note === 0) n++;
-          if (n >= 12) { for (let q = 0; q < 12; q++) run.push({ p: 0, ch: c.ch, r: c.r + q, any: c.any }); break; }
+          if (n >= 12) { for (let q = 0; q < 12; q++) run.push({ p: pi, ch: c.ch, r: c.r + q, any: c.any }); break; }
         }
         // Then the blank cells straight after a note, one voice after the other (a voice's track may end early and the rest of its
         // pattern be padding, which no format can take a note on), then any blank cell.
@@ -299,7 +302,7 @@ describe('an edit in the grid is heard on the next play', { timeout: 180000 }, (
           const s3 = useTrackerStore.getState();
           s3.setCurrentPattern(e.p);
           // A typed note takes the instrument in use: the one of the note above it.
-          const above = s3.patterns[0].channels[e.ch].rows[e.r - 1];
+          const above = s3.patterns[e.p].channels[e.ch].rows[e.r - 1];
           if (key === 'hvl') {
             // Hively's edit authority is its native track pool: a keystroke goes through hivelyEdit, never setCell (G5).
             const { editHivelyCell } = await import('@/components/hively/hivelyEdit');
