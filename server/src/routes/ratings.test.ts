@@ -13,5 +13,7 @@ describe('ratings route on a fresh database', () => {
     // ratings.ts prepares statements at import; this import is the first touch of the database.
     const mod = await import('./ratings');
     expect(mod.default).toBeTypeOf('function');
-  });
+    // The import transforms the route and the database module: about 6 s on a
+    // loaded machine, past the 5 s default.
+  }, 60_000);
 });
