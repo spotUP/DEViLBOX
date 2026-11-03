@@ -536,6 +536,14 @@
       "cells": 20976,
       "bytes": 20976
     },
+    "howieDavies": {
+      "exporter": "HowieDaviesExporter.exportHowieDavies",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 92244,
+      "bytes": 92244
+    },
     "synthDream": {
       "exporter": "SynthDreamExporter.exportSynthDream",
       "tier": "byte-exact",

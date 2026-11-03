@@ -127,14 +127,26 @@ export interface HowieDaviesGrid {
   /** streamAtStart[pattern][channel] = the pattern stream playing in the pattern's first row, -1 for none */
   streamAtStart: number[][];
   notesPerVoice: number[];
+  /** sources[voice][row over the whole grid], null where no note starts (phase B: where an edit is written) */
+  sources: Array<Array<HowieDaviesRowSource | null>>;
+  /** The tracker note a pattern note byte (a period table index) plays, or 0 when the index is outside the table. */
+  noteForByte: (byte: number) => number;
+}
+
+/** Where a note's bytes live in the file. */
+export interface HowieDaviesRowSource {
+  /** file offset of the note byte (its rest byte follows) */
+  noteAt: number;
+  /** file offset of the operand byte of the Instrument command that chose the instrument, -1 when it is the voice's start state */
+  instrumentAt: number;
 }
 
 interface VoiceState {
   listStart: number; listPos: number; patternStart: number; patternPos: number; repeatsLeft: number;
-  rest: number; instrument: number; stream: number; on: boolean;
+  rest: number; instrument: number; instrumentAt: number; stream: number; on: boolean;
 }
 
-interface Event { tick: number; note: number; instrument: number; stream: number }
+interface Event { tick: number; note: number; instrument: number; stream: number; noteAt: number; instrumentAt: number }
 
 export function buildHowieDaviesGrid(file: Uint8Array): HowieDaviesGrid | string {
   const m = loadImage(file);
@@ -173,7 +185,7 @@ export function buildHowieDaviesGrid(file: Uint8Array): HowieDaviesGrid | string
   for (let v = 0; v < VOICES; v++) {
     const listStart = pointer(m, subsongTable + v * 4);
     if (listStart < 0) return 'a position list pointer is not relocated';
-    voices.push({ listStart, listPos: listStart, patternStart: defaultStream, patternPos: defaultStream, repeatsLeft: 0, rest: 0, instrument: -1, stream: -1, on: true });
+    voices.push({ listStart, listPos: listStart, patternStart: defaultStream, patternPos: defaultStream, repeatsLeft: 0, rest: 0, instrument: -1, instrumentAt: -1, stream: -1, on: true });
   }
   const flags = [true, true, true, true];
   let speed = DEFAULT_SPEED;
@@ -198,7 +210,7 @@ export function buildHowieDaviesGrid(file: Uint8Array): HowieDaviesGrid | string
           s.repeatsLeft--;
           if (s.repeatsLeft >= 0) { s.patternPos = s.patternStart; result = 'pattern'; } else result = 'list';
           break;
-        case 'instrument': s.instrument = operand(); s.patternPos = cursor; result = 'pattern'; break;
+        case 'instrument': s.instrumentAt = cursor + HUNK_BYTES; s.instrument = operand(); s.patternPos = cursor; result = 'pattern'; break;
         case 'speed': speed = operand(); s.patternPos = cursor; result = 'pattern'; break;
         case 'delay': s.rest = (operand() << 24) >> 24; s.patternPos = cursor; result = 'return'; break;
         case 'maxVolume': operand(); s.patternPos = cursor; result = 'pattern'; break;
@@ -248,11 +260,12 @@ export function buildHowieDaviesGrid(file: Uint8Array): HowieDaviesGrid | string
       const regionId = regionStart === defaultStream ? -1 : 0;
       if (value < COMMAND_BASE) {
         if (value >= PERIOD_COUNT) { reason = 'a note is outside the period table'; return; }
+        const noteAt = cursor - 1 + HUNK_BYTES;
         const rest = u8(m, cursor++);
         s.rest = (rest << 24) >> 24;
         s.patternPos = cursor;
         touch(regionStart, cursor, 'pattern', regionId);
-        events[v].push({ tick, note: periodToNote(u16(m, periodAt + 2 * value)), instrument: s.instrument, stream: s.stream });
+        events[v].push({ tick, note: periodToNote(u16(m, periodAt + 2 * value)), instrument: s.instrument, stream: s.stream, noteAt, instrumentAt: s.instrumentAt });
         return;
       }
       const handler = handlerOf(driver.commandTable, value);
@@ -304,6 +317,7 @@ export function buildHowieDaviesGrid(file: Uint8Array): HowieDaviesGrid | string
 
   const notesPerVoice = new Array<number>(VOICES).fill(0);
   const columns: TrackerCell[][] = Array.from({ length: VOICES }, () => Array.from({ length: patternCount * ROWS_PER_PATTERN }, emptyCell));
+  const sources: Array<Array<HowieDaviesRowSource | null>> = Array.from({ length: VOICES }, () => new Array<HowieDaviesRowSource | null>(patternCount * ROWS_PER_PATTERN).fill(null));
   const firstStream: number[][] = Array.from({ length: patternCount }, () => new Array<number>(VOICES).fill(-1));
   for (let v = 0; v < VOICES; v++) {
     for (const e of kept[v]) {
@@ -312,6 +326,7 @@ export function buildHowieDaviesGrid(file: Uint8Array): HowieDaviesGrid | string
       cell.note = e.note;
       cell.instrument = e.instrument + 1;
       notesPerVoice[v]++;
+      sources[v][row] = { noteAt: e.noteAt, instrumentAt: e.instrumentAt };
       if (row % ROWS_PER_PATTERN === 0) firstStream[Math.floor(row / ROWS_PER_PATTERN)][v] = streamIndexOfStart.get(e.stream) ?? -1;
     }
   }
@@ -326,6 +341,7 @@ export function buildHowieDaviesGrid(file: Uint8Array): HowieDaviesGrid | string
   });
   return {
     driver: ['Blazing Thunder', 'Future Bike Simulator', "Yogi's Great Escape"][driverIndex], patterns,
-    songPositions: patterns.map((_, i) => i), rows, ticksPerRow: rowTicks, streams, blockRows, streamAtStart: firstStream, notesPerVoice,
+    songPositions: patterns.map((_, i) => i), rows, ticksPerRow: rowTicks, streams, blockRows, streamAtStart: firstStream, notesPerVoice, sources,
+    noteForByte: (byte) => (byte >= 0 && byte < PERIOD_COUNT ? periodToNote(u16(m, periodAt + 2 * byte)) : 0),
   };
 }
