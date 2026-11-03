@@ -59,7 +59,7 @@ public:
      * steps from the song's first; `offset` is the module-file offset of the
      * next pattern byte the voice reads. False when the decoder cannot say.
      */
-    virtual bool getPlayPosition(int& /*step*/, udword& /*offset*/) { return false; }
+    virtual bool getPlayPosition(int& /*step*/, udword& /*offset*/, int& /*wait*/) { return false; }
 
     /**
      * DEViLBOX extension: the walk. While on, a decoder that supports it

@@ -508,12 +508,12 @@ async function reprojectTFMXFromBytes(get: () => FormatStore): Promise<void> {
     const samplesEdited = gridBaseline.sampleIsEdited();
     gridBaseline.setGridBaseline(gridBaseline.baselineOf(song.patterns));
     if (samplesEdited) gridBaseline.markSampleEdited();
-    // gridSteps follow the grid: a step that stops or starts every voice drops or gains its grid pattern
+    // gridSteps and gridRowTicks follow the grid: a step that stops or starts every voice drops or gains its grid pattern
     const native = get().tfmxNative;
     useFormatStore.setState({
       uadePatternLayout: song.uadePatternLayout ?? null,
       tfmxTimingTable: song.tfmxTimingTable ?? null,
-      ...(native && song.tfmxNative ? { tfmxNative: { ...native, gridSteps: song.tfmxNative.gridSteps } } : {}),
+      ...(native && song.tfmxNative ? { tfmxNative: { ...native, gridSteps: song.tfmxNative.gridSteps, gridRowTicks: song.tfmxNative.gridRowTicks } } : {}),
     } as Partial<FormatStore>);
     const update: { patterns: typeof song.patterns; patternOrder?: number[] } = { patterns: song.patterns };
     if (song.songPositions.length !== tracker.patternOrder.length) update.patternOrder = [...song.songPositions];

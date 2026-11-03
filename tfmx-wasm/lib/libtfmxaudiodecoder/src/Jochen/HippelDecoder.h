@@ -37,7 +37,7 @@ class HippelDecoder : public Decoder {
     ~HippelDecoder();
 
     bool init(void *data, udword length, int songNumber) override;
-    bool getPlayPosition(int& step, udword& offset) override;
+    bool getPlayPosition(int& step, udword& offset, int& wait) override;
     bool walkEnable(bool on) override;
     int walkCount() override { return (int)(walkLog.size() / WALK_INTS); }
     const int* walkData() override { return walkLog.empty() ? 0 : walkLog.data(); }

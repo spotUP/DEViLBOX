@@ -96,7 +96,7 @@ extern "C" {
     /* DEViLBOX extension: voice 0's track step (from the song's first) and
      * the module-file offset of its next pattern byte. Returns 0 when the
      * decoder cannot report one. */
-    int tfmxdec_get_play_position(void* decoder, int32_t* step, uint32_t* offset);
+    int tfmxdec_get_play_position(void* decoder, int32_t* step, uint32_t* offset, int32_t* wait);
 
     /* DEViLBOX extension: the walk (see Decoder.h). Enable clears the record;
      * count is in records of 10 int32; data points at the first. Hippel

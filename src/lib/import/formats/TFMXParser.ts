@@ -191,6 +191,20 @@ interface DecodedTFMXCommand {
 }
 
 /**
+ * Pattern ticks a TFMX pattern command takes, as the decoder runs it (Chris/Pattern.cpp): a
+ * Note+wait (0x7F <= aa < 0xC0; 0x7F counts, the decoder tests aa >= 0x7F) sets wait = ee and
+ * holds the track ee + 1 ticks; F3 Wait sets wait = bb, bb + 1 ticks. Every other command runs
+ * on the tick it is read and the track reads on (0 ticks).
+ */
+export function tfmxCommandTicks(buf: Uint8Array, offset: number): number {
+  if (offset < 0 || offset + 3 >= buf.length) return 0;
+  const aa = buf[offset];
+  if (aa >= 0x7F && aa < 0xC0) return buf[offset + 3] + 1;
+  if (aa === 0xF3) return buf[offset + 1] + 1;
+  return 0;
+}
+
+/**
  * Decode a TFMX pattern's command stream starting at the given file offset.
  * Reads 4-byte longwords until an F0 (end) or F4 (stop) command is found.
  */
@@ -532,6 +546,8 @@ export function parseTFMXFile(
   const channelOffsetMaps: (number | -1)[][][] = [];
   // gridSteps[trackerPatIdx] = the trackstep that grid pattern shows (-1: none)
   const gridSteps: number[] = [];
+  // gridRowTicks[trackerPatIdx][row] = the pattern tick (from the step's start) that row plays at
+  const gridRowTicks: number[][] = [];
 
   for (let stepIdx = firstStep; stepIdx <= lastStep; stepIdx++) {
     const stepOff = trackstepOff + stepIdx * TFMX_TRACKSTEP_ENTRY_SIZE;
@@ -566,42 +582,44 @@ export function parseTFMXFile(
     // If ALL voices are stopped (-1), skip this step
     if (voicePatNums.every(v => v === -1)) continue;
 
-    // Get decoded commands for each channel
-    const channelCommands: DecodedTFMXCommand[][] = [];
-    let maxRows = 0;
+    // Rows are pattern ticks (time grid): a command sits on the tick it plays, the way the
+    // decoder runs it (tfmxCommandTicks), so one row is the same moment on every voice. Commands
+    // that run on the same tick (zero-time commands before a timed one) take sub-rows of that
+    // tick; the tick has as many rows as its busiest voice. Every command keeps its own row and
+    // file offset, so a cell edit stays a byte-exact 4-byte write. Rows a voice spends waiting
+    // are empty and not editable (offset -1). Loops and gotos are shown once, as written.
+    const voiceTicks: Map<number, DecodedTFMXCommand[]>[] = [];
+    let lastTick = 0;
     for (let ch = 0; ch < NUM_CHANNELS; ch++) {
       const patNum = voicePatNums[ch] ?? -1;
-      if (patNum >= 0 && patNum < decodedPatterns.length && decodedPatterns[patNum].length > 0) {
-        channelCommands.push(decodedPatterns[patNum]);
-        maxRows = Math.max(maxRows, decodedPatterns[patNum].length);
-      } else {
-        channelCommands.push([]);
+      const byTick = new Map<number, DecodedTFMXCommand[]>();
+      voiceTicks.push(byTick);
+      if (patNum < 0 || patNum >= decodedPatterns.length) continue;
+      let tick = 0;
+      for (const cmd of decodedPatterns[patNum]) {
+        const at = byTick.get(tick);
+        if (at) at.push(cmd); else byTick.set(tick, [cmd]);
+        lastTick = Math.max(lastTick, tick);
+        tick += tfmxCommandTicks(buf, cmd.fileOffset);
       }
     }
 
-    // Ensure at least 1 row
-    if (maxRows === 0) maxRows = 1;
-
-    // Build tracker rows and offset maps
     const channelRows: TrackerCell[][] = Array.from({ length: NUM_CHANNELS }, () => []);
     const offsetMap: (number | -1)[][] = Array.from({ length: NUM_CHANNELS }, () => []);
-
-    for (let row = 0; row < maxRows; row++) {
-      for (let ch = 0; ch < NUM_CHANNELS; ch++) {
-        const cmds = channelCommands[ch];
-        if (row < cmds.length) {
-          channelRows[ch].push(cmds[row].cell);
-          offsetMap[ch].push(cmds[row].fileOffset);
-        } else {
-          // Padding row beyond this channel's command count
-          channelRows[ch].push({
-            note: 0, instrument: 0, volume: 0,
-            effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-          });
-          offsetMap[ch].push(-1); // not editable
+    const rowTicks: number[] = [];
+    for (let tick = 0; tick <= lastTick; tick++) {
+      const rowsAt = Math.max(1, ...voiceTicks.map((byTick) => byTick.get(tick)?.length ?? 0));
+      for (let sub = 0; sub < rowsAt; sub++) {
+        rowTicks.push(tick);
+        for (let ch = 0; ch < NUM_CHANNELS; ch++) {
+          const cmd = voiceTicks[ch].get(tick)?.[sub];
+          channelRows[ch].push(cmd ? cmd.cell : { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+          offsetMap[ch].push(cmd ? cmd.fileOffset : -1);
         }
       }
     }
+    const maxRows = rowTicks.length;
+    gridRowTicks.push(rowTicks);
 
     channelOffsetMaps.push(offsetMap);
     gridSteps.push(stepIdx);
@@ -640,6 +658,7 @@ export function parseTFMXFile(
     }];
     channelOffsetMaps.push(Array.from({ length: NUM_CHANNELS }, () => [-1]));
     gridSteps.push(-1);
+    gridRowTicks.push([0]);
     trackerPatterns.push({
       id:     'pattern-0',
       name:   'Pattern 0',
@@ -667,41 +686,16 @@ export function parseTFMXFile(
     });
   }
 
-  // Build TFMX timing table: cumulative jiffies → (patternIndex, row)
+  // Build TFMX timing table: cumulative pattern ticks -> (patternIndex, row). Rows are ticks
+  // (gridRowTicks), so a row's time is its step's start plus its tick; a step lasts to its last tick.
   const tfmxTimingTable: { patternIndex: number; row: number; cumulativeJiffies: number }[] = [];
   let cumulativeJiffies = 0;
-
   for (let patIdx = 0; patIdx < trackerPatterns.length; patIdx++) {
-    const pat = trackerPatterns[patIdx];
-    const numRows = pat.channels[0]?.rows.length ?? 0;
-
-    for (let row = 0; row < numRows; row++) {
-      tfmxTimingTable.push({ patternIndex: patIdx, row, cumulativeJiffies });
-      // Get the wait time from the raw TFMX command at this row
-      const offsetMap = channelOffsetMaps[patIdx]?.[0]; // use channel 0 as timing reference
-      if (offsetMap && row < offsetMap.length && offsetMap[row] >= 0) {
-        const cmdOff = offsetMap[row];
-        if (cmdOff >= 0 && cmdOff + 3 < buf.length) {
-          const b0 = buf[cmdOff];
-          const b1 = buf[cmdOff + 1];
-          const b3 = buf[cmdOff + 3];
-          if (b0 >= 0xF0 && (b0 & 0x0F) === 3) {
-            // F3: wait (b1 + 1) jiffies
-            cumulativeJiffies += b1 + 1;
-          } else if (b0 >= 0x80 && b0 < 0xC0) {
-            // Note with wait: b3 + 1 jiffies
-            cumulativeJiffies += b3 + 1;
-          } else {
-            // Immediate command (no wait) — 1 jiffy minimum for display
-            cumulativeJiffies += 1;
-          }
-        } else {
-          cumulativeJiffies += 1;
-        }
-      } else {
-        cumulativeJiffies += 1;
-      }
+    const ticks = gridRowTicks[patIdx] ?? [];
+    for (let row = 0; row < ticks.length; row++) {
+      tfmxTimingTable.push({ patternIndex: patIdx, row, cumulativeJiffies: cumulativeJiffies + ticks[row] });
     }
+    cumulativeJiffies += (ticks[ticks.length - 1] ?? 0) + 1;
   }
 
   // 8. Determine initial BPM/speed from tempo value
@@ -868,6 +862,7 @@ export function parseTFMXFile(
     macroPointerTableOffset: macroPtrTable,
     trackstepOffset: trackstepOff,
     gridSteps,
+    gridRowTicks,
   };
 
   return {

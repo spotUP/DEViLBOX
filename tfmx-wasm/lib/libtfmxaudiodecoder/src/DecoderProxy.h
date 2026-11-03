@@ -79,7 +79,7 @@ class DecoderProxy {
     void previewStop();
 
     /** DEViLBOX extension: forward to the underlying decoder. */
-    bool getPlayPosition(int& step, udword& offset);
+    bool getPlayPosition(int& step, udword& offset, int& wait);
     bool walkEnable(bool on);
     int walkCount();
     const int* walkData();

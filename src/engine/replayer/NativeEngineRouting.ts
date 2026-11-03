@@ -679,7 +679,7 @@ export async function startNativeEngines(
             const { uadePatternLayout: layout, tfmxNative } = useFormatStore.getState();
             if (!layout || !tfmxNative) return;
             const patterns = useTrackerStore.getState().patterns;
-            const at = tfmxGridPositionAt(layout, tfmxNative.gridSteps, (p) => patterns[p]?.length ?? 0, u.step, u.patternOffset);
+            const at = tfmxGridPositionAt(layout, tfmxNative.gridSteps, tfmxNative.gridRowTicks, (p) => patterns[p]?.length ?? 0, u.step, u.patternOffset, u.wait ?? -1);
             if (at) reportEnginePosition(desc.key, at.row, at.pattern);
           }));
         }
