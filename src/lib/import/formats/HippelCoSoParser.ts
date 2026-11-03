@@ -563,8 +563,7 @@ export async function parseHippelCoSoFile(
   const trackerPatterns: Pattern[] = [];
   const songStepCount = Math.floor(song.length / 12);
 
-  // We'll create one TrackerSong pattern per song step.
-  // Each pattern has a fixed length of 16 rows (standard Amiga-style).
+  // One TrackerSong pattern per song position, as long as the position lasts in replayer steps (one row per step).
   const ROWS_PER_PATTERN = COSO_ROWS_PER_STEP;
 
   // One grid (and the byte span behind every cell) from the file's own steps.
@@ -575,7 +574,7 @@ export async function parseHippelCoSoFile(
     trackerPatterns.push({
       id: `pattern-${stepIdx}`,
       name: `Pattern ${stepIdx}`,
-      length: ROWS_PER_PATTERN,
+      length: channelRows[0].length,
       channels: channelRows.map((rows, ch) => ({
         id: `channel-${ch}`,
         name: `Channel ${ch + 1}`,
@@ -670,9 +669,9 @@ export async function parseHippelCoSoFile(
   };
 
   const moduleName = filename.replace(/\.[^/.]+$/, '');
-  // CoSo speed = VBlanks per row.  With initialSpeed=6 (MOD ticks/row):
-  //   rows/sec = 50/cosoSpeed = (BPM * 2/5) / 6  →  BPM = 750 / cosoSpeed
-  const speedBPM   = Math.round(song.speed > 0 ? (750.0 / song.speed) : 125);
+  // One grid row is one replayer step of song.speed vblanks at 50 Hz. With BPM 125 a tracker tick is 20 ms, so a row
+  // of `initialSpeed` ticks lasts song.speed vblanks when initialSpeed = song.speed.
+  const stepSpeed = Math.max(1, Math.min(31, song.speed || 6));
 
   return {
     name: `${moduleName} [Hippel CoSo]`,
@@ -683,8 +682,8 @@ export async function parseHippelCoSoFile(
     songLength: trackerPatterns.length,
     restartPosition: 0,
     numChannels: 4,
-    initialSpeed: 6,
-    initialBPM: Math.max(32, Math.min(255, speedBPM)),
+    initialSpeed: stepSpeed,
+    initialBPM: 125,
     linearPeriods: false,
     hippelFileData: buffer.slice(0),
     uadeVariableLayout: variableLayout,
@@ -770,7 +769,10 @@ export function mapHippelCoSoCells(buf: Uint8Array, instrumentCount: number, sub
   return decodeCoSoGrid(buf, patternsOff, song.pointer, Math.floor(song.length / 12), instrumentCount).spans;
 }
 
-/** Grid rows per CoSo track step: one row per pattern event. */
+/**
+ * The CoSo layout's nominal rows per block (the encoder's row count). The display grid is not this long: its patterns
+ * are as long as the position lasts in replayer steps (decodeCoSoGrid).
+ */
 const COSO_ROWS_PER_STEP = 16;
 
 /** The CoSo note index that `cosoNoteToXM(index, 0)` shows as `xmNote`, or null. */
@@ -780,12 +782,19 @@ export function cosoIndexForXM(xmNote: number): number | null {
 }
 
 /**
- * Decode subsong steps into grid rows, recording each cell's byte span.
+ * Decode subsong steps into a time-aligned grid: one grid row is one replayer step (song.speed vblanks), one song
+ * position is one grid pattern.
  *
- * One row per pattern event, up to 16 per step. A note event is its note byte,
- * an info byte (low five bits: volume sequence = instrument - 1) and, when the
- * info byte's top bits are set, one more byte. The step adds its track
- * transpose to every note, so writing a cell back subtracts it again.
+ * Each voice is independent in the replayer (hippel.c step_voice): an event lasts (row speed + 1) steps, where the row
+ * speed is the last FE n / FD n read and stays in force across patterns and positions. A note event is its note byte,
+ * an info byte (low five bits: volume sequence = instrument - 1) and, when the info byte's top bits are set, one more
+ * byte. The event sits on the row of the step it starts on; the steps it holds are empty rows with no bytes behind
+ * them. FE n takes no time of its own (it is read on into the next event, so its bytes belong to that event's span);
+ * FD n is an empty row that lasts n + 1 steps. The row speed is therefore not shown in the cells: it is the spacing
+ * of the events. A position lasts as long as its longest voice (equal for every voice in practice); a shorter voice
+ * is padded with empty rows.
+ *
+ * The step adds its track transpose to every note, so writing a cell back subtracts it again.
  */
 export function decodeCoSoGrid(
   buf: Uint8Array,
@@ -800,69 +809,74 @@ export function decodeCoSoGrid(
   // a new one. The replayer treats a byte above 127 as a position command
   // (volume fade, speed, stop) that leaves the transpose as it was.
   const soundTransp = [0, 0, 0, 0];
+  // Each voice's row speed (FE n / FD n): it carries over into the next pattern and position. The replayer starts at 0.
+  const rowSpeed = [0, 0, 0, 0];
   for (let stepIdx = 0; stepIdx < stepCount; stepIdx++) {
     const stepBase = songPointer + stepIdx * 12;
+    const voices: { row: number; cell: TrackerCell; span: HippelCellSpan }[][] = [[], [], [], []];
+    const lasts = [0, 0, 0, 0];
+    for (let ch = 0; ch < 4; ch++) {
+      const chBase = stepBase + ch * 3;
+      if (chBase + 3 > buf.length) continue;
+      const patIdx = u8(buf, chBase);
+      const trackTransp = s8(buf, chBase + 1);
+      if (buf[chBase + 2] <= 127) soundTransp[ch] = buf[chBase + 2];
+      const sndT = soundTransp[ch];
+      const patPtrOff = patternsOff + patIdx * 2;
+      let pos = patPtrOff + 2 <= buf.length ? u16BE(buf, patPtrOff) : 0;
+      let at0 = -1; // where the speed changes (FE n) read since the last event start: they belong to the event after them
+      let time = 0;
+      while (pos < buf.length) {
+        const v = s8(buf, pos);
+        const at = at0 >= 0 ? at0 : pos;
+        const eventAt = pos;
+        if (v === -1) break; // end of pattern
+        if (v === -2) {
+          at0 = at;
+          rowSpeed[ch] = pos + 1 < buf.length ? buf[pos + 1] : 0;
+          pos += 2;
+        } else if (v === -3) {
+          // FD n: set the row speed and wait; an empty row of n + 1 steps.
+          rowSpeed[ch] = pos + 1 < buf.length ? buf[pos + 1] : 0;
+          pos += 2;
+          at0 = -1;
+          const baseline = emptyCell();
+          voices[ch].push({ row: time, cell: baseline, span: cosoSpan(at, pos - at, eventAt, baseline, trackTransp, false, sndT) });
+          time += rowSpeed[ch] + 1;
+        } else {
+          // Every other byte is a note event (hippel.c step_voice). Bit 7 set: the pitch
+          // changes without an instrument trigger, so the cell shows the note and no instrument.
+          const noTrigger = v < 0;
+          at0 = -1;
+          pos++;
+          let infoVal = 0;
+          if (pos < buf.length) { infoVal = s8(buf, pos); pos++; }
+          if ((infoVal & 0xE0) !== 0 && pos < buf.length) pos++; // infoPrev
+          // The replayer plays envelope (info & 31) + sound transpose, byte
+          // wrapped, and falls back to envelope 0 when that is past the table.
+          const envIdx = ((infoVal & 31) + sndT) & 0xFF;
+          const instrNum = noTrigger ? 0 : envIdx < instrumentCount ? envIdx + 1 : 1;
+          const baseline: TrackerCell = {
+            note: cosoNoteToXM(v & 0x7F, trackTransp),
+            instrument: instrNum,
+            volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+          };
+          voices[ch].push({ row: time, cell: baseline, span: cosoSpan(at, pos - at, eventAt, baseline, trackTransp, true, sndT) });
+          time += rowSpeed[ch] + 1;
+        }
+      }
+      lasts[ch] = time;
+    }
+    const length = Math.max(1, ...lasts);
     const stepRows: TrackerCell[][] = [];
     const stepSpans: (HippelCellSpan | null)[][] = [];
     for (let ch = 0; ch < 4; ch++) {
-      const chRows: TrackerCell[] = [];
-      const chSpans: (HippelCellSpan | null)[] = [];
-      const chBase = stepBase + ch * 3;
-      if (chBase + 3 <= buf.length) {
-        const patIdx = u8(buf, chBase);
-        const trackTransp = s8(buf, chBase + 1);
-        if (buf[chBase + 2] <= 127) soundTransp[ch] = buf[chBase + 2];
-        const sndT = soundTransp[ch];
-        const patPtrOff = patternsOff + patIdx * 2;
-        let pos = patPtrOff + 2 <= buf.length ? u16BE(buf, patPtrOff) : 0;
-        // Where the speed changes (FE n) read since the last row start: they take no time of their own, so
-        // they belong to the row of the event that follows them (hippel.c step_voice reads on in the same step).
-        let speedFrom = -1;
-        let speedN = -1; // the last FE n read since the last row start; -1 = none
-        while (chRows.length < COSO_ROWS_PER_STEP && pos < buf.length) {
-          const v = s8(buf, pos);
-          const at = speedFrom >= 0 ? speedFrom : pos;
-          const eventAt = pos;
-          if (v === -1) break; // end of pattern
-          if (v === -2) {
-            speedFrom = at;
-            speedN = pos + 1 < buf.length ? buf[pos + 1] : 0;
-            pos += 2;
-          } else if (v === -3) {
-            // FD n: the row speed n is the row's speed effect (n = 0 is the plain empty row).
-            const fdN = pos + 1 < buf.length ? buf[pos + 1] : 0;
-            pos += 2;
-            speedFrom = -1;
-            speedN = -1;
-            const baseline = fdN > 0 ? speedCell(emptyCell(), fdN) : emptyCell();
-            chRows.push(baseline);
-            chSpans.push(cosoSpan(at, pos - at, eventAt, baseline, trackTransp, false, sndT));
-          } else {
-            // Every other byte is a note event (hippel.c step_voice). Bit 7 set: the pitch
-            // changes without an instrument trigger, so the cell shows the note and no instrument.
-            const noTrigger = v < 0;
-            speedFrom = -1;
-            const feN = speedN;
-            speedN = -1;
-            pos++;
-            let infoVal = 0;
-            if (pos < buf.length) { infoVal = s8(buf, pos); pos++; }
-            if ((infoVal & 0xE0) !== 0 && pos < buf.length) pos++; // infoPrev
-            // The replayer plays envelope (info & 31) + sound transpose, byte
-            // wrapped, and falls back to envelope 0 when that is past the table.
-            const envIdx = ((infoVal & 31) + sndT) & 0xFF;
-            const instrNum = noTrigger ? 0 : envIdx < instrumentCount ? envIdx + 1 : 1;
-            const baseline = speedCell({
-              note: cosoNoteToXM(v & 0x7F, trackTransp),
-              instrument: instrNum,
-              volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-            }, feN);
-            chRows.push(baseline);
-            chSpans.push(cosoSpan(at, pos - at, eventAt, baseline, trackTransp, true, sndT));
-          }
-        }
+      const chRows: TrackerCell[] = Array.from({ length }, () => emptyCell());
+      const chSpans: (HippelCellSpan | null)[] = new Array(length).fill(null);
+      for (const e of voices[ch]) {
+        chRows[e.row] = e.cell;
+        chSpans[e.row] = e.span;
       }
-      while (chRows.length < COSO_ROWS_PER_STEP) { chRows.push(emptyCell()); chSpans.push(null); }
       stepRows.push(chRows);
       stepSpans.push(chSpans);
     }
@@ -876,7 +890,7 @@ export function decodeCoSoGrid(
  * A span holding a note event (`isNote`) or a -3 (FD) command, with the -2 (FE)
  * speed changes in front of it (`offset` .. `eventAt`). FE takes no time: it is
  * read with the event after it in the same step, so it is no row of its own. FD
- * is a row (speed change and wait one step), shown as an empty row. CoSo has no
+ * is a row (speed change and wait), shown as an empty row. CoSo has no
  * rest byte either. So only a note event can be rewritten, only with another
  * note, and a note keeps the info byte's top bits (and so its length).
  */
@@ -886,12 +900,10 @@ function cosoSpan(
   return {
     offset, length, baseline,
     encode(cell, file) {
-      // The row speed is the cell's speed effect. n of 0 / none on a note row is no FE byte.
-      const wantSpeed = cell.effTyp === COSO_SPEED_EFFECT ? cell.eff ?? 0 : 0;
       if (!isNote) {
-        // FD n is the whole row: only the speed can change, and only on a row that stays empty.
-        if ((cell.note ?? 0) !== 0 || (cell.instrument ?? 0) !== 0 || wantSpeed > 0xFF) return null;
-        return new Uint8Array([0xFD, wantSpeed]);
+        // FD n is the whole row (its speed is the spacing of the events, not a cell field): it stays an empty row.
+        if ((cell.note ?? 0) !== 0 || (cell.instrument ?? 0) !== 0) return null;
+        return file.slice(offset, offset + length);
       }
       if ((cell.note ?? 0) === 0) return null;
       const idx = cosoIndexForXM(cell.note);
@@ -908,16 +920,8 @@ function cosoSpan(
       const low = inst > 0 && !noTrigger ? (inst - 1 - soundTransp) & 0xFF : oldInfo & 31;
       if (low > 31) return null;
       const info = (oldInfo & 0xE0) | low;
-      // The speed changes in front of the event stay as they are.
+      // The speed changes (FE n) in front of the event stay as they are: the row speed is not a cell field.
       const prefix = [...file.subarray(offset, eventAt)];
-      // The last FE n in front of the event is the row's speed. A changed speed is written into that byte; adding or
-      // removing an FE would change the span length, which the in-place patch refuses (null) so the rebuild takes over.
-      const feAt = prefix.length - 1;
-      const haveSpeed = feAt >= 1 && prefix[feAt - 1] === 0xFE;
-      if (haveSpeed) {
-        if (wantSpeed > 0xFF || (wantSpeed === 0 && prefix[feAt] !== 0)) return null;
-        prefix[feAt] = wantSpeed;
-      } else if (wantSpeed > 0) return null;
       const out = [...prefix, noteByte, info];
       if ((info & 0xE0) !== 0) out.push(file[eventAt + 2]);
       return out.length === length ? new Uint8Array(out) : null;
@@ -926,14 +930,6 @@ function cosoSpan(
 }
 
 // ── Helper functions ─────────────────────────────────────────────────────────
-
-/** The effect type that carries a CoSo row speed (FE n / FD n) in the grid; the effect value is n. */
-export const COSO_SPEED_EFFECT = 0x0F;
-
-/** `cell` showing row speed `n` (VBlanks per row) in its effect column; n < 0 = no speed byte. */
-function speedCell(cell: TrackerCell, n: number): TrackerCell {
-  return n < 0 ? cell : { ...cell, effTyp: COSO_SPEED_EFFECT, eff: n };
-}
 
 function emptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };

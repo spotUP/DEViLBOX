@@ -186,15 +186,15 @@ describe('a Hippel song', { timeout: 60000 }, () => {
     useInstrumentStore.setState({ instruments: song.instruments });
     useFormatStore.setState({ hippelFileData: song.hippelFileData });
     useTrackerStore.getState().loadPatterns(structuredClone(song.patterns));
-    useTrackerStore.getState().setCurrentPattern(0);
-    const noteAt = () => useTrackerStore.getState().patterns[0].channels[0].rows[1].note;
+    useTrackerStore.getState().setCurrentPattern(1);
+    const noteAt = () => useTrackerStore.getState().patterns[1].channels[0].rows[0].note;
     const was = noteAt();
 
     vi.useFakeTimers();
-    useTrackerStore.getState().setCell(0, 1, { note: 49 });
+    useTrackerStore.getState().setCell(0, 0, { note: 49 });
     expect(noteAt(), 'B-3 + 1 is not stored').toBe(was);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('B-3'));
-    useTrackerStore.getState().setCell(0, 1, { note: 48 });
+    useTrackerStore.getState().setCell(0, 0, { note: 48 });
     expect(noteAt(), 'B-3 itself is stored').toBe(48);
     vi.useRealTimers();
     warn.mockRestore();
