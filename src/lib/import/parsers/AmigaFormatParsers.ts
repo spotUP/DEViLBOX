@@ -2843,6 +2843,18 @@ export async function tryRouteFormat(
       'DavidHanneyParser', { injectUADE: true });
   }
 
+  // ── EMS (Editeur Musical Sequentiel; EMS.* prefix) ────────────────────────
+  // Native parser decodes the 64-row patterns; EMS v6 shares the extension and falls through to UADE.
+  if (matchesExt(filename, ['ems'])) {
+    const { isEMSFormat, parseEMSFile } = await import('@lib/import/formats/EMSParser');
+    return withNativeThenUADE('ems', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        if (isEMSFormat(buf)) return parseEMSFile(buf instanceof Uint8Array ? buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer : buf as ArrayBuffer, name);
+        return null;
+      },
+      'EMSParser', { injectUADE: true });
+  }
+
   // ── ArtAndMagic (.aam / AAM.*) ───────────────────────────────────────────
   // Stub parser for title + UADE classic audio.
   if (matchesExt(filename, ['aam'])) {
