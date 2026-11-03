@@ -2309,6 +2309,19 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
 
+  // ── Dynamic Synthesizer (dns.*) ──────────────────────────────────────────
+  {
+    key: 'dynamicSynthesizer',
+    label: 'Dynamic Synthesizer',
+    description: 'Dynamic Synthesizer (dns.*) - read-only command-stream grid, nuade / UADE plays the module',
+    family: 'amiga-native',
+    matchMode: 'prefix',
+    prefixes: ['dns.'],
+    prefKey: 'dynamicsynthesizer',
+    nativeParser: { module: '@lib/import/formats/DynamicSynthesizerParser', parseFn: 'parseDynamicSynthesizerFile', detectFn: 'isDynamicSynthesizerFormat' },
+    uadeFallback: true,
+  },
+
   // ── SynthDream (sdr.* prefix) ────────────────────────────────────────────
   {
     key: 'synthDream',
@@ -2496,7 +2509,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     ['ast', 'ActionAmics prefix'],
     ['bfc', 'FutureComposer-BSI'], ['bsi', 'BSI'], ['fc-bsi', 'FC-BSI'],
     ['cus', 'Custom'], ['cust', 'Custom'], ['custom', 'Custom'],
-    ['dh', 'David Hanney'], ['dns', 'Dynamic Synthesizer'], ['dz', 'Darius Zendeh'],
+    ['dh', 'David Hanney'], ['dz', 'Darius Zendeh'],
     ['mkiio', 'Mark II (O)'],
     ['mg', 'MG'], ['ems', 'EMS'], ['emsv6', 'EMS v6'],
     ['fw', 'Forgotten Worlds'],

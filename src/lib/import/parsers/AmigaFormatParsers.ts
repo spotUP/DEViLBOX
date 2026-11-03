@@ -2531,8 +2531,14 @@ export async function tryRouteFormat(
 
   // ── Dynamic Synthesizer (.dns) ────────────────────────────────────────────
   if (matchesExt(filename, ['dns'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['dns']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
+    // read-only command-stream grid (dynamicSynthesizerGrid.ts); UADE keeps playing the module
+    const dnsCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['dns']) };
+    const { parseDynamicSynthesizerFile } =
+      await import('@lib/import/formats/DynamicSynthesizerParser');
+    return withNativeThenUADE('dynamicsynthesizer', dnsCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) =>
+        parseDynamicSynthesizerFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name),
+      'DynamicSynthesizerParser', { injectUADE: true });
   }
 
   // ── Voodoo Supreme Synthesizer (.vss) ─────────────────────────────────────
