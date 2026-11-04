@@ -48,6 +48,8 @@ export interface CellHit {
   columnType: CellColumnType;
   noteColumnIndex: number;
   digitIndex: number;
+  /** Effect columns only: 0-based index of the effect column hit (columnType collapses columns 1.. into 'effTyp2'). */
+  effectColumnIndex?: number;
 }
 
 export function resolveCellColumn(input: CellHitInput): CellHit {
@@ -94,12 +96,12 @@ export function resolveCellColumn(input: CellHitInput): CellHit {
     const paramDigit = nibbleOf(xInEff - CW * typDigits, 2);
     if (effCol === 0) {
       return onType
-        ? { columnType: 'effTyp', noteColumnIndex: 0, digitIndex: typeDigit }
-        : { columnType: 'effParam', noteColumnIndex: 0, digitIndex: paramDigit };
+        ? { columnType: 'effTyp', noteColumnIndex: 0, digitIndex: typeDigit, effectColumnIndex: 0 }
+        : { columnType: 'effParam', noteColumnIndex: 0, digitIndex: paramDigit, effectColumnIndex: 0 };
     }
     return onType
-      ? { columnType: 'effTyp2', noteColumnIndex: 0, digitIndex: typeDigit }
-      : { columnType: 'effParam2', noteColumnIndex: 0, digitIndex: paramDigit };
+      ? { columnType: 'effTyp2', noteColumnIndex: 0, digitIndex: typeDigit, effectColumnIndex: effCol }
+      : { columnType: 'effParam2', noteColumnIndex: 0, digitIndex: paramDigit, effectColumnIndex: effCol };
   }
 
   if (input.hasAcid && xInParams < effectsWidth + CW * 2 + 8) {

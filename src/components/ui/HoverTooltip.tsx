@@ -53,6 +53,11 @@ export interface HoverTooltip {
   hoverProps: (label: string) => HoverTooltipProps;
   /** Render once, anywhere. Null while nothing is hovered. */
   tooltip: React.ReactNode;
+  /**
+   * Show a tooltip anchored to a rectangle that is not a DOM element (a cell inside a canvas).
+   * Same portal, flip and dismissal rules as hoverProps. Lines split on newline.
+   */
+  showAt: (label: string, anchor: { left: number; width: number; top: number; bottom: number }) => void;
   /** Hide immediately — for a click that opens a menu, or a panic. */
   hide: () => void;
 }
@@ -72,6 +77,12 @@ export function useHoverTooltip(): HoverTooltip {
     onMouseLeave: hide,
     'aria-label': label,
   }), [hide]);
+
+  const showAt = useCallback((label: string, a: { left: number; width: number; top: number; bottom: number }) => {
+    setState((prev) => (prev && prev.label === label && prev.x === a.left + a.width / 2 && prev.top === a.top
+      ? prev
+      : { label, x: a.left + a.width / 2, top: a.top, bottom: a.bottom }));
+  }, []);
 
   // A pointer press, a scroll or a key means the pointer is no longer telling
   // the truth about what is under it. Capture phase, because a handler on the
@@ -104,7 +115,7 @@ export function useHoverTooltip(): HoverTooltip {
       <div
         ref={nodeRef}
         role="tooltip"
-        className="fixed z-[100] pointer-events-none max-w-xs px-2 py-1 rounded border border-dark-borderLight bg-dark-bg text-text-primary text-xs font-mono shadow-lg"
+        className="fixed z-[100] pointer-events-none max-w-xs whitespace-pre-line px-2 py-1 rounded border border-dark-borderLight bg-dark-bg text-text-primary text-xs font-mono shadow-lg"
         style={{
           left: state.x,
           top: y,
@@ -117,5 +128,5 @@ export function useHoverTooltip(): HoverTooltip {
     );
   }
 
-  return { hoverProps, tooltip, hide };
+  return { hoverProps, showAt, tooltip, hide };
 }
