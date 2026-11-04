@@ -21,7 +21,7 @@ interface FileBrowserProps {
   onClose: () => void;
   /** Song / project loads. Not used in pick-file mode (onPickFile set). */
   onLoad?: (data: object, filename: string) => void;
-  onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => Promise<void>;
+  onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>, sourceKey?: string) => Promise<void>;
   onSave?: (getData: () => object) => void;
   mode?: 'load' | 'save';
   currentProjectData?: () => object;

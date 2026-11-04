@@ -40,7 +40,7 @@ import { AuthModal } from '@/components/dialogs/AuthModal';
 
 interface ModlandPanelProps {
   isOpen: boolean;
-  onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => Promise<void>;
+  onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>, sourceKey?: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -138,7 +138,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
         const buffer = await downloadModlandFile(file.full_path, modlandProgress.report(file.full_path));
         const companions = await acquireModlandCompanions(file.full_path, buffer);
 
-        await onLoadTrackerModule(buffer, file.filename, companions);
+        await onLoadTrackerModule(buffer, file.filename, companions, ratingId('modland', file.full_path));
         onClose();
       } catch (err) {
         setModlandError(err instanceof Error ? err.message : 'Failed to download');
@@ -308,7 +308,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
 
 interface HVSCPanelProps {
   isOpen: boolean;
-  onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string) => Promise<void>;
+  onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>, sourceKey?: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -417,7 +417,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
       try {
         const buffer = await downloadHVSCFile(entry.path);
         const filename = entry.path.split('/').pop() || entry.name;
-        await onLoadTrackerModule(buffer, filename);
+        await onLoadTrackerModule(buffer, filename, undefined, ratingId('hvsc', entry.path));
         onClose();
       } catch (err) {
         setHvscError(err instanceof Error ? err.message : 'Failed to download');
@@ -685,7 +685,7 @@ function modarchiveToResult(f: ModArchiveFile): OnlineResult {
 
 interface OnlinePanelProps {
   isOpen: boolean;
-  onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => Promise<void>;
+  onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>, sourceKey?: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -874,7 +874,7 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
     setError(null);
     try {
       const { buffer, filename, companions } = await downloadItem(item, downloadProgress.report(item.key));
-      await onLoadTrackerModule(buffer, filename, companions);
+      await onLoadTrackerModule(buffer, filename, companions, item.source === 'modarchive' ? undefined : ratingId(item.source, item.key));
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to download');
