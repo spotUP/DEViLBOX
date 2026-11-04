@@ -1,7 +1,7 @@
 ---
 date: 2026-11-04
 topic: TW (Tony Williams / Sound Images) editability, phase 1 findings
-status: plan only, no parser written
+status: phase 2 built for future basketball (same-length edits); relocation and variants open
 ---
 
 # TW editability, phase 1
@@ -88,3 +88,13 @@ Table decode: dispatch table words at 0x31a (21 entries, 0x80-0x94), jump = 0x31
 5. Test: real-song round trip (edit a note -> export -> reparse, assert bytes identical outside the edit), on
    future basketball + blinkys + chuckie egg 2; one reachability test via the import entry point with call sentinel.
 Size estimate: parser ~500 lines + grid/edits/glyphs ~400 + test ~150; 1-2 agent days; relocation on growth is the risk.
+
+## Phase 2 results (2026-11-04)
+RESOLVED: 0x82 operand is the loop word in the voice LIST after the 0x0000 terminator, not in the stream.
+List = first-block word, block words..., 0, loop word (all relative to the base). Song count = (first list offset of record 0)/10 (2 in future basketball).
+Base: scan for `c0fc 000a` then `43fb` lea; base = ext-word PC + int8. Instrument table: same scan with `c0fc 000c`, 12 bytes per entry, D0-DF index = b-0xD0 (max 16).
+Pitch: 36-word PT period table at 0x634, index (byte+transpose)&63, tracker note = 13+index. Duration E0-FF sticky = b-0xDF ticks. Operand lengths: 82:2(list) 84:2 87:1 88:3 89:5 8B:3 8C:3 C0-CF:3, rest 0.
+Built: tonyWilliamsWalk/Grid/Edits/EffectGlyphs (effTyp block 0x90..0x9F), TonyWilliamsParser, TonyWilliamsEncoder, TonyWilliamsExporter, `tw` branch in AmigaFormatParsers, glyph hooks in xmConversions + both renderers, corpus test.
+Edits written back same-length: note (shifts note byte), instrument (D0 byte), duration/volume/envelope/arp command byte, one-byte operand of 84/87/88/89.
+OPEN: length-changing edits need list/block relocation (all offsets base-relative words; the code is fused with data, so growth moves the sample data at 0x1404 unless padded). Instruments are placeholders (no sample extraction, UADE plays). Subsong >0 wired through parser arg only.
+Variants: blinkys scary school-sfx and chuckie egg 2 (`6000 xxxx`) need the base locator verified (same muluw scan may fail if the init differs) and their pitch/instrument tables re-derived; warinthegulf (`b27a 003c`) is a different player: needs its own disassembly pass (header, song table, opcode table).
