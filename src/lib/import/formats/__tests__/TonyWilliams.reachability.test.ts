@@ -39,9 +39,11 @@ describe('Tony Williams reachability', () => {
     expect(song.initialBPM).toBe(125);
     // No invented instrument names: the file names none.
     expect(song.instruments.every((i) => i.name === '')).toBe(true);
-    // Regression: plays wrong once synced. UADE plays the whole song, but the 16 placeholder instruments stayed
-    // 'Synth', counted as replaced, and the engine-driven rows fired Tone notes on top of UADE.
-    expect(song.instruments.every((i) => i.synthType === 'UADEEditableSynth')).toBe(true);
+    // Regression: "future basketball main is not complete, it has no individual synth instruments". The import
+    // used to hold 16 empty placeholders; each used table entry is now its own sample instrument with real PCM, and
+    // the engine-driven rows still fire no Tone notes on top of UADE.
+    expect(song.instruments.length).toBeGreaterThan(0);
+    expect(song.instruments.every((i) => i.synthType === 'Sampler' && (i.sample?.audioBuffer?.byteLength ?? 0) > 44)).toBe(true);
     expect(song.instruments.some((i) => isReplacedInstrument(i, false))).toBe(false);
     const out = new Uint8Array(await (await exportTonyWilliams(song)).data.arrayBuffer());
     expect(Buffer.from(out).equals(raw)).toBe(true);
