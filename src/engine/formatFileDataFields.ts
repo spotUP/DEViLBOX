@@ -130,3 +130,18 @@ export function moduleHeldIn(holder: ModuleHolder, field: string): ArrayBuffer |
   if (own instanceof ArrayBuffer) return own;
   return holder.nuadeFileData && holder.nuadeModuleFields?.includes(field) ? holder.nuadeFileData : null;
 }
+
+/**
+ * The bytes of the module the loaded song was opened from: the first FILE_DATA_FIELDS entry that holds any. Each format's
+ * module field sits before its companion banks in the list, so the module wins over a companion. Returns the stored
+ * buffer or view itself (no copy), so a store selector over it stays referentially stable.
+ */
+export function heldModuleBytes(holder: object): ArrayBuffer | Uint8Array | null {
+  const rec = holder as Record<string, unknown>;
+  for (const field of FILE_DATA_FIELDS) {
+    const v = rec[field];
+    if (v instanceof ArrayBuffer && v.byteLength > 0) return v;
+    if (v instanceof Uint8Array && v.byteLength > 0) return v;
+  }
+  return null;
+}
