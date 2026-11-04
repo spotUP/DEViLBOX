@@ -31,13 +31,7 @@ import {
   getFeaturedTunes,
   type HVSCEntry,
 } from '@/lib/hvscApi';
-import {
-  batchGetRatings,
-  setRating,
-  removeRating,
-  type RatingMap,
-} from '@/lib/ratingsApi';
-import { useRatingsStore } from '@/stores/useRatingsStore';
+import { useRatingsStore, ratingId } from '@/stores/useRatingsStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { StarRating } from '@/components/shared/StarRating';
 import { AuthModal } from '@/components/dialogs/AuthModal';
@@ -65,7 +59,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
   const [modlandHasMore, setModlandHasMore] = useState(false);
   const [modlandDownloading, setModlandDownloading] = useState<Set<string>>(new Set());
   const modlandProgress = useDownloadProgress();
-  const [modlandRatings, setModlandRatings] = useState<RatingMap>({});
+  const modlandRatings = useRatingsStore((s) => s.ratings);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const isLoggedIn = useAuthStore(s => !!s.token);
   const modlandSearchTimer = useRef<ReturnType<typeof setTimeout>>(null);
@@ -105,9 +99,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
         // Fetch ratings
         const keys = data.results.map(r => r.full_path);
         if (keys.length > 0) {
-          batchGetRatings('modland', keys).then(r => {
-            setModlandRatings(prev => append ? { ...prev, ...r } : r);
-          }).catch(() => {});
+          void useRatingsStore.getState().loadMany('modland', keys);
         }
       } catch (err) {
         setModlandError(err instanceof Error ? err.message : 'Search failed');
@@ -164,17 +156,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
 
   const handleModlandRate = useCallback(async (key: string, star: number) => {
     if (!isLoggedIn) { setShowAuthModal(true); return; }
-    try {
-      if (star === 0) {
-        const res = await removeRating('modland', key);
-        useRatingsStore.getState().record('modland', key, { avg: res.avg, count: res.count });
-        setModlandRatings(prev => ({ ...prev, [key]: { avg: res.avg, count: res.count } }));
-      } else {
-        const res = await setRating('modland', key, star);
-        useRatingsStore.getState().record('modland', key, { avg: res.avg, count: res.count, userRating: res.userRating });
-        setModlandRatings(prev => ({ ...prev, [key]: { avg: res.avg, count: res.count, userRating: res.userRating } }));
-      }
-    } catch { /* ignore */ }
+    await useRatingsStore.getState().rate('modland', key, star);
   }, [isLoggedIn]);
 
   return (
@@ -261,7 +243,7 @@ export const ModlandPanel: React.FC<ModlandPanelProps> = ({ isOpen, onLoadTracke
 
                   {/* Star rating */}
                   {(() => {
-                    const r = modlandRatings[file.full_path];
+                    const r = modlandRatings[ratingId('modland', file.full_path)];
                     const avg = r?.avg ?? file.avg_rating ?? 0;
                     const count = r?.count ?? file.vote_count ?? 0;
                     return (
@@ -338,7 +320,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
   const [hvscQuery, setHvscQuery] = useState('');
   const [hvscSearchResults, setHvscSearchResults] = useState<HVSCEntry[]>([]);
   const [hvscDownloading, setHvscDownloading] = useState<Set<string>>(new Set());
-  const [hvscRatings, setHvscRatings] = useState<RatingMap>({});
+  const hvscRatings = useRatingsStore((s) => s.ratings);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const isLoggedIn = useAuthStore(s => !!s.token);
   const hvscSearchRef = useRef<HTMLInputElement>(null);
@@ -355,7 +337,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
           setHvscEntries(tunes);
           setHvscError(null);
           const keys = tunes.filter(t => !t.isDirectory).map(t => t.path);
-          if (keys.length > 0) batchGetRatings('hvsc', keys).then(r => setHvscRatings(prev => ({ ...prev, ...r }))).catch(() => {});
+          if (keys.length > 0) void useRatingsStore.getState().loadMany('hvsc', keys);
         })
         .catch((err) => {
           setHvscError(err instanceof Error ? err.message : 'Failed to load featured tunes');
@@ -377,7 +359,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
       setHvscQuery('');
       setHvscSearchResults([]);
       const keys = result.entries.filter((e: HVSCEntry) => !e.isDirectory).map((e: HVSCEntry) => e.path);
-      if (keys.length > 0) batchGetRatings('hvsc', keys).then(r => setHvscRatings(prev => ({ ...prev, ...r }))).catch(() => {});
+      if (keys.length > 0) void useRatingsStore.getState().loadMany('hvsc', keys);
     } catch (err) {
       setHvscError(err instanceof Error ? err.message : 'Failed to browse directory');
     } finally {
@@ -406,7 +388,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
       // Fetch ratings
       const keys = results.filter(e => !e.isDirectory).map(e => e.path);
       if (keys.length > 0) {
-        batchGetRatings('hvsc', keys).then(setHvscRatings).catch(() => {});
+        void useRatingsStore.getState().loadMany('hvsc', keys);
       }
     } catch (err) {
       setHvscError(err instanceof Error ? err.message : 'Search failed');
@@ -461,17 +443,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
 
   const handleHvscRate = useCallback(async (key: string, star: number) => {
     if (!isLoggedIn) { setShowAuthModal(true); return; }
-    try {
-      if (star === 0) {
-        const res = await removeRating('hvsc', key);
-        useRatingsStore.getState().record('hvsc', key, { avg: res.avg, count: res.count });
-        setHvscRatings(prev => ({ ...prev, [key]: { avg: res.avg, count: res.count } }));
-      } else {
-        const res = await setRating('hvsc', key, star);
-        useRatingsStore.getState().record('hvsc', key, { avg: res.avg, count: res.count, userRating: res.userRating });
-        setHvscRatings(prev => ({ ...prev, [key]: { avg: res.avg, count: res.count, userRating: res.userRating } }));
-      }
-    } catch { /* ignore */ }
+    await useRatingsStore.getState().rate('hvsc', key, star);
   }, [isLoggedIn]);
 
   return (
@@ -545,7 +517,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
 
                     {/* Star rating */}
                     {!entry.isDirectory && (() => {
-                      const r = hvscRatings[entry.path];
+                      const r = hvscRatings[ratingId('hvsc', entry.path)];
                       const avg = r?.avg ?? entry.avg_rating ?? 0;
                       const count = r?.count ?? entry.vote_count ?? 0;
                       return (
@@ -633,7 +605,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
 
                     {/* Star rating */}
                     {!entry.isDirectory && (() => {
-                      const r = hvscRatings[entry.path];
+                      const r = hvscRatings[ratingId('hvsc', entry.path)];
                       const avg = r?.avg ?? entry.avg_rating ?? 0;
                       const count = r?.count ?? entry.vote_count ?? 0;
                       return (
@@ -736,7 +708,7 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
   const [hasMore, setHasMore] = useState(remembered?.hasMore ?? false);
   const [downloading, setDownloading] = useState<Set<string>>(new Set());
   const downloadProgress = useDownloadProgress();
-  const [ratings, setRatings] = useState<RatingMap>({});
+  const ratings = useRatingsStore((s) => s.ratings);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const isLoggedIn = useAuthStore(s => !!s.token);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -807,17 +779,8 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
 
       const modlandKeys = combined.filter(r => r.source === 'modland').map(r => r.key);
       const hvscKeys = combined.filter(r => r.source === 'hvsc').map(r => r.key);
-      const ratingPromises: Promise<RatingMap>[] = [];
-      if (modlandKeys.length > 0) ratingPromises.push(batchGetRatings('modland', modlandKeys));
-      if (hvscKeys.length > 0) ratingPromises.push(batchGetRatings('hvsc', hvscKeys));
-      if (ratingPromises.length > 0) {
-        Promise.all(ratingPromises).then(maps => {
-          const merged = Object.assign({}, ...maps);
-          setRatings(prev => append ? { ...prev, ...merged } : merged);
-        }).catch(() => {});
-      } else if (!append) {
-        setRatings({});
-      }
+      void useRatingsStore.getState().loadMany('modland', modlandKeys);
+      void useRatingsStore.getState().loadMany('hvsc', hvscKeys);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
     } finally {
@@ -836,11 +799,9 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
       restoredSearch.current = null;
       if (r.results.length > 0) {
         const rows = r.results as OnlineResult[];
-        const maps = (['modland', 'hvsc'] as const)
-          .map((src) => ({ src, keys: rows.filter((x) => x.source === src).map((x) => x.key) }))
-          .filter((g) => g.keys.length > 0)
-          .map((g) => batchGetRatings(g.src, g.keys));
-        Promise.all(maps).then((m) => setRatings(Object.assign({}, ...m))).catch(() => {});
+        for (const src of ['modland', 'hvsc'] as const) {
+          void useRatingsStore.getState().loadMany(src, rows.filter((x) => x.source === src).map((x) => x.key));
+        }
         return;
       }
     }
@@ -1005,15 +966,7 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
     // The ratings service knows Modland and HVSC only; archive rows show no stars.
     if (item.source === 'modarchive') return;
     if (!isLoggedIn) { setShowAuthModal(true); return; }
-    try {
-      if (star === 0) {
-        const res = await removeRating(item.source, item.key);
-        setRatings(prev => ({ ...prev, [item.key]: { avg: res.avg, count: res.count } }));
-      } else {
-        const res = await setRating(item.source, item.key, star);
-        setRatings(prev => ({ ...prev, [item.key]: { avg: res.avg, count: res.count, userRating: res.userRating } }));
-      }
-    } catch { /* ignore */ }
+    await useRatingsStore.getState().rate(item.source, item.key, star);
   }, [isLoggedIn]);
 
   return (
@@ -1101,7 +1054,7 @@ export const OnlinePanel: React.FC<OnlinePanelProps> = ({ isOpen, onLoadTrackerM
                   </div>
 
                   {item.source !== 'modarchive' && (() => {
-                    const r = ratings[item.key];
+                    const r = ratings[ratingId(item.source, item.key)];
                     const avg = r?.avg ?? item.avg_rating ?? 0;
                     const count = r?.count ?? item.vote_count ?? 0;
                     return (
