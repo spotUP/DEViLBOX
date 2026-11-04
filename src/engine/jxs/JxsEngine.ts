@@ -14,6 +14,7 @@ import {
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
 import { decodeJxsModule, jxsPlayRange } from '@lib/import/formats/jxsGrid';
+import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { actionamicsTransform } from '@engine/actionamics/ActionamicsEngine';
 
 /** Where the replayer is, in the engine position contract: the index into songPositions and the row (0..63). */
@@ -85,15 +86,28 @@ export class JxsEngine extends WASMChannelOutputsEngine {
   }
 
   /** One message from the worklet. */
-  handleWorkletMessage(data: { type: string; bar: number; step: number; message?: string }): void {
+  handleWorkletMessage(data: {
+    type: string; bar: number; step: number; message?: string;
+    channels?: number | Int16Array[]; frame?: number; sampleRate?: number;
+  }): void {
     switch (data.type) {
       case 'ready':
         console.log('[JxsEngine] WASM ready');
         this.markNodeReady();
         if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
         break;
-      case 'moduleLoaded':
-        console.log('[JxsEngine] Module loaded');
+      case 'moduleLoaded': {
+        // The channel VU meters and the per-channel oscilloscopes read the oscilloscope store: one entry per voice.
+        const voices = typeof data.channels === 'number' ? data.channels : 0;
+        useOscilloscopeStore.getState().setChipInfo(voices, 0, Array.from({ length: voices }, (_, c) => `Channel ${c + 1}`));
+        console.log('[JxsEngine] Module loaded, voices:', voices);
+        break;
+      }
+      case 'oscData':
+        // Per-voice audio from the worklet's DevilboxChannelStream.
+        if (Array.isArray(data.channels)) {
+          useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame ?? 0, data.sampleRate ?? 0);
+        }
         break;
       case 'position':
         // Outside the played range: the pre-roll before the first row (start step - 1) and the loop bar the
