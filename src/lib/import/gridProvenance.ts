@@ -107,6 +107,7 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
   jamcracker: 'pass',
   jochenHippel7V: 'pass',
   jochenHippelST: 'pass',
+  jxs: 'pass',
   kdm: 'pass',
   maxTrax: 'pass',
   mdl: 'n/a',
@@ -231,6 +232,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   jamcracker: 'pass',
   jochenHippel7V: 'pass',
   jochenHippelST: 'pass',
+  jxs: 'pass',
   kdm: 'fail',
   maxTrax: 'n/a',
   mdl: 'n/a',
@@ -483,7 +485,7 @@ export const DIRECT_GRIDS: readonly string[] = [
   '669', 'far', 'plm', 'ult', 'rtm', 'dsm', 'dtm', 'stm', 'stx', 'nru', 'ptm', 'gdm', 'stk', 'stp',
   'mdl', 'amf', 'j2b', 'mo3', 'itp', 'nst', 'wow', 'kt', 'xrns', 'mod', 'xm', 'it', 's3m',
   // MONOTONE stores 4-track patterns; ANSI music stores one PLAY string the parser lays on rows.
-  'monotone', 'ansiMusic', 'kdm', 'tonyWilliams',
+  'monotone', 'ansiMusic', 'kdm', 'jxs', 'tonyWilliams',
   // SynthDream: the command streams decode to a read-only tick grid (synthDreamGrid.ts), no oracle yet.
   'synthDream',
   // Tim Follin: the command streams decode to a read-only tick grid (timFollinGrid.ts), no oracle yet.

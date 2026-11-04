@@ -1657,6 +1657,18 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     customDispatch: true, // Must exclude mon_old.* (handled by jeroenTel)
   },
   {
+    key: 'jxs',
+    label: 'JayTrax',
+    description: 'JayTrax (.jxs) - native parser and own WASM player.',
+    family: 'amiga-native',
+    matchMode: 'extension',
+    extRegex: /\.jxs$/i,
+    prefKey: 'jxs',
+    nativeParser: { module: '@lib/import/formats/JxsParser', parseFn: 'parseJxsFile', detectFn: 'isJxsFormat' },
+    uadeFallback: false,
+    customDispatch: true,
+  },
+  {
     key: 'kdm',
     label: 'Ken Silverman KDM',
     description: 'Ken Silverman KDM (Ken\'s Digital Music) — native parser and own WASM player; waves.kwv instrument bank.',

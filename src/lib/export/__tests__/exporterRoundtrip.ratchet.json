@@ -304,6 +304,14 @@
       "cells": 7168,
       "bytes": 108458
     },
+    "jxs": {
+      "exporter": "JxsExporter.exportJxs",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 55382,
+      "bytes": 55382
+    },
     "kdm": {
       "exporter": "KdmExporter.exportKdm",
       "tier": "byte-exact",

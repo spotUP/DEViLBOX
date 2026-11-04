@@ -72,6 +72,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   scumm: 'public/data/songs/formats/zaktitle.scumm',
   sunTronic: 'public/data/songs/formats/SUNTronicTunes/mule.src',
   tonyWilliams: 'public/data/songs/formats/future basketball main.tw',
+  jxs: 'public/data/songs/formats/popcorn.jxs',
   kdm: 'public/data/songs/formats/flysong.kdm',
   davidWhittaker: 'public/data/songs/formats/apb.dw',
   robHubbard: 'public/data/songs/rob-hubbard/skateordie.rh',

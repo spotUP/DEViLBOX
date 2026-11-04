@@ -689,14 +689,15 @@ export async function tryRouteFormat(
 
   // ── Tony Williams (.tw) ─────────────────────────────────────────────────
   if (matchesExt(filename, ['tw'])) {
-    try {
-      const { parseTonyWilliamsFile } = await import('@lib/import/formats/TonyWilliamsParser');
-      return await parseTonyWilliamsFile(buffer, originalFileName, requestedSubsong ?? 0);
-    } catch (err) {
-      console.warn(`[TonyWilliamsParser] Native parse failed for ${filename}, falling back to UADE:`, err);
-    }
-    const { parseUADEFile: parseUADE } = await import('@lib/import/formats/UADEParser');
-    return parseUADE(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+    // UADE plays the whole song; the native grid is display + edit carrier. The shared path tags the
+    // instruments UADEEditableSynth so the engine-driven rows (uadePlayerTickGrid) fire no Tone notes.
+    const { isTonyWilliamsFormat, parseTonyWilliamsFile } = await import('@lib/import/formats/TonyWilliamsParser');
+    return withNativeThenUADE('soundimages', ctx,
+      (buf: Uint8Array | ArrayBuffer, name: string) => {
+        const ab = buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer;
+        return isTonyWilliamsFormat(ab) ? parseTonyWilliamsFile(ab, name, requestedSubsong ?? 0) : null;
+      },
+      'TonyWilliamsParser', { injectUADE: true });
   }
 
   // ── Art of Noise ──────────────────────────────────────────────────────────
@@ -2784,6 +2785,16 @@ export async function tryRouteFormat(
     return withNativeThenUADE('musicMaker8V', mm8Ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => { if (isMusicMaker8VFormat(buf as ArrayBuffer, name)) return parseMusicMaker8VFile(buf as ArrayBuffer, name); return null; },
       'MusicMakerParser/8V', { injectUADE: true });
+  }
+
+  // ── JayTrax (.jxs) ──────────────────────────────────────────────────────────
+  if (matchesExt(filename, ['jxs'])) {
+    const { isJxsFormat, parseJxsFile } = await import('@lib/import/formats/JxsParser');
+    if (isJxsFormat(new Uint8Array(ctx.buffer))) {
+      const song = parseJxsFile(new Uint8Array(ctx.buffer), ctx.originalFileName);
+      if (song) return song;
+    }
+    throw new Error(`JXS file did not decode: ${ctx.originalFileName}`);
   }
 
   // ── Ken Silverman KDM (.kdm) ────────────────────────────────────────────────
