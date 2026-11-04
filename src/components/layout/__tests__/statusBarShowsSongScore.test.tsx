@@ -1,7 +1,7 @@
 /**
- * The tracker status bar shows the loaded song's community score (star, average, count)
- * the way the DJ deck info bar does. The key travels openSong -> useFormatStore.songSourceKey
- * -> StatusBar -> SongScore -> useRatingsStore; unloadSong clears it.
+ * The tracker status bar no longer shows the loaded song's info (score, SID metadata, song database
+ * info); the active project tab does (see activeTabSongInfo.test.tsx). The key still travels
+ * openSong -> useFormatStore.songSourceKey; unloadSong clears it.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
@@ -27,7 +27,7 @@ vi.mock('@/engine/TrackerReplayer', () => ({ getTrackerReplayer: () => ({ stop: 
 
 afterEach(() => {
   cleanup();
-  useFormatStore.getState().setSongSourceKey(null);
+  useFormatStore.getState().clearSongInfo();
   useRatingsStore.setState({ ratings: {} });
 });
 
@@ -35,29 +35,23 @@ const seed = (key: string): void => {
   useRatingsStore.setState({ ratings: { [ratingId('modland', key)]: { avg: 4.5, count: 7, userRating: 0 } } as never, load: vi.fn(async () => {}) } as never);
 };
 
-describe('status bar song score', { timeout: 60000 }, () => {
-  it('renders "avg (count)" for a loaded song that has a rating key', () => {
+describe('status bar carries no song info', { timeout: 60000 }, () => {
+  it('shows no score, title or authors even when a key, song database info and SID metadata are set', () => {
     seed('X/Y/z.mod');
-    useFormatStore.getState().setSongSourceKey('modland:X/Y/z.mod');
+    const fs = useFormatStore.getState();
+    fs.setSongSourceKey('modland:X/Y/z.mod');
+    fs.setSongDBInfo({ authors: ['Jogeir'], publishers: [], album: 'Fantasy Album', year: '1991', format: 'MOD', duration_ms: 1 });
+    fs.setSidMetadata({ format: 'PSID', version: 2, title: 'Commando', author: 'Rob Hubbard', copyright: '', chipModel: '8580', clockSpeed: 'PAL', subsongs: 3, defaultSubsong: 0, currentSubsong: 1, secondSID: false, thirdSID: false });
     const { container } = render(<StatusBar />);
-    expect(container.textContent).toContain('4.5');
-    expect(container.textContent).toContain('(7)');
+    const t = container.textContent ?? '';
+    for (const s of ['4.5', '(7)', 'Fantasy Album', 'Jogeir', 'Commando', 'Rob Hubbard', 'MOS', 'Sub 2/3']) expect(t).not.toContain(s);
+    expect(t).toContain('Row');
   });
 
-  it('shows nothing for a song without a key', () => {
-    seed('X/Y/z.mod');
-    const { container } = render(<StatusBar />);
-    expect(container.textContent).not.toContain('(7)');
-  });
-
-  it('openSong of a Modland path sets the key, so the bar shows the score; a plain file clears it', async () => {
-    seed('X/Y/z.mod');
+  it('openSong of a Modland path sets the key; a plain file clears it', async () => {
     const r = await openSong({ kind: 'modland', path: 'X/Y/z.mod' }, { origin: 'modland' });
     expect(r.ok).toBe(true);
     expect(useFormatStore.getState().songSourceKey).toBe('modland:X/Y/z.mod');
-    const { container } = render(<StatusBar />);
-    expect(container.textContent).toContain('4.5');
-    expect(container.textContent).toContain('(7)');
     await openSong({ kind: 'file', file: new File([new Uint8Array(8)], 'local.mod') }, { origin: 'dialog', askForChoices: false });
     expect(useFormatStore.getState().songSourceKey).toBeNull();
   });

@@ -24,10 +24,12 @@ import { ServerStatusBadges } from './ServerStatusBadges';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useHistoryStore } from '@stores/useHistoryStore';
 import { useFT2ToolbarActions } from '@stores/useFT2ToolbarActions';
+import { ActiveTabSongInfo, useActiveTabSongInfo } from './ActiveTabSongInfo';
 import { CinterShrinklerReadout } from '@components/tracker/FT2Toolbar/CinterShrinklerReadout';
 
 const NavBarComponent: React.FC = () => {
   const n = useNavBar();
+  const activeSongInfo = useActiveTabSongInfo(n.tabs.find((t) => t.id === n.activeTabId)?.name ?? '');
 
   const editorFullscreen = useUIStore((state) => state.editorFullscreen);
   const openModal = useUIStore((state) => state.openModal);
@@ -305,6 +307,7 @@ const NavBarComponent: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => n.setActiveTab(tab.id)}
+              title={n.activeTabId === tab.id ? activeSongInfo.tooltip || undefined : undefined}
               onDoubleClick={() => startTabEdit(tab.id, tab.name)}
               className={`
                 group flex items-center gap-2 px-3 py-1.5 rounded-t-md text-sm font-medium
@@ -333,7 +336,9 @@ const NavBarComponent: React.FC = () => {
                 />
               ) : (
                 <span className="flex items-center">
-                  {tab.name || 'Untitled'}
+                  {n.activeTabId === tab.id
+                    ? <ActiveTabSongInfo info={activeSongInfo} />
+                    : (tab.name || 'Untitled')}
                   {tab.isDirty && <span className="text-accent-primary ml-1">*</span>}
                   {n.activeTabId === tab.id && <CinterShrinklerReadout />}
                 </span>
