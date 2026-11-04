@@ -139,7 +139,9 @@ export interface SplGrid {
   blockRows: TrackerCell[][];
   rowSources: SplRowSource[][][];
   streamAtStart: number[][];
-  /** BPM that makes one grid row last one replayer step at speed 1 */
+  /** Player-interrupt ticks per grid row: the replayer divider steps every (dividerReload + 1) / 2 ticks (song.initialSpeed) */
+  ticksPerStep: number;
+  /** BPM at which one player tick lasts 2.5 / BPM seconds, i.e. the song's own tick rate (TIMEBASE_HZ / timer) */
   bpm: number;
   buildName: string;
   /** The tracker note a stream note byte plays under an instrument record's octave and transposition (the grid's own lookup). */
@@ -286,10 +288,11 @@ function decodeSpl(buf: Uint8Array, build: SplBuildInfo, hunk: SplHunk, timer: n
     rowSources.push(sources.map((s) => s.slice(start, start + len)));
     streamAtStart.push(runAtTick.map((s) => s[start]));
   }
-  // one step every (reload + 1) / 2 ticks of TIMEBASE_HZ / timer Hz; at speed 1 a row is one tick of 2.5 / BPM seconds
+  // one step every (reload + 1) / 2 player ticks of TIMEBASE_HZ / timer Hz (60 Hz for Boulder Dash, not the 50 Hz vertical
+  // blank): a row is ticksPerStep ticks, each 2.5 / BPM seconds, so the grid follows the player's interrupt count
   const ticksPerStep = (build.dividerReload + 1) / 2;
-  const bpm = Math.max(32, Math.min(255, Math.round((2.5 * TIMEBASE_HZ) / (timer * ticksPerStep))));
+  const bpm = Math.max(32, Math.min(255, Math.round((2.5 * TIMEBASE_HZ) / timer)));
   const noteOffsets = voices.flatMap((p) => p.map((n) => n.offset));
-  return { noteOffsets, patterns, songPositions, rows, streams, blockRows, rowSources, streamAtStart, bpm, buildName: build.name,
+  return { noteOffsets, patterns, songPositions, rows, streams, blockRows, rowSources, streamAtStart, ticksPerStep, bpm, buildName: build.name,
     noteForByte: (byte, octave, steps) => { const period = periodOf(transposeNote(byte, steps), octave); return period > 0 ? periodToNote(period) : 0; } };
 }

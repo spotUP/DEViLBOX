@@ -13,12 +13,16 @@
  *  - A flat walk of the streams to each voice's first backward `f3` jump counts 660 / 364 / 410 / 80 notes and
  *    2496 / 2496 / 2496 / 320 steps (one grid row per step); the longest voice sets the grid: 2496 rows = 39 patterns.
  *  - Timer long @code+0x34 = 0x2e2f = 11823 -> 709379 / 11823 = 60 Hz; the Swing divider (reload 7) steps every 4
- *    ticks -> 15 steps/s; at speed 1 a row lasts 2.5 / BPM s, so BPM = 2.5 * 15 = 37.5 -> 37.
+ *    ticks -> 15 steps/s. The player clock is the timer interrupt (UADE counted 901 player ticks in 15 s, not 750 at 50 Hz;
+ *    the survey in thoughts/spot/todos.md matched 116 of 116 note-ons at 4 ticks a row, 44 of 116 at 1). So a row is
+ *    initialSpeed 4 ticks of 2.5 / BPM s with BPM = 2.5 * 60 = 150, and the playhead follows the player-interrupt count
+ *    (uadePlayerTickGrid): row r sounds on player tick 1 + 4 r.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { playerTickGridPosition } from '@/lib/tracker/tickGridPosition';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 const sentinel = vi.hoisted(() => ({ calls: 0 }));
@@ -62,7 +66,15 @@ describe('spl import route', () => {
     expect(v[0][1]).toEqual([16, 22, 1]);
     expect(v[1][0]).toEqual([0, 22, 1]);
     expect(v[2][0]).toEqual([0, 22, 1]);
-    expect(song.initialBPM).toBe(37);
+    expect(song.initialBPM).toBe(150);
+    expect(song.initialSpeed).toBe(4);
+    expect(song.uadePlayerTickGrid).toBe(true);
+    // a row lasts speed * 2.5 / BPM = 1/15 s: the divider's 4 ticks of the 60 Hz timer
+    expect(song.initialSpeed * 2.5 / song.initialBPM).toBeCloseTo(4 / 60, 6);
+    const grid = { speed: song.initialSpeed, songPositions: song.songPositions, patternLengths: song.patterns.map((p) => p.length) };
+    expect(playerTickGridPosition(1, grid)).toEqual({ songPos: 0, row: 0 });
+    expect(playerTickGridPosition(1 + 4 * 64, grid)).toEqual({ songPos: 1, row: 0 });
+    expect(playerTickGridPosition(1 + 4 * 63 + 3, grid)).toEqual({ songPos: 0, row: 63 });
 
     expect(layout.blockRows?.length).toBeGreaterThan(0);
     layout.blockRows?.forEach((cells, i) => {

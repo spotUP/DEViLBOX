@@ -30,6 +30,7 @@ export function parseSoundProgrammingLanguageFile(buffer: ArrayBuffer, filename:
   let layout: UADEVariablePatternLayout | undefined;
   let unmatched: string | null = null;
   let bpm = 125;
+  let ticksPerStep = 1;
 
   const grid = buildSplGrid(buf);
   if (typeof grid === 'string') {
@@ -38,6 +39,7 @@ export function parseSoundProgrammingLanguageFile(buffer: ArrayBuffer, filename:
     patterns = grid.patterns;
     songPositions = grid.songPositions;
     bpm = grid.bpm;
+    ticksPerStep = grid.ticksPerStep;
     layout = {
       formatId: 'soundProgrammingLanguage',
       numChannels: 4,
@@ -83,9 +85,11 @@ export function parseSoundProgrammingLanguageFile(buffer: ArrayBuffer, filename:
     songLength: songPositions.length,
     restartPosition: 0,
     numChannels: 4,
-    // one grid row is one replayer step; at speed 1 the BPM sets the step rate
-    initialSpeed: 1,
+    // one grid row is one replayer step of ticksPerStep player ticks (the timer-driven clock, not 50 Hz)
+    initialSpeed: ticksPerStep,
     initialBPM: bpm,
+    // the player steps on its own timer interrupt: the playhead follows UADE's player-interrupt count
+    ...(layout ? { uadePlayerTickGrid: true } : {}),
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0),
     uadeEditableFileName: filename,
