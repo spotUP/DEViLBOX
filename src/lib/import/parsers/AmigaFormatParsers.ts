@@ -687,6 +687,18 @@ export async function tryRouteFormat(
     return parseUADE(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
   }
 
+  // ── Tony Williams (.tw) ─────────────────────────────────────────────────
+  if (matchesExt(filename, ['tw'])) {
+    try {
+      const { parseTonyWilliamsFile } = await import('@lib/import/formats/TonyWilliamsParser');
+      return await parseTonyWilliamsFile(buffer, originalFileName, requestedSubsong ?? 0);
+    } catch (err) {
+      console.warn(`[TonyWilliamsParser] Native parse failed for ${filename}, falling back to UADE:`, err);
+    }
+    const { parseUADEFile: parseUADE } = await import('@lib/import/formats/UADEParser');
+    return parseUADE(buffer, originalFileName, prefs.uade ?? 'enhanced', subsong, preScannedMeta);
+  }
+
   // ── Art of Noise ──────────────────────────────────────────────────────────
   // AON4 (.aon) and AON8 (.aon8) — identified by "AON4"/"AON8" magic bytes at offset 0.
   if (matchesExt(filename, ['aon', 'aon8'])) {

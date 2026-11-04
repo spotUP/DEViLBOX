@@ -16,6 +16,7 @@ import { FRED_EFFECT_GLYPH } from '@/lib/import/formats/fredEffectGlyphs';
 import { SM_EFFECT_GLYPH } from '@/lib/import/formats/soundMasterEffectGlyphs';
 import { AST_EFFECT_GLYPH } from '@/lib/import/formats/actionamicsEffectGlyphs';
 import { AVP_EFFECT_GLYPH } from '@/lib/import/formats/activisionProEffectGlyphs';
+import { TW_EFFECT_GLYPH } from '@/lib/import/formats/tonyWilliamsEffectGlyphs';
 import { DW_EFFECT_GLYPH } from '@/lib/import/formats/davidWhittakerEffectGlyphs';
 import { BD_EFFECT_GLYPH } from '@/lib/import/formats/benDaglishEffectGlyphs';
 import { RH_EFFECT_GLYPH } from '@/lib/import/formats/robHubbardEffectGlyphs';
@@ -404,7 +405,7 @@ export class TrackerCanvas2DRenderer {
             : chan.effectNotation === 'furnace'
             ? furnaceEffectText(eff, effp)
             // SunTronic (0x40..0x4F) / SNX (0x60..0x62) / Sound Player (0x63..0x69) / Fred Editor (0x70..0x73) / Sound Master (0x74..0x78) private control effects
-            : `${SUN_EFFECT_GLYPH[eff] ?? SNX_EFFECT_GLYPH[eff] ?? SPL_EFFECT_GLYPH[eff] ?? FRED_EFFECT_GLYPH[eff] ?? SM_EFFECT_GLYPH[eff] ?? AST_EFFECT_GLYPH[eff] ?? AVP_EFFECT_GLYPH[eff] ?? DW_EFFECT_GLYPH[eff] ?? BD_EFFECT_GLYPH[eff] ?? RH_EFFECT_GLYPH[eff] ?? FP_EFFECT_GLYPH[eff] ?? MA_EFFECT_GLYPH[eff] ?? EFFECT_CHARS_2D[eff] ?? '?'}${hex2(effp)}`;
+            : `${SUN_EFFECT_GLYPH[eff] ?? SNX_EFFECT_GLYPH[eff] ?? SPL_EFFECT_GLYPH[eff] ?? FRED_EFFECT_GLYPH[eff] ?? SM_EFFECT_GLYPH[eff] ?? AST_EFFECT_GLYPH[eff] ?? AVP_EFFECT_GLYPH[eff] ?? DW_EFFECT_GLYPH[eff] ?? TW_EFFECT_GLYPH[eff] ?? BD_EFFECT_GLYPH[eff] ?? RH_EFFECT_GLYPH[eff] ?? FP_EFFECT_GLYPH[eff] ?? MA_EFFECT_GLYPH[eff] ?? EFFECT_CHARS_2D[eff] ?? '?'}${hex2(effp)}`;
           ctx.fillText(effStr, effBaseX, y);
         }
       }
