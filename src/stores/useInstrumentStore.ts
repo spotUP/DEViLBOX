@@ -863,7 +863,7 @@ export const useInstrumentStore = create<InstrumentStore>()(
               'JamCrackerSynth', 'MaxTraxSynth', 'FCSynth', 'SoundMonSynth', 'SidMonSynth',
               'DigMugSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth', 'FredSynth', 'TFMXSynth',
               'SonicArrangerSynth', 'HippelCoSoSynth', 'RobHubbardSynth', 'HippelStSynth', 'DavidWhittakerSynth',
-              'OctaMEDSynth', 'SidMon1Synth', 'MusicLineSynth', 'KlysSynth',
+              'OctaMEDSynth', 'SidMon1Synth', 'MusicLineSynth', 'KlysSynth', 'JxsSynth',
             ];
             if (wasmSynthTypes.includes(updatedInstrument.synthType)) {
               return; // Handled — WASM engine runs independently, no invalidation needed

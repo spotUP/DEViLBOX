@@ -22,11 +22,21 @@ class JxsProcessor extends AudioWorkletProcessor {
     this.qlen = 0;
     this.frac = 0;
     this.drained = false;
+    // Keyboard preview: a second copy of the module (voice 0 only), rendered apart from the song at 44.1 kHz.
+    this.previewOn = false;   // the copy is made in the WASM
+    this.previewKey = null;   // the module bytes the copy was made from
+    this.previewPtr = 0;      // stereo frames the copy renders into
+    this.pq = new Float32Array(1024);
+    this.pqlen = 0;
+    this.pfrac = 0;
     // Per-voice mono queues (aligned with q) and the per-quantum voice buffers handed to
     // worklets/channel-outputs.js (dub sends, isolation) and channel-stream.js (scopes, VU).
     this.voices = 0;
     this.vq = [];
     this.chBufs = [];
+    // Channel meters: each voice's peak since the last report, and the report cadence.
+    this.peaks = new Float32Array(16);
+    this.reportCounter = 0;
     this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
   }
@@ -59,8 +69,58 @@ class JxsProcessor extends AudioWorkletProcessor {
         this.port.postMessage({ type: 'stopped' });
         break;
       case 'pause': this.playing = !this.playing; break;
+      case 'previewLoad': this.previewLoad(data.buffer); break;
+      case 'noteOn': if (this.previewOn) { this.pqlen = 0; this.pfrac = 0; this.module._jxs_preview_note(data.instrument, data.note); } break;
+      case 'noteOff': if (this.previewOn) this.module._jxs_preview_stop(); break;
       case 'dispose': this.cleanup(); break;
     }
+  }
+
+  /** Make the preview copy of the module (the replayer plays the keys itself, apart from the song). */
+  previewLoad(buffer) {
+    const m = this.module;
+    if (!m || !buffer) return;
+    if (this.previewKey === buffer && this.previewOn) return;
+    const bytes = new Uint8Array(buffer);
+    const ptr = m._malloc(bytes.length);
+    if (!ptr) return;
+    m.HEAPU8.set(bytes, ptr);
+    this.previewOn = m._jxs_preview_open(ptr, bytes.length) === 1;
+    m._free(ptr);
+    this.previewKey = this.previewOn ? buffer : null;
+    this.pqlen = 0; this.pfrac = 0;
+  }
+
+  /** Keyboard voice: the preview copy's voice 0, resampled and added to both sides. */
+  addPreview(outputL, outputR, n) {
+    if (!this.previewOn || !this.previewPtr) return;
+    const m = this.module;
+    const ratio = 44100 / sampleRate;
+    const need = Math.floor(this.pfrac + (n - 1) * ratio) + 2;
+    while (this.pqlen < need) {
+      const got = m._jxs_preview_render(this.previewPtr, 128);
+      if (got <= 0) return;
+      if (this.pq.length < (this.pqlen + 128) * 2) {
+        const bigger = new Float32Array((this.pqlen + 256) * 2);
+        bigger.set(this.pq.subarray(0, this.pqlen * 2));
+        this.pq = bigger;
+      }
+      const base = this.previewPtr >> 2;
+      this.pq.set(m.HEAPF32.subarray(base, base + got * 2), this.pqlen * 2);
+      this.pqlen += got;
+    }
+    for (let i = 0; i < n; i++) {
+      const pos = this.pfrac + i * ratio;
+      const j = Math.floor(pos);
+      const t = pos - j;
+      outputL[i] += this.pq[2 * j] * (1 - t) + this.pq[2 * j + 2] * t;
+      outputR[i] += this.pq[2 * j + 1] * (1 - t) + this.pq[2 * j + 3] * t;
+    }
+    const end = this.pfrac + n * ratio;
+    const used = Math.floor(end);
+    this.pfrac = end - used;
+    this.pq.copyWithin(0, used * 2, this.pqlen * 2);
+    this.pqlen = Math.max(0, this.pqlen - used);
   }
 
   openSong(skipTicks) {
@@ -120,6 +180,7 @@ class JxsProcessor extends AudioWorkletProcessor {
       if (wasmBinary) config.wasmBinary = wasmBinary;
       this.module = await globalThis.createJxs(config);
       this.outPtr = this.module._malloc(128 * 2 * 4);
+      this.previewPtr = this.module._malloc(128 * 2 * 4);
       this.updateBufferViews();
       this.initialized = true;
       this.initializing = false;
@@ -139,6 +200,9 @@ class JxsProcessor extends AudioWorkletProcessor {
   cleanup() {
     if (this.module && this.open) { this.module._jxs_close(); }
     if (this.module && this.outPtr) this.module._free(this.outPtr);
+    if (this.module && this.previewPtr) this.module._free(this.previewPtr);
+    if (this.module && this.previewOn) this.module._jxs_preview_close();
+    this.previewOn = false; this.previewKey = null; this.previewPtr = 0; this.pqlen = 0; this.pfrac = 0;
     this.open = false; this.outPtr = 0; this.outBuf = null; this.module = null;
     this.initialized = false; this.playing = false; this.lastHeapBuffer = null;
   }
@@ -170,11 +234,16 @@ class JxsProcessor extends AudioWorkletProcessor {
   }
 
   process(inputs, outputs) {
-    if (!this.initialized || !this.open || !this.playing) return true;
+    if (!this.initialized) return true;
     const output = outputs[0];
     if (!output || output.length < 2) return true;
     const outputL = output[0], outputR = output[1];
     const n = Math.min(outputL.length, 128);
+    if (!this.open || !this.playing) {
+      // The song is silent: only the keyboard voice sounds.
+      if (this.previewOn) { outputL.fill(0); outputR.fill(0); this.addPreview(outputL, outputR, n); }
+      return true;
+    }
     // Linear resample from the engine's 48 kHz to the context rate.
     const ratio = 44100 / sampleRate;
     const need = Math.floor(this.frac + (n - 1) * ratio) + 2;
@@ -203,6 +272,26 @@ class JxsProcessor extends AudioWorkletProcessor {
         this._stream.writeFloat32(this.chBufs, produced);
       }
     }
+    // Channel meters every 8 quanta: each voice's peak and its note-start count, stamped with the
+    // audio clock so the meter is held until the sound is heard. The counts make a quiet voice
+    // (a soft lead, a slow attack) flash on every note, which a level rise alone can miss.
+    for (let c = 0; c < this.voices; c++) {
+      const b = this.chBufs[c];
+      let p = this.peaks[c];
+      for (let i = 0; i < produced; i++) { const v = Math.abs(b[i]); if (v > p) p = v; }
+      this.peaks[c] = p;
+    }
+    if (++this.reportCounter >= 8 && this.voices > 0) {
+      this.reportCounter = 0;
+      const levels = [], noteStarts = [];
+      for (let c = 0; c < this.voices; c++) {
+        levels.push(Math.min(1, this.peaks[c]));
+        noteStarts.push(this.module._jxs_note_starts(c) >>> 0);
+        this.peaks[c] = 0;
+      }
+      this.port.postMessage({ type: 'chLevels', levels, noteStarts, audioTime: currentTime });
+    }
+    this.addPreview(outputL, outputR, produced);
     const end = this.frac + produced * ratio;
     const used = Math.floor(end);
     this.frac = end - used;

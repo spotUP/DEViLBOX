@@ -163,7 +163,7 @@ const WITH_SYNTH: Record<string, SynthType[]> = {
   jochenHippelST: ['HippelStSynth', 'HippelSynth'],
   inStereo2: ['InStereo2Synth', 'InStereo2WasmSynth'],
   jamCracker: ['JamCrackerSynth'],
-  jxs: ['JxsWasmSynth'],
+  jxs: ['JxsSynth', 'JxsWasmSynth'],
   kdm: ['KdmWasmSynth'],
   monotone: ['MonotoneWasmSynth'],
   musicAssembler: ['MusicAssemblerSynth'],

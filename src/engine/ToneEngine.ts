@@ -1156,7 +1156,7 @@ export class ToneEngine {
       'MusicLineSynth', 'JamCrackerSynth', 'MaxTraxSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
       'TFMXSynth', 'FCSynth', 'C64SID',
       // WASM player-pool synths — each has a fixed-size pool, must dedup
-      'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth', 'DigMugSynth',
+      'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth', 'DigMugSynth', 'JxsSynth',
       'FredSynth', 'OctaMEDSynth',
       'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth', 'HippelStSynth',
       'DavidWhittakerSynth', 'SonicArrangerSynth',
@@ -1336,7 +1336,7 @@ export class ToneEngine {
   public async ensureWASMSynthsReady(configs: InstrumentConfig[], usage?: ReadonlyMap<number, ReadonlySet<number>>): Promise<void> {
     const wasmConfigs = configs.filter((c) => 
       ['TB303', 'Buzz3o3', 'V2', 'V2Speech', 'Sam', 'DECtalk', 'PinkTrombone', 'Synare', 'DubSiren', 'SpaceLaser', 'Furnace', 'HivelySynth', 'UADESynth', 'UADEEditableSynth', 'SymphonieSynth', 'MusicLineSynth',
-       'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'FCSynth', 'FredSynth', 'TFMXSynth',
+       'SoundMonSynth', 'SidMonSynth', 'DigMugSynth', 'JxsSynth', 'FCSynth', 'FredSynth', 'TFMXSynth',
        'OctaMEDSynth', 'SidMon1Synth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth', 'HippelStSynth', 'DavidWhittakerSynth',
        'SonicArrangerSynth', 'InStereo2Synth', 'InStereo1Synth', 'DeltaMusic1Synth', 'DeltaMusic2Synth',
        'StartrekkerAMSynth', 'SunVoxSynth', 'JamCrackerSynth', 'MaxTraxSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
@@ -1351,7 +1351,7 @@ export class ToneEngine {
     const seenNativePlayers = new Set<string>();
     const deduped = wasmConfigs.filter(c => {
       if (c.synthType === 'HivelySynth' || c.synthType === 'UADESynth' || c.synthType === 'UADEEditableSynth' || c.synthType === 'SymphonieSynth' || c.synthType === 'MusicLineSynth' || c.synthType === 'JamCrackerSynth' || c.synthType === 'MaxTraxSynth' || c.synthType === 'PreTrackerSynth' || c.synthType === 'FuturePlayerSynth' || c.synthType === 'TFMXSynth' || c.synthType === 'FCSynth' || c.synthType === 'C64SID'
-        || c.synthType === 'SoundMonSynth' || c.synthType === 'SidMonSynth' || c.synthType === 'SidMon1Synth' || c.synthType === 'DigMugSynth'
+        || c.synthType === 'SoundMonSynth' || c.synthType === 'SidMonSynth' || c.synthType === 'SidMon1Synth' || c.synthType === 'DigMugSynth' || c.synthType === 'JxsSynth'
         || c.synthType === 'FredSynth' || c.synthType === 'OctaMEDSynth'
         || c.synthType === 'HippelCoSoSynth' || c.synthType === 'RobHubbardSynth' || c.synthType === 'SteveTurnerSynth' || c.synthType === 'HippelStSynth'
         || c.synthType === 'DavidWhittakerSynth' || c.synthType === 'SonicArrangerSynth'
@@ -2044,7 +2044,7 @@ export class ToneEngine {
       'TR808', 'TR909',
       'SonicArrangerSynth', 'InStereo2Synth', 'InStereo1Synth', 'JamCrackerSynth', 'MaxTraxSynth', 'PreTrackerSynth', 'FuturePlayerSynth',
       'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth',
-      'DigMugSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth',
+      'DigMugSynth', 'JxsSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth',
       'FCSynth', 'TFMXSynth', 'MusicLineSynth', 'SymphonieSynth', 'SunVoxSynth',
       'FredSynth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth', 'HippelStSynth', 'StartrekkerAMSynth',
       'OctaMEDSynth', 'DavidWhittakerSynth', 'SunTronicSynth',
@@ -2662,6 +2662,7 @@ export class ToneEngine {
       case 'SoundMonSynth':
       case 'SidMonSynth':
       case 'DigMugSynth':
+      case 'JxsSynth':
       case 'FCSynth':
       case 'FredSynth':
       case 'TFMXSynth':

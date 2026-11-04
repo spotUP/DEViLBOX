@@ -25,6 +25,7 @@ import { SoundMonSynth } from './soundmon/SoundMonSynth';
 import { SunTronicSynth } from './suntronic/SunTronicSynth';
 import { SidMonSynth } from './sidmon/SidMonSynth';
 import { DigMugSynth } from './digmug/DigMugSynth';
+import { JxsSynth } from './jxs/JxsSynth';
 import { FCSynth } from './fc/FCSynth';
 import { TFMXSynth } from './tfmx/TFMXSynth';
 import { FredSynth } from './fred/FredSynth';
@@ -746,6 +747,10 @@ export class InstrumentFactory {
         instrument = dmSynth;
         break;
       }
+
+      case 'JxsSynth':
+        instrument = new JxsSynth(config.id);
+        break;
 
       case 'FCSynth': {
         const fcSynth = new FCSynth();
