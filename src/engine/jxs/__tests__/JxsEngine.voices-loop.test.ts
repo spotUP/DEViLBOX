@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { JxsEngine, JXS_MAX_VOICES } from '../JxsEngine';
+import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 
 const root = path.resolve(__dirname, '../../../..');
 
@@ -76,6 +77,23 @@ describe('JxsEngine per-channel outputs (channel VU meters, oscilloscopes, dub s
       return e;
     };
     expect(energy(0b111)).toBeLessThan(energy(0) * 0.05);
+  });
+});
+
+describe('JxsEngine feeds the channel VU meters and oscilloscopes', () => {
+  it('registers one scope channel per voice and forwards the per-voice audio to the oscilloscope store', () => {
+    const engine = Object.create(JxsEngine.prototype) as unknown as {
+      handleWorkletMessage(d: Record<string, unknown>): void;
+    };
+    engine.handleWorkletMessage({ type: 'moduleLoaded', channels: 3, bar: 0, step: 0 });
+    const s1 = useOscilloscopeStore.getState();
+    expect(s1.numChannels).toBe(3);
+    expect(s1.channelNames).toEqual(['Channel 1', 'Channel 2', 'Channel 3']);
+    const voice = new Int16Array(256).fill(1000);
+    engine.handleWorkletMessage({ type: 'oscData', channels: [voice, voice, voice], frame: 7, sampleRate: 48000, bar: 0, step: 0 });
+    const s2 = useOscilloscopeStore.getState();
+    expect(s2.channelData.length).toBe(3);
+    expect(s2.channelData[0]?.[0]).toBe(1000);
   });
 });
 
