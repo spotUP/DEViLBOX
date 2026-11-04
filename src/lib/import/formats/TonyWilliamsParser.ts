@@ -87,7 +87,9 @@ export async function parseTonyWilliamsFile(buffer: ArrayBuffer, filename: strin
   const instruments = buildTwSampleInstruments(bytes, walk.info.instrumentTable, blockRows);
   const baseName = filename.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
   const result: TrackerSong = {
-    name: baseName, format: 'XM' as TrackerFormat,
+    // Cells play by ProTracker periods (byte 0 = 856 = C-1, the player's table at 0x634): an Amiga-period format, as
+    // the sibling command-stream parsers name it, so typing octave, key periods and replayer mode follow the periods.
+    name: baseName, format: 'MOD' as TrackerFormat,
     patterns: grid.patterns, instruments, songPositions: grid.songPositions, songLength: grid.songPositions.length,
     restartPosition: 0, numChannels: TW_VOICES, initialSpeed: walk.info.speed, initialBPM: 125,
     // The player steps on its 50 Hz vertical-blank interrupt, not CIA-A Timer A (which stays 0 for TW), so the
