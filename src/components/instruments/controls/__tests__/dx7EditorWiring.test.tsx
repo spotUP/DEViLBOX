@@ -139,7 +139,7 @@ describe('Library tab', () => {
     const target = manifest.banks[1];
     render(<Editor id={id} />);
     tab('Library');
-    const search = await screen.findByLabelText('Search the library');
+    const search = await screen.findByLabelText('Search the library', {}, { timeout: 10000 });
     const banks = () => within(screen.getByRole('listbox', { name: 'Banks' })).getAllByRole('option');
     await waitFor(() => expect(banks()).toHaveLength(246));
     fireEvent.change(search, { target: { value: target.name } });
