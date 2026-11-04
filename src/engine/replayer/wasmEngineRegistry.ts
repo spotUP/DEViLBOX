@@ -935,7 +935,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'InStereo1WasmSynth',
     suppressNotes: true,
     fileDataKey: 'inStereo1FileData',
-    gridCellEdits: true,
+    liveSwap: true,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,

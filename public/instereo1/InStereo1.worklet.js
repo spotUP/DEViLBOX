@@ -16,6 +16,9 @@ class InStereo1Processor extends AudioWorkletProcessor {
     this.initialized = false;
     this.playing = false;
     this.bufferSize = 128;
+    this.framesPlayed = 0;    // frames the song rendered since it started: a swapped-in module catches up to here
+    this.subsong = 0;
+    this.muteMask = null;
     this.lastHeapBuffer = null;
     this.initializing = false;
     this.lastPosPattern = -1;
@@ -45,25 +48,60 @@ class InStereo1Processor extends AudioWorkletProcessor {
           if (!this.handle) { this.port.postMessage({ type: 'error', message: 'is1_create failed (unsupported format)' }); return; }
           const subsongCount = this.module._is1_subsong_count(this.handle);
           if (typeof data.subsong === 'number' && data.subsong > 0) this.module._is1_select_subsong(this.handle, data.subsong);
+          this.subsong = typeof data.subsong === 'number' ? data.subsong : 0;
+          this.framesPlayed = 0;
+          this.muteMask = null;
           this.playing = false;
           this.port.postMessage({ type: 'moduleLoaded', subsongCount, channels: 4 });
         } catch (error) { this.port.postMessage({ type: 'error', message: error.message }); }
         break;
       }
+      case 'swapModule': this.swapModule(data.moduleData); break;
       case 'previewLoad': this.previewLoad(data.buffer); break;
       case 'noteOn': if (this.previewHandle) this.module._is1_preview_note(this.previewHandle, data.instrument, data.note); break;
       case 'noteOff': if (this.previewHandle) this.module._is1_preview_stop(this.previewHandle); break;
       case 'play': this.playing = true; this.lastPosPattern = -1; this.lastPosRow = -1; break;
       case 'stop':
         this.playing = false;
+        this.framesPlayed = 0;
+        this.subsong = 0;
         if (this.handle) this.module._is1_select_subsong(this.handle, 0);
         this.port.postMessage({ type: 'stopped' });
         break;
       case 'pause': this.playing = !this.playing; break;
-      case 'setSubsong': if (this.handle) this.module._is1_select_subsong(this.handle, data.subsong); break;
-      case 'setChannelMask': if (this.handle) this.module._is1_set_channel_mask(this.handle, data.mask); break;
+      case 'setSubsong': if (this.handle) { this.module._is1_select_subsong(this.handle, data.subsong); this.subsong = data.subsong; this.framesPlayed = 0; } break;
+      case 'setChannelMask': this.muteMask = data.mask; if (this.handle) this.module._is1_set_channel_mask(this.handle, data.mask); break;
       case 'setTrackCell': { if (this.handle && this.module._is1_set_cell) { this.module._is1_set_cell(this.handle, data.index, data.note, data.instrument, data.arpeggio, data.effect, data.effectArg); } break; }      case 'setInstrumentParam': {        if (this.handle && this.module._is1_set_instrument_param) {          var pLen = this.module.lengthBytesUTF8(data.param) + 1;          var pPtr = this.module._malloc(pLen);          this.module.stringToUTF8(data.param, pPtr, pLen);          this.module._is1_set_instrument_param(this.handle, data.instrument, pPtr, data.value);          this.module._free(pPtr);        }        break;      }      case 'dispose': this.cleanup(); break;
     }
+  }
+
+  /**
+   * An edited module takes the place of the playing one without a restart. The new module is loaded as a second handle and run
+   * silently for the frames already played, in the blocks they were played in (the replayer is deterministic); from there it is
+   * the edited module played from the start, at the position the listener is at. The old handle is freed once the new one plays.
+   */
+  swapModule(moduleData) {
+    if (!this.module || !moduleData) return;
+    const bytes = new Uint8Array(moduleData);
+    const ptr = this.module._malloc(bytes.length);
+    if (!ptr) { this.port.postMessage({ type: 'error', message: 'malloc failed for module data' }); return; }
+    this.module.HEAPU8.set(bytes, ptr);
+    const handle = this.module._is1_create(ptr, bytes.length, sampleRate);
+    this.module._free(ptr);
+    if (!handle) { this.port.postMessage({ type: 'error', message: 'is1_create failed for the swapped module' }); return; }
+    if (this.subsong > 0) this.module._is1_select_subsong(handle, this.subsong);
+    if (this.muteMask !== null) this.module._is1_set_channel_mask(handle, this.muteMask);
+    this.updateBufferViews();
+    let left = this.framesPlayed;
+    while (left > 0) {
+      const n = Math.min(this.bufferSize, left);
+      this.module._is1_render_multi(handle, this.chPtrs[0], this.chPtrs[1], this.chPtrs[2], this.chPtrs[3], n);
+      left -= n;
+    }
+    if (this.handle) this.module._is1_destroy(this.handle);
+    this.handle = handle;
+    this.lastPosPattern = -1; this.lastPosRow = -1;
+    this.port.postMessage({ type: 'moduleSwapped', frames: this.framesPlayed });
   }
 
   async initWasm(rate, wasmBinary, jsCode) {
@@ -195,6 +233,7 @@ class InStereo1Processor extends AudioWorkletProcessor {
       this.handle, this.chPtrs[0], this.chPtrs[1], this.chPtrs[2], this.chPtrs[3], numSamples);
 
     if (rendered > 0) {
+      this.framesPlayed += rendered;
       // Mix to stereo: channels 0,3 → left; channels 1,2 → right (Amiga panning)
       // A voice in an isolation slot leaves the mix; channel-outputs.js
       // carries it (and the per-channel dub sends).

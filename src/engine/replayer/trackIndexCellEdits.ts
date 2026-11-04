@@ -73,7 +73,6 @@ const FORMATS: Record<string, Record4Format> = {
   },
   SonicArranger: { rowsPerRecord: 0, stride: 4, fields: flaggedArpLine },
   InStereo2Replayer: { rowsPerRecord: 0, stride: 4, fields: flaggedArpLine },
-  InStereo1Replayer: { rowsPerRecord: 0, stride: 4, fields: nibbleArpLine },
   SynthesisReplayer: { rowsPerRecord: 0, stride: 4, fields: nibbleArpLine },
 };
 
