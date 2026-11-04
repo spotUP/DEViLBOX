@@ -7,16 +7,13 @@
 import { describe, it, expect } from 'vitest';
 import { DefleMaskParser } from '../formats/DefleMaskParser';
 
-// DefleMask .dmf magic: ".DeFleMask." (first 11 chars, then version byte, padded to 16)
+// DefleMask .dmf magic: ".DelekDefleMask." (16 bytes), then the version byte at offset 16
 function makeDMFBuffer(version = 24): ArrayBuffer {
   const buf = new ArrayBuffer(256);
   const bytes = new Uint8Array(buf);
-  // Magic: ".DeFleMask." = 46 44 65 46 6C 65 4D 61 73 6B 2E
-  const magic = '.DeFleMask.';
+  const magic = '.DelekDefleMask.';
   for (let i = 0; i < magic.length; i++) bytes[i] = magic.charCodeAt(i);
   bytes[magic.length] = version; // version byte (e.g. 24)
-  // Pad remaining magic bytes to 16
-  for (let i = magic.length + 1; i < 16; i++) bytes[i] = 0;
   return buf;
 }
 
