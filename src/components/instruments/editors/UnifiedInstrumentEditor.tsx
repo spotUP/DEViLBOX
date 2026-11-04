@@ -130,6 +130,9 @@ function isTFMXType(synthType: SynthType): boolean {
 }
 
 /** Check if synth type is Sonic Arranger */
+function isJxsType(synthType: SynthType): boolean {
+  return synthType === 'JxsSynth';
+}
 function isSonicArrangerType(synthType: SynthType): boolean {
   return synthType === 'SonicArrangerSynth';
 }
@@ -236,6 +239,7 @@ function getEditorMode(instrument: Pick<InstrumentConfig, 'synthType' | 'xrns'>)
   if (isRonKlarenType(synthType)) return 'ronklaren';
   if (isDigMugType(synthType)) return 'digmug';
   if (isSonicArrangerType(synthType)) return 'sonic-arranger';
+  if (isJxsType(synthType)) return 'jxs';
   if (isInStereo2Type(synthType)) return 'instereo2';
   if (isFCType(synthType)) return 'fc';
   if (isDeltaMusic1Type(synthType)) return 'deltamusic1';

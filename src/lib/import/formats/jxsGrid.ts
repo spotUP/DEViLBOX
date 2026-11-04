@@ -18,15 +18,13 @@
  * placement of that pattern changes with it), all other bytes are carried.
  */
 import type { TrackerCell } from '@/types';
+import { jxsLayout } from './jxsInstrument';
 import {
   JX_AUX, JX_FX_BASE, JX_RAW_BASE, JX_SINGLE_SCRIPTS, JX_SLOT_BASE, JX_SLOT_FIELDS, JX_WAVE_RESET,
 } from './jxsEffectGlyphs';
 
 export const JXS_ROWS = 64;
 
-const HEADER = 52;
-const SUBSONG = 16564;
-const INSTRUMENT = 8712;
 const ROW = 5;
 
 const u16 = (b: Uint8Array, o: number): number => b[o] | (b[o + 1] << 8);
@@ -75,39 +73,17 @@ export function jxsPlayRange(m: JxsModule): { firstBar: number; lastBar: number 
 
 /** Decode the file; null when it is not a complete JayTrax module. */
 export function decodeJxsModule(bytes: Uint8Array): JxsModule | null {
-  if (bytes.length < HEADER) return null;
-  const version = u16(bytes, 0);
-  if (version !== 3456 && version !== 3457) return null;
-  const P = s32(bytes, 4), S = s32(bytes, 8), I = s32(bytes, 12);
-  if (S < 1 || S > 256 || P < 0 || P > 65536 || I < 0 || I > 4096) return null;
-  let off = HEADER;
-  const subOff = off;
-  off += S * SUBSONG;
-  const patternOffset = off;
-  off += P * 64 * ROW;
-  if (off > bytes.length) return null;
-  for (let p = 0; p < P; p++) {
-    if (off + 4 > bytes.length) return null;
-    const n = s32(bytes, off);
-    if (n < 0 || n > 4096) return null;
-    off += 4 + n;
-    if (off > bytes.length) return null;
-  }
-  const instrumentNames: string[] = [];
-  for (let i = 0; i < I; i++) {
-    if (off + INSTRUMENT > bytes.length) return null;
+  const lay = jxsLayout(bytes);
+  if (!lay) return null;
+  const subOff = lay.subsongOffset;
+  const patternOffset = lay.patternOffset;
+  const version = lay.version;
+  const P = lay.patterns, S = lay.subsongs, I = lay.instruments;
+  const instrumentNames: string[] = lay.instrumentOffset.map((q) => {
     let name = '';
-    for (let k = 0; k < 32 && bytes[off + 2 + k]; k++) name += String.fromCharCode(bytes[off + 2 + k]);
-    instrumentNames.push(name);
-    const has = s32(bytes, off + 512) !== 0;
-    const len = s32(bytes, off + 516);
-    off += INSTRUMENT;
-    if (has) {
-      if (len < 0 || off + len > bytes.length) return null;
-      off += len;
-    }
-  }
-  if (off + 256 > bytes.length) return null;
+    for (let k = 0; k < 32 && bytes[q + 2 + k]; k++) name += String.fromCharCode(bytes[q + 2 + k]);
+    return name;
+  });
 
   const channels = s16(bytes, subOff + 146);
   if (channels < 1 || channels > 16) return null;

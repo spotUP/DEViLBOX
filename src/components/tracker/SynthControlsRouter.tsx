@@ -141,6 +141,9 @@ const SidMonControls = lazy(() =>
 const DigMugControls = lazy(() =>
   import('@components/instruments/controls/DigMugControls').then(m => ({ default: m.DigMugControls }))
 );
+const JxsControls = lazy(() =>
+  import('@components/instruments/controls/JxsControls').then(m => ({ default: m.JxsControls }))
+);
 const SonicArrangerControls = lazy(() =>
   import('@components/instruments/controls/SonicArrangerControls').then(m => ({ default: m.SonicArrangerControls }))
 );
@@ -464,6 +467,9 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     if (synthType === 'DigMugSynth') {
       const cfg = deepMerge(DEFAULT_DIGMUG, instrument.digMug || {});
       return <DigMugControls config={cfg} onChange={(u) => onUpdateLive('digMug', cfg, u)} uadeChipRam={instrument.uadeChipRam} />;
+    }
+    if (synthType === 'JxsSynth') {
+      return <JxsControls instrumentId={instrument.id} />;
     }
     if (synthType === 'SonicArrangerSynth') {
       const cfg = deepMerge(DEFAULT_SONIC_ARRANGER, instrument.sonicArranger || {});
