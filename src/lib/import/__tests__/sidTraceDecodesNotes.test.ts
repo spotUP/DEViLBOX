@@ -19,9 +19,11 @@ describe('SID import decodes the register trace into an editable song', () => {
       names: song.instruments.slice(0, 3).map((i) => i.name),
     }));
 
-    // P1: instruments inferred from the trace, not the three fixed voice instruments.
+    // P1: instruments inferred from the trace, not the three fixed voice instruments
+    // (those are named "<label> Voice N (model)"). A SID file stores no instrument
+    // names, so a trace instrument's name stays empty rather than invented.
     expect(song.instruments.length).toBeGreaterThan(0);
-    expect(song.instruments.every((i) => i.synthType === 'C64SID' && /^Instrument \d+$/.test(i.name))).toBe(true);
+    expect(song.instruments.every((i) => i.synthType === 'C64SID' && i.name === '')).toBe(true);
     const used = new Set(noteStarts.map((c) => c.instrument));
     for (const id of used) expect(song.instruments.some((i) => i.id === id)).toBe(true);
 
