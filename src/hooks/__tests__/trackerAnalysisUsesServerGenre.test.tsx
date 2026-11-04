@@ -1,8 +1,10 @@
 /**
- * Reachability for the server genre (G11'): loading a module makes
- * useTrackerAnalysis ask GET /api/genre/:key with the module's uade key, file
- * name, size and md5, and the ModArchive tag replaces the audio model's
- * genre in the analysis every consumer reads (badge, AutoDub, AutoEQ).
+ * Reachability for the server genre (G11'): loading a module from any source
+ * (ModArchive, Modland, HVSC, a local file) makes useTrackerAnalysis ask
+ * GET /api/genre/:key with the module's uade key, the name it was opened under
+ * (format store sourceFileName), size and md5, and the ModArchive tag replaces
+ * the audio model's genre in the analysis every consumer reads (badge, AutoDub,
+ * AutoEQ).
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
@@ -32,12 +34,14 @@ vi.mock('@/engine/TrackerAnalysisPipeline', () => ({ analyzeAudio: vi.fn(), extr
 import { useTrackerAnalysis } from '../useTrackerAnalysis';
 import { useTrackerAnalysisStore } from '@/stores/useTrackerAnalysisStore';
 import { useFormatStore } from '@/stores/useFormatStore';
-import { useTrackerStore } from '@/stores/useTrackerStore';
 import { computeUadeKey } from '@/lib/moduleGenre';
-import type { Pattern } from '@/types/tracker';
 
 describe('tracker analysis uses the server genre', () => {
-  afterEach(() => { vi.unstubAllGlobals(); });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    useFormatStore.getState().reset();
+    useTrackerAnalysisStore.getState().clearAnalysis();
+  });
 
   it('a loaded module shows its ModArchive genre in place of the audio guess', async () => {
     const bytes = Uint8Array.from({ length: 70000 }, (_, i) => (i * 13) & 255);
@@ -46,10 +50,7 @@ describe('tracker analysis uses the server genre', () => {
     )));
     vi.stubGlobal('fetch', fetchMock);
 
-    useTrackerStore.setState({
-      patterns: [{ importMetadata: { sourceFile: 'chemical_emotion.mod' } } as unknown as Pattern],
-    });
-    useFormatStore.setState({ libopenmptFileData: bytes.buffer });
+    useFormatStore.setState({ libopenmptFileData: bytes.buffer, sourceFileName: 'chemical_emotion.mod' });
 
     renderHook(() => useTrackerAnalysis());
 
@@ -66,5 +67,31 @@ describe('tracker analysis uses the server genre', () => {
 
     const genre = useTrackerAnalysisStore.getState().currentAnalysis?.genre;
     expect([genre?.primary, genre?.subgenre, genre?.confidence, genre?.mood]).toEqual(['Electronic', 'Ambient', 1, 'Driving']);
+  });
+
+  it('a song from Modland on its own replayer asks for the genre under its file name', async () => {
+    const bytes = Uint8Array.from({ length: 4321 }, (_, i) => (i * 7) & 255);
+    const fetchMock = vi.fn(async (_url: string) => new Response(JSON.stringify(
+      { key: computeUadeKey(bytes), genre: null, source: 'none' },
+    )));
+    vi.stubGlobal('fetch', fetchMock);
+
+    // InStereo! 1.0 plays on its own WASM replayer: its bytes sit in inStereo1FileData, a field the genre lookup never read.
+    useFormatStore.setState({ inStereo1FileData: bytes.buffer, sourceFileName: 'fantasi8.is' });
+    renderHook(() => useTrackerAnalysis());
+
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/genre/'))).toBe(true));
+    const url = new URL(String(fetchMock.mock.calls.find(([u]) => String(u).includes('/genre/'))![0]));
+    expect(url.searchParams.get('name')).toBe('fantasi8.is');
+    expect(url.searchParams.get('size')).toBe('4321');
+  });
+
+  it('asks nothing until the song has a file name, so a wrong name never reaches the server cache', async () => {
+    const fetchMock = vi.fn(async (_url: string) => new Response('{}'));
+    vi.stubGlobal('fetch', fetchMock);
+    useFormatStore.setState({ libopenmptFileData: new Uint8Array(100).buffer, sourceFileName: null });
+    renderHook(() => useTrackerAnalysis());
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/genre/'))).toHaveLength(0);
   });
 });

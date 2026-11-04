@@ -12,6 +12,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { useFormatStore } from '@/stores/useFormatStore';
+import { heldModuleBytes } from '@/engine/formatFileDataFields';
 import { useTransportStore } from '@/stores/useTransportStore';
 import {
   useTrackerAnalysisStore,
@@ -62,11 +63,9 @@ function computeContentHash(data: Uint8Array | ArrayBuffer): string {
 async function requestModuleGenre(
   fileHash: string,
   data: Uint8Array | ArrayBuffer,
+  fileName: string,
   isCurrent: () => boolean,
 ): Promise<void> {
-  const { useTrackerStore } = await import('@/stores/useTrackerStore');
-  const fileName = useTrackerStore.getState().patterns[0]?.importMetadata?.sourceFile;
-  if (!fileName) return;
   const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
   const tag = await lookupModuleGenre(bytes, fileName);
   if (tag && isCurrent()) useTrackerAnalysisStore.getState().setModuleGenre(fileHash, tag);
@@ -79,38 +78,9 @@ export function useTrackerAnalysis(): void {
   const songTitle = useProjectStore((s) => s.metadata.name);
   const editorMode = useFormatStore((s) => s.editorMode);
   
-  // Get raw file data reactively from format store
-  const rawFileData = useFormatStore((s) => 
-    s.libopenmptFileData ??
-    s.uadeEditableFileData ??
-    s.hivelyFileData ??
-    s.klysFileData ??
-    s.musiclineFileData ??
-    s.c64SidFileData ??
-    s.jamCrackerFileData ??
-    s.futurePlayerFileData ??
-    s.preTrackerFileData ??
-    s.maFileData ??
-    s.hippelFileData ??
-    s.sonixFileData ??
-    s.pxtoneFileData ??
-    s.organyaFileData ??
-    s.sawteethFileData ??
-    s.eupFileData ??
-    s.ixsFileData ??
-    s.psycleFileData ??
-    s.sc68FileData ??
-    s.zxtuneFileData ??
-    s.pumaTrackerFileData ??
-    s.artOfNoiseFileData ??
-    s.qsfFileData ??
-    s.bdFileData ??
-    s.sd2FileData ??
-    s.ayFileData ??
-    s.symphonieFileData ??
-    s.v2mFileData ??
-    null
-  );
+  // The loaded song's module bytes (every format's field, FILE_DATA_FIELDS) and the name it was opened under.
+  const rawFileData = useFormatStore((s) => heldModuleBytes(s));
+  const sourceFileName = useFormatStore((s) => s.sourceFileName);
   
   // Get reactive state from store
   const analysisState = useTrackerAnalysisStore((s) => s.analysisState);
@@ -194,6 +164,18 @@ export function useTrackerAnalysis(): void {
     });
   }, []);
   
+  // Effect: ask the server for the genre of whatever was loaded, from any source (ModArchive, Modland, HVSC, a local
+  // file): the server matches by file name, size and checksum. Waits for the name openSong sets after the load, so an
+  // old song's name never goes out with new bytes.
+  const genreAsked = useRef<string | null>(null);
+  useEffect(() => {
+    if (!fileHash || !rawFileData || !sourceFileName) return;
+    const key = `${fileHash}:${sourceFileName}`;
+    if (genreAsked.current === key) return;
+    genreAsked.current = key;
+    void requestModuleGenre(fileHash, rawFileData, sourceFileName, () => lastFileHash.current === fileHash);
+  }, [fileHash, rawFileData, sourceFileName]);
+
   // Effect: Handle song changes
   useEffect(() => {
     const store = useTrackerAnalysisStore.getState();
@@ -211,10 +193,6 @@ export function useTrackerAnalysis(): void {
       console.log(`[TrackerAnalysis] New song: ${songTitle} (${fileHash})`);
       lastFileHash.current = fileHash;
 
-      if (rawFileData) {
-        void requestModuleGenre(fileHash, rawFileData, () => lastFileHash.current === fileHash);
-      }
-      
       // Stop any existing capture
       stopCapture();
       analysisInProgress.current = false;
