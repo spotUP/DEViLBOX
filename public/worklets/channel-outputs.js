@@ -88,8 +88,9 @@ if (!globalThis.DevilboxChannelOutputs) {
      * @param n         frames rendered
      * @param sideOf    (ch) => 0 for left, 1 for right, 0.5 for centre
      * @param gain      scale applied to each voice to match its level in the main mix
+     * @param dubGain   the same for the dub sends (mono on both sides); defaults to gain
      */
-    write(outputs, voices, n, sideOf, gain = 1) {
+    write(outputs, voices, n, sideOf, gain = 1, dubGain = gain) {
       // Isolation slots: the voices in each mask, placed on their side.
       for (let s = 0; s < ISOLATION_SLOTS; s++) {
         const mask = this.slotMasks[s];
@@ -113,7 +114,7 @@ if (!globalThis.DevilboxChannelOutputs) {
         const buf = voices[ch];
         if (!out || out.length < 2 || !buf) continue;
         const L = out[0], R = out[1];
-        for (let i = 0; i < n; i++) { const v = buf[i] * gain; L[i] = v; R[i] = v; }
+        for (let i = 0; i < n; i++) { const v = buf[i] * dubGain; L[i] = v; R[i] = v; }
       }
     }
   }

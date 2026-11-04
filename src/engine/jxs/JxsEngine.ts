@@ -22,6 +22,9 @@ export interface JxsPositionUpdate {
   row: number;
 }
 
+/** Voices a JayTrax song can carry (the replayer's channel table). */
+export const JXS_MAX_VOICES = 16;
+
 export class JxsEngine extends WASMChannelOutputsEngine {
   private static instance: JxsEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
@@ -69,8 +72,8 @@ export class JxsEngine extends WASMChannelOutputsEngine {
 
   protected createNode(): void {
     const ctx = this.audioContext;
-    // One stereo mix; the replayer has no per-voice outputs.
-    this.workletNode = new AudioWorkletNode(ctx, 'jxs-processor', channelOutputNodeOptions(1));
+    // The main mix plus one output per voice the format can carry; the worklet renders every voice into its own buffer.
+    this.workletNode = new AudioWorkletNode(ctx, 'jxs-processor', channelOutputNodeOptions(JXS_MAX_VOICES));
 
     this.workletNode.port.onmessage = (event) => this.handleWorkletMessage(event.data);
 

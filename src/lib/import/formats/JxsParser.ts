@@ -7,6 +7,7 @@
  */
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern } from '@/types';
+import type { InstrumentConfig } from '@typedefs/instrument';
 import { decodeJxsModule, isJxsModule, jxsPlayRange, jxsPlacement, jxsRowCell, JXS_ROWS, type JxsModule } from './jxsGrid';
 
 export function isJxsFormat(bytes: Uint8Array): boolean {
@@ -47,11 +48,15 @@ function buildSong(m: JxsModule, filename: string, bytes: Uint8Array): TrackerSo
   // one engine pass plays. A replay restarts at the first of them (the engine has no in-pass loop jump).
   const { firstBar, lastBar } = jxsPlayRange(m);
   const positions = Array.from({ length: lastBar - firstBar + 1 }, (_, i) => firstBar + i);
+  // One entry per JayTrax instrument, id = the 1-based number the grid cells carry. The name is the file's.
+  const instruments = m.instrumentNames.map((name, i) => ({
+    id: i + 1, name, type: 'synth' as const, synthType: 'JxsWasmSynth' as const, effects: [], volume: 0, pan: 0,
+  })) as unknown as InstrumentConfig[];
   const song = {
     name: m.title || filename.replace(/\.[^/.]+$/, ''),
     format: 'JXS',
     patterns,
-    instruments: [],
+    instruments,
     songPositions: positions,
     songLength: positions.length,
     restartPosition: 0,

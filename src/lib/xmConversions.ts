@@ -13,6 +13,7 @@ import { soundMasterEffectToString } from './import/formats/soundMasterEffectGly
 import { actionamicsEffectToString } from './import/formats/actionamicsEffectGlyphs';
 import { activisionProEffectToString } from './import/formats/activisionProEffectGlyphs';
 import { tonyWilliamsEffectToString } from './import/formats/tonyWilliamsEffectGlyphs';
+import { jxsEffectToString } from './import/formats/jxsEffectGlyphs';
 import { davidWhittakerEffectToString } from './import/formats/davidWhittakerEffectGlyphs';
 import { benDaglishEffectToString } from './import/formats/benDaglishEffectGlyphs';
 import { robHubbardEffectToString } from './import/formats/robHubbardEffectGlyphs';
@@ -276,6 +277,10 @@ export function xmEffectToString(effTyp: number, eff: number): string {
   // Tony Williams stream commands (reserved block 0x90..0x9F).
   const tw = tonyWilliamsEffectToString(effTyp, eff);
   if (tw !== null) return tw;
+
+  // JayTrax row scripts (reserved block 0x100..).
+  const jx = jxsEffectToString(effTyp, eff);
+  if (jx !== null) return jx;
 
   // Ben Daglish track and position-list commands (reserved block 0xD8..0xEC).
   const bd = benDaglishEffectToString(effTyp, eff);
