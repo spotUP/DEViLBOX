@@ -18,6 +18,9 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import {
+  soundFactoryOpcodeFor, SOUND_FACTORY_EMPTY_INSTRUMENT, type SoundFactoryPitchParams,
+} from '@/lib/import/formats/soundFactoryPitch';
 
 const HEADER_SIZE = 276; // 4 + 16 + 256
 const PAL_CLOCK = 3546895;
@@ -33,11 +36,31 @@ const Op = {
   End:              0x8E,
 } as const;
 
-/** Reverse of parser's psfNoteToXm: xmNote = noteByte + 13 */
-function xmNoteToPsf(xmNote: number): number {
+/**
+ * Note opcode for a grid note on an instrument: the inverse of the parser's
+ * audible-pitch naming (soundFactoryGridNote). The exporter writes no
+ * SetTranspose, so transpose is 0.
+ */
+function xmNoteToPsf(xmNote: number, pitch: SoundFactoryPitchParams): number {
   if (xmNote <= 0 || xmNote > 96) return -1;
-  const noteByte = xmNote - 13;
-  return (noteByte >= 0 && noteByte <= 0x7F) ? noteByte : -1;
+  return soundFactoryOpcodeFor(pitch, xmNote);
+}
+
+/**
+ * The replayer pitch fields written for an instrument. An instrument imported from
+ * a .psf keeps its own (metadata.soundFactoryPitch); any other gets the sampling
+ * period from its sample rate at octave 0.
+ */
+function instrumentPitch(
+  inst: TrackerSong['instruments'][number] | undefined,
+  pcmLength: number,
+): SoundFactoryPitchParams {
+  const sampleLength = Math.floor(pcmLength / 2);
+  const looped = (inst?.sample?.loop ?? false) && sampleLength > 0;
+  const stored = inst?.metadata?.soundFactoryPitch;
+  if (stored) return { ...stored, sampleLength, looped };
+  const period = freqToPeriod(inst?.sample?.sampleRate ?? 8287);
+  return { samplingPeriod: period, octave: 0, waveCount: 1, sampleLength, looped };
 }
 
 /** Convert C3 sample rate (Hz) back to Amiga period */
@@ -47,13 +70,19 @@ function freqToPeriod(freq: number): number {
 }
 
 /** Extract 8-bit signed PCM from an instrument's sample audioBuffer (WAV format) */
-function extractPcm(inst: { sample?: { audioBuffer?: ArrayBuffer } }): Int8Array {
+function extractPcm(inst: { sample?: { audioBuffer?: ArrayBuffer; loop?: boolean; loopEnd?: number } }): Int8Array {
   const buf = inst.sample?.audioBuffer;
   if (!buf || buf.byteLength < 44) return new Int8Array(0);
 
   const wav = new DataView(buf);
   const dataLen = wav.getUint32(40, true);
-  const frames = Math.floor(dataLen / 2);
+  // A Sound Factory instrument loops its whole sample, so a looped sample ends at its
+  // loop end. pcm8ToWAV tiles short looped waves up to 512 frames for the browser;
+  // without this cut an 8-word wave was written back as 512 words, which moves the
+  // replayer's pitch (the cycle length) and its table-mode period.
+  const wavFrames = Math.floor(dataLen / 2);
+  const loopEnd = inst.sample?.loop ? Math.floor(inst.sample.loopEnd ?? 0) : 0;
+  const frames = loopEnd > 0 && loopEnd < wavFrames ? loopEnd : wavFrames;
   const pcm = new Int8Array(frames);
   for (let i = 0; i < frames; i++) {
     const s16 = wav.getInt16(44 + i * 2, true);
@@ -70,6 +99,7 @@ function buildChannelOpcodes(
   song: TrackerSong,
   channelIdx: number,
   warnings: string[],
+  pitchById: Map<number, SoundFactoryPitchParams>,
 ): Uint8Array {
   const chunks: Uint8Array[] = [];
   let currentInstrId = 0;
@@ -115,7 +145,7 @@ function buildChannelOpcodes(
 
       if (xmNote > 0 && xmNote <= 96) {
         // Note event — collect consecutive empty rows after as duration
-        const noteByte = xmNoteToPsf(xmNote);
+        const noteByte = xmNoteToPsf(xmNote, pitchById.get(currentInstrId) ?? SOUND_FACTORY_EMPTY_INSTRUMENT);
         if (noteByte >= 0) {
           let duration = 1;
           // Look ahead for empty rows that extend this note's duration
@@ -199,7 +229,7 @@ function buildChannelOpcodes(
 function buildDefineInstrument(
   slot: number,
   pcm: Int8Array,
-  period: number,
+  pitch: SoundFactoryPitchParams,
   inst: { sample?: { loop?: boolean; loopStart?: number; loopEnd?: number } } | undefined,
 ): Uint8Array | null {
   const sampleLengthWords = Math.floor(pcm.length / 2);
@@ -235,8 +265,8 @@ function buildDefineInstrument(
   out[off++] = sampleLengthWords & 0xFF;
 
   // samplingPeriod (big-endian)
-  out[off++] = (period >> 8) & 0xFF;
-  out[off++] = period & 0xFF;
+  out[off++] = (pitch.samplingPeriod >> 8) & 0xFF;
+  out[off++] = pitch.samplingPeriod & 0xFF;
 
   // effectByte — bit0 = oneShot (no loop)
   const isLoop = inst?.sample?.loop ?? false;
@@ -253,8 +283,9 @@ function buildDefineInstrument(
   off += 4;
   // phasingStart(1) + phasingEnd(1) + phasingSpeed(1) + phasingStep(1) = 4
   off += 4;
-  // waveCount(1) + octave(1) = 2
-  off += 2;
+  // waveCount(1) + octave(1): the replayer's period math reads both
+  out[off++] = pitch.waveCount & 0xFF;
+  out[off++] = pitch.octave & 0xFF;
   // filterFrequency(1) + filterEnd(1) + filterSpeed(1) = 3
   off += 3;
   // padding(1) = 1
@@ -278,7 +309,7 @@ export async function exportSoundFactory(
 
   // Prepare instrument sample data
   const instrumentPcms = new Map<number, Int8Array>();
-  const instrumentPeriods = new Map<number, number>();
+  const pitchById = new Map<number, SoundFactoryPitchParams>();
 
   for (let i = 0; i < song.instruments.length; i++) {
     const inst = song.instruments[i];
@@ -286,10 +317,7 @@ export async function exportSoundFactory(
     const pcm = extractPcm(inst);
     instrumentPcms.set(id, pcm);
 
-    // Use sample rate from the sample config to derive the Amiga period
-    const sampleRate = inst.sample?.sampleRate ?? 8287;
-    const period = freqToPeriod(sampleRate);
-    instrumentPeriods.set(id, period);
+    pitchById.set(id, instrumentPitch(inst, pcm.length));
   }
 
   // Define EVERY instrument once, up front, in id order (slot 0..N-1), as a preamble
@@ -304,7 +332,7 @@ export async function exportSoundFactory(
     const def = buildDefineInstrument(
       i, // slot is 0-based (= id-1)
       instrumentPcms.get(i + 1) ?? new Int8Array(0),
-      instrumentPeriods.get(i + 1) ?? 214,
+      pitchById.get(i + 1) ?? SOUND_FACTORY_EMPTY_INSTRUMENT,
       song.instruments[i],
     );
     if (def) preambleChunks.push(def);
@@ -319,7 +347,7 @@ export async function exportSoundFactory(
   // Build opcode streams for each channel (UseInstrument only; all defs are in preamble)
   const channelOpcodes: Uint8Array[] = [];
   for (let ch = 0; ch < NUM_CHANNELS; ch++) {
-    const opcodes = buildChannelOpcodes(song, ch, warnings);
+    const opcodes = buildChannelOpcodes(song, ch, warnings, pitchById);
     if (ch === 0) {
       const merged = new Uint8Array(preamble.length + opcodes.length);
       merged.set(preamble, 0);

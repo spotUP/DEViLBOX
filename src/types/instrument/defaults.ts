@@ -117,6 +117,14 @@ export interface InstrumentMetadata {
   originalEnvelope?: EnvelopePoints; // Preserved point-based volume envelope for FT2 processing
   panningEnvelope?: EnvelopePoints; // Preserved panning envelope for FT2 processing
   autoVibrato?: AutoVibrato; // Preserved auto-vibrato settings
+  /** Sound Factory (.psf) replayer pitch fields (soundFactoryPitch.ts); the exporter writes them back. */
+  soundFactoryPitch?: {
+    samplingPeriod: number;
+    octave: number;
+    waveCount: number;
+    sampleLength: number;
+    looped: boolean;
+  };
   fadeout?: number; // XM fadeout speed (0-4095), applied per tick on key-off
   sampleMap?: number[]; // XM note-to-sample mapping (96 entries, note 0-95 → sample index)
   multiSamples?: Array<{

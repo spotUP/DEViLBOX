@@ -76,7 +76,7 @@ export async function populatePatternsFromChipRAM(
         if (fileOffset < 0 || fileOffset + layout.bytesPerCell > allBytes.length) return existingRow;
 
         const cellBytes = allBytes.slice(fileOffset, fileOffset + layout.bytesPerCell);
-        const cell = decode(cellBytes);
+        const cell = decode(cellBytes, fileOffset + layout.patternDataFileOffset);
         cellsDecoded++;
 
         if (cell.note > 0 || cell.instrument > 0 || cell.effTyp > 0) {

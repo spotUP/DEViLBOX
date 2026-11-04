@@ -63,8 +63,10 @@ export interface UADEPatternLayout {
    * Inverse of encodeCell. Used by the chip RAM pattern reader to populate
    * pattern display after UADE loads a packed/compiled module.
    * If not provided, the format's parser is responsible for populating patterns.
+   * `fileOffset` is the cell's absolute file offset (getCellFileOffset), for
+   * formats whose decoding depends on stream context at that position.
    */
-  decodeCell?: (bytes: Uint8Array) => TrackerCell;
+  decodeCell?: (bytes: Uint8Array, fileOffset?: number) => TrackerCell;
 
   /**
    * Optional custom offset calculation for formats with non-standard layouts

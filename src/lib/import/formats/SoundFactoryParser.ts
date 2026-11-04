@@ -70,6 +70,10 @@ import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeSoundFactoryCell } from '@/engine/uade/encoders/SoundFactoryEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import {
+  soundFactoryGridNote, soundFactoryOpcodeFor, soundFactoryPeriodMultiplier,
+  SOUND_FACTORY_EMPTY_INSTRUMENT, type SoundFactoryPitchParams,
+} from './soundFactoryPitch';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -130,16 +134,19 @@ function periodToFreq(period: number): number {
   return Math.round(PAL_CLOCK / (2 * period));
 }
 
-/** PSF note byte (0x00-0x7F) to XM note.
- *  Notes are encoded directly as indices into a period table (12 per octave).
- *  0x00-0x0B = octave 1, 0x0C-0x17 = octave 2, etc.
- */
-function psfNoteToXm(noteByte: number): number {
-  if (noteByte > 0x7F) return 0;
-  // Map to XM: note 0 → C-1 (XM note 13, displays "C-1")
-  const xmNote = noteByte + 13;
-  return Math.max(1, Math.min(96, xmNote));
+/** The header fields the replayer's period math reads (soundFactoryPitch.ts). */
+function pitchParams(instr: PSFInstrument): SoundFactoryPitchParams {
+  return {
+    samplingPeriod: instr.samplingPeriod,
+    octave: instr.octave,
+    waveCount: instr.waveCount,
+    sampleLength: instr.sampleLength,
+    looped: (instr.effectByte & 0x01) === 0 && instr.sampleData.length > 0,
+  };
 }
+
+/** soundfactory.c's sf_default_instrument_template (sample_length 1, sampling_period 0, wave_count 1, octave 0): plays before any instrument is selected. */
+const EMPTY_INSTRUMENT_PITCH = SOUND_FACTORY_EMPTY_INSTRUMENT;
 
 // ── Format Identification ──────────────────────────────────────────────────
 
@@ -179,6 +186,8 @@ interface PSFInstrument {
   sampleLength: number;   // in words
   samplingPeriod: number;
   effectByte: number;
+  waveCount: number;      // header +24
+  octave: number;         // header +25: octave at which samplingPeriod plays unchanged
   sampleData: Int8Array;
   name: string;
 }
@@ -336,7 +345,9 @@ function fetchInstrument(opcodes: Uint8Array, offset: number): PSFInstrument {
   off += 4;
   // phasingStart(1) + phasingEnd(1) + phasingSpeed(1) + phasingStep(1) = 4
   off += 4;
-  // waveCount(1) + octave(1) = 2
+  // waveCount(1) + octave(1) = 2 (the replayer's period math reads both)
+  const waveCount = off < maxOff ? u8(opcodes, off) : 1;
+  const octave = off + 1 < maxOff ? u8(opcodes, off + 1) : 0;
   off += 2;
   // filterFrequency(1) + filterEnd(1) + filterSpeed(1) = 3
   off += 3;
@@ -357,7 +368,7 @@ function fetchInstrument(opcodes: Uint8Array, offset: number): PSFInstrument {
     sampleData = new Int8Array(0);
   }
 
-  return { offset, sampleLength, samplingPeriod, effectByte, sampleData, name: '' };
+  return { offset, sampleLength, samplingPeriod, effectByte, waveCount, octave, sampleData, name: '' };
 }
 
 // ── Main Parser ────────────────────────────────────────────────────────────
@@ -438,6 +449,13 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
     instrArray.push(instr);
     instrOffsetToId.set(offset, instrIdCounter++);
   }
+  // Replayer pitch inputs per instrument id-1 (grid naming, playback rate, codec inverse).
+  const instrPitch: SoundFactoryPitchParams[] = instrArray.map(pitchParams);
+  // Per note-opcode file offset: the instrument pitch and transpose in force there, so
+  // decodeCell names a stored opcode exactly as the import walk did.
+  const cellContext = new Map<number, { pitch: SoundFactoryPitchParams; transpose: number }>();
+  const pitchForInstrument = (instrument: number): SoundFactoryPitchParams =>
+    instrument > 0 && instrument <= instrPitch.length ? instrPitch[instrument - 1] : EMPTY_INSTRUMENT_PITCH;
 
   // ── Build InstrumentConfig[] ──────────────────────────────────────────
   const instrConfigs: InstrumentConfig[] = [];
@@ -461,9 +479,13 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
       const loopStart = isOneShot ? 0 : 0;
       const loopEnd   = isOneShot ? 0 : rawPcm.length;
 
-      instrConfigs.push(
-        createSamplerInstrument(id, '', rawPcm, 64, c3Rate, loopStart, loopEnd)
-      );
+      // Period playback at the instrument's own multiplier: grid notes name the audible pitch
+      // (soundFactoryPitch.ts), so note N must play the replayer's byte rate, not N's MOD rate.
+      const pitch = instrPitch[idx];
+      const cfg = createSamplerInstrument(id, '', rawPcm, 64, c3Rate, loopStart, loopEnd);
+      if (cfg.metadata?.modPlayback) cfg.metadata.modPlayback.periodMultiplier = soundFactoryPeriodMultiplier(pitch);
+      cfg.metadata = { ...cfg.metadata, soundFactoryPitch: pitch };
+      instrConfigs.push(cfg);
     } else {
       instrConfigs.push({
         id,
@@ -493,6 +515,7 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
     const events: NoteEvent[] = [];
     let offset = startOffset;
     let currentInstrId = 0;
+    let currentTranspose = 0; // SetTranspose: signed, added to every note opcode (soundfactory.c:549)
     let currentVolume = 64;
     const callStack: number[] = [];
     const forStack: Array<{ count: number; returnOffset: number }> = [];
@@ -513,7 +536,9 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
         if (offset + 2 > opcodes.length) break;
         const noteFileOff = HEADER_SIZE + (offset - 1); // file offset of note opcode byte
         const duration = u16BE(opcodes, offset); offset += 2;
-        const xmNote = psfNoteToXm(opcode);
+        const pitch = pitchForInstrument(currentInstrId);
+        const xmNote = soundFactoryGridNote(pitch, opcode + currentTranspose);
+        cellContext.set(noteFileOff, { pitch, transpose: currentTranspose });
         events.push({ note: xmNote, instrId: currentInstrId, volume: currentVolume, duration, fileOffset: noteFileOff });
         continue;
       }
@@ -615,11 +640,14 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
         case Op.Looping:
           break;
 
+        case Op.SetTranspose:
+          if (offset < opcodes.length) currentTranspose = (u8(opcodes, offset++) << 24) >> 24;
+          break;
+
         case Op.FadeOut:
         case Op.FadeIn:
         case Op.Led:
         case Op.WaitForRequest:
-        case Op.SetTranspose:
           if (offset < opcodes.length) offset++;
           break;
 
@@ -782,8 +810,11 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
     numChannels: NUM_CHANNELS,
     numPatterns: trackerPatterns.length,
     moduleSize: bytes.byteLength,
-    encodeCell: encodeSoundFactoryCell,
-    decodeCell: (raw: Uint8Array): TrackerCell => {
+    // Edited cells have no transpose context: they encode with transpose 0 (the opcode that
+    // plays the grid note on the cell's instrument when the voice is not transposed).
+    encodeCell: (cell: TrackerCell): Uint8Array =>
+      encodeSoundFactoryCell(cell, (note, instrument) => soundFactoryOpcodeFor(pitchForInstrument(instrument), note)),
+    decodeCell: (raw: Uint8Array, fileOffset?: number): TrackerCell => {
       // 3 bytes: opcode, durationHi, durationLo
       const opcode = raw[0];
       // Byte-exact carriers: the note is a clamped lookup, the pause opcode flattens to an
@@ -796,8 +827,9 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
         // Pause/rest (0x80+)
         return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, ...carriers };
       }
-      // Note: psfNoteToXm = opcode + 13
-      const note = Math.max(1, Math.min(96, opcode + 13));
+      // Audible-pitch naming in the instrument/transpose context the import walk recorded.
+      const ctx = fileOffset !== undefined ? cellContext.get(fileOffset) : undefined;
+      const note = soundFactoryGridNote(ctx?.pitch ?? EMPTY_INSTRUMENT_PITCH, opcode + (ctx?.transpose ?? 0));
       return { note, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, ...carriers };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
