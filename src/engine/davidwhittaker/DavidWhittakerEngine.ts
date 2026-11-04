@@ -128,9 +128,12 @@ export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
   previewLoad(buffer: ArrayBuffer): void {
     this.workletNode?.port.postMessage({ type: 'previewLoad', buffer });
   }
-  /** One key: `sample` (0-based) at the replayer's note `note`, with the envelope and arpeggio the song pairs with it. */
-  noteOn(sample: number, note: number, atTime?: number): void {
-    this.workletNode?.port.postMessage({ type: 'noteOn', atTime, sample, note });
+  /**
+   * One key: `sample` (0-based) sounding Paula period `period`, with the envelope and arpeggio the song pairs with it.
+   * The replayer picks the note byte for that period from the loaded module (dw_preview_key).
+   */
+  noteOn(sample: number, period: number, atTime?: number): void {
+    this.workletNode?.port.postMessage({ type: 'noteOn', atTime, sample, period });
   }
   noteOff(atTime?: number): void { this.workletNode?.port.postMessage({ type: 'noteOff', atTime }); }
 

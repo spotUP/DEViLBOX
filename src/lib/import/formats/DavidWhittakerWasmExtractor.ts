@@ -8,6 +8,7 @@
  * 2026-10-07: "the pattern data is a bad guesstimate"). Follows AyletWasmExtractor: the bundle is
  * fetched from public/davidwhittaker/ on the main thread and kept for the session.
  */
+import type { DwPitch } from './davidWhittakerPitch';
 
 interface DwWasmModule {
   _malloc(n: number): number;
@@ -79,6 +80,8 @@ export interface DwLayout {
   tracks: Array<{ offset: number; length: number }>;
   /** Every position-list entry of every subsong and voice: where it is, and the file offset of the track it names. */
   entries: Array<{ at: number; track: number }>;
+  /** How the replayer turns a note byte into a period (davidWhittakerPitch.ts). */
+  pitch: DwPitch;
 }
 
 export interface DwWalk {
@@ -145,13 +148,20 @@ function readLayout(M: DwWasmModule, handle: number): DwLayout {
   try {
     const n = M._dw_layout(handle, out, MAX_LAYOUT_RECORDS);
     const dv = new DataView(M.HEAPU8.buffer);
-    const layout: DwLayout = { startOffset: 0, pointerWidth: 2, oldPlayer: false, tracks: [], entries: [] };
+    const pitch: DwPitch = { periods: [], oldPlayer: false, sampleTranspose: false, channelTranspose: false, globalTranspose: false, samples: [] };
+    const layout: DwLayout = { startOffset: 0, pointerWidth: 2, oldPlayer: false, tracks: [], entries: [], pitch };
     for (let i = 0; i < n; i++) {
       const r = [0, 4, 8, 12].map((o) => dv.getInt32(out + i * 16 + o, true));
       if (r[0] === 0) layout.tracks.push({ offset: r[1], length: r[2] });
       else if (r[0] === 1) layout.entries.push({ at: r[1], track: r[3] });
-      else { layout.startOffset = r[1]; layout.pointerWidth = r[2]; layout.oldPlayer = r[3] === 1; }
+      else if (r[0] === 2) { layout.startOffset = r[1]; layout.pointerWidth = r[2]; layout.oldPlayer = r[3] === 1; }
+      else if (r[0] === 3) {
+        pitch.periods = new Array<number>(r[1]).fill(0);
+        pitch.sampleTranspose = (r[2] & 1) !== 0; pitch.channelTranspose = (r[2] & 2) !== 0; pitch.globalTranspose = (r[2] & 4) !== 0;
+      } else if (r[0] === 4) pitch.periods[r[1]] = r[2];
+      else if (r[0] === 5) pitch.samples[r[1]] = { fineTunePeriod: r[2], transpose: r[3] };
     }
+    pitch.oldPlayer = layout.oldPlayer;
     return layout;
   } finally {
     M._free(out);

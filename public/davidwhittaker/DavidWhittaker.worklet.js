@@ -54,7 +54,7 @@ class DavidWhittakerProcessor extends AudioWorkletProcessor {
         break;
       }
       case 'previewLoad': this.previewLoad(data.buffer); break;
-      case 'noteOn': this.previewNoteOn(data.sample, data.note, data.envelope, data.arpeggio); break;
+      case 'noteOn': this.previewNoteOn(data.sample, data.period, data.envelope, data.arpeggio); break;
       case 'noteOff': if (this.previewHandle) this.module._dw_preview_stop(this.previewHandle); break;
       case 'play': this.playing = true; break;
       case 'stop':
@@ -185,9 +185,11 @@ class DavidWhittakerProcessor extends AudioWorkletProcessor {
     if (this.previewHandle) { this.module._dw_preview_scan(this.previewHandle); this.module._dw_preview_stop(this.previewHandle); }
   }
 
-  previewNoteOn(sample, note, envelope, arpeggio) {
+  /** One key: `sample` at the note byte that sounds Paula period `period` (the grid note's period; dw_preview_key). */
+  previewNoteOn(sample, period, envelope, arpeggio) {
     if (!this.module || !this.previewHandle) return;
-    this.module._dw_preview_note(this.previewHandle, sample, note, envelope === undefined ? -1 : envelope, arpeggio === undefined ? -1 : arpeggio);
+    const ok = this.module._dw_preview_key(this.previewHandle, sample, period, envelope === undefined ? -1 : envelope, arpeggio === undefined ? -1 : arpeggio);
+    if (!ok) console.warn(`[DavidWhittaker] sample ${sample} has no note byte for period ${period}`);
   }
 
   cleanup() {

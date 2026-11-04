@@ -38,6 +38,8 @@ void dw_preview_scan(DwModule* module);
 int dw_preview_envelope(const DwModule* module, int sample);
 int dw_preview_arpeggio(const DwModule* module, int sample);
 bool dw_preview_note(DwModule* module, int sample, int note, int envelope, int arpeggio);
+int dw_preview_key_byte(DwModule* module, int sample, int target_period);
+bool dw_preview_key(DwModule* module, int sample, int target_period, int envelope, int arpeggio);
 void dw_preview_stop(DwModule* module);
 
 // What the replayer plays: (channel, sample index, track byte) of each note the subsong starts in `ticks` ticks

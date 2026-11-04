@@ -775,7 +775,7 @@ export async function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: str
 
   const result: TrackerSong = {
     name: `${baseName}${extractInfo}`,
-    format: 'XM' as TrackerFormat,
+    format: 'MOD' as TrackerFormat,
     patterns,
     instruments,
     songPositions,

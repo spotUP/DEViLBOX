@@ -7,6 +7,7 @@
  * One reachability proof per song: parse -> edit the grid -> exportDavidWhittaker (the product's
  * export entry) -> parse again; the walk call count proves the export ran the replayer.
  */
+import { dwNoteToByte, dwWalkTransposes } from '@/lib/import/formats/davidWhittakerPitch';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -112,7 +113,7 @@ describe.each(SONGS)('David Whittaker grid edits reach the module: %s', (name) =
     for (let i = 0; i < orig.length; i++) if (orig[i] !== bytes[i]) diff.push(i);
     const fxOff = off(p.fxEv) + (p.fxEv.kind === DW_WALK.envelope ? 0 : 1);
     expect(diff.sort((a, b) => a - b)).toEqual([off(p.noteEv), off(p.insSample), fxOff].sort((a, b) => a - b));
-    expect(bytes[off(p.noteEv)]).toBe(p.newNote - 25);
+    expect(bytes[off(p.noteEv)]).toBe(dwNoteToByte(walk.layout.pitch, p.newNote, p.noteEv.a, dwWalkTransposes(walk).get(p.noteEv)));
 
     // re-import: the edited cells hold the edits
     const again = await parseDavidWhittakerFile(bytes.buffer.slice(0) as ArrayBuffer, name) as TrackerSong;

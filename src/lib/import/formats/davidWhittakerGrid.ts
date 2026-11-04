@@ -11,15 +11,10 @@
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import { DW_FX } from './davidWhittakerEffectGlyphs';
 import { DW_WALK, type DwWalk, type DwWalkEvent } from './DavidWhittakerWasmExtractor';
+import { dwByteToNote, dwWalkTransposes } from './davidWhittakerPitch';
 
 const ROWS_PER_PATTERN = 64;
 const EFFECT_SLOTS = 5;
-
-/** The tracker note a DW track byte plays: an index into the 60-entry period table, C-1 = 25. */
-export function dwTrackByteToNote(byte: number): number {
-  const n = byte + 25;
-  return n >= 1 && n <= 96 ? n : 0;
-}
 
 type Fx = [effTyp: number, eff: number];
 
@@ -99,6 +94,7 @@ export function buildDWGridFromWalk(walk: DwWalk): DwGrid {
   const curBlock = new Array<number>(channels).fill(-1);
   let ei = 0;
   const ev = walk.events;
+  const transposes = dwWalkTransposes(walk);
   for (let t = 0; t < rows; t++) {
     for (; ei < ev.length && ev[ei].tick === t; ei++) {
       const e = ev[ei];
@@ -106,7 +102,8 @@ export function buildDWGridFromWalk(walk: DwWalk): DwGrid {
       curBlock[e.channel] = e.block === 0xffffffff ? -1 : e.block;
       const cell = grid[e.channel][t];
       if (e.kind === DW_WALK.note) {
-        cell.note = dwTrackByteToNote(e.b);
+        // named by the pitch the replayer plays it at: the byte through the period table, the sample's tuning, the transposes
+        cell.note = dwByteToNote(walk.layout.pitch, e.b, e.a, transposes.get(e));
         cell.instrument = e.a >= 0 ? e.a + 1 : 0;
       } else if (e.kind === DW_WALK.mute) {
         // a mute is a note-off only where it stops a sounding voice

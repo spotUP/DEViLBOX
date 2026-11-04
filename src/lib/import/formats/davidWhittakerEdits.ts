@@ -4,7 +4,8 @@
  * The grid (davidWhittakerGrid.ts) is the replayer's own walk: every cell is made of walk events,
  * and every event names the file byte of the command that ran (block + pos). An edited cell is
  * therefore a byte patch, in place, never a re-pack:
- *   - note: the note byte of the command that played it (track byte = note - 25);
+ *   - note: the note byte of the command that played it, the byte that plays the named pitch with the cell's sample
+ *     (davidWhittakerPitch.ts, the same map the grid names it by);
  *   - instrument: the sample-change command that was in force for that note (its byte is
  *     sampleBase + index, the base read off the module's own byte and the replayer's index);
  *   - an effect column: the argument byte(s) of the command that ran, or the index inside an
@@ -18,6 +19,7 @@ import type { Pattern } from '@/types';
 import { DW_FX } from './davidWhittakerEffectGlyphs';
 import { DW_WALK, type DwWalk, type DwWalkEvent } from './DavidWhittakerWasmExtractor';
 import { buildDWGridFromWalk, dwEventEffects } from './davidWhittakerGrid';
+import { dwNoteToByte, dwWalkTransposes, type DwTransposes } from './davidWhittakerPitch';
 
 const ROWS_PER_PATTERN = 64;
 const NO_BLOCK = 0xffffffff;
@@ -67,6 +69,7 @@ const WAIT_BASE = 0xdf;
  */
 function growBlocks(
   source: Uint8Array, walk: DwWalk, adds: DwAdd[], noteSample: Map<DwWalkEvent, DwWalkEvent | null>, warnings: string[],
+  transposes: Map<DwWalkEvent, DwTransposes>,
 ): { data: Uint8Array; patched: number } {
   const { layout } = walk;
   if (layout.oldPlayer) { for (const a of adds) warnings.push(`${a.where}: this player's notes carry their sample; not written`); return { data: source, patched: 0 }; }
@@ -100,10 +103,11 @@ function growBlocks(
     const ku = k / speed;
     const rest = durationUnits - ku;
     if (ku < 1 || rest < 1 || durationUnits > 32) { warnings.push(`${a.where}: the row is outside the covering note's ${durationUnits} unit wait; not written`); continue; }
-    const noteByte = a.note - 25;
-    if (noteByte < 0 || noteByte > 0x7f) { warnings.push(`${a.where}: note ${a.note} is below the replayer's table; not written`); continue; }
     // The sample for Z: the one in force at the covering note unless the typed instrument is another.
     const inForce = noteSample.get(cover) ?? null;
+    const zSample = a.instrument > 0 ? a.instrument - 1 : cover.kind === DW_WALK.note ? cover.a : (inForce?.a ?? -1);
+    const noteByte = dwNoteToByte(layout.pitch, a.note, zSample, transposes.get(cover));
+    if (noteByte === null) { warnings.push(`${a.where}: no note byte plays ${a.note} with sample ${zSample + 1}; not written`); continue; }
     const middle: number[] = [];
     const afterZ: number[] = [];
     if (a.instrument > 0 && inForce && a.instrument - 1 !== inForce.a) {
@@ -181,6 +185,7 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
     else if (isNoteSlot(e)) noteSample.set(e, lastSample[e.channel]);
   }
   const adds: DwAdd[] = [];
+  const transposes = dwWalkTransposes(walk);
   const cmdOffset = (e: DwWalkEvent): number => (e.block === NO_BLOCK ? -1 : e.block + e.pos);
 
   for (let p = 0; p < edited.length; p++) {
@@ -206,8 +211,13 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
             else warnings.push(`${where}: a note removed or turned into a note-off needs a different command; not written`);
           }
           else if (n < 1 || n > 96) warnings.push(`${where}: a note removed or turned into a note-off needs a different command; not written`);
-          else if (n - 25 < 0 || n - 25 > 0x7f) warnings.push(`${where}: note ${n} is below the replayer's table; not written`);
-          else want(cmdOffset(noteEv), n - 25, `${where} note`);
+          else {
+            const ins = c.instrument ?? 0;
+            const sample = ins > 0 ? ins - 1 : noteEv.kind === DW_WALK.note ? noteEv.a : (noteSample.get(noteEv)?.a ?? -1);
+            const byte = dwNoteToByte(walk.layout.pitch, n, sample, transposes.get(noteEv));
+            if (byte === null) warnings.push(`${where}: no note byte plays ${n} with sample ${sample + 1}; not written`);
+            else want(cmdOffset(noteEv), byte, `${where} note`);
+          }
         }
         if ((c.instrument ?? 0) !== (b.instrument ?? 0)) {
           const ins = c.instrument ?? 0;
@@ -251,7 +261,7 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
     if (out[off] !== value) { out[off] = value; patched++; }
   }
   if (adds.length > 0) {
-    const grown = growBlocks(out, walk, adds, noteSample, warnings);
+    const grown = growBlocks(out, walk, adds, noteSample, warnings, transposes);
     return { data: grown.data, patched: patched + grown.patched, warnings };
   }
   return { data: out, patched, warnings };
