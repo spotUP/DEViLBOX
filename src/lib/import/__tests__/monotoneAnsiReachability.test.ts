@@ -50,8 +50,8 @@ describe('MONOTONE and ANSI music are reachable through parseModuleToSong', () =
 
   it('a plain ANSI art file without music does not become an AnsiMusic song', async () => {
     const art = new TextEncoder().encode('\x1b[31;1mHELLO\x1b[0m\r\n\x1b[2;5Hplain art, no music\r\n');
-    const song = await parseModuleToSong(fileOf(art, 'ART.ANS')).catch(() => null);
+    // Refused by the ANSI route itself: it never falls through to libopenmpt and UADE.
+    await expect(parseModuleToSong(fileOf(art, 'ART.ANS'))).rejects.toThrow(/ANSI art without a music block/);
     expect(parseAnsiMusicFile).not.toHaveBeenCalled();
-    expect(song?.format).not.toBe('AnsiMusic');
   }, 60000);
 });
