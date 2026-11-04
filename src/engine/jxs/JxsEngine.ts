@@ -15,6 +15,7 @@ import {
 } from '@engine/wasm/WASMSingletonBase';
 import { decodeJxsModule, jxsPlayRange } from '@lib/import/formats/jxsGrid';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import { ChannelMeterFeed } from '@engine/tone/channelMeterFeed';
 import { actionamicsTransform } from '@engine/actionamics/ActionamicsEngine';
 
 /** Where the replayer is, in the engine position contract: the index into songPositions and the row (0..63). */
@@ -25,6 +26,9 @@ export interface JxsPositionUpdate {
 
 /** Voices a JayTrax song can carry (the replayer's channel table). */
 export const JXS_MAX_VOICES = 16;
+
+/** The channel VU meters' feed: per-voice levels and note-start counts from the worklet. */
+const meterFeed = new ChannelMeterFeed();
 
 export class JxsEngine extends WASMChannelOutputsEngine {
   private static instance: JxsEngine | null = null;
@@ -89,6 +93,7 @@ export class JxsEngine extends WASMChannelOutputsEngine {
   handleWorkletMessage(data: {
     type: string; bar: number; step: number; message?: string;
     channels?: number | Int16Array[]; frame?: number; sampleRate?: number;
+    levels?: number[]; noteStarts?: number[]; audioTime?: number;
   }): void {
     switch (data.type) {
       case 'ready':
@@ -108,6 +113,9 @@ export class JxsEngine extends WASMChannelOutputsEngine {
         if (Array.isArray(data.channels)) {
           useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame ?? 0, data.sampleRate ?? 0);
         }
+        break;
+      case 'chLevels':
+        if (data.levels) meterFeed.reportFromWorklet({ levels: data.levels, noteStarts: data.noteStarts, audioTime: data.audioTime }, this.audioContext);
         break;
       case 'position':
         // Outside the played range: the pre-roll before the first row (start step - 1) and the loop bar the
@@ -129,6 +137,7 @@ export class JxsEngine extends WASMChannelOutputsEngine {
     if (!this.workletNode) throw new Error('JxsEngine not initialized');
     const m = decodeJxsModule(new Uint8Array(buffer));
     this._range = m ? jxsPlayRange(m) : { firstBar: 0, lastBar: Number.MAX_SAFE_INTEGER };
+    meterFeed.clearHeld();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
   }
 
@@ -141,8 +150,18 @@ export class JxsEngine extends WASMChannelOutputsEngine {
     this.workletNode?.port.postMessage({ type: 'play' });
     this.afterPlay();
   }
-  stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
+  stop(): void { meterFeed.clearHeld(); this.workletNode?.port.postMessage({ type: 'stop' }); }
   pause(): void { this.workletNode?.port.postMessage({ type: 'pause' }); }
+
+  /** Hand the worklet the song's bytes for its keyboard copy of the module. */
+  previewLoad(buffer: ArrayBuffer): void {
+    this.workletNode?.port.postMessage({ type: 'previewLoad', buffer });
+  }
+  /** One key: the 1-based instrument (the cell's instrument byte) at the grid's note number. */
+  noteOn(instrument: number, note: number, atTime?: number): void {
+    this.workletNode?.port.postMessage({ type: 'noteOn', atTime, instrument, note });
+  }
+  noteOff(atTime?: number): void { this.workletNode?.port.postMessage({ type: 'noteOff', atTime }); }
 
   onPositionUpdate(cb: (update: JxsPositionUpdate) => void): () => void {
     this._positionCallbacks.add(cb);

@@ -313,6 +313,7 @@ export type SynthType =
   | 'BenDaglishSynth'          // Ben Daglish (WASM replayer)
   | 'SoundControlWasmSynth'    // Sound Control (WASM replayer)
   | 'ActionamicsWasmSynth'     // Actionamics (WASM replayer)
+  | 'JxsSynth'                // JayTrax (keyboard voice on the WASM replayer)
   | 'JxsWasmSynth'            // JayTrax (WASM replayer)
   | 'KdmWasmSynth'            // Ken Silverman KDM (WASM replayer)
   | 'MonotoneWasmSynth'        // MONOTONE (WASM replayer)

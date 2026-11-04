@@ -50,7 +50,7 @@ function buildSong(m: JxsModule, filename: string, bytes: Uint8Array): TrackerSo
   const positions = Array.from({ length: lastBar - firstBar + 1 }, (_, i) => firstBar + i);
   // One entry per JayTrax instrument, id = the 1-based number the grid cells carry. The name is the file's.
   const instruments = m.instrumentNames.map((name, i) => ({
-    id: i + 1, name, type: 'synth' as const, synthType: 'JxsWasmSynth' as const, effects: [], volume: 0, pan: 0,
+    id: i + 1, name, type: 'synth' as const, synthType: 'JxsSynth' as const, effects: [], volume: 0, pan: 0,
   })) as unknown as InstrumentConfig[];
   const song = {
     name: m.title || filename.replace(/\.[^/.]+$/, ''),

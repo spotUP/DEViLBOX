@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { JxsEngine, JXS_MAX_VOICES } from '../JxsEngine';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
+import { ChannelMeterFeed } from '@engine/tone/channelMeterFeed';
 
 const root = path.resolve(__dirname, '../../../..');
 
@@ -131,6 +132,7 @@ describe('JxsEngine loop', () => {
       g.AudioWorkletProcessor = class { port = { postMessage() {}, onmessage: null as unknown }; };
       g.registerProcessor = (_n: string, c: unknown) => { Proc = c; };
       g.sampleRate = 44100;
+      g.currentTime = 0;
       delete g.DevilboxChannelOutputs;
       delete g.DevilboxChannelStream;
       new Function(fs.readFileSync(path.join(root, 'public/worklets/channel-outputs.js'), 'utf8'))();
@@ -179,6 +181,24 @@ describe('JxsEngine loop', () => {
         expect(rms(sum) / rms(dry[side])).toBeLessThan(1.1);
       }
     });
+
+    it('the channel VU meter flashes on every voice of popcorn, the quiet third voice included', async () => {
+      const w = await bootWorklet('popcorn.jxs');
+      const reports: { levels: number[]; noteStarts: number[] }[] = [];
+      w.proc.port.postMessage = (msg: { type: string; levels: number[]; noteStarts: number[] }) => {
+        if (msg.type === 'chLevels') reports.push(msg);
+      };
+      // ~60 s: popcorn's third voice comes in around 40 s.
+      w.proc.playing = true;
+      for (let b = 0; b < Math.ceil((60 * 44100) / 128); b++) w.proc.process([], w.newOuts());
+      expect(reports.length).toBeGreaterThan(100);
+      const flashes = new Array(w.voices).fill(0);
+      const feed = new ChannelMeterFeed();
+      const sink = { updateRealtimeChannelLevels() {}, triggerChannelMeter(c: number) { flashes[c]++; } };
+      for (const r of reports) feed.feedCounted(sink, r.levels, r.noteStarts);
+      expect(w.voices).toBeGreaterThanOrEqual(3);
+      for (let c = 0; c < w.voices; c++) expect(flashes[c], `voice ${c + 1}`).toBeGreaterThan(5);
+    }, 120000);
 
     it('a dub send carries its voice at the level the voice has in the main mix', async () => {
       const probe = await bootWorklet('popcorn.jxs');

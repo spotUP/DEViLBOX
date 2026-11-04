@@ -51,7 +51,7 @@ const NATIVE_AUDITION_SYNTHS = new Set([
   'SunTronicSynth', 'FredSynth', 'SoundMonSynth', 'FuturePlayerSynth', 'SidMonSynth',
   // Keyboard voices of the replayers themselves (ledger K2): the rendered PCM these parsers also keep is
   // one fixed-pitch loop of the waveform (an octave off, a bleep), not the instrument.
-  'DavidWhittakerSynth', 'StartrekkerAMSynth', 'DigMugSynth', 'SonicArrangerSynth',
+  'DavidWhittakerSynth', 'StartrekkerAMSynth', 'DigMugSynth', 'JxsSynth', 'SonicArrangerSynth',
   'DeltaMusic1Synth', 'DeltaMusic2Synth', 'InStereo1Synth', 'InStereo2Synth',
   // K7: Rob Hubbard plays through UADE (injectUADE), so the clobber below made every instrument a
   // UADEEditableSynth whose key plays nothing; the keyboard voice is the replayer own voice (robhubbard_synth.c).
@@ -71,7 +71,7 @@ const NATIVE_AUDITION_SYNTHS = new Set([
  * silent on the keyboard (nothing to play, and nothing is faked).
  */
 export const KEYBOARD_VOICE_SYNTHS: ReadonlySet<string> = new Set([
-  'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth', 'DigMugSynth', 'FCSynth', 'FredSynth',
+  'SoundMonSynth', 'SidMonSynth', 'SidMon1Synth', 'DigMugSynth', 'JxsSynth', 'FCSynth', 'FredSynth',
   'TFMXSynth', 'OctaMEDSynth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth', 'HippelStSynth',
   'DavidWhittakerSynth', 'SonicArrangerSynth', 'InStereo1Synth', 'InStereo2Synth',
   'StartrekkerAMSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth', 'FuturePlayerSynth',

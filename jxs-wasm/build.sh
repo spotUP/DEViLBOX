@@ -8,7 +8,7 @@ mkdir -p "$OUT_DIR"
 emcc -O2 -std=c++17 -fno-fast-math -ffp-contract=off -fwrapv -Wall -Wextra -Wno-unused-function \
     -I"$SCRIPT_DIR/src" \
     "$SCRIPT_DIR/src/jxs_wasm.cpp" \
-    -sEXPORTED_FUNCTIONS="['_jxs_open','_jxs_error','_jxs_rate','_jxs_tracks','_jxs_duration_ms','_jxs_bar','_jxs_step','_jxs_render','_jxs_voices','_jxs_voice','_jxs_voice_side','_jxs_set_isolated','_jxs_close','_malloc','_free']" \
+    -sEXPORTED_FUNCTIONS="['_jxs_open','_jxs_error','_jxs_rate','_jxs_tracks','_jxs_duration_ms','_jxs_bar','_jxs_step','_jxs_render','_jxs_voices','_jxs_voice','_jxs_voice_side','_jxs_set_isolated','_jxs_note_starts','_jxs_close','_jxs_preview_open','_jxs_preview_note','_jxs_preview_stop','_jxs_preview_render','_jxs_preview_close','_malloc','_free']" \
     -sEXPORTED_RUNTIME_METHODS="['HEAPU8','HEAPF32','UTF8ToString']" \
     -sMODULARIZE=1 -sEXPORT_NAME=createJxs -sENVIRONMENT=worker \
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=33554432 -sMAXIMUM_MEMORY=268435456 \

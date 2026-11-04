@@ -189,6 +189,13 @@ struct State {
   float buf[2 * kPlayRequest];
   float vbuf[16][kPlayRequest];   // per-voice mono, aligned with buf
   float vout[16][kPlayRequest];   // the last jxs_render call's per-voice frames
+  // Note starts, for the channel meters: strike() logs each one at the frame of the request
+  // it sounds at (tick_at, -1 outside a playing request); synthw_jxs_render counts them into
+  // starts[] once the output reaches that frame, so the counts follow what is heard.
+  struct Strike { int c, at; };
+  Strike strikes[256];
+  int nstrikes = 0, sdone = 0, tick_at = -1;
+  uint32_t starts[16] = {};
   int buf_n = 0, buf_pos = 0;
   bool done = false;
 };
@@ -282,6 +289,7 @@ void strike(State& s, Channel& h, int note, int n) {
   if (note == 0) return;
   if (n > s.song.I) return;
   if (n == 0 && h.instr == 0) return;
+  if (s.tick_at >= 0 && s.nstrikes < 256) s.strikes[s.nstrikes++] = {static_cast<int>(&h - s.ch), s.tick_at};
   h.arpstep = h.volpos = h.panpos = h.pitchpos = 0;
   h.note = note;
   h.bent = note;
@@ -794,6 +802,8 @@ void lookahead(State& s) {
 // one request of R frames (§5.2); out == nullptr: the silent length pass
 int request(State& s, float* out, int R) {
   int done = 0;
+  s.nstrikes = 0;
+  s.sdone = 0;
   while (R > 0) {
     if (s.ended) break;
     int piece;
@@ -815,7 +825,9 @@ int request(State& s, float* out, int R) {
         piece_settings(s);
         lookahead(s);
       }
+      s.tick_at = out ? done : -1;
       tick(s);
+      s.tick_at = -1;
     }
   }
   return done;
@@ -1098,11 +1110,17 @@ extern "C" int synthw_jxs_open(const char* path, const uint8_t* data, size_t siz
   return ok;
 }
 
+// Count the logged note starts the output has reached (all of them when `upto` is past the request).
+static void deliver_strikes(State& s, int upto) {
+  while (s.sdone < s.nstrikes && s.strikes[s.sdone].at < upto) ++s.starts[s.strikes[s.sdone++].c];
+}
+
 extern "C" int synthw_jxs_render(float* out, int frames) {
   if (!g) return 0;
   int done = 0;
   while (done < frames) {
     if (g->buf_pos >= g->buf_n) {
+      deliver_strikes(*g, INT32_MAX);
       if (g->done) break;
       g->buf_n = request(*g, g->buf, kPlayRequest);
       g->buf_pos = 0;
@@ -1115,6 +1133,7 @@ extern "C" int synthw_jxs_render(float* out, int frames) {
       for (int c = 0; c < 16; ++c)
         std::memcpy(g->vout[c] + done, g->vbuf[c] + g->buf_pos, sizeof(float) * n);
     g->buf_pos += n;
+    deliver_strikes(*g, g->buf_pos);
     done += n;
   }
   return done;
