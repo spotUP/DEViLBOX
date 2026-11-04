@@ -554,11 +554,11 @@
     },
     "tonyWilliams": {
       "exporter": "TonyWilliamsExporter.exportTonyWilliams",
-      "tier": "pattern-data",
-      "status": "parse-error",
-      "matchPct": 0,
-      "cells": 0,
-      "bytes": 0
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 102144,
+      "bytes": 102144
     },
     "unic": {
       "exporter": "UNICExporter.exportUNIC",
