@@ -162,12 +162,15 @@ const rowAt = (m: JxsModule, pattern: number, row: number): number => m.patternO
 
 const SINGLE = new Set<number>(JX_SINGLE_SCRIPTS);
 
+/** A script byte jxs_engine.cpp script() ignores (0 and 76..255): the row's d and p do nothing. */
+const inertScript = (sc: number): boolean => !SINGLE.has(sc) && (sc < 14 || sc > 73);
+
 /** The grid cell of a pattern row (layout: jxsEffectGlyphs.ts). */
 export function jxsRowCell(image: Uint8Array, m: JxsModule, pattern: number, row: number): TrackerCell {
   const o = rowAt(m, pattern, row);
   const d = image[o + 1], p = image[o + 3], sc = image[o + 4];
   const cell: TrackerCell = { note: image[o], instrument: image[o + 2], volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
-  if (sc === 0 && d === 0 && p === 0) return cell;
+  if (inertScript(sc)) return cell;
   if (SINGLE.has(sc)) {
     cell.effTyp = JX_FX_BASE + sc; cell.eff = d;
     if (p !== 0) { cell.effTyp2 = JX_AUX; cell.eff2 = p; }
@@ -220,6 +223,10 @@ export function applyJxsGridEdits(bytes: Uint8Array, edits: readonly JxsGridEdit
     const o = rowAt(m, where[0], where[1]);
     out[o] = Math.min(127, c.note ?? 0);
     const fx = jxsCellScript(c);
+    // A cell with no effect keeps an inert script row's bytes: they never showed and do nothing.
+    if (fx.sc === 0 && fx.d === 0 && fx.p === 0 && inertScript(bytes[o + 4])) {
+      fx.d = bytes[o + 1]; fx.p = bytes[o + 3]; fx.sc = bytes[o + 4];
+    }
     out[o + 1] = fx.d;
     out[o + 2] = (c.instrument ?? 0) & 0xff;
     out[o + 3] = fx.p;

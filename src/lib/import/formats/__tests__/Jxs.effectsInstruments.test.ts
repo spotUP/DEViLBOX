@@ -32,7 +32,7 @@ describe('JayTrax effects', () => {
   it('an edited effect cell round-trips to the right bytes', async () => {
     const t = load('popcorn.jxs');
     const m = decodeJxsModule(raw('popcorn.jxs'))!;
-    const rows = t.patterns[0].channels.flatMap((c) => c.rows.filter((r) => r.effTyp));
+    const rows = t.patterns.flatMap((p) => p.channels.flatMap((c) => c.rows.filter((r) => r.effTyp)));
     const cell = rows[0];
     cell.eff = ((cell.eff ?? 0) + 1) & 0xff;
     const out = await bytesOf(t);
@@ -41,13 +41,13 @@ describe('JayTrax effects', () => {
     expect(diff.length).toBe(1);
     expect((diff[0] - m.patternOffset) % 5).toBe(1); // the d byte of a row
     const again = parseJxsFile(out, 'p')!;
-    expect(again.patterns[0].channels.flatMap((c) => c.rows.filter((r) => r.effTyp))[0].eff).toBe(cell.eff);
+    expect(again.patterns.flatMap((p) => p.channels.flatMap((c) => c.rows.filter((r) => r.effTyp)))[0].eff).toBe(cell.eff);
   });
   it('a slot-field and a wave-reset script survive the cell mapping', async () => {
     const src = raw('popcorn.jxs');
     const m = decodeJxsModule(src)!;
     const t = load('popcorn.jxs');
-    for (const sc of [14, 24, 40, 57, 58, 73, 200]) {
+    for (const sc of [14, 24, 40, 57, 58, 73]) {
       const img = src.slice();
       img[m.patternOffset + 4] = sc; img[m.patternOffset + 1] = 5; img[m.patternOffset + 3] = 0;
       const tt = parseJxsFile(img, 'x')!;
@@ -63,6 +63,25 @@ describe('JayTrax effects', () => {
       expect(out[m.patternOffset + 1]).toBe(6);
     }
     expect(t).toBeTruthy();
+  });
+  it('popcorn shows no ?01 on rows whose script the replayer ignores, and keeps their bytes on edit', async () => {
+    const src = raw('popcorn.jxs');
+    const m = decodeJxsModule(src)!;
+    const t = load('popcorn.jxs');
+    const glyphs = t.patterns.flatMap((p) => p.channels.flatMap((c) => c.rows))
+      .filter((r) => r.effTyp).map((r) => jxsEffectToString(r.effTyp, r.eff ?? 0) ?? '');
+    expect(glyphs.filter((g) => g.startsWith('?'))).toEqual([]);
+    // script 200 is inert too: no effect shown
+    const img = src.slice();
+    img[m.patternOffset + 4] = 200; img[m.patternOffset + 1] = 5; img[m.patternOffset + 3] = 3;
+    const tt = parseJxsFile(img, 'x')!;
+    (tt as unknown as { jxsFileData: ArrayBuffer }).jxsFileData = img.slice().buffer;
+    const cell = tt.patterns[0].channels[0].rows[0];
+    expect(cell.effTyp).toBe(0);
+    // a note edit on an inert row keeps d, p and script
+    cell.note = ((cell.note ?? 0) % 96) + 1;
+    const out = await bytesOf(tt);
+    expect([out[m.patternOffset + 1], out[m.patternOffset + 3], out[m.patternOffset + 4]]).toEqual([5, 3, 200]);
   });
 });
 

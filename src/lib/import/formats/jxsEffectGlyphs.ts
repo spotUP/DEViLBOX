@@ -14,8 +14,9 @@
  *   effTyp / eff   script kind / d
  *   effTyp2 / eff2 JX_FX.aux / selector: p for a single setting (p != 0 only), slot 0..3 for a slot
  *                  field, wave 0..15 for a wave reset, p for a raw script
- *   A script outside the compact kinds (0 with d set, 76..255, or a slot/reset row with p != 0) is "raw":
- *   effTyp = JX_RAW_BASE + script, eff = d, eff2 = p.
+ *   A slot/reset row with p != 0 is "raw": effTyp = JX_RAW_BASE + script, eff = d, eff2 = p.
+ *   Script 0 and 76..255 are inert (script() ignores them, d and p included): the cell shows no effect and
+ *   applyJxsGridEdits keeps those bytes while the cell stays empty, so files stay byte-exact.
  */
 export const JX_FX_BASE = 0x100;
 /** Single-setting scripts: id = JX_FX_BASE + script. */
