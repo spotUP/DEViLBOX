@@ -464,6 +464,7 @@ export async function openSong(src: SongSourceRef | StoredSongSource, o: OpenOpt
 
     // The outgoing song was unloaded (and its key cleared) inside the load; the new song's key lands now.
     useFormatStore.getState().setSongSourceKey(src.kind === 'modland' ? `modland:${src.path}` : o.sourceKey ?? null);
+    useFormatStore.getState().setSourceFileName(name);
 
     const { playingEngineFromStores } = await import('@/engine/replayer/NativeEngineRouting');
     const format = useFormatStore.getState();

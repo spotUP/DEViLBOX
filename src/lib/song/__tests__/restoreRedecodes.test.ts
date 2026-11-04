@@ -123,4 +123,41 @@ describe('restoring an autosave', () => {
     expect(parseCalls.n).toBe(0);
     expect(useFormatStore.getState().uadeEditableFileData?.byteLength).toBeGreaterThan(0);
   }, 60000);
+
+  it('a restored JayTrax session shows today\'s decoder output, not the cells saved before a parser fix', async () => {
+    const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
+    const { baselineOf, hashCell } = await import('@/lib/song/gridBaseline');
+    const { restoreFromStoredBytes } = await import('@/lib/song/restoreFromStoredBytes');
+    const raw = readFileSync(join(SONGS, 'popcorn.jxs'));
+    const bytes = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
+    const decoded = await parseModuleToSong(new File([bytes], 'popcorn.jxs'));
+    const jxs = (decoded as unknown as Record<string, unknown>).jxsFileData as ArrayBuffer;
+    expect(jxs.byteLength).toBeGreaterThan(0);
+
+    // The save of the stale build: one cell the old parser got wrong (its hash is the baseline, so it is decoder output)
+    // and one cell the user edited (its hash differs from the baseline).
+    const patterns = structuredClone(decoded.patterns);
+    const baseline = baselineOf(patterns);
+    const stale = { ...patterns[0].channels[0].rows[2], note: 77, effTyp: 0x2a, eff: 0x77 };
+    patterns[0].channels[0].rows[2] = stale;
+    baseline[0][2] = hashCell(stale);
+    const edited = { ...patterns[0].channels[1].rows[4], note: 49 };
+    patterns[0].channels[1].rows[4] = edited;
+    const rows0 = patterns[0].channels[0].rows.length;
+    expect(baseline[0][rows0 + 4]).not.toBe(hashCell(edited));
+
+    const saved = {
+      patterns, instruments: decoded.instruments,
+      engine: { jxsFileData: jxs, sourceFileName: 'popcorn.jxs' },
+    } as never;
+    const out = await restoreFromStoredBytes(saved, baseline);
+
+    expect(out.reason).toBeUndefined();
+    expect(out.redecoded).toBe(true);
+    const rows = out.song.patterns[0].channels;
+    expect(rows[0].rows[2]).toEqual(decoded.patterns[0].channels[0].rows[2]);
+    expect(rows[0].rows[2]).not.toEqual(stale);
+    expect(rows[1].rows[4]).toEqual(edited);
+    expect((out.song.engine as unknown as Record<string, unknown>).sourceFileName).toBe('popcorn.jxs');
+  }, 60000);
 });
