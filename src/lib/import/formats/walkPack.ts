@@ -14,7 +14,8 @@ import type { FpWalk, FpWalkEvent } from './fpWalk';
 
 const MA_EVENT_FIELDS = 18;
 const MA_WRITE_FIELDS = 3;
-const FP_EVENT_FIELDS = 13;
+/** 13 numeric fields plus `ret` (NaN when the event has none, so an absent field stays absent). */
+const FP_EVENT_FIELDS = 14;
 
 export interface PackedMaWalk {
   head: Omit<MaWalk, 'events' | 'writes'>;
@@ -63,7 +64,7 @@ export function packFpWalk(w: FpWalk): PackedFpWalk {
   const { events, ...head } = w;
   const e = new Float64Array(events.length * FP_EVENT_FIELDS);
   events.forEach((v, i) => {
-    e.set([v.tick, v.voice, v.kind, v.a, v.b, v.period, v.off, v.dur, v.delta, v.t1, v.t2, v.arp, v.porta], i * FP_EVENT_FIELDS);
+    e.set([v.tick, v.voice, v.kind, v.a, v.b, v.period, v.off, v.dur, v.delta, v.t1, v.t2, v.arp, v.porta, v.ret ?? NaN], i * FP_EVENT_FIELDS);
   });
   return { head, events: e };
 }
@@ -76,6 +77,7 @@ export function unpackFpWalk(p: PackedFpWalk): FpWalk {
       tick: e[o], voice: e[o + 1], kind: e[o + 2], a: e[o + 3], b: e[o + 4], period: e[o + 5], off: e[o + 6], dur: e[o + 7],
       delta: e[o + 8], t1: e[o + 9], t2: e[o + 10], arp: e[o + 11], porta: e[o + 12],
     };
+    if (!Number.isNaN(e[o + 13])) events[i].ret = e[o + 13];
   }
   return { ...p.head, events };
 }
