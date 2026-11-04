@@ -9,17 +9,21 @@
 // imports (src/lib/import/__tests__/serverImportsStayLeaf.test.ts).
 import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
-import { readdirSync, rmSync, statSync } from 'node:fs';
-import { dirname, join, resolve, sep } from 'node:path';
+import { existsSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const srcDir = join(root, 'src');
-const outDir = join(root, 'dist');
+// SERVER_BUILD_OUT / SERVER_BUILD_SKIP_TSC let the build-output test emit into a temp dir
+// without the slow type-check; the real build uses neither.
+const outDir = process.env.SERVER_BUILD_OUT ? resolve(process.env.SERVER_BUILD_OUT) : join(root, 'dist');
 
-execFileSync(process.execPath, [join(root, 'node_modules/typescript/bin/tsc'), '-p', root, '--noEmit'], {
-  stdio: 'inherit',
-});
+if (!process.env.SERVER_BUILD_SKIP_TSC) {
+  execFileSync(process.execPath, [join(root, 'node_modules/typescript/bin/tsc'), '-p', root, '--noEmit'], {
+    stdio: 'inherit',
+  });
+}
 
 function walk(dir) {
   return readdirSync(dir).flatMap((name) => {
@@ -29,6 +33,12 @@ function walk(dir) {
   });
 }
 
+const entryPoints = walk(srcDir);
+// Only imports of files this build emits may stay external: they exist in dist at run time.
+// Anything else under server/src (data such as JSON) is inlined, or dist would require a file
+// it never wrote (the 2026-11-04 outage: '../data/hippo-playlists.json' crash-looped the backend).
+const emitted = new Set(entryPoints);
+
 const keepServerImportsExternal = {
   name: 'keep-server-imports-external',
   setup(b) {
@@ -36,7 +46,7 @@ const keepServerImportsExternal = {
       if (args.kind === 'entry-point' || args.pluginData === 'inner') return null;
       const r = await b.resolve(args.path, { resolveDir: args.resolveDir, kind: args.kind, pluginData: 'inner' });
       if (r.errors.length) return { errors: r.errors };
-      if (r.path.startsWith(srcDir + sep)) return { path: args.path, external: true };
+      if (emitted.has(r.path)) return { path: args.path, external: true };
       return null;
     });
   },
@@ -44,7 +54,7 @@ const keepServerImportsExternal = {
 
 rmSync(outDir, { recursive: true, force: true });
 await build({
-  entryPoints: walk(srcDir),
+  entryPoints,
   outdir: outDir,
   outbase: srcDir,
   bundle: true,
@@ -59,4 +69,24 @@ await build({
   logLevel: 'warning',
   plugins: [keepServerImportsExternal],
 });
+
+// Every relative require in dist must resolve inside dist, or the server dies at start.
+const missing = [];
+for (const file of (function list(dir) {
+  return readdirSync(dir).flatMap((n) => {
+    const p = join(dir, n);
+    return statSync(p).isDirectory() ? list(p) : p.endsWith('.js') ? [p] : [];
+  });
+})(outDir)) {
+  for (const m of readFileSync(file, 'utf8').matchAll(/require\((["'])(\.\.?\/[^"']+)\1\)/g)) {
+    const target = resolve(dirname(file), m[2]);
+    if (![target, `${target}.js`, join(target, 'index.js')].some((t) => existsSync(t))) {
+      missing.push(`${file.slice(outDir.length + 1)} requires ${m[2]}`);
+    }
+  }
+}
+if (missing.length) {
+  console.error(`server build: dist requires files it does not contain:\n  ${missing.join('\n  ')}`);
+  process.exit(1);
+}
 console.log(`server built: ${resolve(outDir)}`);
