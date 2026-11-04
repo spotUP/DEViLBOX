@@ -116,6 +116,11 @@ export class InStereo1Engine extends WASMChannelOutputsEngine {
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
   }
 
+  /** Swap the playing module for an edited one without restarting: the worklet runs it silently up to the position played. */
+  swapModule(buffer: ArrayBuffer): void {
+    this.workletNode?.port.postMessage({ type: 'swapModule', moduleData: buffer });
+  }
+
   play(): void {
     this.workletNode?.port.postMessage({ type: 'play' });
     this.afterPlay();

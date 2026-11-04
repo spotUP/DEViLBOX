@@ -36,7 +36,6 @@ const SPECS: Spec[] = [
   { name: 'Sonic Arranger', key: 'SonicArranger', file: 'sonic-arranger/mega end.sa', dir: 'sonic-arranger', stem: 'SonicArranger', mod: 'sonic-arranger/SonicArrangerEngine', cls: 'SonicArrangerEngine', prefix: 'sa', rowed: false, arp: true },
   { name: 'Delta Music 1', key: 'DeltaMusic1Replayer', file: 'delta-music/triplex1.dm', dir: 'deltamusic1', stem: 'DeltaMusic1', mod: 'deltamusic1/DeltaMusic1Engine', cls: 'DeltaMusic1Engine', prefix: 'dm1', rowed: true, arp: false },
   { name: 'Delta Music 2', key: 'DeltaMusic2Replayer', file: 'delta-music-2/asperity megademo 3.dm2', dir: 'deltamusic2', stem: 'DeltaMusic2', mod: 'deltamusic2/DeltaMusic2Engine', cls: 'DeltaMusic2Engine', prefix: 'dm2', rowed: true, arp: false },
-  { name: 'InStereo 1', key: 'InStereo1Replayer', file: 'instereo!/fantasi8.is', dir: 'instereo1', stem: 'InStereo1', mod: 'instereo1/InStereo1Engine', cls: 'InStereo1Engine', prefix: 'is1', rowed: false, arp: true },
   { name: 'InStereo 2', key: 'InStereo2Replayer', file: 'instereo!-2.0/spaceflight.is20', dir: 'instereo2', stem: 'InStereo2', mod: 'instereo2/InStereo2Engine', cls: 'InStereo2Engine', prefix: 'is2', rowed: false, arp: true },
   { name: 'Synthesis', key: 'SynthesisReplayer', file: 'synthesis/space sound.syn', dir: 'synthesis', stem: 'Synthesis', mod: 'synthesis/SynthesisEngine', cls: 'SynthesisEngine', prefix: 'syn', rowed: false, arp: true },
 ];
