@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { parseTonyWilliamsFile } from '../TonyWilliamsParser';
+import { walkTonyWilliams } from '../tonyWilliamsWalk';
 import { exportTonyWilliams } from '@lib/export/TonyWilliamsExporter';
 import { encodeVariableBlock } from '@/engine/uade/UADEPatternEncoder';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
@@ -38,7 +39,11 @@ describe('Tony Williams corpus', () => {
     const out = await bytesOf(song);
     const orig = new Uint8Array(buf);
     const diffs = [...orig.keys()].filter((i) => orig[i] !== out[i]);
-    expect(diffs.length).toBeGreaterThanOrEqual(1);
+    expect(diffs.length).toBe(1);
+    const at = diffs[0]!;
+    expect(out[at]).toBe(orig[at]! + 1);
+    const walk = walkTonyWilliams(buf, 0)!;
+    expect(walk.events.some((e) => e.cmd.op < 0x80 && e.cmd.offset === at)).toBe(true);
     const re = await parseTonyWilliamsFile(out.buffer.slice(0) as ArrayBuffer, 'x.tw');
     expect(re.patterns[hit!.p]!.channels[hit!.c]!.rows[hit!.r]!.note).toBe(before + 1);
   });
