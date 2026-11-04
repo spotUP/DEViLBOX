@@ -35,20 +35,20 @@ describe('resolveCellColumn — click resolves column AND nibble', () => {
 
   it('effect cell: type glyph → effTyp, both param glyphs → effParam nibbles', () => {
     expect(resolveCellColumn({ ...base, localX: 86 }))
-      .toEqual({ columnType: 'effTyp', noteColumnIndex: 0, digitIndex: 0 });
+      .toEqual({ columnType: 'effTyp', noteColumnIndex: 0, effectColumnIndex: 0, digitIndex: 0 });
     expect(resolveCellColumn({ ...base, localX: 96 }))
-      .toEqual({ columnType: 'effParam', noteColumnIndex: 0, digitIndex: 0 });
+      .toEqual({ columnType: 'effParam', noteColumnIndex: 0, effectColumnIndex: 0, digitIndex: 0 });
     expect(resolveCellColumn({ ...base, localX: 106 }))
-      .toEqual({ columnType: 'effParam', noteColumnIndex: 0, digitIndex: 1 });
+      .toEqual({ columnType: 'effParam', noteColumnIndex: 0, effectColumnIndex: 0, digitIndex: 1 });
   });
 
   it('second effect cell resolves to effTyp2 / effParam2', () => {
     expect(resolveCellColumn({ ...base, localX: 120 }))
-      .toEqual({ columnType: 'effTyp2', noteColumnIndex: 0, digitIndex: 0 });
+      .toEqual({ columnType: 'effTyp2', noteColumnIndex: 0, effectColumnIndex: 1, digitIndex: 0 });
     expect(resolveCellColumn({ ...base, localX: 130 }))
-      .toEqual({ columnType: 'effParam2', noteColumnIndex: 0, digitIndex: 0 });
+      .toEqual({ columnType: 'effParam2', noteColumnIndex: 0, effectColumnIndex: 1, digitIndex: 0 });
     expect(resolveCellColumn({ ...base, localX: 140 }))
-      .toEqual({ columnType: 'effParam2', noteColumnIndex: 0, digitIndex: 1 });
+      .toEqual({ columnType: 'effParam2', noteColumnIndex: 0, effectColumnIndex: 1, digitIndex: 1 });
   });
 
   it('acid flag columns resolve when present', () => {

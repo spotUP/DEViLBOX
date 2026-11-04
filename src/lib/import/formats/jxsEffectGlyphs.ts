@@ -53,3 +53,62 @@ export function jxsEffectToString(effTyp: number, eff: number): string | null {
   if (glyph === undefined) return null;
   return `${glyph}${(eff & 0xff).toString(16).toUpperCase().padStart(2, '0')}`;
 }
+
+/**
+ * What each JayTrax row script does, read from script() in jxs-wasm/src/jxs_engine.cpp.
+ * The script changes the live settings of the instrument playing on the channel (nothing happens on a
+ * channel with no instrument). `d` is the cell value.
+ */
+export const JX_SINGLE_MEANINGS: Record<number, string> = {
+  1: 'Bends the pitch from the current note to the note given as the value; the bend speed is the auxiliary value',
+  2: 'Selects the oscillator wave (0 to 15) of the instrument',
+  3: 'Sets the wave length: values above 192 give 256 samples, above 96 give 128, above 48 give 64, otherwise 32',
+  4: 'Sets the instrument volume',
+  5: 'Selects the volume wave (0 to 15; 0 is off)',
+  6: 'Sets how fast the volume wave advances',
+  7: 'Sets the loop point the volume wave returns to',
+  8: 'Sets the fine tune (0 to 15)',
+  9: 'Selects the pitch wave (0 to 15; 0 is off)',
+  10: 'Sets how fast the pitch wave advances',
+  11: 'Sets the loop point the pitch wave returns to',
+  12: 'Sets the delay before the pitch wave starts',
+  13: 'Selects the arpeggio (0 to 15)',
+  74: 'Sets the song tempo in beats per minute (clamped to 10 to 220)',
+  75: 'Sets the groove (0 to 3)',
+};
+
+/** Meaning of one modulation slot field, same order as JX_SLOT_FIELD_NAMES. */
+export const JX_SLOT_FIELD_MEANINGS = [
+  'Sets which parameter the slot modulates (0 to 15)',
+  'Sets the first modulation source (0 to 15)',
+  'Sets the second modulation source (0 to 15)',
+  'Sets the slot oscillator (0 to 15)',
+  'Sets the first variable of the slot',
+  'Sets the second variable of the slot',
+  'Sets the slot speed',
+  'Sets the oscillator speed of the slot',
+  'Sets the oscillator flag of the slot (0 or 1)',
+  'Sets the slot type (0 to 17)',
+  'Sets the slot reset flag (0 or 1)',
+] as const;
+
+/** Describe a JayTrax grid effect, or null outside the block. */
+export function jxsDescribe(effTyp: number, eff: number): { name: string; meaning: string; value: string } | null {
+  const v = eff & 0xff;
+  if (JX_EFFECT_GLYPH[effTyp] === undefined) return null;
+  if (effTyp >= JX_RAW_BASE) {
+    const sc = effTyp - JX_RAW_BASE;
+    return { name: 'Raw Script', meaning: `Row script ${sc} with a non-zero auxiliary value, kept as raw bytes so the file stays byte-exact`, value: `value ${v}` };
+  }
+  if (effTyp === JX_AUX) return { name: 'Auxiliary Value', meaning: 'Second parameter of the row script: the bend speed, slot number or wave number', value: `value ${v}` };
+  if (effTyp === JX_WAVE_RESET) return { name: 'Wave Reset', meaning: 'Sets whether the selected wave restarts on every note (0 or 1); the wave number is the auxiliary value', value: `flag ${Math.min(v, 1)}` };
+  if (effTyp >= JX_SLOT_BASE && effTyp < JX_SLOT_BASE + JX_SLOT_FIELDS) {
+    const f = effTyp - JX_SLOT_BASE;
+    return { name: `Slot ${JX_SLOT_FIELD_NAMES[f]}`, meaning: `${JX_SLOT_FIELD_MEANINGS[f]}; the slot number (0 to 3) is the auxiliary value`, value: `value ${v}` };
+  }
+  const sc = effTyp - JX_FX_BASE;
+  const name = JX_SINGLE_NAMES[sc];
+  if (name === undefined) return null;
+  const text = name.charAt(0).toUpperCase() + name.slice(1);
+  return { name: text, meaning: JX_SINGLE_MEANINGS[sc], value: `value ${v}` };
+}

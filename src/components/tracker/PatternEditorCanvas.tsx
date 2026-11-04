@@ -16,6 +16,7 @@ import { channelLayout, notifyChannelLayout, fitAndStretchChannelWidths, channel
 import { resolveWasmPattern } from './wasmPatternHold';
 import { computeChannelFollowScroll, createChannelFollowGate } from '@/lib/tracker/followScroll';
 import { resolveCellColumn } from '@/lib/tracker/cellHitTest';
+import { useEffectCellHover } from './useEffectCellHover';
 import { effectCellWidth } from '@/lib/tracker/effectNotation';
 import { resolveScrollRow, resolveFormatViewRow } from '@/lib/tracker/playbackNavigation';
 import { recordModeBorderClass } from '@/lib/tracker/patternEditorChrome';
@@ -735,6 +736,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       noteColumnIndex: hit.noteColumnIndex,
       columnType: hit.columnType as CursorPosition['columnType'],
       digitIndex: hit.digitIndex,
+      effectColumnIndex: hit.effectColumnIndex,
     };
   }, [pattern, dimensions.height, scrollLeft, channelOffsets, channelWidths, numChannels, fitScale]);
 
@@ -903,7 +905,13 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     setIsDragging(true);
   }, [isMobile, getCellFromCoords, fitScale]);
 
+  const { onHoverMove, onHoverEnd, tooltip: effectHoverTooltip } = useEffectCellHover(
+    getCellFromCoords,
+    (ch, row) => pattern?.channels[ch]?.rows[row],
+  );
+
   const handleMouseMove = useCallback((e: React.MouseEvent | PointerEvent) => {
+    onHoverMove(e);
     // Scratch drag handled by document-level listener (supports dragging outside canvas)
     if (isScratchDragRef.current) return;
 
@@ -916,7 +924,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     if (!cell) return;
 
     useCursorStore.getState().updateSelection(cell.channelIndex, cell.rowIndex, cell.columnType as any);
-  }, [isDragging, isMobile, getCellFromCoords]);
+  }, [isDragging, isMobile, getCellFromCoords, onHoverMove]);
 
   const stopAutoScroll = useCallback(() => {
     if (autoScrollRafRef.current !== null) {
@@ -3616,13 +3624,14 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
         onPointerDown={handleMouseDown as React.PointerEventHandler}
         onPointerMove={handleMouseMove as React.PointerEventHandler}
         onPointerUp={handleMouseUp as React.PointerEventHandler}
-        onPointerLeave={() => { if (!isScratchDragRef.current && !isDragging) handleMouseUp(); }}
-        onWheel={handleWheel}
+        onPointerLeave={() => { onHoverEnd(); if (!isScratchDragRef.current && !isDragging) handleMouseUp(); }}
+        onWheel={(e) => { onHoverEnd(); handleWheel(e); }}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         {...patternGestures}
       >
+        {effectHoverTooltip}
         {/* Visual background — rendered inside the grid container so it doesn't bleed into channel headers */}
         {trackerVisualBg && dimensions.width > 0 && dimensions.height > 0 && (
           <div className="absolute inset-0 z-0 pointer-events-none">
