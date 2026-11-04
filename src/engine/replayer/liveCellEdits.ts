@@ -54,7 +54,7 @@ export function playingDescriptor(song: TrackerSong): NativeEngineDescriptor | n
 /** Where a grid edit of a song goes (one per branch of sendCellEditsToEngine). */
 export type LiveEditRoute =
   | 'fred-module' | 'actionamics-module' | 'monotone-module' | 'kdm-module' | 'jxs-module' | 'activisionPro-module'
-  | 'track-index' | 'grid-cell' | 'engine-swap' | 'eagleplayer-module' | 'hippelst-module' | 'chip-ram' | 'uade-module' | 'none';
+  | 'track-index' | 'grid-cell' | 'engine-swap' | 'eagleplayer-module' | 'hippelst-module' | 'med-module' | 'chip-ram' | 'uade-module' | 'none';
 
 /**
  * The route `sendCellEditsToEngine` takes for `song`, decided from the song alone (no engine
@@ -76,6 +76,8 @@ export function liveEditRoute(song: TrackerSong): { route: LiveEditRoute; engine
   if (desc?.liveSwap) return at('engine-swap');
   if (desc?.key === 'HippelSt') return at('hippelst-module');
   if (desc?.key === 'EaglePlayer' && song.eaglePlayerId && hasModuleEncoder(song)) return at('eagleplayer-module');
+  // OctaMED MMD3 plays on libopenmpt, which has no live cell write: the edited module is hot-reloaded.
+  if (song.libopenmptFileData && !song.uadeEditableFileData && song.uadePatternLayout?.formatId?.startsWith('med_')) return at('med-module');
   if (song.uadePatternLayout) return at('chip-ram');
   // A module UADE plays whose edit only the exporter can place (G24): the exported bytes are diffed into chip RAM.
   if (song.uadeEditableFileData) return at('uade-module');
@@ -162,6 +164,12 @@ export async function sendCellEditsToEngine(
     case 'hippelst-module': {
       const { applyHippelStEdits } = await import('../hippelst/hippelStEdits');
       await applyHippelStEdits(song, edits);
+      return;
+    }
+    // OctaMED MMD3: a grid cell is a 4-byte cell of the module; the edit patches the module and libopenmpt hot-reloads it.
+    case 'med-module': {
+      const { applyMedModuleEdits } = await import('../libopenmpt/medModuleEdits');
+      applyMedModuleEdits(song);
       return;
     }
     // A native worklet engine that takes the whole edited module and runs on from the position played.
