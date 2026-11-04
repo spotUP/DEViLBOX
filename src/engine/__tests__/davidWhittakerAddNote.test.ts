@@ -6,6 +6,7 @@
  *   - the ORIGINAL player (UADE) plays it: the other voices write exactly the same Paula registers for the whole
  *     render, the edited voice is the same up to the row and plays something else from it.
  */
+import { dwNoteToByte, dwWalkTransposes } from '@/lib/import/formats/davidWhittakerPitch';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -107,10 +108,12 @@ describe('David Whittaker: a note on a row no note starts on', { timeout: 120000
     const ex = await exportDavidWhittaker(song);
     expect(ex.warnings).toEqual([]);
     const out = new Uint8Array(await ex.data.arrayBuffer());
-    expect(slots.map((e) => out[e!.block + e!.pos]), 'each hold byte became its note').toEqual(rows.map((t) => 37 + t - 25));
+    const tr = dwWalkTransposes(walk);
+    const want = rows.map((t, i) => dwNoteToByte(walk.layout.pitch, 37 + t, 0, tr.get(slots[i]!)));
+    expect(slots.map((e) => out[e!.block + e!.pos]), 'each hold byte became its note').toEqual(want);
     const walk2 = await walkDavidWhittaker(out.slice().buffer as ArrayBuffer);
     const played = rows.map((t) => walk2.events.find((e) => e.kind === DW_WALK.note && e.channel === 0 && e.tick === t)?.b);
-    expect(played, 'the walk plays each typed note on its row').toEqual(rows.map((t) => 37 + t - 25));
+    expect(played, 'the walk plays each typed note on its row').toEqual(want);
     // The original player starts a sample for each typed note; the blank template starts none on voice 1.
     const starts = (ev: string[]) => ev.filter((e) => e.split(':')[2] === '0').length;
     const was = await paulaEventStream(bytes, 'davidWhittaker.dw', 2);

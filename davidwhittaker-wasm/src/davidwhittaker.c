@@ -2686,6 +2686,56 @@ bool dw_preview_note(DwModule* m, int sample, int note, int envelope, int arpegg
     return true;
 }
 
+/*
+ * The note byte that makes `sample` sound at Paula period `target_period` on the preview voice, so a key plays the
+ * grid note it names. The period of a byte is the one do_frame_stuff sustains on this voice:
+ *   periods[byte + transposes] * fine_tune_period >> 10,
+ * the transposes being the channel transpose the preview sets from the song (scan_transpose; global transpose is 0
+ * after initialize_sound), or the sample transpose on a player without channel transpose (read_track_commands folds
+ * it into the stored note). Old players (periods1) play periods1[byte % 12] with sample byte / 12. Of all bytes the
+ * one with the period nearest the target (in pitch) wins, so a key past the sample's range plays its end note.
+ * -1 when the sample has no playable byte.
+ */
+int dw_preview_key_byte(DwModule* m, int sample, int target_period) {
+    if (!m || sample < 0 || sample >= m->number_of_samples || target_period <= 0) return -1;
+    if (!m->scan_env) dw_preview_scan(m);
+    int best = -1;
+    double best_err = 0.0;
+    if (m->old_player) {
+        for (int i = 0; i < 12; i++) {
+            int byte = sample * 12 + i;
+            if (byte > 0x7f || periods1[i] == 0) continue;
+            double r = (double)periods1[i] / (double)target_period;
+            double err = r > 1.0 ? r : 1.0 / r;
+            if (best < 0 || err < best_err) { best = byte; best_err = err; }
+        }
+        return best;
+    }
+    uint32_t ftp = m->samples[sample].fine_tune_period;
+    if (ftp == 0 || m->periods_count <= 0) return -1;
+    int offset = 0;
+    if (m->enable_channel_transpose) offset = m->scan_transpose ? m->scan_transpose[sample] : 0;
+    else if (m->enable_sample_transpose) offset = m->samples[sample].transpose;
+    for (int byte = 0; byte <= 0x7f; byte++) {
+        int idx = (int8_t)(uint8_t)(byte + offset);   // the replayer's int8_t / uint8_t index arithmetic
+        if (idx < 0) idx = 0;
+        if (idx >= m->periods_count) idx = m->periods_count - 1;
+        uint32_t period = (uint32_t)((m->periods[idx] * ftp) >> 10);
+        if (period == 0) continue;
+        double r = (double)period / (double)target_period;
+        double err = r > 1.0 ? r : 1.0 / r;
+        if (best < 0 || err < best_err) { best = byte; best_err = err; }
+    }
+    return best;
+}
+
+/* One key: `sample` at the byte that sounds `target_period` (dw_preview_key_byte). False when it plays none. */
+bool dw_preview_key(DwModule* m, int sample, int target_period, int envelope, int arpeggio) {
+    int byte = dw_preview_key_byte(m, sample, target_period);
+    if (byte < 0) return false;
+    return dw_preview_note(m, sample, byte, envelope, arpeggio);
+}
+
 void dw_preview_stop(DwModule* m) {
     if (!m) return;
     for (int i = 0; i < m->number_of_channels; i++) mixer_mute(&m->mixer_channels[i]);
@@ -2779,6 +2829,26 @@ int dw_layout(const DwModule* m, int32_t* out, int max_records) {
     {
         int32_t* r = out;
         r[0] = 2; r[1] = m->start_offset; r[2] = m->uses_32bit_pointers ? 4 : 2; r[3] = m->old_player ? 1 : 0;
+        n++;
+    }
+    // The pitch the replayer plays a note byte at (read_track_commands / do_frame_stuff): kind 3 = the period table
+    // length and which transposes this player applies (bit 0 sample, bit 1 channel, bit 2 global), kind 4 = one
+    // period table entry, kind 5 = one sample's fine_tune_period and transpose.
+    if (n < max_records) {
+        int32_t* r = out + (size_t)n * 4;
+        r[0] = 3; r[1] = m->periods_count;
+        r[2] = (m->enable_sample_transpose ? 1 : 0) | (m->enable_channel_transpose ? 2 : 0) | (m->enable_global_transpose ? 4 : 0);
+        r[3] = 0;
+        n++;
+    }
+    for (int i = 0; i < m->periods_count && n < max_records; i++) {
+        int32_t* r = out + (size_t)n * 4;
+        r[0] = 4; r[1] = i; r[2] = m->periods[i]; r[3] = 0;
+        n++;
+    }
+    for (int i = 0; m->samples && i < m->number_of_samples && n < max_records; i++) {
+        int32_t* r = out + (size_t)n * 4;
+        r[0] = 5; r[1] = i; r[2] = m->samples[i].fine_tune_period; r[3] = m->samples[i].transpose;
         n++;
     }
     for (int i = 0; i < m->track_count && n < max_records; i++) {

@@ -12,7 +12,7 @@ import type { DavidWhittakerConfig } from '@/types/instrument';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { DavidWhittakerEngine } from './DavidWhittakerEngine';
-import { dwNoteForKey } from './dwKeyNote';
+import { dwPeriodForKey } from './dwKeyNote';
 
 export class DavidWhittakerSynth implements DevilboxSynth {
   private engine: DavidWhittakerEngine;
@@ -59,7 +59,7 @@ export class DavidWhittakerSynth implements DevilboxSynth {
     if (this.sampleIndex < 0 || note === undefined) return;
     this.loadModule();
     const midi = typeof note === 'string' ? noteToMidi(note) : note;
-    this.engine.noteOn(this.sampleIndex, dwNoteForKey(midi), time);
+    this.engine.noteOn(this.sampleIndex, dwPeriodForKey(midi), time);
   }
   triggerRelease(_note?: string | number, time?: number): void { this.engine.noteOff(time); }
   releaseAll(): void { this.engine.noteOff(); }

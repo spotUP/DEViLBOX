@@ -11,6 +11,7 @@
  *     the encoder writes is the command the grid shows;
  *   - the effect columns hold the commands the replayer ran, named as DW names them.
  */
+import { dwByteToNote, dwWalkTransposes } from '@/lib/import/formats/davidWhittakerPitch';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -77,13 +78,15 @@ describe.each(SONGS)('David Whittaker %s: the grid is what the replayer plays', 
     const dv = new DataView(mod.HEAPU8.buffer, ptr, n * 6);
     const trace = Array.from({ length: n }, (_, i) => ({ ch: dv.getInt16(i * 6, true), sample: dv.getInt16(i * 6 + 2, true), byte: dv.getInt16(i * 6 + 4, true) }));
     mod._free(ptr);
+    const transposes = dwWalkTransposes(walk);
     let compared = 0;
     for (let ch = 0; ch < 4; ch++) {
       const played = trace.filter((t) => t.ch === ch);
+      const walked = walk.events.filter((e) => e.kind === DW_WALK.note && e.channel === ch);
       const shown = timeline(song, ch).filter((c) => c.note > 0 && c.note < 97);
       expect(shown.length, `${name} voice ${ch}: note count`).toBe(played.length);
       played.forEach((t, i) => {
-        expect({ note: shown[i].note, instrument: shown[i].instrument }, `${name} voice ${ch} note ${i}`).toEqual({ note: t.byte + 25, instrument: t.sample + 1 });
+        expect({ note: shown[i].note, instrument: shown[i].instrument }, `${name} voice ${ch} note ${i}`).toEqual({ note: dwByteToNote(walk.layout.pitch, t.byte, t.sample, transposes.get(walked[i])), instrument: t.sample + 1 });
         compared++;
       });
     }

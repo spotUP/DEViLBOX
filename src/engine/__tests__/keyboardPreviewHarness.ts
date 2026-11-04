@@ -100,6 +100,19 @@ export function fundamentalHz(x: Float32Array, minHz = 30, maxHz = 4000): number
     r[l] = s / e0;
     if (r[l] > best) best = r[l];
   }
-  for (let l = lo + 1; l < hi; l++) if (r[l] >= 0.9 * best && r[l] >= r[l - 1] && r[l] >= r[l + 1]) return SR / l;
-  return 0;
+  let pick = 0;
+  for (let l = lo + 1; l < hi; l++) if (r[l] >= 0.9 * best && r[l] >= r[l - 1] && r[l] >= r[l + 1]) { pick = l; break; }
+  if (!pick) return 0;
+  // A wave whose half-period nearly repeats (strong 2nd harmonic) also clears
+  // the 90 % bar at half its period. When the lag twice as long correlates
+  // clearly better and itself near-perfect (>= 0.95) while the short lag is
+  // not (< 0.95), that longer lag is the real period, not a subharmonic:
+  // apb.dw sample 7 at D2 reads r(81) = 0.899 but r(162) = 0.984 at 48 kHz.
+  for (;;) {
+    let dbl = 0;
+    for (let l = 2 * pick - 2; l <= 2 * pick + 2; l++) if (l > lo && l < hi && (!dbl || r[l] > r[dbl])) dbl = l;
+    if (!dbl || r[pick] >= 0.95 || r[dbl] < 0.95 || r[dbl] < r[pick] + 0.05) break;
+    pick = dbl;
+  }
+  return SR / pick;
 }

@@ -15,7 +15,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { startWorklet, ROOT, type WorkletProc } from './workletHarness';
 import { parseDavidWhittakerFile } from '@/lib/import/formats/DavidWhittakerParser';
-import { dwNoteForKey } from '@/engine/davidwhittaker/dwKeyNote';
+import { dwPeriodForKey } from '@/engine/davidwhittaker/dwKeyNote';
+import type { DavidWhittakerConfig } from '@/types/instrument/exotic';
 import { parseStartrekkerAMFile } from '@/lib/import/formats/StartrekkerAMParser';
 import { stPeriodForKey } from '@/engine/startrekker-am/stKeyNote';
 import { parseDigitalMugicianFile } from '@/lib/import/formats/DigitalMugicianParser';
@@ -51,7 +52,7 @@ const emscriptenTransform = (c: string) => c
   .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
 
 interface Cell { note: number; instrument: number; effTyp?: number; eff?: number; effTyp2?: number; effTyp3?: number; effTyp4?: number; effTyp5?: number }
-interface GridSong { instruments: Array<{ id: number; name?: string; synthType?: string; digMug?: { sampleIndex?: number; fineTune?: number }; inStereo2?: { instrumentNumber?: number } }>; initialSpeed: number; songPositions: number[]; patterns: Array<{ length: number; channels: Array<{ rows: Cell[] }> }> }
+interface GridSong { instruments: Array<{ id: number; name?: string; synthType?: string; digMug?: { sampleIndex?: number; fineTune?: number }; inStereo2?: { instrumentNumber?: number }; davidWhittaker?: DavidWhittakerConfig }>; initialSpeed: number; songPositions: number[]; patterns: Array<{ length: number; channels: Array<{ rows: Cell[] }> }> }
 
 /**
  * First note of channel `ch` in song order that carries only the commands a key plays too (the envelope,
@@ -120,7 +121,8 @@ describe.each(['formats/apb.dw', 'david-whittaker/garfield2+.dw'])('David Whitta
       const b = await startWorklet('davidwhittaker', 'DavidWhittaker', emscriptenTransform);
       await b.send({ type: 'loadModule', moduleData: ab.slice(0) });
       await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
-      await b.send({ type: 'noteOn', sample: v.ins - 1, note: dwNoteForKey(v.note + 11) });
+      // The replayer picks the byte for the grid note's period from the loaded module (dw_preview_key).
+      await b.send({ type: 'noteOn', sample: v.ins - 1, period: dwPeriodForKey(v.note + 11) });
       expectSameVoice(`${name} voice ${v.ch}`, v.audio, previewVoiceFromOnset(b.proc, v.ticks), v.ticks);
     }
   });
@@ -140,7 +142,7 @@ describe.each(['formats/apb.dw', 'david-whittaker/garfield2+.dw'])('David Whitta
     await b.send({ type: 'loadModule', moduleData: ab.slice(0) });
     await b.send({ type: 'previewLoad', buffer: ab.slice(0) });
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent before a key').toBe(0);
-    await b.send({ type: 'noteOn', sample: 0, note: 28 });
+    await b.send({ type: 'noteOn', sample: 0, period: dwPeriodForKey(28 + 11) });
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'a key sounds').toBeGreaterThan(0.01);
     await b.send({ type: 'noteOff' });
     expect(totalRms(rmsPerTick(renderTicks(b.proc, 10, 0), 10)), 'silent after release').toBe(0);
