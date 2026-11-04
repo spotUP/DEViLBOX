@@ -4,9 +4,10 @@
  * Sound Factory uses an opcode-based streaming format, NOT fixed-size cells.
  * Notes are 3 bytes: opcode (0x00-0x7F note index) + uint16 BE duration.
  *
- * Note mapping (reverse of parser's psfNoteToXm):
- *   Parser: xmNote = noteByte + 13
- *   Encoder: noteByte = xmNote - 13
+ * Note mapping: grid notes name the audible pitch, which depends on the
+ * instrument (src/lib/import/formats/soundFactoryPitch.ts). The parser binds
+ * `noteToOpcode` to its instruments (soundFactoryOpcodeFor); without it the
+ * registered encoder uses the default (empty) instrument's inverse.
  *
  * Since PSF is a streaming opcode format, we encode each note cell as:
  *   byte[0]: note byte (0x00-0x7F, period table index)
@@ -20,14 +21,23 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
+import { soundFactoryOpcodeFor, SOUND_FACTORY_EMPTY_INSTRUMENT } from '@/lib/import/formats/soundFactoryPitch';
 
-export function encodeSoundFactoryCell(cell: TrackerCell): Uint8Array {
+/** Note opcode (0..127) for a grid note on an instrument id; -1 when none plays it. */
+export type SoundFactoryNoteToOpcode = (gridNote: number, instrument: number) => number;
+
+const defaultNoteToOpcode: SoundFactoryNoteToOpcode = (gridNote) =>
+  soundFactoryOpcodeFor(SOUND_FACTORY_EMPTY_INSTRUMENT, gridNote);
+
+export function encodeSoundFactoryCell(
+  cell: TrackerCell,
+  noteToOpcode: SoundFactoryNoteToOpcode = defaultNoteToOpcode,
+): Uint8Array {
   const out = new Uint8Array(3);
   const xmNote = cell.note ?? 0;
 
   if (xmNote > 0 && xmNote <= 96) {
-    // Reverse psfNoteToXm: xmNote = noteByte + 13 → noteByte = xmNote - 13
-    const noteByte = xmNote - 13;
+    const noteByte = noteToOpcode(xmNote, cell.instrument ?? 0);
     if (noteByte >= 0 && noteByte <= 0x7F) {
       out[0] = noteByte;
     } else {
@@ -56,4 +66,4 @@ export function encodeSoundFactoryCell(cell: TrackerCell): Uint8Array {
   return out;
 }
 
-registerPatternEncoder('soundFactory', () => encodeSoundFactoryCell);
+registerPatternEncoder('soundFactory', () => (cell: TrackerCell) => encodeSoundFactoryCell(cell));
