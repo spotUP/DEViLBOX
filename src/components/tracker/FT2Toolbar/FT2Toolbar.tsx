@@ -753,10 +753,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
           if (result.success === true) notify.success(result.message);
           else if (result.success === false) notify.error(result.error);
         } catch { notify.error('Failed to load file'); }
-      }} onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => {
+      }} onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>, sourceKey?: string) => {
         // openSong shows the import dialog (the one in the tracker view) only when
         // the file has a real choice, and opens it directly otherwise.
-        await openUserSong(new File([buffer], filename), 'filebrowser', companionFiles, (message) => notify.error(message));
+        await openUserSong(new File([buffer], filename), 'filebrowser', companionFiles, (message) => notify.error(message), sourceKey);
       }} />
 
       <UpRoughGenerateDialog isOpen={showUpRoughGenerate} onClose={() => setShowUpRoughGenerate(false)} />
