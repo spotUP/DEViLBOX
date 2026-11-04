@@ -102,6 +102,8 @@ export interface DeckSong {
 
 export interface OpenOptions {
   origin: OpenOrigin;
+  /** The `modland:`/`hvsc:` key ratings use, for callers whose source kind does not carry the path. */
+  sourceKey?: string;
   subsong?: number;
   /**
    * Where the song goes. The editor (default), or a DJ deck: a deck open reads
@@ -459,6 +461,9 @@ export async function openSong(src: SongSourceRef | StoredSongSource, o: OpenOpt
     });
     if (!loaded.success) return { ok: false, error: loaded.error };
     if (loaded.success !== true) return { ok: false, error: `${name} needs a confirmation step that a headless open cannot show` };
+
+    // The outgoing song was unloaded (and its key cleared) inside the load; the new song's key lands now.
+    useFormatStore.getState().setSongSourceKey(src.kind === 'modland' ? `modland:${src.path}` : o.sourceKey ?? null);
 
     const { playingEngineFromStores } = await import('@/engine/replayer/NativeEngineRouting');
     const format = useFormatStore.getState();

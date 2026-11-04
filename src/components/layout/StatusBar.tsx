@@ -14,6 +14,7 @@ import { LoudnessMeterPanel } from '@/components/audio/LoudnessMeterPanel';
 import { useSongLoadStore, OPEN_PHASE_LABEL } from '@/stores/useSongLoadStore';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { WifiOff } from 'lucide-react';
+import { SongScore } from '@/components/shared/SongScore';
 import { useShallow } from 'zustand/react/shallow';
 import type { KnobAssignment } from '@/midi/knobBanks';
 import { getKnobBankForSynth, getKnobPageName } from '@/midi/knobBanks';
@@ -129,8 +130,9 @@ const TrackerStatusContent: React.FC = () => {
       patternLength: s.patterns[s.currentPatternIndex]?.length || 64,
     }))
   );
-  const { songDBInfo, sidMetadata } = useFormatStore(
+  const { songDBInfo, sidMetadata, songSourceKey } = useFormatStore(
     useShallow((s) => ({
+      songSourceKey: s.songSourceKey,
       songDBInfo: s.songDBInfo,
       sidMetadata: s.sidMetadata,
     }))
@@ -165,6 +167,7 @@ const TrackerStatusContent: React.FC = () => {
       <span className={`px-2 py-0.5 rounded min-w-[4ch] text-center ${recordMode ? 'bg-accent-error/20 text-accent-error' : 'text-text-primary'}`}>
         {recordMode ? 'REC' : 'EDIT'}
       </span>
+      {songSourceKey && <SongScore fileName={songSourceKey} />}
       {sidMetadata && (
         <>
           <div className="w-px h-3 bg-border opacity-50" />

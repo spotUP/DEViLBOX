@@ -137,7 +137,7 @@ interface UseFileNavigationOptions {
   isOpen: boolean;
   fileSource: FileSource;
   onLoad: (data: object, filename: string) => void;
-  onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => Promise<void>;
+  onLoadTrackerModule?: (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>, sourceKey?: string) => Promise<void>;
   onClose: () => void;
   currentProjectData?: () => object;
   mode?: 'load' | 'save';
