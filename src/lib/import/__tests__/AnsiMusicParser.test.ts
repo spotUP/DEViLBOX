@@ -45,7 +45,7 @@ describe('AnsiMusicParser on real fixtures', () => {
     expect(JSON.stringify(a.patterns)).not.toBe(JSON.stringify(b.patterns));
   });
 
-  it('plain ANSI art (music block removed) is rejected and falls through', async () => {
+  it('plain ANSI art (music block removed) is refused by the ANSI route, never handed to libopenmpt', async () => {
     const buf = new Uint8Array(load('MUSIC_pavt199.ANS'));
     const { blocks } = scanAnsiMusicBlocks(buf);
     const parts: Uint8Array[] = [];
@@ -54,7 +54,7 @@ describe('AnsiMusicParser on real fixtures', () => {
     parts.push(buf.subarray(at));
     const art = Uint8Array.from(parts.flatMap((p) => Array.from(p)));
     expect(isAnsiMusicFormat(art.buffer as ArrayBuffer)).toBe(false);
-    expect(await tryChipDumpParse(art.buffer as ArrayBuffer, 'art.ans', 'art.ans')).toBeNull();
+    await expect(tryChipDumpParse(art.buffer as ArrayBuffer, 'art.ans', 'art.ans')).rejects.toThrow(/ANSI art without a music block/);
   });
 
   it('a run of rests is silence, not a note-off per rest', () => {

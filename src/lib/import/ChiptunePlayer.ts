@@ -207,6 +207,11 @@ export class ChiptunePlayer {
 
   onError(handler: EventHandler<{ type: string }>): void {
     this.addHandler('onError', handler);
+    // A worklet that failed to start stays failed, and the failure can fire
+    // synchronously inside onInitialized() before a caller subscribes here.
+    // Replay it, as onInitialized replays success, so no caller waits for a
+    // timeout on a player that will never start.
+    if (this.initError) handler({ type: 'init', message: this.initError } as { type: string });
   }
 
   onMetadata(handler: EventHandler<ChiptuneMetadata>): void {
