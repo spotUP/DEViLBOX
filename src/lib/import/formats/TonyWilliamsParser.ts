@@ -9,6 +9,43 @@ import type { TrackerCell } from '@/types';
 import { tonyWilliamsEncoder } from '@/engine/uade/encoders/TonyWilliamsEncoder';
 import { walkTonyWilliams, twSongInfo, readTwBlock, TW_VOICES } from './tonyWilliamsWalk';
 import { buildTwGrid } from './tonyWilliamsGrid';
+import { createSamplerInstrument } from './AmigaUtils';
+
+const TW_INSTR_ENTRY = 12;
+const TW_MAX_INSTR = 16;
+/** Amiga C-3 sample rate, as every sibling sampler parser uses. */
+const TW_SAMPLE_RATE = 8287;
+
+/**
+ * One sample instrument per table entry a D0-DF command selects (id = entry + 1, the id the grid shows).
+ * Entry: long sample ptr + word length (words), long loop ptr + word loop length (words); pointers are offsets from
+ * the file start (the player's a5). A loop pointing outside the sample (the shared silent-loop stub) means no loop.
+ * The file carries no names, so none are invented.
+ */
+function buildTwSampleInstruments(bytes: Uint8Array, table: number, blockRows: TrackerCell[][]): InstrumentConfig[] {
+  if (table < 0) return [];
+  const used = new Set<number>();
+  for (const rows of blockRows) for (const c of rows) { const op = c.period ?? 0; if (op >= 0xd0 && op <= 0xdf) used.add(op - 0xd0); }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const out: InstrumentConfig[] = [];
+  for (const idx of [...used].sort((a, b) => a - b)) {
+    const o = table + idx * TW_INSTR_ENTRY;
+    if (idx >= TW_MAX_INSTR || o + TW_INSTR_ENTRY > bytes.length) continue;
+    const ptr = view.getUint32(o);
+    const len = view.getUint16(o + 4) * 2;
+    const loopPtr = view.getUint32(o + 6);
+    const loopLen = view.getUint16(o + 10) * 2;
+    if (len === 0 || ptr + len > bytes.length) continue;
+    let loopStart = 0;
+    let loopEnd = 0;
+    if (loopLen > 2 && loopPtr >= ptr && loopPtr + loopLen <= ptr + len) {
+      loopStart = loopPtr - ptr;
+      loopEnd = loopStart + loopLen;
+    }
+    out.push(createSamplerInstrument(idx + 1, '', bytes.slice(ptr, ptr + len), 64, TW_SAMPLE_RATE, loopStart, loopEnd));
+  }
+  return out;
+}
 
 export function isTonyWilliamsFormat(input: ArrayBuffer | Uint8Array): boolean {
   const b = input instanceof Uint8Array ? input : new Uint8Array(input);
@@ -40,10 +77,7 @@ export async function parseTonyWilliamsFile(buffer: ArrayBuffer, filename: strin
     blockRawBytes.push(bytes.slice(a, end));
     sizes.push(end - a);
   }
-  const instruments: InstrumentConfig[] = Array.from({ length: 16 }, (_, i) => ({
-    id: i + 1, name: '', type: 'synth' as const, synthType: 'Synth' as const,
-    effects: [], volume: 0, pan: 0,
-  })) as unknown as InstrumentConfig[];
+  const instruments = buildTwSampleInstruments(bytes, walk.info.instrumentTable, blockRows);
   const baseName = filename.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
   const result: TrackerSong = {
     name: baseName, format: 'XM' as TrackerFormat,
