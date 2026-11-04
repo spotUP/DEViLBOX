@@ -20,7 +20,7 @@ import { withNativeDefault, withNativeThenUADE, callUADE, getBasename, injectUAD
 import { tryChipDumpParse } from './ChipDumpParsers';
 import { tryUADEPrefixParse } from './UADEPrefixParsers';
 import { tryPCTrackerParse } from './PCTrackerParsers';
-import { detectFormatFromContent } from '@lib/import/FormatRegistry';
+import { detectFormatFromContent, getFormatExtensions } from '@lib/import/FormatRegistry';
 import { songWalks, WalkCancelledError, type SongWalkClient } from '@/lib/import/formats/songWalkClient';
 import { chooseFileSubsong, fileSubsongFormatByKey } from '@/lib/import/fileSubsongs';
 
@@ -50,6 +50,10 @@ function matchesExt(filename: string, exts: string[]): boolean {
   for (const ext of exts) {
     if (lower.endsWith('.' + ext)) return true;
   }
+  // A name that already ends in a registered extension of its own (`two.jxs`, `one.fur`, `sfx.dmf`) is that
+  // format's file; its first segment is a title, not a UADE prefix (`two.song`, `mdat.rocknroll`).
+  const dot = base.lastIndexOf('.');
+  if (dot > 0 && getFormatExtensions().includes(base.slice(dot))) return false;
   // Check prefix: ext. at start of basename
   for (const ext of exts) {
     if (base.startsWith(ext + '.')) return true;
