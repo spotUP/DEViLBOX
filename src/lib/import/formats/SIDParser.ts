@@ -357,7 +357,7 @@ function makeSidInstrument(id: number, n: DecodedNote, model: string): Instrumen
   const wave = (bit: number) => p.waves.some((w) => (w & bit) !== 0);
   return {
     id,
-    name: `Instrument ${id}`,
+    name: '',
     type: 'synth', synthType: 'C64SID',
     effects: [], volume: 0, pan: 0,
     furnace: {
