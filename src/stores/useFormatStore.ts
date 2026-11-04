@@ -234,6 +234,8 @@ export interface FormatStore {
   /** MusicLine keyboard input mode: 'mono' (single channel) or 'poly' (rotate across channels) */
   musiclineKeyboardMode: 'mono' | 'poly';
   originalModuleData: { base64: string; format: 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN'; sourceFile?: string } | null;
+  /** Rating key (`modland:<path>` / `hvsc:<path>`) of the loaded song, null for a local file or new song. */
+  songSourceKey: string | null;
   songDBInfo: { authors: string[]; publishers: string[]; album: string; year: string; format: string; duration_ms: number } | null;
   /**
    * The parser's `TrackerSong.format` for the loaded song ('ASAP', 'PiyoPiyo',
@@ -351,6 +353,7 @@ export interface FormatStore {
   setSongDBInfo: (info: FormatStore['songDBInfo']) => void;
   setSidMetadata: (info: FormatStore['sidMetadata']) => void;
   /** Clear the outgoing song's header info (SID header, SongDB lookup) at unload. */
+  setSongSourceKey: (key: string | null) => void;
   clearSongInfo: () => void;
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
   setMaxTraxData: (data: MaxTraxData | null) => void;
@@ -761,6 +764,7 @@ export const useFormatStore = create<FormatStore>()(
     musiclineKeyboardMode: 'mono',
     originalModuleData: null,
     songDBInfo: null,
+    songSourceKey: null,
     songFormat: null,
     activeFormatId: null,
     sidMetadata: null,
@@ -1276,7 +1280,8 @@ export const useFormatStore = create<FormatStore>()(
     }),
     setSongDBInfo: (info) => set((state) => { state.songDBInfo = info; }),
     setSidMetadata: (info) => set((state) => { state.sidMetadata = info; }),
-    clearSongInfo: () => set((state) => { state.sidMetadata = null; state.songDBInfo = null; }),
+    setSongSourceKey: (key) => set((state) => { state.songSourceKey = key; }),
+    clearSongInfo: () => set((state) => { state.sidMetadata = null; state.songDBInfo = null; state.songSourceKey = null; }),
     setOriginalModuleData: (data) => set((state) => { state.originalModuleData = data; }),
 
     applyEditorMode: (song) => {
@@ -1786,6 +1791,7 @@ export const useFormatStore = create<FormatStore>()(
       state.libopenmptFileData = null;
       state.originalModuleData = null;
       state.songDBInfo = null;
+      state.songSourceKey = null;
       state.sidMetadata = null;
     }),
   }))

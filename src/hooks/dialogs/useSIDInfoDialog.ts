@@ -86,7 +86,7 @@ export function useSIDInfoDialog({ onClose }: UseSIDInfoDialogOptions) {
       try {
         const buffer = await downloadHVSCFile(tune.path);
         const file = new File([buffer], tune.filename || tune.path.split('/').pop() || 'tune.sid');
-        const result = await openSong({ kind: 'file', file }, { origin: 'dialog' });
+        const result = await openSong({ kind: 'file', file }, { origin: 'dialog', sourceKey: `hvsc:${tune.path}` });
         if (result.ok) {
           if (!result.notified) notify.success(result.message);
           onClose();
