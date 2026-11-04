@@ -568,7 +568,8 @@ export const useInstrumentStore = create<InstrumentStore>()(
       const sampleEdit = updates.sample
         ? classifySampleEdit(currentInstrument?.sample, get().instruments.find((inst) => inst.id === id)?.sample)
         : { loop: false, data: false };
-      propagateSampleEditToSong(id, get().instruments.find((inst) => inst.id === id)?.sample, sampleEdit);
+      const editedInstrument = get().instruments.find((inst) => inst.id === id);
+      propagateSampleEditToSong(id, editedInstrument?.sample, sampleEdit, !!editedInstrument?.uadeChipRam && editedInstrument.synthType === 'Sampler');
       // A loop-only edit reaches the keyboard voice's Players where they stand, so a held note follows
       // it; only a Player that cannot take it (a Sampler that never looped) is rebuilt below.
       let sampleLoopLive = false;

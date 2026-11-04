@@ -5,6 +5,7 @@
  */
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { walkTonyWilliams } from '@lib/import/formats/tonyWilliamsWalk';
+import { applyChipRamSampleEdits } from './chipRamSamplePatch';
 import { applyTwGridEdits } from '@lib/import/formats/tonyWilliamsEdits';
 
 export interface TonyWilliamsExportResult { data: Blob; filename: string; warnings: string[] }
@@ -25,6 +26,10 @@ export async function exportTonyWilliams(song: TrackerSong): Promise<TonyWilliam
       warnings.push(...r.warnings);
     }
   }
+  // A sample edited in the shared sample editor (PCM, length, loop) lands where the module keeps the sample.
+  const samples = applyChipRamSampleEdits(bytes, song.instruments ?? []);
+  bytes = new Uint8Array(samples.data);
+  warnings.push(...samples.warnings);
   const filename = (song.uadeEditableFileName ?? 'untitled.tw').split('/').pop() ?? 'untitled.tw';
   return { data: new Blob([bytes as unknown as Uint8Array<ArrayBuffer>], { type: 'application/octet-stream' }), filename, warnings };
 }
