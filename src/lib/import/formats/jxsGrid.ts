@@ -49,6 +49,25 @@ export interface JxsModule {
   segments: JxsSegment[][];
   /** Grid patterns (64 timeline rows each). */
   bars: number;
+  /** Subsong 0 play range (bars/steps, as the engine reads them at +88..+112), clamped into the grid. */
+  startBar: number;
+  startStep: number;
+  endBar: number;
+  endStep: number;
+  loopBar: number;
+  loopStep: number;
+  loopFlag: number;
+}
+
+/**
+ * The bars one pass of subsong 0 plays, as the engine runs it (jxs_engine.cpp tick + openSong): it starts at
+ * startBar/startStep and stops BEFORE the row at endBar/endStep, so a bar whose end position is step 0 is not
+ * played. The engine never jumps to the loop bar during a pass (it sets ended there), so a replay restarts at
+ * startBar. Shared by the parser (songPositions) and JxsEngine (bar -> songPos).
+ */
+export function jxsPlayRange(m: JxsModule): { firstBar: number; lastBar: number } {
+  const lastBar = Math.max(m.startBar, m.endStep === 0 ? m.endBar - 1 : m.endBar);
+  return { firstBar: m.startBar, lastBar };
 }
 
 /** Decode the file; null when it is not a complete JayTrax module. */
@@ -102,10 +121,19 @@ export function decodeJxsModule(bytes: Uint8Array): JxsModule | null {
   }
   let title = '';
   for (let i = 0; i < 32 && bytes[subOff + 114 + i]; i++) title += String.fromCharCode(bytes[subOff + 114 + i]);
+  const bars = Math.max(1, Math.ceil(rows / JXS_ROWS));
+  const clampBar = (v: number, lo: number): number => Math.min(bars - 1, Math.max(lo, v));
+  const clampStep = (v: number): number => Math.min(JXS_ROWS - 1, Math.max(0, v));
+  const endBar = clampBar(s32(bytes, subOff + 96), 0);
+  const startBar = Math.min(clampBar(s32(bytes, subOff + 88), 0), endBar);
+  const loopBar = Math.min(clampBar(s32(bytes, subOff + 104), 0), endBar);
   return {
+    startBar, startStep: clampStep(s32(bytes, subOff + 92)),
+    endBar, endStep: clampStep(s32(bytes, subOff + 100)),
+    loopBar, loopStep: clampStep(s32(bytes, subOff + 108)), loopFlag: s16(bytes, subOff + 112),
     image: bytes, version, patterns: P, subsongs: S, instruments: I, channels,
     bpm: s32(bytes, subOff + 80), title, patternOffset, segments,
-    bars: Math.max(1, Math.ceil(rows / JXS_ROWS)),
+    bars,
   };
 }
 

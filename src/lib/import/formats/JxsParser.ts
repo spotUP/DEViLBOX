@@ -7,7 +7,7 @@
  */
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern } from '@/types';
-import { decodeJxsModule, isJxsModule, jxsPlacement, jxsRowCell, JXS_ROWS, type JxsModule } from './jxsGrid';
+import { decodeJxsModule, isJxsModule, jxsPlayRange, jxsPlacement, jxsRowCell, JXS_ROWS, type JxsModule } from './jxsGrid';
 
 export function isJxsFormat(bytes: Uint8Array): boolean {
   return isJxsModule(bytes);
@@ -43,7 +43,10 @@ function buildSong(m: JxsModule, filename: string, bytes: Uint8Array): TrackerSo
       originalChannelCount: m.channels, originalPatternCount: m.patterns, originalInstrumentCount: m.instruments,
     },
   }));
-  const positions = patterns.map((_, p) => p);
+  // Pattern index = bar (edits and export address patterns by bar, so none are trimmed); the order is the bars
+  // one engine pass plays. A replay restarts at the first of them (the engine has no in-pass loop jump).
+  const { firstBar, lastBar } = jxsPlayRange(m);
+  const positions = Array.from({ length: lastBar - firstBar + 1 }, (_, i) => firstBar + i);
   const song = {
     name: m.title || filename.replace(/\.[^/.]+$/, ''),
     format: 'JXS',
