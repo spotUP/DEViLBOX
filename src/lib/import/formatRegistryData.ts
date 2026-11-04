@@ -444,6 +444,17 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
   {
+    key: 'tonyWilliams',
+    label: 'Tony Williams',
+    description: 'Tony Williams (Sound Images) - native grid, UADE plays',
+    family: 'amiga-native',
+    matchMode: 'both',
+    extRegex: /\.tw$/i,
+    prefixes: ['tw.'],
+    nativeParser: { module: '@lib/import/formats/TonyWilliamsParser', parseFn: 'parseTonyWilliamsFile', detectFn: 'isTonyWilliamsFormat' },
+    uadeFallback: true,
+  },
+  {
     key: 'artOfNoise',
     label: 'Art of Noise',
     description: 'Art of Noise — native parser or UADE',
