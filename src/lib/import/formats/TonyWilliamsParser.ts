@@ -41,14 +41,17 @@ export async function parseTonyWilliamsFile(buffer: ArrayBuffer, filename: strin
     sizes.push(end - a);
   }
   const instruments: InstrumentConfig[] = Array.from({ length: 16 }, (_, i) => ({
-    id: i + 1, name: `Instrument ${i + 1}`, type: 'synth' as const, synthType: 'Synth' as const,
+    id: i + 1, name: '', type: 'synth' as const, synthType: 'Synth' as const,
     effects: [], volume: 0, pan: 0,
   })) as unknown as InstrumentConfig[];
   const baseName = filename.replace(/^.*\//, '').replace(/\.[^.]+$/, '');
   const result: TrackerSong = {
     name: baseName, format: 'XM' as TrackerFormat,
     patterns: grid.patterns, instruments, songPositions: grid.songPositions, songLength: grid.songPositions.length,
-    restartPosition: 0, numChannels: TW_VOICES, initialSpeed: 1, initialBPM: 125,
+    restartPosition: 0, numChannels: TW_VOICES, initialSpeed: walk.info.speed, initialBPM: 125,
+    // The player steps on its 50 Hz vertical-blank interrupt, not CIA-A Timer A (which stays 0 for TW), so the
+    // playhead must follow UADE's player-interrupt count; without this the cursor never got an engine row.
+    uadePlayerTickGrid: true,
     uadeEditableFileData: buffer.slice(0), uadeEditableFileName: filename,
   };
   const layout: UADEVariablePatternLayout = {

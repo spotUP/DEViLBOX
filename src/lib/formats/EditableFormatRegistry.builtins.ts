@@ -15,6 +15,7 @@ import { registerEditableFormat, setFormatInstruments } from './EditableFormatRe
 import type { SynthType } from '@typedefs/instrument';
 
 registerEditableFormat({ formatId: "actionamics", label: "", newSong: { template: "templates/actionamics.ast", name: "Actionamics" }, patternCodec: { kind: "variable" }, exporter: { module: "ActionamicsExporter", fn: "exportActionamics", byLayout: true } });
+registerEditableFormat({ formatId: "kdm", label: "Ken Silverman KDM", patternCodec: { kind: "fixed" }, exporter: { module: "KdmExporter", fn: "exportKdm", byLayout: true } });
 registerEditableFormat({ formatId: "monotone", label: "MONOTONE", newSong: { template: "templates/monotone.mon" }, patternCodec: { kind: "fixed" }, exporter: { module: "MonotoneExporter", fn: "exportMonotone", byLayout: true } });
 registerEditableFormat({ formatId: "ansiMusic", label: "ANSI Music", newSong: { template: "templates/ansimusic.ans" }, patternCodec: { kind: "fixed" }, exporter: { module: "AnsiMusicExporter", fn: "exportAnsiMusic" } });
 registerEditableFormat({ formatId: "activisionPro", label: "Activision Pro", newSong: { template: "templates/activisionPro.avp" }, patternCodec: { kind: "fixed" }, exporter: { module: "ActivisionProExporter", fn: "exportActivisionPro", byLayout: true } });
@@ -161,6 +162,7 @@ const WITH_SYNTH: Record<string, SynthType[]> = {
   jochenHippelST: ['HippelStSynth', 'HippelSynth'],
   inStereo2: ['InStereo2Synth', 'InStereo2WasmSynth'],
   jamCracker: ['JamCrackerSynth'],
+  kdm: ['KdmWasmSynth'],
   monotone: ['MonotoneWasmSynth'],
   musicAssembler: ['MusicAssemblerSynth'],
   musicLine: ['MusicLineSynth'],

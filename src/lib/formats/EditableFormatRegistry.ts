@@ -179,6 +179,7 @@ const ENGINE_FIELD_FORMAT_IDS: ReadonlyArray<readonly [formatId: string, carries
   ['benDaglish', (song) => !!song.bdFileData],
   ['sawteeth', (song) => !!song.sawteethFileData],
   ['monotone', (song) => song.format === 'MON'],
+  ['kdm', (song) => song.format === 'KDM'],
 ];
 
 /** The formatId whose instrument set locks the editor when this song loads, or '' for an unlocked project. */

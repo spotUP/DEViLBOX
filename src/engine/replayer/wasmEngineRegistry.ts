@@ -819,6 +819,18 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     dynamicResolver: async () => (await import('@/engine/monotone/MonotoneEngine')).MonotoneEngine as unknown as WASMSingletonStatic,
   },
   {
+    key: 'KdmReplayer',
+    synthType: 'KdmWasmSynth',
+    suppressNotes: true,
+    fileDataKey: 'kdmFileData',
+    loadMethod: 'loadTune',
+    supportsPause: false,
+    supportsResume: false,
+    needsDirectRouting: true,
+    staticRef: null,
+    dynamicResolver: async () => (await import('@/engine/kdm/KdmEngine')).KdmEngine as unknown as WASMSingletonStatic,
+  },
+  {
     key: 'ActivisionProReplayer',
     synthType: 'ActivisionProWasmSynth',
     suppressNotes: true,
