@@ -10,27 +10,21 @@
  *   3. u16BE(18) != 0, positive (signed), even (bit 0 == 0)
  *   4. u16BE(u16BE(18)) == 0 (word at the offset stored in bytes[18..19] must be zero)
  *
- * Metadata extraction (from InitPlayer):
- *   Pattern count: u16BE(556) in the module data
- *
- * Single-file format: packer wraps music data in a MMDC container.
- * Actual audio playback is delegated to UADE.
+ * The file is an OctaMED MMD0 module whose blocks are run-length packed (mmdcCodec.ts). The import unpacks it to an
+ * MMD0 image and lets MEDParser decode the cells, so the grid shows the real notes. Playback stays with UADE on the
+ * original bytes; the layout (id 'mmdc') addresses the unpacked image and MEDExporter.patchMmdcModule repacks.
  *
  * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/MMDC/src/MMDC_v3.asm
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
-import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { parseMEDFile } from './MEDParser';
+import { unpackMmdc } from './mmdcCodec';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
 /** Minimum file size to hold the MMDC header (at least 20 bytes). */
 const MIN_FILE_SIZE = 20;
-
-/** Maximum patterns to report. */
-const MAX_PATTERNS = 128;
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
 
@@ -77,116 +71,30 @@ export function isMMDCFormat(buffer: ArrayBuffer | Uint8Array): boolean {
 // ── Main parser ─────────────────────────────────────────────────────────────
 
 /**
- * Parse an MMDC module file into a TrackerSong.
- *
- * Extracts pattern count from the binary header.
- * Actual audio playback is always delegated to UADE.
+ * Parse an MMDC module file into a TrackerSong with its real pattern grid.
  *
  * @param buffer   Raw file bytes (ArrayBuffer)
  * @param filename Original filename (used to derive the module name)
  */
 export function parseMMDCFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
+  if (!isMMDCFormat(buf)) throw new Error('Not an MMDC module');
 
-  if (!isMMDCFormat(buf)) {
-    throw new Error('Not an MMDC module');
-  }
-
-  // ── Module name from filename ─────────────────────────────────────────────
+  const unpacked = unpackMmdc(buf);
+  const med = parseMEDFile(unpacked.buffer.slice(unpacked.byteOffset, unpacked.byteOffset + unpacked.byteLength) as ArrayBuffer, filename);
 
   const baseName = filename.split('/').pop() ?? filename;
-  // Strip "MMDC." prefix (case-insensitive) or ".mmdc" extension
-  const moduleName =
-    baseName.replace(/^mmdc\./i, '').replace(/\.mmdc$/i, '') || baseName;
+  const moduleName = baseName.replace(/^mmdc\./i, '').replace(/\.mmdc$/i, '') || baseName;
+  const nameSuffix = med.patterns.length > 0 ? ` (${med.patterns.length} patt)` : '';
 
-  // ── Pattern count from offset 556 ────────────────────────────────────────
-
-  let patternCount = 0;
-  if (buf.length >= 558) {
-    const raw = u16BE(buf, 556);
-    patternCount = Math.min(raw, MAX_PATTERNS);
-  }
-
-  // ── Instrument placeholders (MMDC supports up to 64 samples) ─────────────
-
-  const instruments: InstrumentConfig[] = Array.from(
-    { length: 1 },
-    (_, i) =>
-      ({
-        id: i + 1,
-        name: '',
-        type: 'synth' as const,
-        synthType: 'Synth' as const,
-        effects: [],
-        volume: 0,
-        pan: 0,
-      }) as InstrumentConfig,
-  );
-
-  // ── Empty pattern (placeholder — UADE handles actual audio) ──────────────
-
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0,
-    instrument: 0,
-    volume: 0,
-    effTyp: 0,
-    eff: 0,
-    effTyp2: 0,
-    eff2: 0,
-  }));
-
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
-    length: 64,
-    channels: Array.from({ length: 4 }, (_, ch) => ({
-      id: `channel-${ch}`,
-      name: `Channel ${ch + 1}`,
-      muted: false,
-      solo: false,
-      collapsed: false,
-      volume: 100,
-      pan: ch === 0 || ch === 3 ? -50 : 50,
-      instrumentId: null,
-      color: null,
-      rows: emptyRows,
-    })),
-    importMetadata: {
-      sourceFormat: 'MOD' as const,
-      sourceFile: filename,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: 4,
-      originalPatternCount: patternCount || 1,
-      originalInstrumentCount: 0,
-    },
-  };
-
-  const nameSuffix = patternCount > 0 ? ` (${patternCount} patt)` : '';
-
+  const { libopenmptFileData: _unused, ...rest } = med;
+  void _unused;
   return {
+    ...rest,
     name: `${moduleName} [MMDC]${nameSuffix}`,
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
-    instruments,
-    songPositions: [0],
-    songLength: 1,
-    restartPosition: 0,
-    numChannels: 4,
-    initialSpeed: 6,
-    initialBPM: 125,
-    linearPeriods: false,
-    uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+    uadeEditableFileData: buffer.slice(0),
     uadeEditableFileName: filename,
-    uadePatternLayout: {
-      formatId: 'mmdc',
-      patternDataFileOffset: 1084,
-      bytesPerCell: 4,
-      rowsPerPattern: 64,
-      numChannels: 4,
-      numPatterns: patternCount || 1,
-      moduleSize: buffer.byteLength,
-      encodeCell: encodeMODCell,
-      decodeCell: decodeMODCell,
-    } as UADEPatternLayout,
+    uadePatternLayout: { ...med.uadePatternLayout!, formatId: 'mmdc', moduleSize: buffer.byteLength },
   };
 }

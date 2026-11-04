@@ -7,6 +7,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { unpackMmdc, repackMmdc } from '@/lib/import/formats/mmdcCodec';
 
 function writeU16BE(view: DataView, off: number, val: number): void {
   view.setUint16(off, val, false);
@@ -70,8 +71,26 @@ export function patchMedModule(song: TrackerSong): ArrayBuffer | null {
   return out.buffer;
 }
 
+/**
+ * A song parsed from a packed OctaMED (MMDC) file: the edited cells go into the unpacked MMD0 image the layout
+ * addresses, then the blocks are packed again. Unedited blocks keep their stored bytes. Null for any other song.
+ */
+export function patchMmdcModule(song: TrackerSong): ArrayBuffer | null {
+  const layout = song.uadePatternLayout;
+  const src = song.uadeEditableFileData;
+  if (!src || layout?.formatId !== 'mmdc' || !layout.getCellFileOffset) return null;
+  const packed = new Uint8Array(src);
+  const out = unpackMmdc(packed);
+  song.patterns.forEach((pat, p) => pat.channels.forEach((chan, ch) => chan.rows.forEach((cell, row) => {
+    const off = layout.getCellFileOffset!(p, row, ch);
+    if (off > 0) out.set(layout.encodeCell(cell, out.subarray(off, off + layout.bytesPerCell)), off);
+  })));
+  const repacked = repackMmdc(packed, out);
+  return repacked.buffer.slice(repacked.byteOffset, repacked.byteOffset + repacked.byteLength) as ArrayBuffer;
+}
+
 export function exportMED(song: TrackerSong): ArrayBuffer {
-  const patched = patchMedModule(song);
+  const patched = patchMmdcModule(song) ?? patchMedModule(song);
   if (patched) return patched;
   const nChannels = Math.min(4, song.numChannels);
   const nBlocks   = song.patterns.length;
