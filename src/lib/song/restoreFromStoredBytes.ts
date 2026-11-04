@@ -10,7 +10,9 @@
  * For a song that carries the bytes the decoder read (uadeEditableFileData and
  * its name - every UADE byte-exact codec, MED, Sound Master, Jesper Olsen ...;
  * nuadeFileData / eaglePlayerFileData and their names for a song those engines
- * play, storedModuleOf)
+ * play; any other WASM whole-song engine (JayTrax, hively, ...) keeps its bytes
+ * under the fileDataKey of its wasmEngineRegistry entry and the name it was
+ * opened under in sourceFileName, storedModuleOf)
  * the restore runs the same parse a fresh load runs (parseModuleToSong, with
  * the stored companion files) and takes the grid and the engine fields from it.
  * The user's work is kept: a cell whose hash differs from the load-time
@@ -19,8 +21,9 @@
  * save.
  *
  * Kept as saved, with the reason logged, when re-decoding is not safe:
- *  - no bytes or no file name (TS-replayer songs, hively, libopenmpt songs:
- *    their edits live in the stored patterns and there is nothing to re-read);
+ *  - no bytes or no file name (TS-replayer songs, libopenmpt songs, and saves
+ *    from before sourceFileName existed: their edits live in the stored
+ *    patterns and there is nothing to re-read);
  *  - no baseline (saved before baselines existed: every edit would be
  *    indistinguishable from the old decoder's output);
  *  - several UADE subsongs (the played subsong is not saved; the engines that do save it - nuade, the
@@ -32,6 +35,8 @@
 import type { Pattern } from '@/types/tracker';
 import type { SongToApply } from './applySong';
 import { hashCell, type GridBaseline } from './gridBaseline';
+import { FILE_DATA_FIELDS } from '@/engine/formatFileDataFields';
+import { WASM_ENGINES } from '@/engine/replayer/wasmEngineRegistry';
 
 type Parse = typeof import('@/lib/import/parseModuleToSong').parseModuleToSong;
 
@@ -51,6 +56,8 @@ function lineUp(stored: readonly Pattern[], other: readonly Pattern[]): boolean 
   });
 }
 
+const MODULE_PAIR_KEYS: ReadonlySet<string> = new Set(['uadeEditableFileData', 'nuadeFileData', 'eaglePlayerFileData']);
+
 /**
  * The module the decoder read and its file name. A UADE-routed song keeps it in uadeEditableFileData; a song nuade or
  * the EaglePlayer runner plays keeps it in that engine's field (playOnNuade / playOnEaglePlayer take the UADE field
@@ -65,6 +72,15 @@ export function storedModuleOf(eng: Record<string, unknown>): { bytes?: ArrayBuf
   for (const [data, fileName] of pairs) {
     const bytes = eng[data] as ArrayBuffer | undefined;
     if (bytes && bytes.byteLength > 0) return { bytes, name: eng[fileName] as string | undefined };
+  }
+  // Any other whole-song engine: its module bytes sit under the registry's fileDataKey, the name is the one the song was opened under.
+  for (const desc of WASM_ENGINES) {
+    const bytes = eng[desc.fileDataKey as string];
+    if (bytes instanceof ArrayBuffer && bytes.byteLength > 0) return { bytes, name: eng.sourceFileName as string | undefined };
+    if (ArrayBuffer.isView(bytes) && bytes.byteLength > 0) {
+      const v = bytes as Uint8Array;
+      return { bytes: v.buffer.slice(v.byteOffset, v.byteOffset + v.byteLength) as ArrayBuffer, name: eng.sourceFileName as string | undefined };
+    }
   }
   return {};
 }
@@ -135,6 +151,15 @@ export async function restoreFromStoredBytes(
   });
 
   carryStartSubsong(eng, fresh as unknown as Record<string, unknown>);
+  // Companion binaries (TFMX smpl.*, bank files) are inputs the re-decode was not given; keep the saved ones.
+  // The three module pairs stay out: a decoder that does not produce them must not get stale ones back.
+  const freshRec = fresh as unknown as Record<string, unknown>;
+  for (const key of FILE_DATA_FIELDS) {
+    if (MODULE_PAIR_KEYS.has(key)) continue;
+    if (freshRec[key] == null && eng[key] != null) freshRec[key] = eng[key];
+  }
+  // The fresh decode does not know the name it was opened under; the next save needs it again.
+  if (eng.sourceFileName) (fresh as unknown as Record<string, unknown>).sourceFileName = eng.sourceFileName;
   const freshBaseline: GridBaseline = fresh.patterns.map((p) => p.channels.flatMap((ch) => ch.rows.map(hashCell)));
   const useStoredInstruments = song.instruments.length === fresh.instruments.length;
   return {

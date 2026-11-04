@@ -238,6 +238,8 @@ export interface FormatStore {
   originalModuleData: { base64: string; format: 'MOD' | 'XM' | 'IT' | 'S3M' | 'UNKNOWN'; sourceFile?: string } | null;
   /** Rating key (`modland:<path>` / `hvsc:<path>`) of the loaded song, null for a local file or new song. */
   songSourceKey: string | null;
+  /** File name the loaded song was opened under (openSong). Saved with the project so a restore can re-decode the stored module bytes of any engine. */
+  sourceFileName: string | null;
   songDBInfo: { authors: string[]; publishers: string[]; album: string; year: string; format: string; duration_ms: number } | null;
   /**
    * The parser's `TrackerSong.format` for the loaded song ('ASAP', 'PiyoPiyo',
@@ -356,6 +358,7 @@ export interface FormatStore {
   setSidMetadata: (info: FormatStore['sidMetadata']) => void;
   /** Clear the outgoing song's header info (SID header, SongDB lookup) at unload. */
   setSongSourceKey: (key: string | null) => void;
+  setSourceFileName: (name: string | null) => void;
   clearSongInfo: () => void;
   setOriginalModuleData: (data: FormatStore['originalModuleData']) => void;
   setMaxTraxData: (data: MaxTraxData | null) => void;
@@ -769,6 +772,7 @@ export const useFormatStore = create<FormatStore>()(
     originalModuleData: null,
     songDBInfo: null,
     songSourceKey: null,
+    sourceFileName: null,
     songFormat: null,
     activeFormatId: null,
     sidMetadata: null,
@@ -1285,6 +1289,7 @@ export const useFormatStore = create<FormatStore>()(
     setSongDBInfo: (info) => set((state) => { state.songDBInfo = info; }),
     setSidMetadata: (info) => set((state) => { state.sidMetadata = info; }),
     setSongSourceKey: (key) => set((state) => { state.songSourceKey = key; }),
+    setSourceFileName: (name) => set((state) => { state.sourceFileName = name; }),
     clearSongInfo: () => set((state) => { state.sidMetadata = null; state.songDBInfo = null; state.songSourceKey = null; }),
     setOriginalModuleData: (data) => set((state) => { state.originalModuleData = data; }),
 
@@ -1395,6 +1400,7 @@ export const useFormatStore = create<FormatStore>()(
         state.sunTronicCompanionPcm = (song as any).sunTronicCompanionPcm ?? null;
         state.sunTronicNative = song.sunTronicNative ?? null;
         state.uadeEditableFileName = (song as any).uadeEditableFileName ?? null;
+        state.sourceFileName = (song as any).sourceFileName ?? null;
         state.maxTraxFileData = (song as any).maxTraxFileData ?? null;
         state.maxTraxFileName = (song as any).maxTraxFileName ?? null;
         state.nativeSamplePlayback = (song as any).nativeSamplePlayback ?? false;
@@ -1800,6 +1806,7 @@ export const useFormatStore = create<FormatStore>()(
       state.originalModuleData = null;
       state.songDBInfo = null;
       state.songSourceKey = null;
+      state.sourceFileName = null;
       state.sidMetadata = null;
     }),
   }))
