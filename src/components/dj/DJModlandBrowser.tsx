@@ -34,12 +34,7 @@ import { cacheSong } from '@/engine/dj/DJSongCache';
 import { getDJPipeline } from '@/engine/dj/DJPipeline';
 import { loadRenderToDeck } from '@/engine/dj/DJTrackLoader';
 import { useDJPlaylistStore } from '@/stores/useDJPlaylistStore';
-import {
-  batchGetRatings,
-  setRating,
-  removeRating,
-  type RatingMap,
-} from '@/lib/ratingsApi';
+import { useRatingsStore, ratingId } from '@/stores/useRatingsStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { AuthModal } from '@/components/dialogs/AuthModal';
 import { StarRating } from '@/components/shared/StarRating';
@@ -90,7 +85,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
   const [downloadingPaths, setDownloadingPaths] = useState<Set<string>>(new Set());
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [, setLoadedDecks] = useState<Set<string>>(new Set());
-  const [ratings, setRatings] = useState<RatingMap>({});
+  const ratings = useRatingsStore((s) => s.ratings);
   // Row hover is tracked in React state instead of via Tailwind's
   // `group-hover:*` CSS because StarRating re-renders rapidly on per-star
   // mouse-enter — Chrome sometimes drops the ancestor `:hover` state for
@@ -204,17 +199,8 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
 
         const modlandKeys = combined.filter(r => r.source === 'modland').map(r => r.key);
         const hvscKeys = combined.filter(r => r.source === 'hvsc').map(r => r.key);
-        const ratingPromises: Promise<RatingMap>[] = [];
-        if (modlandKeys.length > 0) ratingPromises.push(batchGetRatings('modland', modlandKeys));
-        if (hvscKeys.length > 0) ratingPromises.push(batchGetRatings('hvsc', hvscKeys));
-        if (ratingPromises.length > 0) {
-          Promise.all(ratingPromises).then(maps => {
-            const merged = Object.assign({}, ...maps);
-            setRatings(prev => append ? { ...prev, ...merged } : merged);
-          }).catch(() => {});
-        } else if (!append) {
-          setRatings({});
-        }
+        void useRatingsStore.getState().loadMany('modland', modlandKeys);
+        void useRatingsStore.getState().loadMany('hvsc', hvscKeys);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Search failed');
       } finally {
@@ -247,39 +233,7 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
 
   const handleRate = useCallback(async (item: OnlineResult, star: number) => {
     if (!isLoggedIn) { setShowAuthModal(true); return; }
-    const itemKey = item.key;
-    const ratingSource = item.source;
-    // Optimistic update
-    setRatings(prev => {
-      const existing = prev[itemKey];
-      if (star === 0) {
-        if (!existing) return prev;
-        const newCount = Math.max(0, existing.count - 1);
-        const newAvg = newCount > 0
-          ? (existing.avg * existing.count - (existing.userRating || 0)) / newCount
-          : 0;
-        return { ...prev, [itemKey]: { avg: newAvg, count: newCount } };
-      }
-      const oldUser = existing?.userRating;
-      const oldCount = existing?.count || 0;
-      const oldAvg = existing?.avg || 0;
-      const newCount = oldUser ? oldCount : oldCount + 1;
-      const newAvg = oldUser
-        ? (oldAvg * oldCount - oldUser + star) / newCount
-        : (oldAvg * oldCount + star) / newCount;
-      return { ...prev, [itemKey]: { avg: newAvg, count: newCount, userRating: star } };
-    });
-    try {
-      if (star === 0) {
-        await removeRating(ratingSource, itemKey);
-      } else {
-        await setRating(ratingSource, itemKey, star);
-      }
-    } catch {
-      batchGetRatings(ratingSource, [itemKey]).then(rm => {
-        setRatings(prev => ({ ...prev, ...rm }));
-      }).catch(() => {});
-    }
+    await useRatingsStore.getState().rate(item.source, item.key, star);
   }, [isLoggedIn]);
 
   // ── Scroll selected item into view ───────────────────────────────────
@@ -803,9 +757,9 @@ export const DJModlandBrowser: React.FC<DJModlandBrowserProps> = ({ onClose, var
                     {file.source === 'hvsc' && <span className="text-text-secondary/60 text-[9px]">HVSC</span>}
                     <span className="text-text-muted/60">{file.author}</span>
                     <StarRating
-                      avg={ratings[file.key]?.avg ?? file.avg_rating ?? 0}
-                      count={ratings[file.key]?.count ?? file.vote_count ?? 0}
-                      userRating={ratings[file.key]?.userRating}
+                      avg={ratings[ratingId(file.source, file.key)]?.avg ?? file.avg_rating ?? 0}
+                      count={ratings[ratingId(file.source, file.key)]?.count ?? file.vote_count ?? 0}
+                      userRating={ratings[ratingId(file.source, file.key)]?.userRating}
                       onRate={(star) => handleRate(file, star)}
                     />
                   </div>
