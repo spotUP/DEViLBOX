@@ -13,18 +13,21 @@ import {
   type WASMAssetsCache,
   type WASMLoaderConfig,
 } from '@engine/wasm/WASMSingletonBase';
+import { decodeJxsModule, jxsPlayRange } from '@lib/import/formats/jxsGrid';
 import { actionamicsTransform } from '@engine/actionamics/ActionamicsEngine';
 
-/** Where the replayer is: the bar and the step (0..63) it last entered. */
+/** Where the replayer is, in the engine position contract: the index into songPositions and the row (0..63). */
 export interface JxsPositionUpdate {
-  bar: number;
-  step: number;
+  songPos: number;
+  row: number;
 }
 
 export class JxsEngine extends WASMChannelOutputsEngine {
   private static instance: JxsEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
+  /** Bars one pass plays (jxsPlayRange): songPositions[0] = firstBar. */
+  private _range = { firstBar: 0, lastBar: Number.MAX_SAFE_INTEGER };
   private _songEndCallback: (() => void) | null = null;
   private _positionCallbacks = new Set<(update: JxsPositionUpdate) => void>();
 
@@ -69,28 +72,7 @@ export class JxsEngine extends WASMChannelOutputsEngine {
     // One stereo mix; the replayer has no per-voice outputs.
     this.workletNode = new AudioWorkletNode(ctx, 'jxs-processor', channelOutputNodeOptions(1));
 
-    this.workletNode.port.onmessage = (event) => {
-      const data = event.data;
-      switch (data.type) {
-        case 'ready':
-          console.log('[JxsEngine] WASM ready');
-          this.markNodeReady();
-          if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
-          break;
-        case 'moduleLoaded':
-          console.log('[JxsEngine] Module loaded');
-          break;
-        case 'position':
-          for (const cb of this._positionCallbacks) cb({ bar: data.bar, step: data.step });
-          break;
-        case 'songEnd':
-          this._songEndCallback?.();
-          break;
-        case 'error':
-          console.error('[JxsEngine]', data.message);
-          break;
-      }
-    };
+    this.workletNode.port.onmessage = (event) => this.handleWorkletMessage(event.data);
 
     this.workletNode.port.postMessage({
       type: 'init', sampleRate: ctx.sampleRate,
@@ -99,9 +81,37 @@ export class JxsEngine extends WASMChannelOutputsEngine {
     this.workletNode.connect(this.output, 0);
   }
 
+  /** One message from the worklet. */
+  handleWorkletMessage(data: { type: string; bar: number; step: number; message?: string }): void {
+    switch (data.type) {
+      case 'ready':
+        console.log('[JxsEngine] WASM ready');
+        this.markNodeReady();
+        if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
+        break;
+      case 'moduleLoaded':
+        console.log('[JxsEngine] Module loaded');
+        break;
+      case 'position':
+        // Outside the played range: the pre-roll before the first row (start step - 1) and the loop bar the
+        // engine parks on when it ends. Neither is a played row, so the grid is not moved there.
+        if (data.bar < this._range.firstBar || data.bar > this._range.lastBar) break;
+        for (const cb of this._positionCallbacks) cb({ songPos: data.bar - this._range.firstBar, row: data.step });
+        break;
+      case 'songEnd':
+        this._songEndCallback?.();
+        break;
+      case 'error':
+        console.error('[JxsEngine]', data.message);
+        break;
+    }
+  }
+
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('JxsEngine not initialized');
+    const m = decodeJxsModule(new Uint8Array(buffer));
+    this._range = m ? jxsPlayRange(m) : { firstBar: 0, lastBar: Number.MAX_SAFE_INTEGER };
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
   }
 
