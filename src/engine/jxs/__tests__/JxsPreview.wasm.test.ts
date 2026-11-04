@@ -6,6 +6,8 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { jxsNoteForKey } from '../JxsSynth';
+import { loadJxsWasm, renderNote } from './jxsWasmHarness';
 
 const root = path.resolve(__dirname, '../../../..');
 
@@ -72,5 +74,15 @@ describe('JXS single-note preview (keyboard voice)', () => {
     m._jxs_preview_note(9999, 37);
     expect(peakOf(m, out, 40)).toBe(0);
     m._jxs_preview_close();
+  });
+
+  it('the keyboard key for C-2 plays the same sound as raw note 72, not a very low octave', async () => {
+    const m = await loadJxsWasm();
+    const bytes = new Uint8Array(fs.readFileSync(path.join(root, 'public/data/songs/formats/popcorn.jxs')));
+    let instrument = 0, direct: Float32Array = new Float32Array(0);
+    for (let i = 1; i <= 12 && !direct.some((v) => v !== 0); i++) { instrument = i; direct = renderNote(m, bytes, i, 72); }
+    const key = renderNote(m, bytes, instrument, jxsNoteForKey(36));
+    expect(direct.some((v) => v !== 0)).toBe(true);
+    expect(Array.from(key)).toEqual(Array.from(direct));
   });
 });

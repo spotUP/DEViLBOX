@@ -5,7 +5,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { parseJxsFile, isJxsFormat } from '@lib/import/formats/JxsParser';
-import { decodeJxsModule, jxsPlacement, JXS_ROWS } from '@lib/import/formats/jxsGrid';
+import { decodeJxsModule, jxsPlacement, jxsGridNoteToRaw, jxsRowCell, JXS_ROWS } from '@lib/import/formats/jxsGrid';
+import { xmNoteToString } from '@/lib/xmConversions';
 import { exportJxs } from '@lib/export/JxsExporter';
 
 const DIR = 'public/data/songs/formats';
@@ -51,6 +52,22 @@ describe('JayTrax corpus', () => {
     const diff: number[] = [];
     raw.forEach((v, i) => { if (out[i] !== v) diff.push(i); });
     expect(diff).toEqual([noteByte]);
-    expect(out[noteByte]).toBe(cell.note);
+    expect(out[noteByte]).toBe(jxsGridNoteToRaw(cell.note));
+  });
+});
+
+describe('JayTrax grid note names (owner: names were wrong, one semitone and four octaves off)', () => {
+  it('popcorn raw note 72 shows as C-2 in the grid', () => {
+    const image = new Uint8Array(readFileSync('public/data/songs/formats/popcorn.jxs'));
+    const m = decodeJxsModule(image)!;
+    let found = 0;
+    for (let p = 0; p < m.patterns; p++) {
+      for (let r = 0; r < JXS_ROWS; r++) {
+        if (image[m.patternOffset + (p * 64 + r) * 5] !== 72) continue;
+        found++;
+        expect(xmNoteToString(jxsRowCell(image, m, p, r).note ?? 0)).toBe('C-2');
+      }
+    }
+    expect(found).toBeGreaterThan(0);
   });
 });

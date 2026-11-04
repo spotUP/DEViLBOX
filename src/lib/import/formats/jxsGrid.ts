@@ -134,6 +134,19 @@ export function jxsPlacement(m: JxsModule, channel: number, t: number): [number,
   return null;
 }
 
+/**
+ * The ONE place the JayTrax note offset lives. The replayer's frequency table sounds raw note n at
+ * MIDI n - 36, and the XM label (note 1 = C-0 = MIDI 12) therefore names it at XM n - 47: raw 48 is C-0,
+ * raw 72 is C-2. Raw notes 1..47 sound below the grid's range and have no grid note (they show empty).
+ */
+export const JXS_RAW_NOTE_OFFSET = 47;
+
+/** Grid (XM) note of a raw row note; 0 for no note or a raw note below the grid's range. */
+export const jxsRawToGridNote = (raw: number): number => (raw > JXS_RAW_NOTE_OFFSET ? raw - JXS_RAW_NOTE_OFFSET : 0);
+
+/** Raw row note of a grid (XM) note; 0 stays 0. */
+export const jxsGridNoteToRaw = (note: number): number => (note > 0 ? note + JXS_RAW_NOTE_OFFSET : 0);
+
 const rowAt = (m: JxsModule, pattern: number, row: number): number => m.patternOffset + (pattern * 64 + row) * ROW;
 
 const SINGLE = new Set<number>(JX_SINGLE_SCRIPTS);
@@ -145,7 +158,7 @@ const inertScript = (sc: number): boolean => !SINGLE.has(sc) && (sc < 14 || sc >
 export function jxsRowCell(image: Uint8Array, m: JxsModule, pattern: number, row: number): TrackerCell {
   const o = rowAt(m, pattern, row);
   const d = image[o + 1], p = image[o + 3], sc = image[o + 4];
-  const cell: TrackerCell = { note: image[o], instrument: image[o + 2], volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+  const cell: TrackerCell = { note: jxsRawToGridNote(image[o]), instrument: image[o + 2], volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
   if (inertScript(sc)) return cell;
   if (SINGLE.has(sc)) {
     cell.effTyp = JX_FX_BASE + sc; cell.eff = d;
@@ -197,7 +210,8 @@ export function applyJxsGridEdits(bytes: Uint8Array, edits: readonly JxsGridEdit
     const c = e.cell;
     if (same(before, c)) continue;
     const o = rowAt(m, where[0], where[1]);
-    out[o] = Math.min(127, c.note ?? 0);
+    // An unedited note keeps its byte (raw notes under 48 have no grid note and must survive).
+    if ((c.note ?? 0) !== before.note) out[o] = Math.min(127, jxsGridNoteToRaw(c.note ?? 0));
     const fx = jxsCellScript(c);
     // A cell with no effect keeps an inert script row's bytes: they never showed and do nothing.
     if (fx.sc === 0 && fx.d === 0 && fx.p === 0 && inertScript(bytes[o + 4])) {
