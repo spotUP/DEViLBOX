@@ -1,7 +1,7 @@
 /**
- * Loading a song from the tracker's Modland browser ends with the status bar showing its
+ * Loading a song from the tracker's Modland browser ends with the active project tab showing its
  * community score: ModlandPanel -> onLoadTrackerModule(..., sourceKey) -> openUserSong -> openSong
- * -> useFormatStore.songSourceKey -> StatusBar. The key is the same ratingId the panel's own stars use.
+ * -> useFormatStore.songSourceKey -> the active project tab (NavBar). The key is the same ratingId the panel's own stars use.
  */
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { ModlandPanel } from '../FilePreviewPanel';
-import { StatusBar } from '@/components/layout/StatusBar';
+import { NavBar } from '@/components/layout/NavBar';
 import { openUserSong } from '@/lib/song/openUserSong';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { useRatingsStore, ratingId } from '@/stores/useRatingsStore';
@@ -56,8 +56,8 @@ afterEach(() => {
   useRatingsStore.setState({ ratings: {} });
 });
 
-describe('Modland browser load shows the score in the status bar', { timeout: 60000 }, () => {
-  it('passes modland:<full_path> through openUserSong, and the bar shows the score', async () => {
+describe('Modland browser load shows the score in the active tab', { timeout: 60000 }, () => {
+  it('passes modland:<full_path> through openUserSong, and the active tab shows the score', async () => {
     useRatingsStore.setState({ ratings: { [ratingId('modland', 'Pro/Art/z.mod')]: { avg: 4.5, count: 7, userRating: 0 } } as never, loadMany: vi.fn(async () => {}), load: vi.fn(async () => {}) } as never);
     const onLoad = vi.fn(async (buffer: ArrayBuffer, filename: string, companions?: Map<string, ArrayBuffer>, sourceKey?: string) => {
       await openUserSong(new File([buffer], filename), 'filebrowser', companions, (m) => { throw new Error(m); }, sourceKey);
@@ -66,7 +66,7 @@ describe('Modland browser load shows the score in the status bar', { timeout: 60
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'z' } });
     fireEvent.click(await screen.findByText('Load', {}, { timeout: 5000 }));
     await waitFor(() => expect(useFormatStore.getState().songSourceKey).toBe('modland:Pro/Art/z.mod'), { timeout: 10000 });
-    const bar = render(<StatusBar />);
+    const bar = render(<NavBar />);
     expect(bar.container.textContent).toContain('4.5');
     expect(bar.container.textContent).toContain('(7)');
   });

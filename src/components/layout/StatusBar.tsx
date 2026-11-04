@@ -4,7 +4,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState as useReactState } from 'react';
-import { useTrackerStore, useCursorStore, useTransportStore, useAudioStore, useMIDIStore, useUIStore, useFormatStore } from '@stores';
+import { useTrackerStore, useCursorStore, useTransportStore, useAudioStore, useMIDIStore, useUIStore } from '@stores';
 import { useEditorStore } from '@stores/useEditorStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useDJStore } from '@/stores/useDJStore';
@@ -14,7 +14,6 @@ import { LoudnessMeterPanel } from '@/components/audio/LoudnessMeterPanel';
 import { useSongLoadStore, OPEN_PHASE_LABEL } from '@/stores/useSongLoadStore';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { WifiOff } from 'lucide-react';
-import { SongScore } from '@/components/shared/SongScore';
 import { useShallow } from 'zustand/react/shallow';
 import type { KnobAssignment } from '@/midi/knobBanks';
 import { getKnobBankForSynth, getKnobPageName } from '@/midi/knobBanks';
@@ -130,14 +129,6 @@ const TrackerStatusContent: React.FC = () => {
       patternLength: s.patterns[s.currentPatternIndex]?.length || 64,
     }))
   );
-  const { songDBInfo, sidMetadata, songSourceKey } = useFormatStore(
-    useShallow((s) => ({
-      songSourceKey: s.songSourceKey,
-      songDBInfo: s.songDBInfo,
-      sidMetadata: s.sidMetadata,
-    }))
-  );
-
   const { isPlaying, currentRow } = useTransportStore(
     useShallow((s) => ({ isPlaying: s.isPlaying, currentRow: s.currentRow }))
   );
@@ -167,54 +158,6 @@ const TrackerStatusContent: React.FC = () => {
       <span className={`px-2 py-0.5 rounded min-w-[4ch] text-center ${recordMode ? 'bg-accent-error/20 text-accent-error' : 'text-text-primary'}`}>
         {recordMode ? 'REC' : 'EDIT'}
       </span>
-      {songSourceKey && <SongScore fileName={songSourceKey} />}
-      {sidMetadata && (
-        <>
-          <div className="w-px h-3 bg-border opacity-50" />
-          <div className="flex items-center gap-2 text-text-muted text-xs">
-            {sidMetadata.title && (
-              <span className="text-text-primary">{sidMetadata.title}</span>
-            )}
-            {sidMetadata.author && (
-              <span>by <span className="text-text-primary font-semibold">{sidMetadata.author}</span></span>
-            )}
-            {sidMetadata.chipModel !== 'Unknown' && (
-              <span className="text-text-muted">[MOS {sidMetadata.chipModel}]</span>
-            )}
-            {sidMetadata.clockSpeed !== 'Unknown' && (
-              <span className="text-text-muted">{sidMetadata.clockSpeed}</span>
-            )}
-            {sidMetadata.subsongs > 1 && (
-              <span className="text-text-muted tabular-nums">Sub {sidMetadata.currentSubsong + 1}/{sidMetadata.subsongs}</span>
-            )}
-          </div>
-        </>
-      )}
-      {songDBInfo && (
-        <>
-          <div className="w-px h-3 bg-border opacity-50" />
-          <div className="flex items-center gap-2 text-text-muted text-xs">
-            {songDBInfo.album && (
-              <span>
-                <span className="text-text-primary">{songDBInfo.album}</span>
-              </span>
-            )}
-            {songDBInfo.year && (
-              <span className="text-text-muted">({songDBInfo.year})</span>
-            )}
-            {songDBInfo.format && (
-              <span className="text-text-muted">
-                [{songDBInfo.format}]
-              </span>
-            )}
-            {songDBInfo.authors?.length > 0 && (
-              <span>
-                by <span className="text-text-primary font-semibold">{songDBInfo.authors.join(', ')}</span>
-              </span>
-            )}
-          </div>
-        </>
-      )}
     </div>
   );
 };
