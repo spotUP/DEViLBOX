@@ -42,7 +42,14 @@ function buildTwSampleInstruments(bytes: Uint8Array, table: number, blockRows: T
       loopStart = loopPtr - ptr;
       loopEnd = loopStart + loopLen;
     }
-    out.push(createSamplerInstrument(idx + 1, '', bytes.slice(ptr, ptr + len), 64, TW_SAMPLE_RATE, loopStart, loopEnd));
+    const inst = createSamplerInstrument(idx + 1, '', bytes.slice(ptr, ptr + len), 64, TW_SAMPLE_RATE, loopStart, loopEnd);
+    // The generic chip-RAM sample path (chipRamSamplePatch.ts): PCM at `ptr` (len bytes allocated), and the table
+    // entry's length / loop fields. The module base is UADE's to say at play time; file offsets are what the patch needs.
+    inst.uadeChipRam = {
+      moduleBase: 0, moduleSize: bytes.length, instrBase: ptr, instrSize: len,
+      sections: { sampleOffset: ptr, lengthField: o + 4, loopPtrField: o + 6, loopLenField: o + 10 },
+    };
+    out.push(inst);
   }
   return out;
 }

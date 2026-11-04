@@ -36,9 +36,18 @@ export function classifySampleEdit(before: SampleConfig | undefined, after: Samp
 }
 
 /** Tell the song players that hold their own copy of the sample. */
-export function propagateSampleEditToSong(instrumentId: number, sample: SampleConfig | undefined, edit: SampleEdit): void {
+export function propagateSampleEditToSong(
+  instrumentId: number, sample: SampleConfig | undefined, edit: SampleEdit, chipRamSample = false,
+): void {
   if (!sample || (!edit.loop && !edit.data)) return;
   markSampleEdited();
+  // A Sampler that carries `uadeChipRam` plays from the module UADE holds in chip RAM: the export now carries the
+  // edited sample (chipRamSamplePatch.ts), so the same export diffed into chip RAM is what is heard at once.
+  if (chipRamSample) {
+    void Promise.all([import('@/engine/uade/liveModuleEdits'), import('./liveSong')])
+      .then(([live, song]) => live.applyEditedModuleToChipRam(song.liveTrackerSong()))
+      .catch((err) => console.warn('[sampleEdit] the edited sample could not be written to chip RAM:', err));
+  }
   void import('@engine/libopenmpt/OpenMPTEditBridge')
     .then((bridge) => bridge.syncSampleEdit(instrumentId, sample, edit))
     .catch((err) => console.warn('[sampleEdit] the libopenmpt copy of the sample could not be updated:', err));
