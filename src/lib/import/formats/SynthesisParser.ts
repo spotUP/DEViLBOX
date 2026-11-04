@@ -28,8 +28,8 @@
  *
  * Note mapping:
  *   Period table: 109 entries (index 0 = no note; indices 1–108 valid).
- *   Index 49 = 856 (Amiga C-3 / XM C-3 = note 37).
- *   xmNote = 37 + (synthNoteIdx - 49)
+ *   Index 49 = 856 (ProTracker C-1 = periodNotes note 13).
+ *   gridNote = 13 + (synthNoteIdx - 49)
  *
  * Loop logic (from NostalgicPlayer Samples property):
  *   repeatLength == 0  → full loop (loop from 0 for waveformLength bytes)
@@ -50,7 +50,7 @@ const PAL_CLOCK = 3546895;
 
 
 /**
- * Index in SYN_PERIODS corresponding to XM note 37 (C-3, period 856).
+ * Index in SYN_PERIODS corresponding to grid note 13 (ProTracker C-1, period 856).
  * All synth notes map relative to this anchor.
  */
 const SYN_REFERENCE_IDX = 49; // SYN_PERIODS[49] = 856
@@ -345,7 +345,7 @@ function parseSynthesis(bytes: Uint8Array, filename: string): TrackerSong | null
 
         let loopStart = 0;
         let loopEnd   = 0;
-        const sampleRate = Math.round(PAL_CLOCK / (2 * 856)); // C-3 rate
+        const sampleRate = Math.round(PAL_CLOCK / (2 * 856)); // rate of period 856 (C-1)
 
         if (rl === 0) {
           // Full loop
@@ -569,7 +569,9 @@ function parseSynthesis(bytes: Uint8Array, filename: string): TrackerSong | null
 
   return {
     name:            moduleName || baseName,
-    format:          'XM' as TrackerFormat,
+    // Cells are ProTracker periods (SYN_PERIODS[49] = 856 = C-1): an Amiga-period format, so typing octave, key
+    // periods and replayer mode follow the periods (a note-number format like 'XM' would not).
+    format:          'MOD' as TrackerFormat,
     patterns,
     instruments:     instrumentConfigs,
     songPositions,
