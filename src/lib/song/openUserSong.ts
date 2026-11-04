@@ -13,9 +13,11 @@ export async function openUserSong(
   origin: 'drop' | 'filebrowser',
   companions: Map<string, ArrayBuffer> | undefined,
   fail: (message: string) => void,
+  /** The `modland:`/`hvsc:` rating key when the file came from one of those browsers. */
+  sourceKey?: string,
 ): Promise<void> {
   try {
-    const opened = await openSong({ kind: 'file', file, companions }, { origin, interactive: true });
+    const opened = await openSong({ kind: 'file', file, companions }, { origin, interactive: true, sourceKey });
     if (opened.ok) {
       if (!opened.notified) notify.success(opened.message);
     } else if (!opened.cancelled) {

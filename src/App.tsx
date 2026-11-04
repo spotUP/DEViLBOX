@@ -1091,13 +1091,13 @@ function App() {
                 reportLoadFailure('Failed to load project');
               }
             }}
-            onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>) => {
+            onLoadTrackerModule={async (buffer: ArrayBuffer, filename: string, companionFiles?: Map<string, ArrayBuffer>, sourceKey?: string) => {
               setShowFileBrowser(false);
               await openUserSong(new File([buffer], filename), 'filebrowser', companionFiles, (message) => {
                 // The actual reason (UADE dispatch error, missing companion, parser
                 // throw) so a companion 404 is told apart from a parse crash.
                 reportLoadFailure(message.startsWith(filename) ? message : `${filename}: ${message}`);
-              });
+              }, sourceKey);
             }}
           />
         )}
