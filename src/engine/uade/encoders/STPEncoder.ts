@@ -3,11 +3,12 @@
  *
  * Cell encoding (4 bytes):
  *   byte[0]: instrument (1-based; 0 = no instrument)
- *   byte[1]: note (1-based; 0 = empty; STP_NOTE_OFFSET=25 → XM note = 25 + raw)
+ *   byte[1]: note (1-based; 0 = empty)
  *   byte[2]: effect command
  *   byte[3]: effect parameter
  *
- * Note mapping: XM note → STP raw = xmNote - 25
+ * Note mapping: grid note -> STP byte through stpPitch.gridNoteToStpByte
+ * (byte = grid note + 11, via periodNotes; byte 48 = period 214 = C-3).
  *
  * Effect mapping (reverse of convertSTPEffect):
  *   XM 0x01 → STP 0x01 (portamento up)
@@ -22,8 +23,7 @@
 
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
-
-const STP_NOTE_OFFSET = 25;
+import { gridNoteToStpByte } from '@/lib/import/formats/stpPitch';
 
 function reverseSTPEffect(effTyp: number, eff: number): { cmd: number; param: number } {
   if (effTyp === 0 && eff === 0) return { cmd: 0, param: 0 };
@@ -51,12 +51,7 @@ function encodeSTPCell(cell: TrackerCell): Uint8Array {
 
   out[0] = (cell.instrument ?? 0) & 0xFF;
 
-  const note = cell.note ?? 0;
-  if (note > 0 && note >= STP_NOTE_OFFSET) {
-    out[1] = note - STP_NOTE_OFFSET;
-  } else {
-    out[1] = 0;
-  }
+  out[1] = gridNoteToStpByte(cell.note ?? 0);
 
   const { cmd, param } = reverseSTPEffect(cell.effTyp ?? 0, cell.eff ?? 0);
   out[2] = cmd & 0xFF;

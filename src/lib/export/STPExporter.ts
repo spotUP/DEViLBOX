@@ -51,6 +51,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { gridNoteToStpByte } from '@/lib/import/formats/stpPitch';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────────
 
@@ -74,17 +75,11 @@ function writeStringFixed(buf: Uint8Array, off: number, str: string, len: number
 
 // ── Note conversion ────────────────────────────────────────────────────────────
 
-/**
- * XM note → STP note (1-based, 0=empty).
- * Parser uses: XM note = 25 + stpNote, so stpNote = xmNote - 25.
- */
-const STP_NOTE_OFFSET = 25;
-
+/** Grid note -> STP note byte: inverse of the parser's stpByteToGridNote (via the note's period). */
 function xmNoteToSTP(xmNote: number): number {
   if (xmNote <= 0) return 0;
   if (xmNote === 97) return 0; // note-off has no STP equivalent
-  const stp = xmNote - STP_NOTE_OFFSET;
-  return stp > 0 ? Math.min(stp, 255) : 0;
+  return Math.min(gridNoteToStpByte(xmNote), 255);
 }
 
 // ── Effect reverse mapping (XM → STP) ──────────────────────────────────────────
