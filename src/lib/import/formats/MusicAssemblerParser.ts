@@ -276,7 +276,9 @@ function parseMusicAssembler(bytes: Uint8Array, filename: string, precomputedWal
 
   return {
     name:            baseName,
-    format:          'XM' as TrackerFormat,
+    // Cells are ProTracker periods (table index 0 = 1712 = note 1): an Amiga-period format, so typing octave, key
+    // periods and replayer mode follow the periods (a note-number format like 'XM' would not).
+    format:          'MOD' as TrackerFormat,
     patterns,
     instruments:     instrumentConfigs,
     songPositions,
