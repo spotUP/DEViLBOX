@@ -105,7 +105,7 @@ export function trackCellWrite(song: TrackerSong, key: string, edit: LiveCellEdi
   return { ...addr, ...fmt.fields(raw) };
 }
 
-/** The setTrackCell shape the eight engines implement. */
+/** The setTrackCell shape the seven engines in the table above implement. */
 interface TrackCellEngine {
   setTrackCell(index: number, row: number, note: number, instrument: number, arpeggio: number, effect: number, effectArg: number): void;
 }
