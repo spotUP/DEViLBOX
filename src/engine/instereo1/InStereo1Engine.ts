@@ -150,10 +150,6 @@ export class InStereo1Engine extends WASMChannelOutputsEngine {
     return () => { this._positionCallbacks.delete(cb); };
   }
 
-  /** Edit a cell of the replayer's own track pool (its index and row, not the grid's pattern). */
-  setTrackCell(index: number, row: number, note: number, instrument: number, arpeggio: number, effect: number, effectArg: number): void {
-    this.workletNode?.port.postMessage({ type: 'setTrackCell', index, row, note, instrument, arpeggio, effect, effectArg });
-  }
 
   /** Set an instrument parameter by name */
   setInstrumentParam(instrument: number, param: string, value: number): void {
