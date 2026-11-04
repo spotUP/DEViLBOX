@@ -52,6 +52,7 @@
  * Reference: OpenMPT Load_stp.cpp
  */
 
+import { stpByteToGridNote } from './stpPitch';
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
@@ -93,16 +94,7 @@ const FILE_HEADER_SIZE = 204;
 // The STP3 magic bytes
 const STP_MAGIC = [0x53, 0x54, 0x50, 0x33]; // "STP3"
 
-// NOTE_MIDDLEC in OpenMPT = 61 (middle C, MIDI note 60)
-// STP note formula: mptNote = NOTE_MIDDLEC - 36 + note  (when note > 0)
-//                           = 61 - 36 + note = 25 + note
-// Our XM-style notes: 1=C-0, 13=C-1, ... 60=C-4 (MIDI), 61=C#4 ...
-// We align with OpenMPT: NOTE_MIDDLEC - 36 = 25 offset → XM note = 25 + stpNote
-// This puts STP note 1 → XM note 26 (which is approximately D-1 in XM terms).
-// NOTE_MIDDLEC in our system = 61 (same as OpenMPT), C-5 = 60+1 = 61? Let's use OpenMPT logic directly.
-// OpenMPT NOTE_MIDDLEC = 61 = C-5. STP note 1 maps to the lowest C.
-// NOTE_MIDDLEC - 36 + 1 = 26 = C-2 in ProTracker (1-indexed). This matches.
-const STP_NOTE_OFFSET = 25; // XM note = STP_NOTE_OFFSET + stpNote
+// STP note byte -> grid note: see stpPitch.ts (OpenMPT note = 25 + byte, byte 36 = period 428 = C-2 = grid 25).
 
 // ── CIA tempo conversion ────────────────────────────────────────────────────
 
@@ -493,7 +485,7 @@ export async function parseSTPFile(
       const command = bytes[2];
       const param   = bytes[3];
 
-      const note = noteRaw > 0 ? STP_NOTE_OFFSET + noteRaw : 0;
+      const note = stpByteToGridNote(noteRaw);
       const { effTyp, eff } = convertSTPEffect(command, param);
 
       // Byte-exact carrier: convertSTPEffect is many-to-one (0x0C→XM 0x0C but XM 0x0C
@@ -566,9 +558,8 @@ function parsePatternChannels(
       const command = u8(v, cellBase + 2);
       const param   = u8(v, cellBase + 3);
 
-      // Note: STP note is 1-based, mapped to OpenMPT note as: NOTE_MIDDLEC - 36 + note
-      // = 61 - 36 + note = 25 + note
-      const note = noteRaw > 0 ? STP_NOTE_OFFSET + noteRaw : 0;
+      // STP note byte is 1-based; stpByteToGridNote maps it through the Amiga period table.
+      const note = stpByteToGridNote(noteRaw);
 
       // Effect conversion — following OpenMPT ReadSTP() switch(command)
       const { effTyp, eff } = convertSTPEffect(command, param);
