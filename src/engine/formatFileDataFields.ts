@@ -94,6 +94,7 @@ export const FILE_DATA_FIELDS = [
   'ronKlarenFileData',
   'actionamicsFileData',
   'monotoneFileData',
+  'kdmFileData',
   'activisionProFileData',
   'synthesisFileData',
   'dssFileData',

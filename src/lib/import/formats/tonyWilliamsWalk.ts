@@ -48,6 +48,8 @@ export interface TwSongInfo {
   songs: number;
   lists: number[];
   instrumentTable: number;
+  /** frames per stream step: high byte of the song record's 5th word (init 0x934 -> a5@(18); the 50 Hz IRQ steps the voices when a5@(19) counts down to 0) */
+  speed: number;
 }
 
 export interface TwWalk {
@@ -92,7 +94,8 @@ export function twSongInfo(b: Uint8Array, song: number): TwSongInfo | null {
     if (off + 4 > b.length) return null;
     lists.push(off);
   }
-  return { base, songs, lists, instrumentTable: scanLea(b, 12) };
+  const speed = b[base + song * 10 + 8] ?? 0;
+  return { base, songs, lists, instrumentTable: scanLea(b, 12), speed: speed > 0 ? speed : 1 };
 }
 
 export function readTwBlock(b: Uint8Array, start: number): TwCommand[] | null {

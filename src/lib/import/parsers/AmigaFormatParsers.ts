@@ -2786,6 +2786,16 @@ export async function tryRouteFormat(
       'MusicMakerParser/8V', { injectUADE: true });
   }
 
+  // ── Ken Silverman KDM (.kdm) ────────────────────────────────────────────────
+  if (matchesExt(filename, ['kdm'])) {
+    const { isKdmFormat, parseKdmFile } = await import('@lib/import/formats/KdmParser');
+    if (isKdmFormat(new Uint8Array(ctx.buffer))) {
+      const song = parseKdmFile(new Uint8Array(ctx.buffer), ctx.originalFileName);
+      if (song) return song;
+    }
+    throw new Error(`KDM file did not decode: ${ctx.originalFileName}`);
+  }
+
   // ── MONOTONE (.mon, PC speaker tracker) ───────────────────────────────────
   // .mon is also Maniacs of Noise (below): the "MONOTONE" header decides, anything else falls through.
   if (matchesExt(filename, ['mon'])) {
