@@ -9,10 +9,11 @@ import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { JxsEngine } from './JxsEngine';
+import { jxsGridNoteToRaw } from '@lib/import/formats/jxsGrid';
 
-/** The grid's note number (what a cell carries) a MIDI key plays: the grid shows note 1 as MIDI 12. */
+/** The raw replayer note a MIDI key plays: the grid note (MIDI - 11, as every format) through the one offset. */
 export function jxsNoteForKey(midi: number): number {
-  return Math.max(1, Math.min(127, midi - 11));
+  return Math.max(1, Math.min(127, jxsGridNoteToRaw(Math.max(1, midi - 11))));
 }
 
 export class JxsSynth implements DevilboxSynth {

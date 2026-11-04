@@ -6,6 +6,7 @@
  *   empty Sampler) -> InstrumentFactory builds the instrument -> triggerAttack(note name a key produces)
  *   -> JxsEngine.noteOn message {instrument, note} to the worklet.
  */
+import { jxsGridNoteToRaw } from '@lib/import/formats/jxsGrid';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -49,7 +50,7 @@ describe('JayTrax keyboard', () => {
     const on = sent.filter((m) => m.type === 'noteOn');
     expect(on).toHaveLength(1);
     expect(on[0].instrument).toBe(inst!.id);
-    expect(on[0].note).toBe(60 - 11); // C4 = MIDI 60; the grid shows note 1 as MIDI 12
+    expect(on[0].note).toBe(jxsGridNoteToRaw(60 - 11)); // C4 = MIDI 60 = grid note 49; the replayer takes the raw note
     expect(sent.some((m) => m.type === 'previewLoad')).toBe(true);
 
     synth.triggerRelease();
