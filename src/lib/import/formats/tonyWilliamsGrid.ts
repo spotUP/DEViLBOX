@@ -81,7 +81,8 @@ export function buildTwGrid(walk: TwWalk): TwGrid {
   const raw: Array<Omit<TwSource, 'pattern' | 'row'> & { tick: number }> = [];
   const pendingInstr: Array<{ offset: number; value: number } | null> = new Array(TW_VOICES).fill(null);
   const curBlock = new Array<number>(TW_VOICES).fill(-1);
-  const ev = walk.events;
+  // The walk emits one voice after another; the row sweep below needs tick order (stable: voice order within a tick).
+  const ev = walk.events.map((e, i) => ({ e, i })).sort((a, b) => a.e.tick - b.e.tick || a.i - b.i).map((x) => x.e);
   let ei = 0;
   for (let t = 0; t < rows; t++) {
     for (; ei < ev.length && (ev[ei]?.tick ?? 0) <= t; ei++) {
