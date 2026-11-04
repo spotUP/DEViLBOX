@@ -149,6 +149,79 @@ export function injectUADEPlayback(result: TrackerSong, ctx: FallbackContext): T
 }
 
 /**
+ * UADE plays the song's audio, so every instrument that has no voice of its
+ * own is tagged UADEEditableSynth: the replayer's suppressNotes path works and
+ * no plain Tone synth leaks over the module (a key on a plain 'Synth' placeholder
+ * plays a generic Tone tone, and hybrid playback layers it over UADE).
+ *
+ * `routed: true` is the UADEParser NATIVE_ROUTES return path: the song is kept
+ * as the native parser built it, only the placeholder instruments are retagged.
+ * Samplers (PCM or not), keyboard voices and dedicated-engine songs stay as the
+ * parser made them.
+ */
+export function retagInstrumentsForUadeAudio(
+  result: TrackerSong,
+  buffer: ArrayBuffer,
+  filename: string,
+  opts?: { routed?: boolean },
+): void {
+  const routed = opts?.routed === true;
+  const dedicated = playsOnDedicatedEngine(result);
+  if (dedicated) {
+    if (routed) return;
+    // Dedicated WASM engine handles all audio — set instruments to
+    // 'Sampler' so ToneEngine doesn't try to instantiate unknown
+    // synth types (e.g. 'SynthesisWasmSynth') and show error dialogs.
+    // An instrument with no PCM keeps its native keyboard voice
+    // (dedicatedEngineSynthType); flattening it left an empty Sampler
+    // and a silent keyboard.
+    for (const inst of result.instruments) {
+      inst.synthType = dedicatedEngineSynthType(inst) as typeof inst.synthType;
+    }
+    return;
+  }
+  // If native parser returned 0 instruments, create one.
+  if (result.instruments.length === 0) {
+    if (routed) return;
+    result.instruments = [{
+      id: 0,
+      name: 'UADE Audio',
+      type: 'synth' as const,
+      synthType: 'UADEEditableSynth' as const,
+      effects: [],
+      volume: -6,
+      pan: 0,
+      uade: {
+        type: 'uade' as const,
+        fileData: buffer.slice(0),
+        filename,
+        subsongCount: 1,
+        currentSubsong: 0,
+        metadata: { player: 'Unknown', formatName: 'Unknown', minSubsong: 0, maxSubsong: 0 },
+      },
+    }];
+    return;
+  }
+  for (const inst of result.instruments) {
+    // Preserve native audition voices (e.g. SunTronicSynth): the song
+    // still plays through UADE via uadeEditableFileData (suppressNotes),
+    // but auditioning the instrument plays THAT voice, not the module.
+    if (NATIVE_AUDITION_SYNTHS.has(inst.synthType)) continue;
+    if (routed) {
+      // Only the plain placeholder is replaced; Samplers and keyboard voices are the parser's own.
+      if (inst.synthType !== 'Synth') continue;
+    } else if (inst.synthType === 'Sampler' && ((inst.sample?.audioBuffer?.byteLength ?? 0) > 0 || !!inst.sample?.url)) {
+      // A Sampler the native parser filled with the file's own PCM keeps its voice: the song still plays
+      // through UADE, but a key on the instrument plays that sample (period playback), where a
+      // UADEEditableSynth key plays nothing (K8: Richard Joseph .sng/.ins held 24 such instruments).
+      levelSamplerForUade(inst);
+      continue;
+    }
+    inst.synthType = 'UADEEditableSynth';
+  }
+}
+
+/**
  * Format where native parser is the DEFAULT (most common: HVL, OKT, MED, DIGI).
  * If user sets pref to 'uade', uses UADE instead.
  */
@@ -220,43 +293,7 @@ export async function withNativeThenUADE(
             }
             return result;
           }
-          // UADE handles ALL audio — tag every instrument as UADEEditableSynth
-          // so the replayer's suppressNotes path works and no basic-synth audio
-          // leaks through.  If native parser returned 0 instruments, create one.
-          if (result.instruments.length === 0) {
-            result.instruments = [{
-              id: 0,
-              name: 'UADE Audio',
-              type: 'synth' as const,
-              synthType: 'UADEEditableSynth' as const,
-              effects: [],
-              volume: -6,
-              pan: 0,
-              uade: {
-                type: 'uade' as const,
-                fileData: ctx.buffer.slice(0),
-                filename: ctx.originalFileName,
-                subsongCount: 1,
-                currentSubsong: 0,
-                metadata: { player: 'Unknown', formatName: 'Unknown', minSubsong: 0, maxSubsong: 0 },
-              },
-            }];
-          } else {
-            for (const inst of result.instruments) {
-              // Preserve native audition voices (e.g. SunTronicSynth): the song
-              // still plays through UADE via uadeEditableFileData (suppressNotes),
-              // but auditioning the instrument plays THAT voice, not the module.
-              if (NATIVE_AUDITION_SYNTHS.has(inst.synthType)) continue;
-              // A Sampler the native parser filled with the file's own PCM keeps its voice: the song still plays
-              // through UADE, but a key on the instrument plays that sample (period playback), where a
-              // UADEEditableSynth key plays nothing (K8: Richard Joseph .sng/.ins held 24 such instruments).
-              if (inst.synthType === 'Sampler' && ((inst.sample?.audioBuffer?.byteLength ?? 0) > 0 || !!inst.sample?.url)) {
-                levelSamplerForUade(inst);
-                continue;
-              }
-              inst.synthType = 'UADEEditableSynth';
-            }
-          }
+          retagInstrumentsForUadeAudio(result, ctx.buffer, ctx.originalFileName);
           return injectUADEPlayback(result, ctx);
         }
       }

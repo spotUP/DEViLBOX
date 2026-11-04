@@ -19,6 +19,7 @@ import { enhancedSamplesAreUnusable, isDegenerateSample, nativeGridHasNotes } fr
 import { uadeKeyVolume } from '@lib/import/uadeKeyLevel';
 import { createSamplerInstrument } from './AmigaUtils';
 import { UADE_EXTENSIONS, isUADEFormat } from '../uadeExtensions';
+import { retagInstrumentsForUadeAudio } from '../parsers/withFallback';
 export { isUADEFormat };
 
 // Amiga C-3 reference sample rate (PAL: 3546895 / 428 ≈ 8287 Hz; industry standard 8363 Hz)
@@ -771,6 +772,7 @@ export async function parseUADEFile(
           console.log(`[UADEParser] '${fmt}' → native parser`);
           nativeSong.uadeEditableFileData ??= buffer.slice(0) as ArrayBuffer;
           nativeSong.uadeEditableFileName ??= filename;
+          retagInstrumentsForUadeAudio(nativeSong, buffer, filename, { routed: true });
           if (companionFiles && companionFiles.size > 0) {
             (nativeSong as any).uadeCompanionFiles = companionFiles;
           }
