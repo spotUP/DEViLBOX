@@ -304,6 +304,14 @@
       "cells": 7168,
       "bytes": 108458
     },
+    "kdm": {
+      "exporter": "KdmExporter.exportKdm",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 5264,
+      "bytes": 5264
+    },
     "monotone": {
       "exporter": "MonotoneExporter.exportMonotone",
       "tier": "byte-exact",

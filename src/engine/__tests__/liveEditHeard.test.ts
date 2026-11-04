@@ -79,6 +79,8 @@ files.sort();
 /** The song of each format the table runs (an explicit file wins over the registry's extension match). */
 const FILE: Record<string, string> = {
   suntronic: 'SUNTronicTunes/mule.src',
+  // the walker reads the song player; the sfx-only blinkys file is a variant it does not parse
+  tonyWilliams: 'formats/future basketball main.tw',
   robHubbard: files.find((f) => f.endsWith('.rh')) ?? '',
   davidWhittaker: files.find((f) => f.endsWith('.dw')) ?? '',
   benDaglish: files.find((f) => f.endsWith('.bd')) ?? '',

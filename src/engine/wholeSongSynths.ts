@@ -23,7 +23,7 @@
  * registers appears here, so the two cannot drift apart.
  */
 export const WHOLE_SONG_SYNTH_TYPES: ReadonlySet<string> = new Set([
-  'ActionamicsWasmSynth', 'MonotoneWasmSynth', 'ActivisionProWasmSynth', 'ArtOfNoiseSynth', 'AsapSynth',
+  'ActionamicsWasmSynth', 'MonotoneWasmSynth', 'KdmWasmSynth', 'ActivisionProWasmSynth', 'ArtOfNoiseSynth', 'AsapSynth',
   'BenDaglishSynth', 'Cinter4Synth', 'CpsycleSynth', 'DavidWhittakerWasmSynth',
   'DeltaMusic1WasmSynth', 'DeltaMusic2WasmSynth', 'DigMugWasmSynth', 'DssWasmSynth',
   'EupminiSynth', 'FaceTheMusicWasmSynth', 'FmplayerSynth',

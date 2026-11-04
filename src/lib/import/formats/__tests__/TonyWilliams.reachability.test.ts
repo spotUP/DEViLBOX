@@ -32,6 +32,12 @@ describe('Tony Williams reachability', () => {
     for (let c = 0; c < 4; c++) {
       expect(pats.some((p) => p.channels[c]!.rows.some((r) => r.note > 0))).toBe(true);
     }
+    // Regression: the grid played at speed 1 (one row per 50 Hz frame), 6x too fast. The player steps the voices
+    // every a5@(18) frames, loaded from the song record's tempo byte (0x06 in future basketball).
+    expect(song.initialSpeed).toBe(6);
+    expect(song.initialBPM).toBe(125);
+    // No invented instrument names: the file names none.
+    expect(song.instruments.every((i) => i.name === '')).toBe(true);
     const out = new Uint8Array(await (await exportTonyWilliams(song)).data.arrayBuffer());
     expect(Buffer.from(out).equals(raw)).toBe(true);
   });

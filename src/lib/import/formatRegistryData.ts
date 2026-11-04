@@ -1657,6 +1657,18 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     customDispatch: true, // Must exclude mon_old.* (handled by jeroenTel)
   },
   {
+    key: 'kdm',
+    label: 'Ken Silverman KDM',
+    description: 'Ken Silverman KDM (Ken\'s Digital Music) — native parser and own WASM player; waves.kwv instrument bank.',
+    family: 'amiga-native',
+    matchMode: 'extension',
+    extRegex: /\.kdm$/i,
+    prefKey: 'kdm',
+    nativeParser: { module: '@lib/import/formats/KdmParser', parseFn: 'parseKdmFile', detectFn: 'isKdmFormat' },
+    uadeFallback: false,
+    customDispatch: true,
+  },
+  {
     key: 'monotone',
     label: 'MONOTONE',
     description: 'MONOTONE (PC speaker tracker) — native parser and own WASM player. Shares .mon with Maniacs of Noise, which owns the name-only answer (this entry sits after it); detectFormatFromContent and the import dispatch pick MONOTONE by its header.',

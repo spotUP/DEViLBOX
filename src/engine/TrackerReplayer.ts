@@ -94,6 +94,7 @@ const PLAYERS_PER_CHANNEL = 2; // Double-buffered pool for overlap-free note tra
 export type TrackerFormat =
   | 'MOD' | 'XM' | 'IT' | 'S3M' | 'HVL' | 'AHX' | 'ML'
   | 'MON'   // MONOTONE (PC speaker tracker, own WASM player)
+  | 'KDM'   // Ken Silverman KDM (own WASM player)
   // Exotic Amiga formats (Phase 2 full editing)
   | 'OKT'   // Oktalyzer
   | 'MED'   // OctaMED / MED
@@ -482,6 +483,7 @@ export interface TrackerSong {
   ronKlarenFileData?: ArrayBuffer;
   actionamicsFileData?: ArrayBuffer;
   monotoneFileData?: ArrayBuffer;
+  kdmFileData?: ArrayBuffer;
   activisionProFileData?: ArrayBuffer;
   synthesisFileData?: ArrayBuffer;
   dssFileData?: ArrayBuffer;
