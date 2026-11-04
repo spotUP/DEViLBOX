@@ -92,6 +92,7 @@ export interface FormatEnginePreferences {
   soundControl?: FormatEngineChoice;       // .sc/.sct → SoundControlParser vs UADE
   soundFactory?: FormatEngineChoice;       // .psf → SoundFactoryParser vs UADE
   actionamics?: FormatEngineChoice;        // .act → ActionamicsParser vs UADE
+  jxs?: FormatEngineChoice;                // .jxs (JayTrax) -> JxsParser (own WASM player)
   kdm?: FormatEngineChoice;                // .kdm (Ken Silverman KDM) → KdmParser (own WASM player)
   monotone?: FormatEngineChoice;           // .mon (MONOTONE) → MonotoneParser (own WASM player)
   activisionPro?: FormatEngineChoice;      // .avp/.mw → ActivisionProParser vs UADE

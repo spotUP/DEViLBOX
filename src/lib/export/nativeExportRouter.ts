@@ -301,6 +301,9 @@ const NATIVE_EXPORTERS: NativeExporterEntry[] = [
   // Fred Editor keeps format 'MOD'; its module (with the grid's edits) is the export.
   { id: 'fredEditor', matches: (s) => songIds(s).formatId === 'fredEditor',
     run: async (s) => { const { exportFredEditor } = await import('./FredEditorExporter'); return exportFredEditor(s); } },
+  // JayTrax: its module (with the grid's edits) is the export.
+  { id: 'jxs', matches: (s) => songIds(s).format === 'JXS' && !!s.jxsFileData,
+    run: async (s) => { const { exportJxs } = await import('./JxsExporter'); return exportJxs(s); } },
   // KDM: its module (with the grid's edits) is the export.
   { id: 'kdm', matches: (s) => songIds(s).format === 'KDM' && !!s.kdmFileData,
     run: async (s) => { const { exportKdm } = await import('./KdmExporter'); return exportKdm(s); } },

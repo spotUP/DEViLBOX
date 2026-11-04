@@ -21,7 +21,7 @@ import { exportJxs } from '@lib/export/JxsExporter';
 const PATH = 'public/data/songs/formats/popcorn.jxs';
 
 describe('JayTrax reachability', () => {
-  it.skip('top-level import runs the JXS parser; native export is byte-exact', async () => {
+  it('top-level import runs the JXS parser; native export is byte-exact', async () => {
     const raw = readFileSync(PATH);
     const song = await parseModuleToSong(new File([new Uint8Array(raw)], 'popcorn.jxs'));
     expect(vi.mocked(parseJxsFile)).toHaveBeenCalledTimes(1);

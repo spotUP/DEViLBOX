@@ -14,6 +14,7 @@ vi.mock('@lib/import/formats/TonyWilliamsParser', async (importOriginal) => {
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { parseTonyWilliamsFile } from '@lib/import/formats/TonyWilliamsParser';
 import { exportTonyWilliams } from '@lib/export/TonyWilliamsExporter';
+import { isReplacedInstrument } from '@/engine/replayer/hybridInstruments';
 
 const PATH = 'public/data/songs/formats/future basketball main.tw';
 
@@ -38,6 +39,10 @@ describe('Tony Williams reachability', () => {
     expect(song.initialBPM).toBe(125);
     // No invented instrument names: the file names none.
     expect(song.instruments.every((i) => i.name === '')).toBe(true);
+    // Regression: plays wrong once synced. UADE plays the whole song, but the 16 placeholder instruments stayed
+    // 'Synth', counted as replaced, and the engine-driven rows fired Tone notes on top of UADE.
+    expect(song.instruments.every((i) => i.synthType === 'UADEEditableSynth')).toBe(true);
+    expect(song.instruments.some((i) => isReplacedInstrument(i, false))).toBe(false);
     const out = new Uint8Array(await (await exportTonyWilliams(song)).data.arrayBuffer());
     expect(Buffer.from(out).equals(raw)).toBe(true);
   });
