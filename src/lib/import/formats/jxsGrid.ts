@@ -18,7 +18,7 @@
  * placement of that pattern changes with it), all other bytes are carried.
  */
 import type { TrackerCell } from '@/types';
-import { jxsLayout } from './jxsInstrument';
+import { jxsLayout, JXS_SUBSONG_BYTES } from './jxsInstrument';
 import {
   JX_AUX, JX_FX_BASE, JX_RAW_BASE, JX_SINGLE_SCRIPTS, JX_SLOT_BASE, JX_SLOT_FIELDS, JX_WAVE_RESET,
 } from './jxsEffectGlyphs';
@@ -35,6 +35,8 @@ export interface JxsSegment { start: number; length: number; pattern: number }
 
 export interface JxsModule {
   image: Uint8Array;
+  /** The subsong this grid lays out (0-based); `subsongs` is how many the file holds. */
+  subsong: number;
   version: number;
   patterns: number;
   subsongs: number;
@@ -71,11 +73,14 @@ export function jxsPlayRange(m: JxsModule): { firstBar: number; lastBar: number 
   return { firstBar: m.startBar, lastBar };
 }
 
-/** Decode the file; null when it is not a complete JayTrax module. */
-export function decodeJxsModule(bytes: Uint8Array): JxsModule | null {
+/**
+ * Decode the file as subsong `subsong` (0-based); null when it is not a complete JayTrax module or has no such subsong.
+ * Every subsong shares the patterns and instruments; only its order lists, header fields and play range differ.
+ */
+export function decodeJxsModule(bytes: Uint8Array, subsong = 0): JxsModule | null {
   const lay = jxsLayout(bytes);
-  if (!lay) return null;
-  const subOff = lay.subsongOffset;
+  if (!lay || subsong < 0 || subsong >= lay.subsongs) return null;
+  const subOff = lay.subsongOffset + subsong * JXS_SUBSONG_BYTES;
   const patternOffset = lay.patternOffset;
   const version = lay.version;
   const P = lay.patterns, S = lay.subsongs, I = lay.instruments;
@@ -114,13 +119,24 @@ export function decodeJxsModule(bytes: Uint8Array): JxsModule | null {
     startBar, startStep: clampStep(s32(bytes, subOff + 92)),
     endBar, endStep: clampStep(s32(bytes, subOff + 100)),
     loopBar, loopStep: clampStep(s32(bytes, subOff + 108)), loopFlag: s16(bytes, subOff + 112),
-    image: bytes, version, patterns: P, subsongs: S, instruments: I, instrumentNames, channels,
+    image: bytes, subsong, version, patterns: P, subsongs: S, instruments: I, instrumentNames, channels,
     bpm: s32(bytes, subOff + 80), title, patternOffset, segments,
     bars,
   };
 }
 
 export const isJxsModule = (bytes: Uint8Array): boolean => decodeJxsModule(bytes) !== null;
+
+/** Does subsong `subsong` start a note: any of its placed pattern rows carries one (the grid's own walk). */
+export function jxsSubsongAudible(bytes: Uint8Array, subsong: number): boolean {
+  const m = decodeJxsModule(bytes, subsong);
+  if (!m) return false;
+  return m.segments.some((list) => list.some((s) => {
+    if (s.pattern < 0 || s.pattern >= m.patterns) return false;
+    for (let r = 0; r < Math.min(s.length, JXS_ROWS); r++) if (bytes[m.patternOffset + (s.pattern * 64 + r) * ROW] > 0) return true;
+    return false;
+  }));
+}
 
 /** The pattern row that timeline row `t` of a channel plays: [pattern, row], or null. */
 export function jxsPlacement(m: JxsModule, channel: number, t: number): [number, number] | null {
@@ -198,8 +214,8 @@ const same = (a: TrackerCell, b: TrackerCell): boolean =>
  * The file bytes with grid edits written into the pattern rows they sit on; the same
  * array when no cell differs from what it shows. Cells off the timeline are ignored.
  */
-export function applyJxsGridEdits(bytes: Uint8Array, edits: readonly JxsGridEdit[]): Uint8Array {
-  const m = decodeJxsModule(bytes);
+export function applyJxsGridEdits(bytes: Uint8Array, edits: readonly JxsGridEdit[], subsong = 0): Uint8Array {
+  const m = decodeJxsModule(bytes, subsong);
   if (!m) return bytes;
   const out = bytes.slice();
   let changed = false;

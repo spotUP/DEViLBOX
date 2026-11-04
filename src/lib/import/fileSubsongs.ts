@@ -82,6 +82,13 @@ const FORMATS: Record<string, FileSubsongFormat> = {
       return !!walk && walk.events.some((e) => e.kind === RH_WALK.note);
     },
   },
+  // JayTrax: S subsongs of 16564 bytes share the patterns and instruments (jxsGrid.ts); the engine opens one by index.
+  jxs: {
+    key: 'jxs',
+    fileDataField: 'jxsFileData',
+    count: async (bytes) => (await import('./formats/jxsInstrument')).jxsLayout(new Uint8Array(bytes))?.subsongs ?? 0,
+    audible: async (bytes, subsong) => (await import('./formats/jxsGrid')).jxsSubsongAudible(new Uint8Array(bytes), subsong),
+  },
   benDaglish: {
     key: 'benDaglish',
     fileDataField: 'bdFileData',

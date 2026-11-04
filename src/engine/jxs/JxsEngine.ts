@@ -132,13 +132,13 @@ export class JxsEngine extends WASMChannelOutputsEngine {
     }
   }
 
-  async loadTune(buffer: ArrayBuffer): Promise<void> {
+  async loadTune(buffer: ArrayBuffer, subsong = 0): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('JxsEngine not initialized');
-    const m = decodeJxsModule(new Uint8Array(buffer));
+    const m = decodeJxsModule(new Uint8Array(buffer), subsong);
     this._range = m ? jxsPlayRange(m) : { firstBar: 0, lastBar: Number.MAX_SAFE_INTEGER };
     meterFeed.clearHeld();
-    this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+    this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer, subsong });
   }
 
   /** Swap in an edited song while it plays (the replayer reopens it at the same bar and step). */

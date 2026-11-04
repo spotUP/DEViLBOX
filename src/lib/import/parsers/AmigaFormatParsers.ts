@@ -2791,7 +2791,7 @@ export async function tryRouteFormat(
   if (matchesExt(filename, ['jxs'])) {
     const { isJxsFormat, parseJxsFile } = await import('@lib/import/formats/JxsParser');
     if (isJxsFormat(new Uint8Array(ctx.buffer))) {
-      const song = parseJxsFile(new Uint8Array(ctx.buffer), ctx.originalFileName);
+      const song = parseJxsFile(new Uint8Array(ctx.buffer), ctx.originalFileName, ctx.subsong);
       if (song) return song;
     }
     throw new Error(`JXS file did not decode: ${ctx.originalFileName}`);

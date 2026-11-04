@@ -51,6 +51,7 @@ class JxsProcessor extends AudioWorkletProcessor {
       case 'loadModule':
         if (!this.module) break;
         this.songBytes = new Uint8Array(data.moduleData);
+        this.track = data.subsong | 0;   // the subsong jxs_open plays; a replaced (edited) module keeps it
         this.playing = false;
         if (this.openSong(0)) this.port.postMessage({ type: 'moduleLoaded', channels: this.voices, durationMs: this.module._jxs_duration_ms(), tracks: this.module._jxs_tracks() });
         break;

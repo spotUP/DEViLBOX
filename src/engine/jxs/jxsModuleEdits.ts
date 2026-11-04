@@ -13,7 +13,7 @@ export async function applyJxsModuleEdits(song: TrackerSong, edits: readonly Liv
   if (!song.jxsFileData) return null;
   const { applyJxsGridEdits } = await import('@/lib/import/formats/jxsGrid');
   const current = new Uint8Array(song.jxsFileData);
-  const next = applyJxsGridEdits(current, edits);
+  const next = applyJxsGridEdits(current, edits, song.fileSubsongs?.current ?? 0);
   if (next === current || (next.length === current.length && next.every((b, i) => b === current[i]))) return null;
   return commitJxsModule(song, next);
 }
