@@ -1,22 +1,23 @@
 /**
  * JxsParser.ts - JayTrax (.jxs) native parser.
  *
- * The module is decoded by jxsGrid.ts (the original image is the carrier; subsong 0 is laid
+ * The module is decoded by jxsGrid.ts (the original image is the carrier; the chosen subsong (0 by default) is laid
  * on a 64 row timeline, one grid channel per JayTrax channel). Playback is the JXS WASM
  * replayer (jxs-wasm, JxsEngine), which reads the same image.
  */
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern } from '@/types';
 import type { InstrumentConfig } from '@typedefs/instrument';
+import { fileSubsongsField } from '../fileSubsongs';
 import { decodeJxsModule, isJxsModule, jxsPlayRange, jxsPlacement, jxsRowCell, JXS_ROWS, type JxsModule } from './jxsGrid';
 
 export function isJxsFormat(bytes: Uint8Array): boolean {
   return isJxsModule(bytes);
 }
 
-export function parseJxsFile(bytes: Uint8Array, filename: string): TrackerSong | null {
+export function parseJxsFile(bytes: Uint8Array, filename: string, subsong = 0): TrackerSong | null {
   try {
-    const m = decodeJxsModule(bytes);
+    const m = decodeJxsModule(bytes, subsong);
     return m ? buildSong(m, filename, bytes) : null;
   } catch (e) {
     console.warn('[JxsParser] Parse failed:', e);
@@ -65,6 +66,8 @@ function buildSong(m: JxsModule, filename: string, bytes: Uint8Array): TrackerSo
     initialBPM: m.bpm >= 32 && m.bpm <= 255 ? m.bpm : 125,
     linearPeriods: false,
     jxsFileData: bytes.slice().buffer as ArrayBuffer,
+    // A file with several subsongs: the shared subsong model (lib/import/fileSubsongs), a switch reopens the file at the tune.
+    ...fileSubsongsField({ count: m.subsongs, current: m.subsong, fileName: filename }),
   };
   // The 'JXS' format name and jxsFileData field are declared in TrackerReplayer.ts (shared wiring).
   return song as unknown as TrackerSong;

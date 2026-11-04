@@ -22,7 +22,7 @@ export async function exportJxs(song: TrackerSong): Promise<JxsExportResult> {
       edits.push({ pattern: p, row, channel: ch, cell });
     })));
   }
-  const data = applyJxsGridEdits(new Uint8Array(src), edits);
+  const data = applyJxsGridEdits(new Uint8Array(src), edits, song.fileSubsongs?.current ?? 0);
   const base = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
   return {
     data: new Blob([data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer], { type: 'application/octet-stream' }),

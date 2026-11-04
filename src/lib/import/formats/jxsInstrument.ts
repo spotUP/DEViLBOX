@@ -15,7 +15,8 @@
  *   16 waves x 256 s16 at 520.
  */
 const HEADER = 52;
-const SUBSONG = 16564;
+export const JXS_SUBSONG_BYTES = 16564;
+const SUBSONG = JXS_SUBSONG_BYTES;
 const INSTRUMENT = 8712;
 const PATTERN = 320;
 

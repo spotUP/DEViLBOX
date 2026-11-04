@@ -824,6 +824,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     suppressNotes: true,
     fileDataKey: 'jxsFileData',
     loadMethod: 'loadTune',
+    getLoadArgs: (song) => [song.fileSubsongs?.current ?? 0],
     supportsPause: false,
     supportsResume: false,
     needsDirectRouting: true,
