@@ -176,6 +176,10 @@ struct State {
   int gbar = 0, gstep = 0;
   bool ended = false, frozen = false;
   bool timing_only = false;
+  bool measuring = false;   // the silent length pass: it ends at the loop point instead of looping
+  uint32_t isomask = 0;     // voices an isolation slot carries: left out of the main mix
+  float vmono[16];          // each voice's dry contribution to the frame mix_frame last made
+  float vside[16] = {0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f};  // where it sits: right share of its pan (0 left, 1 right)
   int16_t echoL[65536], echoR[65536];
   int e = 0;
   int16_t dbuf[200];
@@ -183,6 +187,8 @@ struct State {
   int freq[16][128];
   // output of the engine's requests
   float buf[2 * kPlayRequest];
+  float vbuf[16][kPlayRequest];   // per-voice mono, aligned with buf
+  float vout[16][kPlayRequest];   // the last jxs_render call's per-voice frames
   int buf_n = 0, buf_pos = 0;
   bool done = false;
 };
@@ -639,7 +645,8 @@ void tick(State& s) {
         s.frozen = true;   // endless: the instruments keep sounding
         rows = false;
       } else {
-        s.ended = true;
+        // The loop point (the real player loops to it); the length pass stops there to count one pass.
+        if (s.measuring) s.ended = true;
         s.gbar = s.loopbar;
         s.gstep = s.loopstep;
       }
@@ -689,6 +696,7 @@ inline int sample_at(const Instr* in, int64_t k) {
 void mix_frame(State& s, int e, int& outL, int& outR, int& eL, int& eR) {
   int sumL = 0, sumR = 0;
   eL = eR = 0;
+  for (int c = 0; c < 16; ++c) s.vmono[c] = 0.0f;
   for (int c = 0; c < s.N; ++c) {
     Channel& h = s.ch[c];
     if (!h.active) continue;
@@ -723,8 +731,15 @@ void mix_frame(State& s, int e, int& outL, int& outR, int& eL, int& eR) {
       a = ((h.w[h.base + j] * f) >> 8) + ((h.w[h.base + i] * (255 - f)) >> 8);
       h.phase = static_cast<uint16_t>(static_cast<uint16_t>(h.phase + h.step) & h.mask);
     }
-    sumL += (a * h.L) >> 8;
-    sumR += (a * h.R) >> 8;
+    const int vl = (a * h.L) >> 8, vr = (a * h.R) >> 8;
+    // The voice's two main-mix sides, (vl + vr) / (2N) * amp/100 in all, shared out by its own pan: a
+    // slot gives vmono * (1 - vside) to the left and vmono * vside to the right, which is exactly
+    // vl / (2N) and vr / (2N), the voice's share of the main mix.
+    s.vmono[c] = static_cast<float>(vl + vr) / (2.0f * static_cast<float>(s.N)) * static_cast<float>(s.amp) / 100.0f / 32768.0f;
+    if (h.L + h.R != 0) s.vside[c] = static_cast<float>(h.R) / static_cast<float>(h.L + h.R);
+    if ((s.isomask >> c) & 1u) continue;   // carried by an isolation slot: not in the main mix
+    sumL += vl;
+    sumR += vr;
     eL += (a * h.EL) >> 8;
     eR += (a * h.ER) >> 8;
   }
@@ -734,7 +749,7 @@ void mix_frame(State& s, int e, int& outL, int& outR, int& eL, int& eR) {
   outR = clampi(tdiv(outR * s.amp, 100), -32760, 32760);
 }
 
-void mix(State& s, float* out, int frames) {
+void mix(State& s, float* out, int frames, int voff) {
   for (int t = 0; t < frames; ++t) {
     int L, R, eL, eR;
     mix_frame(s, s.e, L, R, eL, eR);
@@ -746,6 +761,7 @@ void mix(State& s, float* out, int frames) {
       R = tdiv(R * s.dk, 100) + tdiv(s.dbuf[s.dk] * (100 - s.dk), 100);
       ++s.dk;
     }
+    for (int c = 0; c < 16; ++c) s.vbuf[c][voff + t] = s.vmono[c];
     out[2 * t] = static_cast<float>(L) / 32768.0f;
     out[2 * t + 1] = static_cast<float>(R) / 32768.0f;
     s.echoL[s.e] = s16(tdiv(tdiv(eL, s.N) + s.echoL[s.e], 2));
@@ -791,7 +807,7 @@ int request(State& s, float* out, int R) {
     R -= piece;
     if (out) {
       piece_settings(s);
-      mix(s, out + 2 * done, piece);
+      mix(s, out + 2 * done, piece, done);
     }
     done += piece;
     if (s.C == s.T) {
@@ -1037,6 +1053,7 @@ int open_song(State& s, const uint8_t* data, size_t size, int track, synth_info*
   load_settings(s);
   s.rnd.seed();
   s.timing_only = !s.today;   // in the correct behaviour only its length counts
+  s.measuring = true;
   restart(s);
   long long frames = 0;
   bool endless = false;
@@ -1050,6 +1067,7 @@ int open_song(State& s, const uint8_t* data, size_t size, int track, synth_info*
     }
   }
   s.timing_only = false;
+  s.measuring = false;
   if (frames == 0 || (s.startbar == s.endbar && s.startstep == s.endstep)) {
     info->n_names = 0;
     return fail(info, "the track is empty");
@@ -1093,6 +1111,9 @@ extern "C" int synthw_jxs_render(float* out, int frames) {
     }
     const int n = std::min(frames - done, g->buf_n - g->buf_pos);
     std::memcpy(out + 2 * done, g->buf + 2 * g->buf_pos, sizeof(float) * 2 * n);
+    if (done + n <= kPlayRequest)
+      for (int c = 0; c < 16; ++c)
+        std::memcpy(g->vout[c] + done, g->vbuf[c] + g->buf_pos, sizeof(float) * n);
     g->buf_pos += n;
     done += n;
   }

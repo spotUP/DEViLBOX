@@ -18,10 +18,11 @@
  * placement of that pattern changes with it), all other bytes are carried.
  */
 import type { TrackerCell } from '@/types';
+import {
+  JX_AUX, JX_FX_BASE, JX_RAW_BASE, JX_SINGLE_SCRIPTS, JX_SLOT_BASE, JX_SLOT_FIELDS, JX_WAVE_RESET,
+} from './jxsEffectGlyphs';
 
 export const JXS_ROWS = 64;
-/** effTyp2 marker: eff2 holds the signed script parameter byte of the row. */
-export const JXS_PARAM_EFFECT = 0x7f;
 
 const HEADER = 52;
 const SUBSONG = 16564;
@@ -40,6 +41,8 @@ export interface JxsModule {
   patterns: number;
   subsongs: number;
   instruments: number;
+  /** Instrument names as stored (32 bytes at +2 of each instrument record, up to the first NUL). */
+  instrumentNames: string[];
   channels: number;
   bpm: number;
   title: string;
@@ -90,8 +93,12 @@ export function decodeJxsModule(bytes: Uint8Array): JxsModule | null {
     off += 4 + n;
     if (off > bytes.length) return null;
   }
+  const instrumentNames: string[] = [];
   for (let i = 0; i < I; i++) {
     if (off + INSTRUMENT > bytes.length) return null;
+    let name = '';
+    for (let k = 0; k < 32 && bytes[off + 2 + k]; k++) name += String.fromCharCode(bytes[off + 2 + k]);
+    instrumentNames.push(name);
     const has = s32(bytes, off + 512) !== 0;
     const len = s32(bytes, off + 516);
     off += INSTRUMENT;
@@ -131,7 +138,7 @@ export function decodeJxsModule(bytes: Uint8Array): JxsModule | null {
     startBar, startStep: clampStep(s32(bytes, subOff + 92)),
     endBar, endStep: clampStep(s32(bytes, subOff + 100)),
     loopBar, loopStep: clampStep(s32(bytes, subOff + 108)), loopFlag: s16(bytes, subOff + 112),
-    image: bytes, version, patterns: P, subsongs: S, instruments: I, channels,
+    image: bytes, version, patterns: P, subsongs: S, instruments: I, instrumentNames, channels,
     bpm: s32(bytes, subOff + 80), title, patternOffset, segments,
     bars,
   };
@@ -153,15 +160,39 @@ export function jxsPlacement(m: JxsModule, channel: number, t: number): [number,
 
 const rowAt = (m: JxsModule, pattern: number, row: number): number => m.patternOffset + (pattern * 64 + row) * ROW;
 
-/** The grid cell of a pattern row. */
+const SINGLE = new Set<number>(JX_SINGLE_SCRIPTS);
+
+/** The grid cell of a pattern row (layout: jxsEffectGlyphs.ts). */
 export function jxsRowCell(image: Uint8Array, m: JxsModule, pattern: number, row: number): TrackerCell {
   const o = rowAt(m, pattern, row);
-  const param = image[o + 3];
-  return {
-    note: image[o], instrument: image[o + 2], volume: 0,
-    effTyp: image[o + 4], eff: image[o + 1],
-    effTyp2: param !== 0 ? JXS_PARAM_EFFECT : 0, eff2: param,
-  };
+  const d = image[o + 1], p = image[o + 3], sc = image[o + 4];
+  const cell: TrackerCell = { note: image[o], instrument: image[o + 2], volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+  if (sc === 0 && d === 0 && p === 0) return cell;
+  if (SINGLE.has(sc)) {
+    cell.effTyp = JX_FX_BASE + sc; cell.eff = d;
+    if (p !== 0) { cell.effTyp2 = JX_AUX; cell.eff2 = p; }
+  } else if (p === 0 && sc >= 14 && sc <= 57) {
+    cell.effTyp = JX_SLOT_BASE + ((sc - 14) % JX_SLOT_FIELDS); cell.eff = d;
+    cell.effTyp2 = JX_AUX; cell.eff2 = Math.floor((sc - 14) / JX_SLOT_FIELDS);
+  } else if (p === 0 && sc >= 58 && sc <= 73) {
+    cell.effTyp = JX_WAVE_RESET; cell.eff = d;
+    cell.effTyp2 = JX_AUX; cell.eff2 = sc - 58;
+  } else {
+    cell.effTyp = JX_RAW_BASE + sc; cell.eff = d;
+    if (p !== 0) { cell.effTyp2 = JX_AUX; cell.eff2 = p; }
+  }
+  return cell;
+}
+
+/** The row bytes {d, p, script} of a grid cell: the inverse of jxsRowCell. */
+function jxsCellScript(c: TrackerCell): { d: number; p: number; sc: number } {
+  const t = c.effTyp ?? 0, d = (c.eff ?? 0) & 0xff;
+  const sel = (c.effTyp2 ?? 0) === JX_AUX ? (c.eff2 ?? 0) & 0xff : 0;
+  if (t >= JX_RAW_BASE && t < JX_RAW_BASE + 256) return { d, p: sel, sc: t - JX_RAW_BASE };
+  if (t >= JX_SLOT_BASE && t < JX_SLOT_BASE + JX_SLOT_FIELDS) return { d, p: 0, sc: 14 + (sel & 3) * JX_SLOT_FIELDS + (t - JX_SLOT_BASE) };
+  if (t === JX_WAVE_RESET) return { d, p: 0, sc: 58 + (sel & 15) };
+  if (t > JX_FX_BASE && t < JX_FX_BASE + 256 && SINGLE.has(t - JX_FX_BASE)) return { d, p: sel, sc: t - JX_FX_BASE };
+  return { d, p: 0, sc: 0 };
 }
 
 export interface JxsGridEdit { pattern: number; row: number; channel: number; cell: TrackerCell }
@@ -188,10 +219,11 @@ export function applyJxsGridEdits(bytes: Uint8Array, edits: readonly JxsGridEdit
     if (same(before, c)) continue;
     const o = rowAt(m, where[0], where[1]);
     out[o] = Math.min(127, c.note ?? 0);
-    out[o + 1] = (c.eff ?? 0) & 0xff;
+    const fx = jxsCellScript(c);
+    out[o + 1] = fx.d;
     out[o + 2] = (c.instrument ?? 0) & 0xff;
-    out[o + 3] = (c.effTyp2 ?? 0) === JXS_PARAM_EFFECT ? (c.eff2 ?? 0) & 0xff : 0;
-    out[o + 4] = (c.effTyp ?? 0) & 0xff;
+    out[o + 3] = fx.p;
+    out[o + 4] = fx.sc;
     changed = true;
   }
   return changed ? out : bytes;

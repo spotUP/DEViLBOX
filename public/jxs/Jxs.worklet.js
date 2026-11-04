@@ -22,10 +22,17 @@ class JxsProcessor extends AudioWorkletProcessor {
     this.qlen = 0;
     this.frac = 0;
     this.drained = false;
+    // Per-voice mono queues (aligned with q) and the per-quantum voice buffers handed to
+    // worklets/channel-outputs.js (dub sends, isolation) and channel-stream.js (scopes, VU).
+    this.voices = 0;
+    this.vq = [];
+    this.chBufs = [];
+    this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
   }
 
   async handleMessage(data) {
+    if (this._outs && this._outs.handleMessage(data)) return;
     if (data.type !== 'init' && !this.module && this.initializing) return;
     switch (data.type) {
       case 'init':
@@ -35,7 +42,7 @@ class JxsProcessor extends AudioWorkletProcessor {
         if (!this.module) break;
         this.songBytes = new Uint8Array(data.moduleData);
         this.playing = false;
-        if (this.openSong(0)) this.port.postMessage({ type: 'moduleLoaded', channels: 1, durationMs: this.module._jxs_duration_ms(), tracks: this.module._jxs_tracks() });
+        if (this.openSong(0)) this.port.postMessage({ type: 'moduleLoaded', channels: this.voices, durationMs: this.module._jxs_duration_ms(), tracks: this.module._jxs_tracks() });
         break;
       case 'replaceModule': {
         // An edited song swapped in while it plays: reopen and fast-forward to the tick.
@@ -67,6 +74,9 @@ class JxsProcessor extends AudioWorkletProcessor {
     m._free(ptr);
     if (!ok) { this.port.postMessage({ type: 'error', message: 'jxs_open: ' + m.UTF8ToString(m._jxs_error()) }); return false; }
     this.open = true;
+    this.voices = m._jxs_voices();
+    this.vq = []; this.chBufs = [];
+    for (let c = 0; c < this.voices; c++) { this.vq.push(new Float32Array(1024)); this.chBufs.push(new Float32Array(128)); }
     this.ended = false;
     this.qlen = 0; this.frac = 0; this.drained = false;
     this.lastTick = -1;
@@ -145,6 +155,15 @@ class JxsProcessor extends AudioWorkletProcessor {
         this.q = bigger;
       }
       this.q.set(this.outBuf.subarray(0, got * 2), this.qlen * 2);
+      for (let c = 0; c < this.voices; c++) {
+        if (this.vq[c].length < this.qlen + 128) {
+          const vb = new Float32Array(this.qlen + 256);
+          vb.set(this.vq[c].subarray(0, this.qlen));
+          this.vq[c] = vb;
+        }
+        const vp = m._jxs_voice(c) >> 2;
+        this.vq[c].set(m.HEAPF32.subarray(vp, vp + got), this.qlen);
+      }
       this.qlen += got;
       if (got < 128) this.drained = true;
     }
@@ -160,6 +179,8 @@ class JxsProcessor extends AudioWorkletProcessor {
     const ratio = 44100 / sampleRate;
     const need = Math.floor(this.frac + (n - 1) * ratio) + 2;
     this.fill(need);
+    const o = this._outs;
+    if (o && this.module._jxs_set_isolated) this.module._jxs_set_isolated(o.isolatedMask >>> 0);
     let produced = 0;
     for (let i = 0; i < n; i++) {
       const pos = this.frac + i * ratio;
@@ -168,12 +189,25 @@ class JxsProcessor extends AudioWorkletProcessor {
       const t = pos - j;
       outputL[i] = this.q[2 * j] * (1 - t) + this.q[2 * j + 2] * t;
       outputR[i] = this.q[2 * j + 1] * (1 - t) + this.q[2 * j + 3] * t;
+      for (let c = 0; c < this.voices; c++) this.chBufs[c][i] = this.vq[c][j] * (1 - t) + this.vq[c][j + 1] * t;
       produced++;
+    }
+    // Every sample of each voice, for the oscilloscopes, the level meters and the per-channel dub
+    // sends / isolation slots. A voice buffer holds its whole main-mix share (both sides added); an
+    // isolation slot splits it by the voice's own pan (gain 1), so the slot sounds as the voice did in
+    // the main mix. A dub send is mono on both sides: half of the buffer, the mean of the two sides.
+    if (this.voices > 0 && produced > 0) {
+      if (o) o.write(outputs, this.chBufs, produced, (c) => this.module._jxs_voice_side(c), 1, 0.5);
+      if (globalThis.DevilboxChannelStream) {
+        this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
+        this._stream.writeFloat32(this.chBufs, produced);
+      }
     }
     const end = this.frac + produced * ratio;
     const used = Math.floor(end);
     this.frac = end - used;
     this.q.copyWithin(0, used * 2, this.qlen * 2);
+    for (let c = 0; c < this.voices; c++) this.vq[c].copyWithin(0, used, this.qlen);
     this.qlen = Math.max(0, this.qlen - used);
     const bar = this.module._jxs_bar(), step = this.module._jxs_step();
     const pos = bar * 64 + step;

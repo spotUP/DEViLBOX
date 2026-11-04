@@ -32,6 +32,15 @@ EMSCRIPTEN_KEEPALIVE int jxs_render(float* out, int frames) {
   return g_open ? synthw_jxs_render(out, frames) : 0;
 }
 
+/* Voices in the song (1..16). */
+EMSCRIPTEN_KEEPALIVE int jxs_voices(void) { return g_open && g ? g->N : 0; }
+/* Voice c's mono frames from the last jxs_render call (the first `frames` of them are valid). */
+EMSCRIPTEN_KEEPALIVE const float* jxs_voice(int c) { return g_open && g && c >= 0 && c < 16 ? g->vout[c] : nullptr; }
+/* Where voice c sits in the stereo field: 0 hard left, 1 hard right (its pan, as the main mix applies it). */
+EMSCRIPTEN_KEEPALIVE float jxs_voice_side(int c) { return g_open && g && c >= 0 && c < 16 ? g->vside[c] : 0.5f; }
+/* Voices an isolation slot carries (bit c): left out of the main mix. */
+EMSCRIPTEN_KEEPALIVE void jxs_set_isolated(unsigned mask) { if (g_open && g) g->isomask = mask; }
+
 EMSCRIPTEN_KEEPALIVE void jxs_close(void) {
   synthw_jxs_close();
   g_open = 0;

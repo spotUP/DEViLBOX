@@ -33,6 +33,8 @@ export const NATIVE_WHOLE_PLAYER_TYPES: ReadonlySet<string> = new Set([
   'DavidWhittakerSynth', 'SonicArrangerSynth',
   'InStereo2Synth', 'InStereo1Synth', 'StartrekkerAMSynth',
   'DeltaMusic1Synth', 'DeltaMusic2Synth',
+  // JayTrax: the JXS WASM replayer plays the module; its instruments only carry names
+  'JxsWasmSynth',
 ]);
 
 /**
