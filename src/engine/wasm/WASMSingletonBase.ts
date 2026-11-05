@@ -302,9 +302,40 @@ export function channelOutputNodeOptions(voices: number): AudioWorkletNodeOption
 export abstract class WASMChannelOutputsEngine extends WASMSingletonBase {
   private _nodeReady = false;
 
+  /** Engines whose worklet narrows its hard-panned mix by the stereo separation setting (see supportsStereoSeparation). */
+  private static readonly stereoSeparationEngines = new Set<WASMChannelOutputsEngine>();
+
+  /**
+   * Whether the worklet applies `setStereoSeparation` (worklets/channel-outputs.js narrowStereo). Such an engine
+   * routes directly, so the replayer's separation node never reaches it: the base applies the stored setting
+   * when the node reports ready, and forwardStereoSeparation() pushes slider changes live.
+   */
+  protected supportsStereoSeparation(): boolean {
+    return false;
+  }
+
+  /** DEViLBOX stereo separation 0-100 (%): 100 = full Amiga L/R, 0 = mono. */
+  setStereoSeparation(percent: number): void {
+    this.workletNode?.port.postMessage({ type: 'setStereoSeparation', value: percent });
+  }
+
+  /** Push the setting to every live engine that supports it (the settings dialog's slider). */
+  static forwardStereoSeparation(percent: number): void {
+    for (const engine of WASMChannelOutputsEngine.stereoSeparationEngines) {
+      if (engine.isDisposed) WASMChannelOutputsEngine.stereoSeparationEngines.delete(engine);
+      else engine.setStereoSeparation(percent);
+    }
+  }
+
   /** Called by the subclass when its worklet reports ready. */
   protected markNodeReady(): void {
     this._nodeReady = true;
+    if (this.supportsStereoSeparation()) {
+      WASMChannelOutputsEngine.stereoSeparationEngines.add(this);
+      void import('@stores/useSettingsStore').then(({ useSettingsStore }) => {
+        this.setStereoSeparation(useSettingsStore.getState().stereoSeparation);
+      }).catch(() => { /* settings not ready: worklet default (full Amiga) applies */ });
+    }
   }
 
   /** Called by a subclass that replaces its node: the new one is not ready until it reports. */

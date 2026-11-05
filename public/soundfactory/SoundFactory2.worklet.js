@@ -15,8 +15,6 @@ class SoundFactory2Processor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
     this.initializing = false;
-    // DEViLBOX stereo separation 0..1 (1 = full Amiga hard L/R, 0 = mono); the engine pushes the app setting.
-    this.stereoSep = 1;
     // Per-channel dub sends + isolation slots (worklets/channel-outputs.js).
     this._outs = globalThis.DevilboxChannelOutputs ? new globalThis.DevilboxChannelOutputs() : null;
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
@@ -64,7 +62,6 @@ class SoundFactory2Processor extends AudioWorkletProcessor {
         break;
       case 'pause': this.playing = !this.playing; break;
       case 'setSubsong': if (this.handle) this.module._sf_select_subsong(this.handle, data.subsong); break;
-      case 'setStereoSeparation': this.stereoSep = Math.max(0, Math.min(1, (+data.value) / 100)); break;
       case 'setChannelMask': if (this.handle) this.module._sf_set_channel_mask(this.handle, data.mask); break;
       case 'setCell': {        if (this.handle && this.module._sf_set_cell) {          this.module._sf_set_cell(this.handle, data.index, data.row, data.channel, data.note, data.instrument, data.effect, data.effectArg);        }        break;      }      case 'setInstrumentParam': {        if (this.handle && this.module._sf_set_instrument_param_at_offset) {          var pLen = this.module.lengthBytesUTF8(data.param) + 1;          var pPtr = this.module._malloc(pLen);          this.module.stringToUTF8(data.param, pPtr, pLen);          this.module._sf_set_instrument_param_at_offset(this.handle, data.recordOffset, pPtr, data.value);          this.module._free(pPtr);        }        break;      }      case 'getInstrumentParam': {        if (this.handle && this.module._sf_get_instrument_param) {          var pLen = this.module.lengthBytesUTF8(data.param) + 1;          var pPtr = this.module._malloc(pLen);          this.module.stringToUTF8(data.param, pPtr, pLen);          var val = this.module._sf_get_instrument_param(this.handle, data.inst, pPtr);          this.module._free(pPtr);          this.port.postMessage({ type: 'instrumentParamValue', inst: data.inst, param: data.param, value: val });        }        break;      }      case 'dispose': this.cleanup(); break;
     }
@@ -172,16 +169,8 @@ class SoundFactory2Processor extends AudioWorkletProcessor {
         outputL[i] = k0 * b0[i] + k3 * b3[i];
         outputR[i] = k1 * b1[i] + k2 * b2[i];
       }
-      // Narrow the hard Amiga L/R toward mono per the stereo separation setting (mid/side).
-      const sep = this.stereoSep;
-      if (sep < 1) {
-        for (let i = 0; i < rendered; i++) {
-          const mid = (outputL[i] + outputR[i]) * 0.5;
-          const side = (outputL[i] - outputR[i]) * 0.5 * sep;
-          outputL[i] = mid + side;
-          outputR[i] = mid - side;
-        }
-      }
+      // Narrow the Amiga L/R toward mono per the stereo separation setting (worklets/channel-outputs.js).
+      if (o) o.narrowStereo(outputL, outputR, rendered);
 
       // Every sample of each voice, for the oscilloscopes and the per-channel
       // role classifiers (worklets/channel-stream.js).

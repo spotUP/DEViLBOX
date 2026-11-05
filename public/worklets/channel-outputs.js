@@ -16,6 +16,7 @@
  *   { type: 'dubChannelDisableAll' }
  *   { type: 'addIsolation', slotIndex, channelMask }
  *   { type: 'removeIsolation', slotIndex }
+ *   { type: 'setStereoSeparation', value }   value 0-100 (%), the app setting; narrowStereo() applies it
  *
  * Loaded before the engine worklet (WASMSingletonBase.loadWASMAssets), like
  * worklets/channel-stream.js, so the engine's processor finds it on the
@@ -31,6 +32,8 @@ if (!globalThis.DevilboxChannelOutputs) {
       this.dubEnabled = new Array(MAX_DUB_CHANNELS).fill(false);
       this.slotMasks = new Array(ISOLATION_SLOTS).fill(0);
       this.isolatedMask = 0;
+      // DEViLBOX stereo separation 0..1 (1 = full Amiga hard L/R, 0 = mono); the engine pushes the app setting.
+      this.stereoSep = 1;
     }
 
     /** Handle a dub/isolation message; true when it was one. */
@@ -45,6 +48,9 @@ if (!globalThis.DevilboxChannelOutputs) {
           }
           return true;
         }
+        case 'setStereoSeparation':
+          this.stereoSep = Math.max(0, Math.min(1, (+data.value) / 100));
+          return true;
         case 'dubChannelDisableAll':
           this.dubEnabled.fill(false);
           return true;
@@ -66,6 +72,21 @@ if (!globalThis.DevilboxChannelOutputs) {
         }
         default:
           return false;
+      }
+    }
+
+    /**
+     * Narrow a hard-panned main mix toward mono per the stereo separation setting (mid/side):
+     * side scaled by the setting, mid kept. Call right after the worklet's L/R mix, in place.
+     */
+    narrowStereo(outputL, outputR, n) {
+      const sep = this.stereoSep;
+      if (sep >= 1) return;
+      for (let i = 0; i < n; i++) {
+        const mid = (outputL[i] + outputR[i]) * 0.5;
+        const side = (outputL[i] - outputR[i]) * 0.5 * sep;
+        outputL[i] = mid + side;
+        outputR[i] = mid - side;
       }
     }
 

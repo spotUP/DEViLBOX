@@ -27,6 +27,9 @@ function futurecomposerTransform(code: string): string {
 }
 
 export class FutureComposerEngine extends WASMChannelOutputsEngine {
+  /** The worklet narrows its Amiga L/R mix by the stereo separation setting (worklets/channel-outputs.js). */
+  protected override supportsStereoSeparation(): boolean { return true; }
+
   private static instance: FutureComposerEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 

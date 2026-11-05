@@ -30,6 +30,9 @@ export function gmcTransform(code: string): string {
 const meterFeed = new ChannelMeterFeed();
 
 export class GmcEngine extends WASMChannelOutputsEngine {
+  /** The worklet narrows its Amiga L/R mix by the stereo separation setting (worklets/channel-outputs.js). */
+  protected override supportsStereoSeparation(): boolean { return true; }
+
   private static instance: GmcEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 

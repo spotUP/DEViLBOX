@@ -27,6 +27,9 @@ function soundfactoryTransform(code: string): string {
 }
 
 export class SoundFactory2Engine extends WASMChannelOutputsEngine {
+  /** The worklet narrows its Amiga L/R mix by the stereo separation setting (worklets/channel-outputs.js). */
+  protected override supportsStereoSeparation(): boolean { return true; }
+
   private static instance: SoundFactory2Engine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
@@ -84,10 +87,6 @@ export class SoundFactory2Engine extends WASMChannelOutputsEngine {
         case 'moduleLoaded':
           useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 0', 'Paula 1', 'Paula 2', 'Paula 3']);
           console.log('[SoundFactory2Engine] Module loaded, subsongs:', data.subsongCount);
-          // Direct routing bypasses the replayer's separation node: apply the app setting here.
-          void import('@stores/useSettingsStore').then(({ useSettingsStore }) => {
-            this.setStereoSeparation(useSettingsStore.getState().stereoSeparation);
-          }).catch(() => { /* settings not ready: worklet default (full Amiga) applies */ });
           break;
         case 'oscData':
           useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
@@ -132,11 +131,6 @@ export class SoundFactory2Engine extends WASMChannelOutputsEngine {
 
   setMuteMask(mask: number): void {
     this.workletNode?.port.postMessage({ type: 'setChannelMask', mask });
-  }
-
-  /** DEViLBOX stereo separation 0-100 (%): 100 = full Amiga L/R, 0 = mono. */
-  setStereoSeparation(percent: number): void {
-    this.workletNode?.port.postMessage({ type: 'setStereoSeparation', value: percent });
   }
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }

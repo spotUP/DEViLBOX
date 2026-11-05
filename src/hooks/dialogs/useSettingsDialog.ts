@@ -16,6 +16,7 @@ import { useAudioStore } from '@stores/useAudioStore';
 import { useDJStore } from '@stores/useDJStore';
 import { useModlandContributionModal } from '@stores/useModlandContributionModal';
 import { getTrackerReplayer } from '@engine/TrackerReplayer';
+import { WASMChannelOutputsEngine } from '@engine/wasm/WASMSingletonBase';
 import { getDJEngineIfActive } from '@engine/dj/DJEngine';
 import { BG_MODES, getBgModeLabel } from '@/components/tracker/TrackerVisualBackground';
 import { getASIDDeviceManager, isASIDSupported } from '@lib/sid/ASIDDeviceManager';
@@ -298,10 +299,8 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
     void import('@engine/sonix/SonixEngine').then(({ SonixEngine }) => {
       if (SonixEngine.hasInstance()) SonixEngine.getInstance().setStereoSeparation(v);
     }).catch(() => { /* engine not loaded */ });
-    // Sound Factory renders in its own WASM worklet and routes directly — forward live.
-    void import('@engine/soundfactory/SoundFactory2Engine').then(({ SoundFactory2Engine }) => {
-      if (SoundFactory2Engine.hasInstance()) SoundFactory2Engine.getInstance().setStereoSeparation(v);
-    }).catch(() => { /* engine not loaded */ });
+    // Direct-routed Amiga worklets (channel-outputs.js narrowStereo) take the setting live through the engine registry.
+    WASMChannelOutputsEngine.forwardStereoSeparation(v);
     const djEng = getDJEngineIfActive();
     if (djEng) {
       djEng.deckA.replayer.setStereoSeparation(v);
