@@ -232,6 +232,7 @@ typedef struct BdPlayer {
     // Playhead: the 50 Hz tick being played, counted from the start of the song and restarted when
     // the song starts over (-1 before the first tick). The grid is one row per tick (bd_walk).
     int play_tick;
+    int play_ptick;   // processed ticks so far minus 1 (frames the counter feature skips are not counted): the grid clock's tick
     int next_tick;
 } BdPlayer;
 
@@ -266,8 +267,9 @@ struct BdModule {
     // Walk (bd_walk): every command the track reader executes, with the tick it ran on
     bool walking;
     int walk_tick;
+    int walk_ptick;                // processed ticks so far minus 1: frames the counter feature skips (every 6th) are not counted
     int walk_count, walk_max;
-    int32_t* walk_out;             // 8 ints per event
+    int32_t* walk_out;             // 9 ints per event
     int walk_end_tick[4];          // tick each voice first reached the end of its position list (-1: not yet)
 };
 
@@ -297,12 +299,12 @@ enum {
 
 static void bd_walk_event(BdModule* mod, const BdVoiceInfo* v, int track, int pos, int kind, int a, int b, int c) {
     if (!mod->walking || mod->walk_count >= mod->walk_max) return;
-    int32_t* e = mod->walk_out + (size_t)mod->walk_count * 8;
+    int32_t* e = mod->walk_out + (size_t)mod->walk_count * 9;
     e[0] = mod->walk_tick;
     e[1] = (int32_t)(v - mod->player->voices);
     e[2] = track;
     e[3] = pos;
-    e[4] = kind; e[5] = a; e[6] = b; e[7] = c;
+    e[4] = kind; e[5] = a; e[6] = b; e[7] = c; e[8] = mod->walk_ptick;
     mod->walk_count++;
 }
 
@@ -1418,6 +1420,7 @@ static void bd_init_sound(BdModule* mod, int sub_song) {
     p->playing_info.master_volume_fade_speed_counter = 1;
     p->playing_info.counter = 6;
     p->play_tick = -1;
+    p->play_ptick = -1;
     p->next_tick = 0;
 
     for (int i = 0; i < 4; i++) {
@@ -2294,6 +2297,9 @@ static void bd_player_tick(BdModule* mod) {
         }
     }
 
+    p->play_ptick++;
+    mod->walk_ptick++;   // the frame is processed: the track commands below run on it
+
     if (!p->playing_info.enable_playing) {
         p->playing_info.enable_playing = true;
 
@@ -2324,13 +2330,13 @@ static void bd_player_tick(BdModule* mod) {
 /**
  * Run the current subsong from its start and write every command the replayer executes, each as 8
  * int32: tick, voice, track number (-1: a position-list command), byte position in the track (or
- * the position list), kind (BD_WALK_*), a, b, c. Stops when every voice has reached the end of its
+ * the position list), kind (BD_WALK_*), a, b, c, processed tick (frames the counter feature skips are not counted; 9 int32 per event). Stops when every voice has reached the end of its
  * position list once, or after `max_ticks`. info[0] ticks run, info[1] the tick the last voice
  * finished, info[2..5] each voice's end tick (-1 never), info[6] voices, info[7] samples,
- * info[8] subsongs. Returns the event count.
+ * info[8] subsongs, info[9] / info[10] processed ticks per frame (num / den), info[11] processed ticks run. Returns the event count.
  */
 int bd_get_play_tick(const BdModule* module) {
-    return (module != nullptr && module->player != nullptr) ? module->player->play_tick : -1;
+    return (module != nullptr && module->player != nullptr) ? module->player->play_ptick : -1;
 }
 
 int bd_walk(BdModule* mod, int max_ticks, int32_t* out, int max_events, int32_t* info) {
@@ -2344,6 +2350,7 @@ int bd_walk(BdModule* mod, int max_ticks, int32_t* out, int max_events, int32_t*
     mod->walk_count = 0;
     mod->walk_max = max_events;
     mod->walk_out = out;
+    mod->walk_ptick = -1;   // the first processed tick is processed tick 0
     for (int i = 0; i < 4; i++) mod->walk_end_tick[i] = -1;
     int ticks = 0;
     for (; ticks < max_ticks && mod->walk_count < max_events; ticks++) {
@@ -2367,6 +2374,8 @@ int bd_walk(BdModule* mod, int max_ticks, int32_t* out, int max_events, int32_t*
         info[6] = 4;
         info[7] = (int)mod->sample_count;
         info[8] = (int)mod->sub_song_count;
+        // info[9] / info[10]: processed ticks per 50 Hz frame, as a fraction (the counter feature skips 1 frame in 6); info[11]: processed ticks run.
+        info[9] = mod->features.enable_counter ? 5 : 1; info[10] = mod->features.enable_counter ? 6 : 1; info[11] = mod->walk_ptick + 1;
     }
     int n = mod->walk_count;
     bd_init_sound(mod, saved);

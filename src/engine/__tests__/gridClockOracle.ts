@@ -20,13 +20,21 @@ export function rowSeconds(song: Pick<TrackerSong, 'initialSpeed' | 'initialBPM'
 }
 
 /** Per voice, the seconds at which the grid starts a note, rows laid out in song order on the scheduler's clock. */
-export function gridOnsets(song: Pick<TrackerSong, 'patterns' | 'songPositions' | 'initialSpeed' | 'initialBPM'>): number[][] {
+/** `delayTicks(cell, col)`: ticks into its row the note of note column `col` (0 or 1) starts, for a format with step-grid note delays. */
+export function gridOnsets(
+  song: Pick<TrackerSong, 'patterns' | 'songPositions' | 'initialSpeed' | 'initialBPM'>,
+  delayTicks?: (cell: TrackerSong['patterns'][number]['channels'][number]['rows'][number], col: 0 | 1) => number,
+): number[][] {
   const out: number[][] = song.patterns[0].channels.map(() => []);
   const sec = rowSeconds(song);
   let row = 0;
   for (const p of song.songPositions) {
     const pat = song.patterns[p];
-    pat.channels.forEach((c, ch) => c.rows.forEach((r, i) => { if (r.note > 0 && r.note < 97) out[ch].push((row + i) * sec); }));
+    const tickSec = sec / (song.initialSpeed ?? 6);
+    pat.channels.forEach((c, ch) => c.rows.forEach((r, i) => {
+      if (r.note > 0 && r.note < 97) out[ch].push((row + i) * sec + (delayTicks ? delayTicks(r, 0) : 0) * tickSec);
+      if (r.note2 && r.note2 > 0 && r.note2 < 97) out[ch].push((row + i) * sec + (delayTicks ? delayTicks(r, 1) : 0) * tickSec);
+    }));
     row += pat.length;
   }
   return out;

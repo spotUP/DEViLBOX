@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { installWasmNodeFetches } from '@/lib/import/__tests__/helpers/dwNodeFetch';
 import { walkBenDaglish, BD_WALK } from '@/lib/import/formats/BenDaglishWasmExtractor';
+import { bdRowClock } from '@/lib/import/formats/benDaglishGrid';
 import { measureLiveSwap, type LiveSwapSpec } from './helpers/liveSwapCheck';
 import { sameAudio } from './helpers/workletHarness';
 
@@ -54,7 +55,10 @@ describe('Ben Daglish: an edit is heard while the song plays', { timeout: 240000
     const firstRun = (e: { track: number; pos: number }) => Math.min(...walk.events.filter((x) => x.track === e.track && x.pos === e.pos && x.kind === BD_WALK.note).map((x) => x.tick));
     const target = walk.events.find((e) => e.kind === BD_WALK.note && e.a >= 0 && e.track >= 0 && e.tick >= 70 && e.tick < 200 && firstRun(e) === e.tick)!;
     expect(target, 'a note a little after the first second').toBeTruthy();
-    const p = Math.floor(target.tick / 64), row = target.tick % 64;
+    const clock = bdRowClock(walk);
+    // The note's grid row (the grid is cut into 64-row patterns); a note off the step is skipped by the search below only when it has an offset.
+    const g = clock.tickToRow(target.ptick).row;
+    const p = Math.floor(g / 64), row = g % 64;
     const { useTrackerStore } = await import('@/stores/useTrackerStore');
     const r = await measureLiveSwap(spec, { p, ch: target.voice, row }, () => {
       const cur = useTrackerStore.getState().patterns[p].channels[target.voice].rows[row].note;

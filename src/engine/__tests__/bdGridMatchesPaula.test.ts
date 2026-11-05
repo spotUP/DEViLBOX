@@ -1,9 +1,8 @@
 /**
  * The Ben Daglish grid sits where the ORIGINAL player starts its notes (UADE Paula note-ons).
  *
- * Same oracle and clock as dwGridMatchesPaula (gridClockOracle): the grid's rows are 50 Hz replayer
- * ticks, so the song the tracker's scheduler plays must spend one tick per row (initialSpeed 1 at
- * 125 BPM); with the old speed of 6 the cursor ran at a sixth of the sound. UADE offers tunes 0 and 2
+ * Same oracle and clock as dwGridMatchesPaula (gridClockOracle): the grid's rows are `step` processed
+ * ticks on one fixed clock (initialSpeed = step at 125 BPM); a note off the step carries its delay. UADE offers tunes 0 and 2
  * of motorhead (as apb.dw, it never offers tune 1): UADE tune 1 plays tune 0, UADE tune 2 plays tune 2.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -12,6 +11,7 @@ import { openUade, PaulaSession } from './gridOracle';
 import { rowSeconds, gridOnsets, paulaOnsetsOf, onsetCoverage } from './gridClockOracle';
 import { installWasmNodeFetches } from '@/lib/import/__tests__/helpers/dwNodeFetch';
 import { parseBenDaglishFile } from '@/lib/import/formats/BenDaglishParser';
+import { BD_FX } from '@/lib/import/formats/benDaglishEffectGlyphs';
 
 const FILE = 'public/data/songs/ben-daglish/motorhead-titleandingame.bd';
 const TOLERANCE_MS = 60;
@@ -31,7 +31,7 @@ describe('Ben Daglish motorhead grids against the original player (UADE Paula no
     const bytes = new Uint8Array(readFileSync(FILE));
     const song = await parseBenDaglishFile(bytes.slice().buffer as ArrayBuffer, 'motorhead.bd', tune);
     const paula = paulaOnsetsOf(new PaulaSession(mod, bytes, 'motorhead.bd', { subsong: uadeTune }), SPAN_SECONDS + 1);
-    const cov = onsetCoverage(gridOnsets(song), paula, SPAN_SECONDS - 2, TOLERANCE_MS);
+    const cov = onsetCoverage(gridOnsets(song, (c, col) => (col === 1 ? c.delay2 ?? 0 : c.effTyp === BD_FX.rowOffset ? c.eff : 0)), paula, SPAN_SECONDS - 2, TOLERANCE_MS);
     expect(cov.length, 'voices with notes in the span').toBeGreaterThanOrEqual(2);
     for (const { voice, notes, hit } of cov) {
       expect(hit / notes, `tune ${tune} voice ${voice + 1}: ${hit} of ${notes} grid notes sit on a note the player starts (row = ${rowSeconds(song) * 1000} ms)`).toBeGreaterThanOrEqual(MIN_COVERAGE);
