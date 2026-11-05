@@ -10,7 +10,7 @@
  * speed = step and 125 BPM.
  */
 import type { TrackerCell } from '@/types';
-import { makeRowClock, mainStepFromOnsets, type RowClock } from './stepRowClock';
+import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer, type RowClock } from './stepRowClock';
 import { BD_FX } from './benDaglishEffectGlyphs';
 
 /** One effect operand byte: its effect id (soundFactoryEffects.ts), the byte's value and its file offset. */
@@ -106,27 +106,27 @@ export function buildSfGrid(voices: readonly (readonly SfGridEvent[])[], maxRows
 
   voices.forEach((events, v) => {
     const on = onsetsOf(events);
-    const hasNote = new Array<boolean>(rowCount).fill(false);
+    const place = makeOnsetPlacer(clock, MAX_NOTE_COLS);
     events.forEach((e, i) => {
-      const { row, offset } = clock.tickToRow(on[i]);
+      const { row } = clock.tickToRow(on[i]);
       if (row >= rowCount) return;
       const cell = rows[v][row] as TrackerCell & Record<string, number>;
       if (!e.isNote) {
         if (offsets[v][row] < 0) { offsets[v][row] = e.fileOffset; anchors[v][row] = i; }
         return;
       }
-      if (!hasNote[row]) {
-        hasNote[row] = true;
+      const pl = place(v, on[i]);
+      if (!pl) { unplaced++; return; }
+      const offset = pl.offset;
+      if (pl.col === 0) {
         cell.note = e.note; cell.instrument = e.instrId;
         offsets[v][row] = e.fileOffset; anchors[v][row] = i;
         if (offset > 0) { cell.effTyp = SF_FX_ROW_OFFSET; cell.eff = offset; delayedNotes++; }
-      } else if (cell.note2 === undefined) {
+      } else {
         cell.note2 = e.note; cell.instrument2 = e.instrId; cell.delay2 = offset;
         noteCols[v] = MAX_NOTE_COLS;
         clashRows++;
         if (offset > 0) delayedNotes++;
-      } else {
-        unplaced++;
       }
     });
 
