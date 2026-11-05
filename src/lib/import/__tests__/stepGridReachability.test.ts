@@ -28,6 +28,7 @@ import { buildRobHubbardGrid } from '../formats/RobHubbardParser';
 import { rhRowClock, rhTickToRow, buildRHGridFromWalk } from '../formats/robHubbardGrid';
 import { RH_WALK } from '../formats/rhWalk';
 import { installWasmNodeFetches } from './helpers/dwNodeFetch';
+import { daveLoweEncoderForStep } from '../formats/DaveLoweParser';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 let restore = () => {};
@@ -251,6 +252,63 @@ describe('step grid: Hippel CoSo through parseModuleToSong', () => {
         expect(shown[v].length).toBeGreaterThan(0);
         expect(shown[v], `voice ${v} note ticks`).toEqual(walked[v]);
       }
+    });
+  }
+});
+
+// Dave Lowe and Dave Lowe New: authored durations, no speed command. The step is the exact GCD of every duration, so every
+// event starts on the first tick of its row. The expected onsets come from an independent decoder over the section bytes
+// (the layout's carrier rows), and the grid encoder must hand the same durations back.
+const dlSectionOnsets = (bytes: number[]): { onsets: number[]; ticks: number } => {
+  const w = (o: number) => (bytes[o] << 8) | bytes[o + 1];
+  const onsets: number[] = [];
+  let tick = 0;
+  for (let o = 0; o + 1 < bytes.length;) {
+    const word = w(o); o += 2;
+    if (word > 100) { onsets.push(tick); tick += w(o); o += 2; }
+    else if (word === 32) { tick += w(o); o += 2; }
+    else if (word === 4 || word === 12) o += 4;
+    else break;
+  }
+  return { onsets, ticks: tick };
+};
+
+const DL_SONGS = [
+  { path: 'dave-lowe/incredibleshrinkingsphere.dl', step: 4 },
+  { path: 'dave-lowe-new/m-bison.dln', step: 2 }   // the onset gaps share 4 but some note/rest durations are 2 ticks,
+];
+
+describe('step grid: Dave Lowe and Dave Lowe New through parseModuleToSong', () => {
+  for (const s of DL_SONGS) {
+    it(`${s.path}: one row per ${s.step}-tick step, every onset on (row)*step, encoder returns the durations`, async () => {
+      const ab = bytesOf(s.path);
+      const before = vi.mocked(makeRowClock).mock.calls.length;
+      const song = await parseModuleToSong(new File([ab.slice(0)], s.path.split('/').pop()!));
+      expect(vi.mocked(makeRowClock).mock.calls.length, 'the row clock ran during the import').toBeGreaterThan(before);
+      expect(song.initialSpeed).toBe(s.step);
+      const layout = song.uadeVariableLayout!;      const file = new Uint8Array(ab);
+      const sec = layout.filePatternAddrs.map((addr, i) => dlSectionOnsets(Array.from(file.subarray(addr, addr + layout.filePatternSizes[i]))));
+      expect(sec.every((x) => x.ticks % s.step === 0), 'every section length is a step multiple').toBe(true);
+
+      let checked = 0;
+      let start = 0;
+      song.songPositions.forEach((pi, pos) => {
+        const pat = song.patterns[pi];
+        layout.trackMap[pos].forEach((fp, ch) => {
+          const shown: number[] = [];
+          pat.channels[ch].rows.forEach((cell, r) => { if (cell.note > 0) shown.push((start + r) * s.step); });
+          const want = fp < 0 ? [] : sec[fp].onsets.filter((t) => t / s.step < pat.length).map((t) => start * s.step + t);   // (the parsers cap a pattern at 256 rows)
+          expect(shown, `position ${pos} channel ${ch}`).toEqual(want);
+          checked += shown.length;
+          if (fp >= 0 && shown.length) {
+            const bytes = daveLoweEncoderForStep(s.step).encodePattern(pat.channels[ch].rows, ch);
+            expect(dlSectionOnsets(Array.from(bytes)).onsets, `re-encoded onsets, position ${pos} channel ${ch}`).toEqual(sec[fp].onsets.filter((t) => t / s.step < pat.length));
+          }
+        });
+        start += pat.length;
+      });
+      console.log(`DL ${s.path}: notes ${checked}, positions ${song.songPositions.length}`);
+      expect(checked).toBeGreaterThan(100);
     });
   }
 });

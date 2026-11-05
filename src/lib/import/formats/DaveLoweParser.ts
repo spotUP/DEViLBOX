@@ -34,6 +34,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
 import type { InstrumentConfig } from '@/types/instrument';
 import type { UADEVariablePatternLayout, VariableLengthEncoder } from '@/engine/uade/UADEPatternEncoder';
+import { makeRowClock, gcd, type RowClock } from './stepRowClock';
 import { createSamplerInstrument, periodToNoteIndex, amigaNoteToXM } from './AmigaUtils';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -171,6 +172,28 @@ function parseCommandStream(buf: Uint8Array, fileOff: number): { events: DLEvent
   return { events, byteSize: pos - fileOff };
 }
 
+// ── Step row clock ────────────────────────────────────────────────────────────
+
+/**
+ * One grid row is one song step (thoughts/shared/plans/2026-11-05-step-grid.md). Dave Lowe commands carry authored
+ * durations and no speed command, so the step is the exact GCD of every note and rest duration of the song: every
+ * event then starts on the first tick of its row (offset 0) and no row-offset effect is needed.
+ */
+export function daveLoweStep(durations: Iterable<number>): number {
+  let g = 0;
+  for (const d of durations) if (d > 0) g = g ? gcd(g, d) : d;
+  return Math.max(1, g);
+}
+
+/** The durations of every note and rest of a parsed command stream. */
+export function eventDurations(events: ReadonlyArray<{ type: string; duration?: number }>): number[] {
+  const out: number[] = [];
+  for (const e of events) if ((e.type === 'note' || e.type === 'rest') && e.duration) out.push(e.duration);
+  return out;
+}
+
+export const daveLoweRowClock = (step: number): RowClock => makeRowClock([{ tick: 0, speed: step }]);
+
 // ── Convert events to tracker rows ────────────────────────────────────────────
 
 interface RowData {
@@ -181,10 +204,11 @@ interface RowData {
   eff: number;
 }
 
-function eventsToRows(events: DLEvent[], sampleInfoBase: number): { rows: RowData[]; totalTicks: number } {
+function eventsToRows(events: DLEvent[], sampleInfoBase: number, clock: RowClock): { rows: RowData[]; totalTicks: number } {
   const rows: RowData[] = [];
   let currentInstr = 0;
   let totalTicks = 0;
+  const notes: Array<{ tick: number; cell: RowData }> = [];
 
   for (const ev of events) {
     switch (ev.type) {
@@ -202,33 +226,20 @@ function eventsToRows(events: DLEvent[], sampleInfoBase: number): { rows: RowDat
       case 'note': {
         const noteIdx = periodToNoteIndex(ev.period);
         const xmNote = amigaNoteToXM(noteIdx);
-        // First row: note + instrument
-        rows.push({
-          note: xmNote,
-          instrument: currentInstr,
-          volume: 0,
-          effTyp: 0,
-          eff: 0,
-        });
-        // Remaining duration ticks: empty rows
-        for (let t = 1; t < ev.duration; t++) {
-          rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 });
-        }
+        notes.push({ tick: totalTicks, cell: { note: xmNote, instrument: currentInstr, volume: 0, effTyp: 0, eff: 0 } });
         totalTicks += ev.duration;
         break;
       }
-      case 'rest': {
-        for (let t = 0; t < ev.duration; t++) {
-          rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 });
-        }
+      case 'rest':
         totalTicks += ev.duration;
         break;
-      }
       case 'seqAdvance':
         break;
     }
   }
 
+  for (let r = 0; r < clock.rowsForTicks(totalTicks); r++) rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 });
+  for (const n of notes) rows[clock.tickToRow(n.tick).row] = n.cell;
   return { rows, totalTicks };
 }
 
@@ -238,7 +249,7 @@ function eventsToRows(events: DLEvent[], sampleInfoBase: number): { rows: RowDat
  * Encode tracker rows back to DL command stream binary.
  * Groups consecutive note rows, rest rows, etc. into commands.
  */
-function encodeRowsToStream(rows: TrackerCell[], _channel: number): Uint8Array {
+function encodeRowsToStream(rows: TrackerCell[], _channel: number, step = 1): Uint8Array {
   // Carrier path (byte-exact): rows produced by the parser's blockRows are
   // per-byte carriers of the real command-stream section (cutoff=1, period=byte).
   // Dave Lowe commands are variable-length word pairs; concatenating the carrier
@@ -273,7 +284,8 @@ function encodeRowsToStream(rows: TrackerCell[], _channel: number): Uint8Array {
       if (period > 0) {
         // Write period word + duration word
         out.push((period >> 8) & 0xFF, period & 0xFF);
-        out.push((duration >> 8) & 0xFF, duration & 0xFF);
+        const ticks = duration * step;
+        out.push((ticks >> 8) & 0xFF, ticks & 0xFF);
       }
       i += duration;
     } else {
@@ -284,7 +296,8 @@ function encodeRowsToStream(rows: TrackerCell[], _channel: number): Uint8Array {
       }
       if (duration > 0) {
         out.push(0x00, CMD_REST);  // word = 32
-        out.push((duration >> 8) & 0xFF, duration & 0xFF);
+        const ticks = duration * step;
+        out.push((ticks >> 8) & 0xFF, ticks & 0xFF);
         i += duration;
       } else {
         i++;
@@ -298,10 +311,13 @@ function encodeRowsToStream(rows: TrackerCell[], _channel: number): Uint8Array {
   return new Uint8Array(out);
 }
 
-export const daveLoweEncoder: VariableLengthEncoder = {
+/** The encoder of a song whose grid row is `step` ticks: row gaps are multiplied back to the authored durations. */
+export const daveLoweEncoderForStep = (step: number): VariableLengthEncoder => ({
   formatId: 'daveLowe',
-  encodePattern: encodeRowsToStream,
-};
+  encodePattern: (rows, channel) => encodeRowsToStream(rows, channel, step),
+});
+
+export const daveLoweEncoder: VariableLengthEncoder = daveLoweEncoderForStep(1);
 
 // ── Main parser ───────────────────────────────────────────────────────────────
 
@@ -472,6 +488,7 @@ export async function parseDaveLoweFile(
     }
 
     // Parse each unique command section into rows
+    const sectionEvents = new Map<number, DLEvent[]>();
     const sectionRows = new Map<number, RowData[]>();   // sectionPtr → rows
     const sectionBytes = new Map<number, number>();      // sectionPtr → byte size
 
@@ -483,9 +500,13 @@ export async function parseDaveLoweFile(
         continue;
       }
       const { events, byteSize } = parseCommandStream(buf, fileOff);
-      const { rows } = eventsToRows(events, sampleInfoPtr);
-      sectionRows.set(sectionPtr, rows);
+      sectionEvents.set(sectionPtr, events);
       sectionBytes.set(sectionPtr, byteSize);
+    }
+    const songStep = daveLoweStep([...sectionEvents.values()].flatMap(eventDurations));
+    const clock = daveLoweRowClock(songStep);
+    for (const [sectionPtr, events] of sectionEvents) {
+      sectionRows.set(sectionPtr, eventsToRows(events, sampleInfoPtr, clock).rows);
     }
 
     // Build tracker patterns from positions
@@ -592,7 +613,7 @@ export async function parseDaveLoweFile(
       numFilePatterns: allSectionPtrs.length,
       rowsPerPattern: patterns.map(p => p.length),
       moduleSize: buf.length,
-      encoder: daveLoweEncoder,
+      encoder: daveLoweEncoderForStep(songStep),
       filePatternAddrs,
       filePatternSizes,
       trackMap,
@@ -609,7 +630,7 @@ export async function parseDaveLoweFile(
       songLength: songPositions.length,
       restartPosition: 0,
       numChannels: 4,
-      initialSpeed: 1,  // 1 tick per row — durations are already expanded
+      initialSpeed: songStep,  // one row per song step: the GCD of every duration
       initialBPM: 125,
       linearPeriods: false,
       uadeEditableFileData: buffer.slice(0) as ArrayBuffer,

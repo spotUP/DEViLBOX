@@ -33,7 +33,8 @@ import type { Pattern, ChannelData, TrackerCell } from '@/types';
 import type { InstrumentConfig } from '@/types/instrument';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument, periodToNoteIndex, amigaNoteToXM } from './AmigaUtils';
-import { daveLoweEncoder } from './DaveLoweParser';
+import { daveLoweEncoderForStep, daveLoweStep, eventDurations, daveLoweRowClock } from './DaveLoweParser';
+import type { RowClock } from './stepRowClock';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -152,10 +153,12 @@ interface RowData {
 function eventsToRows(
   events: DLEvent[],
   instrPtrToId: Map<number, number>,
+  clock: RowClock,
 ): { rows: RowData[]; totalTicks: number } {
   const rows: RowData[] = [];
   let currentInstr = 0;
   let totalTicks = 0;
+  const notes: Array<{ tick: number; cell: RowData }> = [];
 
   for (const ev of events) {
     if (ev.type === 'setInstrument') {
@@ -163,20 +166,15 @@ function eventsToRows(
       if (id > 0) currentInstr = id;
     } else if (ev.type === 'note') {
       const noteIdx = periodToNoteIndex(ev.period!);
-      const xmNote = amigaNoteToXM(noteIdx);
-      rows.push({ note: xmNote, instrument: currentInstr, volume: 0, effTyp: 0, eff: 0 });
-      for (let t = 1; t < ev.duration!; t++) {
-        rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 });
-      }
+      notes.push({ tick: totalTicks, cell: { note: amigaNoteToXM(noteIdx), instrument: currentInstr, volume: 0, effTyp: 0, eff: 0 } });
       totalTicks += ev.duration!;
     } else if (ev.type === 'rest') {
-      for (let t = 0; t < ev.duration!; t++) {
-        rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 });
-      }
       totalTicks += ev.duration!;
     }
   }
 
+  for (let r = 0; r < clock.rowsForTicks(totalTicks); r++) rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 });
+  for (const n of notes) rows[clock.tickToRow(n.tick).row] = n.cell;
   return { rows, totalTicks };
 }
 
@@ -323,9 +321,11 @@ export function parseDaveLoweNewFile(buffer: ArrayBuffer, filename: string): Tra
 
   // ── Build tracker patterns ────────────────────────────────────────────────
   const sectionRows = new Map<number, RowData[]>();
+  const songStep = daveLoweStep(allSectionPtrs.flatMap((ptr) => eventDurations(sectionEvents.get(ptr) ?? [])));
+  const clock = daveLoweRowClock(songStep);
   for (const sectionPtr of allSectionPtrs) {
     const events = sectionEvents.get(sectionPtr) ?? [];
-    const { rows } = eventsToRows(events, instrPtrToId);
+    const { rows } = eventsToRows(events, instrPtrToId, clock);
     sectionRows.set(sectionPtr, rows);
   }
 
@@ -397,7 +397,7 @@ export function parseDaveLoweNewFile(buffer: ArrayBuffer, filename: string): Tra
     numFilePatterns: allSectionPtrs.length,
     rowsPerPattern: patterns.map(p => p.length),
     moduleSize: buf.length,
-    encoder: daveLoweEncoder,
+    encoder: daveLoweEncoderForStep(songStep),
     filePatternAddrs,
     filePatternSizes,
     trackMap,
@@ -412,7 +412,7 @@ export function parseDaveLoweNewFile(buffer: ArrayBuffer, filename: string): Tra
     songLength: songPositions.length,
     restartPosition: 0,
     numChannels: 4,
-    initialSpeed: 1,
+    initialSpeed: songStep,
     initialBPM: 125,
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
