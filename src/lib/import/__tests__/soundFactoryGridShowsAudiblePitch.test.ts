@@ -34,12 +34,12 @@ describe('Sound Factory grid shows the audible pitch', () => {
     expect(vi.mocked(parseSoundFactoryFile)).toHaveBeenCalledTimes(1);
 
     const notes = song.patterns.flatMap((p) => p.channels.flatMap((c) => c.rows.map((r) => r.note))).filter((n) => n > 0);
-    expect(notes.length).toBe(4444)  // step grid: 16384 rows of 6 ticks, was 16384 ticks;
+    expect(notes.length).toBe(2078); // one pass of the song: the walk ends at the Goto loop point (was 4444 = loop body repeated up to the grid cap)
     expect(notes.every((n) => n >= 1 && n <= 96)).toBe(true);
     // Every note inside the period table plays; the old naming left 319 past it.
     // The 9 left are real pitches above B-5 (instrument 1's 8-byte wave at C-7)
     // and one clamp, beyond noteToPeriod's 72-note table.
-    expect(notes.filter((n) => noteToPeriod(n) <= 0).length).toBe(12); // 9 in the first 16384 ticks; the step grid shows 6x more of the song
+    expect(notes.filter((n) => noteToPeriod(n) <= 0).length).toBe(8); // one pass of the song (was 12: loop-body notes repeated by the buggy walk)
 
     // Pattern 0, channel 2, row 5 (tick 30 on the 6-tick step; row 30 before the step grid): opcode 47 (B, octave 3) on instrument 1, an
     // 8-byte looped wave at sampling period 428, octave 6. The replayer period

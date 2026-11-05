@@ -541,20 +541,17 @@ export function parseSoundFactoryWithEffects(bytes: Uint8Array, filename: string
     let currentVolume = 64;
     const callStack: number[] = [];
     const forStack: Array<{ count: number; returnOffset: number }> = [];
-    const visitedNote = new Set<number>();
+    const visitedCmd = new Set<number>(); // start offset of every command walked so far
     let steps = 0;
 
     while (offset < opcodes.length && steps < 65536) {
       steps++;
 
+      visitedCmd.add(offset);
       const opcode = u8(opcodes, offset++);
 
       if (opcode < 0x80) {
         // Note (0x00-0x7F) followed by uint16 duration
-        if (visitedNote.has(offset - 1)) {
-          // Loop detected — stop
-          break;
-        }
         if (offset + 2 > opcodes.length) break;
         const noteFileOff = HEADER_SIZE + (offset - 1); // file offset of note opcode byte
         const duration = u16BE(opcodes, offset); offset += 2;
@@ -609,14 +606,18 @@ export function parseSoundFactoryWithEffects(bytes: Uint8Array, filename: string
           if (offset + 4 > opcodes.length) return;
           const rel = s32BE(opcodes, offset); offset += 4;
           callStack.push(offset);
-          offset = (offset - 4 + rel) >>> 0;
+          offset = (offset + rel) >>> 0; // relative to the end of the operand (soundfactory.c:744-757)
           break;
         }
 
         case Op.Goto: {
           if (offset + 4 > opcodes.length) return;
           const rel = s32BE(opcodes, offset); offset += 4;
-          offset = (offset - 4 + rel) >>> 0;
+          const target = (offset + rel) >>> 0; // relative to the end of the operand (soundfactory.c:744-757)
+          // Goto outside any sub-routine or For loop that lands on a command already walked is the song's loop
+          // point: one pass of the voice is done.
+          if (callStack.length === 0 && forStack.length === 0 && visitedCmd.has(target)) return;
+          offset = target;
           break;
         }
 
