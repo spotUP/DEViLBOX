@@ -114,6 +114,11 @@ export class SoundFactory2Engine extends WASMChannelOutputsEngine {
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer, rowStep });
   }
 
+  /** Start-at-position: the next play() runs the sequencer silently to grid tick `tick` and plays from there. */
+  seekTick(tick: number): void {
+    this.workletNode?.port.postMessage({ type: 'seek', tick });
+  }
+
   play(): void {
     this.workletNode?.port.postMessage({ type: 'play' });
     this.afterPlay();

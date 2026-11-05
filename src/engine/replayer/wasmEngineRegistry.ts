@@ -97,6 +97,11 @@ export interface NativeEngineDescriptor {
    */
   startAt?: (instance: WASMSingletonEngine, frame: number) => void;
   /**
+   * Engines without a row preview (so no rowStartFrame) name their seek target themselves: the unit startAt takes for grid
+   * row (`songPos`, `row`) of this song. Absent: the target is the row-preview frame.
+   */
+  startTargetOf?: (song: TrackerSong, songPos: number, row: number) => number | null;
+  /**
    * How the tracker pitch slider (and its Key Lock) reaches this engine natively. applyNativeEnginePitch
    * (nativeEnginePitch.ts) drives it from computeTempoPitchSplit while the engine plays, and again when it starts.
    * Absent: the slider does not reach the engine natively. A direct-routed engine then does not follow the slider at
@@ -893,6 +898,10 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/soundfactory/SoundFactory2Engine')).SoundFactory2Engine as unknown as WASMSingletonStatic,
+    // The grid is one fixed clock (soundFactoryGrid.ts): `initialSpeed` 50 Hz ticks per row, 64 rows per pattern, one
+    // order entry per pattern. The replayer's sequencer runs silently to that tick (C sf_seek_tick), exact by construction.
+    startTargetOf: (song, songPos, row) => ((song.songPositions[songPos] ?? songPos) * 64 + row) * song.initialSpeed,
+    startAt: (instance, tick) => (instance as unknown as import('@/engine/soundfactory/SoundFactory2Engine').SoundFactory2Engine).seekTick(tick),
   },
   {
     key: 'FaceTheMusicReplayer',

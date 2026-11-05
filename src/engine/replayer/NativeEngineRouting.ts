@@ -648,7 +648,9 @@ export async function startNativeEngines(
         // A start away from the top of the song (Play / Play Pattern at the cursor): the engine plays the song from its
         // start unless told, so move it to the position's frame first. Position 0 row 0 stays the plain play path.
         if (desc.startAt && startPosition && (startPosition.songPos > 0 || startPosition.row > 0)) {
-          const frame = await rowStartFrame(song, startPosition.songPos, startPosition.row);
+          const frame = desc.startTargetOf
+            ? desc.startTargetOf(song, startPosition.songPos, startPosition.row)
+            : await rowStartFrame(song, startPosition.songPos, startPosition.row);
           if (frame !== null && frame > 0) desc.startAt(instance, frame);
         }
         instance.play();
