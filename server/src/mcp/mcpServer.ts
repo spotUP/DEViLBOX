@@ -452,6 +452,13 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
   );
 
   server.tool(
+    'get_playhead_offset',
+    'Measure how far the grid playhead is from the audio: for `seconds` (default 8) every change of the row the pattern editor follows is compared with the time that row reaches the ear (engine tick stamped with its render time, mapped through the audio output timestamp). Returns offset ms stats (negative = grid early, positive = late). David Whittaker engine only; play a .dw song first.',
+    { seconds: z.number().optional().describe('Measurement window in seconds (1-60, default 8)') },
+    (p) => call('get_playhead_offset', p),
+  );
+
+  server.tool(
     'clear_dub_automation',
     'Remove every recorded DUB automation lane (parameters prefixed "dub.") from the '
       + 'project, leaving musical automation untouched. A song carrying recorded dub '
@@ -2278,6 +2285,7 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
         'Audio Analysis': [
           { tool: 'get_audio_analysis', description: 'RMS, peak, FFT, band energy, beat detection' },
           { tool: 'get_audio_context_info', description: 'Web Audio context state' },
+          { tool: 'get_playhead_offset', description: 'Grid playhead vs heard audio offset in ms (David Whittaker)' },
           { tool: 'get_voice_state', description: 'Voice allocation state' },
           { tool: 'get_voice_take', description: 'The stored Voice to Notes take: length, voiced span, shaped notes, hits, pitch track summary' },
           { tool: 'get_instrument_level', description: 'Per-instrument audio level' },
