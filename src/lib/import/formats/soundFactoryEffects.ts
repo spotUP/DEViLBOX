@@ -105,3 +105,28 @@ export function sfEncodeEffects(fx: ReadonlyArray<{ id: number; value: number }>
   }
   return bytes;
 }
+
+/**
+ * The grid effect list `fx` made well-formed: an enabling effect whose enable byte is non-zero gets the operands
+ * that follow it (a missing one is zero-filled), one whose enable byte is zero loses them. This is what lets the
+ * writer turn "set vibrato to 1" into the full command and "set it to 0" into the one-byte command.
+ */
+export function sfNormalizeEffects(fx: ReadonlyArray<{ id: number; value: number }>): Array<{ id: number; value: number }> {
+  const out: Array<{ id: number; value: number }> = [];
+  for (let i = 0; i < fx.length;) {
+    const op = sfOpcodeStartingWith(fx[i].id);
+    if (op < 0 || sfPresenceEffect(op) !== undefined) { out.push({ ...fx[i] }); i++; continue; }
+    const adsr = op === SF_OPCODE.SetAdsr;
+    const seq: number[] = adsr ? [...ADSR_FIXED, F.releaseTime] : [LAYOUT[op].first, ...LAYOUT[op].more];
+    const got: number[] = [];
+    seq.forEach((id, k) => {
+      const need = adsr ? (k < 4 || got[3] !== 0) : (k === 0 || got[0] !== 0);
+      const present = fx[i]?.id === id;
+      const value = present ? fx[i].value : 0;
+      if (present) i++;
+      got.push(value);
+      if (need) out.push({ id, value });
+    });
+  }
+  return out;
+}

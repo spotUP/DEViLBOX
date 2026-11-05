@@ -63,6 +63,8 @@ export interface SfGrid {
   rows: TrackerCell[][];
   /** Per voice and row: file offset of the opcode that row edits (note first, else a pause), -1 none. */
   offsets: number[][];
+  /** Per voice and row: index (in the voice's event list) of the event `offsets` names, -1 none. */
+  anchors: number[][];
   step: number;
   clock: RowClock;
   /** Voices that hold a second note column. */
@@ -95,6 +97,7 @@ export function buildSfGrid(voices: readonly (readonly SfGridEvent[])[], maxRows
   const rowCount = Math.max(1, Math.min(maxRows, clock.rowsForTicks(total)));
   const rows = voices.map(() => Array.from({ length: rowCount }, emptyCell));
   const offsets = voices.map(() => new Array<number>(rowCount).fill(-1));
+  const anchors = voices.map(() => new Array<number>(rowCount).fill(-1));
   const noteCols = voices.map(() => 1);
   const effectCols = voices.map(() => SF_MIN_EFFECT_COLS);
   const effectOffsets = voices.map(() => new Map<number, number[]>());
@@ -109,13 +112,13 @@ export function buildSfGrid(voices: readonly (readonly SfGridEvent[])[], maxRows
       if (row >= rowCount) return;
       const cell = rows[v][row] as TrackerCell & Record<string, number>;
       if (!e.isNote) {
-        if (offsets[v][row] < 0) offsets[v][row] = e.fileOffset;
+        if (offsets[v][row] < 0) { offsets[v][row] = e.fileOffset; anchors[v][row] = i; }
         return;
       }
       if (!hasNote[row]) {
         hasNote[row] = true;
         cell.note = e.note; cell.instrument = e.instrId;
-        offsets[v][row] = e.fileOffset;
+        offsets[v][row] = e.fileOffset; anchors[v][row] = i;
         if (offset > 0) { cell.effTyp = SF_FX_ROW_OFFSET; cell.eff = offset; delayedNotes++; }
       } else if (cell.note2 === undefined) {
         cell.note2 = e.note; cell.instrument2 = e.instrId; cell.delay2 = offset;
@@ -152,5 +155,5 @@ export function buildSfGrid(voices: readonly (readonly SfGridEvent[])[], maxRows
       }
     });
   });
-  return { rows, offsets, step, clock, noteCols, delayedNotes, clashRows, unplaced, effectCols, effectOffsets, effectsSeen, effectsPlaced, effectsBeyondGrid, effectCounts };
+  return { rows, offsets, anchors, step, clock, noteCols, delayedNotes, clashRows, unplaced, effectCols, effectOffsets, effectsSeen, effectsPlaced, effectsBeyondGrid, effectCounts };
 }

@@ -22,7 +22,7 @@ import type { TrackerCell } from '@/types';
 import { SF_FX_ROW_OFFSET } from '@/lib/import/formats/soundFactoryGrid';
 import { sfEncodeEffects } from '@/lib/import/formats/soundFactoryEffects';
 import { BD_FX } from '@/lib/import/formats/benDaglishEffectGlyphs';
-import { applySfEffectEdits } from '@/lib/import/formats/soundFactoryEdits';
+import { writeSoundFactory } from '@/lib/import/formats/soundFactoryEdits';
 import {
   soundFactoryOpcodeFor, SOUND_FACTORY_EMPTY_INSTRUMENT, type SoundFactoryPitchParams,
 } from '@/lib/import/formats/soundFactoryPitch';
@@ -316,17 +316,12 @@ export async function exportSoundFactory(
   const warnings: string[] = [];
   const NUM_CHANNELS = 4;
 
-  // A loaded module whose effect operands were edited: patch the operand bytes over the original stream
-  // (same length, loops and subroutines intact). The rebuild below cannot write effect commands, and a song
-  // with note edits keeps using it.
+  // A loaded module goes through the one lossless writer: the source stream, byte-exact, with the grid edits
+  // applied to it and every stored offset and length recomputed. The rebuild below is for songs made in the editor.
   if (song.soundFactoryFileData) {
-    const edits = applySfEffectEdits(new Uint8Array(song.soundFactoryFileData), song.patterns);
-    if (edits.patched > 0 && edits.otherEdits === 0) {
-      const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_\- ]/g, '_');
-      return { data: new Blob([edits.data.buffer as ArrayBuffer], { type: 'application/octet-stream' }), filename: `${baseName}.psf`, warnings: edits.warnings };
-    }
-    warnings.push(...edits.warnings);
-    if (edits.patched > 0) warnings.push('Effect edits are not written together with note edits (the stream is rebuilt without effect commands).');
+    const written = writeSoundFactory(new Uint8Array(song.soundFactoryFileData), song.patterns);
+    const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_\- ]/g, '_');
+    return { data: new Blob([written.data.buffer as ArrayBuffer], { type: 'application/octet-stream' }), filename: `${baseName}.psf`, warnings: written.warnings };
   }
 
   // Prepare instrument sample data
