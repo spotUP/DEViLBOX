@@ -36,6 +36,9 @@ describe('step grid: David Whittaker through parseModuleToSong', () => {
 
     expect(song.initialSpeed).toBe(10);
     expect(song.initialBPM).toBe(125);                       // no frame skip on this tune
+    for (const pat of song.patterns) for (const ch of pat.channels) {
+      expect(ch.channelMeta?.effectCols, 'the editor shows every effect slot the grid fills').toBeGreaterThanOrEqual(5);
+    }
     expect(song.patterns.length, 'ceil(1217 rows / 64), not 191').toBe(Math.ceil(12161 / 10 / 64));
 
     const walk = await walkDavidWhittaker(ab.slice(0), 60_000, 0);
