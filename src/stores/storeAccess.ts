@@ -43,6 +43,12 @@ let _mixerStore: MinimalStore | null = null;
  * pulls the native engines behind it.
  */
 let _formatStore: MinimalStore | null = null;
+/**
+ * The instrument store joined on 2026-11-05. It statically imports ToneEngine, TrackerReplayer and every synth config, so
+ * a static import of it from the format store (applyWavesamplePlan) made everything that reads the format store, down to
+ * nativeSubsongPlayback and NativeEngineRouting, evaluate the whole app (about 20 s to import under vitest).
+ */
+let _instrumentStore: MinimalStore | null = null;
 
 export function registerTrackerStore(store: unknown): void {
   _trackerStore = store as MinimalStore;
@@ -64,6 +70,10 @@ export function registerFormatStore(store: unknown): void {
   _formatStore = store as MinimalStore;
 }
 
+export function registerInstrumentStore(store: unknown): void {
+  _instrumentStore = store as MinimalStore;
+}
+
 export function getTrackerStoreRef(): MinimalStore {
   if (!_trackerStore) throw new Error('[storeAccess] useTrackerStore accessed before registration');
   return _trackerStore;
@@ -77,6 +87,11 @@ export function getEditorStoreRef(): MinimalStore {
 export function getCursorStoreRef(): MinimalStore {
   if (!_cursorStore) throw new Error('[storeAccess] useCursorStore accessed before registration');
   return _cursorStore;
+}
+
+export function getInstrumentStoreRef(): MinimalStore {
+  if (!_instrumentStore) throw new Error('[storeAccess] useInstrumentStore accessed before registration');
+  return _instrumentStore;
 }
 
 /** Null rather than throwing: the FX chain is built while a song loads, which

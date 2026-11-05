@@ -8,7 +8,7 @@ import { getFirstPresetForSynthType } from '@constants/factoryPresets';
 import { catalogSynthConfig } from '@constants/synthCategories';
 import { DEFAULT_VITAL_PRESET_ID, VITAL_PRESET_PARAM_KEY } from '@engine/vstbridge/vitalPreset';
 import { DEFAULT_ODIN2_PRESET_ID, ODIN2_PRESET_PARAM_KEY } from '@engine/vstbridge/odin2Preset';
-import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
+import { getDefaultFurnaceConfig } from '@engine/factories/furnaceDefaultConfig';
 import { cinter4ParamsToSampleName } from '@lib/import/formats/cinter4Params';
 import {
   DEFAULT_DUB_SIREN,

@@ -4,7 +4,7 @@
  */
 
 import type { EffectConfig } from '@typedefs/instrument';
-import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
+import { getDefaultEffectParameters } from '@engine/factories/effectDefaultParameters';
 
 /** Generate a unique effect ID. */
 function generateEffectId(): string {

@@ -10,7 +10,11 @@ import { immer } from 'zustand/middleware/immer';
 import * as Tone from 'tone';
 import type { TransportState, GrooveTemplate } from '@typedefs/audio';
 import { GROOVE_TEMPLATES } from '@typedefs/audio';
-import { useInstrumentStore } from './useInstrumentStore';
+import { getInstrumentStoreRef } from './storeAccess';
+import type { useInstrumentStore as InstrumentStoreType } from './useInstrumentStore';
+
+/** Late-bound instrument store (breaks the static store -> engine import chain). */
+const instrumentState = () => getInstrumentStoreRef().getState() as ReturnType<typeof InstrumentStoreType.getState>;
 import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } from '@/lib/formatCompatibility';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 import { useUIStore } from './useUIStore';
@@ -264,7 +268,7 @@ export const useTransportStore = create<TransportStore>()(
       }
 
       // Auto-bake any instruments that need it before starting playback
-      useInstrumentStore.getState().autoBakeInstruments();
+      instrumentState().autoBakeInstruments();
 
       // CRITICAL for iOS: Start audio context synchronously during user gesture
       // Dynamic import creates async delay that breaks iOS gesture chain
@@ -323,7 +327,7 @@ export const useTransportStore = create<TransportStore>()(
       }
       if (!isPlaying) {
         // Auto-bake before starting
-        useInstrumentStore.getState().autoBakeInstruments();
+        instrumentState().autoBakeInstruments();
         
         // CRITICAL for iOS: Start audio context synchronously during user gesture
         // iOS requires Tone.start() to be called on the same callstack as the user interaction
