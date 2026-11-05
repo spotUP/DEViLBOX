@@ -46,7 +46,15 @@ class SoundFactory2Processor extends AudioWorkletProcessor {
         } catch (error) { this.port.postMessage({ type: 'error', message: error.message }); }
         break;
       }
-      case 'play': this.playing = true; this._lastSongPos = -1; this._lastRow = -1; break;
+      case 'seek':
+        // Held until the next 'play' (a stopped song re-selects its subsong on stop, which would undo an early seek).
+        this._seekTick = Math.max(0, Math.floor(data.tick) || 0);
+        break;
+      case 'play':
+        // Start-at-position: the sequencer runs silently to the asked tick (C sf_seek_tick), then plays on from it.
+        if (this._seekTick > 0 && this.handle) this.module._sf_seek_tick(this.handle, this._seekTick);
+        this._seekTick = 0;
+        this.playing = true; this._lastSongPos = -1; this._lastRow = -1; break;
       case 'stop':
         this.playing = false;
         if (this.handle) this.module._sf_select_subsong(this.handle, 0);

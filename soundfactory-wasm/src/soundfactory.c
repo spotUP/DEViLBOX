@@ -1524,6 +1524,21 @@ void sf_set_channel_mask(SfModule* module, uint32_t mask) {
         module->channels[i].muted = ((mask >> i) & 1) == 0;
 }
 
+// Start-at-position seek: run the song's sequencer silently up to tick `tick`, so the next rendered frame plays
+// that tick. Every voice command (GoSub, Goto, loops, instruments, volume and period state) runs exactly as when
+// playing that far; only sample mixing is skipped. Forward only from the current position (a started song is
+// re-selected first, which also restores the original instruments). Returns the tick reached, -1 on bad input.
+int sf_seek_tick(SfModule* module, int tick) {
+    if (!module || tick < 0 || !module->current_song) return -1;
+    if (module->next_tick > tick) return -1;
+    while (module->next_tick < tick) {
+        sf_play_tick(module);
+        if (module->next_tick == 0) return -1; // every voice looped: the song is shorter than the asked tick
+    }
+    module->tick_accumulator = module->ticks_per_frame; // the next frame fires tick `tick`
+    return module->next_tick;
+}
+
 // Playhead: the grid's global row (one row per 50 Hz tick); -1 before the first tick.
 int sf_get_play_tick(const SfModule* module) {
     return module ? module->play_tick : -1;
