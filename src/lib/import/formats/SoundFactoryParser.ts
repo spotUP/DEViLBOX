@@ -427,7 +427,7 @@ export function parseSoundFactoryWithEffects(bytes: Uint8Array, filename: string
   let offsetIdx = 0;
   for (let i = 0; i < 16; i++) {
     const ch = voiceCounts[i];
-    if (ch === 0) { offsetIdx++; continue; }
+    if (ch === 0) continue; // offset blocks are contiguous, one per used subsong (soundfactory.c:1342-1352)
 
     const row = rawOffsets[offsetIdx++];
     const relOffsets = row.map(o => o > 0 ? o - HEADER_SIZE : 0);
@@ -540,7 +540,8 @@ export function parseSoundFactoryWithEffects(bytes: Uint8Array, filename: string
         // Note (0x00-0x7F) followed by uint16 duration
         if (offset + 2 > opcodes.length) break;
         const noteFileOff = HEADER_SIZE + (offset - 1); // file offset of note opcode byte
-        const duration = u16BE(opcodes, offset); offset += 2;
+        // Bit 15 only suppresses the envelope restart; the duration is the low 15 bits (soundfactory.c:561, :593).
+        const duration = u16BE(opcodes, offset) & 0x7fff; offset += 2;
         const pitch = pitchForInstrument(currentInstrId);
         const xmNote = soundFactoryGridNote(pitch, opcode + currentTranspose);
         cellContext.set(noteFileOff, { pitch, transpose: currentTranspose });
@@ -556,7 +557,7 @@ export function parseSoundFactoryWithEffects(bytes: Uint8Array, filename: string
           cellContext.set(pauseFileOff, { pitch: pitchForInstrument(currentInstrId), transpose: currentTranspose });
           const dur = u16BE(opcodes, offset); offset += 2;
           events.push({ note: 0, instrId: 0, volume: 0, duration: dur, isNote: false, fileOffset: pauseFileOff, effects: pending.splice(0) });
-          if (opcode === Op.StopAndPause) return;
+          // StopAndPause only mutes the channel for the pause; the voice then reads on (soundfactory.c:1019-1023).
           break;
         }
 
