@@ -104,3 +104,28 @@ export function mainStepFromOnsets(onsetsPerVoice: readonly (readonly number[])[
   if (ranked.length === 0) return 1;
   return ranked.length === 1 ? ranked[0][0] : gcd(ranked[0][0], ranked[1][0]);
 }
+
+export interface OnsetPlacement {
+  row: number;
+  /** 0: the first note column; 1 and up: a further onset of the same key in the same row. */
+  col: number;
+  /** Ticks into the row the note starts (the 0xD7 row-offset effect for column 0, `delay2` for column 1). */
+  offset: number;
+}
+
+/**
+ * The one rule for where a note onset sits in the step grid (plan section 2): its row and offset on the clock, and the
+ * note column when an earlier onset of the same key (a voice) already took that row. Call it once per onset in the
+ * order the onsets are placed; it returns null when the row has no note column left (`maxCols`, 2 in the cell model).
+ */
+export function makeOnsetPlacer(clock: RowClock, maxCols = 2): (key: number, tick: number) => OnsetPlacement | null {
+  const used = new Map<string, number>();
+  return (key, tick) => {
+    const { row, offset } = clock.tickToRow(tick);
+    const k = `${key}:${row}`;
+    const col = used.get(k) ?? 0;
+    if (col >= maxCols) return null;
+    used.set(k, col + 1);
+    return { row, col, offset };
+  };
+}

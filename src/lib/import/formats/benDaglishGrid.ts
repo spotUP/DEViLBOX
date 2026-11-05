@@ -11,7 +11,7 @@
  */
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import { periodToNote } from '@/lib/amiga/periodNotes';
-import { makeRowClock, mainStepFromOnsets, type RowClock } from './stepRowClock';
+import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer, type RowClock } from './stepRowClock';
 import { BD_FX } from './benDaglishEffectGlyphs';
 import { BD_WALK, type BdWalk, type BdWalkEvent } from './BenDaglishWasmExtractor';
 
@@ -90,15 +90,12 @@ export interface BdNotePlacement {
 export function bdNotePlacements(walk: BdWalk, clock: RowClock = bdRowClock(walk)): { placed: BdNotePlacement[]; unplaced: BdWalkEvent[] } {
   const placed: BdNotePlacement[] = [];
   const unplaced: BdWalkEvent[] = [];
-  const used = new Map<string, number>();
+  const place = makeOnsetPlacer(clock, MAX_NOTE_COLS);
   for (const e of walk.events) {
     if (!bdIsVisibleNote(e) || e.voice >= 4) continue;
-    const { row, offset } = clock.tickToRow(e.ptick);
-    const key = `${e.voice}:${row}`;
-    const col = used.get(key) ?? 0;
-    if (col >= MAX_NOTE_COLS) { unplaced.push(e); continue; }
-    used.set(key, col + 1);
-    placed.push({ event: e, voice: e.voice, row, col, offset });
+    const pl = place(e.voice, e.ptick);
+    if (!pl) { unplaced.push(e); continue; }
+    placed.push({ event: e, voice: e.voice, ...pl });
   }
   return { placed, unplaced };
 }
