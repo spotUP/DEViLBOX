@@ -170,6 +170,8 @@ export function buildDWGridFromWalk(walk: DwWalk): DwGrid {
       id: `channel-${ch}`, name: `Channel ${ch + 1}`,
       muted: false, solo: false, collapsed: false,
       volume: 100, pan: (ch === 0 || ch === 3) ? -50 : 50, instrumentId: null, color: null,
+      // The editor draws channelMeta.effectCols columns (default 2); without it slots 3-6 stay hidden.
+      channelMeta: { importedFromMOD: false, effectCols: effectColumns },
       rows: cells.slice(start, start + len),
     }));
     patterns.push({ id: `pattern-${p}`, name: `Pattern ${p}`, length: len, channels: chData });
