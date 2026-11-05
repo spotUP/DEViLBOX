@@ -887,6 +887,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     suppressNotes: true,
     fileDataKey: 'soundFactoryFileData',
     loadMethod: 'loadTune',
+    getLoadArgs: (song) => [song.initialSpeed],
     supportsPause: false,
     supportsResume: false,
     needsDirectRouting: true,

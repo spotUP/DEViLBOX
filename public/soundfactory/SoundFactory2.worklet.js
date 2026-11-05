@@ -31,6 +31,7 @@ class SoundFactory2Processor extends AudioWorkletProcessor {
         if (!this.module) break;
         try {
           if (this.handle) { this.module._sf_destroy(this.handle); this.handle = 0; }
+          this.rowStep = data.rowStep > 0 ? data.rowStep : 1;
           const uint8Data = new Uint8Array(data.moduleData);
           const wasmPtr = this.module._malloc(uint8Data.length);
           if (!wasmPtr) { this.port.postMessage({ type: 'error', message: 'malloc failed' }); return; }
@@ -171,12 +172,12 @@ class SoundFactory2Processor extends AudioWorkletProcessor {
       }
     }
 
-    // Playhead: the importer's grid is one row per 50 Hz tick in patterns of 64
-    // rows (SoundFactoryParser ROWS_PER_PATTERN), so the replayer's tick is the
-    // global row; posted when it changes (the engine's onPositionUpdate).
+    // Playhead: the importer's grid is a fixed row clock of `rowStep` 50 Hz ticks per row in
+    // patterns of 64 rows (soundFactoryGrid.ts), so the global row is floor(tick / rowStep); posted when it changes (the engine's onPositionUpdate).
     const playTick = this.module._sf_get_play_tick(this.handle);
     if (playTick >= 0) {
-      const songPos = Math.floor(playTick / 64), playRow = playTick % 64;
+      const globalRow = Math.floor(playTick / (this.rowStep || 1));
+      const songPos = Math.floor(globalRow / 64), playRow = globalRow % 64;
       if (songPos !== this._lastSongPos || playRow !== this._lastRow) {
         this._lastSongPos = songPos; this._lastRow = playRow;
         this.port.postMessage({ type: 'position', songPos, row: playRow });

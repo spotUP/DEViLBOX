@@ -70,6 +70,7 @@ import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeSoundFactoryCell } from '@/engine/uade/encoders/SoundFactoryEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { buildSfGrid } from './soundFactoryGrid';
 import {
   soundFactoryGridNote, soundFactoryOpcodeFor, soundFactoryPeriodMultiplier,
   SOUND_FACTORY_EMPTY_INSTRUMENT, type SoundFactoryPitchParams,
@@ -508,6 +509,7 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
     instrId: number;    // instrument ID (0 = no instrument)
     volume: number;     // 0-64
     duration: number;   // ticks
+    isNote: boolean;    // false: a pause
     fileOffset: number; // absolute file offset of this opcode (-1 if none)
   }
 
@@ -539,7 +541,7 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
         const pitch = pitchForInstrument(currentInstrId);
         const xmNote = soundFactoryGridNote(pitch, opcode + currentTranspose);
         cellContext.set(noteFileOff, { pitch, transpose: currentTranspose });
-        events.push({ note: xmNote, instrId: currentInstrId, volume: currentVolume, duration, fileOffset: noteFileOff });
+        events.push({ note: xmNote, instrId: currentInstrId, volume: currentVolume, duration, isNote: true, fileOffset: noteFileOff });
         continue;
       }
 
@@ -549,7 +551,7 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
           if (offset + 2 > opcodes.length) return events;
           const pauseFileOff = HEADER_SIZE + (offset - 1); // file offset of pause opcode
           const dur = u16BE(opcodes, offset); offset += 2;
-          events.push({ note: 0, instrId: 0, volume: 0, duration: dur, fileOffset: pauseFileOff });
+          events.push({ note: 0, instrId: 0, volume: 0, duration: dur, isNote: false, fileOffset: pauseFileOff });
           if (opcode === Op.StopAndPause) return events;
           break;
         }
@@ -709,42 +711,12 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
     }
   }
 
-  // Convert note events (with tick durations) to flat pattern rows
-  // Duration of 1 tick = 1 row (simplification; actual tick depends on tempo)
-  // Also build parallel file offset arrays for getCellFileOffset
-  function eventsToRows(events: NoteEvent[]): { rows: TrackerCell[]; offsets: number[] } {
-    const rows: TrackerCell[] = [];
-    const offsets: number[] = [];
-    const MAX_ROWS = 16384; // safety cap to prevent browser freeze
-    for (const ev of events) {
-      if (rows.length >= MAX_ROWS) break;
-      // First row has the note, remaining rows are empty
-      rows.push({
-        note: ev.note,
-        instrument: ev.instrId,
-        volume: 0,
-        effTyp: 0,
-        eff: 0,
-        effTyp2: 0,
-        eff2: 0,
-      });
-      offsets.push(ev.fileOffset);
-      const durCap = Math.min(ev.duration, MAX_ROWS - rows.length + 1);
-      for (let d = 1; d < durCap; d++) {
-        rows.push(emptyCell());
-        offsets.push(-1); // duration-hold rows have no independent file offset
-      }
-    }
-    if (rows.length === 0) {
-      rows.push(emptyCell());
-      offsets.push(-1);
-    }
-    return { rows, offsets };
-  }
-
-  const flatResults = channelEvents.map(eventsToRows);
-  const flatChannelRows = flatResults.map(r => r.rows);
-  const flatChannelOffsets = flatResults.map(r => r.offsets);
+  // Step grid (soundFactoryGrid.ts): 1 row = 1 song step on one fixed clock, notes off the step carry a delay,
+  // a second note in a row goes to note column 2. File offsets stay parallel to the rows for getCellFileOffset.
+  const MAX_ROWS = 16384; // safety cap to prevent browser freeze
+  const sfGrid = buildSfGrid(channelEvents, MAX_ROWS);
+  const flatChannelRows = sfGrid.rows;
+  const flatChannelOffsets = sfGrid.offsets;
 
   // Calculate total rows
   const maxRows = Math.max(...flatChannelRows.map(r => r.length), 1);
@@ -782,6 +754,7 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
         pan: AMIGA_PAN[ch] ?? 0,
         instrumentId: null,
         color: null,
+        channelMeta: { importedFromMOD: false, effectCols: 2, noteCols: sfGrid.noteCols[ch], noteColDelay: true },
         rows,
       })),
       importMetadata: {
@@ -850,8 +823,8 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
     songLength: trackerPatterns.length,
     restartPosition: 0,
     numChannels: NUM_CHANNELS,
-    initialSpeed: 6,
-    initialBPM: 125,
+    initialSpeed: sfGrid.step,
+    initialBPM: 125, // a tick is 20 ms (50 Hz CIA): speed = step ticks per row at 125 BPM
     linearPeriods: false,
     soundFactoryFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
     uadePatternLayout,

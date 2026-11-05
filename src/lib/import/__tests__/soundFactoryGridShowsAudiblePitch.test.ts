@@ -34,21 +34,21 @@ describe('Sound Factory grid shows the audible pitch', () => {
     expect(vi.mocked(parseSoundFactoryFile)).toHaveBeenCalledTimes(1);
 
     const notes = song.patterns.flatMap((p) => p.channels.flatMap((c) => c.rows.map((r) => r.note))).filter((n) => n > 0);
-    expect(notes.length).toBe(2084);
+    expect(notes.length).toBe(4444)  // step grid: 16384 rows of 6 ticks, was 16384 ticks;
     expect(notes.every((n) => n >= 1 && n <= 96)).toBe(true);
     // Every note inside the period table plays; the old naming left 319 past it.
     // The 9 left are real pitches above B-5 (instrument 1's 8-byte wave at C-7)
     // and one clamp, beyond noteToPeriod's 72-note table.
-    expect(notes.filter((n) => noteToPeriod(n) <= 0).length).toBe(9);
+    expect(notes.filter((n) => noteToPeriod(n) <= 0).length).toBe(12); // 9 in the first 16384 ticks; the step grid shows 6x more of the song
 
-    // Pattern 0, channel 2, row 30: opcode 47 (B, octave 3) on instrument 1, an
+    // Pattern 0, channel 2, row 5 (tick 30 on the 6-tick step; row 30 before the step grid): opcode 47 (B, octave 3) on instrument 1, an
     // 8-byte looped wave at sampling period 428, octave 6. The replayer period
     // is floor(428 * 17359 / 32768) * 8 = 1808, which sounds 3546895 / (1808 * 8)
     // = 245.2 Hz: B3 (MIDI 59), grid note 48. The old grid showed opcode + 13 = 60.
     const layout = song.uadePatternLayout!;
-    const off = layout.getCellFileOffset!(0, 30, 1);
+    const off = layout.getCellFileOffset!(0, 5, 1);
     const opcode = raw[off];
-    const cell = song.patterns[0].channels[1].rows[30];
+    const cell = song.patterns[0].channels[1].rows[5];
     const inst = song.instruments.find((i) => i.id === cell.instrument)!;
     const pitch = inst.metadata!.soundFactoryPitch!;
     expect({ opcode, instrument: cell.instrument }).toEqual({ opcode: 47, instrument: 1 });

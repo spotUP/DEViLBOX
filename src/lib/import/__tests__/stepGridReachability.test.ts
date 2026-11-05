@@ -110,3 +110,47 @@ describe('step grid: Ben Daglish through parseBenDaglishFile', () => {
     });
   }
 });
+
+describe('step grid: Sound Factory through parseModuleToSong', () => {
+  it('goldrunner.psf: main step 6 ticks from the onsets, one row per step, every note on its tick', async () => {
+    const ab = bytesOf('formats/goldrunner.psf');
+    const clockCalls = vi.mocked(makeRowClock).mock.calls.length;
+    const stepCalls = vi.mocked(mainStepFromOnsets).mock.calls.length;
+    const song = await parseModuleToSong(new File([ab.slice(0)], 'goldrunner.psf'));
+    expect(vi.mocked(makeRowClock).mock.calls.length, 'the row clock ran during the import').toBeGreaterThan(clockCalls);
+    expect(vi.mocked(mainStepFromOnsets).mock.calls.length, 'the shared step function ran during the import').toBeGreaterThan(stepCalls);
+
+    // the step is measured from the note onsets (sfMainStep), not hardcoded
+    const results = vi.mocked(mainStepFromOnsets).mock.results;
+    expect(song.initialSpeed, 'main step in ticks').toBe(results[results.length - 1].value);
+    expect(song.initialSpeed).toBe(6);
+    expect(song.initialBPM, 'a tick is 20 ms: speed = step at 125 BPM').toBe(125);
+
+    // each onset gap on a voice, in ticks, is what the rows and delays say
+    const step = song.initialSpeed;
+    let notes = 0, delayed = 0, note2 = 0;
+    for (let c = 0; c < song.numChannels; c++) {
+      let last = -1;
+      song.songPositions.forEach((pi, pos) => {
+        const ch = song.patterns[pi].channels[c];
+        ch.rows.forEach((cell, r) => {
+          if (cell.note > 0) {
+            notes++;
+            const off = cell.effTyp === BD_FX.rowOffset ? cell.eff : 0;
+            if (off > 0) delayed++;
+            expect(off, 'delay stays inside the row').toBeLessThan(step);
+            const tick = (pos * 64 + r) * step + off;
+            expect(tick, `voice ${c + 1} onsets rise`).toBeGreaterThan(last);
+            last = tick;
+          }
+          if (cell.note2) { note2++; expect(cell.delay2 ?? 0).toBeLessThan(step); }
+        });
+      });
+    }
+    // measured 2026-11-05: 16384-row cap (98304 ticks), 3 enabled voices, no two onsets share a row
+    expect(notes, 'notes shown').toBe(4444);
+    expect(delayed, 'notes off the step carry the 0xD7 delay').toBe(2363);
+    expect(note2, 'same-row clashes').toBe(0);
+    expect(song.patterns.length, '16384 rows / 64').toBe(256);
+  });
+});
