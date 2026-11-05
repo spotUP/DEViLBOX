@@ -13,11 +13,12 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseDavidWhittakerFile } from '@/lib/import/formats/DavidWhittakerParser';
 import { walkDavidWhittaker, DW_WALK, type DwWalk, type DwWalkEvent } from '@/lib/import/formats/DavidWhittakerWasmExtractor';
-import { dwEventEffects, buildDWGridFromWalk } from '@/lib/import/formats/davidWhittakerGrid';
+import { dwEventEffects, buildDWGridFromWalk, dwRowClock } from '@/lib/import/formats/davidWhittakerGrid';
 import { exportDavidWhittaker } from '@/lib/export/DavidWhittakerExporter';
 import { installDwNodeFetch } from '@/lib/import/__tests__/helpers/dwNodeFetch';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern } from '@/types';
+import type { RowClock } from '@/lib/import/formats/stepRowClock';
 
 const SONGS = ['formats/apb.dw', 'david-whittaker/garfield2+.dw'];
 const ROWS = 64;
@@ -29,8 +30,11 @@ const load = (n: string): ArrayBuffer => {
   return f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength) as ArrayBuffer;
 };
 const off = (e: DwWalkEvent): number => e.block + e.pos;
-const cellAt = (pats: Pattern[], ch: number, tick: number): Rec =>
-  pats[Math.floor(tick / ROWS)].channels[ch].rows[tick % ROWS] as unknown as Rec;
+/** The step grid: one row per song step, so an event sits on the row its processed tick falls on. */
+let clk: RowClock;
+const rowOf = (e: DwWalkEvent): number => clk.tickToRow(e.ptick).row;
+const cellAt = (pats: Pattern[], ch: number, row: number): Rec =>
+  pats[Math.floor(row / ROWS)].channels[ch].rows[row % ROWS] as unknown as Rec;
 const clonePatterns = (p: Pattern[]): Pattern[] => structuredClone(p);
 
 let restoreFetch = () => {};
@@ -46,6 +50,7 @@ interface Plan {
 
 /** Choose three independent edits from the walk: a note, an instrument (its sample command), an effect argument. */
 function plan(walk: DwWalk, pats: Pattern[]): Plan {
+  clk = dwRowClock(walk);
   const lastSample: Array<DwWalkEvent | null> = new Array(walk.channels).fill(null);
   const noted: Array<{ e: DwWalkEvent; sc: DwWalkEvent }> = [];
   for (const e of walk.events) {
@@ -53,7 +58,7 @@ function plan(walk: DwWalk, pats: Pattern[]): Plan {
     else if (e.kind === DW_WALK.note && lastSample[e.channel]) noted.push({ e, sc: lastSample[e.channel]! });
   }
   const used = new Set<number>();
-  const n1 = noted.find(({ e }) => e.tick < pats.length * ROWS)!;
+  const n1 = noted.find(({ e }) => rowOf(e) < pats.length * ROWS)!;
   used.add(off(n1.e));
   const n2 = noted.find(({ e, sc }) => e.channel !== n1.e.channel && off(sc) !== off(n1.e) && !used.has(off(e)))!;
   const order = [DW_WALK.speed, DW_WALK.globalVolume, DW_WALK.vibrato, DW_WALK.slide, DW_WALK.globalTranspose, DW_WALK.envelope];
@@ -62,20 +67,20 @@ function plan(walk: DwWalk, pats: Pattern[]): Plan {
     for (const e of walk.events) {
       if (e.kind !== kind) continue;
       const typ = dwEventEffects(e)[0][0];
-      const cell = cellAt(pats, e.channel, e.tick);
+      const cell = cellAt(pats, e.channel, rowOf(e));
       const slot = FX.findIndex(([kt, kv]) => cell[kt] === typ && cell[kv] === (dwEventEffects(e)[0][1]));
       if (slot >= 0) { fx = { e, slot, typ }; break; }
     }
     if (fx) break;
   }
-  const baseNote = cellAt(pats, n1.e.channel, n1.e.tick).note!;
-  const baseFx = cellAt(pats, fx!.e.channel, fx!.e.tick)[FX[fx!.slot][1]]!;
+  const baseNote = cellAt(pats, n1.e.channel, rowOf(n1.e)).note!;
+  const baseFx = cellAt(pats, fx!.e.channel, rowOf(fx!.e))[FX[fx!.slot][1]]!;
   // a select byte (envelope) moves to another index the song itself uses; an argument byte moves by one
   const otherEnv = walk.events.find((e) => e.kind === DW_WALK.envelope && e.a !== baseFx)?.a;
   const newFx = fx!.e.kind === DW_WALK.envelope ? otherEnv! : (baseFx + 1) & 0xff;
   return {
     noteEv: n1.e, newNote: baseNote < 90 ? baseNote + 2 : baseNote - 2,
-    insEv: n2.e, insSample: n2.sc, newIns: ((cellAt(pats, n2.e.channel, n2.e.tick).instrument! % walk.samples) + 1),
+    insEv: n2.e, insSample: n2.sc, newIns: ((cellAt(pats, n2.e.channel, rowOf(n2.e)).instrument! % walk.samples) + 1),
     fxEv: fx!.e, fxSlot: fx!.slot, fxTyp: fx!.typ, newFx,
   };
 }
@@ -87,6 +92,7 @@ describe.each(SONGS)('David Whittaker grid edits reach the module: %s', (name) =
     const song = await parseDavidWhittakerFile(src, name) as TrackerSong;
     expect(song.uadeVariableLayout, 'the grid matched the walk').toBeTruthy();
     const walk = await walkDavidWhittaker(src);
+    clk = dwRowClock(walk);
     walkCalls++;
 
     // unedited grid: the export is the module, byte for byte
@@ -96,9 +102,9 @@ describe.each(SONGS)('David Whittaker grid edits reach the module: %s', (name) =
 
     const p = plan(walk, song.patterns);
     const edited = clonePatterns(song.patterns);
-    const noteCell = cellAt(edited, p.noteEv.channel, p.noteEv.tick);
-    const insCell = cellAt(edited, p.insEv.channel, p.insEv.tick);
-    const fxCell = cellAt(edited, p.fxEv.channel, p.fxEv.tick);
+    const noteCell = cellAt(edited, p.noteEv.channel, rowOf(p.noteEv));
+    const insCell = cellAt(edited, p.insEv.channel, rowOf(p.insEv));
+    const fxCell = cellAt(edited, p.fxEv.channel, rowOf(p.fxEv));
     noteCell.note = p.newNote;
     insCell.instrument = p.newIns;
     fxCell[FX[p.fxSlot][1]] = p.newFx;
@@ -118,9 +124,9 @@ describe.each(SONGS)('David Whittaker grid edits reach the module: %s', (name) =
     // re-import: the edited cells hold the edits
     const again = await parseDavidWhittakerFile(bytes.buffer.slice(0) as ArrayBuffer, name) as TrackerSong;
     const re = again.patterns;
-    expect(cellAt(re, p.noteEv.channel, p.noteEv.tick).note).toBe(p.newNote);
-    expect(cellAt(re, p.insEv.channel, p.insEv.tick).instrument).toBe(p.newIns);
-    expect(cellAt(re, p.fxEv.channel, p.fxEv.tick)[FX[p.fxSlot][1]]).toBe(p.newFx);
+    expect(cellAt(re, p.noteEv.channel, rowOf(p.noteEv)).note).toBe(p.newNote);
+    expect(cellAt(re, p.insEv.channel, rowOf(p.insEv)).instrument).toBe(p.newIns);
+    expect(cellAt(re, p.fxEv.channel, rowOf(p.fxEv))[FX[p.fxSlot][1]]).toBe(p.newFx);
 
     // and no other cell changed except where a shared command or the sample in force is the edited byte
     const walk2 = await walkDavidWhittaker(bytes.buffer.slice(0) as ArrayBuffer);
@@ -130,7 +136,7 @@ describe.each(SONGS)('David Whittaker grid edits reach the module: %s', (name) =
     const allowed = new Set<string>();
     for (const e of walk.events) {
       if (e.kind === DW_WALK.sample) lastS[e.channel] = e;
-      if (touched.has(off(e)) || (e.kind === DW_WALK.note && lastS[e.channel] && touched.has(off(lastS[e.channel]!)))) allowed.add(`${e.channel}:${e.tick}`);
+      if (touched.has(off(e)) || (e.kind === DW_WALK.note && lastS[e.channel] && touched.has(off(lastS[e.channel]!)))) allowed.add(`${e.channel}:${clk.tickToRow(e.ptick).row}`);
     }
     expect(walk2.ticks, 'the song keeps its length (note and argument edits only)').toBeGreaterThan(0);
     let stray = 0;
@@ -142,13 +148,13 @@ describe.each(SONGS)('David Whittaker grid edits reach the module: %s', (name) =
     expect(stray, 'cells that changed without sharing an edited command').toBe(0);
   });
 
-  it('an edit that needs a longer block is refused with a warning and leaves the module untouched', async () => {
+  it('an edit the module cannot hold is refused with a warning and leaves the module untouched', async () => {
     const src = load(name);
     const song = await parseDavidWhittakerFile(src, name) as TrackerSong;
     const edited = clonePatterns(song.patterns);
-    // a note on a row where the replayer runs none
-    const empty = (edited[0].channels[0].rows as unknown as Rec[]).find((c) => !c.note && !c.effTyp)!;
-    empty.note = 40;
+    // a note removed: the module's command stream has no command for "no note here" at a row that starts one
+    const played = edited.flatMap((pt) => pt.channels[0].rows as unknown as Rec[]).find((c) => (c.note ?? 0) > 0 && (c.note ?? 0) < 97)!;
+    played.note = 0;
     const r = await exportDavidWhittaker({ ...song, patterns: edited } as TrackerSong);
     expect(r.warnings.length).toBe(1);
     expect(new Uint8Array(await r.data.arrayBuffer())).toEqual(new Uint8Array(src));

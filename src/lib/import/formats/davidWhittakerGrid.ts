@@ -1,8 +1,9 @@
 /**
  * davidWhittakerGrid.ts - the David Whittaker tracker grid, drawn from the replayer's own walk.
  *
- * A DW song is a per-channel command stream; the grid is the replayer's tick timeline (row ===
- * 50 Hz tick, docs/FORMAT_COMMAND_STREAM_GRID.md) of what davidwhittaker.c's track reader executed:
+ * A DW song is a per-channel command stream; the grid is the replayer's timeline of what
+ * davidwhittaker.c's track reader executed, one row per song step (`speed` processed ticks, through
+ * stepRowClock.ts; frames the player skips are not counted):
  * a note with the sample it plays with, a note-off only where a mute stops a sounding voice, every
  * other command in the effect columns on the tick it ran, a silent voice empty. Nothing here reads
  * the module: the walk is the oracle (DavidWhittakerWasmExtractor), the byte-exact export lives in
@@ -12,9 +13,21 @@ import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import { DW_FX } from './davidWhittakerEffectGlyphs';
 import { DW_WALK, type DwWalk, type DwWalkEvent } from './DavidWhittakerWasmExtractor';
 import { dwByteToNote, dwWalkTransposes } from './davidWhittakerPitch';
+import { makeRowClock, type RowClock } from './stepRowClock';
 
 const ROWS_PER_PATTERN = 64;
 const EFFECT_SLOTS = 5;
+/** The most effect columns a cell holds (effTyp..effTyp8); the grid uses 5, or 6 when a song needs one more. */
+const MAX_EFFECT_SLOTS = 8;
+/** Tracker speed effect (Fxx below 32). */
+export const FX_SPEED = 0xf;
+
+/** The row clock of a walk: its subsong speed, changed by every speed command at the processed tick it ran on. */
+export function dwRowClock(walk: DwWalk): RowClock {
+  const changes = [{ tick: 0, speed: walk.speed }];
+  for (const e of walk.events) if (e.kind === DW_WALK.speed) changes.push({ tick: e.ptick, speed: e.a });
+  return makeRowClock(changes);
+}
 
 type Fx = [effTyp: number, eff: number];
 
@@ -35,7 +48,10 @@ export function dwEventEffects(e: DwWalkEvent): Fx[] {
     case DW_WALK.halfVolumeOn: return [[DW_FX.halfVolumeOn, 0]];
     case DW_WALK.halfVolumeOff: return [[DW_FX.halfVolumeOff, 0]];
     case DW_WALK.restart: return [[DW_FX.restart, 0]];
-    case DW_WALK.speed: return [[DW_FX.speed, b8(e.a)]];
+    // the tracker's own speed effect: the scheduler follows it. A speed of 32 or more would read as a tempo.
+    case DW_WALK.speed:
+      if (e.a < 1 || e.a > 31) throw new Error(`the song sets speed ${e.a}, which the tracker's speed effect cannot hold`);
+      return [[FX_SPEED, e.a]];
     case DW_WALK.delaySpeed: return [[DW_FX.delaySpeed, b8(e.a)]];
     case DW_WALK.globalFade: return [[DW_FX.globalVolumeFade, b8(e.a)]];
     case DW_WALK.globalVolume: return [[DW_FX.globalVolume, b8(e.a)]];
@@ -46,8 +62,9 @@ export function dwEventEffects(e: DwWalkEvent): Fx[] {
   }
 }
 
-const SLOT_KEYS = [
+export const SLOT_KEYS = [
   ['effTyp', 'eff'], ['effTyp2', 'eff2'], ['effTyp3', 'eff3'], ['effTyp4', 'eff4'], ['effTyp5', 'eff5'],
+  ['effTyp6', 'eff6'], ['effTyp7', 'eff7'], ['effTyp8', 'eff8'],
 ] as const;
 
 function emptyCell(): TrackerCell {
@@ -64,43 +81,52 @@ const STATE_SETTING: ReadonlySet<number> = new Set([DW_FX.envelope, DW_FX.arpegg
  * later command of the same kind sets again dropped - they were in force for no time at all - and
  * what still does not fit is counted by the caller (the song then opens without a grid).
  */
-export function fitEffectColumns(list: Fx[]): { shown: Fx[]; overflow: boolean } {
-  if (list.length <= EFFECT_SLOTS) return { shown: list, overflow: false };
+export function fitEffectColumns(list: Fx[], slots = EFFECT_SLOTS): { shown: Fx[]; overflow: boolean } {
+  if (list.length <= slots) return { shown: list, overflow: false };
   const kept = list.filter(([typ], i) => !(STATE_SETTING.has(typ) && list.some(([t2], j) => j > i && t2 === typ)));
-  return { shown: kept.slice(0, EFFECT_SLOTS), overflow: kept.length > EFFECT_SLOTS };
+  return { shown: kept.slice(0, slots), overflow: kept.length > slots };
 }
 
 export interface DwGrid {
   patterns: Pattern[];
   songPositions: number[];
-  /** Rows of the timeline (ticks of the longest voice's first pass). */
+  /** Rows of the timeline (song steps of the longest voice's first pass). */
   rows: number;
+  /** Effect columns the song uses: 5, or 6 when a row needed one more (R3 of the step-grid plan). */
+  effectColumns: number;
   /** For each pattern and voice, the file offset of the block playing on the pattern's first tick (-1: none yet). */
   blockAtStart: number[][];
   /** Rows where more commands ran on one voice than the cell has effect columns (the walk is then not fully shown). */
   overflowRows: number;
 }
 
-/** Draw the walk as 64-row patterns on the 50 Hz tick timeline. */
+/** Draw the walk as 64-row patterns, one row per song step. */
 export function buildDWGridFromWalk(walk: DwWalk): DwGrid {
   const channels = Math.max(1, walk.channels);
-  const rows = Math.max(1, walk.ticks);
+  const clock = dwRowClock(walk);
+  const rows = Math.max(1, clock.rowsForTicks(walk.processedTicks));
   const grid: TrackerCell[][] = Array.from({ length: channels }, () => Array.from({ length: rows }, emptyCell));
-  // The effects each cell shows, in the order the replayer ran them; placed into the columns once the tick is complete.
+  // The effects each cell shows, in the order the replayer ran them; placed into the columns once the row is complete.
   const pending = new Map<number, Fx[]>();
+  // Ticks into the row the cell's commands ran: one value per cell, or the cell cannot show them.
+  const offsets = new Map<number, number>();
   const blockAt: number[][] = Array.from({ length: channels }, () => new Array<number>(rows).fill(-1));
-  let overflowRows = 0;
 
   const curBlock = new Array<number>(channels).fill(-1);
   let ei = 0;
   const ev = walk.events;
   const transposes = dwWalkTransposes(walk);
-  for (let t = 0; t < rows; t++) {
-    for (; ei < ev.length && ev[ei].tick === t; ei++) {
+  for (let r = 0; r < rows; r++) {
+    for (; ei < ev.length && clock.tickToRow(ev[ei].ptick).row === r; ei++) {
       const e = ev[ei];
       if (e.channel >= channels) continue;
       curBlock[e.channel] = e.block === 0xffffffff ? -1 : e.block;
-      const cell = grid[e.channel][t];
+      const cell = grid[e.channel][r];
+      const key = e.channel * rows + r;
+      const { offset } = clock.tickToRow(e.ptick);
+      const seen = offsets.get(key);
+      if (seen === undefined) offsets.set(key, offset);
+      else if (seen !== offset) throw new Error(`voice ${e.channel + 1} runs commands at ticks ${seen} and ${offset} of row ${r}; one row cannot show both`);
       if (e.kind === DW_WALK.note) {
         // named by the pitch the replayer plays it at: the byte through the period table, the sample's tuning, the transposes
         cell.note = dwByteToNote(walk.layout.pitch, e.b, e.a, transposes.get(e));
@@ -111,20 +137,28 @@ export function buildDWGridFromWalk(walk: DwWalk): DwGrid {
       } else {
         const fx = dwEventEffects(e);
         if (fx.length > 0) {
-          const key = e.channel * rows + t;
           const list = pending.get(key);
           if (list) list.push(...fx); else pending.set(key, [...fx]);
         }
       }
     }
-    for (let ch = 0; ch < channels; ch++) blockAt[ch][t] = curBlock[ch];
+    for (let ch = 0; ch < channels; ch++) blockAt[ch][r] = curBlock[ch];
   }
 
+  // The row offset leads the effect list: it takes the first slot, so the edit layer finds the rest behind it.
+  for (const [key, offset] of offsets) {
+    if (offset === 0) continue;
+    const list = pending.get(key);
+    if (list) list.unshift([DW_FX.rowOffset, offset]); else pending.set(key, [[DW_FX.rowOffset, offset]]);
+  }
+  let effectColumns = EFFECT_SLOTS;
+  for (const list of pending.values()) if (fitEffectColumns(list).overflow) { effectColumns = EFFECT_SLOTS + 1; break; }
+  let overflowRows = 0;
   for (const [key, list] of pending) {
-    const { shown, overflow } = fitEffectColumns(list);
+    const { shown, overflow } = fitEffectColumns(list, effectColumns);
     if (overflow) overflowRows++;
     const cell = grid[Math.floor(key / rows)][key % rows] as unknown as Record<string, number>;
-    shown.forEach(([typ, val], i) => { cell[SLOT_KEYS[i][0]] = typ; cell[SLOT_KEYS[i][1]] = val; });
+    shown.slice(0, MAX_EFFECT_SLOTS).forEach(([typ, val], i) => { cell[SLOT_KEYS[i][0]] = typ; cell[SLOT_KEYS[i][1]] = val; });
   }
 
   const patterns: Pattern[] = [];
@@ -142,5 +176,5 @@ export function buildDWGridFromWalk(walk: DwWalk): DwGrid {
     songPositions.push(p);
     blockAtStart.push(blockAt.map((b) => b[start]));
   }
-  return { patterns, songPositions, rows, blockAtStart, overflowRows };
+  return { patterns, songPositions, rows, effectColumns, blockAtStart, overflowRows };
 }

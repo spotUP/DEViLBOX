@@ -57,8 +57,10 @@ export const DW_WALK = {
 } as const;
 
 export interface DwWalkEvent {
-  /** Replayer tick (50 Hz) the command ran on. */
+  /** Replayer frame (50 Hz) the command ran on, skipped frames included. */
   tick: number;
+  /** Processed tick the command ran on: frames the player skips (delay / extra counter) are not counted. */
+  ptick: number;
   channel: number;
   /** File offset of the command's block (0xFFFFFFFF: the empty track a voice without a list reads). */
   block: number;
@@ -89,8 +91,12 @@ export interface DwWalk {
   speed: number;
   layout: DwLayout;
   events: DwWalkEvent[];
-  /** Ticks run, up to the first pass of the longest voice. */
+  /** Frames (50 Hz) run, up to the first pass of the longest voice. */
   ticks: number;
+  /** Processed ticks run in those frames (equals `ticks` unless the player skips frames). */
+  processedTicks: number;
+  /** Processed ticks per 50 Hz frame at the subsong's start (1 unless the player skips frames), as num / den. */
+  tickRate: { num: number; den: number };
   /** The tick each voice first reached the end of its position list (-1: it has none). */
   wrapTicks: number[];
   channels: number;
@@ -117,23 +123,24 @@ export async function walkDavidWhittaker(buffer: ArrayBuffer, maxTicks = 60_000,
     M._dw_destroy(handle);
     throw new Error(`the David Whittaker replayer has no subsong ${subsong}`);
   }
-  const out = M._malloc(MAX_EVENTS * 7 * 4);
+  const out = M._malloc(MAX_EVENTS * 8 * 4);
   const info = M._malloc(16 * 4);
   try {
     const n = M._dw_walk(handle, maxTicks, out, MAX_EVENTS, info);
     const dv = new DataView(M.HEAPU8.buffer);
     const events: DwWalkEvent[] = [];
     for (let i = 0; i < n; i++) {
-      const o = out + i * 28;
+      const o = out + i * 32;
       events.push({
         tick: dv.getInt32(o, true), channel: dv.getInt32(o + 4, true), block: dv.getUint32(o + 8, true),
         pos: dv.getInt32(o + 12, true), kind: dv.getInt32(o + 16, true), a: dv.getInt32(o + 20, true), b: dv.getInt32(o + 24, true),
+        ptick: dv.getInt32(o + 28, true),
       });
     }
-    const inf = Array.from({ length: 13 }, (_, i) => dv.getInt32(info + i * 4, true));
+    const inf = Array.from({ length: 16 }, (_, i) => dv.getInt32(info + i * 4, true));
     const channels = inf[10];
     const layout = readLayout(M, handle);
-    return { speed: inf[12], layout, events, ticks: inf[1] + 1, wrapTicks: inf.slice(2, 2 + channels), channels, samples: inf[11] };
+    return { speed: inf[12], layout, events, ticks: inf[1] + 1, processedTicks: inf[15], tickRate: { num: inf[13], den: inf[14] }, wrapTicks: inf.slice(2, 2 + channels), channels, samples: inf[11] };
   } finally {
     M._free(out);
     M._free(info);

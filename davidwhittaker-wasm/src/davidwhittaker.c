@@ -299,9 +299,10 @@ struct DwModule {
     // Walk (dw_walk): every command the replayer executes, with the tick it ran on
     bool walking;
     int walk_tick;
+    int walk_ptick;                // processed ticks so far minus 1: frame ticks the player skipped (delay / extra counter) are not counted
     int walk_pos;                  // byte position of the command being executed in its track
     int walk_count, walk_max;
-    int32_t* walk_out;             // 7 ints per event
+    int32_t* walk_out;             // 8 ints per event
     int walk_stop_tick;            // tick of the first stop-song command (-1: none); the walk ends there, as the original player's song does
     int walk_wrap_tick[8];         // tick at which each channel first reached the end of its position list (-1: not yet)
     int trace_count;
@@ -1661,9 +1662,9 @@ static void walk_event(DwModule* m, DwChannelInfo* ch, int kind, int a, int b) {
     uint32_t trk = 0xFFFFFFFFu;
     for (int i = 0; i < m->track_count; i++)
         if (m->tracks[i].data == ch->track_data) { trk = m->tracks[i].offset + (uint32_t)m->start_offset; break; }
-    int32_t* e = m->walk_out + (size_t)m->walk_count * 7;
+    int32_t* e = m->walk_out + (size_t)m->walk_count * 8;
     e[0] = m->walk_tick; e[1] = ch->channel_number; e[2] = (int32_t)trk; e[3] = m->walk_pos;
-    e[4] = kind; e[5] = a; e[6] = b;
+    e[4] = kind; e[5] = a; e[6] = b; e[7] = m->walk_ptick;
     m->walk_count++;
 }
 
@@ -2180,6 +2181,8 @@ static void play_tick(DwModule* m) {
             return;
         }
     }
+
+    m->walk_ptick++;   // the tick is processed: the commands below run on it
 
     if (m->enable_global_volume_fade) {
         if (m->playing_info.global_volume_fade_speed != 0) {
@@ -2770,18 +2773,22 @@ int dw_trace(DwModule* m, int ticks, int16_t* out, int max_notes) {
 /**
  * Run the current subsong from its start and write every command the replayer executes, each as 7
  * int32: tick, channel, file offset of the command's block (-1 for the empty track), byte position
- * of the command in it, kind (DW_WALK_*), a, b. Stops when every channel has reached the end of its
+ * of the command in it, kind (DW_WALK_*), a, b, processed tick (frame ticks the player skips are not counted). 8 int32 per event. Stops when every channel has reached the end of its
  * position list once or the first stop-song command ran (the song is then the first pass of the longest channel, the shorter ones
  * looping inside it as the replayer loops them) or after `max_ticks`. info[0] ticks run, info[1] the
  * tick the last channel finished its first pass, info[2..9] each channel's first-pass tick (-1 never),
- * info[10] channels, info[11] number of samples, info[12] the subsong's initial speed. Returns the event count.
+ * info[10] channels, info[11] number of samples, info[12] the subsong's initial speed, info[13] / info[14] processed ticks per frame at the start (numerator / denominator), info[15] processed ticks run. Returns the event count.
  */
 int dw_walk(DwModule* m, int max_ticks, int32_t* out, int max_events, int32_t* info) {
     if (!m || !out || max_events <= 0) return 0;
     int saved = m->current_song;
     initialize_sound(m, saved);
+    int rate_num = 1, rate_den = 1;
+    if (m->use_extra_counter) { rate_num *= 5; rate_den *= 6; }
+    if (m->enable_delay_counter) { rate_num *= 256 - m->playing_info.delay_counter_speed; rate_den *= 256; }
     m->walking = true;
     m->walk_tick = -1;     // the first play_tick is tick 0
+    m->walk_ptick = -1;    // the first processed tick is processed tick 0
     m->walk_count = 0;
     m->walk_max = max_events;
     m->walk_out = out;
@@ -2808,6 +2815,9 @@ int dw_walk(DwModule* m, int max_ticks, int32_t* out, int max_events, int32_t* i
         for (int i = 0; i < 8; i++) info[2 + i] = i < m->number_of_channels ? m->walk_wrap_tick[i] : -1;
         info[10] = m->number_of_channels; info[11] = m->number_of_samples;
         info[12] = (saved >= 0 && saved < m->song_info_count) ? m->song_info_list[saved].speed : 0;
+        // info[13] / info[14]: processed ticks per 50 Hz frame at the subsong's start, as a fraction (the extra counter
+        // skips 1 frame in 6, the delay counter skips delay_counter_speed in 256); info[15]: processed ticks the walk ran.
+        info[13] = rate_num; info[14] = rate_den; info[15] = m->walk_ptick + 1;
     }
     int n = m->walk_count;
     initialize_sound(m, saved);

@@ -17,7 +17,7 @@ export const DW_EFFECT_NAMES = [
   'envelope', 'arpeggio', 'slide speed', 'slide delay', 'vibrato speed', 'vibrato depth', 'vibrato off',
   'global transpose', 'channel transpose', 'volume fade', 'global volume fade', 'global volume',
   'half volume on', 'half volume off', 'speed', 'delay speed', 'loop', 'restart', 'sound effect',
-  'stop song', 'wait for next row',
+  'stop song', 'wait for next row', 'row offset',
 ] as const;
 
 /** Command ids. */
@@ -28,13 +28,15 @@ export const DW_FX = {
   globalVolumeFade: DW_FX_BASE + 10, globalVolume: DW_FX_BASE + 11, halfVolumeOn: DW_FX_BASE + 12,
   halfVolumeOff: DW_FX_BASE + 13, speed: DW_FX_BASE + 14, delaySpeed: DW_FX_BASE + 15, loop: DW_FX_BASE + 16,
   restart: DW_FX_BASE + 17, soundEffect: DW_FX_BASE + 18, stopSong: DW_FX_BASE + 19, waitRow: DW_FX_BASE + 20,
+  /** Ticks into the row the cell's commands ran (the step grid keeps a command that is not on a row's first tick). */
+  rowOffset: DW_FX_BASE + 21,
 } as const;
 
 export const DW_FX_MIN = DW_FX_BASE;
 export const DW_FX_MAX = DW_FX_BASE + DW_EFFECT_NAMES.length - 1;
 
 /** One letter per command, in id order. */
-const LETTERS = 'EASDVWOTCFGMHNPYLRXQU';
+const LETTERS = 'EASDVWOTCFGMHNPYLRXQUK';
 
 export const DW_EFFECT_GLYPH: Record<number, string> = Object.fromEntries(
   Array.from(LETTERS, (ch, i) => [DW_FX_BASE + i, ch]),
