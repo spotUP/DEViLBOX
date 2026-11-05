@@ -69,6 +69,13 @@ async function isUfoRoute(filename: string, buffer: ArrayBuffer): Promise<boolea
   return isUFOFormat(buffer);
 }
 
+/** `sjs.<tune>` whose tune name is also a registered extension (`sjs.jb`): Sound Player only with its bytes. */
+async function isSoundPlayerPrefixedRoute(filename: string, buffer: ArrayBuffer): Promise<boolean> {
+  if (!getBasename(filename.toLowerCase()).startsWith('sjs.')) return false;
+  const { isSoundPlayerFormat } = await import('@lib/import/formats/SoundPlayerParser');
+  return isSoundPlayerFormat(buffer);
+}
+
 /**
  * Normalize a reversed-extension filename to UADE prefix form.
  * UADE identifies formats by filename prefix (e.g. "mc.commando"), not extension ("commando.mc").
@@ -2075,7 +2082,9 @@ export async function tryRouteFormat(
   // (EaglePlayerEngine) with its smp.<tune> companion; the grid is the
   // player's own walk of the song rows (SoundPlayerParser), its samples the
   // smp.<tune> FORMs, and grid edits go into the module the player plays.
-  if (matchesExt(filename, ['sjs'])) {
+  // `sjs.jb` names a tune "jb": its last segment is a registered extension (Jason Brooke's), which matchesExt
+  // reads as that format's file. The player's own prefix with the player's own bytes settles it.
+  if (matchesExt(filename, ['sjs']) || await isSoundPlayerPrefixedRoute(filename, buffer)) {
     const { isSoundPlayerFormat, parseSoundPlayerFile } = await import('@lib/import/formats/SoundPlayerParser');
     if (isSoundPlayerFormat(buffer)) {
       const { withEaglePlayer } = await import('./withEaglePlayer');
