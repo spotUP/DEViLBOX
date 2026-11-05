@@ -129,6 +129,9 @@ const HivelyControls = lazy(() =>
 const JamCrackerControls = lazy(() =>
   import('@components/instruments/controls/JamCrackerControls').then(m => ({ default: m.JamCrackerControls }))
 );
+const SoundFactoryControls = lazy(() =>
+  import('@components/instruments/controls/SoundFactoryControls').then(m => ({ default: m.SoundFactoryControls }))
+);
 const SunTronicSynthControls = lazy(() =>
   import('@components/instruments/controls/SunTronicSynthControls').then(m => ({ default: m.SunTronicSynthControls }))
 );
@@ -651,11 +654,18 @@ export const SynthControlsRouter: React.FC<SynthControlsRouterProps> = ({ instru
     return null;
   })();
 
-  if (!content) return fallback ? <>{fallback}</> : null;
+  // Sound Factory instruments (any synthType, usually Sampler) carry DefineInstr effect parameters: show them
+  // beside whatever the type's own controls (or the generic fallback) are.
+  const soundFactory = instrument.metadata?.soundFactoryInstrument
+    ? <SoundFactoryControls instrument={instrument} onChange={onUpdate} />
+    : null;
+
+  if (!content && !soundFactory) return fallback ? <>{fallback}</> : null;
 
   return (
     <Suspense fallback={<LoadingFallback />}>
-      {content}
+      {content ?? fallback}
+      {soundFactory}
     </Suspense>
   );
 };
