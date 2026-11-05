@@ -24,6 +24,9 @@ import { parseBenDaglishFile } from '../formats/BenDaglishParser';
 import { walkBenDaglish } from '../formats/BenDaglishWasmExtractor';
 import { bdNotePlacements, bdRowClock } from '../formats/benDaglishGrid';
 import { BD_FX } from '../formats/benDaglishEffectGlyphs';
+import { buildRobHubbardGrid } from '../formats/RobHubbardParser';
+import { rhRowClock, rhTickToRow, buildRHGridFromWalk } from '../formats/robHubbardGrid';
+import { RH_WALK } from '../formats/rhWalk';
 import { installWasmNodeFetches } from './helpers/dwNodeFetch';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
@@ -147,10 +150,107 @@ describe('step grid: Sound Factory through parseModuleToSong', () => {
         });
       });
     }
-    // measured 2026-11-05: 16384-row cap (98304 ticks), 3 enabled voices, no two onsets share a row
-    expect(notes, 'notes shown').toBe(4444);
-    expect(delayed, 'notes off the step carry the 0xD7 delay').toBe(2363);
+    // measured 2026-11-05: one pass of the song, the walk ends at the Goto loop point (2df42a272; was 4444 =
+    // loop body repeated up to the 16384-row cap), no two onsets share a row
+    expect(notes, 'notes shown').toBe(2078);
+    expect(delayed, 'one pass sits on the 6-tick step; the 2363 delays came from loop repeats off the step').toBe(0);
     expect(note2, 'same-row clashes').toBe(0);
-    expect(song.patterns.length, '16384 rows / 64').toBe(256);
+    expect(song.patterns.length, 'one pass: 1345 rows in 64-row positions').toBe(22);
   });
+});
+
+const RH_SONGS = [
+  { path: 'rob-hubbard/skateordie.rh', speed: 5, ticks: 12160 },
+  { path: 'rob-hubbard/budokan.rh', speed: 8, ticks: 9472 },
+];
+
+describe('step grid: Rob Hubbard through parseModuleToSong', () => {
+  for (const s of RH_SONGS) {
+    it(`${s.path}: step ${s.speed}, no delayed notes, every note row x speed + 1 is its walk interrupt`, async () => {
+      const ab = bytesOf(s.path);
+      const before = vi.mocked(makeRowClock).mock.calls.length;
+      const song = await parseModuleToSong(new File([ab.slice(0)], s.path.split('/').pop()!));
+      expect(vi.mocked(makeRowClock).mock.calls.length, 'the row clock ran during the import').toBeGreaterThan(before);
+      expect(song.initialSpeed).toBe(s.speed);
+
+      const g = buildRobHubbardGrid(new Uint8Array(ab.slice(0)));
+      expect(g).not.toBeNull();
+      const walk = g!.walk;
+      expect(walk.speed).toBe(s.speed);
+      expect(walk.ticks).toBe(s.ticks);
+      const clock = rhRowClock(walk);
+      // every event is on the first interrupt of its row: the format has no delayed notes
+      expect(walk.events.filter((e) => rhTickToRow(clock, e.tick).offset !== 0).length).toBe(0);
+      const rebuilt = buildRHGridFromWalk(walk, () => null);
+      expect(rebuilt.offGridEvents).toBe(0);
+      expect(rebuilt.rows).toBe(s.ticks / s.speed);
+
+      // the song's note rows per voice are the walk's note interrupts mapped through the clock
+      const shown: number[][] = [[], [], [], []];
+      song.songPositions.forEach((pi, pos) => song.patterns[pi].channels.forEach((ch, c) => ch.rows.forEach((cell, r) => {
+        if (cell.note > 0 && cell.note < 97) shown[c].push(pos * 64 + r);
+      })));
+      const walked: number[][] = [[], [], [], []];
+      for (const e of walk.events) if (e.kind === RH_WALK.note && e.voice < 4) walked[e.voice].push(rhTickToRow(clock, e.tick).row);
+      for (let v = 0; v < 4; v++) {
+        expect(shown[v].length).toBeGreaterThan(0);
+        expect(shown[v].map((r) => clock.rowToTick(r) + 1), `voice ${v} note interrupts`).toEqual(walked[v].map((r) => r * s.speed + 1));
+      }
+    });
+  }
+});
+
+// Hippel CoSo is a step grid already (one row per replayer step of song.speed vblanks). The oracle here is an independent
+// per-voice walk of hippel.c step_voice: an event starts at step s, lasts rowSpeed + 1 steps, FD waits, FF ends the
+// pattern and takes no time. Each voice walks on alone; the grid pads a position to its longest voice.
+const HIPPEL_SONGS = [
+  { path: 'hippel-coso/wings of death (level 3).hipc', speed: 4, positions: 70, positionLength: 32 },
+  { path: 'formats/prehistoric_tale.hipc', speed: 7, positions: 30, positionLength: 24 },
+];
+
+describe('step grid: Hippel CoSo through parseModuleToSong', () => {
+  for (const s of HIPPEL_SONGS) {
+    it(`${s.path}: speed ${s.speed}, every note row x speed is its replayer tick`, async () => {
+      const ab = bytesOf(s.path);
+      const buf = new Uint8Array(ab.slice(0));
+      const song = await parseModuleToSong(new File([ab.slice(0)], s.path.split('/').pop()!));
+      expect(song.initialSpeed).toBe(s.speed);
+      expect(song.songPositions.length).toBe(s.positions);
+      const u16 = (o: number) => (buf[o] << 8) | buf[o + 1];
+      const u32 = (o: number) => ((buf[o] << 24) | (buf[o + 1] << 16) | (buf[o + 2] << 8) | buf[o + 3]) >>> 0;
+      const patternsOff = u32(12), songsOff = u32(20);
+      const base = u16(songsOff) * 12 + u32(16);
+      const walked: number[][] = [[], [], [], []];
+      for (let v = 0; v < 4; v++) {
+        let step = 0, rs = 0;
+        for (let p = 0; p < s.positions; p++) {
+          let pos = u16(patternsOff + buf[base + p * 12 + v * 3] * 2);
+          for (let guard = 0; guard < 5000; guard++) {
+            let c = buf[pos];
+            if (c === 0xff) break;
+            let at = pos + 1;
+            while (c === 0xfe) { rs = buf[at]; c = buf[at + 1]; at += 2; }
+            if (c === 0xff) break;
+            if (c === 0xfd) { rs = buf[at]; pos = at + 1; step += rs + 1; continue; }
+            const info = buf[at++];
+            if (info & 0xe0) at++;
+            walked[v].push(step * s.speed);
+            step += rs + 1;
+            pos = at;
+          }
+        }
+      }
+      const shown: number[][] = [[], [], [], []];
+      let start = 0;
+      for (const pi of song.songPositions) {
+        const pat = song.patterns[pi];
+        pat.channels.forEach((ch, c) => ch.rows.forEach((cell, r) => { if (cell.note > 0 && cell.note < 97) shown[c].push((start + r) * s.speed); }));
+        start += pat.length;
+      }
+      for (let v = 0; v < 4; v++) {
+        expect(shown[v].length).toBeGreaterThan(0);
+        expect(shown[v], `voice ${v} note ticks`).toEqual(walked[v]);
+      }
+    });
+  }
 });

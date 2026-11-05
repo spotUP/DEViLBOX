@@ -41,7 +41,7 @@ const ENGINES: Array<[string, string, string, string, string, JsTransform?]> = [
   ['soundfx', 'SoundFx', '@engine/soundfx/SoundFxEngine', 'SoundFxEngine', `${S}/soundfx/batdance.sfx`, soundfxTransform],
 ];
 
-type FakeEngine = WASMChannelOutputsEngine & { workletNode: unknown; markNodeReady(): void; _disposed: boolean };
+type FakeEngine = WASMChannelOutputsEngine & { workletNode: AudioWorkletNode | null; markNodeReady(): void; _disposed: boolean };
 const created: FakeEngine[] = [];
 afterEach(() => { for (const e of created.splice(0)) e._disposed = true; WASMChannelOutputsEngine.forwardStereoSeparation(useSettingsStore.getState().stereoSeparation); });
 
@@ -86,7 +86,7 @@ describe('stereo separation reaches every direct-routed Amiga worklet', { timeou
     // The engine as the app builds it, minus the AudioContext: its port forwards to the real worklet's message handler.
     const engine = Object.create(Engine.prototype) as FakeEngine;
     const posts: unknown[] = [];
-    engine.workletNode = { port: { postMessage: (m: unknown) => { posts.push(m); void send(m); } } };
+    engine.workletNode = { port: { postMessage: (m: unknown) => { posts.push(m); void send(m); } } } as unknown as AudioWorkletNode;
     created.push(engine);
     const setSep = vi.spyOn(engine, 'setStereoSeparation');
 
