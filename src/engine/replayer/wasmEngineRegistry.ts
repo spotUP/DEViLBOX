@@ -100,7 +100,12 @@ export interface NativeEngineDescriptor {
    * Engines without a row preview (so no rowStartFrame) name their seek target themselves: the unit startAt takes for grid
    * row (`songPos`, `row`) of this song. Absent: the target is the row-preview frame.
    */
-  startTargetOf?: (song: TrackerSong, songPos: number, row: number) => number | null;
+  /**
+   * 'grid': the frame comes from the song's grid clock (gridStartFrame), for engines whose worklet renders and
+   * discards frames up to a `seekFrames` target on play (public/worklets/channel-outputs.js discardSeek).
+   */
+  startFrames?: 'grid';
+  startTargetOf?: (song: TrackerSong, songPos: number, row: number, sampleRate: number) => number | null;
   /**
    * How the tracker pitch slider (and its Key Lock) reaches this engine natively. applyNativeEnginePitch
    * (nativeEnginePitch.ts) drives it from computeTempoPitchSplit while the engine plays, and again when it starts.
@@ -131,6 +136,14 @@ interface HivelyTempoPitch {
 // ---------------------------------------------------------------------------
 // Engine registry - add new WASM engines here
 // ---------------------------------------------------------------------------
+
+/** Registry fields of an engine on the shared worklet seek: the grid row's frame, then the `seekFrames` message. */
+const GRID_FRAME_SEEK = {
+  startFrames: 'grid',
+  startAt: (instance: WASMSingletonEngine, frame: number): void => {
+    (instance as unknown as { seekFrames(frame: number): void }).seekFrames(frame);
+  },
+} as const;
 
 export const WASM_ENGINES: NativeEngineDescriptor[] = [
   {
@@ -735,6 +748,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/soundcontrol/SoundControlEngine')).SoundControlEngine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   {
     key: 'DeltaMusic1Replayer',
@@ -748,6 +762,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/deltamusic1/DeltaMusic1Engine')).DeltaMusic1Engine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   {
     key: 'SoundFxReplayer',
@@ -760,6 +775,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/soundfx/SoundFxEngine')).SoundFxEngine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   {
     key: 'GmcReplayer',
@@ -772,6 +788,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/gmc/GmcEngine')).GmcEngine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   {
     key: 'DeltaMusic2Replayer',
@@ -785,6 +802,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/deltamusic2/DeltaMusic2Engine')).DeltaMusic2Engine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   // RobHubbard, CoreDesign, StartrekkerAM — no NostalgicPlayer C# source,
   {
@@ -798,6 +816,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/ronklaren/RonKlarenEngine')).RonKlarenEngine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   {
     key: 'ActionamicsReplayer',
@@ -810,6 +829,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/actionamics/ActionamicsEngine')).ActionamicsEngine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   {
     key: 'MonotoneReplayer',
@@ -859,6 +879,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/activisionpro/ActivisionProEngine')).ActivisionProEngine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   {
     key: 'SynthesisReplayer',
@@ -872,6 +893,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/synthesis/SynthesisEngine')).SynthesisEngine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   {
     key: 'DssReplayer',
@@ -885,6 +907,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/dss/DssEngine')).DssEngine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   {
     key: 'SoundFactory2Replayer',
@@ -915,6 +938,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/facethemusic/FaceTheMusicEngine')).FaceTheMusicEngine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   {
     key: 'FredReplayer2',
@@ -927,6 +951,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/fred-replayer/FredReplayerEngine')).FredReplayerEngine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   {
     key: 'OktalyzerReplayer',
@@ -940,6 +965,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/oktalyzer/OktalyzerEngine')).OktalyzerEngine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   {
     key: 'InStereo1Replayer',
@@ -953,6 +979,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/instereo1/InStereo1Engine')).InStereo1Engine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   {
     key: 'FutureComposerReplayer',
@@ -966,6 +993,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/futurecomposer/FutureComposerEngine')).FutureComposerEngine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   {
     key: 'InStereo2Replayer',
@@ -979,6 +1007,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/instereo2/InStereo2Engine')).InStereo2Engine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   {
     key: 'QuadraComposerReplayer',
@@ -992,6 +1021,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/quadracomposer/QuadraComposerEngine')).QuadraComposerEngine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   // UADE-only. Fall through to UADE.
   {
@@ -1006,6 +1036,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/soundmon/SoundMonEngine')).SoundMonEngine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   {
     key: 'DigMugReplayer',
@@ -1019,6 +1050,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/digmug/DigMugEngine')).DigMugEngine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   {
     key: 'DavidWhittakerReplayer',
@@ -1046,6 +1078,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/sonic-arranger/SonicArrangerEngine')).SonicArrangerEngine as unknown as WASMSingletonStatic,
+    ...GRID_FRAME_SEEK,
   },
   {
     key: 'SunTronicSong',

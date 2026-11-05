@@ -16,6 +16,7 @@
  *   { type: 'dubChannelDisableAll' }
  *   { type: 'addIsolation', slotIndex, channelMask }
  *   { type: 'removeIsolation', slotIndex }
+ *   { type: 'seekFrames', frame }            start-at-position (not 'seek', which Nuade and Cinter4 own): the next play renders and discards `frame` frames
  *   { type: 'setStereoSeparation', value }   value 0-100 (%), the app setting; narrowStereo() applies it
  *
  * Loaded before the engine worklet (WASMSingletonBase.loadWASMAssets), like
@@ -34,6 +35,23 @@ if (!globalThis.DevilboxChannelOutputs) {
       this.isolatedMask = 0;
       // DEViLBOX stereo separation 0..1 (1 = full Amiga hard L/R, 0 = mono); the engine pushes the app setting.
       this.stereoSep = 1;
+      // Start-at-position target in output frames, held until the next play (discardSeek).
+      this.seekFrames = 0;
+    }
+
+    /**
+     * Run on 'play': render and throw away the frames up to the seek target, so the song plays on from there. Silent
+     * (the render buffers are discarded), shape of UADE.worklet.js's uade_wasm_skip_frames. renderBlock(n) renders n
+     * frames and returns how many it produced (<= 0: song ended). The target is consumed.
+     */
+    discardSeek(renderBlock, blockSize) {
+      let left = this.seekFrames;
+      this.seekFrames = 0;
+      while (left > 0) {
+        const n = Math.min(left, blockSize);
+        if (!(renderBlock(n) > 0)) break;
+        left -= n;
+      }
     }
 
     /** Handle a dub/isolation message; true when it was one. */
@@ -48,6 +66,9 @@ if (!globalThis.DevilboxChannelOutputs) {
           }
           return true;
         }
+        case 'seekFrames':
+          this.seekFrames = Math.max(0, Math.floor(+data.frame) || 0);
+          return true;
         case 'setStereoSeparation':
           this.stereoSep = Math.max(0, Math.min(1, (+data.value) / 100));
           return true;

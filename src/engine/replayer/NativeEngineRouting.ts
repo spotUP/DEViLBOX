@@ -9,6 +9,7 @@
  * C64 SID is instance-based (not singleton) and handled separately.
  */
 
+import { gridStartFrame } from './gridStartFrame';
 import { silenceIsNotTheSongs } from './performerSilence';
 import * as Tone from 'tone';
 import type { TrackerSong } from '../TrackerReplayer';
@@ -648,9 +649,12 @@ export async function startNativeEngines(
         // A start away from the top of the song (Play / Play Pattern at the cursor): the engine plays the song from its
         // start unless told, so move it to the position's frame first. Position 0 row 0 stays the plain play path.
         if (desc.startAt && startPosition && (startPosition.songPos > 0 || startPosition.row > 0)) {
+          const sampleRate = instance.output.context.sampleRate;
           const frame = desc.startTargetOf
-            ? desc.startTargetOf(song, startPosition.songPos, startPosition.row)
-            : await rowStartFrame(song, startPosition.songPos, startPosition.row);
+            ? desc.startTargetOf(song, startPosition.songPos, startPosition.row, sampleRate)
+            : desc.startFrames === 'grid'
+              ? gridStartFrame(song, startPosition.songPos, startPosition.row, sampleRate)
+              : await rowStartFrame(song, startPosition.songPos, startPosition.row);
           if (frame !== null && frame > 0) desc.startAt(instance, frame);
         }
         instance.play();

@@ -46,7 +46,7 @@ describe('Sound Factory transport start', () => {
     const { WASM_ENGINES } = await import('@/engine/replayer/wasmEngineRegistry');
     const desc = WASM_ENGINES.find((d) => d.key === 'SoundFactory2Replayer')!;
     expect(desc.startAt).toBeTypeOf('function');
-    const tick = desc.startTargetOf!(song as never, 6, 3);
+    const tick = desc.startTargetOf!(song as never, 6, 3, 48000);
     expect(tick).toBe((6 * 64 + 3) * song.initialSpeed);
     calls.length = 0;
     desc.startAt!(engine as never, tick!);
