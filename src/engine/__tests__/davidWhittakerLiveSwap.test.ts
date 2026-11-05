@@ -13,6 +13,7 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { installDwNodeFetch } from '@/lib/import/__tests__/helpers/dwNodeFetch';
+import { dwRowClock } from '@/lib/import/formats/davidWhittakerGrid';
 import { walkDavidWhittaker, DW_WALK } from '@/lib/import/formats/DavidWhittakerWasmExtractor';
 import { openWorklet, sameAudio, type WorkletHarness } from './helpers/workletHarness';
 import { awaitSwap } from './helpers/liveSwapCheck';
@@ -103,7 +104,8 @@ describe('David Whittaker: an edit is heard while the song plays', { timeout: 24
     const walk = await walkDavidWhittaker(f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength) as ArrayBuffer);
     const target = walk.events.find((e) => e.kind === DW_WALK.note && e.tick >= 70 && e.tick < 120)!;
     expect(target, 'a note a little after the first second').toBeTruthy();
-    const p = Math.floor(target.tick / 64), row = target.tick % 64;
+    const tgtRow = dwRowClock(walk).tickToRow(target.ptick).row;   // one row per song step
+    const p = Math.floor(tgtRow / 64), row = tgtRow % 64;
     const { useTrackerStore } = await import('@/stores/useTrackerStore');
     const r = await liveEdit((ch, rw, note) => {
       const cur = useTrackerStore.getState().patterns[p].channels[ch].rows[rw].note;
@@ -121,15 +123,17 @@ describe('David Whittaker: an edit is heard while the song plays', { timeout: 24
     const walk = await walkDavidWhittaker(f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength) as ArrayBuffer);
     const notes = walk.events.filter((e) => e.kind === DW_WALK.note);
     const { useTrackerStore } = await import('@/stores/useTrackerStore');
+    const clock = dwRowClock(walk);
     let tried = 0;
     for (const e of notes) {
-      const next = notes.find((x) => x.channel === e.channel && x.tick > e.tick);
-      const tick = e.tick + walk.speed;
-      if (e.tick < 60 || !next || tick >= next.tick || tick >= 128) continue;
+      const next = notes.find((x) => x.channel === e.channel && x.ptick > e.ptick);
+      const eRow = clock.tickToRow(e.ptick).row;
+      const gridRow = eRow + 1;   // one row is one song step: the row under the note
+      if (e.tick < 60 || !next || gridRow >= clock.tickToRow(next.ptick).row || gridRow >= 128) continue;
       if (++tried > 6) break;
-      const p = Math.floor(tick / 64), row = tick % 64;
+      const p = Math.floor(gridRow / 64), row = gridRow % 64;
       const r = await liveEdit((ch, rw) => {
-        const above = useTrackerStore.getState().patterns[p].channels[ch].rows[e.tick % 64];
+        const above = useTrackerStore.getState().patterns[p].channels[ch].rows[eRow % 64];
         useTrackerStore.getState().setCell(ch, rw, { note: above.note + 2, instrument: above.instrument });
       }, { p, ch: e.channel, row, note: 0 });
       if (!r.grew) continue;

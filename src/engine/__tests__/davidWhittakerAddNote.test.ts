@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { walkDavidWhittaker, DW_WALK } from '@/lib/import/formats/DavidWhittakerWasmExtractor';
-import { buildDWGridFromWalk } from '@/lib/import/formats/davidWhittakerGrid';
+import { buildDWGridFromWalk, dwRowClock } from '@/lib/import/formats/davidWhittakerGrid';
 import { applyDwGridEdits } from '@/lib/import/formats/davidWhittakerEdits';
 import { installDwNodeFetch } from '@/lib/import/__tests__/helpers/dwNodeFetch';
 import { paulaEventStream, eventsOfVoice } from './gridOracle';
@@ -32,6 +32,7 @@ describe('David Whittaker: a note on a row no note starts on', { timeout: 120000
     const bytes = new Uint8Array(ab);
     const walk = await walkDavidWhittaker(ab.slice(0));
     const grid = buildDWGridFromWalk(walk).patterns;
+    const clock = dwRowClock(walk);
 
     // Candidates: one speed unit into a note that lasts longer, first pattern(s).
     const tried: string[] = [];
@@ -39,12 +40,14 @@ describe('David Whittaker: a note on a row no note starts on', { timeout: 120000
     const notes = walk.events.filter((e) => e.kind === DW_WALK.note);
     for (let i = 0; i < notes.length && !chosen && tried.length < 12; i++) {
       const e = notes[i];
-      const next = notes.find((x) => x.channel === e.channel && x.tick > e.tick);
-      const tick = e.tick + walk.speed;
-      if (!next || tick >= next.tick || tick >= 2 * ROWS) continue;
-      const p = Math.floor(tick / ROWS), row = tick % ROWS;
+      const next = notes.find((x) => x.channel === e.channel && x.ptick > e.ptick);
+      // one row is one song step: the row under a note's own row
+      const eRow = clock.tickToRow(e.ptick).row;
+      const gridRow = eRow + 1;
+      if (!next || gridRow >= clock.tickToRow(next.ptick).row || gridRow >= 2 * ROWS) continue;
+      const p = Math.floor(gridRow / ROWS), row = gridRow % ROWS;
       const cell = grid[p]?.channels[e.channel]?.rows[row] as unknown as { note: number } | undefined;
-      const above = grid[p]?.channels[e.channel]?.rows[e.tick % ROWS] as unknown as { note: number } | undefined;
+      const above = grid[p]?.channels[e.channel]?.rows[eRow % ROWS] as unknown as { note: number } | undefined;
       if (!cell || cell.note !== 0 || !above || above.note <= 0 || above.note >= 97) continue;
       const edited = structuredClone(grid);
       (edited[p].channels[e.channel].rows[row] as unknown as { note: number }).note = above.note + 2;
@@ -54,7 +57,8 @@ describe('David Whittaker: a note on a row no note starts on', { timeout: 120000
     }
     expect(chosen, `a blank row inside a note that the module can split: ${tried.join(' | ')}`).not.toBeNull();
     const grown = chosen!.result.data;
-    const tick = chosen!.p * ROWS + chosen!.row;
+    const newRow = chosen!.p * ROWS + chosen!.row;
+    const tick = clock.rowToTick(newRow);   // garfield2+ has no frame skip: a processed tick is a frame
 
     // The grown module's walk: every old note start is still there, the new one is at the typed tick.
     const walk2 = await walkDavidWhittaker(grown.slice().buffer as ArrayBuffer);

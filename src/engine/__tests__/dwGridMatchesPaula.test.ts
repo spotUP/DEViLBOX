@@ -11,6 +11,8 @@
  * (TrackerReplayer: a row lasts initialSpeed * 2.5 / initialBPM seconds), so a grid whose rows are
  * 50 Hz ticks but whose song speed is the module's (3, 5...) puts the cursor at a third or a fifth
  * of the sound: the notes the grid shows at second S are not the notes that play at second S.
+ * Fixed by the step grid: one row is one song step (initialSpeed = module speed), frame-skip modules
+ * carry a fractional initialBPM, so the drift cause is gone (stepGridReachability.test.ts).
  *
  * Held to: every note-on the grid shows, on the voice it shows it, is a Paula note-on within
  * TOLERANCE_MS, over the span before the tune's stop-song command (UADE moves on to the next tune

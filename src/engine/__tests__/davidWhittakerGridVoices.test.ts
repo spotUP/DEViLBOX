@@ -19,6 +19,7 @@ import { startWorklet, ROOT } from './workletHarness';
 import { renderTicks, rmsPerTick } from './keyboardPreviewHarness';
 import { parseDavidWhittakerFile } from '@/lib/import/formats/DavidWhittakerParser';
 import { walkDavidWhittaker, DW_WALK } from '@/lib/import/formats/DavidWhittakerWasmExtractor';
+import { dwRowClock, FX_SPEED } from '@/lib/import/formats/davidWhittakerGrid';
 import { DW_FX_MIN, DW_EFFECT_NAMES } from '@/lib/import/formats/davidWhittakerEffectGlyphs';
 import { installDwNodeFetch } from '@/lib/import/__tests__/helpers/dwNodeFetch';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
@@ -37,7 +38,7 @@ const emscriptenTransform = (c: string) => c
   .replace('HEAPU8=new Uint8Array(b);', 'HEAPU8=Module["HEAPU8"]=new Uint8Array(b);')
   .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
 
-interface Cell { note: number; instrument: number; effTyp?: number; eff?: number; effTyp2?: number; eff2?: number; effTyp3?: number; eff3?: number; effTyp4?: number; eff4?: number; effTyp5?: number; eff5?: number }
+interface Cell { note: number; instrument: number; effTyp?: number; eff?: number; effTyp2?: number; eff2?: number; effTyp3?: number; eff3?: number; effTyp4?: number; eff4?: number; effTyp5?: number; eff5?: number; effTyp6?: number; eff6?: number; effTyp7?: number; eff7?: number; effTyp8?: number; eff8?: number }
 interface GridSong {
   songPositions: number[];
   gridUnmatchedReason?: string;
@@ -47,7 +48,7 @@ interface GridSong {
 
 /** The grid of voice `ch` as one flat tick timeline. */
 const timeline = (song: GridSong, ch: number): Cell[] => song.songPositions.flatMap((pi) => song.patterns[pi].channels[ch].rows);
-const effectCells = (c: Cell): Array<[number, number]> => ([[c.effTyp, c.eff], [c.effTyp2, c.eff2], [c.effTyp3, c.eff3], [c.effTyp4, c.eff4], [c.effTyp5, c.eff5]] as Array<[number | undefined, number | undefined]>)
+const effectCells = (c: Cell): Array<[number, number]> => ([[c.effTyp, c.eff], [c.effTyp2, c.eff2], [c.effTyp3, c.eff3], [c.effTyp4, c.eff4], [c.effTyp5, c.eff5], [c.effTyp6, c.eff6], [c.effTyp7, c.eff7], [c.effTyp8, c.eff8]] as Array<[number | undefined, number | undefined]>)
   .filter(([t]) => t !== undefined && t !== 0) as Array<[number, number]>;
 
 let restoreFetch = () => {};
@@ -96,15 +97,21 @@ describe.each(SONGS)('David Whittaker %s: the grid is what the replayer plays', 
   it('a voice\'s audio starts within a tick of each note and a voice with no notes is silent; no stray instrument numbers or note-offs', async () => {
     const ab = corpus(name);
     const song = await parseDavidWhittakerFile(ab, name) as unknown as GridSong;
+    const walk = await walkDavidWhittaker(ab);
+    const clock = dwRowClock(walk);
     for (let ch = 0; ch < 4; ch++) {
       const cells = timeline(song, ch);
+      // one row is one song step: the audio timeline is in replayer frames, so a note's frame is read from the walk
+      const frames = walk.events.filter((e) => e.channel === ch && e.kind === DW_WALK.note && clock.tickToRow(e.ptick).row < cells.length).map((e) => e.tick);
+      const total = (frames.length ? frames[frames.length - 1] : 0) + 8;
       cells.forEach((c, t) => { if (c.instrument > 0) expect(c.note > 0 && c.note < 97, `${name} voice ${ch} tick ${t}: instrument ${c.instrument} on a cell that starts no note`).toBe(true); });
       const a = await startWorklet('davidwhittaker', 'DavidWhittaker', emscriptenTransform);
       await a.send({ type: 'loadModule', moduleData: ab.slice(0) });
       await a.send({ type: 'setChannelMask', mask: 1 << ch });
       await a.send({ type: 'play' });
-      const rms = rmsPerTick(renderTicks(a.proc, cells.length + 2, ch === 1 || ch === 2 ? 1 : 0), cells.length + 2);
-      const noteTicks = cells.flatMap((c, t) => (c.note > 0 && c.note < 97 ? [t] : []));
+      const rms = rmsPerTick(renderTicks(a.proc, total + 2, ch === 1 || ch === 2 ? 1 : 0), total + 2);
+      const noteTicks = frames;
+      expect(cells.filter((c) => c.note > 0 && c.note < 97).length, `${name} voice ${ch}: a grid note for every walk note`).toBe(frames.length);
       if (noteTicks.length === 0) {
         expect(Math.max(...rms), `${name} voice ${ch} never has a note: silent`).toBeLessThan(1e-4);
         expect(cells.every((c) => c.note === 0), `${name} voice ${ch} empty`).toBe(true);
@@ -128,6 +135,7 @@ describe.each(SONGS)('David Whittaker %s: the grid is what the replayer plays', 
     const song = await parseDavidWhittakerFile(ab, name) as unknown as GridSong;
     const layout = song.uadeVariableLayout!;
     const walk = await walkDavidWhittaker(ab);
+    const clock = dwRowClock(walk);
     const fpOf = new Map(layout.filePatternAddrs.map((addr, fp) => [addr, fp]));
     const carrierAt = (block: number, pos: number) => {
       const rows = layout.blockRows![fpOf.get(block)!];
@@ -170,7 +178,7 @@ describe.each(SONGS)('David Whittaker %s: the grid is what the replayer plays', 
         case DW_WALK.halfVolumeOn: return [[id('half volume on'), 0]];
         case DW_WALK.halfVolumeOff: return [[id('half volume off'), 0]];
         case DW_WALK.restart: return [[id('restart'), 0]];
-        case DW_WALK.speed: return [[id('speed'), e.a]];
+        case DW_WALK.speed: return [[FX_SPEED, e.a]];
         case DW_WALK.delaySpeed: return [[id('delay speed'), e.a]];
         case DW_WALK.globalFade: return [[id('global volume fade'), e.a]];
         case DW_WALK.globalVolume: return [[id('global volume'), e.a]];
@@ -182,7 +190,22 @@ describe.each(SONGS)('David Whittaker %s: the grid is what the replayer plays', 
     let seenKinds = 0;
     for (let ch = 0; ch < walk.channels; ch++) {
       const want: Array<[number, number, number]> = [];
-      for (const e of walk.events) if (e.channel === ch && e.tick < song.songPositions.length * 64) for (const [t, v] of expected(e)) want.push([e.tick, t, v]);
+      // a row holds its row offset first (when the command is not on a step boundary), then the commands in walk order
+      const byRow = new Map<number, { offset: number; list: Array<[number, number]> }>();
+      for (const e of walk.events) {
+        const { row, offset } = clock.tickToRow(e.ptick);
+        if (e.channel !== ch || row >= song.songPositions.length * 64) continue;
+        const ex = expected(e);
+        if (ex.length === 0) continue;
+        const cell = byRow.get(row) ?? { offset, list: [] };
+        cell.list.push(...ex);
+        byRow.set(row, cell);
+      }
+      for (const row of [...byRow.keys()].sort((x, y) => x - y)) {
+        const { offset, list } = byRow.get(row)!;
+        if (offset > 0) want.push([row, id('row offset'), offset]);
+        for (const [t, v] of list) want.push([row, t, v]);
+      }
       const got: Array<[number, number, number]> = [];
       timeline(song, ch).forEach((c, t) => { for (const [typ, v] of effectCells(c)) got.push([t, typ, v]); });
       expect(got, `${name} voice ${ch} effect columns`).toEqual(want);

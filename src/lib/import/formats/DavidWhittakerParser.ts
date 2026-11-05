@@ -718,6 +718,7 @@ export async function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: str
   let patterns: Pattern[] = [];
   let songPositions: number[] = [0];
   let initialSpeed = 6;
+  let initialBPM = 125;
   let filePatterns: DWFilePatterns | null = null;
   let blockAtStart: number[][] = [];
   let unmatched: string | null = null;
@@ -739,11 +740,11 @@ export async function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: str
         patterns = grid.patterns;
         songPositions = grid.songPositions;
         blockAtStart = grid.blockAtStart;
-        // A grid row is one 50 Hz replayer tick (the module's song speed is how many ticks the
-        // TRACK waits per wait unit, and is already in the timeline), so the scheduler that moves
-        // the cursor must spend one tick per row: initialSpeed 1 at 125 BPM = 20 ms. The module's
-        // speed there ran the cursor at a third (speed 3) or a fifth of the sound.
-        initialSpeed = 1;
+        // A grid row is one song step: `speed` processed ticks (stepRowClock.ts). A processed tick lasts
+        // 1/(50 * num/den) s once the player skips frames, and a row lasts speed * 2.5 / BPM s, so the
+        // scheduler's tempo is 125 * num / den (fractional, owner decision R1).
+        initialSpeed = walk.speed;
+        initialBPM = (125 * walk.tickRate.num) / walk.tickRate.den;
       }
     } catch (err) {
       unmatched = `the replayer could not walk the song: ${err instanceof Error ? err.message : String(err)}`;
@@ -783,7 +784,7 @@ export async function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: str
     restartPosition: 0,
     numChannels: CHANNELS,
     initialSpeed,
-    initialBPM: 125,
+    initialBPM,
     davidWhittakerFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
