@@ -18,6 +18,8 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import type { TrackerCell } from '@/types';
+import { SF_FX_ROW_OFFSET } from '@/lib/import/formats/soundFactoryGrid';
 import {
   soundFactoryOpcodeFor, SOUND_FACTORY_EMPTY_INSTRUMENT, type SoundFactoryPitchParams,
 } from '@/lib/import/formats/soundFactoryPitch';
@@ -114,9 +116,34 @@ function buildChannelOpcodes(
     const channel = pattern.channels[channelIdx];
     const rows = channel.rows;
 
-    let rowIdx = 0;
-    while (rowIdx < rows.length) {
-      const cell = rows[rowIdx];
+    // One grid row = `step` ticks (the parser's main step, song.initialSpeed). A cell with the
+    // row-offset effect starts its note that many ticks into the row. Every event's duration
+    // is the tick gap to the next event (or the pattern end), so the file keeps the song's timing.
+    const step = Math.max(1, Math.floor(song.initialSpeed || 1));
+    const isEvent = (c: TrackerCell): boolean =>
+      (c.note ?? 0) > 0 || (c.instrument ?? 0) > 0 || (c.effTyp ?? 0) > 0 || (c.volume ?? 0) > 0;
+    const events: { cell: TrackerCell; tick: number }[] = [];
+    rows.forEach((c, r) => {
+      if (!isEvent(c)) return;
+      events.push({ cell: c, tick: r * step + (c.effTyp === SF_FX_ROW_OFFSET ? (c.eff ?? 0) : 0) });
+    });
+    if ((rows.some((c) => (c.note2 ?? 0) > 0))) warnings.push(`Ch${channelIdx + 1}: second note column is not exported`);
+    const patternEnd = rows.length * step;
+    const pushPause = (ticks: number): void => {
+      if (ticks <= 0) return;
+      const pauseBytes = new Uint8Array(3);
+      pauseBytes[0] = Op.Pause;
+      pauseBytes[1] = (ticks >> 8) & 0xFF;
+      pauseBytes[2] = ticks & 0xFF;
+      chunks.push(pauseBytes);
+    };
+    let cursor = 0;
+    for (let i = 0; i < events.length; i++) {
+      const { cell, tick } = events[i];
+      pushPause(tick - cursor);
+      const nextTick = i + 1 < events.length ? events[i + 1].tick : patternEnd;
+      const duration = Math.max(1, nextTick - tick);
+      cursor = tick + duration;
       const xmNote = cell.note ?? 0;
       const instrId = cell.instrument ?? 0;
 
@@ -144,66 +171,23 @@ function buildChannelOpcodes(
       }
 
       if (xmNote > 0 && xmNote <= 96) {
-        // Note event — collect consecutive empty rows after as duration
         const noteByte = xmNoteToPsf(xmNote, pitchById.get(currentInstrId) ?? SOUND_FACTORY_EMPTY_INSTRUMENT);
         if (noteByte >= 0) {
-          let duration = 1;
-          // Look ahead for empty rows that extend this note's duration
-          while (rowIdx + duration < rows.length) {
-            const next = rows[rowIdx + duration];
-            if ((next.note ?? 0) > 0 || (next.instrument ?? 0) > 0 ||
-                (next.effTyp ?? 0) > 0 || (next.volume ?? 0) > 0) {
-              break;
-            }
-            duration++;
-          }
           const noteBytes = new Uint8Array(3);
           noteBytes[0] = noteByte;
           noteBytes[1] = (duration >> 8) & 0xFF;
           noteBytes[2] = duration & 0xFF;
           chunks.push(noteBytes);
-          rowIdx += duration;
-          continue;
         } else {
-          // Note out of range — treat as pause
           warnings.push(`Ch${channelIdx + 1}: Note ${xmNote} out of PSF range, converted to pause`);
-          const pauseBytes = new Uint8Array(3);
-          pauseBytes[0] = Op.Pause;
-          pauseBytes[1] = 0;
-          pauseBytes[2] = 1;
-          chunks.push(pauseBytes);
-          rowIdx++;
-          continue;
+          pushPause(duration);
         }
-      } else if (xmNote === 97) {
-        // Note off — emit pause
-        const pauseBytes = new Uint8Array(3);
-        pauseBytes[0] = Op.Pause;
-        pauseBytes[1] = 0;
-        pauseBytes[2] = 1;
-        chunks.push(pauseBytes);
-        rowIdx++;
-        continue;
       } else {
-        // Empty row — collect consecutive empty rows as a single pause
-        let duration = 1;
-        while (rowIdx + duration < rows.length) {
-          const next = rows[rowIdx + duration];
-          if ((next.note ?? 0) > 0 || (next.instrument ?? 0) > 0 ||
-              (next.effTyp ?? 0) > 0 || (next.volume ?? 0) > 0) {
-            break;
-          }
-          duration++;
-        }
-        const pauseBytes = new Uint8Array(3);
-        pauseBytes[0] = Op.Pause;
-        pauseBytes[1] = (duration >> 8) & 0xFF;
-        pauseBytes[2] = duration & 0xFF;
-        chunks.push(pauseBytes);
-        rowIdx += duration;
-        continue;
+        // Note off, or a cell with no note: a pause to the next event.
+        pushPause(duration);
       }
     }
+    pushPause(patternEnd - cursor);
   }
 
   // End the channel

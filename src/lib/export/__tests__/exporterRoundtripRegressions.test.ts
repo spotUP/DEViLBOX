@@ -305,7 +305,8 @@ describe('exporter round-trip regressions', () => {
     // reordered the table (ch0 instr 3 -> re 1) and dropped out-of-range references
     // (ch1 instr 3 -> re 0). Pre-defining every instrument in id order fixes both.
     const { cells, matched } = cellMatch(song as TrackerSong, re as TrackerSong);
-    expect(cells).toBeGreaterThan(5000);
+    // One row per song step now (6 ticks), so the grid holds ~6x fewer cells than the per-tick grid (>5000).
+    expect(cells).toBeGreaterThan(400);
     expect(matched).toBe(cells);
   });
 

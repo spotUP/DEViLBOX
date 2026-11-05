@@ -107,10 +107,11 @@ export class SoundFactory2Engine extends WASMChannelOutputsEngine {
     this.workletNode.connect(this.output, 0);
   }
 
-  async loadTune(buffer: ArrayBuffer): Promise<void> {
+  /** `rowStep` = ticks per grid row (the song's initialSpeed): the playhead row is floor(tick / rowStep). */
+  async loadTune(buffer: ArrayBuffer, rowStep = 1): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('SoundFactory2Engine not initialized');
-    this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+    this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer, rowStep });
   }
 
   play(): void {
