@@ -50,8 +50,8 @@ async function walkedVoices(subsong: number, ticks: number): Promise<number[]> {
 describe('DavidWhittakerEngine plays the subsong of the song', { timeout: 120_000 }, () => {
   it('the registry hands the engine the subsong the grid was built from', () => {
     const dw = WASM_ENGINES.find((e) => e.key === 'DavidWhittakerReplayer')!;
-    expect(dw.getLoadArgs!({ fileSubsongs: { count: 8, current: 3, fileName: 'apb.dw' } } as TrackerSong)).toEqual([3]);
-    expect(dw.getLoadArgs!({} as TrackerSong)).toEqual([0]);
+    expect(dw.getLoadArgs!({ fileSubsongs: { count: 8, current: 3, fileName: 'apb.dw' } } as TrackerSong)).toEqual([3, undefined]); // [subsong, grid clock]
+    expect(dw.getLoadArgs!({} as TrackerSong)).toEqual([0, undefined]);
   });
 
   it.each([0, 1, 4])('apb.dw subsong %i sounds on the voices its walk starts notes on', async (subsong) => {

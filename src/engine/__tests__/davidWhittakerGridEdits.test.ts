@@ -152,9 +152,10 @@ describe.each(SONGS)('David Whittaker grid edits reach the module: %s', (name) =
     const src = load(name);
     const song = await parseDavidWhittakerFile(src, name) as TrackerSong;
     const edited = clonePatterns(song.patterns);
-    // a note removed: the module's command stream has no command for "no note here" at a row that starts one
-    const played = edited.flatMap((pt) => pt.channels[0].rows as unknown as Rec[]).find((c) => (c.note ?? 0) > 0 && (c.note ?? 0) < 97)!;
-    played.note = 0;
+    // a note-off on a row inside a long note: the module's command stream has no note slot there to mute (a note REMOVED on a
+    // row that starts one is written as a mute, davidWhittakerDeleteNote.test.ts)
+    const held = edited.flatMap((pt) => pt.channels[0].rows as unknown as Rec[]).find((c, i, all) => (c.note ?? 0) === 0 && i > 0 && (all[i - 1].note ?? 0) > 0 && (all[i - 1].note ?? 0) < 97)!;
+    held.note = 97;
     const r = await exportDavidWhittaker({ ...song, patterns: edited } as TrackerSong);
     expect(r.warnings.length).toBe(1);
     expect(new Uint8Array(await r.data.arrayBuffer())).toEqual(new Uint8Array(src));

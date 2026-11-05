@@ -25,6 +25,7 @@ size_t dw_render(DwModule* module, float* interleaved_stereo, size_t frames);
 // ch0..ch3 are float arrays of at least `frames` floats. Any may be NULL to skip.
 size_t dw_render_multi(DwModule* module, float* ch0, float* ch1, float* ch2, float* ch3, size_t frames);
 
+int dw_played_ticks(const DwModule* module);
 bool dw_has_ended(const DwModule* module);
 
 // Edit API

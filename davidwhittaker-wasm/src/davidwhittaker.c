@@ -299,6 +299,7 @@ struct DwModule {
     // Walk (dw_walk): every command the replayer executes, with the tick it ran on
     bool walking;
     int walk_tick;
+    int played_ticks;              // processed ticks the player has run for the current tune (dw_played_ticks)
     int walk_ptick;                // processed ticks so far minus 1: frame ticks the player skipped (delay / extra counter) are not counted
     int walk_pos;                  // byte position of the command being executed in its track
     int walk_count, walk_max;
@@ -1559,6 +1560,7 @@ static void initialize_sound(DwModule* m, int sub_song) {
     DwSongInfo* song = &m->song_info_list[sub_song];
 
     memset(&m->playing_info, 0, sizeof(DwGlobalPlayingInfo));
+    m->played_ticks = 0;
     m->playing_info.transpose = 0;
     m->playing_info.speed = song->speed;
     m->playing_info.volume_fade_speed = 0;
@@ -2182,6 +2184,7 @@ static void play_tick(DwModule* m) {
         }
     }
 
+    m->played_ticks++;
     m->walk_ptick++;   // the tick is processed: the commands below run on it
 
     if (m->enable_global_volume_fade) {
@@ -2553,6 +2556,12 @@ void dw_set_channel_mask(DwModule* module, uint32_t mask) {
 
     for (int i = 0; i < module->number_of_channels && i < 4; i++)
         module->mixer_channels[i].muted = ((mask >> i) & 1) == 0;
+}
+
+/* Processed ticks the player has run for the current tune (reset by dw_create / dw_select_subsong); the same count as
+ * the walk's processed ticks, so a grid row clock built from the walk maps it. Frames the player skips are not counted. */
+int dw_played_ticks(const DwModule* module) {
+    return module ? module->played_ticks : 0;
 }
 
 bool dw_has_ended(const DwModule* module) {

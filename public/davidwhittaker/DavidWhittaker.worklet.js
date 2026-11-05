@@ -18,6 +18,7 @@ class DavidWhittakerProcessor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.framesPlayed = 0;      // frames the song has rendered since it last started: a swapped-in module catches up to here
     this.channelMask = null;
+    this.lastPlayedTicks = -1;  // the processed-tick count last posted as a 'position' message
     this.lastHeapBuffer = null;
     this.initializing = false;
     // Per-channel dub sends + isolation slots (worklets/channel-outputs.js).
@@ -56,11 +57,12 @@ class DavidWhittakerProcessor extends AudioWorkletProcessor {
       case 'previewLoad': this.previewLoad(data.buffer); break;
       case 'noteOn': this.previewNoteOn(data.sample, data.period, data.envelope, data.arpeggio); break;
       case 'noteOff': if (this.previewHandle) this.module._dw_preview_stop(this.previewHandle); break;
-      case 'play': this.playing = true; break;
+      case 'play': this.playing = true; this.lastPlayedTicks = -1; break;
       case 'stop':
         this.playing = false;
         if (this.handle) this.module._dw_select_subsong(this.handle, this.subsong || 0);
         this.framesPlayed = 0;
+        this.lastPlayedTicks = -1;
         this.port.postMessage({ type: 'stopped' });
         break;
       case 'pause': this.playing = !this.playing; break;
@@ -258,6 +260,17 @@ class DavidWhittakerProcessor extends AudioWorkletProcessor {
       if (globalThis.DevilboxChannelStream) {
         this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
         this._stream.writeFloat32(this.chBufs.slice(0, 4), rendered);
+      }
+    }
+
+    // Playhead: the replayer's own processed-tick count (davidwhittaker.c dw_played_ticks), posted when it changes. The engine
+    // maps it onto the grid's row clock (DavidWhittakerEngine.ts), so the cursor is the player's position, not a second clock.
+    // After swapModule the new handle has run the frames already played, so the count continues from where it was.
+    if (typeof this.module._dw_played_ticks === 'function') {
+      const ticks = this.module._dw_played_ticks(this.handle);
+      if (ticks !== this.lastPlayedTicks) {
+        this.lastPlayedTicks = ticks;
+        this.port.postMessage({ type: 'playTick', ticks });
       }
     }
 
