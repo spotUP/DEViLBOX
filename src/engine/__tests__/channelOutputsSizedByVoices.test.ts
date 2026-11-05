@@ -33,6 +33,21 @@ const SIZED_BY_THE_LOADED_SONG: Readonly<Record<string, string>> = {
 };
 const PROOF_TITLE = "describe('NuadeEngine node is sized by the loaded song'";
 
+/**
+ * Engines whose replayer carries more than 8 voices: the source file -> the voice count of the replayer's channel table.
+ * JayTrax: jxs-wasm/src/jxs_wasm.cpp, "Voices in the song (1..16)", channel arrays indexed c < 16.
+ */
+const MORE_THAN_EIGHT_VOICES: Readonly<Record<string, number>> = {
+  'jxs/JxsEngine.ts': 16,
+};
+
+/** The argument as a number: a literal, or a constant the same file defines as a literal. */
+function voiceCount(source: string, arg: string): string {
+  const name = arg.trim();
+  if (/^\d+$/.test(name)) return name;
+  return source.match(new RegExp(`const\\s+${name}\\s*=\\s*(\\d+)\\s*;`))?.[1] ?? name;
+}
+
 describe('engine worklet nodes declare only the outputs their voices fill', () => {
   it('a 4-voice engine gets main + 4 isolation slots + 4 dub sends', () => {
     expect(channelOutputNodeOptions(4).numberOfOutputs).toBe(9);
@@ -53,8 +68,10 @@ describe('engine worklet nodes declare only the outputs their voices fill', () =
         expect(readFileSync(join(__dirname, '..', proof), 'utf8'), `${f} is sized per song: ${proof} must prove it`).toContain(PROOF_TITLE);
         continue;
       }
-      expect(arg, f).toMatch(/^\d+$/);
-      expect(Number(arg), f).toBeLessThanOrEqual(8);
+      const count = voiceCount(readFileSync(f, 'utf8'), arg);
+      expect(count, f).toMatch(/^\d+$/);
+      const cap = Object.entries(MORE_THAN_EIGHT_VOICES).find(([file]) => f.endsWith(file))?.[1] ?? 8;
+      expect(Number(count), f).toBeLessThanOrEqual(cap);
     }
   });
 });
