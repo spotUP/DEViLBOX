@@ -29,6 +29,8 @@ int sf_get_play_tick(const SfModule* module);
 int sf_get_instrument_count(const SfModule* module);
 float sf_get_instrument_param(const SfModule* module, int inst, const char* param);
 void sf_set_instrument_param(SfModule* module, int inst, const char* param, float value);
+int sf_set_instrument_param_at_offset(SfModule* module, uint32_t file_offset, const char* param, float value);
+float sf_get_playing_instrument_param_at_offset(SfModule* module, uint32_t file_offset, const char* param);
 size_t sf_export(const SfModule* module, uint8_t* out, size_t max_size);
 
 

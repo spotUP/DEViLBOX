@@ -1209,7 +1209,9 @@ static void sf_find_samples_in_list(SfModule* m, uint32_t offset) {
                 offset++; // instrument number
                 uint16_t ilen = sf_fetch_word_at(m, &offset);
 
-                if (m->num_original_instruments < SF_MAX_INSTRUMENTS) {
+                // One entry per DefineInstr record: GoSub re-scans visit the same record again.
+                if (sf_find_original_instrument_index(m, offset) < 0 &&
+                    m->num_original_instruments < SF_MAX_INSTRUMENTS) {
                     m->original_instrument_offsets[m->num_original_instruments] = offset;
                     sf_parse_instrument_at(m, offset);
                     m->num_original_instruments++;
@@ -1540,9 +1542,7 @@ int sf_get_instrument_count(const SfModule* module) {
     return module ? module->num_original_instruments : 0;
 }
 
-float sf_get_instrument_param(const SfModule* module, int inst, const char* param) {
-    if (!module || inst < 0 || inst >= module->num_original_instruments || !param) return -1.0f;
-    const SfInstrument* in = &module->original_instruments[inst];
+static float sf_get_param(const SfInstrument* in, const char* param) {
 
     if (strcmp(param, "instrumentNumber") == 0)  return (float)in->instrument_number;
     if (strcmp(param, "sampleLength") == 0)      return (float)in->sample_length;
@@ -1577,9 +1577,12 @@ float sf_get_instrument_param(const SfModule* module, int inst, const char* para
     return -1.0f;
 }
 
-void sf_set_instrument_param(SfModule* module, int inst, const char* param, float value) {
-    if (!module || inst < 0 || inst >= module->num_original_instruments || !param) return;
-    SfInstrument* in = &module->original_instruments[inst];
+float sf_get_instrument_param(const SfModule* module, int inst, const char* param) {
+    if (!module || inst < 0 || inst >= module->num_original_instruments || !param) return -1.0f;
+    return sf_get_param(&module->original_instruments[inst], param);
+}
+
+static void sf_apply_instrument_param(SfInstrument* in, const char* param, float value) {
     uint8_t b = (uint8_t)value;
     uint16_t v = (uint16_t)value;
 
@@ -1611,6 +1614,31 @@ void sf_set_instrument_param(SfModule* module, int inst, const char* param, floa
     if (strcmp(param, "filterSpeed") == 0)        { in->filter_speed = b; return; }
     if (strcmp(param, "dasrSustainOffset") == 0)  { in->dasr_sustain_offset = v; return; }
     if (strcmp(param, "dasrReleaseOffset") == 0)  { in->dasr_release_offset = v; return; }
+}
+
+void sf_set_instrument_param(SfModule* module, int inst, const char* param, float value) {
+    if (!module || inst < 0 || inst >= module->num_original_instruments || !param) return;
+    sf_apply_instrument_param(&module->original_instruments[inst], param, value);
+    if (inst < module->num_playing_instruments)
+        sf_apply_instrument_param(&module->playing_instruments[inst], param, value);
+}
+
+// Keyed by the DefineInstr record's file offset (the SoundFactoryParser recordOffset), not by list position.
+// Writes the original (kept for later subsong selects) and the live copy the voices play from.
+// Returns the instrument index, or -1 when no record starts at that offset.
+int sf_set_instrument_param_at_offset(SfModule* module, uint32_t file_offset, const char* param, float value) {
+    if (!module || !param || file_offset < 276) return -1;
+    int idx = sf_find_original_instrument_index(module, file_offset - 276);
+    if (idx < 0) return -1;
+    sf_set_instrument_param(module, idx, param, value);
+    return idx;
+}
+
+float sf_get_playing_instrument_param_at_offset(SfModule* module, uint32_t file_offset, const char* param) {
+    if (!module || !param || file_offset < 276) return -1.0f;
+    int idx = sf_find_original_instrument_index(module, file_offset - 276);
+    if (idx < 0 || idx >= module->num_playing_instruments) return -1.0f;
+    return sf_get_param(&module->playing_instruments[idx], param);
 }
 
 size_t sf_export(const SfModule* module, uint8_t* out, size_t max_size) {

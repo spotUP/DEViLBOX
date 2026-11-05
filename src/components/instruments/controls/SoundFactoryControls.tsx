@@ -54,10 +54,10 @@ export const SoundFactoryControls: React.FC<SoundFactoryControlsProps> = ({ inst
     for (const [k, v] of Object.entries(patch)) if (v !== undefined) params[k] = v;
     instrumentRef.current = { ...cur, metadata: { ...cur.metadata, soundFactoryInstrument: { ...m, params } } };
     onChange({ metadata: instrumentRef.current.metadata });
-    // Parser instrument ids are 1-based in the order the WASM replayer lists its instruments.
+    // Keyed by the DefineInstr record's file offset: list position in the replayer can differ from the parser's.
     if (SoundFactory2Engine.hasInstance()) {
       const engine = SoundFactory2Engine.getInstance();
-      for (const [k, v] of Object.entries(patch)) if (v !== undefined) engine.setInstrumentParam(cur.id - 1, k, v);
+      for (const [k, v] of Object.entries(patch)) if (v !== undefined) engine.setInstrumentParam(m.recordOffset, k, v);
     }
   }, [onChange]);
 
