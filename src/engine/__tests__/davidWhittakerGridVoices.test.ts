@@ -75,7 +75,9 @@ describe.each(SONGS)('David Whittaker %s: the grid is what the replayer plays', 
     const mod = a.proc.module as { _malloc(n: number): number; _free(p: number): void; HEAPU8: Uint8Array; _dw_trace(h: number, ticks: number, out: number, max: number): number };
     const ptr = mod._malloc(4096 * 6);
     const walk = await walkDavidWhittaker(ab);
-    const n = mod._dw_trace(a.proc.handle as number, walk.ticks, ptr, 4096);
+    // the walk's last tick is the wrap tick (pass 2's first tick) unless a stop-song ended the tune
+    const passTicks = walk.events.some((e) => e.kind === DW_WALK.stopSong) ? walk.ticks : walk.ticks - 1;
+    const n = mod._dw_trace(a.proc.handle as number, passTicks, ptr, 4096);
     const dv = new DataView(mod.HEAPU8.buffer, ptr, n * 6);
     const trace = Array.from({ length: n }, (_, i) => ({ ch: dv.getInt16(i * 6, true), sample: dv.getInt16(i * 6 + 2, true), byte: dv.getInt16(i * 6 + 4, true) }));
     mod._free(ptr);
@@ -193,7 +195,15 @@ describe.each(SONGS)('David Whittaker %s: the grid is what the replayer plays', 
       // a row holds its row offset first (when the command is not on a step boundary), then the commands in walk order
       const byRow = new Map<number, { offset: number; list: Array<[number, number]> }>();
       for (const e of walk.events) {
-        const { row, offset } = clock.tickToRow(e.ptick);
+        let { row, offset } = clock.tickToRow(e.ptick);
+        // on or after the wrap tick: the next pass, played from row 0 by the order loop; only the loop command that ended
+        // this pass is shown, on the last row and with no row offset
+        const nextPass = e.ptick >= walk.processedTicks;
+        if (nextPass) {
+          if (e.kind !== DW_WALK.endOfTrack) continue;
+          row = clock.rowsForTicks(walk.processedTicks) - 1;
+          offset = 0;
+        }
         if (e.channel !== ch || row >= song.songPositions.length * 64) continue;
         const ex = expected(e);
         if (ex.length === 0) continue;

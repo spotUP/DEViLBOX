@@ -102,4 +102,35 @@ describe('David Whittaker grids against the original player (UADE Paula note-ons
       expect(compared, 'voices compared').toBeGreaterThanOrEqual(name === 'apb.dw' ? 32 : 12);
     });
   }
+
+  // The order loops: pass 2 is the grid's rows replayed from the order's loop start. A grid one row too long per pass
+  // (the wrap tick drawn as an extra row) is in step for pass 1 and runs one row late from pass 2 on.
+  const SECOND_PASS_SECONDS = 20;
+  // Only apb.dw: UADE ends garfield2+.dw tune 0 (a 243 s pass) at about 238 s, before its second pass starts, so the
+  // original has no second pass to compare there. Voices 3 and 4 of apb.dw tune 0 start notes in the original's second
+  // pass that the walk never shows (the grid has none): a separate gap, so voices without grid notes are not compared.
+  for (const rel of FILES.slice(0, 1)) {
+    const name = rel.split('/').pop()!;
+    it(`${name}: tune 0 stays on the player's notes through the second pass of the order`, async () => {
+      const bytes = new Uint8Array(readFileSync(rel));
+      const ab = bytes.slice().buffer as ArrayBuffer;
+      const table = tableOffset(await openUade(), bytes, name);
+      expect(table).toBeGreaterThan(0);
+      const song = await parseDavidWhittakerFile(ab.slice(0), name, 0, 0);
+      const rowCount = song.songPositions.reduce((n, p) => n + song.patterns[p].length, 0);
+      if (name === 'apb.dw') expect(rowCount, 'apb.dw tune 0: 128 rows at speed 3 are the 384 ticks of one pass').toBe(128);
+      expect(song.restartPosition ?? 0, 'the order loops to its first step').toBe(0);
+      const pass = rowCount * rowSeconds(song);
+      const grid = gridOnsets(song).map((l) => [...l, ...l.map((t) => t + pass)]);
+      const span = Math.min(pass + SECOND_PASS_SECONDS, 2 * pass);
+      const paula = paulaOnsets(await openUade(), bytes, name, table, 0, span + 1);
+      const misses: string[] = [];
+      for (const m of onsetMatch(grid, paula, span, TOLERANCE_MS)) {
+        if (m.grid === 0) continue;
+        const ok = (hit: number, n: number): boolean => n === 0 || hit / n >= MIN_COVERAGE;
+        if (!ok(m.gridHit, m.grid) || !ok(m.playerHit, m.player)) misses.push(`${name} voice ${m.voice + 1}: grid ${m.grid} (${m.gridHit} hit), player ${m.player} (${m.playerHit} hit), pass ${pass.toFixed(3)} s`);
+      }
+      expect(misses, 'voices that fall out of step in pass 2').toEqual([]);
+    });
+  }
 });

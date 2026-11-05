@@ -2795,6 +2795,7 @@ int dw_walk(DwModule* m, int max_ticks, int32_t* out, int max_events, int32_t* i
     for (int i = 0; i < 8; i++) m->walk_wrap_tick[i] = -1;
     m->walk_stop_tick = -1;
     int ticks = 0;
+    bool wrapped = false;   // the walk ended on the tick every voice wrapped, a tick that already belongs to the next pass
     for (; ticks < max_ticks && m->walk_count < max_events; ticks++) {
         play_tick(m);
         bool all = true;
@@ -2802,7 +2803,7 @@ int dw_walk(DwModule* m, int max_ticks, int32_t* out, int max_events, int32_t* i
             if (m->channels[i].position_list_length == 0) continue;   // a voice with no track
             if (m->walk_wrap_tick[i] < 0) all = false;
         }
-        if (all) { ticks++; break; }
+        if (all) { ticks++; wrapped = true; break; }
         // A stop-song ends the song: the replayer resets and would play the tune again from its start, which is not the tune's first pass.
         if (m->walk_stop_tick >= 0) { ticks++; break; }
     }
@@ -2817,7 +2818,7 @@ int dw_walk(DwModule* m, int max_ticks, int32_t* out, int max_events, int32_t* i
         info[12] = (saved >= 0 && saved < m->song_info_count) ? m->song_info_list[saved].speed : 0;
         // info[13] / info[14]: processed ticks per 50 Hz frame at the subsong's start, as a fraction (the extra counter
         // skips 1 frame in 6, the delay counter skips delay_counter_speed in 256); info[15]: processed ticks the walk ran.
-        info[13] = rate_num; info[14] = rate_den; info[15] = m->walk_ptick + 1;
+        info[13] = rate_num; info[14] = rate_den; info[15] = wrapped ? m->walk_ptick : m->walk_ptick + 1;
     }
     int n = m->walk_count;
     initialize_sound(m, saved);

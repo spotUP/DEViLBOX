@@ -144,6 +144,18 @@ export function buildDWGridFromWalk(walk: DwWalk): DwGrid {
     }
     for (let ch = 0; ch < channels; ch++) blockAt[ch][r] = curBlock[ch];
   }
+  // Events on or after the wrap tick belong to the next pass, which the order loop plays from row 0: none is drawn.
+  // The loop command itself ran at the end of this pass, so it shows on the last row (no row offset: it is no
+  // command of that row's own tick).
+  for (; ei < ev.length; ei++) {
+    const e = ev[ei];
+    if (e.kind !== DW_WALK.endOfTrack || e.channel >= channels || e.ptick < walk.processedTicks) continue;
+    const fx = dwEventEffects(e);
+    if (fx.length === 0) continue;
+    const key = e.channel * rows + (rows - 1);
+    const list = pending.get(key);
+    if (list) list.push(...fx); else pending.set(key, [...fx]);
+  }
 
   // The row offset leads the effect list: it takes the first slot, so the edit layer finds the rest behind it.
   for (const [key, offset] of offsets) {

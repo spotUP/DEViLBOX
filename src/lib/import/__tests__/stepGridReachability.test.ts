@@ -39,17 +39,18 @@ describe('step grid: David Whittaker through parseModuleToSong', () => {
     for (const pat of song.patterns) for (const ch of pat.channels) {
       expect(ch.channelMeta?.effectCols, 'the editor shows every effect slot the grid fills').toBeGreaterThanOrEqual(5);
     }
-    expect(song.patterns.length, 'ceil(1217 rows / 64), not 191').toBe(Math.ceil(12161 / 10 / 64));
+    expect(song.patterns.length, 'ceil(1216 rows / 64), not 191').toBe(Math.ceil(12160 / 10 / 64));
 
     const walk = await walkDavidWhittaker(ab.slice(0), 60_000, 0);
     const clock = dwRowClock(walk);
+    // (a note on the wrap tick starts the next pass: the order loop plays it at row 0, so the grid does not draw it)
     // note rows per channel over the song order, against the walk's own note ticks
     const rows: number[][] = Array.from({ length: walk.channels }, () => []);
     song.songPositions.forEach((pi, pos) => {
       song.patterns[pi].channels.forEach((ch, c) => ch.rows.forEach((cell, r) => { if (cell.note > 0 && cell.note < 97) rows[c].push(pos * 64 + r); }));
     });
     for (let c = 0; c < walk.channels; c++) {
-      const ticks = walk.events.filter((e) => e.channel === c && e.kind === DW_WALK.note).map((e) => e.ptick);
+      const ticks = walk.events.filter((e) => e.channel === c && e.kind === DW_WALK.note && e.ptick < walk.processedTicks).map((e) => e.ptick);
       expect(rows[c].length, `voice ${c + 1} note count`).toBe(ticks.length);
       rows[c].forEach((row, i) => expect(row * song.initialSpeed, `voice ${c + 1} note ${i}`).toBe(ticks[i]));
       expect(ticks.every((t) => clock.tickToRow(t).offset === 0), 'no note off the step').toBe(true);
