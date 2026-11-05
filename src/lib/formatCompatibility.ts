@@ -9,7 +9,11 @@
  * audio, automation). The dialog only fires once per violation type per song.
  */
 
-import { useFormatStore } from '@stores/useFormatStore';
+// Type-only + late-bound registry: a value import of useFormatStore drags the
+// whole native-engine graph (~43 s to load under vitest) into every consumer
+// of this module, e.g. useAutomationStore and the exporters.
+import type { FormatStore } from '@stores/useFormatStore';
+import { getFormatStoreRefOrNull } from '@stores/storeAccess';
 import { showConfirm } from '@stores/useConfirmStore';
 
 // ── Format Constraints ──────────────────────────────────────────────────────
@@ -255,7 +259,9 @@ export function getActiveFormatLimits(): FormatConstraints | null {
   if (_suppressDepth > 0) return null;
 
   try {
-    const fmt = useFormatStore.getState();
+    // No registered store means useFormatStore never evaluated: nothing native is loaded.
+    const fmt = getFormatStoreRefOrNull()?.getState() as FormatStore | undefined;
+    if (!fmt) return null;
     const hasNative = !!(
       fmt.libopenmptFileData || fmt.uadeEditableFileData || fmt.hivelyFileData ||
       fmt.klysFileData || fmt.c64SidFileData || fmt.musiclineFileData ||
