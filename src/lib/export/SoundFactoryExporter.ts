@@ -20,6 +20,9 @@
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { TrackerCell } from '@/types';
 import { SF_FX_ROW_OFFSET } from '@/lib/import/formats/soundFactoryGrid';
+import { sfEncodeEffects } from '@/lib/import/formats/soundFactoryEffects';
+import { BD_FX } from '@/lib/import/formats/benDaglishEffectGlyphs';
+import { applySfEffectEdits } from '@/lib/import/formats/soundFactoryEdits';
 import {
   soundFactoryOpcodeFor, SOUND_FACTORY_EMPTY_INSTRUMENT, type SoundFactoryPitchParams,
 } from '@/lib/import/formats/soundFactoryPitch';
@@ -106,6 +109,7 @@ function buildChannelOpcodes(
   const chunks: Uint8Array[] = [];
   let currentInstrId = 0;
   let currentVolume = 64;
+  let currentTranspose = 0;
 
   // Walk all patterns in song order
   for (let posIdx = 0; posIdx < song.songPositions.length; posIdx++) {
@@ -158,6 +162,23 @@ function buildChannelOpcodes(
         currentInstrId = instrId;
       }
 
+      // Effect commands of the cell (every slot but the row-offset delay), written before the note they precede.
+      const cellFx: { id: number; value: number }[] = [];
+      const cellRec = cell as unknown as Record<string, number | undefined>;
+      for (const [typKey, valKey] of CELL_FX_SLOTS) {
+        const id = cellRec[typKey] ?? 0;
+        if (id !== 0 && id !== SF_FX_ROW_OFFSET) cellFx.push({ id, value: cellRec[valKey] ?? 0 });
+      }
+      if (cellFx.length) {
+        const fxBytes = sfEncodeEffects(cellFx, warnings, `Ch${channelIdx + 1} row ${Math.floor(tick / step) + 1}`);
+        if (fxBytes.length) chunks.push(Uint8Array.from(fxBytes));
+        // A SetVolume command already set the volume; the volume column must not write it a second time.
+        const volFx = cellFx.filter((f) => f.id === BD_FX.channelVolume).pop();
+        if (volFx) currentVolume = volFx.value;
+        const trFx = cellFx.filter((f) => f.id === BD_FX.transpose).pop();
+        if (trFx) currentTranspose = (trFx.value << 24) >> 24;
+      }
+
       // Volume change (only emit if instrument is active and cell has volume-like info)
       // PSF volume range is 0-64
       const cellVol = cell.volume ?? 0;
@@ -171,7 +192,9 @@ function buildChannelOpcodes(
       }
 
       if (xmNote > 0 && xmNote <= 96) {
-        const noteByte = xmNoteToPsf(xmNote, pitchById.get(currentInstrId) ?? SOUND_FACTORY_EMPTY_INSTRUMENT);
+        // The replayer adds the SetTranspose value to every note opcode, so write the opcode without it.
+        const rawByte = xmNoteToPsf(xmNote, pitchById.get(currentInstrId) ?? SOUND_FACTORY_EMPTY_INSTRUMENT);
+        const noteByte = rawByte >= 0 && rawByte - currentTranspose >= 0 && rawByte - currentTranspose < 0x80 ? rawByte - currentTranspose : -1;
         if (noteByte >= 0) {
           const noteBytes = new Uint8Array(3);
           noteBytes[0] = noteByte;
@@ -285,11 +308,26 @@ function buildDefineInstrument(
   return out;
 }
 
+const CELL_FX_SLOTS = [['effTyp', 'eff'], ['effTyp2', 'eff2'], ['effTyp3', 'eff3'], ['effTyp4', 'eff4'], ['effTyp5', 'eff5'], ['effTyp6', 'eff6'], ['effTyp7', 'eff7'], ['effTyp8', 'eff8']] as const;
+
 export async function exportSoundFactory(
   song: TrackerSong,
 ): Promise<{ data: Blob; filename: string; warnings: string[] }> {
   const warnings: string[] = [];
   const NUM_CHANNELS = 4;
+
+  // A loaded module whose effect operands were edited: patch the operand bytes over the original stream
+  // (same length, loops and subroutines intact). The rebuild below cannot write effect commands, and a song
+  // with note edits keeps using it.
+  if (song.soundFactoryFileData) {
+    const edits = applySfEffectEdits(new Uint8Array(song.soundFactoryFileData), song.patterns);
+    if (edits.patched > 0 && edits.otherEdits === 0) {
+      const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_\- ]/g, '_');
+      return { data: new Blob([edits.data.buffer as ArrayBuffer], { type: 'application/octet-stream' }), filename: `${baseName}.psf`, warnings: edits.warnings };
+    }
+    warnings.push(...edits.warnings);
+    if (edits.patched > 0) warnings.push('Effect edits are not written together with note edits (the stream is rebuilt without effect commands).');
+  }
 
   // Prepare instrument sample data
   const instrumentPcms = new Map<number, Int8Array>();

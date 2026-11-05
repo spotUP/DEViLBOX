@@ -22,6 +22,7 @@ import { TW_EFFECT_GLYPH } from '@/lib/import/formats/tonyWilliamsEffectGlyphs';
 import { JX_EFFECT_GLYPH } from '@/lib/import/formats/jxsEffectGlyphs';
 import { DW_EFFECT_GLYPH } from '@/lib/import/formats/davidWhittakerEffectGlyphs';
 import { BD_EFFECT_GLYPH } from '@/lib/import/formats/benDaglishEffectGlyphs';
+import { SF_EFFECT_GLYPH } from '@/lib/import/formats/soundFactoryEffectGlyphs';
 import { RH_EFFECT_GLYPH } from '@/lib/import/formats/robHubbardEffectGlyphs';
 import { FP_EFFECT_GLYPH } from '@/lib/import/formats/fpEffectGlyphs';
 import { MA_EFFECT_GLYPH } from '@/lib/import/formats/maEffectGlyphs';
@@ -961,6 +962,9 @@ export class TrackerGLRenderer {
               } else if (BD_EFFECT_GLYPH[colEffTyp] !== undefined) {
                 // Ben Daglish track and position-list commands (block 0xD8..0xEC)
                 effStr = BD_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
+              } else if (SF_EFFECT_GLYPH[colEffTyp] !== undefined) {
+                // Sound Factory stream commands (block 0x300..0x322)
+                effStr = SF_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
               } else if (RH_EFFECT_GLYPH[colEffTyp] !== undefined) {
                 // Rob Hubbard stream commands (block 0xED..0xF2)
                 effStr = RH_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];

@@ -13,6 +13,9 @@ import type { TrackerCell } from '@/types';
 import { makeRowClock, mainStepFromOnsets, type RowClock } from './stepRowClock';
 import { BD_FX } from './benDaglishEffectGlyphs';
 
+/** One effect operand byte: its effect id (soundFactoryEffects.ts), the byte's value and its file offset. */
+export interface SfEffect { id: number; value: number; fileOffset: number; }
+
 /** One opcode of a voice's stream: a note (`isNote`) or a pause, lasting `duration` ticks. */
 export interface SfGridEvent {
   isNote: boolean;
@@ -20,7 +23,14 @@ export interface SfGridEvent {
   instrId: number;
   duration: number;
   fileOffset: number;
+  /** Effect operands that take effect at this event (the opcodes sat in the stream just before it). */
+  effects?: SfEffect[];
 }
+
+/** Effect slots a cell holds (the cell type's effTyp..effTyp8). */
+export const SF_MAX_EFFECT_SLOTS = 8;
+/** A voice always shows this many effect columns (slot 1 holds the delay). */
+export const SF_MIN_EFFECT_COLS = 2;
 
 /** Sound Factory shares the Ben Daglish "ticks into the row" effect id (one global effect id space). */
 export const SF_FX_ROW_OFFSET = BD_FX.rowOffset;
@@ -61,7 +71,21 @@ export interface SfGrid {
   clashRows: number;
   /** Notes that are a third onset in one row of one voice (no note column left). */
   unplaced: number;
+  /** Effect columns per voice: SF_MIN_EFFECT_COLS, grown to fit the busiest row (never above 8). */
+  effectCols: number[];
+  /** Per voice, row -> file offset of each effect slot (index 0 = slot 1), -1 for a slot without a file byte. */
+  effectOffsets: Array<Map<number, number[]>>;
+  /** Effect operands in the voices' events vs. operands placed in a cell slot. */
+  effectsSeen: number;
+  effectsPlaced: number;
+  /** Effect operands of events past the last grid row (not in the grid, same as their notes). */
+  effectsBeyondGrid: number;
+  /** Per effect id: operands seen and operands placed (the count check reads these). */
+  effectCounts: Map<number, { seen: number; placed: number }>;
 }
+
+const SLOT_TYP = ['effTyp', 'effTyp2', 'effTyp3', 'effTyp4', 'effTyp5', 'effTyp6', 'effTyp7', 'effTyp8'] as const;
+const SLOT_VAL = ['eff', 'eff2', 'eff3', 'eff4', 'eff5', 'eff6', 'eff7', 'eff8'] as const;
 
 /** Lay the voices' events out on the fixed step clock. `maxRows` caps each voice. */
 export function buildSfGrid(voices: readonly (readonly SfGridEvent[])[], maxRows: number): SfGrid {
@@ -72,7 +96,10 @@ export function buildSfGrid(voices: readonly (readonly SfGridEvent[])[], maxRows
   const rows = voices.map(() => Array.from({ length: rowCount }, emptyCell));
   const offsets = voices.map(() => new Array<number>(rowCount).fill(-1));
   const noteCols = voices.map(() => 1);
-  let delayedNotes = 0, clashRows = 0, unplaced = 0;
+  const effectCols = voices.map(() => SF_MIN_EFFECT_COLS);
+  const effectOffsets = voices.map(() => new Map<number, number[]>());
+  const effectCounts = new Map<number, { seen: number; placed: number }>();
+  let delayedNotes = 0, clashRows = 0, unplaced = 0, effectsSeen = 0, effectsPlaced = 0, effectsBeyondGrid = 0;
 
   voices.forEach((events, v) => {
     const on = onsetsOf(events);
@@ -99,6 +126,31 @@ export function buildSfGrid(voices: readonly (readonly SfGridEvent[])[], maxRows
         unplaced++;
       }
     });
+
+    // Effects go in the first free slot of their row, after the notes are placed (slot 1 may hold the delay).
+    events.forEach((e, i) => {
+      if (!e.effects?.length) return;
+      // An event past the last grid row is outside the grid like its notes (the song outruns the row cap);
+      // only the zero-length trailing event (commands after the last note) rides the last row.
+      const rawRow = clock.tickToRow(on[i]).row;
+      if (rawRow >= rowCount && e.duration > 0) { effectsBeyondGrid += e.effects.length; return; }
+      const row = Math.min(rowCount - 1, rawRow);
+      const cell = rows[v][row] as unknown as Record<string, number>;
+      for (const fx of e.effects) {
+        const c = effectCounts.get(fx.id) ?? { seen: 0, placed: 0 };
+        effectCounts.set(fx.id, c);
+        c.seen++; effectsSeen++;
+        let slot = 0;
+        while (slot < SF_MAX_EFFECT_SLOTS && (cell[SLOT_TYP[slot]] ?? 0) !== 0) slot++;
+        if (slot >= SF_MAX_EFFECT_SLOTS) continue;
+        cell[SLOT_TYP[slot]] = fx.id; cell[SLOT_VAL[slot]] = fx.value;
+        c.placed++; effectsPlaced++;
+        effectCols[v] = Math.max(effectCols[v], slot + 1);
+        const offs = effectOffsets[v].get(row) ?? new Array<number>(SF_MAX_EFFECT_SLOTS).fill(-1);
+        offs[slot] = fx.fileOffset;
+        effectOffsets[v].set(row, offs);
+      }
+    });
   });
-  return { rows, offsets, step, clock, noteCols, delayedNotes, clashRows, unplaced };
+  return { rows, offsets, step, clock, noteCols, delayedNotes, clashRows, unplaced, effectCols, effectOffsets, effectsSeen, effectsPlaced, effectsBeyondGrid, effectCounts };
 }

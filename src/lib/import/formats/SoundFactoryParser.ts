@@ -67,10 +67,12 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
+import { soundFactoryPcmBytes } from './soundFactoryInstrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeSoundFactoryCell } from '@/engine/uade/encoders/SoundFactoryEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
-import { buildSfGrid } from './soundFactoryGrid';
+import { buildSfGrid, type SfEffect } from './soundFactoryGrid';
+import { sfDecodeOperands, sfPresenceEffect } from './soundFactoryEffects';
 import {
   soundFactoryGridNote, soundFactoryOpcodeFor, soundFactoryPeriodMultiplier,
   SOUND_FACTORY_EMPTY_INSTRUMENT, type SoundFactoryPitchParams,
@@ -379,6 +381,20 @@ function fetchInstrument(opcodes: Uint8Array, offset: number): PSFInstrument {
  * Returns null if the file cannot be parsed.
  */
 export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): TrackerSong | null {
+  return parseSoundFactoryWithEffects(bytes, filename)?.song ?? null;
+}
+
+/** The parse plus, per voice, the file offset of every effect operand cell (global row -> slot offsets, -1 none). */
+export interface SoundFactoryParse {
+  song: TrackerSong;
+  effectOffsets: Array<Map<number, number[]>>;
+  /** Effect operands in the stream walk vs. placed in a cell slot, and per effect id. */
+  effectsSeen: number;
+  effectsPlaced: number;
+  effectCounts: Map<number, { seen: number; placed: number }>;
+}
+
+export function parseSoundFactoryWithEffects(bytes: Uint8Array, filename: string): SoundFactoryParse | null {
   if (!isSoundFactoryFormat(bytes)) return null;
 
   const moduleLength = u32BE(bytes, 0);
@@ -467,11 +483,8 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
     const isOneShot = (instr.effectByte & 0x01) !== 0;
 
     if (instr.sampleData.length > 0) {
-      // Convert signed to unsigned PCM
-      const rawPcm = new Uint8Array(instr.sampleData.length);
-      for (let i = 0; i < instr.sampleData.length; i++) {
-        rawPcm[i] = (instr.sampleData[i] + 128) & 0xff;
-      }
+      // Raw two's-complement bytes, as createSamplerInstrument expects (soundFactoryInstrument.ts)
+      const rawPcm = soundFactoryPcmBytes(instr.sampleData);
 
       const c3Rate = instr.samplingPeriod > 0
         ? periodToFreq(instr.samplingPeriod)
@@ -511,10 +524,11 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
     duration: number;   // ticks
     isNote: boolean;    // false: a pause
     fileOffset: number; // absolute file offset of this opcode (-1 if none)
+    effects?: SfEffect[]; // effect opcodes that take effect at this event
   }
 
-  function extractNotesFromVoice(startOffset: number): NoteEvent[] {
-    const events: NoteEvent[] = [];
+  /** Walk one voice's stream into `events`; effect opcodes wait in `pending` for the next note or pause. */
+  function walkVoice(startOffset: number, events: NoteEvent[], pending: SfEffect[]): void {
     let offset = startOffset;
     let currentInstrId = 0;
     let currentTranspose = 0; // SetTranspose: signed, added to every note opcode (soundfactory.c:549)
@@ -541,41 +555,32 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
         const pitch = pitchForInstrument(currentInstrId);
         const xmNote = soundFactoryGridNote(pitch, opcode + currentTranspose);
         cellContext.set(noteFileOff, { pitch, transpose: currentTranspose });
-        events.push({ note: xmNote, instrId: currentInstrId, volume: currentVolume, duration, isNote: true, fileOffset: noteFileOff });
+        events.push({ note: xmNote, instrId: currentInstrId, volume: currentVolume, duration, isNote: true, fileOffset: noteFileOff, effects: pending.splice(0) });
         continue;
       }
 
       switch (opcode) {
         case Op.Pause:
         case Op.StopAndPause: {
-          if (offset + 2 > opcodes.length) return events;
+          if (offset + 2 > opcodes.length) return;
           const pauseFileOff = HEADER_SIZE + (offset - 1); // file offset of pause opcode
           const dur = u16BE(opcodes, offset); offset += 2;
-          events.push({ note: 0, instrId: 0, volume: 0, duration: dur, isNote: false, fileOffset: pauseFileOff });
-          if (opcode === Op.StopAndPause) return events;
+          events.push({ note: 0, instrId: 0, volume: 0, duration: dur, isNote: false, fileOffset: pauseFileOff, effects: pending.splice(0) });
+          if (opcode === Op.StopAndPause) return;
           break;
         }
 
-        case Op.SetVolume:
-          if (offset < opcodes.length) currentVolume = Math.min(64, u8(opcodes, offset++));
-          break;
-
-        case Op.SetFineTune:
         case Op.UseInstrument: {
           if (offset < opcodes.length) {
             const slot = u8(opcodes, offset++);
-            if (opcode === Op.UseInstrument) {
-              // Find instrument by slot index (sequential order)
-              if (slot < instrArray.length) {
-                currentInstrId = slot + 1;
-              }
-            }
+            // Find instrument by slot index (sequential order)
+            if (slot < instrArray.length) currentInstrId = slot + 1;
           }
           break;
         }
 
         case Op.DefineInstrument: {
-          if (offset + 3 > opcodes.length) return events;
+          if (offset + 3 > opcodes.length) return;
           offset++; // slot
           const wordCount = u16BE(opcodes, offset); offset += 2;
           const instrOffset = offset;
@@ -589,12 +594,12 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
           if (callStack.length > 0) {
             offset = callStack.pop()!;
           } else {
-            return events;
+            return;
           }
           break;
 
         case Op.GoSub: {
-          if (offset + 4 > opcodes.length) return events;
+          if (offset + 4 > opcodes.length) return;
           const rel = s32BE(opcodes, offset); offset += 4;
           callStack.push(offset);
           offset = (offset - 4 + rel) >>> 0;
@@ -602,7 +607,7 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
         }
 
         case Op.Goto: {
-          if (offset + 4 > opcodes.length) return events;
+          if (offset + 4 > opcodes.length) return;
           const rel = s32BE(opcodes, offset); offset += 4;
           offset = (offset - 4 + rel) >>> 0;
           break;
@@ -631,57 +636,43 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
 
         case Op.Loop:
           // Restart from beginning — stop extraction to avoid infinite loop
-          return events;
+          return;
 
         case Op.End:
-          return events;
+          return;
 
         case Op.Nop:
         case Op.Request:
-        case Op.OneShot:
-        case Op.Looping:
           break;
 
-        case Op.SetTranspose:
-          if (offset < opcodes.length) currentTranspose = (u8(opcodes, offset++) << 24) >> 24;
-          break;
-
-        case Op.FadeOut:
-        case Op.FadeIn:
-        case Op.Led:
         case Op.WaitForRequest:
           if (offset < opcodes.length) offset++;
           break;
 
+        case Op.SetVolume:
+        case Op.SetFineTune:
+        case Op.SetTranspose:
+        case Op.FadeOut:
+        case Op.FadeIn:
+        case Op.Led:
+        case Op.OneShot:
+        case Op.Looping:
         case Op.Portamento:
         case Op.Tremolo:
-        case Op.Filter: {
-          if (offset >= opcodes.length) return events;
-          const enable = u8(opcodes, offset++) !== 0;
-          if (enable) offset += 3;
-          break;
-        }
-
-        case Op.Arpeggio: {
-          if (offset >= opcodes.length) return events;
-          const enable = u8(opcodes, offset++) !== 0;
-          if (enable) offset += 1;
-          break;
-        }
-
+        case Op.Filter:
+        case Op.Arpeggio:
         case Op.Vibrato:
-        case Op.Phasing: {
-          if (offset >= opcodes.length) return events;
-          const enable = u8(opcodes, offset++) !== 0;
-          if (enable) offset += 4;
-          break;
-        }
-
+        case Op.Phasing:
         case Op.SetAdsr: {
-          if (offset + 3 >= opcodes.length) return events;
-          offset += 3;
-          const releaseEnabled = u8(opcodes, offset++) !== 0;
-          if (releaseEnabled) offset += 1;
+          // One effect per operand byte (soundFactoryEffects.ts), kept with its file offset for write-back.
+          const base = offset;
+          const ops = sfDecodeOperands(opcode, (i) => (base + i < opcodes.length ? u8(opcodes, base + i) : undefined));
+          if (!ops) return;
+          const presence = sfPresenceEffect(opcode) !== undefined;
+          ops.forEach((o, i) => pending.push({ id: o.id, value: o.value, fileOffset: HEADER_SIZE + (presence ? base - 1 : base + i) }));
+          if (!presence) offset += ops.length;
+          if (opcode === Op.SetVolume) currentVolume = Math.min(64, ops[0].value);
+          if (opcode === Op.SetTranspose) currentTranspose = (ops[0].value << 24) >> 24;
           break;
         }
 
@@ -690,6 +681,17 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
       }
     }
 
+    return;
+  }
+
+  /** The events of a voice; effects after the last note or pause ride a zero-length trailing event. */
+  function extractNotesFromVoice(startOffset: number): NoteEvent[] {
+    const events: NoteEvent[] = [];
+    const pending: SfEffect[] = [];
+    walkVoice(startOffset, events, pending);
+    if (pending.length > 0) {
+      events.push({ note: 0, instrId: 0, volume: 0, duration: 0, isNote: false, fileOffset: -1, effects: pending.splice(0) });
+    }
     return events;
   }
 
@@ -754,7 +756,7 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
         pan: AMIGA_PAN[ch] ?? 0,
         instrumentId: null,
         color: null,
-        channelMeta: { importedFromMOD: false, effectCols: 2, noteCols: sfGrid.noteCols[ch], noteColDelay: true },
+        channelMeta: { importedFromMOD: false, effectCols: sfGrid.effectCols[ch], noteCols: sfGrid.noteCols[ch], noteColDelay: true },
         rows,
       })),
       importMetadata: {
@@ -814,7 +816,7 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
     },
   };
 
-  return {
+  const song: TrackerSong = {
     name: moduleName,
     format: 'PSF' as TrackerFormat,
     patterns: trackerPatterns,
@@ -828,6 +830,10 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
     linearPeriods: false,
     soundFactoryFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
     uadePatternLayout,
+  };
+  return {
+    song, effectOffsets: sfGrid.effectOffsets,
+    effectsSeen: sfGrid.effectsSeen, effectsPlaced: sfGrid.effectsPlaced, effectCounts: sfGrid.effectCounts,
   };
 }
 
