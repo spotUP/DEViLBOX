@@ -17,6 +17,8 @@ import { parseSoundFactoryWithEffects } from './SoundFactoryParser';
 import { SF_FX_ROW_OFFSET, SF_MAX_EFFECT_SLOTS } from './soundFactoryGrid';
 import { sfEncodeEffects, sfNormalizeEffects } from './soundFactoryEffects';
 import { soundFactoryOpcodeFor } from './soundFactoryPitch';
+import type { InstrumentConfig } from '@/types';
+import { sfInstrumentPatchStats, writeSfInstrParams } from './soundFactoryInstrumentParams';
 import { tokenizeSoundFactory, writeSoundFactoryStream, type SfStreamEdit } from './soundFactoryStream';
 
 const ROWS_PER_PATTERN = 64; // the parser's pattern length
@@ -52,9 +54,26 @@ function cellEffects(cell: TrackerCell): { fx: Fx[]; delay: number } {
 
 const same = (a: readonly Fx[], b: readonly Fx[]): boolean => a.length === b.length && a.every((x, i) => x.id === b[i].id && x.value === b[i].value);
 
-/** Write `edited` over the loaded .psf bytes `source`. */
-export function writeSoundFactory(source: Uint8Array, edited: readonly Pattern[]): SfEditResult {
+/**
+ * Patch each instrument's DefineInstr record from its metadata, in place and at constant length (no offset moves),
+ * on a copy of `source`. The pitch fields are not writable (soundFactoryInstrumentParams.ts), so the grid's note
+ * names are unchanged and the grid edits below still diff against a parse of the patched copy.
+ */
+function patchInstruments(source: Uint8Array, instruments: readonly InstrumentConfig[]): Uint8Array {
+  const out = source.slice();
+  for (const inst of instruments) {
+    const meta = inst.metadata?.soundFactoryInstrument;
+    if (!meta || meta.recordOffset < 0) continue;
+    sfInstrumentPatchStats.records++;
+    sfInstrumentPatchStats.bytes += writeSfInstrParams(out, meta.recordOffset, meta.params);
+  }
+  return out;
+}
+
+/** Write `edited` over the loaded .psf bytes `source`; `instruments` (optional) patch the instrument records. */
+export function writeSoundFactory(sourceBytes: Uint8Array, edited: readonly Pattern[], instruments: readonly InstrumentConfig[] = []): SfEditResult {
   sfWriterStats.calls++;
+  const source = instruments.length > 0 ? patchInstruments(sourceBytes, instruments) : sourceBytes;
   const warnings: string[] = [];
   const res: SfEditResult = { data: source, patched: 0, warnings };
   const parse = parseSoundFactoryWithEffects(source, 'edit.psf');

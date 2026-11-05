@@ -163,6 +163,7 @@ const SidMonControls = lazy(() => import('../controls/SidMonControls').then(m =>
 const RonKlarenControls = lazy(() => import('../controls/RonKlarenControls').then(m => ({ default: m.RonKlarenControls })));
 const DigMugControls = lazy(() => import('../controls/DigMugControls').then(m => ({ default: m.DigMugControls })));
 const FCControls = lazy(() => import('../controls/FCControls').then(m => ({ default: m.FCControls })));
+const SoundFactoryControls = lazy(() => import('../controls/SoundFactoryControls').then(m => ({ default: m.SoundFactoryControls })));
 const FredControls = lazy(() => import('../controls/FredControls').then(m => ({ default: m.FredControls })));
 const TFMXControls = lazy(() => import('../controls/TFMXControls').then(m => ({ default: m.TFMXControls })));
 const TFMXMacroEditor = lazy(() => import('../../tfmx/TFMXMacroEditor').then(m => ({ default: m.TFMXMacroEditor })));
@@ -1036,6 +1037,11 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
               />
             </Suspense>
           )}
+          {instrument.metadata?.soundFactoryInstrument && (
+            <Suspense fallback={<LoadingControls />}>
+              <SoundFactoryControls instrument={instrument} onChange={handleChange} />
+            </Suspense>
+          )}
         </div>
       </div>
     );
@@ -1694,6 +1700,11 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
             synthType={instrument.synthType}
           />
         </Suspense>
+        {instrument.metadata?.soundFactoryInstrument && (
+          <Suspense fallback={<LoadingControls />}>
+            <SoundFactoryControls instrument={instrument} onChange={handleChange} />
+          </Suspense>
+        )}
       </div>
     );
   }

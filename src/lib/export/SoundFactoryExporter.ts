@@ -319,7 +319,7 @@ export async function exportSoundFactory(
   // A loaded module goes through the one lossless writer: the source stream, byte-exact, with the grid edits
   // applied to it and every stored offset and length recomputed. The rebuild below is for songs made in the editor.
   if (song.soundFactoryFileData) {
-    const written = writeSoundFactory(new Uint8Array(song.soundFactoryFileData), song.patterns);
+    const written = writeSoundFactory(new Uint8Array(song.soundFactoryFileData), song.patterns, song.instruments);
     const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_\- ]/g, '_');
     return { data: new Blob([written.data.buffer as ArrayBuffer], { type: 'application/octet-stream' }), filename: `${baseName}.psf`, warnings: written.warnings };
   }

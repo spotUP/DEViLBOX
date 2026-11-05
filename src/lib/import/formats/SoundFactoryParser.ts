@@ -71,6 +71,7 @@ import { soundFactoryPcmBytes } from './soundFactoryInstrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeSoundFactoryCell } from '@/engine/uade/encoders/SoundFactoryEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { readSfInstrParams, SF_INSTR_HEADER_SIZE, type SfInstrParams } from './soundFactoryInstrumentParams';
 import { buildSfGrid, type SfEffect } from './soundFactoryGrid';
 import { sfDecodeOperands, sfPresenceEffect } from './soundFactoryEffects';
 import {
@@ -191,6 +192,7 @@ interface PSFInstrument {
   effectByte: number;
   waveCount: number;      // header +24
   octave: number;         // header +25: octave at which samplingPeriod plays unchanged
+  params: SfInstrParams;  // every record field (soundFactoryInstrumentParams.ts)
   sampleData: Int8Array;
   name: string;
 }
@@ -330,34 +332,17 @@ function findInstruments(
   }
 }
 
+/** The editable record of an instrument: its parameters and the file offset of its DefineInstr record. */
+function sfInstrumentMeta(instr: PSFInstrument): { params: SfInstrParams; recordOffset: number } {
+  return { params: { ...instr.params }, recordOffset: HEADER_SIZE + instr.offset };
+}
+
 function fetchInstrument(opcodes: Uint8Array, offset: number): PSFInstrument {
-  let off = offset;
   const maxOff = opcodes.length;
-
-  const sampleLength   = off + 2 <= maxOff ? u16BE(opcodes, off) : 0; off += 2;
-  const samplingPeriod = off + 2 <= maxOff ? u16BE(opcodes, off) : 0; off += 2;
-  const effectByte     = off < maxOff ? u8(opcodes, off++) : 0;
-
-  // Skip: tremoloSpeed(1) + tremoloStep(1) + tremoloRange(1) = 3
-  off += 3;
-  // portamentoStep(2) + portamentoSpeed(1) + arpeggioSpeed(1) = 4
-  off += 4;
-  // vibratoDelay(1) + vibratoSpeed(1) + vibratoStep(1) + vibratoAmount(1) = 4
-  off += 4;
-  // attackTime(1) + decayTime(1) + sustainLevel(1) + releaseTime(1) = 4
-  off += 4;
-  // phasingStart(1) + phasingEnd(1) + phasingSpeed(1) + phasingStep(1) = 4
-  off += 4;
-  // waveCount(1) + octave(1) = 2 (the replayer's period math reads both)
-  const waveCount = off < maxOff ? u8(opcodes, off) : 1;
-  const octave = off + 1 < maxOff ? u8(opcodes, off + 1) : 0;
-  off += 2;
-  // filterFrequency(1) + filterEnd(1) + filterSpeed(1) = 3
-  off += 3;
-  // padding(1) = 1
-  off += 1;
-  // DASR_SustainOffset(2) + DASR_ReleaseOffset(2) = 4
-  off += 4;
+  const params = readSfInstrParams(opcodes, offset);
+  const { sampleLength, samplingPeriod, effectByte, octave } = params;
+  const waveCount = offset + 24 < maxOff ? params.waveCount : 1;
+  const off = offset + SF_INSTR_HEADER_SIZE;
 
   // Sample data: sampleLength words (signed bytes)
   const dataLen = sampleLength * 2;
@@ -371,7 +356,7 @@ function fetchInstrument(opcodes: Uint8Array, offset: number): PSFInstrument {
     sampleData = new Int8Array(0);
   }
 
-  return { offset, sampleLength, samplingPeriod, effectByte, waveCount, octave, sampleData, name: '' };
+  return { offset, sampleLength, samplingPeriod, effectByte, waveCount, octave, params, sampleData, name: '' };
 }
 
 // ── Main Parser ────────────────────────────────────────────────────────────
@@ -514,7 +499,7 @@ export function parseSoundFactoryWithEffects(bytes: Uint8Array, filename: string
       const pitch = instrPitch[idx];
       const cfg = createSamplerInstrument(id, '', rawPcm, 64, c3Rate, loopStart, loopEnd);
       if (cfg.metadata?.modPlayback) cfg.metadata.modPlayback.periodMultiplier = soundFactoryPeriodMultiplier(pitch);
-      cfg.metadata = { ...cfg.metadata, soundFactoryPitch: pitch };
+      cfg.metadata = { ...cfg.metadata, soundFactoryPitch: pitch, soundFactoryInstrument: sfInstrumentMeta(instr) };
       instrConfigs.push(cfg);
     } else {
       instrConfigs.push({
@@ -525,6 +510,7 @@ export function parseSoundFactoryWithEffects(bytes: Uint8Array, filename: string
         effects: [],
         volume: 0,
         pan: 0,
+        metadata: { soundFactoryInstrument: sfInstrumentMeta(instr) },
       } as InstrumentConfig);
     }
   }

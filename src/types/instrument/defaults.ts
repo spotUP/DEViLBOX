@@ -125,6 +125,11 @@ export interface InstrumentMetadata {
     sampleLength: number;
     looped: boolean;
   };
+  /** Sound Factory (.psf) DefineInstr record: every parameter (soundFactoryInstrumentParams.ts) and the record's file offset. */
+  soundFactoryInstrument?: {
+    params: Record<string, number>;
+    recordOffset: number;
+  };
   fadeout?: number; // XM fadeout speed (0-4095), applied per tick on key-off
   sampleMap?: number[]; // XM note-to-sample mapping (96 entries, note 0-95 → sample index)
   multiSamples?: Array<{
