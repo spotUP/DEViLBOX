@@ -69,8 +69,8 @@ export function parseTimFollinFile(buffer: ArrayBuffer, filename: string, subson
     songLength: songPositions.length,
     restartPosition: 0,
     numChannels: 4,
-    // one grid row is one 50 Hz replayer tick: speed 1 at 125 BPM = 20 ms
-    initialSpeed: 1,
+    // one grid row is one song step (timFollinGrid.ts): speed = step ticks of 20 ms at 125 BPM
+    initialSpeed: grid?.step ?? 1,
     initialBPM: 125,
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0),

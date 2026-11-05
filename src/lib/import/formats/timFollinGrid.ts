@@ -16,6 +16,8 @@
  */
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import { periodToNote } from '@/lib/amiga/periodNotes';
+import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer, type RowClock } from './stepRowClock';
+import { BD_FX } from './benDaglishEffectGlyphs';
 
 const ROWS_PER_PATTERN = 64;
 const MAX_ROWS = 32768;
@@ -171,8 +173,19 @@ export interface TfolGrid {
   regions: TfolRegion[];
   /** One carrier cell per byte of each region (cutoff = 1, period = the byte), parallel to `regions`. */
   blockRows: TrackerCell[][];
-  /** Per pattern, voice and row: the note starting there. */
+  /** Per pattern, voice and row: the note starting there (the first note column). */
   rowSources: TfolRowSource[][][];
+  /** Per pattern, voice and row: the second note in the row (note column 2), when two notes start in one row. */
+  rowSources2: TfolRowSource[][][];
+  /** Processed ticks per row: the song step, measured from the note onsets. */
+  step: number;
+  clock: RowClock;
+  /** Notes that start inside their row (a row offset in the first effect column, or `delay2` in note column 2). */
+  delayedNotes: number;
+  /** Notes with no note column left in their row (a third onset of one voice in one row). */
+  unplacedNotes: number;
+  /** Per voice: 2 when any row holds two notes. */
+  noteCols: number[];
   /** For each pattern and voice, the region playing on the pattern's first row (-1: none). */
   regionAtStart: number[][];
   /** Notes per voice inside the timeline. */
@@ -252,6 +265,17 @@ function emptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
 }
 
+/** Each voice's note onset ticks inside the timeline, as the walk runs them (the reference the grid is checked against). */
+export function timFollinOnsetTicks(b: Uint8Array, subsong = 0): number[][] | null {
+  const m = locateTimFollin(b);
+  if (!m || subsong < 0 || subsong >= m.subsongCount) return null;
+  const songNumber = (subsong + 1) & (SONGS - 1);
+  const song = timFollinSong(b, m, songNumber);
+  const runs = song.streams.map((s, v) => runVoice(b, m, s, v < song.voices, songNumber === SILENT_SONG));
+  const ticks = Math.min(MAX_ROWS, Math.max(1, ...runs.map((r) => r.pass)));
+  return runs.map((r) => r.notes.filter((n) => n.tick < ticks).map((n) => n.tick));
+}
+
 /** Decode a subsong (0-based, as the replayer: song number (subsong + 1) & 15) into the display grid and its carriers. */
 export function buildTimFollinGrid(b: Uint8Array, subsong = 0): TfolGrid | null {
   const m = locateTimFollin(b);
@@ -260,7 +284,11 @@ export function buildTimFollinGrid(b: Uint8Array, subsong = 0): TfolGrid | null 
   const song = timFollinSong(b, m, songNumber);
   const runs = song.streams.map((s, v) => runVoice(b, m, s, v < song.voices, songNumber === SILENT_SONG));
   if (runs.every((r) => r.notes.length === 0)) return null;
-  const rows = Math.min(MAX_ROWS, Math.max(1, ...runs.map((r) => r.pass)));
+  const ticks = Math.min(MAX_ROWS, Math.max(1, ...runs.map((r) => r.pass)));
+  // one row is one song step: the main step of the voices' note onsets, in the replayer's ticks
+  const step = mainStepFromOnsets(runs.map((r) => r.notes.filter((n) => n.tick < ticks).map((n) => n.tick)));
+  const clock = makeRowClock([{ tick: 0, speed: step }]);
+  const rows = Math.max(1, clock.rowsForTicks(ticks));
 
   // regions: the executed event spans, merged where they touch or overlap
   const spans = runs.flatMap((r) => r.spans).sort((x, y) => x[0] - y[0] || x[1] - y[1]);
@@ -276,19 +304,35 @@ export function buildTimFollinGrid(b: Uint8Array, subsong = 0): TfolGrid | null 
 
   const grid: TrackerCell[][] = Array.from({ length: VOICES }, () => Array.from({ length: rows }, emptyCell));
   const sources: TfolRowSource[][] = Array.from({ length: VOICES }, () => new Array<TfolRowSource>(rows).fill(null));
+  const sources2: TfolRowSource[][] = Array.from({ length: VOICES }, () => new Array<TfolRowSource>(rows).fill(null));
   const regionAtTick: number[][] = Array.from({ length: VOICES }, () => new Array<number>(rows).fill(-1));
   const noteCounts: number[] = [];
+  const noteCols = new Array<number>(VOICES).fill(1);
+  const place = makeOnsetPlacer(clock);
+  let delayedNotes = 0, unplacedNotes = 0;
   runs.forEach((run, v) => {
     let count = 0;
     run.notes.forEach((n, i) => {
-      if (n.tick >= rows) return;
+      if (n.tick >= ticks) return;
+      const pl = place(v, n.tick);
+      if (!pl) { unplacedNotes++; return; }
       count++;
-      grid[v][n.tick].note = n.shown;
-      grid[v][n.tick].instrument = n.instrument;
+      const cell = grid[v][pl.row];
       const region = regionOf(n.offset);
-      sources[v][n.tick] = { region, offset: n.offset, length: n.length, noteByte: n.noteByte, base: n.base };
-      const end = Math.min(rows, i + 1 < run.notes.length ? run.notes[i + 1].tick : rows);
-      for (let t = n.tick; t < end; t++) regionAtTick[v][t] = region;
+      const src = { region, offset: n.offset, length: n.length, noteByte: n.noteByte, base: n.base };
+      if (pl.col === 0) {
+        cell.note = n.shown;
+        cell.instrument = n.instrument;
+        if (pl.offset > 0) { cell.effTyp = BD_FX.rowOffset; cell.eff = pl.offset; delayedNotes++; }
+        sources[v][pl.row] = src;
+      } else {
+        Object.assign(cell, { note2: n.shown, instrument2: n.instrument, delay2: pl.offset });
+        if (pl.offset > 0) delayedNotes++;
+        noteCols[v] = 2;
+        sources2[v][pl.row] = src;
+      }
+      const end = Math.min(rows, i + 1 < run.notes.length ? clock.tickToRow(run.notes[i + 1].tick).row : rows);
+      for (let t = pl.row; t < end; t++) regionAtTick[v][t] = region;
     });
     noteCounts.push(count);
   });
@@ -296,6 +340,7 @@ export function buildTimFollinGrid(b: Uint8Array, subsong = 0): TfolGrid | null 
   const patterns: Pattern[] = [];
   const songPositions: number[] = [];
   const rowSources: TfolRowSource[][][] = [];
+  const rowSources2: TfolRowSource[][][] = [];
   const regionAtStart: number[][] = [];
   for (let start = 0, p = 0; start < rows; start += ROWS_PER_PATTERN, p++) {
     const len = Math.min(ROWS_PER_PATTERN, rows - start);
@@ -304,11 +349,13 @@ export function buildTimFollinGrid(b: Uint8Array, subsong = 0): TfolGrid | null 
       muted: false, solo: false, collapsed: false,
       volume: 100, pan: (ch === 0 || ch === 3) ? -50 : 50, instrumentId: null, color: null,
       rows: cells.slice(start, start + len),
+      channelMeta: { importedFromMOD: false, effectCols: 2, noteCols: noteCols[ch], noteColDelay: true },
     }));
     patterns.push({ id: `pattern-${p}`, name: `Pattern ${p}`, length: len, channels: chData });
     songPositions.push(p);
     rowSources.push(sources.map((s) => s.slice(start, start + len)));
+    rowSources2.push(sources2.map((s) => s.slice(start, start + len)));
     regionAtStart.push(regionAtTick.map((s) => s[start]));
   }
-  return { patterns, songPositions, rows, regions, blockRows, rowSources, regionAtStart, noteCounts };
+  return { patterns, songPositions, rows, regions, blockRows, rowSources, rowSources2, step, clock, delayedNotes, unplacedNotes, noteCols, regionAtStart, noteCounts };
 }

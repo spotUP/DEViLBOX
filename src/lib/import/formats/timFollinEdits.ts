@@ -25,7 +25,7 @@ export interface TimFollinEditResult {
   warnings: string[];
 }
 
-interface Edit { pattern: number; channel: number; row: number; note: number; offset: number; value: number }
+interface Edit { pattern: number; channel: number; row: number; col: 0 | 1; note: number; offset: number; value: number }
 
 const where = (e: { pattern: number; channel: number; row: number }): string => `voice ${e.channel + 1}, pattern ${e.pattern}, row ${e.row}`;
 
@@ -33,7 +33,7 @@ export function otherFieldsDiffer(a: TrackerCell, b: TrackerCell): boolean {
   const x = a as unknown as Record<string, number | undefined>;
   const y = b as unknown as Record<string, number | undefined>;
   for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) {
-    if (k === 'note' || k === 'instrument') continue;
+    if (k === 'note' || k === 'instrument' || k === 'note2' || k === 'instrument2') continue;
     if ((x[k] ?? 0) !== (y[k] ?? 0)) return true;
   }
   return false;
@@ -69,35 +69,36 @@ export function applyTimFollinGridEdits(original: Uint8Array, patterns: readonly
   patterns.forEach((pat, pi) => pat.channels.forEach((ch, c) => ch.rows.forEach((cell, r) => {
     const was = base.patterns[pi]?.channels[c]?.rows[r];
     if (!was) return;
-    const noteChanged = cell.note !== was.note;
-    const instChanged = cell.instrument !== was.instrument;
     const otherChanged = otherFieldsDiffer(cell, was);
-    if (!noteChanged && !instChanged && !otherChanged) return;
     const at = { pattern: pi, channel: c, row: r };
-    if (instChanged) warnings.push(`${PREFIX} ${where(at)}: the instrument is chosen by an Instrument command shared by many notes; that change was not written.`);
+    if (cell.instrument !== was.instrument || cell.instrument2 !== was.instrument2) warnings.push(`${PREFIX} ${where(at)}: the instrument is chosen by an Instrument command shared by many notes; that change was not written.`);
     if (otherChanged) warnings.push(`${PREFIX} ${where(at)}: volume and effect columns are not stored per row in this format; that change was not written.`);
-    if (!noteChanged) return;
-    const src = base.rowSources[pi]?.[c]?.[r];
-    if (!src || was.note < 1 || was.note >= NOTE_OFF) {
-      warnings.push(`${PREFIX} ${where(at)}: no note plays on this row, and adding or removing one, or changing a rest or note off, would change the length of the stream; the edit was not written.`);
-      return;
+    for (const col of [0, 1] as const) {
+      const now = col === 0 ? cell.note : (cell.note2 ?? 0);
+      const wasNote = col === 0 ? was.note : (was.note2 ?? 0);
+      if (now === wasNote) continue;
+      const src = (col === 0 ? base.rowSources : base.rowSources2)[pi]?.[c]?.[r];
+      if (!src || wasNote < 1 || wasNote >= NOTE_OFF) {
+        warnings.push(`${PREFIX} ${where(at)}: no note plays on this row, and adding or removing one, or changing a rest or note off, would change the length of the stream; the edit was not written.`);
+        continue;
+      }
+      if (now < 1 || now >= NOTE_OFF) {
+        warnings.push(`${PREFIX} ${where(at)}: a note cannot be removed or turned into a note off without changing the stream length; the edit was not written.`);
+        continue;
+      }
+      const value = byteFor(now, src.base, src.noteByte);
+      if (value < 0) {
+        warnings.push(`${PREFIX} ${where(at)}: note ${now} is not in the player's period table; the note was not written.`);
+        continue;
+      }
+      const other = claimed.get(src.offset);
+      if (other !== undefined && other !== value) {
+        warnings.push(`${PREFIX} ${where(at)}: another edited row shares a stream byte with this one and wants a different value; this edit was not written.`);
+        continue;
+      }
+      claimed.set(src.offset, value);
+      accepted.push({ ...at, col, note: now, offset: src.offset, value });
     }
-    if (cell.note < 1 || cell.note >= NOTE_OFF) {
-      warnings.push(`${PREFIX} ${where(at)}: a note cannot be removed or turned into a note off without changing the stream length; the edit was not written.`);
-      return;
-    }
-    const value = byteFor(cell.note, src.base, src.noteByte);
-    if (value < 0) {
-      warnings.push(`${PREFIX} ${where(at)}: note ${cell.note} is not in the player's period table; the note was not written.`);
-      return;
-    }
-    const other = claimed.get(src.offset);
-    if (other !== undefined && other !== value) {
-      warnings.push(`${PREFIX} ${where(at)}: another edited row shares a stream byte with this one and wants a different value; this edit was not written.`);
-      return;
-    }
-    claimed.set(src.offset, value);
-    accepted.push({ ...at, note: cell.note, offset: src.offset, value });
   })));
 
   const writeAll = (edits: Edit[]): void => {
@@ -108,7 +109,7 @@ export function applyTimFollinGridEdits(original: Uint8Array, patterns: readonly
   // cells that share an edited byte legitimately change with it
   const touched = new Set(accepted.map((e) => e.offset));
   const shared = new Set<string>();
-  base.rowSources.forEach((pat, pi) => pat.forEach((voice, c) => voice.forEach((s, r) => {
+  for (const srcs of [base.rowSources, base.rowSources2]) srcs.forEach((pat, pi) => pat.forEach((voice, c) => voice.forEach((s, r) => {
     if (s && touched.has(s.offset)) shared.add(`${c}:${pi * ROWS_PER_PATTERN + r}`);
   })));
 
@@ -116,14 +117,14 @@ export function applyTimFollinGridEdits(original: Uint8Array, patterns: readonly
     writeAll(edits);
     const again = buildTimFollinGrid(data, subsong);
     if (!again || again.rows !== base.rows) return edits;
-    const bad = edits.filter((e) => cellAt(again, e.channel, e.pattern * ROWS_PER_PATTERN + e.row)?.note !== e.note);
+    const bad = edits.filter((e) => (e.col === 0 ? cellAt(again, e.channel, e.pattern * ROWS_PER_PATTERN + e.row)?.note : cellAt(again, e.channel, e.pattern * ROWS_PER_PATTERN + e.row)?.note2) !== e.note);
     if (bad.length > 0) return bad;
     for (let c = 0; c < 4; c++) {
       for (let row = 0; row < base.rows; row++) {
         if (shared.has(`${c}:${row}`)) continue;
         const a = cellAt(again, c, row);
         const b = cellAt(base, c, row);
-        if (a?.note !== b?.note || a?.instrument !== b?.instrument) return edits; // something else moved
+        if (a?.note !== b?.note || a?.instrument !== b?.instrument || a?.note2 !== b?.note2) return edits; // something else moved
       }
     }
     return [];

@@ -25,17 +25,27 @@ const NAME = 'follin_smallest.tf';
 const raw = readFileSync(`${process.cwd()}/public/data/songs/formats/${NAME}`);
 const ab = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer;
 
-const cellAt = (s: TrackerSong, v: number, tick: number) => {
-  const c = s.patterns[Math.floor(tick / 64)].channels[v].rows[tick % 64];
-  return [c.note, c.instrument];
-};
+
+/** The note starting on `tick` of a voice: one row is one song step, a note inside its row has a 0xD7 delay or sits in note column 2. */
+function cellAt(song: TrackerSong, v: number, tick: number): number[] {
+  const step = song.initialSpeed;
+  const row = Math.floor(tick / step), off = tick % step;
+  const c = song.patterns[Math.floor(row / 64)].channels[v].rows[row % 64] as unknown as Record<string, number>;
+  if (c.note > 0 && (c.effTyp === 0xd7 ? c.eff : 0) === off) return [c.note, c.instrument];
+  if (c.note2 > 0 && (c.delay2 ?? 0) === off) return [c.note2, c.instrument2];
+  return [0, 0];
+}
+const countNotes = (song: TrackerSong, v: number): number =>
+  song.patterns.reduce((n, p) => n + p.channels[v].rows.filter((r) => r.note > 0).length + p.channels[v].rows.filter((r) => (r.note2 ?? 0) > 0).length, 0);
 
 describe('Tim Follin read-only grid', () => {
   it('notes per voice, first notes, byte-exact carriers', () => {
     expect(isTimFollinFormat(ab, NAME)).toBe(true);
     const song = parseTimFollinFile(ab, NAME);
     expect(song.gridUnmatchedReason).toBeUndefined();
-    expect(song.patterns.reduce((n, p) => n + p.length, 0)).toBe(588);
+    // one row is one song step (measured 15 ticks): ceil(588 / 15) rows
+    expect(song.initialSpeed).toBe(15);
+    expect(song.patterns.reduce((n, p) => n + p.length, 0)).toBe(Math.ceil(588 / song.initialSpeed));
 
     expect(cellAt(song, 0, 0)).toEqual([37, 5]);
     expect(cellAt(song, 0, 1)).toEqual([0, 0]);
@@ -44,11 +54,10 @@ describe('Tim Follin read-only grid', () => {
     expect(cellAt(song, 1, 47)).toEqual([13, 8]);
     expect(cellAt(song, 2, 3)).toEqual([37, 10]);
     expect(cellAt(song, 3, 2)).toEqual([39, 7]);
-    expect(cellAt(song, 3, 3)).toEqual([39, 5]);
+    // a third onset in one row of one voice has no note column left (grid.unplacedNotes)
 
-    const counts = [0, 1, 2, 3].map((v) =>
-      song.patterns.reduce((n, p) => n + p.channels[v].rows.filter((r) => r.note > 0).length, 0));
-    expect(counts).toEqual([47, 19, 14, 21]);
+    const counts = [0, 1, 2, 3].map((v) => countNotes(song, v));
+    expect(counts).toEqual([42, 19, 14, 20]) // 47, 19, 14, 21 walk onsets; the 6 left out are third onsets in one 15-tick row;
 
     const layout = (song as unknown as { uadeVariableLayout: UADEVariablePatternLayout }).uadeVariableLayout;
     expect(layout.formatId).toBe('timFollin');
