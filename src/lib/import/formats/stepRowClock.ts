@@ -79,3 +79,28 @@ export function makeRowClock(speedChanges: readonly SpeedChange[]): RowClock {
     },
   };
 }
+
+/** Greatest common divisor of two positive integers. */
+export function gcd(a: number, b: number): number {
+  while (b) [a, b] = [b, a % b];
+  return a;
+}
+
+/**
+ * The main step of a format whose notes carry authored durations and no speed command: the GCD of the two most
+ * common gaps between consecutive onsets on one voice (deterministic, no threshold; ties go to the shorter gap).
+ * `onsetsPerVoice` lists each voice's onset ticks in ascending order. With one distinct gap that gap is the step;
+ * with none the step is 1. Shared by every format that derives its step from the notes (Ben Daglish, Sound Factory).
+ */
+export function mainStepFromOnsets(onsetsPerVoice: readonly (readonly number[])[]): number {
+  const counts = new Map<number, number>();
+  for (const onsets of onsetsPerVoice) {
+    for (let i = 1; i < onsets.length; i++) {
+      const d = onsets[i] - onsets[i - 1];
+      if (d > 0) counts.set(d, (counts.get(d) ?? 0) + 1);
+    }
+  }
+  const ranked = [...counts].sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+  if (ranked.length === 0) return 1;
+  return ranked.length === 1 ? ranked[0][0] : gcd(ranked[0][0], ranked[1][0]);
+}

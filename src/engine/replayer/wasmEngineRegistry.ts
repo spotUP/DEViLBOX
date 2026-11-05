@@ -219,7 +219,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     suppressNotes: true,
     fileDataKey: 'bdFileData',
     loadMethod: 'loadTune',
-    getLoadArgs: (song) => [song.fileSubsongs?.current ?? 0],
+    getLoadArgs: (song) => [song.fileSubsongs?.current ?? 0, song.initialSpeed],
     supportsPause: false,
     supportsResume: false,
     needsDirectRouting: true,

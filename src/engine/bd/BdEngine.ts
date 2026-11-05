@@ -91,16 +91,16 @@ export class BdEngine extends WASMSingletonBase {
     this.workletNode.connect(this.output);
   }
 
-  /** Load the module and start on `subsong` (0-based) - the tune the song's grid shows. */
-  async loadTune(buffer: ArrayBuffer, subsong = 0): Promise<void> {
+  /** Load the module and start on `subsong` (0-based) - the tune the song's grid shows. `rowStep` = processed ticks per grid row (the song's initialSpeed). */
+  async loadTune(buffer: ArrayBuffer, subsong = 0, rowStep = 1): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('BdEngine not initialized');
-    this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer, subsong });
+    this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer, subsong, rowStep });
   }
 
   /** Swap the playing module for an edited one without restarting: the worklet runs it silently up to the position played. */
-  swapModule(buffer: ArrayBuffer, subsong = 0): void {
-    this.workletNode?.port.postMessage({ type: 'swapModule', moduleData: buffer, subsong });
+  swapModule(buffer: ArrayBuffer, subsong = 0, rowStep = 1): void {
+    this.workletNode?.port.postMessage({ type: 'swapModule', moduleData: buffer, subsong, rowStep });
   }
 
   play(): void { this.workletNode?.port.postMessage({ type: 'play' }); }

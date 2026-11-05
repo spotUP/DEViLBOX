@@ -8,7 +8,7 @@
  *   2. every grid note starts a sample in UADE on that voice, with the same pitch name (no stray notes);
  *   3. an instrument number names one sample: a Paula sample pointer is one grid instrument everywhere (a
  *      looped sample may start from several pointers, so the other direction does not hold);
- *   4. a voice that never sounds is empty; the rows are the song's ticks; the carriers still encode
+ *   4. a voice that never sounds is empty; the rows are the song's steps on one fixed clock (a note off the step carries its delay); the carriers still encode
  *      every track byte-for-byte (benDaglishRoundtrip.test.ts stays green).
  * One clock for the whole song is a fit (UADE's vblank jitters a few ms), checked tightly.
  */
@@ -19,6 +19,9 @@ import { openUade, PaulaSession, PaulaNoteOns, PAULA_REG } from './gridOracle';
 import { installWasmNodeFetch } from '@/lib/import/__tests__/helpers/dwNodeFetch';
 import { parseBenDaglishFile } from '@/lib/import/formats/BenDaglishParser';
 import { walkBenDaglish, BD_WALK } from '@/lib/import/formats/BenDaglishWasmExtractor';
+import { bdRowClock } from '@/lib/import/formats/benDaglishGrid';
+import { BD_FX } from '@/lib/import/formats/benDaglishEffectGlyphs';
+import type { RowClock } from '@/lib/import/formats/stepRowClock';
 import { periodToNote } from '@/lib/amiga/periodNotes';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 
@@ -34,7 +37,7 @@ afterAll(() => restore());
 interface Onset { ms: number; note: number; ptr: number }
 interface GridSong {
   songPositions: number[];
-  patterns: Array<{ length: number; channels: Array<{ rows: Array<{ note: number; instrument: number }> }> }>;
+  patterns: Array<{ length: number; channels: Array<{ rows: Array<{ note: number; instrument: number; effTyp: number; eff: number; note2?: number; instrument2?: number; delay2?: number }> }> }>;
   uadeVariableLayout?: UADEVariablePatternLayout;
   gridEstimated?: boolean;
 }
@@ -62,13 +65,18 @@ async function uadeOnsets(bytes: Uint8Array, name: string): Promise<{ per: Onset
   return { per, lastMs };
 }
 
-const gridNotes = (song: GridSong, v: number): Array<{ tick: number; note: number; instrument: number }> => {
+// A grid note's tick on the fixed clock: its row's first tick plus the delay (the row offset effect in the first
+// slot for note column 1, delay2 for note column 2).
+const gridNotes = (song: GridSong, v: number, clock: RowClock): Array<{ tick: number; note: number; instrument: number }> => {
   const out: Array<{ tick: number; note: number; instrument: number }> = [];
-  let tick = 0;
+  let row0 = 0;
   for (const pi of song.songPositions) {
     const p = song.patterns[pi];
-    p.channels[v].rows.forEach((c, r) => { if (c.note) out.push({ tick: tick + r, note: c.note, instrument: c.instrument }); });
-    tick += p.length;
+    p.channels[v].rows.forEach((c, r) => {
+      if (c.note) out.push({ tick: clock.rowToTick(row0 + r, c.effTyp === BD_FX.rowOffset ? c.eff : 0), note: c.note, instrument: c.instrument });
+      if (c.note2) out.push({ tick: clock.rowToTick(row0 + r, c.delay2 ?? 0), note: c.note2, instrument: c.instrument2 ?? 0 });
+    });
+    row0 += p.length;
   }
   return out;
 };
@@ -83,10 +91,11 @@ describe.each(SONGS)('Ben Daglish grid against UADE (independent oracle): %s', (
 
     const walk = await walkBenDaglish(ab);
     expect(walk.events.some((e) => e.kind === BD_WALK.note), 'the replayer walk ran').toBe(true);
-    expect(song.patterns.reduce((n, p) => n + p.length, 0), 'rows are the ticks of the walk').toBe(walk.ticks);
+    const clock = bdRowClock(walk);
+    expect(song.patterns.reduce((n, p) => n + p.length, 0), 'rows are the steps of the walk plus the restart tick').toBe(clock.rowsForTicks(walk.processedTicks + 1));
 
     const { per, lastMs } = await uadeOnsets(bytes, path.split('/').pop()!);
-    const grid = [0, 1, 2, 3].map((v) => gridNotes(song, v));
+    const grid = [0, 1, 2, 3].map((v) => gridNotes(song, v, clock));
 
     // one clock: UADE ms = k * tick*20 + b, fitted on the sample starts, the tolerance tightening
     let k = 1, b0 = 40;

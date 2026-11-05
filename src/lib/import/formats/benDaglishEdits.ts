@@ -13,8 +13,8 @@
  * command arguments have no cell-to-byte map yet).
  */
 import type { Pattern } from '@/types';
-import { BD_WALK, type BdWalk } from './BenDaglishWasmExtractor';
-import { buildBDGridFromWalk } from './benDaglishGrid';
+import type { BdWalk } from './BenDaglishWasmExtractor';
+import { buildBDGridFromWalk, bdNotePlacements } from './benDaglishGrid';
 
 const ROWS_PER_PATTERN = 64;
 const NOTE_MAX = 0x7e;
@@ -31,11 +31,13 @@ export interface BdEditResult {
  * module bytes. `trackFileOffsets[track]` is where the track's bytes start in `source`.
  */
 export function applyBdGridEdits(source: Uint8Array, walk: BdWalk, trackFileOffsets: readonly number[], edited: Pattern[]): BdEditResult {
-  const base = buildBDGridFromWalk(walk).patterns;
+  const baseGrid = buildBDGridFromWalk(walk);
+  const base = baseGrid.patterns;
   const out = new Uint8Array(source);
   const warnings: string[] = [];
   const noteAt = new Map<string, { track: number; pos: number }>();
-  for (const e of walk.events) if (e.kind === BD_WALK.note && e.a >= 0 && e.c > 0) noteAt.set(`${e.voice}:${e.tick}`, { track: e.track, pos: e.pos });
+  // keyed by voice, grid row and note column: the same placement the grid is drawn from
+  for (const pl of bdNotePlacements(walk, baseGrid.clock).placed) noteAt.set(`${pl.voice}:${pl.row}:${pl.col}`, { track: pl.event.track, pos: pl.event.pos });
 
   const wanted = new Map<number, number>();
   for (let p = 0; p < edited.length; p++) {
@@ -49,18 +51,21 @@ export function applyBdGridEdits(source: Uint8Array, walk: BdWalk, trackFileOffs
         const c = eRows[row];
         if (!c) continue;
         const where = `pattern ${p} voice ${ch + 1} row ${row}`;
-        if (c.note !== b.note) {
-          const at = noteAt.get(`${ch}:${p * ROWS_PER_PATTERN + row}`);
+        const cols: Array<{ col: number; cn: number; bn: number }> = [{ col: 0, cn: c.note, bn: b.note }, { col: 1, cn: c.note2 ?? 0, bn: b.note2 ?? 0 }];
+        for (const { col, cn, bn } of cols) {
+          if (cn === bn) continue;
+          const at = noteAt.get(`${ch}:${p * ROWS_PER_PATTERN + row}:${col}`);
           if (!at) warnings.push(`${where}: a note where the replayer runs none needs a longer track; not written`);
-          else if (c.note < 1 || c.note > 96 || b.note < 1 || b.note > 96) warnings.push(`${where}: a note removed or turned into a note-off needs a different command; not written`);
+          else if (cn < 1 || cn > 96 || bn < 1 || bn > 96) warnings.push(`${where}: a note removed or turned into a note-off needs a different command; not written`);
           else {
             const off = trackFileOffsets[at.track] + at.pos;
-            const nb = (source[off] ?? 0xff) + (c.note - b.note);
+            const nb = (source[off] ?? 0xff) + (cn - bn);
             if (off >= out.length || (source[off] ?? 0xff) > NOTE_MAX) warnings.push(`${where}: the command byte is not a note; not written`);
-            else if (nb < 0 || nb > NOTE_MAX) warnings.push(`${where}: note ${c.note} is outside the player's note range; not written`);
+            else if (nb < 0 || nb > NOTE_MAX) warnings.push(`${where}: note ${cn} is outside the player's note range; not written`);
             else wanted.set(off, nb);
           }
         }
+        if ((c.delay2 ?? 0) !== (b.delay2 ?? 0)) warnings.push(`${where}: a note delay change has no command byte mapped yet; not written`);
         if (c.instrument !== b.instrument) warnings.push(`${where}: an instrument change has no command byte mapped yet; not written`);
         const fx = (x: typeof c) => [x.effTyp, x.eff, x.effTyp2, x.eff2, x.effTyp3, x.eff3, x.effTyp4, x.eff4, x.effTyp5, x.eff5].join();
         if (fx(c) !== fx(b)) warnings.push(`${where}: an effect column change has no command byte mapped yet; not written`);

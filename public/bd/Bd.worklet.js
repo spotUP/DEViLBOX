@@ -19,6 +19,7 @@ class BdProcessor extends AudioWorkletProcessor {
     this.muteMask = 0xFFFFFFFF;
     this.framesPlayed = 0;      // frames rendered since the song started: a swapped-in module catches up to here
     this.subsong = 0;
+    this.rowStep = 1;
     this._lastSongPos = -1;
     this._lastRow = -1;
 
@@ -68,6 +69,7 @@ class BdProcessor extends AudioWorkletProcessor {
             this._lastSongPos = -1; this._lastRow = -1;
             this.framesPlayed = 0;
             this.subsong = data.subsong > 0 ? data.subsong : 0;
+            this.rowStep = data.rowStep > 0 ? data.rowStep : 1;
             const free = this.module._free || this.module.free;
             if (free) free(wasmPtr);
 
@@ -81,6 +83,7 @@ class BdProcessor extends AudioWorkletProcessor {
         break;
 
       case 'swapModule':
+        if (data.rowStep > 0) this.rowStep = data.rowStep;
         this.swapModule(data.moduleData, data.subsong);
         break;
 
@@ -320,13 +323,14 @@ class BdProcessor extends AudioWorkletProcessor {
       }
     }
 
-    // Playhead: the importer's grid is one row per 50 Hz tick in patterns of 64 rows
-    // (benDaglishGrid.ts), so the replayer's tick is the global row; posted when it changes
-    // (the engine's onPositionUpdate).
+    // Playhead: the importer's grid is a fixed row clock of `rowStep` processed ticks per row in
+    // patterns of 64 rows (benDaglishGrid.ts); _bd_play_tick is the processed tick, so the global row
+    // is floor(tick / rowStep). Posted when it changes (the engine's onPositionUpdate).
     if (typeof this.module._bd_play_tick === 'function') {
       const playTick = this.module._bd_play_tick();
       if (playTick >= 0) {
-        const songPos = Math.floor(playTick / 64), playRow = playTick % 64;
+        const globalRow = Math.floor(playTick / (this.rowStep || 1));
+        const songPos = Math.floor(globalRow / 64), playRow = globalRow % 64;
         if (songPos !== this._lastSongPos || playRow !== this._lastRow) {
           this._lastSongPos = songPos; this._lastRow = playRow;
           this.port.postMessage({ type: 'position', songPos, row: playRow });

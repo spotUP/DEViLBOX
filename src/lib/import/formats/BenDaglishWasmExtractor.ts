@@ -53,8 +53,10 @@ export const BD_WALK = {
 } as const;
 
 export interface BdWalkEvent {
-  /** Replayer tick (50 Hz) the command ran on. */
+  /** Replayer frame (50 Hz) the command ran on, skipped frames included. */
   tick: number;
+  /** Processed tick the command ran on: frames the counter feature skips (every 6th) are not counted. */
+  ptick: number;
   voice: number;
   /** Track number the command is in (-1: a position-list command). */
   track: number;
@@ -68,8 +70,12 @@ export interface BdWalkEvent {
 
 export interface BdWalk {
   events: BdWalkEvent[];
-  /** Ticks run, up to every voice's first pass. */
+  /** Frames (50 Hz) run, up to every voice's first pass. */
   ticks: number;
+  /** Processed ticks run in those frames (equals `ticks` unless the counter feature skips frames). */
+  processedTicks: number;
+  /** Processed ticks per 50 Hz frame (1 unless the counter feature skips frames), as num / den. */
+  tickRate: { num: number; den: number };
   /** The tick each voice first reached the end of its position list (-1: never). */
   endTicks: number[];
   samples: number;
@@ -90,7 +96,7 @@ export async function walkBenDaglish(buffer: ArrayBuffer, subsong = 0, maxTicks 
   const ok = M._player_init(p, data.length);
   M._free(p);
   if (ok !== 0) throw new Error('the Ben Daglish replayer refused the file');
-  const out = M._malloc(MAX_EVENTS * 8 * 4);
+  const out = M._malloc(MAX_EVENTS * 9 * 4);
   const info = M._malloc(16 * 4);
   try {
     if (subsong > 0) M._player_set_subsong(subsong);
@@ -98,15 +104,16 @@ export async function walkBenDaglish(buffer: ArrayBuffer, subsong = 0, maxTicks 
     const dv = new DataView(M.HEAPU8.buffer);
     const events: BdWalkEvent[] = [];
     for (let i = 0; i < n; i++) {
-      const o = out + i * 32;
+      const o = out + i * 36;
       events.push({
         tick: dv.getInt32(o, true), voice: dv.getInt32(o + 4, true), track: dv.getInt32(o + 8, true),
         pos: dv.getInt32(o + 12, true), kind: dv.getInt32(o + 16, true),
         a: dv.getInt32(o + 20, true), b: dv.getInt32(o + 24, true), c: dv.getInt32(o + 28, true),
+        ptick: dv.getInt32(o + 32, true),
       });
     }
-    const inf = Array.from({ length: 9 }, (_, i) => dv.getInt32(info + i * 4, true));
-    return { events, ticks: inf[0], endTicks: inf.slice(2, 6), samples: inf[7], subsongs: inf[8] };
+    const inf = Array.from({ length: 12 }, (_, i) => dv.getInt32(info + i * 4, true));
+    return { events, ticks: inf[0], processedTicks: inf[11], tickRate: { num: inf[9], den: inf[10] }, endTicks: inf.slice(2, 6), samples: inf[7], subsongs: inf[8] };
   } finally {
     M._free(out);
     M._free(info);

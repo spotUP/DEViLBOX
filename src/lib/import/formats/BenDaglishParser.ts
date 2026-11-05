@@ -726,6 +726,8 @@ export async function parseBenDaglishFile(
   let songPositions: number[] = [0];
   let trackAtStart: number[][] = [];
   let unmatched: string | null = null;
+  let initialSpeed = 1;
+  let initialBPM = 125;
 
   if (!carriers) {
     unmatched = 'the module scan found no tracks';
@@ -741,6 +743,9 @@ export async function parseBenDaglishFile(
         patterns = grid.patterns;
         songPositions = grid.songPositions;
         trackAtStart = grid.trackAtStart;
+        // a row is `step` processed ticks; the counter feature skips frames, so a processed tick lasts den/num frames
+        initialSpeed = grid.step;
+        initialBPM = (125 * walk.tickRate.num) / walk.tickRate.den;
       }
     } catch (err) {
       unmatched = `the replayer could not walk the song: ${err instanceof Error ? err.message : String(err)}`;
@@ -801,10 +806,9 @@ export async function parseBenDaglishFile(
     songLength: songPositions.length,
     restartPosition: 0,
     numChannels: 4,
-    // A grid row is one 50 Hz replayer tick (the walk's timeline), so the scheduler that moves the
-    // cursor spends one tick per row: speed 1 at 125 BPM = 20 ms. Speed 6 ran it at a sixth of the sound.
-    initialSpeed: 1,
-    initialBPM: 125,
+    // A grid row is `step` processed ticks (benDaglishGrid.ts); speed = step at 125 BPM spends 20 ms per tick.
+    initialSpeed,
+    initialBPM,
     linearPeriods: false,
     bdFileData: buffer.slice(0),
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,

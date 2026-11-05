@@ -22,6 +22,8 @@ export const BD_EFFECT_NAMES = [
 
 /** Command ids. */
 export const BD_FX = {
+  /** Ticks into the row a note starts (the step grid's note delay); 0xD7 is free (David Whittaker ends at 0xD5, 0xED is Rob Hubbard's). */
+  rowOffset: 0xd7,
   sampleMap: BD_FX_BASE, portaDelay: BD_FX_BASE + 1, portaDuration: BD_FX_BASE + 2, portaDelta: BD_FX_BASE + 3,
   portaOff: BD_FX_BASE + 4, fadeSpeed: BD_FX_BASE + 5, fadeDuration: BD_FX_BASE + 6, fadeAdd: BD_FX_BASE + 7,
   fadeOff: BD_FX_BASE + 8, porta2Duration: BD_FX_BASE + 9, porta2Off: BD_FX_BASE + 10,
@@ -30,15 +32,16 @@ export const BD_FX = {
   masterFade: BD_FX_BASE + 17, mapSetIndex: BD_FX_BASE + 18, mapSetSample: BD_FX_BASE + 19, end: BD_FX_BASE + 20,
 } as const;
 
-export const BD_FX_MIN = BD_FX_BASE;
+export const BD_FX_MIN = BD_FX.rowOffset;
 export const BD_FX_MAX = BD_FX_BASE + BD_EFFECT_NAMES.length - 1;
 
 /** One letter per command, in id order. */
 const LETTERS = 'BDURNFTAOKJVSLZXYMIGE';
 
-export const BD_EFFECT_GLYPH: Record<number, string> = Object.fromEntries(
-  Array.from(LETTERS, (ch, i) => [BD_FX_BASE + i, ch]),
-);
+export const BD_EFFECT_GLYPH: Record<number, string> = {
+  ...Object.fromEntries(Array.from(LETTERS, (ch, i) => [BD_FX_BASE + i, ch])),
+  [BD_FX.rowOffset]: 'Q',
+};
 
 /** A Ben Daglish command as a 3-char grid token, or null outside the block. */
 export function benDaglishEffectToString(effTyp: number, eff: number): string | null {

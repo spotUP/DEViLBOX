@@ -37,6 +37,7 @@ import { parseFCFile } from '@/lib/import/formats/FCParser';
 import { parseSidMon2File } from '@/lib/import/formats/SidMon2Parser';
 import { parseSoundFactoryFile } from '@/lib/import/formats/SoundFactoryParser';
 import { parseBenDaglishFile } from '@/lib/import/formats/BenDaglishParser';
+import { BD_FX } from '@/lib/import/formats/benDaglishEffectGlyphs';
 import { installWasmNodeFetch } from '@/lib/import/__tests__/helpers/dwNodeFetch';
 
 /** The Emscripten glue of the replayer wasm, made loadable in a worklet scope (as the engines' own transforms do). */
@@ -74,6 +75,10 @@ interface Case {
    * never one row early or two late.
    */
   maxOnsetLag?: number;
+  /** Effect id of a cell's delay offset (ticks into the row): the note's onset is looked for that many ticks after the report. */
+  delayEffect?: number;
+  /** Frames between a row's report and its notes' sound when a row is many ticks (Ben Daglish: the DMA starts one tick after the read). */
+  onsetLagFrames?: number;
   /** The worklet starts rendering on load and has no play message. */
   noPlay?: boolean;
   /** The grid carries Bxx (jump) / Dxx (break) that end a pattern early. */
@@ -117,10 +122,10 @@ const CASES: Case[] = [
   { name: 'Sound Factory (oriental.psf)', dir: 'soundfactory', stem: 'SoundFactory2', file: 'public/data/songs/soundfactory/oriental.psf',
     transform: emscriptenTransform, voices: 4, gridClock: false, maxOnsetLag: 1,
     parse: (b) => parseSoundFactoryFile(b, 'oriental.psf') as TrackerSong },
-  // Ben Daglish: the grid is the walk (one row per 50 Hz tick); the worklet has no per-voice buffers and no play
+  // Ben Daglish: the grid is the walk on a fixed row clock (initialSpeed processed ticks a row, passed to the worklet as rowStep); the worklet has no per-voice buffers and no play
   // message, and the sample's DMA starts on the tick after the note is read (as on the Amiga): onset lag 1.
   { name: 'Ben Daglish (mickey_mouse.bd)', dir: 'bd', stem: 'Bd', file: 'public/data/songs/formats/mickey_mouse.bd',
-    transform: emscriptenTransform, voices: 4, gridClock: false, isolate: true, noPlay: true, maxOnsetLag: 1,
+    transform: emscriptenTransform, voices: 4, gridClock: false, isolate: true, noPlay: true, onsetLagFrames: 960, delayEffect: BD_FX.rowOffset,
     parse: async (b) => { const restore = installWasmNodeFetch('bd', 'Bd'); try { return await parseBenDaglishFile(ab(b), 'mickey_mouse.bd'); } finally { restore(); } } },
 ];
 
@@ -143,7 +148,7 @@ async function renderReports(c: Case, song: TrackerSong, bytes: Uint8Array, bank
   for (let pass = 0; pass < passes; pass++) {
     const { proc, send, posted } = await startWorklet(c.dir, c.stem, c.transform);
     if (c.isolate) await send({ type: 'setMuteMask', mask: 1 << pass });
-    const load: Record<string, unknown> = { type: 'loadModule', moduleData: ab(bytes) };
+    const load: Record<string, unknown> = { type: 'loadModule', moduleData: ab(bytes), rowStep: song.initialSpeed };
     if (bank) load.sampleData = ab(bank);
     await send(load);
     if (!c.noPlay) await send({ type: 'play' });
@@ -225,7 +230,8 @@ describe('native replayer playhead follows the grid row', () => {
         for (let v = 0; v < Math.min(c.voices, song.numChannels); v++) {
           const cell = song.patterns[order[at.songPos]].channels[v]?.rows[at.row];
           if (!cell || cell.note <= 0 || cell.note > 96) continue;
-          sum += rise(levels, reports[i + shift].frame / BLOCK, v);
+          const delayFrames = c.delayEffect !== undefined && cell.effTyp === c.delayEffect ? cell.eff * FRAMES_PER_TICK : 0;
+          sum += rise(levels, Math.floor((reports[i + shift].frame + (c.onsetLagFrames ?? 0) + delayFrames) / BLOCK), v);
           n++;
         }
       }
