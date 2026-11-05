@@ -204,6 +204,8 @@ class DigMugProcessor extends AudioWorkletProcessor {
         outputL[i] = k0 * b0[i] + k3 * b3[i];
         outputR[i] = k1 * b1[i] + k2 * b2[i];
       }
+      // Narrow the Amiga L/R toward mono per the stereo separation setting (worklets/channel-outputs.js).
+      if (o) o.narrowStereo(outputL, outputR, rendered);
 
       // Every sample of each voice, for the oscilloscopes and the per-channel
       // role classifiers (worklets/channel-stream.js).
