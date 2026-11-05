@@ -5,6 +5,7 @@
  */
 
 import { PositionCallbacks, type EnginePositionUpdate } from '@engine/wasm/PositionCallbacks';
+import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { getDevilboxAudioContext } from "@/utils/audio-context";
 import {
   WASMSingletonBase,
@@ -73,7 +74,11 @@ export class BdEngine extends WASMSingletonBase {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 0', 'Paula 1', 'Paula 2', 'Paula 3']);
           console.log('[BdEngine] Module loaded');
+          break;
+        case 'oscData':
+          useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
         case 'position':
           this._positions.emit(data);

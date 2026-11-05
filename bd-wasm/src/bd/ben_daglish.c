@@ -2386,7 +2386,7 @@ int bd_walk(BdModule* mod, int max_ticks, int32_t* out, int max_events, int32_t*
 // Render
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static size_t bd_player_render(BdModule* mod, float* interleaved_stereo, size_t frames) {
+static size_t bd_player_render(BdModule* mod, float* interleaved_stereo, size_t frames, float* const* ch_out) {
     BdPlayer* p = mod->player;
 
     if (p == nullptr || interleaved_stereo == nullptr) {
@@ -2403,6 +2403,9 @@ static size_t bd_player_render(BdModule* mod, float* interleaved_stereo, size_t 
         float right = 0.0f;
 
         for (int ch = 0; ch < 4; ch++) {
+            if (ch_out != nullptr && ch_out[ch] != nullptr) {
+                ch_out[ch][frame] = 0.0f;   // a muted voice stays silent in its own buffer
+            }
             if ((p->channel_mask & (1U << ch)) == 0) {
                 continue;
             }
@@ -2421,6 +2424,9 @@ static size_t bd_player_render(BdModule* mod, float* interleaved_stereo, size_t 
             // NostalgicPlayer mixer applies 0.5x gain per channel
             float gain = (float)vol / 128.0f;
             float out = sample * gain;
+            if (ch_out != nullptr && ch_out[ch] != nullptr) {
+                ch_out[ch][frame] = out;    // this voice alone, before the Amiga stereo sum
+            }
 
             // Amiga panning: 0,3=left; 1,2=right
             if (ch == 0 || ch == 3) {
@@ -2643,7 +2649,16 @@ size_t bd_render(BdModule* module, float* interleaved_stereo, size_t frames) {
         return 0;
     }
 
-    return bd_player_render(module, interleaved_stereo, frames);
+    return bd_player_render(module, interleaved_stereo, frames, nullptr);
+}
+
+size_t bd_render_channels(BdModule* module, float* interleaved_stereo, float* ch0, float* ch1, float* ch2, float* ch3, size_t frames) {
+    if (module == nullptr || module->player == nullptr) {
+        return 0;
+    }
+
+    float* ch_out[4] = { ch0, ch1, ch2, ch3 };
+    return bd_player_render(module, interleaved_stereo, frames, ch_out);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

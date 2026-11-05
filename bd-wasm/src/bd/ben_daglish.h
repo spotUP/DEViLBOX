@@ -24,6 +24,8 @@ int bd_channel_count(const BdModule* module);
 void bd_set_channel_mask(BdModule* module, uint32_t mask);
 
 size_t bd_render(BdModule* module, float* interleaved_stereo, size_t frames);
+/* As bd_render, and each voice alone (after its volume, before the stereo sum) into ch0..ch3. */
+size_t bd_render_channels(BdModule* module, float* interleaved_stereo, float* ch0, float* ch1, float* ch2, float* ch3, size_t frames);
 bool bd_has_ended(const BdModule* module);
 
 /* Playhead: the grid's global row (one row per 50 Hz tick); -1 before the first tick. */
