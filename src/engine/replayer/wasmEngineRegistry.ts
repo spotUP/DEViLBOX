@@ -1018,7 +1018,7 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     suppressNotes: true,
     fileDataKey: 'davidWhittakerFileData',
     loadMethod: 'loadTune',
-    getLoadArgs: (song) => [song.fileSubsongs?.current ?? 0],
+    getLoadArgs: (song) => [song.fileSubsongs?.current ?? 0, song.davidWhittakerClock],
     supportsPause: false,
     supportsResume: false,
     needsDirectRouting: true,

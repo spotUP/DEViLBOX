@@ -13,20 +13,25 @@ import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import { DW_FX } from './davidWhittakerEffectGlyphs';
 import { DW_WALK, type DwWalk, type DwWalkEvent } from './DavidWhittakerWasmExtractor';
 import { dwByteToNote, dwWalkTransposes } from './davidWhittakerPitch';
-import { makeRowClock, type RowClock } from './stepRowClock';
+import { makeRowClock, type RowClock, type SpeedChange } from './stepRowClock';
 
-const ROWS_PER_PATTERN = 64;
+export const ROWS_PER_PATTERN = 64;
 const EFFECT_SLOTS = 5;
 /** The most effect columns a cell holds (effTyp..effTyp8); the grid uses 5, or 6 when a song needs one more. */
 const MAX_EFFECT_SLOTS = 8;
 /** Tracker speed effect (Fxx below 32). */
 export const FX_SPEED = 0xf;
 
-/** The row clock of a walk: its subsong speed, changed by every speed command at the processed tick it ran on. */
-export function dwRowClock(walk: DwWalk): RowClock {
-  const changes = [{ tick: 0, speed: walk.speed }];
+/** The speed in force from each processed tick of a walk: its subsong speed, changed by every speed command at the tick it ran on. */
+export function dwSpeedChanges(walk: DwWalk): SpeedChange[] {
+  const changes: SpeedChange[] = [{ tick: 0, speed: walk.speed }];
   for (const e of walk.events) if (e.kind === DW_WALK.speed) changes.push({ tick: e.ptick, speed: e.a });
-  return makeRowClock(changes);
+  return changes;
+}
+
+/** The row clock of a walk. */
+export function dwRowClock(walk: DwWalk): RowClock {
+  return makeRowClock(dwSpeedChanges(walk));
 }
 
 type Fx = [effTyp: number, eff: number];

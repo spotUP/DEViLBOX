@@ -4,6 +4,9 @@
  * Follows the BdEngine/SonicArrangerEngine pattern.
  */
 
+import { PositionCallbacks, type EnginePositionUpdate } from '@engine/wasm/PositionCallbacks';
+import { makeRowClock, type RowClock, type SpeedChange } from '@/lib/import/formats/stepRowClock';
+import { ROWS_PER_PATTERN } from '@/lib/import/formats/davidWhittakerGrid';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
@@ -25,11 +28,26 @@ export function davidwhittakerTransform(code: string): string {
     .replace('HEAPF32=new Float32Array(b);', 'HEAPF32=Module["HEAPF32"]=new Float32Array(b);');
 }
 
+/** What maps the replayer's processed ticks onto the grid: its speed changes and the ticks one pass of the song lasts. */
+export interface DwGridClock { speedChanges: readonly SpeedChange[]; passTicks: number }
+
+/**
+ * The grid row the replayer is on after it has run `playedTicks` processed ticks (dw_played_ticks): the tick it just ran
+ * is playedTicks - 1, the song loops every `passTicks`, and the grid is one row per song step cut into 64-row patterns.
+ */
+export function dwGridPosition(clock: RowClock, passTicks: number, playedTicks: number): EnginePositionUpdate {
+  const tick = Math.max(0, playedTicks - 1);
+  const global = clock.tickToRow(passTicks > 0 ? tick % passTicks : tick).row;
+  return { songPos: Math.floor(global / ROWS_PER_PATTERN), row: global % ROWS_PER_PATTERN };
+}
+
 export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
   private static instance: DavidWhittakerEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   private _songEndCallback: (() => void) | null = null;
+  private readonly _positions = new PositionCallbacks();
+  private _clock: { clock: RowClock; passTicks: number } | null = null;
 
   private constructor() {
     super();
@@ -85,6 +103,11 @@ export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
         case 'oscData':
           useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
+        case 'playTick':
+          if (this._clock && typeof data.ticks === 'number' && data.ticks > 0) {
+            this._positions.emit(dwGridPosition(this._clock.clock, this._clock.passTicks, data.ticks));
+          }
+          break;
         case 'songEnd':
           this._songEndCallback?.();
           break;
@@ -102,15 +125,29 @@ export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
   }
 
   /** Load the module and start on `subsong` (0-based) - the tune the song's grid shows. */
-  async loadTune(buffer: ArrayBuffer, subsong = 0): Promise<void> {
+  async loadTune(buffer: ArrayBuffer, subsong = 0, clock?: DwGridClock): Promise<void> {
+    this.setGridClock(clock);
     await this._initPromise;
     if (!this.workletNode) throw new Error('DavidWhittakerEngine not initialized');
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer, subsong });
   }
 
   /** Swap the playing module for an edited one without restarting: the worklet runs it silently up to the position played. */
-  swapModule(buffer: ArrayBuffer, subsong = 0): void {
+  swapModule(buffer: ArrayBuffer, subsong = 0, clock?: DwGridClock): void {
+    this.setGridClock(clock);
     this.workletNode?.port.postMessage({ type: 'swapModule', moduleData: buffer, subsong });
+  }
+
+  /** The grid the position reports map onto; the edited module's grid when it swaps in (a speed edit moves the rows). */
+  private setGridClock(clock: DwGridClock | undefined): void {
+    this._clock = clock && clock.speedChanges.length > 0
+      ? { clock: makeRowClock(clock.speedChanges), passTicks: clock.passTicks }
+      : null;
+  }
+
+  /** The row and song-order index the replayer is on, as the grid shows them. */
+  onPositionUpdate(cb: (update: EnginePositionUpdate) => void): () => void {
+    return this._positions.add(cb);
   }
 
   play(): void {
@@ -150,6 +187,7 @@ export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
   }
 
   override dispose(): void {
+    this._positions.clear();
     super.dispose();
     if (DavidWhittakerEngine.instance === this) DavidWhittakerEngine.instance = null;
   }

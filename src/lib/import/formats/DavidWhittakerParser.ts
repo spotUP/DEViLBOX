@@ -30,7 +30,7 @@ import { DEFAULT_DAVID_WHITTAKER } from '@/types/instrument';
 import { davidWhittakerEncoder } from '@/engine/uade/encoders/DavidWhittakerEncoder';
 import { walkDavidWhittaker, DW_WALK } from './DavidWhittakerWasmExtractor';
 import { chooseFileSubsong, fileSubsongFormatByKey, fileSubsongsField } from '../fileSubsongs';
-import { buildDWGridFromWalk } from './davidWhittakerGrid';
+import { buildDWGridFromWalk, dwSpeedChanges } from './davidWhittakerGrid';
 
 // ── Binary read helpers ───────────────────────────────────────────────────────
 
@@ -722,6 +722,7 @@ export async function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: str
   let filePatterns: DWFilePatterns | null = null;
   let blockAtStart: number[][] = [];
   let unmatched: string | null = null;
+  let davidWhittakerClock: { speedChanges: { tick: number; speed: number }[]; passTicks: number } | undefined;
 
   if (scanResult && scanResult.songs.length > 0) {
     const song = scanResult.songs[tune];
@@ -740,6 +741,8 @@ export async function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: str
         patterns = grid.patterns;
         songPositions = grid.songPositions;
         blockAtStart = grid.blockAtStart;
+        // What maps the replayer's processed-tick count onto the grid rows while it plays (DavidWhittakerEngine.ts).
+        davidWhittakerClock = { speedChanges: dwSpeedChanges(walk), passTicks: walk.processedTicks };
         // A grid row is one song step: `speed` processed ticks (stepRowClock.ts). A processed tick lasts
         // 1/(50 * num/den) s once the player skips frames, and a row lasts speed * 2.5 / BPM s, so the
         // scheduler's tempo is 125 * num / den (fractional, owner decision R1).
@@ -786,6 +789,7 @@ export async function parseDavidWhittakerFile(buffer: ArrayBuffer, filename: str
     initialSpeed,
     initialBPM,
     davidWhittakerFileData: buffer.slice(0) as ArrayBuffer,
+    davidWhittakerClock,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
     ...fileSubsongsField({ ...tunes, current: tune }),

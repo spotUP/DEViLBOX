@@ -453,6 +453,8 @@ export interface TrackerSong {
   digMugFileData?: ArrayBuffer;
   /** Raw David Whittaker binary for DavidWhittakerEngine WASM playback */
   davidWhittakerFileData?: ArrayBuffer;
+  /** The grid's row clock (speed changes by processed tick) and the length of one pass, to map the replayer's tick count onto grid rows */
+  davidWhittakerClock?: { speedChanges: { tick: number; speed: number }[]; passTicks: number };
   /** Raw Sound Control binary for SoundControlEngine WASM playback */
   soundControlFileData?: ArrayBuffer;
   /** Raw Delta Music 1.0 binary for DeltaMusic1Engine WASM playback */
