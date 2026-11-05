@@ -8,11 +8,12 @@
  *     (davidWhittakerPitch.ts, the same map the grid names it by);
  *   - instrument: the sample-change command that was in force for that note (its byte is
  *     sampleBase + index, the base read off the module's own byte and the replayer's index);
+ *   - a removed note: the mute command (0x82) over the note byte, same length, same timing (a rest);
  *   - an effect column: the argument byte(s) of the command that ran, or the index inside an
  *     envelope / arpeggio select byte.
  * A command is shared by every tick that replays its block, so an edit shows wherever the block
  * plays: that is the module's structure, not a copy. Edits that would change a block's length
- * (a note where the replayer ran none, a different command, a note removed) cannot be written in
+ * (a note where the replayer ran none, a different command) cannot be written in
  * place and come back as warnings, never as a half-edit.
  */
 import type { Pattern } from '@/types';
@@ -55,6 +56,9 @@ function isNoteSlot(e: DwWalkEvent): boolean {
 
 /** A note put on a row the replayer runs no note on (G5). */
 interface DwAdd { ch: number; row: number; note: number; instrument: number; where: string }
+
+/** The mute track command: 0x80 | effect 2 (DW_EFFECT_MUTE). Silences the voice and, like a note, ends the read run. */
+const DW_MUTE_BYTE = 0x82;
 
 /** Wait commands are 0xe0 + units - 1 (1..32 speed units). */
 const WAIT_BASE = 0xdf;
@@ -188,6 +192,7 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
     else if (isNoteSlot(e)) noteSample.set(e, lastSample[e.channel]);
   }
   const adds: DwAdd[] = [];
+  const restedCells = new Set<string>();   // cells whose note became a mute: the sample no longer plays, its instrument is moot
   const transposes = dwWalkTransposes(walk);
   const cmdOffset = (e: DwWalkEvent): number => (e.block === NO_BLOCK ? -1 : e.block + e.pos);
 
@@ -213,7 +218,15 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
             if (n >= 1 && n <= 96 && (b.note ?? 0) === 0) adds.push({ ch, row: p * ROWS_PER_PATTERN + row, note: n, instrument: c.instrument ?? 0, where });
             else warnings.push(`${where}: a note removed or turned into a note-off needs a different command; not written`);
           }
-          else if (n < 1 || n > 96) warnings.push(`${where}: a note removed or turned into a note-off needs a different command; not written`);
+          else if (n < 1 || n > 96) {
+            // A note removed or turned into a note-off is the mute command (0x82, effect 2 of the track command table,
+            // davidwhittaker.c do_effects DW_EFFECT_MUTE): one byte that ends the read run and times itself with the wait in
+            // force, exactly like the note byte it replaces, so the block keeps its length and the later notes their ticks.
+            // The old player has no mute command (a zero note mutes there), so nothing is written for it.
+            if (noteEv.kind !== DW_WALK.note) warnings.push(`${where}: a note removed or turned into a note-off needs a different command; not written`);
+            else if (walk.layout.oldPlayer) warnings.push(`${where}: this player has no mute command; not written`);
+            else { want(cmdOffset(noteEv), DW_MUTE_BYTE, `${where} note removed`); restedCells.add(where); }
+          }
           else {
             const ins = c.instrument ?? 0;
             const sample = ins > 0 ? ins - 1 : noteEv.kind === DW_WALK.note ? noteEv.a : (noteSample.get(noteEv)?.a ?? -1);
@@ -222,7 +235,7 @@ export function applyDwGridEdits(source: Uint8Array, walk: DwWalk, edited: Patte
             else want(cmdOffset(noteEv), byte, `${where} note`);
           }
         }
-        if ((c.instrument ?? 0) !== (b.instrument ?? 0)) {
+        if ((c.instrument ?? 0) !== (b.instrument ?? 0) && !restedCells.has(where)) {
           const ins = c.instrument ?? 0;
           const sc = noteEv ? noteSample.get(noteEv) : null;
           if (!noteEv) { if (!adds.some((a) => a.where === where)) warnings.push(`${where}: an instrument without a note is not part of the module; not written`); }
