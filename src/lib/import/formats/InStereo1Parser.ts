@@ -44,7 +44,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { InStereo2Config } from '@/types/instrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeInStereo1Cell } from '@/engine/uade/encoders/InStereo1Encoder';
+import { encodeInStereo1Cell, is10IndexToXm } from '@/engine/uade/encoders/InStereo1Encoder';
 import { createSamplerInstrument } from './AmigaUtils';
 import type { UADEChipRamInfo } from '@/types/instrument';
 
@@ -98,8 +98,7 @@ function readString(buf: Uint8Array, off: number, len: number): string {
  */
 function is10NoteToXm(noteIndex: number): number {
   if (noteIndex <= 0 || noteIndex >= IS10_PERIODS.length) return 0;
-  const xm = noteIndex - 36;
-  return (xm >= 1 && xm <= 96) ? xm : 0;
+  return is10IndexToXm(noteIndex);
 }
 
 // ── Format Identification ──────────────────────────────────────────────────
@@ -598,7 +597,7 @@ export function parseInStereo1File(bytes: Uint8Array, filename: string): Tracker
       if (byt1 === 0x7F) {
         note = 97; // note-off
       } else if (byt1 > 0) {
-        note = Math.max(1, Math.min(96, byt1 + 36));
+        note = is10IndexToXm(byt1);
       }
       const instrument = byt2;
       const effect = byt3 & 0x0F;

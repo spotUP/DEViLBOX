@@ -8,8 +8,9 @@
  *   byte[3]: effect argument
  *
  * Note mapping:
- *   Parser: is10NoteToXm: noteIndex + 36 = xmNote (clamped to 96)
- *   Reverse: xmNote → noteIndex = xmNote - 36; 97 → 0x7f (note-off)
+ *   Parser: is10NoteToXm: xmNote = noteIndex - 36 (index 49 = period 856 = C-1 = 13; measured against
+ *   Paula, thoughts/spot/2026-11-05-octave-instereo1.md)
+ *   Reverse: xmNote → noteIndex = xmNote + 36; 97 → 0x7f (note-off)
  *
  * Effect mapping:
  *   Parser: is10EffectToXm maps effect 7 → XM 0x0C, effect F → XM 0x0F
@@ -19,19 +20,27 @@
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
 
+/** Period-table index (1..108) to grid note; 0 when outside the grid. Index 49 = 856 = C-1 = 13. */
+export function is10IndexToXm(noteIndex: number): number {
+  const xm = noteIndex - 36;
+  return (xm >= 1 && xm <= 96) ? xm : 0;
+}
+
+/** Grid note to period-table index; 0 when the table has no such entry. */
+export function xmToIs10Index(xmNote: number): number {
+  const idx = xmNote + 36;
+  return (xmNote >= 1 && idx <= 108) ? idx : 0;
+}
+
 function encodeInStereo1Cell(cell: TrackerCell): Uint8Array {
   const out = new Uint8Array(4);
   const note = cell.note ?? 0;
 
   // Byte 0: note index
-  // Parser: is10NoteToXm(noteIndex) = noteIndex + 36
-  // Reverse: noteIndex = xmNote - 36
   if (note === 97) {
     out[0] = 0x7f; // note-off
-  } else if (note > 36) {
-    out[0] = Math.min(108, note - 36);
   } else {
-    out[0] = 0;
+    out[0] = xmToIs10Index(note);
   }
 
   // Byte 1: instrument (1-based in both parser and file)

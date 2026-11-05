@@ -24,6 +24,7 @@
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell } from '@/types';
 import { isInStereo1Format, parseInStereo1File } from '@/lib/import/formats/InStereo1Parser';
+import { xmToIs10Index } from '@/engine/uade/encoders/InStereo1Encoder';
 import { sampleIsEdited } from '@/lib/song/gridBaseline';
 
 // ── Write helpers (big-endian) ──────────────────────────────────────────────
@@ -60,8 +61,7 @@ function writeString(buf: Uint8Array, off: number, str: string, maxLen: number):
 function xmNoteToIS10(xmNote: number): number {
   if (xmNote === 0) return 0;
   if (xmNote === 97) return 0x7F; // note-off
-  const noteIdx = xmNote + 36;
-  return (noteIdx >= 1 && noteIdx <= 108) ? noteIdx : 0;
+  return xmToIs10Index(xmNote);
 }
 
 // ── XM effect to IS10 effect ────────────────────────────────────────────────
