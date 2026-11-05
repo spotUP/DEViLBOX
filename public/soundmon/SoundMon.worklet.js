@@ -47,7 +47,7 @@ class SoundMonProcessor extends AudioWorkletProcessor {
         } catch (error) { this.port.postMessage({ type: 'error', message: error.message }); }
         break;
       }
-      case 'play': if (this.keyboardOnly) break; this.playing = true; this._lastSongPos = -1; this._lastRow = -1; break;
+      case 'play': if (this.keyboardOnly) break; this.playing = true; if (this._outs && this.handle && this.module) this._outs.discardSeek((n) => this.module._sm_render_multi(this.handle, this.chPtrs[0], this.chPtrs[1], this.chPtrs[2], this.chPtrs[3], n), this.bufferSize); this._lastSongPos = -1; this._lastRow = -1; break;
       case 'stop':
         this.playing = false;
         if (this.handle) this.module._sm_select_subsong(this.handle, 0);

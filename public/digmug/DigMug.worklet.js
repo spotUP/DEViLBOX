@@ -51,7 +51,7 @@ class DigMugProcessor extends AudioWorkletProcessor {
       case 'previewLoad': this.previewLoad(data.buffer); break;
       case 'noteOn': if (this.previewHandle) this.module._dm_preview_note(this.previewHandle, data.instrument, data.note); break;
       case 'noteOff': if (this.previewHandle) this.module._dm_preview_stop(this.previewHandle); break;
-      case 'play': this.playing = true; this._lastSongPos = -1; this._lastRow = -1; break;
+      case 'play': this.playing = true; if (this._outs && this.handle && this.module) this._outs.discardSeek((n) => this.module._dm_render_multi(this.handle, this.chPtrs[0], this.chPtrs[1], this.chPtrs[2], this.chPtrs[3], n), this.bufferSize); this._lastSongPos = -1; this._lastRow = -1; break;
       case 'stop':
         this.playing = false;
         if (this.handle) this.module._dm_select_subsong(this.handle, 0);

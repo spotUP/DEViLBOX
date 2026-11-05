@@ -338,6 +338,14 @@ export abstract class WASMChannelOutputsEngine extends WASMSingletonBase {
     }
   }
 
+  /**
+   * Start-at-position: the next play() renders and discards `frame` output frames inside the worklet (channel-outputs.js
+   * discardSeek), then plays on from there. Only worklets that call discardSeek on play honour it.
+   */
+  seekFrames(frame: number): void {
+    this.workletNode?.port.postMessage({ type: 'seekFrames', frame });
+  }
+
   /** Called by a subclass that replaces its node: the new one is not ready until it reports. */
   protected markNodeNotReady(): void {
     this._nodeReady = false;
