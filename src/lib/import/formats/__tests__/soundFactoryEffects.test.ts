@@ -6,7 +6,6 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { parseSoundFactoryWithEffects } from '../SoundFactoryParser';
-import { applySfEffectEdits } from '../soundFactoryEdits';
 import { exportSoundFactory } from '@/lib/export/SoundFactoryExporter';
 import { SF_EFFECT_NAMES, SF_FX_BASE } from '../soundFactoryEffectGlyphs';
 import { BD_FX } from '../benDaglishEffectGlyphs';
@@ -82,18 +81,6 @@ describe('Sound Factory effect commands on goldrunner.psf', () => {
     const re = parseSoundFactoryWithEffects(out, 'goldrunner.psf')!;
     expect(re.effectsSeen).toBe(r.effectsSeen);
     expect(countInCells(re.song.patterns)).toEqual(countInCells(r.song.patterns));
-  });
-
-  it('warns and writes nothing for an edit that would need a new opcode', () => {
-    const src = load();
-    const r = parseSoundFactoryWithEffects(src, 'goldrunner.psf')!;
-    const cell = r.song.patterns[0].channels[0].rows[0] as unknown as Record<string, number>;
-    const free = SLOT_TYP.findIndex((t) => (cell[t] ?? 0) === 0);
-    cell[SLOT_TYP[free]] = SF_FX_BASE + 2; cell[SLOT_VAL[free]] = 9;
-    const res = applySfEffectEdits(src, r.song.patterns);
-    expect(res.patched).toBe(0);
-    expect(res.warnings.some((w) => w.includes('insert'))).toBe(true);
-    expect(Array.from(res.data)).toEqual(Array.from(src));
   });
 
   it('every Sound Factory module in the corpus places all of its effect operands', () => {

@@ -385,9 +385,25 @@ export function parseSoundFactoryFile(bytes: Uint8Array, filename: string): Trac
 }
 
 /** The parse plus, per voice, the file offset of every effect operand cell (global row -> slot offsets, -1 none). */
+export interface NoteEvent {
+  note: number;       // XM note number (0 = no note)
+  instrId: number;    // instrument ID (0 = no instrument)
+  volume: number;     // 0-64
+  duration: number;   // ticks
+  isNote: boolean;    // false: a pause
+  fileOffset: number; // absolute file offset of this opcode (-1 if none)
+  effects?: SfEffect[]; // effect opcodes that take effect at this event
+}
+
 export interface SoundFactoryParse {
   song: TrackerSong;
   effectOffsets: Array<Map<number, number[]>>;
+  /** Per voice, the events of the walk in stream order (the lossless writer's view of the voice). */
+  voiceEvents: NoteEvent[][];
+  /** Per voice and global row: index into voiceEvents of the event the row's file offset names, -1 none. */
+  anchors: number[][];
+  /** Per event opcode file offset: the instrument pitch and transpose in force there. */
+  eventContext: Map<number, { pitch: SoundFactoryPitchParams; transpose: number }>;
   /** Effect operands in the stream walk vs. placed in a cell slot, and per effect id. */
   effectsSeen: number;
   effectsPlaced: number;
@@ -517,16 +533,6 @@ export function parseSoundFactoryWithEffects(bytes: Uint8Array, filename: string
   // Walk the opcode stream for each channel of the first sub-song and extract
   // note events with their durations. Convert to a flat sequence of rows.
 
-  interface NoteEvent {
-    note: number;       // XM note number (0 = no note)
-    instrId: number;    // instrument ID (0 = no instrument)
-    volume: number;     // 0-64
-    duration: number;   // ticks
-    isNote: boolean;    // false: a pause
-    fileOffset: number; // absolute file offset of this opcode (-1 if none)
-    effects?: SfEffect[]; // effect opcodes that take effect at this event
-  }
-
   /** Walk one voice's stream into `events`; effect opcodes wait in `pending` for the next note or pause. */
   function walkVoice(startOffset: number, events: NoteEvent[], pending: SfEffect[]): void {
     let offset = startOffset;
@@ -564,6 +570,7 @@ export function parseSoundFactoryWithEffects(bytes: Uint8Array, filename: string
         case Op.StopAndPause: {
           if (offset + 2 > opcodes.length) return;
           const pauseFileOff = HEADER_SIZE + (offset - 1); // file offset of pause opcode
+          cellContext.set(pauseFileOff, { pitch: pitchForInstrument(currentInstrId), transpose: currentTranspose });
           const dur = u16BE(opcodes, offset); offset += 2;
           events.push({ note: 0, instrId: 0, volume: 0, duration: dur, isNote: false, fileOffset: pauseFileOff, effects: pending.splice(0) });
           if (opcode === Op.StopAndPause) return;
@@ -832,7 +839,7 @@ export function parseSoundFactoryWithEffects(bytes: Uint8Array, filename: string
     uadePatternLayout,
   };
   return {
-    song, effectOffsets: sfGrid.effectOffsets,
+    song, effectOffsets: sfGrid.effectOffsets, voiceEvents: channelEvents, anchors: sfGrid.anchors, eventContext: cellContext,
     effectsSeen: sfGrid.effectsSeen, effectsPlaced: sfGrid.effectsPlaced, effectCounts: sfGrid.effectCounts,
   };
 }
