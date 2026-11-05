@@ -107,8 +107,11 @@ describe('David Whittaker grids against the original player (UADE Paula note-ons
   // (the wrap tick drawn as an extra row) is in step for pass 1 and runs one row late from pass 2 on.
   const SECOND_PASS_SECONDS = 20;
   // Only apb.dw: UADE ends garfield2+.dw tune 0 (a 243 s pass) at about 238 s, before its second pass starts, so the
-  // original has no second pass to compare there. Voices 3 and 4 of apb.dw tune 0 start notes in the original's second
-  // pass that the walk never shows (the grid has none): a separate gap, so voices without grid notes are not compared.
+  // original has no second pass to compare there. Voices 3 and 4 of apb.dw tune 0 start notes from 8.50 s (tick 424, the
+  // end of pass 1) that the walk never shows: those are tune 1's notes (samples 0xd7d0 / 0xe4f2, lists 0x9c0 / 0x99e).
+  // The 68k player never leaves its song (its end-of-list code at 0x502 restarts the list in place and nothing in it calls
+  // the init entry at 0x0); UADE re-enters the init for the next table entry once every voice has wrapped. A voice without
+  // grid notes is therefore not compared past pass 1, and the grid and the C walk are right.
   for (const rel of FILES.slice(0, 1)) {
     const name = rel.split('/').pop()!;
     it(`${name}: tune 0 stays on the player's notes through the second pass of the order`, async () => {
