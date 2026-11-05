@@ -18,7 +18,10 @@ class DavidWhittakerProcessor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.framesPlayed = 0;      // frames the song has rendered since it last started: a swapped-in module catches up to here
     this.channelMask = null;
-    this.lastPlayedTicks = -1;  // the processed-tick count last posted as a 'position' message
+    this.lastPlayedTicks = -1;  // the processed-tick count last seen after a render
+    this.latencyFrames = 0;     // frames from the render to the ear (output + base latency): a tick is reported when it is HEARD
+    this.seekGen = 0;           // stamped on every playTick: the engine drops reports from before its latest seek
+    this.tickQueue = [];        // ticks reached but not yet heard: { ticks, played (framesPlayed at the tick), frame (context frame) }
     this.lastHeapBuffer = null;
     this.initializing = false;
     // Per-channel dub sends + isolation slots (worklets/channel-outputs.js).
@@ -54,15 +57,20 @@ class DavidWhittakerProcessor extends AudioWorkletProcessor {
         } catch (error) { this.port.postMessage({ type: 'error', message: error.message }); }
         break;
       }
+      case 'seekTicks': this.seekTicks(data.ticks, data.gen); break;
       case 'previewLoad': this.previewLoad(data.buffer); break;
       case 'noteOn': this.previewNoteOn(data.sample, data.period, data.envelope, data.arpeggio); break;
       case 'noteOff': if (this.previewHandle) this.module._dw_preview_stop(this.previewHandle); break;
-      case 'play': this.playing = true; this.lastPlayedTicks = -1; break;
+      case 'play':
+        this.playing = true; this.lastPlayedTicks = -1; this.tickQueue.length = 0;
+        this.latencyFrames = Number.isFinite(data.latencyFrames) && data.latencyFrames > 0 ? data.latencyFrames : 0;
+        break;
       case 'stop':
         this.playing = false;
         if (this.handle) this.module._dw_select_subsong(this.handle, this.subsong || 0);
         this.framesPlayed = 0;
         this.lastPlayedTicks = -1;
+        this.tickQueue.length = 0;
         this.port.postMessage({ type: 'stopped' });
         break;
       case 'pause': this.playing = !this.playing; break;
@@ -172,6 +180,21 @@ class DavidWhittakerProcessor extends AudioWorkletProcessor {
     this.port.postMessage({ type: 'moduleSwapped', frames: this.framesPlayed });
   }
 
+  /**
+   * Play Pattern: jump the song to processed tick `ticks` without sounding anything (dw_seek_ticks runs the replayer silently
+   * to it, restarting the tune when it is already past). The played-frame count follows, so a later swapModule catches up to
+   * the same place, and the ticks not yet heard from before the jump are dropped.
+   */
+  seekTicks(ticks, gen) {
+    if (!this.module || !this.handle || typeof this.module._dw_seek_ticks !== 'function') return;
+    if (this.module._dw_played_ticks(this.handle) > ticks) this.framesPlayed = 0;
+    this.framesPlayed += this.module._dw_seek_ticks(this.handle, ticks);
+    this.tickQueue.length = 0;
+    this.lastPlayedTicks = -1;
+    this.seekGen = gen | 0;
+    this.port.postMessage({ type: 'seeked', ticks: this.module._dw_played_ticks(this.handle), gen: this.seekGen });
+  }
+
   /** Make the preview copy of the module (the replayer plays the keys itself, apart from the song). */
   previewLoad(buffer) {
     if (!this.module || !buffer) return;
@@ -263,15 +286,22 @@ class DavidWhittakerProcessor extends AudioWorkletProcessor {
       }
     }
 
-    // Playhead: the replayer's own processed-tick count (davidwhittaker.c dw_played_ticks), posted when it changes. The engine
-    // maps it onto the grid's row clock (DavidWhittakerEngine.ts), so the cursor is the player's position, not a second clock.
+    // Playhead: the replayer's own processed-tick count (davidwhittaker.c dw_played_ticks). The engine maps it onto the grid's
+    // row clock (DavidWhittakerEngine.ts), so the cursor is the player's position, not a second clock. A tick is posted when it
+    // is HEARD: the frames played minus the output latency has reached it (the Nuade worklet's latencyFrames pattern), so the
+    // cursor is on the row at the ear, not the row the render is ahead on. `frame` is the context frame the tick rendered at.
     // After swapModule the new handle has run the frames already played, so the count continues from where it was.
     if (typeof this.module._dw_played_ticks === 'function') {
       const ticks = this.module._dw_played_ticks(this.handle);
       if (ticks !== this.lastPlayedTicks) {
         this.lastPlayedTicks = ticks;
-        this.port.postMessage({ type: 'playTick', ticks });
+        const blockStart = typeof currentFrame === 'number' ? currentFrame : this.framesPlayed;
+        this.tickQueue.push({ ticks, played: this.framesPlayed, frame: blockStart + Math.max(0, rendered) });
       }
+      const heard = this.framesPlayed - this.latencyFrames;
+      let due = null;
+      while (this.tickQueue.length > 0 && this.tickQueue[0].played <= heard) due = this.tickQueue.shift();
+      if (due) this.port.postMessage({ type: 'playTick', ticks: due.ticks, frame: due.frame, gen: this.seekGen });
     }
 
     this.addPreview(outputL, outputR, rendered > 0 ? rendered : numSamples);

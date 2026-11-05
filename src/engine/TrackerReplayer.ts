@@ -14,6 +14,7 @@
  */
 
 import { applyEditorCellEdit } from '@lib/import/furnaceEditorCells';
+import { DavidWhittakerEngine } from './davidwhittaker/DavidWhittakerEngine';
 import { outputLatencySec } from './audioLatency';
 import { isReplacedInstrument, noteVolumeIsVelocity, synthNoteVelocity } from './replayer/hybridInstruments';
 import { isTonePortamentoEffect } from './replayer/SynthEffectProcessor';
@@ -1129,10 +1130,13 @@ export class TrackerReplayer {
    * @returns true when the engine was seeked and this position should be dropped.
    */
   private enforcePatternLoopOnEngine(position: number): boolean {
-    if (!this.useLibopenmptPlayback) return false;
+    const dw = !this.useLibopenmptPlayback && !!this.song?.davidWhittakerClock && DavidWhittakerEngine.hasInstance();
+    if (!this.useLibopenmptPlayback && !dw) return false;
     if (!shouldSeekBackToLoop(
       position, this.patternLoopActive, this.patternLoopStartPos, this.patternLoopEndPos,
     )) return false;
+    // David Whittaker: the replayer is run silently to the loop's first pattern (dw_seek_ticks), not seeked through the scheduler.
+    if (dw) return DavidWhittakerEngine.getInstance().seekToPattern(this.patternLoopStartPos);
     this.seekTo(this.patternLoopStartPos, 0);
     return true;
   }

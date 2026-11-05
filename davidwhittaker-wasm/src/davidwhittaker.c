@@ -2564,6 +2564,21 @@ int dw_played_ticks(const DwModule* module) {
     return module ? module->played_ticks : 0;
 }
 
+/* Run the player silently until it has processed `target_ticks` ticks of the current tune (the next tick it plays is processed
+ * tick `target_ticks`), restarting the tune first when it is already past that. Nothing is mixed out: the voices are muted at the
+ * restart and sound again from the first note after the target. Returns the frames the player ran, which the caller adds to
+ * its played-frame count (a swapped-in module catches up to that count). */
+size_t dw_seek_ticks(DwModule* module, int target_ticks) {
+    if (!module || target_ticks < 0) return 0;
+    if (module->played_ticks > target_ticks) dw_select_subsong(module, module->current_song);
+    size_t frames = 0;
+    const size_t block = 256, cap = (size_t)module->sample_rate * 3600;
+    while (module->played_ticks < target_ticks && !module->has_ended && frames < cap) {
+        frames += dw_render_multi(module, nullptr, nullptr, nullptr, nullptr, block);
+    }
+    return frames;
+}
+
 bool dw_has_ended(const DwModule* module) {
     if (!module) return true;
     return module->has_ended;

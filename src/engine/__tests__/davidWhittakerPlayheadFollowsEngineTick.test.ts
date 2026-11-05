@@ -49,7 +49,7 @@ describe('David Whittaker reports its play position', { timeout: 60_000 }, () =>
     (globalThis as { AudioWorkletNode?: unknown }).AudioWorkletNode = FakeNode;
     const engine = Object.create(DavidWhittakerEngine.prototype) as Record<string, unknown>;
     const speedChanges = [{ tick: 0, speed: 6 }, { tick: 600, speed: 3 }];
-    Object.assign(engine, { audioContext: { sampleRate: 48000 }, output: {}, _positions: undefined });
+    Object.assign(engine, { audioContext: { sampleRate: 48000 }, output: {}, _positions: undefined, _seekGen: 0, _tickLog: [] });
     // the engine's own field initialisers did not run on Object.create: set what the handler reads
     engine._positions = new PositionCallbacks();
     (engine as unknown as { createNode(): void }).createNode();

@@ -47,6 +47,7 @@ export async function openWorklet(opts: { dir: string; name: string; factory: st
   // The AudioWorkletGlobalScope clock: the start time of the block being rendered.
   let frames = 0;
   Object.defineProperty(g, 'currentTime', { get: () => frames / SAMPLE_RATE, configurable: true });
+  Object.defineProperty(g, 'currentFrame', { get: () => frames, configurable: true });
   const posted: Array<Record<string, unknown>> = [];
   class FakeProcessor {
     port = { onmessage: null as ((e: { data: unknown }) => void) | null, postMessage: (m: unknown) => { posted.push(m as Record<string, unknown>); } };
