@@ -11,6 +11,8 @@ class BdProcessor extends AudioWorkletProcessor {
     this.module = null;
     this.interleavedPtr = 0;
     this.interleavedBuf = null;
+    this.chPtrs = [0, 0, 0, 0];   // one mono buffer per voice, for the oscilloscopes and per-channel levels
+    this.chBufs = null;
     this.initialized = false;
     this.bufferSize = 128;
     this.lastHeapBuffer = null;
@@ -223,6 +225,7 @@ class BdProcessor extends AudioWorkletProcessor {
           this.port.postMessage({ type: 'error', message: 'malloc failed for output buffer' });
           return;
         }
+        for (let i = 0; i < 4; i++) this.chPtrs[i] = malloc(this.bufferSize * 4);
       }
 
       // Set output sample rate to match AudioContext
@@ -274,6 +277,7 @@ class BdProcessor extends AudioWorkletProcessor {
     if (!heapF32) return;
     if (this.lastHeapBuffer !== heapF32.buffer) {
       this.interleavedBuf = new Float32Array(heapF32.buffer, this.interleavedPtr, this.bufferSize * 2);
+      this.chBufs = this.chPtrs[0] ? this.chPtrs.map((ptr) => new Float32Array(heapF32.buffer, ptr, this.bufferSize)) : null;
       this.lastHeapBuffer = heapF32.buffer;
     }
   }
@@ -281,7 +285,9 @@ class BdProcessor extends AudioWorkletProcessor {
   cleanup() {
     const free = this.module?._free || this.module?.free;
     if (free && this.interleavedPtr) { free(this.interleavedPtr); this.interleavedPtr = 0; }
+    if (free) for (let i = 0; i < 4; i++) { if (this.chPtrs[i]) { free(this.chPtrs[i]); this.chPtrs[i] = 0; } }
     this.interleavedBuf = null;
+    this.chBufs = null;
     this.module = null;
     this.initialized = false;
     this.lastHeapBuffer = null;
@@ -312,9 +318,17 @@ class BdProcessor extends AudioWorkletProcessor {
     if (typeof this.module._player_render === 'function') {
       this.updateBufferViews();
       if (this.interleavedBuf) {
-        const rendered = this.module._player_render(this.interleavedPtr, numSamples);
+        const multi = this.chBufs && typeof this.module._player_render_channels === 'function';
+        const rendered = multi
+          ? this.module._player_render_channels(this.interleavedPtr, this.chPtrs[0], this.chPtrs[1], this.chPtrs[2], this.chPtrs[3], numSamples)
+          : this.module._player_render(this.interleavedPtr, numSamples);
         if (rendered > 0) {
           this.framesPlayed += rendered;
+          // Every sample of each voice, for the oscilloscopes and the per-channel role classifiers (worklets/channel-stream.js).
+          if (multi && globalThis.DevilboxChannelStream) {
+            this._stream ||= new globalThis.DevilboxChannelStream(this.port, sampleRate);
+            this._stream.writeFloat32(this.chBufs.slice(0, 4), rendered);
+          }
           for (let i = 0; i < rendered; i++) {
             outputL[i] = this.interleavedBuf[i * 2];
             outputR[i] = this.interleavedBuf[i * 2 + 1];

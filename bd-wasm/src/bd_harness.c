@@ -31,6 +31,12 @@ EXPORT int player_render(float *buf, int frames) {
     return (int)bd_render(g_module, buf, (size_t)frames);
 }
 
+/* player_render plus each voice alone into four mono buffers (oscilloscopes, per-channel levels). */
+EXPORT int player_render_channels(float *buf, float *ch0, float *ch1, float *ch2, float *ch3, int frames) {
+    if (!g_module) return 0;
+    return (int)bd_render_channels(g_module, buf, ch0, ch1, ch2, ch3, (size_t)frames);
+}
+
 EXPORT void player_stop(void) {
     if (g_module) {
         bd_destroy(g_module);
