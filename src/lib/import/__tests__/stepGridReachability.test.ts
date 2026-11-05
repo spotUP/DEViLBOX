@@ -9,14 +9,14 @@ import { resolve } from 'node:path';
 
 vi.mock('../formats/stepRowClock', async (orig) => {
   const m = await orig<typeof import('../formats/stepRowClock')>();
-  return { ...m, makeRowClock: vi.fn(m.makeRowClock), mainStepFromOnsets: vi.fn(m.mainStepFromOnsets) };
+  return { ...m, makeRowClock: vi.fn(m.makeRowClock), mainStepFromOnsets: vi.fn(m.mainStepFromOnsets), makeOnsetPlacer: vi.fn(m.makeOnsetPlacer) };
 });
 vi.mock('@/engine/ToneEngine', () => {
   const engine = new Proxy({}, { get: () => () => Promise.resolve() });
   return { getToneEngine: () => engine };
 });
 
-import { makeRowClock, mainStepFromOnsets } from '../formats/stepRowClock';
+import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer } from '../formats/stepRowClock';
 import { parseModuleToSong } from '../parseModuleToSong';
 import { walkDavidWhittaker, DW_WALK } from '../formats/DavidWhittakerWasmExtractor';
 import { dwRowClock } from '../formats/davidWhittakerGrid';
@@ -28,6 +28,7 @@ import { buildRobHubbardGrid } from '../formats/RobHubbardParser';
 import { rhRowClock, rhTickToRow, buildRHGridFromWalk } from '../formats/robHubbardGrid';
 import { RH_WALK } from '../formats/rhWalk';
 import { installWasmNodeFetches } from './helpers/dwNodeFetch';
+import { timFollinOnsetTicks, buildTimFollinGrid } from '../formats/timFollinGrid';
 import { daveLoweEncoderForStep } from '../formats/DaveLoweParser';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
@@ -311,4 +312,52 @@ describe('step grid: Dave Lowe and Dave Lowe New through parseModuleToSong', () 
       expect(checked).toBeGreaterThan(100);
     });
   }
+});
+
+describe('step grid: Tim Follin through parseModuleToSong', () => {
+  it('sly spy title.tf: one row per measured step, every onset on (pos*rows+row)*step + delay', async () => {
+    const rel = 'follin-player-ii/sly spy title.tf';
+    const ab = bytesOf(rel);
+    const beforeClock = vi.mocked(makeRowClock).mock.calls.length;
+    const beforePlacer = vi.mocked(makeOnsetPlacer).mock.calls.length;
+    const song = await parseModuleToSong(new File([ab.slice(0)], 'sly spy title.tf'));
+    expect(vi.mocked(makeRowClock).mock.calls.length, 'the shared row clock ran').toBeGreaterThan(beforeClock);
+    expect(vi.mocked(makeOnsetPlacer).mock.calls.length, 'the shared onset placer ran').toBeGreaterThan(beforePlacer);
+    const walk = timFollinOnsetTicks(new Uint8Array(ab))!;
+    const step = mainStepFromOnsets(walk);
+    expect(step).toBe(6);
+    expect(song.initialSpeed).toBe(step);
+    let delayed = 0, second = 0, unplaced = 0;
+    walk.forEach((want, v) => {
+      const shown: number[] = [];
+      song.songPositions.forEach((pi, pos) => {
+        const pat = song.patterns[pi];
+        pat.channels[v].rows.forEach((cell, r) => {
+          const base = (pos * 64 + r) * step;   // all patterns but the last hold 64 rows
+          if (cell.note > 0) {
+            const delay = cell.effTyp === BD_FX.rowOffset ? cell.eff : 0;
+            if (delay) delayed++;
+            shown.push(base + delay);
+          }
+          if ((cell.note2 ?? 0) > 0) { second++; shown.push(base + (cell.delay2 ?? 0)); }
+        });
+      });
+      // the cell has two note columns: a third onset in one row of a voice is the only one left out
+      shown.sort((a, b) => a - b);
+      const perRow = new Map<number, number>();
+      const left: number[] = [];
+      for (const t of want) {
+        const row = Math.floor(t / step);
+        const n = perRow.get(row) ?? 0;
+        perRow.set(row, n + 1);
+        if (n >= 2) left.push(t);
+      }
+      expect(shown, `voice ${v}`).toEqual(want.filter((t) => !left.includes(t)));
+      unplaced += left.length;
+    });
+    const grid = buildTimFollinGrid(new Uint8Array(ab))!;
+    expect(grid.unplacedNotes, 'the grid counts the notes it left out').toBe(unplaced);
+    console.log(`TF sly spy: step ${step}, onsets ${walk.map((w) => w.length).join('/')}, delayed ${delayed}, second column ${second}, left out ${unplaced}`);
+    expect(delayed + second).toBeGreaterThan(0);
+  });
 });

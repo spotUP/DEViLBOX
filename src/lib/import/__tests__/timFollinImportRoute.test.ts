@@ -13,6 +13,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { timFollinEncoder } from '@/engine/uade/encoders/TimFollinEncoder';
+import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 
 const sentinel = vi.hoisted(() => ({ calls: 0 }));
@@ -29,12 +30,23 @@ describe('Tim Follin .tf import route', () => {
     expect(sentinel.calls).toBeGreaterThan(0);
     expect(song.gridUnmatchedReason).toBeUndefined();
 
-    // one row = one tick: 588 rows in 64-row patterns
-    expect(song.patterns.reduce((n, p) => n + p.length, 0)).toBe(588);
-    const at = (v: number, tick: number) => {
-      const c = song.patterns[Math.floor(tick / 64)].channels[v].rows[tick % 64];
-      return [c.note, c.instrument];
-    };
+    // one row = one song step (15 ticks): ceil(588 / 15) rows in 64-row patterns
+    expect(song.initialSpeed).toBe(15);
+    expect(song.patterns.reduce((n, p) => n + p.length, 0)).toBe(Math.ceil(588 / song.initialSpeed));
+
+/** The note starting on `tick` of a voice: one row is one song step, a note inside its row has a 0xD7 delay or sits in note column 2. */
+const at = (v: number, tick: number): number[] => noteAtFor(song, v, tick);
+function noteAtFor(song: TrackerSong, v: number, tick: number): number[] {
+  const step = song.initialSpeed;
+  const row = Math.floor(tick / step), off = tick % step;
+  const c = song.patterns[Math.floor(row / 64)].channels[v].rows[row % 64] as unknown as Record<string, number>;
+  if (c.note > 0 && (c.effTyp === 0xd7 ? c.eff : 0) === off) return [c.note, c.instrument];
+  if (c.note2 > 0 && (c.delay2 ?? 0) === off) return [c.note2, c.instrument2];
+  return [0, 0];
+}
+const countNotesFor = (song: TrackerSong, v: number): number =>
+  song.patterns.reduce((n, p) => n + p.channels[v].rows.filter((r) => r.note > 0).length + p.channels[v].rows.filter((r) => (r.note2 ?? 0) > 0).length, 0);
+
     expect(at(0, 0)).toEqual([37, 5]);
     expect(at(0, 2)).toEqual([34, 6]);
     expect(at(1, 0)).toEqual([37, 5]);
@@ -42,13 +54,12 @@ describe('Tim Follin .tf import route', () => {
     expect(at(1, 47)).toEqual([13, 8]);
     expect(at(2, 3)).toEqual([37, 10]);
     expect(at(3, 2)).toEqual([39, 7]);
-    expect(at(3, 3)).toEqual([39, 5]);
+    // a third onset in one row of one voice has no note column left (grid.unplacedNotes)
     // a hold is an empty row
     expect(at(0, 1)).toEqual([0, 0]);
 
-    const counts = [0, 1, 2, 3].map((v) =>
-      song.patterns.reduce((n, p) => n + p.channels[v].rows.filter((r) => r.note > 0).length, 0));
-    expect(counts).toEqual([47, 19, 14, 21]);
+    const counts = [0, 1, 2, 3].map((v) => countNotesFor(song, v));
+    expect(counts).toEqual([42, 19, 14, 20]) // 47, 19, 14, 21 walk onsets; the 6 left out are third onsets in one 15-tick row;
 
     // carriers: the executed stream regions, rebuilt through the encoder, equal the original file bytes
     const layout = (song as unknown as { uadeVariableLayout?: UADEVariablePatternLayout }).uadeVariableLayout;
