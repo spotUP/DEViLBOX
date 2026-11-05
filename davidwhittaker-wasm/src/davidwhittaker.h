@@ -26,6 +26,7 @@ size_t dw_render(DwModule* module, float* interleaved_stereo, size_t frames);
 size_t dw_render_multi(DwModule* module, float* ch0, float* ch1, float* ch2, float* ch3, size_t frames);
 
 int dw_played_ticks(const DwModule* module);
+size_t dw_seek_ticks(DwModule* module, int target_ticks);
 bool dw_has_ended(const DwModule* module);
 
 // Edit API

@@ -41,6 +41,14 @@ export function dwGridPosition(clock: RowClock, passTicks: number, playedTicks: 
   return { songPos: Math.floor(global / ROWS_PER_PATTERN), row: global % ROWS_PER_PATTERN };
 }
 
+/** One reported position with the context time its tick rendered at: what get_playhead_offset measures the display against. */
+export interface DwTickLogEntry { sec: number; songPos: number; row: number }
+
+/** The processed tick the replayer must have run for the next tick it plays to be the first of grid pattern `pattern`. */
+export function dwPatternStartTick(clock: RowClock, pattern: number): number {
+  return clock.rowToTick(Math.max(0, pattern) * ROWS_PER_PATTERN);
+}
+
 export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
   private static instance: DavidWhittakerEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
@@ -48,6 +56,8 @@ export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
   private _songEndCallback: (() => void) | null = null;
   private readonly _positions = new PositionCallbacks();
   private _clock: { clock: RowClock; passTicks: number } | null = null;
+  private readonly _tickLog: DwTickLogEntry[] = [];
+  private _seekGen = 0;
 
   private constructor() {
     super();
@@ -104,8 +114,13 @@ export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
           useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
           break;
         case 'playTick':
-          if (this._clock && typeof data.ticks === 'number' && data.ticks > 0) {
-            this._positions.emit(dwGridPosition(this._clock.clock, this._clock.passTicks, data.ticks));
+          if (this._clock && typeof data.ticks === 'number' && data.ticks > 0 && (data.gen ?? 0) === this._seekGen) {
+            const at = dwGridPosition(this._clock.clock, this._clock.passTicks, data.ticks);
+            if (typeof data.frame === 'number') {
+              this._tickLog.push({ sec: data.frame / this.audioContext.sampleRate, songPos: at.songPos ?? 0, row: at.row });
+              if (this._tickLog.length > 2048) this._tickLog.splice(0, this._tickLog.length - 2048);
+            }
+            this._positions.emit(at);
           }
           break;
         case 'songEnd':
@@ -150,8 +165,27 @@ export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
     return this._positions.add(cb);
   }
 
+  /**
+   * Play Pattern: jump playback to the start of grid pattern `pattern` (64 rows of the song's row clock) without sounding the
+   * skipped part. Returns false when the engine has no row clock to place the pattern with. Reports from before the jump are
+   * dropped (they carry the old generation).
+   */
+  seekToPattern(pattern: number): boolean {
+    if (!this._clock || !this.workletNode) return false;
+    this._seekGen++;
+    this.workletNode.port.postMessage({ type: 'seekTicks', ticks: dwPatternStartTick(this._clock.clock, pattern), gen: this._seekGen });
+    return true;
+  }
+
+  /** The reported positions of the last seconds, with the context time each rendered at (MCP get_playhead_offset). */
+  tickLog(): readonly DwTickLogEntry[] { return this._tickLog; }
+
   play(): void {
-    this.workletNode?.port.postMessage({ type: 'play' });
+    // The worklet reports a tick once it is heard: output + base latency, the Nuade engine's latencyFrames.
+    const ctx = this.audioContext;
+    const latency = (ctx.outputLatency || 0) + (ctx.baseLatency || 0);
+    this._tickLog.length = 0;
+    this.workletNode?.port.postMessage({ type: 'play', latencyFrames: Math.round(latency * ctx.sampleRate) });
     this.afterPlay();
   }
   stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
