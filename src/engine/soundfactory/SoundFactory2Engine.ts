@@ -132,9 +132,12 @@ export class SoundFactory2Engine extends WASMChannelOutputsEngine {
     this.workletNode?.port.postMessage({ type: 'setCell', index, row, channel, note, instrument, effect, effectArg });
   }
 
-  /** Set an instrument parameter by name */
-  setInstrumentParam(instrument: number, param: string, value: number): void {
-    this.workletNode?.port.postMessage({ type: 'setInstrumentParam', instrument, param, value });
+  /**
+   * Set an instrument parameter by name on the DefineInstr record that starts at `recordOffset`
+   * (file offset, the parser's soundFactoryInstrument.recordOffset). Reaches the live playing copy.
+   */
+  setInstrumentParam(recordOffset: number, param: string, value: number): void {
+    this.workletNode?.port.postMessage({ type: 'setInstrumentParam', recordOffset, param, value });
   }
 
   /** The row and song-order index the replayer is on, as the grid shows them. */
