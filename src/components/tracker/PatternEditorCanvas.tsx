@@ -1615,6 +1615,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
           effectCols: ch.channelMeta?.effectCols ?? 2,
           effectNotation: ch.channelMeta?.effectNotation,
           noteCols: ch.channelMeta?.noteCols,
+          noteColDelay: ch.channelMeta?.noteColDelay,
           rows: ch.rows.map((cell): CellSnapshot => ({
             note: cell.note ?? 0,
             instrument: cell.instrument ?? 0,
@@ -1629,7 +1630,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
             eff4: cell.eff4,
             effTyp5: cell.effTyp5,
             eff5: cell.eff5,
-            note2: cell.note2, instrument2: cell.instrument2, volume2: cell.volume2,
+            note2: cell.note2, instrument2: cell.instrument2, volume2: cell.volume2, delay2: cell.delay2, delay3: cell.delay3, delay4: cell.delay4,
             note3: cell.note3, instrument3: cell.instrument3, volume3: cell.volume3,
             note4: cell.note4, instrument4: cell.instrument4, volume4: cell.volume4,
             flag1: cell.flag1,
@@ -2419,6 +2420,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                 effectCols: ch.channelMeta?.effectCols ?? 2,
                 effectNotation: ch.channelMeta?.effectNotation,
                 noteCols: ch.channelMeta?.noteCols,
+          noteColDelay: ch.channelMeta?.noteColDelay,
                 rows: ch.rows.map((cell): CellSnapshot => ({
                   note: cell.note ?? 0, instrument: cell.instrument ?? 0,
                   volume: cell.volume ?? 0, effTyp: cell.effTyp ?? 0, eff: cell.eff ?? 0,
@@ -2426,7 +2428,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
                   effTyp3: cell.effTyp3, eff3: cell.eff3,
                   effTyp4: cell.effTyp4, eff4: cell.eff4,
                   effTyp5: cell.effTyp5, eff5: cell.eff5,
-                  note2: cell.note2, instrument2: cell.instrument2, volume2: cell.volume2,
+                  note2: cell.note2, instrument2: cell.instrument2, volume2: cell.volume2, delay2: cell.delay2, delay3: cell.delay3, delay4: cell.delay4,
                   note3: cell.note3, instrument3: cell.instrument3, volume3: cell.volume3,
                   note4: cell.note4, instrument4: cell.instrument4, volume4: cell.volume4,
                   flag1: cell.flag1, flag2: cell.flag2, probability: cell.probability,
