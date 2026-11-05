@@ -68,6 +68,10 @@ export function encodeDavidWhittakerPattern(rows: TrackerCell[]): Uint8Array {
 export const davidWhittakerEncoder: VariableLengthEncoder = {
   formatId: 'davidWhittaker',
   encodePattern: (rows: TrackerCell[]) => encodeDavidWhittakerPattern(rows),
+  // The tick grid (davidWhittakerGrid.ts) is the replayer's walk, not the block's command rows: its cells carry no
+  // command bytes, so packing them gives an empty block that would zero the slot. Its edits are written by
+  // applyDwGridEdits (davidWhittakerEdits.ts), never by re-packing.
+  canEncode: (rows: TrackerCell[]) => rows.some((cell) => cell.cutoff !== undefined),
 };
 
 registerVariableEncoder(davidWhittakerEncoder);

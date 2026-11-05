@@ -188,6 +188,12 @@ export interface VariableLengthEncoder {
    * @returns Encoded byte stream (variable length)
    */
   encodePattern(rows: TrackerCell[], channel: number): Uint8Array;
+
+  /**
+   * False when `rows` hold nothing this encoder can pack (a grid that is not the block's own rows): writing the
+   * encoding would blank the block's slot. Absent: always true.
+   */
+  canEncode?(rows: TrackerCell[]): boolean;
 }
 
 /**
