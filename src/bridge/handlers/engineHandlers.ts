@@ -41,3 +41,37 @@ export async function setFormatEngine(params: Record<string, unknown>): Promise<
   if (!r.switched) return { error: r.error };
   return { ok: true, prefKey, stored: r.stored, reopened: r.reopened };
 }
+
+/**
+ * get_playhead_offset: samples every change of the position the pattern editor follows (useWasmPositionStore) for
+ * `seconds` and reports, per change, how far it was from the moment that row reached the ear (playheadOffset.ts).
+ * Needs an engine that stamps its reports with their render time: David Whittaker today.
+ */
+export async function getPlayheadOffset(params: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
+  const seconds = Math.min(60, Math.max(1, typeof params.seconds === 'number' ? params.seconds : 8));
+  const { DavidWhittakerEngine } = await import('../../engine/davidwhittaker/DavidWhittakerEngine');
+  const { useWasmPositionStore } = await import('../../stores/useWasmPositionStore');
+  const { getDevilboxAudioContext } = await import('../../utils/audio-context');
+  const { offsetOfChange, offsetStats } = await import('./playheadOffset');
+  if (!DavidWhittakerEngine.hasInstance()) return { error: 'No David Whittaker engine is loaded; get_playhead_offset measures it only' };
+  const engine = DavidWhittakerEngine.getInstance();
+  const ctx = getDevilboxAudioContext();
+  const offsets: number[] = [];
+  let unmatched = 0;
+  const unsubscribe = useWasmPositionStore.subscribe((s, prev) => {
+    if (!s.active || (s.row === prev.row && s.songPos === prev.songPos)) return;
+    const obsMs = performance.now();
+    const ts = ctx.getOutputTimestamp();
+    if (ts.contextTime === undefined || ts.performanceTime === undefined) return;
+    const o = offsetOfChange(engine.tickLog(), s.songPos, s.row, obsMs, { contextTime: ts.contextTime, performanceTime: ts.performanceTime });
+    if (o === null) unmatched++; else offsets.push(o);
+  });
+  await new Promise((r) => setTimeout(r, seconds * 1000));
+  unsubscribe();
+  return {
+    seconds, unmatched,
+    latencySeconds: { output: ctx.outputLatency ?? 0, base: ctx.baseLatency },
+    offsetMs: offsetStats(offsets),
+    meaning: 'grid change time minus the time that row reaches the ear: negative = the grid is early, positive = late',
+  };
+}

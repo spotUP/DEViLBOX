@@ -203,7 +203,7 @@ import {
 import { analyzeSongHandler } from './handlers/analysisHandlers';
 import { getVoiceTake, voiceToNotes } from './handlers/voiceHandlers';
 import { generatePattern, transformPattern } from './handlers/generatorHandlers';
-import { getFormatEngines, setFormatEngine } from './handlers/engineHandlers';
+import { getFormatEngines, setFormatEngine, getPlayheadOffset } from './handlers/engineHandlers';
 import {
   getDJState, getDJPlaylistState, djLoadFile,
   djTogglePlay, djStop, djCue, djSync,
@@ -248,6 +248,7 @@ const handlers: Record<string, Handler> = {
   get_instrument: getInstrument,
   get_current_instrument: getCurrentInstrument,
   get_playback_state: getPlaybackState,
+  get_playhead_offset: getPlayheadOffset,
   get_playback_silence: getPlaybackSilence,
   clear_silence_snapshot: clearSilenceSnapshot,
   get_cursor: getCursor,
