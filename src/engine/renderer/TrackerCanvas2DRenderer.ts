@@ -392,8 +392,11 @@ export class TrackerCanvas2DRenderer {
             const vol = nc === 0 ? (cell?.volume ?? 0)
               : nc === 1 ? (cell?.volume2 ?? 0)
               : nc === 2 ? (cell?.volume3 ?? 0) : (cell?.volume4 ?? 0);
-            ctx.fillStyle = isPlayRow ? '#ffffff' : vol === 0 ? theme.textMuted : theme.textVolume;
-            ctx.fillText(vol === 0 ? '··' : hex2(vol), ncX + cw * 5 + 4, y);
+            const showDelay = nc > 0 && chan.noteColDelay === true;
+            const delay = nc === 1 ? (cell?.delay2 ?? 0) : nc === 2 ? (cell?.delay3 ?? 0) : (cell?.delay4 ?? 0);
+            const sub = showDelay ? delay : vol;
+            ctx.fillStyle = isPlayRow ? '#ffffff' : sub === 0 ? theme.textMuted : showDelay ? theme.textEffect : theme.textVolume;
+            ctx.fillText(sub === 0 ? '··' : hex2(sub), ncX + cw * 5 + 4, y);
           }
 
           // Effects start after all note column groups

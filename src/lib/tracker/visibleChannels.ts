@@ -24,7 +24,7 @@ const NUMERIC_CELL_FIELDS: readonly (keyof TrackerCell)[] = [
   'note', 'instrument', 'volume', 'effTyp', 'eff', 'effTyp2', 'eff2',
   'effTyp3', 'eff3', 'effTyp4', 'eff4', 'effTyp5', 'eff5', 'effTyp6', 'eff6', 'effTyp7', 'eff7', 'effTyp8', 'eff8',
   'flag1', 'flag2', 'cutoff', 'resonance', 'envMod', 'pan', 'probability',
-  'note2', 'instrument2', 'volume2', 'note3', 'instrument3', 'volume3', 'note4', 'instrument4', 'volume4',
+  'note2', 'instrument2', 'volume2', 'note3', 'instrument3', 'volume3', 'note4', 'instrument4', 'volume4', 'delay2', 'delay3', 'delay4',
 ];
 
 export function cellHasData(cell: TrackerCell | undefined): boolean {

@@ -1,27 +1,20 @@
 /**
- * The step grid (thoughts/shared/plans/2026-11-05-step-grid.md), Ben Daglish, through the product's importer
- * (parseBenDaglishFile): one fixed clock per song, a note off the step carries its delay in the first effect slot, a second
- * note on one row goes to note column 2. The sentinel proves the shared row clock and step function ran during the import.
+ * Ben Daglish step grid behaviour (thoughts/shared/plans/2026-11-05-step-grid.md): the step function and the edit
+ * layer. That the import runs the shared clock is proved once, in stepGridReachability.test.ts.
  */
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-vi.mock('../formats/stepRowClock', async (orig) => {
-  const m = await orig<typeof import('../formats/stepRowClock')>();
-  return { ...m, makeRowClock: vi.fn(m.makeRowClock), mainStepFromOnsets: vi.fn(m.mainStepFromOnsets) };
-});
 vi.mock('@/engine/ToneEngine', () => {
   const engine = new Proxy({}, { get: () => () => Promise.resolve() });
   return { getToneEngine: () => engine };
 });
 
-import { makeRowClock, mainStepFromOnsets } from '../formats/stepRowClock';
+import { mainStepFromOnsets } from '../formats/stepRowClock';
 import { parseBenDaglishFile } from '../formats/BenDaglishParser';
 import { walkBenDaglish } from '../formats/BenDaglishWasmExtractor';
-import { bdNotePlacements, bdRowClock } from '../formats/benDaglishGrid';
 import { applyBdGridEdits } from '../formats/benDaglishEdits';
-import { BD_FX } from '../formats/benDaglishEffectGlyphs';
 import { installWasmNodeFetch } from './helpers/dwNodeFetch';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
@@ -42,45 +35,7 @@ describe('mainStepFromOnsets', () => {
   });
 });
 
-const SONGS = [
-  { path: 'ben-daglish/motorhead-titleandingame.bd', step: 5, delayed: 32, clashes: 16, delayedVoice: 3 },
-  { path: 'formats/mickey_mouse.bd', step: 8, delayed: 118, clashes: 0, delayedVoice: 1 },
-];
-
-describe('step grid: Ben Daglish through parseBenDaglishFile', () => {
-  for (const s of SONGS) {
-    it(`${s.path}: step ${s.step}, ${s.delayed} delayed notes, ${s.clashes} same-row clashes`, async () => {
-      const ab = bytesOf(s.path);
-      const clockCalls = vi.mocked(makeRowClock).mock.calls.length;
-      const stepCalls = vi.mocked(mainStepFromOnsets).mock.calls.length;
-      const song = await parseBenDaglishFile(ab.slice(0), s.path.split('/').pop()!) as unknown as TrackerSong;
-      expect(vi.mocked(makeRowClock).mock.calls.length, 'the row clock ran during the import').toBeGreaterThan(clockCalls);
-      expect(vi.mocked(mainStepFromOnsets).mock.calls.length, 'the shared step function ran during the import').toBeGreaterThan(stepCalls);
-
-      expect(song.initialSpeed).toBe(s.step);
-
-      const walk = await walkBenDaglish(ab.slice(0), 0);
-      const clock = bdRowClock(walk);
-      const { placed, unplaced } = bdNotePlacements(walk, clock);
-      expect(unplaced.length).toBe(0);
-      const delayed = placed.filter((p) => p.offset > 0);
-      const clashes = placed.filter((p) => p.col === 1);
-      expect(delayed.length, 'delayed notes').toBe(s.delayed);
-      expect(clashes.length, 'same-row clashes').toBe(s.clashes);
-      expect(new Set(delayed.map((p) => p.voice)), 'delayed voices').toEqual(new Set([s.delayedVoice]));
-      if (s.clashes) expect(new Set(clashes.map((p) => p.voice)), 'clash voices').toEqual(new Set([s.delayedVoice]));
-
-      // the song shows them: every delayed col-0 note carries the offset in its first effect slot, every clash is in note column 2 with its delay
-      let shownOffsets = 0, shownNote2 = 0;
-      song.songPositions.forEach((pi) => song.patterns[pi].channels.forEach((ch) => ch.rows.forEach((cell) => {
-        if (cell.effTyp === BD_FX.rowOffset) shownOffsets++;
-        if (cell.note2) shownNote2++;
-      })));
-      expect(shownNote2).toBe(s.clashes);
-      expect(shownOffsets, 'offset effects in the first slot').toBe(placed.filter((p) => p.col === 0 && p.offset > 0).length);
-    });
-  }
-
+describe('Ben Daglish edits (the wiring is proved in stepGridReachability.test.ts)', () => {
   it('motorhead: an edit of a note in note column 2 is written to the module', async () => {
     const path = 'ben-daglish/motorhead-titleandingame.bd';
     const ab = bytesOf(path);
@@ -93,5 +48,30 @@ describe('step grid: Ben Daglish through parseBenDaglishFile', () => {
     const res = applyBdGridEdits(new Uint8Array(ab), walk, song.uadeVariableLayout!.filePatternAddrs!, edited);
     expect(res.warnings).toEqual([]);
     expect(res.patched, 'one byte changed').toBe(1);
+  });
+
+  it('motorhead: a delay2 edit on a clash row moves that note onset in the module, nothing else', async () => {
+    const path = 'ben-daglish/motorhead-titleandingame.bd';
+    const ab = bytesOf(path);
+    const song = await parseBenDaglishFile(ab.slice(0), 'motorhead-titleandingame.bd') as unknown as TrackerSong;
+    const walk = await walkBenDaglish(ab.slice(0), 0);
+    const edited = song.patterns.map((p) => ({ ...p, channels: p.channels.map((c) => ({ ...c, rows: c.rows.map((r) => ({ ...r })) })) }));
+    let cell: (typeof edited)[0]['channels'][0]['rows'][0] | undefined;
+    for (const p of edited) for (const c of p.channels) for (const r of c.rows) if (!cell && r.note2 && (r.delay2 ?? 0) >= 2) cell = r;
+    expect(cell, 'a clash cell with room to move is in the grid').toBeTruthy();
+    cell!.delay2 = cell!.delay2! - 1;
+    const res = applyBdGridEdits(new Uint8Array(ab), walk, song.uadeVariableLayout!.filePatternAddrs!, edited);
+    expect(res.warnings).toEqual([]);
+    expect(res.patched, 'two duration bytes').toBe(2);
+    // the re-walk: exactly one note starts one tick earlier, the song is as long as before
+    const out = res.data.buffer.slice(res.data.byteOffset, res.data.byteOffset + res.data.byteLength) as ArrayBuffer;
+    const walk2 = await walkBenDaglish(out, 0);
+    // a track plays again on every pass, so an event is told apart by its place and its n-th play
+    const keyed = (w: typeof walk) => { const seen = new Map<string, number>(); return new Map(w.events.map((e) => { const k = `${e.voice}:${e.track}:${e.pos}`; const n = seen.get(k) ?? 0; seen.set(k, n + 1); return [`${k}#${n}`, e.ptick] as const; })); };
+    const before = keyed(walk), after = keyed(walk2);
+    const deltas = [...before].filter(([k, t]) => after.get(k) !== t).map(([k, t]) => t - after.get(k)!);
+    expect(deltas.length, 'the edited note moved on every play').toBeGreaterThan(0);
+    expect(new Set(deltas), 'each moved one tick earlier, nothing else moved').toEqual(new Set([1]));
+    expect(walk2.processedTicks, 'song length unchanged').toBe(walk.processedTicks);
   });
 });

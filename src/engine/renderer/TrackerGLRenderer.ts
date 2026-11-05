@@ -879,6 +879,17 @@ export class TrackerGLRenderer {
             const vol = nc === 0 ? (cell.volume ?? 0)
               : nc === 1 ? (cell.volume2 ?? 0)
               : nc === 2 ? (cell.volume3 ?? 0) : (cell.volume4 ?? 0);
+            if (nc > 0 && chData.noteColDelay === true) {
+              const delay = nc === 1 ? (cell.delay2 ?? 0) : nc === 2 ? (cell.delay3 ?? 0) : (cell.delay4 ?? 0);
+              if (delay !== 0) {
+                this.setTmpColor(lerpWhiteRGBA(colors.textEffect, glow), cellAlpha);
+                this.addGlyphString(HEX_TABLE[delay & 0xFF], px, gy, atlas, this.tmpColor, bold);
+              } else if (!ui.blankEmpty) {
+                this.setTmpColor(lerpWhiteRGBA(colors.textMuted, 0), cellAlpha);
+                this.addGlyphString('..', px, gy, atlas, this.tmpColor, false);
+              }
+              continue;
+            }
             const hasVol = vol >= 0x10 && vol <= 0x50;
             if (hasVol) {
               this.setTmpColor(lerpWhiteRGBA(colors.textVolume, glow), cellAlpha);
