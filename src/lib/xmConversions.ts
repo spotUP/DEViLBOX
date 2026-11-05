@@ -16,6 +16,7 @@ import { tonyWilliamsEffectToString } from './import/formats/tonyWilliamsEffectG
 import { jxsEffectToString } from './import/formats/jxsEffectGlyphs';
 import { davidWhittakerEffectToString } from './import/formats/davidWhittakerEffectGlyphs';
 import { benDaglishEffectToString } from './import/formats/benDaglishEffectGlyphs';
+import { soundFactoryEffectToString } from './import/formats/soundFactoryEffectGlyphs';
 import { robHubbardEffectToString } from './import/formats/robHubbardEffectGlyphs';
 import { futurePlayerEffectToString } from './import/formats/fpEffectGlyphs';
 import { musicAssemblerEffectToString } from './import/formats/maEffectGlyphs';
@@ -285,6 +286,10 @@ export function xmEffectToString(effTyp: number, eff: number): string {
   // Ben Daglish track and position-list commands (reserved block 0xD8..0xEC).
   const bd = benDaglishEffectToString(effTyp, eff);
   if (bd !== null) return bd;
+
+  // Sound Factory stream commands (reserved block 0x300..0x322).
+  const sf = soundFactoryEffectToString(effTyp, eff);
+  if (sf !== null) return sf;
 
   // Rob Hubbard stream commands (reserved block 0xED..0xF2).
   const rh = robHubbardEffectToString(effTyp, eff);
