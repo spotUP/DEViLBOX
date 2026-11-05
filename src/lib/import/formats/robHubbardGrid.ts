@@ -12,6 +12,7 @@
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import { periodToPitch } from '@/lib/amiga/periodNotes';
 import { RH_FX } from './robHubbardEffectGlyphs';
+import { makeRowClock, type RowClock } from './stepRowClock';
 import { RH_WALK, type RhWalk, type RhWalkEvent } from './rhWalk';
 
 const ROWS_PER_PATTERN = 64;
@@ -88,15 +89,30 @@ export interface RhGrid {
   blockAtStart: number[][];
   /** Notes whose period names no tracker note (the grid would show nothing for a note the player plays). */
   unnamedNotes: number;
+  /** Walk events not on the first interrupt of their row (always 0: durations are `speed` multiples). */
+  offGridEvents: number;
   /** Rows where more commands ran on one voice than the cell has effect columns. */
   overflowRows: number;
 }
 
+/**
+ * The row clock of a walk: one row per `speed` interrupts. The walk counts interrupts from 1 (the player's first call),
+ * the clock from 0, so a walk event at `tick` sits at clock tick `tick - 1`. Rob Hubbard has one speed for the whole song
+ * and every duration is `speed * units`, so every event lands on the first tick of a row (offset 0): this format needs no
+ * row-offset effect, and `RhGrid.offGridEvents` counts the events that would (0 on every corpus song).
+ */
+export function rhRowClock(walk: RhWalk): RowClock {
+  return makeRowClock([{ tick: 0, speed: Math.max(1, walk.speed) }]);
+}
+
+/** The row an interrupt of the walk falls in and how far into it. */
+export const rhTickToRow = (clock: RowClock, tick: number): { row: number; offset: number } => clock.tickToRow(tick - 1);
+
 /** Draw the walk as 64-row patterns, one row per `speed` interrupts. */
 export function buildRHGridFromWalk(walk: RhWalk, locate: RhCommandLocator): RhGrid {
   const channels = Math.max(1, walk.voices);
-  const speed = Math.max(1, walk.speed);
-  const rows = Math.max(1, Math.ceil(walk.ticks / speed));
+  const clock = rhRowClock(walk);
+  const rows = Math.max(1, clock.rowsForTicks(walk.ticks));
   const grid: TrackerCell[][] = Array.from({ length: channels }, () => Array.from({ length: rows }, emptyCell));
   const src: Array<Array<RHCellSource | null>> = Array.from({ length: channels }, () => new Array<RHCellSource | null>(rows).fill(null));
   const cmdSrc: Array<Array<RHCellSource | null>> = Array.from({ length: channels }, () => new Array<RHCellSource | null>(rows).fill(null));
@@ -106,13 +122,14 @@ export function buildRHGridFromWalk(walk: RhWalk, locate: RhCommandLocator): RhG
   const curBlock = new Array<number>(channels).fill(-1);
   let overflowRows = 0;
   let unnamedNotes = 0;
+  let offGridEvents = 0;
 
   const ev = walk.events;
   let ei = 0;
   for (let r = 0; r < rows; r++) {
-    const tickEnd = r * speed + speed;               // ticks 1 + r*speed .. (r+1)*speed fall on this row
-    for (; ei < ev.length && ev[ei].tick <= tickEnd; ei++) {
+    for (; ei < ev.length && rhTickToRow(clock, ev[ei].tick).row <= r; ei++) {
       const e = ev[ei];
+      if (rhTickToRow(clock, e.tick).offset !== 0) offGridEvents++;
       if (e.voice >= channels) continue;
       curBlock[e.voice] = e.block;
       const cell = grid[e.voice][r];
@@ -166,5 +183,5 @@ export function buildRHGridFromWalk(walk: RhWalk, locate: RhCommandLocator): RhG
     commandSources.push(cmdSrc.map((s) => s.slice(start, start + len)));
     blockAtStart.push(blockAt.map((b) => b[start]));
   }
-  return { patterns, songPositions, rows, cellSources, commandSources, blockAtStart, unnamedNotes, overflowRows };
+  return { patterns, songPositions, rows, cellSources, commandSources, blockAtStart, unnamedNotes, offGridEvents, overflowRows };
 }
