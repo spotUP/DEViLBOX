@@ -55,9 +55,13 @@ function tableOffset(mod: PaulaLogModule, bytes: Uint8Array, name: string): numb
 }
 
 /** Per voice, the seconds at which the original player starts a note, `seconds` of tune `tune` (copied over table entry 0). */
-function paulaOnsets(mod: PaulaLogModule, bytes: Uint8Array, name: string, table: number, tune: number, seconds: number): number[][] {
+function paulaOnsets(mod: PaulaLogModule, bytes: Uint8Array, name: string, table: number, tune: number, seconds: number, loopEntries = 1): number[][] {
   const patched = bytes.slice();
-  patched.copyWithin(table, table + 10 * tune, table + 10 * tune + 10);
+  // loopEntries > 1: the tune is copied over that many entries. UADE re-enters the player's init for the NEXT table entry
+  // once every voice has wrapped (score.s songendbit -> host next subsong; uade_wasm_set_one_subsong cannot stop it, see
+  // the oracle section of thoughts/spot/2026-11-05-apb-voices34.md), so identical entries make it replay the SAME tune, as the tracker loops it.
+  const entry = patched.slice(table + 10 * tune, table + 10 * tune + 10);
+  for (let e = 0; e < Math.max(1, loopEntries); e++) patched.set(entry, table + 10 * e);
   return paulaOnsetsOf(new PaulaSession(mod, patched, name, { subsong: 1 }), seconds, true);
 }
 
@@ -107,11 +111,11 @@ describe('David Whittaker grids against the original player (UADE Paula note-ons
   // (the wrap tick drawn as an extra row) is in step for pass 1 and runs one row late from pass 2 on.
   const SECOND_PASS_SECONDS = 20;
   // Only apb.dw: UADE ends garfield2+.dw tune 0 (a 243 s pass) at about 238 s, before its second pass starts, so the
-  // original has no second pass to compare there. Voices 3 and 4 of apb.dw tune 0 start notes from 8.50 s (tick 424, the
-  // end of pass 1) that the walk never shows: those are tune 1's notes (samples 0xd7d0 / 0xe4f2, lists 0x9c0 / 0x99e).
-  // The 68k player never leaves its song (its end-of-list code at 0x502 restarts the list in place and nothing in it calls
-  // the init entry at 0x0); UADE re-enters the init for the next table entry once every voice has wrapped. A voice without
-  // grid notes is therefore not compared past pass 1, and the grid and the C walk are right.
+  // original has no second pass to compare there. The 68k player never leaves its song (its end-of-list code at 0x502
+  // restarts the list in place); UADE re-enters the init for the next table entry once every voice has wrapped, which
+  // played tune 1 from 8.50 s (voices 3 and 4 started its notes). The oracle therefore copies tune 0 over EVERY table
+  // entry, so each re-entry replays tune 0 as the tracker loops it, and a voice that is silent in the grid must be silent
+  // in the player too.
   for (const rel of FILES.slice(0, 1)) {
     const name = rel.split('/').pop()!;
     it(`${name}: tune 0 stays on the player's notes through the second pass of the order`, async () => {
@@ -126,12 +130,11 @@ describe('David Whittaker grids against the original player (UADE Paula note-ons
       const pass = rowCount * rowSeconds(song);
       const grid = gridOnsets(song).map((l) => [...l, ...l.map((t) => t + pass)]);
       const span = Math.min(pass + SECOND_PASS_SECONDS, 2 * pass);
-      const paula = paulaOnsets(await openUade(), bytes, name, table, 0, span + 1);
+      const paula = paulaOnsets(await openUade(), bytes, name, table, 0, span + 1, await dwSubsongCount(ab.slice(0)));
       const misses: string[] = [];
       for (const m of onsetMatch(grid, paula, span, TOLERANCE_MS)) {
-        if (m.grid === 0) continue;
         const ok = (hit: number, n: number): boolean => n === 0 || hit / n >= MIN_COVERAGE;
-        if (!ok(m.gridHit, m.grid) || !ok(m.playerHit, m.player)) misses.push(`${name} voice ${m.voice + 1}: grid ${m.grid} (${m.gridHit} hit), player ${m.player} (${m.playerHit} hit), pass ${pass.toFixed(3)} s`);
+        if ((m.player === 0) !== (m.grid === 0) || !ok(m.gridHit, m.grid) || !ok(m.playerHit, m.player)) misses.push(`${name} voice ${m.voice + 1}: grid ${m.grid} (${m.gridHit} hit), player ${m.player} (${m.playerHit} hit), pass ${pass.toFixed(3)} s`);
       }
       expect(misses, 'voices that fall out of step in pass 2').toEqual([]);
     });
