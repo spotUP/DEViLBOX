@@ -8,7 +8,7 @@ import { immer } from 'zustand/middleware/immer';
 import type * as Tone from 'tone';
 import type { EffectConfig, AudioEffectType as EffectType } from '@typedefs/instrument';
 import type { ToneEngine } from '@engine/ToneEngine';
-import { getDefaultEffectParameters } from '@engine/InstrumentFactory';
+import { getDefaultEffectParameters } from '@engine/factories/effectDefaultParameters';
 import { getDefaultEffectWet } from '@engine/factories/EffectFactory';
 import { createBatchedSet } from '@/utils/batchedSet';
 import { targetsChannels } from '@engine/tone/sidechainKey';

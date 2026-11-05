@@ -40,13 +40,13 @@ import {
 } from '@typedefs/instrument';
 import type { SynthType } from '@typedefs/instrument';
 
-import { getDefaultFurnaceConfig } from '@engine/InstrumentFactory';
+import { getDefaultFurnaceConfig } from '@engine/factories/furnaceDefaultConfig';
 import { getToneEngine } from '@engine/ToneEngine';
 import { touchesToneVoice } from '@engine/tone/toneSynthKnobs';
 import { peekTrackerReplayer } from '@engine/TrackerReplayer';
 import * as OpenMPTEditBridge from '@engine/libopenmpt/OpenMPTEditBridge';
 import { recognizeCinter4Instruments } from '@engine/cinter4/cinter4Recognize';
-import { getFormatStoreRefOrNull } from './storeAccess';
+import { getFormatStoreRefOrNull, registerInstrumentStore } from './storeAccess';
 import { isSynthAllowed, formatDisplayName } from '@/lib/formats/EditableFormatRegistry';
 import { notify } from './useNotificationStore';
 import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } from '@/lib/formatCompatibility';
@@ -2424,4 +2424,5 @@ useInstrumentStore.subscribe((state, prev) => {
  * store at its defaults and the loaded song disappears mid-session. See
  * `lib/dev/keepAcrossHmr.ts`.
  */
+registerInstrumentStore(useInstrumentStore);
 keepAcrossHmr(import.meta.hot, useInstrumentStore, 'instruments');

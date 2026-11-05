@@ -34,8 +34,8 @@ import { useEditorStore } from './useEditorStore';
 import { useUIStore } from './useUIStore';
 import { lockFormatId } from '../lib/formats/EditableFormatRegistry';
 import { applySunNoteEdit, reprojectSunGrid } from '../lib/import/formats/sunReproject';
-import { getTrackerStoreRef } from './storeAccess';
-import { useInstrumentStore } from './useInstrumentStore';
+import { getTrackerStoreRef, getInstrumentStoreRef } from './storeAccess';
+import type { useInstrumentStore as _InstrumentStoreType } from './useInstrumentStore';
 import type { Pattern } from '@/types/tracker';
 import type { InstrumentConfig } from '@/types/instrument';
 import { applyWavesampleIdMap, planUnusedWavesampleRemoval, planEqualWavesampleMerge, type WavesampleCleanupPlan } from '@/engine/musicline/wavesampleCleanup';
@@ -627,10 +627,12 @@ export type MaxTraxSampleMutation =
 function applyWavesamplePlan(plan: (patterns: Pattern[], instruments: InstrumentConfig[]) => WavesampleCleanupPlan): number {
   const trackerStore = getTrackerStoreRef();
   const trackerState = trackerStore.getState() as ReturnType<typeof _TrackerStoreType.getState>;
-  const { removeIds, idMap } = plan(trackerState.patterns, useInstrumentStore.getState().instruments);
+  const instrumentStore = getInstrumentStoreRef();
+  const instrumentState = instrumentStore.getState() as ReturnType<typeof _InstrumentStoreType.getState>;
+  const { removeIds, idMap } = plan(trackerState.patterns, instrumentState.instruments);
   if (removeIds.length === 0) return 0;
   trackerStore.setState((draft: { patterns: Pattern[] }) => { applyWavesampleIdMap(draft.patterns, idMap); });
-  useInstrumentStore.getState().removeInstrumentsRenumbered(removeIds);
+  instrumentState.removeInstrumentsRenumbered(removeIds);
   return removeIds.length;
 }
 
