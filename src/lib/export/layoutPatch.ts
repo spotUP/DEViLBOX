@@ -60,6 +60,7 @@ export function patchModuleByVariableLayout(source: ArrayBuffer | Uint8Array, la
     const addr = fp == null || fp < 0 ? undefined : layout.filePatternAddrs[fp];
     const size = fp == null || fp < 0 ? undefined : layout.filePatternSizes[fp];
     if (fp == null || addr == null || size == null || addr + size > buf.length) continue;
+    if (layout.encoder.canEncode && !layout.encoder.canEncode(patterns[pattern].channels[channel].rows)) continue;
     const encoded = encodeVariableBlock(layout, fp, patterns[pattern].channels[channel].rows, channel);
     if (encoded.length > size) {
       refused.push({ pattern, channel, encoded: encoded.length, slot: size });
