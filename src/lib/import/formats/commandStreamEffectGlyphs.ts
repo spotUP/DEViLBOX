@@ -4,7 +4,7 @@
  * SINGLE SOURCE OF TRUTH for the effTyp integers these two formats' commands occupy in the tracker grid. None is
  * an XM effect; each keeps its own id and its operand verbatim (low byte), named in the player's terms
  * (third-party/nuade/players/{riffraff,howiedavies}). `effTyp` is a GLOBAL id space shared by every format's
- * display path (xmEffectToString + TrackerGLRenderer + TrackerCanvas2DRenderer); the blocks are 0x510..0x517 and 0x520..0x521
+ * display path (xmEffectToString + TrackerGLRenderer + TrackerCanvas2DRenderer); the blocks are 0x510..0x517, 0x520..0x521 and 0x530..0x531
  * (beathovenEffectGlyphs.ts holds 0x500..0x503).
  *
  * ZERO imports on purpose - imported by the renderer workers.
@@ -40,13 +40,23 @@ export const HD_FX = {
   maxVolume: HD_FX_BASE + 1,
 } as const;
 
+export const HC_FX_BASE = 0x530;
+/** Jochen Hippel CoSo note parameter (hippel.c step_voice): the byte after the info byte, read when info bits 5-7 are set. */
+export const HC_FX = {
+  /** P: portamento rate (info bit 5, the byte feeds hip_portamento_apply). */
+  portamento: HC_FX_BASE,
+  /** F: frequency sequence number replacing the instrument's own (info bit 6). */
+  altSequence: HC_FX_BASE + 1,
+} as const;
+
 export const CS_FX_MIN = RR_FX_BASE;
-export const CS_FX_MAX = HD_FX.maxVolume;
+export const CS_FX_MAX = HC_FX.altSequence;
 
 export const CS_EFFECT_GLYPH: Record<number, string> = {
   [RR_FX.setVolume]: 'V', [RR_FX.volumeSlide]: 'S', [RR_FX.volumeSlideRate]: 'R', [RR_FX.masterFade]: 'F',
   [RR_FX.masterFadeRate]: 'G', [RR_FX.pitchSlide]: 'P', [RR_FX.pitchSlideLow]: 'Q', [RR_FX.pitchSlideOff]: 'O',
   [HD_FX.speed]: 'S', [HD_FX.maxVolume]: 'V',
+  [HC_FX.portamento]: 'P', [HC_FX.altSequence]: 'F',
 };
 
 /** A command of these formats as a 3-char grid token, or null outside the blocks. */

@@ -50,6 +50,8 @@
  * Reference: FlodJS JHPlayer.js by Christian Corti, Neoart Costa Rica (2012)
  */
 
+import { HC_FX } from './commandStreamEffectGlyphs';
+import { addCellEffect } from './cellEffectSlots';
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { HippelCoSoConfig, HippelCoSoSampleData, HippelCoSoSampleEntry, UADEChipRamInfo } from '@/types/instrument';
@@ -851,7 +853,8 @@ export function decodeCoSoGrid(
           pos++;
           let infoVal = 0;
           if (pos < buf.length) { infoVal = s8(buf, pos); pos++; }
-          if ((infoVal & 0xE0) !== 0 && pos < buf.length) pos++; // infoPrev
+          let param = -1;
+          if ((infoVal & 0xE0) !== 0 && pos < buf.length) param = buf[pos++]; // infoPrev
           // The replayer plays envelope (info & 31) + sound transpose, byte
           // wrapped, and falls back to envelope 0 when that is past the table.
           const envIdx = ((infoVal & 31) + sndT) & 0xFF;
@@ -861,6 +864,9 @@ export function decodeCoSoGrid(
             instrument: instrNum,
             volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
           };
+          // The parameter byte is the portamento rate (info bit 5) and the replacement frequency sequence (bit 6).
+          if (param >= 0 && (infoVal & 0x20) !== 0) addCellEffect(baseline, HC_FX.portamento, param);
+          if (param >= 0 && (infoVal & 0x40) !== 0) addCellEffect(baseline, HC_FX.altSequence, param);
           voices[ch].push({ row: time, cell: baseline, span: cosoSpan(at, pos - at, eventAt, baseline, trackTransp, true, sndT) });
           time += rowSpeed[ch] + 1;
         }
@@ -923,13 +929,22 @@ function cosoSpan(
       // The speed changes (FE n) in front of the event stay as they are: the row speed is not a cell field.
       const prefix = [...file.subarray(offset, eventAt)];
       const out = [...prefix, noteByte, info];
-      if ((info & 0xE0) !== 0) out.push(file[eventAt + 2]);
+      if ((info & 0xE0) !== 0) out.push(hippelParamOf(cell) ?? file[eventAt + 2]);
       return out.length === length ? new Uint8Array(out) : null;
     },
   };
 }
 
 // ── Helper functions ─────────────────────────────────────────────────────────
+
+/** The note parameter byte the cell's Portamento / Frequency Sequence effect holds, or null when it shows neither. */
+function hippelParamOf(cell: TrackerCell): number | null {
+  const c = cell as unknown as Record<string, number | undefined>;
+  for (const [t, v] of [['effTyp', 'eff'], ['effTyp2', 'eff2']] as const) {
+    if (c[t] === HC_FX.portamento || c[t] === HC_FX.altSequence) return (c[v] ?? 0) & 0xFF;
+  }
+  return null;
+}
 
 function emptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
