@@ -5,21 +5,28 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const { stopDeck, disableAutoDJ } = vi.hoisted(() => ({
-  stopDeck: vi.fn(async (id: 'A' | 'B' | 'C') => (await import('@/stores/useDJStore')).useDJStore.getState().setDeckPlaying(id, false)),
-  disableAutoDJ: vi.fn(async () => (await import('@/stores/useDJStore')).useDJStore.setState({ autoDJEnabled: false })),
-}));
+const { stopDeck, disableAutoDJ, useDJStoreRef } = vi.hoisted(() => {
+  const useDJStoreRef = { current: (): typeof import('@/stores/useDJStore').useDJStore => { throw new Error('store not bound'); } };
+  return {
+  useDJStoreRef,
+  // Synchronous like the real DJActions: the store is read through the static import below, not a lazy one.
+  stopDeck: vi.fn((id: 'A' | 'B' | 'C') => useDJStoreRef.current().getState().setDeckPlaying(id, false)),
+  disableAutoDJ: vi.fn(() => useDJStoreRef.current().setState({ autoDJEnabled: false })),
+  };
+});
 vi.mock('@/engine/dj/DJActions', () => ({ stopDeck, disableAutoDJ }));
 const engine = vi.hoisted(() => ({ releaseAll: vi.fn(), setGlobalPlaybackRate: vi.fn(), setGlobalDetune: vi.fn() }));
 vi.mock('@/engine/ToneEngine', () => ({ getToneEngine: () => engine }));
 
 import { useTransportStore } from '@/stores/useTransportStore';
 import { useDJStore } from '@/stores/useDJStore';
+useDJStoreRef.current = () => useDJStore;
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { installOneProgrammeAtATime } from '../oneProgrammeAtATime';
+import { installOneProgrammeAtATime, settled } from '../oneProgrammeAtATime';
 
-const flush = () => new Promise((r) => setTimeout(r, 0));
+// The handover awaits lazy imports; wait on the product's own promises, never a tick count.
+const flush = () => settled();
 let uninstall: () => void;
 
 beforeEach(() => {

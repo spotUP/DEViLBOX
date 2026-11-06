@@ -49,17 +49,29 @@ export async function handOverToDJ(): Promise<void> {
 
 let unsubscribe: (() => void) | null = null;
 
+/** Handovers started by the store subscriptions that have not finished (each awaits a lazy import). */
+const inFlight = new Set<Promise<void>>();
+function track(work: Promise<void>): void {
+  inFlight.add(work);
+  void work.finally(() => inFlight.delete(work));
+}
+
+/** Resolves once every handover the subscriptions started has finished, including ones they start while waiting. */
+export async function settled(): Promise<void> {
+  while (inFlight.size > 0) await Promise.all([...inFlight]);
+}
+
 /** Call once at startup. Returns the uninstaller (tests). */
 export function installOneProgrammeAtATime(): () => void {
   if (unsubscribe) return unsubscribe;
   const offTransport = useTransportStore.subscribe((state, prev) => {
-    if (state.isPlaying && !prev.isPlaying) void stopDJ();
+    if (state.isPlaying && !prev.isPlaying) track(stopDJ());
   });
   const offDecks = useDJStore.subscribe(
     (s) => DECK_IDS.map((id) => s.decks[id].isPlaying),
     (now, before) => {
       const started = now.some((playing, i) => playing && !before[i]);
-      if (started && useTransportStore.getState().isPlaying) void handOverToDJ();
+      if (started && useTransportStore.getState().isPlaying) track(handOverToDJ());
     },
     { equalityFn: (a, b) => a.every((v, i) => v === b[i]) },
   );
