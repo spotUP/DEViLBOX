@@ -60,7 +60,10 @@ class NuadeProcessor extends AudioWorkletProcessor {
   }
 
   async handleMessage(data) {
-    if (this._outs && this._outs.handleMessage(data)) return;
+    // nuade separates in its own mixer, so the setting goes to nw_set_separation (0..1) and never to the shared
+    // channel-outputs helper: that helper claims 'setStereoSeparation' for its narrowStereo(), which this worklet
+    // does not run, and the mixer would stay at full width.
+    if (data.type !== 'setStereoSeparation' && this._outs && this._outs.handleMessage(data)) return;
     if (data.type !== 'init' && !this.module && this.initializing) return;
     switch (data.type) {
       case 'init':
@@ -104,7 +107,7 @@ class NuadeProcessor extends AudioWorkletProcessor {
         this.swap(data.bytes);
         break;
       case 'setStereoSeparation':
-        if (this.module) this.module._nw_set_separation(Number(data.value));
+        if (this.module) this.module._nw_set_separation(Math.max(0, Math.min(1, Number(data.value) / 100)));
         break;
       case 'requestState':
         this.readState(data.offset | 0, data.len | 0);

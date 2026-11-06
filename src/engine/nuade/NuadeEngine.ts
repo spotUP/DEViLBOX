@@ -230,7 +230,11 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
   /** Bit N set = voice N audible - the mixer's solo/mute. */
   setMuteMask(mask: number): void { this._muteMask = mask; this.post({ type: 'setMuteMask', mask }); }
 
-  setStereoSeparation(value: number): void { this.post({ type: 'setStereoSeparation', value }); }
+  /** The app's stereo separation setting reaches the nuade mixer itself (nw_set_separation), not worklets/channel-outputs.js narrowStereo. */
+  protected override supportsStereoSeparation(): boolean { return true; }
+
+  /** DEViLBOX stereo separation 0-100 (%): 100 = full Amiga L/R, 0 = mono. The worklet scales it to nuade's 0..1. */
+  override setStereoSeparation(percent: number): void { this.post({ type: 'setStereoSeparation', value: percent }); }
 
   /**
    * The mute mask a row clip is rendered with: the mixer's (bit N set = voice N audible) without the voices an isolation
