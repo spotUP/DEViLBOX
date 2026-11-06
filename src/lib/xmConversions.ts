@@ -21,6 +21,7 @@ import { soundFactoryEffectToString } from './import/formats/soundFactoryEffectG
 import { robHubbardEffectToString } from './import/formats/robHubbardEffectGlyphs';
 import { futurePlayerEffectToString } from './import/formats/fpEffectGlyphs';
 import { musicAssemblerEffectToString } from './import/formats/maEffectGlyphs';
+import { beathovenEffectToString } from './import/formats/beathovenEffectGlyphs';
 import { isDubEffectTypeForDisplay } from '@/engine/dub/moveTable';
 import { isLowOctaveNote, midiToNoteValue, noteValueName, noteValueToMidi, parseNoteName } from '@/lib/tracker/noteValue';
 
@@ -307,6 +308,10 @@ export function xmEffectToString(effTyp: number, eff: number): string {
   // Music Assembler track and position commands (reserved block 0xFB..0xFE).
   const ma = musicAssemblerEffectToString(effTyp, eff);
   if (ma !== null) return ma;
+
+  // Beathoven Synthesizer stream commands (reserved block 0x500..0x503).
+  const bth = beathovenEffectToString(effTyp, eff);
+  if (bth !== null) return bth;
 
   const typeChar = EFFECT_CHAR_MAP[effTyp] ?? '0';
   return `${typeChar}${HEX_BYTE[eff] ?? '00'}`;

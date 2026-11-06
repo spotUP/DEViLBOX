@@ -27,6 +27,7 @@ import { SF_EFFECT_GLYPH } from '@/lib/import/formats/soundFactoryEffectGlyphs';
 import { RH_EFFECT_GLYPH } from '@/lib/import/formats/robHubbardEffectGlyphs';
 import { FP_EFFECT_GLYPH } from '@/lib/import/formats/fpEffectGlyphs';
 import { MA_EFFECT_GLYPH } from '@/lib/import/formats/maEffectGlyphs';
+import { BTH_EFFECT_GLYPH } from '@/lib/import/formats/beathovenEffectGlyphs';
 import { computeCaretRect, computeFieldRect, FIELD_OUTLINE_STYLE } from '@/lib/tracker/caretGeometry';
 import { effectCellWidth, emptyEffectText, furnaceEffectText } from '@/lib/tracker/effectNotation';
 import { anySoloActive, isChannelDimmed } from '@/lib/tracker/channelDim';
@@ -972,6 +973,9 @@ export class TrackerGLRenderer {
               } else if (MA_EFFECT_GLYPH[colEffTyp] !== undefined) {
                 // Music Assembler track and position commands (block 0xFB..0xFE)
                 effStr = MA_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
+              } else if (BTH_EFFECT_GLYPH[colEffTyp] !== undefined) {
+                // Beathoven Synthesizer stream commands (block 0x500..0x503)
+                effStr = BTH_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
               } else {
                 effStr = (EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF];
               }

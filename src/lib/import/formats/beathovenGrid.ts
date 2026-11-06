@@ -15,6 +15,8 @@
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import { periodToNote } from '@/lib/amiga/periodNotes';
 import { makeRowClock, exactStepFromOnsets, type RowClock } from './stepRowClock';
+import { BTH_FX } from './beathovenEffectGlyphs';
+import { addCellEffect, effectColumnsMeta } from './cellEffectSlots';
 
 const ROWS_PER_PATTERN = 64;
 const MAX_ROWS = 32768;
@@ -96,7 +98,7 @@ export interface BthGrid {
   onsets: number[][];
 }
 
-interface Placed { tick: number; note: number; instrument: number; stream: number; offset: number; length: number; noteOffset: number; noteNum: number; base: number }
+interface Placed { tick: number; note: number; instrument: number; stream: number; offset: number; length: number; noteOffset: number; noteNum: number; base: number; fx: Array<[number, number]> }
 
 /** The tracker note a note number shows under `base` (0 when the table holds no period there). */
 export function bthShownNote(buf: Uint8Array, prm: BthParams, num: number, base: number): number {
@@ -154,6 +156,8 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
     const placed: Placed[] = [];
     let row = 0;
     let instrument = 0;
+    /** Commands read since the last note: they set the voice's state for the next note, so they show on its row. */
+    let pending: Array<[number, number]> = [];
     let ei = list.track;
     let visitedLoop = false;
     let guard = 0;
@@ -177,8 +181,11 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
         const sz = cmdSize(o);
         const op = u16(buf, o + 2);
         if (w === 0) break;
-        const place = (num: number, numAt: number, len: number): void => {
-          placed.push({ tick: row, note: bthShownNote(buf, prm, num, base), instrument, stream: si, offset: o, length: sz, noteOffset: numAt, noteNum: num, base });
+        const place = (num: number, numAt: number, len: number, arpeggio = false): void => {
+          const fx = pending;
+          pending = [];
+          if (arpeggio) fx.push([BTH_FX.arpeggio, u16(buf, o + 4)]);
+          placed.push({ tick: row, note: bthShownNote(buf, prm, num, base), instrument, stream: si, offset: o, length: sz, noteOffset: numAt, noteNum: num, base, fx });
           row += len * rowUnit;
         };
         const dur = (v: number): number => (prm.legacy ? (prm.scaled ? (v >> 2) * 5 : v) : v);
@@ -187,15 +194,16 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
           if (!instruments.has(rec)) instruments.set(rec, instruments.size + 1);
           instrument = instruments.get(rec) ?? 0;
         } else if (prm.legacy) {
-          if (w === 0x81) place(u16(buf, o + 6), o + 6, dur(op));
+          if (w === 0x81) place(u16(buf, o + 6), o + 6, dur(op), true);
           else if (w === 0x82) { row += dur(op); }
           else place(w, o, dur(op));
         } else if (w === 0x81 || w === 0x82 || w === 0x85) {
-          // slide, legato and note bias change the sound, not the timeline
+          // slide, legato and note bias change the sound, not the timeline: they show on the next note's row
+          pending.push([w === 0x81 ? BTH_FX.slide : w === 0x82 ? BTH_FX.legato : BTH_FX.noteBias, op]);
         } else if (w === 0x83) {
           row += op;
         } else if (w === 0x84) {
-          place(u16(buf, o + 6), o + 6, op);
+          place(u16(buf, o + 6), o + 6, op, true);
         } else {
           place(w, o, op);
         }
@@ -225,6 +233,7 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
       const cell = grid[v][row];
       cell.note = p.note || NOTE_OFF_UNUSED;
       if (p.note > 0) cell.instrument = p.instrument;
+      for (const [typ, val] of p.fx) addCellEffect(cell, typ, val);
       sources[v][row] = { stream: p.stream, offset: p.offset, length: p.length, noteOffset: p.noteOffset, noteNum: p.noteNum, base: p.base };
       const endRow = Math.min(rows, i + 1 < placed.length ? clock.tickToRow(placed[i + 1].tick).row : rows);
       for (let t = row; t < endRow; t++) streamAtTick[v][t] = p.stream;
@@ -250,6 +259,7 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
       muted: false, solo: false, collapsed: false,
       volume: 100, pan: (ch === 0 || ch === 3) ? -50 : 50, instrumentId: null, color: null,
       rows: cells.slice(start, start + len),
+      ...effectColumnsMeta(cells.slice(start, start + len)),
     }));
     patterns.push({ id: `pattern-${p}`, name: `Pattern ${p}`, length: len, channels: chData });
     songPositions.push(p);
