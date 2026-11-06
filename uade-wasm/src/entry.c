@@ -59,6 +59,8 @@ static int s_sample_rate = 44100;
  * when CIA-A Timer A fires (via UADE_WASM hook in cia.c CIA_update()).
  * Used by the JS enhanced scan to derive row boundaries precisely. */
 static uint32_t g_uade_tick_count = 0;
+/* Emulated stereo frames the core has produced (Paula log timestamp); reset with g_uade_tick_count. */
+uint32_t g_uade_emu_frames = 0;
 
 /* Player ticks since last load: CIA-A Timer B overflows with the interrupt
  * enabled - the timer the score drives a player's DTP_Interrupt from. Numbers
@@ -143,6 +145,7 @@ void uade_wasm_log_paula_write(uint8_t channel, uint8_t reg, uint16_t value) {
     g_paula_log[idx].value       = value;
     g_paula_log[idx].source_addr = g_uade_last_chip_read_addr;
     g_paula_log[idx].tick        = g_uade_tick_count;
+    g_paula_log[idx].frame       = g_uade_emu_frames;
     g_paula_log_write++;
 }
 
@@ -366,6 +369,7 @@ int uade_wasm_load(const uint8_t *data, size_t len, const char *filename_hint) {
     s_pcm_write = 0;
     s_total_frames = 0;
     g_uade_tick_count = 0;
+    g_uade_emu_frames = 0;
     g_player_tick_count = 0;
 
     /* Reset DMA restart detection state */
@@ -481,6 +485,7 @@ void uade_wasm_set_subsong(int subsong) {
      * Do NOT use uade_stop() — use our clean reset path instead. */
     s_playing = 0;
     g_uade_tick_count = 0;
+    g_uade_emu_frames = 0;
     g_player_tick_count = 0;
     uade_shim_reset_for_load();
     memset(&s_state->song, 0, sizeof(s_state->song));
@@ -972,6 +977,7 @@ int uade_wasm_full_reset(void) {
     s_pcm_read  = 0;
     s_pcm_write = 0;
     g_uade_tick_count   = 0;
+    g_uade_emu_frames = 0;
     g_player_tick_count = 0;
     g_paula_log_read    = 0;
     g_paula_log_write   = 0;
@@ -1013,6 +1019,7 @@ int uade_wasm_full_reset(void) {
 EMSCRIPTEN_KEEPALIVE
 void uade_wasm_reset_tick_count(void) {
     g_uade_tick_count = 0;
+    g_uade_emu_frames = 0;
     g_paula_log_read  = 0;
     g_paula_log_write = 0;
 }
@@ -1052,6 +1059,25 @@ int uade_wasm_get_paula_log(uint32_t *out, int maxEntries) {
                               (uint32_t)e->value;
         out[count * 3 + 1] = e->source_addr;
         out[count * 3 + 2] = e->tick;
+        g_paula_log_read++;
+        count++;
+    }
+    return count;
+}
+
+/* Same drain as uade_wasm_get_paula_log, 4 words per entry: [3] = emulated output frame at write time. */
+EMSCRIPTEN_KEEPALIVE
+int uade_wasm_get_paula_log4(uint32_t *out, int maxEntries) {
+    int count = 0;
+    while (count < maxEntries && g_paula_log_read != g_paula_log_write) {
+        uint32_t idx = g_paula_log_read & PAULA_LOG_MASK;
+        UadePaulaLogEntry *e = &g_paula_log[idx];
+        out[count * 4 + 0] = ((uint32_t)e->channel << 24) |
+                             ((uint32_t)e->reg     << 16) |
+                              (uint32_t)e->value;
+        out[count * 4 + 1] = e->source_addr;
+        out[count * 4 + 2] = e->tick;
+        out[count * 4 + 3] = e->frame;
         g_paula_log_read++;
         count++;
     }
