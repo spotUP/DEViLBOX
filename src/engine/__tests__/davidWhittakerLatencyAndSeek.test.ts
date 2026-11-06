@@ -72,6 +72,26 @@ describe('David Whittaker output latency and seek', { timeout: 60_000 }, () => {
     expect(back[0].ticks as number).toBeLessThan(60);
   });
 
+  it('Play Pattern loop wraps on the render position: no frame of the next pattern is rendered, and the main thread is not needed', async () => {
+    const run = async (loop: boolean) => {
+      const h = await openWorklet(worklet);
+      await h.send({ type: 'loadModule', moduleData: apb().slice(0), subsong: 0 });
+      if (loop) await h.send({ type: 'setLoop', startTick: 40, endTick: 150 });
+      await h.send({ type: 'play', latencyFrames: 0 });   // zero latency: a report is the render position
+      h.render(1500);   // ~4.3 s, 215 ticks at 50 Hz: crosses tick 150 once or twice
+      return h;
+    };
+    const looped = await run(true);
+    const ticks = tickMsgs(looped.posted).map((m) => m.ticks as number);
+    const wraps = looped.posted.filter((m) => m.type === 'looped');
+    expect(wraps.length, 'wrap sentinel: the worklet looped by itself').toBeGreaterThanOrEqual(1);
+    expect(Math.max(...ticks), 'the render never reaches the next pattern').toBeLessThan(150);
+    expect(wraps[0].ticks).toBe(40);
+    expect(ticks.filter((t) => t >= 40).length).toBeGreaterThan(100);
+    const free = tickMsgs((await run(false)).posted).map((m) => m.ticks as number);
+    expect(Math.max(...free), 'without a loop the same render does pass tick 150').toBeGreaterThanOrEqual(150);
+  });
+
   it('the engine drops reports of an older seek generation and posts the pattern-start tick', () => {
     class FakeNode {
       posts: unknown[] = [];
@@ -92,6 +112,10 @@ describe('David Whittaker output latency and seek', { timeout: 60_000 }, () => {
     expect(e.seekToPattern(2)).toBe(true);
     expect(dwPatternStartTick(makeRowClock(speedChanges), 2), '2 patterns x 64 rows x speed 6').toBe(768);
     expect(node.posts.at(-1)).toEqual({ type: 'seekTicks', ticks: 768, gen: 1 });
+    e.setPatternLoop({ start: 1, end: 2 });
+    expect(node.posts.at(-1), 'loop patterns 1..2 = ticks of pattern 1 start to pattern 3 start').toEqual({ type: 'setLoop', startTick: 384, endTick: 1152 });
+    e.setPatternLoop(null);
+    expect(node.posts.at(-1)).toEqual({ type: 'setLoop', startTick: -1, endTick: -1 });
     node.port.onmessage!({ data: { type: 'playTick', ticks: 5, gen: 0 } });   // stale, from before the seek
     expect(seen).toHaveLength(0);
     node.port.onmessage!({ data: { type: 'playTick', ticks: 769, gen: 1 } });

@@ -1108,6 +1108,9 @@ export class TrackerReplayer {
     this.patternLoopStartPos = startPos;
     this.patternLoopEndPos = endPos;
     this.patternLoopActive = true;
+    if (this.song?.davidWhittakerClock && DavidWhittakerEngine.hasInstance()) {
+      DavidWhittakerEngine.getInstance().setPatternLoop({ start: startPos, end: endPos });   // wraps at render time; enforcePatternLoopOnEngine stays the fallback
+    }
     if (this.slipEnabled) {
       this.slipSongPos = this.songPos;
       this.slipPattPos = this.pattPos;
@@ -1148,6 +1151,7 @@ export class TrackerReplayer {
     // seekTo below and yank playback back to the ghost position.
     if (!this.patternLoopActive) return;
     this.patternLoopActive = false;
+    if (DavidWhittakerEngine.hasInstance()) DavidWhittakerEngine.getInstance().setPatternLoop(null);
     this.patternLoopStartPos = -1;
     this.patternLoopEndPos = -1;
     if (this.slipEnabled) {

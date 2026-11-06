@@ -18,6 +18,8 @@ class DavidWhittakerProcessor extends AudioWorkletProcessor {
     this.bufferSize = 128;
     this.framesPlayed = 0;      // frames the song has rendered since it last started: a swapped-in module catches up to here
     this.channelMask = null;
+    this.loopStartTick = -1;    // Play Pattern loop in processed ticks (setLoop), -1 = none
+    this.loopEndTick = -1;
     this.lastPlayedTicks = -1;  // the processed-tick count last seen after a render
     this.latencyFrames = 0;     // frames from the render to the ear (the shared output latency, audioLatency.ts): a tick is reported when it is HEARD
     this.seekGen = 0;           // stamped on every playTick: the engine drops reports from before its latest seek
@@ -58,6 +60,7 @@ class DavidWhittakerProcessor extends AudioWorkletProcessor {
         break;
       }
       case 'seekTicks': this.seekTicks(data.ticks, data.gen); break;
+      case 'setLoop': this.setLoop(data.startTick, data.endTick); break;
       case 'previewLoad': this.previewLoad(data.buffer); break;
       case 'noteOn': this.previewNoteOn(data.sample, data.period, data.envelope, data.arpeggio); break;
       case 'noteOff': if (this.previewHandle) this.module._dw_preview_stop(this.previewHandle); break;
@@ -195,6 +198,51 @@ class DavidWhittakerProcessor extends AudioWorkletProcessor {
     this.port.postMessage({ type: 'seeked', ticks: this.module._dw_played_ticks(this.handle), gen: this.seekGen });
   }
 
+  /**
+   * Render `n` frames of the song. With a Play Pattern loop set (setLoop) the loop end is enforced HERE, on the render position:
+   * from the loop's last tick on the replayer is stepped one frame at a time, and the first frame that belongs to tick
+   * `loopEndTick` (the next pattern) is never kept; the replayer is run silently back to `loopStartTick` (dw_seek_ticks) and the
+   * rest of the block renders from there. The main thread cannot do this: it only learns a tick one output latency after it
+   * rendered, by which time the next pattern is already audible.
+   */
+  renderLooped(n) {
+    const m = this.module, h = this.handle;
+    const render = (off, count) => m._dw_render_multi(h, this.chPtrs[0] + off * 4, this.chPtrs[1] + off * 4, this.chPtrs[2] + off * 4, this.chPtrs[3] + off * 4, count);
+    if (this.loopEndTick < 0 || typeof m._dw_played_ticks !== 'function' || typeof m._dw_seek_ticks !== 'function') return render(0, n);
+    let done = 0;
+    while (done < n) {
+      const at = m._dw_played_ticks(h);
+      if (at < this.loopEndTick - 1 || at >= this.loopEndTick) {
+        const got = render(done, n - done);
+        if (got <= 0) break;
+        done += got;
+        continue;
+      }
+      // On the loop's last tick: frame by frame.
+      const before = m._dw_played_ticks(h);
+      const got = render(done, 1);
+      if (got <= 0) break;
+      if (m._dw_played_ticks(h) >= this.loopEndTick && before < this.loopEndTick) {
+        // That frame started the next pattern: drop it, wrap, and render it again from the loop start.
+        if (m._dw_played_ticks(h) > this.loopStartTick) this.framesPlayed = 0;
+        this.framesPlayed += m._dw_seek_ticks(h, this.loopStartTick);
+        this.tickQueue.length = 0;
+        this.lastPlayedTicks = -1;
+        this.port.postMessage({ type: 'looped', ticks: m._dw_played_ticks(h) });
+        continue;
+      }
+      done += got;
+    }
+    return done;
+  }
+
+  /** Play Pattern loop in processed ticks (null clears it): the worklet wraps at render time (renderLooped). */
+  setLoop(startTick, endTick) {
+    const ok = Number.isFinite(startTick) && Number.isFinite(endTick) && endTick > startTick && startTick >= 0;
+    this.loopStartTick = ok ? startTick : -1;
+    this.loopEndTick = ok ? endTick : -1;
+  }
+
   /** Make the preview copy of the module (the replayer plays the keys itself, apart from the song). */
   previewLoad(buffer) {
     if (!this.module || !buffer) return;
@@ -259,8 +307,7 @@ class DavidWhittakerProcessor extends AudioWorkletProcessor {
     }
 
     // Render per-channel
-    const rendered = this.module._dw_render_multi(
-      this.handle, this.chPtrs[0], this.chPtrs[1], this.chPtrs[2], this.chPtrs[3], numSamples);
+    const rendered = this.renderLooped(numSamples);
 
     if (rendered > 0) {
       this.framesPlayed += rendered;
