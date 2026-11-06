@@ -6,6 +6,7 @@
  */
 
 import { getDevilboxAudioContext } from "@/utils/audio-context";
+import { outputLatencySec } from '../audioLatency';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import {
@@ -158,7 +159,7 @@ export class Cinter4Engine extends WASMChannelOutputsEngine {
     // buffer + hardware latency (large on Bluetooth). Subtract it so the scroll
     // matches what's heard, not what's queued. 50 ticks/sec.
     const ctx = this.audioContext;
-    const latencySec = (ctx?.outputLatency || 0) + (ctx?.baseLatency || 0);
+    const latencySec = outputLatencySec(ctx);
     tick = Math.max(0, tick - Math.round(latencySec * 50));
     let playTick = tick;
     const loopLen = cfg.ticksPerTrack - cfg.restartTick;

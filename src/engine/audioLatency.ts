@@ -21,6 +21,11 @@ export function outputLatencySec(ctx: LatencySource | null | undefined): number 
   return Number.isFinite(v) && v > 0 ? v : 0;
 }
 
+/** Output latency in whole sample frames, for a worklet that holds its position report back until it is heard. */
+export function outputLatencyFrames(ctx: (LatencySource & { sampleRate: number }) | null | undefined): number {
+  return ctx ? Math.round(outputLatencySec(ctx) * ctx.sampleRate) : 0;
+}
+
 /**
  * The position (seconds into the material) the listener hears now, given the
  * position the player has rendered up to, its playback rate and the output

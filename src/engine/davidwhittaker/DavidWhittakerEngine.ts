@@ -9,6 +9,7 @@ import { makeRowClock, type RowClock, type SpeedChange } from '@/lib/import/form
 import { ROWS_PER_PATTERN } from '@/lib/import/formats/davidWhittakerGrid';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
+import { outputLatencyFrames } from '../audioLatency';
 import {
   WASMChannelOutputsEngine,
   channelOutputNodeOptions,
@@ -184,11 +185,9 @@ export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
   tickLog(): readonly DwTickLogEntry[] { return this._tickLog; }
 
   play(): void {
-    // The worklet reports a tick once it is heard: output + base latency, the Nuade engine's latencyFrames.
-    const ctx = this.audioContext;
-    const latency = (ctx.outputLatency || 0) + (ctx.baseLatency || 0);
+    // The worklet reports a tick once it is heard: the shared output latency (audioLatency.ts), in frames.
     this._tickLog.length = 0;
-    this.workletNode?.port.postMessage({ type: 'play', latencyFrames: Math.round(latency * ctx.sampleRate) });
+    this.workletNode?.port.postMessage({ type: 'play', latencyFrames: outputLatencyFrames(this.audioContext) });
     this.afterPlay();
   }
   stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }

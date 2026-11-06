@@ -29,6 +29,7 @@ import {
 import { nuadeVoiceCounter } from './nuadeProbe';
 import { nuadeFormatForPlayer } from './nuadeFormats';
 import { createNuadeEditPort, recordNuadePlayerCaps, type NuadeEditPort } from './nuadeEditPort';
+import { outputLatencyFrames } from '../audioLatency';
 
 export type NuadePosition = GridFollowPosition;
 
@@ -220,9 +221,7 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
   }
 
   play(): void {
-    const ctx = this.audioContext;
-    const latency = (ctx.outputLatency || 0) + (ctx.baseLatency || 0);
-    this.post({ type: 'play', latencyFrames: Math.round(latency * ctx.sampleRate) });
+    this.post({ type: 'play', latencyFrames: outputLatencyFrames(this.audioContext) });
     this.afterPlay();
   }
   stop(): void { this.meterFeed.clearHeld(); this.post({ type: 'stop' }); }

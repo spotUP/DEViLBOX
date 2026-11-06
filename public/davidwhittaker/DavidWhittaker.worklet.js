@@ -19,7 +19,7 @@ class DavidWhittakerProcessor extends AudioWorkletProcessor {
     this.framesPlayed = 0;      // frames the song has rendered since it last started: a swapped-in module catches up to here
     this.channelMask = null;
     this.lastPlayedTicks = -1;  // the processed-tick count last seen after a render
-    this.latencyFrames = 0;     // frames from the render to the ear (output + base latency): a tick is reported when it is HEARD
+    this.latencyFrames = 0;     // frames from the render to the ear (the shared output latency, audioLatency.ts): a tick is reported when it is HEARD
     this.seekGen = 0;           // stamped on every playTick: the engine drops reports from before its latest seek
     this.tickQueue = [];        // ticks reached but not yet heard: { ticks, played (framesPlayed at the tick), frame (context frame) }
     this.lastHeapBuffer = null;
