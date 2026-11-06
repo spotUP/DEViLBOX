@@ -10,7 +10,7 @@
  * speed = step and 125 BPM.
  */
 import type { TrackerCell } from '@/types';
-import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer, type RowClock } from './stepRowClock';
+import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer, setNoteColumn, CELL_NOTE_COLUMNS, type RowClock } from './stepRowClock';
 import { BD_FX } from './benDaglishEffectGlyphs';
 
 /** One effect operand byte: its effect id (soundFactoryEffects.ts), the byte's value and its file offset. */
@@ -36,7 +36,6 @@ export const SF_MIN_EFFECT_COLS = 2;
 export const SF_FX_ROW_OFFSET = BD_FX.rowOffset;
 
 /** Note columns a voice can hold: the second holds the second onset of a row. */
-const MAX_NOTE_COLS = 2;
 
 function emptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
@@ -67,11 +66,11 @@ export interface SfGrid {
   anchors: number[][];
   step: number;
   clock: RowClock;
-  /** Voices that hold a second note column. */
+  /** Per voice: note columns, 1 plus the largest same-row clash (plan rule R5). */
   noteCols: number[];
   delayedNotes: number;
   clashRows: number;
-  /** Notes that are a third onset in one row of one voice (no note column left). */
+  /** Onsets deeper than the cell's 4 note columns (plan rule R5 grows the columns, the cell model stops at 4). */
   unplaced: number;
   /** Effect columns per voice: SF_MIN_EFFECT_COLS, grown to fit the busiest row (never above 8). */
   effectCols: number[];
@@ -106,7 +105,7 @@ export function buildSfGrid(voices: readonly (readonly SfGridEvent[])[], maxRows
 
   voices.forEach((events, v) => {
     const on = onsetsOf(events);
-    const place = makeOnsetPlacer(clock, MAX_NOTE_COLS);
+    const place = makeOnsetPlacer(clock);
     events.forEach((e, i) => {
       const { row } = clock.tickToRow(on[i]);
       if (row >= rowCount) return;
@@ -116,19 +115,20 @@ export function buildSfGrid(voices: readonly (readonly SfGridEvent[])[], maxRows
         return;
       }
       const pl = place(v, on[i]);
-      if (!pl) { unplaced++; return; }
+      if (pl.col >= CELL_NOTE_COLUMNS) { unplaced++; return; }
       const offset = pl.offset;
       if (pl.col === 0) {
         cell.note = e.note; cell.instrument = e.instrId;
         offsets[v][row] = e.fileOffset; anchors[v][row] = i;
         if (offset > 0) { cell.effTyp = SF_FX_ROW_OFFSET; cell.eff = offset; delayedNotes++; }
       } else {
-        cell.note2 = e.note; cell.instrument2 = e.instrId; cell.delay2 = offset;
-        noteCols[v] = MAX_NOTE_COLS;
+        setNoteColumn(cell, pl.col, e.note, e.instrId, offset);
         clashRows++;
         if (offset > 0) delayedNotes++;
       }
     });
+
+    noteCols[v] = Math.min(CELL_NOTE_COLUMNS, place.columnsOf(v));
 
     // Effects go in the first free slot of their row, after the notes are placed (slot 1 may hold the delay).
     events.forEach((e, i) => {

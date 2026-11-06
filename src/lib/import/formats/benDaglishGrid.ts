@@ -11,14 +11,13 @@
  */
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import { periodToNote } from '@/lib/amiga/periodNotes';
-import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer, type RowClock } from './stepRowClock';
+import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer, setNoteColumn, CELL_NOTE_COLUMNS, type RowClock } from './stepRowClock';
 import { BD_FX } from './benDaglishEffectGlyphs';
 import { BD_WALK, type BdWalk, type BdWalkEvent } from './BenDaglishWasmExtractor';
 
 const ROWS_PER_PATTERN = 64;
 const EFFECT_SLOTS = 5;
 /** Note columns a voice can hold: the second holds the second onset of a row. */
-const MAX_NOTE_COLS = 2;
 
 type Fx = [effTyp: number, eff: number];
 
@@ -85,19 +84,19 @@ export interface BdNotePlacement {
 /**
  * Where every note of the walk sits in the grid: its row and ticks into the row on the fixed clock, and which note
  * column of that voice and row. The grid builder and the edit layer both read this, so they cannot disagree.
- * `unplaced` lists notes that are a third onset in one row of one voice (no column left).
+ * Plan rule R5: `noteCols[voice]` is 1 plus the largest same-row clash of that voice; `unplaced` lists onsets deeper than the cell's 4 note columns.
  */
-export function bdNotePlacements(walk: BdWalk, clock: RowClock = bdRowClock(walk)): { placed: BdNotePlacement[]; unplaced: BdWalkEvent[] } {
+export function bdNotePlacements(walk: BdWalk, clock: RowClock = bdRowClock(walk)): { placed: BdNotePlacement[]; unplaced: BdWalkEvent[]; noteCols: number[] } {
   const placed: BdNotePlacement[] = [];
   const unplaced: BdWalkEvent[] = [];
-  const place = makeOnsetPlacer(clock, MAX_NOTE_COLS);
+  const place = makeOnsetPlacer(clock);
   for (const e of walk.events) {
     if (!bdIsVisibleNote(e) || e.voice >= 4) continue;
     const pl = place(e.voice, e.ptick);
-    if (!pl) { unplaced.push(e); continue; }
+    if (pl.col >= CELL_NOTE_COLUMNS) { unplaced.push(e); continue; }
     placed.push({ event: e, voice: e.voice, ...pl });
   }
-  return { placed, unplaced };
+  return { placed, unplaced, noteCols: Array.from({ length: 4 }, (_, v) => Math.min(CELL_NOTE_COLUMNS, place.columnsOf(v))) };
 }
 
 export interface BdGrid {
@@ -133,11 +132,11 @@ export function buildBDGridFromWalk(walk: BdWalk): BdGrid {
   const trackAt: number[][] = Array.from({ length: channels }, () => new Array<number>(rows).fill(-1));
   let overflowRows = 0;
 
-  const { placed, unplaced } = bdNotePlacements(walk, clock);
+  const { placed, unplaced, noteCols: placedCols } = bdNotePlacements(walk, clock);
   overflowRows += unplaced.length;
   const placeOf = new Map<BdWalkEvent, BdNotePlacement>();
   for (const pl of placed) placeOf.set(pl.event, pl);
-  const noteCols = new Array<number>(channels).fill(1);
+  const noteCols = Array.from({ length: channels }, (_, v) => placedCols[v] ?? 1);
   let delayedNotes = 0, clashRows = 0;
   const addFx = (voice: number, row: number, typ: number, val: number, front = false): void => {
     const cell = grid[voice][row] as unknown as Record<string, number>;
@@ -168,9 +167,7 @@ export function buildBDGridFromWalk(walk: BdWalk): BdGrid {
         c.note = note; c.instrument = e.a + 1;
         if (pl.offset > 0) { addFx(e.voice, row, BD_FX.rowOffset, pl.offset, true); delayedNotes++; }
       } else {
-        c.note2 = note; c.instrument2 = e.a + 1;
-        c.delay2 = pl.offset;
-        noteCols[e.voice] = MAX_NOTE_COLS;
+        setNoteColumn(c, pl.col, note, e.a + 1, pl.offset);
         clashRows++;
         if (pl.offset > 0) delayedNotes++;
       }

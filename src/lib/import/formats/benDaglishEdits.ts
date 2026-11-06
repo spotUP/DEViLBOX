@@ -89,7 +89,9 @@ export function applyBdGridEdits(source: Uint8Array, walk: BdWalk, trackFileOffs
         const c = eRows[row];
         if (!c) continue;
         const where = `pattern ${p} voice ${ch + 1} row ${row}`;
-        const cols: Array<{ col: number; cn: number; bn: number }> = [{ col: 0, cn: c.note, bn: b.note }, { col: 1, cn: c.note2 ?? 0, bn: b.note2 ?? 0 }];
+        const cx = c as unknown as Record<string, number | undefined>, bx = b as unknown as Record<string, number | undefined>;
+        const key = (col: number, f: string): string => (col === 0 && f === 'note' ? 'note' : `${f}${col + 1}`);
+        const cols: Array<{ col: number; cn: number; bn: number }> = [0, 1, 2, 3].map((col) => ({ col, cn: cx[key(col, 'note')] ?? 0, bn: bx[key(col, 'note')] ?? 0 }));
         for (const { col, cn, bn } of cols) {
           if (cn === bn) continue;
           const at = noteAt.get(`${ch}:${p * ROWS_PER_PATTERN + row}:${col}`);
@@ -103,10 +105,11 @@ export function applyBdGridEdits(source: Uint8Array, walk: BdWalk, trackFileOffs
             else wanted.set(off, nb);
           }
         }
-        if ((c.delay2 ?? 0) !== (b.delay2 ?? 0)) {
-          const pl = placeAt.get(`${ch}:${p * ROWS_PER_PATTERN + row}:1`);
-          const d = c.delay2 ?? 0;
-          if (!pl) warnings.push(`${where}: a delay on a row with no second note; not written`);
+        for (const col of [1, 2, 3]) {
+          if ((cx[`delay${col + 1}`] ?? 0) === (bx[`delay${col + 1}`] ?? 0)) continue;
+          const pl = placeAt.get(`${ch}:${p * ROWS_PER_PATTERN + row}:${col}`);
+          const d = cx[`delay${col + 1}`] ?? 0;
+          if (!pl) warnings.push(`${where}: a delay on a row with no note in that column; not written`);
           else if (d < 0 || d >= step) warnings.push(`${where}: a delay of ${d} is outside the row (0-${step - 1} ticks); not written`);
           else moveOnset(pl, d - pl.offset, where);
         }
