@@ -133,8 +133,8 @@ install_snapshot_traps
 # invoked by hand with no ref list.
 # The push gate runs what the pushed commits can reach, not the whole suite:
 # type-check, then the tests affected by the files changed since the remote
-# ref (scripts/git-hooks/affected-tests.mjs: sibling suites + tests that read
-# a changed file's source). The fast tier (test:ci) and the nightly heavy tier
+# ref (scripts/git-hooks/affected-tests.mjs: sibling suites + changed test files,
+# at most 30; owner 2026-11-06 "Siblings only, CI wide"). The fast tier (test:ci) and the nightly heavy tier
 # run in CI, which blocks the deploy. A new branch (remote sha all zeros) is
 # scoped against the nearest commit the remote already has: a remote-tracking
 # ref of this remote that is an ancestor, the merge-base with the remote's
@@ -194,12 +194,6 @@ base_of() {
   return 0
 }
 
-# Files whose change moves behaviour everywhere the song-load route runs, without any test naming them: the generated
-# per-format engine defaults. Flipping a format to nuade broke 17 suites that import songs through parseModuleToSong
-# (2026-10-13); the proximity selection below saw only nuadeFormats' direct importers. A push that touches one of these
-# runs the whole fast tier (test:ci), as a push with no known base does.
-GLOBAL_EFFECT_FILES="src/engine/nuade/nuadeVerdicts.ts src/stores/useSettingsStore.ts src/lib/import/parseModuleToSong.ts"
-
 # Files this push actually changes: those touched by commits no remote ref has yet,
 # plus the files a merge resolved by hand (--cc lists only those). A plain
 # `git diff base sha` also counts everything a merge of main brought in; main
@@ -218,21 +212,14 @@ changed_files() {
 }
 
 affected_tests() {
-  local base=$1 sha=$2 changed files g
+  local base=$1 sha=$2 changed files
+  # Files with a global effect (nuadeVerdicts, useSettingsStore, parseModuleToSong) used to run the whole fast tier
+  # here; owner 2026-11-06 moved every wide run to CI, which blocks the deploy.
   changed="$(changed_files "$base" "$sha")"
-  for g in $GLOBAL_EFFECT_FILES; do
-    case $'\n'"$changed"$'\n' in
-      *$'\n'"$g"$'\n'*)
-        echo "$g changed: it moves behaviour for every imported song, so the whole fast tier runs"
-        in_snapshot npm run --silent test:ci
-        return $?
-        ;;
-    esac
-  done
   # shellcheck disable=SC2086
   files="$(in_snapshot node scripts/git-hooks/affected-tests.mjs --files $changed)"
   if [ -z "$files" ]; then
-    echo "no test suite reads the changed files"
+    echo "no sibling test suite for the changed files (wider suites run in CI)"
     return 0
   fi
   echo "$files"

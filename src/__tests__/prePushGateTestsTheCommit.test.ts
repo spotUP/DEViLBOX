@@ -117,6 +117,30 @@ describe('scripts/git-hooks/pre-push gates the pushed commit, not the working tr
     expect(r.status).toBe(0);
   });
 
+  it('a change to a global-effect file (song load, engine defaults) still runs only the affected tests; wide runs are CI\'s', () => {
+    // Owner 2026-11-06 "Siblings only, CI wide": this file used to trigger the whole fast tier on the laptop.
+    mkdirSync(join(repo, 'scripts/git-hooks'), { recursive: true });
+    mkdirSync(join(repo, 'src/lib/import'), { recursive: true });
+    writeFileSync(join(repo, 'scripts/git-hooks/affected-tests.mjs'), 'process.stdout.write("");\n');
+    writeFileSync(join(repo, 'src/lib/import/parseModuleToSong.ts'), 'export {};\n');
+    writeFileSync(join(repo, 'package.json'), JSON.stringify({
+      name: 'fake', version: '0.0.0', scripts: { 'type-check': 'true', 'test:ci': 'exit 1', 'test:compliance': 'true' },
+    }));
+    git('add', '.');
+    const base = commitCheck('ok\n');
+    writeFileSync(join(repo, 'src/lib/import/parseModuleToSong.ts'), 'export const a = 1;\n');
+    git('add', 'src/lib/import/parseModuleToSong.ts');
+    git('commit', '-q', '-m', 'change');
+    const sha = git('rev-parse', 'HEAD');
+    const r = spawnSync('bash', [HOOK], {
+      cwd: repo, encoding: 'utf8', env: { ...env, TMPDIR: scratch },
+      input: `refs/heads/main ${sha} refs/heads/main ${base}\n`,
+    });
+    expect(r.stderr).toContain('affected tests ok');
+    expect(r.stderr).not.toContain('whole fast tier');
+    expect(r.status).toBe(0);
+  });
+
   it('a new branch is scoped against the nearest commit the remote has, not the whole suite', () => {
     // 2026-10-20: pushing a stack of 13 new branches ran test:ci once per branch, because a new branch arrives with an
     // all-zero remote sha. The remote-tracking ref of the remote being pushed to (the hook's $1) is a known base.
@@ -156,29 +180,6 @@ describe('scripts/git-hooks/pre-push gates the pushed commit, not the working tr
       input: `refs/heads/feat/a ${sha} refs/heads/feat/a ${ZERO}\n`,
     });
     expect(r.stderr).toContain('test:ci (no remote base) failed');
-    expect(r.status).toBe(1);
-  });
-
-  it('a change to the per-format engine defaults runs the whole fast tier even with a known base (17 suites broke unseen on 2026-10-13)', () => {
-    mkdirSync(join(repo, 'scripts/git-hooks'), { recursive: true });
-    writeFileSync(join(repo, 'scripts/git-hooks/affected-tests.mjs'), 'process.stdout.write("");\n');
-    writeFileSync(join(repo, 'package.json'), JSON.stringify({
-      name: 'fake', version: '0.0.0', scripts: { 'type-check': 'true', 'test:ci': 'exit 1', 'test:compliance': 'true' },
-    }));
-    mkdirSync(join(repo, 'src/engine/nuade'), { recursive: true });
-    writeFileSync(join(repo, 'src/engine/nuade/nuadeVerdicts.ts'), 'export const NUADE_VERDICTS = {};\n');
-    git('add', '.');
-    const base = commitCheck('ok\n');
-    writeFileSync(join(repo, 'src/engine/nuade/nuadeVerdicts.ts'), 'export const NUADE_VERDICTS = { mmdc: 1 };\n');
-    git('add', 'src/engine/nuade/nuadeVerdicts.ts');
-    git('commit', '-q', '-m', 'flip a default');
-    const sha = git('rev-parse', 'HEAD');
-    const r = spawnSync('bash', [HOOK], {
-      cwd: repo, encoding: 'utf8', env: { ...env, TMPDIR: scratch },
-      input: `refs/heads/main ${sha} refs/heads/main ${base}\n`,
-    });
-    expect(r.stderr).toContain('whole fast tier runs');
-    expect(r.stderr).toContain('affected tests failed'); // test:ci is the failing script of this fake repo
     expect(r.status).toBe(1);
   });
 
