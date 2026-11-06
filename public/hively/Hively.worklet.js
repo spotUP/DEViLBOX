@@ -99,6 +99,7 @@ class HivelyProcessor extends AudioWorkletProcessor {
         break;
 
       case 'loadTune':
+        this.subsong = 0;
         this.loadTune(data.buffer, data.defStereo || 2);
         break;
 
@@ -108,10 +109,17 @@ class HivelyProcessor extends AudioWorkletProcessor {
 
       case 'initSubsong':
         if (this.wasm && this.tuneLoaded) {
-          this.wasm._hively_init_subsong(data.nr || 0);
+          this.subsong = data.nr || 0;
+          this.wasm._hively_init_subsong(this.subsong);
           this._reapplyChannelGains();
           this.resetRingBuffer();
         }
+        break;
+
+      // Transport start at a grid row: re-init the subsong, then decode and discard ticks until the replayer's own
+      // position and row reach the target (hvl has no seek; setPosition edits the position table).
+      case 'seekTo':
+        this.seekToRow(data.position, data.row);
         break;
 
       case 'play':
@@ -473,6 +481,20 @@ class HivelyProcessor extends AudioWorkletProcessor {
       this.tuneLoaded = false;
       this.playing = false;
       this.resetRingBuffer();
+    }
+  }
+
+  seekToRow(position, row) {
+    const w = this.wasm;
+    if (!w || !this.tuneLoaded) return;
+    w._hively_init_subsong(this.subsong || 0);
+    this._reapplyChannelGains();
+    this.resetRingBuffer();
+    // Cap: about an hour of 50 Hz ticks, so a target the song never reaches cannot hang the audio thread.
+    for (let i = 0; i < 180000; i++) {
+      if (w._hively_get_position() === position && w._hively_get_row() === row) break;
+      if (w._hively_is_song_end()) break;
+      if (w._hively_decode_frame(this.decodePtrL, this.decodePtrR) <= 0) break;
     }
   }
 

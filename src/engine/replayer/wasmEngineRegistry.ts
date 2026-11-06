@@ -148,6 +148,17 @@ const GRID_FRAME_SEEK = {
   },
 } as const;
 
+/**
+ * Registry fields of an engine whose grid is the replayer's own order position and row (one pattern per order entry):
+ * the target packs both into one number (startTargetOf), startAt unpacks it for the engine's seekToRow.
+ */
+const POSITION_ROW_SPAN = 0x10000;
+const positionRowTarget = (songPos: number, row: number): number => songPos * POSITION_ROW_SPAN + row;
+const seekToPositionRow = (instance: WASMSingletonEngine, target: number): void => {
+  (instance as unknown as { seekToRow(songPos: number, row: number): void }).seekToRow(
+    Math.floor(target / POSITION_ROW_SPAN), target % POSITION_ROW_SPAN);
+};
+
 export const WASM_ENGINES: NativeEngineDescriptor[] = [
   {
     key: 'Hively',
@@ -168,6 +179,9 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
       setRate: (instance, f) => (instance as unknown as HivelyTempoPitch).setSliderRate(f),
       setTempoScale: (instance, f) => (instance as unknown as HivelyTempoPitch).setTempoScale(f),
     },
+    // Order position and row of the replayer itself: the importer's songPositions are 0..n-1, one pattern per position.
+    startTargetOf: (_song, songPos, row) => positionRowTarget(songPos, row),
+    startAt: seekToPositionRow,
   },
   {
     key: 'Klystrack',
@@ -218,6 +232,9 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/pretracker/PreTrackerEngine')).PreTrackerEngine as unknown as WASMSingletonStatic,
+    // Order position and row of the replayer itself (player_get_position / player_get_row); songPositions are 0..n-1.
+    startTargetOf: (_song, songPos, row) => positionRowTarget(songPos, row),
+    startAt: seekToPositionRow,
   },
   {
     key: 'MusicAssembler',

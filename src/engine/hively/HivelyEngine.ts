@@ -304,6 +304,11 @@ export class HivelyEngine extends WASMSingletonBase implements IsolationCapableE
     });
   }
 
+  /** Transport start at a grid row: the worklet re-inits the subsong and discards ticks up to the replayer's position/row. */
+  seekToRow(position: number, row: number): void {
+    this.workletNode?.port.postMessage({ type: 'seekTo', position, row });
+  }
+
   stop(): void {
     this.workletNode?.port.postMessage({ type: 'stop' });
     this.workletNode?.port.postMessage({ type: 'disableOsc' });
