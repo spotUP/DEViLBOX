@@ -67,8 +67,9 @@ interface GridPattern { channels: Array<{ rows: TrackerCell[] }> }
 /** The fields the cell's own bytes carry; anything else is not in the file. */
 function differs(a: TrackerCell, b: TrackerCell): boolean {
   return (a.note ?? 0) !== (b.note ?? 0) || (a.instrument ?? 0) !== (b.instrument ?? 0)
-    // The effect column: CoSo shows its row speed (FE n / FD n) there.
-    || (a.effTyp ?? 0) !== (b.effTyp ?? 0) || (a.eff ?? 0) !== (b.eff ?? 0);
+    // The effect columns: CoSo shows its row speed (FE n / FD n) and the note's Portamento / Frequency Sequence parameter there.
+    || (a.effTyp ?? 0) !== (b.effTyp ?? 0) || (a.eff ?? 0) !== (b.eff ?? 0)
+    || (a.effTyp2 ?? 0) !== (b.effTyp2 ?? 0) || (a.eff2 ?? 0) !== (b.eff2 ?? 0);
 }
 
 /** The volume column, which lives in other bytes (see `HippelCellSpan.aux`). */
