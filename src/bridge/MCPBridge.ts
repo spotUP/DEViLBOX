@@ -314,7 +314,7 @@ const handlers: Record<string, Handler> = {
   // ─── Write: Transport ────────────────────────────────────────────────────────
   set_bpm: setBpm,
   set_speed: setSpeed,
-  play: () => play(),
+  play: play,
   stop: () => stop(),
   pause: () => pause(),
   set_swing: setSwing,
