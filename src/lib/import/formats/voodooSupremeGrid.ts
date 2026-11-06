@@ -16,15 +16,14 @@
  * change state cost no time. The grid runs to the first tick at which every voice has executed a goto (or ended); a voice
  * that wrapped earlier keeps looping until then. One grid row is the greatest common divisor of all note ticks.
  *
- * Pitch: see voodooPitchForIndex (periodToPitch of the replayer's period). Not shown in phase A: portamento slides (the start note is shown), period table octave commands,
+ * Pitch: see voodooNoteForIndex (periodToNote of the period the replayer writes to Paula; measured against UADE's AUDxPER log). Not shown in phase A: portamento slides (the start note is shown), period table octave commands,
  * envelopes, waveform tables, subsongs after the first. Note write-back is phase B.
  */
-import { periodToPitch } from '@/lib/amiga/periodNotes';
+import { periodToNote } from '@/lib/amiga/periodNotes';
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 
 const VOICES = 4;
 const ROWS_PER_PATTERN = 64;
-const MAX_NOTE = 96;
 const MAX_TICKS = 400000;
 const COMMAND_GUARD = 65536;
 const NOTE_OFF = 97;
@@ -43,13 +42,13 @@ const emptyCell = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTy
 const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
 
 /**
- * The ProTracker-named pitch of the period the replayer writes to Paula for a table index (note byte + transpose,
- * clamped like period_index): periodToPitch of the table entry, unbounded (the periods span -50..45), 0 for the silent
- * zero entries. The grid shows it lifted by whole octaves (VoodooGrid.octaveLift) when the lowest pitch is below note 1.
+ * The grid note of a table index (note byte + transpose, clamped like period_index): periodToNote of the table period,
+ * which is the value the replayer writes to AUDxPER for a note-on (measured: voo8 voice 0 first note writes 224 = note 36).
+ * 0 for the silent zero entries. Periods beyond the grid table (above 1712) show as its lowest note.
  */
-export function voodooPitchForIndex(index: number): number {
+export function voodooNoteForIndex(index: number): number {
   const period = VOODOO_PERIODS[Math.max(0, Math.min(98, index))];
-  return period > 0 ? periodToPitch(period) : -1000;
+  return period > 0 ? periodToNote(period) : 0;
 }
 
 export interface VoodooGrid {
@@ -58,8 +57,6 @@ export interface VoodooGrid {
   rows: number;
   /** replayer ticks per grid row */
   ticksPerRow: number;
-  /** semitones (a multiple of 12) added to every note so that the lowest pitch is note 1 or higher; 0 when none is needed */
-  octaveLift: number;
   notesPerVoice: number[];
   /** number of distinct (sample, waveform table) sounds the grid refers to */
   instrumentCount: number;
@@ -122,7 +119,7 @@ export function buildVoodooGrid(file: Uint8Array): VoodooGrid | string {
       if (v.pos < 0 || v.pos >= size) { retire(); return; }
       const cmd = byte();
       if (cmd < 0x80) {
-        const note = voodooPitchForIndex(cmd + v.transpose);
+        const note = voodooNoteForIndex(cmd + v.transpose);
         events[index].push({ tick, note, instrument: instrumentOf(v) });
         v.counter = byte();
         return;
@@ -155,7 +152,7 @@ export function buildVoodooGrid(file: Uint8Array): VoodooGrid | string {
         case 0x89: { // portamento: start note sounds, stop note and the slide ticks follow; the third byte is the wait
           const start = byte();
           byte();
-          events[index].push({ tick, note: voodooPitchForIndex(start + v.transpose), instrument: instrumentOf(v) });
+          events[index].push({ tick, note: voodooNoteForIndex(start + v.transpose), instrument: instrumentOf(v) });
           v.counter = byte();
           return;
         }
@@ -186,11 +183,6 @@ export function buildVoodooGrid(file: Uint8Array): VoodooGrid | string {
   if (reason) return reason;
   if (songEnd <= 0) return 'the voices never all loop within the tick limit';
 
-  let minPitch = Infinity, maxPitch = -Infinity;
-  for (const list of events) for (const e of list) if (e.note !== NOTE_OFF && e.note > -1000) { minPitch = Math.min(minPitch, e.note); maxPitch = Math.max(maxPitch, e.note); }
-  const octaveLift = minPitch < 1 && Number.isFinite(minPitch) ? Math.ceil((1 - minPitch) / 12) * 12 : 0;
-  if (maxPitch + octaveLift > MAX_NOTE) return `the pitch range ${minPitch}..${maxPitch} does not fit the grid's notes`;
-  for (const list of events) for (const e of list) if (e.note !== NOTE_OFF) e.note = e.note > -1000 ? e.note + octaveLift : 0;
   const kept = events.map((list) => list.filter((e) => e.tick < songEnd));
   let rowTicks = songEnd;
   for (const list of kept) for (const e of list) rowTicks = gcd(rowTicks, e.tick === 0 ? songEnd : e.tick);
@@ -215,5 +207,5 @@ export function buildVoodooGrid(file: Uint8Array): VoodooGrid | string {
     }));
     return { id: `pattern-${p}`, name: `Pattern ${p}`, length, channels };
   });
-  return { patterns, songPositions: patterns.map((_, i) => i), rows, ticksPerRow: rowTicks, octaveLift, notesPerVoice, instrumentCount: instrumentIds.size };
+  return { patterns, songPositions: patterns.map((_, i) => i), rows, ticksPerRow: rowTicks, notesPerVoice, instrumentCount: instrumentIds.size };
 }
