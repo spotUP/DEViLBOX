@@ -300,7 +300,7 @@ describe('step grid: Dave Lowe and Dave Lowe New through parseModuleToSong', () 
         const pat = song.patterns[pi];
         layout.trackMap[pos].forEach((fp, ch) => {
           const shown: number[] = [];
-          pat.channels[ch].rows.forEach((cell, r) => { if (cell.note > 0) shown.push((start + r) * s.step); });
+          pat.channels[ch].rows.forEach((cell, r) => { if (cell.note > 0 && cell.note !== 97) shown.push((start + r) * s.step); });   // (a rest after a note is a note-off cell, 97: not a note-on)
           const want = fp < 0 ? [] : sec[fp].onsets.filter((t) => t / s.step < pat.length).map((t) => start * s.step + t);   // (the parsers cap a pattern at 256 rows)
           expect(shown, `position ${pos} channel ${ch}`).toEqual(want);
           checked += shown.length;
