@@ -19,6 +19,8 @@
  */
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import { periodToNote } from '@/lib/amiga/periodNotes';
+import { SPL_FX } from './commandStreamEffectGlyphs';
+import { addCellEffect, effectColumnsMeta } from './cellEffectSlots';
 
 const ROWS_PER_PATTERN = 64;
 const MAX_ROWS = 32768;
@@ -46,7 +48,7 @@ interface SplBuildInfo {
   periodTable: number;
   transpose: number;
   streams: number[];
-  /** Hash with the first byte of every decoded note zeroed: identifies the build after note edits (see readSplBuild). */
+  /** Hash with the every decoded note byte (first and extra) zeroed: identifies the build after note edits (see readSplBuild). */
   noteMaskedHash: bigint;
 }
 
@@ -59,7 +61,7 @@ const BUILDS: SplBuildInfo[] = [
     periodTable: 0x2f6,
     transpose: 9,
     streams: [0xa26, 0xabe, 0xbbe, 0xc96],
-    noteMaskedHash: 0x1f0bde0087d5762en,
+    noteMaskedHash: 0x68bf090bd803a303n,
   },
 ];
 
@@ -137,6 +139,8 @@ export interface SplGrid {
   rows: number;
   streams: SplStream[];
   blockRows: TrackerCell[][];
+  /** Per voice and grid row: the stream byte behind each extra-note effect of the cell (file offset), in slot order. */
+  effectSources: Array<Array<Array<{ typ: number; at: number }>>>;
   rowSources: SplRowSource[][][];
   streamAtStart: number[][];
   /** Player-interrupt ticks per grid row: the replayer divider steps every (dividerReload + 1) / 2 ticks (song.initialSpeed) */
@@ -148,7 +152,7 @@ export interface SplGrid {
   noteForByte: (byte: number, octave: number, steps: number) => number;
 }
 
-interface Placed { tick: number; note: number; instrument: number; run: number; offset: number; length: number; octave: number; steps: number }
+interface Placed { tick: number; note: number; instrument: number; run: number; offset: number; length: number; octave: number; steps: number; extras: number[] }
 interface Run { start: number; end: number }
 
 /** transpose_note: octave in the high nibble, semitone in the low. */
@@ -235,7 +239,8 @@ function decodeSpl(buf: Uint8Array, build: SplBuildInfo, hunk: SplHunk, timer: n
         const more = (rec.flags & 1) === 0 ? 0 : (rec.flags & 0x20) !== 0 ? 3 : 1;
         const moved = transposeNote(b, build.transpose + rec.transpose);
         const period = periodOf(moved, rec.octave);
-        placed.push({ tick: row, note: period > 0 ? periodToNote(period) : 0, instrument, run, offset: at(pos), length: 1 + more, octave: rec.octave, steps: build.transpose + rec.transpose });
+        placed.push({ tick: row, note: period > 0 ? periodToNote(period) : 0, instrument, run, offset: at(pos), length: 1 + more, octave: rec.octave, steps: build.transpose + rec.transpose,
+          extras: Array.from({ length: more }, (_, i) => at(pos + 1 + i)) });
         pos += 1 + more;
         touch(pos);
         row += Math.max(reload, 1);
@@ -250,6 +255,7 @@ function decodeSpl(buf: Uint8Array, build: SplBuildInfo, hunk: SplHunk, timer: n
 
   const grid: TrackerCell[][] = Array.from({ length: VOICES }, () => Array.from({ length: rows }, emptyCell));
   const sources: SplRowSource[][] = Array.from({ length: VOICES }, () => new Array<SplRowSource>(rows).fill(null));
+  const effectSources: Array<Array<Array<{ typ: number; at: number }>>> = Array.from({ length: VOICES }, () => new Array(rows).fill(null).map(() => []));
   const runAtTick: number[][] = Array.from({ length: VOICES }, () => new Array<number>(rows).fill(-1));
   voices.forEach((placed, v) => {
     for (let i = 0; i < placed.length; i++) {
@@ -258,6 +264,13 @@ function decodeSpl(buf: Uint8Array, build: SplBuildInfo, hunk: SplHunk, timer: n
       const cell = grid[v][p.tick];
       cell.note = p.note;
       if (p.note > 0) cell.instrument = p.instrument;
+      const slots: Array<{ typ: number; at: number }> = [];
+      p.extras.slice(0, 3).forEach((off, k) => {
+        const typ = [SPL_FX.extraNote1, SPL_FX.extraNote2, SPL_FX.extraNote3][k];
+        addCellEffect(cell, typ, u8(buf, off));
+        slots.push({ typ, at: off });
+      });
+      effectSources[v][p.tick] = slots;
       sources[v][p.tick] = { stream: p.run, offset: p.offset, length: p.length, octave: p.octave, steps: p.steps };
       const endTick = Math.min(rows, i + 1 < placed.length ? placed[i + 1].tick : rows);
       for (let t = p.tick; t < endTick; t++) runAtTick[v][t] = p.run;
@@ -282,6 +295,7 @@ function decodeSpl(buf: Uint8Array, build: SplBuildInfo, hunk: SplHunk, timer: n
       muted: false, solo: false, collapsed: false,
       volume: 100, pan: (ch === 0 || ch === 3) ? -50 : 50, instrumentId: null, color: null,
       rows: cells.slice(start, start + len),
+      ...effectColumnsMeta(cells.slice(start, start + len)),
     }));
     patterns.push({ id: `pattern-${p}`, name: `Pattern ${p}`, length: len, channels: chData });
     songPositions.push(p);
@@ -292,7 +306,8 @@ function decodeSpl(buf: Uint8Array, build: SplBuildInfo, hunk: SplHunk, timer: n
   // blank): a row is ticksPerStep ticks, each 2.5 / BPM seconds, so the grid follows the player's interrupt count
   const ticksPerStep = (build.dividerReload + 1) / 2;
   const bpm = Math.max(32, Math.min(255, Math.round((2.5 * TIMEBASE_HZ) / timer)));
-  const noteOffsets = voices.flatMap((p) => p.map((n) => n.offset));
-  return { noteOffsets, patterns, songPositions, rows, streams, blockRows, rowSources, streamAtStart, ticksPerStep, bpm, buildName: build.name,
+  // every note byte of a command: the first and the extra ones (all stay below 0xC0 when edited)
+  const noteOffsets = voices.flatMap((p) => p.flatMap((n) => [n.offset, ...n.extras]));
+  return { noteOffsets, patterns, songPositions, rows, streams, blockRows, effectSources, rowSources, streamAtStart, ticksPerStep, bpm, buildName: build.name,
     noteForByte: (byte, octave, steps) => { const period = periodOf(transposeNote(byte, steps), octave); return period > 0 ? periodToNote(period) : 0; } };
 }

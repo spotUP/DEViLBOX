@@ -4,7 +4,7 @@
  * SINGLE SOURCE OF TRUTH for the effTyp integers these two formats' commands occupy in the tracker grid. None is
  * an XM effect; each keeps its own id and its operand verbatim (low byte), named in the player's terms
  * (third-party/nuade/players/{riffraff,howiedavies}). `effTyp` is a GLOBAL id space shared by every format's
- * display path (xmEffectToString + TrackerGLRenderer + TrackerCanvas2DRenderer); the blocks are 0x510..0x517, 0x520..0x521 and 0x530..0x531
+ * display path (xmEffectToString + TrackerGLRenderer + TrackerCanvas2DRenderer); the blocks are 0x510..0x517, 0x520..0x521, 0x530..0x531 and 0x540..0x542
  * (beathovenEffectGlyphs.ts holds 0x500..0x503).
  *
  * ZERO imports on purpose - imported by the renderer workers.
@@ -49,14 +49,26 @@ export const HC_FX = {
   altSequence: HC_FX_BASE + 1,
 } as const;
 
+export const SPL_FX_BASE = 0x540;
+/** Sound Programming Language extra note bytes (spl.c step_voice): an instrument record whose flags say so makes a note command carry 1 or 3 more note bytes, each started in the same step. The operand is the stream byte verbatim (octave nibble, semitone nibble). */
+export const SPL_FX = {
+  /** N: second note byte of the command. */
+  extraNote1: SPL_FX_BASE,
+  /** N: third note byte of the command. */
+  extraNote2: SPL_FX_BASE + 1,
+  /** N: fourth note byte of the command. */
+  extraNote3: SPL_FX_BASE + 2,
+} as const;
+
 export const CS_FX_MIN = RR_FX_BASE;
-export const CS_FX_MAX = HC_FX.altSequence;
+export const CS_FX_MAX = SPL_FX.extraNote3;
 
 export const CS_EFFECT_GLYPH: Record<number, string> = {
   [RR_FX.setVolume]: 'V', [RR_FX.volumeSlide]: 'S', [RR_FX.volumeSlideRate]: 'R', [RR_FX.masterFade]: 'F',
   [RR_FX.masterFadeRate]: 'G', [RR_FX.pitchSlide]: 'P', [RR_FX.pitchSlideLow]: 'Q', [RR_FX.pitchSlideOff]: 'O',
   [HD_FX.speed]: 'S', [HD_FX.maxVolume]: 'V',
   [HC_FX.portamento]: 'P', [HC_FX.altSequence]: 'F',
+  [SPL_FX.extraNote1]: 'N', [SPL_FX.extraNote2]: 'N', [SPL_FX.extraNote3]: 'N',
 };
 
 /** A command of these formats as a 3-char grid token, or null outside the blocks. */
