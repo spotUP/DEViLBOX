@@ -22,6 +22,8 @@ export const PAULA_LOG_MAX = 512;
 export interface PaulaLogModule extends UADEModule {
   _uade_wasm_enable_paula_log(on: number): void;
   _uade_wasm_get_paula_log(outPtr: number, max: number): number;
+  /** Same drain, 4 words per entry; word 3 is the emulated output frame of the write. */
+  _uade_wasm_get_paula_log4(outPtr: number, max: number): number;
   _uade_wasm_read_memory(addr: number, dst: number, len: number): number;
   _uade_wasm_write_memory(addr: number, src: number, len: number): number;
   _uade_wasm_set_subsong(n: number): void;
@@ -38,6 +40,8 @@ export interface PaulaWrite {
   voice: number;
   reg: number;
   value: number;
+  /** Emulated output frame at the write (only from the 4-word log); burst-independent, unlike the drain chunk. */
+  frame?: number;
 }
 
 /** Sentinel: how many log drains and decoded entries ran. A test that claims to compare against UADE asserts these moved. */
@@ -52,6 +56,26 @@ export function decodePaulaLog(heap: Uint8Array, logPtr: number, n: number): Pau
     out.push({ voice: w >>> 24, reg: (w >>> 16) & 0xff, value: w & 0xffff });
   }
   return out;
+}
+
+/** Decode `n` 4-word log entries (stride 4) at `logPtr`, with the emulated output frame of each write. */
+export function decodePaulaLog4(heap: Uint8Array, logPtr: number, n: number): PaulaWrite[] {
+  const u32 = new Uint32Array(heap.buffer, logPtr, n * 4);
+  const out: PaulaWrite[] = [];
+  for (let i = 0; i < n; i++) {
+    const w = u32[i * 4];
+    out.push({ voice: w >>> 24, reg: (w >>> 16) & 0xff, value: w & 0xffff, frame: u32[i * 4 + 3] });
+  }
+  return out;
+}
+
+/** Read the writes logged since the last drain, stamped with emulated frames (buffer needs 16 bytes per entry). */
+export function drainPaulaLog4(mod: PaulaLogModule, logPtr: number, max = PAULA_LOG_MAX): PaulaWrite[] {
+  const n = mod._uade_wasm_get_paula_log4(logPtr, max);
+  refreshHeap(mod as unknown as UADEModule);
+  oracleStats.drains++;
+  oracleStats.writes += n;
+  return decodePaulaLog4(mod.HEAPU8, logPtr, n);
 }
 
 /** Read the writes logged since the last drain. */
@@ -106,12 +130,12 @@ export class PaulaSession {
     if (!logBeforeLoad) mod._uade_wasm_enable_paula_log(1);
     this.pL = mod._malloc(PAULA_CHUNK * 4);
     this.pR = mod._malloc(PAULA_CHUNK * 4);
-    this.logPtr = mod._malloc(PAULA_LOG_MAX * 12);
+    this.logPtr = mod._malloc(PAULA_LOG_MAX * 16);
   }
 
   /** Writes logged but not yet drained (the load's own writes, before the first render). */
   drain(): PaulaWrite[] {
-    return drainPaulaLog(this.mod, this.logPtr);
+    return drainPaulaLog4(this.mod, this.logPtr);
   }
 
   /** Render one 10 ms chunk. Returns the writes it logged, or null when the song ended. */

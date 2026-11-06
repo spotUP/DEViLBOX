@@ -244,6 +244,9 @@ static inline void write_left_right(int left, int right)
 
     *(sndbufpt++) = left;
     *(sndbufpt++) = right;
+#ifdef UADE_WASM
+    g_uade_emu_frames++;
+#endif
 
     check_sound_buffers();
 }

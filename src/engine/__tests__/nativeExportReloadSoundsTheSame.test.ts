@@ -18,7 +18,7 @@ import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { noteValueToPitch } from '@/lib/tracker/noteValue';
 import { createHash } from 'node:crypto';
 import { isSunTronicV13Format } from '@/lib/import/formats/SunTronicV13';
-import { openUade, PaulaSession } from './gridOracle';
+import { openUade, PaulaSession, PAULA_CHUNK, type PaulaWrite } from './gridOracle';
 import { EXPORT_ROUND_TRIP } from '@/lib/import/gridProvenance';
 import { pickDscNote } from './helpers/pickDscNote';
 import { loadTfmxWalkModule, type TfmxWalkHost } from './helpers/tfmxWalkHost';
@@ -292,8 +292,8 @@ type Trace = Ev[][] & { end?: number };
 type RigName = 'paula' | 'tfmx';
 
 const PAULA_SECONDS = Number(process.env.G16_SECONDS ?? 8);
-/** Chunks (UADE, 10 ms) or ticks (TFMX) two loads of one module may differ by. */
-const TIME_JITTER = 2;
+/** Chunks (UADE, 10 ms, from the emulated frame of each write) or ticks (TFMX) two loads of one module may differ by. Measured: 0 fails the edited Ben Daglish case by one chunk, 1 passes all rows. */
+const TIME_JITTER = 1;
 const TFMX_TICKS = 3000;
 const stats = { renders: 0, events: 0 };
 let tfmx: TfmxWalkHost | null = null;
@@ -313,18 +313,20 @@ async function paulaTrace(bytes: Uint8Array, name: string): Promise<Trace | null
   const per: Trace = Object.assign([[], [], [], []] as Ev[][], { end: Infinity });
   // Stop short of the window's end: a write two loads of one module drift by a few chunks over the window.
   const last = PAULA_SECONDS * 100 - 50;
-  const add = (chunk: number, writes: Array<{ voice: number; reg: number; value: number }>) => {
+  const add = (writes: PaulaWrite[]) => {
     for (const w of writes) {
       if (w.voice >= 4) continue;
+      // Emulated time of the write, not the drain chunk: the core runs ahead in bursts, so a drain chunk can be several late.
+      const chunk = Math.floor((w.frame ?? 0) / PAULA_CHUNK);
       // Writes in the last chunks (an 'edge') are kept apart: a shift of a chunk moves one across the window's end.
       per[w.voice].push({ kind: chunk > last - TIME_JITTER - 1 ? 'edge' : w.reg === 3 ? 'period' : w.reg < 2 ? 'pointer' : 'other', text: `${w.reg}:${w.value}`, t: chunk });
     }
   };
-  add(0, session.drain());
+  add(session.drain());
   for (let chunk = 1; chunk <= PAULA_SECONDS * 100; chunk++) {
     const writes = session.step();
     if (!writes) { per.end = chunk; break; }
-    add(chunk, writes);
+    add(writes);
   }
   session.close();
   stats.renders++;

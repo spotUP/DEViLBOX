@@ -25,7 +25,9 @@ typedef struct {
     uint16_t value;
     uint32_t source_addr;   /* g_uade_last_chip_read_addr at write time */
     uint32_t tick;          /* g_uade_tick_count at write time */
-} UadePaulaLogEntry;        /* 12 bytes */
+    uint32_t frame;         /* emulated output frames produced before this write (emulated time, burst-independent) */
+} UadePaulaLogEntry;        /* 16 bytes */
+extern uint32_t g_uade_emu_frames;
 
 /* Snapshot of all 4 Paula channels captured at each CIA-A Timer A tick.
  * Each tick corresponds to one tracker "speed" unit. Every `speed` ticks = one pattern row.
