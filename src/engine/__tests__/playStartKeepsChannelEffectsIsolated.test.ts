@@ -14,6 +14,7 @@
  * tune clears it.
  */
 import { describe, it, expect, vi } from 'vitest';
+import * as mixerStore from '@/stores/useMixerStore';
 import { TrackerReplayer } from '../TrackerReplayer';
 import { getActiveIsolationEngine, getPlayingIsolationEngine, setPlayingIsolationEngine } from '../tone/ChannelRoutedEffects';
 import { useAudioStore } from '@/stores/useAudioStore';
@@ -60,12 +61,9 @@ vi.mock('../ToneEngine', () => {
   const engine = new Proxy({}, { get: (_t, k) => (k === 'rebuildMasterEffects' ? rebuildMasterEffects : () => undefined) });
   return { getToneEngine: () => engine };
 });
-// The slot build: resolves only when the test says so.
-vi.mock('@/stores/useMixerStore', async (orig) => ({
-  ...(await orig<object>()),
-  scheduleWasmEffectRebuild: vi.fn(),
-  rebuildWasmEffectsNow: vi.fn(() => new Promise<void>((resolve) => { h.builds.push(() => { h.posted.push('built'); resolve(); }); })),
-}));
+// The slot build is stubbed with vi.spyOn in the test body, not with vi.mock + importOriginal: a mock factory that
+// imports the original store evaluates the store's static chain (down to ChannelRoutedEffects) inside the factory, and
+// ChannelRoutedEffects' own dynamic import of the store then resolves to the original module, not the mock.
 vi.mock('@/stores/useNotificationStore', () => ({ notify: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() } }));
 
 const flush = async (): Promise<void> => {
@@ -100,6 +98,11 @@ async function playOnce(replayer: TrackerReplayer): Promise<void> {
 
 describe('an effect aimed at channels never reaches the whole mix across stop and play', () => {
   it('first play, stop, second play: the chain always resolves the engine, and rendering starts after the build', async () => {
+    // The slot build: resolves only when the test says so.
+    vi.spyOn(mixerStore, 'scheduleWasmEffectRebuild').mockImplementation(() => undefined);
+    vi.spyOn(mixerStore, 'rebuildWasmEffectsNow').mockImplementation(
+      () => new Promise<void>((resolve) => { h.builds.push(() => { h.posted.push('built'); resolve(); }); }),
+    );
     setPlayingIsolationEngine(null);
     await flush();
     h.chainEngines.length = 0;
