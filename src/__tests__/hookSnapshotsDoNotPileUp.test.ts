@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execFileSync, spawnSync } from 'child_process';
-import { mkdtempSync, writeFileSync, rmSync, existsSync, utimesSync } from 'fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, utimesSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, resolve } from 'path';
 
@@ -84,5 +84,21 @@ describe('hook snapshots do not pile up in TMPDIR', { timeout: 60000 }, () => {
     expect(existsSync(a)).toBe(false); // older idle slot beyond the cap
     expect(existsSync(b)).toBe(true);
     expect(existsSync(c)).toBe(true);
+  });
+
+  it('pruning never waits for the delete: a slow rm does not hold the hook, and the slot path is free at once', () => {
+    // 2026-11-05: a commit sat 6+ minutes in prune_snapshots rm -rf of a ~38 000 file slot.
+    const slot = bash(
+      `. "${SNAPSHOT_SH}"; SNAP_LABEL=t; materialise_reusable "$(git rev-parse HEAD)" "$(git write-tree)"; s=$SNAP; cleanup_snapshot; echo "$s"`,
+      repo, opts,
+    );
+    utimesSync(join(slot, '.git/devilbox-last-used'), hoursAgo(2), hoursAgo(2));
+    const bin = join(scratch, 'bin');
+    mkdirSync(bin);
+    writeFileSync(join(bin, 'rm'), '#!/bin/bash\nsleep 8\nexec /bin/rm "$@"\n', { mode: 0o755 });
+    const t0 = Date.now();
+    bash(`. "${SNAPSHOT_SH}"; prune_snapshots`, repo, { ...opts, PATH: `${bin}:${process.env.PATH}` });
+    expect(Date.now() - t0).toBeLessThan(4000);
+    expect(existsSync(slot)).toBe(false);
   });
 });

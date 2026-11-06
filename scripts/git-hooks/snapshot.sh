@@ -15,8 +15,26 @@ cleanup_snapshot() {
   if [ -n "$KEPT" ]; then
     [ -n "$SNAP" ] && touch "$SNAP/.git/devilbox-last-used" 2>/dev/null
     [ -n "$KEPT_LOCK" ] && rmdir "$KEPT_LOCK" 2>/dev/null; KEPT=""; KEPT_LOCK=""
-  elif [ -n "$SNAP" ]; then rm -rf "$SNAP"; fi
+  elif [ -n "$SNAP" ]; then discard_snapshot "$SNAP"; fi
   SNAP=""
+}
+# Deleting a snapshot is ~38 000 small files: 25 s on a quiet disk, 6+ minutes
+# under load (2026-11-05, a commit sat in prune_snapshots' rm -rf). The copy
+# itself is needed (tests read tracked fixtures and ask git which files are
+# tracked), and a kept slot is reused at ~3 s, but nothing needs the DELETE to
+# finish before the hook goes on. So the directory is renamed out of the
+# devilbox-<label>* namespace (one inode, instant, same volume) and removed by a
+# detached rm; the hook never waits for it. Names devilbox-trash.* are skipped by
+# prune_snapshots, so a running delete is never raced.
+discard_snapshot() {
+  local d=$1 trash
+  [ -e "$d" ] || return 0
+  trash="${TMPDIR:-/tmp}/devilbox-trash.$$.$RANDOM"
+  if mv "$d" "$trash" 2>/dev/null; then
+    ( nohup rm -rf "$trash" >/dev/null 2>&1 </dev/null & )
+  else
+    rm -rf "$d"
+  fi
 }
 # On a signal the running step (npm/tsc/vitest) is stopped first, or it would
 # keep running in a directory that is being deleted.
@@ -48,25 +66,26 @@ prune_snapshots() {
   for d in "${TMPDIR:-/tmp}"/devilbox-*; do
     [ -d "$d/.git" ] || continue
     case "$d" in
+      */devilbox-trash.*) continue ;;
       *-kept-*)
         [ -d "$d.lock" ] && continue
         url="$(snapshot_env git -C "$d" config remote.origin.url 2>/dev/null)"
-        if [ -z "$url" ] || [ ! -e "$url" ]; then rm -rf "$d"; continue; fi
+        if [ -z "$url" ] || [ ! -e "$url" ]; then discard_snapshot "$d"; continue; fi
         [ -e "$d/.git/devilbox-last-used" ] || touch -r "$d/.git" "$d/.git/devilbox-last-used"
-        if [ -n "$(find "$d/.git/devilbox-last-used" -mmin +"$idle_min" 2>/dev/null)" ]; then rm -rf "$d"; continue; fi
+        if [ -n "$(find "$d/.git/devilbox-last-used" -mmin +"$idle_min" 2>/dev/null)" ]; then discard_snapshot "$d"; continue; fi
         idle+=("$d")
         ;;
       *)
         pid="$(cat "$d/.git/devilbox-owner" 2>/dev/null)"
-        if [ -n "$pid" ]; then kill -0 "$pid" 2>/dev/null || rm -rf "$d"
-        elif [ -n "$(find "$d" -maxdepth 0 -mmin +60 2>/dev/null)" ]; then rm -rf "$d"; fi
+        if [ -n "$pid" ]; then kill -0 "$pid" 2>/dev/null || discard_snapshot "$d"
+        elif [ -n "$(find "$d" -maxdepth 0 -mmin +60 2>/dev/null)" ]; then discard_snapshot "$d"; fi
         ;;
     esac
   done
   [ "${#idle[@]}" -gt "$max_idle" ] || return 0
   # Newest first; everything after the first max_idle goes.
   ls -td $(printf '%s/.git/devilbox-last-used\n' "${idle[@]}") | tail -n +"$((max_idle + 1))" | while read -r f; do
-    rm -rf "${f%/.git/devilbox-last-used}"
+    discard_snapshot "${f%/.git/devilbox-last-used}"
   done
 }
 
@@ -210,9 +229,9 @@ materialise_reusable() {
   if [ -z "$dir" ]; then materialise "$sha" "$tree"; return; fi
   # A kept clone made with other patterns (or none: the full 2.2 GB checkouts the
   # first version left behind) is rebuilt once.
-  if [ -d "$dir/.git" ] && [ "$(cat "$dir/.git/devilbox-sparse" 2>/dev/null)" != "$(sparse_fingerprint)" ]; then rm -rf "$dir"; fi
+  if [ -d "$dir/.git" ] && [ "$(cat "$dir/.git/devilbox-sparse" 2>/dev/null)" != "$(sparse_fingerprint)" ]; then discard_snapshot "$dir"; fi
   if [ ! -d "$dir/.git" ]; then
-    rm -rf "$dir"
+    discard_snapshot "$dir"
     mkdir -p "$dir"
     snapshot_env git clone --quiet --shared --no-checkout "$top" "$dir"
     apply_sparse "$dir"
