@@ -12,8 +12,8 @@
  * writer (fpGridEdits.ts).
  */
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
-import { periodToPitch } from '@/lib/amiga/periodNotes';
-import { pitchToNoteValue, PITCH_HIGHEST, PITCH_LOWEST } from '@/lib/tracker/noteValue';
+import { periodToPitch, periodToGridNote } from '@/lib/amiga/periodNotes';
+import { PITCH_HIGHEST, PITCH_LOWEST } from '@/lib/tracker/noteValue';
 import { FP_FX } from './fpEffectGlyphs';
 import { WALK_ROWS_PER_PATTERN, walkLayout, walkTickPosition, type WalkLayout } from './walkLayout';
 import { FP_PERIODS, FP_WALK, fpReleaseRate, type FpWalk, type FpWalkEvent } from './fpWalk';
@@ -55,8 +55,7 @@ export function fpKeyIndexForMidi(midi: number): number {
 
 /** The grid note a table period plays (stored value, the octave below C-0 included); 0 when the grid has no such note. */
 export function fpPeriodToNote(period: number): number {
-  const n = fpPeriodPitch(period);
-  return n === null ? 0 : pitchToNoteValue(n);
+  return periodToGridNote(period);
 }
 
 /** The Future Player grid's layout and playhead mapping are the shared walk ones (walkLayout.ts). */

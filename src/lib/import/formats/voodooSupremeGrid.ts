@@ -19,7 +19,7 @@
  * Pitch: see voodooNoteForIndex (periodToNote of the period the replayer writes to Paula; measured against UADE's AUDxPER log). Not shown in phase A: portamento slides (the start note is shown), period table octave commands,
  * envelopes, waveform tables, subsongs after the first. Note write-back is phase B.
  */
-import { periodToNote } from '@/lib/amiga/periodNotes';
+import { periodToGridNote } from '@/lib/amiga/periodNotes';
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 
 const VOICES = 4;
@@ -44,11 +44,11 @@ const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
 /**
  * The grid note of a table index (note byte + transpose, clamped like period_index): periodToNote of the table period,
  * which is the value the replayer writes to AUDxPER for a note-on (measured: voo8 voice 0 first note writes 224 = note 36).
- * 0 for the silent zero entries. Periods beyond the grid table (above 1712) show as its lowest note.
+ * 0 for the silent zero entries. Periods above 1712 show as the octave below C-0 (periodToGridNote).
  */
 export function voodooNoteForIndex(index: number): number {
   const period = VOODOO_PERIODS[Math.max(0, Math.min(98, index))];
-  return period > 0 ? periodToNote(period) : 0;
+  return period > 0 ? periodToGridNote(period) : 0;
 }
 
 export interface VoodooGrid {
