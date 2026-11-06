@@ -11,6 +11,7 @@
  * as edited and every cell that does not share an edited byte must be unchanged, otherwise the edit is taken out again.
  */
 import type { Pattern, TrackerCell } from '@/types';
+import { cellEffects, effectEditPatches } from './cellEffectSlots';
 import { buildSplGrid, type SplGrid } from './soundProgrammingLanguageGrid';
 
 const NOTE_OFF = 97;
@@ -18,7 +19,7 @@ const ROWS_PER_PATTERN = 64;
 const PREFIX = 'Sound Programming Language';
 
 export interface SplEditResult { data: Uint8Array; patched: number; warnings: string[] }
-interface Edit { pattern: number; channel: number; row: number; note: number; at: number; byte: number }
+interface Edit { pattern: number; channel: number; row: number; note: number; at: number; byte: number; fx: Array<[number, number]>; fxPatches: Array<[number, number]> }
 
 const where = (e: { pattern: number; channel: number; row: number }): string => `voice ${e.channel + 1}, pattern ${e.pattern}, row ${e.row}`;
 const cellAt = (g: SplGrid, channel: number, row: number): TrackerCell | undefined =>
@@ -28,7 +29,7 @@ function otherFieldsDiffer(a: TrackerCell, b: TrackerCell): boolean {
   const x = a as unknown as Record<string, number | undefined>;
   const y = b as unknown as Record<string, number | undefined>;
   for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) {
-    if (k === 'note' || k === 'instrument') continue;
+    if (k === 'note' || k === 'instrument' || k.startsWith('eff')) continue; // the effect slots are handled by effectEditPatches
     if ((x[k] ?? 0) !== (y[k] ?? 0)) return true;
   }
   return false;
@@ -52,11 +53,24 @@ export function applySplGridEdits(original: Uint8Array, patterns: readonly Patte
     const noteChanged = cell.note !== was.note;
     const instChanged = cell.instrument !== was.instrument;
     const otherChanged = otherFieldsDiffer(cell, was);
-    if (!noteChanged && !instChanged && !otherChanged) return;
+    const fxChanged = JSON.stringify(cellEffects(cell)) !== JSON.stringify(cellEffects(was));
+    if (!noteChanged && !instChanged && !otherChanged && !fxChanged) return;
     const at = { pattern: pi, channel: c, row: r };
     if (otherChanged) warnings.push(`${PREFIX} ${where(at)}: volume and effect columns are not stored per row in this format; that change was not written.`);
     if (instChanged) warnings.push(`${PREFIX} ${where(at)}: the instrument is a record copied inline into the stream, not a byte per note; the instrument was not written.`);
-    if (!noteChanged) return;
+    let fxPatches: Array<[number, number]> = [];
+    if (fxChanged) {
+      const fxr = effectEditPatches(cell, was, base.effectSources[c]?.[pi * ROWS_PER_PATTERN + r] ?? []);
+      if (fxr.refusal) warnings.push(`${PREFIX} ${where(at)}: ${fxr.refusal}; the effect change was not written.`);
+      else fxPatches = fxr.patches;
+    }
+    if (!noteChanged) {
+      if (fxPatches.length > 0) {
+        for (const [off, val] of fxPatches) claimed.set(off, val);
+        accepted.push({ ...at, note: cell.note, at: -1, byte: -1, fx: cellEffects(cell), fxPatches });
+      }
+      return;
+    }
     const src = base.rowSources[pi]?.[c]?.[r];
     if (!src || was.note < 1 || was.note >= NOTE_OFF) {
       warnings.push(`${PREFIX} ${where(at)}: no note plays on this row, and adding or removing one would change the length of the stream; the edit was not written.`);
@@ -78,31 +92,31 @@ export function applySplGridEdits(original: Uint8Array, patterns: readonly Patte
       return;
     }
     claimed.set(src.offset, found);
-    accepted.push({ ...at, note: cell.note, at: src.offset, byte: found });
+    accepted.push({ ...at, note: cell.note, at: src.offset, byte: found, fx: cellEffects(cell), fxPatches });
   })));
 
   const writeAll = (edits: Edit[]): void => {
     data.set(original);
-    for (const e of edits) data[e.at] = e.byte;
+    for (const e of edits) { if (e.at >= 0) data[e.at] = e.byte; for (const [off, val] of e.fxPatches) data[off] = val; }
   };
-  const touched = new Set(accepted.map((e) => e.at));
+  const touched = new Set(accepted.flatMap((e) => [e.at, ...e.fxPatches.map(([o]) => o)]));
   const shared = new Set<string>();
   base.rowSources.forEach((pat, pi) => pat.forEach((col, c) => col.forEach((s, r) => {
-    if (s && touched.has(s.offset)) shared.add(`${c}:${pi * ROWS_PER_PATTERN + r}`);
+    if (s && (touched.has(s.offset) || base.effectSources[c][pi * ROWS_PER_PATTERN + r].some((x) => touched.has(x.at)))) shared.add(`${c}:${pi * ROWS_PER_PATTERN + r}`);
   })));
 
   const failing = (edits: Edit[]): Edit[] => {
     writeAll(edits);
     const again = buildSplGrid(data);
     if (typeof again === 'string' || again.rows !== base.rows) return edits;
-    const bad = edits.filter((e) => cellAt(again, e.channel, e.pattern * ROWS_PER_PATTERN + e.row)?.note !== e.note);
+    const bad = edits.filter((e) => { const got = cellAt(again, e.channel, e.pattern * ROWS_PER_PATTERN + e.row); return got?.note !== e.note || (e.fxPatches.length > 0 && JSON.stringify(cellEffects(got as TrackerCell)) !== JSON.stringify(e.fx)); });
     if (bad.length > 0) return bad;
     for (let c = 0; c < 4; c++) {
       for (let row = 0; row < base.rows; row++) {
         if (shared.has(`${c}:${row}`)) continue;
         const a = cellAt(again, c, row);
         const b = cellAt(base, c, row);
-        if (!a || !b || a.note !== b.note || a.instrument !== b.instrument) return edits;
+        if (!a || !b || a.note !== b.note || a.instrument !== b.instrument || JSON.stringify(cellEffects(a)) !== JSON.stringify(cellEffects(b))) return edits;
       }
     }
     return [];
