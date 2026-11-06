@@ -70,6 +70,10 @@ export async function getPlayheadOffset(params: Record<string, unknown> = {}): P
   unsubscribe();
   return {
     seconds, unmatched,
+    // Why a run matches nothing: an empty log means the engine reported no clocked tick (no grid clock, or no playTick).
+    logEntries: engine.tickLog().length,
+    lastLogged: engine.tickLog().slice(-2),
+    lastShown: { songPos: useWasmPositionStore.getState().songPos, row: useWasmPositionStore.getState().row },
     latencySeconds: { output: ctx.outputLatency ?? 0, base: ctx.baseLatency },
     offsetMs: offsetStats(offsets),
     meaning: 'grid change time minus the time that row reaches the ear: negative = the grid is early, positive = late',

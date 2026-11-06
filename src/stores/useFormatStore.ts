@@ -225,6 +225,8 @@ export interface FormatStore {
   /** The clock the parser/scan measured for the grid (TrackerSong.uadeFirstTick / uadePlayerTickGrid): the playhead follow and the row preview map UADE's tick counts through it. */
   uadeFirstTick: number | null;
   uadePlayerTickGrid: boolean;
+  /** David Whittaker: the row clock the parser walked (TrackerSong.davidWhittakerClock); the engine maps its played ticks onto the grid with it (position reports, Play Pattern seek and loop). */
+  davidWhittakerClock: { speedChanges: { tick: number; speed: number }[]; passTicks: number } | null;
   libopenmptFileData: ArrayBuffer | null;
   hivelyMeta: { stereoMode: number; mixGain: number; speedMultiplier: number; version: number } | null;
   furnaceSubsongs: FurnaceSubsongPlayback[] | null;
@@ -762,6 +764,7 @@ export const useFormatStore = create<FormatStore>()(
     uadeEditableCurrentSubsong: 0,
     uadeFirstTick: null,
     uadePlayerTickGrid: false,
+    davidWhittakerClock: null,
     libopenmptFileData: null,
     hivelyMeta: null,
     furnaceSubsongs: null,
@@ -1422,6 +1425,7 @@ export const useFormatStore = create<FormatStore>()(
         state.uadeEditableCurrentSubsong = (song as any).uadeEditableSubsongs?.start ?? 0;
         state.uadeFirstTick = (song as any).uadeFirstTick ?? null;
         state.uadePlayerTickGrid = (song as any).uadePlayerTickGrid === true;
+        state.davidWhittakerClock = (song as any).davidWhittakerClock ?? null;
         state.libopenmptFileData = (song as any).libopenmptFileData ?? null;
         if (song.furnaceNative) {
           newEditorMode = 'furnace';
@@ -1804,6 +1808,7 @@ export const useFormatStore = create<FormatStore>()(
       state.uadeEditableCurrentSubsong = 0;
       state.uadeFirstTick = null;
       state.uadePlayerTickGrid = false;
+      state.davidWhittakerClock = null;
       state.libopenmptFileData = null;
       state.originalModuleData = null;
       state.songDBInfo = null;
