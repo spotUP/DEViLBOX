@@ -106,4 +106,36 @@ describe('stereo separation reaches every direct-routed Amiga worklet', { timeou
     expect(full, `${stem}: hard pan returns at 100%`).toBeGreaterThan(0);
     expect(mono, `${stem}: no side energy at 0%`).toBeLessThan(full * 1e-6);
   });
+
+  // Nuade separates inside its own mixer (the worklet scales the percent to nw_set_separation 0..1), so the narrowStereo
+  // helper is not involved and must not swallow the message:
+  // the engine converts the app's percent and the worklet's rendered side energy follows it.
+  it('nuade: stored setting on node ready, live slider through the registry', async () => {
+    const { NuadeEngine } = await import('@engine/nuade/NuadeEngine');
+    const { proc, send, posted } = await startWorklet('nuade', 'Nuade');
+    await send({ type: 'loadModule', bytes: songBuffer(`${S}/formats/antidust.bp3`), playerId: '', fileName: 'antidust.bp3', companions: [] });
+    expect(posted.find((m) => m.type === 'moduleLoaded' || m.type === 'error')?.type).toBe('moduleLoaded');
+    await send({ type: 'play' });
+
+    const engine = Object.create(NuadeEngine.prototype) as FakeEngine;
+    const posts: unknown[] = [];
+    (engine as unknown as { post(m: unknown): void }).post = (m) => { posts.push(m); void send(m); };
+    engine.workletNode = {} as AudioWorkletNode;
+    created.push(engine);
+    const setSep = vi.spyOn(engine, 'setStereoSeparation');
+
+    useSettingsStore.setState({ stereoSeparation: 0 });
+    engine.markNodeReady();
+    await vi.waitFor(() => expect(setSep).toHaveBeenCalledWith(0));
+    const mono = sideEnergy(proc, 300);
+
+    useSettingsStore.setState({ stereoSeparation: 100 });
+    WASMChannelOutputsEngine.forwardStereoSeparation(100);
+    expect(setSep).toHaveBeenLastCalledWith(100);
+    const full = sideEnergy(proc, 300);
+
+    expect(posts.map((m) => (m as { value: number }).value)).toEqual([0, 100]);
+    expect(full, 'nuade: hard pan returns at 100%').toBeGreaterThan(0);
+    expect(mono, 'nuade: no side energy at 0%').toBeLessThan(full * 1e-6);
+  });
 });

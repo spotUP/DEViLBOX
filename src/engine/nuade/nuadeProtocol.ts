@@ -34,6 +34,7 @@ export type NuadeIn =
   | { type: 'seek'; frame: number }
   /** A grid row rendered by the row-preview worker, played out of the engine's own output while the song is stopped. */
   | { type: 'playRowClip'; clip: RowClip }
+  /** The app setting, 0-100 (%); the worklet hands it to nw_set_separation as 0..1. */
   | { type: 'setStereoSeparation'; value: number }
   /** Read bytes of the player's typed state (answered with `state`). */
   | { type: 'requestState'; offset: number; len: number }
