@@ -105,6 +105,24 @@ export function mainStepFromOnsets(onsetsPerVoice: readonly (readonly number[])[
   return ranked.length === 1 ? ranked[0][0] : gcd(ranked[0][0], ranked[1][0]);
 }
 
+/**
+ * The exact step (plan rule R4): the GCD of every gap between consecutive onsets on one voice, and of each voice's
+ * first onset tick, over the whole song. Every onset then lands on a row with no offset. No threshold, no guessing.
+ * A result of 1 means the processed ticks share no common unit: the caller reports the deltas, it does not pick a step.
+ * `onsetsPerVoice` lists each voice's onset ticks in ascending order. With no onset at all the step is 1.
+ */
+export function exactStepFromOnsets(onsetsPerVoice: readonly (readonly number[])[]): number {
+  let g = 0;
+  for (const onsets of onsetsPerVoice) {
+    let prev = 0;
+    for (const t of onsets) {
+      if (t > prev) g = gcd(g, t - prev);
+      prev = Math.max(prev, t);
+    }
+  }
+  return g || 1;
+}
+
 export interface OnsetPlacement {
   row: number;
   /** 0: the first note column; 1 and up: a further onset of the same key in the same row. */
