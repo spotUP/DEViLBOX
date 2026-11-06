@@ -215,6 +215,8 @@ interface RowData {
   period?: number;
   /** The stream sets the instrument the channel already runs; the encoder writes the repeated command. */
   dlInstrRepeat?: boolean;
+  /** The raw SET_INSTRUMENT pointer when it is not the canonical descriptor address of its id (a pointer past the table). */
+  dlInstrPtr?: number;
   /** The section ended on this terminator word instead of SEQ_ADVANCE (set on its last row). */
   dlEnd?: number;
   /** The row is past the stream's end (only the row that carries the terminator of an empty section). */
@@ -225,7 +227,7 @@ interface RowData {
 export type DLGridEvent =
   | { type: 'note'; period: number; duration: number }
   | { type: 'rest'; duration: number }
-  | { type: 'setInstrument'; id: number }
+  | { type: 'setInstrument'; id: number; rawPtr?: number }
   | { type: 'setVolEnv'; envId: number }
   | { type: 'seqAdvance'; word?: number };
 
@@ -239,6 +241,7 @@ export function eventsToGridRows(events: DLGridEvent[], clock: RowClock): { rows
   let currentInstr = 0;
   let instrPending = false;
   let instrRepeat = false;
+  let instrRawPtr: number | undefined;
   let envPending = 0;
   let totalTicks = 0;
   const cells: Array<{ tick: number; cell: RowData }> = [];
@@ -252,8 +255,10 @@ export function eventsToGridRows(events: DLGridEvent[], clock: RowClock): { rows
     };
     if (period > 0) cell.period = period;
     if (instrRepeat) cell.dlInstrRepeat = true;
+    if (instrPending && instrRawPtr !== undefined) cell.dlInstrPtr = instrRawPtr;
     instrPending = false;
     instrRepeat = false;
+    instrRawPtr = undefined;
     envPending = 0;
     return cell;
   };
@@ -261,7 +266,7 @@ export function eventsToGridRows(events: DLGridEvent[], clock: RowClock): { rows
   for (const ev of events) {
     switch (ev.type) {
       case 'setInstrument':
-        if (ev.id > 0) { instrRepeat = instrPending ? instrRepeat : ev.id === currentInstr; currentInstr = ev.id; instrPending = true; }
+        if (ev.id > 0) { instrRepeat = instrPending ? instrRepeat : ev.id === currentInstr; currentInstr = ev.id; instrPending = true; instrRawPtr = ev.rawPtr; }
         break;
       case 'setVolEnv':
         if (ev.envId > 0) envPending = ev.envId;
@@ -316,7 +321,10 @@ function eventsToRows(events: DLEvent[], sampleInfoBase: number, envPtrs: number
   const grid: DLGridEvent[] = events.map((ev): DLGridEvent => {
     if (ev.type === 'setInstrument') {
       const idx = sampleInfoBase > 0 ? Math.floor((ev.sampleInfoPtr - sampleInfoBase) / SAMPLE_DESC_SIZE) : -1;
-      return { type: 'setInstrument', id: idx >= 0 ? idx + 1 : 0 };
+      const id = idx >= 0 ? idx + 1 : 0;
+      // a pointer that is not the descriptor's own address (the song points past the table) travels with the row
+      const canonical = sampleInfoBase + idx * SAMPLE_DESC_SIZE;
+      return { type: 'setInstrument', id, ...(id > 0 && ev.sampleInfoPtr !== canonical ? { rawPtr: ev.sampleInfoPtr } : {}) };
     }
     if (ev.type === 'setVolEnv') return { type: 'setVolEnv', envId: envPtrs.indexOf(ev.envPtr) + 1 };
     return ev;
@@ -370,7 +378,9 @@ function encodeRowsToStream(rows: TrackerCell[], _channel: number, step = 1, tab
     const emitEnv = (): void => { if (env > 0 && tables.envPtrs[env - 1] !== undefined) pushCmd(out, CMD_SET_VOL_ENV, tables.envPtrs[env - 1]); };
     if (tables.envFirst) emitEnv();
     const instr = c.instrument ?? 0;
-    const ptr = instr > 0 && (instr !== running || c.dlInstrRepeat) ? tables.instrumentPtr(instr) : undefined;
+    let ptr = instr > 0 && (instr !== running || c.dlInstrRepeat) ? tables.instrumentPtr(instr) : undefined;
+    // an unedited instrument keeps the song's own pointer when it lay inside the same descriptor slot
+    if (ptr !== undefined && c.dlInstrPtr !== undefined && c.dlInstrPtr >= ptr && c.dlInstrPtr < ptr + SAMPLE_DESC_SIZE) ptr = c.dlInstrPtr;
     if (ptr !== undefined) { pushCmd(out, CMD_SET_INSTRUMENT, ptr); running = instr; }
     if (!tables.envFirst) emitEnv();
   };
@@ -657,6 +667,7 @@ export async function parseDaveLoweFile(
               eff: sRows[r].eff,
               ...(sRows[r].period ? { period: sRows[r].period } : {}),
             ...(sRows[r].dlInstrRepeat ? { dlInstrRepeat: true } : {}),
+              ...(sRows[r].dlInstrPtr !== undefined ? { dlInstrPtr: sRows[r].dlInstrPtr } : {}),
               ...(sRows[r].dlEnd !== undefined ? { dlEnd: sRows[r].dlEnd } : {}),
               ...(sRows[r].dlPadding ? { dlPadding: true } : {}),
               effTyp2: 0,
