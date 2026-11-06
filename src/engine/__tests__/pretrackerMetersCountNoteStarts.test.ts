@@ -13,6 +13,7 @@ describe('PreTracker channel meters', { timeout: 60_000 }, () => {
   it('flash on more notes than the level-jump rule saw', async () => {
     const { proc, send, posted } = await startWorklet('pretracker', 'PreTracker', preTrackerTransform, 'Pretracker');
     await send({ type: 'loadModule', moduleData: songBuffer('public/data/songs/pretracker/the little things.prt') });
+    await send({ type: 'play' }); // the worklet renders only between play and stop
     const counted: number[] = []; const byLevel: number[] = [];
     const sinkOf = (hits: number[]) => ({ updateRealtimeChannelLevels() {}, triggerChannelMeter(i: number) { hits[i] = (hits[i] ?? 0) + 1; } });
     const countedFeed = new ChannelMeterFeed(); const levelFeed = new ChannelMeterFeed();

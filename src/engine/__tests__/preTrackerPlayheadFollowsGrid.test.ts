@@ -29,6 +29,7 @@ describe('PreTracker playhead follows the grid row', () => {
     const song = await parsePreTrackerFile(buf.slice(0), 'the little things.prt');
     const { proc, send, posted } = await startWorklet('pretracker', 'PreTracker', preTrackerTransform, 'Pretracker');
     await send({ type: 'loadModule', moduleData: buf.slice(0) });
+    await send({ type: 'play' }); // the worklet renders only between play and stop
     const m = (proc as unknown as { module: Mod }).module;
     const outs = stereoOutputs(5);
 
