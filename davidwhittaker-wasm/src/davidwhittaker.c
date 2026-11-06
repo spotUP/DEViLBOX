@@ -2564,18 +2564,34 @@ int dw_played_ticks(const DwModule* module) {
     return module ? module->played_ticks : 0;
 }
 
-/* Run the player silently until it has processed `target_ticks` ticks of the current tune (the next tick it plays is processed
+/* Run the player silently until it has processed `target_ticks` ticks of the current tune (the next frame it renders processes
  * tick `target_ticks`), restarting the tune first when it is already past that. Nothing is mixed out: the voices are muted at the
  * restart and sound again from the first note after the target. Returns the frames the player ran, which the caller adds to
  * its played-frame count (a swapped-in module catches up to that count). */
+/* Whether the next play_tick call processes its tick (counts it in played_ticks), or returns early on the delay counter or
+ * the extra counter: the same tests play_tick makes, without changing anything. */
+static bool next_tick_is_processed(const DwModule* m) {
+    if (m->enable_delay_counter && m->playing_info.delay_counter + m->playing_info.delay_counter_speed > 255) return false;
+    if (m->use_extra_counter && m->playing_info.extra_counter - 1 == 0) return false;
+    return true;
+}
+
 size_t dw_seek_ticks(DwModule* module, int target_ticks) {
     if (!module || target_ticks < 0) return 0;
     if (module->played_ticks > target_ticks) dw_select_subsong(module, module->current_song);
     size_t frames = 0;
-    const size_t block = 256, cap = (size_t)module->sample_rate * 3600;
-    while (module->played_ticks < target_ticks && !module->has_ended && frames < cap) {
+    const size_t cap = (size_t)module->sample_rate * 3600;
+    // A block shorter than one tick moves played_ticks by one at most, so blocks never pass target - 1.
+    const size_t block = module->ticks_per_frame > 257.0f ? 256 : 1;
+    while (module->played_ticks < target_ticks - 1 && !module->has_ended && frames < cap)
         frames += dw_render_multi(module, nullptr, nullptr, nullptr, nullptr, block);
-    }
+    while (module->played_ticks < target_ticks && !module->has_ended && frames < cap)
+        frames += dw_render_multi(module, nullptr, nullptr, nullptr, nullptr, 1);
+    // Stop on the frame that processes tick `target_ticks`: the rest of tick target - 1 (and any tick play_tick skips)
+    // is run here, so the first frame the caller renders is the first frame of the target tick, never the tick before.
+    while (!module->has_ended && frames < cap
+           && !(module->tick_accumulator + 1.0f >= module->ticks_per_frame && next_tick_is_processed(module)))
+        frames += dw_render_multi(module, nullptr, nullptr, nullptr, nullptr, 1);
     return frames;
 }
 

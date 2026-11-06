@@ -72,6 +72,24 @@ describe('David Whittaker output latency and seek', { timeout: 60_000 }, () => {
     expect(back[0].ticks as number).toBeLessThan(60);
   });
 
+  it('seekTicks stops on the target tick boundary: the first frame after it plays tick `target`, never the rest of the tick before', async () => {
+    // A seek that stopped inside tick target - 1 left its remaining frames to the next render, so the first report after a
+    // seek (and after every Play Pattern wrap) was played_ticks == target: the previous pattern's last row on the grid.
+    for (const target of [150, 40, 101]) {
+      const h = await openWorklet(worklet);
+      await h.send({ type: 'loadModule', moduleData: apb().slice(0), subsong: 0 });
+      await h.send({ type: 'play', latencyFrames: 0 });
+      h.render(30);
+      h.posted.length = 0;
+      await h.send({ type: 'seekTicks', ticks: target, gen: 1 });
+      h.render(1);
+      const first = tickMsgs(h.posted);
+      expect(first.map((m) => m.ticks), `seek ${target}: the first block runs tick ${target} and reports it`).toEqual([target + 1]);
+      h.render(40);
+      expect(tickMsgs(h.posted).every((m) => (m.ticks as number) > target), `seek ${target}: no report from before the target`).toBe(true);
+    }
+  });
+
   it('Play Pattern loop wraps on the render position: no frame of the next pattern is rendered, and the main thread is not needed', async () => {
     const run = async (loop: boolean) => {
       const h = await openWorklet(worklet);
