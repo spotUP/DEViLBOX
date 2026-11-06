@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeRowClock } from '../stepRowClock';
+import { makeRowClock, exactStepFromOnsets } from '../stepRowClock';
 
 describe('stepRowClock', () => {
   it('round-trips every tick across two speed changes', () => {
@@ -35,5 +35,16 @@ describe('stepRowClock', () => {
     expect(() => makeRowClock([])).toThrow();
     expect(() => makeRowClock([{ tick: 5, speed: 3 }])).toThrow();
     expect(() => makeRowClock([{ tick: 0, speed: 0 }])).toThrow();
+  });
+});
+
+describe('exactStepFromOnsets (plan R4)', () => {
+  it('is the GCD of every onset gap and of each voice first onset', () => {
+    expect(exactStepFromOnsets([[0, 6, 18, 24], [12, 36]])).toBe(6);
+    expect(exactStepFromOnsets([[6, 12]])).toBe(6);
+  });
+  it('is 1 when the gaps share no unit, and for no onsets', () => {
+    expect(exactStepFromOnsets([[0, 6, 7]])).toBe(1);
+    expect(exactStepFromOnsets([[]])).toBe(1);
   });
 });
