@@ -13,6 +13,7 @@ import { soundMasterEffectToString } from './import/formats/soundMasterEffectGly
 import { actionamicsEffectToString } from './import/formats/actionamicsEffectGlyphs';
 import { activisionProEffectToString } from './import/formats/activisionProEffectGlyphs';
 import { tonyWilliamsEffectToString } from './import/formats/tonyWilliamsEffectGlyphs';
+import { daveLoweEffectToString } from './import/formats/daveLoweEffectGlyphs';
 import { jxsEffectToString } from './import/formats/jxsEffectGlyphs';
 import { davidWhittakerEffectToString } from './import/formats/davidWhittakerEffectGlyphs';
 import { benDaglishEffectToString } from './import/formats/benDaglishEffectGlyphs';
@@ -278,6 +279,10 @@ export function xmEffectToString(effTyp: number, eff: number): string {
   // Tony Williams stream commands (reserved block 0x90..0x9F).
   const tw = tonyWilliamsEffectToString(effTyp, eff);
   if (tw !== null) return tw;
+
+  // Dave Lowe volume-envelope command (reserved id 0x400).
+  const dl = daveLoweEffectToString(effTyp, eff);
+  if (dl !== null) return dl;
 
   // JayTrax row scripts (reserved block 0x100..).
   const jx = jxsEffectToString(effTyp, eff);

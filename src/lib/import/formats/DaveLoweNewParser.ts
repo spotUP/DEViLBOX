@@ -32,8 +32,8 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell } from '@/types';
 import type { InstrumentConfig } from '@/types/instrument';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { createSamplerInstrument, periodToNoteIndex, amigaNoteToXM } from './AmigaUtils';
-import { daveLoweEncoderForStep, daveLoweStep, eventDurations, daveLoweRowClock } from './DaveLoweParser';
+import { createSamplerInstrument } from './AmigaUtils';
+import { daveLoweEncoderForStep, daveLoweStep, eventDurations, daveLoweRowClock, eventsToGridRows, distinctPointers, envComesFirst, type DLGridEvent } from './DaveLoweParser';
 import type { RowClock } from './stepRowClock';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -148,34 +148,23 @@ interface RowData {
   volume: number;
   effTyp: number;
   eff: number;
+  period?: number;
 }
 
 function eventsToRows(
   events: DLEvent[],
   instrPtrToId: Map<number, number>,
+  envPtrs: number[],
   clock: RowClock,
 ): { rows: RowData[]; totalTicks: number } {
-  const rows: RowData[] = [];
-  let currentInstr = 0;
-  let totalTicks = 0;
-  const notes: Array<{ tick: number; cell: RowData }> = [];
-
-  for (const ev of events) {
-    if (ev.type === 'setInstrument') {
-      const id = instrPtrToId.get(ev.ptr!) ?? 0;
-      if (id > 0) currentInstr = id;
-    } else if (ev.type === 'note') {
-      const noteIdx = periodToNoteIndex(ev.period!);
-      notes.push({ tick: totalTicks, cell: { note: amigaNoteToXM(noteIdx), instrument: currentInstr, volume: 0, effTyp: 0, eff: 0 } });
-      totalTicks += ev.duration!;
-    } else if (ev.type === 'rest') {
-      totalTicks += ev.duration!;
-    }
-  }
-
-  for (let r = 0; r < clock.rowsForTicks(totalTicks); r++) rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 });
-  for (const n of notes) rows[clock.tickToRow(n.tick).row] = n.cell;
-  return { rows, totalTicks };
+  const grid: DLGridEvent[] = events.map((ev): DLGridEvent => {
+    if (ev.type === 'setInstrument') return { type: 'setInstrument', id: instrPtrToId.get(ev.ptr!) ?? 0 };
+    if (ev.type === 'setVolEnv') return { type: 'setVolEnv', envId: envPtrs.indexOf(ev.ptr!) + 1 };
+    if (ev.type === 'note') return { type: 'note', period: ev.period!, duration: ev.duration! };
+    if (ev.type === 'rest') return { type: 'rest', duration: ev.duration! };
+    return { type: 'seqAdvance' };
+  });
+  return eventsToGridRows(grid, clock);
 }
 
 // ── Main parser ───────────────────────────────────────────────────────────────
@@ -323,9 +312,10 @@ export function parseDaveLoweNewFile(buffer: ArrayBuffer, filename: string): Tra
   const sectionRows = new Map<number, RowData[]>();
   const songStep = daveLoweStep(allSectionPtrs.flatMap((ptr) => eventDurations(sectionEvents.get(ptr) ?? [])));
   const clock = daveLoweRowClock(songStep);
+  const envPtrs = distinctPointers(allSectionPtrs.flatMap((ptr) => (sectionEvents.get(ptr) ?? []).flatMap((e) => (e.type === 'setVolEnv' ? [e.ptr!] : []))));
   for (const sectionPtr of allSectionPtrs) {
     const events = sectionEvents.get(sectionPtr) ?? [];
-    const { rows } = eventsToRows(events, instrPtrToId, clock);
+    const { rows } = eventsToRows(events, instrPtrToId, envPtrs, clock);
     sectionRows.set(sectionPtr, rows);
   }
 
@@ -356,6 +346,7 @@ export function parseDaveLoweNewFile(buffer: ArrayBuffer, filename: string): Tra
           trackerRows.push({
             note: sRows[r].note, instrument: sRows[r].instrument,
             volume: sRows[r].volume, effTyp: sRows[r].effTyp, eff: sRows[r].eff,
+            ...(sRows[r].period ? { period: sRows[r].period } : {}),
             effTyp2: 0, eff2: 0,
           });
         } else {
@@ -409,7 +400,7 @@ export function parseDaveLoweNewFile(buffer: ArrayBuffer, filename: string): Tra
     numFilePatterns: allSectionPtrs.length,
     rowsPerPattern: patterns.map(p => p.length),
     moduleSize: buf.length,
-    encoder: daveLoweEncoderForStep(songStep),
+    encoder: daveLoweEncoderForStep(songStep, { instrumentPtr: (id) => sortedInstrPtrs[id - 1], envPtrs, envFirst: envComesFirst(allSectionPtrs.flatMap((ptr) => (sectionEvents.get(ptr) ?? []).map((e) => e.type))) }),
     filePatternAddrs,
     filePatternSizes,
     trackMap,

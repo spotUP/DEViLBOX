@@ -35,6 +35,7 @@ import type { Pattern, ChannelData, TrackerCell } from '@/types';
 import type { InstrumentConfig } from '@/types/instrument';
 import type { UADEVariablePatternLayout, VariableLengthEncoder } from '@/engine/uade/UADEPatternEncoder';
 import { makeRowClock, gcd, type RowClock } from './stepRowClock';
+import { DL_FX_VOL_ENV } from './daveLoweEffectGlyphs';
 import { createSamplerInstrument, periodToNoteIndex, amigaNoteToXM } from './AmigaUtils';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -49,6 +50,7 @@ const CMD_SET_INSTRUMENT = 4;
 const CMD_SEQ_ADVANCE = 8;
 const CMD_SET_VOL_ENV = 12;
 const CMD_REST = 32;
+const NOTE_OFF = 97;             // XM note off: a rest that follows a note
 const CMD_NOTE_THRESHOLD = 100;  // words > 100 are note periods
 
 // Standard ProTracker period table for encoding
@@ -202,35 +204,60 @@ interface RowData {
   volume: number;
   effTyp: number;
   eff: number;
+  /** The authored Amiga period of a note (finetuned songs hold periods between the table's); the encoder writes it back while the note is unchanged. */
+  period?: number;
 }
 
-function eventsToRows(events: DLEvent[], sampleInfoBase: number, clock: RowClock): { rows: RowData[]; totalTicks: number } {
+/** A command-stream event with its pointers already resolved to ids (instrument id 0 = pointer not a known instrument). */
+export type DLGridEvent =
+  | { type: 'note'; period: number; duration: number }
+  | { type: 'rest'; duration: number }
+  | { type: 'setInstrument'; id: number }
+  | { type: 'setVolEnv'; envId: number }
+  | { type: 'seqAdvance' };
+
+/**
+ * Events to grid rows (shared by Dave Lowe and Dave Lowe New). A note takes the running instrument; SET_INSTRUMENT
+ * and SET_VOL_ENV commands attach to the next note or rest: the instrument column and the DL_FX_VOL_ENV effect of
+ * the row that event starts, so the encoder writes them back before it in the same order.
+ */
+export function eventsToGridRows(events: DLGridEvent[], clock: RowClock): { rows: RowData[]; totalTicks: number } {
   const rows: RowData[] = [];
   let currentInstr = 0;
+  let instrPending = false;
+  let envPending = 0;
   let totalTicks = 0;
-  const notes: Array<{ tick: number; cell: RowData }> = [];
+  const cells: Array<{ tick: number; cell: RowData }> = [];
+  let afterNote = false;
+
+  const cellAt = (note: number, period = 0): RowData => {
+    const cell: RowData = {
+      note, instrument: (note > 0 && note !== NOTE_OFF) || instrPending ? currentInstr : 0, volume: 0,
+      effTyp: envPending > 0 ? DL_FX_VOL_ENV : 0, eff: envPending,
+    };
+    if (period > 0) cell.period = period;
+    instrPending = false;
+    envPending = 0;
+    return cell;
+  };
 
   for (const ev of events) {
     switch (ev.type) {
-      case 'setInstrument': {
-        // Convert sample info pointer to instrument index (1-based)
-        if (sampleInfoBase > 0) {
-          const idx = Math.floor((ev.sampleInfoPtr - sampleInfoBase) / SAMPLE_DESC_SIZE);
-          if (idx >= 0) currentInstr = idx + 1;
-        }
+      case 'setInstrument':
+        if (ev.id > 0) { currentInstr = ev.id; instrPending = true; }
         break;
-      }
       case 'setVolEnv':
-        // Volume envelope changes don't produce rows
+        if (ev.envId > 0) envPending = ev.envId;
         break;
-      case 'note': {
-        const noteIdx = periodToNoteIndex(ev.period);
-        const xmNote = amigaNoteToXM(noteIdx);
-        notes.push({ tick: totalTicks, cell: { note: xmNote, instrument: currentInstr, volume: 0, effTyp: 0, eff: 0 } });
+      case 'note':
+        afterNote = true;
+        cells.push({ tick: totalTicks, cell: cellAt(amigaNoteToXM(periodToNoteIndex(ev.period)), ev.period) });
         totalTicks += ev.duration;
         break;
-      }
       case 'rest':
+        // a rest after a note is a note off, so the encoder does not fold it into the note's duration
+        if (instrPending || envPending > 0 || afterNote) cells.push({ tick: totalTicks, cell: cellAt(afterNote ? NOTE_OFF : 0) });
+        afterNote = false;
         totalTicks += ev.duration;
         break;
       case 'seqAdvance':
@@ -239,17 +266,56 @@ function eventsToRows(events: DLEvent[], sampleInfoBase: number, clock: RowClock
   }
 
   for (let r = 0; r < clock.rowsForTicks(totalTicks); r++) rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 });
-  for (const n of notes) rows[clock.tickToRow(n.tick).row] = n.cell;
+  for (const n of cells) rows[clock.tickToRow(n.tick).row] = n.cell;
   return { rows, totalTicks };
+}
+
+/** Whether the first adjacent SET_VOL_ENV / SET_INSTRUMENT pair of the song has the envelope first (default true). */
+export const envComesFirst = (types: string[]): boolean => {
+  for (let i = 0; i + 1 < types.length; i++) {
+    if (types[i] === 'setVolEnv' && types[i + 1] === 'setInstrument') return true;
+    if (types[i] === 'setInstrument' && types[i + 1] === 'setVolEnv') return false;
+  }
+  return true;
+};
+
+/** The distinct pointers in first-use order: envelope id n (1-based) is entry n-1. */
+export const distinctPointers = (ptrs: Iterable<number>): number[] => [...new Set(ptrs)];
+
+/** Old Dave Lowe: instrument ids are the sample descriptor index (1-based) of the pointer; envelope ids index `envPtrs`. */
+function eventsToRows(events: DLEvent[], sampleInfoBase: number, envPtrs: number[], clock: RowClock): { rows: RowData[]; totalTicks: number } {
+  const grid: DLGridEvent[] = events.map((ev): DLGridEvent => {
+    if (ev.type === 'setInstrument') {
+      const idx = sampleInfoBase > 0 ? Math.floor((ev.sampleInfoPtr - sampleInfoBase) / SAMPLE_DESC_SIZE) : -1;
+      return { type: 'setInstrument', id: idx >= 0 ? idx + 1 : 0 };
+    }
+    if (ev.type === 'setVolEnv') return { type: 'setVolEnv', envId: envPtrs.indexOf(ev.envPtr) + 1 };
+    return ev;
+  });
+  return eventsToGridRows(grid, clock);
 }
 
 // ── Encoder ───────────────────────────────────────────────────────────────────
 
+/** The pointers a re-encode writes back: instrument id -> SET_INSTRUMENT pointer, envelope id (1-based) -> `envPtrs`. */
+export interface DLCommandTables {
+  /** The song writes SET_VOL_ENV before SET_INSTRUMENT (Dave Lowe New) or after it (Dave Lowe). */
+  envFirst: boolean;
+  instrumentPtr: (id: number) => number | undefined;
+  envPtrs: readonly number[];
+}
+
+const pushCmd = (out: number[], word: number, ptr: number): void => {
+  out.push(0x00, word, (ptr >>> 24) & 0xFF, (ptr >>> 16) & 0xFF, (ptr >>> 8) & 0xFF, ptr & 0xFF);
+};
+
 /**
  * Encode tracker rows back to DL command stream binary.
- * Groups consecutive note rows, rest rows, etc. into commands.
+ * Groups consecutive note rows, rest rows, etc. into commands. The instrument column and the DL_FX_VOL_ENV effect
+ * of a row come back as SET_INSTRUMENT (word 4) and SET_VOL_ENV (word 12) before its note or rest; an instrument
+ * equal to the running one is not repeated.
  */
-function encodeRowsToStream(rows: TrackerCell[], _channel: number, step = 1): Uint8Array {
+function encodeRowsToStream(rows: TrackerCell[], _channel: number, step = 1, tables?: DLCommandTables): Uint8Array {
   // Carrier path (byte-exact): rows produced by the parser's blockRows are
   // per-byte carriers of the real command-stream section (cutoff=1, period=byte).
   // Dave Lowe commands are variable-length word pairs; concatenating the carrier
@@ -265,23 +331,39 @@ function encodeRowsToStream(rows: TrackerCell[], _channel: number, step = 1): Ui
   }
 
   const out: number[] = [];
+  let running = 0;
+  const envOf = (c: TrackerCell): number => (c.effTyp === DL_FX_VOL_ENV ? (c.eff ?? 0) : 0);
+  const hasCommand = (c: TrackerCell): boolean => (c.note ?? 0) > 0 || (c.instrument ?? 0) > 0 || envOf(c) > 0;
+  const emitCommands = (c: TrackerCell): void => {
+    if (!tables) return;
+    const env = envOf(c);
+    const emitEnv = (): void => { if (env > 0 && tables.envPtrs[env - 1] !== undefined) pushCmd(out, CMD_SET_VOL_ENV, tables.envPtrs[env - 1]); };
+    if (tables.envFirst) emitEnv();
+    const instr = c.instrument ?? 0;
+    const ptr = instr > 0 && instr !== running ? tables.instrumentPtr(instr) : undefined;
+    if (ptr !== undefined) { pushCmd(out, CMD_SET_INSTRUMENT, ptr); running = instr; }
+    if (!tables.envFirst) emitEnv();
+  };
   let i = 0;
 
   while (i < rows.length) {
     const cell = rows[i];
     const note = cell.note ?? 0;
 
-    if (note > 0) {
-      // Find duration: count how many subsequent rows have no note
+    if (note > 0 && note !== NOTE_OFF) {
+      // Find duration: count how many subsequent rows carry no command
       let duration = 1;
-      while (i + duration < rows.length && (rows[i + duration].note ?? 0) === 0 &&
-             (rows[i + duration].instrument ?? 0) === 0) {
+      while (i + duration < rows.length && !hasCommand(rows[i + duration])) {
         duration++;
       }
       // Convert XM note to period
       const periodIdx = note - 13; // XM note 13 = C-1 = period index 0
-      const period = (periodIdx >= 0 && periodIdx < MOD_PERIODS.length) ? MOD_PERIODS[periodIdx] : 0;
+      const tablePeriod = (periodIdx >= 0 && periodIdx < MOD_PERIODS.length) ? MOD_PERIODS[periodIdx] : 0;
+      // the authored period survives while the note is the one it was named from
+      const authored = cell.period ?? 0;
+      const period = authored > CMD_NOTE_THRESHOLD && amigaNoteToXM(periodToNoteIndex(authored)) === note ? authored : tablePeriod;
       if (period > 0) {
+        emitCommands(cell);
         // Write period word + duration word
         out.push((period >> 8) & 0xFF, period & 0xFF);
         const ticks = duration * step;
@@ -289,19 +371,16 @@ function encodeRowsToStream(rows: TrackerCell[], _channel: number, step = 1): Ui
       }
       i += duration;
     } else {
-      // REST: count consecutive empty rows
-      let duration = 0;
-      while (i + duration < rows.length && (rows[i + duration].note ?? 0) === 0) {
+      // REST: this row (which may carry commands) and the empty rows after it
+      let duration = 1;
+      while (i + duration < rows.length && !hasCommand(rows[i + duration])) {
         duration++;
       }
-      if (duration > 0) {
-        out.push(0x00, CMD_REST);  // word = 32
-        const ticks = duration * step;
-        out.push((ticks >> 8) & 0xFF, ticks & 0xFF);
-        i += duration;
-      } else {
-        i++;
-      }
+      emitCommands(cell);
+      out.push(0x00, CMD_REST);  // word = 32
+      const ticks = duration * step;
+      out.push((ticks >> 8) & 0xFF, ticks & 0xFF);
+      i += duration;
     }
   }
 
@@ -312,9 +391,9 @@ function encodeRowsToStream(rows: TrackerCell[], _channel: number, step = 1): Ui
 }
 
 /** The encoder of a song whose grid row is `step` ticks: row gaps are multiplied back to the authored durations. */
-export const daveLoweEncoderForStep = (step: number): VariableLengthEncoder => ({
+export const daveLoweEncoderForStep = (step: number, tables?: DLCommandTables): VariableLengthEncoder => ({
   formatId: 'daveLowe',
-  encodePattern: (rows, channel) => encodeRowsToStream(rows, channel, step),
+  encodePattern: (rows, channel) => encodeRowsToStream(rows, channel, step, tables),
 });
 
 export const daveLoweEncoder: VariableLengthEncoder = daveLoweEncoderForStep(1);
@@ -505,8 +584,9 @@ export async function parseDaveLoweFile(
     }
     const songStep = daveLoweStep([...sectionEvents.values()].flatMap(eventDurations));
     const clock = daveLoweRowClock(songStep);
+    const envPtrs = distinctPointers([...sectionEvents.values()].flatMap((evs) => evs.flatMap((e) => (e.type === 'setVolEnv' ? [e.envPtr] : []))));
     for (const [sectionPtr, events] of sectionEvents) {
-      sectionRows.set(sectionPtr, eventsToRows(events, sampleInfoPtr, clock).rows);
+      sectionRows.set(sectionPtr, eventsToRows(events, sampleInfoPtr, envPtrs, clock).rows);
     }
 
     // Build tracker patterns from positions
@@ -538,6 +618,7 @@ export async function parseDaveLoweFile(
               volume: sRows[r].volume,
               effTyp: sRows[r].effTyp,
               eff: sRows[r].eff,
+              ...(sRows[r].period ? { period: sRows[r].period } : {}),
               effTyp2: 0,
               eff2: 0,
             });
@@ -611,7 +692,11 @@ export async function parseDaveLoweFile(
       numFilePatterns: allSectionPtrs.length,
       rowsPerPattern: patterns.map(p => p.length),
       moduleSize: buf.length,
-      encoder: daveLoweEncoderForStep(songStep),
+      encoder: daveLoweEncoderForStep(songStep, {
+        instrumentPtr: (id) => (sampleInfoPtr > 0 ? sampleInfoPtr + (id - 1) * SAMPLE_DESC_SIZE : undefined),
+        envPtrs,
+        envFirst: envComesFirst([...sectionEvents.values()].flatMap((evs) => evs.map((e) => e.type))),
+      }),
       filePatternAddrs,
       filePatternSizes,
       trackMap,
