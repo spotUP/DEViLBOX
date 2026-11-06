@@ -142,7 +142,9 @@ function roundTripFixed(raw: Uint8Array, layout: UADEPatternLayout, song: Tracke
         }
         if (!cell) continue;
         cells++;
-        if (bytesEqual(encodeCell(cell), orig)) exact++;
+        // The write paths (writeCellToChipRam, layoutPatch, UADEChipEditor) hand the cell's stored bytes to a layout that asks for them.
+        const stored = layout.encodeOverStored ? orig : undefined;
+        if (bytesEqual(encodeCell(cell, stored), orig)) exact++;
       }
     }
   }
