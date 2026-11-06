@@ -387,6 +387,8 @@ export interface SoundFactoryParse {
   voiceEvents: NoteEvent[][];
   /** Per voice and global row: index into voiceEvents of the event the row's file offset names, -1 none. */
   anchors: number[][];
+  /** Per voice: global row -> event index of each further note column's onset (index 0 = note column 2). */
+  colAnchors: Array<Map<number, number[]>>;
   /** Per event opcode file offset: the instrument pitch and transpose in force there. */
   eventContext: Map<number, { pitch: SoundFactoryPitchParams; transpose: number }>;
   /** Effect operands in the stream walk vs. placed in a cell slot, and per effect id. */
@@ -827,7 +829,7 @@ export function parseSoundFactoryWithEffects(bytes: Uint8Array, filename: string
     uadePatternLayout,
   };
   return {
-    song, effectOffsets: sfGrid.effectOffsets, voiceEvents: channelEvents, anchors: sfGrid.anchors, eventContext: cellContext,
+    song, effectOffsets: sfGrid.effectOffsets, voiceEvents: channelEvents, anchors: sfGrid.anchors, colAnchors: sfGrid.colAnchors, eventContext: cellContext,
     effectsSeen: sfGrid.effectsSeen, effectsPlaced: sfGrid.effectsPlaced, effectCounts: sfGrid.effectCounts,
   };
 }
