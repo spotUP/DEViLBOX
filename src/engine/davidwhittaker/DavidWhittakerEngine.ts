@@ -182,10 +182,14 @@ export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
       this.workletNode.port.postMessage({ type: 'setLoop', startTick: -1, endTick: -1 });
       return;
     }
+    // The last pattern ends where the song pass does: the replayer's tick count runs on into the next pass (pattern 0)
+    // and never reaches the start tick of a pattern past the song.
+    const end = dwPatternStartTick(this._clock.clock, r.end + 1);
+    const pass = this._clock.passTicks;
     this.workletNode.port.postMessage({
       type: 'setLoop',
       startTick: dwPatternStartTick(this._clock.clock, r.start),
-      endTick: dwPatternStartTick(this._clock.clock, r.end + 1),
+      endTick: pass > 0 ? Math.min(end, pass) : end,
     });
   }
 

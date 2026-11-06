@@ -148,6 +148,10 @@ describe('David Whittaker output latency and seek', { timeout: 60_000 }, () => {
     expect(node.posts.at(-1), 'loop patterns 1..2 = ticks of pattern 1 start to pattern 3 start').toEqual({ type: 'setLoop', startTick: 384, endTick: 1152 });
     e.setPatternLoop(null);
     expect(node.posts.at(-1)).toEqual({ type: 'setLoop', startTick: -1, endTick: -1 });
+    // DW-LOOP-LAST-PATTERN: the song's last pattern ends at the pass end, which the replayer's tick count does reach.
+    (engine as unknown as { setGridClock(c: unknown): void }).setGridClock({ speedChanges, passTicks: 1000 });
+    e.setPatternLoop({ start: 2, end: 2 });
+    expect(node.posts.at(-1), 'last pattern loops at the pass end, not at pattern 3 start').toEqual({ type: 'setLoop', startTick: 768, endTick: 1000 });
     node.port.onmessage!({ data: { type: 'playTick', ticks: 5, gen: 0 } });   // stale, from before the seek
     expect(seen).toHaveLength(0);
     node.port.onmessage!({ data: { type: 'playTick', ticks: 769, gen: 1 } });
