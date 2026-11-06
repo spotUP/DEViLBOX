@@ -8,6 +8,7 @@
  */
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { KlysEngine } from '@/engine/klystrack/KlysEngine';
 
 const loads: Uint8Array[] = [];
 const serializeCalls = { n: 0 };
@@ -26,7 +27,8 @@ const fakeEngine = (() => {
   };
 })();
 
-vi.mock('@/engine/klystrack/KlysEngine', () => ({ KlysEngine: { getInstance: () => fakeEngine, hasInstance: () => true } }));
+// The engine is stubbed with vi.spyOn on the real class in beforeAll, not with vi.mock: after the static import chain
+// was cut, a vi.mock'd KlysEngine is sometimes bypassed by klysEdit's own dynamic import (hasInstance() false).
 vi.mock('../../dub/DubBus', () => ({ getActiveDubBus: () => ({ registerWholeMixTap() {}, unregisterWholeMixTap() {}, setEngineIsolation() {} }) }));
 vi.mock('../../ToneEngine', () => ({
   getToneEngine: () => ({ getInstrument() {}, connectMeters() {}, stopNativeEngine() {}, getNativeEngineOutput: () => null }),
@@ -42,6 +44,8 @@ function makeSong(): TrackerSong {
 
 describe('klystrack Play loads the edited song', () => {
   beforeAll(async () => {
+    vi.spyOn(KlysEngine, 'getInstance').mockReturnValue(fakeEngine as never);
+    vi.spyOn(KlysEngine, 'hasInstance').mockReturnValue(true);
     await import('@stores/useFormatStore');
     await import('../NativeEngineRouting');
     await import('@stores/useTransportStore');
