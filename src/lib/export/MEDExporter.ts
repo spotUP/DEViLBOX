@@ -7,6 +7,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { MED_NOTE_BASE_TRANSPOSE } from '@/lib/import/formats/MEDParser';
 import { unpackMmdc, repackMmdc } from '@/lib/import/formats/mmdcCodec';
 
 function writeU16BE(view: DataView, off: number, val: number): void {
@@ -190,10 +191,10 @@ export function exportMED(song: TrackerSong): ArrayBuffer {
   }
 
   // ── Write block data ─────────────────────────────────────────────────────
-  // MMD0 note transpose: MEDParser reads note = rawNote + 24 (noteBaseTranspose) +
-  // playTranspose. We write playTranspose = 0, so the inverse is rawNote = note - 24
+  // MMD0 note transpose: MEDParser reads note = rawNote + 12 (MED_NOTE_BASE_TRANSPOSE) +
+  // playTranspose. We write playTranspose = 0, so the inverse is rawNote = note - 12
   // (a 1-based 6-bit note index; 0 = no note).
-  const NOTE_BASE_TRANSPOSE = 24;
+  const NOTE_BASE_TRANSPOSE = MED_NOTE_BASE_TRANSPOSE;
   let bpos = blockDataOff;
   for (const pattern of song.patterns) {
     const nLines = pattern.length;
