@@ -20,7 +20,7 @@ import { chainedHeapTransform, db, fromOnset, previewRender, previewVoice, rende
 import { parseRobHubbardFile } from '@/lib/import/formats/RobHubbardParser';
 import { serializeRobHubbardConfig } from '@/engine/robhubbard/RobHubbardSynth';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
-import { parseMEDFile } from '@/lib/import/formats/MEDParser';
+import { parseMEDFile, MED_NOTE_BASE_TRANSPOSE } from '@/lib/import/formats/MEDParser';
 import { OctaMEDSynth } from '@/engine/octamed/OctaMEDSynth';
 import { startWorklet } from './workletHarness';
 import { noteToMidi } from '@/utils/audio-context';
@@ -125,7 +125,7 @@ describe('OctaMED synth keyboard preview is the instrument as UADE\'s OctaMED pl
       const fx: MedSynthFixture = { waveforms: [saw(c.wave)], voltbl: [64, 0xff], wftbl: [0, 0xff], volSpeed: 1, wfSpeed: 1, note: c.rawNote };
       const uv = await uadeVoice(buildMedSynthModule(fx), 'x.mmd0', 0, 0.3);
       const { cfg, cell } = config(fx);
-      expect(cell.note, 'grid note of the raw note').toBe(c.rawNote + 24);
+      expect(cell.note, 'grid note of the raw note').toBe(c.rawNote + MED_NOTE_BASE_TRANSPOSE);
       const { out } = await octaPreview(cfg, cell.note + 11, 50);
       const previewPeriod = PAULA_CLOCK / (hzOf(out.subarray(FPT), 49) * c.wave);
       expect(Math.abs(cents(previewPeriod, uv.period[4])), `preview period ${previewPeriod.toFixed(1)} UADE ${uv.period[4]}`).toBeLessThan(30);

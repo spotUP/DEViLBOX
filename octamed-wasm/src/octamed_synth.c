@@ -313,15 +313,18 @@ KEEPALIVE void octamed_player_set_instrument_param(int handle, const char *param
   }
 }
 
+/* MEDParser's MED_NOTE_BASE_TRANSPOSE (MMD0-2): grid note = raw note + 12. Keep equal to the TypeScript constant. */
+#define MED_NOTE_BASE_TRANSPOSE 12
+
 /* midi_note is the keyboard key: grid note n = key - 11 (xmConversions
- * noteToMidi), and MED raw note = grid note - 24 (MEDParser's MMD0-2 base). */
+ * noteToMidi), and MED raw note = grid note - MED_NOTE_BASE_TRANSPOSE. */
 KEEPALIVE void octamed_player_note_on(int handle, int midi_note, int velocity) {
   if (handle < 0 || handle >= MAX_PLAYERS) return;
   Player *p = &g_players[handle];
   if (!p->allocated) return;
   (void)velocity; /* Paula volume comes from the tables and the instrument */
 
-  p->period = raw_note_period(midi_note - 11 - 24);
+  p->period = raw_note_period(midi_note - 11 - MED_NOTE_BASE_TRANSPOSE);
   p->periodOff = 0; p->pitchSlide = 0; p->volSlide = 0;
   p->volume = 0;
   p->wave = p->waveNext = 0;
