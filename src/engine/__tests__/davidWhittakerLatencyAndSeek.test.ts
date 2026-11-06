@@ -5,10 +5,9 @@
  *     frame it rendered at;
  *   - seekTicks runs the replayer silently to a target tick, also backwards, and tags later reports with a generation;
  *   - the engine drops reports of an older generation and posts the pattern-start tick of the row clock;
- *   - Play Pattern, driven through PlaybackCoordinator.dispatchEnginePosition, seeks the engine when the position leaves
- *     the loop range (call-count sentinel) and does not seek inside it.
+ *   - Play Pattern loops inside the worklet on the render position (setLoop), from the loop's first tick.
  */
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { installDwNodeFetch } from '@/lib/import/__tests__/helpers/dwNodeFetch';
@@ -16,8 +15,6 @@ import { openWorklet } from './helpers/workletHarness';
 import { DavidWhittakerEngine, dwPatternStartTick } from '../davidwhittaker/DavidWhittakerEngine';
 import { makeRowClock } from '@/lib/import/formats/stepRowClock';
 import { PositionCallbacks } from '@engine/wasm/PositionCallbacks';
-import { PlaybackCoordinator } from '../PlaybackCoordinator';
-import { TrackerReplayer } from '../TrackerReplayer';
 
 const worklet = { dir: 'davidwhittaker', name: 'DavidWhittaker', factory: 'createDavidWhittaker' };
 let restoreFetch = () => {};
@@ -157,32 +154,5 @@ describe('David Whittaker output latency and seek', { timeout: 60_000 }, () => {
     node.port.onmessage!({ data: { type: 'playTick', ticks: 769, gen: 1 } });
     expect(seen).toHaveLength(1);
     expect((seen[0] as { songPos: number }).songPos).toBe(2);
-  });
-
-  it('Play Pattern seeks a David Whittaker engine when the position leaves the loop, and only then', () => {
-    const seek = vi.fn(() => true);
-    const hasInstance = vi.spyOn(DavidWhittakerEngine, 'hasInstance').mockReturnValue(true);
-    const getInstance = vi.spyOn(DavidWhittakerEngine, 'getInstance').mockReturnValue({ seekToPattern: seek } as unknown as DavidWhittakerEngine);
-    try {
-      const replayer = Object.create(TrackerReplayer.prototype) as Record<string, unknown>;
-      Object.assign(replayer, {
-        useLibopenmptPlayback: false, song: { davidWhittakerClock: {} },
-        patternLoopActive: true, patternLoopStartPos: 2, patternLoopEndPos: 3,
-      });
-      const c = new PlaybackCoordinator();
-      c.stateRing.playing = true;
-      c.context.songPositions = [0, 1, 2, 3, 4];
-      c.context.enforceLoop = (p) => (replayer as unknown as { enforcePatternLoopOnEngine(p: number): boolean }).enforcePatternLoopOnEngine(p);
-      c.dispatchEnginePosition(0, 2);
-      c.dispatchEnginePosition(5, 3);
-      expect(seek, 'inside the loop range: no seek').not.toHaveBeenCalled();
-      c.dispatchEnginePosition(0, 4);
-      expect(seek).toHaveBeenCalledTimes(1);
-      expect(seek).toHaveBeenCalledWith(2);
-      expect(c.songPos, 'the out-of-range position is dropped').toBe(3);
-    } finally {
-      hasInstance.mockRestore();
-      getInstance.mockRestore();
-    }
   });
 });
