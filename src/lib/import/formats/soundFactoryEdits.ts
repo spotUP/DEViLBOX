@@ -102,6 +102,21 @@ export function writeSoundFactory(sourceBytes: Uint8Array, edited: readonly Patt
     else warnings.push(`${where}: no pitch context for this command; note not written`);
   };
 
+  /** Move the onset of event `ai` (command token `anchor`) later by `d` ticks: the previous event's duration grows, its own shrinks. */
+  const moveOnset = (c: number, ai: number, anchor: number, insertAt: number, d: number, shown: number, where: string): void => {
+    const prev = ai > 0 ? parse.voiceEvents[c][ai - 1] : undefined;
+    const prevTok = prev && prev.fileOffset >= 0 ? at(prev.fileOffset) : -1;
+    if (prevTok >= 0 && duration(prevTok) + d >= 0 && duration(anchor) - d >= 0 && duration(prevTok) + d <= 0xffff) {
+      setDuration(prevTok, duration(prevTok) + d);
+      setDuration(anchor, duration(anchor) - d);
+    } else if (ai === 0 && d > 0 && duration(anchor) - d >= 0) {
+      insert(insertAt, [OP_PAUSE, (d >> 8) & 255, d & 255]);
+      setDuration(anchor, duration(anchor) - d);
+    } else {
+      warnings.push(`${where}: delay ${shown} does not fit the neighbouring durations; not written`);
+    }
+  };
+
   edited.forEach((pat, p) => pat.channels.forEach((ch, c) => ch.rows.forEach((cell, r) => {
     const was = base[p]?.channels[c]?.rows[r];
     if (!was) return;
@@ -119,14 +134,20 @@ export function writeSoundFactory(sourceBytes: Uint8Array, edited: readonly Patt
     // Further note columns: the note opcode of the event each column's onset anchors to.
     for (let k = 1; k < maxNoteColumns([cell, was]); k++) {
       const nowNote = getColumnField(cell, k, 'note') ?? 0;
-      if (nowNote === (getColumnField(was, k, 'note') ?? 0)) continue;
+      const xNoteChanged = nowNote !== (getColumnField(was, k, 'note') ?? 0);
+      const xDelay = getColumnField(cell, k, 'delay') ?? 0, xDelayWas = getColumnField(was, k, 'delay') ?? 0;
+      if (!xNoteChanged && xDelay === xDelayWas) continue;
       const xi = parse.colAnchors[c]?.get(g)?.[k - 1] ?? -1;
       const xev = xi >= 0 ? parse.voiceEvents[c][xi] : undefined;
       const xTok = xev && xev.fileOffset >= 0 ? at(xev.fileOffset) : -1;
       if (!xev || xTok < 0) { warnings.push(`${where} note column ${k + 1}: no command to edit here; not written`); continue; }
       sfWriterStats.extraColumnWrites++;
       res.patched++;
-      writeNote(bytes, xTok, xev.fileOffset, nowNote, where);
+      if (xNoteChanged) writeNote(bytes, xTok, xev.fileOffset, nowNote, where);
+      if (xDelay !== xDelayWas) {
+        const fx = [...new Set((xev.effects ?? []).map((f) => at(f.fileOffset)))].sort((x, y) => x - y);
+        moveOnset(c, xi, xTok, fx.length > 0 ? fx[0] : xTok, xDelay - xDelayWas, xDelay, `${where} note column ${k + 1}`);
+      }
     }
     if (!noteChanged && !fxChanged && !delayChanged) return;
     const ai = parse.anchors[c]?.[g] ?? -1;
@@ -139,20 +160,7 @@ export function writeSoundFactory(sourceBytes: Uint8Array, edited: readonly Patt
     const fxTokens = [...new Set((ev.effects ?? []).map((f) => at(f.fileOffset)))].sort((x, y) => x - y);
     const insertAt = fxTokens.length > 0 ? fxTokens[0] : anchor;
 
-    if (delayChanged) {
-      const d = now.delay - old.delay;
-      const prev = ai > 0 ? parse.voiceEvents[c][ai - 1] : undefined;
-      const prevTok = prev && prev.fileOffset >= 0 ? at(prev.fileOffset) : -1;
-      if (prevTok >= 0 && duration(prevTok) + d >= 0 && duration(anchor) - d >= 0 && duration(prevTok) + d <= 0xffff) {
-        setDuration(prevTok, duration(prevTok) + d);
-        setDuration(anchor, duration(anchor) - d);
-      } else if (ai === 0 && d > 0 && duration(anchor) - d >= 0) {
-        insert(insertAt, [OP_PAUSE, (d >> 8) & 255, d & 255]);
-        setDuration(anchor, duration(anchor) - d);
-      } else {
-        warnings.push(`${where}: delay ${now.delay} does not fit the neighbouring durations; not written`);
-      }
-    }
+    if (delayChanged) moveOnset(c, ai, anchor, insertAt, now.delay - old.delay, now.delay, where);
 
     if (noteChanged) {
       writeNote(bytes, anchor, ev.fileOffset, a.note ?? 0, where);
