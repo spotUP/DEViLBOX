@@ -97,6 +97,7 @@ class MaschineHIDBridge {
   private connected = false;
   /** Timed retries left. Spent only after a live bridge drops, so a machine with no bridge logs one failure, not one every 2 s. */
   private retriesLeft = 0;
+  private connectSetup: Promise<void> = Promise.resolve();
   private focusListening = false;
   private deviceModel: 'mk2' | 'mk3' = 'mk2';
 
@@ -139,11 +140,11 @@ class MaschineHIDBridge {
           this.reconnectTimer = null;
         }
         // Start the screen manager now that we have a connection
-        this.initScreenManager();
         // MK2 has 16 pads — tell the drum pad UI
-        import('@/stores/useDrumPadStore').then(({ useDrumPadStore }) => {
+        const padCount = import('@/stores/useDrumPadStore').then(({ useDrumPadStore }) => {
           useDrumPadStore.getState().setControllerPadCount(16);
         });
+        this.connectSetup = Promise.all([this.initScreenManager(), padCount]).then(() => undefined);
       });
 
       this.ws.addEventListener('message', (event) => {
@@ -318,8 +319,13 @@ class MaschineHIDBridge {
     this.send({ type: 'setProjectName', name });
   }
 
-  private initScreenManager(): void {
-    Promise.all([
+  /** Resolves once the lazy module loads started by the last connect (screens, drum pad store) have finished. */
+  settled(): Promise<void> {
+    return this.connectSetup;
+  }
+
+  private initScreenManager(): Promise<void> {
+    return Promise.all([
       import('./performance/screens/InstrumentScreen'),
       import('./performance/screens/MixerScreen'),
       import('./performance/screens/StepScreen'),
