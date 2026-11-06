@@ -20,6 +20,8 @@
  * envelopes, waveform tables, subsongs after the first. Note write-back is phase B.
  */
 import { periodToGridNote } from '@/lib/amiga/periodNotes';
+import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer, setNoteColumn } from './stepRowClock';
+import { BD_FX } from './benDaglishEffectGlyphs';
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 
 const VOICES = 4;
@@ -39,7 +41,6 @@ export const VOODOO_PERIODS: readonly number[] = [
 ];
 
 const emptyCell = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
-const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
 
 /**
  * The grid note of a table index (note byte + transpose, clamped like period_index): periodToNote of the table period,
@@ -184,26 +185,36 @@ export function buildVoodooGrid(file: Uint8Array): VoodooGrid | string {
   if (songEnd <= 0) return 'the voices never all loop within the tick limit';
 
   const kept = events.map((list) => list.filter((e) => e.tick < songEnd));
-  let rowTicks = songEnd;
-  for (const list of kept) for (const e of list) rowTicks = gcd(rowTicks, e.tick === 0 ? songEnd : e.tick);
-  const rows = Math.ceil(songEnd / rowTicks);
+  // one row is one step of the shared clock: the main step of the voices' onsets (a note off the step sits on its row with a row offset)
+  const rowTicks = mainStepFromOnsets(kept.map((list) => list.map((e) => e.tick)));
+  const clock = makeRowClock([{ tick: 0, speed: rowTicks }]);
+  const rows = Math.max(1, clock.rowsForTicks(songEnd));
   const patternCount = Math.ceil(rows / ROWS_PER_PATTERN);
   const notesPerVoice = new Array<number>(VOICES).fill(0);
   const columns: TrackerCell[][] = Array.from({ length: VOICES }, () => Array.from({ length: patternCount * ROWS_PER_PATTERN }, emptyCell));
+  const place = makeOnsetPlacer(clock);
   for (let v = 0; v < VOICES; v++) {
     for (const e of kept[v]) {
-      const cell = columns[v][e.tick / rowTicks];
-      cell.note = e.note;
-      cell.instrument = e.instrument;
+      const pl = place(v, e.tick);
+      const cell = columns[v][pl.row];
+      if (pl.col === 0) {
+        cell.note = e.note;
+        cell.instrument = e.instrument;
+        if (pl.offset > 0) { cell.effTyp = BD_FX.rowOffset; cell.eff = pl.offset; }
+      } else {
+        setNoteColumn(cell, pl.col, e.note, e.instrument, pl.offset);
+      }
       if (e.note !== NOTE_OFF) notesPerVoice[v]++;
     }
   }
+  const noteCols = Array.from({ length: VOICES }, (_, v) => place.columnsOf(v));
   const patterns: Pattern[] = Array.from({ length: patternCount }, (_, p) => {
     const length = Math.min(ROWS_PER_PATTERN, rows - p * ROWS_PER_PATTERN);
     const channels: ChannelData[] = columns.map((col, ch) => ({
       id: `channel-${ch}`, name: `Channel ${ch + 1}`, muted: false, solo: false, collapsed: false,
       volume: 100, pan: ch === 0 || ch === 3 ? -50 : 50, instrumentId: null, color: null,
       rows: col.slice(p * ROWS_PER_PATTERN, p * ROWS_PER_PATTERN + length),
+      channelMeta: { importedFromMOD: false, effectCols: 2, noteCols: noteCols[ch], noteColDelay: true },
     }));
     return { id: `pattern-${p}`, name: `Pattern ${p}`, length, channels };
   });
