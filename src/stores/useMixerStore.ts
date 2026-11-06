@@ -362,16 +362,12 @@ void (async () => {
   // (2026-10-03). Deduplicated by class: the list names classes, the registry
   // names descriptors, and one engine must not take the mask twice.
   try {
-    const routing = await import('../engine/replayer/NativeEngineRouting');
-    // The routing module and this store sit on an import cycle; when this
-    // warm-up runs while that module is still evaluating, its namespace
-    // resolves with WASM_ENGINES not yet initialised. Wait for it rather than
-    // register nothing: a silent miss here is exactly the bug this replaces.
-    for (let tries = 0; !Array.isArray(routing.WASM_ENGINES) && tries < 100; tries++) {
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    }
-    const { WASM_ENGINES } = routing;
-    if (!Array.isArray(WASM_ENGINES)) throw new Error('WASM_ENGINES never initialised');
+    // WASM_ENGINES lives in wasmEngineRegistry, which imports nothing that
+    // leads back here. NativeEngineRouting re-exports it but sits on an import
+    // cycle with this store, so its namespace can still be mid-evaluation
+    // (WASM_ENGINES uninitialised) when this warm-up runs; importing the
+    // defining module removes the cycle instead of polling for it.
+    const { WASM_ENGINES } = await import('../engine/replayer/wasmEngineRegistry');
     const { collectMuteRegistrations } = await import('../lib/mixer/engineMuteRegistry');
     const known = new Set<unknown>([..._muteMaskEngineCache.values()].map(v => v.Engine));
     const knownGain = new Set<unknown>([..._gainEngineCache.values()].map(v => v.Engine));
