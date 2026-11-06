@@ -28,6 +28,7 @@ import { RH_EFFECT_GLYPH } from '@/lib/import/formats/robHubbardEffectGlyphs';
 import { FP_EFFECT_GLYPH } from '@/lib/import/formats/fpEffectGlyphs';
 import { MA_EFFECT_GLYPH } from '@/lib/import/formats/maEffectGlyphs';
 import { BTH_EFFECT_GLYPH } from '@/lib/import/formats/beathovenEffectGlyphs';
+import { CS_EFFECT_GLYPH } from '@/lib/import/formats/commandStreamEffectGlyphs';
 import { computeCaretRect, computeFieldRect, FIELD_OUTLINE_STYLE } from '@/lib/tracker/caretGeometry';
 import { effectCellWidth, emptyEffectText, furnaceEffectText } from '@/lib/tracker/effectNotation';
 import { anySoloActive, isChannelDimmed } from '@/lib/tracker/channelDim';
@@ -976,6 +977,9 @@ export class TrackerGLRenderer {
               } else if (BTH_EFFECT_GLYPH[colEffTyp] !== undefined) {
                 // Beathoven Synthesizer stream commands (block 0x500..0x503)
                 effStr = BTH_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
+              } else if (CS_EFFECT_GLYPH[colEffTyp] !== undefined) {
+                // Riff Raff / Howie Davies stream commands (blocks 0x510..0x517, 0x520..0x521)
+                effStr = CS_EFFECT_GLYPH[colEffTyp] + HEX_TABLE[colEff & 0xFF];
               } else {
                 effStr = (EFFECT_CHARS[colEffTyp] ?? '?') + HEX_TABLE[colEff & 0xFF];
               }
