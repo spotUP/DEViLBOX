@@ -1,14 +1,12 @@
 /**
- * The pre-commit gate runs the tests that read a changed source file's text.
+ * The git hooks run only a changed file's sibling suites and the changed test files, at most 30.
  *
- * Source-text tests (readFileSync of `foo.ts`, then string checks) import
- * nothing and often live far from `foo.ts`, so neither sibling proximity nor
- * the module graph finds them. bc140123d refactored DJTrackLoader.ts, its
- * commit ran no test that reads it, and djViewRegressions.test.ts failed only
- * at pre-push, after the full suite.
+ * Owner 2026-11-06 ("Siblings only, CI wide"): the source-text and importer expansion (tests that
+ * read or import a changed file from elsewhere) made one push select hundreds of suites and hold the
+ * machine for every other session. Every wider run belongs to CI, which blocks the deploy.
  */
 import { describe, it, expect } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -20,64 +18,68 @@ function cleanEnv(): NodeJS.ProcessEnv {
   return Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
 }
 
-function affected(...files: string[]): string[] {
-  return affectedWith([], ...files);
-}
-
-function affectedWith(flags: string[], ...files: string[]): string[] {
-  return execFileSync('node', ['scripts/git-hooks/affected-tests.mjs', ...flags, '--files', ...files], {
+function select(flags: string[], ...files: string[]): { files: string[]; err: string } {
+  const r = spawnSync('node', ['scripts/git-hooks/affected-tests.mjs', ...flags, '--files', ...files], {
     cwd: root,
     encoding: 'utf8',
     env: cleanEnv(),
-  }).split('\n').filter(Boolean);
+  });
+  return { files: r.stdout.split('\n').filter(Boolean), err: r.stderr };
 }
 
-describe('pre-commit affected-test selection', () => {
-  it('a change to DJTrackLoader.ts runs the test that reads its source', () => {
-    expect(affected('src/engine/dj/DJTrackLoader.ts'))
-      .toContain('src/engine/dj/__tests__/djViewRegressions.test.ts');
+const affected = (...files: string[]): string[] => select([], ...files).files;
+
+describe('hook affected-test selection: siblings only', () => {
+  it('a source file selects its sibling __tests__ suites', () => {
+    expect(affected('src/stores/useDJStore.ts')).toContain('src/stores/__tests__/useDJStore.test.ts');
   });
 
-  it('a change to DeckPatternDisplay.tsx runs the test that imports it from elsewhere by module path', () => {
-    // 70a57efa2 changed it; renderedDeckPatternViewMetersEachChannel (import '../DeckPatternDisplay') failed only in CI.
-    expect(affected('src/components/dj/DeckPatternDisplay.tsx'))
-      .toContain('src/components/dj/__tests__/renderedDeckPatternViewMetersEachChannel.test.tsx');
+  it('a shared module selects only its siblings, not its ~87 importers', () => {
+    const picked = affected('src/stores/useDJStore.ts');
+    expect(picked.length).toBeLessThan(10);
+    expect(picked.every((f) => f.startsWith('src/stores/'))).toBe(true);
+  });
+
+  it('a test in another folder that imports or reads a file is left to CI', () => {
+    const picked = affected('src/engine/dj/DJTrackLoader.ts');
+    expect(picked.every((f) => f.startsWith('src/engine/dj/'))).toBe(true);
   });
 
   it('a changed test file still runs itself', () => {
-    const self = 'src/__tests__/preCommitRunsSourceTextTests.test.ts';
+    const self = 'src/__tests__/hooksRunSiblingSuitesOnly.test.ts';
     expect(affected(self)).toContain(self);
-  });
-
-  it('a change to a server file runs the src/ test that reads it', () => {
-    expect(affected('server/src/mcp/mcpServer.ts'))
-      .toContain('src/lib/import/__tests__/companionResolver.reachability.test.ts');
   });
 
   it('a file outside src/ and server/src/ selects nothing', () => {
     expect(affected('scripts/build.ts')).toEqual([]);
   });
+
+  it('over the cap only the changed test files run, and stderr says the rest is left to CI', () => {
+    const self = 'src/__tests__/hooksRunSiblingSuitesOnly.test.ts';
+    const all = affected('src/stores/useDJStore.ts', self);
+    expect(all.length).toBeGreaterThan(1);
+    const capped = select(['--max-suites', '1'], 'src/stores/useDJStore.ts', self);
+    expect(capped.files).toEqual([self]);
+    expect(capped.err).toContain('left to CI');
+  });
+
+  it('the default cap is 30 suites', () => {
+    const dir = 'src/lib/import/__tests__';
+    const tests = fs.readdirSync(path.join(root, dir)).filter((f) => f.endsWith('.test.ts')).slice(0, 31)
+      .map((f) => `${dir}/${f}`);
+    expect(tests.length).toBe(31);
+    expect(affected(...tests)).toEqual([]);
+    expect(affected(...tests.slice(0, 30)).length).toBe(30);
+  });
 });
 
-describe('pre-commit gate stays fast and isolated', () => {
-  it('a shared module is deferred to pre-push: with a cap its importers are not selected, without one they are', () => {
-    // useDJStore is imported by ~87 suites; selecting them all made one commit take ~15 minutes.
-    const uncapped = affected('src/stores/useDJStore.ts');
-    const capped = affectedWith(['--max-importers', '8'], 'src/stores/useDJStore.ts');
-    expect(uncapped.length).toBeGreaterThan(40);
-    expect(capped.length).toBeLessThan(10);
-  });
-
-  it('the cap keeps a module with few importers fully selected (the DeckPatternDisplay miss stays caught)', () => {
-    expect(affectedWith(['--max-importers', '8'], 'src/components/dj/DeckPatternDisplay.tsx'))
-      .toContain('src/components/dj/__tests__/renderedDeckPatternViewMetersEachChannel.test.tsx');
-  });
-
-  it('the pre-commit hook passes the cap, the pre-push hook does not', () => {
-    const preCommit = fs.readFileSync(path.join(root, 'scripts/git-hooks/pre-commit'), 'utf8');
-    const prePush = fs.readFileSync(path.join(root, 'scripts/git-hooks/pre-push'), 'utf8');
-    expect(preCommit).toContain('--max-importers');
-    expect(prePush).not.toContain('--max-importers');
+describe('hook gate stays fast and isolated', () => {
+  it('neither hook passes the old importer cap or runs the whole fast tier for a song-load file', () => {
+    for (const hook of ['pre-commit', 'pre-push']) {
+      const text = fs.readFileSync(path.join(root, 'scripts/git-hooks', hook), 'utf8');
+      expect(text).not.toContain('--max-importers');
+      expect(text).not.toContain('GLOBAL_EFFECT_FILES=');
+    }
   });
 
   it('both hooks test a snapshot through the one shared mechanism', () => {

@@ -6,8 +6,9 @@
 # Runs ONLY the test suites that sit next to the staged files (a source file's
 # sibling `__tests__` suite, plus any staged `*.test.ts` directly). This keeps
 # tight-loop commits fast — seconds, not the ~2 min the full `test:ci` glob
-# takes. The FULL suite still runs at pre-push and in CI, so nothing that
-# proximity misses can reach a pushed branch unchecked.
+# takes. At most 30 suites; owner 2026-11-06 ("Siblings only, CI wide"): every
+# wider run, including tests that read a file's source, belongs to CI, which
+# blocks the deploy.
 #
 # Why not `vitest related` (module-graph affected set)? Measured: this repo's
 # store/type barrels make the graph hyper-connected, so `related` on a single
@@ -39,10 +40,8 @@ else
   RED=''; GRN=''; YLW=''; RST=''
 fi
 
-# Resolve the proximity-affected test set for the staged changes.
-# A file that many suites name or import is a shared module: its importers are
-# left to pre-push (--max-importers), or one commit ran 100-200 suites, ~15 min.
-MAX_IMPORTERS="${DEVILBOX_PRECOMMIT_MAX_IMPORTERS:-8}"
+# Resolve the proximity-affected test set for the staged changes: sibling suites
+# and staged test files, at most 30 (affected-tests.mjs); wider runs are CI's.
 STAGED="$(git diff --cached --name-only --diff-filter=ACMR | tr '\n' ' ')"
 FILES_RAW=""
 # Only src/ and server/src/ TypeScript selects suites; otherwise skip the clone.
@@ -55,13 +54,13 @@ if printf '%s' " $STAGED" | grep -Eq ' (src|server/src)/[^ ]*\.tsx?( |$)'; then
   install_snapshot_traps
   materialise_reusable "$(git rev-parse HEAD)" "$(git write-tree)"
   # shellcheck disable=SC2086
-  FILES_RAW="$(in_snapshot node scripts/git-hooks/affected-tests.mjs --max-importers "$MAX_IMPORTERS" --files $STAGED || true)"
+  FILES_RAW="$(in_snapshot node scripts/git-hooks/affected-tests.mjs --files $STAGED || true)"
 fi
 
 # CRITICAL: an empty list must NEVER reach `vitest run` — with no path args
 # vitest runs the ENTIRE default suite. Bail before that can happen.
 if [ -z "${FILES_RAW//[[:space:]]/}" ]; then
-  echo "${YLW}[pre-commit] no test suites sit next to the staged files — the full suite runs at pre-push.${RST}" >&2
+  echo "${YLW}[pre-commit] no test suites sit next to the staged files — wider suites run in CI.${RST}" >&2
   exit 0
 fi
 
@@ -75,7 +74,7 @@ set +f
 IFS=$OLD_IFS
 
 if [ "${#FILES[@]}" -eq 0 ]; then
-  echo "${YLW}[pre-commit] no test suites sit next to the staged files — the full suite runs at pre-push.${RST}" >&2
+  echo "${YLW}[pre-commit] no test suites sit next to the staged files — wider suites run in CI.${RST}" >&2
   exit 0
 fi
 
@@ -88,4 +87,4 @@ if ! run_vitest_suites -- "${FILES[@]}"; then
   exit 1
 fi
 
-echo "${GRN}[pre-commit] ok (affected only — full suite gates at pre-push)${RST}" >&2
+echo "${GRN}[pre-commit] ok (affected only — wider suites gate in CI)${RST}" >&2

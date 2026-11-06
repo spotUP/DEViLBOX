@@ -1,46 +1,44 @@
 #!/usr/bin/env node
 /**
- * affected-tests.mjs — resolve the fast, "affected-only" test set for a commit.
+ * affected-tests.mjs — resolve the small "affected-only" test set the git hooks run.
  *
- * Prints a newline-separated list of test files to run, chosen by FILESYSTEM
- * PROXIMITY to the staged changes:
+ * Prints a newline-separated list of test files, chosen by FILESYSTEM PROXIMITY
+ * to the changed files, and nothing wider:
  *
- *   - a staged `*.test.ts(x)` file → itself
- *   - a staged source `dir/foo.ts(x)` → `dir/__tests__/foo*.test.ts(x)`
- *     (its sibling test suite, matched by basename)
- *   - a staged source `foo.ts(x)` → every test that names `foo.ts(x)` in its
- *     text. Source-text tests (readFileSync of the source, then string checks)
- *     live anywhere and import nothing, so neither proximity nor the module
- *     graph finds them; a refactor of `foo.ts` broke them only at pre-push.
+ *   - a changed `*.test.ts(x)` file -> itself
+ *   - a changed source `dir/foo.ts(x)` -> `dir/__tests__/foo.*.test.ts(x)` and
+ *     `dir/foo.*.test.ts(x)` (its sibling suites, matched by basename)
  *
- * `--files a.ts b.ts` resolves for those paths instead of the staged set
- * (used by the selector's own test).
+ * Owner 2026-11-06 ("Siblings only, CI wide"): the hooks run only these suites,
+ * at most MAX_SUITES of them. Tests that read a changed file's source or import
+ * it from elsewhere, and every wider run, belong to CI (which blocks the deploy).
+ * The earlier source-text and importer expansion made one push select hundreds
+ * of suites and hold the machine for every other session.
  *
- * Why proximity and not `vitest related` (module-graph)? Measured: this repo's
- * store/type barrels make the import graph hyper-connected, so `vitest related`
- * on a single leaf pulls in hundreds of unrelated suites (~2.5 min) — no faster
- * than the full run, and the "related" set is polluted by incidental barrel
- * imports. A file's sibling `__tests__` suite is the true, fast relevance
- * signal for a pre-commit gate. Anything proximity misses (a far-away test that
- * genuinely depends on a shared change) is caught by the FULL suite at
- * pre-push + CI — this is only the tight-loop commit gate.
+ * Over the cap: only the changed test files run (when they fit under the cap),
+ * else nothing, and a line on stderr says the rest is left to CI.
  *
- * Suites listed in tools/test-tiers/push-only.json are never emitted: they
- * are push-tier (test:ci at pre-push) and too long for a commit gate.
+ * `--files a.ts b.ts` resolves for those paths instead of the staged set (the
+ * pre-push hook and the selector's own tests). `--max-suites N` overrides the cap.
  *
- * Exit 0 with empty output means "nothing local to run" — the caller skips
- * pre-commit tests and relies on the pre-push full suite.
+ * Suites listed in tools/test-tiers/push-only.json and src/__tests__/ci/ are
+ * never emitted: they are too long for a hook and run in CI.
+ *
+ * Exit 0 with empty output means "nothing local to run".
  */
 
-import { execFileSync, execSync } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, basename, join, extname } from 'node:path';
 
 const root = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
 
+const capArg = process.argv.indexOf('--max-suites');
+const MAX_SUITES = capArg >= 0 ? Number(process.argv[capArg + 1]) : 30;
+
 const filesArg = process.argv.indexOf('--files');
 const changed = filesArg >= 0
-  ? process.argv.slice(filesArg + 1).filter((a, i, all) => a !== '--max-importers' && all[i - 1] !== '--max-importers')
+  ? process.argv.slice(filesArg + 1).filter((a, i, all) => a !== '--max-suites' && all[i - 1] !== '--max-suites')
   : execSync('git diff --cached --name-only --diff-filter=ACMR', {
     encoding: 'utf8',
     cwd: root,
@@ -57,6 +55,11 @@ const isTest = (f) => /\.test\.(ts|tsx)$/.test(f);
  * Sibling test suites for a staged source file, matched by basename: in its
  * __tests__/ directory (the src/ layout) or next to it (the server/src layout).
  */
+function importsByRelativePath(testAbs, prefix, stem) {
+  const escaped = `${prefix}${stem}`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`['"]${escaped}(\\.[cm]?[jt]sx?)?['"]`).test(readFileSync(testAbs, 'utf8'));
+}
+
 function siblingTests(sourceFile) {
   const ext = extname(sourceFile); // .ts | .tsx
   const stem = basename(sourceFile, ext); // foo
@@ -65,79 +68,47 @@ function siblingTests(sourceFile) {
     const abs = join(root, testsDir);
     if (!existsSync(abs)) continue;
     for (const entry of readdirSync(abs)) {
-      // foo.test.ts / foo.contract.test.ts / foo.golden.test.ts …
-      if (isTest(entry) && entry.startsWith(`${stem}.`)) out.push(join(testsDir, entry));
+      if (!isTest(entry)) continue;
+      // foo.test.ts / foo.contract.test.ts / foo.golden.test.ts …, or a suite in the same folder that imports
+      // the file by relative path (server/src/ai/aiLimits.test.ts imports './limits').
+      if (entry.startsWith(`${stem}.`) || importsByRelativePath(join(abs, entry), testsDir === dirname(sourceFile) ? './' : '../', stem)) {
+        out.push(join(testsDir, entry));
+      }
     }
   }
   return out;
 }
 
-/**
- * Tests that name any of these source files in their text: `foo.ts` (source-text
- * tests), or an import of the module, `/foo'` / `/foo"` - a test that imports
- * '../Foo' from another directory, or under another name than Foo.test.tsx, is
- * no sibling. 70a57efa2 changed DeckPatternDisplay.tsx; its commit and push ran
- * no test, and renderedDeckPatternViewMetersEachChannel (which imports
- * '../DeckPatternDisplay') failed only in CI. Generic module names (index,
- * types) would select half the suite and are left to CI.
- */
-function grepTests(patterns) {
-  try {
-    return execFileSync(
-      'git',
-      ['grep', '-l', '-F', ...patterns, '--', 'src/**/*.test.ts', 'src/**/*.test.tsx', 'server/src/**/*.test.ts'],
-      { encoding: 'utf8', cwd: root },
-    ).split('\n').map((s) => s.trim()).filter(Boolean);
-  } catch {
-    return []; // git grep exits 1 when nothing matches
-  }
-}
-
-/**
- * `--max-importers N` (the pre-commit gate): a file that more than N suites
- * name in their text or import by module path is a shared module (a store, a registry). Selecting all
- * of its importers made one commit run 100-200 suites (~15 min); for such a
- * file only its sibling suite runs (staged tests run too), and the rest is left to pre-push, which passes no cap and so selects every importer.
- */
-const capArg = process.argv.indexOf('--max-importers');
-const maxImporters = capArg >= 0 ? Number(process.argv[capArg + 1]) : Infinity;
-
-function sourceTextTests(sourceFiles) {
-  const out = new Set();
-  for (const f of sourceFiles) {
-    const name = basename(f);
-    const stem = basename(name, extname(name));
-    const named = grepTests(['-e', name]);
-    if (named.length <= maxImporters) for (const t of named) out.add(t);
-    if (stem === 'index' || stem === 'types') continue;
-    const importers = grepTests(['-e', `/${stem}'`, '-e', `/${stem}"`]);
-    if (importers.length <= maxImporters) for (const t of importers) out.add(t);
-  }
-  return [...out];
-}
-
 const set = new Set();
-const sources = [];
+const changedTests = new Set();
 for (const f of staged) {
   if (isTest(f)) {
-    if (existsSync(join(root, f))) set.add(f);
+    set.add(f);
+    changedTests.add(f);
   } else {
-    sources.push(f);
     // server/ suites run under server/vitest.config.ts (run_vitest_suites in snapshot.sh).
-    if (f.startsWith('src/') || f.startsWith('server/src/')) for (const t of siblingTests(f)) set.add(t);
+    for (const t of siblingTests(f)) set.add(t);
   }
 }
-for (const t of sourceTextTests(sources)) set.add(t);
 
-// Push-tier suites too long for this gate (tools/test-tiers/push-only.json) run at pre-push, never here.
+// Suites too long for a hook (tools/test-tiers/push-only.json) run in CI, never here.
 const pushOnlyPath = join(root, 'tools/test-tiers/push-only.json');
 const pushOnly = new Set(existsSync(pushOnlyPath) ? JSON.parse(readFileSync(pushOnlyPath, 'utf8')).files.map((f) => f.file) : []);
 
-// src/__tests__/ci/ is push tier by directory: a bare `vitest run` excludes it (vite.config.ts) and test:ci
-// names the directory at pre-push. Its suites import whole engine graphs cold (regression.test.ts takes ~18 s
-// for InstrumentFactory alone) and time out beside a second worker, so the commit gate never runs them.
+// src/__tests__/ci/ is CI tier by directory: a bare `vitest run` excludes it (vite.config.ts) and test:ci
+// names the directory. Its suites import whole engine graphs cold (regression.test.ts takes ~18 s
+// for InstrumentFactory alone) and time out beside a second worker, so the hooks never run them.
 const CI_DIR = 'src/__tests__/ci/';
 
 // Only emit files that still exist on disk (a deleted test can appear staged).
-const files = [...set].filter((f) => existsSync(join(root, f)) && !pushOnly.has(f) && !f.startsWith(CI_DIR));
+const runnable = (f) => existsSync(join(root, f)) && !pushOnly.has(f) && !f.startsWith(CI_DIR);
+let files = [...set].filter(runnable);
+if (files.length > MAX_SUITES) {
+  const own = [...changedTests].filter(runnable);
+  const kept = own.length <= MAX_SUITES ? own : [];
+  process.stderr.write(
+    `affected-tests: ${files.length} suites is over the cap of ${MAX_SUITES}; running ${kept.length} changed test files, the rest is left to CI\n`,
+  );
+  files = kept;
+}
 process.stdout.write(files.join('\n'));
