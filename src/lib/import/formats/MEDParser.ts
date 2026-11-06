@@ -84,6 +84,13 @@ function playbackData(
 /** Grid note = raw note + this + playtransp (MMD0/1/2); the exporter inverts it. */
 export const MED_NOTE_BASE_TRANSPOSE = 12;
 
+/**
+ * Keyboard key (noteToMidi) a sampler instrument plays at its own rate: grid note 25 is Paula period 428 (periodToNote),
+ * which plays the sample at its recorded rate, and key = grid note + 11. The grid names MMD0/1/2 notes with
+ * MED_NOTE_BASE_TRANSPOSE, so the preview's base note follows it; the default 'C3' belongs to the old base of 24.
+ */
+export const MED_SAMPLE_BASE_NOTE = 'C2';
+
 export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
   const magic = str4(buf, 0);
@@ -580,6 +587,8 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
       i + 1, name, pcm, instr.volume, 8287,
       instr.loopStart, instr.loopStart + instr.loopLength
     ));
+    const placed = instruments[instruments.length - 1];
+    if (magic !== 'MMD3' && placed.sample) placed.sample.baseNote = MED_SAMPLE_BASE_NOTE;
   }
 
   // ── Build output ─────────────────────────────────────────────────────────
