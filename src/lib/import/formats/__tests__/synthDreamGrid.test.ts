@@ -17,6 +17,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { parseSynthDreamFile, isSynthDreamFormat } from '../SynthDreamParser';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { BD_FX } from '../benDaglishEffectGlyphs';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 const DIR = `${process.cwd()}/public/data/songs/formats`;
@@ -28,12 +29,16 @@ function load(name: string): { bytes: Uint8Array; song: TrackerSong } {
   return { bytes: new Uint8Array(ab), song: parseSynthDreamFile(ab, name) };
 }
 
+/** Every note of a voice as [tick, note, instrument]: row * step plus its row offset or column delay (plan R7 step grid). */
 function voiceNotes(song: TrackerSong, v: number): Array<[number, number, number]> {
   const out: Array<[number, number, number]> = [];
+  const step = song.initialSpeed;
   song.patterns.forEach((p, pi) => p.channels[v].rows.forEach((c, r) => {
-    if (c.note) out.push([pi * 64 + r, c.note, c.instrument]);
+    const base = (pi * 64 + r) * step;
+    if (c.note) out.push([base + (c.effTyp === BD_FX.rowOffset ? c.eff : 0), c.note, c.instrument]);
+    (c.extraNotes ?? []).forEach((x) => { if (x.note) out.push([base + (x.delay ?? 0), x.note, x.instrument ?? 0]); });
   }));
-  return out;
+  return out.sort((a, b) => a[0] - b[0]);
 }
 
 const layoutOf = (s: TrackerSong): UADEVariablePatternLayout =>

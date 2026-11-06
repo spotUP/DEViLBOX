@@ -63,11 +63,11 @@ describe('bss import route', () => {
     const { raw, song, layout } = await load('beathoven_smallest.bss');
     const v = [0, 1, 2, 3].map((i) => notesOf(song, i));
     expect(v.map((n) => n.length)).toEqual([43, 192, 22, 43]);
-    expect(v[0][0]).toEqual([90, 34, 1]);
+    expect(v[0][0]).toEqual([18, 34, 1])  /* tick 90 at step 5 */;
     expect(v[2][0][0]).toBe(0);
     expect(v[2][0][1]).toBe(33);
-    expect(v[3][0]).toEqual([10, 34, 1]);
-    expect(song.patterns.reduce((n, p) => n + p.length, 0)).toBe(1360);
+    expect(v[3][0]).toEqual([2, 34, 1]);
+    expect(song.patterns.reduce((n, p) => n + p.length, 0)).toBe(272);
     expectCarriersRebuildBytes(raw, layout);
   });
 
@@ -81,7 +81,7 @@ describe('bss import route', () => {
     expect(v[2][0][1]).toBe(27);
     expect(v[3][0][0]).toBe(0);
     expect(v[3][0][1]).toBe(27);
-    expect(song.patterns.reduce((n, p) => n + p.length, 0)).toBe(768);
+    expect(song.patterns.reduce((n, p) => n + p.length, 0)).toBe(384);
     expectCarriersRebuildBytes(raw, layout);
   });
 });

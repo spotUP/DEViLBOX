@@ -45,10 +45,13 @@ function otherFieldsDiffer(a: TrackerCell, b: TrackerCell): boolean {
   const x = a as unknown as Record<string, number | undefined>;
   const y = b as unknown as Record<string, number | undefined>;
   for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) {
-    if (k === 'note' || k === 'instrument') continue;
+    if (k === 'note' || k === 'instrument' || k === 'extraNotes') continue;
     if ((x[k] ?? 0) !== (y[k] ?? 0)) return true;
   }
-  return false;
+  // further note columns are read-only here: any change in them counts as an edit that is not written
+  const ea = JSON.stringify(a.extraNotes ?? []);
+  const eb = JSON.stringify(b.extraNotes ?? []);
+  return ea !== eb;
 }
 
 function where(e: { pattern: number; channel: number; row: number }): string {

@@ -14,6 +14,7 @@
  */
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import { periodToNote } from '@/lib/amiga/periodNotes';
+import { makeRowClock, exactStepFromOnsets, type RowClock } from './stepRowClock';
 
 const ROWS_PER_PATTERN = 64;
 const MAX_ROWS = 32768;
@@ -88,6 +89,11 @@ export interface BthGrid {
   blockRows: TrackerCell[][];
   rowSources: BthRowSource[][][];
   streamAtStart: number[][];
+  /** Ticks per row: the exact GCD of every onset gap (plan R4/R7). */
+  step: number;
+  clock: RowClock;
+  /** Each voice's note onset ticks within the first pass (what the step is derived from). */
+  onsets: number[][];
 }
 
 interface Placed { tick: number; note: number; instrument: number; stream: number; offset: number; length: number; noteOffset: number; noteNum: number; base: number }
@@ -200,8 +206,13 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
     firstPass.push(row);
   }
 
-  const rows = Math.min(MAX_ROWS, Math.max(1, ...firstPass));
+  const ticks = Math.min(MAX_ROWS, Math.max(1, ...firstPass));
   if (voices.every((p) => p.length === 0)) return 'the voices have no notes';
+  // plan rule R4/R7: one row is the exact GCD of every onset gap, so every note lands on a row with no offset
+  const onsets = voices.map((p) => p.filter((c) => c.tick < ticks).map((c) => c.tick));
+  const step = exactStepFromOnsets(onsets);
+  const clock = makeRowClock([{ tick: 0, speed: step }]);
+  const rows = Math.max(1, clock.rowsForTicks(ticks));
 
   const grid: TrackerCell[][] = Array.from({ length: VOICES }, () => Array.from({ length: rows }, emptyCell));
   const sources: BthRowSource[][] = Array.from({ length: VOICES }, () => new Array<BthRowSource>(rows).fill(null));
@@ -209,13 +220,14 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
   voices.forEach((placed, v) => {
     for (let i = 0; i < placed.length; i++) {
       const p = placed[i];
-      if (p.tick >= rows) break;
-      const cell = grid[v][p.tick];
+      if (p.tick >= ticks) break;
+      const row = clock.tickToRow(p.tick).row;
+      const cell = grid[v][row];
       cell.note = p.note || NOTE_OFF_UNUSED;
       if (p.note > 0) cell.instrument = p.instrument;
-      sources[v][p.tick] = { stream: p.stream, offset: p.offset, length: p.length, noteOffset: p.noteOffset, noteNum: p.noteNum, base: p.base };
-      const endTick = Math.min(rows, i + 1 < placed.length ? placed[i + 1].tick : rows);
-      for (let t = p.tick; t < endTick; t++) streamAtTick[v][t] = p.stream;
+      sources[v][row] = { stream: p.stream, offset: p.offset, length: p.length, noteOffset: p.noteOffset, noteNum: p.noteNum, base: p.base };
+      const endRow = Math.min(rows, i + 1 < placed.length ? clock.tickToRow(placed[i + 1].tick).row : rows);
+      for (let t = row; t < endRow; t++) streamAtTick[v][t] = p.stream;
     }
   });
 
@@ -244,5 +256,5 @@ export function buildBthGrid(buf: Uint8Array): BthGrid | string {
     rowSources.push(sources.map((s) => s.slice(start, start + len)));
     streamAtStart.push(streamAtTick.map((s) => s[start]));
   }
-  return { patterns, songPositions, rows, streams, blockRows, rowSources, streamAtStart };
+  return { patterns, songPositions, rows, streams, blockRows, rowSources, streamAtStart, step, clock, onsets };
 }
