@@ -34,3 +34,33 @@ export function effectColumnsMeta(rows: readonly TrackerCell[]): { channelMeta: 
   const effectCols = Math.max(2, ...rows.map(cellEffectColumns));
   return effectCols > 2 ? { channelMeta: { importedFromMOD: false, effectCols } } : {};
 }
+
+/** The cell's effects in slot order (empty slots skipped), the order `addCellEffect` filled them. */
+export function cellEffects(cell: TrackerCell): Array<[number, number]> {
+  const rec = cell as unknown as Record<string, number | undefined>;
+  const out: Array<[number, number]> = [];
+  for (const [kt, kv] of SLOTS) if (rec[kt]) out.push([rec[kt] as number, (rec[kv] ?? 0) & 0xff]);
+  return out;
+}
+
+/**
+ * The byte patches (file offset, value) that turn the effect slots of `was` into those of `cell`, for a format whose effect
+ * columns show stream commands. Only a changed value of an existing command is expressible (same length); adding, removing
+ * or retyping a command is refused with the reason. `sources[i]` is the byte behind slot i (`at` -1: the command has none).
+ */
+export function effectEditPatches(
+  cell: TrackerCell, was: TrackerCell, sources: ReadonlyArray<{ typ: number; at: number }>,
+): { patches: Array<[number, number]>; refusal: string | null } {
+  const a = cellEffects(was);
+  const b = cellEffects(cell);
+  if (a.length !== b.length) return { patches: [], refusal: 'a stream command cannot be added or removed without changing the stream length' };
+  const patches: Array<[number, number]> = [];
+  for (let i = 0; i < a.length; i++) {
+    if (a[i][0] !== b[i][0]) return { patches: [], refusal: 'a stream command cannot be turned into another command' };
+    if (a[i][1] === b[i][1]) continue;
+    const src = sources[i];
+    if (!src || src.typ !== a[i][0] || src.at < 0) return { patches: [], refusal: 'this command has no argument byte to change' };
+    patches.push([src.at, b[i][1]]);
+  }
+  return { patches, refusal: null };
+}
