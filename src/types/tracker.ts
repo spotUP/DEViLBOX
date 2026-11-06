@@ -143,6 +143,8 @@ export interface TrackerCell {
   dlPadding?: boolean;
   /** Dave Lowe / Dave Lowe New only: the stream sets the instrument the channel already runs (a repeated word 4); the re-encode writes it again. */
   dlInstrRepeat?: boolean;
+  /** Dave Lowe / Dave Lowe New only: set on the last row of a section that ends on a terminator word other than SEQ_ADVANCE (0x0014, 0x001c or 0x0030); the re-encode writes that word back. */
+  dlEnd?: number;
 
   // ── Renoise-style multi-note columns (any number per cell) ──
   // Column 1 uses the primary note/instrument/volume fields above. Every further column

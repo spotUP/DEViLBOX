@@ -52,6 +52,8 @@ const CMD_SET_VOL_ENV = 12;
 const CMD_REST = 32;
 const NOTE_OFF = 97;             // XM note off: a rest that follows a note
 const CMD_NOTE_THRESHOLD = 100;  // words > 100 are note periods
+/** Other words that end a section like SEQ_ADVANCE does (the parser stops on them; the encoder writes the section's own word back). */
+export const DL_END_WORDS: readonly number[] = [0x14, 0x1c, 0x30];
 
 // Standard ProTracker period table for encoding
 const MOD_PERIODS = [
@@ -122,6 +124,8 @@ interface DLSetVolEnv {
 }
 interface DLSeqAdvance {
   type: 'seqAdvance';
+  /** The terminator word when it is not SEQ_ADVANCE itself (see DL_END_WORDS). */
+  word?: number;
 }
 
 type DLEvent = DLNote | DLRest | DLSetInstrument | DLSetVolEnv | DLSeqAdvance;
@@ -160,6 +164,9 @@ function parseCommandStream(buf: Uint8Array, fileOff: number): { events: DLEvent
       events.push({ type: 'rest', duration });
     } else if (word === CMD_SEQ_ADVANCE) {
       events.push({ type: 'seqAdvance' });
+      break;
+    } else if (DL_END_WORDS.includes(word)) {
+      events.push({ type: 'seqAdvance', word });
       break;
     } else if (word === 0) {
       // end marker
@@ -208,6 +215,10 @@ interface RowData {
   period?: number;
   /** The stream sets the instrument the channel already runs; the encoder writes the repeated command. */
   dlInstrRepeat?: boolean;
+  /** The section ended on this terminator word instead of SEQ_ADVANCE (set on its last row). */
+  dlEnd?: number;
+  /** The row is past the stream's end (only the row that carries the terminator of an empty section). */
+  dlPadding?: boolean;
 }
 
 /** A command-stream event with its pointers already resolved to ids (instrument id 0 = pointer not a known instrument). */
@@ -216,7 +227,7 @@ export type DLGridEvent =
   | { type: 'rest'; duration: number }
   | { type: 'setInstrument'; id: number }
   | { type: 'setVolEnv'; envId: number }
-  | { type: 'seqAdvance' };
+  | { type: 'seqAdvance'; word?: number };
 
 /**
  * Events to grid rows (shared by Dave Lowe and Dave Lowe New). A note takes the running instrument; SET_INSTRUMENT
@@ -232,6 +243,7 @@ export function eventsToGridRows(events: DLGridEvent[], clock: RowClock): { rows
   let totalTicks = 0;
   const cells: Array<{ tick: number; cell: RowData }> = [];
   let afterNote = false;
+  let endWord: number | undefined;
 
   const cellAt = (note: number, period = 0): RowData => {
     const cell: RowData = {
@@ -266,12 +278,24 @@ export function eventsToGridRows(events: DLGridEvent[], clock: RowClock): { rows
         totalTicks += ev.duration;
         break;
       case 'seqAdvance':
+        endWord = ev.word;
         break;
     }
   }
 
   for (let r = 0; r < clock.rowsForTicks(totalTicks); r++) rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0 });
   for (const n of cells) rows[clock.tickToRow(n.tick).row] = n.cell;
+  if (instrPending || envPending > 0) {
+    // commands after the last note or rest (a section of commands only has no row at all): one padding row carries
+    // them and the section's end word, and the encoder writes them without a duration
+    const tail = cellAt(0);
+    tail.dlPadding = true;
+    tail.dlEnd = endWord ?? CMD_SEQ_ADVANCE;
+    rows.push(tail);
+  } else if (endWord !== undefined) {
+    if (rows.length === 0) rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, dlPadding: true });
+    rows[rows.length - 1].dlEnd = endWord;
+  }
   return { rows, totalTicks };
 }
 
@@ -352,7 +376,9 @@ function encodeRowsToStream(rows: TrackerCell[], _channel: number, step = 1, tab
   };
   let i = 0;
   let end = rows.length;
-  while (end > 0 && rows[end - 1].dlPadding && !hasCommand(rows[end - 1])) end--;
+  // a padding row that carries commands and the end word (dlEnd) holds the commands after the last note or rest
+  const isTail = (c: TrackerCell): boolean => !!c.dlPadding && c.dlEnd !== undefined && (c.note ?? 0) === 0;
+  while (end > 0 && rows[end - 1].dlPadding && (!hasCommand(rows[end - 1]) || isTail(rows[end - 1]))) end--;
 
   while (i < end) {
     const cell = rows[i];
@@ -392,8 +418,11 @@ function encodeRowsToStream(rows: TrackerCell[], _channel: number, step = 1, tab
     }
   }
 
-  // SEQ_ADVANCE at end
-  out.push(0x00, CMD_SEQ_ADVANCE);
+  for (let k = end; k < rows.length; k++) if (isTail(rows[k]) && hasCommand(rows[k])) emitCommands(rows[k]);
+  // the section's own terminator word (flagged on its last row, or on the one padding row of a section with no row), SEQ_ADVANCE otherwise
+  let endWord = CMD_SEQ_ADVANCE;
+  for (let k = rows.length - 1; k >= 0; k--) if (rows[k].dlEnd !== undefined) { endWord = rows[k].dlEnd!; break; }
+  out.push(0x00, endWord);
 
   return new Uint8Array(out);
 }
@@ -628,6 +657,8 @@ export async function parseDaveLoweFile(
               eff: sRows[r].eff,
               ...(sRows[r].period ? { period: sRows[r].period } : {}),
             ...(sRows[r].dlInstrRepeat ? { dlInstrRepeat: true } : {}),
+              ...(sRows[r].dlEnd !== undefined ? { dlEnd: sRows[r].dlEnd } : {}),
+              ...(sRows[r].dlPadding ? { dlPadding: true } : {}),
               effTyp2: 0,
               eff2: 0,
             });
