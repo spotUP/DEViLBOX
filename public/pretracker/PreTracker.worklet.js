@@ -41,6 +41,7 @@ class PreTrackerProcessor extends AudioWorkletProcessor {
         break;
 
       case 'loadModule':
+        this.subsong = 0;
         this.lastReportedPos = -1;
         this.lastReportedRow = -1;
         this.loadModuleData(data.moduleData);
@@ -56,7 +57,14 @@ class PreTrackerProcessor extends AudioWorkletProcessor {
       case 'setSubsong':
         if (this.module && typeof this.module._player_set_subsong === 'function') {
           this.module._player_set_subsong(data.subsong);
+          this.subsong = data.subsong;
         }
+        break;
+
+      // Transport start at a grid row: restart the subsong, then render and discard blocks until the replayer's own
+      // order position and row reach the target (the replayer has no seek; setPositionEntry edits the order table).
+      case 'seekTo':
+        this.seekToRow(data.songPos, data.row);
         break;
 
       case 'setChannelGain':
@@ -172,6 +180,22 @@ class PreTrackerProcessor extends AudioWorkletProcessor {
         this.cleanup();
         break;
     }
+  }
+
+  seekToRow(songPos, row) {
+    const m = this.module;
+    if (!m || typeof m._player_render !== 'function' || typeof m._player_set_subsong !== 'function') return;
+    this.updateBufferViews();
+    if (!this.interleavedBuf) return;
+    m._player_set_subsong(this.subsong || 0);
+    // Cap: about 30 minutes of audio at 48 kHz, so a target the song never reaches cannot hang the audio thread.
+    const maxBlocks = Math.ceil((30 * 60 * 48000) / this.bufferSize);
+    for (let i = 0; i < maxBlocks; i++) {
+      if (m._player_get_position() === songPos && m._player_get_row() === row) break;
+      if (m._player_render(this.interleavedPtr, this.bufferSize) <= 0) break;
+    }
+    this.lastReportedPos = -1;
+    this.lastReportedRow = -1;
   }
 
   loadModuleData(moduleData) {

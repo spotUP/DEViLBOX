@@ -352,6 +352,11 @@ export class PreTrackerEngine extends WASMSingletonBase implements IsolationCapa
     this.workletNode?.port.postMessage({ type: 'play' });
   }
 
+  /** Transport start at a grid row: the worklet restarts the subsong and discards audio up to the replayer's position/row. */
+  seekToRow(songPos: number, row: number): void {
+    this.workletNode?.port.postMessage({ type: 'seekTo', songPos, row });
+  }
+
   stop(): void {
     meterFeed.clearHeld();
     this.workletNode?.port.postMessage({ type: 'stop' });
