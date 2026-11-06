@@ -1,5 +1,5 @@
 /**
- * OctaMED MMD0 octave: the grid names a note by the period Paula plays (UADE AUDxPER log, periodToNote 428 = C-2 = 25),
+ * OctaMED MMD0/MMD1 octave (MMD2: no song in the repo; MMD3: UADE cannot play it): the grid names a note by the period Paula plays (UADE AUDxPER log, periodToNote 428 = C-2 = 25),
  * absolute pitch, on real songs. Mapping: MEDParser noteBaseTranspose (rawNote + 24 + playTranspose for MMD0).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -16,8 +16,8 @@ let mod: LogModule;
 beforeAll(async () => { restore = installDwNodeFetch(); mod = (await openUade()) as unknown as LogModule; });
 afterAll(() => { restore(); try { mod._uade_wasm_cleanup(); } catch { /* ignore */ } });
 
-describe('OctaMED MMD0 octave', { timeout: 180_000 }, () => {
-  for (const rel of ['octamed-mmd0/universal monsters - title.mmd0', 'formats/universal monsters - dracula.mmd0']) {
+describe('OctaMED MMD0/MMD1 octave', { timeout: 180_000 }, () => {
+  for (const rel of ['octamed-mmd0/universal monsters - title.mmd0', 'formats/universal monsters - dracula.mmd0', 'formats/funky nightmare.mmd1']) {
     it(`${rel}: grid notes equal the pitch Paula plays (absolute)`, async () => {
       const name = rel.split('/').pop() ?? rel;
       const bytes = new Uint8Array(readFileSync(join(ROOT, rel)));
