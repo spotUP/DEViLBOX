@@ -1109,7 +1109,7 @@ export class TrackerReplayer {
     this.patternLoopEndPos = endPos;
     this.patternLoopActive = true;
     if (this.song?.davidWhittakerClock && DavidWhittakerEngine.hasInstance()) {
-      DavidWhittakerEngine.getInstance().setPatternLoop({ start: startPos, end: endPos });   // wraps at render time; enforcePatternLoopOnEngine stays the fallback
+      DavidWhittakerEngine.getInstance().setPatternLoop({ start: startPos, end: endPos });   // the worklet wraps on the render position (its reports never reach enforcePatternLoopOnEngine)
     }
     if (this.slipEnabled) {
       this.slipSongPos = this.songPos;
@@ -1133,13 +1133,10 @@ export class TrackerReplayer {
    * @returns true when the engine was seeked and this position should be dropped.
    */
   private enforcePatternLoopOnEngine(position: number): boolean {
-    const dw = !this.useLibopenmptPlayback && !!this.song?.davidWhittakerClock && DavidWhittakerEngine.hasInstance();
-    if (!this.useLibopenmptPlayback && !dw) return false;
+    if (!this.useLibopenmptPlayback) return false;
     if (!shouldSeekBackToLoop(
       position, this.patternLoopActive, this.patternLoopStartPos, this.patternLoopEndPos,
     )) return false;
-    // David Whittaker: the replayer is run silently to the loop's first pattern (dw_seek_ticks), not seeked through the scheduler.
-    if (dw) return DavidWhittakerEngine.getInstance().seekToPattern(this.patternLoopStartPos);
     this.seekTo(this.patternLoopStartPos, 0);
     return true;
   }
