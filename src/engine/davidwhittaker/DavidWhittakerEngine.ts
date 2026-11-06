@@ -6,6 +6,7 @@
 
 import { PositionCallbacks, type EnginePositionUpdate } from '@engine/wasm/PositionCallbacks';
 import { makeRowClock, type RowClock, type SpeedChange } from '@/lib/import/formats/stepRowClock';
+import { dwRowStartTick } from './dwGridTicks';
 import { ROWS_PER_PATTERN } from '@/lib/import/formats/davidWhittakerGrid';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
@@ -47,7 +48,7 @@ export interface DwTickLogEntry { sec: number; songPos: number; row: number }
 
 /** The processed tick the replayer must have run for the next tick it plays to be the first of grid pattern `pattern`. */
 export function dwPatternStartTick(clock: RowClock, pattern: number): number {
-  return clock.rowToTick(Math.max(0, pattern) * ROWS_PER_PATTERN);
+  return dwRowStartTick(clock, pattern);
 }
 
 export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
@@ -204,9 +205,15 @@ export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
    * dropped (they carry the old generation).
    */
   seekToPattern(pattern: number): boolean {
-    if (!this._clock || !this.workletNode) return false;
+    if (!this._clock) return false;
+    return this.seekToTick(dwPatternStartTick(this._clock.clock, pattern));
+  }
+
+  /** Jump playback to processed tick `ticks` (a grid row's tick, dwRowStartTick) before play(); the seek survives the play message. */
+  seekToTick(ticks: number): boolean {
+    if (!this.workletNode) return false;
     this._seekGen++;
-    this.workletNode.port.postMessage({ type: 'seekTicks', ticks: dwPatternStartTick(this._clock.clock, pattern), gen: this._seekGen });
+    this.workletNode.port.postMessage({ type: 'seekTicks', ticks, gen: this._seekGen });
     return true;
   }
 
