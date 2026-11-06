@@ -39,15 +39,15 @@ describe('voodoo supreme import route', () => {
     expect(rowsOf(song, 0).length).toBe(6289);
     expect([0, 1, 2, 3].map((v) => played(song, v).length)).toEqual([365, 599, 481, 562]);
     const first = song.patterns[0].channels.map((c) => c.rows.slice(0, 16).map((r) => r.note));
-    expect(first[0]).toEqual([48, 0, 0, 0, 0, 0, 0, 0, 0, 0, 48, 0, 48, 0, 0, 0]);
-    expect(first[1]).toEqual([97, 0, 51, 0, 0, 0, 0, 0, 51, 0, 0, 0, 0, 0, 51, 0]);
-    expect(first[2]).toEqual([97, 0, 0, 0, 55, 0, 55, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(first[0]).toEqual([36, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 0, 36, 0, 0, 0]);
+    expect(first[1]).toEqual([97, 0, 39, 0, 0, 0, 0, 0, 39, 0, 0, 0, 0, 0, 39, 0]);
+    expect(first[2]).toEqual([97, 0, 0, 0, 43, 0, 43, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
   });
   it('silkworm.vss', async () => {
     const song = await load('public/data/songs/voodoo-supreme/silkworm.vss');
     expect(rowsOf(song, 0).length).toBe(6913);
     expect([0, 1, 2, 3].map((v) => played(song, v).length)).toEqual([790, 723, 312, 298]);
-    expect(song.patterns[0].channels[0].rows[0].note).toBe(49);
+    expect(song.patterns[0].channels[0].rows[0].note).toBe(37);
     expect(song.patterns[0].channels[0].rows[8].note).toBe(97);
   });
 });
