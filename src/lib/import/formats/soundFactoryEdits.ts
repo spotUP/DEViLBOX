@@ -29,7 +29,7 @@ const SLOT_TYP = ['effTyp', 'effTyp2', 'effTyp3', 'effTyp4', 'effTyp5', 'effTyp6
 const SLOT_VAL = ['eff', 'eff2', 'eff3', 'eff4', 'eff5', 'eff6', 'eff7', 'eff8'] as const;
 
 /** Sentinel: how many times the writer ran (the reachability test reads it). */
-export const sfWriterStats = { calls: 0 };
+export const sfWriterStats = { calls: 0, extraColumnWrites: 0 };
 
 export interface SfEditResult {
   data: Uint8Array;
@@ -93,6 +93,14 @@ export function writeSoundFactory(sourceBytes: Uint8Array, edited: readonly Patt
   const duration = (i: number): number => (bytes[i][1] << 8) | bytes[i][2];
   const setDuration = (i: number, d: number): void => { bytes[i][1] = (d >> 8) & 255; bytes[i][2] = d & 255; };
   const base = parse.song.patterns;
+  /** Set the note of the command token `tok` (its event opcode at `fileOffset`): pause <-> note, pitch from the recorded context. */
+  const writeNote = (toks: Uint8Array[], tok: number, fileOffset: number, note: number, where: string): void => {
+    const ctx = parse.eventContext.get(fileOffset);
+    if (toks[tok][0] === 0x99) warnings.push(`${where}: a stop-and-pause command keeps its note`);
+    else if (note === 0) toks[tok][0] = OP_PAUSE;
+    else if (ctx) toks[tok][0] = soundFactoryOpcodeFor(ctx.pitch, note, ctx.transpose);
+    else warnings.push(`${where}: no pitch context for this command; note not written`);
+  };
 
   edited.forEach((pat, p) => pat.channels.forEach((ch, c) => ch.rows.forEach((cell, r) => {
     const was = base[p]?.channels[c]?.rows[r];
@@ -105,8 +113,20 @@ export function writeSoundFactory(sourceBytes: Uint8Array, edited: readonly Patt
     const noteChanged = (a.note ?? 0) !== (b.note ?? 0);
     const fxChanged = !same(sfNormalizeEffects(now.fx), old.fx);
     const delayChanged = now.delay !== old.delay;
-    if ((a.instrument ?? 0) !== (b.instrument ?? 0) || Array.from({ length: maxNoteColumns([cell, was]) - 1 }, (_, i) => i + 1).some((k) => (getColumnField(cell, k, 'note') ?? 0) !== (getColumnField(was, k, 'note') ?? 0) || (getColumnField(cell, k, 'instrument') ?? 0) !== (getColumnField(was, k, 'instrument') ?? 0))) {
-      warnings.push(`${where}: instrument and further-column note edits are not written`);
+    if ((a.instrument ?? 0) !== (b.instrument ?? 0) || Array.from({ length: maxNoteColumns([cell, was]) - 1 }, (_, i) => i + 1).some((k) => (getColumnField(cell, k, 'instrument') ?? 0) !== (getColumnField(was, k, 'instrument') ?? 0))) {
+      warnings.push(`${where}: instrument edits are not written`);
+    }
+    // Further note columns: the note opcode of the event each column's onset anchors to.
+    for (let k = 1; k < maxNoteColumns([cell, was]); k++) {
+      const nowNote = getColumnField(cell, k, 'note') ?? 0;
+      if (nowNote === (getColumnField(was, k, 'note') ?? 0)) continue;
+      const xi = parse.colAnchors[c]?.get(g)?.[k - 1] ?? -1;
+      const xev = xi >= 0 ? parse.voiceEvents[c][xi] : undefined;
+      const xTok = xev && xev.fileOffset >= 0 ? at(xev.fileOffset) : -1;
+      if (!xev || xTok < 0) { warnings.push(`${where} note column ${k + 1}: no command to edit here; not written`); continue; }
+      sfWriterStats.extraColumnWrites++;
+      res.patched++;
+      writeNote(bytes, xTok, xev.fileOffset, nowNote, where);
     }
     if (!noteChanged && !fxChanged && !delayChanged) return;
     const ai = parse.anchors[c]?.[g] ?? -1;
@@ -135,12 +155,7 @@ export function writeSoundFactory(sourceBytes: Uint8Array, edited: readonly Patt
     }
 
     if (noteChanged) {
-      const ctx = parse.eventContext.get(ev.fileOffset);
-      const op = bytes[anchor][0];
-      if (op === 0x99) warnings.push(`${where}: a stop-and-pause command keeps its note`);
-      else if ((a.note ?? 0) === 0) bytes[anchor][0] = OP_PAUSE;
-      else if (ctx) bytes[anchor][0] = soundFactoryOpcodeFor(ctx.pitch, a.note ?? 0, ctx.transpose);
-      else warnings.push(`${where}: no pitch context for this command; note not written`);
+      writeNote(bytes, anchor, ev.fileOffset, a.note ?? 0, where);
     }
 
     if (fxChanged) {

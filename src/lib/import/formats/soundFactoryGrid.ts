@@ -64,6 +64,8 @@ export interface SfGrid {
   offsets: number[][];
   /** Per voice and row: index (in the voice's event list) of the event `offsets` names, -1 none. */
   anchors: number[][];
+  /** Per voice: row -> event index of each further note column's onset (index 0 = note column 2). */
+  colAnchors: Array<Map<number, number[]>>;
   step: number;
   clock: RowClock;
   /** Per voice: note columns, 1 plus the largest same-row clash (plan rule R5). */
@@ -97,6 +99,7 @@ export function buildSfGrid(voices: readonly (readonly SfGridEvent[])[], maxRows
   const rows = voices.map(() => Array.from({ length: rowCount }, emptyCell));
   const offsets = voices.map(() => new Array<number>(rowCount).fill(-1));
   const anchors = voices.map(() => new Array<number>(rowCount).fill(-1));
+  const colAnchors = voices.map(() => new Map<number, number[]>());
   const noteCols = voices.map(() => 1);
   const effectCols = voices.map(() => SF_MIN_EFFECT_COLS);
   const effectOffsets = voices.map(() => new Map<number, number[]>());
@@ -123,6 +126,9 @@ export function buildSfGrid(voices: readonly (readonly SfGridEvent[])[], maxRows
         if (offset > 0) { cell.effTyp = SF_FX_ROW_OFFSET; cell.eff = offset; delayedNotes++; }
       } else {
         setNoteColumn(cell, pl.col, e.note, e.instrId, offset);
+        const list = colAnchors[v].get(row) ?? [];
+        list[pl.col - 1] = i;
+        colAnchors[v].set(row, list);
         clashRows++;
         if (offset > 0) delayedNotes++;
       }
@@ -155,5 +161,5 @@ export function buildSfGrid(voices: readonly (readonly SfGridEvent[])[], maxRows
       }
     });
   });
-  return { rows, offsets, anchors, step, clock, noteCols, delayedNotes, clashRows, unplaced, effectCols, effectOffsets, effectsSeen, effectsPlaced, effectsBeyondGrid, effectCounts };
+  return { rows, offsets, anchors, colAnchors, step, clock, noteCols, delayedNotes, clashRows, unplaced, effectCols, effectOffsets, effectsSeen, effectsPlaced, effectsBeyondGrid, effectCounts };
 }
