@@ -15,7 +15,8 @@ import { DW_WALK, type DwWalk, type DwWalkEvent } from './DavidWhittakerWasmExtr
 import { dwByteToNote, dwWalkTransposes } from './davidWhittakerPitch';
 import { makeRowClock, type RowClock, type SpeedChange } from './stepRowClock';
 
-export const ROWS_PER_PATTERN = 64;
+import { ROWS_PER_PATTERN } from '@/engine/davidwhittaker/dwGridTicks';
+export { ROWS_PER_PATTERN };
 const EFFECT_SLOTS = 5;
 /** The most effect columns a cell holds (effTyp..effTyp8); the grid uses 5, or 6 when a song needs one more. */
 const MAX_EFFECT_SLOTS = 8;
