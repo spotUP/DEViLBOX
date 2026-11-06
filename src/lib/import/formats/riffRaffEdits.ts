@@ -7,11 +7,12 @@
  * and only when the stream holds one (an instrument that is the voice's start state has no byte to patch). A pattern is
  * shared by every place that plays it, so an edit shows wherever the pattern byte plays. Edits the stream cannot hold
  * at its length - a note on a row without one, a note removed or turned into a note off, a duration or rate change,
- * the volume and effect columns (not stored per row) - are refused with a warning and nothing is written for them.
+ * the volume column (not stored per row), a stream command added, removed or retyped - are refused with a warning and nothing is written for them.
  * After patching, the grid is decoded again: every edited cell must read back as edited, and every cell that does not
  * share an edited byte must be unchanged, otherwise the edit is taken out again.
  */
 import type { Pattern, TrackerCell } from '@/types';
+import { cellEffects, effectEditPatches } from './cellEffectSlots';
 import { buildRiffRaffGrid, type RiffRaffGrid } from './riffRaffGrid';
 
 const NOTE_OFF = 97;
@@ -26,7 +27,7 @@ export interface RiffRaffEditResult {
   warnings: string[];
 }
 
-interface Edit { pattern: number; channel: number; row: number; note: number; instrument: number; noteAt: number; noteByte: number; instrumentAt: number; instrumentByte: number }
+interface Edit { pattern: number; channel: number; row: number; note: number; instrument: number; noteAt: number; noteByte: number; instrumentAt: number; instrumentByte: number; fxPatches: Array<[number, number]>; fx: Array<[number, number]> }
 
 const where = (e: { pattern: number; channel: number; row: number }): string => `voice ${e.channel + 1}, pattern ${e.pattern}, row ${e.row}`;
 
@@ -34,7 +35,7 @@ function otherFieldsDiffer(a: TrackerCell, b: TrackerCell): boolean {
   const x = a as unknown as Record<string, number | undefined>;
   const y = b as unknown as Record<string, number | undefined>;
   for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) {
-    if (k === 'note' || k === 'instrument') continue;
+    if (k === 'note' || k === 'instrument' || k.startsWith('eff')) continue; // the effect slots are handled by effectEditPatches
     if ((x[k] ?? 0) !== (y[k] ?? 0)) return true;
   }
   return false;
@@ -63,11 +64,32 @@ export function applyRiffRaffGridEdits(original: Uint8Array, patterns: readonly 
     const noteChanged = cell.note !== was.note;
     const instChanged = cell.instrument !== was.instrument;
     const otherChanged = otherFieldsDiffer(cell, was);
-    if (!noteChanged && !instChanged && !otherChanged) return;
+    const fxChanged = JSON.stringify(cellEffects(cell)) !== JSON.stringify(cellEffects(was));
+    if (!noteChanged && !instChanged && !otherChanged && !fxChanged) return;
     const at = { pattern: pi, channel: c, row: r };
     if (otherChanged) {
-      warnings.push(`${PREFIX} ${where(at)}: volume and effect columns are not stored per row in this format; that change was not written.`);
-      if (!noteChanged && !instChanged) return;
+      warnings.push(`${PREFIX} ${where(at)}: the volume column is not stored per row in this format; that change was not written.`);
+      if (!noteChanged && !instChanged && !fxChanged) return;
+    }
+    let fxPatches: Array<[number, number]> = [];
+    if (fxChanged) {
+      const fxr = effectEditPatches(cell, was, base.effectSources[c]?.[pi * ROWS_PER_PATTERN + r] ?? []);
+      if (fxr.refusal) warnings.push(`${PREFIX} ${where(at)}: ${fxr.refusal}; the effect change was not written.`);
+      else fxPatches = fxr.patches;
+      if (!noteChanged && !instChanged) {
+        if (fxPatches.length === 0) return;
+        // an effect-only edit: the effect byte is the whole patch, no note byte is involved
+        for (const [offset, value] of fxPatches) {
+          const other = claimed.get(offset);
+          if (other !== undefined && other !== value) {
+            warnings.push(`${PREFIX} ${where(at)}: another edited row shares a stream command byte with this one and wants a different value; this edit was not written.`);
+            return;
+          }
+        }
+        for (const [offset, value] of fxPatches) claimed.set(offset, value);
+        accepted.push({ ...at, note: cell.note, instrument: cell.instrument, noteAt: -1, noteByte: -1, instrumentAt: -1, instrumentByte: -1, fxPatches, fx: cellEffects(cell) });
+        return;
+      }
     }
     const src = base.sources[c]?.[pi * ROWS_PER_PATTERN + r];
     if (!src || was.note < 1 || was.note >= NOTE_OFF) {
@@ -111,33 +133,45 @@ export function applyRiffRaffGridEdits(original: Uint8Array, patterns: readonly 
     }
     claimed.set(src.noteAt, noteByte);
     if (instrumentByte >= 0) claimed.set(src.instrumentAt, instrumentByte);
-    accepted.push({ ...at, note: cell.note, instrument: cell.instrument, noteAt: src.noteAt, noteByte, instrumentAt: instChanged ? src.instrumentAt : -1, instrumentByte });
+    for (const [offset, value] of fxPatches) {
+      const other = claimed.get(offset);
+      if (other !== undefined && other !== value) {
+        warnings.push(`${PREFIX} ${where(at)}: another edited row shares a stream command byte with this one and wants a different value; this edit was not written.`);
+        return;
+      }
+    }
+    for (const [offset, value] of fxPatches) claimed.set(offset, value);
+    accepted.push({ ...at, note: cell.note, instrument: cell.instrument, noteAt: src.noteAt, noteByte, instrumentAt: instChanged ? src.instrumentAt : -1, instrumentByte, fxPatches, fx: cellEffects(cell) });
   })));
 
   const writeAll = (edits: Edit[]): void => {
     data.set(original);
     for (const e of edits) {
-      data[e.noteAt] = e.noteByte;
+      if (e.noteAt >= 0) data[e.noteAt] = e.noteByte;
       if (e.instrumentAt >= 0) data[e.instrumentAt] = e.instrumentByte;
+      for (const [offset, value] of e.fxPatches) data[offset] = value;
     }
   };
 
   // Source bytes of every cell, to know which cells share an edited byte (they legitimately change with it).
   const shared = new Set<string>();
   const touched = new Set<number>();
-  for (const e of accepted) { touched.add(e.noteAt); if (e.instrumentAt >= 0) touched.add(e.instrumentAt); }
+  for (const e of accepted) { if (e.noteAt >= 0) touched.add(e.noteAt); if (e.instrumentAt >= 0) touched.add(e.instrumentAt); for (const [offset] of e.fxPatches) touched.add(offset); }
   base.sources.forEach((col, c) => col.forEach((s, row) => {
     if (s && (touched.has(s.noteAt) || touched.has(s.instrumentAt))) shared.add(`${c}:${row}`);
   }));
+  base.effectSources.forEach((col, c) => col.forEach((list, row) => {
+    if (list.some((s) => touched.has(s.at))) shared.add(`${c}:${row}`);
+  }));
 
-  const sameCell = (a: TrackerCell | undefined, b: TrackerCell | undefined): boolean => !!a && !!b && a.note === b.note && a.instrument === b.instrument;
+  const sameCell = (a: TrackerCell | undefined, b: TrackerCell | undefined): boolean => !!a && !!b && a.note === b.note && a.instrument === b.instrument && JSON.stringify(cellEffects(a)) === JSON.stringify(cellEffects(b));
   const failing = (edits: Edit[]): Edit[] => {
     writeAll(edits);
     const again = buildRiffRaffGrid(data);
     if (typeof again === 'string' || again.rows !== base.rows) return edits;
     const bad = edits.filter((e) => {
       const got = cellAt(again, e.channel, e.pattern * ROWS_PER_PATTERN + e.row);
-      return !(got?.note === e.note && got.instrument === e.instrument);
+      return !(got?.note === e.note && got.instrument === e.instrument && (e.fxPatches.length === 0 || JSON.stringify(cellEffects(got)) === JSON.stringify(e.fx)));
     });
     if (bad.length > 0) return bad;
     for (let c = 0; c < base.sources.length; c++) {

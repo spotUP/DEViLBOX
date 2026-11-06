@@ -206,6 +206,8 @@ export interface RiffRaffGrid {
   fileOffsetBase: number;
   /** sources[voice][row over the whole grid], null where no note event starts (phase B: where an edit is written) */
   sources: Array<Array<RiffRaffRowSource | null>>;
+  /** effectSources[voice][row]: the byte behind each effect-column command of the row, in effect slot order (phase B) */
+  effectSources: Array<Array<StreamEffectSource[]>>;
   /** The tracker note a pattern note byte plays under a transposition (the grid's own period lookup). */
   noteForByte: (byte: number, transpose: number) => number;
 }
@@ -219,7 +221,10 @@ export interface RiffRaffRowSource {
   transpose: number;
 }
 
-interface VoiceEvent { tick: number; kind: 'note' | 'rest' | 'silence'; note: number; instrument: number; stream: number; wait: number; noteAt: number; instrumentAt: number; transpose: number; fx: Array<[number, number]> }
+/** Where one effect-column command of a row lives: its effTyp and the file offset of the argument byte holding its value (-1: no byte). */
+export interface StreamEffectSource { typ: number; at: number }
+
+interface VoiceEvent { tick: number; kind: 'note' | 'rest' | 'silence'; note: number; instrument: number; stream: number; wait: number; noteAt: number; instrumentAt: number; transpose: number; fx: Array<[number, number, number]> }
 
 class Walker {
   readonly commands: Command[];
@@ -280,7 +285,7 @@ function runVoice(w: Walker, voice: number, trackList: number, startTranspose: n
   let instrument = startInstrument;
   let instrumentAt = -1;
   let currentStream = w.stream(startPattern, -1);
-  let pending: Array<[number, number]> = [];
+  let pending: Array<[number, number, number]> = [];
   let tick = 0;
   let steps = 0;
   const periods = w.t.base.periods ?? 0;
@@ -320,11 +325,13 @@ function runVoice(w: Walker, voice: number, trackList: number, startTranspose: n
         const argAt = patternPos;
         for (let i = 0; i < argBytes(command); i++) arg[i] = u8(m, patternPos++);
         // state commands show on the next note or rest row (the voice's state when that event plays)
-        if (command === 'setVolume') pending.push([RR_FX.setVolume, arg[0]]);
-        else if (command === 'volumeSlide') pending.push([RR_FX.volumeSlide, arg[0]], [RR_FX.volumeSlideRate, arg[1]]);
-        else if (command === 'masterFade') pending.push([RR_FX.masterFade, arg[0]], [RR_FX.masterFadeRate, arg[1]]);
-        else if (command === 'pitchSlide') pending.push([RR_FX.pitchSlide, arg[0]], [RR_FX.pitchSlideLow, arg[1]]);
-        else if (command === 'pitchSlideOff') pending.push([RR_FX.pitchSlideOff, 0]);
+        // each entry: effTyp, value, file offset of the argument byte that holds it (-1: the command has none)
+        const fileAt = (i: number): number => argAt + i + HUNK_BYTES;
+        if (command === 'setVolume') pending.push([RR_FX.setVolume, arg[0], fileAt(0)]);
+        else if (command === 'volumeSlide') pending.push([RR_FX.volumeSlide, arg[0], fileAt(0)], [RR_FX.volumeSlideRate, arg[1], fileAt(1)]);
+        else if (command === 'masterFade') pending.push([RR_FX.masterFade, arg[0], fileAt(0)], [RR_FX.masterFadeRate, arg[1], fileAt(1)]);
+        else if (command === 'pitchSlide') pending.push([RR_FX.pitchSlide, arg[0], fileAt(0)], [RR_FX.pitchSlideLow, arg[1], fileAt(1)]);
+        else if (command === 'pitchSlideOff') pending.push([RR_FX.pitchSlideOff, 0, -1]);
         if (command === 'setSample') { instrument = arg[0]; instrumentAt = argAt + HUNK_BYTES; }
         if (command === 'rest' || command === 'restSilence') {
           const wait = u16(m, rates + 2 * arg[0]);
@@ -415,13 +422,14 @@ export function buildRiffRaffGrid(file: Uint8Array): RiffRaffGrid | string {
 
   const notesPerVoice = new Array<number>(VOICES).fill(0);
   const sources: Array<Array<RiffRaffRowSource | null>> = Array.from({ length: VOICES }, () => new Array<RiffRaffRowSource | null>(patternCount * ROWS_PER_PATTERN).fill(null));
+  const effectSources: StreamEffectSource[][][] = Array.from({ length: VOICES }, () => Array.from({ length: patternCount * ROWS_PER_PATTERN }, () => []));
   const columns: TrackerCell[][] = Array.from({ length: VOICES }, () => Array.from({ length: patternCount * ROWS_PER_PATTERN }, emptyCell));
   const firstStream: number[][] = Array.from({ length: patternCount }, () => new Array<number>(VOICES).fill(-1));
   for (let v = 0; v < VOICES; v++) {
     for (const e of voiceEvents[v]) {
       const row = e.tick / step;
       const cell = columns[v][row];
-      for (const [typ, val] of e.fx) addCellEffect(cell, typ, val);
+      for (const [typ, val, at] of e.fx) if (addCellEffect(cell, typ, val)) effectSources[v][row].push({ typ, at });
       if (e.kind === 'note') { cell.note = e.note; cell.instrument = e.instrument + 1; notesPerVoice[v]++; sources[v][row] = { noteAt: e.noteAt, instrumentAt: e.instrumentAt, transpose: e.transpose }; }
       else if (e.kind === 'silence') cell.note = NOTE_OFF;
       const p = Math.floor(row / ROWS_PER_PATTERN);
@@ -458,7 +466,7 @@ export function buildRiffRaffGrid(file: Uint8Array): RiffRaffGrid | string {
   }
   return {
     version: version.name, patterns, songPositions: patterns.map((_, i) => i), rows, ticksPerRow: step, streams, blockRows,
-    streamAtStart: firstStream, notesPerVoice, samples, enabled, fileOffsetBase: HUNK_BYTES, sources,
+    streamAtStart: firstStream, notesPerVoice, samples, enabled, fileOffsetBase: HUNK_BYTES, sources, effectSources,
     noteForByte: (byte, transpose) => periodToNote(u16(m, (base.periods ?? 0) + 2 * ((byte + transpose) & 0xffff))),
   };
 }

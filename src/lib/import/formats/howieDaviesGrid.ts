@@ -29,6 +29,7 @@
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import { periodToNote } from '@/lib/amiga/periodNotes';
 import { HD_FX } from './commandStreamEffectGlyphs';
+import type { StreamEffectSource } from './riffRaffGrid';
 import { addCellEffect, effectColumnsMeta } from './cellEffectSlots';
 
 const VOICES = 4;
@@ -131,6 +132,8 @@ export interface HowieDaviesGrid {
   notesPerVoice: number[];
   /** sources[voice][row over the whole grid], null where no note starts (phase B: where an edit is written) */
   sources: Array<Array<HowieDaviesRowSource | null>>;
+  /** effectSources[voice][row]: the byte behind each effect-column command of the row, in effect slot order (phase B) */
+  effectSources: Array<Array<StreamEffectSource[]>>;
   /** The tracker note a pattern note byte (a period table index) plays, or 0 when the index is outside the table. */
   noteForByte: (byte: number) => number;
 }
@@ -147,10 +150,10 @@ interface VoiceState {
   listStart: number; listPos: number; patternStart: number; patternPos: number; repeatsLeft: number;
   rest: number; instrument: number; instrumentAt: number; stream: number; on: boolean;
   /** Speed / Maximum Volume commands read since the last note: they show on the next note's row. */
-  pending: Array<[number, number]>;
+  pending: Array<[number, number, number]>;
 }
 
-interface Event { tick: number; note: number; instrument: number; stream: number; noteAt: number; instrumentAt: number; fx: Array<[number, number]> }
+interface Event { tick: number; note: number; instrument: number; stream: number; noteAt: number; instrumentAt: number; fx: Array<[number, number, number]> }
 
 export function buildHowieDaviesGrid(file: Uint8Array): HowieDaviesGrid | string {
   const m = loadImage(file);
@@ -215,9 +218,9 @@ export function buildHowieDaviesGrid(file: Uint8Array): HowieDaviesGrid | string
           if (s.repeatsLeft >= 0) { s.patternPos = s.patternStart; result = 'pattern'; } else result = 'list';
           break;
         case 'instrument': s.instrumentAt = cursor + HUNK_BYTES; s.instrument = operand(); s.patternPos = cursor; result = 'pattern'; break;
-        case 'speed': speed = operand(); s.pending.push([HD_FX.speed, speed]); s.patternPos = cursor; result = 'pattern'; break;
+        case 'speed': { const at = cursor + HUNK_BYTES; speed = operand(); s.pending.push([HD_FX.speed, speed, at]); s.patternPos = cursor; result = 'pattern'; break; }
         case 'delay': s.rest = (operand() << 24) >> 24; s.patternPos = cursor; result = 'return'; break;
-        case 'maxVolume': s.pending.push([HD_FX.maxVolume, operand()]); s.patternPos = cursor; result = 'pattern'; break;
+        case 'maxVolume': { const at = cursor + HUNK_BYTES; s.pending.push([HD_FX.maxVolume, operand(), at]); s.patternPos = cursor; result = 'pattern'; break; }
         case 'listRestart': s.listPos = s.listStart; clearFlag(v); result = 'list'; break;
         case 'listRestartOff': s.listPos = s.listStart; clearFlag(v); s.on = false; result = 'list'; break;
         case 'listLoopBack': {
@@ -322,6 +325,7 @@ export function buildHowieDaviesGrid(file: Uint8Array): HowieDaviesGrid | string
 
   const notesPerVoice = new Array<number>(VOICES).fill(0);
   const columns: TrackerCell[][] = Array.from({ length: VOICES }, () => Array.from({ length: patternCount * ROWS_PER_PATTERN }, emptyCell));
+  const effectSources: StreamEffectSource[][][] = Array.from({ length: VOICES }, () => Array.from({ length: patternCount * ROWS_PER_PATTERN }, () => []));
   const sources: Array<Array<HowieDaviesRowSource | null>> = Array.from({ length: VOICES }, () => new Array<HowieDaviesRowSource | null>(patternCount * ROWS_PER_PATTERN).fill(null));
   const firstStream: number[][] = Array.from({ length: patternCount }, () => new Array<number>(VOICES).fill(-1));
   for (let v = 0; v < VOICES; v++) {
@@ -330,7 +334,7 @@ export function buildHowieDaviesGrid(file: Uint8Array): HowieDaviesGrid | string
       const cell = columns[v][row];
       cell.note = e.note;
       cell.instrument = e.instrument + 1;
-      for (const [typ, val] of e.fx) addCellEffect(cell, typ, val);
+      for (const [typ, val, at] of e.fx) if (addCellEffect(cell, typ, val)) effectSources[v][row].push({ typ, at });
       notesPerVoice[v]++;
       sources[v][row] = { noteAt: e.noteAt, instrumentAt: e.instrumentAt };
       if (row % ROWS_PER_PATTERN === 0) firstStream[Math.floor(row / ROWS_PER_PATTERN)][v] = streamIndexOfStart.get(e.stream) ?? -1;
@@ -348,7 +352,7 @@ export function buildHowieDaviesGrid(file: Uint8Array): HowieDaviesGrid | string
   });
   return {
     driver: ['Blazing Thunder', 'Future Bike Simulator', "Yogi's Great Escape"][driverIndex], patterns,
-    songPositions: patterns.map((_, i) => i), rows, ticksPerRow: rowTicks, streams, blockRows, streamAtStart: firstStream, notesPerVoice, sources,
+    songPositions: patterns.map((_, i) => i), rows, ticksPerRow: rowTicks, streams, blockRows, streamAtStart: firstStream, notesPerVoice, sources, effectSources,
     noteForByte: (byte) => (byte >= 0 && byte < PERIOD_COUNT ? periodToNote(u16(m, periodAt + 2 * byte)) : 0),
   };
 }
