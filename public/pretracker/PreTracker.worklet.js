@@ -21,6 +21,8 @@ class PreTrackerProcessor extends AudioWorkletProcessor {
     this.processCount = 0;
     this.lastReportedPos = -1;
     this.lastReportedRow = -1;
+    // Loading is silent: audio renders only between 'play' and 'stop' (same as the Hively worklet).
+    this.playing = false;
 
     // Per-channel isolation (4 slots, matching Hively/Furnace pattern)
     this.isolationSlots = [null, null, null, null]; // { channelMask }
@@ -44,10 +46,16 @@ class PreTrackerProcessor extends AudioWorkletProcessor {
         this.subsong = 0;
         this.lastReportedPos = -1;
         this.lastReportedRow = -1;
+        this.playing = false;
         this.loadModuleData(data.moduleData);
         break;
 
+      case 'play':
+        this.playing = true;
+        break;
+
       case 'stop':
+        this.playing = false;
         if (this.module && typeof this.module._player_stop === 'function') {
           this.module._player_stop();
           this.port.postMessage({ type: 'stopped' });
@@ -610,6 +618,8 @@ class PreTrackerProcessor extends AudioWorkletProcessor {
     if (!outputL || !outputR) return true;
 
     const numSamples = Math.min(outputL.length, this.bufferSize);
+
+    if (!this.playing) return true;
 
     if (typeof this.module._player_render === 'function') {
       this.updateBufferViews();
