@@ -8,7 +8,7 @@
  *   2. Only effect 0x0D was preserved; every other effect nibble in byte[1] was dropped.
  *
  * encodeTCBTrackerCell now takes the song's noteOffset and inverts the note byte exactly,
- * and decodeCell stores the raw TCB effect nibble VERBATIM, so the codec is byte-exact.
+ * and decodeCell shows the pitch bends 1-10 as portamento; the stored bytes decide which nibble an unedited cell writes back, so the codec is byte-exact.
  *
  * Fixture: public/data/songs/formats/cannonfodder.tcb (committed real module).
  */
@@ -47,7 +47,7 @@ describe('TCBTracker pattern codec', () => {
           const cell = layout.decodeCell(orig);
           if ((orig[0] ?? 0) >= 0x10 && (orig[0] ?? 0) <= 0x3b) sawNote = true;
           if (((orig[1] ?? 0) & 0x0f) !== 0) sawEffect = true;
-          const re = layout.encodeCell(cell);
+          const re = layout.encodeCell(cell, orig);
           expect([...re], `cell p${p} r${r} c${c} @${off}`).toEqual([...orig]);
           checked++;
         }
