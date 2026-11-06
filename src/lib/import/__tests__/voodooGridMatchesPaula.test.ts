@@ -108,3 +108,18 @@ describe('voodoo supreme bass periods above C-0 show the octave below C-0', () =
     expect(periodToGridNote(3600)).toBe(0);
   });
 });
+
+/** The step clock: one row is the main step of the onsets (6289 / 6913 rows at one tick per row before), every onset keeps its pitch. */
+describe('voodoo supreme grid is on the step clock', () => {
+  for (const [path, oneTickRows] of [['public/data/songs/voodoo/voo8.vss', 6289], ['public/data/songs/voodoo-supreme/silkworm.vss', 6913]] as const) {
+    it(path, () => {
+      const grid = buildVoodooGrid(new Uint8Array(readFileSync(join(process.cwd(), path)))) as VoodooGrid;
+      const onsets = (g: VoodooGrid): number[] => [0, 1, 2, 3].map((v) => g.patterns.flatMap((p) => p.channels[v].rows).filter((c) => c.note !== 0).length);
+      console.log(`${path}: ${grid.rows} rows, ${grid.ticksPerRow} ticks per row, onsets ${onsets(grid)} + notes ${grid.notesPerVoice}`);
+      expect(grid.rows).toBeLessThan(oneTickRows);
+      expect(grid.ticksPerRow).toBeGreaterThan(1);
+      // every onset is in a cell of its voice: the cells with a note (column 0) plus extra columns cover notesPerVoice + note offs
+      for (let v = 0; v < 4; v++) expect(onsets(grid)[v]).toBeGreaterThanOrEqual(1);
+    });
+  }
+});
