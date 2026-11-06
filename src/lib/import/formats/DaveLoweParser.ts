@@ -521,8 +521,6 @@ export async function parseDaveLoweFile(
           maxRows = Math.max(maxRows, rows.length);
         }
       }
-      // Cap pattern length at 256 rows for sanity
-      maxRows = Math.min(maxRows, 256);
       if (maxRows === 0) maxRows = 1;
 
       const channels: ChannelData[] = [];

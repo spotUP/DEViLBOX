@@ -342,7 +342,6 @@ export function parseDaveLoweNewFile(buffer: ArrayBuffer, filename: string): Tra
         maxRows = Math.max(maxRows, rows.length);
       }
     }
-    maxRows = Math.min(maxRows, 256);
     if (maxRows === 0) maxRows = 1;
 
     const channels: ChannelData[] = [];
@@ -391,6 +390,19 @@ export function parseDaveLoweNewFile(buffer: ArrayBuffer, filename: string): Tra
     filePatternSizes.push(sectionBytes.get(sectionPtr) ?? 0);
   }
 
+  // Per-byte carrier rows (the Dave Lowe recipe, DaveLoweParser.ts): a section is a variable-length command stream, so
+  // the encoder reproduces it verbatim from these; the editable display grid stays carrier-less.
+  const blockRows: TrackerCell[][] = filePatternAddrs.map((addr, i) => {
+    const cells: TrackerCell[] = [];
+    for (let b = 0; b < filePatternSizes[i] && addr + b < buf.length; b++) {
+      cells.push({
+        note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
+        cutoff: 1, period: buf[addr + b] & 0xFF,
+      });
+    }
+    return cells;
+  });
+
   const variableLayout: UADEVariablePatternLayout = {
     formatId: 'daveLowe',
     numChannels: 4,
@@ -401,6 +413,7 @@ export function parseDaveLoweNewFile(buffer: ArrayBuffer, filename: string): Tra
     filePatternAddrs,
     filePatternSizes,
     trackMap,
+    blockRows,
   };
 
   return {
