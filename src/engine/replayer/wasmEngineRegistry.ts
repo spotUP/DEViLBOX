@@ -17,6 +17,7 @@ import { FILE_DATA_FIELDS } from '../formatFileDataFields';
 import { nuadeSongHasCellWrite } from '../nuade/nuadeCaps';
 import { makeRowClock } from '../../lib/import/formats/stepRowClock';
 import { dwRowStartTick } from '../davidwhittaker/dwGridTicks';
+import { CINTER4_ROWS_PER_PATTERN } from '../../lib/import/formats/cinter4Music';
 import { uadeEditableLoadArgs } from '../uade/uadeLoadArgs';
 
 // ---------------------------------------------------------------------------
@@ -648,6 +649,10 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     needsDirectRouting: true,
     staticRef: null,
     dynamicResolver: async () => (await import('@/engine/cinter4/Cinter4Engine')).Cinter4Engine as unknown as WASMSingletonStatic,
+    // The grid is the folded tick stream (foldCinter4ToModPatterns): CINTER4_ROWS_PER_PATTERN rows per pattern at the
+    // recovered `initialSpeed` ticks per row, one order entry per pattern. The player is linear, so seekTo(tick) is exact.
+    startTargetOf: (song, songPos, row) => ((song.songPositions[songPos] ?? songPos) * CINTER4_ROWS_PER_PATTERN + row) * song.initialSpeed,
+    startAt: (instance, tick) => (instance as unknown as import('@/engine/cinter4/Cinter4Engine').Cinter4Engine).seekTo(tick),
   },
   {
     key: 'Pmdmini',
