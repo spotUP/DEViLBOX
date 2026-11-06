@@ -36,9 +36,9 @@ const fakeEngine = (() => {
   return { output, ready: async () => {}, loadTune: async () => {}, play: vi.fn(), stop: vi.fn(), pause: vi.fn(), onPositionUpdate: () => () => {} };
 })();
 
-vi.mock('@/engine/fred-replayer/FredReplayerEngine', () => ({
-  FredReplayerEngine: { getInstance: () => fakeEngine, hasInstance: () => true },
-}));
+// Fred's engine is stubbed with vi.spyOn on the real class in beforeAll, not with vi.mock: the registry reaches it
+// through a dynamic import, and in CI that import bypassed a vi.mock'd FredReplayerEngine and built the real engine
+// (no AudioContext, so no tap). Same as klystrackPlayLoadsTheEditedSong.
 vi.mock('../ToneEngine', () => ({
   getToneEngine: () => ({ getInstrument() {}, connectMeters() {}, stopNativeEngine() {}, getNativeEngineOutput: () => null }),
 }));
@@ -51,6 +51,9 @@ const song = {
 
 describe('a replayed engine song still feeds the dub bus', () => {
   beforeAll(async () => {
+    const { FredReplayerEngine } = await import('@/engine/fred-replayer/FredReplayerEngine');
+    vi.spyOn(FredReplayerEngine, 'getInstance').mockReturnValue(fakeEngine as never);
+    vi.spyOn(FredReplayerEngine, 'hasInstance').mockReturnValue(true);
     await import('../replayer/NativeEngineRouting');
     await import('@stores/useTransportStore');
   }, 60_000);
