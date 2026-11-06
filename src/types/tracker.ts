@@ -139,6 +139,11 @@ export interface TrackerCell {
   /** SunTronic V1.3 only: order position (subsong-0 entry index) this display cell belongs to. */
   sunPosition?: number;
 
+  /** Dave Lowe / Dave Lowe New only: the row lies past the end of its channel's command stream (the channel is shorter than the longest channel of the pattern). The re-encode does not turn it into duration. */
+  dlPadding?: boolean;
+  /** Dave Lowe / Dave Lowe New only: the stream sets the instrument the channel already runs (a repeated word 4); the re-encode writes it again. */
+  dlInstrRepeat?: boolean;
+
   // ── Renoise-style multi-note columns (any number per cell) ──
   // Column 1 uses the primary note/instrument/volume fields above. Every further column
   // is extraNotes[col - 2]; each has independent note-off, instrument, volume and sub-row

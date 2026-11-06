@@ -10,7 +10,8 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseDaveLoweNewFile } from '../DaveLoweNewParser';
-import { parseDaveLoweFile } from '../DaveLoweParser';
+import { parseDaveLoweFile, daveLoweEncoderForStep } from '../DaveLoweParser';
+import type { TrackerCell } from '@/types';
 import { patchModuleByVariableLayout } from '@/lib/export/layoutPatch';
 import { baselineOf, setGridBaseline } from '@/lib/song/gridBaseline';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
@@ -113,5 +114,66 @@ describe('Dave Lowe grid re-encode keeps instrument and envelope commands', () =
     // Known open: one section (patterns 44-45, channel 1) has a SET_INSTRUMENT pointer 8 bytes past the last 14-byte
     // descriptor (0x2332, mapped to the same id as 0x232a) and an unmodelled command word 0x001c. Everything else matches.
     expect(mismatched.map((m) => m.split(' ')[0])).toEqual(['44:1', '45:1']);
+  });
+});
+
+/** Sections of a song whose untouched full grid channel (padding rows included) does not re-encode to the section's bytes. */
+function untouchedMismatches(song: TrackerSong, ab: ArrayBuffer): string[] {
+  const layout = (song as unknown as { uadeVariableLayout: UADEVariablePatternLayout }).uadeVariableLayout;
+  const orig = new Uint8Array(ab);
+  const seen = new Set<number>();
+  const bad: string[] = [];
+  for (let pi = 0; pi < song.patterns.length; pi++) {
+    for (let ch = 0; ch < 4; ch++) {
+      const fp = layout.trackMap[pi][ch];
+      if (fp == null || fp < 0 || seen.has(fp)) continue;
+      seen.add(fp);
+      const want = orig.subarray(layout.filePatternAddrs[fp], layout.filePatternAddrs[fp] + layout.filePatternSizes[fp]);
+      const got = layout.encoder.encodePattern(song.patterns[pi].channels[ch].rows, ch);
+      if (got.length !== want.length || got.some((x, i) => x !== want[i])) bad.push(`${pi}:${ch}`);
+    }
+  }
+  return bad;
+}
+
+const cell = (o: Partial<TrackerCell> = {}): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, ...o });
+const tables = { envFirst: true, instrumentPtr: (id: number) => 0x2000 + id * 14, envPtrs: [] as number[] };
+const hex = (b: Uint8Array) => Array.from(b).map((x) => x.toString(16).padStart(2, '0')).join('');
+
+describe('Dave Lowe grid re-encode of a short channel and of a repeated instrument command', () => {
+  it('padding rows after a channel end never become duration (unedited channel is byte-exact)', () => {
+    const enc = daveLoweEncoderForStep(8, tables);
+    const note = cell({ note: 40 });
+    const padded = [note, cell({ dlPadding: true }), cell({ dlPadding: true }), cell({ dlPadding: true })];
+    const bare = enc.encodePattern([note], 0);
+    expect(hex(enc.encodePattern(padded, 0))).toBe(hex(bare));
+    expect(hex(bare).slice(4)).toBe('00080008');
+    // a note typed into the padding is real; only the padding after it is dropped
+    const typed = [note, cell({ dlPadding: true }), cell({ note: 42, dlPadding: true }), cell({ dlPadding: true })];
+    expect(commandWords(enc.encodePattern(typed, 0)).length).toBe(3);
+  });
+
+  it('a repeated setInstrument of the running instrument is written again; an unflagged repeat is not', () => {
+    const enc = daveLoweEncoderForStep(8, tables);
+    const a = cell({ note: 40, instrument: 1, period: 0x1e0 });
+    const repeat = cell({ note: 40, instrument: 1, period: 0x1e0, dlInstrRepeat: true });
+    const plain = cell({ note: 40, instrument: 1, period: 0x1e0 });
+    const withRepeat = commandWords(enc.encodePattern([a, repeat], 0));
+    expect(withRepeat.filter((w) => w.startsWith('0004')).length).toBe(2);
+    expect(commandWords(enc.encodePattern([a, plain], 0)).filter((w) => w.startsWith('0004')).length).toBe(1);
+  });
+
+  it('parser records both: padding cells of a short channel and untouched sections of both corpus songs', async () => {
+    const mb = read('public/data/songs/formats/m-bison.dln');
+    const sphere = read('public/data/songs/formats/incredibleshrinkingsphere.dl');
+    const bison = parseDaveLoweNewFile(mb.slice(0), 'm-bison.dln');
+    const sph = await parseDaveLoweFile(sphere.slice(0), 'incredibleshrinkingsphere.dl');
+    expect(sph.patterns.some((p) => p.channels.some((c) => c.rows.some((r) => r.dlPadding)))).toBe(true);
+    // Open (not padding, not repeats): sections that end on an unmodelled terminator word (0x14, 0x1c, 0x30) and the
+    // pointer 0x2332 mapped to the same id as 0x232a. Before the padding fix 19 more sections of the sphere failed.
+    expect(untouchedMismatches(bison, mb)).toEqual(['0:2']);
+    expect(untouchedMismatches(sph, sphere)).toEqual([
+      '13:2', '34:3', '35:1', '35:3', '42:1', '44:1', '45:1', '49:3', '50:3', '51:3', '52:3', '53:3', '72:3', '78:3', '87:2', '89:2',
+    ]);
   });
 });

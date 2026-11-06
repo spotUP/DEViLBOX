@@ -206,6 +206,8 @@ interface RowData {
   eff: number;
   /** The authored Amiga period of a note (finetuned songs hold periods between the table's); the encoder writes it back while the note is unchanged. */
   period?: number;
+  /** The stream sets the instrument the channel already runs; the encoder writes the repeated command. */
+  dlInstrRepeat?: boolean;
 }
 
 /** A command-stream event with its pointers already resolved to ids (instrument id 0 = pointer not a known instrument). */
@@ -225,6 +227,7 @@ export function eventsToGridRows(events: DLGridEvent[], clock: RowClock): { rows
   const rows: RowData[] = [];
   let currentInstr = 0;
   let instrPending = false;
+  let instrRepeat = false;
   let envPending = 0;
   let totalTicks = 0;
   const cells: Array<{ tick: number; cell: RowData }> = [];
@@ -236,7 +239,9 @@ export function eventsToGridRows(events: DLGridEvent[], clock: RowClock): { rows
       effTyp: envPending > 0 ? DL_FX_VOL_ENV : 0, eff: envPending,
     };
     if (period > 0) cell.period = period;
+    if (instrRepeat) cell.dlInstrRepeat = true;
     instrPending = false;
+    instrRepeat = false;
     envPending = 0;
     return cell;
   };
@@ -244,7 +249,7 @@ export function eventsToGridRows(events: DLGridEvent[], clock: RowClock): { rows
   for (const ev of events) {
     switch (ev.type) {
       case 'setInstrument':
-        if (ev.id > 0) { currentInstr = ev.id; instrPending = true; }
+        if (ev.id > 0) { instrRepeat = instrPending ? instrRepeat : ev.id === currentInstr; currentInstr = ev.id; instrPending = true; }
         break;
       case 'setVolEnv':
         if (ev.envId > 0) envPending = ev.envId;
@@ -313,7 +318,8 @@ const pushCmd = (out: number[], word: number, ptr: number): void => {
  * Encode tracker rows back to DL command stream binary.
  * Groups consecutive note rows, rest rows, etc. into commands. The instrument column and the DL_FX_VOL_ENV effect
  * of a row come back as SET_INSTRUMENT (word 4) and SET_VOL_ENV (word 12) before its note or rest; an instrument
- * equal to the running one is not repeated.
+ * equal to the running one is written again only when the cell is flagged `dlInstrRepeat` (the stream repeated it).
+ * Trailing `dlPadding` cells (a channel shorter than its pattern) are not part of the stream and add no duration.
  */
 function encodeRowsToStream(rows: TrackerCell[], _channel: number, step = 1, tables?: DLCommandTables): Uint8Array {
   // Carrier path (byte-exact): rows produced by the parser's blockRows are
@@ -340,20 +346,22 @@ function encodeRowsToStream(rows: TrackerCell[], _channel: number, step = 1, tab
     const emitEnv = (): void => { if (env > 0 && tables.envPtrs[env - 1] !== undefined) pushCmd(out, CMD_SET_VOL_ENV, tables.envPtrs[env - 1]); };
     if (tables.envFirst) emitEnv();
     const instr = c.instrument ?? 0;
-    const ptr = instr > 0 && instr !== running ? tables.instrumentPtr(instr) : undefined;
+    const ptr = instr > 0 && (instr !== running || c.dlInstrRepeat) ? tables.instrumentPtr(instr) : undefined;
     if (ptr !== undefined) { pushCmd(out, CMD_SET_INSTRUMENT, ptr); running = instr; }
     if (!tables.envFirst) emitEnv();
   };
   let i = 0;
+  let end = rows.length;
+  while (end > 0 && rows[end - 1].dlPadding && !hasCommand(rows[end - 1])) end--;
 
-  while (i < rows.length) {
+  while (i < end) {
     const cell = rows[i];
     const note = cell.note ?? 0;
 
     if (note > 0 && note !== NOTE_OFF) {
       // Find duration: count how many subsequent rows carry no command
       let duration = 1;
-      while (i + duration < rows.length && !hasCommand(rows[i + duration])) {
+      while (i + duration < end && !hasCommand(rows[i + duration])) {
         duration++;
       }
       // Convert XM note to period
@@ -373,7 +381,7 @@ function encodeRowsToStream(rows: TrackerCell[], _channel: number, step = 1, tab
     } else {
       // REST: this row (which may carry commands) and the empty rows after it
       let duration = 1;
-      while (i + duration < rows.length && !hasCommand(rows[i + duration])) {
+      while (i + duration < end && !hasCommand(rows[i + duration])) {
         duration++;
       }
       emitCommands(cell);
@@ -619,11 +627,12 @@ export async function parseDaveLoweFile(
               effTyp: sRows[r].effTyp,
               eff: sRows[r].eff,
               ...(sRows[r].period ? { period: sRows[r].period } : {}),
+            ...(sRows[r].dlInstrRepeat ? { dlInstrRepeat: true } : {}),
               effTyp2: 0,
               eff2: 0,
             });
           } else {
-            trackerRows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+            trackerRows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, dlPadding: true });
           }
         }
 
