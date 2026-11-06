@@ -11,6 +11,7 @@
  * as edited and every cell that does not share an edited byte must be unchanged, otherwise the edit is taken out again.
  */
 import type { Pattern, TrackerCell } from '@/types';
+import { getColumnField, maxNoteColumns } from '@/lib/tracker/noteColumns';
 import { buildTimFollinGrid, timFollinShownNote, type TfolGrid } from './timFollinGrid';
 
 const NOTE_OFF = 97;
@@ -33,15 +34,19 @@ export function otherFieldsDiffer(a: TrackerCell, b: TrackerCell): boolean {
   const x = a as unknown as Record<string, number | undefined>;
   const y = b as unknown as Record<string, number | undefined>;
   for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) {
-    if (/^(note|instrument)[234]?$/.test(k)) continue;
+    if (k === 'note' || k === 'instrument' || k === 'extraNotes') continue;
     if ((x[k] ?? 0) !== (y[k] ?? 0)) return true;
+  }
+  // Notes and instruments of every column are handled by the caller; volume and delay of the further columns are "other".
+  const cols = maxNoteColumns([a, b]);
+  for (let col = 1; col < cols; col++) {
+    for (const f of ['volume', 'delay'] as const) if ((getColumnField(a, col, f) ?? 0) !== (getColumnField(b, col, f) ?? 0)) return true;
   }
   return false;
 }
 
 /** The note shown in note column `col` (0 = first) of a cell. */
-const noteIn = (cell: TrackerCell | undefined, col: number): number =>
-  ((cell as unknown as Record<string, number | undefined> | undefined)?.[col === 0 ? 'note' : `note${col + 1}`]) ?? 0;
+const noteIn = (cell: TrackerCell | undefined, col: number): number => (cell ? getColumnField(cell, col, 'note') : undefined) ?? 0;
 
 const cellAt = (g: TfolGrid, channel: number, row: number): TrackerCell | undefined =>
   g.patterns[Math.floor(row / ROWS_PER_PATTERN)]?.channels[channel]?.rows[row % ROWS_PER_PATTERN];
@@ -75,7 +80,7 @@ export function applyTimFollinGridEdits(original: Uint8Array, patterns: readonly
     if (!was) return;
     const otherChanged = otherFieldsDiffer(cell, was);
     const at = { pattern: pi, channel: c, row: r };
-    if ((['instrument', 'instrument2', 'instrument3', 'instrument4'] as const).some((f) => cell[f] !== was[f])) warnings.push(`${PREFIX} ${where(at)}: the instrument is chosen by an Instrument command shared by many notes; that change was not written.`);
+    if (Array.from({ length: maxNoteColumns([cell, was]) }, (_, col) => col).some((col) => getColumnField(cell, col, 'instrument') !== getColumnField(was, col, 'instrument'))) warnings.push(`${PREFIX} ${where(at)}: the instrument is chosen by an Instrument command shared by many notes; that change was not written.`);
     if (otherChanged) warnings.push(`${PREFIX} ${where(at)}: volume and effect columns are not stored per row in this format; that change was not written.`);
     for (let col = 0; col < base.noteCols[c]; col++) {
       const now = noteIn(cell, col);
@@ -128,7 +133,7 @@ export function applyTimFollinGridEdits(original: Uint8Array, patterns: readonly
         if (shared.has(`${c}:${row}`)) continue;
         const a = cellAt(again, c, row);
         const b = cellAt(base, c, row);
-        if (a?.note !== b?.note || a?.instrument !== b?.instrument || [1, 2, 3].some((k) => noteIn(a, k) !== noteIn(b, k))) return edits; // something else moved
+        if (a?.note !== b?.note || a?.instrument !== b?.instrument || Array.from({ length: Math.max(maxNoteColumns([a, b].filter((x): x is TrackerCell => !!x)), 1) }, (_, k) => k).some((k) => noteIn(a, k) !== noteIn(b, k))) return edits; // something else moved
       }
     }
     return [];

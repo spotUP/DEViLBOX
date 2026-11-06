@@ -7,6 +7,7 @@
  * - Standard tracker timing: 2.5ms per tick at 125 BPM
  */
 
+import { getColumnField } from '@/lib/tracker/noteColumns';
 import * as Tone from 'tone';
 import { getToneEngine } from './ToneEngine';
 import { getTrackerReplayer } from './TrackerReplayer';
@@ -692,13 +693,13 @@ export class PatternScheduler {
               this.applyTickEffects(channelIndex, effectResult, localHandler);
 
               // ── Extra note columns (chord support) ─────────────────────
-              // Process note columns 2-4 for multi-note chord playback
+              // Process note columns 2 and up for multi-note chord playback
               const totalNoteCols = channel.channelMeta?.noteCols ?? 1;
               if (totalNoteCols > 1 && !engine.isChannelMuted(channelIndex)) {
                 for (let nc = 1; nc < totalNoteCols; nc++) {
-                  const extraNote = nc === 1 ? (cell.note2 ?? 0) : nc === 2 ? (cell.note3 ?? 0) : (cell.note4 ?? 0);
-                  const extraInst = nc === 1 ? (cell.instrument2 ?? 0) : nc === 2 ? (cell.instrument3 ?? 0) : (cell.instrument4 ?? 0);
-                  const extraVol = nc === 1 ? (cell.volume2 ?? 0) : nc === 2 ? (cell.volume3 ?? 0) : (cell.volume4 ?? 0);
+                  const extraNote = getColumnField(cell, nc, 'note') ?? 0;
+                  const extraInst = getColumnField(cell, nc, 'instrument') ?? 0;
+                  const extraVol = getColumnField(cell, nc, 'volume') ?? 0;
 
                   if (extraNote === 97) {
                     // Note-off for this column — release the channel's poly voice

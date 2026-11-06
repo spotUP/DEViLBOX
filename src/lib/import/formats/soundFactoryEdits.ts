@@ -13,6 +13,7 @@
  * An unedited song serializes to its own bytes, so a no-op export is lossless by construction.
  */
 import type { Pattern, TrackerCell } from '@/types';
+import { getColumnField, maxNoteColumns } from '@/lib/tracker/noteColumns';
 import { parseSoundFactoryWithEffects } from './SoundFactoryParser';
 import { SF_FX_ROW_OFFSET, SF_MAX_EFFECT_SLOTS } from './soundFactoryGrid';
 import { sfEncodeEffects, sfNormalizeEffects } from './soundFactoryEffects';
@@ -104,7 +105,7 @@ export function writeSoundFactory(sourceBytes: Uint8Array, edited: readonly Patt
     const noteChanged = (a.note ?? 0) !== (b.note ?? 0);
     const fxChanged = !same(sfNormalizeEffects(now.fx), old.fx);
     const delayChanged = now.delay !== old.delay;
-    if ((a.instrument ?? 0) !== (b.instrument ?? 0) || [2, 3, 4].some((k) => (a[`note${k}`] ?? 0) !== (b[`note${k}`] ?? 0) || (a[`instrument${k}`] ?? 0) !== (b[`instrument${k}`] ?? 0))) {
+    if ((a.instrument ?? 0) !== (b.instrument ?? 0) || Array.from({ length: maxNoteColumns([cell, was]) - 1 }, (_, i) => i + 1).some((k) => (getColumnField(cell, k, 'note') ?? 0) !== (getColumnField(was, k, 'note') ?? 0) || (getColumnField(cell, k, 'instrument') ?? 0) !== (getColumnField(was, k, 'instrument') ?? 0))) {
       warnings.push(`${where}: instrument and further-column note edits are not written`);
     }
     if (!noteChanged && !fxChanged && !delayChanged) return;

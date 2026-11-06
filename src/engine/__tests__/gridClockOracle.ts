@@ -33,7 +33,7 @@ export function gridOnsets(
     const tickSec = sec / (song.initialSpeed ?? 6);
     pat.channels.forEach((c, ch) => c.rows.forEach((r, i) => {
       if (r.note > 0 && r.note < 97) out[ch].push((row + i) * sec + (delayTicks ? delayTicks(r, 0) : 0) * tickSec);
-      if (r.note2 && r.note2 > 0 && r.note2 < 97) out[ch].push((row + i) * sec + (delayTicks ? delayTicks(r, 1) : 0) * tickSec);
+      if (r.extraNotes?.[0]?.note && r.extraNotes[0].note > 0 && r.extraNotes[0].note < 97) out[ch].push((row + i) * sec + (delayTicks ? delayTicks(r, 1) : 0) * tickSec);
     }));
     row += pat.length;
   }

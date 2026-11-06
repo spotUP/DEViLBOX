@@ -43,7 +43,7 @@ describe('Ben Daglish edits (the wiring is proved in stepGridReachability.test.t
     const walk = await walkBenDaglish(ab.slice(0), 0);
     const edited = song.patterns.map((p) => ({ ...p, channels: p.channels.map((c) => ({ ...c, rows: c.rows.map((r) => ({ ...r })) })) }));
     let done = false;
-    for (const p of edited) { for (const c of p.channels) { for (const r of c.rows) { if (!done && r.note2 && r.note2 < 90) { r.note2 += 1; done = true; } } } }
+    for (const p of edited) { for (const c of p.channels) { for (const r of c.rows) { const x = r.extraNotes?.[0]; if (!done && x?.note && x.note < 90) { x.note += 1; done = true; } } } }
     expect(done, 'a note column 2 exists').toBe(true);
     const res = applyBdGridEdits(new Uint8Array(ab), walk, song.uadeVariableLayout!.filePatternAddrs!, edited);
     expect(res.warnings).toEqual([]);
@@ -57,9 +57,9 @@ describe('Ben Daglish edits (the wiring is proved in stepGridReachability.test.t
     const walk = await walkBenDaglish(ab.slice(0), 0);
     const edited = song.patterns.map((p) => ({ ...p, channels: p.channels.map((c) => ({ ...c, rows: c.rows.map((r) => ({ ...r })) })) }));
     let cell: (typeof edited)[0]['channels'][0]['rows'][0] | undefined;
-    for (const p of edited) for (const c of p.channels) for (const r of c.rows) if (!cell && r.note2 && (r.delay2 ?? 0) >= 2) cell = r;
+    for (const p of edited) for (const c of p.channels) for (const r of c.rows) if (!cell && r.extraNotes?.[0]?.note && (r.extraNotes[0].delay ?? 0) >= 2) cell = r;
     expect(cell, 'a clash cell with room to move is in the grid').toBeTruthy();
-    cell!.delay2 = cell!.delay2! - 1;
+    cell!.extraNotes![0].delay = cell!.extraNotes![0].delay! - 1;
     const res = applyBdGridEdits(new Uint8Array(ab), walk, song.uadeVariableLayout!.filePatternAddrs!, edited);
     expect(res.warnings).toEqual([]);
     expect(res.patched, 'two duration bytes').toBe(2);

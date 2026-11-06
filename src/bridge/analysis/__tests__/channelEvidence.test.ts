@@ -44,9 +44,7 @@ function makeChannel(
     const row = Number(rowStr);
     const notes = Array.isArray(v) ? v : [v];
     const cell: TrackerCell = { ...emptyCell(), note: notes[0], instrument };
-    if (notes[1] !== undefined) cell.note2 = notes[1];
-    if (notes[2] !== undefined) cell.note3 = notes[2];
-    if (notes[3] !== undefined) cell.note4 = notes[3];
+    if (notes.length > 1) cell.extraNotes = notes.slice(1).map((note) => ({ note }));
     rows[row] = cell;
   }
   return {

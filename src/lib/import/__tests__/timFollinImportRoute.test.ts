@@ -41,11 +41,12 @@ function noteAtFor(song: TrackerSong, v: number, tick: number): number[] {
   const row = Math.floor(tick / step), off = tick % step;
   const c = song.patterns[Math.floor(row / 64)].channels[v].rows[row % 64] as unknown as Record<string, number>;
   if (c.note > 0 && (c.effTyp === 0xd7 ? c.eff : 0) === off) return [c.note, c.instrument];
-  if (c.note2 > 0 && (c.delay2 ?? 0) === off) return [c.note2, c.instrument2];
+  const x = (c as unknown as { extraNotes?: Array<{ note?: number; instrument?: number; delay?: number }> }).extraNotes?.[0];
+  if (x && (x.note ?? 0) > 0 && (x.delay ?? 0) === off) return [x.note!, x.instrument ?? 0];
   return [0, 0];
 }
 const countNotesFor = (song: TrackerSong, v: number): number =>
-  song.patterns.reduce((n, p) => n + p.channels[v].rows.filter((r) => r.note > 0).length + p.channels[v].rows.filter((r) => (r.note2 ?? 0) > 0).length, 0);
+  song.patterns.reduce((n, p) => n + p.channels[v].rows.filter((r) => r.note > 0).length + p.channels[v].rows.filter((r) => (r.extraNotes?.[0]?.note ?? 0) > 0).length, 0);
 
     expect(at(0, 0)).toEqual([37, 5]);
     expect(at(0, 2)).toEqual([34, 6]);

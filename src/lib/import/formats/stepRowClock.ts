@@ -127,7 +127,7 @@ export interface OnsetPlacement {
   row: number;
   /** 0: the first note column; 1 and up: a further onset of the same key in the same row. */
   col: number;
-  /** Ticks into the row the note starts (the 0xD7 row-offset effect for column 0, `delay2` for column 1). */
+  /** Ticks into the row the note starts (the 0xD7 row-offset effect for column 0, the column delay for further columns). */
   offset: number;
 }
 
@@ -156,11 +156,4 @@ export function makeOnsetPlacer(clock: RowClock): OnsetPlacer {
   return Object.assign(place, { columnsOf: (key: number) => cols.get(key) ?? 1 });
 }
 
-/** Note columns the cell model holds (note..note4). A clash deeper than this has no cell field to live in: the callers count it as left out and say so. */
-export const CELL_NOTE_COLUMNS = 4;
-
-/** The cell fields of note column `col` (0 is note/instrument; 1..3 are note2..note4, delay2..delay4). */
-export function setNoteColumn(cell: object, col: number, note: number, instrument: number, delay: number): void {
-  if (col < 1 || col >= CELL_NOTE_COLUMNS) throw new RangeError(`note column ${col + 1} does not exist in the cell model (${CELL_NOTE_COLUMNS} columns)`);
-  Object.assign(cell, { [`note${col + 1}`]: note, [`instrument${col + 1}`]: instrument, [`delay${col + 1}`]: delay });
-}
+export { setNoteColumn } from '@/lib/tracker/noteColumns';

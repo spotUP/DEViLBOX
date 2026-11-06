@@ -129,14 +129,12 @@ export function parseNoteName(text: string): number | null {
 }
 
 /** How many cells (all note columns) of the patterns hold a note of the octave below C-0. */
-export function countLowOctaveNotes(patterns: ReadonlyArray<{ channels: ReadonlyArray<{ rows: ReadonlyArray<{ note?: number; note2?: number; note3?: number; note4?: number } | undefined> }> }>): number {
+export function countLowOctaveNotes(patterns: ReadonlyArray<{ channels: ReadonlyArray<{ rows: ReadonlyArray<{ note?: number; extraNotes?: ReadonlyArray<{ note?: number }> } | undefined> }> }>): number {
   let n = 0;
   for (const p of patterns) for (const ch of p.channels) for (const c of ch.rows) {
     if (!c) continue;
     if (isLowOctaveNote(c.note ?? 0)) n++;
-    if (isLowOctaveNote(c.note2 ?? 0)) n++;
-    if (isLowOctaveNote(c.note3 ?? 0)) n++;
-    if (isLowOctaveNote(c.note4 ?? 0)) n++;
+    for (const e of c.extraNotes ?? []) if (isLowOctaveNote(e.note ?? 0)) n++;
   }
   return n;
 }

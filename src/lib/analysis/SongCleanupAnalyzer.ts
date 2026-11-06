@@ -62,7 +62,7 @@ function hashSampleData(buffer: ArrayBuffer): string {
 
 /**
  * Scan all patterns → channels → rows and collect every instrument index > 0.
- * Checks all four note columns (instrument, instrument2, instrument3, instrument4).
+ * Checks every note column.
  */
 export function findUsedInstruments(patterns: Pattern[]): Set<number> {
   const used = new Set<number>();
@@ -70,9 +70,7 @@ export function findUsedInstruments(patterns: Pattern[]): Set<number> {
     for (const channel of pattern.channels) {
       for (const cell of channel.rows) {
         if (cell.instrument > 0) used.add(cell.instrument);
-        if (cell.instrument2 != null && cell.instrument2 > 0) used.add(cell.instrument2);
-        if (cell.instrument3 != null && cell.instrument3 > 0) used.add(cell.instrument3);
-        if (cell.instrument4 != null && cell.instrument4 > 0) used.add(cell.instrument4);
+        for (const extra of cell.extraNotes ?? []) if (extra.instrument != null && extra.instrument > 0) used.add(extra.instrument);
       }
     }
   }

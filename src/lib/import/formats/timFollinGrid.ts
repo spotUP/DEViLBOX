@@ -16,7 +16,7 @@
  */
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import { periodToNote } from '@/lib/amiga/periodNotes';
-import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer, setNoteColumn, CELL_NOTE_COLUMNS, type RowClock } from './stepRowClock';
+import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer, setNoteColumn, type RowClock } from './stepRowClock';
 import { BD_FX } from './benDaglishEffectGlyphs';
 
 const ROWS_PER_PATTERN = 64;
@@ -180,7 +180,7 @@ export interface TfolGrid {
   /** Processed ticks per row: the song step, measured from the note onsets. */
   step: number;
   clock: RowClock;
-  /** Notes that start inside their row (a row offset in the first effect column, or `delay2` in note column 2). */
+  /** Notes that start inside their row (a row offset in the first effect column, or the delay of note column 2). */
   delayedNotes: number;
   /** Onsets deeper than the cell's 4 note columns (plan rule R5 grows the columns, the cell model stops at 4). */
   unplacedNotes: number;
@@ -311,13 +311,13 @@ export function buildTimFollinGrid(b: Uint8Array, subsong = 0): TfolGrid | null 
   const noteCounts: number[] = [];
   const noteCols = new Array<number>(VOICES).fill(1);
   const place = makeOnsetPlacer(clock);
-  let delayedNotes = 0, unplacedNotes = 0;
+  let delayedNotes = 0;
+  const unplacedNotes = 0; // the cell holds any number of note columns: no onset is left out (plan R5)
   runs.forEach((run, v) => {
     let count = 0;
     run.notes.forEach((n, i) => {
       if (n.tick >= ticks) return;
       const pl = place(v, n.tick);
-      if (pl.col >= CELL_NOTE_COLUMNS) { unplacedNotes++; return; }
       count++;
       const cell = grid[v][pl.row];
       const region = regionOf(n.offset);
@@ -335,7 +335,7 @@ export function buildTimFollinGrid(b: Uint8Array, subsong = 0): TfolGrid | null 
       const end = Math.min(rows, i + 1 < run.notes.length ? clock.tickToRow(run.notes[i + 1].tick).row : rows);
       for (let t = pl.row; t < end; t++) regionAtTick[v][t] = region;
     });
-    noteCols[v] = Math.min(CELL_NOTE_COLUMNS, place.columnsOf(v));
+    noteCols[v] = place.columnsOf(v);
     noteCounts.push(count);
   });
 

@@ -156,7 +156,7 @@ describe('schema 26 migration', () => {
       ],
     };
     migrateSavedProject(project, 25);
-    expect(CURRENT_SCHEMA).toBe(26);
+    expect(CURRENT_SCHEMA).toBe(27);
     expect(project.instruments[0]).toMatchObject({ synthType: 'SunVoxSynth', sunvox: { patchData: null }, sunvoxModular: DEFAULT_SUNVOX_SYNTH_PATCH });
     expect(project.instruments[1].synthType).toBe('SunVoxModular');
   });

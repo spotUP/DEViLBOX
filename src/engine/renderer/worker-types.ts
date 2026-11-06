@@ -4,6 +4,7 @@
  * the main thread and worker threads.
  */
 
+import type { NoteColumnCell } from '@/lib/tracker/noteColumns';
 import type { EffectNotation } from '@/lib/tracker/effectNotation';
 import type { ClockAnchor } from '../audioLatency';
 
@@ -48,9 +49,8 @@ export interface CellSnapshot {
   effTyp6?: number;  eff6?: number;
   effTyp7?: number;  eff7?: number;
   effTyp8?: number;  eff8?: number;
-  note2?: number; instrument2?: number; volume2?: number; delay2?: number; delay3?: number; delay4?: number;
-  note3?: number; instrument3?: number; volume3?: number;
-  note4?: number; instrument4?: number; volume4?: number;
+  /** Note columns 2 and up; index 0 is column 2. */
+  extraNotes?: NoteColumnCell[];
   flag1?: number;
   flag2?: number;
   probability?: number;
@@ -68,7 +68,7 @@ export interface ChannelSnapshot {
   /** from channelMeta.effectNotation: 'furnace' draws each effect as 4 hex chars (code + value). */
   effectNotation?: EffectNotation;
   noteCols?: number;  // from channelMeta.noteCols, default 1
-  /** from channelMeta.noteColDelay: note columns 2-4 draw delay2..4 where the volume would be. */
+  /** from channelMeta.noteColDelay: note columns 2 and up draw their delay where the volume would be. */
   noteColDelay?: boolean;
   rows: CellSnapshot[];
   /** Per-channel column specs — overrides global ui.columns when present */

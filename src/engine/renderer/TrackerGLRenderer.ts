@@ -10,6 +10,7 @@
  * At 60fps with 256 rows × 16 channels, this is ~3 draw calls / frame.
  */
 
+import { getColumnField } from '@/lib/tracker/noteColumns';
 import { buildGlyphAtlas, parseColor, parseRgba, type GlyphAtlas, type GlyphInfo } from './glyph-atlas';
 import { SUN_EFFECT_GLYPH } from '@/lib/import/formats/sunEffectGlyphs';
 import { SNX_EFFECT_GLYPH } from '@/lib/import/formats/sonixEffectGlyphs';
@@ -850,8 +851,7 @@ export class TrackerGLRenderer {
             const isPreviewNc = nc === 0 && previewNote !== null;
             const cellNote = isPreviewNc ? previewNote
               : nc === 0 ? (cell.note ?? 0)
-              : nc === 1 ? (cell.note2 ?? 0)
-              : nc === 2 ? (cell.note3 ?? 0) : (cell.note4 ?? 0);
+              : (getColumnField(cell, nc, 'note') ?? 0);
             if (!ui.blankEmpty || cellNote !== 0) {
               const noteHas = cellNote !== 0;
               const noteColor = lerpWhiteRGBA(
@@ -866,8 +866,7 @@ export class TrackerGLRenderer {
             let px = ncX + noteWidth + 4;
 
             const inst = nc === 0 ? (cell.instrument ?? 0)
-              : nc === 1 ? (cell.instrument2 ?? 0)
-              : nc === 2 ? (cell.instrument3 ?? 0) : (cell.instrument4 ?? 0);
+              : (getColumnField(cell, nc, 'instrument') ?? 0);
             if (inst !== 0) {
               this.setTmpColor(lerpWhiteRGBA(colors.textInstrument, glow), cellAlpha);
               this.addGlyphString(HEX_TABLE[inst & 0xFF], px, gy, atlas, this.tmpColor, bold);
@@ -878,10 +877,9 @@ export class TrackerGLRenderer {
             px += CHAR_WIDTH * 2 + 4;
 
             const vol = nc === 0 ? (cell.volume ?? 0)
-              : nc === 1 ? (cell.volume2 ?? 0)
-              : nc === 2 ? (cell.volume3 ?? 0) : (cell.volume4 ?? 0);
+              : (getColumnField(cell, nc, 'volume') ?? 0);
             if (nc > 0 && chData.noteColDelay === true) {
-              const delay = nc === 1 ? (cell.delay2 ?? 0) : nc === 2 ? (cell.delay3 ?? 0) : (cell.delay4 ?? 0);
+              const delay = getColumnField(cell, nc, 'delay') ?? 0;
               if (delay !== 0) {
                 this.setTmpColor(lerpWhiteRGBA(colors.textEffect, glow), cellAlpha);
                 this.addGlyphString(HEX_TABLE[delay & 0xFF], px, gy, atlas, this.tmpColor, bold);

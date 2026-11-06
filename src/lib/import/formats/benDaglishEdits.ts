@@ -8,7 +8,7 @@
  * transpose and the sample's base note add. An edited note is therefore the command's byte plus the cell's
  * change, written in place; the track keeps its length.
  *
- * A note column 2 delay (`delay2`, ticks into the row) is the note's onset inside its row. The onset is the sum of the
+ * A note column 2 delay (`extraNotes[0].delay`, ticks into the row) is the note's onset inside its row. The onset is the sum of the
  * duration bytes before it (a note command is the note byte then its ticks byte; a rest is 0x7f then its ticks), so a
  * delay change of d ticks adds d to the duration byte of the timing command just before the note and takes d from the
  * note's own duration byte: the note moves, every later onset on the voice stays where it was and no byte is added.
@@ -19,6 +19,7 @@
  * no cell-to-byte map yet).
  */
 import type { Pattern } from '@/types';
+import { getColumnField, maxNoteColumns } from '@/lib/tracker/noteColumns';
 import type { BdWalk, BdWalkEvent } from './BenDaglishWasmExtractor';
 import { BD_WALK } from './BenDaglishWasmExtractor';
 import { buildBDGridFromWalk, bdNotePlacements, type BdNotePlacement } from './benDaglishGrid';
@@ -89,9 +90,8 @@ export function applyBdGridEdits(source: Uint8Array, walk: BdWalk, trackFileOffs
         const c = eRows[row];
         if (!c) continue;
         const where = `pattern ${p} voice ${ch + 1} row ${row}`;
-        const cx = c as unknown as Record<string, number | undefined>, bx = b as unknown as Record<string, number | undefined>;
-        const key = (col: number, f: string): string => (col === 0 && f === 'note' ? 'note' : `${f}${col + 1}`);
-        const cols: Array<{ col: number; cn: number; bn: number }> = [0, 1, 2, 3].map((col) => ({ col, cn: cx[key(col, 'note')] ?? 0, bn: bx[key(col, 'note')] ?? 0 }));
+        const colCount = maxNoteColumns([c, b]);
+        const cols: Array<{ col: number; cn: number; bn: number }> = Array.from({ length: colCount }, (_, col) => ({ col, cn: getColumnField(c, col, 'note') ?? 0, bn: getColumnField(b, col, 'note') ?? 0 }));
         for (const { col, cn, bn } of cols) {
           if (cn === bn) continue;
           const at = noteAt.get(`${ch}:${p * ROWS_PER_PATTERN + row}:${col}`);
@@ -105,10 +105,10 @@ export function applyBdGridEdits(source: Uint8Array, walk: BdWalk, trackFileOffs
             else wanted.set(off, nb);
           }
         }
-        for (const col of [1, 2, 3]) {
-          if ((cx[`delay${col + 1}`] ?? 0) === (bx[`delay${col + 1}`] ?? 0)) continue;
+        for (let col = 1; col < colCount; col++) {
+          if ((getColumnField(c, col, 'delay') ?? 0) === (getColumnField(b, col, 'delay') ?? 0)) continue;
           const pl = placeAt.get(`${ch}:${p * ROWS_PER_PATTERN + row}:${col}`);
-          const d = cx[`delay${col + 1}`] ?? 0;
+          const d = getColumnField(c, col, 'delay') ?? 0;
           if (!pl) warnings.push(`${where}: a delay on a row with no note in that column; not written`);
           else if (d < 0 || d >= step) warnings.push(`${where}: a delay of ${d} is outside the row (0-${step - 1} ticks); not written`);
           else moveOnset(pl, d - pl.offset, where);

@@ -15,7 +15,7 @@ import type { ProjectMetadata } from '@/types/project';
 import type { MixerSnapshot } from '@stores/useMixerStore';
 import type { DubBusSettings } from '@/types/dub';
 import { needsMigration, migrateProject } from '@/lib/migration';
-import { migrateGridOctaveBias, migrateSunVoxModularInstruments } from '@/lib/persistence/migrations';
+import { migrateGridOctaveBias, migrateNoteColumns, migrateSunVoxModularInstruments } from '@/lib/persistence/migrations';
 import { decodeNativeEngineFields, type SerializedCompanionFiles } from '@/lib/export/exporters';
 import { toTypedJson, fromTypedJson } from '@/lib/persistence/typedJson';
 import type { SongToApply, ProjectExtras } from './applySong';
@@ -87,6 +87,8 @@ export function savedSongToApply(data: SavedSongFields): SongToApply {
     patterns = migrated.patterns;
     instruments = migrated.instruments;
   }
+  // Further note columns are a list now (schema 27); before the octave step, which reads them.
+  migrateNoteColumns(patterns as unknown as Parameters<typeof migrateNoteColumns>[0]);
   // Hippel / Future Player grids saved an octave (or two) above the pitch they play: back to the played pitch.
   migrateGridOctaveBias(
     patterns as unknown as Array<{ channels: Array<{ rows: Array<Record<string, unknown>> }> }>,
