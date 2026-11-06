@@ -9,14 +9,14 @@ import { resolve } from 'node:path';
 
 vi.mock('../formats/stepRowClock', async (orig) => {
   const m = await orig<typeof import('../formats/stepRowClock')>();
-  return { ...m, makeRowClock: vi.fn(m.makeRowClock), mainStepFromOnsets: vi.fn(m.mainStepFromOnsets), makeOnsetPlacer: vi.fn(m.makeOnsetPlacer) };
+  return { ...m, makeRowClock: vi.fn(m.makeRowClock), mainStepFromOnsets: vi.fn(m.mainStepFromOnsets), makeOnsetPlacer: vi.fn(m.makeOnsetPlacer), exactStepFromOnsets: vi.fn(m.exactStepFromOnsets) };
 });
 vi.mock('@/engine/ToneEngine', () => {
   const engine = new Proxy({}, { get: () => () => Promise.resolve() });
   return { getToneEngine: () => engine };
 });
 
-import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer } from '../formats/stepRowClock';
+import { makeRowClock, mainStepFromOnsets, exactStepFromOnsets, makeOnsetPlacer } from '../formats/stepRowClock';
 import { parseModuleToSong } from '../parseModuleToSong';
 import { walkDavidWhittaker, DW_WALK } from '../formats/DavidWhittakerWasmExtractor';
 import { dwRowClock } from '../formats/davidWhittakerGrid';
@@ -29,6 +29,9 @@ import { rhRowClock, rhTickToRow, buildRHGridFromWalk } from '../formats/robHubb
 import { RH_WALK } from '../formats/rhWalk';
 import { installWasmNodeFetches } from './helpers/dwNodeFetch';
 import { timFollinOnsetTicks, buildTimFollinGrid } from '../formats/timFollinGrid';
+import { sdrOnsetTicks, buildSdrGrid } from '../formats/synthDreamGrid';
+import { buildBthGrid } from '../formats/beathovenGrid';
+import { sapOnsetsOf } from '../formats/SAPParser';
 import { daveLoweEncoderForStep } from '../formats/DaveLoweParser';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
@@ -374,4 +377,105 @@ describe('step grid: Tim Follin through parseModuleToSong', () => {
     expect(grown, 'a clash deeper than two ran the grow path').toBeGreaterThan(0);
     expect(delayed + second).toBeGreaterThan(0);
   });
+});
+
+/** Every note of a voice in a parsed song as the tick it starts on: (pos*64 + row)*step + row offset or column delay. */
+function shownTicks(song: TrackerSong, v: number, step: number): number[] {
+  const out: number[] = [];
+  song.songPositions.forEach((pi, pos) => {
+    song.patterns[pi].channels[v].rows.forEach((cell, r) => {
+      const base = (pos * 64 + r) * step;
+      if (cell.note > 0) out.push(base + (cell.effTyp === BD_FX.rowOffset ? cell.eff : 0));
+      (cell.extraNotes ?? []).forEach((x) => { if ((x.note ?? 0) > 0) out.push(base + (x.delay ?? 0)); });
+    });
+  });
+  return out.sort((a, b) => a - b);
+}
+
+describe('step grid: Synth Dream through parseModuleToSong', () => {
+  for (const [file, step] of [['sdr.nobuddiesland end 2', 4], ['sdr.nobuddiesland jigsaw', 6]] as const) {
+    it(`${file}: main step ${step} from the command onsets, off-step commands keep their tick as an offset, none dropped`, async () => {
+      const ab = bytesOf(`synth-dream/${file}`);
+      const before = vi.mocked(mainStepFromOnsets).mock.calls.length;
+      const beforePlacer = vi.mocked(makeOnsetPlacer).mock.calls.length;
+      const song = await parseModuleToSong(new File([ab.slice(0)], file));
+      expect(vi.mocked(mainStepFromOnsets).mock.calls.length, 'the main-step helper ran').toBeGreaterThan(before);
+      expect(vi.mocked(makeOnsetPlacer).mock.calls.length, 'the onset placer ran').toBeGreaterThan(beforePlacer);
+      const onsets = sdrOnsetTicks(new Uint8Array(ab))!;
+      expect(mainStepFromOnsets(onsets)).toBe(step);
+      expect(song.initialSpeed).toBe(step);
+      const grid = buildSdrGrid(new Uint8Array(ab))!;
+      const shown = sdrOnsetTicks(new Uint8Array(ab), 0, true)!;
+      let placed = 0, wanted = 0;
+      onsets.forEach((_want, v) => {
+        const got = shownTicks(song, v, step);
+        // a command with no note (modifier only) shows an empty cell, so only note-bearing onsets are compared
+        const shownWant = shown[v];
+        expect(got, `voice ${v}`).toEqual(shownWant);
+        placed += got.length; wanted += shownWant.length;
+        expect(song.patterns[0].channels[v].channelMeta?.noteCols).toBe(grid.noteCols[v]);
+      });
+      expect(placed).toBe(wanted);
+      expect(grid.delayedNotes, 'off-step commands carry an offset').toBeGreaterThan(0);
+      console.log(`SDR ${file}: step ${step}, onsets ${onsets.map((o) => o.length).join('/')}, delayed ${grid.delayedNotes}, note columns ${grid.noteCols.join('/')}`);
+    });
+  }
+});
+
+describe('step grid: Beathoven through parseModuleToSong', () => {
+  for (const [file, step] of [['formats/beathoven_smallest.bss', 5], ['formats/tristar_cracktro.bss', 2]] as const) {
+    it(`${file}: exact GCD step ${step}, every onset on row*step with no offset`, async () => {
+      const ab = bytesOf(file);
+      const before = vi.mocked(exactStepFromOnsets).mock.calls.length;
+      const song = await parseModuleToSong(new File([ab.slice(0)], file.split('/').pop()!));
+      expect(vi.mocked(exactStepFromOnsets).mock.calls.length, 'the exact-step helper ran').toBeGreaterThan(before);
+      const grid = buildBthGrid(new Uint8Array(ab));
+      if (typeof grid === 'string') throw new Error(grid);
+      expect(grid.step).toBe(step);
+      expect(song.initialSpeed).toBe(step);
+      let placed = 0, wanted = 0;
+      grid.onsets.forEach((ticks, v) => {
+        const rows = song.patterns.flatMap((p) => p.channels[v].rows);
+        const got: number[] = [];
+        rows.forEach((c, r) => { expect(c.effTyp, 'no row offset').not.toBe(BD_FX.rowOffset); if (c.note !== 0) got.push(r * step); });
+        expect(got, `voice ${v}: row*step equals the onset tick`).toEqual(ticks);
+        placed += got.length; wanted += ticks.length;
+      });
+      expect(placed).toBe(wanted);
+      expect(wanted).toBeGreaterThan(0);
+      console.log(`BSS ${file}: step ${step}, onsets ${wanted}, placed ${placed}, offsets 0`);
+    });
+  }
+});
+
+describe('step grid: SAP through parseModuleToSong', () => {
+  for (const file of ['warhawk.sap', 'chop suey.sap', 'amaurote.sap']) {
+    it(`${file}: main step from the frame onsets, row*step + offset equals every onset frame, none dropped`, async () => {
+      const ab = bytesOf(`sap/${file}`);
+      const beforeMain = vi.mocked(mainStepFromOnsets).mock.calls.length;
+      const beforePlacer = vi.mocked(makeOnsetPlacer).mock.calls.length;
+      const song = await parseModuleToSong(new File([ab.slice(0)], file));
+      expect(vi.mocked(mainStepFromOnsets).mock.calls.length, 'the main-step helper ran').toBeGreaterThan(beforeMain);
+      expect(vi.mocked(makeOnsetPlacer).mock.calls.length, 'the onset placer ran').toBeGreaterThan(beforePlacer);
+      const want = sapOnsetsOf(ab);
+      const step = mainStepFromOnsets(want.map((o) => o.map((x) => x.tick)));
+      expect(song.initialSpeed).toBe(step);
+      let placed = 0, total = 0, delayed = 0;
+      want.forEach((list, v) => {
+        const got: number[] = [];
+        song.patterns[0].channels[v].rows.forEach((cell, r) => {
+          if (cell.note > 0) { const d = cell.effTyp === BD_FX.rowOffset ? cell.eff : 0; if (d) delayed++; got.push(r * step + d); }
+          (cell.extraNotes ?? []).forEach((x) => { if ((x.note ?? 0) > 0) { if (x.delay) delayed++; got.push(r * step + (x.delay ?? 0)); } });
+        });
+        got.sort((a, b) => a - b);
+        // an onset whose pitch fell outside the note range (note 0) shows an empty cell, as before; every real note and note-off lands
+        const shown = list.filter((x) => x.note > 0).map((x) => x.tick);
+        expect(got, `voice ${v}`).toEqual(shown);
+        placed += got.length; total += shown.length;
+      });
+      expect(placed).toBe(total);
+      expect(total).toBeGreaterThan(0);
+      console.log(`SAP ${file}: step ${step}, onsets ${total}, delayed ${delayed}`);
+    });
+  }
 });

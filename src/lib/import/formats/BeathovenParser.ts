@@ -72,8 +72,8 @@ export function parseBeathovenFile(buffer: ArrayBuffer, filename: string): Track
     songLength: songPositions.length,
     restartPosition: 0,
     numChannels: 4,
-    // one grid row is one replayer step; the legacy engine steps once per 50 Hz tick
-    initialSpeed: 1,
+    // one grid row is the exact GCD step of the note onsets (beathovenGrid.ts), in 50 Hz replayer ticks of 20 ms at 125 BPM
+    initialSpeed: typeof grid === 'string' ? 1 : grid.step,
     initialBPM: 125,
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0),

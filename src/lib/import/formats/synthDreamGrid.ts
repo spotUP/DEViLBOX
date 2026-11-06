@@ -9,10 +9,14 @@
  *
  * Three layers (docs/FORMAT_COMMAND_STREAM_GRID.md): the stream bytes (truth), `blockRows` (one carrier cell per
  * word: cutoff = 2, period = the word), and the display grid on a shared tick timeline (row === replayer tick).
- * Each command's source span (stream, byte offset, byte length) is recorded per row in `rowSources`.
+ * Plan rules R6/R7: one row is one song step, the main step of the command onsets (`mainStepFromOnsets`, as Tim Follin);
+ * a command off the step keeps its exact tick as a row offset and note columns grow through `makeOnsetPlacer`, so no
+ * command is dropped. Each command's source span (stream, byte offset, byte length) is recorded per row in `rowSources`.
  * This file only reads; synthDreamEdits.ts writes grid edits back into those bytes (phase B).
  */
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
+import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer, setNoteColumn, type RowClock } from './stepRowClock';
+import { BD_FX } from './benDaglishEffectGlyphs';
 
 const ROWS_PER_PATTERN = 64;
 const MAX_ROWS = 32768;
@@ -184,6 +188,13 @@ export interface SdrGrid {
   rowSources: SdrRowSource[][][];
   /** For each pattern and voice, the stream playing on the pattern's first row (-1: none). */
   streamAtStart: number[][];
+  /** Ticks (50 Hz replayer ticks) per row: the main step of the command onsets. */
+  step: number;
+  clock: RowClock;
+  /** Note columns of each voice: its largest same-row clash. */
+  noteCols: number[];
+  /** Commands that start off the row's first tick (they carry a row offset or column delay). */
+  delayedNotes: number;
 }
 
 function emptyCell(): TrackerCell {
@@ -195,8 +206,8 @@ interface Placed {
   noteAt: number; instrumentAt: number; transpose: number; fixedPitch: boolean; substituteOf: number; substituteBy: number;
 }
 
-/** Decode the module's subsong into per-voice command lists on the tick timeline. */
-export function buildSdrGrid(buf: Uint8Array, subsong = 0): SdrGrid | null {
+/** Every voice's commands in play order on the tick timeline, with the ticks the first pass covers. */
+function walkSdr(buf: Uint8Array, subsong: number): { streams: SdrStream[]; voices: Placed[][]; ticks: number } | null {
   if (subsong < 0 || subsong >= sdrSubsongCount(buf)) return null;
   const streams: SdrStream[] = [];
   const streamAt = new Map<number, number>();
@@ -258,26 +269,56 @@ export function buildSdrGrid(buf: Uint8Array, subsong = 0): SdrGrid | null {
     firstPass.push(Math.max(0, passTicks));
   }
 
-  const rows = Math.min(MAX_ROWS, Math.max(1, ...firstPass));
+  const ticks = Math.min(MAX_ROWS, Math.max(1, ...firstPass));
   if (voices.every((p) => p.length === 0)) return null;
+  return { streams, voices, ticks };
+}
+
+/** The tick every command of each voice starts on within the first pass (the onsets the step is derived from); `shownOnly`: just those that show a note. */
+export function sdrOnsetTicks(buf: Uint8Array, subsong = 0, shownOnly = false): number[][] | null {
+  const w = walkSdr(buf, subsong);
+  return w ? w.voices.map((p) => p.filter((c) => c.tick < w.ticks && (!shownOnly || c.note > 0)).map((c) => c.tick)) : null;
+}
+
+/** Decode the module's subsong into the tracker grid on the shared step clock. */
+export function buildSdrGrid(buf: Uint8Array, subsong = 0): SdrGrid | null {
+  const walk = walkSdr(buf, subsong);
+  if (!walk) return null;
+  const { streams, voices, ticks } = walk;
+  // one row is one song step: the main step of the commands' onsets, in replayer ticks (plan R6/R7)
+  const step = mainStepFromOnsets(voices.map((p) => p.filter((c) => c.tick < ticks).map((c) => c.tick)));
+  const clock = makeRowClock([{ tick: 0, speed: step }]);
+  const rows = Math.max(1, clock.rowsForTicks(ticks));
 
   const grid: TrackerCell[][] = Array.from({ length: VOICES }, () => Array.from({ length: rows }, emptyCell));
   const sources: SdrRowSource[][] = Array.from({ length: VOICES }, () => new Array<SdrRowSource>(rows).fill(null));
   const streamAtTick: number[][] = Array.from({ length: VOICES }, () => new Array<number>(rows).fill(-1));
+  const place = makeOnsetPlacer(clock);
+  const noteCols = new Array<number>(VOICES).fill(1);
+  let delayedNotes = 0;
   voices.forEach((placed, v) => {
     for (let i = 0; i < placed.length; i++) {
       const p = placed[i];
-      if (p.tick >= rows) break;
-      const cell = grid[v][p.tick];
-      cell.note = p.note;
-      if (p.note > 0 && p.note < NOTE_OFF) cell.instrument = p.instrument;
-      sources[v][p.tick] = {
-        stream: p.stream, offset: p.cmd.offset, length: p.cmd.length, noteAt: p.noteAt, instrumentAt: p.instrumentAt,
-        transpose: p.transpose, fixedPitch: p.fixedPitch, substituteOf: p.substituteOf, substituteBy: p.substituteBy,
-      };
-      const endTick = Math.min(rows, i + 1 < placed.length ? placed[i + 1].tick : rows);
-      for (let t = p.tick; t < endTick; t++) streamAtTick[v][t] = p.stream;
+      if (p.tick >= ticks) break;
+      const pl = place(v, p.tick);
+      const cell = grid[v][pl.row];
+      const instrument = p.note > 0 && p.note < NOTE_OFF ? p.instrument : 0;
+      if (pl.col === 0) {
+        cell.note = p.note;
+        cell.instrument = instrument;
+        if (pl.offset > 0) { cell.effTyp = BD_FX.rowOffset; cell.eff = pl.offset; delayedNotes++; }
+        sources[v][pl.row] = {
+          stream: p.stream, offset: p.cmd.offset, length: p.cmd.length, noteAt: p.noteAt, instrumentAt: p.instrumentAt,
+          transpose: p.transpose, fixedPitch: p.fixedPitch, substituteOf: p.substituteOf, substituteBy: p.substituteBy,
+        };
+      } else {
+        setNoteColumn(cell, pl.col, p.note, instrument, pl.offset);
+        if (pl.offset > 0) delayedNotes++;
+      }
+      const endRow = Math.min(rows, i + 1 < placed.length ? clock.tickToRow(placed[i + 1].tick).row : rows);
+      for (let t = pl.row; t < endRow; t++) streamAtTick[v][t] = p.stream;
     }
+    noteCols[v] = place.columnsOf(v);
   });
 
   const blockRows = streams.map((s) => {
@@ -299,11 +340,12 @@ export function buildSdrGrid(buf: Uint8Array, subsong = 0): SdrGrid | null {
       muted: false, solo: false, collapsed: false,
       volume: 100, pan: (ch === 0 || ch === 3) ? -50 : 50, instrumentId: null, color: null,
       rows: cells.slice(start, start + len),
+      channelMeta: { importedFromMOD: false, effectCols: 2, noteCols: noteCols[ch], noteColDelay: true },
     }));
     patterns.push({ id: `pattern-${p}`, name: `Pattern ${p}`, length: len, channels: chData });
     songPositions.push(p);
     rowSources.push(sources.map((s) => s.slice(start, start + len)));
     streamAtStart.push(streamAtTick.map((s) => s[start]));
   }
-  return { patterns, songPositions, rows, streams, blockRows, rowSources, streamAtStart };
+  return { patterns, songPositions, rows, streams, blockRows, rowSources, streamAtStart, step, clock, noteCols, delayedNotes };
 }

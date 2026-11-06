@@ -8,6 +8,8 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, ChannelData, InstrumentConfig } from '@/types';
 import { DEFAULT_FURNACE } from '@/types/instrument';
+import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer, setNoteColumn } from './stepRowClock';
+import { BD_FX } from './benDaglishEffectGlyphs';
 import { Cpu6502, type MemoryMap } from '@/lib/import/cpu/Cpu6502';
 
 function emptyCell(): TrackerCell {
@@ -144,10 +146,39 @@ function runSAPEmulation(buf: Uint8Array, meta: SAPMeta, numCh: number): FrameNo
   return frameStates;
 }
 
-function framesToPattern(frameStates: FrameNotes[], instruments: InstrumentConfig[], numCh: number): Pattern {
-  const MAX_ROWS = 256;
-  const step = Math.max(1, Math.ceil(frameStates.length / MAX_ROWS));
-  const rows = Math.min(MAX_ROWS, Math.ceil(frameStates.length / step));
+interface SapOnset { tick: number; note: number }
+
+/** Each channel's note changes by frame: a new pitch is a note, silence after a note is a note-off (97). */
+export function sapOnsets(frameStates: FrameNotes[], numCh: number): SapOnset[][] {
+  const out: SapOnset[][] = Array.from({ length: numCh }, () => []);
+  const lastNote = new Array(numCh).fill(0);
+  frameStates.forEach((fs, tick) => {
+    for (let ch = 0; ch < numCh && ch < fs.notes.length; ch++) {
+      const n = fs.notes[ch];
+      if (n !== null && n !== lastNote[ch]) { out[ch].push({ tick, note: n }); lastNote[ch] = n; }
+      else if (n === null && lastNote[ch] > 0) { out[ch].push({ tick, note: 97 }); lastNote[ch] = 0; }
+    }
+  });
+  return out;
+}
+
+/** The onsets the importer places for a SAP file, by frame (the importer's own emulation; used by the reachability test). */
+export function sapOnsetsOf(buffer: ArrayBuffer): SapOnset[][] {
+  const buf = new Uint8Array(buffer);
+  const meta = parseSAPHeader(buf);
+  const numCh = meta.stereo ? 8 : 4;
+  return sapOnsets(runSAPEmulation(buf, meta, numCh), numCh);
+}
+
+/**
+ * One row is one song step: the main step of the note onsets in frames (plan R6/R7, as Tim Follin). An onset off the
+ * step keeps its exact frame as a row offset, and note columns grow through the shared placer: no onset is dropped.
+ */
+function framesToPattern(frameStates: FrameNotes[], instruments: InstrumentConfig[], numCh: number): { pattern: Pattern; step: number } {
+  const onsets = sapOnsets(frameStates, numCh);
+  const step = mainStepFromOnsets(onsets.map((o) => o.map((x) => x.tick)));
+  const clock = makeRowClock([{ tick: 0, speed: step }]);
+  const rows = Math.max(1, clock.rowsForTicks(frameStates.length));
 
   const channels: ChannelData[] = Array.from({ length: numCh }, (_, i): ChannelData => ({
     id: `ch${i}`, name: instruments[i]?.name || `POKEY ${i + 1}`,
@@ -156,24 +187,24 @@ function framesToPattern(frameStates: FrameNotes[], instruments: InstrumentConfi
     rows: Array.from({ length: rows }, emptyCell),
   }));
 
-  const lastNote = new Array(numCh).fill(0);
-  for (let row = 0; row < rows; row++) {
-    const fs = frameStates[Math.min(row * step, frameStates.length - 1)];
-    for (let ch = 0; ch < numCh && ch < fs.notes.length; ch++) {
-      const n = fs.notes[ch];
-      const cell = channels[ch].rows[row];
-      if (n !== null && n !== lastNote[ch]) {
-        cell.note = n;
-        cell.instrument = ch + 1;
-        lastNote[ch] = n;
-      } else if (n === null && lastNote[ch] > 0) {
-        cell.note = 97;
-        lastNote[ch] = 0;
+  const place = makeOnsetPlacer(clock);
+  onsets.forEach((list, ch) => {
+    for (const o of list) {
+      const pl = place(ch, o.tick);
+      const cell = channels[ch].rows[pl.row];
+      const instrument = o.note === 97 ? 0 : ch + 1;
+      if (pl.col === 0) {
+        cell.note = o.note;
+        cell.instrument = instrument;
+        if (pl.offset > 0) { cell.effTyp = BD_FX.rowOffset; cell.eff = pl.offset; }
+      } else {
+        setNoteColumn(cell, pl.col, o.note, instrument, pl.offset);
       }
     }
-  }
+    channels[ch].channelMeta = { importedFromMOD: false, effectCols: 2, noteCols: place.columnsOf(ch), noteColDelay: true };
+  });
 
-  return { id: 'p0', name: 'Pattern 1', length: rows, channels };
+  return { pattern: { id: 'p0', name: 'Pattern 1', length: rows, channels }, step };
 }
 
 export function isSAPFormat(buffer: ArrayBuffer): boolean {
@@ -200,12 +231,13 @@ export async function parseSAPFile(buffer: ArrayBuffer, filename: string): Promi
   }));
 
   let pattern: Pattern;
+  let step = 1;
   if (meta.dataOffset > 0 && meta.initAddr > 0 && meta.playerAddr > 0) {
     try {
       const frameStates = runSAPEmulation(buf, meta, numCh);
-      pattern = frameStates.length > 0
-        ? framesToPattern(frameStates, instruments, numCh)
-        : {
+      const built = frameStates.length > 0 ? framesToPattern(frameStates, instruments, numCh) : null;
+      if (built) step = built.step;
+      pattern = built ? built.pattern : {
             id: 'p0', name: 'Pattern 1', length: 16,
             channels: Array.from({ length: numCh }, (_, i): ChannelData => ({
               id: `ch${i}`, name: `POKEY ${i + 1}`,
@@ -246,8 +278,8 @@ export async function parseSAPFile(buffer: ArrayBuffer, filename: string): Promi
     songLength: meta.songs,
     restartPosition: 0,
     numChannels: numCh,
-    initialSpeed: 1,
-    initialBPM: 50,
+    initialSpeed: step,
+    initialBPM: 125,
     asapFileData: buffer.slice(0),
     asapFilename: filename,
   };
