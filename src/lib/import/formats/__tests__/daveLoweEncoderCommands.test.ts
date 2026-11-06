@@ -111,9 +111,9 @@ describe('Dave Lowe grid re-encode keeps instrument and envelope commands', () =
     const song = await parseDaveLoweFile(ab.slice(0), 'incredibleshrinkingsphere.dl');
     const { commandsSeen, mismatched } = await check(song, ab);
     expect(commandsSeen, 'the song has setInstrument/setVolEnv commands').toBeGreaterThan(50);
-    // Known open: one section (patterns 44-45, channel 1) has a SET_INSTRUMENT pointer 8 bytes past the last 14-byte
-    // descriptor (0x2332, mapped to the same id as 0x232a) and an unmodelled command word 0x001c. Everything else matches.
-    expect(mismatched.map((m) => m.split(' ')[0])).toEqual(['44:1', '45:1']);
+    // Known open: one section (pattern 44, channel 1) has a SET_INSTRUMENT pointer 8 bytes past the last 14-byte
+    // descriptor (0x2332, mapped to the same id as 0x232a). Everything else matches.
+    expect(mismatched.map((m) => m.split(' ')[0])).toEqual(['44:1']);
   });
 });
 
@@ -169,11 +169,21 @@ describe('Dave Lowe grid re-encode of a short channel and of a repeated instrume
     const bison = parseDaveLoweNewFile(mb.slice(0), 'm-bison.dln');
     const sph = await parseDaveLoweFile(sphere.slice(0), 'incredibleshrinkingsphere.dl');
     expect(sph.patterns.some((p) => p.channels.some((c) => c.rows.some((r) => r.dlPadding)))).toBe(true);
-    // Open (not padding, not repeats): sections that end on an unmodelled terminator word (0x14, 0x1c, 0x30) and the
-    // pointer 0x2332 mapped to the same id as 0x232a. Before the padding fix 19 more sections of the sphere failed.
-    expect(untouchedMismatches(bison, mb)).toEqual(['0:2']);
-    expect(untouchedMismatches(sph, sphere)).toEqual([
-      '13:2', '34:3', '35:1', '35:3', '42:1', '44:1', '45:1', '49:3', '50:3', '51:3', '52:3', '53:3', '72:3', '78:3', '87:2', '89:2',
-    ]);
+    // Left: four sections whose SET_INSTRUMENT pointer 0x2332 maps to the id of 0x232a (42:1, 72:3 and 89:2 were hidden behind
+    // their terminator word). Sections that end on the terminator
+    // words 0x14, 0x1c or 0x30 (16 of them) come back byte-exact since the parsers flag them (dlEnd) and the encoder writes the word.
+    expect(untouchedMismatches(bison, mb)).toEqual([]);
+    expect(untouchedMismatches(sph, sphere)).toEqual(['42:1', '44:1', '72:3', '89:2']);
+    const ends = new Set<number>();
+    for (const song of [bison, sph]) for (const p of song.patterns) for (const c of p.channels) for (const r of c.rows) if (r.dlEnd !== undefined) ends.add(r.dlEnd);
+    expect([...ends].sort((x, y) => x - y)).toEqual([0x14, 0x1c, 0x30]);
+  });
+
+  it('a section flagged with a terminator word ends on it; an unflagged section ends on SEQ_ADVANCE', () => {
+    const enc = daveLoweEncoderForStep(8, tables);
+    for (const w of [0x14, 0x1c, 0x30]) {
+      expect(hex(enc.encodePattern([cell({ note: 40 }), cell({ dlPadding: true, dlEnd: undefined }), cell({ dlEnd: w })], 0)).slice(-4)).toBe(w.toString(16).padStart(4, '0'));
+    }
+    expect(hex(enc.encodePattern([cell({ note: 40 })], 0)).slice(-4)).toBe('0008');
   });
 });

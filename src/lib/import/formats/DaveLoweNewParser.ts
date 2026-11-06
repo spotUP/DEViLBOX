@@ -33,7 +33,7 @@ import type { Pattern, ChannelData, TrackerCell } from '@/types';
 import type { InstrumentConfig } from '@/types/instrument';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
-import { daveLoweEncoderForStep, daveLoweStep, eventDurations, daveLoweRowClock, eventsToGridRows, distinctPointers, envComesFirst, type DLGridEvent } from './DaveLoweParser';
+import { DL_END_WORDS, daveLoweEncoderForStep, daveLoweStep, eventDurations, daveLoweRowClock, eventsToGridRows, distinctPointers, envComesFirst, type DLGridEvent } from './DaveLoweParser';
 import type { RowClock } from './stepRowClock';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -96,6 +96,7 @@ interface DLEvent {
   period?: number;
   duration?: number;
   ptr?: number;
+  word?: number;
 }
 
 function parseCommandStream(buf: Uint8Array, fileOff: number): { events: DLEvent[]; byteSize: number } {
@@ -130,6 +131,9 @@ function parseCommandStream(buf: Uint8Array, fileOff: number): { events: DLEvent
     } else if (word === CMD_SEQ_ADVANCE) {
       events.push({ type: 'seqAdvance' });
       break;
+    } else if (DL_END_WORDS.includes(word)) {
+      events.push({ type: 'seqAdvance', word });
+      break;
     } else if (word === 0) {
       break;
     } else {
@@ -150,6 +154,8 @@ interface RowData {
   eff: number;
   period?: number;
   dlInstrRepeat?: boolean;
+  dlEnd?: number;
+  dlPadding?: boolean;
 }
 
 function eventsToRows(
@@ -163,7 +169,7 @@ function eventsToRows(
     if (ev.type === 'setVolEnv') return { type: 'setVolEnv', envId: envPtrs.indexOf(ev.ptr!) + 1 };
     if (ev.type === 'note') return { type: 'note', period: ev.period!, duration: ev.duration! };
     if (ev.type === 'rest') return { type: 'rest', duration: ev.duration! };
-    return { type: 'seqAdvance' };
+    return { type: 'seqAdvance', word: ev.word };
   });
   return eventsToGridRows(grid, clock);
 }
@@ -349,6 +355,8 @@ export function parseDaveLoweNewFile(buffer: ArrayBuffer, filename: string): Tra
             volume: sRows[r].volume, effTyp: sRows[r].effTyp, eff: sRows[r].eff,
             ...(sRows[r].period ? { period: sRows[r].period } : {}),
             ...(sRows[r].dlInstrRepeat ? { dlInstrRepeat: true } : {}),
+            ...(sRows[r].dlEnd !== undefined ? { dlEnd: sRows[r].dlEnd } : {}),
+            ...(sRows[r].dlPadding ? { dlPadding: true } : {}),
             effTyp2: 0, eff2: 0,
           });
         } else {
