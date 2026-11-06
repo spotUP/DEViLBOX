@@ -533,7 +533,10 @@ describe('knobs the snapshot walker cannot show, read at their consumer', () => 
 
   it('masterBassDb and masterBassPunchDb reach the master punch shelf and the low band once the master insert is wired', async () => {
     const read = async (s: Partial<DubBusSettings>) => {
-      const rig = await withBus(s);
+      // The knobs are read off AudioParam.value after the wiring settles; no audio is
+      // compared, so a 0.1 s render (9 clock steps) is enough. Three 0.4 s rigs cost
+      // 120 real-time settle waits and starved CI past the 30 s hang detector.
+      const rig = await withBus(s, 0.1);
       const src = rig.ctx.createGain();
       const dst = rig.ctx.createGain();
       dst.connect(rig.ctx.destination);
