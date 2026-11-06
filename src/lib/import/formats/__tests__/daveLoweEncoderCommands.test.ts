@@ -111,9 +111,8 @@ describe('Dave Lowe grid re-encode keeps instrument and envelope commands', () =
     const song = await parseDaveLoweFile(ab.slice(0), 'incredibleshrinkingsphere.dl');
     const { commandsSeen, mismatched } = await check(song, ab);
     expect(commandsSeen, 'the song has setInstrument/setVolEnv commands').toBeGreaterThan(50);
-    // Known open: one section (pattern 44, channel 1) has a SET_INSTRUMENT pointer 8 bytes past the last 14-byte
-    // descriptor (0x2332, mapped to the same id as 0x232a). Everything else matches.
-    expect(mismatched.map((m) => m.split(' ')[0])).toEqual(['44:1']);
+    // Pattern 44 channel 1 sets the instrument by 0x2332, 8 bytes past the descriptor table's end (0x232a); the row carries the raw pointer.
+    expect(mismatched).toEqual([]);
   });
 });
 
@@ -173,7 +172,7 @@ describe('Dave Lowe grid re-encode of a short channel and of a repeated instrume
     // their terminator word). Sections that end on the terminator
     // words 0x14, 0x1c or 0x30 (16 of them) come back byte-exact since the parsers flag them (dlEnd) and the encoder writes the word.
     expect(untouchedMismatches(bison, mb)).toEqual([]);
-    expect(untouchedMismatches(sph, sphere)).toEqual(['42:1', '44:1', '72:3', '89:2']);
+    expect(untouchedMismatches(sph, sphere)).toEqual([]);
     const ends = new Set<number>();
     for (const song of [bison, sph]) for (const p of song.patterns) for (const c of p.channels) for (const r of c.rows) if (r.dlEnd !== undefined) ends.add(r.dlEnd);
     expect([...ends].sort((x, y) => x - y)).toEqual([0x14, 0x1c, 0x30]);

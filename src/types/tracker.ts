@@ -143,6 +143,8 @@ export interface TrackerCell {
   dlPadding?: boolean;
   /** Dave Lowe / Dave Lowe New only: the stream sets the instrument the channel already runs (a repeated word 4); the re-encode writes it again. */
   dlInstrRepeat?: boolean;
+  /** Dave Lowe only: the raw SET_INSTRUMENT pointer when it is not the canonical descriptor address of the instrument id (it points past the descriptor table); the re-encode writes it back while the instrument is unedited. */
+  dlInstrPtr?: number;
   /** Dave Lowe / Dave Lowe New only: set on the last row of a section that ends on a terminator word other than SEQ_ADVANCE (0x0014, 0x001c or 0x0030); the re-encode writes that word back. */
   dlEnd?: number;
 
