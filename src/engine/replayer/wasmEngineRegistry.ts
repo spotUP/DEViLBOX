@@ -15,6 +15,8 @@
 import type { TrackerSong } from '../TrackerReplayer';
 import { FILE_DATA_FIELDS } from '../formatFileDataFields';
 import { nuadeSongHasCellWrite } from '../nuade/nuadeCaps';
+import { makeRowClock } from '../../lib/import/formats/stepRowClock';
+import { dwRowStartTick } from '../davidwhittaker/dwGridTicks';
 import { uadeEditableLoadArgs } from '../uade/uadeLoadArgs';
 
 // ---------------------------------------------------------------------------
@@ -1060,6 +1062,11 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     fileDataKey: 'davidWhittakerFileData',
     loadMethod: 'loadTune',
     getLoadArgs: (song) => [song.fileSubsongs?.current ?? 0, song.davidWhittakerClock],
+    // Play / Play Pattern away from the top: the tick of the grid row on the song's row clock, seeked before play().
+    startTargetOf: (song, songPos, row) => song.davidWhittakerClock?.speedChanges.length
+      ? dwRowStartTick(makeRowClock(song.davidWhittakerClock.speedChanges), songPos, row)
+      : null,
+    startAt: (instance, tick) => { (instance as unknown as import('@/engine/davidwhittaker/DavidWhittakerEngine').DavidWhittakerEngine).seekToTick(tick); },
     supportsPause: false,
     supportsResume: false,
     needsDirectRouting: true,
