@@ -62,6 +62,7 @@ export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
   private _clock: { clock: RowClock; passTicks: number } | null = null;
   private readonly _tickLog: DwTickLogEntry[] = [];
   private _seekGen = 0;
+  private _loop: { start: number; end: number } | null = null;
 
   private constructor() {
     super();
@@ -162,6 +163,30 @@ export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
     this._clock = clock && clock.speedChanges.length > 0
       ? { clock: makeRowClock(clock.speedChanges), passTicks: clock.passTicks }
       : null;
+    this.postLoop();   // a new clock moves the loop's ticks
+  }
+
+  /**
+   * Play Pattern: loop grid patterns `start`..`end` (inclusive) inside the worklet, which wraps on the RENDER position so the
+   * next pattern is never rendered (the main thread only sees a position one output latency late). null clears it.
+   */
+  setPatternLoop(range: { start: number; end: number } | null): void {
+    this._loop = range;
+    this.postLoop();
+  }
+
+  private postLoop(): void {
+    if (!this.workletNode) return;
+    const r = this._loop;
+    if (!r || !this._clock || r.start < 0) {
+      this.workletNode.port.postMessage({ type: 'setLoop', startTick: -1, endTick: -1 });
+      return;
+    }
+    this.workletNode.port.postMessage({
+      type: 'setLoop',
+      startTick: dwPatternStartTick(this._clock.clock, r.start),
+      endTick: dwPatternStartTick(this._clock.clock, r.end + 1),
+    });
   }
 
   /** The row and song-order index the replayer is on, as the grid shows them. */
