@@ -2571,8 +2571,13 @@ export async function tryRouteFormat(
 
   // ── Voodoo Supreme Synthesizer (.vss) ─────────────────────────────────────
   if (matchesExt(filename, ['vss'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
-    return parseUADEFile(buffer, toUADEPrefixName(originalFileName, ['vss']), prefs.uade ?? 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
+    // Voodoo Supreme: read-only time-aligned grid (voodooSupremeGrid.ts); UADE keeps playing the module
+    const vssCtx = { ...ctx, originalFileName: toUADEPrefixName(originalFileName, ['vss']) };
+    const { parseVoodooSupremeSynthesizerFile } = await import('@lib/import/formats/VoodooSupremeSynthesizerParser');
+    return withNativeThenUADE('voodoo', vssCtx,
+      (buf: Uint8Array | ArrayBuffer, name: string) =>
+        parseVoodooSupremeSynthesizerFile(buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer, name),
+      'VoodooSupremeSynthesizerParser', { injectUADE: true });
   }
 
   // ── SynTracker (.synmod) ──────────────────────────────────────────────────
