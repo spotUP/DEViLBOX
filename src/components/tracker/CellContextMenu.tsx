@@ -556,13 +556,10 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
       const makeChordAction = (intervals: readonly number[], inversion: number) => () => {
         let notes = chordNotes(rootNote, intervals);
         if (inversion > 0) notes = invertChord(notes, inversion);
-        const neededCols = Math.min(4, notes.length);
+        const neededCols = notes.length;
         const currentCols = pattern?.channels[channelIndex]?.channelMeta?.noteCols ?? 1;
         if (neededCols > currentCols) setChannelMeta(channelIndex, { noteCols: neededCols });
-        const update: Record<string, number> = {};
-        if (notes.length >= 2) { update.note2 = notes[1]; update.instrument2 = rootInst; }
-        if (notes.length >= 3) { update.note3 = notes[2]; update.instrument3 = rootInst; }
-        if (notes.length >= 4) { update.note4 = notes[3]; update.instrument4 = rootInst; }
+        const update = { extraNotes: notes.slice(1).map((note) => ({ note, instrument: rootInst })) };
         setCell(channelIndex, rowIndex, update);
         onClose();
       };

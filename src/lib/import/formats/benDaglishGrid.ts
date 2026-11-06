@@ -11,7 +11,7 @@
  */
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import { periodToNote } from '@/lib/amiga/periodNotes';
-import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer, setNoteColumn, CELL_NOTE_COLUMNS, type RowClock } from './stepRowClock';
+import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer, setNoteColumn, type RowClock } from './stepRowClock';
 import { BD_FX } from './benDaglishEffectGlyphs';
 import { BD_WALK, type BdWalk, type BdWalkEvent } from './BenDaglishWasmExtractor';
 
@@ -88,15 +88,14 @@ export interface BdNotePlacement {
  */
 export function bdNotePlacements(walk: BdWalk, clock: RowClock = bdRowClock(walk)): { placed: BdNotePlacement[]; unplaced: BdWalkEvent[]; noteCols: number[] } {
   const placed: BdNotePlacement[] = [];
-  const unplaced: BdWalkEvent[] = [];
+  const unplaced: BdWalkEvent[] = []; // always empty: the cell holds any number of note columns (plan R5)
   const place = makeOnsetPlacer(clock);
   for (const e of walk.events) {
     if (!bdIsVisibleNote(e) || e.voice >= 4) continue;
     const pl = place(e.voice, e.ptick);
-    if (pl.col >= CELL_NOTE_COLUMNS) { unplaced.push(e); continue; }
     placed.push({ event: e, voice: e.voice, ...pl });
   }
-  return { placed, unplaced, noteCols: Array.from({ length: 4 }, (_, v) => Math.min(CELL_NOTE_COLUMNS, place.columnsOf(v))) };
+  return { placed, unplaced, noteCols: Array.from({ length: 4 }, (_, v) => place.columnsOf(v)) };
 }
 
 export interface BdGrid {
@@ -107,7 +106,7 @@ export interface BdGrid {
   /** Processed ticks per row. */
   step: number;
   clock: RowClock;
-  /** Notes starting inside their row (a delay in the first effect slot, or `delay2` in note column 2). */
+  /** Notes starting inside their row (a delay in the first effect slot, or the delay of note column 2). */
   delayedNotes: number;
   /** Rows where a voice starts two notes (the second is in note column 2). */
   clashRows: number;

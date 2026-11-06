@@ -17,6 +17,7 @@
  *   - Loop (0x8D) at the end to restart, or End (0x8E) to stop
  */
 
+import { cellNoteColumns, columnNotes } from '@/lib/tracker/noteColumns';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { TrackerCell } from '@/types';
 import { SF_FX_ROW_OFFSET } from '@/lib/import/formats/soundFactoryGrid';
@@ -131,7 +132,7 @@ function buildChannelOpcodes(
       if (!isEvent(c)) return;
       events.push({ cell: c, tick: r * step + (c.effTyp === SF_FX_ROW_OFFSET ? (c.eff ?? 0) : 0) });
     });
-    if ((rows.some((c) => (c.note2 ?? 0) > 0))) warnings.push(`Ch${channelIdx + 1}: second note column is not exported`);
+    if ((rows.some((c) => cellNoteColumns(c) > 1 && columnNotes(c).slice(1).some((n) => n > 0)))) warnings.push(`Ch${channelIdx + 1}: further note columns are not exported`);
     const patternEnd = rows.length * step;
     const pushPause = (ticks: number): void => {
       if (ticks <= 0) return;

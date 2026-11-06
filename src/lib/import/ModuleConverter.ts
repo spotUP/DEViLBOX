@@ -3,6 +3,7 @@
  * Supports both libopenmpt (legacy) and native parsers (XM/MOD)
  */
 
+import type { NoteColumnCell } from '@/lib/tracker/noteColumns';
 import type { Pattern, TrackerCell, ChannelData, ImportMetadata } from '@typedefs';
 import type { RawSongData, RawPatternCell } from './ModuleLoader';
 import type { XMNote } from './formats/XMParser';
@@ -369,16 +370,8 @@ export function convertXMModule(
             lastInstrument = cell.instrument;
           }
           // Preserve extra note columns from XRNS import
-          const raw = xmNote as unknown as Record<string, number>;
-          if (raw.note2) cell.note2 = raw.note2;
-          if (raw.instrument2) cell.instrument2 = raw.instrument2;
-          if (raw.volume2) cell.volume2 = raw.volume2;
-          if (raw.note3) cell.note3 = raw.note3;
-          if (raw.instrument3) cell.instrument3 = raw.instrument3;
-          if (raw.volume3) cell.volume3 = raw.volume3;
-          if (raw.note4) cell.note4 = raw.note4;
-          if (raw.instrument4) cell.instrument4 = raw.instrument4;
-          if (raw.volume4) cell.volume4 = raw.volume4;
+          const raw = xmNote as unknown as { extraNotes?: NoteColumnCell[] };
+          if (raw.extraNotes) cell.extraNotes = raw.extraNotes.map((e) => ({ ...e }));
           rows.push(cell);
         } else {
           rows.push({
@@ -580,7 +573,7 @@ export function convertMODModule(
  * through to UADE; it is now parseModuleToSong's (PatternExtractor).
  */
 export function convertXRNSModule(
-  patterns: Array<Array<Array<Record<string, number | undefined>>>>,
+  patterns: Array<Array<Array<Record<string, number | NoteColumnCell[] | undefined>>>>,
   metadata: ImportMetadata,
   instrumentNames: string[],
 ): ConversionResult {
@@ -595,15 +588,14 @@ export function convertXRNSModule(
       volume: 100, pan: 0, instrumentId: null, color: null,
       rows: pat.map((row): TrackerCell => {
         const c = row[ch] ?? {};
+        const num = (v: number | NoteColumnCell[] | undefined): number => (typeof v === 'number' ? v : 0);
         const cell: TrackerCell = {
-          note: c.note || 0, instrument: c.instrument || 0,
-          volume: c.volume || 0, effTyp: c.effTyp || 0,
-          eff: c.eff || 0, effTyp2: 0, eff2: 0,
+          note: num(c.note), instrument: num(c.instrument),
+          volume: num(c.volume), effTyp: num(c.effTyp),
+          eff: num(c.eff), effTyp2: 0, eff2: 0,
         };
         // Renoise's extra note columns (a chord on one track).
-        for (const k of ['note2', 'instrument2', 'volume2', 'note3', 'instrument3', 'volume3', 'note4', 'instrument4', 'volume4'] as const) {
-          if (c[k] !== undefined) (cell as unknown as Record<string, number>)[k] = c[k]!;
-        }
+        if (Array.isArray(c.extraNotes)) cell.extraNotes = c.extraNotes.map((e) => ({ ...e }));
         return cell;
       }),
     })),

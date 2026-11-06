@@ -2,6 +2,7 @@
  * MIDI Store - MIDI device state and CC mappings
  */
 
+import { columnPatchAt } from '@/lib/tracker/columnPatchAt';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { persist } from 'zustand/middleware';
@@ -562,24 +563,9 @@ export const useMIDIStore = create<MIDIStore>()(
                       const vol = Math.round((message.velocity / 127) * 64);
                       const volumeCol = vol > 0 ? 0x10 + Math.min(vol, 64) : 0;
 
-                      const cellUpdate: Record<string, number> = {};
-                      if (nci === 0) {
-                        cellUpdate.note = xmNote;
-                        cellUpdate.instrument = instrumentId;
-                        cellUpdate.volume = volumeCol;
-                      } else if (nci === 1) {
-                        cellUpdate.note2 = xmNote;
-                        cellUpdate.instrument2 = instrumentId;
-                        cellUpdate.volume2 = volumeCol;
-                      } else if (nci === 2) {
-                        cellUpdate.note3 = xmNote;
-                        cellUpdate.instrument3 = instrumentId;
-                        cellUpdate.volume3 = volumeCol;
-                      } else {
-                        cellUpdate.note4 = xmNote;
-                        cellUpdate.instrument4 = instrumentId;
-                        cellUpdate.volume4 = volumeCol;
-                      }
+                      const cellUpdate = columnPatchAt(cursor.channelIndex, cursor.rowIndex, nci, {
+                        note: xmNote, instrument: instrumentId, volume: volumeCol,
+                      });
 
                       setCell(cursor.channelIndex, cursor.rowIndex, cellUpdate);
 

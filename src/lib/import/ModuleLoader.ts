@@ -4,6 +4,7 @@
  * Falls back to libopenmpt for other formats (IT, S3M, etc.)
  */
 
+import { setColumnField, type NoteColumnCell } from '@/lib/tracker/noteColumns';
 import { ChiptunePlayer } from './ChiptunePlayer';
 import { parseXM } from './formats/XMParser';
 import { parseMOD } from './formats/MODParser';
@@ -376,7 +377,7 @@ async function loadWithNativeParser(
             const note = noteCol?.note ? xrnsNoteToMidi(noteCol.note) : 0;
             if (note > 0) notesInPattern++;
 
-            const cellData: Record<string, number> = {
+            const cellData: Record<string, number | NoteColumnCell[]> = {
               note,
               instrument: noteCol?.instrument !== undefined ? noteCol.instrument + 1 : 0,
               volume: noteCol?.volume ?? 0,
@@ -384,19 +385,20 @@ async function loadWithNativeParser(
               eff: 0,
             };
 
-            // Map extra note columns (up to 4 total)
-            for (let nc = 1; nc < Math.min(noteColumns.length, 4); nc++) {
+            // Map extra note columns (any number; the channel declares as many as its widest row)
+            const tmp: { extraNotes?: NoteColumnCell[] } = {};
+            for (let nc = 1; nc < noteColumns.length; nc++) {
               const col = noteColumns[nc];
               if (!col) continue;
               const extraNote = col.note ? xrnsNoteToMidi(col.note) : 0;
               if (extraNote > 0 || col.instrument !== undefined) {
-                const suffix = nc + 1; // note2, note3, note4
-                cellData[`note${suffix}`] = extraNote;
-                if (col.instrument !== undefined) cellData[`instrument${suffix}`] = col.instrument + 1;
-                if (col.volume !== undefined) cellData[`volume${suffix}`] = col.volume;
+                setColumnField(tmp, nc, 'note', extraNote);
+                if (col.instrument !== undefined) setColumnField(tmp, nc, 'instrument', col.instrument + 1);
+                if (col.volume !== undefined) setColumnField(tmp, nc, 'volume', col.volume);
                 if (nc + 1 > maxNoteColsPerChannel[ch]) maxNoteColsPerChannel[ch] = nc + 1;
               }
             }
+            if (tmp.extraNotes) cellData.extraNotes = tmp.extraNotes;
 
             rowData.push(cellData);
           }

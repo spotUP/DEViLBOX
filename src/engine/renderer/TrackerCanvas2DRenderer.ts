@@ -7,6 +7,7 @@
  * so the worker can swap between them transparently.
  */
 
+import { getColumnField } from '@/lib/tracker/noteColumns';
 import type { TrackerRenderInput } from './worker-types';
 import { editRowTop } from '@/lib/tracker/editRowAnchor';
 import { SUN_EFFECT_GLYPH } from '@/lib/import/formats/sunEffectGlyphs';
@@ -369,8 +370,7 @@ export class TrackerCanvas2DRenderer {
             const isPreviewNc = nc === 0 && previewNote !== null;
             const noteVal = isPreviewNc ? previewNote
               : nc === 0 ? (cell?.note ?? 0)
-              : nc === 1 ? (cell?.note2 ?? 0)
-              : nc === 2 ? (cell?.note3 ?? 0) : (cell?.note4 ?? 0);
+              : (cell ? getColumnField(cell, nc, 'note') ?? 0 : 0);
             const noteText = noteStr(noteVal, displayOffset);
             if (isPreviewNc && noteVal !== 0) {
               const keepAlpha = ctx.globalAlpha;
@@ -385,16 +385,14 @@ export class TrackerCanvas2DRenderer {
             }
 
             const inst = nc === 0 ? (cell?.instrument ?? 0)
-              : nc === 1 ? (cell?.instrument2 ?? 0)
-              : nc === 2 ? (cell?.instrument3 ?? 0) : (cell?.instrument4 ?? 0);
+              : (cell ? getColumnField(cell, nc, 'instrument') ?? 0 : 0);
             ctx.fillStyle = isPlayRow ? '#ffffff' : inst === 0 ? theme.textMuted : theme.textInstrument;
             ctx.fillText(inst === 0 ? '··' : hex2(inst), ncX + cw * 3 + 2, y);
 
             const vol = nc === 0 ? (cell?.volume ?? 0)
-              : nc === 1 ? (cell?.volume2 ?? 0)
-              : nc === 2 ? (cell?.volume3 ?? 0) : (cell?.volume4 ?? 0);
+              : (cell ? getColumnField(cell, nc, 'volume') ?? 0 : 0);
             const showDelay = nc > 0 && chan.noteColDelay === true;
-            const delay = nc === 1 ? (cell?.delay2 ?? 0) : nc === 2 ? (cell?.delay3 ?? 0) : (cell?.delay4 ?? 0);
+            const delay = (cell ? getColumnField(cell, nc, 'delay') ?? 0 : 0);
             const sub = showDelay ? delay : vol;
             ctx.fillStyle = isPlayRow ? '#ffffff' : sub === 0 ? theme.textMuted : showDelay ? theme.textEffect : theme.textVolume;
             ctx.fillText(sub === 0 ? '··' : hex2(sub), ncX + cw * 5 + 4, y);

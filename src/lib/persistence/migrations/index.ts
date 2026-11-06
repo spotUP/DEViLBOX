@@ -31,7 +31,7 @@ export const MIN_LOADABLE_SCHEMA = 21;
  * every save and gates loads against it. Kept here so the migration chain and
  * the writer share one source of truth.
  */
-export const CURRENT_SCHEMA = 26;
+export const CURRENT_SCHEMA = 27;
 
 /**
  * Forward-migrate a saved project in place from `fromVersion` up to the current
@@ -76,6 +76,13 @@ export function migrateSavedProject(
   if (fromVersion < 26) {
     const instruments = (project as { instruments?: Array<Record<string, unknown>> }).instruments;
     if (Array.isArray(instruments)) migrateSunVoxModularInstruments(instruments);
+  }
+
+  // 26 → 27: a cell's further note columns (note2..note4, instrument2.., volume2.., delay2..) became the list
+  //          `extraNotes` (any number of columns, src/lib/tracker/noteColumns.ts). Transformed, not dropped.
+  if (fromVersion < 27) {
+    const patterns = (project as { patterns?: Array<{ channels?: Array<{ rows?: Array<Record<string, unknown>> }> }> }).patterns;
+    if (Array.isArray(patterns)) migrateNoteColumns(patterns as unknown as NoteColumnPatterns);
   }
 
   // CZ-101 instruments carry their own patch as the string parameters `_cz101Tone` (128 tone bytes, base64) and
@@ -137,9 +144,10 @@ export function migrateGridOctaveBias<P extends { channels: Array<{ rows: Array<
     if (!c) continue;
     if ('hippelBias' in c) delete c.hippelBias;
     if (bias === 0) continue;
-    for (const key of ['note', 'note2', 'note3', 'note4'] as const) {
-      const v = c[key];
-      if (typeof v === 'number' && v >= 1 && v <= 96) { c[key] = pitchToNoteValue(v - bias); shifted++; }
+    const columns: Array<Record<string, unknown>> = [c, ...(Array.isArray(c.extraNotes) ? (c.extraNotes as Array<Record<string, unknown>>) : [])];
+    for (const col of columns) {
+      const v = col.note;
+      if (typeof v === 'number' && v >= 1 && v <= 96) { col.note = pitchToNoteValue(v - bias); shifted++; }
     }
   }
   return { patterns, instruments, shifted };
@@ -162,4 +170,36 @@ export function migrateSunVoxModularInstruments<I extends object>(instruments: I
     inst.sunvox = { patchData: null, patchName: typeof inst.name === 'string' ? inst.name : '', controlValues: {} };
   }
   return instruments;
+}
+
+type NoteColumnPatterns = Array<{ channels: Array<{ rows: Array<Record<string, unknown> | undefined> }> }>;
+
+/**
+ * Cells saved with the fixed further note columns (note2..note4 with instrument/volume/delay of the same
+ * number, schema 26 and older) become `extraNotes` (schema 27). Keyed on the old fields themselves, which it
+ * removes, so it is idempotent and leaves a cell that already has `extraNotes` as it is.
+ * Mutates and returns its argument.
+ */
+export function migrateNoteColumns<P extends NoteColumnPatterns>(patterns: P): P {
+  const FIELDS = ['note', 'instrument', 'volume', 'delay'] as const;
+  for (const p of patterns) for (const ch of p.channels) for (const c of ch.rows) {
+    if (!c) continue;
+    const extra: Array<Record<string, number>> = Array.isArray(c.extraNotes) ? (c.extraNotes as Array<Record<string, number>>) : [];
+    let touched = false;
+    for (const n of [2, 3, 4]) {
+      const col: Record<string, number> = {};
+      for (const f of FIELDS) {
+        const key = `${f}${n}`;
+        if (key in c) {
+          const v = c[key];
+          if (typeof v === 'number') col[f] = v;
+          delete c[key];
+          touched = true;
+        }
+      }
+      if (Object.keys(col).length > 0) { while (extra.length < n - 1) extra.push({}); extra[n - 2] = { ...extra[n - 2], ...col }; }
+    }
+    if (touched && extra.length > 0) c.extraNotes = extra;
+  }
+  return patterns;
 }

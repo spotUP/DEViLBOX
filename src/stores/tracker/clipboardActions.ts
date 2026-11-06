@@ -4,6 +4,7 @@
  * All functions that modify pattern data expect to run on immer drafts.
  */
 
+import { cloneExtraNotes, clearExtraField, copyExtraField, mergeExtraField } from '@/lib/tracker/noteColumns';
 import type {
   Pattern,
   TrackerCell,
@@ -72,27 +73,22 @@ export function copySelectionHelper(
     for (let row = minRow; row <= maxRow; row++) {
       const sourceCell = pattern.channels[ch].rows[row];
       if (isFullCell) {
-        channelData.push({ ...sourceCell });
+        channelData.push({ ...sourceCell, extraNotes: cloneExtraNotes(sourceCell) });
       } else {
         const sparseCell: TrackerCell = { ...EMPTY_CELL };
         if (columnTypes.includes('note')) {
           sparseCell.note = sourceCell.note;
           sparseCell.instrument = sourceCell.instrument;
-          sparseCell.note2 = sourceCell.note2; sparseCell.instrument2 = sourceCell.instrument2;
-          sparseCell.note3 = sourceCell.note3; sparseCell.instrument3 = sourceCell.instrument3;
-          sparseCell.note4 = sourceCell.note4; sparseCell.instrument4 = sourceCell.instrument4;
+          copyExtraField(sparseCell, sourceCell, 'note');
+          copyExtraField(sparseCell, sourceCell, 'instrument');
         }
         if (columnTypes.includes('instrument')) {
           sparseCell.instrument = sourceCell.instrument;
-          sparseCell.instrument2 = sourceCell.instrument2;
-          sparseCell.instrument3 = sourceCell.instrument3;
-          sparseCell.instrument4 = sourceCell.instrument4;
+          copyExtraField(sparseCell, sourceCell, 'instrument');
         }
         if (columnTypes.includes('volume')) {
           sparseCell.volume = sourceCell.volume;
-          sparseCell.volume2 = sourceCell.volume2;
-          sparseCell.volume3 = sourceCell.volume3;
-          sparseCell.volume4 = sourceCell.volume4;
+          copyExtraField(sparseCell, sourceCell, 'volume');
         }
         if (columnTypes.includes('effTyp') || columnTypes.includes('effParam')) {
           sparseCell.effTyp = sourceCell.effTyp;
@@ -150,33 +146,23 @@ export function cutSelectionHelper(
         const sparseCell: TrackerCell = { ...EMPTY_CELL };
         if (columnTypes.includes('note')) {
           sparseCell.note = cell.note; sparseCell.instrument = cell.instrument;
-          sparseCell.note2 = cell.note2; sparseCell.instrument2 = cell.instrument2;
-          sparseCell.note3 = cell.note3; sparseCell.instrument3 = cell.instrument3;
-          sparseCell.note4 = cell.note4; sparseCell.instrument4 = cell.instrument4;
+          copyExtraField(sparseCell, cell, 'note');
+          copyExtraField(sparseCell, cell, 'instrument');
           cell.note = 0; cell.instrument = 0;
-          cell.note2 = undefined; cell.instrument2 = undefined;
-          cell.note3 = undefined; cell.instrument3 = undefined;
-          cell.note4 = undefined; cell.instrument4 = undefined;
+          clearExtraField(cell, 'note');
+          clearExtraField(cell, 'instrument');
         }
         if (columnTypes.includes('instrument')) {
           sparseCell.instrument = cell.instrument;
-          sparseCell.instrument2 = cell.instrument2;
-          sparseCell.instrument3 = cell.instrument3;
-          sparseCell.instrument4 = cell.instrument4;
+          copyExtraField(sparseCell, cell, 'instrument');
           cell.instrument = 0;
-          cell.instrument2 = undefined;
-          cell.instrument3 = undefined;
-          cell.instrument4 = undefined;
+          clearExtraField(cell, 'instrument');
         }
         if (columnTypes.includes('volume')) {
           sparseCell.volume = cell.volume;
-          sparseCell.volume2 = cell.volume2;
-          sparseCell.volume3 = cell.volume3;
-          sparseCell.volume4 = cell.volume4;
+          copyExtraField(sparseCell, cell, 'volume');
           cell.volume = 0;
-          cell.volume2 = undefined;
-          cell.volume3 = undefined;
-          cell.volume4 = undefined;
+          clearExtraField(cell, 'volume');
         }
         if (columnTypes.includes('effTyp') || columnTypes.includes('effParam')) {
           sparseCell.effTyp = cell.effTyp;
@@ -246,21 +232,16 @@ export function pasteHelper(
         if (sourceCell.instrument !== 0) {
           targetCell.instrument = sourceCell.instrument;
         }
-        targetCell.note2 = sourceCell.note2; targetCell.instrument2 = sourceCell.instrument2;
-        targetCell.note3 = sourceCell.note3; targetCell.instrument3 = sourceCell.instrument3;
-        targetCell.note4 = sourceCell.note4; targetCell.instrument4 = sourceCell.instrument4;
+        copyExtraField(targetCell, sourceCell, 'note');
+        copyExtraField(targetCell, sourceCell, 'instrument');
       }
       if (hasMaskBit(pasteMask, MASK_INSTRUMENT) && (!isSparse || columnTypes!.includes('instrument'))) {
         targetCell.instrument = sourceCell.instrument;
-        targetCell.instrument2 = sourceCell.instrument2;
-        targetCell.instrument3 = sourceCell.instrument3;
-        targetCell.instrument4 = sourceCell.instrument4;
+        copyExtraField(targetCell, sourceCell, 'instrument');
       }
       if (hasMaskBit(pasteMask, MASK_VOLUME) && (!isSparse || columnTypes!.includes('volume'))) {
         targetCell.volume = sourceCell.volume;
-        targetCell.volume2 = sourceCell.volume2;
-        targetCell.volume3 = sourceCell.volume3;
-        targetCell.volume4 = sourceCell.volume4;
+        copyExtraField(targetCell, sourceCell, 'volume');
       }
       if (hasMaskBit(pasteMask, MASK_EFFECT) && (!isSparse || columnTypes!.includes('effTyp') || columnTypes!.includes('effParam'))) {
         targetCell.effTyp = sourceCell.effTyp;
@@ -339,21 +320,15 @@ export function pasteMixHelper(
 
       if (hasMaskBit(pasteMask, MASK_NOTE) && sourceCell.note !== 0 && targetCell.note === 0) {
         targetCell.note = sourceCell.note;
-        if (sourceCell.note2 && !targetCell.note2) targetCell.note2 = sourceCell.note2;
-        if (sourceCell.note3 && !targetCell.note3) targetCell.note3 = sourceCell.note3;
-        if (sourceCell.note4 && !targetCell.note4) targetCell.note4 = sourceCell.note4;
+        mergeExtraField(targetCell, sourceCell, 'note');
       }
       if (hasMaskBit(pasteMask, MASK_INSTRUMENT) && sourceCell.instrument !== 0 && targetCell.instrument === 0) {
         targetCell.instrument = sourceCell.instrument;
-        if (sourceCell.instrument2 && !targetCell.instrument2) targetCell.instrument2 = sourceCell.instrument2;
-        if (sourceCell.instrument3 && !targetCell.instrument3) targetCell.instrument3 = sourceCell.instrument3;
-        if (sourceCell.instrument4 && !targetCell.instrument4) targetCell.instrument4 = sourceCell.instrument4;
+        mergeExtraField(targetCell, sourceCell, 'instrument');
       }
       if (hasMaskBit(pasteMask, MASK_VOLUME) && sourceCell.volume !== 0 && targetCell.volume === 0) {
         targetCell.volume = sourceCell.volume;
-        if (sourceCell.volume2 && !targetCell.volume2) targetCell.volume2 = sourceCell.volume2;
-        if (sourceCell.volume3 && !targetCell.volume3) targetCell.volume3 = sourceCell.volume3;
-        if (sourceCell.volume4 && !targetCell.volume4) targetCell.volume4 = sourceCell.volume4;
+        mergeExtraField(targetCell, sourceCell, 'volume');
       }
       if (hasMaskBit(pasteMask, MASK_EFFECT) && (sourceCell.effTyp !== 0 || sourceCell.eff !== 0) && targetCell.effTyp === 0 && targetCell.eff === 0) {
         targetCell.effTyp = sourceCell.effTyp;
@@ -397,15 +372,15 @@ export function pasteFloodHelper(
 
         if (hasMaskBit(pasteMask, MASK_NOTE)) {
           targetCell.note = sourceCell.note;
-          targetCell.note2 = sourceCell.note2; targetCell.note3 = sourceCell.note3; targetCell.note4 = sourceCell.note4;
+          copyExtraField(targetCell, sourceCell, 'note');
         }
         if (hasMaskBit(pasteMask, MASK_INSTRUMENT)) {
           targetCell.instrument = sourceCell.instrument;
-          targetCell.instrument2 = sourceCell.instrument2; targetCell.instrument3 = sourceCell.instrument3; targetCell.instrument4 = sourceCell.instrument4;
+          copyExtraField(targetCell, sourceCell, 'instrument');
         }
         if (hasMaskBit(pasteMask, MASK_VOLUME)) {
           targetCell.volume = sourceCell.volume;
-          targetCell.volume2 = sourceCell.volume2; targetCell.volume3 = sourceCell.volume3; targetCell.volume4 = sourceCell.volume4;
+          copyExtraField(targetCell, sourceCell, 'volume');
         }
         if (hasMaskBit(pasteMask, MASK_EFFECT)) {
           targetCell.effTyp = sourceCell.effTyp;
@@ -462,9 +437,9 @@ export function pastePushForwardHelper(
       targetCell.note = 0;
       targetCell.instrument = 0;
       targetCell.volume = 0;
-      targetCell.note2 = undefined; targetCell.instrument2 = undefined; targetCell.volume2 = undefined;
-      targetCell.note3 = undefined; targetCell.instrument3 = undefined; targetCell.volume3 = undefined;
-      targetCell.note4 = undefined; targetCell.instrument4 = undefined; targetCell.volume4 = undefined;
+      clearExtraField(targetCell, 'note');
+      clearExtraField(targetCell, 'instrument');
+      clearExtraField(targetCell, 'volume');
       targetCell.effTyp = 0;
       targetCell.eff = 0;
       targetCell.effTyp2 = 0;
@@ -475,18 +450,18 @@ export function pastePushForwardHelper(
 
       if (hasMaskBit(pasteMask, MASK_NOTE)) {
         targetCell.note = sourceCell.note;
-        targetCell.note2 = sourceCell.note2; targetCell.note3 = sourceCell.note3; targetCell.note4 = sourceCell.note4;
+        copyExtraField(targetCell, sourceCell, 'note');
         targetCell.flag1 = sourceCell.flag1 ?? 0;
         targetCell.flag2 = sourceCell.flag2 ?? 0;
         targetCell.probability = sourceCell.probability ?? 0;
       }
       if (hasMaskBit(pasteMask, MASK_INSTRUMENT)) {
         targetCell.instrument = sourceCell.instrument;
-        targetCell.instrument2 = sourceCell.instrument2; targetCell.instrument3 = sourceCell.instrument3; targetCell.instrument4 = sourceCell.instrument4;
+        copyExtraField(targetCell, sourceCell, 'instrument');
       }
       if (hasMaskBit(pasteMask, MASK_VOLUME)) {
         targetCell.volume = sourceCell.volume;
-        targetCell.volume2 = sourceCell.volume2; targetCell.volume3 = sourceCell.volume3; targetCell.volume4 = sourceCell.volume4;
+        copyExtraField(targetCell, sourceCell, 'volume');
       }
       if (hasMaskBit(pasteMask, MASK_EFFECT)) {
         targetCell.effTyp = sourceCell.effTyp;

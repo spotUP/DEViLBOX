@@ -6,11 +6,11 @@
  * decision"): the main step is the GCD of the two most common gaps between a voice's note onsets
  * (stepRowClock.mainStepFromOnsets, shared with Ben Daglish). A note that starts inside its row sits on that
  * row with a delay (0xD7 in the first effect slot); a second note in the same row of the same voice goes in
- * note column 2 with its own delay (`delay2`). A tick is always 20 ms, so a row of `step` ticks plays at
+ * note column 2 with its own delay (its column delay). A tick is always 20 ms, so a row of `step` ticks plays at
  * speed = step and 125 BPM.
  */
 import type { TrackerCell } from '@/types';
-import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer, setNoteColumn, CELL_NOTE_COLUMNS, type RowClock } from './stepRowClock';
+import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer, setNoteColumn, type RowClock } from './stepRowClock';
 import { BD_FX } from './benDaglishEffectGlyphs';
 
 /** One effect operand byte: its effect id (soundFactoryEffects.ts), the byte's value and its file offset. */
@@ -101,7 +101,8 @@ export function buildSfGrid(voices: readonly (readonly SfGridEvent[])[], maxRows
   const effectCols = voices.map(() => SF_MIN_EFFECT_COLS);
   const effectOffsets = voices.map(() => new Map<number, number[]>());
   const effectCounts = new Map<number, { seen: number; placed: number }>();
-  let delayedNotes = 0, clashRows = 0, unplaced = 0, effectsSeen = 0, effectsPlaced = 0, effectsBeyondGrid = 0;
+  const unplaced = 0; // the cell holds any number of note columns: no onset is left out (plan R5)
+  let delayedNotes = 0, clashRows = 0, effectsSeen = 0, effectsPlaced = 0, effectsBeyondGrid = 0;
 
   voices.forEach((events, v) => {
     const on = onsetsOf(events);
@@ -115,7 +116,6 @@ export function buildSfGrid(voices: readonly (readonly SfGridEvent[])[], maxRows
         return;
       }
       const pl = place(v, on[i]);
-      if (pl.col >= CELL_NOTE_COLUMNS) { unplaced++; return; }
       const offset = pl.offset;
       if (pl.col === 0) {
         cell.note = e.note; cell.instrument = e.instrId;
@@ -128,7 +128,7 @@ export function buildSfGrid(voices: readonly (readonly SfGridEvent[])[], maxRows
       }
     });
 
-    noteCols[v] = Math.min(CELL_NOTE_COLUMNS, place.columnsOf(v));
+    noteCols[v] = place.columnsOf(v);
 
     // Effects go in the first free slot of their row, after the notes are placed (slot 1 may hold the delay).
     events.forEach((e, i) => {

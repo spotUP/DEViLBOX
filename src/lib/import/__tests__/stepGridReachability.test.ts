@@ -107,7 +107,7 @@ describe('step grid: Ben Daglish through parseBenDaglishFile', () => {
       let shownOffsets = 0, shownNote2 = 0, shownDelay2 = 0;
       song.songPositions.forEach((pi) => song.patterns[pi].channels.forEach((ch) => ch.rows.forEach((cell) => {
         if (cell.effTyp === BD_FX.rowOffset) shownOffsets++;
-        if (cell.note2) { shownNote2++; if ((cell.delay2 ?? 0) > 0) shownDelay2++; }
+        if (cell.extraNotes?.[0]?.note) { shownNote2++; if ((cell.extraNotes[0].delay ?? 0) > 0) shownDelay2++; }
       })));
       expect(shownNote2).toBe(s.clashes);
       expect(shownDelay2, 'note column 2 delays shown').toBe(clashes.filter((p) => p.offset > 0).length);
@@ -148,7 +148,7 @@ describe('step grid: Sound Factory through parseModuleToSong', () => {
             expect(tick, `voice ${c + 1} onsets rise`).toBeGreaterThan(last);
             last = tick;
           }
-          if (cell.note2) { note2++; expect(cell.delay2 ?? 0).toBeLessThan(step); }
+          if (cell.extraNotes?.[0]?.note) { note2++; expect(cell.extraNotes[0].delay ?? 0).toBeLessThan(step); }
         });
       });
     }
@@ -328,6 +328,7 @@ describe('step grid: Tim Follin through parseModuleToSong', () => {
     expect(step).toBe(6);
     expect(song.initialSpeed).toBe(step);
     let delayed = 0, second = 0, grown = 0, left = 0;
+    const usedCols = new Set<number>();   // sentinel: zero-based column indexes that carry a note
     const gridCols = buildTimFollinGrid(new Uint8Array(ab))!.noteCols;
     walk.forEach((want, v) => {
       const shown: number[] = [];
@@ -341,13 +342,13 @@ describe('step grid: Tim Follin through parseModuleToSong', () => {
             if (delay) delayed++;
             shown.push(base + delay);
           }
-          const rec = cell as unknown as Record<string, number | undefined>;
-          for (const k of [2, 3, 4]) {
-            if ((rec[`note${k}`] ?? 0) > 0) { second++; if (k > 2) grown++; shown.push(base + (rec[`delay${k}`] ?? 0)); measuredCols = Math.max(measuredCols, k); }
-          }
+          (cell.extraNotes ?? []).forEach((x, i) => {
+            const k = i + 2;
+            if ((x.note ?? 0) > 0) { second++; if (k > 2) grown++; shown.push(base + (x.delay ?? 0)); measuredCols = Math.max(measuredCols, k); usedCols.add(k - 1); }
+          });
         });
       });
-      // plan rule R5: the voice's note columns equal its largest same-row clash, up to the cell's 4; only an onset deeper than that is left out
+      // plan rule R5: the voice's note columns equal its largest same-row clash, uncapped; no onset is left out
       shown.sort((a, b) => a - b);
       const perRow = new Map<number, number>();
       let clash = 0;
@@ -357,16 +358,19 @@ describe('step grid: Tim Follin through parseModuleToSong', () => {
         const n = (perRow.get(row) ?? 0) + 1;
         perRow.set(row, n);
         clash = Math.max(clash, n);
-        if (n <= 4) kept.push(t); else left++;
+        kept.push(t);
       }
       expect(shown, `voice ${v}`).toEqual(kept);
-      expect(gridCols[v], `voice ${v} note columns = measured max clash`).toBe(Math.min(clash, 4));
-      expect(song.patterns[0].channels[v].channelMeta?.noteCols, `voice ${v} declared note columns`).toBe(Math.min(clash, 4));
+      expect(gridCols[v], `voice ${v} note columns = measured max clash`).toBe(clash);
+      expect(song.patterns[0].channels[v].channelMeta?.noteCols, `voice ${v} declared note columns`).toBe(clash);
       expect(measuredCols).toBeLessThanOrEqual(clash);
     });
     const grid = buildTimFollinGrid(new Uint8Array(ab))!;
-    expect(grid.unplacedNotes, 'the grid counts the onsets deeper than 4 columns').toBe(left);
-    console.log(`TF sly spy: step ${step}, onsets ${walk.map((w) => w.length).join('/')}, delayed ${delayed}, extra columns ${second} (beyond column 2: ${grown}), note columns ${gridCols.join('/')}, left out ${left} (measured max clash per voice 2/2/2/5, cell model holds 4 note columns)`);
+    expect(grid.unplacedNotes, 'no onset is left out').toBe(0);
+    expect(left, 'no onset is left out').toBe(0);
+    expect(gridCols[3], 'voice 4 needs five note columns').toBe(5);
+    expect(usedCols.has(4), 'column index 4 carries a note').toBe(true);
+    console.log(`TF sly spy: step ${step}, onsets ${walk.map((w) => w.length).join('/')}, delayed ${delayed}, extra columns ${second} (beyond column 2: ${grown}), note columns ${gridCols.join('/')}, left out ${left} (measured max clash per voice 2/2/2/5, uncapped note columns)`);
     expect(grown, 'a clash deeper than two ran the grow path').toBeGreaterThan(0);
     expect(delayed + second).toBeGreaterThan(0);
   });

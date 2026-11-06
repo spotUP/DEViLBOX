@@ -31,6 +31,7 @@
  * numbers can be computed offline for a validation corpus.
  */
 
+import { columnNotes } from '@/lib/tracker/noteColumns';
 import type { ChannelData, Pattern, TrackerCell } from '@typedefs/tracker';
 import { detectSkankPattern } from './MusicAnalysis';
 
@@ -38,8 +39,6 @@ import { detectSkankPattern } from './MusicAnalysis';
 const MIN_NOTE = 1;
 const MAX_NOTE = 96;
 
-/** Every note column a cell can carry, in column order. */
-const NOTE_COLUMNS = ['note', 'note2', 'note3', 'note4'] as const;
 
 export interface PitchEvidence {
   /** Lowest and highest sounding note, in tracker note numbers. */
@@ -134,9 +133,8 @@ export interface PatternFingerprint {
 function notesInCell(cell: TrackerCell | undefined): number[] {
   if (!cell) return [];
   const out: number[] = [];
-  for (const col of NOTE_COLUMNS) {
-    const n = cell[col];
-    if (typeof n === 'number' && n >= MIN_NOTE && n <= MAX_NOTE) out.push(n);
+  for (const n of columnNotes(cell)) {
+    if (n >= MIN_NOTE && n <= MAX_NOTE) out.push(n);
   }
   return out;
 }

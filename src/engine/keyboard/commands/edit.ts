@@ -2,6 +2,7 @@
  * Edit Commands - Pattern editing operations
  */
 
+import { columnPatchAt } from '@/lib/tracker/columnPatchAt';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useEditorStore } from '@stores/useEditorStore';
 import { useCursorStore } from '@/stores/useCursorStore';
@@ -22,13 +23,11 @@ export function deleteNote(): boolean {
   if (behavior.deleteClearsWhat === 'cursor-field') {
     // IT/Renoise style: clear only the current column
     if (cursor.columnType === 'note') {
-      const noteField = nci === 0 ? 'note' : nci === 1 ? 'note2' : nci === 2 ? 'note3' : 'note4';
-      setCell(cursor.channelIndex, cursor.rowIndex, { [noteField]: 0 });
+      setCell(cursor.channelIndex, cursor.rowIndex, columnPatchAt(cursor.channelIndex, cursor.rowIndex, nci, { note: 0 }));
     } else if (cursor.columnType === 'instrument') {
-      const instField = nci === 0 ? 'instrument' : nci === 1 ? 'instrument2' : nci === 2 ? 'instrument3' : 'instrument4';
-      setCell(cursor.channelIndex, cursor.rowIndex, { [instField]: 0 });
+      setCell(cursor.channelIndex, cursor.rowIndex, columnPatchAt(cursor.channelIndex, cursor.rowIndex, nci, { instrument: 0 }));
     } else if (cursor.columnType === 'volume') {
-      setCell(cursor.channelIndex, cursor.rowIndex, { volume: 0 });
+      setCell(cursor.channelIndex, cursor.rowIndex, columnPatchAt(cursor.channelIndex, cursor.rowIndex, nci, { volume: 0 }));
     } else if (cursor.columnType === 'effTyp') {
       setCell(cursor.channelIndex, cursor.rowIndex, { effTyp: 0, eff: 0, effect: '' });
     } else if (cursor.columnType === 'effParam') {
@@ -43,12 +42,7 @@ export function deleteNote(): boolean {
   } else if (behavior.deleteClearsWhat === 'note-sample') {
     // PT style: clear note+instrument (no volume column)
     if (cursor.columnType === 'note' || cursor.columnType === 'instrument') {
-      const fields: Record<string, number | undefined> = {};
-      if (nci === 0) { fields.note = 0; fields.instrument = 0; }
-      else if (nci === 1) { fields.note2 = 0; fields.instrument2 = 0; }
-      else if (nci === 2) { fields.note3 = 0; fields.instrument3 = 0; }
-      else { fields.note4 = 0; fields.instrument4 = 0; }
-      setCell(cursor.channelIndex, cursor.rowIndex, fields);
+      setCell(cursor.channelIndex, cursor.rowIndex, columnPatchAt(cursor.channelIndex, cursor.rowIndex, nci, { note: 0, instrument: 0 }));
     } else if (cursor.columnType === 'effTyp' || cursor.columnType === 'effParam') {
       setCell(cursor.channelIndex, cursor.rowIndex, { effTyp: 0, eff: 0, effect: '' });
     } else {
@@ -57,12 +51,7 @@ export function deleteNote(): boolean {
   } else {
     // FT2 style: clear note+inst+vol for the active note column
     if (cursor.columnType === 'note' || cursor.columnType === 'instrument' || cursor.columnType === 'volume') {
-      const fields: Record<string, number | undefined> = {};
-      if (nci === 0) { fields.note = 0; fields.instrument = 0; fields.volume = 0; }
-      else if (nci === 1) { fields.note2 = 0; fields.instrument2 = 0; fields.volume2 = 0; }
-      else if (nci === 2) { fields.note3 = 0; fields.instrument3 = 0; fields.volume3 = 0; }
-      else { fields.note4 = 0; fields.instrument4 = 0; fields.volume4 = 0; }
-      setCell(cursor.channelIndex, cursor.rowIndex, fields);
+      setCell(cursor.channelIndex, cursor.rowIndex, columnPatchAt(cursor.channelIndex, cursor.rowIndex, nci, { note: 0, instrument: 0, volume: 0 }));
     } else {
       const { clearCell } = useTrackerStore.getState();
       clearCell(cursor.channelIndex, cursor.rowIndex);

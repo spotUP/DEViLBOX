@@ -5,6 +5,7 @@ import { isTextEntryTarget } from '@/lib/keyboard/isTextEntryTarget';
  * Edit operations (undo/redo, cut/copy/paste, transpose, etc.) remain here.
  */
 
+import { columnPatchAt } from '@/lib/tracker/columnPatchAt';
 import { useEffect, useCallback, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useCursorStore, useTransportStore, useInstrumentStore } from '@stores';
@@ -24,14 +25,6 @@ import { resolveFt2BlockKey } from '@lib/tracker/blockKeymap';
 import { isKeyHandled } from '@lib/tracker/keyHandledSentinel';
 import { formatModeOwnsEditKey, windowHandlerWritesCells } from '@lib/tracker/formatModeKeyOwnership';
 import type { EditorBehavior } from '@engine/keyboard/EditorBehavior';
-
-/** Get the cell field names for a given note column index (0-3) */
-function noteColFields(nci: number): { note: string; instrument: string; volume: string } {
-  if (nci === 1) return { note: 'note2', instrument: 'instrument2', volume: 'volume2' };
-  if (nci === 2) return { note: 'note3', instrument: 'instrument3', volume: 'volume3' };
-  if (nci === 3) return { note: 'note4', instrument: 'instrument4', volume: 'volume4' };
-  return { note: 'note', instrument: 'instrument', volume: 'volume' };
-}
 
 /** PT default jump rows for F6-F10 (0=0%, 1=25%, 2=50%, 3=75%, 4=last row) */
 function ptDefaultJumpRow(posIndex: number, patternLength: number): number {
@@ -170,14 +163,14 @@ export const useTrackerInput = () => {
       case 'note-inst-vol': {
         // FT2: Delete clears note+instrument+volume on note column, or cursor field
         if (colType === 'note') {
-          const f = noteColFields(cursorRef.current.noteColumnIndex ?? 0);
-          setCell(ch, row, { [f.note]: 0, [f.instrument]: 0, [f.volume]: 0 });
+          const nci = cursorRef.current.noteColumnIndex ?? 0;
+          setCell(ch, row, columnPatchAt(ch, row, nci, { note: 0, instrument: 0, volume: 0 }));
         } else if (colType === 'instrument') {
-          const f = noteColFields(cursorRef.current.noteColumnIndex ?? 0);
-          setCell(ch, row, { [f.instrument]: 0 });
+          const nci = cursorRef.current.noteColumnIndex ?? 0;
+          setCell(ch, row, columnPatchAt(ch, row, nci, { instrument: 0 }));
         } else if (colType === 'volume') {
-          const f = noteColFields(cursorRef.current.noteColumnIndex ?? 0);
-          setCell(ch, row, { [f.volume]: 0 });
+          const nci = cursorRef.current.noteColumnIndex ?? 0;
+          setCell(ch, row, columnPatchAt(ch, row, nci, { volume: 0 }));
         } else if (colType === 'effTyp' || colType === 'effParam') {
           setCell(ch, row, { effTyp: 0, eff: 0 });
         } else if (colType === 'effTyp2' || colType === 'effParam2') {
@@ -192,14 +185,14 @@ export const useTrackerInput = () => {
       case 'cursor-field': {
         // IT/Renoise: Delete clears only the field at cursor position
         if (colType === 'note') {
-          const f = noteColFields(cursorRef.current.noteColumnIndex ?? 0);
-          setCell(ch, row, { [f.note]: 0 });
+          const nci = cursorRef.current.noteColumnIndex ?? 0;
+          setCell(ch, row, columnPatchAt(ch, row, nci, { note: 0 }));
         } else if (colType === 'instrument') {
-          const f = noteColFields(cursorRef.current.noteColumnIndex ?? 0);
-          setCell(ch, row, { [f.instrument]: 0 });
+          const nci = cursorRef.current.noteColumnIndex ?? 0;
+          setCell(ch, row, columnPatchAt(ch, row, nci, { instrument: 0 }));
         } else if (colType === 'volume') {
-          const f = noteColFields(cursorRef.current.noteColumnIndex ?? 0);
-          setCell(ch, row, { [f.volume]: 0 });
+          const nci = cursorRef.current.noteColumnIndex ?? 0;
+          setCell(ch, row, columnPatchAt(ch, row, nci, { volume: 0 }));
         } else if (colType === 'effTyp' || colType === 'effParam') {
           setCell(ch, row, { effTyp: 0, eff: 0 });
         } else if (colType === 'effTyp2' || colType === 'effParam2') {
@@ -213,8 +206,8 @@ export const useTrackerInput = () => {
       }
       case 'note-sample': {
         // PT: Delete clears note + sample number
-        const f = noteColFields(cursorRef.current.noteColumnIndex ?? 0);
-        setCell(ch, row, { [f.note]: 0, [f.instrument]: 0 });
+        const nci = cursorRef.current.noteColumnIndex ?? 0;
+        setCell(ch, row, columnPatchAt(ch, row, nci, { note: 0, instrument: 0 }));
         break;
       }
     }

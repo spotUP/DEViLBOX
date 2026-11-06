@@ -34,7 +34,7 @@ describe('instrumentChannelUsage', () => {
     expect(usage.has(6)).toBe(false);
   });
   it('multi-note cells count their extra instrument columns', () => {
-    const usage = instrumentChannelUsage([pattern([{ instrumentId: null, rows: [cell({ note: 49, instrument: 1, instrument2: 3, instrument3: 4 })] }])]);
+    const usage = instrumentChannelUsage([pattern([{ instrumentId: null, rows: [cell({ note: 49, instrument: 1, extraNotes: [{ instrument: 3 }, { instrument: 4 }] })] }])]);
     expect([1, 3, 4].map((id) => [...usage.get(id)!])).toEqual([[0], [0], [0]]);
   });
 });
@@ -50,7 +50,7 @@ describe('instrumentNoteUsage', () => {
     expect([...usage.get(2)!]).toEqual([40]);
   });
   it('an extra note column plays on its own instrument column, else on the cell\'s instrument', () => {
-    const usage = instrumentNoteUsage([pattern([{ instrumentId: null, rows: [cell({ note: 49, instrument: 1, note2: 52, note3: 56, instrument3: 4 })] }])]);
+    const usage = instrumentNoteUsage([pattern([{ instrumentId: null, rows: [cell({ note: 49, instrument: 1, extraNotes: [{ note: 52 }, { note: 56, instrument: 4 }] })] }])]);
     expect([...usage.get(1)!].sort()).toEqual([49, 52]);
     expect([...usage.get(4)!]).toEqual([56]);
   });

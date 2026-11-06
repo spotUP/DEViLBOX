@@ -4,6 +4,7 @@
  * octave selection, and edit step cycling — all behavior-aware per scheme.
  */
 
+import { columnPatchAt } from '@/lib/tracker/columnPatchAt';
 import { useCallback, useMemo, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useCursorStore, useTransportStore, useInstrumentStore } from '@stores';
@@ -212,19 +213,10 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
 
       // Write to the correct note column field based on noteColumnIndex
       const cellUpdate: Partial<import('@typedefs').TrackerCell> = {};
-      if (nci === 0) {
-        cellUpdate.note = xmNote;
-        cellUpdate.instrument = currentInstrumentId !== null ? currentInstrumentId : undefined;
-      } else if (nci === 1) {
-        cellUpdate.note2 = xmNote;
-        cellUpdate.instrument2 = currentInstrumentId !== null ? currentInstrumentId : undefined;
-      } else if (nci === 2) {
-        cellUpdate.note3 = xmNote;
-        cellUpdate.instrument3 = currentInstrumentId !== null ? currentInstrumentId : undefined;
-      } else {
-        cellUpdate.note4 = xmNote;
-        cellUpdate.instrument4 = currentInstrumentId !== null ? currentInstrumentId : undefined;
-      }
+      Object.assign(cellUpdate, columnPatchAt(targetChannel, targetRow, nci, {
+        note: xmNote,
+        instrument: currentInstrumentId !== null ? currentInstrumentId : undefined,
+      }));
 
       setCell(targetChannel, targetRow, cellUpdate);
 
@@ -298,9 +290,8 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
           e.preventDefault();
           const targetRow = (recordMode && isPlaying) ? playbackRow : cursorRef.current.rowIndex;
           const nci = cursorRef.current.noteColumnIndex ?? 0;
-          const noteField = nci === 0 ? 'note' : nci === 1 ? 'note2' : nci === 2 ? 'note3' : 'note4';
           if (recordMode && windowMayWrite()) {
-            setCell(cursorRef.current.channelIndex, targetRow, { [noteField]: XM_NOTE_OFF });
+            setCell(cursorRef.current.channelIndex, targetRow, columnPatchAt(cursorRef.current.channelIndex, targetRow, nci, { note: XM_NOTE_OFF }));
             if (editStep > 0 && !isPlaying) {
               moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
             }
@@ -313,9 +304,8 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
           e.preventDefault();
           const targetRow = (recordMode && isPlaying) ? playbackRow : cursorRef.current.rowIndex;
           const nci = cursorRef.current.noteColumnIndex ?? 0;
-          const noteField = nci === 0 ? 'note' : nci === 1 ? 'note2' : nci === 2 ? 'note3' : 'note4';
           if (recordMode && windowMayWrite()) {
-            setCell(cursorRef.current.channelIndex, targetRow, { [noteField]: XM_NOTE_CUT });
+            setCell(cursorRef.current.channelIndex, targetRow, columnPatchAt(cursorRef.current.channelIndex, targetRow, nci, { note: XM_NOTE_CUT }));
             if (editStep > 0 && !isPlaying) {
               moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
             }
@@ -328,9 +318,8 @@ export const useNoteInput = (refs: TrackerInputRefs) => {
           e.preventDefault();
           const targetRow = (recordMode && isPlaying) ? playbackRow : cursorRef.current.rowIndex;
           const nci = cursorRef.current.noteColumnIndex ?? 0;
-          const noteField = nci === 0 ? 'note' : nci === 1 ? 'note2' : nci === 2 ? 'note3' : 'note4';
           if (recordMode && windowMayWrite()) {
-            setCell(cursorRef.current.channelIndex, targetRow, { [noteField]: XM_NOTE_FADE });
+            setCell(cursorRef.current.channelIndex, targetRow, columnPatchAt(cursorRef.current.channelIndex, targetRow, nci, { note: XM_NOTE_FADE }));
             if (editStep > 0 && !isPlaying) {
               moveCursorToRow((cursorRef.current.rowIndex + editStep) % pattern.length);
             }

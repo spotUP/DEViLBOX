@@ -31,7 +31,7 @@ describe('Ben Daglish motorhead grids against the original player (UADE Paula no
     const bytes = new Uint8Array(readFileSync(FILE));
     const song = await parseBenDaglishFile(bytes.slice().buffer as ArrayBuffer, 'motorhead.bd', tune);
     const paula = paulaOnsetsOf(new PaulaSession(mod, bytes, 'motorhead.bd', { subsong: uadeTune }), SPAN_SECONDS + 1);
-    const cov = onsetCoverage(gridOnsets(song, (c, col) => (col === 1 ? c.delay2 ?? 0 : c.effTyp === BD_FX.rowOffset ? c.eff : 0)), paula, SPAN_SECONDS - 2, TOLERANCE_MS);
+    const cov = onsetCoverage(gridOnsets(song, (c, col) => (col === 1 ? c.extraNotes?.[0]?.delay ?? 0 : c.effTyp === BD_FX.rowOffset ? c.eff : 0)), paula, SPAN_SECONDS - 2, TOLERANCE_MS);
     expect(cov.length, 'voices with notes in the span').toBeGreaterThanOrEqual(2);
     for (const { voice, notes, hit } of cov) {
       expect(hit / notes, `tune ${tune} voice ${voice + 1}: ${hit} of ${notes} grid notes sit on a note the player starts (row = ${rowSeconds(song) * 1000} ms)`).toBeGreaterThanOrEqual(MIN_COVERAGE);

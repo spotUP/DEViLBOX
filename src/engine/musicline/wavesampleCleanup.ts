@@ -94,9 +94,9 @@ export function applyWavesampleIdMap(patterns: Pattern[], idMap: Map<number, num
     for (const channel of pattern.channels) {
       for (const cell of channel.rows) {
         let n = map(cell.instrument); if (n !== undefined) { cell.instrument = n; changed++; }
-        n = map(cell.instrument2); if (n !== undefined) { cell.instrument2 = n; changed++; }
-        n = map(cell.instrument3); if (n !== undefined) { cell.instrument3 = n; changed++; }
-        n = map(cell.instrument4); if (n !== undefined) { cell.instrument4 = n; changed++; }
+        for (const extra of cell.extraNotes ?? []) {
+          n = map(extra.instrument); if (n !== undefined) { extra.instrument = n; changed++; }
+        }
       }
     }
   }

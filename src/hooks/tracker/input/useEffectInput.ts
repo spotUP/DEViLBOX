@@ -4,6 +4,8 @@
  * effect2 type/param, flag columns, and probability column.
  */
 
+import { getColumnField } from '@/lib/tracker/noteColumns';
+import { columnPatchAt } from '@/lib/tracker/columnPatchAt';
 import { useCallback, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTrackerStore, useCursorStore, useTransportStore } from '@stores';
@@ -75,16 +77,15 @@ export const useEffectInput = (refs: TrackerInputRefs) => {
         return true;
       }
 
-      // ---------- NOTE COLUMN DELAY (note columns 2-4 of a channel with noteColDelay): two hex digits of delayN ticks ----------
+      // ---------- NOTE COLUMN DELAY (note columns 2 and up of a channel with noteColDelay): two hex digits of delay ticks ----------
       const delayNci = cursorRef.current.noteColumnIndex ?? 0;
       if (cursorRef.current.columnType === 'volume' && delayNci > 0
         && pattern.channels[cursorRef.current.channelIndex]?.channelMeta?.noteColDelay === true && HEX_DIGITS_ALL.includes(key)) {
         e.preventDefault();
-        const delayField = (['delay2', 'delay3', 'delay4'] as const)[delayNci - 1];
-        const current = currentCell[delayField] ?? 0;
+        const current = getColumnField(currentCell, delayNci, 'delay') ?? 0;
         const hexDigit = parseInt(key, 16);
         const next = cursorRef.current.digitIndex === 0 ? (hexDigit << 4) | (current & 0x0f) : (current & 0xf0) | hexDigit;
-        setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, { [delayField]: next });
+        setCell(cursorRef.current.channelIndex, cursorRef.current.rowIndex, columnPatchAt(cursorRef.current.channelIndex, cursorRef.current.rowIndex, delayNci, { delay: next }));
         applyEntryAdvance(cursorRef.current.columnType, cursorRef.current.digitIndex);
         return true;
       }

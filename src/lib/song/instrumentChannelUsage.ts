@@ -36,9 +36,7 @@ export function instrumentChannelUsage(patterns: readonly Pattern[]): Map<number
         const own = cell.instrument ?? 0;
         if (own > 0) addTo(usage, own, channelIndex);
         else if (isPlayedNote(cell.note)) channelDefaultUsed = true;
-        addTo(usage, cell.instrument2, channelIndex);
-        addTo(usage, cell.instrument3, channelIndex);
-        addTo(usage, cell.instrument4, channelIndex);
+        for (const extra of cell.extraNotes ?? []) addTo(usage, extra.instrument, channelIndex);
       }
       if (channelDefaultUsed) addTo(usage, channel.instrumentId, channelIndex);
     });
@@ -59,9 +57,9 @@ export function instrumentNoteUsage(patterns: readonly Pattern[]): Map<number, S
       for (const cell of channel.rows) {
         const own = cell.instrument && cell.instrument > 0 ? cell.instrument : channel.instrumentId;
         if (isPlayedNote(cell.note)) addTo(usage, own, cell.note);
-        if (isPlayedNote(cell.note2)) addTo(usage, cell.instrument2 || own, cell.note2);
-        if (isPlayedNote(cell.note3)) addTo(usage, cell.instrument3 || own, cell.note3);
-        if (isPlayedNote(cell.note4)) addTo(usage, cell.instrument4 || own, cell.note4);
+        for (const extra of cell.extraNotes ?? []) {
+          if (isPlayedNote(extra.note)) addTo(usage, extra.instrument || own, extra.note);
+        }
       }
     }
   }
