@@ -94,6 +94,8 @@ export function liveTrackerSong(overrides: Partial<TrackerSong> = {}): TrackerSo
     // The grid's UADE clock and the subsong played: the playhead follow and the row preview read them from the song.
     uadeFirstTick: fmt.uadeFirstTick ?? undefined,
     uadePlayerTickGrid: fmt.uadePlayerTickGrid || undefined,
+    // The David Whittaker row clock: the engine's load args read it from the song (wasmEngineRegistry getLoadArgs).
+    davidWhittakerClock: fmt.davidWhittakerClock ?? undefined,
     uadeEditableSubsongs: fmt.uadeEditableSubsongs ?? undefined,
     uadeEditableCurrentSubsong: fmt.uadeEditableCurrentSubsong,
     adplugTicksPerRow: fmt.adplugTicksPerRow ?? undefined,
