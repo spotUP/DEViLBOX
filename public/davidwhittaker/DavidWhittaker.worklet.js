@@ -199,7 +199,8 @@ class DavidWhittakerProcessor extends AudioWorkletProcessor {
   }
 
   /**
-   * Render `n` frames of the song. With a Play Pattern loop set (setLoop) the loop end is enforced HERE, on the render position:
+   * Render `n` frames of the song. With a Play Pattern loop set (setLoop) the loop is enforced HERE, on the render position: a
+   * position below the loop start or at its end is first run silently to the start (Play Pattern on a later pattern, a stop);
    * from the loop's last tick on the replayer is stepped one frame at a time, and the first frame that belongs to tick
    * `loopEndTick` (the next pattern) is never kept; the replayer is run silently back to `loopStartTick` (dw_seek_ticks) and the
    * rest of the block renders from there. The main thread cannot do this: it only learns a tick one output latency after it
@@ -212,7 +213,12 @@ class DavidWhittakerProcessor extends AudioWorkletProcessor {
     let done = 0;
     while (done < n) {
       const at = m._dw_played_ticks(h);
-      if (at < this.loopEndTick - 1 || at >= this.loopEndTick) {
+      if (at < this.loopStartTick || at >= this.loopEndTick) {
+        // Outside the loop (Play Pattern started below it, or a stop rewound the tune): run silently to its start first.
+        this.wrapToLoopStart();
+        continue;
+      }
+      if (at < this.loopEndTick - 1) {
         const got = render(done, n - done);
         if (got <= 0) break;
         done += got;
@@ -224,16 +230,22 @@ class DavidWhittakerProcessor extends AudioWorkletProcessor {
       if (got <= 0) break;
       if (m._dw_played_ticks(h) >= this.loopEndTick && before < this.loopEndTick) {
         // That frame started the next pattern: drop it, wrap, and render it again from the loop start.
-        if (m._dw_played_ticks(h) > this.loopStartTick) this.framesPlayed = 0;
-        this.framesPlayed += m._dw_seek_ticks(h, this.loopStartTick);
-        this.tickQueue.length = 0;
-        this.lastPlayedTicks = -1;
-        this.port.postMessage({ type: 'looped', ticks: m._dw_played_ticks(h) });
+        this.wrapToLoopStart();
         continue;
       }
       done += got;
     }
     return done;
+  }
+
+  /** Run the replayer silently to the loop's first tick and drop the ticks not yet heard from before it. */
+  wrapToLoopStart() {
+    const m = this.module, h = this.handle;
+    if (m._dw_played_ticks(h) > this.loopStartTick) this.framesPlayed = 0;
+    this.framesPlayed += m._dw_seek_ticks(h, this.loopStartTick);
+    this.tickQueue.length = 0;
+    this.lastPlayedTicks = -1;
+    this.port.postMessage({ type: 'looped', ticks: m._dw_played_ticks(h) });
   }
 
   /** Play Pattern loop in processed ticks (null clears it): the worklet wraps at render time (renderLooped). */

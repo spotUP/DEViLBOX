@@ -110,6 +110,20 @@ describe('David Whittaker output latency and seek', { timeout: 60_000 }, () => {
     expect(Math.max(...free), 'without a loop the same render does pass tick 150').toBeGreaterThanOrEqual(150);
   });
 
+  it('Play Pattern on a later pattern starts at the loop start: no tick before it is rendered (no seek message needed)', async () => {
+    // The app's Play Pattern posts setLoop then play; nothing seeks the worklet (DW positions bypass the coordinator's
+    // enforceLoop), so the worklet itself must move a position below the loop start into the loop before rendering.
+    const h = await openWorklet(worklet);
+    await h.send({ type: 'loadModule', moduleData: apb().slice(0), subsong: 0 });
+    await h.send({ type: 'setLoop', startTick: 101, endTick: 150 });
+    await h.send({ type: 'play', latencyFrames: 0 });
+    h.render(400);
+    const ticks = tickMsgs(h.posted).map((m) => m.ticks as number);
+    expect(ticks.length).toBeGreaterThan(5);
+    expect(ticks[0], 'the first heard tick is the loop start').toBe(102);
+    expect(Math.min(...ticks), 'no tick of the patterns before the loop is rendered').toBeGreaterThan(101);
+  });
+
   it('the engine drops reports of an older seek generation and posts the pattern-start tick', () => {
     class FakeNode {
       posts: unknown[] = [];
