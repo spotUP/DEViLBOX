@@ -63,9 +63,12 @@ describe('Maschine bridge client with no bridge running', () => {
   });
 
   it('retries on a timer after a connected bridge drops, then stops', async () => {
-    const { initMaschineHIDBridge } = await freshBridge();
+    const { initMaschineHIDBridge, getMaschineHIDBridge } = await freshBridge();
     initMaschineHIDBridge();
     last().open();
+    // Opening starts lazy module loads; the file must not end while they are in flight
+    // (vitest reports "Closing rpc while fetch was pending" as an unhandled error).
+    await getMaschineHIDBridge().settled();
     last().fail();
     await vi.advanceTimersByTimeAsync(2_000);
     expect(FakeSocket.made).toHaveLength(2);
