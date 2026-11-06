@@ -63,7 +63,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig, TrackerCell, Pattern, UADEChipRamInfo } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeTCBTrackerCell } from '@/engine/uade/encoders/TCBTrackerEncoder';
+import { encodeTCBTrackerCell, tcbEffectFromNibble } from '@/engine/uade/encoders/TCBTrackerEncoder';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -225,6 +225,13 @@ export async function parseTCBTrackerFile(
   const amigaFreqs = isNewFmt ? u16BE(buf, 144) : 0;
   const noteOffset = (isNewFmt && amigaFreqs !== 0) ? 0 : 3;
 
+  // specialValues (format 2): 16 x int16BE after the instrument names; the pitch bend of effect n is specialValues[n].
+  const specialValues: number[] = [];
+  for (let i = 0; i < 16; i++) {
+    const at = 146 + 128 + i * 2;
+    specialValues.push(isNewFmt && at + 2 <= buf.length ? (u16BE(buf, at) << 16) >> 16 : 0);
+  }
+
   const instrNamesOff = isNewFmt ? 146 : 144; // 144 or 144+2
 
   const instrNames: string[] = [];
@@ -342,14 +349,9 @@ export async function parseTCBTrackerFile(
         }
 
         // Effect mapping
-        let effTyp = 0;
-        let eff = 0;
-        if (effectType === 0x0D) {
-          effTyp = 0x0D; // pattern break
-          eff = 0;
-        }
-        // Effects 0x01-0x0A are pitch bends using specialValues (format 2 only)
-        // Not mapped here as they require runtime context
+        // 0x0D pattern break; 0x01-0x0A pitch bends as XM portamento from specialValues (format 2 only, as OpenMPT does).
+        // Not shown: 0x0B/0x0C interrupt/continue sample (no XM effect), 0x0E/0x0F reserved.
+        const { effTyp, eff } = tcbEffectFromNibble(effectType, specialValues);
 
         channelRows[ch].push({
           note: xmNote,
@@ -425,7 +427,8 @@ export async function parseTCBTrackerFile(
     moduleSize: buf.length,
     // Thread the song's noteOffset into the encoder so the note byte round-trips exactly
     // (the standalone default of 3 is only correct for non-Amiga-freq modules).
-    encodeCell: (cell: TrackerCell): Uint8Array => encodeTCBTrackerCell(cell, noteOffset),
+    encodeCell: (cell: TrackerCell, stored?: Uint8Array): Uint8Array => encodeTCBTrackerCell(cell, noteOffset, specialValues, stored),
+    encodeOverStored: true,
     decodeCell: (bytes: Uint8Array): TrackerCell => {
       // Inverse of parser's 2-byte TCB Tracker cell decode
       const noteByte    = bytes[0];
@@ -445,18 +448,15 @@ export async function parseTCBTrackerFile(
         }
       }
 
-      // Effect: store the raw TCB effect nibble VERBATIM so encodeCell can reproduce byte[1]
-      // exactly. TCB is played by the native UADE replayer (not DEViLBOX's XM effect engine),
-      // so the raw command code is the correct editable representation — mapping only 0x0D and
-      // dropping the rest made write-back lossy (the encoder could not restore the nibble).
-      const effTyp = effectType;
+      // Effect: the same grid effect the parser shows; encodeCell gets the stored bytes back to keep the nibble.
+      const { effTyp, eff } = tcbEffectFromNibble(effectType, specialValues);
 
       return {
         note: xmNote,
         instrument: xmNote > 0 || effectType > 0 ? rawInstr : 0,
         volume: 0,
         effTyp,
-        eff: 0,
+        eff,
         effTyp2: 0,
         eff2: 0,
       };
