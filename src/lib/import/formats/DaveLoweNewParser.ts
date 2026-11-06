@@ -149,6 +149,7 @@ interface RowData {
   effTyp: number;
   eff: number;
   period?: number;
+  dlInstrRepeat?: boolean;
 }
 
 function eventsToRows(
@@ -347,10 +348,11 @@ export function parseDaveLoweNewFile(buffer: ArrayBuffer, filename: string): Tra
             note: sRows[r].note, instrument: sRows[r].instrument,
             volume: sRows[r].volume, effTyp: sRows[r].effTyp, eff: sRows[r].eff,
             ...(sRows[r].period ? { period: sRows[r].period } : {}),
+            ...(sRows[r].dlInstrRepeat ? { dlInstrRepeat: true } : {}),
             effTyp2: 0, eff2: 0,
           });
         } else {
-          trackerRows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+          trackerRows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0, dlPadding: true });
         }
       }
 
