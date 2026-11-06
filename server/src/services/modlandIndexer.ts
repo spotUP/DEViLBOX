@@ -12,7 +12,8 @@ import db from '../db/database';
 import { isSupportedFormat } from '../../../src/lib/import/formatFilenameMatcher';
 import { companionPathsIn, type ListedFile } from './modlandCompanions';
 
-const MODLAND_INDEX_SCHEMA_VERSION = '3';
+// 4: Stonetracker joined the whitelist, so its SPS sample banks are indexed (and listable as companions).
+const MODLAND_INDEX_SCHEMA_VERSION = '4';
 
 // ── Format whitelist (modland folder name → file extension) ─────────────────
 
@@ -56,6 +57,11 @@ const PLAYABLE_FORMATS: Record<string, string> = {
   'Hippel 7V': 'hip7',
   'Hippel COSO': 'hipc',
   'Hippel ST': 'hst',
+
+  // StoneTracker: tune.spm + tune.sps sample bank. Without the folder here the .sps (not a
+  // registered song extension) never reached the index, /modland/list did not show it, and the
+  // online load fetched the song without its bank.
+  'Stonetracker': 'spm',
 
   // TFMX variants (prefix-style: mdat.songname / smpl.songname)
   'TFMX': 'tfmx',
@@ -265,7 +271,7 @@ interface ParsedEntry {
   extension: string;
 }
 
-function parseAllmodsLine(line: string): ParsedEntry | null {
+export function parseAllmodsLine(line: string): ParsedEntry | null {
   const match = line.match(LINE_REGEX);
   if (!match) return null;
 
