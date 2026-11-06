@@ -24,11 +24,13 @@
  * one carrier cell per byte (cutoff 2, period = the byte) for every distinct pattern and the four track lists, so the
  * encoder rebuilds them; the grid shows the decoded notes.
  *
- * Not decoded: the Portamento command (argument size unknown, refused), pitch and volume commands (they stay in the
- * carriers, the grid shows notes, the instrument and note off), subsongs after the first.
+ * Not decoded: the Portamento command (argument size unknown, refused), subsongs after the first. Volume, volume slide,
+ * master fade and pitch slide commands show in the effect columns of the next event's row (V S R F G P Q O).
  */
 import type { Pattern, TrackerCell, ChannelData } from '@/types';
 import { periodToNote } from '@/lib/amiga/periodNotes';
+import { RR_FX } from './commandStreamEffectGlyphs';
+import { addCellEffect, effectColumnsMeta } from './cellEffectSlots';
 
 const VOICES = 4;
 const HUNK_BYTES = 0x20;
@@ -217,7 +219,7 @@ export interface RiffRaffRowSource {
   transpose: number;
 }
 
-interface VoiceEvent { tick: number; kind: 'note' | 'rest' | 'silence'; note: number; instrument: number; stream: number; wait: number; noteAt: number; instrumentAt: number; transpose: number }
+interface VoiceEvent { tick: number; kind: 'note' | 'rest' | 'silence'; note: number; instrument: number; stream: number; wait: number; noteAt: number; instrumentAt: number; transpose: number; fx: Array<[number, number]> }
 
 class Walker {
   readonly commands: Command[];
@@ -278,6 +280,7 @@ function runVoice(w: Walker, voice: number, trackList: number, startTranspose: n
   let instrument = startInstrument;
   let instrumentAt = -1;
   let currentStream = w.stream(startPattern, -1);
+  let pending: Array<[number, number]> = [];
   let tick = 0;
   let steps = 0;
   const periods = w.t.base.periods ?? 0;
@@ -316,11 +319,18 @@ function runVoice(w: Walker, voice: number, trackList: number, startTranspose: n
         const arg = [0, 0];
         const argAt = patternPos;
         for (let i = 0; i < argBytes(command); i++) arg[i] = u8(m, patternPos++);
+        // state commands show on the next note or rest row (the voice's state when that event plays)
+        if (command === 'setVolume') pending.push([RR_FX.setVolume, arg[0]]);
+        else if (command === 'volumeSlide') pending.push([RR_FX.volumeSlide, arg[0]], [RR_FX.volumeSlideRate, arg[1]]);
+        else if (command === 'masterFade') pending.push([RR_FX.masterFade, arg[0]], [RR_FX.masterFadeRate, arg[1]]);
+        else if (command === 'pitchSlide') pending.push([RR_FX.pitchSlide, arg[0]], [RR_FX.pitchSlideLow, arg[1]]);
+        else if (command === 'pitchSlideOff') pending.push([RR_FX.pitchSlideOff, 0]);
         if (command === 'setSample') { instrument = arg[0]; instrumentAt = argAt + HUNK_BYTES; }
         if (command === 'rest' || command === 'restSilence') {
           const wait = u16(m, rates + 2 * arg[0]);
           if (wait === 0) { w.reason ??= 'a rest uses a rate of 0'; return { events, wrapTick }; }
-          events.push({ tick, kind: command === 'rest' ? 'rest' : 'silence', note: 0, instrument, stream: currentStream, wait, noteAt: -1, instrumentAt: -1, transpose });
+          events.push({ tick, kind: command === 'rest' ? 'rest' : 'silence', note: 0, instrument, stream: currentStream, wait, noteAt: -1, instrumentAt: -1, transpose, fx: pending });
+          pending = [];
           tick += wait;
           produced = true;
         }
@@ -331,7 +341,8 @@ function runVoice(w: Walker, voice: number, trackList: number, startTranspose: n
       const wait = u16(m, rates + 2 * rateIndex);
       if (wait === 0) { w.reason ??= 'a note uses a rate of 0'; return { events, wrapTick }; }
       const period = u16(m, periods + 2 * ((byte + transpose) & 0xffff));
-      events.push({ tick, kind: 'note', note: periodToNote(period), instrument, stream: currentStream, wait, noteAt, instrumentAt, transpose });
+      events.push({ tick, kind: 'note', note: periodToNote(period), instrument, stream: currentStream, wait, noteAt, instrumentAt, transpose, fx: pending });
+      pending = [];
       tick += wait;
       produced = true;
     }
@@ -410,6 +421,7 @@ export function buildRiffRaffGrid(file: Uint8Array): RiffRaffGrid | string {
     for (const e of voiceEvents[v]) {
       const row = e.tick / step;
       const cell = columns[v][row];
+      for (const [typ, val] of e.fx) addCellEffect(cell, typ, val);
       if (e.kind === 'note') { cell.note = e.note; cell.instrument = e.instrument + 1; notesPerVoice[v]++; sources[v][row] = { noteAt: e.noteAt, instrumentAt: e.instrumentAt, transpose: e.transpose }; }
       else if (e.kind === 'silence') cell.note = NOTE_OFF;
       const p = Math.floor(row / ROWS_PER_PATTERN);
@@ -427,6 +439,7 @@ export function buildRiffRaffGrid(file: Uint8Array): RiffRaffGrid | string {
       id: `channel-${ch}`, name: `Channel ${ch + 1}`, muted: !enabled[ch], solo: false, collapsed: false,
       volume: 100, pan: ch === 0 || ch === 3 ? -50 : 50, instrumentId: null, color: null,
       rows: col.slice(p * ROWS_PER_PATTERN, p * ROWS_PER_PATTERN + length),
+      ...effectColumnsMeta(col.slice(p * ROWS_PER_PATTERN, p * ROWS_PER_PATTERN + length)),
     }));
     return { id: `pattern-${p}`, name: `Pattern ${p}`, length, channels };
   });

@@ -22,6 +22,7 @@ import { robHubbardEffectToString } from './import/formats/robHubbardEffectGlyph
 import { futurePlayerEffectToString } from './import/formats/fpEffectGlyphs';
 import { musicAssemblerEffectToString } from './import/formats/maEffectGlyphs';
 import { beathovenEffectToString } from './import/formats/beathovenEffectGlyphs';
+import { commandStreamEffectToString } from './import/formats/commandStreamEffectGlyphs';
 import { isDubEffectTypeForDisplay } from '@/engine/dub/moveTable';
 import { isLowOctaveNote, midiToNoteValue, noteValueName, noteValueToMidi, parseNoteName } from '@/lib/tracker/noteValue';
 
@@ -312,6 +313,10 @@ export function xmEffectToString(effTyp: number, eff: number): string {
   // Beathoven Synthesizer stream commands (reserved block 0x500..0x503).
   const bth = beathovenEffectToString(effTyp, eff);
   if (bth !== null) return bth;
+
+  // Riff Raff / Howie Davies stream commands (reserved blocks 0x510..0x517, 0x520..0x521).
+  const cs = commandStreamEffectToString(effTyp, eff);
+  if (cs !== null) return cs;
 
   const typeChar = EFFECT_CHAR_MAP[effTyp] ?? '0';
   return `${typeChar}${HEX_BYTE[eff] ?? '00'}`;
