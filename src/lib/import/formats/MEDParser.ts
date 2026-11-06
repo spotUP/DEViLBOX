@@ -103,8 +103,10 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
   // Measured against the Paula periods UADE plays (AUDxPER log) for universal monsters title/dracula.mmd0: raw
   // note n (strans 0, playtransp 0) plays the period ProTracker's index n + 12 does (raw 25 -> 214 = C-3 = grid 37),
   // named by periodToNote (428 = C-2 = 25). A base of 24 sat a whole octave above the pitch Paula plays.
-  // MMD3 (0) is not measured: no MMD3 song plays through UADE here.
-  const noteBaseTranspose = magic === 'MMD3' ? 0 : MED_NOTE_BASE_TRANSPOSE;
+  // MMD3: UADE cannot play it; OpenMPT's MED loader (Load_med.cpp, 'if(version > 2) transpose -= 24') puts every MMD3
+  // pattern note 24 semitones below the same raw byte in MMD0-2, so the base is 12 - 24 = -12 (raw 37 plays period 428).
+  // A raw note below 13 would fall under grid note 1 and is clamped there for display; the export keeps the stored bits.
+  const noteBaseTranspose = magic === 'MMD3' ? MED_NOTE_BASE_TRANSPOSE - 24 : MED_NOTE_BASE_TRANSPOSE;
 
   // ── Parse header offsets ─────────────────────────────────────────────────
   // MED file header (52 bytes):
@@ -277,7 +279,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
             note = 97; // note cut
           } else {
             const rawNote = rawNoteVal & 0x7F;
-            note = rawNote > 0 ? rawNote + noteBaseTranspose + playTranspose : 0;
+            note = rawNote > 0 ? Math.max(1, rawNote + noteBaseTranspose + playTranspose) : 0;
           }
           // Apply effect mapping (same as MMD0 — MED effects need conversion)
           const mapped1 = mapMEDEffect(rawEff1, rawParm, tempoCtx);
@@ -297,7 +299,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
           const rawNote = raw0 & 0x3F;
           inst = (raw1 >> 4) | ((raw0 & 0x80) >> 3) | ((raw0 & 0x40) >> 1);
           const rawEff = raw1 & 0x0F;
-          note = rawNote > 0 ? rawNote + noteBaseTranspose + playTranspose : 0;
+          note = rawNote > 0 ? Math.max(1, rawNote + noteBaseTranspose + playTranspose) : 0;
           const { effTyp: e, eff: ev } = mapMEDEffect(rawEff, raw2, tempoCtx);
           effTyp = e;
           eff = ev;
@@ -588,7 +590,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
       instr.loopStart, instr.loopStart + instr.loopLength
     ));
     const placed = instruments[instruments.length - 1];
-    if (magic !== 'MMD3' && placed.sample) placed.sample.baseNote = MED_SAMPLE_BASE_NOTE;
+    if (placed.sample) placed.sample.baseNote = MED_SAMPLE_BASE_NOTE;
   }
 
   // ── Build output ─────────────────────────────────────────────────────────
@@ -658,7 +660,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
             note = 97; // note cut
           } else {
             const rawNote = rawNoteVal & 0x7F;
-            note = rawNote > 0 ? rawNote + noteBaseTranspose + playTranspose : 0;
+            note = rawNote > 0 ? Math.max(1, rawNote + noteBaseTranspose + playTranspose) : 0;
           }
           const mapped = mapMEDEffect(rawEff, rawParam, tempoCtx);
           return { note, instrument: inst, volume: 0, effTyp: mapped.effTyp, eff: mapped.eff, effTyp2: 0, eff2: 0 };
@@ -671,7 +673,7 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
           const rawNote = raw0 & 0x3F;
           const inst = (raw1 >> 4) | ((raw0 & 0x80) >> 3) | ((raw0 & 0x40) >> 1);
           const rawEff = raw1 & 0x0F;
-          const note = rawNote > 0 ? rawNote + noteBaseTranspose + playTranspose : 0;
+          const note = rawNote > 0 ? Math.max(1, rawNote + noteBaseTranspose + playTranspose) : 0;
           const mapped = mapMEDEffect(rawEff, raw2, tempoCtx);
           return { note, instrument: inst, volume: 0, effTyp: mapped.effTyp, eff: mapped.eff, effTyp2: 0, eff2: 0 };
         },
