@@ -81,6 +81,9 @@ function playbackData(
   return { libopenmptFileData: buffer.slice(0), uadePatternLayout };
 }
 
+/** Grid note = raw note + this + playtransp (MMD0/1/2); the exporter inverts it. */
+export const MED_NOTE_BASE_TRANSPOSE = 12;
+
 export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong {
   const buf = new Uint8Array(buffer);
   const magic = str4(buf, 0);
@@ -90,12 +93,11 @@ export function parseMEDFile(buffer: ArrayBuffer, filename: string): TrackerSong
   }
 
   const isMMD1Plus = magic !== 'MMD0';
-  // OpenMPT uses transpose = NOTE_MIN(1) + 47 + playTranspose = 48 for MMD0/1/2,
-  // and subtracts 24 for MMD3 (version > 2) → transpose = 24.
-  // DEViLBOX note = OpenMPT note - 24 (period 428 = C-2 in DEViLBOX = C-4 in OpenMPT = note 49):
-  //   MMD0/1/2: baseTranspose = 48 - 24 = 24
-  //   MMD3:     baseTranspose = 24 - 24 = 0
-  const noteBaseTranspose = magic === 'MMD3' ? 0 : 24;
+  // Measured against the Paula periods UADE plays (AUDxPER log) for universal monsters title/dracula.mmd0: raw
+  // note n (strans 0, playtransp 0) plays the period ProTracker's index n + 12 does (raw 25 -> 214 = C-3 = grid 37),
+  // named by periodToNote (428 = C-2 = 25). A base of 24 sat a whole octave above the pitch Paula plays.
+  // MMD3 (0) is not measured: no MMD3 song plays through UADE here.
+  const noteBaseTranspose = magic === 'MMD3' ? 0 : MED_NOTE_BASE_TRANSPOSE;
 
   // ── Parse header offsets ─────────────────────────────────────────────────
   // MED file header (52 bytes):
