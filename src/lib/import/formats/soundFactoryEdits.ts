@@ -104,8 +104,8 @@ export function writeSoundFactory(sourceBytes: Uint8Array, edited: readonly Patt
     const noteChanged = (a.note ?? 0) !== (b.note ?? 0);
     const fxChanged = !same(sfNormalizeEffects(now.fx), old.fx);
     const delayChanged = now.delay !== old.delay;
-    if ((a.instrument ?? 0) !== (b.instrument ?? 0) || (a.note2 ?? 0) !== (b.note2 ?? 0) || (a.instrument2 ?? 0) !== (b.instrument2 ?? 0)) {
-      warnings.push(`${where}: instrument and second-column note edits are not written`);
+    if ((a.instrument ?? 0) !== (b.instrument ?? 0) || [2, 3, 4].some((k) => (a[`note${k}`] ?? 0) !== (b[`note${k}`] ?? 0) || (a[`instrument${k}`] ?? 0) !== (b[`instrument${k}`] ?? 0))) {
+      warnings.push(`${where}: instrument and further-column note edits are not written`);
     }
     if (!noteChanged && !fxChanged && !delayChanged) return;
     const ai = parse.anchors[c]?.[g] ?? -1;

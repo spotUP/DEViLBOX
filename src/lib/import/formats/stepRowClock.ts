@@ -131,19 +131,36 @@ export interface OnsetPlacement {
   offset: number;
 }
 
+export type OnsetPlacer = ((key: number, tick: number) => OnsetPlacement) & {
+  /** Note columns key (a voice) needs so far: 1 plus its largest same-row clash. Only grows; never capped (plan rule R5). */
+  columnsOf(key: number): number;
+};
+
 /**
  * The one rule for where a note onset sits in the step grid (plan section 2): its row and offset on the clock, and the
  * note column when an earlier onset of the same key (a voice) already took that row. Call it once per onset in the
- * order the onsets are placed; it returns null when the row has no note column left (`maxCols`, 2 in the cell model).
+ * order the onsets are placed. Plan rule R5: the note columns grow to the measured maximum same-row clash of the song,
+ * so no onset is ever dropped; `columnsOf(key)` is the count the channel declares (`noteCols`).
  */
-export function makeOnsetPlacer(clock: RowClock, maxCols = 2): (key: number, tick: number) => OnsetPlacement | null {
+export function makeOnsetPlacer(clock: RowClock): OnsetPlacer {
   const used = new Map<string, number>();
-  return (key, tick) => {
+  const cols = new Map<number, number>();
+  const place = (key: number, tick: number): OnsetPlacement => {
     const { row, offset } = clock.tickToRow(tick);
     const k = `${key}:${row}`;
     const col = used.get(k) ?? 0;
-    if (col >= maxCols) return null;
     used.set(k, col + 1);
+    if (col + 1 > (cols.get(key) ?? 1)) cols.set(key, col + 1);
     return { row, col, offset };
   };
+  return Object.assign(place, { columnsOf: (key: number) => cols.get(key) ?? 1 });
+}
+
+/** Note columns the cell model holds (note..note4). A clash deeper than this has no cell field to live in: the callers count it as left out and say so. */
+export const CELL_NOTE_COLUMNS = 4;
+
+/** The cell fields of note column `col` (0 is note/instrument; 1..3 are note2..note4, delay2..delay4). */
+export function setNoteColumn(cell: object, col: number, note: number, instrument: number, delay: number): void {
+  if (col < 1 || col >= CELL_NOTE_COLUMNS) throw new RangeError(`note column ${col + 1} does not exist in the cell model (${CELL_NOTE_COLUMNS} columns)`);
+  Object.assign(cell, { [`note${col + 1}`]: note, [`instrument${col + 1}`]: instrument, [`delay${col + 1}`]: delay });
 }

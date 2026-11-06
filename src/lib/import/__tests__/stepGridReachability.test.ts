@@ -327,9 +327,11 @@ describe('step grid: Tim Follin through parseModuleToSong', () => {
     const step = mainStepFromOnsets(walk);
     expect(step).toBe(6);
     expect(song.initialSpeed).toBe(step);
-    let delayed = 0, second = 0, unplaced = 0;
+    let delayed = 0, second = 0, grown = 0, left = 0;
+    const gridCols = buildTimFollinGrid(new Uint8Array(ab))!.noteCols;
     walk.forEach((want, v) => {
       const shown: number[] = [];
+      let measuredCols = 1;
       song.songPositions.forEach((pi, pos) => {
         const pat = song.patterns[pi];
         pat.channels[v].rows.forEach((cell, r) => {
@@ -339,25 +341,33 @@ describe('step grid: Tim Follin through parseModuleToSong', () => {
             if (delay) delayed++;
             shown.push(base + delay);
           }
-          if ((cell.note2 ?? 0) > 0) { second++; shown.push(base + (cell.delay2 ?? 0)); }
+          const rec = cell as unknown as Record<string, number | undefined>;
+          for (const k of [2, 3, 4]) {
+            if ((rec[`note${k}`] ?? 0) > 0) { second++; if (k > 2) grown++; shown.push(base + (rec[`delay${k}`] ?? 0)); measuredCols = Math.max(measuredCols, k); }
+          }
         });
       });
-      // the cell has two note columns: a third onset in one row of a voice is the only one left out
+      // plan rule R5: the voice's note columns equal its largest same-row clash, up to the cell's 4; only an onset deeper than that is left out
       shown.sort((a, b) => a - b);
       const perRow = new Map<number, number>();
-      const left: number[] = [];
+      let clash = 0;
+      const kept: number[] = [];
       for (const t of want) {
         const row = Math.floor(t / step);
-        const n = perRow.get(row) ?? 0;
-        perRow.set(row, n + 1);
-        if (n >= 2) left.push(t);
+        const n = (perRow.get(row) ?? 0) + 1;
+        perRow.set(row, n);
+        clash = Math.max(clash, n);
+        if (n <= 4) kept.push(t); else left++;
       }
-      expect(shown, `voice ${v}`).toEqual(want.filter((t) => !left.includes(t)));
-      unplaced += left.length;
+      expect(shown, `voice ${v}`).toEqual(kept);
+      expect(gridCols[v], `voice ${v} note columns = measured max clash`).toBe(Math.min(clash, 4));
+      expect(song.patterns[0].channels[v].channelMeta?.noteCols, `voice ${v} declared note columns`).toBe(Math.min(clash, 4));
+      expect(measuredCols).toBeLessThanOrEqual(clash);
     });
     const grid = buildTimFollinGrid(new Uint8Array(ab))!;
-    expect(grid.unplacedNotes, 'the grid counts the notes it left out').toBe(unplaced);
-    console.log(`TF sly spy: step ${step}, onsets ${walk.map((w) => w.length).join('/')}, delayed ${delayed}, second column ${second}, left out ${unplaced}`);
+    expect(grid.unplacedNotes, 'the grid counts the onsets deeper than 4 columns').toBe(left);
+    console.log(`TF sly spy: step ${step}, onsets ${walk.map((w) => w.length).join('/')}, delayed ${delayed}, extra columns ${second} (beyond column 2: ${grown}), note columns ${gridCols.join('/')}, left out ${left} (measured max clash per voice 2/2/2/5, cell model holds 4 note columns)`);
+    expect(grown, 'a clash deeper than two ran the grow path').toBeGreaterThan(0);
     expect(delayed + second).toBeGreaterThan(0);
   });
 });

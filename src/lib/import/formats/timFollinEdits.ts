@@ -25,7 +25,7 @@ export interface TimFollinEditResult {
   warnings: string[];
 }
 
-interface Edit { pattern: number; channel: number; row: number; col: 0 | 1; note: number; offset: number; value: number }
+interface Edit { pattern: number; channel: number; row: number; col: number; note: number; offset: number; value: number }
 
 const where = (e: { pattern: number; channel: number; row: number }): string => `voice ${e.channel + 1}, pattern ${e.pattern}, row ${e.row}`;
 
@@ -33,11 +33,15 @@ export function otherFieldsDiffer(a: TrackerCell, b: TrackerCell): boolean {
   const x = a as unknown as Record<string, number | undefined>;
   const y = b as unknown as Record<string, number | undefined>;
   for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) {
-    if (k === 'note' || k === 'instrument' || k === 'note2' || k === 'instrument2') continue;
+    if (/^(note|instrument)[234]?$/.test(k)) continue;
     if ((x[k] ?? 0) !== (y[k] ?? 0)) return true;
   }
   return false;
 }
+
+/** The note shown in note column `col` (0 = first) of a cell. */
+const noteIn = (cell: TrackerCell | undefined, col: number): number =>
+  ((cell as unknown as Record<string, number | undefined> | undefined)?.[col === 0 ? 'note' : `note${col + 1}`]) ?? 0;
 
 const cellAt = (g: TfolGrid, channel: number, row: number): TrackerCell | undefined =>
   g.patterns[Math.floor(row / ROWS_PER_PATTERN)]?.channels[channel]?.rows[row % ROWS_PER_PATTERN];
@@ -71,13 +75,13 @@ export function applyTimFollinGridEdits(original: Uint8Array, patterns: readonly
     if (!was) return;
     const otherChanged = otherFieldsDiffer(cell, was);
     const at = { pattern: pi, channel: c, row: r };
-    if (cell.instrument !== was.instrument || cell.instrument2 !== was.instrument2) warnings.push(`${PREFIX} ${where(at)}: the instrument is chosen by an Instrument command shared by many notes; that change was not written.`);
+    if ((['instrument', 'instrument2', 'instrument3', 'instrument4'] as const).some((f) => cell[f] !== was[f])) warnings.push(`${PREFIX} ${where(at)}: the instrument is chosen by an Instrument command shared by many notes; that change was not written.`);
     if (otherChanged) warnings.push(`${PREFIX} ${where(at)}: volume and effect columns are not stored per row in this format; that change was not written.`);
-    for (const col of [0, 1] as const) {
-      const now = col === 0 ? cell.note : (cell.note2 ?? 0);
-      const wasNote = col === 0 ? was.note : (was.note2 ?? 0);
+    for (let col = 0; col < base.noteCols[c]; col++) {
+      const now = noteIn(cell, col);
+      const wasNote = noteIn(was, col);
       if (now === wasNote) continue;
-      const src = (col === 0 ? base.rowSources : base.rowSources2)[pi]?.[c]?.[r];
+      const src = (col === 0 ? base.rowSources : base.rowSourcesExtra[col - 1])?.[pi]?.[c]?.[r];
       if (!src || wasNote < 1 || wasNote >= NOTE_OFF) {
         warnings.push(`${PREFIX} ${where(at)}: no note plays on this row, and adding or removing one, or changing a rest or note off, would change the length of the stream; the edit was not written.`);
         continue;
@@ -109,7 +113,7 @@ export function applyTimFollinGridEdits(original: Uint8Array, patterns: readonly
   // cells that share an edited byte legitimately change with it
   const touched = new Set(accepted.map((e) => e.offset));
   const shared = new Set<string>();
-  for (const srcs of [base.rowSources, base.rowSources2]) srcs.forEach((pat, pi) => pat.forEach((voice, c) => voice.forEach((s, r) => {
+  for (const srcs of [base.rowSources, ...base.rowSourcesExtra]) srcs.forEach((pat, pi) => pat.forEach((voice, c) => voice.forEach((s, r) => {
     if (s && touched.has(s.offset)) shared.add(`${c}:${pi * ROWS_PER_PATTERN + r}`);
   })));
 
@@ -117,14 +121,14 @@ export function applyTimFollinGridEdits(original: Uint8Array, patterns: readonly
     writeAll(edits);
     const again = buildTimFollinGrid(data, subsong);
     if (!again || again.rows !== base.rows) return edits;
-    const bad = edits.filter((e) => (e.col === 0 ? cellAt(again, e.channel, e.pattern * ROWS_PER_PATTERN + e.row)?.note : cellAt(again, e.channel, e.pattern * ROWS_PER_PATTERN + e.row)?.note2) !== e.note);
+    const bad = edits.filter((e) => noteIn(cellAt(again, e.channel, e.pattern * ROWS_PER_PATTERN + e.row), e.col) !== e.note);
     if (bad.length > 0) return bad;
     for (let c = 0; c < 4; c++) {
       for (let row = 0; row < base.rows; row++) {
         if (shared.has(`${c}:${row}`)) continue;
         const a = cellAt(again, c, row);
         const b = cellAt(base, c, row);
-        if (a?.note !== b?.note || a?.instrument !== b?.instrument || a?.note2 !== b?.note2) return edits; // something else moved
+        if (a?.note !== b?.note || a?.instrument !== b?.instrument || [1, 2, 3].some((k) => noteIn(a, k) !== noteIn(b, k))) return edits; // something else moved
       }
     }
     return [];
