@@ -17,6 +17,7 @@
  * functions.
  */
 import { getPeriodExtended } from '@/engine/effects/PeriodTables';
+import { pitchToNoteValue } from '@/lib/tracker/noteValue';
 
 /** Finetune-0 periods, index 0 = note 1 (C-0). */
 export const AMIGA_PERIODS: readonly number[] = [
@@ -58,6 +59,16 @@ export function periodToPitch(period: number): number {
   while (p > lowest * 1.03) { p /= 2; octaves--; }
   while (p < highest * 0.97) { p *= 2; octaves++; }
   return periodToNote(p) + 12 * octaves;
+}
+
+/**
+ * The grid note (stored value, noteValue.ts) a period plays: periodToNote inside C-0..B-5, the octave below C-0
+ * as negative values (c_1..b_1) for periods up to twice C-0's, 0 (no note) for a period the grid cannot name.
+ * Shared by the Future Player and Voodoo Supreme grids.
+ */
+export function periodToGridNote(period: number): number {
+  if (!(period > 0)) return 0;
+  return pitchToNoteValue(periodToPitch(period));
 }
 
 /**

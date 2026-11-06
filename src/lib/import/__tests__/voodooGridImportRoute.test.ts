@@ -6,6 +6,7 @@
  * period 224 = pitch 36), shown lifted by 12 on both songs (octaveLift) because the lowest pitch is -11. Octave unverified
  * against audio.
  */
+import { isPitchedNote } from '@/lib/tracker/noteValue';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -19,7 +20,7 @@ vi.mock('../formats/voodooSupremeGrid', async (importOriginal) => {
 
 const ROOT = process.cwd();
 const rowsOf = (song: TrackerSong, voice: number) => song.patterns.flatMap((p) => p.channels[voice].rows);
-const played = (song: TrackerSong, voice: number) => rowsOf(song, voice).map((c) => c.note).filter((n) => n > 0 && n !== 97);
+const played = (song: TrackerSong, voice: number) => rowsOf(song, voice).map((c) => c.note).filter((n) => isPitchedNote(n));
 
 async function load(path: string): Promise<TrackerSong> {
   const { parseModuleToSong } = await import('../parseModuleToSong');

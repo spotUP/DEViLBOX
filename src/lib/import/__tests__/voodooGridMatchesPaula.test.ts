@@ -12,7 +12,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { openUade, PaulaSession, PAULA_REG, oracleStats } from '@/engine/__tests__/gridOracle';
 import { buildVoodooGrid, type VoodooGrid } from '../formats/voodooSupremeGrid';
-import { periodToNote } from '@/lib/amiga/periodNotes';
+import { periodToNote, periodToGridNote } from '@/lib/amiga/periodNotes';
+import { noteValueToPitch } from '@/lib/tracker/noteValue';
 
 const SONGS = ['voodoo/voo8.vss', 'voodoo-supreme/silkworm.vss'].map((p) => `public/data/songs/${p}`);
 const FIRST_EVENTS = 6;
@@ -71,4 +72,39 @@ describe('voodoo supreme grid notes equal the notes of the periods UADE writes',
       expect(hist[1] + hist[2] + hist[3]).toBeGreaterThan(total / 2);
     }, 180000);
   }
+});
+
+/**
+ * Bass below C-0: periods above 1712 (voo8 voice 3: 1726 and 2334; silkworm voice 1: 1512-1696) are the octave below
+ * C-0 in the grid (negative stored values, noteValue.ts), periodToGridNote of the period UADE writes - not a clamp to C-0.
+ */
+describe('voodoo supreme bass periods above C-0 show the octave below C-0', () => {
+  for (const [path, voice] of [['public/data/songs/voodoo/voo8.vss', 3], ['public/data/songs/voodoo-supreme/silkworm.vss', 1]] as const) {
+    it(path, async () => {
+      const grid = buildVoodooGrid(new Uint8Array(readFileSync(join(process.cwd(), path)))) as VoodooGrid;
+      const rows = grid.patterns.flatMap((p) => p.channels[voice].rows);
+      const low = rows.map((c, row) => ({ row, note: c.note })).filter((e) => e.note < 0);
+      expect(low.length).toBeGreaterThan(0);
+      const lastTick = low[Math.min(low.length, 8) - 1].row * grid.ticksPerRow + 2;
+      const paula = await paulaPeriodsPerTick(path, lastTick);
+      const lines: string[] = [];
+      for (const e of low.slice(0, 8)) {
+        const period = paula[voice][Math.max(e.row * grid.ticksPerRow, 1)];
+        lines.push(`voice ${voice} row ${e.row}: grid note ${e.note}, UADE period ${period} -> ${periodToGridNote(period)}`);
+        expect(period).toBeGreaterThan(1500);
+        // voo8 voice 3 samples 66-99 units below its table period (2400 -> 2334, 1792 -> 1726/1693; cause not measured here),
+        // up to a semitone of pitch; silkworm voice 1 is exact.
+        const pitchDiff = Math.abs((noteValueToPitch(e.note) as number) - (noteValueToPitch(periodToGridNote(period)) as number));
+        expect(pitchDiff).toBeLessThanOrEqual(path.includes('voo8') ? 1 : 0);
+        expect(e.note).toBeLessThan(0);
+      }
+      console.log(lines.join('\n'));
+    }, 180000);
+  }
+  it('periodToGridNote: the octave below C-0 is linear; a period past it has no note', () => {
+    expect(periodToGridNote(1712)).toBe(1);
+    expect(periodToGridNote(2334)).toBe(-5);
+    expect(periodToGridNote(3424)).toBe(-12);
+    expect(periodToGridNote(3600)).toBe(0);
+  });
 });
