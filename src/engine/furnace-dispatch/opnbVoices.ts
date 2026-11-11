@@ -4,16 +4,19 @@
  * systemPresets.ts, so the editor, the engine upload and the composing chat's
  * channel text all say the same thing.
  */
-import { SYSTEM_PRESETS, DivChanType, type DivChanDef } from '@constants/systemPresets';
-import { DIV_INS_FM, DIV_INS_AY, DIV_INS_ADPCMA, DIV_INS_ADPCMB } from '@lib/export/FurnaceInstrumentEncoder';
+import type { DivChanDef } from '@constants/systemPresets';
+import {
+  chipSpecOf, kindOfInsType, kindOfChipChannel, chipChannelsOfKind,
+  type ChipVoiceKind, type ChipVoiceSpec,
+} from './chipVoiceKinds';
 
 /** FurnaceConfig.chipType of the YM2610 (OPNB) and the YM2610B (OPNBB). */
 export const CHIPTYPE_OPNB = 14;
 export const CHIPTYPE_OPNBB = 48;
 
-const PRESET_OF_CHIPTYPE: Record<number, string> = {
-  [CHIPTYPE_OPNB]: 'ym2610_full',
-  [CHIPTYPE_OPNBB]: 'ym2610b',
+const SYNTH_OF_CHIPTYPE: Record<number, string> = {
+  [CHIPTYPE_OPNB]: 'FurnaceOPNB',
+  [CHIPTYPE_OPNBB]: 'FurnaceOPNBB',
 };
 
 export type OpnbVoiceKindId = 'fm' | 'ssg' | 'adpcma' | 'adpcmb';
@@ -27,34 +30,32 @@ export interface OpnbVoiceKind {
   takes: (def: DivChanDef) => boolean;
 }
 
-export const OPNB_VOICE_KINDS: readonly OpnbVoiceKind[] = [
-  { id: 'fm', label: 'FM', divInsType: DIV_INS_FM, takes: (d) => d.type === DivChanType.FM },
-  { id: 'ssg', label: 'SSG', divInsType: DIV_INS_AY, takes: (d) => d.type === DivChanType.PULSE },
-  { id: 'adpcma', label: 'ADPCM-A', divInsType: DIV_INS_ADPCMA, takes: (d) => d.type === DivChanType.PCM && d.name.startsWith('ADPCM-A') },
-  { id: 'adpcmb', label: 'ADPCM-B', divInsType: DIV_INS_ADPCMB, takes: (d) => d.type === DivChanType.PCM && d.name.startsWith('ADPCM-B') },
-];
-
-export function isOpnbChipType(chipType: number): boolean {
-  return chipType in PRESET_OF_CHIPTYPE;
+function asOpnbKind(k: ChipVoiceKind): OpnbVoiceKind {
+  return { id: k.id as OpnbVoiceKindId, label: k.label, divInsType: k.insTypes[0], takes: k.takes };
 }
 
-function layoutOf(chipType: number): DivChanDef[] {
-  const id = PRESET_OF_CHIPTYPE[chipType];
-  const preset = SYSTEM_PRESETS.find((p) => p.id === id);
-  if (!preset) throw new Error(`opnbVoices: chipType ${chipType} is not a Neo Geo chip`);
-  return preset.channelDefs;
+// The Neo Geo kinds are the YM2610 entry of chipVoiceKinds.ts, the one table of every mixed-kind chip.
+const OPNB_SPEC = chipSpecOf('FurnaceOPNB') as ChipVoiceSpec;
+export const OPNB_VOICE_KINDS: readonly OpnbVoiceKind[] = OPNB_SPEC.kinds.map(asOpnbKind);
+
+export function isOpnbChipType(chipType: number): boolean {
+  return chipType in SYNTH_OF_CHIPTYPE;
+}
+
+function specOf(chipType: number): ChipVoiceSpec {
+  const spec = chipSpecOf(SYNTH_OF_CHIPTYPE[chipType]);
+  if (!spec) throw new Error(`opnbVoices: chipType ${chipType} is not a Neo Geo chip`);
+  return spec;
 }
 
 export function opnbVoiceKind(divInsType: number | undefined): OpnbVoiceKind {
-  return OPNB_VOICE_KINDS.find((k) => k.divInsType === divInsType) ?? OPNB_VOICE_KINDS[0];
+  return asOpnbKind(kindOfInsType(OPNB_SPEC, divInsType));
 }
 
 /** The chip channels (counted from the chip's first) that take a kind. */
 export function opnbKindChannels(chipType: number, divInsType: number | undefined): number[] {
-  const kind = opnbVoiceKind(divInsType);
-  const out: number[] = [];
-  layoutOf(chipType).forEach((d, i) => { if (kind.takes(d)) out.push(i); });
-  return out;
+  const spec = specOf(chipType);
+  return chipChannelsOfKind(spec, kindOfInsType(spec, divInsType));
 }
 
 export function opnbFirstChannel(chipType: number, divInsType: number | undefined): number {
@@ -70,8 +71,8 @@ export const opnbPreviewChannel = opnbFirstChannel;
 
 /** The kind a chip channel takes. */
 export function opnbVoiceKindOfChannel(chipType: number, chipChannel: number): OpnbVoiceKind {
-  const def = layoutOf(chipType)[chipChannel];
-  return OPNB_VOICE_KINDS.find((k) => def && k.takes(def)) ?? OPNB_VOICE_KINDS[0];
+  const spec = specOf(chipType);
+  return asOpnbKind(kindOfChipChannel(spec, chipChannel) ?? spec.kinds[0]);
 }
 
 // ── SSG voice: macro labels and audible defaults ───────────────────────────────
