@@ -2358,6 +2358,20 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
 
+  // ── MCMD (.mcmd) ─────────────────────────────────────────────────────────
+  {
+    key: 'mcmd',
+    label: 'MCMD',
+    description: 'MCMD (.mcmd) - four-voice note pool as the grid, note edits saved in place; nuade / UADE plays the module',
+    family: 'amiga-native',
+    matchMode: 'both',
+    extRegex: /\.mcmd$/i,
+    prefixes: ['mcmd.'],
+    prefKey: 'mcmd',
+    nativeParser: { module: '@lib/import/formats/MCMDParser', parseFn: 'parseMcmdFile', detectFn: 'isMcmdFormat' },
+    uadeFallback: true,
+  },
+
   // ── Howie Davies (.hd) ───────────────────────────────────────────────────
   {
     key: 'howieDavies',
@@ -2577,7 +2591,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     ['fw', 'Forgotten Worlds'],
     ['hn', 'HN'], ['thn', 'THN'],
     ['mtp2', 'MajorTom 2'], ['arp', 'ARP'],
-    ['hip', 'Jochen Hippel base'], ['mcmd', 'MCMD'], ['sog', 'SOG'],
+    ['hip', 'Jochen Hippel base'], ['sog', 'SOG'],
     ['mok', 'Silmarils'], ['mso', 'Medley SO'],
     ['pn', 'Pokeynoise'],
     ['sa-p', 'Sonic Arranger P'], ['lion', 'Lion'], ['sa_old', 'Sonic Arranger Old'],
