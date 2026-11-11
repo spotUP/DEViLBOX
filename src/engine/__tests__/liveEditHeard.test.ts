@@ -94,6 +94,10 @@ const FILE: Record<string, string> = {
   sidmon1: files.find((f) => f.endsWith('.sid1')) ?? '',
   sonicArranger: files.find((f) => f.endsWith('.sa')) ?? '',
   soundfx: files.find((f) => f.endsWith('.sfx')) ?? '',
+  // the extension match finds a 114-byte Organya song without notes first (formats/cave_story_-_42_-_xxxx.org)
+  organya: 'organya/obj0640-1.org',
+  // the `digi.` prefix match finds an Ad Lib capture (digi.rad) that no content detector rejects
+  digi: 'digibooster/the day after.digi',
 };
 /** Formats UADE plays from the module bytes: the Paula stream is the sound. */
 const PAULA = new Set(['suntronic', 'robHubbard', 'davidWhittaker', 'benDaglish', 'jochenHippelST', 'activisionPro', 'fred', 'actionamics', 'soundMaster', 'digitalSonixChrome', 'sidmon1']);
