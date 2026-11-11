@@ -70,3 +70,33 @@ describe('one start dialog', () => {
     expect(order).toEqual(['load']);
   });
 });
+
+describe('start dialog off', () => {
+  beforeEach(() => {
+    unlocks.length = 0; endCb = null;
+    resetStartupSequenceForTest(); resetBootRestoreForTest();
+    localStorage.clear();
+    useUIStore.getState().closeModal();
+    useUIStore.getState().setStartupJingleStage('off');
+    window.history.replaceState({}, '', '/');
+  });
+
+  it.each([
+    ['setting off', '/', { welcomeDialogEnabled: false, welcomeJingleEnabled: true }],
+    ['?quiet', '/?quiet', { welcomeDialogEnabled: true, welcomeJingleEnabled: true }],
+  ])('%s: no dialog, no jingle, no hold, the boot restore still completes', async (_n, url, settings) => {
+    useSettingsStore.setState(settings);
+    window.history.replaceState({}, '', url);
+    beginStartupSequence();
+    beginBootRestore();
+    openStartDialog('b1');
+    expect(useUIStore.getState().modalOpen).toBeNull();
+    expect(useUIStore.getState().startupJingleStage).toBe('off');
+    await whenStartupJingleDone();
+    endBootRestore();
+    await whenBootRestoreDone();
+    expect(unlocks).toEqual([]);
+    expect(Object.keys(localStorage)).not.toContain('devilbox-seen-version');
+    window.history.replaceState({}, '', '/');
+  });
+});
