@@ -62,9 +62,37 @@ describe('useTrackerStore — pattern lifecycle', () => {
     expect(useTransportStore.getState().currentRow).toBe(0);
   });
 
-  // Note: the happy-path clonePattern test is covered by the Puppeteer UI
-  // smoke suite (Phase 3) — happy-dom's structuredClone can't unwrap immer
-  // Proxy drafts, so running it here would only test the test environment.
+  // Found while composing through duplicate_pattern (2026-11-11): both actions
+  // threw "#<Object> could not be cloned" in real Chrome on every call, because
+  // structuredClone was handed the immer draft. No copy was ever made.
+  it.each(['clonePattern', 'duplicatePattern'] as const)('%s inserts an independent copy after the source pattern', (action) => {
+    const store = useTrackerStore.getState();
+    store.setCell(0, 3, { note: 49, instrument: 2 });
+    const before = useTrackerStore.getState().patterns.length;
+    useTrackerStore.setState({ patternOrder: [0, 1, 0] });
+
+    useTrackerStore.getState()[action](0);
+
+    const state = useTrackerStore.getState();
+    expect(state.patterns.length).toBe(before + 1);
+    const [source, copy] = [state.patterns[0], state.patterns[1]];
+    expect(copy.id).not.toBe(source.id);
+    expect(copy.name).toBe(`${source.name} (Copy)`);
+    expect(copy.channels[0].rows[3]).toMatchObject({ note: 49, instrument: 2 });
+    // Order entries that pointed past the source move with the splice.
+    expect(state.patternOrder).toEqual([0, 2, 0]);
+
+    // The copy is independent: an edit of it leaves the source alone.
+    useTrackerStore.setState({ currentPatternIndex: 1 });
+    useTrackerStore.getState().setCell(0, 3, { note: 60 });
+    expect(useTrackerStore.getState().patterns[0].channels[0].rows[3].note).toBe(49);
+    expect(useTrackerStore.getState().patterns[1].channels[0].rows[3].note).toBe(60);
+  });
+
+  it('duplicatePattern moves the cursor to the copy', () => {
+    useTrackerStore.getState().duplicatePattern(0);
+    expect(useTrackerStore.getState().currentPatternIndex).toBe(1);
+  });
 });
 
 describe('useTrackerStore — bulkBlockEdit atomic undo', () => {
