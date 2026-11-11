@@ -28,6 +28,7 @@ const PARSE_FALLBACK: Record<string, { module: string; fn: string }> = {
   mmd0: { module: '@lib/import/formats/MEDParser', fn: 'parseMEDFile' },
   pmd: { module: '@lib/import/formats/PiyoPiyoParser', fn: 'parsePiyoPiyoFile' },
   org: { module: '@lib/import/formats/OrganyaParser', fn: 'parseOrganyaFile' },
+  aon: { module: '@lib/import/formats/ArtOfNoiseParser', fn: 'parseArtOfNoiseFile' },
   okta: { module: '@lib/import/formats/OktalyzerParser', fn: 'parseOktalyzerFile' },
   prt: { module: '@lib/import/formats/PreTrackerParser', fn: 'parsePreTrackerFile' },
   synmod: { module: '@lib/import/formats/SynTrackerParser', fn: 'parseSynTrackerFile' },

@@ -21,7 +21,7 @@ import { registerPatternEncoder } from '../UADEPatternEncoder';
 /**
  * Reverse-translate XM effect → AON effect.
  */
-function reverseEffect(effTyp: number, eff: number): { effect: number; effectArg: number } {
+export function reverseEffect(effTyp: number, eff: number): { effect: number; effectArg: number } {
   if (effTyp === 0 && eff === 0) return { effect: 0, effectArg: 0 };
 
   // AON effects are numbered 0-15, same as MOD

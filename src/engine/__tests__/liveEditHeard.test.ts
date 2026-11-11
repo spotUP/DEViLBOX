@@ -140,7 +140,7 @@ const UNCONFIRMED: string[] = [];
  */
 export const UNMEASURED: Record<string, string> = {
   dmf: 'import needs the Furnace WASM (FurnaceFileOps.js) the node run cannot load',
-  artOfNoise: 'import needs an AudioContext (ToneEngine)', steveTurner: 'import needs an AudioContext (ToneEngine)',
+  artOfNoise: 'plays on the ArtOfNoise worklet (WASM), which the node run cannot render', steveTurner: 'import needs an AudioContext (ToneEngine)',
   goatTracker: 'import needs an AudioContext (ToneEngine)', anders0land: 'import needs an AudioContext (ToneEngine)',
   fmTracker: 'import needs an AudioContext (ToneEngine)', imagoOrpheus: 'import needs an AudioContext (ToneEngine)',
   cdfm67: 'import needs an AudioContext (ToneEngine)', karlMorton: 'import needs an AudioContext (ToneEngine)',

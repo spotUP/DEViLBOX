@@ -26,7 +26,7 @@ registerEditableFormat({ formatId: "adplug", label: "AdPlug", newSong: { templat
 registerEditableFormat({ formatId: "amf", label: "", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "amosMusicBank", label: "AMOS Music Bank", newSong: { template: "templates/amosMusicBank.abk" }, patternCodec: { kind: "variable" }, exporter: { module: "AMOSMusicBankExporter", fn: "exportAMOSMusicBank", ext: "abk", byLayout: true } });
 registerEditableFormat({ formatId: "ams", label: "", patternCodec: { kind: "variable" } });
-registerEditableFormat({ formatId: "aon", label: "Art of Noise", patternCodec: { kind: "fixed" } });
+registerEditableFormat({ formatId: "aon", label: "Art of Noise", patternCodec: { kind: "fixed" }, exporter: { module: "ArtOfNoiseExporter", fn: "exportArtOfNoise", byLayout: true } });
 registerEditableFormat({ formatId: "aProSys", label: "A-Pro-Sys", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "artAndMagic", label: "Art and Magic", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "benDaglish", label: "Ben Daglish", newSong: { template: "templates/benDaglish.bd", name: "Ben Daglish" }, patternCodec: { kind: "variable" }, exporter: { module: "BenDaglishExporter", fn: "exportBenDaglish", ext: "bd", byLayout: true } });
