@@ -74,6 +74,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   tonyWilliams: 'public/data/songs/formats/future basketball main.tw',
   jxs: 'public/data/songs/formats/popcorn.jxs',
   kdm: 'public/data/songs/formats/flysong.kdm',
+  davidHanney: 'public/data/songs/formats/tearaway_thomas.dh',
   ems: 'public/data/songs/formats/je taime.ems',
   mcmd: 'public/data/songs/formats/ep-trmonsterbusiness.mcmd',
   organya: 'public/data/songs/organya/obj0640-1.org',
