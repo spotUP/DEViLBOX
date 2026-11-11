@@ -1949,7 +1949,28 @@ export const useTrackerStore = create<TrackerStore>()(
         }
       }),
 
-    reorderChannel: (fromIndex, toIndex) =>
+    reorderChannel: (fromIndex, toIndex) => {
+      // A move shifts every channel between the two positions, in every pattern. Same rule as
+      // swapChannels: check first, and refuse the whole move when any shifted channel would land a
+      // wrong-kind note on its new chip channel. Nothing is written on a refusal.
+      const patterns = get().patterns;
+      if (fromIndex !== toIndex && fromIndex >= 0 && toIndex >= 0) {
+        for (const pattern of patterns) {
+          if (fromIndex >= pattern.channels.length || toIndex >= pattern.channels.length) continue;
+          const order = pattern.channels.map((_, i) => i);
+          order.splice(toIndex, 0, order.splice(fromIndex, 1)[0]);
+          for (let newIndex = 0; newIndex < order.length; newIndex++) {
+            if (order[newIndex] === newIndex) continue;
+            for (const cell of pattern.channels[order[newIndex]].rows) {
+              const error = noteVoiceKindError(newIndex, cell);
+              if (error) {
+                notify.warning(`${error} Channel was not moved.`);
+                return;
+              }
+            }
+          }
+        }
+      }
       set((state) => {
         state.patterns.forEach((pattern) => {
           if (
@@ -1974,7 +1995,8 @@ export const useTrackerStore = create<TrackerStore>()(
         } else if (fromIndex > curCh && toIndex <= curCh) {
           useCursorStore.getState().moveCursorToChannel(curCh + 1);
         }
-      }),
+      });
+    },
 
     updateChannelName: (channelIndex, name) =>
       set((state) => {
