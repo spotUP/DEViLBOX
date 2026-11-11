@@ -53,7 +53,7 @@ export function playingDescriptor(song: TrackerSong): NativeEngineDescriptor | n
 
 /** Where a grid edit of a song goes (one per branch of sendCellEditsToEngine). */
 export type LiveEditRoute =
-  | 'fred-module' | 'actionamics-module' | 'monotone-module' | 'kdm-module' | 'jxs-module' | 'activisionPro-module'
+  | 'fred-module' | 'actionamics-module' | 'monotone-module' | 'kdm-module' | 'organya-module' | 'jxs-module' | 'activisionPro-module'
   | 'track-index' | 'grid-cell' | 'engine-swap' | 'eagleplayer-module' | 'hippelst-module' | 'med-module' | 'chip-ram' | 'uade-module' | 'none';
 
 /**
@@ -69,6 +69,7 @@ export function liveEditRoute(song: TrackerSong): { route: LiveEditRoute; engine
   if (desc?.key === 'ActionamicsReplayer') return at('actionamics-module');
   if (desc?.key === 'MonotoneReplayer') return at('monotone-module');
   if (desc?.key === 'KdmReplayer') return at('kdm-module');
+  if (desc?.key === 'Organya') return at('organya-module');
   if (desc?.key === 'JxsReplayer') return at('jxs-module');
   if (desc?.key === 'ActivisionProReplayer') return at('activisionPro-module');
   if (desc && isTrackIndexEngine(desc.key)) return at('track-index');
@@ -109,6 +110,11 @@ export async function sendCellEditsToEngine(
     case 'kdm-module': {
       const { applyKdmModuleEdits } = await import('../kdm/kdmModuleEdits');
       await applyKdmModuleEdits(song, edits);
+      break;
+    }
+    case 'organya-module': {
+      const { applyOrganyaModuleEdits } = await import('../organya/organyaModuleEdits');
+      await applyOrganyaModuleEdits(song, edits);
       break;
     }
     case 'monotone-module': {

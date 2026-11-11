@@ -16,6 +16,7 @@ import type { SynthType } from '@typedefs/instrument';
 
 registerEditableFormat({ formatId: "actionamics", label: "", newSong: { template: "templates/actionamics.ast", name: "Actionamics" }, patternCodec: { kind: "variable" }, exporter: { module: "ActionamicsExporter", fn: "exportActionamics", byLayout: true } });
 registerEditableFormat({ formatId: "jxs", label: "JayTrax", patternCodec: { kind: "fixed" }, exporter: { module: "JxsExporter", fn: "exportJxs", byLayout: true } });
+registerEditableFormat({ formatId: "organya", label: "Organya", patternCodec: { kind: "fixed" }, exporter: { module: "OrganyaExporter", fn: "exportOrganya", byLayout: true } });
 registerEditableFormat({ formatId: "kdm", label: "Ken Silverman KDM", patternCodec: { kind: "fixed" }, exporter: { module: "KdmExporter", fn: "exportKdm", byLayout: true } });
 registerEditableFormat({ formatId: "monotone", label: "MONOTONE", newSong: { template: "templates/monotone.mon" }, patternCodec: { kind: "fixed" }, exporter: { module: "MonotoneExporter", fn: "exportMonotone", byLayout: true } });
 registerEditableFormat({ formatId: "ansiMusic", label: "ANSI Music", newSong: { template: "templates/ansimusic.ans" }, patternCodec: { kind: "fixed" }, exporter: { module: "AnsiMusicExporter", fn: "exportAnsiMusic" } });
@@ -165,6 +166,7 @@ const WITH_SYNTH: Record<string, SynthType[]> = {
   jamCracker: ['JamCrackerSynth'],
   jxs: ['JxsSynth', 'JxsWasmSynth'],
   kdm: ['KdmWasmSynth'],
+  organya: ['OrganyaSynth'],
   monotone: ['MonotoneWasmSynth'],
   musicAssembler: ['MusicAssemblerSynth'],
   musicLine: ['MusicLineSynth'],

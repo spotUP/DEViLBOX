@@ -124,6 +124,11 @@ export class OrganyaEngine extends WASMSingletonBase {
     );
   }
 
+  /** Swap an edited module in while the song plays (the core restarts it from the top). */
+  replaceModule(buffer: ArrayBuffer): void {
+    this.workletNode?.port.postMessage({ type: 'replaceModule', moduleData: buffer });
+  }
+
   play(): void {
     this.workletNode?.port.postMessage({ type: 'play' });
   }

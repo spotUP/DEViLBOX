@@ -180,6 +180,7 @@ const ENGINE_FIELD_FORMAT_IDS: ReadonlyArray<readonly [formatId: string, carries
   ['sawteeth', (song) => !!song.sawteethFileData],
   ['monotone', (song) => song.format === 'MON'],
   ['kdm', (song) => song.format === 'KDM'],
+  ['organya', (song) => song.format === 'Organya'],
   ['jxs', (song) => song.format === 'JXS'],
 ];
 

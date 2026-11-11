@@ -320,6 +320,14 @@
       "cells": 5264,
       "bytes": 5264
     },
+    "organya": {
+      "exporter": "OrganyaExporter.exportOrganya",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 9954,
+      "bytes": 9954
+    },
     "monotone": {
       "exporter": "MonotoneExporter.exportMonotone",
       "tier": "byte-exact",
