@@ -84,6 +84,13 @@ export interface UADEPatternLayout {
    * When set it replaces encodeCell for live writes, and the grid is not a
    * per-cell byte view of chip RAM, so there is no chip-RAM read-back.
    */
+  /**
+   * A format whose grid shows stream command arguments as effects (cellEffectSlots): the byte patches (offset, value)
+   * that put the cell's edited effects into the module, and whether the cell's note is as parsed (then the writers
+   * leave the note bytes alone instead of re-deriving them from the grid note). Applied by patchModuleByLayout
+   * and the chip-RAM cell writer next to encodeCell.
+   */
+  effectPatches?: (pattern: number, row: number, channel: number, cell: TrackerCell) => { patches: Array<[number, number]>; noteUnchanged: boolean };
   writeCell?: (pattern: number, row: number, channel: number, cell: TrackerCell) => Array<{ offset: number; bytes: Uint8Array }>;
   /**
    * A cell no stored row covers (a command-stream or timed-row format: the cell lies inside a row that lasts

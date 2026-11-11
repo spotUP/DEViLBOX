@@ -71,6 +71,8 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { RonKlarenConfig } from '@/types/instrument/exotic';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { RK_FX } from './commandStreamEffectGlyphs';
+import { addCellEffect, effectColumnsMeta, effectEditPatches } from './cellEffectSlots';
 import { encodeRonKlarenCell } from '@/engine/uade/encoders/RonKlarenEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
@@ -712,9 +714,13 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
 
   // ── Decode tracks into note rows ───────────────────────────────────────
   interface RkRow { noteIdx: number; instrNum: number; hasNote: boolean; }
+  /** One argument byte of a command that precedes a note: the grid effect id, the track-relative position of the byte and its value. */
+  interface RkArg { typ: number; at: number; val: number; }
 
-  function decodeTrackToRows(data: Uint8Array, numRows: number, transpose: number): { rows: RkRow[]; notePositions: number[] } {
+  function decodeTrackToRows(data: Uint8Array, numRows: number, transpose: number): { rows: RkRow[]; notePositions: number[]; args: RkArg[][] } {
     const rows: RkRow[] = [];
+    const args: RkArg[][] = [];
+    let pending: RkArg[] = []; // commands read since the last note row; they show on the next one
     const notePositions: number[] = []; // position of note cmd byte within data[]
     let pos = 0;
     let currentInstr = 0;
@@ -723,6 +729,8 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     function emitRow(noteIdx: number, instrId: number, dataPos: number, hasNote: boolean): void {
       rows.push({ noteIdx, instrNum: instrId, hasNote });
       notePositions.push(dataPos);
+      args.push(hasNote ? pending : []);
+      if (hasNote) pending = [];
     }
 
     while (pos < data.length && rows.length < numRows) {
@@ -741,8 +749,8 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       }
 
       if (cmd === 0x80) {
-        // SetArpeggio (skip arg, not tracked for static display)
-        if (pos < data.length) pos++;
+        // SetArpeggio: the arpeggio number shows as an effect on the next note row
+        if (pos < data.length) { pending.push({ typ: RK_FX.arpeggio, at: pos, val: data[pos] }); pos++; }
         continue;
       }
 
@@ -752,6 +760,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
           const endNote = data[pos];
           const increment = data[pos + 1];
           const waitCount = data[pos + 2];
+          pending.push({ typ: RK_FX.portamentoEnd, at: pos, val: endNote }, { typ: RK_FX.portamentoIncrement, at: pos + 1, val: increment }, { typ: RK_FX.portamentoWait, at: pos + 2, val: waitCount });
           pos += 3;
           // Portamento: emit note row with current period and wait
           const transposedEnd = Math.min(endNote + transpose, RK_PERIODS.length - 1);
@@ -777,8 +786,8 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       }
 
       if (cmd === 0x84) {
-        // ChangeAdsrSpeed
-        if (pos < data.length) pos++;
+        // ChangeAdsrSpeed: the speed shows as an effect on the next note row
+        if (pos < data.length) { pending.push({ typ: RK_FX.adsrSpeed, at: pos, val: data[pos] }); pos++; }
         continue;
       }
 
@@ -807,8 +816,9 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     while (rows.length < numRows) {
       rows.push({ noteIdx: 0, instrNum: 0, hasNote: false });
       notePositions.push(-1);
+      args.push([]);
     }
-    return { rows: rows.slice(0, numRows), notePositions: notePositions.slice(0, numRows) };
+    return { rows: rows.slice(0, numRows), notePositions: notePositions.slice(0, numRows), args: args.slice(0, numRows) };
   }
 
   // ── Build TrackerSong patterns ─────────────────────────────────────────
@@ -825,10 +835,14 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   const trackerPatterns: Pattern[] = [];
   // Build cell offset map: cellOffsetMap[patIdx][ch][row] = file offset
   const cellOffsetMap: number[][][] = [];
+  // Per pattern, channel and row: the stream byte behind each effect of the cell (file offset, slot order) and the cell as parsed.
+  const effectSourceMap: Array<Array<Array<Array<{ typ: number; at: number }>>>> = [];
+  const parsedCells: TrackerCell[][][] = [];
 
   for (let posIdx = 0; posIdx < maxTrackEntries; posIdx++) {
     const channelRows: TrackerCell[][] = Array.from({ length: 4 }, () => []);
     const patOffsets: number[][] = Array.from({ length: 4 }, () => []);
+    const patSources: Array<Array<Array<{ typ: number; at: number }>>> = Array.from({ length: 4 }, () => []);
 
     for (let ch = 0; ch < 4; ch++) {
       const posList = primarySong.positions[ch];
@@ -839,13 +853,14 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
         for (let r = 0; r < ROWS_PER_TRACK; r++) {
           channelRows[ch].push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
           patOffsets[ch].push(-1);
+          patSources[ch].push([]);
         }
         continue;
       }
 
       const trackData = trackDataArrays[entry.trackNumber];
       const trackStart = trackFileStarts[entry.trackNumber];
-      const { rows: decodedRows, notePositions } = decodeTrackToRows(trackData, ROWS_PER_TRACK, entry.transpose);
+      const { rows: decodedRows, notePositions, args } = decodeTrackToRows(trackData, ROWS_PER_TRACK, entry.transpose);
 
       for (let ri = 0; ri < decodedRows.length; ri++) {
         const row = decodedRows[ri];
@@ -862,6 +877,12 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
           eff2: 0,
         });
 
+        const slots: Array<{ typ: number; at: number }> = [];
+        for (const a of args[ri]) {
+          if (trackStart >= 0 && addCellEffect(channelRows[ch][ri], a.typ, a.val)) slots.push({ typ: a.typ, at: trackStart + a.at });
+        }
+        patSources[ch].push(slots);
+
         // Compute file offset from track-relative position
         const relPos = notePositions[ri];
         patOffsets[ch].push(relPos >= 0 && trackStart >= 0 ? trackStart + relPos : -1);
@@ -869,6 +890,8 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     }
 
     cellOffsetMap.push(patOffsets);
+    effectSourceMap.push(patSources);
+    parsedCells.push(channelRows.map((rows) => rows.map((c) => ({ ...c }))));
 
     trackerPatterns.push({
       id: `pattern-${posIdx}`,
@@ -885,6 +908,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
         instrumentId: null,
         color: null,
         rows,
+        ...effectColumnsMeta(rows),
       })),
       importMetadata: {
         sourceFormat: 'RK',
@@ -959,6 +983,12 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
         note, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
         period: (raw[0] << 8) | raw[1],
       };
+    },
+    effectPatches: (pattern, row, channel, cell) => {
+      const was = parsedCells[pattern]?.[channel]?.[row];
+      if (!was) return { patches: [], noteUnchanged: false };
+      const fx = effectEditPatches(cell, was, effectSourceMap[pattern][channel][row] ?? []);
+      return { patches: fx.refusal ? [] : fx.patches, noteUnchanged: cell.note === was.note };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       if (pattern < 0 || pattern >= cellOffsetMap.length) return -1;

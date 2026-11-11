@@ -24,6 +24,9 @@ export function patchModuleByLayout(source: ArrayBuffer | Uint8Array, layout: UA
   const unplaced: LayoutPatchResult['unplaced'] = [];
   let patched = 0;
   for (const { pattern, row, channel, cell } of editedCells(patterns)) {
+    const fx = layout.effectPatches?.(pattern, row, channel, cell);
+    if (fx) for (const [at, val] of fx.patches) if (at >= 0 && at < buf.length && buf[at] !== val) { buf[at] = val; patched++; }
+    if (fx?.noteUnchanged) continue;
     const offset = getCellFileOffset(layout, pattern, row, channel);
     if (offset < 0 || offset + layout.bytesPerCell > buf.length) {
       if ((cell.note ?? 0) > 0) unplaced.push({ pattern, row, channel });
