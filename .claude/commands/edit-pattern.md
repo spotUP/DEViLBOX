@@ -79,7 +79,7 @@ write_note_sequence(
 ### Fill Range
 ```
 fill_range(channel: 0, startRow: 0, endRow: 63,
-  cell: {note: "C-2", instrument: 2}, step: 8)
+  note: "C-2", instrument: 2, step: 8)
 ```
 
 ### Batch Operations (Atomic)

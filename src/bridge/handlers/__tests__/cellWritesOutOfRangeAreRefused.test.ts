@@ -94,6 +94,23 @@ describe('MCP pattern writes outside the song', () => {
     expect(notesOfCurrentPattern()).toBe(before);
   });
 
+  it('fill_range with the fields the tool sends (flat note and instrument) writes the notes', () => {
+    // The MCP tool schema has no `cell` key: it sends note, instrument, ... flat.
+    const result = fillRange({ channel: 0, startRow: 0, endRow: 8, step: 4, note: 'C-3', instrument: 1 });
+    expect(result).toMatchObject({ ok: true, count: 3 });
+    for (const row of [0, 4, 8]) {
+      expect(current().channels[0].rows[row].note).toBeGreaterThan(0);
+      expect(current().channels[0].rows[row].instrument).toBe(1);
+    }
+    expect(current().channels[0].rows[1].note).toBe(0);
+  });
+
+  it('fill_range that names no cell field reports an error instead of ok', () => {
+    const before = notesOfCurrentPattern();
+    expect(fillRange({ channel: 0, startRow: 0, endRow: 8, step: 4 })).toHaveProperty('error');
+    expect(notesOfCurrentPattern()).toBe(before);
+  });
+
   it('clear_cell, clear_channel and clear_pattern refuse a target that does not exist', () => {
     const channelCount = current().channels.length;
     expect(clearCell({ channel: channelCount, row: 0 })).toHaveProperty('error');
