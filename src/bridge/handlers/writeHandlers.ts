@@ -62,10 +62,51 @@ function resolveNote(note: unknown): number | undefined {
 
 // ─── Pattern Editing ───────────────────────────────────────────────────────────
 
+/**
+ * The one range check for every MCP pattern write. The store drops a write to
+ * a channel or row that does not exist, and `setCurrentPattern` ignores an
+ * index that does not exist (the write then lands in the pattern that was
+ * current). A caller that got `{ ok: true }` for such a write composed into
+ * nothing, so each writer asks here first and reports the song's real size.
+ *
+ * `patternIndex` undefined means the current pattern. `channel` undefined
+ * skips the channel check (clear_pattern). Returns the error text, or null.
+ */
+function cellTargetError(patternIndex: unknown, channel: unknown, rows: readonly unknown[] = []): string | null {
+  const st = useTrackerStore.getState();
+  const index = patternIndex ?? st.currentPatternIndex;
+  const patternCount = st.patterns.length;
+  if (typeof index !== 'number' || !Number.isInteger(index) || index < 0 || index >= patternCount) {
+    return `patternIndex ${String(index)} is out of range: the song has ${patternCount} patterns (0..${patternCount - 1}). Add one with add_pattern.`;
+  }
+  const pattern = st.patterns[index];
+  const channelCount = pattern.channels.length;
+  if (channel !== undefined
+    && (typeof channel !== 'number' || !Number.isInteger(channel) || channel < 0 || channel >= channelCount)) {
+    return `channel ${String(channel)} is out of range: the song has ${channelCount} channels (0..${channelCount - 1}). Add channels with set_channel_count.`;
+  }
+  for (const row of rows) {
+    if (typeof row !== 'number' || !Number.isInteger(row) || row < 0 || row >= pattern.length) {
+      return `row ${String(row)} is out of range: pattern ${index} has ${pattern.length} rows (0..${pattern.length - 1}). Change the length with resize_pattern.`;
+    }
+  }
+  return null;
+}
+
+/** A row step for the bulk writers: a whole number from 1 up (0 would never advance). */
+function stepError(step: unknown): string | null {
+  return typeof step === 'number' && Number.isInteger(step) && step >= 1
+    ? null
+    : `step ${String(step)} is not valid: use a whole number from 1 up.`;
+}
+
 export function setCell(params: Record<string, unknown>): Record<string, unknown> {
   const channel = params.channel as number;
   const row = params.row as number;
-  const patternIndex = params.patternIndex as number | undefined;
+  const patternIndex = (params.patternIndex ?? undefined) as number | undefined;
+
+  const rangeError = cellTargetError(patternIndex, channel, [row]);
+  if (rangeError) return { error: rangeError };
 
   if (patternIndex !== undefined) {
     useTrackerStore.getState().setCurrentPattern(patternIndex);
@@ -92,8 +133,14 @@ export function setCell(params: Record<string, unknown>): Record<string, unknown
 }
 
 export function setCells(params: Record<string, unknown>): Record<string, unknown> {
-  const patternIndex = params.patternIndex as number | undefined;
+  const patternIndex = (params.patternIndex ?? undefined) as number | undefined;
   const cells = params.cells as Array<Record<string, unknown>>;
+
+  // Every cell is checked before the first is written: no half-written batch.
+  for (const cell of cells) {
+    const rangeError = cellTargetError(patternIndex, cell.channel, [cell.row]);
+    if (rangeError) return { error: rangeError };
+  }
 
   if (patternIndex !== undefined) {
     useTrackerStore.getState().setCurrentPattern(patternIndex);
@@ -112,7 +159,10 @@ export function setCells(params: Record<string, unknown>): Record<string, unknow
 export function clearCell(params: Record<string, unknown>): Record<string, unknown> {
   const channel = params.channel as number;
   const row = params.row as number;
-  const patternIndex = params.patternIndex as number | undefined;
+  const patternIndex = (params.patternIndex ?? undefined) as number | undefined;
+
+  const rangeError = cellTargetError(patternIndex, channel, [row]);
+  if (rangeError) return { error: rangeError };
 
   if (patternIndex !== undefined) {
     useTrackerStore.getState().setCurrentPattern(patternIndex);
@@ -123,7 +173,9 @@ export function clearCell(params: Record<string, unknown>): Record<string, unkno
 }
 
 export function clearPattern(params: Record<string, unknown>): Record<string, unknown> {
-  const patternIndex = params.patternIndex as number | undefined;
+  const patternIndex = (params.patternIndex ?? undefined) as number | undefined;
+  const rangeError = cellTargetError(patternIndex, undefined);
+  if (rangeError) return { error: rangeError };
   if (patternIndex !== undefined) {
     useTrackerStore.getState().setCurrentPattern(patternIndex);
   }
@@ -133,6 +185,8 @@ export function clearPattern(params: Record<string, unknown>): Record<string, un
 
 export function clearChannel(params: Record<string, unknown>): Record<string, unknown> {
   const channel = params.channel as number;
+  const rangeError = cellTargetError(undefined, channel);
+  if (rangeError) return { error: rangeError };
   useTrackerStore.getState().clearChannel(channel);
   return { ok: true };
 }
@@ -1409,7 +1463,9 @@ export function fillRange(params: Record<string, unknown>): Record<string, unkno
   const step = (params.step as number) ?? 1;
   const cellData = params.cell as Record<string, unknown>;
 
-  const patternIndex = params.patternIndex as number | undefined;
+  const patternIndex = (params.patternIndex ?? undefined) as number | undefined;
+  const rangeError = stepError(step) ?? cellTargetError(patternIndex, channel, [startRow, endRow]);
+  if (rangeError) return { error: rangeError };
   if (patternIndex !== undefined) {
     useTrackerStore.getState().setCurrentPattern(patternIndex);
   }
@@ -1432,7 +1488,11 @@ export function writeNoteSequence(params: Record<string, unknown>): Record<strin
   const instrument = params.instrument as number | undefined;
   const step = (params.step as number) ?? 1;
 
-  const patternIndex = params.patternIndex as number | undefined;
+  const patternIndex = (params.patternIndex ?? undefined) as number | undefined;
+  // First and last row cover the whole run: every row between them is in range too.
+  const lastRow = startRow + Math.max(0, notes.length - 1) * step;
+  const rangeError = stepError(step) ?? cellTargetError(patternIndex, channel, [startRow, lastRow]);
+  if (rangeError) return { error: rangeError };
   if (patternIndex !== undefined) {
     useTrackerStore.getState().setCurrentPattern(patternIndex);
   }
