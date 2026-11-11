@@ -595,7 +595,7 @@ export function parseArtOfNoiseFile(bytes: Uint8Array, filename: string): Tracke
   const moduleName = (songName || filename).replace(/\.[^/.]+$/, '');
 
   const uadePatternLayout: UADEPatternLayout | undefined = patternChunkOffset > 0 ? {
-    formatId: 'aon',
+    formatId: 'artOfNoise',
     patternDataFileOffset: patternChunkOffset,
     bytesPerCell: 4,
     rowsPerPattern: 64,

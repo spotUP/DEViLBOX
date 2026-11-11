@@ -616,7 +616,7 @@
       "cells": 1408,
       "bytes": 6689
     },
-    "aon": {
+    "artOfNoise": {
       "exporter": "ArtOfNoiseExporter.exportArtOfNoise",
       "tier": "byte-exact",
       "status": "byte-exact",
