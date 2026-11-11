@@ -34,6 +34,8 @@ Always debug via DEViLBOX MCP (`get_console_errors`, `play_fur`, `load_file`, `g
 2. Browser open at `http://localhost:5174`.
 3. Click browser once, unlock AudioContext.
 
+**Agents driving the page:** start dev stack with `DEVILBOX_NO_RELOAD=1 npm run dev:fullstack` (no reload on file change; reload tab on purpose after code change) and open `http://localhost:5174/?quiet` (no welcome dialog, no jingle, that load only; owner settings untouched). Plain `http://localhost:5174` open welcome dialog + jingle every load — confuse agents, jingle draw cells in pattern while it run.
+
 MCP say "No browser connected" — check `lsof -nP -iTCP:4003 -sTCP:LISTEN` confirm Express own port 4003, then reconnect Claude Code. Full troubleshoot: `docs/MCP_DEBUGGING_GUIDE.md`. ~130 tools by category — call `get_mcp_help` for live catalogue.
 
 **Always stop playback when test done.** Playing song keep audio graph, WASM engines, render loop hot — heat + battery drain. After any MCP test start playback (`play`, `play_fur`, `load_file`+play, `trigger_note`), finish with `stop` (plus `release_all_notes` if notes triggered) before task end.
