@@ -328,6 +328,14 @@
       "cells": 9954,
       "bytes": 9954
     },
+    "piyoPiyo": {
+      "exporter": "PiyoPiyoExporter.exportPiyoPiyo",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 5144,
+      "bytes": 5144
+    },
     "monotone": {
       "exporter": "MonotoneExporter.exportMonotone",
       "tier": "byte-exact",

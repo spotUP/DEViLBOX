@@ -87,6 +87,11 @@ export class PiyoPiyoEngine extends WASMSingletonBase {
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
   }
 
+  /** Swap an edited module in while the song plays; the cursor and wait timer stay. */
+  replaceModule(buffer: ArrayBuffer): void {
+    this.workletNode?.port.postMessage({ type: 'replaceModule', moduleData: buffer });
+  }
+
   play(): void { this.workletNode?.port.postMessage({ type: 'play' }); }
   stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
   pause(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }

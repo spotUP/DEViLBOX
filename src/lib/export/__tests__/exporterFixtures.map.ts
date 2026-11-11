@@ -75,6 +75,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   jxs: 'public/data/songs/formats/popcorn.jxs',
   kdm: 'public/data/songs/formats/flysong.kdm',
   organya: 'public/data/songs/organya/obj0640-1.org',
+  piyoPiyo: 'public/data/songs/studio-pixel---piyopiyo/obj0176-1.pmd',
   davidWhittaker: 'public/data/songs/formats/apb.dw',
   robHubbard: 'public/data/songs/rob-hubbard/skateordie.rh',
   benDaglish: 'public/data/songs/ben-daglish/motorhead-titleandingame.bd',

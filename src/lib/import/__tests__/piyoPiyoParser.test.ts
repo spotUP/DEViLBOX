@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tryChipDumpParse } from '../parsers/ChipDumpParsers';
+import { decodePiyoPiyoModule } from '../formats/piyoPiyoGrid';
 import { parsePiyoPiyoFile, readPiyoPiyoHeader, piyoPiyoTempo } from '../formats/PiyoPiyoParser';
 
 const FILE = join(process.cwd(), 'public/data/songs/studio-pixel---piyopiyo/obj0176-1.pmd');
@@ -25,12 +26,12 @@ describe('PiyoPiyo', () => {
     expect(song?.piyoPiyoFileData?.byteLength).toBe(bytes().length);
   });
 
-  it('draws four channels, one row per record, the lowest key of each chord as the note', async () => {
+  it('draws one row per record, a lane per chord key', async () => {
     const h = readPiyoPiyoHeader(bytes());
     expect(h.records).toBe(256);
     expect(h.waitMs).toBe(120);
     const song = await parsePiyoPiyoFile(buffer(), 'obj0176-1.pmd');
-    expect(song.numChannels).toBe(4);
+    expect(song.numChannels).toBe(decodePiyoPiyoModule(bytes())!.channels);
     expect(song.patterns.length).toBe(4);
     expect(song.instruments.map((i) => i.synthType)).toEqual(['PiyoPiyoSynth', 'PiyoPiyoSynth', 'PiyoPiyoSynth', 'PiyoPiyoSynth']);
     expect(noteCount(song)).toBeGreaterThan(50);

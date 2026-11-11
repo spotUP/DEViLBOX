@@ -107,6 +107,20 @@ class PiyoPiyoProcessor extends AudioWorkletProcessor {
           this.port.postMessage({ type: 'error', message: String(err && err.message || err) });
         }
         break;
+      case 'replaceModule':
+        // An edited song swapped in while it plays: keep the position and the wait timer, restart the voices.
+        try {
+          const song = parsePmd(new Uint8Array(d.moduleData));
+          const cursor = this.cursor, waitTimer = this.waitTimer;
+          this.song = song;
+          this.reset();
+          this.cursor = Math.min(cursor, Math.max(0, song.records - 1));
+          this.waitTimer = waitTimer;
+          this.port.postMessage({ type: 'moduleLoaded', records: song.records, waitMs: song.waitMs });
+        } catch (err) {
+          this.port.postMessage({ type: 'error', message: String(err && err.message || err) });
+        }
+        break;
       case 'play': if (this.song) this.playing = true; break;
       case 'stop': this.playing = false; this.reset(); break;
       case 'setMuteMask': this.muteMask = d.mask; break;

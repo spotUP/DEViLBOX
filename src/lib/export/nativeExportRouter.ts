@@ -310,6 +310,9 @@ const NATIVE_EXPORTERS: NativeExporterEntry[] = [
   // Organya: its module (with the grid's edits) is the export.
   { id: 'organya', matches: (s) => songIds(s).format === 'Organya' && !!s.organyaFileData,
     run: async (s) => { const { exportOrganya } = await import('./OrganyaExporter'); return exportOrganya(s); } },
+  // PiyoPiyo: its module (with the grid's edits) is the export.
+  { id: 'piyoPiyo', matches: (s) => songIds(s).format === 'PiyoPiyo' && !!s.piyoPiyoFileData,
+    run: async (s) => { const { exportPiyoPiyo } = await import('./PiyoPiyoExporter'); return exportPiyoPiyo(s); } },
   // MONOTONE: its module (with the grid's edits) is the export.
   { id: 'monotone', matches: (s) => songIds(s).format === 'MON' && !!s.monotoneFileData,
     run: async (s) => { const { exportMonotone } = await import('./MonotoneExporter'); return exportMonotone(s); } },

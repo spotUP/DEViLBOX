@@ -181,6 +181,7 @@ const ENGINE_FIELD_FORMAT_IDS: ReadonlyArray<readonly [formatId: string, carries
   ['monotone', (song) => song.format === 'MON'],
   ['kdm', (song) => song.format === 'KDM'],
   ['organya', (song) => song.format === 'Organya'],
+  ['piyoPiyo', (song) => song.format === 'PiyoPiyo'],
   ['jxs', (song) => song.format === 'JXS'],
 ];
 
