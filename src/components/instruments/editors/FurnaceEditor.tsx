@@ -391,7 +391,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
 
   return (
     <ScrollLockContainer>
-      <div className="synth-controls-flow space-y-4">
+      <div className="space-y-4">
       {/* Chip Header */}
       <div className="flex items-center gap-4 bg-dark-bgSecondary p-3 rounded-lg border border-dark-border">
         <div className="flex items-center gap-3">
@@ -573,7 +573,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
           </div>
 
           {/* Operators, numbered 1-4 as on the chip */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+          <div className={`grid grid-cols-1 md:grid-cols-2 gap-3 ${operatorCount >= 4 ? '2xl:grid-cols-4' : ''}`}>
             {displayOrder.map((storageIndex, position) => {
               const op = config.operators[storageIndex];
               if (!op) return null; // Skip missing operators (e.g. PSG instruments with no FM data)

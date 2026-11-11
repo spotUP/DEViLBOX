@@ -899,7 +899,7 @@ export const SynthTypeDispatcher: React.FC<SynthTypeDispatcherProps> = ({
         )}
 
         {/* Furnace Controls — hardware or simple */}
-        <div className="synth-editor-content overflow-y-auto p-4">
+        <div className="synth-editor-content synth-editor-content--no-columns overflow-y-auto p-4">
           {uiMode === 'hardware' && hasFurnaceHardware ? (
             <div className="space-y-4">
               {renderFurnaceHardware()}
