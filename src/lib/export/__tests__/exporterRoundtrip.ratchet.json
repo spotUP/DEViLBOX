@@ -663,6 +663,14 @@
       "matchPct": 1,
       "cells": 4094,
       "bytes": 4094
+    },
+    "wallyBeben": {
+      "exporter": "WallyBebenExporter.exportWallyBeben",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 54076,
+      "bytes": 54076
     }
   },
   "missingFixture": [
