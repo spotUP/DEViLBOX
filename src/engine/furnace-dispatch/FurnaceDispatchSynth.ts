@@ -5,7 +5,7 @@
  * the native Furnace dispatch WASM engine. Supports 57+ platforms.
  */
 
-import { isOpnbChipType, opnbPreviewChannel } from './opnbVoices';
+import { isOpnbChipType, opnbPreviewChannel, withSsgDefaultMacros, placeUserSample } from './opnbVoices';
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import {
@@ -16,7 +16,7 @@ import {
   type OscDataCallback
 } from './FurnaceDispatchEngine';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
-import { encodeFurnaceInstrument } from '@lib/export/FurnaceInstrumentEncoder';
+import { encodeFurnaceInstrument, DIV_INS_AY, DIV_INS_ADPCMA, DIV_INS_ADPCMB } from '@lib/export/FurnaceInstrumentEncoder';
 import type { FurnaceConfig } from '@typedefs/instrument';
 import { FurnaceChipType } from '@engine/chips/FurnaceChipEngine';
 import { getToneEngine } from '@engine/ToneEngine';
@@ -382,7 +382,16 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     // Spread-copy first: the config may be a frozen immer proxy from the store,
     // and we need to mutate chipType/ops/algorithm below for platform correction.
     // Reshape for the platform's FM family (chip id, 2-op for OPL/OPLL); see fmInstrument.ts.
-    const enriched = fitFmToChip(this.injectChipRequiredMacros(config as unknown as FurnaceConfig), correctChipType);
+    let source = configFurnace;
+    if ((configFurnace.divInsType === DIV_INS_ADPCMA || configFurnace.divInsType === DIV_INS_ADPCMB) && configFurnace.userSample) {
+      // Join the user's sample to the module list and point the instrument at it.
+      const placed = placeUserSample(this.engine.getModuleSamples(), configFurnace.userSample);
+      this.engine.setModuleSamples(placed.list);
+      this.engine.uploadModuleSamplesToPlatform(this.platformType, true);
+      const amiga = configFurnace.amiga ?? { initSample: -1, useNoteMap: false, useSample: true, useWave: false, waveLen: 32, noteMap: [] };
+      source = { ...configFurnace, amiga: { ...amiga, initSample: placed.index, useSample: true } };
+    }
+    const enriched = fitFmToChip(this.injectChipRequiredMacros(source), correctChipType);
 
     // Encode from config using our encoder
     // The raw binary data from .fur files is in INS2 format, but the WASM expects
@@ -804,7 +813,11 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     let modified = false;
     let result = config;
 
-    if (pt === P.LYNX) {
+    if (config.divInsType === DIV_INS_AY) {
+      // A Neo Geo SSG voice is silent without a volume macro and a tone bit.
+      const ssg = withSsgDefaultMacros(macros);
+      if (ssg.added) { macros.splice(0, macros.length, ...(ssg.macros as typeof macros)); modified = true; }
+    } else if (pt === P.LYNX) {
       // Lynx needs duty macro to set LFSR feedback register
       if (!macros.some(m => (m.code ?? m.type) === 2)) {
         macros.push({ code: 2, type: 0, data: [1], loop: -1, release: -1, mode: 0 });
