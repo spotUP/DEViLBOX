@@ -36,6 +36,8 @@ Always debug via DEViLBOX MCP (`get_console_errors`, `play_fur`, `load_file`, `g
 
 **Agents driving the page:** start dev stack with `DEVILBOX_NO_RELOAD=1 npm run dev:fullstack` (no reload on file change; reload tab on purpose after code change) and open `http://localhost:5174/?quiet` (no welcome dialog, no jingle, that load only; owner settings untouched). Plain `http://localhost:5174` open welcome dialog + jingle every load — confuse agents, jingle draw cells in pattern while it run.
 
+**Before first MCP write: read [`docs/AGENT_TRACKER_GUIDE.md`](docs/AGENT_TRACKER_GUIDE.md).** Hosted page share local relay — confirm `location.host` is `localhost:5174` before every write batch. Effect commands: call `get_mcp_help` with format-family topic (`pc-tracker-composing`, `neo-geo-composing`), never guess `effTyp`. Tool `ok` not proof — read cells back.
+
 MCP say "No browser connected" — check `lsof -nP -iTCP:4003 -sTCP:LISTEN` confirm Express own port 4003, then reconnect Claude Code. Full troubleshoot: `docs/MCP_DEBUGGING_GUIDE.md`. ~130 tools by category — call `get_mcp_help` for live catalogue.
 
 **Always stop playback when test done.** Playing song keep audio graph, WASM engines, render loop hot — heat + battery drain. After any MCP test start playback (`play`, `play_fur`, `load_file`+play, `trigger_note`), finish with `stop` (plus `release_all_notes` if notes triggered) before task end.
@@ -124,6 +126,7 @@ Big impl guide live in `docs/`:
 - [`docs/HARDWARE_UI_PATTERN.md`](docs/HARDWARE_UI_PATTERN.md) — hardware UI WASM module extract pattern (PT2, FT2, etc.).
 - [`docs/FORMAT_COMMAND_STREAM_GRID.md`](docs/FORMAT_COMMAND_STREAM_GRID.md) — "Rob Hubbard recipe": turn compiled per-channel command-stream format into editable tick-grid with byte-exact `blockRows` carrier (davidWhittaker/hippel/benDaglish class).
 - [`docs/MCP_DEBUGGING_GUIDE.md`](docs/MCP_DEBUGGING_GUIDE.md) — full MCP tool ref, debug workflow, architecture.
+- [`docs/AGENT_TRACKER_GUIDE.md`](docs/AGENT_TRACKER_GUIDE.md) — how agent drive tracker right: page check before write, write-tool argument shapes, effect-command help topic per format family, verify-after-write, known traps. Read before first MCP write.
 - [`docs/FORMAT_STATUS_TRACKER.md`](docs/FORMAT_STATUS_TRACKER.md) — `localhost:4444` format-audit dashboard, API, key convention.
 
 Read these 'stead of inline content here. Update when impl change.

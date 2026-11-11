@@ -7,6 +7,10 @@ description: "Edit tracker patterns — write notes, sequences, fills, batch ope
 
 Read and write tracker pattern data programmatically.
 
+## Read first
+
+`docs/AGENT_TRACKER_GUIDE.md`: confirm the page is `localhost:5174` before writing, pass `patternIndex` on every call, look up effect numbers with `get_mcp_help` (topic `pc-tracker-composing` for MOD/XM/S3M/IT, `neo-geo-composing` for Neo Geo), and read cells back after writing; a tool's `ok` is not proof.
+
 ## Usage
 
 ```
