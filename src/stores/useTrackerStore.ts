@@ -587,6 +587,14 @@ interface TrackerStore {
   setChannelPan: (channelIndex: number, pan: number) => void;
   setChannelColor: (channelIndex: number, color: string | null) => void;
   setChannelRows: (channelIndex: number, rows: TrackerCell[]) => void;
+  /**
+   * Put rows on a channel of the current pattern as a display overlay, not as
+   * a user edit: no voice-kind refusal, no warning toast. One caller: the
+   * startup jingle lips, which draw decorative cells on every channel each
+   * frame and put the song's own rows back at the end. An edit of the song
+   * (randomize, paste, MCP write) uses `setChannelRows`.
+   */
+  setOverlayChannelRows: (channelIndex: number, rows: TrackerCell[]) => void;
   reorderChannel: (fromIndex: number, toIndex: number) => void;
   updateChannelName: (channelIndex: number, name: string) => void;
   /** Run the ChannelNaming classifier across the current song + instrument
@@ -1924,9 +1932,14 @@ export const useTrackerStore = create<TrackerStore>()(
     setChannelRows: (channelIndex, rows) => {
       const patternIndex = get().currentPatternIndex;
       const beforePattern = get().patterns[patternIndex];
+      get().setOverlayChannelRows(channelIndex, rows);
+      if (beforePattern) refuseWrongKindCells(patternIndex, beforePattern);
+    },
+
+    setOverlayChannelRows: (channelIndex, rows) =>
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
-        if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
+        if (pattern && channelIndex >= 0 && channelIndex < pattern.channels.length) {
           // Ensure rows array matches pattern length
           const paddedRows = [...rows];
           while (paddedRows.length < pattern.length) {
@@ -1934,9 +1947,7 @@ export const useTrackerStore = create<TrackerStore>()(
           }
           pattern.channels[channelIndex].rows = paddedRows.slice(0, pattern.length);
         }
-      });
-      if (beforePattern) refuseWrongKindCells(patternIndex, beforePattern);
-    },
+      }),
 
     reorderChannel: (fromIndex, toIndex) =>
       set((state) => {

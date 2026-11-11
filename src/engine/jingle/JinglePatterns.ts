@@ -172,7 +172,8 @@ function rmsOf(analyser: AnalyserNode): number {
 
 // ── Frame ─────────────────────────────────────────────────────────────────────
 
-function updateChannels(guardPatternIdx: number, seconds: number): void {
+/** One lip frame. Exported for the regression test; the rAF loop is its only product caller. */
+export function updateChannels(guardPatternIdx: number, seconds: number): void {
   // Only animate the pattern we were invoked on — don't corrupt other patterns
   // if the user manually switches away during playback.
   if (useTrackerStore.getState().currentPatternIndex !== guardPatternIdx) return;
@@ -183,7 +184,10 @@ function updateChannels(guardPatternIdx: number, seconds: number): void {
   const rms = rmsOf(analyser);
   const viseme = visemeAt(seconds);
   for (let ch = 0; ch < injectedNumCh; ch++) {
-    useTrackerStore.getState().setChannelRows(ch, mouthRows(mouthOpening(ch, viseme, rms), rms));
+    // Display overlay, not a song edit: the lip cells carry instrument 1 on every
+    // channel, which the edit path refuses (with a warning toast per frame) on a
+    // chip channel of another voice kind, e.g. Neo Geo SSG and ADPCM channels.
+    useTrackerStore.getState().setOverlayChannelRows(ch, mouthRows(mouthOpening(ch, viseme, rms), rms));
   }
 }
 
@@ -318,7 +322,9 @@ export function teardownMouthPatterns(): void {
       useTrackerStore.getState().setCurrentPattern(savedPatternIndex);
     }
     for (let ch = 0; ch < savedChannelData.length; ch++) {
-      useTrackerStore.getState().setChannelRows(ch, savedChannelData[ch]!);
+      // Put the song's own rows back exactly. The edit path would refuse a saved
+      // cell of the wrong voice kind and leave a lip cell in the song.
+      useTrackerStore.getState().setOverlayChannelRows(ch, savedChannelData[ch]!);
     }
   }
 
