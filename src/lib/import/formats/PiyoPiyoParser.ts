@@ -4,16 +4,16 @@
  * Playback is PiyoPiyoEngine (a worklet port of piyopiyo-rs); this parser
  * draws the grid and carries the file as `piyoPiyoFileData`. The file is
  * four tracks of `records` events, 4 bytes each: bits 0-23 are the 24 piano
- * keys down at that step (chords), bits 24-31 the pan. The grid shows the
- * lowest key of each chord as the row's note, one channel per track; every
- * key still plays. Format layout: see public/piyopiyo/PiyoPiyo.worklet.js
+ * keys down at that step (chords), bits 24-31 the pan. piyoPiyoGrid.ts maps
+ * them: a track owns one lane per key of its widest chord, and cell edits are
+ * written back into the carried file. Format layout: see public/piyopiyo/PiyoPiyo.worklet.js
  * (2026-10-05 broken-formats sweep, B5).
  */
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, ChannelData, InstrumentConfig } from '@/types';
+import { decodePiyoPiyoModule, piyoPiyoEventAt, piyoPiyoEventCell, PIYOPIYO_ROWS, PIYOPIYO_TRACKS } from './piyoPiyoGrid';
 import { tempoForRowMs } from '../rowTempo';
 
-const ROWS_PER_PATTERN = 64;
 const TRACK_NAMES = ['Track 1', 'Track 2', 'Track 3', 'Drums'];
 
 export function isPiyoPiyoFormat(bytes: Uint8Array): boolean {
@@ -46,30 +46,27 @@ export function piyoPiyoTempo(waitMs: number): { speed: number; bpm: number } {
 export async function parsePiyoPiyoFile(buffer: ArrayBuffer | Uint8Array, filename = 'song.pmd'): Promise<TrackerSong> {
   const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   const h = readPiyoPiyoHeader(bytes);
-  const eventsAt = 0x418;
-  if (eventsAt + h.records * 16 > bytes.length) throw new Error(`${filename}: PiyoPiyo file is short (${h.records} records announced)`);
 
-  const patternCount = Math.max(1, Math.ceil(h.records / ROWS_PER_PATTERN));
-  const patterns: Pattern[] = Array.from({ length: patternCount }, (_, p) => ({
-    id: `p${p}`, name: `Pattern ${p + 1}`, length: ROWS_PER_PATTERN,
-    channels: TRACK_NAMES.map((name, ch): ChannelData => ({
+  const m = decodePiyoPiyoModule(bytes);
+  if (!m) throw new Error(`${filename}: PiyoPiyo file is short (${h.records} records announced)`);
+  const names: string[] = [];
+  m.lanes.forEach((n, t) => {
+    for (let l = 0; l < n; l++) names.push(l === 0 ? TRACK_NAMES[t] : `${TRACK_NAMES[t]}.${l + 1}`);
+  });
+  const patterns: Pattern[] = Array.from({ length: m.patterns }, (_, p) => ({
+    id: `p${p}`, name: `Pattern ${p + 1}`, length: PIYOPIYO_ROWS,
+    channels: names.map((name, ch): ChannelData => ({
       id: `ch${ch}`, name, muted: false, solo: false, collapsed: false, volume: 100, pan: 0, instrumentId: null, color: null,
-      rows: Array.from({ length: ROWS_PER_PATTERN }, emptyCell),
+      rows: Array.from({ length: PIYOPIYO_ROWS }, emptyCell),
     })),
   }));
-
-  for (let t = 0; t < 4; t++) {
-    const base = eventsAt + t * h.records * 4;
-    for (let r = 0; r < h.records; r++) {
-      const ev = u32(bytes, base + r * 4);
-      const keys = ev & 0xffffff;
-      if (keys === 0) continue;
-      let key = 0;
-      while (!(keys & (1 << key))) key++;
-      const cell = patterns[Math.floor(r / ROWS_PER_PATTERN)].channels[t].rows[r % ROWS_PER_PATTERN];
-      // XM note numbers: 1 = C-0. Melody keys sit on the track's octave; drums on their key index.
-      cell.note = Math.min(96, 1 + key + 12 * (t < 3 ? h.octaves[t] + 1 : 1));
-      cell.instrument = t + 1;
+  for (let t = 0; t < PIYOPIYO_TRACKS; t++) {
+    for (let r = 0; r < m.records; r++) {
+      const ev = piyoPiyoEventAt(bytes, m.records, t, r);
+      if (ev === 0) continue;
+      for (let l = 0; l < m.lanes[t]; l++) {
+        patterns[Math.floor(r / PIYOPIYO_ROWS)].channels[m.firstChannel[t] + l].rows[r % PIYOPIYO_ROWS] = piyoPiyoEventCell(m, t, l, ev);
+      }
     }
   }
 
@@ -84,8 +81,8 @@ export async function parsePiyoPiyoFile(buffer: ArrayBuffer | Uint8Array, filena
     instruments,
     songPositions: patterns.map((_, i) => i),
     songLength: patterns.length,
-    restartPosition: Math.min(patterns.length - 1, Math.floor(h.repeatStart / ROWS_PER_PATTERN)),
-    numChannels: 4,
+    restartPosition: Math.min(patterns.length - 1, Math.floor(h.repeatStart / PIYOPIYO_ROWS)),
+    numChannels: m.channels,
     initialSpeed: speed,
     initialBPM: bpm,
     piyoPiyoFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,

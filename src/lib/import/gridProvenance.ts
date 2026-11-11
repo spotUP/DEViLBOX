@@ -110,6 +110,7 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
   jxs: 'pass',
   kdm: 'pass',
   organya: 'pass',
+  piyoPiyo: 'pass',
   maxTrax: 'pass',
   mdl: 'n/a',
   med: 'n/a',
@@ -236,6 +237,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   jxs: 'pass',
   kdm: 'fail',
   organya: 'fail',
+  piyoPiyo: 'pass',
   maxTrax: 'n/a',
   mdl: 'n/a',
   med: 'n/a',
@@ -399,7 +401,6 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   maniacsOfNoise: 'G11-maniacsOfNoise',
   mdx: 'G11-mdx',
   pmd: 'G11-pmd',
-  piyoPiyo: 'G11-piyoPiyo',
   adplug: 'G11-adplug',
   ufo: 'G11-ufo',
   earAche: 'U28',
@@ -486,7 +487,7 @@ export const DIRECT_GRIDS: readonly string[] = [
   '669', 'far', 'plm', 'ult', 'rtm', 'dsm', 'dtm', 'stm', 'stx', 'nru', 'ptm', 'gdm', 'stk', 'stp',
   'mdl', 'amf', 'j2b', 'mo3', 'itp', 'nst', 'wow', 'kt', 'xrns', 'mod', 'xm', 'it', 's3m',
   // MONOTONE stores 4-track patterns; ANSI music stores one PLAY string the parser lays on rows.
-  'monotone', 'ansiMusic', 'kdm', 'organya', 'jxs', 'tonyWilliams',
+  'monotone', 'ansiMusic', 'kdm', 'organya', 'piyoPiyo', 'jxs', 'tonyWilliams',
   // SynthDream: the command streams decode to a read-only tick grid (synthDreamGrid.ts), no oracle yet.
   'synthDream',
   // Tim Follin: the command streams decode to a read-only tick grid (timFollinGrid.ts), no oracle yet.
