@@ -11,7 +11,7 @@ description: "Compose on Furnace FM chips (Neo Geo YM2610): channels, patches, a
 
 ## Workflow
 
-1. Call `get_mcp_help` with `topic: "neo-geo-composing"`. It lists the effect commands that reach the chip (only Cxx) and those that do not.
+1. Call `get_mcp_help` with `topic: "neo-geo-composing"`. It lists the effect commands that reach the chip (every code except Fxx, Bxx, Dxx, E6x) and those that do not.
 2. Shape patches with `get_synth_config` and `update_synth_config` (configKey "furnace").
 3. Keep each instrument on a channel of its voice kind: FM 0-3, SSG 4-6, ADPCM-A 7-12, ADPCM-B 13.
 4. Write cells with `set_cells`; Cxx goes in effTyp 12 and eff, on a row with a note.
