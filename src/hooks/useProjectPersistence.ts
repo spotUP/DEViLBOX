@@ -21,6 +21,7 @@ import { savedSongToApply, savedSongToJson } from '@/lib/song/savedSong';
 import { setRestoredEditsPending } from '@/lib/song/gridBaseline';
 import { restoreFromStoredBytes } from '@/lib/song/restoreFromStoredBytes';
 import { snapshotSong } from '@/lib/song/snapshotSong';
+import { decideSnapshot, keysToDrop, newestFirst, songFingerprint } from '@/lib/song/songRevisions';
 import { compressProject } from '@/lib/projectCompression';
 import { markExplicitlySaved, clearExplicitlySaved, setExplicitlySaved, isExplicitlySaved } from '@/lib/persistence/explicitSave';
 
@@ -43,9 +44,11 @@ let hasLoadedFromStorage = false;
 
 // IndexedDB constants
 const IDB_NAME = 'devilbox';
-const IDB_VERSION = 2;
+const IDB_VERSION = 3;
 const IDB_STORE = 'project';
 const IDB_REVISIONS_STORE = 'revisions';
+/** Songs saved just before another song replaced them (songRevisions.ts); kept apart from the save-time revisions so neither crowds out the other. */
+const IDB_REPLACED_STORE = 'replaced';
 const IDB_PROJECT_KEY = 'current';
 const IDB_RECOVERY_KEY = 'recovery';
 const MAX_REVISIONS = 50;
@@ -181,6 +184,9 @@ function getDB(): Promise<IDBDatabase> {
         const store = db.createObjectStore(IDB_REVISIONS_STORE, { autoIncrement: true });
         store.createIndex('savedAt', 'savedAt');
       }
+      if (!db.objectStoreNames.contains(IDB_REPLACED_STORE)) {
+        db.createObjectStore(IDB_REPLACED_STORE, { autoIncrement: true });
+      }
     };
     req.onsuccess = () => {
       cachedDB = req.result;
@@ -260,6 +266,8 @@ function idbDeleteRecovery(): Promise<void> {
 
 export interface LocalRevision {
   key: number;
+  /** 'save': taken when the song was saved. 'replaced': taken just before another song replaced it. */
+  kind: 'save' | 'replaced';
   savedAt: string;
   name: string;
   patternCount: number;
@@ -287,6 +295,7 @@ function idbListRevisions(): Promise<LocalRevision[]> {
         const val = cursor.value as SavedProject;
         results.push({
           key: cursor.key as number,
+          kind: 'save',
           savedAt: val.savedAt,
           name: val.metadata?.name || 'Untitled',
           patternCount: val.patterns?.length || 0,
@@ -340,6 +349,71 @@ function idbPruneRevisions(max: number): Promise<void> {
         }
       };
     };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  }));
+}
+
+type ReplacedRecord = SavedProject & { fingerprint: string };
+
+function idbListReplaced(): Promise<LocalRevision[]> {
+  return getDB().then(db => new Promise((resolve, reject) => {
+    const req = db.transaction(IDB_REPLACED_STORE, 'readonly').objectStore(IDB_REPLACED_STORE).openCursor(null, 'prev');
+    const results: LocalRevision[] = [];
+    req.onsuccess = () => {
+      const cursor = req.result;
+      if (!cursor) { resolve(results); return; }
+      const val = cursor.value as SavedProject;
+      results.push({
+        key: cursor.key as number,
+        kind: 'replaced',
+        savedAt: val.savedAt,
+        name: val.metadata?.name || 'Untitled',
+        patternCount: val.patterns?.length || 0,
+        instrumentCount: val.instruments?.length || 0,
+      });
+      cursor.continue();
+    };
+    req.onerror = () => reject(req.error);
+  }));
+}
+
+/** Append `record`, then drop the oldest beyond MAX_REPLACED_REVISIONS, in one transaction. */
+function idbAddReplaced(record: ReplacedRecord): Promise<void> {
+  return getDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_REPLACED_STORE, 'readwrite');
+    const store = tx.objectStore(IDB_REPLACED_STORE);
+    store.add(record);
+    const keysReq = store.getAllKeys();
+    keysReq.onsuccess = () => {
+      for (const k of keysToDrop(keysReq.result as number[])) store.delete(k);
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  }));
+}
+
+function idbNewestReplacedFingerprint(): Promise<string | undefined> {
+  return getDB().then(db => new Promise((resolve, reject) => {
+    const req = db.transaction(IDB_REPLACED_STORE, 'readonly').objectStore(IDB_REPLACED_STORE).openCursor(null, 'prev');
+    req.onsuccess = () => resolve((req.result?.value as ReplacedRecord | undefined)?.fingerprint);
+    req.onerror = () => reject(req.error);
+  }));
+}
+
+function idbGetReplaced(key: number): Promise<SavedProject | undefined> {
+  return getDB().then(db => new Promise((resolve, reject) => {
+    const req = db.transaction(IDB_REPLACED_STORE, 'readonly').objectStore(IDB_REPLACED_STORE).get(key);
+    req.onsuccess = () => resolve(req.result as SavedProject | undefined);
+    req.onerror = () => reject(req.error);
+  }));
+}
+
+function idbDeleteReplaced(key: number): Promise<void> {
+  return getDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_REPLACED_STORE, 'readwrite');
+    tx.objectStore(IDB_REPLACED_STORE).delete(key);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   }));
@@ -593,11 +667,40 @@ export async function loadProjectFromObject(data: unknown): Promise<boolean> {
 // ============================================================================
 
 /**
- * List all local revisions, newest-first
+ * Save the open song as a revision BEFORE another song replaces it. Called by
+ * withSongLoad (songLifecycle.ts) ahead of the unload, so every opener is
+ * covered. Never throws and never blocks the replace on a failed write: the
+ * failure is reported with a warning.
+ */
+export async function saveOpenSongBeforeReplace(): Promise<void> {
+  try {
+    const fields = snapshotSong();
+    const fingerprint = songFingerprint(fields);
+    const decision = decideSnapshot(fields, fingerprint, await idbNewestReplacedFingerprint());
+    if (decision !== 'save') return;
+    await idbAddReplaced({
+      version: '1.0.0',
+      schemaVersion: SCHEMA_VERSION,
+      savedAt: new Date().toISOString(),
+      ...fields,
+      fingerprint,
+    } as ReplacedRecord);
+  } catch (err) {
+    console.warn('[Persistence] Failed to save the replaced song as a revision:', err);
+    try {
+      const { notify } = await import('@stores/useNotificationStore');
+      notify.warning('The song being replaced could not be saved as a revision.');
+    } catch { /* notifications unavailable */ }
+  }
+}
+
+/**
+ * List all local revisions (save-time and before-replace), newest-first
  */
 export async function listLocalRevisions(): Promise<LocalRevision[]> {
   try {
-    return await idbListRevisions();
+    const [saved, replaced] = await Promise.all([idbListRevisions(), idbListReplaced()]);
+    return newestFirst([...saved, ...replaced]);
   } catch (err) {
     console.error('[Persistence] Failed to list revisions:', err);
     return [];
@@ -605,11 +708,12 @@ export async function listLocalRevisions(): Promise<LocalRevision[]> {
 }
 
 /**
- * Load a local revision by key into all stores (same as loadProjectFromStorage)
+ * Load a local revision into all stores (same as loadProjectFromStorage). The
+ * song open now is saved as a revision first, like any replace.
  */
-export async function loadLocalRevision(key: number): Promise<boolean> {
+export async function loadLocalRevision(key: number, kind: LocalRevision['kind'] = 'save'): Promise<boolean> {
   try {
-    const project = await idbGetRevision(key);
+    const project = await (kind === 'replaced' ? idbGetReplaced(key) : idbGetRevision(key));
     if (!project || !prepareSavedProject(project, 'accept')) return false;
     await openSavedSong({ name: project.metadata?.name || 'revision', source: 'revision', song: () => savedSongToApply(project) });
     useProjectStore.getState().markAsSaved();
@@ -625,9 +729,9 @@ export async function loadLocalRevision(key: number): Promise<boolean> {
 /**
  * Delete a single local revision by key
  */
-export async function deleteLocalRevision(key: number): Promise<void> {
+export async function deleteLocalRevision(key: number, kind: LocalRevision['kind'] = 'save'): Promise<void> {
   try {
-    await idbDeleteRevision(key);
+    await (kind === 'replaced' ? idbDeleteReplaced(key) : idbDeleteRevision(key));
   } catch (err) {
     console.error('[Persistence] Failed to delete revision:', err);
   }
