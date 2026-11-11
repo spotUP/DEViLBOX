@@ -286,6 +286,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
                   <div className="flex items-center justify-between">
                     <div className="flex flex-col">
+                      <label className="text-ft2-text text-xs font-mono">Welcome Dialog:</label>
+                      <span className="text-[9px] text-ft2-textDim font-mono">Tips and what is new at start; the tips button still opens it. Add ?quiet to the URL to skip it once</span>
+                    </div>
+                    <Toggle label="" value={s.welcomeDialogEnabled} onChange={s.setWelcomeDialogEnabled} size="sm" />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col">
                       <label className="text-ft2-text text-xs font-mono">Next Subsong at End:</label>
                       <span className="text-[9px] text-ft2-textDim font-mono">Off: the song stops when its subsong ends</span>
                     </div>

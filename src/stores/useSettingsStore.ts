@@ -71,6 +71,8 @@ interface SettingsStore {
 
   // Startup jingle
   welcomeJingleEnabled: boolean;
+  /** The tips / what's new dialog opens at start. Off: only the NavBar button opens it. */
+  welcomeDialogEnabled: boolean;
   /** A subsong that ends (silence) starts the next one of the file; off = the song stops, as before. */
   autoAdvanceSubsongs: boolean;
   /** Master FX channel buttons take effect on the next bar line of the playing song. */
@@ -118,6 +120,7 @@ interface SettingsStore {
   setVuMeterMirror: (enabled: boolean) => void;
   setMaxHeadroomMode: (enabled: boolean) => void;
   setWelcomeJingleEnabled: (v: boolean) => void;
+  setWelcomeDialogEnabled: (v: boolean) => void;
   setAutoAdvanceSubsongs: (v: boolean) => void;
   setMasterFxQuantize: (v: boolean) => void;
   setSmoothScrolling: (smooth: boolean) => void;
@@ -212,6 +215,7 @@ export const useSettingsStore = create<SettingsStore>()(
       vuMeterMirror: false,  // Default: VU meters extend upward
       maxHeadroomMode: false,
       welcomeJingleEnabled: true,  // Play startup jingle on first interaction
+      welcomeDialogEnabled: true,  // Open the tips / what's new dialog at start
       smoothScrolling: false,      // Default to stepped scrolling (classic tracker feel)
       showGhostPatterns: true,     // Default on
       masterFxQuantize: true,      // Owner, 2026-10-08: channel on/offs in the master FX are quantized, switch on by default
@@ -416,6 +420,8 @@ export const useSettingsStore = create<SettingsStore>()(
 
     setWelcomeJingleEnabled: (v) =>
       set((state) => { state.welcomeJingleEnabled = v; }),
+    setWelcomeDialogEnabled: (v) =>
+      set((state) => { state.welcomeDialogEnabled = v; }),
     setAutoAdvanceSubsongs: (v) =>
       set((state) => { state.autoAdvanceSubsongs = v; }),
     setMasterFxQuantize: (v) =>
@@ -564,6 +570,7 @@ export const useSettingsStore = create<SettingsStore>()(
         sidClockSpeed: state.sidClockSpeed,
         sidBufferSize: state.sidBufferSize,
         welcomeJingleEnabled: state.welcomeJingleEnabled,
+        welcomeDialogEnabled: state.welcomeDialogEnabled,
         // Additive: a save without it merges in the default (on), no version bump.
         autoAdvanceSubsongs: state.autoAdvanceSubsongs,
         masterFxQuantize: state.masterFxQuantize,

@@ -3,6 +3,8 @@ import { Lightbulb, ChevronLeft, ChevronRight, X, Info, Sparkles, History } from
 import { DEVILBOX_TIPS } from '../../constants/tips';
 import { CHANGELOG, CURRENT_VERSION, BUILD_NUMBER, type ChangelogEntry } from '@generated/changelog';
 import { useThemeStore } from '@stores';
+import { Toggle } from '@components/controls/Toggle';
+import { useSettingsStore } from '@stores/useSettingsStore';
 import { useModalClose } from '@hooks/useDialogKeyboard';
 
 const SEEN_VERSION_KEY = 'devilbox-seen-version';
@@ -88,6 +90,9 @@ export const TipOfTheDay: React.FC<TipOfTheDayProps> = ({ isOpen, onClose, initi
   };
 
   // Use standard modal close hook for Enter/Escape
+  const welcomeDialogEnabled = useSettingsStore((s) => s.welcomeDialogEnabled);
+  const setWelcomeDialogEnabled = useSettingsStore((s) => s.setWelcomeDialogEnabled);
+
   useModalClose({ isOpen, onClose });
   
   // Arrow keys for tip navigation
@@ -237,7 +242,13 @@ export const TipOfTheDay: React.FC<TipOfTheDayProps> = ({ isOpen, onClose, initi
         </div>
 
         {/* Footer Action */}
-        <div className="p-4 bg-black/40 flex justify-center">
+        <div className="p-4 bg-black/40 flex flex-col items-center gap-3">
+          <Toggle
+            label="Do not show this again"
+            value={!welcomeDialogEnabled}
+            onChange={(v) => setWelcomeDialogEnabled(!v)}
+            size="sm"
+          />
           <button 
             onClick={onClose}
             className="w-full py-3 rounded-lg font-bold text-sm transition-all uppercase tracking-widest bg-accent-primary text-dark-bg hover:opacity-90"

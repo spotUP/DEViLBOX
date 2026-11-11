@@ -134,6 +134,8 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
   // ── Store: useSettingsStore ──────────────────────────────────────────────
   const welcomeJingleEnabled = useSettingsStore((s) => s.welcomeJingleEnabled);
   const setWelcomeJingleEnabled = useSettingsStore((s) => s.setWelcomeJingleEnabled);
+  const welcomeDialogEnabled = useSettingsStore((s) => s.welcomeDialogEnabled);
+  const setWelcomeDialogEnabled = useSettingsStore((s) => s.setWelcomeDialogEnabled);
   const autoAdvanceSubsongs = useSettingsStore((s) => s.autoAdvanceSubsongs);
   const setAutoAdvanceSubsongs = useSettingsStore((s) => s.setAutoAdvanceSubsongs);
   const amigaLimits = useSettingsStore((s) => s.amigaLimits);
@@ -364,6 +366,7 @@ export function useSettingsDialog({ isOpen }: UseSettingsDialogOptions) {
     setCustomColor, resetCustomTheme,
     // Settings store
     welcomeJingleEnabled, setWelcomeJingleEnabled,
+    welcomeDialogEnabled, setWelcomeDialogEnabled,
     autoAdvanceSubsongs, setAutoAdvanceSubsongs,
     amigaLimits, setAmigaLimits, linearInterpolation, setLinearInterpolation,
     useBLEP, setUseBLEP, stereoSeparation, stereoSeparationMode, modplugSeparation,

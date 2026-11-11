@@ -15,6 +15,12 @@ import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useUIStore, type StartupJingleStage } from '@stores/useUIStore';
 import { whenBootRestoreDone } from './bootRestore';
+import { startupPolicy } from './startupPolicy';
+
+function currentPolicy() {
+  const { welcomeDialogEnabled, welcomeJingleEnabled } = useSettingsStore.getState();
+  return startupPolicy(window.location.search, { welcomeDialogEnabled, welcomeJingleEnabled });
+}
 
 let began = false;
 let gestureHandled = false;
@@ -34,7 +40,7 @@ export type StartupDialog =
 
 /**
  * The tips dialog's tab: the changelog on a new build, the tips otherwise. It
- * opens on every start, so there is no "off" answer.
+ * opens on every start unless the Welcome Dialog setting is off or the page has ?quiet (startupPolicy); a closed policy opens nothing.
  */
 export function startupTipsModal(buildNumber: string): { initialTab: 'changelog' | 'tips' } {
   const hasNewVersion = localStorage.getItem('devilbox-seen-version') !== buildNumber;
@@ -53,10 +59,11 @@ export function startupDialog(buildNumber: string, search: string): StartupDialo
 }
 
 /**
- * Open the one start dialog. A ?collab=CODE link opens the collaboration modal,
+ * Open the one start dialog, unless the policy says none (setting off, ?quiet). A ?collab=CODE link opens the collaboration modal,
  * joins the room and drops the parameter so a refresh does not join again.
  */
 export function openStartDialog(buildNumber: string): void {
+  if (!currentPolicy().openDialog) return;
   const dialog = startupDialog(buildNumber, window.location.search);
   const { openModal } = useUIStore.getState();
   if (dialog.modal === 'collab') {
@@ -122,7 +129,7 @@ function finish(): void {
 export function beginStartupSequence(): void {
   if (began) return;
   began = true;
-  if (!useSettingsStore.getState().welcomeJingleEnabled) return;
+  if (!currentPolicy().runJingle) return;
   setStage('awaiting-gesture');
   const jingle = getJingleEngine();
   jingle.onEnd(() => {
