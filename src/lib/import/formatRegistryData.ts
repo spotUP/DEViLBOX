@@ -1232,9 +1232,10 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
   {
     key: 'fashionTracker',
     label: 'Fashion Tracker',
-    description: 'Fashion Tracker (ex.* prefix)',
+    description: 'Fashion Tracker (.ex) - four-voice pattern table as the grid, note edits saved in place; nuade / UADE plays the module',
     family: 'amiga-native',
-    matchMode: 'prefix',
+    matchMode: 'both',
+    extRegex: /\.ex$/i,
     prefixes: ['ex.'],
     prefKey: 'fashionTracker',
     nativeParser: { module: '@lib/import/formats/FashionTrackerParser', parseFn: 'parseFashionTrackerFile', detectFn: 'isFashionTrackerFormat' },

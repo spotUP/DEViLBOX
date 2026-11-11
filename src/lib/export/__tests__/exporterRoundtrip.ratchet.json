@@ -647,6 +647,14 @@
       "matchPct": 1,
       "cells": 9102,
       "bytes": 9102
+    },
+    "fashionTracker": {
+      "exporter": "FashionTrackerExporter.exportFashionTracker",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 67502,
+      "bytes": 67502
     }
   },
   "missingFixture": [
