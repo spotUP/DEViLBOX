@@ -211,4 +211,32 @@ describe('bulk edits refuse a note on a channel of the wrong voice kind', () => 
     useTrackerStore.getState().setChannelRows(1, rows);
     expect(noteAt(1, 0)).toBe(49);
   });
+
+  it('reorder channel refuses a move that puts an FM note on an SSG channel: nothing written, one warning', () => {
+    useTrackerStore.getState().setCell(FM_CH, 0, { note: 49, instrument: FM_ID });
+    const snapshot = JSON.stringify(useTrackerStore.getState().patterns);
+    const before = warnings();
+    useTrackerStore.getState().reorderChannel(FM_CH, 4);
+    expect(JSON.stringify(useTrackerStore.getState().patterns)).toBe(snapshot);
+    expect(noteAt(FM_CH, 0)).toBe(49);
+    expect(warnings()).toBe(before + 1);
+  });
+
+  it('reorder channel between channels of the same kind still works, no warning', () => {
+    useTrackerStore.getState().setCell(FM_CH, 0, { note: 49, instrument: FM_ID });
+    const before = warnings();
+    useTrackerStore.getState().reorderChannel(FM_CH, 2);
+    expect(noteAt(2, 0)).toBe(49);
+    expect(noteAt(FM_CH, 0)).toBe(0);
+    expect(warnings()).toBe(before);
+  });
+
+  it('reorder channel in a song with no chip instrument still reorders', () => {
+    useInstrumentStore.setState({ instruments: [instrument(PIANO_ID, 'Synth')] });
+    useTrackerStore.getState().setCell(FM_CH, 0, { note: 49, instrument: PIANO_ID });
+    const before = warnings();
+    useTrackerStore.getState().reorderChannel(FM_CH, 4);
+    expect(noteAt(4, 0)).toBe(49);
+    expect(warnings()).toBe(before);
+  });
 });
