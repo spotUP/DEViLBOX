@@ -11,7 +11,22 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import type { FurnaceConfig, FurnaceOperatorConfig, FurnaceMacro, FurnaceAmigaConfig, FurnaceN163Config, FurnaceFDSConfig, FurnaceESFMConfig, FurnaceESFMOperatorConfig, FurnaceMultiPCMConfig, FurnaceSoundUnitConfig, FurnaceSID2Config, FurnaceES5506Config, FurnaceWaveSynthConfig, FurnaceSID3Config, FurnaceSID3Filter } from '@typedefs/instrument';
 import { Knob } from '@components/controls/Knob';
+import { Toggle } from '@components/controls/Toggle';
 import { CustomSelect } from '@components/common/CustomSelect';
+import { Button } from '@components/ui/Button';
+import { TabStrip } from '@components/ui/TabStrip';
+import { resolveColor, toneColor, type ControlTone } from '@components/ui/controlColor';
+import {
+  FM_FEEDBACK_OPERATOR,
+  FM_OPERATOR_PARAMETER_LABELS,
+  SSG_ENVELOPE_SHAPES,
+  describeFmAlgorithm,
+  fmAlgorithmCount,
+  fmOperatorDisplayOrder,
+  formatSignedValue,
+  isFmCarrier,
+  type FmOperatorParameter,
+} from '@lib/furnace/fmOperatorModel';
 import { Cpu, Activity, Zap, Waves, Volume2, Music, Settings, FileUp, Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 import { InstrumentOscilloscope } from '@components/visualization';
 import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
@@ -193,8 +208,9 @@ interface FurnaceEditorProps {
 
 export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrumentId, onChange }) => {
   const [activeTab, setActiveTab] = useState<'fm' | 'macros' | 'chip'>('fm');
-  const [macroSubTab, setMacroSubTab] = useState<'global' | 'op1' | 'op2' | 'op3' | 'op4'>('global');
-  // selectedOp: 1-indexed op number matching FMAlgorithmDiagram convention (null = none)
+  // Operator whose macros are shown, as the displayed operator number (null = global macros)
+  const [macroOperator, setMacroOperator] = useState<number | null>(null);
+  // selectedOp: displayed operator number, 1-4 as on the chip (null = none)
   const [selectedOp, setSelectedOp] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const configRef = useRef(config);
@@ -278,160 +294,234 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
   };
 
   const updateOperator = useCallback((idx: number, updates: Partial<FurnaceOperatorConfig>) => {
-    const newOps = [...config.operators];
+    const newOps = [...configRef.current.operators];
     newOps[idx] = { ...newOps[idx], ...updates };
     pushLiveUpdate({ operators: newOps });
-  }, [config.operators, pushLiveUpdate]);
+  }, [pushLiveUpdate]);
 
   const chipName = getChipName(config.chipType);
   const category = getChipCategory(config.chipType);
   const paramRanges = useMemo(() => getChipParameterRanges(config.chipType), [config.chipType]);
   const hasOpMacros = config.opMacroArrays?.some(arr => arr && arr.length > 0) ?? false;
 
-  // Determine operator order (Furnace uses different order for visualization)
-  const opOrder = useMemo(() => {
-    if (paramRanges.opCount === 2) return [0, 1];
-    return [0, 2, 1, 3]; // Furnace standard order for 4-op
-  }, [paramRanges.opCount]);
+  // config.operators is in Furnace storage order; the editor shows operators 1-4 as on the chip.
+  const operatorCount = paramRanges.opCount === 2 ? 2 : 4;
+  const displayOrder = fmOperatorDisplayOrder(operatorCount);
+  const algorithmCount = fmAlgorithmCount(operatorCount);
+  // The two-operator diagram numbers its boxes 2 (modulator) and 1 (carrier).
+  const diagramBox = (operatorNumber: number) => (operatorCount === 2 ? 3 - operatorNumber : operatorNumber);
+  const diagramLabels = operatorCount === 2 ? TWO_OPERATOR_DIAGRAM_LABELS : undefined;
+  const macroStorageIndex = macroOperator === null ? null : displayOrder[macroOperator - 1] ?? null;
+
+  const mainTabs: Array<{ id: 'fm' | 'macros' | 'chip'; label: string }> = [
+    { id: 'fm', label: 'Operators' },
+    { id: 'macros', label: 'Macros' },
+    ...(paramRanges.hasDT2 ? [{ id: 'chip' as const, label: 'Chip Settings' }] : []),
+  ];
+  const macroTabs = [
+    { id: 'global', label: 'Global' },
+    ...displayOrder.map((_, position) => ({ id: String(position + 1), label: `Operator ${position + 1}` })),
+  ];
+
+  // Macro target tabs plus the macro list, shared by the FM macro tab and the non-FM macro panel
+  const macroEditor = (
+    <>
+      {hasOpMacros && (
+        <TabStrip
+          tabs={macroTabs}
+          active={macroOperator === null ? 'global' : String(macroOperator)}
+          onChange={(id) => setMacroOperator(id === 'global' ? null : Number(id))}
+          ariaLabel="Macro target"
+          className="mb-3"
+          dense
+        />
+      )}
+
+      {macroStorageIndex === null || !hasOpMacros ? (
+        <MacroListEditor
+          macros={config.macros}
+          onChange={(macros) => onChange({ macros: macros as FurnaceMacro[] })}
+          chipType={config.chipType}
+        />
+      ) : (
+        <MacroListEditor
+          macros={(config.opMacroArrays ?? [[], [], [], []])[macroStorageIndex] ?? []}
+          onChange={(macros) => {
+            const newOpArrays = [...(configRef.current.opMacroArrays ?? [[], [], [], []])];
+            newOpArrays[macroStorageIndex] = macros as FurnaceMacro[];
+            onChange({ opMacroArrays: newOpArrays });
+          }}
+          chipType={config.chipType}
+        />
+      )}
+    </>
+  );
 
   return (
     <ScrollLockContainer>
       <div className="synth-controls-flow space-y-4">
       {/* Chip Header */}
-      <div className="flex items-center justify-between bg-dark-bgSecondary p-3 rounded-lg border border-dark-border/50">
+      <div className="flex items-center gap-4 bg-dark-bgSecondary p-3 rounded-lg border border-dark-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-violet-700 rounded flex items-center justify-center shadow-lg shadow-indigo-900/20">
-            <Cpu size={20} className="text-text-primary" />
+          <div className="w-10 h-10 bg-accent-primary/15 border border-accent-primary/40 rounded flex items-center justify-center">
+            <Cpu size={20} className="text-accent-primary" />
           </div>
           <div>
             <h2 className="font-bold text-text-primary text-sm tracking-tight">{chipName}</h2>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-text-muted font-mono uppercase bg-dark-bg px-1.5 py-0.5 rounded border border-dark-border">
-                {category} • {paramRanges.opCount}OP
-              </span>
-              <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
-                <Zap size={8} /> Ready
-              </span>
-            </div>
+            <span className="text-[10px] text-text-muted font-mono bg-dark-bg px-1.5 py-0.5 rounded border border-dark-border">
+              {category === 'FM' ? `FM, ${operatorCount} operators` : category}
+            </span>
           </div>
         </div>
 
         {/* Live Oscilloscope */}
-        <div className="flex-1 mx-4">
+        <div className="flex-1">
           <VisualizerFrame variant="compact">
             <InstrumentOscilloscope
               instrumentId={instrumentId}
               width="auto"
               height={40}
-              color="#a78bfa"
+              color={resolveColor(toneColor('primary'))}
               backgroundColor="transparent"
               className="w-full"
             />
           </VisualizerFrame>
         </div>
-
-        {/* Global Controls */}
-        <div className="flex gap-3">
-          <Knob
-            label="FMS"
-            value={config.fms ?? 0}
-            min={0}
-            max={7}
-            onChange={(v) => pushLiveUpdate({ fms: Math.round(v) })}
-            size="sm"
-            color="#8b5cf6"
-            formatValue={(v) => String(Math.round(v))}
-          />
-          <Knob
-            label="AMS"
-            value={config.ams ?? 0}
-            min={0}
-            max={3}
-            onChange={(v) => pushLiveUpdate({ ams: Math.round(v) })}
-            size="sm"
-            color="#a78bfa"
-            formatValue={(v) => String(Math.round(v))}
-          />
-        </div>
       </div>
 
       {/* Tab Navigation */}
       {category === "FM" && (
-        <div className="flex gap-1 bg-dark-bg p-1 rounded-lg border border-dark-border">
-          {(['fm', 'macros', ...(paramRanges.hasDT2 ? ['chip' as const] : [])] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab as 'fm' | 'macros' | 'chip')}
-              className={`flex-1 py-1.5 px-3 rounded text-xs font-mono uppercase transition-colors ${
-                activeTab === tab
-                  ? 'bg-amber-600 text-text-primary'
-                  : 'text-text-muted hover:text-text-primary hover:bg-dark-bgSecondary'
-              }`}
-            >
-              {tab === 'fm' ? 'Operators' : tab === 'macros' ? 'Macros' : 'Settings'}
-            </button>
-          ))}
-        </div>
+        <TabStrip tabs={mainTabs} active={activeTab} onChange={setActiveTab} ariaLabel="Instrument editor sections" />
       )}
 
       {/* FM OPERATOR PANEL */}
       {category === "FM" && activeTab === 'fm' && (
-        <div className="space-y-4 animate-in fade-in duration-200">
-          {/* Algorithm & Feedback Section */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Algorithm Diagram */}
-            <div className="md:col-span-2">
+        <div className="space-y-3">
+          {/* Algorithm: current routing, all routings to pick from, voice controls */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <div className="bg-dark-bgSecondary p-3 rounded-lg border border-dark-border flex flex-col gap-2">
+              <PanelTitle>Algorithm {config.algorithm}</PanelTitle>
               <FMAlgorithmDiagram
                 algorithm={config.algorithm}
                 feedback={config.feedback}
-                opCount={paramRanges.opCount as 2 | 4}
-                selectedOp={selectedOp}
-                onSelectOp={handleDiagramSelect}
+                opCount={operatorCount}
+                opLabels={diagramLabels}
+                selectedOp={selectedOp === null ? null : diagramBox(selectedOp)}
+                onSelectOp={(box) => handleDiagramSelect(diagramBox(box))}
+                height={112}
               />
+              <p className="text-[10px] font-mono text-text-muted">
+                {describeFmAlgorithm(config.algorithm, operatorCount)}. Feedback {config.feedback} on operator {FM_FEEDBACK_OPERATOR}. Click an operator to find its card.
+              </p>
             </div>
 
-            {/* Algorithm Controls */}
-            <div className="bg-dark-bgSecondary p-3 rounded-lg border border-dark-border">
-              <div className="flex flex-wrap gap-3">
-                <Knob
-                  label="ALG"
-                  value={config.algorithm}
-                  min={0}
-                  max={7}
-                  onChange={(v) => pushLiveUpdate({ algorithm: Math.round(v) })}
-                  size="md"
-                  color="#f59e0b"
-                  formatValue={(v) => String(Math.round(v))}
-                />
-                <Knob
-                  label="FB"
-                  value={config.feedback}
-                  min={0}
-                  max={7}
-                  onChange={(v) => pushLiveUpdate({ feedback: Math.round(v) })}
-                  size="md"
-                  color="#d97706"
-                  formatValue={(v) => String(Math.round(v))}
-                />
+            <div className="bg-dark-bgSecondary p-3 rounded-lg border border-dark-border flex flex-col gap-2">
+              <PanelTitle>All Algorithms</PanelTitle>
+              <div className={`grid gap-1.5 ${algorithmCount > 2 ? 'grid-cols-4' : 'grid-cols-2'}`}>
+                {Array.from({ length: algorithmCount }, (_, algorithm) => {
+                  const active = algorithm === config.algorithm;
+                  return (
+                    <Button
+                      key={algorithm}
+                      variant="ghost"
+                      onClick={() => pushLiveUpdate({ algorithm })}
+                      title={`Algorithm ${algorithm}: ${describeFmAlgorithm(algorithm, operatorCount)}`}
+                      aria-pressed={active}
+                      className={`!h-auto !p-1 flex flex-col items-stretch gap-0.5 rounded border ${
+                        active ? 'border-accent-primary bg-accent-primary/10' : 'border-dark-border bg-dark-bg'
+                      }`}
+                    >
+                      <FMAlgorithmDiagram
+                        algorithm={algorithm}
+                        feedback={0}
+                        opCount={operatorCount}
+                        opLabels={diagramLabels}
+                        compact
+                      />
+                      <span className={`text-[10px] font-mono ${active ? 'text-accent-primary' : 'text-text-muted'}`}>
+                        {algorithm}
+                      </span>
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="bg-dark-bgSecondary p-3 rounded-lg border border-dark-border flex flex-col gap-3">
+              <div>
+                <PanelTitle>Voice</PanelTitle>
+                <div className="flex flex-wrap gap-4 mt-2">
+                  <Knob
+                    label="Algorithm"
+                    value={config.algorithm}
+                    min={0}
+                    max={algorithmCount - 1}
+                    onChange={(v) => pushLiveUpdate({ algorithm: Math.round(v) })}
+                    size="md"
+                    tone="primary"
+                    paramKey="furnace.algorithm"
+                    formatValue={formatInteger}
+                  />
+                  <Knob
+                    label="Feedback"
+                    value={config.feedback}
+                    min={0}
+                    max={7}
+                    onChange={(v) => pushLiveUpdate({ feedback: Math.round(v) })}
+                    size="md"
+                    tone="secondary"
+                    paramKey="furnace.feedback"
+                    formatValue={formatInteger}
+                  />
+                </div>
+              </div>
+              <div className="pt-3 border-t border-dark-border">
+                <PanelTitle>Low Frequency Oscillator</PanelTitle>
+                <div className="flex flex-wrap gap-4 mt-2">
+                  <Knob
+                    label="Pitch Sensitivity"
+                    value={config.fms ?? 0}
+                    min={0}
+                    max={7}
+                    onChange={(v) => pushLiveUpdate({ fms: Math.round(v) })}
+                    size="md"
+                    tone="highlight"
+                    paramKey="furnace.fms"
+                    formatValue={formatInteger}
+                  />
+                  <Knob
+                    label="Amplitude Sensitivity"
+                    value={config.ams ?? 0}
+                    min={0}
+                    max={3}
+                    onChange={(v) => pushLiveUpdate({ ams: Math.round(v) })}
+                    size="md"
+                    tone="highlight"
+                    formatValue={formatInteger}
+                  />
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Operators Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {opOrder.slice(0, paramRanges.opCount).map((opIdx) => {
-              const op = config.operators[opIdx];
+          {/* Operators, numbered 1-4 as on the chip */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            {displayOrder.map((storageIndex, position) => {
+              const op = config.operators[storageIndex];
               if (!op) return null; // Skip missing operators (e.g. PSG instruments with no FM data)
+              const operatorNumber = position + 1;
               return (
-              <OperatorCard
-                key={opIdx}
-                index={opIdx}
-                op={op}
-                onUpdate={(u) => updateOperator(opIdx, u)}
-                ranges={paramRanges}
-                isCarrier={isOperatorCarrier(config.algorithm, opIdx)}
-                isSelected={selectedOp === opIdx + 1}
-              />
+                <OperatorCard
+                  key={storageIndex}
+                  operatorNumber={operatorNumber}
+                  op={op}
+                  onUpdate={(u) => updateOperator(storageIndex, u)}
+                  ranges={paramRanges}
+                  isCarrier={isFmCarrier(config.algorithm, operatorNumber, operatorCount)}
+                  hasFeedback={operatorNumber === FM_FEEDBACK_OPERATOR && config.feedback > 0}
+                  isSelected={selectedOp === operatorNumber}
+                  paramKeyPrefix={storageIndex === 0 ? 'furnace.op1' : undefined}
+                />
               );
             })}
           </div>
@@ -440,74 +530,37 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
 
       {/* MACROS TAB */}
       {category === "FM" && activeTab === 'macros' && (
-        <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border animate-in fade-in duration-200">
+        <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
           <div className="flex items-center gap-2 mb-4">
-            <Activity size={16} className="text-violet-400" />
-            <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Macro Editor</h3>
-            <span className="text-[9px] text-text-muted">Draw to edit • Loop (blue) • Release (red)</span>
+            <Activity size={16} className="text-accent-secondary" />
+            <PanelTitle>Macro Editor</PanelTitle>
+            <span className="text-[10px] font-mono text-text-muted">Draw to edit. Loop and release markers sit under each macro.</span>
           </div>
 
-          {hasOpMacros && (
-            <div className="flex gap-0.5 mb-3 bg-dark-bg p-0.5 rounded border border-dark-border">
-              {(['global', 'op1', 'op2', 'op3', 'op4'] as const).map(sub => (
-                <button
-                  key={sub}
-                  onClick={() => setMacroSubTab(sub)}
-                  className={`flex-1 py-1 px-2 rounded text-[10px] font-mono uppercase transition-colors ${
-                    macroSubTab === sub
-                      ? 'bg-violet-600 text-text-primary'
-                      : 'text-text-muted hover:text-text-primary hover:bg-dark-bgSecondary'
-                  }`}
-                >
-                  {sub === 'global' ? 'Global' : sub.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {macroSubTab === 'global' || !hasOpMacros ? (
-            <MacroListEditor
-              macros={config.macros}
-              onChange={(macros) => onChange({ macros: macros as FurnaceMacro[] })}
-              chipType={config.chipType}
-            />
-          ) : (
-            <MacroListEditor
-              macros={(config.opMacroArrays ?? [[], [], [], []])[parseInt(macroSubTab.slice(2)) - 1] ?? []}
-              onChange={(macros) => {
-                const opIdx = parseInt(macroSubTab.slice(2)) - 1;
-                const newOpArrays = [...(config.opMacroArrays ?? [[], [], [], []])];
-                newOpArrays[opIdx] = macros as FurnaceMacro[];
-                onChange({ opMacroArrays: newOpArrays });
-              }}
-              chipType={config.chipType}
-            />
-          )}
+          {macroEditor}
         </div>
       )}
 
       {/* CHIP SETTINGS TAB */}
       {category === "FM" && activeTab === 'chip' && (
-        <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border animate-in fade-in duration-200">
+        <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
           <div className="flex items-center gap-2 mb-4">
             <Settings size={16} className="text-accent-highlight" />
-            <h3 className="font-mono text-xs font-bold text-text-primary uppercase">Chip Settings</h3>
+            <PanelTitle>Chip Settings</PanelTitle>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="flex flex-wrap gap-4">
             {paramRanges.hasDT2 && (
-              <div className="flex justify-center">
-                <Knob
-                  label="FMS2"
-                  value={config.fms2 ?? 0}
-                  min={0}
-                  max={7}
-                  onChange={(v) => pushLiveUpdate({ fms2: Math.round(v) })}
-                  size="sm"
-                  color="#06b6d4"
-                  formatValue={(v) => String(Math.round(v))}
-                />
-              </div>
+              <Knob
+                label="Pitch Sensitivity 2"
+                value={config.fms2 ?? 0}
+                min={0}
+                max={7}
+                onChange={(v) => pushLiveUpdate({ fms2: Math.round(v) })}
+                size="md"
+                tone="highlight"
+                formatValue={formatInteger}
+              />
             )}
           </div>
         </div>
@@ -654,49 +707,12 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
       {category !== "FM" && (
         <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center gap-2 mb-4">
-            <Activity size={16} className="text-violet-400" />
-            <h3 className="font-mono text-xs font-bold text-text-primary uppercase tracking-wider">
-              Macros ({config.macros.length})
-            </h3>
-            <span className="text-[9px] text-text-muted">Draw to edit • Loop (blue) • Release (red)</span>
+            <Activity size={16} className="text-accent-secondary" />
+            <PanelTitle>Macros ({config.macros.length})</PanelTitle>
+            <span className="text-[10px] font-mono text-text-muted">Draw to edit. Loop and release markers sit under each macro.</span>
           </div>
 
-          {hasOpMacros && (
-            <div className="flex gap-0.5 mb-3 bg-dark-bg p-0.5 rounded border border-dark-border">
-              {(['global', 'op1', 'op2', 'op3', 'op4'] as const).map(sub => (
-                <button
-                  key={sub}
-                  onClick={() => setMacroSubTab(sub)}
-                  className={`flex-1 py-1 px-2 rounded text-[10px] font-mono uppercase transition-colors ${
-                    macroSubTab === sub
-                      ? 'bg-violet-600 text-text-primary'
-                      : 'text-text-muted hover:text-text-primary hover:bg-dark-bgSecondary'
-                  }`}
-                >
-                  {sub === 'global' ? 'Global' : sub.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {macroSubTab === 'global' || !hasOpMacros ? (
-            <MacroListEditor
-              macros={config.macros}
-              onChange={(macros) => onChange({ macros: macros as FurnaceMacro[] })}
-              chipType={config.chipType}
-            />
-          ) : (
-            <MacroListEditor
-              macros={(config.opMacroArrays ?? [[], [], [], []])[parseInt(macroSubTab.slice(2)) - 1] ?? []}
-              onChange={(macros) => {
-                const opIdx = parseInt(macroSubTab.slice(2)) - 1;
-                const newOpArrays = [...(config.opMacroArrays ?? [[], [], [], []])];
-                newOpArrays[opIdx] = macros as FurnaceMacro[];
-                onChange({ opMacroArrays: newOpArrays });
-              }}
-              chipType={config.chipType}
-            />
-          )}
+          {macroEditor}
         </div>
       )}
 
@@ -714,191 +730,203 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
 // ============================================================================
 
 interface OperatorCardProps {
-  index: number;
+  /** Operator number as on the chip and in the algorithm diagram (1-based). */
+  operatorNumber: number;
   op: FurnaceOperatorConfig;
   onUpdate: (u: Partial<FurnaceOperatorConfig>) => void;
   ranges: ChipParameterRanges;
   isCarrier: boolean;
+  /** This operator feeds back into itself (feedback above zero). */
+  hasFeedback: boolean;
   /** Highlighted by clicking in the FMAlgorithmDiagram */
   isSelected?: boolean;
+  /** MIDI parameter key prefix, set only for the operator the parameter router maps. */
+  paramKeyPrefix?: string;
 }
 
-const OperatorCard: React.FC<OperatorCardProps> = ({
-  index, op, onUpdate, ranges, isCarrier, isSelected
+type FmNumericParameter = Exclude<FmOperatorParameter, 'am' | 'vib' | 'sus' | 'ksr' | 'egt'>;
+type FmSwitchParameter = Extract<FmOperatorParameter, 'am' | 'vib' | 'sus' | 'ksr' | 'egt'>;
+
+/** Operator parameters the MIDI parameter router maps, by key suffix. */
+const OPERATOR_PARAM_KEY_SUFFIX: Partial<Record<FmNumericParameter, string>> = {
+  tl: 'TL', ar: 'AR', dr: 'DR', sl: 'SL', rr: 'RR',
+};
+
+const TWO_OPERATOR_DIAGRAM_LABELS: Record<number, string> = { 2: '1', 1: '2' };
+
+const formatInteger = (value: number): string => String(Math.round(value));
+
+const PanelTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <h3 className="text-[10px] font-mono font-bold text-text-secondary uppercase tracking-wider">{children}</h3>
+);
+
+const OperatorGroup: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+  <div className="pt-2 border-t border-dark-border">
+    <div className="text-[10px] font-mono text-text-muted mb-2">{title}</div>
+    <div className="flex flex-wrap items-end gap-x-2 gap-y-3">{children}</div>
+  </div>
+);
+
+const RoleBadge: React.FC<{ className: string; children: React.ReactNode }> = ({ className, children }) => (
+  <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${className}`}>{children}</span>
+);
+
+interface OperatorKnobProps {
+  parameter: FmNumericParameter;
+  value: number;
+  min: number;
+  max: number;
+  tone: ControlTone;
+  onUpdate: (u: Partial<FurnaceOperatorConfig>) => void;
+  paramKeyPrefix?: string;
+  formatValue?: (value: number) => string;
+}
+
+const OperatorKnob: React.FC<OperatorKnobProps> = ({
+  parameter, value, min, max, tone, onUpdate, paramKeyPrefix, formatValue = formatInteger,
 }) => {
-  const borderColor = isSelected
-    ? 'border-emerald-500/60'
-    : isCarrier ? 'border-amber-500/30' : 'border-blue-500/30';
-  const accentColor = isCarrier ? '#f59e0b' : '#3b82f6';
-  const bgGradient = isSelected
-    ? 'from-emerald-950/25 to-transparent'
-    : isCarrier
-      ? 'from-amber-950/20 to-transparent'
-      : 'from-blue-950/20 to-transparent';
+  const suffix = OPERATOR_PARAM_KEY_SUFFIX[parameter];
+  return (
+    <div className="flex justify-center min-w-[72px]">
+      <Knob
+        label={FM_OPERATOR_PARAMETER_LABELS[parameter]}
+        value={value}
+        min={min}
+        max={max}
+        onChange={(v) => onUpdate({ [parameter]: Math.round(v) } as Partial<FurnaceOperatorConfig>)}
+        size="sm"
+        tone={tone}
+        paramKey={paramKeyPrefix && suffix ? `${paramKeyPrefix}${suffix}` : undefined}
+        formatValue={formatValue}
+      />
+    </div>
+  );
+};
+
+const OperatorSwitch: React.FC<{
+  parameter: FmSwitchParameter;
+  value: boolean;
+  onUpdate: (u: Partial<FurnaceOperatorConfig>) => void;
+}> = ({ parameter, value, onUpdate }) => (
+  <Toggle
+    label={FM_OPERATOR_PARAMETER_LABELS[parameter]}
+    value={value}
+    onChange={(v) => onUpdate({ [parameter]: v } as Partial<FurnaceOperatorConfig>)}
+    tone="highlight"
+    size="sm"
+  />
+);
+
+const OperatorCard: React.FC<OperatorCardProps> = ({
+  operatorNumber, op, onUpdate, ranges, isCarrier, hasFeedback, isSelected, paramKeyPrefix,
+}) => {
+  const border = isSelected
+    ? 'border-accent-highlight'
+    : isCarrier ? 'border-accent-primary/40' : 'border-dark-border';
+  const roleTone: ControlTone = isCarrier ? 'primary' : 'secondary';
+  const knob = { onUpdate, paramKeyPrefix };
 
   return (
-    <div className={`bg-gradient-to-br ${bgGradient} bg-dark-bgSecondary p-3 rounded-lg border ${borderColor} transition-colors`}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <div
-            className="w-6 h-6 rounded flex items-center justify-center font-mono text-xs font-bold border"
-            style={{
-              backgroundColor: `${accentColor}20`,
-              borderColor: `${accentColor}50`,
-              color: accentColor,
-            }}
-          >
-            {index + 1}
-          </div>
-          <div>
-            <span className="font-mono text-[10px] font-bold text-text-primary uppercase">
-              OP{index + 1}
-            </span>
-            <span className="text-[9px] text-text-muted ml-2">
-              {isCarrier ? 'Carrier' : 'Modulator'}
-            </span>
-          </div>
+    <div className={`bg-dark-bgSecondary p-3 rounded-lg border ${border} flex flex-col gap-3`}>
+      {/* Header: number, role, switch */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-mono font-bold text-text-primary">Operator {operatorNumber}</span>
+          {isCarrier ? (
+            <RoleBadge className="border-accent-primary/50 bg-accent-primary/10 text-accent-primary">Carrier</RoleBadge>
+          ) : (
+            <RoleBadge className="border-dark-borderLight text-text-secondary">Modulator</RoleBadge>
+          )}
+          {hasFeedback && (
+            <RoleBadge className="border-accent-secondary/50 text-accent-secondary">Feedback</RoleBadge>
+          )}
         </div>
-
-        {/* Enable toggle */}
-        <button
-          onClick={() => onUpdate({ enabled: !op.enabled })}
-          className={`text-[9px] font-mono px-2 py-0.5 rounded border transition-colors ${
-            op.enabled
-              ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-400'
-              : 'bg-dark-bg border-dark-border text-text-muted'
-          }`}
-        >
-          {op.enabled ? 'ON' : 'OFF'}
-        </button>
-      </div>
-
-      {/* Envelope Visualization - Full width */}
-      <div className="mb-3 w-full">
-        <EnvelopeVisualization
-          mode="adsr"
-          tl={op.tl}
-          ar={op.ar}
-          dr={op.dr}
-          d2r={op.d2r ?? 0}
-          rr={op.rr}
-          sl={op.sl}
-          maxTl={ranges.tl.max}
-          maxRate={ranges.ar.max}
-          color={accentColor}
-          width={280}
-          height={48}
+        <Toggle
+          label="Enabled"
+          value={op.enabled}
+          onChange={(enabled) => onUpdate({ enabled })}
+          tone="success"
+          size="sm"
         />
       </div>
 
-      {/* Row 1: TL, MULT, DT */}
-      <div className="flex justify-between items-center gap-1 mb-2">
-        <Knob label="TL" value={op.tl} min={ranges.tl.min} max={ranges.tl.max}
-          onChange={(v) => onUpdate({ tl: Math.round(v) })} size="sm" color="#ef4444"
-          formatValue={(v) => String(Math.round(v))} />
-        <Knob label="MULT" value={op.mult} min={ranges.mult.min} max={ranges.mult.max}
-          onChange={(v) => onUpdate({ mult: Math.round(v) })} size="sm" color="#22d3ee"
-          formatValue={(v) => String(Math.round(v))} />
-        <Knob label="DT" value={op.dt} min={ranges.dt.min} max={ranges.dt.max}
-          onChange={(v) => onUpdate({ dt: Math.round(v) })} size="sm" color="#a78bfa"
-          formatValue={(v) => { const val = Math.round(v); return val > 0 ? `+${val}` : String(val); }} />
-      </div>
+      {/* Envelope shape at full card width */}
+      <EnvelopeVisualization
+        mode="adsr"
+        tl={op.tl}
+        ar={op.ar}
+        dr={op.dr}
+        d2r={op.d2r ?? 0}
+        rr={op.rr}
+        sl={op.sl}
+        maxTl={ranges.tl.max}
+        maxRate={ranges.ar.max}
+        color={resolveColor(toneColor(roleTone))}
+        width="auto"
+        height={72}
+      />
 
-      {/* Row 2: AR, DR, SL, RR (envelope row) */}
-      <div className="flex justify-between items-center gap-1 mb-2">
-        <Knob label="AR" value={op.ar} min={ranges.ar.min} max={ranges.ar.max}
-          onChange={(v) => onUpdate({ ar: Math.round(v) })} size="sm" color="#10b981"
-          formatValue={(v) => String(Math.round(v))} />
-        <Knob label="DR" value={op.dr} min={ranges.dr.min} max={ranges.dr.max}
-          onChange={(v) => onUpdate({ dr: Math.round(v) })} size="sm" color="#f59e0b"
-          formatValue={(v) => String(Math.round(v))} />
-        <Knob label="SL" value={op.sl} min={ranges.sl.min} max={ranges.sl.max}
-          onChange={(v) => onUpdate({ sl: Math.round(v) })} size="sm" color="#8b5cf6"
-          formatValue={(v) => String(Math.round(v))} />
-        <Knob label="RR" value={op.rr} min={ranges.rr.min} max={ranges.rr.max}
-          onChange={(v) => onUpdate({ rr: Math.round(v) })} size="sm" color="#ec4899"
-          formatValue={(v) => String(Math.round(v))} />
-      </div>
+      <OperatorGroup title="Level and Frequency">
+        <OperatorKnob {...knob} parameter="tl" value={op.tl} min={ranges.tl.min} max={ranges.tl.max} tone={roleTone} />
+        <OperatorKnob {...knob} parameter="mult" value={op.mult} min={ranges.mult.min} max={ranges.mult.max} tone="highlight" />
+        {ranges.dt.max > ranges.dt.min && (
+          <OperatorKnob {...knob} parameter="dt" value={op.dt} min={ranges.dt.min} max={ranges.dt.max} tone="highlight"
+            formatValue={formatSignedValue} />
+        )}
+        {ranges.hasDT2 && (
+          <OperatorKnob {...knob} parameter="dt2" value={op.dt2 ?? 0} min={ranges.dt2?.min ?? 0} max={ranges.dt2?.max ?? 3} tone="highlight" />
+        )}
+        {ranges.hasWS && (
+          <OperatorKnob {...knob} parameter="ws" value={op.ws ?? 0} min={ranges.ws?.min ?? 0} max={ranges.ws?.max ?? 7} tone="highlight" />
+        )}
+        {ranges.ksl && (
+          <OperatorKnob {...knob} parameter="ksl" value={op.ksl ?? 0} min={ranges.ksl.min} max={ranges.ksl.max} tone="neutral" />
+        )}
+      </OperatorGroup>
 
-      {/* Row 3: D2R, RS + flags (always visible) */}
-      <div className="pt-2 border-t border-dark-border mt-1">
-        {/* Row 3: D2R, RS, DT2, KSL, WS - all in one horizontal row */}
-        <div className="flex justify-center items-center gap-3 mb-2">
-            {ranges.hasD2R && (
-              <Knob label="D2R" value={op.d2r ?? 0} min={ranges.d2r.min} max={ranges.d2r.max}
-                onChange={(v) => onUpdate({ d2r: Math.round(v) })} size="sm" color="#fb923c"
-                formatValue={(v) => String(Math.round(v))} />
-            )}
-            {ranges.rs.max > 0 && (
-              <Knob label="RS" value={op.rs ?? 0} min={ranges.rs.min} max={ranges.rs.max}
-                onChange={(v) => onUpdate({ rs: Math.round(v) })} size="sm" color="#06b6d4"
-                formatValue={(v) => String(Math.round(v))} />
-            )}
-            {ranges.hasDT2 && (
-              <Knob label="DT2" value={op.dt2 ?? 0} min={0} max={3}
-                onChange={(v) => onUpdate({ dt2: Math.round(v) })} size="sm" color="#c084fc"
-                formatValue={(v) => String(Math.round(v))} />
-            )}
-            {ranges.ksl && (
-              <Knob label="KSL" value={op.ksl ?? 0} min={ranges.ksl.min} max={ranges.ksl.max}
-                onChange={(v) => onUpdate({ ksl: Math.round(v) })} size="sm" color="#fbbf24"
-                formatValue={(v) => String(Math.round(v))} />
-            )}
-            {ranges.hasWS && (
-              <Knob label="WS" value={op.ws ?? 0} min={0} max={7}
-                onChange={(v) => onUpdate({ ws: Math.round(v) })} size="sm" color="#34d399"
-                formatValue={(v) => String(Math.round(v))} />
-            )}
-            {ranges.isOPZ && (
-              <>
-                <Knob label="DAM" value={op.dam ?? 0} min={0} max={7}
-                  onChange={(v) => onUpdate({ dam: Math.round(v) })} size="sm" color="#f472b6"
-                  formatValue={(v) => String(Math.round(v))} />
-                <Knob label="DVB" value={op.dvb ?? 0} min={0} max={7}
-                  onChange={(v) => onUpdate({ dvb: Math.round(v) })} size="sm" color="#e879f9"
-                  formatValue={(v) => String(Math.round(v))} />
-                <Knob label="KVS" value={op.kvs ?? 0} min={0} max={3}
-                  onChange={(v) => onUpdate({ kvs: Math.round(v) })} size="sm" color="#c084fc"
-                  formatValue={(v) => String(Math.round(v))} />
-              </>
-            )}
-          </div>
+      <OperatorGroup title="Envelope">
+        <OperatorKnob {...knob} parameter="ar" value={op.ar} min={ranges.ar.min} max={ranges.ar.max} tone={roleTone} />
+        <OperatorKnob {...knob} parameter="dr" value={op.dr} min={ranges.dr.min} max={ranges.dr.max} tone={roleTone} />
+        <OperatorKnob {...knob} parameter="sl" value={op.sl} min={ranges.sl.min} max={ranges.sl.max} tone={roleTone} />
+        {ranges.hasD2R && (
+          <OperatorKnob {...knob} parameter="d2r" value={op.d2r ?? 0} min={ranges.d2r.min} max={ranges.d2r.max} tone={roleTone} />
+        )}
+        <OperatorKnob {...knob} parameter="rr" value={op.rr} min={ranges.rr.min} max={ranges.rr.max} tone={roleTone} />
+        {ranges.rs.max > 0 && (
+          <OperatorKnob {...knob} parameter="rs" value={op.rs ?? 0} min={ranges.rs.min} max={ranges.rs.max} tone="neutral" />
+        )}
+      </OperatorGroup>
 
-          {/* Boolean Flags - horizontal row */}
-          <div className="flex justify-center gap-2">
-            <ToggleButton label="AM" value={op.am ?? false} onChange={(v) => onUpdate({ am: v })} />
-            {ranges.hasSSG && (
-              <CustomSelect
-                value={String(op.ssg ?? 0)}
-                onChange={(v) => onUpdate({ ssg: parseInt(v) })}
-                className="text-[9px] font-mono px-1 py-0.5 rounded border bg-dark-bg border-dark-border text-text-primary"
-                title="SSG-EG Mode"
-                options={[
-                  { value: '0', label: 'SSG Off' },
-                  { value: '8', label: 'SSG \\\\\\\\' },
-                  { value: '9', label: 'SSG \\‾‾' },
-                  { value: '10', label: 'SSG \\/\\/' },
-                  { value: '11', label: 'SSG \\‾' },
-                  { value: '12', label: 'SSG ////' },
-                  { value: '13', label: 'SSG /‾‾' },
-                  { value: '14', label: 'SSG /\\/\\' },
-                  { value: '15', label: 'SSG /‾' },
-                ]}
-              />
-            )}
-            {ranges.hasWS && (
-              <>
-                <ToggleButton label="VIB" value={op.vib ?? false} onChange={(v) => onUpdate({ vib: v })} />
-                <ToggleButton label="SUS" value={op.sus ?? false} onChange={(v) => onUpdate({ sus: v })} />
-                <ToggleButton label="KSR" value={op.ksr ?? false} onChange={(v) => onUpdate({ ksr: v })} />
-              </>
-            )}
-            {ranges.isOPZ && (
-              <ToggleButton label="EGT" value={op.egt ?? false} onChange={(v) => onUpdate({ egt: v })} />
-            )}
-          </div>
-        </div>
+      <OperatorGroup title="Modulation">
+        <OperatorSwitch parameter="am" value={op.am ?? false} onUpdate={onUpdate} />
+        {ranges.hasWS && (
+          <>
+            <OperatorSwitch parameter="vib" value={op.vib ?? false} onUpdate={onUpdate} />
+            <OperatorSwitch parameter="sus" value={op.sus ?? false} onUpdate={onUpdate} />
+            <OperatorSwitch parameter="ksr" value={op.ksr ?? false} onUpdate={onUpdate} />
+          </>
+        )}
+        {ranges.isOPZ && (
+          <>
+            <OperatorSwitch parameter="egt" value={op.egt ?? false} onUpdate={onUpdate} />
+            <OperatorKnob {...knob} parameter="dam" value={op.dam ?? 0} min={0} max={7} tone="neutral" />
+            <OperatorKnob {...knob} parameter="dvb" value={op.dvb ?? 0} min={0} max={7} tone="neutral" />
+            <OperatorKnob {...knob} parameter="kvs" value={op.kvs ?? 0} min={0} max={3} tone="neutral" />
+          </>
+        )}
+        {ranges.hasSSG && (
+          <label className="flex flex-col gap-1 text-[10px] font-mono text-text-muted">
+            {FM_OPERATOR_PARAMETER_LABELS.ssg}
+            <CustomSelect
+              value={String(op.ssg ?? 0)}
+              onChange={(v) => onUpdate({ ssg: parseInt(v, 10) })}
+              className="bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-xs px-2 py-1"
+              title={FM_OPERATOR_PARAMETER_LABELS.ssg}
+              options={SSG_ENVELOPE_SHAPES.map((shape) => ({ value: String(shape.value), label: shape.label }))}
+            />
+          </label>
+        )}
+      </OperatorGroup>
     </div>
   );
 };
@@ -2937,7 +2965,7 @@ const SID2Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<Furnace
 // ============================================================================
 
 function getChipCategory(id: number): "FM" | "PSG" | "Wavetable" | "PCM" | "Other" {
-  if ([0, 1, 2, 11, 13, 14, 22, 23, 26].includes(id)) return "FM";
+  if ([0, 1, 2, 11, 13, 14, 22, 23, 26, 47, 48].includes(id)) return "FM";
   if ([3, 4, 5, 12, 15, 16, 17, 18, 33, 34, 35, 43, 44].includes(id)) return "PSG";
   if ([6, 7, 8, 9, 19, 36, 37, 38].includes(id)) return "Wavetable";
   if ([10, 20, 21, 24, 25, 27, 28, 29, 30, 31, 32, 39, 40, 41, 42].includes(id)) return "PCM";
@@ -2992,23 +3020,10 @@ function getChipName(id: number): string {
     42: "NEC (μPD1771)",
     43: "Toshiba (T6W28)",
     44: "Nintendo Virtual Boy",
+    47: "NEC PC-88 (YM2203)",
+    48: "Neo Geo (YM2610B)",
   };
   return names[id] || `Unknown Chip (${id})`;
-}
-
-function isOperatorCarrier(algorithm: number, opIndex: number): boolean {
-  // Based on Furnace's opIsOutput array
-  const carrierMap: Record<number, number[]> = {
-    0: [0],           // Alg 0: OP1 is carrier
-    1: [0],           // Alg 1: OP1 is carrier
-    2: [0],           // Alg 2: OP1 is carrier
-    3: [0],           // Alg 3: OP1 is carrier
-    4: [0, 2],        // Alg 4: OP1 and OP3 are carriers
-    5: [0, 1, 2],     // Alg 5: OP1, OP2, OP3 are carriers
-    6: [0, 1, 2],     // Alg 6: OP1, OP2, OP3 are carriers
-    7: [0, 1, 2, 3],  // Alg 7: All operators are carriers
-  };
-  return carrierMap[algorithm]?.includes(opIndex) ?? false;
 }
 
 // OPLL hardware presets moved to factory presets (src/constants/furnacePresets.ts)
