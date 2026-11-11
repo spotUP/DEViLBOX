@@ -1454,11 +1454,11 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
 
   server.tool(
     'update_synth_config',
-    'Update a synth sub-config (e.g., tb303, envelope, filter, furnace). Merges with existing config.',
+    'Update a synth sub-config (e.g., tb303, envelope, filter, furnace). A partial update: fields you do not name keep their value, at every depth. A list of objects (for example furnace.operators) is patched by position: entry N of your list changes entry N of the stored list, and a null entry leaves that one alone, so [null, null, null, {"tl": 12}] changes only the fourth. A list of numbers and an empty list replace the stored list.',
     {
       id: z.number().int().min(0).describe('Instrument ID'),
       configKey: z.string().describe('Sub-config key (e.g., "tb303", "envelope", "filter", "oscillator", "furnace")'),
-      updates: z.record(z.string(), z.any()).describe('Key-value pairs to merge into the sub-config'),
+      updates: z.record(z.string(), z.any()).describe('Only the fields to change; merged deeply into the sub-config'),
     },
     (p) => call('update_synth_config', p),
   );
