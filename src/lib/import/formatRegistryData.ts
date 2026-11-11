@@ -2358,6 +2358,20 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
 
+  // ── EMS (.ems) ───────────────────────────────────────────────────────────
+  {
+    key: 'ems',
+    label: 'EMS',
+    description: 'EMS (.ems) - Editeur Musical Sequentiel, 64-row four-voice patterns as the grid, note edits saved in place; nuade / UADE plays the module',
+    family: 'amiga-native',
+    matchMode: 'both',
+    extRegex: /\.ems$/i,
+    prefixes: ['ems.'],
+    prefKey: 'ems',
+    nativeParser: { module: '@lib/import/formats/EMSParser', parseFn: 'parseEMSFile', detectFn: 'isEMSFormat' },
+    uadeFallback: true,
+  },
+
   // ── MCMD (.mcmd) ─────────────────────────────────────────────────────────
   {
     key: 'mcmd',
@@ -2587,7 +2601,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     ['cus', 'Custom'], ['cust', 'Custom'], ['custom', 'Custom'],
     ['dh', 'David Hanney'], ['dz', 'Darius Zendeh'],
     ['mkiio', 'Mark II (O)'],
-    ['mg', 'MG'], ['ems', 'EMS'], ['emsv6', 'EMS v6'],
+    ['mg', 'MG'], ['emsv6', 'EMS v6'],
     ['fw', 'Forgotten Worlds'],
     ['hn', 'HN'], ['thn', 'THN'],
     ['mtp2', 'MajorTom 2'], ['arp', 'ARP'],

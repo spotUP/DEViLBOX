@@ -624,6 +624,14 @@
       "cells": 63356,
       "bytes": 63356
     },
+    "ems": {
+      "exporter": "EmsExporter.exportEms",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 46060,
+      "bytes": 46060
+    },
     "mcmd": {
       "exporter": "McmdExporter.exportMcmd",
       "tier": "byte-exact",
