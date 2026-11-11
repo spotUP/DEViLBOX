@@ -1041,6 +1041,7 @@ export const useTrackerStore = create<TrackerStore>()(
           useEditorStore.getState().pasteMask,
         );
       });
+      refuseWrongKindCells(patternIndex, beforePattern);
       pushEditAction('SWAP_SELECTION', 'Swap selection', patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
@@ -1180,6 +1181,18 @@ export const useTrackerStore = create<TrackerStore>()(
     swapChannels: (ch1, ch2) => {
       const patternIndex = get().currentPatternIndex;
       const beforePattern = get().patterns[patternIndex];
+      // A swap is one move, not a cell-by-cell write: put back only the refused cells and the other
+      // channel's notes vanish. So the whole swap is refused when either side would land a wrong-kind note.
+      const sides: Array<[number, number]> = [[ch1, ch2], [ch2, ch1]];
+      for (const [from, to] of sides) {
+        for (const cell of beforePattern.channels[from]?.rows ?? []) {
+          const error = noteVoiceKindError(to, cell);
+          if (error) {
+            notify.warning(`${error} Channels were not swapped.`);
+            return;
+          }
+        }
+      }
       set((state) => {
         swapChannelsHelper(state.patterns[state.currentPatternIndex], ch1, ch2);
       });
@@ -1219,6 +1232,7 @@ export const useTrackerStore = create<TrackerStore>()(
       set((state) => {
         mutate(state.patterns[state.currentPatternIndex]);
       });
+      refuseWrongKindCells(patternIndex, beforePattern);
       pushEditAction('BULK_BLOCK_EDIT', label, patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
@@ -1283,6 +1297,7 @@ export const useTrackerStore = create<TrackerStore>()(
         const cursor = useCursorStore.getState().cursor;
         readMacroSlotHelper(pattern, cursor, macro, useEditorStore.getState().pasteMask, useEditorStore.getState().insertMode);
       });
+      refuseWrongKindCells(patternIndex, beforePattern);
       pushEditAction('READ_MACRO', 'Apply macro', patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
@@ -1296,6 +1311,7 @@ export const useTrackerStore = create<TrackerStore>()(
         const { cursor, selection } = useCursorStore.getState();
         applyInstrumentToSelectionHelper(pattern, selection, cursor, instrumentId);
       });
+      refuseWrongKindCells(patternIndex, beforePattern);
       pushEditAction('EDIT_CELL', 'Apply instrument to selection', patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
@@ -1366,12 +1382,27 @@ export const useTrackerStore = create<TrackerStore>()(
     // Swap all occurrences of Instrument A with Instrument B
     remapInstrument: (oldId, newId, scope) => {
       const patternIndex = get().currentPatternIndex;
-      const beforePattern = get().patterns[patternIndex];
+      const beforePatterns = get().patterns;
+      const beforePattern = beforePatterns[patternIndex];
       set((state) => {
         const { cursor, selection } = useCursorStore.getState();
         remapInstrumentHelper(state.patterns, state.currentPatternIndex, selection, cursor, oldId, newId, scope);
       });
-      syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
+      // Scope song reaches every pattern. Immer keeps untouched patterns by reference.
+      beforePatterns.forEach((before, i) => {
+        if (get().patterns[i] !== before) refuseWrongKindCells(i, before);
+      });
+      const changes: PatternChange[] = [];
+      beforePatterns.forEach((before, i) => {
+        const after = get().patterns[i];
+        if (after !== before) changes.push({ patternIndex: i, before, after });
+      });
+      if (changes.length === 1 && changes[0].patternIndex === patternIndex) {
+        pushEditAction('EDIT_CELL', 'Remap instrument', patternIndex, beforePattern, get().patterns[patternIndex]);
+      } else if (changes.length > 0) {
+        useHistoryStore.getState().pushMultiAction('BULK_BLOCK_EDIT', 'Remap instrument', changes);
+      }
+      for (const c of changes) syncBulkEdit(c.patternIndex, get().patterns[c.patternIndex], c.before as Pattern);
     },
 
     // Advanced editing - Interpolate values in selection
@@ -1890,7 +1921,9 @@ export const useTrackerStore = create<TrackerStore>()(
         });
       }),
 
-    setChannelRows: (channelIndex, rows) =>
+    setChannelRows: (channelIndex, rows) => {
+      const patternIndex = get().currentPatternIndex;
+      const beforePattern = get().patterns[patternIndex];
       set((state) => {
         const pattern = state.patterns[state.currentPatternIndex];
         if (channelIndex >= 0 && channelIndex < pattern.channels.length) {
@@ -1901,7 +1934,9 @@ export const useTrackerStore = create<TrackerStore>()(
           }
           pattern.channels[channelIndex].rows = paddedRows.slice(0, pattern.length);
         }
-      }),
+      });
+      if (beforePattern) refuseWrongKindCells(patternIndex, beforePattern);
+    },
 
     reorderChannel: (fromIndex, toIndex) =>
       set((state) => {
@@ -2221,6 +2256,9 @@ export const useTrackerStore = create<TrackerStore>()(
       const orderBefore = get().patternOrder;
       set((state) => {
         edit(state);
+      });
+      before.forEach((b, i) => {
+        if (get().patterns[i] !== b) refuseWrongKindCells(i, b);
       });
       const after = get().patterns;
       if (after.length < before.length) throw new Error('multiPatternEdit: an edit may not remove patterns');
