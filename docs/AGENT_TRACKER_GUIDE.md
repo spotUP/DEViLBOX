@@ -12,6 +12,10 @@ Last checked against the code: 2026-11-12.
 4. A dev-server restart drops the `devilbox-tracker` MCP server. The owner reconnects it with `/mcp`.
 5. A second tab on an older IndexedDB version blocks the database upgrade (song revisions). One tab only.
 
+### Starting from another repository
+
+The `devilbox-tracker` MCP server is registered at user scope, so a session in any repository has the tools. It still needs the DEViLBOX dev stack running (step 1) and the one tab open (step 2); without them every tool answers "No browser connected". The skills (`/compose`, `/edit-pattern`, `/furnace-fm`, `/pc-tracker-effects`, ...) live in `/Users/spot/Code/DEViLBOX/.claude/commands/` and do not follow: read this guide and call `get_mcp_help` with the format topic (section 6) instead.
+
 ## 2. Confirm which page you drive, before every write batch
 
 The hosted page at `devilbox.uprough.net` connects to the same local relay. A local MCP call can therefore land on the owner's live-site tab.
@@ -92,7 +96,8 @@ Not every format is editable. `src/lib/formats/EditableFormatRegistry.builtins.t
 ## 7. Verify, never trust `ok`
 
 - Read back what you wrote (`render_pattern_text` for a few rows is enough).
-- Known handlers that returned `ok` after doing nothing (fix in progress 2026-11-12): `duplicate_pattern` with an out-of-range index, `set_pattern_order` with an empty list, `delete_instrument` / `update_instrument` / `clone_instrument` with an unknown id. `resize_pattern` above the limit waits on a confirm dialog.
+- These now return an error instead of `ok` (commit `0f1f8ee87`): `duplicate_pattern` with an out-of-range index, `set_pattern_order` with an empty list, `delete_instrument` / `update_instrument` / `clone_instrument` with an unknown id, `delete_instrument` of the last instrument. Still open: `resize_pattern` above the format limit returns before the confirm dialog is answered; the mixer tools are unchecked for a channel beyond the song.
+- `effTyp` / `effTyp2` accept the whole id space (format-private blocks from 0x500 included) in `set_cell`, `set_cells` and `fill_range`.
 - Sound: `play`, then `get_audio_level { durationMs }`; a non-zero `rmsAvg` means signal, not that it sounds right. Solo a channel to check one voice. `get_audio_level` does not see engines that own a separate native audio context (SunTronic).
 - `get_note_trigger_log` output is very large and lists notes on muted channels: avoid it.
 - `get_playback_state.currentGlobalRow` and `getCurrentRow()` have read 0 during play: do not use them as a position check.
