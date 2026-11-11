@@ -358,6 +358,13 @@ export interface FurnaceConfig {
    * previews on the YM2612's sixth channel, its DAC. Absent: channel 0.
    */
   previewChannel?: number;
+  /**
+   * The Furnace instrument type (DivInstrumentType) this instrument is, when
+   * the chip type alone does not say: a Neo Geo (YM2610 / YM2610B) instrument
+   * is an FM (1), SSG (6), ADPCM-A (37) or ADPCM-B (38) voice. Absent: the
+   * type follows the chip type (FM for OPNB).
+   */
+  divInsType?: number;
 
   // FM parameters
   algorithm: number;     // 0-7 (operator connection algorithm)
