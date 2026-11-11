@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { X, Maximize2, Keyboard, Usb } from 'lucide-react';
+import { X, Maximize2, Keyboard, Usb, Search } from 'lucide-react';
 import { useUIStore } from '@stores/useUIStore';
 import { themes, THEME_TOKEN_GROUPS } from '@stores/useThemeStore';
 import { type SIDEngineType } from '@stores/useSettingsStore';
@@ -29,6 +29,8 @@ import { KeyboardNormalizer } from '@engine/keyboard/KeyboardNormalizer';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { AIKeysPanel } from '@components/ai/AIKeysPanel';
 import { PlaybackEnginesPanel } from '@components/dialogs/PlaybackEnginesPanel';
+import { SettingsSection, SettingsVisibleSectionsContext } from '@components/dialogs/SettingsSection';
+import { filterSettingsEntries, SETTINGS_SEARCH_INDEX } from '@/lib/settingsSearch';
 
 /** Normalize any CSS color to #RRGGBB for <input type="color"> */
 function normalizeToHex6(color: string | undefined): string {
@@ -60,6 +62,13 @@ function editBehaviourDescription(choice: EditBehaviourChoice): string {
 export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const s = useSettingsDialog({ isOpen: true }); // DOM unmounts when closed
   const [showShortcuts, setShowShortcuts] = useState(false); // DOM-only
+  const [query, setQuery] = useState(''); // DOM-only search text
+  const searching = query.trim() !== '';
+  const visibleSections = searching
+    ? new Set(filterSettingsEntries(SETTINGS_SEARCH_INDEX, query).map((e) => e.id))
+    : null;
+  // While searching, every tab renders so matches in other tabs are reachable
+  const showTab = (id: string) => searching || s.activeTab === id;
 
   // Standard modal keyboard handling (Enter/Escape to close)
   useModalClose({ isOpen: true, onClose });
@@ -84,6 +93,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
           </button>
         </div>
 
+        {/* Search */}
+        <div className="px-4 py-2 border-b border-ft2-border relative">
+          <Search size={12} className="absolute left-6 top-1/2 -translate-y-1/2 text-ft2-textDim pointer-events-none" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search settings"
+            aria-label="Search settings"
+            autoFocus
+            className="w-full bg-ft2-bg border border-ft2-border text-ft2-text text-xs font-mono pl-6 pr-6 py-1 focus:outline-none focus:border-ft2-highlight"
+          />
+          {searching && (
+            <button
+              onClick={() => setQuery('')}
+              className="absolute right-6 top-1/2 -translate-y-1/2 text-ft2-textDim hover:text-ft2-highlight focus:outline-none"
+              aria-label="Clear search"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+
         {/* Tab Bar */}
         <div className="flex border-b border-ft2-border bg-ft2-header/50 px-2 overflow-x-auto scrollbar-ft2">
           {SETTINGS_TABS.map((tab) => (
@@ -103,14 +135,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
         {/* Content */}
         <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto scrollbar-ft2">
+          <SettingsVisibleSectionsContext.Provider value={visibleSections}>
+          {visibleSections && visibleSections.size === 0 && (
+            <p className="text-ft2-textDim text-xs font-mono">No settings match</p>
+          )}
           
           {/* ═══════════════════════════════════════════════════════════════════
               GENERAL TAB
               ═══════════════════════════════════════════════════════════════════ */}
-          {s.activeTab === 'general' && (
+          {showTab('general') && (
             <>
               {/* Theme */}
-              <section>
+              <SettingsSection id="theme">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">THEME</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -169,10 +205,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     </div>
                   )}
                 </div>
-              </section>
+              </SettingsSection>
 
               {/* Display */}
-              <section>
+              <SettingsSection id="display">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">DISPLAY</h3>
                 <div className="space-y-3">
                   {/* Number Format */}
@@ -224,10 +260,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     <Toggle label="" value={s.smoothScrolling} onChange={s.setSmoothScrolling} size="sm" />
                   </div>
                 </div>
-              </section>
+              </SettingsSection>
 
               {/* Layout */}
-              <section>
+              <SettingsSection id="layout">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">LAYOUT</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -239,17 +275,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     <Toggle label="" value={s.oscilloscopeVisible} onChange={s.setOscilloscopeVisible} size="sm" />
                   </div>
                 </div>
-              </section>
+              </SettingsSection>
             </>
           )}
 
           {/* ═══════════════════════════════════════════════════════════════════
               AUDIO TAB
               ═══════════════════════════════════════════════════════════════════ */}
-          {s.activeTab === 'audio' && (
+          {showTab('audio') && (
             <>
               {/* Engine */}
-              <section>
+              <SettingsSection id="engine">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">ENGINE</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -300,10 +336,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     <Toggle label="" value={s.autoAdvanceSubsongs} onChange={s.setAutoAdvanceSubsongs} size="sm" />
                   </div>
                 </div>
-              </section>
+              </SettingsSection>
 
               {/* Stereo */}
-              <section>
+              <SettingsSection id="stereo">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">STEREO SEPARATION</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -367,10 +403,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     />
                   </div>
                 </div>
-              </section>
+              </SettingsSection>
 
               {/* Bus Gain */}
-              <section>
+              <SettingsSection id="bus-gain">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">BUS GAIN BALANCE</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -403,17 +439,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     </div>
                   </div>
                 </div>
-              </section>
+              </SettingsSection>
             </>
           )}
 
           {/* ═══════════════════════════════════════════════════════════════════
               VISUAL TAB
               ═══════════════════════════════════════════════════════════════════ */}
-          {s.activeTab === 'visual' && (
+          {showTab('visual') && (
             <>
               {/* VU Meters */}
-              <section>
+              <SettingsSection id="vu">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">VU METERS</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -455,10 +491,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     <Toggle label="" value={s.vuMeterMirror} onChange={s.setVuMeterMirror} size="sm" />
                   </div>
                 </div>
-              </section>
+              </SettingsSection>
 
               {/* Pattern views */}
-              <section>
+              <SettingsSection id="pattern-views">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">PATTERN VIEWS</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -483,10 +519,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     <Toggle label="" value={s.showUnusedChannels} onChange={s.setShowUnusedChannels} size="sm" />
                   </div>
                 </div>
-              </section>
+              </SettingsSection>
 
               {/* Visual Background */}
-              <section>
+              <SettingsSection id="visual-background">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">VISUAL BACKGROUND</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -514,7 +550,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       className="w-24 accent-accent-primary" />
                   </div>
                 </div>
-              </section>
+              </SettingsSection>
 
             </>
           )}
@@ -522,9 +558,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
           {/* ═══════════════════════════════════════════════════════════════════
               RECORDING TAB
               ═══════════════════════════════════════════════════════════════════ */}
-          {s.activeTab === 'recording' && (
+          {showTab('recording') && (
             <>
-              <section>
+              <SettingsSection id="recording">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">RECORDING</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -571,17 +607,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     </div>
                   </div>
                 </div>
-              </section>
+              </SettingsSection>
             </>
           )}
 
           {/* ═══════════════════════════════════════════════════════════════════
               INPUT TAB
               ═══════════════════════════════════════════════════════════════════ */}
-          {s.activeTab === 'input' && (
+          {showTab('input') && (
             <>
               {/* Keyboard */}
-              <section>
+              <SettingsSection id="keyboard">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">KEYBOARD</h3>
                 <div className="space-y-3">
                   <div className="flex flex-col gap-2">
@@ -635,10 +671,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     <KeyBindingEditor platform={s.platformOverride === 'auto' ? (KeyboardNormalizer.isMac() ? 'mac' : 'pc') : s.platformOverride} />
                   </div>
                 )}
-              </section>
+              </SettingsSection>
 
               {/* Vinyl Scratch */}
-              <section>
+              <SettingsSection id="vinyl-scratch">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">VINYL SCRATCH</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -680,25 +716,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     <div>Hold <kbd className="px-1 py-0.5 bg-ft2-border text-ft2-text rounded text-[8px]">Z</kbd> = fader cut · <kbd className="px-1 py-0.5 bg-ft2-border text-ft2-text rounded text-[8px]">X</kbd> = crab</div>
                   </div>
                 </div>
-              </section>
+              </SettingsSection>
             </>
           )}
 
           {/* ═══════════════════════════════════════════════════════════════════
               MIDI TAB
               ═══════════════════════════════════════════════════════════════════ */}
-          {s.activeTab === 'midi' && (
+          {showTab('midi') && (
             <>
               {/* MIDI Devices */}
-              <section>
+              <SettingsSection id="midi-devices">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">MIDI DEVICES</h3>
                 <div className="bg-dark-bgSecondary/40 border border-dark-border/50 rounded p-3">
                   <MIDIToolbarDropdown inline />
                 </div>
-              </section>
+              </SettingsSection>
 
               {/* MIDI Settings */}
-              <section>
+              <SettingsSection id="midi-settings">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">MIDI SETTINGS</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -709,10 +745,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     <Toggle label="" value={s.midiPolyphonic} onChange={s.setMidiPolyphonic} size="sm" />
                   </div>
                 </div>
-              </section>
+              </SettingsSection>
 
               {/* MIDI Tools */}
-              <section>
+              <SettingsSection id="midi-tools">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">MIDI TOOLS</h3>
                 <div className="space-y-2">
                   <button onClick={() => { onClose(); useUIStore.getState().openModal('midi-wizard'); }}
@@ -748,25 +784,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     </div>
                   </button>
                 </div>
-              </section>
+              </SettingsSection>
 
               {/* KK Light Guide */}
-              <section>
+              <SettingsSection id="kk-light-guide">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">KK LIGHT GUIDE</h3>
                 <div className="bg-dark-bgSecondary/40 border border-dark-border/50 rounded p-3">
                   <KKLightGuidePanel />
                 </div>
-              </section>
+              </SettingsSection>
             </>
           )}
 
           {/* ═══════════════════════════════════════════════════════════════════
               SID TAB
               ═══════════════════════════════════════════════════════════════════ */}
-          {s.activeTab === 'sid' && (
+          {showTab('sid') && (
             <>
               {/* SID Engine */}
-              <section>
+              <SettingsSection id="sid-engine">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide">SID PLAYER ENGINE</h3>
                 <p className="text-ft2-textDim text-[9px] font-mono mb-2">Choose emulation engine for C64 SID music (.sid files).</p>
                 <div className="space-y-2">
@@ -788,10 +824,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     </label>
                   ))}
                 </div>
-              </section>
+              </SettingsSection>
 
               {/* SID Hardware */}
-              <section>
+              <SettingsSection id="sid-hardware">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-3 tracking-wide flex items-center gap-2">
                   <Usb size={14} className="text-ft2-highlight" />
                   SID HARDWARE OUTPUT
@@ -839,43 +875,43 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       className="bg-ft2-bg border border-ft2-border text-ft2-text text-[10px] font-mono px-2 py-1" />
                   </div>
                 )}
-              </section>
+              </SettingsSection>
             </>
           )}
 
           {/* ═══════════════════════════════════════════════════════════════════
               ABOUT TAB
               ═══════════════════════════════════════════════════════════════════ */}
-          {s.activeTab === 'engines' && <PlaybackEnginesPanel />}
-          {s.activeTab === 'ai' && <AIKeysPanel />}
+          {!searching && s.activeTab === 'engines' && <PlaybackEnginesPanel />}
+          {!searching && s.activeTab === 'ai' && <AIKeysPanel />}
 
-          {s.activeTab === 'about' && (
+          {showTab('about') && (
             <>
-              <section>
+              <SettingsSection id="about">
                 <div className="text-ft2-textDim text-[10px] font-mono space-y-1 mb-4">
                   <div className="text-ft2-highlight font-bold">DEViLBOX v1.0.0</div>
                   <div>TB-303 Acid Tracker</div>
                   <div className="text-ft2-highlight">Settings are saved automatically</div>
                 </div>
-              </section>
+              </SettingsSection>
 
-              <section>
+              <SettingsSection id="modland">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-2 tracking-wide">MODLAND INTEGRATION</h3>
                 <p className="text-ft2-textDim text-[9px] font-mono mb-2">Contribution modal for unknown modules. Clear dismissed files to re-enable.</p>
                 <button onClick={() => { useModlandContributionModal.getState().clearDismissedHashes(); alert('Cleared'); }}
                   className="px-3 py-1.5 bg-transparent border border-ft2-border text-ft2-text text-[10px] font-mono hover:bg-ft2-rowEven transition-colors">
                   CLEAR DISMISSED FILES
                 </button>
-              </section>
+              </SettingsSection>
 
-              <section>
+              <SettingsSection id="workbench">
                 <h3 className="text-ft2-highlight text-xs font-bold mb-2 tracking-wide">WORKBENCH</h3>
                 <div className="text-[9px] text-ft2-textDim font-mono">
                   <span className="text-ft2-highlight">Tab</span> — hold for Exposé (fit all windows) · release to restore
                 </div>
-              </section>
+              </SettingsSection>
 
-              <section>
+              <SettingsSection id="danger-zone">
                 <h3 className="text-accent-error text-xs font-bold mb-2 tracking-wide">DANGER ZONE</h3>
                 <p className="text-ft2-textDim text-[9px] font-mono mb-2">Clear all state and reset to factory defaults. Your project will be lost if not exported.</p>
                 <button
@@ -886,9 +922,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                   className="px-3 py-1.5 bg-transparent border border-accent-error/60 text-accent-error text-[10px] font-mono hover:bg-accent-error/10 transition-colors">
                   CLEAR ALL STATE & RELOAD
                 </button>
-              </section>
+              </SettingsSection>
             </>
           )}
+          </SettingsVisibleSectionsContext.Provider>
         </div>
 
         {/* Footer */}
