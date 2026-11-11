@@ -78,6 +78,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   ems: 'public/data/songs/formats/je taime.ems',
   emsv6: 'public/data/songs/formats/perception.ems',
   mcmd: 'public/data/songs/formats/ep-trmonsterbusiness.mcmd',
+  wallyBeben: 'public/data/songs/formats/wicked.wb',
   fashionTracker: 'public/data/songs/fashion-tracker/ivory tover ii.ex',
   organya: 'public/data/songs/organya/obj0640-1.org',
   artOfNoise: 'public/data/songs/art-of-noise/inside.blipp.aon',

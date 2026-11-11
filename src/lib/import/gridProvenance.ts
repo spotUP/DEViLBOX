@@ -65,6 +65,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   dynamicSynthesizer: 'pass',
   riffRaff: 'pass',
   mcmd: 'pass',
+  wallyBeben: 'pass',
   fashionTracker: 'pass',
   davidHanney: 'pass',
   ems: 'pass',
@@ -152,6 +153,7 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
   dynamicSynthesizer: 'pass',
   riffRaff: 'pass',
   mcmd: 'pass',
+  wallyBeben: 'pass',
   fashionTracker: 'pass',
   davidHanney: 'pass',
   ems: 'pass',
@@ -285,6 +287,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   dynamicSynthesizer: 'fail',
   riffRaff: 'fail',
   mcmd: 'pass',
+  wallyBeben: 'fail',
   fashionTracker: 'pass',
   davidHanney: 'pass',
   ems: 'pass',
@@ -394,7 +397,6 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   coreDesign: 'U17',
   jankoMrsicFlogel: 'G11-jankoMrsicFlogel',
   nickPellingPacker: 'G11-nickPellingPacker',
-  wallyBeben: 'U16',
   steveBarrett: 'G11-steveBarrett',
   paulSummers: 'G11-paulSummers',
   desire: 'U26',
@@ -513,6 +515,8 @@ export const DIRECT_GRIDS: readonly string[] = [
   'riffRaff',
   // MCMD: the fixed 4-voice two-byte cell pool is the grid, read and written in place (MCMDParser.ts getCellFileOffset).
   'mcmd',
+  // Wally Beben: the phrase note bytes are the grid, read and written in place (WallyBebenParser.ts getCellFileOffset).
+  'wallyBeben',
   // EMS: the fixed 64-row 4-voice four-byte cell pool is the grid, read and written in place (EMSParser.ts getCellFileOffset).
   'ems',
   // EMS v6: the sub-song's track lists and pattern command streams read as a tick grid, each note cell tied to its note byte (EMSv6Parser.ts noteBytes), written in place by EmsV6Exporter.
