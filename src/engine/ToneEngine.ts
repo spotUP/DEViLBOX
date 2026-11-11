@@ -5593,6 +5593,15 @@ export class ToneEngine {
   public initChannelPitch(channelIndex: number, instrumentKey: number, baseFrequency: number, basePlaybackRate: number = 1): void { _initChannelPitch(this._channelCtx, channelIndex, instrumentKey, baseFrequency, basePlaybackRate); }
   public clearChannelPitch(channelIndex: number): void { _clearChannelPitch(this._channelCtx, channelIndex); }
   public setChannelMute(channelIndex: number, muted: boolean): void { _setChannelMute(this._channelCtx, channelIndex, muted); }
+  /**
+   * Mute the song's silenced channels inside every Furnace chip instrument. A chip's audio bypasses the
+   * channel strips (shared native synth on the synth bus), so the strip mute above never reaches it.
+   */
+  public applySongChannelMutesToChipSynths(songChannelMutes: readonly boolean[]): void {
+    this.instruments.forEach((instrument) => {
+      if (instrument instanceof FurnaceDispatchSynth) instrument.applySongChannelMutes(songChannelMutes);
+    });
+  }
   public setChannelStripDestination(channelIndex: number, destination: Tone.InputNode | null): void { _setChannelStripDestination(this._channelCtx, channelIndex, destination); }
   public setChannelStripDubTap(channelIndex: number, tap: Tone.InputNode | null): void { _setChannelStripDubTap(this._channelCtx, channelIndex, tap); }
   public setMixerChannelVolume(channelIndex: number, volumeDb: number): void { _setMixerChannelVolume(this._channelCtx, channelIndex, volumeDb); }
