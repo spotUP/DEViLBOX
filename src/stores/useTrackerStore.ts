@@ -7,6 +7,7 @@
 import { keepAcrossHmr } from '@/lib/dev/keepAcrossHmr';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { current } from 'immer';
 import type {
   ChannelData,
   Pattern,
@@ -371,6 +372,22 @@ function applyHistoryStep(action: HistoryAction, dir: 'undo' | 'redo'): void {
  * end (FT2's resize is undoable and clamps). This is the shared core both public
  * resize actions route through.
  */
+/**
+ * Insert a copy of pattern `index` right after it, inside a store update.
+ * `state.patterns[index]` is an immer draft there, and structuredClone refuses
+ * a draft ("#<Object> could not be cloned"), so the draft is read out with
+ * `current` first. Shared by clonePattern and duplicatePattern.
+ */
+function insertPatternCopy(state: { patterns: Pattern[]; patternOrder: number[] }, index: number): void {
+  const original = state.patterns[index];
+  const cloned: Pattern = structuredClone(current(original));
+  cloned.id = idGenerator.generate('pattern');
+  cloned.name = `${original.name} (Copy)`;
+  state.patterns.splice(index + 1, 0, cloned);
+  // Shift patternOrder indices that are > index to account for the splice
+  state.patternOrder = state.patternOrder.map((p) => (p > index ? p + 1 : p));
+}
+
 function resizeOne(index: number, newLength: number): void {
   const state0 = useTrackerStore.getState();
   if (index < 0 || index >= state0.patterns.length || newLength <= 0) return;
@@ -1578,13 +1595,7 @@ export const useTrackerStore = create<TrackerStore>()(
     clonePattern: (index) =>
       set((state) => {
         if (index >= 0 && index < state.patterns.length) {
-          const original = state.patterns[index];
-          const cloned: Pattern = structuredClone(original);
-          cloned.id = idGenerator.generate('pattern');
-          cloned.name = `${original.name} (Copy)`;
-          state.patterns.splice(index + 1, 0, cloned);
-          // Shift patternOrder indices that are > index to account for the splice
-          state.patternOrder = state.patternOrder.map((p) => (p > index ? p + 1 : p));
+          insertPatternCopy(state, index);
           // Add status message
           if (typeof window !== 'undefined') {
             import('@stores/useUIStore').then(({ useUIStore }) => {
@@ -1624,13 +1635,7 @@ export const useTrackerStore = create<TrackerStore>()(
     duplicatePattern: (index) =>
       set((state) => {
         if (index >= 0 && index < state.patterns.length) {
-          const original = state.patterns[index];
-          const cloned: Pattern = structuredClone(original);
-          cloned.id = idGenerator.generate('pattern');
-          cloned.name = `${original.name} (Copy)`;
-          state.patterns.splice(index + 1, 0, cloned);
-          // Shift patternOrder indices that are > index to account for the splice
-          state.patternOrder = state.patternOrder.map((p) => (p > index ? p + 1 : p));
+          insertPatternCopy(state, index);
           state.currentPatternIndex = index + 1;
         }
       }),
