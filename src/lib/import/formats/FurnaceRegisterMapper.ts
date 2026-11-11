@@ -3,6 +3,12 @@ import { FurnaceChipEngine, FurnaceChipType } from '@engine/chips/FurnaceChipEng
 import { getWavetableForChip } from '@constants/furnaceWavetablePresets';
 
 /**
+ * Slot register offsets of the OPN family (YM2203/2608/2610/2612), indexed by Furnace STORAGE
+ * operator index (fmshared_OPN.h opOffs).
+ */
+export const OPN_SLOT_OFFSETS: readonly number[] = [0x00, 0x04, 0x08, 0x0C];
+
+/**
  * FurnaceRegisterMapper
  * Translates Furnace instrument parameters into raw chip registers.
  * Currently supports OPN2 (Genesis) and OPM (Arcade).
@@ -48,11 +54,10 @@ export class FurnaceRegisterMapper {
     const b4Val = 0xC0 | ((ams & 3) << 4) | (fms & 7);
     engine.write(chip, regBase | (0xB4 + chanOffset), b4Val);
 
-    // 3. Map Operators - OPN2 slot offsets (from Furnace fmshared_OPN.h + fmsharedbase.h)
-    // opOffs = {0x00, 0x04, 0x08, 0x0C} for slots 0,1,2,3
-    // orderedOps = {0, 2, 1, 3} maps operator index to slot
-    // So: Op1→slot0→0x00, Op2→slot2→0x08, Op3→slot1→0x04, Op4→slot3→0x0C
-    const opOffsets = [0x00, 0x08, 0x04, 0x0C];
+    // 3. Map Operators: operators[j] is in Furnace storage order and is committed to slot
+    // offset opOffs[j] (genesis.cpp `state.op[j]` at `chanOffs|opOffs[j]`). orderedOps only
+    // translates user-facing effect operator numbers; it is not applied here.
+    const opOffsets = OPN_SLOT_OFFSETS;
 
     config.operators.forEach((op: FurnaceOperatorConfig, i: number) => {
       const opOff = opOffsets[i] + chanOffset;
@@ -595,7 +600,7 @@ export class FurnaceRegisterMapper {
     engine.write(chip, regBase | (0xB4 + chanOffset), b4Val);
 
     // Operator parameters - same slot mapping as OPN2
-    const opOffsets = [0x00, 0x08, 0x04, 0x0C];
+    const opOffsets = OPN_SLOT_OFFSETS;
 
     config.operators.forEach((op: FurnaceOperatorConfig, i: number) => {
       const opOff = opOffsets[i] + chanOffset;
@@ -650,7 +655,7 @@ export class FurnaceRegisterMapper {
     engine.write(chip, 0xB4 + chanOffset, b4Val);
 
     // Operator parameters - same slot mapping as OPN2
-    const opOffsets = [0x00, 0x08, 0x04, 0x0C];
+    const opOffsets = OPN_SLOT_OFFSETS;
 
     config.operators.forEach((op: FurnaceOperatorConfig, i: number) => {
       const opOff = opOffsets[i] + chanOffset;
@@ -710,7 +715,7 @@ export class FurnaceRegisterMapper {
     const b4Val = 0xC0 | ((ams & 3) << 4) | (fms & 7);
     engine.write(chip, regBase | (0xB4 + chanOffset), b4Val);
 
-    const opOffsets = [0x00, 0x08, 0x04, 0x0C];
+    const opOffsets = OPN_SLOT_OFFSETS;
 
     config.operators.forEach((op: FurnaceOperatorConfig, i: number) => {
       const opOff = opOffsets[i] + chanOffset;
