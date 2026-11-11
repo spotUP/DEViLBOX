@@ -9,11 +9,12 @@
 import { Router, type Request, type Response } from 'express';
 import { spawn, type ChildProcess } from 'child_process';
 import { resolve } from 'path';
-import { buildSystemPrompt } from '../ai/systemPrompt';
+import { buildSystemPrompt, trackerStateText } from '../ai/systemPrompt';
 import { BrowserChannel, deliverToolResult } from '../ai/browserChannel';
 import { freeAvailability, runFreeChat } from '../ai/freeProvider';
 import { visitorKey, vendorKey } from '../ai/limits';
 import { runVendorChat } from '../ai/vendorChat';
+import { agentErrorMessage, listAgentModels } from '../ai/anthropicAgent';
 import { VENDORS, checkOpenRouterKey, isVendorId, listVendorModels, type VendorId } from '../ai/vendors';
 import { ProviderError } from '../ai/toolLoop';
 import { scrub } from '../ai/vendorPost';
@@ -119,7 +120,7 @@ router.post('/chat', (req: Request, res: Response) => {
       signal: abort.signal,
     };
     const run = isVendorId(provider)
-      ? runVendorChat({ ...common, vendor: provider, visitorKey: vendorKey(req, provider) })
+      ? runVendorChat({ ...common, vendor: provider, visitorKey: vendorKey(req, provider), conversationId: convId, trackerState: trackerStateText(context) })
       : runFreeChat({ ...common, visitorKey: visitorKey(req) });
     void run.then((r) => { if (r.text) remember(convId, history, r.text); })
       .catch((e: unknown) => {
@@ -232,6 +233,29 @@ router.post('/check-key', async (req: Request, res: Response) => {
   } catch (e) {
     const err = e instanceof ProviderError ? e : new ProviderError('other', `Could not check the ${vendor === 'openrouter' ? 'OpenRouter' : VENDORS[vendor].label} key`);
     res.json({ ok: false, kind: err.kind, error: scrub(err.message, key) });
+  }
+});
+
+/**
+ * POST /api/ai/models — the models this key can chat with, for the model
+ * picker. Body: { vendor: 'anthropic' | 'openai' }, key in the vendor's
+ * header. The key is used for this call only, never stored or logged.
+ * Answers { ok: true, models: [{ id, label }] }.
+ */
+router.post('/models', async (req: Request, res: Response) => {
+  const vendor = (req.body as { vendor?: unknown } | undefined)?.vendor;
+  if (!isVendorId(vendor)) return res.status(400).json({ ok: false, kind: 'bad-request', error: 'Unknown vendor' });
+  const key = vendorKey(req, vendor);
+  if (!key) return res.json({ ok: false, kind: 'auth', error: 'No key was sent.' });
+  try {
+    const models = vendor === 'anthropic'
+      ? (await listAgentModels(key)).map((m) => ({ id: m.id, label: m.label }))
+      : (await listVendorModels(vendor, key)).map((id) => ({ id, label: id }));
+    res.json({ ok: true, models });
+  } catch (e) {
+    if (e instanceof ProviderError) return res.json({ ok: false, kind: e.kind, error: scrub(e.message, key) });
+    const error = vendor === 'anthropic' ? agentErrorMessage(e, key) : `Could not list the ${VENDORS[vendor].label} models`;
+    res.json({ ok: false, kind: 'other', error });
   }
 });
 

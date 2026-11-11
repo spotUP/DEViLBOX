@@ -7,12 +7,12 @@
  */
 
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
-import { useAIStore, AI_PROVIDERS, getModelsForProvider, type AIProvider } from '@stores/useAIStore';
+import { useAIStore, AI_PROVIDERS, modelOptionsFor, isVendorProvider, type AIProvider } from '@stores/useAIStore';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useTransportStore } from '@stores/useTransportStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
-import { sendMessage, stopStreaming, checkAIStatus, type AIStatus } from '@/services/aiChatService';
+import { sendMessage, stopStreaming, checkAIStatus, refreshVendorModels, type AIStatus } from '@/services/aiChatService';
 import { Button } from '@components/ui/Button';
 import { AIKeysPanel } from './AIKeysPanel';
 import { AISetupWizard } from './AISetupWizard';
@@ -22,7 +22,9 @@ import { AIMessage } from './AIMessage';
 import { AIInput } from './AIInput';
 import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 import { CollapsedPanelStrip } from '@components/ui/CollapsedPanelStrip';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Copy } from 'lucide-react';
+import { copyAIChatLog } from '@/utils/aiChatLog';
+import { notify } from '@stores/useNotificationStore';
 
 export const AIPanel: React.FC = () => {
   const isOpen = useAIStore((s) => s.isOpen);
@@ -71,6 +73,14 @@ export const AIPanel: React.FC = () => {
     if (isOpen && authStatus?.free?.available === false && !hasKey && !wizardSettled) openWizard();
   }, [isOpen, authStatus, hasKey, wizardSettled, openWizard]);
 
+  // A visitor's own key decides which models exist: read the list when the
+  // provider or its key changes, so the Model picker offers what the key can use.
+  const vendorModels = useAIStore((s) => s.vendorModels);
+  const vendorKey = useAIKeysStore((s) => (isVendorProvider(provider) ? s.keys[provider] : undefined));
+  useEffect(() => {
+    if (isOpen && isVendorProvider(provider)) void refreshVendorModels(provider);
+  }, [isOpen, provider, vendorKey]);
+
   // Opening (header click, Ctrl+L, toolbar menu) puts the cursor in the prompt.
   // Not on first mount: a panel restored as expanded must not steal focus.
   const wasOpen = useRef(isOpen);
@@ -87,6 +97,13 @@ export const AIPanel: React.FC = () => {
   const handleSend = useCallback((text: string) => {
     sendMessage(text);
   }, []);
+
+  // Reads the store at click time, so the log holds the turn that is still running too.
+  const handleCopyLog = async () => {
+    const copied = await copyAIChatLog(useAIStore.getState());
+    if (copied) notify.success('AI chat log copied');
+    else notify.error('Could not copy the AI chat log');
+  };
 
   const handleStop = useCallback(() => {
     stopStreaming();
@@ -135,6 +152,18 @@ export const AIPanel: React.FC = () => {
       <div className="flex items-center justify-between gap-2 px-2 py-1 bg-dark-bgSecondary border-b border-dark-border shrink-0">
         <span className="text-xs font-medium text-text-muted">AI Assistant</span>
         <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            data-testid="ai-copy-log"
+            onClick={handleCopyLog}
+            disabled={messages.length === 0}
+            title="Copy the whole chat log, with tool calls, to the clipboard"
+            className="text-[10px] font-mono"
+          >
+            <Copy size={12} />
+            Copy Log
+          </Button>
           <Button variant="ghost" size="sm" onClick={clearHistory} title="Clear chat history" className="text-[10px] font-mono">
             Clear
           </Button>
@@ -168,17 +197,17 @@ export const AIPanel: React.FC = () => {
           <CustomSelect
             value={model}
             onChange={setModel}
-            options={getModelsForProvider(provider).map((m) => ({ value: m.id, label: `${m.label} (${m.description})` }))}
+            options={modelOptionsFor(provider, vendorModels, model)}
             title="AI model"
             className="flex-1 min-w-0 px-2 py-0.5 text-[10px] font-mono bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary"
           />
         </label>
       </div>
 
-      {provider === 'free' && (
+      {(provider === 'free' || activeModel) && (
         <div className="px-3 py-1 bg-dark-bgSecondary border-b border-dark-border text-[10px] font-mono text-text-muted">
-          <div>Free models via OpenRouter. Answers may be slower.</div>
-          {activeModel && <div>Answered by {activeModel}</div>}
+          {provider === 'free' && <div>Free models via OpenRouter. Answers may be slower.</div>}
+          {activeModel && <div data-testid="ai-active-model">Answered by {activeModel}</div>}
         </div>
       )}
 
