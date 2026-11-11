@@ -488,6 +488,14 @@
       "cells": 62660,
       "bytes": 62660
     },
+    "soundPlayer": {
+      "exporter": "SoundPlayerExporter.exportSoundPlayer",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 5991,
+      "bytes": 5991
+    },
     "soundMon": {
       "exporter": "SMON (SoundMonExporter)",
       "tier": "byte-exact",
