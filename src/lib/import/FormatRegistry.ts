@@ -91,6 +91,10 @@ export function detectFormatFromContent(filename: string, bytes: Uint8Array): Fo
       // parser rejects them.
       if (ascii(952, 'KRIS')) return byKey('kris');
       break;
+    case 'ems':
+      // EMS 1.24 and EMS v6 share .ems; v6 carries the tag 'E.M.S. V6' at offset 0.
+      if (ascii(0, 'E.M.S. V6')) return byKey('emsv6');
+      break;
     case 'pmd':
       // Studio Pixel PiyoPiyo starts 'PMD'; PC-98 PMD98 files start with a version byte.
       if (ascii(0, 'PMD')) return byKey('piyoPiyo');
