@@ -109,6 +109,7 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
   jochenHippelST: 'pass',
   jxs: 'pass',
   kdm: 'pass',
+  artOfNoise: 'pass',
   organya: 'pass',
   piyoPiyo: 'pass',
   maxTrax: 'pass',
@@ -203,6 +204,7 @@ export const LIVE_EDIT_WHY: Record<string, string> = {
  */
 export type AddOnEmptyRow = 'pass' | 'fail' | 'n/a';
 export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
+  artOfNoise: 'pass',
   '669': 'n/a',
   actionamics: 'pass',
   // activisionPro: a note on a blank row is cut into the covering rest or held-note event (activisionProGrid.ts).

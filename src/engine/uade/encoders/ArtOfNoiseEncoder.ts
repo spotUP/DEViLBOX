@@ -80,6 +80,6 @@ function encodeAONCell(cell: TrackerCell): Uint8Array {
   return out;
 }
 
-registerPatternEncoder('aon', () => encodeAONCell);
+registerPatternEncoder('artOfNoise', () => encodeAONCell);
 
 export { encodeAONCell };

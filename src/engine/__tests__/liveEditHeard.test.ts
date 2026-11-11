@@ -96,6 +96,8 @@ const FILE: Record<string, string> = {
   soundfx: files.find((f) => f.endsWith('.sfx')) ?? '',
   // the extension match finds a 114-byte Organya song without notes first (formats/cave_story_-_42_-_xxxx.org)
   organya: 'organya/obj0640-1.org',
+  // the prefix match finds a SunTronic instrument file (aon.x) first; the real module is under art-of-noise/
+  artOfNoise: 'art-of-noise/inside.blipp.aon',
   // the `digi.` prefix match finds an Ad Lib capture (digi.rad) that no content detector rejects
   digi: 'digibooster/the day after.digi',
 };
@@ -140,7 +142,7 @@ const UNCONFIRMED: string[] = [];
  */
 export const UNMEASURED: Record<string, string> = {
   dmf: 'import needs the Furnace WASM (FurnaceFileOps.js) the node run cannot load',
-  artOfNoise: 'plays on the ArtOfNoise worklet (WASM), which the node run cannot render', steveTurner: 'import needs an AudioContext (ToneEngine)',
+  steveTurner: 'import needs an AudioContext (ToneEngine)',
   goatTracker: 'import needs an AudioContext (ToneEngine)', anders0land: 'import needs an AudioContext (ToneEngine)',
   fmTracker: 'import needs an AudioContext (ToneEngine)', imagoOrpheus: 'import needs an AudioContext (ToneEngine)',
   cdfm67: 'import needs an AudioContext (ToneEngine)', karlMorton: 'import needs an AudioContext (ToneEngine)',
