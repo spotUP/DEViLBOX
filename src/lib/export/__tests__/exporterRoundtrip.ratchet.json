@@ -695,6 +695,14 @@
       "matchPct": 1,
       "cells": 45394,
       "bytes": 45394
+    },
+    "jesperOlsen": {
+      "exporter": "JesperOlsenExporter.exportJesperOlsen",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 8484,
+      "bytes": 8484
     }
   },
   "missingFixture": [
