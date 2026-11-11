@@ -26,3 +26,25 @@ export function chipChannelFor(channelIndex: number, chipChannels: number, previ
   }
   return channelIndex % count;
 }
+
+/**
+ * Which chip channels to mute for a song's channel mutes.
+ *
+ * Tracker channels map onto the chip with chipChannelFor (channel % count), so
+ * one chip channel can carry several song channels (an 8-channel song on a
+ * 4-channel Game Boy puts song channels 0 and 4 on chip channel 0). A chip
+ * channel is muted only when every song channel that maps onto it is muted;
+ * a chip channel no song channel maps onto stays open (live notes play there).
+ */
+export function chipChannelMutes(songChannelMutes: readonly boolean[], chipChannels: number): boolean[] {
+  const count = Math.max(1, chipChannels);
+  const fed = new Array<boolean>(count).fill(false);
+  const open = new Array<boolean>(count).fill(false);
+  songChannelMutes.forEach((muted, ch) => {
+    if (ch >= LIVE_VOICE_BASE_CHANNEL) return;
+    const c = chipChannelFor(ch, count);
+    fed[c] = true;
+    if (!muted) open[c] = true;
+  });
+  return fed.map((isFed, c) => isFed && !open[c]);
+}

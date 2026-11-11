@@ -20,6 +20,7 @@ import type { FurnaceConfig } from '@typedefs/instrument';
 import { FurnaceChipType } from '@engine/chips/FurnaceChipEngine';
 import { getToneEngine } from '@engine/ToneEngine';
 import { fitFmToChip } from './fmInstrument';
+import { chipChannelMutes } from './chipChannel';
 
 // DivInstrumentType constants (matching FurnaceInstrumentEncoder)
 const DIV_INS_FM = 1;
@@ -1233,6 +1234,19 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
         this.engine.noteOff(ch, this.platformType);
       }
     }
+  }
+
+  /**
+   * Mute this chip's channels for the song's channel mutes.
+   *
+   * The chip's audio goes to the synth bus, not through the channel strips, so
+   * a channel-strip mute never reaches it; the replayer's skipped note-ons only
+   * stop NEW notes. The chip's own per-channel mute silences a note that is
+   * already sounding and keeps its state, so unmuting brings it back.
+   */
+  applySongChannelMutes(songChannelMutes: readonly boolean[]): void {
+    const mutes = chipChannelMutes(songChannelMutes, this.getNumChannels() || 3);
+    mutes.forEach((muted, chan) => this.engine.mute(chan, muted, this.platformType));
   }
 
   /**

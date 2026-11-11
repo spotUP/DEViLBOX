@@ -1791,6 +1791,13 @@ export class TrackerReplayer {
    */
   setChannelMuteMask(mask: number): void {
     this.channelMuteMask = mask;
+    // Furnace chip instruments sound on the synth bus, past the channel strips: mute their chip channels so a
+    // note already sounding goes silent. Not for a DJ deck (ToneEngine's chips are the tracker's), and not in
+    // the Furnace editor, where the mixer already mutes the song's chip channels song-wide.
+    if (!this.isDJDeck && this.song && useFormatStore.getState().editorMode !== 'furnace') {
+      const songChannelMutes = Array.from({ length: this.song.numChannels }, (_, ch) => ch < 32 && (mask & (1 << ch)) === 0);
+      getToneEngine().applySongChannelMutesToChipSynths(songChannelMutes);
+    }
     // Forward to the active WASM engine for actual channel muting.
     if (this._activeWasmEngine) {
       this._activeWasmEngine.setMuteMask(mask);
