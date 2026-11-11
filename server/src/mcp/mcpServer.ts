@@ -11,6 +11,7 @@ import { config as loadEnv } from 'dotenv';
 import { readFile, readdir, stat as fsStat } from 'fs/promises';
 import { basename, dirname, join, resolve } from 'path';
 import { callBrowser as relayCallBrowser } from './wsRelay';
+import { NEO_GEO_COMPOSING_DOC, NEO_GEO_COMPOSING_TOPIC } from '../ai/neoGeoComposing';
 import { resolveCompanions, modlandListing, type CompanionListing } from '../../../src/lib/import/companionResolver';
 
 /** Sample subdirectories a module may own. Listed when present, by their name as on disk. */
@@ -2174,8 +2175,10 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
     'List all available MCP tools grouped by category with brief descriptions. Use this to discover what DEViLBOX can do. Optionally filter by category.',
     {
       category: z.string().optional().describe('Filter by category name (e.g., "transport", "mixer", "pattern", "synth", "modland", "hvsc", "performance")'),
+      topic: z.string().optional().describe('Return a help topic instead of the tool list. Topics: "neo-geo-composing" (effect commands that reach the YM2610 chip)'),
     },
     async (p) => {
+      if (p.topic === NEO_GEO_COMPOSING_TOPIC) return textResult(NEO_GEO_COMPOSING_DOC);
       const categories: Record<string, Array<{ tool: string; description: string }>> = {
         'Song & Project': [
           { tool: 'get_song_info', description: 'Song state: BPM, speed, channels, patterns, order' },
