@@ -365,6 +365,12 @@ export interface FurnaceConfig {
    * type follows the chip type (FM for OPNB).
    */
   divInsType?: number;
+  /**
+   * The user's own PCM sample for a Neo Geo ADPCM-A / ADPCM-B voice. The
+   * synth appends it to the module sample list and points amiga.initSample
+   * at it; the dispatch core converts the 16-bit PCM to the chip's ADPCM.
+   */
+  userSample?: FurnaceUserSample;
 
   // FM parameters
   algorithm: number;     // 0-7 (operator connection algorithm)
@@ -446,4 +452,11 @@ export interface FurnaceConfig {
     loopEnabled: boolean;
     loopMode?: number;  // 0=forward, 1=backward, 2=ping-pong
   };
+}
+
+/** A user-supplied 16-bit PCM sample (see FurnaceConfig.userSample). */
+export interface FurnaceUserSample {
+  data: Int16Array;
+  rate: number;
+  name: string;
 }

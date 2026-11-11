@@ -14,6 +14,9 @@ import { Knob } from '@components/controls/Knob';
 import { Toggle } from '@components/controls/Toggle';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { Button } from '@components/ui/Button';
+import { notify } from '@stores/useNotificationStore';
+import { parseWavToAudioBuffer } from '@utils/audio/wavParser';
+import { OPNB_VOICE_KINDS, SSG_MACRO_LABELS, isOpnbChipType, opnbFirstChannel, opnbVoiceKind, withSsgDefaultMacros } from '@engine/furnace-dispatch/opnbVoices';
 import { TabStrip } from '@components/ui/TabStrip';
 import { resolveColor, toneColor, type ControlTone } from '@components/ui/controlColor';
 import {
@@ -213,6 +216,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
   // selectedOp: displayed operator number, 1-4 as on the chip (null = none)
   const [selectedOp, setSelectedOp] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sampleInputRef = useRef<HTMLInputElement>(null);
   const configRef = useRef(config);
 
   // Keep configRef in sync
@@ -313,6 +317,33 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
   const diagramLabels = operatorCount === 2 ? TWO_OPERATOR_DIAGRAM_LABELS : undefined;
   const macroStorageIndex = macroOperator === null ? null : displayOrder[macroOperator - 1] ?? null;
 
+  // YM2610 / YM2610B: one chip, four voice kinds. Only the FM kind has operators.
+  const neoKind = isOpnbChipType(config.chipType) ? opnbVoiceKind(config.divInsType) : null;
+  const showFmPanels = category === "FM" && (!neoKind || neoKind.id === 'fm');
+
+  const setVoiceKind = (id: string) => {
+    const kind = OPNB_VOICE_KINDS.find((k) => k.id === id);
+    if (!kind) return;
+    const updates: Partial<FurnaceConfig> = {
+      divInsType: kind.divInsType,
+      previewChannel: opnbFirstChannel(config.chipType, kind.divInsType),
+    };
+    if (kind.id === 'ssg') updates.macros = withSsgDefaultMacros(configRef.current.macros).macros;
+    pushLiveUpdate(updates);
+    if (kind.id === 'fm') setActiveTab('fm');
+  };
+
+  const loadAdpcmSample = async (file: File) => {
+    try {
+      const audio = parseWavToAudioBuffer(await file.arrayBuffer());
+      const floats = audio.getChannelData(0);
+      const data = Int16Array.from(floats, (x) => Math.max(-32768, Math.min(32767, Math.round(x * 32767))));
+      pushLiveUpdate({ userSample: { data, rate: audio.sampleRate, name: file.name } });
+    } catch (err) {
+      notify.error(`Could not load sample: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
   const mainTabs: Array<{ id: 'fm' | 'macros' | 'chip'; label: string }> = [
     { id: 'fm', label: 'Operators' },
     { id: 'macros', label: 'Macros' },
@@ -342,6 +373,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
           macros={config.macros}
           onChange={(macros) => onChange({ macros: macros as FurnaceMacro[] })}
           chipType={config.chipType}
+          labels={neoKind?.id === 'ssg' ? SSG_MACRO_LABELS : undefined}
         />
       ) : (
         <MacroListEditor
@@ -389,13 +421,49 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
         </div>
       </div>
 
+      {/* Neo Geo voice kind */}
+      {neoKind && (
+        <div className="bg-dark-bgSecondary p-3 rounded-lg border border-dark-border flex flex-wrap items-center gap-3">
+          <span className="text-[10px] font-mono text-text-muted">Voice</span>
+          <CustomSelect
+            value={neoKind.id}
+            onChange={setVoiceKind}
+            options={OPNB_VOICE_KINDS.map((k) => ({ value: k.id, label: k.label }))}
+            className="text-xs"
+          />
+          {(neoKind.id === 'adpcma' || neoKind.id === 'adpcmb') && (
+            <>
+              <Button variant="default" size="sm" onClick={() => sampleInputRef.current?.click()}>
+                <FileUp size={14} /> Load Sample
+              </Button>
+              <input
+                ref={sampleInputRef}
+                type="file"
+                accept=".wav"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void loadAdpcmSample(file);
+                  e.target.value = '';
+                }}
+              />
+              <span className="text-[10px] font-mono text-text-muted">
+                {config.userSample
+                  ? `${config.userSample.name} (${config.userSample.data.length} samples at ${config.userSample.rate} Hz)`
+                  : 'No sample loaded. The voice is silent until a WAV file is loaded.'}
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Tab Navigation */}
-      {category === "FM" && (
+      {showFmPanels && (
         <TabStrip tabs={mainTabs} active={activeTab} onChange={setActiveTab} ariaLabel="Instrument editor sections" />
       )}
 
       {/* FM OPERATOR PANEL */}
-      {category === "FM" && activeTab === 'fm' && (
+      {showFmPanels && activeTab === 'fm' && (
         <div className="space-y-3">
           {/* Algorithm: current routing, all routings to pick from, voice controls */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
@@ -529,7 +597,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
       )}
 
       {/* MACROS TAB */}
-      {category === "FM" && activeTab === 'macros' && (
+      {showFmPanels && activeTab === 'macros' && (
         <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
           <div className="flex items-center gap-2 mb-4">
             <Activity size={16} className="text-accent-secondary" />
@@ -542,7 +610,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
       )}
 
       {/* CHIP SETTINGS TAB */}
-      {category === "FM" && activeTab === 'chip' && (
+      {showFmPanels && activeTab === 'chip' && (
         <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border">
           <div className="flex items-center gap-2 mb-4">
             <Settings size={16} className="text-accent-highlight" />
@@ -704,7 +772,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
       )}
 
       {/* MACROS PANEL (for non-FM categories) */}
-      {category !== "FM" && (
+      {!showFmPanels && (
         <div className="bg-dark-bgSecondary p-4 rounded-lg border border-dark-border animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center gap-2 mb-4">
             <Activity size={16} className="text-accent-secondary" />

@@ -37,6 +37,8 @@ interface MacroListEditorProps {
   onChange: (macros: FurnaceMacro[]) => void;
   chipType?: number;
   playbackPositions?: Record<number, number>; // macroType → current playback step
+  /** Names to show, and the only macro types offered by Add, when a voice uses a few slots with its own meaning (SSG). */
+  labels?: Readonly<Record<number, string>>;
 }
 
 // ── Macro type metadata ────────────────────────────────────────────────────────
@@ -633,7 +635,9 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
   macros,
   onChange,
   playbackPositions,
+  labels,
 }) => {
+  const typeNames = labels ?? MACRO_TYPE_NAMES;
   const [showAddMenu, setShowAddMenu] = useState(false);
 
   const getMacroRange = (macroType: number): { min: number; max: number; bipolar: boolean } => {
@@ -685,7 +689,7 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
   };
 
   // Types not yet added
-  const availableTypes = Object.entries(MACRO_TYPE_NAMES)
+  const availableTypes = Object.entries(typeNames)
     .filter(([typeNum]) => !macros.some(m => m.type === parseInt(typeNum)))
     .map(([typeNum, name]) => ({ type: parseInt(typeNum), name }));
 
@@ -703,7 +707,7 @@ export const MacroListEditor: React.FC<MacroListEditorProps> = ({
                   style={{ backgroundColor: getMacroColor(macro.type) }}
                 />
                 <span className="font-mono text-[10px] font-bold text-text-primary">
-                  {MACRO_TYPE_NAMES[macro.type] || `Macro ${macro.type}`}
+                  {typeNames[macro.type] || MACRO_TYPE_NAMES[macro.type] || `Macro ${macro.type}`}
                 </span>
                 {typeof playbackPositions?.[macro.type] === 'number' && (
                   <span className="text-[9px] text-yellow-400">▶ {playbackPositions[macro.type]}</span>
