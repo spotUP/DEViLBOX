@@ -61,6 +61,23 @@ export function fmAlgorithm(algorithm: number, operatorCount: number): FmAlgorit
   return table[index];
 }
 
+/** Storage indices of the operators that reach the output (derived from the algorithm table and the display order). */
+export function fmCarrierStorageIndices(algorithm: number, operatorCount: number): number[] {
+  const order = fmOperatorDisplayOrder(operatorCount);
+  return fmAlgorithm(algorithm, operatorCount).carriers.map((operatorNumber) => order[operatorNumber - 1]).sort((a, b) => a - b);
+}
+
+/**
+ * Operator data written as the chip manual numbers it (operator 1, 2, 3, 4) in storage order
+ * (operator 1, 3, 2, 4). Four-operator lists swap entries 1 and 2; other lengths pass through.
+ */
+export function fmOperatorsFromManualOrder<T>(operators: ReadonlyArray<T>): T[] {
+  const stored = [...operators];
+  if (stored.length !== 4) return stored;
+  const order = FM_FOUR_OPERATOR_DISPLAY_ORDER; // the swap is its own inverse
+  return order.map((index) => stored[index]);
+}
+
 /** How many algorithms a chip with this many operators has. */
 export function fmAlgorithmCount(operatorCount: number): number {
   return (operatorCount === 2 ? FM_TWO_OPERATOR_ALGORITHMS : FM_FOUR_OPERATOR_ALGORITHMS).length;
