@@ -65,6 +65,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   dynamicSynthesizer: 'pass',
   riffRaff: 'pass',
   mcmd: 'pass',
+  davidHanney: 'pass',
   ems: 'pass',
   howieDavies: 'pass',
   soundProgrammingLanguage: 'pass',
@@ -149,6 +150,7 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
   dynamicSynthesizer: 'pass',
   riffRaff: 'pass',
   mcmd: 'pass',
+  davidHanney: 'pass',
   ems: 'pass',
   howieDavies: 'pass',
   synthesis: 'pass',
@@ -280,6 +282,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   dynamicSynthesizer: 'fail',
   riffRaff: 'fail',
   mcmd: 'pass',
+  davidHanney: 'pass',
   ems: 'pass',
   howieDavies: 'fail',
   synthesis: 'pass',
@@ -428,7 +431,6 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   uade_fc_bsi: 'G11-uade-only',
   uade_cust: 'G11-uade-only',
   uade_custom: 'G11-uade-only',
-  uade_dh: 'U28',
   uade_dz: 'U27',
   uade_mkiio: 'G11-uade-only',
   uade_mg: 'G11-uade-only',
@@ -510,6 +512,8 @@ export const DIRECT_GRIDS: readonly string[] = [
   'mcmd',
   // EMS: the fixed 64-row 4-voice four-byte cell pool is the grid, read and written in place (EMSParser.ts getCellFileOffset).
   'ems',
+  // David Hanney: the BLK chunk row pools are the grid, read and written in place (DavidHanneyParser.ts getCellFileOffset).
+  'davidHanney',
   // Howie Davies: the position lists and patterns decode to a read-only tick grid (howieDaviesGrid.ts), no oracle yet.
   'howieDavies',
 ];

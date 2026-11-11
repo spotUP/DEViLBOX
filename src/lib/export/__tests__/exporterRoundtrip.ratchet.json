@@ -624,6 +624,14 @@
       "cells": 63356,
       "bytes": 63356
     },
+    "davidHanney": {
+      "exporter": "DavidHanneyExporter.exportDavidHanney",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 3402,
+      "bytes": 3402
+    },
     "ems": {
       "exporter": "EmsExporter.exportEms",
       "tier": "byte-exact",

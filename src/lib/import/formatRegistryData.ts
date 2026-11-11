@@ -2358,6 +2358,20 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
 
+  // ── David Hanney (.dh) ───────────────────────────────────────────────────
+  {
+    key: 'davidHanney',
+    label: 'David Hanney',
+    description: 'David Hanney (.dh) - DSNG block chunks, four-voice patterns as the grid, note edits saved in place; nuade / UADE plays the module',
+    family: 'amiga-native',
+    matchMode: 'both',
+    extRegex: /\.dh$/i,
+    prefixes: ['dh.'],
+    prefKey: 'davidHanney',
+    nativeParser: { module: '@lib/import/formats/DavidHanneyParser', parseFn: 'parseDavidHanneyFile', detectFn: 'isDavidHanneyFormat' },
+    uadeFallback: true,
+  },
+
   // ── EMS (.ems) ───────────────────────────────────────────────────────────
   {
     key: 'ems',
@@ -2599,7 +2613,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     ['abk', 'AMOS'], ['agi', 'Sierra AGI'],
     ['bfc', 'FutureComposer-BSI'], ['bsi', 'BSI'], ['fc-bsi', 'FC-BSI'],
     ['cus', 'Custom'], ['cust', 'Custom'], ['custom', 'Custom'],
-    ['dh', 'David Hanney'], ['dz', 'Darius Zendeh'],
+    ['dz', 'Darius Zendeh'],
     ['mkiio', 'Mark II (O)'],
     ['mg', 'MG'], ['emsv6', 'EMS v6'],
     ['fw', 'Forgotten Worlds'],
