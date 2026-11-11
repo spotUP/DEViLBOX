@@ -4,7 +4,7 @@
  * output format. Each stub records its argv + env to a sentinel file, so the
  * test proves the stub RAN and the parsed text reached the SSE response.
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import express from 'express';
 import type { Server } from 'http';
 import { mkdtempSync, writeFileSync, chmodSync, readFileSync, existsSync, rmSync } from 'fs';
@@ -14,6 +14,7 @@ import aiRoutes from '../routes/ai';
 import { setFreeProviderFetch } from './freeProvider';
 import { resetModelCatalogue } from './freeModels';
 import { resetModelCosts } from './modelCosts';
+import { resetAgentHistory, resetAgentModelCache } from './anthropicAgent';
 
 let dir: string;
 let server: Server;
@@ -127,7 +128,7 @@ describe('POST /api/ai/chat provider free (reachability)', () => {
     const headers = new Headers(init?.headers);
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) as Record<string, unknown> : null;
     calls.push({ url, auth: headers.get('authorization'), body });
-    if (url.endsWith('/models')) return new Response(JSON.stringify({ data: MODELS }), { status: 200 });
+    if (pathOf(url).endsWith('/models')) return new Response(JSON.stringify({ data: MODELS }), { status: 200 });
     completions++;
     const messages = (body?.messages ?? []) as Array<{ role: string }>;
     const answered = messages.some((m) => m.role === 'tool');
@@ -220,6 +221,56 @@ describe('POST /api/ai/chat provider free (reachability)', () => {
   });
 });
 
+/** The Anthropic model list as the SDK pages it: two chat models with display names. */
+const ANTHROPIC_MODELS = {
+  data: [
+    { type: 'model', id: 'claude-sonnet-5-5', display_name: 'Claude Sonnet 5.5', max_tokens: 64000 },
+    { type: 'model', id: 'claude-haiku-5-5', display_name: 'Claude Haiku 5.5', max_tokens: 64000 },
+  ],
+  has_more: false, first_id: 'claude-sonnet-5-5', last_id: 'claude-haiku-5-5',
+};
+
+/** The model list as Anthropic sends it: the SDK parses a body as JSON only when the content type says so. */
+function anthropicModelList(): Response {
+  return new Response(JSON.stringify(ANTHROPIC_MODELS), { status: 200, headers: { 'content-type': 'application/json' } });
+}
+
+type SseBlock =
+  | { type: 'text'; deltas: string[] }
+  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> };
+
+/** One streamed Messages API reply, in the vendor's own server-sent event format. */
+function anthropicSse(blocks: SseBlock[], stopReason: string): Response {
+  const events: Array<Record<string, unknown>> = [{
+    type: 'message_start',
+    message: { id: 'msg_test', type: 'message', role: 'assistant', model: 'claude-sonnet-5-5', content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 10, output_tokens: 0 } },
+  }];
+  blocks.forEach((block, index) => {
+    if (block.type === 'text') {
+      events.push({ type: 'content_block_start', index, content_block: { type: 'text', text: '' } });
+      for (const text of block.deltas) events.push({ type: 'content_block_delta', index, delta: { type: 'text_delta', text } });
+    } else {
+      events.push({ type: 'content_block_start', index, content_block: { type: 'tool_use', id: block.id, name: block.name, input: {} } });
+      events.push({ type: 'content_block_delta', index, delta: { type: 'input_json_delta', partial_json: JSON.stringify(block.input) } });
+    }
+    events.push({ type: 'content_block_stop', index });
+  });
+  events.push({ type: 'message_delta', delta: { stop_reason: stopReason, stop_sequence: null }, usage: { output_tokens: 20 } });
+  events.push({ type: 'message_stop' });
+  const text = events.map((e) => `event: ${String(e.type)}\ndata: ${JSON.stringify(e)}\n\n`).join('');
+  return new Response(text, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+}
+
+/** How many tool results the request body carries: the round the stubbed model is on. */
+function toolResultCount(body: Record<string, unknown> | null): number {
+  return (JSON.stringify(body?.messages ?? []).match(/"type":"tool_result"/g) ?? []).length;
+}
+
+/** The path of a vendor URL without its query: the Anthropic SDK lists models at /v1/models?limit=100. */
+function pathOf(url: string): string {
+  return new URL(url).pathname;
+}
+
 describe('POST /api/ai/chat with a visitor Anthropic or OpenAI key (FA-14)', () => {
   const calls: Array<{ url: string; headers: Headers; body: Record<string, unknown> | null }> = [];
 
@@ -228,15 +279,15 @@ describe('POST /api/ai/chat with a visitor Anthropic or OpenAI key (FA-14)', () 
     const headers = new Headers(init?.headers);
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) as Record<string, unknown> : null;
     calls.push({ url, headers, body });
-    if (url.endsWith('/models')) {
-      const data = url.includes('anthropic') ? [{ id: 'claude-sonnet-5-5' }] : [{ id: 'gpt-5-mini' }, { id: 'whisper-1' }];
-      return new Response(JSON.stringify({ data }), { status: 200 });
+    if (pathOf(url).endsWith('/models')) {
+      if (url.includes('anthropic')) return anthropicModelList();
+      return new Response(JSON.stringify({ data: [{ id: 'gpt-5-mini' }, { id: 'whisper-1' }] }), { status: 200 });
     }
     if (url.includes('anthropic')) {
-      const answered = JSON.stringify(body?.messages).includes('tool_result');
-      return new Response(JSON.stringify(answered
-        ? { content: [{ type: 'text', text: 'The song is Test Song.' }], stop_reason: 'end_turn' }
-        : { content: [{ type: 'tool_use', id: 'u1', name: 'get_song_info', input: {} }], stop_reason: 'tool_use' }), { status: 200 });
+      const answered = toolResultCount(body) > 0;
+      return answered
+        ? anthropicSse([{ type: 'text', deltas: ['The song is ', 'Test Song.'] }], 'end_turn')
+        : anthropicSse([{ type: 'tool_use', id: 'u1', name: 'get_song_info', input: {} }], 'tool_use');
     }
     const answered = ((body?.messages ?? []) as Array<{ role: string }>).some((m) => m.role === 'tool');
     const message = answered
@@ -280,18 +331,20 @@ describe('POST /api/ai/chat with a visitor Anthropic or OpenAI key (FA-14)', () 
 
   beforeAll(() => { setFreeProviderFetch(stubVendorFetch); });
   afterAll(() => { setFreeProviderFetch(null); });
+  beforeEach(() => { resetAgentModelCache(); resetAgentHistory(); });
 
   it.each([
-    ['anthropic', 'x-anthropic-key', 'sk-ant-test', 'x-api-key', 'sk-ant-test', 'messages'],
+    // The Anthropic SDK sends the key as a bearer token
+    ['anthropic', 'x-anthropic-key', 'sk-ant-test', 'authorization', 'Bearer sk-ant-test', 'messages'],
     ['openai', 'x-openai-key', 'sk-test', 'authorization', 'Bearer sk-test', 'chat/completions'],
   ])('%s: the visitor key reaches the models and chat URLs, tool_call round trip, final text, key in no event', async (provider, header, key, sent, sentValue, chatPath) => {
     calls.length = 0;
     const events = await vendorChat(provider, { [header]: key });
-    const models = calls.filter((c) => c.url.endsWith('/models'));
-    const chats = calls.filter((c) => c.url.endsWith(chatPath));
+    const models = calls.filter((c) => pathOf(c.url).endsWith('/models'));
+    const chats = calls.filter((c) => pathOf(c.url).endsWith(chatPath));
     expect(models).toHaveLength(1); // sentinel: the stubbed vendor ran
     expect(chats.length).toBeGreaterThanOrEqual(2);
-    expect([...models, ...chats].every((c) => c.headers.get(sent) === sentValue)).toBe(true);
+    expect([...models, ...chats].map((c) => `${pathOf(c.url)} ${c.headers.get(sent)}`)).toEqual([...models, ...chats].map((c) => `${pathOf(c.url)} ${sentValue}`));
     expect(events.find((e) => e.type === 'tool_call')).toMatchObject({ method: 'get_song_info' });
     expect(events.filter((e) => e.type === 'text').map((e) => e.content).join('')).toBe('The song is Test Song.');
     expect(events[events.length - 1]).toMatchObject({ type: 'done', code: 0 });
@@ -329,11 +382,107 @@ describe('POST /api/ai/chat with a visitor Anthropic or OpenAI key (FA-14)', () 
       });
       return r.text();
     };
-    expect(JSON.parse(await check('anthropic', 'x-anthropic-key', 'sk-ant-test'))).toEqual({ ok: true, models: 1 });
+    expect(JSON.parse(await check('anthropic', 'x-anthropic-key', 'sk-ant-test'))).toEqual({ ok: true, models: 2 });
     setFreeProviderFetch(async () => new Response(JSON.stringify({ error: { message: 'bad sk-ant-nope' } }), { status: 401 }));
     const bad = await check('anthropic', 'x-anthropic-key', 'sk-ant-nope');
     setFreeProviderFetch(stubVendorFetch);
     expect(JSON.parse(bad)).toMatchObject({ ok: false, kind: 'auth' });
     expect(bad).not.toContain('sk-ant-nope');
+  });
+  it('anthropic composes past three tool rounds: every call runs, text streams in pieces, the composer tools are offered and batch is not', async () => {
+    const ROUNDS = 6;
+    calls.length = 0;
+    setFreeProviderFetch(async (input, init) => {
+      const url = String(input);
+      const body = typeof init?.body === 'string' ? JSON.parse(init.body) as Record<string, unknown> : null;
+      calls.push({ url, headers: new Headers(init?.headers), body });
+      if (pathOf(url).endsWith('/models')) return anthropicModelList();
+      const round = toolResultCount(body);
+      return round < ROUNDS
+        ? anthropicSse([{ type: 'text', deltas: [`Step ${round}.`] }, { type: 'tool_use', id: `u${round}`, name: 'get_song_info', input: {} }], 'tool_use')
+        : anthropicSse([{ type: 'text', deltas: ['All ', 'done.'] }], 'end_turn');
+    });
+    const events = await vendorChat('anthropic', { 'x-anthropic-key': 'sk-ant-test' });
+    setFreeProviderFetch(stubVendorFetch);
+
+    const chats = calls.filter((c) => pathOf(c.url).endsWith('messages'));
+    expect(chats).toHaveLength(ROUNDS + 1); // sentinel: the streaming loop ran every round
+    expect(events.filter((e) => e.type === 'tool_call')).toHaveLength(ROUNDS);
+    expect(events.filter((e) => e.type === 'tool_use')).toHaveLength(ROUNDS);
+    const results = events.filter((e) => e.type === 'tool_result');
+    expect(results).toHaveLength(ROUNDS);
+    expect(results.every((e) => e.ok === true && String(e.result).includes('Test Song'))).toBe(true);
+    const pieces = events.filter((e) => e.type === 'text').map((e) => String(e.content));
+    expect(pieces.slice(-2)).toEqual(['\n\nAll ', 'done.']);
+    expect(events.find((e) => e.type === 'model')).toMatchObject({ model: 'claude-sonnet-5-5' });
+    expect(events.some((e) => e.type === 'error')).toBe(false);
+    expect(events[events.length - 1]).toMatchObject({ type: 'done', code: 0 });
+
+    const first = chats[0].body as { stream?: boolean; tools: Array<{ name: string }>; system: Array<{ cache_control?: unknown }> };
+    expect(first.stream).toBe(true);
+    const offered = first.tools.map((t) => t.name);
+    expect(offered).toEqual(expect.arrayContaining(['add_pattern', 'create_instrument', 'write_note_sequence', 'set_pattern_order']));
+    for (const banned of ['batch', 'new_song', 'load_file', 'evaluate_script', 'hard_reload']) expect(offered).not.toContain(banned);
+    expect(first.system[0].cache_control).toEqual({ type: 'ephemeral' });
+    expect(JSON.stringify(events)).not.toContain('sk-ant-test');
+  });
+
+  it('anthropic uses the model the visitor picked, and falls back to the preferred one when the pick is not listed', async () => {
+    const ask = async (model: string) => {
+      calls.length = 0;
+      const r = await fetch(`${base}/api/ai/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-anthropic-key': 'sk-ant-test' },
+        body: JSON.stringify({ prompt: 'hi', provider: 'anthropic', model }),
+      });
+      await r.text();
+      return (calls.find((c) => pathOf(c.url).endsWith('messages'))?.body as { model: string }).model;
+    };
+    setFreeProviderFetch(async (input, init) => {
+      const url = String(input);
+      calls.push({ url, headers: new Headers(init?.headers), body: typeof init?.body === 'string' ? JSON.parse(init.body) as Record<string, unknown> : null });
+      if (pathOf(url).endsWith('/models')) return anthropicModelList();
+      return anthropicSse([{ type: 'text', deltas: ['Hi.'] }], 'end_turn');
+    });
+    expect(await ask('claude-haiku-5-5')).toBe('claude-haiku-5-5');
+    expect(await ask('claude-nonexistent')).toBe('claude-sonnet-5-5');
+    setFreeProviderFetch(stubVendorFetch);
+  });
+
+  it('a refusal ends the chat with one error and runs no tool', async () => {
+    setFreeProviderFetch(async (input) => (pathOf(String(input)).endsWith('/models')
+      ? anthropicModelList()
+      : anthropicSse([{ type: 'tool_use', id: 'u1', name: 'clear_pattern', input: {} }], 'refusal')));
+    const events = await vendorChat('anthropic', { 'x-anthropic-key': 'sk-ant-test' });
+    setFreeProviderFetch(stubVendorFetch);
+    expect(events.filter((e) => e.type === 'tool_call')).toHaveLength(0);
+    expect(events.find((e) => e.type === 'error')).toMatchObject({ error: 'The model declined this request.' });
+  });
+
+  it('POST /models lists the key\'s models with labels, and never returns the key', async () => {
+    const list = async (vendor: string, headers: Record<string, string>) => {
+      const r = await fetch(`${base}/api/ai/models`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify({ vendor }),
+      });
+      return { status: r.status, text: await r.text() };
+    };
+    const ok = await list('anthropic', { 'x-anthropic-key': 'sk-ant-test' });
+    expect(JSON.parse(ok.text)).toEqual({
+      ok: true,
+      models: [{ id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5' }, { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5' }],
+    });
+    expect(ok.text).not.toContain('sk-ant-test');
+
+    expect(JSON.parse((await list('anthropic', {})).text)).toMatchObject({ ok: false, kind: 'auth' });
+    const unknown = await list('nobody', { 'x-anthropic-key': 'sk-ant-test' });
+    expect(unknown.status).toBe(400);
+    expect(JSON.parse(unknown.text)).toMatchObject({ ok: false, kind: 'bad-request' });
+
+    resetAgentModelCache();
+    setFreeProviderFetch(async () => new Response(JSON.stringify({ type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key sk-ant-nope' } }), { status: 401 }));
+    const bad = await list('anthropic', { 'x-anthropic-key': 'sk-ant-nope' });
+    setFreeProviderFetch(stubVendorFetch);
+    expect(JSON.parse(bad.text)).toMatchObject({ ok: false });
+    expect(bad.text).not.toContain('sk-ant-nope');
   });
 });

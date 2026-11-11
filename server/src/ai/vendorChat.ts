@@ -4,7 +4,9 @@
  * `done`). The key is read once from the request header, used for this
  * request only, never stored or logged, and scrubbed from every message.
  */
+import { runAnthropicAgent } from './anthropicAgent';
 import { createFreeToolset } from './freeToolset';
+import { buildComposerSystemPrompt } from './systemPrompt';
 import { DEFAULT_DEADLINE_MS, ProviderError, askWithTools, type ChatTurn } from './toolLoop';
 import { VENDORS, listVendorModels, pickModel, type VendorId } from './vendors';
 import { makeJsonPost, scrub } from './vendorPost';
@@ -22,6 +24,10 @@ export interface VendorChatOptions {
   callBrowser: BrowserCaller;
   signal?: AbortSignal;
   deadlineMs?: number;
+  /** Anthropic only: keeps the tool turns of earlier requests in this conversation. */
+  conversationId?: string;
+  /** Anthropic only: the "Current tracker state" lines, sent outside the cached prompt. */
+  trackerState?: string;
 }
 
 export async function runVendorChat(opts: VendorChatOptions): Promise<{ text: string | null; model: string | null }> {
@@ -32,6 +38,15 @@ export async function runVendorChat(opts: VendorChatOptions): Promise<{ text: st
     return { text: null, model: null };
   };
   if (!key) return fail(v.noKeyMessage);
+
+  // Claude runs the long streaming agent; see anthropicAgent.ts for why it is not askWithTools.
+  if (opts.vendor === 'anthropic') {
+    return runAnthropicAgent({
+      system: buildComposerSystemPrompt(), trackerState: opts.trackerState, history: opts.history,
+      conversationId: opts.conversationId, visitorKey: key, requestedModel: opts.requestedModel,
+      emit: opts.emit, callBrowser: opts.callBrowser, signal: opts.signal, deadlineMs: opts.deadlineMs,
+    });
+  }
 
   let model: string | null;
   try {

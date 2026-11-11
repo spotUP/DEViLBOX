@@ -3,7 +3,7 @@
  * Shared by the chat UI panels.
  */
 
-import { useAIStore } from '@stores/useAIStore';
+import { useAIStore, type AIVendorProvider, type AIVendorModel } from '@stores/useAIStore';
 import { useAIKeysStore, keyHeadersFor, AI_KEY_HEADERS, type AIKeyVendor } from '@stores/useAIKeysStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
 import { useTransportStore } from '@stores/useTransportStore';
@@ -72,6 +72,49 @@ export async function checkAIKey(vendor: AIKeyVendor, key: string): Promise<AIKe
   } catch {
     return { ok: false, kind: 'network', error: 'Cannot reach the server. Is it running?' };
   }
+}
+
+export type AIVendorModels =
+  | { ok: true; models: AIVendorModel[] }
+  | { ok: false; error: string };
+
+/** The models this key can chat with (Anthropic or OpenAI); the key travels in the vendor's header only. */
+export async function fetchVendorModels(vendor: AIVendorProvider, key: string): Promise<AIVendorModels> {
+  try {
+    const res = await fetch(`${API_BASE}/ai/models`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', [AI_KEY_HEADERS[vendor]]: key },
+      body: JSON.stringify({ vendor }),
+    });
+    const body = await res.json();
+    if (body && body.ok === true && Array.isArray(body.models)) {
+      const models = (body.models as unknown[]).flatMap((m): AIVendorModel[] => {
+        const entry = m as { id?: unknown; label?: unknown } | null;
+        if (typeof entry?.id !== 'string') return [];
+        return [{ id: entry.id, label: typeof entry.label === 'string' && entry.label ? entry.label : entry.id }];
+      });
+      return { ok: true, models };
+    }
+    return { ok: false, error: typeof body?.error === 'string' ? body.error : 'The model list could not be read.' };
+  } catch {
+    return { ok: false, error: 'Cannot reach the server. Is it running?' };
+  }
+}
+
+/**
+ * Fill the model picker for an own-key provider from the saved key. Without a
+ * key the list is emptied; a failed fetch keeps the list already shown.
+ */
+export async function refreshVendorModels(vendor: AIVendorProvider): Promise<AIVendorModels> {
+  const key = useAIKeysStore.getState().keys[vendor];
+  if (!key) {
+    useAIStore.getState().setVendorModels(vendor, []);
+    return { ok: true, models: [] };
+  }
+  const result = await fetchVendorModels(vendor, key);
+  // The key can change while the request is out; a list for an old key is dropped.
+  if (result.ok && useAIKeysStore.getState().keys[vendor] === key) useAIStore.getState().setVendorModels(vendor, result.models);
+  return result;
 }
 
 /** A failed key check in plain words. */
@@ -195,7 +238,7 @@ export async function sendMessage(prompt: string): Promise<void> {
               });
               break;
             case 'tool_result':
-              s.addToolResult(assistantId, event.tool, event.result);
+              s.addToolResult(assistantId, event.tool, typeof event.result === 'string' ? event.result : '', event.ok === false);
               break;
             case 'error':
               s.setError(event.error);

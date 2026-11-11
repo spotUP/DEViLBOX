@@ -1,7 +1,8 @@
 /**
  * AI Chat Store — shared state for the in-app AI assistant panel.
- * Only the panel's expanded/collapsed flag (isOpen) is persisted, under a
- * versioned key; the conversation itself is not.
+ * Persisted under a versioned key: the panel's expanded/collapsed flag
+ * (isOpen), the chosen provider and the model chosen for each provider. The
+ * conversation and the model lists fetched for a vendor key are not.
  */
 
 import { create } from 'zustand';
@@ -64,12 +65,72 @@ export function getDefaultModel(provider: AIProvider): string {
   return models[0]?.id || 'haiku';
 }
 
+/** The providers whose model list comes from the visitor's own key. */
+export type AIVendorProvider = 'anthropic' | 'openai';
+
+export function isVendorProvider(provider: AIProvider): provider is AIVendorProvider {
+  return provider === 'anthropic' || provider === 'openai';
+}
+
+/** One model a visitor's key can chat with, as the server lists it. */
+export interface AIVendorModel {
+  id: string;
+  label: string;
+}
+
+export type AIVendorModelLists = Partial<Record<AIVendorProvider, AIVendorModel[]>>;
+export type AIModelChoices = Partial<Record<AIProvider, string>>;
+
+export interface AIModelOption {
+  value: string;
+  label: string;
+}
+
+/**
+ * The model picker's options for a provider: its built-in models, then (own
+ * key providers) the models the key can use. The chosen model always has an
+ * option, so the picker shows it before the key's list has arrived.
+ */
+export function modelOptionsFor(provider: AIProvider, vendorModels: AIVendorModelLists, chosen: string): AIModelOption[] {
+  const options: AIModelOption[] = getModelsForProvider(provider).map((m) => ({ value: m.id, label: `${m.label} (${m.description})` }));
+  if (isVendorProvider(provider)) {
+    for (const m of vendorModels[provider] ?? []) {
+      if (!options.some((o) => o.value === m.id)) options.push({ value: m.id, label: m.label });
+    }
+  }
+  if (chosen && !options.some((o) => o.value === chosen)) options.push({ value: chosen, label: chosen });
+  return options;
+}
+
+function isProvider(value: unknown): value is AIProvider {
+  return typeof value === 'string' && AI_PROVIDERS.some((p) => p.id === value);
+}
+
+/** The persisted part of the store, read back from any stored shape. */
+export function readPersistedAIPanel(persisted: unknown): { isOpen: boolean; provider: AIProvider; modelByProvider: AIModelChoices } {
+  const state = (persisted ?? {}) as { isOpen?: unknown; provider?: unknown; modelByProvider?: unknown };
+  const modelByProvider: AIModelChoices = {};
+  if (state.modelByProvider && typeof state.modelByProvider === 'object') {
+    for (const [provider, model] of Object.entries(state.modelByProvider as Record<string, unknown>)) {
+      if (isProvider(provider) && typeof model === 'string' && model) modelByProvider[provider] = model;
+    }
+  }
+  return {
+    isOpen: state.isOpen === true,
+    provider: isProvider(state.provider) ? state.provider : 'free',
+    modelByProvider,
+  };
+}
+
 // --- Messages ---
 
 export interface AIToolCall {
   tool: string;
   input: Record<string, unknown>;
+  /** Absent while the tool runs; an empty string is a finished call that returned nothing. */
   result?: string;
+  /** true when the tool reported an error (the model sees it and usually corrects the call). */
+  failed?: boolean;
 }
 
 export interface AIMessage {
@@ -89,7 +150,12 @@ interface AIState {
   conversationId: string | null;
   error: string | null;
   provider: AIProvider;
+  /** The model chosen for the current provider ('auto' = the server picks). */
   model: string;
+  /** The model chosen for each provider, so a choice survives a provider switch and a reload. */
+  modelByProvider: AIModelChoices;
+  /** Models the visitor's own key can use, per vendor; fetched, not persisted. */
+  vendorModels: AIVendorModelLists;
   /** Model that answered the current chat (from the `model` SSE event); not persisted. */
   activeModel: string | null;
 }
@@ -105,11 +171,12 @@ interface AIActions {
   addAssistantMessage: () => string;
   appendAssistantText: (messageId: string, text: string) => void;
   addToolCall: (messageId: string, toolCall: AIToolCall) => void;
-  addToolResult: (messageId: string, tool: string, result: string) => void;
+  addToolResult: (messageId: string, tool: string, result: string, failed?: boolean) => void;
   finalizeAssistantMessage: (messageId: string) => void;
   setProvider: (provider: AIProvider) => void;
   setModel: (model: string) => void;
   setActiveModel: (model: string | null) => void;
+  setVendorModels: (provider: AIVendorProvider, models: AIVendorModel[]) => void;
   clearHistory: () => void;
 }
 
@@ -123,6 +190,8 @@ export const useAIStore = create<AIState & AIActions>()(
     error: null,
     provider: 'free' as AIProvider,
     model: 'auto',
+    modelByProvider: {},
+    vendorModels: {},
     activeModel: null,
 
     toggle: () => set((s) => { s.isOpen = !s.isOpen; }),
@@ -132,13 +201,18 @@ export const useAIStore = create<AIState & AIActions>()(
     setStreaming: (streaming) => set((s) => { s.isStreaming = streaming; }),
     setConversationId: (id) => set((s) => { s.conversationId = id; }),
     setError: (error) => set((s) => { s.error = error; }),
-    setModel: (model) => set((s) => { s.model = model; }),
+    setModel: (model) => set((s) => {
+      s.model = model;
+      s.modelByProvider[s.provider] = model;
+    }),
+    setVendorModels: (provider, models) => set((s) => { s.vendorModels[provider] = models; }),
     setActiveModel: (model) => set((s) => { s.activeModel = model; }),
 
     setProvider: (provider) => set((s) => {
       s.provider = provider;
-      // Auto-switch to default model for the new provider
-      s.model = getDefaultModel(provider);
+      // The model last chosen for this provider, else its default
+      s.model = s.modelByProvider[provider] ?? getDefaultModel(provider);
+      s.activeModel = null;
       // Clear conversation when switching providers
       s.conversationId = null;
     }),
@@ -185,12 +259,16 @@ export const useAIStore = create<AIState & AIActions>()(
         if (msg) msg.toolCalls.push(toolCall);
       }),
 
-    addToolResult: (messageId, tool, result) =>
+    addToolResult: (messageId, tool, result, failed) =>
       set((s) => {
         const msg = s.messages.find((m) => m.id === messageId);
         if (!msg) return;
-        const tc = [...msg.toolCalls].reverse().find((t) => t.tool === tool && !t.result);
-        if (tc) tc.result = result;
+        // Calls of one tool finish in the order they started.
+        const tc = msg.toolCalls.find((t) => t.tool === tool && t.result === undefined);
+        if (tc) {
+          tc.result = result ?? '';
+          if (failed) tc.failed = true;
+        }
       }),
 
     finalizeAssistantMessage: (messageId) =>
@@ -208,11 +286,13 @@ export const useAIStore = create<AIState & AIActions>()(
   })),
   {
     name: 'devilbox-ai-panel',
-    version: 1,
-    partialize: (state) => ({ isOpen: state.isOpen }),
-    migrate: (persistedState) => {
-      const state = (persistedState ?? {}) as { isOpen?: unknown };
-      return { isOpen: state.isOpen === true };
+    // Version 2 adds provider and modelByProvider; version 1 held isOpen only.
+    version: 2,
+    partialize: (state) => ({ isOpen: state.isOpen, provider: state.provider, modelByProvider: state.modelByProvider }),
+    migrate: (persistedState) => readPersistedAIPanel(persistedState),
+    merge: (persistedState, current) => {
+      const saved = readPersistedAIPanel(persistedState);
+      return { ...current, ...saved, model: saved.modelByProvider[saved.provider] ?? getDefaultModel(saved.provider) };
     },
   },
   ),
