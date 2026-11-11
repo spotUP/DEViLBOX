@@ -31,7 +31,7 @@ import { setFormatPlaybackPlaying, resetFormatPlaybackState } from '@engine/Form
 import { gtUltraTogglePlay } from '@engine/gtultra/gtUltraTransport';
 import { useWasmPositionStore } from '@stores/useWasmPositionStore';
 import { useCursorStore } from '@stores/useCursorStore';
-import { X, Menu, FileUp, FileDown, FilePlus, Trash2 as ClearIcon, Wand2, HelpCircle, Info as InfoIcon, Gamepad2, Headphones } from 'lucide-react';
+import { X, Menu, FileUp, FileDown, FilePlus, Trash2 as ClearIcon, Wand2, HelpCircle, Info as InfoIcon, History as HistoryIcon, Gamepad2, Headphones } from 'lucide-react';
 import { UpRoughGenerateDialog } from '@components/dialogs/UpRoughGenerateDialog';
 import { LogoAnimation } from '@components/visualization/LogoAnimation';
 import { SineScroller } from '@components/visualization/SineScroller';
@@ -578,6 +578,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
     { id: 'export-uprough-song', label: 'Export Up Rough Song...', icon: <FileUp size={14} />, onClick: handleExportUpRoughSong },
     { id: 'preview-uprough-song', label: 'Preview Up Rough Song', icon: <Headphones size={14} />, onClick: handlePreviewUpRoughSong },
     { id: 'new', label: 'New Song', icon: <FilePlus size={14} />, onClick: () => useUIStore.getState().openNewSongWizard() },
+    { id: 'revisions', label: 'Revisions', icon: <HistoryIcon size={14} />, onClick: () => useUIStore.getState().openModal('revisions') },
     { id: 'clear', label: 'Clear All Patterns', icon: <ClearIcon size={14} />, danger: true, onClick: () => setShowClearModal(true) },
     { type: 'divider' as const },
     { id: 'ai', label: 'AI Composition', icon: <Wand2 size={14} />, checked: aiOpen, onClick: toggleAI },

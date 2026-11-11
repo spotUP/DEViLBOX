@@ -55,10 +55,10 @@ export async function unloadSong(): Promise<void> {
 }
 
 /**
- * Run an opener: unload the outgoing song, mark the load in flight, and clear
+ * Run an opener: save the outgoing song as a revision, unload it, mark the load in flight, and clear
  * the mark when it ends - success or failure.
  */
-export async function withSongLoad<T>(label: string, load: () => Promise<T>, opts?: { silent?: boolean }): Promise<T> {
+export async function withSongLoad<T>(label: string, load: () => Promise<T>, opts?: { silent?: boolean; snapshotOutgoing?: boolean }): Promise<T> {
   const first = useSongLoadStore.getState().depth === 0;
   // `silent` goes up with depth, so the panel never shows for the unload of a silent load.
   useSongLoadStore.setState((s) => ({
@@ -68,6 +68,13 @@ export async function withSongLoad<T>(label: string, load: () => Promise<T>, opt
   }));
   try {
     if (first) {
+      // The open song is saved as a revision before anything replaces it. This is
+      // the one point every opener passes through; a failed write only warns.
+      // Tab and sync switches keep their song elsewhere and opt out.
+      if (opts?.snapshotOutgoing !== false) {
+        const { saveOpenSongBeforeReplace } = await import('@hooks/useProjectPersistence');
+        await saveOpenSongBeforeReplace();
+      }
       await unloadSong();
       useSongLoadStore.setState({ phase: 'acquire' });
       useSongLoadStore.setState({ unloadedForLoad: true });

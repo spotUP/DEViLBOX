@@ -328,7 +328,7 @@ async function openStoredSong(src: StoredSongSource): Promise<OpenResult> {
       const song = await src.song();
       setSongLoadPhase('apply');
       await applySong(song, src.source);
-    }, { silent: src.silent });
+    }, { silent: src.silent, snapshotOutgoing: src.source !== 'tab' && src.source !== 'sync' });
     const format = useFormatStore.getState();
     return { ok: true, name: src.name, message: `Opened ${src.name}`, engine: 'saved', editorMode: format.editorMode,
       kind: 'saved', started: false, companions: 0, notified: false };
