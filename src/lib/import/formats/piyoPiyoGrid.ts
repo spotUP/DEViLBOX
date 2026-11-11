@@ -68,6 +68,22 @@ export function decodePiyoPiyoModule(bytes: Uint8Array): PiyoPiyoModule | null {
   };
 }
 
+/**
+ * The engine's track mask (bit t = track t audible) for the mixer's channel mask
+ * (bit c = grid channel c audible). A track sounds while any of its lanes is
+ * audible: the engine plays a chord as one voice, so one lane cannot be cut alone.
+ */
+export function piyoPiyoTrackMask(channelMask: number, lanes: readonly number[]): number {
+  let mask = 0;
+  let first = 0;
+  for (let t = 0; t < lanes.length; t++) {
+    const bits = lanes[t] >= 31 ? 0x7fffffff : ((1 << lanes[t]) - 1);
+    if ((channelMask >>> first) & bits) mask |= 1 << t;
+    first += lanes[t];
+  }
+  return mask;
+}
+
 const keysOf = (ev: number): number[] => {
   const ks: number[] = [];
   for (let k = 0; k < PIYOPIYO_KEYS; k++) if (ev & (1 << k)) ks.push(k);
