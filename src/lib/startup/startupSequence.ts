@@ -14,6 +14,7 @@ import { injectMouthPatterns, teardownMouthPatterns } from '@engine/jingle/Jingl
 import { useCollaborationStore } from '@stores/useCollaborationStore';
 import { useSettingsStore } from '@stores/useSettingsStore';
 import { useUIStore, type StartupJingleStage } from '@stores/useUIStore';
+import { whenBootRestoreDone } from './bootRestore';
 
 let began = false;
 let gestureHandled = false;
@@ -153,6 +154,9 @@ export async function startStartupJingle(): Promise<void> {
     setStage('done');
     return;
   }
+  // The lips are overlay channels in the current pattern: draw them in the
+  // restored song, after the boot restore, never in the placeholder it replaces.
+  await whenBootRestoreDone();
   injectMouthPatterns();
   jingle.play();
   useUIStore.getState().setJingleActive(true);

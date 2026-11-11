@@ -1,8 +1,7 @@
 /**
  * Reachability: a start opens exactly ONE blocking dialog, closing it through
  * the real MCP door (dismiss_modal, the same close handler the dialogs use) is
- * the start gesture, and a song load queued during boot lands after the silent
- * restore. Sentinel: the jingle engine's unlock call count.
+ * the start gesture, and a song load queued during boot lands after the jingle. Sentinel: the jingle engine's unlock call count.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -45,9 +44,10 @@ describe('one start dialog', () => {
   it.each([
     ['', 'tips'],
     ['?collab=ABCDEF', 'collab'],
-  ])('start %j opens exactly the %s dialog; closing it starts the jingle and releases a queued load after the restore', async (search, modal) => {
+  ])('start %j opens exactly the %s dialog; closing it starts the jingle and releases a queued load after the jingle', async (search, modal) => {
     beginStartupSequence();
     beginBootRestore();
+    endBootRestore(); // the restore does not wait for the dialog: it is done before a bridge call is answered
     window.history.replaceState({}, '', '/' + search);
     openStartDialog('b1');
 
@@ -66,12 +66,7 @@ describe('one start dialog', () => {
     expect(useUIStore.getState().modalOpen).toBeNull();
 
     endCb!(); // jingle ends
-    await Promise.resolve(); await Promise.resolve();
-    expect(order).toEqual([]); // restore still running: the load waits
-
-    order.push('restore');
-    endBootRestore();
     await load;
-    expect(order).toEqual(['restore', 'load']);
+    expect(order).toEqual(['load']);
   });
 });

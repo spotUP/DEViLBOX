@@ -415,7 +415,7 @@ export { migrateDubLaneEvents } from '@/lib/song/migrateDubLaneEvents';
  * explicit auto-save. `opts.silent` (the boot restore) opens it without the
  * loading panel.
  */
-export async function applySavedProject(project: SavedProject, opts?: { fromRecovery?: boolean; silent?: boolean }): Promise<boolean> {
+export async function applySavedProject(project: SavedProject, opts?: { fromRecovery?: boolean; silent?: boolean; atBoot?: boolean }): Promise<boolean> {
   if (!prepareSavedProject(project, 'discard')) return false;
   // The stored module bytes are decoded again by today's decoder; the user's
   // edited cells, instruments, mixer and the rest of the project come from the
@@ -426,6 +426,7 @@ export async function applySavedProject(project: SavedProject, opts?: { fromReco
     name: project.metadata?.name || 'saved project',
     source: opts?.fromRecovery ? 'recovery' : 'project',
     silent: opts?.silent,
+    atBoot: opts?.atBoot,
     song: async () => {
       const restored = await restoreFromStoredBytes(savedSongToApply(project), project.gridBaseline);
       console.log(`[restore] ${restored.redecoded ? 're-decoded from the stored module bytes' : `kept as saved (${restored.reason})`}`);
@@ -687,9 +688,9 @@ export function useProjectPersistence() {
         // The explicit slot is authoritative: a crash snapshot beside it is
         // stale by definition.
         await idbDeleteRecovery().catch(() => {});
-        await applySavedProject(saved!, { silent: true });
+        await applySavedProject(saved!, { silent: true, atBoot: true });
       } else if (decision.kind === 'recovery') {
-        await applySavedProject(rec!, { fromRecovery: true, silent: true });
+        await applySavedProject(rec!, { fromRecovery: true, silent: true, atBoot: true });
       }
     })()
       .catch((error: unknown) => { console.error('[Persistence] Boot restore failed:', error); })

@@ -220,6 +220,7 @@ import {
 
 import { RELAY_WS_URL } from './relayEndpoint';
 import { createReloadGate } from '../lib/dev/engineReloadGate';
+import { whenBootRestoreDone } from '../lib/startup/bootRestore';
 
 const WS_URL = RELAY_WS_URL;
 const INITIAL_BACKOFF_MS = 500;
@@ -630,6 +631,11 @@ export async function dispatchBridgeCall(
 ): Promise<BridgeDispatchResult> {
   const handler = Object.prototype.hasOwnProperty.call(handlers, method) ? handlers[method] : undefined;
   if (!handler) return { ok: false, error: `Unknown method: ${method}` };
+
+  // A call acts on the song the user will see, never on the placeholder the
+  // boot restore is about to replace. The restore no longer waits for the
+  // start dialog, so this wait is short and ends on apply, nothing, or failure.
+  await whenBootRestoreDone();
 
   callsInFlight++;
   lastCallActivityAt = Date.now();

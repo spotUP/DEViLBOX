@@ -310,6 +310,13 @@ export interface StoredSongSource {
   source: SongSource;
   /** The silent boot restore: no loading panel (useSongLoadStore.silent). */
   silent?: boolean;
+  /**
+   * The boot restore. It lands without waiting for the startup jingle: the
+   * jingle only delays audio, and it starts its lips after the restore
+   * (startStartupJingle awaits whenBootRestoreDone), so the restored song is
+   * the one the user sees and the one MCP calls act on.
+   */
+  atBoot?: boolean;
 }
 
 /** The lifecycle of a song that needs no parse: unload, loading state, apply once. */
@@ -382,7 +389,7 @@ export async function openSong(src: SongSourceRef | StoredSongSource, o: OpenOpt
   // channels in the current pattern), so no song loads into the tracker before
   // it ends. That includes a stored song: the silent boot restore opens one, and
   // landing it mid-jingle replaced the lips with the restored pattern.
-  await whenStartupJingleDone();
+  if (!(src.kind === 'song' && src.atBoot)) await whenStartupJingleDone();
   // The boot restore is itself a stored-song open, so it cannot wait on its own gate.
   if (src.kind === 'song') return openStoredSong(src);
   // A restore finishing after a load would overwrite the loaded song.
