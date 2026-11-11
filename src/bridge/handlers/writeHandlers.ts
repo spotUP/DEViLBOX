@@ -1502,13 +1502,35 @@ export function swapChannels(params: Record<string, unknown>): Record<string, un
 
 // ─── Bulk Operations ───────────────────────────────────────────────────────────
 
+/** The cell fields a write tool may carry, as `setCell` reads them. */
+const CELL_FIELDS = ['note', 'instrument', 'volume', 'effTyp', 'eff', 'effTyp2', 'eff2', 'flag1', 'flag2', 'probability'] as const;
+
+/**
+ * The cell a fill_range call asks for. The MCP tool schema sends the cell
+ * fields flat (`note`, `instrument`, ...), next to `channel` and the rows; an
+ * older caller form nests them under `cell`. Both are read, flat fields win.
+ * An empty result means the call named nothing to write.
+ */
+function fillRangeCell(params: Record<string, unknown>): Record<string, unknown> {
+  const nested = (params.cell && typeof params.cell === 'object' ? params.cell : {}) as Record<string, unknown>;
+  const cell: Record<string, unknown> = {};
+  for (const field of CELL_FIELDS) {
+    const value = params[field] ?? nested[field];
+    if (value !== undefined && value !== null) cell[field] = value;
+  }
+  return cell;
+}
+
 /** Fill a range with a repeating pattern of cells */
 export function fillRange(params: Record<string, unknown>): Record<string, unknown> {
   const channel = params.channel as number;
   const startRow = params.startRow as number;
   const endRow = params.endRow as number;
   const step = (params.step as number) ?? 1;
-  const cellData = params.cell as Record<string, unknown>;
+  const cellData = fillRangeCell(params);
+  if (Object.keys(cellData).length === 0) {
+    return { error: 'fill_range needs at least one cell field: note, instrument, volume, effTyp, eff, effTyp2, eff2, flag1, flag2 or probability. Nothing was written.' };
+  }
 
   const patternIndex = (params.patternIndex ?? undefined) as number | undefined;
   const rangeError = stepError(step) ?? cellTargetError(patternIndex, channel, [startRow, endRow]);
