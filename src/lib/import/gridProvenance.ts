@@ -109,6 +109,7 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
   jochenHippelST: 'pass',
   jxs: 'pass',
   kdm: 'pass',
+  organya: 'pass',
   maxTrax: 'pass',
   mdl: 'n/a',
   med: 'n/a',
@@ -234,6 +235,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   jochenHippelST: 'pass',
   jxs: 'pass',
   kdm: 'fail',
+  organya: 'fail',
   maxTrax: 'n/a',
   mdl: 'n/a',
   med: 'n/a',
@@ -321,7 +323,6 @@ export const SCOPE_GRIDS: Record<string, string> = {
   qsf: 'QsfParser: Z80 program + ROM; engine only',
   fmp: 'FmplayerParser: raw binary to engine, empty grid',
   pxtone: 'PxtoneParser: minimal shell, one empty pattern, engine plays (event data exists but is not shown)',
-  organya: 'OrganyaParser: minimal shell, one empty pattern',
   eupmini: 'EupminiParser: minimal shell, one empty pattern',
   ixalance: 'IxalanceParser: minimal shell (format is IT-like with real patterns, not shown)',
   cpsycle: 'CpsycleParser: minimal shell (Psycle has real patterns, not shown)',
@@ -485,7 +486,7 @@ export const DIRECT_GRIDS: readonly string[] = [
   '669', 'far', 'plm', 'ult', 'rtm', 'dsm', 'dtm', 'stm', 'stx', 'nru', 'ptm', 'gdm', 'stk', 'stp',
   'mdl', 'amf', 'j2b', 'mo3', 'itp', 'nst', 'wow', 'kt', 'xrns', 'mod', 'xm', 'it', 's3m',
   // MONOTONE stores 4-track patterns; ANSI music stores one PLAY string the parser lays on rows.
-  'monotone', 'ansiMusic', 'kdm', 'jxs', 'tonyWilliams',
+  'monotone', 'ansiMusic', 'kdm', 'organya', 'jxs', 'tonyWilliams',
   // SynthDream: the command streams decode to a read-only tick grid (synthDreamGrid.ts), no oracle yet.
   'synthDream',
   // Tim Follin: the command streams decode to a read-only tick grid (timFollinGrid.ts), no oracle yet.

@@ -74,6 +74,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   tonyWilliams: 'public/data/songs/formats/future basketball main.tw',
   jxs: 'public/data/songs/formats/popcorn.jxs',
   kdm: 'public/data/songs/formats/flysong.kdm',
+  organya: 'public/data/songs/organya/obj0640-1.org',
   davidWhittaker: 'public/data/songs/formats/apb.dw',
   robHubbard: 'public/data/songs/rob-hubbard/skateordie.rh',
   benDaglish: 'public/data/songs/ben-daglish/motorhead-titleandingame.bd',

@@ -26,6 +26,7 @@ const PARSE_FALLBACK: Record<string, { module: string; fn: string }> = {
   digi: { module: '@lib/import/formats/DigiBoosterParser', fn: 'parseDigiBoosterFile' },
   is: { module: '@lib/import/formats/InStereo1Parser', fn: 'parseInStereo1File' },
   mmd0: { module: '@lib/import/formats/MEDParser', fn: 'parseMEDFile' },
+  org: { module: '@lib/import/formats/OrganyaParser', fn: 'parseOrganyaFile' },
   okta: { module: '@lib/import/formats/OktalyzerParser', fn: 'parseOktalyzerFile' },
   prt: { module: '@lib/import/formats/PreTrackerParser', fn: 'parsePreTrackerFile' },
   synmod: { module: '@lib/import/formats/SynTrackerParser', fn: 'parseSynTrackerFile' },

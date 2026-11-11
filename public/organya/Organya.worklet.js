@@ -52,6 +52,9 @@ class OrganyaProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      // replaceModule: an edited song swapped in while it plays. The core has no seek export, so the song
+      // restarts from the top; the channel mask (reset by organya_init) is applied again.
+      case 'replaceModule':
       case 'loadModule':
         if (this.module && typeof this.module._organya_init === 'function') {
           try {
@@ -95,6 +98,7 @@ class OrganyaProcessor extends AudioWorkletProcessor {
               meta.channels = this.module._organya_get_num_channels();
             }
 
+            if (data.type === 'replaceModule' && this.muteMask !== undefined) this.applyMuteMask(this.muteMask);
             this.port.postMessage({ type: 'moduleLoaded', meta });
           } catch (error) {
             this.port.postMessage({ type: 'error', message: error.message });
@@ -109,18 +113,10 @@ class OrganyaProcessor extends AudioWorkletProcessor {
         }
         break;
 
-      case 'setMuteMask': {
-        if (this.module && typeof this.module._organya_set_channel_gain === 'function') {
-          const mask = data.mask || 0;
-          const numCh = typeof this.module._organya_get_num_channels === 'function'
-            ? this.module._organya_get_num_channels() : 16;
-          for (let ch = 0; ch < numCh; ch++) {
-            const muted = (mask & (1 << ch)) === 0;
-            this.module._organya_set_channel_gain(ch, muted ? 0.0 : 1.0);
-          }
-        }
+      case 'setMuteMask':
+        this.muteMask = data.mask || 0;
+        this.applyMuteMask(this.muteMask);
         break;
-      }
 
       case 'setChannelGain':
         if (this.module && typeof this.module._organya_set_channel_gain === 'function') {
@@ -235,6 +231,17 @@ class OrganyaProcessor extends AudioWorkletProcessor {
     if (this.lastHeapBuffer !== heapF32.buffer) {
       this.interleavedBuf = new Float32Array(heapF32.buffer, this.interleavedPtr, this.bufferSize * 2);
       this.lastHeapBuffer = heapF32.buffer;
+    }
+  }
+
+  applyMuteMask(mask) {
+    if (this.module && typeof this.module._organya_set_channel_gain === 'function') {
+      const numCh = typeof this.module._organya_get_num_channels === 'function'
+        ? this.module._organya_get_num_channels() : 16;
+      for (let ch = 0; ch < numCh; ch++) {
+        const muted = (mask & (1 << ch)) === 0;
+        this.module._organya_set_channel_gain(ch, muted ? 0.0 : 1.0);
+      }
     }
   }
 
