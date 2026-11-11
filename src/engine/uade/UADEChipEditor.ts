@@ -121,6 +121,9 @@ export class UADEChipEditor {
       for (const run of layout.writeCell(pattern, row, channel, cell)) await this.writeBytes(moduleBase + run.offset, run.bytes);
       return;
     }
+    const fx = layout.effectPatches?.(pattern, row, channel, cell);
+    if (fx) for (const [at, val] of fx.patches) await this.writeBytes(moduleBase + at, new Uint8Array([val]));
+    if (fx?.noteUnchanged) return;
     const fileOffset = getCellFileOffset(layout, pattern, row, channel);
     if (fileOffset < 0) return; // non-editable cell (e.g., wait row in variable-length format)
     const addr = moduleBase + fileOffset;
