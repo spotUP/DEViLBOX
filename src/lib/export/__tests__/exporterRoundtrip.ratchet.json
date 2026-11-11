@@ -623,6 +623,14 @@
       "matchPct": 1,
       "cells": 63356,
       "bytes": 63356
+    },
+    "mcmd": {
+      "exporter": "McmdExporter.exportMcmd",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 9102,
+      "bytes": 9102
     }
   },
   "missingFixture": [
