@@ -687,6 +687,14 @@
       "matchPct": 1,
       "cells": 2523,
       "bytes": 2523
+    },
+    "tfmx7v": {
+      "exporter": "Tfmx7vExporter.exportTfmx7v",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 45394,
+      "bytes": 45394
     }
   },
   "missingFixture": [

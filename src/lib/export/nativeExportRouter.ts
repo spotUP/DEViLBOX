@@ -376,18 +376,12 @@ const NATIVE_EXPORTERS: NativeExporterEntry[] = [
   // The module as loaded with the grid's edits patched in - the same bytes the TFMX decoder plays. Byte-exact where nothing was
   // edited, and it keeps the samples the from-scratch CoSo serializer cannot rebuild. CoSo goes through hippelCoSoModule, which
   // lays the module out again from the grid when an edit has no room in place (a block shared by several steps or voices).
-  { id: 'hippel', matches: (s) => !!s.hippelFileData && (songIds(s).layoutFormatId === 'hippelCoSo' || songIds(s).layoutFormatId === 'tfmx7v'),
+  // Hippel 7V is the registered Tfmx7vExporter (the layoutExporter branch below).
+  { id: 'hippel', matches: (s) => !!s.hippelFileData && songIds(s).layoutFormatId === 'hippelCoSo',
     run: async (s, baseName) => {
-      if (songIds(s).layoutFormatId === 'hippelCoSo') {
-        const { hippelCoSoModule } = await import('./HippelCoSoExporter');
-        const module = hippelCoSoModule(s);
-        return module ? { data: module.bytes, filename: `${baseName}.hipc`, warnings: module.warnings } : null;
-      }
-      const { rebuildHippelSong, hippelRefusedWarnings } = await import('@engine/hippel/rebuildHippelModule');
-      const rebuilt = rebuildHippelSong(s);
-      if (!rebuilt) return null;
-      const warnings = hippelRefusedWarnings(rebuilt.refused);
-      return { data: rebuilt.bytes, filename: `${baseName}.hip7`, warnings };
+      const { hippelCoSoModule } = await import('./HippelCoSoExporter');
+      const module = hippelCoSoModule(s);
+      return module ? { data: module.bytes, filename: `${baseName}.hipc`, warnings: module.warnings } : null;
     } },
   { id: 'symphoniePro', matches: (s) => songIds(s).layoutFormatId === 'symphoniePro' || !!s.symphonieFileData,
     run: async (s, baseName) => { const { exportSymphonieProFile } = await import('./SymphonieProExporter'); return { data: exportSymphonieProFile(s), filename: `${baseName}.symmod`, warnings: [] }; } },
