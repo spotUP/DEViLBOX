@@ -7,6 +7,7 @@
  * singleton pattern (2026-10-05 broken-formats sweep, B5).
  */
 
+import { decodePiyoPiyoModule, piyoPiyoTrackMask } from '@/lib/import/formats/piyoPiyoGrid';
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import {
   WASMSingletonBase,
@@ -21,6 +22,9 @@ export class PiyoPiyoEngine extends WASMSingletonBase {
   private static instance: PiyoPiyoEngine | null = null;
   private static cache: WASMAssetsCache = createWASMAssetsCache();
   private static drums: Record<string, ArrayBuffer> | null = null;
+  /** Lanes per track of the loaded module: the grid's channels are lanes, the engine's mask is per track. */
+  private lanes: number[] = [1, 1, 1, 1];
+  private channelMask = 0xffffffff;
 
   private constructor() {
     super();
@@ -84,11 +88,13 @@ export class PiyoPiyoEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('PiyoPiyoEngine not initialized');
+    this.noteLanes(buffer);
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
   }
 
   /** Swap an edited module in while the song plays; the cursor and wait timer stay. */
   replaceModule(buffer: ArrayBuffer): void {
+    this.noteLanes(buffer);
     this.workletNode?.port.postMessage({ type: 'replaceModule', moduleData: buffer });
   }
 
@@ -96,9 +102,22 @@ export class PiyoPiyoEngine extends WASMSingletonBase {
   stop(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
   pause(): void { this.workletNode?.port.postMessage({ type: 'stop' }); }
 
-  /** Bits 0-2 = melody tracks 1-3, bit 3 = drums; set = audible (the mixer's solo/mute). */
+  private noteLanes(buffer: ArrayBuffer): void {
+    const m = decodePiyoPiyoModule(new Uint8Array(buffer));
+    if (!m) return;
+    this.lanes = m.lanes;
+    this.sendMuteMask();
+  }
+
+  private sendMuteMask(): void {
+    // Worklet mask: bits 0-2 = melody tracks 1-3, bit 3 = drums; set = audible.
+    this.workletNode?.port.postMessage({ type: 'setMuteMask', mask: piyoPiyoTrackMask(this.channelMask, this.lanes) });
+  }
+
+  /** The mixer's mask by grid channel (one bit per lane); mapped to the four tracks here. */
   setMuteMask(mask: number): void {
-    this.workletNode?.port.postMessage({ type: 'setMuteMask', mask });
+    this.channelMask = mask;
+    this.sendMuteMask();
   }
 
   override dispose(): void {

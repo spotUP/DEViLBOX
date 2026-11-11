@@ -46,3 +46,11 @@ describe('the engine registry is the one source', () => {
     expect(names).toContain('OktalyzerReplayer');
   }, 60_000);
 });
+
+describe('PiyoPiyo', () => {
+  it('is a registered mask engine', async () => {
+    const { WASM_ENGINES } = await import('@/engine/replayer/NativeEngineRouting');
+    const regs = await collectMuteRegistrations(WASM_ENGINES);
+    expect(regs.find(r => r.key === 'PiyoPiyo')?.bitmask).toBe(true);
+  }, 60_000);
+});
