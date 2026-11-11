@@ -79,6 +79,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   emsv6: 'public/data/songs/formats/perception.ems',
   mcmd: 'public/data/songs/formats/ep-trmonsterbusiness.mcmd',
   wallyBeben: 'public/data/songs/formats/wicked.wb',
+  richardJoseph: 'public/data/songs/richard-joseph/cannon fodder (intro).sng',
   soundPlayer: 'public/data/songs/formats/Scott Johnston/sjs.awesome',
   fashionTracker: 'public/data/songs/fashion-tracker/ivory tover ii.ex',
   organya: 'public/data/songs/organya/obj0640-1.org',

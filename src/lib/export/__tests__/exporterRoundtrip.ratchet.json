@@ -679,6 +679,14 @@
       "matchPct": 1,
       "cells": 54076,
       "bytes": 54076
+    },
+    "richardJoseph": {
+      "exporter": "RichardJosephExporter.exportRichardJoseph",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 2523,
+      "bytes": 2523
     }
   },
   "missingFixture": [
