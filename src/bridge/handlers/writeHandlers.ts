@@ -242,6 +242,10 @@ export function addPattern(params: Record<string, unknown>): Record<string, unkn
 
 export function duplicatePattern(params: Record<string, unknown>): Record<string, unknown> {
   const index = (params.patternIndex as number | undefined) ?? useTrackerStore.getState().currentPatternIndex;
+  const patternCount = useTrackerStore.getState().patterns.length;
+  if (!Number.isInteger(index) || index < 0 || index >= patternCount) {
+    return { error: `Pattern ${index} does not exist: the song has ${patternCount} patterns (0-${patternCount - 1}). Nothing was duplicated.` };
+  }
   useTrackerStore.getState().duplicatePattern(index);
   const tracker = useTrackerStore.getState();
   return { ok: true, newPatternIndex: tracker.patterns.length - 1 };
@@ -281,6 +285,9 @@ export function setChannelCount(params: Record<string, unknown>): Record<string,
 
 export function setPatternOrder(params: Record<string, unknown>): Record<string, unknown> {
   const order = params.order as number[];
+  if (!Array.isArray(order) || order.length === 0) {
+    return { error: 'set_pattern_order needs at least one pattern index: a song cannot have an empty order. The order was not changed.' };
+  }
   useTrackerStore.getState().setPatternOrder(order);
   return { ok: true };
 }
@@ -1412,10 +1419,16 @@ export function createInstrument(params: Record<string, unknown>): Record<string
   return { ok: true, instrumentId: id };
 }
 
+function unknownInstrumentError(id: unknown): string {
+  const ids = useInstrumentStore.getState().instruments.map((inst) => inst.id).join(', ');
+  return `Instrument ${String(id)} does not exist. Existing instrument ids: ${ids}. Nothing was changed.`;
+}
+
 export function updateInstrument(params: Record<string, unknown>): Record<string, unknown> {
   const id = params.id as number;
   const updates = params.updates as Record<string, unknown>;
   const current = useInstrumentStore.getState().instruments.find((inst) => inst.id === id);
+  if (!current) return { error: unknownInstrumentError(id) };
   const newType = updates?.synthType as SynthType | undefined;
   const refusal = newType && current && newType !== current.synthType ? synthRefusal(newType) : null;
   if (refusal) return { ok: false, error: refusal };
@@ -1424,13 +1437,18 @@ export function updateInstrument(params: Record<string, unknown>): Record<string
 }
 
 export function deleteInstrument(params: Record<string, unknown>): Record<string, unknown> {
-  useInstrumentStore.getState().deleteInstrument(params.id as number);
+  const id = params.id as number;
+  const { instruments } = useInstrumentStore.getState();
+  if (!instruments.some((inst) => inst.id === id)) return { error: unknownInstrumentError(id) };
+  if (instruments.length <= 1) return { error: `Instrument ${id} is the only instrument: a song keeps at least one. Nothing was deleted.` };
+  useInstrumentStore.getState().deleteInstrument(id);
   return { ok: true };
 }
 
 export function cloneInstrument(params: Record<string, unknown>): Record<string, unknown> {
   const source = useInstrumentStore.getState().instruments.find((inst) => inst.id === (params.id as number));
-  const refusal = source ? synthRefusal(source.synthType) : null;
+  if (!source) return { error: unknownInstrumentError(params.id) };
+  const refusal = synthRefusal(source.synthType);
   if (refusal) return { ok: false, error: refusal };
   const newId = useInstrumentStore.getState().cloneInstrument(params.id as number);
   return { ok: true, newInstrumentId: newId };

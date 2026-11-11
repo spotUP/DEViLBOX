@@ -91,6 +91,14 @@ function textResult(data: unknown) {
 }
 
 /** How a tool reaches the browser: the WS relay for the CLI path, a per-chat channel for the Free provider. */
+/**
+ * Effect type of a cell. effTyp is one global id space shared by every format: the standard
+ * effects sit below 0x40 and the private format blocks start at 0x500 (the highest registered id
+ * today is 0x554). The cell stores a plain number with no cap, so the schema only bounds it to 16 bits.
+ */
+export const EFF_TYP_MAX = 0xFFFF;
+const effTypSchema = z.number().int().min(0).max(EFF_TYP_MAX).optional().describe('Effect type (standard below 0x40; format-private ids from 0x500)');
+
 export type BrowserCaller = (method: string, params: Record<string, unknown>) => Promise<unknown>;
 
 export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowser?: BrowserCaller } = {}): McpServer {
@@ -238,9 +246,9 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
       note: z.union([z.number(), z.string()]).optional().describe('Note: 1-96 (1 = C-0), -12..-1 = the octave below C-0 (c_1..b_1), 97=off, or "C-4"/"c_1"/"OFF"'),
       instrument: z.number().int().min(0).max(128).optional().describe('Instrument (1-128, 0=none)'),
       volume: z.number().int().min(0).max(255).optional().describe('Volume column'),
-      effTyp: z.number().int().min(0).max(35).optional().describe('Effect type'),
+      effTyp: effTypSchema.describe('Effect type'),
       eff: z.number().int().min(0).max(255).optional().describe('Effect param'),
-      effTyp2: z.number().int().min(0).max(35).optional().describe('2nd effect type'),
+      effTyp2: effTypSchema.describe('2nd effect type'),
       eff2: z.number().int().min(0).max(255).optional().describe('2nd effect param'),
       flag1: z.number().optional().describe('Flag 1 (TB-303: 1=accent)'),
       flag2: z.number().optional().describe('Flag 2 (TB-303: 2=slide)'),
@@ -260,10 +268,13 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
         note: z.union([z.number(), z.string()]).optional(),
         instrument: z.number().int().min(0).max(128).optional(),
         volume: z.number().int().min(0).max(255).optional(),
-        effTyp: z.number().int().min(0).max(35).optional(),
+        effTyp: effTypSchema,
         eff: z.number().int().min(0).max(255).optional(),
-        effTyp2: z.number().int().min(0).max(35).optional(),
+        effTyp2: effTypSchema,
         eff2: z.number().int().min(0).max(255).optional(),
+        flag1: z.number().optional().describe('Flag 1 (TB-303: 1=accent)'),
+        flag2: z.number().optional().describe('Flag 2 (TB-303: 2=slide)'),
+        probability: z.number().int().min(0).max(100).optional().describe('Play probability 0-100%'),
       })).describe('Array of cells to set'),
     },
     (p) => call('set_cells', p),
@@ -321,8 +332,13 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
       note: z.union([z.number(), z.string()]).optional().describe('Note value'),
       instrument: z.number().int().min(0).max(128).optional(),
       volume: z.number().int().min(0).max(255).optional(),
-      effTyp: z.number().int().min(0).max(35).optional(),
+      effTyp: effTypSchema,
       eff: z.number().int().min(0).max(255).optional(),
+      effTyp2: effTypSchema.describe('2nd effect type'),
+      eff2: z.number().int().min(0).max(255).optional().describe('2nd effect param'),
+      flag1: z.number().optional().describe('Flag 1 (TB-303: 1=accent)'),
+      flag2: z.number().optional().describe('Flag 2 (TB-303: 2=slide)'),
+      probability: z.number().int().min(0).max(100).optional().describe('Play probability 0-100%'),
     },
     (p) => call('fill_range', p),
   );
