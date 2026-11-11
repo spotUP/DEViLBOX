@@ -28,6 +28,7 @@ import { getDevilboxAudioContext } from '../../utils/audio-context';
 import { applyEphemeralDubSettings } from '../../lib/dub/measurementSettings';
 import type { EphemeralDubSettings, EphemeralDubSettingsTarget } from '../../lib/dub/measurementSettings';
 import { getAudioMonitor, disposeAudioMonitor } from '../monitoring/AudioMonitor';
+import { mergePartialUpdate } from '../../lib/mergePartialUpdate';
 import { isChannelShapeKind } from '../../lib/dub/channelShape';
 import { testAllSynths, testToneSynths, testCustomSynths, testFurnaceSynths, testMAMESynths } from '../../utils/synthTester';
 import { parseNoteName } from '../../lib/tracker/noteValue';
@@ -1685,7 +1686,9 @@ export function updateSynthConfig(params: Record<string, unknown>): Record<strin
   // Build the update with the sub-config key
   const instrumentUpdate: Record<string, unknown> = {};
   const currentSubConfig = (inst as unknown as Record<string, unknown>)[configKey] ?? {};
-  instrumentUpdate[configKey] = { ...(currentSubConfig as Record<string, unknown>), ...updates };
+  // Partial update: unnamed fields stay, and a list of objects (FM operators) is
+  // patched entry by entry instead of being replaced.
+  instrumentUpdate[configKey] = mergePartialUpdate(currentSubConfig, updates);
 
   useInstrumentStore.getState().updateInstrument(id, instrumentUpdate);
   return { ok: true, instrumentId: id, configKey, updatedFields: Object.keys(updates) };
