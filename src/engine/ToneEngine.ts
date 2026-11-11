@@ -5166,6 +5166,37 @@ export class ToneEngine {
   public updateFurnaceParameters(instrumentId: number, config: NonNullable<InstrumentConfig['furnace']>): void { _updateFurnaceParameters(this._synthCtx, instrumentId, config); }
 
   /**
+   * The Furnace chip synth that plays a song channel of an instrument, with the chip channel
+   * that song channel maps to (the same mapping the note trigger uses). Null for any other synth.
+   */
+  private furnaceDispatchSynthFor(instrumentId: number, channelIndex: number, config: InstrumentConfig): { synth: FurnaceDispatchSynth; chipChannel: number } | null {
+    const synth = this.instruments.get(this.getInstrumentKey(instrumentId, channelIndex))
+      ?? this.instruments.get(this.getInstrumentKey(instrumentId, -1));
+    if (!(synth instanceof FurnaceDispatchSynth)) return null;
+    const chipChannel = chipChannelFor(channelIndex, synth.getNumChannels() || 3, config.furnace?.previewChannel);
+    return { synth, chipChannel };
+  }
+
+  /**
+   * A cell effect of a tracker-made song, sent to the chip channel of the song channel through
+   * FurnaceEffectRouter. Returns false when the instrument is not a Furnace chip synth.
+   */
+  public applyFurnaceCellEffect(instrumentId: number, channelIndex: number, config: InstrumentConfig, effect: number, param: number): boolean {
+    const target = this.furnaceDispatchSynthFor(instrumentId, channelIndex, config);
+    if (!target) return false;
+    target.synth.applyEffect(effect, param, target.chipChannel);
+    return true;
+  }
+
+  /** A cell volume (0-1 level) on a song channel's chip channel, as a volume command. */
+  public applyFurnaceCellVolume(instrumentId: number, channelIndex: number, config: InstrumentConfig, level: number): boolean {
+    const target = this.furnaceDispatchSynthFor(instrumentId, channelIndex, config);
+    if (!target) return false;
+    target.synth.applyVolumeLevel(level, target.chipChannel);
+    return true;
+  }
+
+  /**
    * Apply a tracker effect to a Furnace instrument.
    * Routes effect through FurnaceEffectRouter → FurnaceDispatchEngine.
    * @param instrumentId The instrument ID

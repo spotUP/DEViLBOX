@@ -40,6 +40,7 @@ import { useAutomationStore } from '@/stores/useAutomationStore';
 import { useCursorStore } from '@/stores/useCursorStore';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { decodeVolumeColumn, noteStartLevel } from '@/lib/tracker/volumeColumn';
+import { furnaceCellChipEffects, cellSetVolumeLevel } from './replayer/furnaceCellEffects';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { useOscilloscopeStore } from '@/stores/useOscilloscopeStore';
@@ -1345,6 +1346,9 @@ export class TrackerReplayer {
       const instId = rowInst || chanInst;
       if (!instId || !this._replacedInstruments.has(instId)) continue;
 
+      // Effects and volume reach the chip on rows without a note too.
+      this.routeRowToChip(ch, channel, row, instId);
+
       // Only fire on rows with actual notes — empty rows sustain current note
       if (row.note <= 0 || row.note >= 97) continue;
 
@@ -1368,6 +1372,36 @@ export class TrackerReplayer {
     // as silence). The synth plays on top of the original sample. This is
     // acceptable until the OpenMPT core engine migration (Phase 2+) where
     // libopenmpt becomes the soundlib and we can silence samples directly.
+  }
+
+  /**
+   * Send a row's effect columns and volume to the Furnace chip of a user-made song.
+   *
+   * ONE call point for both ways a row reaches a synth: processRowForSynths (the TS scheduler,
+   * _suppressNotes false) and fireHybridNotesForRow (an external engine drives position,
+   * _suppressNotes or hasActiveDispatch true). Those two never run for the same song at once, so
+   * a row is routed once. A row without a note must reach the chip too, so both callers call this
+   * before their note gate.
+   *
+   * An imported .fur song (song.furnaceNative) plays through its own WASM sequencer command
+   * path, which already carries these effects; it never goes through here.
+   * Note rows take Cxx and the volume column as the note velocity (processHybridRow), so only a
+   * row without a note sends the level as a volume command.
+   */
+  private routeRowToChip(chIndex: number, ch: ChannelState, row: TrackerCell, instId: number): void {
+    if (this.song?.furnaceNative) return;
+    const config = this.instrumentMap.get(instId);
+    if (!config?.synthType?.startsWith('Furnace')) return;
+    if (this.isChannelMuted(chIndex)) return;
+    const engine = getToneEngine();
+    for (const e of furnaceCellChipEffects(row)) {
+      engine.applyFurnaceCellEffect(config.id, chIndex, config, e.effect, e.param);
+    }
+    if (isPitchedNote(row.note)) return;
+    const level = cellSetVolumeLevel(row) ?? decodeVolumeColumn(row.volume, useFormatStore.getState().editorMode);
+    if (level === null) return;
+    ch.volume = Math.round(level * 64);
+    engine.applyFurnaceCellVolume(config.id, chIndex, config, level);
   }
 
   /**
@@ -1486,7 +1520,7 @@ export class TrackerReplayer {
     // A volume-column level sets the channel volume at tick 0, as Cxx does. A SoundFont or SFZ
     // note carries that volume in its velocity, so it must be in ch.volume before the trigger;
     // every other synth gets the volume column on its lane from the SynthEffectProcessor.
-    if (noteVolumeIsVelocity(ch.instrument?.synthType)) {
+    if (noteVolumeIsVelocity(ch.instrument?.synthType) || (ch.instrument?.synthType?.startsWith('Furnace') && !this.song.furnaceNative)) {
       const level = decodeVolumeColumn(row.volume, useFormatStore.getState().editorMode);
       if (level !== null) ch.volume = Math.round(level * 64);
     }
@@ -1659,6 +1693,8 @@ export class TrackerReplayer {
           ? (channel.instrument as { id: number }).id : 0;
       const inst = chanInst ? this.instrumentMap.get(chanInst) : null;
       const isSynth = inst?.synthType && inst.synthType !== 'Sampler';
+
+      if (isSynth && inst) this.routeRowToChip(ch, channel, row, inst.id);
 
       // Note-off
       if (row.note === 97) {

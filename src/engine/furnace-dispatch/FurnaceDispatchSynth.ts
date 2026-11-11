@@ -1288,6 +1288,14 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     this.engine.applyEffect(chan ?? this.currentChannel, effect, param, this.platformType);
   }
 
+  /**
+   * A 0-1 volume level as a volume command on a chip channel, in the chip's own volume range
+   * (the scale triggerAttack uses). Goes through the effect router, as the cell's set-volume effect does.
+   */
+  applyVolumeLevel(level: number, chan?: number): void {
+    this.applyEffect(0x0C, Math.round(Math.max(0, Math.min(1, level)) * getMaxVolume(this.platformType)), chan);
+  }
+
   applyExtendedEffect(x: number, y: number, chan?: number): void {
     if (!this._isReady || this._disposed) return;
     this.engine.applyExtendedEffect(chan ?? this.currentChannel, x, y, this.platformType);
