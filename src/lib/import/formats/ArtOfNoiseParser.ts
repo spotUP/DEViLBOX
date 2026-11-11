@@ -54,7 +54,7 @@ import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
 import type { UADEChipRamInfo } from '@/types/instrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { AON_PERIODS, aonNoteToGridNote } from './aonNotes';
+import { AON_PERIODS, aonEffectToGridEffect, aonNoteToGridNote } from './aonNotes';
 import { encodeAONCell } from '@/engine/uade/encoders/ArtOfNoiseEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -543,26 +543,7 @@ export function parseArtOfNoiseFile(bytes: Uint8Array, filename: string): Tracke
         const instrId = line.instrument > 0 ? line.instrument : 0;
         const xmNote = aonNoteToGridNote(line.note);
 
-        // Map AON effects to XM effects
-        let effTyp = 0, eff = 0;
-        const arg = line.effectArg;
-        switch (line.effect) {
-          case 0:  break;                              // Arpeggio (handled inline by player)
-          case 1:  effTyp = 0x01; eff = arg; break;   // SlideUp → portamento up
-          case 2:  effTyp = 0x02; eff = arg; break;   // SlideDown → portamento down
-          case 3:  effTyp = 0x03; eff = arg; break;   // TonePortamento
-          case 4:  effTyp = 0x04; eff = arg; break;   // Vibrato
-          case 5:  effTyp = 0x05; eff = arg; break;   // TonePortamento+VolumeSlide
-          case 6:  effTyp = 0x06; eff = arg; break;   // Vibrato+VolumeSlide
-          case 9:  effTyp = 0x09; eff = arg; break;   // SetSampleOffset
-          case 10: effTyp = 0x0A; eff = arg; break;   // VolumeSlide
-          case 11: effTyp = 0x0B; eff = arg; break;   // PositionJump
-          case 12: effTyp = 0x0C; eff = Math.min(64, arg); break; // SetVolume
-          case 13: effTyp = 0x0D; eff = arg; break;   // PatternBreak
-          case 14: effTyp = 0x0E; eff = arg; break;   // ExtraEffects
-          case 15: effTyp = 0x0F; eff = arg; break;   // SetSpeed
-          default: break;
-        }
+        const { effTyp, eff } = aonEffectToGridEffect(line.effect, line.effectArg);
 
         channelRows[c].push({
           note:       xmNote,

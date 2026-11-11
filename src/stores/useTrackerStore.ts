@@ -27,6 +27,7 @@ import { useProjectStore } from './useProjectStore';
 import { songToSongFile, type SongMeta } from '@lib/uprough/songFile';
 import { isSynthCompatibleWithChannel, getChannelBadge, getSynthBadge } from '../constants/channelTypeCompat';
 import { hippelLinkedEdits, hippelSpansFor } from '@/engine/hippel/hippelLinkedCells';
+import { aonLinkedEdits } from '@/lib/import/formats/artOfNoiseGrid';
 import { isCoSo } from '@/engine/hippel/rebuildHippelModule';
 import { moduleHeldIn } from '@/engine/formatFileDataFields';
 import { cosoIndexForXM } from '@lib/import/formats/HippelCoSoParser';
@@ -227,7 +228,11 @@ function pushEditAction(
   // block was refused by the patcher, so playback swapped in a module laid out again from the grid.
   const hippelModule = UNLINKED_EDITS.has(type) ? null : moduleHeldIn(fmt, 'hippelFileData');
   const spans = hippelModule ? hippelSpansFor(hippelModule, useInstrumentStore.getState().instruments.length, fmt.fileSubsongs?.current ?? 0) : null;
-  const linked = spans ? hippelLinkedEdits(spans, patternIndex, before, after, useTrackerStore.getState().patterns) : [];
+  const aonModule = UNLINKED_EDITS.has(type) ? null : moduleHeldIn(fmt, 'artOfNoiseFileData');
+  // Art of Noise positions share stored patterns: an edit shows in every position of the same stored pattern.
+  const linked: Array<{ pattern: number; row: number; channel: number; values: Partial<import('@typedefs').TrackerCell> }> = spans
+    ? hippelLinkedEdits(spans, patternIndex, before, after, useTrackerStore.getState().patterns)
+    : aonModule ? aonLinkedEdits(new Uint8Array(aonModule), patternIndex, before, after, useTrackerStore.getState().patterns) : [];
   if (linked.length === 0) { history.pushAction(type, description, patternIndex, before, after); return; }
   const others = [...new Set(linked.map((e) => e.pattern))];
   const befores = new Map(others.map((p) => [p, structuredClone(useTrackerStore.getState().patterns[p])]));

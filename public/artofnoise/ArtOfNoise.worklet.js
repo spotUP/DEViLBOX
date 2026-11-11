@@ -33,6 +33,7 @@ class ArtOfNoiseProcessor extends AudioWorkletProcessor {
         await this.initModule(data.sampleRate, data.wasmBinary, data.jsCode);
         break;
 
+      case 'replaceModule':
       case 'loadModule':
         if (this.module && typeof this.module._player_load === 'function') {
           try {

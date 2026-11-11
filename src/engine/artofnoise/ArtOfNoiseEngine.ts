@@ -102,6 +102,11 @@ export class ArtOfNoiseEngine extends WASMSingletonBase {
     this.workletNode.connect(this.output);
   }
 
+  /** Swap an edited module in while the song plays (the core reloads it). */
+  replaceModule(buffer: ArrayBuffer): void {
+    this.workletNode?.port.postMessage({ type: 'replaceModule', moduleData: buffer });
+  }
+
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('ArtOfNoiseEngine not initialized');

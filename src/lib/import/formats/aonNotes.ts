@@ -128,3 +128,22 @@ export function gridNoteToAonNote(gridNote: number): number {
   const i = GRID_NOTE_OF_AON.indexOf(gridNote);
   return i < 0 ? 0 : i + 1;
 }
+
+/**
+ * File effect (0..33) and argument to the grid's (effTyp, eff). The file commands 1-6, 9-15 are the
+ * MOD/XM commands of the same number; the others (arpeggio 0, and 7, 8, 16..33) have no grid effect.
+ * Single mapping: the parser, the grid edit writer and the exporter all read it.
+ */
+export function aonEffectToGridEffect(effect: number, arg: number): { effTyp: number; eff: number } {
+  switch (effect) {
+    case 1: case 2: case 3: case 4: case 5: case 6: case 9: case 10: case 11: case 13: case 14: case 15:
+      return { effTyp: effect, eff: arg };
+    case 12: return { effTyp: 0x0C, eff: Math.min(64, arg) };
+    default: return { effTyp: 0, eff: 0 };
+  }
+}
+
+/** True for the effect numbers the grid can show and write (the ones aonEffectToGridEffect maps). */
+export function isAonGridEffect(effTyp: number): boolean {
+  return effTyp === 0 || (effTyp >= 1 && effTyp <= 6) || (effTyp >= 9 && effTyp <= 15);
+}
