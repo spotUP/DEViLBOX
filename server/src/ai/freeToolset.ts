@@ -12,6 +12,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createMcpServer, type BrowserCaller } from '../mcp/mcpServer';
 import { NEO_GEO_COMPOSING_DOC, NEO_GEO_COMPOSING_TOPIC } from './neoGeoComposing';
+import { PC_TRACKER_COMPOSING_DOC, PC_TRACKER_COMPOSING_TOPIC } from './pcTrackerComposing';
 import type { ToolOutcome, ToolSpec } from './toolLoop';
 
 export const MAX_FREE_TOOLS = 24;
@@ -97,6 +98,7 @@ export async function createFreeToolset(callBrowser: BrowserCaller, options: Too
       // tools this chat can call, so the model never plans around one it cannot.
       if (name === 'get_mcp_help') {
         if (args?.topic === NEO_GEO_COMPOSING_TOPIC) return { ok: true, content: NEO_GEO_COMPOSING_DOC };
+        if (args?.topic === PC_TRACKER_COMPOSING_TOPIC) return { ok: true, content: PC_TRACKER_COMPOSING_DOC };
         return { ok: true, content: describeTools(tools) };
       }
       try {
