@@ -333,6 +333,23 @@ export function buildInstrumentConfig(id: number, config?: DeepPartial<Instrumen
     };
   }
 
+  // Every Furnace chip instrument carries a chip patch: the engine uploads an
+  // instrument to the chip only when `furnace` is present, and the editor reads
+  // it. The caller's fields win; the chip default fills what the caller left
+  // out, operator by operator. Covers every creation path (the type switcher
+  // seeds its own), so an instrument created with only a name and a type plays
+  // the chip's default voice instead of nothing.
+  if (newInstrument.synthType?.startsWith('Furnace')) {
+    const chipDefault = getDefaultFurnaceConfig(newInstrument.synthType);
+    if (chipDefault) {
+      const given = newInstrument.furnace as Partial<FurnaceConfig> | undefined;
+      const operators = given?.operators
+        ? given.operators.map((op, i) => ({ ...(chipDefault.operators[i] ?? chipDefault.operators[0]), ...op }))
+        : chipDefault.operators;
+      newInstrument.furnace = { ...chipDefault, ...given, operators };
+    }
+  }
+
   // Auto-set monophonic flag for synths that are inherently monophonic
   // Only set if not explicitly specified in config
   if (config?.monophonic === undefined) {
