@@ -1278,9 +1278,9 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   /**
    * Send a raw dispatch command.
    */
-  sendCommand(cmd: number, chan: number, val1: number = 0, val2: number = 0): void {
+  sendCommand(cmd: number, chan: number, val1: number = 0, val2: number = 0, time?: number): void {
     if (!this._isReady || this._disposed) return;
-    this.engine.dispatch(cmd, chan, val1, val2, this.platformType);
+    this.engine.dispatch(cmd, chan, val1, val2, this.platformType, time);
   }
 
   applyEffect(effect: number, param: number, chan?: number): void {

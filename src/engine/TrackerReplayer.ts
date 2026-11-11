@@ -41,6 +41,8 @@ import { useCursorStore } from '@/stores/useCursorStore';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { decodeVolumeColumn, noteStartLevel } from '@/lib/tracker/volumeColumn';
 import { furnaceCellChipEffects, cellSetVolumeLevel } from './replayer/furnaceCellEffects';
+import { FurnaceTickEffects } from './furnace-dispatch/FurnaceTickEffects';
+import { noteToMidi } from '@/utils/audio-context';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
 import { useOscilloscopeStore } from '@/stores/useOscilloscopeStore';
@@ -762,6 +764,10 @@ export class TrackerReplayer {
 
   // Tick-level effect processor for synth instruments in hybrid mode.
   // Created when libopenmpt starts and replaced instruments exist.
+  /** Per-tick Furnace cell effects (arpeggio) of the chip channels of a hybrid song. */
+  private furnaceTick = new FurnaceTickEffects();
+  /** Song channel -> instrument id for every channel routeRowToChip has seen. */
+  private furnaceTickChannels = new Map<number, number>();
   private _synthEffectProcessor: import('./replayer/SynthEffectProcessor').SynthEffectProcessor | null = null;
 
   // SonicArranger dynamic track length (effect 0x9): overrides pattern length
@@ -1347,7 +1353,7 @@ export class TrackerReplayer {
       if (!instId || !this._replacedInstruments.has(instId)) continue;
 
       // Effects and volume reach the chip on rows without a note too.
-      this.routeRowToChip(ch, channel, row, instId);
+      this.routeRowToChip(ch, channel, row, instId, time);
 
       // Only fire on rows with actual notes — empty rows sustain current note
       if (row.note <= 0 || row.note >= 97) continue;
@@ -1388,14 +1394,25 @@ export class TrackerReplayer {
    * Note rows take Cxx and the volume column as the note velocity (processHybridRow), so only a
    * row without a note sends the level as a volume command.
    */
-  private routeRowToChip(chIndex: number, ch: ChannelState, row: TrackerCell, instId: number): void {
+  private routeRowToChip(chIndex: number, ch: ChannelState, row: TrackerCell, instId: number, time?: number): void {
     if (this.song?.furnaceNative) return;
     const config = this.instrumentMap.get(instId);
     if (!config?.synthType?.startsWith('Furnace')) return;
     if (this.isChannelMuted(chIndex)) return;
     const engine = getToneEngine();
+    // Arpeggio (0xy) is stepped per tick by furnaceTick (stepFurnaceTicks), as Furnace does it;
+    // the router's HINT command for it is only an annotation a chip ignores.
+    let arp: number | null = null;
     for (const e of furnaceCellChipEffects(row)) {
+      if (e.effect === 0x00) { arp = e.param; continue; }
+      if (e.effect === 0xE0) this.furnaceTick.setArpSpeed(e.param);
       engine.applyFurnaceCellEffect(config.id, chIndex, config, e.effect, e.param);
+    }
+    // Furnace chip note: MIDI note - 12, as FurnaceDispatchSynth.triggerAttack sends it.
+    const chipNote = isPitchedNote(row.note) ? noteToMidi(xmNoteToNoteName(row.note)) - 12 : null;
+    this.furnaceTickChannels.set(chIndex, config.id);
+    for (const c of this.furnaceTick.beginRow(chIndex, chipNote, arp)) {
+      engine.applyFurnaceChipCommand(config.id, chIndex, config, c.cmd, c.val1, c.val2, time);
     }
     if (isPitchedNote(row.note)) return;
     const level = cellSetVolumeLevel(row) ?? decodeVolumeColumn(row.volume, useFormatStore.getState().editorMode);
@@ -1694,7 +1711,7 @@ export class TrackerReplayer {
       const inst = chanInst ? this.instrumentMap.get(chanInst) : null;
       const isSynth = inst?.synthType && inst.synthType !== 'Sampler';
 
-      if (isSynth && inst) this.routeRowToChip(ch, channel, row, inst.id);
+      if (isSynth && inst) this.routeRowToChip(ch, channel, row, inst.id, time);
 
       // Note-off
       if (row.note === 97) {
@@ -3000,6 +3017,9 @@ export class TrackerReplayer {
     this.coordinator.stopCaptureSync();
     resetCaptureSync();
 
+    this.furnaceTick.reset();
+    this.furnaceTickChannels.clear();
+
     // Stop all channels (release synth notes + stop sample players)
     for (let i = 0; i < this.channels.length; i++) {
       this.stopChannel(this.channels[i], i);
@@ -3243,6 +3263,7 @@ export class TrackerReplayer {
     if (!this._suppressNotes && this.currentTick === 0) {
       this.processRowForSynths(safeTime);
     }
+    if (!this._suppressNotes) this.stepFurnaceTicks(safeTime);
 
     // Notify tick processing
     if (this.onTickProcess) {
@@ -3271,6 +3292,19 @@ export class TrackerReplayer {
       }
 
       this.advanceRow();
+    }
+  }
+
+  /** One tick of the Furnace cell effects on every chip channel routeRowToChip has seen. */
+  private stepFurnaceTicks(time: number): void {
+    if (this.furnaceTickChannels.size === 0) return;
+    const engine = getToneEngine();
+    for (const [chIndex, instId] of this.furnaceTickChannels) {
+      const config = this.instrumentMap.get(instId);
+      if (!config || this.isChannelMuted(chIndex)) continue;
+      for (const c of this.furnaceTick.tick(chIndex)) {
+        engine.applyFurnaceChipCommand(config.id, chIndex, config, c.cmd, c.val1, c.val2, time);
+      }
     }
   }
 

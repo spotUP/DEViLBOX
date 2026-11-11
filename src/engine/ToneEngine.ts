@@ -5188,6 +5188,14 @@ export class ToneEngine {
     return true;
   }
 
+  /** A raw dispatch command (the per-tick effect stepper's LEGATO) on a song channel's chip channel at an audio time. */
+  public applyFurnaceChipCommand(instrumentId: number, channelIndex: number, config: InstrumentConfig, cmd: number, val1: number, val2: number, time?: number): boolean {
+    const target = this.furnaceDispatchSynthFor(instrumentId, channelIndex, config);
+    if (!target) return false;
+    target.synth.sendCommand(cmd, target.chipChannel, val1, val2, time);
+    return true;
+  }
+
   /** A cell volume (0-1 level) on a song channel's chip channel, as a volume command. */
   public applyFurnaceCellVolume(instrumentId: number, channelIndex: number, config: InstrumentConfig, level: number): boolean {
     const target = this.furnaceDispatchSynthFor(instrumentId, channelIndex, config);
