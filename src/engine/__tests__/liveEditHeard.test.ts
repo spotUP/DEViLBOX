@@ -103,20 +103,36 @@ const FILE: Record<string, string> = {
 const PAULA = new Set(['suntronic', 'robHubbard', 'davidWhittaker', 'benDaglish', 'jochenHippelST', 'activisionPro', 'fred', 'actionamics', 'soundMaster', 'digitalSonixChrome', 'sidmon1']);
 const UADE_NAME: Record<string, (n: string) => string> = { jochenHippelST: () => 'song.hst' };
 
-function registryFile(key: string): string | undefined {
+/** Content detection (what a dropped file gets) names this file as the row's format. A name match alone proves nothing. */
+function confirmedAs(key: string, rel: string): boolean {
+  return detectFormatFromContent(basename(rel), new Uint8Array(readFileSync(join(SONGS, rel))))?.key === key;
+}
+
+/** The files whose name the registry gives to this format (extension or prefix), confirmed or not. */
+function namedFiles(key: string): string[] {
   const def = FORMAT_REGISTRY.find((f) => f.key === key);
-  if (!def) return undefined;
-  // A name match is this format's song only when content detection (what a dropped file gets) agrees:
-  // `.mon` names both Maniacs of Noise and MONOTONE, and the corpus .mon is Maniacs of Noise.
-  return files.find((rel) => {
+  if (!def) return [];
+  return files.filter((rel) => {
     const b = basename(rel).toLowerCase();
-    const named = (def.extRegex && def.matchMode !== 'prefix' && def.extRegex.test(b))
+    return (def.extRegex && def.matchMode !== 'prefix' && def.extRegex.test(b))
       || (def.prefixes && def.matchMode !== 'extension' && def.prefixes.some((p) => b.startsWith(p)));
-    if (!named) return false;
-    const detected = detectFormatFromContent(basename(rel), new Uint8Array(readFileSync(join(SONGS, rel))));
-    return !detected || detected.key === key;
   });
 }
+
+/**
+ * The row's song: the pinned file or the first name match, accepted ONLY when content detection confirms
+ * the row's format (`.mon` names both Maniacs of Noise and MONOTONE; `digi.` names an Ad Lib capture).
+ * No `!detected` escape: a file detection cannot place is not this format's song.
+ */
+function registryFile(key: string): string | undefined {
+  return namedFiles(key).find((rel) => confirmedAs(key, rel));
+}
+
+/**
+ * Rows that have a candidate (a pin or a name match) but no file content detection confirms: each fails loudly
+ * by name below instead of running on a wrong file. A row with no name match at all has no corpus song and is skipped.
+ */
+const UNCONFIRMED: string[] = [];
 
 /**
  * Formats the table cannot run in node, each with the reason (named, never skipped quietly). They are the
@@ -135,6 +151,7 @@ export const UNMEASURED: Record<string, string> = {
   chuckBiscuits: 'import needs the OpenMPT WASM the node run cannot load', gameMusicCreator: 'import needs the OpenMPT WASM the node run cannot load',
   soundfx: 'import needs the OpenMPT WASM the node run cannot load',
   ams: 'import needs the OpenMPT WASM the node run cannot load',
+  monotone: 'no corpus song: the only .mon files are Maniacs of Noise (content detection says so)',
   iceTracker: 'the registry match is an instrument file, no corpus module',
   musicMaker: 'the song needs its instrument companion file, not in the corpus folder',
   stoneTracker: 'the song needs its sample bank companion file, not in the corpus folder',
@@ -144,8 +161,17 @@ export const UNMEASURED: Record<string, string> = {
 const KEYS = [...Object.keys(WALK_GRIDS), ...DIRECT_GRIDS];
 const rows: Array<{ key: string; rel: string }> = KEYS.flatMap((key) => {
   if (key in UNMEASURED) return [];
-  const rel = FILE[key] || registryFile(key);
-  return rel && existsSync(join(SONGS, rel)) ? [{ key, rel }] : [];
+  const pinned = FILE[key];
+  const rel = pinned ? (existsSync(join(SONGS, pinned)) && confirmedAs(key, pinned) ? pinned : undefined) : registryFile(key);
+  if (rel) return [{ key, rel }];
+  if (pinned || namedFiles(key).length > 0) UNCONFIRMED.push(key);
+  return [];
+});
+
+describe('every row runs on a song of its own format', () => {
+  it('no row has a candidate file that content detection refuses', () => {
+    expect(UNCONFIRMED.map((key) => `${key}: ${FILE[key] || namedFiles(key).join(', ')} is not confirmed as ${key} by content detection`)).toEqual([]);
+  });
 });
 
 type Cell = { note: number; instrument: number };
