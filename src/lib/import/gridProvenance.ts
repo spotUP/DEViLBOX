@@ -65,6 +65,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   dynamicSynthesizer: 'pass',
   riffRaff: 'pass',
   mcmd: 'pass',
+  ems: 'pass',
   howieDavies: 'pass',
   soundProgrammingLanguage: 'pass',
   timFollin: 'pass',
@@ -148,6 +149,7 @@ export const LIVE_EDIT: Record<string, LiveEditStatus> = {
   dynamicSynthesizer: 'pass',
   riffRaff: 'pass',
   mcmd: 'pass',
+  ems: 'pass',
   howieDavies: 'pass',
   synthesis: 'pass',
   tcbTracker: 'pass',
@@ -278,6 +280,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   dynamicSynthesizer: 'fail',
   riffRaff: 'fail',
   mcmd: 'pass',
+  ems: 'pass',
   howieDavies: 'fail',
   synthesis: 'pass',
   tcbTracker: 'pass',
@@ -429,7 +432,6 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   uade_dz: 'U27',
   uade_mkiio: 'G11-uade-only',
   uade_mg: 'G11-uade-only',
-  uade_ems: 'U28',
   uade_emsv6: 'G11-uade-only',
   uade_hn: 'G11-uade-only',
   uade_thn: 'G11-uade-only',
@@ -506,6 +508,8 @@ export const DIRECT_GRIDS: readonly string[] = [
   'riffRaff',
   // MCMD: the fixed 4-voice two-byte cell pool is the grid, read and written in place (MCMDParser.ts getCellFileOffset).
   'mcmd',
+  // EMS: the fixed 64-row 4-voice four-byte cell pool is the grid, read and written in place (EMSParser.ts getCellFileOffset).
+  'ems',
   // Howie Davies: the position lists and patterns decode to a read-only tick grid (howieDaviesGrid.ts), no oracle yet.
   'howieDavies',
 ];

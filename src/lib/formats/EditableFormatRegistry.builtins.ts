@@ -16,6 +16,7 @@ import type { SynthType } from '@typedefs/instrument';
 
 registerEditableFormat({ formatId: "actionamics", label: "", newSong: { template: "templates/actionamics.ast", name: "Actionamics" }, patternCodec: { kind: "variable" }, exporter: { module: "ActionamicsExporter", fn: "exportActionamics", byLayout: true } });
 registerEditableFormat({ formatId: "jxs", label: "JayTrax", patternCodec: { kind: "fixed" }, exporter: { module: "JxsExporter", fn: "exportJxs", byLayout: true } });
+registerEditableFormat({ formatId: "ems", label: "EMS", patternCodec: { kind: "fixed" }, exporter: { module: "EmsExporter", fn: "exportEms", byLayout: true } });
 registerEditableFormat({ formatId: "mcmd", label: "MCMD", patternCodec: { kind: "fixed" }, exporter: { module: "McmdExporter", fn: "exportMcmd", byLayout: true } });
 registerEditableFormat({ formatId: "organya", label: "Organya", patternCodec: { kind: "fixed" }, exporter: { module: "OrganyaExporter", fn: "exportOrganya", byLayout: true } });
 registerEditableFormat({ formatId: "piyoPiyo", label: "PiyoPiyo", patternCodec: { kind: "fixed" }, exporter: { module: "PiyoPiyoExporter", fn: "exportPiyoPiyo", byLayout: true } });
