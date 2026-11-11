@@ -27,9 +27,10 @@ import type { FurnaceConfig, FurnaceMacro } from '@typedefs/instrument';
 
 // DivInstrumentType values (from instrument.h)
 const DIV_INS_STD = 0;
-const DIV_INS_FM = 1;
+export const DIV_INS_FM = 1;
 const DIV_INS_GB = 2;
 const DIV_INS_C64 = 3;
+export const DIV_INS_AY = 6;
 const DIV_INS_N163 = 17;
 const DIV_INS_OPZ = 19;
 const DIV_INS_MIKEY = 23;
@@ -46,6 +47,8 @@ const DIV_INS_SU = 30;
 const DIV_INS_ESFM = 55;
 const DIV_INS_POWERNOISE = 56;
 const DIV_INS_SID2 = 63;
+export const DIV_INS_ADPCMA = 37;
+export const DIV_INS_ADPCMB = 38;
 
 /** All FM-based instrument types that have operator data */
 const FM_INSTRUMENT_TYPES = new Set([
@@ -140,7 +143,9 @@ const CHIPTYPE_TO_DIV_INS: Record<number, number> = {
   49: DIV_INS_ESFM,      // ESFM → DIV_INS_ESFM (55)
 };
 
-function resolveInsType(config: FurnaceConfig): number {
+export function resolveInsType(config: FurnaceConfig): number {
+  // An explicit instrument type (Neo Geo SSG / ADPCM-A / ADPCM-B voice) wins over every inference below.
+  if (config.divInsType !== undefined) return config.divInsType;
   // If config has chip-specific data, use the corresponding DivInstrumentType
   if (config.c64) return DIV_INS_C64;       // 3
   if (config.gb) return DIV_INS_GB;          // 2
