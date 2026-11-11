@@ -10,6 +10,15 @@ import { testCpuLimits } from './vitest.limits';
 // heavy offline-render suites out; the heavy tier (VITEST_TIER=heavy,
 // npm run test:heavy) runs only those, nightly. Unset: every test.
 const testTier = process.env.VITEST_TIER as 'fast' | 'heavy' | undefined
+
+/**
+ * DEVILBOX_NO_RELOAD=1 turns off every automatic page reload of the dev server:
+ * Vite hot module replacement and the engine-change reload below. Agents that
+ * drive the open tab through the MCP set it, because a reload in the middle of
+ * their work drops the page state they are testing. The tab then runs the code
+ * it loaded until someone reloads it on purpose.
+ */
+const noReload = process.env.DEVILBOX_NO_RELOAD === '1'
 const ciDirRequested = process.argv.some((arg) => arg.replace(/\\/g, '/').replace(/^\.\//, '').startsWith('src/__tests__/ci'))
 const heavyTestFiles: string[] = testTier
   ? (JSON.parse(fs.readFileSync(path.resolve(__dirname, 'tools/test-tiers/heavy.json'), 'utf8')) as { files: { file: string }[] }).files.map((f) => f.file)
@@ -127,7 +136,7 @@ function copyOnnxWasmFiles() {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), generateVersionFile(), copyOnnxWasmFiles(), reloadOnEngineChange()],
+  plugins: [react(), generateVersionFile(), copyOnnxWasmFiles(), ...(noReload ? [] : [reloadOnEngineChange()])],
   // Force root base path for subdomain deployment (Docker/live site)
   // GitHub Pages deployment uses separate workflow with --base flag
   base: '/',
@@ -204,6 +213,7 @@ export default defineConfig({
     // on maker instead of DEViLBOX. strictPort surfaces a conflict loudly instead.
     port: 5174,
     strictPort: true,
+    ...(noReload ? { hmr: false } : {}),
     // Cross-Origin Isolation headers required for SharedArrayBuffer (scsynth WASM pthreads)
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
