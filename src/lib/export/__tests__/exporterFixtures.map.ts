@@ -77,6 +77,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   davidHanney: 'public/data/songs/formats/tearaway_thomas.dh',
   ems: 'public/data/songs/formats/je taime.ems',
   mcmd: 'public/data/songs/formats/ep-trmonsterbusiness.mcmd',
+  fashionTracker: 'public/data/songs/fashion-tracker/ivory tover ii.ex',
   organya: 'public/data/songs/organya/obj0640-1.org',
   artOfNoise: 'public/data/songs/art-of-noise/inside.blipp.aon',
   piyoPiyo: 'public/data/songs/studio-pixel---piyopiyo/obj0176-1.pmd',
