@@ -76,6 +76,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   kdm: 'public/data/songs/formats/flysong.kdm',
   davidHanney: 'public/data/songs/formats/tearaway_thomas.dh',
   ems: 'public/data/songs/formats/je taime.ems',
+  emsv6: 'public/data/songs/formats/perception.ems',
   mcmd: 'public/data/songs/formats/ep-trmonsterbusiness.mcmd',
   fashionTracker: 'public/data/songs/fashion-tracker/ivory tover ii.ex',
   organya: 'public/data/songs/organya/obj0640-1.org',

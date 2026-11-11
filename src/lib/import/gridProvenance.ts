@@ -68,6 +68,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   fashionTracker: 'pass',
   davidHanney: 'pass',
   ems: 'pass',
+  emsv6: 'pass',
   howieDavies: 'pass',
   soundProgrammingLanguage: 'pass',
   timFollin: 'pass',
@@ -437,7 +438,6 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   uade_dz: 'U27',
   uade_mkiio: 'G11-uade-only',
   uade_mg: 'G11-uade-only',
-  uade_emsv6: 'G11-uade-only',
   uade_hn: 'G11-uade-only',
   uade_thn: 'G11-uade-only',
   uade_mtp2: 'G11-uade-only',
@@ -515,6 +515,8 @@ export const DIRECT_GRIDS: readonly string[] = [
   'mcmd',
   // EMS: the fixed 64-row 4-voice four-byte cell pool is the grid, read and written in place (EMSParser.ts getCellFileOffset).
   'ems',
+  // EMS v6: the sub-song's track lists and pattern command streams read as a tick grid, each note cell tied to its note byte (EMSv6Parser.ts noteBytes), written in place by EmsV6Exporter.
+  'emsv6',
   // David Hanney: the BLK chunk row pools are the grid, read and written in place (DavidHanneyParser.ts getCellFileOffset).
   'davidHanney',
   // Howie Davies: the position lists and patterns decode to a read-only tick grid (howieDaviesGrid.ts), no oracle yet.

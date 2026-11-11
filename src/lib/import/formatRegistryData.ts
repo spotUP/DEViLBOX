@@ -2387,6 +2387,19 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     uadeFallback: true,
   },
 
+  // ── EMS v6 (perception.ems class: "E.M.S. V6" tag) ───────────────────────
+  {
+    key: 'emsv6',
+    label: 'EMS v6',
+    description: 'EMS v6 (.ems) - the track lists and command streams of sub-song 0 as the tick grid, note edits saved in place; nuade / UADE plays the module',
+    family: 'amiga-native',
+    matchMode: 'prefix',
+    prefixes: ['emsv6.'],
+    prefKey: 'emsv6',
+    nativeParser: { module: '@lib/import/formats/EMSv6Parser', parseFn: 'parseEMSv6File', detectFn: 'isEMSv6Format' },
+    uadeFallback: true,
+  },
+
   // ── MCMD (.mcmd) ─────────────────────────────────────────────────────────
   {
     key: 'mcmd',
@@ -2616,7 +2629,7 @@ export const FORMAT_REGISTRY: FormatDefinition[] = [
     ['cus', 'Custom'], ['cust', 'Custom'], ['custom', 'Custom'],
     ['dz', 'Darius Zendeh'],
     ['mkiio', 'Mark II (O)'],
-    ['mg', 'MG'], ['emsv6', 'EMS v6'],
+    ['mg', 'MG'],
     ['fw', 'Forgotten Worlds'],
     ['hn', 'HN'], ['thn', 'THN'],
     ['mtp2', 'MajorTom 2'], ['arp', 'ARP'],

@@ -655,6 +655,14 @@
       "matchPct": 1,
       "cells": 67502,
       "bytes": 67502
+    },
+    "emsv6": {
+      "exporter": "EmsV6Exporter.exportEmsV6",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 4094,
+      "bytes": 4094
     }
   },
   "missingFixture": [
