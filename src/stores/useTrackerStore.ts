@@ -515,10 +515,12 @@ interface TrackerStore {
   // Channel management
   addChannel: () => void;
   /**
-   * Grow every pattern to `count` channels for a transient overlay (the startup
-   * jingle lips) that restores the original count itself. Skips the keyboard
-   * scheme and format-compatibility caps that `addChannel` enforces on user
-   * edits; only the hard MAX_CHANNELS limit applies. Returns the resulting count.
+   * Grow every pattern to `count` channels, without a dialog. Two callers: a
+   * transient overlay (the startup jingle lips) that restores the original
+   * count itself, and the MCP `set_channel_count` tool, which checks the
+   * format limit itself and answers with an error instead of the confirm
+   * dialog `addChannel` opens. Only the hard MAX_CHANNELS limit applies here.
+   * Never removes a channel. Returns the resulting count.
    */
   addOverlayChannels: (count: number) => number;
   removeChannel: (channelIndex: number) => void;

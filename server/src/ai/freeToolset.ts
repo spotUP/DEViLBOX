@@ -40,6 +40,7 @@ export const COMPOSER_TOOL_ALLOWLIST: readonly string[] = [
   ...FREE_TOOL_ALLOWLIST,
   // song structure
   'get_pattern_list', 'get_pattern_order', 'add_pattern', 'duplicate_pattern', 'resize_pattern',
+  'set_channel_count',
   'clear_pattern', 'clear_channel', 'clear_cell', 'set_pattern_order', 'add_to_order', 'remove_from_order',
   'set_project_metadata',
   // instruments
