@@ -5,6 +5,8 @@ import {
   SSG_ENVELOPE_SHAPES,
   describeFmAlgorithm,
   fmAlgorithm,
+  fmCarrierStorageIndices,
+  fmOperatorsFromManualOrder,
   fmOperatorDisplayOrder,
   formatSignedValue,
   isFmCarrier,
@@ -108,5 +110,17 @@ describe('fmOperatorModel', () => {
     expect(formatSignedValue(2)).toBe('+2');
     expect(formatSignedValue(0)).toBe('0');
     expect(formatSignedValue(-3)).toBe('-3');
+  });
+});
+
+describe('storage order helpers', () => {
+  it('carriers sit at storage indices (operators 1, 3, 2, 4)', () => {
+    expect([0, 1, 2, 3, 4, 5, 6, 7].map((a) => fmCarrierStorageIndices(a, 4))).toEqual([
+      [3], [3], [3], [3], [2, 3], [1, 2, 3], [1, 2, 3], [0, 1, 2, 3],
+    ]);
+  });
+  it('manual-order operator lists swap entries 1 and 2 only for four operators', () => {
+    expect(fmOperatorsFromManualOrder(['op1', 'op2', 'op3', 'op4'])).toEqual(['op1', 'op3', 'op2', 'op4']);
+    expect(fmOperatorsFromManualOrder(['a', 'b'])).toEqual(['a', 'b']);
   });
 });
