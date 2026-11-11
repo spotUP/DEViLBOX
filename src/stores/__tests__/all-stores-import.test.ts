@@ -6,7 +6,7 @@
  * dependencies, or side-effects that assume a browser-only API.
  */
 
-import { describe, it, expect } from 'vitest';
+import { beforeAll, describe, it, expect } from 'vitest';
 import { assertNoCrashOnImport } from './_harness';
 
 const STORE_MODULES: Array<[name: string, load: () => Promise<Record<string, unknown>>]> = [
@@ -66,7 +66,22 @@ const STORE_MODULES: Array<[name: string, load: () => Promise<Record<string, unk
 // can take 40+ seconds on cold start.
 const IMPORT_TIMEOUT_MS = 60000;
 
+// The first import of the store graph pays the whole cold transform (Tone.js,
+// InstrumentFactory, the WASM glue). Measured 110 s with the machine busy and
+// the runner at nice 19, which made whichever store came first with that graph
+// (useCollaborationStore, useDJSetStore) time out although nothing was wrong
+// with it. The transform is paid once here, on its own budget, so the per-store
+// budget below measures the store. A store that throws on import is ignored
+// here and still fails in its own test.
+const COLD_TRANSFORM_TIMEOUT_MS = 600000;
+
 describe('Store safety net — import + init', () => {
+  beforeAll(async () => {
+    for (const [, load] of STORE_MODULES) {
+      await load().catch(() => undefined);
+    }
+  }, COLD_TRANSFORM_TIMEOUT_MS);
+
   for (const [name, load] of STORE_MODULES) {
     it(
       `${name} imports cleanly and exposes a valid initial state`,
