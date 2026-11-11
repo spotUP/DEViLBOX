@@ -15,6 +15,7 @@ import { useAudioStore } from '../../stores/useAudioStore';
 import { useMixerStore } from '../../stores/useMixerStore';
 import type { SynthType } from '@typedefs/instrument';
 import { useInstrumentStore, synthRefusal, buildInstrumentConfig } from '../../stores/useInstrumentStore';
+import { noteVoiceKindError } from '../../engine/furnace-dispatch/noteVoiceKindGuard';
 import { useProjectStore } from '../../stores/useProjectStore';
 import { useSynthErrorStore } from '../../stores/useSynthErrorStore';
 import { closeStartDialog } from '../../lib/startup/startupSequence';
@@ -102,6 +103,22 @@ function stepError(step: unknown): string | null {
     : `step ${String(step)} is not valid: use a whole number from 1 up.`;
 }
 
+/**
+ * A note of one voice kind on a channel of another (an FM voice on an ADPCM
+ * channel of a Neo Geo song) would be silent or wrong, so it is refused with
+ * text naming the channels that take the instrument. Null when the cell fits.
+ */
+function voiceKindError(patternIndex: number | undefined, channel: number, row: number, params: Record<string, unknown>): string | null {
+  const st = useTrackerStore.getState();
+  const existing = st.patterns[patternIndex ?? st.currentPatternIndex]?.channels[channel]?.rows[row];
+  const note = params.note === undefined ? undefined : resolveNote(params.note);
+  return noteVoiceKindError(
+    channel,
+    { note, instrument: params.instrument as number | undefined },
+    existing,
+  );
+}
+
 export function setCell(params: Record<string, unknown>): Record<string, unknown> {
   const channel = params.channel as number;
   const row = params.row as number;
@@ -109,6 +126,9 @@ export function setCell(params: Record<string, unknown>): Record<string, unknown
 
   const rangeError = cellTargetError(patternIndex, channel, [row]);
   if (rangeError) return { error: rangeError };
+
+  const kindError = voiceKindError(patternIndex, channel, row, params);
+  if (kindError) return { error: kindError };
 
   if (patternIndex !== undefined) {
     useTrackerStore.getState().setCurrentPattern(patternIndex);
@@ -142,6 +162,8 @@ export function setCells(params: Record<string, unknown>): Record<string, unknow
   for (const cell of cells) {
     const rangeError = cellTargetError(patternIndex, cell.channel, [cell.row]);
     if (rangeError) return { error: rangeError };
+    const kindError = voiceKindError(patternIndex, cell.channel as number, cell.row as number, cell);
+    if (kindError) return { error: kindError };
   }
 
   if (patternIndex !== undefined) {

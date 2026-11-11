@@ -14,6 +14,7 @@ import pako from 'pako';
 import { furnaceRowToTrackerCell } from '../furnaceEditorCells';
 import { notify } from '@/stores/useNotificationStore';
 import { synthTypeForPlatform } from '@/engine/furnace-dispatch/synthPlatforms';
+import { chipSpecOf } from '@/engine/furnace-dispatch/chipVoiceKinds';
 import type {
   FurnaceSubsong,
 } from '@/types/tracker';
@@ -250,8 +251,9 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
       const converted = convertToInstrument(parsed, i + 1, 'FUR');
       for (const inst of converted) {
         if (inst.furnace && previewChannel > 0) inst.furnace.previewChannel = previewChannel;
-        // A Neo Geo voice keeps its kind, so the editor shows the section the instrument is.
-        if (inst.furnace && (synthType === 'FurnaceOPNB' || synthType === 'FurnaceOPNBB')) inst.furnace.divInsType = furIns.type;
+        // A voice of a mixed-kind chip (Neo Geo, YM2608, YM2203, Y8950, OPL4) keeps its kind, so the editor
+        // shows the section the instrument is and the note check knows which channels take it.
+        if (inst.furnace && chipSpecOf(synthType)) inst.furnace.divInsType = furIns.type;
       }
       instruments.push(...converted.map((inst, j) => ({ ...inst, id: i + 1 + j })));
     } catch (err) {

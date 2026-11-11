@@ -23,6 +23,7 @@ import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } fro
 import { SYSTEM_PRESETS, DivChanType } from '../constants/systemPresets';
 import { autoNameChannels as computeAutoNames } from '@/bridge/analysis/ChannelNaming';
 import { useInstrumentStore } from './useInstrumentStore';
+import { noteVoiceKindError } from '@/engine/furnace-dispatch/noteVoiceKindGuard';
 import { useProjectStore } from './useProjectStore';
 import { songToSongFile, type SongMeta } from '@lib/uprough/songFile';
 import { isSynthCompatibleWithChannel, getChannelBadge, getSynthBadge } from '../constants/channelTypeCompat';
@@ -207,6 +208,39 @@ function cosoRefusesNote(cellUpdate: Partial<TrackerCell>): boolean {
   if (!data || !isCoSo(new Uint8Array(data)) || cosoIndexForXM(note) !== null) return false;
   notify.warning('CoSo plays notes from C-1 to B-3: the top note is B-3.');
   return true;
+}
+
+/**
+ * A paste or transpose may land a note of one voice kind (say an FM voice) on a
+ * channel of another (an ADPCM channel). After the operation's write, put back
+ * every cell that now holds such a note and tell the user once, however many
+ * cells that was. Cells of the operation that fit stay written.
+ */
+function refuseWrongKindCells(patternIndex: number, before: Pattern): void {
+  const after = useTrackerStore.getState().patterns[patternIndex];
+  if (!after) return;
+  const refused: Array<{ ch: number; row: number }> = [];
+  let firstError: string | null = null;
+  after.channels.forEach((channel, ch) => {
+    channel.rows.forEach((cell, row) => {
+      const old = before.channels[ch]?.rows[row];
+      if (!old || (old.note === cell.note && old.instrument === cell.instrument)) return;
+      const error = noteVoiceKindError(ch, cell);
+      if (!error) return;
+      refused.push({ ch, row });
+      firstError ??= error;
+    });
+  });
+  if (!refused.length) return;
+  useTrackerStore.setState((state) => {
+    for (const { ch, row } of refused) {
+      const old = before.channels[ch].rows[row];
+      const cell = state.patterns[patternIndex].channels[ch].rows[row];
+      cell.note = old.note;
+      cell.instrument = old.instrument;
+    }
+  });
+  notify.warning(`${firstError} ${refused.length} note${refused.length === 1 ? ' was' : 's were'} not written.`);
 }
 
 /**
@@ -702,6 +736,8 @@ export const useTrackerStore = create<TrackerStore>()(
     setCell: (channelIndex, rowIndex, cellUpdate, targetPattern) => {
       if (cosoRefusesNote(cellUpdate)) return;
       const patternIndex = targetPattern ?? get().currentPatternIndex;
+      const kindError = noteVoiceKindError(channelIndex, cellUpdate, get().patterns[patternIndex]?.channels[channelIndex]?.rows[rowIndex]);
+      if (kindError) { notify.warning(kindError); return; }
       const beforePattern = get().patterns[patternIndex];
       set((state) => {
         setCellInPattern(state.patterns[patternIndex], channelIndex, rowIndex, cellUpdate);
@@ -970,6 +1006,7 @@ export const useTrackerStore = create<TrackerStore>()(
         const cursor = useCursorStore.getState().cursor;
         pasteHelper(pattern, cursor, state.clipboard, useEditorStore.getState().pasteMask);
       });
+      refuseWrongKindCells(patternIndex, beforePattern);
       pushEditAction('PASTE', 'Paste', patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
@@ -1002,6 +1039,7 @@ export const useTrackerStore = create<TrackerStore>()(
         const cursor = useCursorStore.getState().cursor;
         pasteMixHelper(pattern, cursor, state.clipboard, useEditorStore.getState().pasteMask);
       });
+      refuseWrongKindCells(patternIndex, beforePattern);
       pushEditAction('PASTE_MIX', 'Mix paste', patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
@@ -1017,6 +1055,7 @@ export const useTrackerStore = create<TrackerStore>()(
         const cursor = useCursorStore.getState().cursor;
         pasteFloodHelper(pattern, cursor, state.clipboard, useEditorStore.getState().pasteMask);
       });
+      refuseWrongKindCells(patternIndex, beforePattern);
       pushEditAction('PASTE_FLOOD', 'Flood paste', patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
@@ -1032,6 +1071,7 @@ export const useTrackerStore = create<TrackerStore>()(
         const cursor = useCursorStore.getState().cursor;
         pastePushForwardHelper(pattern, cursor, state.clipboard, useEditorStore.getState().pasteMask);
       });
+      refuseWrongKindCells(patternIndex, beforePattern);
       pushEditAction('PASTE_PUSH_FORWARD', 'Push-forward paste', patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
@@ -1065,6 +1105,7 @@ export const useTrackerStore = create<TrackerStore>()(
         const p = state.patterns[state.currentPatternIndex];
         pasteTrackHelper(p, channelIndex, state.trackClipboard, useEditorStore.getState().pasteMask);
       });
+      refuseWrongKindCells(patternIndex, beforePattern);
       pushEditAction('PASTE_TRACK', 'Paste track', patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
@@ -1200,6 +1241,7 @@ export const useTrackerStore = create<TrackerStore>()(
           }
         });
       });
+      refuseWrongKindCells(patternIndex, beforePattern);
       pushEditAction('PASTE_PATTERN', 'Paste pattern', patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
@@ -1253,6 +1295,7 @@ export const useTrackerStore = create<TrackerStore>()(
           : null;
         transposeSelectionHelper(pattern, selection, cursor, semitones, targetInstrumentId);
       });
+      refuseWrongKindCells(patternIndex, beforePattern);
       pushEditAction('TRANSPOSE', 'Transpose', patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
@@ -1275,6 +1318,7 @@ export const useTrackerStore = create<TrackerStore>()(
         const { cursor } = useCursorStore.getState();
         transposeSelectionHelper(pattern, fullTrackSelection, cursor, semitones, null);
       });
+      refuseWrongKindCells(patternIndex, beforePattern);
       pushEditAction('TRANSPOSE', 'Transpose Track', patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
@@ -1297,6 +1341,7 @@ export const useTrackerStore = create<TrackerStore>()(
         const { cursor } = useCursorStore.getState();
         transposeSelectionHelper(pattern, fullPatternSelection, cursor, semitones, null);
       });
+      refuseWrongKindCells(patternIndex, beforePattern);
       pushEditAction('TRANSPOSE', 'Transpose Pattern', patternIndex, beforePattern, get().patterns[patternIndex]);
       syncBulkEdit(patternIndex, get().patterns[patternIndex], beforePattern);
     },
