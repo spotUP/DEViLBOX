@@ -83,6 +83,7 @@ import {
   addPattern,
   duplicatePattern,
   resizePattern,
+  setChannelCount,
   setPatternOrder,
   addToOrder,
   removeFromOrder,
@@ -300,6 +301,7 @@ const handlers: Record<string, Handler> = {
   add_pattern: addPattern,
   duplicate_pattern: duplicatePattern,
   resize_pattern: resizePattern,
+  set_channel_count: setChannelCount,
 
   // ─── Write: Pattern Order ────────────────────────────────────────────────────
   set_pattern_order: setPatternOrder,

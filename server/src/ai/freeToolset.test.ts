@@ -55,7 +55,7 @@ describe('free toolset (FA-6)', () => {
     const names = ts.tools.map((t) => t.name);
     expect(names.length).toBe(COMPOSER_TOOL_ALLOWLIST.length);
     expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
-    expect(names).toEqual(expect.arrayContaining(['add_pattern', 'create_instrument', 'write_note_sequence', 'set_pattern_order']));
+    expect(names).toEqual(expect.arrayContaining(['add_pattern', 'create_instrument', 'write_note_sequence', 'set_pattern_order', 'set_channel_count']));
     for (const banned of ['batch', 'new_song', 'load_file', 'evaluate_script', 'hard_reload', 'execute_command']) {
       expect(names).not.toContain(banned);
       expect(await ts.execute(banned, {})).toEqual({ ok: false, content: `Unknown tool: ${banned}` });

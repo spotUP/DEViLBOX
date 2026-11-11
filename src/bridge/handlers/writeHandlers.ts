@@ -20,7 +20,8 @@ import { useSynthErrorStore } from '../../stores/useSynthErrorStore';
 import { closeStartDialog } from '../../lib/startup/startupSequence';
 import { getGlobalRegistry } from '../../hooks/useGlobalKeyboardHandler';
 import { getToneEngine } from '../../engine/ToneEngine';
-import { suppressFormatChecks, restoreFormatChecks } from '../../lib/formatCompatibility';
+import { suppressFormatChecks, restoreFormatChecks, getActiveFormatLimits } from '../../lib/formatCompatibility';
+import { MAX_CHANNELS, MIN_CHANNELS } from '../../constants/trackerConstants';
 import * as Tone from 'tone';
 import { AudioDataBus } from '../../engine/vj/AudioDataBus';
 import { getDevilboxAudioContext } from '../../utils/audio-context';
@@ -228,6 +229,29 @@ export function resizePattern(params: Record<string, unknown>): Record<string, u
   const newLength = params.length as number;
   useTrackerStore.getState().resizePattern(index, newLength);
   return { ok: true };
+}
+
+/**
+ * Grow the song to `count` channels. Grow only: dropping a channel deletes its
+ * notes, which stays a hand action. A loaded native format caps the count; the
+ * UI asks through a confirm dialog, a tool caller cannot answer one, so the cap
+ * is an error here.
+ */
+export function setChannelCount(params: Record<string, unknown>): Record<string, unknown> {
+  const count = params.count;
+  if (typeof count !== 'number' || !Number.isInteger(count) || count < MIN_CHANNELS || count > MAX_CHANNELS) {
+    return { error: `count ${String(count)} is not valid: use a whole number from ${MIN_CHANNELS} to ${MAX_CHANNELS}.` };
+  }
+  const st = useTrackerStore.getState();
+  const current = st.patterns[0]?.channels.length ?? 0;
+  if (count < current) {
+    return { error: `set_channel_count only adds channels: the song has ${current} channels and ${count} was asked. Leave unused channels empty.` };
+  }
+  const limits = getActiveFormatLimits();
+  if (limits && count > limits.maxChannels) {
+    return { error: `${limits.name} songs hold at most ${limits.maxChannels} channels; ${count} was asked.` };
+  }
+  return { ok: true, channelCount: st.addOverlayChannels(count) };
 }
 
 // ─── Pattern Order (Song Arrangement) ──────────────────────────────────────────

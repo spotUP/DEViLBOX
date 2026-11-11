@@ -367,6 +367,13 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
     (p) => call('resize_pattern', p),
   );
 
+  server.tool(
+    'set_channel_count',
+    'Grow the song to this many channels (all patterns). Only adds channels, never removes one. Returns the resulting channelCount.',
+    { count: z.number().int().min(1).max(16).describe('Channel count wanted (1-16, not below the current count)') },
+    (p) => call('set_channel_count', p),
+  );
+
   // ═══════════════════════════════════════════════════════════════════════════════
   // PATTERN ORDER (SONG ARRANGEMENT)
   // ═══════════════════════════════════════════════════════════════════════════════
@@ -2192,6 +2199,7 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
           { tool: 'add_pattern', description: 'Add a new empty pattern' },
           { tool: 'duplicate_pattern', description: 'Duplicate an existing pattern' },
           { tool: 'resize_pattern', description: 'Change pattern row count' },
+          { tool: 'set_channel_count', description: 'Grow the song to N channels (adds only)' },
           { tool: 'insert_row', description: 'Insert a row, shifting others down' },
           { tool: 'delete_row', description: 'Delete a row, shifting others up' },
           { tool: 'swap_channels', description: 'Swap two channels' },
