@@ -54,6 +54,7 @@ import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import { createSamplerInstrument } from './AmigaUtils';
 import type { UADEChipRamInfo } from '@/types/instrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { AON_PERIODS, aonNoteToGridNote } from './aonNotes';
 import { encodeAONCell } from '@/engine/uade/encoders/ArtOfNoiseEncoder';
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -61,118 +62,9 @@ import { encodeAONCell } from '@/engine/uade/encoders/ArtOfNoiseEncoder';
 /** PAL Amiga clock frequency (Hz) */
 const PAL_CLOCK = 3546895;
 
-/**
- * AON period table (16 fine-tune rows × 60 notes).
- * Rows 0-7 are fine-tunes 0..7; rows 8-15 are fine-tunes -8..-1.
- * Copied verbatim from NostalgicPlayer Tables.cs.
- */
-const AON_PERIODS: number[][] = [
-  // Tuning 0 (normal)
-  [3434,3232,3048,2880,2712,2560,2416,2280,2152,2032,1920,1812,
-   1712,1616,1524,1440,1356,1280,1208,1140,1076,1016, 960, 906,
-    856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480, 453,
-    428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240, 226,
-    214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120, 113],
-  // Tuning 1
-  [3400,3208,3028,2860,2696,2548,2404,2268,2140,2020,1908,1800,
-   1700,1604,1514,1430,1348,1274,1202,1134,1070,1010, 954, 900,
-    850, 802, 757, 715, 674, 637, 601, 567, 535, 505, 477, 450,
-    425, 401, 379, 357, 337, 318, 300, 284, 268, 253, 239, 225,
-    213, 201, 189, 179, 169, 159, 150, 142, 134, 126, 119, 113],
-  // Tuning 2
-  [3376,3184,3008,2836,2680,2528,2388,2252,2128,2008,1896,1788,
-   1688,1592,1504,1418,1340,1264,1194,1126,1064,1004, 948, 894,
-    844, 796, 752, 709, 670, 632, 597, 563, 532, 502, 474, 447,
-    422, 398, 376, 355, 335, 316, 298, 282, 266, 251, 237, 224,
-    211, 199, 188, 177, 167, 158, 149, 141, 133, 125, 118, 112],
-  // Tuning 3
-  [3352,3164,2984,2816,2660,2512,2368,2236,2112,1992,1880,1776,
-   1676,1582,1492,1408,1330,1256,1184,1118,1056, 996, 940, 888,
-    838, 791, 746, 704, 665, 628, 592, 559, 528, 498, 470, 444,
-    419, 395, 373, 352, 332, 314, 296, 280, 264, 249, 235, 222,
-    209, 198, 187, 176, 166, 157, 148, 140, 132, 125, 118, 111],
-  // Tuning 4
-  [3328,3140,2964,2796,2640,2492,2352,2220,2096,1980,1868,1764,
-   1664,1570,1482,1398,1320,1246,1176,1110,1048, 990, 934, 882,
-    832, 785, 741, 699, 660, 623, 588, 555, 524, 495, 467, 441,
-    416, 392, 370, 350, 330, 312, 294, 278, 262, 247, 233, 220,
-    208, 196, 185, 175, 165, 156, 147, 139, 131, 124, 117, 110],
-  // Tuning 5
-  [3304,3116,2944,2776,2620,2476,2336,2204,2080,1964,1852,1748,
-   1652,1558,1472,1388,1310,1238,1168,1102,1040, 982, 926, 874,
-    826, 779, 736, 694, 655, 619, 584, 551, 520, 491, 463, 437,
-    413, 390, 368, 347, 328, 309, 292, 276, 260, 245, 232, 219,
-    206, 195, 184, 174, 164, 155, 146, 138, 130, 123, 116, 109],
-  // Tuning 6
-  [3280,3096,2920,2756,2604,2456,2320,2188,2064,1948,1840,1736,
-   1640,1548,1460,1378,1302,1228,1160,1094,1032, 974, 920, 868,
-    820, 774, 730, 689, 651, 614, 580, 547, 516, 487, 460, 434,
-    410, 387, 365, 345, 325, 307, 290, 274, 258, 244, 230, 217,
-    205, 193, 183, 172, 163, 154, 145, 137, 129, 122, 115, 109],
-  // Tuning 7
-  [3256,3072,2900,2736,2584,2440,2300,2172,2052,1936,1828,1724,
-   1628,1536,1450,1368,1292,1220,1150,1086,1026, 968, 914, 862,
-    814, 768, 725, 684, 646, 610, 575, 543, 513, 484, 457, 431,
-    407, 384, 363, 342, 323, 305, 288, 272, 256, 242, 228, 216,
-    204, 192, 181, 171, 161, 152, 144, 136, 128, 121, 114, 108],
-  // Tuning -8
-  [3628,3424,3232,3048,2880,2712,2560,2416,2280,2152,2032,1920,
-   1814,1712,1616,1524,1440,1356,1280,1208,1140,1076,1016, 960,
-    907, 856, 808, 762, 720, 678, 640, 604, 570, 538, 508, 480,
-    453, 428, 404, 381, 360, 339, 320, 302, 285, 269, 254, 240,
-    226, 214, 202, 190, 180, 170, 160, 151, 143, 135, 127, 120],
-  // Tuning -7
-  [3600,3400,3208,3028,2860,2700,2544,2404,2268,2140,2020,1908,
-   1800,1700,1604,1514,1430,1350,1272,1202,1134,1070,1010, 954,
-    900, 850, 802, 757, 715, 675, 636, 601, 567, 535, 505, 477,
-    450, 425, 401, 379, 357, 337, 318, 300, 284, 268, 253, 238,
-    225, 212, 200, 189, 179, 169, 159, 150, 142, 134, 126, 119],
-  // Tuning -6
-  [3576,3376,3184,3008,2836,2680,2528,2388,2252,2128,2008,1896,
-   1788,1688,1592,1504,1418,1340,1264,1194,1126,1064,1004, 948,
-    894, 844, 796, 752, 709, 670, 632, 597, 563, 532, 502, 474,
-    447, 422, 398, 376, 355, 335, 316, 298, 282, 266, 251, 237,
-    223, 211, 199, 188, 177, 167, 158, 149, 141, 133, 125, 118],
-  // Tuning -5
-  [3548,3352,3164,2984,2816,2660,2512,2368,2236,2112,1992,1880,
-   1774,1676,1582,1492,1408,1330,1256,1184,1118,1056, 996, 940,
-    887, 838, 791, 746, 704, 665, 628, 592, 559, 528, 498, 470,
-    444, 419, 395, 373, 352, 332, 314, 296, 280, 264, 249, 235,
-    222, 209, 198, 187, 176, 166, 157, 148, 140, 132, 125, 118],
-  // Tuning -4
-  [3524,3328,3140,2964,2796,2640,2492,2352,2220,2096,1976,1868,
-   1762,1664,1570,1482,1398,1320,1246,1176,1110,1048, 988, 934,
-    881, 832, 785, 741, 699, 660, 623, 588, 555, 524, 494, 467,
-    441, 416, 392, 370, 350, 330, 312, 294, 278, 262, 247, 233,
-    220, 208, 196, 185, 175, 165, 156, 147, 139, 131, 123, 117],
-  // Tuning -3
-  [3500,3304,3116,2944,2776,2620,2476,2336,2204,2080,1964,1852,
-   1750,1652,1558,1472,1388,1310,1238,1168,1102,1040, 982, 926,
-    875, 826, 779, 736, 694, 655, 619, 584, 551, 520, 491, 463,
-    437, 413, 390, 368, 347, 328, 309, 292, 276, 260, 245, 232,
-    219, 206, 195, 184, 174, 164, 155, 146, 138, 130, 123, 116],
-  // Tuning -2
-  [3472,3280,3096,2920,2756,2604,2456,2320,2188,2064,1948,1840,
-   1736,1640,1548,1460,1378,1302,1228,1160,1094,1032, 974, 920,
-    868, 820, 774, 730, 689, 651, 614, 580, 547, 516, 487, 460,
-    434, 410, 387, 365, 345, 325, 307, 290, 274, 258, 244, 230,
-    217, 205, 193, 183, 172, 163, 154, 145, 137, 129, 122, 115],
-  // Tuning -1
-  [3448,3256,3072,2900,2736,2584,2440,2300,2172,2052,1936,1828,
-   1724,1628,1536,1450,1368,1292,1220,1150,1086,1026, 968, 914,
-    862, 814, 768, 725, 684, 646, 610, 575, 543, 513, 484, 457,
-    431, 407, 384, 363, 342, 323, 305, 288, 272, 256, 242, 228,
-    216, 203, 192, 181, 171, 161, 152, 144, 136, 128, 121, 114],
-];
 
-/**
- * The reference note in AON is note index 25 (0-based in period table row),
- * which is C-2 in octave-2 (period 856 for tuning 0).
- * This corresponds to XM note 37 (C-3 in XM's 1-based 5-octave scheme).
- * AON notes are 1-based in pattern data (0 = no note).
- */
+/** Period-table index of period 856 (tuning 0); the ratio reference for fine-tune rows. */
 const AON_REFERENCE_NOTE_IDX = 24; // 0-based index in period table → period 856
-const AON_REFERENCE_XM_NOTE  = 49; // Period 856 = MOD table idx 24 = XM note 49 (C-4)
 
 // ── Utility ────────────────────────────────────────────────────────────────
 
@@ -200,27 +92,6 @@ function readString(buf: Uint8Array, off: number, maxLen: number): string {
     result += c >= 32 ? String.fromCharCode(c) : '';
   }
   return result;
-}
-
-/**
- * Convert AON note index (1-based, 1-60) and instrument fineTune to XM note number.
- * AON period table: row = fineTune (0-15, maps to Tables.Periods rows 0-15 in C#).
- * The C# NostalgicPlayer index mapping: fineTune 0-7 → rows 0-7; fineTune 8-15 → rows 8-15.
- * We look up the period, then find the closest period in the standard Amiga table to
- * get an XM note number, or use direct index arithmetic since AON periods map
- * cleanly to 5 octaves of 12 semitones.
- *
- * AON note 1 = period table index 0 (highest period = lowest pitch).
- * AON note 25 = period 856 (C-2 ProTracker) = XM note 37 (C-3).
- * AON note index 0-based: i → XM note = AON_REFERENCE_XM_NOTE + (i - AON_REFERENCE_NOTE_IDX)
- */
-function aonNoteToXM(aonNote: number, _fineTune: number): number {
-  if (aonNote === 0) return 0;
-  const idx = aonNote - 1; // 0-based
-  // Direct semitone mapping: AON has 5 octaves × 12 semitones = 60 notes
-  // AON idx 24 → period 856 → XM C-3 = note 37
-  const xmNote = AON_REFERENCE_XM_NOTE + (idx - AON_REFERENCE_NOTE_IDX);
-  return Math.max(1, Math.min(96, xmNote));
 }
 
 /**
@@ -670,10 +541,7 @@ export function parseArtOfNoiseFile(bytes: Uint8Array, filename: string): Tracke
         }
 
         const instrId = line.instrument > 0 ? line.instrument : 0;
-        const fineTune = instrId > 0 && instrId - 1 < finalInstruments.length
-          ? finalInstruments[instrId - 1].fineTune
-          : 0;
-        const xmNote = aonNoteToXM(line.note, fineTune);
+        const xmNote = aonNoteToGridNote(line.note);
 
         // Map AON effects to XM effects
         let effTyp = 0, eff = 0;
@@ -759,8 +627,7 @@ export function parseArtOfNoiseFile(bytes: Uint8Array, filename: string): Tracke
       const instrument = raw[1] & 0x3F;
       const effect = raw[2] & 0x3F;
       const effectArg = raw[3];
-      // aonNoteToXM: xmNote = 49 + ((aonNote - 1) - 24) = aonNote + 24
-      const note = aonNote > 0 ? Math.max(1, Math.min(96, aonNote + 24)) : 0;
+      const note = aonNoteToGridNote(aonNote);
       // Byte-exact carriers: the XM view drops the two unused/arpeggio bits packed in
       // the top of each of b0/b1/b2 (masked off by &0x3F) and collapses the effect map
       // one-way, so the derivation above is lossy. Stash the exact source bytes in the

@@ -7,17 +7,15 @@
  *   b3 = [arpeggioHi:2 | effect:6]
  *   b4 = effectArg
  *
- * Note mapping (reverse of aonNoteToXM):
- *   XM note 0 → AON note 0 (empty)
- *   XM note N → AON note = (N - 37 + 24) + 1 = N - 12
- *   Parser: xmNote = 37 + (idx - 24) where idx = aonNote - 1
- *   So: aonNote = xmNote - 37 + 24 + 1 = xmNote - 12
+ * Note mapping: gridNoteToAonNote (formats/aonNotes.ts), the inverse of the parser's
+ * aonNoteToGridNote; both derive from the replayer period via periodNotes.ts.
  *
  * Effect mapping: AON effects map 1:1 to MOD/XM effects (same command numbers)
  * Arpeggio: stored across bits of b2 and b3, not in TrackerCell (lost in translation)
  */
 
 import type { TrackerCell } from '@/types';
+import { gridNoteToAonNote } from '@/lib/import/formats/aonNotes';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
 
 /**
@@ -53,9 +51,8 @@ function encodeAONCell(cell: TrackerCell): Uint8Array {
 
   // Byte 0: note (bits 5-0), arpeggio is in bits 7-6 but we don't have that info
   const note = cell.note ?? 0;
-  if (note > 0) {
-    const aonNote = note - 12; // reverse of: xmNote = 37 + (idx - 24) where idx = aonNote - 1
-    out[0] = Math.max(0, Math.min(63, aonNote)) & 0x3F;
+  if (note !== 0) {
+    out[0] = gridNoteToAonNote(note) & 0x3F;
   }
 
   // Byte 1: instrument (bits 5-0), arpeggio low bits in 7-6
