@@ -318,7 +318,9 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   sng.str(song.name).str('');
   for (let ch = 0; ch < FUR_NEO_GEO_CHANNELS; ch++) for (const pos of song.songPositions) sng.u8(pos);
   for (let ch = 0; ch < FUR_NEO_GEO_CHANNELS; ch++) sng.u8(fxColumns[ch]);
-  for (let ch = 0; ch < FUR_NEO_GEO_CHANNELS; ch++) sng.u8(0); // hidden
+  // Furnace song.cpp DivSubSong::putData: bit 0 = channel shown in the pattern view, bit 1 = shown in the
+  // channel oscilloscope. 0 opens the module with every channel hidden.
+  for (let ch = 0; ch < FUR_NEO_GEO_CHANNELS; ch++) sng.u8(3);
   for (let ch = 0; ch < FUR_NEO_GEO_CHANNELS; ch++) sng.u8(0); // collapsed
   for (let ch = 0; ch < FUR_NEO_GEO_CHANNELS; ch++) sng.str('');
   for (let ch = 0; ch < FUR_NEO_GEO_CHANNELS; ch++) sng.str('');

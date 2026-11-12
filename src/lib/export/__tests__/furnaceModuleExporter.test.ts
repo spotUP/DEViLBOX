@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { xmVolToFurnace } from '@/lib/import/furnaceEditorCells';
 import { exportFurnaceModule, furnaceModuleExportAvailable, FUR_SYSTEM_YM2610 } from '../FurnaceModuleExporter';
+import pako from 'pako';
 import { parseFurnaceSong } from '@/lib/import/formats/FurnaceSongParser';
 import { DEFAULT_FURNACE } from '@/types/instrument/defaults';
 import { EMPTY_CELL } from '@/types/tracker';
@@ -184,6 +185,19 @@ describe('exportFurnaceModule', () => {
       expect(got.effects[0]).toEqual({ type: src.effTyp, value: src.eff });
       expect(got.effects[1]).toEqual({ type: 0x0a, value: row });
     }
+  });
+
+  it('marks every channel as shown in the pattern view and the channel oscilloscope', () => {
+    const bytes = pako.inflate(exportFurnaceModule(song()).bytes);
+    // SNG2 writes, per channel: effect column count, then the show byte (Furnace writes 3), then the collapse byte (0).
+    const shown = new Array<number>(14).fill(3);
+    const collapsed = new Array<number>(14).fill(0);
+    const want = [...shown, ...collapsed];
+    let found = false;
+    for (let i = 0; i + want.length <= bytes.length && !found; i++) {
+      found = want.every((v, k) => bytes[i + k] === v);
+    }
+    expect(found).toBe(true);
   });
 
   it('refuses what the module cannot hold', () => {
