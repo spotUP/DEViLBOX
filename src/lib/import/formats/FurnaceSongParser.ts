@@ -2927,18 +2927,23 @@ export function convertFurnaceToDevilbox(module: FurnaceModule, subsongIndex = 0
       width: wt.width,
       height: wt.height,
     })),
-    samples: module.samples.map(s => ({
-      data: s.data as Int16Array | Int8Array | Uint8Array,
-      rate: s.c4Rate,
-      depth: s.depth,
-      samples: s.length,
-      loopStart: s.loopStart,
-      loopEnd: s.loopEnd,
-      loopMode: s.loopDirection ?? 0,
-      name: s.name,
-    })),
+    samples: toSequencerSamples(module),
     furnaceNative,
   };
+}
+
+/** The module's samples in the shape the dispatch engine uploads (`setModuleSamples`, `song.furnaceSamples`). */
+export function toSequencerSamples(module: FurnaceModule) {
+  return module.samples.map(s => ({
+    data: s.data as Int16Array | Int8Array | Uint8Array,
+    rate: s.c4Rate,
+    depth: s.depth,
+    samples: s.length,
+    loopStart: s.loopStart,
+    loopEnd: s.loopEnd,
+    loopMode: s.loopDirection ?? 0,
+    name: s.name,
+  }));
 }
 
 /**

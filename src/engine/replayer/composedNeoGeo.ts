@@ -45,3 +45,11 @@ export function deriveComposedNeoGeo(song: TrackerSong): Promise<DerivedFurnaceN
 export function isReplacedForDerivedSong(inst: InstrumentConfig, derivedIds: ReadonlySet<number>): boolean {
   return !derivedIds.has(inst.id);
 }
+
+/** Do two derived sample lists hold the same sample data, in the same order? */
+export function sameDerivedSamples(a: DerivedFurnaceNative['samples'], b: DerivedFurnaceNative['samples']): boolean {
+  return a.length === b.length && a.every((s, i) => {
+    const t = b[i];
+    return s.rate === t.rate && s.data.length === t.data.length && s.data.every((v, j) => v === t.data[j]);
+  });
+}

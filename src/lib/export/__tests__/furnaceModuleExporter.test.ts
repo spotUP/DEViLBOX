@@ -233,7 +233,36 @@ describe('exportFurnaceModule', () => {
 
     const u = song();
     u.instruments[1] = inst(2, 'Sample', { ...ssgConfig, divInsType: 37, userSample: { name: 's', data: [1, 2], loop: false } } as unknown as FurnaceConfig);
-    expect(() => exportFurnaceModule(u)).toThrow(/ADPCM/);
+    expect(() => exportFurnaceModule(u)).toThrow(/no 16-bit data/);
+
+    const v = song();
+    v.instruments[1] = inst(2, 'Sample', { ...ssgConfig, divInsType: 37, userSample: { name: 's', data: new Int16Array([1, 2]), rate: 0 } } as unknown as FurnaceConfig);
+    expect(() => exportFurnaceModule(v)).toThrow(/no rate/);
+  });
+
+  it('writes the sample of an ADPCM instrument, once per sample buffer, and the instrument names it', async () => {
+    const kick = new Int16Array([0, 1200, -1200, 32767, -32768, 5]);
+    const snare = new Int16Array([7, -7, 9]);
+    const adpcm = (type: number, data: Int16Array, rate: number, name: string): FurnaceConfig =>
+      ({ ...ssgConfig, divInsType: type, macros: [], userSample: { name, data, rate } }) as unknown as FurnaceConfig;
+    const s = song();
+    s.instruments.push(inst(3, 'Kick', adpcm(37, kick, 18500, 'kick')));
+    s.instruments.push(inst(4, 'Kick again', adpcm(37, kick, 18500, 'kick')));
+    s.instruments.push(inst(5, 'Snare B', adpcm(38, snare, 22050, 'snare')));
+    set(s.patterns[0], 7, 0, { note: 49, instrument: 3 });
+    set(s.patterns[0], 8, 0, { note: 49, instrument: 4 });
+    set(s.patterns[0], 13, 0, { note: 49, instrument: 5 });
+
+    const r = exportFurnaceModule(s);
+    const mod = await parseFurnaceSong(r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) as ArrayBuffer);
+    expect(mod.samples.length).toBe(2);
+    expect(Array.from(mod.samples[0].data as Int16Array)).toEqual(Array.from(kick));
+    expect(mod.samples[0].c4Rate).toBe(18500);
+    expect(mod.samples[0].name).toBe('kick');
+    expect(Array.from(mod.samples[1].data as Int16Array)).toEqual(Array.from(snare));
+    expect(mod.samples[1].c4Rate).toBe(22050);
+    expect(mod.instruments.slice(2).map((i) => i.amiga?.initSample)).toEqual([0, 0, 1]);
+    expect(mod.instruments[0].amiga?.initSample ?? -1).toBe(-1);
   });
 
   it('offers the export only for Neo Geo instruments', () => {

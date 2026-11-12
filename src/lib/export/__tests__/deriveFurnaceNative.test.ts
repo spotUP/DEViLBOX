@@ -87,6 +87,25 @@ describe('deriveFurnaceNativeFromSong on the composer trial song', () => {
     expect(bad.slice(0, 5)).toEqual([]);
   });
 
+  it('returns the sample of an ADPCM instrument for the sequencer, and none for a song without one', async () => {
+    const dbx = loadDbx();
+    expect((await deriveFurnaceNativeFromSong(toSong(dbx))).samples).toEqual([]);
+
+    const kick = new Int16Array([0, 900, -900, 32767, -32768]);
+    const base = dbx.instruments[0];
+    const withKick = {
+      ...base,
+      id: 99,
+      name: 'Kick',
+      furnace: { ...base.furnace, divInsType: 37, macros: [], userSample: { name: 'kick', data: kick, rate: 18500 } },
+    } as unknown as Dbx['instruments'][number];
+    const d = await deriveFurnaceNativeFromSong(toSong({ ...dbx, instruments: [...dbx.instruments, withKick] }));
+    expect(d.samples).toHaveLength(1);
+    expect(Array.from(d.samples[0].data as Int16Array)).toEqual(Array.from(kick));
+    expect(d.samples[0].rate).toBe(18500);
+    expect(d.samples[0].samples).toBe(kick.length);
+  });
+
   it('carries order list, pattern length, timing, channel count, chip and instruments', async () => {
     const dbx = loadDbx();
     const d = await deriveFurnaceNativeFromSong(toSong(dbx));

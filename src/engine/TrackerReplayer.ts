@@ -16,7 +16,7 @@
 import { applyEditorCellEdit } from '@lib/import/furnaceEditorCells';
 import { DavidWhittakerEngine } from './davidwhittaker/DavidWhittakerEngine';
 import { outputLatencySec } from './audioLatency';
-import { composedNeoGeoSequencerRoute, deriveComposedNeoGeo, isReplacedForDerivedSong } from './replayer/composedNeoGeo';
+import { composedNeoGeoSequencerRoute, deriveComposedNeoGeo, isReplacedForDerivedSong, sameDerivedSamples } from './replayer/composedNeoGeo';
 import { derivedCellSeqWrites, derivedPlayState, neoGeoInstrumentIds, planStructuralEdit, isStructuralNoop, type DerivedPlayState } from './replayer/composedNeoGeoLiveSync';
 import type { DerivedFurnaceNative } from '@/lib/export/deriveFurnaceNative';
 import { notify } from '@stores/useNotificationStore';
@@ -1857,6 +1857,12 @@ export class TrackerReplayer {
       if (plan.rederive || plan.changedInstrumentIds.length > 0) {
         const fresh = await deriveComposedNeoGeo({ ...this.song, patterns: useTrackerStore.getState().patterns, songPositions: useTrackerStore.getState().patternOrder, instruments: (await import('@stores/useInstrumentStore')).useInstrumentStore.getState().instruments });
         if (!this.playing || this._derivedNeoGeo !== derived) return;
+        // A new or changed ADPCM sample: the instruments below name samples by index.
+        if (!sameDerivedSamples(derived.samples, fresh.samples)) {
+          this.song.furnaceSamples = fresh.samples.length > 0 ? fresh.samples : undefined;
+          engine.replaceModuleSamples(fresh.samples.length > 0 ? fresh.samples : null);
+          derived.samples = fresh.samples;
+        }
         if (plan.rederive) {
           this.song.furnaceNative = fresh.native;
           this._derivedNeoGeo = fresh;
@@ -2587,13 +2593,14 @@ export class TrackerReplayer {
 
     // A song composed on the Neo Geo chip: derive its native data now, so the sequencer gate
     // below takes it and the XM / hybrid route does not also run (no double playback).
-    if (this._derivedNeoGeo) delete this.song.furnaceNative; // left by an aborted earlier play
+    if (this._derivedNeoGeo) { delete this.song.furnaceNative; delete this.song.furnaceSamples; } // left by an aborted earlier play
     this._derivedNeoGeo = null;
     if (composedNeoGeoSequencerRoute(this.song)) {
       try {
         const derived = await deriveComposedNeoGeo(this.song);
         if (gen !== this._playGeneration) return;
         this.song.furnaceNative = derived.native;
+        this.song.furnaceSamples = derived.samples.length > 0 ? derived.samples : undefined;
         this._derivedNeoGeo = derived;
         if (derived.warnings.length > 0) {
           notify.warning(`Neo Geo playback: ${derived.warnings.join('; ')}`);
@@ -3066,7 +3073,7 @@ export class TrackerReplayer {
     // The native data of a composed Neo Geo song lives for one play only (re-derived at the next).
     this.stopDerivedWatch();
     if (this._derivedNeoGeo) {
-      if (this.song) delete this.song.furnaceNative;
+      if (this.song) { delete this.song.furnaceNative; delete this.song.furnaceSamples; }
       this._derivedNeoGeo = null;
     }
 
