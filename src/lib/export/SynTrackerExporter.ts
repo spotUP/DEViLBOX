@@ -14,6 +14,7 @@
  * Reference: third-party/uade-3.05/amigasrc/players/wanted_team/SynTracker (magic SYNTRACKER-SONG:)
  */
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { patchModuleByLayout } from './layoutPatch';
 
 const PATTERN_BASE = 0x0800;
 const ROWS_PER_PATTERN = 32;
@@ -28,8 +29,12 @@ export function exportSynTrackerFile(song: TrackerSong): Uint8Array {
   if (!original) {
     throw new Error('SynTracker export requires the original file data (uadeEditableFileData)');
   }
-  const out = new Uint8Array(original.slice(0));
+  // Only the cells edited since load are written (patchModuleByLayout). Writing every position's cells would let a later
+  // position that shares a pattern block with an edited one overwrite the edit with its unedited copy.
+  const layout = song.uadePatternLayout;
+  if (layout) return patchModuleByLayout(original, layout, song.patterns).bytes;
 
+  const out = new Uint8Array(original.slice(0));
   const positions = Math.min(song.patterns.length, POSITION_LIST_SIZE);
   for (let pos = 0; pos < positions; pos++) {
     const pattern = song.patterns[pos];
