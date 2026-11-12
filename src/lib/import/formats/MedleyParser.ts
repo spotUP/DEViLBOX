@@ -226,7 +226,7 @@ export function parseMedleyFile(buffer: ArrayBuffer, filename: string): TrackerS
     songLength: songPositions.length,
     restartPosition: 0,
     numChannels: 4,
-    initialSpeed: 6,
+    initialSpeed: 1,
     initialBPM: 125,
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
