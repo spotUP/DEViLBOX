@@ -11,7 +11,7 @@
  * (startNativeEngines), a real corpus song (SidMon 1, a chip-RAM
  * byte carrier); the sentinel is the chip-RAM writer.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TrackerCell } from '@/types/tracker';
@@ -29,7 +29,12 @@ vi.mock('@/engine/uade/UADEEngine', () => ({
   UADEEngine: { hasInstance: () => true, getInstance: () => engine },
 }));
 vi.mock('@/engine/uade/UADEChipEditor', () => ({ UADEChipEditor: class {} }));
-vi.mock('@/engine/uade/UADEChipRAMPatternReader', () => ({ populatePatternsFromChipRAM: async () => ({}) }));
+// The engine's onStarted hook awaits the edit replay and only then reads the patterns back, so a call
+// here is the signal that the replay has finished (the replay's lazy imports take a variable time).
+const patternReads = vi.hoisted(() => ({ count: 0 }));
+vi.mock('@/engine/uade/UADEChipRAMPatternReader', () => ({
+  populatePatternsFromChipRAM: async () => { patternReads.count++; return {}; },
+}));
 vi.mock('@/engine/ToneEngine', () => {
   const t = {
     releaseAll: vi.fn(), disposeAllInstruments: vi.fn(), preloadInstruments: vi.fn(async () => {}),
@@ -72,6 +77,7 @@ async function restoreAndStart(project: unknown) {
   const { useTrackerStore } = await import('@stores/useTrackerStore');
   const { startNativeEngines, clearRunningEngineKeys } = await import('@/engine/replayer/NativeEngineRouting');
   clearRunningEngineKeys();
+  patternReads.count = 0;
   expect(await applySavedProject(project as never, { fromRecovery: true })).toBe(true);
   const f = useFormatStore.getState();
   const song = {
@@ -79,11 +85,27 @@ async function restoreAndStart(project: unknown) {
     uadeEditableFileData: f.uadeEditableFileData, uadePatternLayout: f.uadePatternLayout,
   };
   await startNativeEngines(song as never, {} as never, false, true, new Set());
-  await new Promise((r) => setTimeout(r, 700)); // UADE reads chip RAM 500 ms after the load
+  // UADE reads chip RAM 500 ms after the load, after replaying the restored edits
+  const deadline = Date.now() + 30_000;
+  while (patternReads.count === 0 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 25));
+  expect(patternReads.count).toBe(1);
   return song;
 }
 
 describe('restoring an autosave on an engine-played song', () => {
+  // The first restore pulls the whole app graph through vite's on-demand transform: 30-55 s at the
+  // test run's lowest CPU priority, more beside a second test file. Paid here, under its own limit,
+  // so the 60 s of each test bound the restore and the engine start, not the cold transform (a test
+  // that timed out left its restore running into the next test, which then saw a stray write; the edit replay's own lazy imports raced the old fixed 700 ms wait the same way; now the wait ends at the pattern read-back that follows the replay).
+  beforeAll(async () => {
+    await Promise.all([
+      import('@/lib/import/parseModuleToSong'), import('@/lib/song/gridBaseline'), import('@hooks/useProjectPersistence'),
+      import('@stores/useFormatStore'), import('@stores/useTrackerStore'), import('@/engine/replayer/NativeEngineRouting'),
+      // The edit replay loads these lazily, 500 ms after the engine load; cold, that outlasts the wait below.
+      import('@/engine/replayer/liveCellEdits'), import('@/engine/uade/writeCellToChipRam'),
+    ]);
+  }, 300_000);
+
   it('sends the edited cell through the chip-RAM writer once the engine has loaded, and nothing else', { timeout: 60000 }, async () => {
     writes.length = 0;
     const { project, orig } = await savedProject(49);

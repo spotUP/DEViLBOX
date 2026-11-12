@@ -518,7 +518,7 @@ async function reprojectTFMXFromBytes(get: () => FormatStore): Promise<void> {
 
     const song = parseTFMXFile(fmt.tfmxFileData, fmt.uadeEditableFileName ?? 'mdat.edited', fmt.tfmxNative.activeSubsong);
     const samplesEdited = gridBaseline.sampleIsEdited();
-    gridBaseline.setGridBaseline(gridBaseline.baselineOf(song.patterns));
+    gridBaseline.setGridBaseline(gridBaseline.baselineOf(song.patterns), gridBaseline.extraBaselineOf(song.patterns));
     if (samplesEdited) gridBaseline.markSampleEdited();
     // gridSteps and gridRowTicks follow the grid: a step that stops or starts every voice drops or gains its grid pattern
     const native = get().tfmxNative;
@@ -571,7 +571,7 @@ async function rebuildSunTronicFromPositions(get: () => FormatStore): Promise<vo
     const buffer = bytes.slice().buffer as ArrayBuffer;
     const parsed = parseSunTronicFile(buffer.slice(0), fmt.uadeEditableFileName ?? song.name ?? 'song');
     const samplesEdited = gridBaseline.sampleIsEdited();
-    gridBaseline.setGridBaseline(gridBaseline.baselineOf(parsed.patterns));
+    gridBaseline.setGridBaseline(gridBaseline.baselineOf(parsed.patterns), gridBaseline.extraBaselineOf(parsed.patterns));
     if (samplesEdited) gridBaseline.markSampleEdited();
     useFormatStore.setState({
       uadeEditableFileData: buffer,

@@ -34,7 +34,7 @@
  */
 import type { Pattern } from '@/types/tracker';
 import type { SongToApply } from './applySong';
-import { hashCell, type GridBaseline } from './gridBaseline';
+import { cellIsEdited, extraBaselineOf, hashCell, type GridBaseline } from './gridBaseline';
 import { FILE_DATA_FIELDS } from '@/engine/formatFileDataFields';
 import { WASM_ENGINES } from '@/engine/replayer/wasmEngineRegistry';
 
@@ -44,6 +44,8 @@ export interface RestoreOutcome {
   song: SongToApply;
   /** The baseline the applied grid is measured against (the fresh decode's, when re-decoded). */
   baseline: GridBaseline | null;
+  /** The further note columns' hashes of the same grid (null: the save predates them). */
+  baselineExtra: GridBaseline | null;
   redecoded: boolean;
   reason?: string;
 }
@@ -104,8 +106,9 @@ export async function restoreFromStoredBytes(
   song: SongToApply,
   baseline: GridBaseline | null | undefined,
   parse?: Parse,
+  baselineExtra?: GridBaseline | null,
 ): Promise<RestoreOutcome> {
-  const kept = (reason: string): RestoreOutcome => ({ song, baseline: baseline ?? null, redecoded: false, reason });
+  const kept = (reason: string): RestoreOutcome => ({ song, baseline: baseline ?? null, baselineExtra: baselineExtra ?? null, redecoded: false, reason });
   const eng = song.engine as Record<string, unknown>;
   const { bytes, name } = storedModuleOf(eng);
   if (!bytes || bytes.byteLength === 0 || !name) return kept('no stored module bytes');
@@ -143,7 +146,8 @@ export async function restoreFromStoredBytes(
       channels: p.channels.map((ch, c) => ({
         ...ch,
         rows: ch.rows.map((cell, r) => {
-          const edited = hashCell(cell) !== baseline[pi][flat++];
+          const i = flat++;
+          const edited = cellIsEdited(cell, baseline[pi][i], baselineExtra?.[pi]?.[i], !!baselineExtra);
           return edited ? cell : fp.channels[c].rows[r];
         }),
       })),
@@ -161,9 +165,11 @@ export async function restoreFromStoredBytes(
   // The fresh decode does not know the name it was opened under; the next save needs it again.
   if (eng.sourceFileName) (fresh as unknown as Record<string, unknown>).sourceFileName = eng.sourceFileName;
   const freshBaseline: GridBaseline = fresh.patterns.map((p) => p.channels.flatMap((ch) => ch.rows.map(hashCell)));
+  const freshBaselineExtra = extraBaselineOf(fresh.patterns);
   const useStoredInstruments = song.instruments.length === fresh.instruments.length;
   return {
     baseline: freshBaseline,
+    baselineExtra: freshBaselineExtra,
     redecoded: true,
     song: {
       ...song,

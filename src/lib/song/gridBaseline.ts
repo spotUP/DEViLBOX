@@ -18,16 +18,39 @@ export type GridBaseline = number[][];
 /** FNV-1a over the cell's fields in a fixed order (key order of the object must not matter). */
 export function hashCell(cell: TrackerCell): number {
   const keys = Object.keys(cell).sort();
-  let h = 0x811c9dc5;
+  let h = FNV_BASIS;
   for (const k of keys) {
     const v = (cell as unknown as Record<string, unknown>)[k];
     if (v === undefined) continue;
-    const s = `${k}=${String(v)};`;
-    for (let i = 0; i < s.length; i++) {
-      h ^= s.charCodeAt(i);
-      h = Math.imul(h, 0x01000193) >>> 0;
-    }
+    h = fnvAdd(h, `${k}=${String(v)};`);
   }
+  return h >>> 0;
+}
+
+const FNV_BASIS = 0x811c9dc5;
+function fnvAdd(h: number, s: string): number {
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h;
+}
+
+const EXTRA_FIELDS = ['note', 'instrument', 'volume', 'delay'] as const;
+
+/**
+ * FNV-1a over the cell's further note columns (extraNotes) only; hashCell leaves them out and its
+ * stored values must not change. Fields in a fixed order, undefined fields skipped, so an absent
+ * extraNotes, an empty one and columns holding nothing all hash alike.
+ */
+export function hashExtraNotes(cell: TrackerCell): number {
+  let h = FNV_BASIS;
+  cell.extraNotes?.forEach((col, i) => {
+    for (const f of EXTRA_FIELDS) {
+      const v = col[f];
+      if (v !== undefined) h = fnvAdd(h, `${i}.${f}=${v};`);
+    }
+  });
   return h >>> 0;
 }
 
@@ -35,7 +58,22 @@ export function baselineOf(patterns: readonly Pattern[]): GridBaseline {
   return patterns.map((p) => p.channels.flatMap((ch) => ch.rows.map(hashCell)));
 }
 
+/** Same indexing as baselineOf, hashing the further note columns (hashExtraNotes). */
+export function extraBaselineOf(patterns: readonly Pattern[]): GridBaseline {
+  return patterns.map((p) => p.channels.flatMap((ch) => ch.rows.map(hashExtraNotes)));
+}
+
+/**
+ * Whether a cell differs from its baseline hashes. `extra` is null for a song saved before the
+ * further note columns were hashed: those columns then count as unchanged.
+ */
+export function cellIsEdited(cell: TrackerCell, base: number | undefined, extra: number | undefined, hasExtra: boolean): boolean {
+  return hashCell(cell) !== base || (hasExtra && hashExtraNotes(cell) !== extra);
+}
+
 let current: GridBaseline | null = null;
+/** Hashes of the further note columns (gridBaselineExtra); null = a save from before they were hashed. */
+let currentExtra: GridBaseline | null = null;
 
 /**
  * A sample's loop or data changed since the load (sampleEdit.ts). An engine that holds its own
@@ -46,8 +84,9 @@ export function markSampleEdited(): void { samplesEdited = true; }
 export function sampleIsEdited(): boolean { return samplesEdited; }
 
 /** null = unknown (a project saved before baselines existed): it is never re-decoded. */
-export function setGridBaseline(b: GridBaseline | null): void { current = b; restoredEditsPending = false; samplesEdited = false; }
+export function setGridBaseline(b: GridBaseline | null, extra: GridBaseline | null = null): void { current = b; currentExtra = b ? extra : null; restoredEditsPending = false; samplesEdited = false; }
 export function getGridBaseline(): GridBaseline | null { return current; }
+export function getGridBaselineExtra(): GridBaseline | null { return currentExtra; }
 
 /**
  * A restore that decoded the stored module again brought back the original
@@ -63,11 +102,13 @@ export function setRestoredEditsPending(v: boolean): void { restoredEditsPending
 export function editedCells(patterns: readonly Pattern[]): { pattern: number; row: number; channel: number; cell: TrackerCell }[] {
   const baseline = current;
   if (!baseline) return [];
+  const extra = currentExtra;
   const edits: { pattern: number; row: number; channel: number; cell: TrackerCell }[] = [];
   patterns.forEach((p, pi) => {
     let flat = 0;
     p.channels.forEach((ch, c) => ch.rows.forEach((cell, r) => {
-      if (hashCell(cell) !== baseline[pi]?.[flat++]) edits.push({ pattern: pi, row: r, channel: c, cell });
+      const i = flat++;
+      if (cellIsEdited(cell, baseline[pi]?.[i], extra?.[pi]?.[i], !!extra)) edits.push({ pattern: pi, row: r, channel: c, cell });
     }));
   });
   return edits;
@@ -87,9 +128,10 @@ export function takeRestoredEdits(patterns: readonly Pattern[]): { pattern: numb
 export function gridIsEdited(patterns: readonly Pattern[]): boolean {
   const baseline = current;
   if (!baseline) return false;
+  const extra = currentExtra;
   if (patterns.length !== baseline.length) return true;
   return patterns.some((p, pi) => {
     const flat = p.channels.flatMap((ch) => ch.rows);
-    return flat.length !== baseline[pi].length || flat.some((cell, i) => hashCell(cell) !== baseline[pi][i]);
+    return flat.length !== baseline[pi].length || flat.some((cell, i) => cellIsEdited(cell, baseline[pi][i], extra?.[pi]?.[i], !!extra));
   });
 }

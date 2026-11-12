@@ -24,7 +24,7 @@ import {
   getOriginalModuleDataForExport, getNativeEngineDataForExport, getNativeEngineMetaForExport, getNativeCompanionFilesForExport,
 } from '@/lib/export/exporters';
 import type { SavedSongFields } from './savedSong';
-import { getGridBaseline } from './gridBaseline';
+import { getGridBaseline, getGridBaselineExtra } from './gridBaseline';
 
 /** The current song, serialisable (sample buffers stripped, native data base64). */
 export function snapshotSong(): SavedSongFields {
@@ -111,7 +111,8 @@ export function snapshotSong(): SavedSongFields {
     // The grid as the decoder produced it: restore tells edits from decoder output with it.
     ...(() => {
       const gb = getGridBaseline();
-      return gb ? { gridBaseline: gb } : {};
+      const gbx = getGridBaselineExtra();
+      return gb ? { gridBaseline: gb, ...(gbx ? { gridBaselineExtra: gbx } : {}) } : {};
     })(),
     // Save replaced instrument IDs for hybrid playback persistence
     ...(() => {

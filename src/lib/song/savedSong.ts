@@ -53,6 +53,8 @@ export interface SavedSongFields {
   performanceJournal?: unknown;
   /** Per-cell hashes of the grid as loaded (gridBaseline.ts); absent in older saves. */
   gridBaseline?: GridBaseline;
+  /** Hashes of the further note columns beside gridBaseline (hashExtraNotes); absent in saves from before. */
+  gridBaselineExtra?: GridBaseline;
 }
 
 /** Legacy .dbx automation: { [patternId]: { [channel]: { [param]: curve } } }. */
@@ -140,5 +142,6 @@ export function savedSongToApply(data: SavedSongFields): SongToApply {
     engine: decodeNativeEngineFields(data.nativeEngineData, data.nativeEngineMeta, data.linearPeriods, data.nativeCompanionFiles) as SongToApply['engine'],
     extras,
     gridBaseline: data.gridBaseline ?? null,
+    gridBaselineExtra: data.gridBaselineExtra ?? null,
   };
 }
