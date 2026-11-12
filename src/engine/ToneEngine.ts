@@ -5196,6 +5196,12 @@ export class ToneEngine {
     return true;
   }
 
+  /** Volume maximum of a song channel's chip channel (0 when it has no Furnace dispatch synth). */
+  public furnaceChipVolumeMax(instrumentId: number, channelIndex: number, config: InstrumentConfig): number {
+    const target = this.furnaceDispatchSynthFor(instrumentId, channelIndex, config);
+    return target ? target.synth.chipVolumeMax(target.chipChannel) : 0;
+  }
+
   /** A cell volume (0-1 level) on a song channel's chip channel, as a volume command. */
   public applyFurnaceCellVolume(instrumentId: number, channelIndex: number, config: InstrumentConfig, level: number): boolean {
     const target = this.furnaceDispatchSynthFor(instrumentId, channelIndex, config);

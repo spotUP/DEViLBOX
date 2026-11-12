@@ -1293,6 +1293,11 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     this.engine.applyEffect(chan ?? this.currentChannel, effect, param, this.platformType);
   }
 
+  /** Volume maximum of one chip channel (what a VOLUME command accepts). */
+  chipVolumeMax(chan: number): number {
+    return maxVolumeOfChannel(this.platformType, chan);
+  }
+
   /**
    * A 0-1 volume level as a volume command on a chip channel, in the chip's own volume range
    * (the scale triggerAttack uses). Goes through the effect router, as the cell's set-volume effect does.

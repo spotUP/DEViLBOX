@@ -168,3 +168,93 @@ describe('arpeggio 0xy steps every tick of an engine-driven row', () => {
     expect(calls.filter((c) => c.cmd === DivCmd.LEGATO)).toEqual([]);
   });
 });
+
+/**
+ * Symptom: vibrato, slides, portamento, volume slide and tremolo "do nothing" in a tracker-made chip
+ * song. The router sent one command (or only an annotation a chip ignores) at the row start; Furnace
+ * sends a pitch or volume command on every tick (playback.cpp nextTick).
+ */
+describe('Furnace cell effects step on every tick of an engine-driven row', () => {
+  beforeEach(() => { resetStore(useTrackerStore); });
+
+  const chan = chipChannelFor(1, CHIP_CHANNELS, undefined);
+  const VOL_MAX = 127; // YM2610 FM channel volume range
+
+  function play(cell: Record<string, number>, rows: Array<Record<string, number>> = []) {
+    const { r, calls } = build();
+    r._suppressNotes = true;
+    setRow(1, { instrument: INST_ID, ...cell });
+    const fire = r.fireHybridNotesForRow as (t: number) => void;
+    for (const extra of rows) {
+      fire.call(r, 10);
+      setRow(1, extra);
+    }
+    calls.length = 0;
+    fire.call(r, 10);
+    return calls.filter((c) => c.chan === chan);
+  }
+  const ofCmd = (calls: Call[], cmd: number) => calls.filter((c) => c.cmd === cmd);
+
+  it('a pitch slide up (1xx) keeps sliding on all six ticks instead of one jump', () => {
+    const calls = play({ note: 49, effTyp: 1, eff: 0x04 });
+    const slide = ofCmd(calls, DivCmd.NOTE_PORTA);
+    expect(slide.length).toBe(6);
+    expect(slide.every((c) => c.val1 === 16 && c.val2 === 255)).toBe(true);
+  });
+
+  it('a pitch slide down (2xx) keeps sliding on all six ticks instead of one jump', () => {
+    const calls = play({ note: 49, effTyp: 2, eff: 0x04 });
+    const slide = ofCmd(calls, DivCmd.NOTE_PORTA);
+    expect(slide.length).toBe(6);
+    expect(slide.every((c) => c.val1 === 16 && c.val2 === -60)).toBe(true);
+  });
+
+  it('a tone portamento (3xx) slides toward the note on every tick and does not retrigger it', () => {
+    const calls = play({ note: 49, effTyp: 3, eff: 0x02 }, [{ note: 53, effTyp: 3, eff: 0x02 }]);
+    const slide = ofCmd(calls, DivCmd.NOTE_PORTA);
+    expect(slide.length).toBe(6);
+    expect(slide.every((c) => c.val1 === 8)).toBe(true);
+    expect(ofCmd(calls, DivCmd.NOTE_ON).length).toBe(0);
+  });
+
+  it('vibrato (4xy) moves the pitch on every tick along the sine table', () => {
+    const calls = play({ note: 49, effTyp: 4, eff: 0x48 });
+    const pitch = ofCmd(calls, DivCmd.PITCH).map((c) => c.val1);
+    // 1 immediate + 6 ticks; depth 8, rate 4: pos 4,8,... table value * 8 * 15 >> 4 / 15
+    expect(pitch.length).toBe(7);
+    expect(pitch[0]).toBe(0);
+    expect(pitch.slice(1).some((v) => v !== 0)).toBe(true);
+    expect(new Set(pitch).size).toBeGreaterThan(3);
+  });
+
+  it('a volume slide (Axy) fades the volume on every tick', () => {
+    const calls = play({ note: 49, volume: 0x50, effTyp: 0x0A, eff: 0x04 });
+    const vol = ofCmd(calls, DivCmd.VOLUME).map((c) => c.val1);
+    const tail = vol.slice(-6);
+    expect(tail.length).toBe(6);
+    for (let i = 1; i < tail.length; i++) expect(tail[i]).toBeLessThanOrEqual(tail[i - 1]);
+    expect(tail[5]).toBeLessThan(tail[0]);
+    expect(tail[0]).toBeLessThan(VOL_MAX);
+  });
+
+  it('vibrato with volume slide (5xy) moves pitch and volume on every tick', () => {
+    const calls = play({ note: 49, effTyp: 4, eff: 0x48 }, [{ note: 0, instrument: 0, effTyp: 5, eff: 0x02 }]);
+    const lastRow = calls.slice(-30);
+    expect(ofCmd(lastRow, DivCmd.PITCH).length).toBeGreaterThanOrEqual(6);
+    expect(ofCmd(lastRow, DivCmd.VOLUME).length).toBeGreaterThanOrEqual(6);
+  });
+
+  it('portamento with volume slide (6xy) slides the pitch and fades the volume on every tick', () => {
+    const calls = play({ note: 49, effTyp: 3, eff: 0x02 }, [{ note: 53, effTyp: 6, eff: 0x02 }]);
+    const lastRow = calls.slice(-30);
+    expect(ofCmd(lastRow, DivCmd.NOTE_PORTA).length).toBeGreaterThanOrEqual(6);
+    expect(ofCmd(lastRow, DivCmd.VOLUME).length).toBeGreaterThanOrEqual(6);
+  });
+
+  it('tremolo (7xy) moves the volume on every tick', () => {
+    const calls = play({ note: 49, effTyp: 7, eff: 0x48 });
+    const vol = ofCmd(calls, DivCmd.VOLUME).map((c) => c.val1);
+    expect(vol.length).toBeGreaterThanOrEqual(6);
+    expect(new Set(vol.slice(-6)).size).toBeGreaterThan(2);
+  });
+});
