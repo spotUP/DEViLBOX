@@ -10,7 +10,11 @@ function read(relPath: string): string {
 
 describe('modland indexing contracts', () => {
   it('uses DEViLBOX filename support detection instead of only the stale folder whitelist', () => {
-    const source = read('server/src/services/modlandIndexer.ts');
+    // The line parser lives in modlandAllmods.ts (split out of the indexer so
+    // tests can import it without the database); the indexer must use it.
+    const indexer = read('server/src/services/modlandIndexer.ts');
+    expect(indexer).toContain("import { LINE_REGEX, parseAllmodsLine, type ParsedEntry } from './modlandAllmods';");
+    const source = read('server/src/services/modlandAllmods.ts');
     expect(source).toContain("import { isSupportedFormat } from '../../../src/lib/import/formatFilenameMatcher';");
     expect(source).toContain('if (!mappedExt && !isSupportedFormat(lowerFilename)) return null;');
     expect(source).toContain('const ext = mappedExt ?? path.extname(lowerFilename).slice(1);');
