@@ -17,7 +17,7 @@
  * that wrapped earlier keeps looping until then. One grid row is the greatest common divisor of all note ticks.
  *
  * Pitch: see voodooNoteForIndex (periodToNote of the period the replayer writes to Paula; measured against UADE's AUDxPER log). Not shown in phase A: portamento slides (the start note is shown), period table octave commands,
- * envelopes, waveform tables, subsongs after the first. Note write-back (phase B): every first-column note cell records the file byte of its command (noteBytes), written in place by VoodooSupremeExporter.
+ * envelopes, waveform tables, subsongs after the first. Note write-back (phase B): every note cell, extra note columns included, records the file byte of its command (noteBytes), written in place by VoodooSupremeExporter.
  */
 import { periodToGridNote } from '@/lib/amiga/periodNotes';
 import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer, setNoteColumn } from './stepRowClock';
@@ -61,11 +61,12 @@ export interface VoodooGrid {
   notesPerVoice: number[];
   /** number of distinct (sample, waveform table) sounds the grid refers to */
   instrumentCount: number;
-  /** each first-column note cell and the file byte of the track command that played it (a note byte, or a portamento's start byte) */
+  /** each note cell (any note column) and the file byte of the track command that played it (a note byte, or a portamento's start byte) */
   noteBytes: VoodooNoteByte[];
 }
 
-export interface VoodooNoteByte { pattern: number; channel: number; row: number; offset: number; note: number; base: number }
+/** `col` is the note column of the cell (absent or 0 = the cell's own note, 1 and up = extraNotes[col - 1]). */
+export interface VoodooNoteByte { pattern: number; channel: number; row: number; offset: number; note: number; base: number; col?: number; porta?: boolean }
 
 /**
  * The note byte (0..0x7F) whose table index (byte + base) shows `note`, nearest to `current`; -1 when the table has none.
@@ -81,7 +82,7 @@ export function voodooByteFor(note: number, base: number, current: number): numb
 }
 
 /** Where a note event sits in the file: the table index is (byte + base), base being the voice's transpose when the note played. */
-interface Event { tick: number; note: number; instrument: number; offset?: number; base?: number }
+interface Event { tick: number; note: number; instrument: number; offset?: number; base?: number; porta?: boolean }
 
 export function buildVoodooGrid(file: Uint8Array): VoodooGrid | string {
   const size = file.length;
@@ -173,7 +174,7 @@ export function buildVoodooGrid(file: Uint8Array): VoodooGrid | string {
           const startAt = v.pos;
           const start = byte();
           byte();
-          events[index].push({ tick, note: voodooNoteForIndex(start + v.transpose), instrument: instrumentOf(v), offset: startAt, base: v.transpose });
+          events[index].push({ tick, note: voodooNoteForIndex(start + v.transpose), instrument: instrumentOf(v), offset: startAt, base: v.transpose, porta: true });
           v.counter = byte();
           return;
         }
@@ -221,10 +222,11 @@ export function buildVoodooGrid(file: Uint8Array): VoodooGrid | string {
       if (pl.col === 0) {
         cell.note = e.note;
         cell.instrument = e.instrument;
-        if (e.offset !== undefined) noteBytes.push({ pattern: Math.floor(pl.row / ROWS_PER_PATTERN), channel: v, row: pl.row % ROWS_PER_PATTERN, offset: e.offset, note: e.note, base: e.base ?? 0 });
+        if (e.offset !== undefined) noteBytes.push({ pattern: Math.floor(pl.row / ROWS_PER_PATTERN), channel: v, row: pl.row % ROWS_PER_PATTERN, offset: e.offset, note: e.note, base: e.base ?? 0, ...(e.porta ? { porta: true } : {}) });
         if (pl.offset > 0) { cell.effTyp = BD_FX.rowOffset; cell.eff = pl.offset; }
       } else {
         setNoteColumn(cell, pl.col, e.note, e.instrument, pl.offset);
+        if (e.offset !== undefined) noteBytes.push({ pattern: Math.floor(pl.row / ROWS_PER_PATTERN), channel: v, row: pl.row % ROWS_PER_PATTERN, offset: e.offset, note: e.note, base: e.base ?? 0, col: pl.col, ...(e.porta ? { porta: true } : {}) });
       }
       if (e.note !== NOTE_OFF) notesPerVoice[v]++;
     }

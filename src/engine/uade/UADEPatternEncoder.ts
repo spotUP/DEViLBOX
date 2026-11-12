@@ -240,7 +240,7 @@ export interface UADEVariablePatternLayout {
    * of the command that played it, with the note the grid showed. A note edit is that byte moved by the cell's change.
    * `base`: for a format whose byte is a table index plus a per-voice offset (Voodoo Supreme transpose), the offset in force.
    */
-  noteBytes?: Array<{ pattern: number; channel: number; row: number; offset: number; note: number; base?: number }>;
+  noteBytes?: Array<{ pattern: number; channel: number; row: number; offset: number; note: number; base?: number; col?: number; porta?: boolean }>;
 
   /**
    * Original byte sizes of each file-level pattern's encoded data.
