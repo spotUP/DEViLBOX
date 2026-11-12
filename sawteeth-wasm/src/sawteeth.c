@@ -770,7 +770,9 @@ static int parse_file(st_engine_t *e, const uint8_t *data, int len) {
 
   /* ── Read instruments ── */
   if (off + 1 > len) return -1;
-  s->num_instruments = data[off++];
+  /* The file stores the instrument count minus the dummy slot 0 (SawteethParser.ts:297:
+     actual = value + 1). Without the +1 the last instrument was never parsed or played. */
+  s->num_instruments = data[off++] + 1;
 
   /* Instrument 0 is a dummy */
   memset(&s->instruments[0], 0, sizeof(st_ins_t));
@@ -1196,4 +1198,153 @@ void sawteeth_set_step(int ins, int step_idx, uint8_t note, uint8_t wform, uint8
   p->steps[step_idx].note     = note;
   p->steps[step_idx].wform    = wform & 0x07;
   p->steps[step_idx].relative = relative != 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+ *  Standalone preview voices (keyboard note preview)
+ *
+ *  Each voice owns a private copy of one song instrument and its own
+ *  st_ins_ply_t, so it runs the SAME instrument code path as a song channel
+ *  (ins_ply_trig / ins_ply_next: oscillator, envelopes, filter, step
+ *  program, clipping) without touching the song players. The copy survives
+ *  sawteeth_stop() (which frees the song); sawteeth_preview_resync() copies
+ *  the song instrument again after an edit.
+ * ══════════════════════════════════════════════════════════════════════ */
+
+#define ST_MAX_PREVIEWS 16
+#define ST_PREVIEW_RELEASE_STEP (1.0f / 8.0f)  /* amp fade per tick on note off */
+
+typedef struct {
+  bool       used;
+  bool       active;
+  int        src;               /* song instrument index this copy follows */
+  st_ins_t   ins;               /* private copy, arrays owned */
+  st_ins_ply_t ip;
+  float     *buf;               /* sps floats, one tick */
+  int        sps;
+  int        pos;               /* read position in buf */
+  int        note;
+  float      vel;
+  float      amp, amp_step;
+} st_preview_t;
+
+static st_preview_t g_previews[ST_MAX_PREVIEWS];
+
+static void preview_free_ins(st_ins_t *d) {
+  free(d->amp);
+  free(d->filter);
+  free(d->steps);
+  d->amp = NULL;
+  d->filter = NULL;
+  d->steps = NULL;
+}
+
+/* Deep-copy song instrument src into d. Returns 0 on success. */
+static int preview_copy_ins(st_ins_t *d, int src) {
+  if (src < 0 || src >= g_engine.song.num_instruments) return -1;
+  const st_ins_t *s = &g_engine.song.instruments[src];
+  if (!s->amp || !s->filter || !s->steps || s->amp_points < 1 || s->len < 1) return -1;
+  st_timelev_t  *a  = (st_timelev_t *)malloc(s->amp_points * sizeof(st_timelev_t));
+  st_timelev_t  *f  = (st_timelev_t *)malloc((s->filter_points ? s->filter_points : 1) * sizeof(st_timelev_t));
+  st_ins_step_t *st = (st_ins_step_t *)malloc(s->len * sizeof(st_ins_step_t));
+  if (!a || !f || !st) { free(a); free(f); free(st); return -1; }
+  memcpy(a, s->amp, s->amp_points * sizeof(st_timelev_t));
+  if (s->filter_points) memcpy(f, s->filter, s->filter_points * sizeof(st_timelev_t));
+  memcpy(st, s->steps, s->len * sizeof(st_ins_step_t));
+  preview_free_ins(d);
+  *d = *s;
+  d->amp = a;
+  d->filter = f;
+  d->steps = st;
+  return 0;
+}
+
+/* Create a preview voice for song instrument ins. Returns handle or -1. */
+int sawteeth_preview_create(int ins) {
+  if (g_engine.song.sps_pal == 0) return -1;
+  for (int h = 0; h < ST_MAX_PREVIEWS; h++) {
+    st_preview_t *p = &g_previews[h];
+    if (p->used) continue;
+    memset(p, 0, sizeof(*p));
+    if (preview_copy_ins(&p->ins, ins) != 0) return -1;
+    p->sps = g_engine.song.sps_pal;
+    p->buf = (float *)calloc(p->sps, sizeof(float));
+    if (!p->buf) { preview_free_ins(&p->ins); return -1; }
+    p->src = ins;
+    p->pos = p->sps;
+    p->used = true;
+    ins_ply_init(&p->ip);
+    return h;
+  }
+  return -1;
+}
+
+void sawteeth_preview_free(int h) {
+  if (h < 0 || h >= ST_MAX_PREVIEWS || !g_previews[h].used) return;
+  preview_free_ins(&g_previews[h].ins);
+  free(g_previews[h].buf);
+  memset(&g_previews[h], 0, sizeof(g_previews[h]));
+}
+
+void sawteeth_preview_note_on(int h, int note, int velocity) {
+  if (h < 0 || h >= ST_MAX_PREVIEWS || !g_previews[h].used) return;
+  st_preview_t *p = &g_previews[h];
+  if (note < 1) note = 1;
+  if (note >= ST_MAX_NOTES) note = ST_MAX_NOTES - 1;
+  p->note = note;
+  p->vel = clampf((float)velocity / 127.0f, 0.0f, 1.0f);
+  p->amp = 1.0f;
+  p->amp_step = 0;
+  ins_ply_trig(&p->ip, &p->ins, g_engine.n2f);
+  p->pos = p->sps;   /* start a fresh tick on the next render */
+  p->active = true;
+}
+
+void sawteeth_preview_note_off(int h) {
+  if (h < 0 || h >= ST_MAX_PREVIEWS || !g_previews[h].used) return;
+  g_previews[h].amp_step = -ST_PREVIEW_RELEASE_STEP;
+}
+
+/* Re-copy the song instrument into every voice that follows it (after an edit). */
+void sawteeth_preview_resync(int ins) {
+  for (int h = 0; h < ST_MAX_PREVIEWS; h++) {
+    st_preview_t *p = &g_previews[h];
+    if (p->used && p->src == ins) preview_copy_ins(&p->ins, ins);
+  }
+}
+
+/* Add all active voices into interleaved stereo out (LRLR...). Returns the
+   number of voices that were active. The caller zeroes out first. */
+int sawteeth_preview_render(float *out, int num_samples) {
+  int voices = 0;
+  for (int h = 0; h < ST_MAX_PREVIEWS; h++) {
+    st_preview_t *p = &g_previews[h];
+    if (!p->used || !p->active) continue;
+    voices++;
+    int done = 0;
+    while (done < num_samples && p->active) {
+      if (p->pos >= p->sps) {
+        p->amp = clampf(p->amp + p->amp_step, 0.0f, 1.0f);
+        if (p->amp_step < 0 && p->amp <= 0.0f) { p->active = false; break; }
+        ins_ply_set_amp(&p->ip, p->amp * p->vel);
+        ins_ply_set_freq(&p->ip, g_engine.n2f[p->note]);
+        ins_ply_set_cut_off(&p->ip, 1.0f);
+        ins_ply_next(&p->ip, p->buf, p->sps, g_engine.n2f, g_engine.r2f);
+        p->pos = 0;
+      }
+      int avail = p->sps - p->pos;
+      int need = num_samples - done;
+      int n = avail < need ? avail : need;
+      for (int i = 0; i < n; i++) {
+        float sv = p->buf[p->pos + i];
+        if (sv != sv || sv > 2.0f || sv < -2.0f) sv = 0.0f;
+        sv *= 0.5f;   /* single voice: same headroom as a two-channel song mix */
+        out[(done + i) * 2]     += sv;
+        out[(done + i) * 2 + 1] += sv;
+      }
+      p->pos += n;
+      done += n;
+    }
+  }
+  return voices;
 }

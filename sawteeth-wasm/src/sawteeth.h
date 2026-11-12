@@ -257,4 +257,12 @@ int  sawteeth_get_step_count(int ins);
 void sawteeth_get_steps(int ins, uint8_t *out_notes, uint8_t *out_wforms, uint8_t *out_relative, int max);
 void sawteeth_set_step(int ins, int step_idx, uint8_t note, uint8_t wform, uint8_t relative);
 
+/* Standalone single-instrument preview voices (do not touch song playback) */
+int  sawteeth_preview_create(int ins);
+void sawteeth_preview_free(int handle);
+void sawteeth_preview_note_on(int handle, int note, int velocity);
+void sawteeth_preview_note_off(int handle);
+void sawteeth_preview_resync(int ins);
+int  sawteeth_preview_render(float *out, int num_samples);
+
 #endif /* SAWTEETH_H */
