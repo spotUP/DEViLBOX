@@ -13,15 +13,15 @@ import { buildMedleyGrid, applyMedleyGridEdits } from '../medleyGrid';
 
 const FIXTURE = join(process.cwd(), 'public/data/songs/medley/combat.mso');
 
-function load() {
+async function load() {
   const b = readFileSync(FIXTURE);
   const ab = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
-  return { raw: new Uint8Array(ab), song: parseMedleyFile(ab, 'combat.mso') };
+  return { raw: new Uint8Array(ab), song: await parseMedleyFile(ab, 'combat.mso') };
 }
 
 describe('Medley track-stream grid', () => {
   it('re-encodes every track stream byte-exact and exports the module unchanged', async () => {
-    const { raw, song } = load();
+    const { raw, song } = await load();
     const l = song.uadeVariableLayout!;
     expect(l.formatId).toBe('medley');
     l.filePatternAddrs.forEach((addr, fp) => {
@@ -35,7 +35,7 @@ describe('Medley track-stream grid', () => {
   });
 
   it('one changed note changes only the stored byte(s) it is played from', async () => {
-    const { raw, song } = load();
+    const { raw, song } = await load();
     const nb = song.uadeVariableLayout!.noteBytes!;
     // a byte played from exactly one cell
     const count = new Map<number, number>();
@@ -53,8 +53,8 @@ describe('Medley track-stream grid', () => {
     expect(out.data[n.offset]).toBe(raw[n.offset] + 2);
   });
 
-  it('puts known audio time on a known row (voice 1 of subsong 1 starts a note on tick 0; every voice loops)', () => {
-    const { raw } = load();
+  it('puts known audio time on a known row (voice 1 of subsong 1 starts a note on tick 0; every voice loops)', async () => {
+    const { raw } = await load();
     const g = buildMedleyGrid(raw, 'x', 1)!;
     expect(g.unsupportedVoices).toEqual([]);
     expect(g.ticks).toBeGreaterThan(1);
@@ -66,8 +66,8 @@ describe('Medley track-stream grid', () => {
   });
 
   // Stage 2. Expected values come from the reference replayer (nuade medley.c / mdl_module.c) run as a scratch mirror, not from this grid.
-  it('puts notes on the replayer ticks: first step, after a loop pass, after a Call, and in the second pass of a restarted track', () => {
-    const { raw } = load();
+  it('puts notes on the replayer ticks: first step, after a loop pass, after a Call, and in the second pass of a restarted track', async () => {
+    const { raw } = await load();
     const g = buildMedleyGrid(raw, 'x', 1)!;
     const at = (voice: number, tick: number) => g.placements.find(p => p.voice === voice && p.tick === tick);
     // voice:tick:stream offset:grid note. Voice 1 tick 108 is after a loop pass; voice 4 tick 114 follows a Call.
@@ -81,13 +81,13 @@ describe('Medley track-stream grid', () => {
     expect(g.ticks).toBe(384);
   });
 
-  it('a grid row is one 50 Hz replayer tick (speed * 2.5 / BPM = 0.02 s)', () => {
-    const { song } = load();
+  it('a grid row is one 50 Hz replayer tick (speed * 2.5 / BPM = 0.02 s)', async () => {
+    const { song } = await load();
     expect(song.initialSpeed * 2.5 / song.initialBPM).toBeCloseTo(0.02, 6);
   });
 
-  it('keeps note offset and instrument across a track restart (replayer End does not reset them)', () => {
-    const { raw } = load();
+  it('keeps note offset and instrument across a track restart (replayer End does not reset them)', async () => {
+    const { raw } = await load();
     const u = (o: number) => ((raw[o] << 24) | (raw[o + 1] << 16) | (raw[o + 2] << 8) | raw[o + 3]) | 0;
     const t = 8 + u(8);
     const e = t + 10 * 4 + u(t + 10 * 4) + 16; // first item of track 10, voice 4's own track
@@ -100,7 +100,7 @@ describe('Medley track-stream grid', () => {
     expect(note(192)).toBe(34); // second pass: the transpose set in pass one is still in force
   });
 
-  it('maps sampled pitch from the replayer period table (entry 50 = 856, entry 62 = 428)', () => {
+  it('maps sampled pitch from the replayer period table (entry 50 = 856, entry 62 = 428)', async () => {
     const src = readFileSync(join(process.cwd(), 'third-party/nuade/players/medley/mdl_data.c'), 'utf8');
     const body = src.slice(src.indexOf('mdl_period_table'), src.indexOf('};'));
     const table = [...body.matchAll(/0x[0-9a-fA-F]+/g)].map(m => parseInt(m[0], 16));
@@ -108,8 +108,8 @@ describe('Medley track-stream grid', () => {
     expect(table[62]).toBe(0x1ac);
   });
 
-  it('an instrument edit writes the Instrument command argument byte and reaches every note it serves', () => {
-    const { raw } = load();
+  it('an instrument edit writes the Instrument command argument byte and reaches every note it serves', async () => {
+    const { raw } = await load();
     const g = buildMedleyGrid(raw, 'x', 1)!;
     const served = g.placements.filter(p => p.voice === 3 && p.instrOffset === 935);
     expect(served.length).toBeGreaterThan(5);
@@ -128,21 +128,21 @@ describe('Medley track-stream grid', () => {
 });
 
 describe('Medley instruments and song length (combat.mso)', () => {
-  it('lists every instrument of the module table, named from the file, numbered as the stream numbers them', () => {
-    const { song } = load();
+  it('lists every instrument of the module table, named from the file, numbered as the stream numbers them', async () => {
+    const { song } = await load();
     expect(song.instruments.length).toBe(22);
     expect(song.instruments.map(i => i.id)).toEqual(Array.from({ length: 22 }, (_, i) => i + 1));
     expect(song.instruments[0].name).toBe('Pipe Organ');
     expect(song.instruments[13].name).toBe('Snaredrum');
     expect(song.instruments[21].name).toBe('ubba');
     const used = new Set<number>();
-    for (let sub = 1; sub <= 7; sub++) for (const pl of buildMedleyGrid(load().raw, '', sub)!.placements) used.add(pl.instrument);
+    for (let sub = 1; sub <= 7; sub++) for (const pl of buildMedleyGrid((await load()).raw, '', sub)!.placements) used.add(pl.instrument);
     for (const n of used) expect(song.instruments.some(i => i.id === n), `instrument ${n}`).toBe(true);
     expect(used.size).toBeGreaterThan(1);
   });
 
-  it('subsong 7 (Combat) is walked to its real end of 123264 ticks, not cut at 60000', () => {
-    const { raw } = load();
+  it('subsong 7 (Combat) is walked to its real end of 123264 ticks, not cut at 60000', async () => {
+    const { raw } = await load();
     const g = buildMedleyGrid(raw, '', 7)!;
     expect(g.ticks).toBe(123264);
     expect(g.patterns.length * 64).toBeGreaterThanOrEqual(g.ticks);

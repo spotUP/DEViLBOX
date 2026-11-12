@@ -36,11 +36,11 @@ describe("isMedleyFormat", () => {
 // ── Parse FILE1 ───────────────────────────────────────────────────────────────
 
 describe("parseMedleyFile — atmos.mso", () => {
-  it("parses without throwing", () => {
-    expect(() => parseMedleyFile(loadBuf(FILE1), "atmos.mso")).not.toThrow();
+  it("parses without throwing", async () => {
+    await expect(parseMedleyFile(loadBuf(FILE1), "atmos.mso")).resolves.toBeDefined();
   });
-  it("reports format capabilities", () => {
-    const song = parseMedleyFile(loadBuf(FILE1), "atmos.mso");
+  it("reports format capabilities", async () => {
+    const song = await parseMedleyFile(loadBuf(FILE1), "atmos.mso");
     const report = analyzeFormat(song, "atmos.mso");
     console.log("\n" + formatReportToString(report));
     expect(typeof report.format).toBe("string");
@@ -51,11 +51,11 @@ describe("parseMedleyFile — atmos.mso", () => {
 // ── Parse FILE2 ───────────────────────────────────────────────────────────────
 
 describe("parseMedleyFile — combat.mso", () => {
-  it("parses without throwing", () => {
-    expect(() => parseMedleyFile(loadBuf(FILE2), "combat.mso")).not.toThrow();
+  it("parses without throwing", async () => {
+    await expect(parseMedleyFile(loadBuf(FILE2), "combat.mso")).resolves.toBeDefined();
   });
-  it("reports format capabilities", () => {
-    const song = parseMedleyFile(loadBuf(FILE2), "combat.mso");
+  it("reports format capabilities", async () => {
+    const song = await parseMedleyFile(loadBuf(FILE2), "combat.mso");
     const report = analyzeFormat(song, "combat.mso");
     console.log("\n" + formatReportToString(report));
     expect(typeof report.format).toBe("string");

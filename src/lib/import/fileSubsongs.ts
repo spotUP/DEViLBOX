@@ -19,6 +19,8 @@ export interface FileSubsongs {
   current: number;
   /** The name the file was opened under (its extension routes it to the parser again on a switch). */
   fileName: string;
+  /** The engine's number for tune 0 when it does not count from 0 (UADE Medley: 1); absent = 0. */
+  engineFirst?: number;
 }
 
 export interface FileSubsongFormat {
@@ -83,6 +85,15 @@ const FORMATS: Record<string, FileSubsongFormat> = {
     },
   },
   // JayTrax: S subsongs of 16564 bytes share the patterns and instruments (jxsGrid.ts); the engine opens one by index.
+  // Medley (.mso): the song table's tunes 1..N, registry tune i = table entry i + 1 (medleyGrid.MEDLEY_FIRST_TUNE); UADE plays the same numbers.
+  medley: {
+    key: 'medley',
+    // The registry's medley entry matches .ml only; Medley modules are .mso (or mso.* prefixed).
+    names: /\.mso$|(^|\/)mso\./,
+    fileDataField: 'uadeEditableFileData',
+    count: async (bytes) => (await import('./formats/medleyGrid')).medleySubsongCount(new Uint8Array(bytes)),
+    audible: async (bytes, subsong) => (await import('./formats/medleyGrid')).medleySubsongAudible(new Uint8Array(bytes), subsong),
+  },
   jxs: {
     key: 'jxs',
     fileDataField: 'jxsFileData',

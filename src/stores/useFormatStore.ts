@@ -159,7 +159,7 @@ export interface FormatStore {
    */
   nativeSubsongs: NativeSubsongs | null;
   /** The subsongs of a command-stream file the parser built the grid from (lib/import/fileSubsongs); null for one tune. */
-  fileSubsongs: { count: number; current: number; fileName: string } | null;
+  fileSubsongs: { count: number; current: number; fileName: string; engineFirst?: number } | null;
   /** S98 register log for S98Engine (ymfm) */
   s98FileData: ArrayBuffer | null;
   stoneTrackerFileData: ArrayBuffer | null;

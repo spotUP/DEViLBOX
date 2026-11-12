@@ -160,6 +160,27 @@ export interface MedleyGrid {
 
 const emptyCell = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
 
+/**
+ * Index convention. The file-subsong registry (fileSubsongs.ts) counts tunes from 0; Medley's song table has an empty entry 0
+ * and holds its tunes at 1..N, and UADE's Medley player (DTP_SubSongRange 1..N, N = the count word before the table) plays
+ * the same numbers. Registry tune i is therefore table entry / UADE subsong i + MEDLEY_FIRST_TUNE.
+ */
+export const MEDLEY_FIRST_TUNE = 1;
+
+/** Tunes in the file: the count word two bytes before the song table (what the UADE player reports), clamped to 1..64; 0 when it is no Medley module. */
+export function medleySubsongCount(buf: Uint8Array): number {
+  const tables = medleyTables(buf);
+  if (!tables || tables.song < 2) return 0;
+  const raw = (buf[tables.song - 2] << 8) | buf[tables.song - 1];
+  return Math.min(Math.max(raw, 1), 64);
+}
+
+/** Does registry tune `subsong` (0-based) start a note? The replayer walk of buildMedleyGrid decides, never the header. */
+export function medleySubsongAudible(buf: Uint8Array, subsong: number): boolean {
+  const grid = buildMedleyGrid(buf, '', subsong + MEDLEY_FIRST_TUNE);
+  return !!grid && grid.placements.length > 0;
+}
+
 /** Build the grid of one subsong (1-based, as the song table is indexed). */
 export function buildMedleyGrid(buf: Uint8Array, sourceFile: string, subsong = 1): MedleyGrid | null {
   const tables = medleyTables(buf);

@@ -31,7 +31,8 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { medleyEncoder } from '@/engine/uade/encoders/MedleyEncoder';
-import { buildMedleyGrid, medleyInstrumentList, MEDLEY_ROWS_PER_PATTERN } from './medleyGrid';
+import { buildMedleyGrid, medleyInstrumentList, MEDLEY_ROWS_PER_PATTERN, MEDLEY_FIRST_TUNE, medleySubsongCount } from './medleyGrid';
+import { chooseFileSubsong, fileSubsongFormatByKey, fileSubsongsField, type FileSubsongs } from '../fileSubsongs';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
 
@@ -90,8 +91,9 @@ export function isMedleyFormat(buffer: ArrayBuffer | Uint8Array): boolean {
  *
  * @param buffer   Raw file bytes (ArrayBuffer)
  * @param filename Original filename (used to derive the module name)
+ * @param subsong  Tune to draw (0-based registry index = song table entry - 1); absent, the first that sounds
  */
-export function parseMedleyFile(buffer: ArrayBuffer, filename: string): TrackerSong {
+export async function parseMedleyFile(buffer: ArrayBuffer, filename: string, subsong?: number): Promise<TrackerSong> {
   const buf = new Uint8Array(buffer);
 
   if (!isMedleyFormat(buf)) {
@@ -107,21 +109,7 @@ export function parseMedleyFile(buffer: ArrayBuffer, filename: string): TrackerS
 
   // ── Subsong count extraction ──────────────────────────────────────────────
 
-  // The assembly routine resolves: targetOffset = 4 + u32BE(buf, 4)
-  // and reads the subsong count word at (targetOffset - 2).
-  let subsongCount = 1;
-  if (buf.length >= 8) {
-    const relPtr = u32BE(buf, 4);
-    const targetOffset = 4 + relPtr;
-    const subsongWordOffset = targetOffset - 2;
-    if (subsongWordOffset >= 0 && subsongWordOffset + 2 <= buf.length) {
-      const raw = u16BE(buf, subsongWordOffset);
-      if (raw > 0) {
-        // Clamp to a reasonable range
-        subsongCount = Math.min(Math.max(raw, 1), 64);
-      }
-    }
-  }
+  const subsongCount = Math.max(medleySubsongCount(buf), 1);
 
   // ── Scan for sample/instrument data ────────────────────────────────────────
   //
@@ -175,7 +163,12 @@ export function parseMedleyFile(buffer: ArrayBuffer, filename: string): TrackerS
     eff2: 0,
   }));
 
-  const grid = buildMedleyGrid(buf, filename, 1);
+  const tunes: FileSubsongs = {
+    ...(await chooseFileSubsong(fileSubsongFormatByKey('medley')!, buffer, filename, subsong)
+      .catch((): FileSubsongs => ({ count: 1, current: 0, fileName: filename }))),
+    engineFirst: MEDLEY_FIRST_TUNE,
+  };
+  const grid = buildMedleyGrid(buf, filename, tunes.current + MEDLEY_FIRST_TUNE);
 
   const pattern = {
     id: 'pattern-0',
@@ -234,6 +227,7 @@ export function parseMedleyFile(buffer: ArrayBuffer, filename: string): TrackerS
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    ...fileSubsongsField(tunes),
     ...(grid ? {
       uadePlayerTickGrid: true,
       uadeVariableLayout: {
