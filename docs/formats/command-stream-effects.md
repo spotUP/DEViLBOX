@@ -72,6 +72,12 @@ Formats: sawteeth.
 - effTyp 1390 (0x56E), grid Exx: effect e. Parameter: parameter meaning not documented.
 - effTyp 1391 (0x56F), grid Fxx: effect f. Parameter: parameter meaning not documented.
 
+### Jochen Hippel ST (note event with info bit 0x20: eff is the extra byte, the speed per tick)
+
+Formats: jochenHippelST.
+
+- effTyp 1392 (0x570), grid Pxx: portamento. Parameter: parameter meaning not documented.
+
 ## Not verified
 
 - Names are the table's own identifiers; glyphs are what the grid shows. Playback was not checked per command.

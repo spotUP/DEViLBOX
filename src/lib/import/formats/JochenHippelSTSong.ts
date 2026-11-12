@@ -22,12 +22,15 @@
  */
 
 import type { TrackerCell } from '@/types';
+import { HS_FX } from './commandStreamEffectGlyphs';
 import {
   decodeHstModule, encodeHstModule, compressHstSong, hstHeader, hstStep, hstStepCount,
   hstPatternRows, hstPatternStreams, packHstRows, perRowHstStream,
   perRowHstOffsets, hstU16, hstU32, hstW16, hstW32,
   type HstModule, type HstRow, type HstStepVoice, type HstCosoSong,
 } from './JochenHippelSTModule';
+
+const HST_INFO_PORTAMENTO = 0x20;
 
 /** XM note of YM period table index 0 ($EEE, 32.7 Hz = C-1). */
 export const HST_NOTE_BASE = 13;
@@ -46,6 +49,11 @@ export function hstCellFromRow(row: HstRow, sv: HstStepVoice, volSeqs: number): 
     // ANDI.W #$1F,D1; ADD.B $20(A0),D1; CMP.W nVol-1,D1; BLS - else sequence 0.
     const v = ((row.info & 0x1f) + sv.soundTranspose) & 0xff;
     cell.instrument = (v > volSeqs - 1 ? 0 : v) + 1;
+  }
+  // info $20: portamento, the extra byte is its speed per tick. Display only: an edit keeps the stored info and extra (hstRowFromCell).
+  if ((row.info & HST_INFO_PORTAMENTO) !== 0 && row.extra !== null) {
+    cell.effTyp = HS_FX.portamento;
+    cell.eff = row.extra;
   }
   return cell;
 }
