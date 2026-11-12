@@ -12,6 +12,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createMcpServer, type BrowserCaller } from '../mcp/mcpServer';
 import { PRIVATE_EFFECTS_DOC, PRIVATE_EFFECTS_TOPIC } from './privateEffectBlocks';
+import { COMMAND_STREAM_DOC, COMMAND_STREAM_TOPIC } from './commandStreamEffects';
 import { NEO_GEO_COMPOSING_DOC, NEO_GEO_COMPOSING_TOPIC } from './neoGeoComposing';
 import { PC_TRACKER_COMPOSING_DOC, PC_TRACKER_COMPOSING_TOPIC } from './pcTrackerComposing';
 import type { ToolOutcome, ToolSpec } from './toolLoop';
@@ -101,6 +102,7 @@ export async function createFreeToolset(callBrowser: BrowserCaller, options: Too
         if (args?.topic === NEO_GEO_COMPOSING_TOPIC) return { ok: true, content: NEO_GEO_COMPOSING_DOC };
         if (args?.topic === PC_TRACKER_COMPOSING_TOPIC) return { ok: true, content: PC_TRACKER_COMPOSING_DOC };
         if (args?.topic === PRIVATE_EFFECTS_TOPIC) return { ok: true, content: PRIVATE_EFFECTS_DOC };
+        if (args?.topic === COMMAND_STREAM_TOPIC) return { ok: true, content: COMMAND_STREAM_DOC };
         return { ok: true, content: describeTools(tools) };
       }
       try {
