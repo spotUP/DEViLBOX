@@ -76,12 +76,12 @@ Call `get_mcp_help { topic }` and follow the text it returns. The topic text is 
 |--------|---------|-----------|-------|-------|
 | PC tracker standard | MOD, XM, S3M, IT and relatives | `pc-tracker-composing` | `/pc-tracker-effects` | Done. Unverified: W (effTyp 32), Z (35) playback; MOD export with effTyp above 15. |
 | Furnace chip | Neo Geo (YM2610) | `neo-geo-composing` | `/furnace-fm` | Pilot done. Other Furnace chips: no topic yet. |
-| Amiga native mapped to standard ids | 46 formats | none yet | - | Use `pc-tracker-composing` numbers with care; per-format limits not documented. |
-| Format-private effect blocks | 24 formats | none yet | - | Glyph tables in `src/lib/import/formats/*EffectGlyphs.ts`. |
-| Command-stream | 15 formats | none yet | - | [`FORMAT_COMMAND_STREAM_GRID.md`](FORMAT_COMMAND_STREAM_GRID.md), `commandStreamEffectGlyphs.ts`. |
+| Amiga native mapped to standard ids | 46 formats | `amiga-standard-effects` | - | Done. Per format, the standard ids its importer writes (grep of the parser). 17 formats write no literal id and 12 more also set ids from a table: see the gaps file. |
+| Format-private effect blocks | 24 formats | `format-private-effects` | - | Done for the 18 formats that have an `*EffectGlyphs.ts` table. 9 own-set formats have no table. Parameter meaning is documented only for Tony Williams and JayTrax. |
+| Command-stream | 15 formats | `command-stream-effects` | - | Done for Riff Raff, Howie Davies, Hippel CoSo, Sound Programming Language, Ron Klaren. The other members have no table. See [`FORMAT_COMMAND_STREAM_GRID.md`](FORMAT_COMMAND_STREAM_GRID.md). |
 | No effects | 71 formats | - | - | Notes and instruments only. |
 
-Full inventory with every format's family: `thoughts/spot/2026-11-12_format-effects-inventory.md` (local, git-ignored). `get_command_list` returns keyboard commands, not effect commands.
+Open gaps per format: `thoughts/spot/2026-11-12_effect-mapping-gaps.md`. Full inventory with every format's family: `thoughts/spot/2026-11-12_format-effects-inventory.md` (local, git-ignored). `get_command_list` returns keyboard commands, not effect commands.
 
 Not every format is editable. `src/lib/formats/EditableFormatRegistry.builtins.ts` is the list. A cell write into a format that is not registered there changes the grid but never reaches the exported module.
 
