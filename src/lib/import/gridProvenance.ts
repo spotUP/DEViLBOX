@@ -465,7 +465,6 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   uade_tfmx1_5: 'G11-uade-only',
   uade_tfmx7v: 'G11-uade-only',
   uade_tfmxpro: 'G11-uade-only',
-  uade_vss: 'G11-uade-only',
   uade_ah: 'G11-uade-only',
   uade_bvs: 'G11-uade-only',
   uade_cba: 'G11-uade-only',
@@ -508,6 +507,8 @@ export const DIRECT_GRIDS: readonly string[] = [
   'synthDream',
   // Tim Follin: the command streams decode to a read-only tick grid (timFollinGrid.ts), no oracle yet.
   'timFollin',
+  // Voodoo Supreme Synthesizer: the four voice track streams decode to a read-only tick grid (voodooSupremeGrid.ts), measured against UADE's AUDxPER log (voodooGridMatchesPaula.test.ts).
+  'uade_vss',
   // Beathoven Synthesizer: the command streams decode to a read-only tick grid (beathovenGrid.ts), no oracle yet.
   'beathoven',
   // Sound Programming Language: the command streams decode to a read-only tick grid (soundProgrammingLanguageGrid.ts), no oracle yet.
