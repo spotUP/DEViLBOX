@@ -16,6 +16,9 @@
 import { applyEditorCellEdit } from '@lib/import/furnaceEditorCells';
 import { DavidWhittakerEngine } from './davidwhittaker/DavidWhittakerEngine';
 import { outputLatencySec } from './audioLatency';
+import { composedNeoGeoSequencerRoute, deriveComposedNeoGeo, isReplacedForDerivedSong } from './replayer/composedNeoGeo';
+import type { DerivedFurnaceNative } from '@/lib/export/deriveFurnaceNative';
+import { notify } from '@stores/useNotificationStore';
 import { isReplacedInstrument, noteVolumeIsVelocity, synthNoteVelocity } from './replayer/hybridInstruments';
 import { isTonePortamentoEffect } from './replayer/SynthEffectProcessor';
 import { isPerChannelNativeSynthType } from './perChannelNativeSynths';
@@ -785,6 +788,8 @@ export class TrackerReplayer {
   // The TS scheduler does NOT run; position updates come from worklet messages.
   private useWasmSequencer = false;
   private _seqPositionUnsub: (() => void) | null = null;
+  /** Native data derived at Play for a composed Neo Geo song; set only while that play lasts. */
+  private _derivedNeoGeo: DerivedFurnaceNative | null = null;
 
   // libopenmpt playback: when active, audio comes from the libopenmpt worklet
   // and TrackerReplayer only forwards position updates to the UI.
@@ -2477,6 +2482,26 @@ export class TrackerReplayer {
       }
     }
 
+    // A song composed on the Neo Geo chip: derive its native data now, so the sequencer gate
+    // below takes it and the XM / hybrid route does not also run (no double playback).
+    if (this._derivedNeoGeo) delete this.song.furnaceNative; // left by an aborted earlier play
+    this._derivedNeoGeo = null;
+    if (composedNeoGeoSequencerRoute(this.song)) {
+      try {
+        const derived = await deriveComposedNeoGeo(this.song);
+        if (gen !== this._playGeneration) return;
+        this.song.furnaceNative = derived.native;
+        this._derivedNeoGeo = derived;
+        if (derived.warnings.length > 0) {
+          notify.warning(`Neo Geo playback: ${derived.warnings.join('; ')}`);
+        }
+      } catch (err) {
+        console.error('[TrackerReplayer] Neo Geo native derivation failed:', err);
+        notify.error(`Neo Geo song cannot be played: ${err instanceof Error ? err.message : String(err)}`);
+        return;
+      }
+    }
+
     this.playing = true;
 
     // ── Universal hybrid playback setup (ALL formats) ──────────────────────
@@ -2492,7 +2517,10 @@ export class TrackerReplayer {
       const instruments = useInstrumentStore.getState().instruments;
       const furnaceSequencer = !!this.song.furnaceNative;
       for (const inst of instruments) {
-        if (isReplacedInstrument(inst, furnaceSequencer)) {
+        const replaced = this._derivedNeoGeo
+          ? isReplacedForDerivedSong(inst, new Set(this._derivedNeoGeo.instrumentIds))
+          : isReplacedInstrument(inst, furnaceSequencer);
+        if (replaced) {
           this._replacedInstruments.add(inst.id);
         } else {
           this._replacedInstruments.delete(inst.id);
@@ -2552,9 +2580,16 @@ export class TrackerReplayer {
           isStillCurrent: () => gen === this._playGeneration,
           initialSongPos: this.songPos,
           initialPattPos: this.pattPos,
+          ins2Uploads: this._derivedNeoGeo?.ins2,
         });
         if (gen !== this._playGeneration) return;
 
+        if (!result.started && this._derivedNeoGeo) {
+          // No fallback to the hybrid route for a composed song: that would be a different sound.
+          notify.error('Neo Geo song cannot be played: the sequencer did not start');
+          this.stop();
+          return;
+        }
         if (result.started) {
           this.useWasmSequencer = true;
           this._seqPositionUnsub = result.cleanup;
@@ -2923,6 +2958,12 @@ export class TrackerReplayer {
 
     this.playing = false;
     this._playGeneration++; // Invalidate any in-flight async play()
+
+    // The native data of a composed Neo Geo song lives for one play only (re-derived at the next).
+    if (this._derivedNeoGeo) {
+      if (this.song) delete this.song.furnaceNative;
+      this._derivedNeoGeo = null;
+    }
 
     // Stop WASM sequencer if active
     if (this.useWasmSequencer) {

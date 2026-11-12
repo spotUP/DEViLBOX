@@ -2049,6 +2049,11 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       isStillCurrent: () => boolean;
       initialSongPos: number;
       initialPattPos: number;
+      /**
+       * INS2 blobs by sequencer slot, for a song whose native data was derived at Play (a composed
+       * song): its store instruments are not the module's, so the slots come from the derivation.
+       */
+      ins2Uploads?: ReadonlyArray<{ slot: number; data: Uint8Array }>;
     },
   ): Promise<{ started: false } | { started: true; cleanup: () => void }> {
     if (!opts.song.furnaceNative) {
@@ -2158,7 +2163,10 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       // The sequencer references instruments by index (0, 1, 2...) via
       // DIV_CMD_INSTRUMENT. Each instrument must be in the global table
       // or the dispatch returns silence.
-      if (opts.song.instruments.length > 0) {
+      if (opts.ins2Uploads) {
+        for (const { slot, data } of opts.ins2Uploads) this.loadIns2(slot, data);
+        _log(`[FurnaceDispatchEngine] pre-uploaded ${opts.ins2Uploads.length} derived INS2 instruments`);
+      } else if (opts.song.instruments.length > 0) {
         // `collectIns2Uploads` knows where the blob actually lives. This read
         // `inst.rawBinaryData`, which the converter never sets — it puts the
         // blob on the furnace CONFIG — so this loop reported
