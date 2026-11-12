@@ -30,10 +30,12 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, ChannelData, TrackerCell, InstrumentConfig } from '@/types';
 import { amigaNoteToXM, createSamplerInstrument } from './AmigaUtils';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 
-// NOTE: uadePatternLayout not added — Jeroen Tel uses variable-length byte stream
-// encoding per track (not fixed-size cells). Requires UADEVariablePatternLayout with
-// per-track address/size tracking during parsing.
+// Editing: tracks are variable-length byte streams, so the layout is per cell (getCellFileOffset): the file offset of the
+// note byte of the entry that starts on that row. Only a note edit is written (the entry's duration, instrument, volume and
+// slide bytes stay); the player stores the note before the voice's transpose, so the byte written is the grid note minus
+// that transpose (JeroenTelExporter.ts).
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -255,6 +257,7 @@ interface JTTrackEntry {
   instrument: number; // sample table index (-1 = no change)
   volume: number;     // volume override (0 = no change, 1-127 = value)
   slide: number;      // portamento speed (0 = none)
+  noteAt: number;     // file offset of the note byte (-1: a spacer row has none)
 }
 
 /**
@@ -300,13 +303,14 @@ function parseJTTrack(buf: Uint8Array, trackOff: number): JTTrackEntry[] {
       pos++;
       if (pos >= len || buf[pos] === 0xFF) break;
       // Otherwise this is just a rest/spacer row with the given duration
-      entries.push({ duration, note: 0, instrument: -1, volume, slide: 0 });
+      entries.push({ duration, note: 0, instrument: -1, volume, slide: 0, noteAt: -1 });
       continue;
     }
 
     let note = 0;
     let instrument = -1;
     let slide = 0;
+    let noteAt = -1;
 
     if (typeBits === 0x40) {
       // Type 1: note + slide
@@ -316,6 +320,7 @@ function parseJTTrack(buf: Uint8Array, trackOff: number): JTTrackEntry[] {
       pos++;
       if (pos >= len) break;
       note = buf[pos];
+      noteAt = pos;
     } else if (typeBits === 0x80) {
       // Type 2: instrument change + note
       pos++;
@@ -332,11 +337,13 @@ function parseJTTrack(buf: Uint8Array, trackOff: number): JTTrackEntry[] {
         if (pos >= len) break;
       }
       note = buf[pos];
+      noteAt = pos;
     } else {
       // Type 0: note only
       pos++;
       if (pos >= len) break;
       note = buf[pos];
+      noteAt = pos;
     }
 
     if (glide && slide === 0) {
@@ -344,7 +351,7 @@ function parseJTTrack(buf: Uint8Array, trackOff: number): JTTrackEntry[] {
       slide = 1;
     }
 
-    entries.push({ duration, note, instrument, volume, slide });
+    entries.push({ duration, note, instrument, volume, slide, noteAt });
 
     // Check for track terminator (0xFF after the note byte)
     pos++;
@@ -551,6 +558,10 @@ export async function parseJeroenTelFile(
       transpose: number;
     }
     const voiceSteps: VoiceStep[][] = [[], [], [], []];
+    /** Per pattern, channel, row: file offset of the note byte of the entry starting there (-1: none). */
+    const cellOffsetMap: number[][][] = [];
+    /** Per pattern, channel: the transpose the grid notes were shifted by. */
+    const transposeMap: number[][] = [];
 
     for (let v = 0; v < 4; v++) {
       let seqOff = voiceSeqOffs[v];
@@ -583,6 +594,8 @@ export async function parseJeroenTelFile(
     // For each step, look up the track in the track pointer table and parse it
     for (let step = 0; step < numSteps; step++) {
       const channelRows: TrackerCell[][] = [[], [], [], []];
+      const channelOffs: number[][] = [[], [], [], []];
+      const transposeRow: number[] = [0, 0, 0, 0];
       let maxRows = 0;
 
       for (let ch = 0; ch < 4; ch++) {
@@ -601,6 +614,8 @@ export async function parseJeroenTelFile(
         // Expand entries into rows (each entry occupies `duration` rows, with
         // the note/instrument on the first row and empty rows for the rest)
         const rows: TrackerCell[] = [];
+        const offs: number[] = [];
+        transposeRow[ch] = vstep.transpose;
         for (const entry of entries) {
           // JT note n plays the period ProTracker's index n + 1 does. Measured against the Paula writes of
           // stormlord title.jt: with index + 12 every grid note sat one semitone under the period the player
@@ -623,8 +638,10 @@ export async function parseJeroenTelFile(
             eff2: 0,
           });
 
+          offs.push(entry.noteAt);
           // Fill remaining duration rows with empty cells
           for (let d = 1; d < Math.max(1, entry.duration); d++) {
+            offs.push(-1);
             rows.push({
               note: 0, instrument: 0, volume: 0,
               effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
@@ -633,6 +650,7 @@ export async function parseJeroenTelFile(
         }
 
         channelRows[ch] = rows;
+        channelOffs[ch] = offs;
         if (rows.length > maxRows) maxRows = rows.length;
       }
 
@@ -671,6 +689,13 @@ export async function parseJeroenTelFile(
         };
       });
 
+      cellOffsetMap.push(channelOffs.map((o) => {
+        const padded = o.slice(0, patLen);
+        while (padded.length < patLen) padded.push(-1);
+        return padded;
+      }));
+      transposeMap.push(transposeRow);
+
       const pattern: Pattern = {
         id: `pattern-${step}`,
         name: `Pattern ${step}`,
@@ -692,6 +717,8 @@ export async function parseJeroenTelFile(
 
     // If we got patterns, return with parsed data
     if (patterns.length > 0) {
+      // The notes as parsed: an edit is told from the file by comparing against these, not the live grid.
+      const parsedNotes = patterns.map((pt) => pt.channels.map((c) => c.rows.map((r) => r.note)));
       return {
         name: `${moduleName} [Jeroen Tel] (${numInstruments} smp)`,
         format: 'MOD' as TrackerFormat,
@@ -706,6 +733,27 @@ export async function parseJeroenTelFile(
         linearPeriods: false,
         uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
         uadeEditableFileName: filename,
+        uadePatternLayout: {
+          formatId: 'jeroenTel',
+          patternDataFileOffset: 0, // not used (getCellFileOffset overrides)
+          bytesPerCell: 1,
+          rowsPerPattern: 128,
+          numChannels: 4,
+          numPatterns: patterns.length,
+          moduleSize: buffer.byteLength,
+          encodeCell: () => new Uint8Array(1),
+          decodeCell: () => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 }),
+          effectPatches: (pattern, row, channel, cell) => {
+            const wasNote = parsedNotes[pattern]?.[channel]?.[row];
+            const at = cellOffsetMap[pattern]?.[channel]?.[row] ?? -1;
+            if (wasNote === undefined || cell.note === wasNote) return { patches: [], noteUnchanged: true };
+            if (at < 0) return { patches: [], noteUnchanged: false };
+            const raw = (cell.note > 0 ? cell.note - 12 - JT_NOTE_OFFSET : 0) - (transposeMap[pattern][channel] ?? 0);
+            return { patches: [[at, Math.max(0, Math.min(0x7F, raw))]], noteUnchanged: true };
+          },
+          getCellFileOffset: (pattern: number, row: number, channel: number): number =>
+            cellOffsetMap[pattern]?.[channel]?.[row] ?? -1,
+        } as UADEPatternLayout,
       };
     }
   }
