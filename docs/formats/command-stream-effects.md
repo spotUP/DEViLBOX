@@ -78,6 +78,29 @@ Formats: jochenHippelST.
 
 - effTyp 1392 (0x570), grid Pxx: portamento. Parameter: parameter meaning not documented.
 
+### Paul Robotham (voice-stream command 0x80..0xff, effTyp = 0x580 + command index & 0x1f, eff = first operand byte; fade also has a second operand)
+
+Formats: paulRobotham.
+
+- effTyp 1409 (0x581), grid Lxx: loop count. Parameter: parameter meaning not documented.
+- effTyp 1410 (0x582), grid Exx: loop end. Parameter: parameter meaning not documented.
+- effTyp 1415 (0x587), grid Hxx: vibrato. Parameter: parameter meaning not documented.
+- effTyp 1416 (0x588), grid Ixx: vibrato speed. Parameter: parameter meaning not documented.
+- effTyp 1417 (0x589), grid Pxx: slide. Parameter: parameter meaning not documented.
+- effTyp 1419 (0x58B), grid Yxx: volume envelope. Parameter: parameter meaning not documented.
+- effTyp 1420 (0x58C), grid Zxx: pitch envelope. Parameter: parameter meaning not documented.
+- effTyp 1421 (0x58D), grid Vxx: volume. Parameter: parameter meaning not documented.
+- effTyp 1422 (0x58E), grid Txx: tempo. Parameter: parameter meaning not documented.
+- effTyp 1427 (0x593), grid Fxx: flags. Parameter: parameter meaning not documented.
+- effTyp 1428 (0x594), grid Mxx: mode. Parameter: parameter meaning not documented.
+- effTyp 1429 (0x595), grid Xxx: command21. Parameter: parameter meaning not documented.
+- effTyp 1430 (0x596), grid Dxx: fade. Parameter: parameter meaning not documented.
+- effTyp 1431 (0x597), grid Uxx: command23. Parameter: parameter meaning not documented.
+- effTyp 1432 (0x598), grid Kxx: command24. Parameter: parameter meaning not documented.
+- effTyp 1433 (0x599), grid Jxx: command25. Parameter: parameter meaning not documented.
+- effTyp 1434 (0x59A), grid Nxx: command26. Parameter: parameter meaning not documented.
+- effTyp 1435 (0x59B), grid Gxx: fade second. Parameter: parameter meaning not documented.
+
 ## Not verified
 
 - Names are the table's own identifiers; glyphs are what the grid shows. Playback was not checked per command.

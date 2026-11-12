@@ -94,8 +94,54 @@ export const HS_FX = {
   portamento: HS_FX_BASE,
 } as const;
 
+export const PR_FX_BASE = 0x580;
+/**
+ * Paul Robotham voice-stream commands (0x80..0xff, jump-table index = byte & 0x1f; docs in the header of paulRobothamGrid.ts):
+ * effTyp = PR_FX_BASE + the command index, eff = its first operand byte (0 for a command without operand). The instrument
+ * command (15) is the instrument column, so it has no id. Command 22 has two operands: the second is `fadeSecond`.
+ * Command 21, 23, 24, 25 and 26 are named by number: the repo has no description of what they do.
+ */
+export const PR_FX = {
+  /** Command 1: push loop count. */
+  loopCount: PR_FX_BASE + 1,
+  /** Command 2: loop end (no operand). */
+  loopEnd: PR_FX_BASE + 2,
+  /** Command 7: vibrato. */
+  vibrato: PR_FX_BASE + 7,
+  /** Command 8: vibrato speed. */
+  vibratoSpeed: PR_FX_BASE + 8,
+  /** Command 9: slide. */
+  slide: PR_FX_BASE + 9,
+  /** Command 11: volume envelope. */
+  volumeEnvelope: PR_FX_BASE + 11,
+  /** Command 12: pitch envelope. */
+  pitchEnvelope: PR_FX_BASE + 12,
+  /** Command 13: volume. */
+  volume: PR_FX_BASE + 13,
+  /** Command 14: tempo (multiplier = operand << 4). */
+  tempo: PR_FX_BASE + 14,
+  /** Command 19: flags. */
+  flags: PR_FX_BASE + 19,
+  /** Command 20: mode. */
+  mode: PR_FX_BASE + 20,
+  /** Command 21 (operand meaning not documented). */
+  command21: PR_FX_BASE + 21,
+  /** Command 22: fade, first operand. */
+  fade: PR_FX_BASE + 22,
+  /** Command 23 (no operand, meaning not documented). */
+  command23: PR_FX_BASE + 23,
+  /** Command 24 (operand meaning not documented). */
+  command24: PR_FX_BASE + 24,
+  /** Command 25 (no operand, meaning not documented). */
+  command25: PR_FX_BASE + 25,
+  /** Command 26 (no operand, meaning not documented). */
+  command26: PR_FX_BASE + 26,
+  /** Command 22: fade, second operand. */
+  fadeSecond: PR_FX_BASE + 27,
+} as const;
+
 export const CS_FX_MIN = RR_FX_BASE;
-export const CS_FX_MAX = HS_FX.portamento;
+export const CS_FX_MAX = PR_FX.fadeSecond;
 
 export const CS_EFFECT_GLYPH: Record<number, string> = {
   [RR_FX.setVolume]: 'V', [RR_FX.volumeSlide]: 'S', [RR_FX.volumeSlideRate]: 'R', [RR_FX.masterFade]: 'F',
@@ -105,6 +151,10 @@ export const CS_EFFECT_GLYPH: Record<number, string> = {
   [RK_FX.arpeggio]: 'A', [RK_FX.portamentoEnd]: 'P', [RK_FX.portamentoIncrement]: 'P', [RK_FX.portamentoWait]: 'W', [RK_FX.adsrSpeed]: 'S',
   ...Object.fromEntries(Object.values(ST_FX).map((id) => [id, (id - ST_FX_BASE).toString(16).toUpperCase()])),
   [HS_FX.portamento]: 'P',
+  [PR_FX.loopCount]: 'L', [PR_FX.loopEnd]: 'E', [PR_FX.vibrato]: 'H', [PR_FX.vibratoSpeed]: 'I', [PR_FX.slide]: 'P',
+  [PR_FX.volumeEnvelope]: 'Y', [PR_FX.pitchEnvelope]: 'Z', [PR_FX.volume]: 'V', [PR_FX.tempo]: 'T', [PR_FX.flags]: 'F',
+  [PR_FX.mode]: 'M', [PR_FX.command21]: 'X', [PR_FX.fade]: 'D', [PR_FX.fadeSecond]: 'G', [PR_FX.command23]: 'U',
+  [PR_FX.command24]: 'K', [PR_FX.command25]: 'J', [PR_FX.command26]: 'N',
   [SPL_FX.extraNote1]: 'N', [SPL_FX.extraNote2]: 'N', [SPL_FX.extraNote3]: 'N',
 };
 
