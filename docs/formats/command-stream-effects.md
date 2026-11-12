@@ -26,9 +26,9 @@ Formats: howieDavies.
 - effTyp 1312 (0x520), grid Sxx: speed. Parameter: parameter meaning not documented.
 - effTyp 1313 (0x521), grid Vxx: max volume. Parameter: parameter meaning not documented.
 
-### Jochen Hippel CoSo
+### Jochen Hippel CoSo and MCMD (note parameter: CoSo = the byte after the info byte, MCMD = the info byte of the row before)
 
-Formats: hippelCoso.
+Formats: hippelCoso, mcmd.
 
 - effTyp 1328 (0x530), grid Pxx: portamento. Parameter: parameter meaning not documented.
 - effTyp 1329 (0x531), grid Fxx: alt sequence. Parameter: parameter meaning not documented.

@@ -11,7 +11,7 @@ export const COMMAND_STREAM_TOPIC = 'command-stream-effects';
 export const COMMAND_STREAM_BLOCKS: readonly EffectBlock[] = [
   { formats: ['riffRaff'], title: 'Riff Raff', rows: rowsFromFx(RR_FX, CS_EFFECT_GLYPH) },
   { formats: ['howieDavies'], title: 'Howie Davies', rows: rowsFromFx(HD_FX, CS_EFFECT_GLYPH) },
-  { formats: ['hippelCoso'], title: 'Jochen Hippel CoSo', rows: rowsFromFx(HC_FX, CS_EFFECT_GLYPH) },
+  { formats: ['hippelCoso', 'mcmd'], title: 'Jochen Hippel CoSo and MCMD (note parameter: CoSo = the byte after the info byte, MCMD = the info byte of the row before)', rows: rowsFromFx(HC_FX, CS_EFFECT_GLYPH) },
   { formats: ['soundProgrammingLanguage'], title: 'Sound Programming Language', rows: rowsFromFx(CS_SPL_FX, CS_EFFECT_GLYPH) },
   { formats: ['ronKlaren'], title: 'Ron Klaren', rows: rowsFromFx(RK_FX, CS_EFFECT_GLYPH) },
   { formats: ['sawteeth'], title: 'Sawteeth (effect byte split: effTyp from the high nibble, eff the low nibble)', rows: rowsFromFx(ST_FX, CS_EFFECT_GLYPH) },

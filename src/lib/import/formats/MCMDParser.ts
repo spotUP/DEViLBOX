@@ -14,10 +14,18 @@
  * convention where index 12 = C-1), bit 7 = keep the running instrument. Info byte bits 0-5 = instrument (volume
  * sequence number, shown + 1), bit 6 = portamento, bit 7 = alternative frequency sequence; both flags and the
  * parameter an info byte carries on a row without a note are kept from the stored bytes.
+ *
+ * Effects (mcmd.c step_voice, apply_portamento, start_instrument): a note row whose info has bit 6 or 7 takes its parameter
+ * from the INFO byte of the row before it (the last row of the pattern for row 0). Bit 6 = portamento, the parameter is the
+ * speed (a value with bit 7 set slides the other way); bit 7 = the parameter replaces the instrument's frequency sequence
+ * number. Both are shown with the Hippel CoSo ids (HC_FX), the same two note parameters of the same player family:
+ * portamento in the first effect column, the frequency sequence in the first free one. Editing the shown value writes the
+ * parameter byte (effectPatches); the flags themselves stay as stored.
  */
 import type { TrackerCell, Pattern, InstrumentConfig } from '@/types';
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { HC_FX } from './commandStreamEffectGlyphs';
 
 const HEADER_SIZE = 0x12;
 const SEQUENCE_SIZE = 64;
@@ -29,6 +37,8 @@ const VOICES = 4;
 const NOTE_MASK = 0x7F;
 const NOTE_PATTERN_END = 1;
 const NOTE_NO_INSTRUMENT = 0x80;
+const INFO_PORTAMENTO = 0x40;
+const INFO_ALT_FSEQ = 0x80;
 const INFO_INSTRUMENT = 0x3F;
 const MAX_TABLE_SIZE = 0x7FFF;
 
@@ -73,15 +83,32 @@ export function isMcmdFormat(buffer: ArrayBuffer | Uint8Array): boolean {
   return layoutTables(buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer)) !== null;
 }
 
-/** Decode a row's two bytes. A note index below 2 or above 95 has no XM note and shows empty; the encoder keeps its bytes. */
-export function decodeMcmdCell(bytes: Uint8Array): TrackerCell {
+/** The effects a note row's info byte asks for: [effTyp, eff] pairs, portamento first. `param` is the info byte of the row before. */
+function mcmdEffects(info: number, param: number): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  if (info & INFO_PORTAMENTO) out.push([HC_FX.portamento, param]);
+  if (info & INFO_ALT_FSEQ) out.push([HC_FX.altSequence, param]);
+  return out;
+}
+
+/**
+ * Decode a row's two bytes. A note index below 2 or above 95 has no XM note and shows empty; the encoder keeps its bytes.
+ * `param` (the info byte of the row before) adds the portamento / frequency-sequence effects; without it none is shown.
+ */
+export function decodeMcmdCell(bytes: Uint8Array, param?: number): TrackerCell {
   const index = (bytes[0] ?? 0) & NOTE_MASK;
   const hasNote = index > NOTE_PATTERN_END && index + 1 <= 96;
-  return {
+  const cell: TrackerCell = {
     note: hasNote ? index + 1 : 0,
     instrument: hasNote ? ((bytes[1] ?? 0) & INFO_INSTRUMENT) + 1 : 0,
     volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
   };
+  if (hasNote && param !== undefined) {
+    const [first, second] = mcmdEffects(bytes[1] ?? 0, param);
+    if (first) { cell.effTyp = first[0]; cell.eff = first[1]; }
+    if (second) { cell.effTyp2 = second[0]; cell.eff2 = second[1]; }
+  }
+  return cell;
 }
 
 /** Encode a cell over the row's stored bytes; fields the grid does not show (flags, parameter, no-instrument bit) are kept. */
@@ -119,6 +146,9 @@ export function parseMcmdFile(buffer: ArrayBuffer, filename: string): TrackerSon
     return pool >= t.patternCount ? -1 : t.patterns + pool * t.patternSize + row * ROW_SIZE;
   };
 
+  /** The parameter of the note row at `off`: the info byte of the row before it, the pattern's last row for row 0 (mcmd.c step_voice). */
+  const paramAt = (off: number, row: number): number => b[off + 1 - ROW_SIZE + (row === 0 ? t.patternSize : 0)] ?? 0;
+
   const baseName = filename.split('/').pop() ?? filename;
   const patterns: Pattern[] = Array.from({ length: trackRowCount }, (_, p) => ({
     id: `pattern-${p}`,
@@ -132,7 +162,7 @@ export function parseMcmdFile(buffer: ArrayBuffer, filename: string): TrackerSon
       instrumentId: null, color: null,
       rows: Array.from({ length: rowsPerPattern }, (_, r) => {
         const off = cellOffset(p, r, ch);
-        return off < 0 ? decodeMcmdCell(new Uint8Array(ROW_SIZE)) : decodeMcmdCell(b.subarray(off, off + ROW_SIZE));
+        return off < 0 ? decodeMcmdCell(new Uint8Array(ROW_SIZE)) : decodeMcmdCell(b.subarray(off, off + ROW_SIZE), paramAt(off, r));
       }),
     })),
     importMetadata: {
@@ -161,6 +191,22 @@ export function parseMcmdFile(buffer: ArrayBuffer, filename: string): TrackerSon
     encodeOverStored: true,
     decodeCell: decodeMcmdCell,
     getCellFileOffset: cellOffset,
+    effectPatches: (pattern, row, channel, cell) => {
+      // An edited portamento / frequency-sequence value goes to the parameter byte (the info byte of the row before). The flags stay.
+      const off = cellOffset(pattern, row, channel);
+      if (off < 0) return { patches: [], noteUnchanged: false };
+      const stored = b.subarray(off, off + ROW_SIZE);
+      const param = paramAt(off, row);
+      const shown = decodeMcmdCell(stored, param);
+      const wanted = [[cell.effTyp, cell.eff], [cell.effTyp2, cell.eff2]];
+      const was = [[shown.effTyp, shown.eff], [shown.effTyp2, shown.eff2]];
+      for (let i = 0; i < 2; i++) {
+        if (was[i][0] !== 0 && wanted[i][0] === was[i][0] && wanted[i][1] !== was[i][1]) {
+          return { patches: [[off + 1 - ROW_SIZE + (row === 0 ? t.patternSize : 0), wanted[i][1] & 0xFF]], noteUnchanged: false };
+        }
+      }
+      return { patches: [], noteUnchanged: false };
+    },
   };
 
   return {
