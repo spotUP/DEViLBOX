@@ -85,7 +85,17 @@ describe('spamming one key on a Furnace chip instrument', () => {
   it('tracker channels still map onto the chip channels; live slots and a bad preview channel fall back to channel 0', () => {
     expect([0, 1, 2, 3, 4, 5, 7].map((c) => chipChannelFor(c, 4))).toEqual([0, 1, 2, 3, 0, 1, 3]);
     expect([100, 113, 114, 115].map((c) => chipChannelFor(c, 4))).toEqual([0, 0, 0, 0]);
-    expect(chipChannelFor(115, 4, 2)).toBe(2);
-    expect(chipChannelFor(115, 4, 9)).toBe(0);
+    expect(chipChannelFor(115, 4, { previewChannel: 2 })).toBe(2);
+    expect(chipChannelFor(115, 4, { previewChannel: 9 })).toBe(0);
+  });
+
+  it('a Neo Geo instrument made without a preview channel is heard from the keyboard: its live note plays on the first channel of its voice kind', () => {
+    const OPNB = 14;
+    // create_instrument + update_synth_config leave previewChannel unset (owner report: instruments 5-8 silent)
+    expect(chipChannelFor(115, 14, { chipType: OPNB, divInsType: 6 })).toBe(4);    // SSG
+    expect(chipChannelFor(115, 14, { chipType: OPNB, divInsType: 1 })).toBe(0);    // FM
+    expect(chipChannelFor(115, 14, { chipType: OPNB, divInsType: 6, previewChannel: 5 })).toBe(5);   // a named channel wins
+    expect(chipChannelFor(5, 14, { chipType: OPNB, divInsType: 6 })).toBe(5);      // a tracker channel is not moved
+    expect(chipChannelFor(115, 4, { chipType: 4, divInsType: 6 })).toBe(0);        // a chip without voice kinds: first channel
   });
 });

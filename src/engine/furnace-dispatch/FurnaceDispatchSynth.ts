@@ -5,7 +5,8 @@
  * the native Furnace dispatch WASM engine. Supports 57+ platforms.
  */
 
-import { isOpnbChipType, opnbPreviewChannel, withSsgDefaultMacros, placeUserSample } from './opnbVoices';
+import { withSsgDefaultMacros, placeUserSample } from './opnbVoices';
+import { livePreviewChannel } from './chipChannel';
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import {
@@ -331,11 +332,9 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     console.log(`[FurnaceDispatchSynth] Encoding and uploading instrument ${this.furnaceInstrumentIndex} "${name}" to platform ${this.platformType}`);
 
     const configFurnace = config as unknown as FurnaceConfig;
-    if (typeof configFurnace.previewChannel === 'number') this.currentChannel = configFurnace.previewChannel;
-    else if (configFurnace.divInsType !== undefined && isOpnbChipType(configFurnace.chipType)) {
-      // A Neo Geo voice kind names no preview channel: play on its kind's first chip channel.
-      this.currentChannel = opnbPreviewChannel(configFurnace.chipType, configFurnace.divInsType);
-    }
+    // Same rule as a live note's channel (chipChannel.ts): the named preview channel, else the kind's first.
+    const preview = livePreviewChannel(configFurnace);
+    if (preview !== undefined) this.currentChannel = preview;
 
     // If we have rawBinaryData from a .fur file, use it directly.
     // This is the native INS2 format that the WASM dispatch already knows how to parse.
