@@ -9,7 +9,8 @@ import { join } from 'path';
 import { parsePaulRobothamFile } from '../PaulRobothamParser';
 import { exportPaulRobotham } from '@/lib/export/PaulRobothamExporter';
 import { encodeVariableBlock } from '@/engine/uade/UADEPatternEncoder';
-import { PR_NOTE_BASE } from '../paulRobothamGrid';
+import { PR_NOTE_BASE, buildPRGrid } from '../paulRobothamGrid';
+import { PR_FX } from '../commandStreamEffectGlyphs';
 
 const FIXTURE = join(process.cwd(), 'public/data/songs/paul-robotham/dawnpatrol-sad.dat');
 
@@ -48,5 +49,25 @@ describe('Paul Robotham command-stream grid', () => {
     out.data.forEach((v, i) => { if (v !== raw[i]) diff.push(i); });
     expect(diff).toEqual([n.offset]);
     expect(out.data[n.offset]).toBe(n.note + 2 - PR_NOTE_BASE);
+  });
+
+  it('shows the stream commands in the effect columns (dawnpatrol-sad)', () => {
+    const { raw, song } = load();
+    const cell = (p: number, c: number, r: number) => song.patterns[p].channels[c].rows[r];
+    // voice 1 frame 0: tempo 160, pitch envelope 0, flags 0, vibrato 0, volume 13 (the five columns)
+    const c0 = cell(0, 0, 0);
+    expect([[c0.effTyp, c0.eff], [c0.effTyp2, c0.eff2], [c0.effTyp3, c0.eff3], [c0.effTyp4, c0.eff4], [c0.effTyp5, c0.eff5]]).toEqual([
+      [PR_FX.tempo, 160], [PR_FX.pitchEnvelope, 0], [PR_FX.flags, 0], [PR_FX.vibrato, 0], [PR_FX.volume, 13],
+    ]);
+    // a note drawn with the command 24 operand 4 that ran just before it
+    const n = cell(0, 0, 45);
+    expect(n.note).toBe(28);
+    expect([n.effTyp, n.eff]).toEqual([PR_FX.command24, 4]);
+    // every effect-bearing command is drawn or counted as dropped (dawnpatrol-sad: 156 commands, three on a full frame)
+    const grid = buildPRGrid(raw, 'x', 10)!;
+    expect(grid.droppedEffects).toBe(3);
+    const shown = song.patterns.reduce((n2, p) => n2 + p.channels.reduce((n3, ch) => n3 + ch.rows.reduce((n4, r) =>
+      n4 + [r.effTyp, r.effTyp2, r.effTyp3, r.effTyp4, r.effTyp5].filter(t => (t ?? 0) >= PR_FX.loopCount).length, 0), 0), 0);
+    expect(shown + grid.droppedEffects).toBe(156);
   });
 });

@@ -26,6 +26,7 @@
  */
 import type { Pattern, TrackerCell } from '@/types';
 import { cellFieldsEqual } from '@/engine/uade/UADEPatternEncoder';
+import { PR_FX, PR_FX_BASE } from './commandStreamEffectGlyphs';
 
 export const PR_ROWS_PER_PATTERN = 64;
 /** Grid note of note byte 0 (period 856 = C-1, src/lib/amiga/periodNotes.ts). */
@@ -92,6 +93,8 @@ export interface PRGrid {
   /** Every note the grid shows, with the file byte of the command it is drawn from. */
   placements: PRNotePlacement[];
   ticks: number;
+  /** Command effects that found no free effect column on their frame (more than five commands ran on one frame); the stream keeps them. */
+  droppedEffects: number;
 }
 
 /** Voice start offsets from the header (8-byte header, then D1 four-byte pointers). */
@@ -103,6 +106,29 @@ export function prVoiceStarts(buf: Uint8Array): number[] {
     starts.push(((buf[o] << 24) | (buf[o + 1] << 16) | (buf[o + 2] << 8) | buf[o + 3]) >>> 0);
   }
   return starts;
+}
+
+const EFFECT_SLOTS = [['effTyp', 'eff'], ['effTyp2', 'eff2'], ['effTyp3', 'eff3'], ['effTyp4', 'eff4'], ['effTyp5', 'eff5']] as const;
+
+/** The effect-column entries a command shows (none for the instrument command, which is the instrument column and unknown indexes). */
+export function prCommandEffects(c: TrackerCell): Array<[effTyp: number, eff: number]> {
+  const cmd = (c.period ?? 0) & 0x1f;
+  if ((c.period ?? 0) < 0x80 || cmd === CMD_INSTRUMENT || OPERANDS[cmd] === undefined) return [];
+  const out: Array<[number, number]> = [[PR_FX_BASE + cmd, c.pan ?? 0]];
+  if (PR_FX_BASE + cmd === PR_FX.fade) out.push([PR_FX.fadeSecond, c.resonance ?? 0]);
+  return out;
+}
+
+/** Put a command's effects in the first free effect columns of `cell`; entries beyond the five columns are not drawn. */
+function addEffects(cell: TrackerCell, fx: Array<[number, number]>): number {
+  let dropped = 0;
+  for (const [typ, val] of fx) {
+    const slot = EFFECT_SLOTS.find(([t]) => !cell[t]);
+    if (!slot) { dropped++; continue; }
+    cell[slot[0]] = typ;
+    cell[slot[1]] = val;
+  }
+  return dropped;
 }
 
 const emptyCell = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
@@ -120,6 +146,7 @@ export function buildPRGrid(buf: Uint8Array, sourceFile: string, instrumentCount
   const sizes: number[] = [];
   const placements: PRNotePlacement[] = [];
   const timelines: TrackerCell[][] = [];
+  let droppedEffects = 0;
   starts.forEach((start, voice) => {
     const rows = decodePRStream(buf, start, limitOf.get(voice) ?? buf.length);
     blockRows.push(rows);
@@ -133,14 +160,17 @@ export function buildPRGrid(buf: Uint8Array, sourceFile: string, instrumentCount
         const cmd = op & 0x1f;
         if (cmd === CMD_TEMPO) mul = (c.pan ?? 0) << 4;
         else if (cmd === CMD_INSTRUMENT) inst = Math.min((c.pan ?? 0) + 1, Math.max(instrumentCount, 1));
+        // a command takes no time: its effect is drawn on the frame it runs, in the cell of the note that follows
+        const fx = prCommandEffects(c);
+        if (fx.length > 0 && tick < PR_MAX_FRAMES) droppedEffects += addEffects(line[tick] ??= emptyCell(), fx);
       } else if (len >= 2) {
         const d = c.pan ?? 0;
         const total = ((d & 0x1f) << (d >> 5)) * mul + rem;
         const frames = Math.floor(total / TEMPO_DIV);
         rem = total % TEMPO_DIV;
         if (tick < PR_MAX_FRAMES) {
-          if (op !== PR_TIE && op < PR_TABLE_NOTES && !line[tick]) {
-            line[tick] = { ...emptyCell(), note: PR_NOTE_BASE + op, instrument: inst };
+          if (op !== PR_TIE && op < PR_TABLE_NOTES && !line[tick]?.note) {
+            line[tick] = { ...(line[tick] ?? emptyCell()), note: PR_NOTE_BASE + op, instrument: inst };
             placements.push({ voice, tick, offset: pos, note: PR_NOTE_BASE + op, instrument: inst });
           }
         }
@@ -168,7 +198,7 @@ export function buildPRGrid(buf: Uint8Array, sourceFile: string, instrumentCount
   }));
   return {
     patterns, voices: starts.length, filePatternAddrs: starts, filePatternSizes: sizes,
-    trackMap: patterns.map(() => starts.map((_, v) => v)), blockRows, placements, ticks,
+    trackMap: patterns.map(() => starts.map((_, v) => v)), blockRows, placements, ticks, droppedEffects,
   };
 }
 
