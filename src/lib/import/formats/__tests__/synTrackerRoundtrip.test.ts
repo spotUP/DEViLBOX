@@ -5,6 +5,7 @@
  *
  * Fixtures: public/data/songs/syntracker/*.synmod (real SYNTRACKER-SONG: modules).
  */
+import { baselineOf, setGridBaseline } from '@/lib/song/gridBaseline';
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
@@ -45,6 +46,8 @@ describe('SynTracker parse + export round-trip', () => {
   it('edits survive the round-trip', () => {
     const buf = ab(files[0]);
     const song = parseSynTrackerFile(buf, `synmod.${files[0]}`);
+    // The product sets the grid baseline at load; the exporter writes the cells edited since.
+    setGridBaseline(baselineOf(song.patterns));
     const edit = { note: 40, instrument: 3, volume: 0, effTyp: 0x53, eff: 6, effTyp2: 0, eff2: 0 };
     // SynTracker patterns can be shared across song positions (per-channel position lists);
     // export is last-position-wins, so edit channel-0 row-0 in every position for a
@@ -57,5 +60,6 @@ describe('SynTracker parse + export round-trip', () => {
     expect(cell.instrument).toBe(3);
     expect(cell.effTyp).toBe(0x53);
     expect(cell.eff).toBe(6);
+    setGridBaseline(null);
   });
 });

@@ -24,7 +24,8 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig } from '@/types';
+import type { InstrumentConfig, TrackerCell } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 
 const SYNTRACKER_MAGIC = 'SYNTRACKER-SONG:';
 const PATTERN_BASE = 0x0800;
@@ -43,6 +44,15 @@ function readString(data: Uint8Array, offset: number, maxLen: number): string {
   while (end < limit && data[end] !== 0) end++;
   const bytes = data.slice(offset, end);
   return String.fromCharCode(...bytes).replace(/[\x00-\x1f]/g, '').trim();
+}
+
+/** The 4 file bytes of a grid cell: note, instrument (0xFF = note-off), effect command (ASCII), effect value. Bijective with the parser's cell. */
+export function encodeSynTrackerCell(cell: TrackerCell): Uint8Array {
+  return Uint8Array.of((cell.note ?? 0) & 0xff, (cell.instrument ?? 0) & 0xff, (cell.effTyp ?? 0) & 0xff, (cell.eff ?? 0) & 0xff);
+}
+
+export function decodeSynTrackerCell(raw: Uint8Array): TrackerCell {
+  return { note: raw[0], instrument: raw[1], volume: 0, effTyp: raw[2], eff: raw[3], effTyp2: 0, eff2: 0 } as TrackerCell;
 }
 
 export function isSynTrackerFormat(buffer: ArrayBuffer | Uint8Array, filename?: string): boolean {
@@ -183,6 +193,24 @@ export function parseSynTrackerFile(buffer: ArrayBuffer, filename: string): Trac
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    uadePatternLayout: {
+      formatId: 'synTracker',
+      patternDataFileOffset: PATTERN_BASE,
+      bytesPerCell: BYTES_PER_CELL,
+      rowsPerPattern: ROWS_PER_PATTERN,
+      numChannels: NUM_CHANNELS,
+      numPatterns: songLength,
+      moduleSize: buffer.byteLength,
+      encodeCell: encodeSynTrackerCell,
+      decodeCell: decodeSynTrackerCell,
+      // Song position `pattern` plays, on channel `channel`, the pattern block its position list names.
+      getCellFileOffset: (pattern: number, row: number, channel: number): number => {
+        const patIdx = positionLists[channel]?.[pattern];
+        if (patIdx === undefined || row < 0 || row >= ROWS_PER_PATTERN) return -1;
+        const off = PATTERN_BASE + patIdx * BYTES_PER_PATTERN + row * BYTES_PER_CELL;
+        return off + BYTES_PER_CELL <= buffer.byteLength ? off : -1;
+      },
+    } as UADEPatternLayout,
   };
 }
 
