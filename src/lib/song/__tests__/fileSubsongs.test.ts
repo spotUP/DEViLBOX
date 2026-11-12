@@ -67,7 +67,7 @@ describe('the default tune is the first one that sounds', () => {
 describe('a UADE song whose parser attached no subsongs still gets the live switch', () => {
   it('counts from the pre-scan, and leaves songs that have a subsong model alone', () => {
     const song = { uadeEditableFileName: 'x.sc', initialSpeed: 4 };
-    expect(uadeSubsongsFallback(song, { subsongCount: 3 })).toEqual({ count: 3, speeds: [4, 4, 4] });
+    expect(uadeSubsongsFallback(song, { subsongCount: 3 })).toEqual({ count: 3, speeds: [4, 4, 4], start: 0, rebuild: true });
     expect(uadeSubsongsFallback(song, { subsongCount: 1 })).toBeNull();
     expect(uadeSubsongsFallback({ ...song, uadeEditableSubsongs: { count: 3 } }, { subsongCount: 3 })).toBeNull();
     expect(uadeSubsongsFallback({ initialSpeed: 6 }, { subsongCount: 3 })).toBeNull();

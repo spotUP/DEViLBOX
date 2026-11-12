@@ -134,7 +134,7 @@ async function importTrackerModuleUnloaded(
     return;
   }
   // The tune count is the song's, whichever parser drew the grid: the subsong box switches it live (no pick at load).
-  const uadeSubs = uadeSubsongsFallback(song, options.uadeMetadata);
+  const uadeSubs = uadeSubsongsFallback(song, options.uadeMetadata, options.subsong);
   if (uadeSubs) (song as { uadeEditableSubsongs?: unknown }).uadeEditableSubsongs = uadeSubs;
   const c4Data = (song as { cinter4FileData?: ArrayBuffer }).cinter4FileData;
   if (c4Data && new DataView(c4Data).getInt16(0, false) < 0) {

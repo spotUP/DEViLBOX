@@ -36,3 +36,20 @@ export async function reopenAtFileSubsong(index: number): Promise<void> {
     return;
   }
 }
+
+/**
+ * Open the loaded non-editable UADE song again on tune `index` (0-based): its grid was drawn for
+ * one tune (UADE scan or native parser), so the grid, the instruments and the audio subsong change together.
+ */
+export async function reopenAtUadeSubsong(index: number): Promise<void> {
+  const fmt = useFormatStore.getState();
+  const subs = fmt.uadeEditableSubsongs;
+  const bytes = fmt.uadeEditableFileData;
+  if (!subs || !bytes || !fmt.uadeEditableFileName || index < 0 || index >= subs.count || index === fmt.uadeEditableCurrentSubsong) return;
+  const wasPlaying = useTransportStore.getState().isPlaying;
+  const r = await openSong(
+    { kind: 'bytes', name: fmt.uadeEditableFileName, bytes: bytes.slice(0) },
+    { origin: 'subsong', subsong: index, start: wasPlaying ? 'song' : false },
+  );
+  if (!r.ok && !r.cancelled) notify.error(`Could not open subsong ${index + 1}: ${r.error}`);
+}

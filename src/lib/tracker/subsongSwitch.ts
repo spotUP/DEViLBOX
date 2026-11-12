@@ -56,10 +56,13 @@ export function subsongStatus(f: SubsongFields): SubsongStatus | null {
 export function uadeSubsongsFallback(
   song: { uadeEditableSubsongs?: unknown; uadeEditableFileName?: string; fileSubsongs?: unknown; nuadeSubsongs?: unknown; initialSpeed?: number },
   meta: { subsongCount?: number } | undefined,
-): { count: number; speeds: number[] } | null {
+  /** The tune the grid was built for. */
+  subsong = 0,
+): { count: number; speeds: number[]; start: number; rebuild: true } | null {
   const count = meta?.subsongCount ?? 0;
   if (count <= 1 || song.uadeEditableSubsongs || song.fileSubsongs || song.nuadeSubsongs || !song.uadeEditableFileName) return null;
-  return { count, speeds: Array(count).fill(song.initialSpeed || 6) };
+  // rebuild: the grid belongs to one tune (the parser drew it from the scan), so a switch reopens the file at the new tune.
+  return { count, speeds: Array(count).fill(song.initialSpeed || 6), start: subsong, rebuild: true };
 }
 
 /** The subsong `delta` away from the one playing, or null past either end. */
@@ -98,6 +101,11 @@ export async function switchSubsong(index: number): Promise<void> {
       const [{ useTrackerStore }, { useTransportStore }] = await Promise.all([
         import('@stores/useTrackerStore'), import('@stores/useTransportStore'),
       ]);
+      if ((subs as { rebuild?: boolean }).rebuild) {
+        const { reopenAtUadeSubsong } = await import('@/lib/song/reopenSubsong');
+        await reopenAtUadeSubsong(index);
+        return;
+      }
       useFormatStore.setState({ uadeEditableCurrentSubsong: index });
       const tracker = useTrackerStore.getState();
       // A parser decoded each subsong's order over shared patterns (DSC):
