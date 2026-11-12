@@ -9,7 +9,7 @@ import { join } from 'path';
 import { parseMedleyFile } from '../MedleyParser';
 import { exportMedley } from '@/lib/export/MedleyExporter';
 import { encodeVariableBlock } from '@/engine/uade/UADEPatternEncoder';
-import { buildMedleyGrid } from '../medleyGrid';
+import { buildMedleyGrid, applyMedleyGridEdits } from '../medleyGrid';
 
 const FIXTURE = join(process.cwd(), 'public/data/songs/medley/combat.mso');
 
@@ -63,5 +63,66 @@ describe('Medley track-stream grid', () => {
     expect(first.length).toBeGreaterThan(0);
     // every sounding voice has notes in the last pattern's range or loops back (timeline filled)
     for (const v of [0, 3]) expect(g.placements.some(p => p.voice === v)).toBe(true);
+  });
+
+  // Stage 2. Expected values come from the reference replayer (nuade medley.c / mdl_module.c) run as a scratch mirror, not from this grid.
+  it('puts notes on the replayer ticks: first step, after a loop pass, after a Call, and in the second pass of a restarted track', () => {
+    const { raw } = load();
+    const g = buildMedleyGrid(raw, 'x', 1)!;
+    const at = (voice: number, tick: number) => g.placements.find(p => p.voice === voice && p.tick === tick);
+    // voice:tick:stream offset:grid note. Voice 1 tick 108 is after a loop pass; voice 4 tick 114 follows a Call.
+    const known: Array<[number, number, number, number]> = [[0, 0, 904, 10], [0, 108, 906, 10], [3, 0, 938, 29], [3, 114, 940, 29]];
+    for (const [v, t, off, note] of known) {
+      const p = at(v, t);
+      expect(p, `voice ${v} tick ${t}`).toBeTruthy();
+      expect(p!.offset).toBe(off);
+      expect(p!.note).toBe(note);
+    }
+    expect(g.ticks).toBe(384);
+  });
+
+  it('a grid row is one 50 Hz replayer tick (speed * 2.5 / BPM = 0.02 s)', () => {
+    const { song } = load();
+    expect(song.initialSpeed * 2.5 / song.initialBPM).toBeCloseTo(0.02, 6);
+  });
+
+  it('keeps note offset and instrument across a track restart (replayer End does not reset them)', () => {
+    const { raw } = load();
+    const u = (o: number) => ((raw[o] << 24) | (raw[o + 1] << 16) | (raw[o + 2] << 8) | raw[o + 3]) | 0;
+    const t = 8 + u(8);
+    const e = t + 10 * 4 + u(t + 10 * 4) + 16; // first item of track 10, voice 4's own track
+    const patched = new Uint8Array(raw);
+    patched[e + 2] = 0x88; // Transpose
+    patched[e + 3] = 5;
+    const g = buildMedleyGrid(patched, 'x', 1)!;
+    const note = (tick: number) => g.placements.find(p => p.voice === 3 && p.tick === tick)?.note;
+    expect(note(180)).toBe(29); // first pass, before the transpose is reached again
+    expect(note(192)).toBe(34); // second pass: the transpose set in pass one is still in force
+  });
+
+  it('maps sampled pitch from the replayer period table (entry 50 = 856, entry 62 = 428)', () => {
+    const src = readFileSync(join(process.cwd(), 'third-party/nuade/players/medley/mdl_data.c'), 'utf8');
+    const body = src.slice(src.indexOf('mdl_period_table'), src.indexOf('};'));
+    const table = [...body.matchAll(/0x[0-9a-fA-F]+/g)].map(m => parseInt(m[0], 16));
+    expect(table[50]).toBe(0x358);
+    expect(table[62]).toBe(0x1ac);
+  });
+
+  it('an instrument edit writes the Instrument command argument byte and reaches every note it serves', () => {
+    const { raw } = load();
+    const g = buildMedleyGrid(raw, 'x', 1)!;
+    const served = g.placements.filter(p => p.voice === 3 && p.instrOffset === 935);
+    expect(served.length).toBeGreaterThan(5);
+    const edited = g.patterns.map(p => ({ ...p, channels: p.channels.map(c => ({ ...c, rows: c.rows.map(r => ({ ...r })) })) }));
+    const first = served[0];
+    edited[Math.floor(first.tick / 64)].channels[3].rows[first.tick % 64].instrument = 17;
+    const r = applyMedleyGridEdits(raw, edited, 1);
+    expect(r.warnings).toEqual([]);
+    const diff: number[] = [];
+    r.data.forEach((v, i) => { if (v !== raw[i]) diff.push(i); });
+    expect(diff).toEqual([935]);
+    expect(r.data[935]).toBe(17);
+    const g2 = buildMedleyGrid(r.data, 'x', 1)!;
+    for (const p of served) expect(g2.placements.find(q => q.voice === 3 && q.tick === p.tick)!.instrument).toBe(17);
   });
 });

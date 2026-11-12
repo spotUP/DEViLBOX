@@ -33,14 +33,14 @@ const CMD_END = 0, CMD_INSTRUMENT = 3, CMD_RANDOM = 4, CMD_CALL = 5, CMD_LOOP_ST
 const u32 = (b: Uint8Array, o: number): number => ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) | 0;
 const i8 = (v: number): number => (v << 24) >> 24;
 
-export interface MedleyTables { song: number; track: number; instrument: number }
+export interface MedleyTables { song: number; track: number; instrument: number; wave: number }
 
 /** Table bases of a Medley module, or null when the header does not hold. */
 export function medleyTables(buf: Uint8Array): MedleyTables | null {
   if (buf.length < 0x20 || buf[0] !== 0x4d || buf[1] !== 0x53 || buf[2] !== 0x4f || buf[3] !== 0x42) return null;
   const at = (o: number): number => o + u32(buf, o);
-  const t = { song: at(4), track: at(8), instrument: at(12) };
-  return [t.song, t.track, t.instrument].every(b => b > 0 && b < buf.length) ? t : null;
+  const t = { song: at(4), track: at(8), instrument: at(12), wave: at(16) };
+  return [t.song, t.track, t.instrument, t.wave].every(b => b > 0 && b < buf.length) ? t : null;
 }
 
 /** File offset an entry of a table points at, or 0 for an empty or out-of-range entry. */
@@ -81,6 +81,38 @@ export function encodeMedleyStream(rows: TrackerCell[]): Uint8Array {
   return new Uint8Array(out);
 }
 
+// Sampled-instrument pitch (mdl_module.c mdl_note_region / mdl_region_wave / mdl_sample_period_index, medley.c
+// mdl_select_pitch). The replayer's period table (mdl_data.c) steps one semitone per index and holds ProTracker's C-1 (856)
+// at index MDL_C1_INDEX = 50, so DEViLBOX's note for period 856 (periodNotes.ts: 856 = note 13 = C-1, 428 = note 25 =
+// C-2) is index - 50 + 13. The medleyRoundtrip test reads mdl_data.c to hold the index of 856 and 428.
+const REGION_START = [0x00, 0x1a, 0x26, 0x32, 0x3e, 0x4a, 0x56, 0x62];
+const SAMPLED_PERIOD_BASE = 0x30;
+const C1_INDEX = 50;
+const PERIOD_COUNT = 110;
+const INST_TYPE = 0x10, INST_WAVE = 0x14, WAVE_OCTAVE = 0x14, TYPE_LOOPED = 1, TYPE_SYNTH = 2;
+const GRID_NOTE_OF_C1 = 13;
+
+/**
+ * The grid note a note byte sounds on an instrument: for a synth instrument the sounding value itself, for a sampled one
+ * the note of the period the replayer picks. Null when the period index is outside the replayer's table (or the wave is
+ * missing), where the grid shows no note.
+ */
+export function medleySoundingGridNote(buf: Uint8Array, tables: MedleyTables, instrument: number, sounding: number): number | null {
+  const rec = medleyEntry(buf, tables.instrument, instrument);
+  if (!rec || buf[rec + INST_TYPE] === TYPE_SYNTH) return sounding;
+  let region = REGION_START.length - 1;
+  while (region > 0 && sounding < REGION_START[region]) region--;
+  let wave = buf[rec + INST_WAVE + region];
+  while (wave === 0 && region > 0) wave = buf[rec + INST_WAVE + --region];
+  const w = medleyEntry(buf, tables.wave, wave);
+  if (!w) return null;
+  let index = (sounding - buf[w + WAVE_OCTAVE] * 12) & 0xff;
+  if (buf[rec + INST_TYPE] === TYPE_LOOPED) index = (index - 12) & 0xff;
+  index = (index + SAMPLED_PERIOD_BASE) & 0xff;
+  const note = index - C1_INDEX + GRID_NOTE_OF_C1;
+  return index < PERIOD_COUNT && note >= 1 ? note : null;
+}
+
 export interface MedleyPlacement {
   voice: number; tick: number;
   /** File offset of the stored note byte. */
@@ -90,6 +122,8 @@ export interface MedleyPlacement {
   /** Grid note minus the stored byte: song + voice + instrument transpose in force. Two cells of one byte with different deltas are not the same note. */
   delta: number;
   instrument: number;
+  /** File offset of the argument byte of the Instrument command in force (it serves every note until the next one); -1 = the instrument is the song record's. */
+  instrOffset: number;
 }
 
 export interface MedleyGrid {
@@ -136,13 +170,20 @@ export function buildMedleyGrid(buf: Uint8Array, sourceFile: string, subsong = 1
   const unsupported: number[] = [];
   const voiceTracks = [0, 1, 2, 3].map(v => buf[song + 0x10 + v]);
 
+  // The state a voice keeps from one pass of its track to the next: End on the voice's own track only sets the position
+  // back to the track start (medley.c mdl_command_end); note offset, instrument and loop stack are not reset
+  // (mdl_reset_voice clears them once, at the song start).
+  interface VoiceState { noteOffset: number; inst: number; instAt: number; loops: Array<{ pos: number; count: number }> }
+  const states: VoiceState[] = [];
+
   // One pass of a voice's own track from `tick`; returns the tick it ends on (null = RandomTrack met).
-  const runPass = (voice: number, track: number, tick: number, line: TrackerCell[], startInst: number): number | null => {
+  const runPass = (voice: number, track: number, tick: number, line: TrackerCell[]): number | null => {
     const span = medleyTrackSpan(buf, tables, track);
     if (!span) return tick;
-    let pos = span.start, noteOffset = 0, inst = startInst, steps = 0;
+    const state = states[voice];
+    let pos = span.start, steps = 0;
     const calls: number[] = [];
-    const loops: Array<{ pos: number; count: number }> = [];
+    const loops = state.loops;
     while (pos + 1 < buf.length && steps++ < MAX_STEPS && tick < MAX_FRAMES) {
       const op = buf[pos], arg = buf[pos + 1];
       if (op >= 0x80) {
@@ -154,8 +195,8 @@ export function buildMedleyGrid(buf: Uint8Array, sourceFile: string, subsong = 1
           continue;
         }
         if (cmd === CMD_RANDOM) return null;
-        if (cmd === CMD_INSTRUMENT && medleyEntry(buf, tables.instrument, arg)) inst = arg;
-        else if (cmd === CMD_TRANSPOSE) noteOffset = arg;
+        if (cmd === CMD_INSTRUMENT && medleyEntry(buf, tables.instrument, arg)) { state.inst = arg; state.instAt = pos + 1; }
+        else if (cmd === CMD_TRANSPOSE) state.noteOffset = arg;
         else if (cmd === CMD_CALL) {
           const s = medleyTrackSpan(buf, tables, arg);
           if (calls.length < STACK_DEPTH && s) { calls.push(pos + 2); pos = s.start; continue; }
@@ -174,10 +215,12 @@ export function buildMedleyGrid(buf: Uint8Array, sourceFile: string, subsong = 1
       const dur = arg & 0x7f;
       if (dur !== 0) {
         if (op !== 0) {
-          const delta = (songTranspose + noteOffset + instTranspose(inst)) | 0;
-          const note = (op + delta) & 0xff;
-          line[tick] = { ...(line[tick] ?? emptyCell()), note, instrument: inst };
-          placements.push({ voice, tick, offset: pos, note, delta: note - op, instrument: inst });
+          const sounding = (op + songTranspose + state.noteOffset + instTranspose(state.inst)) & 0xff;
+          const note = medleySoundingGridNote(buf, tables, state.inst, sounding);
+          if (note !== null) {
+            line[tick] = { ...(line[tick] ?? emptyCell()), note, instrument: state.inst };
+            placements.push({ voice, tick, offset: pos, note, delta: note - op, instrument: state.inst, instrOffset: state.instAt });
+          }
         }
         tick += dur;
       }
@@ -194,7 +237,8 @@ export function buildMedleyGrid(buf: Uint8Array, sourceFile: string, subsong = 1
     const track = voiceTracks[v];
     let end = 0;
     if (track) {
-      const e = runPass(v, track, 0, line, buf[song + 0x1a + v] || startInst || 1);
+      states[v] = { noteOffset: 0, inst: buf[song + 0x1a + v] || startInst || 1, instAt: -1, loops: [] };
+      const e = runPass(v, track, 0, line);
       if (e === null) { unsupported.push(v); } else end = e;
     }
     line.length = Math.max(line.length, Math.min(end, MAX_FRAMES));
@@ -208,7 +252,7 @@ export function buildMedleyGrid(buf: Uint8Array, sourceFile: string, subsong = 1
     if (!track || passLen[v] <= 0 || unsupported.includes(v)) continue;
     let t = passLen[v];
     while (t < ticks) {
-      const e = runPass(v, track, t, timelines[v], buf[song + 0x1a + v] || startInst || 1);
+      const e = runPass(v, track, t, timelines[v]);
       if (e === null || e <= t) break;
       t = e;
     }
@@ -249,6 +293,8 @@ export function applyMedleyGridEdits(source: Uint8Array, edited: Pattern[], subs
     edited[Math.floor(tick / MEDLEY_ROWS_PER_PATTERN)]?.channels[voice]?.rows[tick % MEDLEY_ROWS_PER_PATTERN];
   const placed = new Set<string>();
   const wanted = new Map<number, Set<number>>();
+  const tables = medleyTables(source);
+  const wantedInst = new Map<number, Set<number>>();
   for (const pl of base.placements) {
     placed.add(`${pl.voice}:${pl.tick}`);
     const cell = cellAt(pl.voice, pl.tick);
@@ -260,9 +306,21 @@ export function applyMedleyGridEdits(source: Uint8Array, edited: Pattern[], subs
         wanted.get(pl.offset)!.add(b);
       } else warnings.push(`voice ${pl.voice + 1} tick ${pl.tick}: note ${cell.note} is outside the stored range or removes the note; not written`);
     }
-    if ((cell.instrument ?? 0) !== pl.instrument) warnings.push(`voice ${pl.voice + 1} tick ${pl.tick}: instrument changes are not written yet`);
+    if ((cell.instrument ?? 0) !== pl.instrument) {
+      const inst = cell.instrument ?? 0;
+      if (pl.instrOffset < 0) warnings.push(`voice ${pl.voice + 1} tick ${pl.tick}: the instrument comes from the song record, no Instrument command to write; not written`);
+      else if (inst < 0 || inst > 255 || (!tables || !medleyEntry(source, tables.instrument, inst))) warnings.push(`voice ${pl.voice + 1} tick ${pl.tick}: instrument ${inst} does not exist; not written`);
+      else {
+        if (!wantedInst.has(pl.instrOffset)) wantedInst.set(pl.instrOffset, new Set());
+        wantedInst.get(pl.instrOffset)!.add(inst);
+      }
+    }
   }
   let patched = 0;
+  for (const [offset, set] of wantedInst) {
+    if (set.size === 1) { out[offset] = [...set][0]; patched++; }
+    else warnings.push(`stream byte ${offset}: cells served by this Instrument command were edited to different instruments; not written`);
+  }
   for (const [offset, set] of wanted) {
     if (set.size === 1) { out[offset] = [...set][0]; patched++; }
     else warnings.push(`stream byte ${offset}: cells that play it were edited to different notes; not written`);
