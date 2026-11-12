@@ -41,7 +41,7 @@ import { useCursorStore } from '@/stores/useCursorStore';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { decodeVolumeColumn, noteStartLevel } from '@/lib/tracker/volumeColumn';
 import { furnaceCellChipEffects, cellSetVolumeLevel } from './replayer/furnaceCellEffects';
-import { FurnaceTickEffects } from './furnace-dispatch/FurnaceTickEffects';
+import { FurnaceTickEffects, TICK_STEPPED_EFFECTS } from './furnace-dispatch/FurnaceTickEffects';
 import { noteToMidi } from '@/utils/audio-context';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
@@ -1407,22 +1407,26 @@ export class TrackerReplayer {
     // Arpeggio (0xy) is stepped per tick by furnaceTick (stepFurnaceTicks), as Furnace does it;
     // the router's HINT command for it is only an annotation a chip ignores.
     let arp: number | null = null;
+    // Slides, portamento, vibrato, volume slide and tremolo are stepped per tick too (furnaceTick).
+    const stepped: { effect: number; param: number }[] = [];
     for (const e of furnaceCellChipEffects(row)) {
       if (e.effect === 0x00) { arp = e.param; continue; }
+      if (TICK_STEPPED_EFFECTS.has(e.effect)) { stepped.push(e); continue; }
       if (e.effect === 0xE0) this.furnaceTick.setArpSpeed(e.param);
       engine.applyFurnaceCellEffect(config.id, chIndex, config, e.effect, e.param);
     }
     // Furnace chip note: MIDI note - 12, as FurnaceDispatchSynth.triggerAttack sends it.
     const chipNote = isPitchedNote(row.note) ? noteToMidi(xmNoteToNoteName(row.note)) - 12 : null;
     this.furnaceTickChannels.set(chIndex, config.id);
-    for (const c of this.furnaceTick.beginRow(chIndex, chipNote, arp)) {
+    const rowLevel = cellSetVolumeLevel(row) ?? decodeVolumeColumn(row.volume, useFormatStore.getState().editorMode);
+    const chipVolMax = engine.furnaceChipVolumeMax(config.id, chIndex, config);
+    for (const c of this.furnaceTick.beginRow(chIndex, chipNote, arp, stepped, chipVolMax, rowLevel)) {
       engine.applyFurnaceChipCommand(config.id, chIndex, config, c.cmd, c.val1, c.val2, time);
     }
     if (isPitchedNote(row.note)) return;
-    const level = cellSetVolumeLevel(row) ?? decodeVolumeColumn(row.volume, useFormatStore.getState().editorMode);
-    if (level === null) return;
-    ch.volume = Math.round(level * 64);
-    engine.applyFurnaceCellVolume(config.id, chIndex, config, level);
+    if (rowLevel === null) return;
+    ch.volume = Math.round(rowLevel * 64);
+    engine.applyFurnaceCellVolume(config.id, chIndex, config, rowLevel);
   }
 
   /**
@@ -1547,7 +1551,9 @@ export class TrackerReplayer {
     }
 
     // Normal note trigger
-    if (hasNote && !probabilitySkip) {
+    // A Furnace tone portamento (3xx / 6xy) slides to the note instead of retriggering it.
+    const holdForPorta = this.furnaceTick.holdsNote(chIndex) && !!ch.instrument?.synthType?.startsWith('Furnace');
+    if (hasNote && !probabilitySkip && !holdForPorta) {
       ch.xmNote = noteValue;
 
       // Determine playback period/pitch
