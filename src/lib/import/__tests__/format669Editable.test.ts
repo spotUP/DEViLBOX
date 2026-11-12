@@ -57,4 +57,29 @@ describe('Composer 669 is editable', () => {
     expect(again.patterns[p].channels[c].rows[r].note).toBe(cell.note + 1);
     expect(again.patterns[p].channels[c].rows[r].instrument).toBe(cell.instrument);
   });
+
+  it('a pattern played at several song positions: one edit reaches the file once; two different edits are reported', async () => {
+    const song = await load();
+    const layout = song.uadePatternLayout!;
+    // speed fighter plays file pattern 9 at song positions 0..3 (rawOrders), so those grid patterns share their stored cells
+    let found: { c: number; r: number } | null = null;
+    for (let c = 1; c < 8 && !found; c++) {
+      const r = song.patterns[0].channels[c].rows.findIndex((x) => x.note > 12 && x.note < 90 && x.instrument > 0);
+      if (r >= 0) found = { c, r };
+    }
+    expect(found).not.toBeNull();
+    const { c, r } = found!;
+    expect(getCellFileOffset(layout, 1, r, c)).toBe(getCellFileOffset(layout, 0, r, c));
+    setGridBaseline(baselineOf(song.patterns));
+    const cell = song.patterns[0].channels[c].rows[r];
+    song.patterns[0].channels[c].rows[r] = { ...cell, note: cell.note + 1 };
+    const one = await exportFormat669(song);
+    expect(one.warnings).toEqual([]);
+    const at = getCellFileOffset(layout, 0, r, c);
+    expect(one.data[at] >> 2).toBe((raw[at] >> 2) + 1);
+    song.patterns[1].channels[c].rows[r] = { ...cell, note: cell.note + 2 };
+    const two = await exportFormat669(song);
+    expect(two.warnings.join(' ')).toContain('several song positions');
+    expect(two.data[at] >> 2).toBe((raw[at] >> 2) + 2);
+  });
 });
