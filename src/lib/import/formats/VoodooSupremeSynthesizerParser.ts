@@ -71,6 +71,8 @@ export function parseVoodooSupremeSynthesizerFile(buffer: ArrayBuffer, filename:
       filePatternSizes: [],
       trackMap: grid.patterns.map(() => [-1, -1, -1, -1]),
       noteBytes: grid.noteBytes,
+      // a track played several times (gosub) is one stored note: an edit reaches every cell that plays its byte
+      propagateSharedCells: true,
     };
     result.uadeVariableLayout = layout;
   }
