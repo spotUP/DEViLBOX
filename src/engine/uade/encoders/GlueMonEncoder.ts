@@ -28,9 +28,18 @@ export const GLUE_REST = 0xff;
 const GLUE_NOTE_MAX = 0x60;
 
 function encodeGlueMonCell(cell: TrackerCell): Uint8Array {
-  // Byte-exact carrier restore: reproduce the exact source byte when present.
-  if (cell.period !== undefined) {
-    return new Uint8Array([cell.period & 0xff]);
+  // Byte-exact carrier restore: reproduce the exact source byte while the cell still shows what that byte decodes to.
+  // An edit (the grid copies the cell, carrier included) changes note or instrument, so it is encoded from them below;
+  // a note byte keeps its tie/portamento LSB.
+  const carrier = cell.period;
+  if (carrier !== undefined) {
+    const v = carrier & 0xff;
+    const shownNote = v <= GLUE_NOTE_MAX ? ((v & 0xfe) >> 1) + 1 : 0;
+    const shownInstr = v >= 0xc8 && v <= 0xcf ? v - 0xc7 : 0;
+    if (shownNote === (cell.note ?? 0) && shownInstr === (cell.instrument ?? 0)) return new Uint8Array([v]);
+    if ((cell.note ?? 0) > 0 && v <= GLUE_NOTE_MAX) {
+      return new Uint8Array([Math.min((((cell.note ?? 0) - 1) << 1) & 0xfe, GLUE_NOTE_MAX) | (v & 1)]);
+    }
   }
 
   // Edited note: invert decodeCell's mapping — visible note (idx+1) → even byte
