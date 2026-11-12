@@ -2647,6 +2647,7 @@ export class ToneEngine {
       case 'WAM':
       case 'Buzzmachine':
       // WASM song players (full-module playback via AudioWorklet)
+      case 'SawteethSynth': // keyboard preview voice; the song still plays on the whole-song engine
       case 'HivelySynth':
       case 'UADESynth':
       case 'UADEEditableSynth':

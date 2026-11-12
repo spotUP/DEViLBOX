@@ -7,6 +7,7 @@
 
 import { getDevilboxAudioContext } from '@/utils/audio-context';
 import { useOscilloscopeStore } from '@/stores/useOscilloscopeStore';
+import { useFormatStore } from '@/stores/useFormatStore';
 import {
   WASMSingletonBase,
   createWASMAssetsCache,
@@ -63,6 +64,8 @@ export class SawteethEngine extends WASMSingletonBase {
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   private _pendingInstrumentRequests = new Map<number, (data: SawteethInstrumentData) => void>();
+  private _pendingPlayerRequests = new Map<number, (handle: number) => void>();
+  private _nextRequestId = 1;
 
   private constructor() {
     super();
@@ -98,8 +101,8 @@ export class SawteethEngine extends WASMSingletonBase {
     const ctx = this.audioContext;
 
     this.workletNode = new AudioWorkletNode(ctx, 'sawteeth-processor', {
-      outputChannelCount: [2],
-      numberOfOutputs: 1,
+      outputChannelCount: [2, 2],
+      numberOfOutputs: 2,
     });
 
     this.workletNode.port.onmessage = (event) => {
@@ -131,6 +134,15 @@ export class SawteethEngine extends WASMSingletonBase {
           break;
         }
 
+        case 'playerCreated': {
+          const resolve = this._pendingPlayerRequests.get(data.requestId as number);
+          if (resolve) {
+            this._pendingPlayerRequests.delete(data.requestId as number);
+            resolve(data.handle as number);
+          }
+          break;
+        }
+
         case 'error':
           console.error('[SawteethEngine]', data.message);
           break;
@@ -144,7 +156,30 @@ export class SawteethEngine extends WASMSingletonBase {
       jsCode: SawteethEngine.cache.jsCode,
     });
 
-    this.workletNode.connect(this.output);
+    this.workletNode.connect(this.output, 0);
+  }
+
+  private _previewTarget: AudioNode | null = null;
+
+  /**
+   * The worklet's second output carries all preview voices mixed. It feeds one
+   * synth output at a time (the synth that played last), so the mix is not
+   * heard once per synth.
+   */
+  routePreviewTo(target: AudioNode): void {
+    if (!this.workletNode || this._previewTarget === target) return;
+    if (this._previewTarget) {
+      try { this.workletNode.disconnect(this._previewTarget, 1); } catch { /* already gone */ }
+    }
+    this.workletNode.connect(target, 1);
+    this._previewTarget = target;
+  }
+
+  /** Stop feeding target (synth disposed). */
+  unroutePreview(target: AudioNode): void {
+    if (this._previewTarget !== target) return;
+    try { this.workletNode?.disconnect(target, 1); } catch { /* already gone */ }
+    this._previewTarget = null;
   }
 
   async loadTune(buffer: ArrayBuffer): Promise<void> {
@@ -183,6 +218,42 @@ export class SawteethEngine extends WASMSingletonBase {
       this._pendingInstrumentRequests.set(insIdx, resolve);
       this.workletNode?.port.postMessage({ type: 'getInstrument', ins: insIdx });
     });
+  }
+
+  /**
+   * Create a standalone preview voice for song instrument insIdx (the
+   * replayer's own instrument code, separate from the song players).
+   * Resolves to a handle, or -1 when the instrument is not available
+   * (no tune loaded, or the song was stopped before the voice existed).
+   */
+  async createPreviewPlayer(insIdx: number): Promise<number> {
+    await this._initPromise;
+    if (!this.workletNode) return -1;
+    const request = (): Promise<number> => new Promise<number>((resolve) => {
+      const requestId = this._nextRequestId++;
+      this._pendingPlayerRequests.set(requestId, resolve);
+      this.workletNode?.port.postMessage({ type: 'createPlayer', ins: insIdx, requestId });
+    });
+    const handle = await request();
+    if (handle >= 0) return handle;
+    // No tune in the replayer yet (typed key before the first play): load the
+    // open song's bytes without starting it, then ask again.
+    const bytes = useFormatStore.getState().sawteethFileData;
+    if (!bytes) return -1;
+    this.workletNode.port.postMessage({ type: 'loadModule', moduleData: bytes.slice(0), previewOnly: true });
+    return request();
+  }
+
+  previewNoteOn(handle: number, note: number, velocity: number): void {
+    this.workletNode?.port.postMessage({ type: 'noteOn', handle, note, velocity });
+  }
+
+  previewNoteOff(handle: number): void {
+    this.workletNode?.port.postMessage({ type: 'noteOff', handle });
+  }
+
+  destroyPreviewPlayer(handle: number): void {
+    this.workletNode?.port.postMessage({ type: 'destroyPlayer', handle });
   }
 
   /** Set a single scalar parameter on an instrument */

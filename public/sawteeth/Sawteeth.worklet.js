@@ -64,6 +64,10 @@ class SawteethProcessor extends AudioWorkletProcessor {
               return;
             }
 
+            // Loaded only so keyboard preview voices can copy instruments: do not play the song.
+            // (sawteeth_stop would free the instruments the voices copy, so only skip rendering the song.)
+            this.songSilent = !!data.previewOnly;
+
             const meta = {};
             if (typeof this.module._sawteeth_get_num_channels === 'function') {
               meta.channels = this.module._sawteeth_get_num_channels();
@@ -105,6 +109,7 @@ class SawteethProcessor extends AudioWorkletProcessor {
       case 'setParam':
         if (this.module && typeof this.module._sawteeth_set_param === 'function') {
           this.module._sawteeth_set_param(data.ins, data.paramId, data.value);
+          this.resyncPreviews(data.ins);
         }
         break;
 
@@ -209,6 +214,7 @@ class SawteethProcessor extends AudioWorkletProcessor {
         }
         m._sawteeth_set_amp_env(ins, tPtr, lPtr, count);
         free(tPtr); free(lPtr);
+        this.resyncPreviews(ins);
         break;
       }
 
@@ -229,14 +235,44 @@ class SawteethProcessor extends AudioWorkletProcessor {
         }
         m._sawteeth_set_filter_env(ins, tPtr, lPtr, count);
         free(tPtr); free(lPtr);
+        this.resyncPreviews(ins);
         break;
       }
 
       case 'setStep': {
         if (!this.module || typeof this.module._sawteeth_set_step !== 'function') break;
         this.module._sawteeth_set_step(data.ins, data.stepIdx, data.note, data.wForm, data.relative ? 1 : 0);
+        this.resyncPreviews(data.ins);
         break;
       }
+
+      // Standalone preview voices (keyboard notes). Own state, own copy of the
+      // instrument; run the replayer's instrument code, independent of the song.
+      case 'createPlayer': {
+        const m = this.module;
+        const handle = m && typeof m._sawteeth_preview_create === 'function'
+          ? m._sawteeth_preview_create(data.ins | 0) : -1;
+        this.port.postMessage({ type: 'playerCreated', requestId: data.requestId, handle });
+        break;
+      }
+
+      case 'noteOn':
+        if (this.module && typeof this.module._sawteeth_preview_note_on === 'function') {
+          this.module._sawteeth_preview_note_on(data.handle, data.note | 0, data.velocity | 0);
+        }
+        break;
+
+      case 'noteOff':
+        if (this.module && typeof this.module._sawteeth_preview_note_off === 'function') {
+          this.module._sawteeth_preview_note_off(data.handle);
+        }
+        break;
+
+      case 'destroyPlayer':
+        if (this.module && typeof this.module._sawteeth_preview_free === 'function') {
+          this.module._sawteeth_preview_free(data.handle);
+        }
+        break;
 
       case 'dispose':
         this.cleanup();
@@ -359,6 +395,12 @@ class SawteethProcessor extends AudioWorkletProcessor {
     this.lastHeapBuffer = null;
   }
 
+  resyncPreviews(ins) {
+    if (this.module && typeof this.module._sawteeth_preview_resync === 'function') {
+      this.module._sawteeth_preview_resync(ins);
+    }
+  }
+
   process(inputs, outputs, parameters) {
     if (!this.initialized || !this.module) return true;
     const output = outputs[0];
@@ -372,11 +414,25 @@ class SawteethProcessor extends AudioWorkletProcessor {
     if (typeof this.module._sawteeth_render === 'function') {
       this.updateBufferViews();
       if (this.interleavedBuf) {
-        const rendered = this.module._sawteeth_render(this.interleavedPtr, numSamples);
+        this.interleavedBuf.fill(0);
+        const rendered = this.songSilent ? 0 : this.module._sawteeth_render(this.interleavedPtr, numSamples);
         if (rendered > 0) {
           for (let i = 0; i < rendered; i++) {
             outputL[i] = this.interleavedBuf[i * 2];
             outputR[i] = this.interleavedBuf[i * 2 + 1];
+          }
+        }
+        // Keyboard preview voices leave on their own output (outputs[1]), so the
+        // song output is never doubled by them.
+        const preview = outputs[1];
+        if (preview && preview.length >= 2 && typeof this.module._sawteeth_preview_render === 'function') {
+          this.interleavedBuf.fill(0);
+          const voices = this.module._sawteeth_preview_render(this.interleavedPtr, numSamples);
+          if (voices > 0) {
+            for (let i = 0; i < numSamples; i++) {
+              preview[0][i] = this.interleavedBuf[i * 2];
+              preview[1][i] = this.interleavedBuf[i * 2 + 1];
+            }
           }
         }
       }

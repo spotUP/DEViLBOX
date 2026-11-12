@@ -16,6 +16,7 @@ import {
 } from '@/types/instrument';
 import { DEFAULT_SUNVOX_PATCH_URL, isSunVoxSongPlayer } from './sunvox/sunvoxPatchConfig';
 import { HivelySynth } from './hively/HivelySynth';
+import { SawteethSynth } from './sawteeth/SawteethSynth';
 import { GTUltraSynth } from './gtultra/GTUltraSynth';
 import { KlysSynth } from './klystrack/KlysSynth';
 import { JamCrackerSynth } from './jamcracker/JamCrackerSynth';
@@ -657,6 +658,11 @@ export class InstrumentFactory {
         instrument = hvlSynth;
         break;
       }
+
+      case 'SawteethSynth':
+        // Keyboard preview voice for instrument config.id; the song plays on the whole-song engine.
+        instrument = new SawteethSynth(config.id);
+        break;
 
       case 'GTUltraSynth': {
         // GT Ultra shares a single WASM SID engine — the synth is a thin proxy
