@@ -1384,11 +1384,11 @@ export function encodeInstrumentAsINS2(inst: FurnaceInstrument, formatVersion: n
   // ── NA: Name ──
   if (inst.name && inst.name.length > 0) {
     const lenPos = startFeature('NA');
-    // Name: uint16 length + string bytes (no null terminator)
+    // Name: null-terminated string (what readString and Furnace's own reader take)
     const nameBytes = new TextEncoder().encode(inst.name);
-    writeUint16(nameBytes.length);
     u8.set(nameBytes, pos);
     pos += nameBytes.length;
+    u8[pos++] = 0;
     endFeature(lenPos);
   }
 
