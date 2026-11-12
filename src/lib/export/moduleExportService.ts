@@ -14,6 +14,7 @@
  * since before this unit.
  */
 import { liveTrackerSong } from '@/lib/song/liveSong';
+import { exportFurnaceModule, type FurnaceModuleResult } from './FurnaceModuleExporter';
 import { exportWithOpenMPT, type OpenMPTExportOptions, type OpenMPTExportResult } from './OpenMPTExporter';
 import { exportSongToMOD, type ModExportResult } from './modExport';
 import type { ExportNativeOptions, NativeExportResult } from './nativeExportRouter';
@@ -94,4 +95,9 @@ export async function exportMidiFile(options: MidiFileOptions): Promise<MidiFile
     data: exportPatternToMIDI(pattern, song.initialBPM, timeSignature, { ...midiOptions, includeAutomation }),
     scope, name: pattern.name || 'pattern', patternIndex: idx,
   };
+}
+
+/** Neo Geo (YM2610) song as a Furnace .fur module, from the live song. Throws when the song holds something the module cannot. */
+export function exportFurnaceModuleFile(): FurnaceModuleResult {
+  return exportFurnaceModule(liveTrackerSong());
 }

@@ -6,6 +6,7 @@
  * All store subscriptions, local state, effects, and handlers live here.
  */
 
+import { furnaceModuleExportAvailable } from '@/lib/export/FurnaceModuleExporter';
 import { useState, useEffect, useCallback } from 'react';
 import { lowOctaveExportRefusal } from '@/lib/tracker/noteValue';
 import {
@@ -223,19 +224,31 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     onClose();
   }, [instruments, selectedInstrumentId, options]);
 
+  const furnaceModuleAvailable = furnaceModuleExportAvailable(instruments);
+
   // ── Shared handler: export fur ──────────────────────────────────────────────
 
   const handleExportFur = useCallback(async (
     downloadFn: (blob: Blob, filename: string) => void,
     onClose: () => void,
   ) => {
-    const furBuffer = await saveFurFileWasm();
-    const blob = new Blob([furBuffer], { type: 'application/octet-stream' });
+    // A song composed in the app on Neo Geo voices is written by the module writer;
+    // any other Furnace song is the imported module the WASM engine holds.
+    let furBuffer: ArrayBuffer | Uint8Array;
+    if (furnaceModuleAvailable) {
+      const { exportFurnaceModuleFile } = await import('@lib/export/moduleExportService');
+      const result = exportFurnaceModuleFile();
+      furBuffer = result.bytes;
+      result.warnings.forEach((w) => notify.warning(w));
+    } else {
+      furBuffer = await saveFurFileWasm();
+    }
+    const blob = new Blob([furBuffer as BlobPart], { type: 'application/octet-stream' });
     const filename = `${metadata.name || 'song'}.fur`;
     downloadFn(blob, filename);
     notify.success(`Furnace file "${filename}" exported successfully! (${furBuffer.byteLength} bytes)`);
     onClose();
-  }, [metadata]);
+  }, [metadata, furnaceModuleAvailable]);
 
   // ── Shared handler: export nano ─────────────────────────────────────────────
 
@@ -399,6 +412,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     handleExportSFX,
     handleExportInstrument,
     handleExportFur,
+    furnaceModuleAvailable,
     handleExportNano,
     handleExportNative,
     nativeAvailable,

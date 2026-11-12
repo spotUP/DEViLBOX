@@ -314,7 +314,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     <Zap size={24} className="mx-auto mb-2" />
                     <div className="font-mono text-sm font-semibold">Nano</div>
                   </button>
-                  {ex.editorMode === 'furnace' && (
+                  {(ex.editorMode === 'furnace' || ex.furnaceModuleAvailable) && (
                     <button
                       onClick={() => ex.setExportMode('fur')}
                       className={`
@@ -326,7 +326,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       `}
                     >
                       <FileMusic size={24} className="mx-auto mb-2" />
-                      <div className="font-mono text-sm font-semibold">Furnace</div>
+                      <div className="font-mono text-sm font-semibold">Export Furnace Module</div>
                     </button>
                   )}
                   {ex.nativeAvailable && (
@@ -498,7 +498,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   <div className="space-y-3">
                     <div className="text-sm font-mono text-text-secondary space-y-1">
                       <div>Format: <span className="text-accent-primary">Furnace Tracker Module</span></div>
-                      <div>Engine: <span className="text-accent-primary">FurnaceFileOps WASM</span></div>
+                      <div>Engine: <span className="text-accent-primary">{ex.furnaceModuleAvailable ? 'Neo Geo module writer' : 'FurnaceFileOps WASM'}</span></div>
                       <div>Patterns: <span className="text-accent-primary">{ex.patterns.length}</span></div>
                       <div>Instruments: <span className="text-accent-primary">{ex.instruments.length}</span></div>
                     </div>
