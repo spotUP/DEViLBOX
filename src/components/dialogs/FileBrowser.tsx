@@ -326,7 +326,7 @@ export const FileBrowser: React.FC<FileBrowserProps> = ({
                         nav.setSelectedFile(null);
                       }}
                       data-file-row
-                      className="sticky top-0 z-10 -mx-4 -mt-4 flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors bg-dark-bgSecondary hover:bg-dark-bgHover border-b border-dark-border"
+                      className="sticky -top-4 z-10 -mx-4 -mt-4 flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors bg-dark-bgSecondary hover:bg-dark-bgHover border-b border-dark-border"
                     >
                       <ArrowLeft size={18} className="text-text-muted" />
                       <div className="flex-1">
