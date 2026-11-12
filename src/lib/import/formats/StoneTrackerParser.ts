@@ -63,6 +63,10 @@ export interface StoneTrackerRow {
   effects: Array<{ cmd: number; param: number }>;
   /** File offset of the note word's first byte (the word holding `note`), -1 when the row has no note word. */
   noteAt: number;
+  /** File offset of the word whose second byte holds the sample (a note word, or a word with note 0), -1 when the row has none. */
+  sampleAt: number;
+  /** File offset of each effect word, in the order of `effects`. */
+  effectAts: number[];
 }
 
 /** One track pattern decoded to `rows` rows, exactly as the player reads it. */
@@ -70,7 +74,7 @@ export function decodeStoneTrackerPattern(bytes: Uint8Array, offset: number, row
   const out: StoneTrackerRow[] = [];
   let p = offset;
   while (out.length < rows && p + 1 < bytes.length) {
-    const row: StoneTrackerRow = { note: 0, sample: 0, effects: [], noteAt: -1 };
+    const row: StoneTrackerRow = { note: 0, sample: 0, effects: [], noteAt: -1, sampleAt: -1, effectAts: [] };
     let empty = 0;
     for (;;) {
       if (p + 1 >= bytes.length) break;
@@ -82,15 +86,17 @@ export function decodeStoneTrackerPattern(bytes: Uint8Array, offset: number, row
       else if (code < FIRST_EFFECT) {
         if (code > 0 && code <= MAX_NOTE) { row.note = code; row.noteAt = wordAt; }
         if (b1) row.sample = b1;
+        if (row.sampleAt < 0 || b1) row.sampleAt = wordAt;
       } else {
         row.effects.push({ cmd: code - FIRST_EFFECT, param: b1 });
+        row.effectAts.push(wordAt);
       }
       if (b0 & 0x80) break;
     }
     out.push(row);
-    for (let i = 0; i < empty && out.length < rows; i++) out.push({ note: 0, sample: 0, effects: [], noteAt: -1 });
+    for (let i = 0; i < empty && out.length < rows; i++) out.push({ note: 0, sample: 0, effects: [], noteAt: -1, sampleAt: -1, effectAts: [] });
   }
-  while (out.length < rows) out.push({ note: 0, sample: 0, effects: [], noteAt: -1 });
+  while (out.length < rows) out.push({ note: 0, sample: 0, effects: [], noteAt: -1, sampleAt: -1, effectAts: [] });
   return out;
 }
 
@@ -99,6 +105,13 @@ function gridEffect(cmd: number, param: number): { typ: number; val: number } | 
   if (cmd <= 0x0d || cmd === 0x0f) return { typ: cmd, val: param };          // ProTracker 0-D, F
   if (cmd >= 0x10 && cmd <= 0x1e) return { typ: 0x0e, val: ((cmd & 0x0f) << 4) | (param & 0x0f) };  // 1x0y = Exy
   return null;   // 0E Set Note, 20-33: StoneTracker's own
+}
+
+/** The StoneTracker effect word a grid effect writes as, the inverse of gridEffect; null when the grid effect has no word. */
+function effectWord(typ: number, val: number): { cmd: number; param: number } | null {
+  if (typ <= 0x0d || typ === 0x0f) return { cmd: typ, param: val & 0xff };
+  if (typ === 0x0e) return { cmd: 0x10 | ((val >> 4) & 0x0f), param: val & 0x0f };
+  return null;
 }
 
 const emptyCell = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
@@ -162,7 +175,7 @@ export function parseStoneTrackerFile(buffer: ArrayBuffer | Uint8Array, filename
   // Editing: cellOffsetMap[grid pattern][channel][row] = file offset of the note word's first byte (-1: the row has no note
   // word, so nothing to overwrite). A track pattern shared by several positions is one set of bytes in the file.
   const cellOffsetMap: number[][][] = [];
-  const parsedNotes: number[][][] = [];
+  const parsedRows: Array<Array<Array<StoneTrackerRow | undefined>>> = [];
   const usedSamples = new Set<number>();
   for (let pos = 0; pos < positions; pos++) {
     const tracks = Array.from({ length: voices }, (_, t) => listAt(t, pos));
@@ -171,12 +184,12 @@ export function parseStoneTrackerFile(buffer: ArrayBuffer | Uint8Array, filename
     let index = gridIndex.get(key);
     if (index === undefined) {
       const offs: number[][] = [];
-      const notes: number[][] = [];
+      const kept: Array<Array<StoneTrackerRow | undefined>> = [];
       const channels = Array.from({ length: channelCount }, (_, ch): ChannelData => {
         const isCtrl = ch === voices;
         const rows = isCtrl ? patternRows(true, ctrl) : patternRows(false, tracks[ch]);
         offs.push(Array.from({ length: patternLength }, (_, r) => rows?.[r]?.noteAt ?? -1));
-        notes.push(Array.from({ length: patternLength }, (_, r) => (rows?.[r]?.note ? rows[r].note + NOTE_OFFSET : 0)));
+        kept.push(Array.from({ length: patternLength }, (_, r) => rows?.[r]));
         return {
           id: `ch${ch}`, name: isCtrl ? 'FX' : `Track ${ch + 1}`, muted: false, solo: false, collapsed: false,
           volume: 100, pan: 0, instrumentId: null, color: null,
@@ -185,7 +198,7 @@ export function parseStoneTrackerFile(buffer: ArrayBuffer | Uint8Array, filename
       });
       index = patterns.length;
       cellOffsetMap.push(offs);
-      parsedNotes.push(notes);
+      parsedRows.push(kept);
       gridIndex.set(key, index);
       patterns.push({ id: `p${index}`, name: `Position ${pos}`, length: patternLength, channels });
     }
@@ -230,14 +243,28 @@ export function parseStoneTrackerFile(buffer: ArrayBuffer | Uint8Array, filename
       moduleSize: bytes.length,
       encodeCell: () => new Uint8Array(1),
       decodeCell: () => emptyCell(),
-      // Only a changed note on a row that already holds a note word is written: the word's first byte is the note (1-36)
-      // with bit 7 (end of row) kept. Sample, effects and row structure stay as stored.
+      // A changed note (on a row that already holds a note word), sample (second byte of that word) or one of the two shown
+      // effects (rewritten in its own effect word) is written; the word's end-of-row bit stays. Row structure, effects the
+      // grid does not show and a field the row has no word for stay as stored.
       effectPatches: (pattern, row, channel, cell) => {
-        const was = parsedNotes[pattern]?.[channel]?.[row];
+        const was = parsedRows[pattern]?.[channel]?.[row];
+        const patches: Array<[number, number]> = [];
+        const wasNote = was?.note ? was.note + NOTE_OFFSET : 0;
+        if (was === undefined) return { patches, noteUnchanged: true };
+        if (was.sampleAt >= 0 && cell.instrument !== was.sample && cell.instrument >= 1 && cell.instrument <= 255) patches.push([was.sampleAt + 1, cell.instrument]);
+        const shown = was.effects.map((e, i) => ({ ...e, at: was.effectAts[i], grid: gridEffect(e.cmd, e.param) })).filter((e) => e.grid !== null);
+        const edits = [{ typ: cell.effTyp, val: cell.eff }, { typ: cell.effTyp2 ?? 0, val: cell.eff2 ?? 0 }];
+        edits.forEach((e, i) => {
+          const old = shown[i];
+          if (!old?.grid || (e.typ === old.grid.typ && e.val === old.grid.val)) return;
+          const w = effectWord(e.typ, e.val);
+          if (w) patches.push([old.at, (bytes[old.at] & 0x80) | (w.cmd + FIRST_EFFECT)], [old.at + 1, w.param]);
+        });
         const at = cellOffsetMap[pattern]?.[channel]?.[row] ?? -1;
-        if (was === undefined || cell.note === was) return { patches: [], noteUnchanged: true };
-        if (at < 0 || cell.note - NOTE_OFFSET < 1 || cell.note - NOTE_OFFSET > MAX_NOTE) return { patches: [], noteUnchanged: false };
-        return { patches: [[at, (bytes[at] & 0x80) | (cell.note - NOTE_OFFSET)]], noteUnchanged: true };
+        if (cell.note === wasNote) return { patches, noteUnchanged: true };
+        if (at < 0 || cell.note - NOTE_OFFSET < 1 || cell.note - NOTE_OFFSET > MAX_NOTE) return { patches, noteUnchanged: false };
+        patches.push([at, (bytes[at] & 0x80) | (cell.note - NOTE_OFFSET)]);
+        return { patches, noteUnchanged: true };
       },
       getCellFileOffset: (pattern: number, row: number, channel: number): number => cellOffsetMap[pattern]?.[channel]?.[row] ?? -1,
     } as UADEPatternLayout,
