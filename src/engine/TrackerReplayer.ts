@@ -1372,6 +1372,10 @@ export class TrackerReplayer {
       this.processHybridRow(ch, channel, row, time);
     }
 
+    // The TS tick handler does not step Furnace cell effects while an external engine drives the
+    // rows (_suppressNotes), so the row's ticks are scheduled here, on the engine's own row time.
+    this.stepFurnaceTicksForRow(time);
+
     // NOTE: We intentionally do NOT call updateWasmMuteMask() here.
     // Muting channels in libopenmpt prevents subsequent non-replaced instrument
     // notes from playing (the unmute arrives too late — the row already rendered
@@ -3293,6 +3297,17 @@ export class TrackerReplayer {
 
       this.advanceRow();
     }
+  }
+
+  /**
+   * Every tick of one row of the Furnace cell effects, scheduled from the row's start time.
+   * For the engine-driven path, which gets one callback per row and no per-tick callback: without
+   * this an arpeggio (0xy) never leaves its base note.
+   */
+  private stepFurnaceTicksForRow(time: number): void {
+    if (this.furnaceTickChannels.size === 0) return;
+    const tickInterval = 2.5 / this.bpm;
+    for (let tick = 0; tick < this.speed; tick++) this.stepFurnaceTicks(time + tick * tickInterval);
   }
 
   /** One tick of the Furnace cell effects on every chip channel routeRowToChip has seen. */
