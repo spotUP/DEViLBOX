@@ -384,12 +384,7 @@ class SawteethProcessor extends AudioWorkletProcessor {
     const m = this.module;
     if (!m || typeof m._sawteeth_set_channel_tap !== 'function') return;
     const malloc = m._malloc || m.malloc;
-    const free = m._free || m.free;
-    for (let c = 0; c < 12; c++) m._sawteeth_set_channel_tap(c, 0);
-    if (this.tapPtrs && free) for (const p of this.tapPtrs) free(p);
-    this.tapPtrs = [];
-    this.tapViews = null;
-    this.tapHeap = null;
+    this.releaseChannelTaps();
     for (let c = 0; c < numCh; c++) {
       const ptr = malloc(this.bufferSize * 4);
       if (!ptr) break;
@@ -399,6 +394,21 @@ class SawteethProcessor extends AudioWorkletProcessor {
   }
 
   /** Stream the channel samples of the last `frames` song frames (see worklets/channel-stream.js). */
+  /** Clear the C taps, free the tap buffers from the module that allocated them, drop the views. */
+  releaseChannelTaps() {
+    const m = this.module;
+    if (m) {
+      if (typeof m._sawteeth_set_channel_tap === 'function') {
+        for (let c = 0; c < 12; c++) m._sawteeth_set_channel_tap(c, 0);
+      }
+      const free = m._free || m.free;
+      if (this.tapPtrs && free) for (const p of this.tapPtrs) free(p);
+    }
+    this.tapPtrs = [];
+    this.tapViews = null;
+    this.tapHeap = null;
+  }
+
   streamChannelTaps(frames) {
     if (!this.tapPtrs || this.tapPtrs.length === 0 || !globalThis.DevilboxChannelStream) return;
     const heap = this.module.HEAPF32 || (this.module.wasmMemory && new Float32Array(this.module.wasmMemory.buffer));
@@ -423,6 +433,7 @@ class SawteethProcessor extends AudioWorkletProcessor {
   }
 
   cleanup() {
+    this.releaseChannelTaps();
     if (this.module && typeof this.module._sawteeth_stop === 'function') {
       try { this.module._sawteeth_stop(); } catch (e) {}
     }
