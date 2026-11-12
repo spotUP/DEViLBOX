@@ -611,7 +611,7 @@ export async function parseSidMon2File(
   let currentPatternLen = 64;  // SidMon II default, can be changed by effect 0x76
   const trackerPatterns: Pattern[] = [];
   // Every grid note cell and the file byte of the note command that played it (G24: a note edit is a byte patch).
-  const noteCells: Array<{ pattern: number; channel: number; row: number; offset: number; note: number }> = [];
+  const noteCells: Array<{ pattern: number; channel: number; row: number; offset: number; note: number; base: number }> = [];
 
   // Voice state for simulation
   interface VoiceState {
@@ -695,7 +695,7 @@ export async function parseSidMon2File(
 
               // Map note to XM using period table for accuracy
               xmNote = sidmonNoteToXM(voice.note, 0);
-              if (xmNote > 0) noteCells.push({ pattern: trackPos, channel: ch, row: patRow, offset: rowData.offset, note: xmNote });
+              if (xmNote > 0) noteCells.push({ pattern: trackPos, channel: ch, row: patRow, offset: rowData.offset, note: xmNote, base: transpose });
 
               // Reset ADSR
               voice.adsrPos = 4;
@@ -940,6 +940,7 @@ export async function parseSidMon2File(
     trackMap,
     blockRows,
     noteBytes: noteCells,
+    propagateSharedCells: true,
   };
 
   return {
