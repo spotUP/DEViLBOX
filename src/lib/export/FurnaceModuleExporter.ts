@@ -15,6 +15,7 @@
  */
 import pako from 'pako';
 import type { InstrumentConfig, FurnaceConfig, FurnaceMacro } from '@/types/instrument';
+import type { FurnaceUserSample } from '@/types/instrument/furnace';
 import type { Pattern, TrackerCell } from '@/types/tracker';
 import { effectNotationOf, type EffectNotation } from '@/lib/tracker/effectNotation';
 import {
@@ -222,8 +223,48 @@ function toFileMacro(m: FurnaceMacro): FileMacro {
   };
 }
 
-function toFileInstrument(name: string, cfg: FurnaceConfig): FurnaceInstrument {
+/** True for an ADPCM-A / ADPCM-B voice that carries its own sample (the rule the live synth uses). */
+function hasUserSample(cfg: FurnaceConfig): cfg is FurnaceConfig & { userSample: FurnaceUserSample } {
   const type = resolveInsType(cfg);
+  return (type === DIV_INS_ADPCMA || type === DIV_INS_ADPCMB) && !!cfg.userSample;
+}
+
+/**
+ * The module sample list: every user sample of an ADPCM voice, once, in instrument order.
+ * Two instruments that share one sample buffer share one module sample (same rule as
+ * `placeUserSample` in the live synth, which compares the `data` buffer).
+ */
+function collectUserSamples(configs: FurnaceConfig[]): FurnaceUserSample[] {
+  const list: FurnaceUserSample[] = [];
+  for (const cfg of configs) {
+    if (hasUserSample(cfg) && !list.some((s) => s.data === cfg.userSample.data)) list.push(cfg.userSample);
+  }
+  return list;
+}
+
+/**
+ * One SMP2 block, in the layout of Furnace `DivSample::putSampleData` (sample.cpp): 16-bit PCM,
+ * no loop, rendered on every chip. Furnace converts it to ADPCM-A / ADPCM-B itself.
+ */
+function encodeSmp2(sample: FurnaceUserSample): Uint8Array {
+  const rate = Math.round(sample.rate);
+  const b = new Bytes()
+    .str(sample.name)
+    .u32(sample.data.length)
+    .u32(rate).u32(rate)          // centerRate, and the legacy copy of it
+    .u8(16)                       // depth: 16-bit
+    .u8(0)                        // loop mode
+    .u8(0)                        // BRR emphasis
+    .u8(0)                        // flags (dither, BRR no filter)
+    .u32(0xffffffff).u32(0xffffffff); // loop start / end: -1 = no loop
+  for (let i = 0; i < 4; i++) b.u32(0xffffffff); // render on every chip, for each sample memory type
+  for (let i = 0; i < sample.data.length; i++) b.u16(sample.data[i] & 0xffff);
+  return block('SMP2', b);
+}
+
+function toFileInstrument(name: string, cfg: FurnaceConfig, samples: FurnaceUserSample[]): FurnaceInstrument {
+  const type = resolveInsType(cfg);
+  const sampleIndex = hasUserSample(cfg) ? samples.findIndex((s) => s.data === cfg.userSample.data) : -1;
   return {
     name,
     type,
@@ -232,14 +273,19 @@ function toFileInstrument(name: string, cfg: FurnaceConfig): FurnaceInstrument {
     samples: [],
     wavetables: [],
     opMacroArrays: cfg.opMacroArrays?.map((a) => a.filter((m) => m.data.length > 0).map(toFileMacro)),
+    // The instrument points at its sample by module index, as the live synth does.
+    // One sample for every note: a note map would name samples the module does not hold.
+    ...(sampleIndex >= 0
+      ? { amiga: { initSample: sampleIndex, useNoteMap: false, useSample: true, useWave: false, waveLen: cfg.amiga?.waveLen ?? 32 } }
+      : {}),
   };
 }
 
 function checkInstrument(inst: InstrumentConfig, cfg: FurnaceConfig, problems: string[]): void {
-  const type = resolveInsType(cfg);
   const label = `Instrument ${inst.id} "${inst.name}"`;
-  if (type === DIV_INS_ADPCMA || type === DIV_INS_ADPCMB) {
-    if (cfg.userSample) problems.push(`${label}: ADPCM samples cannot be written to a Furnace module yet`);
+  if (hasUserSample(cfg)) {
+    if (!(cfg.userSample.data instanceof Int16Array) || cfg.userSample.data.length === 0) problems.push(`${label}: the sample has no 16-bit data`);
+    if (!(cfg.userSample.rate > 0)) problems.push(`${label}: the sample has no rate`);
   }
   const hasNamedOpMacros = (cfg.opMacros ?? []).some((o) => Object.values(o).some((m) => m && m.data.length > 0));
   const hasRawOpMacros = (cfg.opMacroArrays ?? []).some((a) => a.some((m) => m.data.length > 0));
@@ -332,10 +378,12 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   for (let ch = 0; ch < FUR_NEO_GEO_CHANNELS; ch++) sng.u32(0);
   const sng2 = block('SNG2', sng);
 
-  const ins2 = neo.map((inst) => encodeInstrumentAsINS2(toFileInstrument(inst.name, inst.furnace as FurnaceConfig), FUR_EXPORT_VERSION));
+  const userSamples = collectUserSamples(neo.map((inst) => inst.furnace as FurnaceConfig));
+  const ins2 = neo.map((inst) => encodeInstrumentAsINS2(toFileInstrument(inst.name, inst.furnace as FurnaceConfig, userSamples), FUR_EXPORT_VERSION));
+  const smp2 = userSamples.map(encodeSmp2);
 
-  // Layout: header, INF2, SNG2, INS2..., PATN...
-  const buildInf2 = (sngPtr: number, insPtrs: number[], patPtrs: number[]): Uint8Array => {
+  // Layout: header, INF2, SNG2, INS2..., SMP2..., PATN...
+  const buildInf2 = (sngPtr: number, insPtrs: number[], smpPtrs: number[], patPtrs: number[]): Uint8Array => {
     const b = new Bytes()
       .str(song.name).str('').str('Neo Geo MVS').str('')
       .str('').str('').str('').str('')
@@ -345,24 +393,31 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
       .u32(0).u8(1); // patchbay: no connections, automatic
     b.u8(0x01).u32(1).u32(sngPtr);
     if (insPtrs.length > 0) { b.u8(0x04).u32(insPtrs.length); insPtrs.forEach((p) => b.u32(p)); }
+    if (smpPtrs.length > 0) { b.u8(0x06).u32(smpPtrs.length); smpPtrs.forEach((p) => b.u32(p)); }
     if (patPtrs.length > 0) { b.u8(0x07).u32(patPtrs.length); patPtrs.forEach((p) => b.u32(p)); }
     b.u8(0x00);
     return block('INF2', b);
   };
-  const inf2Len = buildInf2(0, ins2.map(() => 0), patnBlocks.map(() => 0)).length;
+  const inf2Len = buildInf2(0, ins2.map(() => 0), smp2.map(() => 0), patnBlocks.map(() => 0)).length;
   let cursor = 32 + inf2Len;
   const sngPtr = cursor;
   cursor += sng2.length;
   const insPtrs = ins2.map((b) => { const p = cursor; cursor += b.length; return p; });
+  const smpPtrs = smp2.map((b) => { const p = cursor; cursor += b.length; return p; });
   const patPtrs = patnBlocks.map((b) => { const p = cursor; cursor += b.length; return p; });
-  const inf2 = buildInf2(sngPtr, insPtrs, patPtrs);
+  const inf2 = buildInf2(sngPtr, insPtrs, smpPtrs, patPtrs);
 
   const file = new Bytes().ascii('-Furnace module-').u16(FUR_EXPORT_VERSION).u16(0).u32(32);
   for (let i = 0; i < 8; i++) file.u8(0);
-  for (const part of [inf2, sng2, ...ins2, ...patnBlocks]) file.bytes(part);
+  for (const part of [inf2, sng2, ...ins2, ...smp2, ...patnBlocks]) file.bytes(part);
 
-  if (neo.every((i) => resolveInsType(i.furnace as FurnaceConfig) !== DIV_INS_ADPCMA && resolveInsType(i.furnace as FurnaceConfig) !== DIV_INS_ADPCMB)) {
-    warnings.push('The module has no ADPCM-A or ADPCM-B samples (the song has none)');
+  // An ADPCM voice with no sample of its own names no sample in the module.
+  const bare = neo.filter((i) => {
+    const t = resolveInsType(i.furnace as FurnaceConfig);
+    return (t === DIV_INS_ADPCMA || t === DIV_INS_ADPCMB) && !(i.furnace as FurnaceConfig).userSample;
+  });
+  if (bare.length > 0) {
+    warnings.push(`ADPCM instruments without a sample of their own are written without a sample: ${bare.map((i) => `${i.id} "${i.name}"`).join(', ')}`);
   }
   return { bytes: pako.deflate(file.toUint8Array()), warnings };
 }

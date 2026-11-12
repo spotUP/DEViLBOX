@@ -1464,6 +1464,12 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
     this._samplesUploadedForPlatform.clear();
   }
 
+  /** Replace the song's samples while it plays and write them to every chip that exists. */
+  replaceModuleSamples(samples: Parameters<FurnaceDispatchEngine['setModuleSamples']>[0]): void {
+    this.setModuleSamples(samples);
+    for (const chipId of this.chips.keys()) this.uploadModuleSamplesToPlatform(chipId, true);
+  }
+
   /** Get stored module wavetables (used by FurnaceDispatchSynth during chip init). */
   getModuleWavetables(): Array<{ data: number[]; width: number; height: number }> | null {
     return this._moduleWavetables;

@@ -7,7 +7,7 @@
  * the C++ sequencer through the same data shape as an imported one.
  */
 import { exportFurnaceModule, type FurnaceModuleSong } from './FurnaceModuleExporter';
-import { parseFurnaceSong, buildFurnaceNativeData } from '@/lib/import/formats/FurnaceSongParser';
+import { parseFurnaceSong, buildFurnaceNativeData, toSequencerSamples } from '@/lib/import/formats/FurnaceSongParser';
 import { collectIns2Uploads, type Ins2Upload } from '@/engine/furnace-dispatch/ins2Uploads';
 import type { FurnaceNativeData } from '@/types/tracker';
 import { NEO_GEO_SYNTH_TYPE } from './FurnaceModuleExporter';
@@ -21,6 +21,8 @@ export interface DerivedFurnaceNative {
    * in song order, so native index + 1 equals the store id only when those ids are 1..n.
    */
   instrumentIds: number[];
+  /** The module's samples (ADPCM-A / ADPCM-B user samples), in the shape `song.furnaceSamples` holds. */
+  samples: ReturnType<typeof toSequencerSamples>;
   /** Exporter notes: what was left out on purpose. */
   warnings: string[];
 }
@@ -34,5 +36,5 @@ export async function deriveFurnaceNativeFromSong(song: FurnaceModuleSong): Prom
   const instrumentIds = song.instruments
     .filter((i) => i.synthType === NEO_GEO_SYNTH_TYPE && i.furnace)
     .map((i) => i.id);
-  return { native, ins2, instrumentIds, warnings };
+  return { native, ins2, instrumentIds, samples: toSequencerSamples(module), warnings };
 }
