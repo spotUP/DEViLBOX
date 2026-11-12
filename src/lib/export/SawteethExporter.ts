@@ -55,7 +55,10 @@ export async function exportSawteeth(
 
   // We always write version 1200 (supports lLoop + rLoop fields)
   const ST_VERSION = 1200;
-  const SPS_PAL = 882;
+  // The grid's row is initialSpeed ticks of spsPal samples (the parser's layout); each exported part
+  // step is one grid row, so write that row length as the part's sps and the tempo back as spsPal.
+  const SPS_PAL = song.initialBPM > 0 ? Math.max(1, Math.min(65535, Math.round(110250 / song.initialBPM))) : 882;
+  const ROW_TICKS = Math.max(1, Math.min(255, Math.round(song.initialSpeed || 6)));
 
   // ── Build Parts ──────────────────────────────────────────────────────────
   // One Part per (songPosition, channel) pair.
@@ -101,7 +104,7 @@ export async function exportSawteeth(
       chIndices.push(idx);
 
       exportParts.push({
-        sps: 6, // default steps-per-second
+        sps: ROW_TICKS,
         steps,
         name: `P${posIdx}C${ch}`,
       });
@@ -111,7 +114,7 @@ export async function exportSawteeth(
 
   if (exportParts.length === 0) {
     // Need at least one part
-    exportParts.push({ sps: 6, steps: [{ ins: 0, eff: 0, note: 0 }], name: '' });
+    exportParts.push({ sps: ROW_TICKS, steps: [{ ins: 0, eff: 0, note: 0 }], name: '' });
     partIndex.push(Array.from({ length: channelCount }, () => 0));
   }
 
