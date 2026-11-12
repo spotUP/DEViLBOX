@@ -43,7 +43,7 @@ export interface WASMSingletonStatic {
    * the song carries, so the next load plays it (engines with `gridCellEdits`
    * whose module the grid is a reading of).
    */
-  patchModuleCell?(pattern: number, row: number, channel: number, note: number, instrument: number): void;
+  patchModuleCell?(pattern: number, row: number, channel: number, note: number, instrument: number, effTyp?: number, eff?: number): void;
 }
 
 /** Descriptor for a singleton WASM engine in the registry */

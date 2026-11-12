@@ -157,7 +157,7 @@ export async function sendCellEditsToEngine(
       const Engine = desc!.staticRef ?? (desc!.dynamicResolver ? await desc!.dynamicResolver() : null);
       if (!Engine) return;
       if (!Engine.hasInstance()) {
-        for (const { pattern, row, channel, cell } of edits) Engine.patchModuleCell?.(pattern, row, channel, cell.note ?? 0, cell.instrument ?? 0);
+        for (const { pattern, row, channel, cell } of edits) Engine.patchModuleCell?.(pattern, row, channel, cell.note ?? 0, cell.instrument ?? 0, cell.effTyp ?? 0, cell.eff ?? 0);
         return;
       }
       const engine = Engine.getInstance() as unknown as GridCellEngine;
