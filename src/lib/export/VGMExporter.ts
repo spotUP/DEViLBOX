@@ -23,6 +23,10 @@ const VGM_CMD = {
   YM2612_PORT0: 0x52,
   YM2612_PORT1: 0x53,
 
+  // YM2610 / YM2610B (OPNB, OPNBB)
+  YM2610_PORT0: 0x58,
+  YM2610_PORT1: 0x59,
+
   // YM2151 (OPM)
   YM2151: 0x54,
 
@@ -92,6 +96,7 @@ const VGM_HEADER = {
   SEGA_PCM_CLOCK: 0x38,
   SEGA_PCM_IF: 0x3C,
   // More clocks follow...
+  YM2610_CLOCK: 0x4C,    // bit 31 set = YM2610B
   YM3812_CLOCK: 0x50,
   YMF262_CLOCK: 0x5C,
   AY8910_CLOCK: 0x74,
@@ -105,6 +110,8 @@ const VGM_HEADER = {
 // Standard chip clocks
 const CHIP_CLOCKS: Record<number, number> = {
   [FurnaceChipType.OPN2]: 7670453,    // Genesis NTSC
+  [FurnaceChipType.OPNB]: 8000000,    // Neo Geo YM2610
+  [FurnaceChipType.OPNB_B]: 8000000,  // YM2610B
   [FurnaceChipType.OPM]: 3579545,     // Standard YM2151
   [FurnaceChipType.PSG]: 3579545,     // SMS PSG
   [FurnaceChipType.OPLL]: 3579545,
@@ -237,6 +244,12 @@ function getVGMCommand(chipType: number, port: number): { cmd: number; adjustedP
         ? { cmd: VGM_CMD.YM2612_PORT0, adjustedPort: port }
         : { cmd: VGM_CMD.YM2612_PORT1, adjustedPort: port - 0x100 };
 
+    case FurnaceChipType.OPNB:
+    case FurnaceChipType.OPNB_B:
+      return port < 0x100
+        ? { cmd: VGM_CMD.YM2610_PORT0, adjustedPort: port }
+        : { cmd: VGM_CMD.YM2610_PORT1, adjustedPort: port - 0x100 };
+
     case FurnaceChipType.OPM:
       return { cmd: VGM_CMD.YM2151, adjustedPort: port };
 
@@ -364,6 +377,12 @@ export function exportToVGM(
   // Set chip clocks
   if (usedChips.has(FurnaceChipType.OPN2)) {
     view.setUint32(VGM_HEADER.YM2612_CLOCK, CHIP_CLOCKS[FurnaceChipType.OPN2], true);
+  }
+  if (usedChips.has(FurnaceChipType.OPNB_B)) {
+    // Bit 31 of the YM2610 clock marks a YM2610B
+    view.setUint32(VGM_HEADER.YM2610_CLOCK, (CHIP_CLOCKS[FurnaceChipType.OPNB_B] | 0x80000000) >>> 0, true);
+  } else if (usedChips.has(FurnaceChipType.OPNB)) {
+    view.setUint32(VGM_HEADER.YM2610_CLOCK, CHIP_CLOCKS[FurnaceChipType.OPNB], true);
   }
   if (usedChips.has(FurnaceChipType.OPM)) {
     view.setUint32(VGM_HEADER.YM2151_CLOCK, CHIP_CLOCKS[FurnaceChipType.OPM], true);
