@@ -13,7 +13,6 @@
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { applyBdGridEdits } from '@lib/import/formats/benDaglishEdits';
 import { walkBenDaglish } from '@lib/import/formats/BenDaglishWasmExtractor';
-import { editedCells, getGridBaseline } from '@/lib/song/gridBaseline';
 
 export interface BenDaglishExportResult {
   data: Uint8Array;
@@ -26,7 +25,9 @@ export async function exportBenDaglish(song: TrackerSong): Promise<BenDaglishExp
   if (!src) throw new Error('Ben Daglish export needs the module the song was loaded from');
   const name = (song.uadeEditableFileName ?? 'song.bd').split('/').pop() ?? 'song.bd';
   const trackOffsets = song.uadeVariableLayout?.filePatternAddrs;
-  if (!trackOffsets || (getGridBaseline() && editedCells(song.patterns).length === 0)) return { data: new Uint8Array(src), filename: name, warnings: [] };
+  // Not gated on editedCells: its cell hash leaves out extraNotes, so an edit in a further note column would read as "no edit".
+  // applyBdGridEdits compares the grid with a fresh walk of the module and patches nothing when they agree.
+  if (!trackOffsets) return { data: new Uint8Array(src), filename: name, warnings: [] };
   const walk = await walkBenDaglish(src.slice(0), song.fileSubsongs?.current ?? 0);
   const res = applyBdGridEdits(new Uint8Array(src), walk, trackOffsets, song.patterns);
   return { data: res.data, filename: name, warnings: res.warnings };
