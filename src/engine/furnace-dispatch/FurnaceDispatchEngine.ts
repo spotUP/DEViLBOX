@@ -20,6 +20,8 @@ import {
 } from '@engine/wasm/WASMSingletonBase';
 
 export { FurnaceDispatchPlatform } from './platforms';
+import { batchesToRegisterWrites, type DispatchRegBatch } from '@lib/export/dispatchRegCapture';
+import type { RegisterWrite } from '@lib/export/VGMExporter';
 import { STAND_INS } from './synthPlatforms';
 
 /** Sample depth formats (matching Furnace DivSampleDepth enum) */
@@ -783,6 +785,7 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
   private latestOscData: (Int16Array | null)[] = [];
 
   // Command log callbacks for automation capture
+  private _regCaptureBatches: DispatchRegBatch[] = [];
   private _cmdLogCallbacks: Set<(entries: Array<{ tick: number; cmd: number; channel: number; value1: number; value2: number }>) => void> = new Set();
 
   // Shared WASM asset cache (binary + JS glue + per-context registration state).
@@ -1162,6 +1165,10 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
         for (const cb of this._seqPositionCallbacks) {
           cb(data.order as number, data.row as number, data.audioTime as number | undefined);
         }
+        break;
+
+      case 'regCapture':
+        this._regCaptureBatches.push(...(data.batches as DispatchRegBatch[]));
         break;
 
       case 'cmdLog': {
@@ -1749,6 +1756,28 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
   onOscData(callback: OscDataCallback): () => void {
     this.oscCallbacks.add(callback);
     return () => { this.oscCallbacks.delete(callback); };
+  }
+
+  /**
+   * Start capturing chip register writes (drained once per chip tick in the
+   * worklet). Clears any earlier capture. Call before playback starts.
+   */
+  startRegCapture(): void {
+    this._regCaptureBatches = [];
+    this.workletNode?.port.postMessage({ type: 'setRegCapture', enable: true });
+  }
+
+  /** Stop capturing; batches already posted stay collected. */
+  stopRegCapture(): void {
+    this.workletNode?.port.postMessage({ type: 'setRegCapture', enable: false });
+  }
+
+  /**
+   * The captured writes as VGMExporter log entries (timestamp in samples at
+   * the worklet sample rate; chips with no VGM mapping are left out).
+   */
+  getRegCaptureLog(): RegisterWrite[] {
+    return batchesToRegisterWrites(this._regCaptureBatches);
   }
 
   /** Enable/disable command log capture for automation lanes */
