@@ -28,6 +28,7 @@
  */
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, ChannelData, InstrumentConfig } from '@/types';
+import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 
 const NOTE_OFFSET = 12;
 const MAX_NOTE = 36;
@@ -60,6 +61,8 @@ export interface StoneTrackerRow {
   note: number;      // 1-36, 0 none
   sample: number;    // 1-255, 0 none
   effects: Array<{ cmd: number; param: number }>;
+  /** File offset of the note word's first byte (the word holding `note`), -1 when the row has no note word. */
+  noteAt: number;
 }
 
 /** One track pattern decoded to `rows` rows, exactly as the player reads it. */
@@ -67,16 +70,17 @@ export function decodeStoneTrackerPattern(bytes: Uint8Array, offset: number, row
   const out: StoneTrackerRow[] = [];
   let p = offset;
   while (out.length < rows && p + 1 < bytes.length) {
-    const row: StoneTrackerRow = { note: 0, sample: 0, effects: [] };
+    const row: StoneTrackerRow = { note: 0, sample: 0, effects: [], noteAt: -1 };
     let empty = 0;
     for (;;) {
       if (p + 1 >= bytes.length) break;
       const b0 = bytes[p], b1 = bytes[p + 1];
+      const wordAt = p;
       p += 2;
       const code = b0 & 0x7f;
       if (code === 0x7f) empty = b1;
       else if (code < FIRST_EFFECT) {
-        if (code > 0 && code <= MAX_NOTE) row.note = code;
+        if (code > 0 && code <= MAX_NOTE) { row.note = code; row.noteAt = wordAt; }
         if (b1) row.sample = b1;
       } else {
         row.effects.push({ cmd: code - FIRST_EFFECT, param: b1 });
@@ -84,9 +88,9 @@ export function decodeStoneTrackerPattern(bytes: Uint8Array, offset: number, row
       if (b0 & 0x80) break;
     }
     out.push(row);
-    for (let i = 0; i < empty && out.length < rows; i++) out.push({ note: 0, sample: 0, effects: [] });
+    for (let i = 0; i < empty && out.length < rows; i++) out.push({ note: 0, sample: 0, effects: [], noteAt: -1 });
   }
-  while (out.length < rows) out.push({ note: 0, sample: 0, effects: [] });
+  while (out.length < rows) out.push({ note: 0, sample: 0, effects: [], noteAt: -1 });
   return out;
 }
 
@@ -155,6 +159,10 @@ export function parseStoneTrackerFile(buffer: ArrayBuffer | Uint8Array, filename
   const gridIndex = new Map<string, number>();
   const patterns: Pattern[] = [];
   const songPositions: number[] = [];
+  // Editing: cellOffsetMap[grid pattern][channel][row] = file offset of the note word's first byte (-1: the row has no note
+  // word, so nothing to overwrite). A track pattern shared by several positions is one set of bytes in the file.
+  const cellOffsetMap: number[][][] = [];
+  const parsedNotes: number[][][] = [];
   const usedSamples = new Set<number>();
   for (let pos = 0; pos < positions; pos++) {
     const tracks = Array.from({ length: voices }, (_, t) => listAt(t, pos));
@@ -162,9 +170,13 @@ export function parseStoneTrackerFile(buffer: ArrayBuffer | Uint8Array, filename
     const key = `${tracks.join(',')}|${ctrl}`;
     let index = gridIndex.get(key);
     if (index === undefined) {
+      const offs: number[][] = [];
+      const notes: number[][] = [];
       const channels = Array.from({ length: channelCount }, (_, ch): ChannelData => {
         const isCtrl = ch === voices;
         const rows = isCtrl ? patternRows(true, ctrl) : patternRows(false, tracks[ch]);
+        offs.push(Array.from({ length: patternLength }, (_, r) => rows?.[r]?.noteAt ?? -1));
+        notes.push(Array.from({ length: patternLength }, (_, r) => (rows?.[r]?.note ? rows[r].note + NOTE_OFFSET : 0)));
         return {
           id: `ch${ch}`, name: isCtrl ? 'FX' : `Track ${ch + 1}`, muted: false, solo: false, collapsed: false,
           volume: 100, pan: 0, instrumentId: null, color: null,
@@ -172,6 +184,8 @@ export function parseStoneTrackerFile(buffer: ArrayBuffer | Uint8Array, filename
         };
       });
       index = patterns.length;
+      cellOffsetMap.push(offs);
+      parsedNotes.push(notes);
       gridIndex.set(key, index);
       patterns.push({ id: `p${index}`, name: `Position ${pos}`, length: patternLength, channels });
     }
@@ -204,6 +218,29 @@ export function parseStoneTrackerFile(buffer: ArrayBuffer | Uint8Array, filename
     initialSpeed: 6,
     initialBPM: bpm,
     stoneTrackerFileData: copy(bytes),
+    uadeEditableFileData: copy(bytes),
+    uadeEditableFileName: filename,
+    uadePatternLayout: {
+      formatId: 'stoneTracker',
+      patternDataFileOffset: 0, // not used (getCellFileOffset overrides)
+      bytesPerCell: 1,
+      rowsPerPattern: patternLength,
+      numChannels: channelCount,
+      numPatterns: patterns.length,
+      moduleSize: bytes.length,
+      encodeCell: () => new Uint8Array(1),
+      decodeCell: () => emptyCell(),
+      // Only a changed note on a row that already holds a note word is written: the word's first byte is the note (1-36)
+      // with bit 7 (end of row) kept. Sample, effects and row structure stay as stored.
+      effectPatches: (pattern, row, channel, cell) => {
+        const was = parsedNotes[pattern]?.[channel]?.[row];
+        const at = cellOffsetMap[pattern]?.[channel]?.[row] ?? -1;
+        if (was === undefined || cell.note === was) return { patches: [], noteUnchanged: true };
+        if (at < 0 || cell.note - NOTE_OFFSET < 1 || cell.note - NOTE_OFFSET > MAX_NOTE) return { patches: [], noteUnchanged: false };
+        return { patches: [[at, (bytes[at] & 0x80) | (cell.note - NOTE_OFFSET)]], noteUnchanged: true };
+      },
+      getCellFileOffset: (pattern: number, row: number, channel: number): number => cellOffsetMap[pattern]?.[channel]?.[row] ?? -1,
+    } as UADEPatternLayout,
     stoneTrackerSampleData: copy(bank),
   };
 }
