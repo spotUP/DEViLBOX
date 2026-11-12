@@ -27,7 +27,7 @@ vi.mock('@/lib/songdb', () => ({ computeSongDBHash: () => '', lookupSongDB: asyn
 
 import { openSong, prepareSong } from '@/lib/song/openSong';
 import { needsImportChoice } from '@/lib/song/importChoice';
-import { switchSubsong } from '@/lib/tracker/subsongSwitch';
+import { switchSubsong, subsongStatus, uadeSubsongsFallback } from '@/lib/tracker/subsongSwitch';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { chooseFileSubsong, scanFileSubsongs, type FileSubsongFormat } from '@/lib/import/fileSubsongs';
@@ -64,6 +64,18 @@ describe('the default tune is the first one that sounds', () => {
   });
 });
 
+describe('a UADE song whose parser attached no subsongs still gets the live switch', () => {
+  it('counts from the pre-scan, and leaves songs that have a subsong model alone', () => {
+    const song = { uadeEditableFileName: 'x.sc', initialSpeed: 4 };
+    expect(uadeSubsongsFallback(song, { subsongCount: 3 })).toEqual({ count: 3, speeds: [4, 4, 4] });
+    expect(uadeSubsongsFallback(song, { subsongCount: 1 })).toBeNull();
+    expect(uadeSubsongsFallback({ ...song, uadeEditableSubsongs: { count: 3 } }, { subsongCount: 3 })).toBeNull();
+    expect(uadeSubsongsFallback({ initialSpeed: 6 }, { subsongCount: 3 })).toBeNull();
+    const fmt = { ...useFormatStore.getState(), uadeEditableSubsongs: { count: 3, speeds: [4, 4, 4] }, uadeEditableCurrentSubsong: 0 };
+    expect(subsongStatus(fmt)).toEqual({ source: 'uade', count: 3, current: 0 });
+  });
+});
+
 describe('a tick that ends one pass and starts the next fits the effect columns', () => {
   it('drops the vibrato the same tick sets again, and still refuses what cannot fit', () => {
     const vib = (a: number, b: number): [number, number][] => [[DW_FX.vibratoSpeed, a], [DW_FX.vibratoDepth, b]];
@@ -86,8 +98,16 @@ describe('David Whittaker apb.dw: 8 subsongs', { timeout: 120_000 }, () => {
     expect(await scanFileSubsongs('apb.dw', bytesOf(REL))).toEqual({ count: 8, first: 0 });
     const prepared = await prepareSong({ kind: 'bytes', name: 'apb.dw', bytes: bytesOf(REL) });
     expect(prepared.fileSubsongs).toEqual({ count: 8, first: 0 });
-    expect(needsImportChoice(prepared)).toBe(true);
-    expect(needsImportChoice({ ...prepared, fileSubsongs: undefined })).toBe(false);
+    // Owner rule 2026-11-12: subsongs are never picked at load time; they switch live, so tunes alone raise no dialog.
+    expect(needsImportChoice(prepared)).toBe(false);
+  });
+
+  it('a load that passes no tune opens the default tune and the live switch reports the count', async () => {
+    const bytes = bytesOf(REL);
+    const prepared = await prepareSong({ kind: 'bytes', name: 'apb.dw', bytes });
+    await openAt('apb.dw', bytes); // what the dialog passes now: no subsong
+    expect(useFormatStore.getState().fileSubsongs).toMatchObject({ count: prepared.fileSubsongs!.count, current: prepared.fileSubsongs!.first });
+    expect(subsongStatus(useFormatStore.getState())).toEqual({ source: 'file', count: 8, current: 0 });
   });
 
   it('opens through openSong on the tune asked for, with the grid of the replayer walk of that tune', async () => {

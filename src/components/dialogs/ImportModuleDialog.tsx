@@ -7,7 +7,6 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { X, Music, FileAudio, AlertCircle, Folder } from 'lucide-react';
 import { countCinterModInstruments } from '@engine/cinter4/cinter4Recognize';
 import { Button } from '@components/ui/Button';
-import { CustomSelect } from '@components/common/CustomSelect';
 import {
   getSupportedExtensions,
   isSupportedModule,
@@ -73,11 +72,6 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
   const [uadeInitPhase, setUadeInitPhase] = useState('');
   const [error, setError]               = useState<string | null>(null);
   const [uadeMetadata, setUadeMetadata] = useState<UADEMetadata | null>(null);
-  const [selectedSubsong, setSelectedSubsong] = useState(0);
-  // Tunes a command-stream file holds (lib/import/fileSubsongs) and the first that sounds.
-  const [fileSubsongs, setFileSubsongs] = useState<{ count: number; first: number } | null>(null);
-  const pickerCount = uadeMetadata?.subsongCount ?? fileSubsongs?.count ?? 0;
-  const defaultSubsong = fileSubsongs?.first ?? 0;
   const [songDBInfo, setSongDBInfo] = useState<SongDBResult | null>(null);
   const [sidHeader, setSidHeader] = useState<SIDHeaderInfo | null>(null);
   // Track the companions used for the currently loaded file
@@ -122,12 +116,7 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
       return;
     }
     if (prepared.uadeMetadata) setUadeMetadata(prepared.uadeMetadata);
-    setFileSubsongs(prepared.fileSubsongs ?? null);
-    if (prepared.fileSubsongs) setSelectedSubsong(prepared.fileSubsongs.first);
-    if (prepared.sidInfo) {
-      setSidHeader(prepared.sidInfo);
-      setSelectedSubsong(prepared.sidInfo.defaultSubsong);
-    }
+    if (prepared.sidInfo) setSidHeader(prepared.sidInfo);
     setModuleInfo(prepared.info);
   }, []);
 
@@ -152,8 +141,6 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     setUadeMetadata(null);
     setSongDBInfo(null);
     setSidHeader(null);
-    setFileSubsongs(null);
-    setSelectedSubsong(0);
     setLoadedFileName(fname);
 
     // Yield to React so the loading state renders before async work starts
@@ -216,12 +203,12 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     // Block the dialog until import completes so UADE engine is fully ready
     setIsImporting(true);
     try {
-      await onImport(moduleInfo, { useLibopenmpt: true, subsong: selectedSubsong, uadeMetadata: uadeMetadata ?? undefined, companionFiles: companionMap });
+      await onImport(moduleInfo, { useLibopenmpt: true, uadeMetadata: uadeMetadata ?? undefined, companionFiles: companionMap });
     } finally {
       setIsImporting(false);
     }
     onClose();
-  }, [moduleInfo, onImport, onClose, selectedSubsong, activeCompanions, uadeMetadata]);
+  }, [moduleInfo, onImport, onClose, activeCompanions, uadeMetadata]);
 
   // Keep ref in sync so the Enter key handler always calls the latest version
   useEffect(() => { handleImportRef.current = handleImport; }, [handleImport]);
@@ -258,8 +245,6 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
     setError(null);
     setUadeMetadata(null);
     setSidHeader(null);
-    setFileSubsongs(null);
-    setSelectedSubsong(0);
     setActiveCompanions([]);
     onClose();
   }, [onClose]);
@@ -572,8 +557,6 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                 <SIDInfoPanel
                   header={sidHeader}
                   songDBInfo={songDBInfo}
-                  selectedSubsong={selectedSubsong}
-                  onSubsongChange={setSelectedSubsong}
                 />
               )}
 
@@ -603,40 +586,6 @@ export const ImportModuleDialog: React.FC<ImportModuleDialogProps> = ({
                       <span>Group:</span>
                       <span className="text-text-primary truncate ml-2">{songDBInfo.publishers.join(', ')}</span>
                     </div>
-                  )}
-                </div>
-              )}
-
-              {/* Subsong picker — shown when the UADE pre-scan or a command-stream parser found several subsongs */}
-              {pickerCount > 1 && (
-                <div className="flex items-center gap-3">
-                  <label className="text-xs text-text-muted whitespace-nowrap">Import subsong:</label>
-                  {pickerCount > 20 ? (
-                    // Number input for formats with many subsongs (avoids rendering hundreds of options)
-                    <div className="flex items-center gap-2 flex-1">
-                      <input
-                        type="number"
-                        min={1}
-                        max={pickerCount}
-                        value={selectedSubsong + 1}
-                        onChange={(e) => {
-                          const v = Math.max(1, Math.min(pickerCount, Number(e.target.value)));
-                          setSelectedSubsong(v - 1);
-                        }}
-                        className="w-20 text-xs bg-dark-bgSecondary border border-dark-border rounded px-2 py-1.5 text-text-primary"
-                      />
-                      <span className="text-xs text-text-muted">of {pickerCount}</span>
-                    </div>
-                  ) : (
-                    <CustomSelect
-                      value={String(selectedSubsong)}
-                      onChange={(v) => setSelectedSubsong(Number(v))}
-                      options={Array.from({ length: pickerCount }, (_, i) => ({
-                        value: String(i),
-                        label: `Subsong ${i + 1}${i === defaultSubsong ? ' (default)' : ''}`,
-                      }))}
-                      className="flex-1 text-xs bg-dark-bgSecondary border border-dark-border rounded px-2 py-1.5 text-text-primary"
-                    />
                   )}
                 </div>
               )}

@@ -4,12 +4,11 @@
  * Reads the file with the same Furnace WASM loader the import uses, so the
  * preview accepts exactly what the import accepts — DefleMask files included —
  * and names each chip the way Furnace does. Displays chip system, author,
- * subsong list, and lets the user choose which subsong to import.
+ * subsong list; the import opens the first subsong and the SUBSONG box switches live.
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { X, Cpu, FileAudio, AlertCircle } from 'lucide-react';
-import { CustomSelect } from '@components/common/CustomSelect';
 import { Button } from '@components/ui/Button';
 import type { ModuleInfo } from '@lib/import/ModuleLoader';
 import type { ImportOptions } from './ImportModuleDialog';
@@ -41,7 +40,6 @@ export const ImportFurnaceDialog: React.FC<ImportFurnaceDialogProps> = ({
   const [moduleFile, setModuleFile]   = useState<File | null>(null);
   const [isLoading, setIsLoading]     = useState(false);
   const [error, setError]             = useState<string | null>(null);
-  const [selectedSubsong, setSelectedSubsong] = useState(0);
   const [format, setFormat]           = useState('Furnace');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -56,7 +54,6 @@ export const ImportFurnaceDialog: React.FC<ImportFurnaceDialogProps> = ({
     setModule(null);
     setModuleBuffer(null);
     setModuleFile(null);
-    setSelectedSubsong(0);
 
     try {
       const buf = await file.arrayBuffer();
@@ -100,8 +97,8 @@ export const ImportFurnaceDialog: React.FC<ImportFurnaceDialogProps> = ({
         title: module.name || moduleFile.name.replace(/\.[^/.]+$/, ''),
         type: 'Furnace',
         channels: module.numChannels,
-        patterns: module.nativeData.subsongs[selectedSubsong]?.ordersLen ?? 0,
-        orders: module.nativeData.subsongs[selectedSubsong]?.ordersLen ?? 0,
+        patterns: module.nativeData.subsongs[0]?.ordersLen ?? 0,
+        orders: module.nativeData.subsongs[0]?.ordersLen ?? 0,
         instruments: module.instrumentBinaries.length,
         samples: module.samples.length,
         duration: 0,
@@ -109,23 +106,22 @@ export const ImportFurnaceDialog: React.FC<ImportFurnaceDialogProps> = ({
       arrayBuffer: moduleBuffer,
       file: moduleFile,
     };
-    onImport(info, { useLibopenmpt: false, subsong: selectedSubsong });
+    onImport(info, { useLibopenmpt: false });
     onClose();
-  }, [module, moduleBuffer, moduleFile, selectedSubsong, onImport, onClose]);
+  }, [module, moduleBuffer, moduleFile, onImport, onClose]);
 
   const handleClose = useCallback(() => {
     setModule(null);
     setModuleBuffer(null);
     setModuleFile(null);
     setError(null);
-    setSelectedSubsong(0);
     onClose();
   }, [onClose]);
 
   if (!isOpen) return null;
 
   const subsongs = module?.nativeData.subsongs ?? [];
-  const subsong = subsongs[selectedSubsong] ?? subsongs[0];
+  const subsong = subsongs[0];
   const bpm = subsong
     ? Math.round(2.5 * (subsong.hz || 60) * ((subsong.virtualTempoN || 150) / (subsong.virtualTempoD || 150)))
     : 0;
@@ -256,22 +252,6 @@ export const ImportFurnaceDialog: React.FC<ImportFurnaceDialogProps> = ({
                   )}
                 </div>
               </div>
-
-              {/* Subsong picker */}
-              {subsongs.length > 1 && (
-                <div className="bg-dark-bg rounded-lg p-3 space-y-2">
-                  <p className="text-xs font-medium text-text-primary">Import Subsong</p>
-                  <CustomSelect
-                    value={String(selectedSubsong)}
-                    onChange={(v) => setSelectedSubsong(Number(v))}
-                    options={subsongs.map((ss, i) => ({
-                      value: String(i),
-                      label: `${i + 1}. ${ss.name || `Subsong ${i + 1}`}${i === 0 ? ' (default)' : ''}`,
-                    }))}
-                    className="w-full text-sm bg-dark-bgSecondary border border-dark-border rounded px-3 py-2 text-text-primary cursor-pointer"
-                  />
-                </div>
-              )}
 
               {/* Info note */}
               <p className="text-xs text-text-muted">
