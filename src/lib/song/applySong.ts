@@ -39,7 +39,7 @@ import { migrateDubLaneEvents } from './migrateDubLaneEvents';
 import { upgradeFurnaceEffectNotation } from '@/lib/import/furnaceEditorCells';
 import { typingOctaveFor } from '@/lib/amiga/periodNotes';
 import { liveSongFormat } from './liveSong';
-import { baselineOf, setGridBaseline, type GridBaseline } from './gridBaseline';
+import { baselineOf, extraBaselineOf, setGridBaseline, type GridBaseline } from './gridBaseline';
 
 type FormatState = ReturnType<typeof useFormatStore.getState>;
 
@@ -78,6 +78,8 @@ export interface SongToApply {
    * grid. null: unknown (saved before baselines existed).
    */
   gridBaseline?: GridBaseline | null;
+  /** Hashes of the further note columns beside gridBaseline; null/omitted with a gridBaseline: unknown (older save). */
+  gridBaselineExtra?: GridBaseline | null;
 }
 
 /** A saved project's state beyond the song (see savedSong.ts). */
@@ -189,7 +191,8 @@ export async function applySong(song: SongToApply, source: SongSource): Promise<
   // sees the previous song's - or no - instruments.
   await new Promise<void>((resolve) => queueMicrotask(resolve));
   tracker.loadPatterns(song.patterns);
-  setGridBaseline(song.gridBaseline === undefined ? baselineOf(song.patterns) : song.gridBaseline);
+  if (song.gridBaseline === undefined) setGridBaseline(baselineOf(song.patterns), extraBaselineOf(song.patterns));
+  else setGridBaseline(song.gridBaseline, song.gridBaselineExtra ?? null);
   tracker.setCurrentPattern(0);
   if (song.order.length > 0) tracker.setPatternOrder(song.order);
 

@@ -163,6 +163,8 @@ interface SavedProject {
   performanceJournal?: import('@/lib/dub/performanceJournal').PerformanceJournal;
   /** The grid as loaded, hashed per cell (restore tells edits from decoder output). Additive: older saves lack it. */
   gridBaseline?: import('@/lib/song/gridBaseline').GridBaseline;
+  /** Further note columns' hashes beside gridBaseline; absent in saves from before. */
+  gridBaselineExtra?: import('@/lib/song/gridBaseline').GridBaseline;
 }
 
 // ============================================================================
@@ -502,10 +504,10 @@ export async function applySavedProject(project: SavedProject, opts?: { fromReco
     silent: opts?.silent,
     atBoot: opts?.atBoot,
     song: async () => {
-      const restored = await restoreFromStoredBytes(savedSongToApply(project), project.gridBaseline);
+      const restored = await restoreFromStoredBytes(savedSongToApply(project), project.gridBaseline, undefined, project.gridBaselineExtra);
       console.log(`[restore] ${restored.redecoded ? 're-decoded from the stored module bytes' : `kept as saved (${restored.reason})`}`);
       redecoded = restored.redecoded;
-      return { ...restored.song, gridBaseline: restored.baseline };
+      return { ...restored.song, gridBaseline: restored.baseline, gridBaselineExtra: restored.baselineExtra };
     },
   });
   // The engine plays the stored (original) bytes: its first start sends the edited cells again.
