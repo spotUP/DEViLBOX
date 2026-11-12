@@ -270,7 +270,7 @@ function pushEditAction(
     ? hippelLinkedEdits(spans, patternIndex, before, after, useTrackerStore.getState().patterns)
     : aonModule ? aonLinkedEdits(new Uint8Array(aonModule), patternIndex, before, after, useTrackerStore.getState().patterns)
     // A layout whose stored pattern plays at several song positions (Composer 669): grid cells with one file offset are one cell.
-    : fmt.uadePatternLayout && !UNLINKED_EDITS.has(type) ? sharedCellEdits(fmt.uadePatternLayout, patternIndex, before, after, useTrackerStore.getState().patterns) : [];
+    : (fmt.uadePatternLayout ?? fmt.uadeVariableLayout) && !UNLINKED_EDITS.has(type) ? sharedCellEdits((fmt.uadePatternLayout ?? fmt.uadeVariableLayout)!, patternIndex, before, after, useTrackerStore.getState().patterns) : [];
   if (linked.length === 0) { history.pushAction(type, description, patternIndex, before, after); return; }
   const others = [...new Set(linked.map((e) => e.pattern))];
   const befores = new Map(others.map((p) => [p, structuredClone(useTrackerStore.getState().patterns[p])]));

@@ -253,6 +253,12 @@ export interface UADEVariablePatternLayout {
   noteBytes?: Array<{ pattern: number; channel: number; row: number; offset: number; note: number; base?: number; col?: number; porta?: boolean; cut?: boolean }>;
 
   /**
+   * With noteBytes: two note cells with the same file offset and base are one stored note (a track played several times), so a
+   * note edit of one is carried to the others in the same undo step (sharedCellEdits.ts). Only the note of each column is stored.
+   */
+  propagateSharedCells?: boolean;
+
+  /**
    * Original byte sizes of each file-level pattern's encoded data.
    * filePatternSizes[filePatIdx] = byte count.
    * Re-encoded data must fit within this limit (overflow = reject edit).
