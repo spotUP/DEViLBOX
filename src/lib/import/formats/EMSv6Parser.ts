@@ -259,6 +259,7 @@ export function parseEMSv6File(buffer: ArrayBuffer, filename: string): TrackerSo
     trackMap: trackerPatterns.map(() => reads.map(() => -1)),
     blockRows,
     noteBytes,
+    propagateSharedCells: true,
   };
 
   return {
