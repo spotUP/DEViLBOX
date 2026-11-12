@@ -119,8 +119,12 @@ describe('volume maximum of one chip channel', () => {
     expect([2, 3].map(ch => maxVolumeOfChipChannel('FurnaceOPN2203', ch))).toEqual([127, 15]);
   });
 
-  it('a chip whose upstream maximum was not read, or no chip, falls back to the platform value', () => {
-    expect(maxVolumeOfChipChannel('FurnaceY8950', 0)).toBeUndefined();
+  it('Y8950 and OPL4 (opl.cpp): FM 63, Y8950 ADPCM 255, OPL4 PCM 127', () => {
+    expect([0, 9].map(ch => maxVolumeOfChipChannel('FurnaceY8950', ch))).toEqual([63, 255]);
+    expect([0, 18].map(ch => maxVolumeOfChipChannel('FurnaceOPL4', ch))).toEqual([63, 127]);
+  });
+
+  it('a chip without per-kind maxima, or no chip, falls back to the platform value', () => {
     expect(maxVolumeOfChipChannel('FurnaceGB', 0)).toBeUndefined();
     expect(maxVolumeOfChipChannel(undefined, 0)).toBeUndefined();
   });

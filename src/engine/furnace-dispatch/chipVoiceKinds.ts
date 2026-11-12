@@ -113,13 +113,31 @@ export function voiceKindOfInstrument(inst: Pick<InstrumentConfig, 'synthType' |
 }
 
 /**
- * Volume maximum of each voice kind on the OPN chips, from upstream GET_VOLMAX
- * (ym2610.cpp, ym2610b.cpp, ym2608.cpp, ym2203.cpp): FM 127, SSG 15,
- * ADPCM-A 31, ADPCM-B 255. Only chips whose GET_VOLMAX was read are listed;
- * Y8950 and OPL4 are not.
+ * Volume maximum of each voice kind, per chip, from upstream GET_VOLMAX
+ * (third-party/furnace-master/src/engine/platform/):
+ *  - ym2610.cpp, ym2610b.cpp, ym2608.cpp, ym2203.cpp: FM 127, SSG 15, ADPCM-A 31, ADPCM-B 255.
+ *  - opl.cpp:2578-2583: OPL4 PCM 127, Y8950 ADPCM 255, every other channel 63
+ *    (127 only on the YMU759 build, which the app does not map to these synths).
+ * Chips not listed here use the platform-wide value or the per-channel rules below.
  */
-const OPN_KIND_VOLUME_MAX: Partial<Record<ChipVoiceKindId, number>> = { fm: 127, ssg: 15, adpcma: 31, adpcmb: 255 };
-const VOLUME_MAX_CHIPS: ReadonlySet<string> = new Set(['FurnaceOPNB', 'FurnaceOPNBB', 'FurnaceOPNA', 'FurnaceOPN2203']);
+const KIND_VOLUME_MAX: Readonly<Record<string, Partial<Record<ChipVoiceKindId, number>>>> = {
+  FurnaceOPNB: { fm: 127, ssg: 15, adpcma: 31, adpcmb: 255 },
+  FurnaceOPNBB: { fm: 127, ssg: 15, adpcma: 31, adpcmb: 255 },
+  FurnaceOPNA: { fm: 127, ssg: 15, adpcma: 31, adpcmb: 255 },
+  FurnaceOPN2203: { fm: 127, ssg: 15 },
+  FurnaceY8950: { fm: 63, adpcmb: 255 },
+  FurnaceOPL4: { fm: 63, pcm: 127 },
+};
+
+/**
+ * Chips whose volume maximum depends on the channel number, not on a voice
+ * kind (upstream GET_VOLMAX): vrc6.cpp:446-448 the saw (channel 2) 63, the
+ * pulses 15; vera.cpp:450-455 channels below 16 (PSG) 63, the PCM channel 15.
+ */
+const CHANNEL_VOLUME_MAX: Readonly<Record<string, (chipChannel: number) => number>> = {
+  FurnaceVRC6: (ch) => (ch === 2 ? 63 : 15),
+  FurnaceVERA: (ch) => (ch < 16 ? 63 : 15),
+};
 
 /**
  * The volume maximum of one chip channel of a mixed-kind chip, or undefined
@@ -128,10 +146,14 @@ const VOLUME_MAX_CHIPS: ReadonlySet<string> = new Set(['FurnaceOPNB', 'FurnaceOP
  * channel overflows the 4-bit register and plays at a fraction of the level.
  */
 export function maxVolumeOfChipChannel(synthType: string | undefined, chipChannel: number): number | undefined {
-  if (!synthType || !VOLUME_MAX_CHIPS.has(synthType)) return undefined;
+  if (!synthType) return undefined;
+  const byChannel = CHANNEL_VOLUME_MAX[synthType];
+  if (byChannel) return byChannel(chipChannel);
+  const kindMax = KIND_VOLUME_MAX[synthType];
+  if (!kindMax) return undefined;
   const spec = chipSpecOf(synthType);
   const kind = spec && kindOfChipChannel(spec, chipChannel);
-  return kind ? OPN_KIND_VOLUME_MAX[kind.id] : undefined;
+  return kind ? kindMax[kind.id] : undefined;
 }
 
 /** Live voices (preview and audition channels, 100 and up) are not pattern cells. */

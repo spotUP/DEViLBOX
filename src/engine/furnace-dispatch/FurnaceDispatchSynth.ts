@@ -128,7 +128,7 @@ const PLATFORM_CHANNELS: Record<number, string[]> = {
 // Some platforms have per-channel volMax (e.g. YM2608 FM=127, PSG=15, ADPCM-A=31, ADPCM-B=255).
 // This table holds their FM value; maxVolumeOfChannel() below gives the value of one channel
 // and is what live notes and cell volumes use.
-const PLATFORM_VOL_MAX: Record<number, number> = {
+export const PLATFORM_VOL_MAX: Record<number, number> = {
   // PSG / simple chips (4-bit volume = 15)
   [FurnaceDispatchPlatform.GB]: 15,
   [FurnaceDispatchPlatform.SMS]: 15,
@@ -144,7 +144,7 @@ const PLATFORM_VOL_MAX: Record<number, number> = {
   [FurnaceDispatchPlatform.POKEY]: 15,
   [FurnaceDispatchPlatform.MMC5]: 15,
   [FurnaceDispatchPlatform.SWAN]: 15,
-  [FurnaceDispatchPlatform.VRC6]: 15,        // pulse=15, saw=63 (per-channel)
+  [FurnaceDispatchPlatform.VRC6]: 15,        // pulse=15; saw (chan 2)=63 via maxVolumeOfChipChannel
   [FurnaceDispatchPlatform.VBOY]: 15,
   [FurnaceDispatchPlatform.N163]: 15,
   [FurnaceDispatchPlatform.OPLL]: 15,
@@ -165,7 +165,18 @@ const PLATFORM_VOL_MAX: Record<number, number> = {
   // 6-bit volume = 63
   [FurnaceDispatchPlatform.ESFM]: 63,
   [FurnaceDispatchPlatform.DAVE]: 63,
-  [FurnaceDispatchPlatform.VERA]: 63,
+  [FurnaceDispatchPlatform.VERA]: 63,         // PSG=63; PCM (chan 16)=15 via maxVolumeOfChipChannel
+  // OPL family (opl.cpp:2578-2583): 63 for FM; Y8950 ADPCM 255 and OPL4 PCM 127 via maxVolumeOfChipChannel
+  [FurnaceDispatchPlatform.OPL]: 63,
+  [FurnaceDispatchPlatform.OPL2]: 63,
+  [FurnaceDispatchPlatform.OPL3]: 63,
+  [FurnaceDispatchPlatform.OPL_DRUMS]: 63,
+  [FurnaceDispatchPlatform.OPL2_DRUMS]: 63,
+  [FurnaceDispatchPlatform.OPL3_DRUMS]: 63,
+  [FurnaceDispatchPlatform.OPL4]: 63,
+  [FurnaceDispatchPlatform.OPL4_DRUMS]: 63,
+  [FurnaceDispatchPlatform.Y8950]: 63,
+  [FurnaceDispatchPlatform.Y8950_DRUMS]: 63,
   // Special small volumes
   [FurnaceDispatchPlatform.FDS]: 32,
   [FurnaceDispatchPlatform.TED]: 8,
@@ -223,7 +234,7 @@ const PLATFORM_VOL_MAX: Record<number, number> = {
   [FurnaceDispatchPlatform.AMIGA]: 64,
 };
 
-function getMaxVolume(platform: number): number {
+export function getMaxVolume(platform: number): number {
   return PLATFORM_VOL_MAX[platform] ?? 127;
 }
 
