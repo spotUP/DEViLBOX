@@ -1,61 +1,52 @@
 /**
- * Regression: Paul Robotham (.dat) exposed a STUB pattern layout — a 64-row empty
- * grid decoded with the generic MOD codec over raw bytes at file offset 0 (module
- * header), so pattern write-back matched only ~8% of cells and never touched the song.
- *
- * A Paul Robotham module stores its song as header + voice/sequence/pattern pointer
- * tables + instrument records, then the pattern data: each pattern pointer addresses a
- * fixed-length per-voice note/command stream (note indices 0x1c-0x3e, 0x3f = rest, plus
- * high command bytes 0x80+). The stream is not a clean note/effect cell, so the faithful
- * byte-exact inverse is a per-byte carrier: decodeCell exposes a best-effort display note
- * and stashes the exact source byte in the invisible `period` carrier, and
- * encodePaulRobothamCell reproduces it verbatim.
- *
- * On revert (stub layout at offset 0 / no carrier) the encoder rewrites the stream bytes,
- * so the command/high bytes no longer round-trip and this fails.
- *
- * Fixture: public/data/songs/formats/dawnpatrol-sad.dat (real module).
+ * Paul Robotham (.dat): the grid is read from the four voice command streams (paulRobothamGrid.ts).
+ * Unedited export is byte-identical to the module; one edited note moves exactly that note's byte.
+ * Fixture: public/data/songs/paul-robotham/dawnpatrol-sad.dat (real module).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parsePaulRobothamFile } from '../PaulRobothamParser';
-import { getCellFileOffset } from '@/engine/uade/UADEPatternEncoder';
+import { exportPaulRobotham } from '@/lib/export/PaulRobothamExporter';
+import { encodeVariableBlock } from '@/engine/uade/UADEPatternEncoder';
+import { PR_NOTE_BASE } from '../paulRobothamGrid';
 
-const FIXTURE = join(process.cwd(), 'public/data/songs/formats/dawnpatrol-sad.dat');
+const FIXTURE = join(process.cwd(), 'public/data/songs/paul-robotham/dawnpatrol-sad.dat');
 
-describe('Paul Robotham pattern codec', () => {
-  it('encodeCell is a byte-exact inverse of decodeCell over every pattern-stream byte', () => {
-    const b = readFileSync(FIXTURE);
-    const ab = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
-    const raw = new Uint8Array(ab);
-    const song = parsePaulRobothamFile(ab, 'dawnpatrol-sad.dat');
-    const layout = song.uadePatternLayout;
-    expect(layout, 'layout present').toBeTruthy();
-    if (!layout || !layout.decodeCell || !layout.encodeCell) {
-      throw new Error('layout incomplete');
-    }
-    expect(layout.formatId).toBe('paulRobotham');
-    // Must point at the real pattern data, not the stub offset 0.
-    expect(layout.patternDataFileOffset).toBeGreaterThan(0);
-    expect(layout.bytesPerCell).toBe(1);
+function load() {
+  const b = readFileSync(FIXTURE);
+  const ab = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+  return { raw: new Uint8Array(ab), song: parsePaulRobothamFile(ab, 'dawnpatrol-sad.dat') };
+}
 
-    let checked = 0;
-    let sawCommand = false; // a high command byte the note-only view can't reconstruct
-    for (let p = 0; p < layout.numPatterns; p++) {
-      for (let r = 0; r < layout.rowsPerPattern; r++) {
-        for (let c = 0; c < layout.numChannels; c++) {
-          const off = getCellFileOffset(layout, p, r, c);
-          if (off <= 0 || off + layout.bytesPerCell > raw.length) continue;
-          const orig = raw.subarray(off, off + layout.bytesPerCell);
-          if (orig[0] > 0x3f) sawCommand = true;
-          const re = layout.encodeCell(layout.decodeCell(orig));
-          expect([...re], `cell p${p} r${r} c${c} @${off}`).toEqual([...orig]);
-          checked++;
-        }
-      }
-    }
-    expect(checked).toBeGreaterThan(0);
-    expect(sawCommand, 'fixture exercises high command bytes').toBe(true);
+describe('Paul Robotham command-stream grid', () => {
+  it('re-encodes every voice stream byte-exact and exports the module unchanged', async () => {
+    const { raw, song } = load();
+    const l = song.uadeVariableLayout!;
+    expect(l.formatId).toBe('paulRobotham');
+    expect(l.filePatternAddrs).toEqual([0x554, 0x5a1, 0x676, 0x73b]);
+    l.filePatternAddrs.forEach((addr, fp) => {
+      const re = encodeVariableBlock(l, fp, l.blockRows![fp], fp);
+      expect(Array.from(re)).toEqual(Array.from(raw.subarray(addr, addr + l.filePatternSizes[fp])));
+    });
+    expect(l.filePatternSizes.reduce((a, b) => a + b, 0)).toBe(raw.length - 0x554);
+    const out = await exportPaulRobotham(song);
+    expect(out.warnings).toEqual([]);
+    expect(Array.from(out.data)).toEqual(Array.from(raw));
+  });
+
+  it('one changed note changes only that note byte', async () => {
+    const { raw, song } = load();
+    const n = song.uadeVariableLayout!.noteBytes!.find(x => raw[x.offset] > 1 && raw[x.offset] < 58)!;
+    expect(n).toBeTruthy();
+    const cell = song.patterns[n.pattern].channels[n.channel].rows[n.row];
+    expect(cell.note).toBe(n.note);
+    cell.note = n.note + 2;
+    const out = await exportPaulRobotham(song);
+    expect(out.warnings).toEqual([]);
+    const diff: number[] = [];
+    out.data.forEach((v, i) => { if (v !== raw[i]) diff.push(i); });
+    expect(diff).toEqual([n.offset]);
+    expect(out.data[n.offset]).toBe(n.note + 2 - PR_NOTE_BASE);
   });
 });

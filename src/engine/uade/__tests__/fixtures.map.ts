@@ -36,7 +36,7 @@ export interface EncoderFixture {
 export const ENCODER_FIXTURES: EncoderFixture[] = [
   // activisionPro left the harness: since 8c7aedfa0 its grid is the replayer's event stream and
   // cell edits are written into the event bytes by the module model, not by a UADE cell layout.
-  { formatId: "aon", fixture: "public/data/songs/art-of-noise/inside.blipp.aon", kind: "fixed" },
+  { formatId: "artOfNoise", fixture: "public/data/songs/art-of-noise/inside.blipp.aon", kind: "fixed" },
   { formatId: "ams", fixture: "public/data/songs/velvet-studio/kernel.ams", kind: "variable" },
   { formatId: "ashleyHogg", fixture: "public/data/songs/ashley-hogg/ash.nobby the aardvark", kind: "fixed" },
   { formatId: "deltaMusic2", fixture: "public/data/songs/delta-music-2/asperity megademo 3.dm2", kind: "fixed" },
@@ -91,7 +91,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "mtm", fixture: "public/data/songs/formats/anonymous in 4ce.mtm", kind: "fixed" },
   { formatId: "musicLine", fixture: "public/data/songs/formats/harmonic disorder.ml", kind: "variable" },
   { formatId: "nru", fixture: "public/data/songs/formats/howiedavies.nru", kind: "fixed" },
-  { formatId: "paulRobotham", fixture: "public/data/songs/formats/dawnpatrol-sad.dat", kind: "fixed" },
+  { formatId: "paulRobotham", fixture: "public/data/songs/formats/dawnpatrol-sad.dat", kind: "variable" },
   { formatId: "paulShields", fixture: "public/data/songs/formats/jug-hiscore.ps", kind: "fixed" },
   { formatId: "plm", fixture: "public/data/songs/disorder-tracker-2/hyper geckoo.plm", kind: "fixed" },
   { formatId: "ptm", fixture: "public/data/songs/formats/rew_vibr.ptm", kind: "variable" },
