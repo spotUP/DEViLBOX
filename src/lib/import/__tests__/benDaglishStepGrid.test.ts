@@ -15,6 +15,8 @@ import { mainStepFromOnsets } from '../formats/stepRowClock';
 import { parseBenDaglishFile } from '../formats/BenDaglishParser';
 import { walkBenDaglish } from '../formats/BenDaglishWasmExtractor';
 import { applyBdGridEdits } from '../formats/benDaglishEdits';
+import { exportBenDaglish } from '@/lib/export/BenDaglishExporter';
+import { baselineOf, setGridBaseline } from '@/lib/song/gridBaseline';
 import { installWasmNodeFetch } from './helpers/dwNodeFetch';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
@@ -48,6 +50,21 @@ describe('Ben Daglish edits (the wiring is proved in stepGridReachability.test.t
     const res = applyBdGridEdits(new Uint8Array(ab), walk, song.uadeVariableLayout!.filePatternAddrs!, edited);
     expect(res.warnings).toEqual([]);
     expect(res.patched, 'one byte changed').toBe(1);
+  });
+
+  it('motorhead: exportBenDaglish writes an edit made only in note column 2 (the baseline hash does not see extraNotes)', async () => {
+    const ab = bytesOf('ben-daglish/motorhead-titleandingame.bd');
+    const song = await parseBenDaglishFile(ab.slice(0), 'motorhead-titleandingame.bd') as unknown as TrackerSong;
+    setGridBaseline(baselineOf(song.patterns));
+    try {
+      const same = await exportBenDaglish(song);
+      expect(same.data, 'unedited export is the source').toEqual(new Uint8Array(ab));
+      let done = false;
+      for (const p of song.patterns) for (const c of p.channels) for (const r of c.rows) { const x = r.extraNotes?.[0]; if (!done && x?.note && x.note < 90) { x.note += 1; done = true; } }
+      expect(done).toBe(true);
+      const res = await exportBenDaglish(song);
+      expect(res.data.some((b, i) => b !== new Uint8Array(ab)[i]), 'the column 2 edit reaches the file').toBe(true);
+    } finally { setGridBaseline(null); }
   });
 
   it('motorhead: a delay2 edit on a clash row moves that note onset in the module, nothing else', async () => {
