@@ -90,6 +90,7 @@ Not every format is editable. `src/lib/formats/EditableFormatRegistry.builtins.t
 - Channels: FM 0-3, SSG 4-6, ADPCM-A 7-12, ADPCM-B 13.
 - An instrument's voice kind must match the channel kind. A wrong-kind note is refused (one toast, cell stays empty). The same refusal covers swap, remap, apply-instrument, channel swap, randomize and channel drag.
 - Volume: Cxx (effTyp 12), 00 to 40. Arpeggio 0xy, slides and vibrato 1xx to 4xx, chip commands from 10.
+- The chip has no filter, echo or reverb. Measured replacements (they reach the chip in a user-made song): arpeggio 0xy for a chord on one SSG channel; LFO 10xy (effTyp 16); feedback 11xx (effTyp 17); operator 1 level 12xx (effTyp 18) written per row as a filter sweep; echo as a second, quieter instrument copy one row late on a free FM channel. Slides 1xx/2xx, portamento 3xx, vibrato 4xy, tremolo 7xy and volume slide Axy step per tick in tests (commit `4f21b355a`), not heard yet.
 - SSG instrument config: `{ furnace: { divInsType: 6, chipType: 14, macros: [...] } }`. Macro shape `{ code, type: 0, data, loop: -1, release: -1, mode: 0 }`; codes: volume 0, arpeggio 1, noise 2, wave 3. Drums on SSG are short volume macros plus a noise macro.
 - No tool loads ADPCM samples yet.
 
