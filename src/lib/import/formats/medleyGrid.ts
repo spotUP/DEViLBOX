@@ -25,8 +25,9 @@ import type { Pattern, TrackerCell } from '@/types';
 import { cellFieldsEqual } from '@/engine/uade/UADEPatternEncoder';
 
 export const MEDLEY_ROWS_PER_PATTERN = 64;
-const MAX_FRAMES = 60000;
-const MAX_STEPS = 200000;
+// A runaway guard only: combat.mso subsong 7 (Combat) really runs 123264 ticks (16 passes of its loop), so the cap must stay above any real song.
+const MAX_FRAMES = 400000;
+const MAX_STEPS = 4000000;
 const STACK_DEPTH = 8;
 const CMD_END = 0, CMD_INSTRUMENT = 3, CMD_RANDOM = 4, CMD_CALL = 5, CMD_LOOP_START = 6, CMD_LOOP_END = 7, CMD_TRANSPOSE = 8;
 
@@ -50,6 +51,24 @@ export function medleyEntry(buf: Uint8Array, base: number, index: number): numbe
   const rel = u32(buf, base + index * 4);
   const target = rel === 0 ? 0 : base + index * 4 + rel;
   return target > 0 && target < buf.length ? target : 0;
+}
+
+/**
+ * Every filled entry of the instrument table: `number` is the table index the stream's Instrument command and the song
+ * record's instrument bytes use (index 0 is never filled), `name` the NUL-padded ASCII name in the record's first 16 bytes.
+ */
+export function medleyInstrumentList(buf: Uint8Array): Array<{ number: number; name: string }> {
+  const tables = medleyTables(buf);
+  if (!tables) return [];
+  const out: Array<{ number: number; name: string }> = [];
+  for (let n = 0; n <= buf[tables.instrument - 1]; n++) {
+    const rec = medleyEntry(buf, tables.instrument, n);
+    if (!rec || rec + 0x10 > buf.length) continue;
+    let name = '';
+    for (let i = 0; i < 16 && buf[rec + i] !== 0; i++) name += String.fromCharCode(buf[rec + i]);
+    out.push({ number: n, name });
+  }
+  return out;
 }
 
 /** Stream start and one-past-end (just after the End command) of a track; null for an empty entry. */

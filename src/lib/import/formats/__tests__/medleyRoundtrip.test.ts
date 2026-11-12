@@ -126,3 +126,27 @@ describe('Medley track-stream grid', () => {
     for (const p of served) expect(g2.placements.find(q => q.voice === 3 && q.tick === p.tick)!.instrument).toBe(17);
   });
 });
+
+describe('Medley instruments and song length (combat.mso)', () => {
+  it('lists every instrument of the module table, named from the file, numbered as the stream numbers them', () => {
+    const { song } = load();
+    expect(song.instruments.length).toBe(22);
+    expect(song.instruments.map(i => i.id)).toEqual(Array.from({ length: 22 }, (_, i) => i + 1));
+    expect(song.instruments[0].name).toBe('Pipe Organ');
+    expect(song.instruments[13].name).toBe('Snaredrum');
+    expect(song.instruments[21].name).toBe('ubba');
+    const used = new Set<number>();
+    for (let sub = 1; sub <= 7; sub++) for (const pl of buildMedleyGrid(load().raw, '', sub)!.placements) used.add(pl.instrument);
+    for (const n of used) expect(song.instruments.some(i => i.id === n), `instrument ${n}`).toBe(true);
+    expect(used.size).toBeGreaterThan(1);
+  });
+
+  it('subsong 7 (Combat) is walked to its real end of 123264 ticks, not cut at 60000', () => {
+    const { raw } = load();
+    const g = buildMedleyGrid(raw, '', 7)!;
+    expect(g.ticks).toBe(123264);
+    expect(g.patterns.length * 64).toBeGreaterThanOrEqual(g.ticks);
+    expect(buildMedleyGrid(raw, '', 1)!.ticks).toBe(384);
+  });
+});
+
