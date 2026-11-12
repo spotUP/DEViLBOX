@@ -265,6 +265,46 @@ describe('exportFurnaceModule', () => {
     expect(mod.instruments[0].amiga?.initSample ?? -1).toBe(-1);
   });
 
+  it('gives an ADPCM-A and an ADPCM-B instrument on one sample buffer a module sample each (ngdevkit furtool converts a module sample to one codec only)', async () => {
+    const kick = new Int16Array([0, 1200, -1200, 32767, -32768, 5]);
+    const adpcm = (type: number): FurnaceConfig =>
+      ({ ...ssgConfig, divInsType: type, macros: [], userSample: { name: 'kick', data: kick, rate: 18500 } }) as unknown as FurnaceConfig;
+    const s = song();
+    s.instruments.push(inst(3, 'Kick A', adpcm(37)));
+    s.instruments.push(inst(4, 'Kick B', adpcm(38)));
+    s.instruments.push(inst(5, 'Kick A again', adpcm(37)));
+    set(s.patterns[0], 7, 0, { note: 49, instrument: 3 });
+    set(s.patterns[0], 13, 0, { note: 49, instrument: 4 });
+
+    const r = exportFurnaceModule(s);
+    const mod = await parseFurnaceSong(r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) as ArrayBuffer);
+    expect(mod.samples.length).toBe(2);
+    expect(Array.from(mod.samples[0].data as Int16Array)).toEqual(Array.from(kick));
+    expect(Array.from(mod.samples[1].data as Int16Array)).toEqual(Array.from(kick));
+    expect(mod.instruments.slice(2).map((i) => i.amiga?.initSample)).toEqual([0, 1, 0]);
+  });
+
+  it('writes every pattern the order list names for every channel, an empty one too (ngdevkit nsstool stops on a missing pattern)', () => {
+    const bytes = pako.inflate(exportFurnaceModule(song()).bytes);
+    const keys = new Set<string>();
+    for (let i = 0; i + 14 <= bytes.length; i++) {
+      if (bytes[i] === 0x50 && bytes[i + 1] === 0x41 && bytes[i + 2] === 0x54 && bytes[i + 3] === 0x4e) {
+        // "PATN", u32 size, u8 subsong, u8 channel, u16 pattern index
+        keys.add(`${bytes[i + 9]}_${bytes[i + 10] | (bytes[i + 11] << 8)}`);
+      }
+    }
+    for (let ch = 0; ch < 14; ch++) {
+      expect(keys.has(`${ch}_0`), `channel ${ch} pattern 0`).toBe(true);
+      expect(keys.has(`${ch}_1`), `channel ${ch} pattern 1`).toBe(true);
+    }
+  });
+
+  it('writes the chip flags of the YM2610 with SSG volume 256 (Furnace loads a module without them at 128)', async () => {
+    const r = exportFurnaceModule(song());
+    const mod = await parseFurnaceSong(r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) as ArrayBuffer);
+    expect(mod.chipFlags).toEqual(['ssgVol=256\n']);
+  });
+
   it('offers the export only for Neo Geo instruments', () => {
     expect(furnaceModuleExportAvailable(song().instruments)).toBe(true);
     expect(furnaceModuleExportAvailable([{ id: 1, name: 'x', type: 'synth', synthType: 'Synth' } as unknown as InstrumentConfig])).toBe(false);
