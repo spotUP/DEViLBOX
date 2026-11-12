@@ -1686,7 +1686,7 @@ export async function tryRouteFormat(
     return withNativeThenUADE('medley', ctx,
       (buf: Uint8Array | ArrayBuffer, name: string) => {
         const ab = buf instanceof Uint8Array ? buf.buffer as ArrayBuffer : buf as ArrayBuffer;
-        if (isMedleyFormat(buf)) return parseMedleyFile(ab, name);
+        if (isMedleyFormat(buf)) return parseMedleyFile(ab, name, requestedSubsong);
         return null;
       },
       'MedleyParser', { injectUADE: true });

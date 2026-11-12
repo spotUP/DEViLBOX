@@ -21,7 +21,7 @@ export type UadeLoadArgs = [fileName: string, subsong: number, pinSubsong: boole
 export function uadeEditableLoadArgs(song: UadeLoadSong): UadeLoadArgs {
   const first = song.uadeEditableSubsongs?.first ?? 0;
   const tune = song.fileSubsongs;
-  const subsong = tune ? first + tune.current : first + (song.uadeEditableCurrentSubsong ?? 0);
+  const subsong = tune ? first + (tune.engineFirst ?? 0) + tune.current : first + (song.uadeEditableCurrentSubsong ?? 0);
   return [song.uadeEditableFileName || 'module.mod', subsong, !!song.uadeEditableSubsongs?.orders || !!tune, song.uadeCompanionFiles ?? undefined];
 }
 

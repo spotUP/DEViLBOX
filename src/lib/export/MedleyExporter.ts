@@ -4,7 +4,7 @@
  * export is byte-identical to the source. Edits a stream has no place for come back as warnings.
  */
 import type { TrackerSong } from '@/engine/TrackerReplayer';
-import { applyMedleyGridEdits } from '@/lib/import/formats/medleyGrid';
+import { applyMedleyGridEdits, MEDLEY_FIRST_TUNE } from '@/lib/import/formats/medleyGrid';
 
 export interface MedleyExportResult {
   data: Uint8Array;
@@ -15,7 +15,7 @@ export interface MedleyExportResult {
 export async function exportMedley(song: TrackerSong): Promise<MedleyExportResult> {
   const src = song.uadeEditableFileData;
   if (!src) throw new Error('Medley export needs the module the song was loaded from');
-  const res = applyMedleyGridEdits(new Uint8Array(src), song.patterns);
+  const res = applyMedleyGridEdits(new Uint8Array(src), song.patterns, (song.fileSubsongs?.current ?? 0) + MEDLEY_FIRST_TUNE);
   const name = (song.uadeEditableFileName ?? 'module.mso').split('/').pop() ?? 'module.mso';
   return { data: res.data, filename: name, warnings: res.warnings };
 }
