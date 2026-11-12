@@ -73,6 +73,8 @@ class SawteethProcessor extends AudioWorkletProcessor {
               meta.channels = this.module._sawteeth_get_num_channels();
             }
 
+            this.setupChannelTaps(meta.channels || 0);
+
             this.port.postMessage({ type: 'moduleLoaded', meta });
           } catch (error) {
             this.port.postMessage({ type: 'error', message: error.message });
@@ -373,6 +375,43 @@ class SawteethProcessor extends AudioWorkletProcessor {
     }
   }
 
+  /**
+   * Per-channel scope taps: one float buffer per song channel in WASM memory that
+   * sawteeth_render fills with that channel's samples (44100 Hz, before the
+   * resampler), so the oscilloscopes read engine output and never re-render.
+   */
+  setupChannelTaps(numCh) {
+    const m = this.module;
+    if (!m || typeof m._sawteeth_set_channel_tap !== 'function') return;
+    const malloc = m._malloc || m.malloc;
+    const free = m._free || m.free;
+    for (let c = 0; c < 12; c++) m._sawteeth_set_channel_tap(c, 0);
+    if (this.tapPtrs && free) for (const p of this.tapPtrs) free(p);
+    this.tapPtrs = [];
+    this.tapViews = null;
+    this.tapHeap = null;
+    for (let c = 0; c < numCh; c++) {
+      const ptr = malloc(this.bufferSize * 4);
+      if (!ptr) break;
+      this.tapPtrs.push(ptr);
+      m._sawteeth_set_channel_tap(c, ptr);
+    }
+  }
+
+  /** Stream the channel samples of the last `frames` song frames (see worklets/channel-stream.js). */
+  streamChannelTaps(frames) {
+    if (!this.tapPtrs || this.tapPtrs.length === 0 || !globalThis.DevilboxChannelStream) return;
+    const heap = this.module.HEAPF32 || (this.module.wasmMemory && new Float32Array(this.module.wasmMemory.buffer));
+    if (!heap) return;
+    if (this.tapHeap !== heap.buffer) {
+      this.tapViews = this.tapPtrs.map((ptr) => new Float32Array(heap.buffer, ptr, this.bufferSize));
+      this.tapHeap = heap.buffer;
+    }
+    // The engine renders at 44100 Hz, so the scope data states 44100.
+    this._stream ||= new globalThis.DevilboxChannelStream(this.port, 44100);
+    this._stream.writeFloat32(this.tapViews, frames);
+  }
+
   updateBufferViews() {
     if (!this.module || !this.interleavedPtr) return;
     const heapF32 = this.module.HEAPF32 || (this.module.wasmMemory && new Float32Array(this.module.wasmMemory.buffer));
@@ -457,8 +496,12 @@ class SawteethProcessor extends AudioWorkletProcessor {
         if (!this.songResampler) this.songResampler = { q: new Float32Array(1024), qlen: 0, frac: 0 };
         if (!this.previewResampler) this.previewResampler = { q: new Float32Array(1024), qlen: 0, frac: 0 };
         const songSilent = this.songSilent;
-        this.resampleInto(this.songResampler, outputL, outputR, numSamples, (frames) =>
-          songSilent ? 0 : this.module._sawteeth_render(this.interleavedPtr, frames));
+        this.resampleInto(this.songResampler, outputL, outputR, numSamples, (frames) => {
+          if (songSilent) return 0;
+          const written = this.module._sawteeth_render(this.interleavedPtr, frames);
+          if (written > 0) this.streamChannelTaps(written);
+          return written;
+        });
         // Keyboard preview voices leave on their own output (outputs[1]), so the
         // song output is never doubled by them.
         const preview = outputs[1];

@@ -243,6 +243,7 @@ int  sawteeth_render(float *out, int num_samples);
 void sawteeth_set_sample_rate(int rate);
 int  sawteeth_get_num_channels(void);
 void sawteeth_set_channel_gain(int ch, float gain);
+void sawteeth_set_channel_tap(int ch, float *ptr);
 
 /* Instrument query/edit API */
 int  sawteeth_get_num_instruments(void);
