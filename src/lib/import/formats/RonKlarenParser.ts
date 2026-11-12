@@ -713,11 +713,12 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   }
 
   // ── Decode tracks into note rows ───────────────────────────────────────
-  interface RkRow { noteIdx: number; instrNum: number; hasNote: boolean; }
+  interface RkRow { noteIdx: number; instrNum: number; hasNote: boolean; /** Track-relative position of the SetInstrument argument byte the row's instrument comes from; -1 when none precedes. */ instrAt: number; }
   /** One argument byte of a command that precedes a note: the grid effect id, the track-relative position of the byte and its value. */
   interface RkArg { typ: number; at: number; val: number; }
 
   function decodeTrackToRows(data: Uint8Array, numRows: number, transpose: number): { rows: RkRow[]; notePositions: number[]; args: RkArg[][] } {
+    let currentInstrAt = -1;
     const rows: RkRow[] = [];
     const args: RkArg[][] = [];
     let pending: RkArg[] = []; // commands read since the last note row; they show on the next one
@@ -727,7 +728,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     let pendingRows = 0;
 
     function emitRow(noteIdx: number, instrId: number, dataPos: number, hasNote: boolean): void {
-      rows.push({ noteIdx, instrNum: instrId, hasNote });
+      rows.push({ noteIdx, instrNum: instrId, hasNote, instrAt: currentInstrAt });
       notePositions.push(dataPos);
       args.push(hasNote ? pending : []);
       if (hasNote) pending = [];
@@ -776,7 +777,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
 
       if (cmd === 0x82) {
         // SetInstrument
-        if (pos < data.length) { currentInstr = data[pos++]; }
+        if (pos < data.length) { currentInstrAt = pos; currentInstr = data[pos++]; }
         continue;
       }
 
@@ -814,7 +815,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
 
     // Pad to numRows
     while (rows.length < numRows) {
-      rows.push({ noteIdx: 0, instrNum: 0, hasNote: false });
+      rows.push({ noteIdx: 0, instrNum: 0, hasNote: false, instrAt: -1 });
       notePositions.push(-1);
       args.push([]);
     }
@@ -840,12 +841,16 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   const parsedCells: TrackerCell[][][] = [];
   // Per pattern and channel: the sequence entry's transpose, which the grid note carries on top of the stored period index.
   const transposeMap: number[][] = [];
+  // Per pattern, channel and row: the file offset of the SetInstrument argument byte behind the cell's instrument (-1: none). One byte serves every
+  // note until the next SetInstrument, so an instrument edit is written there and shows on each of those rows after a re-parse.
+  const instrSourceMap: number[][][] = [];
 
   for (let posIdx = 0; posIdx < maxTrackEntries; posIdx++) {
     const channelRows: TrackerCell[][] = Array.from({ length: 4 }, () => []);
     const patOffsets: number[][] = Array.from({ length: 4 }, () => []);
     const patSources: Array<Array<Array<{ typ: number; at: number }>>> = Array.from({ length: 4 }, () => []);
     const patTranspose: number[] = [0, 0, 0, 0];
+    const patInstrAt: number[][] = Array.from({ length: 4 }, () => []);
 
     for (let ch = 0; ch < 4; ch++) {
       const posList = primarySong.positions[ch];
@@ -886,6 +891,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
           if (trackStart >= 0 && addCellEffect(channelRows[ch][ri], a.typ, a.val)) slots.push({ typ: a.typ, at: trackStart + a.at });
         }
         patSources[ch].push(slots);
+        patInstrAt[ch].push(row.hasNote && row.instrAt >= 0 && trackStart >= 0 ? trackStart + row.instrAt : -1);
 
         // Compute file offset from track-relative position
         const relPos = notePositions[ri];
@@ -895,6 +901,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
 
     cellOffsetMap.push(patOffsets);
     transposeMap.push(patTranspose);
+    instrSourceMap.push(patInstrAt);
     effectSourceMap.push(patSources);
     parsedCells.push(channelRows.map((rows) => rows.map((c) => ({ ...c }))));
 
@@ -994,6 +1001,8 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       if (!was) return { patches: [], noteUnchanged: false };
       const fx = effectEditPatches(cell, was, effectSourceMap[pattern][channel][row] ?? []);
       const patches = fx.refusal ? [] : fx.patches;
+      const instrAt = instrSourceMap[pattern]?.[channel]?.[row] ?? -1;
+      if (instrAt >= 0 && cell.instrument !== was.instrument && cell.instrument >= 0 && cell.instrument <= 255) patches.push([instrAt, cell.instrument]);
       // A track played under a transpose stores the grid note minus that transpose: write the note byte here (the wait byte stays),
       // as the generic cell encoder knows no transpose.
       const transpose = transposeMap[pattern]?.[channel] ?? 0;
