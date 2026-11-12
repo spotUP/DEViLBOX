@@ -7,6 +7,8 @@
 
 import { withSsgDefaultMacros, placeUserSample } from './opnbVoices';
 import { livePreviewChannel } from './chipChannel';
+import { maxVolumeOfChipChannel } from './chipVoiceKinds';
+import { synthTypeForPlatform } from './synthPlatforms';
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
 import {
@@ -124,8 +126,8 @@ const PLATFORM_CHANNELS: Record<number, string[]> = {
 /** Platform volume maximums (matching Furnace GET_VOLMAX per chip) */
 // volMax values from upstream Furnace GET_VOLMAX dispatch (per-platform .cpp files).
 // Some platforms have per-channel volMax (e.g. YM2608 FM=127, PSG=15, ADPCM-A=31, ADPCM-B=255).
-// For those, we use the FM channel volMax since that's the primary channel for live play.
-// The WASM sequencer handles per-channel volMax correctly for .fur playback.
+// This table holds their FM value; maxVolumeOfChannel() below gives the value of one channel
+// and is what live notes and cell volumes use.
 const PLATFORM_VOL_MAX: Record<number, number> = {
   // PSG / simple chips (4-bit volume = 15)
   [FurnaceDispatchPlatform.GB]: 15,
@@ -223,6 +225,11 @@ const PLATFORM_VOL_MAX: Record<number, number> = {
 
 function getMaxVolume(platform: number): number {
   return PLATFORM_VOL_MAX[platform] ?? 127;
+}
+
+/** Volume maximum of one chip channel: the channel kind's own on a mixed-kind chip, else the platform's. */
+export function maxVolumeOfChannel(platform: number, chan: number): number {
+  return maxVolumeOfChipChannel(synthTypeForPlatform(platform), chan) ?? getMaxVolume(platform);
 }
 
 export interface FurnaceDispatchSynthOptions {
@@ -519,7 +526,6 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     const P = FurnaceDispatchPlatform;
     const pt = this.platformType;
     const numCh = this.engine.getChannelCount(pt) || 4;
-    const maxVol = getMaxVolume(pt);
 
     // Upload module-level wavetables/samples from .fur file (if available)
     // These overwrite any test data loaded below, so upload FIRST to let
@@ -664,30 +670,30 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       case P.QSOUND:
       case P.MULTIPCM:
         if (!hasModuleSamples) { this.loadTestSample8bit(); this.uploadSampleInstrument(); this.engine.renderSamples(pt); }
-        for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
+        for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVolumeOfChannel(pt, ch)); }
         break;
       // === RF5C68 and GA20: standard signed 8-bit (WASM renderSamples converts) ===
       case P.RF5C68:
       case P.GA20:
         if (!hasModuleSamples) { this.loadTestSample8bit(); this.uploadSampleInstrument(); this.engine.renderSamples(pt); }
-        for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
+        for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVolumeOfChannel(pt, ch)); }
         break;
       // === VOX ADPCM chips ===
       case P.MSM6258:
       case P.MSM6295:
         if (!hasModuleSamples) { this.loadTestSampleVOX(); this.uploadSampleInstrument(); this.engine.renderSamples(pt); }
-        for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
+        for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVolumeOfChannel(pt, ch)); }
         break;
       case P.ES5506:
       case P.C140:
       case P.C219:
       case P.PCM_DAC:
         if (!hasModuleSamples) { this.loadTestSample16bit(); this.uploadSampleInstrument(); this.engine.renderSamples(pt); }
-        for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
+        for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVolumeOfChannel(pt, ch)); }
         break;
       case P.SNES:
         if (!hasModuleSamples) { this.loadTestSampleBRR(); this.uploadSampleInstrument(); this.engine.renderSamples(pt); }
-        for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
+        for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVolumeOfChannel(pt, ch)); }
         break;
 
       // === Atari Lynx Mikey: needs non-zero FEEDBACK (duty) to oscillate ===
@@ -719,7 +725,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       P.QSOUND, P.MULTIPCM, P.MSM6258, P.ES5506, P.C140, P.C219, P.PCM_DAC, P.SNES
     ];
     if (!sampleBasedChips.includes(pt)) {
-      for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVol); }
+      for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVolumeOfChannel(pt, ch)); }
     }
   }
 
@@ -879,7 +885,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
 
     for (let ch = 0; ch < numCh; ch++) {
       this.engine.setInstrument(ch, 0, pt);
-      this.engine.setVolume(ch, getMaxVolume(pt), pt);
+      this.engine.setVolume(ch, maxVolumeOfChannel(pt, ch), pt);
     }
   }
 
@@ -920,7 +926,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
 
     for (let ch = 0; ch < numCh; ch++) {
       this.engine.setInstrument(ch, 0, pt);
-      this.engine.setVolume(ch, getMaxVolume(pt), pt);
+      this.engine.setVolume(ch, maxVolumeOfChannel(pt, ch), pt);
     }
   }
 
@@ -953,7 +959,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
 
     for (let ch = 0; ch < numCh; ch++) {
       this.engine.setInstrument(ch, 0, pt);
-      this.engine.setVolume(ch, getMaxVolume(pt), pt);
+      this.engine.setVolume(ch, maxVolumeOfChannel(pt, ch), pt);
     }
   }
 
@@ -1184,7 +1190,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     this.engine.setInstrument(chan, this.furnaceInstrumentIndex, pt, true, _time);
 
     // Set volume based on velocity
-    const maxVol = getMaxVolume(pt);
+    const maxVol = maxVolumeOfChannel(pt, chan);
     const vol = Math.round(velocity * maxVol);
     this.engine.setVolume(chan, vol, pt, _time);
 
@@ -1292,7 +1298,8 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
    * (the scale triggerAttack uses). Goes through the effect router, as the cell's set-volume effect does.
    */
   applyVolumeLevel(level: number, chan?: number): void {
-    this.applyEffect(0x0C, Math.round(Math.max(0, Math.min(1, level)) * getMaxVolume(this.platformType)), chan);
+    const target = chan ?? this.currentChannel;
+    this.applyEffect(0x0C, Math.round(Math.max(0, Math.min(1, level)) * maxVolumeOfChannel(this.platformType, target)), chan);
   }
 
   applyExtendedEffect(x: number, y: number, chan?: number): void {

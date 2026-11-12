@@ -112,6 +112,28 @@ export function voiceKindOfInstrument(inst: Pick<InstrumentConfig, 'synthType' |
   return { spec, kind: kindOfInsType(spec, f?.divInsType) };
 }
 
+/**
+ * Volume maximum of each voice kind on the OPN chips, from upstream GET_VOLMAX
+ * (ym2610.cpp, ym2610b.cpp, ym2608.cpp, ym2203.cpp): FM 127, SSG 15,
+ * ADPCM-A 31, ADPCM-B 255. Only chips whose GET_VOLMAX was read are listed;
+ * Y8950 and OPL4 are not.
+ */
+const OPN_KIND_VOLUME_MAX: Partial<Record<ChipVoiceKindId, number>> = { fm: 127, ssg: 15, adpcma: 31, adpcmb: 255 };
+const VOLUME_MAX_CHIPS: ReadonlySet<string> = new Set(['FurnaceOPNB', 'FurnaceOPNBB', 'FurnaceOPNA', 'FurnaceOPN2203']);
+
+/**
+ * The volume maximum of one chip channel of a mixed-kind chip, or undefined
+ * when the chip has one maximum for all channels (or was not checked) and the
+ * platform-wide value applies. A volume scaled to the FM maximum on an SSG
+ * channel overflows the 4-bit register and plays at a fraction of the level.
+ */
+export function maxVolumeOfChipChannel(synthType: string | undefined, chipChannel: number): number | undefined {
+  if (!synthType || !VOLUME_MAX_CHIPS.has(synthType)) return undefined;
+  const spec = chipSpecOf(synthType);
+  const kind = spec && kindOfChipChannel(spec, chipChannel);
+  return kind ? OPN_KIND_VOLUME_MAX[kind.id] : undefined;
+}
+
 /** Live voices (preview and audition channels, 100 and up) are not pattern cells. */
 const FIRST_LIVE_CHANNEL = 100;
 const NOTE_OFF = 97;
