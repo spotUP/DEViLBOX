@@ -25,6 +25,7 @@ registerEditableFormat({ formatId: "tfmx7v", label: "Jochen Hippel 7V", patternC
 registerEditableFormat({ formatId: "jesperOlsen", label: "Jesper Olsen", patternCodec: { kind: "fixed" }, exporter: { module: "JesperOlsenExporter", fn: "exportJesperOlsen", byLayout: true } });
 registerEditableFormat({ formatId: "wallyBeben", label: "Wally Beben", patternCodec: { kind: "fixed" }, exporter: { module: "WallyBebenExporter", fn: "exportWallyBeben", byLayout: true } });
 registerEditableFormat({ formatId: "synTracker", label: "SynTracker", patternCodec: { kind: "fixed" }, exporter: { module: "SynTrackerExporter", fn: "exportSynTrackerFile", ext: "synmod" } });
+registerEditableFormat({ formatId: "tomyTracker", label: "Tomy Tracker", patternCodec: { kind: "fixed" }, exporter: { module: "TomyTrackerExporter", fn: "exportTomyTracker", ext: "sg", byLayout: true } });
 registerEditableFormat({ formatId: "soundPlayer", label: "Sound Player", patternCodec: { kind: "fixed" }, exporter: { module: "SoundPlayerExporter", fn: "exportSoundPlayer", byLayout: true } });
 registerEditableFormat({ formatId: "mcmd", label: "MCMD", patternCodec: { kind: "fixed" }, exporter: { module: "McmdExporter", fn: "exportMcmd", byLayout: true } });
 registerEditableFormat({ formatId: "organya", label: "Organya", patternCodec: { kind: "fixed" }, exporter: { module: "OrganyaExporter", fn: "exportOrganya", byLayout: true } });
