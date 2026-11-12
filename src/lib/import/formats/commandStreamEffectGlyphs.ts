@@ -140,8 +140,23 @@ export const PR_FX = {
   fadeSecond: PR_FX_BASE + 27,
 } as const;
 
+export const MD_FX_BASE = 0x5a0;
+/**
+ * Medley track-stream commands (medley.c mdl_run_command; byte 0x80 | command, then the parameter byte): effTyp = MD_FX_BASE +
+ * the command number, eff = the parameter byte verbatim. Instrument is the instrument column; End, Call and the loop
+ * commands are structure, not shown.
+ */
+export const MD_FX = {
+  /** Command 2: voice volume table scale (the replayer builds the table from param >> 1). */
+  volume: MD_FX_BASE + 2,
+  /** Command 4: jump to a track picked at random from the list of (byte, track) pairs that follows; the parameter is the pair count. The pick is made at run time. */
+  randomTrack: MD_FX_BASE + 4,
+  /** Command 8: voice note offset added to every note (unsigned byte, wraps). */
+  transpose: MD_FX_BASE + 8,
+} as const;
+
 export const CS_FX_MIN = RR_FX_BASE;
-export const CS_FX_MAX = PR_FX.fadeSecond;
+export const CS_FX_MAX = MD_FX.transpose;
 
 export const CS_EFFECT_GLYPH: Record<number, string> = {
   [RR_FX.setVolume]: 'V', [RR_FX.volumeSlide]: 'S', [RR_FX.volumeSlideRate]: 'R', [RR_FX.masterFade]: 'F',
@@ -155,6 +170,7 @@ export const CS_EFFECT_GLYPH: Record<number, string> = {
   [PR_FX.volumeEnvelope]: 'Y', [PR_FX.pitchEnvelope]: 'Z', [PR_FX.volume]: 'V', [PR_FX.tempo]: 'T', [PR_FX.flags]: 'F',
   [PR_FX.mode]: 'M', [PR_FX.command21]: 'X', [PR_FX.fade]: 'D', [PR_FX.fadeSecond]: 'G', [PR_FX.command23]: 'U',
   [PR_FX.command24]: 'K', [PR_FX.command25]: 'J', [PR_FX.command26]: 'N',
+  [MD_FX.volume]: 'V', [MD_FX.randomTrack]: 'R', [MD_FX.transpose]: 'T',
   [SPL_FX.extraNote1]: 'N', [SPL_FX.extraNote2]: 'N', [SPL_FX.extraNote3]: 'N',
 };
 

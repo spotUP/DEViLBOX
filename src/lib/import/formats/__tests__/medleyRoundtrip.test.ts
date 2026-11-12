@@ -9,7 +9,8 @@ import { join } from 'path';
 import { parseMedleyFile } from '../MedleyParser';
 import { exportMedley } from '@/lib/export/MedleyExporter';
 import { encodeVariableBlock } from '@/engine/uade/UADEPatternEncoder';
-import { buildMedleyGrid, applyMedleyGridEdits } from '../medleyGrid';
+import { buildMedleyGrid, applyMedleyGridEdits, MEDLEY_ROWS_PER_PATTERN } from '../medleyGrid';
+import { MD_FX } from '../commandStreamEffectGlyphs';
 
 const FIXTURE = join(process.cwd(), 'public/data/songs/medley/combat.mso');
 
@@ -150,3 +151,68 @@ describe('Medley instruments and song length (combat.mso)', () => {
   });
 });
 
+
+describe('Medley stream commands in the effect columns (combat.mso)', () => {
+  const FX_KEYS = [['effTyp', 'eff'], ['effTyp2', 'eff2'], ['effTyp3', 'eff3'], ['effTyp4', 'eff4'], ['effTyp5', 'eff5']] as const;
+  const cellAt = (g: ReturnType<typeof buildMedleyGrid>, voice: number, tick: number) =>
+    g!.patterns[Math.floor(tick / MEDLEY_ROWS_PER_PATTERN)].channels[voice].rows[tick % MEDLEY_ROWS_PER_PATTERN];
+  /** Set the value of every cell that runs the command whose parameter byte is `offset`. */
+  const setParam = (g: NonNullable<ReturnType<typeof buildMedleyGrid>>, offset: number, value: number) => {
+    for (const fx of g.effects.filter(e => e.offset === offset)) cellAt(g, fx.voice, fx.tick)[FX_KEYS[fx.slot][1]] = value;
+  };
+
+  it('Volume command (track 22, parameter byte 1841) shows as V7F and an edit writes only that byte', async () => {
+    const { raw } = await load();
+    const sub = [1, 2, 3, 4, 5, 6, 7].find(s => buildMedleyGrid(raw, '', s)!.effects.some(e => e.offset === 1841))!;
+    expect(sub).toBeTruthy();
+    const g = buildMedleyGrid(raw, '', sub)!;
+    const fx = g.effects.find(e => e.offset === 1841)!;
+    expect(fx.effTyp).toBe(MD_FX.volume);
+    expect(raw[1841]).toBe(127);
+    const cell = cellAt(g, fx.voice, fx.tick);
+    expect([cell[FX_KEYS[fx.slot][0]], cell[FX_KEYS[fx.slot][1]]]).toEqual([MD_FX.volume, 127]);
+    setParam(g, 1841, 64);
+    const r = applyMedleyGridEdits(raw, g.patterns, sub);
+    expect(r.warnings).toEqual([]);
+    const diff: number[] = [];
+    r.data.forEach((v, i) => { if (v !== raw[i]) diff.push(i); });
+    expect(diff).toEqual([1841]);
+    expect(r.data[1841]).toBe(64);
+    // the replayer's view of the edited module: the command now carries 64
+    expect(buildMedleyGrid(r.data, '', sub)!.effects.find(e => e.offset === 1841)!.value).toBe(64);
+  });
+
+  it('Transpose command shows as T and an edit moves the notes after it, byte-exact', async () => {
+    const { raw } = await load();
+    const g = buildMedleyGrid(raw, '', 1)!;
+    const fx = g.effects.find(e => e.effTyp === MD_FX.transpose && e.voice === 0 && e.offset === 1199)!;
+    expect(fx).toBeTruthy();
+    expect(raw[1199]).toBe(253);
+    const before = g.placements.find(p => p.voice === 0 && p.tick >= fx.tick)!;
+    setParam(g, 1199, 255);
+    const r = applyMedleyGridEdits(raw, g.patterns, 1);
+    expect(r.warnings).toEqual([]);
+    const diff: number[] = [];
+    r.data.forEach((v, i) => { if (v !== raw[i]) diff.push(i); });
+    expect(diff).toEqual([1199]);
+    const after = buildMedleyGrid(r.data, '', 1)!.placements.find(p => p.voice === 0 && p.tick === before.tick)!;
+    expect(after.note - before.note).toBe(2);
+  });
+
+  it('RandomTrack is shown as an effect with its bytes kept, and no note is invented after it', async () => {
+    const { raw } = await load();
+    const patched = new Uint8Array(raw);
+    patched[1840] = 0x84; // the Volume command of track 22 becomes RandomTrack with 2 choices
+    patched[1841] = 2;
+    const sub = [1, 2, 3, 4, 5, 6, 7].find(s => buildMedleyGrid(patched, '', s)!.effects.some(e => e.offset === 1841))!;
+    const g = buildMedleyGrid(patched, '', sub)!;
+    const fx = g.effects.find(e => e.offset === 1841)!;
+    expect(fx.effTyp).toBe(MD_FX.randomTrack);
+    expect(g.unsupportedVoices).toContain(fx.voice);
+    expect(cellAt(g, fx.voice, fx.tick)[FX_KEYS[fx.slot][1]]).toBe(2);
+    expect(g.placements.some(p => p.voice === fx.voice && p.tick > fx.tick)).toBe(false);
+    const r = applyMedleyGridEdits(patched, g.patterns, sub);
+    expect(r.warnings).toEqual([]);
+    expect(Array.from(r.data)).toEqual(Array.from(patched));
+  });
+});
