@@ -28,6 +28,13 @@ static float g_tri_table[ST_SINE_TABLE];
 static bool  g_tables_init = false;
 static float g_channel_gains[ST_MAX_CHANNELS];
 
+/* Per-channel scope tap: each channel's post-gain, pre-pan samples for the
+ * current tick (g_chan_tick) and, when the host registered a buffer for a
+ * channel (sawteeth_set_channel_tap), a copy of what sawteeth_render hands out. */
+static float *g_chan_tick[ST_MAX_CHANNELS];
+static int    g_chan_tick_len = 0;
+static float *g_tap[ST_MAX_CHANNELS];
+
 /* ── Helpers ── */
 
 static inline float clampf(float x, float lo, float hi) {
@@ -990,6 +997,12 @@ void sawteeth_set_channel_gain(int ch, float gain) {
   }
 }
 
+/* Host registers (or clears, ptr = NULL) the buffer that sawteeth_render fills
+ * with channel `ch`'s samples, one float per rendered frame, same index as out. */
+void sawteeth_set_channel_tap(int ch, float *ptr) {
+  if (ch >= 0 && ch < ST_MAX_CHANNELS) g_tap[ch] = ptr;
+}
+
 /* Render one tick of all channels into the tick buffers */
 static void render_tick(st_engine_t *e) {
   int sps = e->song.sps_pal;
@@ -999,9 +1012,18 @@ static void render_tick(st_engine_t *e) {
   memset(e->tick_buf_l, 0, sps * sizeof(float));
   memset(e->tick_buf_r, 0, sps * sizeof(float));
 
+  if (g_chan_tick_len != sps) {
+    for (int c = 0; c < ST_MAX_CHANNELS; c++) {
+      free(g_chan_tick[c]);
+      g_chan_tick[c] = (float *)calloc(sps, sizeof(float));
+    }
+    g_chan_tick_len = sps;
+  }
+
   for (int c = 0; c < nch; c++) {
     st_player_t *p = &e->players[c];
     bool has_audio = player_next_buffer(p, e, c);
+    if (g_chan_tick[c]) memset(g_chan_tick[c], 0, sps * sizeof(float));
 
     if (has_audio && g_channel_gains[c] > 0.0f) {
       st_channel_t *ch = &e->song.channels[c];
@@ -1014,6 +1036,7 @@ static void render_tick(st_engine_t *e) {
         /* Kill NaN/Inf and clamp extreme values */
         if (sv != sv || sv > 2.0f || sv < -2.0f) sv = 0.0f;
         sv *= gain;
+        if (g_chan_tick[c]) g_chan_tick[c][i] = sv;
         e->tick_buf_l[i] += sv * pan_l;
         e->tick_buf_r[i] += sv * pan_r;
       }
@@ -1054,6 +1077,11 @@ int sawteeth_render(float *out, int num_samples) {
       if (r > 1.0f) r = 1.0f; else if (r < -1.0f) r = -1.0f;
       out[(written + i) * 2]     = l;
       out[(written + i) * 2 + 1] = r;
+    }
+    for (int c = 0; c < ST_MAX_CHANNELS; c++) {
+      if (g_tap[c] && g_chan_tick[c]) {
+        memcpy(g_tap[c] + written, g_chan_tick[c] + e->tick_buf_pos, copy * sizeof(float));
+      }
     }
 
     e->tick_buf_pos += copy;

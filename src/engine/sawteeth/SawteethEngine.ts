@@ -124,6 +124,10 @@ export class SawteethEngine extends WASMSingletonBase {
           break;
         }
 
+        case 'oscData':
+          useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
+          break;
+
         case 'instrumentData': {
           const insData = data.data as SawteethInstrumentData;
           const resolve = this._pendingInstrumentRequests.get(insData.ins);
