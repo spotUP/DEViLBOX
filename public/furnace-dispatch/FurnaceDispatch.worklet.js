@@ -117,6 +117,48 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
   }
 
   /**
+   * Start/stop register-write capture. While on, every chip's register writes
+   * are drained after each chip tick and posted as 'regCapture' batches
+   * {platformType, sample, pairs} (sample = samples since capture start).
+   * Off: _regCapture is null and the audio path does one null check per tick.
+   */
+  setRegCapture(enable) {
+    if (!this.wasm || !this.wasm.regDump) return;
+    if (enable === (this._regCapture !== null)) return;
+    if (enable) {
+      const max = 8192;
+      this._regCapture = { max, ptr: this.module._malloc(max * 8), samples: 0, pending: [] };
+      for (const chip of this.chips.values()) this.wasm.regDump(chip.handle, 1);
+    } else {
+      this.flushRegCapture();
+      for (const chip of this.chips.values()) this.wasm.regDump(chip.handle, 0);
+      this.module._free(this._regCapture.ptr);
+      this._regCapture = null;
+      this.port.postMessage({ type: 'regCaptureStopped' });
+    }
+  }
+
+  /** Drain one chip's writes (call right after its tick), stamped at `sample`. */
+  drainRegWrites(chip, sample) {
+    const cap = this._regCapture;
+    const n = this.wasm.regWrites(chip.handle, cap.ptr, cap.max);
+    if (n <= 0) return;
+    const heapBuf = this.getHeapBuffer();
+    if (!heapBuf) return;
+    const pairs = new Int32Array(heapBuf, cap.ptr, n * 2).slice();
+    cap.pending.push({ platformType: chip.platformType, sample, pairs });
+  }
+
+  /** Post batches collected so far (at most once per process block). */
+  flushRegCapture() {
+    const cap = this._regCapture;
+    if (!cap || cap.pending.length === 0) return;
+    const batches = cap.pending;
+    cap.pending = [];
+    this.port.postMessage({ type: 'regCapture', batches }, batches.map(b => b.pairs.buffer));
+  }
+
+  /**
    * Post the command-log entries recorded since the last drain, then clear
    * them. Without the clear, every poll copied and re-posted the WHOLE log
    * from the start of playback — on the audio thread — about a million
@@ -646,6 +688,10 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         }
         break;
       }
+      case 'setRegCapture': {
+        this.setRegCapture(!!data.enable);
+        break;
+      }
       case 'seqSeek': {
         if (this.wasm) this.wasm.seqSeek(data.order, data.row);
         break;
@@ -882,7 +928,11 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         cmdLogCount: this.module._furnace_cmd_log_count,
         cmdLogGet: this.module._furnace_cmd_log_get,
         cmdLogClear: this.module._furnace_cmd_log_clear,
+        // Register-write capture (DivDispatch::getRegisterWrites; drains on read)
+        regDump: this.module._furnace_dispatch_reg_dump,
+        regWrites: this.module._furnace_dispatch_reg_writes,
       };
+      this._regCapture = null;
       this._cmdLogEnabled = false;
       this._cmdLogPollCounter = 0;
 
@@ -1205,10 +1255,22 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
             this.port.postMessage({ type: 'error', message: 'WASM sequencer crashed: ' + (e.message || e) });
           }
         }
+        // Tick position inside this block, relative to capture start
+        const regCap = this._regCapture;
+        const tickSample = regCap
+          ? regCap.samples + Math.max(0, Math.round(numSamples - this.tickAccumulator + this.samplesPerTick))
+          : 0;
         for (const chip of this.chips.values()) {
-          try { this.wasm.tick(chip.handle); } catch { /* skip bad chip */ }
+          try {
+            this.wasm.tick(chip.handle);
+            if (regCap) this.drainRegWrites(chip, tickSample);
+          } catch { /* skip bad chip */ }
         }
         this.tickAccumulator -= this.samplesPerTick;
+      }
+      if (this._regCapture) {
+        this._regCapture.samples += numSamples;
+        this.flushRegCapture();
       }
 
       // Drain command log periodically and post to main thread
