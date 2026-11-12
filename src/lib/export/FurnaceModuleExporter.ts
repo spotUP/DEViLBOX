@@ -36,6 +36,12 @@ export const FUR_EXPORT_VERSION = 245;
 /** System id of the YM2610 (Neo Geo): FM 1-4, SSG 1-3, ADPCM-A 1-6, ADPCM-B. */
 export const FUR_SYSTEM_YM2610 = 0xa5;
 export const FUR_NEO_GEO_CHANNELS = 14;
+/**
+ * Chip flags of the exported YM2610: SSG volume 256, the level of the chip itself. Furnace's own
+ * default is 128 (ym2610shared.h, flags.getInt("ssgVol",128)), which ngdevkit furtool makes up for
+ * with a warning. The song is played here from the same module, so screen and export agree.
+ */
+export const FUR_NEO_GEO_CHIP_FLAGS = 'ssgVol=256\n';
 /** The synth type of a Neo Geo instrument in the tracker. */
 export const NEO_GEO_SYNTH_TYPE = 'FurnaceOPNB';
 
@@ -229,15 +235,31 @@ function hasUserSample(cfg: FurnaceConfig): cfg is FurnaceConfig & { userSample:
   return (type === DIV_INS_ADPCMA || type === DIV_INS_ADPCMB) && !!cfg.userSample;
 }
 
+/** One module sample: the PCM data and the ADPCM voice type that plays it. */
+interface ModuleSample {
+  sample: FurnaceUserSample;
+  insType: number;
+}
+
+/** Index of the module sample an ADPCM voice plays, -1 for a voice without a sample of its own. */
+function moduleSampleIndex(cfg: FurnaceConfig, samples: ModuleSample[]): number {
+  if (!hasUserSample(cfg)) return -1;
+  const insType = resolveInsType(cfg);
+  return samples.findIndex((s) => s.sample.data === cfg.userSample.data && s.insType === insType);
+}
+
 /**
- * The module sample list: every user sample of an ADPCM voice, once, in instrument order.
- * Two instruments that share one sample buffer share one module sample (same rule as
- * `placeUserSample` in the live synth, which compares the `data` buffer).
+ * The module sample list: every user sample of an ADPCM voice, in instrument order, once per
+ * sample buffer and voice type. Two instruments of one type that share a sample buffer share one
+ * module sample (same rule as `placeUserSample` in the live synth, which compares the `data`
+ * buffer). An ADPCM-A and an ADPCM-B instrument on one buffer get a module sample each: ngdevkit
+ * furtool converts a PCM module sample to the codec of the first instrument that names it, so a
+ * sample shared across the two types would reach one of them in the wrong codec.
  */
-function collectUserSamples(configs: FurnaceConfig[]): FurnaceUserSample[] {
-  const list: FurnaceUserSample[] = [];
+function collectUserSamples(configs: FurnaceConfig[]): ModuleSample[] {
+  const list: ModuleSample[] = [];
   for (const cfg of configs) {
-    if (hasUserSample(cfg) && !list.some((s) => s.data === cfg.userSample.data)) list.push(cfg.userSample);
+    if (hasUserSample(cfg) && moduleSampleIndex(cfg, list) < 0) list.push({ sample: cfg.userSample, insType: resolveInsType(cfg) });
   }
   return list;
 }
@@ -262,9 +284,9 @@ function encodeSmp2(sample: FurnaceUserSample): Uint8Array {
   return block('SMP2', b);
 }
 
-function toFileInstrument(name: string, cfg: FurnaceConfig, samples: FurnaceUserSample[]): FurnaceInstrument {
+function toFileInstrument(name: string, cfg: FurnaceConfig, samples: ModuleSample[]): FurnaceInstrument {
   const type = resolveInsType(cfg);
-  const sampleIndex = hasUserSample(cfg) ? samples.findIndex((s) => s.data === cfg.userSample.data) : -1;
+  const sampleIndex = moduleSampleIndex(cfg, samples);
   return {
     name,
     type,
@@ -329,19 +351,22 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
 
   // Cells per channel and pattern
   const fxColumns = new Array<number>(FUR_NEO_GEO_CHANNELS).fill(1);
+  // Furnace writes every pattern the order list names, an empty one too (fur.cpp, patsToWrite).
+  // ngdevkit nsstool looks each ordered pattern up in the file and stops on a missing one.
+  const orderedPatterns = new Set(song.songPositions);
   const patnBlocks: Uint8Array[] = [];
   for (let ch = 0; ch < FUR_NEO_GEO_CHANNELS; ch++) {
     for (const [pi, p] of song.patterns.entries()) {
       const src = p.channels[ch];
-      if (!src) continue;
+      if (!src && !orderedPatterns.has(pi)) continue;
       const rows: FileCell[] = [];
       for (let r = 0; r < patLen; r++) {
-        const cell = src.rows[r];
-        rows.push(cell
+        const cell = src?.rows[r];
+        rows.push(cell && src
           ? cellToFile(cell, insIndexById, `Pattern ${pi} channel ${ch + 1} row ${r}`, problems, effectNotationOf(src.channelMeta), warnings)
           : { note: -1, ins: -1, vol: -1, fx: Array.from({ length: MAX_FX_COLUMNS }, () => ({ type: -1, val: -1 })) });
       }
-      if (rows.every(isEmptyCell)) continue; // Furnace creates an empty pattern for a missing block
+      if (rows.every(isEmptyCell) && !orderedPatterns.has(pi)) continue;
       for (const row of rows) {
         row.fx.forEach((f, k) => { if (f.type >= 0 || f.val >= 0) fxColumns[ch] = Math.max(fxColumns[ch], k + 1); });
       }
@@ -380,10 +405,14 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
 
   const userSamples = collectUserSamples(neo.map((inst) => inst.furnace as FurnaceConfig));
   const ins2 = neo.map((inst) => encodeInstrumentAsINS2(toFileInstrument(inst.name, inst.furnace as FurnaceConfig, userSamples), FUR_EXPORT_VERSION));
-  const smp2 = userSamples.map(encodeSmp2);
+  const smp2 = userSamples.map((s) => encodeSmp2(s.sample));
 
-  // Layout: header, INF2, SNG2, INS2..., SMP2..., PATN...
-  const buildInf2 = (sngPtr: number, insPtrs: number[], smpPtrs: number[], patPtrs: number[]): Uint8Array => {
+  // Chip flags of the YM2610 (fur.cpp, "CHIP FLAGS": key=value lines, zero-terminated). Furnace
+  // loads a module without this block at SSG volume 128, half the level of the chip.
+  const flag = block('FLAG', new Bytes().str(FUR_NEO_GEO_CHIP_FLAGS));
+
+  // Layout: header, INF2, SNG2, FLAG, INS2..., SMP2..., PATN...
+  const buildInf2 = (sngPtr: number, flagPtr: number, insPtrs: number[], smpPtrs: number[], patPtrs: number[]): Uint8Array => {
     const b = new Bytes()
       .str(song.name).str('').str('Neo Geo MVS').str('')
       .str('').str('').str('').str('')
@@ -392,24 +421,27 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
       .u16(FUR_SYSTEM_YM2610).u16(FUR_NEO_GEO_CHANNELS).f32(1).f32(0).f32(0)
       .u32(0).u8(1); // patchbay: no connections, automatic
     b.u8(0x01).u32(1).u32(sngPtr);
+    b.u8(0x02).u32(1).u32(flagPtr);
     if (insPtrs.length > 0) { b.u8(0x04).u32(insPtrs.length); insPtrs.forEach((p) => b.u32(p)); }
     if (smpPtrs.length > 0) { b.u8(0x06).u32(smpPtrs.length); smpPtrs.forEach((p) => b.u32(p)); }
     if (patPtrs.length > 0) { b.u8(0x07).u32(patPtrs.length); patPtrs.forEach((p) => b.u32(p)); }
     b.u8(0x00);
     return block('INF2', b);
   };
-  const inf2Len = buildInf2(0, ins2.map(() => 0), smp2.map(() => 0), patnBlocks.map(() => 0)).length;
+  const inf2Len = buildInf2(0, 0, ins2.map(() => 0), smp2.map(() => 0), patnBlocks.map(() => 0)).length;
   let cursor = 32 + inf2Len;
   const sngPtr = cursor;
   cursor += sng2.length;
+  const flagPtr = cursor;
+  cursor += flag.length;
   const insPtrs = ins2.map((b) => { const p = cursor; cursor += b.length; return p; });
   const smpPtrs = smp2.map((b) => { const p = cursor; cursor += b.length; return p; });
   const patPtrs = patnBlocks.map((b) => { const p = cursor; cursor += b.length; return p; });
-  const inf2 = buildInf2(sngPtr, insPtrs, smpPtrs, patPtrs);
+  const inf2 = buildInf2(sngPtr, flagPtr, insPtrs, smpPtrs, patPtrs);
 
   const file = new Bytes().ascii('-Furnace module-').u16(FUR_EXPORT_VERSION).u16(0).u32(32);
   for (let i = 0; i < 8; i++) file.u8(0);
-  for (const part of [inf2, sng2, ...ins2, ...smp2, ...patnBlocks]) file.bytes(part);
+  for (const part of [inf2, sng2, flag, ...ins2, ...smp2, ...patnBlocks]) file.bytes(part);
 
   // An ADPCM voice with no sample of its own names no sample in the module.
   const bare = neo.filter((i) => {
