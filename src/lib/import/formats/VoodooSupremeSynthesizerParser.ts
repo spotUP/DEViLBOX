@@ -9,7 +9,17 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout, VariableLengthEncoder } from '@/engine/uade/UADEPatternEncoder';
+import { registerVariableEncoder } from '@/engine/uade/UADEPatternEncoder';
 import { buildVoodooGrid } from './voodooSupremeGrid';
+
+/** No block of this format is re-encoded: the grid is a reading of the player and note edits are in-place byte patches (VoodooSupremeExporter). */
+export const voodooEncoder: VariableLengthEncoder = {
+  formatId: 'uade_vss',
+  encodePattern: () => new Uint8Array(0),
+  canEncode: () => false,
+};
+registerVariableEncoder(voodooEncoder);
 
 export function isVoodooSupremeSynthesizerFormat(_buffer: ArrayBuffer | Uint8Array, filename?: string): boolean {
   if (filename) {
@@ -42,7 +52,7 @@ export function parseVoodooSupremeSynthesizerFile(buffer: ArrayBuffer, filename:
     numChannels: 4, initialSpeed: 6, initialBPM: 125, linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer, uadeEditableFileName: filename,
   };
-  // Phase A: the grid is the decoded display (4 voices, 50 Hz ticks); note write-back is not wired.
+  // The grid is the decoded display (4 voices, 50 Hz ticks); note cells carry their file byte in the layout's noteBytes.
   if (typeof grid === 'string') {
     result.gridUnmatchedReason = grid;
   } else {
@@ -50,6 +60,19 @@ export function parseVoodooSupremeSynthesizerFile(buffer: ArrayBuffer, filename:
     result.songPositions = grid.songPositions;
     result.songLength = grid.songPositions.length;
     result.initialSpeed = grid.ticksPerRow;
+    const layout: UADEVariablePatternLayout = {
+      formatId: 'uade_vss',
+      numChannels: 4,
+      numFilePatterns: 0,
+      rowsPerPattern: grid.patterns.map((p) => p.length),
+      moduleSize: buffer.byteLength,
+      encoder: voodooEncoder,
+      filePatternAddrs: [],
+      filePatternSizes: [],
+      trackMap: grid.patterns.map(() => [-1, -1, -1, -1]),
+      noteBytes: grid.noteBytes,
+    };
+    result.uadeVariableLayout = layout;
   }
   return result;
 }
