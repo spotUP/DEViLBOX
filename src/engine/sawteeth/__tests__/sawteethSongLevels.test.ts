@@ -84,4 +84,34 @@ describe('Sawteeth okolaNUKE.st levels', () => {
     expect(level).toBeGreaterThan(0.01);
     expect(level).toBeLessThan(0.1);
   });
+
+  /**
+   * Channels 2 and 3 are mostly rests in this tune (verified from the part
+   * data: ch3 is one all-rest part until 11.52 s, ch2 plays instrument 5 drum
+   * hits at 2.88-3.84 s and 10.56-11.52 s and instrument 6 at 13.44-17.28 s).
+   * Where a note sounds the channel must be audible; in the rests it must be
+   * silent. Windows are whole seconds, [start, end).
+   */
+  const channelWindows: Record<number, { sounding: [number, number][]; rest: [number, number][] }> = {
+    2: { sounding: [[3, 4], [13, 17]], rest: [[0, 2], [5, 10]] },
+    3: { sounding: [[11, 13], [17, 20]], rest: [[0, 10], [14, 16]] },
+  };
+
+  for (const ch of [2, 3]) {
+    it(`channel ${ch} is audible in every window with a sounding note and silent in rests`, () => {
+      m._sawteeth_stop();
+      expect(m._sawteeth_init(songPtr, song.length)).toBe(0);
+      for (let c = 0; c < 4; c++) m._sawteeth_set_channel_gain(c, c === ch ? 1 : 0);
+      const perSecond: number[] = [];
+      for (let sec = 0; sec < 20; sec++) perSecond.push(rms((b, n) => { m._sawteeth_render(b, n); }, 1));
+      for (let c = 0; c < 4; c++) m._sawteeth_set_channel_gain(c, 1);
+      const { sounding, rest } = channelWindows[ch];
+      for (const [a, b] of sounding) {
+        for (let sec = a; sec < b; sec++) expect(perSecond[sec], `ch${ch} second ${sec}`).toBeGreaterThan(0.01);
+      }
+      for (const [a, b] of rest) {
+        for (let sec = a; sec < b; sec++) expect(perSecond[sec], `ch${ch} rest second ${sec}`).toBeLessThan(0.002);
+      }
+    });
+  }
 });

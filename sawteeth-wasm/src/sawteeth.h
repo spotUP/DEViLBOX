@@ -168,6 +168,7 @@ typedef struct {
   float   lo, hi, bp, bs;
 
   bool    trigged;
+  bool    cur_relative;          /* relative flag of the last step read */
   st_ins_t *curr_ins;
 } st_ins_ply_t;
 

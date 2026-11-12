@@ -112,7 +112,7 @@ static float lfo_next(st_lfo_t *lfo) {
 static void wave_init(st_wave_t *w) {
   memset(w, 0, sizeof(*w));
   w->jng_seed = 1;
-  w->form = ST_WAVE_HOLD;
+  w->form = ST_WAVE_SAW;  /* reference Wave starts as Saw */
 }
 
 static void wave_set_freq(st_wave_t *w, float freq) {
@@ -131,6 +131,11 @@ static void wave_no_interp(st_wave_t *w) {
 }
 
 static void wave_set_form(st_wave_t *w, int form) {
+  /* reference Wave.SetForm: on a change, an overshooting phase restarts */
+  if (w->form != form) {
+    if (w->curr_val > 1.0f) w->curr_val = 0;
+    if (w->curr > 1.0f) w->curr = 0;
+  }
   w->form = form;
 }
 
@@ -141,18 +146,24 @@ static void wave_set_pwm(st_wave_t *w, float pwm) {
 }
 
 /* Park-Miller RNG */
+/* Reference Wave.JngRand: ONE static seed shared by every Wave instance. */
+static int g_jng_seed = 1;
 static float wave_noise_next(st_wave_t *w) {
-  int seed = w->jng_seed;
+  (void)w;
+  int seed = g_jng_seed;
   int q = seed / 127773;
   seed = 16807 * (seed - q * 127773) - 2836 * q;
   if (seed < 0) seed += 2147483647;
-  w->jng_seed = seed;
-  return (float)seed / 1073741823.5f - 1.0f;
+  g_jng_seed = seed;
+  return (float)seed / 1073741824.0f - 1.0f;
 }
 
 /* Fill buffer with waveform samples. Returns true if audio produced. */
 static bool wave_fill(st_wave_t *w, float *buf, int len) {
   if (w->form == ST_WAVE_HOLD) return false;
+  /* reference Wave.Next: below 0.001 the voice is skipped and from_amp is NOT
+     updated, so the next audible block ramps from the last audible level */
+  if (w->amp < 0.001f) return false;
 
   float amp = w->amp;
   float from = w->from_amp;
@@ -222,9 +233,11 @@ static bool wave_fill(st_wave_t *w, float *buf, int len) {
         w->curr += w->step;
         if (w->curr >= 1.0f) {
           w->curr -= 1.0f;
-          w->noise_val = wave_noise_next(w);
+          /* reference FillNoise: the held value carries the amplitude at the
+             moment it is drawn; the amp ramp does not scale it afterwards */
+          w->noise_val = a * wave_noise_next(w);
         }
-        buf[i] = a * w->noise_val;
+        buf[i] = w->noise_val;
       }
       break;
     }
@@ -273,11 +286,11 @@ static void ins_ply_init(st_ins_ply_t *ip) {
   memset(ip, 0, sizeof(*ip));
   wave_init(&ip->wave);
   ip->curr_amp = 0;
-  ip->curr_f = 1.0f;
-  ip->curr_part_freq = 1.0f;
-  ip->curr_part_amp = 1.0f;
-  ip->curr_part_co = 1.0f;
-  ip->ins_freq = 1.0f;
+  ip->curr_f = 0;
+  ip->curr_part_freq = 440.0f;
+  ip->curr_part_amp = 0;
+  ip->curr_part_co = 0;
+  ip->ins_freq = 440.0f;
   ip->res = 0;
   ip->adsr = -1;
   ip->f_adsr = -1;
@@ -289,21 +302,14 @@ static void ins_ply_trig(st_ins_ply_t *ip, st_ins_t *ins, const float *n2f) {
   ip->step_c = 0;
   ip->next_s = 0;
 
-  /* reset amp envelope */
-  ip->curr_amp = 0;
-  ip->amp_step = 0;
+  /* Reference InsPly.TrigAdsr: only envelope pointers are reset. Level
+     (curr_amp, curr_f), step slopes, filter state, LFO phase and the wave
+     oscillator keep their values, so a retrigger glides from the old level. */
   ip->adsr = -1;
   ip->next_adsr = 0;
-
-  /* reset filter envelope */
-  ip->curr_f = 0;
-  ip->f_step = 0;
   ip->f_adsr = -1;
   ip->next_f_adsr = 0;
 
-  /* reset LFOs */
-  ip->vib.curr = 0;
-  ip->pwm_lfo.curr = 0;
   lfo_set(&ip->vib, (float)ins->vib_s * 50.0f);
   lfo_set(&ip->pwm_lfo, (float)ins->pwm_s * 5.0f);
   ip->v_amp = (float)ins->vib_d / 2000.0f;
@@ -313,11 +319,6 @@ static void ins_ply_trig(st_ins_ply_t *ip, st_ins_t *ins, const float *n2f) {
   float raw_r = (float)ins->res / 255.0f;
   ip->res = 1.0f - (1.0f - raw_r) * (1.0f - raw_r);
 
-  /* reset filter state */
-  ip->lo = ip->hi = ip->bp = ip->bs = 0;
-
-  /* reset wave */
-  wave_init(&ip->wave);
   ip->pwm_offs = 0;
 
   (void)n2f;
@@ -354,7 +355,9 @@ static bool ins_ply_next(st_ins_ply_t *ip, float *buf, int sps_pal,
     ip->next_s = ins->sps;
     if (ip->step_c < ins->len) {
       st_ins_step_t *is = &ins->steps[ip->step_c];
-      wave_set_form(&ip->wave, is->wform);
+      /* reference Next: wform 0 keeps the previous waveform */
+      if (is->wform != 0) wave_set_form(&ip->wave, is->wform);
+      ip->cur_relative = is->relative;
       if (is->note > 0 && is->note < ST_MAX_NOTES) {
         if (is->relative) {
           ip->ins_freq = r2f[is->note];
@@ -404,22 +407,12 @@ static bool ins_ply_next(st_ins_ply_t *ip, float *buf, int sps_pal,
   /* ── Compute final values ── */
   float final_amp = ip->curr_amp * ip->curr_part_amp;
   float final_co  = ip->curr_f * ip->curr_part_co;
-  final_co = clampf(final_co, 0.0f, 1.0f);
 
   /* ── Set frequency with vibrato ── */
   float vib_mod = 1.0f + ip->v_amp * lfo_next(&ip->vib);
-  float freq;
-  if (ip->trigged && ip->curr_ins->steps[0].relative) {
-    freq = ip->curr_part_freq * ip->ins_freq * vib_mod;
-  } else {
-    /* Check if current instrument step is relative */
-    int cur_step = ip->step_c > 0 ? ip->step_c - 1 : 0;
-    if (cur_step < ins->len && ins->steps[cur_step].relative) {
-      freq = ip->curr_part_freq * ip->ins_freq * vib_mod;
-    } else {
-      freq = ip->ins_freq * vib_mod;
-    }
-  }
+  /* reference: the most recently read step decides, whether or not it set a note */
+  float freq = ip->cur_relative ? ip->curr_part_freq * ip->ins_freq * vib_mod
+                                : ip->ins_freq * vib_mod;
   wave_set_freq(&ip->wave, freq);
 
   /* ── PWM ── */
@@ -440,9 +433,9 @@ static bool ins_ply_next(st_ins_ply_t *ip, float *buf, int sps_pal,
 
   /* ── Apply filter ── */
   if (ins->filter_mode != ST_FILT_OFF) {
-    /* Clamp cutoff for SVF stability (must be < ~1.0 to prevent blowup) */
-    float co = clampf(final_co, 0.0f, 0.99f);
-    float amp_clamp = final_amp > 0.001f ? final_amp : 0.001f;
+    /* reference filters: no cutoff clamp, lo clamped to +-amp only */
+    float co = final_co;
+    float amp_clamp = final_amp;
     for (int i = 0; i < sps_pal; i++) {
       float f = buf[i];
       switch (ins->filter_mode) {
@@ -470,9 +463,6 @@ static bool ins_ply_next(st_ins_ply_t *ip, float *buf, int sps_pal,
           ip->bp += co * ip->hi;
           ip->lo = clampf(t, -amp_clamp, amp_clamp);
           ip->bs = ip->lo + ip->hi;
-          /* Clamp filter state to prevent blowup */
-          ip->bp = clampf(ip->bp, -4.0f, 4.0f);
-          ip->hi = clampf(ip->hi, -4.0f, 4.0f);
           switch (ins->filter_mode) {
             case ST_FILT_LP: buf[i] = ip->lo; break;
             case ST_FILT_HP: buf[i] = ip->hi; break;
@@ -505,10 +495,11 @@ static bool ins_ply_next(st_ins_ply_t *ip, float *buf, int sps_pal,
     }
   }
 
-  /* Final per-sample clamp to prevent any blowup from reaching the mixer */
-  for (int i = 0; i < sps_pal; i++) {
-    if (buf[i] > 1.0f) buf[i] = 1.0f;
-    if (buf[i] < -1.0f) buf[i] = -1.0f;
+  /* No per-sample clamp (reference has none; the mixer clamps). Only guard
+     against a non-finite filter state poisoning every later block. */
+  if (!isfinite(ip->lo) || !isfinite(ip->hi) || !isfinite(ip->bp) || !isfinite(ip->bs)) {
+    ip->lo = ip->hi = ip->bp = ip->bs = 0;
+    memset(buf, 0, sps_pal * sizeof(float));
   }
 
   return true;
@@ -941,6 +932,7 @@ int sawteeth_init(const uint8_t *data, int len) {
 
   st_engine_t *e = &g_engine;
   memset(e, 0, sizeof(*e));
+  g_jng_seed = 1;
   e->sample_rate = ST_SAMPLE_RATE;
 
   if (parse_file(e, data, len) != 0) {
