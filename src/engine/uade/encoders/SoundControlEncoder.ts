@@ -2,7 +2,7 @@
  * SoundControlEncoder — Encodes TrackerCell back to Sound Control native format.
  *
  * Sound Control tracks use variable-length events:
- *   Note event:  4 bytes { noteByte, sampleOrInstr, unused(0), volume }
+ *   Note event:  4 bytes { noteByte, duration, sampleNumber, volume }
  *   Wait event:  2 bytes { 0x00, numTicks }
  *   End marker:  2 bytes { 0xFF, 0xFF }
  *
@@ -37,6 +37,14 @@ function applySoundControlCarriers(out: Uint8Array, cell: TrackerCell): void {
   }
 }
 
+/** Duration of a note typed on a blank row (8 is the most common duration of the corpus song). */
+const DEFAULT_DURATION = 8;
+
+/** Grid instrument id -> sample table index: the parser gives sample s the instrument id s + 1. */
+function scSampleNumber(instrument: number | undefined): number {
+  return instrument && instrument > 0 ? (instrument - 1) & 0xFF : 0;
+}
+
 /**
  * Reverse of sc40NoteToXm: XM note → SC 4.0+ period table index (1-based).
  * sc40NoteToXm does: idx + 13 → xmNote (SoundControlParser), so reverse: xmNote - 13 + 1 = xmNote - 12
@@ -68,11 +76,11 @@ function xmToSc3xNote(xmNote: number): number {
 /**
  * Encode a TrackerCell to SC 4.0+ format (4 bytes).
  */
-function encodeSoundControl40Cell(cell: TrackerCell): Uint8Array {
+function encodeSoundControl40Cell(cell: TrackerCell, stored?: Uint8Array): Uint8Array {
   const out = new Uint8Array(4);
   out[0] = xmToSc40Note(cell.note ?? 0);
-  out[1] = (cell.instrument ?? 0) & 0xFF;
-  out[2] = 0; // unused byte (yy)
+  out[1] = stored?.[1] ?? DEFAULT_DURATION; // duration is not in the grid: an edit of an existing event keeps its stored byte, a new note gets the default
+  out[2] = scSampleNumber(cell.instrument);
   out[3] = (cell.volume ?? 0) & 0x7F;
   applySoundControlCarriers(out, cell);
   return out;
@@ -81,11 +89,11 @@ function encodeSoundControl40Cell(cell: TrackerCell): Uint8Array {
 /**
  * Encode a TrackerCell to SC 3.x format (4 bytes).
  */
-function encodeSoundControl3xCell(cell: TrackerCell): Uint8Array {
+function encodeSoundControl3xCell(cell: TrackerCell, stored?: Uint8Array): Uint8Array {
   const out = new Uint8Array(4);
   out[0] = xmToSc3xNote(cell.note ?? 0);
-  out[1] = (cell.instrument ?? 0) & 0xFF;
-  out[2] = 0; // unused byte (yy)
+  out[1] = stored?.[1] ?? DEFAULT_DURATION; // duration is not in the grid: an edit of an existing event keeps its stored byte, a new note gets the default
+  out[2] = scSampleNumber(cell.instrument);
   out[3] = (cell.volume ?? 0) & 0x7F;
   applySoundControlCarriers(out, cell);
   return out;

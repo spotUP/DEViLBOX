@@ -280,7 +280,9 @@ export function parseSoundControlFile(bytes: Uint8Array, filename: string): Trac
 
         // zz=0x80 means "store note+sample in list" (4.0+), else volume
         const volume = (zz === 0x80) ? 64 : Math.min(64, zz & 0x7f);
-        const sampleOrInstr = dat2;
+        // Event bytes: nn dd ss zz. dd (dat2) is the note DURATION (timer, multiples of 4 on the corpus); ss (yy) is the SAMPLE number
+        // (player disassembly 0x10d2-0x10ea indexes the sample table with it). Row placement comes from the wait events, not from dd.
+        const sampleOrInstr = yy;
 
         rows.push({
           wait: 0,
@@ -293,7 +295,6 @@ export function parseSoundControlFile(bytes: Uint8Array, filename: string): Trac
           fileOffset: eventOff,
         });
 
-        void yy; // yy is unused per spec ("ignored")
       }
     }
 
@@ -519,20 +520,21 @@ export function parseSoundControlFile(bytes: Uint8Array, filename: string): Trac
     formatId: 'soundControl',
     patternDataFileOffset: tracksBase, // tracks section starts at offset 64
     bytesPerCell: 4,
+    encodeOverStored: true, // byte 1 (duration) is not in the grid: edits keep the stored byte
     rowsPerPattern: 64, // nominal (actual varies per track)
     numChannels,
     numPatterns: trackerPatterns.length,
     moduleSize: bytes.byteLength,
     encodeCell,
     decodeCell: (raw: Uint8Array): TrackerCell => {
-      // 4 bytes: noteByte, instrument, unused, volume
+      // 4 bytes: noteByte, duration, sample number, volume
       const noteByte = raw[0];
-      const instrument = raw[1];
+      const instrument = sampleIdMap.get(raw[2]) ?? 0;
       const volume = raw[3] & 0x7F;
       const note = is40orHigher ? sc40NoteToXm(noteByte) : sc3xNoteToXm(noteByte);
       // Byte-exact carrier. The 4-byte note event is lossy in the XM view: the note maps
       // through a nearest-match period table, the volume masks its top bit (&0x7F), and
-      // raw[2] (unused) is dropped. Stash the raw 4 source bytes in the invisible
+      // the duration (raw[1]) is not shown in the grid. Stash the raw 4 source bytes in the invisible
       // period/pan/cutoff carriers (fields the parser's grid loop never sets, so edited
       // cells fall back to the canonical derivation).
       return {

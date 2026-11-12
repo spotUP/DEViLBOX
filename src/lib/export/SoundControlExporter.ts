@@ -159,7 +159,8 @@ export async function exportSoundControl(
         if ((cell.note ?? 0) > 0) grow.push({ pattern, row, channel, cell });
         continue;
       }
-      out.set(layout.encodeCell(cell), at);
+      // Byte 1 is the event's duration: the grid does not show it, so an edit keeps the module's own byte.
+      out.set(layout.encodeCell(cell, out.slice(at, at + layout.bytesPerCell)), at);
     }
     // Notes on rows that are ticks of a wait (G5): each split moves what follows, so the module is parsed again after every one.
     const { parseSoundControlFile } = await import('@/lib/import/formats/SoundControlParser');
@@ -167,7 +168,7 @@ export async function exportSoundControl(
       const fresh = parseSoundControlFile(out, song.name || 'module')?.uadePatternLayout;
       const at = fresh?.getCellFileOffset?.(g.pattern, g.row, g.channel) ?? -1;
       // An earlier split of the same wait may have made this row a note row of its own: then it is an in-place edit.
-      if (fresh && at >= 0) { out = out.slice(); out.set(fresh.encodeCell(g.cell), at); continue; }
+      if (fresh && at >= 0) { out = out.slice(); out.set(fresh.encodeCell(g.cell, out.slice(at, at + fresh.bytesPerCell)), at); continue; }
       const next = fresh?.growCell?.(out, g.pattern, g.row, g.channel, g.cell);
       if (!next || typeof next === 'string') warnings.push(`pattern ${g.pattern} voice ${g.channel + 1} row ${g.row}: ${next ?? 'the module could not be read again'}; not written`);
       else out = next;
