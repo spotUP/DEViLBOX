@@ -442,6 +442,9 @@ export async function parse669File(
     encodeCell: encode669Edit,
     decodeCell: decode669Bytes,
     encodeOverStored: true,
+    // One file pattern plays at several song positions; speed and pattern break are injected per position on channel 0.
+    propagateSharedCells: true,
+    positionBoundFields: (_row, channel) => (channel === 0 ? ['effTyp', 'eff'] : []),
     getCellFileOffset: (pattern, row, channel) => {
       const filePattern = rawOrders[pattern];
       return filePattern === undefined ? -1 : patternDataBase + filePattern * PATTERN_SIZE + (row * NUM_CHANNELS + channel) * BYTES_PER_CELL;
