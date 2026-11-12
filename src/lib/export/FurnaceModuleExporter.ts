@@ -1,7 +1,7 @@
 /**
  * Furnace module (.fur) writer for a Neo Geo (YM2610 / OPNB) song composed in the tracker.
  *
- * Writes the current module layout (format version 240, INF2 / SNG2 / INS2 / PATN blocks,
+ * Writes the current module layout (format version 245, INF2 / SNG2 / INS2 / PATN blocks,
  * zlib-compressed), the one Furnace 0.6.8 and later read. Layout reference:
  * third-party/furnace-master/papers/format.md and src/engine/fileOps/fur.cpp. The pattern
  * channel is ONE byte in a PATN header, as fur.cpp writes it (format.md says two).
@@ -25,8 +25,13 @@ import {
 import { resolveInsType, DIV_INS_ADPCMA, DIV_INS_ADPCMB } from './FurnaceInstrumentEncoder';
 import { editorEffectToFurnace, xmVolToFurnace, xmNoteToFurnace } from '@/lib/import/furnaceEditorCells';
 
-/** Furnace format version written: the first with INF2 / SNG2 blocks. */
-export const FUR_EXPORT_VERSION = 240;
+/**
+ * Furnace format version written: DIV_ENGINE_VERSION of the vendored Furnace (engine.h, 245), the
+ * engine that plays the song here. INF2 / SNG2 blocks start at 240 in Furnace itself, but ngdevkit's
+ * furtool.py reads `version <= 240` with the old INFO reader, and Furnace converts ADSR / LFO macros
+ * of instruments below 245 (convertOldADSRLFO), which would change macros written with 245 meaning.
+ */
+export const FUR_EXPORT_VERSION = 245;
 /** System id of the YM2610 (Neo Geo): FM 1-4, SSG 1-3, ADPCM-A 1-6, ADPCM-B. */
 export const FUR_SYSTEM_YM2610 = 0xa5;
 export const FUR_NEO_GEO_CHANNELS = 14;
@@ -332,7 +337,7 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   // Layout: header, INF2, SNG2, INS2..., PATN...
   const buildInf2 = (sngPtr: number, insPtrs: number[], patPtrs: number[]): Uint8Array => {
     const b = new Bytes()
-      .str(song.name).str('').str('Neo Geo').str('')
+      .str(song.name).str('').str('Neo Geo MVS').str('')
       .str('').str('').str('').str('')
       .f32(440).u8(1)
       .f32(1).u16(FUR_NEO_GEO_CHANNELS).u16(1)

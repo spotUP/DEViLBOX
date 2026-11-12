@@ -200,6 +200,28 @@ describe('exportFurnaceModule', () => {
     expect(found).toBe(true);
   });
 
+  // ngdevkit's furtool.py reads `version <= 240` with the old INFO reader (assert on "INFO"), so a
+  // module with INF2 blocks must carry a version above 240. 245 is DIV_ENGINE_VERSION of the vendored
+  // Furnace; below it Furnace converts ADSR / LFO macros on load. furtool also takes the clock from
+  // the system name (MVS or AES).
+  it('writes format version 245 and the system name "Neo Geo MVS", which ngdevkit furtool needs', () => {
+    const raw = pako.inflate(exportFurnaceModule(song()).bytes);
+    const view = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
+    expect(new TextDecoder().decode(raw.subarray(0, 16))).toBe('-Furnace module-');
+    expect(view.getUint16(16, true)).toBe(245);
+    const infoAt = view.getUint32(20, true);
+    expect(new TextDecoder().decode(raw.subarray(infoAt, infoAt + 4))).toBe('INF2');
+    // INF2 body: song name, author, system name (zero-terminated strings).
+    const strings: string[] = [];
+    let at = infoAt + 8;
+    for (let i = 0; i < 3; i++) {
+      const end = raw.indexOf(0, at);
+      strings.push(new TextDecoder().decode(raw.subarray(at, end)));
+      at = end + 1;
+    }
+    expect(strings).toEqual(['Round trip', '', 'Neo Geo MVS']);
+  });
+
   it('refuses what the module cannot hold', () => {
     const s = song();
     s.patterns[1] = { ...s.patterns[1], length: 32 };
