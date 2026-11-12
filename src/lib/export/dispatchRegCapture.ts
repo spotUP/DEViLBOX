@@ -23,6 +23,13 @@ export interface DispatchRegBatch {
  * VGM chip type for a dispatch platform, or null when the exporter has no
  * mapping yet (only the YM2610 family so far).
  */
+export const VGM_MAPPED_PLATFORMS: readonly number[] = [
+  FurnaceDispatchPlatform.YM2610_FULL,
+  FurnaceDispatchPlatform.YM2610_FULL_EXT,
+  FurnaceDispatchPlatform.YM2610_CRAP,
+  FurnaceDispatchPlatform.YM2610_CRAP_EXT,
+];
+
 export function vgmChipTypeOfPlatform(platformType: number): number | null {
   switch (platformType) {
     case FurnaceDispatchPlatform.YM2610_FULL:
@@ -55,5 +62,28 @@ export function batchesToRegisterWrites(batches: readonly DispatchRegBatch[]): R
       });
     }
   }
+  return out;
+}
+
+/** VGM wait commands count samples at this fixed rate. */
+export const VGM_SAMPLE_RATE = 44100;
+
+/**
+ * Turn a dispatch capture into the 12-byte-per-entry log `parseRegisterLog`
+ * reads (timestamp u32, chipType u8, port u32 at +5, data u8, 2 pad), with the
+ * timestamps converted from the worklet sample rate to the VGM rate of 44100.
+ * Going through the log keeps the one export path (`exportChipMusic`) for both
+ * capture sources. The VGM length is the last write's time; no loop is derived.
+ */
+export function dispatchCaptureToLog(writes: readonly RegisterWrite[], workletRate: number): Uint8Array {
+  const out = new Uint8Array(writes.length * 12);
+  const view = new DataView(out.buffer);
+  writes.forEach((w, i) => {
+    const o = i * 12;
+    view.setUint32(o, Math.round(w.timestamp * VGM_SAMPLE_RATE / workletRate), true);
+    view.setUint8(o + 4, w.chipType);
+    view.setUint32(o + 5, w.port, true);
+    view.setUint8(o + 9, w.data);
+  });
   return out;
 }

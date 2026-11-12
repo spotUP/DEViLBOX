@@ -6,6 +6,8 @@
  */
 
 import { FurnaceChipEngine, FurnaceChipType } from '../../engine/chips/FurnaceChipEngine';
+import { FurnaceDispatchEngine } from '../../engine/furnace-dispatch/FurnaceDispatchEngine';
+import { VGM_MAPPED_PLATFORMS, dispatchCaptureToLog } from './dispatchRegCapture';
 import { parseRegisterLog, exportToVGM, type VGMExportOptions, type RegisterWrite } from './VGMExporter';
 import { exportToZSM, canExportZSM, type ZSMExportOptions } from './ZSMExporter';
 import { exportToSAP, canExportSAP, type SAPExportOptions } from './SAPExporter';
@@ -368,6 +370,8 @@ export async function exportChipMusic(
 export class ChipRecordingSession {
   private isRecording = false;
   private engine: FurnaceChipEngine;
+  /** Set while recording from the dispatch engine (user-made Furnace chip songs). */
+  private dispatch: FurnaceDispatchEngine | null = null;
 
   constructor() {
     this.engine = FurnaceChipEngine.getInstance();
@@ -382,7 +386,13 @@ export class ChipRecordingSession {
       return;
     }
 
-    this.engine.setLogging(true);
+    // Capture source, chosen here only: a song on FurnaceDispatchEngine (its
+    // chips exist, one with a VGM mapping) records through the dispatch
+    // capture; everything else through the FurnaceChipEngine log.
+    const d = FurnaceDispatchEngine.getInstance();
+    this.dispatch = d.isInitialized && VGM_MAPPED_PLATFORMS.some(p => d.hasChip(p)) ? d : null;
+    if (this.dispatch) this.dispatch.startRegCapture();
+    else this.engine.setLogging(true);
     this.isRecording = true;
     console.log('[ChipRecordingSession] Recording started');
   }
@@ -396,8 +406,16 @@ export class ChipRecordingSession {
       return new Uint8Array(0);
     }
 
-    this.engine.setLogging(false);
     this.isRecording = false;
+    if (this.dispatch) {
+      const d = this.dispatch;
+      this.dispatch = null;
+      d.stopRegCapture();
+      // The last tick's batch may still be in flight from the worklet.
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return dispatchCaptureToLog(d.getRegCaptureLog(), d.regCaptureSampleRate);
+    }
+    this.engine.setLogging(false);
 
     const logData = await this.engine.getLog();
     console.log(`[ChipRecordingSession] Recording stopped. Captured ${logData.length} bytes`);

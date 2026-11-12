@@ -1780,6 +1780,9 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
     return batchesToRegisterWrites(this._regCaptureBatches);
   }
 
+  /** Sample rate of the timestamps in getRegCaptureLog (the native context rate). */
+  get regCaptureSampleRate(): number { return this._nativeCtx?.sampleRate ?? 44100; }
+
   /** Enable/disable command log capture for automation lanes */
   enableCmdLog(enable: boolean): void {
     this.workletNode?.port.postMessage({ type: 'enableCmdLog', enable });
