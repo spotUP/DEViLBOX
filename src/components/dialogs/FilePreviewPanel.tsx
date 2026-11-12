@@ -568,7 +568,7 @@ export const HVSCPanel: React.FC<HVSCPanelProps> = ({ isOpen, onLoadTrackerModul
                 {/* Back button for directories */}
                 {hvscPath && (
                   <div
-                    className="flex items-center gap-3 px-3 py-2 bg-dark-bgTertiary/50 rounded border border-dark-borderLight
+                    className="sticky top-0 z-10 flex items-center gap-3 px-3 py-2 bg-dark-bgTertiary rounded border border-dark-borderLight
                                hover:bg-dark-bgHover hover:border-dark-border transition-colors cursor-pointer"
                     onClick={() => {
                       const parentPath = hvscPath.split('/').slice(0, -1).join('/');
