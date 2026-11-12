@@ -21,6 +21,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { ST_FX_BASE } from '@/lib/import/formats/commandStreamEffectGlyphs';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -82,8 +83,12 @@ export async function exportSawteeth(
           continue;
         }
         const ins = (cell.instrument ?? 0) & 0xFF;
-        // Sawteeth effect byte — the parser stores raw eff and doesn't map to XM effects
-        const eff = 0;
+        // Sawteeth effect byte: the parser shows it as format-private effect ST_FX_BASE + high nibble
+        // with the low nibble as the value; write the same byte back (anything else has no Sawteeth byte).
+        const effTyp = cell.effTyp ?? 0;
+        const eff = effTyp >= ST_FX_BASE && effTyp <= ST_FX_BASE + 0x0f
+          ? ((effTyp - ST_FX_BASE) << 4) | ((cell.eff ?? 0) & 0x0f)
+          : 0;
         const note = (cell.note ?? 0);
         steps.push({
           ins,
