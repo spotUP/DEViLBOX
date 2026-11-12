@@ -24,6 +24,7 @@ import { FurnaceDispatchEngine } from '../furnace-dispatch/FurnaceDispatchEngine
 import { FurnaceEffectRouter } from '../furnace-dispatch/FurnaceEffectRouter';
 import { FurnaceDispatchPlatform, DivCmd } from '../furnace-dispatch/FurnaceDispatchEngine';
 import { chipChannelFor } from '../furnace-dispatch/chipChannel';
+import { FurnaceTickEffects } from '../furnace-dispatch/FurnaceTickEffects';
 import { useTrackerStore } from '@/stores/useTrackerStore';
 import { resetStore } from '@/stores/__tests__/_harness';
 
@@ -63,6 +64,11 @@ function build(furnaceNative = false) {
   r._replacedInstruments = new Set([INST_ID]);
   r.channels = [0, 1, 2].map(() => ({ instrument: config, volume: 64, gainNode: { gain: { setValueAtTime: () => undefined, cancelScheduledValues: () => undefined, linearRampToValueAtTime: () => undefined, value: 1 } } }));
   r.isChannelMuted = () => false;
+  // Object.create skips the class field initialisers.
+  r.furnaceTick = new FurnaceTickEffects();
+  r.furnaceTickChannels = new Map<number, number>();
+  r._bpm = 125;
+  r.speed = 6;
   return { r, calls };
 }
 
@@ -120,5 +126,45 @@ describe.each(entries)('cell effects reach the Furnace chip via %s', (_name, run
     setRow(2, { note: 0, instrument: 0, effTyp: 0x10, eff: 0x05, volume: 0x50 });
     run(r);
     expect(calls).toEqual([]);
+  });
+});
+
+/**
+ * Symptom: "arps are nowhere to be heard" in a user-made Neo Geo song. Such a song runs engine-driven
+ * (one callback per row, _suppressNotes true), where the TS tick handler does not step Furnace cell
+ * effects, so 0xy sent its base note once and never cycled.
+ */
+describe('arpeggio 0xy steps every tick of an engine-driven row', () => {
+  beforeEach(() => { resetStore(useTrackerStore); });
+
+  function buildTicking() {
+    const built = build();
+    const times: number[] = [];
+    const tone = holder.engine as { applyFurnaceChipCommand: (...a: unknown[]) => boolean };
+    const real = ToneEngine.prototype.applyFurnaceChipCommand;
+    tone.applyFurnaceChipCommand = function (this: unknown, ...a: unknown[]) {
+      if (a[3] === DivCmd.LEGATO) times.push(a[6] as number);
+      return (real as (...x: unknown[]) => boolean).apply(this, a);
+    };
+    built.r._suppressNotes = true;
+    return { ...built, times };
+  }
+
+  it('cycles base, +x, +y across the six ticks of the row, 20 ms apart', () => {
+    const { r, calls, times } = buildTicking();
+    setRow(1, { note: 49, instrument: INST_ID, effTyp: 0, eff: 0x47 });
+    (r as { fireHybridNotesForRow(t: number): void }).fireHybridNotesForRow(10);
+    const chan = chipChannelFor(1, CHIP_CHANNELS, undefined);
+    const legato = calls.filter((c) => c.cmd === DivCmd.LEGATO && c.chan === chan).map((c) => c.val1);
+    const base = legato[0];
+    expect(legato).toEqual([base, base + 4, base + 7, base, base + 4, base + 7]);
+    expect(times.map((t) => Math.round((t - 10) * 1000))).toEqual([0, 20, 40, 60, 80, 100]);
+  });
+
+  it('a row without 0xy sends no per-tick note change', () => {
+    const { r, calls } = buildTicking();
+    setRow(1, { note: 49, instrument: INST_ID });
+    (r as { fireHybridNotesForRow(t: number): void }).fireHybridNotesForRow(10);
+    expect(calls.filter((c) => c.cmd === DivCmd.LEGATO)).toEqual([]);
   });
 });
