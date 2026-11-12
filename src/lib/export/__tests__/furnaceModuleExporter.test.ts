@@ -305,6 +305,23 @@ describe('exportFurnaceModule', () => {
     expect(mod.chipFlags).toEqual(['ssgVol=256\n']);
   });
 
+  it('keeps the second speed, the grooves and the compat flags of a loaded Furnace module', async () => {
+    const r = exportFurnaceModule({
+      ...song(),
+      speed2: 3,
+      grooves: [[6, 4, 5], [2, 2]],
+      compatFlags: { limitSlides: true, linearPitch: 2, pitchSlideSpeed: 9, brokenShortcutSlides: false },
+    });
+    const mod = await parseFurnaceSong(r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) as ArrayBuffer);
+    expect(mod.subsongs[0].speed1).toBe(5);
+    expect(mod.subsongs[0].speed2).toBe(3);
+    expect(mod.grooves.map((g) => g.val.slice(0, g.len))).toEqual([[6, 4, 5], [2, 2]]);
+    expect(mod.compatFlags.limitSlides).toBe(true);
+    expect(mod.compatFlags.linearPitch).toBe(2);
+    expect(mod.compatFlags.pitchSlideSpeed).toBe(9);
+    expect(mod.compatFlags.brokenShortcutSlides).toBe(false);
+  });
+
   it('offers the export only for Neo Geo instruments', () => {
     expect(furnaceModuleExportAvailable(song().instruments)).toBe(true);
     expect(furnaceModuleExportAvailable([{ id: 1, name: 'x', type: 'synth', synthType: 'Synth' } as unknown as InstrumentConfig])).toBe(false);
