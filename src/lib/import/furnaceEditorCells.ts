@@ -93,10 +93,14 @@ export function furnaceRowToTrackerCell(row: FurnaceRow): TrackerCell {
   return cell;
 }
 
-/** Editor volume column (0 = empty, 0x10-0x50) → Furnace volume (-1 = empty, 0-127). */
+/**
+ * Editor volume column (0 = empty, 0x10-0x50 = set volume 0-64) → Furnace volume (-1 = empty, 0-127).
+ * 0x01-0x0F and 0x51-0xFF hold no set-volume in the XM volume column (0x60 and up are slides,
+ * vibrato, pan, portamento), so they map to empty instead of a full volume.
+ */
 export function xmVolToFurnace(vol: number): number {
-  if (vol < 0x10) return -1;
-  return Math.min(127, Math.round((Math.min(vol, 0x50) - 0x10) * 127 / 64));
+  if (vol < 0x10 || vol > 0x50) return -1;
+  return Math.round((vol - 0x10) * 127 / 64);
 }
 
 /** Editor effect (type, param) → Furnace effect (cmd, val): the cell holds Furnace's code and value as they are. */

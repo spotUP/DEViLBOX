@@ -135,11 +135,18 @@ export function cellToFile(
     else ins = idx;
   }
   let vol = cell.volume ? xmVolToFurnace(cell.volume) : -1;
+  if (cell.volume && vol < 0) warnings.push(`${where}: volume column 0x${cell.volume.toString(16)} dropped, it is not a set-volume value (0x10-0x50)`);
   const fx = cellEffects(cell).map(([t, v]) => {
     if (notation === 'tracker' && t === 0x0c) {
       if (vol < 0) vol = xmVolToFurnace(0x10 + Math.min(64, v));
       else warnings.push(`${where}: Cxx dropped because the volume column is already set`);
       return { type: -1, val: -1 };
+    }
+    if (notation === 'tracker' && t === 0x0f) {
+      // Store meaning: 01-1F speed, 20-FF BPM, 00 stops. Furnace 0Fxx is speed only, F0xx is tempo
+      // (tick rate = value * 2 / 5 Hz, the same as a tracker BPM), FF00 stops the song.
+      if (v >= 0x20) return { type: 0xf0, val: v };
+      if (v === 0) return { type: 0xff, val: 0 };
     }
     const e = editorEffectToFurnace(t, v);
     return { type: e.cmd, val: e.val };
