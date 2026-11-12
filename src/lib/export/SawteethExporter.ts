@@ -22,6 +22,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { ST_FX_BASE } from '../import/formats/commandStreamEffectGlyphs';
+import type { SawteethStored, SawteethPart } from '../import/formats/SawteethParser';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -40,12 +41,142 @@ interface ExportPart {
   name: string;
 }
 
+
+// ── Carrier path: write the stored structure back, apply grid edits onto the stored part steps ──────────
+
+interface ExportChannel {
+  left: number;
+  right: number;
+  lLoop: number;
+  rLoop: number;
+  steps: Array<{ part: number; transp: number; dAmp: number }>;
+}
+
+interface Layout {
+  version: number;
+  spsPal: number;
+  channels: ExportChannel[];
+  parts: ExportPart[];
+  breakPoints: number[][];
+  /** Names to write; the stored counts when carried, all of them otherwise. */
+  partNamesStored: number;
+  insNamesStored: number | null;
+}
+
+interface GridSource { partIdx: number; row: number }
+type SongWithCarrier = TrackerSong & {
+  sawteethStored?: SawteethStored;
+  sawteethGridSource?: Array<Array<GridSource | null>>;
+};
+
+const clampNote = (n: number): number => Math.max(1, Math.min(96, n));
+
+/**
+ * Returns the stored layout with the grid edits applied, or a string naming why the carrier cannot express the song.
+ * Fallback triggers (each returns a reason): no carrier; version below 900 (instrument layout differs); channel count
+ * changed; pattern order not 0..n-1; pattern added, removed or resized (row count per channel or the 64-row pattern
+ * split differs from the parsed grid); speed (row ticks) changed; a non-empty cell on a row that is not the start of a
+ * stored part step. Not triggers: cell edits (note, instrument, effect), BPM (written as spsPal), channel pan,
+ * instrument edits, song name.
+ */
+function planFromCarrier(song: SongWithCarrier): Layout | string {
+  const st = song.sawteethStored;
+  const source = song.sawteethGridSource;
+  if (!st || !source) return 'no stored Sawteeth structure (song composed from scratch)';
+  if (st.version < 900) return `file version ${st.version} is below 900 (older instrument layout)`;
+  if (song.numChannels !== st.channels.length || source.length !== st.channels.length) return 'channel count changed';
+  if (song.songPositions.length !== song.patterns.length || song.songPositions.some((p, i) => p !== i)) return 'pattern order changed';
+  const total = song.patterns.reduce((n, p) => n + p.length, 0);
+  if (source.some((c) => c.length !== total)) return 'pattern added, removed or resized';
+  const PAT = 64;
+  if (song.patterns.some((p, i) => p.length !== Math.min(PAT, total - PAT * i))) return 'pattern resized';
+  if (song.initialSpeed !== st.rowTicks) return 'speed (row length) changed';
+
+  const parts: ExportPart[] = st.parts.map((p: SawteethPart) => ({
+    sps: p.sps,
+    steps: p.steps.map((s) => ({ ...s })),
+    name: p.name,
+  }));
+  const rowAt = (ch: number, flat: number) => {
+    let rest = flat;
+    for (const p of song.patterns) {
+      if (rest < p.length) return p.channels[ch]?.rows[rest];
+      rest -= p.length;
+    }
+    return undefined;
+  };
+
+  // The channel pan the parser derived; a pan the user did not touch keeps the raw stored left/right.
+  const panOf = (c: { left: number; right: number }): number => Math.round(((c.right - c.left) / 255) * 50);
+  const channels: ExportChannel[] = [];
+  for (let ch = 0; ch < st.channels.length; ch++) {
+    const sc = st.channels[ch];
+    let left = sc.left;
+    let right = sc.right;
+    const pan = song.patterns[0]?.channels[ch]?.pan;
+    if (pan !== undefined && pan !== panOf(sc)) {
+      const norm = (pan + 50) / 100;
+      left = Math.round((1 - norm) * 255);
+      right = Math.round(norm * 255);
+    }
+    channels.push({ left, right, lLoop: sc.lLoop, rLoop: sc.rLoop, steps: sc.steps.map((s) => ({ ...s })) });
+
+    // Walk the grid: the stored step behind each starting row, compared with what the parser would have shown.
+    const chRows = source[ch];
+    // Which channel step (and so which transpose) each grid row belongs to is recomputed as the parser walks it.
+    let flat = 0;
+    for (let si = 0; si <= sc.rLoop; si++) {
+      const step = sc.steps[si];
+      const partIdx = Math.min(step.part, st.parts.length - 1);
+      const part = st.parts[partIdx];
+      const rowsPerStep = part.sps / st.rowTicks;
+      for (let row = 0; row < part.len; row++) {
+        const orig = part.steps[row];
+        const src = chRows[flat];
+        const cell = rowAt(ch, flat);
+        if (!src || src.partIdx !== partIdx || src.row !== row) return 'grid no longer matches the stored part steps';
+        if (cell) {
+          const wantNote = orig.note > 0 ? clampNote(orig.note + step.transp) : 0;
+          const wantIns = orig.ins > 0 && orig.ins < st.instrumentCount ? orig.ins : 0;
+          const wantEffTyp = orig.eff !== 0 ? ST_FX_BASE + (orig.eff >> 4) : 0;
+          const wantEff = orig.eff & 0x0f;
+          const target = parts[partIdx].steps[row];
+          if ((cell.note ?? 0) !== wantNote) {
+            const n = cell.note ?? 0;
+            target.note = n >= 1 && n <= 96 ? Math.max(0, Math.min(255, n - step.transp)) : 0;
+          }
+          if ((cell.instrument ?? 0) !== wantIns) target.ins = (cell.instrument ?? 0) & 0xff;
+          if ((cell.effTyp ?? 0) !== wantEffTyp || (cell.eff ?? 0) !== wantEff) {
+            const t = cell.effTyp ?? 0;
+            target.eff = t >= ST_FX_BASE && t <= ST_FX_BASE + 0x0f ? ((t - ST_FX_BASE) << 4) | ((cell.eff ?? 0) & 0x0f) : 0;
+          }
+        }
+        flat++;
+        for (let k = 1; k < rowsPerStep; k++) {
+          const filler = rowAt(ch, flat);
+          if (chRows[flat] !== null) return 'grid no longer matches the stored part steps';
+          if (filler && (filler.note || filler.instrument || filler.effTyp || filler.eff)) {
+            return 'a cell was filled on a row that is not the start of a stored part step';
+          }
+          flat++;
+        }
+      }
+    }
+    if (flat !== total) return 'grid length differs from the stored channel sequence';
+  }
+
+  // Tempo: the parser derived BPM = 110250 / spsPal.
+  let spsPal = st.spsPal;
+  if (Math.abs(song.initialBPM - 110250 / st.spsPal) > 1e-6 && song.initialBPM > 0) {
+    spsPal = Math.max(1, Math.min(65535, Math.round(110250 / song.initialBPM)));
+  }
+  return { version: st.version, spsPal, channels, parts, breakPoints: st.breakPoints, partNamesStored: st.partNamesStored, insNamesStored: st.insNamesStored };
+}
+
 // ── Main export function ─────────────────────────────────────────────────────
 
-export async function exportSawteeth(
-  song: TrackerSong,
-): Promise<{ data: Blob; filename: string; warnings: string[] }> {
-  const warnings: string[] = [];
+/** Fallback: flatten everything (one part per pattern-channel slice, transpose 0, loops 0..len-1, no break points). */
+function planFlatten(song: TrackerSong, warnings: string[]): Layout {
 
   const numChannels = Math.min(12, song.numChannels);
   if (numChannels < 1) {
@@ -145,23 +276,47 @@ export async function exportSawteeth(
     channelSeqs.push(seq);
   }
 
-  // ── Build instrument data ────────────────────────────────────────────────
-  // Sawteeth instruments are synth-based. We create minimal valid instruments
-  // from TrackerSong instrument configs. Instrument 0 is a dummy (not written).
-  const insCount = Math.min(255, Math.max(1, song.instruments.length));
-
-  // ── Derive panning from pattern channel info ─────────────────────────────
+  // ── Pan derived from pattern channel info ───────────────────────────────
   const channelPans: Array<{ left: number; right: number }> = [];
   for (let ch = 0; ch < channelCount; ch++) {
-    // Try to recover pan from pattern channel data
     const pat0 = song.patterns[song.songPositions[0] ?? 0];
     const panVal = pat0?.channels[ch]?.pan ?? 0; // -50..50 range in DEViLBOX
-    // Convert back: left = 255 when pan=-50, right = 255 when pan=50
     const norm = (panVal + 50) / 100; // 0..1
-    const left = Math.round((1 - norm) * 255);
-    const right = Math.round(norm * 255);
-    channelPans.push({ left, right });
+    channelPans.push({ left: Math.round((1 - norm) * 255), right: Math.round(norm * 255) });
   }
+  return {
+    version: ST_VERSION,
+    spsPal: SPS_PAL,
+    channels: channelSeqs.map((seq, ch) => ({
+      left: channelPans[ch].left,
+      right: channelPans[ch].right,
+      lLoop: 0,
+      rLoop: seq.length - 1,
+      steps: seq,
+    })),
+    parts: exportParts,
+    breakPoints: [],
+    partNamesStored: exportParts.length,
+    insNamesStored: null,
+  };
+}
+
+export async function exportSawteeth(
+  song: TrackerSong,
+): Promise<{ data: Blob; filename: string; warnings: string[] }> {
+  const warnings: string[] = [];
+  const carried = planFromCarrier(song as SongWithCarrier);
+  let layout: Layout;
+  if (typeof carried === 'string') {
+    warnings.push(`Sawteeth export rewrote the song structure (parts not shared, transposes baked in, loop points and break points reset): ${carried}.`);
+    layout = planFlatten(song, warnings);
+  } else {
+    layout = carried;
+  }
+  const { version: ST_VERSION, spsPal: SPS_PAL, channels: layoutChannels, parts: exportParts, breakPoints } = layout;
+  const channelCount = layoutChannels.length;
+  const partCount = exportParts.length;
+  const insCount = Math.min(255, Math.max(1, song.instruments.length));
 
   // ── Serialize to binary ──────────────────────────────────────────────────
   const buf: number[] = [];
@@ -178,30 +333,16 @@ export async function exportSawteeth(
   // channelCount (u8)
   buf.push(channelCount);
 
-  // Per-channel data
-  for (let ch = 0; ch < channelCount; ch++) {
-    const seq = channelSeqs[ch];
-    const pan = channelPans[ch];
-    const len = seq.length;
-
-    buf.push(pan.left & 0xFF);   // Left
-    buf.push(pan.right & 0xFF);  // Right
-
-    // Len (u16 BE)
+  // Per-channel data. lLoop only for version >= 910, rLoop only for version >= 1200 (sawteeth.c L714-723).
+  for (const c of layoutChannels) {
+    const len = c.steps.length;
+    buf.push(c.left & 0xFF, c.right & 0xFF);
     buf.push((len >> 8) & 0xFF, len & 0xFF);
-
-    // lLoop (u16 BE, version >= 910)
-    buf.push(0, 0); // loop start = 0
-
-    // rLoop (u16 BE, version >= 1200)
-    const rLoop = len - 1;
-    buf.push((rLoop >> 8) & 0xFF, rLoop & 0xFF);
-
+    if (ST_VERSION >= 910) buf.push((c.lLoop >> 8) & 0xFF, c.lLoop & 0xFF);
+    if (ST_VERSION >= 1200) buf.push((c.rLoop >> 8) & 0xFF, c.rLoop & 0xFF);
     // Steps: part(1) + transp(1 signed) + dAmp(1)
-    for (const step of seq) {
-      buf.push(step.part & 0xFF);
-      buf.push(step.transp & 0xFF); // signed as unsigned byte
-      buf.push(step.dAmp & 0xFF);
+    for (const step of c.steps) {
+      buf.push(step.part & 0xFF, step.transp & 0xFF, step.dAmp & 0xFF);
     }
   }
 
@@ -257,19 +398,24 @@ export async function exportSawteeth(
     }
   }
 
-  // breakPCount (u8) = 0
-  buf.push(0);
+  // breakPCount (u8), then 8 raw bytes each (4 pal + 4 command)
+  buf.push(breakPoints.length & 0xFF);
+  for (const bp of breakPoints) for (const v of bp) buf.push(v & 0xFF);
 
   // ── Strings section ────────────────────────────────────────────────────
   // name, author, partNames[0..partCount-1], insNames[1..instrumentCount-1]
   writeString(buf, song.name || 'Untitled');
   writeString(buf, song.instruments.find((i) => i.sawteeth)?.sawteeth?.author ?? ''); // author
 
-  for (let i = 0; i < partCount; i++) {
+  for (let i = 0; i < Math.min(partCount, layout.partNamesStored); i++) {
     writeString(buf, exportParts[i].name || '');
   }
 
-  for (let i = 0; i < storedCount; i++) {
+  // An instrument name the user set must be written even if the original file stored no names.
+  let lastNamed = 0;
+  for (let i = 0; i < storedCount; i++) if (song.instruments[i]?.name) lastNamed = i + 1;
+  const insNameCount = Math.min(storedCount, Math.max(layout.insNamesStored ?? storedCount, lastNamed));
+  for (let i = 0; i < insNameCount; i++) {
     const inst = song.instruments[i];
     writeString(buf, inst?.name ?? '');
   }
