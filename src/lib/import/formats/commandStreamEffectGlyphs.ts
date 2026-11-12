@@ -4,7 +4,7 @@
  * SINGLE SOURCE OF TRUTH for the effTyp integers these two formats' commands occupy in the tracker grid. None is
  * an XM effect; each keeps its own id and its operand verbatim (low byte), named in the player's terms
  * (third-party/nuade/players/{riffraff,howiedavies}). `effTyp` is a GLOBAL id space shared by every format's
- * display path (xmEffectToString + TrackerGLRenderer + TrackerCanvas2DRenderer); the blocks are 0x510..0x517, 0x520..0x521, 0x530..0x531, 0x540..0x542 and 0x550..0x554
+ * display path (xmEffectToString + TrackerGLRenderer + TrackerCanvas2DRenderer); the blocks are 0x510..0x517, 0x520..0x521, 0x530..0x531, 0x540..0x542, 0x550..0x554 and 0x560..0x56F
  * (beathovenEffectGlyphs.ts holds 0x500..0x503).
  *
  * ZERO imports on purpose - imported by the renderer workers.
@@ -75,8 +75,20 @@ export const RK_FX = {
   adsrSpeed: RK_FX_BASE + 4,
 } as const;
 
+export const ST_FX_BASE = 0x560;
+/**
+ * Sawteeth part-step effect byte (Step.Eff: "4 bits eff, 4 bits value"): effTyp = ST_FX_BASE + the high nibble (0..15; high nibble 0 with a value still shows, as ST_FX_BASE itself),
+ * eff = the low nibble. The glyph is the high nibble's hex digit. The nibble meanings are not in the repo's replayer
+ * source (NostalgicPlayer's loader only reads Eff), so they are named by number, not guessed.
+ */
+export const ST_FX = {
+  effect0: ST_FX_BASE, effect1: ST_FX_BASE + 1, effect2: ST_FX_BASE + 2, effect3: ST_FX_BASE + 3, effect4: ST_FX_BASE + 4, effect5: ST_FX_BASE + 5,
+  effect6: ST_FX_BASE + 6, effect7: ST_FX_BASE + 7, effect8: ST_FX_BASE + 8, effect9: ST_FX_BASE + 9, effectA: ST_FX_BASE + 10,
+  effectB: ST_FX_BASE + 11, effectC: ST_FX_BASE + 12, effectD: ST_FX_BASE + 13, effectE: ST_FX_BASE + 14, effectF: ST_FX_BASE + 15,
+} as const;
+
 export const CS_FX_MIN = RR_FX_BASE;
-export const CS_FX_MAX = RK_FX.adsrSpeed;
+export const CS_FX_MAX = ST_FX.effectF;
 
 export const CS_EFFECT_GLYPH: Record<number, string> = {
   [RR_FX.setVolume]: 'V', [RR_FX.volumeSlide]: 'S', [RR_FX.volumeSlideRate]: 'R', [RR_FX.masterFade]: 'F',
@@ -84,6 +96,7 @@ export const CS_EFFECT_GLYPH: Record<number, string> = {
   [HD_FX.speed]: 'S', [HD_FX.maxVolume]: 'V',
   [HC_FX.portamento]: 'P', [HC_FX.altSequence]: 'F',
   [RK_FX.arpeggio]: 'A', [RK_FX.portamentoEnd]: 'P', [RK_FX.portamentoIncrement]: 'P', [RK_FX.portamentoWait]: 'W', [RK_FX.adsrSpeed]: 'S',
+  ...Object.fromEntries(Object.values(ST_FX).map((id) => [id, (id - ST_FX_BASE).toString(16).toUpperCase()])),
   [SPL_FX.extraNote1]: 'N', [SPL_FX.extraNote2]: 'N', [SPL_FX.extraNote3]: 'N',
 };
 

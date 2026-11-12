@@ -51,6 +51,27 @@ Formats: ronKlaren.
 - effTyp 1363 (0x553), grid Wxx: portamento wait. Parameter: parameter meaning not documented.
 - effTyp 1364 (0x554), grid Sxx: adsr speed. Parameter: parameter meaning not documented.
 
+### Sawteeth (effect byte split: effTyp from the high nibble, eff the low nibble)
+
+Formats: sawteeth.
+
+- effTyp 1376 (0x560), grid 0xx: effect0. Parameter: parameter meaning not documented.
+- effTyp 1377 (0x561), grid 1xx: effect1. Parameter: parameter meaning not documented.
+- effTyp 1378 (0x562), grid 2xx: effect2. Parameter: parameter meaning not documented.
+- effTyp 1379 (0x563), grid 3xx: effect3. Parameter: parameter meaning not documented.
+- effTyp 1380 (0x564), grid 4xx: effect4. Parameter: parameter meaning not documented.
+- effTyp 1381 (0x565), grid 5xx: effect5. Parameter: parameter meaning not documented.
+- effTyp 1382 (0x566), grid 6xx: effect6. Parameter: parameter meaning not documented.
+- effTyp 1383 (0x567), grid 7xx: effect7. Parameter: parameter meaning not documented.
+- effTyp 1384 (0x568), grid 8xx: effect8. Parameter: parameter meaning not documented.
+- effTyp 1385 (0x569), grid 9xx: effect9. Parameter: parameter meaning not documented.
+- effTyp 1386 (0x56A), grid Axx: effect a. Parameter: parameter meaning not documented.
+- effTyp 1387 (0x56B), grid Bxx: effect b. Parameter: parameter meaning not documented.
+- effTyp 1388 (0x56C), grid Cxx: effect c. Parameter: parameter meaning not documented.
+- effTyp 1389 (0x56D), grid Dxx: effect d. Parameter: parameter meaning not documented.
+- effTyp 1390 (0x56E), grid Exx: effect e. Parameter: parameter meaning not documented.
+- effTyp 1391 (0x56F), grid Fxx: effect f. Parameter: parameter meaning not documented.
+
 ## Not verified
 
 - Names are the table's own identifiers; glyphs are what the grid shows. Playback was not checked per command.

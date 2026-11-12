@@ -4,7 +4,7 @@
 // "command-stream-effects" and docs/formats/command-stream-effects.md (kept equal by
 // src/utils/__tests__/commandStreamEffects.test.ts). Gaps: thoughts/spot/2026-11-12_effect-mapping-gaps.md.
 import { type EffectBlock, PARAM_NOT_DOCUMENTED, renderBlocks, rowsFromFx } from './effectBlockDoc';
-import { CS_EFFECT_GLYPH, HC_FX, HD_FX, RK_FX, RR_FX, SPL_FX as CS_SPL_FX } from '../../../src/lib/import/formats/commandStreamEffectGlyphs';
+import { CS_EFFECT_GLYPH, HC_FX, HD_FX, RK_FX, RR_FX, ST_FX, SPL_FX as CS_SPL_FX } from '../../../src/lib/import/formats/commandStreamEffectGlyphs';
 
 export const COMMAND_STREAM_TOPIC = 'command-stream-effects';
 
@@ -14,6 +14,7 @@ export const COMMAND_STREAM_BLOCKS: readonly EffectBlock[] = [
   { formats: ['hippelCoso'], title: 'Jochen Hippel CoSo', rows: rowsFromFx(HC_FX, CS_EFFECT_GLYPH) },
   { formats: ['soundProgrammingLanguage'], title: 'Sound Programming Language', rows: rowsFromFx(CS_SPL_FX, CS_EFFECT_GLYPH) },
   { formats: ['ronKlaren'], title: 'Ron Klaren', rows: rowsFromFx(RK_FX, CS_EFFECT_GLYPH) },
+  { formats: ['sawteeth'], title: 'Sawteeth (effect byte split: effTyp from the high nibble, eff the low nibble)', rows: rowsFromFx(ST_FX, CS_EFFECT_GLYPH) },
 ];
 
 export const COMMAND_STREAM_DOC = `# Command-stream format effects (Riff Raff, Howie Davies, Hippel CoSo, Sound Programming Language, Ron Klaren)
