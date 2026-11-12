@@ -62,6 +62,7 @@
  *     combined: bit7 = Relative, bits[3:0] = WForm
  */
 
+import { ST_FX_BASE } from './commandStreamEffectGlyphs';
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell, InstrumentConfig } from '@/types';
 import type { SawteethConfig, SawteethInstrumentConfig } from '@/types/instrument/exotic';
@@ -548,8 +549,9 @@ export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerS
           note: xmNote,
           instrument: instrId,
           volume: 0,
-          effTyp: 0,
-          eff: 0,
+          // The part step's effect byte (high nibble effect, low nibble value) shown as a format-private effect.
+          effTyp: s.eff !== 0 ? ST_FX_BASE + (s.eff >> 4) : 0,
+          eff: s.eff & 0x0f,
           effTyp2: 0,
           eff2: 0,
         });
