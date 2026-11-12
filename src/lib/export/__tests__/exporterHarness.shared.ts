@@ -32,6 +32,7 @@ const PARSE_FALLBACK: Record<string, { module: string; fn: string }> = {
   okta: { module: '@lib/import/formats/OktalyzerParser', fn: 'parseOktalyzerFile' },
   prt: { module: '@lib/import/formats/PreTrackerParser', fn: 'parsePreTrackerFile' },
   synmod: { module: '@lib/import/formats/SynTrackerParser', fn: 'parseSynTrackerFile' },
+  vss: { module: '@lib/import/formats/VoodooSupremeSynthesizerParser', fn: 'parseVoodooSupremeSynthesizerFile' },
 };
 
 /** Parse a fixture (or exported bytes under the fixture's name). */
@@ -62,7 +63,10 @@ export async function parseAs(rel: string, raw: Uint8Array): Promise<TrackerSong
   let song: TrackerSong | null = null;
   for (const arg of [ab, raw]) {
     try {
-      song = await Promise.resolve(parse(arg, name));
+      // StoneTracker keeps its samples in a companion .sps next to the .spm.
+      song = /\.spm$/i.test(name)
+        ? await Promise.resolve((parse as (b: ArrayBuffer | Uint8Array, n: string, bank: Uint8Array) => TrackerSong)(arg, name, readFixture(rel.replace(/\.spm$/i, '.sps'))))
+        : await Promise.resolve(parse(arg, name));
     } catch {
       song = null;
     }

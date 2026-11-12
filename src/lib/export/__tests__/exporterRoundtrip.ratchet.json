@@ -703,6 +703,78 @@
       "matchPct": 1,
       "cells": 8484,
       "bytes": 8484
+    },
+    "daveLowe": {
+      "exporter": "DaveLoweExporter.exportDaveLowe",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 122564,
+      "bytes": 122564
+    },
+    "format669": {
+      "exporter": "Format669Exporter.exportFormat669",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 398422,
+      "bytes": 398422
+    },
+    "glueMon": {
+      "exporter": "GlueMonExporter.exportGlueMon",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 686,
+      "bytes": 686
+    },
+    "jeroenTel": {
+      "exporter": "JeroenTelExporter.exportJeroenTel",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 146838,
+      "bytes": 146838
+    },
+    "paulRobotham": {
+      "exporter": "PaulRobothamExporter.exportPaulRobotham",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 2044,
+      "bytes": 2044
+    },
+    "ronKlaren": {
+      "exporter": "RonKlarenExporter.exportRonKlaren",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 11368,
+      "bytes": 11368
+    },
+    "stoneTracker": {
+      "exporter": "StoneTrackerExporter.exportStoneTracker",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 10918,
+      "bytes": 10918
+    },
+    "tomyTracker": {
+      "exporter": "TomyTrackerExporter.exportTomyTracker",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 25894,
+      "bytes": 25894
+    },
+    "uade_vss": {
+      "exporter": "VoodooSupremeExporter.exportVoodooSupreme",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 10560,
+      "bytes": 10560
     }
   },
   "missingFixture": [
