@@ -73,7 +73,7 @@ import type { RonKlarenConfig } from '@/types/instrument/exotic';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { RK_FX } from './commandStreamEffectGlyphs';
 import { addCellEffect, effectColumnsMeta, effectEditPatches } from './cellEffectSlots';
-import { encodeRonKlarenCell } from '@/engine/uade/encoders/RonKlarenEncoder';
+import { encodeRonKlarenCell, ronKlarenNoteIndex } from '@/engine/uade/encoders/RonKlarenEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -838,11 +838,14 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
   // Per pattern, channel and row: the stream byte behind each effect of the cell (file offset, slot order) and the cell as parsed.
   const effectSourceMap: Array<Array<Array<Array<{ typ: number; at: number }>>>> = [];
   const parsedCells: TrackerCell[][][] = [];
+  // Per pattern and channel: the sequence entry's transpose, which the grid note carries on top of the stored period index.
+  const transposeMap: number[][] = [];
 
   for (let posIdx = 0; posIdx < maxTrackEntries; posIdx++) {
     const channelRows: TrackerCell[][] = Array.from({ length: 4 }, () => []);
     const patOffsets: number[][] = Array.from({ length: 4 }, () => []);
     const patSources: Array<Array<Array<{ typ: number; at: number }>>> = Array.from({ length: 4 }, () => []);
+    const patTranspose: number[] = [0, 0, 0, 0];
 
     for (let ch = 0; ch < 4; ch++) {
       const posList = primarySong.positions[ch];
@@ -858,6 +861,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
         continue;
       }
 
+      patTranspose[ch] = entry.transpose;
       const trackData = trackDataArrays[entry.trackNumber];
       const trackStart = trackFileStarts[entry.trackNumber];
       const { rows: decodedRows, notePositions, args } = decodeTrackToRows(trackData, ROWS_PER_TRACK, entry.transpose);
@@ -890,6 +894,7 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
     }
 
     cellOffsetMap.push(patOffsets);
+    transposeMap.push(patTranspose);
     effectSourceMap.push(patSources);
     parsedCells.push(channelRows.map((rows) => rows.map((c) => ({ ...c }))));
 
@@ -988,7 +993,17 @@ function parseInternal(bytes: Uint8Array, filename: string): TrackerSong | null 
       const was = parsedCells[pattern]?.[channel]?.[row];
       if (!was) return { patches: [], noteUnchanged: false };
       const fx = effectEditPatches(cell, was, effectSourceMap[pattern][channel][row] ?? []);
-      return { patches: fx.refusal ? [] : fx.patches, noteUnchanged: cell.note === was.note };
+      const patches = fx.refusal ? [] : fx.patches;
+      // A track played under a transpose stores the grid note minus that transpose: write the note byte here (the wait byte stays),
+      // as the generic cell encoder knows no transpose.
+      const transpose = transposeMap[pattern]?.[channel] ?? 0;
+      const at = cellOffsetMap[pattern]?.[channel]?.[row] ?? -1;
+      if (transpose !== 0 && at >= 0 && cell.note !== was.note) {
+        const idx = ronKlarenNoteIndex(cell.note);
+        patches.push([at, idx < 0 ? 0 : Math.max(0, Math.min(RK_PERIODS.length - 1, idx - transpose))]);
+        return { patches, noteUnchanged: true };
+      }
+      return { patches, noteUnchanged: cell.note === was.note };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       if (pattern < 0 || pattern >= cellOffsetMap.length) return -1;

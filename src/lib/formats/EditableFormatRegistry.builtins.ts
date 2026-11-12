@@ -111,7 +111,7 @@ registerEditableFormat({ formatId: "ptm", label: "", patternCodec: { kind: "vari
 registerEditableFormat({ formatId: "pumaTracker", label: "Puma Tracker", patternCodec: { kind: "variable" }, newSong: { template: "templates/pumatracker.puma" }, exporter: { module: "PumaTrackerExporter", fn: "exportPumaTrackerFile" } });
 registerEditableFormat({ formatId: "quadraComposer", label: "Quadra Composer", newSong: { template: "templates/quadraComposer.emod" }, patternCodec: { kind: "fixed" }, exporter: { module: "QuadraComposerExporter", fn: "exportQuadraComposer", byLayout: true } });
 registerEditableFormat({ formatId: "robHubbard", label: "Rob Hubbard", newSong: { template: "templates/robHubbard.rh" }, patternCodec: { kind: "fixed" }, exporter: { module: "RobHubbardExporter", fn: "exportRobHubbard", byLayout: true } });
-registerEditableFormat({ formatId: "ronKlaren", label: "Ron Klaren", patternCodec: { kind: "fixed" } });
+registerEditableFormat({ formatId: "ronKlaren", label: "Ron Klaren", patternCodec: { kind: "fixed" }, exporter: { module: "RonKlarenExporter", fn: "exportRonKlaren", ext: "rk", byLayout: true } });
 registerEditableFormat({ formatId: "rtm", label: "", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "s3m", label: "S3M", patternCodec: { kind: "variable" } });
 registerEditableFormat({ formatId: "sawteeth", label: "Sawteeth", newSong: { template: "templates/sawteeth.st", name: "Sawteeth" }, patternCodec: { kind: "variable" }, exporter: { module: "SawteethExporter", fn: "exportSawteeth", byLayout: true } });
