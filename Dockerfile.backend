@@ -20,6 +20,8 @@ COPY server/src ./src
 COPY server/tsconfig.json server/build.mjs ./
 COPY src/lib /app/src/lib
 COPY src/types /app/src/types
+# Server code imports src/utils/ft2EffectDescriptions (a leaf: no imports). Guarded by serverImportsStayLeaf.test.ts.
+COPY src/utils/ft2EffectDescriptions.ts /app/src/utils/ft2EffectDescriptions.ts
 
 # Build TypeScript, then prune devDeps
 RUN npm run build && npm prune --production

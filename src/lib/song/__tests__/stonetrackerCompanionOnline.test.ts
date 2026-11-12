@@ -28,7 +28,7 @@ vi.mock('@/lib/import/parseModuleToSong', () => ({
 vi.mock('../../../../server/src/db/database', () => ({ default: {} }));
 
 import { openSong } from '@/lib/song/openSong';
-import { parseAllmodsLine } from '../../../../server/src/services/modlandIndexer';
+import { parseAllmodsLine } from '../../../../server/src/services/modlandAllmods';
 
 const DIR = 'pub/modules/Stonetracker/Mytholog';
 const ALLMODS = ['hypnosphere.spm', 'hypnosphere.sps'].map((n, i) => `${i + 1}\tStonetracker/Mytholog/${n}`);

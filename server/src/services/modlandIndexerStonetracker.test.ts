@@ -10,7 +10,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('../db/database', () => ({ default: {} }));
 
-import { parseAllmodsLine } from './modlandIndexer';
+import { parseAllmodsLine } from './modlandAllmods';
 import { companionPathsIn } from './modlandCompanions';
 
 describe('Modland index keeps a StoneTracker sample bank beside its song', () => {
