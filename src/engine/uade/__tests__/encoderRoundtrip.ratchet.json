@@ -8,7 +8,7 @@
       "matchPct": 1,
       "cells": 35
     },
-    "aon": {
+    "artOfNoise": {
       "kind": "fixed",
       "method": "decode-encode",
       "status": "byte-exact",
@@ -385,12 +385,12 @@
       "cells": 256
     },
     "paulRobotham": {
-      "kind": "fixed",
-      "method": "decode-encode",
+      "kind": "variable",
+      "method": "encode-pattern",
       "status": "byte-exact",
       "byteExact": true,
       "matchPct": 1,
-      "cells": 768
+      "cells": 4
     },
     "paulShields": {
       "kind": "fixed",
