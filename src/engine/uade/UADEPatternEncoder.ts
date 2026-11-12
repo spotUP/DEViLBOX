@@ -77,6 +77,16 @@ export interface UADEPatternLayout {
   getCellFileOffset?: (pattern: number, row: number, channel: number) => number;
 
   /**
+   * Set by a format whose grid expands one stored pattern into several grid patterns (song positions): two grid cells
+   * with the same getCellFileOffset are one stored cell, so an edit of one is carried to the others in the same undo step
+   * (sharedCellEdits.ts).
+   */
+  propagateSharedCells?: boolean;
+
+  /** With propagateSharedCells: cell fields a grid position owns itself (not stored in the shared cell), never carried to the others. */
+  positionBoundFields?: (row: number, channel: number) => ReadonlyArray<keyof TrackerCell>;
+
+  /**
    * A cell whose bytes depend on where it sits - a step's transposes, a row
    * of a packed stream whose later rows move when its length changes - is
    * written by the layout itself: the byte runs to write, at offsets from the

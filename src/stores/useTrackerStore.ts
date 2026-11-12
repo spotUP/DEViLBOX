@@ -30,6 +30,7 @@ import { songToSongFile, type SongMeta } from '@lib/uprough/songFile';
 import { isSynthCompatibleWithChannel, getChannelBadge, getSynthBadge } from '../constants/channelTypeCompat';
 import { hippelLinkedEdits, hippelSpansFor } from '@/engine/hippel/hippelLinkedCells';
 import { aonLinkedEdits } from '@/lib/import/formats/artOfNoiseGrid';
+import { sharedCellEdits } from '@/lib/song/sharedCellEdits';
 import { isCoSo } from '@/engine/hippel/rebuildHippelModule';
 import { moduleHeldIn } from '@/engine/formatFileDataFields';
 import { cosoIndexForXM } from '@lib/import/formats/HippelCoSoParser';
@@ -267,7 +268,9 @@ function pushEditAction(
   // Art of Noise positions share stored patterns: an edit shows in every position of the same stored pattern.
   const linked: Array<{ pattern: number; row: number; channel: number; values: Partial<import('@typedefs').TrackerCell> }> = spans
     ? hippelLinkedEdits(spans, patternIndex, before, after, useTrackerStore.getState().patterns)
-    : aonModule ? aonLinkedEdits(new Uint8Array(aonModule), patternIndex, before, after, useTrackerStore.getState().patterns) : [];
+    : aonModule ? aonLinkedEdits(new Uint8Array(aonModule), patternIndex, before, after, useTrackerStore.getState().patterns)
+    // A layout whose stored pattern plays at several song positions (Composer 669): grid cells with one file offset are one cell.
+    : fmt.uadePatternLayout && !UNLINKED_EDITS.has(type) ? sharedCellEdits(fmt.uadePatternLayout, patternIndex, before, after, useTrackerStore.getState().patterns) : [];
   if (linked.length === 0) { history.pushAction(type, description, patternIndex, before, after); return; }
   const others = [...new Set(linked.map((e) => e.pattern))];
   const befores = new Map(others.map((p) => [p, structuredClone(useTrackerStore.getState().patterns[p])]));
