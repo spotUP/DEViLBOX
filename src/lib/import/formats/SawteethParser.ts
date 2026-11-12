@@ -505,11 +505,11 @@ export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerS
   }
   if (rowTicks < 1) rowTicks = 6;
 
-  const expandedChannels: Array<Array<(SawteethStep & { partIdx: number }) | null>> = [];
+  const expandedChannels: Array<Array<(SawteethStep & { partIdx: number; row: number }) | null>> = [];
 
   for (let ch = 0; ch < channelCount; ch++) {
     const chInfo = channels[ch];
-    const flat: Array<(SawteethStep & { partIdx: number }) | null> = [];
+    const flat: Array<(SawteethStep & { partIdx: number; row: number }) | null> = [];
 
     for (let si = 0; si <= chInfo.rLoop; si++) {
       const step = chInfo.steps[si];
@@ -524,7 +524,7 @@ export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerS
         if (note > 0) {
           note = Math.max(1, Math.min(96, note + step.transp));
         }
-        flat.push({ ins: s.ins, eff: s.eff, note, partIdx });
+        flat.push({ ins: s.ins, eff: s.eff, note, partIdx, row });
         for (let k = 1; k < rowsPerStep; k++) flat.push(null);
       }
     }
@@ -631,6 +631,9 @@ export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerS
     initialBPM: (44100 / spsPal) * 2.5,
     linearPeriods: false,
     sawteethFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+    // Which stored part step each grid row plays (per channel, indexed by the flat row over all patterns): an edit of
+    // one stored step must reach every grid row that plays it.
+    sawteethGridSource: expandedChannels.map((flat) => flat.map((s) => (s ? { partIdx: s.partIdx, row: s.row } : null))),
   } as TrackerSong;
   return result;
 }

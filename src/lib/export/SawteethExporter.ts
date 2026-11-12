@@ -21,7 +21,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
-import { ST_FX_BASE } from '@/lib/import/formats/commandStreamEffectGlyphs';
+import { ST_FX_BASE } from '../import/formats/commandStreamEffectGlyphs';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -222,49 +222,39 @@ export async function exportSawteeth(
     }
   }
 
-  // instrumentCount - 1 (u8). Actual count = value + 1. Index 0 is dummy.
-  // We need at least 2 instruments (dummy + 1 real) for a valid file.
-  const totalInstruments = Math.max(2, insCount + 1); // +1 for dummy index 0
-  buf.push((totalInstruments - 1) & 0xFF);
+  // instrumentCount - 1 (u8). The parser reads that value as the number of STORED instruments (index 0 is a
+  // dummy it adds itself), so the stored count is the number of real instruments. Instruments come from the
+  // parser's Sawteeth config (shared by every instrument); without one, minimal stubs are written.
+  const cfgInstruments = song.instruments.find((i) => i.sawteeth)?.sawteeth?.instruments ?? [];
+  const storedCount = Math.max(1, cfgInstruments.length > 0 ? cfgInstruments.length : insCount);
+  buf.push(storedCount & 0xFF);
 
-  // Per-instrument data (starting at index 1)
-  for (let i = 1; i < totalInstruments; i++) {
-    // FilterPoints (1) + filter envelope points
-    buf.push(1); // 1 filter point
-    buf.push(0); // time
-    buf.push(127); // lev (mid-range filter)
+  const clampByte = (v: number): number => Math.max(0, Math.min(255, Math.round(v)));
+  for (let i = 0; i < storedCount; i++) {
+    const ins = cfgInstruments[i];
+    const filterEnv = ins && ins.filterEnv.length > 0 ? ins.filterEnv : [{ time: 0, lev: 127 }];
+    const ampEnv = ins && ins.ampEnv.length > 0 ? ins.ampEnv : [{ time: 0, lev: 255 }];
+    const steps = ins && ins.steps.length > 0 ? ins.steps : [{ note: 36, wForm: 1, relative: false }];
 
-    // AmpPoints (1) + amp envelope points
-    buf.push(1); // 1 amp point
-    buf.push(0); // time
-    buf.push(255); // lev (full amplitude)
+    buf.push(filterEnv.length & 0xFF);
+    for (const pt of filterEnv) buf.push(clampByte(pt.time), clampByte(pt.lev));
+    buf.push(ampEnv.length & 0xFF);
+    for (const pt of ampEnv) buf.push(clampByte(pt.time), clampByte(pt.lev));
 
-    // FilterMode (1)
-    buf.push(0);
+    buf.push(clampByte(ins?.filterMode ?? 0));
+    // ClipMode_Boost: clip mode in the high nibble, boost in the low nibble
+    buf.push((((ins?.clipMode ?? 0) & 0x0F) << 4) | ((ins?.boost ?? 1) & 0x0F));
+    buf.push(clampByte(ins?.vibS ?? 1), clampByte(ins?.vibD ?? 1), clampByte(ins?.pwmS ?? 1), clampByte(ins?.pwmD ?? 1));
+    buf.push(clampByte(ins?.res ?? 0));
+    buf.push(Math.max(1, clampByte(ins?.sps ?? 30)));
 
-    // ClipMode_Boost (1): boost = low nibble, clipMode = high nibble
-    buf.push(1); // boost=1, clipMode=0
-
-    // VibS, VibD, PwmS, PwmD (1 each)
-    buf.push(1); // vibS
-    buf.push(1); // vibD
-    buf.push(1); // pwmS
-    buf.push(1); // pwmD
-
-    // Res (1)
-    buf.push(0);
-
-    // Sps (1, >= 1)
-    buf.push(30);
-
-    // Version >= 900: Len(1) + Loop(1)
-    buf.push(1); // len
-    buf.push(0); // loop
-
-    // InsStep[]: combined(1) + note(1)
-    // combined: bit7 = relative, bits[3:0] = wForm
-    buf.push(0); // combined: relative=false, wForm=0 (saw)
-    buf.push(36); // note (middle C area)
+    // Version >= 900: Len(1) + Loop(1); Loop must be < Len
+    const len = Math.min(255, steps.length);
+    buf.push(len, Math.min(len - 1, clampByte(ins?.loop ?? 0)));
+    for (let j = 0; j < len; j++) {
+      const st = steps[j];
+      buf.push(((st.relative ? 0x80 : 0) | (st.wForm & 0x0F)) & 0xFF, clampByte(st.note));
+    }
   }
 
   // breakPCount (u8) = 0
@@ -273,15 +263,15 @@ export async function exportSawteeth(
   // ── Strings section ────────────────────────────────────────────────────
   // name, author, partNames[0..partCount-1], insNames[1..instrumentCount-1]
   writeString(buf, song.name || 'Untitled');
-  writeString(buf, ''); // author
+  writeString(buf, song.instruments.find((i) => i.sawteeth)?.sawteeth?.author ?? ''); // author
 
   for (let i = 0; i < partCount; i++) {
     writeString(buf, exportParts[i].name || '');
   }
 
-  for (let i = 1; i < totalInstruments; i++) {
-    const inst = song.instruments[i - 1];
-    writeString(buf, inst?.name || `Ins ${i}`);
+  for (let i = 0; i < storedCount; i++) {
+    const inst = song.instruments[i];
+    writeString(buf, inst?.name ?? '');
   }
 
   // ── Build output ─────────────────────────────────────────────────────────
