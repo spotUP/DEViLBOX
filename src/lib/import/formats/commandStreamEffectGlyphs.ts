@@ -87,8 +87,15 @@ export const ST_FX = {
   effectB: ST_FX_BASE + 11, effectC: ST_FX_BASE + 12, effectD: ST_FX_BASE + 13, effectE: ST_FX_BASE + 14, effectF: ST_FX_BASE + 15,
 } as const;
 
+export const HS_FX_BASE = 0x570;
+/** Jochen Hippel ST (.hst/.sog/.soc) note event: info bit $20 sets a portamento; the event's extra byte is the speed per tick (Hippel ST replayer, lbC000854). */
+export const HS_FX = {
+  /** P: portamento, speed per tick (the extra byte of a note whose info has $20). */
+  portamento: HS_FX_BASE,
+} as const;
+
 export const CS_FX_MIN = RR_FX_BASE;
-export const CS_FX_MAX = ST_FX.effectF;
+export const CS_FX_MAX = HS_FX.portamento;
 
 export const CS_EFFECT_GLYPH: Record<number, string> = {
   [RR_FX.setVolume]: 'V', [RR_FX.volumeSlide]: 'S', [RR_FX.volumeSlideRate]: 'R', [RR_FX.masterFade]: 'F',
@@ -97,6 +104,7 @@ export const CS_EFFECT_GLYPH: Record<number, string> = {
   [HC_FX.portamento]: 'P', [HC_FX.altSequence]: 'F',
   [RK_FX.arpeggio]: 'A', [RK_FX.portamentoEnd]: 'P', [RK_FX.portamentoIncrement]: 'P', [RK_FX.portamentoWait]: 'W', [RK_FX.adsrSpeed]: 'S',
   ...Object.fromEntries(Object.values(ST_FX).map((id) => [id, (id - ST_FX_BASE).toString(16).toUpperCase()])),
+  [HS_FX.portamento]: 'P',
   [SPL_FX.extraNote1]: 'N', [SPL_FX.extraNote2]: 'N', [SPL_FX.extraNote3]: 'N',
 };
 
