@@ -16,19 +16,22 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TrackerCell } from '@/types/tracker';
 
+// The sentinel is the chip editor's cell patch, the call the real writeCellToChipRam ends in. Mocking
+// writeCellToChipRam itself raced: under load the replay's lazy import sometimes got the real module.
 const writes = vi.hoisted(() => [] as { pattern: number; row: number; channel: number; note: number | undefined }[]);
-vi.mock('@/engine/uade/writeCellToChipRam', () => ({
-  writeCellToChipRam: async (_s: unknown, pattern: number, row: number, channel: number, cell: TrackerCell) => {
-    writes.push({ pattern, row, channel, note: cell.note });
-  },
-}));
 const engine = vi.hoisted(() => ({
   ready: async () => {}, loadTune: async () => {}, play: () => {},
 }));
 vi.mock('@/engine/uade/UADEEngine', () => ({
   UADEEngine: { hasInstance: () => true, getInstance: () => engine },
 }));
-vi.mock('@/engine/uade/UADEChipEditor', () => ({ UADEChipEditor: class {} }));
+vi.mock('@/engine/uade/UADEChipEditor', () => ({
+  UADEChipEditor: class {
+    async patchPatternCell(_layout: unknown, pattern: number, row: number, channel: number, cell: TrackerCell) {
+      writes.push({ pattern, row, channel, note: cell.note });
+    }
+  },
+}));
 // The engine's onStarted hook awaits the edit replay and only then reads the patterns back, so a call
 // here is the signal that the replay has finished (the replay's lazy imports take a variable time).
 const patternReads = vi.hoisted(() => ({ count: 0 }));
