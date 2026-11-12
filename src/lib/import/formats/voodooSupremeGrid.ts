@@ -61,12 +61,12 @@ export interface VoodooGrid {
   notesPerVoice: number[];
   /** number of distinct (sample, waveform table) sounds the grid refers to */
   instrumentCount: number;
-  /** each note cell (any note column) and the file byte of the track command that played it (a note byte, or a portamento's start byte) */
+  /** each note cell (any note column) and the file byte of the track command that played it (a note byte, a portamento's start byte, or the 0xFF of a note cut) */
   noteBytes: VoodooNoteByte[];
 }
 
 /** `col` is the note column of the cell (absent or 0 = the cell's own note, 1 and up = extraNotes[col - 1]). */
-export interface VoodooNoteByte { pattern: number; channel: number; row: number; offset: number; note: number; base: number; col?: number; porta?: boolean }
+export interface VoodooNoteByte { pattern: number; channel: number; row: number; offset: number; note: number; base: number; col?: number; porta?: boolean; cut?: boolean }
 
 /**
  * The note byte (0..0x7F) whose table index (byte + base) shows `note`, nearest to `current`; -1 when the table has none.
@@ -82,7 +82,7 @@ export function voodooByteFor(note: number, base: number, current: number): numb
 }
 
 /** Where a note event sits in the file: the table index is (byte + base), base being the voice's transpose when the note played. */
-interface Event { tick: number; note: number; instrument: number; offset?: number; base?: number; porta?: boolean }
+interface Event { tick: number; note: number; instrument: number; offset?: number; base?: number; porta?: boolean; cut?: boolean }
 
 export function buildVoodooGrid(file: Uint8Array): VoodooGrid | string {
   const size = file.length;
@@ -146,7 +146,7 @@ export function buildVoodooGrid(file: Uint8Array): VoodooGrid | string {
         return;
       }
       switch (cmd) {
-        case 0xff: events[index].push({ tick, note: NOTE_OFF, instrument: 0 }); v.counter = byte(); return;
+        case 0xff: events[index].push({ tick, note: NOTE_OFF, instrument: 0, offset: cmdAt, base: v.transpose, cut: true }); v.counter = byte(); return;
         case 0x81: { // gosub
           const arg = byte();
           if (arg >= offsets.length) { reason = 'a gosub names a track outside the offset table'; return; }
@@ -222,11 +222,11 @@ export function buildVoodooGrid(file: Uint8Array): VoodooGrid | string {
       if (pl.col === 0) {
         cell.note = e.note;
         cell.instrument = e.instrument;
-        if (e.offset !== undefined) noteBytes.push({ pattern: Math.floor(pl.row / ROWS_PER_PATTERN), channel: v, row: pl.row % ROWS_PER_PATTERN, offset: e.offset, note: e.note, base: e.base ?? 0, ...(e.porta ? { porta: true } : {}) });
+        if (e.offset !== undefined) noteBytes.push({ pattern: Math.floor(pl.row / ROWS_PER_PATTERN), channel: v, row: pl.row % ROWS_PER_PATTERN, offset: e.offset, note: e.note, base: e.base ?? 0, ...(e.porta ? { porta: true } : {}), ...(e.cut ? { cut: true } : {}) });
         if (pl.offset > 0) { cell.effTyp = BD_FX.rowOffset; cell.eff = pl.offset; }
       } else {
         setNoteColumn(cell, pl.col, e.note, e.instrument, pl.offset);
-        if (e.offset !== undefined) noteBytes.push({ pattern: Math.floor(pl.row / ROWS_PER_PATTERN), channel: v, row: pl.row % ROWS_PER_PATTERN, offset: e.offset, note: e.note, base: e.base ?? 0, col: pl.col, ...(e.porta ? { porta: true } : {}) });
+        if (e.offset !== undefined) noteBytes.push({ pattern: Math.floor(pl.row / ROWS_PER_PATTERN), channel: v, row: pl.row % ROWS_PER_PATTERN, offset: e.offset, note: e.note, base: e.base ?? 0, col: pl.col, ...(e.porta ? { porta: true } : {}), ...(e.cut ? { cut: true } : {}) });
       }
       if (e.note !== NOTE_OFF) notesPerVoice[v]++;
     }
