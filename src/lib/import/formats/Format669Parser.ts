@@ -38,6 +38,64 @@ import { createSamplerInstrument } from './AmigaUtils';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encode669Cell } from '@/engine/uade/encoders/Composer667Encoder';
 
+// -- Cell codec for write-back ------------------------------------------------
+
+/** The grid cell a stored 3-byte 669 cell decodes to (the parser's own cell decode), with the exact source bytes as carriers. */
+function decode669Bytes(bytes: Uint8Array): TrackerCell {
+  const byte0 = bytes[0];
+  const byte1 = bytes[1];
+  const byte2 = bytes[2];
+  let note = 0;
+  let instrument = 0;
+  let volume = 0;
+  if (byte0 < 0xFE) {
+    note = Math.max(1, Math.min(96, (byte0 >> 2) + 37));
+    instrument = (((byte0 & 0x03) << 4) | (byte1 >> 4)) + 1;
+  }
+  if (byte0 <= 0xFE) volume = Math.round(((byte1 & 0x0F) * 64 + 8) / 15);
+  let effTyp = EFF_NONE;
+  let eff = 0;
+  if (byte2 !== 0xFF) {
+    const mapped = map669Effect(byte2 >> 4, byte2 & 0x0F);
+    effTyp = mapped.effTyp;
+    eff = mapped.eff;
+  }
+  return { note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0, period: (byte0 << 8) | byte1, pan: byte2 };
+}
+
+/**
+ * Write an edited grid cell over its stored bytes: only the fields the edit changed are re-encoded (note, 6-bit instrument,
+ * 4-bit volume, effect); everything else keeps its stored byte. The grid's injected speed/break effects on channel 0 are not
+ * in the cell, so they never overwrite the stored effect byte.
+ */
+function encode669Edit(cell: TrackerCell, stored?: Uint8Array, channel?: number): Uint8Array {
+  if (!stored) return encode669Cell(cell);
+  const out = stored.slice(0, 3);
+  const was = decode669Bytes(stored);
+  const note = cell.note ?? 0;
+  const volume = cell.volume ?? 0;
+  const nibble = (vol: number): number => Math.min(15, Math.round((vol * 15) / 64));
+  if (note !== was.note || (cell.instrument ?? 0) !== was.instrument || volume !== was.volume) {
+    const vol = volume !== was.volume ? nibble(volume) : stored[1] & 0x0F;
+    if (note > 0) {
+      const inst6 = Math.max(0, ((cell.instrument ?? 0) || was.instrument || 1) - 1) & 0x3F;
+      out[0] = (Math.max(0, Math.min(63, note - 37)) << 2) | (inst6 >> 4);
+      out[1] = ((inst6 & 0x0F) << 4) | vol;
+    } else if (volume > 0) {
+      out[0] = 0xFE;
+      out[1] = vol;
+    } else {
+      out[0] = 0xFF;
+      out[1] = 0;
+    }
+  }
+  const effTyp = cell.effTyp ?? 0;
+  const eff = cell.eff ?? 0;
+  const injected = channel === 0 && (effTyp === EFF_SPEED || effTyp === EFF_PATTERN_BREAK);
+  if (!injected && (effTyp !== was.effTyp || eff !== was.eff)) out[2] = encode669Cell({ ...cell, period: undefined, pan: undefined })[2];
+  return out;
+}
+
 // -- Binary helpers -----------------------------------------------------------
 
 function u8(v: DataView, off: number): number    { return v.getUint8(off); }
@@ -381,51 +439,12 @@ export async function parse669File(
     numChannels: NUM_CHANNELS,
     numPatterns,
     moduleSize: buffer.byteLength,
-    encodeCell: encode669Cell,
-    decodeCell: (bytes: Uint8Array): TrackerCell => {
-      // Inverse of encode669Cell — matches parser's cell decode
-      const byte0 = bytes[0]; // noteInstr
-      const byte1 = bytes[1]; // instrVol
-      const byte2 = bytes[2]; // effParam
-
-      let note = 0;
-      let instrument = 0;
-      let volume = 0;
-
-      if (byte0 < 0xFE) {
-        // Has note + instrument
-        const rawNote = byte0 >> 2;
-        const instrRaw = ((byte0 & 0x03) << 4) | (byte1 >> 4);
-        note = Math.max(1, Math.min(96, rawNote + 37));
-        instrument = instrRaw + 1; // parser adds 1 for 1-based
-      }
-
-      if (byte0 <= 0xFE) {
-        // Has volume (noteInstr < 0xFF)
-        const rawVol = byte1 & 0x0F;
-        volume = Math.round((rawVol * 64 + 8) / 15);
-      }
-
-      // Effect: 0xFF = no effect
-      let effTyp = 0;
-      let eff = 0;
-      if (byte2 !== 0xFF) {
-        const command = byte2 >> 4;
-        const param = byte2 & 0x0F;
-        const mapped = map669Effect(command, param);
-        effTyp = mapped.effTyp;
-        eff = mapped.eff;
-      }
-
-      // Carry the exact 3 source bytes so encode669Cell can reproduce them byte-exact — the
-      // 6-bit instrument, /15-scaled volume, and many-to-one effect map are all lossy above.
-      // period/pan are fields the grid loop (buildPattern) never sets, so edited cells fall back
-      // to the canonical derivation.
-      return {
-        note, instrument, volume, effTyp, eff, effTyp2: 0, eff2: 0,
-        period: (byte0 << 8) | byte1,
-        pan: byte2,
-      };
+    encodeCell: encode669Edit,
+    decodeCell: decode669Bytes,
+    encodeOverStored: true,
+    getCellFileOffset: (pattern, row, channel) => {
+      const filePattern = rawOrders[pattern];
+      return filePattern === undefined ? -1 : patternDataBase + filePattern * PATTERN_SIZE + (row * NUM_CHANNELS + channel) * BYTES_PER_CELL;
     },
   };
 
@@ -442,5 +461,7 @@ export async function parse669File(
     initialBPM:      78,  // OpenMPT Load_669.cpp: Order().SetDefaultTempoInt(78)
     linearPeriods:   false,
     uadePatternLayout,
+    uadeEditableFileData: buffer.slice(0),
+    uadeEditableFileName: filename,
   };
 }
