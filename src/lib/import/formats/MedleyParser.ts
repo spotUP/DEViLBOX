@@ -31,7 +31,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { medleyEncoder } from '@/engine/uade/encoders/MedleyEncoder';
-import { buildMedleyGrid, MEDLEY_ROWS_PER_PATTERN } from './medleyGrid';
+import { buildMedleyGrid, medleyInstrumentList, MEDLEY_ROWS_PER_PATTERN } from './medleyGrid';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
 
@@ -204,17 +204,20 @@ export function parseMedleyFile(buffer: ArrayBuffer, filename: string): TrackerS
     },
   };
 
-  const instruments: InstrumentConfig[] = [];
-  for (let i = 0; i < sampleCount; i++) {
-    instruments.push({
-      id: i + 1,
-      name: '',
-      type: 'synth' as const,
-      synthType: 'Synth' as const,
-      effects: [],
-      volume: 0,
-      pan: 0,
-    } as InstrumentConfig);
+  // One entry per filled instrument-table slot; id = the table index the stream's Instrument command and the grid cells use.
+  const instruments: InstrumentConfig[] = medleyInstrumentList(buf).map(({ number, name }) => ({
+    id: number,
+    name,
+    type: 'synth' as const,
+    synthType: 'Synth' as const,
+    effects: [],
+    volume: 0,
+    pan: 0,
+  } as InstrumentConfig));
+  if (instruments.length === 0) {
+    for (let i = 0; i < sampleCount; i++) {
+      instruments.push({ id: i + 1, name: '', type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0 } as InstrumentConfig);
+    }
   }
 
   return {
