@@ -17,16 +17,12 @@ interface SIDInfoPanelProps {
   header: SIDHeaderInfo;
   songDBInfo?: SongDBResult | null;
   stilInfo?: STILSubsongInfo | null;
-  selectedSubsong: number;
-  onSubsongChange: (subsong: number) => void;
 }
 
 export const SIDInfoPanel: React.FC<SIDInfoPanelProps> = ({
   header,
   songDBInfo,
   stilInfo,
-  selectedSubsong,
-  onSubsongChange,
 }) => {
   const sidEngine = useSettingsStore(s => s.sidEngine);
   const setSidEngine = useSettingsStore(s => s.setSidEngine);
@@ -39,8 +35,8 @@ export const SIDInfoPanel: React.FC<SIDInfoPanelProps> = ({
     : 'Unknown';
   const chipCount = 1 + (header.secondSID ? 1 : 0) + (header.thirdSID ? 1 : 0);
 
-  // Get duration from SongDB for current subsong
-  const subsongDuration = songDBInfo?.found && songDBInfo?.subsongs?.[selectedSubsong];
+  // Duration from SongDB of the tune the load opens (the header default; the SUBSONG box switches it live)
+  const subsongDuration = songDBInfo?.found && songDBInfo?.subsongs?.[header.defaultSubsong];
   const durationStr = subsongDuration
     ? `${Math.floor(subsongDuration.duration_ms / 60000)}:${String(Math.floor((subsongDuration.duration_ms % 60000) / 1000)).padStart(2, '0')}`
     : null;
@@ -91,42 +87,6 @@ export const SIDInfoPanel: React.FC<SIDInfoPanelProps> = ({
             <span className="text-blue-300/80 ml-auto font-mono">{durationStr}</span>
           )}
         </div>
-
-        {/* Subsong Selector */}
-        {header.subsongs > 1 && (
-          <div className="flex items-center gap-3 border-t border-blue-800/30 pt-2">
-            <label className="text-xs text-text-muted whitespace-nowrap">Subsong:</label>
-            {header.subsongs > 20 ? (
-              <div className="flex items-center gap-2 flex-1">
-                <input
-                  type="number"
-                  min={1}
-                  max={header.subsongs}
-                  value={selectedSubsong + 1}
-                  onChange={(e) => {
-                    const v = Math.max(1, Math.min(header.subsongs, Number(e.target.value)));
-                    onSubsongChange(v - 1);
-                  }}
-                  className="w-20 text-xs bg-dark-bgSecondary border border-blue-800/40 rounded px-2 py-1 text-text-primary"
-                />
-                <span className="text-xs text-text-muted">of {header.subsongs}</span>
-                {durationStr && (
-                  <span className="text-xs text-blue-300/70 ml-auto font-mono">{durationStr}</span>
-                )}
-              </div>
-            ) : (
-              <CustomSelect
-                value={String(selectedSubsong)}
-                onChange={(v) => onSubsongChange(Number(v))}
-                options={Array.from({ length: header.subsongs }, (_, i) => ({
-                  value: String(i),
-                  label: `Subsong ${i + 1}${i === header.defaultSubsong ? ' (default)' : ''}${songDBInfo?.found && songDBInfo?.subsongs?.[i] ? ` — ${Math.floor(songDBInfo.subsongs[i].duration_ms / 60000)}:${String(Math.floor((songDBInfo.subsongs[i].duration_ms % 60000) / 1000)).padStart(2, '0')}` : ''}`,
-                }))}
-                className="flex-1 text-xs bg-dark-bgSecondary border border-blue-800/40 rounded px-2 py-1 text-text-primary"
-              />
-            )}
-          </div>
-        )}
 
         {/* SID Engine Selector */}
         <div className="flex flex-col gap-1 border-t border-blue-800/30 pt-2">

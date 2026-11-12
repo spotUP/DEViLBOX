@@ -6,9 +6,9 @@
  * file carries a real choice, and opens directly otherwise. A dialog that only
  * says "Import" is a click that changes nothing.
  *
- * A real choice is: several subsongs to pick from, a partner file the format
+ * A real choice is: a partner file the format
  * needs that was not provided, or a format whose own dialog collects settings
- * (Furnace subsong, MIDI quantise and pattern length).
+ * (MIDI quantise and pattern length).
  */
 import { detectNativeFormat } from '@lib/import/prepareModuleImport';
 import { expectedCompanionNames } from '@lib/import/companionResolver';
@@ -40,9 +40,6 @@ export function needsCompanionPrompt(filename: string, companionCount: number, h
 export function needsImportChoice(p: Pick<PreparedSong, 'file' | 'songKind' | 'companions' | 'uadeMetadata' | 'sidInfo' | 'fileSubsongs'> & { info?: { arrayBuffer?: ArrayBuffer } }): boolean {
   if (OWN_DIALOG.test(p.file.name)) return true;
   if (p.songKind !== 'module') return false;
-  if ((p.uadeMetadata?.subsongCount ?? 0) > 1) return true;
-  if ((p.sidInfo?.subsongs ?? 0) > 1) return true;
-  if ((p.fileSubsongs?.count ?? 0) > 1) return true;
   const head = p.info?.arrayBuffer ? new Uint8Array(p.info.arrayBuffer, 0, Math.min(128, p.info.arrayBuffer.byteLength)) : undefined;
   return needsCompanionPrompt(p.file.name, p.companions?.size ?? 0, head);
 }

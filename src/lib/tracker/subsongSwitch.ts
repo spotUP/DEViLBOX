@@ -47,6 +47,21 @@ export function subsongStatus(f: SubsongFields): SubsongStatus | null {
   return null;
 }
 
+/**
+ * The UADE subsong model for a song the UADE pre-scan found several subsongs in but whose parser
+ * attached none (a native parser that only draws the grid, UADE plays it): the count then lives
+ * only in UADEMetadata.subsongCount, and without this the load has no subsong box. Null when the
+ * song already has a subsong model of any source, or is not UADE-played.
+ */
+export function uadeSubsongsFallback(
+  song: { uadeEditableSubsongs?: unknown; uadeEditableFileName?: string; fileSubsongs?: unknown; nuadeSubsongs?: unknown; initialSpeed?: number },
+  meta: { subsongCount?: number } | undefined,
+): { count: number; speeds: number[] } | null {
+  const count = meta?.subsongCount ?? 0;
+  if (count <= 1 || song.uadeEditableSubsongs || song.fileSubsongs || song.nuadeSubsongs || !song.uadeEditableFileName) return null;
+  return { count, speeds: Array(count).fill(song.initialSpeed || 6) };
+}
+
 /** The subsong `delta` away from the one playing, or null past either end. */
 export function stepTarget(status: SubsongStatus | null, delta: number): number | null {
   if (!status) return null;

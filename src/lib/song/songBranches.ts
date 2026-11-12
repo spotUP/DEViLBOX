@@ -38,7 +38,7 @@ import { emptyPattern } from '@/lib/import/formats/Sc68Parser';
 import { nativeGridHasNotes } from '@/lib/import/uadeScanQuality';
 import type { PreparedModule, PrepareHooks } from '@/lib/import/prepareModuleImport';
 import { isSongFormat, type FileLoadOptions, type FileLoadResult } from '@/lib/file/UnifiedFileLoader';
-
+import { uadeSubsongsFallback } from '@/lib/tracker/subsongSwitch';
 
 async function stopActivePlaybackForIncomingSong(
   engine: ReturnType<typeof getToneEngine>,
@@ -133,6 +133,9 @@ async function importTrackerModuleUnloaded(
     notify.error(`Module "${song.name || filename}" contains no patterns to import.`);
     return;
   }
+  // The tune count is the song's, whichever parser drew the grid: the subsong box switches it live (no pick at load).
+  const uadeSubs = uadeSubsongsFallback(song, options.uadeMetadata);
+  if (uadeSubs) (song as { uadeEditableSubsongs?: unknown }).uadeEditableSubsongs = uadeSubs;
   const c4Data = (song as { cinter4FileData?: ArrayBuffer }).cinter4FileData;
   if (c4Data && new DataView(c4Data).getInt16(0, false) < 0) {
     let rawData: ArrayBuffer | undefined;
