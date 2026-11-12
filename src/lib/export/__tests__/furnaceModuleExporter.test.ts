@@ -3,6 +3,7 @@
  * with the repo's own Furnace parser and compare cell for cell.
  */
 import { describe, expect, it } from 'vitest';
+import { xmVolToFurnace } from '@/lib/import/furnaceEditorCells';
 import { exportFurnaceModule, furnaceModuleExportAvailable, FUR_SYSTEM_YM2610 } from '../FurnaceModuleExporter';
 import { parseFurnaceSong } from '@/lib/import/formats/FurnaceSongParser';
 import { DEFAULT_FURNACE } from '@/types/instrument/defaults';
@@ -127,6 +128,62 @@ describe('exportFurnaceModule', () => {
     expect(vol.loop).toBe(4);
     const arpMacro = ay.macros.find((m) => m.code === 1)!;
     expect(arpMacro.data).toEqual([0, 4, 7, 12]);
+  });
+
+  it('maps the volume column the way the editor does: set volume 0x10-0x50 only, anything else is dropped with a warning', async () => {
+    expect([0x10, 0x30, 0x50].map(xmVolToFurnace)).toEqual([0, 64, 127]);
+    expect([0x00, 0x01, 0x0f, 0x51, 0x60, 0xff].map(xmVolToFurnace)).toEqual([-1, -1, -1, -1, -1, -1]);
+    const s = song();
+    set(s.patterns[0], 0, 1, { note: 49, instrument: 1, volume: 0x30 });
+    set(s.patterns[0], 0, 2, { note: 49, instrument: 1, volume: 0x07 });
+    set(s.patterns[0], 0, 3, { note: 49, instrument: 1, volume: 0x70 });
+    const r = exportFurnaceModule(s);
+    const mod = await parseFurnaceSong(r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) as ArrayBuffer);
+    const cell = (row: number) => mod.patterns.get('0_0_0')!.rows[row];
+    expect(cell(1).volume).toBe(64);
+    expect(cell(2).volume).toBe(-1);
+    expect(cell(3).volume).toBe(-1);
+    expect(r.warnings.filter((w) => w.includes('volume column')).length).toBe(2);
+  });
+
+  it('writes Fxx as the store plays it: 01-1F speed (0Fxx), 20-FF BPM (F0xx), 00 stop (FF00)', async () => {
+    const s = song();
+    set(s.patterns[0], 0, 1, { effTyp: 0x0f, eff: 0x03 });
+    set(s.patterns[0], 0, 2, { effTyp: 0x0f, eff: 0x78 });
+    set(s.patterns[0], 0, 3, { effTyp: 0x0f, eff: 0x00 });
+    const r = exportFurnaceModule(s);
+    const mod = await parseFurnaceSong(r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) as ArrayBuffer);
+    const fx = (row: number) => mod.patterns.get('0_0_0')!.rows[row].effects[0];
+    expect(fx(1)).toEqual({ type: 0x0f, value: 3 });
+    expect(fx(2)).toEqual({ type: 0xf0, value: 0x78 });
+    expect(fx(3)).toEqual({ type: 0xff, value: 0 });
+  });
+
+  it('round trips every note, instrument, volume and effect cell of a dense song', async () => {
+    const s = song();
+    const sources: Array<[number, number]> = [];
+    for (let ch = 0; ch < 14; ch++) {
+      const ins = ch >= 4 && ch < 7 ? 2 : 1;
+      for (let row = 0; row < ROWS; row++) {
+        if ((row + ch) % 3 === 0) continue;
+        set(s.patterns[0], ch, row, {
+          note: 13 + ((ch * 5 + row) % 60), instrument: ins, volume: 0x10 + ((row * 4 + ch) % 0x41),
+          effTyp: row % 4, eff: (ch * 16 + row) & 0xff, effTyp2: 0x0a, eff2: row,
+        });
+        sources.push([ch, row]);
+      }
+    }
+    const r = exportFurnaceModule(s);
+    const mod = await parseFurnaceSong(r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) as ArrayBuffer);
+    for (const [ch, row] of sources) {
+      const src = s.patterns[0].channels[ch].rows[row];
+      const got = mod.patterns.get(`0_${ch}_0`)!.rows[row];
+      expect((got.octave + 5) * 12 + got.note).toBe(src.note + 59);
+      expect(got.instrument).toBe(src.instrument - 1);
+      expect(got.volume).toBe(xmVolToFurnace(src.volume));
+      expect(got.effects[0]).toEqual({ type: src.effTyp, value: src.eff });
+      expect(got.effects[1]).toEqual({ type: 0x0a, value: row });
+    }
   });
 
   it('refuses what the module cannot hold', () => {
