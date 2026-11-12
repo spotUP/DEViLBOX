@@ -101,6 +101,14 @@ Formats: paulRobotham.
 - effTyp 1434 (0x59A), grid Nxx: command26. Parameter: parameter meaning not documented.
 - effTyp 1435 (0x59B), grid Gxx: fade second. Parameter: parameter meaning not documented.
 
+### Medley (track-stream command 0x80 | command, effTyp = 0x5a0 + command number, eff = the parameter byte; Randomtrack picks its track at run time and ends the grid walk of that voice)
+
+Formats: medley.
+
+- effTyp 1442 (0x5A2), grid Vxx: volume. Parameter: parameter meaning not documented.
+- effTyp 1444 (0x5A4), grid Rxx: random track. Parameter: parameter meaning not documented.
+- effTyp 1448 (0x5A8), grid Txx: transpose. Parameter: parameter meaning not documented.
+
 ## Not verified
 
 - Names are the table's own identifiers; glyphs are what the grid shows. Playback was not checked per command.

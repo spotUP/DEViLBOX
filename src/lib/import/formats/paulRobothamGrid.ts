@@ -108,7 +108,7 @@ export function prVoiceStarts(buf: Uint8Array): number[] {
   return starts;
 }
 
-const EFFECT_SLOTS = [['effTyp', 'eff'], ['effTyp2', 'eff2'], ['effTyp3', 'eff3'], ['effTyp4', 'eff4'], ['effTyp5', 'eff5']] as const;
+export const EFFECT_SLOTS = [['effTyp', 'eff'], ['effTyp2', 'eff2'], ['effTyp3', 'eff3'], ['effTyp4', 'eff4'], ['effTyp5', 'eff5']] as const;
 
 /** The effect-column entries a command shows (none for the instrument command, which is the instrument column and unknown indexes). */
 export function prCommandEffects(c: TrackerCell): Array<[effTyp: number, eff: number]> {

@@ -19,17 +19,19 @@
  * Layers (docs/FORMAT_COMMAND_STREAM_GRID.md): `blockRows` carry every track stream byte-exact (cutoff = 2, period =
  * byte 0, pan = byte 1). The display grid is carrier-less, one row per tick. A stored note byte is played from every
  * call and loop pass that reaches it, so `placements` lists each of them with the transpose delta in force.
- * Not supported: RandomTrack (command 4) and random-wait voices; a walk that meets one stops that voice.
+ * RandomTrack (command 4) is shown as an effect (R, pair count) and ends the walk of that voice (the pick is made at run time); random-wait voices are not supported.
  */
 import type { Pattern, TrackerCell } from '@/types';
 import { cellFieldsEqual } from '@/engine/uade/UADEPatternEncoder';
+import { MD_FX } from './commandStreamEffectGlyphs';
+import { EFFECT_SLOTS } from './paulRobothamGrid';
 
 export const MEDLEY_ROWS_PER_PATTERN = 64;
 // A runaway guard only: combat.mso subsong 7 (Combat) really runs 123264 ticks (16 passes of its loop), so the cap must stay above any real song.
 const MAX_FRAMES = 400000;
 const MAX_STEPS = 4000000;
 const STACK_DEPTH = 8;
-const CMD_END = 0, CMD_INSTRUMENT = 3, CMD_RANDOM = 4, CMD_CALL = 5, CMD_LOOP_START = 6, CMD_LOOP_END = 7, CMD_TRANSPOSE = 8;
+const CMD_END = 0, CMD_VOLUME = 2, CMD_INSTRUMENT = 3, CMD_RANDOM = 4, CMD_CALL = 5, CMD_LOOP_START = 6, CMD_LOOP_END = 7, CMD_TRANSPOSE = 8;
 
 const u32 = (b: Uint8Array, o: number): number => ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) | 0;
 const i8 = (v: number): number => (v << 24) >> 24;
@@ -145,6 +147,9 @@ export interface MedleyPlacement {
   instrOffset: number;
 }
 
+/** A Volume, RandomTrack or Transpose command shown in an effect column: `offset` is its parameter byte, `slot` the effect column (0-based) of the cell at (voice, tick). */
+export interface MedleyEffect { voice: number; tick: number; offset: number; effTyp: number; slot: number; value: number }
+
 export interface MedleyGrid {
   patterns: Pattern[];
   voices: number;
@@ -153,6 +158,7 @@ export interface MedleyGrid {
   trackMap: number[][];
   blockRows: TrackerCell[][];
   placements: MedleyPlacement[];
+  effects: MedleyEffect[];
   ticks: number;
   /** Voices whose walk stopped at a RandomTrack command. */
   unsupportedVoices: number[];
@@ -207,6 +213,7 @@ export function buildMedleyGrid(buf: Uint8Array, sourceFile: string, subsong = 1
   };
 
   const placements: MedleyPlacement[] = [];
+  const effects: MedleyEffect[] = [];
   const unsupported: number[] = [];
   const voiceTracks = [0, 1, 2, 3].map(v => buf[song + 0x10 + v]);
 
@@ -234,6 +241,18 @@ export function buildMedleyGrid(buf: Uint8Array, sourceFile: string, subsong = 1
           pos = ret;
           continue;
         }
+        // a command takes no time: its parameter is drawn in an effect column of the cell of the tick it runs on
+        const fxTyp = cmd === CMD_VOLUME ? MD_FX.volume : cmd === CMD_RANDOM ? MD_FX.randomTrack : cmd === CMD_TRANSPOSE ? MD_FX.transpose : 0;
+        if (fxTyp) {
+          const cell = (line[tick] ??= emptyCell());
+          const slot = EFFECT_SLOTS.findIndex(([t]) => !cell[t]);
+          if (slot >= 0) {
+            cell[EFFECT_SLOTS[slot][0]] = fxTyp;
+            cell[EFFECT_SLOTS[slot][1]] = arg;
+            effects.push({ voice, tick, offset: pos + 1, effTyp: fxTyp, slot, value: arg });
+          }
+        }
+        // RandomTrack picks its track at run time (random state = sum of the tick counter): the voice's notes after it are not known
         if (cmd === CMD_RANDOM) return null;
         if (cmd === CMD_INSTRUMENT && medleyEntry(buf, tables.instrument, arg)) { state.inst = arg; state.instAt = pos + 1; }
         else if (cmd === CMD_TRANSPOSE) state.noteOffset = arg;
@@ -314,7 +333,7 @@ export function buildMedleyGrid(buf: Uint8Array, sourceFile: string, subsong = 1
   }));
   return {
     patterns, voices: 4, filePatternAddrs: addrs, filePatternSizes: sizes,
-    trackMap: patterns.map(() => voiceTracks.map(t => t)), blockRows, placements, ticks, unsupportedVoices: unsupported,
+    trackMap: patterns.map(() => voiceTracks.map(t => t)), blockRows, placements, effects, ticks, unsupportedVoices: unsupported,
   };
 }
 
@@ -356,7 +375,27 @@ export function applyMedleyGridEdits(source: Uint8Array, edited: Pattern[], subs
       }
     }
   }
+  const wantedParam = new Map<number, Set<number>>();
+  const fxSlots = new Map<string, Set<number>>();
+  for (const fx of base.effects) {
+    const key = `${fx.voice}:${fx.tick}`;
+    if (!fxSlots.has(key)) fxSlots.set(key, new Set());
+    fxSlots.get(key)!.add(fx.slot);
+    const cell = cellAt(fx.voice, fx.tick);
+    if (!cell) continue;
+    const [typKey, valKey] = EFFECT_SLOTS[fx.slot];
+    const typ = cell[typKey] ?? 0, val = (cell[valKey] ?? 0) & 0xff;
+    if (typ !== fx.effTyp) { warnings.push(`voice ${fx.voice + 1} tick ${fx.tick}: the command in effect column ${fx.slot + 1} was changed or removed; not written`); continue; }
+    if (val !== fx.value) {
+      if (!wantedParam.has(fx.offset)) wantedParam.set(fx.offset, new Set());
+      wantedParam.get(fx.offset)!.add(val);
+    }
+  }
   let patched = 0;
+  for (const [offset, set] of wantedParam) {
+    if (set.size === 1) { out[offset] = [...set][0]; patched++; }
+    else warnings.push(`stream byte ${offset}: cells that run this command were edited to different values; not written`);
+  }
   for (const [offset, set] of wantedInst) {
     if (set.size === 1) { out[offset] = [...set][0]; patched++; }
     else warnings.push(`stream byte ${offset}: cells served by this Instrument command were edited to different instruments; not written`);
@@ -370,7 +409,13 @@ export function applyMedleyGridEdits(source: Uint8Array, edited: Pattern[], subs
     const tick = p * MEDLEY_ROWS_PER_PATTERN + r;
     if (placed.has(`${v}:${tick}`)) return;
     const was = base.patterns[p]?.channels[v]?.rows[r] ?? emptyCell();
-    if (!cellFieldsEqual(cell, was)) stray++;
+    const masked = fxSlots.get(`${v}:${tick}`);
+    if (masked) {
+      // the effect columns that hold a command are compared by the command edit above
+      const a = { ...cell }, b = { ...was };
+      for (const sl of masked) for (const k of EFFECT_SLOTS[sl]) { a[k] = 0; b[k] = 0; }
+      if (!cellFieldsEqual(a, b)) stray++;
+    } else if (!cellFieldsEqual(cell, was)) stray++;
   })));
   if (stray > 0) warnings.push(`${stray} edited cell(s) are not on a note; not written (the stream would change length)`);
   return { data: out, patched, warnings };
