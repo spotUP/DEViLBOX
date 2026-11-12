@@ -103,13 +103,13 @@ function readString(buf: Uint8Array, off: number): { str: string; nextOff: numbe
 
 // ── Internal types ─────────────────────────────────────────────────────────
 
-interface SawteethChStep {
+export interface SawteethChStep {
   part: number;
   transp: number; // signed
   dAmp: number;
 }
 
-interface SawteethChannelInfo {
+export interface SawteethChannelInfo {
   left: number;
   right: number;
   len: number;
@@ -118,17 +118,38 @@ interface SawteethChannelInfo {
   steps: SawteethChStep[];
 }
 
-interface SawteethStep {
+export interface SawteethStep {
   ins: number;
   eff: number;
   note: number;
 }
 
-interface SawteethPart {
+export interface SawteethPart {
   sps: number;
   len: number;
   steps: SawteethStep[];
   name: string;
+}
+
+/**
+ * The stored structure of the file, kept next to the grid so the exporter writes it back unchanged
+ * (part sharing, per-step transpose and dAmp, loop points, break points, version, raw pan). Grid edits are
+ * applied onto it through `sawteethGridSource`.
+ */
+export interface SawteethStored {
+  version: number;
+  spsPal: number;
+  /** Instrument count as the parser sees it (stored count + 1 for the dummy slot 0). */
+  instrumentCount: number;
+  /** Grid row length in ticks (gcd of part sps) the parser laid the grid out with. */
+  rowTicks: number;
+  channels: SawteethChannelInfo[];
+  parts: SawteethPart[];
+  /** Break points, 8 raw bytes each (4 pal + 4 command; the replayer discards them). */
+  breakPoints: number[][];
+  /** How many part names and instrument names the file actually stores (old files end after the author). */
+  partNamesStored: number;
+  insNamesStored: number;
 }
 
 interface SawteethInsStep {
@@ -395,9 +416,11 @@ export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerS
   // ── Break points ───────────────────────────────────────────────────────
   if (off >= bytes.length) return null;
   const breakPCount = u8(bytes, off++);
+  const breakPoints: number[][] = [];
   for (let i = 0; i < breakPCount; i++) {
     if (off + 8 > bytes.length) break;
-    // pal(4) + command(4) — skip for parser
+    // pal(4) + command(4): kept raw for the exporter
+    breakPoints.push(Array.from(bytes.subarray(off, off + 8)));
     off += 8;
   }
 
@@ -416,13 +439,17 @@ export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerS
     off = r2.nextOff;
   }
 
+  let partNamesStored = 0;
+  let insNamesStored = 0;
   for (let i = 0; i < partCount && off < bytes.length; i++) {
+    partNamesStored++;
     const r = readString(bytes, off);
     parts[i].name = r.str;
     off = r.nextOff;
   }
 
   for (let i = 1; i < instrumentCount && off < bytes.length; i++) {
+    insNamesStored++;
     const r = readString(bytes, off);
     instruments[i].name = r.str;
     off = r.nextOff;
@@ -633,6 +660,7 @@ export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerS
     sawteethFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
     // Which stored part step each grid row plays (per channel, indexed by the flat row over all patterns): an edit of
     // one stored step must reach every grid row that plays it.
+    sawteethStored: { version: stVersion, spsPal, instrumentCount, rowTicks, channels, parts, breakPoints, partNamesStored, insNamesStored } as SawteethStored,
     sawteethGridSource: expandedChannels.map((flat) => flat.map((s) => (s ? { partIdx: s.partIdx, row: s.row } : null))),
   } as TrackerSong;
   return result;
