@@ -92,3 +92,70 @@ describe('Sound Control note edits', { timeout: 120000 }, () => {
     expect(back.patterns.length).toBe(parseSoundControlFile(bytes, 'x.sc')!.patterns.length);
   });
 });
+
+/** Event bytes nn dd ss zz: dd is the duration (timer), ss the sample number. Edits are made on cells without carriers, as typing does. */
+describe('Sound Control instrument = sample number (byte 2), duration (byte 1) untouched', { timeout: 120000 }, () => {
+  const firstNote = (song: NonNullable<ReturnType<typeof parseSoundControlFile>>) => {
+    const layout = song.uadePatternLayout!;
+    for (let p = 0; p < song.patterns.length; p++) for (let c = 0; c < 6; c++) {
+      const rows = song.patterns[p].channels[c].rows;
+      for (let r = 0; r < rows.length; r++) {
+        const at = layout.getCellFileOffset!(p, r, c);
+        if (at > 0 && rows[r].note > 0 && bytes[at + 2] >= 1 && bytes[at + 2] <= 14) return { p, c, r, at };
+      }
+    }
+    throw new Error('no note event');
+  };
+
+  it('every note cell shows the sample number of byte 2, never the duration of byte 1', () => {
+    const song = parseSoundControlFile(bytes, 'x.sc')!;
+    const layout = song.uadePatternLayout!;
+    let checked = 0;
+    song.patterns.forEach((pat, p) => pat.channels.forEach((ch, c) => ch.rows.forEach((cell, r) => {
+      const at = layout.getCellFileOffset!(p, r, c);
+      if (at < 0 || cell.note === 0) return;
+      expect(bytes[at + 1] % 4, `duration at ${at} is a multiple of 4`).toBe(0);
+      expect(cell.instrument, `p${p} c${c} r${r} @${at}`).toBe(bytes[at + 2] + 1); // sample s is instrument id s + 1
+      checked++;
+    })));
+    expect(checked).toBeGreaterThan(100);
+  });
+
+  it('unedited export is byte-identical with no warnings', async () => {
+    const song = parseSoundControlFile(bytes, 'x.sc')!;
+    setGridBaseline(baselineOf(song.patterns));
+    const out = await exportSoundControl(song);
+    expect(out.warnings).toEqual([]);
+    expect([...new Uint8Array(await out.data.arrayBuffer())]).toEqual([...bytes]);
+  });
+
+  it('an instrument edit changes exactly byte 2 of that event and re-parses to the new instrument', async () => {
+    const song = parseSoundControlFile(bytes, 'x.sc')!;
+    setGridBaseline(baselineOf(song.patterns));
+    const { p, c, r, at } = firstNote(song);
+    const cell = song.patterns[p].channels[c].rows[r];
+    const newSample = bytes[at + 2] + 1;
+    song.patterns[p].channels[c].rows[r] = { note: cell.note, instrument: newSample + 1, volume: cell.volume, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+    const out = await exportSoundControl(song);
+    expect(out.warnings).toEqual([]);
+    const got = new Uint8Array(await out.data.arrayBuffer());
+    expect(got.length).toBe(bytes.length);
+    const diff: number[] = [];
+    bytes.forEach((b, i) => { if (got[i] !== b) diff.push(i); });
+    expect(diff).toEqual([at + 2]);
+    expect(got[at + 2]).toBe(newSample);
+    expect(parseSoundControlFile(got, 'x.sc')!.patterns[p].channels[c].rows[r].instrument).toBe(newSample + 1);
+  });
+
+  it('a note edit still changes only the note byte', async () => {
+    const song = parseSoundControlFile(bytes, 'x.sc')!;
+    setGridBaseline(baselineOf(song.patterns));
+    const { p, c, r, at } = firstNote(song);
+    const cell = song.patterns[p].channels[c].rows[r];
+    song.patterns[p].channels[c].rows[r] = { note: cell.note + 1, instrument: cell.instrument, volume: cell.volume, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
+    const got = new Uint8Array(await (await exportSoundControl(song)).data.arrayBuffer());
+    const diff: number[] = [];
+    bytes.forEach((b, i) => { if (got[i] !== b) diff.push(i); });
+    expect(diff).toEqual([at]);
+  });
+});
