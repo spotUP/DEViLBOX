@@ -25,7 +25,8 @@ describe.each(FILES)('Voodoo Supreme editable: %s', (path) => {
     for (const n of nb) {
       expect(n.offset).toBeLessThan(bytes.length);
       expect(getColumnField(song.patterns[n.pattern].channels[n.channel].rows[n.row], n.col ?? 0, 'note')).toBe(n.note);
-      expect(voodooNoteForIndex(Math.min(98, Math.max(0, bytes[n.offset] + (n.base ?? 0))))).toBe(n.note);
+      if (n.cut) expect(bytes[n.offset]).toBe(0xff);
+      else expect(voodooNoteForIndex(Math.min(98, Math.max(0, bytes[n.offset] + (n.base ?? 0))))).toBe(n.note);
     }
   });
 
@@ -53,7 +54,7 @@ describe.each(FILES)('Voodoo Supreme editable: %s', (path) => {
     expect(back.patterns[pick.pattern].channels[pick.channel].rows[pick.row].note).toBe(pick.note + 2);
   });
 
-  const unique = (song: ReturnType<typeof load>, pred: (n: { col?: number; porta?: boolean; note: number }) => boolean) => {
+  const unique = (song: ReturnType<typeof load>, pred: (n: { col?: number; porta?: boolean; cut?: boolean; note: number }) => boolean) => {
     const nb = song.uadeVariableLayout!.noteBytes!;
     const count = new Map<number, number>();
     nb.forEach((n) => count.set(n.offset, (count.get(n.offset) ?? 0) + 1));
@@ -68,7 +69,8 @@ describe.each(FILES)('Voodoo Supreme editable: %s', (path) => {
     for (const n of extra) {
       const cell = song.patterns[n.pattern].channels[n.channel].rows[n.row];
       expect(cell.extraNotes?.[(n.col ?? 0) - 1]?.note).toBe(n.note);
-      expect(voodooNoteForIndex(Math.min(98, Math.max(0, bytes[n.offset] + (n.base ?? 0))))).toBe(n.note);
+      if (n.cut) expect(bytes[n.offset]).toBe(0xff);
+      else expect(voodooNoteForIndex(Math.min(98, Math.max(0, bytes[n.offset] + (n.base ?? 0))))).toBe(n.note);
     }
   });
 
@@ -88,7 +90,7 @@ describe.each(FILES)('Voodoo Supreme editable: %s', (path) => {
 
   it('a removed note becomes the note cut command with the wait kept, and reloads as a note-off', async () => {
     const song = load();
-    const pick = unique(song, (n) => (n.col ?? 0) === 0 && !n.porta);
+    const pick = unique(song, (n) => (n.col ?? 0) === 0 && !n.porta && !n.cut);
     setGridBaseline(baselineOf(song.patterns));
     song.patterns[pick!.pattern].channels[pick!.channel].rows[pick!.row].note = 0;
     const r = await exportVoodooSupreme(song);
@@ -98,6 +100,41 @@ describe.each(FILES)('Voodoo Supreme editable: %s', (path) => {
     expect(r.data[pick!.offset + 1]).toBe(bytes[pick!.offset + 1]);
     const back = parseVoodooSupremeSynthesizerFile(r.data.buffer.slice(0) as ArrayBuffer, 'x.vss');
     expect(back.patterns[pick!.pattern].channels[pick!.channel].rows[pick!.row].note).toBe(97);
+  });
+
+  for (const [name, wantCol] of [['first column', 0], ['extra note column', 1]] as const) {
+    it(`an existing note cut in the ${name} replaced by a note is written over its 0xFF and reloads as that note`, async () => {
+      const song = load();
+      const pick = unique(song, (n) => !!n.cut && (wantCol === 0 ? (n.col ?? 0) === 0 : (n.col ?? 0) >= 1));
+      console.info(`${path}: ${song.uadeVariableLayout!.noteBytes!.filter((n) => n.cut).length} existing cuts, ${name} unique pick ${pick ? 'yes' : 'none'}`);
+      if (!pick && wantCol === 1) return; // no real extra-column cut in voo8 or silkworm; no invented fixture
+      expect(pick).toBeDefined();
+      if (!pick) return;
+      expect(bytes[pick.offset]).toBe(0xff);
+      setGridBaseline(baselineOf(song.patterns));
+      const cell = song.patterns[pick.pattern].channels[pick.channel].rows[pick.row];
+      if ((pick.col ?? 0) === 0) cell.note = 40; else cell.extraNotes![(pick.col ?? 0) - 1].note = 40;
+      const r = await exportVoodooSupreme(song);
+      expect(r.warnings).toEqual([]);
+      expect(diffAt(r.data, bytes)).toEqual([pick.offset]);
+      expect(r.data[pick.offset + 1]).toBe(bytes[pick.offset + 1]);
+      const back = parseVoodooSupremeSynthesizerFile(r.data.buffer.slice(0) as ArrayBuffer, 'x.vss');
+      const bc = back.patterns[pick.pattern].channels[pick.channel].rows[pick.row];
+      expect((pick.col ?? 0) === 0 ? bc.note : bc.extraNotes![(pick.col ?? 0) - 1].note).toBe(40);
+    });
+  }
+
+  it('deleting an existing note cut is reported and the file stays identical', async () => {
+    const song = load();
+    const pick = unique(song, (n) => !!n.cut);
+    expect(pick).toBeDefined();
+    if (!pick) return;
+    setGridBaseline(baselineOf(song.patterns));
+    const cell = song.patterns[pick.pattern].channels[pick.channel].rows[pick.row];
+    if ((pick.col ?? 0) === 0) cell.note = 0; else cell.extraNotes![(pick.col ?? 0) - 1].note = 0;
+    const r = await exportVoodooSupreme(song);
+    expect(r.warnings.length).toBe(1);
+    expect(diffAt(r.data, bytes)).toEqual([]);
   });
 
   it('refuses removing a portamento (longer than a cut) and a note on a row no command played, and keeps the module', async () => {

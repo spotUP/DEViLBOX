@@ -6,7 +6,8 @@
  * (byte + transpose), so an edited note is the byte whose entry shows the new note. Same length, and byte-exact where nothing
  * was edited. Extra note columns (several notes in one row of a voice) carry their own byte like the first column. A removed
  * note or a note-off becomes the note cut command 0xFF (same size as note + wait; the cell reloads as a note-off); a portamento
- * is longer, so removing it is a warning. A note on a row no command played, a note the table has no byte for and two edits of
+ * is longer, so removing it is a warning. Note cuts already in the file are recorded like notes (`cut`): a note put on one
+ * is written over its 0xFF (2 bytes either way); deleting one is a warning (it stays a cut). A note on a row no command played, a note the table has no byte for and two edits of
  * one shared byte (a track played several times) come back as warnings and are not written.
  */
 import type { TrackerSong } from '@/engine/TrackerReplayer';
@@ -50,13 +51,14 @@ export async function exportVoodooSupreme(song: TrackerSong): Promise<VoodooSupr
     let nb: number;
     if (note < 1 || note === NOTE_OFF) {
       // A removed note or a note-off: the note cut (0xFF) followed by the same wait is the same size as note + wait.
+      if (n.cut) { warnings.push(`${label}: a note cut cannot be removed (the player has no command for a rest on a sounding voice); kept`); continue; }
       if (n.porta) { warnings.push(`${label}: a portamento is four bytes and a note cut two; a removed note there is not written`); continue; }
       nb = NOTE_CUT;
     } else if (note > NOTE_OFF) {
       warnings.push(`${label}: note ${note} is not in the player's period table; not written`);
       continue;
     } else {
-      nb = voodooByteFor(note, n.base ?? 0, loaded[n.offset]);
+      nb = voodooByteFor(note, n.base ?? 0, n.cut ? 0 : loaded[n.offset]);
       if (nb < 0) {
         warnings.push(`${label}: note ${note} is not in the player's period table; not written`);
         continue;
