@@ -14,14 +14,40 @@
  *
  * A live note plays on the instrument's preview channel instead: the channel
  * Furnace previews the instrument on (FurnaceConfig.previewChannel, set on
- * import), or the chip's first channel when the instrument names none.
+ * import and by the instrument editor). An instrument that names none plays on
+ * the first chip channel of its voice kind when the chip has kinds (a Neo Geo
+ * SSG instrument on the first SSG channel, not on FM channel 0, where its
+ * note-on made no sound: owner report 2026-11-12), else on the chip's first
+ * channel.
  */
+import { isOpnbChipType, opnbFirstChannel } from './opnbVoices';
+
 export const LIVE_VOICE_BASE_CHANNEL = 100;
 
-export function chipChannelFor(channelIndex: number, chipChannels: number, previewChannel?: number): number {
+/** The fields of a FurnaceConfig that decide where a live note plays. */
+export interface LiveChannelSource {
+  previewChannel?: number;
+  chipType?: number;
+  divInsType?: number;
+}
+
+/**
+ * The chip channel a live note of this instrument plays on, or undefined when
+ * the instrument names none and its chip has no voice kinds.
+ */
+export function livePreviewChannel(furnace: LiveChannelSource | undefined): number | undefined {
+  if (!furnace) return undefined;
+  if (typeof furnace.previewChannel === 'number') return furnace.previewChannel;
+  if (furnace.divInsType !== undefined && furnace.chipType !== undefined && isOpnbChipType(furnace.chipType)) {
+    return opnbFirstChannel(furnace.chipType, furnace.divInsType);
+  }
+  return undefined;
+}
+
+export function chipChannelFor(channelIndex: number, chipChannels: number, furnace?: LiveChannelSource): number {
   const count = Math.max(1, chipChannels);
   if (channelIndex >= LIVE_VOICE_BASE_CHANNEL) {
-    const preview = previewChannel ?? 0;
+    const preview = livePreviewChannel(furnace) ?? 0;
     return preview >= 0 && preview < count ? preview : 0;
   }
   return channelIndex % count;

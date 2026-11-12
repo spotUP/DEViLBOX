@@ -3416,12 +3416,12 @@ export class ToneEngine {
         // (a live keyboard/MIDI voice plays on the instrument's preview channel - chipChannel.ts)
         if (instrument instanceof FurnaceSynth && channelIndex !== undefined) {
           const maxCh = FurnaceSynth.getMaxChannels(instrument.getChipType());
-          instrument.setChannelIndex(chipChannelFor(channelIndex, maxCh, config.furnace?.previewChannel));
+          instrument.setChannelIndex(chipChannelFor(channelIndex, maxCh, config.furnace));
         }
         // Set chip channel on FurnaceDispatchSynth (for C64/GB/NES multi-channel tracker playback)
         if (instrument instanceof FurnaceDispatchSynth && channelIndex !== undefined) {
           const maxCh = instrument.getNumChannels() || 3;
-          instrument.setChannel(chipChannelFor(channelIndex, maxCh, config.furnace?.previewChannel));
+          instrument.setChannel(chipChannelFor(channelIndex, maxCh, config.furnace));
         }
         // Standard synths - apply slide/accent for 303-style effects
         const targetFreq = cachedFrequency(note);
@@ -4158,12 +4158,12 @@ export class ToneEngine {
           // Set chip channel on FurnaceSynth before triggering (for multi-channel tracker playback)
           if (voiceNode instanceof FurnaceSynth && channelIndex !== undefined) {
             const maxCh = FurnaceSynth.getMaxChannels(voiceNode.getChipType());
-            voiceNode.setChannelIndex(chipChannelFor(channelIndex, maxCh, config.furnace?.previewChannel));
+            voiceNode.setChannelIndex(chipChannelFor(channelIndex, maxCh, config.furnace));
           }
           // Set chip channel on FurnaceDispatchSynth (for C64/GB/NES multi-channel tracker playback)
           if (voiceNode instanceof FurnaceDispatchSynth && channelIndex !== undefined) {
             const maxCh = voiceNode.getNumChannels() || 3;
-            voiceNode.setChannel(chipChannelFor(channelIndex, maxCh, config.furnace?.previewChannel));
+            voiceNode.setChannel(chipChannelFor(channelIndex, maxCh, config.furnace));
           }
           // Set chip channel on OPL3Synth (for multi-timbral AdLib tracker playback)
           if (voiceNode instanceof OPL3Synth && channelIndex !== undefined) {
@@ -5173,7 +5173,7 @@ export class ToneEngine {
     const synth = this.instruments.get(this.getInstrumentKey(instrumentId, channelIndex))
       ?? this.instruments.get(this.getInstrumentKey(instrumentId, -1));
     if (!(synth instanceof FurnaceDispatchSynth)) return null;
-    const chipChannel = chipChannelFor(channelIndex, synth.getNumChannels() || 3, config.furnace?.previewChannel);
+    const chipChannel = chipChannelFor(channelIndex, synth.getNumChannels() || 3, config.furnace);
     return { synth, chipChannel };
   }
 
