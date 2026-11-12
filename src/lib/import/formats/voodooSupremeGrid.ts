@@ -17,7 +17,7 @@
  * that wrapped earlier keeps looping until then. One grid row is the greatest common divisor of all note ticks.
  *
  * Pitch: see voodooNoteForIndex (periodToNote of the period the replayer writes to Paula; measured against UADE's AUDxPER log). Not shown in phase A: portamento slides (the start note is shown), period table octave commands,
- * envelopes, waveform tables, subsongs after the first. Note write-back is phase B.
+ * envelopes, waveform tables, subsongs after the first. Note write-back (phase B): every first-column note cell records the file byte of its command (noteBytes), written in place by VoodooSupremeExporter.
  */
 import { periodToGridNote } from '@/lib/amiga/periodNotes';
 import { makeRowClock, mainStepFromOnsets, makeOnsetPlacer, setNoteColumn } from './stepRowClock';
@@ -61,9 +61,27 @@ export interface VoodooGrid {
   notesPerVoice: number[];
   /** number of distinct (sample, waveform table) sounds the grid refers to */
   instrumentCount: number;
+  /** each first-column note cell and the file byte of the track command that played it (a note byte, or a portamento's start byte) */
+  noteBytes: VoodooNoteByte[];
 }
 
-interface Event { tick: number; note: number; instrument: number }
+export interface VoodooNoteByte { pattern: number; channel: number; row: number; offset: number; note: number; base: number }
+
+/**
+ * The note byte (0..0x7F) whose table index (byte + base) shows `note`, nearest to `current`; -1 when the table has none.
+ * A byte of 0x80 and up is a command, so the range stops at 0x7F.
+ */
+export function voodooByteFor(note: number, base: number, current: number): number {
+  let best = -1;
+  for (let b = 0; b < 0x80; b++) {
+    if (voodooNoteForIndex(b + base) !== note) continue;
+    if (best < 0 || Math.abs(b - current) < Math.abs(best - current)) best = b;
+  }
+  return best;
+}
+
+/** Where a note event sits in the file: the table index is (byte + base), base being the voice's transpose when the note played. */
+interface Event { tick: number; note: number; instrument: number; offset?: number; base?: number }
 
 export function buildVoodooGrid(file: Uint8Array): VoodooGrid | string {
   const size = file.length;
@@ -118,10 +136,11 @@ export function buildVoodooGrid(file: Uint8Array): VoodooGrid | string {
     const retire = (): void => { v.on = false; v.wrapped = true; };
     for (let guard = 0; guard < COMMAND_GUARD && !reason; guard++) {
       if (v.pos < 0 || v.pos >= size) { retire(); return; }
+      const cmdAt = v.pos;
       const cmd = byte();
       if (cmd < 0x80) {
         const note = voodooNoteForIndex(cmd + v.transpose);
-        events[index].push({ tick, note, instrument: instrumentOf(v) });
+        events[index].push({ tick, note, instrument: instrumentOf(v), offset: cmdAt, base: v.transpose });
         v.counter = byte();
         return;
       }
@@ -151,9 +170,10 @@ export function buildVoodooGrid(file: Uint8Array): VoodooGrid | string {
         case 0x86: case 0x87: case 0x8c: case 0x8d: byte(); break;
         case 0x88: v.waveTable = byte(); byte(); break;
         case 0x89: { // portamento: start note sounds, stop note and the slide ticks follow; the third byte is the wait
+          const startAt = v.pos;
           const start = byte();
           byte();
-          events[index].push({ tick, note: voodooNoteForIndex(start + v.transpose), instrument: instrumentOf(v) });
+          events[index].push({ tick, note: voodooNoteForIndex(start + v.transpose), instrument: instrumentOf(v), offset: startAt, base: v.transpose });
           v.counter = byte();
           return;
         }
@@ -193,6 +213,7 @@ export function buildVoodooGrid(file: Uint8Array): VoodooGrid | string {
   const notesPerVoice = new Array<number>(VOICES).fill(0);
   const columns: TrackerCell[][] = Array.from({ length: VOICES }, () => Array.from({ length: patternCount * ROWS_PER_PATTERN }, emptyCell));
   const place = makeOnsetPlacer(clock);
+  const noteBytes: VoodooNoteByte[] = [];
   for (let v = 0; v < VOICES; v++) {
     for (const e of kept[v]) {
       const pl = place(v, e.tick);
@@ -200,6 +221,7 @@ export function buildVoodooGrid(file: Uint8Array): VoodooGrid | string {
       if (pl.col === 0) {
         cell.note = e.note;
         cell.instrument = e.instrument;
+        if (e.offset !== undefined) noteBytes.push({ pattern: Math.floor(pl.row / ROWS_PER_PATTERN), channel: v, row: pl.row % ROWS_PER_PATTERN, offset: e.offset, note: e.note, base: e.base ?? 0 });
         if (pl.offset > 0) { cell.effTyp = BD_FX.rowOffset; cell.eff = pl.offset; }
       } else {
         setNoteColumn(cell, pl.col, e.note, e.instrument, pl.offset);
@@ -218,5 +240,5 @@ export function buildVoodooGrid(file: Uint8Array): VoodooGrid | string {
     }));
     return { id: `pattern-${p}`, name: `Pattern ${p}`, length, channels };
   });
-  return { patterns, songPositions: patterns.map((_, i) => i), rows, ticksPerRow: rowTicks, notesPerVoice, instrumentCount: instrumentIds.size };
+  return { patterns, songPositions: patterns.map((_, i) => i), rows, ticksPerRow: rowTicks, notesPerVoice, instrumentCount: instrumentIds.size, noteBytes };
 }
