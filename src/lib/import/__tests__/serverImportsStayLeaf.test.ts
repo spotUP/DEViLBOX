@@ -7,7 +7,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { builtinModules } from 'node:module';
+import { dirname, join, relative, resolve } from 'node:path';
 
 const repo = resolve(__dirname, '../../../..');
 const serverSrc = join(repo, 'server/src');
@@ -87,6 +88,100 @@ describe('server imports of the frontend tree stay leaf modules', () => {
     expect(importers).toEqual([]);
     const indexer = readFileSync(join(serverSrc, 'services/modlandIndexer.ts'), 'utf8');
     expect(indexer).not.toMatch(/FormatRegistry/);
-    expect(indexer).toMatch(/formatFilenameMatcher/);
+    const allmods = readFileSync(join(serverSrc, 'services/modlandAllmods.ts'), 'utf8');
+    expect(allmods).not.toMatch(/FormatRegistry/);
+    expect(allmods).toMatch(/formatFilenameMatcher/);
+  });
+});
+
+/** Root src/ files that import from server/src (the frontend type-check and vitest pull these in). */
+function rootFilesImportingServer(): string[] {
+  const out: string[] = [];
+  const scan = (dir: string): void => {
+    for (const n of readdirSync(dir)) {
+      const p = join(dir, n);
+      if (statSync(p).isDirectory()) {
+        if (n !== 'node_modules') scan(p);
+      } else if (/\.tsx?$/.test(n)) {
+        for (const s of specifiers(p)) {
+          if (!s.startsWith('.')) continue;
+          const r = resolveRelative(p, s);
+          if (r && r.startsWith(serverSrc + '/')) {
+            out.push(p);
+            break;
+          }
+        }
+      }
+    }
+  };
+  scan(appSrc);
+  return out;
+}
+
+function packageName(spec: string): string {
+  const parts = spec.split('/');
+  return spec.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
+}
+
+describe('server modules imported by root src/ need no server-only package', () => {
+  // The electron CI job runs only the root npm ci: a server module that imports
+  // adm-zip (declared in server/package.json only) breaks the root type-check.
+  it('every bare import reachable from root src/ through server/src is a root dependency', () => {
+    const pkg = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const declared = new Set([...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.devDependencies ?? {})]);
+    const builtins = new Set(builtinModules);
+    const seen = new Set<string>();
+    const queue: string[] = [];
+    const entryFiles = rootFilesImportingServer();
+    expect(entryFiles.length).toBeGreaterThanOrEqual(5);
+    for (const f of entryFiles) {
+      for (const s of specifiers(f)) {
+        const r = s.startsWith('.') ? resolveRelative(f, s) : null;
+        if (r && r.startsWith(serverSrc + '/')) queue.push(r);
+      }
+    }
+    const offenders: string[] = [];
+    while (queue.length) {
+      const f = queue.pop()!;
+      if (seen.has(f)) continue;
+      seen.add(f);
+      for (const s of specifiers(f)) {
+        if (s.startsWith('.')) {
+          const r = resolveRelative(f, s);
+          if (r) queue.push(r);
+          continue;
+        }
+        const name = s.replace(/^node:/, '');
+        if (s.startsWith('node:') || builtins.has(packageName(name)) || builtins.has(name)) continue;
+        // The root type-check only needs declarations: @types/<name> in the root is enough
+        // (better-sqlite3 is imported at runtime solely by a test that runs with server/node_modules).
+        const pkgName = packageName(s);
+        const typesName = `@types/${pkgName.replace(/^@/, '').replace('/', '__')}`;
+        if (!declared.has(pkgName) && !declared.has(typesName)) offenders.push(`${relative(repo, f)} imports '${s}'`);
+      }
+    }
+    expect(seen.size).toBeGreaterThan(0);
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe('Dockerfile.backend copies every frontend file the server reaches', () => {
+  // The backend image builds with only the server tree plus the COPY'd frontend paths.
+  it('each reached frontend file lies under a COPY source', () => {
+    const docker = readFileSync(join(repo, 'Dockerfile.backend'), 'utf8');
+    const copied: string[] = [];
+    for (const line of docker.split('\n')) {
+      const m = /^COPY\s+(?:--\S+\s+)*(src\/\S+)\s+\S+\s*$/.exec(line.trim());
+      if (m) copied.push(m[1].replace(/\/$/, ''));
+    }
+    expect(copied.length).toBeGreaterThan(0);
+    const { files } = appFilesReachedByServer();
+    const missing = [...files]
+      .map((f) => relative(repo, f))
+      .filter((f) => !copied.some((c) => f === c || f.startsWith(`${c}/`) || f === `${c}.ts`));
+    expect(missing).toEqual([]);
   });
 });
