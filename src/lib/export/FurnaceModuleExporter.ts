@@ -59,6 +59,12 @@ export interface FurnaceModuleSong {
   hz?: number;
   virtualTempoN?: number;
   virtualTempoD?: number;
+  /** Second speed of the speed pattern (Furnace alternates speed 1 and speed 2 per row). */
+  speed2?: number;
+  /** Compat flags of a loaded module (Furnace key names); absent = Furnace defaults. */
+  compatFlags?: Record<string, unknown>;
+  /** Groove patterns of a loaded module, 16 entries each, unused entries 0. */
+  grooves?: number[][];
 }
 
 export interface FurnaceModuleResult {
@@ -104,6 +110,25 @@ class Bytes {
 /** A block: 4-char tag, u32 size, body. */
 function block(tag: string, body: Bytes): Uint8Array {
   return new Bytes().ascii(tag).u32(body.length).bytes(body.toUint8Array()).toUint8Array();
+}
+
+/** CFLG body (song.cpp DivCompatFlags::putData): key=value lines, zero-terminated; Furnace reads missing keys as defaults. */
+function compatFlagsText(flags: Record<string, unknown>): string {
+  let out = '';
+  for (const [k, v] of Object.entries(flags)) {
+    if (typeof v === 'boolean') out += `${k}=${v ? 'true' : 'false'}\n`;
+    else if (typeof v === 'number' && Number.isFinite(v)) out += `${k}=${Math.round(v)}\n`;
+  }
+  return out;
+}
+
+/** GROV body (DivGroovePattern::putData): length byte, 16 x u16. Length = the leading non-zero entries. */
+function grooveBody(val: number[]): Bytes {
+  let len = 0;
+  while (len < 16 && (val[len] ?? 0) > 0) len++;
+  const b = new Bytes().u8(len);
+  for (let i = 0; i < 16; i++) b.u16(Math.max(0, Math.min(65535, val[i] ?? 0)));
+  return b;
 }
 
 // -- Cells ------------------------------------------------------------------------
@@ -388,9 +413,12 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
     .f32(hz).u8(1).u8(1)
     .u16(patLen).u16(song.songPositions.length)
     .u8(4).u8(16)
-    .u16(vN).u16(vD)
-    .u8(1);
-  for (let i = 0; i < 16; i++) sng.u16(i === 0 ? Math.max(1, song.initialSpeed) : 0);
+    .u16(vN).u16(vD);
+  // Speed pattern (song.cpp DivSubSong::readData): length byte, 16 x u16. Two entries = Furnace alternates them per row.
+  const speed1 = Math.max(1, song.initialSpeed);
+  const speed2 = song.speed2 && song.speed2 > 0 && song.speed2 !== speed1 ? Math.min(65535, song.speed2) : 0;
+  sng.u8(speed2 ? 2 : 1);
+  for (let i = 0; i < 16; i++) sng.u16(i === 0 ? speed1 : i === 1 ? speed2 : 0);
   sng.str(song.name).str('');
   for (let ch = 0; ch < FUR_NEO_GEO_CHANNELS; ch++) for (const pos of song.songPositions) sng.u8(pos);
   for (let ch = 0; ch < FUR_NEO_GEO_CHANNELS; ch++) sng.u8(fxColumns[ch]);
@@ -411,8 +439,13 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   // loads a module without this block at SSG volume 128, half the level of the chip.
   const flag = block('FLAG', new Bytes().str(FUR_NEO_GEO_CHIP_FLAGS));
 
-  // Layout: header, INF2, SNG2, FLAG, INS2..., SMP2..., PATN...
-  const buildInf2 = (sngPtr: number, flagPtr: number, insPtrs: number[], smpPtrs: number[], patPtrs: number[]): Uint8Array => {
+  // Compat flags and grooves of a loaded module (CFLG / GROV); a new song omits both and Furnace uses defaults.
+  const cflgText = song.compatFlags ? compatFlagsText(song.compatFlags) : '';
+  const cflg = cflgText ? block('CFLG', new Bytes().str(cflgText)) : null;
+  const grov = (song.grooves ?? []).slice(0, 255).map((g) => block('GROV', grooveBody(g)));
+
+  // Layout: header, INF2, SNG2, FLAG, CFLG, GROV..., INS2..., SMP2..., PATN...
+  const buildInf2 = (sngPtr: number, flagPtr: number, cflgPtr: number, grovPtrs: number[], insPtrs: number[], smpPtrs: number[], patPtrs: number[]): Uint8Array => {
     const b = new Bytes()
       .str(song.name).str('').str('Neo Geo MVS').str('')
       .str('').str('').str('').str('')
@@ -422,26 +455,31 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
       .u32(0).u8(1); // patchbay: no connections, automatic
     b.u8(0x01).u32(1).u32(sngPtr);
     b.u8(0x02).u32(1).u32(flagPtr);
+    if (cflg) b.u8(0x08).u32(1).u32(cflgPtr);
+    if (grovPtrs.length > 0) { b.u8(0x0a).u32(grovPtrs.length); grovPtrs.forEach((p) => b.u32(p)); }
     if (insPtrs.length > 0) { b.u8(0x04).u32(insPtrs.length); insPtrs.forEach((p) => b.u32(p)); }
     if (smpPtrs.length > 0) { b.u8(0x06).u32(smpPtrs.length); smpPtrs.forEach((p) => b.u32(p)); }
     if (patPtrs.length > 0) { b.u8(0x07).u32(patPtrs.length); patPtrs.forEach((p) => b.u32(p)); }
     b.u8(0x00);
     return block('INF2', b);
   };
-  const inf2Len = buildInf2(0, 0, ins2.map(() => 0), smp2.map(() => 0), patnBlocks.map(() => 0)).length;
+  const inf2Len = buildInf2(0, 0, 0, grov.map(() => 0), ins2.map(() => 0), smp2.map(() => 0), patnBlocks.map(() => 0)).length;
   let cursor = 32 + inf2Len;
   const sngPtr = cursor;
   cursor += sng2.length;
   const flagPtr = cursor;
   cursor += flag.length;
+  const cflgPtr = cursor;
+  if (cflg) cursor += cflg.length;
+  const grovPtrs = grov.map((b) => { const p = cursor; cursor += b.length; return p; });
   const insPtrs = ins2.map((b) => { const p = cursor; cursor += b.length; return p; });
   const smpPtrs = smp2.map((b) => { const p = cursor; cursor += b.length; return p; });
   const patPtrs = patnBlocks.map((b) => { const p = cursor; cursor += b.length; return p; });
-  const inf2 = buildInf2(sngPtr, flagPtr, insPtrs, smpPtrs, patPtrs);
+  const inf2 = buildInf2(sngPtr, flagPtr, cflgPtr, grovPtrs, insPtrs, smpPtrs, patPtrs);
 
   const file = new Bytes().ascii('-Furnace module-').u16(FUR_EXPORT_VERSION).u16(0).u32(32);
   for (let i = 0; i < 8; i++) file.u8(0);
-  for (const part of [inf2, sng2, flag, ...ins2, ...smp2, ...patnBlocks]) file.bytes(part);
+  for (const part of [inf2, sng2, flag, ...(cflg ? [cflg] : []), ...grov, ...ins2, ...smp2, ...patnBlocks]) file.bytes(part);
 
   // An ADPCM voice with no sample of its own names no sample in the module.
   const bare = neo.filter((i) => {
