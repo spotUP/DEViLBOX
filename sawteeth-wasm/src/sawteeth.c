@@ -451,10 +451,14 @@ static bool ins_ply_next(st_ins_ply_t *ip, float *buf, int sps_pal,
           buf[i] = ip->lo;
           break;
         case ST_FILT_OLP:
+          /* Same recurrence as the reference InsPly.Olp: the one-sample delay
+             line is hi/bp (previous outputs), not the input. The old
+             version fed lo back on itself with positive gain and ran into
+             the clamp, giving a constant full-scale buzz that never decayed. */
+          ip->lo = co * f + (1.0f - co) * ip->hi;
           ip->lo += (ip->lo - ip->bp) * ip->res;
-          ip->lo = co * f + ip->lo * (1.0f - co);
-          ip->lo = clampf(ip->lo, -4.0f, 4.0f);
-          ip->bp = f;
+          ip->bp = ip->hi;
+          ip->hi = ip->lo;
           buf[i] = ip->lo;
           break;
         case ST_FILT_LP:
@@ -586,7 +590,7 @@ static bool player_next_buffer(st_player_t *p, st_engine_t *e, int ch_idx) {
           p->freq_step = 1.0f - ((float)eff_param + 1.0f) / (50.0f * 3.0f);
           break;
         case 0x3: { /* portamento */
-          float spd = ((float)eff_param + 1.0f) / (50.0f * 3.0f);
+          float spd = ((float)eff_param + 1.0f) / 50.0f; /* reference: Divider, not Divider*3 */
           if (p->target_freq > p->freq) {
             p->freq_step = 1.0f + spd;
           } else {
