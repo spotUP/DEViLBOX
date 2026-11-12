@@ -401,6 +401,41 @@ class SawteethProcessor extends AudioWorkletProcessor {
     }
   }
 
+  /**
+   * Pull engine frames (44100 Hz, interleaved stereo in interleavedBuf) through
+   * `render` and write `n` linearly interpolated frames at the context rate.
+   * Same scheme as Kdm.worklet.js. `render(frames)` fills interleavedBuf; frames
+   * it does not write stay zero.
+   */
+  resampleInto(state, outL, outR, n, render) {
+    const ratio = 44100 / sampleRate;
+    const need = Math.floor(state.frac + (n - 1) * ratio) + 2;
+    while (state.qlen < need) {
+      const frames = Math.min(this.bufferSize, need - state.qlen);
+      this.interleavedBuf.fill(0);
+      render(frames);
+      if ((state.qlen + frames) * 2 > state.q.length) {
+        const bigger = new Float32Array((state.qlen + frames) * 4);
+        bigger.set(state.q.subarray(0, state.qlen * 2));
+        state.q = bigger;
+      }
+      state.q.set(this.interleavedBuf.subarray(0, frames * 2), state.qlen * 2);
+      state.qlen += frames;
+    }
+    for (let i = 0; i < n; i++) {
+      const pos = state.frac + i * ratio;
+      const j = Math.floor(pos);
+      const t = pos - j;
+      outL[i] = state.q[2 * j] * (1 - t) + state.q[2 * j + 2] * t;
+      outR[i] = state.q[2 * j + 1] * (1 - t) + state.q[2 * j + 3] * t;
+    }
+    const end = state.frac + n * ratio;
+    const used = Math.floor(end);
+    state.frac = end - used;
+    state.q.copyWithin(0, used * 2, state.qlen * 2);
+    state.qlen = Math.max(0, state.qlen - used);
+  }
+
   process(inputs, outputs, parameters) {
     if (!this.initialized || !this.module) return true;
     const output = outputs[0];
@@ -414,26 +449,22 @@ class SawteethProcessor extends AudioWorkletProcessor {
     if (typeof this.module._sawteeth_render === 'function') {
       this.updateBufferViews();
       if (this.interleavedBuf) {
-        this.interleavedBuf.fill(0);
-        const rendered = this.songSilent ? 0 : this.module._sawteeth_render(this.interleavedPtr, numSamples);
-        if (rendered > 0) {
-          for (let i = 0; i < rendered; i++) {
-            outputL[i] = this.interleavedBuf[i * 2];
-            outputR[i] = this.interleavedBuf[i * 2 + 1];
-          }
-        }
+        // The engine synthesises at 44100 Hz (one tick = spsPal samples at that rate,
+        // every oscillator step is a fraction of 44100). Handing its samples to a
+        // 48000 Hz context unchanged plays the song 8.8 % fast and 1.5 semitones
+        // sharp, and the grid clock (20 ms ticks) leaves the audio behind. Resample
+        // both outputs from 44100 Hz to the context rate.
+        if (!this.songResampler) this.songResampler = { q: new Float32Array(1024), qlen: 0, frac: 0 };
+        if (!this.previewResampler) this.previewResampler = { q: new Float32Array(1024), qlen: 0, frac: 0 };
+        const songSilent = this.songSilent;
+        this.resampleInto(this.songResampler, outputL, outputR, numSamples, (frames) =>
+          songSilent ? 0 : this.module._sawteeth_render(this.interleavedPtr, frames));
         // Keyboard preview voices leave on their own output (outputs[1]), so the
         // song output is never doubled by them.
         const preview = outputs[1];
         if (preview && preview.length >= 2 && typeof this.module._sawteeth_preview_render === 'function') {
-          this.interleavedBuf.fill(0);
-          const voices = this.module._sawteeth_preview_render(this.interleavedPtr, numSamples);
-          if (voices > 0) {
-            for (let i = 0; i < numSamples; i++) {
-              preview[0][i] = this.interleavedBuf[i * 2];
-              preview[1][i] = this.interleavedBuf[i * 2 + 1];
-            }
-          }
+          this.resampleInto(this.previewResampler, preview[0], preview[1], numSamples, (frames) =>
+            this.module._sawteeth_preview_render(this.interleavedPtr, frames));
         }
       }
     }
