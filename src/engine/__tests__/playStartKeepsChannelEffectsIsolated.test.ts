@@ -98,6 +98,11 @@ async function playOnce(replayer: TrackerReplayer): Promise<void> {
 
 describe('an effect aimed at channels never reaches the whole mix across stop and play', () => {
   it('first play, stop, second play: the chain always resolves the engine, and rendering starts after the build', async () => {
+    // The engine arms a 1 s wall-clock backstop that posts 'play' when the worklet never answers the paused
+    // 'load'. On a loaded machine the cold import chain inside flush() takes longer than that second and the
+    // backstop fired mid-test (pre-push run, 2026-11-12: posted = load, play, enableOsc). The backstop is not
+    // under test here, so its timer never runs: only setTimeout / clearTimeout are faked, promises stay real.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     // The slot build: resolves only when the test says so.
     vi.spyOn(mixerStore, 'scheduleWasmEffectRebuild').mockImplementation(() => undefined);
     vi.spyOn(mixerStore, 'rebuildWasmEffectsNow').mockImplementation(
@@ -133,5 +138,6 @@ describe('an effect aimed at channels never reaches the whole mix across stop an
     await flush();
     expect(getPlayingIsolationEngine(), 'a different tune clears the engine').toBeNull();
     replayer.dispose?.();
+    vi.useRealTimers();
   });
 });
