@@ -7,19 +7,26 @@ import React from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useFormatStore } from '@stores/useFormatStore';
 import { subsongStatus, switchSubsong } from '@/lib/tracker/subsongSwitch';
+import { useDebouncedCommit } from '@hooks/useDebouncedCommit';
 import { FT2NumericInput } from './FT2NumericInput';
 
 export interface FT2SubsongInputProps { label?: string; className?: string }
 
+/** A switch reopens and rescans the song: step presses only show the number; the switch runs once the user stops. */
+export const SUBSONG_SWITCH_SETTLE_MS = 400;
+
+const commitSubsong = (oneBased: number) => void switchSubsong(oneBased - 1);
+
 export const FT2SubsongInput: React.FC<FT2SubsongInputProps> = React.memo(({ label = 'Subsong', className = '' }) => {
   const status = useFormatStore(useShallow((s) => subsongStatus(s)));
+  const [shown, change] = useDebouncedCommit((status?.current ?? 0) + 1, commitSubsong, SUBSONG_SWITCH_SETTLE_MS);
   if (!status || status.count <= 1) return null;
   return (
     <div className={className}>
       <FT2NumericInput
         label={label}
-        value={status.current + 1}
-        onChange={(v) => void switchSubsong(v - 1)}
+        value={shown}
+        onChange={change}
         min={1}
         max={status.count}
       />
