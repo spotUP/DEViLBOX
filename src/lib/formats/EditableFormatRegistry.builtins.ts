@@ -74,6 +74,7 @@ registerEditableFormat({ formatId: "graoumfTracker2_gtk4", label: "Graoumf Track
 registerEditableFormat({ formatId: "graoumfTracker2_gtk5", label: "Graoumf Tracker 2", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "hippelCoSo", label: "Hippel-CoSo", patternCodec: { kind: "variable" }, exporter: { module: "HippelCoSoExporter", fn: "exportAsHippelCoSo", byLayout: true }, newSong: { template: "templates/hippelCoSo.hipc", name: "Jochen Hippel CoSo" } });
 registerEditableFormat({ formatId: "stoneTracker", label: "StoneTracker", patternCodec: { kind: "variable" }, exporter: { module: "StoneTrackerExporter", fn: "exportStoneTracker", ext: "spm", byLayout: true } });
+registerEditableFormat({ formatId: "daveLowe", label: "Dave Lowe", patternCodec: { kind: "variable" }, exporter: { module: "DaveLoweExporter", fn: "exportDaveLowe", ext: "dl", byLayout: true } });
 registerEditableFormat({ formatId: "jeroenTel", label: "Jeroen Tel", patternCodec: { kind: "fixed" }, exporter: { module: "JeroenTelExporter", fn: "exportJeroenTel", ext: "jt", byLayout: true } });
 registerEditableFormat({ formatId: "jochenHippelST", label: "", newSong: { template: "templates/jochenHippelST.hst", name: "Jochen Hippel ST" }, patternCodec: { kind: "fixed" }, exporter: { module: "JochenHippelSTExporter", fn: "exportJochenHippelST", byLayout: true } });
 registerEditableFormat({ formatId: "hivelyAHX", label: "HivelyTracker", patternCodec: { kind: "fixed" } });
