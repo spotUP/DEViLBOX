@@ -41,7 +41,7 @@ export const HD_FX = {
 } as const;
 
 export const HC_FX_BASE = 0x530;
-/** Jochen Hippel CoSo note parameter (hippel.c step_voice): the byte after the info byte, read when info bits 5-7 are set. */
+/** Jochen Hippel CoSo note parameter (hippel.c step_voice; MCMD uses the same two, mcmd.c INFO_PORTAMENTO / INFO_ALT_FSEQ, shown with these ids): the byte after the info byte, read when info bits 5-7 are set. */
 export const HC_FX = {
   /** P: portamento rate (info bit 5, the byte feeds hip_portamento_apply). */
   portamento: HC_FX_BASE,
