@@ -14,6 +14,9 @@ import { sm1IndexToXM } from '@/engine/uade/encoders/SidMon1Encoder';
 
 const NAME = 'myfunnymazea.sid';
 const raw = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/sidmon-1', NAME)));
+// myfunnymazea has no effect rows; anarchy.sid1 has 324 bend rows (3xx), no speed rows: speed is written on a blank note row.
+const NAME2 = 'anarchy.sid1';
+const raw2 = new Uint8Array(readFileSync(join(process.cwd(), 'public/data/songs/formats', NAME2)));
 const load = () => parseSidMon1File(raw.slice().buffer as ArrayBuffer, NAME);
 
 describe('SidMon 1 cell edits reach the bytes', () => {
@@ -61,5 +64,70 @@ describe('SidMon 1 cell edits reach the bytes', () => {
     const diff = out.reduce<number[]>((l, v, k) => (v !== raw[k] ? [...l, k] : l), []);
     expect(diff).toEqual([off]);
     expect(out[off]).toBe(raw[off] + 2);
+  });
+
+  it('effect edits (speed Fxx, bend 3xx, clear) reach the stored param/effect bytes; unwritable ones are left', async () => {
+    const song = parseSidMon1File(raw2.slice().buffer as ArrayBuffer, NAME2);
+    const layout = song.uadePatternLayout!;
+    const find = (typ: number) => {
+      for (let p = 0; p < song.patterns.length; p++) {
+        for (let ch = 0; ch < 4; ch++) {
+          const rows = song.patterns[p].channels[ch].rows;
+          const r = rows.findIndex((x, k) => x.effTyp === typ && layout.getCellFileOffset!(p, k, ch) >= 0);
+          if (r >= 0) return { p, r, ch };
+        }
+      }
+      return null;
+    };
+    const blank = (() => {
+      for (let p = 0; p < song.patterns.length; p++) for (let ch = 0; ch < 4; ch++) {
+        const rows = song.patterns[p].channels[ch].rows;
+        const r = rows.findIndex((x, k) => x.note > 0 && x.effTyp === 0 && raw2[layout.getCellFileOffset!(p, k, ch) + 2] === 0 && layout.getCellFileOffset!(p, k, ch) >= 0);
+        if (r >= 0) return { p, r, ch };
+      }
+      return null;
+    })();
+    const bend = find(0x03);
+    const speed = find(0x0F);
+    // Every effect type the parser shows that this song uses; a song without one is a failure, not a skip.
+    expect(bend ?? speed).not.toBeNull();
+    expect(blank).not.toBeNull();
+    const run = (h: { p: number; r: number; ch: number }, patch: Partial<typeof song.patterns[0]['channels'][0]['rows'][0]>) => {
+      const cell = song.patterns[h.p].channels[h.ch].rows[h.r];
+      const off = layout.getCellFileOffset!(h.p, h.r, h.ch);
+      return { off, bytes: layout.writeCell!(h.p, h.r, h.ch, { ...cell, ...patch })[0].bytes };
+    };
+    if (bend) {
+      const cell = song.patterns[bend.p].channels[bend.ch].rows[bend.r];
+      const a = run(bend, { eff: (cell.eff + 1) & 0xFF });
+      expect(a.bytes[3]).toBe((raw2[a.off + 3] + 1) & 0xFF);
+      expect(a.bytes[2]).toBe(raw2[a.off + 2]); // the target note stays
+      const c = run(bend, { effTyp: 0, eff: 0 });
+      expect([c.bytes[2], c.bytes[3]]).toEqual([0, 0]);
+      const toSpeed = run(bend, { effTyp: 0x0F, eff: 5 });
+      expect([toSpeed.bytes[2], toSpeed.bytes[3]]).toEqual([2, 5]);
+    }
+    if (speed) {
+      const a = run(speed, { eff: 7 });
+      expect([a.bytes[2], a.bytes[3]]).toEqual([2, 7]);
+      const c = run(speed, { effTyp: 0, eff: 0 });
+      expect([c.bytes[2], c.bytes[3]]).toEqual([0, 0]);
+      // 3xx cannot be derived (target note): the effect byte is kept.
+      const nb = run(speed, { effTyp: 0x03, eff: 4 });
+      expect(Array.from(nb.bytes)).toEqual(Array.from(raw.slice(nb.off, nb.off + 5)));
+    }
+    // A blank note row gets a speed effect; reparsed it shows F07.
+    const b = run(blank!, { effTyp: 0x0F, eff: 7 });
+    expect([b.bytes[2], b.bytes[3]]).toEqual([2, 7]);
+    const edited = new Uint8Array(raw2);
+    edited.set(b.bytes, b.off);
+    const back = parseSidMon1File(edited.buffer as ArrayBuffer, NAME2);
+    expect(back.patterns[blank!.p].channels[blank!.ch].rows[blank!.r]).toMatchObject({ effTyp: 0x0F, eff: 7 });
+    // Export: the edit changes exactly the effect and param bytes.
+    song.patterns[blank!.p].channels[blank!.ch].rows[blank!.r] = { ...song.patterns[blank!.p].channels[blank!.ch].rows[blank!.r], effTyp: 0x0F, eff: 7 };
+    const out = new Uint8Array(await (await exportSidMon1(song)).data.arrayBuffer());
+    const diff = out.reduce<number[]>((l, v, k) => (v !== raw2[k] ? [...l, k] : l), []);
+    expect(diff.every((k) => k === b.off + 2 || k === b.off + 3)).toBe(true);
+    expect(out[b.off + 2]).toBe(2);
   });
 });

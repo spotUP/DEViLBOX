@@ -525,6 +525,24 @@ export function parseSidMon1File(buffer: ArrayBuffer, filename: string, moduleBa
         }
       }
       if ((cell.instrument ?? 0) !== shown.instrument) bytes[1] = (cell.instrument ?? 0) & 0xFF;
+      // The effect column (replayer sidmon1.c:973): 2 sets the speed (Fxx), any other effect except 0 and 3 is a
+      // bend (3xx) whose target note is the effect byte itself, which the grid has no field for. The parameter
+      // byte is the same for every cell showing this stored row (no transpose in it), so an edit stays consistent.
+      const now = gridCell(bytes, playerRow(bytes, versionTag, totInstruments), tracks[c.track].transpose);
+      const wantTyp = cell.effTyp ?? 0;
+      const wantEff = cell.eff ?? 0;
+      const playsNote = bytes[0] > 0 && bytes[0] < 255;
+      if (playsNote && (wantTyp !== now.effTyp || wantEff !== now.eff)) {
+        const stored = playerRow(bytes, versionTag, totInstruments).effect;
+        const rawEffect = (e: number): number => (versionTag === 0x1444 && e > 0 ? (e - 469) & 0xff : e);
+        // Effect 3 (pattern length) has no grid field and moves the grid's row layout: never overwritten here.
+        if (stored !== 3) {
+          if (wantTyp === 0x0F) { bytes[2] = rawEffect(2); bytes[3] = wantEff; }
+          else if (wantTyp === 0x03 && now.effTyp === 0x03) bytes[3] = wantEff;
+          else if (wantTyp === 0 && now.effTyp !== 0) { bytes[2] = 0; bytes[3] = 0; }
+          // 3xx on a cell with no bend: the target note cannot be derived from the grid; left unwritten.
+        }
+      }
       working.set(bytes, off);
       return [{ offset: off, bytes }];
     },

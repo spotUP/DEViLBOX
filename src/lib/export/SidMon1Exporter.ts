@@ -5,7 +5,7 @@
  * module (per-voice track lists, rows that last several global rows), so a
  * rebuilt module would no longer be the song that was loaded. The export is
  * the module as loaded with the edits written into it:
- *   - every grid cell whose note or instrument differs from the loaded grid is
+ *   - every grid cell whose note, instrument or effect differs from the loaded grid is
  *     written through the layout's own cell writer (the same one a live edit
  *     uses), which keeps the effect and speed bytes and removes the track's
  *     transpose;
@@ -41,7 +41,7 @@ export async function exportSidMon1(song: TrackerSong): Promise<SidMon1ExportRes
   const loaded = parseSidMon1File(song.uadeEditableFileData.slice(0), song.name || 'module');
   const layout = loaded.uadePatternLayout!;
 
-  // Cells the user changed: note or instrument differs from the loaded grid.
+  // Cells the user changed: note, instrument or effect differs from the loaded grid.
   let written = 0;
   const grow: Array<{ p: number; r: number; ch: number; cell: TrackerCell }> = [];
   const steps = Math.min(loaded.patterns.length, song.patterns.length);
@@ -50,7 +50,8 @@ export async function exportSidMon1(song: TrackerSong): Promise<SidMon1ExportRes
       const was = loaded.patterns[p].channels[ch].rows;
       const now = song.patterns[p].channels[ch]?.rows ?? [];
       for (let r = 0; r < Math.min(was.length, now.length); r++) {
-        if ((was[r].note ?? 0) === (now[r].note ?? 0) && (was[r].instrument ?? 0) === (now[r].instrument ?? 0)) continue;
+        if ((was[r].note ?? 0) === (now[r].note ?? 0) && (was[r].instrument ?? 0) === (now[r].instrument ?? 0)
+          && (was[r].effTyp ?? 0) === (now[r].effTyp ?? 0) && (was[r].eff ?? 0) === (now[r].eff ?? 0)) continue;
         const runs = layout.writeCell!(p, r, ch, now[r]);
         if (runs.length === 0) {
           // A note on a cell inside a long row: the row covering it is split afterwards (G5).

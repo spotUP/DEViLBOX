@@ -150,18 +150,18 @@ export class SidMon1ReplayerEngine extends WASMSingletonBase {
    * are ignored. A row shared by several steps changes in all of them.
    * Returns the (row index, bytes) it wrote.
    */
-  static patchModuleCell(pattern: number, row: number, channel: number, note: number, instrument: number): { index: number; bytes: Uint8Array }[] {
+  static patchModuleCell(pattern: number, row: number, channel: number, note: number, instrument: number, effTyp = 0, eff = 0): { index: number; bytes: Uint8Array }[] {
     const fmt = useFormatStore.getState();
     const layout = fmt.uadePatternLayout;
     if (!layout?.writeCell) return [];
     const module = fmt.sidmon1WasmFileData ? new Uint8Array(fmt.sidmon1WasmFileData) : null;
-    const runs = layout.writeCell(pattern, row, channel, { note, instrument, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+    const runs = layout.writeCell(pattern, row, channel, { note, instrument, volume: 0, effTyp, eff, effTyp2: 0, eff2: 0 });
     for (const run of runs) module?.set(run.bytes, run.offset);
     return runs.map((run) => ({ index: (run.offset - layout.patternDataFileOffset) / 5, bytes: run.bytes }));
   }
 
-  setCell(pattern: number, row: number, channel: number, note: number, instrument: number): void {
-    for (const { index, bytes } of SidMon1ReplayerEngine.patchModuleCell(pattern, row, channel, note, instrument)) {
+  setCell(pattern: number, row: number, channel: number, note: number, instrument: number, effTyp = 0, eff = 0): void {
+    for (const { index, bytes } of SidMon1ReplayerEngine.patchModuleCell(pattern, row, channel, note, instrument, effTyp, eff)) {
       this.workletNode?.port.postMessage({ type: 'setRow', index, bytes });
     }
   }
