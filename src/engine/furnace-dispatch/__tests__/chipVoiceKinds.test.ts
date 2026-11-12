@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { SYSTEM_PRESETS, DivChanType } from '@constants/systemPresets';
 import {
-  CHIP_SPECS, chipLayout, chipChannelsOfKind, kindOfChipChannel, checkNoteVoiceKind,
+  CHIP_SPECS, chipLayout, chipChannelsOfKind, kindOfChipChannel, checkNoteVoiceKind, maxVolumeOfChipChannel,
 } from '../chipVoiceKinds';
 import { DIV_INS_FM, DIV_INS_AY, DIV_INS_ADPCMA, DIV_INS_ADPCMB, DIV_INS_OPL, DIV_INS_MULTIPCM } from '@lib/export/FurnaceInstrumentEncoder';
 
@@ -105,5 +105,23 @@ describe('checkNoteVoiceKind', () => {
     const mixed = SYSTEM_PRESETS.filter((p) => new Set(p.channelDefs.map((d) => d.type)).size > 1);
     expect(mixed.length).toBe(38);
     expect(DivChanType.PCM).toBeDefined();
+  });
+});
+
+describe('volume maximum of one chip channel', () => {
+  it('YM2610: FM 127, SSG 15, ADPCM-A 31, ADPCM-B 255', () => {
+    expect([0, 3, 4, 6, 7, 12, 13].map(ch => maxVolumeOfChipChannel('FurnaceOPNB', ch)))
+      .toEqual([127, 127, 15, 15, 31, 31, 255]);
+  });
+
+  it('YM2608 and YM2203 follow the same kinds at their own offsets', () => {
+    expect([5, 6, 9, 15].map(ch => maxVolumeOfChipChannel('FurnaceOPNA', ch))).toEqual([127, 15, 31, 255]);
+    expect([2, 3].map(ch => maxVolumeOfChipChannel('FurnaceOPN2203', ch))).toEqual([127, 15]);
+  });
+
+  it('a chip whose upstream maximum was not read, or no chip, falls back to the platform value', () => {
+    expect(maxVolumeOfChipChannel('FurnaceY8950', 0)).toBeUndefined();
+    expect(maxVolumeOfChipChannel('FurnaceGB', 0)).toBeUndefined();
+    expect(maxVolumeOfChipChannel(undefined, 0)).toBeUndefined();
   });
 });

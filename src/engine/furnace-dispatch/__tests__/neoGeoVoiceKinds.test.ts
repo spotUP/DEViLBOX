@@ -69,6 +69,26 @@ describe('Neo Geo voice kinds reach the chip', () => {
     expect(calls.noteOn.mock.calls.at(-1)![0]).toBe(channel);
   });
 
+  // The owner heard SSG drums far too weak: a full-velocity note sent volume 127
+  // (the FM maximum) to a 4-bit SSG channel.
+  it.each([
+    ['ssg', DIV_INS_AY, 15],
+    ['adpcma', DIV_INS_ADPCMA, 31],
+    ['adpcmb', DIV_INS_ADPCMB, 255],
+  ])('%s: a full-velocity note sets the channel kind maximum, not the FM 127', async (_id, divInsType, max) => {
+    calls.setVolume.mockClear();
+    await play({ divInsType, operators: [] });
+    const [channel, volume] = calls.setVolume.mock.calls.at(-1)!;
+    expect(channel).toBe(calls.noteOn.mock.calls.at(-1)![0]);
+    expect(volume).toBe(max);
+  });
+
+  it('an FM voice still gets 127 at full velocity', async () => {
+    calls.setVolume.mockClear();
+    await play({ operators: [] });
+    expect(calls.setVolume.mock.calls.at(-1)![1]).toBe(127);
+  });
+
   it('an SSG voice with no macros uploads as the same blob as one with a volume and a tone macro', async () => {
     const macro = (code: number, v: number) => ({ code, type: 0, data: [v], loop: -1, release: -1, mode: 0 });
     await play({ divInsType: DIV_INS_AY, operators: [], macros: [] });
