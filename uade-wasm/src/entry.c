@@ -49,6 +49,9 @@ static int s_paused  = 0;
 static int s_looping = 0;
 static int s_total_frames = 0;  /* Total frames rendered (for position tracking) */
 static char s_last_vpath[512] = "/uade/song";  /* Last module VFS path (for loop/subsong) */
+/* Subsong the core was last started on (-1 = the default one). A loop restart replays THIS tune: with -1 it would start
+ * the default subsong, so a pinned tune that ended came back as another tune. */
+static int s_last_subsong = -1;
 
 /* Sample rate for the WASM module (set at init) */
 static int s_sample_rate = 44100;
@@ -332,6 +335,10 @@ int uade_wasm_init(int sample_rate) {
     uade_config_set_option(cfg, UC_BASE_DIR, "/uade");
     uade_config_set_option(cfg, UC_FREQUENCY, s_sample_rate == 44100 ? "44100" : "48000");
     uade_config_set_option(cfg, UC_PANNING_VALUE, "1.0"); /* Full mono — mix all channels to center */
+    /* DEViLBOX plays one tune at a time (tunes are switched live): a tune that ends must loop on itself, never advance
+     * to the next subsong (uadestate.c WAIT_SUBSONG_CHANGE -> uade_next_subsong). uade_wasm_set_one_subsong can still
+     * override. */
+    uade_config_set_option(cfg, UC_ONE_SUBSONG, NULL);
 
     if (guarded_new_state(cfg) != 0) {
         free(cfg);
@@ -412,6 +419,7 @@ int uade_wasm_load(const uint8_t *data, size_t len, const char *filename_hint) {
 
     /* Start playback */
     chdir("/uade");
+    s_last_subsong = -1;
     int ret = guarded_play(vpath, -1);
     if (ret <= 0) {
         void *buf = malloc(len);
@@ -506,6 +514,7 @@ void uade_wasm_set_subsong(int subsong) {
         }
     }
 
+    s_last_subsong = subsong;
     s_playing = (guarded_play(s_last_vpath, subsong) > 0);
 }
 
@@ -562,7 +571,7 @@ static int restart_for_loop(void) {
             uade_send_string(UADE_COMMAND_CONFIG, uaerc_path, &s_state->ipc);
         }
     }
-    return (guarded_play(s_last_vpath, -1) > 0) ? 1 : 0;
+    return (guarded_play(s_last_vpath, s_last_subsong) > 0) ? 1 : 0;
 }
 
 /*
