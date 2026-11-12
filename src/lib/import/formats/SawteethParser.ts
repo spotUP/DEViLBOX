@@ -490,17 +490,32 @@ export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerS
   // To keep it simple: for each channel, pre-expand to a flat row list and
   // then emit one pattern per 16 (or per part boundary) rows.
 
-  // Pre-expand each channel to a flat array of { ins, eff, note } rows.
-  const expandedChannels: Array<Array<SawteethStep & { partIdx: number }>> = [];
+  // Common tick base. Every part has its own sps (ticks per part step; one tick is
+  // spsPal samples), so one grid row per part step would make a fast part take as
+  // long as a slow one and the channels would drift apart. One grid row is
+  // gcd(sps of every part a channel sequence plays) ticks; a part step with sps S
+  // owns S / unit rows: the step's cell on the first row, empty cells after it.
+  const partIdxOf = (part: number): number => (part < partCount ? part : partCount - 1);
+  let rowTicks = 0;
+  for (let ch = 0; ch < channelCount; ch++) {
+    const chInfo = channels[ch];
+    for (let si = 0; si <= chInfo.rLoop; si++) {
+      rowTicks = gcd(rowTicks, parts[partIdxOf(chInfo.steps[si].part)].sps);
+    }
+  }
+  if (rowTicks < 1) rowTicks = 6;
+
+  const expandedChannels: Array<Array<(SawteethStep & { partIdx: number }) | null>> = [];
 
   for (let ch = 0; ch < channelCount; ch++) {
     const chInfo = channels[ch];
-    const flat: Array<SawteethStep & { partIdx: number }> = [];
+    const flat: Array<(SawteethStep & { partIdx: number }) | null> = [];
 
     for (let si = 0; si <= chInfo.rLoop; si++) {
       const step = chInfo.steps[si];
-      const partIdx = step.part < partCount ? step.part : partCount - 1;
+      const partIdx = partIdxOf(step.part);
       const part = parts[partIdx];
+      const rowsPerStep = part.sps / rowTicks;
 
       for (let row = 0; row < part.len; row++) {
         const s = part.steps[row];
@@ -510,6 +525,7 @@ export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerS
           note = Math.max(1, Math.min(96, note + step.transp));
         }
         flat.push({ ins: s.ins, eff: s.eff, note, partIdx });
+        for (let k = 1; k < rowsPerStep; k++) flat.push(null);
       }
     }
 
@@ -536,12 +552,12 @@ export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerS
 
       for (let r = 0; r < patLen; r++) {
         const globalRow = startRow + r;
-        if (globalRow >= chExpanded.length) {
+        const s = globalRow < chExpanded.length ? chExpanded[globalRow] : null;
+        if (!s) {
           rows.push(emptyCell());
           continue;
         }
 
-        const s = chExpanded[globalRow];
         const xmNote = s.note; // already 1-based XM note or 0
         const instrId = s.ins > 0 && s.ins < instrumentCount ? s.ins : 0;
 
@@ -609,8 +625,10 @@ export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerS
     songLength: trackerPatterns.length,
     restartPosition: 0,
     numChannels: channelCount,
-    initialSpeed: 6,
-    initialBPM: 125,
+    // The tracker clock runs 2.5 / BPM seconds per tick and a row is initialSpeed ticks; one Sawteeth tick
+    // is spsPal samples at 44100 Hz, so BPM = tick rate * 2.5 makes grid time equal audio time.
+    initialSpeed: rowTicks,
+    initialBPM: (44100 / spsPal) * 2.5,
     linearPeriods: false,
     sawteethFileData: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
   } as TrackerSong;
@@ -618,6 +636,11 @@ export function parseSawteethFile(bytes: Uint8Array, filename: string): TrackerS
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+function gcd(a: number, b: number): number {
+  while (b) { const t = a % b; a = b; b = t; }
+  return a;
+}
 
 function emptyCell(): TrackerCell {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
