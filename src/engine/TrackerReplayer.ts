@@ -17,6 +17,7 @@ import { applyEditorCellEdit } from '@lib/import/furnaceEditorCells';
 import { DavidWhittakerEngine } from './davidwhittaker/DavidWhittakerEngine';
 import { outputLatencySec } from './audioLatency';
 import { composedNeoGeoSequencerRoute, deriveComposedNeoGeo, isReplacedForDerivedSong } from './replayer/composedNeoGeo';
+import { derivedCellSeqWrites, derivedPlayState, neoGeoInstrumentIds, planStructuralEdit, isStructuralNoop, type DerivedPlayState } from './replayer/composedNeoGeoLiveSync';
 import type { DerivedFurnaceNative } from '@/lib/export/deriveFurnaceNative';
 import { notify } from '@stores/useNotificationStore';
 import { isReplacedInstrument, noteVolumeIsVelocity, synthNoteVelocity } from './replayer/hybridInstruments';
@@ -790,6 +791,10 @@ export class TrackerReplayer {
   private _seqPositionUnsub: (() => void) | null = null;
   /** Native data derived at Play for a composed Neo Geo song; set only while that play lasts. */
   private _derivedNeoGeo: DerivedFurnaceNative | null = null;
+  /** What the running sequencer was loaded from (composedNeoGeoLiveSync.ts); null when no derived song plays. */
+  private _derivedState: DerivedPlayState | null = null;
+  private _derivedWatchUnsubs: Array<() => void> = [];
+  private _derivedSyncChain: Promise<void> = Promise.resolve();
 
   // libopenmpt playback: when active, audio comes from the libopenmpt worklet
   // and TrackerReplayer only forwards position updates to the UI.
@@ -1773,6 +1778,9 @@ export class TrackerReplayer {
    * was gone at the next Play, which re-uploaded the untouched native data.
    */
   syncCellToWasmSequencer(ch: number, patIdx: number, row: number, cell: Partial<import('@/types/tracker').TrackerCell>): void {
+    // A composed Neo Geo song plays from a derived native: its cell is converted by the .fur
+    // exporter's own conversion, not by the import-side applyEditorCellEdit.
+    if (this._derivedNeoGeo) { this.syncDerivedCell(ch, patIdx, row); return; }
     const native = this.song?.furnaceNative;
     if (!native || !this.song) return;
     const writes = applyEditorCellEdit(native, this.song.songPositions, patIdx, ch, row, cell);
@@ -1781,6 +1789,101 @@ export class TrackerReplayer {
       const engine = FurnaceDispatchEngine.getInstance();
       for (const w of writes) engine.seqSetCell(w.ch, w.pat, w.row, w.col, w.val);
     }).catch(() => {});
+  }
+
+  /** (a) One store cell of a derived song to the sequencer: all columns, exporter conversion. */
+  private syncDerivedCell(ch: number, patIdx: number, row: number): void {
+    const derived = this._derivedNeoGeo;
+    if (!derived || !this.useWasmSequencer || ch >= 14) return;
+    const channel = useTrackerStore.getState().patterns[patIdx]?.channels[ch];
+    const cell = channel?.rows[row];
+    if (!channel || !cell) return;
+    const sync = derivedCellSeqWrites(cell, channel.channelMeta, derived.instrumentIds, ch, patIdx, row);
+    if (sync.problems.length > 0) console.warn('[TrackerReplayer] live edit:', sync.problems.join('; '));
+    const chan = derived.native.subsongs[derived.native.activeSubsong ?? 0]?.channels[ch];
+    const openCols = chan && sync.effectCols > chan.effectCols ? sync.effectCols : 0;
+    if (chan && openCols) chan.effectCols = openCols;
+    import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
+      const engine = FurnaceDispatchEngine.getInstance();
+      if (openCols) engine.seqSetEffectCols(ch, openCols);
+      for (const w of sync.writes) engine.seqSetCell(w.ch, w.pat, w.row, w.col, w.val);
+    }).catch(() => {});
+  }
+
+  /** The state a derived song's sequencer would be loaded from right now. */
+  private async currentDerivedState(): Promise<DerivedPlayState> {
+    const { useInstrumentStore } = await import('@stores/useInstrumentStore');
+    const instruments = useInstrumentStore.getState().instruments;
+    const tracker = useTrackerStore.getState();
+    return derivedPlayState(
+      { patterns: tracker.patterns, songPositions: tracker.patternOrder, instruments },
+      neoGeoInstrumentIds(instruments),
+    );
+  }
+
+  /** Watch the stores for structural edits (order, pattern length, instruments) while a derived song plays. */
+  private async startDerivedWatch(): Promise<void> {
+    this.stopDerivedWatch();
+    const { useInstrumentStore } = await import('@stores/useInstrumentStore');
+    this._derivedState = await this.currentDerivedState();
+    const trigger = () => { this._derivedSyncChain = this._derivedSyncChain.then(() => this.applyDerivedStructuralEdit()).catch(() => {}); };
+    this._derivedWatchUnsubs.push(
+      useTrackerStore.subscribe((s, prev) => { if (s.patternOrder !== prev.patternOrder || s.patterns !== prev.patterns) trigger(); }),
+      useInstrumentStore.subscribe((s, prev) => { if (s.instruments !== prev.instruments) trigger(); }),
+    );
+  }
+
+  private stopDerivedWatch(): void {
+    for (const u of this._derivedWatchUnsubs) u();
+    this._derivedWatchUnsubs = [];
+    this._derivedState = null;
+  }
+
+  /**
+   * (b)(c)(d): order changes go through seqSetOrder, instrument parameters through loadIns2 plus
+   * forceIns, anything the sequencer fixes at load (order length, pattern length, instrument set)
+   * re-derives the native and reloads it at the current position.
+   */
+  private async applyDerivedStructuralEdit(): Promise<void> {
+    const before = this._derivedState;
+    const derived = this._derivedNeoGeo;
+    if (!before || !derived || !this.song || !this.useWasmSequencer) return;
+    const now = await this.currentDerivedState();
+    const plan = planStructuralEdit(before, now);
+    if (isStructuralNoop(plan)) { this._derivedState = now; return; }
+    const { FurnaceDispatchEngine } = await import('@engine/furnace-dispatch/FurnaceDispatchEngine');
+    const engine = FurnaceDispatchEngine.getInstance();
+    try {
+      if (plan.rederive || plan.changedInstrumentIds.length > 0) {
+        const fresh = await deriveComposedNeoGeo({ ...this.song, patterns: useTrackerStore.getState().patterns, songPositions: useTrackerStore.getState().patternOrder, instruments: (await import('@stores/useInstrumentStore')).useInstrumentStore.getState().instruments });
+        if (!this.playing || this._derivedNeoGeo !== derived) return;
+        if (plan.rederive) {
+          this.song.furnaceNative = fresh.native;
+          this._derivedNeoGeo = fresh;
+          for (const { slot, data } of fresh.ins2) engine.loadIns2(slot, data);
+          const { uploadFurnaceToSequencer } = await import('@/lib/export/FurnaceSequencerSerializer');
+          await uploadFurnaceToSequencer(fresh.native, 0);
+          engine.seqPlay(this.songPos, this.pattPos);
+        } else {
+          const slots = new Set(plan.changedInstrumentIds.map((id) => now.instrumentIds.indexOf(id)));
+          for (const u of fresh.ins2) if (slots.has(u.slot)) engine.loadIns2(u.slot, u.data);
+          derived.ins2 = fresh.ins2;
+          engine.forceIns();
+        }
+      }
+      if (!plan.rederive && plan.orderWrites.length > 0) {
+        const sub = derived.native.subsongs[derived.native.activeSubsong ?? 0];
+        for (const { pos, pat } of plan.orderWrites) {
+          for (let ch = 0; ch < 14; ch++) {
+            engine.seqSetOrder(ch, pos, pat);
+            if (sub?.orders[ch]) sub.orders[ch][pos] = pat;
+          }
+        }
+      }
+      this._derivedState = now;
+    } catch (err) {
+      notify.error(`Neo Geo live edit could not reach the sequencer: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   // ==========================================================================
@@ -2594,6 +2697,7 @@ export class TrackerReplayer {
           this.useWasmSequencer = true;
           this._seqPositionUnsub = result.cleanup;
           this.coordinator.markDispatchActive();
+          if (this._derivedNeoGeo) void this.startDerivedWatch();
           _log('[TrackerReplayer] Using WASM sequencer for Furnace playback');
           return;
         }
@@ -2960,6 +3064,7 @@ export class TrackerReplayer {
     this._playGeneration++; // Invalidate any in-flight async play()
 
     // The native data of a composed Neo Geo song lives for one play only (re-derived at the next).
+    this.stopDerivedWatch();
     if (this._derivedNeoGeo) {
       if (this.song) delete this.song.furnaceNative;
       this._derivedNeoGeo = null;

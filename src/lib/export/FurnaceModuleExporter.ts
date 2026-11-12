@@ -33,7 +33,7 @@ export const FUR_NEO_GEO_CHANNELS = 14;
 /** The synth type of a Neo Geo instrument in the tracker. */
 export const NEO_GEO_SYNTH_TYPE = 'FurnaceOPNB';
 
-const FILE_NOTE_OFF = 180;
+export const FILE_NOTE_OFF = 180;
 const MAX_FX_COLUMNS = 8;
 
 export interface FurnaceModuleSong {
@@ -96,7 +96,7 @@ function block(tag: string, body: Bytes): Uint8Array {
 
 // -- Cells ------------------------------------------------------------------------
 
-interface FileCell {
+export interface FileCell {
   note: number; // file note, -1 none
   ins: number; // -1 none
   vol: number; // -1 none
@@ -115,7 +115,7 @@ function cellEffects(cell: TrackerCell): Array<[number, number]> {
  * command, so a verbatim copy would change what the song plays. Move it to the volume column
  * (the same 0-64 to 0-127 scale as the volume column). Furnace-notation channels keep their codes.
  */
-function cellToFile(
+export function cellToFile(
   cell: TrackerCell,
   insIndexById: Map<number, number>,
   where: string,
