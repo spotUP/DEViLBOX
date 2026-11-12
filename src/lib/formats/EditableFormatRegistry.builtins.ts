@@ -108,6 +108,7 @@ registerEditableFormat({ formatId: "octamed_mmd0", label: "OctaMED", patternCode
 registerEditableFormat({ formatId: "octamed_mmd1", label: "OctaMED", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "oktalyzer", label: "Oktalyzer", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "paulRobotham", label: "Paul Robotham", patternCodec: { kind: "variable" }, exporter: { module: "PaulRobothamExporter", fn: "exportPaulRobotham", byLayout: true } });
+registerEditableFormat({ formatId: "medley", label: "Medley", patternCodec: { kind: "variable" }, exporter: { module: "MedleyExporter", fn: "exportMedley", byLayout: true } });
 registerEditableFormat({ formatId: "plm", label: "", patternCodec: { kind: "fixed" } });
 registerEditableFormat({ formatId: "preTracker", label: "PreTracker", exporter: { module: "PreTrackerExporter", fn: "exportAsPreTracker" } });
 registerEditableFormat({ formatId: "psm", label: "", patternCodec: { kind: "variable" } });

@@ -29,8 +29,9 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
-import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { medleyEncoder } from '@/engine/uade/encoders/MedleyEncoder';
+import { buildMedleyGrid, MEDLEY_ROWS_PER_PATTERN } from './medleyGrid';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
 
@@ -174,6 +175,8 @@ export function parseMedleyFile(buffer: ArrayBuffer, filename: string): TrackerS
     eff2: 0,
   }));
 
+  const grid = buildMedleyGrid(buf, filename, 1);
+
   const pattern = {
     id: 'pattern-0',
     name: 'Pattern 0',
@@ -217,7 +220,7 @@ export function parseMedleyFile(buffer: ArrayBuffer, filename: string): TrackerS
   return {
     name: `${moduleName} [Medley]${subsongCount > 1 ? ` (${subsongCount} subsongs)` : ''}`,
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
+    patterns: grid ? grid.patterns : [pattern],
     instruments,
     songPositions,
     songLength: songPositions.length,
@@ -228,16 +231,25 @@ export function parseMedleyFile(buffer: ArrayBuffer, filename: string): TrackerS
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
-    uadePatternLayout: {
-      formatId: 'medley',
-      patternDataFileOffset: 1084,
-      bytesPerCell: 4,
-      rowsPerPattern: 64,
-      numChannels: 4,
-      numPatterns: 1,
-      moduleSize: buffer.byteLength,
-      encodeCell: encodeMODCell,
-      decodeCell: decodeMODCell,
-    } as UADEPatternLayout,
+    ...(grid ? {
+      uadePlayerTickGrid: true,
+      uadeVariableLayout: {
+        formatId: 'medley',
+        numChannels: grid.voices,
+        numFilePatterns: grid.blockRows.length,
+        rowsPerPattern: MEDLEY_ROWS_PER_PATTERN,
+        moduleSize: buffer.byteLength,
+        encoder: medleyEncoder,
+        filePatternAddrs: grid.filePatternAddrs,
+        filePatternSizes: grid.filePatternSizes,
+        trackMap: grid.trackMap,
+        blockRows: grid.blockRows,
+        propagateSharedCells: true,
+        noteBytes: grid.placements.map(pl => ({
+          pattern: Math.floor(pl.tick / MEDLEY_ROWS_PER_PATTERN), channel: pl.voice,
+          row: pl.tick % MEDLEY_ROWS_PER_PATTERN, offset: pl.offset, note: pl.note, base: pl.delta,
+        })),
+      } as UADEVariablePatternLayout,
+    } : {}),
   };
 }
