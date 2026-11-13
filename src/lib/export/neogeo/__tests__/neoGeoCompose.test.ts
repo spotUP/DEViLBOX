@@ -81,6 +81,12 @@ describe('neoGeoCompose', () => {
     expect(lintNeoGeoSong(s.build()).join('\n')).toMatch(/crashes furtool on an FM 2 operator channel/);
   });
 
+  it('rejects 00xy, which runs until a 0000 the editor cell cannot hold', () => {
+    const { s, p } = song();
+    p.put(NEO.SSG1, 4, { note: 'A-4', fx: [[0x00, 0x37]] });
+    expect(lintNeoGeoSong(s.build()).join('\n')).toMatch(/arpeggio 0037 never stops/);
+  });
+
   it('counts ADPCM-B V ROM in 256-byte blocks of 4-bit samples', () => {
     const { s } = song();
     s.addInstrument('kick', {

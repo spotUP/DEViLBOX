@@ -241,6 +241,8 @@ export function lintNeoGeoSong(song: FurnaceModuleSong): string[] {
           if (FX_FM_ONLY.has(t)) { if (kind !== 'fm') out.push(`${where}: effect ${fx} works on FM channels only`); continue; }
           if (!FX_ANY.has(t)) { out.push(`${where}: effect ${fx} is not supported by furtool`); continue; }
           if ((t === 0x08 || t === 0x80) && kind === 'ssg') out.push(`${where}: SSG has no panning (${fx})`);
+          // Furnace 00xy runs until 0000, and an editor cell stores 0000 as an empty effect, so nothing can stop it.
+          if (t === 0x00) out.push(`${where}: arpeggio ${fx} never stops (0000 cannot be written); use an arp macro or notes`);
           if (t === 0xe5 && kind === 'adpcmB') out.push(`${where}: ADPCM-B has no fine pitch (${fx})`);
         }
       });
