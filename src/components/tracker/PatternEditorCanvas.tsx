@@ -137,6 +137,9 @@ interface PatternEditorCanvasProps {
    *  When MusicLine renders each channel as a separate instance, this tells
    *  the automation system which real channel this instance represents. */
   formatChannelOffset?: number;
+  /** Sub-editor (a song order matrix) whose columns line up with the main pattern editor's channels: same offsets,
+   *  widths, scale and horizontal scroll, while both have the same channel count. */
+  alignToMainLayout?: boolean;
 }
 
 // PERFORMANCE: Memoize to prevent re-renders on every scroll step
@@ -160,6 +163,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   hideVUMeters = false,
   hideAutomationLanes: hideAutoLanesProp = false,
   formatChannelOffset = 0,
+  alignToMainLayout = false,
 }) => {
   // The column layout the track scopes align to comes from the main editor
   // only; a sub-editor (the GoatTracker order matrix, a perf list) keeps its
@@ -438,6 +442,17 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   const fitChannels = useSettingsStore(s => s.fitAllChannelsTracker) && !mobileCanvas;
   // With fit off the pattern is drawn at the zoom slider's scale; `fitScale` below is the scale in use either way.
   const manualScale = useUIStore(s => s.trackerZoom) / 100;
+  // The main editor's published layout (new arrays only when it changes; scroll is followed further down).
+  const mainScale = useUIStore(s => s.trackerScale);
+  const [mainLayout, setMainLayout] = useState<{ offsets: number[]; widths: number[] } | null>(null);
+  useEffect(() => {
+    if (!alignToMainLayout) return;
+    const read = () => setMainLayout(prev =>
+      prev && prev.offsets === channelLayout.offsets && prev.widths === channelLayout.widths
+        ? prev : { offsets: channelLayout.offsets, widths: channelLayout.widths });
+    read();
+    return subscribeChannelLayout(read);
+  }, [alignToMainLayout]);
   // The header's "+" column; the channel layout leaves room for it.
   const showAddChannel = !isFormatMode && !isMobile && (pattern?.channels.length ?? 0) < 16;
   const addChannelPx = showAddChannel ? ADD_CHANNEL_BUTTON_PX : 0;
@@ -449,6 +464,17 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     const globalLaneOffset = globalLaneVisible ? GLOBAL_LANE_W : 0;
     // FORMAT MODE: compute widths from column definitions (per-channel columns supported)
     if (isFormatMode && formatColumns && formatChannels) {
+      const n = formatChannels.length;
+      if (alignToMainLayout && mainLayout && n > 0 && mainLayout.widths.length === n && mainLayout.offsets.length === n) {
+        const end = mainLayout.offsets[n - 1] + mainLayout.widths[n - 1];
+        return {
+          numChannels: n,
+          channelOffsets: mainLayout.offsets,
+          channelWidths: mainLayout.widths,
+          totalChannelsWidth: end - Math.floor(LNW * mainScale),
+          fitScale: mainScale,
+        };
+      }
       return formatChannelLayout({
         formatChannels,
         formatColumns,
@@ -525,7 +551,7 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
       totalChannelsWidth: currentX - Math.floor(LNW * fitted.scale),
       fitScale: fitted.scale,
     };
-  }, [pattern, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts, globalLaneVisible, dimensions.width, fitChannels, manualScale, visibleMask, showAddChannel]);
+  }, [pattern, columnVisibility, isFormatMode, formatColumns, formatChannels, mobileCanvas, CW, LNW, showAutomationLanes, channelLaneCounts, globalLaneVisible, dimensions.width, fitChannels, manualScale, visibleMask, showAddChannel, alignToMainLayout, mainLayout, mainScale]);
 
   // Row-number gutter and global lane at the fitted scale (canvas px). Everything
   // the worker draws is scaled by fitScale, so these are what the DOM must match.
@@ -536,8 +562,8 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
   // Publish on change, reset only on unmount: a cleanup that reset on every
   // change flapped the store (1.5 -> 1 -> 1.5) and cost two extra commits, each
   // posting the same layout again.
-  useEffect(() => { publishFitScale(fitScale); }, [fitScale, publishFitScale]);
-  useEffect(() => () => publishFitScale(1), [publishFitScale]);
+  useEffect(() => { if (!hideVUMeters) publishFitScale(fitScale); }, [fitScale, publishFitScale, hideVUMeters]);
+  useEffect(() => () => { if (!hideVUMeters) publishFitScale(1); }, [publishFitScale, hideVUMeters]);
   const fitScaleRef = useRef(fitScale);
   const dimensionsRef = useRef(dimensions);
   dimensionsRef.current = dimensions;
@@ -3124,6 +3150,23 @@ export const PatternEditorCanvas: React.FC<PatternEditorCanvasProps> = React.mem
     setScrollLeft(left);
     if (headerScrollRef.current) headerScrollRef.current.scrollLeft = left;
   }, []);
+
+  // An aligned sub-editor scrolls sideways with the main editor.
+  useEffect(() => {
+    if (!alignToMainLayout) return;
+    const follow = () => {
+      const left = channelLayout.scrollLeft;
+      if (left === scrollLeftRef.current) return;
+      scrollLeftRef.current = left;
+      layoutOut.scrollLeft = left;
+      bridgeRef.current?.post({ type: 'scroll', x: left });
+      setScrollLeft(left);
+      if (headerScrollRef.current) headerScrollRef.current.scrollLeft = left;
+      if (bottomScrollRef.current) bottomScrollRef.current.scrollLeft = left;
+    };
+    follow();
+    return subscribeChannelLayout(follow);
+  }, [alignToMainLayout, layoutOut]);
 
   // NOTE: webglUnsupported (iOS) no longer short-circuits here.
   // The main-thread Canvas2D renderer effect above creates a canvas in containerRef
