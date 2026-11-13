@@ -77,6 +77,7 @@ export class Cinter4Engine extends WASMChannelOutputsEngine {
           break;
 
         case 'moduleLoaded':
+          this.settleModuleLoad();
           // Playback starts with the load: re-post the open dub sends now.
           this.afterPlay();
           break;
@@ -94,6 +95,7 @@ export class Cinter4Engine extends WASMChannelOutputsEngine {
 
         case 'error':
           console.error('[Cinter4Engine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -111,6 +113,7 @@ export class Cinter4Engine extends WASMChannelOutputsEngine {
   async loadTune(buffer: ArrayBuffer, rawData?: ArrayBuffer, posConfig?: Cinter4PosConfig): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('Cinter4Engine not initialized');
+    const answered = this.beginModuleLoad();
     this.posConfig = posConfig ?? null;
 
     // Songs with raw (non-Cinter) instruments need their PCM in instrument space
@@ -136,6 +139,7 @@ export class Cinter4Engine extends WASMChannelOutputsEngine {
       const { useSettingsStore } = await import('@stores/useSettingsStore');
       this.setStereoSeparation(useSettingsStore.getState().stereoSeparation);
     } catch { /* settings not ready — worklet default (25%) applies */ }
+    await answered;
   }
 
   /** Per-channel mute/solo (isolation UI): gain 0 = mute, 1 = play. Paula ch 0-3. */

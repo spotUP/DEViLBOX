@@ -62,8 +62,6 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
   private _lastSwapMs: number | null = null;
   private readonly swapCallbacks = new Set<(ms: number) => void>();
   private readonly loadCallbacks = new Set<(l: NuadeLoaded) => void>();
-  /** The load in flight: settled by the worklet's moduleLoaded / error answer, so loadTune does not resolve over a refused module. */
-  private _loadPending: { resolve: () => void; reject: (err: Error) => void } | null = null;
   private readonly voiceCallbacks = new Set<(voices: NuadeVoiceState[]) => void>();
   private readonly stateRequests: Array<(bytes: ArrayBuffer) => void> = [];
 
@@ -156,8 +154,7 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
         // nuade subsongs are 0-based already; what plays is the subsong the load started (asked for, else the file's default).
         reportSubsongs('Nuade', data.subsongs, data.startedSubsong ?? data.defaultSubsong);
         for (const cb of this.loadCallbacks) cb(data);
-        this._loadPending?.resolve();
-        this._loadPending = null;
+        this.settleModuleLoad();
         break;
       }
       case 'subsongStarted':
@@ -197,8 +194,7 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
         break;
       case 'error':
         console.error('[NuadeEngine]', data.message);
-        this._loadPending?.reject(new Error(data.message));
-        this._loadPending = null;
+        this.failModuleLoad(data.message);
         break;
     }
   }
@@ -218,8 +214,7 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
     if (!this.workletNode) throw new Error('NuadeEngine not initialized');
     this._editPort = null;
     this._loaded = null;
-    this._loadPending?.reject(Object.assign(new Error('Load replaced by a newer one'), { name: 'AbortError' }));
-    const answered = new Promise<void>((resolve, reject) => { this._loadPending = { resolve, reject }; });
+    const answered = this.beginModuleLoad();
     this.post({
       type: 'loadModule',
       bytes: moduleData, playerId, fileName: fileName || playerId,

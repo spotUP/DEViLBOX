@@ -74,6 +74,7 @@ export class BdEngine extends WASMSingletonBase {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          this.settleModuleLoad();
           useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 0', 'Paula 1', 'Paula 2', 'Paula 3']);
           console.log('[BdEngine] Module loaded');
           break;
@@ -85,6 +86,7 @@ export class BdEngine extends WASMSingletonBase {
           break;
         case 'error':
           console.error('[BdEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -100,7 +102,9 @@ export class BdEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer, subsong = 0, rowStep = 1): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('BdEngine not initialized');
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer, subsong, rowStep });
+    await answered;
   }
 
   /** Swap the playing module for an edited one without restarting: the worklet runs it silently up to the position played. */

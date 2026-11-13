@@ -67,10 +67,12 @@ export class AyletEngine extends WASMSingletonBase {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          this.settleModuleLoad();
           console.log(`[AyletEngine] AY file loaded: ${data.numTracks} song(s), playing ${data.track}`);
           break;
         case 'error':
           console.error('[AyletEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -86,7 +88,9 @@ export class AyletEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer, track = -1): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('AyletEngine not initialized');
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer, track });
+    await answered;
   }
 
   play(): void { /* the tune starts on load */ }

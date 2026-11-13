@@ -71,6 +71,7 @@ export class AsapEngine extends WASMSingletonBase implements SubsongPlayer {
           break;
 
         case 'moduleLoaded':
+          this.settleModuleLoad();
           console.log('[AsapEngine] Module loaded', data.meta);
           if (typeof data.meta?.songs === 'number' && typeof data.meta?.song === 'number' && data.meta.song >= 0) {
             reportSubsongs('Asap', data.meta.songs, data.meta.song);
@@ -84,6 +85,7 @@ export class AsapEngine extends WASMSingletonBase implements SubsongPlayer {
 
         case 'error':
           console.error('[AsapEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -102,10 +104,12 @@ export class AsapEngine extends WASMSingletonBase implements SubsongPlayer {
   async loadTune(buffer: ArrayBuffer, filename?: string, song = -1): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('AsapEngine not initialized');
+    const answered = this.beginModuleLoad();
 
     this.workletNode.port.postMessage(
       { type: 'loadModule', moduleData: buffer, filename: filename || 'tune.sap', song },
     );
+    await answered;
   }
 
   play(): void {

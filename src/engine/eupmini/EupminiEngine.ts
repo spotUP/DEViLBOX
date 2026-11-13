@@ -79,6 +79,7 @@ export class EupminiEngine extends WASMSingletonBase {
           break;
 
         case 'moduleLoaded':
+          this.settleModuleLoad();
           console.log('[EupminiEngine] Module loaded');
           break;
 
@@ -99,6 +100,7 @@ export class EupminiEngine extends WASMSingletonBase {
           break;
         case 'error':
           console.error('[EupminiEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -117,10 +119,12 @@ export class EupminiEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer, fmBank?: ArrayBuffer, pcmBank?: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('EupminiEngine not initialized');
+    const answered = this.beginModuleLoad();
 
     this.workletNode.port.postMessage(
       { type: 'loadModule', moduleData: buffer, fmBank, pcmBank },
     );
+    await answered;
   }
 
   play(): void {

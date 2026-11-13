@@ -71,6 +71,7 @@ export class ArtOfNoiseEngine extends WASMSingletonBase {
           break;
 
         case 'moduleLoaded':
+          this.settleModuleLoad();
           console.log('[ArtOfNoiseEngine] Module loaded');
           break;
 
@@ -88,6 +89,7 @@ export class ArtOfNoiseEngine extends WASMSingletonBase {
 
         case 'error':
           console.error('[ArtOfNoiseEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -110,11 +112,13 @@ export class ArtOfNoiseEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('ArtOfNoiseEngine not initialized');
+    const answered = this.beginModuleLoad();
     meterFeed.clearHeld();
 
     this.workletNode.port.postMessage(
       { type: 'loadModule', moduleData: buffer },
     );
+    await answered;
   }
 
   play(): void {
