@@ -41,3 +41,23 @@ macros, an ADPCM-B kick sample and effects on every phrase.
 
 When the driver grows (new effects or macros in furtool), update the sets at the top of
 `neoGeoCompose.ts` in the same commit.
+
+## Scramble hardware (two AY-3-8910)
+
+A spec that returns a `ScrambleSongBuilder` (`src/lib/export/neogeo/scrambleCompose.ts`) builds a
+Scramble-board `.fur` instead: AY-3-8910 at 1789772 Hz, 58.3 Hz tick, written by
+`exportFurnaceAyScramble`. The Neo Geo lint does not run; exporter warnings print as `[EXPORT]`.
+
+```
+npx tsx --tsconfig tsconfig.app.json tools/neogeo-compose/run.ts peter-motif /path/to/motif.fur
+```
+
+- `new ScrambleSongBuilder(name, speed, rows, 6)`: 6 channels = two chips, 3 = one chip.
+- Channels: `AY.LEAD`, `AY.BASS`, `AY.DRUMS` (chip 0), `AY.AY1_A`, `AY.AY1_B`, `AY.AY1_C` (chip 1).
+- Instruments: `ayInstrument([ayMacro(AY_MACRO.VOL, [15, 13, 11], loop)])`.
+- Volume column: `vol: ayVol(0..15)`.
+- Effects BossGame's player builds: 04 0A 0B 0D 0F FF. 00 01 02 03 EC ED export with a warning and
+  BossGame's `tools/ay_music.py` rejects them.
+- Check the result: `python3 -I tools/ay_music.py --dump music/<tune>.fur` in the BossGame repo.
+
+`songs/peter-motif.ts` is the smallest example.
