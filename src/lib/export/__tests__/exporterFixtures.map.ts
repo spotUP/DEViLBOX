@@ -45,6 +45,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   daveLowe: 'public/data/songs/dave-lowe/incredibleshrinkingsphere.dl',
   jeroenTel: 'public/data/songs/jeroen-tel/stormlord title.jt',
   paulRobotham: 'public/data/songs/paul-robotham/dawnpatrol-sad.dat',
+  paulShields: 'public/data/songs/paul-shields/jug-hiscore.ps',
   ronKlaren: 'public/data/songs/ron-klaren/astra 2.rk',
   uade_vss: 'public/data/songs/voodoo/voo8.vss',
   deltaMusic1: 'public/data/songs/delta-music/triplex1.dm',
