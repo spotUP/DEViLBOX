@@ -210,6 +210,7 @@ All third-party components are compatible with GPL-3.0-or-later.
   - Darius Zendeh
   - Dave Lowe
   - David Hanney
+  - Digital Sonix & Chrome
   - EarAche
   - EMS (Editeur Musical Sequentiel)
   - Fashion Tracker
@@ -222,9 +223,11 @@ All third-party components are compatible with GPL-3.0-or-later.
   - Maniacs of Noise
   - Mark II
   - MCMD
+  - Medley
   - Mike Davies
   - OctaMED MMDC
   - Paul Shields
+  - Paul Summers
   - Peter Verswyvelen
   - Professional Sound Artists
   - Riff Raff
@@ -235,6 +238,7 @@ All third-party components are compatible with GPL-3.0-or-later.
   - Sean Conran
   - SidMon II
   - Silmarils
+  - Sound Images
   - Sound Master
   - Sound Programming Language
   - Speedy A1 System
