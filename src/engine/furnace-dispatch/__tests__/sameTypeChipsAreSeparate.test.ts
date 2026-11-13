@@ -19,17 +19,26 @@ describe('two chips of the same type', () => {
     expect(keys.map(chipKeyPlatform)).toEqual([20, 4, 20, 20]);
   });
 
-  it('the worklet creates a second AY with its own handle, and it sounds alone', async () => {
+  // AY, YM2612 and SN76489 share the createChip/getChip path; each pair must split.
+  it.each([
+    ['AY8910', FurnaceDispatchPlatform.AY8910, true],
+    ['YM2612', FurnaceDispatchPlatform.YM2612, false],
+    ['SN76489', FurnaceDispatchPlatform.SMS, true],
+  ])('the worklet gives a second %s its own handle', async (_name, plat, audible) => {
     loadSharedWorkletScripts();
     const { proc, send } = await startWorklet('furnace-dispatch', 'FurnaceDispatch');
-    const ay = FurnaceDispatchPlatform.AY8910;
-    const [k0, k1] = chipKeysFor([ay, ay]);
+    const [k0, k1] = chipKeysFor([plat, plat]);
     for (const k of [k0, k1]) await send({ type: 'createChip', platformType: k, sampleRate: 48000 });
     const p = proc as unknown as Proc;
     expect(p.chips.size).toBe(2);
     expect(p.chips.get(k1)!.handle).not.toBe(p.chips.get(k0)!.handle);
-    expect(p.chips.get(k1)!.platformType).toBe(ay);
+    expect(p.chips.get(k1)!.platformType).toBe(plat);
 
+    // Song order is explicit, not arrival order: reordering moves the Map.
+    await send({ type: 'orderChips', keys: [k1, k0] });
+    expect([...p.chips.keys()]).toEqual([k1, k0]);
+
+    if (!audible) return; // FM needs a patch before it sounds; the handle split is the point.
     // Note on the second chip's channel 0 only: sound must come out.
     await send({ type: 'dispatch', platformType: k1, cmd: 0, chan: 0, val1: 60, val2: 0 });
     await send({ type: 'dispatch', platformType: k1, cmd: 3, chan: 0, val1: 15, val2: 0 });

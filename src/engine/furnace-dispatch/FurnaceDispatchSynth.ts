@@ -24,7 +24,7 @@ import type { FurnaceConfig } from '@typedefs/instrument';
 import { FurnaceChipType } from '@engine/chips/FurnaceChipEngine';
 import { getToneEngine } from '@engine/ToneEngine';
 import { fitFmToChip } from './fmInstrument';
-import { chipChannelMutes } from './chipChannel';
+import { chipChannelMutes, chipChannelFor, LIVE_VOICE_BASE_CHANNEL, type LiveChannelSource } from './chipChannel';
 
 // DivInstrumentType constants (matching FurnaceInstrumentEncoder)
 const DIV_INS_FM = 1;
@@ -262,7 +262,9 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   private _pendingUploadConfig: { config: Record<string, unknown>, name: string } | null = null; // Stored for re-upload after retry init
   private currentChannel = 0;
   private platformType: number;
-  private activeNotes: Map<number, number> = new Map(); // midiNote -> channel
+  /** Which chip notes go to: the platform type (first chip) or a later same-type chip's key (chipKey.ts). */
+  private chipKey: number;
+  private activeNotes: Map<number, { chan: number; key: number }> = new Map(); // midiNote -> chip channel
   // Volume normalization is handled per-chip by the worklet's POST_AMP table
   // (matching upstream Furnace 1:1). No JS-side offset on the shared gain node.
   private furnaceInstrumentIndex = 0; // Which Furnace instrument slot this synth uses
@@ -279,6 +281,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   constructor(platformType: number = FurnaceDispatchPlatform.GB, opts: FurnaceDispatchSynthOptions = {}) {
     this.output = getDevilboxAudioContext().createGain();
     this.platformType = platformType;
+    this.chipKey = platformType;
     this.fromModule = opts.fromModule ?? false;
     this.engine = FurnaceDispatchEngine.getInstance();
     this._isReadyPromise = new Promise((resolve) => { this._resolveReady = resolve; });
@@ -1198,21 +1201,21 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     // in slot 0 may have been replaced by a preset load, and without
     // forcing, the dispatch skips copying params when the index matches.
     if ((window as any).FURNACE_DEBUG) console.log(`[FurnaceDispatchSynth] triggerAttack: note=${midiNote} chan=${chan} inst=${this.furnaceInstrumentIndex} platform=${pt} time=${_time?.toFixed(4)}`);
-    this.engine.setInstrument(chan, this.furnaceInstrumentIndex, pt, true, _time);
+    this.engine.setInstrument(chan, this.furnaceInstrumentIndex, this.chipKey, true, _time);
 
     // Set volume based on velocity
     const maxVol = maxVolumeOfChannel(pt, chan);
     const vol = Math.round(velocity * maxVol);
-    this.engine.setVolume(chan, vol, pt, _time);
+    this.engine.setVolume(chan, vol, this.chipKey, _time);
 
     // Furnace dispatch note 0 = C-0, which is MIDI note 12.
     // So dispatch note = midiNote - 12.
-    this.engine.noteOn(chan, midiNote - 12, pt, _time);
+    this.engine.noteOn(chan, midiNote - 12, this.chipKey, _time);
 
     // Track active note. The NOTE_ON replaced whatever the channel played, so drop that note's entry: a later
     // release of the old note must not send a NOTE_OFF that cuts this one.
-    for (const [n, c] of this.activeNotes) if (c === chan) this.activeNotes.delete(n);
-    this.activeNotes.set(midiNote, chan);
+    for (const [n, c] of this.activeNotes) if (c.chan === chan && c.key === this.chipKey) this.activeNotes.delete(n);
+    this.activeNotes.set(midiNote, { chan, key: this.chipKey });
   }
 
   triggerAttackRelease(
@@ -1240,15 +1243,15 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
           ? Math.round(12 * Math.log2(note / 440) + 69)
           : note);
 
-      const chan = this.activeNotes.get(midiNote);
-      if (chan !== undefined) {
-        this.engine.noteOff(chan, this.platformType, time);
+      const held = this.activeNotes.get(midiNote);
+      if (held !== undefined) {
+        this.engine.noteOff(held.chan, held.key, time);
         this.activeNotes.delete(midiNote);
       }
     } else {
       // Release all active notes
-      for (const [, chan] of this.activeNotes) {
-        this.engine.noteOff(chan, this.platformType, time);
+      for (const [, held] of this.activeNotes) {
+        this.engine.noteOff(held.chan, held.key, time);
       }
       this.activeNotes.clear();
     }
@@ -1263,9 +1266,9 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     // tracker replayer with channel routing), some notes may not be tracked.
     // Send noteOff to every channel to guarantee silence.
     if (this._isReady && !this._disposed) {
-      const numCh = this.engine.getChannelCount(this.platformType) || 3;
-      for (let ch = 0; ch < numCh; ch++) {
-        this.engine.noteOff(ch, this.platformType);
+      const spans = this.engine.chipSpansOf(this.platformType);
+      for (const { key, numChannels } of spans.length > 0 ? spans : [{ key: this.platformType, numChannels: 3 }]) {
+        for (let ch = 0; ch < numChannels; ch++) this.engine.noteOff(ch, key);
       }
     }
   }
@@ -1279,6 +1282,15 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
    * already sounding and keeps its state, so unmuting brings it back.
    */
   applySongChannelMutes(songChannelMutes: readonly boolean[]): void {
+    const spans = this.engine.chipSpansOf(this.platformType);
+    if (spans.length > 1) {
+      // Several chips of this type: each takes its own slice of the song's channels.
+      for (const { key, offset, numChannels } of spans) {
+        chipChannelMutes(songChannelMutes.slice(offset, offset + numChannels), numChannels)
+          .forEach((muted, chan) => this.engine.mute(chan, muted, key));
+      }
+      return;
+    }
     const mutes = chipChannelMutes(songChannelMutes, this.getNumChannels() || 3);
     mutes.forEach((muted, chan) => this.engine.mute(chan, muted, this.platformType));
   }
@@ -1292,16 +1304,31 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   }
 
   /**
+   * Play the next notes for a tracker channel (or a live voice slot, 100 and up).
+   * A song channel inside a chip of this type plays on that chip's own channel,
+   * so a song with two AY-3-8910 sends channels 3-5 to the second AY; any other
+   * channel maps onto the first chip as chipChannelFor does. Returns the chip channel.
+   */
+  setSongChannel(channelIndex: number, furnace?: LiveChannelSource): number {
+    const span = channelIndex < LIVE_VOICE_BASE_CHANNEL
+      ? this.engine.chipSpansOf(this.platformType).find((s) => channelIndex >= s.offset && channelIndex < s.offset + s.numChannels)
+      : undefined;
+    this.chipKey = span?.key ?? this.platformType;
+    this.setChannel(span ? channelIndex - span.offset : chipChannelFor(channelIndex, this.getNumChannels() || 3, furnace));
+    return this.currentChannel;
+  }
+
+  /**
    * Send a raw dispatch command.
    */
   sendCommand(cmd: number, chan: number, val1: number = 0, val2: number = 0, time?: number): void {
     if (!this._isReady || this._disposed) return;
-    this.engine.dispatch(cmd, chan, val1, val2, this.platformType, time);
+    this.engine.dispatch(cmd, chan, val1, val2, this.chipKey, time);
   }
 
   applyEffect(effect: number, param: number, chan?: number): void {
     if (!this._isReady || this._disposed) return;
-    this.engine.applyEffect(chan ?? this.currentChannel, effect, param, this.platformType);
+    this.engine.applyEffect(chan ?? this.currentChannel, effect, param, this.chipKey);
   }
 
   /** Volume maximum of one chip channel (what a VOLUME command accepts). */
@@ -1320,12 +1347,12 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
 
   applyExtendedEffect(x: number, y: number, chan?: number): void {
     if (!this._isReady || this._disposed) return;
-    this.engine.applyExtendedEffect(chan ?? this.currentChannel, x, y, this.platformType);
+    this.engine.applyExtendedEffect(chan ?? this.currentChannel, x, y, this.chipKey);
   }
 
   applyPlatformEffect(effect: number, param: number, chan?: number): void {
     if (!this._isReady || this._disposed) return;
-    this.engine.applyPlatformEffect(chan ?? this.currentChannel, effect, param, this.platformType);
+    this.engine.applyPlatformEffect(chan ?? this.currentChannel, effect, param, this.chipKey);
   }
 
   /**
@@ -1357,7 +1384,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     // Map param names to dispatch commands
     switch (param) {
       case 'volume':
-        this.engine.setVolume(this.currentChannel, value, this.platformType);
+        this.engine.setVolume(this.currentChannel, value, this.chipKey);
         break;
       case 'channel':
         this.currentChannel = value;
@@ -1367,7 +1394,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
 
   set(param: string, value: number): void {
     const ch = this.currentChannel;
-    const pt = this.platformType;
+    const pt = this.chipKey;   // routing only: every use below is a dispatch target
 
     // FM operator params: fmOp0TL, fmOp1AR, fmOp2DR, etc.
     const opMatch = param.match(/^fmOp(\d+)(TL|AR|DR|SL|RR|DT|MULT)$/);
