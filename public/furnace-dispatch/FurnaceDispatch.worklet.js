@@ -265,6 +265,15 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'orderChips': {
+        // Song system order: channel offsets count chips in Map order.
+        const ordered = new Map();
+        for (const k of data.keys || []) { const c = this.chips.get(k); if (c) ordered.set(k, c); }
+        for (const [k, c] of this.chips) if (!ordered.has(k)) ordered.set(k, c);
+        this.chips = ordered;
+        break;
+      }
+
       case 'destroyChip': {
         const chip = this.chips.get(data.platformType);
         if (chip && this.wasm) {
@@ -1263,6 +1272,8 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         if (this.sequencerActive && this.wasm.seqIsPlaying && this.wasm.seqIsPlaying()) {
           try {
             const pos = this.wasm.seqTick();
+            // FF (stop song) or the last loop stopped the sequencer: the transport must stop too.
+            if (!this.wasm.seqIsPlaying()) this.port.postMessage({ type: 'seqEnded' });
             this._lastSeqOrder = (pos >> 16) & 0xFFFF;
             this._lastSeqRow = pos & 0xFFFF;
             if (this.wasm.seqGetDivider) {

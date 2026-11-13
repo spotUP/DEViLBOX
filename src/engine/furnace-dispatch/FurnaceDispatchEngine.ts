@@ -23,7 +23,7 @@ export { FurnaceDispatchPlatform } from './platforms';
 import { batchesToRegisterWrites, type DispatchRegBatch, type DispatchSampleRom } from '@lib/export/dispatchRegCapture';
 import type { RegisterWrite } from '@lib/export/VGMExporter';
 import { STAND_INS } from './synthPlatforms';
-import { chipKeysFor } from './chipKey';
+import { chipKeysFor, chipKeyPlatform } from './chipKey';
 
 /** Sample depth formats (matching Furnace DivSampleDepth enum) */
 export const SampleDepth = {
@@ -806,6 +806,7 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
   private _seqLoadResolve: (() => void) | null = null;
   private _seqLoadReject: ((err: Error) => void) | null = null;
   private _seqPositionCallbacks: Set<(order: number, row: number, audioTime?: number) => void> = new Set();
+  private _seqEndedCallbacks: Set<() => void> = new Set();
 
   // Module-level wavetable/sample data from .fur file import
   // Stored here so FurnaceDispatchSynth can upload to each platform during chip init
@@ -862,6 +863,34 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
   /** Get the dispatch handle for a specific platform type */
   getChipHandle(platformType: number): number {
     return this.chips.get(platformType)?.handle ?? 0;
+  }
+
+  /**
+   * The chips of one platform type with the song-wide channel each starts at
+   * (chips in song order, as the sequencer and the worklet's offsets count).
+   */
+  chipSpansOf(platformType: number): { key: number; offset: number; numChannels: number }[] {
+    const spans: { key: number; offset: number; numChannels: number }[] = [];
+    let offset = 0;
+    for (const [key, chip] of this.chips) {
+      if (chipKeyPlatform(key) === platformType) spans.push({ key, offset, numChannels: chip.numChannels });
+      offset += chip.numChannels;
+    }
+    return spans;
+  }
+
+  /**
+   * Put the chips in the song's system order, here and in the worklet. Chips
+   * kept from the previous song stayed where they were created, so a song
+   * whose systems came in another order had its channel offsets (isolation,
+   * mutes, live-note routing) counted in the old order.
+   */
+  private orderChips(keys: readonly number[]): void {
+    const ordered = new Map<number, { handle: number; numChannels: number }>();
+    for (const k of keys) { const c = this.chips.get(k); if (c) ordered.set(k, c); }
+    for (const [k, c] of this.chips) if (!ordered.has(k)) ordered.set(k, c);
+    this.chips = ordered;
+    this.workletNode?.port.postMessage({ type: 'orderChips', keys: [...keys] });
   }
 
   /** Whether audio is already routed from the worklet to destination */
@@ -1167,6 +1196,10 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
         for (const cb of this._seqPositionCallbacks) {
           cb(data.order as number, data.row as number, data.audioTime as number | undefined);
         }
+        break;
+
+      case 'seqEnded':
+        for (const cb of this._seqEndedCallbacks) cb();
         break;
 
       case 'sampleMem': {
@@ -1938,7 +1971,7 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
    * @param param - Effect parameter (0x00-0xFF)
    */
   applyEffect(chan: number, effect: number, param: number, platformType?: number): void {
-    const pt = platformType ?? this.platform;
+    const pt = chipKeyPlatform(platformType ?? this.platform);   // a chip key routes; its platform maps the effect
     const commands = this.effectRouter.routeEffect(pt, chan, effect, param);
     for (const cmd of commands) {
       this.dispatch(cmd.cmd, cmd.chan, cmd.val1, cmd.val2, platformType);
@@ -1946,7 +1979,7 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
   }
 
   applyExtendedEffect(chan: number, x: number, y: number, platformType?: number): void {
-    const pt = platformType ?? this.platform;
+    const pt = chipKeyPlatform(platformType ?? this.platform);   // a chip key routes; its platform maps the effect
     const commands = this.effectRouter.routeExtendedEffect(pt, chan, x, y);
     for (const cmd of commands) {
       this.dispatch(cmd.cmd, cmd.chan, cmd.val1, cmd.val2, platformType);
@@ -1954,7 +1987,7 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
   }
 
   applyPlatformEffect(chan: number, effect: number, param: number, platformType?: number): void {
-    const pt = platformType ?? this.platform;
+    const pt = chipKeyPlatform(platformType ?? this.platform);   // a chip key routes; its platform maps the effect
     const commands = this.effectRouter.routePlatformEffect(pt, chan, effect, param);
     for (const cmd of commands) {
       this.dispatch(cmd.cmd, cmd.chan, cmd.val1, cmd.val2, platformType);
@@ -2078,6 +2111,8 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       isStillCurrent: () => boolean;
       initialSongPos: number;
       initialPattPos: number;
+      /** The sequencer stopped by itself (FF stop song, or the last loop played). */
+      onEnded: () => void;
       /**
        * INS2 blobs by sequencer slot, for a song whose native data was derived at Play (a composed
        * song): its store instruments are not the module's, so the slots come from the derivation.
@@ -2143,6 +2178,8 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
           _log(`[FurnaceDispatchEngine] reusing existing chip ${chipId}`);
         }
       }
+
+      this.orderChips(chipIds);
 
       // The song's own pitch model / clock / tuning, before anything plays or resets.
       this.applySongDispatchSettings(opts.song.furnaceNative, chipIds);
@@ -2228,6 +2265,9 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
         coordinator.dispatchEnginePosition(row, order, audioTime);
       });
       cleanups.push(seqPositionUnsub);
+      // FF (stop song) stops the WASM sequencer; the transport follows, as in Furnace.
+      this._seqEndedCallbacks.add(opts.onEnded);
+      cleanups.push(() => { this._seqEndedCallbacks.delete(opts.onEnded); });
 
       // ── 8. Command log → automation capture ───────────────────────────
       this.enableCmdLog(true);

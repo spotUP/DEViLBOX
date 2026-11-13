@@ -3422,8 +3422,7 @@ export class ToneEngine {
         }
         // Set chip channel on FurnaceDispatchSynth (for C64/GB/NES multi-channel tracker playback)
         if (instrument instanceof FurnaceDispatchSynth && channelIndex !== undefined) {
-          const maxCh = instrument.getNumChannels() || 3;
-          instrument.setChannel(chipChannelFor(channelIndex, maxCh, config.furnace));
+          instrument.setSongChannel(channelIndex, config.furnace);
         }
         // Standard synths - apply slide/accent for 303-style effects
         const targetFreq = cachedFrequency(note);
@@ -4164,8 +4163,7 @@ export class ToneEngine {
           }
           // Set chip channel on FurnaceDispatchSynth (for C64/GB/NES multi-channel tracker playback)
           if (voiceNode instanceof FurnaceDispatchSynth && channelIndex !== undefined) {
-            const maxCh = voiceNode.getNumChannels() || 3;
-            voiceNode.setChannel(chipChannelFor(channelIndex, maxCh, config.furnace));
+            voiceNode.setSongChannel(channelIndex, config.furnace);
           }
           // Set chip channel on OPL3Synth (for multi-timbral AdLib tracker playback)
           if (voiceNode instanceof OPL3Synth && channelIndex !== undefined) {
@@ -5175,7 +5173,8 @@ export class ToneEngine {
     const synth = this.instruments.get(this.getInstrumentKey(instrumentId, channelIndex))
       ?? this.instruments.get(this.getInstrumentKey(instrumentId, -1));
     if (!(synth instanceof FurnaceDispatchSynth)) return null;
-    const chipChannel = chipChannelFor(channelIndex, synth.getNumChannels() || 3, config.furnace);
+    // Also points the synth at the chip that owns this song channel (a second same-type chip).
+    const chipChannel = synth.setSongChannel(channelIndex, config.furnace);
     return { synth, chipChannel };
   }
 
