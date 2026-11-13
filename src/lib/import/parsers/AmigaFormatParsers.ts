@@ -1716,16 +1716,19 @@ export async function tryRouteFormat(
       'JeroenTelParser', { injectUADE: true });
   }
 
-  // ── Quartet / Quartet PSG / Quartet ST (qpa.* / sqt.* / qts.* prefix) ──────
+  // ── Quartet / Quartet PSG / Quartet ST (qpa.* / sqt.* / qts.* prefix, .4v / .sqt suffix) ──
   // Two-file format: song data (.4v/.qpa/.sqt/.qts) + samples (SMP.set).
-  // UADE enhanced scan reconstructs patterns from Paula register captures.
+  // The native parser decodes the grid; UADE plays. A ZX Spectrum SQ-Tracker
+  // .sqt fails the Quartet content check and falls through to ZXTune below.
   if (matchesExt(filename, ['qpa', 'sqt', 'qts', '4v'])) {
-    const { parseUADEFile } = await import('@lib/import/formats/UADEParser');
+    const { isQuartetFormat, parseQuartetFile } = await import('@lib/import/formats/QuartetParser');
     const qFile = toUADEPrefixName(originalFileName, ['qpa', 'sqt', 'qts', '4v']);
-    const song = await parseUADEFile(buffer, qFile, 'enhanced', subsong, preScannedMeta, companionFiles, uadeEngine);
-    song.uadeEditableFileData = buffer.slice(0);
-    song.uadeEditableFileName = qFile;
-    return song;
+    if (isQuartetFormat(buffer, qFile)) {
+      const qCtx: FallbackContext = { ...ctx, originalFileName: qFile };
+      return withNativeThenUADE('quartet', qCtx,
+        (buf: Uint8Array | ArrayBuffer, name: string) => parseQuartetFile(buf as ArrayBuffer, name),
+        'QuartetParser', { injectUADE: true });
+    }
   }
 
   // ── Sound Master (sm.* / sm1.* / sm2.* / sm3.* / smpro.* prefix) ───────────
