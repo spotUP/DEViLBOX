@@ -12,8 +12,12 @@ import { FT2NumericInput } from './FT2NumericInput';
 
 export interface FT2SubsongInputProps { label?: string; className?: string }
 
-/** A switch reopens and rescans the song: step presses only show the number; the switch runs once the user stops. */
-export const SUBSONG_SWITCH_SETTLE_MS = 400;
+/**
+ * A switch reopens and rescans the song: step presses only show the number; the switch runs once the user stops.
+ * 400 ms was shorter than the gap between deliberate single clicks, so every click rescanned (owner report,
+ * 2026-11-13); 1200 ms covers click-by-click stepping and still answers soon after the last click.
+ */
+export const SUBSONG_SWITCH_SETTLE_MS = 1200;
 
 const commitSubsong = (oneBased: number) => void switchSubsong(oneBased - 1);
 
