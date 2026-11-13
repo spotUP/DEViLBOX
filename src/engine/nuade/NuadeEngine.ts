@@ -243,6 +243,8 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
     const copy = bytes.slice(0);
     this.post({ type: 'keyLoad', bytes: copy, playerId, fileName }, [copy]);
   }
+  /** The key module's bytes were edited in place (Medley instrument editor): the next keyLoad sends them again. */
+  forgetKeyModule(): void { this._keyModule = null; }
   keyOn(instrument: number, sounding: number): void { this.post({ type: 'keyOn', instrument, sounding }); }
   keyOff(): void { this.post({ type: 'keyOff' }); }
 

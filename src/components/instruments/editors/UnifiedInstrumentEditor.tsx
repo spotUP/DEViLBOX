@@ -235,6 +235,7 @@ function getEditorMode(instrument: Pick<InstrumentConfig, 'synthType' | 'xrns'>)
   if (synthType === 'JamCrackerSynth') return 'jamcracker';
   if (synthType === 'SF2Synth') return 'sidfactory2';
   if (isSoundMonType(synthType)) return 'soundmon';
+  if (synthType === 'MedleySynth') return 'medley';
   if (isSidMonType(synthType)) return 'sidmon';
   if (isRonKlarenType(synthType)) return 'ronklaren';
   if (isDigMugType(synthType)) return 'digmug';

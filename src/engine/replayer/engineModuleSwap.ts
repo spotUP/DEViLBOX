@@ -18,14 +18,18 @@ interface SwappableEngine { swapModule?(module: ArrayBuffer, ...loadArgs: unknow
 let latest = 0;
 let chain: Promise<unknown> = Promise.resolve();
 
-/** Hand the playing engine the edited module. False when nothing was sent (no running engine, no edit, a newer call took over). */
-export function applyEditedModuleToEngine(song: TrackerSong, desc: NativeEngineDescriptor): Promise<boolean> {
+/**
+ * Hand the playing engine the edited module. False when nothing was sent (no running engine, no edit, a newer call took over).
+ * `unedited`: the module to send when the grid carries no edit (editedModuleForPlay answers null), for an edit written into
+ * the loaded module's own bytes (a Medley instrument record).
+ */
+export function applyEditedModuleToEngine(song: TrackerSong, desc: NativeEngineDescriptor, unedited?: ArrayBuffer | Uint8Array | null): Promise<boolean> {
   const mine = ++latest;
   const run = async (): Promise<boolean> => {
     if (mine !== latest) return false;
     const Engine = desc.staticRef ?? (desc.dynamicResolver ? await desc.dynamicResolver() : null);
     if (!Engine?.hasInstance()) return false;
-    const bytes = await editedModuleForPlay(song, desc);
+    const bytes = (await editedModuleForPlay(song, desc)) ?? unedited ?? null;
     if (!bytes || mine !== latest) return false;
     const instance = Engine.getInstance() as unknown as SwappableEngine;
     if (!instance.swapModule) return false;
