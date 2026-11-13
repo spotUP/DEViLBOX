@@ -7,6 +7,7 @@
  */
 
 import { furnaceModuleExportAvailable } from '@/lib/export/FurnaceModuleExporter';
+import { furnaceAyScrambleExportAvailable, ayScrambleTempoWarning } from '@/lib/export/FurnaceExporter';
 import { useState, useEffect, useCallback } from 'react';
 import { lowOctaveExportRefusal } from '@/lib/tracker/noteValue';
 import {
@@ -36,7 +37,7 @@ import { saveFurFileWasm } from '@lib/import/wasm/FurnaceFileOps';
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
-export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur';
+export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furAy';
 export type DialogMode = 'export' | 'import';
 
 export type { ExportOptions };
@@ -77,6 +78,7 @@ export const FORMAT_EXTENSIONS: Record<ExportMode, string> = {
   nano: '.dbn',
   native: '',
   fur: '.fur',
+  furAy: '.fur',
 };
 
 export const CHIP_FORMAT_DESCRIPTIONS: Record<string, string> = {
@@ -250,6 +252,23 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     onClose();
   }, [metadata, furnaceModuleAvailable]);
 
+  const furnaceAyAvailable = furnaceAyScrambleExportAvailable(instruments);
+  const furnaceAyTempoWarning = ayScrambleTempoWarning(bpm);
+
+  const handleExportFurAy = useCallback(async (
+    downloadFn: (blob: Blob, filename: string) => void,
+    onClose: () => void,
+  ) => {
+    const { exportFurnaceAyScrambleFile } = await import('@lib/export/moduleExportService');
+    const result = exportFurnaceAyScrambleFile();
+    result.warnings.forEach((w) => notify.warning(w));
+    const blob = new Blob([result.bytes as BlobPart], { type: 'application/octet-stream' });
+    const filename = `${metadata.name || 'song'}.fur`;
+    downloadFn(blob, filename);
+    notify.success(`Furnace file "${filename}" exported successfully! (${result.bytes.byteLength} bytes)`);
+    onClose();
+  }, [metadata]);
+
   // ── Shared handler: export nano ─────────────────────────────────────────────
 
   const handleExportNano = useCallback((
@@ -413,6 +432,9 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     handleExportInstrument,
     handleExportFur,
     furnaceModuleAvailable,
+    handleExportFurAy,
+    furnaceAyAvailable,
+    furnaceAyTempoWarning,
     handleExportNano,
     handleExportNative,
     nativeAvailable,

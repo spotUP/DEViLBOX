@@ -10,7 +10,7 @@ import pako from 'pako';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  exportFurnaceAyScramble, furnaceAyScrambleExportAvailable,
+  exportFurnaceAyScramble, furnaceAyScrambleExportAvailable, ayScrambleTempoWarning,
   FUR_AY_SCRAMBLE_VERSION, FUR_AY_SCRAMBLE_CHIP_FLAGS,
 } from '../FurnaceExporter';
 import { parseFurnaceSong } from '@/lib/import/formats/FurnaceSongParser';
@@ -141,5 +141,16 @@ describe('exportFurnaceAyScramble', () => {
     set(s.patterns[0], 1, 2, { effTyp: 0x07, eff: 0x44 }); // tremolo: not run by the player
     const { warnings } = exportFurnaceAyScramble(s);
     expect(warnings.some((w) => w.includes('Effect 07 left out'))).toBe(true);
+  });
+});
+
+describe('ayScrambleTempoWarning', () => {
+  it('warns with the BPM to use when the song does not tick at 58.3 Hz', () => {
+    const w = ayScrambleTempoWarning(125);
+    expect(w).toContain('50.00 Hz');
+    expect(w).toContain('145.75');
+  });
+  it('is silent at BPM 145.75', () => {
+    expect(ayScrambleTempoWarning(145.75)).toBeNull();
   });
 });
