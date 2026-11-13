@@ -191,11 +191,15 @@ export async function parseUADEFile(
   // Helper: inject subsong info onto song result when format has multiple subsongs.
   // Called at each exit point so the UI shows the subsong selector.
   const injectSubsongs = (song: TrackerSong): TrackerSong => {
-    if (metadata.subsongCount > 1) {
-      (song as any).uadeEditableSubsongs = {
+    // A parser that decoded per-tune orders (DSC, Hippel ST, Jesper Olsen) keeps its own model.
+    if (metadata.subsongCount > 1 && !song.uadeEditableSubsongs) {
+      // rebuild: the grid is one tune (the scan of `subsong`), so a live switch reopens the file at the new tune.
+      song.uadeEditableSubsongs = {
         count: metadata.subsongCount,
         speeds: Array(metadata.subsongCount).fill(song.initialSpeed || 6),
-      };
+        start: subsong,
+        rebuild: true,
+      } as NonNullable<TrackerSong['uadeEditableSubsongs']>;
     }
     return song;
   };

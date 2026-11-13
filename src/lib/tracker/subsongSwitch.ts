@@ -124,8 +124,7 @@ export async function switchSubsong(index: number): Promise<void> {
         if (wasPlaying) await transport.play();
         return;
       }
-      tracker.setPatternOrder([index]);
-      tracker.setCurrentPattern(index);
+      // No per-tune orders and no rebuild: the grid is not tune-specific, so the order stays as it is (index is a tune, not a pattern).
       useTransportStore.getState().setSpeed(subs.speeds[index] ?? 6);
       // Switch the UADE subsong in place (no full reload: avoids a double init).
       try {
