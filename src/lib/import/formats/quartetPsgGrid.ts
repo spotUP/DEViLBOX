@@ -65,7 +65,8 @@ export function quartetSongBases(buf: Uint8Array): number[] {
       const out: number[] = [];
       for (let i = 0; a + i * 2 + 2 <= buf.length; i++) {
         const t = a + s16(buf, a + i * 2);
-        if (!valid(t) || t <= a + i * 2 || (out.length && a + i * 2 >= Math.min(...out))) break;
+        // entries ascend; the first one that does not is padding after the real table (warlock: 5 songs, then 0xe96 repeated)
+        if (!valid(t) || t <= a + i * 2 || (out.length && (a + i * 2 >= Math.min(...out) || t <= out[out.length - 1]))) break;
         out.push(t);
       }
       return out;

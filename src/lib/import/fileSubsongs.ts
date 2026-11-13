@@ -94,6 +94,17 @@ const FORMATS: Record<string, FileSubsongFormat> = {
     count: async (bytes) => (await import('./formats/medleyGrid')).medleySubsongCount(new Uint8Array(bytes)),
     audible: async (bytes, subsong) => (await import('./formats/medleyGrid')).medleySubsongAudible(new Uint8Array(bytes), subsong),
   },
+  // Quartet PSG (.sqt): the songs the init routine can select (quartetPsgGrid.quartetSongBases); UADE plays the same numbers, counted from 0.
+  quartet: {
+    key: 'quartet',
+    names: /\.sqt$|(^|\/)sqt\./,
+    fileDataField: 'uadeEditableFileData',
+    count: async (bytes) => (await import('./formats/quartetPsgGrid')).quartetSongBases(new Uint8Array(bytes)).length,
+    audible: async (bytes, subsong) => {
+      const g = (await import('./formats/quartetPsgGrid')).buildQuartetGrid(new Uint8Array(bytes), 'x.sqt', subsong);
+      return !!g && g.placements.length > 0;
+    },
+  },
   jxs: {
     key: 'jxs',
     fileDataField: 'jxsFileData',
