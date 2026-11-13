@@ -46,3 +46,20 @@ describe('Quartet ST grid from the voice streams', () => {
     g.usedSamples.forEach(s => expect(ids).toContain(s + 1));
   });
 });
+
+describe('Quartet ST through the parser (owner report: qts song loads and plays but shows no pattern data)', () => {
+  it('a qts. song gets the decoded grid and the SMP samples, not the blank placeholder', async () => {
+    const { parseQuartetFile } = await import('../QuartetParser');
+    const companions = new Map<string, ArrayBuffer>([['SMP.set', smp.slice().buffer as ArrayBuffer]]);
+    const s = await parseQuartetFile(song.slice().buffer as ArrayBuffer, 'qts.demo5', undefined, companions);
+    expect(s.patterns).toHaveLength(4);
+    expect(s.songLength).toBe(4);
+    const notes = s.patterns.flatMap(p => p.channels.flatMap(c => c.rows)).filter(r => (r.note ?? 0) > 0);
+    expect(notes.length).toBeGreaterThan(0);
+    expect(s.initialSpeed).toBe(20);
+    expect(s.initialBPM).toBe(500);
+    expect(s.uadePlayerTickGrid).toBe(true);
+    expect(s.uadeEditableFileData).toBeDefined();
+    expect(s.instruments.some(i => /AHHH/i.test(i.name))).toBe(true);
+  });
+});
