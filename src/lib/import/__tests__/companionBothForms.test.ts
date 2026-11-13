@@ -65,6 +65,15 @@ describe('companionResolver: shared banks and special cases', () => {
     expect(r.companions).toEqual(['SMP.set']);
     expect(r.usedSharedBank).toBe(true);
   });
+  it('a Quartet qpa.DemoMusic fetches its own SMP.DemoMusic', () => {
+    const r = resolveCompanions('qpa.DemoMusic', { siblings: ['qpa.DemoMusic', 'SMP.DemoMusic', 'SMP.set'] });
+    expect(r.companions).toEqual(['SMP.DemoMusic']);
+  });
+  it('a Quartet qpa song owning no bank takes the shared SMP.set', () => {
+    const r = resolveCompanions('qpa.Tune', { siblings: ['qpa.Tune', 'SMP.set'] });
+    expect(r.companions).toEqual(['SMP.set']);
+    expect(r.usedSharedBank).toBe(true);
+  });
   it('audiosculpture_smallest.adsc finds .adsc.as', () => {
     expect(resolveCompanions('audiosculpture_smallest.adsc', { siblings: ['audiosculpture_smallest.adsc', 'audiosculpture_smallest.adsc.as'] }).companions)
       .toEqual(['audiosculpture_smallest.adsc.as']);

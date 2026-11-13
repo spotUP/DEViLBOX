@@ -37,8 +37,9 @@
  *   dword[24] ≤ 0x4C and dword[24] & 3 == 0
  *   word[16]  = 0x0056
  *
- * This parser extracts metadata only. Actual audio playback is delegated
- * entirely to UADE.
+ * QPA, SQT and QTS songs get a read-only grid decoded from their song data
+ * (quartetPcmGrid.ts, quartetPsgGrid.ts, quartetStGrid.ts); audio playback is
+ * delegated entirely to UADE.
  *
  * References:
  *   third-party/uade-3.05/amigasrc/players/wanted_team/Quartet/Quartet_v1.asm
@@ -54,6 +55,9 @@ import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder'
 import { quartetEncoder } from '@/engine/uade/encoders/QuartetEncoder';
 import { buildQuartetGrid, QUARTET_ROWS_PER_PATTERN } from './quartetPsgGrid';
 import { buildQuartetStGrid, buildQuartetStInstruments, QUARTET_ST_VOICES } from './quartetStGrid';
+import {
+  buildQuartetPcmGrid, buildQuartetPcmInstruments, QUARTET_PCM_TICK_HZ, QUARTET_PCM_VOICES,
+} from './quartetPcmGrid';
 import { chooseFileSubsong, fileSubsongFormatByKey, fileSubsongsField, type FileSubsongs } from '../fileSubsongs';
 
 // ── Binary helpers ──────────────────────────────────────────────────────────
@@ -443,8 +447,8 @@ function buildEmptyPattern(filename: string, numInstruments: number) {
   };
 }
 
-/** The Quartet ST sample file: the song's own SMP.<name>, else the shared SMP.set (either case). */
-function findQuartetStSamples(songName: string, companionFiles?: Map<string, ArrayBuffer>): Uint8Array | null {
+/** The Quartet (qpa) / Quartet ST (qts) sample file: the song's own SMP.<name>, else the shared SMP.set (either case). */
+function findQuartetSamples(songName: string, companionFiles?: Map<string, ArrayBuffer>): Uint8Array | null {
   if (!companionFiles) return null;
   for (const cand of [`smp.${songName}`, 'smp.set', 'set.smp']) {
     for (const [key, val] of companionFiles) {
@@ -605,7 +609,7 @@ export async function parseQuartetFile(
       name: `${moduleName} [${label}]`,
       format: 'MOD' as TrackerFormat,
       patterns: stGrid.patterns,
-      instruments: buildQuartetStInstruments(stGrid, findQuartetStSamples(moduleName, companionFiles)),
+      instruments: buildQuartetStInstruments(stGrid, findQuartetSamples(moduleName, companionFiles)),
       songPositions: stGrid.patterns.map((_, i) => i),
       songLength: stGrid.patterns.length,
       restartPosition: 0,
@@ -620,7 +624,29 @@ export async function parseQuartetFile(
     };
   }
 
-  // ── Pattern placeholder (QPA, or an SQT / QTS whose data shape is not recognised) ──
+  // ── QPA: the grid is read from the song rows (quartetPcmGrid.ts), samples from the SMP sample set ──
+  const pcmGrid = variant === 'qpa' ? buildQuartetPcmGrid(buf, filename) : null;
+  if (pcmGrid) {
+    return {
+      name: `${moduleName} [${label}]`,
+      format: 'MOD' as TrackerFormat,
+      patterns: pcmGrid.patterns,
+      instruments: buildQuartetPcmInstruments(pcmGrid, findQuartetSamples(moduleName, companionFiles)),
+      songPositions: pcmGrid.patterns.map((_, i) => i),
+      songLength: pcmGrid.patterns.length,
+      restartPosition: 0,
+      numChannels: QUARTET_PCM_VOICES,
+      // one row = `tempo` player ticks at the 50 Hz CIA rate (BPM = Hz * 2.5)
+      initialSpeed: pcmGrid.tempo,
+      initialBPM: Math.round(QUARTET_PCM_TICK_HZ * 2.5),
+      linearPeriods: false,
+      uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+      uadeEditableFileName: filename,
+      uadePlayerTickGrid: true,
+    };
+  }
+
+  // ── Pattern placeholder (a QPA / SQT / QTS whose data shape is not recognised) ──
   const pattern = buildEmptyPattern(filename, numInstruments);
 
   return {
