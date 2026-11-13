@@ -56,6 +56,15 @@ describe('companionResolver: shared banks and special cases', () => {
     const r = resolveCompanions('sdr.nobuddiesland_jigsaw', { siblings: ['sdr.nobuddiesland_jigsaw', 'smp.nobuddiesland_jigsaw', 'smp.set'] });
     expect(r.companions).toEqual(['smp.nobuddiesland_jigsaw']);
   });
+  it('a Quartet ST qts.Turtle 1 fetches its own SMP.Turtle 1 (UADE score dies without it)', () => {
+    const r = resolveCompanions('qts.Turtle 1', { siblings: ['qts.Turtle 1', 'SMP.Turtle 1', 'qts.Turtle 4', 'SMP.Turtle 4'] });
+    expect(r.companions).toEqual(['SMP.Turtle 1']);
+  });
+  it('a Quartet ST qts.Psychosomatic owning no bank takes the shared SMP.set', () => {
+    const r = resolveCompanions('qts.Psychosomatic', { siblings: ['qts.Psychosomatic', 'SMP.set'] });
+    expect(r.companions).toEqual(['SMP.set']);
+    expect(r.usedSharedBank).toBe(true);
+  });
   it('audiosculpture_smallest.adsc finds .adsc.as', () => {
     expect(resolveCompanions('audiosculpture_smallest.adsc', { siblings: ['audiosculpture_smallest.adsc', 'audiosculpture_smallest.adsc.as'] }).companions)
       .toEqual(['audiosculpture_smallest.adsc.as']);
