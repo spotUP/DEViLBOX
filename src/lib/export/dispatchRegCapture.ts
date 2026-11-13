@@ -78,9 +78,11 @@ export const VGM_SAMPLE_RATE = 44100;
 export function dispatchCaptureToLog(writes: readonly RegisterWrite[], workletRate: number): Uint8Array {
   const out = new Uint8Array(writes.length * 12);
   const view = new DataView(out.buffer);
+  // The capture clock runs from Record, the song starts later: time zero is the first write.
+  const origin = writes.reduce((m, w) => Math.min(m, w.timestamp), Infinity);
   writes.forEach((w, i) => {
     const o = i * 12;
-    view.setUint32(o, Math.round(w.timestamp * VGM_SAMPLE_RATE / workletRate), true);
+    view.setUint32(o, Math.round((w.timestamp - origin) * VGM_SAMPLE_RATE / workletRate), true);
     view.setUint8(o + 4, w.chipType);
     view.setUint32(o + 5, w.port, true);
     view.setUint8(o + 9, w.data);
