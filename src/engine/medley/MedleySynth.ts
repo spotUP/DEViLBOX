@@ -45,11 +45,33 @@ export class MedleySynth implements DevilboxSynth {
     return module;
   }
 
+  /**
+   * Counts key presses. The key module loads asynchronously, so a release can arrive before its attack has posted
+   * keyOn; the attack then checks the count and stays silent instead of starting a note nothing will release.
+   */
+  private _press = 0;
+  private _released = true;
+  private _releaseTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Milliseconds from now until audio-clock time `time` (0 when absent or past). */
+  private delayMs(time?: number): number {
+    if (time === undefined) return 0;
+    return Math.max(0, (time - getDevilboxAudioContext().currentTime) * 1000);
+  }
+
+  private clearReleaseTimer(): void {
+    if (this._releaseTimer !== null) clearTimeout(this._releaseTimer);
+    this._releaseTimer = null;
+  }
+
   triggerAttack(note?: string | number, _time?: number, _velocity?: number): void {
     if (this._disposed) return;
+    this.clearReleaseTimer();
+    const press = ++this._press;
+    this._released = false;
     const midi = typeof note === 'string' ? noteToMidi(note) : (note ?? 48);
     void this.loadKeyModule().then((module) => {
-      if (!module || this._disposed) return;
+      if (!module || this._disposed || press !== this._press || this._released) return;
       const buf = new Uint8Array(module);
       const tables = medleyTables(buf);
       if (!tables) return;
@@ -58,8 +80,20 @@ export class MedleySynth implements DevilboxSynth {
     });
   }
 
-  triggerRelease(_note?: string | number, _time?: number): void {
-    if (!this._disposed) NuadeEngine.getInstance().keyOff();
+  /** Releases at audio-clock `time` when given (triggerAttackRelease, MCP trigger_note duration), else now. */
+  triggerRelease(_note?: string | number, time?: number): void {
+    if (this._disposed) return;
+    this.clearReleaseTimer();
+    const press = this._press;
+    const release = (): void => {
+      this._releaseTimer = null;
+      if (this._disposed || press !== this._press) return;
+      this._released = true;
+      NuadeEngine.getInstance().keyOff();
+    };
+    const ms = this.delayMs(time);
+    if (ms > 0) this._releaseTimer = setTimeout(release, ms);
+    else release();
   }
 
   releaseAll(): void { this.triggerRelease(); }
@@ -73,6 +107,7 @@ export class MedleySynth implements DevilboxSynth {
   }
 
   dispose(): void {
+    this.clearReleaseTimer();
     if (!this._disposed) NuadeEngine.getInstance().keyOff();
     this._disposed = true;
   }
