@@ -11,13 +11,13 @@ export default function (): ScrambleSongBuilder {
   const lead = s.addInstrument('Fanfare lead', ayInstrument([]));
   // Noise on the first tick only: a timpani low down, a struck bell higher up.
   const stab = s.addInstrument('Struck tone', ayInstrument([
-    ayMacro(AY_MACRO.VOL, [12, 11, 10, 8, 6, 4, 2, 0]), ayMacro(AY_MACRO.MIXER, [3, 1]),
+    ayMacro(AY_MACRO.VOL, [12, 10, 8, 6, 4, 2, 0]), ayMacro(AY_MACRO.MIXER, [3, 1]),
   ]));
 
   const p = s.pattern();
   ['C-5', 'D-5', 'E-5'].forEach((note, i) => p.put(AY.LEAD, i * 2, { note, ins: lead }));
   p.put(AY.LEAD, 6, { note: 'G-5', ins: lead, fx: [[0x04, 0x85], [0x0a, 0x01]] }); // vibrato, fading to the stop
-  p.put(AY.LEAD, 14, { fx: [[0xff, 0x00]] });
+  p.put(AY.LEAD, 14, { note: 'OFF', fx: [[0xff, 0x00]] });
   p.put(AY.BASS, 0, { note: 'C-3', ins: stab });
   p.put(AY.BASS, 6, { note: 'C-3', ins: stab });
   // One struck voice per row (bass 0 and 6, timpani 2 and 4, bells 7 8 9): the same instrument never stacks.
