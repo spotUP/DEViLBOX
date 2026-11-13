@@ -226,11 +226,11 @@ export default function gumbirdsTitle(repoRoot: string): NeoGeoSongBuilder {
     const notes = ['E-5', 'G-5', 'C-6', 'E-6', 'G-6', 'E-6', 'C-6', 'G-5'];
     notes.forEach((n, i) => p.put(NEO.FM4, o + 8 + i, { note: n, ins: BELL, vol: i % 2 ? 79 : 95, fx: [[0x08, i % 2 ? 0x0f : 0xf0]] }));
   };
-  // Fast SSG run up two octaves of F major at the end of B (one note per row, then 00xy flourish on top).
+  // Fast SSG run up two octaves of F major at the end of B (one note per row, A on top).
   const run = (p: NeoGeoPattern, o: number) => {
     const scale = ['C-5', 'D-5', 'E-5', 'F-5', 'G-5', 'A-5', 'Bb5', 'C-6', 'D-6', 'E-6', 'F-6', 'G-6'];
     scale.forEach((n, i) => p.put(NEO.SSG1, o + 4 + i, { note: n, ins: RUN }));
-    p.put(NEO.SSG1, o + 15, { note: 'A-6', ins: RUN, fx: [[0x00, 0x37]] });
+    p.put(NEO.SSG1, o + 15, { note: 'A-6', ins: RUN });
   };
   // Counter-melody for the repeat of hook A: longer notes in the gaps of the lead, octave 4-5.
   const counter: Line[] = [
