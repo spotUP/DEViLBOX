@@ -72,10 +72,14 @@ export class MaxTraxEngine extends WASMSingletonBase {
         case 'moduleLoaded':
           if (data.result !== 0) {
             console.error('[MaxTraxEngine] maxtrax_load returned', data.result);
+            this.failModuleLoad('maxtrax_load returned ' + data.result);
+          } else {
+            this.settleModuleLoad();
           }
           break;
         case 'error':
           console.error('[MaxTraxEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
         case 'log':
           // WASM stderr/stdout — surface only in dev, not as an error.
@@ -102,7 +106,9 @@ export class MaxTraxEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer, score = 0): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('[MaxTraxEngine] not initialized');
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'load', buffer, score });
+    await answered;
   }
 
   /**

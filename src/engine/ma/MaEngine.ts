@@ -85,6 +85,7 @@ export class MaEngine extends WASMSingletonBase {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          this.settleModuleLoad();
           console.log('[MaEngine] Module loaded');
           break;
         case 'position': {
@@ -111,6 +112,7 @@ export class MaEngine extends WASMSingletonBase {
         }
         case 'error':
           console.error('[MaEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -137,7 +139,9 @@ export class MaEngine extends WASMSingletonBase {
     const walk = m ? walkMusicAssembler(m, subsong) : null;
     this._layoutOfTune = walk && walk.stop !== 'ended' ? walkLayout(walk) : null;
     this._layout = this._layoutOfTune;
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer, subsong });
+    await answered;
   }
 
   /** The row and song-order index the replayer is on, as the grid shows them. */

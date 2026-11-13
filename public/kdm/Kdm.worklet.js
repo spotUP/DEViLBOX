@@ -31,7 +31,7 @@ class KdmProcessor extends AudioWorkletProcessor {
         await this.initWasm(data.wasmBinary, data.jsCode, data.bankData);
         break;
       case 'loadModule':
-        if (!this.module) break;
+        if (!this.module) { this.port.postMessage({ type: 'error', message: 'KDM player not initialised' }); break; }
         this.songBytes = new Uint8Array(data.moduleData);
         this.playing = false;
         if (this.openSong(0)) this.port.postMessage({ type: 'moduleLoaded', channels: 1, totalTicks: this.module._kdm_total_ticks() });

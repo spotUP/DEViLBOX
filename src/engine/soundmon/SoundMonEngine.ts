@@ -86,6 +86,7 @@ export class SoundMonEngine extends WASMChannelOutputsEngine {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          this.settleModuleLoad();
           if (data.keyboardOnly) break; // the keyboard copy: the scopes belong to the engine playing the song
           useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 0', 'Paula 1', 'Paula 2', 'Paula 3']);
           console.log('[SoundMonEngine] Module loaded, subsongs:', data.subsongCount);
@@ -101,6 +102,7 @@ export class SoundMonEngine extends WASMChannelOutputsEngine {
           break;
         case 'error':
           console.error('[SoundMonEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -116,7 +118,9 @@ export class SoundMonEngine extends WASMChannelOutputsEngine {
     await this._initPromise;
     if (!this.workletNode) throw new Error('SoundMonEngine not initialized');
     this._keyboardFrom = null;
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+    await answered;
   }
 
   /** The module the keyboard copy was made from (see keyboardCopy), null while the replayer holds the song or nothing. */

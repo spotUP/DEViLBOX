@@ -32,7 +32,11 @@ class SoundFxProcessor extends AudioWorkletProcessor {
         await this.initWasm(data.sampleRate, data.wasmBinary, data.jsCode);
         break;
       case 'loadModule': {
-        if (!this.module) break;
+        if (!this.module) {
+          // Answer every load: the engine waits for moduleLoaded or error before it reports loaded.
+          this.port.postMessage({ type: 'error', message: 'SoundFx player not initialised' });
+          break;
+        }
         try {
           if (this.handle) { this.module._sfx_destroy(this.handle); this.handle = 0; }
           const uint8Data = new Uint8Array(data.moduleData);

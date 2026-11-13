@@ -71,6 +71,7 @@ export class TFMEngine extends WASMSingletonBase {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          this.settleModuleLoad();
           useOscilloscopeStore.getState().setChipInfo(6, 0, ['YM2203 A FM 1', 'YM2203 A FM 2', 'YM2203 A FM 3', 'YM2203 B FM 1', 'YM2203 B FM 2', 'YM2203 B FM 3']);
           console.log('[TFMEngine] TFM Music Maker file loaded');
           break;
@@ -82,6 +83,7 @@ export class TFMEngine extends WASMSingletonBase {
           break;
         case 'error':
           console.error('[TFMEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -97,7 +99,9 @@ export class TFMEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('TFMEngine not initialized');
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+    await answered;
   }
 
   play(): void { /* the tune starts on load */ }

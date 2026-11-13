@@ -80,11 +80,13 @@ export class PmdminiEngine extends WASMSingletonBase {
           break;
 
         case 'moduleLoaded':
+          this.settleModuleLoad();
           console.log('[PmdminiEngine] Module loaded', data.meta);
           break;
 
         case 'error':
           console.error('[PmdminiEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -103,9 +105,11 @@ export class PmdminiEngine extends WASMSingletonBase {
     await this._initPromise;
     if (!this.workletNode) throw new Error('PmdminiEngine not initialized');
 
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage(
       { type: 'loadModule', moduleData: buffer },
     );
+    await answered;
   }
 
   play(): void {

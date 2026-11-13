@@ -69,6 +69,7 @@ export class S98Engine extends WASMSingletonBase {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded': {
+          this.settleModuleLoad();
           // One scope per logged device, named by its chip.
           const names = (data.types as number[]).slice(0, 8).map(s98DeviceName);
           useOscilloscopeStore.getState().setChipInfo(names.length, 0, names);
@@ -82,6 +83,7 @@ export class S98Engine extends WASMSingletonBase {
           break;
         case 'error':
           console.error('[S98Engine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -97,7 +99,9 @@ export class S98Engine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('S98Engine not initialized');
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+    await answered;
   }
 
   play(): void { /* the log starts on load */ }

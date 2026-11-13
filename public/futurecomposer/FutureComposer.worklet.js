@@ -28,7 +28,7 @@ class FutureComposerProcessor extends AudioWorkletProcessor {
         await this.initWasm(data.sampleRate, data.wasmBinary, data.jsCode);
         break;
       case 'loadModule': {
-        if (!this.module) break;
+        if (!this.module) { this.port.postMessage({ type: 'error', message: 'Future Composer player not initialised' }); break; }
         try {
           if (this.handle) { this.module._fc_destroy(this.handle); this.handle = 0; }
           const uint8Data = new Uint8Array(data.moduleData);

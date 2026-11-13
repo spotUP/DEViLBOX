@@ -67,11 +67,13 @@ export class PxtoneEngine extends WASMSingletonBase {
           break;
 
         case 'moduleLoaded':
+          this.settleModuleLoad();
           console.log('[PxtoneEngine] Module loaded');
           break;
 
         case 'error':
           console.error('[PxtoneEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -90,9 +92,11 @@ export class PxtoneEngine extends WASMSingletonBase {
     await this._initPromise;
     if (!this.workletNode) throw new Error('PxtoneEngine not initialized');
 
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage(
       { type: 'loadModule', moduleData: buffer },
     );
+    await answered;
   }
 
   play(): void {

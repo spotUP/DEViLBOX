@@ -72,10 +72,12 @@ export class PiyoPiyoEngine extends WASMSingletonBase {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          this.settleModuleLoad();
           console.log(`[PiyoPiyoEngine] loaded: ${data.records} records, ${data.waitMs} ms each`);
           break;
         case 'error':
           console.error('[PiyoPiyoEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -89,7 +91,9 @@ export class PiyoPiyoEngine extends WASMSingletonBase {
     await this._initPromise;
     if (!this.workletNode) throw new Error('PiyoPiyoEngine not initialized');
     this.noteLanes(buffer);
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+    await answered;
   }
 
   /** Swap an edited module in while the song plays; the cursor and wait timer stay. */

@@ -102,6 +102,7 @@ export class JxsEngine extends WASMChannelOutputsEngine {
         if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
         break;
       case 'moduleLoaded': {
+        this.settleModuleLoad();
         // The channel VU meters and the per-channel oscilloscopes read the oscilloscope store: one entry per voice.
         const voices = typeof data.channels === 'number' ? data.channels : 0;
         useOscilloscopeStore.getState().setChipInfo(voices, 0, Array.from({ length: voices }, (_, c) => `Channel ${c + 1}`));
@@ -128,6 +129,7 @@ export class JxsEngine extends WASMChannelOutputsEngine {
         break;
       case 'error':
         console.error('[JxsEngine]', data.message);
+        this.failModuleLoad(String(data.message ?? 'module load failed'));
         break;
     }
   }
@@ -138,7 +140,9 @@ export class JxsEngine extends WASMChannelOutputsEngine {
     const m = decodeJxsModule(new Uint8Array(buffer), subsong);
     this._range = m ? jxsPlayRange(m) : { firstBar: 0, lastBar: Number.MAX_SAFE_INTEGER };
     meterFeed.clearHeld();
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer, subsong });
+    await answered;
   }
 
   /** Swap in an edited song while it plays (the replayer reopens it at the same bar and step). */
