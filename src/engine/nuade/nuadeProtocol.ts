@@ -83,6 +83,7 @@ export type NuadeOut =
 export const NUADE_IN_MESSAGES = [
   'init', 'loadModule', 'play', 'stop', 'pause', 'setSubsong', 'setMuteMask',
   'swapModule', 'seek', 'playRowClip', 'setStereoSeparation', 'requestState', 'cellWrite', 'instrumentWrite',
+  'keyLoad', 'keyOn', 'keyOff',
 ] as const satisfies readonly NuadeIn['type'][];
 
 /** The dub / isolation kinds handled by DevilboxChannelOutputs. */
