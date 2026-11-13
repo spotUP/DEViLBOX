@@ -504,6 +504,14 @@
       "cells": 11076,
       "bytes": 11076
     },
+    "mmdc": {
+      "exporter": "MEDExporter.exportMED",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 24716,
+      "bytes": 24716
+    },
     "soundMon": {
       "exporter": "SMON (SoundMonExporter)",
       "tier": "byte-exact",

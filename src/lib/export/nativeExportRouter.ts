@@ -352,7 +352,7 @@ const NATIVE_EXPORTERS: NativeExporterEntry[] = [
   { id: 'pumaTracker', matches: (s) => songIds(s).format === 'PumaTracker' || songIds(s).layoutFormatId === 'pumaTracker',
     run: async (s, baseName) => { const { exportPumaTrackerFile } = await import('./PumaTrackerExporter'); return { data: exportPumaTrackerFile(s), filename: `${baseName}.puma`, warnings: [] }; } },
   { id: 'med', matches: (s) => songIds(s).format === 'MED' || songIds(s).layoutFormatId === 'med_mmd0' || songIds(s).layoutFormatId === 'med_mmd1' || songIds(s).layoutFormatId === 'mmdc',
-    run: async (s, baseName) => { const { exportMED } = await import('./MEDExporter'); return { data: exportMED(s), filename: `${baseName}.mmd0`, warnings: [] }; } },
+    run: async (s, baseName) => { const { exportMED } = await import('./MEDExporter'); return { data: exportMED(s), filename: `${baseName}.${songIds(s).layoutFormatId === 'mmdc' ? 'mmdc' : 'mmd0'}`, warnings: [] }; } },
   { id: 'preTracker', matches: (s) => songIds(s).format === 'PreTracker',
     run: async (_s, baseName) => { const { exportAsPreTracker } = await import('./PreTrackerExporter'); return exportAsPreTracker(baseName); } },
   { id: 'hively', matches: (s) => { const i = songIds(s); return i.format === 'HVL' || i.format === 'AHX' || i.layoutFormatId === 'hivelyHVL' || i.layoutFormatId === 'hivelyAHX'; },
