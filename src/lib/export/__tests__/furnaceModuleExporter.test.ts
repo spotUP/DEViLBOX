@@ -299,10 +299,10 @@ describe('exportFurnaceModule', () => {
     }
   });
 
-  it('writes the chip flags of the YM2610 with SSG volume 256 (Furnace loads a module without them at 128)', async () => {
+  it('composed Neo Geo song does not play its SSG arpeggios far louder than the FM voices: SSG volume stays at the Furnace default 128, not 256', async () => {
     const r = exportFurnaceModule(song());
     const mod = await parseFurnaceSong(r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) as ArrayBuffer);
-    expect(mod.chipFlags).toEqual(['ssgVol=256\n']);
+    expect(mod.chipFlags).toEqual(['ssgVol=128\n']);
   });
 
   it('keeps the second speed, the grooves and the compat flags of a loaded Furnace module', async () => {

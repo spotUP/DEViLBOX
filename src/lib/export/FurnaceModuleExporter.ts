@@ -37,11 +37,13 @@ export const FUR_EXPORT_VERSION = 245;
 export const FUR_SYSTEM_YM2610 = 0xa5;
 export const FUR_NEO_GEO_CHANNELS = 14;
 /**
- * Chip flags of the exported YM2610: SSG volume 256, the level of the chip itself. Furnace's own
- * default is 128 (ym2610shared.h, flags.getInt("ssgVol",128)), which ngdevkit furtool makes up for
- * with a warning. The song is played here from the same module, so screen and export agree.
+ * Chip flags of the exported YM2610: SSG volume 128, Furnace's own default (ym2610shared.h,
+ * flags.getInt("ssgVol",128)), the balance every loaded .fur plays with. The flag was 256 (twice
+ * the SSG level of any Furnace module); a sustained SSG square then stood far above the FM voices
+ * (owner listen 2026-11-13, NG-7a: "the arps are very loud compared to the rest"). The song is
+ * played here from the same module, so screen and export agree.
  */
-export const FUR_NEO_GEO_CHIP_FLAGS = 'ssgVol=256\n';
+export const FUR_NEO_GEO_CHIP_FLAGS = 'ssgVol=128\n';
 /** The synth type of a Neo Geo instrument in the tracker. */
 export const NEO_GEO_SYNTH_TYPE = 'FurnaceOPNB';
 
