@@ -401,12 +401,12 @@
       "cells": 4
     },
     "paulShields": {
-      "kind": "fixed",
-      "method": "decode-encode",
+      "kind": "variable",
+      "method": "encode-pattern",
       "status": "byte-exact",
       "byteExact": true,
       "matchPct": 1,
-      "cells": 98
+      "cells": 16
     },
     "plm": {
       "kind": "fixed",

@@ -1,35 +1,18 @@
 /**
- * PaulShieldsEncoder — Encodes TrackerCell back to Paul Shields (.ps)
- * sequence/note-command-stream bytes.
+ * PaulShieldsEncoder - the Paul Shields pattern stream from its carrier rows.
  *
- * A Paul Shields module (player from Paul Shields.AMP.asm) stores its song as a
- * header + sample records + instrument/waveform tables, then a set of per-channel
- * sequence streams addressed by a 4-entry song-pointer table. Each channel stream
- * is an opcode-driven command byte-stream (JMP (PC,D0.W) dispatch), not a clean
- * note/effect grid, so the faithful byte-exact inverse is a per-byte carrier.
- *
- * decodeCell (in PaulShieldsParser) stashes the exact source byte in the invisible
- * `period` carrier; this encoder reproduces it verbatim. Edited grid cells lack the
- * carrier and fall back to a rest byte. True note-level editing of the command
- * stream is future work (the command-stream tick-grid recipe); this codec's job is
- * a byte-exact export round-trip over the real located sequence region.
+ * The parser keeps each pattern byte a voice reaches as one carrier cell (cutoff = 1, period = byte; paulShieldsGrid.ts
+ * holds the byte layout), so a block is those bytes concatenated and an unedited block is byte-exact. Note edits are
+ * written in place by PaulShieldsExporter (applyPaulShieldsGridEdits), never by re-flowing the stream.
  */
+import type { VariableLengthEncoder } from '../UADEPatternEncoder';
+import { registerVariableEncoder } from '../UADEPatternEncoder';
+import { encodePaulShieldsStream } from '@/lib/import/formats/paulShieldsGrid';
 
-import type { TrackerCell } from '@/types';
-import { registerPatternEncoder } from '../UADEPatternEncoder';
+export const paulShieldsEncoder: VariableLengthEncoder = {
+  formatId: 'paulShields',
+  encodePattern: (rows) => encodePaulShieldsStream(rows),
+  canEncode: (rows) => rows.every(c => c.cutoff !== undefined),
+};
 
-// A zero byte reads as a no-op / stream terminator in the dispatch table.
-const PS_REST = 0x00;
-
-function encodePaulShieldsCell(cell: TrackerCell): Uint8Array {
-  // Byte-exact carrier restore: reproduce the exact source byte when present.
-  if (cell.period !== undefined) {
-    return new Uint8Array([cell.period & 0xFF]);
-  }
-  // Edited cell: no clean note→command mapping for a dispatch stream — emit a rest.
-  return new Uint8Array([PS_REST]);
-}
-
-registerPatternEncoder('paulShields', () => encodePaulShieldsCell);
-
-export { encodePaulShieldsCell, PS_REST };
+registerVariableEncoder(paulShieldsEncoder);

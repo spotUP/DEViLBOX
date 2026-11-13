@@ -93,7 +93,7 @@ export const ENCODER_FIXTURES: EncoderFixture[] = [
   { formatId: "musicLine", fixture: "public/data/songs/formats/harmonic disorder.ml", kind: "variable" },
   { formatId: "nru", fixture: "public/data/songs/formats/howiedavies.nru", kind: "fixed" },
   { formatId: "paulRobotham", fixture: "public/data/songs/formats/dawnpatrol-sad.dat", kind: "variable" },
-  { formatId: "paulShields", fixture: "public/data/songs/formats/jug-hiscore.ps", kind: "fixed" },
+  { formatId: "paulShields", fixture: "public/data/songs/formats/jug-hiscore.ps", kind: "variable", parser: { module: "@lib/import/formats/PaulShieldsParser", parseFn: "parsePaulShieldsFile" } },
   { formatId: "plm", fixture: "public/data/songs/disorder-tracker-2/hyper geckoo.plm", kind: "fixed" },
   { formatId: "ptm", fixture: "public/data/songs/formats/rew_vibr.ptm", kind: "variable" },
   { formatId: "pumaTracker", fixture: "public/data/songs/pumatracker/liquid kids - lv1a.puma", kind: "variable" },
