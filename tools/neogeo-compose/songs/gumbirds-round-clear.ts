@@ -1,7 +1,7 @@
 /**
  * Gumbirds - round clear jingle (Neo Geo MVS, YM2610 extended FM, nullsound via furtool).
  * F major, speed 5 at 60 Hz (180 BPM), one 48-row pattern = 4.0 s. Does not loop (no 0B jump).
- * Rows 0-11: fast upward SSG run (one note per row) with an ext-FM echo of the run on FM 2 OP1, snare roll.
+ * Rows 0-11: fast upward SSG run (one note per row) snare roll (the OP1 echo flutter was removed 2026-11-14: owner dislikes the flap sounds).
  * Rows 12-27: the gum hook rhythm (0, 3, 6, 8, 10, 12) as unison band hits, climbing to the leading tone.
  * SSG volumes are even (0-14): only those map to an exact editor value.
  * Row 28: bright F major chord on every voice, SSG noise cymbal tail, bells ping-pong, last notes ring out.
@@ -71,8 +71,6 @@ export default function gumbirdsRoundClear(repoRoot: string): NeoGeoSongBuilder 
   const run = ['C-5', 'D-5', 'E-5', 'F-5', 'G-5', 'A-5', 'Bb5', 'C-6', 'D-6', 'E-6', 'F-6', 'G-6'];
   run.forEach((n, i) => {
     p.put(NEO.SSG1, i, { note: n, ins: RUN });
-    // Ext-FM echo: OP1 shadows the run a row and 2 ticks late, quieter (log scale, 103 = -18 dB).
-    if (i + 1 < 12) p.put(NEO.OP1, i + 1, { note: n, ins: EXT, vol: 103, fx: [[0xed, 2]] });
   });
   // Snare roll: 8ths growing louder, then 16ths into the hook.
   [[0, 6], [2, 6], [4, 8], [6, 8], [8, 10], [9, 12], [10, 12], [11, 14]].forEach(([r, v]) =>
