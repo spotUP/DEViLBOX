@@ -825,8 +825,8 @@ export interface MixerChannelState {
   dubSweepFeedback: number; // Comb sweep feedback (0–0.9)
 }
 
-function defaultChannels(): MixerChannelState[] {
-  return Array.from({ length: 16 }, (_, i) => ({
+function defaultChannels(count = 16): MixerChannelState[] {
+  return Array.from({ length: count }, (_, i) => ({
     volume: 1,
     pan: 0,
     muted: false,
@@ -942,7 +942,8 @@ interface MixerStoreActions {
   loadChannelInsertPreset: (ch: number, effects: EffectConfig[]) => void;
 
   // Reset mute/solo state (called on song load)
-  resetMuteState: () => void;
+  /** Clear mute/solo; grow the strip list to `channelCount` so songs past 16 channels (e.g. 17-channel Neo Geo ext-FM) can be muted. */
+  resetMuteState: (channelCount?: number) => void;
   reapplyAllMutes: () => void;
 
   // Bulk load mixer state from saved project
@@ -1059,8 +1060,11 @@ export const useMixerStore = create<MixerStore>()(
       syncMuteToPatternChannels();
     },
 
-    resetMuteState(): void {
+    resetMuteState(channelCount?: number): void {
       set((state) => {
+        if (channelCount && channelCount > state.channels.length) {
+          state.channels.push(...defaultChannels(channelCount).slice(state.channels.length));
+        }
         state.channels.forEach((c) => {
           c.muted = false;
           c.soloed = false;
