@@ -127,7 +127,17 @@ describe('a key on a song instrument, with the song on nuade or on its own repla
         const Cls = await c.engine();
         const engine = Object.create(Cls.prototype) as Record<string, unknown>;
         const output = fakeGain();
-        engine.workletNode = { port: { postMessage: (m: Msg) => { sent.push(m); pending.push(w.send(m)); } } };
+        // The engine's port.onmessage is not wired (no constructor ran), so hand it the worklet's load answer the way
+        // that handler does: a load settles on 'moduleLoaded' and fails on 'error', not on postMessage.
+        let answered = 0;
+        const answer = (): void => {
+          for (; answered < w.posted.length; answered++) {
+            const p = w.posted[answered] as Msg;
+            if (p.type === 'moduleLoaded') (engine.settleModuleLoad as () => void).call(engine);
+            else if (p.type === 'error') (engine.failModuleLoad as (m: string) => void).call(engine, String(p.message));
+          }
+        };
+        engine.workletNode = { port: { postMessage: (m: Msg) => { sent.push(m); pending.push(w.send(m).then(answer)); } } };
         engine.output = output;
         engine.audioContext = fakeContext;
         engine.ready = async () => {};
