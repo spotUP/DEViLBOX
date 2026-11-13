@@ -94,6 +94,20 @@ const FORMATS: Record<string, FileSubsongFormat> = {
     count: async (bytes) => (await import('./formats/medleyGrid')).medleySubsongCount(new Uint8Array(bytes)),
     audible: async (bytes, subsong) => (await import('./formats/medleyGrid')).medleySubsongAudible(new Uint8Array(bytes), subsong),
   },
+  // Digital Sonix & Chrome (.dsc): the repeats-0 entries start the tunes (dscSubsongCount); UADE and nuade number them from 0.
+  digitalSonixChrome: {
+    key: 'digitalSonixChrome',
+    names: /\.dsc$|(^|\/)dsc\./,
+    fileDataField: 'uadeEditableFileData',
+    count: async (bytes) => {
+      const d = await import('./formats/DigitalSonixChromeModule');
+      return d.dscSubsongCount(d.decodeDscModule(new Uint8Array(bytes)));
+    },
+    audible: async (bytes, subsong) => {
+      const d = await import('./formats/DigitalSonixChromeModule');
+      return d.dscSubsongEntries(d.decodeDscModule(new Uint8Array(bytes)), subsong).some((e) => e.rows > 0);
+    },
+  },
   // Quartet PSG (.sqt): the songs the init routine can select (quartetPsgGrid.quartetSongBases); UADE plays the same numbers, counted from 0.
   quartet: {
     key: 'quartet',
