@@ -109,10 +109,12 @@ export default function gumbirdsTitle(repoRoot: string): NeoGeoSongBuilder {
     seqMacro(1, [12, 5, 0]),
     seqMacro(3, [3, 3, 2]),
   ]));
-  // Buzz bass: SSG hardware envelope as the oscillator (wave = envelope only, shape 8 = repeating saw down),
-  // envelope period locked to the note pitch (num/den 1/1).
+  // Buzz bass: SSG hardware envelope as the oscillator (wave = envelope only, shape 10 = repeating triangle),
+  // envelope period locked to the note pitch (num/den 1/1). The triangle cycle is twice the saw cycle, so it
+  // sounds an octave under the written note and softer than the saw. Envelope mode ignores the volume
+  // register, so the level is fixed at full: the notes are gated short instead.
   const BUZZ = s.addInstrument('SSG envelope buzz', ssg([
-    seqMacro(0, [15]), seqMacro(3, [4]), seqMacro(6, [8]), seqMacro(7, [1]), seqMacro(8, [1]),
+    seqMacro(0, [15]), seqMacro(3, [4]), seqMacro(6, [10]), seqMacro(7, [1]), seqMacro(8, [1]),
   ]));
   // Kick: 0.18 s of a TR-style kick, resampled to 18.5 kHz, 30 ms fade at the end.
   const wav = readWavPcm16(readFileSync(`${repoRoot}/public/data/samples/packs/drumnibus/kicks/BD_Romkick1.wav`));
@@ -179,11 +181,12 @@ export default function gumbirdsTitle(repoRoot: string): NeoGeoSongBuilder {
   }
 
   // Chord stabs on the FM 2 operators: off-beat hits; OP4 strums 1 tick late. `echo` repeats the stab
-  // 2 rows later, quieter (the ext-FM echo stab).
+  // 2 rows later, quieter (the ext-FM echo stab). Operator-channel volume is log scale (Furnace
+  // ym2610ext: TL = 127 - (127 - opTL + vol - 127)), 0.75 dB per step: 127 = patch level, 103 = -18 dB.
   function stabs(p: NeoGeoPattern, o: number, ch: Chord, rows: number[], echo = false) {
     for (const r of rows) {
-      ch.stab.forEach((n, i) => p.put(NEO.OP2 + i, o + r, { note: n, ins: EXT, vol: 111, fx: i === 2 ? [[0xed, 1]] : [] }));
-      if (echo && r + 2 < 16) ch.stab.forEach((n, i) => p.put(NEO.OP2 + i, o + r + 2, { note: n, ins: EXT, vol: 62, fx: [[0xed, i]] }));
+      ch.stab.forEach((n, i) => p.put(NEO.OP2 + i, o + r, { note: n, ins: EXT, vol: 127, fx: i === 2 ? [[0xed, 1]] : [] }));
+      if (echo && r + 2 < 16) ch.stab.forEach((n, i) => p.put(NEO.OP2 + i, o + r + 2, { note: n, ins: EXT, vol: 103, fx: [[0xed, i]] }));
     }
   }
 
@@ -197,7 +200,7 @@ export default function gumbirdsTitle(repoRoot: string): NeoGeoSongBuilder {
   function lead(p: NeoGeoPattern, o: number, line: Line, echo = true, vol = 111) {
     for (const [r, n, fx] of line) {
       p.put(NEO.FM1, o + r, { note: n, ins: LEAD, vol, fx: fx ?? [] });
-      if (echo && n !== 'OFF' && o + r + 2 < 32) p.put(NEO.OP1, o + r + 2, { note: n, ins: EXT, vol: 62, fx: [[0xed, 2]] });
+      if (echo && n !== 'OFF' && o + r + 2 < 32) p.put(NEO.OP1, o + r + 2, { note: n, ins: EXT, vol: 103, fx: [[0xed, 2]] });
     }
   }
 
@@ -346,12 +349,15 @@ export default function gumbirdsTitle(repoRoot: string): NeoGeoSongBuilder {
       if (!build) {
         const buzzRoot = up(ch.root, 12);
         p.put(NEO.SSG2, o, { note: buzzRoot, ins: BUZZ, fx: bar > 0 ? [[0x03, 0x60]] : [] });
+        p.put(NEO.SSG2, o + 4, { note: 'OFF' });
+        p.put(NEO.SSG2, o + 6, { note: buzzRoot, ins: BUZZ });
         p.put(NEO.SSG2, o + 8, { note: buzzRoot + 7, ins: BUZZ });
+        p.put(NEO.SSG2, o + 10, { note: 'OFF' });
         p.put(NEO.SSG2, o + 12, { note: buzzRoot + 12, ins: BUZZ, fx: [[0xec, 3]] });
       }
       // Sustained chord on the operators: soft and low under the lead.
-      ch.stab.forEach((n, i) => p.put(NEO.OP2 + i, o, { note: n, ins: EXT, vol: 79, fx: i === 2 ? [[0xed, 2]] : [] }));
-      ch.stab.forEach((n, i) => p.put(NEO.OP2 + i, o + 10, { note: n, ins: EXT, vol: 62, fx: [[0xed, i]] }));
+      ch.stab.forEach((n, i) => p.put(NEO.OP2 + i, o, { note: n, ins: EXT, vol: 119, fx: i === 2 ? [[0xed, 2]] : [] }));
+      ch.stab.forEach((n, i) => p.put(NEO.OP2 + i, o + 10, { note: n, ins: EXT, vol: 103, fx: [[0xed, i]] }));
       if (build) drums(p, o, { sixteenths: true, fill: bar === 7, push: true });
       else {
         p.put(NEO.B, o, { note: 'C-4', ins: KICK });
