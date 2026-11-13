@@ -12,13 +12,17 @@
  *                            triangle-envelope sub octave on the second chip
  *   order 7  bars 15-16  A'  answer + canon, loops to order 0
  *
- * Channels 1-3 (AY2) carry the whole tune. Channel 4 (AY1 A) is decoration only (the wink sparkle).
- * Everything is tick-timed by macros no longer than 13 ticks and there is no 0F, so speed 5 works.
- * ROM thrift: the motif pattern is one body on the lead and on AY1 B (same instrument), the bass pulse
- * and the plain drum pattern repeat, the B section bass is two long notes per pattern.
+ * Channels 1-3 (AY2) carry the whole tune. The second chip plays in every order and only adds to them:
+ *   channel 4 (AY1 A)  the lead's own notes as an echo, 12 ticks late and quieter (the shot effect steals it)
+ *   channel 5 (AY1 B)  a round with the lead: the answer under the motif and the motif under the answer
+ *                      (minor and major), a fifth above the stabs and the bend in B (can drop out)
+ *   channel 6 (AY1 C)  the bass an octave up; in the heavy A the triangle sub thump with an octave tail
+ * Each AY1 channel keeps one instrument and never uses the volume column, so its notes compile to the same
+ * bytes as the lead's and the bass's wherever the cells match. No rhythm depends on a macro length and
+ * there is no 0F, so speed 5 works.
  */
-import { AY, AY_MACRO, ScrambleSongBuilder, ayInstrument, ayMacro, ayVol } from '@/lib/export/neogeo/scrambleCompose';
-import type { NeoHit } from '@/lib/export/neogeo/neoGeoCompose';
+import { AY, AY_MACRO, ScrambleSongBuilder, ayInstrument, ayMacro } from '@/lib/export/neogeo/scrambleCompose';
+import { noteNumber, type NeoHit } from '@/lib/export/neogeo/neoGeoCompose';
 
 // Furnace AY macro codes the builder does not name: auto envelope (envelope period follows the note) numerator / denominator.
 const AUTO_ENV_NUM = 7;
@@ -46,8 +50,9 @@ export default function (): ScrambleSongBuilder {
   // Triangle envelope runs at half the saw rate: the written note sounds an octave lower.
   // The envelope always plays at full level, so the sub is a 3-tick thump, not a drone (a held one buries the core).
   const sub = ins('Triangle sub', [
-    ayMacro(AY_MACRO.MIXER, [ENV, ENV, ENV, TONE]), ayMacro(AY_MACRO.VOL, [15, 15, 15, 0]),
-    ayMacro(AY_MACRO.ENV_SHAPE, [10]), ...autoEnv]);
+    // After the thump the channel rings on as a quiet square an octave above the written note.
+    ayMacro(AY_MACRO.MIXER, [ENV, ENV, ENV, TONE]), ayMacro(AY_MACRO.VOL, [15, 15, 15, 9, 9, 8, 8, 7, 7, 6]),
+    ayMacro(AY_MACRO.ARP, [0, 0, 0, 12]), ayMacro(AY_MACRO.ENV_SHAPE, [10]), ...autoEnv]);
   // Drums carry their own off-beat hat at tick 11: one tick early at speed 6, one tick late at speed 5.
   const kick = ins('Kick + hat', [
     ayMacro(AY_MACRO.VOL, [12, 12, 11, 9, 6, 0, 0, 0, 0, 0, 0, 8, 0]),
@@ -61,6 +66,16 @@ export default function (): ScrambleSongBuilder {
     ayMacro(AY_MACRO.MIXER, [TONE | NOISE, TONE | NOISE, NOISE])]);
   const stab = ins('Minor stab', [
     ayMacro(AY_MACRO.VOL, [12, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 0]), ayMacro(AY_MACRO.ARP, [0, 3, 7], 0)]);
+  // Second chip (AY1): one plain-tone instrument per channel, all below the lead's 15.
+  const echo = ins('Echo', [ayMacro(AY_MACRO.VOL, [...new Array<number>(12).fill(0), 9, 9, 8, 7, 6, 5])]);
+  const canon = ins('Canon', [ayMacro(AY_MACRO.VOL, [10, 10, 9, 9, 8, 8, 7])]);
+  const octave = ins('Bass octave', [ayMacro(AY_MACRO.VOL, [10, 10, 9, 8, 7, 6]), ayMacro(AY_MACRO.ARP, [12])]);
+  /** The same cells on another instrument, optionally transposed. */
+  const as = (hits: Hits, i: number, semis = 0): Hits => hits.map(([row, h]) => [row, {
+    ...h,
+    ...(h.ins !== undefined ? { ins: i } : {}),
+    ...(semis && typeof h.note === 'string' && h.note !== 'OFF' ? { note: noteNumber(h.note) + semis } : {}),
+  }]);
 
   // ---- lead bodies ----
   const motif = (i: number, third: string, accentFx: Array<[number, number]>, heldFx: Array<[number, number]>): Hits => [
@@ -75,12 +90,14 @@ export default function (): ScrambleSongBuilder {
   ];
   const motifMinor = motif(lead, 'D#5', [], [[0x04, 0x52]]);
   const motifMajor = motif(laugh, 'E-5', [[0x04, 0x84]], [[0x04, 0x84]]); // fast vibrato on the long notes only
-  const answer: Hits = [
-    [0, { note: 'D#5', ins: lead, fx: [[0x04, 0x00]] }], [3, { note: 'F-5', ins: lead }], [6, { note: 'G-5', ins: lead }],
-    [8, { note: 'C-5', ins: lead }], [11, { note: 'G#5', ins: lead }],
-    [16, { note: 'G-5', ins: lead }], [19, { note: 'F-5', ins: lead }], [22, { note: 'D#5', ins: lead }],
-    [24, { note: 'C-5', ins: lead }], [28, { note: 'C#5', ins: lead }], [30, { note: 'B-4', ins: lead }], // bVI, bII, V
+  const answerOf = (third: string, sixth: string, second: string): Hits => [
+    [0, { note: third, ins: lead, fx: [[0x04, 0x00]] }], [3, { note: 'F-5', ins: lead }], [6, { note: 'G-5', ins: lead }],
+    [8, { note: 'C-5', ins: lead }], [11, { note: sixth, ins: lead }],
+    [16, { note: 'G-5', ins: lead }], [19, { note: 'F-5', ins: lead }], [22, { note: third, ins: lead }],
+    [24, { note: 'C-5', ins: lead }], [28, { note: second, ins: lead }], [30, { note: 'B-4', ins: lead }], // bVI, bII, V
   ];
+  const answer = answerOf('D#5', 'G#5', 'C#5');
+  const answerMajor = answerOf('E-5', 'A-5', 'D-5'); // AY1 B only, under the laughing motif
   const stabsB: Hits = [ // motif head, then the same a semitone up
     [0, { note: 'C-5', ins: lead, fx: [[0x04, 0x00]] }], [3, { note: 'D-5', ins: lead }], [6, { note: 'D#5', ins: lead }], [8, { note: 'OFF' }],
     [16, { note: 'C#5', ins: lead }], [19, { note: 'D#5', ins: lead }], [22, { note: 'E-5', ins: lead }], [24, { note: 'OFF' }],
@@ -127,23 +144,23 @@ export default function (): ScrambleSongBuilder {
     [16, K], [19, K], [22, K], [24, S], [26, { note: 'G#3', ins: stab }], [28, S], [30, S], [31, S],
   ];
 
-  // ---- extras on AY1 ----
-  const wink = (third: string): Hits => [ // channel 4, decoration: a yodel sparkle on the wink and on the last note
-    [11, { note: third, ins: laugh, vol: ayVol(8) }], [14, { note: 'OFF' }], [22, { note: 'C-6', ins: laugh }], [26, { note: 'OFF' }],
-  ];
+  // ---- AY1 C in the heavy A: sub thump on the beats and the turnaround roots ----
   const subLine: Hits = [[0, { note: 'C-2', ins: sub }], [8, { note: 'C-2', ins: sub }], [16, { note: 'C-2', ins: sub }], [24, { note: 'G#1', ins: sub }], [28, { note: 'C#2', ins: sub }], [30, { note: 'G-1', ins: sub }]];
 
-  const OFF: Hits = [[0, { note: 'OFF' }]];
-  const rows: Array<Partial<Record<number, Hits>>> = [
-    { [AY.LEAD]: motifMinor, [AY.BASS]: pulse, [AY.DRUMS]: beat, [AY.AY1_A]: wink('D#6'), [AY.AY1_B]: [[0, { note: 'OFF', vol: ayVol(9) }]], [AY.AY1_C]: OFF },
-    { [AY.LEAD]: answer, [AY.BASS]: pulse, [AY.DRUMS]: beat, [AY.AY1_B]: motifMinor },
-    { [AY.LEAD]: stabsB, [AY.BASS]: droneB, [AY.DRUMS]: heart, [AY.AY1_B]: OFF },
-    { [AY.LEAD]: turn, [AY.BASS]: droneTurn, [AY.DRUMS]: roll },
-    { [AY.LEAD]: motifMajor, [AY.BASS]: bounce, [AY.DRUMS]: beat, [AY.AY1_A]: wink('E-6') },
-    { [AY.LEAD]: haHa, [AY.BASS]: bounce, [AY.DRUMS]: beat, [AY.AY1_B]: motifMajor },
-    { [AY.LEAD]: motifMinor, [AY.BASS]: pulse, [AY.DRUMS]: heavy, [AY.AY1_A]: wink('D#6'), [AY.AY1_B]: OFF, [AY.AY1_C]: subLine },
-    { [AY.LEAD]: answer, [AY.BASS]: pulse, [AY.DRUMS]: heavy, [AY.AY1_B]: motifMinor, [AY.AY1_C]: subLine },
+  // One order: [lead, bass, drums, AY1 B line, AY1 C line]. AY1 A always echoes the lead.
+  const orders: Array<[Hits, Hits, Hits, Hits, Hits]> = [
+    [motifMinor, pulse, beat, as(answer, canon), as(pulse, octave)],
+    [answer, pulse, beat, as(motifMinor, canon), as(pulse, octave)],
+    [stabsB, droneB, heart, as(stabsB, canon, 7), as(droneB, octave)],
+    [turn, droneTurn, roll, as(turn, canon, 7), as(droneTurn, octave)],
+    [motifMajor, bounce, beat, as(answerMajor, canon), as(bounce, octave)],
+    [haHa, bounce, beat, as(motifMajor, canon), as(bounce, octave)],
+    [motifMinor, pulse, heavy, as(answer, canon), subLine],
+    [answer, pulse, heavy, as(motifMinor, canon), subLine],
   ];
+  const rows = orders.map(([ld, bs, dr, b, c]): Partial<Record<number, Hits>> => ({
+    [AY.LEAD]: ld, [AY.BASS]: bs, [AY.DRUMS]: dr, [AY.AY1_A]: as(ld, echo), [AY.AY1_B]: b, [AY.AY1_C]: c,
+  }));
   for (const row of rows) {
     const p = s.pattern();
     for (const [ch, hits] of Object.entries(row)) p.seq(Number(ch), hits as Hits);
