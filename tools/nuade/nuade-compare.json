@@ -1692,41 +1692,6 @@
    "ms": 20
   },
   {
-   "correlation": 0.9920478526548867,
-   "lagMs": -20,
-   "windowSecs": 1.4,
-   "uadeEndAt": 9.728,
-   "nuadeEndAt": 1.9199166666666667,
-   "peak": 0.3406982421875,
-   "rms": 0.06361381565611156,
-   "voices": 4,
-   "player": "soundimages",
-   "uadeRms": 0.06164729507284511,
-   "swapMs": 1.3616250000004584,
-   "format": "soundimages",
-   "song": "public/data/songs/formats/blinkys scary school-sfx.tw",
-   "songPass": false,
-   "sha": "3fa40b121cc26bdcea540196",
-   "ms": 126
-  },
-  {
-   "correlation": 0.9890143319008045,
-   "lagMs": -20,
-   "windowSecs": 30,
-   "uadeEndAt": -1,
-   "nuadeEndAt": -1,
-   "peak": 0.395355224609375,
-   "rms": 0.06350416276022637,
-   "voices": 4,
-   "player": "soundimages",
-   "uadeRms": 0.06298476838531986,
-   "format": "soundimages",
-   "song": "public/data/songs/formats/future basketball main.tw",
-   "songPass": true,
-   "sha": "9e2793acddd66bdcea540196",
-   "ms": 316
-  },
-  {
    "error": "_uade_wasm_load failed (ret=-1)",
    "peak": 0,
    "rms": 0,
@@ -4339,6 +4304,41 @@
    "songPass": true,
    "sha": "ee5a17088d588a1c9ae84d8ba70c00126b7ba87128dfb364",
    "ms": 490
+  },
+  {
+   "correlation": 0.9923363681844766,
+   "lagMs": -20,
+   "windowSecs": 1.36,
+   "uadeEndAt": 1.8773333333333333,
+   "nuadeEndAt": 1.9199166666666667,
+   "peak": 0.3406982421875,
+   "rms": 0.06361381565611156,
+   "voices": 4,
+   "player": "soundimages",
+   "uadeRms": 0.0621874709665814,
+   "swapMs": 1.5599999999999454,
+   "format": "soundimages",
+   "song": "public/data/songs/formats/blinkys scary school-sfx.tw",
+   "songPass": true,
+   "sha": "3fa40b121cc28a1c9ae84d8b",
+   "ms": 107
+  },
+  {
+   "correlation": 0.9890143319008045,
+   "lagMs": -20,
+   "windowSecs": 30,
+   "uadeEndAt": -1,
+   "nuadeEndAt": -1,
+   "peak": 0.395355224609375,
+   "rms": 0.06350416276022637,
+   "voices": 4,
+   "player": "soundimages",
+   "uadeRms": 0.06298476838531986,
+   "format": "soundimages",
+   "song": "public/data/songs/formats/future basketball main.tw",
+   "songPass": true,
+   "sha": "9e2793acddd68a1c9ae84d8b",
+   "ms": 390
   }
  ]
 }

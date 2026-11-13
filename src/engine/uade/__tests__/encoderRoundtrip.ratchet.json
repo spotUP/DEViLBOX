@@ -336,6 +336,14 @@
       "matchPct": 1,
       "cells": 50
     },
+    "medley": {
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 52
+    },
     "mikeDavies": {
       "kind": "fixed",
       "method": "decode-encode",
@@ -433,12 +441,12 @@
       "cells": 2304
     },
     "quartet": {
-      "kind": "fixed",
-      "method": "decode-encode",
-      "status": "lossy",
-      "byteExact": false,
-      "matchPct": 0.0625,
-      "cells": 256
+      "kind": "variable",
+      "method": "encode-pattern",
+      "status": "byte-exact",
+      "byteExact": true,
+      "matchPct": 1,
+      "cells": 3
     },
     "robHubbard": {
       "kind": "variable",
