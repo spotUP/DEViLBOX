@@ -19,6 +19,7 @@
 | Sound check (headless, silent, resumable) | `npm run sound-check` — tables every song in `public/data/songs/formats` via UADE WASM; rows to `test-data/uade-corpus-sweep.json` |
 | Sync preset banks (clone/pull devilbox-presets into public/data/presets) | `npm run presets:sync` |
 | Format status tracker | `npx tsx tools/format-server.ts &` (serve on :4444) |
+| BossGame .fur opens+plays in Furnace 0.6.8.3 (headless, resumable; `--only <name>`, `--failed`) | `nice -n 19 npx tsx tools/bossgame-furnace-check.ts` -> `test-data/bossgame-furnace-check.json` |
 
 **Type-check mandatory after every change.** `npm run type-check` must pass before task done — catch unused vars (TS6133), strict null/undefined, enum syntax `tsc --noEmit` miss. Stricter than global rule; no substitute.
 
