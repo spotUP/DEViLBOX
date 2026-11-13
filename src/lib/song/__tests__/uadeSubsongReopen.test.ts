@@ -11,6 +11,10 @@ const openSong = vi.fn(async (_src: unknown, _o: unknown) => ({ ok: true as cons
 vi.mock('@/lib/song/openSong', () => ({ openSong: (s: unknown, o: unknown) => openSong(s, o) }));
 vi.mock('@/stores/useNotificationStore', () => ({ notify: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() } }));
 vi.mock('@/lib/tracker/playhead', () => ({ rewindPlayhead: vi.fn() }));
+// The real tracker and transport stores pull the whole engine graph (85 s to load under a busy machine, past the
+// pre-push timeout). The reopen path reads only isPlaying from the transport.
+vi.mock('@stores/useTrackerStore', () => ({ useTrackerStore: { getState: () => ({}) } }));
+vi.mock('@stores/useTransportStore', () => ({ useTransportStore: { getState: () => ({ isPlaying: false }) } }));
 
 import { switchSubsong, uadeSubsongsFallback } from '@/lib/tracker/subsongSwitch';
 import { useFormatStore } from '@/stores/useFormatStore';
@@ -20,7 +24,7 @@ const FILE = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../publi
 describe('switching the tune of a non-editable UADE song', () => {
   beforeEach(() => openSong.mockClear());
 
-  it('opens the file again on the tune asked for', { timeout: 90000 }, async () => {
+  it('opens the file again on the tune asked for', async () => {
     const b = readFileSync(FILE);
     const bytes = b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
     const model = uadeSubsongsFallback({ uadeEditableFileName: 'centurion_battle.rh', initialSpeed: 6 }, { subsongCount: 4 }, 0)!;
