@@ -68,6 +68,31 @@ function actualCell(d: DerivedFurnaceNative, p: number, ch: number, r: number): 
 }
 
 describe('deriveFurnaceNativeFromSong on the composer trial song', () => {
+  it('arp stops on the next row without an arp command in Neo Geo export', async () => {
+    const dbx = loadDbx();
+    const d = await deriveFurnaceNativeFromSong(toSong(dbx));
+    const sub = d.native.subsongs[0];
+    // Positions 0-1 play pattern 5, whose channel index 4 carries tracker arps (037 / 047); position 2
+    // plays pattern 0, whose channel 4 notes carry none.
+    expect(dbx.patternOrder.slice(0, 3)).toEqual([5, 5, 0]);
+    const ch = 4;
+    expect(dbx.patterns[5].channels[ch].rows.some((c) => c.effTyp === 0 && c.eff !== 0)).toBe(true);
+    // Furnace 00xy sticks until 0000: play the native rows of that channel along the order list up to the
+    // first note row of position 2; the arp must be off there.
+    const rowsOf = (p: number) => sub.channels[ch].patterns.get(p)?.rows ?? [];
+    let arp = 0;
+    let sawArp = false;
+    for (const p of [5, 5]) {
+      for (const row of rowsOf(p)) for (const e of row.effects) if (e.cmd === 0) { arp = e.val; sawArp ||= e.val !== 0; }
+    }
+    expect(sawArp).toBe(true);
+    const rows = rowsOf(0);
+    const firstNote = rows.findIndex((r) => r.note >= 0);
+    expect(firstNote).toBeGreaterThanOrEqual(0);
+    for (let r = 0; r <= firstNote; r++) for (const e of rows[r].effects) if (e.cmd === 0) arp = e.val;
+    expect(arp).toBe(0);
+  });
+
   it('every pattern, row and channel round-trips to the store cell', async () => {
     const dbx = loadDbx();
     const d = await deriveFurnaceNativeFromSong(toSong(dbx));

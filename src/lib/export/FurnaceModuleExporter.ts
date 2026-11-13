@@ -149,6 +149,56 @@ function cellEffects(cell: TrackerCell): Array<[number, number]> {
   return out;
 }
 
+// -- Tracker arpeggio lifetime ----------------------------------------------------
+//
+// Tracker 0xy (ProTracker pt2_replayer.c arpeggio(), FastTracker 2 ft2_replayer.c arpeggio() and
+// getNewNote "arpeggio running, set period back") plays only on the row that carries it: the next
+// row without 0xy is back on the base note. Furnace 00xy stays on until 00 00
+// (FurnaceSequencer.cpp ch.arp = effectVal; playback.cpp the same). So a tracker-notation row
+// without an arp right after a row with one gets Furnace 0000. Both step one arp note per tick:
+// PT tick % 3, FT2 arpeggioTab, Furnace arpLen 1 (written in SNG2, the sequencer's g_arpLen = 1).
+
+/** The cell carries a tracker arpeggio (effect 0 with a non-zero parameter) in any effect column. */
+export function cellHasTrackerArp(cell: TrackerCell | undefined): boolean {
+  if (!cell) return false;
+  return cellEffects(cell).some(([t, v]) => t === 0 && v !== 0);
+}
+
+/** Patterns that play right before / after pattern `pi` in the order list (the song loops to position 0). */
+function orderNeighbours(positions: readonly number[], pi: number, dir: -1 | 1): number[] {
+  const n = positions.length;
+  const out = new Set<number>();
+  positions.forEach((p, i) => { if (p === pi) out.add(positions[(i + dir + n) % n]); });
+  return [...out];
+}
+
+/**
+ * Whether row `r` of pattern `pi`, channel `ch` must stop a tracker arpeggio (Furnace 0000): the row
+ * is tracker notation, carries no arp, and the row that plays before it does. Row 0 looks at the last
+ * row of every pattern that precedes `pi` somewhere in the order list: one predecessor ending on an
+ * arp is enough (an extra 0000 after a predecessor without arp changes nothing).
+ */
+export function trackerArpStopAt(
+  patterns: readonly Pattern[], positions: readonly number[], pi: number, ch: number, r: number,
+): boolean {
+  const chan = patterns[pi]?.channels[ch];
+  if (!chan || effectNotationOf(chan.channelMeta) !== 'tracker' || cellHasTrackerArp(chan.rows[r])) return false;
+  if (r > 0) return cellHasTrackerArp(chan.rows[r - 1]);
+  return orderNeighbours(positions, pi, -1).some((q) => {
+    const prev = patterns[q]?.channels[ch];
+    return !!prev && effectNotationOf(prev.channelMeta) === 'tracker' && cellHasTrackerArp(prev.rows[patterns[q].length - 1]);
+  });
+}
+
+/** Cells whose arp stop depends on cell (pi, ch, r): the row after it, or row 0 of every pattern that follows pi. */
+export function trackerArpDependents(
+  patterns: readonly Pattern[], positions: readonly number[], pi: number, r: number,
+): Array<{ pat: number; row: number }> {
+  const len = patterns[pi]?.length ?? 0;
+  if (r + 1 < len) return [{ pat: pi, row: r + 1 }];
+  return orderNeighbours(positions, pi, 1).map((pat) => ({ pat, row: 0 }));
+}
+
 /**
  * Tracker-notation Cxx (effect type 0x0C, 0-64) is "set volume". Furnace's own 0Cxx is a different
  * command, so a verbatim copy would change what the song plays. Move it to the volume column
@@ -161,6 +211,8 @@ export function cellToFile(
   problems: string[],
   notation: EffectNotation = 'tracker',
   warnings: string[] = [],
+  /** trackerArpStopAt for this cell: write Furnace 0000 to end the arp of the row before. */
+  arpStop = false,
 ): FileCell {
   let note = -1;
   if (cell.note > 0) {
@@ -190,6 +242,11 @@ export function cellToFile(
     const e = editorEffectToFurnace(t, v);
     return { type: e.cmd, val: e.val };
   });
+  if (arpStop && notation === 'tracker') {
+    const free = fx.find((f) => f.type < 0 && f.val < 0);
+    if (free) { free.type = 0; free.val = 0; }
+    else warnings.push(`${where}: no free effect column for the 0000 that ends the arpeggio of the row before`);
+  }
   return { note, ins, vol, fx };
 }
 
@@ -390,7 +447,8 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
       for (let r = 0; r < patLen; r++) {
         const cell = src?.rows[r];
         rows.push(cell && src
-          ? cellToFile(cell, insIndexById, `Pattern ${pi} channel ${ch + 1} row ${r}`, problems, effectNotationOf(src.channelMeta), warnings)
+          ? cellToFile(cell, insIndexById, `Pattern ${pi} channel ${ch + 1} row ${r}`, problems, effectNotationOf(src.channelMeta), warnings,
+            trackerArpStopAt(song.patterns, song.songPositions, pi, ch, r))
           : { note: -1, ins: -1, vol: -1, fx: Array.from({ length: MAX_FX_COLUMNS }, () => ({ type: -1, val: -1 })) });
       }
       if (rows.every(isEmptyCell) && !orderedPatterns.has(pi)) continue;

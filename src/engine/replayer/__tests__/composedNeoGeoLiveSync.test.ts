@@ -10,6 +10,7 @@ import type { TrackerSong } from '../../TrackerReplayer';
 import type { InstrumentConfig } from '@typedefs/instrument';
 import type { TrackerCell, Pattern } from '@/types/tracker';
 import { composedNeoGeoModuleSong, deriveComposedNeoGeo } from '../composedNeoGeo';
+import { trackerArpStopAt } from '@/lib/export/FurnaceModuleExporter';
 import {
   derivedCellSeqWrites, derivedPlayState, isStructuralNoop, neoGeoInstrumentIds, planStructuralEdit,
 } from '../composedNeoGeoLiveSync';
@@ -79,7 +80,8 @@ describe('NG-3 (a): live cell edit equals a fresh derive', () => {
     for (let ch = 0; ch < Math.min(CHANNELS, pat.channels.length); ch++) {
       const chan = pat.channels[ch];
       for (let row = 0; row < chan.rows.length; row++) {
-        const sync = derivedCellSeqWrites(chan.rows[row], chan.channelMeta, fresh.instrumentIds, ch, patIdx, row);
+        const sync = derivedCellSeqWrites(chan.rows[row], chan.channelMeta, fresh.instrumentIds, ch, patIdx, row,
+          trackerArpStopAt(song.patterns, song.songPositions, patIdx, ch, row));
         expect(sync.problems).toEqual([]);
         const nRow = sub.channels[ch].patterns.get(patIdx)?.rows[row];
         const want = new Map<number, number>();
