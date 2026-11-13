@@ -220,6 +220,7 @@ export const SongOrderMatrix: React.FC<SongOrderMatrixProps> = ({
         onFormatCellChange={onCellChange}
         onFormatRowClick={onPositionClick}
         hideVUMeters
+        alignToMainLayout
         hideAutomationLanes={hideAutomationLanes}
       />
       {onToggleCollapse && (
