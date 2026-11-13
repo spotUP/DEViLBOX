@@ -10,6 +10,7 @@ import {
   type ChipExportFormat,
   type RegisterWrite,
 } from './ChipExporter';
+import type { VGMDataBlock } from './VGMExporter';
 
 interface ChipExportPanelProps {
   handlerRef: React.MutableRefObject<(() => Promise<false | void>) | null>;
@@ -38,6 +39,7 @@ export const ChipExportPanel: React.FC<ChipExportPanelProps> = ({
   const [isChipRecording, setIsChipRecording] = useState(false);
   const [chipRecordingTime, setChipRecordingTime] = useState(0);
   const [chipLogData, setChipLogData] = useState<Uint8Array | null>(null);
+  const [chipRomBlocks, setChipRomBlocks] = useState<VGMDataBlock[]>([]);
   const [chipWrites, setChipWrites] = useState<RegisterWrite[]>([]);
   const [availableChipFormats, setAvailableChipFormats] = useState<ChipExportFormat[]>([]);
   const [chipTitle, setChipTitle] = useState('');
@@ -90,6 +92,7 @@ export const ChipExportPanel: React.FC<ChipExportPanelProps> = ({
     const logData = await chipRecordingSession.stopRecording();
     setIsChipRecording(false);
     setChipLogData(logData);
+    setChipRomBlocks(chipRecordingSession.getRomBlocks());
 
     if (logData.length > 0) {
       const writes = parseRegisterLog(logData);
@@ -156,6 +159,7 @@ export const ChipExportPanel: React.FC<ChipExportPanelProps> = ({
         title: chipTitle || metadata.name || 'Untitled',
         author: chipAuthor || metadata.author || 'Unknown',
         loopPoint: loopPointSamples,
+        vgm: { dataBlocks: chipRomBlocks },
       });
 
       setRenderProgress(100);
