@@ -85,6 +85,11 @@ export function liveTrackerSong(overrides: Partial<TrackerSong> = {}): TrackerSo
     nuadePlayerId: fmt.nuadePlayerId ?? undefined,
     nuadeFileName: fmt.nuadeFileName ?? undefined,
     nuadeSubsong: fmt.nuadeSubsong ?? undefined,
+    // The count the player gave at import (applyNuadeChoice): a restored session has no import, and without it the
+    // subsong control stays hidden until the engine loads on play.
+    nuadeSubsongs: fmt.nativeSubsongs?.engine === 'Nuade'
+      ? { count: fmt.nativeSubsongs.count, defaultSubsong: fmt.nativeSubsongs.current }
+      : undefined,
     nuadeModuleFields: fmt.nuadeModuleFields ?? undefined,
     eaglePlayerId: fmt.eaglePlayerId ?? undefined,
     eaglePlayerFileName: fmt.eaglePlayerFileName ?? undefined,
