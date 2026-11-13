@@ -37,6 +37,14 @@ export const FUR_EXPORT_VERSION = 245;
 export const FUR_SYSTEM_YM2610 = 0xa5;
 export const FUR_NEO_GEO_CHANNELS = 14;
 /**
+ * System id of the extended-FM YM2610 (Furnace "Neo Geo MVS Extended Channel 2"): FM 2 split into its
+ * four operators. 17 channels: FM 1, FM 2 OP1-OP4, FM 3, FM 4, SSG 1-3, ADPCM-A 1-6, ADPCM-B. ngdevkit
+ * furtool/nsstool read both ids (furtool.py: `tracks = {0xa5: 14, 0xa6: 17}`, nsstool merges the four
+ * OP channels into one FM2 stream).
+ */
+export const FUR_SYSTEM_YM2610_EXT = 0xa6;
+export const FUR_NEO_GEO_EXT_CHANNELS = 17;
+/**
  * Chip flags of the exported YM2610: SSG volume 256 (full chip level, fmVol stays at its default
  * 256). This is the only setting where the level the composer hears matches the Neo Geo ROM.
  * ngdevkit's furtool (check_chip_flags, HALF_SSG_VOL) reads ssgVol=128 (Furnace's default,
@@ -74,6 +82,8 @@ export interface FurnaceModuleSong {
   compatFlags?: Record<string, unknown>;
   /** Groove patterns of a loaded module, 16 entries each, unused entries 0. */
   grooves?: number[][];
+  /** Write the extended-FM chip (0xa6, 17 channels): channels 1-4 are FM 2 OP1-OP4. */
+  extendedFm?: boolean;
 }
 
 export interface FurnaceModuleResult {
@@ -410,6 +420,8 @@ function checkInstrument(inst: InstrumentConfig, cfg: FurnaceConfig, problems: s
 export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResult {
   const problems: string[] = [];
   const warnings: string[] = [];
+  const system = song.extendedFm ? FUR_SYSTEM_YM2610_EXT : FUR_SYSTEM_YM2610;
+  const chans = song.extendedFm ? FUR_NEO_GEO_EXT_CHANNELS : FUR_NEO_GEO_CHANNELS;
 
   // Instruments: Neo Geo voices in song order; the cells' ids map to file indices.
   const neo = song.instruments.filter(isNeoGeoInstrument);
@@ -428,9 +440,9 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   if (patLen > 1024) problems.push(`Pattern length ${patLen} is over the 1024 rows Furnace allows`);
   for (const [pi, p] of song.patterns.entries()) {
     if (p.length !== patLen) problems.push(`Pattern ${pi} has ${p.length} rows but pattern 0 has ${patLen}: a Furnace song has one pattern length`);
-    p.channels.slice(FUR_NEO_GEO_CHANNELS).forEach((ch, k) => {
+    p.channels.slice(chans).forEach((ch, k) => {
       if (ch.rows.some((c) => !isEmptyCell(cellToFile(c, insIndexById, '', [], effectNotationOf(ch.channelMeta))))) {
-        problems.push(`Pattern ${pi} channel ${FUR_NEO_GEO_CHANNELS + k + 1} has notes but a Neo Geo song has ${FUR_NEO_GEO_CHANNELS} channels`);
+        problems.push(`Pattern ${pi} channel ${chans + k + 1} has notes but this Neo Geo chip has ${chans} channels`);
       }
     });
   }
@@ -441,12 +453,12 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   if (song.songPositions.length > 256) problems.push('A Furnace order table holds at most 256 entries');
 
   // Cells per channel and pattern
-  const fxColumns = new Array<number>(FUR_NEO_GEO_CHANNELS).fill(1);
+  const fxColumns = new Array<number>(chans).fill(1);
   // Furnace writes every pattern the order list names, an empty one too (fur.cpp, patsToWrite).
   // ngdevkit nsstool looks each ordered pattern up in the file and stops on a missing one.
   const orderedPatterns = new Set(song.songPositions);
   const patnBlocks: Uint8Array[] = [];
-  for (let ch = 0; ch < FUR_NEO_GEO_CHANNELS; ch++) {
+  for (let ch = 0; ch < chans; ch++) {
     for (const [pi, p] of song.patterns.entries()) {
       const src = p.channels[ch];
       if (!src && !orderedPatterns.has(pi)) continue;
@@ -487,15 +499,15 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   sng.u8(speed2 ? 2 : 1);
   for (let i = 0; i < 16; i++) sng.u16(i === 0 ? speed1 : i === 1 ? speed2 : 0);
   sng.str(song.name).str('');
-  for (let ch = 0; ch < FUR_NEO_GEO_CHANNELS; ch++) for (const pos of song.songPositions) sng.u8(pos);
-  for (let ch = 0; ch < FUR_NEO_GEO_CHANNELS; ch++) sng.u8(fxColumns[ch]);
+  for (let ch = 0; ch < chans; ch++) for (const pos of song.songPositions) sng.u8(pos);
+  for (let ch = 0; ch < chans; ch++) sng.u8(fxColumns[ch]);
   // Furnace song.cpp DivSubSong::putData: bit 0 = channel shown in the pattern view, bit 1 = shown in the
   // channel oscilloscope. 0 opens the module with every channel hidden.
-  for (let ch = 0; ch < FUR_NEO_GEO_CHANNELS; ch++) sng.u8(3);
-  for (let ch = 0; ch < FUR_NEO_GEO_CHANNELS; ch++) sng.u8(0); // collapsed
-  for (let ch = 0; ch < FUR_NEO_GEO_CHANNELS; ch++) sng.str('');
-  for (let ch = 0; ch < FUR_NEO_GEO_CHANNELS; ch++) sng.str('');
-  for (let ch = 0; ch < FUR_NEO_GEO_CHANNELS; ch++) sng.u32(0);
+  for (let ch = 0; ch < chans; ch++) sng.u8(3);
+  for (let ch = 0; ch < chans; ch++) sng.u8(0); // collapsed
+  for (let ch = 0; ch < chans; ch++) sng.str('');
+  for (let ch = 0; ch < chans; ch++) sng.str('');
+  for (let ch = 0; ch < chans; ch++) sng.u32(0);
   const sng2 = block('SNG2', sng);
 
   const userSamples = collectUserSamples(neo.map((inst) => inst.furnace as FurnaceConfig));
@@ -518,8 +530,8 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
       .str(song.name).str('').str('Neo Geo MVS').str('')
       .str('').str('').str('').str('')
       .f32(440).u8(1)
-      .f32(1).u16(FUR_NEO_GEO_CHANNELS).u16(1)
-      .u16(FUR_SYSTEM_YM2610).u16(FUR_NEO_GEO_CHANNELS).f32(1).f32(0).f32(0)
+      .f32(1).u16(chans).u16(1)
+      .u16(system).u16(chans).f32(1).f32(0).f32(0)
       .u32(0).u8(1); // patchbay: no connections, automatic
     b.u8(0x01).u32(1).u32(sngPtr);
     b.u8(0x02).u32(1).u32(flagPtr);
