@@ -389,14 +389,16 @@ export class ChipRecordingSession {
       return;
     }
 
-    // Capture source, chosen here only: a song on FurnaceDispatchEngine (its
-    // chips exist, one with a VGM mapping) records through the dispatch
-    // capture; everything else through the FurnaceChipEngine log.
+    // Both sources record from here on and the source is chosen at stop, by
+    // what was captured. The dispatch capture must not wait for a chip: a song
+    // that was loaded but never played has no dispatch chip yet (the chips are
+    // made at play start), and the worklet enables register dump on every chip
+    // created while a capture runs.
     const d = FurnaceDispatchEngine.getInstance();
-    this.dispatch = d.isInitialized && VGM_MAPPED_PLATFORMS.some(p => d.hasChip(p)) ? d : null;
+    this.dispatch = d.isInitialized ? d : null;
     this.romBlocks = [];
     if (this.dispatch) this.dispatch.startRegCapture();
-    else this.engine.setLogging(true);
+    this.engine.setLogging(true);
     this.isRecording = true;
     console.log('[ChipRecordingSession] Recording started');
   }
@@ -417,9 +419,13 @@ export class ChipRecordingSession {
       d.stopRegCapture();
       // The last tick's batch may still be in flight from the worklet.
       await new Promise(resolve => setTimeout(resolve, 100));
-      const platform = VGM_MAPPED_PLATFORMS.find(p => d.hasChip(p));
-      this.romBlocks = platform === undefined ? [] : ym2610RomBlocks(await d.getSampleRoms(platform));
-      return dispatchCaptureToLog(d.getRegCaptureLog(), d.regCaptureSampleRate);
+      const captured = d.getRegCaptureLog();
+      if (captured.length > 0) {
+        this.engine.setLogging(false);
+        const platform = VGM_MAPPED_PLATFORMS.find(p => d.hasChip(p));
+        this.romBlocks = platform === undefined ? [] : ym2610RomBlocks(await d.getSampleRoms(platform));
+        return dispatchCaptureToLog(captured, d.regCaptureSampleRate);
+      }
     }
     this.engine.setLogging(false);
 

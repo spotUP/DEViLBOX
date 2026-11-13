@@ -47,6 +47,8 @@ export const ChipExportPanel: React.FC<ChipExportPanelProps> = ({
   const [chipLoopPoint, setChipLoopPoint] = useState(0);
 
   const chipRecordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Record started the playback itself, so Stop ends it. */
+  const startedPlaybackRef = useRef(false);
 
   // Sync chipLoopPoint with global loopStartRow on mount
   useEffect(() => {
@@ -71,6 +73,12 @@ export const ChipExportPanel: React.FC<ChipExportPanelProps> = ({
 
   const startChipRecording = () => {
     chipRecordingSession.startRecording();
+    // A song that was loaded but never played has no chips yet; Record plays it
+    // so the capture does not depend on a manual Play.
+    if (!useTransportStore.getState().isPlaying) {
+      startedPlaybackRef.current = true;
+      void useTransportStore.getState().play();
+    }
     setIsChipRecording(true);
     setChipRecordingTime(0);
     setChipLogData(null);
@@ -90,6 +98,10 @@ export const ChipExportPanel: React.FC<ChipExportPanelProps> = ({
     }
 
     const logData = await chipRecordingSession.stopRecording();
+    if (startedPlaybackRef.current) {
+      startedPlaybackRef.current = false;
+      useTransportStore.getState().stop();
+    }
     setIsChipRecording(false);
     setChipLogData(logData);
     setChipRomBlocks(chipRecordingSession.getRomBlocks());
@@ -117,7 +129,7 @@ export const ChipExportPanel: React.FC<ChipExportPanelProps> = ({
   handlerRef.current = async () => {
     // Validate chip export
     if (!chipLogData || chipLogData.length === 0) {
-      notify.error('No recording data. Press Record and play your song first.');
+      notify.error('No recording data. Press Record first.');
       return false;
     }
 
@@ -219,10 +231,10 @@ export const ChipExportPanel: React.FC<ChipExportPanelProps> = ({
           </div>
           <p className="text-xs font-mono text-text-muted mt-2">
             {isChipRecording
-              ? 'Recording... Play your song now!'
+              ? 'Recording... the song is playing; press Stop when it has finished'
               : chipWrites.length > 0
               ? `Captured ${chipWrites.length.toLocaleString()} register writes`
-              : 'Press Record, then play your song to capture chip output'}
+              : 'Press Record to play the song and capture its chip output'}
           </p>
         </div>
 
