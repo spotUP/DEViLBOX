@@ -1,0 +1,75 @@
+diff --color -ruN a/include/nuade/players/medley.h b/include/nuade/players/medley.h
+--- a/include/nuade/players/medley.h	2026-11-13 14:28:05
++++ b/include/nuade/players/medley.h	2026-11-13 14:28:09
+@@ -213,6 +213,16 @@
+ // The player's state behind a song it opened; 0 when the song is another player's.
+ MdlPlayer* mdl_from_nuade(NuadeSong* song);
+ 
++// Keyboard voice (DEViLBOX, nuade-wasm/patches/0002): a second player on the song's module plays single notes of one
++// instrument through the replayer's own note start, pitch, envelope and modulators, with no track running.
++// mdl_key_park stops every voice of a started player and keeps its ticks running with no track stepping.
++void mdl_key_park(MdlPlayer* player);
++// Starts `sounding` (the note value mdl_select_pitch works on: track note + transposes) with `instrument` on `voice`.
++// False when the instrument number names no instrument.
++bool mdl_key_on(MdlPlayer* player, int voice, uint8_t instrument, uint8_t sounding);
++// Key up: the envelope runs its release.
++void mdl_key_off(MdlPlayer* player, int voice);
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff --color -ruN a/players/medley/medley.c b/players/medley/medley.c
+--- a/players/medley/medley.c	2026-11-13 14:28:04
++++ b/players/medley/medley.c	2026-11-13 14:28:09
+@@ -758,3 +758,51 @@
+     return (MdlVoiceState) { .note = v->shown_note,
+                              .instrument = v->instrument_number != 0 ? v->instrument_number - 1 : -1 };
+ }
++
++// ---- Keyboard voice (DEViLBOX, nuade-wasm/patches/0002) ----
++// The fields a track note sets in mdl_next_step (note, key_on, retrigger, new_step, divider), set from outside the
++// track; the voice tick then runs the replayer's own mdl_select_pitch, envelope, modulators and register writes.
++
++void mdl_key_park(MdlPlayer* player) {
++    if (player == nullptr) {
++        return;
++    }
++    for (int i = 0; i < MDL_VOICES; i++) {
++        MdlVoice* voice = &player->voices[i];
++        mdl_reset_voice(voice);
++        nuade_paula_channel_dma_off(&voice->paula);
++    }
++    player->song_end = false;
++    player->playing = true;
++}
++
++bool mdl_key_on(MdlPlayer* player, int voice_index, uint8_t instrument, uint8_t sounding) {
++    if (player == nullptr || voice_index < 0 || voice_index >= MDL_VOICES) {
++        return false;
++    }
++    if (mdl_instrument_offset(&player->module, instrument) == MDL_NO_OFFSET) {
++        return false;
++    }
++    MdlVoice* voice = &player->voices[voice_index];
++    mdl_reset_voice(voice);
++    mdl_command_instrument(player, voice, instrument);
++    voice->note = (uint8_t)(sounding - player->transpose - voice->instrument.transpose);
++    voice->note_offset = 0;
++    voice->key_on = true;
++    voice->retrigger = true;
++    voice->new_step = true;
++    voice->divider = 0;
++    voice->sequence_running = false;
++    voice->active = true;
++    player->playing = true;
++    return true;
++}
++
++void mdl_key_off(MdlPlayer* player, int voice_index) {
++    if (player == nullptr || voice_index < 0 || voice_index >= MDL_VOICES) {
++        return;
++    }
++    MdlVoice* voice = &player->voices[voice_index];
++    voice->key_on = false;
++    voice->retrigger = false;
++}

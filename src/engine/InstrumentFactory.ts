@@ -33,6 +33,7 @@ import { FredSynth } from './fred/FredSynth';
 import { HippelCoSoSynth } from './hippelcoso/HippelCoSoSynth';
 import { RobHubbardSynth } from './robhubbard/RobHubbardSynth';
 import { HippelStSynth } from './hippelst/HippelStSynth';
+import { MedleySynth } from './medley/MedleySynth';
 import { SteveTurnerSynth } from './steveturner/SteveTurnerSynth';
 import { StartrekkerAMSynth } from './startrekker-am/StartrekkerAMSynth';
 import { SidMon1Synth } from './sidmon1/SidMon1Synth';
@@ -867,6 +868,16 @@ export class InstrumentFactory {
         break;
       }
 
+      case 'MedleySynth': {
+        const mdlSynth = new MedleySynth();
+        const num = (config.metadata as unknown as { medleyInstrument?: number } | undefined)?.medleyInstrument;
+        mdlSynth.setInstrumentNumber(typeof num === 'number' ? num : config.id);
+        mdlSynth.setInstrument().catch(err =>
+          console.error('[InstrumentFactory] Medley keyboard voice load failed:', err)
+        );
+        instrument = mdlSynth;
+        break;
+      }
       case 'HippelStSynth': {
         const hstSynth = new HippelStSynth();
         const idx = (config.metadata as { hippelStInstrument?: number } | undefined)?.hippelStInstrument;

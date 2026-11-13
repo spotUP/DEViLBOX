@@ -31,7 +31,7 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
 import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { medleyEncoder } from '@/engine/uade/encoders/MedleyEncoder';
-import { buildMedleyGrid, medleyInstrumentList, MEDLEY_ROWS_PER_PATTERN, MEDLEY_FIRST_TUNE, medleySubsongCount } from './medleyGrid';
+import { buildMedleyGrid, medleyInstrumentList, MEDLEY_ROWS_PER_PATTERN, MEDLEY_FIRST_TUNE, medleySubsongCount, medleyTables, medleyInstrumentType } from './medleyGrid';
 import { chooseFileSubsong, fileSubsongFormatByKey, fileSubsongsField, type FileSubsongs } from '../fileSubsongs';
 
 // ── Binary helpers ─────────────────────────────────────────────────────────
@@ -198,11 +198,14 @@ export async function parseMedleyFile(buffer: ArrayBuffer, filename: string, sub
   };
 
   // One entry per filled instrument-table slot; id = the table index the stream's Instrument command and the grid cells use.
+  // MedleySynth: the key plays the instrument on nuade's medley player itself (nuade-wasm patch 0002).
+  const tables = medleyTables(buf);
   const instruments: InstrumentConfig[] = medleyInstrumentList(buf).map(({ number, name }) => ({
     id: number,
     name,
     type: 'synth' as const,
-    synthType: 'Synth' as const,
+    synthType: 'MedleySynth' as const,
+    metadata: { medleyInstrument: number, medleyInstrumentType: tables ? medleyInstrumentType(buf, tables, number) : null },
     effects: [],
     volume: 0,
     pan: 0,

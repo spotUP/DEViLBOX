@@ -40,7 +40,12 @@ export type NuadeIn =
   | { type: 'requestState'; offset: number; len: number }
   /** Edit slot: forwarded to nw_cell_write / nw_instrument_write, which answer -ENOSYS until upstream publishes a write API. */
   | { type: 'cellWrite'; pattern: number; row: number; channel: number; values: number[] }
-  | { type: 'instrumentWrite'; instrument: number; param: number; value: number };
+  | { type: 'instrumentWrite'; instrument: number; param: number; value: number }
+  /** Keyboard voice (nw_key_*, Medley only): the song's module opened on a parked second player, played one key at a time. */
+  | { type: 'keyLoad'; bytes: ArrayBuffer; playerId: string; fileName: string }
+  /** `sounding` = the replayer's note value (track note + transposes) the key plays with `instrument`. */
+  | { type: 'keyOn'; instrument: number; sounding: number }
+  | { type: 'keyOff' };
 
 export interface NuadeVoiceState { note: number; instrument: number; volume: number; pan: number; active: boolean }
 

@@ -20,6 +20,7 @@
 #include <strings.h>
 
 #include "nuade/nuade.h"
+#include "nuade/players/medley.h"
 
 #define NW_MAX_VOICES 64
 #define NW_SNAPSHOT_MAX_VOICES 32
@@ -115,7 +116,11 @@ EMSCRIPTEN_KEEPALIVE void nw_clear_files(void) {
   s_file_count = 0;
 }
 
+static NuadeSong* s_key = NULL; /* keyboard voice song (nw_key_*), see below */
+void nw_key_close(void); /* defined (and exported) below */
+
 EMSCRIPTEN_KEEPALIVE void nw_close(void) {
+  nw_key_close();
   if (s_next) nuade_close(s_next);
   s_next = NULL;
   if (s_song) nuade_close(s_song);
@@ -451,4 +456,84 @@ EMSCRIPTEN_KEEPALIVE int nw_cell_write(int pattern, int row, int channel, const 
 EMSCRIPTEN_KEEPALIVE int nw_instrument_write(int instrument, int param, int value) {
   (void)instrument; (void)param; (void)value;
   return -ENOSYS;
+}
+
+/* ---- keyboard voice: single notes of one song instrument through the format's own replayer ----
+ * A second song opened on the same module and parked: its player keeps ticking, no track runs, and a key starts the
+ * replayer's own note start on voice 0 (Medley: mdl_key_on, nuade-wasm/patches/0002). Rendered apart from the playing
+ * song and added to the output by the worklet, so a key sounds while the song plays or is stopped. */
+#define NW_KEY_VOICE 0
+static float *s_key_voices = NULL;
+static uint32_t s_key_frames = 0;
+static uint32_t s_key_subsong = 0;
+
+EMSCRIPTEN_KEEPALIVE void nw_key_close(void) {
+  if (s_key) nuade_close(s_key);
+  s_key = NULL;
+}
+
+static int key_park(void) {
+  if (!s_key || !nuade_start(s_key, s_key_subsong, s_rate)) return 0;
+  MdlPlayer *mdl = mdl_from_nuade(s_key);
+  if (!mdl) return 0;
+  mdl_key_park(mdl);
+  return 1;
+}
+
+/* Opens the keyboard song. 0 ok, -2 open failed, -3 start failed, -4 the player has no keyboard voice. */
+EMSCRIPTEN_KEEPALIVE int nw_key_open(const uint8_t *data, int len, const char *name, const char *playerId, int subsong) {
+  nw_key_close();
+  const int r = open_into(&s_key, data, len, name, playerId);
+  if (r != 0) return r;
+  nuade_set_stereo_separation(s_key, 0.0f);
+  s_key_subsong = subsong < 0 ? 0u : (uint32_t)subsong;
+  if (!mdl_from_nuade(s_key)) {
+    snprintf(s_error, sizeof s_error, "no keyboard voice for this player");
+    nw_key_close();
+    return -4;
+  }
+  if (!key_park()) {
+    snprintf(s_error, sizeof s_error, "keyboard start failed");
+    nw_key_close();
+    return -3;
+  }
+  return 0;
+}
+
+/* Key down: `instrument` is the replayer's instrument number, `sounding` the note value its pitch code works on. */
+EMSCRIPTEN_KEEPALIVE int nw_key_on(int instrument, int sounding) {
+  if (!s_key) return 0;
+  MdlPlayer *mdl = mdl_from_nuade(s_key);
+  if (!mdl) return 0;
+  if (mdl->ended && !key_park()) return 0;
+  return mdl_key_on(mdl, NW_KEY_VOICE, (uint8_t)instrument, (uint8_t)sounding) ? 1 : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE void nw_key_off(void) {
+  MdlPlayer *mdl = s_key ? mdl_from_nuade(s_key) : NULL;
+  if (mdl) mdl_key_off(mdl, NW_KEY_VOICE);
+}
+
+/* Renders `frames` of the keyboard voice into `stereo` (interleaved L/R, overwritten): voice 0 centred in both
+ * channels, so a key is not panned hard to one side as an Amiga voice is. Returns the frames written. */
+EMSCRIPTEN_KEEPALIVE int nw_key_render(float *stereo, int frames) {
+  if (!s_key || !stereo || frames <= 0) return 0;
+  const uint32_t n = (uint32_t)frames;
+  const NuadeSongInfo *info = nuade_info(s_key);
+  const uint32_t voices = info->voice_count > NW_MAX_VOICES ? NW_MAX_VOICES : info->voice_count;
+  if (s_key_frames < n) {
+    free(s_key_voices);
+    s_key_voices = (float *)malloc((size_t)NW_MAX_VOICES * n * sizeof(float));
+    s_key_frames = s_key_voices ? n : 0;
+    if (!s_key_voices) return 0;
+  }
+  float *ptrs[NW_MAX_VOICES];
+  for (uint32_t v = 0; v < voices; v++) ptrs[v] = s_key_voices + (size_t)v * n;
+  NuadeRenderResult r = nuade_render(s_key, stereo, ptrs, n);
+  for (uint32_t i = 0; i < r.frames; i++) {
+    const float x = ptrs[NW_KEY_VOICE][i];
+    stereo[2 * i] = x;
+    stereo[2 * i + 1] = x;
+  }
+  return (int)r.frames;
 }

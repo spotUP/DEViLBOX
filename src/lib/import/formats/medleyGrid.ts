@@ -134,6 +134,31 @@ export function medleySoundingGridNote(buf: Uint8Array, tables: MedleyTables, in
   return index < PERIOD_COUNT && note >= 1 ? note : null;
 }
 
+/**
+ * The sounding value (the replayer's note value, mdl_select_pitch input) that plays `gridNote` on `instrument`: the
+ * inverse of medleySoundingGridNote, used by the keyboard voice. Nearest sounding when no value lands exactly; null when
+ * the instrument plays no pitch at all.
+ */
+export function medleySoundingForGridNote(buf: Uint8Array, tables: MedleyTables, instrument: number, gridNote: number): number | null {
+  let best: number | null = null, bestDist = Infinity;
+  for (let s = 0; s < 256; s++) {
+    const note = medleySoundingGridNote(buf, tables, instrument, s);
+    if (note === null) continue;
+    const d = Math.abs(note - gridNote);
+    if (d < bestDist) { best = s; bestDist = d; if (d === 0) break; }
+  }
+  return best;
+}
+
+const MEDLEY_TYPE_NAMES = ['Sample', 'Looped', 'Synth', 'OneShot'] as const;
+export type MedleyInstrumentType = typeof MEDLEY_TYPE_NAMES[number];
+/** The instrument's type byte (record + 0x10, medley.h MdlInstrumentType); null when the table names no record. */
+export function medleyInstrumentType(buf: Uint8Array, tables: MedleyTables, instrument: number): MedleyInstrumentType | null {
+  const rec = medleyEntry(buf, tables.instrument, instrument);
+  if (!rec) return null;
+  return MEDLEY_TYPE_NAMES[Math.min(buf[rec + INST_TYPE], 3)];
+}
+
 export interface MedleyPlacement {
   voice: number; tick: number;
   /** File offset of the stored note byte. */

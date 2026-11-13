@@ -14,6 +14,9 @@
 const MAX_VOICES = 64;
 const QUANTUM = 128;
 const SNAPSHOT_WORDS = 10 + 32 * 5;
+// How long the keyboard voice keeps rendering after key up: the envelope release of a Medley instrument runs out well
+// inside it.
+const KEY_RELEASE_FRAMES = 3 * 48000;
 const VU_EVERY = 16; // quanta between vu messages: about 23 Hz at 48 kHz
 // An edited module is caught up to the playing position at most this long per render quantum (128 frames = 2.67 ms
 // at 48 kHz), see stepNext.
@@ -56,6 +59,10 @@ class NuadeProcessor extends AudioWorkletProcessor {
     this.clip = globalThis.DevilboxRowClip ? new globalThis.DevilboxRowClip(this.port, sampleRate) : null;
     this.clipPeaks = [];
     this.clipQuanta = 0;
+    // The keyboard voice (nw_key_*): the module it plays, whether it is open, and the frames it still renders.
+    this.key = null;
+    this.keyOpen = false;
+    this.keyFrames = 0;
     this.port.onmessage = (event) => { this.handleMessage(event.data); };
   }
 
@@ -120,6 +127,20 @@ class NuadeProcessor extends AudioWorkletProcessor {
           this.port.postMessage({ type: 'writeResult', op: 'instrument', status: this.module._nw_instrument_write(data.instrument | 0, data.param | 0, data.value | 0) });
         }
         break;
+      case 'keyLoad':
+        this.key = { bytes: data.bytes, playerId: data.playerId, fileName: data.fileName };
+        this.openKey();
+        break;
+      case 'keyOn':
+        if (!this.keyOpen) this.openKey();
+        if (this.keyOpen && this.module._nw_key_on(data.instrument | 0, data.sounding | 0)) this.keyFrames = Infinity;
+        break;
+      case 'keyOff':
+        if (this.keyOpen) {
+          this.module._nw_key_off();
+          if (this.keyFrames > KEY_RELEASE_FRAMES) this.keyFrames = KEY_RELEASE_FRAMES;
+        }
+        break;
       case 'dispose':
         if (this.clip) this.clip.drop();
         this.cleanup();
@@ -161,6 +182,43 @@ class NuadeProcessor extends AudioWorkletProcessor {
     if (r !== 0) throw new Error('nuade open failed (' + r + '): ' + m.UTF8ToString(m._nw_last_error()));
   }
 
+  /** Opens the keyboard voice on the module of the last keyLoad (the playing song is not touched). */
+  openKey() {
+    const m = this.module;
+    this.keyOpen = false;
+    this.keyFrames = 0;
+    if (!m || !this.key || typeof m._nw_key_open !== 'function') return;
+    const data = new Uint8Array(this.key.bytes);
+    const ptr = this.writeBytes(data, false);
+    const name = this.cstr(this.key.fileName || 'song');
+    const id = this.cstr(this.key.playerId || '');
+    const r = m._nw_key_open(ptr, data.length, name, id, 0);
+    m._free(ptr); m._free(name); m._free(id);
+    if (r !== 0) {
+      this.port.postMessage({ type: 'error', message: 'nuade keyboard open failed (' + r + '): ' + m.UTF8ToString(m._nw_last_error()) });
+      return;
+    }
+    this.keyOpen = true;
+  }
+
+  /** Adds the keyboard voice into the main output while a key sounds or its release runs out. */
+  mixKey(output) {
+    if (!this.keyOpen || this.keyFrames <= 0 || !output || output.length < 2) return;
+    const m = this.module;
+    const n = Math.min(output[0].length, QUANTUM);
+    this.updateBufferViews();
+    if (!this.keyBuf || this.keyBuf.buffer !== m.HEAPF32.buffer) {
+      if (!this.keyPtr) this.keyPtr = m._malloc(QUANTUM * 2 * 4);
+      if (!this.keyPtr) return;
+      this.keyBuf = new Float32Array(m.HEAPF32.buffer, this.keyPtr, QUANTUM * 2);
+    }
+    const rendered = m._nw_key_render(this.keyPtr, n);
+    if (this.keyBuf.buffer !== m.HEAPF32.buffer) this.keyBuf = new Float32Array(m.HEAPF32.buffer, this.keyPtr, QUANTUM * 2);
+    const l = output[0], r = output[1], b = this.keyBuf;
+    for (let i = 0; i < rendered; i++) { l[i] += b[2 * i]; r[i] += b[2 * i + 1]; }
+    this.keyFrames -= n;
+  }
+
   load(data) {
     const m = this.module;
     if (!m) return;
@@ -191,6 +249,7 @@ class NuadeProcessor extends AudioWorkletProcessor {
       this.subsong = wanted;
       this.appliedMask = -1;
       this.loaded = true;
+      if (this.key) this.openKey();
       const meta = {};
       for (const key of ['title', 'artist', 'format', 'tool', 'message']) {
         const k = this.cstr(key);
@@ -357,6 +416,8 @@ class NuadeProcessor extends AudioWorkletProcessor {
   cleanup() {
     if (this.module) {
       try { this.module._nw_close(); } catch (e) { /* ignore */ }
+      if (this.keyPtr) { this.module._free(this.keyPtr); this.keyPtr = 0; this.keyBuf = null; }
+      this.keyOpen = false;
       for (const p of [this.outPtr, this.voicePtr, this.panPtr, this.snapPtr, this.vuPtr]) if (p) this.module._free(p);
     }
     this.outPtr = this.voicePtr = this.panPtr = this.snapPtr = this.vuPtr = 0;
@@ -460,10 +521,11 @@ class NuadeProcessor extends AudioWorkletProcessor {
       const out = outputs[0];
       if (out && out.length >= 2) this.processClip(out, outputs);
       if (this.module && this.loaded) this.stepNext();
+      if (this.initialized) this.mixKey(out);
       return true;
     }
-    if (!this.initialized || !this.module || !this.loaded) return true;
-    if (!this.playing) { this.stepNext(); return true; }
+    if (!this.initialized || !this.module) return true;
+    if (!this.loaded || !this.playing) { this.mixKey(outputs[0]); if (this.loaded) this.stepNext(); return true; }
     const output = outputs[0];
     if (!output || output.length < 2) return true;
     const m = this.module;
@@ -479,6 +541,7 @@ class NuadeProcessor extends AudioWorkletProcessor {
     m._nw_pans(this.panPtr, this.voices);
     const pans = new Float32Array(m.HEAPU8.buffer, this.panPtr, Math.max(1, this.voices));
     this.emit(output, outputs, this.outBuf, voices, pans, n, rendered);
+    this.mixKey(output);
     if (rendered > 0) this.postPosition();
     if ((++this.quanta % VU_EVERY) === 0) this.postVu();
     if (!this.songEndSent && (m._nw_last_flags() & 2)) {
