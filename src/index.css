@@ -2239,6 +2239,12 @@
   cursor: text;
 }
 
+/* The count after a value of a counted set (subsong 006/012), inside the value box. */
+.ft2-numeric-max {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
 .ft2-numeric-value-clickable:hover {
   border-color: var(--color-accent);
 }

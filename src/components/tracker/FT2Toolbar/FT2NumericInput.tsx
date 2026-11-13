@@ -203,9 +203,9 @@ export const FT2NumericInput: React.FC<FT2NumericInputProps> = ({
           title={`Click to type ${label}`}
         >
           {formatValue(value)}
+          {showMax && <span className="ft2-numeric-max">/{formatValue(max)}</span>}
         </span>
       )}
-      {showMax && <span className="ft2-numeric-label" aria-label={`of ${max}`}>/{formatValue(max)}</span>}
       <div className="ft2-numeric-arrows">
         <button
           className="ft2-arrow ft2-arrow-up"
