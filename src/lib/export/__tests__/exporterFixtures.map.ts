@@ -92,6 +92,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   tfmx7v: 'public/data/songs/formats/ghostbattle_gameover.hip7',
   jesperOlsen: 'public/data/songs/jesper-olsen/lollypop-subgame 01.jo',
   soundPlayer:'public/data/songs/formats/Scott Johnston/sjs.awesome',
+  medley: 'public/data/songs/medley/combat.mso',
   fashionTracker: 'public/data/songs/fashion-tracker/ivory tover ii.ex',
   organya: 'public/data/songs/organya/obj0640-1.org',
   artOfNoise: 'public/data/songs/art-of-noise/inside.blipp.aon',
