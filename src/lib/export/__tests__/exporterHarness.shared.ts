@@ -33,6 +33,7 @@ const PARSE_FALLBACK: Record<string, { module: string; fn: string }> = {
   prt: { module: '@lib/import/formats/PreTrackerParser', fn: 'parsePreTrackerFile' },
   synmod: { module: '@lib/import/formats/SynTrackerParser', fn: 'parseSynTrackerFile' },
   mso: { module: '@lib/import/formats/MedleyParser', fn: 'parseMedleyFile' },
+  sqt: { module: '@lib/import/formats/QuartetParser', fn: 'parseQuartetFile' },
   mmdc: { module: '@lib/import/formats/MMDCParser', fn: 'parseMMDCFile' },
   vss: { module: '@lib/import/formats/VoodooSupremeSynthesizerParser', fn: 'parseVoodooSupremeSynthesizerFile' },
 };

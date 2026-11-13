@@ -51,6 +51,8 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
+import { quartetEncoder } from '@/engine/uade/encoders/QuartetEncoder';
+import { buildQuartetGrid, QUARTET_ROWS_PER_PATTERN } from './quartetPsgGrid';
 
 // ── Binary helpers ──────────────────────────────────────────────────────────
 
@@ -534,7 +536,41 @@ export async function parseQuartetFile(
     } as InstrumentConfig);
   }
 
-  // ── Pattern placeholder ───────────────────────────────────────────────────
+  // ── SQT: the grid is read from the module's own voice streams (quartetPsgGrid.ts) ──
+  const grid = variant === 'sqt' ? buildQuartetGrid(buf, filename, 0) : null;
+  if (grid) {
+    if (instruments[0]) instruments[0].name = 'YM-2149 tone';
+    return {
+      name: `${moduleName} [${label}]`,
+      format: 'MOD' as TrackerFormat,
+      patterns: grid.patterns,
+      instruments,
+      songPositions: grid.patterns.map((_, i) => i),
+      songLength: grid.patterns.length,
+      restartPosition: 0,
+      numChannels: grid.voices,
+      // one row = `step` sub-ticks, four sub-ticks per 50 Hz play call (playhead timing unverified)
+      initialSpeed: Math.max(1, Math.round(grid.step / 4)),
+      initialBPM: 125,
+      linearPeriods: false,
+      uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+      uadeEditableFileName: filename,
+      uadeVariableLayout: {
+        formatId: 'quartet',
+        numChannels: grid.voices,
+        numFilePatterns: grid.blockRows.length,
+        rowsPerPattern: QUARTET_ROWS_PER_PATTERN,
+        moduleSize: buffer.byteLength,
+        encoder: quartetEncoder,
+        filePatternAddrs: grid.filePatternAddrs,
+        filePatternSizes: grid.filePatternSizes,
+        trackMap: grid.trackMap,
+        blockRows: grid.blockRows,
+      },
+    };
+  }
+
+  // ── Pattern placeholder (QPA / QTS, or an SQT whose code shape is not recognised) ──
   const pattern = buildEmptyPattern(filename, numInstruments);
 
   return {
