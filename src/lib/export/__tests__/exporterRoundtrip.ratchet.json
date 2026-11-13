@@ -504,6 +504,14 @@
       "cells": 11076,
       "bytes": 11076
     },
+    "quartet": {
+      "exporter": "QuartetExporter.exportQuartet",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 20888,
+      "bytes": 20888
+    },
     "mmdc": {
       "exporter": "MEDExporter.exportMED",
       "tier": "byte-exact",
