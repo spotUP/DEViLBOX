@@ -2208,7 +2208,7 @@ export const useTrackerStore = create<TrackerStore>()(
         // The play-start seek reads the transport row; clear it so a new song
         // begins at row 0 rather than the previous song's leftover row.
         useTransportStore.getState().setCurrentRow(0);
-        useMixerStore.getState().resetMuteState();
+        useMixerStore.getState().resetMuteState(Math.max(...patterns.map((p) => p.channels.length)));
         // Auto-name channels after the import chain settles. Fires on
         // every loadPatterns call but is safely idempotent — the helper
         // skips channels whose name isn't generic, so user renames and
