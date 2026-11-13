@@ -111,7 +111,7 @@ export const NUADE_VERDICTS: Readonly<Record<string, NuadeVerdict>> = {
   soundcontrol: {"uadeEnvelopeCorrelation":0.9948,"ownEnvelopeCorrelation":0.9947,"endAgrees":true,"defaultEngine":"uade"},
   soundfactory: {"uadeEnvelopeCorrelation":0.9249,"ownEnvelopeCorrelation":0.8903,"endAgrees":true,"defaultEngine":"native"},
   soundfx: {"uadeEnvelopeCorrelation":0.9616,"endAgrees":false,"defaultEngine":"native","ownNote":"our engine not measured yet"},
-  soundimages: {"uadeEnvelopeCorrelation":0.9905,"endAgrees":false,"defaultEngine":"uade","heldBecause":"blinkys scary school-sfx.tw: UADE ends at 9.7 s, nuade ends at 1.9 s"},
+  soundimages: {"uadeEnvelopeCorrelation":0.9907,"endAgrees":true,"defaultEngine":"nuade"},
   soundmaster: {"uadeEnvelopeCorrelation":0.9805,"endAgrees":true,"defaultEngine":"nuade"},
   soundmon: {"uadeEnvelopeCorrelation":0.9656,"ownEnvelopeCorrelation":0.9338,"endAgrees":true,"defaultEngine":"nuade"},
   specialfx: {"uadeEnvelopeCorrelation":0.9874,"endAgrees":false,"defaultEngine":"uade","heldBecause":"wildwheels_ingame.jd: UADE ends at 16.9 s, nuade ends at 4.3 s; striker ingame.jd: RMS 0.008 <= 0.02; striker ingame.jd: UADE plays on, nuade ends at 5.6 s"},
