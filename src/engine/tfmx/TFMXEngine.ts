@@ -46,7 +46,7 @@ export class TFMXEngine extends WASMChannelOutputsEngine {
 
   private _playerHandleResolvers: Array<(handle: number) => void> = [];
   private _positionCallbacks: Array<(update: TFMXModulePosition) => void> = [];
-  private _moduleLoadedResolvers: Array<(info: { voices: number; songs: number; duration: number }) => void> = [];
+  private _moduleLoadedInfo: { voices: number; songs: number; duration: number } = { voices: 0, songs: 0, duration: 0 };
 
   /** The subsong loadTune started; a reload (a macro edit, a grid edit) keeps it. */
   private _subsong = 0;
@@ -116,11 +116,8 @@ export class TFMXEngine extends WASMChannelOutputsEngine {
             const resolve = this._playerHandleResolvers.shift()!;
             resolve(-1);
           }
-          // Unblock any pending loadTune() callers on module load failure
-          if (this._moduleLoadedResolvers.length > 0) {
-            const resolve = this._moduleLoadedResolvers.shift()!;
-            resolve({ voices: 0, songs: 0, duration: 0 });
-          }
+          // A refusal rejects the load in flight (no-op when none is in flight).
+          this.failModuleLoad(String(data.message ?? 'TFMX worklet error'));
           break;
 
         case 'playerCreated':
@@ -141,10 +138,8 @@ export class TFMXEngine extends WASMChannelOutputsEngine {
               ? Array.from({ length: data.voices }, (_: unknown, v: number) => `Paula ${v}`)
               : undefined,
           );
-          if (this._moduleLoadedResolvers.length > 0) {
-            const resolve = this._moduleLoadedResolvers.shift()!;
-            resolve({ voices: data.voices, songs: data.songs, duration: data.duration });
-          }
+          this._moduleLoadedInfo = { voices: data.voices, songs: data.songs, duration: data.duration };
+          this.settleModuleLoad();
           break;
 
         case 'oscData':
@@ -207,9 +202,7 @@ export class TFMXEngine extends WASMChannelOutputsEngine {
     const transfers: Transferable[] = [mdatCopy];
     if (smplCopy) transfers.push(smplCopy);
 
-    const promise = new Promise<{ voices: number; songs: number; duration: number }>((resolve) => {
-      this._moduleLoadedResolvers.push(resolve);
-    });
+    const promise = this.beginModuleLoad();
 
     this.workletNode.port.postMessage({
       type: 'loadModule',
@@ -218,7 +211,8 @@ export class TFMXEngine extends WASMChannelOutputsEngine {
       subsong,
     }, transfers);
 
-    return promise;
+    await promise;
+    return this._moduleLoadedInfo;
   }
 
   /**

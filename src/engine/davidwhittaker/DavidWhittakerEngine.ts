@@ -115,6 +115,7 @@ export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
         case 'moduleLoaded':
           useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 0', 'Paula 1', 'Paula 2', 'Paula 3']);
           console.log('[DavidWhittakerEngine] Module loaded, subsongs:', data.subsongCount);
+          this.settleModuleLoad();
           break;
         case 'oscData':
           useOscilloscopeStore.getState().updateChannelData(data.channels, data.frame, data.sampleRate);
@@ -134,6 +135,7 @@ export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
           break;
         case 'error':
           console.error('[DavidWhittakerEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'DavidWhittaker worklet error'));
           break;
       }
     };
@@ -150,7 +152,9 @@ export class DavidWhittakerEngine extends WASMChannelOutputsEngine {
     this.setGridClock(clock);
     await this._initPromise;
     if (!this.workletNode) throw new Error('DavidWhittakerEngine not initialized');
+    const done = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer, subsong });
+    await done;
   }
 
   /** Swap the playing module for an edited one without restarting: the worklet runs it silently up to the position played. */

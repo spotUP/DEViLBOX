@@ -25,8 +25,7 @@ export class HippelStEngine extends WASMSingletonBase {
   private static cache: WASMAssetsCache = createWASMAssetsCache();
 
   private _positionCallbacks = new Set<(p: HippelStPosition) => void>();
-  private _loadResolvers: Array<() => void> = [];
-  private _keyResolvers: Array<() => void> = [];
+  private _keyResolvers: Array<{ resolve: () => void; reject: (err: Error) => void }> = [];
   /** The image the keyboard player holds (once per song). */
   private _keyImage: ArrayBuffer | null = null;
 
@@ -62,18 +61,19 @@ export class HippelStEngine extends WASMSingletonBase {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'tuneLoaded':
-          for (const r of this._loadResolvers.splice(0)) r();
+          this.settleModuleLoad();
           break;
         case 'keyLoaded':
-          for (const r of this._keyResolvers.splice(0)) r();
+          for (const r of this._keyResolvers.splice(0)) r.resolve();
           break;
         case 'position':
           for (const cb of this._positionCallbacks) cb({ step: data.step, row: data.row });
           break;
         case 'error':
           console.error('[HippelStEngine]', data.message);
-          for (const r of this._loadResolvers.splice(0)) r();
-          for (const r of this._keyResolvers.splice(0)) r();
+          // A refusal rejects the load in flight (a song the player refused must not report loaded).
+          this.failModuleLoad(String(data.message ?? 'HippelSt worklet error'));
+          for (const r of this._keyResolvers.splice(0)) r.reject(new Error(String(data.message ?? 'HippelSt worklet error')));
           break;
       }
     };
@@ -105,7 +105,7 @@ export class HippelStEngine extends WASMSingletonBase {
     if (!this.workletNode) throw new Error('HippelStEngine not initialized');
     const sub = subsong ?? useFormatStore.getState().uadeEditableCurrentSubsong ?? 0;
     const msg = HippelStEngine.imageMessage(image);
-    const done = new Promise<void>((resolve) => { this._loadResolvers.push(resolve); });
+    const done = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadTune', ...msg, subsong: sub }, [msg.image]);
     await done;
   }
@@ -140,9 +140,9 @@ export class HippelStEngine extends WASMSingletonBase {
     if (!this.workletNode || this._keyImage === image) return;
     this._keyImage = image;
     const msg = HippelStEngine.imageMessage(image);
-    const done = new Promise<void>((resolve) => { this._keyResolvers.push(resolve); });
+    const done = new Promise<void>((resolve, reject) => { this._keyResolvers.push({ resolve, reject }); });
     this.workletNode.port.postMessage({ type: 'keyLoad', ...msg }, [msg.image]);
-    await done;
+    try { await done; } catch (err) { this._keyImage = null; throw err; }
   }
 
   /** Start instrument `instrument` (0-based volume sequence) on the pattern note byte `note`. */
