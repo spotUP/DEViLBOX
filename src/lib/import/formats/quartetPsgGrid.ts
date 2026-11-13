@@ -10,7 +10,8 @@
  * Stream (play routine, 4 sub-ticks per play call): 12-byte big-endian records, command word first.
  *   'P' 0x50  +2 duration (sub-ticks), +4 long frequency F, +8 unused: note on
  *   'R' 0x52  +2 duration: rest            'S' 0x53  +2 duration, +4 long target F, +8 long rate: slide, no retrigger
- *   'V' 0x56  +8 long, low word >> 1 = volume/envelope, no time
+ *   'V' 0x56  +8 long, only the low word (+10..+11) is read: it is 4 * instrument number, no time, no volume. Bytes +2..+9
+ *             are never read by the player (editor leftovers) and stay byte-exact.
  *   'l' 0x6c  loop start                    'L' 0x4c  +8 word count: loop body runs count + 1 times
  *   'F' 0x46  back to the stream start (voice end)
  * Pitch: the replayer turns F into a YM period = 3579545 * 8 / F; on the ST's 2 MHz YM the tone is F / 229.09 Hz, and all
@@ -19,6 +20,10 @@
  * Layers (docs/FORMAT_COMMAND_STREAM_GRID.md): `blockRows` carry every voice stream byte-exact, one carrier cell per two
  * bytes (cutoff = 2, period = byte 0, pan = byte 1). The display grid is carrier-less, one row per header step.
  * A record reached by several loop passes is listed once per pass in `placements`.
+ *
+ * Instruments (decode: thoughts/spot/2026-11-13-quartet-v-decode.md): at note-on the player reads the word table of file
+ * offsets (init-adjacent code `lea table,a2` = 45fa disp, followed by 3472 1000) at the voice's V number and copies the
+ * 14-byte definition it points to. The grid's instrument column = V number + 1; a note before any V is instrument 0 (id 1).
  */
 import type { Pattern, TrackerCell } from '@/types';
 import { cellFieldsEqual } from '@/engine/uade/UADEPatternEncoder';
@@ -112,7 +117,49 @@ export function encodeQuartetStream(rows: TrackerCell[]): Uint8Array {
 }
 
 /** A stored note record placed on the grid: `offset` is the record, the frequency long is at offset + 4. */
-export interface QuartetPlacement { voice: number; row: number; offset: number; note: number; slide: boolean }
+export interface QuartetPlacement {
+  voice: number; row: number; offset: number; note: number; slide: boolean;
+  /** offset of the 'V' record that governs this note (its low word is at +10), or null before the voice's first V */
+  vOffset: number | null;
+  /** instrument column value: V number + 1 */
+  instrument: number;
+}
+
+export interface QuartetInstrumentDef { number: number; offset: number; name: string }
+
+const INSTR_LEN = 14;
+
+/** The word table of instrument-definition file offsets; entries run until an odd or out-of-file entry or the first definition. */
+export function quartetInstrumentOffsets(buf: Uint8Array): number[] {
+  for (let p = 0; p + 8 <= buf.length && p < 0x2000; p += 2) {
+    if (u16(buf, p) !== 0x45fa || u16(buf, p + 4) !== 0x3472 || u16(buf, p + 6) !== 0x1000) continue;
+    const a = p + 2 + s16(buf, p + 2);
+    const out: number[] = [];
+    let lowest = Infinity;
+    for (let i = 0; a + i * 2 + 2 <= buf.length && a + i * 2 < lowest; i++) {
+      const o = u16(buf, a + i * 2);
+      if ((o & 1) || o + INSTR_LEN > buf.length) break;
+      out.push(o);
+      lowest = Math.min(lowest, o);
+    }
+    return out;
+  }
+  return [];
+}
+
+/** Name from the decoded fields of a 14-byte definition, full English words. */
+export function quartetInstrumentName(buf: Uint8Array, o: number): string {
+  const mixer = buf[o + 6], flags = buf[o + 12];
+  const parts: string[] = [];
+  const tone = !(mixer & 1), noise = !(mixer & 8);
+  parts.push(tone && noise ? 'Tone and Noise' : tone ? 'Tone' : noise ? 'Noise' : 'Silent');
+  if (buf[o + 8] !== 0) parts.push(flags & 2 ? 'Vibrato' : 'Pitch Sweep');
+  if (buf[o + 7] !== 0) parts.push('Random Pitch');
+  if (flags & 1) parts.push('Hold');
+  if (flags & 4) parts.push('Octave Down');
+  parts.push(`Volume Sequence ${buf[o + 10]}`);
+  return parts.join(', ');
+}
 
 export interface QuartetGrid {
   patterns: Pattern[];
@@ -124,6 +171,8 @@ export interface QuartetGrid {
   trackMap: number[][];
   blockRows: TrackerCell[][];
   placements: QuartetPlacement[];
+  /** one per V number used in this song, in number order */
+  instruments: QuartetInstrumentDef[];
   subsongs: number;
 }
 
@@ -136,6 +185,10 @@ export function buildQuartetGrid(buf: Uint8Array, sourceFile: string, subsong = 
   const step = Math.max(1, u16(buf, base + 4));
   const placements: QuartetPlacement[] = [];
   const timelines: TrackerCell[][] = spans.map(() => []);
+
+  // the voice's current V record survives loop passes and the stream restart
+  const curV: Array<{ offset: number; number: number } | null> = spans.map(() => null);
+  const usedNumbers = new Set<number>();
 
   // One pass of a voice stream from sub-tick t0; returns the sub-tick it ends on.
   const runPass = (v: number, t0: number): number => {
@@ -151,14 +204,21 @@ export function buildQuartetGrid(buf: Uint8Array, sourceFile: string, subsong = 
         if (top && top.done < u16(buf, p + 8)) { top.done++; p = top.at; continue; }
         loops.pop(); p += REC; continue;
       }
+      if (cmd === CMD.V) {
+        curV[v] = { offset: p, number: u16(buf, p + 10) >> 2 };
+        usedNumbers.add(curV[v]!.number);
+        p += REC; continue;
+      }
       if (cmd === CMD.P || cmd === CMD.S) {
         const row = Math.floor(t / step);
         const line = timelines[v];
         while (line.length <= row) line.push(emptyCell());
         if (!line[row].note) {
           const note = quartetFreqToNote(u32(buf, p + 4));
-          line[row] = { ...emptyCell(), note, instrument: 1, effTyp: cmd === CMD.S ? 3 : 0 };
-          placements.push({ voice: v, row, offset: p, note, slide: cmd === CMD.S });
+          const instrument = (curV[v]?.number ?? 0) + 1;
+          if (!curV[v]) usedNumbers.add(0);
+          line[row] = { ...emptyCell(), note, instrument, effTyp: cmd === CMD.S ? 3 : 0 };
+          placements.push({ voice: v, row, offset: p, note, slide: cmd === CMD.S, vOffset: curV[v]?.offset ?? null, instrument });
         }
       }
       if (cmd === CMD.P || cmd === CMD.S || cmd === CMD.R) t += u16(buf, p + 2);
@@ -174,6 +234,10 @@ export function buildQuartetGrid(buf: Uint8Array, sourceFile: string, subsong = 
     let t = passLen[v];
     while (passLen[v] > 0 && t < ticks) { const e = runPass(v, t); if (e <= t) break; t = e; }
   });
+  const table = quartetInstrumentOffsets(buf);
+  const instruments: QuartetInstrumentDef[] = [...usedNumbers].sort((a, b) => a - b)
+    .filter(n => n < table.length)
+    .map(n => ({ number: n, offset: table[n], name: quartetInstrumentName(buf, table[n]) }));
   const rows = Math.min(MAX_ROWS, Math.ceil(ticks / step));
   const numPatterns = Math.max(1, Math.ceil(rows / QUARTET_ROWS_PER_PATTERN));
   const patterns: Pattern[] = Array.from({ length: numPatterns }, (_, p) => ({
@@ -188,7 +252,7 @@ export function buildQuartetGrid(buf: Uint8Array, sourceFile: string, subsong = 
     })),
     importMetadata: {
       sourceFormat: 'MOD' as const, sourceFile, importedAt: new Date().toISOString(),
-      originalChannelCount: VOICES, originalPatternCount: numPatterns, originalInstrumentCount: 1,
+      originalChannelCount: VOICES, originalPatternCount: numPatterns, originalInstrumentCount: Math.max(1, instruments.length),
     },
   }));
   return {
@@ -196,7 +260,7 @@ export function buildQuartetGrid(buf: Uint8Array, sourceFile: string, subsong = 
     filePatternAddrs: spans.map(s => s.start), filePatternSizes: spans.map(s => s.end - s.start),
     trackMap: patterns.map(() => spans.map((_, v) => v)),
     blockRows: spans.map(s => decodeQuartetStream(buf, s.start, s.end)),
-    placements: placements.filter(pl => pl.row < rows), subsongs: bases.length,
+    placements: placements.filter(pl => pl.row < rows), instruments, subsongs: bases.length,
   };
 }
 
@@ -204,7 +268,7 @@ export interface QuartetEditResult { data: Uint8Array; patched: number; warnings
 
 /**
  * Write the grid's note edits into the module: a changed note becomes the stored frequency long of its 'P' / 'S' record.
- * Cells played from the same record must agree; any other changed cell is reported, not written.
+ * A changed instrument rewrites the low word of the governing 'V' record (number * 4). Cells played from the same record must agree; any other changed cell is reported, not written.
  */
 export function applyQuartetGridEdits(source: Uint8Array, edited: Pattern[], subsong = 0): QuartetEditResult {
   const out = new Uint8Array(source);
@@ -214,11 +278,23 @@ export function applyQuartetGridEdits(source: Uint8Array, edited: Pattern[], sub
     edited[Math.floor(row / QUARTET_ROWS_PER_PATTERN)]?.channels[voice]?.rows[row % QUARTET_ROWS_PER_PATTERN];
   const warnings: string[] = [];
   const wanted = new Map<number, Set<number>>();
+  const wantedV = new Map<number, Set<number>>();
+  const tableLen = quartetInstrumentOffsets(source).length;
   const placed = new Set<string>();
   for (const pl of base.placements) {
     placed.add(`${pl.voice}:${pl.row}`);
     const cell = cellAt(pl.voice, pl.row);
-    if (!cell || cell.note === pl.note) continue;
+    if (!cell) continue;
+    if ((cell.instrument ?? 0) !== pl.instrument) {
+      const n = (cell.instrument ?? 0) - 1;
+      if (pl.vOffset === null) warnings.push(`voice ${pl.voice + 1} row ${pl.row}: no sound setup record before this note, its instrument is read-only; not written`);
+      else if (n < 0 || n >= tableLen || n * 4 > 0xffff) warnings.push(`voice ${pl.voice + 1} row ${pl.row}: instrument ${cell.instrument} is not in the module's instrument table; not written`);
+      else {
+        if (!wantedV.has(pl.vOffset)) wantedV.set(pl.vOffset, new Set());
+        wantedV.get(pl.vOffset)!.add(n);
+      }
+    }
+    if (cell.note === pl.note) continue;
     const f = (cell.note ?? 0) > 0 ? quartetNoteToFreq(cell.note ?? 0) : null;
     if (f === null) { warnings.push(`voice ${pl.voice + 1} row ${pl.row}: note ${cell.note} removes the note or has no frequency; not written`); continue; }
     if (!wanted.has(pl.offset)) wanted.set(pl.offset, new Set());
@@ -231,11 +307,27 @@ export function applyQuartetGridEdits(source: Uint8Array, edited: Pattern[], sub
     out[offset + 4] = (f >>> 24) & 0xff; out[offset + 5] = (f >>> 16) & 0xff; out[offset + 6] = (f >>> 8) & 0xff; out[offset + 7] = f & 0xff;
     patched++;
   }
+  // all notes played under one V record share its instrument; the cells that read it must agree
+  const vNumbers = new Map<number, Set<number>>();
+  for (const pl of base.placements) {
+    if (pl.vOffset === null) continue;
+    const c = cellAt(pl.voice, pl.row);
+    if (!c) continue;
+    if (!vNumbers.has(pl.vOffset)) vNumbers.set(pl.vOffset, new Set());
+    vNumbers.get(pl.vOffset)!.add((c.instrument ?? 0) - 1);
+  }
+  for (const [vOffset, set] of wantedV) {
+    const all = vNumbers.get(vOffset)!;
+    if (all.size !== 1) { warnings.push(`sound setup record at ${vOffset}: the notes under it were given different instruments; not written`); continue; }
+    const n = [...set][0], v = n * 4;
+    out[vOffset + 10] = (v >>> 8) & 0xff; out[vOffset + 11] = v & 0xff;
+    patched++;
+  }
   let stray = 0;
   edited.forEach((pat, p) => pat.channels.forEach((chn, v) => chn.rows.forEach((cell, r) => {
     const row = p * QUARTET_ROWS_PER_PATTERN + r;
     const was = base.patterns[p]?.channels[v]?.rows[r] ?? emptyCell();
-    if (placed.has(`${v}:${row}`)) { if (!cellFieldsEqual({ ...cell, note: was.note }, was)) stray++; }
+    if (placed.has(`${v}:${row}`)) { if (!cellFieldsEqual({ ...cell, note: was.note, instrument: was.instrument }, was)) stray++; }
     else if (!cellFieldsEqual(cell, was)) stray++;
   })));
   if (stray > 0) warnings.push(`${stray} edited cell(s) change more than a stored note; not written (the stream would change length)`);

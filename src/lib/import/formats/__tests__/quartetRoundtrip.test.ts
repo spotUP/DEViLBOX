@@ -77,6 +77,63 @@ describe('quartet grid shows real notes and exports byte-exact', () => {
   });
 });
 
+describe('quartet V record is the instrument', () => {
+  it('horror zombies has three instruments over its two songs, named from their definitions; warlock one', async () => {
+    const h = await load(FIXTURES[0]);
+    // the noise setup (V number 2) is only played by the second song
+    expect(h.song.instruments.map(i => i.id)).toEqual([1, 2]);
+    expect(h.song.instruments.map(i => i.name)).toEqual(['Tone, Pitch Sweep, Volume Sequence 8', 'Tone, Vibrato, Volume Sequence 0']);
+    const g1 = buildQuartetGrid(h.raw, 'x', 1)!;
+    expect(g1.instruments.map(i => i.number)).toContain(2);
+    expect(g1.instruments.find(i => i.number === 2)!.name).toBe('Noise, Volume Sequence 8');
+    const all = new Set([...buildQuartetGrid(h.raw, 'x', 0)!.instruments, ...g1.instruments].map(i => i.number));
+    expect(all.size).toBeGreaterThanOrEqual(3);
+    const w = await load(FIXTURES[1]);
+    expect(w.song.instruments.length).toBe(1);
+    expect(w.song.instruments[0].name).toBe('Tone, Pitch Sweep, Volume Sequence 7');
+  });
+
+  it('notes carry the V number + 1 as instrument', async () => {
+    const { raw } = await load(FIXTURES[0]);
+    const g = buildQuartetGrid(raw, 'x', 0)!;
+    expect(new Set(g.placements.map(p => p.instrument))).toEqual(new Set([1, 2]));
+    for (const p of g.placements) {
+      if (p.vOffset !== null) expect(((raw[p.vOffset + 10] << 8) | raw[p.vOffset + 11]) / 4 + 1).toBe(p.instrument);
+    }
+  });
+
+  it('an instrument change on every note under one V record rewrites only that record low word and re-imports', async () => {
+    const { raw, song } = await load(FIXTURES[0]);
+    const g = buildQuartetGrid(raw, 'x', 0)!;
+    const target = g.placements.find(p => p.vOffset !== null && p.instrument === 1)!;
+    const same = g.placements.filter(p => p.vOffset === target.vOffset);
+    for (const p of same) {
+      song.patterns[Math.floor(p.row / QUARTET_ROWS_PER_PATTERN)].channels[p.voice].rows[p.row % QUARTET_ROWS_PER_PATTERN].instrument = 3;
+    }
+    const out = await exportQuartet(song);
+    expect(out.warnings).toEqual([]);
+    const diff: number[] = [];
+    out.data.forEach((v, i) => { if (v !== raw[i]) diff.push(i); });
+    expect(diff.length).toBeGreaterThan(0);
+    expect(diff.every(i => i >= target.vOffset! + 10 && i < target.vOffset! + 12)).toBe(true);
+    expect((out.data[target.vOffset! + 10] << 8) | out.data[target.vOffset! + 11]).toBe(8);
+    const ab = out.data.buffer.slice(out.data.byteOffset, out.data.byteOffset + out.data.byteLength) as ArrayBuffer;
+    const again = await parseQuartetFile(ab, 'horror zombies from crypt.sqt');
+    const c = again.patterns[Math.floor(target.row / QUARTET_ROWS_PER_PATTERN)].channels[target.voice].rows[target.row % QUARTET_ROWS_PER_PATTERN];
+    expect(c.instrument).toBe(3);
+  });
+
+  it('disagreeing instruments under one V record are refused with a warning', async () => {
+    const { raw, song } = await load(FIXTURES[0]);
+    const g = buildQuartetGrid(raw, 'x', 0)!;
+    const target = g.placements.find(p => p.vOffset !== null && g.placements.filter(q => q.vOffset === p.vOffset).length > 1)!;
+    song.patterns[Math.floor(target.row / QUARTET_ROWS_PER_PATTERN)].channels[target.voice].rows[target.row % QUARTET_ROWS_PER_PATTERN].instrument = target.instrument === 3 ? 2 : 3;
+    const out = await exportQuartet(song);
+    expect(out.warnings.length).toBeGreaterThan(0);
+    expect(Array.from(out.data)).toEqual(Array.from(raw));
+  });
+});
+
 describe('quartet .sqt through the app import entry point', () => {
   it.each(FIXTURES)('%s: parseModuleToSong gives the Quartet PSG grid, not the UADE scan', async (rel) => {
     const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
