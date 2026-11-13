@@ -99,6 +99,8 @@ export interface PaulaSessionOptions {
   logBeforeLoad?: boolean;
   /** Subsong to select after the load (1-based; ignored when <= 1). */
   subsong?: number;
+  /** At song end, start the same subsong again instead of ending the session (uade_wasm_set_looping). Default false. */
+  loop?: boolean;
 }
 
 /** A module loaded into UADE with the Paula log running, rendered in 10 ms chunks. */
@@ -120,7 +122,7 @@ export class PaulaSession {
     const hint = mod._malloc(name.length * 4 + 1);
     mod.stringToUTF8(name, hint, name.length * 4 + 1);
     mod._uade_wasm_stop();
-    mod._uade_wasm_set_looping(0);
+    mod._uade_wasm_set_looping(opts.loop ? 1 : 0);
     mod._uade_wasm_set_one_subsong(1);
     if (logBeforeLoad) mod._uade_wasm_enable_paula_log(1);
     const ret = mod._uade_wasm_load(ptr, bytes.length, hint);
