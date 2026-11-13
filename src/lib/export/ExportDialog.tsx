@@ -86,6 +86,9 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
         case 'fur':
           return await ex.handleExportFur((b, n) => saveAs(b, n), onClose);
 
+        case 'furAy':
+          return await ex.handleExportFurAy((b, n) => saveAs(b, n), onClose);
+
         case 'nano':
           return await ex.handleExportNano((b, n) => saveAs(b, n), onClose);
 
@@ -329,6 +332,21 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold">Export Furnace Module</div>
                     </button>
                   )}
+                  {ex.furnaceAyAvailable && (
+                    <button
+                      onClick={() => ex.setExportMode('furAy')}
+                      className={`
+                        p-4 rounded-lg border-2 transition-all text-center
+                        ${ex.exportMode === 'furAy'
+                          ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
+                          : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
+                        }
+                      `}
+                    >
+                      <FileMusic size={24} className="mx-auto mb-2" />
+                      <div className="font-mono text-sm font-semibold">Furnace AY-3-8910 (Scramble)</div>
+                    </button>
+                  )}
                   {ex.nativeAvailable && (
                     <button
                       onClick={() => ex.setExportMode('native')}
@@ -506,6 +524,27 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                 </div>
               )}
 
+              {ex.exportMode === 'furAy' && (
+                <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
+                  <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
+                    Furnace AY-3-8910 Export for Scramble (.fur)
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="text-sm font-mono text-text-secondary space-y-1">
+                      <div>Chip: <span className="text-accent-primary">AY-3-8910, 3 channels, 58.3 Hz</span></div>
+                      <div>Patterns: <span className="text-accent-primary">{ex.patterns.length}</span></div>
+                      <div>Instruments: <span className="text-accent-primary">{ex.instruments.length}</span></div>
+                    </div>
+                    {ex.furnaceAyTempoWarning && (
+                      <div className="text-xs font-mono text-accent-warning">{ex.furnaceAyTempoWarning}</div>
+                    )}
+                    <div className="text-xs font-mono text-text-muted">
+                      Effects, macros and instruments outside the player contract are left out; each one is listed in a warning after export.
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {ex.exportMode === 'native' && (
                 <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
                   <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
@@ -663,7 +702,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   : ex.exportMode === 's3m' ? '.s3m'
                   : ex.exportMode === 'chip' ? `.${chipExtension}`
                   : ex.exportMode === 'nano' ? '.dbn'
-                  : ex.exportMode === 'fur' ? '.fur'
+                  : ex.exportMode === 'fur' || ex.exportMode === 'furAy' ? '.fur'
                   : `.${ex.exportMode}.json`
                 }`
               : 'Select a file to import'}
