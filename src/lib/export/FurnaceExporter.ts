@@ -71,23 +71,46 @@ export function exportInstrumentToFurnace(inst: ParsedInstrument): Uint8Array {
 // version < 240): header with info pointer, INFO with pointer tables, FLAG, ADIR x3,
 // INS2, PATN (new pattern format, version >= 157).
 //
-// Contract of the BossGame player (thoughts/spot/2026-11-13_ay-scramble-export.md):
-// one AY-3-8910 (system 0x80), 3 channels, tick 58.3 Hz, instruments with sequence
-// macros volume / arpeggio / duty (noise period) / wave (mixer bits) only, one loop
-// point, no release; effects 00 01 02 03 04 0A 0B 0D 0F EC ED FF only. Anything else
-// is left out of the file and named in the warnings.
+// Contract of the BossGame player (thoughts/spot/2026-11-13_ay-scramble-export.md,
+// widened by the BossGame music brief): one AY-3-8910 system (0x80) per 3 channels, so
+// one system for 1-3 channels and two for 4-6, tick 58.3 Hz, one loop point, no release.
+// Sequence macros volume / arpeggio / duty (noise period) / wave (mixer bits; bit 2 is
+// the hardware envelope) plus the envelope macros. Effects 01 02 03 04 0A 0B 0D 0F FF,
+// plus the features beyond the first player: 00, EC, ED and the envelope effects. Those
+// stay in the file and are named in the warnings; anything the player will never run
+// (07, Cx, F0, FC, E7, samples ...) is left out and named too.
+//
+// Hardware envelope, as Furnace 0.6.x stores it (platform/ay.cpp, doc/7-systems/ay8910.md):
+//   - wave macro (code 3) bit 2 (value & 4) turns the envelope on for the channel;
+//   - envelope shape = register 0x0D, 0-15, from macro EX2 (code 6) or effect 22xy
+//     (x = shape, y = 1 routes the envelope to this channel);
+//   - envelope period = macro EX5 (code 16), or effects 23xx (low byte) / 24xx (high byte),
+//     slid by 25xx (up) / 26xx (down);
+//   - auto envelope (period follows the note) = macros EX3 (code 7, numerator) and ALG
+//     (code 8, denominator), or effect 29xy (x numerator, y denominator).
 
 export const FUR_AY_SCRAMBLE_VERSION = 228;
 export const FUR_AY_SCRAMBLE_TICK_HZ = 58.3;
+/** Channels of one AY-3-8910 system; a song with 4-6 channels writes two systems. */
 export const FUR_AY_SCRAMBLE_CHANNELS = 3;
+/** Most AY systems (chips) a song may use. */
+export const FUR_AY_SCRAMBLE_MAX_SYSTEMS = 2;
 const FUR_SYSTEM_AY8910 = 0x80;
 /** ay.cpp setFlags: clockSel 0 = COLOR_NTSC / 2 = 1789772.5 Hz; chipType 0 = AY-3-8910. */
 export const FUR_AY_SCRAMBLE_CHIP_FLAGS = 'clockSel=0\nchipType=0\n';
-/** Effects the BossGame player runs. */
-export const AY_SCRAMBLE_EFFECTS: ReadonlySet<number> = new Set([0x00, 0x01, 0x02, 0x03, 0x04, 0x0a, 0x0b, 0x0d, 0x0f, 0xec, 0xed, 0xff]);
-/** Macro codes the BossGame player runs: volume, arpeggio, duty (noise period), wave (mixer bits). */
+/** Effects the first BossGame player runs. */
+export const AY_SCRAMBLE_EFFECTS: ReadonlySet<number> = new Set([0x01, 0x02, 0x03, 0x04, 0x0a, 0x0b, 0x0d, 0x0f, 0xff]);
+/** Effects written but beyond the first player: 00, note cut EC, note delay ED, AY envelope shape/period/slide/auto. */
+export const AY_SCRAMBLE_EXTRA_EFFECTS: ReadonlyMap<number, string> = new Map([
+  [0x00, '00'], [0xec, 'EC (note cut)'], [0xed, 'ED (note delay)'],
+  [0x22, '22xy (envelope shape)'], [0x23, '23xx (envelope period low)'], [0x24, '24xx (envelope period high)'],
+  [0x25, '25xx (envelope slide up)'], [0x26, '26xx (envelope slide down)'], [0x29, '29xy (auto envelope)'],
+]);
+/** Macro codes the first BossGame player runs: volume, arpeggio, duty (noise period), wave (mixer bits). */
 const AY_SCRAMBLE_MACRO_NAMES: Record<number, string> = { 0: 'volume', 1: 'arpeggio', 2: 'duty', 3: 'wave' };
-/** Wave macro bit 2 turns the AY hardware envelope on, outside the contract. */
+/** Envelope macros: EX2 shape, EX3 auto-envelope numerator, ALG auto-envelope denominator, EX5 period. */
+const AY_SCRAMBLE_ENVELOPE_MACRO_NAMES: Record<number, string> = { 6: 'envelope shape', 7: 'auto envelope numerator', 8: 'auto envelope denominator', 16: 'envelope period' };
+/** Wave macro bit 2 turns the AY hardware envelope on. */
 const AY_WAVE_ENVELOPE_BIT = 4;
 const AY_FX_COLUMNS = 8;
 
@@ -122,7 +145,8 @@ function ayFileInstrument(inst: InstrumentConfig, warnings: string[]): FileInstr
   for (const m of cfg.macros) {
     if (m.data.length === 0) continue;
     const code = m.code ?? 0;
-    const name = AY_SCRAMBLE_MACRO_NAMES[code];
+    const envelopeName = AY_SCRAMBLE_ENVELOPE_MACRO_NAMES[code];
+    const name = AY_SCRAMBLE_MACRO_NAMES[code] ?? envelopeName;
     if (!name) { warnings.push(`${label}: macro ${code} left out, the player runs volume, arpeggio, duty and wave macros only`); continue; }
     if (m.mode !== 0) { warnings.push(`${label}: ${name} macro left out, it is an ADSR or LFO macro, not a sequence`); continue; }
     if (m.release >= 0) warnings.push(`${label}: ${name} macro release point removed, the player has no release`);
@@ -132,9 +156,9 @@ function ayFileInstrument(inst: InstrumentConfig, warnings: string[]): FileInstr
       data = data.map((v) => Math.max(0, Math.min(15, v)));
     }
     if (code === 3 && data.some((v) => (v & AY_WAVE_ENVELOPE_BIT) !== 0)) {
-      warnings.push(`${label}: wave macro envelope bit removed, the player has no hardware envelope`);
-      data = data.map((v) => v & ~AY_WAVE_ENVELOPE_BIT);
+      warnings.push(`${label}: wave macro keeps the hardware envelope bit, outside the old player contract, BossGame compiler must support it`);
     }
+    if (envelopeName) warnings.push(`${label}: ${envelopeName} macro kept, outside the old player contract, BossGame compiler must support it`);
     macros.push({
       code, length: data.length, loop: m.loop < 0 || m.loop >= data.length ? 255 : m.loop, release: 255,
       mode: 0, type: 0, delay: m.delay ?? 0, speed: m.speed ?? 1, data,
@@ -215,7 +239,10 @@ function ayPatch(w: BinaryWriter, at: number, value: number): void {
 export function exportFurnaceAyScramble(song: FurnaceModuleSong): FurnaceAyScrambleResult {
   const problems: string[] = [];
   const warnings: string[] = [];
-  const nCh = FUR_AY_SCRAMBLE_CHANNELS;
+  // One system per 3 channels: 1-3 channels write one AY, 4-6 write two (empty channels pad the second).
+  const songChannels = Math.max(1, ...song.patterns.map((p) => p.channels.length));
+  const nSys = songChannels <= FUR_AY_SCRAMBLE_CHANNELS ? 1 : FUR_AY_SCRAMBLE_MAX_SYSTEMS;
+  const nCh = nSys * FUR_AY_SCRAMBLE_CHANNELS;
 
   const ay = song.instruments.filter(isAyInstrument);
   const insIndexById = new Map<number, number>();
@@ -240,12 +267,13 @@ export function exportFurnaceAyScramble(song: FurnaceModuleSong): FurnaceAyScram
   const ordered = new Set(song.songPositions);
   const fxColumns = new Array<number>(nCh).fill(1);
   const dropped = new Map<string, number>();
+  const extras = new Map<string, number>();
   const pats: { ch: number; index: number; rows: FileCell[] }[] = [];
   for (const [pi, p] of song.patterns.entries()) {
     if (p.length !== patLen) problems.push(`Pattern ${pi} has ${p.length} rows but the song has ${patLen}: a Furnace song has one pattern length`);
     p.channels.slice(nCh).forEach((chan, k) => {
       if (chan.rows.some((c) => c.note > 0 || c.instrument > 0 || c.volume > 0)) {
-        problems.push(`Pattern ${pi} channel ${nCh + k + 1} has notes but the AY-3-8910 has ${nCh} channels`);
+        problems.push(`Pattern ${pi} channel ${nCh + k + 1} has notes but the Scramble target holds ${nCh} channels (two AY-3-8910)`);
       }
     });
     for (let ch = 0; ch < nCh; ch++) {
@@ -264,7 +292,9 @@ export function exportFurnaceAyScramble(song: FurnaceModuleSong): FurnaceAyScram
         // cellToFile scales the volume column to 0-127; the AY channel volume is 0-15.
         if (fc.vol >= 0) fc.vol = Math.round(fc.vol * 15 / 127);
         for (const f of fc.fx) {
-          if (f.type >= 0 && !AY_SCRAMBLE_EFFECTS.has(f.type)) {
+          const extra = f.type >= 0 ? AY_SCRAMBLE_EXTRA_EFFECTS.get(f.type) : undefined;
+          if (extra) extras.set(extra, (extras.get(extra) ?? 0) + 1);
+          else if (f.type >= 0 && !AY_SCRAMBLE_EFFECTS.has(f.type)) {
             const key = f.type.toString(16).toUpperCase().padStart(2, '0');
             dropped.set(key, (dropped.get(key) ?? 0) + 1);
             f.type = -1; f.val = -1;
@@ -278,6 +308,7 @@ export function exportFurnaceAyScramble(song: FurnaceModuleSong): FurnaceAyScram
     }
   }
   for (const [key, n] of dropped) warnings.push(`Effect ${key} left out ${n} time(s): the Scramble player does not run it`);
+  for (const [name, n] of extras) warnings.push(`Effect ${name} kept ${n} time(s), outside the old player contract, BossGame compiler must support it`);
 
   if (problems.length > 0) {
     const shown = problems.slice(0, 8).join('; ');
@@ -295,7 +326,7 @@ export function exportFurnaceAyScramble(song: FurnaceModuleSong): FurnaceAyScram
   w.writeUint32(32);
   w.writeZeros(8);
 
-  let flagPtrAt = 0;
+  const flagPtrAt: number[] = [];
   const insPtrAt: number[] = [];
   const patPtrAt: number[] = [];
   const adirPtrAt: number[] = [];
@@ -313,10 +344,10 @@ export function exportFurnaceAyScramble(song: FurnaceModuleSong): FurnaceAyScram
     w.writeUint16(0); // wavetables
     w.writeUint16(0); // samples
     w.writeUint32(pats.length);
-    for (let i = 0; i < 32; i++) w.writeUint8(i === 0 ? FUR_SYSTEM_AY8910 : 0);
+    for (let i = 0; i < 32; i++) w.writeUint8(i < nSys ? FUR_SYSTEM_AY8910 : 0);
     for (let i = 0; i < 32; i++) w.writeInt8(64); // chip volume (64 = 1.0)
     for (let i = 0; i < 32; i++) w.writeInt8(0); // chip panning
-    for (let i = 0; i < 32; i++) { if (i === 0) flagPtrAt = w.getOffset(); w.writeUint32(0); }
+    for (let i = 0; i < 32; i++) { if (i < nSys) flagPtrAt.push(w.getOffset()); w.writeUint32(0); }
     w.writeNullTerminatedString(song.name);
     w.writeNullTerminatedString('');
     w.writeFloat32(440);
@@ -340,8 +371,8 @@ export function exportFurnaceAyScramble(song: FurnaceModuleSong): FurnaceAyScram
     w.writeNullTerminatedString(''); // subsong notes
     w.writeUint8(0); // additional subsongs
     w.writeZeros(3);
-    for (const s of [`AY-3-8910 (Scramble)`, '', '', '', '', '']) w.writeNullTerminatedString(s);
-    w.writeFloat32(1); w.writeFloat32(0); w.writeFloat32(0); // chip volume, panning, front/rear
+    for (const s of [nSys === 1 ? 'AY-3-8910 (Scramble)' : 'Dual AY-3-8910 (Scramble)', '', '', '', '', '']) w.writeNullTerminatedString(s);
+    for (let i = 0; i < nSys; i++) { w.writeFloat32(1); w.writeFloat32(0); w.writeFloat32(0); } // per system: volume, panning, front/rear
     w.writeUint32(0); // patchbay connections
     w.writeUint8(1); // automatic patchbay
     // Compat flags, version 138-200 set: brokenPortaLegato .. oldSampleOffset.
@@ -352,7 +383,7 @@ export function exportFurnaceAyScramble(song: FurnaceModuleSong): FurnaceAyScram
     for (let i = 0; i < 3; i++) { adirPtrAt.push(w.getOffset()); w.writeUint32(0); }
   });
 
-  ayPatch(w, flagPtrAt, ayBlock(w, 'FLAG', () => w.writeNullTerminatedString(FUR_AY_SCRAMBLE_CHIP_FLAGS)));
+  for (const at of flagPtrAt) ayPatch(w, at, ayBlock(w, 'FLAG', () => w.writeNullTerminatedString(FUR_AY_SCRAMBLE_CHIP_FLAGS)));
   for (const at of adirPtrAt) ayPatch(w, at, ayBlock(w, 'ADIR', () => { w.writeUint32(0); }));
   instruments.forEach((inst, i) => {
     const at = w.getOffset();

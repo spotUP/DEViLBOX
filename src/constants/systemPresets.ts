@@ -1249,6 +1249,17 @@ export const SYSTEM_PRESETS: SystemPreset[] = [
     ]
   },
   {
+    id: 'ay8910_x2',
+    name: 'Dual AY-3-8910 (6 channels)',
+    description: 'Two AY-3-8910 chips side by side (Konami Scramble hardware): 6 channels, hardware envelope on each chip.',
+    fileID: 0x80, fileID_DMF: 0, channels: 6, minChans: 6, maxChans: 6,
+    isFM: false, isSTD: true, isCompound: true, waveWidth: 0, waveHeight: 0, vgmVersion: 0x151,
+    channelDefs: [
+      ...genPSG(3).map((c) => ({ ...c, name: `AY1 ${c.name}`, shortName: `A${c.shortName}` })),
+      ...genPSG(3).map((c) => ({ ...c, name: `AY2 ${c.name}`, shortName: `B${c.shortName}` })),
+    ]
+  },
+  {
     id: 'arcade',
     name: 'DefleCade',
     description: 'Compound system for DefleMask/Furnace arcade emulation.',
