@@ -23,6 +23,7 @@ export { FurnaceDispatchPlatform } from './platforms';
 import { batchesToRegisterWrites, type DispatchRegBatch, type DispatchSampleRom } from '@lib/export/dispatchRegCapture';
 import type { RegisterWrite } from '@lib/export/VGMExporter';
 import { STAND_INS } from './synthPlatforms';
+import { chipKeysFor } from './chipKey';
 
 /** Sample depth formats (matching Furnace DivSampleDepth enum) */
 export const SampleDepth = {
@@ -1727,8 +1728,9 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       if (cf._packed && cf._dispatchFlags) this.setCompatFlagsRaw(cf._dispatchFlags as Uint8Array);
       else this.setCompatFlags(cf as unknown as CompatFlags);
     }
+    const keys = chipKeysFor(chipIds ?? []);
     (data.chipFlags ?? []).forEach((flagStr, i) => {
-      if (flagStr && flagStr.length > 0) this.setChipFlags(flagStr, chipIds?.[i]);
+      if (flagStr && flagStr.length > 0) this.setChipFlags(flagStr, keys[i]);
     });
     if (data.tuning !== undefined) this.setTuning(data.tuning);
   }
@@ -1742,7 +1744,7 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
     this.workletNode.port.postMessage({
       type: 'setMixVolumes',
       masterVol: nativeData.masterVol ?? 1.0,
-      chipIds: nativeData.chipIds,
+      chipIds: chipKeysFor(nativeData.chipIds ?? []),
       systemVol: nativeData.systemVol ?? [],
       systemPan: nativeData.systemPan ?? [],
       systemPanFR: nativeData.systemPanFR ?? [],
@@ -2119,7 +2121,8 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       // we get WASM traps ("function signature mismatch", "memory access").
       this.seqStop();
 
-      const chipIds = opts.song.furnaceNative.chipIds ?? [];
+      // Chip keys, not platform types: two systems of one type are two chips.
+      const chipIds = chipKeysFor(opts.song.furnaceNative.chipIds ?? []);
       const newChipSet = new Set(chipIds);
       const oldChipIds = [...(this as any).chips.keys() as IterableIterator<number>];
       _log(`[FurnaceDispatchEngine] startWithCoordinator: chipIds=${JSON.stringify(chipIds)} oldChips=${JSON.stringify(oldChipIds)}`);
