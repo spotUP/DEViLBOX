@@ -76,3 +76,19 @@ describe('quartet grid shows real notes and exports byte-exact', () => {
     expect(again.patterns[pat].channels[n.voice].rows[row].note).toBe(n.note + 2);
   });
 });
+
+describe('quartet .sqt through the app import entry point', () => {
+  it.each(FIXTURES)('%s: parseModuleToSong gives the Quartet PSG grid, not the UADE scan', async (rel) => {
+    const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
+    const b = readFileSync(join(process.cwd(), rel));
+    const name = rel.split('/').pop()!;
+    const direct = await parseQuartetFile(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer, name);
+    const song = await parseModuleToSong(new File([new Uint8Array(b)], name));
+    const count = (s: typeof song) => s.patterns.reduce((a, p) => a + p.channels.reduce((x, c) => x + c.rows.filter(r => (r.note ?? 0) > 0).length, 0), 0);
+    expect(song.name).toContain('[Quartet PSG]');
+    expect(count(song)).toBeGreaterThan(50);
+    expect(count(song)).toBe(count(direct));
+    expect(song.uadeEditableFileData).toBeTruthy();
+    expect(song.uadeEditableFileName).toBeTruthy();
+  });
+});
