@@ -11,14 +11,15 @@
  * Bytes: BossGame's compiler shares identical channel bodies, also across channels. AY1 A, AY1 B and AY1 C
  * never name an instrument inside the loop, so they play the lead's and the bass's bytes through their own
  * instruments: a 12-tick delayed-volume echo (A), a static +7 arpeggio for power chords (B) and a square
- * body under the buzz (C). The loop therefore costs calls only on AY1, and the core 3 sound complete alone.
- * Keep it that way: an `ins` inside a loop pattern on LEAD or BASS breaks the sharing.
+ * body an octave above the bass, or in A a detuned unison that beats against it (C). The loop therefore costs calls only on AY1, and the core 3 sound complete alone.
+ * Keep it that way: an `ins` inside a loop pattern on LEAD or BASS breaks the sharing (AY1 C has two, see the end).
  */
 import { AY, AY_MACRO, ScrambleSongBuilder, ayInstrument, ayMacro } from '@/lib/export/neogeo/scrambleCompose';
 import type { NeoGeoPattern } from '@/lib/export/neogeo/neoGeoCompose';
 
 const TONE = 1, NOISE = 2, ENV = 4;
 const AUTO_ENV_NUM = 7, AUTO_ENV_DEN = 8; // Furnace ex3 / alg macros: envelope period follows the note
+const BEAT_DETUNE = 0x94; // E5xx on AY1 C: 20/128 semitone sharp, one swell a bar at C-2 (0.6 Hz); 0x80 is in tune
 type Line = Array<[number, string]>;
 
 export default function (): ScrambleSongBuilder {
@@ -28,16 +29,22 @@ export default function (): ScrambleSongBuilder {
 
   // Core (AY2)
   const stab = ins('Stab', [[AY_MACRO.VOL, [15, 14, 13, 12, 10, 8, 6, 4, 2, 0]], [AY_MACRO.ARP, [12, 12, 0]], [AY_MACRO.MIXER, [TONE]]]);
-  // Tone and envelope on one channel at the same nominal pitch: the envelope period rounds a few cents sharp, so the two phase slowly.
-  const buzz = ins('Buzz bass', [[AY_MACRO.VOL, [13]], [AY_MACRO.MIXER, [TONE | ENV]], [AY_MACRO.ENV_SHAPE, [8]], [AUTO_ENV_NUM, [1]], [AUTO_ENV_DEN, [1]]]);
+  // Sawtooth envelope alone for 2 ticks as the buzz attack, then a plain square at 13. Held tone + envelope on one channel phased
+  // against each other and swung the bass level by 19 dB (measured solo); the envelope also always plays at 15.
+  const buzz = ins('Buzz bass', [[AY_MACRO.VOL, [13]], [AY_MACRO.MIXER, [ENV, ENV, TONE]], [AY_MACRO.ENV_SHAPE, [8]], [AUTO_ENV_NUM, [1]], [AUTO_ENV_DEN, [1]]]);
   const rumble = ins('Rumble', [[AY_MACRO.VOL, [13]], [AY_MACRO.MIXER, [ENV]], [AY_MACRO.ENV_SHAPE, [8]]]);
   const kick = ins('Kick', [[AY_MACRO.VOL, [12, 12, 11, 10, 8, 6, 3, 0]], [AY_MACRO.ARP, [24, 19, 12, 7, 3, 0]], [AY_MACRO.NOISE, [10]], [AY_MACRO.MIXER, [TONE | NOISE, TONE]]]);
   const snare = ins('Snare', [[AY_MACRO.VOL, [12, 11, 10, 8, 6, 4, 2, 0]], [AY_MACRO.NOISE, [16, 20, 22]], [AY_MACRO.MIXER, [TONE | NOISE, NOISE]]]);
   const chug = ins('Chug', [[AY_MACRO.VOL, [11, 7, 3, 0]], [AY_MACRO.NOISE, [27]], [AY_MACRO.MIXER, [TONE | NOISE, TONE]]]);
-  // Layers (AY1): same bytes as the core, other instruments
+  // Layers (AY1): same bytes as the core, other instruments. Doubling voices sit 2-5 steps under the voice they double.
   const echo = ins('Echo', [[AY_MACRO.VOL, [...new Array<number>(12).fill(0), 8, 6, 4, 2, 0]], [AY_MACRO.MIXER, [TONE]]]);
-  const fifth = ins('Fifth', [[AY_MACRO.VOL, [12, 11, 10, 9, 7, 5, 3, 1, 0]], [AY_MACRO.ARP, [7]], [AY_MACRO.MIXER, [TONE]]]);
-  const body = ins('Bass body', [[AY_MACRO.VOL, [12, 12, 11]], [AY_MACRO.MIXER, [TONE]]]);
+  const fifth = ins('Fifth', [[AY_MACRO.VOL, [10, 9, 8, 7, 6, 4, 3, 1, 0]], [AY_MACRO.ARP, [7]], [AY_MACRO.MIXER, [TONE]]]);
+  // An octave above the bass: two squares at the same pitch on two chips add or cancel by their chance phase, a different level every note.
+  const body = ins('Bass body', [[AY_MACRO.VOL, [10, 10, 9]], [AY_MACRO.ARP, [12]], [AY_MACRO.MIXER, [TONE]]]);
+
+  // The two-chip bass effect in the A section: the same note on the other chip, a fixed E5xx detune and 4 volume steps under
+  // the bass, so the pair swells and dips at a steady rate and can never cancel. Unison at equal level cancelled completely.
+  const beat = ins('Bass beat', [[AY_MACRO.VOL, [9]], [AY_MACRO.MIXER, [TONE]]]);
 
   const LEADS = [AY.LEAD, AY.AY1_A, AY.AY1_B];
   const BASSES = [AY.BASS, AY.AY1_C];
@@ -66,8 +73,8 @@ export default function (): ScrambleSongBuilder {
   const i2 = s.pattern();
   drums(i2, 'K.K.K.K.KKKKSSSS');
   const pickup: Line = [[12, 'G-1'], [14, 'B-1']];
-  ([[AY.BASS, buzz], [AY.AY1_C, body]] as const).forEach(([ch, i]) => {
-    i2.put(ch, 12, { note: 'G-1', ins: i, fx: [[0x25, 0x00]] }); // slide off before the auto envelope takes the period
+  ([[AY.BASS, buzz], [AY.AY1_C, beat]] as const).forEach(([ch, i]) => {
+    i2.put(ch, 12, { note: 'G-1', ins: i, fx: ch === AY.AY1_C ? [[0x25, 0x00], [0xe5, BEAT_DETUNE]] : [[0x25, 0x00]] }); // slide off before the auto envelope takes the period
     i2.put(ch, 14, { note: 'B-1' });
   });
   ([[AY.LEAD, stab], [AY.AY1_A, echo], [AY.AY1_B, fifth]] as const).forEach(([ch, i]) =>
@@ -95,6 +102,16 @@ export default function (): ScrambleSongBuilder {
     [[0, 'G-1'], [2, 'G-1'], [4, 'B-1'], [6, 'B-1'], [8, 'D-2'], [10, 'D-2'], [12, 'F-2'], [14, 'G#2']], GROOVE);
   const c4 = bar([[6, 'D-5'], [9, 'B-4']], [[0, 'G-1'], [2, 'OFF']], HEART);
   s.patterns[c4].channels[AY.DRUMS].rows[15] = { ...s.patterns[c4].channels[AY.DRUMS].rows[15], effTyp: 0x0b, eff: 2 };
+
+  // AY1 C changes instrument twice a loop: the beating unison for A (orders 2-9), the plain octave for B and C. These two cells cost
+  // AY1 C its shared body in those two patterns; BASS itself still names no instrument.
+  const ay1cIns = (pat: number, i: number, detune: number) => {
+    const rows = s.patterns[pat].channels[AY.AY1_C].rows;
+    if (rows[0].effTyp) throw new Error('boss: AY1 C row 0 already has an effect');
+    rows[0] = { ...rows[0], instrument: i, effTyp: 0xe5, eff: detune };
+  };
+  ay1cIns(a1, beat, BEAT_DETUNE);
+  ay1cIns(rise[0], body, 0x80);
 
   s.order.push(s.indexOf(i1), s.indexOf(i2), a1, a2, a3, a4, a1, a2, a3, a8, ...rise, c3, c4);
   return s;
