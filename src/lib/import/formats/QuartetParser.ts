@@ -546,7 +546,14 @@ export async function parseQuartetFile(
     : null;
   const grid = variant === 'sqt' ? buildQuartetGrid(buf, filename, tunes?.current ?? 0) : null;
   if (grid && tunes) {
-    if (instruments[0]) instruments[0].name = 'YM-2149 tone';
+    if (grid.instruments.length) {
+      instruments.length = 0;
+      for (const d of grid.instruments) {
+        instruments.push({
+          id: d.number + 1, name: d.name, type: 'synth' as const, synthType: 'Synth' as const, effects: [], volume: 0, pan: 0,
+        } as InstrumentConfig);
+      }
+    } else if (instruments[0]) instruments[0].name = 'YM-2149 tone';
     return {
       name: `${moduleName} [${label}]`,
       format: 'MOD' as TrackerFormat,
