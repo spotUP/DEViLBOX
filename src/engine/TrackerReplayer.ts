@@ -17,7 +17,7 @@ import { applyEditorCellEdit } from '@lib/import/furnaceEditorCells';
 import { DavidWhittakerEngine } from './davidwhittaker/DavidWhittakerEngine';
 import { outputLatencySec } from './audioLatency';
 import { composedNeoGeoSequencerRoute, deriveComposedNeoGeo, isReplacedForDerivedSong, sameDerivedSamples } from './replayer/composedNeoGeo';
-import { derivedCellSeqWrites, derivedPlayState, neoGeoInstrumentIds, planStructuralEdit, isStructuralNoop, type DerivedPlayState } from './replayer/composedNeoGeoLiveSync';
+import { derivedCellSyncInSong, derivedPlayState, neoGeoInstrumentIds, planStructuralEdit, isStructuralNoop, type DerivedPlayState } from './replayer/composedNeoGeoLiveSync';
 import type { DerivedFurnaceNative } from '@/lib/export/deriveFurnaceNative';
 import { notify } from '@stores/useNotificationStore';
 import { isReplacedInstrument, noteVolumeIsVelocity, synthNoteVelocity } from './replayer/hybridInstruments';
@@ -1795,10 +1795,10 @@ export class TrackerReplayer {
   private syncDerivedCell(ch: number, patIdx: number, row: number): void {
     const derived = this._derivedNeoGeo;
     if (!derived || !this.useWasmSequencer || ch >= 14) return;
-    const channel = useTrackerStore.getState().patterns[patIdx]?.channels[ch];
-    const cell = channel?.rows[row];
-    if (!channel || !cell) return;
-    const sync = derivedCellSeqWrites(cell, channel.channelMeta, derived.instrumentIds, ch, patIdx, row);
+    const { patterns, patternOrder } = useTrackerStore.getState();
+    if (!patterns[patIdx]?.channels[ch]?.rows[row]) return;
+    // The cell plus the rows whose arp stop (Furnace 0000) depends on it, as the exporter writes them.
+    const sync = derivedCellSyncInSong(patterns, patternOrder, derived.instrumentIds, ch, patIdx, row);
     if (sync.problems.length > 0) console.warn('[TrackerReplayer] live edit:', sync.problems.join('; '));
     const chan = derived.native.subsongs[derived.native.activeSubsong ?? 0]?.channels[ch];
     const openCols = chan && sync.effectCols > chan.effectCols ? sync.effectCols : 0;
@@ -1885,6 +1885,15 @@ export class TrackerReplayer {
             if (sub?.orders[ch]) sub.orders[ch][pos] = pat;
           }
         }
+        // A new order neighbour changes which row 0 must stop a tracker arp (0000): rewrite row 0 of
+        // the patterns at and after each changed position.
+        const order = now.order;
+        const rowZero = new Set<number>();
+        for (const { pos } of plan.orderWrites) {
+          rowZero.add(order[pos]);
+          rowZero.add(order[(pos + 1) % order.length]);
+        }
+        for (const pat of rowZero) for (let ch = 0; ch < 14; ch++) this.syncDerivedCell(ch, pat, 0);
       }
       this._derivedState = now;
     } catch (err) {

@@ -15,8 +15,10 @@
  *  (d) instrument parameter  -> re-derive INS2, loadIns2 for each changed slot (+ forceIns)
  *      instrument set changed -> re-derive and reload (file indices shift)
  */
-import type { TrackerCell, ChannelData } from '@/types/tracker';
-import { cellToFile, FILE_NOTE_OFF, NEO_GEO_SYNTH_TYPE, type FurnaceModuleSong } from '@/lib/export/FurnaceModuleExporter';
+import type { TrackerCell, ChannelData, Pattern } from '@/types/tracker';
+import {
+  cellToFile, FILE_NOTE_OFF, NEO_GEO_SYNTH_TYPE, trackerArpStopAt, trackerArpDependents, type FurnaceModuleSong,
+} from '@/lib/export/FurnaceModuleExporter';
 import { effectNotationOf } from '@/lib/tracker/effectNotation';
 
 /** One write for the sequencer: FurnaceDispatchEngine.seqSetCell(ch, pat, row, col, val). */
@@ -47,11 +49,13 @@ export function derivedCellSeqWrites(
   ch: number,
   pat: number,
   row: number,
+  /** trackerArpStopAt for this cell (the exporter's own row context). */
+  arpStop = false,
 ): DerivedCellSync {
   const insIndexById = new Map<number, number>();
   instrumentIds.forEach((id, i) => insIndexById.set(id, i));
   const problems: string[] = [];
-  const f = cellToFile(cell, insIndexById, `pattern ${pat} channel ${ch + 1} row ${row}`, problems, effectNotationOf(channelMeta));
+  const f = cellToFile(cell, insIndexById, `pattern ${pat} channel ${ch + 1} row ${row}`, problems, effectNotationOf(channelMeta), [], arpStop);
   const writes: SeqCellWrite[] = [];
   const put = (col: number, val: number) => writes.push({ ch, pat, row, col, val });
   put(0, seqNoteOfFile(f.note));
@@ -64,6 +68,33 @@ export function derivedCellSeqWrites(
     if (e.type >= 0 || e.val >= 0) effectCols = Math.max(effectCols, k + 1);
   });
   return { writes, effectCols, problems };
+}
+
+/**
+ * A live edit of one store cell in song context: the cell itself plus the cells whose tracker
+ * arp stop (Furnace 0000) depends on it (the next row, or row 0 of every pattern that follows in
+ * the order list), each converted exactly as the exporter converts it.
+ */
+export function derivedCellSyncInSong(
+  patterns: readonly Pattern[],
+  positions: readonly number[],
+  instrumentIds: readonly number[],
+  ch: number,
+  pat: number,
+  row: number,
+): DerivedCellSync {
+  const out: DerivedCellSync = { writes: [], effectCols: 1, problems: [] };
+  for (const at of [{ pat, row }, ...trackerArpDependents(patterns, positions, pat, row)]) {
+    const chan = patterns[at.pat]?.channels[ch];
+    const cell = chan?.rows[at.row];
+    if (!chan || !cell) continue;
+    const s = derivedCellSeqWrites(cell, chan.channelMeta, instrumentIds, ch, at.pat, at.row,
+      trackerArpStopAt(patterns, positions, at.pat, ch, at.row));
+    out.writes.push(...s.writes);
+    out.problems.push(...s.problems);
+    out.effectCols = Math.max(out.effectCols, s.effectCols);
+  }
+  return out;
 }
 
 /** What the running sequencer was loaded from, for deciding how a later edit reaches it. */
