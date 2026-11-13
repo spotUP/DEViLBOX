@@ -33,9 +33,10 @@
  */
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
-import type { InstrumentConfig, TrackerCell } from '@/types';
-import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodePaulShieldsCell } from '@/engine/uade/encoders/PaulShieldsEncoder';
+import type { InstrumentConfig } from '@/types';
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { paulShieldsEncoder } from '@/engine/uade/encoders/PaulShieldsEncoder';
+import { buildPaulShieldsGrid, PAUL_SHIELDS_ROWS_PER_PATTERN } from './paulShieldsGrid';
 import { createSamplerInstrument } from './AmigaUtils';
 
 // The detection code checks offsets up to 528+2 bytes from file start.
@@ -150,49 +151,6 @@ function findSampleDataOffset(buf: Uint8Array, variant: PaulShieldsVariant): num
     pos += 2;
   }
   return pos;
-}
-
-/**
- * Return the word offsets of the 4-entry song-pointer table for a variant. Each
- * entry is a u16 file offset to a per-channel sequence/note-command stream.
- * (Same offsets findSampleDataOffset uses to bound the sample-data start.)
- */
-function songPtrOffsets(variant: PaulShieldsVariant): number[] {
-  if (variant === 'new') return [166, 170, 174, 178];
-  if (variant === 'old') return [518, 522, 526, 530];
-  return [514, 518, 522, 526]; // veryold
-}
-
-/**
- * Locate the contiguous per-channel sequence/note-command region: from the
- * earliest song-pointer target up to where sample PCM begins. This is the real
- * on-disk note data the player dispatches over (NOT the sample records or the
- * instrument/waveform tables). Returns [start, end); start === end when absent.
- */
-function findCommandRegion(buf: Uint8Array, variant: PaulShieldsVariant): [number, number] {
-  const end = findSampleDataOffset(buf, variant);
-  if (end <= 0) return [0, 0];
-  let start = end;
-  for (const off of songPtrOffsets(variant)) {
-    const t = safeU16(buf, off);
-    if (t > 0 && t < start) start = t;
-  }
-  if (start >= end || start < 0 || end > buf.length) return [0, 0];
-  return [start, end];
-}
-
-/**
- * Byte-exact decode of a single command-stream byte. The dispatch stream has no
- * clean note representation, so the display note is left neutral and the exact
- * source byte is stashed in the invisible `period` carrier for round-trip.
- */
-function decodePSCell(raw: Uint8Array): TrackerCell {
-  const b = raw[0] ?? 0;
-  return {
-    note: 0, instrument: 0, volume: 0,
-    effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-    period: b,
-  } as TrackerCell;
 }
 
 export function parsePaulShieldsFile(buffer: ArrayBuffer, filename: string): TrackerSong {
@@ -310,50 +268,37 @@ export function parsePaulShieldsFile(buffer: ArrayBuffer, filename: string): Tra
     }
   }
 
-  // ── Sequence / note-command region ────────────────────────────────────────
-  // Point the pattern layout at the real per-channel command streams the player
-  // dispatches over, so pattern write-back is byte-exact (the previous stub used
-  // the generic MOD codec over file offset 0 = header, matching ~8% of cells).
-  const [regionStart, regionEnd] = findCommandRegion(buf, variant);
-  const hasRegion = regionEnd > regionStart;
-  const regionLen = hasRegion ? regionEnd - regionStart : 64;
-
-  const rows = Array.from({ length: regionLen }, () => ({
-    note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-  }));
-
-  const pattern = {
-    id: 'pattern-0', name: 'Pattern 0', length: regionLen,
-    channels: [{
-      id: 'channel-0', name: 'Sequence', muted: false,
-      solo: false, collapsed: false, volume: 100, pan: 0,
-      instrumentId: null, color: null, rows,
-    }],
-    importMetadata: {
-      sourceFormat: 'MOD' as const, sourceFile: filename,
-      importedAt: new Date().toISOString(),
-      originalChannelCount: 4, originalPatternCount: 1,
-      originalInstrumentCount: instruments.length,
-    },
-  };
+  // ── Tick grid ─────────────────────────────────────────────────────────────
+  // One row per 50 Hz tick, read from the voices' own order lists and pattern streams (paulShieldsGrid.ts). The
+  // pattern streams ride along byte-exact as carrier blocks; note edits are written in place by PaulShieldsExporter.
+  const grid = buildPaulShieldsGrid(buf, filename);
+  if (!grid) throw new Error('[PaulShieldsParser] the order lists of this module could not be read');
+  const R = PAUL_SHIELDS_ROWS_PER_PATTERN;
 
   return {
     name: `${moduleName} [Paul Shields]`, format: 'MOD' as TrackerFormat,
-    patterns: [pattern], instruments, songPositions: [0],
-    songLength: 1, restartPosition: 0, numChannels: 4,
-    initialSpeed: 6, initialBPM: 125, linearPeriods: false,
+    patterns: grid.patterns, instruments, songPositions: grid.patterns.map((_, i) => i),
+    songLength: grid.patterns.length, restartPosition: 0, numChannels: 4,
+    initialSpeed: 1, initialBPM: 125, linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
-    uadePatternLayout: {
+    uadePlayerTickGrid: true,
+    uadeVariableLayout: {
       formatId: 'paulShields',
-      patternDataFileOffset: hasRegion ? regionStart : 0,
-      bytesPerCell: 1,
-      rowsPerPattern: regionLen,
-      numChannels: 1,
-      numPatterns: 1,
+      numChannels: grid.voices,
+      numFilePatterns: grid.blockRows.length,
+      rowsPerPattern: R,
       moduleSize: buffer.byteLength,
-      encodeCell: encodePaulShieldsCell,
-      decodeCell: decodePSCell,
-    } as UADEPatternLayout,
+      encoder: paulShieldsEncoder,
+      filePatternAddrs: grid.filePatternAddrs,
+      filePatternSizes: grid.filePatternSizes,
+      trackMap: grid.trackMap,
+      blockRows: grid.blockRows,
+      propagateSharedCells: true,
+      noteBytes: grid.placements.map(pl => ({
+        pattern: Math.floor(pl.tick / R), channel: pl.voice, row: pl.tick % R,
+        offset: pl.offset, note: pl.note, base: pl.delta,
+      })),
+    } as UADEVariablePatternLayout,
   };
 }
