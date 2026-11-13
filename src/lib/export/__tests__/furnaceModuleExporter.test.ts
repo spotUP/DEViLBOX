@@ -299,10 +299,14 @@ describe('exportFurnaceModule', () => {
     }
   });
 
-  it('composed Neo Geo song does not play its SSG arpeggios far louder than the FM voices: SSG volume stays at the Furnace default 128, not 256', async () => {
+  it('Neo Geo export keeps the SSG/FM balance furtool builds into the ROM: SSG volume 256, so furtool does not lower the SSG volume macros', async () => {
+    // ngdevkit furtool check_chip_flags: ssgVol=128 sets HALF_SSG_VOL and every SSG vol macro step
+    // drops by one (-2.7 dB), not the -6 dB Furnace applies; the ROM then plays SSG 3.3 dB louder
+    // against FM than DEViLBOX. Only 256 (with fmVol at its default 256) plays the same everywhere.
     const r = exportFurnaceModule(song());
     const mod = await parseFurnaceSong(r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) as ArrayBuffer);
-    expect(mod.chipFlags).toEqual(['ssgVol=128\n']);
+    expect(mod.chipFlags).toEqual(['ssgVol=256\n']);
+    expect((mod.chipFlags ?? []).join('')).not.toMatch(/fmVol=(?!256)/);
   });
 
   it('keeps the second speed, the grooves and the compat flags of a loaded Furnace module', async () => {

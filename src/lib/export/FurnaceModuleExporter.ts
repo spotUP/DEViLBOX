@@ -37,13 +37,20 @@ export const FUR_EXPORT_VERSION = 245;
 export const FUR_SYSTEM_YM2610 = 0xa5;
 export const FUR_NEO_GEO_CHANNELS = 14;
 /**
- * Chip flags of the exported YM2610: SSG volume 128, Furnace's own default (ym2610shared.h,
- * flags.getInt("ssgVol",128)), the balance every loaded .fur plays with. The flag was 256 (twice
- * the SSG level of any Furnace module); a sustained SSG square then stood far above the FM voices
- * (owner listen 2026-11-13, NG-7a: "the arps are very loud compared to the rest"). The song is
- * played here from the same module, so screen and export agree.
+ * Chip flags of the exported YM2610: SSG volume 256 (full chip level, fmVol stays at its default
+ * 256). This is the only setting where the level the composer hears matches the Neo Geo ROM.
+ * ngdevkit's furtool (check_chip_flags, HALF_SSG_VOL) reads ssgVol=128 (Furnace's default,
+ * ym2610shared.h) as "Furnace halved the SSG" and lowers every SSG volume macro step by one
+ * (-2.7 dB on the ymfm SSG table) instead of -6 dB, and nsstool does not touch volume-column
+ * values at all. At 128 the ROM therefore played SSG about 3.3 dB louder against FM than
+ * DEViLBOX/Furnace, and macro tails at 1 vanished. At 256 furtool keeps the macros as written and
+ * prints no warning (measured on the composer trial song, NG-GAME-3, 2026-11-13).
+ * History: 2acbbcf47 set 128 after the owner heard "the arps are very loud compared to the
+ * rest"; that listen coincided with the sticky-arp bug fixed in 07c12dd3b, and the owner later
+ * reported 128 "sounds the same as before". The song is played here from the same module, so
+ * screen and export agree.
  */
-export const FUR_NEO_GEO_CHIP_FLAGS = 'ssgVol=128\n';
+export const FUR_NEO_GEO_CHIP_FLAGS = 'ssgVol=256\n';
 /** The synth type of a Neo Geo instrument in the tracker. */
 export const NEO_GEO_SYNTH_TYPE = 'FurnaceOPNB';
 
@@ -496,7 +503,8 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   const smp2 = userSamples.map((s) => encodeSmp2(s.sample));
 
   // Chip flags of the YM2610 (fur.cpp, "CHIP FLAGS": key=value lines, zero-terminated). Furnace
-  // loads a module without this block at SSG volume 128, half the level of the chip.
+  // loads a module without this block at SSG volume 128, half the level of the chip, which
+  // furtool then compensates in the wrong amount (see FUR_NEO_GEO_CHIP_FLAGS).
   const flag = block('FLAG', new Bytes().str(FUR_NEO_GEO_CHIP_FLAGS));
 
   // Compat flags and grooves of a loaded module (CFLG / GROV); a new song omits both and Furnace uses defaults.
