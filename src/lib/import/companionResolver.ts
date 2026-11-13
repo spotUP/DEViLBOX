@@ -55,6 +55,8 @@ export const ROLE_WORDS: ReadonlySet<string> = new Set([
   'rjp',
   // Quartet ST: QTS.<tune> + SMP.<tune>, else SMP.set (UADE opens '/uade/SMP.<tune>' then '/uade/SMP.set')
   'qts',
+  // Quartet: QPA.<tune> + SMP.<tune>, else SMP.set (eagleplayer ExtLoad; nuade qt_module.c read_sample_set)
+  'qpa',
   // the server's prefix pairs
   'jpn', 'jpnd', 'jp', 'jpo', 'jpold', 'thm', 'mfp', 'sjs', 'max', 'mcr', 'mcs', 'midi',
   // the server's extension pairs and suffixes
@@ -70,7 +72,7 @@ export const ROLE_WORDS: ReadonlySet<string> = new Set([
 export const EXPECTED_PARTNER: Readonly<Record<string, string[]>> = {
   mdat: ['smpl'], smpl: ['mdat'], tfmx: ['smpl'], tfx: ['smpl'],
   spm: ['sps'], sps: ['spm'],
-  rjp: ['smp', 'smp.set'], qts: ['smp', 'smp.set'], dns: ['smp'], sdr: ['smp', 'smp.set'], osp: ['smp.set'],
+  rjp: ['smp', 'smp.set'], qts: ['smp', 'smp.set'], qpa: ['smp', 'smp.set'], dns: ['smp'], sdr: ['smp', 'smp.set'], osp: ['smp.set'],
   jpn: ['smp'], jpnd: ['smp'], jp: ['smp'], jpo: ['smp'], jpold: ['smp'], thm: ['smp'], mfp: ['smp'], sjs: ['smp'], max: ['smp'],
   mcr: ['mcs'], mcs: ['mcr'], midi: ['smpl'],
   sng: ['ins'], dum: ['ins'], '4v': ['set'],
