@@ -29,6 +29,7 @@ import type { InstrumentConfig, Pattern } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { makeDscCellCodec } from '@/engine/uade/encoders/DigitalSonixChromeEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { fileSubsongsField } from '../fileSubsongs';
 import {
   decodeDscModule, dscSections, dscSpeed, dscSubsongCount, dscSubsongEntries, type DscModule,
 } from './DigitalSonixChromeModule';
@@ -296,6 +297,8 @@ export function parseDscFile(buffer: ArrayBuffer, filename: string, subsong = 0)
     initialSpeed: dscSpeed(m.tempo), initialBPM: 125, linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
+    // The tune the grid shows: on nuade (no UADE subsong list) the live switch reopens at a tune, and nuade starts the same one.
+    ...fileSubsongsField({ count: subsongCount, current: subsong, fileName: filename }),
     // Rows are `speed` player interrupts from the first one (proven against
     // UADE's Paula log, digitalSonixChromeGridMatchesPlayer.test.ts).
     uadePlayerTickGrid: true,
