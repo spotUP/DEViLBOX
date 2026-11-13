@@ -15,8 +15,8 @@
  * carry a fractional initialBPM, so the drift cause is gone (stepGridReachability.test.ts).
  *
  * Held to: every note-on the grid shows, on the voice it shows it, is a Paula note-on within
- * TOLERANCE_MS, over the span before the tune's stop-song command (UADE moves on to the next tune
- * after it) and at most WINDOW_SECONDS.
+ * TOLERANCE_MS, over the span before the tune's stop-song command (UADE ends the tune there) and at
+ * most WINDOW_SECONDS.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -54,15 +54,15 @@ function tableOffset(mod: PaulaLogModule, bytes: Uint8Array, name: string): numb
   return -1;
 }
 
-/** Per voice, the seconds at which the original player starts a note, `seconds` of tune `tune` (copied over table entry 0). */
-function paulaOnsets(mod: PaulaLogModule, bytes: Uint8Array, name: string, table: number, tune: number, seconds: number, loopEntries = 1): number[][] {
+/**
+ * Per voice, the seconds at which the original player starts a note, `seconds` of tune `tune` (copied over table entry 0).
+ * loop: when UADE reports the song end, the session starts the same tune again (UADE plays one subsong and never moves
+ * on to the next table entry), so the original's second pass follows its first as the tracker loops the order.
+ */
+function paulaOnsets(mod: PaulaLogModule, bytes: Uint8Array, name: string, table: number, tune: number, seconds: number, loop = false): number[][] {
   const patched = bytes.slice();
-  // loopEntries > 1: the tune is copied over that many entries. UADE re-enters the player's init for the NEXT table entry
-  // once every voice has wrapped (score.s songendbit -> host next subsong; uade_wasm_set_one_subsong cannot stop it, see
-  // the oracle section of thoughts/spot/2026-11-05-apb-voices34.md), so identical entries make it replay the SAME tune, as the tracker loops it.
-  const entry = patched.slice(table + 10 * tune, table + 10 * tune + 10);
-  for (let e = 0; e < Math.max(1, loopEntries); e++) patched.set(entry, table + 10 * e);
-  return paulaOnsetsOf(new PaulaSession(mod, patched, name, { subsong: 1 }), seconds, true);
+  patched.copyWithin(table, table + 10 * tune, table + 10 * tune + 10);
+  return paulaOnsetsOf(new PaulaSession(mod, patched, name, { subsong: 1, loop }), seconds, true);
 }
 
 describe('David Whittaker grids against the original player (UADE Paula note-ons)', { timeout: 900_000 }, () => {
@@ -112,10 +112,13 @@ describe('David Whittaker grids against the original player (UADE Paula note-ons
   const SECOND_PASS_SECONDS = 20;
   // Only apb.dw: UADE ends garfield2+.dw tune 0 (a 243 s pass) at about 238 s, before its second pass starts, so the
   // original has no second pass to compare there. The 68k player never leaves its song (its end-of-list code at 0x502
-  // restarts the list in place); UADE re-enters the init for the next table entry once every voice has wrapped, which
-  // played tune 1 from 8.50 s (voices 3 and 4 started its notes). The oracle therefore copies tune 0 over EVERY table
-  // entry, so each re-entry replays tune 0 as the tracker loops it, and a voice that is silent in the grid must be silent
-  // in the player too.
+  // restarts the list in place), but score.s reports a song end once every voice has wrapped. UADE used to answer that by
+  // entering the next table entry (tune 1 from 8.50 s on voices 3 and 4), and the oracle copied tune 0 over every entry;
+  // since UADE plays one subsong (dfec53be6, UC_ONE_SUBSONG at init) it stops there instead, the session ended at 8.47 s and
+  // the grid's whole second pass counted as missing. The session now loops: UADE restarts the same tune at the song end,
+  // which replays tune 0 as the tracker loops the order, so a voice that is silent in the grid must stay silent in the
+  // player too. Measured: pass 2 note-ons sit 23 ms (max 43 ms) from the grid's, pass 1 8 ms (max 20 ms); the restart
+  // costs about 15 ms.
   for (const rel of FILES.slice(0, 1)) {
     const name = rel.split('/').pop()!;
     it(`${name}: tune 0 stays on the player's notes through the second pass of the order`, async () => {
@@ -130,7 +133,7 @@ describe('David Whittaker grids against the original player (UADE Paula note-ons
       const pass = rowCount * rowSeconds(song);
       const grid = gridOnsets(song).map((l) => [...l, ...l.map((t) => t + pass)]);
       const span = Math.min(pass + SECOND_PASS_SECONDS, 2 * pass);
-      const paula = paulaOnsets(await openUade(), bytes, name, table, 0, span + 1, await dwSubsongCount(ab.slice(0)));
+      const paula = paulaOnsets(await openUade(), bytes, name, table, 0, span + 1, true);
       const misses: string[] = [];
       for (const m of onsetMatch(grid, paula, span, TOLERANCE_MS)) {
         const ok = (hit: number, n: number): boolean => n === 0 || hit / n >= MIN_COVERAGE;
