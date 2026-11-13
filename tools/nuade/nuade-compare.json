@@ -1,7 +1,7 @@
 {
  "version": 1,
  "instrument": {
-  "wasm": "8a1c9ae84d8b",
+  "wasm": "ed9331a76ac9",
   "known_good": {
    "song": "public/data/songs/formats/antidust.bp3",
    "correlation": 0.9739122364298693,
@@ -4288,24 +4288,6 @@
    "ms": 335
   },
   {
-   "correlation": 0.9877984210923785,
-   "lagMs": -20,
-   "windowSecs": 7.16,
-   "uadeEndAt": 7.68,
-   "nuadeEndAt": 7.679666666666667,
-   "peak": 0.31121826171875,
-   "rms": 0.06269480400366917,
-   "voices": 4,
-   "player": "medley",
-   "uadeRms": 0.06182329220400609,
-   "swapMs": 112.24491699999999,
-   "format": "medley",
-   "song": "public/data/songs/medley/combat.mso",
-   "songPass": true,
-   "sha": "770f8218c6aa8a1c9ae84d8b",
-   "ms": 271
-  },
-  {
    "correlation": 0.9720383988115028,
    "lagMs": -20,
    "windowSecs": 3.48,
@@ -4339,6 +4321,24 @@
    "songPass": true,
    "sha": "a8d676bf4f2f8a1c9ae84d8b",
    "ms": 68
+  },
+  {
+   "correlation": 0.9877984210923785,
+   "lagMs": -20,
+   "windowSecs": 7.16,
+   "uadeEndAt": 7.68,
+   "nuadeEndAt": 7.679666666666667,
+   "peak": 0.31121826171875,
+   "rms": 0.06269480400366917,
+   "voices": 4,
+   "player": "medley",
+   "uadeRms": 0.06182329220400609,
+   "swapMs": 122.91687499999898,
+   "format": "medley",
+   "song": "public/data/songs/medley/combat.mso",
+   "songPass": true,
+   "sha": "770f8218c6aaed9331a76ac9",
+   "ms": 264
   }
  ]
 }
