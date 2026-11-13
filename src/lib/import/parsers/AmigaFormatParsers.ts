@@ -1726,7 +1726,7 @@ export async function tryRouteFormat(
     if (isQuartetFormat(buffer, qFile)) {
       const qCtx: FallbackContext = { ...ctx, originalFileName: qFile };
       return withNativeThenUADE('quartet', qCtx,
-        (buf: Uint8Array | ArrayBuffer, name: string) => parseQuartetFile(buf as ArrayBuffer, name),
+        (buf: Uint8Array | ArrayBuffer, name: string) => parseQuartetFile(buf as ArrayBuffer, name, requestedSubsong),
         'QuartetParser', { injectUADE: true });
     }
   }

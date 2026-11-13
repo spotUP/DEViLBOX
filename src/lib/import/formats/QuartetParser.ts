@@ -53,6 +53,7 @@ import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { quartetEncoder } from '@/engine/uade/encoders/QuartetEncoder';
 import { buildQuartetGrid, QUARTET_ROWS_PER_PATTERN } from './quartetPsgGrid';
+import { chooseFileSubsong, fileSubsongFormatByKey, fileSubsongsField, type FileSubsongs } from '../fileSubsongs';
 
 // ── Binary helpers ──────────────────────────────────────────────────────────
 
@@ -465,10 +466,12 @@ const VARIANT_LABEL: Record<NonNullable<QuartetVariant>, string> = {
  *
  * @param buffer   Raw file bytes (ArrayBuffer)
  * @param filename Original filename (used to derive song name and variant)
+ * @param subsong  SQT song to draw (0-based, quartetSongBases order); absent, the first that sounds
  */
 export async function parseQuartetFile(
   buffer: ArrayBuffer,
   filename: string,
+  subsong?: number,
 ): Promise<TrackerSong> {
   const buf = new Uint8Array(buffer);
   const basename = filename.split('/').pop() ?? filename;
@@ -537,8 +540,12 @@ export async function parseQuartetFile(
   }
 
   // ── SQT: the grid is read from the module's own voice streams (quartetPsgGrid.ts) ──
-  const grid = variant === 'sqt' ? buildQuartetGrid(buf, filename, 0) : null;
-  if (grid) {
+  const tunes: FileSubsongs | null = variant === 'sqt'
+    ? await chooseFileSubsong(fileSubsongFormatByKey('quartet')!, buffer, filename, subsong)
+      .catch((): FileSubsongs => ({ count: 1, current: 0, fileName: filename }))
+    : null;
+  const grid = variant === 'sqt' ? buildQuartetGrid(buf, filename, tunes?.current ?? 0) : null;
+  if (grid && tunes) {
     if (instruments[0]) instruments[0].name = 'YM-2149 tone';
     return {
       name: `${moduleName} [${label}]`,
@@ -555,6 +562,7 @@ export async function parseQuartetFile(
       linearPeriods: false,
       uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
       uadeEditableFileName: filename,
+      ...fileSubsongsField(tunes),
       uadeVariableLayout: {
         formatId: 'quartet',
         numChannels: grid.voices,
