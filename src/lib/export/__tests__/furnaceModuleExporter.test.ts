@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { xmVolToFurnace } from '@/lib/import/furnaceEditorCells';
-import { exportFurnaceModule, furnaceModuleExportAvailable, FUR_SYSTEM_YM2610 } from '../FurnaceModuleExporter';
+import { exportFurnaceModule, furnaceModuleExportAvailable, FUR_SYSTEM_YM2610, FUR_SYSTEM_YM2610_EXT } from '../FurnaceModuleExporter';
 import pako from 'pako';
 import { parseFurnaceSong } from '@/lib/import/formats/FurnaceSongParser';
 import { DEFAULT_FURNACE } from '@/types/instrument/defaults';
@@ -324,6 +324,22 @@ describe('exportFurnaceModule', () => {
     expect(mod.compatFlags.linearPitch).toBe(2);
     expect(mod.compatFlags.pitchSlideSpeed).toBe(9);
     expect(mod.compatFlags.brokenShortcutSlides).toBe(false);
+  });
+
+  it('writes the extended-FM chip (0xa6, 17 channels) with FM 2 OP1-OP4 on channels 1-4', async () => {
+    const s = song();
+    for (const p of s.patterns) for (let i = 14; i < 17; i++) p.channels.push(channel(i));
+    set(s.patterns[0], 3, 1, { note: 61, instrument: 1 }); // FM 2 OP3
+    set(s.patterns[0], 16, 0, { note: 49, instrument: 1 }); // ADPCM-B
+    const r = exportFurnaceModule({ ...s, extendedFm: true });
+    const mod = await parseFurnaceSong(r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) as ArrayBuffer);
+    expect(mod.systems[0]).toBe(FUR_SYSTEM_YM2610_EXT);
+    expect(mod.chans).toBe(17);
+    expect(mod.systemChans[0]).toBe(17);
+    const fileNote = (c: { note: number; octave: number }) => (c.octave + 5) * 12 + c.note;
+    expect(fileNote(mod.patterns.get('0_3_0')!.rows[1])).toBe(120);
+    expect(fileNote(mod.patterns.get('0_16_0')!.rows[0])).toBe(108);
+    expect(() => exportFurnaceModule(s)).toThrow(/channel 17 has notes/);
   });
 
   it('offers the export only for Neo Geo instruments', () => {

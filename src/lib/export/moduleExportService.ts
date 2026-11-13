@@ -14,6 +14,7 @@
  * since before this unit.
  */
 import { liveTrackerSong } from '@/lib/song/liveSong';
+import { FurnaceDispatchPlatform } from '@/engine/furnace-dispatch/platforms';
 import { exportFurnaceModule, type FurnaceModuleResult } from './FurnaceModuleExporter';
 import { exportFurnaceAyScramble, ayScrambleTempoWarning, type FurnaceAyScrambleResult } from './FurnaceExporter';
 import { exportWithOpenMPT, type OpenMPTExportOptions, type OpenMPTExportResult } from './OpenMPTExporter';
@@ -100,7 +101,10 @@ export async function exportMidiFile(options: MidiFileOptions): Promise<MidiFile
 
 /** Neo Geo (YM2610) song as a Furnace .fur module, from the live song. Throws when the song holds something the module cannot. */
 export function exportFurnaceModuleFile(): FurnaceModuleResult {
-  return exportFurnaceModule(liveTrackerSong());
+  const song = liveTrackerSong();
+  // An imported extended-FM module (0xa6) keeps its 17-channel layout on export.
+  const extendedFm = song.furnaceNative?.chipIds.includes(FurnaceDispatchPlatform.YM2610_EXT) ?? false;
+  return exportFurnaceModule({ ...song, extendedFm });
 }
 
 /** AY-3-8910 song as a Furnace .fur for the BossGame Scramble player, from the live song. Warnings include the tempo check. */
