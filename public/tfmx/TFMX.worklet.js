@@ -149,7 +149,7 @@ class TFMXProcessor extends AudioWorkletProcessor {
 
       // ── Full-module playback messages ────────────────────────────────────
       case 'loadModule': {
-        if (!this.wasm || !this.ctx) break;
+        if (!this.wasm || !this.ctx) { this.port.postMessage({ type: 'error', message: 'TFMX not initialised' }); break; }
         // Clean up any standalone instrument players from previous loads
         for (const hp of Object.keys(this.players)) {
           const hi = parseInt(hp);
