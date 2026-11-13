@@ -194,7 +194,14 @@ export async function applySong(song: SongToApply, source: SongSource): Promise<
   if (song.gridBaseline === undefined) setGridBaseline(baselineOf(song.patterns), extraBaselineOf(song.patterns));
   else setGridBaseline(song.gridBaseline, song.gridBaselineExtra ?? null);
   tracker.setCurrentPattern(0);
-  if (song.order.length > 0) tracker.setPatternOrder(song.order);
+  // An order entry must name a pattern of this song. A saved session can hold one that does not
+  // (a subsong switch once wrote the tune index as a pattern index); playing it freezes the
+  // transport, so such entries are dropped here, where every load path enters.
+  const order = song.order.filter((p) => Number.isInteger(p) && p >= 0 && p < song.patterns.length);
+  if (order.length < song.order.length) {
+    console.warn(`[applySong] dropped ${song.order.length - order.length} order entries that name no pattern (${song.patterns.length} patterns)`);
+  }
+  if (order.length > 0) tracker.setPatternOrder(order);
 
   const format = useFormatStore.getState();
   format.setOriginalModuleData(song.originalModuleData);
