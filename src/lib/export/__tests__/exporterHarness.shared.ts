@@ -32,6 +32,7 @@ const PARSE_FALLBACK: Record<string, { module: string; fn: string }> = {
   okta: { module: '@lib/import/formats/OktalyzerParser', fn: 'parseOktalyzerFile' },
   prt: { module: '@lib/import/formats/PreTrackerParser', fn: 'parsePreTrackerFile' },
   synmod: { module: '@lib/import/formats/SynTrackerParser', fn: 'parseSynTrackerFile' },
+  mso: { module: '@lib/import/formats/MedleyParser', fn: 'parseMedleyFile' },
   vss: { module: '@lib/import/formats/VoodooSupremeSynthesizerParser', fn: 'parseVoodooSupremeSynthesizerFile' },
 };
 

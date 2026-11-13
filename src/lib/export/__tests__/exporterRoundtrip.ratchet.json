@@ -496,6 +496,14 @@
       "cells": 5991,
       "bytes": 5991
     },
+    "medley": {
+      "exporter": "MedleyExporter.exportMedley",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 11076,
+      "bytes": 11076
+    },
     "soundMon": {
       "exporter": "SMON (SoundMonExporter)",
       "tier": "byte-exact",
