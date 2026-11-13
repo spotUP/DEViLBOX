@@ -55,7 +55,12 @@ describe('MMDC editable grid', () => {
 
     setGridBaseline(baselineOf(song.patterns));
     const { exportNativeSong } = await import('@/lib/export/nativeExportRouter');
-    expect(Buffer.from((await exportNativeSong(song))!.data as Uint8Array).equals(raw)).toBe(true);
+    const exported = (await exportNativeSong(song))!;
+    expect(Buffer.from(exported.data as Uint8Array).equals(raw)).toBe(true);
+    expect(exported.filename).toMatch(/\.mmdc$/);
+    const { getEditableFormat, getLayoutExporters } = await import('@/lib/formats/EditableFormatRegistry');
+    expect(getEditableFormat('mmdc')?.exporter?.fn).toBe('exportMED');
+    expect(getLayoutExporters().mmdc?.module).toBe('MEDExporter');
 
     const row = song.patterns[0].channels[1].rows[3];
     const cell = { ...row, note: row.note === 40 ? 41 : 40, instrument: row.instrument === 5 ? 6 : 5 };
