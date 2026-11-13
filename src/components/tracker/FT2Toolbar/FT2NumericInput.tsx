@@ -25,6 +25,8 @@ interface FT2NumericInputProps {
   throttleMs?: number;
   /** Optional preset values for right-click menu */
   presets?: PresetOption[];
+  /** Show the maximum after the value ("006/012"): the value is one of a counted set (subsongs). */
+  showMax?: boolean;
 }
 
 export const FT2NumericInput: React.FC<FT2NumericInputProps> = ({
@@ -37,6 +39,7 @@ export const FT2NumericInput: React.FC<FT2NumericInputProps> = ({
   format = 'decimal',
   throttleMs = 0,
   presets,
+  showMax = false,
 }) => {
   // Refs for hold-to-repeat functionality
   const repeatIntervalRef = useRef<number | null>(null);
@@ -202,6 +205,7 @@ export const FT2NumericInput: React.FC<FT2NumericInputProps> = ({
           {formatValue(value)}
         </span>
       )}
+      {showMax && <span className="ft2-numeric-label" aria-label={`of ${max}`}>/{formatValue(max)}</span>}
       <div className="ft2-numeric-arrows">
         <button
           className="ft2-arrow ft2-arrow-up"

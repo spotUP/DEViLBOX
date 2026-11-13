@@ -29,6 +29,7 @@ export const FT2SubsongInput: React.FC<FT2SubsongInputProps> = React.memo(({ lab
         onChange={change}
         min={1}
         max={status.count}
+        showMax
       />
     </div>
   );
