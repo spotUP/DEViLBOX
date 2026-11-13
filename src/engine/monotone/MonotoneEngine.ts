@@ -78,6 +78,7 @@ export class MonotoneEngine extends WASMChannelOutputsEngine {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          this.settleModuleLoad();
           console.log('[MonotoneEngine] Module loaded');
           break;
         case 'position':
@@ -88,6 +89,7 @@ export class MonotoneEngine extends WASMChannelOutputsEngine {
           break;
         case 'error':
           console.error('[MonotoneEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -102,7 +104,9 @@ export class MonotoneEngine extends WASMChannelOutputsEngine {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('MonotoneEngine not initialized');
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+    await answered;
   }
 
   /** Swap in an edited module's cells and order while it plays (the replayer keeps its place). */

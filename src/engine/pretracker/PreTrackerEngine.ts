@@ -215,6 +215,7 @@ export class PreTrackerEngine extends WASMSingletonBase implements IsolationCapa
           break;
 
         case 'moduleLoaded':
+          this.settleModuleLoad();
           console.log('[PreTrackerEngine] Module loaded');
           break;
 
@@ -299,6 +300,7 @@ export class PreTrackerEngine extends WASMSingletonBase implements IsolationCapa
 
         case 'error':
           console.error('[PreTrackerEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -343,9 +345,11 @@ export class PreTrackerEngine extends WASMSingletonBase implements IsolationCapa
     meterFeed.clearHeld();
 
     this._metadata = null;
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage(
       { type: 'loadModule', moduleData: buffer },
     );
+    await answered;
   }
 
   play(): void {

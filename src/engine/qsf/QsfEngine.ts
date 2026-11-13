@@ -67,10 +67,12 @@ export class QsfEngine extends WASMSingletonBase {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          this.settleModuleLoad();
           console.log('[QsfEngine] QSF module loaded');
           break;
         case 'error':
           console.error('[QsfEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -85,7 +87,9 @@ export class QsfEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('QsfEngine not initialized');
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+    await answered;
   }
 
   play(): void { this.workletNode?.port.postMessage({ type: 'play' }); }

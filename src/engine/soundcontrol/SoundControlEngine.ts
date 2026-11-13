@@ -82,6 +82,7 @@ export class SoundControlEngine extends WASMChannelOutputsEngine {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          this.settleModuleLoad();
           useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 0', 'Paula 1', 'Paula 2', 'Paula 3']);
           console.log('[SoundControlEngine] Module loaded, subsongs:', data.subsongCount);
           break;
@@ -93,6 +94,7 @@ export class SoundControlEngine extends WASMChannelOutputsEngine {
           break;
         case 'error':
           console.error('[SoundControlEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -112,7 +114,9 @@ export class SoundControlEngine extends WASMChannelOutputsEngine {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('SoundControlEngine not initialized');
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+    await answered;
   }
 
   play(): void {

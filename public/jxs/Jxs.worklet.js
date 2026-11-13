@@ -49,7 +49,7 @@ class JxsProcessor extends AudioWorkletProcessor {
         await this.initWasm(data.wasmBinary, data.jsCode);
         break;
       case 'loadModule':
-        if (!this.module) break;
+        if (!this.module) { this.port.postMessage({ type: 'error', message: 'JXS player not initialised' }); break; }
         this.songBytes = new Uint8Array(data.moduleData);
         this.track = data.subsong | 0;   // the subsong jxs_open plays; a replaced (edited) module keeps it
         this.playing = false;

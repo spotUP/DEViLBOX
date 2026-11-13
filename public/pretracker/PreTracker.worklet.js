@@ -207,7 +207,10 @@ class PreTrackerProcessor extends AudioWorkletProcessor {
   }
 
   loadModuleData(moduleData) {
-    if (!this.module || typeof this.module._player_init !== 'function') return;
+    if (!this.module || typeof this.module._player_init !== 'function') {
+      this.port.postMessage({ type: 'error', message: 'PreTracker player not initialised' });
+      return;
+    }
     try {
       const uint8Data = new Uint8Array(moduleData);
       const malloc = this.module._malloc || this.module.malloc;

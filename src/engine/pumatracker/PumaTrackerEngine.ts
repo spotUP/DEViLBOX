@@ -88,6 +88,7 @@ export class PumaTrackerEngine extends WASMSingletonBase {
           break;
 
         case 'moduleLoaded':
+          this.settleModuleLoad();
           console.log('[PumaTrackerEngine] Module loaded');
           break;
 
@@ -108,6 +109,7 @@ export class PumaTrackerEngine extends WASMSingletonBase {
 
         case 'error':
           console.error('[PumaTrackerEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -132,9 +134,11 @@ export class PumaTrackerEngine extends WASMSingletonBase {
     if (!this.workletNode) throw new Error('PumaTrackerEngine not initialized');
     meterFeed.clearHeld();
 
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage(
       { type: 'loadModule', moduleData: buffer },
     );
+    await answered;
   }
 
   play(): void {

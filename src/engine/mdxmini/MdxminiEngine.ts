@@ -67,6 +67,7 @@ export class MdxminiEngine extends WASMSingletonBase {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          this.settleModuleLoad();
           console.log('[MdxminiEngine] MDX module loaded');
           break;
         case 'pdxLoaded':
@@ -74,6 +75,7 @@ export class MdxminiEngine extends WASMSingletonBase {
           break;
         case 'error':
           console.error('[MdxminiEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -88,7 +90,9 @@ export class MdxminiEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('MdxminiEngine not initialized');
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+    await answered;
   }
 
   async loadPdx(buffer: ArrayBuffer): Promise<void> {

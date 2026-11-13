@@ -96,11 +96,13 @@ export class OrganyaEngine extends WASMSingletonBase {
           break;
 
         case 'moduleLoaded':
+          this.settleModuleLoad();
           console.log('[OrganyaEngine] Module loaded');
           break;
 
         case 'error':
           console.error('[OrganyaEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -119,9 +121,11 @@ export class OrganyaEngine extends WASMSingletonBase {
     await this._initPromise;
     if (!this.workletNode) throw new Error('OrganyaEngine not initialized');
 
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage(
       { type: 'loadModule', moduleData: buffer },
     );
+    await answered;
   }
 
   /** Swap an edited module in while the song plays (the core restarts it from the top). */

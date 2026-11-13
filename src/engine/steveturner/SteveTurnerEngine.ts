@@ -86,6 +86,7 @@ export class SteveTurnerEngine extends WASMSingletonBase {
           break;
 
         case 'moduleLoaded':
+          this.settleModuleLoad();
           console.log('[SteveTurnerEngine] Module loaded');
           break;
 
@@ -105,6 +106,7 @@ export class SteveTurnerEngine extends WASMSingletonBase {
 
         case 'error':
           console.error('[SteveTurnerEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -124,10 +126,12 @@ export class SteveTurnerEngine extends WASMSingletonBase {
     if (!this.workletNode) throw new Error('SteveTurnerEngine not initialized');
     meterFeed.clearHeld();
 
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage(
       { type: 'loadModule', moduleData: buffer },
     );
     this._previewSource = null;
+    await answered;
   }
 
   /**

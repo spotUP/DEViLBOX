@@ -75,6 +75,7 @@ export class Sd2Engine extends WASMSingletonBase {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          this.settleModuleLoad();
           console.log('[Sd2Engine] Module loaded');
           break;
         case 'position':
@@ -82,6 +83,7 @@ export class Sd2Engine extends WASMSingletonBase {
           break;
         case 'error':
           console.error('[Sd2Engine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -102,7 +104,9 @@ export class Sd2Engine extends WASMSingletonBase {
     await this._initPromise;
     if (!this.workletNode) throw new Error('Sd2Engine not initialized');
     this.setKeyboardCopy(null);
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+    await answered;
   }
 
   /** The module the keyboard copy was made from (see keyboardCopy), null while the replayer holds the song or nothing. */

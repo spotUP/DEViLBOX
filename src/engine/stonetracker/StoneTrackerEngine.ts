@@ -72,6 +72,7 @@ export class StoneTrackerEngine extends WASMSingletonBase {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          this.settleModuleLoad();
           useOscilloscopeStore.getState().setChipInfo(8, 0, Array.from({ length: 8 }, (_, i) => `Track ${i + 1}`));
           console.log('[StoneTrackerEngine] StoneTracker song loaded');
           break;
@@ -83,6 +84,7 @@ export class StoneTrackerEngine extends WASMSingletonBase {
           break;
         case 'error':
           console.error('[StoneTrackerEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -99,7 +101,9 @@ export class StoneTrackerEngine extends WASMSingletonBase {
     await this._initPromise;
     if (!this.workletNode) throw new Error('StoneTrackerEngine not initialized');
     if (!sampleBank) throw new Error('StoneTracker needs the SPS sample bank beside the SPM song');
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: song, sampleData: sampleBank });
+    await answered;
   }
 
   play(): void { /* the song starts on load */ }

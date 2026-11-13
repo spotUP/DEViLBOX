@@ -54,10 +54,12 @@ export class MusicMakerEngine extends WASMSingletonBase {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          this.settleModuleLoad();
           console.log(`[MusicMakerEngine] loaded: ${data.kind === 'ext' ? 'EXT' : 'STD'} song, ${data.voices} voices`);
           break;
         case 'error':
           console.error('[MusicMakerEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -69,7 +71,9 @@ export class MusicMakerEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('MusicMakerEngine not initialized');
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', module: musicMakerWorkletModule(buffer) });
+    await answered;
   }
 
   play(): void { this.workletNode?.port.postMessage({ type: 'play' }); }

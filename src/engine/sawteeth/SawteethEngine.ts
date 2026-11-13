@@ -117,6 +117,7 @@ export class SawteethEngine extends WASMSingletonBase {
           break;
 
         case 'moduleLoaded': {
+          this.settleModuleLoad();
           console.log('[SawteethEngine] Module loaded');
           const numCh = data.meta?.channels ?? 4;
           const names = Array.from({ length: numCh }, (_, i) => `Ch ${i + 1}`);
@@ -149,6 +150,7 @@ export class SawteethEngine extends WASMSingletonBase {
 
         case 'error':
           console.error('[SawteethEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -190,9 +192,11 @@ export class SawteethEngine extends WASMSingletonBase {
     await this._initPromise;
     if (!this.workletNode) throw new Error('SawteethEngine not initialized');
 
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage(
       { type: 'loadModule', moduleData: buffer },
     );
+    await answered;
   }
 
   play(): void {

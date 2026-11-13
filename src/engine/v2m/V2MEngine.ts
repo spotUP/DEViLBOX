@@ -72,6 +72,7 @@ export class V2MEngine extends WASMSingletonBase {
           break;
 
         case 'loaded':
+          this.settleModuleLoad();
           console.log('[V2MEngine] V2M loaded, length:', data.lengthSeconds, 's');
           break;
 
@@ -81,6 +82,7 @@ export class V2MEngine extends WASMSingletonBase {
 
         case 'error':
           console.error('[V2MEngine]', data.error);
+          this.failModuleLoad(String(data.error ?? 'module load failed'));
           break;
       }
     };
@@ -100,7 +102,9 @@ export class V2MEngine extends WASMSingletonBase {
     if (!this.workletNode) throw new Error('V2MEngine not initialized');
 
     const data = new Uint8Array(buffer);
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'load', data });
+    await answered;
   }
 
   play(): void {

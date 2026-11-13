@@ -80,6 +80,7 @@ export class KdmEngine extends WASMChannelOutputsEngine {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          this.settleModuleLoad();
           console.log('[KdmEngine] Module loaded');
           break;
         case 'position':
@@ -90,6 +91,7 @@ export class KdmEngine extends WASMChannelOutputsEngine {
           break;
         case 'error':
           console.error('[KdmEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -111,7 +113,9 @@ export class KdmEngine extends WASMChannelOutputsEngine {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('KdmEngine not initialized');
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+    await answered;
   }
 
   /** Swap in an edited song while it plays (the replayer reopens it at the same tick). */

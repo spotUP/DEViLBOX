@@ -74,6 +74,7 @@ export class PsgplayEngine extends WASMSingletonBase implements SubsongPlayer {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          this.settleModuleLoad();
           useOscilloscopeStore.getState().setChipInfo(3, 0, ['YM2149 A', 'YM2149 B', 'YM2149 C']);
           console.log(`[PsgplayEngine] SNDH loaded, subtune ${data.track} of ${data.subtunes}`);
           // PSG play counts subtunes from 1; the model from 0.
@@ -85,6 +86,7 @@ export class PsgplayEngine extends WASMSingletonBase implements SubsongPlayer {
           break;
         case 'error':
           console.error('[PsgplayEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           this.subsongRequests.settle(-1);
           break;
       }
@@ -102,7 +104,9 @@ export class PsgplayEngine extends WASMSingletonBase implements SubsongPlayer {
     await this._initPromise;
     if (!this.workletNode) throw new Error('PsgplayEngine not initialized');
     this.tune = buffer;
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer, track });
+    await answered;
   }
 
   /** Start subtune `index` (0-based) of the file loaded: PSG play reloads it on that subtune. */

@@ -74,6 +74,7 @@ export class GmeEngine extends WASMSingletonBase implements SubsongPlayer {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded': {
+          this.settleModuleLoad();
           // The voices the oscilloscopes get, named by game-music-emu.
           const names = (data.voices as string[]).slice(0, data.scopes as number);
           useOscilloscopeStore.getState().setChipInfo(names.length, 0, names);
@@ -94,6 +95,7 @@ export class GmeEngine extends WASMSingletonBase implements SubsongPlayer {
           break;
         case 'error':
           console.error('[GmeEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -109,7 +111,9 @@ export class GmeEngine extends WASMSingletonBase implements SubsongPlayer {
   async loadTune(buffer: ArrayBuffer, track = 0): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('GmeEngine not initialized');
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer, track });
+    await answered;
   }
 
   play(): void { /* the track starts on load */ }

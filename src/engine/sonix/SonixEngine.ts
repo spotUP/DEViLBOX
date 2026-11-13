@@ -114,6 +114,7 @@ export class SonixEngine extends WASMChannelOutputsEngine {
           break;
 
         case 'moduleLoaded': {
+          this.settleModuleLoad();
           this._meta = data.meta || null;
           console.log('[SonixEngine] Module loaded:', this._meta);
           // Playback starts with the load: re-post the open dub sends now.
@@ -153,6 +154,7 @@ export class SonixEngine extends WASMChannelOutputsEngine {
 
         case 'error':
           console.error('[SonixEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -182,9 +184,11 @@ export class SonixEngine extends WASMChannelOutputsEngine {
 
     // songPath drives the worklet's sonix_song_load_instruments() sidecar-dir walk;
     // its parent dir must match the sidecarFiles' memfs paths (see SONIX_MEMFS_SONG_PATH).
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage(
       { type: 'loadModule', moduleData: buffer, sidecarFiles: sidecarFiles || [], songPath: songPath || 'sonix/song' },
     );
+    await answered;
   }
 
   get meta(): SonixMeta | null {
