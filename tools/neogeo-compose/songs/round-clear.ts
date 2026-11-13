@@ -9,7 +9,7 @@ import { AY, AY_MACRO, ScrambleSongBuilder, ayInstrument, ayMacro, ayVol } from 
 
 export default function (): ScrambleSongBuilder {
   const s = new ScrambleSongBuilder("Peter's Game round clear", 4, 16, 6);
-  const pluck = s.addInstrument('Bright pluck', ayInstrument([ayMacro(AY_MACRO.VOL, [15, 14, 13, 12, 11, 10, 8, 6, 4, 3, 2, 1])]));
+  const pluck = s.addInstrument('Bright pluck', ayInstrument([ayMacro(AY_MACRO.VOL, [15, 14, 13, 12, 11, 10, 8, 6, 4, 3, 2, 0])]));
 
   const p = s.pattern();
   ([[0, 'D-5'], [2, 'B-4'], [4, 'C-5'], [6, 'E-5'], [7, 'G-5'], [8, 'C-6']] as const)
