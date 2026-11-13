@@ -178,8 +178,10 @@ export function repackMmdc(packed: Uint8Array, editedUnpacked: Uint8Array): Uint
     const cells = editedUnpacked.subarray(at, at + b.cells.length);
     if (cells.every((v, k) => v === b.cells[k])) return packed.subarray(b.packedOffset, b.regionEnd);
     const enc = blockBytes(b.tracks, b.lines, encodeMmdcStream(cells));
-    // the block carried a pad byte before the next object: keep that object even-aligned
-    if (b.regionEnd > b.packedEnd && (enc.length & 1)) {
+    // Everything after the block moves by the size difference: keep that difference even, so every later object (block,
+    // sample record, array) stays on the alignment it had. Nuade rejects a sample record on an odd offset, so an odd
+    // shift makes the edited module unplayable. A trailing zero after the stream is never read by the decoder.
+    if ((enc.length - (b.regionEnd - b.packedOffset)) & 1) {
       const padded = new Uint8Array(enc.length + 1);
       padded.set(enc);
       return padded;
