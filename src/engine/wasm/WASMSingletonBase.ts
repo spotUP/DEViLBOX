@@ -237,6 +237,34 @@ export abstract class WASMSingletonBase {
     }
   }
 
+  /** The module load in flight, settled by the worklet's answer (see beginModuleLoad). */
+  private _moduleLoad: { resolve: () => void; reject: (err: Error) => void } | null = null;
+
+  /**
+   * Start a module load and get a promise that settles on the worklet's answer, not on postMessage.
+   * Call it BEFORE posting the load message, await the result after posting it, and settle it from
+   * the message handler: settleModuleLoad() on the success message, failModuleLoad() on 'error'.
+   * Without this a refused module still reports loaded and the routing calls play() on nothing
+   * (Nuade 5b566cb55, audit thoughts/spot/2026-11-13_native-load-audit.md). A newer load aborts
+   * the older one with an AbortError, which callers treat as a quiet cancel.
+   */
+  protected beginModuleLoad(): Promise<void> {
+    this._moduleLoad?.reject(Object.assign(new Error('Load replaced by a newer one'), { name: 'AbortError' }));
+    return new Promise<void>((resolve, reject) => { this._moduleLoad = { resolve, reject }; });
+  }
+
+  /** The worklet accepted the module: resolve the load in flight (no-op when none is in flight). */
+  protected settleModuleLoad(): void {
+    this._moduleLoad?.resolve();
+    this._moduleLoad = null;
+  }
+
+  /** The worklet refused the module: reject the load in flight with its message (no-op when none is in flight). */
+  protected failModuleLoad(message: string): void {
+    this._moduleLoad?.reject(new Error(message));
+    this._moduleLoad = null;
+  }
+
   protected abstract createNode(): void;
   protected abstract getLoaderConfig(): WASMLoaderConfig;
 

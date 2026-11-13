@@ -105,6 +105,7 @@ export class EaglePlayerEngine extends WASMChannelOutputsEngine implements Subso
         case 'rowClipDone':
           break;
         case 'moduleLoaded':
+          this.settleModuleLoad();
           this._loadedOnce = true;
           useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 1', 'Paula 2', 'Paula 3', 'Paula 4']);
           // The player's DTP_SubSongRange, 0-based for the subsong model.
@@ -129,6 +130,7 @@ export class EaglePlayerEngine extends WASMChannelOutputsEngine implements Subso
           break;
         case 'error':
           console.error('[EaglePlayerEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -160,6 +162,7 @@ export class EaglePlayerEngine extends WASMChannelOutputsEngine implements Subso
     const fmt = eaglePlayerFormat(formatId);
     if (!fmt) throw new Error(`EaglePlayerEngine: unknown format "${formatId}"`);
     const playerData = (await EaglePlayerEngine.fetchPlayer(eaglePlayerUrl(fmt, import.meta.env.BASE_URL || '/'))).slice(0);
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({
       type: 'loadModule',
       moduleData, playerData,
@@ -171,6 +174,7 @@ export class EaglePlayerEngine extends WASMChannelOutputsEngine implements Subso
       // matches the base name, case-insensitively).
       files: Array.from(companions ?? [], ([name, data]) => ({ name, data: data.slice(0) })),
     }, [moduleData, playerData]);
+    await answered;
   }
 
   play(): void {

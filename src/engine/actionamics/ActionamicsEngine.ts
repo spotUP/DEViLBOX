@@ -92,6 +92,7 @@ export class ActionamicsEngine extends WASMChannelOutputsEngine {
           if (this._resolveInit) { this._resolveInit(); this._resolveInit = null; }
           break;
         case 'moduleLoaded':
+          this.settleModuleLoad();
           useOscilloscopeStore.getState().setChipInfo(4, 0, ['Paula 0', 'Paula 1', 'Paula 2', 'Paula 3']);
           console.log('[ActionamicsEngine] Module loaded, subsongs:', data.subsongCount);
           break;
@@ -106,6 +107,7 @@ export class ActionamicsEngine extends WASMChannelOutputsEngine {
           break;
         case 'error':
           console.error('[ActionamicsEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -120,7 +122,9 @@ export class ActionamicsEngine extends WASMChannelOutputsEngine {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('ActionamicsEngine not initialized');
+    const answered = this.beginModuleLoad();
     this.workletNode.port.postMessage({ type: 'loadModule', moduleData: buffer });
+    await answered;
   }
 
   /** Swap in an edited module's tracks while it plays (every voice keeps its row). */

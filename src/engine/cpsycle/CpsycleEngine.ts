@@ -73,11 +73,13 @@ export class CpsycleEngine extends WASMSingletonBase {
           break;
 
         case 'moduleLoaded':
+          this.settleModuleLoad();
           console.log('[CpsycleEngine] Module loaded');
           break;
 
         case 'error':
           console.error('[CpsycleEngine]', data.message);
+          this.failModuleLoad(String(data.message ?? 'module load failed'));
           break;
       }
     };
@@ -95,10 +97,12 @@ export class CpsycleEngine extends WASMSingletonBase {
   async loadTune(buffer: ArrayBuffer): Promise<void> {
     await this._initPromise;
     if (!this.workletNode) throw new Error('CpsycleEngine not initialized');
+    const answered = this.beginModuleLoad();
 
     this.workletNode.port.postMessage(
       { type: 'loadModule', moduleData: buffer },
     );
+    await answered;
   }
 
   play(): void {

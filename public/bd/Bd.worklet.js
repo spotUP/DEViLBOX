@@ -81,6 +81,9 @@ class BdProcessor extends AudioWorkletProcessor {
           } catch (error) {
             this.port.postMessage({ type: 'error', message: error.message });
           }
+        } else {
+          // Answer every load: the engine waits for moduleLoaded or error before it reports loaded.
+          this.port.postMessage({ type: 'error', message: 'Ben Daglish player not initialised' });
         }
         break;
 
