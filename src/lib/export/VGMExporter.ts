@@ -131,7 +131,21 @@ export interface RegisterWrite {
   data: number;
 }
 
+/**
+ * One ROM data block (VGM 0x67 0x66 tt): `type` is the VGM block type (YM2610
+ * ADPCM-A ROM 0x82, ADPCM-B ROM 0x83), `romSize` the chip's total ROM size,
+ * `startAddress` where `bytes` sit in it (Furnace writes the used bytes at 0).
+ */
+export interface VGMDataBlock {
+  type: number;
+  romSize: number;
+  startAddress: number;
+  bytes: Uint8Array;
+}
+
 export interface VGMExportOptions {
+  /** ROM blocks written before the first command (sample ROMs the register writes point into). */
+  dataBlocks?: VGMDataBlock[];
   title?: string;
   author?: string;
   game?: string;
@@ -351,17 +365,29 @@ export function exportToVGM(
   // End of data
   commands.push(VGM_CMD.END);
 
+  // ROM data blocks come before the first command. They stay out of `commands`
+  // so the loop-point scan below never reads sample bytes as commands.
+  const blocks: number[] = [];
+  for (const b of options.dataBlocks ?? []) {
+    const size = b.bytes.length + 8; // the two u32 below count in the block length
+    blocks.push(0x67, 0x66, b.type & 0xFF);
+    for (const v of [size, b.romSize, b.startAddress]) {
+      blocks.push(v & 0xFF, (v >>> 8) & 0xFF, (v >>> 16) & 0xFF, (v >>> 24) & 0xFF);
+    }
+    for (let i = 0; i < b.bytes.length; i++) blocks.push(b.bytes[i]);
+  }
+
   // Create GD3 tag
   const gd3 = createGD3Tag(options);
 
   // Calculate header size (0x100 for VGM 1.71)
   const headerSize = 0x100;
-  const dataOffset = headerSize - 0x34; // Relative to offset 0x34
-  const gd3Offset = headerSize + commands.length - 0x14; // Relative to offset 0x14
-  const eofOffset = headerSize + commands.length + gd3.length - 0x04; // Relative to offset 0x04
+  const dataOffset = headerSize - 0x34; // blocks and commands both start at headerSize // Relative to offset 0x34
+  const gd3Offset = headerSize + blocks.length + commands.length - 0x14; // Relative to offset 0x14
+  const eofOffset = headerSize + blocks.length + commands.length + gd3.length - 0x04; // Relative to offset 0x04
 
   // Build final file
-  const totalSize = headerSize + commands.length + gd3.length;
+  const totalSize = headerSize + blocks.length + commands.length + gd3.length;
   const vgm = new Uint8Array(totalSize);
   const view = new DataView(vgm.buffer);
 
@@ -433,16 +459,17 @@ export function exportToVGM(
       }
     }
     if (loopByteOffset > 0) {
-      view.setUint32(VGM_HEADER.LOOP_OFFSET, headerSize + loopByteOffset - 0x1C, true);
+      view.setUint32(VGM_HEADER.LOOP_OFFSET, headerSize + blocks.length + loopByteOffset - 0x1C, true);
       view.setUint32(VGM_HEADER.LOOP_SAMPLES, totalSamples - options.loopPoint, true);
     }
   }
 
   // Write command data
-  vgm.set(commands, headerSize);
+  vgm.set(blocks, headerSize);
+  vgm.set(commands, headerSize + blocks.length);
 
   // Write GD3 tag
-  vgm.set(gd3, headerSize + commands.length);
+  vgm.set(gd3, headerSize + blocks.length + commands.length);
 
   return vgm;
 }

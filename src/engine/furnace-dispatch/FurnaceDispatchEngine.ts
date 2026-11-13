@@ -20,7 +20,7 @@ import {
 } from '@engine/wasm/WASMSingletonBase';
 
 export { FurnaceDispatchPlatform } from './platforms';
-import { batchesToRegisterWrites, type DispatchRegBatch } from '@lib/export/dispatchRegCapture';
+import { batchesToRegisterWrites, type DispatchRegBatch, type DispatchSampleRom } from '@lib/export/dispatchRegCapture';
 import type { RegisterWrite } from '@lib/export/VGMExporter';
 import { STAND_INS } from './synthPlatforms';
 
@@ -786,6 +786,7 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
 
   // Command log callbacks for automation capture
   private _regCaptureBatches: DispatchRegBatch[] = [];
+  private _sampleMemWaiters = new Map<number, (roms: DispatchSampleRom[]) => void>();
   private _cmdLogCallbacks: Set<(entries: Array<{ tick: number; cmd: number; channel: number; value1: number; value2: number }>) => void> = new Set();
 
   // Shared WASM asset cache (binary + JS glue + per-context registration state).
@@ -1166,6 +1167,13 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
           cb(data.order as number, data.row as number, data.audioTime as number | undefined);
         }
         break;
+
+      case 'sampleMem': {
+        const wait = this._sampleMemWaiters.get(data.platformType as number);
+        this._sampleMemWaiters.delete(data.platformType as number);
+        wait?.(data.blocks as DispatchSampleRom[]);
+        break;
+      }
 
       case 'regCapture':
         this._regCaptureBatches.push(...(data.batches as DispatchRegBatch[]));
@@ -1784,6 +1792,19 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
    */
   getRegCaptureLog(): RegisterWrite[] {
     return batchesToRegisterWrites(this._regCaptureBatches);
+  }
+
+  /**
+   * The chip's sample ROMs after renderSamples (YM2610: ADPCM-A and ADPCM-B),
+   * for the VGM export's 0x67 data blocks. Resolves empty if the worklet does
+   * not answer within a second.
+   */
+  getSampleRoms(platformType: number): Promise<DispatchSampleRom[]> {
+    return new Promise(resolve => {
+      const timer = setTimeout(() => { this._sampleMemWaiters.delete(platformType); resolve([]); }, 1000);
+      this._sampleMemWaiters.set(platformType, roms => { clearTimeout(timer); resolve(roms); });
+      this.workletNode?.port.postMessage({ type: 'getSampleMem', platformType });
+    });
   }
 
   /** Sample rate of the timestamps in getRegCaptureLog (the native context rate). */

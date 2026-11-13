@@ -385,6 +385,24 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         }
         break;
 
+      case 'getSampleMem': {
+        // The chip's sample ROMs (YM2610: index 0 ADPCM-A, 1 ADPCM-B) as Furnace's
+        // VGM export reads them: used bytes, capacity, a copy of the used bytes.
+        const chip = this.getChip(data.platformType);
+        const blocks = [];
+        if (chip && this.wasm && this.wasm.sampleMem) {
+          for (const index of data.indices || [0, 1]) {
+            const usage = this.wasm.sampleMem(chip.handle, index, 0);
+            if (usage <= 0) continue;
+            const capacity = this.wasm.sampleMem(chip.handle, index, 1);
+            const ptr = this.wasm.sampleMem(chip.handle, index, 2);
+            blocks.push({ index, capacity, bytes: new Uint8Array(this.module.HEAPU8.subarray(ptr, ptr + usage)) });
+          }
+        }
+        this.port.postMessage({ type: 'sampleMem', platformType: data.platformType, blocks }, blocks.map(b => b.bytes.buffer));
+        break;
+      }
+
       case 'renderSamples': {
         const chip = this.getChip(data.platformType);
         if (chip && this.wasm) {
@@ -889,6 +907,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         loadIns2: this.module._furnace_dispatch_load_ins2,
         setSample: this.module._furnace_dispatch_set_sample,
         renderSamples: this.module._furnace_dispatch_render_samples,
+        sampleMem: this.module._furnace_dispatch_sample_mem,
         // Macro control functions
         setMacrosEnabled: this.module._furnace_dispatch_set_macros_enabled,
         clearMacros: this.module._furnace_dispatch_clear_macros,
@@ -1000,6 +1019,10 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     });
 
     this.tickAccumulator = 0;
+
+    // A chip made while a register capture runs (the song was never played
+    // before Record) is dumped from its first tick, like the chips that existed.
+    if (this._regCapture && this.wasm.regDump) this.wasm.regDump(handle, 1);
 
     // Set tick rate
     this.wasm.setTickRate(handle, this.tickRate);

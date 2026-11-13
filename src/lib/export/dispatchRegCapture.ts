@@ -6,7 +6,7 @@
  */
 import { FurnaceChipType } from '../../engine/chips/FurnaceChipEngine';
 import { FurnaceDispatchPlatform } from '../../engine/furnace-dispatch/platforms';
-import type { RegisterWrite } from './VGMExporter';
+import type { RegisterWrite, VGMDataBlock } from './VGMExporter';
 
 /**
  * One drained batch as the worklet posts it. `pairs` is a flat
@@ -85,5 +85,27 @@ export function dispatchCaptureToLog(writes: readonly RegisterWrite[], workletRa
     view.setUint32(o + 5, w.port, true);
     view.setUint8(o + 9, w.data);
   });
+  return out;
+}
+
+/** One chip sample ROM as the worklet reads it (YM2610: index 0 ADPCM-A, 1 ADPCM-B). */
+export interface DispatchSampleRom {
+  index: number;
+  capacity: number;
+  bytes: Uint8Array;
+}
+
+/**
+ * VGM ROM data blocks for a YM2610 chip's sample ROMs, as Furnace's VGM export
+ * writes them (vgmOps.cpp: type 0x82 ADPCM-A, 0x83 ADPCM-B, ROM size = chip
+ * capacity, the used bytes at address 0 -- the addresses renderSamples gave the
+ * samples, which the chip registers point to).
+ */
+export function ym2610RomBlocks(roms: readonly DispatchSampleRom[]): VGMDataBlock[] {
+  const out: VGMDataBlock[] = [];
+  for (const r of roms) {
+    if (r.bytes.length === 0 || (r.index !== 0 && r.index !== 1)) continue;
+    out.push({ type: r.index === 0 ? 0x82 : 0x83, romSize: r.capacity, startAddress: 0, bytes: r.bytes });
+  }
   return out;
 }

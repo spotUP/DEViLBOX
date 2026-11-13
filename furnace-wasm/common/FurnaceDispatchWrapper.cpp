@@ -1139,6 +1139,23 @@ int furnace_dispatch_reg_writes(int handle, int* out, int max) {
 }
 
 /**
+ * Sample memory of one chip, as Furnace's VGM export reads it
+ * (DivDispatch::getSampleMem / getSampleMemUsage / getSampleMemCapacity):
+ * the YM2610 has index 0 = ADPCM-A ROM, 1 = ADPCM-B ROM. `what`: 0 = bytes
+ * used, 1 = capacity, 2 = address of the first byte in the module heap
+ * (valid until the next renderSamples). Returns 0 for an index the chip lacks.
+ */
+EMSCRIPTEN_KEEPALIVE
+int furnace_dispatch_sample_mem(int handle, int index, int what) {
+  auto it = g_instances.find(handle);
+  if (it == g_instances.end() || !it->second->dispatch) return 0;
+  DivDispatch* d = it->second->dispatch;
+  if (what == 0) return (int)d->getSampleMemUsage(index);
+  if (what == 1) return (int)d->getSampleMemCapacity(index);
+  return (int)(size_t)d->getSampleMem(index);
+}
+
+/**
  * Send a command to the dispatch.
  */
 EMSCRIPTEN_KEEPALIVE

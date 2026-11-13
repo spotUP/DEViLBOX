@@ -7,7 +7,8 @@
 
 import { FurnaceChipEngine, FurnaceChipType } from '../../engine/chips/FurnaceChipEngine';
 import { FurnaceDispatchEngine } from '../../engine/furnace-dispatch/FurnaceDispatchEngine';
-import { VGM_MAPPED_PLATFORMS, dispatchCaptureToLog } from './dispatchRegCapture';
+import { VGM_MAPPED_PLATFORMS, dispatchCaptureToLog, ym2610RomBlocks } from './dispatchRegCapture';
+import type { VGMDataBlock } from './VGMExporter';
 import { parseRegisterLog, exportToVGM, type VGMExportOptions, type RegisterWrite } from './VGMExporter';
 import { exportToZSM, canExportZSM, type ZSMExportOptions } from './ZSMExporter';
 import { exportToSAP, canExportSAP, type SAPExportOptions } from './SAPExporter';
@@ -372,6 +373,8 @@ export class ChipRecordingSession {
   private engine: FurnaceChipEngine;
   /** Set while recording from the dispatch engine (user-made Furnace chip songs). */
   private dispatch: FurnaceDispatchEngine | null = null;
+  /** ROM data blocks of the last dispatch recording (YM2610 sample ROMs), for the VGM export. */
+  private romBlocks: VGMDataBlock[] = [];
 
   constructor() {
     this.engine = FurnaceChipEngine.getInstance();
@@ -391,6 +394,7 @@ export class ChipRecordingSession {
     // capture; everything else through the FurnaceChipEngine log.
     const d = FurnaceDispatchEngine.getInstance();
     this.dispatch = d.isInitialized && VGM_MAPPED_PLATFORMS.some(p => d.hasChip(p)) ? d : null;
+    this.romBlocks = [];
     if (this.dispatch) this.dispatch.startRegCapture();
     else this.engine.setLogging(true);
     this.isRecording = true;
@@ -413,6 +417,8 @@ export class ChipRecordingSession {
       d.stopRegCapture();
       // The last tick's batch may still be in flight from the worklet.
       await new Promise(resolve => setTimeout(resolve, 100));
+      const platform = VGM_MAPPED_PLATFORMS.find(p => d.hasChip(p));
+      this.romBlocks = platform === undefined ? [] : ym2610RomBlocks(await d.getSampleRoms(platform));
       return dispatchCaptureToLog(d.getRegCaptureLog(), d.regCaptureSampleRate);
     }
     this.engine.setLogging(false);
@@ -421,6 +427,11 @@ export class ChipRecordingSession {
     console.log(`[ChipRecordingSession] Recording stopped. Captured ${logData.length} bytes`);
 
     return logData;
+  }
+
+  /** Sample ROM blocks of the last recording; pass as `vgm.dataBlocks` to exportChipMusic. */
+  getRomBlocks(): VGMDataBlock[] {
+    return this.romBlocks;
   }
 
   /**
