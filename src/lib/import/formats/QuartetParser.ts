@@ -53,6 +53,7 @@ import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { quartetEncoder } from '@/engine/uade/encoders/QuartetEncoder';
 import { buildQuartetGrid, QUARTET_ROWS_PER_PATTERN } from './quartetPsgGrid';
+import { buildQuartetStGrid, buildQuartetStInstruments, QUARTET_ST_VOICES } from './quartetStGrid';
 import { chooseFileSubsong, fileSubsongFormatByKey, fileSubsongsField, type FileSubsongs } from '../fileSubsongs';
 
 // ── Binary helpers ──────────────────────────────────────────────────────────
@@ -442,6 +443,17 @@ function buildEmptyPattern(filename: string, numInstruments: number) {
   };
 }
 
+/** The Quartet ST sample file: the song's own SMP.<name>, else the shared SMP.set (either case). */
+function findQuartetStSamples(songName: string, companionFiles?: Map<string, ArrayBuffer>): Uint8Array | null {
+  if (!companionFiles) return null;
+  for (const cand of [`smp.${songName}`, 'smp.set', 'set.smp']) {
+    for (const [key, val] of companionFiles) {
+      if ((key.split('/').pop() ?? key).toLowerCase() === cand.toLowerCase()) return new Uint8Array(val);
+    }
+  }
+  return null;
+}
+
 // ── Variant-specific metadata labels ───────────────────────────────────────
 
 const VARIANT_LABEL: Record<NonNullable<QuartetVariant>, string> = {
@@ -472,6 +484,7 @@ export async function parseQuartetFile(
   buffer: ArrayBuffer,
   filename: string,
   subsong?: number,
+  companionFiles?: Map<string, ArrayBuffer>,
 ): Promise<TrackerSong> {
   const buf = new Uint8Array(buffer);
   const basename = filename.split('/').pop() ?? filename;
@@ -585,7 +598,29 @@ export async function parseQuartetFile(
     };
   }
 
-  // ── Pattern placeholder (QPA / QTS, or an SQT whose code shape is not recognised) ──
+  // ── QTS: the grid is read from the four voice streams (quartetStGrid.ts), samples from the SMP file ──
+  const stGrid = variant === 'qts' ? buildQuartetStGrid(buf, filename) : null;
+  if (stGrid) {
+    return {
+      name: `${moduleName} [${label}]`,
+      format: 'MOD' as TrackerFormat,
+      patterns: stGrid.patterns,
+      instruments: buildQuartetStInstruments(stGrid, findQuartetStSamples(moduleName, companionFiles)),
+      songPositions: stGrid.patterns.map((_, i) => i),
+      songLength: stGrid.patterns.length,
+      restartPosition: 0,
+      numChannels: QUARTET_ST_VOICES,
+      // one row = `step` player interrupts; the interrupt runs at tickHz (BPM = Hz * 2.5)
+      initialSpeed: stGrid.step,
+      initialBPM: Math.round(stGrid.tickHz * 2.5),
+      linearPeriods: false,
+      uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+      uadeEditableFileName: filename,
+      uadePlayerTickGrid: true,
+    };
+  }
+
+  // ── Pattern placeholder (QPA, or an SQT / QTS whose data shape is not recognised) ──
   const pattern = buildEmptyPattern(filename, numInstruments);
 
   return {
