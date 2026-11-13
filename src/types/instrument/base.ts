@@ -248,6 +248,7 @@ export type SynthType =
   | 'HippelCoSoSynth' // Jochen Hippel CoSo (frequency/volume sequence synthesis)
   | 'RobHubbardSynth' // Rob Hubbard (Amiga PCM sample + vibrato/wobble synthesis)
   | 'HippelStSynth'   // Jochen Hippel Atari ST (volume/sound sequence over a YM2149 voice)
+  | 'MedleySynth'     // Medley (.mso) instrument: keyboard voice of the nuade medley player (nuade-wasm patch 0002)
   | 'SteveTurnerSynth' // Steve Turner (Amiga PCM + multi-phase envelope + vibrato table)
   | 'SidMon1Synth'    // SidMon 1.0 (ADSR + arpeggio + wavetable synthesis)
   | 'OctaMEDSynth'   // OctaMED SynthInstr (vol/wf command table oscillator)

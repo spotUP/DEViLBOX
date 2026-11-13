@@ -9,8 +9,8 @@ import { useFormatStore } from '@/stores/useFormatStore';
 type KeyboardField = 'soundMonFileData' | 'sd2FileData';
 
 /** The module for the keyboard copy when the loaded song plays on nuade; null when it plays on its own replayer. */
-export function keyboardModuleOnNuade(field: KeyboardField): ArrayBuffer | null {
+export function keyboardModuleOnNuade(field?: KeyboardField): ArrayBuffer | null {
   const f = useFormatStore.getState();
   if (!f.nuadeFileData) return null;
-  return f[field] ?? f.nuadeFileData;
+  return field ? f[field] ?? f.nuadeFileData : f.nuadeFileData;
 }

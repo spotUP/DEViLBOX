@@ -58,6 +58,8 @@ const NATIVE_AUDITION_SYNTHS = new Set([
   'RobHubbardSynth',
   // K9: Hippel ST plays on its own engine (HippelStEngine); a key starts the instrument on its keyboard player.
   'HippelStSynth',
+  // Medley plays on nuade; a key starts the instrument on a parked second medley player (nuade-wasm patch 0002).
+  'MedleySynth',
 ]);
 
 /**
@@ -75,7 +77,7 @@ export const KEYBOARD_VOICE_SYNTHS: ReadonlySet<string> = new Set([
   'TFMXSynth', 'OctaMEDSynth', 'HippelCoSoSynth', 'RobHubbardSynth', 'SteveTurnerSynth', 'HippelStSynth',
   'DavidWhittakerSynth', 'SonicArrangerSynth', 'InStereo1Synth', 'InStereo2Synth',
   'StartrekkerAMSynth', 'DeltaMusic1Synth', 'DeltaMusic2Synth', 'FuturePlayerSynth',
-  'SunTronicSynth',
+  'SunTronicSynth', 'MedleySynth',
 ]);
 
 /**

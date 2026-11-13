@@ -53,6 +53,12 @@ export interface NuadeModule {
   _nw_next_position(): number;
   _nw_next_commit(): number;
   _nw_next_close(): void;
+  /** Keyboard voice (nuade-wasm patch 0002, Medley): a parked second player on the module; 0 ok, -4 not a medley song. */
+  _nw_key_open(data: number, len: number, name: number, playerId: number, subsong: number): number;
+  _nw_key_on(instrument: number, sounding: number): number;
+  _nw_key_off(): void;
+  _nw_key_render(stereo: number, frames: number): number;
+  _nw_key_close(): void;
 }
 
 

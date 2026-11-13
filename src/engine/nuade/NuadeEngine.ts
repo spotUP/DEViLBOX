@@ -231,6 +231,21 @@ export class NuadeEngine extends WASMChannelOutputsEngine implements SubsongPlay
   stop(): void { this.meterFeed.clearHeld(); this.post({ type: 'stop' }); }
   pause(): void { this.post({ type: 'pause' }); }
 
+  private _keyModule: ArrayBuffer | null = null;
+  /**
+   * Keyboard voice (nuade-wasm patch 0002, Medley): the worklet opens `bytes` on a second, parked player and plays keys
+   * on it through the replayer's own note start, mixed into this engine's output. Sent once per module.
+   */
+  async keyLoad(bytes: ArrayBuffer, playerId: string, fileName: string): Promise<void> {
+    await this._initPromise;
+    if (this._keyModule === bytes) return;
+    this._keyModule = bytes;
+    const copy = bytes.slice(0);
+    this.post({ type: 'keyLoad', bytes: copy, playerId, fileName }, [copy]);
+  }
+  keyOn(instrument: number, sounding: number): void { this.post({ type: 'keyOn', instrument, sounding }); }
+  keyOff(): void { this.post({ type: 'keyOff' }); }
+
   /** Bit N set = voice N audible - the mixer's solo/mute. */
   setMuteMask(mask: number): void { this._muteMask = mask; this.post({ type: 'setMuteMask', mask }); }
 
