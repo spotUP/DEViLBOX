@@ -28,8 +28,8 @@ function channel(i: number): ChannelData {
   };
 }
 
-function pattern(id: string): Pattern {
-  return { id, name: id, length: ROWS, channels: Array.from({ length: 3 }, (_, i) => channel(i)) };
+function pattern(id: string, channels = 3): Pattern {
+  return { id, name: id, length: ROWS, channels: Array.from({ length: channels }, (_, i) => channel(i)) };
 }
 
 function set(p: Pattern, ch: number, row: number, cell: Partial<TrackerCell>): void {
@@ -46,9 +46,9 @@ function ay(id: number, name: string, macros: FurnaceMacro[]): InstrumentConfig 
 }
 
 // Tracker notes: 1 = C-0, 49 = C-4, 97 = note off. Volume column 0x10-0x50.
-function song() {
-  const p0 = pattern('p0');
-  const p1 = pattern('p1');
+function song(channels = 3) {
+  const p0 = pattern('p0', channels);
+  const p1 = pattern('p1', channels);
   // Lead (instrument 1): volume decay macro, arpeggio macro 0 4 7 looping.
   set(p0, 0, 0, { note: 49, instrument: 1, volume: 0x50 });
   set(p0, 0, 4, { note: 52, instrument: 1 });
@@ -64,7 +64,7 @@ function song() {
   for (const p of [p0, p1]) for (let r = 0; r < ROWS; r += 4) set(p, 2, r, { note: 49, instrument: 3 });
   set(p1, 2, 15, { effTyp: 0x0b, eff: 0x00 });
   return {
-    name: 'BossGame AY test',
+    name: channels > 3 ? 'BossGame AY 6 channel test' : 'BossGame AY test',
     patterns: [p0, p1],
     instruments: [
       ay(1, 'Lead', [macro(0, [15, 14, 13, 12, 11, 10, 10, 9], 7), macro(1, [0, 4, 7], 0)]),
@@ -82,7 +82,7 @@ const hex2 = (v: number) => v.toString(16).toUpperCase().padStart(2, '0');
 
 /** Row dump of the song as written: note, instrument (file index), AY volume 0-15, effects. */
 function dump(s: ReturnType<typeof song>): string {
-  const lines = [`${s.name}: 3 channels, ${ROWS} rows, orders ${s.songPositions.join(' ')}, speed ${s.initialSpeed}, tick 58.3 Hz`,
+  const lines = [`${s.name}: ${s.patterns[0].channels.length} channels, ${ROWS} rows, orders ${s.songPositions.join(' ')}, speed ${s.initialSpeed}, tick 58.3 Hz`,
     ...s.instruments.map((inst, i) => `instrument ${hex2(i)} ${inst.name}: ${inst.furnace?.macros.map((m) => `macro ${m.code} [${m.data.join(' ')}] loop ${m.loop}`).join('; ')}`)];
   s.patterns.forEach((p, pi) => {
     lines.push('', `pattern ${pi}`);
@@ -141,6 +141,73 @@ describe('exportFurnaceAyScramble', () => {
     set(s.patterns[0], 1, 2, { effTyp: 0x07, eff: 0x44 }); // tremolo: not run by the player
     const { warnings } = exportFurnaceAyScramble(s);
     expect(warnings.some((w) => w.includes('Effect 07 left out'))).toBe(true);
+  });
+});
+
+/** Six-channel song: the 3-channel song plus a second AY (envelope bass, EC, ED, 00). */
+function song6() {
+  const s = song(6);
+  const [p0, p1] = s.patterns;
+  // Envelope instrument: wave macro bit 2 (4) + noise off (mixer tone), shape macro 8, period macro 16.
+  s.instruments.push(
+    ay(4, 'Buzz bass', [macro(0, [15]), macro(3, [4 | 1]), macro(6, [8]), macro(16, [0x0100, 0x0100])]),
+    ay(5, 'Saw bass', [macro(0, [15]), macro(3, [4 | 1]), macro(6, [12]), macro(16, [0x0200])]),
+  );
+  set(p0, 3, 0, { note: 25, instrument: 4 });
+  set(p0, 3, 4, { note: 25, instrument: 5, effTyp: 0x22, eff: 0x81 }); // envelope shape 8, route to channel
+  set(p0, 3, 8, { note: 27, instrument: 4, effTyp: 0x23, eff: 0x40 });
+  set(p0, 4, 0, { note: 49, instrument: 1, effTyp: 0x00, eff: 0x47 }); // arpeggio 00
+  set(p0, 4, 4, { note: 52, instrument: 1, effTyp: 0xec, eff: 0x02 }); // note cut
+  set(p0, 5, 0, { note: 56, instrument: 1, effTyp: 0xed, eff: 0x02 }); // note delay
+  set(p1, 5, 0, { note: 49, instrument: 3 });
+  return s;
+}
+
+describe('exportFurnaceAyScramble, two AY systems', () => {
+  it('writes two AY systems and six channels for a 6-channel song', async () => {
+    const s = song6();
+    const { bytes } = exportFurnaceAyScramble(s);
+    const mod = await parseFurnaceSong(bytes.slice().buffer);
+    expect(mod.systems).toEqual([0x80, 0x80]);
+    expect(mod.chans).toBe(6);
+    expect(mod.instruments.map((i) => i.name)).toContain('Buzz bass');
+    const out = process.env.BOSSGAME_WRITE;
+    if (out) {
+      writeFileSync(join(out, 'test-ay6.fur'), bytes);
+      writeFileSync(join(out, 'test-ay6.txt'), dump(s));
+    }
+  });
+
+  it('keeps the envelope bit, shape macros 8 and 12 and the period macro', async () => {
+    const { bytes, warnings } = exportFurnaceAyScramble(song6());
+    const mod = await parseFurnaceSong(bytes.slice().buffer);
+    const buzz = mod.instruments.find((i) => i.name === 'Buzz bass')!.macros;
+    const saw = mod.instruments.find((i) => i.name === 'Saw bass')!.macros;
+    expect(buzz.find((m) => m.code === 3)?.data[0]! & 4).toBe(4);
+    expect(buzz.find((m) => m.code === 6)?.data).toEqual([8]);
+    expect(saw.find((m) => m.code === 6)?.data).toEqual([12]);
+    expect(buzz.find((m) => m.code === 16)?.data).toEqual([0x0100, 0x0100]);
+    expect(warnings.some((w) => w.includes('Buzz bass') && w.includes('envelope bit'))).toBe(true);
+    expect(warnings.some((w) => w.includes('envelope shape macro kept'))).toBe(true);
+  });
+
+  it('keeps envelope effects, EC, ED and 00 with a warning', () => {
+    const { warnings } = exportFurnaceAyScramble(song6());
+    for (const name of ['22xy', '23xx', 'EC', 'ED', '00']) {
+      expect(warnings.some((w) => w.includes(`Effect ${name}`) && w.includes('kept') && w.includes('BossGame compiler must support it'))).toBe(true);
+    }
+  });
+
+  it('still leaves out a forbidden effect on the second chip', () => {
+    const s = song6();
+    set(s.patterns[0], 4, 8, { note: 49, instrument: 1, effTyp: 0x07, eff: 0x44 });
+    const { warnings } = exportFurnaceAyScramble(s);
+    expect(warnings.some((w) => w.includes('Effect 07 left out'))).toBe(true);
+  });
+
+  it('keeps a 3-channel song on one system', async () => {
+    const mod = await parseFurnaceSong(exportFurnaceAyScramble(song()).bytes.slice().buffer);
+    expect(mod.systems).toEqual([0x80]);
   });
 });
 
