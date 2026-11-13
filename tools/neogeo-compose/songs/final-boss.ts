@@ -37,13 +37,16 @@ export default function (): ScrambleSongBuilder {
     ayMacro(AY_MACRO.VOL, [15, 15, 14, 13, 12, 11, 10], 6), ayMacro(AY_MACRO.ARP, [0, 0, 0, 12, 12, 12], 0)]);
   // Buzz pluck: 3 ticks of tone gated by the saw envelope at the note's own pitch, then a plain tone tail.
   const buzz = ins('Buzz pluck bass', [
-    ayMacro(AY_MACRO.MIXER, [TONE | ENV, TONE | ENV, TONE | ENV, TONE]), ayMacro(AY_MACRO.ENV_SHAPE, [8]), ...autoEnv,
-    ayMacro(AY_MACRO.VOL, [12, 12, 12, 12, 11, 10, 9, 8])]);
-  const saw = ins('Saw drone bass', [ayMacro(AY_MACRO.MIXER, [TONE | ENV]), ayMacro(AY_MACRO.ENV_SHAPE, [8]), ...autoEnv]);
+    ayMacro(AY_MACRO.MIXER, [TONE | ENV, TONE]), ayMacro(AY_MACRO.ENV_SHAPE, [8]), ...autoEnv,
+    ayMacro(AY_MACRO.VOL, [12, 12, 12, 11, 10, 9, 8, 7])]);
+  // Envelope ignores channel volume (always level 15): the saw bite is only the first 2 ticks, the body is plain tone at 12.
+  const saw = ins('Saw drone bass', [
+    ayMacro(AY_MACRO.MIXER, [TONE | ENV, TONE | ENV, TONE]), ayMacro(AY_MACRO.VOL, [15, 15, 12]),
+    ayMacro(AY_MACRO.ENV_SHAPE, [8]), ...autoEnv]);
   // Triangle envelope runs at half the saw rate: the written note sounds an octave lower.
-  // The envelope always plays at full level, so the sub is a 6-tick thump, not a drone (a held one buries the core).
+  // The envelope always plays at full level, so the sub is a 3-tick thump, not a drone (a held one buries the core).
   const sub = ins('Triangle sub', [
-    ayMacro(AY_MACRO.MIXER, [ENV, ENV, ENV, ENV, ENV, ENV, TONE]), ayMacro(AY_MACRO.VOL, [15, 15, 15, 15, 15, 15, 0]),
+    ayMacro(AY_MACRO.MIXER, [ENV, ENV, ENV, TONE]), ayMacro(AY_MACRO.VOL, [15, 15, 15, 0]),
     ayMacro(AY_MACRO.ENV_SHAPE, [10]), ...autoEnv]);
   // Drums carry their own off-beat hat at tick 11: one tick early at speed 6, one tick late at speed 5.
   const kick = ins('Kick + hat', [
