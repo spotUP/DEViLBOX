@@ -11,6 +11,7 @@
 
 import type { FurnaceNativeData } from '@/types';
 import { FurnaceDispatchEngine } from '@/engine/furnace-dispatch/FurnaceDispatchEngine';
+import { chipKeysFor } from '@/engine/furnace-dispatch/chipKey';
 
 /**
  * Upload a Furnace subsong's pattern data to the WASM sequencer.
@@ -143,11 +144,12 @@ export async function uploadFurnaceToSequencer(
     // sequencer channel mapping must match.
     let chanOffset = 0;
     let posted = 0;
+    const chipKeys = chipKeysFor(native.chipIds);
     for (let ci = 0; ci < native.chipIds.length; ci++) {
       const chipId = native.chipIds[ci];
       // Use parser's channel count (sysDef), falling back to dispatch count
-      const chipChans = native.systemChans?.[ci] ?? engine.getChannelCount(chipId);
-      const chipHandle = engine.getChipHandle(chipId);
+      const chipChans = native.systemChans?.[ci] ?? engine.getChannelCount(chipKeys[ci]);
+      const chipHandle = engine.getChipHandle(chipKeys[ci]);
       for (let subIdx = 0; subIdx < chipChans && (chanOffset + subIdx) < numChannels; subIdx++) {
         engine.seqPostMessage({
           type: 'seqSetChannelChip',

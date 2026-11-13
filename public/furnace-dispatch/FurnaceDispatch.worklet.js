@@ -549,9 +549,9 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         const sysPans = data.systemPan || [];
         const sysPanFRs = data.systemPanFR || [];
         for (let i = 0; i < chipIds.length; i++) {
-          const pType = chipIds[i];
+          const pType = chipIds[i];   // chip key
           const sysVol = sysVols[i] ?? 1.0;
-          const postAmp = POST_AMP[pType] ?? 1.0;
+          const postAmp = POST_AMP[pType & 0xffff] ?? 1.0;
           const baseVol = sysVol * postAmp * this.masterVol;
           const pan = sysPans[i] ?? 0.0;
           const panFR = sysPanFRs[i] ?? 0.0;
@@ -983,21 +983,25 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     }
   }
 
-  createChip(platformType, sr) {
+  // `chipKey` is the platform type for a song's first chip of that type and
+  // platform + slot * 0x10000 for the second, third... (Furnace disCont[]: one
+  // dispatch per system, so two AY-3-8910 systems are two chips).
+  createChip(chipKey, sr) {
+    const platformType = chipKey & 0xffff;
     if (this.wasmCrashed) {
       console.warn('[FurnaceDispatch Worklet] Ignoring createChip — WASM module crashed');
       this.port.postMessage({ type: 'error', message: 'Cannot create chip: WASM module crashed. Reload the page.' });
       return;
     }
     // If same platform chip already exists, reuse it (Furnace pattern: disCont[] reuse)
-    if (this.chips.has(platformType)) {
-      const existing = this.chips.get(platformType);
+    if (this.chips.has(chipKey)) {
+      const existing = this.chips.get(chipKey);
       // Reuse existing chip — no log (can happen 4-5x per song load)
       this.port.postMessage({
         type: 'chipCreated',
         handle: existing.handle,
         numChannels: existing.numChannels,
-        platformType: platformType
+        platformType: chipKey
       });
       return;
     }
@@ -1012,10 +1016,11 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     }
 
     const numChannels = this.wasm.getNumChannels(handle);
-    this.chips.set(platformType, {
+    this.chips.set(chipKey, {
       handle,
       numChannels,
       platformType,
+      key: chipKey,
     });
 
     this.tickAccumulator = 0;
@@ -1038,7 +1043,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       type: 'chipCreated',
       handle: handle,
       numChannels: numChannels,
-      platformType: platformType
+      platformType: chipKey
     });
   }
 
@@ -1327,7 +1332,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       // Render each chip and mix into main output with postAmp scaling.
       // Channels that are isolated are muted in the main output to avoid double-summation.
       for (const chip of this.chips.values()) {
-        const chipOff = chipOffsets.get(chip.platformType) || 0;
+        const chipOff = chipOffsets.get(chip.key) || 0;
         try {
           // If isolation is active, mute isolated channels for main output render
           if (isolatedChannelBits) {
@@ -1340,8 +1345,8 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
 
           this.wasm.render(chip.handle, this.outputPtrL, this.outputPtrR, numSamples);
           this.updateBufferViews();
-          const volL = this.chipVolL[chip.platformType] ?? (POST_AMP[chip.platformType] ?? 1.0);
-          const volR = this.chipVolR[chip.platformType] ?? (POST_AMP[chip.platformType] ?? 1.0);
+          const volL = this.chipVolL[chip.key] ?? (POST_AMP[chip.platformType] ?? 1.0);
+          const volR = this.chipVolR[chip.key] ?? (POST_AMP[chip.platformType] ?? 1.0);
           for (let i = 0; i < numSamples; i++) {
             outputL[i] += this.outputBufferL[i] * volL;
             outputR[i] += this.outputBufferR[i] * volR;
@@ -1386,7 +1391,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
           let targetChip = null;
           let targetLocalCh = -1;
           for (const chip of this.chips.values()) {
-            const chipOff = chipOffsets.get(chip.platformType) || 0;
+            const chipOff = chipOffsets.get(chip.key) || 0;
             if (globalCh >= chipOff && globalCh < chipOff + chip.numChannels) {
               targetChip = chip;
               targetLocalCh = globalCh - chipOff;
@@ -1402,8 +1407,8 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
             }
             this.wasm.render(targetChip.handle, this.outputPtrL, this.outputPtrR, numSamples);
             this.updateBufferViews();
-            const dubVolL = this.chipVolL[targetChip.platformType] ?? (POST_AMP[targetChip.platformType] ?? 1.0);
-            const dubVolR = this.chipVolR[targetChip.platformType] ?? (POST_AMP[targetChip.platformType] ?? 1.0);
+            const dubVolL = this.chipVolL[targetChip.key] ?? (POST_AMP[targetChip.platformType] ?? 1.0);
+            const dubVolR = this.chipVolR[targetChip.key] ?? (POST_AMP[targetChip.platformType] ?? 1.0);
             for (let i = 0; i < numSamples; i++) {
               slotL[i] = this.outputBufferL[i] * dubVolL;
               slotR[i] = this.outputBufferR[i] * dubVolR;
@@ -1435,7 +1440,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
           slotR.fill(0);
 
           for (const chip of this.chips.values()) {
-            const chipOff = chipOffsets.get(chip.platformType) || 0;
+            const chipOff = chipOffsets.get(chip.key) || 0;
             try {
               // Mute all channels except those in this slot's mask
               for (let ch = 0; ch < chip.numChannels; ch++) {
@@ -1445,8 +1450,8 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
 
               this.wasm.render(chip.handle, this.outputPtrL, this.outputPtrR, numSamples);
               this.updateBufferViews();
-              const isoVolL = this.chipVolL[chip.platformType] ?? (POST_AMP[chip.platformType] ?? 1.0);
-              const isoVolR = this.chipVolR[chip.platformType] ?? (POST_AMP[chip.platformType] ?? 1.0);
+              const isoVolL = this.chipVolL[chip.key] ?? (POST_AMP[chip.platformType] ?? 1.0);
+              const isoVolR = this.chipVolR[chip.key] ?? (POST_AMP[chip.platformType] ?? 1.0);
               for (let i = 0; i < numSamples; i++) {
                 slotL[i] += this.outputBufferL[i] * isoVolL;
                 slotR[i] += this.outputBufferR[i] * isoVolR;
