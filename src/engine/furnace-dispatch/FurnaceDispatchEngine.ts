@@ -860,6 +860,10 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
   hasChip(platformType: number): boolean {
     return this.chips.has(platformType);
   }
+  /** Whether a note for this platform reaches a chip: its own, or one standing in for it (the worklet's getChip). */
+  playsPlatform(platformType: number): boolean {
+    return this.chips.has(platformType) || (STAND_INS[platformType] ?? []).some((p) => this.chips.has(p));
+  }
   /** Get the dispatch handle for a specific platform type */
   getChipHandle(platformType: number): number {
     return this.chips.get(platformType)?.handle ?? 0;
