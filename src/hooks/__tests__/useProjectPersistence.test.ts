@@ -26,6 +26,9 @@ vi.mock('@/engine/ToneEngine', () => {
 vi.mock('@stores/useInstrumentTypeStore', () => ({
   useInstrumentTypeStore: { getState: () => ({ resetClassified: () => {}, classifyInstruments: () => {} }) },
 }));
+// Load the heavy module graph at collection time, where no hook timeout runs;
+// the dynamic imports below then hit the module cache.
+import '../useProjectPersistence';
 
 beforeAll(() => {
   // Make sure happy-dom's `window` sees the same IDBFactory — some

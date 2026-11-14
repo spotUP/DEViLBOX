@@ -6,6 +6,7 @@
  * Auto-reconnects with exponential backoff (1s, 2s, 4s, capped at 4s).
  */
 
+import { scheduleHardReload } from './hardReload';
 import { furnaceCmdLog } from './handlers/furnaceCmdLog';
 import type { BridgeRequest, BridgeResponse } from './protocol';
 import { RELAY_REPLACED_CLOSE_CODE, RELAY_AGENT_ATTACHED } from './protocol';
@@ -489,8 +490,7 @@ const handlers: Record<string, Handler> = {
   clear_console_errors: () => clearConsoleErrors(),
   hard_reload: () => {
     // Respond before reloading so the MCP tool call gets a response
-    setTimeout(() => { window.location.reload(); }, 150);
-    return { ok: true, message: 'Reloading in 150ms' };
+    return scheduleHardReload(window);
   },
   unlock_audio: async () => {
     // Resume the AudioContext — equivalent to clicking in the browser.
