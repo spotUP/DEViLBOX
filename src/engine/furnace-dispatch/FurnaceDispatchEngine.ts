@@ -868,15 +868,22 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
   /**
    * The chips of one platform type with the song-wide channel each starts at
    * (chips in song order, as the sequencer and the worklet's offsets count).
+   * With no chip of that type running, the chips of the first platform that
+   * stands in for it (STAND_INS, as the worklet's getChip): a Genesis synth on
+   * a song with two YM2612 gets both, each by its own chip key. The worklet's
+   * stand-in lookup by platform reached only the first chip.
    */
   chipSpansOf(platformType: number): { key: number; offset: number; numChannels: number }[] {
-    const spans: { key: number; offset: number; numChannels: number }[] = [];
-    let offset = 0;
-    for (const [key, chip] of this.chips) {
-      if (chipKeyPlatform(key) === platformType) spans.push({ key, offset, numChannels: chip.numChannels });
-      offset += chip.numChannels;
+    for (const p of [platformType, ...(STAND_INS[platformType] ?? [])]) {
+      const spans: { key: number; offset: number; numChannels: number }[] = [];
+      let offset = 0;
+      for (const [key, chip] of this.chips) {
+        if (chipKeyPlatform(key) === p) spans.push({ key, offset, numChannels: chip.numChannels });
+        offset += chip.numChannels;
+      }
+      if (spans.length > 0) return spans;
     }
-    return spans;
+    return [];
   }
 
   /**
