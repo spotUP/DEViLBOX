@@ -231,6 +231,14 @@ export async function applySong(song: SongToApply, source: SongSource): Promise<
   // first module build) at open, not inside the first play() where they
   // delayed row 1 by ~500 ms and stuttered its first notes.
   if (routesThroughLibopenmpt(song.engine)) void warmLibopenmptPlayback(song.engine);
+  // Furnace previews an instrument on the song's chip with the song's flags and mix: keyboard notes
+  // (setSongChannel) need that chip from open on, not only after the first Play.
+  const furnaceNative = song.engine.furnaceNative;
+  if (furnaceNative) {
+    void import('@engine/furnace-dispatch/FurnaceDispatchEngine')
+      .then(({ FurnaceDispatchEngine }) => FurnaceDispatchEngine.getInstance().prepareSongChips(furnaceNative))
+      .catch((err) => console.warn('[applySong] Furnace song chips not prepared:', err));
+  }
 
   if (song.preload !== false && song.instruments.some((i) => i.synthType && i.synthType !== 'Synth')) {
     await engine.preloadInstruments(song.instruments, instrumentChannelUsage(song.patterns), instrumentNoteUsage(song.patterns));

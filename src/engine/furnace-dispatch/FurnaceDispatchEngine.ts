@@ -1779,6 +1779,38 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
     if (data.tuning !== undefined) this.setTuning(data.tuning);
   }
 
+  /** Create the chips (keys) that do not exist yet; false when isStillCurrent turned false on the way. */
+  private async createSongChips(chipIds: readonly number[], isStillCurrent: () => boolean = () => true): Promise<boolean> {
+    const _log = console.log.bind(console);
+    for (const chipId of chipIds) {
+      if (this.hasChip(chipId)) { _log(`[FurnaceDispatchEngine] reusing existing chip ${chipId}`); continue; }
+      _log(`[FurnaceDispatchEngine] creating new chip ${chipId}`);
+      await this.createChip(chipId);
+      if (!isStillCurrent()) { _log('[FurnaceDispatchEngine] ABORTED: not current after createChip'); return false; }
+      await this.waitForChipCreated(chipId);
+      if (!isStillCurrent()) { _log('[FurnaceDispatchEngine] ABORTED: not current after waitForChipCreated'); return false; }
+    }
+    return true;
+  }
+
+  /**
+   * Bring up an opened song's chips with its flags and mix, before the first Play: Furnace previews an
+   * instrument on the song chip with the song's flags, so keyboard notes (setSongChannel) need that chip
+   * from load on. Without it they fell back to stand-alone chips (a YM2610 song's SSG on an AY-3-8910
+   * at the default post-amp, ~15 dB under the FM) until Play created it.
+   */
+  async prepareSongChips(nativeData: import('@/types/tracker').FurnaceNativeData): Promise<void> {
+    if (!this.isInitialized) {
+      const { getDevilboxAudioContext } = await import('@utils/audio-context');
+      await this.init(getDevilboxAudioContext() as unknown as Record<string, unknown>);
+    }
+    const keys = chipKeysFor(nativeData.chipIds ?? []);
+    await this.createSongChips(keys);
+    this.orderChips(keys);
+    this.applySongDispatchSettings(nativeData, nativeData.chipIds);
+    this.sendMixVolumes(nativeData);
+  }
+
   /**
    * Send per-song mix volumes to the worklet (masterVol, systemVol, systemPan).
    * Matches upstream Furnace: vol = systemVol[chip] * postAmp * masterVol.
@@ -2170,17 +2202,7 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
           this.destroyChip(platformType);
         }
       }
-      for (const chipId of chipIds) {
-        if (!this.hasChip(chipId)) {
-          _log(`[FurnaceDispatchEngine] creating new chip ${chipId}`);
-          await this.createChip(chipId);
-          if (!opts.isStillCurrent()) { _log('[FurnaceDispatchEngine] ABORTED: not current after createChip'); return { started: false }; }
-          await this.waitForChipCreated(chipId);
-          if (!opts.isStillCurrent()) { _log('[FurnaceDispatchEngine] ABORTED: not current after waitForChipCreated'); return { started: false }; }
-        } else {
-          _log(`[FurnaceDispatchEngine] reusing existing chip ${chipId}`);
-        }
-      }
+      if (!await this.createSongChips(chipIds, opts.isStillCurrent)) return { started: false };
 
       this.orderChips(chipIds);
 
