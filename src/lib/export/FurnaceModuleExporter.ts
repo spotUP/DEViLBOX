@@ -26,7 +26,8 @@ import {
 } from '@/lib/import/formats/furnace/FurnaceInstrumentParser';
 import { resolveInsType, DIV_INS_ADPCMA, DIV_INS_ADPCMB } from './FurnaceInstrumentEncoder';
 import { editorEffectToFurnace, xmVolToFurnace, xmNoteToFurnace } from '@/lib/import/furnaceEditorCells';
-import { maxVolumeOfChipChannel } from '@engine/furnace-dispatch/chipVoiceKinds';
+import { maxVolumeOfChannel } from '@engine/furnace-dispatch/FurnaceDispatchSynth';
+import { FurnaceDispatchPlatform } from '@engine/furnace-dispatch/platforms';
 
 /**
  * Furnace format version written: DIV_ENGINE_VERSION of Furnace 0.6.8.3 (engine.h at v0.6.8.3, 232),
@@ -250,9 +251,9 @@ export function trackerArpDependents(
  * command, so a verbatim copy would change what the song plays. Move it to the volume column
  * (the same 0-64 to 0-127 scale as the volume column). Furnace-notation channels keep their codes.
  */
-/** Volume maximum of a Neo Geo channel. The extended chip has 3 more FM channels (FM 2 operators) before the SSG, so its SSG/ADPCM channels sit 3 later than the plain chip's. */
+/** Volume maximum of a Neo Geo channel on the plain or extended-FM chip. */
 function neoGeoChannelVolMax(ch: number, ext: boolean): number {
-  return maxVolumeOfChipChannel(NEO_GEO_SYNTH_TYPE, ext ? (ch < 7 ? 0 : ch - 3) : ch) ?? 127;
+  return maxVolumeOfChannel(ext ? FurnaceDispatchPlatform.YM2610_FULL_EXT : FurnaceDispatchPlatform.YM2610_FULL, ch);
 }
 
 export function cellToFile(
@@ -475,7 +476,6 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   const patLen = Math.max(1, ...song.patterns.map((p) => p.length));
   if (patLen > FUR_MAX_ROWS) problems.push(`Pattern length ${patLen} is over the ${FUR_MAX_ROWS} rows Furnace 0.6.8.3 allows`);
   for (const [pi, p] of song.patterns.entries()) {
-    if (p.length !== patLen) problems.push(`Pattern ${pi} has ${p.length} rows but pattern 0 has ${patLen}: a Furnace song has one pattern length`);
     p.channels.slice(chans).forEach((ch, k) => {
       if (ch.rows.some((c) => !isEmptyCell(cellToFile(c, insIndexById, '', [], effectNotationOf(ch.channelMeta))))) {
         problems.push(`Pattern ${pi} channel ${chans + k + 1} has notes but this Neo Geo chip has ${chans} channels`);
@@ -494,17 +494,26 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   // ngdevkit nsstool looks each ordered pattern up in the file and stops on a missing one.
   const orderedPatterns = new Set(song.songPositions);
   const patnBlocks: Uint8Array[] = [];
+  // A Furnace song has one pattern length: a shorter pattern is padded to the longest and ends with
+  // 0D00 (next pattern) on its last row, in the first channel with a free effect column there.
+  const breakWritten = new Set<number>();
   for (let ch = 0; ch < chans; ch++) {
     for (const [pi, p] of song.patterns.entries()) {
       const src = p.channels[ch];
       if (!src && !orderedPatterns.has(pi)) continue;
       const rows: FileCell[] = [];
       for (let r = 0; r < patLen; r++) {
-        const cell = src?.rows[r];
+        const cell = r < p.length ? src?.rows[r] : undefined;
         rows.push(cell && src
           ? cellToFile(cell, insIndexById, `Pattern ${pi} channel ${ch + 1} row ${r}`, problems, effectNotationOf(src.channelMeta), warnings,
             trackerArpStopAt(song.patterns, song.songPositions, pi, ch, r), neoGeoChannelVolMax(ch, !!song.extendedFm))
           : { note: -1, ins: -1, vol: -1, fx: Array.from({ length: MAX_FX_COLUMNS }, () => ({ type: -1, val: -1 })) });
+      }
+      if (p.length < patLen && !breakWritten.has(pi)) {
+        const last = rows[p.length - 1].fx;
+        const free = last.findIndex((f) => f.type < 0 && f.val < 0);
+        if (last.some((f) => f.type === 0x0b || f.type === 0x0d)) breakWritten.add(pi);
+        else if (free >= 0) { last[free] = { type: 0x0d, val: 0 }; breakWritten.add(pi); }
       }
       if (rows.every(isEmptyCell) && !orderedPatterns.has(pi)) continue;
       for (const row of rows) {
@@ -515,6 +524,11 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
     }
   }
 
+  for (const [pi, p] of song.patterns.entries()) {
+    if (p.length < patLen && !breakWritten.has(pi) && orderedPatterns.has(pi)) {
+      problems.push(`Pattern ${pi} has ${p.length} rows, shorter than the ${patLen} of the longest, and no free effect column on its last row for the 0D00 that ends it`);
+    }
+  }
   if (problems.length > 0) {
     const shown = problems.slice(0, 8).join('; ');
     throw new Error(`Cannot export a Furnace module: ${shown}${problems.length > 8 ? `; and ${problems.length - 8} more` : ''}`);
