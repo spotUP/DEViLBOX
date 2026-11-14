@@ -107,6 +107,9 @@ export interface FurnaceModuleSong {
   speed2?: number;
   /** Compat flags of a loaded module (Furnace key names); absent = Furnace defaults. */
   compatFlags?: Record<string, unknown>;
+  /** AY Scramble export only: keep effects, macro codes, release points and macro modes the old player contract
+   *  drops (test tunes for the BossGame compiler). */
+  keepOutsideContract?: boolean;
   /** Groove patterns of a loaded module, 16 entries each, unused entries 0. */
   grooves?: number[][];
   /** Write the extended-FM chip (0xa6, 17 channels): channels 1-4 are FM 2 OP1-OP4. */
@@ -271,7 +274,7 @@ export function cellToFile(
   let note = -1;
   if (cell.note > 0) {
     const n = xmNoteToFurnace(cell.note);
-    note = n === 253 ? FILE_NOTE_OFF : n + 60; // native C-0 = 0, file C-0 = 60
+    note = n >= 253 ? FILE_NOTE_OFF + (n - 253) : n + 60; // native C-0 = 0, file C-0 = 60; off/release/macro release 180-182
   }
   let ins = -1;
   if (cell.instrument > 0) {

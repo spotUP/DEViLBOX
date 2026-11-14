@@ -138,7 +138,7 @@ export function ayScrambleTempoWarning(bpm: number): string | null {
   return `The game plays at ${FUR_AY_SCRAMBLE_TICK_HZ} Hz ticks; this song ticks at ${(bpm * 2 / 5).toFixed(2)} Hz (BPM ${bpm}), so the tempo will differ in the game. Set the BPM to ${FUR_AY_SCRAMBLE_BPM} to match.`;
 }
 
-function ayFileInstrument(inst: InstrumentConfig, warnings: string[]): FileInstrument {
+function ayFileInstrument(inst: InstrumentConfig, warnings: string[], keepAll = false): FileInstrument {
   const cfg = inst.furnace as FurnaceConfig;
   const label = `Instrument ${inst.id} "${inst.name}"`;
   const macros: FileMacro[] = [];
@@ -146,10 +146,13 @@ function ayFileInstrument(inst: InstrumentConfig, warnings: string[]): FileInstr
     if (m.data.length === 0) continue;
     const code = m.code ?? 0;
     const envelopeName = AY_SCRAMBLE_ENVELOPE_MACRO_NAMES[code];
-    const name = AY_SCRAMBLE_MACRO_NAMES[code] ?? envelopeName;
+    const name = AY_SCRAMBLE_MACRO_NAMES[code] ?? envelopeName ?? (keepAll ? `code ${code}` : undefined);
     if (!name) { warnings.push(`${label}: macro ${code} left out, the player runs volume, arpeggio, duty and wave macros only`); continue; }
-    if (m.mode !== 0) { warnings.push(`${label}: ${name} macro left out, it is an ADSR or LFO macro, not a sequence`); continue; }
-    if (m.release >= 0) warnings.push(`${label}: ${name} macro release point removed, the player has no release`);
+    if (keepAll && (!AY_SCRAMBLE_MACRO_NAMES[code] && !envelopeName || m.mode !== 0 || m.release >= 0)) {
+      warnings.push(`${label}: ${name} macro kept with its mode and release, outside the player contract`);
+    }
+    if (!keepAll && m.mode !== 0) { warnings.push(`${label}: ${name} macro left out, it is an ADSR or LFO macro, not a sequence`); continue; }
+    if (!keepAll && m.release >= 0) warnings.push(`${label}: ${name} macro release point removed, the player has no release`);
     let data = m.data.slice(0, 255);
     if (code === 0 && data.some((v) => v < 0 || v > 15)) {
       warnings.push(`${label}: volume macro values clamped to 0-15`);
@@ -160,8 +163,9 @@ function ayFileInstrument(inst: InstrumentConfig, warnings: string[]): FileInstr
     }
     if (envelopeName) warnings.push(`${label}: ${envelopeName} macro kept, outside the old player contract, BossGame compiler must support it`);
     macros.push({
-      code, length: data.length, loop: m.loop < 0 || m.loop >= data.length ? 255 : m.loop, release: 255,
-      mode: 0, type: 0, delay: m.delay ?? 0, speed: m.speed ?? 1, data,
+      code, length: data.length, loop: m.loop < 0 || m.loop >= data.length ? 255 : m.loop,
+      release: keepAll && m.release >= 0 && m.release < data.length ? m.release : 255,
+      mode: keepAll ? m.mode : 0, type: 0, delay: m.delay ?? 0, speed: m.speed ?? 1, data,
     });
   }
   if (cfg.opMacroArrays?.some((a) => a.some((m) => m.data.length > 0))) warnings.push(`${label}: per-operator macros left out`);
@@ -294,7 +298,10 @@ export function exportFurnaceAyScramble(song: FurnaceModuleSong): FurnaceAyScram
         for (const f of fc.fx) {
           const extra = f.type >= 0 ? AY_SCRAMBLE_EXTRA_EFFECTS.get(f.type) : undefined;
           if (extra) extras.set(extra, (extras.get(extra) ?? 0) + 1);
-          else if (f.type >= 0 && !AY_SCRAMBLE_EFFECTS.has(f.type)) {
+          else if (f.type >= 0 && !AY_SCRAMBLE_EFFECTS.has(f.type) && song.keepOutsideContract) {
+            const key = f.type.toString(16).toUpperCase().padStart(2, '0');
+            extras.set(key, (extras.get(key) ?? 0) + 1);
+          } else if (f.type >= 0 && !AY_SCRAMBLE_EFFECTS.has(f.type)) {
             const key = f.type.toString(16).toUpperCase().padStart(2, '0');
             dropped.set(key, (dropped.get(key) ?? 0) + 1);
             f.type = -1; f.val = -1;
@@ -315,7 +322,7 @@ export function exportFurnaceAyScramble(song: FurnaceModuleSong): FurnaceAyScram
     throw new Error(`Cannot export for the AY-3-8910 (Scramble): ${shown}${problems.length > 8 ? `; and ${problems.length - 8} more` : ''}`);
   }
 
-  const instruments = ay.map((inst) => ayFileInstrument(inst, warnings));
+  const instruments = ay.map((inst) => ayFileInstrument(inst, warnings, song.keepOutsideContract));
   const speed = Math.max(1, Math.min(255, song.initialSpeed));
   const w = new BinaryWriter(64 * 1024);
 
@@ -352,7 +359,9 @@ export function exportFurnaceAyScramble(song: FurnaceModuleSong): FurnaceAyScram
     w.writeNullTerminatedString('');
     w.writeFloat32(440);
     // Compat flags, version 37-69 set (Furnace defaults of a new song); fur.cpp reads 20 bytes here at any version.
-    for (const v of [0, 1, 2, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1]) w.writeUint8(v);
+    // Index 1 is linear pitch (0 off, 1 partial, 2 full); the song's compatFlags.linearPitch overrides the 1.
+    const linear = song.compatFlags?.linearPitch;
+    for (const v of [0, typeof linear === 'number' ? linear : 1, 2, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1]) w.writeUint8(v);
     for (let i = 0; i < instruments.length; i++) { insPtrAt.push(w.getOffset()); w.writeUint32(0); }
     for (let i = 0; i < pats.length; i++) { patPtrAt.push(w.getOffset()); w.writeUint32(0); }
     for (let ch = 0; ch < nCh; ch++) for (const pos of song.songPositions) w.writeUint8(pos);

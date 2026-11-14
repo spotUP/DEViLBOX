@@ -30,13 +30,15 @@ import { maxVolumeOfChannel } from '@engine/furnace-dispatch/channelVolume';
  */
 export function furnaceNoteToXM(note: number): number {
   if (note < 0 || note === 252) return 0; // empty / null
-  if (note === 253 || note === 254 || note === 255) return 97; // off / release → note off
+  if (note === 254) return 255; // note release: the editor's ~~~ (key off with release)
+  if (note === 253 || note === 255) return 97; // off / macro release → note off
   return Math.min(96, note + 1);
 }
 
 /** Editor note → Furnace note: the inverse of `furnaceNoteToXM`. */
 export function xmNoteToFurnace(note: number): number {
   if (note <= 0) return -1;
+  if (note === 255) return 254; // ~~~ → note release
   if (note >= 97) return 253;
   return note - 1;
 }

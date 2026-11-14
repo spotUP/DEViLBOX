@@ -61,3 +61,18 @@ npx tsx --tsconfig tsconfig.app.json tools/neogeo-compose/run.ts peter-motif /pa
 - Check the result: `python3 -I tools/ay_music.py --dump music/<tune>.fur` in the BossGame repo.
 
 `songs/peter-motif.ts` is the smallest example.
+
+### Test tunes outside the player contract
+
+`songs/test-fx1.ts` .. `test-fx6.ts` write BossGame's feature test tunes (plan
+`thoughts/spot/2026-11-14-fur-features-plan.md` in the BossGame repo). They use features
+`ay_music.py` does not accept yet, so the dump rejects some of them until BossGame builds the feature.
+
+- `builder.keepOutsideContract = true`: effects and macros outside the player contract are kept
+  in the file with a warning instead of dropped.
+- `builder.linearPitch = 0 | 1 | 2`: Furnace compat flag "linear pitch" (file compat byte 1).
+  Unset writes 1.
+- `note: 'REL'` writes a note release (`~~~`, file note 181). `'OFF'` is note off (180).
+- `AY_MACRO.PITCH` (4) and `AY_MACRO.PHASE_RESET` (14) join VOL, ARP, DUTY, WAVE.
+- `ayMacro(code, data, loop, { release, delay, speed, mode })`: macro release point, delay, speed
+  and mode. Without `keepOutsideContract` the exporter keeps only what the player contract allows.
