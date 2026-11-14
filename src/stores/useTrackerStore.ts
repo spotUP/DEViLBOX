@@ -34,7 +34,7 @@ import { sharedCellEdits } from '@/lib/song/sharedCellEdits';
 import { isCoSo } from '@/engine/hippel/rebuildHippelModule';
 import { moduleHeldIn } from '@/engine/formatFileDataFields';
 import { cosoIndexForXM } from '@lib/import/formats/HippelCoSoParser';
-import { useHistoryStore, type HistoryAction, type PatternChange } from './useHistoryStore';
+import { useHistoryStore, type HistoryAction, type PatternChange, type InstrumentChange } from './useHistoryStore';
 // Late-bound access to the sibling stores that used to form an import cycle
 // with this file. storeAccess is a leaf — it imports nothing — so the three
 // stores no longer participate in the same module-graph cycle that caused
@@ -335,6 +335,21 @@ function syncBulkEdit(
   debouncedWasmEngineReexport();
 }
 
+/** Write instrument changes through useInstrumentStore (undo restores `before`, redo `after`). */
+function applyInstrumentChanges(changes: InstrumentChange[], dir: 'undo' | 'redo'): void {
+  const inst = useInstrumentStore.getState();
+  for (const c of dir === 'undo' ? [...changes].reverse() : changes) {
+    const target = dir === 'undo' ? c.before : c.after;
+    const exists = useInstrumentStore.getState().instruments.some((x) => x.id === c.id);
+    if (!target) { if (exists) inst.deleteInstrument(c.id); continue; }
+    if (!exists) { inst.addInstrument(structuredClone(target)); continue; }
+    // updateInstrument deep-merges, so keys the other side added are cleared explicitly.
+    const other = dir === 'undo' ? c.after : c.before;
+    const cleared = Object.fromEntries(Object.keys(other ?? {}).filter((k) => !(k in target)).map((k) => [k, undefined]));
+    inst.updateInstrument(c.id, { ...cleared, ...structuredClone(target) });
+  }
+}
+
 /**
  * Put one history step's patterns and song order back (undo) or forward (redo).
  * Patterns the step appended (`before: null`) are removed on undo and appended
@@ -363,6 +378,7 @@ function applyHistoryStep(action: HistoryAction, dir: 'undo' | 'redo'): void {
   });
   const patterns = useTrackerStore.getState().patterns;
   for (const r of replaced) syncBulkEdit(r.index, patterns[r.index], r.before);
+  if (action.instruments) applyInstrumentChanges(action.instruments, dir);
 }
 
 /**
@@ -636,7 +652,8 @@ interface TrackerStore {
    * `edit` gets the patterns and order drafts; it may change patterns and append
    * new ones at the end, never remove one. Changed patterns resync the engines.
    */
-  multiPatternEdit: (label: string, edit: (song: { patterns: Pattern[]; patternOrder: number[] }) => void) => void;
+  /** `instruments` are written through useInstrumentStore and join the same undo step. */
+  multiPatternEdit: (label: string, edit: (song: { patterns: Pattern[]; patternOrder: number[] }) => void, instruments?: InstrumentChange[]) => void;
 
   // UADE live pattern display — updates cells in-place without undo history
   setLiveChannelData: (row: number, channelData: Array<{ note: number; instrument: number; volume: number }>) => void;
@@ -2287,7 +2304,7 @@ export const useTrackerStore = create<TrackerStore>()(
       return action;
     },
 
-    multiPatternEdit: (label, edit) => {
+    multiPatternEdit: (label, edit, instruments) => {
       const before = get().patterns;
       const orderBefore = get().patternOrder;
       set((state) => {
@@ -2306,9 +2323,10 @@ export const useTrackerStore = create<TrackerStore>()(
       });
       const orderAfter = get().patternOrder;
       const orderChanged = orderAfter.length !== orderBefore.length || orderAfter.some((p, i) => p !== orderBefore[i]);
-      if (changes.length === 0 && !orderChanged) return;
+      if (changes.length === 0 && !orderChanged && !instruments?.length) return;
       useHistoryStore.getState().pushMultiAction('BULK_BLOCK_EDIT', label, changes,
-        orderChanged ? { before: orderBefore, after: orderAfter } : undefined);
+        orderChanged ? { before: orderBefore, after: orderAfter } : undefined, instruments);
+      if (instruments?.length) applyInstrumentChanges(instruments, 'redo');
       for (const c of changes) if (c.before) syncBulkEdit(c.patternIndex, c.after, c.before);
     },
 
