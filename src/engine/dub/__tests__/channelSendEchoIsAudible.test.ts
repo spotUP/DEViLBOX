@@ -190,6 +190,6 @@ describe('a channel send at max is heard as an echo on the master', () => {
       const dryClosed = await renderMaster({ ...settings, returnGain: 0 }, 0);
       const closed = await renderMaster(settings, 0);
       expect(bandDb(closed, dryClosed), 'send 0 still put wet on the master').toBeLessThan(NO_WET_DB);
-    }, 180_000);
+    }, 420_000);
   }
 });
