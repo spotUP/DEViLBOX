@@ -158,6 +158,7 @@ function song6() {
   set(p0, 3, 8, { note: 27, instrument: 4, effTyp: 0x23, eff: 0x40 });
   set(p0, 4, 0, { note: 49, instrument: 1, effTyp: 0x00, eff: 0x47 }); // arpeggio 00
   set(p0, 4, 4, { note: 52, instrument: 1, effTyp: 0xec, eff: 0x02 }); // note cut
+  set(p0, 4, 8, { note: 54, instrument: 1, effTyp: 0xe5, eff: 0x88 }); // fine pitch
   set(p0, 5, 0, { note: 56, instrument: 1, effTyp: 0xed, eff: 0x02 }); // note delay
   set(p1, 5, 0, { note: 49, instrument: 3 });
   return s;
@@ -191,9 +192,9 @@ describe('exportFurnaceAyScramble, two AY systems', () => {
     expect(warnings.some((w) => w.includes('envelope shape macro kept'))).toBe(true);
   });
 
-  it('keeps envelope effects, EC, ED and 00 with a warning', () => {
+  it('keeps envelope effects, EC, ED, E5xx and 00 with a warning', () => {
     const { warnings } = exportFurnaceAyScramble(song6());
-    for (const name of ['22xy', '23xx', 'EC', 'ED', '00']) {
+    for (const name of ['22xy', '23xx', 'EC', 'ED', 'E5xx', '00']) {
       expect(warnings.some((w) => w.includes(`Effect ${name}`) && w.includes('kept') && w.includes('BossGame compiler must support it'))).toBe(true);
     }
   });

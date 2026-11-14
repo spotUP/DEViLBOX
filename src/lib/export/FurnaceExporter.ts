@@ -102,7 +102,7 @@ export const FUR_AY_SCRAMBLE_CHIP_FLAGS = 'clockSel=0\nchipType=0\n';
 export const AY_SCRAMBLE_EFFECTS: ReadonlySet<number> = new Set([0x01, 0x02, 0x03, 0x04, 0x0a, 0x0b, 0x0d, 0x0f, 0xff]);
 /** Effects written but beyond the first player: 00, note cut EC, note delay ED, AY envelope shape/period/slide/auto. */
 export const AY_SCRAMBLE_EXTRA_EFFECTS: ReadonlyMap<number, string> = new Map([
-  [0x00, '00'], [0xec, 'EC (note cut)'], [0xed, 'ED (note delay)'],
+  [0x00, '00'], [0xec, 'EC (note cut)'], [0xed, 'ED (note delay)'], [0xe5, 'E5xx (fine pitch)'],
   [0x22, '22xy (envelope shape)'], [0x23, '23xx (envelope period low)'], [0x24, '24xx (envelope period high)'],
   [0x25, '25xx (envelope slide up)'], [0x26, '26xx (envelope slide down)'], [0x29, '29xy (auto envelope)'],
 ]);
