@@ -41,6 +41,7 @@ import { UADEEngine } from '../../engine/uade/UADEEngine';
 import { playingEngineFromStores } from '../../engine/replayer/NativeEngineRouting';
 import { getToneEngine } from '../../engine/ToneEngine';
 import * as Tone from 'tone';
+import { resolveTransportRow } from '../../lib/dub/transportRow';
 import { voiceSourceOf } from '../../engine/tone/toneVoiceProbe';
 import { AudioDataBus } from '../../engine/vj/AudioDataBus';
 import {
@@ -309,7 +310,8 @@ export function getPlaybackState(): Record<string, unknown> {
     isLooping: transport.isLooping,
     currentRow: transport.currentRow,
     currentPattern: useTrackerStore.getState().currentPatternIndex,
-    currentGlobalRow: transport.currentGlobalRow,
+    // The store field only moves per pattern (steps of 64); join it with the live row.
+    currentGlobalRow: resolveTransportRow(transport.currentGlobalRow, transport.currentRow) ?? transport.currentGlobalRow,
     bpm: transport.bpm,
     speed: transport.speed,
     swing: transport.swing,

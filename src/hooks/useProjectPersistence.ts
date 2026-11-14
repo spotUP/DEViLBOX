@@ -890,7 +890,8 @@ export function useProjectPersistence() {
   useEffect(() => {
     if (import.meta.env.DEV) return;
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isDirty) {
+      // hard_reload is an explicit agent request: a leave-site prompt would stall it.
+      if (isDirty && !(window as { __devilboxHardReload?: boolean }).__devilboxHardReload) {
         if (isExplicitlySaved()) void saveProjectToStorage();
         e.preventDefault();
         e.returnValue = '';
