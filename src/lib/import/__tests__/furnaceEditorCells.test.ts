@@ -86,6 +86,14 @@ describe('an edit in the editor', () => {
   });
 });
 
+describe('Neo Geo extended-FM volume scale per channel', () => {
+  it('maps the 17-channel layout onto the chip channels', () => {
+    const native = { activeSubsong: 0, chipIds: [58], systemChans: [17], subsongs: [] } as unknown as FurnaceNativeData;
+    expect([0, 4, 6, 7, 9, 10, 15, 16].map(ch => furnaceChannelVolMax(native, ch)))
+      .toEqual([127, 127, 127, 15, 15, 31, 31, 255]);
+  });
+});
+
 describe('AY volume is 0-15, not 0-127', () => {
   it('shows AY volume 15 as full and writes the edit back as 15', () => {
     const native = {

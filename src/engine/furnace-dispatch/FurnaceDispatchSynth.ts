@@ -238,8 +238,23 @@ export function getMaxVolume(platform: number): number {
   return PLATFORM_VOL_MAX[platform] ?? 127;
 }
 
+/**
+ * Extended-FM chips: the base chip and the first of the four operator channels
+ * that replace one FM channel (Furnace ym2610ext.cpp / ym2610bext.cpp, extChanOffs).
+ */
+const EXT_FM_LAYOUT: Readonly<Record<number, { base: number; extStart: number }>> = {
+  [FurnaceDispatchPlatform.YM2610_FULL_EXT]: { base: FurnaceDispatchPlatform.YM2610_FULL, extStart: 1 },
+  [FurnaceDispatchPlatform.YM2610B_EXT]: { base: FurnaceDispatchPlatform.YM2610B, extStart: 2 },
+};
+
 /** Volume maximum of one chip channel: the channel kind's own on a mixed-kind chip, else the platform's. */
 export function maxVolumeOfChannel(platform: number, chan: number): number {
+  const ext = EXT_FM_LAYOUT[platform];
+  if (ext) {
+    // The four operator channels are one FM channel; channels after them sit 3 higher than on the base chip.
+    const chipChan = chan < ext.extStart + 4 ? Math.min(chan, ext.extStart) : chan - 3;
+    return maxVolumeOfChannel(ext.base, chipChan);
+  }
   return maxVolumeOfChipChannel(synthTypeForPlatform(platform), chan) ?? getMaxVolume(platform);
 }
 
