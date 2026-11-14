@@ -1989,14 +1989,6 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
     }
   }
 
-  applyExtendedEffect(chan: number, x: number, y: number, platformType?: number): void {
-    const pt = chipKeyPlatform(platformType ?? this.platform);   // a chip key routes; its platform maps the effect
-    const commands = this.effectRouter.routeExtendedEffect(pt, chan, x, y);
-    for (const cmd of commands) {
-      this.dispatch(cmd.cmd, cmd.chan, cmd.val1, cmd.val2, platformType);
-    }
-  }
-
   applyPlatformEffect(chan: number, effect: number, param: number, platformType?: number): void {
     const pt = chipKeyPlatform(platformType ?? this.platform);   // a chip key routes; its platform maps the effect
     const commands = this.effectRouter.routePlatformEffect(pt, chan, effect, param);
