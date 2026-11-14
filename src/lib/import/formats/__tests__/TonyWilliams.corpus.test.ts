@@ -80,4 +80,29 @@ describe('Tony Williams corpus', () => {
     expect(song.instruments.some((i) => i.sample!.loop)).toBe(true);
     expect(Buffer.from(await bytesOf(song)).equals(Buffer.from(buf))).toBe(true);
   });
+
+  it('blinkys scary school-sfx (sound-effect build, one block per voice, unused 4th voice) decodes and a note edit round-trips', async () => {
+    const f = readFileSync('public/data/songs/formats/blinkys scary school-sfx.tw');
+    const buf = f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength) as ArrayBuffer;
+    const song = await parseTonyWilliamsFile(buf, 'blinkys scary school-sfx.tw');
+    const notes = [0, 1, 2, 3].map((c) => song.patterns.reduce((n, p) => n + p.channels[c]!.rows.filter((x) => x.note > 0 && x.note < 80).length, 0));
+    expect(notes.slice(0, 3).every((n) => n > 0)).toBe(true);
+    expect(notes[3]).toBe(0);
+    expect(Buffer.from(await bytesOf(song)).equals(Buffer.from(buf))).toBe(true);
+    let hit: { p: number; c: number; r: number } | null = null;
+    for (let p = 0; p < song.patterns.length && !hit; p++) {
+      for (let c = 0; c < 3 && !hit; c++) {
+        const r = song.patterns[p]!.channels[c]!.rows.findIndex((x) => x.note > 0 && x.note < 80);
+        if (r >= 0) hit = { p, c, r };
+      }
+    }
+    const cell = song.patterns[hit!.p]!.channels[hit!.c]!.rows[hit!.r]!;
+    const before = cell.note;
+    cell.note = before + 1;
+    const out = await bytesOf(song);
+    const orig = new Uint8Array(buf);
+    expect([...orig.keys()].filter((i) => orig[i] !== out[i]).length).toBe(1);
+    const re = await parseTonyWilliamsFile(out.buffer.slice(0) as ArrayBuffer, 'x.tw');
+    expect(re.patterns[hit!.p]!.channels[hit!.c]!.rows[hit!.r]!.note).toBe(before + 1);
+  });
 });
