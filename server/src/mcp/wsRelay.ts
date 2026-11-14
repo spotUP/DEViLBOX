@@ -27,6 +27,8 @@ import { RELAY_REPLACED_CLOSE_CODE, RELAY_AGENT_ATTACHED } from './protocol';
 
 const PORT = Number(process.env.MCP_BRIDGE_PORT ?? 4003);
 const TIMEOUT_MS = 900_000;
+const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
+const ALLOW_HOSTED = process.env.DEVILBOX_MCP_ALLOW_HOSTED === '1';
 
 type PendingResolve = (response: BridgeResponse) => void;
 
@@ -45,9 +47,24 @@ let server: http.Server;
 let wss: WebSocketServer;
 let mode: 'server' | 'client' | 'none' = 'none';
 
+/** True when a WebSocket handshake may reach the relay: only browser pages on localhost take the browser slot. */
+export function acceptsConnection(origin: string | undefined, url: string, allowHosted: boolean): boolean {
+  return allowHosted || !origin || LOCAL_ORIGIN.test(origin)
+    || url.startsWith('/mcp') || url.startsWith('/controller') || url.startsWith('/probe');
+}
+
 export function startRelay(): void {
   server = http.createServer();
-  wss = new WebSocketServer({ server });
+  wss = new WebSocketServer({
+    server,
+    // A hosted page (devilbox.uprough.net) dials ws://localhost too; keep MCP off it unless opted in.
+    // No Origin = non-browser client (MCP subprocess); /mcp, /controller, /probe keep their behaviour.
+    verifyClient: ({ origin, req }: { origin: string; req: http.IncomingMessage }) => {
+      if (acceptsConnection(origin, req.url ?? '', ALLOW_HOSTED)) return true;
+      console.error(`[mcp-bridge] Refused hosted origin ${origin} (set DEVILBOX_MCP_ALLOW_HOSTED=1 to allow)`);
+      return false;
+    },
+  });
 
   wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     const isMcpClient = req.url?.startsWith('/mcp');
