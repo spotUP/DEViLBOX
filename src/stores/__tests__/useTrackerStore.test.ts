@@ -1,8 +1,15 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// Instrument writes reach for the audio engine; none exists under test.
+vi.mock('@engine/ToneEngine', () => ({
+  getToneEngine: () => ({ disposeInstrument: vi.fn(), invalidateInstrument: vi.fn(), ensureInstrumentReady: vi.fn() }),
+}));
+
 import { useTrackerStore } from '../useTrackerStore';
 import { useTransportStore } from '../useTransportStore';
 import { useHistoryStore } from '../useHistoryStore';
 import { useCursorStore } from '../useCursorStore';
+import { useInstrumentStore } from '../useInstrumentStore';
 import { resetStore } from './_harness';
 import { undo as undoCommand, redo as redoCommand } from '@engine/keyboard/commands/history';
 
@@ -234,6 +241,32 @@ describe('useTrackerStore — undo restores the step\'s own patterns', () => {
     expect(s.patterns[2].channels[0].rows[3].note).toBe(53);
     expect(s.patterns[2].length).toBe(len);
     expect(s.patternOrder).toEqual([0, 1, 2]);
+  });
+
+  it('multiPatternEdit with instrument changes undoes and redoes them in the same step', () => {
+    useHistoryStore.getState().clearHistory();
+    const seeded = useInstrumentStore.getState().createInstrument();
+    useInstrumentStore.getState().createInstrument();
+    const base = useInstrumentStore.getState().instruments.find((x) => x.id === seeded)!;
+    const edited = { ...structuredClone(base), name: 'Merged name' };
+    const fresh = { ...structuredClone(base), id: 99, name: 'Merged new' };
+    useTrackerStore.getState().multiPatternEdit('inst', (song) => {
+      song.patterns[0].channels[0].rows[1].note = 49;
+    }, [{ id: base.id, before: structuredClone(base), after: edited }, { id: 99, before: null, after: fresh }]);
+    expect(useHistoryStore.getState().undoStack.length).toBe(1);
+    const find = (id: number) => useInstrumentStore.getState().instruments.find((x) => x.id === id);
+    expect(find(base.id)?.name).toBe('Merged name');
+    expect(find(99)?.name).toBe('Merged new');
+
+    useTrackerStore.getState().undoEdit();
+    expect(find(base.id)?.name).toBe(base.name);
+    expect(find(99)).toBeUndefined();
+    expect(useTrackerStore.getState().patterns[0].channels[0].rows[1].note).not.toBe(49);
+
+    useTrackerStore.getState().redoEdit();
+    expect(find(base.id)?.name).toBe('Merged name');
+    expect(find(99)?.name).toBe('Merged new');
+    expect(useTrackerStore.getState().patterns[0].channels[0].rows[1].note).toBe(49);
   });
 
   it('multiPatternEdit that changes nothing records no step', () => {

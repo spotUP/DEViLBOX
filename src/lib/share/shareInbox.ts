@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import { notify } from '@stores/useNotificationStore';
 import { useTrackerStore } from '@stores/useTrackerStore';
+import type { InstrumentChange } from '@stores/useHistoryStore';
 import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { unpackShare, type ShareSong } from './shareContainer';
 import { downloadShare, downloadReply, dismissReply, listReplies } from './shareApi';
@@ -100,12 +101,19 @@ export function pickAll(side: Side): void {
 
 export const closeReview = (): void => useShareInboxStore.setState({ review: null });
 
-/** Write the merge into the stores as one undo step (patterns and order), then dismiss the reply. */
+/** Write the merge into the stores as one undo step (patterns, order and instruments), then dismiss the reply. */
 export async function applyReview(): Promise<void> {
   const review = useShareInboxStore.getState().review;
   if (!review) return;
   const mine = await mineNow();
   const { merged } = mergeSongs(review.base, mine, review.theirs, review.picks);
+  const instruments: InstrumentChange[] = [];
+  for (const i of merged.instruments) {
+    const m = mine.instruments.find((x) => x.id === i.id);
+    if (m && same(m, i)) continue;
+    const current = useInstrumentStore.getState().instruments.find((x) => x.id === i.id);
+    instruments.push({ id: i.id, before: current ? structuredClone(current) : null, after: i });
+  }
   // Write only what the merge changed against the parsed open song; everything else in the stores stays as loaded.
   useTrackerStore.getState().multiPatternEdit('Merge changes from a share reply', (song) => {
     merged.patterns.forEach((p, pi) => {
@@ -122,19 +130,11 @@ export async function applyReview(): Promise<void> {
       });
     });
     if (!same(merged.order, mine.order)) song.patternOrder.splice(0, song.patternOrder.length, ...merged.order);
-  });
-  // shortcut: instruments are not in the undo history; upgrade when the history store covers them.
-  const inst = useInstrumentStore.getState();
-  for (const i of merged.instruments) {
-    const m = mine.instruments.find((x) => x.id === i.id);
-    if (m && same(m, i)) continue;
-    if (inst.instruments.some((x) => x.id === i.id)) inst.updateInstrument(i.id, i);
-    else inst.addInstrument(i);
-  }
+  }, instruments);
   try {
     await dismissReply(review.reply.shareId, review.reply.replyId, review.reply.ownerKey);
   } catch { /* the merge is applied; the reply just stays listed */ }
-  notify.success('Changes merged. Undo reverts the patterns and order; instruments stay.');
+  notify.success('Changes merged. Undo reverts the patterns, order and instruments.');
   closeReview();
   await refreshShareInbox();
 }

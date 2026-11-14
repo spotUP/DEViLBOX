@@ -5,7 +5,7 @@
 
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import type { Pattern } from '@typedefs';
+import type { Pattern, InstrumentConfig } from '@typedefs';
 
 export type ActionType =
   | 'EDIT_CELL'
@@ -62,6 +62,13 @@ export interface PatternChange {
   after: Pattern;
 }
 
+/** One instrument an action changed. `before: null` means the action added it (undo removes it again). */
+export interface InstrumentChange {
+  id: number;
+  before: InstrumentConfig | null;
+  after: InstrumentConfig;
+}
+
 /**
  * One undo step: every pattern it changed and, when it changed the song order,
  * the order before and after. Undo and redo restore these exact indices, never
@@ -74,6 +81,7 @@ export interface HistoryAction {
   description: string;
   changes: PatternChange[];
   order?: { before: number[]; after: number[] };
+  instruments?: InstrumentChange[];
 }
 
 interface HistoryStore {
@@ -96,7 +104,8 @@ interface HistoryStore {
     type: ActionType,
     description: string,
     changes: PatternChange[],
-    order?: { before: number[]; after: number[] }
+    order?: { before: number[]; after: number[] },
+    instruments?: InstrumentChange[]
   ) => void;
   /** Pops the step and returns it; apply it with useTrackerStore.undoEdit, which calls this. */
   undo: () => HistoryAction | null;
@@ -125,7 +134,7 @@ export const useHistoryStore = create<HistoryStore>()(
     pushAction: (type, description, patternIndex, beforeState, afterState) =>
       get().pushMultiAction(type, description, [{ patternIndex, before: beforeState, after: afterState }]),
 
-    pushMultiAction: (type, description, changes, order) =>
+    pushMultiAction: (type, description, changes, order, instruments) =>
       set((state) => {
         const action: HistoryAction = {
           id: `action-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -139,6 +148,7 @@ export const useHistoryStore = create<HistoryStore>()(
             after: structuredClone(c.after),
           })),
           ...(order ? { order: { before: [...order.before], after: [...order.after] } } : {}),
+          ...(instruments?.length ? { instruments: structuredClone(instruments) } : {}),
         };
 
         // Add to undo stack
