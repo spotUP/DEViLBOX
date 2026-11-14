@@ -22,6 +22,11 @@ function doNew(): boolean {
   return true;
 }
 
+export function shareSong(): boolean {
+  void import('@lib/share/shareService').then((m) => m.shareCurrentSong());
+  return true;
+}
+
 export function newFile(): boolean { return doNew(); }
 export function openFile(): boolean { return openFileBrowser(); }
 export function closeFile(): boolean {

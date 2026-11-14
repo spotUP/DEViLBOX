@@ -71,7 +71,7 @@ import {
 } from '@engine/keyboard/commands/view';
 import {
   newFile, openFile, closeFile, saveFile, saveAs,
-  newProject, openProject, saveProject, newSong, loadSong, saveSong, loadModule, saveModule
+  newProject, openProject, saveProject, newSong, loadSong, saveSong, loadModule, saveModule, shareSong
 } from '@engine/keyboard/commands/file';
 import {
   interpolateVolume, interpolateEffect, amplifySelection, applyCurrentInstrument,
@@ -446,6 +446,7 @@ function initializeRegistry() {
     { name: 'load_song', contexts: ['global'], handler: loadSong, description: 'Load song' },
     { name: 'save_song', contexts: ['global'], handler: saveSong, description: 'Save song' },
     { name: 'load_module', contexts: ['global'], handler: loadModule, description: 'Load module' },
+    { name: 'share_song', contexts: ['global'], handler: shareSong, description: 'Copy a share link for the song' },
     { name: 'save_module', contexts: ['global'], handler: saveModule, description: 'Save module' },
     
     // === ADVANCED EDITING ===

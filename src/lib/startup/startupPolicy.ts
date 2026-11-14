@@ -1,3 +1,5 @@
+import { isShareHash } from '@lib/share/shareLink';
+
 /**
  * The one decision: does this page load open the start dialog, and does it run
  * the startup jingle. Pure. Callers (openStartDialog, beginStartupSequence)
@@ -25,8 +27,9 @@ export function isQuietPage(search: string): boolean {
   return new URLSearchParams(search).has('quiet');
 }
 
-export function startupPolicy(search: string, settings: StartupPolicySettings): StartupPolicy {
-  const quiet = isQuietPage(search);
+export function startupPolicy(search: string, settings: StartupPolicySettings, hash = ''): StartupPolicy {
+  // A #share= link opens its song and its own Play prompt: no dialog, no jingle.
+  const quiet = isQuietPage(search) || isShareHash(hash);
   const collabCode = new URLSearchParams(search).get('collab');
   const collabLink = !!collabCode && collabCode.length >= 6;
   // A ?collab= link is an explicit request to join a room, so it opens its modal
