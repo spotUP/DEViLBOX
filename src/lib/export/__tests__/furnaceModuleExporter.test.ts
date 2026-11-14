@@ -235,11 +235,22 @@ describe('exportFurnaceModule', () => {
     expect(new TextDecoder().decode(raw)).not.toContain('INF2');
   });
 
-  it('refuses what the module cannot hold', () => {
+  it('pads a shorter pattern to the song pattern length and ends it with 0D00 on its last row', async () => {
     const s = song();
-    s.patterns[1] = { ...s.patterns[1], length: 32 };
-    expect(() => exportFurnaceModule(s)).toThrow(/pattern length/);
+    s.patterns[1] = { ...s.patterns[1], length: 8 };
+    set(s.patterns[1], 0, 7, { note: 49, instrument: 1, effTyp: 0x0a, eff: 1 });
+    set(s.patterns[1], 0, 9, { note: 49, instrument: 1 }); // past the pattern end: not written
+    const r = exportFurnaceModule(s);
+    const mod = await parseFurnaceSong(r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) as ArrayBuffer);
+    expect(mod.subsongs[0].patLen).toBe(ROWS);
+    const rows = mod.patterns.get('0_0_1')!.rows;
+    expect(rows[7].effects[0]).toEqual({ type: 0x0a, value: 1 });
+    expect(rows[7].effects[1]).toEqual({ type: 0x0d, value: 0 });
+    expect(rows[9].instrument).toBe(-1);
+    expect(mod.subsongs[0].effectColumns[0]).toBe(2);
+  });
 
+  it('refuses what the module cannot hold', () => {
     const t = song();
     set(t.patterns[0], 2, 0, { note: 49, instrument: 9 });
     expect(() => exportFurnaceModule(t)).toThrow(/not a Neo Geo instrument/);
