@@ -21,6 +21,7 @@ import { createAiGuards, trustProxyHops } from './ai/limits';
 import analysisRoutes from './routes/analysis';
 import renderRoutes from './routes/render';
 import djsetsRoutes from './routes/djsets';
+import shareRoutes, { sweepExpiredShares, SHARE_SWEEP_MS } from './routes/share';
 import playlistsRoutes from './routes/playlists';
 import ratingsRoutes from './routes/ratings';
 import nksRoutes from './routes/nks';
@@ -98,6 +99,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/analysis', analysisRoutes);
 app.use('/api/render', express.raw({ type: 'application/octet-stream', limit: '10mb' }), renderRoutes);
 app.use('/api/djsets', djsetsRoutes);
+app.use('/api/share', shareRoutes);
 app.use('/api/playlists', playlistsRoutes);
 app.use('/api/ratings', ratingsRoutes);
 app.use('/api/nks', nksRoutes);
@@ -223,6 +225,10 @@ function startServer(): void {
     console.error('[SongDB] Init failed:', err);
   });
   scheduleSongDBUpdates();
+
+  // Share links expire 5 days after the last open.
+  sweepExpiredShares();
+  setInterval(() => sweepExpiredShares(), SHARE_SWEEP_MS).unref();
 
   // Start MCP WebSocket relay (port 4003) so the AI panel can control any browser
   startMcpRelay();

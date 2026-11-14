@@ -95,6 +95,25 @@ export function createLoudnessTables(database: Database.Database = db): void {
   `);
 }
 
+/**
+ * Share links (POST/GET /api/share). One row per uploaded song container; the bytes live in
+ * DATA_ROOT/share/<id>.bin and never change. expires_at slides forward on every open.
+ */
+export function createShareTables(database: Database.Database = db): void {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS share_links (
+      id TEXT PRIMARY KEY,
+      sha256 TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      parent_id TEXT,
+      owner_key_sha256 TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_share_links_expires ON share_links(expires_at);
+  `);
+}
+
 // Create tables
 /**
  * Module genre tables (GET /api/genre/:key). Exported so a test can build them in memory.
@@ -331,6 +350,7 @@ export function initDatabase() {
   createGenreTables();
   createHipVoteTables();
   createLoudnessTables();
+  createShareTables();
 
   console.log('[DB] Database initialized at:', DB_PATH);
 }
