@@ -21,6 +21,10 @@
  *   1xx / 2xx slide    NOTE_PORTA(speed * 4, 255 | -60) every tick, PRE_PORTA at the start
  *   3xx portamento     NOTE_PORTA(speed * 4, note) every tick, PRE_PORTA at the start
  *   5xy = 4 + Axy with the remembered vibrato; 6xy = 3 + Axy with the remembered portamento.
+ *   E1xy / E2xy        shorthand slide (FurnaceSequencer.cpp case 0xe1/0xe2): y semitones up/down at
+ *                      speed x*4, NOTE_PORTA every tick until the target, then LEGATO target; it runs
+ *                      on across rows like upstream.
+ *   E5xx fine pitch    pitch = xx - 0x80 (0x80 = centre), sent as PITCH with the vibrato added.
  * Defaults of a new Furnace song: linear pitch (slide speed x4), vibrato fine 15, sine vibrato,
  * no "no slides on first tick". Not ported: vibrato shapes (E3x), fine vibrato (E4x), volume slide
  * targets, the slide stop on reaching the target (the dispatch return value is not visible here;
@@ -40,6 +44,8 @@ const TREM_TABLE: number[] = Array.from({ length: 128 }, (_, i) => Math.trunc(25
 /** Compat defaults of a new song: linear pitch multiplies the slide speed by pitchSlideSpeed. */
 const PITCH_SLIDE_SPEED = 4;
 const VIBRATO_FINE = 15;
+/** Linear pitch: one semitone is 128 pitch units (NOTE_FREQUENCY = note << 7). */
+const SEMITONE_UNITS = 128;
 
 export interface ChipTickCommand {
   cmd: number;
@@ -74,6 +80,10 @@ interface ChannelTickState {
   volMax: number;
   /** The row holds a tone portamento: its note must not retrigger the channel. */
   holdNote: boolean;
+  /** E1xy/E2xy running: ticks left until the target note. */
+  shorthandTicks: number;
+  /** E5xx fine pitch, 1/128 semitone (0 = centre). */
+  pitch: number;
 }
 
 function freshState(): ChannelTickState {
@@ -82,11 +92,12 @@ function freshState(): ChannelTickState {
     portaNote: -1, portaSpeed: -1, lastPorta: 0, lastVibrato: 0,
     vibDepth: 0, vibRate: 0, vibPos: 0, volSpeed: 0,
     tremDepth: 0, tremRate: 0, tremPos: 0, volume: null, volMax: 0, holdNote: false,
+    shorthandTicks: 0, pitch: 0,
   };
 }
 
 /** The effect codes FurnaceTickEffects steps itself (the cell router must not send them). */
-export const TICK_STEPPED_EFFECTS: ReadonlySet<number> = new Set([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x0A]);
+export const TICK_STEPPED_EFFECTS: ReadonlySet<number> = new Set([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x0A, 0xE1, 0xE2, 0xE5]);
 
 function volSlideSpeed(param: number): number {
   const y = param & 15;
@@ -153,9 +164,28 @@ export class FurnaceTickEffects {
     s.holdNote = false;
     for (const { effect, param } of effects) {
       switch (effect) {
+        case 0xE1:
+        case 0xE2: {
+          slide = true;
+          const semitones = param & 15;
+          const speed = (param >> 4) * 4;
+          if (semitones === 0 || speed === 0 || s.note === null) this.stopPorta(s, out);
+          else {
+            s.portaNote = s.note + (effect === 0xE1 ? semitones : -semitones);
+            s.portaSpeed = speed;
+            s.shorthandTicks = Math.ceil((semitones * SEMITONE_UNITS) / (speed * PITCH_SLIDE_SPEED));
+            out.push({ cmd: DivCmd.PRE_PORTA, val1: 1, val2: 0 });
+          }
+          break;
+        }
+        case 0xE5:
+          s.pitch = param - 0x80;
+          out.push({ cmd: DivCmd.PITCH, val1: s.pitch + this.vibratoPitch(s), val2: 0 });
+          break;
         case 0x01:
         case 0x02:
           slide = true;
+          s.shorthandTicks = 0;
           if (param === 0) this.stopPorta(s, out);
           else {
             s.portaNote = effect === 0x01 ? 255 : -60;
@@ -165,6 +195,7 @@ export class FurnaceTickEffects {
           break;
         case 0x03:
           slide = true;
+          s.shorthandTicks = 0;
           if (param === 0) this.stopPorta(s, out);
           else {
             s.lastPorta = param;
@@ -185,6 +216,7 @@ export class FurnaceTickEffects {
         case 0x06:
           slide = true;
           volSlide = true;
+          s.shorthandTicks = 0;
           if (param === 0 || s.lastPorta === 0) this.stopPorta(s, out);
           else this.startTonePorta(s, s.lastPorta, hadNote, note !== null, out);
           this.setVolSlide(s, param);
@@ -204,8 +236,9 @@ export class FurnaceTickEffects {
       }
       if (effect === 0x07 && s.tremDepth !== 0) volSlide = false;
     }
-    // A row without the effect ends the running one.
-    if (!slide && s.portaSpeed !== -1) this.stopPorta(s, out);
+    // A row without the effect ends the running one; an E1xy/E2xy slide runs on to its target.
+    // shortcut: a new note ends a running E1xy/E2xy here; upstream's exact rule for that case is not ported.
+    if (!slide && s.portaSpeed !== -1 && (s.shorthandTicks === 0 || note !== null)) this.stopPorta(s, out);
     if (!vibrato && s.vibDepth !== 0) this.setVibrato(s, 0, out);
     if (!volSlide) s.volSpeed = 0;
     if (!tremolo && s.tremDepth !== 0) {
@@ -223,6 +256,7 @@ export class FurnaceTickEffects {
   private stopPorta(s: ChannelTickState, out: ChipTickCommand[]): void {
     s.portaNote = -1;
     s.portaSpeed = -1;
+    s.shorthandTicks = 0;
     out.push({ cmd: DivCmd.PRE_PORTA, val1: 0, val2: 0 });
   }
 
@@ -239,7 +273,7 @@ export class FurnaceTickEffects {
     s.vibDepth = param & 15;
     s.vibRate = param >> 4;
     // update pitch now (upstream sends it with the effect)
-    out.push({ cmd: DivCmd.PITCH, val1: this.vibratoPitch(s), val2: 0 });
+    out.push({ cmd: DivCmd.PITCH, val1: s.pitch + this.vibratoPitch(s), val2: 0 });
   }
 
   private vibratoPitch(s: ChannelTickState): number {
@@ -287,11 +321,18 @@ export class FurnaceTickEffects {
     if (s.vibDepth > 0) {
       s.vibPos += s.vibRate;
       while (s.vibPos >= 64) s.vibPos -= 64;
-      out.push({ cmd: DivCmd.PITCH, val1: this.vibratoPitch(s), val2: 0 });
+      out.push({ cmd: DivCmd.PITCH, val1: s.pitch + this.vibratoPitch(s), val2: 0 });
     }
     // portamento and pitch slides (a channel that never had a note has nothing to slide)
     if (s.note !== null && s.portaSpeed > 0) {
       out.push({ cmd: DivCmd.NOTE_PORTA, val1: s.portaSpeed * PITCH_SLIDE_SPEED, val2: s.portaNote });
+      // E1xy/E2xy at the target: upstream (portaResult 2) ends the slide and makes the target the note
+      if (s.shorthandTicks > 0 && --s.shorthandTicks === 0) {
+        s.note = s.portaNote;
+        s.portaNote = -1;
+        s.portaSpeed = -1;
+        out.push({ cmd: DivCmd.LEGATO, val1: s.note, val2: 0 });
+      }
     }
     // arpeggio (upstream: not while a slide or portamento runs)
     if (s.arp !== 0 && s.note !== null && s.portaSpeed < 1 && --s.arpTicks < 1) {
