@@ -401,6 +401,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
 
     setIsLooping(false);
     setCurrentRow(0);
+    setCurrentPosition(0);
     await engine.init();
 
     // WASM singleton engines (MusicLine, JamCracker): skip engine.stop()+delay.

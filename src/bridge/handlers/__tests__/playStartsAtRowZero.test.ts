@@ -23,6 +23,7 @@ vi.mock('@engine/ToneEngine', () => ({ getToneEngine: () => ({}) }));
 vi.mock('@/engine/ToneEngine', () => ({ getToneEngine: () => ({}) }));
 
 import { play } from '../writeHandlers';
+import { useTrackerStore } from '../../../stores/useTrackerStore';
 
 describe('play tool', () => {
   it.each(['song', 'pattern'])('%s mode after a stop starts at row 0, before the transport plays', async (mode) => {
@@ -31,5 +32,13 @@ describe('play tool', () => {
     await play({ mode });
     expect(transport.play).toHaveBeenCalled();
     expect(transport.currentRow).toBe(0);
+  });
+
+  it('song mode after a stop starts at order 0; pattern mode keeps the order position', async () => {
+    useTrackerStore.setState({ currentPositionIndex: 2 });
+    await play({ mode: 'pattern' });
+    expect(useTrackerStore.getState().currentPositionIndex).toBe(2);
+    await play({ mode: 'song' });
+    expect(useTrackerStore.getState().currentPositionIndex).toBe(0);
   });
 });

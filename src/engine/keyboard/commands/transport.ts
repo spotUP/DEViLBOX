@@ -101,6 +101,7 @@ export function playSong(): boolean {
   Tone.start();
   store.setIsLooping(false);
   store.setCurrentRow(0);
+  useTrackerStore.getState().setCurrentPosition(0);
   // Fast path: if AudioContext is already running, skip async init
   const ctx = Tone.getContext().rawContext as AudioContext;
   if (ctx.state === 'running') {

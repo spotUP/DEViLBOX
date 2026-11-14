@@ -335,7 +335,11 @@ export async function play(params: Record<string, unknown> = {}): Promise<Record
   }
   // Start at row 0, as the product's Play Song / Play Pattern do (keyboard/commands/transport.ts):
   // stop keeps currentRow at the stop row, and song-mode start seeks to it.
-  if (!store.isPlaying) store.setCurrentRow(0);
+  if (!store.isPlaying) {
+    store.setCurrentRow(0);
+    // Song mode starts at order 0, as Play Song does after Stop.
+    if (mode === 'song') useTrackerStore.getState().setCurrentPosition(0);
+  }
 
   await store.play();
   return { ok: true, mode };
