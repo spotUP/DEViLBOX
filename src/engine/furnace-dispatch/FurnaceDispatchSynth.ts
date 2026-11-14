@@ -393,9 +393,9 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       // the sequencer, which believed the channel still held its own.
       if (this.fromModule) return;
 
-      const numCh = this.engine.getChannelCount(this.platformType) || 3;
-      for (let ch = 0; ch < numCh; ch++) {
-        this.engine.setInstrument(ch, this.furnaceInstrumentIndex, this.platformType, true);
+      for (const key of this.chipKeys()) {
+        const numCh = this.engine.getChannelCount(key) || 3;
+        for (let ch = 0; ch < numCh; ch++) this.engine.setInstrument(ch, this.furnaceInstrumentIndex, key, true);
       }
       return;
     }
