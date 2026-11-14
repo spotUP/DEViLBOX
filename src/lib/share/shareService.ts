@@ -7,6 +7,7 @@ import { packShare, unpackShare, type ShareSong } from './shareContainer';
 import { inlineFragment, inlineLink, parseShareHash, storedFragment, SHARE_UPLOAD_MAX } from './shareLink';
 import { downloadShare, uploadShare } from './shareApi';
 import { useSharePromptStore } from './sharePromptStore';
+import { currentSongGeneration } from '@/lib/song/songLifecycle';
 
 /** The current song as a ShareSong: its native file when the format has an exporter, else a .dbx. */
 async function currentSong(): Promise<{ song: ShareSong; warnings: string[] }> {
@@ -26,8 +27,13 @@ async function currentSong(): Promise<{ song: ShareSong; warnings: string[] }> {
 }
 
 const OWNER_KEYS = 'devilbox.shareOwnerKeys';
-/** Share id the open song came from; sent as the parent of the next upload. */
-let openedFromShare: string | undefined;
+/** Share id the open song came from, and that song's load generation; sent as the parent of the next upload. */
+let openedFromShare: { id: string; generation: number } | undefined;
+
+/** The parent id, only while the song opened from that share is still the current song. */
+function parentShareId(): string | undefined {
+  return openedFromShare?.generation === currentSongGeneration() ? openedFromShare.id : undefined;
+}
 
 function rememberOwnerKey(id: string, key: string): void {
   try {
@@ -46,7 +52,7 @@ export async function buildShareLink(): Promise<{ link: string; warnings: string
   if (inline) {
     // Small songs are uploaded too, so the link also names a server copy; the inline data opens first.
     try {
-      const { id, ownerKey } = await uploadShare(container, openedFromShare);
+      const { id, ownerKey } = await uploadShare(container, parentShareId());
       rememberOwnerKey(id, ownerKey);
       return { link: `${base}#share=${inlineLink(inline, id)}`, warnings };
     } catch (e) {
@@ -55,7 +61,7 @@ export async function buildShareLink(): Promise<{ link: string; warnings: string
     }
   }
   if (container.length > SHARE_UPLOAD_MAX) throw new Error('This song is over 8 MB, too big to share. Export it as a file instead.');
-  const { id, ownerKey } = await uploadShare(container, openedFromShare);
+  const { id, ownerKey } = await uploadShare(container, parentShareId());
   rememberOwnerKey(id, ownerKey);
   return { link: `${base}#share=${storedFragment(id)}`, warnings };
 }
@@ -74,7 +80,7 @@ export async function openShareHash(hash: string): Promise<boolean> {
       { origin: 'share' },
     );
     if (!result.ok) throw new Error(result.error);
-    openedFromShare = ref.id;
+    openedFromShare = ref.id ? { id: ref.id, generation: currentSongGeneration() } : undefined;
     useSharePromptStore.getState().show(song.name);
     return true;
   } finally {

@@ -203,6 +203,7 @@ import {
   evaluateScript,
 } from './handlers/writeHandlers';
 import { analyzeSongHandler } from './handlers/analysisHandlers';
+import { shareSong, openShare } from './handlers/shareHandlers';
 import { getVoiceTake, voiceToNotes } from './handlers/voiceHandlers';
 import { generatePattern, transformPattern } from './handlers/generatorHandlers';
 import { getFormatEngines, setFormatEngine, getPlayheadOffset } from './handlers/engineHandlers';
@@ -484,6 +485,8 @@ const handlers: Record<string, Handler> = {
   export_midi: exportMidi,
   export_mod: exportMod,
   export_native: exportNative,
+  share_song: shareSong,
+  open_share: openShare,
 
   // ─── Console Capture ────────────────────────────────────────────────────
   get_console_errors: () => getConsoleErrors(),
