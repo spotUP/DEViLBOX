@@ -333,6 +333,9 @@ export async function play(params: Record<string, unknown> = {}): Promise<Record
     // Pattern mode: enable looping to repeat current pattern
     store.setIsLooping(true);
   }
+  // Start at row 0, as the product's Play Song / Play Pattern do (keyboard/commands/transport.ts):
+  // stop keeps currentRow at the stop row, and song-mode start seeks to it.
+  if (!store.isPlaying) store.setCurrentRow(0);
 
   await store.play();
   return { ok: true, mode };
