@@ -25,8 +25,9 @@ const tuneOf = (n: number): TrackerSong => ({ fileSubsongs: { count: 9, current:
 describe('the registry hands each engine the tune the grid shows', () => {
   it.each([['FuturePlayer'], ['MusicAssembler'], ['BenDaglish']])('%s: load args carry fileSubsongs.current', (key) => {
     const d = WASM_ENGINES.find((e) => e.key === key)!;
-    expect(d.getLoadArgs!(tuneOf(4))).toEqual([4]);
-    expect(d.getLoadArgs!({} as TrackerSong)).toEqual([0]);
+    // BenDaglish also passes song.initialSpeed as a second arg (02081be41)
+    expect(d.getLoadArgs!(tuneOf(4))[0]).toBe(4);
+    expect(d.getLoadArgs!({} as TrackerSong)[0]).toBe(0);
   });
   it('Hippel: the TFMX decoder loads (module, no sample file, tune)', () => {
     const d = WASM_ENGINES.find((e) => e.key === 'Hippel')!;
