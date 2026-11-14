@@ -14,7 +14,7 @@
  * the cell holds Furnace's code and value (effect notation 'furnace').
  */
 import type { TrackerCell, FurnaceRow, FurnaceNativeData } from '@/types/tracker';
-import { maxVolumeOfChannel } from '@engine/furnace-dispatch/FurnaceDispatchSynth';
+import { maxVolumeOfChannel } from '@engine/furnace-dispatch/channelVolume';
 
 /**
  * Furnace note → editor note.
