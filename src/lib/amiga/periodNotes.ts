@@ -135,6 +135,8 @@ export const NOTE_NUMBER_FORMATS: ReadonlySet<string> = new Set([
   // chip and game-music players (registry families chip-dump, c64-chip)
   'VGM', 'S98', 'YM', 'NSF', 'SAP', 'ASAP', 'GBS', 'AY', 'KSS', 'HES', 'SPC', 'GYM', 'SNDH', 'ZXTune',
   'MDX', 'PMD', 'FMP', 'PiyoPiyo', 'TFM',
+  // PC speaker: cell note = BASIC PLAY semitone + 1 (O4 C = note 49 = 261.6 Hz, C-4 as in XM)
+  'AnsiMusic',
 ]);
 
 /**
