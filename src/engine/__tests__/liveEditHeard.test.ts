@@ -104,6 +104,12 @@ const FILE: Record<string, string> = {
   // neither name matches the registry (rjp./.rj, wb. prefix): the corpus holds cannon fodder.sng and wicked.wb
   richardJoseph: 'richard-joseph/cannon fodder (intro).sng',
   wallyBeben: 'wally-beben/wicked.wb',
+  // the corpus holds one song per format below; each is confirmed by content detection (E.M.S. V6 header for emsv6, 0x0125 for ems)
+  davidHanney: 'david-hanney/tearaway thomas unused.dh',
+  ems: 'formats/ballade.song.ems',
+  emsv6: 'formats/perception.ems',
+  fashionTracker: 'fashion-tracker/ivory tover ii.ex',
+  mcmd: 'formats/ep-trmonsterbusiness.mcmd',
 };
 /** Formats UADE plays from the module bytes: the Paula stream is the sound. */
 const PAULA = new Set(['suntronic', 'robHubbard', 'davidWhittaker', 'benDaglish', 'jochenHippelST', 'activisionPro', 'fred', 'actionamics', 'soundMaster', 'digitalSonixChrome', 'sidmon1']);
@@ -161,6 +167,7 @@ export const UNMEASURED: Record<string, string> = {
   iceTracker: 'the registry match is an instrument file, no corpus module',
   musicMaker: 'the song needs its instrument companion file, not in the corpus folder',
   stoneTracker: 'the song needs its sample bank companion file, not in the corpus folder',
+  emsv6: 'import runs the UADE scan (parseUADEFile), the node run has no UADE engine instance',
   kt: 'the song has no note cell to edit (a Klystrack instrument-only file)', xrns: 'the song has no note cell to edit',
 };
 
