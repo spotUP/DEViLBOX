@@ -109,7 +109,11 @@ describe('AY volume is 0-15, not 0-127', () => {
 });
 
 describe('through the real loader and replayer', { timeout: 60000 }, () => {
-  beforeAll(installFurnaceFileOpsWasm);
+  beforeAll(async () => {
+    installFurnaceFileOpsWasm();
+    // Cold import of the replayer graph takes 20-70 s on a busy machine; pay it here, not inside the test's timeout.
+    await Promise.all([import('../parsers/FurnaceToSong'), import('@/engine/TrackerReplayer')]);
+  }, 300_000);
 
   it('opens a DefleMask song with its first note as C-4 and keeps an edit for the next Play', async () => {
     const { parseFurnaceFile } = await import('../parsers/FurnaceToSong');
