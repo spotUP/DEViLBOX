@@ -34,6 +34,8 @@ import { Zap, Music, Sliders, Download, List } from 'lucide-react';
 import { ToastNotification } from '@components/ui/ToastNotification';
 import { JukeboxPanel } from '@components/jukebox/JukeboxPanel';
 import { PopOutWindow } from '@components/ui/PopOutWindow';
+import { SharePrompt } from '@components/share/SharePrompt';
+import { openShareHash } from '@lib/share/shareService';
 import { UpdateNotification } from '@components/ui/UpdateNotification';
 import { SynthErrorDialog } from '@components/ui/SynthErrorDialog';
 import { USBSIDWizard } from '@components/dialogs/USBSIDWizard';
@@ -231,6 +233,11 @@ function App() {
   // The one start dialog: Tip of the day / What's new on every start, or the
   // collaboration modal for a ?collab=CODE link.
   useEffect(() => { openStartDialog(currentVersion.buildNumber); }, [currentVersion.buildNumber]);
+
+  // A #share= link opens its song (no autoplay); SharePrompt then offers Play.
+  useEffect(() => {
+    void openShareHash(window.location.hash).catch((e: unknown) => notify.error(e instanceof Error ? e.message : 'Could not open the share link.'));
+  }, []);
 
   // Cloud sync: pull on login, push on local mutations
   useCloudSync();
@@ -1262,6 +1269,7 @@ function App() {
 
       {/* Toast Notifications */}
       <ToastNotification />
+      <SharePrompt />
 
       {/* Synth Error Dialog - Shows when synth initialization fails */}
       <SynthErrorDialog />

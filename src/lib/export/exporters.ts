@@ -341,6 +341,12 @@ export interface ExportOptions {
  * the song by hand, one without the groove (2026-09-29 audit).
  */
 export function exportSong(options: ExportOptions = {}): void {
+  const { bytes, filename } = songDbxBytes(options);
+  saveAs(new Blob([bytes as BlobPart], { type: 'application/octet-stream' }), filename);
+}
+
+/** The .dbx bytes and file name of the current song; exportSong downloads them, Share uploads them. */
+export function songDbxBytes(options: ExportOptions = {}): { bytes: Uint8Array; filename: string } {
   const song = snapshotSong();
   const songData: SongExport = {
     format: 'devilbox-song',
@@ -351,12 +357,7 @@ export function exportSong(options: ExportOptions = {}): void {
   } as SongExport;
 
   const json = savedSongToJson(songData, options.prettify);
-
-  const compressed = compressProject(json);
-  const blob = new Blob([compressed], { type: 'application/octet-stream' });
-  const filename = `${sanitizeFilename(song.metadata.name)}.dbx`;
-
-  saveAs(blob, filename);
+  return { bytes: new Uint8Array(compressProject(json)), filename: `${sanitizeFilename(song.metadata.name)}.dbx` };
 }
 
 /**

@@ -19,7 +19,7 @@ import { startupPolicy } from './startupPolicy';
 
 function currentPolicy() {
   const { welcomeDialogEnabled, welcomeJingleEnabled } = useSettingsStore.getState();
-  return startupPolicy(window.location.search, { welcomeDialogEnabled, welcomeJingleEnabled });
+  return startupPolicy(window.location.search, { welcomeDialogEnabled, welcomeJingleEnabled }, window.location.hash);
 }
 
 let began = false;

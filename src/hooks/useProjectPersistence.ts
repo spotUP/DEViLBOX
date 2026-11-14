@@ -10,6 +10,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { beginBootRestore, endBootRestore } from '@/lib/startup/bootRestore';
+import { isShareHash } from '@/lib/share/shareLink';
 import { shouldWriteRecovery, hasProjectContent, postLoadFlags, decideBootRestore } from '@/lib/persistence/recoveryGate';
 import { useTrackerStore, useInstrumentStore, useProjectStore, useTransportStore } from '@stores';
 import type { AutomationCurve } from '@typedefs/automation';
@@ -762,6 +763,8 @@ export function useProjectPersistence() {
   useEffect(() => {
     if (hasLoadedFromStorage) return;
     hasLoadedFromStorage = true;
+    // A share link brings its own song; the previous session is not restored over it.
+    if (isShareHash(window.location.hash)) return;
     beginBootRestore();
     void (async () => {
       if (await handleResetParam()) return;

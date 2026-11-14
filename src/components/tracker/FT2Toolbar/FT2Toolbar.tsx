@@ -18,6 +18,7 @@ import { FT2SubsongInput } from './FT2SubsongInput';
 import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useUIStore, useEditorStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { notify } from '@stores/useNotificationStore';
+import { shareCurrentSong } from '@lib/share/shareService';
 import { SONG_FILE_ACCEPT, SONG_FILE_EXTENSION } from '@lib/uprough/songFile';
 import { renderSong } from '@lib/uprough/generateClient';
 import { playAudition, stopAudition } from '@lib/uprough/auditionPlayer';
@@ -633,6 +634,7 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         title={isPlayingPattern ? 'Click: Restart pattern · Shift+click: Power off' : 'Play Pattern'}
         className="min-w-[88px]">Play Pattern</Button>
       <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
+      <Button variant="ghost" size="sm" onClick={() => void shareCurrentSong()} title="Copy a link that opens this song">Share</Button>
       <Button variant="ghost" size="sm" onClick={handleSave} title="Save to browser & download .dbx (Ctrl+S)">Save</Button>
       <Button variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo()} title="Undo (Ctrl+Z)">Undo</Button>
       <Button variant="ghost" size="sm" onClick={handleRedo} disabled={!canRedo()} title="Redo (Ctrl+Shift+Z)">Redo</Button>
