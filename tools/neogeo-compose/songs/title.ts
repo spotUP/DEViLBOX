@@ -28,7 +28,7 @@ export default function (): ScrambleSongBuilder {
   k.line(alone, AY.AY1_B, [[28, 'E-5'], [30, 'D-5']], k.twin);
   k.line(alone, AY.BASS, [[28, 'G-1'], [30, 'G-2']], k.bounce);
   k.line(alone, AY.AY1_C, [[28, 'G-1']], k.thump);
-  k.drums(alone, `${'.'.repeat(24)}K.S.SSSS`);
+  k.drums(alone, `${'.'.repeat(24)}S.S.SSSS`);
 
   const join = k.bar(MOTIF, [[0, 'OFF']], BOUNCE, THUMP, GROOVE);
   const x = k.bar(MOTIF, ANSWER, BOUNCE, THUMP, GROOVE);
