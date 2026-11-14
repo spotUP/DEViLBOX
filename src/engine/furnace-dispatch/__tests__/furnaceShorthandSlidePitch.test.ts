@@ -31,6 +31,29 @@ describe('Furnace E1xy/E2xy shorthand slide and E5xx fine pitch', () => {
     expect(ticks.slice(16).flat()).toEqual([]);
   });
 
+  it('a new note during E1xy/E2xy becomes the slide target without a note-on', () => {
+    const fx = new FurnaceTickEffects();
+    fx.beginRow(0, NOTE, null, [{ effect: 0xE1, param: 0x12 }]);
+    for (let t = 0; t < 6; t++) fx.tick(0);
+    // 6 of 16 ticks run: the slide is 96 units over NOTE; NOTE + 4 is 416 units on = 26 ticks
+    expect(fx.beginRow(0, NOTE + 4, null, [])).toEqual([]);
+    expect(fx.holdsNote(0)).toBe(true);
+    const ticks: ReturnType<FurnaceTickEffects['tick']>[] = [];
+    for (let t = 0; t < 30; t++) ticks.push(fx.tick(0));
+    const portas = ticks.flat().filter((c) => c.cmd === DivCmd.NOTE_PORTA);
+    expect(portas).toHaveLength(26);
+    expect(portas.every((c) => c.val1 === 16 && c.val2 === NOTE + 4)).toBe(true);
+    expect(ticks[25]).toContainEqual({ cmd: DivCmd.LEGATO, val1: NOTE + 4, val2: 0 });
+  });
+
+  it('a new note after E1xy/E2xy reached its target plays normally', () => {
+    const fx = new FurnaceTickEffects();
+    fx.beginRow(0, NOTE, null, [{ effect: 0xE1, param: 0x12 }]);
+    for (let t = 0; t < 20; t++) fx.tick(0);
+    fx.beginRow(0, NOTE + 4, null, []);
+    expect(fx.holdsNote(0)).toBe(false);
+  });
+
   it('E2xy slides down to note - y', () => {
     const fx = new FurnaceTickEffects();
     fx.beginRow(0, NOTE, null, [{ effect: 0xE2, param: 0x83 }]);

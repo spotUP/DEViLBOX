@@ -82,6 +82,8 @@ interface ChannelTickState {
   holdNote: boolean;
   /** E1xy/E2xy running: ticks left until the target note. */
   shorthandTicks: number;
+  /** E1xy/E2xy running: +1 slides up, -1 down. */
+  shorthandDir: number;
   /** E5xx fine pitch, 1/128 semitone (0 = centre). */
   pitch: number;
 }
@@ -92,7 +94,7 @@ function freshState(): ChannelTickState {
     portaNote: -1, portaSpeed: -1, lastPorta: 0, lastVibrato: 0,
     vibDepth: 0, vibRate: 0, vibPos: 0, volSpeed: 0,
     tremDepth: 0, tremRate: 0, tremPos: 0, volume: null, volMax: 0, holdNote: false,
-    shorthandTicks: 0, pitch: 0,
+    shorthandTicks: 0, shorthandDir: 0, pitch: 0,
   };
 }
 
@@ -174,6 +176,7 @@ export class FurnaceTickEffects {
             s.portaNote = s.note + (effect === 0xE1 ? semitones : -semitones);
             s.portaSpeed = speed;
             s.shorthandTicks = Math.ceil((semitones * SEMITONE_UNITS) / (speed * PITCH_SLIDE_SPEED));
+            s.shorthandDir = effect === 0xE1 ? 1 : -1;
             out.push({ cmd: DivCmd.PRE_PORTA, val1: 1, val2: 0 });
           }
           break;
@@ -236,9 +239,12 @@ export class FurnaceTickEffects {
       }
       if (effect === 0x07 && s.tremDepth !== 0) volSlide = false;
     }
+    // A new note during a running E1xy/E2xy becomes its target and plays no note-on
+    // (playback.cpp:1599-1614 with e1e2StopOnSameNote off, the new-song default).
+    // shortcut: e1e2StopOnSameNote on (slide stops instead) is not read; read the song flag when a song sets it.
+    if (!slide && note !== null && s.shorthandTicks > 0) this.retargetShorthand(s, note);
     // A row without the effect ends the running one; an E1xy/E2xy slide runs on to its target.
-    // shortcut: a new note ends a running E1xy/E2xy here; upstream's exact rule for that case is not ported.
-    if (!slide && s.portaSpeed !== -1 && (s.shorthandTicks === 0 || note !== null)) this.stopPorta(s, out);
+    else if (!slide && s.portaSpeed !== -1 && s.shorthandTicks === 0) this.stopPorta(s, out);
     if (!vibrato && s.vibDepth !== 0) this.setVibrato(s, 0, out);
     if (!volSlide) s.volSpeed = 0;
     if (!tremolo && s.tremDepth !== 0) {
@@ -251,6 +257,17 @@ export class FurnaceTickEffects {
   /** True when the row's note must not retrigger the channel: it is a tone portamento target. */
   holdsNote(chan: number): boolean {
     return this.channels.get(chan)?.holdNote ?? false;
+  }
+
+  private retargetShorthand(s: ChannelTickState, note: number): void {
+    const step = s.portaSpeed * PITCH_SLIDE_SPEED;
+    // Where the slide is now: the old target less the ticks it still had to run.
+    const now = s.portaNote * SEMITONE_UNITS - s.shorthandDir * s.shorthandTicks * step;
+    const distance = note * SEMITONE_UNITS - now;
+    s.portaNote = note;
+    s.shorthandDir = distance < 0 ? -1 : 1;
+    s.shorthandTicks = Math.max(1, Math.ceil(Math.abs(distance) / step));
+    s.holdNote = true;
   }
 
   private stopPorta(s: ChannelTickState, out: ChipTickCommand[]): void {
