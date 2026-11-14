@@ -190,7 +190,7 @@ describe('exportFurnaceModule', () => {
 
   it('marks every channel as shown in the pattern view and the channel oscilloscope', () => {
     const bytes = pako.inflate(exportFurnaceModule(song()).bytes);
-    // SNG2 writes, per channel: effect column count, then the show byte (Furnace writes 3), then the collapse byte (0).
+    // INFO writes, per channel: effect column count, then the show byte (Furnace writes 3), then the collapse byte (0).
     const shown = new Array<number>(14).fill(3);
     const collapsed = new Array<number>(14).fill(0);
     const want = [...shown, ...collapsed];
@@ -201,26 +201,38 @@ describe('exportFurnaceModule', () => {
     expect(found).toBe(true);
   });
 
-  // ngdevkit's furtool.py reads `version <= 240` with the old INFO reader (assert on "INFO"), so a
-  // module with INF2 blocks must carry a version above 240. 245 is DIV_ENGINE_VERSION of the vendored
-  // Furnace; below it Furnace converts ADSR / LFO macros on load. furtool also takes the clock from
+  // Furnace 0.6.8.3 (DIV_ENGINE_VERSION 232, the player BossGame checks songs in) reads only the old
+  // INFO block and fails an INF2 module with "invalid info header!"; INF2 starts at version 240.
+  // ngdevkit's furtool.py reads `version <= 240` with the same INFO reader and takes the clock from
   // the system name (MVS or AES).
-  it('writes format version 245 and the system name "Neo Geo MVS", which ngdevkit furtool needs', () => {
-    const raw = pako.inflate(exportFurnaceModule(song()).bytes);
+  it('writes format version 232 with an INFO header that Furnace 0.6.8.3 and ngdevkit furtool read', () => {
+    const s = song();
+    const raw = pako.inflate(exportFurnaceModule(s).bytes);
     const view = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
     expect(new TextDecoder().decode(raw.subarray(0, 16))).toBe('-Furnace module-');
-    expect(view.getUint16(16, true)).toBe(245);
+    expect(view.getUint16(16, true)).toBe(232);
     const infoAt = view.getUint32(20, true);
-    expect(new TextDecoder().decode(raw.subarray(infoAt, infoAt + 4))).toBe('INF2');
-    // INF2 body: song name, author, system name (zero-terminated strings).
-    const strings: string[] = [];
-    let at = infoAt + 8;
-    for (let i = 0; i < 3; i++) {
-      const end = raw.indexOf(0, at);
-      strings.push(new TextDecoder().decode(raw.subarray(at, end)));
-      at = end + 1;
-    }
-    expect(strings).toEqual(['Round trip', '', 'Neo Geo MVS']);
+    expect(infoAt).toBe(32);
+    expect(new TextDecoder().decode(raw.subarray(infoAt, infoAt + 4))).toBe('INFO');
+    const body = infoAt + 8;
+    expect(raw[body]).toBe(0); // time base
+    expect(raw[body + 1]).toBe(s.initialSpeed);
+    expect(raw[body + 3]).toBe(1); // arpeggio speed
+    expect(view.getUint16(body + 8, true)).toBe(s.patterns[0].length);
+    expect(view.getUint16(body + 10, true)).toBe(s.songPositions.length);
+    expect(view.getUint16(body + 16, true)).toBe(0); // no wavetables
+    const systems = body + 24;
+    expect(raw[systems]).toBe(0xa5); // YM2610 (Neo Geo), Furnace file ID
+    expect(raw[systems + 1]).toBe(0); // one chip
+    expect(raw[systems + 32]).toBe(64); // chip volume 1.0
+    const flagPtr = view.getUint32(systems + 96, true);
+    expect(new TextDecoder().decode(raw.subarray(flagPtr, flagPtr + 4))).toBe('FLAG');
+    // Song name, author, then the system name further on (zero-terminated strings).
+    const nameAt = systems + 96 + 128;
+    expect(new TextDecoder().decode(raw.subarray(nameAt, raw.indexOf(0, nameAt)))).toBe('Round trip');
+    const text = new TextDecoder('latin1').decode(raw.subarray(infoAt, infoAt + 8 + view.getUint32(infoAt + 4, true)));
+    expect(text).toContain('\0Neo Geo MVS\0');
+    expect(new TextDecoder().decode(raw)).not.toContain('INF2');
   });
 
   it('refuses what the module cannot hold', () => {

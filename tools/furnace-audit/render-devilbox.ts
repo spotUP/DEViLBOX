@@ -134,31 +134,20 @@ async function loadWasmModule(): Promise<WasmModule> {
       },
     }) as WasmModule;
 
-    // Patch HEAP views from captured memory
+    // HEAP views read the captured memory on every access: a malloc that grows memory detaches the
+    // old buffer, so a view taken once fails with "detached ArrayBuffer" on the next set().
     if (capturedMemory) {
-      const buf = capturedMemory.buffer;
-      module.HEAPU8 = new Uint8Array(buf);
-      module.HEAPF32 = new Float32Array(buf);
-      module.HEAP32 = new Int32Array(buf);
-      // Store memory ref so we can update views after growth
-      (module as any)._wasmMemory = capturedMemory;
+      const memory: WebAssembly.Memory = capturedMemory;
+      Object.defineProperties(module, {
+        HEAPU8: { get: () => new Uint8Array(memory.buffer) },
+        HEAPF32: { get: () => new Float32Array(memory.buffer) },
+        HEAP32: { get: () => new Int32Array(memory.buffer) },
+      });
     }
 
     return module;
   } finally {
     WebAssembly.instantiate = origInstantiate;
-  }
-}
-
-/** Refresh heap views after potential memory growth */
-function updateHeapViews(wasm: WasmModule): void {
-  const mem = (wasm as any)._wasmMemory as WebAssembly.Memory | undefined;
-  if (!mem) return;
-  const buf = mem.buffer;
-  if (wasm.HEAPU8.buffer !== buf) {
-    wasm.HEAPU8 = new Uint8Array(buf);
-    wasm.HEAPF32 = new Float32Array(buf);
-    wasm.HEAP32 = new Int32Array(buf);
   }
 }
 
@@ -476,15 +465,12 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
     }
 
     // 5. Upload instruments using raw INS2 binary data
-    updateHeapViews(wasm);
     const instruments = parsed.instruments || [];
     for (let i = 0; i < instruments.length; i++) {
       const inst = instruments[i];
       if (inst.rawBinaryData && inst.rawBinaryData.byteLength > 0) {
         const rawData = new Uint8Array(inst.rawBinaryData);
-        updateHeapViews(wasm);
         const dataPtr = wasm._malloc(rawData.length);
-        updateHeapViews(wasm);
         wasm.HEAPU8.set(rawData, dataPtr);
         try {
           wasm._furnace_dispatch_load_ins2(i, dataPtr, rawData.length);
@@ -508,9 +494,7 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
       packed[0] = wtLen;
       packed[1] = wtMax;
       for (let j = 0; j < wtLen; j++) packed[2 + j] = wt.data[j];
-      updateHeapViews(wasm);
       const wtPtr = wasm._malloc(packed.byteLength);
-      updateHeapViews(wasm);
       wasm.HEAPU8.set(new Uint8Array(packed.buffer), wtPtr);
       try {
         // Sync wavetable to ALL chip instances (not just first) — multi-chip songs
@@ -584,9 +568,7 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
         blob.set(new Uint8Array(smp.data.buffer, smp.data.byteOffset, smp.data.byteLength), headerSize);
       }
 
-      updateHeapViews(wasm);
       const smpPtr = wasm._malloc(totalLen);
-      updateHeapViews(wasm);
       wasm.HEAPU8.set(blob, smpPtr);
       try {
         // Sync sample to ALL chip instances (not just first) — multi-chip songs
@@ -675,7 +657,6 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
     if (speedPattern && speedPattern.length > 0) {
       const len = Math.min(speedPattern.length, 16);
       const spPtr = wasm._malloc(len * 2); // uint16_t = 2 bytes
-      updateHeapViews(wasm);
       const heap16 = new Uint16Array(wasm.HEAPU8.buffer, spPtr, len);
       for (let i = 0; i < len; i++) heap16[i] = speedPattern[i];
       wasm._furnace_seq_set_speed_pattern(spPtr, len);
@@ -695,7 +676,6 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
       // Send ALL compat flags to each dispatch instance (matches DivCompatFlags struct order)
       const flagBytes = packDispatchCompatFlags(native.compatFlags);
       const flagPtr = wasm._malloc(flagBytes.length);
-      updateHeapViews(wasm);
       wasm.HEAPU8.set(flagBytes, flagPtr);
       for (const { handle } of chipInstances) {
         wasm._furnace_dispatch_set_compat_flags(handle, flagPtr, flagBytes.length);
@@ -713,7 +693,6 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
         const groove = native.grooves[i];
         const len = Math.min(groove.len, 16);
         const ptr = wasm._malloc(len * 2); // uint16_t = 2 bytes
-        updateHeapViews(wasm);
         const heap16 = new Uint16Array(wasm.HEAPU8.buffer, ptr, len);
         for (let j = 0; j < len; j++) heap16[j] = groove.val[j] || 6;
         wasm._furnace_seq_set_groove_entry(i, ptr, len);
@@ -834,7 +813,6 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
     function renderSamples(chunkL: Float32Array, chunkR: Float32Array, offset: number, count: number) {
       for (let ci = 0; ci < chipInstances.length; ci++) {
         wasm._furnace_dispatch_render(chipInstances[ci].handle, outPtrL, outPtrR, count);
-        updateHeapViews(wasm);
         const heapF32 = wasm.HEAPF32;
         const offL = outPtrL >> 2;
         const offR = outPtrR >> 2;

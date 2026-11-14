@@ -1,9 +1,10 @@
 /**
  * Furnace module (.fur) writer for a Neo Geo (YM2610 / OPNB) song composed in the tracker.
  *
- * Writes the current module layout (format version 245, INF2 / SNG2 / INS2 / PATN blocks,
- * zlib-compressed), the one Furnace 0.6.8 and later read. Layout reference:
- * third-party/furnace-master/papers/format.md and src/engine/fileOps/fur.cpp. The pattern
+ * Writes the old module layout (format version 232, INFO / ADIR / INS2 / PATN blocks,
+ * zlib-compressed), the one Furnace 0.6.8.3 reads (it has no INF2 reader and rejects INF2 with
+ * "invalid info header!"); later Furnace and ngdevkit furtool read it too. Layout reference:
+ * the 0.6.8.3 reader, src/engine/fileOps/fur.cpp at tag v0.6.8.3 (old INFO path). The pattern
  * channel is ONE byte in a PATN header, as fur.cpp writes it (format.md says two).
  *
  * The instrument blocks come from `encodeInstrumentAsINS2` (the importer's own INS2 writer);
@@ -28,12 +29,36 @@ import { editorEffectToFurnace, xmVolToFurnace, xmNoteToFurnace } from '@/lib/im
 import { maxVolumeOfChipChannel } from '@engine/furnace-dispatch/chipVoiceKinds';
 
 /**
- * Furnace format version written: DIV_ENGINE_VERSION of the vendored Furnace (engine.h, 245), the
- * engine that plays the song here. INF2 / SNG2 blocks start at 240 in Furnace itself, but ngdevkit's
- * furtool.py reads `version <= 240` with the old INFO reader, and Furnace converts ADSR / LFO macros
- * of instruments below 245 (convertOldADSRLFO), which would change macros written with 245 meaning.
+ * Furnace format version written: DIV_ENGINE_VERSION of Furnace 0.6.8.3 (engine.h at v0.6.8.3, 232),
+ * the oldest player the songs must open in (BossGame checks them in the installed 0.6.8.3). 0.6.8.3
+ * reads only the INFO layout; INF2 / SNG2 / CFLG / GROV start at 240. Later Furnace (and the vendored
+ * 245 engine) reads 232 too; its <245 ADSR / LFO macro conversion does not touch these files, since
+ * the writer only writes plain sequence macros (toFileMacro: open bit 0 only). ngdevkit furtool.py
+ * reads `version <= 240` with this INFO reader.
  */
-export const FUR_EXPORT_VERSION = 245;
+export const FUR_EXPORT_VERSION = 232;
+/** Furnace 0.6.8.3 pattern length limit (DIV_MAX_ROWS at v0.6.8.3). */
+const FUR_MAX_ROWS = 256;
+/**
+ * Compat flags of the INFO layout, in the order fur.cpp (v0.6.8.3) reads them, with the values of
+ * a new Furnace song. Three runs: version 37-69 (20 bytes), 70-130 (28), 138-200 (8).
+ */
+const INFO_COMPAT_FLAGS: ReadonlyArray<ReadonlyArray<readonly [string, number]>> = [
+  [['limitSlides', 0], ['linearPitch', 2], ['loopModality', 1], ['properNoiseLayout', 1], ['waveDutyIsVol', 0],
+    ['resetMacroOnPorta', 0], ['legacyVolumeSlides', 0], ['compatibleArpeggio', 0], ['noteOffResetsSlides', 1],
+    ['targetResetsSlides', 1], ['arpNonPorta', 0], ['algMacroBehavior', 0], ['brokenShortcutSlides', 0],
+    ['ignoreDuplicateSlides', 0], ['stopPortaOnNoteOff', 0], ['continuousVibrato', 0], ['brokenDACMode', 0],
+    ['oneTickCut', 0], ['newInsTriggersInPorta', 1], ['arp0Reset', 1]],
+  [['brokenSpeedSel', 0], ['noSlidesOnFirstTick', 0], ['rowResetsArpPos', 0], ['ignoreJumpAtEnd', 0],
+    ['buggyPortaAfterSlide', 0], ['gbInsAffectsEnvelope', 1], ['sharedExtStat', 1],
+    ['ignoreDACModeOutsideIntendedChannel', 0], ['e1e2AlsoTakePriority', 0], ['newSegaPCM', 1], ['fbPortaPause', 0],
+    ['snDutyReset', 0], ['pitchMacroIsLinear', 1], ['pitchSlideSpeed', 4], ['oldOctaveBoundary', 0], ['noOPN2Vol', 0],
+    ['newVolumeScaling', 1], ['volMacroLinger', 1], ['brokenOutVol', 0], ['e1e2StopOnSameNote', 0],
+    ['brokenPortaArp', 0], ['snNoLowPeriods', 0], ['delayBehavior', 2], ['jumpTreatment', 0], ['autoSystem', 1],
+    ['disableSampleMacro', 0], ['brokenOutVol2', 0], ['oldArpStrategy', 0]],
+  [['brokenPortaLegato', 0], ['brokenFMOff', 0], ['preNoteNoEffect', 0], ['oldDPCM', 0],
+    ['resetArpPhaseOnNewNote', 0], ['ceilVolumeScaling', 0], ['oldAlwaysSetVolume', 0], ['oldSampleOffset', 0]],
+];
 /** System id of the YM2610 (Neo Geo): FM 1-4, SSG 1-3, ADPCM-A 1-6, ADPCM-B. */
 export const FUR_SYSTEM_YM2610 = 0xa5;
 export const FUR_NEO_GEO_CHANNELS = 14;
@@ -132,22 +157,25 @@ function block(tag: string, body: Bytes): Uint8Array {
   return new Bytes().ascii(tag).u32(body.length).bytes(body.toUint8Array()).toUint8Array();
 }
 
-/** CFLG body (song.cpp DivCompatFlags::putData): key=value lines, zero-terminated; Furnace reads missing keys as defaults. */
-function compatFlagsText(flags: Record<string, unknown>): string {
-  let out = '';
-  for (const [k, v] of Object.entries(flags)) {
-    if (typeof v === 'boolean') out += `${k}=${v ? 'true' : 'false'}\n`;
-    else if (typeof v === 'number' && Number.isFinite(v)) out += `${k}=${Math.round(v)}\n`;
-  }
-  return out;
+/** The compat flag bytes of INFO: new-song values, overridden by the loaded module's flags (Furnace key names). */
+function infoCompatFlags(flags: Record<string, unknown>, warnings: string[]): number[][] {
+  const known = new Set(INFO_COMPAT_FLAGS.flat().map(([k]) => k));
+  const lost = Object.keys(flags).filter((k) => !known.has(k));
+  if (lost.length > 0) warnings.push(`Compat flags Furnace 0.6.8.3 does not have, left out: ${lost.join(', ')}`);
+  return INFO_COMPAT_FLAGS.map((run) => run.map(([k, def]) => {
+    const v = flags[k];
+    const n = typeof v === 'boolean' ? (v ? 1 : 0) : typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : def;
+    // 0.6.8.3 linearPitch: 2 = full linear, 1 = partial; later Furnace has only 0/1 and reads >1 as 1.
+    return k === 'linearPitch' ? (n ? 2 : 0) : Math.max(0, Math.min(255, n));
+  }));
 }
 
-/** GROV body (DivGroovePattern::putData): length byte, 16 x u16. Length = the leading non-zero entries. */
+/** Groove in INFO (fur.cpp v0.6.8.3): length byte, 16 x u8. Length = the leading non-zero entries. */
 function grooveBody(val: number[]): Bytes {
   let len = 0;
   while (len < 16 && (val[len] ?? 0) > 0) len++;
   const b = new Bytes().u8(len);
-  for (let i = 0; i < 16; i++) b.u16(Math.max(0, Math.min(65535, val[i] ?? 0)));
+  for (let i = 0; i < 16; i++) b.u8(Math.max(0, Math.min(255, val[i] ?? 0)));
   return b;
 }
 
@@ -174,7 +202,7 @@ function cellEffects(cell: TrackerCell): Array<[number, number]> {
 // row without 0xy is back on the base note. Furnace 00xy stays on until 00 00
 // (FurnaceSequencer.cpp ch.arp = effectVal; playback.cpp the same). So a tracker-notation row
 // without an arp right after a row with one gets Furnace 0000. Both step one arp note per tick:
-// PT tick % 3, FT2 arpeggioTab, Furnace arpLen 1 (written in SNG2, the sequencer's g_arpLen = 1).
+// PT tick % 3, FT2 arpeggioTab, Furnace arpLen 1 (written in INFO, the sequencer's g_arpLen = 1).
 
 /** The cell carries a tracker arpeggio (effect 0 with a non-zero parameter) in any effect column. */
 export function cellHasTrackerArp(cell: TrackerCell | undefined): boolean {
@@ -445,7 +473,7 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   if (song.patterns.length === 0) problems.push('The song has no patterns');
   if (song.patterns.length > 256) problems.push('A Furnace order table holds at most 256 patterns');
   const patLen = Math.max(1, ...song.patterns.map((p) => p.length));
-  if (patLen > 1024) problems.push(`Pattern length ${patLen} is over the 1024 rows Furnace allows`);
+  if (patLen > FUR_MAX_ROWS) problems.push(`Pattern length ${patLen} is over the ${FUR_MAX_ROWS} rows Furnace 0.6.8.3 allows`);
   for (const [pi, p] of song.patterns.entries()) {
     if (p.length !== patLen) problems.push(`Pattern ${pi} has ${p.length} rows but pattern 0 has ${patLen}: a Furnace song has one pattern length`);
     p.channels.slice(chans).forEach((ch, k) => {
@@ -492,31 +520,16 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
     throw new Error(`Cannot export a Furnace module: ${shown}${problems.length > 8 ? `; and ${problems.length - 8} more` : ''}`);
   }
 
-  // SNG2
+  // Song timing and grooves. INFO stores speeds and groove entries as bytes (fur.cpp v0.6.8.3).
   const hz = song.hz ?? 60;
   const vN = song.virtualTempoN ?? Math.max(1, Math.min(65535, Math.round(song.initialBPM)));
   const vD = song.virtualTempoD ?? 150;
-  const sng = new Bytes()
-    .f32(hz).u8(1).u8(1)
-    .u16(patLen).u16(song.songPositions.length)
-    .u8(4).u8(16)
-    .u16(vN).u16(vD);
-  // Speed pattern (song.cpp DivSubSong::readData): length byte, 16 x u16. Two entries = Furnace alternates them per row.
   const speed1 = Math.max(1, song.initialSpeed);
-  const speed2 = song.speed2 && song.speed2 > 0 && song.speed2 !== speed1 ? Math.min(65535, song.speed2) : 0;
-  sng.u8(speed2 ? 2 : 1);
-  for (let i = 0; i < 16; i++) sng.u16(i === 0 ? speed1 : i === 1 ? speed2 : 0);
-  sng.str(song.name).str('');
-  for (let ch = 0; ch < chans; ch++) for (const pos of song.songPositions) sng.u8(pos);
-  for (let ch = 0; ch < chans; ch++) sng.u8(fxColumns[ch]);
-  // Furnace song.cpp DivSubSong::putData: bit 0 = channel shown in the pattern view, bit 1 = shown in the
-  // channel oscilloscope. 0 opens the module with every channel hidden.
-  for (let ch = 0; ch < chans; ch++) sng.u8(3);
-  for (let ch = 0; ch < chans; ch++) sng.u8(0); // collapsed
-  for (let ch = 0; ch < chans; ch++) sng.str('');
-  for (let ch = 0; ch < chans; ch++) sng.str('');
-  for (let ch = 0; ch < chans; ch++) sng.u32(0);
-  const sng2 = block('SNG2', sng);
+  const speed2 = song.speed2 && song.speed2 > 0 && song.speed2 !== speed1 ? song.speed2 : 0;
+  if (speed1 > 255 || speed2 > 255) throw new Error(`Cannot export a Furnace module: speed ${Math.max(speed1, speed2)} is over the 255 Furnace 0.6.8.3 stores`);
+  const grooves = (song.grooves ?? []).slice(0, 255);
+  if (grooves.some((g) => g.some((v) => v > 255))) throw new Error('Cannot export a Furnace module: a groove entry is over the 255 Furnace 0.6.8.3 stores');
+  const compat = infoCompatFlags(song.compatFlags ?? {}, warnings);
 
   const userSamples = collectUserSamples(neo.map((inst) => inst.furnace as FurnaceConfig));
   const ins2 = neo.map((inst) => encodeInstrumentAsINS2(toFileInstrument(inst.name, inst.furnace as FurnaceConfig, userSamples), FUR_EXPORT_VERSION));
@@ -526,48 +539,61 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
   // loads a module without this block at SSG volume 128, half the level of the chip, which
   // furtool then compensates in the wrong amount (see FUR_NEO_GEO_CHIP_FLAGS).
   const flag = block('FLAG', new Bytes().str(FUR_NEO_GEO_CHIP_FLAGS));
+  // Asset directories (instruments, waves, samples): one empty directory each.
+  const adir = block('ADIR', new Bytes().u32(0));
 
-  // Compat flags and grooves of a loaded module (CFLG / GROV); a new song omits both and Furnace uses defaults.
-  const cflgText = song.compatFlags ? compatFlagsText(song.compatFlags) : '';
-  const cflg = cflgText ? block('CFLG', new Bytes().str(cflgText)) : null;
-  const grov = (song.grooves ?? []).slice(0, 255).map((g) => block('GROV', grooveBody(g)));
-
-  // Layout: header, INF2, SNG2, FLAG, CFLG, GROV..., INS2..., SMP2..., PATN...
-  const buildInf2 = (sngPtr: number, flagPtr: number, cflgPtr: number, grovPtrs: number[], insPtrs: number[], smpPtrs: number[], patPtrs: number[]): Uint8Array => {
+  // Layout: header, INFO, FLAG, ADIR x3, INS2..., SMP2..., PATN... (fur.cpp v0.6.8.3, old INFO reader).
+  const buildInfo = (flagPtr: number, adirPtrs: number[], insPtrs: number[], smpPtrs: number[], patPtrs: number[]): Uint8Array => {
     const b = new Bytes()
-      .str(song.name).str('').str('Neo Geo MVS').str('')
-      .str('').str('').str('').str('')
-      .f32(440).u8(1)
-      .f32(1).u16(chans).u16(1)
-      .u16(system).u16(chans).f32(1).f32(0).f32(0)
-      .u32(0).u8(1); // patchbay: no connections, automatic
-    b.u8(0x01).u32(1).u32(sngPtr);
-    b.u8(0x02).u32(1).u32(flagPtr);
-    if (cflg) b.u8(0x08).u32(1).u32(cflgPtr);
-    if (grovPtrs.length > 0) { b.u8(0x0a).u32(grovPtrs.length); grovPtrs.forEach((p) => b.u32(p)); }
-    if (insPtrs.length > 0) { b.u8(0x04).u32(insPtrs.length); insPtrs.forEach((p) => b.u32(p)); }
-    if (smpPtrs.length > 0) { b.u8(0x06).u32(smpPtrs.length); smpPtrs.forEach((p) => b.u32(p)); }
-    if (patPtrs.length > 0) { b.u8(0x07).u32(patPtrs.length); patPtrs.forEach((p) => b.u32(p)); }
-    b.u8(0x00);
-    return block('INF2', b);
+      .u8(0).u8(speed1).u8(speed2 || speed1).u8(1) // time base, speeds, arpeggio speed
+      .f32(hz).u16(patLen).u16(song.songPositions.length).u8(4).u8(16)
+      .u16(ins2.length).u16(0).u16(smp2.length).u32(patnBlocks.length);
+    for (let i = 0; i < 32; i++) b.u8(i === 0 ? system : 0);
+    for (let i = 0; i < 32; i++) b.u8(i === 0 ? 64 : 0); // chip volume, 64 = 1.0
+    for (let i = 0; i < 32; i++) b.u8(0); // chip panning
+    for (let i = 0; i < 32; i++) b.u32(i === 0 ? flagPtr : 0);
+    b.str(song.name).str('').f32(440);
+    compat[0].forEach((v) => b.u8(v));
+    insPtrs.forEach((p) => b.u32(p));
+    smpPtrs.forEach((p) => b.u32(p));
+    patPtrs.forEach((p) => b.u32(p));
+    for (let ch = 0; ch < chans; ch++) for (const pos of song.songPositions) b.u8(pos);
+    for (let ch = 0; ch < chans; ch++) b.u8(fxColumns[ch]);
+    // Bit 0 = channel shown in the pattern view, bit 1 = shown in the channel oscilloscope.
+    // 0 opens the module with every channel hidden.
+    for (let ch = 0; ch < chans; ch++) b.u8(3);
+    for (let ch = 0; ch < chans; ch++) b.u8(0); // collapsed
+    for (let ch = 0; ch < chans; ch++) b.str('');
+    for (let ch = 0; ch < chans; ch++) b.str('');
+    b.str('').f32(1); // song notes, master volume
+    compat[1].forEach((v) => b.u8(v));
+    b.u16(vN).u16(vD);
+    b.str('').str('').u8(0).u8(0).u8(0).u8(0); // first subsong name and notes, no more subsongs, reserved
+    b.str('Neo Geo MVS').str('').str('').str('').str('').str('');
+    b.f32(1).f32(0).f32(0); // chip volume, panning, front/rear panning
+    b.u32(0).u8(1); // patchbay: no connections, automatic
+    compat[2].forEach((v) => b.u8(v));
+    // Speed pattern: length byte, 16 x u8. Two entries = Furnace alternates them per row.
+    b.u8(speed2 ? 2 : 1);
+    for (let i = 0; i < 16; i++) b.u8(i === 0 ? speed1 : i === 1 ? speed2 : 0);
+    b.u8(grooves.length);
+    for (const g of grooves) b.bytes(grooveBody(g).toUint8Array());
+    adirPtrs.forEach((p) => b.u32(p));
+    return block('INFO', b);
   };
-  const inf2Len = buildInf2(0, 0, 0, grov.map(() => 0), ins2.map(() => 0), smp2.map(() => 0), patnBlocks.map(() => 0)).length;
-  let cursor = 32 + inf2Len;
-  const sngPtr = cursor;
-  cursor += sng2.length;
+  const infoLen = buildInfo(0, [0, 0, 0], ins2.map(() => 0), smp2.map(() => 0), patnBlocks.map(() => 0)).length;
+  let cursor = 32 + infoLen;
   const flagPtr = cursor;
   cursor += flag.length;
-  const cflgPtr = cursor;
-  if (cflg) cursor += cflg.length;
-  const grovPtrs = grov.map((b) => { const p = cursor; cursor += b.length; return p; });
+  const adirPtrs = [0, 1, 2].map(() => { const p = cursor; cursor += adir.length; return p; });
   const insPtrs = ins2.map((b) => { const p = cursor; cursor += b.length; return p; });
   const smpPtrs = smp2.map((b) => { const p = cursor; cursor += b.length; return p; });
   const patPtrs = patnBlocks.map((b) => { const p = cursor; cursor += b.length; return p; });
-  const inf2 = buildInf2(sngPtr, flagPtr, cflgPtr, grovPtrs, insPtrs, smpPtrs, patPtrs);
+  const info = buildInfo(flagPtr, adirPtrs, insPtrs, smpPtrs, patPtrs);
 
   const file = new Bytes().ascii('-Furnace module-').u16(FUR_EXPORT_VERSION).u16(0).u32(32);
   for (let i = 0; i < 8; i++) file.u8(0);
-  for (const part of [inf2, sng2, flag, ...(cflg ? [cflg] : []), ...grov, ...ins2, ...smp2, ...patnBlocks]) file.bytes(part);
+  for (const part of [info, flag, adir, adir, adir, ...ins2, ...smp2, ...patnBlocks]) file.bytes(part);
 
   // An ADPCM voice with no sample of its own names no sample in the module.
   const bare = neo.filter((i) => {
