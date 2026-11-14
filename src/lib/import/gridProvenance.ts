@@ -65,7 +65,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   dynamicSynthesizer: 'pass',
   riffRaff: 'pass',
   mcmd: 'pass',
-  wallyBeben: 'pass',
+  wallyBeben: 'fail',
   richardJoseph: 'pass',
   fashionTracker: 'pass',
   davidHanney: 'pass',
@@ -84,7 +84,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
  */
 export type LiveEditStatus = 'pass' | 'fail' | 'n/a';
 export const LIVE_EDIT: Record<string, LiveEditStatus> = {
-  '669': 'n/a',
+  '669': 'pass',
   actionamics: 'pass',
   activisionPro: 'pass',
   amf: 'n/a',
@@ -218,7 +218,7 @@ export const LIVE_EDIT_WHY: Record<string, string> = {
 export type AddOnEmptyRow = 'pass' | 'fail' | 'n/a';
 export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   artOfNoise: 'pass',
-  '669': 'n/a',
+  '669': 'pass',
   actionamics: 'pass',
   // activisionPro: a note on a blank row is cut into the covering rest or held-note event (activisionProGrid.ts).
   activisionPro: 'pass',

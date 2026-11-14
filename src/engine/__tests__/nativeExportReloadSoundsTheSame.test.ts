@@ -140,6 +140,14 @@ const FORMATS: FormatRow[] = [
   { key: 'actionamics', rig: 'paula', files: corpus(['.ast', '.act']) },
   { key: 'soundMaster', rig: 'paula', files: corpus(['.sm']) },
   { key: 'digitalSonixChrome', rig: 'paula', sampleEvery: 4, files: corpus(['.dsc']), pick: pickDscNote, noteSelectsSample: true },
+  // The remaining EXPORT_ROUND_TRIP 'pass' rows. Pins: the extension alone would also match another format's files (.sng, .ems v6, .ex).
+  { key: 'davidHanney', rig: 'paula', files: corpus(['.dh']) },
+  { key: 'ems', rig: 'paula', files: ['formats/je taime.ems'] },
+  { key: 'emsv6', rig: 'paula', files: ['formats/ballade.song.ems'] },
+  { key: 'fashionTracker', rig: 'paula', files: corpus(['.ex'], 'fashion-tracker') },
+  { key: 'mcmd', rig: 'paula', files: corpus(['.mcmd']) },
+  { key: 'richardJoseph', rig: 'paula', files: ['richard-joseph/cannon fodder (intro).sng'] },
+  { key: 'wallyBeben', rig: 'paula', files: ['wally-beben/wicked.wb'] },
   { key: 'dynamicSynthesizer', rig: 'paula', files: corpus(['.ptc']) },
   { key: 'riffRaff', rig: 'paula', files: corpus(['.riff']) },
   { key: 'timFollin', rig: 'paula', files: corpus(['.tf']) },
@@ -210,7 +218,8 @@ const originals = new Map<string, Trace | null>();
 /** Files UADE's own player does not take (it refuses them): no render stage for these. Any other refusal is a failure. */
 const NO_RIG = new Set<string>();
 // dns.ptc: a Dynamic Synthesizer song plays from its dns. module plus an smp. sample companion; the corpus has no smp.ptc, so UADE refuses it and only bytes and grid are held.
-const EXPECTED_NO_RIG: string[] = ['formats/dns.ptc', 'formats/fuzzball-title.fred'];
+// richard-joseph/cannon fodder (intro).sng: UADE refuses it (no Richard Joseph player match), so only bytes and grid are held; no audio verdict.
+const EXPECTED_NO_RIG: string[] = ['formats/dns.ptc', 'formats/fuzzball-title.fred', 'richard-joseph/cannon fodder (intro).sng'];
 /**
  * Files UADE takes but plays as noise, so its stream says nothing about the song: the .sog is the
  * Hippel ST SOURCE the editor packs for the player (the Compress step of jochenHippelSTGridMatchesPlayer),
@@ -377,6 +386,7 @@ const withoutPitch = (t: Trace): Trace => Object.assign(t.map((v) => v.filter((e
  */
 const KNOWN: Record<string, Partial<Record<'unedited' | 'edited', string>>> = {
   'suntronic|smooth': { unedited: 'G16-sunSmooth: the score has no notes, the song parses to a stub and the router exports a MOD of it', edited: 'G16-sunSmooth: no note to edit' },
+  wallyBeben: { edited: 'wicked.wb: the edit of row 0 channel 0 (note 37 to 39, one byte at 4780) reloads as that edit but the 8 second render is identical, so the edit is not heard; cause not investigated' },
 };
 
 /** Run `body`; for a known defect it must still fail (a fixed one is reported so its row is removed). */
