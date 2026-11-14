@@ -4,7 +4,7 @@
 import { notify } from '@stores/useNotificationStore';
 import { openSong } from '@lib/song/openSong';
 import { packShare, unpackShare, type ShareSong } from './shareContainer';
-import { inlineFragment, parseShareHash, storedFragment, SHARE_UPLOAD_MAX } from './shareLink';
+import { inlineFragment, inlineLink, parseShareHash, storedFragment, SHARE_UPLOAD_MAX } from './shareLink';
 import { downloadShare, uploadShare } from './shareApi';
 import { useSharePromptStore } from './sharePromptStore';
 
@@ -43,7 +43,17 @@ export async function buildShareLink(): Promise<{ link: string; warnings: string
   const container = packShare(song);
   const base = `${window.location.origin}${window.location.pathname}`;
   const inline = inlineFragment(container);
-  if (inline) return { link: `${base}#share=${inline}`, warnings };
+  if (inline) {
+    // Small songs are uploaded too, so the link also names a server copy; the inline data opens first.
+    try {
+      const { id, ownerKey } = await uploadShare(container, openedFromShare);
+      rememberOwnerKey(id, ownerKey);
+      return { link: `${base}#share=${inlineLink(inline, id)}`, warnings };
+    } catch (e) {
+      const why = e instanceof Error ? e.message : 'upload failed';
+      return { link: `${base}#share=${inline}`, warnings: [...warnings, `The song could not be saved on the server (${why}). The link still opens it, but has no server copy.`] };
+    }
+  }
   if (container.length > SHARE_UPLOAD_MAX) throw new Error('This song is over 8 MB, too big to share. Export it as a file instead.');
   const { id, ownerKey } = await uploadShare(container, openedFromShare);
   rememberOwnerKey(id, ownerKey);
@@ -64,7 +74,7 @@ export async function openShareHash(hash: string): Promise<boolean> {
       { origin: 'share' },
     );
     if (!result.ok) throw new Error(result.error);
-    openedFromShare = ref.mode === 'stored' ? ref.id : undefined;
+    openedFromShare = ref.id;
     useSharePromptStore.getState().show(song.name);
     return true;
   } finally {
