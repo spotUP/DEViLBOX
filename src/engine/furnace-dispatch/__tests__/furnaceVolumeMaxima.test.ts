@@ -13,7 +13,7 @@ vi.mock('../FurnaceDispatchEngine', async (importActual) => {
 });
 vi.mock('@engine/ToneEngine', () => ({ getToneEngine: () => ({ routeNativeEngineOutput: vi.fn() }) }));
 
-import { PLATFORM_VOL_MAX, maxVolumeOfChannel } from '../FurnaceDispatchSynth';
+import { PLATFORM_VOL_MAX, maxVolumeOfChannel } from '../channelVolume';
 import { FurnaceDispatchPlatform as P } from '../FurnaceDispatchEngine';
 
 /** Platform name -> [upstream GET_VOLMAX value for the first channel, upstream file:line]. */

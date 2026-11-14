@@ -26,7 +26,7 @@ import {
 } from '@/lib/import/formats/furnace/FurnaceInstrumentParser';
 import { resolveInsType, DIV_INS_ADPCMA, DIV_INS_ADPCMB } from './FurnaceInstrumentEncoder';
 import { editorEffectToFurnace, xmVolToFurnace, xmNoteToFurnace } from '@/lib/import/furnaceEditorCells';
-import { maxVolumeOfChannel } from '@engine/furnace-dispatch/FurnaceDispatchSynth';
+import { maxVolumeOfChannel } from '@engine/furnace-dispatch/channelVolume';
 import { FurnaceDispatchPlatform } from '@engine/furnace-dispatch/platforms';
 
 /**
