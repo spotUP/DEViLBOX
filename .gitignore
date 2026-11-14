@@ -274,9 +274,9 @@ public/models/
 public/basis/
 third-party/retromulator/
 
-# AdPlug WASM build - extracted sources (downloaded during build)
-adplug-wasm/adplug-adplug-2.4/
-adplug-wasm/libbinio-libbinio-1.5/
+# AdPlug WASM: the vendored AdPlug 2.4 + libbinio 1.5 sources are tracked (patches/ already applied),
+# so a fresh clone builds the replayer. Only upstream's 45 MB test corpus and the build tree stay out.
+adplug-wasm/adplug-adplug-2.4/test/
 adplug-wasm/build/
 sonic-arranger-wasm/test_sa
 sonic-arranger-wasm/test_sa.dSYM/
