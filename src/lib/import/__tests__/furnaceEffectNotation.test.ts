@@ -54,7 +54,9 @@ describe('Meaningful Connection (ES5506) in Furnace effect notation', { timeout:
     installFurnaceFileOpsWasm();
     const { parseFurnaceFile } = await import('../parsers/FurnaceToSong');
     song = await parseFurnaceFile(readSong(SONG), 'meaningful_connection_es5506.fur');
-  });
+    // Cold import of the store + replayer graph takes 20-70 s on a busy machine; pay it here, not inside a test's timeout.
+    await Promise.all([import('@/stores/useTrackerStore'), import('@/bridge/handlers/readHandlers'), import('@/engine/TrackerReplayer')]);
+  }, 300_000);
 
   it('the grid shows 80xx / 90xx / E5xx exactly as Furnace, and no ? anywhere', async () => {
     const { useTrackerStore } = await import('@/stores/useTrackerStore');
