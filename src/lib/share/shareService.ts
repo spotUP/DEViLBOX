@@ -5,7 +5,7 @@ import { notify } from '@stores/useNotificationStore';
 import { openSong } from '@lib/song/openSong';
 import { packShare, unpackShare, type ShareSong } from './shareContainer';
 import { inlineFragment, inlineLink, parseShareHash, storedFragment, SHARE_UPLOAD_MAX } from './shareLink';
-import { downloadShare, uploadShare } from './shareApi';
+import { downloadShare, uploadShare, uploadReply } from './shareApi';
 import { useSharePromptStore } from './sharePromptStore';
 import { currentSongGeneration } from '@/lib/song/songLifecycle';
 
@@ -35,12 +35,59 @@ function parentShareId(): string | undefined {
   return openedFromShare?.generation === currentSongGeneration() ? openedFromShare.id : undefined;
 }
 
-function rememberOwnerKey(id: string, key: string): void {
+/** Owner keys this browser holds: share id -> key (insertion order, newest last). */
+export function ownerKeys(): Record<string, string> {
   try {
-    const all = JSON.parse(localStorage.getItem(OWNER_KEYS) || '{}') as Record<string, string>;
+    return JSON.parse(localStorage.getItem(OWNER_KEYS) || '{}') as Record<string, string>;
+  } catch { return {}; }
+}
+
+export function rememberOwnerKey(id: string, key: string): void {
+  try {
+    const all = ownerKeys();
+    delete all[id];
     all[id] = key;
     localStorage.setItem(OWNER_KEYS, JSON.stringify(all));
-  } catch { /* storage blocked: the key is only needed for phase 2 */ }
+  } catch { /* storage blocked: the key is only needed to read replies */ }
+}
+
+/** True while the open song came from a share link (and has not been replaced since). */
+export const canSendBack = (): boolean => parentShareId() !== undefined;
+
+/** Send Changes Back: upload the song as currently edited as a reply to the share it came from. */
+export async function sendChangesBack(): Promise<void> {
+  const id = parentShareId();
+  if (!id) { notify.error('This song did not come from a share link.'); return; }
+  try {
+    const { song, warnings } = await currentSong();
+    warnings.forEach((w) => notify.warning(w));
+    await uploadReply(id, packShare(song));
+    notify.success('Changes sent back to the author');
+  } catch (e) {
+    notify.error(e instanceof Error ? e.message : 'Sending changes back failed.');
+  }
+}
+
+/** Copy Author Link: a link holding the newest share's owner key, so the inbox opens on another device. */
+export async function copyAuthorLink(): Promise<void> {
+  const last = Object.entries(ownerKeys()).pop();
+  if (!last) { notify.error('Share a song first; the author link belongs to a link you made.'); return; }
+  const link = `${window.location.origin}${window.location.pathname}#author=${last[0]}.${last[1]}`;
+  try {
+    await navigator.clipboard.writeText(link);
+    notify.success('Author link copied. Keep it private: it opens your inbox.');
+  } catch {
+    useSharePromptStore.getState().showLink(link);
+  }
+}
+
+/** A #author= link stores its owner key and clears the hash. False when the hash is no author link. */
+export function openAuthorHash(hash: string): boolean {
+  const m = /^#author=([0-9A-Za-z]{8})\.([A-Za-z0-9_-]{16,64})$/.exec(hash);
+  if (!m) return false;
+  rememberOwnerKey(m[1], m[2]);
+  window.history.replaceState({}, '', window.location.pathname + window.location.search);
+  return true;
 }
 
 /** Build the link for the song as currently edited. Throws a readable Error when it cannot be shared. */

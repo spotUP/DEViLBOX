@@ -18,7 +18,9 @@ import { FT2SubsongInput } from './FT2SubsongInput';
 import { useTrackerStore, useTransportStore, useProjectStore, useInstrumentStore, useUIStore, useEditorStore } from '@stores';
 import { useShallow } from 'zustand/react/shallow';
 import { notify } from '@stores/useNotificationStore';
-import { shareCurrentSong } from '@lib/share/shareService';
+import { shareCurrentSong, sendChangesBack, copyAuthorLink, canSendBack } from '@lib/share/shareService';
+import { startReview, useShareInboxStore } from '@lib/share/shareInbox';
+import { useSharePromptStore } from '@lib/share/sharePromptStore';
 import { SONG_FILE_ACCEPT, SONG_FILE_EXTENSION } from '@lib/uprough/songFile';
 import { renderSong } from '@lib/uprough/generateClient';
 import { playAudition, stopAudition } from '@lib/uprough/auditionPlayer';
@@ -170,6 +172,10 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
   const engine = getToneEngine();
   // A song is opening (openSong publishes it): the Load button waits.
   const isLoading = useSongLoadStore((state) => state.depth > 0);
+  // Re-render triggers for canSendBack(): a song load, and the Play prompt shown right after a share opens.
+  useSharePromptStore((s) => s.name);
+  const waitingReplies = useShareInboxStore((s) => s.waiting);
+  const inboxBusy = useShareInboxStore((s) => s.busy);
   const [showNibbles, setShowNibbles] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
 
@@ -635,6 +641,13 @@ export const FT2Toolbar: React.FC<FT2ToolbarProps> = React.memo(({
         className="min-w-[88px]">Play Pattern</Button>
       <Button variant="ghost" size="sm" onClick={() => setShowFileBrowser(true)} disabled={isLoading} loading={isLoading}>Load</Button>
       <Button variant="ghost" size="sm" onClick={() => void shareCurrentSong()} title="Copy a link that opens this song">Share</Button>
+      <Button variant="ghost" size="sm" onClick={() => void sendChangesBack()} disabled={!canSendBack()} title="Send this song's edits to the author of the share link it came from">Send Changes Back</Button>
+      <Button variant="ghost" size="sm" onClick={() => void copyAuthorLink()} title="Copy a private link that opens your inbox of changes sent back on another device">Copy Author Link</Button>
+      {waitingReplies.length > 0 && (
+        <Button variant="primary" size="sm" disabled={inboxBusy} onClick={() => void startReview(waitingReplies[0])}>
+          {waitingReplies.length} {waitingReplies.length === 1 ? 'change' : 'changes'} waiting
+        </Button>
+      )}
       <Button variant="ghost" size="sm" onClick={handleSave} title="Save to browser & download .dbx (Ctrl+S)">Save</Button>
       <Button variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo()} title="Undo (Ctrl+Z)">Undo</Button>
       <Button variant="ghost" size="sm" onClick={handleRedo} disabled={!canRedo()} title="Redo (Ctrl+Shift+Z)">Redo</Button>

@@ -35,7 +35,9 @@ import { ToastNotification } from '@components/ui/ToastNotification';
 import { JukeboxPanel } from '@components/jukebox/JukeboxPanel';
 import { PopOutWindow } from '@components/ui/PopOutWindow';
 import { SharePrompt } from '@components/share/SharePrompt';
-import { openShareHash } from '@lib/share/shareService';
+import { ShareReview } from '@components/share/ShareReview';
+import { openShareHash, openAuthorHash } from '@lib/share/shareService';
+import { refreshShareInbox } from '@lib/share/shareInbox';
 import { UpdateNotification } from '@components/ui/UpdateNotification';
 import { SynthErrorDialog } from '@components/ui/SynthErrorDialog';
 import { USBSIDWizard } from '@components/dialogs/USBSIDWizard';
@@ -236,6 +238,8 @@ function App() {
 
   // A #share= link opens its song (no autoplay); SharePrompt then offers Play.
   useEffect(() => {
+    if (openAuthorHash(window.location.hash)) notify.success('Author link opened. Changes sent to your shared songs will show up here.');
+    void refreshShareInbox();
     void openShareHash(window.location.hash).catch((e: unknown) => notify.error(e instanceof Error ? e.message : 'Could not open the share link.'));
   }, []);
 
@@ -1270,6 +1274,7 @@ function App() {
       {/* Toast Notifications */}
       <ToastNotification />
       <SharePrompt />
+      <ShareReview />
 
       {/* Synth Error Dialog - Shows when synth initialization fails */}
       <SynthErrorDialog />
