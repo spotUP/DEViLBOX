@@ -6,7 +6,7 @@
  *   platform has stand-ins (Genesis on a song of two YM2612) got no spans and
  *   fell back to the worklet's platform stand-in lookup: first chip only.
  * - The synth's setup (default instrument, the forced instrument on every
- *   channel after an upload) went to the platform key: the first chip.
+ *   channel after an upload, raw INS2 included) went to the platform key: the first chip.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { chipKeysFor } from '../chipKey';
@@ -77,6 +77,17 @@ describe('the second chip of a type', () => {
     for (const key of [a0, a1]) {
       const chans = calls.dispatch.mock.calls.filter((c) => c[0] === DivCmd.STD_NOISE_MODE && c[4] === key).map((c) => c[1]);
       expect(chans).toEqual([0, 1, 2]);
+    }
+  });
+
+  it('a raw INS2 upload outside a module forces the instrument on both AY chips', async () => {
+    const [a0, a1] = chipKeysFor([P.AY8910, P.AY8910]);
+    const synth = new FurnaceDispatchSynth(P.AY8910);
+    await synth.ready;
+    calls.setInstrument.mockClear();
+    await synth.uploadInstrumentFromConfig({ rawBinaryData: new Uint8Array([0x49, 0x4e, 0x53, 0x32, 0, 0, 0, 0]) }, 'raw');
+    for (const key of [a0, a1]) {
+      expect(calls.setInstrument.mock.calls.filter((c) => c[2] === key).map((c) => c[0])).toEqual([0, 1, 2]);
     }
   });
 });
