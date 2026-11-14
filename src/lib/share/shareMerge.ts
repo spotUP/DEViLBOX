@@ -39,7 +39,7 @@ const sortKeys = (_k: string, v: unknown): unknown =>
   v && typeof v === 'object' && !Array.isArray(v) && !ArrayBuffer.isView(v)
     ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : 1)))
     : v;
-const same = (a: unknown, b: unknown): boolean => a === b || JSON.stringify(a, sortKeys) === JSON.stringify(b, sortKeys);
+export const same = (a: unknown, b: unknown): boolean => a === b || JSON.stringify(a, sortKeys) === JSON.stringify(b, sortKeys);
 
 type Pick3<T> = { value: T; conflict: boolean; fromTheirs: boolean };
 

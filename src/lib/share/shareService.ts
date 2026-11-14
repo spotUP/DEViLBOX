@@ -10,7 +10,7 @@ import { useSharePromptStore } from './sharePromptStore';
 import { currentSongGeneration } from '@/lib/song/songLifecycle';
 
 /** The current song as a ShareSong: its native file when the format has an exporter, else a .dbx. */
-async function currentSong(): Promise<{ song: ShareSong; warnings: string[] }> {
+export async function currentSong(): Promise<{ song: ShareSong; warnings: string[] }> {
   const { exportNativeFile, nativeExportAvailableForLiveSong } = await import('@lib/export/moduleExportService');
   if (await nativeExportAvailableForLiveSong()) {
     const res = await exportNativeFile();
