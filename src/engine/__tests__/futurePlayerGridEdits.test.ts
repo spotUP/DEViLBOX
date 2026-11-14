@@ -8,7 +8,7 @@
  *    command (a shared subroutine);
  *  - a changed instrument patches the set-instrument command in force (its pointer) and re-importing
  *    shows the new instrument on the note;
- *  - an edit that needs a longer block (a note on a blank row, a removed note, a note-off) is a warning
+ *  - a note-off (a rest placed on a sounding note) is a warning
  *    and writes nothing.
  */
 import { describe, it, expect } from 'vitest';
@@ -101,21 +101,13 @@ describe.each(FILES)('Future Player grid edits: %s', (file) => {
     expect(ptr(re, re.patterns[at.p].channels[at.v].rows[at.r].instrument)).toBe(ptr(song, to));
   });
 
-  it('an edit that needs a longer block is a warning and writes nothing', async () => {
+  it('an edit the module cannot hold is a warning and writes nothing', async () => {
     const at = find(false)!;
-    // a removed note
-    const removed = clone(song);
-    removed.patterns[at.p].channels[at.v].rows[at.r].note = 0;
-    // a note on a blank row (no command ran there)
-    let blank: { p: number; v: number; r: number } | null = null;
-    for (let p = 0; p < grid.cellSources.length && !blank; p++) for (let v = 0; v < 4 && !blank; v++) for (let r = 0; r < grid.cellSources[p][v].length && !blank; r++) {
-      if (!grid.cellSources[p][v][r] && song.patterns[p].channels[v].rows[r].note === 0) blank = { p, v, r };
-    }
-    removed.patterns[blank!.p].channels[blank!.v].rows[blank!.r].note = 30;
+    // a removed note and a note on a blank row are written now (a rest of the same length; 3f49fb24d grows the module)
     // a note-off
-    const edited = clone(removed);
+    const edited = clone(song);
     edited.patterns[at.p].channels[at.v].rows[at.r].note = 97;
-    for (const s of [removed, edited]) {
+    for (const s of [edited]) {
       const r = await exportAsFuturePlayer(s);
       expect(r.warnings.length).toBeGreaterThanOrEqual(1);
       const out = new Uint8Array(await r.data.arrayBuffer());
