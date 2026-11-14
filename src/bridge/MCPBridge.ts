@@ -799,6 +799,12 @@ function scheduleReconnect(): void {
 
 export function initMCPBridge(): void {
   if (ws || disposed) return;
+  // The relay refuses hosted pages by default; opt in with localStorage devilbox.mcp.allowHosted=1.
+  if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
+    let allowHosted = false;
+    try { allowHosted = localStorage.getItem('devilbox.mcp.allowHosted') === '1'; } catch { /* storage blocked */ }
+    if (!allowHosted) return;
+  }
   connect();
 }
 

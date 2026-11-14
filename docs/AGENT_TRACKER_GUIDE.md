@@ -18,7 +18,7 @@ The `devilbox-tracker` MCP server is registered at user scope, so a session in a
 
 ## 2. Confirm which page you drive, before every write batch
 
-The hosted page at `devilbox.uprough.net` connects to the same local relay. A local MCP call can therefore land on the owner's live-site tab.
+The relay refuses browser connections from any non-localhost origin, and the hosted bundle does not try to connect. Opt-in needs both `DEVILBOX_MCP_ALLOW_HOSTED=1` on the relay and `localStorage['devilbox.mcp.allowHosted'] = '1'` on the page. With the opt-in on, or with an old relay, a local MCP call can land on the owner's live-site tab, so keep the check below.
 
 Before each batch of writes:
 
