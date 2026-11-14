@@ -14,6 +14,7 @@
  * the cell holds Furnace's code and value (effect notation 'furnace').
  */
 import type { TrackerCell, FurnaceRow, FurnaceNativeData } from '@/types/tracker';
+import { maxVolumeOfChannel } from '@engine/furnace-dispatch/FurnaceDispatchSynth';
 
 /**
  * Furnace note → editor note.
@@ -42,21 +43,32 @@ export function xmNoteToFurnace(note: number): number {
 
 /**
  * Convert a Furnace-native volume value to XM volume column.
- * Furnace: -1=empty, 0-127
+ * Furnace: -1=empty, 0-volMax (the channel's own maximum: 127 FM, 15 AY/SSG, ...)
  * XM vol column: 0=empty, 0x10-0x50 = volume 0-64
  */
-export function furnaceVolToXM(vol: number): number {
+export function furnaceVolToXM(vol: number, volMax = 127): number {
   if (vol < 0) return 0;
-  return 0x10 + Math.min(64, Math.round(vol * 64 / 127));
+  return 0x10 + Math.min(64, Math.round(vol * 64 / volMax));
+}
+
+/** Volume maximum of a song channel: its chip's (AY-3-8910 15, FM 127...), found through the per-chip channel counts. */
+export function furnaceChannelVolMax(native: FurnaceNativeData, ch: number): number {
+  let first = 0;
+  for (let ci = 0; ci < (native.chipIds?.length ?? 0); ci++) {
+    const n = native.systemChans?.[ci] ?? 0;
+    if (ch < first + n) return maxVolumeOfChannel(native.chipIds[ci], ch - first);
+    first += n;
+  }
+  return 127;
 }
 
 /**
  * Convert a FurnaceRow to a TrackerCell for the editor UI.
  */
-export function furnaceRowToTrackerCell(row: FurnaceRow): TrackerCell {
+export function furnaceRowToTrackerCell(row: FurnaceRow, volMax = 127): TrackerCell {
   const note = furnaceNoteToXM(row.note);
   const instrument = row.ins >= 0 ? row.ins + 1 : 0;
-  const volume = furnaceVolToXM(row.vol);
+  const volume = furnaceVolToXM(row.vol, volMax);
 
   // The effect columns keep Furnace's own code and value (the channel is marked
   // effectNotation 'furnace', so the grid writes them as Furnace does: "8040",
@@ -94,13 +106,13 @@ export function furnaceRowToTrackerCell(row: FurnaceRow): TrackerCell {
 }
 
 /**
- * Editor volume column (0 = empty, 0x10-0x50 = set volume 0-64) → Furnace volume (-1 = empty, 0-127).
+ * Editor volume column (0 = empty, 0x10-0x50 = set volume 0-64) → Furnace volume (-1 = empty, 0-volMax).
  * 0x01-0x0F and 0x51-0xFF hold no set-volume in the XM volume column (0x60 and up are slides,
  * vibrato, pan, portamento), so they map to empty instead of a full volume.
  */
-export function xmVolToFurnace(vol: number): number {
+export function xmVolToFurnace(vol: number, volMax = 127): number {
   if (vol < 0x10 || vol > 0x50) return -1;
-  return Math.round((vol - 0x10) * 127 / 64);
+  return Math.round((vol - 0x10) * volMax / 64);
 }
 
 /** Editor effect (type, param) → Furnace effect (cmd, val): the cell holds Furnace's code and value as they are. */
@@ -159,7 +171,8 @@ export function applyEditorCellEdit(
   const blank = (): FurnaceRow => ({ note: -1, ins: -1, vol: -1, effects: [] });
   const nat = patData.rows[row] ?? blank();
   patData.rows[row] = nat;
-  const shown = furnaceRowToTrackerCell(nat);
+  const volMax = furnaceChannelVolMax(native, ch);
+  const shown = furnaceRowToTrackerCell(nat, volMax);
   const writes: SeqCellWrite[] = [];
   const put = (col: number, val: number) => writes.push({ ch, pat, row, col, val });
 
@@ -172,7 +185,7 @@ export function applyEditorCellEdit(
     put(1, nat.ins);
   }
   if (edit.volume !== undefined && edit.volume !== shown.volume) {
-    nat.vol = xmVolToFurnace(edit.volume);
+    nat.vol = xmVolToFurnace(edit.volume, volMax);
     put(2, nat.vol);
   }
   EFFECT_FIELDS.forEach(([typeKey, paramKey], fx) => {

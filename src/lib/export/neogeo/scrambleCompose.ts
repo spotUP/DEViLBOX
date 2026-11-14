@@ -15,8 +15,8 @@ export const AY = { LEAD: 0, BASS: 1, DRUMS: 2, AY1_A: 3, AY1_B: 4, AY1_C: 5 } a
 const AY_NAMES = ['AY2 A', 'AY2 B', 'AY2 C', 'AY1 A', 'AY1 B', 'AY1 C'];
 
 /** Macro codes: volume 0-15, arpeggio, duty = noise period 0-31, wave = mixer bits (1 tone, 2 noise, 4 envelope),
- *  envelope shape (8 buzz, 12 saw) and envelope period. */
-export const AY_MACRO = { VOL: 0, ARP: 1, NOISE: 2, MIXER: 3, ENV_SHAPE: 6, ENV_PERIOD: 16 } as const;
+ *  envelope shape (8 buzz, 12 saw), auto-envelope numerator (EX3) and denominator (ALG), envelope period. */
+export const AY_MACRO = { VOL: 0, ARP: 1, NOISE: 2, MIXER: 3, ENV_SHAPE: 6, AUTO_ENV_NUM: 7, AUTO_ENV_DEN: 8, ENV_PERIOD: 16 } as const;
 
 /** Sequence macro, optional loop step. */
 export function ayMacro(code: number, data: number[], loop = -1): FurnaceMacro {

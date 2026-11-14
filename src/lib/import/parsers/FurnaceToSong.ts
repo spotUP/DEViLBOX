@@ -11,12 +11,13 @@ import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { Pattern, InstrumentConfig, FurnaceSubsongPlayback } from '@/types';
 import type { TrackerCell } from '@/types/tracker';
 import pako from 'pako';
-import { furnaceRowToTrackerCell } from '../furnaceEditorCells';
+import { furnaceRowToTrackerCell, furnaceChannelVolMax } from '../furnaceEditorCells';
 import { notify } from '@/stores/useNotificationStore';
 import { synthTypeForPlatform } from '@/engine/furnace-dispatch/synthPlatforms';
 import { chipSpecOf } from '@/engine/furnace-dispatch/chipVoiceKinds';
 import type {
   FurnaceSubsong,
+  FurnaceNativeData,
 } from '@/types/tracker';
 
 /**
@@ -26,6 +27,7 @@ function subsongToPatterns(
   sub: FurnaceSubsong,
   /** Per channel hardware type from the chip definition; see channelMeta.furnaceType. */
   channelTypes: readonly number[] = [],
+  native?: FurnaceNativeData,
 ): { patterns: Pattern[]; songPositions: number[] } {
   const ordersLen = sub.ordersLen;
 
@@ -56,7 +58,7 @@ function subsongToPatterns(
 
       for (let row = 0; row < sub.patLen; row++) {
         if (patData && patData.rows[row]) {
-          rows.push(furnaceRowToTrackerCell(patData.rows[row]));
+          rows.push(furnaceRowToTrackerCell(patData.rows[row], native ? furnaceChannelVolMax(native, ch) : 127));
         } else {
           rows.push({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
         }
@@ -264,7 +266,7 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
 
   // Convert active subsong patterns
   const activeSub = loaded.nativeData.subsongs[subsong] || loaded.nativeData.subsongs[0];
-  const { patterns, songPositions } = subsongToPatterns(activeSub, loaded.channelTypes);
+  const { patterns, songPositions } = subsongToPatterns(activeSub, loaded.channelTypes, loaded.nativeData);
   const numChannels = activeSub.channels.length;
 
   // Store module-level wavetables/samples on the dispatch engine singleton.
@@ -294,7 +296,7 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
   const furnaceSubsongs: FurnaceSubsongPlayback[] | undefined =
     loaded.numSubsongs > 1
       ? loaded.nativeData.subsongs.map((sub, i) => {
-          const converted = subsongToPatterns(sub, loaded.channelTypes);
+          const converted = subsongToPatterns(sub, loaded.channelTypes, loaded.nativeData);
           return {
             name: sub.name || `Subsong ${i + 1}`,
             patterns: converted.patterns,

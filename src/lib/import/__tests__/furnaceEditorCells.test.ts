@@ -13,7 +13,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
-  furnaceNoteToXM, xmNoteToFurnace, furnaceRowToTrackerCell, applyEditorCellEdit,
+  furnaceNoteToXM, xmNoteToFurnace, furnaceRowToTrackerCell, applyEditorCellEdit, furnaceChannelVolMax,
 } from '../furnaceEditorCells';
 import type { FurnaceNativeData, FurnaceRow } from '@/types/tracker';
 import { installFurnaceFileOpsWasm, readSong } from './furnaceFileOpsWasmHarness';
@@ -83,6 +83,20 @@ describe('an edit in the editor', () => {
     expect(native.subsongs[0].channels[0].patterns.get(0)!.rows[0]).toMatchObject({
       note: -1, ins: -1, vol: -1, effects: [{ cmd: -1, val: -1 }],
     });
+  });
+});
+
+describe('AY volume is 0-15, not 0-127', () => {
+  it('shows AY volume 15 as full and writes the edit back as 15', () => {
+    const native = {
+      activeSubsong: 0, chipIds: [17], systemChans: [3],
+      subsongs: [{ patLen: 1, ordersLen: 1, orders: [[0], [0], [0]],
+        channels: [0, 1, 2].map(() => ({ name: 'AY', effectCols: 1, patterns: new Map([[0, { rows: [row({ note: 48, vol: 15 })] }]]) })) }],
+    } as unknown as FurnaceNativeData;
+    expect(furnaceChannelVolMax(native, 2)).toBe(15);
+    expect(furnaceRowToTrackerCell(row({ vol: 15 }), 15).volume).toBe(0x50);
+    applyEditorCellEdit(native, [0], 0, 1, 0, { volume: 0x10 + 32 });
+    expect(native.subsongs[0].channels[1].patterns.get(0)!.rows[0].vol).toBe(8); // half of 15, rounded
   });
 });
 
