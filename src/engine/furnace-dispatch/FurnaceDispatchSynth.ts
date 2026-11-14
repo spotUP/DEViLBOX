@@ -479,6 +479,22 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
    */
   public setVolumeOffset(_db: number): void { /* intentionally ignored */ }
 
+  /** Recreate this synth's chip after something else destroyed it; ready again once the worklet confirms. */
+  private restoreChip(): void {
+    this._isReady = false;
+    this._isReadyPromise = new Promise((resolve) => { this._resolveReady = resolve; });
+    this.chipKey = this.platformType;
+    void (async () => {
+      const rate = this.engine.getNativeCtx()?.sampleRate;
+      await this.engine.createChip(this.platformType, rate);
+      await this.engine.waitForChipCreated(this.platformType);
+      if (this._disposed) return;
+      if (!this.fromModule) this.setupDefaultInstrument();
+      this._isReady = true;
+      this._resolveReady();
+    })();
+  }
+
   private async initialize(): Promise<void> {
     try {
       const nativeCtx = getDevilboxAudioContext();
@@ -1201,6 +1217,14 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
         if (this._disposed || !this._isReady) return;
         this.triggerAttack(note, _time, velocity);
       });
+      return;
+    }
+
+    // A song start destroys every chip the song does not use (startWithCoordinator),
+    // a keyboard synth's own chip included. Bring it back; the note waits for it above.
+    if (!this.engine.playsPlatform(this.chipKey)) {
+      this.restoreChip();
+      this.triggerAttack(note, _time, velocity);
       return;
     }
 
