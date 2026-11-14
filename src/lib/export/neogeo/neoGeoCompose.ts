@@ -45,9 +45,10 @@ const FX_OP = new Set([0x03, 0x04, 0x0a, 0xea, 0xed]);
 // SSG macros furtool reads: vol 0, arp 1, wave 3, envelope shape 6, envelope num 7 / den 8.
 const SSG_MACROS = new Set([0, 1, 3, 6, 7, 8]);
 
-/** 'C-4' / 'F#5' / 'Bb3' / 'OFF' -> editor note (C-4 = 49, off = 97). */
+/** 'C-4' / 'F#5' / 'Bb3' / 'OFF' / 'REL' -> editor note (C-4 = 49, off = 97, release = 255). */
 export function noteNumber(name: string): number {
   if (name === 'OFF' || name === '===') return 97;
+  if (name === 'REL') return 255;
   const m = /^([A-G])([-#b]?)(\d)$/.exec(name);
   if (!m) throw new Error(`Bad note "${name}"`);
   const base = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1] as 'C'];

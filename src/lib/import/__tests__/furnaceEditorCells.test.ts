@@ -43,11 +43,14 @@ describe('Furnace notes in the editor', () => {
     expect(furnaceNoteToXM(0)).toBe(1);        // C-0 is a note, not an empty cell
     expect(furnaceNoteToXM(-1)).toBe(0);
     expect(furnaceNoteToXM(253)).toBe(97);
+    expect(furnaceNoteToXM(254)).toBe(255);    // note release shows as ~~~
+    expect(furnaceNoteToXM(255)).toBe(97);
   });
 
   it('turns an editor note back into the same Furnace note', () => {
     for (let n = 1; n <= 96; n++) expect(furnaceNoteToXM(xmNoteToFurnace(n))).toBe(n);
     expect(xmNoteToFurnace(97)).toBe(253);
+    expect(xmNoteToFurnace(255)).toBe(254);
     expect(xmNoteToFurnace(0)).toBe(-1);
   });
 });

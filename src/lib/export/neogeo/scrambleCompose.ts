@@ -16,11 +16,15 @@ const AY_NAMES = ['AY2 A', 'AY2 B', 'AY2 C', 'AY1 A', 'AY1 B', 'AY1 C'];
 
 /** Macro codes: volume 0-15, arpeggio, duty = noise period 0-31, wave = mixer bits (1 tone, 2 noise, 4 envelope),
  *  envelope shape (8 buzz, 12 saw), auto-envelope numerator (EX3) and denominator (ALG), envelope period. */
-export const AY_MACRO = { VOL: 0, ARP: 1, NOISE: 2, MIXER: 3, ENV_SHAPE: 6, AUTO_ENV_NUM: 7, AUTO_ENV_DEN: 8, ENV_PERIOD: 16 } as const;
+export const AY_MACRO = {
+  VOL: 0, ARP: 1, NOISE: 2, MIXER: 3, PITCH: 4, ENV_SHAPE: 6, AUTO_ENV_NUM: 7, AUTO_ENV_DEN: 8, PHASE_RESET: 14, ENV_PERIOD: 16,
+} as const;
 
-/** Sequence macro, optional loop step. */
-export function ayMacro(code: number, data: number[], loop = -1): FurnaceMacro {
-  return { code, type: 0, data, loop, release: -1, mode: 0, delay: 0, speed: 1 } as FurnaceMacro;
+/** Sequence macro, optional loop step; `opt.mode` 1 = relative pitch macro. Release, mode, pitch and phase reset
+ *  reach the file only with ScrambleSongBuilder.keepOutsideContract. */
+export function ayMacro(code: number, data: number[], loop = -1,
+  opt: { release?: number; delay?: number; speed?: number; mode?: number } = {}): FurnaceMacro {
+  return { code, type: 0, data, loop, release: opt.release ?? -1, mode: opt.mode ?? 0, delay: opt.delay ?? 0, speed: opt.speed ?? 1 } as FurnaceMacro;
 }
 
 /** AY instrument body for ScrambleSongBuilder.addInstrument. */
@@ -36,6 +40,10 @@ export function ayVol(v: number): number {
 
 export class ScrambleSongBuilder extends NeoGeoSongBuilder {
   readonly channels: number;
+  /** Furnace linear pitch flag (0 off, 1 partial, 2 full); undefined writes 1. */
+  linearPitch?: 0 | 1 | 2;
+  /** Keep what the old player contract drops (test tunes for the BossGame compiler). */
+  keepOutsideContract = false;
   /** `channels` 6 = both chips (every game tune); 3 = one chip (sketches the one-chip compiler can read). */
   constructor(name: string, speed: number, rows: number, channels: 3 | 6 = 6) {
     super(name, speed, rows);
@@ -57,6 +65,10 @@ export class ScrambleSongBuilder extends NeoGeoSongBuilder {
   }
 
   build(): FurnaceModuleSong {
-    return { ...super.build(), hz: FUR_AY_SCRAMBLE_TICK_HZ, initialBPM: FUR_AY_SCRAMBLE_BPM, extendedFm: false };
+    return {
+      ...super.build(), hz: FUR_AY_SCRAMBLE_TICK_HZ, initialBPM: FUR_AY_SCRAMBLE_BPM, extendedFm: false,
+      keepOutsideContract: this.keepOutsideContract,
+      ...(this.linearPitch === undefined ? {} : { compatFlags: { linearPitch: this.linearPitch } }),
+    };
   }
 }
