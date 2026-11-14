@@ -2406,6 +2406,8 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
           { tool: 'export_midi', description: 'Export pattern/song to MIDI (base64)' },
           { tool: 'export_mod', description: 'Export loaded song to ProTracker MOD (base64); bakes OctaMED synths to PCM' },
           { tool: 'export_native', description: 'Export loaded song to its native format (55+ formats) with edits preserved' },
+          { tool: 'share_song', description: 'Make a share link for the song as edited (uploads it)' },
+          { tool: 'open_share', description: 'Open a share link like a visitor: no autoplay, Play prompt' },
         ],
         'Soak Test / Telemetry': [
           { tool: 'dj_vj_action', description: 'Execute DJ/VJ soak-test action (dev-only)' },
@@ -2585,6 +2587,22 @@ export function createMcpServer({ callBrowser = relayCallBrowser }: { callBrowse
       }
       return result;
     },
+  );
+
+  server.tool(
+    'share_song',
+    'Make a share link for the loaded song as currently edited. Uploads it to the share server (5-day sliding lifetime); small songs also carry the data in the link. Returns { link, warnings }. A song opened from a share link is sent with that share as its parent.',
+    {},
+    () => call('share_song'),
+  );
+
+  server.tool(
+    'open_share',
+    'Open a share link the way a visitor tab does: the song loads without autoplay and the Play prompt shows. Accepts the full URL or only its #share= hash. Read the song back (get_song_info) to confirm it loaded.',
+    {
+      link: z.string().describe('Share URL or #share=... hash'),
+    },
+    (p) => call('open_share', p),
   );
 
   // ═══════════════════════════════════════════════════════════════════════════════
