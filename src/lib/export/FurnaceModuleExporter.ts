@@ -25,6 +25,7 @@ import {
 } from '@/lib/import/formats/furnace/FurnaceInstrumentParser';
 import { resolveInsType, DIV_INS_ADPCMA, DIV_INS_ADPCMB } from './FurnaceInstrumentEncoder';
 import { editorEffectToFurnace, xmVolToFurnace, xmNoteToFurnace } from '@/lib/import/furnaceEditorCells';
+import { maxVolumeOfChipChannel } from '@engine/furnace-dispatch/chipVoiceKinds';
 
 /**
  * Furnace format version written: DIV_ENGINE_VERSION of the vendored Furnace (engine.h, 245), the
@@ -221,6 +222,11 @@ export function trackerArpDependents(
  * command, so a verbatim copy would change what the song plays. Move it to the volume column
  * (the same 0-64 to 0-127 scale as the volume column). Furnace-notation channels keep their codes.
  */
+/** Volume maximum of a Neo Geo channel. The extended chip has 3 more FM channels (FM 2 operators) before the SSG, so its SSG/ADPCM channels sit 3 later than the plain chip's. */
+function neoGeoChannelVolMax(ch: number, ext: boolean): number {
+  return maxVolumeOfChipChannel(NEO_GEO_SYNTH_TYPE, ext ? (ch < 7 ? 0 : ch - 3) : ch) ?? 127;
+}
+
 export function cellToFile(
   cell: TrackerCell,
   insIndexById: Map<number, number>,
@@ -230,6 +236,8 @@ export function cellToFile(
   warnings: string[] = [],
   /** trackerArpStopAt for this cell: write Furnace 0000 to end the arp of the row before. */
   arpStop = false,
+  /** The channel's own volume maximum (FM 127, SSG 15, ADPCM-A 31, ADPCM-B 255). */
+  volMax = 127,
 ): FileCell {
   let note = -1;
   if (cell.note > 0) {
@@ -242,11 +250,11 @@ export function cellToFile(
     if (idx === undefined) problems.push(`${where}: instrument ${cell.instrument} is not a Neo Geo instrument`);
     else ins = idx;
   }
-  let vol = cell.volume ? xmVolToFurnace(cell.volume) : -1;
+  let vol = cell.volume ? xmVolToFurnace(cell.volume, volMax) : -1;
   if (cell.volume && vol < 0) warnings.push(`${where}: volume column 0x${cell.volume.toString(16)} dropped, it is not a set-volume value (0x10-0x50)`);
   const fx = cellEffects(cell).map(([t, v]) => {
     if (notation === 'tracker' && t === 0x0c) {
-      if (vol < 0) vol = xmVolToFurnace(0x10 + Math.min(64, v));
+      if (vol < 0) vol = xmVolToFurnace(0x10 + Math.min(64, v), volMax);
       else warnings.push(`${where}: Cxx dropped because the volume column is already set`);
       return { type: -1, val: -1 };
     }
@@ -467,7 +475,7 @@ export function exportFurnaceModule(song: FurnaceModuleSong): FurnaceModuleResul
         const cell = src?.rows[r];
         rows.push(cell && src
           ? cellToFile(cell, insIndexById, `Pattern ${pi} channel ${ch + 1} row ${r}`, problems, effectNotationOf(src.channelMeta), warnings,
-            trackerArpStopAt(song.patterns, song.songPositions, pi, ch, r))
+            trackerArpStopAt(song.patterns, song.songPositions, pi, ch, r), neoGeoChannelVolMax(ch, !!song.extendedFm))
           : { note: -1, ins: -1, vol: -1, fx: Array.from({ length: MAX_FX_COLUMNS }, () => ({ type: -1, val: -1 })) });
       }
       if (rows.every(isEmptyCell) && !orderedPatterns.has(pi)) continue;
