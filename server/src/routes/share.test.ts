@@ -84,4 +84,47 @@ describe('/api/share', () => {
     expect(sweepExpiredShares({ database, dir: () => dir, now: () => clock })).toBeGreaterThan(0);
     expect(fs.existsSync(path.join(dir, `${id}.bin`))).toBe(false);
   });
+
+  describe('replies', () => {
+    const OCT = { 'content-type': 'application/octet-stream' };
+    const make = async () => (await (await post(new Uint8Array([1, 1]))).json()) as { id: string; ownerKey: string };
+    const reply = (id: string, bytes: number[]) => fetch(`${base}/${id}/replies`, { method: 'POST', headers: OCT, body: new Uint8Array(bytes) as BodyInit });
+    const owner = (key: string) => ({ 'x-share-owner-key': key });
+
+    it('stores a reply, lists it for the owner only, returns and dismisses it', async () => {
+      const { id, ownerKey } = await make();
+      const { id: rid } = await (await reply(id, [4, 5, 6])).json() as { id: string };
+      expect((await fetch(`${base}/${id}/replies`)).status).toBe(403);
+      expect((await fetch(`${base}/${id}/replies`, { headers: owner('wrong') })).status).toBe(403);
+      const list = await (await fetch(`${base}/${id}/replies`, { headers: owner(ownerKey) })).json() as { replies: Array<{ id: string }> };
+      expect(list.replies.map((r) => r.id)).toEqual([rid]);
+      const got = await fetch(`${base}/${id}/replies/${rid}`, { headers: owner(ownerKey) });
+      expect([...new Uint8Array(await got.arrayBuffer())]).toEqual([4, 5, 6]);
+      expect((await fetch(`${base}/${id}/replies/${rid}`)).status).toBe(403);
+      expect((await fetch(`${base}/${id}/replies/${rid}`, { method: 'DELETE', headers: owner(ownerKey) })).status).toBe(200);
+      expect((await fetch(`${base}/${id}/replies/${rid}`, { headers: owner(ownerKey) })).status).toBe(404);
+      expect(fs.existsSync(path.join(dir, `r-${rid}.bin`))).toBe(false);
+    });
+
+    it('refuses a reply to an unknown share, an empty body and one over the cap', async () => {
+      expect((await reply('ZZZZZZZZ', [1])).status).toBe(404);
+      const { id } = await make();
+      expect((await reply(id, [])).status).toBe(400);
+      expect((await fetch(`${base}/${id}/replies`, { method: 'POST', headers: OCT, body: new Uint8Array(SHARE_MAX_BYTES + 1) as BodyInit })).status).toBe(413);
+    });
+
+    it('a reply resets the lifetime of the share and its replies, and replies are swept with the share', async () => {
+      const { id, ownerKey } = await make();
+      const { id: first } = await (await reply(id, [1])).json() as { id: string };
+      clock += SHARE_TTL_MS - 1000;
+      const { id: second } = await (await reply(id, [2])).json() as { id: string };
+      clock += SHARE_TTL_MS - 1000; // past the first reply's original expiry
+      const list = await (await fetch(`${base}/${id}/replies`, { headers: owner(ownerKey) })).json() as { replies: Array<{ id: string }> };
+      expect(list.replies.map((r) => r.id).sort()).toEqual([first, second].sort());
+      clock += SHARE_TTL_MS + 1;
+      sweepExpiredShares({ database, dir: () => dir, now: () => clock });
+      expect(fs.existsSync(path.join(dir, `r-${first}.bin`))).toBe(false);
+      expect(database.prepare('SELECT COUNT(*) AS n FROM share_replies WHERE share_id = ?').get(id)).toEqual({ n: 0 });
+    });
+  });
 });

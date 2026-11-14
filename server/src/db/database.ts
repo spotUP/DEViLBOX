@@ -111,6 +111,15 @@ export function createShareTables(database: Database.Database = db): void {
       owner_key_sha256 TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_share_links_expires ON share_links(expires_at);
+    -- Edited copies sent back to a share's author; the blob is a share container in share/r-<id>.bin.
+    CREATE TABLE IF NOT EXISTS share_replies (
+      id TEXT PRIMARY KEY,
+      share_id TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_share_replies_share ON share_replies(share_id);
   `);
 }
 
