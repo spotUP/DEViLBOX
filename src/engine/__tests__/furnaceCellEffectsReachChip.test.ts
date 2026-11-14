@@ -39,6 +39,7 @@ function fakeChip(calls: Call[]): FurnaceDispatchEngine {
   e.effectRouter = new FurnaceEffectRouter();
   e.dispatch = (cmd: number, chan: number, val1 = 0, val2 = 0) => { calls.push({ cmd, chan, val1, val2 }); };
   e.getChannelCount = () => CHIP_CHANNELS;
+  e.chips = new Map(); // chipSpansOf iterates it; empty = single chip of the synth's platform
   return e as unknown as FurnaceDispatchEngine;
 }
 

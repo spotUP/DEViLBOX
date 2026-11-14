@@ -13,6 +13,8 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('../TrackerReplayer', () => ({ getTrackerReplayer: () => null }));
 vi.mock('../ToneEngine', () => ({ getToneEngine: () => ({}) }));
 vi.mock('../dj/DeckScratchBuffer', () => ({ DeckScratchBuffer: class {}, TRACKER_SCRATCH_BUFFER_ID: 'x' }));
+// Static import: the module graph's cold transform (~50 s under load) must not count against a test's timeout.
+import { TrackerScratchController } from '../TrackerScratchController';
 
 function fakeReplayer(suppressed: boolean) {
   let sup = suppressed;
@@ -29,8 +31,7 @@ function fakeReplayer(suppressed: boolean) {
 
 describe('scratch and note suppression', () => {
   for (const before of [true, false]) {
-    it(`leaves suppression ${before ? 'on' : 'off'} as it was before the scratch`, async () => {
-      const { TrackerScratchController } = await import('../TrackerScratchController');
+    it(`leaves suppression ${before ? 'on' : 'off'} as it was before the scratch`, () => {
       const sc = new TrackerScratchController() as unknown as {
         enterScratchMode(r: unknown): void; exitScratchMode(r: unknown): void;
         scratchBufferReady: boolean; stopPhysicsLoop(): void; startPhysicsLoop(): void;
@@ -43,6 +44,6 @@ describe('scratch and note suppression', () => {
       expect(r.isSuppressNotes).toBe(true);     // silent while scratching
       sc.exitScratchMode(r);
       expect(r.isSuppressNotes).toBe(before);
-    }, 60000);
+    });
   }
 });

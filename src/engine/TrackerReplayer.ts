@@ -2699,6 +2699,7 @@ export class TrackerReplayer {
           isStillCurrent: () => gen === this._playGeneration,
           initialSongPos: this.songPos,
           initialPattPos: this.pattPos,
+          onEnded: () => { if (gen === this._playGeneration) useTransportStore.getState().stop(); },
           ins2Uploads: this._derivedNeoGeo?.ins2,
         });
         if (gen !== this._playGeneration) return;

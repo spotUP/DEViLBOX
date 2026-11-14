@@ -33,6 +33,7 @@ async function chipSynth(chipChannels: number, platformType: number, calls: Mute
     platformType,
     engine: {
       getChannelCount: () => chipChannels,
+      chipSpansOf: () => [{ key: platformType, offset: 0, numChannels: chipChannels }],
       mute: (chan: number, muted: boolean, pt?: number) => calls.push({ chan, muted, platformType: pt }),
     },
   });
