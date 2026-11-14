@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { xmVolToFurnace } from '@/lib/import/furnaceEditorCells';
 import { exportFurnaceModule, furnaceModuleExportAvailable, FUR_SYSTEM_YM2610, FUR_SYSTEM_YM2610_EXT } from '../FurnaceModuleExporter';
+import { maxVolumeOfChipChannel } from '@engine/furnace-dispatch/chipVoiceKinds';
 import pako from 'pako';
 import { parseFurnaceSong } from '@/lib/import/formats/FurnaceSongParser';
 import { DEFAULT_FURNACE } from '@/types/instrument/defaults';
@@ -132,8 +133,8 @@ describe('exportFurnaceModule', () => {
   });
 
   it('maps the volume column the way the editor does: set volume 0x10-0x50 only, anything else is dropped with a warning', async () => {
-    expect([0x10, 0x30, 0x50].map(xmVolToFurnace)).toEqual([0, 64, 127]);
-    expect([0x00, 0x01, 0x0f, 0x51, 0x60, 0xff].map(xmVolToFurnace)).toEqual([-1, -1, -1, -1, -1, -1]);
+    expect([0x10, 0x30, 0x50].map((v) => xmVolToFurnace(v))).toEqual([0, 64, 127]);
+    expect([0x00, 0x01, 0x0f, 0x51, 0x60, 0xff].map((v) => xmVolToFurnace(v))).toEqual([-1, -1, -1, -1, -1, -1]);
     const s = song();
     set(s.patterns[0], 0, 1, { note: 49, instrument: 1, volume: 0x30 });
     set(s.patterns[0], 0, 2, { note: 49, instrument: 1, volume: 0x07 });
@@ -181,7 +182,7 @@ describe('exportFurnaceModule', () => {
       const got = mod.patterns.get(`0_${ch}_0`)!.rows[row];
       expect((got.octave + 5) * 12 + got.note).toBe(src.note + 59);
       expect(got.instrument).toBe(src.instrument - 1);
-      expect(got.volume).toBe(xmVolToFurnace(src.volume));
+      expect(got.volume).toBe(xmVolToFurnace(src.volume, maxVolumeOfChipChannel('FurnaceOPNB', ch)));
       expect(got.effects[0]).toEqual({ type: src.effTyp, value: src.eff });
       expect(got.effects[1]).toEqual({ type: 0x0a, value: row });
     }
@@ -340,6 +341,20 @@ describe('exportFurnaceModule', () => {
     expect(fileNote(mod.patterns.get('0_3_0')!.rows[1])).toBe(120);
     expect(fileNote(mod.patterns.get('0_16_0')!.rows[0])).toBe(108);
     expect(() => exportFurnaceModule(s)).toThrow(/channel 17 has notes/);
+  });
+
+  it('writes the volume of each channel on its chip scale: SSG 0-15, FM 0-127 (plain and extended chip)', async () => {
+    for (const extendedFm of [false, true]) {
+      const s = song();
+      for (const p of s.patterns) if (extendedFm) for (let i = 14; i < 17; i++) p.channels.push(channel(i));
+      const ssg = extendedFm ? 7 : 4;
+      set(s.patterns[0], 0, 1, { note: 49, instrument: 1, volume: 0x50 });
+      set(s.patterns[0], ssg, 1, { note: 49, instrument: 2, volume: 0x50 });
+      const r = exportFurnaceModule({ ...s, extendedFm });
+      const mod = await parseFurnaceSong(r.bytes.buffer.slice(r.bytes.byteOffset, r.bytes.byteOffset + r.bytes.byteLength) as ArrayBuffer);
+      expect(mod.patterns.get('0_0_0')!.rows[1].volume).toBe(127);
+      expect(mod.patterns.get(`0_${ssg}_0`)!.rows[1].volume).toBe(15);
+    }
   });
 
   it('offers the export only for Neo Geo instruments', () => {
