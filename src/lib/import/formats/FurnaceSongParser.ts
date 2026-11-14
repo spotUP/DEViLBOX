@@ -163,7 +163,7 @@ const DIV_ELEMENT_PATTERN = 0x07;
 const DIV_ELEMENT_COMPAT_FLAGS = 0x08;
 const DIV_ELEMENT_COMMENTS = 0x09;
 const DIV_ELEMENT_GROOVE = 0x0a;
-const CHIP_SYNTH_IDS = new Set([
+export const CHIP_SYNTH_IDS = new Set([
   0x03,       // SN76489/SMS/PSG
   0x04,       // Game Boy
   0x05,       // PC Engine
@@ -187,6 +187,9 @@ const CHIP_SYNTH_IDS = new Set([
   0x97,       // SAA1099
   0x98,       // OPZ
   0xa0,       // YM2612 ext
+  0x9e,       // YM2610B/OPNB2
+  0xa5,       // YM2610/OPNB (Neo Geo)
+  0xa6,       // YM2610/OPNB ext ch2 (Neo Geo)
   0x02,       // Genesis (compound)
 ]);
 
@@ -3138,7 +3141,8 @@ function createMetadata(module: FurnaceModule, subsongIndex = 0): ImportMetadata
   
   // Calculate BPM for ProTracker-compatible playback
   // Note: speed is NOT in the formula because the replayer multiplies by speed in rowDuration
-  const bpm = Math.round(2.5 * hz * (virtualTempo / virtualTempoD));
+  // Not rounded: hz 58.3 gives 145.75 BPM, and rounding drifts the row clock away from Furnace.
+  const bpm = 2.5 * hz * (virtualTempo / virtualTempoD);
   
   return {
     sourceFormat: 'XM', // Use XM as closest equivalent for effect handling
