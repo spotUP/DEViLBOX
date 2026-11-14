@@ -13,7 +13,7 @@ vi.mock('@lib/import/formats/TonyWilliamsParser', async (importOriginal) => {
 
 import { parseModuleToSong } from '@/lib/import/parseModuleToSong';
 import { parseTonyWilliamsFile } from '@lib/import/formats/TonyWilliamsParser';
-import { exportTonyWilliams } from '@lib/export/TonyWilliamsExporter';
+import { exportNativeSong } from '@lib/export/nativeExportRouter';
 import { isReplacedInstrument } from '@/engine/replayer/hybridInstruments';
 
 const PATH = 'public/data/songs/formats/future basketball main.tw';
@@ -45,7 +45,8 @@ describe('Tony Williams reachability', () => {
     expect(song.instruments.length).toBeGreaterThan(0);
     expect(song.instruments.every((i) => i.synthType === 'Sampler' && (i.sample?.audioBuffer?.byteLength ?? 0) > 44)).toBe(true);
     expect(song.instruments.some((i) => isReplacedInstrument(i, false))).toBe(false);
-    const out = new Uint8Array(await (await exportTonyWilliams(song)).data.arrayBuffer());
+    // The product's export path: a nuade-played song's module is put back under uadeEditableFileData by the router.
+    const out = new Uint8Array((await exportNativeSong(song))!.data as Uint8Array);
     expect(Buffer.from(out).equals(raw)).toBe(true);
   });
 });
