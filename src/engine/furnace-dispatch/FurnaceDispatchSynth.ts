@@ -5,7 +5,7 @@
  * the native Furnace dispatch WASM engine. Supports 57+ platforms.
  */
 
-import { withSsgDefaultMacros, placeUserSample } from './opnbVoices';
+import { withSsgDefaultMacros, placeUserSample, isOpnbChipType, opnbVoiceKindOfChannel } from './opnbVoices';
 import { livePreviewChannel } from './chipChannel';
 import { maxVolumeOfChannel } from './channelVolume';
 import type { DevilboxSynth } from '@/types/synth';
@@ -143,6 +143,8 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   private platformType: number;
   /** Which chip notes go to: the platform type (first chip) or a later same-type chip's key (chipKey.ts). */
   private chipKey: number;
+  /** Furnace chipType of the uploaded instrument; picks OPNB SSG channels for the tone-mode reset. */
+  private previewChipType: number | undefined;
   private activeNotes: Map<number, { chan: number; key: number }> = new Map(); // midiNote -> chip channel
   // Volume normalization is handled per-chip by the worklet's POST_AMP table
   // (matching upstream Furnace 1:1). No JS-side offset on the shared gain node.
@@ -234,7 +236,12 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     const configFurnace = config as unknown as FurnaceConfig;
     // Same rule as a live note's channel (chipChannel.ts): the named preview channel, else the kind's first.
     const preview = livePreviewChannel(configFurnace);
-    if (preview !== undefined) this.currentChannel = preview;
+    if (preview !== undefined) {
+      // Same clamp as chipChannelFor: a preview channel past the chip's last channel plays on channel 0.
+      const count = this.engine.getChannelCount(this.chipKey);
+      this.currentChannel = count > 0 && preview >= count ? 0 : preview;
+    }
+    this.previewChipType = configFurnace.chipType;
 
     // If we have rawBinaryData from a .fur file, use it directly.
     // This is the native INS2 format that the WASM dispatch already knows how to parse.
@@ -1109,6 +1116,11 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     // in slot 0 may have been replaced by a preset load, and without
     // forcing, the dispatch skips copying params when the index matches.
     if ((window as any).FURNACE_DEBUG) console.log(`[FurnaceDispatchSynth] triggerAttack: note=${midiNote} chan=${chan} inst=${this.furnaceInstrumentIndex} platform=${pt} time=${_time?.toFixed(4)}`);
+    // Furnace keeps a PSG channel's tone/noise mode until a wave macro changes it (ay.cpp), and all of a
+    // chip's keyboard synths share one channel: after a noise instrument, a tone instrument with no wave
+    // macro played noise. Reset to tone first; an instrument's own wave macro still sets it on the next tick.
+    const toneMode = this.psgToneModeValue(pt, chan);
+    if (toneMode !== undefined) this.engine.dispatch(DivCmd.STD_NOISE_MODE, chan, toneMode, 0, this.chipKey, _time);
     this.engine.setInstrument(chan, this.furnaceInstrumentIndex, this.chipKey, true, _time);
 
     // Set volume based on velocity
@@ -1124,6 +1136,15 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     // release of the old note must not send a NOTE_OFF that cuts this one.
     for (const [n, c] of this.activeNotes) if (c.chan === chan && c.key === this.chipKey) this.activeNotes.delete(n);
     this.activeNotes.set(midiNote, { chan, key: this.chipKey });
+  }
+
+  /** STD_NOISE_MODE value that selects tone-only on a PSG channel, or undefined when the channel has no PSG mode. */
+  private psgToneModeValue(pt: number, chan: number): number | undefined {
+    if (pt === FurnaceDispatchPlatform.AY) return 0;
+    if (pt === FurnaceDispatchPlatform.AY8930) return 1;
+    const ct = this.previewChipType;
+    if (ct !== undefined && isOpnbChipType(ct) && opnbVoiceKindOfChannel(ct, chan).id === 'ssg') return 0;
+    return undefined;
   }
 
   triggerAttackRelease(
