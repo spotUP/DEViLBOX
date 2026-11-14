@@ -1,13 +1,17 @@
 /**
  * tonyWilliamsEdits.ts - write grid cell edits back into the Tony Williams stream bytes.
- * Same-length edits only: a note byte, a D0 instrument byte, a duration/volume/envelope command
- * byte, or the one operand byte of transpose/slide/vibrato/envelope-params. Growth needs the
- * list/record relocation pass (not built); an edit that cannot be written comes back as a warning.
+ * Same-length edits patch a note byte, a D0 instrument byte, a duration/volume/envelope command
+ * byte, or the one operand byte of transpose/slide/vibrato/envelope-params. Clearing an effect cell
+ * deletes its command and filling an empty effect slot inserts duration/volume/arpeggio/transpose
+ * before the tick's first command; those length changes go through tonyWilliamsRelocate.ts, which
+ * moves the tail and patches every pointer (or refuses, keeping only the same-length edits).
+ * An edit that cannot be written comes back as a warning.
  */
 import type { Pattern } from '@/types';
-import { buildTwGrid, TW_NOTE_BASE, type TwSource } from './tonyWilliamsGrid';
+import { buildTwGrid, TW_NOTE_BASE, TW_ROWS_PER_PATTERN, type TwSource } from './tonyWilliamsGrid';
 import { TW_FX } from './tonyWilliamsEffectGlyphs';
-import type { TwWalk } from './tonyWilliamsWalk';
+import { twEndsBlock, type TwWalk } from './tonyWilliamsWalk';
+import { relocateTonyWilliams, type TwSplice } from './tonyWilliamsRelocate';
 
 type Cell = Record<string, number | undefined>;
 
@@ -30,7 +34,10 @@ export function applyTwGridEdits(original: Uint8Array, walk: TwWalk, patterns: P
     written.set(offset, value);
     data[offset] = value;
   };
+  const splices: TwSplice[] = [];
+  const have = new Set<string>();
   for (const s of grid.sources) {
+    have.add(`${s.pattern}/${s.channel}/${s.row}/${s.kind === 'effect' ? s.slot : -1}`);
     const cell = cellOf(patterns, s);
     if (!cell) continue;
     const where = `pattern ${s.pattern} channel ${s.channel + 1} row ${s.row}`;
@@ -48,6 +55,12 @@ export function applyTwGridEdits(original: Uint8Array, walk: TwWalk, patterns: P
     } else {
       const key = SLOT[s.slot];
       if (!key) continue;
+      if ((cell[key[0]] ?? 0) === 0 && (cell[key[1]] ?? 0) === 0) {
+        const cmd = walk.events.find((e) => e.cmd.offset === s.offset)?.cmd;
+        if (!cmd || cmd.op < 0x80 || cmd.op === 0x85 || cmd.op === 0x86 || twEndsBlock(cmd.op)) warnings.push(`${where}: this command cannot be removed.`);
+        else splices.push({ at: cmd.offset, remove: cmd.length, insert: new Uint8Array(0) });
+        continue;
+      }
       if ((cell[key[0]] ?? 0) !== s.effTyp) { warnings.push(`${where}: effect changed kind; not written.`); continue; }
       const v = (cell[key[1]] ?? 0) & 0xff;
       if (v === s.value) continue;
@@ -64,7 +77,35 @@ export function applyTwGridEdits(original: Uint8Array, walk: TwWalk, patterns: P
       }
     }
   }
-  return { data, warnings };
+  // filled effect slots with no stream command: insert before the first command of that voice at that tick
+  const first = new Map<string, number>();
+  for (const e of walk.events) { const k = `${e.channel}/${e.tick}`; if (!first.has(k)) first.set(k, e.cmd.offset); }
+  const ins = new Map<number, number[]>();
+  patterns.forEach((pat, p) => pat.channels.forEach((ch, c) => ch.rows.forEach((row, r) => {
+    const cell = row as unknown as Cell;
+    SLOT.forEach(([tk, vk], slot) => {
+      const typ = cell[tk] ?? 0;
+      if (typ === 0 || have.has(`${p}/${c}/${r}/${slot}`)) return;
+      const v = (cell[vk] ?? 0) & 0xff;
+      const where = `pattern ${p} channel ${c + 1} row ${r}`;
+      const at = first.get(`${c}/${p * TW_ROWS_PER_PATTERN + r}`);
+      let bytes: number[] | null = null;
+      if (typ === TW_FX.duration) bytes = v >= 1 && v <= 32 ? [0xdf + v] : null;
+      else if (typ === TW_FX.volume) bytes = [0xb0 | (v & 15)];
+      else if (typ === TW_FX.arpeggio) bytes = [0xa0 | (v & 15)];
+      else if (typ === TW_FX.transpose) bytes = [0x87, v];
+      if (at === undefined || !bytes) { warnings.push(`${where}: this effect cannot be added here.`); return; }
+      ins.set(at, [...(ins.get(at) ?? []), ...bytes]);
+    });
+  })));
+  for (const [at, bytes] of ins) splices.push({ at, remove: 0, insert: Uint8Array.from(bytes) });
+
+  if (splices.length === 0) return { data, warnings };
+  const clash = splices.some((a, i) => splices.some((x, j) => i !== j && x.at >= a.at && x.at < a.at + Math.max(a.remove, 1)));
+  if (clash) { warnings.push('Length-changing edits overlap; they were not written.'); return { data, warnings }; }
+  const r = relocateTonyWilliams(data, splices);
+  if ('error' in r) { warnings.push(`Length-changing edits were not written (${r.error}).`); return { data, warnings }; }
+  return { data: r.data, warnings };
 }
 
 const SLOT: Array<[string, string]> = [['effTyp', 'eff'], ['effTyp2', 'eff2'], ['effTyp3', 'eff3'], ['effTyp4', 'eff4'], ['effTyp5', 'eff5']];
