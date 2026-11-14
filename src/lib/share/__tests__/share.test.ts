@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { packShare, unpackShare } from '../shareContainer';
-import { inlineFragment, isShareHash, parseShareHash, SHARE_URL_MAX } from '../shareLink';
+import { inlineFragment, inlineLink, isShareHash, parseShareHash, SHARE_URL_MAX } from '../shareLink';
 import { startupPolicy } from '@lib/startup/startupPolicy';
 
 const on = { welcomeDialogEnabled: true, welcomeJingleEnabled: true };
@@ -47,6 +47,14 @@ describe('share link', () => {
     expect(parsed?.mode).toBe('inline');
     if (parsed?.mode === 'inline') expect(Array.from(unpackShare(parsed.container).bytes)).toEqual(Array.from(noise(200)));
     expect(inlineFragment(packShare({ name: 'a', bytes: noise(20000), companions: [] }))).toBeNull();
+  });
+
+  it('an inline link may carry the server id after the data, and still opens without it', () => {
+    const frag = inlineFragment(packShare({ name: 'a', bytes: noise(50), companions: [] }))!;
+    const withId = parseShareHash(`#share=${inlineLink(frag, 'AbC123xy')}`);
+    expect(withId).toMatchObject({ mode: 'inline', id: 'AbC123xy' });
+    expect(parseShareHash(`#share=${inlineLink(frag)}`)).toMatchObject({ mode: 'inline', id: undefined });
+    expect(parseShareHash(`#share=${frag}.toolongid1`)).toBeNull();
   });
 
   it('parses stored links and ignores other hashes', () => {

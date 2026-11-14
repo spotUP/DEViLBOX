@@ -10,7 +10,7 @@ export const SHARE_URL_MAX = 6000;
 /** Largest container the server stores (server/src/routes/share.ts SHARE_MAX_BYTES). */
 export const SHARE_UPLOAD_MAX = 8 * 1024 * 1024;
 
-export type ShareRef = { mode: 'inline'; container: Uint8Array } | { mode: 'stored'; id: string };
+export type ShareRef = { mode: 'inline'; container: Uint8Array; id?: string } | { mode: 'stored'; id: string };
 
 function toBase64Url(bytes: Uint8Array): string {
   let bin = '';
@@ -31,13 +31,16 @@ export function inlineFragment(container: Uint8Array): string | null {
 
 export const storedFragment = (id: string): string => `s.${id}`;
 
+/** Fragment of a small song: the song itself, plus the server id when the upload worked (`z1.<data>.<id>`; base64url has no dot). */
+export const inlineLink = (fragment: string, id?: string): string => (id ? `${fragment}.${id}` : fragment);
+
 /** The share reference in a location hash, or null when the hash is not a share link or is malformed. */
 export function parseShareHash(hash: string): ShareRef | null {
-  const m = /^#share=(z1|s)\.([A-Za-z0-9_-]+)$/.exec(hash);
+  const m = /^#share=(?:z1\.([A-Za-z0-9_-]+)(?:\.([0-9A-Za-z]{8}))?|s\.([0-9A-Za-z]{8}))$/.exec(hash);
   if (!m) return null;
-  if (m[1] === 's') return { mode: 'stored', id: m[2] };
+  if (m[3]) return { mode: 'stored', id: m[3] };
   try {
-    return { mode: 'inline', container: pako.inflate(fromBase64Url(m[2])) };
+    return { mode: 'inline', container: pako.inflate(fromBase64Url(m[1])), id: m[2] };
   } catch {
     return null;
   }
