@@ -9,7 +9,7 @@
  * Driven through the real triggerPolyNoteAttack / triggerPolyNoteRelease / triggerNoteAttack on a minimal engine whose
  * only instrument is a FurnaceDispatchSynth stand-in that records the chip channel of every note.
  */
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeAll } from 'vitest';
 import { chipChannelFor, LIVE_VOICE_BASE_CHANNEL } from '../furnace-dispatch/chipChannel';
 import type { ToneEngine as ToneEngineT } from '../ToneEngine';
 
@@ -21,12 +21,18 @@ vi.mock('tone', async (orig) => {
 
 afterEach(() => { vi.useRealTimers(); });
 
+// The first import of ToneEngine pays the whole cold transform of its graph (Tone.js, InstrumentFactory, the WASM
+// glue): measured 53 s at nice 19, so the first spam test hit its 60 s budget and the later ones read a module still
+// being evaluated (ToneEngine undefined). Pay it once here on its own budget, as all-stores-import.test.ts does.
+let mods: [typeof import('../ToneEngine'), typeof import('../furnace-dispatch/FurnaceDispatchSynth'), typeof import('../audio/VoiceAllocator')];
+beforeAll(async () => {
+  mods = await Promise.all([import('../ToneEngine'), import('../furnace-dispatch/FurnaceDispatchSynth'), import('../audio/VoiceAllocator')]);
+}, 600_000);
+
 interface Played { note: string; chan: number }
 
 async function spam(chipChannels: number, presses: number, gapMs: number, previewChannel?: number, direct = false): Promise<Played[]> {
-  const { ToneEngine } = await import('../ToneEngine');
-  const { FurnaceDispatchSynth } = await import('../furnace-dispatch/FurnaceDispatchSynth');
-  const { VoiceAllocator } = await import('../audio/VoiceAllocator');
+  const [{ ToneEngine }, { FurnaceDispatchSynth }, { VoiceAllocator }] = mods;
 
   const played: Played[] = [];
   const synth = Object.create(FurnaceDispatchSynth.prototype) as InstanceType<typeof FurnaceDispatchSynth> & { chan: number };
