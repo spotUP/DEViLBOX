@@ -7,12 +7,70 @@
 import type { InstrumentPreset } from '@typedefs/instrument';
 import { FurnaceChipType } from '../engine/chips/FurnaceChipEngine';
 import { op, disabledOp } from './furnacePresets';
+import { neoGeoPresets } from './neoGeoPresetBank';
 
 const noMacros = { macros: [] as never[], opMacros: [] as never[], wavetables: [] as never[] };
 const twoOp = (mod: Parameters<typeof op>[0], car: Parameters<typeof op>[0]) => ({
   ops: 2, operators: [op(mod), op(car), disabledOp(), disabledOp()], ...noMacros,
 });
 
+type OpOverrides = Parameters<typeof op>[0];
+/** Four-operator FM patch (YM2203 / YM2608 / YM2610 family: 4 operators, 3-bit algorithm and feedback). */
+const fourOp = (algorithm: number, feedback: number, o: [OpOverrides, OpOverrides, OpOverrides, OpOverrides]) => ({
+  algorithm, feedback, ops: 4, operators: o.map((x) => op(x)), ...noMacros,
+});
+
+/** Neo Geo / OPN-family voices: ranges tl 0-127, ar/dr/d2r 0-31, sl/rr 0-15, mult 0-15, dt -3..3. */
+const OPN_VOICES = {
+  lead: fourOp(4, 6, [
+    { mult: 1, tl: 22, ar: 31, dr: 6, sl: 2, rr: 6 },
+    { mult: 1, tl: 4, ar: 31, dr: 5, sl: 3, rr: 7 },
+    { mult: 2, tl: 30, ar: 31, dr: 8, sl: 3, rr: 7, dt: 2 },
+    { mult: 1, tl: 2, ar: 31, dr: 6, sl: 2, rr: 8, dt: -1, am: true },
+  ]),
+  bass: fourOp(0, 5, [
+    { mult: 1, tl: 28, ar: 31, dr: 12, sl: 4, rr: 8 },
+    { mult: 1, tl: 34, ar: 31, dr: 14, sl: 5, rr: 8 },
+    { mult: 1, tl: 20, ar: 31, dr: 10, sl: 3, rr: 8 },
+    { mult: 1, tl: 0, ar: 31, dr: 8, sl: 3, rr: 9, d2r: 2 },
+  ]),
+  chord: fourOp(2, 3, [
+    { mult: 1, tl: 36, ar: 24, dr: 4, sl: 3, rr: 5, dt: 1 },
+    { mult: 2, tl: 40, ar: 22, dr: 5, sl: 4, rr: 5, dt: -2 },
+    { mult: 1, tl: 18, ar: 26, dr: 3, sl: 2, rr: 6, dt: 3 },
+    { mult: 1, tl: 6, ar: 20, dr: 3, sl: 2, rr: 6, dt: -1 },
+  ]),
+  arp: fourOp(5, 2, [
+    { mult: 3, tl: 26, ar: 31, dr: 18, sl: 8, rr: 10 },
+    { mult: 1, tl: 10, ar: 31, dr: 16, sl: 7, rr: 10, dt: 1 },
+    { mult: 2, tl: 14, ar: 31, dr: 16, sl: 7, rr: 10, dt: -1 },
+    { mult: 1, tl: 8, ar: 31, dr: 15, sl: 6, rr: 11 },
+  ]),
+  pad: fourOp(7, 4, [
+    { mult: 1, tl: 22, ar: 14, dr: 2, sl: 1, rr: 4, dt: 2 },
+    { mult: 2, tl: 26, ar: 12, dr: 2, sl: 1, rr: 4, dt: -2 },
+    { mult: 1, tl: 24, ar: 13, dr: 3, sl: 2, rr: 4, dt: 1 },
+    { mult: 4, tl: 30, ar: 12, dr: 3, sl: 2, rr: 5, dt: -3 },
+  ]),
+  pluck: fourOp(3, 4, [
+    { mult: 2, tl: 30, ar: 31, dr: 20, sl: 10, rr: 12 },
+    { mult: 1, tl: 20, ar: 31, dr: 18, sl: 9, rr: 12 },
+    { mult: 5, tl: 38, ar: 31, dr: 22, sl: 12, rr: 13, dt: 1 },
+    { mult: 1, tl: 0, ar: 31, dr: 16, sl: 8, rr: 11 },
+  ]),
+  bell: fourOp(4, 1, [
+    { mult: 7, tl: 36, ar: 31, dr: 14, sl: 9, rr: 9 },
+    { mult: 1, tl: 8, ar: 31, dr: 12, sl: 8, rr: 8 },
+    { mult: 14, tl: 44, ar: 31, dr: 16, sl: 11, rr: 9, dt: 3 },
+    { mult: 3, tl: 12, ar: 31, dr: 13, sl: 9, rr: 8, dt: -3 },
+  ]),
+  brass: fourOp(6, 5, [
+    { mult: 1, tl: 18, ar: 20, dr: 4, sl: 2, rr: 6 },
+    { mult: 1, tl: 10, ar: 22, dr: 5, sl: 3, rr: 7 },
+    { mult: 1, tl: 12, ar: 22, dr: 5, sl: 3, rr: 7, dt: 1, vib: true },
+    { mult: 2, tl: 14, ar: 24, dr: 6, sl: 3, rr: 7, dt: -1 },
+  ]),
+};
 export const FURNACE_CHIP_PRESETS: InstrumentPreset['config'][] = [
   // === NES (2A03) ===
   {
@@ -725,7 +783,7 @@ export const FURNACE_CHIP_PRESETS: InstrumentPreset['config'][] = [
     volume: -8,
     pan: 0,
     effects: [],
-    furnace: { chipType: FurnaceChipType.OPN, algorithm: 4, feedback: 5 }
+    furnace: { chipType: FurnaceChipType.OPN, ...OPN_VOICES.bass }
   },
   {
     name: 'YM2608 FM Strings',
@@ -734,17 +792,10 @@ export const FURNACE_CHIP_PRESETS: InstrumentPreset['config'][] = [
     volume: -10,
     pan: 0,
     effects: [],
-    furnace: { chipType: FurnaceChipType.OPNA, algorithm: 5, feedback: 3 }
+    furnace: { chipType: FurnaceChipType.OPNA, ...OPN_VOICES.pad }
   },
-  {
-    name: 'YM2610 FM Lead',
-    type: 'synth',
-    synthType: 'FurnaceOPNB',
-    volume: -8,
-    pan: 0,
-    effects: [],
-    furnace: { chipType: FurnaceChipType.OPNB, algorithm: 4, feedback: 6 }
-  },
+  ...neoGeoPresets('YM2610', 'FurnaceOPNB', FurnaceChipType.OPNB),
+  ...neoGeoPresets('YM2610B', 'FurnaceOPNBB', FurnaceChipType.OPNB_B),
   {
     name: 'YMF278B FM Piano',
     type: 'synth',
