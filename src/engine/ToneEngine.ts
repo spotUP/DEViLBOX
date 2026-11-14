@@ -3421,8 +3421,11 @@ export class ToneEngine {
           instrument.setChannelIndex(chipChannelFor(channelIndex, maxCh, config.furnace));
         }
         // Set chip channel on FurnaceDispatchSynth (for C64/GB/NES multi-channel tracker playback)
-        if (instrument instanceof FurnaceDispatchSynth && channelIndex !== undefined) {
-          instrument.setSongChannel(channelIndex, config.furnace);
+        // A note with no song channel (instrument list click, pad, MCP trigger_note, mono keyboard)
+        // is a live note too: without this it stayed on the synth's stand-alone chip, whose level
+        // differs from the song chip (Genesis FM 3x louder than the YM2610 FM, AY quieter).
+        if (instrument instanceof FurnaceDispatchSynth) {
+          instrument.setSongChannel(channelIndex ?? LIVE_VOICE_BASE_CHANNEL, config.furnace);
         }
         // Standard synths - apply slide/accent for 303-style effects
         const targetFreq = cachedFrequency(note);

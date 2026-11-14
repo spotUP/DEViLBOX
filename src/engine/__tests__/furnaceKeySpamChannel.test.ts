@@ -23,7 +23,7 @@ afterEach(() => { vi.useRealTimers(); });
 
 interface Played { note: string; chan: number }
 
-async function spam(chipChannels: number, presses: number, gapMs: number, previewChannel?: number): Promise<Played[]> {
+async function spam(chipChannels: number, presses: number, gapMs: number, previewChannel?: number, direct = false): Promise<Played[]> {
   const { ToneEngine } = await import('../ToneEngine');
   const { FurnaceDispatchSynth } = await import('../furnace-dispatch/FurnaceDispatchSynth');
   const { VoiceAllocator } = await import('../audio/VoiceAllocator');
@@ -33,6 +33,8 @@ async function spam(chipChannels: number, presses: number, gapMs: number, previe
   synth.chan = 0;
   Object.assign(synth, {
     getNumChannels: () => chipChannels,
+    // setSongChannel asks the dispatch engine which chips run; here only the synth's own chip does
+    engine: { hasChip: () => false, chipSpansOf: () => [], getChannelCount: () => chipChannels },
     setChannel: (c: number) => { synth.chan = c; },
     triggerAttack: (note: string) => { played.push({ note, chan: synth.chan }); },
     triggerRelease: () => {},
@@ -62,7 +64,9 @@ async function spam(chipChannels: number, presses: number, gapMs: number, previe
 
   vi.useFakeTimers();
   for (let i = 0; i < presses; i++) {
-    engine.triggerPolyNoteAttack(1, 'C4', 1, config);   // as useNoteInput's keydown with polyphony on
+    // direct: a note with no song channel (instrument list click, MCP trigger_note, mono keyboard)
+    if (direct) engine.triggerNoteAttack(1, 'C4', 0, 1, config);
+    else engine.triggerPolyNoteAttack(1, 'C4', 1, config);   // as useNoteInput's keydown with polyphony on
     vi.advanceTimersByTime(gapMs / 2);
     engine.triggerPolyNoteRelease(1, 'C4', config);     // keyup
     vi.advanceTimersByTime(gapMs / 2);
@@ -80,6 +84,13 @@ describe('spamming one key on a Furnace chip instrument', () => {
   it('a live note plays on the instrument\'s preview channel (a DefleMask DAC instrument on the YM2612\'s sixth channel)', async () => {
     const played = await spam(6, 10, 30, 5);
     expect(new Set(played.map((p) => p.chan))).toEqual(new Set([5]));
+  }, 60_000);
+
+  // arena.fur (YM2610, 2026-11-14): such a note skipped setSongChannel and stayed on the synth's stand-alone
+  // chip (FM on a Genesis, SSG on an AY-3-8910), so FM and SSG had a different balance than in the song.
+  it('a note with no song channel is routed as a live note too (preview channel, song chip)', async () => {
+    const played = await spam(6, 3, 30, 5, true);
+    expect(played.map((p) => p.chan)).toEqual([5, 5, 5]);
   }, 60_000);
 
   it('tracker channels still map onto the chip channels; live slots and a bad preview channel fall back to channel 0', () => {
