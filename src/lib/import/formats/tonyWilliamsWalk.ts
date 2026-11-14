@@ -90,7 +90,10 @@ export function twSongInfo(b: Uint8Array, song: number): TwSongInfo | null {
   if (songs < 1 || songs > 32 || song >= songs) return null;
   const lists: number[] = [];
   for (let v = 0; v < TW_VOICES; v++) {
-    const off = base + u16(b, base + song * 10 + v * 2);
+    const rel = u16(b, base + song * 10 + v * 2);
+    // sound-effect build (blinkys): an unused voice has a 0 list offset; -1 marks it empty
+    if (rel === 0 && v > 0) { lists.push(-1); continue; }
+    const off = base + rel;
     if (off + 4 > b.length) return null;
     lists.push(off);
   }
@@ -125,10 +128,15 @@ export function walkTonyWilliams(input: ArrayBuffer | Uint8Array, song = 0): TwW
   let ticks = 0;
   for (let ch = 0; ch < TW_VOICES; ch++) {
     const entries: number[] = [];
-    for (let p = info.lists[ch] ?? 0, n = 0; p + 2 <= b.length && n < 4096; p += 2, n++) {
+    const listAt = info.lists[ch] ?? -1;
+    for (let p = listAt, n = 0; listAt >= 0 && p + 2 <= b.length && n < 4096; p += 2, n++) {
       const w = u16(b, p);
       if (w === 0 && n > 0) break;
       entries.push(info.base + w);
+      // sound-effect build: a block ending in song end / stop is the last one; the words after it are not a list
+      const last = readTwBlock(b, info.base + w);
+      const end = last?.[last.length - 1]?.op;
+      if (end === 0x83 || end === 0x94) break;
     }
     voiceBlocks.push(entries);
     let tick = 0;
