@@ -5282,32 +5282,6 @@ export class ToneEngine {
   }
 
   /**
-   * Apply an extended effect (Exy format) to a Furnace instrument.
-   * @param instrumentId The instrument ID
-   * @param x Effect subtype (0x0-0xF)
-   * @param y Effect value (0x0-0xF)
-   * @param channel Optional channel (defaults to 0)
-   * @returns true if effect was applied
-   */
-  public applyFurnaceExtendedEffect(instrumentId: number, x: number, y: number, channel: number = 0): boolean {
-    const synthType = this.instrumentSynthTypes.get(this.getInstrumentKey(instrumentId, -1));
-    if (!synthType || !synthType.startsWith('Furnace')) {
-      return false;
-    }
-
-    for (const [key, instrument] of this.instruments) {
-      if (this.instrumentIdFromKey(key) !== instrumentId) continue;
-
-      if (instrument instanceof FurnaceDispatchSynth) {
-        instrument.applyExtendedEffect(x, y, channel);
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  /**
    * Apply effect to FurnaceSynth (register-based).
    * Translates effects to register writes based on chip type.
    * Effect codes match FurnaceEffectRouter mappings.
