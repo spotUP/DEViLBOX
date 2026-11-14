@@ -1,8 +1,8 @@
 /**
  * Gumbirds - title theme (Neo Geo MVS, YM2610 extended FM, nullsound via furtool).
  * F major, speed 7 at 60 Hz (about 129 BPM), 16 rows per bar, 32-row patterns (2 bars).
- * Orders: 0 intro (drums + bass), 1-4 hook A, 5-8 answer B, 9-12 hook A + counter-melody, 13-16 bridge,
- * then 0B01 back to hook A.
+ * Orders: 0 intro (drums + bass), 1-4 hook A, 5-6 answer B (first and last pattern), 7-10 hook A + counter-melody,
+ * then 0B01 back to hook A. About 41 s.
  */
 import { readFileSync } from 'node:fs';
 import { DEFAULT_FURNACE } from '@/types/instrument/defaults';
@@ -54,10 +54,10 @@ export default function gumbirdsTitle(repoRoot: string): NeoGeoSongBuilder {
   // FM 2 split into 4 operator channels: one alg 7 patch (all carriers). OP1 has the feedback: the lead's echo.
   // OP2-OP4 play the chord stabs: quick decay, small spread of detune between them for width.
   const EXT = s.addInstrument('Echo + stab (FM 2 ops)', fm(7, 4, {
-    op1: { mult: 1, tl: 18, ar: 31, dr: 8, d2r: 3, sl: 4, rr: 7, dt: 3 },
-    op2: { mult: 2, tl: 16, ar: 31, dr: 14, d2r: 9, sl: 8, rr: 10, dt: 4 },
-    op3: { mult: 2, tl: 16, ar: 31, dr: 14, d2r: 9, sl: 8, rr: 10, dt: 2 },
-    op4: { mult: 2, tl: 16, ar: 31, dr: 14, d2r: 9, sl: 8, rr: 10, dt: 3 },
+    op1: { mult: 1, tl: 4, ar: 31, dr: 8, d2r: 3, sl: 4, rr: 7, dt: 3 },
+    op2: { mult: 2, tl: 8, ar: 31, dr: 14, d2r: 6, sl: 5, rr: 10, dt: 4 },
+    op3: { mult: 2, tl: 8, ar: 31, dr: 14, d2r: 6, sl: 5, rr: 10, dt: 2 },
+    op4: { mult: 2, tl: 8, ar: 31, dr: 14, d2r: 6, sl: 5, rr: 10, dt: 3 },
   }));
   // Bells (alg 4): mult 14 and mult 3 modulators over mult 2 / mult 1 carriers = glassy bell with a long ring.
   const BELL = s.addInstrument('Candy bell', fm(4, 0, {
@@ -73,22 +73,13 @@ export default function gumbirdsTitle(repoRoot: string): NeoGeoSongBuilder {
     op3: { mult: 1, tl: 46, ar: 20, dr: 6, d2r: 2, sl: 4, rr: 6, dt: 2 },
     op4: { mult: 1, tl: 14, ar: 26, dr: 4, d2r: 1, sl: 2, rr: 6, dt: 2 },
   }));
-  // Swell pad (alg 4) for the bridge: slow carrier attack; SSG-EG on both modulators (mode 14 = up/down
-  // triangle, mode 10 = down/up) makes the brightness breathe while the chord holds.
-  const PAD = s.addInstrument('SSG-EG swell pad', fm(4, 2, {
-    op1: { mult: 1, tl: 30, ar: 18, dr: 12, d2r: 0, sl: 6, rr: 5, dt: 4, ssg: 8 + 6 },
-    op2: { mult: 1, tl: 10, ar: 11, dr: 2, d2r: 0, sl: 1, rr: 5, dt: 3 },
-    op3: { mult: 2, tl: 36, ar: 16, dr: 10, d2r: 0, sl: 7, rr: 5, dt: 2, ssg: 8 + 2 },
-    op4: { mult: 1, tl: 12, ar: 10, dr: 2, d2r: 0, sl: 1, rr: 5, dt: 4 },
-  }));
-
   // SSG. One loop point per instrument (furtool keeps one for all macros of an instrument).
   const arpMacro = (third: number, top: number) => {
     const cycle = [0, 0, third, third, 7, 7, top, top];
     return [
       // Pluck decay over 16 ticks, then a soft tail; the loop sits on the tail so the arp keeps cycling.
-      // Starts at 9, two AY steps (about 6 dB) under the lead: the arp is a bed, not a second melody.
-      seqMacro(0, [9, 8, 7, 7, 6, 6, 5, 5, 5, 4, 4, 4, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2], 16),
+      // Starts at 15 and rests on 11 (1st fix 13 -> 7 measured 8.7 dB under the lead): the old 9 -> 2 curve with note volume 12 was inaudible (rmsAvg 0.0009 soloed).
+      seqMacro(0, [15, 15, 14, 14, 13, 13, 12, 12, 12, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11], 16),
       seqMacro(1, [...cycle, ...cycle, ...cycle], 16),
     ];
   };
@@ -108,13 +99,6 @@ export default function gumbirdsTitle(repoRoot: string): NeoGeoSongBuilder {
     seqMacro(0, [15, 14, 12, 10, 9, 7, 6, 4, 3, 2, 1, 0]),
     seqMacro(1, [12, 5, 0]),
     seqMacro(3, [3, 3, 2]),
-  ]));
-  // Buzz bass: SSG hardware envelope as the oscillator (wave = envelope only, shape 10 = repeating triangle),
-  // envelope period locked to the note pitch (num/den 1/1). The triangle cycle is twice the saw cycle, so it
-  // sounds an octave under the written note and softer than the saw. Envelope mode ignores the volume
-  // register, so the level is fixed at full: the notes are gated short instead.
-  const BUZZ = s.addInstrument('SSG envelope buzz', ssg([
-    seqMacro(0, [15]), seqMacro(3, [4]), seqMacro(6, [10]), seqMacro(7, [1]), seqMacro(8, [1]),
   ]));
   // Kick: 0.18 s of a TR-style kick, resampled to 18.5 kHz, 30 ms fade at the end.
   const wav = readWavPcm16(readFileSync(`${repoRoot}/public/data/samples/packs/drumnibus/kicks/BD_Romkick1.wav`));
@@ -191,8 +175,8 @@ export default function gumbirdsTitle(repoRoot: string): NeoGeoSongBuilder {
   }
 
   function arps(p: NeoGeoPattern, o: number, ch: Chord) {
-    p.put(NEO.SSG1, o, { note: ch.arpNote, ins: ch.arp, vol: 12 });
-    p.put(NEO.SSG1, o + 8, { note: ch.arpNote, ins: ch.arp, vol: 12 });
+    p.put(NEO.SSG1, o, { note: ch.arpNote, ins: ch.arp });
+    p.put(NEO.SSG1, o + 8, { note: ch.arpNote, ins: ch.arp });
   }
 
   // Lead line: [row, note, fx?]. The OP1 echo copies it 2 rows later, quieter, a touch delayed.
@@ -246,17 +230,6 @@ export default function gumbirdsTitle(repoRoot: string): NeoGeoSongBuilder {
     [[0, 'Bb4'], [6, 'D-5'], [8, 'E-5'], [12, 'G-5']],
     [[0, 'A-5', [[0x03, 0x30]]], [4, 'A-5', [vib]], [12, 'A-5', [[0xe2, 0x35], [0x04, 0]]], [15, 'OFF']],
   ];
-  const bridgeLead: Line[] = [
-    [[0, 'D-5'], [6, 'F-5'], [8, 'Bb5'], [10, 'Bb5', [vib]], [14, 'A-5', [[0x04, 0]]]],
-    [[0, 'G-5'], [6, 'E-5'], [8, 'C-5'], [12, 'E-5'], [14, 'G-5']],
-    [[0, 'A-5'], [4, 'A-5', [vib]], [8, 'C-6', [[0x04, 0]]], [12, 'A-5'], [14, 'G-5']],
-    [[0, 'F-5'], [8, 'E-5'], [10, 'D-5'], [12, 'E-5'], [14, 'F-5']],
-    [[0, 'G-5'], [3, 'Bb5'], [6, 'D-6', [[0x12, 20]]], [8, 'C-6', [[0x12, 30]]], [12, 'Bb5'], [14, 'A-5']],
-    [[0, 'Bb5'], [4, 'Bb5', [vib]], [8, 'A-5', [[0x04, 0]]], [10, 'G-5'], [12, 'F-5'], [14, 'D-5']],
-    [[0, 'E-5'], [3, 'G-5'], [6, 'C-6'], [8, 'E-6', [[0x12, 20]]], [12, 'D-6', [[0x12, 30]]], [14, 'E-6']],
-    [[0, 'G-5', [[0x03, 0x30]]], [4, 'G-5', [vib]], [8, 'E-5', [[0x04, 0]]], [10, 'F-5'], [12, 'G-5'], [14, 'Bb5', [[0xe1, 0x22]]]],
-  ];
-
   // ---- Patterns ----------------------------------------------------------------------------
   const order: NeoGeoPattern[] = [];
 
@@ -288,7 +261,7 @@ export default function gumbirdsTitle(repoRoot: string): NeoGeoSongBuilder {
         stabs(p, o, bar === 6 ? C.Gm : ch, [6], bar === 3 || bar === 7);
         stabs(p, o, bar === 6 ? C.C7 : ch, [14], bar === 3 || bar === 7);
         arps(p, o, bar === 6 ? C.Gm : ch);
-        if (bar === 6) p.put(NEO.SSG1, o + 8, { note: C.C7.arpNote, ins: C.C7.arp, vol: 12 });
+        if (bar === 6) p.put(NEO.SSG1, o + 8, { note: C.C7.arpNote, ins: C.C7.arp });
         lead(p, o, hookLines[bar], !withCounter || bar % 2 === 0);
         if (withCounter) {
           for (const [r, n, fx] of counter[bar]) p.put(NEO.FM4, o + r, { note: n, ins: HORN, vol: 95, fx: fx ?? [] });
@@ -296,7 +269,7 @@ export default function gumbirdsTitle(repoRoot: string): NeoGeoSongBuilder {
           bellAnswer(p, o);
         }
       }
-      // Seam cleanup at the start of every hook A pass: stop bridge pad / buzz carried over the loop jump.
+      // Seam cleanup at the start of every hook A pass: stop notes carried over the loop jump.
       if (pi === 0) {
         if (!withCounter) p.put(NEO.FM4, 0, { note: 'OFF' });
         p.put(NEO.B, 0, { fx: [[0x08, 0xff]] });
@@ -305,7 +278,7 @@ export default function gumbirdsTitle(repoRoot: string): NeoGeoSongBuilder {
       if (pi === 3 && !withCounter) {
         // Answer B goes between the two hook passes.
         const bChords = [C.Dm, C.Bb, C.F, C.C, C.Dm, C.Bb, C.Gm, C.C7];
-        for (let bi = 0; bi < 4; bi++) {
+        for (const bi of [0, 3]) { // answer B cut to its first and last pattern (song length ~41 s)
           const q = s.pattern();
           for (let b = 0; b < 2; b++) {
             const bar = bi * 2 + b, o = b * 16, ch = bChords[bar];
@@ -328,49 +301,7 @@ export default function gumbirdsTitle(repoRoot: string): NeoGeoSongBuilder {
     }
   }
 
-  // Bridge: SSG-EG pad swells on FM 4, SSG envelope buzz bass, half-time slap bass, lighter drums, then the
-  // last 2 bars build back to the hook.
-  // The last build bar is C7 (lead Bb5): the dominant pulls back into the F hook.
-  const bridgeChords = [C.Bb, C.C, C.Am, C.Dm, C.Gm, C.Bb, C.C, C.C7];
-  const padNotes = ['D-4', 'E-4', 'C-4', 'F-4', 'D-4', 'F-4', 'G-4', 'E-4'];
-  for (let pi = 0; pi < 4; pi++) {
-    const p = s.pattern();
-    for (let b = 0; b < 2; b++) {
-      const bar = pi * 2 + b, o = b * 16, ch = bridgeChords[bar];
-      const build = bar >= 6;
-      bass(p, o, ch, !build, bar === 7);
-      // Pad: swell in with a volume slide each bar, centred; FM4 pan reset at the first bar.
-      p.put(NEO.FM4, o, { note: padNotes[bar], ins: PAD, vol: 62, fx: bar === 0 ? [[0x0a, 0x30], [0x08, 0xff]] : [[0x0a, 0x30]] });
-      p.put(NEO.FM4, o + 12, { fx: [[0x0a, 0x00]] });
-      // Arps keep running on SSG 1 through the bridge.
-      arps(p, o, ch);
-      // Buzz bass on SSG 2 an octave over the slap bass, with portamento into each new chord; the
-      // build bars give SSG 2 back to the hats.
-      if (!build) {
-        const buzzRoot = up(ch.root, 12);
-        p.put(NEO.SSG2, o, { note: buzzRoot, ins: BUZZ, fx: bar > 0 ? [[0x03, 0x60]] : [] });
-        p.put(NEO.SSG2, o + 4, { note: 'OFF' });
-        p.put(NEO.SSG2, o + 6, { note: buzzRoot, ins: BUZZ });
-        p.put(NEO.SSG2, o + 8, { note: buzzRoot + 7, ins: BUZZ });
-        p.put(NEO.SSG2, o + 10, { note: 'OFF' });
-        p.put(NEO.SSG2, o + 12, { note: buzzRoot + 12, ins: BUZZ, fx: [[0xec, 3]] });
-      }
-      // Sustained chord on the operators: soft and low under the lead.
-      ch.stab.forEach((n, i) => p.put(NEO.OP2 + i, o, { note: n, ins: EXT, vol: 119, fx: i === 2 ? [[0xed, 2]] : [] }));
-      ch.stab.forEach((n, i) => p.put(NEO.OP2 + i, o + 10, { note: n, ins: EXT, vol: 103, fx: [[0xed, i]] }));
-      if (build) drums(p, o, { sixteenths: true, fill: bar === 7, push: true });
-      else {
-        p.put(NEO.B, o, { note: 'C-4', ins: KICK });
-        p.put(NEO.B, o + 10, { note: 'C-4', ins: KICK, fx: [[0x08, 0xf0]] });
-        p.put(NEO.B, o + 11, { note: 'C-4', ins: KICK, fx: [[0x08, 0x0f]] });
-        p.put(NEO.B, o + 12, { fx: [[0x08, 0xff]] });
-        p.put(NEO.SSG3, o + 8, { note: 'A-4', ins: SNARE });
-      }
-      lead(p, o, bridgeLead[bar], true, bar >= 6 ? 111 : 95);
-    }
-    order.push(p);
-  }
-  // Seam: the bridge ends on the snare fill; arps and pad stop on the jump row, then back to hook A.
+  // Seam: the second hook pass ends on the snare fill; arps stop on the jump row, then back to hook A.
   const last = order[order.length - 1];
   last.put(NEO.SSG1, 31, { note: 'OFF' });
   last.put(NEO.FM4, 31, { note: 'OFF' });
