@@ -89,7 +89,8 @@ const FILE: Record<string, string> = {
   fred: files.find((f) => f.endsWith('.fred')) ?? '',
   actionamics: files.find((f) => f.endsWith('.ast') || f.endsWith('.act')) ?? '',
   soundMaster: files.find((f) => f.endsWith('.sm')) ?? '',
-  digitalSonixChrome: files.find((f) => f.endsWith('.dsc')) ?? '',
+  // the first .dsc by name is an sfx bank (dbfx) whose one played block holds no note with a same-sample sibling record
+  digitalSonixChrome: "digital-sonix-and-chrome/David Hanlon/dragon'sbreath ingame 1.dsc",
   jochenHippel7V: files.find((f) => f.endsWith('.hip7') || f.endsWith('.hip')) ?? '',
   sidmon1: files.find((f) => f.endsWith('.sid1')) ?? '',
   sonicArranger: files.find((f) => f.endsWith('.sa')) ?? '',
@@ -100,6 +101,9 @@ const FILE: Record<string, string> = {
   artOfNoise: 'art-of-noise/inside.blipp.aon',
   // the `digi.` prefix match finds an Ad Lib capture (digi.rad) that no content detector rejects
   digi: 'digibooster/the day after.digi',
+  // neither name matches the registry (rjp./.rj, wb. prefix): the corpus holds cannon fodder.sng and wicked.wb
+  richardJoseph: 'richard-joseph/cannon fodder (intro).sng',
+  wallyBeben: 'wally-beben/wicked.wb',
 };
 /** Formats UADE plays from the module bytes: the Paula stream is the sound. */
 const PAULA = new Set(['suntronic', 'robHubbard', 'davidWhittaker', 'benDaglish', 'jochenHippelST', 'activisionPro', 'fred', 'actionamics', 'soundMaster', 'digitalSonixChrome', 'sidmon1']);
@@ -245,7 +249,7 @@ describe('an edit in the grid is heard on the next play', { timeout: 180000 }, (
 
       // The edit: the store action a keystroke calls.
       const at = key === 'digitalSonixChrome'
-        ? await pickDscNote({ patterns: useTrackerStore.getState().patterns as never }, bytes)
+        ? await pickDscNote({ songPositions: useTrackerStore.getState().patternOrder, patterns: useTrackerStore.getState().patterns as never }, bytes)
         : await pickNote();
       expect(at, 'the song has a note to edit').not.toBeNull();
       const st = useTrackerStore.getState();
@@ -379,7 +383,9 @@ describe('the live-edit table is complete', () => {
 // jochenHippelST left this list with a627f3cca: the registry starts the native HippelSt engine for it, the edit goes to
 // its worklet ('hippelst-module'), and UADE's Paula stream never sees it. Its live-while-playing measurement belongs to
 // the native engine (open item 1 of thoughts/shared/plans/2026-10-08-hippel-st-native.md, hippelStLiveEditHeard).
-const LIVE_UADE = ['robHubbard', 'suntronic', 'soundMaster', 'digitalSonixChrome', 'tcbTracker'];
+// digitalSonixChrome left this list too: the registry plays it on the native Nuade engine (liveSwap, 'engine-swap'), the edit
+// goes to that worklet and UADE's Paula stream never sees it. Its live-while-playing measurement belongs to the nuade engine.
+const LIVE_UADE = ['robHubbard', 'suntronic', 'soundMaster', 'tcbTracker'];
 
 interface LiveMeasured { status: LiveEditStatus; detail: string }
 export const liveMeasured: Record<string, LiveMeasured> = {};
@@ -449,7 +455,7 @@ describe('an edit in the grid is heard while the song plays (G24)', { timeout: 3
       for (let k = 0; k < 24 && !measuredRow; k++) {
         const { bytes, name } = await load(rel);
         const nm = (UADE_NAME[key] ?? ((n: string) => n))(name);
-        const at = key === 'digitalSonixChrome' ? await pickDscNote({ patterns: useTrackerStore.getState().patterns as never }, bytes) : await pickAheadNote(k);
+        const at = key === 'digitalSonixChrome' ? await pickDscNote({ songPositions: useTrackerStore.getState().patternOrder, patterns: useTrackerStore.getState().patterns as never }, bytes, k) : await pickAheadNote(k);
         expect(at, 'the song has a note to edit').not.toBeNull();
         const was = await streamWithWrite(bytes, nm, W, 8, async () => undefined);
         expect(was.events.length, 'the replayer ran (sentinel)').toBeGreaterThan(0);
