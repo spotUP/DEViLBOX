@@ -48,11 +48,10 @@ async function parseShared(song: ShareSong): Promise<MergeSong> {
     const applied = savedSongToApply(JSON.parse(decompressProject(copy)));
     return { patterns: applied.patterns, order: applied.order, instruments: applied.instruments };
   }
-  const { parseModuleToSong } = await import('@/lib/import/parseModuleToSong');
-  const { UADEEngine } = await import('@engine/uade/UADEEngine');
+  // The deck target parses on the deck's own UADE engine and applies nothing to the editor.
+  const { openDeckTrack } = await import('@/lib/song/openSong');
   const companions = new Map(song.companions.map((c) => [c.name, c.bytes.slice().buffer as ArrayBuffer]));
-  const file = new File([song.bytes.slice().buffer as ArrayBuffer], song.name);
-  const parsed = await parseModuleToSong(file, 0, undefined, undefined, companions, UADEEngine.getDeckInstance());
+  const { song: parsed } = await openDeckTrack({ kind: 'bytes', name: song.name, bytes: song.bytes.slice().buffer as ArrayBuffer, companions });
   return { patterns: parsed.patterns, order: parsed.songPositions, instruments: parsed.instruments };
 }
 
