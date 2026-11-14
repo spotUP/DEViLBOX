@@ -2112,7 +2112,7 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       initialSongPos: number;
       initialPattPos: number;
       /** The sequencer stopped by itself (FF stop song, or the last loop played). */
-      onEnded: () => void;
+      onEnded?: () => void;
       /**
        * INS2 blobs by sequencer slot, for a song whose native data was derived at Play (a composed
        * song): its store instruments are not the module's, so the slots come from the derivation.
@@ -2266,8 +2266,11 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       });
       cleanups.push(seqPositionUnsub);
       // FF (stop song) stops the WASM sequencer; the transport follows, as in Furnace.
-      this._seqEndedCallbacks.add(opts.onEnded);
-      cleanups.push(() => { this._seqEndedCallbacks.delete(opts.onEnded); });
+      const onEnded = opts.onEnded;
+      if (onEnded) {
+        this._seqEndedCallbacks.add(onEnded);
+        cleanups.push(() => { this._seqEndedCallbacks.delete(onEnded); });
+      }
 
       // ── 8. Command log → automation capture ───────────────────────────
       this.enableCmdLog(true);
