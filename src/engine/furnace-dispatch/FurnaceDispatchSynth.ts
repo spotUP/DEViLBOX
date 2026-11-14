@@ -1263,11 +1263,6 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     this.applyEffect(0x0C, Math.round(Math.max(0, Math.min(1, level)) * maxVolumeOfChannel(this.platformType, target)), chan);
   }
 
-  applyExtendedEffect(x: number, y: number, chan?: number): void {
-    if (!this._isReady || this._disposed) return;
-    this.engine.applyExtendedEffect(chan ?? this.currentChannel, x, y, this.chipKey);
-  }
-
   applyPlatformEffect(effect: number, param: number, chan?: number): void {
     if (!this._isReady || this._disposed) return;
     this.engine.applyPlatformEffect(chan ?? this.currentChannel, effect, param, this.chipKey);

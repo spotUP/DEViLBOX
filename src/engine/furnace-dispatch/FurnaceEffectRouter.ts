@@ -413,59 +413,10 @@ export class FurnaceEffectRouter {
 
       // Note: 0x0E is NOT used in Furnace (no MOD-style Exy sub-effects).
       // Effects like E1y, EAy etc. don't exist in Furnace's effect space.
-      // The routeExtendedEffect() method exists for explicit API callers only.
 
       // Platform-specific effects (0x10+)
       default:
         commands.push(...this.routePlatformEffect(this.platformType, chan, effect, param));
-        break;
-    }
-
-    return commands;
-  }
-
-  /**
-   * Route extended effects (Exy format)
-   */
-  routeExtendedEffect(platform: number, chan: number, x: number, y: number): DispatchCommand[] {
-    if (platform !== this.platformType) {
-      this.setPlatform(platform);
-    }
-    const commands: DispatchCommand[] = [];
-
-    switch (x) {
-      case 0x1: // E1y - Fine pitch slide up
-        commands.push({ cmd: DivCmd.PITCH, chan, val1: y, val2: 0 });
-        break;
-      case 0x2: // E2y - Fine pitch slide down
-        commands.push({ cmd: DivCmd.PITCH, chan, val1: -y, val2: 0 });
-        break;
-      case 0x3: // E3y - Glissando control
-        commands.push({ cmd: DivCmd.LEGATO, chan, val1: y, val2: 0 });
-        break;
-      case 0x4: // E4y - Vibrato waveform
-        commands.push({ cmd: DivCmd.HINT_VIBRATO_SHAPE, chan, val1: y, val2: 0 });
-        break;
-      case 0x5: // E5y - Set finetune
-        commands.push({ cmd: DivCmd.PITCH, chan, val1: y - 8, val2: 1 });
-        break;
-      case 0x9: // E9y - Retrigger note
-        commands.push({ cmd: DivCmd.NOTE_ON, chan, val1: -1, val2: y });
-        break;
-      case 0xA: // EAy - Fine volume slide up (no ×64 multiplier)
-        commands.push({ cmd: DivCmd.HINT_VOL_SLIDE, chan, val1: y, val2: 0 });
-        break;
-      case 0xB: // EBy - Fine volume slide down (no ×64 multiplier)
-        commands.push({ cmd: DivCmd.HINT_VOL_SLIDE, chan, val1: -y, val2: 0 });
-        break;
-      case 0xC: // ECy - Note cut after y ticks
-        commands.push({ cmd: DivCmd.NOTE_OFF, chan, val1: y, val2: 0 });
-        break;
-      case 0xD: // EDy - Note delay
-        commands.push({ cmd: DivCmd.PRE_NOTE, chan, val1: y, val2: 0 });
-        break;
-      case 0xF: // EFy - Set active macro
-        commands.push({ cmd: DivCmd.MACRO_ON, chan, val1: y, val2: 0 });
         break;
     }
 
