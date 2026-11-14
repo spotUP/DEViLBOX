@@ -30,7 +30,7 @@ const u32 = (b: Uint8Array, o: number): number => (u16(b, o) * 65536 + u16(b, o 
 const emptyCell = (): TrackerCell => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
 
 /** Find the next occurrence of a byte pattern (-1 is a wildcard) at or after `from`. */
-function scan(buf: Uint8Array, pat: number[], from = 0): number {
+function findBytes(buf: Uint8Array, pat: number[], from = 0): number {
   outer: for (let i = from; i + pat.length <= buf.length; i += 2) {
     for (let k = 0; k < pat.length; k++) if (pat[k] >= 0 && buf[i + k] !== pat[k]) continue outer;
     return i;
@@ -60,21 +60,21 @@ export function readBthParams(buf: Uint8Array): BthParams | string {
   const [a, b] = legacy ? [0x0a, 0x0e] : [0x04, 0x08];
   const lists: Array<{ track: number; loop: number }> = [];
   for (let at = 0; at >= 0 && lists.length < VOICES;) {
-    at = scan(buf, [0x21, 0x7c, -1, -1, -1, -1, 0x00, a, 0x21, 0x7c, -1, -1, -1, -1, 0x00, b], at);
+    at = findBytes(buf, [0x21, 0x7c, -1, -1, -1, -1, 0x00, a, 0x21, 0x7c, -1, -1, -1, -1, 0x00, b], at);
     if (at < 0) break;
     lists.push({ track: u32(buf, at + 2), loop: u32(buf, at + 10) });
     at += 16;
   }
   if (lists.length < VOICES) return `only ${lists.length} voice track lists found in the init routine`;
   if (legacy) {
-    const at = scan(buf, [0x45, 0xf9, -1, -1, -1, -1, 0xd0, 0xa8, -1, -1, 0x04, 0x80, -1, -1, -1, -1]);
+    const at = findBytes(buf, [0x45, 0xf9, -1, -1, -1, -1, 0xd0, 0xa8, -1, -1, 0x04, 0x80, -1, -1, -1, -1]);
     if (at < 0) return 'legacy note handler not found';
-    const scaled = scan(buf, [0xe4, 0x48, 0xc0, 0xfc, 0x00, 0x05]) >= 0;
+    const scaled = findBytes(buf, [0xe4, 0x48, 0xc0, 0xfc, 0x00, 0x05]) >= 0;
     return { legacy, tag, trackLists: lists, table: u32(buf, at + 2), origin: u32(buf, at + 12), bias: 0, tempo: 1, scaled };
   }
-  const at = scan(buf, [0x53, 0x40, 0xd0, 0x68, -1, -1, 0x06, 0x40, -1, -1, 0xe3, 0x48, 0x45, 0xf9, -1, -1, -1, -1]);
+  const at = findBytes(buf, [0x53, 0x40, 0xd0, 0x68, -1, -1, 0x06, 0x40, -1, -1, 0xe3, 0x48, 0x45, 0xf9, -1, -1, -1, -1]);
   if (at < 0) return 'note handler with a constant bias not found';
-  const mu = scan(buf, [0xc0, 0xfc, 0x00, -1]);
+  const mu = findBytes(buf, [0xc0, 0xfc, 0x00, -1]);
   if (mu < 0) return 'tempo multiply not found';
   return { legacy, tag, trackLists: lists, table: u32(buf, at + 14), origin: 1, bias: u16(buf, at + 8), tempo: buf[mu + 3], scaled: false };
 }

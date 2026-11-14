@@ -59,6 +59,6 @@ export const ALLOWED_CALLERS: readonly AllowedCaller[] = [
   { file: 'src/lib/export/moduleExportService.ts', fn: 'exportBakedMod', callee: 'exportSongToMOD', count: 1, why: EXPORT_SERVICE },
   { file: 'src/lib/export/audioExportService.ts', fn: 'exportAudio', callee: 'renderUADEToWav', count: 1, why: 'audio export owner: the explicit raw option' },
   { file: 'src/lib/export/audioExport.ts', fn: 'captureLiveSong', callee: 'captureAudioLiveToBuffer', count: 1, why: 'audio export owner: the live capture of the export tap' },
-  { file: 'src/lib/export/nativeExportRouter.ts', fn: 'dispatchNativeExport', callee: 'exportSongToMOD', count: 1, why: 'native export router owner: the MOD dispatch' },
+  { file: 'src/lib/export/nativeExportRouter.ts', fn: 'run', callee: 'exportSongToMOD', count: 1, why: 'native export router owner: the MOD dispatch' },
   { file: 'src/lib/export/MODExporter.ts', fn: 'exportAsMOD', callee: 'exportSongToMOD', count: 1, why: 'native export router owner: the Cinter4 export transforms the song before the MOD writer' },
 ];
