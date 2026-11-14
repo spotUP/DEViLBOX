@@ -407,7 +407,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       // Join the user's sample to the module list and point the instrument at it.
       const placed = placeUserSample(this.engine.getModuleSamples(), configFurnace.userSample);
       this.engine.setModuleSamples(placed.list);
-      this.engine.uploadModuleSamplesToPlatform(this.platformType, true);
+      for (const key of this.chipKeys()) this.engine.uploadModuleSamplesToPlatform(key, true);
       const amiga = configFurnace.amiga ?? { initSample: -1, useNoteMap: false, useSample: true, useWave: false, waveLen: 32, noteMap: [] };
       source = { ...configFurnace, amiga: { ...amiga, initSample: placed.index, useSample: true } };
     }
@@ -428,9 +428,9 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     // ADSR, filter, etc.) gets applied on the next note-on. Without this,
     // the Furnace dispatch sees the same instrument index and skips copying
     // the updated params to channel state — making all presets sound identical.
-    const numCh = this.engine.getChannelCount(this.platformType) || 3;
-    for (let ch = 0; ch < numCh; ch++) {
-      this.engine.setInstrument(ch, this.furnaceInstrumentIndex, this.platformType, true);
+    for (const key of this.chipKeys()) {
+      const numCh = this.engine.getChannelCount(key) || 3;
+      for (let ch = 0; ch < numCh; ch++) this.engine.setInstrument(ch, this.furnaceInstrumentIndex, key, true);
     }
   }
 
@@ -537,9 +537,14 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   }
 
   private setupDefaultInstrument(): void {
+    for (const key of this.chipKeys()) this.setupDefaultInstrumentOn(key);
+  }
+
+  /** The default setup on one chip (`key`): the channel commands go to that chip, the platform picks the patch. */
+  private setupDefaultInstrumentOn(key: number): void {
     const P = FurnaceDispatchPlatform;
     const pt = this.platformType;
-    const numCh = this.engine.getChannelCount(pt) || 4;
+    const numCh = this.engine.getChannelCount(key) || 4;
 
     // Upload module-level wavetables/samples from .fur file (if available)
     // These overwrite any test data loaded below, so upload FIRST to let
@@ -547,21 +552,21 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     const hasModuleWaves = this.engine.getModuleWavetables() !== null;
     const hasModuleSamples = this.engine.getModuleSamples() !== null;
     if (hasModuleWaves) {
-      this.engine.uploadModuleWavetablesToPlatform(pt);
+      this.engine.uploadModuleWavetablesToPlatform(key);
     }
     if (hasModuleSamples) {
-      this.engine.uploadModuleSamplesToPlatform(pt);
+      this.engine.uploadModuleSamplesToPlatform(key);
     }
 
     // Helper: dispatch with platformType
-    const disp = (cmd: number, ch: number, v1 = 0, v2 = 0) => this.engine.dispatch(cmd, ch, v1, v2, pt);
-    const setIns = (ch: number, ins: number) => this.engine.setInstrument(ch, ins, pt);
-    const setVol = (ch: number, vol: number) => this.engine.setVolume(ch, vol, pt);
+    const disp = (cmd: number, ch: number, v1 = 0, v2 = 0) => this.engine.dispatch(cmd, ch, v1, v2, key);
+    const setIns = (ch: number, ins: number) => this.engine.setInstrument(ch, ins, key);
+    const setVol = (ch: number, vol: number) => this.engine.setVolume(ch, vol, key);
 
     // Platform-specific setup
     switch (pt) {
       case P.GB:
-        this.setupDefaultGBInstrument();
+        this.setupDefaultGBInstrument(key);
         break;
 
       // === FM chips need a playable default instrument ===
@@ -577,10 +582,10 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       case P.YM2610_EXT:
       case P.YM2610B:
       case P.YM2610B_EXT:
-        this.setupDefaultFMInstrument(DIV_INS_FM);
+        this.setupDefaultFMInstrument(DIV_INS_FM, key);
         break;
       case P.ARCADE:
-        this.setupDefaultFMInstrument(DIV_INS_OPM);
+        this.setupDefaultFMInstrument(DIV_INS_OPM, key);
         break;
       case P.OPL:
       case P.OPL2:
@@ -591,24 +596,24 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       case P.Y8950_DRUMS:
       case P.OPL4:
       case P.OPL4_DRUMS:
-        this.setupDefaultFMInstrument(DIV_INS_OPL);
+        this.setupDefaultFMInstrument(DIV_INS_OPL, key);
         break;
       case P.OPLL:
       case P.OPLL_DRUMS:
       case P.VRC7:
-        this.setupDefaultOPLLInstrument();
+        this.setupDefaultOPLLInstrument(key);
         break;
       case P.OPZ:
-        this.setupDefaultFMInstrument(DIV_INS_OPZ);
+        this.setupDefaultFMInstrument(DIV_INS_OPZ, key);
         break;
       case P.ESFM:
-        this.setupDefaultFMInstrument(DIV_INS_ESFM);
+        this.setupDefaultFMInstrument(DIV_INS_ESFM, key);
         break;
 
       // === C64 SID needs waveform in instrument ===
       case P.C64_6581:
       case P.C64_8580:
-        this.setupDefaultC64Instrument();
+        this.setupDefaultC64Instrument(key);
         break;
 
       // === AY needs mixer register (reg 7) set to enable tone output ===
@@ -683,30 +688,30 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       case P.YMZ280B:
       case P.QSOUND:
       case P.MULTIPCM:
-        if (!hasModuleSamples) { this.loadTestSample8bit(); this.uploadSampleInstrument(); this.engine.renderSamples(pt); }
+        if (!hasModuleSamples) { this.loadTestSample8bit(); this.uploadSampleInstrument(); this.engine.renderSamples(key); }
         for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVolumeOfChannel(pt, ch)); }
         break;
       // === RF5C68 and GA20: standard signed 8-bit (WASM renderSamples converts) ===
       case P.RF5C68:
       case P.GA20:
-        if (!hasModuleSamples) { this.loadTestSample8bit(); this.uploadSampleInstrument(); this.engine.renderSamples(pt); }
+        if (!hasModuleSamples) { this.loadTestSample8bit(); this.uploadSampleInstrument(); this.engine.renderSamples(key); }
         for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVolumeOfChannel(pt, ch)); }
         break;
       // === VOX ADPCM chips ===
       case P.MSM6258:
       case P.MSM6295:
-        if (!hasModuleSamples) { this.loadTestSampleVOX(); this.uploadSampleInstrument(); this.engine.renderSamples(pt); }
+        if (!hasModuleSamples) { this.loadTestSampleVOX(); this.uploadSampleInstrument(); this.engine.renderSamples(key); }
         for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVolumeOfChannel(pt, ch)); }
         break;
       case P.ES5506:
       case P.C140:
       case P.C219:
       case P.PCM_DAC:
-        if (!hasModuleSamples) { this.loadTestSample16bit(); this.uploadSampleInstrument(); this.engine.renderSamples(pt); }
+        if (!hasModuleSamples) { this.loadTestSample16bit(); this.uploadSampleInstrument(); this.engine.renderSamples(key); }
         for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVolumeOfChannel(pt, ch)); }
         break;
       case P.SNES:
-        if (!hasModuleSamples) { this.loadTestSampleBRR(); this.uploadSampleInstrument(); this.engine.renderSamples(pt); }
+        if (!hasModuleSamples) { this.loadTestSampleBRR(); this.uploadSampleInstrument(); this.engine.renderSamples(key); }
         for (let ch = 0; ch < numCh; ch++) { setIns(ch, 0); setVol(ch, maxVolumeOfChannel(pt, ch)); }
         break;
 
@@ -717,7 +722,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
       // duty macro of 1 causes the FEEDBACK register to be written on the first tick,
       // giving mTapSelector=1 → alternating ±output → audible square wave.
       case P.LYNX:
-        this.setupDefaultLynxInstrument();
+        this.setupDefaultLynxInstrument(key);
         break;
 
       // === Commander X16 VERA PSG: needs waveform set (default is 0 after reset) ===
@@ -743,7 +748,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     }
   }
 
-  private setupDefaultGBInstrument(): void {
+  private setupDefaultGBInstrument(key: number): void {
     const pt = this.platformType;
     const data = new Uint8Array([
       15, 0, 2, 0, 0, 1, 0, 0, // envVol, envDir, envLen, soundLen, softEnv, alwaysInit, doubleWave, hwSeqLen
@@ -751,8 +756,8 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     this.engine.setGBInstrument(0, data, pt);
 
     for (let ch = 0; ch < 4; ch++) {
-      this.engine.setInstrument(ch, 0, pt);
-      this.engine.setVolume(ch, 15, pt);
+      this.engine.setInstrument(ch, 0, key);
+      this.engine.setVolume(ch, 15, key);
     }
 
     // Default wavetable for channel 2 (WAV) — skip if module wavetables were already uploaded
@@ -778,9 +783,9 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
    * C64 SID requires waveform bits set in the instrument — without them,
    * the voice control register has no waveform and produces silence.
    */
-  private setupDefaultC64Instrument(): void {
+  private setupDefaultC64Instrument(key: number): void {
     const pt = this.platformType;
-    const numCh = this.engine.getChannelCount(pt) || 3;
+    const numCh = this.engine.getChannelCount(key) || 3;
 
     // Build a minimal C64 instrument: pulse wave, fast ADSR, 50% duty
     const config: FurnaceConfig = {
@@ -813,8 +818,8 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     this.engine.uploadFurnaceInstrument(0, binaryData, pt);
 
     for (let ch = 0; ch < numCh; ch++) {
-      this.engine.setInstrument(ch, 0, pt);
-      this.engine.setVolume(ch, 15, pt);
+      this.engine.setInstrument(ch, 0, key);
+      this.engine.setVolume(ch, 15, key);
     }
   }
 
@@ -877,9 +882,9 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
    * We upload a DIV_INS_MIKEY instrument with a one-shot duty macro (value=1) so
    * FEEDBACK is written on the first tick after note-on, enabling LFSR oscillation.
    */
-  private setupDefaultLynxInstrument(): void {
+  private setupDefaultLynxInstrument(key: number): void {
     const pt = this.platformType;
-    const numCh = this.engine.getChannelCount(pt) || 4;
+    const numCh = this.engine.getChannelCount(key) || 4;
 
     const config: FurnaceConfig = {
       chipType: FurnaceChipType.LYNX, // 25 — falls through to type=25 in binary; getIns() ignores type
@@ -898,8 +903,8 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     this.engine.uploadFurnaceInstrument(0, binaryData, pt);
 
     for (let ch = 0; ch < numCh; ch++) {
-      this.engine.setInstrument(ch, 0, pt);
-      this.engine.setVolume(ch, maxVolumeOfChannel(pt, ch), pt);
+      this.engine.setInstrument(ch, 0, key);
+      this.engine.setVolume(ch, maxVolumeOfChannel(pt, ch), key);
     }
   }
 
@@ -907,9 +912,9 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
    * Set up a default FM instrument (OPN2/OPM/OPL/OPZ/ESFM).
    * Without this, the WASM default has AR=0 → envelope never opens → silence.
    */
-  private setupDefaultFMInstrument(insType: number): void {
+  private setupDefaultFMInstrument(insType: number, key: number): void {
     const pt = this.platformType;
-    const numCh = this.engine.getChannelCount(pt) || 6;
+    const numCh = this.engine.getChannelCount(key) || 6;
 
     // Basic electric piano: algorithm 4 (parallel carriers), moderate feedback
     const config: FurnaceConfig = {
@@ -939,8 +944,8 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     this.engine.uploadFurnaceInstrument(0, binaryData, pt);
 
     for (let ch = 0; ch < numCh; ch++) {
-      this.engine.setInstrument(ch, 0, pt);
-      this.engine.setVolume(ch, maxVolumeOfChannel(pt, ch), pt);
+      this.engine.setInstrument(ch, 0, key);
+      this.engine.setVolume(ch, maxVolumeOfChannel(pt, ch), key);
     }
   }
 
@@ -949,9 +954,9 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
    * OPLL is 2-op and has 15 built-in ROM patches. Using a preset is more
    * reliable than custom patch data which requires specific register format.
    */
-  private setupDefaultOPLLInstrument(): void {
+  private setupDefaultOPLLInstrument(key: number): void {
     const pt = this.platformType;
-    const numCh = this.engine.getChannelCount(pt) || 9;
+    const numCh = this.engine.getChannelCount(key) || 9;
 
     const config: FurnaceConfig = {
       chipType: 11, // OPLL
@@ -972,8 +977,8 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     this.engine.uploadFurnaceInstrument(0, binaryData, pt);
 
     for (let ch = 0; ch < numCh; ch++) {
-      this.engine.setInstrument(ch, 0, pt);
-      this.engine.setVolume(ch, maxVolumeOfChannel(pt, ch), pt);
+      this.engine.setInstrument(ch, 0, key);
+      this.engine.setVolume(ch, maxVolumeOfChannel(pt, ch), key);
     }
   }
 
@@ -1301,6 +1306,16 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
   setChannel(chan: number): void {
     if ((window as any).FURNACE_DEBUG) console.log(`[FurnaceDispatchSynth] setChannel: ${chan} (platform ${this.platformType})`);
     this.currentChannel = chan;
+  }
+
+  /**
+   * The chip key of every chip this synth plays on: each chip of its platform
+   * (a song with two AY-3-8910 has two), or the platform itself before any runs.
+   * Per-chip state (instrument set on a channel, default setup) goes to each.
+   */
+  private chipKeys(): number[] {
+    const spans = this.engine.chipSpansOf(this.platformType);
+    return spans.length > 0 ? spans.map((s) => s.key) : [this.platformType];
   }
 
   /**

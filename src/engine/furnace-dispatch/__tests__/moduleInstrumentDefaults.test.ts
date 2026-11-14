@@ -21,6 +21,7 @@ const { engine } = vi.hoisted(() => {
     getModuleWavetables: null,
     getModuleSamples: null,
     getChannelCount: 6,
+    chipSpansOf: [],
   };
   const engine = new Proxy(calls, {
     get: (t, k: string) => (t[k] ??= vi.fn(() => returns[k])),

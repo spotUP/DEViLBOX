@@ -50,7 +50,7 @@ function synthFor(synthType: string, id: number, uploads: Array<{ slot: number; 
   Object.assign(s, {
     platformType: pt, furnaceInstrumentIndex: furnaceSlotOf({ id }), currentChannel: 0, _isReady: true,
     _isReadyPromise: Promise.resolve(),
-    engine: { uploadFurnaceInstrument: (slot: number, data: Uint8Array) => uploads.push({ slot, data }), getChannelCount: () => 9, setInstrument() {}, loadIns2() {} },
+    engine: { uploadFurnaceInstrument: (slot: number, data: Uint8Array) => uploads.push({ slot, data }), getChannelCount: () => 9, chipSpansOf: () => [], setInstrument() {}, loadIns2() {} },
   });
   return { s, pt };
 }
