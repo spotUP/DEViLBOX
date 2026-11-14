@@ -359,6 +359,12 @@ export interface FurnaceConfig {
    */
   previewChannel?: number;
   /**
+   * The song chip (DivSystem) a module instrument plays on in its song: a Neo
+   * Geo song's FM and SSG instruments play on its YM2610. While that chip
+   * runs, a keyboard note plays there too, so it gets the song's level and mix.
+   */
+  previewPlatform?: number;
+  /**
    * The Furnace instrument type (DivInstrumentType) this instrument is, when
    * the chip type alone does not say: a Neo Geo (YM2610 / YM2610B) instrument
    * is an FM (1), SSG (6), ADPCM-A (37) or ADPCM-B (38) voice. Absent: the

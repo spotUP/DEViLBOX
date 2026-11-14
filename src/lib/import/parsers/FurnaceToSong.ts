@@ -253,6 +253,8 @@ async function parseFurnaceFileWasm(buffer: ArrayBuffer, _fileName: string, subs
       const converted = convertToInstrument(parsed, i + 1, 'FUR');
       for (const inst of converted) {
         if (inst.furnace && previewChannel > 0) inst.furnace.previewChannel = previewChannel;
+        // Its song chip, so a keyboard note plays where the song plays it: at that chip's level in the song's mix.
+        if (inst.furnace && loaded.instrumentSystems[i] >= 0) inst.furnace.previewPlatform = loaded.instrumentSystems[i];
         // A voice of a mixed-kind chip (Neo Geo, YM2608, YM2203, Y8950, OPL4) keeps its kind, so the editor
         // shows the section the instrument is and the note check knows which channels take it.
         if (inst.furnace && chipSpecOf(synthType)) inst.furnace.divInsType = furIns.type;

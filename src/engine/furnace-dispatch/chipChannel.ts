@@ -27,6 +27,7 @@ export const LIVE_VOICE_BASE_CHANNEL = 100;
 /** The fields of a FurnaceConfig that decide where a live note plays. */
 export interface LiveChannelSource {
   previewChannel?: number;
+  previewPlatform?: number;
   chipType?: number;
   divInsType?: number;
 }

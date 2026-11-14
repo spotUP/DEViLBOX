@@ -7,6 +7,7 @@
 
 import { withSsgDefaultMacros, placeUserSample, isOpnbChipType, opnbVoiceKindOfChannel } from './opnbVoices';
 import { livePreviewChannel } from './chipChannel';
+import { chipKeyPlatform } from './chipKey';
 import { maxVolumeOfChannel } from './channelVolume';
 import type { DevilboxSynth } from '@/types/synth';
 import { getDevilboxAudioContext, noteToMidi } from '@/utils/audio-context';
@@ -1124,7 +1125,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     this.engine.setInstrument(chan, this.furnaceInstrumentIndex, this.chipKey, true, _time);
 
     // Set volume based on velocity
-    const maxVol = maxVolumeOfChannel(pt, chan);
+    const maxVol = maxVolumeOfChannel(chipKeyPlatform(this.chipKey), chan);
     const vol = Math.round(velocity * maxVol);
     this.engine.setVolume(chan, vol, this.chipKey, _time);
 
@@ -1249,11 +1250,16 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
    * channel maps onto the first chip as chipChannelFor does. Returns the chip channel.
    */
   setSongChannel(channelIndex: number, furnace?: LiveChannelSource): number {
+    // A module instrument plays on the chip that plays it in its song (a Neo Geo song's FM and SSG
+    // instruments on its YM2610), not on a chip of its synth's own type: that chip's post-amp and the
+    // song's mix of it (setMixVolumes) then set its level, so the keyboard sounds as the song does.
+    const song = furnace?.previewPlatform;
+    const pt = song !== undefined && this.engine.hasChip(song) ? song : this.platformType;
     const span = channelIndex < LIVE_VOICE_BASE_CHANNEL
-      ? this.engine.chipSpansOf(this.platformType).find((s) => channelIndex >= s.offset && channelIndex < s.offset + s.numChannels)
+      ? this.engine.chipSpansOf(pt).find((s) => channelIndex >= s.offset && channelIndex < s.offset + s.numChannels)
       : undefined;
-    this.chipKey = span?.key ?? this.platformType;
-    this.setChannel(span ? channelIndex - span.offset : chipChannelFor(channelIndex, this.getNumChannels() || 3, furnace));
+    this.chipKey = span?.key ?? pt;
+    this.setChannel(span ? channelIndex - span.offset : chipChannelFor(channelIndex, this.engine.getChannelCount(pt) || 3, furnace));
     return this.currentChannel;
   }
 
