@@ -8,7 +8,7 @@ export default function () {
   const buzz = s.addInstrument('Auto envelope buzz', ayInstrument([
     ayMacro(AY_MACRO.ENV_SHAPE, [8]), ayMacro(AY_MACRO.MIXER, [5]), ayMacro(AY_MACRO.AUTO_ENV_NUM, [1]), ayMacro(AY_MACRO.AUTO_ENV_DEN, [2]),
   ]));
-  const noise = s.addInstrument('Noise', ayInstrument([ayMacro(AY_MACRO.NOISE, [10]), ayMacro(AY_MACRO.MIXER, [8])]));
+  const noise = s.addInstrument('Noise', ayInstrument([ayMacro(AY_MACRO.NOISE, [10]), ayMacro(AY_MACRO.MIXER, [2])]));
   const saw = s.addInstrument('Envelope saw reset', ayInstrument([
     ayMacro(AY_MACRO.ENV_SHAPE, [12]), ayMacro(AY_MACRO.MIXER, [4]), ayMacro(AY_MACRO.PHASE_RESET, [1, 0, 0, 0], 0),
   ]));
