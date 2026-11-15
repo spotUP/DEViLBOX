@@ -10,7 +10,7 @@
 import type { Pattern } from '@/types';
 import { buildTwGrid, TW_NOTE_BASE, TW_ROWS_PER_PATTERN, type TwSource } from './tonyWilliamsGrid';
 import { TW_FX } from './tonyWilliamsEffectGlyphs';
-import { twEndsBlock, type TwWalk } from './tonyWilliamsWalk';
+import { TW_VOICES, twEndsBlock, walkTonyWilliams, type TwWalk } from './tonyWilliamsWalk';
 import { relocateTonyWilliams, type TwSplice } from './tonyWilliamsRelocate';
 
 type Cell = Record<string, number | undefined>;
@@ -19,7 +19,62 @@ function cellOf(patterns: Pattern[], s: TwSource): Cell | null {
   return (patterns[s.pattern]?.channels[s.channel]?.rows[s.row] as unknown as Cell | undefined) ?? null;
 }
 
+/** The same-length and length-changing edits, then each note typed on a row no note starts on (addNote). */
 export function applyTwGridEdits(original: Uint8Array, walk: TwWalk, patterns: Pattern[]): { data: Uint8Array; warnings: string[] } {
+  const r = applyTwStreamEdits(original, walk, patterns);
+  const grid = buildTwGrid(walk);
+  if (patterns.length !== grid.patterns.length) return r;
+  const hasNote = new Set(grid.sources.filter((s) => s.kind === 'note').map((s) => `${s.pattern}/${s.channel}/${s.row}`));
+  patterns.forEach((pat, p) => pat.channels.forEach((ch, c) => ch.rows.forEach((cell, row) => {
+    if (c >= TW_VOICES || (cell.note ?? 0) < 1 || (cell.note ?? 0) >= 97 || hasNote.has(`${p}/${c}/${row}`)) return;
+    if ((grid.patterns[p]?.channels[c]?.rows[row]?.note ?? 0) !== 0) return;
+    r.data = addNote(r.data, { pattern: p, channel: c, row, note: cell.note, instrument: cell.instrument ?? 0 }, r.warnings);
+  })));
+  return r;
+}
+
+interface Add { pattern: number; channel: number; row: number; note: number; instrument: number }
+
+/**
+ * A note on a row inside a held note or rest. The covering command (it waits the sticky duration D) is cut at the row:
+ * duration d1 goes before it, then after it duration D - d1, the new note and duration D again, so every later note
+ * keeps its timing. Everything after moves through tonyWilliamsRelocate.ts. Unless the reloaded song has the same
+ * length and the cell reads back as the note, nothing is written.
+ */
+function addNote(file: Uint8Array, a: Add, warnings: string[]): Uint8Array {
+  const where = `pattern ${a.pattern} channel ${a.channel + 1} row ${a.row}`;
+  const refuse = (why: string): Uint8Array => { warnings.push(`${where}: ${why}; the note was not written.`); return file; };
+  const walk = walkTonyWilliams(file, 0);
+  if (!walk) return refuse('the stream could not be walked');
+  const tick = a.pattern * TW_ROWS_PER_PATTERN + a.row;
+  let dur = 1;
+  let instrument = 0;
+  let cover: { e: (typeof walk.events)[number]; dur: number } | null = null;
+  for (const e of walk.events) {
+    if (e.channel !== a.channel) continue;
+    const op = e.cmd.op;
+    if (op >= 0xe0) dur = op - 0xdf;
+    else if (op >= 0xd0 && op <= 0xdf) { if (!cover) instrument = (op & 15) + 1; }
+    else if ((op < 0x80 || op === 0x85 || op === 0x86) && e.tick < tick && tick < e.tick + dur) cover = { e, dur };
+  }
+  if (!cover) return refuse('no note or rest is held across this row');
+  if (a.instrument !== 0 && a.instrument !== instrument) return refuse('a different instrument would need an Instrument command');
+  const byte = a.note - TW_NOTE_BASE - cover.e.transpose;
+  if (a.note < TW_NOTE_BASE || byte < 0 || byte > 0x3f) return refuse(`note ${a.note} is outside the player's table`);
+  const d1 = tick - cover.e.tick;
+  const at = cover.e.cmd.offset;
+  const r = relocateTonyWilliams(file, [
+    { at, remove: 0, insert: Uint8Array.of(0xdf + d1) },
+    { at: at + cover.e.cmd.length, remove: 0, insert: Uint8Array.of(0xdf + cover.dur - d1, byte, 0xdf + cover.dur) },
+  ]);
+  if ('error' in r) return refuse(r.error);
+  const w2 = walkTonyWilliams(r.data, 0);
+  const got = w2 ? buildTwGrid(w2).patterns[a.pattern]?.channels[a.channel]?.rows[a.row]?.note : undefined;
+  if (!w2 || w2.ticks !== walk.ticks || got !== a.note) return refuse('the song did not read back as the note on this row');
+  return r.data;
+}
+
+function applyTwStreamEdits(original: Uint8Array, walk: TwWalk, patterns: Pattern[]): { data: Uint8Array; warnings: string[] } {
   const data = new Uint8Array(original);
   const warnings: string[] = [];
   const grid = buildTwGrid(walk);

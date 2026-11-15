@@ -285,8 +285,8 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   // synthDream: a note on a row inside a held command cuts that command and inserts a note command; the grown stream moves to the file end and every track entry is repointed (synthDreamEdits.ts).
   synthDream: 'pass',
   timFollin: 'fail',
-  // tonyWilliams: a note on an empty row grows the block; length-changing edits wait for the full relocation
-  tonyWilliams: 'fail',
+  // tonyWilliams: a note on a row inside a held note or rest cuts it (duration, note, duration restored) and relocates the tail (tonyWilliamsEdits.ts).
+  tonyWilliams: 'pass',
   beathoven: 'fail',
   soundProgrammingLanguage: 'fail',
   // dynamicSynthesizer: patterns are fixed-size word arrays; a note on an empty step overwrites its zero word in place, nothing grows (dynamicSynthesizerEdits.ts).
