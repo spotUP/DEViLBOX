@@ -2135,7 +2135,14 @@ const SNESPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<Furnace
     onChange({ snes: { ...config.snes, ...SNES_DEFAULTS, ...updates } });
   }, [config.snes, onChange]);
 
-  const gainModes = ['Direct', 'Inc Linear', 'Inc Bent', 'Dec Linear', 'Dec Exp'];
+  // Raw SNES GAIN register mode values, as Furnace stores them (DivInstrumentSNES::GainMode).
+  const gainModes = [
+    { value: 0, label: 'Direct' },
+    { value: 4, label: 'Decrease Linear' },
+    { value: 5, label: 'Decrease Exponential' },
+    { value: 6, label: 'Increase Linear' },
+    { value: 7, label: 'Increase Bent' },
+  ];
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
@@ -2196,7 +2203,7 @@ const SNESPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<Furnace
                 value={String(typeof snes.gainMode === 'number' ? snes.gainMode : 0)}
                 onChange={(v) => updateSNES({ gainMode: parseInt(v) })}
                 className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-text-primary"
-                options={gainModes.map((mode, i) => ({ value: String(i), label: mode }))}
+                options={gainModes.map((m) => ({ value: String(m.value), label: m.label }))}
               />
             </div>
             <Knob label="GAIN" value={snes.gain} min={0} max={127}
