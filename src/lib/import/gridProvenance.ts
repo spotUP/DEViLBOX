@@ -299,7 +299,8 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   fashionTracker: 'pass',
   davidHanney: 'pass',
   ems: 'pass',
-  howieDavies: 'fail',
+  // howieDavies: a note on a held row cuts the covering note's rest in two; the grown pattern moves to the end of the code hunk (howieDaviesEdits.ts).
+  howieDavies: 'pass',
   synthesis: 'pass',
   tcbTracker: 'pass',
   tfmMusicMaker: 'pass',

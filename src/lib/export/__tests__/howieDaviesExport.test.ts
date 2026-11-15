@@ -105,19 +105,41 @@ describe.each(FILES)('Howie Davies native export: $name', (file) => {
     })));
   }, 240000);
 
-  it('refuses a note on an empty row, a removed note and a volume edit, writing nothing', async () => {
+  it('refuses a removed note and a volume edit, writing nothing', async () => {
     const { raw, song } = await load(file);
     const rows = song.patterns[0].channels[0].rows;
-    const empty = rows.findIndex((c) => c.note === 0);
-    expect(empty).toBeGreaterThanOrEqual(0);
-    rows[empty].note = 40;
     const played = rows.findIndex((c) => c.note > 0 && c.note < 97);
     expect(played).toBeGreaterThanOrEqual(0);
     rows[played].note = 0;
     song.patterns[0].channels[1].rows[0].volume = 30;
     const res = await exportOf(song);
-    expect(res.warnings.length).toBeGreaterThanOrEqual(3);
+    expect(res.warnings.length).toBeGreaterThanOrEqual(2);
     expect(res.warnings.join('\n')).toMatch(/not written/);
     expect(Array.from(res.data)).toEqual(Array.from(raw));
+  }, 240000);
+
+  it('writes a note on a blank row, growing the pattern, and reloads it there with the length of the song kept', async () => {
+    const { raw, song } = await load(file);
+    const g0 = buildHowieDaviesGrid(raw);
+    if (typeof g0 === 'string') throw new Error(g0);
+    const rows = song.patterns[0].channels[0].rows;
+    const note = rows.find((c) => c.note > 0 && c.note < 97)?.note ?? 40;
+    let written: Uint8Array | null = null;
+    let at = -1;
+    for (let c = 0; c < 4 && !written; c++) {
+      for (let r = 1; r < song.patterns[0].channels[c].rows.length && !written; r++) {
+        if (song.patterns[0].channels[c].rows[r].note !== 0) continue;
+        const { song: s } = await load(file);
+        s.patterns[0].channels[c].rows[r].note = note;
+        const res = await exportOf(s);
+        if (res.warnings.length === 0 && res.data.length > raw.length) { written = res.data; at = c * 1000 + r; }
+      }
+    }
+    expect(written, 'some blank row takes a note').not.toBeNull();
+    const [c, r] = [Math.floor(at / 1000), at % 1000];
+    const g1 = buildHowieDaviesGrid(written as Uint8Array);
+    if (typeof g1 === 'string') throw new Error(g1);
+    expect(g1.rows).toBe(g0.rows);
+    expect(g1.patterns[0].channels[c].rows[r].note).toBe(note);
   }, 240000);
 });

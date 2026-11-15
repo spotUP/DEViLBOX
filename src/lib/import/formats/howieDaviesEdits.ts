@@ -5,7 +5,7 @@
  * lands on the new note. An edited instrument cell patches the argument byte of the Instrument command that chose it,
  * and only when the stream holds one (an instrument that is the voice's start state has no byte to patch). A pattern is
  * shared by every place that plays it, so an edit shows wherever the pattern byte plays. Edits the stream cannot hold
- * at its length - a note on a row without one, a note removed or turned into a note off, a rest change,
+ * at its length - a note on a row inside a held note that is not in the start pattern, a note removed or turned into a note off, a rest change,
  * the volume column (not stored per row), a stream command added, removed or retyped - are refused with a warning and nothing is written for them.
  * After patching, the grid is decoded again: every edited cell must read back as edited, and every cell that does not
  * share an edited byte must be unchanged, otherwise the edit is taken out again.
@@ -14,6 +14,7 @@ import type { Pattern, TrackerCell } from '@/types';
 import { cellEffects, effectEditPatches } from './cellEffectSlots';
 import { buildHowieDaviesGrid, type HowieDaviesGrid } from './howieDaviesGrid';
 
+const HUNK_BYTES = 0x20;
 const NOTE_OFF = 97;
 const COMMAND_BASE = 0x80;
 const ROWS_PER_PATTERN = 64;
@@ -27,6 +28,8 @@ export interface HowieDaviesEditResult {
 }
 
 interface Edit { pattern: number; channel: number; row: number; note: number; instrument: number; noteAt: number; noteByte: number; instrumentAt: number; instrumentByte: number; fxPatches: Array<[number, number]>; fx: Array<[number, number]> }
+
+interface Add { pattern: number; channel: number; row: number; note: number; instrument: number }
 
 const where = (e: { pattern: number; channel: number; row: number }): string => `voice ${e.channel + 1}, pattern ${e.pattern}, row ${e.row}`;
 
@@ -45,7 +48,7 @@ const cellAt = (g: HowieDaviesGrid, channel: number, row: number): TrackerCell |
 
 /** The edits of `patterns` against the grid decoded from the untouched module, as byte patches in `data`. */
 export function applyHowieDaviesGridEdits(original: Uint8Array, patterns: readonly Pattern[]): HowieDaviesEditResult {
-  const data = new Uint8Array(original);
+  let data: Uint8Array = new Uint8Array(original);
   const warnings: string[] = [];
   const base = buildHowieDaviesGrid(original);
   if (typeof base === 'string') return { data, patched: 0, warnings };
@@ -55,6 +58,7 @@ export function applyHowieDaviesGridEdits(original: Uint8Array, patterns: readon
   }
 
   const claimed = new Map<number, number>();
+  const adds: Add[] = [];
   const accepted: Edit[] = [];
 
   patterns.forEach((pat, pi) => pat.channels.forEach((ch, c) => ch.rows.forEach((cell, r) => {
@@ -91,6 +95,10 @@ export function applyHowieDaviesGridEdits(original: Uint8Array, patterns: readon
       }
     }
     const src = base.sources[c]?.[pi * ROWS_PER_PATTERN + r];
+    if (!src && noteChanged && cell.note > 0 && cell.note < NOTE_OFF) {
+      adds.push({ ...at, note: cell.note, instrument: cell.instrument });
+      return;
+    }
     if (!src || was.note < 1 || was.note >= NOTE_OFF) {
       warnings.push(`${PREFIX} ${where(at)}: no note plays on this row, and adding or removing one, or changing a rest or note off, would change the length of the stream; the edit was not written.`);
       return;
@@ -195,7 +203,60 @@ export function applyHowieDaviesGridEdits(original: Uint8Array, patterns: readon
     live = bad.length === live.length ? [] : live.filter((e) => !bad.includes(e));
   }
   writeAll(live);
+  for (const a of adds) data = addNote(data, a, warnings);
   let patched = 0;
   for (let i = 0; i < data.length; i++) if (data[i] !== original[i]) patched++;
   return { data, patched, warnings };
+}
+
+const be32 = (d: Uint8Array, o: number): number => ((d[o] << 24) | (d[o + 1] << 16) | (d[o + 2] << 8) | d[o + 3]) >>> 0;
+const put32 = (d: Uint8Array, o: number, v: number): void => { d[o] = v >>> 24; d[o + 1] = (v >>> 16) & 0xff; d[o + 2] = (v >>> 8) & 0xff; d[o + 3] = v & 0xff; };
+
+/**
+ * A note on a row no note starts on. The covering note (rest byte r holds r + 1 steps) is cut after d steps: its rest
+ * byte becomes d - 1 and a new note byte with rest r - d follows, so the voice keeps its timing. d is the first split
+ * the decoded grid shows as the note on that row. The pattern stream grows by two bytes, so it moves to the end of the
+ * code hunk (hunk size words and the file grow with it) and every pattern table long that named it is repointed.
+ * The start pattern lives inside the replayer data and is refused. Unless the cell reads back as the note and the grid
+ * keeps its length, nothing is written.
+ */
+function addNote(file: Uint8Array, a: Add, warnings: string[]): Uint8Array {
+  const g = buildHowieDaviesGrid(file);
+  if (typeof g === 'string') return file;
+  const row = a.pattern * ROWS_PER_PATTERN + a.row;
+  const refuse = (why: string): Uint8Array => { warnings.push(`${PREFIX} ${where(a)}: ${why}; the note was not written.`); return file; };
+  const cov = g.covers[a.channel]?.[row];
+  if (!cov) return refuse('no note sounds on this row');
+  if (cov.stream < 0) return refuse("the start pattern lives inside the replayer's data and cannot grow");
+  if (a.instrument !== 0 && a.instrument !== cov.instrument + 1) return refuse('a different instrument would need an Instrument command');
+  const byte = Array.from({ length: COMMAND_BASE }, (_, b) => b).find((b) => g.noteForByte(b) === a.note) ?? -1;
+  if (byte < 0) return refuse(`note ${a.note} is not in the module's period table`);
+  const stream = g.streams.find((s) => s.kind === 'pattern' && s.offset - HUNK_BYTES === cov.stream);
+  if (!stream) return refuse('the pattern stream is not known');
+  const pointers = g.patternPointerAts(cov.stream);
+  if (pointers.length === 0) return refuse('no pattern table entry names this pattern');
+  const rest = (file[cov.noteAt + 1] << 24) >> 24;
+  if (rest < 1) return refuse('the held note is too short to split');
+  const cut = cov.noteAt - stream.offset;
+  const old = file.subarray(stream.offset, stream.offset + stream.size);
+  const hunk = be32(file, 28) * 4;
+  for (let d = 1; d <= rest; d++) {
+    const grown = new Uint8Array(stream.size + 2);
+    grown.set(old.subarray(0, cut + 2));
+    grown.set([d - 1], cut + 1);
+    grown.set([byte, rest - d], cut + 2);
+    grown.set(old.subarray(cut + 2), cut + 4);
+    const added = Math.ceil(grown.length / 4) * 4;
+    const moved = new Uint8Array(file.length + added);
+    moved.set(file.subarray(0, HUNK_BYTES + hunk));
+    moved.set(grown, HUNK_BYTES + hunk);
+    moved.set(file.subarray(HUNK_BYTES + hunk), HUNK_BYTES + hunk + added);
+    put32(moved, 28, hunk / 4 + added / 4);
+    put32(moved, 20, be32(file, 20) + added / 4); // the hunk table size word keeps its memory flag bits
+    for (const at of pointers) put32(moved, at, hunk);
+    const again = buildHowieDaviesGrid(moved);
+    const got = typeof again === 'string' ? undefined : cellAt(again, a.channel, row);
+    if (typeof again !== 'string' && again.rows === g.rows && got?.note === a.note) return moved;
+  }
+  return refuse('no split of the held note reads back as the new note on this row');
 }

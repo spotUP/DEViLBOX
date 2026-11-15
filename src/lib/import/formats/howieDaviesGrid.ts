@@ -136,7 +136,14 @@ export interface HowieDaviesGrid {
   effectSources: Array<Array<StreamEffectSource[]>>;
   /** The tracker note a pattern note byte (a period table index) plays, or 0 when the index is outside the table. */
   noteForByte: (byte: number) => number;
+  /** covers[voice][row over the whole grid]: the note sounding on the row (phase B: where a note on a blank row splits one) */
+  covers: Array<Array<HowieDaviesCover | null>>;
+  /** File offsets of the longs in the pattern address table that hold the image address `address`. */
+  patternPointerAts: (address: number) => number[];
 }
+
+/** The note sounding on a grid row: its file offset (the rest byte follows), start tick, pattern stream (image address, -1 for the start stream) and instrument. */
+export interface HowieDaviesCover { noteAt: number; tick: number; stream: number; instrument: number }
 
 /** Where a note's bytes live in the file. */
 export interface HowieDaviesRowSource {
@@ -340,6 +347,13 @@ export function buildHowieDaviesGrid(file: Uint8Array): HowieDaviesGrid | string
       if (row % ROWS_PER_PATTERN === 0) firstStream[Math.floor(row / ROWS_PER_PATTERN)][v] = streamIndexOfStart.get(e.stream) ?? -1;
     }
   }
+  const covers: Array<Array<HowieDaviesCover | null>> = Array.from({ length: VOICES }, () => new Array<HowieDaviesCover | null>(patternCount * ROWS_PER_PATTERN).fill(null));
+  for (let v = 0; v < VOICES; v++) {
+    kept[v].forEach((e, i) => {
+      const end = i + 1 < kept[v].length ? kept[v][i + 1].tick : songEnd;
+      for (let row = e.tick / rowTicks; row < end / rowTicks && row < rows; row++) covers[v][row] = { noteAt: e.noteAt, tick: e.tick, stream: e.stream, instrument: e.instrument };
+    });
+  }
   const patterns: Pattern[] = Array.from({ length: patternCount }, (_, p) => {
     const length = Math.min(ROWS_PER_PATTERN, rows - p * ROWS_PER_PATTERN);
     const channels: ChannelData[] = columns.map((col, ch) => ({
@@ -353,6 +367,12 @@ export function buildHowieDaviesGrid(file: Uint8Array): HowieDaviesGrid | string
   return {
     driver: ['Blazing Thunder', 'Future Bike Simulator', "Yogi's Great Escape"][driverIndex], patterns,
     songPositions: patterns.map((_, i) => i), rows, ticksPerRow: rowTicks, streams, blockRows, streamAtStart: firstStream, notesPerVoice, sources, effectSources,
+    covers,
+    patternPointerAts: (address) => {
+      const out: number[] = [];
+      for (let at = patternTable, n = 0; n < 128 && m.reloc[at] === 1 && at + 4 <= m.b.length; at += 4, n++) if (u32(m, at) === address) out.push(at + HUNK_BYTES);
+      return out;
+    },
     noteForByte: (byte) => (byte >= 0 && byte < PERIOD_COUNT ? periodToNote(u16(m, periodAt + 2 * byte)) : 0),
   };
 }
