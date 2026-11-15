@@ -186,6 +186,20 @@ describe('writeTadSong echo header', () => {
     expect(song.warnings.some((w) => /effect F[A3489]xx/i.test(w))).toBe(false);
   }, 60000);
 
+  it('plays the 10xx wave on later wavetable notes of the channel', async () => {
+    const buf = readFileSync(resolve(DIR, 'tetristheme.fur'));
+    const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+    const native = buildFurnaceNativeData(module);
+    const sub = native.subsongs[0];
+    // Bass is a 16-sample wavetable instrument without a wave macro, so it starts on wave 0.
+    const bass = module.instruments.findIndex((i) => i.name === 'Bass');
+    const row = sub.channels.flatMap((ch, c) => ch.patterns.get(sub.orders[c]?.[0] ?? -1)?.rows ?? []).find((r) => r.ins === bass && r.note >= 0 && r.note < 180);
+    row!.effects = [...(row!.effects ?? []), { cmd: 0x10, val: 1 }];
+    const song = writeTadSong({ native, subsong: 0, instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)), samples: toSequencerSamples(module), wavetables: module.wavetables, title: 'tetristheme' });
+    expect(song.mml).toMatch(/^@\d+ w16_1 /m);
+    expect(song.warnings.some((w) => /effect 10xx/i.test(w))).toBe(false);
+  }, 60000);
+
   it('writes the Furnace echo flags as TAD header lines', async () => {
     const lines: Record<string, string> = {};
     for (const file of FILES) {

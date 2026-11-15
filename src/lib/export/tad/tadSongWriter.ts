@@ -256,17 +256,17 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     return samples[n] ? tadNoteRange(sampleTuningHz(samples[n], tuningHz)) : null;
   };
   const wavetables = input.wavetables ?? [];
-  // TAD sample name an instrument plays: `s<sample>` or `w<length>` (wavetable 0; Furnace starts
-  // every channel on wave 0 and 10xx wave changes are dropped effects).
+  // TAD sample name an instrument plays: `s<sample>` or `w<length>[_<wave>]`. Wave: constant wave macro, else
+  // the channel's last 10xx / macro wave (snes.cpp:130-133, 360-364, 453), else 0.
   // Note map: Furnace plays sample noteMap[note].map at note noteMap[note].freq (DivInstrumentAmiga,
   // 180 entries indexed by engine note = row note + 60).
-  const soundOf = (inst: TadInstrumentInput | undefined, note: number): { smp: string; note: number } | null => {
+  const soundOf = (inst: TadInstrumentInput | undefined, note: number, wave = -1): { smp: string; note: number } | null => {
     if (!inst) return null;
     // Native rows hold octave*12+semitone (C-0 = 0); the engine, and so the note map, counts from C-(-5) (C-0 = 60).
     note += FURNACE_NOTE_OFFSET;
     if (inst.useWave) {
-      // shortcut: wave = constant wave macro or 0; Furnace keeps the channel's last wave, and 10xx / changing wave macros are dropped.
-      const wi = constantMacro(inst, 3) ?? 0;
+      // shortcut: changing wave macros are dropped, and 10xx takes effect from the next note, not mid-note.
+      const wi = constantMacro(inst, 3) ?? Math.max(0, wave);
       const len = Math.max(16, ((inst.waveLen ?? 31) + 1) & ~15);
       return wavetables[wi] ? { smp: wi ? `w${len}_${wi}` : `w${len}`, note } : null;
     }
@@ -286,7 +286,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     const ch = snes.first + c;
     // echoMask: Furnace starts these channels with echo on (snes.cpp:914).
     const out: string[] = ['V254', ...(!sfx && echo.on && (echo.mask >> c) & 1 ? ['E1'] : [])];
-    let ins = 0, curIns = -1, vol = 127, panL = 127, panR = 127, lastP = 64, oct = -1, lastV = 'V254';
+    let ins = 0, curIns = -1, wave = -1, vol = 127, panL = 127, panR = 127, lastP = 64, oct = -1, lastV = 'V254';
     // snes.cpp:115-117 outVol = vol * volMacro / 127; a constant volume macro scales V.
     // Pan law, snes.cpp:642-653: each side is outVol * pan / 127 (centre = both full); TAD splits V by p, so
     // V carries panL + panR and p their ratio. Constant panning macros (codes 12/13) override 08xx / 80xx.
@@ -400,6 +400,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             if (sfx || c < 1 || c > 5) drop('effect 13xx (pitch modulation only on song channels B-F)', at);
             else if ((e.val !== 0) !== pmOn) { pmOn = e.val !== 0; cmds.push(pmOn ? 'PM' : 'PM0'); }
           }
+          else if (e.cmd === 0x10) wave = e.val;
           else if (e.cmd === 0x11) noiseOn = e.val !== 0; // snes.cpp:495; TAD N plays noise in place of the next notes
           else if (e.cmd === 0x1d) { /* noise frequency: read from the row walk */ }
           else if (e.cmd === 0x14) {
@@ -523,13 +524,14 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         const isNote = cl.note >= 0 && cl.note < 180;
         const isOff = cl.note === NOTE_OFF || cl.note === NOTE_RELEASE;
         const legato = isNote && s03 > 0 && sounding && curPitch >= 0;
-        const legatoFx = legato ? pitchFx(curPitch, (() => { const n = soundOf(instruments[ins], cl.note)?.note; return n === undefined ? -1 : clampP(n - FURNACE_NOTE_OFFSET); })()) : null;
+        const legatoFx = legato ? pitchFx(curPitch, (() => { const n = soundOf(instruments[ins], cl.note, wave)?.note; return n === undefined ? -1 : clampP(n - FURNACE_NOTE_OFFSET); })()) : null;
         if (legato) {
           // 03xx: glide from the sounding note to the new one, no new key-on.
           flush(true); out.push(...cmds);
           if (legatoFx) pending.tok = fxToken(legatoFx, false);
         } else if (isNote) {
-          const sound = soundOf(instruments[ins], cl.note);
+          const sound = soundOf(instruments[ins], cl.note, wave);
+          wave = constantMacro(instruments[ins], 3) ?? wave;
           const am = arpMacro(instruments[ins]);
           const tad = (sound?.note ?? 0) - FURNACE_NOTE_OFFSET + (am?.hold ?? 0);
           if (!sound) {
