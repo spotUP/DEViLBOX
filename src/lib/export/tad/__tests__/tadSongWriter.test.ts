@@ -24,24 +24,31 @@ describe('writeTadSong', () => {
   it.each(FILES)('%s passes tad-compiler check', async (file) => {
     const buf = readFileSync(resolve(DIR, file));
     const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
-    const song = writeTadSong({
-      native: buildFurnaceNativeData(module),
-      subsong: 0,
-      instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)),
-      samples: toSequencerSamples(module),
-      wavetables: module.wavetables,
-      title: module.name || file,
-    });
-    expect(song.mml).toContain('#Timer');
-    const files: Record<string, Uint8Array | string> = {
-      'p.terrificaudio': tadProjectJson([{ name: 'song', source: 'song.mml' }], song.samples),
-      'song.mml': song.mml,
-    };
-    for (const s of song.samples) files[s.path] = s.data;
+    const native = buildFurnaceNativeData(module);
+    // Echo takes Audio-RAM: lower the delay (as buildTadProject does) until the compiler accepts the song.
     // @ts-expect-error generated JS module
     const { default: create } = await import('../../../../../public/tad/tad-compiler.js');
-    const tad = await openTadSession(files, create as CreateTadCompiler, (f) => resolve('public/tad', f));
-    const r = tad.run(['check', '/p/p.terrificaudio']);
+    let r = { code: 1, log: '' }, song = writeTadSong({ native, subsong: 0, instruments: [], samples: [], title: file });
+    for (let cap = 15; cap >= 0; cap--) {
+      song = writeTadSong({
+        native,
+        subsong: 0,
+        instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)),
+        samples: toSequencerSamples(module),
+        wavetables: module.wavetables,
+        title: module.name || file,
+        echoDelayCap: cap,
+      });
+      expect(song.mml).toContain('#Timer');
+      const files: Record<string, Uint8Array | string> = {
+        'p.terrificaudio': tadProjectJson([{ name: 'song', source: 'song.mml' }], song.samples),
+        'song.mml': song.mml,
+      };
+      for (const s of song.samples) files[s.path] = s.data;
+      const tad = await openTadSession(files, create as CreateTadCompiler, (f) => resolve('public/tad', f));
+      r = tad.run(['check', '/p/p.terrificaudio']);
+      if (r.code === 0 || TOO_LARGE[file] || !/too large by/.test(r.log)) break;
+    }
     console.log(`[${file}] code ${r.code}\n${song.warnings.join('\n')}\n${r.log}`);
     if (TOO_LARGE[file]) {
       expect(r.code).not.toBe(0);
@@ -74,4 +81,22 @@ describe('writeTadSong', () => {
     const dropped = song.warnings.filter((w) => w.startsWith('Dropped notes outside'));
     console.log(`[tetristheme] first native note ${first}; ${dropped.join(' | ')}`);
   });
+});
+
+describe('writeTadSong echo header', () => {
+  it('writes the Furnace echo flags as TAD header lines', async () => {
+    const lines: Record<string, string> = {};
+    for (const file of FILES) {
+      const buf = readFileSync(resolve(DIR, file));
+      const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+      const native = buildFurnaceNativeData(module);
+      const flags = native.chipFlags?.[native.chipIds.indexOf(26)] ?? '';
+      if (!/^echo=true$/m.test(flags)) continue;
+      const song = writeTadSong({ native, subsong: 0, instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)), samples: toSequencerSamples(module), wavetables: module.wavetables, title: file });
+      lines[file] = `${flags.replace(/\n/g, ' ')} => ${song.mml.split('\n').filter((l) => l.startsWith('#Echo') || l.startsWith('#Fir')).join(' | ')}`;
+    }
+    console.log(JSON.stringify(lines, null, 1));
+    expect(Object.keys(lines).length).toBeGreaterThan(0);
+    for (const l of Object.values(lines)) expect(l).toMatch(/#EchoLength \d+ \| .*#FirFilter (-?\d+ ){7}-?\d+ \| #EchoFeedback -?\d+ \| #EchoVolume \d+ \d+/);
+  }, 120000);
 });

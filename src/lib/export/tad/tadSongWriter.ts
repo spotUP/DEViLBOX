@@ -35,6 +35,8 @@ export interface TadSongInput {
   /** Indexed by Furnace wavetable index. */
   wavetables?: FurnaceWavetable[];
   title: string;
+  /** Largest echo delay in Furnace steps (16 ms, 2048 bytes of Audio-RAM each); the builder lowers it until the song fits. */
+  echoDelayCap?: number;
 }
 
 export interface TadSampleFile {
@@ -64,14 +66,30 @@ const hex2 = (n: number) => n.toString(16).toUpperCase().padStart(2, '0');
 interface LinearRow { pos: number; row: number; ticks: number }
 
 /** First SNES channel index in the song and the SNES channel count. */
-function snesChannels(native: FurnaceNativeData): { first: number; count: number } | null {
+function snesChannels(native: FurnaceNativeData): { first: number; count: number; chip: number } | null {
   let first = 0;
   for (let i = 0; i < native.chipIds.length; i++) {
     const n = native.systemChans?.[i] ?? 8;
-    if (native.chipIds[i] === FURNACE_SNES_CHIP_ID) return { first, count: Math.min(n, 8) };
+    if (native.chipIds[i] === FURNACE_SNES_CHIP_ID) return { first, count: Math.min(n, 8), chip: i };
     first += n;
   }
   return null;
+}
+
+/** Furnace SNES chip flags (key=value lines), snes.cpp:1108-1130 setFlags. */
+function snesEchoFlags(raw: string | undefined) {
+  const kv = new Map<string, string>();
+  for (const line of (raw ?? '').split('\n')) { const i = line.indexOf('='); if (i > 0) kv.set(line.slice(0, i), line.slice(i + 1).trim()); }
+  const int = (k: string, d: number) => { const v = parseInt(kv.get(k) ?? '', 10); return Number.isFinite(v) ? v : d; };
+  const i8 = (v: number) => { const b = v & 0xff; return b > 127 ? b - 256 : b; }; // snes.cpp rWrite takes the low byte
+  return {
+    on: kv.get('echo') === 'true',
+    volL: i8(int('echoVolL', 127)), volR: i8(int('echoVolR', 127)),
+    delay: int('echoDelay', 0) & 15,
+    feedback: i8(int('echoFeedback', 0)),
+    fir: [127, 0, 0, 0, 0, 0, 0, 0].map((d, i) => i8(int(`echoFilter${i}`, d))),
+    mask: int('echoMask', 0),
+  };
 }
 
 export function writeTadSong(input: TadSongInput): TadSongResult {
@@ -118,6 +136,12 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     const d = dropped.get(what);
     if (d) d.n++; else dropped.set(what, { n: 1, at });
   };
+  const echo = snesEchoFlags(native.chipFlags?.[snes.chip]);
+  const cap = input.echoDelayCap ?? 15;
+  if (!sfx && echo.on && echo.delay > cap) warnings.push(`Echo delay ${echo.delay * 16} ms lowered to ${cap * 16} ms so the echo buffer fits in the 64 KiB of Audio-RAM.`);
+  echo.delay = Math.min(echo.delay, cap);
+  const echoInit = { ...echo }; // header values; `echo` tracks 1Axx/1Bxx while channels are written
+  let maxDelay = echo.delay; // Furnace 19xx values seen, for #MaxEchoLength
   const where = (ch: number, r: LinearRow) => `channel ${ch + 1}, order ${hex2(r.pos)} row ${hex2(r.row)}`;
 
   // Pass 1: play the order list once, following speeds, jumps and breaks, until a row repeats.
@@ -218,7 +242,8 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
   let sfxChannel = -1;
   for (let c = 0; c < snes.count; c++) {
     const ch = snes.first + c;
-    const out: string[] = ['V254'];
+    // echoMask: Furnace starts these channels with echo on (snes.cpp:914).
+    const out: string[] = ['V254', ...(!sfx && echo.on && (echo.mask >> c) & 1 ? ['E1'] : [])];
     let ins = 0, curIns = -1, vol = 127, pan = 64, oct = -1;
     type Pending = { tok: string; ticks: number; sl?: { a: number; b: number; smp: string; plain: string; oct: number; reg: (p: number, smp: string) => number } };
     let pending: Pending = { tok: 'r', ticks: 0 };
@@ -226,7 +251,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     let sounding = false, curNote = 'r';
     let hasNotes = false;
     // Effect state of this channel (Furnace effects that TAD holds as channel state).
-    let curSmp = '', curPitch = -1, echoOn = false, pmOn = false, vib = '0', vibWant: { d: number; q: number } | null = null, volSlide = 0, lastEnv = '';
+    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', vibWant: { d: number; q: number } | null = null, volSlide = 0, lastEnv = '';
     let env: { mode: number; gain: number; adsr: number[] } | null = null;
     const pitchName = (p: number) => NOTE_NAMES[p % 12];
     // Furnace ticks to TAD ticks (rows are k Furnace-tick multiples; sound effects run at 125 Hz).
@@ -283,6 +308,19 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           if (e.cmd === 0x80) p = Math.round(e.val * 128 / 255);
           else if (e.cmd === 0x08) p = Math.round(64 + ((e.val & 15) - (e.val >> 4)) * 64 / 15);
           else if (e.cmd === 0x12) { if ((e.val !== 0) !== echoOn) { echoOn = e.val !== 0; cmds.push(echoOn ? 'E1' : 'E0'); } }
+          else if (!sfx && echo.on && ((e.cmd >= 0x19 && e.cmd <= 0x1c) || (e.cmd >= 0x30 && e.cmd <= 0x37))) {
+            // Furnace sysDef.cpp:1212-1224 -> TAD \edl \evol \efb \ftap (mml-syntax.md:621-661). Furnace ignores them while echo is off (snes.cpp:566).
+            const sv = e.val > 127 ? e.val - 256 : e.val;
+            if (e.cmd === 0x19) { const d = e.val & 15; if (d > cap) drop('effect 19xx echo delay above the Audio-RAM budget (lowered)', at); maxDelay = Math.max(maxDelay, Math.min(d, cap)); cmds.push(`\\edl ${Math.min(d, cap) * 16}`); }
+            else if (e.cmd === 0x1a || e.cmd === 0x1b) {
+              if (sv < 0) drop('effect 1Axx/1Bxx negative (inverted) echo volume clamped to 0', at);
+              const v = Math.max(0, sv);
+              if (e.cmd === 0x1a) echo.volL = v; else echo.volR = v;
+              cmds.push(`\\evol ${Math.max(0, echo.volL)},${Math.max(0, echo.volR)}`);
+            }
+            else if (e.cmd === 0x1c) cmds.push(`\\efb ${sv}`);
+            else cmds.push(`\\ftap ${e.cmd - 0x30},${sv}`);
+          }
           else if (e.cmd === 0x13) {
             if (sfx || c < 1 || c > 5) drop('effect 13xx (pitch modulation only on song channels B-F)', at);
             else if ((e.val !== 0) !== pmOn) { pmOn = e.val !== 0; cmds.push(pmOn ? 'PM' : 'PM0'); }
@@ -478,9 +516,27 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     if (!block) warnings.push('The sound effect has no notes on an SNES channel.');
     return { mml: block, samples: [...sampleFiles.values()], warnings: [...new Set(warnings)] };
   }
+  // Header: Furnace echo flags -> TAD (mml-syntax.md:51-77). Furnace only runs echo when the flag is on (snes.cpp:836).
+  const echoHeader: string[] = [];
+  if (echoInit.on) {
+    const sum = echoInit.fir.reduce((a, b) => a + Math.abs(b), 0);
+    const inv = echoInit.volL < 0 && echoInit.volR < 0;
+    echoHeader.push(
+      `#EchoLength ${echoInit.delay * 16}`,
+      ...(maxDelay > echoInit.delay ? [`#MaxEchoLength ${maxDelay * 16}`] : []),
+      `#FirFilter ${echoInit.fir.join(' ')}`,
+      ...(sum > 128 ? ['#DisableFirFilterLimit'] : []),
+      `#EchoFeedback ${echoInit.feedback}`,
+      `#EchoVolume ${Math.abs(echoInit.volL)} ${Math.abs(echoInit.volR)}`,
+      ...(inv ? ['#EchoInvert both'] : []),
+    );
+    if (sum > 128) warnings.push(`FIR filter absolute sum ${sum} exceeds 128; the compiler's limit is disabled and the echo may overflow.`);
+    if ((echoInit.volL < 0) !== (echoInit.volR < 0)) warnings.push('Echo volume has one negative side; TAD cannot invert one side here, so it is made positive.');
+  }
   const mml = [
     `#Title ${input.title.replace(/[\r\n]/g, ' ')}`,
     `#Timer ${timer}`,
+    ...echoHeader,
     '',
     ...insLines,
     '',

@@ -117,14 +117,28 @@ function readme(r: TadBuildResult, log: string): string {
   ].join('\n');
 }
 
+/** The echo buffer is the one Audio-RAM block the export can shrink: lower the echo delay until the compiler stops saying "too large". */
 export async function buildTadProject(files: TadBuildFile[], create: CreateTadCompiler, locateFile?: (f: string) => string): Promise<TadBuildResult> {
+  let cap = 15;
+  for (;;) {
+    const r = await buildTadProjectOnce(files, create, locateFile, cap);
+    const msg = r.warnings.join('\n');
+    const over = /too large by (\d+) bytes/.exec(msg), buf = /echo buffer:\s+(\d+) bytes/.exec(msg);
+    // compiler log: "echo buffer: N bytes" with 2048 bytes per 16 ms step
+    const next = over && buf ? Math.floor((Number(buf[1]) - Number(over[1])) / 2048) : -1;
+    if (r.ok || next < 0 || next >= cap) return r;
+    cap = next;
+  }
+}
+
+async function buildTadProjectOnce(files: TadBuildFile[], create: CreateTadCompiler, locateFile: ((f: string) => string) | undefined, echoDelayCap: number): Promise<TadBuildResult> {
   const warnings: string[] = [];
   const pieces: Piece[] = [];
   const usedNames = new Set<string>();
   const unique = (base: string) => { let n = base, i = 2; while (usedNames.has(n)) n = `${base}_${i++}`; usedNames.add(n); return n; };
 
   files.forEach((f, fi) => {
-    const input: Omit<TadSongInput, 'subsong'> = { native: f.native, instruments: f.instruments, samples: f.samples, wavetables: f.wavetables, title: f.title };
+    const input: Omit<TadSongInput, 'subsong'> = { native: f.native, instruments: f.instruments, samples: f.samples, wavetables: f.wavetables, title: f.title, echoDelayCap };
     f.native.subsongs.forEach((sub, si) => {
       if (tadSfxName(sub.name)) {
         const r = writeTadSfx({ ...input, subsong: si });
