@@ -6,16 +6,17 @@
  * cell is a same-length patch of that one byte, chosen so the grid's own lookup lands on the new note. The instrument
  * is a 0x22-byte record copied inline into the stream, not a per-note byte: an instrument change is refused. A stream
  * run is shared by every place that calls it, so an edit shows wherever the run plays. Edits the stream cannot hold
- * at its length - a note on a row without one, a note removed, length or volume / effect changes - are refused with a
+ * at its length - a note on a row without one splits the held note ahead of it (addNote, using the 0xF4 padding after it), a note removed, length or volume / effect changes - are refused with a
  * warning and nothing is written for them. After patching the grid is decoded again: every edited cell must read back
  * as edited and every cell that does not share an edited byte must be unchanged, otherwise the edit is taken out again.
  */
 import type { Pattern, TrackerCell } from '@/types';
 import { cellEffects, effectEditPatches } from './cellEffectSlots';
-import { buildSplGrid, type SplGrid } from './soundProgrammingLanguageGrid';
+import { buildSplGrid, readSplHunk, type SplGrid } from './soundProgrammingLanguageGrid';
 
 const NOTE_OFF = 97;
 const ROWS_PER_PATTERN = 64;
+const VOICES = 4;
 const PREFIX = 'Sound Programming Language';
 
 export interface SplEditResult { data: Uint8Array; patched: number; warnings: string[] }
@@ -35,6 +36,49 @@ function otherFieldsDiffer(a: TrackerCell, b: TrackerCell): boolean {
   return false;
 }
 
+const CODE = 0x20;
+
+/**
+ * A note on an empty row inside a held plain note. The note [N] under length H becomes [Cd][N][C(H-d)][new][CH] (+4
+ * bytes): the new note starts d rows in and the length in force is restored. The module has no room to grow, so the 4
+ * bytes come out of the 0xF4 no-op padding that follows in the same run; the bytes between are moved up, and the
+ * relocations of the call / jump operands among them are raised. Returns the new module or a refusal reason.
+ */
+function addNote(data: Uint8Array, g: SplGrid, pattern: number, channel: number, row: number, cell: TrackerCell): Uint8Array | string {
+  const target = pattern * ROWS_PER_PATTERN + row;
+  let cover = -1;
+  for (let t = target - 1; t >= 0 && cover < 0; t--) if (g.rowSources[Math.floor(t / ROWS_PER_PATTERN)]?.[channel]?.[t % ROWS_PER_PATTERN]) cover = t;
+  const src = cover < 0 ? null : g.rowSources[Math.floor(cover / ROWS_PER_PATTERN)][channel][cover % ROWS_PER_PATTERN];
+  const covering = cover < 0 ? undefined : cellAt(g, channel, cover);
+  if (!src || !covering || covering.note < 1 || covering.note >= NOTE_OFF) return 'no note is being held on this row, so a note added here has nothing to split';
+  if (cell.instrument !== 0 && cell.instrument !== covering.instrument) return 'the instrument is chosen by an instrument record in the stream, not by the note; the instrument differs from the one in force';
+  const d = target - cover;
+  if (src.length !== 1 || d >= src.hold) return 'the covering note carries extra note bytes or is not held across this row';
+  let byte = -1;
+  for (let b = 0; b < 0xc0 && byte < 0; b++) if (g.noteForByte(b, src.octave, src.steps) === cell.note) byte = b;
+  if (byte < 0) return `note ${cell.note} is not in the module's period table for this instrument`;
+  const run = g.streams[src.stream];
+  const runEnd = run.offset + run.size;
+  let pos = src.offset + 1;
+  let block = -1;
+  while (pos < runEnd && block < 0) {
+    const b = data[pos];
+    if (b === 0xf4) { let k = 0; while (pos + k < runEnd && data[pos + k] === 0xf4) k++; if (k >= 4) block = pos; else pos += k; }
+    else if (b === 0xf2 || b === 0xf3) break;
+    else pos += b === 0xf1 ? 5 : b === 0xf0 ? 1 + 0x22 : 1;
+  }
+  if (block < 0) return 'the run holds no 4 bytes of no-op padding after this note to take the added bytes';
+  if (g.streams.some((s) => s.offset > src.offset && s.offset < block + 4)) return 'another command stream starts inside the bytes that would have to move';
+  const hunk = readSplHunk(data);
+  if (typeof hunk === 'string') return hunk;
+  const out = new Uint8Array(data);
+  out.set([0xc0 + d, data[src.offset], 0xc0 + src.hold - d, byte, 0xc0 + src.hold], src.offset);
+  out.set(data.subarray(src.offset + 1, block), src.offset + 5);
+  const relAt = CODE + hunk.size + 12;
+  hunk.relocations.forEach((r, i) => { if (r > src.offset - CODE && r < block - CODE) { out[relAt + 4 * i] = ((r + 4) >>> 24) & 0xff; out[relAt + 4 * i + 1] = ((r + 4) >>> 16) & 0xff; out[relAt + 4 * i + 2] = ((r + 4) >>> 8) & 0xff; out[relAt + 4 * i + 3] = (r + 4) & 0xff; } });
+  return out;
+}
+
 export function applySplGridEdits(original: Uint8Array, patterns: readonly Pattern[]): SplEditResult {
   const data = new Uint8Array(original);
   const warnings: string[] = [];
@@ -46,6 +90,7 @@ export function applySplGridEdits(original: Uint8Array, patterns: readonly Patte
   }
   const claimed = new Map<number, number>();
   const accepted: Edit[] = [];
+  const adds: Array<{ pattern: number; channel: number; row: number; cell: TrackerCell }> = [];
 
   patterns.forEach((pat, pi) => pat.channels.forEach((ch, c) => ch.rows.forEach((cell, r) => {
     const was = base.patterns[pi]?.channels[c]?.rows[r];
@@ -71,6 +116,7 @@ export function applySplGridEdits(original: Uint8Array, patterns: readonly Patte
       }
       return;
     }
+    if (was.note === 0 && cell.note >= 1 && cell.note < NOTE_OFF && !base.rowSources[pi]?.[c]?.[r]) { adds.push({ pattern: pi, channel: c, row: r, cell }); return; }
     const src = base.rowSources[pi]?.[c]?.[r];
     if (!src || was.note < 1 || was.note >= NOTE_OFF) {
       warnings.push(`${PREFIX} ${where(at)}: no note plays on this row, and adding or removing one would change the length of the stream; the edit was not written.`);
@@ -134,6 +180,34 @@ export function applySplGridEdits(original: Uint8Array, patterns: readonly Patte
     live = bad.length === live.length ? [] : live.filter((e) => !bad.includes(e));
   }
   writeAll(live);
+  let current: Uint8Array = data;
+  for (const a of adds) {
+    const before = buildSplGrid(current);
+    if (typeof before === 'string') break;
+    const res = addNote(current, before, a.pattern, a.channel, a.row, a.cell);
+    if (typeof res === 'string') { warnings.push(`${PREFIX} ${where(a)}: ${res}; the note was not written.`); continue; }
+    const after = buildSplGrid(res);
+    const got = typeof after === 'string' ? undefined : cellAt(after, a.channel, a.pattern * ROWS_PER_PATTERN + a.row);
+    let ok = typeof after !== 'string' && after.rows === before.rows && got?.note === a.cell.note;
+    // the only other rows allowed to change are those another call of the same run plays
+    const coverStream = (g: SplGrid, c: number, row: number): number => {
+      for (let t = row; t >= 0; t--) { const s = g.rowSources[Math.floor(t / ROWS_PER_PATTERN)]?.[c]?.[t % ROWS_PER_PATTERN]; if (s) return s.stream; }
+      return -1;
+    };
+    const edited = (() => { for (let t = a.pattern * ROWS_PER_PATTERN + a.row - 1; t >= 0; t--) { const s = before.rowSources[Math.floor(t / ROWS_PER_PATTERN)]?.[a.channel]?.[t % ROWS_PER_PATTERN]; if (s) return s.stream; } return -2; })();
+    if (ok && typeof after !== 'string') {
+      for (let c = 0; c < VOICES && ok; c++) for (let row = 0; row < before.rows && ok; row++) {
+        const x = cellAt(before, c, row);
+        const y = cellAt(after, c, row);
+        if (!x || !y) { ok = false; break; }
+        const same = x.note === y.note && x.instrument === y.instrument && JSON.stringify(cellEffects(x)) === JSON.stringify(cellEffects(y));
+        if (!same && coverStream(before, c, row) !== edited) ok = false;
+      }
+    }
+    if (!ok) { warnings.push(`${PREFIX} ${where(a)}: the module read back differently than the added note; it was not written.`); continue; }
+    current = res;
+  }
+  if (current !== data) data.set(current);
   let patched = 0;
   for (let i = 0; i < data.length; i++) if (data[i] !== original[i]) patched++;
   return { data, patched, warnings };

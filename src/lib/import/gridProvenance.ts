@@ -290,7 +290,8 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   tonyWilliams: 'pass',
   // beathoven: a note on an empty row inside a held plain note splits it ([num][dur] -> [num][d][new][dur - d]); the grown stream moves to the code hunk end and its track-list entries are repointed (beathovenEdits.ts addNote).
   beathoven: 'pass',
-  soundProgrammingLanguage: 'fail',
+  // soundProgrammingLanguage: a note on an empty row inside a held note splits it ([Cd][N][C(H-d)][new][CH], +4 bytes) using the 0xF4 padding behind it in the same run; call/jump relocations among the moved bytes are raised (soundProgrammingLanguageEdits.ts addNote).
+  soundProgrammingLanguage: 'pass',
   // dynamicSynthesizer: patterns are fixed-size word arrays; a note on an empty step overwrites its zero word in place, nothing grows (dynamicSynthesizerEdits.ts).
   dynamicSynthesizer: 'pass',
   // riffRaff: a note on a held row splits the covering note or rest at two rates the module already uses; the grown pattern moves to the end of the code hunk (riffRaffEdits.ts).
