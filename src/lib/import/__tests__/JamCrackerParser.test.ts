@@ -110,3 +110,18 @@ describe('parseJamCrackerFile — analogue vibes.jam', () => {
     console.log(`  JamCracker analogue vibes: ${song.instruments.length} instruments, ${samplerInsts.length} Sampler, ${withAudio.length} with audio`);
   });
 });
+
+describe('JamCracker order list export', () => {
+  it('writes an edited order list of the same length into the module own bytes', async () => {
+    const { exportAsJamCracker } = await import('@/lib/export/JamCrackerExporter');
+    const original = new Uint8Array(loadAB(JAM_FILE_1));
+    const song = await parseJamCrackerFile(original.buffer.slice(0), 'freehand-spreadtro.jam');
+    const want = song.songPositions.slice().reverse();
+    expect(want.length).toBeGreaterThan(1);
+    song.songPositions = want.slice();
+    const bytes = new Uint8Array(await (await exportAsJamCracker(song)).data.arrayBuffer());
+    expect(bytes.length).toBe(original.length);
+    expect(bytes[37]).toBe(original[37]);
+    expect((await parseJamCrackerFile(bytes.buffer, 'freehand-spreadtro.jam')).songPositions).toEqual(want);
+  });
+});

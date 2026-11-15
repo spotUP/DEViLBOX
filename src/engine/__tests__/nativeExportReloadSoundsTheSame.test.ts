@@ -435,7 +435,6 @@ const KNOWN: Record<string, Partial<Record<'unedited' | 'edited', string>>> = {
   fc: { unedited: 'G16 fc: exported bytes differ from the original at byte 14', edited: 'G16 fc: the reloaded grid differs from the edited grid on ~6600 cells (instrument and volume columns lost)' },
   deltaMusic1: { unedited: 'G16 deltaMusic1: exported bytes differ from the original at byte 22', edited: 'G16 deltaMusic1: voice 1 plays a different Paula write after the edit (untouched voice moved)' },
   deltaMusic2: { unedited: 'G16 deltaMusic2: exported bytes differ from the original at byte 0', edited: 'G16 deltaMusic2: the note edit is not heard in the rendered stream' },
-  jamcracker: { unedited: 'G16 jamcracker: exported bytes differ from the original at byte 37', edited: 'G16 jamcracker: untouched voice 1 plays a different Paula write after the edit' },
   soundmon: { edited: 'G16 soundmon: untouched voice 3 plays a different Paula write after the edit' },
   hvl: { edited: 'G16 hvl: the edited-note stage throws (no assertion text; HVL has no UADE replayer rig)' },
   inStereo2: { unedited: 'G16 inStereo2: exported bytes differ from the original at byte 35', edited: 'G16 inStereo2: untouched voice 1 plays a different Paula write after the edit' },
