@@ -200,14 +200,14 @@ describe('Furnace cell effects step on every tick of an engine-driven row', () =
     const calls = play({ note: 49, effTyp: 1, eff: 0x04 });
     const slide = ofCmd(calls, DivCmd.NOTE_PORTA);
     expect(slide.length).toBe(6);
-    expect(slide.every((c) => c.val1 === 16 && c.val2 === 255)).toBe(true);
+    expect(slide.every((c) => c.val1 === 16 && c.val2 === 179)).toBe(true);
   });
 
   it('a pitch slide down (2xx) keeps sliding on all six ticks instead of one jump', () => {
     const calls = play({ note: 49, effTyp: 2, eff: 0x04 });
     const slide = ofCmd(calls, DivCmd.NOTE_PORTA);
     expect(slide.length).toBe(6);
-    expect(slide.every((c) => c.val1 === 16 && c.val2 === -60)).toBe(true);
+    expect(slide.every((c) => c.val1 === 16 && c.val2 === 0)).toBe(true);
   });
 
   it('a tone portamento (3xx) slides toward the note on every tick and does not retrigger it', () => {

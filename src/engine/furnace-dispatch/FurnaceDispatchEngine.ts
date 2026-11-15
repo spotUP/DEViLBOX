@@ -65,6 +65,14 @@ export const SampleLoopMode = {
 
 export type SampleLoopMode = typeof SampleLoopMode[keyof typeof SampleLoopMode];
 
+/**
+ * Dispatch note of a MIDI note. Engine 258 shifts dispatch notes by 60 (calcBaseFreq uses note-60):
+ * dispatch 60 = C-0 = MIDI 12, so dispatch = MIDI + 48.
+ */
+export function dispatchNoteOfMidi(midi: number): number {
+  return midi + 48;
+}
+
 /** DivDispatchCmds subset (matching Furnace dispatch.h) */
 export const DivCmd = {
   // Core commands

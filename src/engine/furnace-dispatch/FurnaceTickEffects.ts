@@ -18,7 +18,7 @@
  *   Axy volume slide   volSpeed = -(y*64) or x*64 (8.8 fixed point); VOLUME each tick, clamped 0..volMax
  *   7xy tremolo        VOLUME(volume - tremTable[pos] * depth), pos += rate (not while a slide runs)
  *   4xy vibrato        PITCH(pitch + vibTable[pos] * depth * 15 >> 4 / 15), pos += rate
- *   1xx / 2xx slide    NOTE_PORTA(speed * 4, 255 | -60) every tick, PRE_PORTA at the start
+ *   1xx / 2xx slide    NOTE_PORTA(speed * 4, 179 | 0) every tick, PRE_PORTA at the start
  *   3xx portamento     NOTE_PORTA(speed * 4, note) every tick, PRE_PORTA at the start
  *   5xy = 4 + Axy with the remembered vibrato; 6xy = 3 + Axy with the remembered portamento.
  *   E1xy / E2xy        shorthand slide (FurnaceSequencer.cpp case 0xe1/0xe2): y semitones up/down at
@@ -191,7 +191,7 @@ export class FurnaceTickEffects {
           s.shorthandTicks = 0;
           if (param === 0) this.stopPorta(s, out);
           else {
-            s.portaNote = effect === 0x01 ? 255 : -60;
+            s.portaNote = effect === 0x01 ? 179 : 0; // engine 258 playback.cpp:1064/1107 (limitSlides off)
             s.portaSpeed = param;
             out.push({ cmd: DivCmd.PRE_PORTA, val1: 1, val2: 0 });
           }

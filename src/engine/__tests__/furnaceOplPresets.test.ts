@@ -67,7 +67,7 @@ async function noteAndRender(pt: number, slot: number) {
   const vmax = VOLUME_MAX[pt] ?? 127;
   await w.send({ type: 'dispatch', platformType: pt, cmd: 4, chan: 0, val1: slot, val2: 1 });
   await w.send({ type: 'dispatch', platformType: pt, cmd: 5, chan: 0, val1: vmax, val2: 0 });
-  await w.send({ type: 'dispatch', platformType: pt, cmd: 0, chan: 0, val1: 48, val2: 0 });
+  await w.send({ type: 'dispatch', platformType: pt, cmd: 0, chan: 0, val1: 108, val2: 0 });
   const outs = stereoOutputs(37); let ss = 0, pk = 0;
   const blocks = 200;
   for (let b = 0; b < blocks; b++) {

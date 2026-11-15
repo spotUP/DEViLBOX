@@ -16,6 +16,7 @@ import {
   FurnaceDispatchPlatform,
   SampleDepth,
   DivCmd,
+  dispatchNoteOfMidi,
   type OscDataCallback
 } from './FurnaceDispatchEngine';
 import { useOscilloscopeStore } from '@stores/useOscilloscopeStore';
@@ -1129,9 +1130,7 @@ export class FurnaceDispatchSynth implements DevilboxSynth {
     const vol = Math.round(velocity * maxVol);
     this.engine.setVolume(chan, vol, this.chipKey, _time);
 
-    // Furnace dispatch note 0 = C-0, which is MIDI note 12.
-    // So dispatch note = midiNote - 12.
-    this.engine.noteOn(chan, midiNote - 12, this.chipKey, _time);
+    this.engine.noteOn(chan, dispatchNoteOfMidi(midiNote), this.chipKey, _time);
 
     // Track active note. The NOTE_ON replaced whatever the channel played, so drop that note's entry: a later
     // release of the old note must not send a NOTE_OFF that cuts this one.

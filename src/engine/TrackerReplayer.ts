@@ -46,6 +46,7 @@ import { useFormatStore } from '@/stores/useFormatStore';
 import { decodeVolumeColumn, noteStartLevel } from '@/lib/tracker/volumeColumn';
 import { furnaceCellChipEffects, cellSetVolumeLevel } from './replayer/furnaceCellEffects';
 import { FurnaceTickEffects, TICK_STEPPED_EFFECTS } from './furnace-dispatch/FurnaceTickEffects';
+import { dispatchNoteOfMidi } from './furnace-dispatch/FurnaceDispatchEngine';
 import { noteToMidi } from '@/utils/audio-context';
 import { useInstrumentStore } from '@/stores/useInstrumentStore';
 import { useWasmPositionStore } from '@/stores/useWasmPositionStore';
@@ -1426,7 +1427,7 @@ export class TrackerReplayer {
       engine.applyFurnaceCellEffect(config.id, chIndex, config, e.effect, e.param);
     }
     // Furnace chip note: MIDI note - 12, as FurnaceDispatchSynth.triggerAttack sends it.
-    const chipNote = isPitchedNote(row.note) ? noteToMidi(xmNoteToNoteName(row.note)) - 12 : null;
+    const chipNote = isPitchedNote(row.note) ? dispatchNoteOfMidi(noteToMidi(xmNoteToNoteName(row.note))) : null;
     this.furnaceTickChannels.set(chIndex, config.id);
     const rowLevel = cellSetVolumeLevel(row) ?? decodeVolumeColumn(row.volume, useFormatStore.getState().editorMode);
     const chipVolMax = engine.furnaceChipVolumeMax(config.id, chIndex, config);
