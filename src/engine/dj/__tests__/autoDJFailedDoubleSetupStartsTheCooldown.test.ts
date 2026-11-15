@@ -9,6 +9,7 @@
  * setup gave up ("could not be corrected"). Numbers: one double loaded in the 150 s after the give-up
  * (CRUISING cooldown 180 s at MUSICAL), the juggle telemetry reads the cooldown, no pattern started.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({

@@ -5,6 +5,7 @@
  * of performance in seconds; failures injected per track; every transition
  * checked against the invariants; metrics asserted with the plan's numbers.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({ engine: null as unknown }));

@@ -9,6 +9,7 @@
  * The per-style behaviour lives here; the wiring through getAutoDJ (anticipate -> poll -> executor
  * -> the Auto DJ's performScratch) is autoDJTransitionScratchThroughTheAutoDJ.test.ts.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({ engine: null as unknown, crossfader: [] as number[] }));

@@ -9,6 +9,7 @@
  *   reach     a stroke fired through the registry (fireDjFx, the entry every Auto Scratch stroke takes) lands on the
  *             Deck C motion with the stroke's own render; Deck C's lanes view is the one consumer and moves with it
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

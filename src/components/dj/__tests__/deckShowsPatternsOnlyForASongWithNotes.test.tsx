@@ -6,6 +6,7 @@
  * (SID-DECK-AUDIT 2) both decks showed an empty pattern grid instead of the scope.
  * Real HVSC files through the real SIDParser.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import 'fake-indexeddb/auto';
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/react';

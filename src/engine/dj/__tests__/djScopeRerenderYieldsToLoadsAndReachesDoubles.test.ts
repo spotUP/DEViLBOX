@@ -8,6 +8,7 @@
  * Real DJEngine / DeckEngine / DJPipeline queue, stand-in render worker with
  * controllable completion.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import 'fake-indexeddb/auto';
 import { describe, it, expect, vi } from 'vitest';
 

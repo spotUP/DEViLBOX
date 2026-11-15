@@ -8,6 +8,7 @@
  * it at 0.93 for 6 s. Now: >= 0.4 s heard backward, below -1.5 x, back at speed.
  * The heard audio of such a rate track is measured in djSpinbackIsHeardBackward.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';

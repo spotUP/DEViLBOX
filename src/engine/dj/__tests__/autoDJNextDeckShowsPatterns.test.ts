@@ -5,6 +5,7 @@
  * replayer. Auto DJ's pre-rendered load passed no song, and a track played
  * from the audio cache after a reload found none in the in-memory song cache.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const probe = vi.hoisted(() => ({

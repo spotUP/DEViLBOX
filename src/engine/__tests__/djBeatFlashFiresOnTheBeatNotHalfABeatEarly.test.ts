@@ -5,6 +5,7 @@
  * the heard position CROSSES a beat: the beat in progress is the last grid
  * beat at or before the position.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('@/engine/dj/DJEngine', () => ({ getDJEngine: () => { throw new Error('no engine in this test'); } }));

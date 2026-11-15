@@ -7,6 +7,7 @@
  * current rate, at 0 and +-8 % pitch; in tracker mode the row comes from the
  * replayer's display ring (heard times), not the scheduler's counters.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, cleanup } from '@testing-library/react';
 import { heardPositionSec, outputLatencySec } from '@/engine/audioLatency';

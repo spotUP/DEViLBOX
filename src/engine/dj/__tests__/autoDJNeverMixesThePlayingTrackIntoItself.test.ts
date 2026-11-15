@@ -10,6 +10,7 @@
  * Drives the Auto DJ's real preload loop, the real loader's pre-render and the
  * real session controller; only the audio cache and the decks are stubbed.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({ engine: null as unknown, rendered: [] as string[] }));

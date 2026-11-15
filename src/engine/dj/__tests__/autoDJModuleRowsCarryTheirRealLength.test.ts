@@ -10,6 +10,7 @@
  * Numbers: the row reads the render's length, and the session's planned set counts it instead of 240 s;
  * the analyser's 90 s preview of a longer module writes the module's walk length.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 vi.mock('@/engine/dj/DJEngine', () => ({ getDJEngine: () => { throw new Error('no engine'); }, getDJEngineIfActive: () => null }));

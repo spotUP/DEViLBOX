@@ -11,6 +11,7 @@
  * successful load or render clears it everywhere; nothing but a failed load
  * (or the owner, by hand) sets it.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { DJPlaylist, PlaylistTrack } from '@/stores/useDJPlaylistStore';
 

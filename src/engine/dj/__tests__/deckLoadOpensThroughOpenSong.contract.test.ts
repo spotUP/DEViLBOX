@@ -6,6 +6,7 @@
  * loading state and its UADE engine are not touched. A deck's UADE scan runs on
  * the deck's own engine, passed down the parse.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, afterEach, vi } from 'vitest';
 
 const probe = vi.hoisted(() => ({

@@ -13,6 +13,7 @@
  * "like 5 % of the moves the demo has" in the first pair - a stroke's stop is scheduled ahead on the voice,
  * the next stroke on that voice starts at that stop, and the old stop silenced it in the worklet.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

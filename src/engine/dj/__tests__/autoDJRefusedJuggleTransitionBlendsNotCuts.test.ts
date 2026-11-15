@@ -18,6 +18,7 @@
  * incoming half before the blend's planned start; the incoming starts at the blend's mix-in; the
  * transition completes on the incoming. Fake timers, fake engine, no audio.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({

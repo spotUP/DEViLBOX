@@ -11,6 +11,7 @@
  * deck's waveforms come from a real ChannelScopeTrack through
  * channelScopeWindow. Fake engine, a recording 2D context, manual frames.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({ song: null as unknown, track: null as unknown, positionSec: 0, waveformCalls: 0 }));

@@ -11,6 +11,7 @@
  * the flush was never needed: KILL writes `enabled: false` and nothing else.
  */
 
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 
 const setDubBus = vi.fn();

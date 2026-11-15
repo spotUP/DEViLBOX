@@ -4,6 +4,7 @@
  * on Deck C through its worklet chain, the level / duck / headroom / 0.94 normalisation - and dj_viz's 50 Hz
  * streams of the same render, against the demo's own output (tools/scratch-fixtures/gen_three_deck_showcase.py).
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

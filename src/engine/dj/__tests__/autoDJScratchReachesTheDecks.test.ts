@@ -11,6 +11,7 @@
  * Fake timers drive the poll and the executor; the deck is a fake whose position runs on the
  * fake clock; the strokes render through the real worklet on an offline context.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch } from '@/test/audio/realWebAudio';
 

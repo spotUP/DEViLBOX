@@ -4,6 +4,7 @@
  * source and record, its release as `scratchStop`, and a recorded set
  * replays them through `fireDjFx` / `releaseDjFx` - the same one path.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({ deck: null as unknown }));

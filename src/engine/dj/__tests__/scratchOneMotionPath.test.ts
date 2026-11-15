@@ -7,6 +7,7 @@
  * playDeckPattern -> ScratchPlayback tick -> deck.setScratchVelocity); sentinel
  * `scratchPhysicsStats.performed` and the deck's rates equal the model's curve.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({ deck: null as unknown }));

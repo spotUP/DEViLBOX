@@ -7,6 +7,7 @@
  * Path: the Auto DJ's `shapeRoutine` -> `scratchShapeDecks` (live engine + store) -> the beat the level is measured on.
  * Pass: scratch RMS / heard beat RMS = 0.60 +- 0.05 with the trim at -6 dB, +4 dB and the fader at 0.8.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { installRealWebAudio } from '@/test/audio/realWebAudio';
 import { NumpyRandomState } from '@/engine/turntable/turntableSim';

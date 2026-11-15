@@ -12,6 +12,7 @@
  * as -40 dB or worse. The whole routine through the controller, the executor and the pool nulls against
  * the demo's render in the A/B harness (`scratchParityRenderAB.test.ts`, SCRATCH_AB_LAYERS=1 SCRATCH_AB_RATE=22050).
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

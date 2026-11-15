@@ -9,6 +9,7 @@
  * idle deck, then the poll loop runs. Sentinel: a double is loaded over the teased track. Numbers: the
  * stand-alone note never reads "waits on the idle deck"; the pre-render is still held for the transition.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({

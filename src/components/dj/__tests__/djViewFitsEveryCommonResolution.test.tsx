@@ -13,6 +13,7 @@
  * overlay and the heavy leaf widgets that need them. DJView, DJDeck, DJMixer,
  * DeckPanelTabs, DeckAudioWaveform, the layout hook and the solver are real.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 

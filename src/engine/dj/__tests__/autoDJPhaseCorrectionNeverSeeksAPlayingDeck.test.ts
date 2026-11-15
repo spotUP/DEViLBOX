@@ -15,6 +15,7 @@
  * deck while it plays; the heard bar-phase error after the bend < 5 ms.
  * Fake timers, fake engine, no audio.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({
@@ -25,13 +26,15 @@ const holder = vi.hoisted(() => ({
   incomingGridShiftSec: 0.040,
 }));
 
-vi.mock('@/engine/dj/DJEngine', async () => {
-  // DJPhase (not DJEngine) answers getDJEngineIfActive for the phase maths.
-  (await import('@/engine/dj/DJPhase')).setDJEngineHolder(
-    new Proxy({}, { get: (_t, k) => (holder.engine as never as Record<PropertyKey, unknown>)[k] }) as never,
-  );
-  return { getDJEngine: () => holder.engine, getDJEngineIfActive: () => holder.engine };
-});
+vi.mock('@/engine/dj/DJEngine', () => ({
+  getDJEngine: () => holder.engine,
+  getDJEngineIfActive: () => holder.engine,
+}));
+// DJPhase (not DJEngine) answers getDJEngineIfActive for the phase maths. Seeded here, not inside the
+// DJEngine mock factory: importing DJPhase there runs useDJStore -> DJActions -> DJEngine and bypasses the mock.
+setDJEngineHolder(
+  new Proxy({}, { get: (_t, k) => (holder.engine as never as Record<PropertyKey, unknown>)[k] }) as never,
+);
 vi.mock('../DJQuantizedFX', () => {
   const record = () => () => () => {};
   return {
@@ -55,6 +58,7 @@ vi.mock('../DJPerSongFx', () => ({ applyPerSongMasterFx: () => {} }));
 
 import { barPhaseErrorSec, setupJuggleTransition, teardownJuggleTransition, OUTGOING } from './juggleTransitionHarness';
 import { corpusTrack } from '../autodj/testing/corpus';
+import { setDJEngineHolder } from '@/engine/dj/DJPhase';
 
 describe('Auto DJ phase correction bends a playing deck, never seeks it', () => {
   afterEach(() => teardownJuggleTransition());

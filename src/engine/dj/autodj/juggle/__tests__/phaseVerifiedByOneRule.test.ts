@@ -11,6 +11,7 @@
  * never layers, and the stand-alone double is not verified - each obeys the one rule, not its own
  * copy of it. Virtual clock, recording sinks, no audio.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({ override: null as null | ((deck: 'A' | 'B') => string | null) }));

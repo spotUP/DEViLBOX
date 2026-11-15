@@ -10,6 +10,7 @@
  * existed is not "fully analysed" (it is re-analysed), and a current entry
  * carries the extended data back out.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({

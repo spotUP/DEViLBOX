@@ -9,6 +9,7 @@
  * the audio analysis' 140.95 (the DJ-K split: playlist 94, deck 140.95).
  * Fake deck engine, no audio.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({

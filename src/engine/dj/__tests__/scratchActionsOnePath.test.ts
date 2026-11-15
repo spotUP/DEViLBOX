@@ -5,6 +5,7 @@
  * only caller of the deck pattern player. The old direct call path has no
  * callers left (static assertion over `src/`).
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';

@@ -8,6 +8,7 @@
  * real deck/mixer primitives (a fake engine records every call). The decision
  * log and the controller's counters are the sentinels that the new code ran.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({

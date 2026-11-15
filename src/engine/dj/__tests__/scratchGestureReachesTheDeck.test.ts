@@ -7,6 +7,7 @@
  * both velocity signs (a chirp reverses), and the channel gain is 0 inside a
  * cut window and 1 inside an open one.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({ deck: null as unknown }));

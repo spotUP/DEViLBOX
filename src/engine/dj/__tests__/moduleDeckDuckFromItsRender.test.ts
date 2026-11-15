@@ -8,6 +8,7 @@
  * its decks to the pool's `shapeRoutinePlan`. Sentinel: `autoScratchRuntimeStats.moduleRenders` (one decode per
  * file, however many routines).
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { installRealWebAudio } from '@/test/audio/realWebAudio';
 

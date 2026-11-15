@@ -6,6 +6,7 @@
  * beatMatchedTransition (what Auto DJ starts for a crossfade) against a fake
  * deck engine that records setPitch, the call that sets the playback rate.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const engine = vi.hoisted(() => ({

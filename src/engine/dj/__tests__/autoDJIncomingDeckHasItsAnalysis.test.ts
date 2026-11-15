@@ -10,6 +10,7 @@
  * apply, against a fake deck engine. The transition functions are recorded with
  * the incoming deck's state at the moment each is chosen.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({

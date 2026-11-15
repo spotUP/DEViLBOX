@@ -11,6 +11,7 @@
  * phase is OPENING (owner plan section 28: normal mixing - a timing gate),
  * so the poll loop alone never juggles here. Fake timers, fake decks, no audio.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({

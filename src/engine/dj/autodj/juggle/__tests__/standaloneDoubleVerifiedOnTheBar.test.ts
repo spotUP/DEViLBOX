@@ -6,6 +6,7 @@
  * the heard bar phase. The real store and DJAutoSync phase measurement; no
  * engine (positions come from the store).
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@/engine/dj/DJEngine', () => ({ getDJEngine: () => { throw new Error('no engine'); }, getDJEngineIfActive: () => null }));

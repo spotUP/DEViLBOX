@@ -8,6 +8,7 @@
  * previous track's pattern). It now reads the song the load parsed for that
  * file (DJSongCache) and re-reads when the deck takes a song (songVersion).
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 

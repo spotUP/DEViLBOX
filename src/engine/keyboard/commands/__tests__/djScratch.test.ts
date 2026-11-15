@@ -14,6 +14,7 @@
  * without actually instantiating DeckEngine / Tone.js.
  */
 
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SCRATCH_PATTERNS } from '@/engine/dj/DJScratchEngine';
 

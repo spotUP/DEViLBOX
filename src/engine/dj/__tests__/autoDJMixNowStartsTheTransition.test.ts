@@ -7,6 +7,7 @@
  * poll loop can complete it. Also with a pre-rendered next track and an
  * anticipated plan in place (the planner must not hold a skip).
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({

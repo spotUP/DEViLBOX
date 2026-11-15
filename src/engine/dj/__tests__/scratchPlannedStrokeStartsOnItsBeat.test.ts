@@ -7,6 +7,7 @@
  * A planned fire (`beats` given) now starts the stroke at its beginning and plays whole cycles;
  * a hand-pressed pattern keeps its phase alignment.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({ deck: null as unknown }));

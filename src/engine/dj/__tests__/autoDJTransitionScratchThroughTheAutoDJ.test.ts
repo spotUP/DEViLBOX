@@ -12,6 +12,7 @@
  * lives in autoDJTransitionWithScratch.test.ts. Fake timers, fake engine, no audio: the runtime's
  * scratch executor records the events instead of playing them.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({

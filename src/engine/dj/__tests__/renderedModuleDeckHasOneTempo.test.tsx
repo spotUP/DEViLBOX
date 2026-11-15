@@ -13,6 +13,7 @@
  * network. The pipeline stand-in applies the analysis during the render, as
  * the real one does for a deck load.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

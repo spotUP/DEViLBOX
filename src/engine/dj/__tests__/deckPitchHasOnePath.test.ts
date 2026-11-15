@@ -7,6 +7,7 @@
  * engine, so a pitch that did not change the store value never sounded.
  * The store no longer has a pitch setter; the guard below keeps it that way.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';

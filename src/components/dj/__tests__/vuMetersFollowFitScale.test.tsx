@@ -4,6 +4,7 @@
  * they stopped lining up with the columns. The meters now take the same fitted
  * scale (ReadOnlyPatternCanvas layout / PatternEditorCanvas fitScale).
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({ song: null as unknown, track: null as unknown, positionSec: 0, waveformCalls: 0 }));

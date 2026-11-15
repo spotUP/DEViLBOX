@@ -6,6 +6,7 @@
  * action path: dubbed -> one registry fire (fx_dub_echo), dry -> none; nothing in the scratch
  * layer calls the Dub engine directly.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';

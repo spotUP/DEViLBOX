@@ -8,6 +8,7 @@
  *
  * Pure planner checks plus the legacy functions on a fake engine (fake timers).
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const engine = vi.hoisted(() => ({

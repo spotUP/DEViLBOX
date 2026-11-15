@@ -8,6 +8,7 @@
  * messages to the render worker captured; the width comes from a stubbed
  * ResizeObserver. The fit maths is tested in tracker/__tests__/fitChannelScale.test.ts.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 type Msg = { type: string; width?: number; w?: number; dpr?: number; layout?: { offsets: number[]; widths: number[] } };

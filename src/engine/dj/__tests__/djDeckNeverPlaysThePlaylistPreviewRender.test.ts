@@ -10,6 +10,7 @@
  * Drives DJPipeline.loadOrEnqueue (real queue, real IndexedDB cache) with a
  * stand-in render worker that renders the 180 s song up to its cap.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import 'fake-indexeddb/auto';
 import { describe, it, expect, vi } from 'vitest';
 

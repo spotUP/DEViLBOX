@@ -7,6 +7,7 @@
  * slider reads changes, and the juggle telemetry the debug view reads is
  * published. Fake timers, fake engine, no audio.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({

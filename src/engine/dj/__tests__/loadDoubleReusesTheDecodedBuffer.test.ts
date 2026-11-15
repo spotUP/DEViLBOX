@@ -6,6 +6,7 @@
  * analysis: the target deck carries the very same analysis object, grid, key
  * and tempo. Tone's player and buffer are stand-ins (no audio context).
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi } from 'vitest';
 
 const holder = vi.hoisted(() => ({ engine: null as unknown, decodes: 0, stems: [] as Array<ArrayBuffer | null> }));

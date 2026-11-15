@@ -5,6 +5,7 @@
  * it as a `url` song source at the server proxy, and refuses a host the proxy
  * does not serve with a reason the playlist shows.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi } from 'vitest';
 
 // Keep the audio engine out: only the source resolution is under test.

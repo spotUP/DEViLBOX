@@ -7,6 +7,7 @@
  * The outgoing deck's physics spins it back (rate negative) and it stops once
  * the reverse ends: the record is pulled out.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';
 

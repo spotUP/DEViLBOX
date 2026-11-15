@@ -8,6 +8,7 @@
  * prototype methods on stand-in objects, since a real DeckEngine needs an
  * AudioContext) and then Auto DJ's real shouldDeferForPatternData.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({ engine: null as unknown }));

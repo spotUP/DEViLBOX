@@ -5,6 +5,7 @@
  * (heardContextTime). Mounts the real overlay through its rAF loop with a
  * tracker pattern in the stores and records the time it asks the ring for.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 

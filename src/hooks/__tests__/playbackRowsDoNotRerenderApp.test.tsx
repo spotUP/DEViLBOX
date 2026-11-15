@@ -7,6 +7,7 @@
  * played, tens of MB/s of garbage, playback slowing until it halted
  * (2026-09-28). The actions now read the stores when pressed.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, cleanup, act } from '@testing-library/react';
 

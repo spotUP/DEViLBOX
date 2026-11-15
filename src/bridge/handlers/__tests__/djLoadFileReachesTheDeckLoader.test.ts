@@ -5,6 +5,7 @@
  * in through the bridge handler, and the deck engine's load is called with
  * the deck and the file name. Also: dj_get_state reports channelScopeCount.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

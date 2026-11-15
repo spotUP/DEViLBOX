@@ -8,6 +8,7 @@
  * phase-aligns. Now every load applies the analysis once the deck holds the
  * track: the grid is there and it is the module's.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 

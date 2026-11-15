@@ -5,6 +5,7 @@
  * and never reorders the user's playlist. The decision log carries the
  * "why this track" explanation with rejected alternatives.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({ engine: null as unknown, loads: [] as string[] }));

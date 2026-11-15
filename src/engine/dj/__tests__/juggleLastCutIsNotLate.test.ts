@@ -14,6 +14,7 @@
  * planned and executed beat and its error in ms. The time rule itself, on the real mixer and player code,
  * is proven (and revert-checked) in deckActionsLandWithTheFader.test.ts.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({

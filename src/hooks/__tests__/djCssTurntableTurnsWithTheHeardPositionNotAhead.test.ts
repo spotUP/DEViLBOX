@@ -4,6 +4,7 @@
  * ahead of what the listener hears by the output latency. They now read the
  * heard position: the deck's clock anchor extrapolated to the frame.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

@@ -11,6 +11,7 @@
  * the beat grid's time of its beat - mean and worst error in ms - at pitch 0 and at +1 semitone, with
  * the store's `effectiveBPM` doubled by the detector.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi } from 'vitest';
 import { useDJStore } from '@/stores/useDJStore';
 import { ScratchExecutor } from '../scratch/ScratchExecutor';

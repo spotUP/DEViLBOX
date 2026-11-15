@@ -12,6 +12,7 @@
  * (a load in flight has no playable buffer; play() throws then, as
  * DeckAudioPlayer does). Sentinel: the loads that reached the deck.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { setTimeout as realSleep } from 'node:timers/promises';
 

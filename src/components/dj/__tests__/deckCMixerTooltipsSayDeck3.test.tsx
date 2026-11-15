@@ -3,6 +3,7 @@
  * worked out with `deckId === 'A' ? '1' : '2'`, which turns C into 2. Every mixer
  * control asks deckNumber() now (A = 1, B = 2, C = 3).
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 

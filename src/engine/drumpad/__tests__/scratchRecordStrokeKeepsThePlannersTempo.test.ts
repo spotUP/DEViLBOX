@@ -5,6 +5,7 @@
  * 2-step baby played 4 steps long and the routine's rhythm smeared. A planned stroke is now timed on the
  * clock that placed it; a pad (no planner) keeps the deck's tempo.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const pool = vi.hoisted(() => ({ bpms: [] as number[] }));

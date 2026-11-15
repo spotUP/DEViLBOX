@@ -22,6 +22,7 @@
  *
  * Drives the Auto DJ's real poll loop and wait with stubbed decks.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({
