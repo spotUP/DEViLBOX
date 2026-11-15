@@ -16,6 +16,7 @@
  * before P13 13.6 %, 1.16, 1.7 %); PERFORMER the demo + 13 feature strokes.
  * Fake timers, fake decks, no audio.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({

@@ -10,6 +10,7 @@
  * DJPipeline (real queue, stand-in render worker) -> cache -> DeckEngine.
  */
 import 'fake-indexeddb/auto';
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 
 const holder = vi.hoisted(() => ({ engine: null as unknown, decodes: 0, renders: [] as Array<{ id: string; maxSeconds?: number }> }));
