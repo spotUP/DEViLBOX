@@ -1,0 +1,3 @@
+Source: https://github.com/Stephane-D/SGDK commit 2a8ddf55046c2f6a58b0586da13d1f6d87b8db50 (master, 2026-11-15)
+Licence: MIT, see LICENSE (repo-wide, Stephane Dallongeville). tools/xgmtool/*/lz77.* are from hwzip, public domain (header comment).
+Files: tools/xgmtool (C, CMake), src/snd/drv_xgm.s80 (XGM Z80 driver source; assembled with sjasm, not vendored).
