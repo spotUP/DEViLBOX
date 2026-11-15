@@ -194,7 +194,7 @@ export const LIVE_WHILE_PLAYING: Record<string, LiveEditStatus> = {
   soundControl: 'pass',
   soundMaster: 'pass',
   suntronic: 'fail',
-  tcbTracker: 'fail',
+  tcbTracker: 'pass',
   // tfmx: tfmxLiveSwap.test.ts - the worklet reloads the module and seeks to the time played; the position is kept to ~30 ms
   // (envelope-correlated with the edited module played from the start), not sample for sample.
   tfmx: 'pass',
@@ -203,7 +203,6 @@ export const LIVE_WHILE_PLAYING: Record<string, LiveEditStatus> = {
 /** Why a LIVE_WHILE_PLAYING row is 'fail', and why the other formats are not in the table (G24). */
 export const LIVE_WHILE_PLAYING_WHY: Record<string, string> = {
   suntronic: 'the exported bytes are found in chip RAM (image at 0x20000, 0x100 records 0x2a000) and written there, but the stream does not move: the player reads a converted copy, not the file image',
-  tcbTracker: 'the layout write changes the file bytes but no Paula event in 8 s of the first three patterns: UADE plays a converted copy of the TCB patterns',
   digi: 'UADE refuses the file (DigiBooster plays through the native engine only)',
 };
 

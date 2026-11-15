@@ -402,10 +402,13 @@ const ANY_EFFECT = true;
 async function pickAheadNote(index = 2): Promise<{ p: number; ch: number; r: number; note: number } | null> {
   const { useTrackerStore } = await import('@/stores/useTrackerStore');
   const found: Array<{ p: number; ch: number; r: number; note: number }> = [];
-  useTrackerStore.getState().patterns.slice(0, 3).forEach((pat, p) => pat.channels.forEach((c, ch) => c.rows.forEach((cell, r) => {
+  // The first patterns the song PLAYS (the order list), not patterns 0-2: tcbTracker's order starts at 0x0e.
+  const { patterns, patternOrder } = useTrackerStore.getState();
+  const played = [...new Set([...patternOrder, 0, 1, 2])].filter((p) => patterns[p]).slice(0, 3);
+  played.forEach((p) => patterns[p].channels.forEach((c, ch) => c.rows.forEach((cell, r) => {
     if (r >= 6 && cell.note > 0 && cell.note < 95 && (!cell.effTyp && !cell.eff || ANY_EFFECT)) found.push({ p, ch, r, note: cell.note + (cell.note > 48 ? -2 : 2) });
   })));
-  found.sort((a, b) => a.p - b.p || a.r - b.r);
+  found.sort((a, b) => played.indexOf(a.p) - played.indexOf(b.p) || a.r - b.r);
   if (process.env.G24_DEBUG) console.log('[g24] candidates', found.length, found.map((f) => `${f.ch}:${f.r}`).join(' '));
   return found[Math.min(index, found.length - 1)] ?? null;
 }
