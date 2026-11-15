@@ -15,7 +15,10 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const h = vi.hoisted(() => ({ decks: {} as Record<string, unknown>, bends: [] as Array<{ deck: string; ratio: number; ms: number }> }));
+const h = vi.hoisted(() => {
+  const decks: Record<string, unknown> = {};
+  return { decks, engine: { getDeck: (id: string) => decks[id] }, bends: [] as Array<{ deck: string; ratio: number; ms: number }> };
+});
 
 vi.mock('@/engine/ToneEngine', () => ({
   getToneEngine: () => ({ setInstrumentOutputOverride: () => {}, preloadInstruments: async () => {}, ensureWASMSynthsReady: async () => {}, rerouteNativeEngine: () => {} }),
@@ -25,13 +28,10 @@ vi.mock('tone', async (orig) => {
   const raw = { currentTime: 0, outputLatency: 0.012 };
   return { ...actual, now: () => raw.currentTime, getContext: () => ({ rawContext: raw, state: 'running' }) };
 });
-vi.mock('@/engine/dj/DJEngine', async () => {
-  const engine = { getDeck: (id: string) => h.decks[id] };
-  // DJPhase (not DJEngine) answers getDJEngineIfActive for the phase maths.
-  (await import('@/engine/dj/DJPhase')).setDJEngineHolder(engine as never);
-  return { getDJEngine: () => engine, getDJEngineIfActive: () => engine };
-});
+vi.mock('@/engine/dj/DJEngine', () => ({ getDJEngine: () => h.engine, getDJEngineIfActive: () => h.engine }));
 
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
+import { setDJEngineHolder } from '@/engine/dj/DJPhase';
 import { DeckEngine } from '../DeckEngine';
 import { DeckKeyLock } from '../DeckKeyLock';
 import { phaseAlign } from '../DJAutoSync';
@@ -63,6 +63,7 @@ const grid = () => {
 
 describe('a key-locked deck is heard later by its processing latency', () => {
   beforeEach(() => {
+    setDJEngineHolder(h.engine as never); // DJPhase, not DJEngine, answers getDJEngineIfActive for the phase maths
     h.bends.length = 0;
     for (const id of ['A', 'B'] as const) {
       useDJStore.getState().setDeckState(id, { isPlaying: true, durationMs: 200_000, pitchOffset: 0, beatGrid: grid() });

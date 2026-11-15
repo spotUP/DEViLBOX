@@ -20,17 +20,19 @@ type DJActionsModule = typeof import('../../engine/dj/DJActions');
 // useInstrumentStore import cycle (TrackerReplayer -> DubBus -> this file).
 let djEngineModule: DJEngineModule | null = null;
 let djActionsModule: DJActionsModule | null = null;
+// Kept, not left unhandled: a failed load (or a test worker closing mid-load) is reported on first use.
+let djLoadError: unknown = null;
 void Promise.all([import('../../engine/dj/DJEngine'), import('../../engine/dj/DJActions')]).then(([e, a]) => {
   djEngineModule = e;
   djActionsModule = a;
-});
+}, (err: unknown) => { djLoadError = err; });
 const getDJEngine = () => {
-  if (!djEngineModule) throw new Error('DJ engine module not loaded yet');
+  if (!djEngineModule) throw new Error('DJ engine module not loaded yet', { cause: djLoadError });
   return djEngineModule.getDJEngine();
 };
 const DJActions = new Proxy({} as DJActionsModule, {
   get(_t, name: keyof DJActionsModule) {
-    if (!djActionsModule) throw new Error('DJ actions module not loaded yet');
+    if (!djActionsModule) throw new Error('DJ actions module not loaded yet', { cause: djLoadError });
     return djActionsModule[name];
   },
 });
