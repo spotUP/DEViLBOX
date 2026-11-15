@@ -228,7 +228,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   benDaglish: 'pass',
   cheesecutter: 'n/a',
   composer667: 'n/a',
-  daveLowe: 'fail',
+  daveLowe: 'pass',
   davidWhittaker: 'pass',
   deltaMusic1: 'pass',
   deltaMusic2: 'pass',

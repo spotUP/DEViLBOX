@@ -267,6 +267,8 @@ export interface UADEVariablePatternLayout {
   stream?: { dataStart: number; pointersAt: number; count: number };
   /** Ben Daglish: the u16 track offset table (`base` + entry = a track's file offset), so a grown track can be moved to the file end and repointed. */
   trackTable?: { pointersAt: number; base: number };
+  /** Dave Lowe: per file pattern, the file offsets of the u32 big-endian pointers (value = address - `base`) that reach it, so a grown section can move to the file end. */
+  sectionRefs?: { base: number; at: number[][] };
 
   /**
    * Original byte sizes of each file-level pattern's encoded data.

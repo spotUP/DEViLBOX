@@ -554,6 +554,7 @@ export async function parseDaveLoweFile(
   // pointers — multiple positions can share the same command data (pattern reuse).
 
   const channelPositionLists: number[][] = [[], [], [], []]; // per-channel arrays of cmd section pointers
+  const listEntryAt: number[][] = [[], [], [], []]; // file offset of each position-list longword
   const patterns: Pattern[] = [];
   const songPositions: number[] = [];
 
@@ -580,6 +581,7 @@ export async function parseDaveLoweFile(
         const ptr = u32BE(buf, pos);
         if (ptr === 0) break;
         channelPositionLists[ch].push(ptr);
+        listEntryAt[ch].push(pos);
         pos += 4;
       }
     }
@@ -752,6 +754,11 @@ export async function parseDaveLoweFile(
       filePatternSizes,
       trackMap,
       blockRows,
+      // every position-list longword that points at a section, so a grown section can be moved to the file end and repointed
+      sectionRefs: {
+        base: CODE_BASE,
+        at: allSectionPtrs.map((sp) => channelPositionLists.flatMap((l, ch) => l.flatMap((v, i) => (v === sp ? [listEntryAt[ch][i]] : [])))),
+      },
     };
 
     // Assign to result (done below)
