@@ -4,6 +4,11 @@
  * A grid note is a note byte 1..0x7F in a voice stream. The replayer plays period table entry
  * (transpose + byte) & 0x7F, so an edited note cell is a same-length patch of that one byte, chosen so the table
  * entry lands on the new note given the transpose in force when the note starts (recorded per row by the grid).
+ * A note typed on an empty row inside a held note splits that note: [note][length] becomes [note][d][new][length - d]
+ * (2 bytes inserted; the new note plays with the instrument and transpose in force, so a different cell instrument is
+ * refused). The module's voice streams are its last data, so every later byte moves by 2 and the song table stream
+ * addresses and Call/Jump address longs at or after the cut are raised by 2. Written only if the reloaded song has the same
+ * tick length, the cell reads back as the note and nothing else changed (repeats of the stream show the note too).
  * A stream run by several voices or loops is shared by every place that plays it. Edits the stream cannot hold at its
  * length - a note on a row without one, a note removed or turned into a note off, the instrument, volume and
  * effect columns (instruments are chosen by commands, volume and effects are not stored per row) - are refused with a
@@ -12,7 +17,7 @@
  */
 import type { Pattern, TrackerCell } from '@/types';
 import { getColumnField, maxNoteColumns } from '@/lib/tracker/noteColumns';
-import { buildTimFollinGrid, timFollinShownNote, type TfolGrid } from './timFollinGrid';
+import { buildTimFollinGrid, locateTimFollin, timFollinShownNote, type TfolGrid } from './timFollinGrid';
 
 const NOTE_OFF = 97;
 const ROWS_PER_PATTERN = 64;
@@ -26,6 +31,7 @@ export interface TimFollinEditResult {
   warnings: string[];
 }
 
+interface AddNote { pattern: number; channel: number; row: number; note: number; instrument: number }
 interface Edit { pattern: number; channel: number; row: number; col: number; note: number; offset: number; value: number }
 
 const where = (e: { pattern: number; channel: number; row: number }): string => `voice ${e.channel + 1}, pattern ${e.pattern}, row ${e.row}`;
@@ -74,6 +80,7 @@ export function applyTimFollinGridEdits(original: Uint8Array, patterns: readonly
 
   const claimed = new Map<number, number>();
   const accepted: Edit[] = [];
+  const adds: AddNote[] = [];
 
   patterns.forEach((pat, pi) => pat.channels.forEach((ch, c) => ch.rows.forEach((cell, r) => {
     const was = base.patterns[pi]?.channels[c]?.rows[r];
@@ -87,6 +94,10 @@ export function applyTimFollinGridEdits(original: Uint8Array, patterns: readonly
       const wasNote = noteIn(was, col);
       if (now === wasNote) continue;
       const src = (col === 0 ? base.rowSources : base.rowSourcesExtra[col - 1])?.[pi]?.[c]?.[r];
+      if (!src && wasNote === 0 && col === 0 && now >= 1 && now < NOTE_OFF) {
+        adds.push({ ...at, note: now, instrument: getColumnField(cell, 0, 'instrument') ?? 0 });
+        continue;
+      }
       if (!src || wasNote < 1 || wasNote >= NOTE_OFF) {
         warnings.push(`${PREFIX} ${where(at)}: no note plays on this row, and adding or removing one, or changing a rest or note off, would change the length of the stream; the edit was not written.`);
         continue;
@@ -153,5 +164,93 @@ export function applyTimFollinGridEdits(original: Uint8Array, patterns: readonly
   writeAll(live);
   let patched = 0;
   for (let i = 0; i < data.length; i++) if (data[i] !== original[i]) patched++;
-  return { data, patched, warnings };
+  let out: Uint8Array = data;
+  for (const a of adds) {
+    const r = addNote(out, subsong, a);
+    if (typeof r === 'string') warnings.push(`${PREFIX} ${where(a)}: ${r}; the note was not written.`);
+    else out = r;
+  }
+  if (out !== data) patched = Math.max(patched, out.length - original.length);
+  return { data: out, patched, warnings };
+}
+
+const u32 = (b: Uint8Array, o: number): number => ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0;
+const put32 = (b: Uint8Array, o: number, v: number): void => { b[o] = v >>> 24; b[o + 1] = (v >>> 16) & 255; b[o + 2] = (v >>> 8) & 255; b[o + 3] = v & 255; };
+
+/** Split the note covering an empty row and insert the note after it; a reason string when refused. */
+function addNote(data: Uint8Array, subsong: number, a: AddNote): Uint8Array | string {
+  const g = buildTimFollinGrid(data, subsong);
+  const m = locateTimFollin(data);
+  if (!g || !m) return 'the module no longer decodes';
+  const tos = data[0] === 0x60 && data[1] === 0x1a;
+  if (tos) {
+    // header: text size at +2; the empty relocation table (one zero long) must be the file's last 4 bytes
+    const reloc = 0x1c + u32(data, 2) + u32(data, 6) + u32(data, 14);
+    if (reloc + 4 !== data.length || u32(data, reloc) !== 0) return 'a program file with a relocation table cannot grow';
+  }
+  if (Array.from({ length: g.noteCols[a.channel] }, (_, k) => noteIn(cellAt(g, a.channel, a.pattern * ROWS_PER_PATTERN + a.row), k)).some((n) => n !== 0)) return 'the row already holds a note';
+  const at = a.pattern * ROWS_PER_PATTERN + a.row;
+  // the note column sources of a row; the covering note is the latest one that starts before this row
+  const srcsAt = (row: number) => [g.rowSources, ...g.rowSourcesExtra].map((t) => t[Math.floor(row / ROWS_PER_PATTERN)]?.[a.channel]?.[row % ROWS_PER_PATTERN]).filter((x): x is NonNullable<typeof x> => !!x);
+  let rowA = at - 1;
+  while (rowA >= 0 && srcsAt(rowA).length === 0) rowA--;
+  const A = rowA >= 0 ? srcsAt(rowA).sort((x, y) => y.tick - x.tick)[0] : null;
+  if (!A) return 'no note is held on this row to split';
+  const T = g.clock.rowToTick(at);
+  const d = T - A.tick;
+  if (d < 1 || d >= A.hold) return 'the row is not inside the held note';
+  if (A.length !== 2) return 'the voice uses a fixed note length command, so a note has no length byte to split';
+  const ins = A.instrument;
+  if (a.instrument !== 0 && a.instrument !== ins) return 'the instrument is chosen by an Instrument command, and this note would play with the one in force';
+  const value = byteFor(a.note, A.nextBase, A.noteByte);
+  if (value < 0) return `note ${a.note} is not in the player's period table`;
+  const cut = A.offset + 2;
+  const len = data.length;
+  const off = (v: number): number => (v + m.delta) >>> 0;
+  if (m.table + 0x194 + 4 > cut || (u32(data, m.table + 0x194) >>> 16) !== 0) return 'the module has a relocation list';
+  for (let i = 0; i < 16; i++) { const t = off(u32(data, m.table + 0x104 + i * 4)); if (t >= cut && t < len) return 'an instrument table lies after the streams'; }
+  const out = new Uint8Array(len + 2);
+  out.set(data.subarray(0, cut));
+  out.set(data.subarray(cut), cut + 2);
+  if (tos) put32(out, 2, u32(data, 2) + 2);
+  out[A.offset + 1] = d;
+  out[cut] = value;
+  out[cut + 1] = A.hold - d;
+  const bump = (site: number): void => {
+    const v = u32(data, site);
+    const t = off(v);
+    if (t >= cut && t < len) put32(out, site >= cut ? site + 2 : site, v + 2);
+  };
+  for (let i = 0; i < 64; i++) bump(m.table + 4 + i * 4);
+  for (let s = 0; s < m.subsongCount; s++) for (const site of buildTimFollinGrid(data, s)?.links ?? []) bump(site);
+  const again = buildTimFollinGrid(out, subsong);
+  if (!again || again.rows !== g.rows) return 'the song length would change';
+  for (let s = 0; s < m.subsongCount; s++) {
+    if (s === subsong) continue;
+    const x = buildTimFollinGrid(data, s);
+    const y = buildTimFollinGrid(out, s);
+    if (!x !== !y || (x && y && x.rows !== y.rows)) return 'another subsong would change';
+  }
+  let changed = 0;
+  for (let c = 0; c < 4; c++) {
+    for (let row = 0; row < g.rows; row++) {
+      const was = cellAt(g, c, row);
+      const now = cellAt(again, c, row);
+      if (!was || !now) return 'the grid shape would change';
+      const cols = Math.max(maxNoteColumns([was, now]), 1);
+      let same = true;
+      for (let k = 0; k < cols; k++) {
+        const wn = noteIn(was, k);
+        const nn = noteIn(now, k);
+        if (wn === nn && getColumnField(was, k, 'instrument') === getColumnField(now, k, 'instrument')) continue;
+        // an empty column that gained the new note: the target row, or a repeat of the same stream
+        if (wn === 0 && nn === a.note && getColumnField(now, k, 'instrument') === ins) { changed++; continue; }
+        same = false;
+      }
+      if (same) continue;
+      return 'other rows would change';
+    }
+  }
+  if (cellAt(again, a.channel, at)?.note !== a.note || changed < 1) return 'the note does not read back on this row';
+  return out;
 }

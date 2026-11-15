@@ -163,7 +163,7 @@ export function timFollinShownNote(noteByte: number): number {
 export interface TfolRegion { offset: number; size: number }
 
 /** The event a row's note was read from. */
-export type TfolRowSource = { region: number; offset: number; length: number; noteByte: number; base: number } | null;
+export type TfolRowSource = { region: number; offset: number; length: number; noteByte: number; base: number; tick: number; hold: number; nextBase: number; instrument: number } | null;
 
 export interface TfolGrid {
   patterns: Pattern[];
@@ -190,15 +190,17 @@ export interface TfolGrid {
   regionAtStart: number[][];
   /** Notes per voice inside the timeline. */
   noteCounts: number[];
+  /** File offsets of the address longs of every Call and Jump the voices run (sorted, unique). */
+  links: number[];
 }
 
-interface PlacedNote { tick: number; offset: number; length: number; noteByte: number; base: number; shown: number; instrument: number }
+interface PlacedNote { tick: number; hold: number; nextBase: number; offset: number; length: number; noteByte: number; base: number; shown: number; instrument: number }
 
-interface VoiceRun { notes: PlacedNote[]; pass: number; spans: Array<[number, number]> }
+interface VoiceRun { notes: PlacedNote[]; pass: number; spans: Array<[number, number]>; links: number[] }
 
 /** Run one voice as tfol.c does (tfol_start, tfol_fetch), recording each note's tick and every executed byte span. */
 function runVoice(b: Uint8Array, m: TfolModuleInfo, stream: number, active: boolean, silent: boolean): VoiceRun {
-  const run: VoiceRun = { notes: [], pass: 0, spans: [] };
+  const run: VoiceRun = { notes: [], pass: 0, spans: [], links: [] };
   if (!active || silent) return run;
   const stack: number[] = [];
   let pc = stream;
@@ -224,7 +226,7 @@ function runVoice(b: Uint8Array, m: TfolModuleInfo, stream: number, active: bool
         curNote = note;
         const length = noteLength !== 0 ? noteLength : ev.args[0] ?? 0;
         run.notes.push({
-          tick, offset: ev.start, length: ev.next - ev.start, noteByte: ev.note, base,
+          tick, hold: length === 0 ? NOTE_COUNTER_ZERO : length, nextBase: transpose, offset: ev.start, length: ev.next - ev.start, noteByte: ev.note, base,
           shown: timFollinShownNote(note), instrument: instrument + 1,
         });
         tick += length === 0 ? NOTE_COUNTER_ZERO : length;
@@ -235,6 +237,7 @@ function runVoice(b: Uint8Array, m: TfolModuleInfo, stream: number, active: bool
       switch (ev.command) {
         case Cmd.Instrument: instrument = a[0]; break;
         case Cmd.Call:
+          run.links.push(ev.next - 4);
           if (stack.length >= STACK_PER_VOICE) { stopped = true; break; }
           stack.push(pc); pc = ev.target; break;
         case Cmd.Return:
@@ -247,7 +250,7 @@ function runVoice(b: Uint8Array, m: TfolModuleInfo, stream: number, active: bool
         case Cmd.NoteLength: noteLength = a[0]; break;
         case Cmd.Stop: stopped = true; break;
         case Cmd.SkipTranspose: skipTranspose = true; break;
-        case Cmd.Jump: pc = ev.target; break;
+        case Cmd.Jump: run.links.push(ev.next - 4); pc = ev.target; break;
         default: break; // envelope, vibrato, pitch modulation, wave flags, sweep: sound shaping, not shown in the grid
       }
     }
@@ -321,7 +324,7 @@ export function buildTimFollinGrid(b: Uint8Array, subsong = 0): TfolGrid | null 
       count++;
       const cell = grid[v][pl.row];
       const region = regionOf(n.offset);
-      const src = { region, offset: n.offset, length: n.length, noteByte: n.noteByte, base: n.base };
+      const src = { region, offset: n.offset, length: n.length, noteByte: n.noteByte, base: n.base, tick: n.tick, hold: n.hold, nextBase: n.nextBase, instrument: n.instrument };
       if (pl.col === 0) {
         cell.note = n.shown;
         cell.instrument = n.instrument;
@@ -359,5 +362,5 @@ export function buildTimFollinGrid(b: Uint8Array, subsong = 0): TfolGrid | null 
     sourcesExtra.forEach((src, i) => rowSourcesExtra[i].push(src.map((s) => s.slice(start, start + len))));
     regionAtStart.push(regionAtTick.map((s) => s[start]));
   }
-  return { patterns, songPositions, rows, regions, blockRows, rowSources, rowSourcesExtra, step, clock, delayedNotes, unplacedNotes, noteCols, regionAtStart, noteCounts };
+  return { patterns, songPositions, rows, regions, blockRows, rowSources, rowSourcesExtra, step, clock, delayedNotes, unplacedNotes, noteCols, regionAtStart, noteCounts, links: [...new Set(runs.flatMap((r) => r.links))].sort((x, y) => x - y) };
 }

@@ -1,7 +1,7 @@
 /**
  * TimFollinExporter.ts - save a Tim Follin (.tf) song: the module it was loaded from, with the grid's note edits
- * patched into the voice streams they came from (timFollinEdits.ts). Same length, byte-exact where nothing was edited;
- * edits the module cannot hold in place come back as warnings.
+ * patched into the voice streams they came from (timFollinEdits.ts). Byte-exact where nothing was edited; a note
+ * added inside a held note grows the module by 2 bytes (stream addresses repointed); edits the module cannot hold come back as warnings.
  * Reference: TimFollinParser.ts (import), timFollinGrid.ts (the walk the grid is drawn from).
  */
 import type { TrackerSong } from '@/engine/TrackerReplayer';

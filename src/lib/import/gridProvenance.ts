@@ -284,7 +284,8 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   suntronic: 'pass',
   // synthDream: a note on a row inside a held command cuts that command and inserts a note command; the grown stream moves to the file end and every track entry is repointed (synthDreamEdits.ts).
   synthDream: 'pass',
-  timFollin: 'fail',
+  // timFollin: a note on a row inside a held note splits it ([note][length] -> [note][d][new][length - d]), the stream addresses after the cut move by 2 (timFollinEdits.ts addNote).
+  timFollin: 'pass',
   // tonyWilliams: a note on a row inside a held note or rest cuts it (duration, note, duration restored) and relocates the tail (tonyWilliamsEdits.ts).
   tonyWilliams: 'pass',
   beathoven: 'fail',

@@ -76,12 +76,9 @@ describe('Tim Follin native export: follin_smallest.tf', () => {
     })));
   }, 240000);
 
-  it('refuses a note on an empty row, a removed note, an instrument and a volume edit, writing nothing', async () => {
+  it('refuses a removed note, an instrument and a volume edit, writing nothing', async () => {
     const { raw, song } = await load();
     const rows = song.patterns[0].channels[0].rows;
-    const empty = rows.findIndex((c) => c.note === 0);
-    expect(empty).toBeGreaterThanOrEqual(0);
-    rows[empty].note = 40;
     const played = rows.findIndex((c) => c.note > 0 && c.note < 97);
     expect(played).toBeGreaterThanOrEqual(0);
     rows[played].note = 0;
@@ -89,7 +86,7 @@ describe('Tim Follin native export: follin_smallest.tf', () => {
     song.patterns[0].channels[1].rows[other].instrument += 1;
     song.patterns[0].channels[2].rows[0].volume = 30;
     const res = await exportOf(song);
-    expect(res.warnings.length).toBeGreaterThanOrEqual(4);
+    expect(res.warnings.length).toBeGreaterThanOrEqual(3);
     expect(res.warnings.join('\n')).toMatch(/not written/);
     expect(Array.from(res.data)).toEqual(Array.from(raw));
   }, 240000);
