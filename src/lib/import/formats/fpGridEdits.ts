@@ -53,8 +53,9 @@ const restBytes = (rows: number): number[] => {
 const noteBytes = (note: number, rows: number): number[] => [note, Math.min(rows, 127), ...restBytes(rows - 127)];
 
 interface SplitNote { k: number; note: number; instr: number; inForce: number }
+interface SplitLead { note: number; dur: number }
 /** One replay of a rest with notes typed on its rows. */
-interface RestSplit { off: number; rows: number; ret: number; voice: number; row0: number; notes: SplitNote[] }
+interface RestSplit { off: number; rows: number; ret: number; voice: number; row0: number; notes: SplitNote[]; lead?: SplitLead }
 interface FreshNote { row: number; note: number; ptr: number }
 
 export interface FpEditResult { data: Uint8Array; patched: number; warnings: string[] }
@@ -132,7 +133,7 @@ export function applyFpGridEdits(source: Uint8Array, edited: Pattern[], instrume
             if (ptr === undefined && cov.instr === 0) { warnings.push(`${where}: no instrument is set on this voice and none was given; not written`); continue; }
             const row0 = rowBase[p] + row - cov.k;
             const key = `${ch}:${row0}`;
-            const split = splits.get(key) ?? { off: cov.off, rows: cov.rows, ret: cov.ret, voice: ch, row0, notes: [] };
+            const split = splits.get(key) ?? { off: cov.off, rows: cov.rows, ret: cov.ret, voice: ch, row0, notes: [], lead: cov.lead };
             split.notes.push({ k: cov.k, note: byte, instr: ptr ?? cov.instr, inForce: cov.instr });
             splits.set(key, split);
             typed.push({ voice: ch, row: rowBase[p] + row, note: n, endRow: -1 });
@@ -236,7 +237,8 @@ export function applyFpGridEdits(source: Uint8Array, edited: Pattern[], instrume
   }
   // the grown module, walked again, must show the typed notes and nothing else new
   // the baseline is the module with the in-place patches already written, so they do not count as changes
-  const replays = new Map([...splits.values()].map((x) => [`${x.voice}:${x.off}:${x.ret}`, x.row0]));
+  // (the same block reached through another caller is a replay too: the module has one copy of it)
+  const replays = new Map([...splits.values()].flatMap((x): Array<[string, number]> => [[`${x.voice}:${x.off}:${x.ret}`, x.row0], [`${x.voice}:${x.off}`, x.row0]]));
   const diff = gridChange(buildFuturePlayerGrid(out, undefined, subsong).grid ?? grid, buildFuturePlayerGrid(grown, undefined, subsong), typed, replays);
   if (diff) { patched -= typed.length; return lost(`the grown module would change ${diff}`); }
   return { data: grown, patched, warnings };
@@ -268,13 +270,16 @@ function gridChange(before: FpGridOf, after: ReturnType<typeof buildFuturePlayer
         const where = `pattern ${p} voice ${ch + 1} row ${r}`;
         const want = typedAt.get(key);
         if (want !== undefined) { if ((n?.note ?? 0) !== want) return `${where} (the typed note does not play there)`; continue; }
-        // a replay of a split rest through the same reference (a loop around the call, or the voice starting over) would
-        // play the typed note too; the walk cannot tell one replay from another, so it counts as a change
+        // A replay of a split rest through the same reference (a loop around the call, or the voice starting over) plays the
+        // typed note too: the module has one copy of the block, as a shared pattern has one. The replay may show the typed note
+        // on its mirrored row, the release after it, or nothing new; anything else is a change the user did not type.
         const cov = before.restCover[p][ch][r];
-        const split0 = cov ? replays.get(`${ch}:${cov.off}:${cov.ret}`) : undefined;
+        const split0 = cov ? replays.get(`${ch}:${cov.off}:${cov.ret}`) ?? replays.get(`${ch}:${cov.off}`) : undefined;
         if (cov && split0 !== undefined && split0 !== row0 + r - cov.k) {
           const was = o.note ?? 0, now = n?.note ?? 0;
-          if (was !== now) return `${where}, a replay of the split rest through the same call (a loop around it, or the voice starting over)`;
+          const mirror = typedAt.get(`${ch}:${split0 + cov.k}`);
+          if (was !== now && now !== mirror && now !== 97) return `${where}, a replay of the split rest through the same call that shows a note nobody typed`;
+          if (was !== now || mirror !== undefined) continue;
         }
         for (const k of CELL_KEYS) {
           const was = o[k] ?? 0, now = n?.[k] ?? 0;
@@ -293,7 +298,8 @@ function splitRest(off: number, split: RestSplit): FpRestReplacement {
   const bytes: number[] = [];
   const relocAt: number[] = [];
   const instr = (ptr: number): void => { relocAt.push(bytes.length + 2); bytes.push(...setInstrument(ptr)); };
-  if (notes[0].k > 0) bytes.push(...restBytes(notes[0].k));
+  // a held note keeps sounding for the rows before the first typed note (its duration byte cut, its retrigger flag kept)
+  if (notes[0].k > 0) bytes.push(...(split.lead ? [split.lead.note, notes[0].k | (split.lead.dur & 0x80)] : restBytes(notes[0].k)));
   notes.forEach((n, i) => {
     const until = i + 1 < notes.length ? notes[i + 1].k : split.rows;
     // an instrument other than the one in force is set for this note only; the one in force comes back after it

@@ -87,7 +87,7 @@ export interface FpWalkEvent {
   t2: number;
   arp: number;
   porta: number;
-  /** Rests: the return address of the innermost call in force (the call command's pointer sits 4 bytes before it), 0 at the top level. */
+  /** Rests and notes: the return address of the innermost call in force (the call command's pointer sits 4 bytes before it), 0 at the top level. */
   ret?: number;
 }
 
@@ -394,7 +394,7 @@ export function walkFuturePlayer(code: Uint8Array, subsong = 0, opts: FpWalkOpti
           if (!skipping) {
             events.push({
               tick: tick0, voice: ch, kind: retrigger ? FP_WALK.note : FP_WALK.legato, a: d0, b: v.instr,
-              period: tablePeriod(code, v, v.arpIdx), off, dur: d1, delta: fpNoteDelta(code, v, v.arpIdx), t1: v.t1, t2: v.t2, arp: v.arp, porta: v.porta,
+              period: tablePeriod(code, v, v.arpIdx), off, dur: d1, delta: fpNoteDelta(code, v, v.arpIdx), t1: v.t1, t2: v.t2, arp: v.arp, porta: v.porta, ret: v.depth > 0 ? v.stack[(v.depth >> 2) - 1] : 0,
             });
           }
           v.sounding = true;

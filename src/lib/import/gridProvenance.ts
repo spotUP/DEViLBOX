@@ -240,7 +240,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   fc: 'pass',
   fred: 'pass',
   fur: 'n/a',
-  futurePlayer: 'fail',
+  futurePlayer: 'pass',
   gdm: 'n/a',
   hippelCoso: 'pass',
   hvl: 'pass',

@@ -146,7 +146,7 @@ export function copyStreamRange(mod: FpHunkModule, start: number, end: number, r
   for (let o = start; o < end;) {
     const rep = reps[ri];
     if (rep && rep.off === o) {
-      if (o + 2 > end || mod.code[o] !== 0) throw new FpGrowError(`code offset ${o} is not a rest command`);
+      if (o + 2 > end || mod.code[o] >= 0x80) throw new FpGrowError(`code offset ${o} is not a rest or note command`);
       for (const r of rep.relocAt) relocsIn.push(out.length + r);
       out.push(...rep.bytes);
       newOffsetOf[o - start] = out.length - rep.bytes.length; newOffsetOf[o - start + 1] = newOffsetOf[o - start];

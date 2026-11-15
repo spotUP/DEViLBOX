@@ -101,6 +101,8 @@ export interface FPRestCover {
   /** Instrument pointer in force at the rest (0 when none ran on the voice yet). */
   instr: number;
   instrCmd: number;
+  /** Set when the row lies inside a held NOTE (not a rest): the note command's bytes, which a split cuts to the rows before the typed note. */
+  lead?: { note: number; dur: number };
 }
 
 /** A command shown in a cell's effect column: its id, the code offset of its first byte and its length in bytes. */
@@ -191,6 +193,11 @@ export function buildFpGridFromWalk(walk: FpWalk, ctx: FpGridContext): FpGrid {
       else put(FP_FX.legato, 0);
       sounding[e.voice] = true;
       src[e.voice][r] = csrc[e.voice][r] = { off: e.off, delta: e.delta, instr: e.b, instrCmd: instrCmd[e.voice], retrigger };
+      // the rows a note holds are split like a rest's: the note is cut to the rows before the typed one
+      const held = e.dur & 0x7f;
+      for (let k = 1; k < held && r + k < rows; k++) {
+        cover[e.voice][r + k] = { off: e.off, rows: held, k, delta: e.delta, instr: e.b, instrCmd: instrCmd[e.voice], ret: e.ret ?? 0, lead: { note: e.a, dur: e.dur } };
+      }
     } else if (e.kind === FP_WALK.rest) {
       // a rest releases the envelope: the voice stops only where the instrument's release rate is not zero
       if (sounding[e.voice] && fpReleaseRate(ctx.code, e.b) > 0) cell.note = 97;
