@@ -135,8 +135,21 @@ describe('writeTadSong echo header', () => {
     tl.macros = [...(tl.macros ?? []), { code: 4, data: [2] }]; // the song has none: 2/128 semitone, about 2 cents
     const song = writeTadSong({ native: buildFurnaceNativeData(module), subsong: 0, instruments, samples: toSequencerSamples(module), wavetables: module.wavetables, title: 'tetristheme' });
     expect(song.mml).toMatch(/[a-g][+-]?%1 & /);
-    expect(song.mml).toContain('MD2');
+    expect(song.mml).toContain('MD+2');
     for (const n of ['Lead', 'Pad', 'Bass']) expect(song.warnings.some((w) => w.includes(`(${n}):`) && /arpeggio|pitch/.test(w))).toBe(false);
+  }, 60000);
+
+  // playback.cpp:1458 E5xx pitch = val - 0x80 in 1/128 semitone; TAD detune applies from the note it precedes.
+  it('carries E5xx fine pitch as MD detune', async () => {
+    const buf = readFileSync(resolve(DIR, 'tetristheme.fur'));
+    const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+    const native = buildFurnaceNativeData(module);
+    const sub = native.subsongs[0];
+    const row = sub.channels.flatMap((ch, c) => ch.patterns.get(sub.orders[c]?.[0] ?? -1)?.rows ?? []).find((r) => r.note >= 0 && r.note < 180)!;
+    row.effects = [...(row.effects ?? []), { cmd: 0xe5, val: 0x90 }]; // +16/128 semitone = 12.5 cents
+    const song = writeTadSong({ native, subsong: 0, instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)), samples: toSequencerSamples(module), wavetables: module.wavetables, title: 'tetristheme' });
+    expect(song.mml).toContain('MD+13');
+    expect(song.warnings.some((w) => /E5xx|effect e5/i.test(w))).toBe(false);
   }, 60000);
 
   it('writes the Furnace echo flags as TAD header lines', async () => {

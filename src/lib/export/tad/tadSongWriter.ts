@@ -300,7 +300,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     let sounding = false, curNote = 'r';
     let hasNotes = false;
     // Effect state of this channel (Furnace effects that TAD holds as channel state).
-    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', vibWant: { d: number; q: number } | null = null, volSlide = 0, lastEnv = '';
+    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', fine = 0, vibWant: { d: number; q: number } | null = null, volSlide = 0, lastEnv = '';
     let env: { mode: number; gain: number; adsr: number[] } | null = null;
     const pitchName = (p: number) => NOTE_NAMES[p % 12];
     // Furnace ticks to TAD ticks (rows are k Furnace-tick multiples; sound effects run at 125 Hz).
@@ -404,6 +404,11 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             // Furnace vibrato: x = rate (64 steps per cycle), y = depth (15 = one semitone). TAD MP is a sawtooth.
             const x = e.val >> 4, y = e.val & 15;
             vibWant = x && y ? { d: Math.round(y * 100 / 15), q: Math.max(1, Math.min(255, Math.round(16 / x))) } : null; // emitted with the next note, depth clamped to that note's pitch
+          }
+          else if (e.cmd === 0xe5 && linear) {
+            // playback.cpp:1458 pitch = val - 0x80 (1/128 semitone, linear pitch); TAD detune only applies on play-note.
+            fine = e.val - 0x80;
+            if (!(cl.note >= 0 && cl.note < 180)) drop('effect E5xx without a note (applies from the next note)', at);
           }
           else if (e.cmd === 0x0a) volSlide = (e.val >> 4) - (e.val & 15) || 0;
           else if ([0x00, 0x01, 0x02, 0x03, 0xec, 0xed].includes(e.cmd)) { /* applied with the note below */ }
@@ -521,9 +526,10 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
               if (d > 0) want = `MP${d},${vibWant.q}`;
             }
             if (want !== vib) { vib = want; cmds.push(want); }
-            // snes.cpp:136-144 + engine.cpp calcFreq: a constant pitch macro is a fixed offset, 1/128 semitone (linear) or raw VxPITCH.
-            const pm = pitchMacro(instruments[ins]) ?? 0;
-            const wantDet = linear ? `MD${Math.max(-1200, Math.min(1200, Math.round(pm * 100 / 128)))}` : `D${Math.max(-16383, Math.min(16383, pm))}`;
+            // snes.cpp:136-144 + engine.cpp calcFreq: a constant pitch macro plus E5xx is a fixed offset, 1/128 semitone (linear) or raw VxPITCH.
+            const pm = (pitchMacro(instruments[ins]) ?? 0) + fine;
+            const dv = linear ? Math.max(-1200, Math.min(1200, Math.round(pm * 100 / 128))) : Math.max(-16383, Math.min(16383, pm));
+            const wantDet = `${linear ? 'MD' : 'D'}${dv > 0 ? '+' : ''}${dv}`; // TAD needs the sign (mml-syntax.md:562-568), except 0
             if (wantDet !== det && (det || pm)) cmds.push(wantDet);
             det = wantDet;
             const key = `${ins} ${sound.smp}`;
