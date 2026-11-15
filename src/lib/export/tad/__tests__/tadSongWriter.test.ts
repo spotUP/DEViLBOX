@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { parseFurnaceSong, toSequencerSamples, buildFurnaceNativeData } from '@/lib/import/formats/FurnaceSongParser';
 import { openTadSession, type CreateTadCompiler } from '../tadCompilerWasm';
-import { writeTadSong } from '../tadSongWriter';
+import { writeTadSong, panSplit } from '../tadSongWriter';
 import { tadProjectJson, tadInstrumentFromFurnace } from '../tadProjectBuilder';
 
 const DIR = resolve(__dirname, '../../../../../public/data/songs/furnace/snes');
@@ -139,4 +139,16 @@ describe('writeTadSong echo header', () => {
     expect(Object.keys(lines).length).toBeGreaterThan(0);
     for (const l of Object.values(lines)) expect(l).toMatch(/#EchoLength \d+ \| .*#FirFilter (-?\d+ ){7}-?\d+ \| #EchoFeedback -?\d+ \| #EchoVolume \d+ \d+/);
   }, 120000);
+});
+
+// Furnace splits 08xy per nibble and 80xx linearly (centre = both sides full), then halves to 0-127.
+describe('panSplit', () => {
+  it('matches the Furnace SNES pan law', () => {
+    expect(panSplit(0x80, 0x80)).toEqual([127, 127]);
+    expect(panSplit(0x80, 0x00)).toEqual([127, 0]);
+    expect(panSplit(0x80, 0xff)).toEqual([0, 127]);
+    expect(panSplit(0x08, 0xf0)).toEqual([127, 0]);
+    expect(panSplit(0x08, 0x0f)).toEqual([0, 127]);
+    expect(panSplit(0x08, 0xff)).toEqual([127, 127]);
+  });
 });

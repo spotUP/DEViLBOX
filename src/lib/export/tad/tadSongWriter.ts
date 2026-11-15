@@ -177,10 +177,13 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     let jump: number | null = null, brk: number | null = null, stop = false;
     for (let ch = 0; ch < nCh; ch++) {
       for (const e of cell(ch, pos, row)?.effects ?? []) {
-        if (e.cmd === 0x0f && e.val > 0) { speeds = [e.val]; speedIdx = 0; }
+        // playback.cpp:645-668: 0Fxx sets speed 2 of a two-speed song (no grooves), else speed 1; 09xx sets
+        // speed 1 without grooves, else picks the groove. Speed changes keep the alternation index.
+        const grooves = native.grooves ?? [];
+        if (e.cmd === 0x0f && e.val > 0) { speeds = [...speeds]; speeds[speeds.length === 2 && !grooves.length ? 1 : 0] = e.val; }
         else if (e.cmd === 0x09) {
-          const g = native.grooves?.[e.val];
-          if (g?.len) { speeds = g.val.slice(0, g.len); speedIdx = 0; }
+          if (!grooves.length) { if (e.val > 0) { speeds = [...speeds]; speeds[0] = e.val; } }
+          else { const g = grooves[e.val]; if (g?.len) { speeds = g.val.slice(0, g.len); speedIdx = 0; } }
         }
         else if (e.cmd === 0x0b) jump = e.val;
         else if (e.cmd === 0x0d) brk = e.val;
@@ -258,9 +261,13 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     const ch = snes.first + c;
     // echoMask: Furnace starts these channels with echo on (snes.cpp:914).
     const out: string[] = ['V254', ...(!sfx && echo.on && (echo.mask >> c) & 1 ? ['E1'] : [])];
-    let ins = 0, curIns = -1, vol = 127, pan = 64, oct = -1, lastV = 'V254', slid = false;
+    let ins = 0, curIns = -1, vol = 127, panL = 127, panR = 127, lastP = 64, oct = -1, lastV = 'V254', slid = false;
     // snes.cpp:115-117 outVol = vol * volMacro / 127; a constant volume macro scales V.
-    const volScale = () => Math.min(127, constantMacro(instruments[ins], 0) ?? 127) / 127;
+    // Pan law, snes.cpp:642-653: each side is outVol * pan / 127 (centre = both full); TAD splits V by p, so
+    // V carries panL + panR and p their ratio. Constant panning macros (codes 12/13) override 08xx / 80xx.
+    const panOf = () => [constantMacro(instruments[ins], 12) ?? panL, constantMacro(instruments[ins], 13) ?? panR].map((v) => v & 127);
+    const panP = () => { const [l, r] = panOf(); return l + r ? Math.round(128 * r / (l + r)) : lastP; };
+    const volScale = () => { const [l, r] = panOf(); return Math.min(127, constantMacro(instruments[ins], 0) ?? 127) / 127 * (l + r) / 254; };
     const volV = () => `V${Math.min(255, Math.round(vol * 2 * volScale()))}`;
     type Pending = { tok: string; ticks: number; sl?: { a: number; b: number; smp: string; plain: string; oct: number; reg: (p: number, smp: string) => number } };
     let pending: Pending = { tok: 'r', ticks: 0 };
@@ -329,16 +336,12 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         }
         if (cl.vol >= 0) volSlide = 0;
         if (cl.vol >= 0) vol = cl.vol;
-        // After a slide the driver volume is unknown: a written volume always lands.
-        if ((cl.vol >= 0 && (slid || volV() !== lastV)) || (cl.ins >= 0 && volV() !== lastV)) { lastV = volV(); slid = false; cmds.push(lastV); }
         const ef = new Map<number, number>();
         for (const e of cl.effects) if (e.cmd >= 0) ef.set(e.cmd, e.val);
-        let envFx = false;
+        let envFx = false, panFx = false;
         for (const e of cl.effects) {
           if (e.cmd < 0 || [0x09, 0x0b, 0x0d, 0x0f, 0xff].includes(e.cmd)) continue;
-          let p: number | null = null;
-          if (e.cmd === 0x80) p = Math.round(e.val * 128 / 255);
-          else if (e.cmd === 0x08) p = Math.round(64 + ((e.val & 15) - (e.val >> 4)) * 64 / 15);
+          if (e.cmd === 0x80 || e.cmd === 0x08) { [panL, panR] = panSplit(e.cmd, e.val); panFx = true; }
           else if (e.cmd === 0x12) { if ((e.val !== 0) !== echoOn) { echoOn = e.val !== 0; cmds.push(echoOn ? 'E1' : 'E0'); } }
           else if (!sfx && echo.on && ((e.cmd >= 0x19 && e.cmd <= 0x1c) || (e.cmd >= 0x30 && e.cmd <= 0x37))) {
             // Furnace sysDef.cpp:1212-1224 -> TAD \edl \evol \efb \ftap (mml-syntax.md:621-661). Furnace ignores them while echo is off (snes.cpp:566).
@@ -366,8 +369,10 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           else if (e.cmd === 0x0a) volSlide = (e.val >> 4) - (e.val & 15) || 0;
           else if ([0x00, 0x01, 0x02, 0x03, 0xec, 0xed].includes(e.cmd)) { /* applied with the note below */ }
           else drop(`effect ${hex2(e.cmd)}xx`, at);
-          if (p !== null && p !== pan) { pan = p; cmds.push(`p${pan}`); }
         }
+        if (panP() !== lastP) { lastP = panP(); cmds.push(`p${lastP}`); }
+        // After a slide the driver volume is unknown: a written volume always lands.
+        if ((cl.vol >= 0 && slid) || ((cl.vol >= 0 || cl.ins >= 0 || panFx) && volV() !== lastV)) { lastV = volV(); slid = false; cmds.push(lastV); }
         if (envFx) {
           const s = instruments[ins]?.snes;
           env ??= {
@@ -594,13 +599,19 @@ const GAIN_PREFIX: Record<number, string> = { 4: 'D', 5: 'E', 6: 'I', 7: 'B' };
 
 // Furnace macro codes the SNES platform reads (snes.cpp:112-200).
 const MACRO_NAMES: Record<number, string> = { 0: 'volume', 1: 'arpeggio', 2: 'noise frequency', 3: 'wave', 4: 'pitch', 5: 'special', 6: 'gain', 12: 'panning left', 13: 'panning right', 14: 'phase reset' };
-// Constant macro values that change nothing (no arp, no pitch offset, full pan).
-const NO_OP_MACRO: Record<number, number> = { 1: 0, 4: 0, 12: 127, 13: 127 };
+// Constant macro values that change nothing (no arp, no pitch offset).
+const NO_OP_MACRO: Record<number, number> = { 1: 0, 4: 0 };
+
+/** 08xy / 80xx to Furnace SNES panL/panR 0-127: playback.cpp:966-978 (8-bit split, convertPanLinearToSplit), snes.cpp:443 (>>1). */
+export function panSplit(cmd: number, v: number): [number, number] {
+  const [l, r] = cmd === 0x08 ? [(v >> 4) | (v & 0xf0), (v & 15) | ((v & 15) << 4)] : [Math.min(255, (255 - v) * 2), Math.min(255, v * 2)];
+  return [l >> 1, r >> 1];
+}
 /** Macros the writer carries as a constant: volume scales V, special sets echo/pitch mod, wave picks the wavetable. */
 function macroCarried(inst: TadInstrumentInput, code: number): boolean {
   const v = constantMacro(inst, code);
   if (v === undefined) return false;
-  if (code === 0 || code === 3) return true;
+  if (code === 0 || code === 3 || code === 12 || code === 13) return true;
   if (code === 5) return (v & (16 | 8 | 1)) === 0; // invert and noise have no TAD command
   return NO_OP_MACRO[code] === v;
 }
