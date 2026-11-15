@@ -602,9 +602,12 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
 
     // Note map (120 entries × 8 bytes each)
     if (amiga.useNoteMap && amiga.noteMap) {
+      // shortcut: the WASM wrapper takes 120 entries, so a 180-note Furnace map (parser) sends
+      // notes 60-179 as before; full 180 needs FurnaceDispatchWrapper.cpp to read 180.
+      const entries = amiga.noteMap.length === 180 ? amiga.noteMap.slice(60) : amiga.noteMap;
       for (let i = 0; i < 120; i++) {
-        if (i < amiga.noteMap.length) {
-          const entry = amiga.noteMap[i];
+        if (i < entries.length) {
+          const entry = entries[i];
           writer.writeUint32(entry.frequency || 0);  // freq (int32)
           writer.writeUint16(entry.sample ?? -1);     // map (int16)
           writer.writeInt8(0);                        // dpcmFreq

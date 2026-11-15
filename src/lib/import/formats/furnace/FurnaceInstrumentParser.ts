@@ -105,6 +105,18 @@ export interface FurnaceInstrument {
   };
 }
 
+/** Furnace's 180-note sample map (instrument.h), indexed by Furnace note (C-4 = 108): no remap. */
+function defaultNoteMap(): Array<{ freq: number; map: number }> {
+  return Array.from({ length: 180 }, (_, note) => ({ freq: note, map: -1 }));
+}
+
+/** Store the note map on inst.amiga and list every sample it plays in inst.samples. */
+function setNoteMap(inst: FurnaceInstrument, noteMap: Array<{ freq: number; map: number }>): void {
+  if (!inst.amiga) return;
+  inst.amiga.noteMap = noteMap;
+  for (const { map } of noteMap) if (map >= 0 && !inst.samples.includes(map)) inst.samples.push(map);
+}
+
 /**
  * Parse instrument
  */
@@ -125,7 +137,7 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
     if (magic === 'INS2') {
       reader.readUint32(); // Block size
     }
-    reader.readUint16(); // insVersion (consumed, not used)
+    const insVersion = reader.readUint16();
     inst.type = reader.readUint16();
 
     // Read features until EN
@@ -169,20 +181,16 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
             waveLen: smWaveLen,
           };
 
-          // Parse note map if present (120 entries × 4 bytes)
+          // Note map, as instrument.cpp readFeatureSM: 180 notes from v246, else notes 60-179
+          // with freq stored 60 lower; before v152 freq is the note itself.
           if (smUseNoteMap) {
-            inst.amiga.noteMap = [];
-            const seenSamples = new Set(inst.samples);
-            for (let note = 0; note < 120; note++) {
+            const noteMap = defaultNoteMap();
+            for (let note = insVersion >= 246 ? 0 : 60; note < 180; note++) {
               const freq = reader.readInt16();
-              const map = reader.readInt16();
-              inst.amiga.noteMap.push({ freq, map });
-              // Collect unique sample indices from the note map
-              if (map >= 0 && !seenSamples.has(map)) {
-                seenSamples.add(map);
-                inst.samples.push(map);
-              }
+              noteMap[note] = { freq: insVersion < 246 ? freq + 60 : freq, map: reader.readInt16() };
             }
+            if (insVersion < 152) noteMap.forEach((e, note) => { e.freq = note; });
+            setNoteMap(inst, noteMap);
           }
           // reader.seek(featEnd) handles any remaining bytes
           break;
@@ -961,25 +969,12 @@ export function parseInstrument(reader: BinaryReader): FurnaceInstrument {
       const useNoteMap = reader.readUint8() !== 0;
       if (inst.amiga) inst.amiga.useNoteMap = useNoteMap;
       if (useNoteMap) {
-        const noteFreqs: number[] = [];
-        for (let note = 0; note < 120; note++) noteFreqs.push(reader.readInt32());
-        const noteMaps: number[] = [];
-        for (let note = 0; note < 120; note++) noteMaps.push(reader.readInt16());
-
-        if (inst.amiga) {
-          inst.amiga.noteMap = [];
-          const seenSamples = new Set(inst.samples);
-          for (let note = 0; note < 120; note++) {
-            // v152+: noteFreqs are actual freqs; <152: overwritten with note index
-            const freq = instVersion < 152 ? note : noteFreqs[note];
-            const map = noteMaps[note];
-            inst.amiga.noteMap.push({ freq, map });
-            if (map >= 0 && !seenSamples.has(map)) {
-              seenSamples.add(map);
-              inst.samples.push(map);
-            }
-          }
-        }
+        // instrument.cpp readInsDataOld: notes 60-179, freqs then maps; freq kept as stored.
+        const noteMap = defaultNoteMap();
+        for (let note = 60; note < 180; note++) noteMap[note].freq = reader.readInt32();
+        for (let note = 60; note < 180; note++) noteMap[note].map = reader.readInt16();
+        if (instVersion < 152) noteMap.forEach((e, note) => { e.freq = note; });
+        if (inst.amiga) setNoteMap(inst, noteMap);
       }
     }
 
