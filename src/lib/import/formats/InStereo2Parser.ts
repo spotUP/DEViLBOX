@@ -705,9 +705,9 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       // Each pattern maps to a position; each channel has a startTrackRow offset
       const posIdx = firstPos + pattern;
-      if (posIdx >= positions.length) return 0;
+      if (posIdx >= positions.length) return -1;
       const pos = positions[posIdx][channel];
-      if (!pos) return 0;
+      if (!pos) return -1;
       const lineIdx = pos.startTrackRow + row;
       return trackRowDataOffset + lineIdx * 4;
     },
