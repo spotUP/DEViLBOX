@@ -130,6 +130,8 @@ export async function buildTadProject(files: TadBuildFile[], create: CreateTadCo
     f.native.subsongs.forEach((sub, si) => {
       if (tadSfxName(sub.name)) {
         const r = writeTadSfx({ ...input, subsong: si });
+        // No notes: tad-compiler rejects the whole project ("No notes in sound effect"), so leave it out.
+        if (!r.mml) { r.warnings.forEach((w) => warnings.push(`${r.name}: ${w} It was left out of the export.`)); return; }
         const name = unique(r.name);
         pieces.push({ name, kind: 'sfx', mml: r.mml.replace(/^=== \S+ ===/, `=== ${name} ===`), samples: r.samples, warnings: r.warnings, file: fi });
       } else {

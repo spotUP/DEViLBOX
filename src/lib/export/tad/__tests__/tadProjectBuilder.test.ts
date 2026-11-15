@@ -13,7 +13,7 @@ async function load(file: string, sfx = false): Promise<TadBuildFile> {
   const buf = readFileSync(resolve(DIR, file));
   const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
   const native = buildFurnaceNativeData(module);
-  if (sfx) native.subsongs.push({ ...native.subsongs[0], name: 'sfx:coin', ordersLen: 1 });
+  if (sfx) native.subsongs.push({ ...native.subsongs[0], name: 'sfx:coin', ordersLen: 1 }, { ...native.subsongs[0], name: 'sfx:empty', ordersLen: 1, channels: native.subsongs[0].channels.map((c) => ({ ...c, patterns: new Map() })) });
   return {
     title: module.name || file.replace(/\.fur$/, ''),
     native,
@@ -32,7 +32,8 @@ describe('buildTadProject', () => {
     const r = await buildTadProject(set, create as CreateTadCompiler, (f) => resolve('public/tad', f));
     console.log(r.warnings.join('\n'));
     expect(r.ok, r.warnings.join('\n')).toBe(true);
-    expect(r.soundEffects).toEqual(['coin']);
+    expect(r.soundEffects).toEqual(['coin']); // sfx:empty has no notes: left out with a warning, not a failed compile
+    expect(r.warnings.some((w) => w.startsWith('empty: '))).toBe(true);
     expect(r.songs.length).toBeGreaterThanOrEqual(2);
     const zip = await JSZip.loadAsync(r.zip);
     const names = Object.keys(zip.files);
