@@ -545,11 +545,11 @@ static int chanTrait(int chan, SeqChanTrait trait) {
   return furnace_dispatch_chan_trait(handle, subChan, (int)trait);
 }
 
-// limitSlides' slide-down target (playback.cpp:1038, 1683): the platform's floor note, else -60.
+// limitSlides' slide-down target (playback.cpp:1038, 1683): the platform's floor note, else 0.
 static int slideDownTarget(int chan) {
-  if (!COMPAT(SEQ_COMPAT_LIMIT_SLIDES)) return -60;
+  if (!COMPAT(SEQ_COMPAT_LIMIT_SLIDES)) return 0;
   int floor = chanTrait(chan, TRAIT_PORTA_FLOOR);
-  return floor < 0 ? -60 : floor;
+  return floor < 0 ? 0 : floor;
 }
 static bool keyOffAffectsPorta(int chan) { return chanTrait(chan, TRAIT_KEYOFF_PORTA) == 1; }
 static bool keyOffAffectsArp(int chan) { return chanTrait(chan, TRAIT_KEYOFF_ARP) == 1; }
@@ -559,7 +559,7 @@ static bool wantPreNote(int chan) { return chanTrait(chan, TRAIT_WANT_PRE_NOTE) 
 
 // Dispatch HINT_PORTA with clamped values (matches Furnace reference)
 #define HINT_PORTA(ch_idx, pNote, pSpeed) \
-  dispatchCmd(DIV_CMD_HINT_PORTA, ch_idx, CLAMP(pNote, -128, 127), MAX(pSpeed, 0))
+  dispatchCmd(DIV_CMD_HINT_PORTA, ch_idx, pNote, MAX(pSpeed, 0))
 
 // ============================================================
 // Per-system effect handlers (from Furnace sysDef.cpp)
@@ -1423,13 +1423,13 @@ static void seqProcessRow(int i, bool afterDelay) {
 
     if (ch.inPorta && COMPAT(SEQ_COMPAT_NOTE_OFF_RESETS_SLIDES)) {
       if (ch.stopOnOff) {
-        ch.portaNote = -1;
+        ch.portaNote = 0;
         ch.portaSpeed = -1;
         HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
         ch.stopOnOff = false;
       }
       if (keyOffAffectsPorta(i)) {
-        ch.portaNote = -1;
+        ch.portaNote = 0;
         ch.portaSpeed = -1;
         HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
       }
@@ -1443,13 +1443,13 @@ static void seqProcessRow(int i, bool afterDelay) {
 
     if (ch.inPorta && COMPAT(SEQ_COMPAT_NOTE_OFF_RESETS_SLIDES)) {
       if (ch.stopOnOff) {
-        ch.portaNote = -1;
+        ch.portaNote = 0;
         ch.portaSpeed = -1;
         HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
         ch.stopOnOff = false;
       }
       if (keyOffAffectsPorta(i)) {
-        ch.portaNote = -1;
+        ch.portaNote = 0;
         ch.portaSpeed = -1;
         HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
       }
@@ -1464,7 +1464,7 @@ static void seqProcessRow(int i, bool afterDelay) {
   } else if (noteVal != -1) {
     // New note
     ch.oldNote = ch.note;
-    ch.note = noteVal - 60;  // Convert from pattern note to signed note
+    ch.note = noteVal;  // engine 258: chan.note is the pattern note as stored (dispatch adds no further 60)
 
     // Per-platform: reset arp on new note if the chip requires it
     if (!ch.keyOn && keyOffAffectsArp(i)) {
@@ -1605,12 +1605,12 @@ static void seqProcessRow(int i, bool afterDelay) {
         if (COMPAT(SEQ_COMPAT_IGNORE_DUPLICATE_SLIDES) && (lastSlide == 0x01 || lastSlide == 0x1337)) break;
         lastSlide = 0x01;
         if (effectVal == 0) {
-          ch.portaNote = -1;
+          ch.portaNote = 0;
           ch.portaSpeed = -1;
           ch.inPorta = false;
           if (!COMPAT(SEQ_COMPAT_ARP_NON_PORTA)) dispatchCmd(DIV_CMD_PRE_PORTA, i, false, 0);
         } else {
-          ch.portaNote = COMPAT(SEQ_COMPAT_LIMIT_SLIDES) ? 0x60 : 255;
+          ch.portaNote = COMPAT(SEQ_COMPAT_LIMIT_SLIDES) ? 156 : 179;
           ch.portaSpeed = effectVal;
           ch.portaStop = true;
           ch.stopOnOff = false;
@@ -1625,7 +1625,7 @@ static void seqProcessRow(int i, bool afterDelay) {
         if (COMPAT(SEQ_COMPAT_IGNORE_DUPLICATE_SLIDES) && (lastSlide == 0x02 || lastSlide == 0x1337)) break;
         lastSlide = 0x02;
         if (effectVal == 0) {
-          ch.portaNote = -1;
+          ch.portaNote = 0;
           ch.portaSpeed = -1;
           ch.inPorta = false;
           if (!COMPAT(SEQ_COMPAT_ARP_NON_PORTA)) dispatchCmd(DIV_CMD_PRE_PORTA, i, false, 0);
@@ -1643,7 +1643,7 @@ static void seqProcessRow(int i, bool afterDelay) {
         break;
       case 0x03: // portamento
         if (effectVal == 0) {
-          ch.portaNote = -1;
+          ch.portaNote = 0;
           ch.portaSpeed = -1;
           HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
           ch.inPorta = false;
@@ -1707,7 +1707,7 @@ static void seqProcessRow(int i, bool afterDelay) {
         break;
       case 0x06: // vol slide + porta
         if (effectVal == 0 || ch.lastPorta == 0) {
-          ch.portaNote = -1;
+          ch.portaNote = 0;
           ch.portaSpeed = -1;
           HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
           ch.inPorta = false;
@@ -2106,7 +2106,7 @@ static void seqProcessRow(int i, bool afterDelay) {
     ch.doNote = false;
 
     if (!ch.keyOn && ch.scheduledSlideReset) {
-      ch.portaNote = -1;
+      ch.portaNote = 0;
       ch.portaSpeed = -1;
       HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
       ch.scheduledSlideReset = false;
@@ -2136,7 +2136,7 @@ static void seqProcessRow(int i, bool afterDelay) {
 
     switch (effect) {
       case 0xf1: // single pitch slide up
-        ch.portaNote = COMPAT(SEQ_COMPAT_LIMIT_SLIDES) ? 0x60 : 255;
+        ch.portaNote = COMPAT(SEQ_COMPAT_LIMIT_SLIDES) ? 156 : 179;
         ch.portaSpeed = effectVal;
         ch.portaStop = true;
         ch.stopOnOff = false;
@@ -2144,7 +2144,7 @@ static void seqProcessRow(int i, bool afterDelay) {
         ch.inPorta = false;
         if (!COMPAT(SEQ_COMPAT_ARP_NON_PORTA)) dispatchCmd(DIV_CMD_PRE_PORTA, i, true, 0);
         dispatchCmd(DIV_CMD_NOTE_PORTA, i, ch.portaSpeed * (getLinearPitch() ? getPitchSlideSpeed() : 1), ch.portaNote);
-        ch.portaNote = -1;
+        ch.portaNote = 0;
         ch.portaSpeed = -1;
         ch.inPorta = false;
         if (!COMPAT(SEQ_COMPAT_ARP_NON_PORTA)) dispatchCmd(DIV_CMD_PRE_PORTA, i, false, 0);
@@ -2158,7 +2158,7 @@ static void seqProcessRow(int i, bool afterDelay) {
         ch.inPorta = false;
         if (!COMPAT(SEQ_COMPAT_ARP_NON_PORTA)) dispatchCmd(DIV_CMD_PRE_PORTA, i, true, 0);
         dispatchCmd(DIV_CMD_NOTE_PORTA, i, ch.portaSpeed * (getLinearPitch() ? getPitchSlideSpeed() : 1), ch.portaNote);
-        ch.portaNote = -1;
+        ch.portaNote = 0;
         ch.portaSpeed = -1;
         ch.inPorta = false;
         if (!COMPAT(SEQ_COMPAT_ARP_NON_PORTA)) dispatchCmd(DIV_CMD_PRE_PORTA, i, false, 0);
@@ -2745,14 +2745,14 @@ static bool seqNextTick() {
               ch.keyOff = true;
               ch.keyOn = false;
               if (ch.stopOnOff) {
-                ch.portaNote = -1;
+                ch.portaNote = 0;
                 ch.portaSpeed = -1;
                 HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
                 ch.stopOnOff = false;
               }
               // Per-platform: some chips reset portamento on note-off
               if (keyOffAffectsPorta(i)) {
-                ch.portaNote = -1;
+                ch.portaNote = 0;
                 ch.portaSpeed = -1;
                 HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
               }

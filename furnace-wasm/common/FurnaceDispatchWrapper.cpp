@@ -951,6 +951,9 @@ int furnace_dispatch_create(int platformType, int sampleRate) {
     return 0;
   }
 
+  // engine 258: pitch tables are built by the engine (notifyPitchTable), not by the chip
+  inst->dispatch->notifyPitchTable(-1);
+
   inst->allocBufs(256);
 
   // Initialize blip_buffer resampling (matches Furnace's DivDispatchContainer)
@@ -997,7 +1000,10 @@ void furnace_dispatch_reset(int handle) {
   if (it != g_instances.end()) {
     DispatchInstance* inst = it->second;
     int oldRate = inst->dispatch->rate;
+    // pitch tables depend on compat flags (linearPitch), chip flags and samples; reset() binds them to channels
+    inst->dispatch->notifyPitchTable(-1);
     inst->dispatch->reset();
+    inst->dispatch->notifyPitchTable(-1);
 
     // If reset changed the chip clock (e.g., after setFlags), update blip buffer rates
     int newRate = inst->dispatch->rate;
