@@ -259,6 +259,14 @@ export interface UADEVariablePatternLayout {
   propagateSharedCells?: boolean;
 
   /**
+   * SidMon II: rows a command holds (a speed byte after a note, or a standalone rest). A note on a held row splits the hold in
+   * two: the speed byte at `at` is cut to the rows before it and a new note command is inserted behind it (the pattern stream
+   * grows; `stream` says where the pointer table and the stream live so they can be moved).
+   */
+  holds?: Array<{ pattern: number; channel: number; row: number; span: number; at: number; standalone: boolean; transpose: number; soundTranspose: number }>;
+  stream?: { dataStart: number; pointersAt: number; count: number };
+
+  /**
    * Original byte sizes of each file-level pattern's encoded data.
    * filePatternSizes[filePatIdx] = byte count.
    * Re-encoded data must fit within this limit (overflow = reject edit).

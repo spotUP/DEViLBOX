@@ -271,7 +271,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   s3m: 'n/a',
   sidFactory2: 'n/a',
   sidmon1: 'pass',
-  sidmon2: 'fail',
+  sidmon2: 'pass',
   soundControl: 'pass',
   soundMaster: 'pass',
   soundPlayer: 'pass',

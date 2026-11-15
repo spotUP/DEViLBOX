@@ -101,6 +101,8 @@ interface S2Row {
   speed: number;
   /** File byte offset of the row's first byte. */
   offset: number;
+  /** File offset of the speed byte (hold) of the row, when it has one. */
+  speedAt?: number;
 }
 
 interface S2Sample {
@@ -431,21 +433,21 @@ export async function parseSidMon2File(
       row.param = readUbyte(data, pos); pos++; i++;
     } else if (value < 0) {
       // Negative: speed change (bitwise NOT)
-      row.speed = ~value;
+      row.speed = ~value; row.speedAt = pos - 1;
     } else if (value < 112) {
       // Note value (1-111)
       row.note = value;
       const next = readByte(data, pos); pos++; i++;
 
       if (next < 0) {
-        row.speed = ~next;
+        row.speed = ~next; row.speedAt = pos - 1;
       } else if (next < 112) {
         // Sample number
         row.sample = next;
         const next2 = readByte(data, pos); pos++; i++;
 
         if (next2 < 0) {
-          row.speed = ~next2;
+          row.speed = ~next2; row.speedAt = pos - 1;
         } else {
           row.effect = next2;
           row.param = readUbyte(data, pos); pos++; i++;
@@ -611,6 +613,7 @@ export async function parseSidMon2File(
   let currentPatternLen = 64;  // SidMon II default, can be changed by effect 0x76
   const trackerPatterns: Pattern[] = [];
   // Every grid note cell and the file byte of the note command that played it (G24: a note edit is a byte patch).
+  const holds: NonNullable<UADEVariablePatternLayout['holds']> = [];
   const noteCells: Array<{ pattern: number; channel: number; row: number; offset: number; note: number; base: number }> = [];
 
   // Voice state for simulation
@@ -674,6 +677,9 @@ export async function parseSidMon2File(
           if (rowData) {
             voice.patternPtr++;
             voice.speed = rowData.speed;
+            if (rowData.speedAt !== undefined && (rowData.speed > 0 || rowData.note === 0)) {
+              holds.push({ pattern: trackPos, channel: ch, row: patRow, span: rowData.speed, at: rowData.speedAt, standalone: rowData.note === 0, transpose: voice.step?.transpose ?? 0, soundTranspose: voice.step?.soundTranspose ?? 0 });
+            }
 
             if (rowData.note > 0) {
               noteTriggered = true;
@@ -940,6 +946,8 @@ export async function parseSidMon2File(
     trackMap,
     blockRows,
     noteBytes: noteCells,
+    holds,
+    stream: { dataStart: patternDataStart, pointersAt: patternDataStart - 2 * numPointers, count: numPointers },
     propagateSharedCells: true,
   };
 

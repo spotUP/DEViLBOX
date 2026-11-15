@@ -32,17 +32,27 @@ describe('SidMon II note edit export', () => {
     expect(notes(back.patterns)).toEqual(notes(before));
   });
 
-  it('refuses a note on a row no command played, and keeps the module', async () => {
+  it('grows the stream for a note on a held row, and the note reloads there with no other note moved', async () => {
     const bytes = readFileSync(DIR + file);
     const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
     const song = await parseSidMon2File(buf, file);
     setGridBaseline(baselineOf(song.patterns));
-    const played = new Set(song.uadeVariableLayout!.noteBytes!.map((x) => `${x.pattern}:${x.channel}:${x.row}`));
-    const rows = song.patterns[0].channels[0].rows;
-    const r = rows.findIndex((_, i) => !played.has(`0:0:${i}`));
-    rows[r].note = 40;
+    const before = structuredClone(song.patterns);
+    const L = song.uadeVariableLayout!;
+    const played = new Set(L.noteBytes!.map((x) => `${x.pattern}:${x.channel}:${x.row}`));
+    const ref = L.noteBytes!.find((x) => L.holds!.some((h) => h.pattern === x.pattern && h.channel === x.channel && h.row === x.row && h.span > 1))!;
+    const h = L.holds!.find((q) => q.pattern === ref.pattern && q.channel === ref.channel && q.row === ref.row)!;
+    const r = h.row + 1;
+    expect(played.has(`${h.pattern}:${h.channel}:${r}`)).toBe(false);
+    song.patterns[h.pattern].channels[h.channel].rows[r].note = ref.note;
     const { data, warnings } = writeSidMon2NoteEdits(song, buf);
-    expect(warnings.length).toBe(1);
-    expect(new Uint8Array(data)).toEqual(new Uint8Array(buf));
+    expect(warnings).toEqual([]);
+    expect(data.byteLength).toBeGreaterThan(buf.byteLength);
+    const back = await parseSidMon2File(data, file);
+    expect(back.patterns[h.pattern].channels[h.channel].rows[r].note).toBe(ref.note);
+    back.patterns[h.pattern].channels[h.channel].rows[r].note = 0;
+    // A shared stream shows the new note on every cell that plays it; compare the edited cell's neighbours only.
+    const notes = (ps: typeof before) => ps[h.pattern].channels.map((c) => c.rows.map((x, i) => (c === ps[h.pattern].channels[h.channel] && i === r ? 0 : x.note)));
+    expect(notes(back.patterns)).toEqual(notes(before));
   });
 });
