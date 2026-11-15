@@ -34,6 +34,8 @@ import { Cpu, Activity, Zap, Waves, Volume2, Music, Settings, FileUp, Plus, Tras
 import { InstrumentOscilloscope } from '@components/visualization';
 import { VisualizerFrame } from '@components/visualization/VisualizerFrame';
 import { MacroListEditor } from './MacroEditor';
+import { SNESPanel, SNESEchoPanel } from './SNESPanels';
+import { SNES_MACRO_LABELS } from '@/lib/furnace/snesDsp';
 import { WavetableListEditor, type WavetableData } from './WavetableEditor';
 import { ScrollLockContainer } from '@components/ui/ScrollLockContainer';
 import { EnvelopeVisualization, WaveformThumbnail, FMAlgorithmDiagram } from '@components/instruments/shared';
@@ -373,7 +375,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
           macros={config.macros}
           onChange={(macros) => onChange({ macros: macros as FurnaceMacro[] })}
           chipType={config.chipType}
-          labels={neoKind?.id === 'ssg' ? SSG_MACRO_LABELS : undefined}
+          labels={neoKind?.id === 'ssg' ? SSG_MACRO_LABELS : config.chipType === 24 ? SNES_MACRO_LABELS : undefined}
         />
       ) : (
         <MacroListEditor
@@ -647,11 +649,14 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
 
       {/* SNES Panel (chipType 24) */}
       {config.chipType === 24 && (
-        <SNESPanel config={config} onChange={pushLiveUpdate} />
+        <>
+          <SNESPanel config={config} onChange={pushLiveUpdate} />
+          <SNESEchoPanel />
+        </>
       )}
 
       {/* Amiga Panel (when amiga config present) */}
-      {config.amiga && (
+      {config.amiga && config.chipType !== 24 && (
         <AmigaPanel config={config} onChange={pushLiveUpdate} />
       )}
 
@@ -1031,7 +1036,7 @@ const GBPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceCo
   const gb = useMemo(() => ({ ...GB_DEFAULTS, ...config.gb }), [config.gb]);
 
   const updateGB = useCallback((updates: Partial<typeof gb>) => {
-    onChange({ gb: { ...config.gb, ...GB_DEFAULTS, ...updates } });
+    onChange({ gb: { ...GB_DEFAULTS, ...config.gb, ...updates } });
   }, [config.gb, onChange]);
 
   return (
@@ -1491,7 +1496,7 @@ const WaveSynthPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<Fu
   const ws = useMemo(() => ({ ...WAVE_SYNTH_DEFAULTS, ...config.ws }), [config.ws]);
 
   const updateWS = useCallback((updates: Partial<FurnaceWaveSynthConfig>) => {
-    onChange({ ws: { ...config.ws, ...WAVE_SYNTH_DEFAULTS, ...updates } });
+    onChange({ ws: { ...WAVE_SYNTH_DEFAULTS, ...config.ws, ...updates } });
   }, [config.ws, onChange]);
 
   const isDual = ws.effect >= 128;
@@ -1866,7 +1871,7 @@ const C64Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
   const c64 = useMemo(() => ({ ...C64_DEFAULTS, ...config.c64 }), [config.c64]);
 
   const updateC64 = useCallback((updates: Partial<typeof c64>) => {
-    onChange({ c64: { ...config.c64, ...C64_DEFAULTS, ...updates } });
+    onChange({ c64: { ...C64_DEFAULTS, ...config.c64, ...updates } });
   }, [config.c64, onChange]);
 
   return (
@@ -2125,97 +2130,6 @@ const C64Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
   );
 };
 
-// SNES Panel - matches Furnace insEdit.cpp SNES editor (lines 7978-8093)
-const SNES_DEFAULTS = { useEnv: true, gainMode: 0, gain: 127, a: 15, d: 7, s: 7, r: 0 };
-
-const SNESPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceConfig>) => void }> = ({ config, onChange }) => {
-  const snes = useMemo(() => ({ ...SNES_DEFAULTS, ...config.snes }), [config.snes]);
-
-  const updateSNES = useCallback((updates: Partial<typeof snes>) => {
-    onChange({ snes: { ...config.snes, ...SNES_DEFAULTS, ...updates } });
-  }, [config.snes, onChange]);
-
-  // Raw SNES GAIN register mode values, as Furnace stores them (DivInstrumentSNES::GainMode).
-  const gainModes = [
-    { value: 0, label: 'Direct' },
-    { value: 4, label: 'Decrease Linear' },
-    { value: 5, label: 'Decrease Exponential' },
-    { value: 6, label: 'Increase Linear' },
-    { value: 7, label: 'Increase Bent' },
-  ];
-
-  return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-      {/* Envelope Mode */}
-      <div className="bg-dark-bgSecondary p-4 rounded-lg border border-accent-highlight/30">
-        <div className="flex items-center gap-2 mb-4">
-          <Activity size={16} className="text-accent-highlight" />
-          <h3 className="font-mono text-xs font-bold text-text-primary uppercase">SNES Envelope</h3>
-          <button
-            onClick={() => updateSNES({ useEnv: !snes.useEnv })}
-            className={`ml-auto px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
-              snes.useEnv
-                ? 'bg-accent-highlight/20 border-accent-highlight/50 text-accent-highlight'
-                : 'bg-dark-bg border-dark-border text-text-muted'
-            }`}
-          >
-            {snes.useEnv ? 'ADSR' : 'GAIN'}
-          </button>
-        </div>
-
-        {snes.useEnv ? (
-          <div className="space-y-3">
-            <div className="flex justify-between gap-4">
-              <Knob label="A" value={snes.a} min={0} max={15}
-                onChange={(v) => updateSNES({ a: Math.round(v) })}
-                size="md" color="#06b6d4" formatValue={(v) => String(Math.round(v))} />
-              <Knob label="D" value={snes.d} min={0} max={7}
-                onChange={(v) => updateSNES({ d: Math.round(v) })}
-                size="md" color="#22d3ee" formatValue={(v) => String(Math.round(v))} />
-              <Knob label="S" value={snes.s} min={0} max={7}
-                onChange={(v) => updateSNES({ s: Math.round(v) })}
-                size="md" color="#67e8f9" formatValue={(v) => String(Math.round(v))} />
-              <Knob label="R" value={snes.r} min={0} max={31}
-                onChange={(v) => updateSNES({ r: Math.round(v) })}
-                size="md" color="#a5f3fc" formatValue={(v) => String(Math.round(v))} />
-            </div>
-            <div className="flex items-center gap-4 pt-2 border-t border-dark-border">
-              <Knob label="D2" value={snes.d2 ?? 0} min={0} max={31}
-                onChange={(v) => updateSNES({ d2: Math.round(v) })}
-                size="sm" color="#0891b2" formatValue={(v) => String(Math.round(v))} />
-              <button
-                onClick={() => updateSNES({ sus: (snes.sus ?? 0) ? 0 : 1 })}
-                className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors ${
-                  (snes.sus ?? 0)
-                    ? 'bg-accent-highlight/20 border-accent-highlight/50 text-accent-highlight'
-                    : 'bg-dark-bg border-dark-border text-text-muted'
-                }`}
-              >
-                Sustain Mode
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center gap-4">
-            <div>
-              <label className="text-[10px] text-text-muted font-mono block mb-1">Gain Mode</label>
-              <CustomSelect
-                value={String(typeof snes.gainMode === 'number' ? snes.gainMode : 0)}
-                onChange={(v) => updateSNES({ gainMode: parseInt(v) })}
-                className="bg-dark-bg border border-dark-border rounded px-2 py-1 text-xs text-text-primary"
-                options={gainModes.map((m) => ({ value: String(m.value), label: m.label }))}
-              />
-            </div>
-            <Knob label="GAIN" value={snes.gain} min={0} max={127}
-              onChange={(v) => updateSNES({ gain: Math.round(v) })}
-              size="md" color="#06b6d4" formatValue={(v) => String(Math.round(v))} />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
 // PSG Panel - fixed to use actual config values
 const PSG_DEFAULTS = { duty: 50, width: 50, noiseMode: 'white' as const, attack: 0, decay: 8, sustain: 10, release: 5 };
 
@@ -2223,7 +2137,7 @@ const PSGPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
   const psg = useMemo(() => ({ ...PSG_DEFAULTS, ...config.psg }), [config.psg]);
 
   const updatePSG = useCallback((updates: Partial<typeof psg>) => {
-    onChange({ psg: { ...config.psg, ...PSG_DEFAULTS, ...updates } });
+    onChange({ psg: { ...PSG_DEFAULTS, ...config.psg, ...updates } });
   }, [config.psg, onChange]);
 
   return (
@@ -2303,7 +2217,7 @@ const PCMPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
   const pcm = useMemo(() => ({ ...PCM_DEFAULTS, ...config.pcm }), [config.pcm]);
 
   const updatePCM = useCallback((updates: Partial<typeof pcm>) => {
-    onChange({ pcm: { ...config.pcm, ...PCM_DEFAULTS, ...updates } });
+    onChange({ pcm: { ...PCM_DEFAULTS, ...config.pcm, ...updates } });
   }, [config.pcm, onChange]);
 
   const bitDepths = [8, 16];
@@ -2364,7 +2278,7 @@ const AmigaPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<Furnac
   const amiga = useMemo(() => ({ ...AMIGA_DEFAULTS, ...config.amiga }), [config.amiga]);
 
   const updateAmiga = useCallback((updates: Partial<FurnaceAmigaConfig>) => {
-    onChange({ amiga: { ...config.amiga, ...AMIGA_DEFAULTS, ...updates } });
+    onChange({ amiga: { ...AMIGA_DEFAULTS, ...config.amiga, ...updates } });
   }, [config.amiga, onChange]);
 
   return (
@@ -2443,7 +2357,7 @@ const N163Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<Furnace
   const n163 = useMemo(() => ({ ...N163_DEFAULTS, ...config.n163 }), [config.n163]);
 
   const updateN163 = useCallback((updates: Partial<FurnaceN163Config>) => {
-    onChange({ n163: { ...config.n163, ...N163_DEFAULTS, ...updates } });
+    onChange({ n163: { ...N163_DEFAULTS, ...config.n163, ...updates } });
   }, [config.n163, onChange]);
 
   const waveModes = ['Load on playback', 'Load when changed', 'Load on note-on', 'Manual write'];
@@ -2551,7 +2465,7 @@ const FDSPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<FurnaceC
   const fds = useMemo(() => ({ ...FDS_DEFAULTS, ...config.fds }), [config.fds]);
 
   const updateFDS = useCallback((updates: Partial<FurnaceFDSConfig>) => {
-    onChange({ fds: { ...config.fds, ...FDS_DEFAULTS, ...updates } });
+    onChange({ fds: { ...FDS_DEFAULTS, ...config.fds, ...updates } });
   }, [config.fds, onChange]);
 
   return (
@@ -2717,7 +2631,7 @@ const MultiPCMPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<Fur
   const mpcm = useMemo(() => ({ ...MULTIPCM_DEFAULTS, ...config.multipcm }), [config.multipcm]);
 
   const updateMultiPCM = useCallback((updates: Partial<FurnaceMultiPCMConfig>) => {
-    onChange({ multipcm: { ...config.multipcm, ...MULTIPCM_DEFAULTS, ...updates } });
+    onChange({ multipcm: { ...MULTIPCM_DEFAULTS, ...config.multipcm, ...updates } });
   }, [config.multipcm, onChange]);
 
   return (
@@ -2820,7 +2734,7 @@ const SoundUnitPanel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<Fu
   const su = useMemo(() => ({ ...SU_DEFAULTS, ...config.soundUnit }), [config.soundUnit]);
 
   const updateSU = useCallback((updates: Partial<FurnaceSoundUnitConfig>) => {
-    onChange({ soundUnit: { ...config.soundUnit, ...SU_DEFAULTS, ...updates } });
+    onChange({ soundUnit: { ...SU_DEFAULTS, ...config.soundUnit, ...updates } });
   }, [config.soundUnit, onChange]);
 
   return (
@@ -2992,7 +2906,7 @@ const SID2Panel: React.FC<{ config: FurnaceConfig; onChange: (u: Partial<Furnace
   const sid2 = useMemo(() => ({ ...SID2_DEFAULTS, ...config.sid2 }), [config.sid2]);
 
   const updateSID2 = useCallback((updates: Partial<FurnaceSID2Config>) => {
-    onChange({ sid2: { ...config.sid2, ...SID2_DEFAULTS, ...updates } });
+    onChange({ sid2: { ...SID2_DEFAULTS, ...config.sid2, ...updates } });
   }, [config.sid2, onChange]);
 
   const mixModes = ['Normal', 'Mode 1', 'Mode 2', 'Mode 3'];
