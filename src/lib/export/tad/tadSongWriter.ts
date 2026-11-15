@@ -22,7 +22,14 @@ export interface TadInstrumentInput {
   useWave?: boolean;
   /** Furnace amiga.waveLen: wavetable length minus 1. */
   waveLen?: number;
-  hasMacros?: boolean;
+  /** Furnace macros by code (MACRO_NAMES); constant volume, wave and special macros are carried. */
+  macros?: { code?: number; data: ArrayLike<number> }[];
+}
+
+/** Furnace macro `code` as one constant value, or undefined when absent or not constant. */
+function constantMacro(inst: TadInstrumentInput | undefined, code: number): number | undefined {
+  const d = inst?.macros?.find((m) => m.code === code && m.data.length > 0)?.data;
+  return d && Array.from(d).every((v) => v === d[0]) ? d[0] : undefined;
 }
 
 export interface TadSongInput {
@@ -213,8 +220,10 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
   const widen = (smp: string, p: number) => { const r2 = sampleOctaves.get(smp); sampleOctaves.set(smp, r2 ? [Math.min(r2[0], p), Math.max(r2[1], p)] : [p, p]); };
   const tuningHz = native.tuning ?? 440;
   /** Playable TAD note range of a sample; null when its data is missing (no limit known). */
+  // Sample name `s<sample>` or `w<length>[_<wave>]` to its number (sample index or wave length).
+  const smpNum = (smp: string) => Number(smp.slice(1).split('_')[0]);
   const playable = (smp: string): [number, number] | null => {
-    const n = Number(smp.slice(1));
+    const n = smpNum(smp);
     if (smp[0] === 'w') return tadNoteRange(32000 / n);
     return samples[n] ? tadNoteRange(sampleTuningHz(samples[n], tuningHz)) : null;
   };
@@ -227,7 +236,12 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     if (!inst) return null;
     // Native rows hold octave*12+semitone (C-0 = 0); the engine, and so the note map, counts from C-(-5) (C-0 = 60).
     note += FURNACE_NOTE_OFFSET;
-    if (inst.useWave) return wavetables[0] ? { smp: `w${Math.max(16, ((inst.waveLen ?? 31) + 1) & ~15)}`, note } : null;
+    if (inst.useWave) {
+      // shortcut: wave = constant wave macro or 0; Furnace keeps the channel's last wave, and 10xx / changing wave macros are dropped.
+      const wi = constantMacro(inst, 3) ?? 0;
+      const len = Math.max(16, ((inst.waveLen ?? 31) + 1) & ~15);
+      return wavetables[wi] ? { smp: wi ? `w${len}_${wi}` : `w${len}`, note } : null;
+    }
     let s = inst.initSample ?? 0;
     if (inst.useNoteMap && inst.noteMap) {
       const m = inst.noteMap[Math.max(0, Math.min(179, note))];
@@ -244,7 +258,10 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     const ch = snes.first + c;
     // echoMask: Furnace starts these channels with echo on (snes.cpp:914).
     const out: string[] = ['V254', ...(!sfx && echo.on && (echo.mask >> c) & 1 ? ['E1'] : [])];
-    let ins = 0, curIns = -1, vol = 127, pan = 64, oct = -1;
+    let ins = 0, curIns = -1, vol = 127, pan = 64, oct = -1, lastV = 'V254', slid = false;
+    // snes.cpp:115-117 outVol = vol * volMacro / 127; a constant volume macro scales V.
+    const volScale = () => Math.min(127, constantMacro(instruments[ins], 0) ?? 127) / 127;
+    const volV = () => `V${Math.min(255, Math.round(vol * 2 * volScale()))}`;
     type Pending = { tok: string; ticks: number; sl?: { a: number; b: number; smp: string; plain: string; oct: number; reg: (p: number, smp: string) => number } };
     let pending: Pending = { tok: 'r', ticks: 0 };
     let carry = 0;
@@ -304,8 +321,16 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
       if (cl) {
         if (cl.ins >= 0) { ins = cl.ins; env = null; lastEnv = ''; }
         const cmds: string[] = [];
+        // Constant special (ex1) macro, snes.cpp:152-172: bit 2 echo, bit 4 pitch modulation.
+        const ex1 = cl.ins >= 0 ? constantMacro(instruments[ins], 5) : undefined;
+        if (ex1 !== undefined) {
+          if (!sfx && echo.on && ((ex1 & 2) !== 0) !== echoOn) { echoOn = (ex1 & 2) !== 0; cmds.push(echoOn ? 'E1' : 'E0'); }
+          if (((ex1 & 4) !== 0) !== pmOn) { pmOn = (ex1 & 4) !== 0; cmds.push(pmOn ? 'PM' : 'PM0'); }
+        }
         if (cl.vol >= 0) volSlide = 0;
-        if (cl.vol >= 0 && cl.vol !== vol) { vol = cl.vol; cmds.push(`V${Math.min(255, vol * 2)}`); }
+        if (cl.vol >= 0) vol = cl.vol;
+        // After a slide the driver volume is unknown: a written volume always lands.
+        if ((cl.vol >= 0 && (slid || volV() !== lastV)) || (cl.ins >= 0 && volV() !== lastV)) { lastV = volV(); slid = false; cmds.push(lastV); }
         const ef = new Map<number, number>();
         for (const e of cl.effects) if (e.cmd >= 0) ef.set(e.cmd, e.val);
         let envFx = false;
@@ -362,7 +387,8 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           if (g && g !== lastEnv) { lastEnv = g; cmds.push(g); }
         }
         if (volSlide) {
-          const d = Math.max(1, Math.min(255, Math.round(Math.abs(volSlide) * r.ticks / tickScale / 2)));
+          const d = Math.max(1, Math.min(255, Math.round(Math.abs(volSlide) * r.ticks / tickScale / 2 * volScale())));
+          slid = true;
           cmds.push(`Vs${volSlide > 0 ? '+' : '-'}${d},${r.ticks}`);
         }
         // Pitch effects: Furnace slide speed is xx * pitchSlideSpeed (default 4) units per tick, 128 per semitone.
@@ -379,7 +405,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         // Portamento velocity as the compiler computes it (command_compiler/channel_bc_generator.rs:760-775): round(register delta / slide ticks),
         // slide ticks = row ticks - 1 (the key-off tick), must be 1..=255 (bytecode.rs:617 PortamentoVelocity, errors.rs:1171). Register: pitch_table.rs:146-157.
         const pitchReg = (p: number, smp = curSmp) => {
-          const hz = smp[0] === 'w' ? 32000 / Number(smp.slice(1)) : samples[Number(smp.slice(1))] ? sampleTuningHz(samples[Number(smp.slice(1))], tuningHz) : 0;
+          const hz = smp[0] === 'w' ? 32000 / smpNum(smp) : samples[smpNum(smp)] ? sampleTuningHz(samples[smpNum(smp)], tuningHz) : 0;
           return hz ? 4096 * 2 ** ((p - Math.round(Math.log2(hz / 440) * 12e6 + 57e6) / 1e6) / 12) : 0;
         };
         const pitchFx = (start: number, newPitch: number): { tok: string; end: number; first: number } | null => {
@@ -516,12 +542,13 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     const [iStr, smp] = key.split(' ');
     const i = Number(iStr);
     const inst = instruments[i];
-    if (inst.hasMacros && !macroWarned.has(i)) { macroWarned.add(i); warnings.push(`Instrument ${i} (${inst.name}): macros dropped.`); }
+    const dropped = (inst.macros ?? []).filter((m) => m.data.length > 0 && !macroCarried(inst, m.code ?? -1)).map((m) => MACRO_NAMES[m.code ?? -1] ?? `macro ${m.code}`);
+    if (dropped.length && !macroWarned.has(i)) { macroWarned.add(i); warnings.push(`Instrument ${i} (${inst.name}): ${dropped.join(', ')} macro${dropped.length > 1 ? 's' : ''} dropped.`); }
     insLines.push(`@${id} ${smp} ${envelope(inst, warnings, i)}`);
     if (!sampleFiles.has(smp)) {
       const octaves = sampleOctaves.get(smp) ?? [48, 48];
-      const n = Number(smp.slice(1));
-      const f = smp[0] === 'w' ? waveFile(wavetables[0], n, octaves) : sampleFile(samples[n], n, tuning, octaves, warnings);
+      const [n, wi = 0] = smp.slice(1).split('_').map(Number);
+      const f = smp[0] === 'w' ? waveFile(wavetables[wi], n, octaves, smp) : sampleFile(samples[n], n, tuning, octaves, warnings);
       if (f) sampleFiles.set(smp, f);
     }
   }
@@ -565,6 +592,19 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
 
 const GAIN_PREFIX: Record<number, string> = { 4: 'D', 5: 'E', 6: 'I', 7: 'B' };
 
+// Furnace macro codes the SNES platform reads (snes.cpp:112-200).
+const MACRO_NAMES: Record<number, string> = { 0: 'volume', 1: 'arpeggio', 2: 'noise frequency', 3: 'wave', 4: 'pitch', 5: 'special', 6: 'gain', 12: 'panning left', 13: 'panning right', 14: 'phase reset' };
+// Constant macro values that change nothing (no arp, no pitch offset, full pan).
+const NO_OP_MACRO: Record<number, number> = { 1: 0, 4: 0, 12: 127, 13: 127 };
+/** Macros the writer carries as a constant: volume scales V, special sets echo/pitch mod, wave picks the wavetable. */
+function macroCarried(inst: TadInstrumentInput, code: number): boolean {
+  const v = constantMacro(inst, code);
+  if (v === undefined) return false;
+  if (code === 0 || code === 3) return true;
+  if (code === 5) return (v & (16 | 8 | 1)) === 0; // invert and noise have no TAD command
+  return NO_OP_MACRO[code] === v;
+}
+
 function envelope(inst: TadInstrumentInput, warnings: string[], i: number): string {
   const s = inst.snes;
   if (!s) return 'gain F127';
@@ -591,8 +631,7 @@ function toInt16(s: FurnaceModuleSample): Int16Array {
  * Wavetable as a looped BRR sample, byte for byte what Furnace writes to SNES sample RAM
  * (snes.cpp updateWave): range 11, filter 0, 4-bit wave value - 8, loop over the whole wave.
  */
-function waveFile(w: FurnaceWavetable, len: number, octaves: [number, number]): TadSampleFile {
-  const name = `w${len}`;
+function waveFile(w: FurnaceWavetable, len: number, octaves: [number, number], name: string): TadSampleFile {
   // Furnace DivWaveSynth::changeWave1: nearest-index stretch to len, scale to 0..15.
   const value = (k: number) => {
     if (w.height < 1 || w.data.length < 1) return 0;

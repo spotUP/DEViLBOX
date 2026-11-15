@@ -97,6 +97,33 @@ describe('writeTadSong echo header', () => {
     expect(song.warnings.some((w) => /sustain mode/.test(w))).toBe(false);
   }, 60000);
 
+  // snes.cpp:115-117 outVol = vol * volMacro / 127: a constant volume macro scales V.
+  it('scales V by a constant volume macro', async () => {
+    const buf = readFileSync(resolve(DIR, 'tetristheme.fur'));
+    const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+    const song = writeTadSong({ native: buildFurnaceNativeData(module), subsong: 0, instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)), samples: toSequencerSamples(module), wavetables: module.wavetables, title: 'tetristheme' });
+    const drums = module.instruments.find((i) => i.name === 'Drums')!;
+    const level = drums.macros.find((m) => m.code === 0)!.data[0];
+    expect(level).toBe(34);
+    expect(song.mml).toContain(`V${Math.round(254 * level / 127)}`);
+    expect(song.warnings.some((w) => /\(Drums\): .*volume/.test(w))).toBe(false);
+  }, 60000);
+
+  // snes.cpp:152-172: a constant special macro sets echo (bit 2) and pitch modulation (bit 4); no warning for it.
+  it('carries constant special macros as echo and pitch modulation', async () => {
+    let checked = 0;
+    for (const file of FILES) {
+      const buf = readFileSync(resolve(DIR, file));
+      const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+      const carried = module.instruments.filter((i) => { const d = i.macros.find((m) => m.code === 5)?.data; return d?.length && Array.from(d).every((v) => v === d[0] && (v & 25) === 0); });
+      if (!carried.length) continue;
+      const song = writeTadSong({ native: buildFurnaceNativeData(module), subsong: 0, instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)), samples: toSequencerSamples(module), wavetables: module.wavetables, title: file });
+      for (const i of carried) expect(song.warnings.some((w) => w.includes(`(${i.name}):`) && w.includes('special'))).toBe(false);
+      checked += carried.length;
+    }
+    expect(checked).toBeGreaterThan(0);
+  }, 120000);
+
   it('writes the Furnace echo flags as TAD header lines', async () => {
     const lines: Record<string, string> = {};
     for (const file of FILES) {
