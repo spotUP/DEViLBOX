@@ -16,10 +16,13 @@ import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';
 import { useDJStore } from '@/stores/useDJStore';
 
 const holder = vi.hoisted(() => ({ engine: null as unknown }));
-vi.mock('@/engine/dj/DJEngine', () => ({
-  getDJEngine: () => holder.engine,
-  getDJEngineIfActive: () => holder.engine,
-}));
+vi.mock('@/engine/dj/DJEngine', async () => {
+  // DJPhase (not DJEngine) answers getDJEngineIfActive for the phase maths.
+  (await import('@/engine/dj/DJPhase')).setDJEngineHolder({
+    getDeck: (id: string) => (holder.engine as { getDeck(id: string): unknown } | null)?.getDeck(id),
+  } as never);
+  return { getDJEngine: () => holder.engine, getDJEngineIfActive: () => holder.engine };
+});
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 

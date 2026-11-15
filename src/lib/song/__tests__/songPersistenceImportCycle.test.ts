@@ -73,14 +73,14 @@ describe('the song stores and the code that snapshots them', () => {
     }
   }, 60000);
 
-  // useTransportStore loads ToneEngine on demand to switch the meters (49 -> 44). The DJ entry (DubActions via DJPhase, parameterRouter loading DJEngine/DJActions on demand) cut 44 -> 30.
+  // useTransportStore loads ToneEngine on demand to switch the meters (49 -> 44). The DJ entry (DubActions via DJPhase, parameterRouter loading DJEngine/DJActions on demand) cut 44 -> 30; songChannelRoles (a store-free leaf for the Auto DJ mix analysis) cut 30 -> 26.
 
   // Ratchet: the static cycle useInstrumentStore sits in may shrink, never grow.
   // Lower the bound when a cut lands. Remaining core: ToneEngine,
   // InstrumentFactory and the synths, TrackerReplayer, the DJ engine, the stores.
-  it('the store import cycle is at most 30 modules', () => {
+  it('the store import cycle is at most 26 modules', () => {
     const STORE = 'src/stores/useInstrumentStore.ts';
     const cycle = [...reachableFiles(STORE).keys()].filter((f) => f === STORE || importChain(f, STORE) !== null);
-    expect(cycle.length, cycle.sort().join('\n')).toBeLessThanOrEqual(30);
+    expect(cycle.length, cycle.sort().join('\n')).toBeLessThanOrEqual(26);
   }, 120000);
 });

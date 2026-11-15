@@ -18,7 +18,7 @@ import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { Pattern, TrackerCell } from '@/types/tracker';
 import { songUsesAmigaPeriods } from '@/lib/amiga/periodNotes';
 import type { ChannelRole } from '@/bridge/analysis/MusicAnalysis';
-import { resolveSongChannelRoles } from '@/engine/dub/songChannelIdentity';
+import { resolveSongChannelRoles } from '@/engine/dub/songChannelRoles';
 import { getRolesAtPosition } from '@/bridge/analysis/SongRoleTimeline';
 import type {
   ActivityTimeline, InstrumentFamily, MusicalFunction, Register, RhythmicRole,

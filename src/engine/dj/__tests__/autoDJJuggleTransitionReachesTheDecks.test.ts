@@ -37,10 +37,13 @@ const holder = vi.hoisted(() => ({
   incomingPhraseConfidence: undefined as number | undefined,
 }));
 
-vi.mock('@/engine/dj/DJEngine', () => ({
-  getDJEngine: () => holder.engine,
-  getDJEngineIfActive: () => holder.engine,
-}));
+vi.mock('@/engine/dj/DJEngine', async () => {
+  // DJPhase (not DJEngine) answers getDJEngineIfActive for the phase maths.
+  (await import('@/engine/dj/DJPhase')).setDJEngineHolder({
+    getDeck: (id: string) => (holder.engine as { getDeck(id: string): unknown } | null)?.getDeck(id),
+  } as never);
+  return { getDJEngine: () => holder.engine, getDJEngineIfActive: () => holder.engine };
+});
 vi.mock('../DJQuantizedFX', () => {
   const record = () => () => () => {};
   return {
