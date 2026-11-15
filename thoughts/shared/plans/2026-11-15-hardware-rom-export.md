@@ -223,6 +223,7 @@ ported to TypeScript. No in-app emulator and no in-app check. All build commands
 - Accept: licence notice added to the project's third-party notice list, no build yet.
 
 ### P1: build xgmtool to WASM
+- Status 2026-11-15: BUILT. `xgmtool-wasm/build.sh` (emcc 4.0.16 from /opt/homebrew) -> `public/xgmtool/xgmtool.{js,wasm}` (60 KB + 64 KB), loader `src/lib/export/xgm/xgmtoolWasm.ts` (MEMFS + callMain, CLI-style). Smoke test converts sparkster-continue.vgz to an `XGM ` file. NOT done: byte-exact check against native xgmtool, staleness guard. Test needs `locateFile` under jsdom.
 - New `xgmtool-wasm/` (CMakeLists or `build.sh` like other `*-wasm/` dirs) compiling the vendored C
   with Emscripten as a callable module (VGM bytes in, XGM bytes out; no file system beyond the
   in-memory one). Output `public/xgmtool/xgmtool.wasm` plus loader.
