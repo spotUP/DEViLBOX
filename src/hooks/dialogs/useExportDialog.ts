@@ -283,8 +283,9 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     const result = await exportTadProjectFile();
     const ram = result.ram ? `Common ${result.ram.common} bytes; ${result.ram.songs.map((s) => `${s.name} ${s.bytes} bytes`).join('; ')}` : 'not measured';
     setTadReport({ warnings: result.warnings, ram });
-    result.warnings.forEach((w) => notify.warning(w));
     downloadFn(new Blob([result.zip as BlobPart], { type: 'application/zip' }), `${metadata.name || 'song'}-tad.zip`);
+    // One toast, not one per warning: the full list is in the zip's README.txt (and the dialog on failure).
+    if (result.warnings.length) notify.warning(`${result.warnings.length} export warnings (dropped macros/effects). Full list in README.txt in the zip.`);
     if (result.ok) { notify.success(`Terrific Audio Driver project exported (${result.songs.length} songs, ${result.soundEffects.length} sound effects).`); onClose(); }
     else notify.error('The TAD compiler rejected the project. The zip holds the project and compiler log only.');
   }, [metadata]);
