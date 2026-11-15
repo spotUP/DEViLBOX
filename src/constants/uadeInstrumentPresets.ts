@@ -12,6 +12,8 @@ import type { DeepPartial, InstrumentConfig, SoundMonConfig, SidMonConfig, Synth
 import { createSamplerInstrument } from '@lib/import/formats/AmigaUtils';
 import { DEFAULT_SOUNDMON, DEFAULT_SIDMON } from '@typedefs/instrument';
 import type { HippelCoSoConfig } from '@typedefs/instrument';
+import { FURNACE_PRESETS } from './furnacePresets';
+import { FURNACE_CHIP_PRESETS } from './furnaceChipPresets';
 import hippelCosoStarters from './data/hippelCosoStarters.json';
 
 type PresetPartial = DeepPartial<InstrumentConfig>;
@@ -71,15 +73,30 @@ const PRESET_SYNTH_MAP: Record<string, SynthType> = {
   pong: 'FurnacePSG', dummy: 'FurnacePSG',
 };
 
-/** Generate generic starter instruments for a chip preset */
+const FACTORY_PRESETS = [...FURNACE_PRESETS, ...FURNACE_CHIP_PRESETS].flatMap((p) => (p.name ? [{ ...p, name: p.name }] : []));
+
+/**
+ * The factory preset a starter role takes for a chip: the one of that synth type whose name carries the role word
+ * ("YM2610 FM Lead" for Lead); a role without a namesake takes the next factory preset of the chip no other role used.
+ */
+function factoryPresetFor(synthType: SynthType, role: string, used: Set<string>): PresetPartial | undefined {
+  const ofChip = FACTORY_PRESETS.filter((p) => p.synthType === synthType);
+  const pick = ofChip.find((p) => !used.has(p.name) && new RegExp(`\\b${role}\\b`, 'i').test(p.name))
+    ?? ofChip.find((p) => !used.has(p.name) && p.furnace?.operators);
+  if (pick) used.add(pick.name);
+  return pick;
+}
+
+/** Generate starter instruments for a chip preset; Furnace chips with factory presets get a distinct patch per role. */
 function genStarter(synthType: SynthType, count: number): PresetPartial[] {
   const names = ['Lead', 'Bass', 'Chord', 'Arp', 'Pad', 'FX', 'Perc', 'Drone'];
   const result: PresetPartial[] = [];
+  const used = new Set<string>();
   const n = Math.min(count, names.length);
   for (let i = 0; i < n; i++) {
-    result.push(synthType === 'Sampler'
-      ? { name: names[i], synthType: 'Sampler' }
-      : { name: names[i], synthType });
+    if (synthType === 'Sampler') { result.push({ name: names[i], synthType: 'Sampler' }); continue; }
+    const factory = factoryPresetFor(synthType, names[i], used);
+    result.push(factory ? { ...structuredClone(factory), name: names[i] } as PresetPartial : { name: names[i], synthType });
   }
   return result;
 }

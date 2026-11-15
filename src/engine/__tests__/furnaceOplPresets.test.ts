@@ -21,6 +21,7 @@ import { getDefaultFurnaceConfig } from '../factories/FurnaceChipSynthFactory';
 import { updateFurnaceInstrument } from '../tone/SynthParameterUpdates';
 import { FURNACE_PRESETS } from '@constants/furnacePresets';
 import { FURNACE_CHIP_PRESETS } from '@constants/furnaceChipPresets';
+import { getInstrumentPresetsForSystem } from '@constants/uadeInstrumentPresets';
 
 type Proc = { process(i: unknown[], o: Float32Array[][]): boolean };
 type Preset = { name: string; synthType: string; furnace?: Record<string, unknown> };
@@ -158,4 +159,60 @@ describe('fitFmToChip', () => {
     expect(fit.operators).toHaveLength(2);
     expect(fit.operators[1].tl).toBe(0);
   });
+});
+
+/**
+ * "All SNK Neo Geo (YM2610) instrument presets sound the same" (owner, 2026-11-09). The starters of the New Song Wizard
+ * (genStarter) were name-only configs and the factory OPNB/OPNBB presets carried no operators, so every patch was the
+ * DEFAULT_FURNACE FM block. Compared here as encoded and uploaded (name held constant).
+ */
+describe('Neo Geo (YM2610) presets differ from each other', () => {
+  const OPNB_FAMILY = /^Furnace(OPNB|OPNBB)$/;
+  const factory = ([...FURNACE_PRESETS, ...FURNACE_CHIP_PRESETS] as Preset[]).filter((p) => OPNB_FAMILY.test(p.synthType));
+
+  async function encoded(preset: Preset): Promise<string> {
+    const uploads: Array<{ slot: number; data: Uint8Array }> = [];
+    const { s } = synthFor(preset.synthType, 1, uploads);
+    await s.uploadInstrumentFromConfig(afterPick(preset), 'x');
+    expect(uploads.length, 'sentinel: the synth encoded and sent the patch').toBe(1);
+    return Buffer.from(uploads[0].data).toString('hex');
+  }
+
+  async function expectPairwiseDifferent(label: string, presets: Preset[]) {
+    const seen = new Map<string, string>();
+    for (const p of presets) {
+      const hex = await encoded(p);
+      const twin = seen.get(hex);
+      expect(twin, `${label}: "${p.name}" encodes identically to "${twin}"`).toBeUndefined();
+      seen.set(hex, p.name);
+    }
+  }
+
+  it('the ym2610_full New Song Wizard starters encode to pairwise different FM blocks', async () => {
+    const starters = getInstrumentPresetsForSystem('ym2610_full') as Preset[];
+    expect(starters.length).toBe(4);
+    await expectPairwiseDifferent('ym2610_full starters', starters);
+  });
+
+  it('the ym2610b New Song Wizard starters encode to pairwise different FM blocks', async () => {
+    await expectPairwiseDifferent('ym2610b starters', getInstrumentPresetsForSystem('ym2610b') as Preset[]);
+  });
+
+  it('every FurnaceOPNB / FurnaceOPNBB factory preset encodes to a pairwise different FM block', async () => {
+    for (const t of ['FurnaceOPNB', 'FurnaceOPNBB']) {
+      const set = factory.filter((p) => p.synthType === t);
+      expect(set.length, `${t} offers several presets`).toBeGreaterThanOrEqual(6);
+      await expectPairwiseDifferent(t, set);
+    }
+  });
+
+  it('two different OPNB presets render different, audible audio on the YM2610 dispatch (getIns type check)', async () => {
+    const lead = factory.find((p) => p.name === 'YM2610 FM Lead')!;
+    const bass = factory.find((p) => p.name === 'YM2610 FM Bass')!;
+    const a = await uploadAndPlay(lead);
+    const b = await uploadAndPlay(bass);
+    expect(a.rmsDb, `lead rms ${a.rmsDb.toFixed(1)} dB`).toBeGreaterThan(-60);
+    expect(b.rmsDb, `bass rms ${b.rmsDb.toFixed(1)} dB`).toBeGreaterThan(-60);
+    expect(Math.abs(a.rmsDb - b.rmsDb) + Math.abs(a.peakDb - b.peakDb), 'Lead and Bass render identically').toBeGreaterThan(0.05);
+  }, 30000);
 });
