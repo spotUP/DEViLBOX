@@ -224,7 +224,8 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   // activisionPro: a note on a blank row is cut into the covering rest or held-note event (activisionProGrid.ts).
   activisionPro: 'pass',
   amf: 'n/a',
-  benDaglish: 'fail',
+  // benDaglish: a note on a held row splits the covering note or rest command; the longer track moves to the file end (benDaglishEdits.ts).
+  benDaglish: 'pass',
   cheesecutter: 'n/a',
   composer667: 'n/a',
   daveLowe: 'fail',

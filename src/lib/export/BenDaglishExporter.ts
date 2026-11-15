@@ -29,6 +29,7 @@ export async function exportBenDaglish(song: TrackerSong): Promise<BenDaglishExp
   // applyBdGridEdits compares the grid with a fresh walk of the module and patches nothing when they agree.
   if (!trackOffsets) return { data: new Uint8Array(src), filename: name, warnings: [] };
   const walk = await walkBenDaglish(src.slice(0), song.fileSubsongs?.current ?? 0);
-  const res = applyBdGridEdits(new Uint8Array(src), walk, trackOffsets, song.patterns);
+  const res = applyBdGridEdits(new Uint8Array(src), walk, trackOffsets, song.patterns,
+    song.uadeVariableLayout?.filePatternSizes && song.uadeVariableLayout.trackTable ? { sizes: song.uadeVariableLayout.filePatternSizes, ...song.uadeVariableLayout.trackTable } : undefined);
   return { data: res.data, filename: name, warnings: res.warnings };
 }

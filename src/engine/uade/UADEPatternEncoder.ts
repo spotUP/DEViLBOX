@@ -265,6 +265,8 @@ export interface UADEVariablePatternLayout {
    */
   holds?: Array<{ pattern: number; channel: number; row: number; span: number; at: number; standalone: boolean; transpose: number; soundTranspose: number }>;
   stream?: { dataStart: number; pointersAt: number; count: number };
+  /** Ben Daglish: the u16 track offset table (`base` + entry = a track's file offset), so a grown track can be moved to the file end and repointed. */
+  trackTable?: { pointersAt: number; base: number };
 
   /**
    * Original byte sizes of each file-level pattern's encoded data.

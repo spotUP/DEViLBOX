@@ -473,6 +473,7 @@ interface BDCarriers {
   trackFileSizes: number[];
   /** Per-track byte-exact carrier rows (one cell per source byte). */
   blockRows: TrackerCell[][];
+  trackTable: { pointersAt: number; base: number };
 }
 
 /**
@@ -501,7 +502,7 @@ function extractBDCarriers(buf: Uint8Array): BDCarriers | null {
       cutoff: 1, period: b & 0xFF,
     })));
   }
-  return { trackFileOffsets, trackFileSizes, blockRows };
+  return { trackFileOffsets, trackFileSizes, blockRows, trackTable: { pointersAt: tablePos, base: offsets.tracksOffset } };
 }
 
 // ── Format detection ────────────────────────────────────────────────────────
@@ -767,6 +768,7 @@ export async function parseBenDaglishFile(
       // the track each voice is playing when a pattern starts
       trackMap: trackAtStart,
       blockRows: carriers.blockRows,
+      trackTable: carriers.trackTable,
     };
   } else {
     console.warn(`[BenDaglishParser] ${filename}: no grid - ${unmatched}`);

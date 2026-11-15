@@ -19,10 +19,11 @@
  * no cell-to-byte map yet).
  */
 import type { Pattern } from '@/types';
+import { periodToNote } from '@/lib/amiga/periodNotes';
 import { getColumnField, maxNoteColumns } from '@/lib/tracker/noteColumns';
 import type { BdWalk, BdWalkEvent } from './BenDaglishWasmExtractor';
 import { BD_WALK } from './BenDaglishWasmExtractor';
-import { buildBDGridFromWalk, bdNotePlacements, type BdNotePlacement } from './benDaglishGrid';
+import { buildBDGridFromWalk, bdNotePlacements, bdIsVisibleNote, type BdNotePlacement } from './benDaglishGrid';
 
 const ROWS_PER_PATTERN = 64;
 const NOTE_MAX = 0x7e;
@@ -39,7 +40,10 @@ export interface BdEditResult {
  * Apply the differences between `edited` (the grid as it is now) and the grid the module's own walk draws to the
  * module bytes. `trackFileOffsets[track]` is where the track's bytes start in `source`.
  */
-export function applyBdGridEdits(source: Uint8Array, walk: BdWalk, trackFileOffsets: readonly number[], edited: Pattern[]): BdEditResult {
+export function applyBdGridEdits(
+  source: Uint8Array, walk: BdWalk, trackFileOffsets: readonly number[], edited: Pattern[],
+  grow?: { sizes: readonly number[]; pointersAt: number; base: number },
+): BdEditResult {
   const baseGrid = buildBDGridFromWalk(walk);
   const base = baseGrid.patterns;
   const out = new Uint8Array(source);
@@ -53,6 +57,8 @@ export function applyBdGridEdits(source: Uint8Array, walk: BdWalk, trackFileOffs
   }
 
   const wanted = new Map<number, number>();
+  /** A note on a row the replayer holds (inside a note's or rest's duration): the track gets two bytes more. */
+  const splits: Array<{ cover: BdWalkEvent; at: number; first: number; note: number; where: string }> = [];
   const step = baseGrid.step;
   const eventIndex = new Map(walk.events.map((e, i) => [e, i]));
   /** The duration byte of a timing command (note or rest) and the ticks it spans, when the bytes agree with the walk. */
@@ -79,6 +85,29 @@ export function applyBdGridEdits(source: Uint8Array, walk: BdWalk, trackFileOffs
     if (p < 1 || p > 255 || n < 1 || n > 255) { warnings.push(`${where}: the duration bytes cannot hold a ${delta > 0 ? '+' : ''}${delta} tick move; not written`); return; }
     wanted.set(pOff, p); wanted.set(nOff, n);
   };
+  /** Plan the split of the timing command that holds `voice` at `row`: its duration is cut at the row and a note command follows. */
+  const planSplit = (voice: number, row: number, cn: number, where: string): void => {
+    const t = row * step;
+    let cover: BdWalkEvent | undefined, prevNote: BdWalkEvent | undefined;
+    for (const x of walk.events) {
+      if (x.voice !== voice || x.ptick > t) continue;
+      if (bdIsVisibleNote(x) && x.ptick < t) prevNote = x;
+      if ((x.kind === BD_WALK.note || x.kind === BD_WALK.rest) && durationOf(x) >= 0 && x.ptick + source[durationOf(x)] > t) cover = x;
+    }
+    if (!cover || !prevNote) { warnings.push(`${where}: no note or rest command holds this row; not written`); return; }
+    const first = t - cover.ptick;
+    const pb = source[trackFileOffsets[prevNote.track] + prevNote.pos];
+    const nb = pb + (cn - periodToNote(prevNote.c));
+    if (pb > NOTE_MAX || nb < 0 || nb > NOTE_MAX) { warnings.push(`${where}: note ${cn} is outside the player's note range; not written`); return; }
+    if (splits.some((s) => s.cover === cover)) { warnings.push(`${where}: another note already splits the same command; not written`); return; }
+    if (first === 0) {
+      // a rest that starts on this row: the note byte replaces the rest byte, the duration stays
+      if (cover.kind !== BD_WALK.rest) { warnings.push(`${where}: the row starts a note the grid does not show; not written`); return; }
+      wanted.set(trackFileOffsets[cover.track] + cover.pos, nb);
+      return;
+    }
+    splits.push({ cover, at: durationOf(cover), first, note: nb, where });
+  };
   for (let p = 0; p < edited.length; p++) {
     const bp = base[p];
     if (!bp) { warnings.push(`pattern ${p} is past the end of the module's walk; not written`); continue; }
@@ -95,7 +124,10 @@ export function applyBdGridEdits(source: Uint8Array, walk: BdWalk, trackFileOffs
         for (const { col, cn, bn } of cols) {
           if (cn === bn) continue;
           const at = noteAt.get(`${ch}:${p * ROWS_PER_PATTERN + row}:${col}`);
-          if (!at) warnings.push(`${where}: a note where the replayer runs none needs a longer track; not written`);
+          if (!at) {
+            if (col === 0 && bn === 0 && cn >= 1 && cn <= 96) planSplit(ch, p * ROWS_PER_PATTERN + row, cn, where);
+            else warnings.push(`${where}: a note where the replayer runs none needs a longer track; not written`);
+          }
           else if (cn < 1 || cn > 96 || bn < 1 || bn > 96) warnings.push(`${where}: a note removed or turned into a note-off needs a different command; not written`);
           else {
             const off = trackFileOffsets[at.track] + at.pos;
@@ -121,5 +153,41 @@ export function applyBdGridEdits(source: Uint8Array, walk: BdWalk, trackFileOffs
   }
   let patched = 0;
   for (const [off, v] of wanted) if (out[off] !== v) { out[off] = v; patched++; }
-  return { data: out, patched, warnings };
+  return growTracks(out, splits, trackFileOffsets, grow, patched, warnings);
+}
+
+/**
+ * Apply the planned splits: each affected track is copied to the end of the module with its duration byte cut and
+ * [note, rest-of-duration] inserted behind it, and its entry in the track offset table points there. Nothing else in the
+ * file moves, so no other pointer needs fixing; the old copy stays as dead bytes.
+ */
+function growTracks(
+  out: Uint8Array, splits: Array<{ cover: BdWalkEvent; at: number; first: number; note: number; where: string }>,
+  trackFileOffsets: readonly number[], grow: { sizes: readonly number[]; pointersAt: number; base: number } | undefined,
+  patched: number, warnings: string[],
+): BdEditResult {
+  const byTrack = new Map<number, typeof splits>();
+  for (const s of splits) byTrack.set(s.cover.track, [...(byTrack.get(s.cover.track) ?? []), s]);
+  let data = out;
+  for (const [track, list] of byTrack) {
+    const start = trackFileOffsets[track], size = grow?.sizes[track];
+    if (!grow || size === undefined) { warnings.push(`${list[0].where}: the module has no track table to repoint; not written`); continue; }
+    const bytes = Array.from(data.subarray(start, start + size));
+    // behind-first so earlier positions stay valid
+    for (const s of [...list].sort((a, b) => b.at - a.at)) {
+      const i = s.at - start;
+      const rest = bytes[i] - s.first;
+      bytes[i] = s.first;
+      bytes.splice(i + 1, 0, s.note, rest);
+    }
+    const newAt = (data.length + 1) & ~1;
+    const entry = newAt - grow.base;
+    if (entry > 0xffff) { warnings.push(`${list[0].where}: the longer track does not fit the 16-bit offset table; not written`); continue; }
+    const next = new Uint8Array(newAt + bytes.length);
+    next.set(data); next.set(bytes, newAt);
+    next[grow.pointersAt + track * 2] = entry >> 8; next[grow.pointersAt + track * 2 + 1] = entry & 0xff;
+    data = next;
+    patched += list.length * 2;
+  }
+  return { data, patched, warnings };
 }
