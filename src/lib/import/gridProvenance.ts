@@ -288,7 +288,8 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   timFollin: 'pass',
   // tonyWilliams: a note on a row inside a held note or rest cuts it (duration, note, duration restored) and relocates the tail (tonyWilliamsEdits.ts).
   tonyWilliams: 'pass',
-  beathoven: 'fail',
+  // beathoven: a note on an empty row inside a held plain note splits it ([num][dur] -> [num][d][new][dur - d]); the grown stream moves to the code hunk end and its track-list entries are repointed (beathovenEdits.ts addNote).
+  beathoven: 'pass',
   soundProgrammingLanguage: 'fail',
   // dynamicSynthesizer: patterns are fixed-size word arrays; a note on an empty step overwrites its zero word in place, nothing grows (dynamicSynthesizerEdits.ts).
   dynamicSynthesizer: 'pass',

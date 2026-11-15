@@ -9,9 +9,13 @@
  * instrument (chosen by an instrument command), volume and effect columns (not stored per row) - are refused with a
  * warning and nothing is written for them. After patching, the grid is decoded again: every edited cell must read back
  * as edited and every cell that does not share an edited word must be unchanged, otherwise the edit is taken out again.
+ *
+ * A note on an empty row inside a held plain note splits that note ([num][dur] -> [num][d][new][dur - d]); the stream
+ * grows by 4 bytes, moves to the end of the code hunk (hunk size words and file grow, relocations stay valid) and every
+ * track-list entry naming it is repointed (addNote).
  */
 import type { Pattern, TrackerCell } from '@/types';
-import { buildBthGrid, bthShownNote, readBthParams, type BthGrid } from './beathovenGrid';
+import { buildBthGrid, bthShownNote, readBthParams, type BthGrid, type BthParams } from './beathovenGrid';
 import { otherFieldsDiffer } from './timFollinEdits';
 
 const NOTE_OFF = 97;
@@ -26,6 +30,85 @@ export interface BeathovenEditResult {
   /** Bytes changed in the module. */
   patched: number;
   warnings: string[];
+}
+
+interface Add { pattern: number; channel: number; row: number; note: number; instrument: number }
+
+const be32 = (d: Uint8Array, o: number): number => ((d[o] << 24) | (d[o + 1] << 16) | (d[o + 2] << 8) | d[o + 3]) >>> 0;
+const put32 = (d: Uint8Array, o: number, v: number): void => { d[o] = v >>> 24; d[o + 1] = (v >>> 16) & 0xff; d[o + 2] = (v >>> 8) & 0xff; d[o + 3] = v & 0xff; };
+const rd16 = (d: Uint8Array, o: number): number => (d[o] << 8) | d[o + 1];
+const CODE = 0x20;
+
+/** File offsets of every track-list entry (8 bytes: stream, note base) reachable from the four voices. */
+function trackEntryOffsets(buf: Uint8Array, prm: BthParams): number[] {
+  const out = new Set<number>();
+  for (const l of prm.trackLists) for (const start of [l.track, l.loop]) {
+    for (let ei = start, n = 0; n < 4096 && ei + CODE + 8 <= buf.length; ei += 8, n++) {
+      if (be32(buf, ei + CODE) === 0) break;
+      out.add(ei + CODE);
+    }
+  }
+  return [...out];
+}
+
+/**
+ * A note on a row no note starts on, inside a plain note. Refused: a different instrument, a row not held by a note
+ * (rest, before the first note), an arpeggio note, a note outside the period table, and any split that does not read
+ * back as the note on that row with the same length and every other cell (not on the moved stream) unchanged.
+ */
+function addNote(file: Uint8Array, a: Add, warnings: string[]): Uint8Array {
+  const refuse = (why: string): Uint8Array => { warnings.push(`${PREFIX} ${where(a)}: ${why}; the note was not written.`); return file; };
+  const g = buildBthGrid(file);
+  const prm = readBthParams(file);
+  if (typeof g === 'string' || typeof prm === 'string') return file;
+  const row = a.pattern * ROWS_PER_PATTERN + a.row;
+  let r0 = -1;
+  for (let r = row - 1; r >= 0 && r0 < 0; r--) if (cellAt(g, a.channel, r)?.note) r0 = r;
+  const src = r0 < 0 ? null : g.rowSources[Math.floor(r0 / ROWS_PER_PATTERN)]?.[a.channel]?.[r0 % ROWS_PER_PATTERN];
+  const cov = r0 < 0 ? undefined : cellAt(g, a.channel, r0);
+  if (!src || !cov) return refuse('no note is held on this row');
+  if (src.length !== 4 || src.noteOffset !== src.offset) return refuse('the held note is an arpeggio and cannot be split');
+  if (a.instrument !== 0 && a.instrument !== cov.instrument) return refuse('a different instrument would need an Instrument command');
+  const num = numberFor(file, a.note, src.base, src.noteNum);
+  if (num < 0) return refuse(`note ${a.note} is not in the player's period table`);
+  const dur = rd16(file, src.offset + 2);
+  const ticks = (v: number): number => (prm.legacy ? (prm.scaled ? (v >> 2) * 5 : v) : v);
+  const want = g.clock.rowToTick(row) - g.clock.rowToTick(r0);
+  if (want <= 0 || want >= ticks(dur)) return refuse('the row is not inside the held note');
+  const stream = g.streams[src.stream];
+  const entries = trackEntryOffsets(file, prm).filter((e) => be32(file, e) === stream.offset - CODE);
+  if (entries.length === 0) return refuse('no track list entry names this stream');
+  const cut = src.offset - stream.offset;
+  const hunk = be32(file, 28) * 4;
+  const added = Math.ceil((stream.size + 4) / 4) * 4;
+  for (let d = 1; d < dur; d++) {
+    if (ticks(d) !== want || ticks(dur - d) !== ticks(dur) - want) continue;
+    const grown = new Uint8Array(added);
+    grown.set(file.subarray(stream.offset, stream.offset + cut + 4));
+    grown[cut + 2] = d >> 8; grown[cut + 3] = d & 0xff;
+    grown.set([num >> 8, num & 0xff, (dur - d) >> 8, (dur - d) & 0xff], cut + 4);
+    grown.set(file.subarray(stream.offset + cut + 4, stream.offset + stream.size), cut + 8);
+    const moved = new Uint8Array(file.length + added);
+    moved.set(file.subarray(0, CODE + hunk));
+    moved.set(grown, CODE + hunk);
+    moved.set(file.subarray(CODE + hunk), CODE + hunk + added);
+    put32(moved, 28, hunk / 4 + added / 4);
+    put32(moved, 20, be32(file, 20) + added / 4); // the size word keeps its memory flag bits
+    for (const e of entries) put32(moved, e, hunk);
+    const again = buildBthGrid(moved);
+    if (typeof again === 'string' || again.rows !== g.rows || cellAt(again, a.channel, row)?.note !== a.note) continue;
+    let clean = true;
+    for (let c = 0; c < VOICES && clean; c++) for (let r = 0; r < g.rows && clean; r++) {
+      if (c === a.channel && r === row) continue;
+      const wasSrc = g.rowSources[Math.floor(r / ROWS_PER_PATTERN)]?.[c]?.[r % ROWS_PER_PATTERN];
+      // cells played from the moved stream share the new note
+      if (wasSrc && g.streams[wasSrc.stream].offset === stream.offset) continue;
+      const x = cellAt(again, c, r), y = cellAt(g, c, r);
+      if (x?.note !== y?.note || x?.instrument !== y?.instrument) clean = false;
+    }
+    if (clean) return moved;
+  }
+  return refuse('no split of the held note reads back as the new note on this row');
 }
 
 interface Edit { pattern: number; channel: number; row: number; note: number; offset: number; value: number }
@@ -60,6 +143,7 @@ export function applyBeathovenGridEdits(original: Uint8Array, patterns: readonly
 
   const claimed = new Map<number, number>();
   const accepted: Edit[] = [];
+  const adds: Add[] = [];
 
   patterns.forEach((pat, pi) => pat.channels.forEach((ch, c) => ch.rows.forEach((cell, r) => {
     const was = base.patterns[pi]?.channels[c]?.rows[r];
@@ -69,10 +153,14 @@ export function applyBeathovenGridEdits(original: Uint8Array, patterns: readonly
     const otherChanged = otherFieldsDiffer(cell, was);
     if (!noteChanged && !instChanged && !otherChanged) return;
     const at = { pattern: pi, channel: c, row: r };
+    const src = base.rowSources[pi]?.[c]?.[r];
+    if (!src && was.note === 0 && cell.note >= 1 && cell.note < NOTE_OFF) {
+      adds.push({ ...at, note: cell.note, instrument: cell.instrument });
+      return;
+    }
     if (instChanged) warnings.push(`${PREFIX} ${where(at)}: the instrument is chosen by an Instrument command shared by many notes; that change was not written.`);
     if (otherChanged) warnings.push(`${PREFIX} ${where(at)}: volume and effect columns are not stored per row in this format; that change was not written.`);
     if (!noteChanged) return;
-    const src = base.rowSources[pi]?.[c]?.[r];
     if (!src || was.note < 1 || was.note >= NOTE_OFF) {
       warnings.push(`${PREFIX} ${where(at)}: no note plays on this row, and adding or removing one, or changing a rest, would change the length of the stream; the edit was not written.`);
       return;
@@ -136,7 +224,9 @@ export function applyBeathovenGridEdits(original: Uint8Array, patterns: readonly
     live = bad.length === live.length ? [] : live.filter((e) => !bad.includes(e));
   }
   writeAll(live);
+  let out: Uint8Array = data;
+  for (const a of adds) out = addNote(out, a, warnings);
   let patched = 0;
-  for (let i = 0; i < data.length; i++) if (data[i] !== original[i]) patched++;
-  return { data, patched, warnings };
+  for (let i = 0; i < out.length; i++) if (out[i] !== original[i]) patched++;
+  return { data: out, patched, warnings };
 }
