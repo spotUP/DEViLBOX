@@ -1,0 +1,47 @@
+name: TAD compiler
+
+# public/tad/tad-compiler.{js,wasm} are hand-built from the vendored Terrific Audio Driver
+# sources in tad-wasm/ (tad-wasm/build.sh, Rust target wasm32-unknown-emscripten) and
+# committed. This fails when those sources changed without the artifacts being rebuilt.
+# Byte correctness is covered by src/lib/export/tad/__tests__/tadCompilerWasm.test.ts
+# (WASM output == native tad-compiler output on the upstream example project).
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - 'tad-wasm/**'
+      - 'public/tad/**'
+      - '.github/workflows/tad-compiler.yml'
+  pull_request:
+    paths:
+      - 'tad-wasm/**'
+      - 'public/tad/**'
+      - '.github/workflows/tad-compiler.yml'
+  workflow_dispatch:
+
+jobs:
+  staleness:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify the committed artifacts are not stale
+        run: |
+          set -euo pipefail
+          BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "No usable base commit - skipping the staleness check."
+            exit 0
+          fi
+          CHANGED=$(git diff --name-only "$BASE" HEAD)
+          # examples/ and docs/ are test input and reference, not compiled into the artifact.
+          if echo "$CHANGED" | grep '^tad-wasm/' | grep -qv -e '^tad-wasm/examples/' -e '^tad-wasm/docs/' \
+             && ! echo "$CHANGED" | grep -qx 'public/tad/tad_compiler.wasm'; then
+            echo "tad-wasm sources changed but public/tad/tad_compiler.wasm was not rebuilt."
+            echo "Run: tad-wasm/build.sh (cargo + emcc on PATH) and commit public/tad/tad-compiler.js + tad_compiler.wasm"
+            exit 1
+          fi

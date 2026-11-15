@@ -1,0 +1,17 @@
+# Vendored subset of terrific-audio-driver (github.com/undisbeliever/terrific-audio-driver,
+# commit 2e453503ad0e16cec9af3ba23cd7a43eee23f61e, crate version 0.4.2). Only the crates the
+# tad-compiler CLI needs; GUI and emulator crates are left out. Upstream source is unmodified.
+[workspace]
+resolver = "2"
+members = ["crates/spc700asm", "crates/brr", "crates/compiler", "crates/tad-compiler"]
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+
+[profile.release.package.brr]
+opt-level = 3
+
+[profile.release.package.compiler]
+opt-level = 3
