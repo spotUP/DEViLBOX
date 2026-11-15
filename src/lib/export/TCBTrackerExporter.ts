@@ -24,6 +24,7 @@
  *     +0xD4 PCM data (8-bit unsigned, XOR 0x80 from signed)
  */
 
+import { patchModuleByLayout } from './layoutPatch';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 
 const NUM_SAMPLES = 16;
@@ -166,6 +167,16 @@ export async function exportTCBTracker(
   song: TrackerSong,
 ): Promise<{ data: Blob; filename: string; warnings: string[] }> {
   const warnings: string[] = [];
+
+  // A loaded module: its own bytes with each edited cell written where the parser's layout puts it (encodeOverStored keeps
+  // the stored effect nibble). The rebuild below writes format 1 from the grid: m-demo3 3.tcb is format 2 ("AN COOL."),
+  // so byte 7 and the special values were lost, and every cell's instrument nibble was re-derived from the grid.
+  const layout = song.uadePatternLayout;
+  if (song.uadeEditableFileData && layout?.formatId === 'tcbTracker' && song.patterns.length === layout.numPatterns) {
+    const r = patchModuleByLayout(song.uadeEditableFileData, layout, song.patterns);
+    if (r.unplaced.length > 0) warnings.push(`${r.unplaced.length} note(s) typed on rows the module has no place for were not saved`);
+    return { data: new Blob([r.bytes.slice().buffer as ArrayBuffer], { type: 'application/octet-stream' }), filename: tcbFilename(song), warnings };
+  }
 
   // ── Collect samples ─────────────────────────────────────────────────────
   const samples: (SampleInfo | null)[] = [];
@@ -362,18 +373,19 @@ export async function exportTCBTracker(
     }
   }
 
-  // ── Generate filename ───────────────────────────────────────────────────
+  return {
+    data: new Blob([output], { type: 'application/octet-stream' }),
+    filename: tcbFilename(song),
+    warnings,
+  };
+}
+
+function tcbFilename(song: TrackerSong): string {
   const baseName = (song.name || 'untitled')
     .replace(/\s*\[TCB Tracker\]\s*/i, '')
     .replace(/[^a-zA-Z0-9_.-]/g, '_')
     .replace(/_+/g, '_')
     .replace(/^_|_$/g, '')
     || 'untitled';
-  const filename = `tcb.${baseName}`;
-
-  return {
-    data: new Blob([output], { type: 'application/octet-stream' }),
-    filename,
-    warnings,
-  };
+  return `tcb.${baseName}`;
 }

@@ -180,7 +180,13 @@ const FORMATS: FormatRow[] = [
   { key: 'tonyWilliams', rig: 'paula', files: ['formats/future basketball main.tw'] },
   { key: 'beathoven', rig: 'paula', files: ['beathoven-synthesizer/tristar cracktro.bss'] },
   { key: 'synthesis', rig: 'paula', files: ['synthesis/space sound.syn'] },
-  { key: 'tcbTracker', rig: 'paula', files: ['tcb-tracker/m-demo3 3.tcb'] },
+  // TCB notes are octaves 1-3 only (note bytes 0x10-0x3B); the picked note is 52, the lowest C-1, so the default move down (50) has no
+  // note byte and writes an empty note: move it up two semitones instead.
+  { key: 'tcbTracker', rig: 'paula', files: ['tcb-tracker/m-demo3 3.tcb'], pick: (s) => {
+    const e = pickNote(s);
+    if (e) e.note = s.patterns[e.p].channels[e.ch].rows[e.r].note + 2;
+    return Promise.resolve(e);
+  } },
   { key: 'tfmMusicMaker', rig: 'paula', files: ['tfm-music-maker/rainstorm.tfe'] },
   { key: 'tfmx', rig: 'paula', files: ['tfmx/mdat.hbtitle'] },
   { key: 'daveLowe', rig: 'paula', files: ['dave-lowe/incredibleshrinkingsphere.dl'] },
@@ -436,7 +442,6 @@ const KNOWN: Record<string, Partial<Record<'unedited' | 'edited', string>>> = {
   pumaTracker: { unedited: 'G16 pumaTracker: exported bytes differ from the original at byte 15', edited: 'G16 pumaTracker: untouched voice 2 plays a different Paula write after the edit' },
   sonicArranger: { unedited: 'G16 sonicArranger: exported bytes differ from the original at byte 35', edited: 'G16 sonicArranger: the reloaded song has 72 patterns, the edited grid 84' },
   synthesis: { unedited: 'G16 synthesis: exported bytes differ from the original at byte 10', edited: 'G16 synthesis: voice 0 plays a different Paula write after the edit' },
-  tcbTracker: { unedited: 'G16 tcbTracker: exported bytes differ from the original at byte 7', edited: 'G16 tcbTracker: instrument column of the reloaded grid differs on cells beside the edit' },
 };
 
 /** Run `body`; for a known defect it must still fail (a fixed one is reported so its row is removed). */
