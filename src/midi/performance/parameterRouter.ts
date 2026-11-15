@@ -13,9 +13,27 @@ import { useInstrumentStore } from '../../stores/useInstrumentStore';
 import { useAudioStore } from '../../stores/useAudioStore';
 import { getToneEngine } from '../../engine/ToneEngine';
 import { getChannelFilterManager } from '../../engine/ChannelFilterManager';
-import { getDJEngine } from '../../engine/dj/DJEngine';
 import { useDJStore } from '../../stores/useDJStore';
-import * as DJActions from '../../engine/dj/DJActions';
+type DJEngineModule = typeof import('../../engine/dj/DJEngine');
+type DJActionsModule = typeof import('../../engine/dj/DJActions');
+// Loaded on demand, not statically: a static import pulls the whole DJ graph into the
+// useInstrumentStore import cycle (TrackerReplayer -> DubBus -> this file).
+let djEngineModule: DJEngineModule | null = null;
+let djActionsModule: DJActionsModule | null = null;
+void Promise.all([import('../../engine/dj/DJEngine'), import('../../engine/dj/DJActions')]).then(([e, a]) => {
+  djEngineModule = e;
+  djActionsModule = a;
+});
+const getDJEngine = () => {
+  if (!djEngineModule) throw new Error('DJ engine module not loaded yet');
+  return djEngineModule.getDJEngine();
+};
+const DJActions = new Proxy({} as DJActionsModule, {
+  get(_t, name: keyof DJActionsModule) {
+    if (!djActionsModule) throw new Error('DJ actions module not loaded yet');
+    return djActionsModule[name];
+  },
+});
 import type { MappableParameter } from '../types';
 import { LATCHING_MOVES } from '../../engine/dub/latchingMoves';
 import { DUB_RETURN_GAIN_MAX } from '../../types/dub';

@@ -17,6 +17,7 @@ import type { DJSetRecorder } from './recording/DJSetRecorder';
 import type { TrackSource } from './recording/DJSetEvent';
 import { DJMicEngine } from './DJMicEngine';
 import type { ChannelScopeTrack } from './channelScopeTrack';
+import { setDJEngineHolder } from './DJPhase';
 
 // Instrument ID offsets to avoid collisions with the tracker view (IDs 1-999)
 // and between decks. Each deck gets a 10000-wide namespace.
@@ -385,6 +386,7 @@ let djEngineInstance: DJEngine | null = null;
 export function getDJEngine(): DJEngine {
   if (!djEngineInstance) {
     djEngineInstance = new DJEngine();
+    setDJEngineHolder(djEngineInstance);
   }
   return djEngineInstance;
 }
@@ -398,5 +400,6 @@ export function disposeDJEngine(): void {
   if (djEngineInstance) {
     djEngineInstance.dispose();
     djEngineInstance = null;
+    setDJEngineHolder(null);
   }
 }

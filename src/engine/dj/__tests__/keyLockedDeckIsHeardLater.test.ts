@@ -25,8 +25,10 @@ vi.mock('tone', async (orig) => {
   const raw = { currentTime: 0, outputLatency: 0.012 };
   return { ...actual, now: () => raw.currentTime, getContext: () => ({ rawContext: raw, state: 'running' }) };
 });
-vi.mock('@/engine/dj/DJEngine', () => {
+vi.mock('@/engine/dj/DJEngine', async () => {
   const engine = { getDeck: (id: string) => h.decks[id] };
+  // DJPhase (not DJEngine) answers getDJEngineIfActive for the phase maths.
+  (await import('@/engine/dj/DJPhase')).setDJEngineHolder(engine as never);
   return { getDJEngine: () => engine, getDJEngineIfActive: () => engine };
 });
 

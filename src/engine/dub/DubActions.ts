@@ -22,7 +22,7 @@ import type { DrumPadEngine } from '../drumpad/DrumPadEngine';
 import type { DubActionId, DubBusSettings } from '@/types/dub';
 import type { DeckId } from '../dj/DeckEngine';
 import { useDJStore } from '@/stores/useDJStore';
-import { onNextDownbeat, getPhaseInfo } from '../dj/DJAutoSync';
+import { onNextDownbeat, getPhaseInfo } from '../dj/DJPhase';
 import { useTransportStore } from '@/stores/useTransportStore';
 import { DEFAULT_MUSICAL_CLOCK_SETTINGS } from '@/lib/dub/musicalClock';
 
