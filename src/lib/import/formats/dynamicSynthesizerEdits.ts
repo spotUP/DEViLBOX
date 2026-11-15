@@ -6,8 +6,8 @@
  * position's sample add). An edited cell is a same-length patch of that one 16-bit word:
  *   - note: the high byte, chosen so the lookup lands on a table entry that reads as the new note;
  *   - instrument: the low nibble (the sample add is subtracted; the result must fit a nibble).
- * A pattern is shared by every position that plays it, so an edit shows wherever the pattern plays. Edits the stream
- * cannot hold at its length - a note on an empty row, a note removed or turned into a note off, a volume or effect
+ * A pattern is shared by every position that plays it, so an edit shows wherever the pattern plays. A note on an empty row
+ * overwrites that step's zero word in place. Edits the pattern cannot hold - a note removed or turned into a note off, a volume or effect
  * (the format has none) - are refused with a warning and nothing is written for them. After patching, the grid is
  * decoded again and every edited cell must read back as edited, otherwise its patch is taken out again.
  */
@@ -67,8 +67,10 @@ export function applyDnsGridEdits(original: Uint8Array, patterns: readonly Patte
       if (!noteChanged && !instChanged) return;
     }
     const src = base.rowSources[pi]?.[c]?.[r];
-    if (!src || was.note < 1 || was.note >= NOTE_OFF) {
-      warnings.push(`Dynamic Synthesizer ${where(at)}: no note plays on this row, and adding or turning one into a rest or note off would change what the fixed-size pattern holds; the edit was not written.`);
+    // a pattern is fixed size, one word per step: a note on an empty step (word 0) overwrites that word in place, no stream grows
+    const empty = was.note === 0 && cell.note >= 1 && cell.note < NOTE_OFF;
+    if (!src || (!empty && (was.note < 1 || was.note >= NOTE_OFF))) {
+      warnings.push(`Dynamic Synthesizer ${where(at)}: turning a note into a rest or note off would change what the fixed-size pattern holds; the edit was not written.`);
       return;
     }
     let word = getWord(original, src.wordAt);
@@ -80,7 +82,9 @@ export function applyDnsGridEdits(original: Uint8Array, patterns: readonly Patte
       }
       word = (word & 0x00ff) | (((idx - src.noteAdd - 1) & 0xff) << 8);
     }
-    if (instChanged) {
+    // an empty step keeps the instrument the position's sample add gives it when the cell names none
+    const shownInstrument = empty && cell.instrument === 0 ? src.sampleAdd : cell.instrument;
+    if (instChanged && !(empty && cell.instrument === 0)) {
       const nibble = (cell.instrument - src.sampleAdd) & 0xff;
       if (nibble > 0xf) {
         warnings.push(`Dynamic Synthesizer ${where(at)}: instrument ${cell.instrument} is out of reach of this position's sample add; the instrument was not written.`);
@@ -98,7 +102,7 @@ export function applyDnsGridEdits(original: Uint8Array, patterns: readonly Patte
       return;
     }
     claimed.set(src.wordAt, word);
-    accepted.push({ ...at, note: cell.note, instrument: cell.instrument, offset: src.wordAt, word });
+    accepted.push({ ...at, note: cell.note, instrument: shownInstrument, offset: src.wordAt, word });
   })));
 
   const writeAll = (edits: Edit[]): void => {

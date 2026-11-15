@@ -289,7 +289,8 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   tonyWilliams: 'fail',
   beathoven: 'fail',
   soundProgrammingLanguage: 'fail',
-  dynamicSynthesizer: 'fail',
+  // dynamicSynthesizer: patterns are fixed-size word arrays; a note on an empty step overwrites its zero word in place, nothing grows (dynamicSynthesizerEdits.ts).
+  dynamicSynthesizer: 'pass',
   riffRaff: 'fail',
   mcmd: 'pass',
   wallyBeben: 'fail',
