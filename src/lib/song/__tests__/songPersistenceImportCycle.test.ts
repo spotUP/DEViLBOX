@@ -73,12 +73,14 @@ describe('the song stores and the code that snapshots them', () => {
     }
   }, 60000);
 
+  // useTransportStore loads ToneEngine on demand to switch the meters (49 -> 44).
+
   // Ratchet: the static cycle useInstrumentStore sits in may shrink, never grow.
   // Lower the bound when a cut lands. Remaining core: ToneEngine,
   // InstrumentFactory and the synths, TrackerReplayer, the DJ engine, the stores.
-  it('the store import cycle is at most 49 modules', () => {
+  it('the store import cycle is at most 44 modules', () => {
     const STORE = 'src/stores/useInstrumentStore.ts';
     const cycle = [...reachableFiles(STORE).keys()].filter((f) => f === STORE || importChain(f, STORE) !== null);
-    expect(cycle.length, cycle.sort().join('\n')).toBeLessThanOrEqual(49);
+    expect(cycle.length, cycle.sort().join('\n')).toBeLessThanOrEqual(44);
   }, 120000);
 });

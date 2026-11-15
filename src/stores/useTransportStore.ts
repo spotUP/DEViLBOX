@@ -18,7 +18,6 @@ const instrumentState = () => getInstrumentStoreRef().getState() as ReturnType<t
 import { checkFormatViolation, getActiveFormatLimits, isViolationConfirmed } from '@/lib/formatCompatibility';
 import { unlockIOSAudio } from '@utils/ios-audio-unlock';
 import { useUIStore } from './useUIStore';
-import { getToneEngine } from '@engine/ToneEngine';
 import { gtUltraOwnsTransport, gtUltraPlay, gtUltraStop, gtUltraTogglePlay } from '@engine/gtultra/gtUltraTransport';
 import { getFormatStoreRefOrNull } from './storeAccess';
 
@@ -158,6 +157,13 @@ function ensureRowHooksLoaded(): void {
 /** One warning, not one per row, when the cursor store is not up yet. */
 let _followWarned = false;
 
+// ToneEngine pulls the synths and format engines back into the store import
+// cycle, so the meter switch loads it on demand (calls keep their order: the
+// module is cached after the first load).
+function setMeters(fn: 'connectMeters' | 'disconnectMeters'): void {
+  void import('@engine/ToneEngine').then((m) => m.getToneEngine()[fn]()).catch(() => { /* engine not ready */ });
+}
+
 export const useTransportStore = create<TransportStore>()(
   immer((set, _get) => ({
     // Initial state (125 BPM = ProTracker/Amiga default)
@@ -289,7 +295,7 @@ export const useTransportStore = create<TransportStore>()(
         state.continuousRow = state.currentRow;
       });
       // Connect level meters (idle CPU savings — disconnected when not playing)
-      try { getToneEngine().connectMeters(); } catch { /* engine not ready */ }
+      setMeters('connectMeters');
     },
 
     pause: () => {
@@ -297,7 +303,7 @@ export const useTransportStore = create<TransportStore>()(
         state.isPlaying = false;
         state.isPaused = true;
       });
-      try { getToneEngine().disconnectMeters(); } catch { /* engine not ready */ }
+      setMeters('disconnectMeters');
     },
 
     stop: () => {
@@ -315,7 +321,7 @@ export const useTransportStore = create<TransportStore>()(
         state.isPlaying = false;
         state.isPaused = false;
       });
-      try { getToneEngine().disconnectMeters(); } catch { /* engine not ready */ }
+      setMeters('disconnectMeters');
     },
 
     togglePlayPause: async () => {
