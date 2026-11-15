@@ -19,6 +19,7 @@
 
 #include "engine.h"
 #include "../ta-log.h"
+#include "sysDef.h"
 #ifdef HAVE_SNDFILE
 #include "sfWrapper.h"
 #endif
@@ -65,6 +66,7 @@ void DivEngine::getTotalAudioFiles(int &files) {
     case DIV_EXPORT_MODE_MANY_CHAN: {
       for (int i=0; i<song.chans; i++) {
         if (!exportChannelMask[i]) continue;
+        if (getChannelFlags(i)&DIV_CHFLAG_AUXILIARY) continue;
 
         files++;
 
@@ -213,7 +215,10 @@ void DivEngine::runExportThread() {
       sf=sfWrap.doOpen(exportPath.c_str(),SFM_WRITE,&si);
       if (sf==NULL) {
         logE("could not open file for writing! (%s)",sf_strerror(NULL));
+        BUSY_BEGIN;
+        got.rate=prevAudioRate;
         exporting=false;
+        BUSY_END;
         return;
       }
 
@@ -227,8 +232,6 @@ void DivEngine::runExportThread() {
       outBufFinal=new float[EXPORT_BUFSIZE*exportOutputs];
 
       // take control of audio output
-      deinitAudioBackend();
-      freelance=false;
       playSub(false);
       freelance=false;
 
@@ -236,7 +239,7 @@ void DivEngine::runExportThread() {
 
       while (playing) {
         size_t total=0;
-        nextBuf(NULL,outBuf,0,exportOutputs,EXPORT_BUFSIZE);
+        nextBuf(NULL,outBuf,0,exportOutputs,EXPORT_BUFSIZE,true);
         if (totalProcessed>EXPORT_BUFSIZE) {
           logE("error: total processed is bigger than export bufsize! %d>%d",totalProcessed,EXPORT_BUFSIZE);
           totalProcessed=EXPORT_BUFSIZE;
@@ -281,17 +284,11 @@ void DivEngine::runExportThread() {
         logE("could not close audio file!");
       }
 
-      if (initAudioBackend()) {
-        for (int i=0; i<song.systemLen; i++) {
-          disCont[i].setRates(got.rate);
-          disCont[i].setQuality(lowQuality,dcHiPass);
-        }
-        if (!output->setRun(true)) {
-          logE("error while activating audio!");
-        }
-      }
       logI("done!");
+      BUSY_BEGIN;
+      got.rate=prevAudioRate;
       exporting=false;
+      BUSY_END;
       break;
     }
     case DIV_EXPORT_MODE_MANY_SYS: {
@@ -330,8 +327,6 @@ void DivEngine::runExportThread() {
       }
 
       // take control of audio output
-      deinitAudioBackend();
-      freelance=false;
       playSub(false);
       freelance=false;
 
@@ -339,7 +334,7 @@ void DivEngine::runExportThread() {
 
       while (playing) {
         size_t total=0;
-        nextBuf(NULL,outBuf,0,2,EXPORT_BUFSIZE);
+        nextBuf(NULL,outBuf,0,2,EXPORT_BUFSIZE,true);
         if (totalProcessed>EXPORT_BUFSIZE) {
           logE("error: total processed is bigger than export bufsize! %d>%d",totalProcessed,EXPORT_BUFSIZE);
           totalProcessed=EXPORT_BUFSIZE;
@@ -397,22 +392,15 @@ void DivEngine::runExportThread() {
         }
       }
 
-      if (initAudioBackend()) {
-        for (int i=0; i<song.systemLen; i++) {
-          disCont[i].setRates(got.rate);
-          disCont[i].setQuality(lowQuality,dcHiPass);
-        }
-        if (!output->setRun(true)) {
-          logE("error while activating audio!");
-        }
-      }
       logI("done!");
+      BUSY_BEGIN;
+      got.rate=prevAudioRate;
       exporting=false;
+      BUSY_END;
       break;
     }
     case DIV_EXPORT_MODE_MANY_CHAN: {
       // take control of audio output
-      deinitAudioBackend();
 
       curExportChan=0;
 
@@ -424,9 +412,10 @@ void DivEngine::runExportThread() {
       outBufFinal=new float[EXPORT_BUFSIZE*exportOutputs];
 
       logI("rendering to files...");
-      
+
       for (int i=0; i<song.chans; i++) {
         if (!exportChannelMask[i]) continue;
+        if (getChannelFlags(i)&DIV_CHFLAG_AUXILIARY) continue;
 
         SNDFILE* sf;
         SF_INFO si;
@@ -505,7 +494,7 @@ void DivEngine::runExportThread() {
 
         while (playing) {
           size_t total=0;
-          nextBuf(NULL,outBuf,0,exportOutputs,EXPORT_BUFSIZE);
+          nextBuf(NULL,outBuf,0,exportOutputs,EXPORT_BUFSIZE,true);
           if (totalProcessed>EXPORT_BUFSIZE) {
             logE("error: total processed is bigger than export bufsize! %d>%d",totalProcessed,EXPORT_BUFSIZE);
             totalProcessed=EXPORT_BUFSIZE;
@@ -571,17 +560,11 @@ void DivEngine::runExportThread() {
         }
       }
 
-      if (initAudioBackend()) {
-        for (int i=0; i<song.systemLen; i++) {
-          disCont[i].setRates(got.rate);
-          disCont[i].setQuality(lowQuality,dcHiPass);
-        }
-        if (!output->setRun(true)) {
-          logE("error while activating audio!");
-        }
-      }
       logI("done!");
+      BUSY_BEGIN;
+      got.rate=prevAudioRate;
       exporting=false;
+      BUSY_END;
       curExportChan=0;
       break;
     }
@@ -623,12 +606,15 @@ bool DivEngine::saveAudio(const char* path, DivAudioExportOptions options) {
       exportPath=exportPath.substr(0,extPos);
     }
   }
+  BUSY_BEGIN;
   exporting=true;
+  BUSY_END;
   stopExport=false;
   stop();
   repeatPattern=false;
   setOrder(0);
   remainingLoops=-1;
+  prevAudioRate=got.rate;
   if (options.format==DIV_EXPORT_FORMAT_OPUS) {
     // Opus only supports 48KHz and a couple divisors of that number...
     got.rate=48000;

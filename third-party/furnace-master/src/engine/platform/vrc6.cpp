@@ -51,14 +51,6 @@ void DivPlatformVRC6::acquireDirect(blip_buffer_t** bb, size_t len) {
     oscBuf[i]->begin(len);
   }
 
-  // DEBUG: log first few calls
-  static int vrc6DebugCount = 0;
-  bool doDebug = (vrc6DebugCount < 5);
-  if (doDebug) {
-    printf("[VRC6 acquireDirect] call #%d len=%zu writes_pending=%d\n",
-           vrc6DebugCount, len, (int)writes.size());
-  }
-
   for (size_t h=0; h<len; h++) {
     // running heuristic
     int advance=vrc6.predict();
@@ -104,11 +96,6 @@ void DivPlatformVRC6::acquireDirect(blip_buffer_t** bb, size_t len) {
     vrc6.tick(advance);
     h+=advance-1;
     int sample=vrc6.out()<<9; // scale to 16 bit
-    if (doDebug && h < 10) {
-      printf("[VRC6] h=%zu advance=%d out=%d sample=%d p0=%d p1=%d saw=%d\n",
-             h, advance, (int)vrc6.out(), sample,
-             (int)vrc6.pulse_out(0), (int)vrc6.pulse_out(1), (int)vrc6.sawtooth_out());
-    }
     if (sample!=prevSample) {
       blip_add_delta(bb[0],h,sample-prevSample);
       prevSample=sample;
@@ -122,9 +109,6 @@ void DivPlatformVRC6::acquireDirect(blip_buffer_t** bb, size_t len) {
     // Command part (what the heck why at the END?!)
     while (!writes.empty()) {
       QueuedWrite w=writes.front();
-      if (doDebug) {
-        printf("[VRC6] write addr=0x%04x val=0x%02x\n", w.addr, w.val);
-      }
       switch (w.addr&0xf000) {
         case 0x9000: // Pulse 1
           if (w.addr<=0x9003) {
@@ -162,15 +146,10 @@ void DivPlatformVRC6::acquireDirect(blip_buffer_t** bb, size_t len) {
   for (int i=0; i<3; i++) {
     oscBuf[i]->end(len);
   }
-  if (doDebug) {
-    vrc6DebugCount++;
-  }
 }
 
 void DivPlatformVRC6::tick(bool sysTick) {
   for (int i=0; i<3; i++) {
-    // 16 for pulse; 14 for saw
-    int CHIP_DIVIDER=(i==2)?14:16;
     chan[i].std.next();
     if (chan[i].std.vol.had) {
       if (i==2) { // sawtooth
@@ -191,9 +170,9 @@ void DivPlatformVRC6::tick(bool sysTick) {
     }
     if (NEW_ARP_STRAT) {
       chan[i].handleArp();
-    } else if (chan[i].std.arp.had) {
+    } else if (chan[i].std.arp.had && !chan[i].rawFreq) {
       if (!chan[i].inPorta) {
-        chan[i].baseFreq=NOTE_PERIODIC(parent->calcArp(chan[i].note,chan[i].std.arp.val));
+        chan[i].baseFreq=chan[i].calcBaseFreq(parent->calcArp(chan[i].note,chan[i].std.arp.val));
       }
       chan[i].freqChanged=true;
     }
@@ -235,9 +214,11 @@ void DivPlatformVRC6::tick(bool sysTick) {
     }
     if (chan[i].freqChanged || chan[i].keyOn || chan[i].keyOff) {
       if (i==2) { // sawtooth
-        chan[i].freq=parent->calcFreq(chan[i].baseFreq,chan[i].pitch,chan[i].fixedArp?chan[i].baseNoteOverride:chan[i].arpOff,chan[i].fixedArp,true,0,chan[i].pitch2,chipClock,14)-1;
+        chan[i].freq=chan[i].calcFreq();
+        if (!chan[i].rawFreq) chan[i].freq--;
       } else { // pulse
-        chan[i].freq=parent->calcFreq(chan[i].baseFreq,chan[i].pitch,chan[i].fixedArp?chan[i].baseNoteOverride:chan[i].arpOff,chan[i].fixedArp,true,0,chan[i].pitch2,chipClock,16)-1;
+        chan[i].freq=chan[i].calcFreq();
+        if (!chan[i].rawFreq) chan[i].freq--;
         if (chan[i].pcm) {
           double off=1.0;
           if (chan[i].dacSample>=0 && chan[i].dacSample<parent->song.sampleLen) {
@@ -252,8 +233,10 @@ void DivPlatformVRC6::tick(bool sysTick) {
           if (dumpWrites) addWrite(0xffff0001+(i<<8),chan[i].dacRate);
         }
       }
-      if (chan[i].freq>4095) chan[i].freq=4095;
-      if (chan[i].freq<0) chan[i].freq=0;
+      if (!chan[i].rawFreq) {
+        if (chan[i].freq>4095) chan[i].freq=4095;
+        if (chan[i].freq<0) chan[i].freq=0;
+      }
       if (chan[i].keyOff) {
         chWrite(i,2,0);
       } else if (chan[i].active) {
@@ -268,12 +251,6 @@ void DivPlatformVRC6::tick(bool sysTick) {
 }
 
 int DivPlatformVRC6::dispatch(DivCommand c) {
-  int CHIP_DIVIDER=(c.chan==2)?14:16;
-  static int vrc6DispatchCount = 0;
-  if (vrc6DispatchCount < 30) {
-    printf("[VRC6 dispatch] cmd=%d chan=%d val1=%d val2=%d skipReg=%d\n", c.cmd, c.chan, c.value, c.value2, (int)skipRegisterWrites);
-    vrc6DispatchCount++;
-  }
   switch (c.cmd) {
     case DIV_CMD_NOTE_ON:
       if (c.chan!=2) { // pulse wave
@@ -315,7 +292,7 @@ int DivPlatformVRC6::dispatch(DivCommand c) {
           }
           chan[c.chan].dacPeriod=0;
           if (c.value!=DIV_NOTE_NULL) {
-            chan[c.chan].baseFreq=NOTE_PERIODIC(c.value);
+            chan[c.chan].baseFreq=chan[c.chan].calcBaseFreq(c.value);
             chan[c.chan].freqChanged=true;
             chan[c.chan].note=c.value;
           }
@@ -329,7 +306,7 @@ int DivPlatformVRC6::dispatch(DivCommand c) {
         }
       }
       if (c.value!=DIV_NOTE_NULL) {
-        chan[c.chan].baseFreq=NOTE_PERIODIC(c.value);
+        chan[c.chan].baseFreq=chan[c.chan].calcBaseFreq(c.value);
         chan[c.chan].freqChanged=true;
         chan[c.chan].note=c.value;
       }
@@ -388,7 +365,7 @@ int DivPlatformVRC6::dispatch(DivCommand c) {
       chan[c.chan].freqChanged=true;
       break;
     case DIV_CMD_NOTE_PORTA: {
-      int destFreq=NOTE_PERIODIC(c.value2+chan[c.chan].sampleNoteDelta);
+      int destFreq=chan[c.chan].calcBaseFreq(c.value2+chan[c.chan].sampleNoteDelta);
       bool return2=false;
       if (destFreq>chan[c.chan].baseFreq) {
         chan[c.chan].baseFreq+=c.value;
@@ -432,7 +409,7 @@ int DivPlatformVRC6::dispatch(DivCommand c) {
       chan[c.chan].setPos=true;
       break;
     case DIV_CMD_LEGATO:
-      chan[c.chan].baseFreq=NOTE_PERIODIC(c.value+chan[c.chan].sampleNoteDelta+((HACKY_LEGATO_MESS)?(chan[c.chan].std.arp.val):(0)));
+      chan[c.chan].baseFreq=chan[c.chan].calcBaseFreq(c.value+chan[c.chan].sampleNoteDelta+((HACKY_LEGATO_MESS)?(chan[c.chan].std.arp.val):(0)));
       chan[c.chan].freqChanged=true;
       chan[c.chan].note=c.value;
       break;
@@ -440,7 +417,7 @@ int DivPlatformVRC6::dispatch(DivCommand c) {
       if (chan[c.chan].active && c.value2) {
         if (parent->song.compatFlags.resetMacroOnPorta) chan[c.chan].macroInit(parent->getIns(chan[c.chan].ins,DIV_INS_VRC6));
       }
-      if (!chan[c.chan].inPorta && c.value && !parent->song.compatFlags.brokenPortaArp && chan[c.chan].std.arp.will && !NEW_ARP_STRAT) chan[c.chan].baseFreq=NOTE_PERIODIC(chan[c.chan].note);
+      if (!chan[c.chan].inPorta && c.value && !parent->song.compatFlags.brokenPortaArp && chan[c.chan].std.arp.will && !NEW_ARP_STRAT) chan[c.chan].baseFreq=chan[c.chan].calcBaseFreq(chan[c.chan].note);
       chan[c.chan].inPorta=c.value;
       break;
     case DIV_CMD_GET_VOLMAX:
@@ -482,7 +459,7 @@ void DivPlatformVRC6::forceIns() {
   }
 }
 
-void* DivPlatformVRC6::getChanState(int ch) {
+SharedChannel* DivPlatformVRC6::getChanState(int ch) {
   return &chan[ch];
 }
 
@@ -514,14 +491,19 @@ int DivPlatformVRC6::getRegisterPoolSize() {
 
 void DivPlatformVRC6::reset() {
   for (int i=0; i<3; i++) {
-    chan[i]=DivPlatformVRC6::Channel();
+    chan[i]=DivPlatformVRC6::Channel(parent->song.compatFlags.linearPitch);
+    if (i==2) {
+      chan[i].pitchTable=&sawPitchTable;
+    } else {
+      chan[i].pitchTable=&pitchTable;
+    }
     chan[i].std.setEngine(parent);
   }
   // HELP
   chan[2].vol=63;
   chan[2].outVol=63;
   if (dumpWrites) {
-    addWrite(0xffffffff,0);
+    softReset();
   }
 
   prevSample=0;
@@ -557,12 +539,24 @@ void DivPlatformVRC6::setFlags(const DivConfig& flags) {
   for (int i=0; i<3; i++) {
     oscBuf[i]->setRate(rate);
   }
+
+  notifyPitchTable();
 }
 
 void DivPlatformVRC6::notifyInsDeletion(void* ins) {
   for (int i=0; i<3; i++) {
     chan[i].std.notifyInsDeletion((DivInstrument*)ins);
   }
+}
+
+void DivPlatformVRC6::notifyPitchTable(int sample) {
+  pitchTable.init(parent->song.tuning,chipClock,16,0x1000,true,parent->song.compatFlags.linearPitch);
+  sawPitchTable.init(parent->song.tuning,chipClock,14,0x1000,true,parent->song.compatFlags.linearPitch);
+  samplePitchTable.update<Channel>(chan,3,parent->song.tuning,1,1,0xffff,false,parent->song.compatFlags.linearPitch,sample);
+}
+
+unsigned int DivPlatformVRC6::getMaxFreq(int ch) {
+  return 0xfff;
 }
 
 void DivPlatformVRC6::poke(unsigned int addr, unsigned short val) {
@@ -575,6 +569,7 @@ void DivPlatformVRC6::poke(std::vector<DivRegWrite>& wlist) {
 
 int DivPlatformVRC6::init(DivEngine* p, int channels, int sugRate, const DivConfig& flags) {
   parent=p;
+  samplePitchTable.init(parent);
   dumpWrites=false;
   skipRegisterWrites=false;
   for (int i=0; i<3; i++) {
@@ -593,4 +588,5 @@ void DivPlatformVRC6::quit() {
 }
 
 DivPlatformVRC6::~DivPlatformVRC6() {
+  samplePitchTable.destroy<Channel>(chan,3);
 }

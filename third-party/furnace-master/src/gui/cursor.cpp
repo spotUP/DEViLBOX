@@ -25,7 +25,7 @@ void FurnaceGUI::startSelection(int xCoarse, int xFine, int y, int ord, bool ful
   DETERMINE_FIRST_LAST;
 
   if (xCoarse!=selStart.xCoarse || xFine!=selStart.xFine || y!=selStart.y || ord!=selStart.order) {
-    curNibble=false;
+    curNibble=0;
   }
 
   if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && !fullRow && settings.doubleClickColumn) {
@@ -289,11 +289,13 @@ void FurnaceGUI::moveCursor(int x, int y, bool select) {
 
   DETERMINE_FIRST_LAST;
   
-  curNibble=false;
+  curNibble=0;
   if (x!=0) {
     demandScrollX=true;
     if (x>0) {
       for (int i=0; i<x; i++) {
+        // check for volume column hide
+        if (cursor.xFine==1 && e->getChannelFlags(cursor.xCoarse)&DIV_CHFLAG_NO_VOLUME) cursor.xFine++;
         if (++cursor.xFine>=(e->curSubSong->chanCollapse[cursor.xCoarse]?(4-e->curSubSong->chanCollapse[cursor.xCoarse]):(3+e->curPat[cursor.xCoarse].effectCols*2))) {
           cursor.xFine=0;
           if (++cursor.xCoarse>=lastChannel) {
@@ -314,6 +316,8 @@ void FurnaceGUI::moveCursor(int x, int y, bool select) {
       }
     } else {
       for (int i=0; i<-x; i++) {
+        // check for volume column hide
+        if (cursor.xFine==3 && e->getChannelFlags(cursor.xCoarse)&DIV_CHFLAG_NO_VOLUME) cursor.xFine--;
         if (--cursor.xFine<0) {
           if (--cursor.xCoarse<firstChannel) {
             if (settings.wrapHorizontal!=0 && !select) {
@@ -407,7 +411,7 @@ void FurnaceGUI::moveCursor(int x, int y, bool select) {
 void FurnaceGUI::moveCursorPrevChannel(bool overflow) {
   makeCursorUndo();
   finishSelection();
-  curNibble=false;
+  curNibble=0;
 
   DETERMINE_FIRST_LAST;
 
@@ -436,7 +440,7 @@ void FurnaceGUI::moveCursorPrevChannel(bool overflow) {
 void FurnaceGUI::moveCursorNextChannel(bool overflow) {
   makeCursorUndo();
   finishSelection();
-  curNibble=false;
+  curNibble=0;
 
   DETERMINE_FIRST_LAST;
 
@@ -467,7 +471,7 @@ void FurnaceGUI::moveCursorTop(bool select) {
   if (!select) {
     finishSelection();
   }
-  curNibble=false;
+  curNibble=0;
   if (cursor.y==0) {
     DETERMINE_FIRST;
     cursor.xCoarse=firstChannel;
@@ -489,7 +493,7 @@ void FurnaceGUI::moveCursorBottom(bool select) {
   if (!select) {
     finishSelection();
   }
-  curNibble=false;
+  curNibble=0;
   if (cursor.y==e->curSubSong->patLen-1) {
     DETERMINE_LAST;
     cursor.xCoarse=lastChannel-1;

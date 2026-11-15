@@ -55,26 +55,40 @@ enum DivChanTypes {
   DIV_CH_NOISE=2,
   DIV_CH_WAVE=3,
   DIV_CH_PCM=4,
-  DIV_CH_OP=5
+  DIV_CH_OP=5,
+  DIV_CH_TIMER=6
+};
+
+enum DivChanFlags: unsigned int {
+  DIV_CHFLAG_NONE=0,
+  // marks the channel as "auxiliary". prevents it from being rendered during audio export.
+  DIV_CHFLAG_AUXILIARY=1,
+  // specifies that this channel lacks volume control. the GUI will hide the volume column if this flag is set.
+  // keep in mind that on/off counts as volume control, so PC Speaker-like chips do not merit this flag!
+  // usually auxiliary channels are the ones deserving this flag.
+  DIV_CHFLAG_NO_VOLUME=2,
 };
 
 struct DivChanDef {
   String name;
   String shortName;
   int type;
+  unsigned int flags;
   // 0: primary
   // 1: alternate (usually PCM)
   DivInstrumentType insType[2];
 
-  DivChanDef(const String& n, const String& sn, int t, DivInstrumentType insT, DivInstrumentType insT2=DIV_INS_NULL):
+  DivChanDef(const String& n, const String& sn, int t, DivInstrumentType insT, DivInstrumentType insT2=DIV_INS_NULL, unsigned int f=0):
     name(n),
     shortName(sn),
     type(t),
+    flags(f),
     insType{insT,insT2} {}
   DivChanDef():
     name("??"),
     shortName("??"),
     type(DIV_CH_NOISE),
+    flags(0),
     insType{DIV_INS_NULL,DIV_INS_NULL} {}
 };
 
@@ -105,7 +119,7 @@ struct DivSysDef {
   const char* name;
   const char* nameJ;
   const char* description;
-  unsigned char id;
+  unsigned short id;
   unsigned char id_DMF;
   int channels, minChans, maxChans;
   bool isFM, isSTD, isCompound;
@@ -121,7 +135,7 @@ struct DivSysDef {
   const EffectHandlerMap postEffectHandlers;
   const EffectHandlerMap preEffectHandlers;
   DivSysDef(
-    const char* sysName, const char* sysNameJ, unsigned char fileID, unsigned char fileID_DMF, int chans, int minCh, int maxCh,
+    const char* sysName, const char* sysNameJ, unsigned short fileID, unsigned char fileID_DMF, int chans, int minCh, int maxCh,
     bool isFMChip, bool isSTDChip, unsigned int vgmVer, bool compound, unsigned int formatMask, unsigned short waveWid, unsigned short waveHei,
     const char* desc,
     DivChanDefFunc gcdFunc,
@@ -265,6 +279,9 @@ enum DivSystem {
   DIV_SYSTEM_UPD1771C,
   DIV_SYSTEM_SID3,
   DIV_SYSTEM_C64_PCM,
+  DIV_SYSTEM_NAMCO_POLEPOS,
+  DIV_SYSTEM_KLATTSCH,
+  DIV_SYSTEM_SAA1099_NEW,
 
   DIV_SYSTEM_MAX
 };

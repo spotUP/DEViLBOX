@@ -269,7 +269,6 @@ set(SOUND_CORE_SOURCES
 
   # === Swan ===
   ${FURNACE_SOUND}/swan.c
-  ${FURNACE_SOUND}/swan_mdfn.cpp
 
   # === VB (Virtual Boy) ===
   ${FURNACE_SOUND}/vsu.cpp
