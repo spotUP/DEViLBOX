@@ -281,6 +281,8 @@ export function parseWallyBebenFile(buffer: ArrayBuffer, filename: string): Trac
       while (pos < buf.length) {
         const b = buf[pos++];
         if (b === 0xFF) break;
+        // DF is a command with one parameter byte (the player consumes it); reading it as a phrase index shifted every step.
+        if (b === 0xDF) { pos++; continue; }
         if (b < 0x80) {
           voiceSeqs[v].push(b);
         }

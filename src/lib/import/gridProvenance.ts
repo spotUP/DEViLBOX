@@ -65,7 +65,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   dynamicSynthesizer: 'pass',
   riffRaff: 'pass',
   mcmd: 'pass',
-  wallyBeben: 'fail',
+  wallyBeben: 'pass',
   richardJoseph: 'pass',
   fashionTracker: 'pass',
   davidHanney: 'pass',

@@ -386,7 +386,6 @@ const withoutPitch = (t: Trace): Trace => Object.assign(t.map((v) => v.filter((e
  */
 const KNOWN: Record<string, Partial<Record<'unedited' | 'edited', string>>> = {
   'suntronic|smooth': { unedited: 'G16-sunSmooth: the score has no notes, the song parses to a stub and the router exports a MOD of it', edited: 'G16-sunSmooth: no note to edit' },
-  wallyBeben: { edited: 'wicked.wb: the parser now reads the tables at the EaglePlayer origin, but the edit of row 0 channel 0 still renders identical over 8 s, so the edited phrase byte is not reached early; next: trace which phrase voice 0 plays first (DF command parameter unverified)' },
 };
 
 /** Run `body`; for a known defect it must still fail (a fixed one is reported so its row is removed). */
