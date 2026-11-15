@@ -40,7 +40,7 @@ export class FurnaceParser {
     if (magic === 'INS2') reader.skip(4);
     reader.skip(2); // version
 
-    const chipType = reader.readUint8();
+    const chipType = reader.readUint16(); // Furnace writes the instrument type as 16 bits
     const config: FurnaceConfig = {
       ...DEFAULT_FURNACE,
       chipType,
@@ -404,27 +404,27 @@ export class FurnaceParser {
   // ---------------------------------------------------------------------------
 
   private static readSNFeature(reader: BinaryReader, config: FurnaceConfig, featEnd: number): void {
+    // Layout per Furnace instrument.cpp readFeatureSN (same as FurnaceInstrumentParser 'SN').
     const byte1 = reader.readUint8();
     const byte2 = reader.readUint8();
     const byte3 = reader.readUint8();
-    const byte4 = reader.readUint8();
-
-    const useEnv = (byte1 & 0x80) !== 0;
+    const gain = reader.readUint8();
     config.snes = {
-      useEnv,
-      gainMode: useEnv ? 0 : (byte1 >> 5) & 3,
-      gain: byte1 & 0x1F,
-      a: (byte2 >> 4) & 0x0F,
-      d: byte2 & 0x07,
-      s: (byte3 >> 5) & 7,
-      r: byte3 & 0x1F,
-      sus: (byte4 >> 5) & 3,
+      useEnv: (byte3 & 0x10) !== 0,
+      gainMode: byte3 & 0x07,
+      gain,
+      a: byte1 & 0x0F,
+      d: (byte1 >> 4) & 0x07,
+      s: (byte2 >> 5) & 0x07,
+      r: byte2 & 0x1F,
+      sus: (byte3 & 0x08) ? 1 : 0,
     };
 
-    // v131+: d2 extra byte
+    // v131+: sus (bits 5-6) and d2 (bits 0-4)
     if (reader.getOffset() < featEnd) {
-      const d2Byte = reader.readUint8();
-      config.snes.d2 = d2Byte & 0x07;
+      const byte5 = reader.readUint8();
+      config.snes.sus = (byte5 >> 5) & 3;
+      config.snes.d2 = byte5 & 0x1F;
     }
   }
 
