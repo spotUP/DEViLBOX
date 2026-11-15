@@ -438,7 +438,6 @@ const KNOWN: Record<string, Partial<Record<'unedited' | 'edited', string>>> = {
   sonicArranger: { unedited: 'G16 sonicArranger: exported bytes differ from the original at byte 35', edited: 'G16 sonicArranger: the reloaded song has 72 patterns, the edited grid 84' },
   synthesis: { unedited: 'G16 synthesis: exported bytes differ from the original at byte 10', edited: 'G16 synthesis: voice 0 plays a different Paula write after the edit' },
   tcbTracker: { unedited: 'G16 tcbTracker: exported bytes differ from the original at byte 7', edited: 'G16 tcbTracker: instrument column of the reloaded grid differs on cells beside the edit' },
-  tfmMusicMaker: { unedited: 'G16 tfmMusicMaker: exported size 20431 vs original 20432' },
 };
 
 /** Run `body`; for a known defect it must still fail (a fixed one is reported so its row is removed). */

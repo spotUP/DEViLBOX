@@ -20,7 +20,8 @@ export function exportTfmMusicMaker(song: TrackerSong): TfmExportResult {
   if (!source) throw new Error('TFM Music Maker export needs the loaded module');
   const bytes = new Uint8Array(source);
   const layout = hasSignature(bytes) ? V13 : V05;
-  const h = decompressTfm(bytes, layout);
+  const end = { pos: 0 };
+  const h = decompressTfm(bytes, layout, end);
   if (!h) throw new Error('TFM Music Maker module does not unpack');
   const warnings: string[] = [];
   for (const { pattern, row, channel, cell } of editedCells(song.patterns)) {
@@ -36,5 +37,11 @@ export function exportTfmMusicMaker(song: TrackerSong): TfmExportResult {
     if (cell.volume !== shown) h[col + LINES + row] = cell.volume >= 0x10 ? Math.max(1, Math.min(31, Math.round((cell.volume - 0x10) * 31 / 64))) : 0;
   }
   const baseName = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
-  return { data: compressTfm(h, layout), filename: `${baseName}.tfe`, warnings };
+  // The bytes after the packed stream go back as the file has them.
+  const packed = compressTfm(h, layout);
+  const tail = bytes.subarray(end.pos);
+  const data = new Uint8Array(packed.length + tail.length);
+  data.set(packed);
+  data.set(tail, packed.length);
+  return { data, filename: `${baseName}.tfe`, warnings };
 }

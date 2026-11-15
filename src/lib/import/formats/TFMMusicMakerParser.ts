@@ -63,7 +63,8 @@ export const hasSignature = (b: Uint8Array): boolean =>
  * The RLE stream after `layout.signature` bytes, unpacked to the full header;
  * null when the stream ends early or breaks ZXTune's checks.
  */
-export function decompressTfm(bytes: Uint8Array, layout: Layout = hasSignature(bytes) ? V13 : V05): Uint8Array | null {
+/** `end`, when given, gets the stream's end: a file can carry bytes after it (rainstorm.tfe ends in one 0xff). */
+export function decompressTfm(bytes: Uint8Array, layout: Layout = hasSignature(bytes) ? V13 : V05, end?: { pos: number }): Uint8Array | null {
   const out = new Uint8Array(layout.headerSize);
   let pos = 0, n = 0;
   for (; n < layout.signature; n++) out[n] = bytes[pos++];
@@ -85,6 +86,7 @@ export function decompressTfm(bytes: Uint8Array, layout: Layout = hasSignature(b
     n += counter - 1;
     last = -1; // ZXTune: disable doubled sequences
   }
+  if (end) end.pos = pos;
   return out;
 }
 
