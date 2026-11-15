@@ -633,7 +633,7 @@ public:
     if (song.compatFlags.linearPitch) {
       return (note << 7);
     }
-    double base = (period ? (song.tuning * 0.0625) : song.tuning) * pow(2.0, (float)(note + 3) / 12.0);
+    double base = (period ? (song.tuning * 0.0625) : song.tuning) * pow(2.0, (float)(note - 60 + 3) / 12.0);
     return period ?
            (clock / base) / divider :
            base * (divider / clock);
@@ -649,7 +649,7 @@ public:
           nbase += arp << 7;
         }
       }
-      double fbase = (period ? (song.tuning * 0.0625) : song.tuning) * pow(2.0, (float)(nbase + 384) / (128.0 * 12.0));
+      double fbase = (period ? (song.tuning * 0.0625) : song.tuning) * pow(2.0, (float)(nbase + 384 - 7680) / (128.0 * 12.0));
       int bf = period ?
                (int)round((clock / fbase) / divider) :
                (int)round(fbase * (divider / clock));
@@ -671,9 +671,9 @@ public:
 
   int calcArp(int note, int arp, int offset=0) {
     if (arp < 0) {
-      if (!(arp & 0x40000000)) return (arp | 0x40000000) + offset;
+      if (!(arp & 0x40000000)) return (arp | 0x40000000) + offset + 60;
     } else {
-      if (arp & 0x40000000) return (arp & (~0x40000000)) + offset;
+      if (arp & 0x40000000) return (arp & (~0x40000000)) + offset + 60;
     }
     return note + arp;
   }
@@ -690,7 +690,7 @@ public:
       boundaryTop >>= 1;
       boundaryBottom >>= 1;
     }
-    int block = note / 12;
+    int block = (note - 60) / 12;
     if (block < 0) block = 0;
     if (block > 7) block = 7;
     bf >>= block;

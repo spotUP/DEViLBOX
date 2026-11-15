@@ -68,7 +68,7 @@ it('a fresh chip is in full linear pitch: a pitch offset of 47 moves a note by a
   loadSharedWorkletScripts();
   const { proc, send } = await startWorklet('furnace-dispatch', 'FurnaceDispatch');
   await send({ type: 'createChip', platformType: 6, sampleRate: 48000 });
-  await send({ type: 'dispatch', platformType: 6, cmd: 0, chan: 0, val1: 58, val2: 0 });
+  await send({ type: 'dispatch', platformType: 6, cmd: 0, chan: 0, val1: 118, val2: 0 });
   await send({ type: 'dispatch', platformType: 6, cmd: 5, chan: 0, val1: 15, val2: 0 });
   await send({ type: 'dispatch', platformType: 6, cmd: 9, chan: 0, val1: 47, val2: 0 });
   const outs = stereoOutputs(37);

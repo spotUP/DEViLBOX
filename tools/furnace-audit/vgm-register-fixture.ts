@@ -26,7 +26,7 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { normalizeWrite, parseCommandView, type ChipKind, type ChipStream, type RegisterFixture } from '../../src/engine/__tests__/helpers/furnaceRegisterStream';
 
-const FURNACE = '/Users/spot/Code/Reference Code/furnace-master/build-headless/furnace';
+const FURNACE = process.env.FURNACE_CLI ?? '/Users/spot/Code/Reference Code/furnace-master/build-headless/furnace';
 
 /** Writes per chip kind, grouped per tick (wait) and cut at `seconds` of VGM time. */
 export function parseVgm(d: Uint8Array, seconds: number): Record<ChipKind, number[][][]> {
