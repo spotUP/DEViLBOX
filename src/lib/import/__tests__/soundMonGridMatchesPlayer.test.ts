@@ -17,7 +17,8 @@
  * The expected sequences were read from UADE's Paula write log while the real
  * replayer played the file (gridVsPaula note-on rules). The replayer runs the
  * step's four columns on Paula voices 3, 2, 1, 0 (bpnext counts d0 down while
- * it walks the voices up); grid channel k is column k. Synth voices restart
+ * it walks the voices up); grid channel k is Paula voice k (step column 3 - k,
+ * soundMonStepIndex). Synth voices restart
  * their waveform on every tick, so both sides collapse consecutive repeats.
  */
 import { describe, it, expect } from 'vitest';
@@ -59,21 +60,21 @@ describe('BP SoundMon grid plays what the replayer plays', () => {
 
   it('testmod.bp3: the voices open with the notes Paula plays, below C-1 included', async () => {
     const song = await parse(bytes('public/data/songs/bp-soundmon-3/testmod.bp3'), 'testmod.bp3');
-    expect(channelPitches(song, 0, 12)).toEqual([13, 11, 13, 8, 13, 11, 13, 8, 13, 11, 13, 8]); // Paula voice 3
-    expect(channelPitches(song, 2, 30)).toEqual([                                              // Paula voice 1
+    expect(channelPitches(song, 3, 12)).toEqual([13, 11, 13, 8, 13, 11, 13, 8, 13, 11, 13, 8]); // Paula voice 3
+    expect(channelPitches(song, 1, 30)).toEqual([                                              // Paula voice 1
       37, 39, 37, 39, 37, 39, 37, 39, 25, 13, 25, 13, 25, 13, 25, 13,
       25, 13, 25, 13, 25, 13, 25, 13, 23, 11, 23, 11, 23, 11]);
   });
 
   it('nicktune1.bp: the voices open with the notes Paula plays', async () => {
     const song = await parse(bytes('public/data/songs/bp-soundmon-2/nicktune1.bp'), 'nicktune1.bp');
-    expect(channelPitches(song, 0, 16)).toEqual([39, 42, 41, 37, 34, 42, 41, 37, 39, 42, 41, 37, 34, 42, 41, 37]); // voice 3
-    expect(channelPitches(song, 1, 4)).toEqual([37, 46, 37, 46]);                                                   // voice 2
-    expect(channelPitches(song, 2, 8)).toEqual([15, 27, 15, 27, 15, 27, 15, 27]);                                   // voice 1
+    expect(channelPitches(song, 3, 16)).toEqual([39, 42, 41, 37, 34, 42, 41, 37, 39, 42, 41, 37, 34, 42, 41, 37]); // voice 3
+    expect(channelPitches(song, 2, 4)).toEqual([37, 46, 37, 46]);                                                   // voice 2
+    expect(channelPitches(song, 1, 8)).toEqual([15, 27, 15, 27, 15, 27, 15, 27]);                                   // voice 1
   });
 
   it('option 10 with a high nibble plays the row without the step transpose', async () => {
-    // nicktune1 step 0, column 0: pattern 1, transpose 0, rows 0/2 = notes 27/30.
+    // nicktune1 step 0, column 0 (Paula voice 3): pattern 1, transpose 0, rows 0/2 = notes 27/30.
     const data = bytes('public/data/songs/bp-soundmon-2/nicktune1.bp').slice();
     const songLength = (data[30] << 8) | data[31];
     data[512 + 3] = 5;                               // step 0, column 0: transpose +5
@@ -81,9 +82,23 @@ describe('BP SoundMon grid plays what the replayer plays', () => {
     data[row0 + 1] = (data[row0 + 1] & 0xf0) | 10;   // option 10 ...
     data[row0 + 2] = 0x10;                           // ... high nibble: transpose off
     const song = await parse(data, 'nicktune1.bp');
-    const rows = song.patterns[0].channels[0].rows;
+    const rows = song.patterns[0].channels[3].rows;
     expect(rows[0].note).toBe(bpNoteToNote(27));     // untransposed
     expect(rows[2].note).toBe(bpNoteToNote(30 + 5)); // transposed
+  });
+
+  it('grid channel 0 reads step column 3, the one Paula voice 0 plays (bpnext moveq #3,d0)', async () => {
+    const data = bytes('public/data/songs/bp-soundmon-2/nicktune1.bp');
+    const song = await parse(data, 'nicktune1.bp');
+    const songLength = (data[30] << 8) | data[31];
+    const patterns = song.uadePatternLayout!;
+    const blocks = patterns.patternDataFileOffset;
+    const steps = blocks - songLength * 16;
+    const stepPattern = (col: number) => (data[steps + col * 4] << 8) | data[steps + col * 4 + 1];
+    for (let ch = 0; ch < 4; ch++) {
+      const p = stepPattern(3 - ch);
+      expect(patterns.getCellFileOffset!(0, 0, ch)).toBe(p === 0 ? 0 : blocks + (p - 1) * 48);
+    }
   });
 
   it('the codec writes an edited note back as the value that plays it', () => {

@@ -60,3 +60,15 @@ export function noteToBpNote(note: number): number {
   // transpose; it takes C-1 (value 1), the nearest playable pitch.
   return value === 0 ? 1 : value;
 }
+
+/**
+ * Index into the step table (songLength * 4 entries) of the entry that Paula
+ * voice `voice` plays at song position `pos`. The replayer counts the entry
+ * down while it counts the voice up (Soundmon2.2.s / 2.0.s bpnext: `moveq
+ * #3,d0` picks entry d0, a3 starts at $dff0a0 and steps $10 per entry), so
+ * entry 3 plays on voice 0. Grid column c is Paula voice c, so every reader
+ * and writer of the step table goes through this one mapping.
+ */
+export function soundMonStepIndex(pos: number, voice: number): number {
+  return pos * 4 + 3 - voice;
+}

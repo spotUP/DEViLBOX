@@ -28,7 +28,7 @@ import type { SoundMonConfig, UADEChipRamInfo } from '@/types/instrument';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeSoundMonCell } from '@/engine/uade/encoders/SoundMonEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
-import { bpNoteToNote, bpPlayedNote } from './SoundMonNotes';
+import { bpNoteToNote, bpPlayedNote, soundMonStepIndex } from './SoundMonNotes';
 
 // ── Utility functions ─────────────────────────────────────────────────────
 
@@ -483,7 +483,7 @@ export async function parseSoundMonFile(
 
     for (let row = 0; row < 16; row++) {
       for (let ch = 0; ch < 4; ch++) {
-        const step = tracks[seqIdx * 4 + ch];
+        const step = tracks[soundMonStepIndex(seqIdx, ch)];
         if (!step || step.pattern === 0) {
           // Pattern 0 or missing: empty row
           channelRows[ch].push(emptyCell());
@@ -702,7 +702,7 @@ export async function parseSoundMonFile(
       };
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
-      const step = tracks[pattern * 4 + channel];
+      const step = tracks[soundMonStepIndex(pattern, channel)];
       if (!step || step.pattern === 0) return 0;
       const rowIdx = ((step.pattern - 1) * 16) + row;
       return patternDataOffset + rowIdx * 3;

@@ -23,7 +23,7 @@
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { TrackerCell, Pattern } from '@/types';
 import type { SoundMonConfig } from '@/types/instrument/exotic';
-import { noteToBpNote } from '@/lib/import/formats/SoundMonNotes';
+import { noteToBpNote, soundMonStepIndex } from '@/lib/import/formats/SoundMonNotes';
 
 export interface SoundMonExportResult {
   data: Blob;
@@ -268,7 +268,7 @@ export async function writeEditsIntoSoundMonModule(
       const rows = now.map((_, r) => r).filter((r) => !sameGridCell(now[r], was[r]));
       if (rows.length === 0) continue;
       edited = true;
-      const step = steps[p * 4 + ch];
+      const step = steps[soundMonStepIndex(p, ch)];
       const block = step.pattern > 0 ? blocks[step.pattern - 1].slice() : new Uint8Array(48);
       for (const r of rows) writeEditedRow(block, r * 3, now[r], was[r], step, (m) => warnings.push(`position ${p} voice ${ch + 1} row ${r}: ${m}`));
       if (step.pattern > 0 && refs.get(step.pattern) === 1) {
@@ -316,7 +316,7 @@ export function exportSongToSoundMon(song: TrackerSong): SoundMonExportResult {
 
   const songLength = song.patterns.length || 1;
   const blockPool: TrackerCell[][] = [];  // unique blocks
-  const trackTable: Array<{ pattern: number; soundTranspose: number; transpose: number }> = [];
+  const trackTable: Array<{ pattern: number; soundTranspose: number; transpose: number }> = new Array(songLength * 4);
 
   for (let seqIdx = 0; seqIdx < songLength; seqIdx++) {
     const pat = song.patterns[seqIdx];
@@ -330,7 +330,7 @@ export function exportSongToSoundMon(song: TrackerSong): SoundMonExportResult {
 
       if (isBlockEmpty(rows)) {
         // Pattern 0 = empty (no data)
-        trackTable.push({ pattern: 0, soundTranspose: 0, transpose: 0 });
+        trackTable[soundMonStepIndex(seqIdx, ch)] = { pattern: 0, soundTranspose: 0, transpose: 0 };
       } else {
         // Check if this block already exists in the pool
         let found = -1;
@@ -338,10 +338,10 @@ export function exportSongToSoundMon(song: TrackerSong): SoundMonExportResult {
           if (blocksEqual(blockPool[i], rows)) { found = i; break; }
         }
         if (found >= 0) {
-          trackTable.push({ pattern: found + 1, soundTranspose: 0, transpose: 0 });
+          trackTable[soundMonStepIndex(seqIdx, ch)] = { pattern: found + 1, soundTranspose: 0, transpose: 0 };
         } else {
           blockPool.push(rows);
-          trackTable.push({ pattern: blockPool.length, soundTranspose: 0, transpose: 0 });
+          trackTable[soundMonStepIndex(seqIdx, ch)] = { pattern: blockPool.length, soundTranspose: 0, transpose: 0 };
         }
       }
     }

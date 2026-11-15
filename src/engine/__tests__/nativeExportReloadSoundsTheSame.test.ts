@@ -444,7 +444,6 @@ const KNOWN: Record<string, Partial<Record<'unedited' | 'edited', string>>> = {
   fc: { unedited: 'G16 fc: exported bytes differ from the original at byte 14', edited: 'G16 fc: the reloaded grid differs from the edited grid on ~6600 cells (instrument and volume columns lost)' },
   deltaMusic1: { unedited: 'G16 deltaMusic1: exported bytes differ from the original at byte 22', edited: 'G16 deltaMusic1: voice 1 plays a different Paula write after the edit (untouched voice moved)' },
   deltaMusic2: { unedited: 'G16 deltaMusic2: exported bytes differ from the original at byte 0', edited: 'G16 deltaMusic2: the note edit is not heard in the rendered stream' },
-  soundmon: { edited: 'G16 soundmon: untouched voice 3 plays a different Paula write after the edit' },
   inStereo2: { unedited: 'G16 inStereo2: exported bytes differ from the original at byte 35', edited: 'G16 inStereo2: untouched voice 1 plays a different Paula write after the edit' },
   pumaTracker: { unedited: 'G16 pumaTracker: exported bytes differ from the original at byte 15', edited: 'G16 pumaTracker: untouched voice 2 plays a different Paula write after the edit' },
   sonicArranger: { unedited: 'G16 sonicArranger: exported bytes differ from the original at byte 35', edited: 'G16 sonicArranger: the reloaded song has 72 patterns, the edited grid 84' },
