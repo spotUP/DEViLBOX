@@ -69,20 +69,31 @@ describe.each(FILES)('SynthDream native export: %s', (name) => {
     expect(again.song.patterns[p].channels[0].rows[r].note).toBe(old + 2);
   });
 
-  it('refuses edits the stream cannot hold in place, writing nothing for them', async () => {
+  it('refuses a removed note, writing nothing for it', async () => {
     const { raw, song } = await load(name);
     const { p, r } = firstNote(song);
-    // a note on a row where no command plays (inside the previous command's duration) would lengthen the stream
+    song.patterns[p].channels[0].rows[r].note = 0;
+    const res = await exportOf(song);
+    expect(res.warnings.length).toBe(1);
+    expect(res.warnings.join('\n')).toMatch(/not written|was not written/);
+    expect(Array.from(res.data)).toEqual(Array.from(raw));
+  });
+
+  it('puts a note on a row inside a held command by cutting it: the stream moves to the file end and reloads with the note', async () => {
+    const { raw, song } = await load(name);
+    const { p, r } = firstNote(song);
     const rows = song.patterns[p].channels[0].rows;
     const empty = rows.findIndex((c, i) => i > r && c.note === 0);
     expect(empty).toBeGreaterThan(0);
     rows[empty].note = 40;
-    // a note removed
-    song.patterns[p].channels[0].rows[r].note = 0;
     const res = await exportOf(song);
-    expect(res.warnings.length).toBe(2);
-    expect(res.warnings.join('\n')).toMatch(/not written|was not written/);
-    expect(Array.from(res.data)).toEqual(Array.from(raw));
+    if (res.warnings.length === 0) {
+      expect(res.data.length).toBeGreaterThan(raw.length);
+      const again = await load(name, res.data);
+      expect(again.song.patterns[p].channels[0].rows[empty].note).toBe(40);
+    } else {
+      expect(Array.from(res.data)).toEqual(Array.from(raw)); // refused whole when the cut would move other rows
+    }
   });
 });
 

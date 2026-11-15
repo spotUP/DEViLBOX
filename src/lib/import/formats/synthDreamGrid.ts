@@ -71,6 +71,8 @@ export interface SdrCommand {
   /** Byte offsets of the note and instrument words inside the command (where an edit is written). */
   noteAt?: number;
   instrumentAt?: number;
+  /** Byte offset of the command's own duration word (absent: it plays for the duration in force). */
+  durationAt?: number;
   rest: boolean;
 }
 
@@ -104,7 +106,7 @@ export function decodeSdrStream(buf: Uint8Array, offset: number): SdrStream {
     if (first < FIRST_MODIFIER) {
       const f = FORMS[first / 2];
       cmd.rest = !!f.rest;
-      if (f.duration) cmd.duration = next();
+      if (f.duration) { cmd.durationAt = pos; cmd.duration = next(); }
       if (f.note) { cmd.noteAt = pos; cmd.note = next(); }
       if (f.glide) { next(); next(); next(); }
       if (f.noteCut) next();
@@ -125,7 +127,7 @@ export function decodeSdrStream(buf: Uint8Array, offset: number): SdrStream {
 }
 
 /** One 12-byte track entry (sdr_read_track_entry). */
-export interface SdrTrackEntry { commands: number; transpose: number; repeat: number; substituteOf: number; substituteBy: number; volumeCut: number }
+export interface SdrTrackEntry { at: number; commands: number; transpose: number; repeat: number; substituteOf: number; substituteBy: number; volumeCut: number }
 
 export function sdrSubsongCount(buf: Uint8Array): number {
   const volumeSwitches = u32(buf, 4);
@@ -139,7 +141,7 @@ export function readSdrTrack(buf: Uint8Array, subsong: number, voice: number): {
   const entries: SdrTrackEntry[] = [];
   while (at + ENTRY_BYTES <= buf.length && buf[at] < TRACK_LOOP && entries.length < MAX_PASS_COMMANDS) {
     entries.push({
-      commands: u32(buf, at), transpose: buf[at + 4], repeat: buf[at + 5],
+      at, commands: u32(buf, at), transpose: buf[at + 4], repeat: buf[at + 5],
       substituteOf: buf[at + 6], substituteBy: buf[at + 7], volumeCut: buf[at + 9],
     });
     at += ENTRY_BYTES;
@@ -174,6 +176,8 @@ export type SdrRowSource = {
   stream: number; offset: number; length: number;
   noteAt: number; instrumentAt: number;
   transpose: number; fixedPitch: boolean; substituteOf: number; substituteBy: number;
+  /** The tick the command starts on, the duration it plays for, and the byte offset of its own duration word (-1: none). */
+  tick: number; duration: number; durationAt: number;
 } | null;
 
 export interface SdrGrid {
@@ -186,6 +190,8 @@ export interface SdrGrid {
   blockRows: TrackerCell[][];
   /** Per pattern, voice and row: the command starting there and the stream bytes it was read from. */
   rowSources: SdrRowSource[][][];
+  /** Per voice, every command of the first pass in play order (also those that sit in a note column or off the row), same shape as a row source. */
+  voiceCommands: NonNullable<SdrRowSource>[][];
   /** For each pattern and voice, the stream playing on the pattern's first row (-1: none). */
   streamAtStart: number[][];
   /** Ticks (50 Hz replayer ticks) per row: the main step of the command onsets. */
@@ -204,6 +210,7 @@ function emptyCell(): TrackerCell {
 interface Placed {
   tick: number; stream: number; cmd: SdrCommand; note: number; instrument: number;
   noteAt: number; instrumentAt: number; transpose: number; fixedPitch: boolean; substituteOf: number; substituteBy: number;
+  duration: number;
 }
 
 /** Every voice's commands in play order on the tick timeline, with the ticks the first pass covers. */
@@ -257,6 +264,7 @@ function walkSdr(buf: Uint8Array, subsong: number): { streams: SdrStream[]; voic
             placed.push({
               tick, stream: si, cmd, note: cmd.rest ? NOTE_OFF : shown, instrument: instrumentNumber + 1,
               noteAt, instrumentAt, transpose: entry.transpose, fixedPitch, substituteOf: entry.substituteOf, substituteBy: entry.substituteBy,
+              duration: duration === 0 ? 0x10000 : duration,
             });
             tick += duration === 0 ? 0x10000 : duration;
           }
@@ -294,12 +302,20 @@ export function buildSdrGrid(buf: Uint8Array, subsong = 0): SdrGrid | null {
   const sources: SdrRowSource[][] = Array.from({ length: VOICES }, () => new Array<SdrRowSource>(rows).fill(null));
   const streamAtTick: number[][] = Array.from({ length: VOICES }, () => new Array<number>(rows).fill(-1));
   const place = makeOnsetPlacer(clock);
+  const voiceCommands: NonNullable<SdrRowSource>[][] = [];
   const noteCols = new Array<number>(VOICES).fill(1);
   let delayedNotes = 0;
   voices.forEach((placed, v) => {
+    const list: NonNullable<SdrRowSource>[] = [];
+    voiceCommands.push(list);
     for (let i = 0; i < placed.length; i++) {
       const p = placed[i];
       if (p.tick >= ticks) break;
+      list.push({
+        stream: p.stream, offset: p.cmd.offset, length: p.cmd.length, noteAt: p.noteAt, instrumentAt: p.instrumentAt,
+        transpose: p.transpose, fixedPitch: p.fixedPitch, substituteOf: p.substituteOf, substituteBy: p.substituteBy,
+        tick: p.tick, duration: p.duration, durationAt: p.cmd.durationAt ?? -1,
+      });
       const pl = place(v, p.tick);
       const cell = grid[v][pl.row];
       const instrument = p.note > 0 && p.note < NOTE_OFF ? p.instrument : 0;
@@ -310,6 +326,7 @@ export function buildSdrGrid(buf: Uint8Array, subsong = 0): SdrGrid | null {
         sources[v][pl.row] = {
           stream: p.stream, offset: p.cmd.offset, length: p.cmd.length, noteAt: p.noteAt, instrumentAt: p.instrumentAt,
           transpose: p.transpose, fixedPitch: p.fixedPitch, substituteOf: p.substituteOf, substituteBy: p.substituteBy,
+          tick: p.tick, duration: p.duration, durationAt: p.cmd.durationAt ?? -1,
         };
       } else {
         setNoteColumn(cell, pl.col, p.note, instrument, pl.offset);
@@ -347,5 +364,5 @@ export function buildSdrGrid(buf: Uint8Array, subsong = 0): SdrGrid | null {
     rowSources.push(sources.map((s) => s.slice(start, start + len)));
     streamAtStart.push(streamAtTick.map((s) => s[start]));
   }
-  return { patterns, songPositions, rows, streams, blockRows, rowSources, streamAtStart, step, clock, noteCols, delayedNotes };
+  return { patterns, songPositions, rows, streams, blockRows, rowSources, voiceCommands, streamAtStart, step, clock, noteCols, delayedNotes };
 }

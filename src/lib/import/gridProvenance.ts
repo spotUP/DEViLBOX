@@ -282,7 +282,8 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   stp: 'n/a',
   stx: 'n/a',
   suntronic: 'pass',
-  synthDream: 'fail',
+  // synthDream: a note on a row inside a held command cuts that command and inserts a note command; the grown stream moves to the file end and every track entry is repointed (synthDreamEdits.ts).
+  synthDream: 'pass',
   timFollin: 'fail',
   // tonyWilliams: a note on an empty row grows the block; length-changing edits wait for the full relocation
   tonyWilliams: 'fail',
