@@ -15,6 +15,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { encodeQCCell } from '@/engine/uade/encoders/QuadraComposerEncoder';
+import { patchModuleByLayout } from './layoutPatch';
 
 // -- Binary helpers -----------------------------------------------------------
 
@@ -115,6 +116,21 @@ export async function exportQuadraComposer(
   song: TrackerSong,
 ): Promise<QuadraComposerExportResult> {
   const warnings: string[] = [];
+
+  // A loaded module: its own bytes with each edited cell written where the parser's layout puts it. The rebuild below
+  // re-derives the FORM size, the EMIC header and the samples from the grid and loses bytes the grid does not hold
+  // (poison.emod: rebuilt FORM size at byte 7 and 28 bytes short).
+  // A song that gained or lost patterns since load no longer fits the file's PATT chunk: it takes the rebuild.
+  if (song.quadraComposerFileData && song.uadePatternLayout?.formatId === 'quadraComposer'
+    && song.patterns.length === song.uadePatternLayout.numPatterns) {
+    const r = patchModuleByLayout(song.quadraComposerFileData, song.uadePatternLayout, song.patterns);
+    if (r.unplaced.length > 0) warnings.push(`${r.unplaced.length} note(s) typed on rows the module has no place for were not saved`);
+    return {
+      data: new Blob([r.bytes.slice().buffer as ArrayBuffer], { type: 'application/octet-stream' }),
+      filename: `${(song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_')}.emod`,
+      warnings,
+    };
+  }
 
   const numChannels = 4; // Quadra Composer is always 4-channel
   const maxInstruments = Math.min(song.instruments.length, 63); // practical limit

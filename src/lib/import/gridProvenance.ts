@@ -91,7 +91,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   musicAssembler: 'pass',
   okt: 'pass',
   pumaTracker: 'fail',
-  quadraComposer: 'fail',
+  quadraComposer: 'pass',
   soundControl: 'pass',
   sonicArranger: 'fail',
   synthDream: 'pass',
