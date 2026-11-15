@@ -59,12 +59,35 @@ describe('Organya is editable through the product load path', () => {
     expect(back.volume).toBe(0x10 + 20);
   }, 60000);
 
-  it('an edit on a cell with no event changes nothing', () => {
+  it('a note typed on a cell with no event is inserted into its track and reads back; every other cell stays', async () => {
     const m = decodeOrganyaModule(bytes)!;
     const used = new Set(m.place.flat().map((q) => `${q.pattern}:${q.row}:${q.channel}`));
-    let row = 0;
+    let row = 1;
     while (used.has(`0:${row}:0`)) row++;
-    const edited = applyOrganyaGridEdits(bytes, [{ pattern: 0, row, channel: 0, cell: { note: 40, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 } }]);
+    const song = await parseOrganyaFile(bytes.slice().buffer as ArrayBuffer, NAME);
+    const cells = song.patterns[0].channels[0].rows;
+    cells[row] = { ...cells[row], note: 40, instrument: 0 };
+    const res = await exportOrganya(song);
+    expect(res.warnings).toEqual([]);
+    const out = new Uint8Array(await res.data.arrayBuffer());
+    expect(out.length).toBe(bytes.length + 8);
+    const again = await parseOrganyaFile(out.slice().buffer as ArrayBuffer, NAME);
+    expect(again.patterns[0].channels[0].rows[row].note).toBe(40);
+    const orig = await parseOrganyaFile(bytes.slice().buffer as ArrayBuffer, NAME);
+    orig.patterns.forEach((pat, p) => pat.channels.forEach((c, ch) => c.rows.forEach((cell, r) => {
+      if (p === 0 && ch === 0 && r === row) return;
+      expect(again.patterns[p].channels[ch].rows[r], `${p}:${ch}:${r}`).toEqual(cell);
+    })));
+  }, 60000);
+
+  it('a typed note with another track\'s instrument is refused with a warning', () => {
+    const m = decodeOrganyaModule(bytes)!;
+    const used = new Set(m.place.flat().map((q) => `${q.pattern}:${q.row}:${q.channel}`));
+    let row = 1;
+    while (used.has(`0:${row}:0`)) row++;
+    const warnings: string[] = [];
+    const edited = applyOrganyaGridEdits(bytes, [{ pattern: 0, row, channel: 0, cell: { note: 40, instrument: bytes[18 + 2] + 2, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 } }], warnings);
     expect(edited).toBe(bytes);
+    expect(warnings.length).toBe(1);
   });
 });

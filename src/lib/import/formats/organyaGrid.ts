@@ -9,9 +9,11 @@
  * running note), u8 length, u8 volume (255 = keep), u8 pan (255 = keep, 6 is
  * centre). Tracks 0-7 are melody, 8-15 drums.
  *
- * The carrier is the original image. The grid only places the file's own
- * events, so an edit rewrites the pitch, length, volume and pan bytes of
- * existing events and nothing else: same-length edits only, no event is added,
+ * The carrier is the original image. An edit rewrites the pitch, length,
+ * volume and pan bytes of existing events in place. A note typed on a cell
+ * with no event inserts one event at that row's position into its track (after
+ * the track's events already there, so the cell's lane is kept): the five
+ * arrays grow by one entry and the record's event count by one. No event is
  * removed or moved.
  *
  * Grid mapping:
@@ -133,11 +135,59 @@ export function organyaEventCell(m: OrganyaModule, t: number, i: number): Tracke
 export interface OrganyaGridEdit { pattern: number; row: number; channel: number; cell: TrackerCell }
 
 /**
- * The file bytes with grid edits written into the events they sit on; the same
- * array when no cell differs from what it shows. Cells with no event are
- * ignored (the grid cannot add events), as is the instrument (a track's).
+ * The bytes with one event inserted into its track for a note typed on an
+ * empty cell, or a reason it cannot be: the cell is not on the track's next
+ * free lane of that position, the note is outside the pitch range, the
+ * instrument is not the track's, or the track already has 65535 events.
+ * Length is the cell's length effect, else the track's previous event's
+ * length (1 when it has none); volume and pan keep the running ones unless set.
  */
-export function applyOrganyaGridEdits(bytes: Uint8Array, edits: readonly OrganyaGridEdit[]): Uint8Array {
+function insertOrganyaEvent(bytes: Uint8Array, e: OrganyaGridEdit): Uint8Array | string {
+  const m = decodeOrganyaModule(bytes);
+  if (!m) return 'module does not decode';
+  const t = m.firstChannel.findIndex((f, k) => e.channel >= f && e.channel < f + m.lanes[k]);
+  if (t < 0) return `channel ${e.channel} has no track`;
+  const c = e.cell;
+  const note = c.note ?? 0;
+  if (note < NOTE_BIAS || note > 96) return `note ${note} is outside the Organya pitch range`;
+  const inst = m.image[HEADER + t * RECORD + 2] + 1;
+  if ((c.instrument ?? 0) > 0 && c.instrument !== inst) return `instrument ${c.instrument} is not track ${t}'s (${inst}); Organya sets the instrument per track`;
+  const n = m.count[t];
+  if (n >= 0xffff) return `track ${t} already has 65535 events`;
+  const pos = (e.pattern * ORGANYA_ROWS + e.row) * m.zoom;
+  let j = 0;
+  let lane = 0;
+  while (j < n && u32(bytes, m.start[t] + 4 * j) <= pos) { if (u32(bytes, m.start[t] + 4 * j) === pos) lane++; j++; }
+  if (e.channel !== m.firstChannel[t] + lane) return `track ${t} takes its next event on position ${pos} in channel ${m.firstChannel[t] + lane}`;
+  const length = (c.effTyp ?? 0) === LENGTH_EFFECT && (c.eff ?? 0) > 0 ? c.eff! : j > 0 ? byteAt(m, t, 2, j - 1) || 1 : 1;
+  const vol = (c.volume ?? 0) >= 0x10 ? Math.min(254, ((c.volume! - 0x10) << 2) | 2) : ORGANYA_NO_VALUE;
+  const pan = (c.effTyp2 ?? 0) === PAN_EFFECT ? Math.min(12, Math.round((c.eff2 ?? 0) / PAN_STEP)) : ORGANYA_NO_VALUE;
+  // The track's arrays start where the earlier tracks' end (a track with no events has none).
+  const at = HEADER + ORGANYA_TRACKS * RECORD + m.count.slice(0, t).reduce((a, b) => a + 8 * b, 0);
+  const out = new Uint8Array(bytes.length + 8);
+  out.set(bytes.subarray(0, at));
+  out[HEADER + t * RECORD + 4] = (n + 1) & 0xff;
+  out[HEADER + t * RECORD + 5] = (n + 1) >> 8;
+  const dv = new DataView(out.buffer);
+  for (let i = 0, k = 0; i <= n; i++) dv.setUint32(at + 4 * i, i === j ? pos : u32(bytes, at + 4 * k++), true);
+  const value = [note - NOTE_BIAS, length, vol, pan];
+  for (let a = 0; a < 4; a++) {
+    const from = at + 4 * n + a * n, to = at + 4 * (n + 1) + a * (n + 1);
+    out.set(bytes.subarray(from, from + j), to);
+    out[to + j] = value[a] & 0xff;
+    out.set(bytes.subarray(from + j, from + n), to + j + 1);
+  }
+  out.set(bytes.subarray(at + 8 * n), at + 8 * (n + 1));
+  return out;
+}
+
+/**
+ * The file bytes with grid edits written into the events they sit on, and an
+ * event inserted for each note typed on a cell with no event; the same array
+ * when no cell differs from what it shows. The instrument (a track's) is not
+ * editable per cell. Refused inserts are reported in warnings.
+ */
+export function applyOrganyaGridEdits(bytes: Uint8Array, edits: readonly OrganyaGridEdit[], warnings?: string[]): Uint8Array {
   const m = decodeOrganyaModule(bytes);
   if (!m) return bytes;
   const at = new Map<string, [number, number]>();
@@ -145,9 +195,10 @@ export function applyOrganyaGridEdits(bytes: Uint8Array, edits: readonly Organya
   const out = m.image;
   let changed = false;
   const put = (t: number, k: number, i: number, v: number): void => { out[organyaArrayOffset(m, t, k) + i] = v & 0xff; changed = true; };
+  const adds: OrganyaGridEdit[] = [];
   for (const e of edits) {
     const hit = at.get(`${e.pattern}:${e.row}:${e.channel}`);
-    if (!hit) continue;
+    if (!hit) { if ((e.cell.note ?? 0) > 0) adds.push(e); continue; }
     const [t, i] = hit;
     const before = organyaEventCell(m, t, i);
     const c = e.cell;
@@ -163,5 +214,13 @@ export function applyOrganyaGridEdits(bytes: Uint8Array, edits: readonly Organya
     if ((c.effTyp2 ?? 0) === PAN_EFFECT && (c.eff2 ?? 0) !== before.eff2) put(t, 4, i, Math.min(12, Math.round((c.eff2 ?? 0) / PAN_STEP)));
     else if ((c.effTyp2 ?? 0) === 0 && before.effTyp2 === PAN_EFFECT) put(t, 4, i, ORGANYA_NO_VALUE);
   }
-  return changed ? out : bytes;
+  // Inserted in position order so each insert sees the lanes the earlier ones took.
+  adds.sort((a, b) => (a.pattern - b.pattern) || (a.row - b.row) || (a.channel - b.channel));
+  let result = changed ? out : bytes;
+  for (const e of adds) {
+    const next = insertOrganyaEvent(result, e);
+    if (typeof next === 'string') warnings?.push(`Organya: the note on pattern ${e.pattern} row ${e.row} channel ${e.channel} was not written: ${next}.`);
+    else result = next;
+  }
+  return result;
 }

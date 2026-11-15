@@ -253,7 +253,7 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   jochenHippelST: 'pass',
   jxs: 'pass',
   kdm: 'pass', // a note on an empty cell inserts an event at its tick (kdmGrid insertKdmEvent)
-  organya: 'fail',
+  organya: 'pass', // a note on an empty cell inserts an event into its track (organyaGrid insertOrganyaEvent)
   piyoPiyo: 'pass',
   maxTrax: 'n/a',
   mdl: 'n/a',
