@@ -8,6 +8,7 @@
 
 import { furnaceModuleExportAvailable } from '@/lib/export/FurnaceModuleExporter';
 import { furnaceAyScrambleExportAvailable, ayScrambleTempoWarning } from '@/lib/export/FurnaceExporter';
+import { FURNACE_SNES_CHIP_ID } from '@/lib/export/tad/tadSongWriter';
 import { useState, useEffect, useCallback } from 'react';
 import { lowOctaveExportRefusal } from '@/lib/tracker/noteValue';
 import {
@@ -37,7 +38,7 @@ import { saveFurFileWasm } from '@lib/import/wasm/FurnaceFileOps';
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
-export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furAy';
+export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furAy' | 'tad';
 export type DialogMode = 'export' | 'import';
 
 export type { ExportOptions };
@@ -79,6 +80,7 @@ export const FORMAT_EXTENSIONS: Record<ExportMode, string> = {
   native: '',
   fur: '.fur',
   furAy: '.fur',
+  tad: '.zip',
 };
 
 export const CHIP_FORMAT_DESCRIPTIONS: Record<string, string> = {
@@ -146,6 +148,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
   // ── Store: useFormatStore ───────────────────────────────────────────────────
   const editorMode = useFormatStore((s) => s.editorMode);
   const originalModuleData = useFormatStore((s) => s.originalModuleData);
+  const furnaceNative = useFormatStore((s) => s.furnaceNative);
   const uadeEditableFileData = useFormatStore((s) => s.uadeEditableFileData);
   const uadeEditableFileName = useFormatStore((s) => s.uadeEditableFileName);
 
@@ -267,6 +270,23 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     downloadFn(blob, filename);
     notify.success(`Furnace file "${filename}" exported successfully! (${result.bytes.byteLength} bytes)`);
     onClose();
+  }, [metadata]);
+
+  const tadAvailable = (furnaceNative?.chipIds ?? []).includes(FURNACE_SNES_CHIP_ID);
+  const [tadReport, setTadReport] = useState<{ warnings: string[]; ram: string } | null>(null);
+
+  const handleExportTad = useCallback(async (
+    downloadFn: (blob: Blob, filename: string) => void,
+    onClose: () => void,
+  ) => {
+    const { exportTadProjectFile } = await import('@lib/export/moduleExportService');
+    const result = await exportTadProjectFile();
+    const ram = result.ram ? `Common ${result.ram.common} bytes; ${result.ram.songs.map((s) => `${s.name} ${s.bytes} bytes`).join('; ')}` : 'not measured';
+    setTadReport({ warnings: result.warnings, ram });
+    result.warnings.forEach((w) => notify.warning(w));
+    downloadFn(new Blob([result.zip as BlobPart], { type: 'application/zip' }), `${metadata.name || 'song'}-tad.zip`);
+    if (result.ok) { notify.success(`Terrific Audio Driver project exported (${result.songs.length} songs, ${result.soundEffects.length} sound effects).`); onClose(); }
+    else notify.error('The TAD compiler rejected the project. The zip holds the project and compiler log only.');
   }, [metadata]);
 
   // ── Shared handler: export nano ─────────────────────────────────────────────
@@ -433,6 +453,9 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     handleExportFur,
     furnaceModuleAvailable,
     handleExportFurAy,
+    handleExportTad,
+    tadAvailable,
+    tadReport,
     furnaceAyAvailable,
     furnaceAyTempoWarning,
     handleExportNano,

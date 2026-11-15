@@ -22,6 +22,7 @@ import { exportSongToMOD, type ModExportResult } from './modExport';
 import type { ExportNativeOptions, NativeExportResult } from './nativeExportRouter';
 import { exportPatternToMIDI, exportSongToMIDI } from './midiExport';
 import type { MIDIExportOptions } from './midiTypes';
+import type { TadBuildResult } from './tad/tadProjectBuilder';
 
 /** MOD / XM / IT / S3M through OpenMPT, from the live song. */
 export async function exportModuleFile(
@@ -113,4 +114,26 @@ export function exportFurnaceAyScrambleFile(): FurnaceAyScrambleResult {
   const result = exportFurnaceAyScramble(song);
   const tempo = ayScrambleTempoWarning(song.initialBPM);
   return tempo ? { ...result, warnings: [...result.warnings, tempo] } : result;
+}
+
+/** SNES Furnace song(s) -> Terrific Audio Driver project zip, from the live song. Instrument index = Furnace instrument index. */
+export async function exportTadProjectFile(): Promise<TadBuildResult> {
+  const song = liveTrackerSong();
+  if (!song.furnaceNative) throw new Error('No Furnace song loaded.');
+  const [{ buildTadProject, tadInstrumentFromFurnace }, compiler] = await Promise.all([
+    import('./tad/tadProjectBuilder'),
+    import(/* @vite-ignore */ `${import.meta.env.BASE_URL}tad/tad-compiler.js`),
+  ]);
+  const base = import.meta.env.BASE_URL;
+  return buildTadProject(
+    [{
+      title: song.name || 'song',
+      native: song.furnaceNative,
+      instruments: song.instruments.map((i) => tadInstrumentFromFurnace(i.name, i.furnace ?? {})),
+      samples: song.furnaceSamples ?? [],
+      wavetables: song.furnaceWavetables?.map((w, n) => ({ name: `wave${n}`, ...w })),
+    }],
+    compiler.default,
+    (f) => `${base}tad/${f}`,
+  );
 }

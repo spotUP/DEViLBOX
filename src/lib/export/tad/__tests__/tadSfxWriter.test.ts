@@ -3,9 +3,9 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { parseFurnaceSong, toSequencerSamples, buildFurnaceNativeData } from '@/lib/import/formats/FurnaceSongParser';
-import type { FurnaceSNESConfig } from '@/types/instrument/furnace';
 import { openTadSession, type CreateTadCompiler } from '../tadCompilerWasm';
-import { writeTadSong, writeTadSfx, tadProjectJson, mergeTadSamples, tadSfxName, TAD_SFX_FILE } from '../tadSongWriter';
+import { writeTadSong, writeTadSfx, mergeTadSamples, tadSfxName, TAD_SFX_FILE } from '../tadSongWriter';
+import { tadProjectJson, tadInstrumentFromFurnace } from '../tadProjectBuilder';
 
 const FILE = resolve(__dirname, '../../../../../public/data/songs/furnace/snes/tetristheme.fur');
 
@@ -25,15 +25,7 @@ describe('writeTadSfx', () => {
     const input = {
       native,
       subsong: 0,
-      instruments: module.instruments.map((i) => ({
-        name: i.name,
-        snes: i.snes as FurnaceSNESConfig | undefined,
-        initSample: i.amiga?.initSample,
-        useNoteMap: i.amiga?.useNoteMap,
-        noteMap: i.amiga?.noteMap,
-        useWave: i.amiga?.useWave,
-        waveLen: i.amiga?.waveLen,
-      })),
+      instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)),
       samples: toSequencerSamples(module),
       wavetables: module.wavetables,
       title: 'tetris',
@@ -47,7 +39,7 @@ describe('writeTadSfx', () => {
 
     const samples = mergeTadSamples([song.samples, sfx.samples]);
     const files: Record<string, Uint8Array | string> = {
-      'p.terrificaudio': tadProjectJson('song', 'song.mml', samples, [sfx.name]),
+      'p.terrificaudio': tadProjectJson([{ name: 'song', source: 'song.mml' }], samples, [sfx.name]),
       'song.mml': song.mml,
       [TAD_SFX_FILE]: sfx.mml,
     };

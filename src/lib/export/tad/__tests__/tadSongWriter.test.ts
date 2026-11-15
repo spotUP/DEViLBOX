@@ -3,9 +3,9 @@ import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { parseFurnaceSong, toSequencerSamples, buildFurnaceNativeData } from '@/lib/import/formats/FurnaceSongParser';
-import type { FurnaceSNESConfig } from '@/types/instrument/furnace';
 import { openTadSession, type CreateTadCompiler } from '../tadCompilerWasm';
-import { writeTadSong, tadProjectJson } from '../tadSongWriter';
+import { writeTadSong } from '../tadSongWriter';
+import { tadProjectJson, tadInstrumentFromFurnace } from '../tadProjectBuilder';
 
 const DIR = resolve(__dirname, '../../../../../public/data/songs/furnace/snes');
 const FILES = readdirSync(DIR).filter((f) => f.endsWith('.fur')).sort();
@@ -17,23 +17,14 @@ describe('writeTadSong', () => {
     const song = writeTadSong({
       native: buildFurnaceNativeData(module),
       subsong: 0,
-      instruments: module.instruments.map((i) => ({
-        name: i.name,
-        snes: i.snes as FurnaceSNESConfig | undefined,
-        initSample: i.amiga?.initSample,
-        useNoteMap: i.amiga?.useNoteMap,
-        noteMap: i.amiga?.noteMap,
-        useWave: i.amiga?.useWave,
-        waveLen: i.amiga?.waveLen,
-        hasMacros: i.macros.some((m) => m.length > 0),
-      })),
+      instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)),
       samples: toSequencerSamples(module),
       wavetables: module.wavetables,
       title: module.name || file,
     });
     expect(song.mml).toContain('#Timer');
     const files: Record<string, Uint8Array | string> = {
-      'p.terrificaudio': tadProjectJson('song', 'song.mml', song.samples),
+      'p.terrificaudio': tadProjectJson([{ name: 'song', source: 'song.mml' }], song.samples),
       'song.mml': song.mml,
     };
     for (const s of song.samples) files[s.path] = s.data;

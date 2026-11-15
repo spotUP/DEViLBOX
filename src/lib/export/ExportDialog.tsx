@@ -89,6 +89,9 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
         case 'furAy':
           return await ex.handleExportFurAy((b, n) => saveAs(b, n), onClose);
 
+        case 'tad':
+          return await ex.handleExportTad((b, n) => saveAs(b, n), onClose);
+
         case 'nano':
           return await ex.handleExportNano((b, n) => saveAs(b, n), onClose);
 
@@ -347,6 +350,21 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold">Furnace AY-3-8910 (Scramble)</div>
                     </button>
                   )}
+                  {ex.tadAvailable && (
+                    <button
+                      onClick={() => ex.setExportMode('tad')}
+                      className={`
+                        p-4 rounded-lg border-2 transition-all text-center
+                        ${ex.exportMode === 'tad'
+                          ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
+                          : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
+                        }
+                      `}
+                    >
+                      <FileMusic size={24} className="mx-auto mb-2" />
+                      <div className="font-mono text-sm font-semibold">SNES (Terrific Audio Driver)</div>
+                    </button>
+                  )}
                   {ex.nativeAvailable && (
                     <button
                       onClick={() => ex.setExportMode('native')}
@@ -545,6 +563,28 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                 </div>
               )}
 
+              {ex.exportMode === 'tad' && (
+                <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
+                  <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
+                    SNES Export for the Terrific Audio Driver (.zip)
+                  </h3>
+                  <div className="space-y-3 text-sm font-mono text-text-secondary">
+                    <div>Each subsong becomes a song; subsongs named <span className="text-accent-primary">sfx:name</span> become sound effects.</div>
+                    <div className="text-xs text-text-muted">
+                      The zip holds the editable project, assembler files (ca65, 64tass, asar, pvsneslib; lorom and hirom), a .spc preview per song and a README.
+                    </div>
+                    {ex.tadReport && (
+                      <div className="space-y-1">
+                        <div className="text-xs">Audio RAM: <span className="text-accent-primary">{ex.tadReport.ram}</span></div>
+                        {ex.tadReport.warnings.map((w, i) => (
+                          <div key={i} className="text-xs text-accent-warning">{w}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {ex.exportMode === 'native' && (
                 <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
                   <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
@@ -703,6 +743,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   : ex.exportMode === 'chip' ? `.${chipExtension}`
                   : ex.exportMode === 'nano' ? '.dbn'
                   : ex.exportMode === 'fur' || ex.exportMode === 'furAy' ? '.fur'
+                  : ex.exportMode === 'tad' ? '.zip'
                   : `.${ex.exportMode}.json`
                 }`
               : 'Select a file to import'}
