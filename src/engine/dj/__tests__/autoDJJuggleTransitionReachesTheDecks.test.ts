@@ -21,6 +21,7 @@
  * that already plays, and the juggle sink's ResyncDeck / JumpToBar keep a
  * playing deck in phase. Fake timers, fake engine, no audio.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { JUGGLE_CUT_SWEEP_MS } from '../autodj/juggle/crossfaderSweep';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -37,13 +38,15 @@ const holder = vi.hoisted(() => ({
   incomingPhraseConfidence: undefined as number | undefined,
 }));
 
-vi.mock('@/engine/dj/DJEngine', async () => {
-  // DJPhase (not DJEngine) answers getDJEngineIfActive for the phase maths.
-  (await import('@/engine/dj/DJPhase')).setDJEngineHolder({
+vi.mock('@/engine/dj/DJEngine', () => ({
+  getDJEngine: () => holder.engine,
+  getDJEngineIfActive: () => holder.engine,
+}));
+// DJPhase (not DJEngine) answers getDJEngineIfActive for the phase maths. Seeded here, not inside the
+// DJEngine mock factory: importing DJPhase there runs useDJStore -> DJActions -> DJEngine and bypasses the mock.
+setDJEngineHolder({
     getDeck: (id: string) => (holder.engine as { getDeck(id: string): unknown } | null)?.getDeck(id),
-  } as never);
-  return { getDJEngine: () => holder.engine, getDJEngineIfActive: () => holder.engine };
-});
+} as never);
 vi.mock('../DJQuantizedFX', () => {
   const record = () => () => () => {};
   return {
@@ -87,6 +90,7 @@ import type { DJTransitionPlan } from '../autodj/types';
 import { corpusTrack } from '../autodj/testing/corpus';
 import { executeTransition } from '../autodj/transitionExecutor';
 import { createDeckJuggleSink } from '../autodj/juggle/juggleDeckSink';
+import { setDJEngineHolder } from '@/engine/dj/DJPhase';
 
 /** Master (deck A) beat at a master position, on its corpus grid. */
 const masterBeat = (pos: number): number => (pos - corpusTrack(OUTGOING).beats[0]) / BEAT;

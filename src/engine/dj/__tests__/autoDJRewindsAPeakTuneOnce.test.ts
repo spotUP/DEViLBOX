@@ -9,6 +9,7 @@
  * remembers the rewind (the next plan moves on), logs a REWIND decision for
  * dj_auto_dj_explain, and the set plan grows by the replayed time.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';
 

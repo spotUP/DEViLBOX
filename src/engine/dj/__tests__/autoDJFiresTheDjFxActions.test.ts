@@ -7,6 +7,7 @@
  * send); a filter build fires the filter rise / release actions and the
  * deck filter position the knob reads moves; a brake fires fx_deck_brake.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({

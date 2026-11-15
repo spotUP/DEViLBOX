@@ -127,13 +127,13 @@ export async function setupJuggleTransition(holder: HarnessHolder, opts: { mode:
   vi.useFakeTimers();
   holder.loads = 0;
   holder.crossfader.length = 0;
-  const { DJEngine } = await vi.importActual<typeof import('../DJEngine')>('../DJEngine');
-  const { DJPipeline } = await vi.importActual<typeof import('../DJPipeline')>('../DJPipeline');
-  holder.pipeline = Object.create(DJPipeline.prototype);
+  // Plain stubs, not Object.create(<real class>.prototype): vi.importActual of the real engine/pipeline drags the
+  // real module graph (useDJStore -> DJActions -> DJEngine) into the file's registry and can bypass the DJEngine mock.
+  holder.pipeline = {};
   const startSec = opts.startSec ?? 10;
   const decks = { A: fakeDeck('A', startSec, true), B: fakeDeck('B', 0, false) };
   const record = (v: number) => { holder.crossfader.push({ at: Date.now(), v, masterPos: decks.A.position() }); };
-  holder.engine = Object.assign(Object.create(DJEngine.prototype), {
+  holder.engine = Object.assign({}, {
     getDeck: (id: 'A' | 'B') => decks[id], remapInstrumentIds: () => {}, tryAutoLoadStems: async () => {}, recorder: null, _pendingTrackSource: null,
     mixer: { setCrossfader: record }, setCrossfader: record,
   });

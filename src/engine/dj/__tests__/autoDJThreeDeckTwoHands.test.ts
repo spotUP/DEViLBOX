@@ -10,6 +10,7 @@
  *    Deck C plays its routine is released with the two-hands reason, it never completes (sentinel: the routine
  *    count 1). Fake timers, fake decks, no audio.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import fixture from '../scratch/__tests__/fixtures/three_deck_two_hands.json';
 

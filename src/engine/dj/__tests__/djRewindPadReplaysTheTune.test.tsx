@@ -10,19 +10,23 @@
  * rate 1, on the other (heard) deck's next bar; the Dub Siren wailed through
  * the pull-back and the Air Horn blew on the restart.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { TurntablePhysics } from '@/engine/turntable/TurntablePhysics';
 import { useDJStore } from '@/stores/useDJStore';
+import { setDJEngineHolder } from '@/engine/dj/DJPhase';
 
 const holder = vi.hoisted(() => ({ engine: null as unknown }));
-vi.mock('@/engine/dj/DJEngine', async () => {
-  // DJPhase (not DJEngine) answers getDJEngineIfActive for the phase maths.
-  (await import('@/engine/dj/DJPhase')).setDJEngineHolder({
+vi.mock('@/engine/dj/DJEngine', () => ({
+  getDJEngine: () => holder.engine,
+  getDJEngineIfActive: () => holder.engine,
+}));
+// DJPhase (not DJEngine) answers getDJEngineIfActive for the phase maths. Seeded here, not inside the
+// DJEngine mock factory: importing DJPhase there runs useDJStore -> DJActions -> DJEngine and bypasses the mock.
+setDJEngineHolder({
     getDeck: (id: string) => (holder.engine as { getDeck(id: string): unknown } | null)?.getDeck(id),
-  } as never);
-  return { getDJEngine: () => holder.engine, getDJEngineIfActive: () => holder.engine };
-});
+} as never);
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 

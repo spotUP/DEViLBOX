@@ -11,6 +11,7 @@
  *   DJ view   the Auto DJ panel has no showcase button (owner decision 2026-10-14) and shows nothing while it is
  *             idle; while it plays it shows the view
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { render, cleanup, act, waitFor } from '@testing-library/react';
 import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch } from '@/test/audio/realWebAudio';

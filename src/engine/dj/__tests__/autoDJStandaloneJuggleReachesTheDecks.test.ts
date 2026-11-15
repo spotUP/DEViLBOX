@@ -15,6 +15,7 @@
  * Negative case: a transition 40 s away (room for the planner, not for a
  * stand-alone setup) - no double. Fake timers, fake decks, no audio.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({
@@ -26,13 +27,15 @@ const holder = vi.hoisted(() => ({
   doubles: 0,
 }));
 
-vi.mock('@/engine/dj/DJEngine', async () => {
-  // DJPhase (not DJEngine) answers getDJEngineIfActive for the phase maths.
-  (await import('@/engine/dj/DJPhase')).setDJEngineHolder({
+vi.mock('@/engine/dj/DJEngine', () => ({
+  getDJEngine: () => holder.engine,
+  getDJEngineIfActive: () => holder.engine,
+}));
+// DJPhase (not DJEngine) answers getDJEngineIfActive for the phase maths. Seeded here, not inside the
+// DJEngine mock factory: importing DJPhase there runs useDJStore -> DJActions -> DJEngine and bypasses the mock.
+setDJEngineHolder({
     getDeck: (id: string) => (holder.engine as { getDeck(id: string): unknown } | null)?.getDeck(id),
-  } as never);
-  return { getDJEngine: () => holder.engine, getDJEngineIfActive: () => holder.engine };
-});
+} as never);
 vi.mock('../DJQuantizedFX', () => {
   const record = () => () => () => {};
   return {
@@ -60,6 +63,7 @@ import { corpusTrack } from '../autodj/testing/corpus';
 import { getDecisionLog } from '../autodj/decisionLog';
 import type { AutoDJInternals } from './juggleTransitionHarness';
 import { setupStandalone, teardownStandalone, runStandalone, type StandaloneRig } from './standaloneJuggleHarness';
+import { setDJEngineHolder } from '@/engine/dj/DJPhase';
 
 const TRACK = 'drops';
 const BPM = 130;

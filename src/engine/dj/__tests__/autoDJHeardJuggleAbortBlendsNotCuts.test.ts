@@ -20,6 +20,7 @@
  * never seeked or stopped while it plays; the transition completes on the incoming and reports the
  * blend as the executed plan. Fake timers, fake engine, no audio.
  */
+import '@/engine/dj/DJEngine'; // the mock first, alone: it must be registered before the store/engine import cycle starts
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 const holder = vi.hoisted(() => ({
@@ -30,13 +31,15 @@ const holder = vi.hoisted(() => ({
   incomingGridShiftSec: 0,
 }));
 
-vi.mock('@/engine/dj/DJEngine', async () => {
-  // DJPhase (not DJEngine) answers getDJEngineIfActive for the phase maths.
-  (await import('@/engine/dj/DJPhase')).setDJEngineHolder({
+vi.mock('@/engine/dj/DJEngine', () => ({
+  getDJEngine: () => holder.engine,
+  getDJEngineIfActive: () => holder.engine,
+}));
+// DJPhase (not DJEngine) answers getDJEngineIfActive for the phase maths. Seeded here, not inside the
+// DJEngine mock factory: importing DJPhase there runs useDJStore -> DJActions -> DJEngine and bypasses the mock.
+setDJEngineHolder({
     getDeck: (id: string) => (holder.engine as { getDeck(id: string): unknown } | null)?.getDeck(id),
-  } as never);
-  return { getDJEngine: () => holder.engine, getDJEngineIfActive: () => holder.engine };
-});
+} as never);
 vi.mock('../DJQuantizedFX', () => {
   const record = () => () => () => {};
   return {
@@ -74,6 +77,7 @@ import { useDJStore } from '@/stores/useDJStore';
 import { BAR, BEAT, setupJuggleTransition, teardownJuggleTransition } from './juggleTransitionHarness';
 import { getSessionController } from '../autodj/sessionController';
 import type { DJTransitionPlan } from '../autodj/types';
+import { setDJEngineHolder } from '@/engine/dj/DJPhase';
 
 describe('JA-ABORT-HEARD: a juggle ladder aborted after the incoming was heard blends onto its landing, never cuts', () => {
   afterEach(() => teardownJuggleTransition());
