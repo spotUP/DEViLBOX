@@ -8,9 +8,11 @@
  * newer songs, fxP (older songs, e.g. flysong and klabsong, have no fxP and
  * are 12+4T+10M bytes instead of 12+4T+11M).
  *
- * The carrier is the original image. The grid only places the file's own
- * events, so an edit rewrites fields of existing events and nothing else:
- * same-length edits only; events cannot be added or removed from the grid.
+ * The carrier is the original image. An edit rewrites fields of existing
+ * events in place. A note typed on a cell with no event inserts one event at
+ * that row's tick (after the events already on that tick, so the cell's lane
+ * is kept): every array grows by one entry and the note count by one. Events
+ * are never removed from the grid.
  *
  * Grid mapping:
  *  - Row zoom is the song's gcd of (time - time[0]) in ticks, so every event
@@ -136,11 +138,57 @@ const same = (a: TrackerCell, b: TrackerCell): boolean =>
   (a.effTyp2 ?? 0) === (b.effTyp2 ?? 0) && (a.eff2 ?? 0) === (b.eff2 ?? 0);
 
 /**
- * The file bytes with grid edits written into the events they sit on; the same
- * array when no cell differs from what it shows. Cells with no event are
- * ignored (the grid cannot add events), as is the instrument (a track's wave).
+ * The bytes with one event inserted for a note typed on an empty cell, or a
+ * reason it cannot be: the cell is not on the track's next free lane of that
+ * tick, the note is outside the pitch range, the instrument is not the
+ * track's wave, or the song already has 8192 events.
  */
-export function applyKdmGridEdits(bytes: Uint8Array, edits: readonly KdmGridEdit[]): Uint8Array {
+function insertKdmEvent(bytes: Uint8Array, e: KdmGridEdit): Uint8Array | string {
+  const m = decodeKdmModule(bytes);
+  if (!m) return 'module does not decode';
+  const t = m.firstChannel.findIndex((f, k) => e.channel >= f && e.channel < f + m.lanes[k]);
+  if (t < 0) return `channel ${e.channel} has no track`;
+  const c = e.cell;
+  const note = c.note ?? 0;
+  const off = note === KDM_GRID_NOTE_OFF;
+  if (!off && (note < 1 || note > 75 + NOTE_BIAS)) return `note ${note} is outside the KDM pitch range`;
+  const wave = bytes[HEADER + 4 * t];
+  if ((c.instrument ?? 0) > 0 && c.instrument !== wave + 1) return `instrument ${c.instrument} is not track ${t}'s wave (${wave + 1}); KDM sets the instrument per track`;
+  if (m.notes >= 8192) return 'the song already has 8192 events';
+  const time = m.times[0] + (e.pattern * KDM_ROWS + e.row) * m.zoom;
+  const trackOf = (i: number): number => bytes[kdmArrayOffset(m, 0) + i];
+  let j = 0;
+  let lane = 0;
+  while (j < m.notes && m.times[j] <= time) { if (m.times[j] === time && trackOf(j) === t) lane++; j++; }
+  if (e.channel !== m.firstChannel[t] + lane) return `track ${t} takes its next event on tick ${time} in channel ${m.firstChannel[t] + lane}`;
+  const volL = off ? 0 : (c.volume ?? 0) >= 0x10 ? Math.max(1, (((c.volume ?? 0) - 0x10) << 2) | 2) : 0x80;
+  const volR = !off && (c.effTyp2 ?? 0) === PAN_EFFECT ? (c.eff2 ?? 0) : 0x80;
+  const fxF = Math.min(16, c.effTyp ?? 0);
+  const value = [t, off ? 0 : note - NOTE_BIAS, volL, volR, fxF, fxF === 0 ? 0 : (c.eff ?? 0), 0];
+  const arrays = m.hasFxP ? 7 : 6;
+  const n = m.notes + 1;
+  const out = new Uint8Array(bytes.length + 4 + arrays);
+  const timesAt = HEADER + 4 * m.tracks;
+  out.set(bytes.subarray(0, timesAt));
+  const dv = new DataView(out.buffer);
+  dv.setInt32(4, n, true);
+  for (let i = 0, k = 0; i < n; i++) dv.setInt32(timesAt + 4 * i, i === j ? time : m.times[k++], true);
+  for (let a = 0; a < arrays; a++) {
+    const from = kdmArrayOffset(m, a), to = timesAt + 4 * n + a * n;
+    out.set(bytes.subarray(from, from + j), to);
+    out[to + j] = value[a] & 0xff;
+    out.set(bytes.subarray(from + j, from + m.notes), to + j + 1);
+  }
+  return out;
+}
+
+/**
+ * The file bytes with grid edits written into the events they sit on, and an
+ * event inserted for each note typed on a cell with no event; the same array
+ * when no cell differs from what it shows. The instrument (a track's wave) is
+ * not editable per cell. Refused inserts are reported in warnings.
+ */
+export function applyKdmGridEdits(bytes: Uint8Array, edits: readonly KdmGridEdit[], warnings?: string[]): Uint8Array {
   const m = decodeKdmModule(bytes);
   if (!m) return bytes;
   const at = new Map<string, number>();
@@ -148,9 +196,10 @@ export function applyKdmGridEdits(bytes: Uint8Array, edits: readonly KdmGridEdit
   const out = m.image;
   let changed = false;
   const put = (k: number, i: number, v: number): void => { out[kdmArrayOffset(m, k) + i] = v & 0xff; changed = true; };
+  const adds: KdmGridEdit[] = [];
   for (const e of edits) {
     const i = at.get(`${e.pattern}:${e.row}:${e.channel}`);
-    if (i === undefined) continue;
+    if (i === undefined) { if ((e.cell.note ?? 0) > 0) adds.push(e); continue; }
     const before = kdmEventCell(m, i);
     const c = e.cell;
     if (same(before, c)) continue;
@@ -171,5 +220,13 @@ export function applyKdmGridEdits(bytes: Uint8Array, edits: readonly KdmGridEdit
     }
     if ((c.effTyp2 ?? 0) === PAN_EFFECT && (c.eff2 ?? 0) !== before.eff2) put(3, i, c.eff2 ?? 0);
   }
-  return changed ? out : bytes;
+  // Inserted in time order so each insert sees the lanes the earlier ones took.
+  adds.sort((a, b) => (a.pattern - b.pattern) || (a.row - b.row) || (a.channel - b.channel));
+  let result = changed ? out : bytes;
+  for (const e of adds) {
+    const next = insertKdmEvent(result, e);
+    if (typeof next === 'string') warnings?.push(`KDM: the note on pattern ${e.pattern} row ${e.row} channel ${e.channel} was not written: ${next}.`);
+    else result = next;
+  }
+  return result;
 }

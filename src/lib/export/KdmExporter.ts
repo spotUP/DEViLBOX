@@ -2,7 +2,8 @@
  * KdmExporter.ts - write a Ken Silverman KDM (.kdm) song back to its own file.
  *
  * The file the song plays (kdmFileData) gets every grid cell that differs from
- * the event it shows written in (kdmGrid.ts); every other byte is carried, so
+ * the event it shows written in, and a note typed on an empty cell inserted as
+ * a new event (kdmGrid.ts); every other byte is carried, so
  * an unedited song exports byte-identical.
  */
 import type { TrackerSong } from '@/engine/TrackerReplayer';
@@ -17,11 +18,12 @@ export async function exportKdm(song: TrackerSong): Promise<KdmExportResult> {
   song.patterns.forEach((pattern, p) => pattern.channels.forEach((channel, ch) => channel.rows.forEach((cell, row) => {
     edits.push({ pattern: p, row, channel: ch, cell });
   })));
-  const data = applyKdmGridEdits(new Uint8Array(src), edits);
+  const warnings: string[] = [];
+  const data = applyKdmGridEdits(new Uint8Array(src), edits, warnings);
   const base = (song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_');
   return {
     data: new Blob([data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer], { type: 'application/octet-stream' }),
     filename: `${base}.kdm`,
-    warnings: [],
+    warnings,
   };
 }

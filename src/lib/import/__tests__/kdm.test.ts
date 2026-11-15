@@ -14,7 +14,7 @@ vi.mock('../formats/KdmParser', async (importOriginal) => {
 
 import { parseModuleToSong } from '../parseModuleToSong';
 import { parseKdmFile } from '../formats/KdmParser';
-import { applyKdmGridEdits, decodeKdmModule, kdmEventCell, KDM_ROWS } from '../formats/kdmGrid';
+import { applyKdmGridEdits, decodeKdmModule, kdmEventCell } from '../formats/kdmGrid';
 import { exportKdm } from '@lib/export/KdmExporter';
 import { WASM_ENGINES, shouldActivate } from '@/engine/replayer/wasmEngineRegistry';
 
@@ -60,13 +60,37 @@ describe.each(['kdmsong.kdm', 'flysong.kdm'])('%s', (name) => {
     expect(diff).toBeLessThanOrEqual(2);
   });
 
-  it('an edit on a cell with no event changes nothing', () => {
+  it('a note typed on a cell with no event is inserted and reads back; every other cell stays', async () => {
+    const song = parseKdmFile(bytes, name)!;
     const m = decodeKdmModule(bytes)!;
     const used = new Set(m.place.map((q) => `${q.pattern}:${q.row}:${q.channel}`));
-    let free: { pattern: number; row: number; channel: number } | null = null;
-    for (let r = 0; r < KDM_ROWS && !free; r++) if (!used.has(`0:${r}:0`)) free = { pattern: 0, row: r, channel: 0 };
-    const edited = applyKdmGridEdits(bytes, [{ ...free!, cell: { note: 40, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 } }]);
+    let row = 1;
+    while (used.has(`0:${row}:0`)) row++;
+    const cells = song.patterns[0].channels[0].rows;
+    cells[row] = { ...cells[row], note: 40, instrument: 0 };
+    const res = await exportKdm(song);
+    expect(res.warnings).toEqual([]);
+    const out = new Uint8Array(await res.data.arrayBuffer());
+    expect(out.length).toBe(bytes.length + 4 + (m.hasFxP ? 7 : 6));
+    const again = parseKdmFile(out, name)!;
+    expect(again.patterns[0].channels[0].rows[row].note).toBe(40);
+    const orig = parseKdmFile(bytes, name)!;
+    orig.patterns.forEach((pat, p) => pat.channels.forEach((c, ch) => c.rows.forEach((cell, r) => {
+      if (p === 0 && ch === 0 && r === row) return;
+      expect(again.patterns[p].channels[ch].rows[r], `${p}:${ch}:${r}`).toEqual(cell);
+    })));
+  });
+
+  it('a typed note with another track\'s instrument is refused with a warning', () => {
+    const m = decodeKdmModule(bytes)!;
+    const used = new Set(m.place.map((q) => `${q.pattern}:${q.row}:${q.channel}`));
+    let row = 1;
+    while (used.has(`0:${row}:0`)) row++;
+    const warnings: string[] = [];
+    const wave = bytes[12];
+    const edited = applyKdmGridEdits(bytes, [{ pattern: 0, row, channel: 0, cell: { note: 40, instrument: wave + 2, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 } }], warnings);
     expect(edited).toBe(bytes);
+    expect(warnings.length).toBe(1);
   });
 });
 
