@@ -165,7 +165,14 @@ const FORMATS: FormatRow[] = [
   { key: 'digitalSoundStudio', rig: 'paula', files: ['digital-sound-studio/zrimay.dss'] },
   { key: 'faceTheMusic', rig: 'paula', files: ['face-the-music/rock.ftm'] },
   { key: 'hippelCoso', rig: 'paula', files: ['hippel-coso/wings of death (level 3).hipc'] },
-  { key: 'hvl', rig: 'paula', files: ['hivelytracker/waiting for a message.hvl'] },
+  // Hively's edit authority is its native track pool (the exporter writes it, the grid is its projection): an edit
+  // goes through the view's write path, never setCell (liveEditHeard G5). The grid note is native note + transpose.
+  { key: 'hvl', rig: 'paula', files: ['hivelytracker/waiting for a message.hvl'], edit: async (at) => {
+    const { useFormatStore } = await import('@stores/useFormatStore');
+    const { editHivelyCell } = await import('@/components/hively/hivelyEdit');
+    const transpose = useFormatStore.getState().hivelyNative?.positions[at.p]?.transpose[at.ch] ?? 0;
+    editHivelyCell(at.p, at.ch, at.r, 'note', at.note - transpose);
+  } },
   { key: 'inStereo2', rig: 'paula', files: ['instereo!-2.0/spaceflight.is20'] },
   { key: 'artOfNoise', rig: 'paula', files: ['art-of-noise/inside.blipp.aon'] },
   { key: 'maxTrax', rig: 'paula', files: ['maxtrax/antmusic.mxtx'], voicesAllocated: true },
@@ -335,6 +342,8 @@ interface FormatRow {
   voicesAllocated?: boolean;
   /** The edit this format can express; the default moves the first note two semitones. */
   pick?: (song: GridSong, bytes: Uint8Array) => Promise<Edit | null>;
+  /** The format's own edit write path; the default is the tracker store's setCell. */
+  edit?: (at: Edit) => Promise<void>;
 }
 
 // ---- The sound: each format's own replayer, as the chip's input stream -------------------------------
@@ -436,7 +445,6 @@ const KNOWN: Record<string, Partial<Record<'unedited' | 'edited', string>>> = {
   deltaMusic1: { unedited: 'G16 deltaMusic1: exported bytes differ from the original at byte 22', edited: 'G16 deltaMusic1: voice 1 plays a different Paula write after the edit (untouched voice moved)' },
   deltaMusic2: { unedited: 'G16 deltaMusic2: exported bytes differ from the original at byte 0', edited: 'G16 deltaMusic2: the note edit is not heard in the rendered stream' },
   soundmon: { edited: 'G16 soundmon: untouched voice 3 plays a different Paula write after the edit' },
-  hvl: { edited: 'G16 hvl: the edited-note stage throws (no assertion text; HVL has no UADE replayer rig)' },
   inStereo2: { unedited: 'G16 inStereo2: exported bytes differ from the original at byte 35', edited: 'G16 inStereo2: untouched voice 1 plays a different Paula write after the edit' },
   pumaTracker: { unedited: 'G16 pumaTracker: exported bytes differ from the original at byte 15', edited: 'G16 pumaTracker: untouched voice 2 plays a different Paula write after the edit' },
   sonicArranger: { unedited: 'G16 sonicArranger: exported bytes differ from the original at byte 35', edited: 'G16 sonicArranger: the reloaded song has 72 patterns, the edited grid 84' },
@@ -485,7 +493,7 @@ for (const fmt of FORMATS.filter((f) => !f.held)) {
         // In pitch (the octave below C-0 is stored -12..-1, so stored values skip 0)
         const delta = noteValueToPitch(note)! - noteValueToPitch(old.note)!;
         st.setCurrentPattern(at!.p);
-        st.setCell(at!.ch, at!.r, { note });
+        if (fmt.edit) await fmt.edit(at!); else st.setCell(at!.ch, at!.r, { note });
         const out = await exportThroughRouter();
         expect(out).not.toBeNull();
         expect(Buffer.compare(Buffer.from(out!), Buffer.from(bytes)), 'the edit changed the file').not.toBe(0);

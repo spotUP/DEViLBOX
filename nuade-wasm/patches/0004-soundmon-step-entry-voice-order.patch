@@ -1,0 +1,26 @@
+diff --git a/players/soundmon/soundmon.c b/players/soundmon/soundmon.c
+index ba629cce6..d421a090c 100644
+--- a/players/soundmon/soundmon.c
++++ b/players/soundmon/soundmon.c
+@@ -307,12 +307,15 @@ static bool load_module(SmModule* m, SmReader* r, SmModuleType type) {
+ 
+     for (int i = 0; i < m->step_num; i++) {
+         for (int j = 0; j < 4; j++) {
+-            m->steps[j][i].track_number = read_b_u16(r);
+-            m->steps[j][i].sound_transpose = read_i8(r);
+-            m->steps[j][i].transpose = read_i8(r);
+-
+-            if (m->steps[j][i].track_number > m->track_num)
+-                m->track_num = m->steps[j][i].track_number;
++            // Entry j plays on Paula voice 3 - j (Soundmon2.2.s bpnext: moveq #3,d0
++            // picks the entry while a3 walks the voices up from $dff0a0).
++            SmStep* s = &m->steps[3 - j][i];
++            s->track_number = read_b_u16(r);
++            s->sound_transpose = read_i8(r);
++            s->transpose = read_i8(r);
++
++            if (s->track_number > m->track_num)
++                m->track_num = s->track_number;
+         }
+ 
+         if (reader_eof(r))

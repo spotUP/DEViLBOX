@@ -83,7 +83,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   faceTheMusic: 'pass',
   futurePlayer: 'pass',
   hippelCoso: 'pass',
-  hvl: 'fail',
+  hvl: 'pass',
   inStereo2: 'fail',
   jamcracker: 'pass',
   artOfNoise: 'pass',
