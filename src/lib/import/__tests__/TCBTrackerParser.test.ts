@@ -13,6 +13,9 @@
  * Note: .tss files in Reference Music/TSS/ are a different format (TSS/UADE).
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { exportTCBTracker } from '@/lib/export/TCBTrackerExporter';
 import { isTCBTrackerFormat, parseTCBTrackerFile } from '../formats/TCBTrackerParser';
 
 // ── Synthetic buffer helpers ───────────────────────────────────────────────
@@ -170,5 +173,22 @@ describe('parseTCBTrackerFile — synthetic buffer with sample data', () => {
     // Detection-passing buffer but no sample data (length=0 for all samples)
     const song = await parseTCBTrackerFile(makeTCBBuffer(), 'tcb.testsong');
     expect(song.instruments).toHaveLength(0);
+  });
+});
+
+describe('TCB Tracker order list export', () => {
+  it('writes an edited order list into the module own bytes (format 2 file)', async () => {
+    const f = readFileSync(resolve(import.meta.dirname, '../../../../public/data/songs/tcb-tracker/m-demo3 3.tcb'));
+    const song = await parseTCBTrackerFile(f.buffer.slice(f.byteOffset, f.byteOffset + f.byteLength), 'tcb.m-demo3 3');
+    const want = song.songPositions.slice();
+    expect(want.length).toBeGreaterThan(1);
+    want.reverse();
+    want.push(want[0]);
+    song.songPositions = want.slice();
+    const out = await exportTCBTracker(song);
+    const bytes = new Uint8Array(await out.data.arrayBuffer());
+    expect(bytes[7]).toBe(0x2e);
+    const back = await parseTCBTrackerFile(bytes.buffer, 'tcb.m-demo3 3');
+    expect(back.songPositions).toEqual(want);
   });
 });

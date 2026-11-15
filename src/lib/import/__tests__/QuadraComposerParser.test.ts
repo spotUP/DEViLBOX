@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { isQuadraComposerFormat, parseQuadraComposerFile } from '../formats/QuadraComposerParser';
+import { exportQuadraComposer } from '@/lib/export/QuadraComposerExporter';
 import { analyzeFormat, formatReportToString } from './formatAnalysis';
 
 const REF = resolve(import.meta.dirname, '../../../../public/data/songs');
@@ -69,5 +70,20 @@ describe('parseQuadraComposerFile — whittakerrhapsody.emod', () => {
     console.log('\n' + formatReportToString(report));
     expect(typeof report.format).toBe('string');
     expect(report.numChannels).toBeGreaterThan(0);
+  });
+});
+
+describe('QuadraComposer order list export', () => {
+  it('writes an edited order list into the module own bytes', async () => {
+    const song = await parseQuadraComposerFile(loadBuf(FILE2), 'poison.emod');
+    const want = song.songPositions.slice();
+    expect(want.length).toBeGreaterThan(1);
+    const other = song.patterns.length > 1 ? [...Array(song.patterns.length).keys()].find((i) => i !== want[0])! : want[0];
+    want[0] = other;
+    [want[0], want[1]] = [want[1], want[0]];
+    song.songPositions = want.slice();
+    const out = await exportQuadraComposer(song);
+    const back = await parseQuadraComposerFile(await out.data.arrayBuffer(), 'poison.emod');
+    expect(back.songPositions).toEqual(want);
   });
 });

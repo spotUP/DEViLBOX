@@ -110,6 +110,30 @@ function extractSample(inst: TrackerSong['instruments'][number]): SampleInfo {
  * but for volume column → effect C conversion we need our own check.
  */
 
+/**
+ * Write the order list into a loaded module's EMIC chunk, where the parser reads it (numPositions u8, then one original
+ * pattern number per position). Same length only: the chunk cannot grow in place. Returns false when it does not fit.
+ */
+function writeOrderInPlace(bytes: Uint8Array, positions: number[]): boolean {
+  const u32 = (o: number) => ((bytes[o] << 24) | (bytes[o + 1] << 16) | (bytes[o + 2] << 8) | bytes[o + 3]) >>> 0;
+  for (let pos = 12; pos + 8 <= bytes.length;) {
+    const size = u32(pos + 4);
+    const data = pos + 8;
+    pos = data + size + (size & 1);
+    if (String.fromCharCode(...bytes.subarray(data - 8, data - 4)) !== 'EMIC') continue;
+    let p = data + 2 + 20 + 20 + 1;
+    p += 1 + bytes[p] * 34 + 1; // numSamples, its records, pad byte
+    const numPatterns = bytes[p++];
+    const orig = Array.from({ length: numPatterns }, (_, i) => bytes[p + i * 26]);
+    p += numPatterns * 26;
+    if (bytes[p] !== positions.length) return false;
+    if (positions.some((x) => x < 0 || x >= numPatterns)) return false;
+    positions.forEach((x, i) => { bytes[p + 1 + i] = orig[x]; });
+    return true;
+  }
+  return false;
+}
+
 // -- Main exporter ------------------------------------------------------------
 
 export async function exportQuadraComposer(
@@ -124,12 +148,15 @@ export async function exportQuadraComposer(
   if (song.quadraComposerFileData && song.uadePatternLayout?.formatId === 'quadraComposer'
     && song.patterns.length === song.uadePatternLayout.numPatterns) {
     const r = patchModuleByLayout(song.quadraComposerFileData, song.uadePatternLayout, song.patterns);
-    if (r.unplaced.length > 0) warnings.push(`${r.unplaced.length} note(s) typed on rows the module has no place for were not saved`);
-    return {
-      data: new Blob([r.bytes.slice().buffer as ArrayBuffer], { type: 'application/octet-stream' }),
-      filename: `${(song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_')}.emod`,
-      warnings,
-    };
+    // An order list of another length does not fit the EMIC chunk in place: it takes the rebuild.
+    if (writeOrderInPlace(r.bytes, song.songPositions)) {
+      if (r.unplaced.length > 0) warnings.push(`${r.unplaced.length} note(s) typed on rows the module has no place for were not saved`);
+      return {
+        data: new Blob([r.bytes.slice().buffer as ArrayBuffer], { type: 'application/octet-stream' }),
+        filename: `${(song.name || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_')}.emod`,
+        warnings,
+      };
+    }
   }
 
   const numChannels = 4; // Quadra Composer is always 4-channel

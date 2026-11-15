@@ -174,8 +174,15 @@ export async function exportTCBTracker(
   const layout = song.uadePatternLayout;
   if (song.uadeEditableFileData && layout?.formatId === 'tcbTracker' && song.patterns.length === layout.numPatterns) {
     const r = patchModuleByLayout(song.uadeEditableFileData, layout, song.patterns);
-    if (r.unplaced.length > 0) warnings.push(`${r.unplaced.length} note(s) typed on rows the module has no place for were not saved`);
-    return { data: new Blob([r.bytes.slice().buffer as ArrayBuffer], { type: 'application/octet-stream' }), filename: tcbFilename(song), warnings };
+    // Both formats keep the order table at byte 14 (128 bytes) and its length at byte 142; a longer list takes the rebuild.
+    const n = song.songPositions.length;
+    if (n >= 1 && n <= 128) {
+      r.bytes.fill(0, 14, 142);
+      song.songPositions.forEach((x, i) => { r.bytes[14 + i] = x; });
+      r.bytes[142] = n;
+      if (r.unplaced.length > 0) warnings.push(`${r.unplaced.length} note(s) typed on rows the module has no place for were not saved`);
+      return { data: new Blob([r.bytes.slice().buffer as ArrayBuffer], { type: 'application/octet-stream' }), filename: tcbFilename(song), warnings };
+    }
   }
 
   // ── Collect samples ─────────────────────────────────────────────────────
