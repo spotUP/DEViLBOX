@@ -297,7 +297,8 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   // riffRaff: a note on a held row splits the covering note or rest at two rates the module already uses; the grown pattern moves to the end of the code hunk (riffRaffEdits.ts).
   riffRaff: 'pass',
   mcmd: 'pass',
-  wallyBeben: 'fail',
+  // wallyBeben: a note on a row past its phrase's end copies the phrase to the file end with rests and the note, repointing its table entry (wallyBebenEdits.ts).
+  wallyBeben: 'pass',
   // richardJoseph: a note on the first blank row after a pattern's last event is inserted before its end-of-pattern byte; the pattern chunk and later pattern pointers grow by one (richardJosephEdits.ts).
   richardJoseph: 'pass',
   fashionTracker: 'pass',

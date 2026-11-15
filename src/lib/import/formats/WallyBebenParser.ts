@@ -131,21 +131,26 @@ interface PhraseDecodeResult {
   rows: TrackerCell[];
   /** File byte offset of each row's note/rest byte */
   offsets: number[];
+  /** File offset of the 0xFF that ends the phrase (-1: none within the scan) */
+  end: number;
+  /** Instrument in force at the end of the phrase */
+  instrument: number;
 }
 
-function decodePhraseToRows(buf: Uint8Array, phraseOff: number): PhraseDecodeResult {
+export function decodePhraseToRows(buf: Uint8Array, phraseOff: number): PhraseDecodeResult {
   const rows: TrackerCell[] = [];
   const offsets: number[] = [];
-  if (phraseOff < 0 || phraseOff >= buf.length) return { rows, offsets };
+  if (phraseOff < 0 || phraseOff >= buf.length) return { rows, offsets, end: -1, instrument: 0 };
 
   let pos = phraseOff;
   let currentInstr = 0;
+  let end = -1;
 
   for (let i = 0; i < 256 && pos < buf.length; i++) {
     const byteOff = pos;
     const b = buf[pos++];
 
-    if (b === 0xFF) break;
+    if (b === 0xFF) { end = byteOff; break; }
 
     if (b <= 0x23) {
       // Note index (0-35) into period table
@@ -174,7 +179,54 @@ function decodePhraseToRows(buf: Uint8Array, phraseOff: number): PhraseDecodeRes
     }
   }
 
-  return { rows, offsets };
+  return { rows, offsets, end, instrument: currentInstr };
+}
+
+// ── Phrase and voice tables (shared by the parser and the exporter's add-note edit) ───────────────────────
+
+export interface WallyBebenStructure {
+  origin: number;
+  /** File offset of the phrase pointer table (-1: none) */
+  phraseTableStart: number;
+  phraseOffsets: number[];
+  /** Per voice, the phrase index played at each step */
+  voiceSeqs: number[][];
+}
+
+export function readWallyBebenStructure(buf: Uint8Array): WallyBebenStructure {
+  const origin = findOrigin(buf);
+  const nSubsongs = findSubsongCount(buf);
+  const songsOff = findSongsPtr(buf, origin);
+  // MOVE.L #n,D1 holds the subsong count + 1 (InitPlayer: subq.l #1,D0; lsl.l #4,D0 = the voice table size).
+  const phraseTableStart = songsOff >= 0 ? songsOff + Math.max(0, nSubsongs - 1) * 4 * 4 : -1;
+  const phraseOffsets: number[] = [];
+  if (phraseTableStart > 0) {
+    for (let i = 0; i < 256; i++) {
+      const ptrOff = phraseTableStart + i * 4;
+      if (ptrOff + 4 > buf.length) break;
+      const absPtr = u32BE(buf, ptrOff);
+      if (absPtr === 0) break;
+      const off = toFileOff(origin, absPtr, buf.length);
+      if (off < 0) break;
+      phraseOffsets.push(off);
+    }
+  }
+  const voiceSeqs: number[][] = [[], [], [], []];
+  if (songsOff >= 0 && phraseOffsets.length > 0) {
+    for (let v = 0; v < 4; v++) {
+      const seqOff = readSongPtr(buf, origin, songsOff, v);
+      if (seqOff < 0) continue;
+      let pos = seqOff;
+      while (pos < buf.length) {
+        const b = buf[pos++];
+        if (b === 0xFF) break;
+        // DF is a command with one parameter byte (the player consumes it); reading it as a phrase index shifted every step.
+        if (b === 0xDF) { pos++; continue; }
+        if (b < 0x80) voiceSeqs[v].push(b);
+      }
+    }
+  }
+  return { origin, phraseTableStart, phraseOffsets, voiceSeqs };
 }
 
 // ── Main parser ───────────────────────────────────────────────────────────────
@@ -187,7 +239,6 @@ export function parseWallyBebenFile(buffer: ArrayBuffer, filename: string): Trac
   const moduleName = baseName.replace(/^wb\./i, '').replace(/\.wb$/i, '') || baseName;
 
   const origin = findOrigin(buf);
-  const nSubsongs = findSubsongCount(buf);
   const songsOff = findSongsPtr(buf, origin);
 
   // ── Extract samples ─────────────────────────────────────────────────────
@@ -247,48 +298,16 @@ export function parseWallyBebenFile(buffer: ArrayBuffer, filename: string): Trac
     } as InstrumentConfig);
   }
 
-  // ── Build phrase table ──────────────────────────────────────────────────
-  // MOVE.L #n,D1 holds the subsong count + 1 (InitPlayer: subq.l #1,D0; lsl.l #4,D0 = the voice table size).
-  const phraseTableStart = songsOff >= 0 ? songsOff + Math.max(0, nSubsongs - 1) * 4 * 4 : -1;
-  const phraseOffsets: number[] = [];
+  // ── Phrase table and voice sequences (subsong 1) ────────────────────────
+  const { phraseOffsets, voiceSeqs } = readWallyBebenStructure(buf);
 
-  if (phraseTableStart > 0) {
-    for (let i = 0; i < 256; i++) {
-      const ptrOff = phraseTableStart + i * 4;
-      if (ptrOff + 4 > buf.length) break;
-      const absPtr = u32BE(buf, ptrOff);
-      if (absPtr === 0) break;
-      const off = toFileOff(origin, absPtr, buf.length);
-      if (off < 0) break;
-      phraseOffsets.push(off);
-    }
-  }
-
-  // ── Parse voice sequences and build patterns ────────────────────────────
+  // ── Build patterns ──────────────────────────────────────────────────────
   const patterns: Pattern[] = [];
   const songPositions: number[] = [];
   // cellOffsetMap: keyed by "patIdx-channel-row" → file byte offset
   const cellOffsetMap = new Map<string, number>();
 
   if (songsOff >= 0 && phraseOffsets.length > 0) {
-    // Read voice sequences for subsong 1
-    const voiceSeqs: number[][] = [[], [], [], []];
-
-    for (let v = 0; v < 4; v++) {
-      const seqOff = readSongPtr(buf, origin, songsOff, v);
-      if (seqOff < 0) continue;
-      let pos = seqOff;
-      while (pos < buf.length) {
-        const b = buf[pos++];
-        if (b === 0xFF) break;
-        // DF is a command with one parameter byte (the player consumes it); reading it as a phrase index shifted every step.
-        if (b === 0xDF) { pos++; continue; }
-        if (b < 0x80) {
-          voiceSeqs[v].push(b);
-        }
-      }
-    }
-
     const numSteps = Math.max(...voiceSeqs.map(s => s.length), 1);
 
     for (let step = 0; step < numSteps; step++) {
