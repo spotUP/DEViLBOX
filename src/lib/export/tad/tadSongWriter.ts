@@ -211,6 +211,12 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     let pending: { tok: string; ticks: number } = { tok: 'r', ticks: 0 };
     let sounding = false, curNote = 'r';
     let hasNotes = false;
+    // Effect state of this channel (Furnace effects that TAD holds as channel state).
+    let curSmp = '', curPitch = -1, echoOn = false, pmOn = false, vib = '0', volSlide = 0, lastEnv = '';
+    let env: { mode: number; gain: number; adsr: number[] } | null = null;
+    const pitchName = (p: number) => NOTE_NAMES[p % 12];
+    // Furnace ticks to TAD ticks (rows are k Furnace-tick multiples; sound effects run at 125 Hz).
+    const tickScale = sfx ? SFX_TICK_HZ / rate : k;
     // cont: the note keeps sounding past this boundary. TAD has no tie after a command, so the
     // note is slurred (`&`) into a repeat of itself.
     const flush = (cont = false) => {
@@ -222,21 +228,114 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
       const at = where(ch, r);
       const cl = cell(ch, r.pos, r.row);
       if (i === loopRow) { flush(true); out.push('L'); }
+      let delayUsed = 0, cutAt = 0;
       if (cl) {
-        if (cl.ins >= 0) ins = cl.ins;
+        if (cl.ins >= 0) { ins = cl.ins; env = null; lastEnv = ''; }
         const cmds: string[] = [];
+        if (cl.vol >= 0) volSlide = 0;
         if (cl.vol >= 0 && cl.vol !== vol) { vol = cl.vol; cmds.push(`V${Math.min(255, vol * 2)}`); }
+        const ef = new Map<number, number>();
+        for (const e of cl.effects) if (e.cmd >= 0) ef.set(e.cmd, e.val);
+        let envFx = false;
         for (const e of cl.effects) {
           if (e.cmd < 0 || [0x09, 0x0b, 0x0d, 0x0f, 0xff].includes(e.cmd)) continue;
           let p: number | null = null;
           if (e.cmd === 0x80) p = Math.round(e.val * 128 / 255);
           else if (e.cmd === 0x08) p = Math.round(64 + ((e.val & 15) - (e.val >> 4)) * 64 / 15);
+          else if (e.cmd === 0x12) { if ((e.val !== 0) !== echoOn) { echoOn = e.val !== 0; cmds.push(echoOn ? 'E1' : 'E0'); } }
+          else if (e.cmd === 0x13) {
+            if (sfx || c < 1 || c > 5) drop('effect 13xx (pitch modulation only on song channels B-F)', at);
+            else if ((e.val !== 0) !== pmOn) { pmOn = e.val !== 0; cmds.push(pmOn ? 'PM' : 'PM0'); }
+          }
+          else if (e.cmd === 0x15 || e.cmd === 0x16 || (e.cmd >= 0x20 && e.cmd <= 0x23)) envFx = true;
+          else if (e.cmd === 0x04) {
+            // Furnace vibrato: x = rate (64 steps per cycle), y = depth (15 = one semitone). TAD MP is a sawtooth.
+            const x = e.val >> 4, y = e.val & 15;
+            const mp = x && y ? `MP${Math.round(y * 100 / 15)},${Math.max(1, Math.min(255, Math.round(16 / x)))}` : 'MP0';
+            if (mp !== vib) { vib = mp; cmds.push(mp); }
+          }
+          else if (e.cmd === 0x0a) volSlide = (e.val >> 4) - (e.val & 15) || 0;
+          else if ([0x00, 0x01, 0x02, 0x03, 0xec, 0xed].includes(e.cmd)) { /* applied with the note below */ }
           else drop(`effect ${hex2(e.cmd)}xx`, at);
           if (p !== null && p !== pan) { pan = p; cmds.push(`p${pan}`); }
         }
+        if (envFx) {
+          const s = instruments[ins]?.snes;
+          env ??= {
+            mode: !s ? 1 : s.useEnv ? 0 : ({ 0: 1, 4: 2, 5: 3, 6: 4, 7: 5 } as Record<number, number>)[Number(s.gainMode)] ?? 1,
+            gain: s?.gain ?? 127,
+            adsr: s ? [s.a & 15, s.d & 7, s.s & 7, s.r & 31] : [15, 0, 7, 0],
+          };
+          const v15 = ef.get(0x15), v16 = ef.get(0x16);
+          if (v15 !== undefined) { if (v15 <= 5) env.mode = v15; else drop('effect 15xx (gain mode above 5)', at); }
+          if (v16 !== undefined) env.gain = v16;
+          const lim = [15, 7, 7, 31];
+          [0x20, 0x21, 0x22, 0x23].forEach((cmd, j) => { const v = ef.get(cmd); if (v !== undefined) env!.adsr[j] = v & lim[j]; });
+          const touched = v15 !== undefined || [0x20, 0x21, 0x22, 0x23].some((cmd) => ef.has(cmd));
+          const g = env.mode === 0
+            ? (touched ? `A ${env.adsr.join(',')}` : '')
+            : (v15 !== undefined || v16 !== undefined) ? `G${'FDEIB'[env.mode - 1]}${env.gain & (env.mode === 1 ? 127 : 31)}` : '';
+          if (g && g !== lastEnv) { lastEnv = g; cmds.push(g); }
+        }
+        if (volSlide) {
+          const d = Math.max(1, Math.min(255, Math.round(Math.abs(volSlide) * r.ticks / tickScale / 2)));
+          cmds.push(`Vs${volSlide > 0 ? '+' : '-'}${d},${r.ticks}`);
+        }
+        // Pitch effects: Furnace slide speed is xx * pitchSlideSpeed (default 4) units per tick, 128 per semitone.
+        const slideMul = Number(native.compatFlags?.pitchSlideSpeed ?? 4);
+        const semis = (speed: number, ticks: number) => Math.trunc(speed * slideMul * ticks / tickScale / 128);
+        const clampP = (p: number) => Math.max(0, Math.min(95, p));
+        const delay = Math.round((ef.get(0xed) ?? 0) * tickScale);
+        const cut = Math.round((ef.get(0xec) ?? 0) * tickScale);
+        const s03 = ef.get(0x03) ?? 0, s01 = ef.get(0x01) ?? 0, s02 = ef.get(0x02) ?? 0, arp = ef.get(0x00) ?? 0;
+        cutAt = cut > 0 ? Math.max(cut, 2) : 0; // a key-off note needs 2 ticks
+        const left = Math.max(1, r.ticks - (delay < r.ticks ? delay : 0));
+        // Pitch token replacing the plain note: slide `{..}` or broken chord `{{..}}`, or null.
+        // start = pitch the token starts from (-1: previous slurred note), returns the token and end pitch.
+        const pitchFx = (start: number, newPitch: number): { tok: string; end: number; first: number } | null => {
+          const from = start >= 0 ? start : newPitch;
+          if (s03 > 0 && start >= 0 && newPitch >= 0 && newPitch !== start) {
+            const d = Math.min(Math.abs(newPitch - start), semis(s03, left));
+            return d && left <= 8 * d && Math.min(start, newPitch) >= 12 ? { tok: 'slide', end: start + Math.sign(newPitch - start) * d, first: start } : null;
+          }
+          const sp = s01 > 0 ? s01 : s02 > 0 ? -s02 : 0;
+          if (sp && from >= 0) {
+            const end = clampP(from + (sp > 0 ? 1 : -1) * semis(Math.abs(sp), left));
+            return end !== from && left <= 8 * Math.abs(end - from) && Math.min(from, end) >= 12 ? { tok: 'slide', end, first: from } : null; // slower slides give TAD portamento speed 0
+          }
+          if (arp && from >= 0 && tickScale === 1) return { tok: 'arp', end: from, first: from };
+          return null;
+        };
+        const fxToken = (fx: { tok: string; end: number; first: number }, keepFirst: boolean): string => {
+          if (fx.tok === 'arp') {
+            const ps = [fx.first, clampP(fx.first + (arp >> 4)), clampP(fx.first + (arp & 15))];
+            let o = oct, s = '';
+            for (const p of ps) { if (Math.floor(p / 12) !== o) { o = Math.floor(p / 12); s += `o${o} `; } s += `${pitchName(p)} `; }
+            for (const p of ps) { const r2 = sampleOctaves.get(curSmp) ?? [o, o]; sampleOctaves.set(curSmp, [Math.min(r2[0], Math.floor(p / 12)), Math.max(r2[1], Math.floor(p / 12))]); }
+            oct = -1; // the chord ends on an unknown octave
+            curNote = `o${Math.floor(fx.first / 12)} ${pitchName(fx.first)}`;
+            curPitch = fx.first;
+            return `{{${s.trim()}}}`;
+          }
+          const o2 = Math.floor(fx.end / 12);
+          const r2 = sampleOctaves.get(curSmp) ?? [o2, o2];
+          sampleOctaves.set(curSmp, [Math.min(r2[0], o2), Math.max(r2[1], o2)]);
+          let t = keepFirst ? `${pitchName(fx.first)} ` : '';
+          if (o2 !== oct) { if (keepFirst) t += `o${o2} `; else out.push(`o${o2}`); }
+          oct = o2;
+          curNote = pitchName(fx.end);
+          curPitch = fx.end;
+          return `{${t}${pitchName(fx.end)}}`;
+        };
         const isNote = cl.note >= 0 && cl.note < 180;
         const isOff = cl.note === NOTE_OFF || cl.note === NOTE_RELEASE;
-        if (isNote) {
+        const legato = isNote && s03 > 0 && sounding && curPitch >= 0;
+        const legatoFx = legato ? pitchFx(curPitch, (() => { const n = soundOf(instruments[ins], cl.note)?.note; return n === undefined ? -1 : clampP(n - FURNACE_NOTE_OFFSET); })()) : null;
+        if (legato) {
+          // 03xx: glide from the sounding note to the new one, no new key-on.
+          flush(true); out.push(...cmds);
+          if (legatoFx) pending.tok = fxToken(legatoFx, false);
+        } else if (isNote) {
           const sound = soundOf(instruments[ins], cl.note);
           const tad = (sound?.note ?? 0) - FURNACE_NOTE_OFFSET;
           if (!sound) {
@@ -246,7 +345,9 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             drop('notes outside TAD octaves 0-7', at);
             flush(); out.push(...cmds); sounding = false; pending = { tok: 'r', ticks: 0 };
           } else {
+            if (delay > 0 && delay < r.ticks) { pending.ticks += delay; delayUsed = delay; } // EDxx: the old note rings on
             flush();
+            curSmp = sound.smp;
             const key = `${ins} ${sound.smp}`;
             const id = tadIns.get(key) ?? tadIns.size;
             tadIns.set(key, id);
@@ -258,17 +359,31 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             const range = sampleOctaves.get(smp);
             sampleOctaves.set(smp, range ? [Math.min(range[0], o), Math.max(range[1], o)] : [o, o]);
             curNote = NOTE_NAMES[tad % 12];
+            curPitch = tad;
             pending = { tok: curNote, ticks: 0 };
             sounding = true;
             hasNotes = true;
+            const fx = pitchFx(-1, tad);
+            if (fx) pending.tok = fxToken(fx, true);
           }
-        } else if (isOff || cmds.length) {
+        } else if (isOff || cmds.length || (sounding && curPitch >= 0 && (s01 || s02 || arp))) {
           flush(!isOff);
           out.push(...cmds);
-          if (isOff) { sounding = false; pending = { tok: 'r', ticks: 0 }; }
+          if (isOff) { sounding = false; curPitch = -1; pending = { tok: 'r', ticks: 0 }; }
+          else if (sounding && curPitch >= 0) {
+            const fx = pitchFx(curPitch, curPitch);
+            if (fx) pending.tok = fxToken(fx, false);
+          }
         }
       }
-      pending.ticks += r.ticks;
+      // ECxx: the note is cut inside the row.
+      if (cutAt > delayUsed && cutAt < r.ticks && sounding) {
+        pending.ticks += cutAt - delayUsed;
+        flush(); sounding = false; curPitch = -1; pending = { tok: 'r', ticks: 0 };
+        pending.ticks += r.ticks - cutAt;
+        return;
+      }
+      pending.ticks += r.ticks - delayUsed;
     });
     flush();
     if (!hasNotes) continue;
@@ -452,14 +567,3 @@ export function mergeTadSamples(lists: TadSampleFile[][]): TadSampleFile[] {
 
 /** TAD sound effect file name in the project (holds every `writeTadSfx` block). */
 export const TAD_SFX_FILE = 'sound-effects.txt';
-
-/** Project JSON for one song, its sound effects (export order) and samples (P3 merges several songs). */
-export function tadProjectJson(songName: string, songFile: string, samples: TadSampleFile[], sfxNames: string[] = []): string {
-  return JSON.stringify({
-    _about: { file_type: 'Terrific Audio Driver project file', version: '0.4.2' },
-    brr_samples: samples.map((s) => s.entry),
-    songs: [{ name: songName, source: songFile }],
-    ...(sfxNames.length ? { default_sfx_flags: { one_channel: true, interruptible: true }, sound_effect_file: TAD_SFX_FILE } : {}),
-    sound_effects: sfxNames,
-  }, null, 2);
-}
