@@ -1247,7 +1247,7 @@ void DivPlatformArcade::quit() {
 }
 
 DivPlatformArcade::DivPlatformArcade():
-  useYMFM(false) {
+  selCore(0) {
 }
 
 DivPlatformArcade::~DivPlatformArcade() {

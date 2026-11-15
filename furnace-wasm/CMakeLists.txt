@@ -37,6 +37,8 @@ set(COMMON_SOURCES
   ${FURNACE_ENGINE}/macroInt.cpp
   ${FURNACE_ENGINE}/waveSynth.cpp
   ${FURNACE_ENGINE}/filter.cpp
+  # pitch tables (engine 258: DivPitchTable vtable lives here)
+  ${FURNACE_ENGINE}/pitchTable.cpp
 
   # DivDispatch base class
   ${FURNACE_PLATFORM}/abstract.cpp
@@ -381,6 +383,13 @@ set(EXTERN_SOURCES
 
   # YM3812-LLE (OPL2 cycle-accurate emulation)
   ${FURNACE_EXTERN}/YM3812-LLE/fmopl2.c
+
+  # YM2414-LLE (OPZ cycle-accurate emulation, used by tx81z)
+  ${FURNACE_EXTERN}/YM2414-LLE/opz_lle.c
+  # engine 258 cores: OPL2 Lite + CQM (opl.cpp), YM2151-LLE (arcade.cpp)
+  ${FURNACE_EXTERN}/Nuked-OPL2-Lite/opl2.c
+  ${FURNACE_EXTERN}/Nuked-CQM/cqm.c
+  ${FURNACE_EXTERN}/YM2151-LLE/fmopm.c
 )
 
 # Define all platforms are enabled
@@ -429,9 +438,7 @@ include_directories(
 
   # External libraries
   ${FURNACE_EXTERN}/blip_buf
-  ${FURNACE_EXTERN}/Nuked-PSG
   ${FURNACE_EXTERN}/Nuked-OPLL
-  ${FURNACE_EXTERN}/opn
   ${FURNACE_EXTERN}/opl
   ${FURNACE_EXTERN}/opm
   ${FURNACE_EXTERN}/ESFMu

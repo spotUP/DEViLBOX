@@ -768,6 +768,10 @@ public:
   // Export state - sid3.cpp checks this for half-clock mode
   bool isExporting() { return false; }
 
+  // Upstream: true while notes play outside song playback (GUI preview). saa.cpp lets timer
+  // channels run then; the WASM path always plays through the song sequencer.
+  bool isFreelance() { return false; }
+
   // Internal state
   float curHz;
 

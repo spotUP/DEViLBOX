@@ -16,8 +16,9 @@ set(FURNACE_ENGINE "${FURNACE_SRC}/engine")
 set(FURNACE_EXTERN "${FURNACE_ROOT}/extern")
 
 # ============================================================
-# zlib (from Furnace extern)
+# zlib (from Furnace extern); zlib 1.3.x gz*.c need unistd.h declared
 # ============================================================
+add_compile_definitions(Z_HAVE_UNISTD_H)
 set(ZLIB_SOURCES
   ${FURNACE_EXTERN}/zlib/adler32.c
   ${FURNACE_EXTERN}/zlib/compress.c

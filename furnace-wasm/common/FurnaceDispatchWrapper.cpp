@@ -123,6 +123,20 @@ extern "C" {
 #include "platform/supervision.h"
 #include "platform/scvtone.h"
 
+// Engine 251 replaced the OPZ second-LFO sensitivities (fms2/ams2) with LFO-select flags.
+// Mirrors DivInstrument::readFeatureFM: version>=251 reads the flags, older data keeps the
+// greater sensitivity and selects LFO2 for it.
+static void applyFmLfo2(DivInstrumentFM& fm, unsigned char fms2, unsigned char ams2, int version) {
+  if (version>=251) {
+    fm.tremLFO=fms2&1;
+    fm.fmsLFO=ams2&2;
+    fm.amsLFO=ams2&1;
+    return;
+  }
+  if (fms2>fm.fms) { fm.fms=fms2; fm.fmsLFO=true; }
+  if (ams2>fm.ams) { fm.ams=ams2; fm.amsLFO=true; }
+}
+
 // ============================================================
 // DivSystem enum (from Furnace sysDef.h)
 // ============================================================
@@ -1707,8 +1721,8 @@ void furnace_dispatch_set_fm_instrument(int handle, int insIndex, unsigned char*
   ins->fm.fb = data[2];
   ins->fm.fms = data[3];
   ins->fm.ams = data[4];
-  ins->fm.fms2 = data[5];
-  ins->fm.ams2 = data[6];
+  unsigned char fms2v = data[5];
+  applyFmLfo2(ins->fm, fms2v, data[6], 0);
   ins->fm.ops = data[7];
   ins->fm.opllPreset = data[8];
   ins->fm.kickFreq = *(unsigned short*)(data + 9);
@@ -2205,8 +2219,8 @@ void furnace_dispatch_set_opm_instrument(int handle, int insIndex, unsigned char
   ins->fm.fb = data[1];
   ins->fm.fms = data[2];
   ins->fm.ams = data[3];
-  ins->fm.fms2 = data[4];
-  ins->fm.ams2 = data[5];
+  unsigned char fms2v = data[4];
+  applyFmLfo2(ins->fm, fms2v, data[5], 0);
   ins->fm.ops = 4;
 
   // Parse operators
@@ -2244,8 +2258,8 @@ void furnace_dispatch_set_opz_instrument(int handle, int insIndex, unsigned char
   ins->fm.fb = data[1];
   ins->fm.fms = data[2];
   ins->fm.ams = data[3];
-  ins->fm.fms2 = data[4];
-  ins->fm.ams2 = data[5];
+  unsigned char fms2v = data[4];
+  applyFmLfo2(ins->fm, fms2v, data[5], 0);
   ins->fm.ops = 4;
 
   // Parse operators with OPZ extensions
@@ -3210,8 +3224,8 @@ void furnace_dispatch_set_instrument_full(int handle, int insIndex, unsigned cha
     ins->fm.fb = fm[1];
     ins->fm.fms = fm[2];
     ins->fm.ams = fm[3];
-    ins->fm.fms2 = fm[4];
-    ins->fm.ams2 = fm[5];
+    unsigned char fms2v = fm[4];
+    applyFmLfo2(ins->fm, fms2v, fm[5], 0);
     ins->fm.ops = fm[6];
     ins->fm.opllPreset = fm[7];
     ins->fm.block = fm[8] & 0x0F;
@@ -3933,13 +3947,13 @@ void furnace_dispatch_load_ins2(int insIndex, unsigned char* data, int dataLen) 
 
       // Byte 2: fms2(bits 7-5) + ams(bits 4-3) + fms(bits 2-0)
       next = data[p++];
-      ins->fm.fms2 = (next >> 5) & 7;
+      unsigned char fms2v = (next >> 5) & 7;
       ins->fm.ams = (next >> 3) & 3;
       ins->fm.fms = next & 7;
 
       // Byte 3: ams2(bits 7-6) + ops(bit 5: 4 if set, 2 if clear) + opllPreset(bits 4-0)
       next = data[p++];
-      ins->fm.ams2 = (next >> 6) & 3;
+      applyFmLfo2(ins->fm, fms2v, (next >> 6) & 3, version);
       ins->fm.ops = (next & 32) ? 4 : 2;
       ins->fm.opllPreset = next & 31;
 
