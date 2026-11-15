@@ -10,6 +10,7 @@ import {
   type TadInstrumentInput, type TadSampleFile, type TadSongInput,
 } from './tadSongWriter';
 import { openTadSession, type CreateTadCompiler } from './tadCompilerWasm';
+import { injectTadPlayerRom, type TadPlayerRomMeta } from './tadPlayerRom';
 
 /** One Furnace instrument in either shape (parsed module or store config) -> writer input. */
 export function tadInstrumentFromFurnace(name: string, f: {
@@ -102,6 +103,8 @@ function readme(r: TadBuildResult, log: string): string {
     'build/     Compiled audio data per assembler (ca65, 64tass, asar, pvsneslib) and memory map (lorom, hirom).',
     '           Each folder holds the assembly file, the .bin it includes and the song/sound effect enums.',
     '           ca65 segment BANK1 and 64tass section AudioBank1 are defaults: rename them to match your linker script.',
+    'build/player.sfc  SNES ROM (LoROM, 256 KiB) with your songs and sound effects. Untested on hardware and emulators.',
+    '           Controls (TAD sound-test menu): up/down picks an item, left/right changes its value, A or B runs it (Play Song, Play SFX).',
     'preview/   One .spc per song (sound effects included). Not for shipping.',
     '',
     `Songs: ${r.songs.join(', ') || 'none'}`,
@@ -118,10 +121,10 @@ function readme(r: TadBuildResult, log: string): string {
 }
 
 /** The echo buffer is the one Audio-RAM block the export can shrink: lower the echo delay until the compiler stops saying "too large". */
-export async function buildTadProject(files: TadBuildFile[], create: CreateTadCompiler, locateFile?: (f: string) => string): Promise<TadBuildResult> {
+export async function buildTadProject(files: TadBuildFile[], create: CreateTadCompiler, locateFile?: (f: string) => string, loadAsset?: (f: string) => Promise<Uint8Array>): Promise<TadBuildResult> {
   let cap = 15;
   for (;;) {
-    const r = await buildTadProjectOnce(files, create, locateFile, cap);
+    const r = await buildTadProjectOnce(files, create, locateFile, cap, loadAsset);
     const msg = r.warnings.join('\n');
     const over = /too large by (\d+) bytes/.exec(msg), buf = /echo buffer:\s+(\d+) bytes/.exec(msg);
     // compiler log: "echo buffer: N bytes" with 2048 bytes per 16 ms step
@@ -131,7 +134,7 @@ export async function buildTadProject(files: TadBuildFile[], create: CreateTadCo
   }
 }
 
-async function buildTadProjectOnce(files: TadBuildFile[], create: CreateTadCompiler, locateFile: ((f: string) => string) | undefined, echoDelayCap: number): Promise<TadBuildResult> {
+async function buildTadProjectOnce(files: TadBuildFile[], create: CreateTadCompiler, locateFile: ((f: string) => string) | undefined, echoDelayCap: number, loadAsset?: (f: string) => Promise<Uint8Array>): Promise<TadBuildResult> {
   const warnings: string[] = [];
   const pieces: Piece[] = [];
   const usedNames = new Set<string>();
@@ -208,6 +211,13 @@ async function buildTadProjectOnce(files: TadBuildFile[], create: CreateTadCompi
       const out = { asm: `/o/${d}_audio.${a.ext}`, bin: `/o/${d}_audio.bin`, inc: `/o/${d}_audio.inc` };
       if (run(`${a.id} ${map} export`, [a.cmd, `--${map}`, ...a.seg, '-a', out.asm, '-b', out.bin, '-i', out.inc, pf])) {
         for (const f of Object.values(out)) zip.file(`build/${d}/${f.slice(3)}`, tad.read(f));
+        if (d === 'ca65_lorom' && loadAsset) {
+          try {
+            const [rom, meta] = await Promise.all([loadAsset('player-lorom.sfc'), loadAsset('player-lorom.json')]);
+            const text = (p: string) => new TextDecoder().decode(tad.read(p));
+            zip.file('build/player.sfc', injectTadPlayerRom(rom, JSON.parse(new TextDecoder().decode(meta)) as TadPlayerRomMeta, { bin: tad.read(out.bin), asm: text(out.asm), inc: text(out.inc) }));
+          } catch (e) { warnings.push(`Player ROM not built: ${(e as Error).message}`); }
+        }
       }
     }
   }

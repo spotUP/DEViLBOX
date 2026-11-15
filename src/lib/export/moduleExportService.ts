@@ -135,5 +135,6 @@ export async function exportTadProjectFile(): Promise<TadBuildResult> {
     }],
     compiler.default,
     (f) => `${base}tad/${f}`,
+    async (f) => new Uint8Array(await (await fetch(`${base}tad/${f}`)).arrayBuffer()),
   );
 }

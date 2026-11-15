@@ -1,0 +1,21 @@
+{
+ "romSize": 262144,
+ "dataOffset": 65587,
+ "dataCapacity": 196557,
+ "loaderSize": 116,
+ "driverSize": 3221,
+ "headerOffset": 32688,
+ "patches": {
+  "lastSongId": [
+   1131,
+   1135
+  ],
+  "lastSfxId": [
+   1151,
+   1155
+  ],
+  "dataItems": [
+   65537
+  ]
+ }
+}
