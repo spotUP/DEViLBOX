@@ -208,6 +208,12 @@ export interface RiffRaffGrid {
   sources: Array<Array<RiffRaffRowSource | null>>;
   /** effectSources[voice][row]: the byte behind each effect-column command of the row, in effect slot order (phase B) */
   effectSources: Array<Array<StreamEffectSource[]>>;
+  /** covers[voice][row over the whole grid]: the note or rest event sounding on the row (phase B: where a note on a blank row splits one) */
+  covers: Array<Array<RiffRaffCover | null>>;
+  /** The lowest rate index whose wait is `ticks` among the rates the module's own events use, -1 for none. */
+  rateIndexFor: (ticks: number) => number;
+  /** File offsets of the longs in the pattern address table that hold the image address `address`. */
+  patternPointerAts: (address: number) => number[];
   /** The tracker note a pattern note byte plays under a transposition (the grid's own period lookup). */
   noteForByte: (byte: number, transpose: number) => number;
 }
@@ -221,10 +227,13 @@ export interface RiffRaffRowSource {
   transpose: number;
 }
 
+/** The event sounding on a grid row: its first byte (a note byte or a Rest command; its rate byte follows), its start tick and length in replayer ticks, and the pattern stream it lives in. */
+export interface RiffRaffCover { at: number; kind: 'note' | 'rest' | 'silence'; tick: number; wait: number; stream: number; transpose: number; instrument: number }
+
 /** Where one effect-column command of a row lives: its effTyp and the file offset of the argument byte holding its value (-1: no byte). */
 export interface StreamEffectSource { typ: number; at: number }
 
-interface VoiceEvent { tick: number; kind: 'note' | 'rest' | 'silence'; note: number; instrument: number; stream: number; wait: number; noteAt: number; instrumentAt: number; transpose: number; fx: Array<[number, number, number]> }
+interface VoiceEvent { tick: number; kind: 'note' | 'rest' | 'silence'; note: number; instrument: number; stream: number; wait: number; at: number; noteAt: number; instrumentAt: number; transpose: number; fx: Array<[number, number, number]> }
 
 class Walker {
   readonly commands: Command[];
@@ -336,7 +345,7 @@ function runVoice(w: Walker, voice: number, trackList: number, startTranspose: n
         if (command === 'rest' || command === 'restSilence') {
           const wait = u16(m, rates + 2 * arg[0]);
           if (wait === 0) { w.reason ??= 'a rest uses a rate of 0'; return { events, wrapTick }; }
-          events.push({ tick, kind: command === 'rest' ? 'rest' : 'silence', note: 0, instrument, stream: currentStream, wait, noteAt: -1, instrumentAt: -1, transpose, fx: pending });
+          events.push({ tick, kind: command === 'rest' ? 'rest' : 'silence', note: 0, instrument, stream: currentStream, wait, at: argAt - 1 + HUNK_BYTES, noteAt: -1, instrumentAt: -1, transpose, fx: pending });
           pending = [];
           tick += wait;
           produced = true;
@@ -348,7 +357,7 @@ function runVoice(w: Walker, voice: number, trackList: number, startTranspose: n
       const wait = u16(m, rates + 2 * rateIndex);
       if (wait === 0) { w.reason ??= 'a note uses a rate of 0'; return { events, wrapTick }; }
       const period = u16(m, periods + 2 * ((byte + transpose) & 0xffff));
-      events.push({ tick, kind: 'note', note: periodToNote(period), instrument, stream: currentStream, wait, noteAt, instrumentAt, transpose, fx: pending });
+      events.push({ tick, kind: 'note', note: periodToNote(period), instrument, stream: currentStream, wait, at: noteAt, noteAt, instrumentAt, transpose, fx: pending });
       pending = [];
       tick += wait;
       produced = true;
@@ -464,8 +473,21 @@ export function buildRiffRaffGrid(file: Uint8Array): RiffRaffGrid | string {
       samples.push(offset >= 0 && bytes > 0 && offset + bytes <= m.b.length ? { offset, bytes } : { offset: -1, bytes: 0 });
     }
   }
+  const covers: Array<Array<RiffRaffCover | null>> = Array.from({ length: VOICES }, () => new Array<RiffRaffCover | null>(patternCount * ROWS_PER_PATTERN).fill(null));
+  let maxRate = 0;
+  voiceEvents.forEach((events, v) => events.forEach((e) => {
+    maxRate = Math.max(maxRate, u8(m, e.at - HUNK_BYTES + 1));
+    for (let row = e.tick / step; row < (e.tick + e.wait) / step && row < rows; row++) covers[v][row] = { at: e.at, kind: e.kind, tick: e.tick, wait: e.wait, stream: e.stream, transpose: e.transpose, instrument: e.instrument };
+  }));
   return {
-    version: version.name, patterns, songPositions: patterns.map((_, i) => i), rows, ticksPerRow: step, streams, blockRows,
+    version: version.name, covers,
+    rateIndexFor: (ticks) => { for (let i = 0; i <= maxRate; i++) if (u16(m, (base.rates ?? 0) + 2 * i) === ticks) return i; return -1; },
+    patternPointerAts: (address) => {
+      const out: number[] = [];
+      for (let at = base.patterns ?? 0, n = 0; n < 256 && m.reloc[at] === 1 && at + 4 <= m.b.length; at += 4, n++) if (u32(m, at) === address) out.push(at + HUNK_BYTES);
+      return out;
+    },
+    patterns, songPositions: patterns.map((_, i) => i), rows, ticksPerRow: step, streams, blockRows,
     streamAtStart: firstStream, notesPerVoice, samples, enabled, fileOffsetBase: HUNK_BYTES, sources, effectSources,
     noteForByte: (byte, transpose) => periodToNote(u16(m, (base.periods ?? 0) + 2 * ((byte + transpose) & 0xffff))),
   };

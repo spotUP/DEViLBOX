@@ -6,7 +6,7 @@
  * lands on the new note. An edited instrument cell patches the argument byte of the Set Sample command that chose it,
  * and only when the stream holds one (an instrument that is the voice's start state has no byte to patch). A pattern is
  * shared by every place that plays it, so an edit shows wherever the pattern byte plays. Edits the stream cannot hold
- * at its length - a note on a row without one, a note removed or turned into a note off, a duration or rate change,
+ * at its length - a note on a row inside a held event that the rate table cannot split in two or in the start pattern, a note removed or turned into a note off, a duration or rate change,
  * the volume column (not stored per row), a stream command added, removed or retyped - are refused with a warning and nothing is written for them.
  * After patching, the grid is decoded again: every edited cell must read back as edited, and every cell that does not
  * share an edited byte must be unchanged, otherwise the edit is taken out again.
@@ -14,6 +14,8 @@
 import type { Pattern, TrackerCell } from '@/types';
 import { cellEffects, effectEditPatches } from './cellEffectSlots';
 import { buildRiffRaffGrid, type RiffRaffGrid } from './riffRaffGrid';
+
+const HUNK_BYTES = 0x20;
 
 const NOTE_OFF = 97;
 const COMMAND_BASE = 0x80;
@@ -28,6 +30,8 @@ export interface RiffRaffEditResult {
 }
 
 interface Edit { pattern: number; channel: number; row: number; note: number; instrument: number; noteAt: number; noteByte: number; instrumentAt: number; instrumentByte: number; fxPatches: Array<[number, number]>; fx: Array<[number, number]> }
+
+interface Add { pattern: number; channel: number; row: number; note: number; instrument: number }
 
 const where = (e: { pattern: number; channel: number; row: number }): string => `voice ${e.channel + 1}, pattern ${e.pattern}, row ${e.row}`;
 
@@ -46,7 +50,7 @@ const cellAt = (g: RiffRaffGrid, channel: number, row: number): TrackerCell | un
 
 /** The edits of `patterns` against the grid decoded from the untouched module, as byte patches in `data`. */
 export function applyRiffRaffGridEdits(original: Uint8Array, patterns: readonly Pattern[]): RiffRaffEditResult {
-  const data = new Uint8Array(original);
+  let data: Uint8Array = new Uint8Array(original);
   const warnings: string[] = [];
   const base = buildRiffRaffGrid(original);
   if (typeof base === 'string') return { data, patched: 0, warnings };
@@ -56,6 +60,7 @@ export function applyRiffRaffGridEdits(original: Uint8Array, patterns: readonly 
   }
 
   const claimed = new Map<number, number>();
+  const adds: Add[] = [];
   const accepted: Edit[] = [];
 
   patterns.forEach((pat, pi) => pat.channels.forEach((ch, c) => ch.rows.forEach((cell, r) => {
@@ -92,6 +97,10 @@ export function applyRiffRaffGridEdits(original: Uint8Array, patterns: readonly 
       }
     }
     const src = base.sources[c]?.[pi * ROWS_PER_PATTERN + r];
+    if (!src && noteChanged && cell.note > 0 && cell.note < NOTE_OFF) {
+      adds.push({ ...at, note: cell.note, instrument: cell.instrument });
+      return;
+    }
     if (!src || was.note < 1 || was.note >= NOTE_OFF) {
       warnings.push(`${PREFIX} ${where(at)}: no note plays on this row, and adding or removing one, or changing a rest or note off, would change the length of the stream; the edit was not written.`);
       return;
@@ -196,7 +205,71 @@ export function applyRiffRaffGridEdits(original: Uint8Array, patterns: readonly 
     live = bad.length === live.length ? [] : live.filter((e) => !bad.includes(e));
   }
   writeAll(live);
+  for (const a of adds) data = addNote(data, a, warnings);
   let patched = 0;
   for (let i = 0; i < data.length; i++) if (data[i] !== original[i]) patched++;
   return { data, patched, warnings };
+}
+
+const be32 = (d: Uint8Array, o: number): number => ((d[o] << 24) | (d[o + 1] << 16) | (d[o + 2] << 8) | d[o + 3]) >>> 0;
+const put32 = (d: Uint8Array, o: number, v: number): void => { d[o] = v >>> 24; d[o + 1] = (v >>> 16) & 0xff; d[o + 2] = (v >>> 8) & 0xff; d[o + 3] = v & 0xff; };
+
+/**
+ * A note on a row no note starts on. A rest (or rest silence) starting on the row becomes the note in place (same two
+ * bytes). Any other row lies inside a held note or rest: that event is cut in two at the row, the first part keeps its
+ * kind, the second is the new note, and the two rates are found in the rate table among those the module already uses
+ * (the song keeps its length). The pattern stream grows by two bytes, so the whole stream moves to the end of the code
+ * hunk (hunk size words and the file grow with it) and every address-table long that named it is repointed. The grid is
+ * decoded again; unless the cell reads back as the note and the song length is unchanged, nothing is written.
+ */
+function addNote(file: Uint8Array, a: Add, warnings: string[]): Uint8Array {
+  const g = buildRiffRaffGrid(file);
+  if (typeof g === 'string') return file;
+  const row = a.pattern * ROWS_PER_PATTERN + a.row;
+  const cov = g.covers[a.channel]?.[row];
+  const refuse = (why: string): Uint8Array => { warnings.push(`${PREFIX} ${where(a)}: ${why}; the note was not written.`); return file; };
+  if (!cov) return refuse('no event sounds on this row');
+  if (a.instrument !== 0 && a.instrument !== cov.instrument + 1) return refuse('a different instrument would need a Set Sample command');
+  let byte = -1;
+  for (let b = 0; b < COMMAND_BASE && byte < 0; b++) if (g.noteForByte(b, cov.transpose) === a.note) byte = b;
+  if (byte < 0) return refuse(`note ${a.note} is not in the module's period table for this voice`);
+  const out = new Uint8Array(file);
+  const offset = row * g.ticksPerRow - cov.tick;
+  if (offset === 0) {
+    if (cov.kind === 'note') return refuse('a note already starts here');
+    out[cov.at] = byte; // Rest and Rest Silence carry the same one rate argument a note does
+  } else {
+    const stream = g.streams[cov.stream];
+    if (!stream || stream.id < 0) return refuse("the start pattern lives inside the replayer's data and cannot grow");
+    const ra = g.rateIndexFor(offset);
+    const rb = g.rateIndexFor(cov.wait - offset);
+    if (ra < 0 || rb < 0) return refuse('the rate table has no entry for the two halves of the held event');
+    const cut = cov.at - stream.offset;
+    const old = file.subarray(stream.offset, stream.offset + stream.size);
+    const grown = new Uint8Array(stream.size + 2);
+    grown.set(old.subarray(0, cut + 2));
+    grown.set([ra, byte, rb], cut + 1);
+    grown.set(old.subarray(cut + 2), cut + 4);
+    const pointers = g.patternPointerAts(stream.offset - HUNK_BYTES);
+    if (pointers.length === 0) return refuse('no address table entry names this pattern');
+    const hunk = be32(file, 28) * 4;
+    const added = Math.ceil(grown.length / 4) * 4;
+    const moved = new Uint8Array(file.length + added);
+    moved.set(file.subarray(0, HUNK_BYTES + hunk));
+    moved.set(grown, HUNK_BYTES + hunk);
+    moved.set(file.subarray(HUNK_BYTES + hunk), HUNK_BYTES + hunk + added);
+    put32(moved, 28, hunk / 4 + added / 4);
+    put32(moved, 20, be32(file, 20) + added / 4); // the hunk table size word keeps its memory flag bits
+    for (const at of pointers) put32(moved, at, hunk);
+    return verify(moved, g.rows, a, byte, warnings, file, where(a));
+  }
+  return verify(out, g.rows, a, byte, warnings, file, where(a));
+}
+
+function verify(candidate: Uint8Array, rows: number, a: Add, byte: number, warnings: string[], fallback: Uint8Array, at: string): Uint8Array {
+  const again = buildRiffRaffGrid(candidate);
+  const got = typeof again === 'string' ? undefined : cellAt(again, a.channel, a.pattern * ROWS_PER_PATTERN + a.row);
+  if (typeof again !== 'string' && again.rows === rows && got?.note === a.note) return candidate;
+  warnings.push(`${PREFIX} ${at}: the replayer would not play the new note (${byte}) on this row; it was not written.`);
+  return fallback;
 }
