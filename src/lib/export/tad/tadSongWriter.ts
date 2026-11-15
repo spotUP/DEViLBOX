@@ -22,14 +22,38 @@ export interface TadInstrumentInput {
   useWave?: boolean;
   /** Furnace amiga.waveLen: wavetable length minus 1. */
   waveLen?: number;
-  /** Furnace macros by code (MACRO_NAMES); constant volume, wave and special macros are carried. */
-  macros?: { code?: number; data: ArrayLike<number> }[];
+  /** Furnace macros by code (MACRO_NAMES); constant volume, wave and special macros are carried. loop/release 255 = none. */
+  macros?: { code?: number; data: ArrayLike<number>; loop?: number; release?: number; speed?: number; delay?: number; mode?: number }[];
 }
 
 /** Furnace macro `code` as one constant value, or undefined when absent or not constant. */
 function constantMacro(inst: TadInstrumentInput | undefined, code: number): number | undefined {
   const d = inst?.macros?.find((m) => m.code === code && m.data.length > 0)?.data;
   return d && Array.from(d).every((v) => v === d[0]) ? d[0] : undefined;
+}
+
+/**
+ * Arp macro (code 1) as Furnace plays it (snes.cpp:118-125, macroInt: delay ticks, then each value for `speed` ticks,
+ * then the last value holds): offsets per Furnace tick before the hold, and the held offset.
+ * undefined = no arp macro; null = the macro loops, has a release point or uses fixed notes (not carried).
+ */
+function arpMacro(inst: TadInstrumentInput | undefined): { steps: number[]; hold: number } | null | undefined {
+  const m = inst?.macros?.find((x) => x.code === 1 && x.data.length > 0);
+  if (!m) return undefined;
+  const d = Array.from(m.data);
+  if (d.some((v) => ((v & 0x40000000) !== 0) !== (v < 0))) return null; // calcArp: bit 30 flipped against the sign = fixed note
+  const hold = d[d.length - 1];
+  if (!m.delay && d.every((v) => v === hold)) return { steps: [], hold };
+  if ((m.loop ?? 255) < d.length || (m.release ?? 255) < d.length) return null;
+  const steps = [...Array<number>(m.delay ?? 0).fill(0), ...d.flatMap((v) => Array<number>(Math.max(1, m.speed ?? 1)).fill(v))];
+  while (steps.length && steps[steps.length - 1] === hold) steps.pop();
+  return { steps, hold };
+}
+
+/** Constant absolute pitch macro (code 4, snes.cpp:136-144: pitch2 = val) or undefined; relative mode keeps sliding. */
+function pitchMacro(inst: TadInstrumentInput | undefined): number | undefined {
+  const m = inst?.macros?.find((x) => x.code === 4 && x.data.length > 0);
+  return m && !m.mode ? constantMacro(inst, 4) : undefined;
 }
 
 export interface TadSongInput {
@@ -269,17 +293,19 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     const panP = () => { const [l, r] = panOf(); return l + r ? Math.round(128 * r / (l + r)) : lastP; };
     const volScale = () => { const [l, r] = panOf(); return Math.min(127, constantMacro(instruments[ins], 0) ?? 127) / 127 * (l + r) / 254; };
     const volV = () => `V${Math.min(255, Math.round(vol * 2 * volScale()))}`;
-    type Pending = { tok: string; ticks: number; sl?: { a: number; b: number; smp: string; plain: string; oct: number; reg: (p: number, smp: string) => number } };
+    // pre: arp macro steps played (slurred) before the note's held pitch; ticks in TAD ticks.
+    type Pending = { tok: string; ticks: number; pre?: { p: number; ticks: number }[]; sl?: { a: number; b: number; smp: string; plain: string; oct: number; reg: (p: number, smp: string) => number } };
     let pending: Pending = { tok: 'r', ticks: 0 };
     let carry = 0;
     let sounding = false, curNote = 'r';
     let hasNotes = false;
     // Effect state of this channel (Furnace effects that TAD holds as channel state).
-    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', vibWant: { d: number; q: number } | null = null, volSlide = 0, lastEnv = '';
+    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', vibWant: { d: number; q: number } | null = null, volSlide = 0, lastEnv = '';
     let env: { mode: number; gain: number; adsr: number[] } | null = null;
     const pitchName = (p: number) => NOTE_NAMES[p % 12];
     // Furnace ticks to TAD ticks (rows are k Furnace-tick multiples; sound effects run at 125 Hz).
     const tickScale = sfx ? SFX_TICK_HZ / rate : k;
+    const linear = Number(native.compatFlags?.linearPitch ?? 1) !== 0;
     // cont: the note keeps sounding past this boundary. TAD has no tie after a command, so the
     // note is slurred (`&`) into a repeat of itself.
     const flush = (cont = false) => {
@@ -300,6 +326,19 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         warnings.push(`Song channel ${ch + 1}: 1-tick rest folded into the next note (the driver needs 2 ticks).`);
         carry = 1; pending = { tok: 'r', ticks: 0 }; return;
       }
+      if (pending.pre && pending.ticks > 1) {
+        // Arp macro steps slur into the held pitch (Furnace changes the frequency only, no new key-on).
+        let o = oct;
+        for (const st of pending.pre) {
+          const t = Math.min(st.ticks, pending.ticks - 1);
+          if (t <= 0) break;
+          if (Math.floor(st.p / 12) !== o) { o = Math.floor(st.p / 12); out.push(`o${o}`); }
+          out.push(`${pitchName(st.p)}%${t} &`);
+          pending.ticks -= t;
+        }
+        if (o !== oct) out.push(`o${oct}`);
+      }
+      pending.pre = undefined;
       const short = !slur && pending.ticks === 1 && pending.tok !== 'r';
       if (short) warnings.push(`Song channel ${ch + 1}: 1-tick note slurred (the driver needs 2 ticks for a key-off note).`);
       // A slide token spans the merged rows, so its portamento velocity is checked here with the real tick count.
@@ -460,7 +499,8 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           if (legatoFx) pending.tok = fxToken(legatoFx, false);
         } else if (isNote) {
           const sound = soundOf(instruments[ins], cl.note);
-          const tad = (sound?.note ?? 0) - FURNACE_NOTE_OFFSET;
+          const am = arpMacro(instruments[ins]);
+          const tad = (sound?.note ?? 0) - FURNACE_NOTE_OFFSET + (am?.hold ?? 0);
           if (!sound) {
             if (!insWarned.has(ins)) { insWarned.add(ins); warnings.push(`Instrument ${ins} has no sample or wavetable for some notes; those notes are rests.`); }
             flush(); out.push(...cmds); sounding = false; pending = { tok: 'r', ticks: 0 };
@@ -481,6 +521,11 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
               if (d > 0) want = `MP${d},${vibWant.q}`;
             }
             if (want !== vib) { vib = want; cmds.push(want); }
+            // snes.cpp:136-144 + engine.cpp calcFreq: a constant pitch macro is a fixed offset, 1/128 semitone (linear) or raw VxPITCH.
+            const pm = pitchMacro(instruments[ins]) ?? 0;
+            const wantDet = linear ? `MD${Math.max(-1200, Math.min(1200, Math.round(pm * 100 / 128)))}` : `D${Math.max(-16383, Math.min(16383, pm))}`;
+            if (wantDet !== det && (det || pm)) cmds.push(wantDet);
+            det = wantDet;
             const key = `${ins} ${sound.smp}`;
             const id = tadIns.get(key) ?? tadIns.size;
             tadIns.set(key, id);
@@ -497,6 +542,21 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             hasNotes = true;
             const fx = pitchFx(-1, tad);
             if (fx) pending.tok = fxToken(fx, true);
+            if (am === null) drop(`arp macros that loop, release or use fixed notes (instrument ${ins})`, at);
+            else if (am?.steps.length) {
+              const pre = am.steps.map((o) => tad - am.hold + o);
+              if (fx) drop(`arp macro steps under a pitch effect (instrument ${ins})`, at);
+              else if (!Number.isInteger(tickScale)) drop(`arp macro steps in sound effects (instrument ${ins})`, at);
+              else if (pre.some((p) => p < 0 || p > 95 || outside(smp, p))) drop(`arp macro steps outside the pitch range of sample ${smp} (instrument ${ins})`, at);
+              else {
+                for (const p of pre) widen(smp, p);
+                pending.pre = pre.reduce<{ p: number; ticks: number }[]>((a, p) => {
+                  const last = a[a.length - 1];
+                  if (last?.p === p) last.ticks += tickScale; else a.push({ p, ticks: tickScale });
+                  return a;
+                }, []);
+              }
+            }
           }
         } else if (isOff && sounding && instruments[ins]?.snes?.sus) {
           // Sustain mode (snes.cpp:655-676): note off sends no KOFF; the release is GAIN decrease (sus 1, 2) or the
@@ -609,10 +669,12 @@ export function panSplit(cmd: number, v: number): [number, number] {
 }
 /** Macros the writer carries as a constant: volume scales V, special sets echo/pitch mod, wave picks the wavetable. */
 function macroCarried(inst: TadInstrumentInput, code: number): boolean {
+  if (code === 1) return arpMacro(inst) !== null;
   const v = constantMacro(inst, code);
   if (v === undefined) return false;
   if (code === 0 || code === 3 || code === 12 || code === 13) return true;
   if (code === 5) return (v & (16 | 8 | 1)) === 0; // invert and noise have no TAD command
+  if (code === 4) return pitchMacro(inst) !== undefined;
   return NO_OP_MACRO[code] === v;
 }
 

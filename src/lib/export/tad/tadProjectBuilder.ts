@@ -16,7 +16,7 @@ import { injectTadPlayerRom, type TadPlayerRomMeta } from './tadPlayerRom';
 export function tadInstrumentFromFurnace(name: string, f: {
   snes?: FurnaceSNESConfig;
   amiga?: { initSample?: number; useNoteMap?: boolean; noteMap?: ({ freq: number; map: number } | { sample: number; frequency: number })[]; useWave?: boolean; waveLen?: number };
-  macros?: ReadonlyArray<{ code?: number; data?: ArrayLike<number> }>;
+  macros?: ReadonlyArray<{ code?: number; data?: ArrayLike<number>; loop?: number; release?: number; speed?: number; delay?: number; mode?: number }>;
 }): TadInstrumentInput {
   return {
     name,
@@ -27,7 +27,7 @@ export function tadInstrumentFromFurnace(name: string, f: {
     noteMap: f.amiga?.noteMap?.map((n) => ('map' in n ? n : { freq: n.frequency, map: n.sample })),
     useWave: f.amiga?.useWave,
     waveLen: f.amiga?.waveLen,
-    macros: f.macros?.map((m) => ({ code: m.code, data: m.data ?? [] })),
+    macros: f.macros?.map((m) => ({ code: m.code, data: m.data ?? [], loop: m.loop, release: m.release, speed: m.speed, delay: m.delay, mode: m.mode })),
   };
 }
 

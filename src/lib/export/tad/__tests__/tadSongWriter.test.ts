@@ -124,6 +124,21 @@ describe('writeTadSong echo header', () => {
     expect(checked).toBeGreaterThan(0);
   }, 120000);
 
+  // snes.cpp:118-144: arp macro steps change the frequency each tick (no key-on); a constant pitch macro is a fixed offset.
+  it('plays arp macro steps as slurred 1-tick notes and a constant pitch macro as MD', async () => {
+    const buf = readFileSync(resolve(DIR, 'tetristheme.fur'));
+    const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+    const lead = module.instruments.find((i) => i.name === 'Lead')!;
+    expect(Array.from(lead.macros.find((m) => m.code === 1)!.data)).toEqual([-1, 0]);
+    const instruments = module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i));
+    const tl = instruments[module.instruments.indexOf(lead)];
+    tl.macros = [...(tl.macros ?? []), { code: 4, data: [2] }]; // the song has none: 2/128 semitone, about 2 cents
+    const song = writeTadSong({ native: buildFurnaceNativeData(module), subsong: 0, instruments, samples: toSequencerSamples(module), wavetables: module.wavetables, title: 'tetristheme' });
+    expect(song.mml).toMatch(/[a-g][+-]?%1 & /);
+    expect(song.mml).toContain('MD2');
+    for (const n of ['Lead', 'Pad', 'Bass']) expect(song.warnings.some((w) => w.includes(`(${n}):`) && /arpeggio|pitch/.test(w))).toBe(false);
+  }, 60000);
+
   it('writes the Furnace echo flags as TAD header lines', async () => {
     const lines: Record<string, string> = {};
     for (const file of FILES) {
