@@ -1,0 +1,56 @@
+--- a/players/spl/spl_module.c
++++ b/players/spl/spl_module.c
+@@ -148,14 +148,52 @@
+     header->subsongs = nuade_read_be32(code + HEADER_SUBSONGS_AT);
+     header->timer = nuade_read_be32(code + HEADER_TIMER_AT);
+     return header->play != 0 && header->init != 0 && header->subsongs != 0;
++}
++
++// An edited module (a note added inside a held note moves bytes within the sequence data and raises the call and jump
++// relocations among them) keeps its size but not its hash. The same hash with the sequence data [lo, hi) zeroed and the
++// relocations inside it left out identifies the build (the TypeScript loader's third hash, soundProgrammingLanguageGrid.ts).
++typedef struct MaskedBuild {
++    uint64_t hash; // of the build it stands for
++    uint32_t lo, hi;
++    uint64_t masked_hash;
++} MaskedBuild;
++
++static const MaskedBuild s_masked_builds[] = {
++    { 0xB65EA0229BF7FB11ull, 0x316, 0xF30, 0xE5A599C02BBB0628ull }, // Boulder Dash
++};
++
++static uint64_t masked_build_hash(const Hunk* hunk, uint32_t prefix_end, uint32_t lo, uint32_t hi) {
++    uint64_t hash = hash_u32(FNV_OFFSET, hunk->size);
++    for (uint32_t i = 0; i < prefix_end; i++) {
++        const uint8_t byte = i >= lo && i < hi ? 0 : hunk->code[i];
++        hash = hash_bytes(hash, &byte, 1);
++    }
++    hash = hash_u32(hash, hunk->relocation_count);
++    for (uint32_t i = 0; i < hunk->relocation_count; i++) {
++        const uint32_t at = nuade_read_be32(hunk->relocations + 4u * i);
++        if (at < lo || at >= hi) {
++            hash = hash_u32(hash, at);
++        }
++    }
++    return hash;
+ }
+ 
+ static const SplBuild* find_build(const Hunk* hunk) {
+     for (uint32_t i = 0; i < spl_build_count; i++) {
+         const SplBuild* build = &spl_builds[i];
+-        if (build->prefix_end <= hunk->size && build_hash(hunk, build->prefix_end) == build->hash) {
++        if (build->prefix_end > hunk->size) {
++            continue;
++        }
++        if (build_hash(hunk, build->prefix_end) == build->hash) {
+             return build;
+         }
++        for (size_t m = 0; m < sizeof(s_masked_builds) / sizeof(s_masked_builds[0]); m++) {
++            const MaskedBuild* masked = &s_masked_builds[m];
++            if (masked->hash == build->hash && masked_build_hash(hunk, build->prefix_end, masked->lo, masked->hi) == masked->masked_hash) {
++                return build;
++            }
++        }
+     }
+     return nullptr;
+ }
