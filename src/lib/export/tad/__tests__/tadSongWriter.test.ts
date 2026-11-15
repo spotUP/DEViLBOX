@@ -84,6 +84,19 @@ describe('writeTadSong', () => {
 });
 
 describe('writeTadSong echo header', () => {
+  // Furnace sustain mode (snes.cpp:655-676): held notes decay at d2, note off keeps the key on and releases at r.
+  it('holds sustain-mode instruments at d2 and releases them at r on note off', async () => {
+    const buf = readFileSync(resolve(DIR, 'tetristheme.fur'));
+    const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+    const song = writeTadSong({ native: buildFurnaceNativeData(module), subsong: 0, instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)), samples: toSequencerSamples(module), wavetables: module.wavetables, title: 'tetristheme' });
+    const lead = module.instruments.find((i) => i.name === 'Lead')?.snes;
+    expect(lead?.sus).toBe(3);
+    const { a, d, s, r, d2 } = lead!;
+    expect(song.mml).toMatch(new RegExp(`^@\\d+ \\S+ adsr ${a} ${d} ${s} ${d2 ?? 0}$`, 'm'));
+    expect(song.mml).toMatch(new RegExp(`& A ${a},${d},${s},${r} w%\\d+ r%2`));
+    expect(song.warnings.some((w) => /sustain mode/.test(w))).toBe(false);
+  }, 60000);
+
   it('writes the Furnace echo flags as TAD header lines', async () => {
     const lines: Record<string, string> = {};
     for (const file of FILES) {

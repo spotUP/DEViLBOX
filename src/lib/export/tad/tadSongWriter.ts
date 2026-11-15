@@ -265,6 +265,13 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
       // A rest needs 2 ticks (tad-wasm compiler mml/command_parser.rs invalid tick count, 2..=65535): a lone 1-tick
       // rest is folded into the length of the next token, which then starts 1 tick early.
       if (pending.ticks > 0 && carry) { pending.ticks += carry; carry = 0; }
+      // 'w': a sustain-mode release (snes.cpp:250-253, no KOFF on note off) rings on without key-off. Before the next
+      // key-on the channel still needs a key-off, else the next note is slurred onto the released one: end with `r%2`.
+      if (pending.tok === 'w') {
+        if (cont) { if (pending.ticks > 0) out.push(`w%${pending.ticks}`); pending.ticks = 0; return; }
+        if (pending.ticks >= 4) { out.push(`w%${pending.ticks - 2}`); pending.ticks = 2; }
+        pending.tok = 'r';
+      }
       if (pending.tok === 'r' && pending.ticks === 1 && !slur) {
         warnings.push(`Song channel ${ch + 1}: 1-tick rest folded into the next note (the driver needs 2 ticks).`);
         carry = 1; pending = { tok: 'r', ticks: 0 }; return;
@@ -341,7 +348,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           env ??= {
             mode: !s ? 1 : s.useEnv ? 0 : ({ 0: 1, 4: 2, 5: 3, 6: 4, 7: 5 } as Record<number, number>)[Number(s.gainMode)] ?? 1,
             gain: s?.gain ?? 127,
-            adsr: s ? [s.a & 15, s.d & 7, s.s & 7, s.r & 31] : [15, 0, 7, 0],
+            adsr: s ? [s.a & 15, s.d & 7, s.s & 7, (s.sus ? s.d2 ?? 0 : s.r) & 31] : [15, 0, 7, 0], // sustain mode: d2 while held (snes.cpp:657-660)
           };
           const v15 = ef.get(0x15), v16 = ef.get(0x16);
           if (v15 !== undefined) { if (v15 <= 5) env.mode = v15; else drop('effect 15xx (gain mode above 5)', at); }
@@ -460,6 +467,16 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             const fx = pitchFx(-1, tad);
             if (fx) pending.tok = fxToken(fx, true);
           }
+        } else if (isOff && sounding && instruments[ins]?.snes?.sus) {
+          // Sustain mode (snes.cpp:655-676): note off sends no KOFF; the release is GAIN decrease (sus 1, 2) or the
+          // ADSR sustain rate switched to r (sus 3). The note is slurred into a wait with that release envelope.
+          const si = instruments[ins]!.snes!;
+          flush(true); out.push(...cmds);
+          if (si.useEnv) {
+            out.push(si.sus === 1 ? `GDT${si.r & 31}` : si.sus === 2 ? `GET${si.r & 31}` : `A ${si.a & 15},${si.d & 7},${si.s & 7},${si.r & 31}`);
+            if (si.sus === 3) { curIns = -1; lastEnv = ''; } // the next note names the instrument again, restoring d2
+          }
+          sounding = false; curPitch = -1; pending = { tok: 'w', ticks: 0 };
         } else if (isOff || cmds.length || (sounding && curPitch >= 0 && (s01 || s02 || arp))) {
           flush(!isOff);
           out.push(...cmds);
@@ -551,8 +568,8 @@ const GAIN_PREFIX: Record<number, string> = { 4: 'D', 5: 'E', 6: 'I', 7: 'B' };
 function envelope(inst: TadInstrumentInput, warnings: string[], i: number): string {
   const s = inst.snes;
   if (!s) return 'gain F127';
-  if (s.sus) warnings.push(`Instrument ${i} (${inst.name}): sustain mode ${s.sus} dropped.`);
-  if (s.useEnv) return `adsr ${s.a & 15} ${s.d & 7} ${s.s & 7} ${s.r & 31}`;
+  // Sustain mode: the held note decays at d2; r is the release, emitted at note off (snes.cpp:657-676).
+  if (s.useEnv) return `adsr ${s.a & 15} ${s.d & 7} ${s.s & 7} ${(s.sus ? s.d2 ?? 0 : s.r) & 31}`;
   const mode = Number(s.gainMode);
   if (mode === 0) return `gain F${s.gain & 127}`;
   const prefix = GAIN_PREFIX[mode];
