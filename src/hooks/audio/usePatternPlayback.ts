@@ -475,13 +475,16 @@ export const usePatternPlayback = () => {
 
         // Apply Furnace compat flags, chip flags, and tuning to the dispatch engine
         const hasCompatFlags = furnaceData?.compatFlags && Object.keys(furnaceData.compatFlags).length > 0;
-        const hasChipFlags = furnaceData?.chipFlags && furnaceData.chipFlags.some(f => f && f.length > 0);
+        // The format store holds the chip flags the editor changes (SNES echo panel); the
+        // song copy is only the state at load.
+        const chipFlags = useFormatStore.getState().furnaceNative?.chipFlags ?? furnaceData?.chipFlags;
+        const hasChipFlags = chipFlags && chipFlags.some(f => f && f.length > 0);
         const hasTuning = furnaceData?.tuning !== undefined;
         if (hasCompatFlags || hasChipFlags || hasTuning) {
           import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
             const engine = FurnaceDispatchEngine.getInstance();
 
-            engine.applySongDispatchSettings(furnaceData!, furnaceNative?.chipIds);
+            engine.applySongDispatchSettings({ ...furnaceData, chipFlags }, furnaceNative?.chipIds);
           });
         }
 

@@ -41,6 +41,8 @@ import type { InstrumentConfig } from '@/types/instrument';
 import { applyWavesampleIdMap, planUnusedWavesampleRemoval, planEqualWavesampleMerge, type WavesampleCleanupPlan } from '@/engine/musicline/wavesampleCleanup';
 import { musicLineInstrumentBytes } from '@/lib/export/MusicLineExporter';
 import { gridOpensInScopeView } from '@/lib/tracker/gridOpensInScopeView';
+import { writeSnesChipFlags, type SnesChipFlags } from '@/lib/furnace/snesDsp';
+import { chipKeysFor } from '@engine/furnace-dispatch/chipKey';
 // Type-only — erased at build time, no runtime cycle. Mirrors useCursorStore.ts
 // pattern so getState() can be cast without `any`.
 import type { useTrackerStore as _TrackerStoreType } from './useTrackerStore';
@@ -267,6 +269,8 @@ export interface FormatStore {
   setEditorMode: (mode: EditorMode) => void;
   setFurnaceNative: (data: FurnaceNativeData | null) => void;
   setFurnaceOrderEntry: (channel: number, position: number, patternIndex: number) => void;
+  /** Change SNES echo and mixing settings of one chip of the Furnace song; a running chip follows. */
+  setSnesChipFlags: (chipIndex: number, updates: Partial<SnesChipFlags>) => void;
   /** Insert a new order row (copy of current) after the given position */
   insertFurnaceOrderRow: (position: number) => void;
   /** Delete the order row at the given position */
@@ -880,6 +884,40 @@ export const useFormatStore = create<FormatStore>()(
       // entry now, so the tune already playing follows the matrix edit too.
       void import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine }) => {
         if (FurnaceDispatchEngine.hasInstance()) FurnaceDispatchEngine.getInstance().seqSetOrder(channel, position, patternIndex);
+      }).catch(() => {});
+    },
+    setSnesChipFlags: (chipIndex, updates) => {
+      let flagsStr: string | null = null;
+      let chipIds: number[] = [];
+      set((state) => {
+        const native = state.furnaceNative;
+        if (!native || chipIndex < 0 || chipIndex >= native.chipIds.length) return;
+        if (!native.chipFlags) native.chipFlags = native.chipIds.map(() => '');
+        flagsStr = writeSnesChipFlags(native.chipFlags[chipIndex], updates);
+        native.chipFlags[chipIndex] = flagsStr;
+        chipIds = [...native.chipIds];
+      });
+      if (flagsStr === null) return;
+      const stored = flagsStr;
+      // The flag string is what the next chip reset and the exports read. A chip that is
+      // already running only reads flags on reset, so it also gets the matching commands.
+      void import('@engine/furnace-dispatch/FurnaceDispatchEngine').then(({ FurnaceDispatchEngine, DivCmd }) => {
+        if (!FurnaceDispatchEngine.hasInstance()) return;
+        const engine = FurnaceDispatchEngine.getInstance();
+        const key = chipKeysFor(chipIds)[chipIndex];
+        engine.setChipFlags(stored, key);
+        const send = (cmd: number, val1: number, val2 = 0, chan = 0) => engine.dispatch(cmd, chan, val1, val2, key);
+        if (updates.echo !== undefined) send(DivCmd.SNES_ECHO_ENABLE, updates.echo ? 1 : 0);
+        if (updates.echoDelay !== undefined) send(DivCmd.SNES_ECHO_DELAY, updates.echoDelay);
+        if (updates.echoFeedback !== undefined) send(DivCmd.SNES_ECHO_FEEDBACK, updates.echoFeedback);
+        if (updates.echoVolL !== undefined) send(DivCmd.SNES_ECHO_VOL_LEFT, updates.echoVolL);
+        if (updates.echoVolR !== undefined) send(DivCmd.SNES_ECHO_VOL_RIGHT, updates.echoVolR);
+        if (updates.dryVolL !== undefined) send(DivCmd.SNES_GLOBAL_VOL_LEFT, updates.dryVolL);
+        if (updates.dryVolR !== undefined) send(DivCmd.SNES_GLOBAL_VOL_RIGHT, updates.dryVolR);
+        updates.echoFilter?.forEach((tap, i) => send(DivCmd.SNES_ECHO_FIR, i, tap));
+        if (updates.echoMask !== undefined) {
+          for (let ch = 0; ch < 8; ch++) send(DivCmd.SNES_ECHO, (updates.echoMask >> ch) & 1, 0, ch);
+        }
       }).catch(() => {});
     },
     insertFurnaceOrderRow: (position) => set((state) => {
