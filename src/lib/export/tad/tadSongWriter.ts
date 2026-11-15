@@ -300,7 +300,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     let sounding = false, curNote = 'r';
     let hasNotes = false;
     // Effect state of this channel (Furnace effects that TAD holds as channel state).
-    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', fine = 0, vibWant: { d: number; q: number } | null = null, volSlide = 0, lastEnv = '';
+    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', fine = 0, inv = 'i0', vibWant: { d: number; q: number } | null = null, volSlide = 0, lastEnv = '';
     let env: { mode: number; gain: number; adsr: number[] } | null = null;
     const pitchName = (p: number) => NOTE_NAMES[p % 12];
     // Furnace ticks to TAD ticks (rows are k Furnace-tick multiples; sound effects run at 125 Hz).
@@ -398,6 +398,13 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           else if (e.cmd === 0x13) {
             if (sfx || c < 1 || c > 5) drop('effect 13xx (pitch modulation only on song channels B-F)', at);
             else if ((e.val !== 0) !== pmOn) { pmOn = e.val !== 0; cmds.push(pmOn ? 'PM' : 'PM0'); }
+          }
+          else if (e.cmd === 0x14) {
+            // snes.cpp:503 invertL = x, invertR = y. TAD L/R act in surround mode only; M (both) in mono/stereo.
+            const l = (e.val >> 4) !== 0, r = (e.val & 15) !== 0;
+            const want = l && r ? 'iB' : l ? 'iL' : r ? 'iR' : 'i0';
+            if (want !== inv) { inv = want; cmds.push(want); }
+            if (l !== r) warnings.push(`${at}: effect 14xy inverts one side only; TAD does that in surround mode only.`);
           }
           else if (e.cmd === 0x15 || e.cmd === 0x16 || (e.cmd >= 0x20 && e.cmd <= 0x23)) envFx = true;
           else if (e.cmd === 0x04) {

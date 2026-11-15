@@ -140,15 +140,16 @@ describe('writeTadSong echo header', () => {
   }, 60000);
 
   // playback.cpp:1458 E5xx pitch = val - 0x80 in 1/128 semitone; TAD detune applies from the note it precedes.
-  it('carries E5xx fine pitch as MD detune', async () => {
+  it('carries E5xx fine pitch as MD detune and 14xy as phase invert', async () => {
     const buf = readFileSync(resolve(DIR, 'tetristheme.fur'));
     const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
     const native = buildFurnaceNativeData(module);
     const sub = native.subsongs[0];
     const row = sub.channels.flatMap((ch, c) => ch.patterns.get(sub.orders[c]?.[0] ?? -1)?.rows ?? []).find((r) => r.note >= 0 && r.note < 180)!;
-    row.effects = [...(row.effects ?? []), { cmd: 0xe5, val: 0x90 }]; // +16/128 semitone = 12.5 cents
+    row.effects = [...(row.effects ?? []), { cmd: 0xe5, val: 0x90 }, { cmd: 0x14, val: 0x11 }]; // +16/128 semitone = 12.5 cents; invert both sides
     const song = writeTadSong({ native, subsong: 0, instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)), samples: toSequencerSamples(module), wavetables: module.wavetables, title: 'tetristheme' });
     expect(song.mml).toContain('MD+13');
+    expect(song.mml).toMatch(/\biB\b/);
     expect(song.warnings.some((w) => /E5xx|effect e5/i.test(w))).toBe(false);
   }, 60000);
 
