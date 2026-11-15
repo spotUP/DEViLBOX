@@ -74,6 +74,34 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   howieDavies: 'pass',
   soundProgrammingLanguage: 'pass',
   timFollin: 'pass',
+  fc: 'fail',
+  sidmon2: 'pass',
+  soundmon: 'fail',
+  deltaMusic1: 'fail',
+  deltaMusic2: 'fail',
+  digitalSoundStudio: 'pass',
+  faceTheMusic: 'pass',
+  futurePlayer: 'pass',
+  hippelCoso: 'pass',
+  hvl: 'fail',
+  inStereo2: 'fail',
+  jamcracker: 'fail',
+  artOfNoise: 'pass',
+  maxTrax: 'fail',
+  musicAssembler: 'pass',
+  okt: 'fail',
+  pumaTracker: 'fail',
+  quadraComposer: 'fail',
+  soundControl: 'pass',
+  sonicArranger: 'fail',
+  synthDream: 'pass',
+  tonyWilliams: 'pass',
+  beathoven: 'pass',
+  synthesis: 'fail',
+  tcbTracker: 'fail',
+  tfmMusicMaker: 'fail',
+  tfmx: 'pass',
+  daveLowe: 'pass',
 };
 
 /**
@@ -206,6 +234,7 @@ export const LIVE_WHILE_PLAYING: Record<string, LiveEditStatus> = {
 export const LIVE_WHILE_PLAYING_WHY: Record<string, string> = {
   suntronic: 'the exported bytes are found in chip RAM (image at 0x20000, 0x100 records 0x2a000) and written there, but the stream does not move: the player reads a converted copy, not the file image',
   digi: 'UADE refuses the file (DigiBooster plays through the native engine only)',
+  mmdc: 'not a G19 row (no walk/direct grid); plays on nuade by engine swap, edit heard while playing measured by nuadeEditsAreHeard.test.ts (mmdc case: voice 2 +2 semitones from the edited row, 1.55 s)',
 };
 
 /** Why a LIVE_EDIT row is 'fail' (plan unit in thoughts/shared/plans/2026-10-06-fix-all-open.md, G19). */

@@ -154,6 +154,35 @@ const FORMATS: FormatRow[] = [
   { key: 'howieDavies', rig: 'paula', files: corpus(['.hd']) },
   { key: 'soundProgrammingLanguage', rig: 'paula', files: corpus(['.spl']) },
   { key: 'sidmon1', rig: 'paula', files: [...corpus(['.sid1']), ...corpus(['.sid'], 'sidmon-1')] },
+  // G16 rows added for the remaining Amiga formats (thoughts/spot/2026-11-15-amiga-editability.md): one pinned corpus song each.
+  { key: 'fc', rig: 'paula', files: ['future-composer-1.4/starglide1.fc'] },
+  { key: 'deltaMusic1', rig: 'paula', files: ['delta-music/triplex1.dm'] },
+  { key: 'deltaMusic2', rig: 'paula', files: ['delta-music-2/asperity megademo 3.dm2'] },
+  { key: 'jamcracker', rig: 'paula', files: ['jamcracker/freehand-spreadtro.jam'] },
+  { key: 'futurePlayer', rig: 'paula', files: ['future-player/imploder drums.fp'] },
+  { key: 'sidmon2', rig: 'paula', files: ['sidmon-2/ice7-intro.sid2'] },
+  { key: 'soundmon', rig: 'paula', files: ['bp-soundmon-2/nicktune1.bp'] },
+  { key: 'digitalSoundStudio', rig: 'paula', files: ['digital-sound-studio/zrimay.dss'] },
+  { key: 'faceTheMusic', rig: 'paula', files: ['face-the-music/rock.ftm'] },
+  { key: 'hippelCoso', rig: 'paula', files: ['hippel-coso/wings of death (level 3).hipc'] },
+  { key: 'hvl', rig: 'paula', files: ['hivelytracker/waiting for a message.hvl'] },
+  { key: 'inStereo2', rig: 'paula', files: ['instereo!-2.0/spaceflight.is20'] },
+  { key: 'artOfNoise', rig: 'paula', files: ['art-of-noise/inside.blipp.aon'] },
+  { key: 'maxTrax', rig: 'paula', files: ['maxtrax/antmusic.mxtx'] },
+  { key: 'musicAssembler', rig: 'paula', files: ['music-assembler/thanatos.ma'] },
+  { key: 'okt', rig: 'paula', files: ['oktalyzer/les granges brulees.okta'] },
+  { key: 'pumaTracker', rig: 'paula', files: ['pumatracker/liquid kids - lv1a.puma'] },
+  { key: 'quadraComposer', rig: 'paula', files: ['quadra-composer/poison.emod'] },
+  { key: 'soundControl', rig: 'paula', files: ['soundcontrol/north sea inferno ongame1.sc'] },
+  { key: 'sonicArranger', rig: 'paula', files: ['sonic-arranger/mega end.sa'] },
+  { key: 'synthDream', rig: 'paula', files: ['synth-dream/sdr.monsterbusiness 1'] },
+  { key: 'tonyWilliams', rig: 'paula', files: ['formats/future basketball main.tw'] },
+  { key: 'beathoven', rig: 'paula', files: ['beathoven-synthesizer/tristar cracktro.bss'] },
+  { key: 'synthesis', rig: 'paula', files: ['synthesis/space sound.syn'] },
+  { key: 'tcbTracker', rig: 'paula', files: ['tcb-tracker/m-demo3 3.tcb'] },
+  { key: 'tfmMusicMaker', rig: 'paula', files: ['tfm-music-maker/rainstorm.tfe'] },
+  { key: 'tfmx', rig: 'paula', files: ['tfmx/mdat.hbtitle'] },
+  { key: 'daveLowe', rig: 'paula', files: ['dave-lowe/incredibleshrinkingsphere.dl'] },
 ];
 
 type Cell = { note: number; instrument: number; volume: number; effTyp: number; eff: number; effTyp2: number; eff2: number };
@@ -219,7 +248,12 @@ const originals = new Map<string, Trace | null>();
 const NO_RIG = new Set<string>();
 // dns.ptc: a Dynamic Synthesizer song plays from its dns. module plus an smp. sample companion; the corpus has no smp.ptc, so UADE refuses it and only bytes and grid are held.
 // richard-joseph/cannon fodder (intro).sng: UADE refuses it (no Richard Joseph player match), so only bytes and grid are held; no audio verdict.
-const EXPECTED_NO_RIG: string[] = ['formats/dns.ptc', 'formats/fuzzball-title.fred', 'richard-joseph/cannon fodder (intro).sng'];
+// face-the-music/rock.ftm, hivelytracker/waiting for a message.hvl, synth-dream/sdr.monsterbusiness 1, tfm-music-maker/rainstorm.tfe,
+// tfmx/mdat.hbtitle: UADE refuses each of them as loaded here (measured in the hook run of the G16 batch), so only bytes and grid are held; no audio verdict.
+const EXPECTED_NO_RIG: string[] = [
+  'face-the-music/rock.ftm', 'formats/dns.ptc', 'formats/fuzzball-title.fred', 'hivelytracker/waiting for a message.hvl',
+  'richard-joseph/cannon fodder (intro).sng', 'synth-dream/sdr.monsterbusiness 1', 'tfm-music-maker/rainstorm.tfe', 'tfmx/mdat.hbtitle',
+];
 /**
  * Files UADE takes but plays as noise, so its stream says nothing about the song: the .sog is the
  * Hippel ST SOURCE the editor packs for the player (the Compress step of jochenHippelSTGridMatchesPlayer),
@@ -386,6 +420,21 @@ const withoutPitch = (t: Trace): Trace => Object.assign(t.map((v) => v.filter((e
  */
 const KNOWN: Record<string, Partial<Record<'unedited' | 'edited', string>>> = {
   'suntronic|smooth': { unedited: 'G16-sunSmooth: the score has no notes, the song parses to a stub and the router exports a MOD of it', edited: 'G16-sunSmooth: no note to edit' },
+  fc: { unedited: 'G16 fc: exported bytes differ from the original at byte 14', edited: 'G16 fc: the reloaded grid differs from the edited grid on ~6600 cells (instrument and volume columns lost)' },
+  deltaMusic1: { unedited: 'G16 deltaMusic1: exported bytes differ from the original at byte 22', edited: 'G16 deltaMusic1: voice 1 plays a different Paula write after the edit (untouched voice moved)' },
+  deltaMusic2: { unedited: 'G16 deltaMusic2: exported bytes differ from the original at byte 0', edited: 'G16 deltaMusic2: the note edit is not heard in the rendered stream' },
+  jamcracker: { unedited: 'G16 jamcracker: exported bytes differ from the original at byte 37', edited: 'G16 jamcracker: untouched voice 1 plays a different Paula write after the edit' },
+  soundmon: { edited: 'G16 soundmon: untouched voice 3 plays a different Paula write after the edit' },
+  hvl: { edited: 'G16 hvl: the edited-note stage throws (no assertion text; HVL has no UADE replayer rig)' },
+  inStereo2: { unedited: 'G16 inStereo2: exported bytes differ from the original at byte 35', edited: 'G16 inStereo2: untouched voice 1 plays a different Paula write after the edit' },
+  maxTrax: { edited: 'G16 maxTrax: the exporter writes a file identical to the original: the edit does not reach the exported bytes' },
+  okt: { edited: 'G16 okt: the edit is not heard in the rendered stream' },
+  pumaTracker: { unedited: 'G16 pumaTracker: exported bytes differ from the original at byte 15', edited: 'G16 pumaTracker: untouched voice 2 plays a different Paula write after the edit' },
+  quadraComposer: { unedited: 'G16 quadraComposer: exported bytes differ from the original at byte 7', edited: 'G16 quadraComposer: the export returns null after the edit (no exporter result)' },
+  sonicArranger: { unedited: 'G16 sonicArranger: exported bytes differ from the original at byte 35', edited: 'G16 sonicArranger: the reloaded song has 72 patterns, the edited grid 84' },
+  synthesis: { unedited: 'G16 synthesis: exported bytes differ from the original at byte 10', edited: 'G16 synthesis: voice 0 plays a different Paula write after the edit' },
+  tcbTracker: { unedited: 'G16 tcbTracker: exported bytes differ from the original at byte 7', edited: 'G16 tcbTracker: instrument column of the reloaded grid differs on cells beside the edit' },
+  tfmMusicMaker: { unedited: 'G16 tfmMusicMaker: exported size 20431 vs original 20432' },
 };
 
 /** Run `body`; for a known defect it must still fail (a fixed one is reported so its row is removed). */
