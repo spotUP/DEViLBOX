@@ -76,6 +76,20 @@ function u16BE(buf: Uint8Array, off: number): number {
   return ((buf[off] << 8) | buf[off + 1]) >>> 0;
 }
 
+/** The layout plus where a note on the first blank row of a pattern's stream is inserted (richardJosephEdits.ts). */
+export interface RJPLayout extends UADEPatternLayout {
+  appendSlot: (pattern: number, row: number, channel: number) => { eopAt: number; patOffset: number } | undefined;
+}
+
+/** The RJP note byte the cell's note plays, or -1 (the inverse of rjpNoteToXM, nearest period). */
+export function rjpNoteByte(xmNote: number): number {
+  const ptIdx = xmNote - 13;
+  if (ptIdx < 0 || ptIdx >= PT_PERIODS.length) return -1;
+  let best = -1, bestDist = Infinity;
+  RJP_PERIODS.forEach((p, i) => { const d = Math.abs(p - PT_PERIODS[ptIdx]); if (d < bestDist) { bestDist = d; best = i; } });
+  return best;
+}
+
 // ── Format detection ───────────────────────────────────────────────────────
 
 /**
@@ -102,7 +116,7 @@ interface RJPChunks {
   patternData: { offset: number; size: number };     // chunk 6
 }
 
-function parseChunks(buf: Uint8Array): RJPChunks | null {
+export function parseChunks(buf: Uint8Array): RJPChunks | null {
   if (buf.length < 36) return null;
 
   let off = 8;
@@ -179,8 +193,8 @@ function decodePatternEvents(
   buf: Uint8Array,
   baseOff: number,
   chunkEnd: number,
-): RJPEvent[] {
-  const events: RJPEvent[] = [];
+): RJPEvent[] & { eopAt?: number } {
+  const events: RJPEvent[] & { eopAt?: number } = [];
   let pos = baseOff;
 
   while (pos < chunkEnd && events.length < MAX_EVENTS_PER_PATTERN) {
@@ -258,7 +272,7 @@ function decodePatternEvents(
       if (endOfPattern) break;
     }
 
-    if (endOfPattern) break;
+    if (endOfPattern) { events.eopAt = pos - 1; break; }
 
     // Only create an event if we got a note
     if (note > 0 || instrument > 0 || speed > 0) {
@@ -443,6 +457,8 @@ export async function parseRJPFile(
 
   // File offset map for editing: patternIndex → row → channel → { fileOffset, byteLen }
   const cellOffsetMap = new Map<string, { fileOffset: number; byteLen: number }>();
+  // The first blank row after a pattern's last event: where a new note goes (the end-of-pattern byte it is inserted before).
+  const appendMap = new Map<string, { eopAt: number; patOffset: number }>();
 
   if (numSubsongs > 0 && chunks.stepPtrs.size >= 4 && chunks.patternPtrs.size >= 4) {
     // Find first non-empty subsong (step-index 0 = channel inactive)
@@ -496,7 +512,7 @@ export async function parseRJPFile(
     const patDataEnd = chunks.patternData.offset + chunks.patternData.size;
 
     // Track which pattern pointer indices we've already decoded
-    const decodedPatterns = new Map<number, RJPEvent[]>();
+    const decodedPatterns = new Map<number, RJPEvent[] & { eopAt?: number }>();
 
     for (let step = 0; step < numSteps; step++) {
       const channelRows: TrackerCell[][] = [[], [], [], []];
@@ -524,6 +540,7 @@ export async function parseRJPFile(
 
         // Convert events to TrackerCell rows (1 row per event)
         const rows: TrackerCell[] = [];
+        if (events.eopAt !== undefined) appendMap.set(`${step}:${events.length}:${ch}`, { eopAt: events.eopAt, patOffset: u32BE(buf, chunks.patternPtrs.offset + patIdx * 4) });
         for (const evt of events) {
           // Map speed to effect F (set speed) in the effect column
           let effTyp = 0;
@@ -654,8 +671,9 @@ export async function parseRJPFile(
   // RJP uses variable-length events, so we use getCellFileOffset with the
   // pre-built offset map rather than a fixed formula.
 
-  const uadePatternLayout: UADEPatternLayout = {
+  const uadePatternLayout: RJPLayout = {
     formatId: 'richardJoseph',
+    appendSlot: (pattern, row, channel) => appendMap.get(`${pattern}:${row}:${channel}`),
     patternDataFileOffset: chunks.patternData.offset,
     bytesPerCell: 1, // note byte only (commands are preceding prefix bytes)
     rowsPerPattern: patterns[0]?.length ?? 64,

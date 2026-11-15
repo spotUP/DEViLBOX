@@ -295,7 +295,8 @@ export const ADD_ON_EMPTY_ROW: Record<string, AddOnEmptyRow> = {
   riffRaff: 'pass',
   mcmd: 'pass',
   wallyBeben: 'fail',
-  richardJoseph: 'fail',
+  // richardJoseph: a note on the first blank row after a pattern's last event is inserted before its end-of-pattern byte; the pattern chunk and later pattern pointers grow by one (richardJosephEdits.ts).
+  richardJoseph: 'pass',
   fashionTracker: 'pass',
   davidHanney: 'pass',
   ems: 'pass',

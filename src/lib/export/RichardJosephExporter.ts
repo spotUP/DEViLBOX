@@ -1,10 +1,11 @@
 /**
  * RichardJosephExporter.ts - save a Richard Joseph (rjp.* / *.sng) song: the module it was loaded from, with each edited grid cell's note byte
  * written where the parser's layout puts it (RichardJosephParser.ts getCellFileOffset / encodeCell). Same length, and
- * byte-exact where nothing was edited. Notes typed on rows the module has no place for come back as warnings.
+ * byte-exact where nothing was edited. A note on the first blank row after a pattern's last event grows the pattern stream (richardJosephEdits.ts); other notes without a place come back as warnings.
  */
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import { patchModuleByLayout } from './layoutPatch';
+import { addRichardJosephNotes } from '@lib/import/formats/richardJosephEdits';
 
 export interface RichardJosephExportResult {
   data: Uint8Array;
@@ -19,11 +20,7 @@ export async function exportRichardJoseph(song: TrackerSong): Promise<RichardJos
   if (!layout) throw new Error('Richard Joseph export needs the pattern layout the song was loaded with');
   const name = (song.uadeEditableFileName ?? 'module.sng').split('/').pop() ?? 'module.sng';
   const r = patchModuleByLayout(src, layout, song.patterns);
-  return {
-    data: r.bytes,
-    filename: name,
-    warnings: r.unplaced.length > 0
-      ? [`${r.unplaced.length} note(s) typed on rows the module has no place for were not saved`]
-      : [],
-  };
+  const warnings: string[] = [];
+  const unplaced = [...r.unplaced].sort((a, b) => a.pattern - b.pattern || a.channel - b.channel || a.row - b.row);
+  return { data: await addRichardJosephNotes(r.bytes, name, song, unplaced, warnings), filename: name, warnings };
 }
