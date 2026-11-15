@@ -20,7 +20,7 @@
  * static cycle.
  */
 import { describe, it, expect } from 'vitest';
-import { importChain } from '@/test/importGraph';
+import { importChain, reachableFiles } from '@/test/importGraph';
 
 describe('the song stores and the code that snapshots them', () => {
   it('useInstrumentStore never statically imports snapshotSong or the project persistence', () => {
@@ -60,4 +60,25 @@ describe('the song stores and the code that snapshots them', () => {
       expect(there && importChain(engine, STORE), engine).toBeNull();
     }
   }, 60000);
+
+  // parameterRouter, DJActions and DjFxActions read the drum pad singletons
+  // from engine/drumpad/drumPadInstance.ts (a leaf) instead of importing
+  // useMIDIPadRouting, which pulled DrumPadEngine, DubRouter and the dub moves
+  // into the cycle (64 -> 49 modules, 2026-11-15).
+  it('the drum pad / dub layer stays out of the store cycle', () => {
+    const STORE = 'src/stores/useInstrumentStore.ts';
+    for (const f of ['src/hooks/drumpad/useMIDIPadRouting.ts', 'src/engine/drumpad/DrumPadEngine.ts', 'src/engine/dub/DubRouter.ts']) {
+      const there = importChain(STORE, f);
+      expect(there && importChain(f, STORE), f).toBeNull();
+    }
+  }, 60000);
+
+  // Ratchet: the static cycle useInstrumentStore sits in may shrink, never grow.
+  // Lower the bound when a cut lands. Remaining core: ToneEngine,
+  // InstrumentFactory and the synths, TrackerReplayer, the DJ engine, the stores.
+  it('the store import cycle is at most 49 modules', () => {
+    const STORE = 'src/stores/useInstrumentStore.ts';
+    const cycle = [...reachableFiles(STORE).keys()].filter((f) => f === STORE || importChain(f, STORE) !== null);
+    expect(cycle.length, cycle.sort().join('\n')).toBeLessThanOrEqual(49);
+  }, 120000);
 });

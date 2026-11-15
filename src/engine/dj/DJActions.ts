@@ -19,7 +19,7 @@ import type { DjEqPreset } from '@/constants/djEqPresets';
 import { useDJSetStore } from '@/stores/useDJSetStore';
 import { useAudioStore } from '@/stores/useAudioStore';
 import { useVocoderStore } from '@/stores/useVocoderStore';
-import { getDrumPadEngine, getNoteRepeatEngine } from '@/hooks/drumpad/useMIDIPadRouting';
+import { getDrumPadEngine, getNoteRepeatEngine } from '@/engine/drumpad/drumPadInstance';
 import { useDrumPadStore } from '@/stores/useDrumPadStore';
 import { getDJEngine, getDJEngineIfActive } from './DJEngine';
 import type { DJSet } from './recording/DJSetFormat';

@@ -24,6 +24,7 @@ import { useTransportStore } from '../../stores/useTransportStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { DrumPadEngine } from '../../engine/drumpad/DrumPadEngine';
 import { NoteRepeatEngine } from '../../engine/drumpad/NoteRepeatEngine';
+import { setDrumPadInstances } from '../../engine/drumpad/drumPadInstance';
 import type { NoteRepeatRate } from '../../engine/drumpad/NoteRepeatEngine';
 import { getToneEngine } from '../../engine/ToneEngine';
 import { getAudioContext } from '../../audio/AudioContextSingleton';
@@ -233,10 +234,9 @@ export function getHeldDrumPads(): number[] {
   return Array.from(_heldPads);
 }
 
-/** Returns the singleton DrumPadEngine instance (for direct voice filter modulation) */
-export function getDrumPadEngine(): DrumPadEngine | null {
-  return _engine;
-}
+// The getters live in a leaf module so readers (parameterRouter, DJActions,
+// DjFxActions) need not import this hook and its engine graph.
+export { getDrumPadEngine, getNoteRepeatEngine } from '../../engine/drumpad/drumPadInstance';
 
 /**
  * Ensure the singleton DrumPadEngine exists, creating it if necessary.
@@ -246,11 +246,6 @@ export function getDrumPadEngine(): DrumPadEngine | null {
  */
 export function ensureDrumPadEngine(): DrumPadEngine {
   return getOrCreateEngine();
-}
-
-/** Returns the singleton NoteRepeatEngine instance (for panic / shared access). */
-export function getNoteRepeatEngine(): NoteRepeatEngine | null {
-  return _noteRepeat;
 }
 
 function getOrCreateEngine(): DrumPadEngine {
@@ -264,6 +259,7 @@ function getOrCreateEngine(): DrumPadEngine {
     // connection via `rerouteOutput`; detach restores it.
     _engine = new DrumPadEngine(ctx, resolveDefaultOutputDestination(ctx));
     _noteRepeat = new NoteRepeatEngine(_engine);
+    setDrumPadInstances(_engine, _noteRepeat);
     useDrumPadStore.getState().loadFromIndexedDB(ctx);
     // If a DJ engine is already up, attach its mixer so dub-action pads can
     // tap deck audio. Otherwise the attach happens when the DJ view mounts
@@ -302,6 +298,7 @@ function disposeEngineIfUnused(): void {
     _heldPads.clear();
     _engine = null;
     _noteRepeat = null;
+    setDrumPadInstances(null, null);
   }
 }
 

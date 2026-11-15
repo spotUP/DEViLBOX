@@ -29,7 +29,7 @@ import { playDeckPattern, stopDeckPattern, finishDeckPatternCycle, spinbackDeck,
 import { realTimers } from '../dj/autodj/executorTimers';
 import type { DeckId } from '../dj/DeckEngine';
 import type { DubBusSettings } from '../../types/dub';
-import { getDrumPadEngine } from '../../hooks/drumpad/useMIDIPadRouting';
+import { getDrumPadEngine } from './drumPadInstance';
 
 // ─── Types ────────────────────────────────────────────────────────
 

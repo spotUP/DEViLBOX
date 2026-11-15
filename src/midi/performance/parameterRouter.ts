@@ -1549,7 +1549,7 @@ export function resetDJRouteCache(): void {
 import { getDrumPadXYMapping } from '../drumpadXYMap';
 import { useDrumPadStore } from '../../stores/useDrumPadStore';
 import { PAD_INSTRUMENT_BASE } from '../../types/drumpad';
-import { getDrumPadEngine } from '../../hooks/drumpad/useMIDIPadRouting';
+import { getDrumPadEngine } from '../../engine/drumpad/drumPadInstance';
 import type { DrumPadXYMapping } from '../drumpadXYMap';
 import type { SynthType } from '../../types/instrument/base';
 
