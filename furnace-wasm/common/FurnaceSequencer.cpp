@@ -10,6 +10,11 @@
 #include <cstdio>
 #include <cmath>
 
+// upstream src/engine/defines.h:63: bit 31 marks a raw-frequency note
+#ifndef DIV_NOTE_RAW_FLAG
+#define DIV_NOTE_RAW_FLAG 0x80000000
+#endif
+
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -533,7 +538,7 @@ static int getLoopModality() {
 // hand tables drifted (porta floor 60 notes low, key-off arp reset on every
 // chip including the Game Boy).
 enum SeqChanTrait { TRAIT_PORTA_FLOOR = 0, TRAIT_KEYOFF_ARP = 1, TRAIT_KEYOFF_PORTA = 2,
-                    TRAIT_LEGACY_ALWAYS_SET_VOLUME = 3, TRAIT_WANT_PRE_NOTE = 4 };
+                    TRAIT_LEGACY_ALWAYS_SET_VOLUME = 3, TRAIT_WANT_PRE_NOTE = 4, TRAIT_MAX_FREQ = 5 };
 
 // -1 when the channel has no dispatch (upstream: dispatchChanOfChan[i] < 0).
 static int chanTrait(int chan, SeqChanTrait trait) {
@@ -550,6 +555,11 @@ static int slideDownTarget(int chan) {
   if (!COMPAT(SEQ_COMPAT_LIMIT_SLIDES)) return 0;
   int floor = chanTrait(chan, TRAIT_PORTA_FLOOR);
   return floor < 0 ? 0 : floor;
+}
+// DivEngine::getMaxFreqChan (engine.cpp:2482): the platform's highest raw frequency.
+static unsigned int getMaxFreqChan(int chan) {
+  int v = chanTrait(chan, TRAIT_MAX_FREQ);
+  return v < 0 ? 0 : (unsigned int)v;
 }
 static bool keyOffAffectsPorta(int chan) { return chanTrait(chan, TRAIT_KEYOFF_PORTA) == 1; }
 static bool keyOffAffectsArp(int chan) { return chanTrait(chan, TRAIT_KEYOFF_ARP) == 1; }
@@ -1610,7 +1620,12 @@ static void seqProcessRow(int i, bool afterDelay) {
           ch.inPorta = false;
           if (!COMPAT(SEQ_COMPAT_ARP_NON_PORTA)) dispatchCmd(DIV_CMD_PRE_PORTA, i, false, 0);
         } else {
-          ch.portaNote = COMPAT(SEQ_COMPAT_LIMIT_SLIDES) ? 156 : 179;
+          if (ch.note & DIV_NOTE_RAW_FLAG) {
+            // raw frequency mode: use the max raw frequency (playback.cpp:1058)
+            ch.portaNote = getMaxFreqChan(i) | DIV_NOTE_RAW_FLAG;
+          } else {
+            ch.portaNote = COMPAT(SEQ_COMPAT_LIMIT_SLIDES) ? 156 : 179;
+          }
           ch.portaSpeed = effectVal;
           ch.portaStop = true;
           ch.stopOnOff = false;
@@ -1630,7 +1645,12 @@ static void seqProcessRow(int i, bool afterDelay) {
           ch.inPorta = false;
           if (!COMPAT(SEQ_COMPAT_ARP_NON_PORTA)) dispatchCmd(DIV_CMD_PRE_PORTA, i, false, 0);
         } else {
-          ch.portaNote = slideDownTarget(i);
+          if (ch.note & DIV_NOTE_RAW_FLAG) {
+            // raw frequency mode: zero (playback.cpp:1101)
+            ch.portaNote = 0 | DIV_NOTE_RAW_FLAG;
+          } else {
+            ch.portaNote = slideDownTarget(i);
+          }
           ch.portaSpeed = effectVal;
           ch.portaStop = true;
           ch.stopOnOff = false;
@@ -1779,6 +1799,8 @@ static void seqProcessRow(int i, bool afterDelay) {
 
       // --- Arpeggio ---
       case 0x00: // arpeggio
+        // don't accept simultaneous arp and raw frequency (playback.cpp:1295)
+        if (ch.note & DIV_NOTE_RAW_FLAG) break;
         ch.arp = effectVal;
         if (ch.arp == 0 && COMPAT(SEQ_COMPAT_ARP0_RESET)) {
           ch.resetArp = true;
@@ -1853,6 +1875,7 @@ static void seqProcessRow(int i, bool afterDelay) {
 
       // --- Shorthand portamento ---
       case 0xe1: // portamento up
+        if (ch.note & DIV_NOTE_RAW_FLAG) break; // ignored in raw frequency mode (playback.cpp:1395)
         ch.portaNote = ch.note + (effectVal & 15);
         ch.portaSpeed = (effectVal >> 4) * 4;
         ch.portaStop = true;
@@ -1872,6 +1895,7 @@ static void seqProcessRow(int i, bool afterDelay) {
         HINT_PORTA(i, ch.portaNote, ch.portaSpeed);
         break;
       case 0xe2: // portamento down
+        if (ch.note & DIV_NOTE_RAW_FLAG) break; // ignored in raw frequency mode (playback.cpp:1426)
         ch.portaNote = ch.note - (effectVal & 15);
         ch.portaSpeed = (effectVal >> 4) * 4;
         ch.portaStop = true;
@@ -2136,28 +2160,30 @@ static void seqProcessRow(int i, bool afterDelay) {
 
     switch (effect) {
       case 0xf1: // single pitch slide up
-        ch.portaNote = COMPAT(SEQ_COMPAT_LIMIT_SLIDES) ? 156 : 179;
+        if (ch.note & DIV_NOTE_RAW_FLAG) ch.portaNote = getMaxFreqChan(i) | DIV_NOTE_RAW_FLAG; // playback.cpp:1759
+        else ch.portaNote = COMPAT(SEQ_COMPAT_LIMIT_SLIDES) ? 156 : 179;
         ch.portaSpeed = effectVal;
         ch.portaStop = true;
         ch.stopOnOff = false;
         ch.scheduledSlideReset = false;
         ch.inPorta = false;
         if (!COMPAT(SEQ_COMPAT_ARP_NON_PORTA)) dispatchCmd(DIV_CMD_PRE_PORTA, i, true, 0);
-        dispatchCmd(DIV_CMD_NOTE_PORTA, i, ch.portaSpeed * (getLinearPitch() ? getPitchSlideSpeed() : 1), ch.portaNote);
+        dispatchCmd(DIV_CMD_NOTE_PORTA, i, ch.portaSpeed * ((getLinearPitch() && !(ch.note & DIV_NOTE_RAW_FLAG)) ? getPitchSlideSpeed() : 1), ch.portaNote);
         ch.portaNote = 0;
         ch.portaSpeed = -1;
         ch.inPorta = false;
         if (!COMPAT(SEQ_COMPAT_ARP_NON_PORTA)) dispatchCmd(DIV_CMD_PRE_PORTA, i, false, 0);
         break;
       case 0xf2: // single pitch slide down
-        ch.portaNote = slideDownTarget(i);
+        if (ch.note & DIV_NOTE_RAW_FLAG) ch.portaNote = 0 | DIV_NOTE_RAW_FLAG; // playback.cpp:1763
+        else ch.portaNote = slideDownTarget(i);
         ch.portaSpeed = effectVal;
         ch.portaStop = true;
         ch.stopOnOff = false;
         ch.scheduledSlideReset = false;
         ch.inPorta = false;
         if (!COMPAT(SEQ_COMPAT_ARP_NON_PORTA)) dispatchCmd(DIV_CMD_PRE_PORTA, i, true, 0);
-        dispatchCmd(DIV_CMD_NOTE_PORTA, i, ch.portaSpeed * (getLinearPitch() ? getPitchSlideSpeed() : 1), ch.portaNote);
+        dispatchCmd(DIV_CMD_NOTE_PORTA, i, ch.portaSpeed * ((getLinearPitch() && !(ch.note & DIV_NOTE_RAW_FLAG)) ? getPitchSlideSpeed() : 1), ch.portaNote);
         ch.portaNote = 0;
         ch.portaSpeed = -1;
         ch.inPorta = false;
@@ -2720,7 +2746,7 @@ static bool seqNextTick() {
         if ((ch.keyOn || ch.keyOff) && ch.portaSpeed > 0) {
           int linearPitch = getLinearPitch();
           int pitchSlideSpeed = getPitchSlideSpeed();
-          int portaResult = dispatchCmd(DIV_CMD_NOTE_PORTA, i, ch.portaSpeed * (linearPitch ? pitchSlideSpeed : 1), ch.portaNote);
+          int portaResult = dispatchCmd(DIV_CMD_NOTE_PORTA, i, ch.portaSpeed * ((linearPitch && !(ch.note & DIV_NOTE_RAW_FLAG)) ? pitchSlideSpeed : 1), ch.portaNote);
           if (portaResult == 2 && ch.portaStop && COMPAT(SEQ_COMPAT_TARGET_RESETS_SLIDES)) {
             ch.portaSpeed = 0;
             HINT_PORTA(i, ch.portaNote, ch.portaSpeed);

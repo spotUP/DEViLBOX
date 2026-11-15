@@ -1111,7 +1111,7 @@ extern "C" void furnace_cmd_log_set_global_chan(int globalChan) {
  * itself (the virtuals playback.cpp calls on disCont[...].dispatch), so the
  * sequencer never keeps a hand-copied table of them:
  *   0 getPortaFloor(ch)   1 keyOffAffectsArp(ch)   2 keyOffAffectsPorta(ch)
- *   3 getLegacyAlwaysSetVolume()   4 getWantPreNote()
+ *   3 getLegacyAlwaysSetVolume()   4 getWantPreNote()   5 getMaxFreq(ch)
  * Returns -1 for an unknown handle, channel or trait.
  */
 EMSCRIPTEN_KEEPALIVE
@@ -1126,6 +1126,7 @@ int furnace_dispatch_chan_trait(int handle, int chan, int trait) {
     case 2: return inst->dispatch->keyOffAffectsPorta(chan) ? 1 : 0;
     case 3: return inst->dispatch->getLegacyAlwaysSetVolume() ? 1 : 0;
     case 4: return inst->dispatch->getWantPreNote() ? 1 : 0;
+    case 5: return (int)inst->dispatch->getMaxFreq(chan);
     default: return -1;
   }
 }
