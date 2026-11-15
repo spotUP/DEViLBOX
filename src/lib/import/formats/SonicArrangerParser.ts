@@ -975,10 +975,10 @@ export async function parseSonicArrangerFile(
     },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const posEntry = positions[pattern];
-      if (!posEntry) return 0;
+      if (!posEntry) return -1;
       const startRow = posEntry[channel].startTrackRow;
       const rowIdx = startRow + row;
-      if (rowIdx < 0 || rowIdx >= numTrackRows) return 0;
+      if (rowIdx < 0 || rowIdx >= numTrackRows) return -1;
       return ntblDataOffset + rowIdx * 4;
     },
   };
