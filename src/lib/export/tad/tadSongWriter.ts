@@ -184,14 +184,25 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
   // Pass 2: one MML line set per SNES channel.
   // TAD instrument id per (Furnace instrument, sound): a note map plays several samples.
   const tadIns = new Map<string, number>();
+  // Semitone range (TAD note id, C0 = 0) each sample plays.
   const sampleOctaves = new Map<string, [number, number]>();
+  const widen = (smp: string, p: number) => { const r2 = sampleOctaves.get(smp); sampleOctaves.set(smp, r2 ? [Math.min(r2[0], p), Math.max(r2[1], p)] : [p, p]); };
+  const tuningHz = native.tuning ?? 440;
+  /** Playable TAD note range of a sample; null when its data is missing (no limit known). */
+  const playable = (smp: string): [number, number] | null => {
+    const n = Number(smp.slice(1));
+    if (smp[0] === 'w') return tadNoteRange(32000 / n);
+    return samples[n] ? tadNoteRange(sampleTuningHz(samples[n], tuningHz)) : null;
+  };
   const wavetables = input.wavetables ?? [];
   // TAD sample name an instrument plays: `s<sample>` or `w<length>` (wavetable 0; Furnace starts
   // every channel on wave 0 and 10xx wave changes are dropped effects).
   // Note map: Furnace plays sample noteMap[note].map at note noteMap[note].freq (DivInstrumentAmiga,
-  // 180 entries indexed by Furnace note = row note value).
+  // 180 entries indexed by engine note = row note + 60).
   const soundOf = (inst: TadInstrumentInput | undefined, note: number): { smp: string; note: number } | null => {
     if (!inst) return null;
+    // Native rows hold octave*12+semitone (C-0 = 0); the engine, and so the note map, counts from C-(-5) (C-0 = 60).
+    note += FURNACE_NOTE_OFFSET;
     if (inst.useWave) return wavetables[0] ? { smp: `w${Math.max(16, ((inst.waveLen ?? 31) + 1) & ~15)}`, note } : null;
     let s = inst.initSample ?? 0;
     if (inst.useNoteMap && inst.noteMap) {
@@ -201,6 +212,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     }
     return s >= 0 && samples[s] ? { smp: `s${s}`, note } : null;
   };
+  const outside = (smp: string, tad: number) => { const r = playable(smp); return !!r && (tad < r[0] || tad > r[1]); };
   const insWarned = new Set<number>();
   const channelMml: string[] = [];
   let sfxChannel = -1;
@@ -208,11 +220,13 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     const ch = snes.first + c;
     const out: string[] = ['V254'];
     let ins = 0, curIns = -1, vol = 127, pan = 64, oct = -1;
-    let pending: { tok: string; ticks: number } = { tok: 'r', ticks: 0 };
+    type Pending = { tok: string; ticks: number; sl?: { a: number; b: number; smp: string; plain: string; oct: number; reg: (p: number, smp: string) => number } };
+    let pending: Pending = { tok: 'r', ticks: 0 };
+    let carry = 0;
     let sounding = false, curNote = 'r';
     let hasNotes = false;
     // Effect state of this channel (Furnace effects that TAD holds as channel state).
-    let curSmp = '', curPitch = -1, echoOn = false, pmOn = false, vib = '0', volSlide = 0, lastEnv = '';
+    let curSmp = '', curPitch = -1, echoOn = false, pmOn = false, vib = '0', vibWant: { d: number; q: number } | null = null, volSlide = 0, lastEnv = '';
     let env: { mode: number; gain: number; adsr: number[] } | null = null;
     const pitchName = (p: number) => NOTE_NAMES[p % 12];
     // Furnace ticks to TAD ticks (rows are k Furnace-tick multiples; sound effects run at 125 Hz).
@@ -221,13 +235,39 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     // note is slurred (`&`) into a repeat of itself.
     const flush = (cont = false) => {
       const slur = cont && sounding;
-      if (pending.ticks > 0) out.push(`${pending.tok}%${pending.ticks}${slur ? ' &' : ''}`);
+      // tad-wasm compiler mml/command_parser.rs:1717 (KEY_OFF_TICK_DELAY = 1, bytecode.rs:35): an unslurred note needs
+      // more than 1 tick, so a 1-tick note is slurred into what follows (no key-off).
+      // A rest needs 2 ticks (tad-wasm compiler mml/command_parser.rs invalid tick count, 2..=65535): a lone 1-tick
+      // rest is folded into the length of the next token, which then starts 1 tick early.
+      if (pending.ticks > 0 && carry) { pending.ticks += carry; carry = 0; }
+      if (pending.tok === 'r' && pending.ticks === 1 && !slur) {
+        warnings.push(`Song channel ${ch + 1}: 1-tick rest folded into the next note (the driver needs 2 ticks).`);
+        carry = 1; pending = { tok: 'r', ticks: 0 }; return;
+      }
+      const short = !slur && pending.ticks === 1 && pending.tok !== 'r';
+      if (short) warnings.push(`Song channel ${ch + 1}: 1-tick note slurred (the driver needs 2 ticks for a key-off note).`);
+      // A slide token spans the merged rows, so its portamento velocity is checked here with the real tick count.
+      // Compiler channel_bc_generator.rs:760-775: velocity = round(register delta / (ticks - 1)), allowed 1..=255 (bytecode.rs:617, errors.rs:1171).
+      if (pending.sl && pending.ticks > 0) {
+        const { a, b, smp, plain, oct: o2, reg } = pending.sl;
+        const delta = Math.abs(reg(b, smp) - reg(a, smp));
+        if (delta && (pending.ticks < 2 || Math.round(delta / pending.ticks) < 1 || Math.round(delta / (pending.ticks - 1)) > 255)) {
+          warnings.push(`Song channel ${ch + 1}: pitch slide over ${pending.ticks} ticks dropped (TAD portamento velocity outside 1..255).`);
+          pending.tok = plain; oct = o2;
+        }
+      }
+      if (pending.ticks > 0) out.push(`${pending.tok}%${pending.ticks}${slur || short ? ' &' : ''}`);
       pending = { tok: slur ? curNote : 'r', ticks: 0 };
     };
     rows.forEach((r, i) => {
       const at = where(ch, r);
       const cl = cell(ch, r.pos, r.row);
-      if (i === loopRow) { flush(true); out.push('L'); }
+      if (i === loopRow) {
+        flush(true); out.push('L');
+        // The loop point joins two instrument states, so the compiler narrows the note range to the overlap of both
+        // (bytecode.rs:1768 InstrumentState::Multiple); naming the instrument again keeps the full range.
+        if (curIns >= 0) out.push(`@${curIns}`);
+      }
       let delayUsed = 0, cutAt = 0;
       if (cl) {
         if (cl.ins >= 0) { ins = cl.ins; env = null; lastEnv = ''; }
@@ -251,8 +291,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           else if (e.cmd === 0x04) {
             // Furnace vibrato: x = rate (64 steps per cycle), y = depth (15 = one semitone). TAD MP is a sawtooth.
             const x = e.val >> 4, y = e.val & 15;
-            const mp = x && y ? `MP${Math.round(y * 100 / 15)},${Math.max(1, Math.min(255, Math.round(16 / x)))}` : 'MP0';
-            if (mp !== vib) { vib = mp; cmds.push(mp); }
+            vibWant = x && y ? { d: Math.round(y * 100 / 15), q: Math.max(1, Math.min(255, Math.round(16 / x))) } : null; // emitted with the next note, depth clamped to that note's pitch
           }
           else if (e.cmd === 0x0a) volSlide = (e.val >> 4) - (e.val & 15) || 0;
           else if ([0x00, 0x01, 0x02, 0x03, 0xec, 0xed].includes(e.cmd)) { /* applied with the note below */ }
@@ -292,11 +331,18 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         const left = Math.max(1, r.ticks - (delay < r.ticks ? delay : 0));
         // Pitch token replacing the plain note: slide `{..}` or broken chord `{{..}}`, or null.
         // start = pitch the token starts from (-1: previous slurred note), returns the token and end pitch.
+        // Portamento velocity as the compiler computes it (command_compiler/channel_bc_generator.rs:760-775): round(register delta / slide ticks),
+        // slide ticks = row ticks - 1 (the key-off tick), must be 1..=255 (bytecode.rs:617 PortamentoVelocity, errors.rs:1171). Register: pitch_table.rs:146-157.
+        const pitchReg = (p: number, smp = curSmp) => {
+          const hz = smp[0] === 'w' ? 32000 / Number(smp.slice(1)) : samples[Number(smp.slice(1))] ? sampleTuningHz(samples[Number(smp.slice(1))], tuningHz) : 0;
+          return hz ? 4096 * 2 ** ((p - Math.round(Math.log2(hz / 440) * 12e6 + 57e6) / 1e6) / 12) : 0;
+        };
         const pitchFx = (start: number, newPitch: number): { tok: string; end: number; first: number } | null => {
           const from = start >= 0 ? start : newPitch;
           if (s03 > 0 && start >= 0 && newPitch >= 0 && newPitch !== start) {
             const d = Math.min(Math.abs(newPitch - start), semis(s03, left));
-            return d && left <= 8 * d && Math.min(start, newPitch) >= 12 ? { tok: 'slide', end: start + Math.sign(newPitch - start) * d, first: start } : null;
+            const end = start + Math.sign(newPitch - start) * d;
+            return d && left <= 8 * d && Math.min(start, newPitch) >= 12 ? { tok: 'slide', end, first: start } : null;
           }
           const sp = s01 > 0 ? s01 : s02 > 0 ? -s02 : 0;
           if (sp && from >= 0) {
@@ -311,20 +357,21 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             const ps = [fx.first, clampP(fx.first + (arp >> 4)), clampP(fx.first + (arp & 15))];
             let o = oct, s = '';
             for (const p of ps) { if (Math.floor(p / 12) !== o) { o = Math.floor(p / 12); s += `o${o} `; } s += `${pitchName(p)} `; }
-            for (const p of ps) { const r2 = sampleOctaves.get(curSmp) ?? [o, o]; sampleOctaves.set(curSmp, [Math.min(r2[0], Math.floor(p / 12)), Math.max(r2[1], Math.floor(p / 12))]); }
+            for (const p of ps) widen(curSmp, p);
             oct = -1; // the chord ends on an unknown octave
             curNote = `o${Math.floor(fx.first / 12)} ${pitchName(fx.first)}`;
             curPitch = fx.first;
             return `{{${s.trim()}}}`;
           }
           const o2 = Math.floor(fx.end / 12);
-          const r2 = sampleOctaves.get(curSmp) ?? [o2, o2];
-          sampleOctaves.set(curSmp, [Math.min(r2[0], o2), Math.max(r2[1], o2)]);
+          widen(curSmp, fx.end);
           let t = keepFirst ? `${pitchName(fx.first)} ` : '';
           if (o2 !== oct) { if (keepFirst) t += `o${o2} `; else out.push(`o${o2}`); }
           oct = o2;
           curNote = pitchName(fx.end);
           curPitch = fx.end;
+          const plain = keepFirst ? `${Math.floor(fx.first / 12) !== o2 ? `o${Math.floor(fx.first / 12)} ` : ''}${pitchName(fx.first)}` : pitchName(fx.end);
+          pending.sl = { a: fx.first, b: fx.end, smp: curSmp, plain, oct: keepFirst ? Math.floor(fx.first / 12) : o2, reg: pitchReg };
           return `{${t}${pitchName(fx.end)}}`;
         };
         const isNote = cl.note >= 0 && cl.note < 180;
@@ -341,13 +388,23 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           if (!sound) {
             if (!insWarned.has(ins)) { insWarned.add(ins); warnings.push(`Instrument ${ins} has no sample or wavetable for some notes; those notes are rests.`); }
             flush(); out.push(...cmds); sounding = false; pending = { tok: 'r', ticks: 0 };
-          } else if (tad < 0 || tad > 95) {
-            drop('notes outside TAD octaves 0-7', at);
+          } else if (tad < 0 || tad > 95 || outside(sound.smp, tad)) {
+            drop(`notes outside the pitch range of sample ${sound.smp} (instrument ${ins})`, `${at}, note ${NOTE_NAMES[((tad % 12) + 12) % 12]}${Math.floor(tad / 12)}`);
             flush(); out.push(...cmds); sounding = false; pending = { tok: 'r', ticks: 0 };
           } else {
             if (delay > 0 && delay < r.ticks) { pending.ticks += delay; delayUsed = delay; } // EDxx: the old note rings on
             flush();
             curSmp = sound.smp;
+            // MP depth: compiler channel_bc_generator.rs:146-190 - round(reg * (2^(cents/1200) - 2^-(cents/1200)) / (2 * quarter wavelength)) must be <= 255.
+            let want = 'MP0';
+            if (vibWant) {
+              const reg = pitchReg(tad);
+              let d = vibWant.d;
+              while (reg && d > 0 && Math.round(reg * (2 ** (d / 1200) - 2 ** (-d / 1200)) / (2 * vibWant.q)) > 255) d--;
+              if (d < vibWant.d) warnings.push(`${at}: vibrato depth ${vibWant.d} cents reduced to ${d} (pitch offset per tick too large).`);
+              if (d > 0) want = `MP${d},${vibWant.q}`;
+            }
+            if (want !== vib) { vib = want; cmds.push(want); }
             const key = `${ins} ${sound.smp}`;
             const id = tadIns.get(key) ?? tadIns.size;
             tadIns.set(key, id);
@@ -356,8 +413,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             const o = Math.floor(tad / 12);
             if (o !== oct) { oct = o; out.push(`o${o}`); }
             const smp = sound.smp;
-            const range = sampleOctaves.get(smp);
-            sampleOctaves.set(smp, range ? [Math.min(range[0], o), Math.max(range[1], o)] : [o, o]);
+            widen(smp, tad);
             curNote = NOTE_NAMES[tad % 12];
             curPitch = tad;
             pending = { tok: curNote, ticks: 0 };
@@ -408,7 +464,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     if (inst.hasMacros && !macroWarned.has(i)) { macroWarned.add(i); warnings.push(`Instrument ${i} (${inst.name}): macros dropped.`); }
     insLines.push(`@${id} ${smp} ${envelope(inst, warnings, i)}`);
     if (!sampleFiles.has(smp)) {
-      const octaves = sampleOctaves.get(smp) ?? [4, 4];
+      const octaves = sampleOctaves.get(smp) ?? [48, 48];
       const n = Number(smp.slice(1));
       const f = smp[0] === 'w' ? waveFile(wavetables[0], n, octaves) : sampleFile(samples[n], n, tuning, octaves, warnings);
       if (f) sampleFiles.set(smp, f);
@@ -479,11 +535,19 @@ function waveFile(w: FurnaceWavetable, len: number, octaves: [number, number]): 
   const path = `samples/${name}.brr`;
   // One wave period is one note cycle (Furnace wavePitchTable scales with the wave length), so the
   // wave played at 32 kHz sounds 32000/len Hz. Unverified by ear; check in the P4 owner test.
-  const pitches = { type: 'octave', frequency: 32000 / len, first_octave: octaves[0], last_octave: octaves[1] };
+  const pitches = { type: 'notes', frequency: 32000 / len, first_note: String(octaves[0]), last_note: String(octaves[1]) };
   return {
     name, path, data,
     entry: { name, source: { type: 'brr', source: path, loop_point: 0 }, ignore_gaussian_overflow: false, pitches, envelope: 'gain F127' },
   };
+}
+
+/** One silent looping BRR block: the instrument lines that name the sample still compile, its notes make no sound. */
+function silentSample(name: string, pitches: Record<string, unknown>): TadSampleFile {
+  const path = `samples/${name}.brr`;
+  const data = new Uint8Array(9);
+  data[0] = 0xb3; // range 11, filter 0, loop + end
+  return { name, path, data, entry: { name, source: { type: 'brr', source: path, loop_point: 0 }, ignore_gaussian_overflow: true, pitches, envelope: 'gain F127' } };
 }
 
 function sampleFile(
@@ -492,19 +556,21 @@ function sampleFile(
   const name = `s${idx}`;
   const label = `Sample ${idx} (${s.name})`;
   // A sample played at c4Rate sounds C-4; TAD wants the frequency of the sample played at 32 kHz.
-  const frequency = (tuning * 2 ** (-9 / 12)) * 32000 / (s.rate || 32000);
-  const pitches = { type: 'octave', frequency, first_octave: octaves[0], last_octave: octaves[1] };
+  const frequency = sampleTuningHz(s, tuning);
+  const pitches = { type: 'notes', frequency, first_note: String(octaves[0]), last_note: String(octaves[1]) };
   const looped = s.loopStart >= 0 && s.loopEnd > s.loopStart;
   if (looped && s.loopMode !== 0) warnings.push(`${label}: ${s.loopMode === 1 ? 'backward' : 'ping-pong'} loop plays forward.`);
+  // BRR data is the Furnace author's own encoding for the same hardware: the compiler's gaussian overflow check
+  // (samples.rs:216) would refuse it, so it is exported as authored. Wave files stay checked.
   const entry = (path: string, source: Record<string, unknown>) => ({
-    name, source: { ...source, source: path }, ignore_gaussian_overflow: false, pitches, envelope: 'gain F127',
+    name, source: { ...source, source: path }, ignore_gaussian_overflow: source.type === 'brr', pitches, envelope: 'gain F127',
   });
 
   if (s.depth === 9) {
     const path = `samples/${name}.brr`;
     const raw = s.data instanceof Uint8Array ? s.data : new Uint8Array(s.data.buffer, s.data.byteOffset, s.data.byteLength);
     const data = raw.slice(0, raw.length - (raw.length % 9));
-    if (!data.length) { warnings.push(`${label}: empty BRR sample; its notes are silent.`); return null; }
+    if (!data.length) { warnings.push(`${label}: empty BRR sample; its notes are silent.`); return silentSample(name, pitches); }
     // Furnace stores BRR without END/LOOP flags (it sets them on upload); TAD wants them in the file.
     for (let b = 0; b < data.length; b += 9) data[b] &= 0xfc;
     data[data.length - 9] |= looped ? 3 : 1;
@@ -517,7 +583,7 @@ function sampleFile(
   }
   if (s.depth !== 8 && s.depth !== 16) {
     warnings.push(`${label}: sample depth ${s.depth} cannot be exported; its notes are silent.`);
-    return null;
+    return silentSample(name, pitches);
   }
 
   const pcm = toInt16(s);
@@ -548,6 +614,26 @@ function sampleFile(
   return { name, path, data, entry: entry(path, source) };
 }
 
+/** Frequency of a sample played at 32 kHz; a sample played at c4Rate sounds C-4. */
+function sampleTuningHz(s: FurnaceModuleSample, tuning: number): number {
+  return (tuning * 2 ** (-9 / 12)) * 32000 / (s.rate || 32000);
+}
+
+/** Playable TAD note ids for a tuning frequency (mirrors tad-wasm compiler pitch_table.rs note_pitches). */
+export function tadNoteRange(freq: number): [number, number] {
+  const mst = Math.round(Math.log2(freq / 440) * 12e6 + 57e6);
+  const semis = Math.floor(mst / 1e6);
+  const maxInc = Math.floor((Math.floor(Math.log2(0x3fff / 0x1000) * 12e6) + (mst % 1e6)) / 1e6);
+  return [Math.max(0, semis - 95), Math.min(95, semis + maxInc)];
+}
+
+type NotePitches = { first_note: string; last_note: string };
+/** Same sample used twice: note range widened to cover both. */
+export function widenTadPitches(a: unknown, b: unknown): Record<string, unknown> {
+  const x = a as NotePitches, y = b as NotePitches;
+  return { ...x, first_note: String(Math.min(+x.first_note, +y.first_note)), last_note: String(Math.max(+x.last_note, +y.last_note)) };
+}
+
 /**
  * One sample list from the songs and sound effects of one Furnace file: same name = same sample,
  * octave range widened to cover every user (TAD rejects notes outside a sample's octaves).
@@ -557,9 +643,7 @@ export function mergeTadSamples(lists: TadSampleFile[][]): TadSampleFile[] {
   for (const f of lists.flat()) {
     const have = out.get(f.name);
     if (!have) { out.set(f.name, f); continue; }
-    const a = have.entry.pitches as { first_octave: number; last_octave: number };
-    const b = f.entry.pitches as { first_octave: number; last_octave: number };
-    const pitches = { ...a, first_octave: Math.min(a.first_octave, b.first_octave), last_octave: Math.max(a.last_octave, b.last_octave) };
+    const pitches = widenTadPitches(have.entry.pitches, f.entry.pitches);
     out.set(f.name, { ...have, entry: { ...have.entry, pitches } });
   }
   return [...out.values()];

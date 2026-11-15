@@ -25,7 +25,7 @@ async function load(file: string, sfx = false): Promise<TadBuildFile> {
 
 describe('buildTadProject', () => {
   it('bundles two songs and a sound effect', async () => {
-    const other = readdirSync(DIR).find((f) => f.endsWith('.fur') && f !== 'tetristheme.fur' && f !== 'Dear Blue SNES.fur' && f !== 'XCHQ_SPC700.fur')!;
+    const other = readdirSync(DIR).find((f) => f.endsWith('.fur') && f === 'amalgam.fur')!; // a corpus song that fits next to tetristheme (the larger ones are over the driver size limits)
     const set = [await load('tetristheme.fur', true), await load(other)];
     // @ts-expect-error generated JS module
     const { default: create } = await import('../../../../../public/tad/tad-compiler.js');

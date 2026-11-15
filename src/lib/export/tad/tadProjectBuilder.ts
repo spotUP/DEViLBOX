@@ -6,7 +6,7 @@ import type { FurnaceNativeData, FurnaceModuleSample } from '@/types/tracker';
 import type { FurnaceSNESConfig } from '@/types/instrument/furnace';
 import type { FurnaceWavetable } from '@/lib/import/formats/FurnaceSongParser';
 import {
-  writeTadSong, writeTadSfx, tadSfxName, mergeTadSamples, TAD_SFX_FILE,
+  writeTadSong, writeTadSfx, tadSfxName, mergeTadSamples, widenTadPitches, TAD_SFX_FILE,
   type TadInstrumentInput, type TadSampleFile, type TadSongInput,
 } from './tadSongWriter';
 import { openTadSession, type CreateTadCompiler } from './tadCompilerWasm';
@@ -85,9 +85,7 @@ function unifySamples(pieces: Piece[], canon: Map<string, TadSampleFile>): void 
         canon.set(name, { ...s, name, path, entry: { ...s.entry, name, source: { ...(s.entry.source as object), source: path } } });
       } else {
         name = found.name;
-        const a = found.entry.pitches as { first_octave: number; last_octave: number };
-        const b = s.entry.pitches as { first_octave: number; last_octave: number };
-        canon.set(name, { ...found, entry: { ...found.entry, pitches: { ...a, first_octave: Math.min(a.first_octave, b.first_octave), last_octave: Math.max(a.last_octave, b.last_octave) } } });
+        canon.set(name, { ...found, entry: { ...found.entry, pitches: widenTadPitches(found.entry.pitches, s.entry.pitches) } });
       }
       rename.set(s.name, name);
     }
