@@ -186,6 +186,8 @@ export const LIVE_WHILE_PLAYING: Record<string, LiveEditStatus> = {
   // hvl: hivelyLiveEdit.test.ts - the view's edit writes the step into the running tune (hively_set_track_step), no module swap.
   hvl: 'pass',
   jochenHippelST: 'pass',
+  // med (MMD3): libopenmpt hot reload of the patched module, measured by libopenmpt/__tests__/medModuleLiveEditHeard.test.ts against the same reload of the unchanged bytes.
+  med: 'pass',
   // musicAssembler, pumaTracker, sidmon2: the same measurement (musicAssemblerLiveSwap, pumaTrackerLiveSwap, sidMon2LiveSwap .test.ts).
   musicAssembler: 'pass',
   pumaTracker: 'pass',
