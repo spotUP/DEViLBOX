@@ -153,6 +153,25 @@ describe('writeTadSong echo header', () => {
     expect(song.warnings.some((w) => /E5xx|effect e5/i.test(w))).toBe(false);
   }, 60000);
 
+  // snes.cpp:495 11xx noise on, :541 1Dxx noise clock: TAD N<freq> plays noise in place of the note.
+  it('plays notes under 11xx as TAD noise at the 1Dxx frequency', async () => {
+    const buf = readFileSync(resolve(DIR, 'tetristheme.fur'));
+    const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+    const native = buildFurnaceNativeData(module);
+    const sub = native.subsongs[0];
+    const row = sub.channels.flatMap((ch, c) => ch.patterns.get(sub.orders[c]?.[0] ?? -1)?.rows ?? []).find((r) => r.note >= 0 && r.note < 180)!;
+    row.effects = [...(row.effects ?? []), { cmd: 0x11, val: 1 }, { cmd: 0x1d, val: 0x0a }];
+    const song = writeTadSong({ native, subsong: 0, instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)), samples: toSequencerSamples(module), wavetables: module.wavetables, title: 'tetristheme' });
+    expect(song.mml).toMatch(/N10,%\d+/);
+    expect(song.warnings.some((w) => /effect (11|1D)/i.test(w))).toBe(false);
+    const files: Record<string, Uint8Array | string> = { 'p.terrificaudio': tadProjectJson([{ name: 'song', source: 'song.mml' }], song.samples), 'song.mml': song.mml };
+    for (const s of song.samples) files[s.path] = s.data;
+    // @ts-expect-error generated JS module
+    const { default: create } = await import('../../../../../public/tad/tad-compiler.js');
+    const r = (await openTadSession(files, create as CreateTadCompiler, (f) => resolve('public/tad', f))).run(['check', '/p/p.terrificaudio']);
+    expect(r.code, r.log).toBe(0);
+  }, 60000);
+
   it('writes the Furnace echo flags as TAD header lines', async () => {
     const lines: Record<string, string> = {};
     for (const file of FILES) {

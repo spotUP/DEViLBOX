@@ -94,7 +94,7 @@ const FURNACE_NOTE_OFFSET = 60;
 const ROW_GUARD = 100_000;
 const hex2 = (n: number) => n.toString(16).toUpperCase().padStart(2, '0');
 
-interface LinearRow { pos: number; row: number; ticks: number }
+interface LinearRow { pos: number; row: number; ticks: number; noise: number }
 
 /** First SNES channel index in the song and the SNES channel count. */
 function snesChannels(native: FurnaceNativeData): { first: number; count: number; chip: number } | null {
@@ -195,7 +195,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
   const rows: LinearRow[] = [];
   const visited = new Map<string, number>();
   let loopRow: number | null = null;
-  let pos = 0, row = 0;
+  let pos = 0, row = 0, noise = 0;
   while (rows.length < ROW_GUARD) {
     visited.set(`${pos}:${row}`, rows.length);
     let jump: number | null = null, brk: number | null = null, stop = false;
@@ -209,12 +209,13 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           if (!grooves.length) { if (e.val > 0) { speeds = [...speeds]; speeds[0] = e.val; } }
           else { const g = grooves[e.val]; if (g?.len) { speeds = g.val.slice(0, g.len); speedIdx = 0; } }
         }
+        else if (e.cmd === 0x1d) noise = e.val & 31; // snes.cpp:541 one noise clock for the whole chip
         else if (e.cmd === 0x0b) jump = e.val;
         else if (e.cmd === 0x0d) brk = e.val;
         else if (e.cmd === 0xff) stop = true;
       }
     }
-    rows.push({ pos, row, ticks: (speeds[speedIdx++ % speeds.length] || 1) * k });
+    rows.push({ pos, row, ticks: (speeds[speedIdx++ % speeds.length] || 1) * k, noise });
     if (stop) break;
     if (jump !== null || brk !== null) { pos = jump ?? pos + 1; row = brk ?? 0; }
     else if (++row >= sub.patLen) { pos++; row = 0; }
@@ -300,7 +301,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     let sounding = false, curNote = 'r';
     let hasNotes = false;
     // Effect state of this channel (Furnace effects that TAD holds as channel state).
-    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', fine = 0, inv = 'i0', vibWant: { d: number; q: number } | null = null, volSlide = 0, lastEnv = '';
+    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', fine = 0, inv = 'i0', noiseOn = false, vibWant: { d: number; q: number } | null = null, volSlide = 0, lastEnv = '';
     let env: { mode: number; gain: number; adsr: number[] } | null = null;
     const pitchName = (p: number) => NOTE_NAMES[p % 12];
     // Furnace ticks to TAD ticks (rows are k Furnace-tick multiples; sound effects run at 125 Hz).
@@ -399,6 +400,8 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             if (sfx || c < 1 || c > 5) drop('effect 13xx (pitch modulation only on song channels B-F)', at);
             else if ((e.val !== 0) !== pmOn) { pmOn = e.val !== 0; cmds.push(pmOn ? 'PM' : 'PM0'); }
           }
+          else if (e.cmd === 0x11) noiseOn = e.val !== 0; // snes.cpp:495; TAD N plays noise in place of the next notes
+          else if (e.cmd === 0x1d) { /* noise frequency: read from the row walk */ }
           else if (e.cmd === 0x14) {
             // snes.cpp:503 invertL = x, invertR = y. TAD L/R act in surround mode only; M (both) in mono/stereo.
             const l = (e.val >> 4) !== 0, r = (e.val & 15) !== 0;
@@ -555,7 +558,12 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             hasNotes = true;
             const fx = pitchFx(-1, tad);
             if (fx) pending.tok = fxToken(fx, true);
-            if (am === null) drop(`arp macros that loop, release or use fixed notes (instrument ${ins})`, at);
+            if (noiseOn) {
+              // Noise ignores the note pitch (snes.cpp:278 FLG noise clock); arp and slides have nothing to move.
+              if (fx) drop('pitch effects on noise notes', at);
+              curNote = pending.tok = `N${r.noise},`;
+            }
+            else if (am === null) drop(`arp macros that loop, release or use fixed notes (instrument ${ins})`, at);
             else if (am?.steps.length) {
               const pre = am.steps.map((o) => tad - am.hold + o);
               if (fx) drop(`arp macro steps under a pitch effect (instrument ${ins})`, at);
