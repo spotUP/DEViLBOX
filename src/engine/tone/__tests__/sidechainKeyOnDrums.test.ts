@@ -20,11 +20,11 @@ import { ChannelRoutedEffectsManager, setPlayingIsolationEngine } from '../Chann
 afterEach(() => setPlayingIsolationEngine(null));
 
 describe('Drums (auto) key', () => {
-  it('picks the drum channel of nicktune1.bp (channel 2, index 1)', async () => {
+  it('picks the drum channel of nicktune1.bp (Paula voice 2, channel index 2)', async () => {
     const b = readFileSync(join(process.cwd(), 'public/data/songs/bp-soundmon-2/nicktune1.bp'));
     const song = await parseSoundMonFile(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength), 'nicktune1.bp');
     const lookup = new Map(song.instruments.map((i) => [i.id, i as InstrumentConfig]));
-    expect(pickDrumKeyChannel(classifySongChannels(song.patterns, lookup))).toBe(1);
+    expect(pickDrumKeyChannel(classifySongChannels(song.patterns, lookup))).toBe(2); // cf07b61c6 mirrored SoundMon grid columns onto Paula voices (3 - v)
   });
 
   it('prefers the kick, then a kit, then any percussion; none gives own input', () => {
