@@ -75,6 +75,34 @@ function snesChannels(native: FurnaceNativeData): { first: number; count: number
 }
 
 export function writeTadSong(input: TadSongInput): TadSongResult {
+  return writeTad(input, false);
+}
+
+/** Prefix of a Furnace subsong name that marks it as a TAD sound effect (`sfx:<name>`). */
+export const TAD_SFX_PREFIX = 'sfx:';
+
+/** TAD sound effect name of a subsong, or null when the subsong is music. */
+export function tadSfxName(subsongName: string | undefined): string | null {
+  if (!subsongName?.startsWith(TAD_SFX_PREFIX)) return null;
+  const name = subsongName.slice(TAD_SFX_PREFIX.length).trim().replace(/[^A-Za-z0-9_]+/g, '_');
+  return name || null;
+}
+
+/**
+ * One `sfx:<name>` subsong as one block of the TAD sound effect file (`=== name === mml`).
+ * TAD plays a sound effect on one channel at a fixed 125 ticks per second, once: the first SNES
+ * channel with notes is kept, rows are rescaled to 125 Hz, the order list plays once.
+ */
+export function writeTadSfx(input: TadSongInput): TadSongResult & { name: string } {
+  const name = tadSfxName(input.native.subsongs[input.subsong]?.name) ?? `sfx${input.subsong}`;
+  const r = writeTad(input, true);
+  return { ...r, name, mml: r.mml && `=== ${name} === mml\n${r.mml}` };
+}
+
+/** TAD sound effect tick rate (docs/sound-effects.md: fixed tempo). */
+const SFX_TICK_HZ = 125;
+
+function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
   const { native, instruments, samples } = input;
   const sub = native.subsongs[input.subsong];
   const warnings: string[] = [];
@@ -97,11 +125,13 @@ export function writeTadSong(input: TadSongInput): TadSongResult {
   const k = Math.max(1, Math.ceil(8000 / rate / 256));
   const timerExact = 8000 / (rate * k);
   let timer = Math.round(timerExact);
-  if (timer < 64) {
+  if (sfx) timer = 64;
+  else if (timer < 64) {
     warnings.push(`Tick rate ${rate.toFixed(2)} Hz is faster than TAD allows (125 Hz); the song plays slower.`);
     timer = 64;
   }
-  if (Math.abs(timer - timerExact) / timerExact > 0.005) {
+  if (sfx && rate > SFX_TICK_HZ) warnings.push(`Tick rate ${rate.toFixed(2)} Hz is faster than TAD sound effects (125 Hz); short rows merge.`);
+  if (!sfx && Math.abs(timer - timerExact) / timerExact > 0.005) {
     warnings.push(`Tempo differs by ${((timer / timerExact - 1) * 100).toFixed(1)}% (TAD timer ${timer}).`);
   }
 
@@ -130,12 +160,17 @@ export function writeTadSong(input: TadSongInput): TadSongResult {
     if (stop) break;
     if (jump !== null || brk !== null) { pos = jump ?? pos + 1; row = brk ?? 0; }
     else if (++row >= sub.patLen) { pos++; row = 0; }
-    if (pos >= sub.ordersLen) pos = 0;
+    if (pos >= sub.ordersLen) { if (sfx) break; pos = 0; }
     if (row >= sub.patLen) row = 0;
     const seen = visited.get(`${pos}:${row}`);
-    if (seen !== undefined) { loopRow = seen; break; }
+    if (seen !== undefined) { if (!sfx) loopRow = seen; break; }
   }
   if (rows.length >= ROW_GUARD) warnings.push('The song did not loop within 100000 rows; it is cut there.');
+  if (sfx) {
+    // Rescale row lengths to 125 Hz; accumulate so rounding does not drift.
+    let acc = 0, prev = 0;
+    for (const r of rows) { acc += r.ticks / k * SFX_TICK_HZ / rate; const t = Math.round(acc); r.ticks = t - prev; prev = t; }
+  }
 
   // Notes on channels of other chips cannot play.
   for (let ch = 0; ch < nCh; ch++) {
@@ -168,6 +203,7 @@ export function writeTadSong(input: TadSongInput): TadSongResult {
   };
   const insWarned = new Set<number>();
   const channelMml: string[] = [];
+  let sfxChannel = -1;
   for (let c = 0; c < snes.count; c++) {
     const ch = snes.first + c;
     const out: string[] = ['V254'];
@@ -236,10 +272,14 @@ export function writeTadSong(input: TadSongInput): TadSongResult {
     });
     flush();
     if (!hasNotes) continue;
-    const letter = 'ABCDEFGH'[c];
+    if (sfx) {
+      if (sfxChannel >= 0) { warnings.push(`Sound effects play on one channel: channel ${ch + 1} dropped (kept channel ${sfxChannel + 1}).`); continue; }
+      sfxChannel = ch;
+    }
+    const letter = sfx ? 'A' : 'ABCDEFGH'[c];
     for (let i = 0; i < out.length; i += 24) channelMml.push(`${letter} ${out.slice(i, i + 24).join(' ')}`);
   }
-  if (loopRow === null) warnings.push('The song stops (FFxx) and does not loop.');
+  if (loopRow === null && !sfx) warnings.push('The song stops (FFxx) and does not loop.');
 
   // Instruments and samples.
   const insLines: string[] = [];
@@ -262,6 +302,11 @@ export function writeTadSong(input: TadSongInput): TadSongResult {
 
   for (const [what, d] of dropped) warnings.push(`Dropped ${what}: ${d.n}x, first at ${d.at}.`);
 
+  if (sfx) {
+    const block = channelMml.length ? [...insLines, '', ...channelMml, ''].join('\n') : '';
+    if (!block) warnings.push('The sound effect has no notes on an SNES channel.');
+    return { mml: block, samples: [...sampleFiles.values()], warnings: [...new Set(warnings)] };
+  }
   const mml = [
     `#Title ${input.title.replace(/[\r\n]/g, ' ')}`,
     `#Timer ${timer}`,
@@ -388,12 +433,33 @@ function sampleFile(
   return { name, path, data, entry: entry(path, source) };
 }
 
-/** Project JSON for one song and its samples (P3 merges several songs into one project). */
-export function tadProjectJson(songName: string, songFile: string, samples: TadSampleFile[]): string {
+/**
+ * One sample list from the songs and sound effects of one Furnace file: same name = same sample,
+ * octave range widened to cover every user (TAD rejects notes outside a sample's octaves).
+ */
+export function mergeTadSamples(lists: TadSampleFile[][]): TadSampleFile[] {
+  const out = new Map<string, TadSampleFile>();
+  for (const f of lists.flat()) {
+    const have = out.get(f.name);
+    if (!have) { out.set(f.name, f); continue; }
+    const a = have.entry.pitches as { first_octave: number; last_octave: number };
+    const b = f.entry.pitches as { first_octave: number; last_octave: number };
+    const pitches = { ...a, first_octave: Math.min(a.first_octave, b.first_octave), last_octave: Math.max(a.last_octave, b.last_octave) };
+    out.set(f.name, { ...have, entry: { ...have.entry, pitches } });
+  }
+  return [...out.values()];
+}
+
+/** TAD sound effect file name in the project (holds every `writeTadSfx` block). */
+export const TAD_SFX_FILE = 'sound-effects.txt';
+
+/** Project JSON for one song, its sound effects (export order) and samples (P3 merges several songs). */
+export function tadProjectJson(songName: string, songFile: string, samples: TadSampleFile[], sfxNames: string[] = []): string {
   return JSON.stringify({
     _about: { file_type: 'Terrific Audio Driver project file', version: '0.4.2' },
     brr_samples: samples.map((s) => s.entry),
     songs: [{ name: songName, source: songFile }],
-    sound_effects: [],
+    ...(sfxNames.length ? { default_sfx_flags: { one_channel: true, interruptible: true }, sound_effect_file: TAD_SFX_FILE } : {}),
+    sound_effects: sfxNames,
   }, null, 2);
 }
