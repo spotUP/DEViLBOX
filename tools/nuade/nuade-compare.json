@@ -1,7 +1,7 @@
 {
  "version": 1,
  "instrument": {
-  "wasm": "ed9331a76ac9",
+  "wasm": "0a5752ff9f1b",
   "known_good": {
    "song": "public/data/songs/formats/antidust.bp3",
    "correlation": 0.9739122364298693,
@@ -574,41 +574,6 @@
    "songPass": true,
    "sha": "71dd279926f16bdcea540196",
    "ms": 540
-  },
-  {
-   "correlation": 0.9970935632696294,
-   "lagMs": -20,
-   "windowSecs": 30,
-   "uadeEndAt": -1,
-   "nuadeEndAt": -1,
-   "peak": 0.64862060546875,
-   "rms": 0.10611213650778428,
-   "voices": 4,
-   "player": "mmdc",
-   "uadeRms": 0.10324845703039388,
-   "swapMs": 142.97541599999386,
-   "format": "mmdc",
-   "song": "public/data/songs/formats/captain planet and the planeteers - title.mmdc",
-   "songPass": true,
-   "sha": "261a34af8e0d6bdcea540196",
-   "ms": 599
-  },
-  {
-   "correlation": 0.9826562541040275,
-   "lagMs": -20,
-   "windowSecs": 3.16,
-   "uadeEndAt": 3.6693333333333333,
-   "nuadeEndAt": 3.6650833333333335,
-   "peak": 0.30169677734375,
-   "rms": 0.07392366172036774,
-   "voices": 4,
-   "player": "mmdc",
-   "uadeRms": 0.07324444686360856,
-   "format": "mmdc",
-   "song": "public/data/songs/octamed-mmdc/knightmare - ingame 3.mmdc",
-   "songPass": true,
-   "sha": "9b09649cf1086bdcea540196",
-   "ms": 82
   },
   {
    "error": "_uade_wasm_load failed (ret=-1)",
@@ -4339,6 +4304,41 @@
    "songPass": true,
    "sha": "770f8218c6aaed9331a76ac9",
    "ms": 264
+  },
+  {
+   "correlation": 0.9970935632696294,
+   "lagMs": -20,
+   "windowSecs": 30,
+   "uadeEndAt": -1,
+   "nuadeEndAt": -1,
+   "peak": 0.64862060546875,
+   "rms": 0.10611213650778428,
+   "voices": 4,
+   "player": "mmdc",
+   "uadeRms": 0.10324845703039388,
+   "swapMs": 127.39158299999986,
+   "format": "mmdc",
+   "song": "public/data/songs/formats/captain planet and the planeteers - title.mmdc",
+   "songPass": true,
+   "sha": "261a34af8e0d0a5752ff9f1b",
+   "ms": 455
+  },
+  {
+   "correlation": 0.9826562541040275,
+   "lagMs": -20,
+   "windowSecs": 3.16,
+   "uadeEndAt": 3.6693333333333333,
+   "nuadeEndAt": 3.6650833333333335,
+   "peak": 0.30169677734375,
+   "rms": 0.07392366172036774,
+   "voices": 4,
+   "player": "mmdc",
+   "uadeRms": 0.07324444686360856,
+   "format": "mmdc",
+   "song": "public/data/songs/octamed-mmdc/knightmare - ingame 3.mmdc",
+   "songPass": true,
+   "sha": "9b09649cf1080a5752ff9f1b",
+   "ms": 57
   }
  ]
 }
