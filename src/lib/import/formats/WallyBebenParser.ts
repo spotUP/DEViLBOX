@@ -12,8 +12,8 @@
  *   - SamplesPtr table: scan for 0xE584 (ASL.L #2,D4) with preceding LEA
  *
  * SongsPtr table layout:
- *   [0..nSubsongs*4-1] = voice sequence pointers (4 per subsong)
- *   [nSubsongs*4..]     = phrase/pattern data pointers
+ *   [0..(n-1)*4-1] = voice sequence pointers (4 per subsong; n = the MOVE.L #n,D1 value)
+ *   [(n-1)*4..]    = phrase/pattern data pointers
  *
  * Voice sequences: byte arrays terminated by 0xFF.
  *   byte < 0x80: phrase index (look up in phrase table)
@@ -62,12 +62,13 @@ export function isWallyBebenFormat(buffer: ArrayBuffer | Uint8Array): boolean {
 // ── Opcode scanning utilities ─────────────────────────────────────────────────
 
 function findOrigin(buf: Uint8Array): number {
-  for (let i = 0; i < Math.min(0x200, buf.length - 6); i += 2) {
-    if (u16BE(buf, i) === 0x1039) {
-      const absAddr = u32BE(buf, i + 2);
-      const d0 = i + 2;
-      return (absAddr - d0) >>> 0;
-    }
+  // EP_WallyBeben InitPlayer: the MOVE.B abs,D0 after the first RTS reads the subsong byte that sits just past
+  // that RTS, so origin = operand - (file offset past the RTS). Every table pointer is relocated against it.
+  let rts = 0;
+  while (rts + 2 <= buf.length && u16BE(buf, rts) !== 0x4E75) rts += 2;
+  const subSongByte = rts + 2;
+  for (let i = subSongByte; i + 6 <= buf.length; i += 2) {
+    if (u16BE(buf, i) === 0x1039) return (u32BE(buf, i + 2) - subSongByte) >>> 0;
   }
   return 0;
 }
@@ -88,20 +89,16 @@ function findSubsongCount(buf: Uint8Array): number {
   return 1;
 }
 
-function findSongsPtr(buf: Uint8Array, origin: number): { offset: number; isU16Hi: boolean } {
+function findSongsPtr(buf: Uint8Array, origin: number): number {
   let past223c = false;
   for (let i = 0; i < Math.min(0x200, buf.length - 6); i += 2) {
     if (u16BE(buf, i) === 0x223C) past223c = true;
     if (past223c && u16BE(buf, i) === 0x41F9) {
       const foff = toFileOff(origin, u32BE(buf, i + 2), buf.length);
-      if (foff > 0 && foff + 4 < buf.length) {
-        const isU16Hi = (u32BE(buf, foff) & 0xFFFF) === 0;
-        return { offset: foff, isU16Hi };
-      }
-      break;
+      return foff > 0 && foff + 4 < buf.length ? foff : -1;
     }
   }
-  return { offset: -1, isU16Hi: false };
+  return -1;
 }
 
 function findSamplesPtr(buf: Uint8Array, origin: number): number {
@@ -121,13 +118,10 @@ function findSamplesPtr(buf: Uint8Array, origin: number): number {
   return -1;
 }
 
-function readSongPtr(buf: Uint8Array, origin: number, songsOff: number, idx: number, isU16Hi: boolean): number {
+function readSongPtr(buf: Uint8Array, origin: number, songsOff: number, idx: number): number {
   const ptrOff = songsOff + idx * 4;
   if (ptrOff + 4 > buf.length) return -1;
-  if (isU16Hi) {
-    const hi16 = (u32BE(buf, ptrOff) >>> 16) & 0xFFFF;
-    return hi16 - (origin & 0xFFFF);
-  }
+  // The eagleplayer relocates every entry as a full longword (RelocSongs / RelocPos).
   return toFileOff(origin, u32BE(buf, ptrOff), buf.length);
 }
 
@@ -194,7 +188,7 @@ export function parseWallyBebenFile(buffer: ArrayBuffer, filename: string): Trac
 
   const origin = findOrigin(buf);
   const nSubsongs = findSubsongCount(buf);
-  const { offset: songsOff, isU16Hi } = findSongsPtr(buf, origin);
+  const songsOff = findSongsPtr(buf, origin);
 
   // ── Extract samples ─────────────────────────────────────────────────────
   const instruments: InstrumentConfig[] = [];
@@ -254,7 +248,8 @@ export function parseWallyBebenFile(buffer: ArrayBuffer, filename: string): Trac
   }
 
   // ── Build phrase table ──────────────────────────────────────────────────
-  const phraseTableStart = songsOff >= 0 ? songsOff + nSubsongs * 4 * 4 : -1;
+  // MOVE.L #n,D1 holds the subsong count + 1 (InitPlayer: subq.l #1,D0; lsl.l #4,D0 = the voice table size).
+  const phraseTableStart = songsOff >= 0 ? songsOff + Math.max(0, nSubsongs - 1) * 4 * 4 : -1;
   const phraseOffsets: number[] = [];
 
   if (phraseTableStart > 0) {
@@ -280,7 +275,7 @@ export function parseWallyBebenFile(buffer: ArrayBuffer, filename: string): Trac
     const voiceSeqs: number[][] = [[], [], [], []];
 
     for (let v = 0; v < 4; v++) {
-      const seqOff = readSongPtr(buf, origin, songsOff, v, isU16Hi);
+      const seqOff = readSongPtr(buf, origin, songsOff, v);
       if (seqOff < 0) continue;
       let pos = seqOff;
       while (pos < buf.length) {
