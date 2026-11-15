@@ -22,6 +22,7 @@ vi.mock('@/engine/dj/DJEngine', () => ({
   getDJEngineIfActive: () => holder.engine,
 }));
 
+import { setDJEngineHolder } from '@/engine/dj/DJPhase';
 import { useDJStore } from '@/stores/useDJStore';
 import { corpusAnalysis } from '../autodj/testing/corpus';
 import { planTransition, type TransitionPlanInput } from '../autodj/transitionPlanner';
@@ -71,6 +72,7 @@ describe('Auto DJ rewinds a peak tune once', () => {
     holder.calls.length = 0;
     const decks: Record<string, ReturnType<typeof fakeDeck>> = { A: fakeDeck('A'), B: fakeDeck('B') };
     holder.engine = { getDeck: (id: string) => decks[id], mixer: { setCrossfader: () => {} }, setCrossfader: () => {} };
+    setDJEngineHolder(holder.engine as never); // DJPhase, not DJEngine, answers getDJEngineIfActive for the phase maths
     const s = useDJStore.getState();
     s.setCrossfader(0);
     s.setDeckState('A', { isPlaying: true, detectedBPM: 120, effectiveBPM: 120, filterPosition: 0, beatGrid: null, trackAnalysis: peakTune() });

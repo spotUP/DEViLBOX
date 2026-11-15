@@ -14,6 +14,8 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { render, cleanup, act, waitFor } from '@testing-library/react';
 import { installRealWebAudio, resolveWorkletsFromPublic, servePublicToFetch } from '@/test/audio/realWebAudio';
+import { getDJEngine } from '@/engine/dj/DJEngine';
+import { setDJEngineHolder } from '@/engine/dj/DJPhase';
 import fixture from '@/engine/dj/scratch/__tests__/fixtures/three_deck_showcase.json';
 
 const holder = vi.hoisted(() => ({
@@ -58,6 +60,8 @@ describe('the Three Deck Showcase reaches the set from the MCP and shows in the 
     const off = new OfflineAudioContext(1, 22050, 22050);
     holder.off = off;
     holder.samplerInput = off.createGain();
+    // DJPhase (not DJEngine) answers getDJEngineIfActive for the phase maths.
+    setDJEngineHolder(getDJEngine() as never);
     // the live context as the player sees it: its clock is the test's
     holder.ctx = new Proxy(off, {
       get(target, prop) {

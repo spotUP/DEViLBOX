@@ -20,6 +20,7 @@ vi.mock('@/engine/dj/DJEngine', () => ({
   getDJEngineIfActive: () => holder.engine,
 }));
 
+import { setDJEngineHolder } from '@/engine/dj/DJPhase';
 import { useDJStore } from '@/stores/useDJStore';
 import { corpusAnalysis } from '../autodj/testing/corpus';
 import { planTransition } from '../autodj/transitionPlanner';
@@ -59,6 +60,7 @@ describe('the Auto DJ fires the DJ FX actions the pads use', () => {
     clearDjFxFireLog();
     const decks: Record<string, ReturnType<typeof fakeDeck>> = { A: fakeDeck('A'), B: fakeDeck('B') };
     holder.engine = { getDeck: (id: string) => decks[id], mixer: { setCrossfader: (v: number) => holder.crossfader.push(v) }, setCrossfader: (v: number) => holder.crossfader.push(v) };
+    setDJEngineHolder(holder.engine as never); // DJPhase, not DJEngine, answers getDJEngineIfActive for the phase maths
     const s = useDJStore.getState();
     s.setCrossfader(0);
     s.setDeckState('A', { isPlaying: true, detectedBPM: 122, effectiveBPM: 122, beatGrid: { beats: [0, 0.49], downbeats: [0], bpm: 122, timeSignature: 4 }, filterPosition: 0 });
