@@ -87,7 +87,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   inStereo2: 'fail',
   jamcracker: 'fail',
   artOfNoise: 'pass',
-  maxTrax: 'fail',
+  maxTrax: 'pass',
   musicAssembler: 'pass',
   okt: 'fail',
   pumaTracker: 'fail',

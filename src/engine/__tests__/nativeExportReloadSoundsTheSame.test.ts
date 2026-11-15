@@ -168,7 +168,7 @@ const FORMATS: FormatRow[] = [
   { key: 'hvl', rig: 'paula', files: ['hivelytracker/waiting for a message.hvl'] },
   { key: 'inStereo2', rig: 'paula', files: ['instereo!-2.0/spaceflight.is20'] },
   { key: 'artOfNoise', rig: 'paula', files: ['art-of-noise/inside.blipp.aon'] },
-  { key: 'maxTrax', rig: 'paula', files: ['maxtrax/antmusic.mxtx'] },
+  { key: 'maxTrax', rig: 'paula', files: ['maxtrax/antmusic.mxtx'], voicesAllocated: true },
   { key: 'musicAssembler', rig: 'paula', files: ['music-assembler/thanatos.ma'] },
   { key: 'okt', rig: 'paula', files: ['oktalyzer/les granges brulees.okta'] },
   { key: 'pumaTracker', rig: 'paula', files: ['pumatracker/liquid kids - lv1a.puma'] },
@@ -321,6 +321,11 @@ interface FormatRow {
   rig: RigName;
   /** A note edit also changes the sample the voice plays (the instrument IS the note's record). */
   noteSelectsSample?: boolean;
+  /**
+   * The replayer picks the Paula voice for each note itself (MaxTrax: MIDI channels, voices allocated per note), so
+   * a grid column is not a voice and the edited note may sound on any of them: only "heard" and "only pitch" apply.
+   */
+  voicesAllocated?: boolean;
   /** The edit this format can express; the default moves the first note two semitones. */
   pick?: (song: GridSong, bytes: Uint8Array) => Promise<Edit | null>;
 }
@@ -427,7 +432,6 @@ const KNOWN: Record<string, Partial<Record<'unedited' | 'edited', string>>> = {
   soundmon: { edited: 'G16 soundmon: untouched voice 3 plays a different Paula write after the edit' },
   hvl: { edited: 'G16 hvl: the edited-note stage throws (no assertion text; HVL has no UADE replayer rig)' },
   inStereo2: { unedited: 'G16 inStereo2: exported bytes differ from the original at byte 35', edited: 'G16 inStereo2: untouched voice 1 plays a different Paula write after the edit' },
-  maxTrax: { edited: 'G16 maxTrax: the exporter writes a file identical to the original: the edit does not reach the exported bytes' },
   okt: { edited: 'G16 okt: the edit is not heard in the rendered stream' },
   pumaTracker: { unedited: 'G16 pumaTracker: exported bytes differ from the original at byte 15', edited: 'G16 pumaTracker: untouched voice 2 plays a different Paula write after the edit' },
   quadraComposer: { unedited: 'G16 quadraComposer: exported bytes differ from the original at byte 7', edited: 'G16 quadraComposer: the export returns null after the edit (no exporter result)' },
@@ -518,7 +522,7 @@ for (const fmt of FORMATS.filter((f) => !f.held)) {
           console.log('[edit]', rel, JSON.stringify(at), 'old', JSON.stringify(old), 'bytes differing', dif.length, dif.slice(0, 6).map((i) => `${i}:${bytes[i]}->${out![i]}`).join(' '), 'sizes', out!.length, bytes.length);
         }
         expect(traceDiff(was, now), 'the edit is heard').not.toBe('equal');
-        expect(traceDiff(was, now, (v) => !touched.has(v), out!.length === bytes.length), `voices without a changed cell (${[...touched].join(',')} changed) play as before`).toBe('equal');
+        if (!fmt.voicesAllocated) expect(traceDiff(was, now, (v) => !touched.has(v), out!.length === bytes.length), `voices without a changed cell (${[...touched].join(',')} changed) play as before`).toBe('equal');
         if (!fmt.noteSelectsSample) expect(traceDiff(withoutPitch(was), withoutPitch(now)), 'only pitch changed').toBe('equal');
       }));
     }

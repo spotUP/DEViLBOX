@@ -294,9 +294,11 @@ const NATIVE_EXPORTERS: NativeExporterEntry[] = [
     run: async (s, baseName) => {
       const { encodeMaxTrax, parseMaxTrax } = await import('@lib/import/formats/maxtrax/maxtraxFormat');
       const { useFormatStore } = await import('@stores/useFormatStore');
-      const live = useFormatStore.getState().maxTraxData;
-      const data = live ?? parseMaxTrax(new Uint8Array(s.maxTraxFileData!));
-      return { data: encodeMaxTrax(data), filename: `${baseName}.mxtx`, warnings: [] };
+      const { applyMaxTraxGridEdits } = await import('@lib/import/formats/MaxTraxParser');
+      const original = parseMaxTrax(new Uint8Array(s.maxTraxFileData!));
+      // The tracker grid's note edits land in the score here; the MaxTrax view's edits are already in the live model.
+      const { data, warnings } = applyMaxTraxGridEdits(useFormatStore.getState().maxTraxData ?? original, original, s.patterns);
+      return { data: encodeMaxTrax(data), filename: `${baseName}.mxtx`, warnings };
     } },
   // Fred Editor keeps format 'MOD'; its module (with the grid's edits) is the export.
   { id: 'fredEditor', matches: (s) => songIds(s).formatId === 'fredEditor',

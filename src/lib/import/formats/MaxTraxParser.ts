@@ -14,13 +14,59 @@
  */
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
-import { parseMaxTrax, isMaxTraxFormat, decodeMaxTraxSamples } from './maxtrax/maxtraxFormat';
-import { deriveGrid } from '@/lib/maxtrax/maxtraxGrid';
+import { parseMaxTrax, isMaxTraxFormat, decodeMaxTraxSamples, type MaxTraxData } from './maxtrax/maxtraxFormat';
+import { deriveGrid, typeNoteAt } from '@/lib/maxtrax/maxtraxGrid';
+import type { MaxTraxGrid, GridNoteCell } from '@/lib/maxtrax/maxtraxGrid.types';
 import { createSamplerInstrument } from './AmigaUtils';
 
 const ROWS_PER_PATTERN = 64;
 
 export { isMaxTraxFormat };
+
+const MAXTRAX_TICKS_PER_ROW = 24;
+
+/** The score the grid shows: the first one with real note events. */
+function maxTraxDisplayScoreIndex(data: MaxTraxData): number {
+  return Math.max(0, data.scores.findIndex((s) => s.events.some((e) => e.command >= 1 && e.command < 0x80)));
+}
+
+/**
+ * The grid cells a score shows, one per (column, absolute row): the first note-on of a row wins; a note-off
+ * shows as key-off (97: TrackerCell 0=empty, 1-96=notes, 97=note off) only on a row no note-on took.
+ */
+function maxTraxDisplayCells(grid: MaxTraxGrid): { column: number; row: number; note: number; on: GridNoteCell | null }[] {
+  const taken = new Map<string, { column: number; row: number; note: number; on: GridNoteCell | null }>();
+  for (const c of grid.noteCells) {
+    const k = `${c.column}:${c.row}`;
+    if (taken.has(k)) continue;
+    taken.set(k, { column: c.column, row: c.row, note: c.kind === 'noteOn' ? c.pitch : 97, on: c.kind === 'noteOn' ? c : null });
+  }
+  return [...taken.values()];
+}
+
+/**
+ * The grid's note edits put into the score: every displayed cell whose note differs from what `original` (the
+ * imported bytes) shows there is typed into `data` (the live model, which may hold MaxTrax view edits) with the
+ * same typeNoteAt the MaxTrax view uses: a new pitch on a note-on, a one-row note on an empty cell. A cleared
+ * note or a key-off has no single score event to become and is reported, not written.
+ */
+export function applyMaxTraxGridEdits(data: MaxTraxData, original: MaxTraxData, patterns: TrackerSong['patterns']): { data: MaxTraxData; warnings: string[] } {
+  const scoreIndex = maxTraxDisplayScoreIndex(original);
+  const was = new Map(maxTraxDisplayCells(deriveGrid(original.scores[scoreIndex] ?? { events: [] }, MAXTRAX_TICKS_PER_ROW)).map((c) => [`${c.column}:${c.row}`, c.note]));
+  const warnings: string[] = [];
+  let score = data.scores[scoreIndex];
+  if (!score) return { data, warnings };
+  patterns.forEach((pat, p) => pat.channels.forEach((chn, column) => chn.rows.forEach((cell, r) => {
+    const row = p * ROWS_PER_PATTERN + r;
+    const note = cell?.note ?? 0;
+    if (note === (was.get(`${column}:${row}`) ?? 0)) return;
+    const next = note >= 1 && note <= 96 ? typeNoteAt(score!, deriveGrid(score!, MAXTRAX_TICKS_PER_ROW), column, row, note) : null;
+    if (next) score = next;
+    else warnings.push(`MaxTrax: the edit at pattern ${p}, voice ${column + 1}, row ${r} has no score event to become and was not exported`);
+  })));
+  if (score === data.scores[scoreIndex]) return { data, warnings };
+  return { data: { ...data, scores: data.scores.map((s, i) => (i === scoreIndex ? score! : s)) }, warnings };
+}
 
 function emptyCell() {
   return { note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 };
@@ -33,14 +79,12 @@ export function parseMaxTraxFile(buffer: ArrayBuffer, filename: string): Tracker
 
   const baseName = (filename.split('/').pop() ?? filename).replace(/^mxtx\./i, '').replace(/\.mxtx$/i, '');
 
-  // Use the first score that has real note events for the display view.
-  const scoreIndex = data.scores.findIndex((s) => s.events.some((e) => e.command >= 1 && e.command < 0x80));
-  const score = data.scores[scoreIndex >= 0 ? scoreIndex : 0] ?? { events: [] };
+  const scoreIndex = maxTraxDisplayScoreIndex(data);
+  const score = data.scores[scoreIndex] ?? { events: [] };
 
   // Derive the display grid from the lossless bijection. startTime values are DELTAS;
   // deriveGrid accumulates them into absolute ticks and assigns voice columns for polyphony.
-  const TPR = 24;
-  const grid = deriveGrid(score, TPR);
+  const grid = deriveGrid(score, MAXTRAX_TICKS_PER_ROW);
   const numChannels = Math.max(1, grid.columns.length);
   const numPatterns = Math.max(1, Math.ceil(grid.rowCount / ROWS_PER_PATTERN));
 
@@ -104,24 +148,13 @@ export function parseMaxTraxFile(buffer: ArrayBuffer, filename: string): Tracker
     return channelPatch[ch];
   });
 
-  // Place note-on and derived note-off cells from the grid.
-  // Note: 97 is the tracker key-off sentinel (TrackerCell convention: note=97 means note off).
-  for (const c of grid.noteCells) {
-    const patIdx = Math.floor(c.row / ROWS_PER_PATTERN);
-    const rowInPat = c.row % ROWS_PER_PATTERN;
-    const cell = patterns[patIdx]?.channels[c.column]?.rows[rowInPat];
+  for (const c of maxTraxDisplayCells(grid)) {
+    const cell = patterns[Math.floor(c.row / ROWS_PER_PATTERN)]?.channels[c.column]?.rows[c.row % ROWS_PER_PATTERN];
     if (!cell) continue;
-    if (c.kind === 'noteOn') {
-      if (cell.note === 0) {
-        cell.note = c.pitch;
-        cell.instrument = patchToId(patchAtEvent[c.eventIndex]);
-        cell.volume = c.velocity;
-      }
-    } else { // noteOff
-      // Don't overwrite a note-on that shares the same display row.
-      if (cell.note === 0) {
-        cell.note = 97; // key-off (TrackerCell: 0=empty, 1-96=notes, 97=note off)
-      }
+    cell.note = c.note;
+    if (c.on) {
+      cell.instrument = patchToId(patchAtEvent[c.on.eventIndex]);
+      cell.volume = c.on.velocity;
     }
   }
 
