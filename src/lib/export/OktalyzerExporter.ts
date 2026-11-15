@@ -70,8 +70,8 @@ export function exportOktalyzer(song: TrackerSong): ArrayBuffer {
   const chunks: Uint8Array[] = [];
 
   // ── CMOD chunk ──────────────────────────────────────────────────────────
-  const cmodData = new Uint8Array(8);
-  // Stereo pairs: L=0, R=0 (stereo)
+  // Every pair split (word 1): the 8 pattern channels written below. An all-zero CMOD would mean 4 channels.
+  const cmodData = new Uint8Array([0, 1, 0, 1, 0, 1, 0, 1]);
   chunks.push(iffChunkHeader('CMOD', 8));
   chunks.push(cmodData);
 

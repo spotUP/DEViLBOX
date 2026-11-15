@@ -73,6 +73,8 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
 
   // ── Parse IFF chunks ─────────────────────────────────────────────────────
   let channelModes: number[] = [0, 0, 0, 0];
+  // Pattern channels, from CMOD (which comes before every PBOD); 8 when a file has no CMOD.
+  let numChannels = 8;
   const samples: OKTSample[] = [];
   let speed = 6;
   let songLength = 0;
@@ -95,6 +97,8 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
         for (let i = 0; i < 4 && i * 2 + 1 < chunkSize; i++) {
           channelModes[i] = readU16BE(buf, dataStart + i * 2);
         }
+        // A pair whose word is nonzero is split into two mixed channels, a zero word is one Paula voice (OpenMPT Load_okt): 4..8 channels.
+        numChannels = channelModes.reduce((n, m) => n + (m ? 2 : 1), 0);
         break;
       }
 
@@ -140,10 +144,10 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
       }
 
       case 'PBOD': {
-        // Pattern body: 2-byte numRows, then rows * 8 channels * 4 bytes
+        // Pattern body: 2-byte numRows, then rows * channels * 4 bytes
         const numRows = readU16BE(buf, dataStart);
         patternFileOffsets.push(dataStart + 2); // cell data starts after numRows
-        const numChans = 8; // Oktalyzer always has 8 channels
+        const numChans = numChannels;
         const cells: number[][] = [];
 
         for (let row = 0; row < numRows; row++) {
@@ -258,7 +262,7 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
     patternDataFileOffset: 0, // overridden by getCellFileOffset
     bytesPerCell: 4,
     rowsPerPattern: 64,
-    numChannels: 8,
+    numChannels,
     numPatterns: trackerPatterns.length,
     moduleSize: buffer.byteLength,
     encodeCell: encodeOktalyzerCell,
@@ -267,7 +271,7 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const cellDataStart = patternFileOffsets[pattern];
       if (cellDataStart === undefined) return 0;
-      return cellDataStart + row * 8 * 4 + channel * 4;
+      return cellDataStart + (row * numChannels + channel) * 4;
     },
   };
 
@@ -279,7 +283,7 @@ export function parseOktalyzerFile(buffer: ArrayBuffer, filename: string): Track
     songPositions: songPositions.length > 0 ? songPositions : [0],
     songLength: songPositions.length || 1,
     restartPosition: 0,
-    numChannels: 8,
+    numChannels,
     initialSpeed: speed,
     initialBPM: 125,
     linearPeriods: false,

@@ -43,9 +43,10 @@ describe('parseOktalyzerFile', () => {
     expect(song.format).toBe('OKT');
   });
 
-  it('has 8 channels', () => {
+  it('has the channels its CMOD names (0,0,1,1: two single voices, two split pairs = 6)', () => {
     const song = parseOktalyzerFile(loadAB(OKTA_FILE), 'les granges brulees.okta');
-    expect(song.numChannels).toBe(8);
+    expect(song.numChannels).toBe(6);
+    expect(song.patterns[0].channels).toHaveLength(6);
   });
 
   it('has at least one pattern', () => {

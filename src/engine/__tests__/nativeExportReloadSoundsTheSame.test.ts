@@ -170,7 +170,8 @@ const FORMATS: FormatRow[] = [
   { key: 'artOfNoise', rig: 'paula', files: ['art-of-noise/inside.blipp.aon'] },
   { key: 'maxTrax', rig: 'paula', files: ['maxtrax/antmusic.mxtx'], voicesAllocated: true },
   { key: 'musicAssembler', rig: 'paula', files: ['music-assembler/thanatos.ma'] },
-  { key: 'okt', rig: 'paula', files: ['oktalyzer/les granges brulees.okta'] },
+  // Its first song position plays pattern 19; pattern 0 starts at position 3, about 19 s in, past the render window.
+  { key: 'okt', rig: 'paula', files: ['oktalyzer/les granges brulees.okta'], pick: (s) => Promise.resolve(pickNote(s, s.songPositions[0])) },
   { key: 'pumaTracker', rig: 'paula', files: ['pumatracker/liquid kids - lv1a.puma'] },
   { key: 'quadraComposer', rig: 'paula', files: ['quadra-composer/poison.emod'] },
   { key: 'soundControl', rig: 'paula', files: ['soundcontrol/north sea inferno ongame1.sc'] },
@@ -282,7 +283,7 @@ interface Edit { p: number; ch: number; r: number; note: number }
  * The first note cell without a command beside it (a plain note), else the first note; moved two
  * semitones: up from the low half of the range, down from the high half.
  */
-function pickNote(song: GridSong): Edit | null {
+function pickNote(song: GridSong, heard = 0): Edit | null {
   let first: Edit | null = null;
   let plain: Edit | null = null;
   let seen = 0;
@@ -294,7 +295,7 @@ function pickNote(song: GridSong): Edit | null {
         const e = { p, ch, r, note: c.note + (c.note > 48 ? -2 : 2) };
         first ??= e;
         // Only among the first few notes of the first pattern: a plain note deep in the song is not heard in the render window.
-        if (++seen <= 8 && p === 0) plain ??= !c.effTyp && !c.eff && !c.effTyp2 && !c.eff2 && !c.volume ? e : null;
+        if (p === heard && ++seen <= 8) plain ??= !c.effTyp && !c.eff && !c.effTyp2 && !c.eff2 && !c.volume ? e : null;
       });
     }
   }
@@ -432,7 +433,6 @@ const KNOWN: Record<string, Partial<Record<'unedited' | 'edited', string>>> = {
   soundmon: { edited: 'G16 soundmon: untouched voice 3 plays a different Paula write after the edit' },
   hvl: { edited: 'G16 hvl: the edited-note stage throws (no assertion text; HVL has no UADE replayer rig)' },
   inStereo2: { unedited: 'G16 inStereo2: exported bytes differ from the original at byte 35', edited: 'G16 inStereo2: untouched voice 1 plays a different Paula write after the edit' },
-  okt: { edited: 'G16 okt: the edit is not heard in the rendered stream' },
   pumaTracker: { unedited: 'G16 pumaTracker: exported bytes differ from the original at byte 15', edited: 'G16 pumaTracker: untouched voice 2 plays a different Paula write after the edit' },
   quadraComposer: { unedited: 'G16 quadraComposer: exported bytes differ from the original at byte 7', edited: 'G16 quadraComposer: the export returns null after the edit (no exporter result)' },
   sonicArranger: { unedited: 'G16 sonicArranger: exported bytes differ from the original at byte 35', edited: 'G16 sonicArranger: the reloaded song has 72 patterns, the edited grid 84' },
