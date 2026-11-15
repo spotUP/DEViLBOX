@@ -12,10 +12,9 @@ const FILES = readdirSync(DIR).filter((f) => f.endsWith('.fur')).sort();
 
 // Songs the driver cannot hold: the compiler's own size errors, not writer faults.
 const TOO_LARGE: Record<string, RegExp> = {
-  '64kb.fur': /goto_relative offset out of bounds \(bytecode is too large\)/,
+  '64kb.fur': /goto_relative offset out of bounds|Song is too large by \d+ bytes/,
   'Breezy.fur': /Song is too large by \d+ bytes/,
   'Cosmic_Warehouse.fur': /Song is too large by \d+ bytes/,
-  'sound processing unit.fur': /Song is too large by \d+ bytes/,
   'spd10.fur': /Song is too large by \d+ bytes/,
   'changeyourheart.fur': /common audio data is too large/,
 };
@@ -170,6 +169,21 @@ describe('writeTadSong echo header', () => {
     const { default: create } = await import('../../../../../public/tad/tad-compiler.js');
     const r = (await openTadSession(files, create as CreateTadCompiler, (f) => resolve('public/tad', f))).run(['check', '/p/p.terrificaudio']);
     expect(r.code, r.log).toBe(0);
+  }, 60000);
+
+  // playback.cpp:1554-1605: FAxy is 4x 0Axy, F3/F4 are 1/64 of 0Axy, F8/F9 change the volume once.
+  it('carries FAxy, F3xx/F4xx and F8xx/F9xx volume effects', async () => {
+    const buf = readFileSync(resolve(DIR, 'tetristheme.fur'));
+    const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+    const native = buildFurnaceNativeData(module);
+    const sub = native.subsongs[0];
+    const rows = sub.channels.flatMap((ch, c) => ch.patterns.get(sub.orders[c]?.[0] ?? -1)?.rows ?? []).filter((r) => r.note >= 0 && r.note < 180);
+    rows[0].effects = [...(rows[0].effects ?? []), { cmd: 0xfa, val: 0x02 }];
+    rows[1].effects = [...(rows[1].effects ?? []), { cmd: 0xf3, val: 0x40 }];
+    rows[2].effects = [...(rows[2].effects ?? []), { cmd: 0xf9, val: 0x10 }];
+    const song = writeTadSong({ native, subsong: 0, instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)), samples: toSequencerSamples(module), wavetables: module.wavetables, title: 'tetristheme' });
+    expect(song.mml).toMatch(/Vs-\d+,\d+/);
+    expect(song.warnings.some((w) => /effect F[A3489]xx/i.test(w))).toBe(false);
   }, 60000);
 
   it('writes the Furnace echo flags as TAD header lines', async () => {

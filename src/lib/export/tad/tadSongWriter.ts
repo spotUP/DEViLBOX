@@ -286,7 +286,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     const ch = snes.first + c;
     // echoMask: Furnace starts these channels with echo on (snes.cpp:914).
     const out: string[] = ['V254', ...(!sfx && echo.on && (echo.mask >> c) & 1 ? ['E1'] : [])];
-    let ins = 0, curIns = -1, vol = 127, panL = 127, panR = 127, lastP = 64, oct = -1, lastV = 'V254', slid = false;
+    let ins = 0, curIns = -1, vol = 127, panL = 127, panR = 127, lastP = 64, oct = -1, lastV = 'V254';
     // snes.cpp:115-117 outVol = vol * volMacro / 127; a constant volume macro scales V.
     // Pan law, snes.cpp:642-653: each side is outVol * pan / 127 (centre = both full); TAD splits V by p, so
     // V carries panL + panR and p their ratio. Constant panning macros (codes 12/13) override 08xx / 80xx.
@@ -301,7 +301,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     let sounding = false, curNote = 'r';
     let hasNotes = false;
     // Effect state of this channel (Furnace effects that TAD holds as channel state).
-    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', fine = 0, inv = 'i0', noiseOn = false, vibWant: { d: number; q: number } | null = null, volSlide = 0, lastEnv = '';
+    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', fine = 0, inv = 'i0', noiseOn = false, vibWant: { d: number; q: number } | null = null, volSlide = 0, slideSkip = 0, lastEnv = '';
     let env: { mode: number; gain: number; adsr: number[] } | null = null;
     const pitchName = (p: number) => NOTE_NAMES[p % 12];
     // Furnace ticks to TAD ticks (rows are k Furnace-tick multiples; sound effects run at 125 Hz).
@@ -420,13 +420,18 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             fine = e.val - 0x80;
             if (!(cl.note >= 0 && cl.note < 180)) drop('effect E5xx without a note (applies from the next note)', at);
           }
-          else if (e.cmd === 0x0a) volSlide = (e.val >> 4) - (e.val & 15) || 0;
+          // volSlide = Furnace volSpeed, 1/256 volume step per tick (playback.cpp:1273, 1554-1605).
+          else if (e.cmd === 0x0a || e.cmd === 0xfa) volSlide = (e.val & 15 ? -(e.val & 15) : e.val >> 4) * (e.cmd === 0xfa ? 256 : 64);
+          else if (e.cmd === 0xf3 || e.cmd === 0xf4) volSlide = e.cmd === 0xf3 ? e.val : -e.val;
+          else if (e.cmd === 0xf8 || e.cmd === 0xf9) {
+            volSlide = 0;
+            vol = Math.max(0, Math.min(127, vol + (e.cmd === 0xf8 ? e.val : -e.val)));
+          }
           else if ([0x00, 0x01, 0x02, 0x03, 0xec, 0xed].includes(e.cmd)) { /* applied with the note below */ }
           else drop(`effect ${hex2(e.cmd)}xx`, at);
         }
         if (panP() !== lastP) { lastP = panP(); cmds.push(`p${lastP}`); }
-        // After a slide the driver volume is unknown: a written volume always lands.
-        if ((cl.vol >= 0 && slid) || ((cl.vol >= 0 || cl.ins >= 0 || panFx) && volV() !== lastV)) { lastV = volV(); slid = false; cmds.push(lastV); }
+        if (((cl.vol >= 0 || cl.ins >= 0 || panFx || ef.has(0xf8) || ef.has(0xf9)) && volV() !== lastV)) { lastV = volV(); cmds.push(lastV); }
         if (envFx) {
           const s = instruments[ins]?.snes;
           env ??= {
@@ -445,10 +450,21 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             : (v15 !== undefined || v16 !== undefined) ? `G${'FDEIB'[env.mode - 1]}${env.gain & (env.mode === 1 ? 127 : 31)}` : '';
           if (g && g !== lastEnv) { lastEnv = g; cmds.push(g); }
         }
-        if (volSlide) {
-          const d = Math.max(1, Math.min(255, Math.round(Math.abs(volSlide) * r.ticks / tickScale / 2 * volScale())));
-          slid = true;
-          cmds.push(`Vs${volSlide > 0 ? '+' : '-'}${d},${r.ticks}`);
+        if (slideSkip) slideSkip--;
+        else if (volSlide) {
+          // Track the Furnace volume (clamped like playback.cpp) so a slide stops at 0/127 and later V writes stay exact.
+          // Following rows that leave the slide alone join one Vs (max 256 ticks), so long fades stay small.
+          const step = (t: number) => { vol = Math.max(0, Math.min(127, vol + volSlide * t / tickScale / 256)); };
+          const same = (e: { cmd: number; val: number }) => e.cmd < 0 || (ef.get(e.cmd) === e.val && [0x0a, 0xfa, 0xf3, 0xf4].includes(e.cmd));
+          let ticks = r.ticks;
+          step(r.ticks);
+          for (let j = i + 1; j < rows.length && j !== loopRow && vol > 0 && vol < 127; j++) {
+            const n = cell(ch, rows[j].pos, rows[j].row);
+            if (ticks + rows[j].ticks > 256 || (n && (n.vol >= 0 || (n.ins >= 0 && n.ins !== ins) || !n.effects.every(same)))) break;
+            ticks += rows[j].ticks; step(rows[j].ticks); slideSkip++;
+          }
+          const from = Number(lastV.slice(1)), to = volV(), d = Number(to.slice(1)) - from;
+          if (d) { lastV = to; cmds.push(`Vs${d > 0 ? '+' : '-'}${Math.min(255, Math.abs(d))},${ticks}`); }
         }
         // Pitch effects: Furnace slide speed is xx * pitchSlideSpeed (default 4) units per tick, 128 per semitone.
         const slideMul = Number(native.compatFlags?.pitchSlideSpeed ?? 4);
