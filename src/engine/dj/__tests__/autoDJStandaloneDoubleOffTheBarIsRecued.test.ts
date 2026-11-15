@@ -22,10 +22,13 @@ const holder = vi.hoisted(() => ({
   doubles: 0,
 }));
 
-vi.mock('@/engine/dj/DJEngine', () => ({
-  getDJEngine: () => holder.engine,
-  getDJEngineIfActive: () => holder.engine,
-}));
+vi.mock('@/engine/dj/DJEngine', async () => {
+  // DJPhase (not DJEngine) answers getDJEngineIfActive for the phase maths.
+  (await import('@/engine/dj/DJPhase')).setDJEngineHolder(
+    new Proxy({}, { get: (_t, k) => (holder.engine as never as Record<PropertyKey, unknown>)[k] }) as never,
+  );
+  return { getDJEngine: () => holder.engine, getDJEngineIfActive: () => holder.engine };
+});
 vi.mock('../DJQuantizedFX', () => {
   const record = () => () => () => {};
   return {
