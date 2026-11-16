@@ -23,7 +23,7 @@ import {
   type FurnaceInstrument as FileInstrument,
   type FurnaceMacro as FileMacro,
 } from '../import/formats/furnace/FurnaceInstrumentParser';
-import { DIV_INS_AY } from './FurnaceInstrumentEncoder';
+import { DIV_INS_AY, DIV_INS_POKEMINI } from './FurnaceInstrumentEncoder';
 
 // Format constants
 const DIV_ENGINE_VERSION = 228;
@@ -99,13 +99,61 @@ const FUR_SYSTEM_AY8910 = 0x80;
 /** ay.cpp setFlags: clockSel 0 = COLOR_NTSC / 2 = 1789772.5 Hz; chipType 0 = AY-3-8910. */
 export const FUR_AY_SCRAMBLE_CHIP_FLAGS = 'clockSel=0\nchipType=0\n';
 
-/** Export target: the arcade Scramble board (default), or a single-AY home machine. */
-export type AyScrambleTarget = 'arcade' | 'vectrex' | 'zx128';
-/** Per target: ay.cpp clockSel (4 = 1.5 MHz Vectrex, 1 = COLOR_PAL*2/5 ZX Spectrum 128), tick Hz, AY systems allowed. */
-export const AY_SCRAMBLE_TARGETS: Record<AyScrambleTarget, { label: string; flags: string; hz: number; maxSystems: number }> = {
-  arcade: { label: 'Arcade (Scramble)', flags: FUR_AY_SCRAMBLE_CHIP_FLAGS, hz: FUR_AY_SCRAMBLE_TICK_HZ, maxSystems: FUR_AY_SCRAMBLE_MAX_SYSTEMS },
-  vectrex: { label: 'Vectrex', flags: 'clockSel=4\nchipType=0\n', hz: 50, maxSystems: 1 },
-  zx128: { label: 'ZX Spectrum 128', flags: 'clockSel=1\nchipType=0\n', hz: 50, maxSystems: 1 },
+/** Export target: the arcade Scramble board (default), a single-AY home machine, or the ZX Spectrum QuadTone beeper. */
+export type AyScrambleTarget = 'arcade' | 'vectrex' | 'zx128' | 'zxbeeper';
+export interface AyScrambleTargetDef {
+  /** Short machine name, used in error and warning text. */
+  name: string;
+  /** Export dialog entry title. */
+  label: string;
+  /** Export dialog detail heading. */
+  heading: string;
+  /** Chip line of the export dialog: the real chip and channel count. */
+  chip: string;
+  /** Chip name in messages. */
+  chipName: string;
+  synthType: 'FurnaceAY' | 'FurnaceZXBEEPER';
+  /** Furnace system id and instrument type. */
+  systemId: number;
+  insType: number;
+  /** Channels that carry notes per system, and channels Furnace allocates per system (QuadTone adds a PCM channel). */
+  toneChannels: number;
+  systemChannels: number;
+  /** Highest channel volume of the chip. */
+  volMax: number;
+  flags: string;
+  hz: number;
+  maxSystems: number;
+  /** Extra effects the target runs, beyond AY_SCRAMBLE_EFFECTS. */
+  extraEffects?: readonly number[];
+}
+/** Per target: ay.cpp clockSel (4 = 1.5 MHz Vectrex, 1 = COLOR_PAL*2/5 ZX Spectrum 128), tick Hz, systems allowed. */
+export const AY_SCRAMBLE_TARGETS: Record<AyScrambleTarget, AyScrambleTargetDef> = {
+  arcade: {
+    name: 'Arcade (Scramble)', label: 'AY-3-8910 (Scramble)', heading: 'AY-3-8910 Export for Scramble (.fur)',
+    chip: 'AY-3-8910, 3 or 6 channels, 58.3 Hz', chipName: 'AY-3-8910', synthType: 'FurnaceAY', systemId: FUR_SYSTEM_AY8910,
+    insType: DIV_INS_AY, toneChannels: FUR_AY_SCRAMBLE_CHANNELS, systemChannels: FUR_AY_SCRAMBLE_CHANNELS, volMax: 15,
+    flags: FUR_AY_SCRAMBLE_CHIP_FLAGS, hz: FUR_AY_SCRAMBLE_TICK_HZ, maxSystems: FUR_AY_SCRAMBLE_MAX_SYSTEMS,
+  },
+  vectrex: {
+    name: 'Vectrex', label: 'Vectrex (AY-3-8910)', heading: 'AY-3-8910 Export for Vectrex (.fur)',
+    chip: 'AY-3-8910, 3 channels, 50 Hz', chipName: 'AY-3-8910', synthType: 'FurnaceAY', systemId: FUR_SYSTEM_AY8910,
+    insType: DIV_INS_AY, toneChannels: FUR_AY_SCRAMBLE_CHANNELS, systemChannels: FUR_AY_SCRAMBLE_CHANNELS, volMax: 15,
+    flags: 'clockSel=4\nchipType=0\n', hz: 50, maxSystems: 1,
+  },
+  zx128: {
+    name: 'ZX Spectrum 128', label: 'ZX Spectrum 128 (AY-3-8910)', heading: 'AY-3-8910 Export for ZX Spectrum 128 (.fur)',
+    chip: 'AY-3-8910, 3 channels, 50 Hz', chipName: 'AY-3-8910', synthType: 'FurnaceAY', systemId: FUR_SYSTEM_AY8910,
+    insType: DIV_INS_AY, toneChannels: FUR_AY_SCRAMBLE_CHANNELS, systemChannels: FUR_AY_SCRAMBLE_CHANNELS, volMax: 15,
+    flags: 'clockSel=1\nchipType=0\n', hz: 50, maxSystems: 1,
+  },
+  // zxbeeperquadtone.cpp / sysDef.cpp: id 0xca, 4 pulse channels (DIV_INS_POKEMINI) + 1 PCM overlay channel, volume 0-2, 12xx pulse width. clockSel 1 = COLOR_PAL*4/5 (3.55 MHz, the Spectrum).
+  zxbeeper: {
+    name: 'ZX Spectrum Beeper', label: 'ZX Spectrum Beeper (QuadTone)', heading: 'ZX Spectrum Beeper Export (QuadTone, .fur)',
+    chip: 'QuadTone beeper, 4 tone channels, 50 Hz', chipName: 'QuadTone beeper', synthType: 'FurnaceZXBEEPER', systemId: 0xca,
+    insType: DIV_INS_POKEMINI, toneChannels: 4, systemChannels: 5, volMax: 2,
+    flags: 'clockSel=1\n', hz: 50, maxSystems: 1, extraEffects: [0x12],
+  },
 };
 /** Effects the first BossGame player runs. */
 export const AY_SCRAMBLE_EFFECTS: ReadonlySet<number> = new Set([0x01, 0x02, 0x03, 0x04, 0x0a, 0x0b, 0x0d, 0x0f, 0xff]);
@@ -129,13 +177,13 @@ export interface FurnaceAyScrambleResult {
   warnings: string[];
 }
 
-export function isAyInstrument(inst: InstrumentConfig): boolean {
-  return inst.synthType === 'FurnaceAY' && !!inst.furnace;
+export function isAyInstrument(inst: InstrumentConfig, target: AyScrambleTarget = 'arcade'): boolean {
+  return inst.synthType === AY_SCRAMBLE_TARGETS[target].synthType && !!inst.furnace;
 }
 
 /** Is the Scramble target on offer (at least one AY-3-8910 voice)? */
-export function furnaceAyScrambleExportAvailable(instruments: InstrumentConfig[]): boolean {
-  return instruments.some(isAyInstrument);
+export function furnaceAyScrambleExportAvailable(instruments: InstrumentConfig[], target: AyScrambleTarget = 'arcade'): boolean {
+  return instruments.some((i) => isAyInstrument(i, target));
 }
 
 /** BPM at which a DEViLBOX song ticks at the game's 58.3 Hz (tick Hz = BPM * 2 / 5). */
@@ -145,10 +193,10 @@ export const FUR_AY_SCRAMBLE_BPM = FUR_AY_SCRAMBLE_TICK_HZ * 5 / 2;
 export function ayScrambleTempoWarning(bpm: number, target: AyScrambleTarget = 'arcade'): string | null {
   const hz = AY_SCRAMBLE_TARGETS[target].hz;
   if (Math.abs(bpm * 2 / 5 - hz) < 0.005) return null;
-  return `The ${AY_SCRAMBLE_TARGETS[target].label} target plays at ${hz} Hz ticks; this song ticks at ${(bpm * 2 / 5).toFixed(2)} Hz (BPM ${bpm}), so the tempo will differ. Set the BPM to ${+(hz * 5 / 2).toFixed(2)} to match.`;
+  return `The ${AY_SCRAMBLE_TARGETS[target].name} target plays at ${hz} Hz ticks; this song ticks at ${(bpm * 2 / 5).toFixed(2)} Hz (BPM ${bpm}), so the tempo will differ. Set the BPM to ${+(hz * 5 / 2).toFixed(2)} to match.`;
 }
 
-function ayFileInstrument(inst: InstrumentConfig, warnings: string[], keepAll = false): FileInstrument {
+function ayFileInstrument(inst: InstrumentConfig, tgt: AyScrambleTargetDef, warnings: string[], keepAll = false): FileInstrument {
   const cfg = inst.furnace as FurnaceConfig;
   const label = `Instrument ${inst.id} "${inst.name}"`;
   const macros: FileMacro[] = [];
@@ -164,9 +212,9 @@ function ayFileInstrument(inst: InstrumentConfig, warnings: string[], keepAll = 
     if (!keepAll && m.mode !== 0) { warnings.push(`${label}: ${name} macro left out, it is an ADSR or LFO macro, not a sequence`); continue; }
     if (!keepAll && m.release >= 0) warnings.push(`${label}: ${name} macro release point removed, the player has no release`);
     let data = m.data.slice(0, 255);
-    if (code === 0 && data.some((v) => v < 0 || v > 15)) {
-      warnings.push(`${label}: volume macro values clamped to 0-15`);
-      data = data.map((v) => Math.max(0, Math.min(15, v)));
+    if (code === 0 && data.some((v) => v < 0 || v > tgt.volMax)) {
+      warnings.push(`${label}: volume macro values clamped to 0-${tgt.volMax}`);
+      data = data.map((v) => Math.max(0, Math.min(tgt.volMax, v)));
     }
     if (code === 3 && data.some((v) => (v & AY_WAVE_ENVELOPE_BIT) !== 0)) {
       warnings.push(`${label}: wave macro keeps the hardware envelope bit, outside the old player contract, BossGame compiler must support it`);
@@ -179,7 +227,7 @@ function ayFileInstrument(inst: InstrumentConfig, warnings: string[], keepAll = 
     });
   }
   if (cfg.opMacroArrays?.some((a) => a.some((m) => m.data.length > 0))) warnings.push(`${label}: per-operator macros left out`);
-  return { name: inst.name, type: DIV_INS_AY, macros, samples: [], wavetables: [] };
+  return { name: inst.name, type: tgt.insType, macros, samples: [], wavetables: [] };
 }
 
 function ayIsEmptyCell(c: FileCell): boolean {
@@ -256,17 +304,18 @@ export function exportFurnaceAyScramble(song: FurnaceModuleSong, target: AyScram
   const warnings: string[] = [];
   // One system per 3 channels: 1-3 channels write one AY, 4-6 write two (empty channels pad the second).
   const songChannels = Math.max(1, ...song.patterns.map((p) => p.channels.length));
-  const nSys = songChannels <= FUR_AY_SCRAMBLE_CHANNELS ? 1 : tgt.maxSystems;
-  const nCh = nSys * FUR_AY_SCRAMBLE_CHANNELS;
+  const nSys = songChannels <= tgt.toneChannels ? 1 : tgt.maxSystems;
+  const nCh = nSys * tgt.systemChannels;
+  const noteCh = nSys * tgt.toneChannels;
 
-  const ay = song.instruments.filter(isAyInstrument);
+  const ay = song.instruments.filter((i) => isAyInstrument(i, target));
   const insIndexById = new Map<number, number>();
   ay.forEach((inst, i) => insIndexById.set(inst.id, i));
-  const skipped = song.instruments.filter((i) => !isAyInstrument(i));
+  const skipped = song.instruments.filter((i) => !isAyInstrument(i, target));
   if (skipped.length > 0) {
-    warnings.push(`Left out ${skipped.length} instrument(s) that are not AY-3-8910 voices: ${skipped.map((i) => `${i.id} "${i.name}"`).join(', ')}`);
+    warnings.push(`Left out ${skipped.length} instrument(s) that are not ${tgt.chipName} voices: ${skipped.map((i) => `${i.id} "${i.name}"`).join(', ')}`);
   }
-  if (ay.length === 0) problems.push('The song has no AY-3-8910 instrument');
+  if (ay.length === 0) problems.push(`The song has no ${tgt.chipName} instrument`);
 
   if (song.patterns.length === 0) problems.push('The song has no patterns');
   if (song.patterns.length > 256) problems.push('A Furnace order table holds at most 256 patterns');
@@ -286,9 +335,9 @@ export function exportFurnaceAyScramble(song: FurnaceModuleSong, target: AyScram
   const pats: { ch: number; index: number; rows: FileCell[] }[] = [];
   for (const [pi, p] of song.patterns.entries()) {
     if (p.length !== patLen) problems.push(`Pattern ${pi} has ${p.length} rows but the song has ${patLen}: a Furnace song has one pattern length`);
-    p.channels.slice(nCh).forEach((chan, k) => {
+    p.channels.slice(noteCh).forEach((chan, k) => {
       if (chan.rows.some((c) => c.note > 0 || c.instrument > 0 || c.volume > 0)) {
-        problems.push(`Pattern ${pi} channel ${nCh + k + 1} has notes but the ${tgt.label} target holds ${nCh} channels (${nSys} AY-3-8910)`);
+        problems.push(`Pattern ${pi} channel ${noteCh + k + 1} has notes but the ${tgt.name} target holds ${noteCh} channels (${nSys} ${tgt.chipName})`);
       }
     });
     for (let ch = 0; ch < nCh; ch++) {
@@ -301,18 +350,19 @@ export function exportFurnaceAyScramble(song: FurnaceModuleSong, target: AyScram
           continue;
         }
         const where = `Pattern ${pi} channel ${ch + 1} row ${r}`;
-        if (cell.instrument > 0 && !insIndexById.has(cell.instrument)) problems.push(`${where}: instrument ${cell.instrument} is not an AY-3-8910 instrument`);
+        if (cell.instrument > 0 && !insIndexById.has(cell.instrument)) problems.push(`${where}: instrument ${cell.instrument} is not an ${tgt.chipName} instrument`);
         const fc = cellToFile(cell, insIndexById, where, [], effectNotationOf(src.channelMeta), warnings,
           trackerArpStopAt(song.patterns, song.songPositions, pi, ch, r));
-        // cellToFile scales the volume column to 0-127; the AY channel volume is 0-15.
-        if (fc.vol >= 0) fc.vol = Math.round(fc.vol * 15 / 127);
+        // cellToFile scales the volume column to 0-127; the chip channel volume is 0-volMax.
+        if (fc.vol >= 0) fc.vol = Math.round(fc.vol * tgt.volMax / 127);
+        const ayEffectOk = (t: number) => AY_SCRAMBLE_EFFECTS.has(t) || !!tgt.extraEffects?.includes(t);
         for (const f of fc.fx) {
-          const extra = f.type >= 0 ? AY_SCRAMBLE_EXTRA_EFFECTS.get(f.type) : undefined;
+          const extra = f.type >= 0 && tgt.synthType === 'FurnaceAY' ? AY_SCRAMBLE_EXTRA_EFFECTS.get(f.type) : undefined;
           if (extra) extras.set(extra, (extras.get(extra) ?? 0) + 1);
-          else if (f.type >= 0 && !AY_SCRAMBLE_EFFECTS.has(f.type) && song.keepOutsideContract) {
+          else if (f.type >= 0 && !ayEffectOk(f.type) && song.keepOutsideContract) {
             const key = f.type.toString(16).toUpperCase().padStart(2, '0');
             extras.set(key, (extras.get(key) ?? 0) + 1);
-          } else if (f.type >= 0 && !AY_SCRAMBLE_EFFECTS.has(f.type)) {
+          } else if (f.type >= 0 && !ayEffectOk(f.type)) {
             const key = f.type.toString(16).toUpperCase().padStart(2, '0');
             dropped.set(key, (dropped.get(key) ?? 0) + 1);
             f.type = -1; f.val = -1;
@@ -330,10 +380,10 @@ export function exportFurnaceAyScramble(song: FurnaceModuleSong, target: AyScram
 
   if (problems.length > 0) {
     const shown = problems.slice(0, 8).join('; ');
-    throw new Error(`Cannot export for the AY-3-8910 (Scramble): ${shown}${problems.length > 8 ? `; and ${problems.length - 8} more` : ''}`);
+    throw new Error(`Cannot export for the ${tgt.label}: ${shown}${problems.length > 8 ? `; and ${problems.length - 8} more` : ''}`);
   }
 
-  const instruments = ay.map((inst) => ayFileInstrument(inst, warnings, song.keepOutsideContract));
+  const instruments = ay.map((inst) => ayFileInstrument(inst, tgt, warnings, song.keepOutsideContract));
   const speed = Math.max(1, Math.min(255, song.initialSpeed));
   const w = new BinaryWriter(64 * 1024);
 
@@ -362,7 +412,7 @@ export function exportFurnaceAyScramble(song: FurnaceModuleSong, target: AyScram
     w.writeUint16(0); // wavetables
     w.writeUint16(0); // samples
     w.writeUint32(pats.length);
-    for (let i = 0; i < 32; i++) w.writeUint8(i < nSys ? FUR_SYSTEM_AY8910 : 0);
+    for (let i = 0; i < 32; i++) w.writeUint8(i < nSys ? tgt.systemId : 0);
     for (let i = 0; i < 32; i++) w.writeInt8(64); // chip volume (64 = 1.0)
     for (let i = 0; i < 32; i++) w.writeInt8(0); // chip panning
     for (let i = 0; i < 32; i++) { if (i < nSys) flagPtrAt.push(w.getOffset()); w.writeUint32(0); }
@@ -391,7 +441,7 @@ export function exportFurnaceAyScramble(song: FurnaceModuleSong, target: AyScram
     w.writeNullTerminatedString(''); // subsong notes
     w.writeUint8(0); // additional subsongs
     w.writeZeros(3);
-    for (const s of [nSys === 1 ? 'AY-3-8910 (Scramble)' : 'Dual AY-3-8910 (Scramble)', '', '', '', '', '']) w.writeNullTerminatedString(s);
+    for (const s of [tgt.synthType !== 'FurnaceAY' ? tgt.name : nSys === 1 ? 'AY-3-8910 (Scramble)' : 'Dual AY-3-8910 (Scramble)', '', '', '', '', '']) w.writeNullTerminatedString(s);
     for (let i = 0; i < nSys; i++) { w.writeFloat32(1); w.writeFloat32(0); w.writeFloat32(0); } // per system: volume, panning, front/rear
     w.writeUint32(0); // patchbay connections
     w.writeUint8(1); // automatic patchbay

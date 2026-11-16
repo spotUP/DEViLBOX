@@ -233,6 +233,35 @@ describe('exportFurnaceAyScramble, targets', () => {
   });
 });
 
+describe('exportFurnaceAyScramble, ZX Spectrum Beeper', () => {
+  const beeper = (channels = 4) => {
+    const s = song(channels);
+    s.instruments = s.instruments.map((i) => ({ ...i, synthType: 'FurnaceZXBEEPER' } as InstrumentConfig));
+    return s;
+  };
+  it('is offered only for beeper instruments', () => {
+    expect(furnaceAyScrambleExportAvailable(beeper().instruments, 'zxbeeper')).toBe(true);
+    expect(furnaceAyScrambleExportAvailable(song().instruments, 'zxbeeper')).toBe(false);
+    expect(furnaceAyScrambleExportAvailable(beeper().instruments, 'arcade')).toBe(false);
+  });
+  it('writes system 0xca with 5 channels, pocket-mini instruments and 50 Hz', async () => {
+    const { bytes } = exportFurnaceAyScramble(beeper(), 'zxbeeper');
+    const mod = await parseFurnaceSong(bytes.slice().buffer);
+    expect(mod.systems).toEqual([0xca]);
+    expect(mod.chans).toBe(5);
+    expect(mod.subsongs[0].hz).toBeCloseTo(50, 3);
+    expect(mod.instruments).toHaveLength(3);
+    expect(mod.instruments.every((i) => i.type === 47)).toBe(true);
+    expect(new TextDecoder().decode(pako.inflate(bytes))).toContain('clockSel=1\n');
+    if (process.env.BOSSGAME_WRITE) writeFileSync(join(process.env.BOSSGAME_WRITE, 'test-beeper.fur'), bytes);
+  });
+  it('refuses notes on the sample overlay channel', () => {
+    const s = beeper(5);
+    set(s.patterns[0], 4, 2, { note: 49, instrument: 1 });
+    expect(() => exportFurnaceAyScramble(s, 'zxbeeper')).toThrow(/ZX Spectrum Beeper target holds 4 channels/);
+  });
+});
+
 describe('ayScrambleTempoWarning', () => {
   it('warns with the BPM to use when the song does not tick at 58.3 Hz', () => {
     const w = ayScrambleTempoWarning(125);

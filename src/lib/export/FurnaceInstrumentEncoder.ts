@@ -32,6 +32,7 @@ export const DIV_INS_FM = 1;
 const DIV_INS_GB = 2;
 const DIV_INS_C64 = 3;
 export const DIV_INS_AY = 6;
+export const DIV_INS_POKEMINI = 47;
 const DIV_INS_N163 = 17;
 const DIV_INS_OPZ = 19;
 const DIV_INS_MIKEY = 23;
