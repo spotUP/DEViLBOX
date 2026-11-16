@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { songToBeeperRows, encodeBeeperMusic, beeperFreqWord, BEEPER_UNIT_MS } from '../zxBeeperData';
+import { songToBeeperRows, encodeBeeperMusic, beeperFreqWord, beeperDutyByte, BEEPER_UNIT_MS } from '../zxBeeperData';
 import { buildZx48Tap, type ZxBeeperPlayer } from '../zxTap';
 import { DEFAULT_FURNACE } from '@/types/instrument/defaults';
 import { EMPTY_CELL } from '@/types/tracker';
@@ -26,7 +26,7 @@ function song() {
   set(p, 0, 0, { note: 58, instrument: 1 }); // A-4 (tracker note 58 = 440 Hz)
   set(p, 0, 4, { note: 62, instrument: 1, effTyp: 0x12, eff: 0x40 });
   set(p, 1, 0, { note: 46, instrument: 1 });
-  set(p, 4, 0, { note: 50, instrument: 1 }); // sample channel: dropped
+  set(p, 4, 0, { note: 50, instrument: 1 }); // Furnace channel 5: takes the free third voice
   const furnace = { ...DEFAULT_FURNACE, chipType: 0xca } as FurnaceConfig;
   const inst = { id: 1, name: 'Beep', type: 'synth', synthType: 'FurnaceZXBEEPER', furnace } as unknown as InstrumentConfig;
   return { name: 'beeper', patterns: [p], instruments: [inst], songPositions: [0], initialSpeed: 6, initialBPM: 125, hz: 50 };
@@ -53,14 +53,17 @@ describe('ZX beeper tap', () => {
     expect(beeperFreqWord(57)).toBe(1845);
   });
 
-  it('turns pattern rows into timed tone rows and drops the sample channel', () => {
+  it('turns pattern rows into timed tone rows and folds channel 5 into a free voice', () => {
     const d = songToBeeperRows(song() as never, player.maxBytes);
     expect(d.rows[0].freq[0]).toBe(1845);
     expect(d.rows[0].freq[1]).toBeGreaterThan(0);
     // 4 rows at speed 6, 50 Hz = 0.48 s
     expect(d.rows[0].units * BEEPER_UNIT_MS).toBeCloseTo(480, -1);
-    expect(d.rows[1].duty[0]).toBe(0x40);
-    expect(d.warnings.join(' ')).toMatch(/Dropped/);
+    expect(d.rows[0].freq[2]).toBe(beeperFreqWord(49));
+    // Furnace duty = pin pulse of 64 samples at 894886 Hz; 12x40 = the same 64, so the byte follows the pitch.
+    expect(d.rows[0].duty[0]).toBe(beeperDutyByte(64, 440));
+    expect(d.rows[1].duty[0]).toBe(beeperDutyByte(0x40, 440 * Math.pow(2, 4 / 12)));
+    expect(d.rows[1].duty[0]).toBe(10);
   });
 
   it('keeps real-time length at 60 Hz and warns it was resampled', () => {
