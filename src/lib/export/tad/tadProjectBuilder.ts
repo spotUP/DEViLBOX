@@ -37,6 +37,9 @@ export interface TadBuildFile {
   instruments: TadInstrumentInput[];
   samples: FurnaceModuleSample[];
   wavetables?: FurnaceWavetable[];
+  /** Shown by the DEViLBOX player ROM. */
+  author?: string;
+  comment?: string;
 }
 
 export interface TadBuildResult {
@@ -103,9 +106,10 @@ function readme(r: TadBuildResult, log: string): string {
     'build/     Compiled audio data per assembler (ca65, 64tass, asar, pvsneslib) and memory map (lorom, hirom).',
     '           Each folder holds the assembly file, the .bin it includes and the song/sound effect enums.',
     '           ca65 segment BANK1 and 64tass section AudioBank1 are defaults: rename them to match your linker script.',
-    'build/player.sfc  SNES ROM (LoROM, 256 KiB) with your songs and sound effects. Checked in snes9x; untested on hardware.',
-    '           It opens on song 0, which is silent: press right for song 1, then B to play it; Start pauses.',
-    '           Controls (TAD sound-test menu): up/down picks an item, left/right changes its value, A or B runs it (Play Song, Play SFX).',
+    'build/player.sfc     DEViLBOX player ROM (LoROM, 256 KiB): plays song 1 on boot and shows title, author, timer and channel levels.',
+    '                     Left/right: previous/next song. A or Start: pause/play. Untested on hardware.',
+    'build/soundtest.sfc  TAD sound-test ROM with the same data. It opens on song 0, which is silent: press right for song 1,',
+    '                     then B to play it; Start pauses. Up/down picks an item, left/right changes its value, A or B runs it.',
     'preview/   One .spc per song (sound effects included). Not for shipping.',
     '',
     'Known difference: TAD keys a note off one tick before the next unslurred note (KEY_OFF_TICK_DELAY);',
@@ -216,11 +220,15 @@ async function buildTadProjectOnce(files: TadBuildFile[], create: CreateTadCompi
       if (run(`${a.id} ${map} export`, [a.cmd, `--${map}`, ...a.seg, '-a', out.asm, '-b', out.bin, '-i', out.inc, pf])) {
         for (const f of Object.values(out)) zip.file(`build/${d}/${f.slice(3)}`, tad.read(f));
         if (d === 'ca65_lorom' && loadAsset) {
-          try {
-            const [rom, meta] = await Promise.all([loadAsset('player-lorom.sfc'), loadAsset('player-lorom.json')]);
-            const text = (p: string) => new TextDecoder().decode(tad.read(p));
-            zip.file('build/player.sfc', injectTadPlayerRom(rom, JSON.parse(new TextDecoder().decode(meta)) as TadPlayerRomMeta, { bin: tad.read(out.bin), asm: text(out.asm), inc: text(out.inc) }));
-          } catch (e) { warnings.push(`Player ROM not built: ${(e as Error).message}`); }
+          const text = (p: string) => new TextDecoder().decode(tad.read(p));
+          const exp = { bin: tad.read(out.bin), asm: text(out.asm), inc: text(out.inc) };
+          const player = { titles: result.songs, author: files[0]?.author, comment: files[0]?.comment };
+          for (const [rom, name] of [['player-devilbox-lorom', 'player'], ['player-lorom', 'soundtest']] as const) {
+            try {
+              const [base, meta] = await Promise.all([loadAsset(`${rom}.sfc`), loadAsset(`${rom}.json`)]);
+              zip.file(`build/${name}.sfc`, injectTadPlayerRom(base, JSON.parse(new TextDecoder().decode(meta)) as TadPlayerRomMeta, exp, player));
+            } catch (e) { warnings.push(`${name}.sfc not built: ${(e as Error).message}`); }
+          }
         }
       }
     }

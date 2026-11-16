@@ -10,6 +10,24 @@ export interface TadPlayerRomMeta {
   driverSize: number;
   headerOffset: number;
   patches: { lastSongId: number[]; lastSfxId: number[]; dataItems: number[] };
+  /** DEViLBOX player only: file offset of the "DVBXMETA" text block (32 titles x 28, author 28, comment 256 + 0). */
+  metaOffset?: number;
+}
+
+/** Text the DEViLBOX player shows. Titles are per song, song 1 first. */
+export interface TadPlayerText {
+  titles: string[];
+  author?: string;
+  comment?: string;
+}
+
+const TITLE_LEN = 28, MAX_TITLES = 32, COMMENT_LEN = 256;
+
+/** The player font holds upper-case ASCII only: lower case is raised, anything else outside space..'_' becomes '?'. */
+function romText(s: string, len: number): number[] {
+  const out = new Array<number>(len).fill(0x20);
+  [...s.toUpperCase().slice(0, len)].forEach((c, i) => { const v = c.charCodeAt(0); out[i] = v >= 0x20 && v <= 0x5f ? v : 0x3f; });
+  return out;
 }
 
 export interface TadCompilerExport {
@@ -39,7 +57,7 @@ export function writeSnesChecksum(rom: Uint8Array, headerOffset: number): void {
   rom[at + 2] = sum & 0xff; rom[at + 3] = sum >> 8;
 }
 
-export function injectTadPlayerRom(base: Uint8Array, meta: TadPlayerRomMeta, exp: TadCompilerExport): Uint8Array {
+export function injectTadPlayerRom(base: Uint8Array, meta: TadPlayerRomMeta, exp: TadCompilerExport, text?: TadPlayerText): Uint8Array {
   if (base.length !== meta.romSize) throw new Error(`Player ROM is ${base.length} bytes, expected ${meta.romSize}`);
   if (num(exp.asm, /Tad_Loader_SIZE\s*=\s*(\d+)/, 'Tad_Loader_SIZE') !== meta.loaderSize
     || num(exp.asm, /Tad_AudioDriver_SIZE\s*=\s*(\d+)/, 'Tad_AudioDriver_SIZE') !== meta.driverSize) {
@@ -53,6 +71,13 @@ export function injectTadPlayerRom(base: Uint8Array, meta: TadPlayerRomMeta, exp
   set(meta.patches.lastSongId, num(exp.inc, /LAST_SONG_ID\s*=\s*(\d+)/, 'LAST_SONG_ID'));
   set(meta.patches.lastSfxId, Math.max(0, num(exp.inc, /N_SOUND_EFFECTS\s*=\s*(\d+)/, 'N_SOUND_EFFECTS') - 1));
   set(meta.patches.dataItems, num(exp.asm, /N_DATA_ITEMS\s*=\s*(\d+)/, 'N_DATA_ITEMS'));
+  if (meta.metaOffset !== undefined && text) {
+    const m = meta.metaOffset + 8;
+    if (String.fromCharCode(...rom.subarray(meta.metaOffset, m)) !== 'DVBXMETA') throw new Error('Player ROM text block not found at metaOffset');
+    for (let i = 0; i < MAX_TITLES; i++) rom.set(romText(text.titles[i] ?? '', TITLE_LEN), m + i * TITLE_LEN);
+    rom.set(romText(text.author ?? '', TITLE_LEN), m + MAX_TITLES * TITLE_LEN);
+    rom.set(romText(text.comment ?? '', COMMENT_LEN), m + (MAX_TITLES + 1) * TITLE_LEN);
+  }
   writeSnesChecksum(rom, meta.headerOffset);
   return rom;
 }

@@ -24,17 +24,23 @@ describe('player.sfc', () => {
     const r = await buildTadProject([file], create as CreateTadCompiler, (f) => resolve('public/tad', f), asset);
     expect(r.ok, r.warnings.join('\n')).toBe(true);
     const zip = await JSZip.loadAsync(r.zip);
-    const rom = await zip.file('build/player.sfc')!.async('uint8array');
     const bin = await zip.file('build/ca65_lorom/ca65_lorom_audio.bin')!.async('uint8array');
-    const meta = JSON.parse(readFileSync('public/tad/player-lorom.json', 'utf8')) as TadPlayerRomMeta;
-    if (process.env.TAD_ROM_OUT) writeFileSync(process.env.TAD_ROM_OUT, rom); // for the headless emulator check
-    expect(rom.length).toBe(262144);
-    expect(Array.from(rom.subarray(meta.dataOffset, meta.dataOffset + bin.length))).toEqual(Array.from(bin));
-    const h = meta.headerOffset + 0x2c;
-    const stored = rom[h + 2] | (rom[h + 3] << 8), comp = rom[h] | (rom[h + 1] << 8);
-    let sum = 0;
-    for (let i = 0; i < rom.length; i++) sum += rom[i];
-    expect(sum & 0xffff).toBe(stored); // checksum bytes are stored, complement bytes added: sum of all = checksum + complement + the rest
-    expect(comp).toBe(stored ^ 0xffff);
+    for (const [name, base] of [['player', 'player-devilbox-lorom'], ['soundtest', 'player-lorom']]) {
+      const rom = await zip.file(`build/${name}.sfc`)!.async('uint8array');
+      const meta = JSON.parse(readFileSync(`public/tad/${base}.json`, 'utf8')) as TadPlayerRomMeta;
+      if (process.env.TAD_ROM_OUT) writeFileSync(`${process.env.TAD_ROM_OUT}.${name}.sfc`, rom); // for the headless emulator check
+      expect(rom.length).toBe(262144);
+      expect(Array.from(rom.subarray(meta.dataOffset, meta.dataOffset + bin.length))).toEqual(Array.from(bin));
+      const h = meta.headerOffset + 0x2c;
+      const stored = rom[h + 2] | (rom[h + 3] << 8), comp = rom[h] | (rom[h + 1] << 8);
+      let sum = 0;
+      for (let i = 0; i < rom.length; i++) sum += rom[i];
+      expect(sum & 0xffff).toBe(stored); // checksum bytes are stored, complement bytes added: sum of all = checksum + complement + the rest
+      expect(comp).toBe(stored ^ 0xffff);
+      if (meta.metaOffset !== undefined) {
+        const title = String.fromCharCode(...rom.subarray(meta.metaOffset + 8, meta.metaOffset + 8 + 28)).trim();
+        expect(title).toBe(r.songs[0].toUpperCase().slice(0, 28));
+      }
+    }
   }, 120000);
 });

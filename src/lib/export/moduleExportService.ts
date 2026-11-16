@@ -14,6 +14,7 @@
  * since before this unit.
  */
 import { liveTrackerSong } from '@/lib/song/liveSong';
+import { useProjectStore } from '@/stores/useProjectStore';
 import { FurnaceDispatchPlatform } from '@/engine/furnace-dispatch/platforms';
 import { exportFurnaceModule, type FurnaceModuleResult } from './FurnaceModuleExporter';
 import { exportFurnaceAyScramble, ayScrambleTempoWarning, type FurnaceAyScrambleResult } from './FurnaceExporter';
@@ -125,6 +126,7 @@ export async function exportTadProjectFile(): Promise<TadBuildResult> {
     import(/* @vite-ignore */ `${import.meta.env.BASE_URL}tad/tad-compiler.js`),
   ]);
   const base = import.meta.env.BASE_URL;
+  const meta = useProjectStore.getState().metadata;
   return buildTadProject(
     [{
       title: song.name || 'song',
@@ -132,6 +134,8 @@ export async function exportTadProjectFile(): Promise<TadBuildResult> {
       instruments: song.instruments.map((i) => tadInstrumentFromFurnace(i.name, i.furnace ?? {})),
       samples: song.furnaceSamples ?? [],
       wavetables: song.furnaceWavetables?.map((w, n) => ({ name: `wave${n}`, ...w })),
+      author: meta.author === 'Unknown' ? '' : meta.author,
+      comment: meta.description,
     }],
     compiler.default,
     (f) => `${base}tad/${f}`,
