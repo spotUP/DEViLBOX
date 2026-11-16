@@ -333,7 +333,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     let sounding = false, curNote = 'r';
     let hasNotes = false;
     // Effect state of this channel (Furnace effects that TAD holds as channel state).
-    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', fine = 0, inv = 'i0', noiseOn = false, vibWant: { d: number; q: number } | null = null, volSlide = 0, slideSkip = 0, lastEnv = '', legatoOn = false;
+    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', fine = 0, inv = 'i0', noiseOn = false, vibWant: { d: number; q: number } | null = null, trem: { d: number; q: number } | null = null, lastTrem = '', volSlide = 0, slideSkip = 0, lastEnv = '', legatoOn = false;
     let env: { mode: number; gain: number; adsr: number[] } | null = null;
     const pitchName = (p: number) => NOTE_NAMES[p % 12];
     // Furnace ticks to TAD ticks (rows are k Furnace-tick multiples; sound effects run at 125 Hz).
@@ -458,9 +458,15 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             fine = e.val - 0x80;
             if (!(cl.note >= 0 && cl.note < 180)) drop('effect E5xx without a note (applies from the next note)', at);
           }
+          else if (e.cmd === 0x07) {
+            // playback.cpp:1252, 2385-2387: volume - tremTable[pos] * y, pos += x per tick over 128 steps (raised cosine, peak-to-peak y volume units).
+            const x = e.val >> 4, y = e.val & 15;
+            trem = x && y ? { d: y, q: Math.max(1, Math.min(127, Math.round(32 / x))) } : null;
+            volSlide = 0;
+          }
           // volSlide = Furnace volSpeed, 1/256 volume step per tick (playback.cpp:1273, 1554-1605).
-          else if (e.cmd === 0x0a || e.cmd === 0xfa) volSlide = (e.val & 15 ? -(e.val & 15) : e.val >> 4) * (e.cmd === 0xfa ? 256 : 64);
-          else if (e.cmd === 0xf3 || e.cmd === 0xf4) volSlide = e.cmd === 0xf3 ? e.val : -e.val;
+          else if (e.cmd === 0x0a || e.cmd === 0xfa) { trem = null; volSlide = (e.val & 15 ? -(e.val & 15) : e.val >> 4) * (e.cmd === 0xfa ? 256 : 64); }
+          else if (e.cmd === 0xf3 || e.cmd === 0xf4) { trem = null; volSlide = e.cmd === 0xf3 ? e.val : -e.val; }
           else if (e.cmd === 0xf8 || e.cmd === 0xf9) {
             volSlide = 0;
             vol = Math.max(0, Math.min(127, vol + (e.cmd === 0xf8 ? e.val : -e.val)));
@@ -504,6 +510,15 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           }
           const from = Number(lastV.slice(1)), to = volV(), d = Number(to.slice(1)) - from;
           if (d) { lastV = to; cmds.push(`Vs${d > 0 ? '+' : '-'}${Math.min(255, Math.abs(d))},${ticks}`); }
+        }
+        // TAD drops tremolo on every V/Vs write (mml-syntax.md:394), so it is armed again after one.
+        // shortcut: TAD swings around V, Furnace only below it (center sits y/2 high); shift V if it is audible.
+        const tremTok = trem ? `V~${Math.max(1, Math.min(127, Math.round(trem.d * volScale())))},${trem.q}` : '';
+        if (cmds.some((t) => /^V(s[+-])?\d/.test(t))) lastTrem = '';
+        if (tremTok !== lastTrem) {
+          if (tremTok) cmds.push(tremTok);
+          else if (!cmds.some((t) => /^V\d/.test(t))) cmds.push(lastV); // 0700 / slide: Furnace restores the volume
+          lastTrem = tremTok;
         }
         // Pitch effects: Furnace slide speed is xx * pitchSlideSpeed (default 4) units per tick, 128 per semitone.
         const slideMul = Number(native.compatFlags?.pitchSlideSpeed ?? 4);
