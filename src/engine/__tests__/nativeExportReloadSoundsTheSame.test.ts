@@ -180,7 +180,18 @@ const FORMATS: FormatRow[] = [
   { key: 'musicAssembler', rig: 'paula', files: ['music-assembler/thanatos.ma'] },
   // Its first song position plays pattern 19; pattern 0 starts at position 3, about 19 s in, past the render window.
   { key: 'okt', rig: 'paula', files: ['oktalyzer/les granges brulees.okta'], pick: (s) => Promise.resolve(pickNote(s, s.songPositions[0])) },
-  { key: 'pumaTracker', rig: 'paula', files: ['pumatracker/liquid kids - lv1a.puma'] },
+  // The parser repeats an RLE group's note on each of its rows: a note equal to the row above is inside a multi-row group, the case that
+  // splits the group on export (and grows the pattern data, so the header's sample offsets move).
+  { key: 'pumaTracker', rig: 'paula', files: ['pumatracker/liquid kids - lv1a.puma'], pick: (s) => {
+    const ch = s.patterns[s.songPositions[0]].channels;
+    for (let c = 0; c < ch.length; c++) {
+      for (let r = 1; r < ch[c].rows.length; r++) {
+        const n = ch[c].rows[r].note;
+        if (n > 0 && n < 95 && n === ch[c].rows[r - 1].note) return Promise.resolve({ p: s.songPositions[0], ch: c, r, note: n + (n > 48 ? -2 : 2) });
+      }
+    }
+    return Promise.resolve(null);
+  } },
   { key: 'quadraComposer', rig: 'paula', files: ['quadra-composer/poison.emod'] },
   { key: 'soundControl', rig: 'paula', files: ['soundcontrol/north sea inferno ongame1.sc'] },
   { key: 'sonicArranger', rig: 'paula', files: ['sonic-arranger/mega end.sa'] },

@@ -209,7 +209,7 @@ function extractOriginalData(originalData: ArrayBuffer): {
  * The module with each edited grid note stored in its track's RLE entries: the grid note is the stored note plus the order's
  * note transpose (PumaTrackerParser), so the stored byte is the grid note minus it. Instrument and effect edits are not stored
  * (shortcut: they carry the order's instrument transpose and the parser's auto-portamento, upgrade with their inverse).
- * A note edited inside a multi-row group (not at its first row) is not stored. Never null today; kept for the caller's fallback.
+ * Never null today; kept for the caller's fallback.
  */
 function patchPumaNotes(source: ArrayBuffer, layout: UADEVariablePatternLayout, patterns: readonly Pattern[]): Uint8Array | null {
   const buf = new Uint8Array(source).slice();
@@ -225,15 +225,47 @@ function patchPumaNotes(source: ArrayBuffer, layout: UADEVariablePatternLayout, 
     if (!rows) edits.set(fp, (rows = new Map()));
     rows.set(row, nx);
   }
-  for (const [fp, rows] of edits) {
+  // A group's run length is its duration (the player applies an effect once per group), so an edited row inside a group splits
+  // it into before / edited row / after groups whose run lengths sum to the original; a group with no edit is copied verbatim.
+  // The patterns are stored back to back, so a split that grows the data moves everything after it and the header's absolute
+  // sample offsets move with it.
+  const chunks: Uint8Array[] = [];
+  let cursor = 0;
+  const order = [...edits.keys()].sort((x, y) => layout.filePatternAddrs[x] - layout.filePatternAddrs[y]);
+  for (const fp of order) {
+    const rows = edits.get(fp)!;
     const addr = layout.filePatternAddrs[fp], size = layout.filePatternSizes[fp];
-    // Edit in place at the group's start: a group's run length is its duration (the player applies an effect once per group), so groups are never merged or split.
+    chunks.push(buf.subarray(cursor, addr));
+    const out: number[] = [];
     for (let i = addr, row = 0; i < addr + size; row += buf[i + 3], i += 4) {
-      const nx = rows.get(row);
-      if (nx !== undefined) buf[i] = nx;
+      const len = buf[i + 3];
+      let start = 0;
+      for (let k = 0; k < len; k++) {
+        const nx = rows.get(row + k);
+        if (nx === undefined) continue;
+        if (k > start) out.push(buf[i], buf[i + 1], buf[i + 2], k - start);
+        out.push(nx, buf[i + 1], buf[i + 2], 1);
+        start = k + 1;
+      }
+      if (start === 0) out.push(buf[i], buf[i + 1], buf[i + 2], len);
+      else if (start < len) out.push(buf[i], buf[i + 1], buf[i + 2], len - start);
+    }
+    chunks.push(Uint8Array.from(out));
+    cursor = addr + size;
+  }
+  chunks.push(buf.subarray(cursor));
+  const result = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+  let at = 0;
+  for (const c of chunks) { result.set(c, at); at += c.length; }
+  const delta = result.length - buf.length;
+  if (delta) {
+    const dv = new DataView(result.buffer);
+    for (let i = 0; i < 10; i++) {
+      const off = dv.getUint32(20 + i * 4, false);
+      if (off) dv.setUint32(20 + i * 4, off + delta, false);
     }
   }
-  return buf;
+  return result;
 }
 
 export function exportPumaTrackerFile(song: TrackerSong): Uint8Array {
