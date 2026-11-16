@@ -36,7 +36,8 @@ describe('master sidechain "Drums (auto)"', () => {
     await wireMasterSidechain(node as never, SIDECHAIN_KEY_DRUMS);
 
     expect(addSidechainTap).toHaveBeenCalledTimes(1);
-    expect(addSidechainTap).toHaveBeenCalledWith(1, scInput);
+    // Drum channel is index 2: columns follow the Paula voice since a3979dc62 (SoundMon step-entry voice order).
+    expect(addSidechainTap).toHaveBeenCalledWith(2, scInput);
     expect(setSelfSidechain).toHaveBeenLastCalledWith(false);
   });
 

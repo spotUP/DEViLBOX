@@ -11,6 +11,9 @@
  *     crest >= 3.
  * With no instrument classified above 0.6, the channel fell to note
  * statistics and a greeting-free "pad".
+ * Since a3979dc62 the grid columns follow the Paula voice the replayer plays
+ * each step entry on (pos*4 + 3 - voice), so that drum voice is now channel 3
+ * (index 2); the owner's "channel 2" was the mirrored column.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -36,10 +39,10 @@ describe('Amiga drum samples classify as drums', () => {
     expect(snare.confidence).toBeGreaterThanOrEqual(0.8);
   });
 
-  it('channel 2 (index 1) is the drum channel', async () => {
+  it('channel 3 (index 2, Paula voice 2) is the drum channel', async () => {
     const song = await loadSong();
     const lookup = new Map(song.instruments.map((i) => [i.id, i as InstrumentConfig]));
     const roles = classifySongRoles(song.patterns, lookup);
-    expect(roles[1]).toBe('percussion');
+    expect(roles[2]).toBe('percussion');
   });
 });
