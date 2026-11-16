@@ -35,7 +35,9 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
-import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import type { UADEPatternLayout, UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { markCookseyEncoder } from '@/engine/uade/encoders/MarkCookseyEncoder';
+import { buildMarkCookseyGrid, MARK_COOKSEY_ROWS_PER_PATTERN } from './markCookseyGrid';
 import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
@@ -408,7 +410,42 @@ export async function parseMarkCookseyFile(
 
   const songPositions = Array.from({ length: subsongCount }, (_, i) => i % 1);
 
-  // ── Empty pattern (placeholder — UADE handles actual audio) ──────────────
+  // ── Tick grid ─────────────────────────────────────────────────────────────
+  // One row per 50 Hz frame, read from subsong 0's own command streams (markCookseyGrid.ts). The streams ride along
+  // byte-exact as carrier blocks; note edits are written in place by MarkCookseyExporter. UADE plays the module.
+  const grid = buildMarkCookseyGrid(buf, filename);
+  if (grid) {
+    const R = MARK_COOKSEY_ROWS_PER_PATTERN;
+    return {
+      name: `${moduleName} [Mark Cooksey ${variantLabel}]${subsongCount > 1 ? ` (${subsongCount} subsongs)` : ''}`,
+      format: 'MOD' as TrackerFormat,
+      patterns: grid.patterns, instruments, songPositions: grid.patterns.map((_, i) => i),
+      songLength: grid.patterns.length, restartPosition: 0, numChannels: 4,
+      initialSpeed: 1, initialBPM: 125, linearPeriods: false,
+      uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+      uadeEditableFileName: filename,
+      uadePlayerTickGrid: true,
+      uadeVariableLayout: {
+        formatId: 'markCooksey',
+        numChannels: grid.voices,
+        numFilePatterns: grid.blockRows.length,
+        rowsPerPattern: R,
+        moduleSize: buffer.byteLength,
+        encoder: markCookseyEncoder,
+        filePatternAddrs: grid.filePatternAddrs,
+        filePatternSizes: grid.filePatternSizes,
+        trackMap: grid.trackMap,
+        blockRows: grid.blockRows,
+        propagateSharedCells: true,
+        noteBytes: grid.placements.map(pl => ({
+          pattern: Math.floor(pl.tick / R), channel: pl.voice, row: pl.tick % R,
+          offset: pl.offset, note: pl.note, base: pl.delta,
+        })),
+      } as UADEVariablePatternLayout,
+    };
+  }
+
+  // ── Empty pattern (placeholder — other variants; UADE handles actual audio) ──
 
   const emptyRows = Array.from({ length: 64 }, () => ({
     note: 0,
