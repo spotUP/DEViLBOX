@@ -17,6 +17,9 @@ class ArtOfNoiseProcessor extends AudioWorkletProcessor {
     this.initializing = false;
     this.processCount = 0;
     this.muteMask = 0xFFFFFFFF;
+    // Frames rendered since the module was loaded: the position an edited module is caught up to (replaceModule).
+    this.framesPlayed = 0;
+    this.subsong = 0;
 
     this.port.onmessage = (event) => {
       this.handleMessage(event.data);
@@ -63,7 +66,11 @@ class ArtOfNoiseProcessor extends AudioWorkletProcessor {
             const free = this.module._free || this.module.free;
             if (free) free(wasmPtr);
 
-            if (ok) {
+            if (ok && data.type === 'replaceModule') {
+              this.catchUp();
+            } else if (ok) {
+              this.framesPlayed = 0;
+              this.subsong = 0;
               this.applyMuteMask();
               this.port.postMessage({ type: 'moduleLoaded' });
             } else {
@@ -78,6 +85,7 @@ class ArtOfNoiseProcessor extends AudioWorkletProcessor {
       case 'stop':
         if (this.module && typeof this.module._player_stop === 'function') {
           this.module._player_stop();
+          this.framesPlayed = 0;
           this.port.postMessage({ type: 'stopped' });
         }
         break;
@@ -85,6 +93,8 @@ class ArtOfNoiseProcessor extends AudioWorkletProcessor {
       case 'setSubsong':
         if (this.module && typeof this.module._player_set_subsong === 'function') {
           this.module._player_set_subsong(data.subsong);
+          this.subsong = data.subsong;
+          this.framesPlayed = 0;
         }
         break;
 
@@ -263,6 +273,19 @@ class ArtOfNoiseProcessor extends AudioWorkletProcessor {
   }
 
 
+  /**
+   * An edited module (just loaded by replaceModule) takes the place of the playing one without a restart (G24): it is run
+   * silently for the frames already played, in the blocks they were played in (the replayer is deterministic), so from here
+   * it is the edited module played from the start, at the position the listener is at.
+   */
+  catchUp() {
+    if (this.subsong > 0 && typeof this.module._player_set_subsong === 'function') this.module._player_set_subsong(this.subsong);
+    this.applyMuteMask();
+    this.updateBufferViews();
+    for (let left = this.framesPlayed; left > 0; left -= this.bufferSize) this.module._player_render(this.interleavedPtr, Math.min(this.bufferSize, left));
+    this.port.postMessage({ type: 'moduleSwapped', frames: this.framesPlayed });
+  }
+
   process(inputs, outputs, parameters) {
     if (!this.initialized || !this.module) return true;
     const output = outputs[0];
@@ -277,6 +300,7 @@ class ArtOfNoiseProcessor extends AudioWorkletProcessor {
       this.updateBufferViews();
       if (this.interleavedBuf) {
         const rendered = this.module._player_render(this.interleavedPtr, numSamples);
+        if (rendered > 0) this.framesPlayed += numSamples;
         if (rendered > 0) {
           for (let i = 0; i < rendered; i++) {
             outputL[i] = this.interleavedBuf[i * 2];
