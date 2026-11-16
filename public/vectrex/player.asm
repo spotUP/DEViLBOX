@@ -16,7 +16,7 @@ rep           equ $C885
         org $0000
         fcc "g GCE 2026"
         fcb $80
-        fdb $0000
+        fdb $FD0D       ; music pointer: BIOS jingle. $0000 made the BIOS play the header text as music (noise until the cart starts)
         fcb $F8,$50,$20,$B0
 title:  fcc "DEVILBOX        "
         fcb $80
