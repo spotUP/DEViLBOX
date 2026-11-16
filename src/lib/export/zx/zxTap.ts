@@ -104,7 +104,15 @@ export function buildZxTap(writes: readonly RegisterWrite[], sampleRate: number,
   return { tap, frames: frames.length, banks: banks.length, dataBytes: banks.reduce((n, b) => n + b.length, 0), seconds: frames.length / 50 };
 }
 
-export interface ZxBeeperPlayer { bytes: Uint8Array; loadAddress: number; entry: number; dataOffset: number; maxBytes: number }
+/** public/zx/beeper.bin + beeper.json (tools/build-zx-beeper.sh): 128K 6 voice beeper player. */
+export interface ZxBeeperPlayer {
+  bytes: Uint8Array; loadAddress: number; entry: number;
+  /** Drum bits go at loadAddress + dataOffset, at most maxDrumBytes. */
+  dataOffset: number; maxDrumBytes: number;
+  /** Record stream: one 16K bank per usable bank, paged in at dataAddress. */
+  dataAddress: number; bankSize: number; usableBanks: number[];
+  iterT: number; drumByteT: number; clock: number;
+}
 
 /** Fetch public/zx/beeper.bin + beeper.json (browser). */
 export async function fetchZxBeeperPlayer(): Promise<ZxBeeperPlayer> {
@@ -116,16 +124,20 @@ export async function fetchZxBeeperPlayer(): Promise<ZxBeeperPlayer> {
   return { ...meta, bytes: new Uint8Array(bin) };
 }
 
-/** 48K tap: BASIC loader (CLEAR; LOAD ""CODE; RANDOMIZE USR) + one CODE block of player + song data. */
-export function buildZx48Tap(player: ZxBeeperPlayer, music: (base: number) => Uint8Array, title = 'devilbox'): Uint8Array {
-  const code = new Uint8Array(player.dataOffset + music(0).length);
+/** 128K tap: BASIC loader, one CODE block of player + drum bits, then one CODE block per stream bank (player banktab order). */
+export function buildZxBeeperTap(player: ZxBeeperPlayer, drums: Uint8Array, banks: readonly Uint8Array[], title = 'devilbox'): Uint8Array {
+  if (drums.length > player.maxDrumBytes) throw new Error(`The drum samples need ${drums.length} bytes; the player has room for ${player.maxDrumBytes}.`);
+  if (banks.length > player.usableBanks.length) throw new Error(`The song needs ${banks.length} banks; the player has ${player.usableBanks.length}.`);
+  const code = new Uint8Array(player.dataOffset + drums.length);
   code.set(player.bytes.subarray(0, player.dataOffset));
-  code.set(music(player.loadAddress + player.dataOffset), player.dataOffset);
+  code.set(drums, player.dataOffset);
   const name = title.replace(/[^\x20-\x7E]/g, '?').slice(0, 10);
-  const loader = basicLoader([], { loadAddress: player.loadAddress, entry: player.entry, dataAddress: 0 });
+  const used = player.usableBanks.slice(0, banks.length);
+  const loader = basicLoader(used, player);
   const parts = [
     tapBlock(0x00, header(0, name, loader.length, 10, loader.length)), tapBlock(0xFF, loader),
     ...codeBlocks('beeper', player.loadAddress, code),
+    ...banks.flatMap((b, i) => codeBlocks(`bank${used[i]}`, player.dataAddress, b)),
   ];
   const tap = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
   let o = 0;

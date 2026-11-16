@@ -119,17 +119,20 @@ export function exportFurnaceAyScrambleFile(target: AyScrambleTarget = 'arcade')
 
 export interface ZxBeeperTapResult { tap: Uint8Array; seconds: number; rows: number; warnings: string[] }
 
-/** ZX Spectrum 48K beeper .tap from the live song's pattern data (first four channels). */
+/** ZX Spectrum 128K beeper .tap from the live song's pattern data: 6 voices, 17xx sample drums, stream in the 128K banks. */
 export async function exportZxBeeperTapFile(title = 'devilbox'): Promise<ZxBeeperTapResult> {
   const song = liveTrackerSong();
-  const [{ songToBeeperRows, encodeBeeperMusic }, { fetchZxBeeperPlayer, buildZx48Tap }] = await Promise.all([
+  const [{ songToBeeperRows, encodeBeeperMusic }, { fetchZxBeeperPlayer, buildZxBeeperTap }] = await Promise.all([
     import('./zx/zxBeeperData'),
     import('./zx/zxTap'),
   ]);
   const player = await fetchZxBeeperPlayer();
-  const data = songToBeeperRows(song, player.maxBytes);
-  const tap = buildZx48Tap(player, (base) => encodeBeeperMusic(data.rows, base), title);
-  return { tap, seconds: data.seconds, rows: data.rows.length, warnings: data.warnings };
+  const data = songToBeeperRows(song);
+  const music = encodeBeeperMusic(data.rows, player.loadAddress + player.dataOffset, player.usableBanks.length);
+  const warnings = [...data.warnings];
+  if (music.truncated) warnings.push(`The song is longer than the 128K memory holds: it was cut after ${Math.floor(music.seconds)} s`);
+  const tap = buildZxBeeperTap(player, data.drums, music.banks, title);
+  return { tap, seconds: music.seconds, rows: data.rows.length, warnings };
 }
 
 /** SNES Furnace song(s) -> Terrific Audio Driver project zip, from the live song. Instrument index = Furnace instrument index. */

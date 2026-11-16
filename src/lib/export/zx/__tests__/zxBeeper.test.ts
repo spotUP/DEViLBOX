@@ -1,12 +1,12 @@
 /**
- * ZX Spectrum 48K beeper .tap. Caveat: the song is synthetic (no real beeper .fur exists in
- * public/data/songs); the player bytes are checked structurally, the audio by MAME (see
- * thoughts/spot/2026-11-16-zx-native-tap-research.md).
+ * ZX Spectrum 128K beeper .tap (public/zx/beeper.asm). The player bytes are checked structurally here, the audio
+ * by MAME (see thoughts/spot/2026-11-16-zx-native-tap-research.md).
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { songToBeeperRows, encodeBeeperMusic, beeperFreqWord, beeperDutyByte, BEEPER_UNIT_MS } from '../zxBeeperData';
-import { buildZx48Tap, type ZxBeeperPlayer } from '../zxTap';
+import { songToBeeperRows, encodeBeeperMusic, beeperFreqWord, beeperDutyUnits, BEEPER_CLOCK, BEEPER_ITER_T, BEEPER_DRUM_BYTE_T } from '../zxBeeperData';
+import { buildZxBeeperTap, type ZxBeeperPlayer } from '../zxTap';
+import { parseFurnaceFile } from '@/lib/import/parsers/FurnaceToSong';
 import { DEFAULT_FURNACE } from '@/types/instrument/defaults';
 import { EMPTY_CELL } from '@/types/tracker';
 import type { Pattern, TrackerCell, ChannelData } from '@/types/tracker';
@@ -26,7 +26,7 @@ function song() {
   set(p, 0, 0, { note: 58, instrument: 1 }); // A-4 (tracker note 58 = 440 Hz)
   set(p, 0, 4, { note: 62, instrument: 1, effTyp: 0x12, eff: 0x40 });
   set(p, 1, 0, { note: 46, instrument: 1 });
-  set(p, 4, 0, { note: 50, instrument: 1 }); // Furnace channel 5: takes the free third voice
+  set(p, 4, 0, { note: 50, instrument: 1 }); // Furnace channel 5: plays on voice 5
   const furnace = { ...DEFAULT_FURNACE, chipType: 0xca } as FurnaceConfig;
   const inst = { id: 1, name: 'Beep', type: 'synth', synthType: 'FurnaceZXBEEPER', furnace } as unknown as InstrumentConfig;
   return { name: 'beeper', patterns: [p], instruments: [inst], songPositions: [0], initialSpeed: 6, initialBPM: 125, hz: 50 };
@@ -48,52 +48,61 @@ const player: ZxBeeperPlayer = {
   bytes: new Uint8Array(readFileSync('public/zx/beeper.bin')),
 };
 
+const rowsT = (rows: ReturnType<typeof songToBeeperRows>['rows']) =>
+  rows.reduce((t, r) => t + r.iters * BEEPER_ITER_T + (r.drum?.bytes ?? 0) * BEEPER_DRUM_BYTE_T, 0);
+
 describe('ZX beeper tap', () => {
-  it('A-4 is 440 Hz in the engine frequency word', () => {
-    expect(beeperFreqWord(57)).toBe(1845);
+  it('player timing constants match the assembled player', () => {
+    expect(player.iterT).toBe(BEEPER_ITER_T);
+    expect(player.drumByteT).toBe(BEEPER_DRUM_BYTE_T);
+    expect(player.clock).toBe(BEEPER_CLOCK);
+    expect(player.bytes.length).toBe(player.dataOffset);
   });
 
-  it('turns pattern rows into timed tone rows and folds channel 5 into a free voice', () => {
-    const d = songToBeeperRows(song() as never, player.maxBytes);
-    expect(d.rows[0].freq[0]).toBe(1845);
-    expect(d.rows[0].freq[1]).toBeGreaterThan(0);
-    // 4 rows at speed 6, 50 Hz = 0.48 s
-    expect(d.rows[0].units * BEEPER_UNIT_MS).toBeCloseTo(480, -1);
-    expect(d.rows[0].freq[2]).toBe(beeperFreqWord(49));
-    // Furnace duty = pin pulse of 64 samples at 894886 Hz; 12x40 = the same 64, so the byte follows the pitch.
-    expect(d.rows[0].duty[0]).toBe(beeperDutyByte(64, 440));
-    expect(d.rows[1].duty[0]).toBe(beeperDutyByte(0x40, 440 * Math.pow(2, 4 / 12)));
-    expect(d.rows[1].duty[0]).toBe(10);
+  it('A-4 is 440 Hz in the player frequency word', () => {
+    expect(beeperFreqWord(57)).toBe(Math.round(440 * 65536 * BEEPER_ITER_T / BEEPER_CLOCK));
   });
 
-  it('keeps real-time length at 60 Hz and warns it was resampled', () => {
-    const s = { ...song(), hz: 60 };
-    const d = songToBeeperRows(s as never, player.maxBytes);
-    expect(d.rows[0].units * BEEPER_UNIT_MS).toBeLessThan(420); // 4 rows x 6 ticks / 60 Hz = 400 ms, not 480
-    expect(d.warnings.join(' ')).toMatch(/60\.00 Hz.*resampled/);
+  it('turns pattern rows into timed records, channel k on voice k', () => {
+    const d = songToBeeperRows(song() as never);
+    expect(d.seconds).toBeCloseTo(16 * 6 / 50, 5);
+    expect(rowsT(d.rows) / BEEPER_CLOCK).toBeGreaterThan(d.seconds * 0.95);
+    expect(rowsT(d.rows) / BEEPER_CLOCK).toBeLessThanOrEqual(d.seconds);
+    expect(d.rows[0].freq[0]).toBe(beeperFreqWord(57));
+    expect(d.rows[0].freq[4]).toBeGreaterThan(0);
+    expect(d.rows[0].duty[4]).toBe(beeperDutyUnits(64));
+    expect(d.rows[0].duty[2]).toBe(0);
+    const later = d.rows.find((r) => r.freq[0] === beeperFreqWord(61))!;
+    expect(later.duty[0]).toBe(beeperDutyUnits(0x40));
+    expect(d.drumHits).toBe(0);
   });
 
-  it('expands a 00xy arpeggio and an arp macro into one row per tick', () => {
-    const s = song();
-    set(s.patterns[0], 2, 0, { note: 58, instrument: 1, effTyp: 0, eff: 0x47 });
-    const d = songToBeeperRows(s as never, player.maxBytes);
-    const w = (n: number) => beeperFreqWord(n);
-    expect(d.rows.slice(0, 3).map((r) => r.freq[2])).toEqual([w(57), w(61), w(64)]);
-    const m = song();
-    (m.instruments[0].furnace as FurnaceConfig).macros = [{ code: 1, type: 0, data: [0, 12], loop: 0, release: -1, mode: 0 }];
-    const e = songToBeeperRows(m as never, player.maxBytes);
-    expect(e.rows.slice(0, 2).map((r) => r.freq[0])).toEqual([w(57), w(69)]);
-  });
-
-  it('builds a tape with valid checksums, a loader and the player code', () => {
-    const d = songToBeeperRows(song() as never, player.maxBytes);
-    const tap = buildZx48Tap(player, (base) => encodeBeeperMusic(d.rows, base), 'beeper');
-    const blocks = parseTap(tap);
+  it('builds a 128K tap: loader, player + drums, one block per bank', () => {
+    const d = songToBeeperRows(song() as never);
+    const m = encodeBeeperMusic(d.rows, player.loadAddress + player.dataOffset, player.usableBanks.length);
+    expect(m.banks.length).toBe(1);
+    expect(m.banks[0][0]).toBe(0x3F); // first record sets all 6 voices
+    expect(m.banks[0][m.banks[0].length - 1]).toBe(0x81);
+    const blocks = parseTap(buildZxBeeperTap(player, d.drums, m.banks, 'beeper'));
     expect(blocks.every((b) => b.ok)).toBe(true);
-    expect(blocks.length).toBe(4);
-    expect(blocks[0].flag).toBe(0x00);
-    expect(blocks[1].data[blocks[1].data.length - 1]).toBe(0x0D);
-    expect(Array.from(blocks[3].data.subarray(0, player.dataOffset))).toEqual(Array.from(player.bytes.subarray(0, player.dataOffset)));
-    expect(blocks[3].data.length).toBe(player.dataOffset + 4 + d.rows.length * 16 + 2);
+    expect(blocks.map((b) => b.flag)).toEqual([0, 0xFF, 0, 0xFF, 0, 0xFF]);
+    expect(blocks[3].data.subarray(0, player.dataOffset)).toEqual(player.bytes);
+    expect(blocks[5].data).toEqual(m.banks[0]);
   });
+
+  it('ZX Extinction Sequence: whole song in the 128K banks, 17xx drums encoded', async () => {
+    const buf = readFileSync('public/data/songs/furnace/misc/ZX Extinction Sequence.fur');
+    const s = await parseFurnaceFile(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length), 'x.fur');
+    const d = songToBeeperRows(s as never);
+    expect(d.seconds).toBeGreaterThan(110);
+    expect(d.drumHits).toBeGreaterThan(100);
+    expect(d.drums.length).toBeGreaterThan(0);
+    expect(d.drums.length).toBeLessThanOrEqual(player.maxDrumBytes);
+    expect(d.rows.some((r) => r.drum)).toBe(true);
+    expect(rowsT(d.rows) / BEEPER_CLOCK).toBeGreaterThan(d.seconds * 0.97);
+    const m = encodeBeeperMusic(d.rows, player.loadAddress + player.dataOffset, player.usableBanks.length);
+    expect(m.truncated).toBe(false);
+    expect(m.seconds).toBeCloseTo(d.seconds, 3);
+    expect(m.banks.length).toBeLessThanOrEqual(player.usableBanks.length);
+  }, 30000);
 });

@@ -1,178 +1,243 @@
-; beeper.asm - 4 channel pulse-width beeper player for the ZX Spectrum 48K.
+; beeper.asm - 6 voice pulse beeper player with 1-bit sample drums for the ZX Spectrum 128K.
+; Written for DEViLBOX (own design; replaces the earlier quattropic-derived 4 voice 48K player).
+; Build: tools/build-zx-beeper.sh (sjasmplus) -> beeper.bin + beeper.json.
 ;
-; Derived from "quattropic" by utz, 08'2015, from
-; https://github.com/utz82/ZX-Spectrum-1-Bit-Routines
-; Copyright (c) 2014-2019, utz/irrlicht project. All rights reserved.
-; Redistribution and use in source and binary forms, with or without modification, are
-; permitted provided that the following conditions are met:
-;  * Redistributions of source code must retain the above copyright notice, this list of
-;    conditions and the following disclaimer.
-;  * Neither the name of utz/irrlicht project nor the names of its contributors may be used
-;    to endorse or promote products derived from this software without specific prior
-;    written permission.
-; THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
-; EXPRESS OR IMPLIED WARRANTIES ARE DISCLAIMED (full disclaimer: see the LICENSE file at the URL above).
+; Model of Furnace's zxbeeper chip (zxbeeper.cpp): each voice adds its frequency word to a 16-bit phase;
+; on a phase wrap the shared pulse timer gets the voice's duty added, and the pin is high while the timer
+; is above zero. The pin is written 3 times per loop iteration, each write takes 1 from the timer.
+; Phases never reset, so a voice keeps its phase across ticks and note changes.
+; A sample drum (Furnace 17xx) plays its 1-bit data alone, the tone voices frozen, like zxbeeper.cpp.
 ;
-; Modifications for DEViLBOX:
-;  * Only the regular tone core is kept (noise, slide and noise+slide cores removed).
-;  * The row length is read from the pattern (eighth word of each row) instead of one
-;    global tempo byte, so Furnace speeds and groove changes survive the export.
-;  * The song data (sequence + rows) is appended after this code by the exporter at
-;    musicdata (see beeper.json); the sequence loops to its start.
+; Memory: code + tables + drum bits at #8000 (bank 2), stream at #C000 in banks 0,1,3,4,6,7 (port #7FFD).
+; Interrupts are off; SP is a scratch register in the tone loop (no stack is used).
 ;
-; Row (8 words): AF = 0xFF00 (note never cut) | duty1,duty2 | duty3,duty4 |
-;                freq1 | freq2 | freq3 | freq4 | timer (row length in 16.384 ms units, 1-254, in the high byte)
-; Frequency word f gives f * 15625 / 65536 Hz. End of pattern: AF with F = 0x40.
-; Sequence: dw pattern address ... , 0
-; Registers: HL add counter ch1, DE freq ch1, IX/BC ch2, IY/DE' ch3, HL'/SP ch4, BC' timer.
-; Build: sjasmplus --raw=beeper.bin beeper.asm
+; Stream record: M < #80: bits 0-5 = voice 1-6 change (each: freq lo, freq hi, duty), bit 6 = drum
+;   (ptr lo, ptr hi, byte count 1-255), then the tone length in loop iterations (lo, hi; 1-65535).
+;   M = #80: continue at the start of the next bank. M = #81: loop to the start of the first bank.
+; Records never cross a bank end.
+;
+; Loop registers: HL ph1, DE ph2, IX ph3, IY ph4, HL' ph5, DE' ph6, BC' iteration counter,
+; B = page of pintab, A = pulse timer.
 
-origin	equ 32768
-	org origin
+ITER_T		equ 363		; T-states per tone loop iteration (counted below, wrap path +2 per voice)
+DRUM_BYTE_T	equ 504		; T-states per drum byte (8 bits of 63 T)
 
+	org #8000
+entry
 	di
-init
-	ei			; detect kempston
-	halt
-	in a,(#1f)
-	inc a
-	jr nz,_skip
-	ld (maskKempston),a
-_skip
-	di
-	exx
-	push hl			; preserve HL' for return to BASIC
-	ld (oldSP),sp
-	ld hl,musicdata
-	ld (seqpntr),hl
-
-rdseq
-seqpntr equ $+1
-	ld sp,0
 	xor a
-	pop de			; pattern pointer to DE
-	or d
-	ld (seqpntr),sp
-	jr nz,rdptn0
-	ld sp,musicdata		; loop to the start of the sequence
-	jr rdseq+3
+	jp setbank
 
-rdptn0
-	ld (patpntr),de
-rdptn
-	in a,(#1f)		; read joystick
-maskKempston equ $+1
-	and #1f
+; ---- tone loop -------------------------------------------------------------------------
+OUTPIN	macro
+	ld c,a			; 4
+	ld a,(bc)		; 7  pin value: timer > 0
+	out (#fe),a		; 11
+	inc b			; 4
+	ld a,(bc)		; 7  timer - 1, floor 0
+	dec b			; 4  = 37
+	endm
+
+loop
+f1	equ $+1
+	ld sp,0			; 10
+	add hl,sp		; 11
+	jr nc,$+4		; 12 / 7
+d1	equ $+1
+	add a,0			;    7     voice 1: 33
+	ex de,hl		; 4
+f2	equ $+1
+	ld sp,0			; 10
+	add hl,sp		; 11
+	ex de,hl		; 4
+	jr nc,$+4		; 12
+d2	equ $+1
+	add a,0			;          voice 2: 41
+	OUTPIN			; 37
+f3	equ $+1
+	ld sp,0			; 10
+	add ix,sp		; 15
+	jr nc,$+4		; 12
+d3	equ $+1
+	add a,0			;          voice 3: 37
+f4	equ $+1
+	ld sp,0
+	add iy,sp
+	jr nc,$+4
+d4	equ $+1
+	add a,0			;          voice 4: 37
+	OUTPIN			; 37
+	exx			; 4
+f5	equ $+1
+	ld sp,0
+	add hl,sp
+	jr nc,$+4
+d5	equ $+1
+	add a,0			;          voice 5: 33
+	ex de,hl
+f6	equ $+1
+	ld sp,0
+	add hl,sp
+	ex de,hl
+	jr nc,$+4
+d6	equ $+1
+	add a,0			;          voice 6: 41
+	exx			; 4
+	OUTPIN			; 37
+	exx			; 4
+	dec c			; 4
+	exx			; 4
+	jp nz,loop		; 10      total 363
+	exx
+	dec b
+	exx
+	jp nz,loop
+
+; ---- tick end: save the loop state, read the next record --------------------------------
+	ld (sv_a),a
+	ld (sv_hl),hl
+	ld (sv_de),de
+	ld (sv_ix),ix
+	ld (sv_iy),iy
+	exx
+	ld (sv_hl2),hl
+	ld (sv_de2),de
+	exx
+sptr	equ $+1
+	ld hl,#c000
+record
+	ld a,(hl)
+	inc hl
+	or a
+	jp m,special
 	ld c,a
-	in a,(#fe)		; read keyboard
-	cpl
-	or c
-	and #1f
-	jp nz,exit
-
-	exx
-
-patpntr equ $+1			; fetch pointer to pattern data
-	ld sp,0
-
-	pop af
-	jr z,rdseq
-
-	ld (ch1Length),a
-
-	ld a,#10
-	ld (stopch),a
-
-	pop hl			; duty1,2
-	ld a,h
-	ld (duty1),a
-	ld a,l
-	ld (duty2),a
-
-	pop hl			; duty3,4
-	ld a,h
-	ld (duty3),a
-	ld a,l
-	ld (duty4),a
-
-	pop de			; freq1
-	pop bc			; freq2
-
-	ld hl,0
-	ld ix,0
-	ld iy,0
-
-	exx
-
-	pop de			; freq3
-	pop hl			; freq4
-	pop bc			; timer (row length in the high byte, low byte 0)
-
-	ld (patpntr),sp		; preserve data pointer
-	ld sp,hl
-	ld hl,0
-
-playRegular
-	exx			;4
-	add hl,de		;11
-	ld a,h			;4
-duty1 equ $+1
-	cp #80			;7
-	sbc a,a			;4
-	and #10			;7
-	out (#fe),a		;11
-
-	add ix,bc		;15
-	ld a,ixh		;8
-duty2 equ $+1
-	cp #80			;7
-	sbc a,a			;4
-	and #10			;7
-	out (#fe),a		;11
-
-	nop			;4
-	nop			;4
-
-	exx			;4
-
-	add hl,sp		;11
-	ld a,h			;4
-duty4 equ $+1
-	cp #80			;7
-	sbc a,a			;4
-stopch equ $+1
-	and #10			;7
-	out (#fe),a		;11
-
-	add iy,de		;15
-	ld a,iyh		;8
-duty3 equ $+1
-	cp #80			;7
-	sbc a,a			;4
-	and #10			;7
-	out (#fe),a		;11
-
-	dec c			;4
-	jr nz,playRegular	;12
-				;224
+VOICE	macro fk, dk
+	rr c
+	jr nc,.skip
+	ld a,(hl)
+	inc hl
+	ld (fk),a
+	ld a,(hl)
+	inc hl
+	ld (fk+1),a
+	ld a,(hl)
+	inc hl
+	ld (dk),a
+.skip
+	endm
+	VOICE f1, d1
+	VOICE f2, d2
+	VOICE f3, d3
+	VOICE f4, d4
+	VOICE f5, d5
+	VOICE f6, d6
+	ld b,0
+	rr c
+	jr nc,.nodrum
+	ld e,(hl)
+	inc hl
+	ld d,(hl)
+	inc hl
+	ld (dptr),de
+	ld b,(hl)
+	inc hl
+.nodrum
+	ld e,(hl)
+	inc hl
+	ld d,(hl)
+	inc hl
+	ld (sptr),hl
+	ld (dur),de
 	ld a,b
-ch1Length equ $+1
-	sub #ff			; = timer - actual length
-	jr z,_cut
-	djnz playRegular
-	jp rdptn
+	or a
+	jr z,restore
 
-_cut
-	ld (stopch),a
-	djnz playRegular
-	jp rdptn
+; ---- drum: B bytes of 1-bit data, MSB first, 63 T per bit (Furnace: 16 samples at 894886 Hz) -----
+dptr	equ $+1
+	ld hl,0
+	ld c,(hl)
+	inc hl
+dbyte
+	dup 7
+	rl c			; 8
+	sbc a,a			; 4
+	and #10			; 7
+	out (#fe),a		; 11
+	jr $+2			; 12
+	cp (hl)			; 7
+	cp (hl)			; 7
+	cp (hl)			; 7  = 63
+	edup
+	rl c
+	sbc a,a
+	and #10
+	out (#fe),a		; 30
+	ld c,(hl)		; 7
+	inc hl			; 6
+	cp (hl)			; 7
+	djnz dbyte		; 13 = 63
 
-exit
-oldSP equ $+1
-	ld sp,0
-	pop hl
+; ---- restore the loop state and run the tone loop for the record's length ----------------
+restore
 	exx
-	ei
-	ret
+dur	equ $+1
+	ld bc,0
+	ld a,c
+	or a
+	jr z,.even
+	inc b
+.even
+sv_hl2	equ $+1
+	ld hl,0
+sv_de2	equ $+1
+	ld de,0
+	exx
+sv_hl	equ $+1
+	ld hl,0
+sv_de	equ $+1
+	ld de,0
+sv_ix	equ $+2
+	ld ix,0
+sv_iy	equ $+2
+	ld iy,0
+	ld b,high pintab
+sv_a	equ $+1
+	ld a,0
+	jp loop
 
-musicdata
+; ---- bank switch: #80 = next bank, #81 = first bank -------------------------------------
+special
+	cp #81
+	ld a,0
+	jr z,setbank
+bankix	equ $+1
+	ld a,0
+	inc a
+setbank
+	ld (bankix),a
+	ld e,a
+	ld d,0
+	ld hl,banktab
+	add hl,de
+	ld a,(hl)
+	ld bc,#7ffd
+	out (c),a
+	ld hl,#c000
+	jp record
+
+banktab	db #10, #11, #13, #14, #16, #17
+
+; ---- pin tables (one page each): pintab[t] = t > 0 ? #10 : 0, dectab[t] = max(t - 1, 0) ----
+	align 256
+pintab	db 0
+	dup 255
+	db #10
+	edup
+dectab	db 0
+v = 0
+	dup 255
+	db v
+v = v + 1
+	edup
+
+drumdata			; the exporter appends the drum bits here
