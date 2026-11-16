@@ -140,7 +140,9 @@ const FURNACE_NOTE_OFFSET = 60;
 const ROW_GUARD = 100_000;
 const hex2 = (n: number) => n.toString(16).toUpperCase().padStart(2, '0');
 
-interface LinearRow { pos: number; row: number; ticks: number; noise: number; rate: number; timer?: number }
+/** Global echo registers at the end of a row: Furnace stores 19-1C/3x while echo is off and writes them when 18xx turns it on. */
+interface EchoRegs { live: boolean; delay: number; volL: number; volR: number; feedback: number; fir: number[] }
+interface LinearRow { pos: number; row: number; ticks: number; noise: number; rate: number; timer?: number; echo: EchoRegs }
 
 /** First SNES channel index in the song and the SNES channel count. */
 function snesChannels(native: FurnaceNativeData): { first: number; count: number; chip: number } | null {
@@ -222,8 +224,9 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
   echo.delay = Math.min(echo.delay, cap);
   if (echo.gainL !== echo.gainR) warnings.push(`Chip volume differs left ${echo.gainL} / right ${echo.gainR}; TAD has one voice volume, so both sides use the average.`);
   const chipGain = (echo.gainL + echo.gainR) / 254;
-  const echoInit = { ...echo }; // header values; `echo` tracks 1Axx/1Bxx while channels are written
+  const echoInit = { ...echo }; // header values
   let maxDelay = echo.delay; // Furnace 19xx values seen, for #MaxEchoLength
+  let gEcho: EchoRegs = { live: echo.on, delay: echo.delay, volL: echo.volL, volR: echo.volR, feedback: echo.feedback, fir: echo.fir };
   const where = (ch: number, r: LinearRow) => `channel ${ch + 1}, order ${hex2(r.pos)} row ${hex2(r.row)}`;
 
   // Pass 1: play the order list once, following speeds, jumps and breaks, until a row repeats.
@@ -263,6 +266,17 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           else { const g = grooves[e.val]; if (g?.len) { speeds = g.val.slice(0, g.len); speedIdx = 0; } }
         }
         else if (e.cmd === 0x1d) noise = e.val & 31; // snes.cpp:541 one noise clock for the whole chip
+        else if (ch >= snes.first && ch < snes.first + snes.count && (e.cmd >= 0x18 && e.cmd <= 0x1c || e.cmd >= 0x30 && e.cmd <= 0x37)) {
+          // snes.cpp:565-601, 574: 19-1C/3x always store their value; 18xx turns echo on (initEcho writes them all) or off.
+          const sv = e.val > 127 ? e.val - 256 : e.val;
+          gEcho = { ...gEcho, fir: [...gEcho.fir] };
+          if (e.cmd === 0x18) gEcho.live = e.val !== 0;
+          else if (e.cmd === 0x19) gEcho.delay = Math.min(e.val & 15, cap);
+          else if (e.cmd === 0x1a) gEcho.volL = sv;
+          else if (e.cmd === 0x1b) gEcho.volR = sv;
+          else if (e.cmd === 0x1c) gEcho.feedback = sv;
+          else gEcho.fir[e.cmd - 0x30] = sv;
+        }
         // playback.cpp:667-671 FDxx/FExx virtual tempo, 1545-1549 F0xx tick rate xx*2/5 Hz.
         else if (e.cmd === 0xfd && e.val > 0) tempoN = e.val;
         else if (e.cmd === 0xfe && e.val > 0) tempoD = e.val;
@@ -282,7 +296,8 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
       if (tc !== curTimer) { rowTimer = tc; curTimer = tc; }
     }
     curRate = rowRate;
-    rows.push({ pos, row, ticks: (speeds[speedIdx++ % speeds.length] || 1) * k, noise, rate: rowRate, timer: rowTimer });
+    if (gEcho.live) maxDelay = Math.max(maxDelay, gEcho.delay);
+    rows.push({ pos, row, ticks: (speeds[speedIdx++ % speeds.length] || 1) * k, noise, rate: rowRate, timer: rowTimer, echo: gEcho });
     if (stop) break;
     if (jump !== null || brk !== null) { pos = jump ?? pos + 1; row = brk ?? 0; }
     else if (++row >= sub.patLen) { pos++; row = 0; }
@@ -306,6 +321,9 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
       if (c && c.note >= 0 && c.note < 180) { drop(`notes on non-SNES channel ${ch + 1}`, where(ch, r)); }
     }
   }
+
+  // Echo runs if the header turns it on or any 18xx does.
+  const echoUsed = !sfx && rows.some((r) => r.echo.live);
 
   // Pass 2: one MML line set per SNES channel.
   // TAD instrument id per (Furnace instrument, sound): a note map plays several samples.
@@ -355,7 +373,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
   for (let c = 0; c < snes.count; c++) {
     const ch = snes.first + c;
     // echoMask: Furnace starts these channels with echo on (snes.cpp:914).
-    const out: string[] = ['V254', ...(!sfx && echo.on && (echo.mask >> c) & 1 ? ['E1'] : [])];
+    const out: string[] = ['V254', ...(echoUsed && (echo.mask >> c) & 1 ? ['E1'] : [])];
     const cuts: number[] = [], bars: number[] = []; // out indexes where a pattern / 16-row bar (or the loop point) starts: subroutine candidates
 
     let ins = 0, curIns = -1, wave = -1, vol = 127, panL = 127, panR = 127, lastP = 64, oct = -1, lastV = 'V254';
@@ -377,7 +395,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     let sounding = false, curNote = 'r';
     let hasNotes = false;
     // Effect state of this channel (Furnace effects that TAD holds as channel state).
-    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', fine = 0, inv = 'i0', noiseOn = false, vibWant: { d: number; q: number } | null = null, trem: { d: number; q: number } | null = null, lastTrem = '', volSlide = 0, slideSkip = 0, lastEnv = '', legatoOn = false, sampleOff = 0, insId = -1, relTok = '';
+    let curSmp = '', curPitch = -1, echoOn = echoUsed && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', fine = 0, inv = 'i0', noiseOn = false, vibWant: { d: number; q: number } | null = null, trem: { d: number; q: number } | null = null, lastTrem = '', volSlide = 0, slideSkip = 0, lastEnv = '', legatoOn = false, sampleOff = 0, insId = -1, relTok = '';
     let env: { mode: number; gain: number; adsr: number[] } | null = null;
     const pitchName = (p: number) => NOTE_NAMES[p % 12];
     // Furnace ticks to TAD ticks (rows are k Furnace-tick multiples; sound effects run at 125 Hz).
@@ -457,34 +475,54 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
       }
       if (r.timer && c === tempoCh) { flush(true); out.push(`T${r.timer}`); }
       let delayUsed = 0, cutAt = 0, retrig = 0, relAt = -1, soAt = -1;
+      // Sustain mode (snes.cpp:402-420, 655-676): note off, ECxx and FCxx send no KOFF; the release is GAIN decrease
+      // (sus 1, 2) or the ADSR sustain rate switched to r (sus 3). The note is slurred into a wait with that envelope.
+      const susRelease = (si: NonNullable<TadInstrumentInput['snes']>) => {
+        if (si.useEnv) {
+          relTok = si.sus === 1 ? `GDT${si.r & 31}` : si.sus === 2 ? `GET${si.r & 31}` : `A ${si.a & 15},${si.d & 7},${si.s & 7},${si.r & 31}`;
+          out.push(relTok);
+          if (si.sus === 3) { curIns = -1; lastEnv = ''; } // the next note names the instrument again, restoring d2
+        }
+        sounding = false; curPitch = -1; pending = { tok: 'w', ticks: 0 };
+      };
       if (cl) {
         if (cl.ins >= 0) { ins = cl.ins; env = null; lastEnv = ''; }
         const cmds: string[] = [];
-        // Constant special (ex1) macro, snes.cpp:152-172: bit 2 echo, bit 4 pitch modulation.
+        // Constant special (ex1) macro, snes.cpp:152-172: 16 invert left, 8 invert right, 4 pitch modulation, 2 echo, 1 noise.
         const ex1 = cl.ins >= 0 ? constantMacro(instruments[ins], 5) : undefined;
         if (ex1 !== undefined) {
-          if (!sfx && echo.on && ((ex1 & 2) !== 0) !== echoOn) { echoOn = (ex1 & 2) !== 0; cmds.push(echoOn ? 'E1' : 'E0'); }
+          if (echoUsed && ((ex1 & 2) !== 0) !== echoOn) { echoOn = (ex1 & 2) !== 0; cmds.push(echoOn ? 'E1' : 'E0'); }
           if (((ex1 & 4) !== 0) !== pmOn) { pmOn = (ex1 & 4) !== 0; cmds.push(pmOn ? 'PM' : 'PM0'); }
+          const il = (ex1 & 16) !== 0, ir = (ex1 & 8) !== 0, iw = il && ir ? 'iB' : il ? 'iL' : ir ? 'iR' : 'i0';
+          if (iw !== inv) { inv = iw; cmds.push(iw); }
+          if (il !== ir) drop('special macro inverting one side only (TAD inverts one side in surround mode only)', at);
+          noiseOn = (ex1 & 1) !== 0; // same as 11xx: TAD N plays noise in place of the next notes
         }
         if (cl.vol >= 0) volSlide = 0;
         if (cl.vol >= 0) vol = cl.vol;
         const ef = new Map<number, number>();
         for (const e of cl.effects) if (e.cmd >= 0) ef.set(e.cmd, e.val);
-        let envFx = false, panFx = false;
+        let envFx = false, panFx = false, panbrFx = false, panbr = '';
         for (const e of cl.effects) {
           if (e.cmd < 0 || [0x09, 0x0b, 0x0d, 0x0f, 0xf0, 0xfd, 0xfe, 0xff].includes(e.cmd)) continue;
           if (e.cmd === 0x80 || e.cmd === 0x08) { [panL, panR] = panSplit(e.cmd, e.val); panFx = true; }
           else if (e.cmd === 0x12) { if ((e.val !== 0) !== echoOn) { echoOn = e.val !== 0; cmds.push(echoOn ? 'E1' : 'E0'); } }
-          else if (!sfx && echo.on && ((e.cmd >= 0x19 && e.cmd <= 0x1c) || (e.cmd >= 0x30 && e.cmd <= 0x37))) {
-            // Furnace sysDef.cpp:1212-1224 -> TAD \edl \evol \efb \ftap (mml-syntax.md:621-661). Furnace ignores them while echo is off (snes.cpp:566).
-            const sv = e.val > 127 ? e.val - 256 : e.val;
-            if (e.cmd === 0x19) { const d = e.val & 15; if (d > cap) drop('effect 19xx echo delay above the Audio-RAM budget (lowered)', at); maxDelay = Math.max(maxDelay, Math.min(d, cap)); cmds.push(`\\edl ${Math.min(d, cap) * 16}`); }
-            else if (e.cmd === 0x1a || e.cmd === 0x1b) {
-              if (sv < 0) drop('effect 1Axx/1Bxx negative (inverted) echo volume clamped to 0', at);
-              const v = Math.max(0, sv);
-              if (e.cmd === 0x1a) echo.volL = v; else echo.volR = v;
-              cmds.push(`\\evol ${Math.max(0, echo.volL)},${Math.max(0, echo.volR)}`);
-            }
+          else if (!sfx && e.cmd === 0x18) {
+            // snes.cpp:574, 833-850: on writes delay, feedback, FIR and volume as stored (row-end state); off mutes the echo.
+            const g = r.echo;
+            if (e.val) cmds.push(`\\edl ${g.delay * 16}`, `\\efb ${g.feedback}`, `\\fir { ${g.fir.join(' ')} }`, `\\evol ${Math.max(0, g.volL)},${Math.max(0, g.volR)}`);
+            else cmds.push('\\evol 0,0');
+            if (e.val && (g.volL < 0 || g.volR < 0)) drop('effect 18xx turning echo on with a negative (inverted) echo volume, clamped to 0', at);
+          }
+          else if (!sfx && ((e.cmd >= 0x19 && e.cmd <= 0x1c) || (e.cmd >= 0x30 && e.cmd <= 0x37))) {
+            // Furnace sysDef.cpp:1212-1224 -> TAD \edl \evol \efb \ftap (mml-syntax.md:621-661). While echo is off Furnace only stores
+            // the value (snes.cpp:566); pass 1 keeps it in r.echo and 18xx writes it. Values are the row-end state.
+            const sv = e.val > 127 ? e.val - 256 : e.val, g = r.echo;
+            if (e.cmd === 0x19 && (e.val & 15) > cap) drop('effect 19xx echo delay above the Audio-RAM budget (lowered)', at);
+            if ((e.cmd === 0x1a || e.cmd === 0x1b) && sv < 0) drop('effect 1Axx/1Bxx negative (inverted) echo volume clamped to 0', at);
+            if (!g.live) { /* stored only */ }
+            else if (e.cmd === 0x19) cmds.push(`\\edl ${g.delay * 16}`);
+            else if (e.cmd === 0x1a || e.cmd === 0x1b) cmds.push(`\\evol ${Math.max(0, g.volL)},${Math.max(0, g.volR)}`);
             else if (e.cmd === 0x1c) cmds.push(`\\efb ${sv}`);
             else cmds.push(`\\ftap ${e.cmd - 0x30},${sv}`);
           }
@@ -515,6 +553,15 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             const x = e.val >> 4, y = e.val & 15;
             vibWant = x && y ? { d: Math.round(y * 100 / 15), q: Math.max(1, Math.min(255, Math.round(16 / x))) } : null; // emitted with the next note, depth clamped to that note's pitch
           }
+          else if (e.cmd === 0x84) {
+            // playback.cpp:1006-1017, 2423-2455: panbrello around the centre, depth y/15 of a full side, 256 steps per
+            // cycle advanced x per tick. TAD p~ depth is centre-to-peak in pan units (64 = full side), mml-syntax.md:402.
+            const x = e.val >> 4, y = e.val & 15;
+            panbr = x && y ? `p~${Math.max(1, Math.min(64, Math.round(y * 64 / 15)))},${Math.max(1, Math.min(255, Math.round(64 / x) * k))}` : '';
+            panbrFx = true;
+          }
+          else if (e.cmd === 0xe5 && !linear) drop('effect E5xx fine pitch in non-linear pitch mode (TAD detune needs linear pitch)', at);
+          else if (e.cmd === 0xe6) drop('effect E6xy delayed legato transpose (TAD has no delayed pitch jump)', at);
           else if (e.cmd === 0xe5 && linear) {
             // playback.cpp:1458 pitch = val - 0x80 (1/128 semitone, linear pitch); TAD detune only applies on play-note.
             fine = e.val - 0x80;
@@ -545,6 +592,8 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           else drop(`effect ${hex2(e.cmd)}xx`, at);
         }
         if (panP() !== lastP) { lastP = panP(); cmds.push(`p${lastP}`); }
+        // Furnace panbrello swings from the centre; TAD p~ swings around the set pan. 84x0 / 840y return to the set pan.
+        if (panbrFx) cmds.push(...(panbr ? ['p64', panbr] : [`p${lastP}`]));
         if (((cl.vol >= 0 || cl.ins >= 0 || panFx || ef.has(0xf8) || ef.has(0xf9)) && volV() !== lastV)) { lastV = volV(); cmds.push(lastV); }
         if (envFx) {
           const s = instruments[ins]?.snes;
@@ -594,7 +643,8 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         const semis = (speed: number, ticks: number) => Math.trunc(speed * slideMul * ticks / tickScale / 128);
         const clampP = (p: number) => Math.max(0, Math.min(95, p));
         const delay = Math.round((ef.get(0xed) ?? 0) * tickScale);
-        // FCxx release = ECxx cut here: both key off the SNES voice (snes.cpp:402-418), release also lets macros run on.
+        // FCxx release = ECxx cut: both key off the SNES voice or start the sustain release (snes.cpp:402-420); the macros FCxx
+        // lets run on are not heard after a KOFF.
         const cut = Math.round((ef.get(0xec) || ef.get(0xfc) || 0) * tickScale);
         retrig = Math.round((ef.get(0x0c) ?? 0) * tickScale);
         // E1xy/E2xy: slide y semitones up/down at speed x*4 (playback.cpp:1391-1445), like 03xx towards that note.
@@ -798,16 +848,8 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             }
           }
         } else if (isOff && sounding && instruments[ins]?.snes?.sus) {
-          // Sustain mode (snes.cpp:655-676): note off sends no KOFF; the release is GAIN decrease (sus 1, 2) or the
-          // ADSR sustain rate switched to r (sus 3). The note is slurred into a wait with that release envelope.
-          const si = instruments[ins]!.snes!;
           flush(true); out.push(...cmds);
-          if (si.useEnv) {
-            relTok = si.sus === 1 ? `GDT${si.r & 31}` : si.sus === 2 ? `GET${si.r & 31}` : `A ${si.a & 15},${si.d & 7},${si.s & 7},${si.r & 31}`;
-            out.push(relTok);
-            if (si.sus === 3) { curIns = -1; lastEnv = ''; } // the next note names the instrument again, restoring d2
-          }
-          sounding = false; curPitch = -1; pending = { tok: 'w', ticks: 0 };
+          susRelease(instruments[ins]!.snes!);
         } else if (isOff || cmds.length || (sounding && curPitch >= 0 && (s01 || s02 || arp || e12))) {
           flush(!isOff);
           out.push(...cmds);
@@ -820,10 +862,12 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
       }
       // E7xx: the sounding note's looping macros are released xx ticks into this row.
       if (relAt >= 0 && sounding && pending.pre?.gen && pending.pre.rel === undefined) pending.pre.rel = pending.ticks / tickScale + relAt;
-      // ECxx: the note is cut inside the row.
+      // ECxx / FCxx: the note is cut (released) inside the row.
       if (cutAt > delayUsed && cutAt < r.ticks && sounding) {
         pending.ticks += cutAt - delayUsed;
-        flush(); sounding = false; curPitch = -1; pending = { tok: 'r', ticks: 0 };
+        const si = instruments[ins]?.snes;
+        if (si?.sus) { flush(true); susRelease(si); }
+        else { flush(); sounding = false; curPitch = -1; pending = { tok: 'r', ticks: 0 }; }
         pending.ticks += r.ticks - cutAt;
         return;
       }
@@ -887,8 +931,11 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
   }
   // Header: Furnace echo flags -> TAD (mml-syntax.md:51-77). Furnace only runs echo when the flag is on (snes.cpp:836).
   const echoHeader: string[] = [];
-  if (echoInit.on) {
-    const sum = echoInit.fir.reduce((a, b) => a + Math.abs(b), 0);
+  if (echoUsed) {
+    // Largest FIR absolute sum the song uses: the header filter and every filter 18xx / 3xyy writes.
+    const sum = Math.max(...[echoInit.fir, ...new Set(rows.map((r) => r.echo.fir))].map((f) => f.reduce((a, b) => a + Math.abs(b), 0)));
+    // Echo off at the start (an 18xx turns it on later): the header is silent, 18xx writes the stored registers.
+    if (!echoInit.on) { echoInit.volL = 0; echoInit.volR = 0; }
     const inv = echoInit.volL < 0 && echoInit.volR < 0;
     echoHeader.push(
       `#EchoLength ${echoInit.delay * 16}`,
@@ -927,13 +974,13 @@ export function panSplit(cmd: number, v: number): [number, number] {
   const [l, r] = cmd === 0x08 ? [(v >> 4) | (v & 0xf0), (v & 15) | ((v & 15) << 4)] : [Math.min(255, (255 - v) * 2), Math.min(255, v * 2)];
   return [l >> 1, r >> 1];
 }
-/** Macros the writer carries as a constant: volume scales V, special sets echo/pitch mod, wave picks the wavetable. */
+/** Macros the writer carries as a constant: volume scales V, special sets invert/echo/pitch mod/noise, wave picks the wavetable. */
 function macroCarried(inst: TadInstrumentInput, code: number): boolean {
   if (code === 1 || code === 0 || code === 2 || code === 4 || code === 12 || code === 13) return true; // unrolled per tick (pieces)
   const v = constantMacro(inst, code);
   if (v === undefined) return false;
   if (code === 3) return true;
-  if (code === 5) return (v & (16 | 8 | 1)) === 0; // invert and noise have no TAD command
+  if (code === 5) return true; // all five bits: i flags, PM, E1/E0, N
   return NO_OP_MACRO[code] === v;
 }
 

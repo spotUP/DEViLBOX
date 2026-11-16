@@ -10,8 +10,8 @@ import { tadProjectJson, tadInstrumentFromFurnace } from '../tadProjectBuilder';
 const FILE = resolve(__dirname, '../../../../../public/data/songs/furnace/snes/tetristheme.fur');
 
 // Puts one effect on each of the first note rows of the first SNES channel with enough notes, writes song + sfx and runs TAD check.
-async function writeWithEffects(effects: [number, number][], skip = 0, editInstruments?: (ins: ReturnType<typeof tadInstrumentFromFurnace>[]) => void) {
-  const buf = readFileSync(FILE);
+async function writeWithEffects(effects: [number, number][], skip = 0, editInstruments?: (ins: ReturnType<typeof tadInstrumentFromFurnace>[]) => void, file = FILE) {
+  const buf = readFileSync(file);
   const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
   const native = buildFurnaceNativeData(module);
   const sub = native.subsongs[0];
@@ -120,6 +120,40 @@ describe('Furnace effects in the TAD writer', () => {
     expect(song.warnings.join('\n')).not.toMatch(/Dropped effect 1[EF]xx[^/]/); // the L/R mismatch warning on row 1 is expected
     expect(song.mml).toMatch(/\\mvol 64\b/);
     expect(song.mml).toMatch(/\\mvol 0\b/);
+    expect(check.code, `${check.log}\n${song.mml.slice(0, 3000)}`).toBe(0);
+  }, 60000);
+
+  it('carries 18xx echo enable, delay, feedback, FIR and volume from the pattern; check passes', async () => {
+    const { song, check } = await writeWithEffects([], 0, undefined, resolve(__dirname, '../../../../../public/data/songs/furnace/snes/Sadness.fur'));
+    expect(song.mml).toMatch(/#EchoVolume 0 0/);
+    expect(song.mml).toMatch(/\\fir \{/);
+    expect(song.mml).toMatch(/\\evol \d+,\d+/);
+    expect(song.warnings.join('\n')).not.toMatch(/Dropped effect 1[89ABC]xx/);
+    expect(check.code, `${check.log}\n${song.mml.slice(0, 3000)}`).toBe(0);
+  }, 60000);
+
+  it('maps 84xy panbrello to p~ and stops it on 8400; check passes', async () => {
+    const { song, check } = await writeWithEffects([[0x84, 0x4f], [0x00, 0x00], [0x84, 0x00]]);
+    expect(song.warnings.join('\n')).not.toMatch(/Dropped effect 84xx/);
+    expect(song.mml).toMatch(/p64 p~64,16\b/);
+    expect(check.code, `${check.log}\n${song.mml.slice(0, 3000)}`).toBe(0);
+  }, 60000);
+
+  it('names E6xy delayed legato as a drop', async () => {
+    const { song } = await writeWithEffects([[0xe6, 0x13]]);
+    expect(song.warnings.join('\n')).toMatch(/E6xy delayed legato/);
+  }, 60000);
+
+  it('maps a constant special macro (both sides inverted) to iB; check passes', async () => {
+    const { song, check } = await writeWithEffects([], 0, (ins) => ins.forEach((i) => { i.macros = [...(i.macros ?? []).filter((m) => m.code !== 5), { code: 5, data: [24], loop: 255, release: 255 }]; }));
+    expect(song.mml).toMatch(/\biB\b/);
+    expect(song.warnings.join('\n')).not.toMatch(/[Ss]pecial macro dropped/);
+    expect(check.code, `${check.log}\n${song.mml.slice(0, 3000)}`).toBe(0);
+  }, 60000);
+
+  it('starts the sustain release on FCxx for a sustain-mode instrument; check passes', async () => {
+    const { song, check } = await writeWithEffects([[0xfc, 0x02]], 0, (ins) => ins.forEach((i) => { if (i.snes) i.snes = { ...i.snes, sus: 1, useEnv: true, r: 5 }; }));
+    expect(song.mml).toMatch(/GDT5/);
     expect(check.code, `${check.log}\n${song.mml.slice(0, 3000)}`).toBe(0);
   }, 60000);
 });
