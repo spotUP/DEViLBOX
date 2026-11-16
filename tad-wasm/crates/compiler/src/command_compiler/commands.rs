@@ -9,7 +9,7 @@ use super::analysis::{SkipLastLoopTransposeAnalysis, TransposeAnalysis};
 use crate::bytecode::{
     DetuneValue, EarlyReleaseMinTicks, EarlyReleaseTicks, InstrumentId, LoopCount, NoiseFrequency,
     Pan, PanSlideAmount, PanSlideTicks, PanbrelloAmplitude, PanbrelloQuarterWavelengthInTicks,
-    PlayNoteTicks, PlayPitchPitch, RelativeEchoFeedback, RelativeEchoVolume,
+    PlayNoteTicks, PlayPitchPitch, SampleOffset, RelativeEchoFeedback, RelativeEchoVolume,
     RelativeFirCoefficient, RelativeMainVolume, RelativePan, RelativeTranspose, Transpose,
     TremoloAmplitude, TremoloQuarterWavelengthInTicks, VibratoDelayTicks,
     VibratoPitchOffsetPerTick, VibratoQuarterWavelengthInTicks, Volume, VolumeSlideAmount,
@@ -369,6 +369,8 @@ pub(crate) enum Command<'a> {
 
     SetSongTempo(Bpm),
     SetSongTickClock(TickClock),
+
+    SetSampleOffset(SampleOffset),
 
     SetMainVolume(MainVolume),
     RelativeMainVolume(RelativeMainVolume),

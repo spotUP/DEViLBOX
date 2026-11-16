@@ -466,6 +466,10 @@ __EndZeropageClearAddr = nonShadow_sfx + 1
 
 
 .vars lastvarpage
+
+    ; DEViLBOX: pending sample-offset DirItem written to VxSRCN by the next voice register
+    ; write instead of `srcn` (0 = none).  Set by `bc__set_sample_offset`.
+    channelSoA_virtualChannels_sampleOffsetSrcn : [u8 : N_CHANNELS]
     ; Counter (in ticks) until the event
     ; (The low-byte is in zeropage)
     channelSoA_countdownTimer_h : [u8 : N_CHANNELS]
@@ -1475,6 +1479,10 @@ _PlaySfx_Return = sfx__both_channels_active.Return
     .assert page(channelSoA_transpose) != 0
     mov channelSoA_transpose + X, A
 
+    ; Cancel any pending sample offset
+    .assert page(channelSoA_virtualChannels_sampleOffsetSrcn) != 0
+    mov channelSoA_virtualChannels_sampleOffsetSrcn + X, A
+
     clrp
 .p0
 
@@ -1812,7 +1820,20 @@ _mutedChannels = zpTmp
             movw DSPADDR, YA
 
             dec A
-            mov Y, channelSoA_virtualChannels_srcn + X
+            push A
+            mov A, channelSoA_virtualChannels_sampleOffsetSrcn + X
+            beq NoSampleOffset
+                ; One-shot sample offset, this write precedes the note's KON.
+                ; (A later SRCN write back to `srcn` is harmless: the loop address is the same.)
+                mov Y, A
+                mov A, #0
+                mov channelSoA_virtualChannels_sampleOffsetSrcn + X, A
+                pop A
+                bra EndSampleOffset
+            NoSampleOffset:
+                pop A
+                mov Y, channelSoA_virtualChannels_srcn + X
+            EndSampleOffset:
             movw DSPADDR, YA
 
             dec A
@@ -3686,6 +3707,89 @@ _subroutineId = zpTmp
 .endproc
 
 
+; DEViLBOX: OUT: zpTmpWord = address of `brrDirectory[A]`
+; KEEP: X
+.proc _dir_item_addr
+    .assert lobyte(brrDirectory) == 0
+    mov Y, #4               ; sizeof(DirItem)
+    mul YA
+    mov zpTmpWord.l, A
+    mov A, Y
+    clrc
+    adc A, #hibyte(brrDirectory)
+    mov zpTmpWord.h, A
+    ret
+.endproc
+
+
+; DEViLBOX: copy the instrument's DirItem into this channel's sample-offset DirItem with
+; `start += A * 144` (256 samples = 16 BRR blocks of 9 bytes).
+;
+; shortcut: a single DirItem per channel; rewriting it while the previous offset note of the same
+; channel still plays can move that note's loop point for up to one tick if the instrument changed.
+;
+; IN: A = sample offset in 256-sample units (0 = cancel)
+; IN: X = channelIndex
+; IN: Y = 0
+; KEEP: X
+.proc bc__set_sample_offset
+    mov Y, A
+    beq Cancel
+
+    mov A, #16 * 9
+    mul YA
+    push Y                  ; offset_h
+    push A                  ; offset_l
+
+    mov A, channelSoA_virtualChannels_srcn + X
+    call _dir_item_addr
+
+    mov Y, #0
+    pop A
+    clrc
+    adc A, [zpTmpWord] + Y
+    mov zpTmp3, A           ; start_l
+    inc Y
+    pop A
+    adc A, [zpTmpWord] + Y
+    push A                  ; start_h
+    mov A, zpTmp3
+    push A                  ; start_l
+    inc Y
+    mov A, [zpTmpWord] + Y
+    mov zpTmp3, A           ; loop_l
+    inc Y
+    mov A, [zpTmpWord] + Y
+    push A                  ; loop_h
+
+    mov A, X
+    clrc
+    adc A, commonDataHeader.sampleOffsetDirItem
+    mov channelSoA_virtualChannels_sampleOffsetSrcn + X, A
+    call _dir_item_addr
+
+    mov Y, #3
+    pop A
+    mov [zpTmpWord] + Y, A  ; loop_h
+    dec Y
+    mov A, zpTmp3
+    mov [zpTmpWord] + Y, A  ; loop_l
+    mov Y, #0
+    pop A
+    mov [zpTmpWord] + Y, A  ; start_l
+    inc Y
+    pop A
+    mov [zpTmpWord] + Y, A  ; start_h
+
+    jmp process_next_bytecode
+
+Cancel:
+    ; A = 0
+    mov channelSoA_virtualChannels_sampleOffsetSrcn + X, A
+    jmp process_next_bytecode
+.endproc
+
+
 ; IN: A = instrument ID
 ; IN: X = channelIndex
 ; IN: Y = 0
@@ -4803,7 +4907,6 @@ SetI8:
 .endinline
 
 
-bc_ReservedForCustomUse = bc__disable_channel
 
 
 BytecodeInstructionTable_l:

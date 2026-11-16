@@ -37,7 +37,8 @@ STACK_BOTTOM_ADDR = $200 - STACK_SIZE
 BC_CHANNEL_STACK_SIZE = 21
 BC_CHANNEL_STACK_OFFSET = 6
 
-LAST_VAR_PAGE_SIZE = (BC_CHANNEL_STACK_SIZE + 11) * 10
+; DEViLBOX: +1 per channel for `channelSoA_virtualChannels_sampleOffsetSrcn`
+LAST_VAR_PAGE_SIZE = (BC_CHANNEL_STACK_SIZE + 12) * 10
 
 ; The -28 ensures the pitch-table and BRR directory is page aligned
 ; `COMMON_DATA_ADDR` MUST be an even address (The loader only works with even addresses).
@@ -45,7 +46,8 @@ LAST_VAR_PAGE_SIZE = (BC_CHANNEL_STACK_SIZE + 11) * 10
 ; If this constant is modified, the following should also be updated:
 ;   * The Tad_AudioDriver_SIZE assert in `ca65-api/tad-audio.s`
 ;   * The Tad_AudioDriver_SIZE assert in `64tass-api/tad-process.inc`
-COMMON_DATA_ADDR = $1100 - 24
+; DEViLBOX: moved up one page to fit the sample-offset (9xx) code and variables
+COMMON_DATA_ADDR = $1200 - 24
 
 ; `CODE_ADDR` MUST be an even address (The loader only works with even addresses)
 CODE_ADDR = $200 + LOADER_SIZE

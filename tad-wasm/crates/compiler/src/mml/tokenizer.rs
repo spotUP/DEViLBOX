@@ -102,6 +102,7 @@ pub enum Token<'a> {
     FtapMinus,
     SetEchoInvert(InvertFlags),
     SetEchoDelay,
+    SetSampleOffset,
 
     // Temp GAIN after quantization tokens
     // (GainModeE is the Echo token)
@@ -586,6 +587,7 @@ fn next_token<'a>(scanner: &mut Scanner<'a>) -> Option<TokenWithPosition<'a>> {
                 "ftap+" => Token::FtapPlus,
                 "ftap-" => Token::FtapMinus,
                 "edl" => Token::SetEchoDelay,
+                "so" => Token::SetSampleOffset,
                 "ei" => {
                     scanner.skip_whitespace();
 

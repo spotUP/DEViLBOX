@@ -112,7 +112,9 @@ COMMON_DATA_POINTERS_SIZE = 10 * 2
 .struct CommonDataHeader
     pointers       : CommonDataPointers
 
-    _padding1      : u8
+    ; DEViLBOX: index of the first sample-offset DirItem (N_CHANNELS slots, one per channel)
+    ; that follow the instrument DirItems.  See `bc__set_sample_offset`.
+    sampleOffsetDirItem : u8
 
     ; MUST BE <= MAX_SOUND_EFFECTS
     nSoundEffects  : u8

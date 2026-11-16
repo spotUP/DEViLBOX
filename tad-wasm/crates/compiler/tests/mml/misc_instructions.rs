@@ -326,3 +326,13 @@ fn set_song_tick_clock() {
     assert_line_matches_bytecode_bytes("T64", &[opcodes::MISCELLANEOUS, SET_SONG_TICK_CLOCK, 64]);
     assert_one_error_in_mml_line("T63", 1, ValueError::TickClockOutOfRange(63).into());
 }
+
+#[test]
+fn set_sample_offset() {
+    assert_line_matches_bytecode(r"\so 0", &["set_sample_offset 0"]);
+    assert_line_matches_bytecode(r"\so 3 c", &["set_sample_offset 3", "play_note c4 24"]);
+    assert_line_matches_bytecode(r"\so $ff", &["set_sample_offset 255"]);
+
+    assert_one_error_in_mml_line(r"\so 256", 1, ValueError::SampleOffsetOutOfRange(256).into());
+    assert_one_error_in_mml_line(r"\so", 1, ValueError::NoSampleOffset.into());
+}

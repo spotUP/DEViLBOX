@@ -562,6 +562,7 @@ pub fn parse_asm_line(bc: &mut Bytecode, line: &str) -> Result<(), ChannelError>
 
        adjust_volume 1 one_svnt_argument,
        set_volume 1 one_uvnt_argument,
+       set_sample_offset 1 one_uvnt_argument,
        adjust_pan 1 one_svnt_argument,
        set_pan 1 one_uvnt_argument,
        set_pan_and_volume 2 two_uvnt_arguments,

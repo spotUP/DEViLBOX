@@ -10,6 +10,7 @@ use crate::bytecode::{
     BcTicksKeyOff, BcTicksNoKeyOff, DetuneValue, EarlyReleaseMinTicks, EarlyReleaseTicks,
     InstrumentId, LoopCount, NoiseFrequency, Pan, PanSlideAmount, PanSlideTicks,
     PanbrelloAmplitude, PanbrelloQuarterWavelengthInTicks, PlayPitchPitch, PortamentoSlideTicks,
+    SampleOffset,
     PortamentoVelocity, RelativeEchoFeedback, RelativeEchoVolume, RelativeFirCoefficient,
     RelativeMainVolume, RelativePan, RelativeVolume, Transpose, TremoloAmplitude,
     TremoloQuarterWavelengthInTicks, VibratoDelayTicks, VibratoPitchOffsetPerTick,
@@ -144,6 +145,7 @@ pub enum ValueError {
     PxPanOutOfRange(i32),
     PanOutOfRange(u32),
     VolumeOutOfRange(u32),
+    SampleOffsetOutOfRange(u32),
     CoarseVolumeOutOfRange(u32),
 
     RelativePanOutOfRange(i32),
@@ -268,6 +270,7 @@ pub enum ValueError {
     NoPlayPitchFrequency,
     NoNoiseFrequency,
     NoVolume,
+    NoSampleOffset,
     NoPan,
     NoPxPan,
     NoRelativeVolume,
@@ -1023,6 +1026,7 @@ impl Display for ValueError {
             ),
             Self::PanOutOfRange(v) => out_of_range!("pan", v, Pan),
             Self::VolumeOutOfRange(v) => out_of_range!("volume", v, Volume),
+            Self::SampleOffsetOutOfRange(v) => out_of_range!("sample offset", v, SampleOffset),
             Self::CoarseVolumeOutOfRange(v) => {
                 write!(
                     f,
@@ -1322,6 +1326,7 @@ impl Display for ValueError {
             Self::NoPlayPitchFrequency => write!(f, "no play pitch frequency"),
             Self::NoNoiseFrequency => write!(f, "no noise frequency"),
             Self::NoVolume => write!(f, "no volume"),
+            Self::NoSampleOffset => write!(f, "no sample offset"),
             Self::NoPan => write!(f, "no pan"),
             Self::NoPxPan => write!(f, "no px pan"),
             Self::NoRelativeVolume => write!(f, "no relative volume"),

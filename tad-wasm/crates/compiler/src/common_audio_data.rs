@@ -10,7 +10,7 @@ use crate::driver_constants::{
     COMMON_DATA_BYTES_PER_PITCH, COMMON_DATA_BYTES_PER_SFX_SUBROUTINE,
     COMMON_DATA_BYTES_PER_SOUND_EFFECT, COMMON_DATA_DIR_TABLE_OFFSET, COMMON_DATA_HEADER_SIZE,
     MAX_BRR_SAMPLES, MAX_COMMON_DATA_SIZE, MAX_DIR_ITEMS, MAX_SFX_DATA_ADDR, MAX_SFX_SUBROUTINES,
-    MAX_SOUND_EFFECTS,
+    MAX_SOUND_EFFECTS, N_CHANNELS,
 };
 use crate::envelope::Envelope;
 use crate::errors::{CommonAudioDataError, CommonAudioDataErrors, SfxCannotFitInSfxBuffer};
@@ -176,7 +176,8 @@ pub fn build_common_audio_data(
     let n_sfx_subroutines = sfx_subroutines.subroutines().len();
     let sfx_subroutine_data = sfx_subroutines.bytecode_data();
 
-    if n_dir_items > MAX_DIR_ITEMS {
+    // The driver needs one spare dir item per channel for `set_sample_offset`.
+    if n_dir_items + N_CHANNELS > MAX_DIR_ITEMS {
         errors.push(CommonAudioDataError::TooManyDirEntries(n_dir_items));
     }
     if n_instruments_and_samples > MAX_BRR_SAMPLES {
@@ -193,7 +194,8 @@ pub fn build_common_audio_data(
         errors.push(CommonAudioDataError::TooManySoundEffects(n_sound_effects));
     }
 
-    let header_size = COMMON_DATA_HEADER_SIZE + n_dir_items * COMMON_DATA_BYTES_PER_DIR;
+    let header_size =
+        COMMON_DATA_HEADER_SIZE + (n_dir_items + N_CHANNELS) * COMMON_DATA_BYTES_PER_DIR;
 
     let common_data_size = header_size
         + n_sfx_subroutines * COMMON_DATA_BYTES_PER_SFX_SUBROUTINE
@@ -273,7 +275,7 @@ pub fn build_common_audio_data(
     push_ptr(sfx_soa_addr, n_sound_effects, 2); // soundEffects_durationAndInterruptFlag_l
     push_ptr(sfx_soa_addr, n_sound_effects, 3); // soundEffects_durationAndInterruptFlag_h
 
-    out.push(0); // _padding1
+    out.push(n_dir_items as u8); // sampleOffsetDirItem
     out.push(n_sound_effects.try_into().unwrap());
     out.push(sound_effects.n_high_priority_sfx);
     out.push(sound_effects.low_priority_index);
@@ -297,6 +299,8 @@ pub fn build_common_audio_data(
         out.extend((o.start + brr_data_addr).to_le_bytes());
         out.extend((o.loop_point + brr_data_addr).to_le_bytes());
     }
+    // Spare dir items, written by the driver's `set_sample_offset` instruction.
+    out.resize(out.len() + N_CHANNELS * COMMON_DATA_BYTES_PER_DIR, 0);
 
     assert_eq!(out.len() + CAD_ADDR, usize::from(sfx_bc_addr));
     out.extend(&sound_effects.sfx_data);

@@ -40,6 +40,8 @@ pub struct StackDepth(u32);
 const MAX_STACK_DEPTH: StackDepth = StackDepth(BC_CHANNEL_STACK_SIZE as u32);
 
 u8_value_newtype!(Volume, VolumeOutOfRange, NoVolume);
+// Sample offset in 256-sample units (16 BRR blocks). 0 cancels a pending offset.
+u8_value_newtype!(SampleOffset, SampleOffsetOutOfRange, NoSampleOffset);
 u8_value_newtype!(Pan, PanOutOfRange, NoPan, 0, 128);
 i8_value_newtype!(
     RelativeVolume,
@@ -296,7 +298,7 @@ pub mod opcodes {
 
     // Order MUST MATCH `audio-driver/src/bytecode.inc`
     declare_opcodes!(
-        RESERVED_FOR_CUSTOM_USE,
+        SET_SAMPLE_OFFSET,
         MISCELLANEOUS,
         PORTAMENTO_DOWN,
         PORTAMENTO_UP,
@@ -373,7 +375,7 @@ const _: () = assert!(
     "There are unaccounted bytecode opcodes"
 );
 
-const _: () = assert!(opcodes::RESERVED_FOR_CUSTOM_USE == 0);
+const _: () = assert!(opcodes::SET_SAMPLE_OFFSET == 0);
 
 #[derive(Clone, Copy)]
 #[allow(clippy::unusual_byte_groupings)]
@@ -2361,6 +2363,11 @@ impl<'a> Bytecode<'a> {
 
     pub fn set_volume(&mut self, volume: Volume) {
         emit_bytecode!(self, opcodes::SET_VOLUME, volume.as_u8());
+    }
+
+    // One-shot: the next key-on starts `offset * 256` samples into the instrument's sample.
+    pub fn set_sample_offset(&mut self, offset: SampleOffset) {
+        emit_bytecode!(self, opcodes::SET_SAMPLE_OFFSET, offset.as_u8());
     }
 
     pub fn adjust_pan(&mut self, p: RelativePan) {

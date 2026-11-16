@@ -1454,6 +1454,7 @@ impl<'a> ChannelBcGenerator<'a> {
             }
             &Command::SetEchoInvert(flags) => self.bc.set_echo_invert(flags),
             &Command::SetEchoDelay(length) => self.bc.set_echo_delay(length)?,
+            &Command::SetSampleOffset(o) => self.bc.set_sample_offset(o),
 
             Command::StartBytecodeAsm => {
                 self.bc._start_asm_block();

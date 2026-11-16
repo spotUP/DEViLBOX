@@ -2547,6 +2547,13 @@ fn parse_fir_filter<'a>(fir_pos: FilePos, p: &mut Parser) -> Command<'a> {
     }
 }
 
+fn parse_set_sample_offset<'a>(pos: FilePos, p: &mut Parser) -> Command<'a> {
+    match parse_unsigned_newtype(pos, p) {
+        Some(o) => Command::SetSampleOffset(o),
+        None => Command::None,
+    }
+}
+
 fn parse_set_echo_delay<'a>(pos: FilePos, p: &mut Parser) -> Command<'a> {
     match parse_unsigned_newtype(pos, p) {
         Some(l) => Command::SetEchoDelay(l),
@@ -2639,6 +2646,7 @@ fn parse_non_mergeable_token<'a>(
         Token::FtapMinus => parse_ftap_minus(pos, p),
         Token::SetEchoInvert(flags) => Command::SetEchoInvert(flags),
         Token::SetEchoDelay => parse_set_echo_delay(pos, p),
+        Token::SetSampleOffset => parse_set_sample_offset(pos, p),
         Token::StartBytecodeAsm => Command::StartBytecodeAsm,
         Token::BytecodeAsm(asm) => parse_bytecode_asm(pos, asm, p),
         Token::EndBytecodeAsm => Command::EndBytecodeAsm,

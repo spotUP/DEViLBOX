@@ -14,7 +14,7 @@ W=$(mktemp -d)
 trap 'rm -rf "$W" "$T/sound-test/gen/audio.inc"' EXIT
 # Tad_Loader_SIZE / Tad_AudioDriver_SIZE of the vendored compiler (tadPlayerRom.ts checks them against the export).
 LOADER=116
-DRIVER=3273
+DRIVER=3381
 
 build() { # last_song_id n_sfx n_data_items out main.s
   mkdir -p "$W/$4"

@@ -62,9 +62,15 @@ DISABLE_CHANNEL_BYTECODE = FIRST_PLAY_NOTE_INSTRUCTION - 1
 
 ; These bytecodes do have parameters
 .ftdef INSTRUCTIONS_WITH_ARGUMENTS
-    ; This opcode is currently reserved for custom extensions.
-    ; (It currently disables the channel)
-    bc_ReservedForCustomUse
+    ; DEViLBOX extension (was `bc_ReservedForCustomUse`, which disabled the channel).
+    ;
+    ; parameter: oooooooo
+    ;      oooooooo = sample offset in 256-sample units (16 BRR blocks), 0 = cancel
+    ;
+    ; One-shot: the next voice register write (the KON of the following note) starts the
+    ; sample `o * 256` samples in.  MUST directly precede the note and follow any instrument change.
+    ; The offset is not clamped: it must be less than the sample length.
+    bc__set_sample_offset
 
     ; Miscellaneous instructions with two byte opcodes.
     ; See `MISC_INSTRUCTIONS`.

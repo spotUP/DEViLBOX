@@ -1248,7 +1248,10 @@ impl ChannelState {
                 }
             }
 
-            opcodes::RESERVED_FOR_CUSTOM_USE => self.disable_channel(),
+            opcodes::SET_SAMPLE_OFFSET => {
+                // The interpreter does not model sample playback position.
+                let _offset = read_pc();
+            }
 
             opcodes::KEYON_NEXT_NOTE => (),
 
@@ -1370,7 +1373,7 @@ impl ChannelState {
 
             opcodes::MISCELLANEOUS => None,
 
-            opcodes::RESERVED_FOR_CUSTOM_USE => None,
+            opcodes::SET_SAMPLE_OFFSET => Some(2),
             opcodes::DISABLE_CHANNEL => None,
         }
     }
