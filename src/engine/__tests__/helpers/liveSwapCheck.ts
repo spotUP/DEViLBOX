@@ -19,7 +19,12 @@ export interface LiveSwapSpec {
   /** Messages that start the song in the worklet. */
   start(module: ArrayBuffer): Array<Record<string, unknown>>;
   /** The message the engine class's swapModule posts. */
-  swapMessage(module: ArrayBuffer, loadArgs: unknown[]): Record<string, unknown>;
+  swapMessage?(module: ArrayBuffer, loadArgs: unknown[]): Record<string, unknown>;
+  /**
+   * The message the engine class's setCell posts, for the 'grid-cell' route (DSS, Face The Music): the edit is written into the
+   * playing replayer's pattern, no module is swapped. The sentinel is then the worklet having taken that message.
+   */
+  cellMessage?(args: unknown[]): Record<string, unknown>;
   pre: number;
   post: number;
   /** The live-edit route the song takes (default 'engine-swap'; Art of Noise re-encodes in its own 'aon-module' route and reloads). */
@@ -50,10 +55,10 @@ const isSwap = (m: Record<string, unknown>) => m.type === 'moduleSwapped' || (m.
  * Wait for the store's own send of a keystroke (sendCellEdits: export, parse, swapModule) to reach the worklet. The test
  * must not send the edit itself as well: two sends race for one swap and the newer drops the older.
  */
-export async function awaitSwap(live: Pick<WorkletHarness, 'posted'>): Promise<boolean> {
-  for (let waited = 0; waited < SWAP_WAIT_MS && !live.posted.some(isSwap); waited += 50) await new Promise((r) => setTimeout(r, 50));
+export async function awaitSwap(live: Pick<WorkletHarness, 'posted'>, done: () => boolean = () => live.posted.some(isSwap)): Promise<boolean> {
+  for (let waited = 0; waited < SWAP_WAIT_MS && !done(); waited += 50) await new Promise((r) => setTimeout(r, 50));
   await settle();
-  return live.posted.some(isSwap);
+  return done();
 }
 
 async function play(spec: LiveSwapSpec, bytes: ArrayBuffer): Promise<WorkletHarness> {
@@ -89,10 +94,20 @@ export async function measureLiveSwap(spec: LiveSwapSpec, at: { p: number; ch: n
   let swapError = '';
   // The module the route handed the engine: the oracle for routes editedModuleForPlay does not cover (Art of Noise).
   let sent: ArrayBuffer | null = null;
+  let cellsTaken = 0;
+  const swapMsg = (module: ArrayBuffer, loadArgs: unknown[]) => {
+    if (!spec.swapMessage) throw new Error('the route swapped a module, the spec names no swapMessage');
+    return spec.swapMessage(module, loadArgs);
+  };
   (globalThis as { __liveEngine?: unknown }).__liveEngine = {
-    swapModule: (module: ArrayBuffer, ...loadArgs: unknown[]) => { sent = module.slice(0); live.send(spec.swapMessage(module, loadArgs)).catch((err) => { swapError = String(err); }); },
+    swapModule: (module: ArrayBuffer, ...loadArgs: unknown[]) => { sent = module.slice(0); live.send(swapMsg(module, loadArgs)).catch((err) => { swapError = String(err); }); },
     // Art of Noise's route hands the engine its module by this name.
-    replaceModule: (module: ArrayBuffer) => { sent = module.slice(0); live.send(spec.swapMessage(module, [])).catch((err) => { swapError = String(err); }); },
+    replaceModule: (module: ArrayBuffer) => { sent = module.slice(0); live.send(swapMsg(module, [])).catch((err) => { swapError = String(err); }); },
+    // The 'grid-cell' route writes the edited cell into the playing replayer.
+    setCell: (...args: unknown[]) => {
+      if (!spec.cellMessage) { swapError = 'the route wrote a cell, the spec names no cellMessage'; return; }
+      live.send(spec.cellMessage(args)).then(() => { cellsTaken++; }, (err) => { swapError = String(err); });
+    },
     // SidMon II's exporter asks the running engine for its module; this stand-in has none to give, so the stored one is used.
     save: async () => null,
   };
@@ -101,7 +116,7 @@ export async function measureLiveSwap(spec: LiveSwapSpec, at: { p: number; ch: n
   // The keystroke alone: the store sends the edit to the engine (sendCellEdits), as in the product. Sending it here as
   // well raced the store's send for the same swap, and the newer call dropped the older one.
   edit();
-  const swapped = await awaitSwap(live);
+  const swapped = await awaitSwap(live, spec.cellMessage ? () => cellsTaken > 0 : undefined);
   if (!swapped && process.env.LS_DEBUG) console.log('[ls] not swapped; worklet posted', JSON.stringify(live.posted.map((m) => [m.type, m.message])), 'swap error', swapError);
   const after = live.render(spec.post);
   (globalThis as { __liveEngine?: unknown }).__liveEngine = undefined;
@@ -139,7 +154,7 @@ export async function assertLiveSwap(
     tried.push(`${cell.p}:${cell.ch}:${cell.row} pre=${preOk} heard=${heard} swapped=${r.swapped} carriesEdit=${r.carriesEdit} route=${r.routeIs}`);
     if (!preOk || !heard) continue;
     expectFn(r.routeIs, 'the song is edited through its live route').toBe(spec.route ?? 'engine-swap');
-    expectFn(r.swapped, 'the worklet swapped the module (sentinel)').toBe(true);
+    expectFn(r.swapped, spec.cellMessage ? 'the worklet took the edited cell (sentinel)' : 'the worklet swapped the module (sentinel)').toBe(true);
     expectFn(sameAudio(r.before, r.oracleAll.slice(0, spec.pre)), 'before the edit it is the song').toBe(true);
     expectFn((spec.sameTail ?? sameAudio)(r.after, r.oracleAll.slice(spec.pre)), 'after the edit it is the edited module at the same position').toBe(true);
     expectFn(heard, 'and the edit is heard').toBe(true);

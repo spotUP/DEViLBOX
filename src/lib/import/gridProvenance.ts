@@ -220,6 +220,13 @@ export const LIVE_WHILE_PLAYING: Record<string, LiveEditStatus> = {
   // artOfNoise: artOfNoiseLiveSwap.test.ts - the worklet's replaceModule loads the edited module and renders silently to the frame played.
   artOfNoise: 'pass',
   jochenHippelST: 'pass',
+  // hippelCoso: plays on nuade; nuadeEditsAreHeard.test.ts (hippel case: voice 4 +2 semitones from the edited row, 6.88 s).
+  hippelCoso: 'pass',
+  // digitalSoundStudio, faceTheMusic: route 'grid-cell', the engine's setCell writes the cell into the playing replayer
+  // (digitalSoundStudioLiveSwap, faceTheMusicLiveSwap .test.ts: the real worklet and WASM, sample for sample).
+  digitalSoundStudio: 'pass',
+  // faceTheMusic: rock.ftm is in EXPECTED_NO_RIG, so its G16 rig sound check is unverified; this measurement is the worklet's own.
+  faceTheMusic: 'pass',
   // med (MMD3): libopenmpt hot reload of the patched module, measured by libopenmpt/__tests__/medModuleLiveEditHeard.test.ts against the same reload of the unchanged bytes.
   med: 'pass',
   // musicAssembler, pumaTracker, sidmon2: the same measurement (musicAssemblerLiveSwap, pumaTrackerLiveSwap, sidMon2LiveSwap .test.ts).
