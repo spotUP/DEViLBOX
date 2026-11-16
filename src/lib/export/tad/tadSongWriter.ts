@@ -126,6 +126,8 @@ function snesEchoFlags(raw: string | undefined) {
     feedback: i8(int('echoFeedback', 0)),
     fir: [127, 0, 0, 0, 0, 0, 0, 0].map((d, i) => i8(int(`echoFilter${i}`, d))),
     mask: int('echoMask', 0),
+    // snes.cpp:1109 globalVol = 127 - volScale scales every voice before dry and echo mix
+    gainL: 127 - (int('volScaleL', 0) & 127), gainR: 127 - (int('volScaleR', 0) & 127),
   };
 }
 
@@ -177,6 +179,8 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
   const cap = input.echoDelayCap ?? 15;
   if (!sfx && echo.on && echo.delay > cap) warnings.push(`Echo delay ${echo.delay * 16} ms lowered to ${cap * 16} ms so the echo buffer fits in the 64 KiB of Audio-RAM.`);
   echo.delay = Math.min(echo.delay, cap);
+  if (echo.gainL !== echo.gainR) warnings.push(`Chip volume differs left ${echo.gainL} / right ${echo.gainR}; TAD has one voice volume, so both sides use the average.`);
+  const chipGain = (echo.gainL + echo.gainR) / 254;
   const echoInit = { ...echo }; // header values; `echo` tracks 1Axx/1Bxx while channels are written
   let maxDelay = echo.delay; // Furnace 19xx values seen, for #MaxEchoLength
   const where = (ch: number, r: LinearRow) => `channel ${ch + 1}, order ${hex2(r.pos)} row ${hex2(r.row)}`;
@@ -317,7 +321,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     const panOf = () => [constantMacro(instruments[ins], 12) ?? panL, constantMacro(instruments[ins], 13) ?? panR].map((v) => v & 127);
     const panP = () => { const [l, r] = panOf(); return l + r ? Math.round(128 * r / (l + r)) : lastP; };
     // m: volume macro value; default the held value of a multi-step macro (its steps play as pre, below).
-    const volScale = (m = stepMacro(instruments[ins], 0)?.hold ?? 127) => { const [l, r] = panOf(); return Math.min(127, m) / 127 * (l + r) / 254; };
+    const volScale = (m = stepMacro(instruments[ins], 0)?.hold ?? 127) => { const [l, r] = panOf(); return Math.min(127, m) / 127 * (l + r) / 254 * chipGain; };
     const volV = (m?: number) => `V${Math.min(255, Math.round(vol * 2 * volScale(m)))}`;
     // pre: arp / volume macro steps played (slurred) before the note's held pitch and volume; ticks in TAD ticks.
     // v: the V of each step, hold: the V after the steps (only with a multi-step volume macro).

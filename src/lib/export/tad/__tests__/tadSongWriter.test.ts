@@ -215,6 +215,21 @@ describe('writeTadSong echo header', () => {
     expect(Object.keys(lines).length).toBeGreaterThan(0);
     for (const l of Object.values(lines)) expect(l).toMatch(/#EchoLength \d+ \| .*#FirFilter (-?\d+ ){7}-?\d+ \| #EchoFeedback -?\d+ \| #EchoVolume \d+ \d+/);
   }, 120000);
+
+  it('scales voice volume by the volScaleL/R chip flags', async () => {
+    const buf = readFileSync(resolve(DIR, 'tetristheme.fur'));
+    const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+    const native = buildFurnaceNativeData(module);
+    const input = { native, subsong: 0, instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)), samples: toSequencerSamples(module), wavetables: module.wavetables, title: 't' };
+    // Distinct V values; V254 also opens every channel line as the start default, so it stays in the scaled set unchanged.
+    const vs = (mml: string) => new Set([...mml.matchAll(/\bV(\d+)/g)].map((m) => Number(m[1])));
+    const full = vs(writeTadSong(input).mml);
+    native.chipFlags![native.chipIds.indexOf(26)] = 'volScaleL=63\nvolScaleR=63';
+    const half = writeTadSong(input);
+    const got = [...vs(half.mml)].filter((v) => v !== 254).sort((x, y) => x - y);
+    expect(got).toEqual([...new Set([...full].map((v) => Math.round(v * 64 / 127)))].sort((x, y) => x - y));
+    expect(half.warnings.join('\n')).not.toMatch(/Chip volume differs/);
+  }, 60000);
 });
 
 // Furnace splits 08xy per nibble and 80xx linearly (centre = both sides full), then halves to 0-127.
