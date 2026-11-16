@@ -89,6 +89,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
 
         case 'zxTap':
           return await ex.handleExportZxTap((b, n) => saveAs(b, n), onClose);
+        case 'vectrexCart':
+          return await ex.handleExportVectrexCart((b, n) => saveAs(b, n), onClose);
         case 'zxBeeperTap':
           return await ex.handleExportZxBeeperTap((b, n) => saveAs(b, n), onClose);
         case 'furAy':
@@ -371,6 +373,21 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">ZX Spectrum 128 (.tap)</div>
                     </button>
                   )}
+                  {ex.furnaceAyAvailable.vectrex && (
+                    <button
+                      onClick={() => ex.setExportMode('vectrexCart')}
+                      className={`
+                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
+                        ${ex.exportMode === 'vectrexCart'
+                          ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
+                          : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
+                        }
+                      `}
+                    >
+                      <FileMusic size={24} className="mx-auto mb-2" />
+                      <div className="font-mono text-sm font-semibold break-words leading-tight">Vectrex Cartridge (AY-3-8910)</div>
+                    </button>
+                  )}
                   {ex.furnaceAyAvailable.zxbeeper && (
                     <button
                       onClick={() => ex.setExportMode('zxBeeperTap')}
@@ -599,6 +616,21 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                 </div>
               )}
 
+              {ex.exportMode === 'vectrexCart' && (
+                <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
+                  <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
+                    Vectrex cartridge (.bin)
+                  </h3>
+                  <div className="space-y-3 text-sm font-mono text-text-secondary">
+                    <div>Plays the song once in real time and records the AY-3-8910 register writes. The cartridge runs on a Vectrex or an emulator and shows the title on screen. It holds at most 32 KB (no bank switching), so long songs are refused.</div>
+                    {ex.vectrexCartTempoWarning && (
+                      <div className="text-xs font-mono text-accent-warning">{ex.vectrexCartTempoWarning}</div>
+                    )}
+                    {ex.vectrexCartBusy && <div className="text-xs font-mono text-accent-primary">Recording the song. Wait for it to finish.</div>}
+                  </div>
+                </div>
+              )}
+
               {ex.exportMode === 'zxTap' && (
                 <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
                   <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
@@ -813,6 +845,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   : ex.exportMode === 'nano' ? '.dbn'
                   : ex.exportMode === 'fur' || ex.exportMode === 'furAy' ? '.fur'
                   : ex.exportMode === 'zxTap' || ex.exportMode === 'zxBeeperTap' ? '.tap'
+                  : ex.exportMode === 'vectrexCart' ? '.bin'
                   : ex.exportMode === 'tad' ? '.zip'
                   : `.${ex.exportMode}.json`
                 }`

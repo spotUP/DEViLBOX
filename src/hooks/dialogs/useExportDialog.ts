@@ -38,7 +38,7 @@ import { saveFurFileWasm } from '@lib/import/wasm/FurnaceFileOps';
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
-export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'tad';
+export type ExportMode = 'song' | 'sfx' | 'instrument' | 'audio' | 'midi' | 'xm' | 'mod' | 'it' | 's3m' | 'chip' | 'nano' | 'native' | 'fur' | 'furAy' | 'zxTap' | 'zxBeeperTap' | 'vectrexCart' | 'tad';
 export type DialogMode = 'export' | 'import';
 
 export type { ExportOptions };
@@ -82,6 +82,7 @@ export const FORMAT_EXTENSIONS: Record<ExportMode, string> = {
   furAy: '.fur',
   zxTap: '.tap',
   zxBeeperTap: '.tap',
+  vectrexCart: '.bin',
   tad: '.zip',
 };
 
@@ -301,6 +302,27 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     }
   }, [metadata]);
 
+  const vectrexCartTempoWarning = ayScrambleTempoWarning(bpm, 'vectrex');
+  const [vectrexCartBusy, setVectrexCartBusy] = useState(false);
+
+  const handleExportVectrexCart = useCallback(async (
+    downloadFn: (blob: Blob, filename: string) => void,
+    onClose: () => void,
+  ) => {
+    setVectrexCartBusy(true);
+    try {
+      const { recordVectrexCartridge } = await import('@lib/export/vectrex/vectrexCapture');
+      const r = await recordVectrexCartridge((metadata.name || 'song').slice(0, 16));
+      downloadFn(new Blob([r.bin as BlobPart], { type: 'application/octet-stream' }), `${metadata.name || 'song'}.bin`);
+      notify.success(`Vectrex cartridge exported (${r.frames} frames, ${Math.round(r.seconds)} s, ${r.bin.byteLength} bytes).`);
+      onClose();
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : 'Vectrex cartridge export failed.');
+    } finally {
+      setVectrexCartBusy(false);
+    }
+  }, [metadata]);
+
   const [zxBeeperReport, setZxBeeperReport] = useState<{ warnings: string[]; seconds: number } | null>(null);
 
   // Preview: build the tape when the tile is selected so the dialog can list what is dropped.
@@ -514,6 +536,9 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     handleExportZxTap,
     zxTapTempoWarning,
     zxTapBusy,
+    handleExportVectrexCart,
+    vectrexCartTempoWarning,
+    vectrexCartBusy,
     handleExportZxBeeperTap,
     zxBeeperReport,
     handleExportTad,
