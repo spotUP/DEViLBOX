@@ -43,7 +43,7 @@ function arpMacro(inst: TadInstrumentInput | undefined): ReturnType<typeof stepM
 }
 
 /** Furnace note an arp macro value gives for `note` (engine.cpp:1940-1947 calcArp): bit 30 flipped against the sign = fixed note + 60. */
-function arpNote(note: number, v: number): number {
+export function arpNote(note: number, v: number): number {
   if (((v & 0x40000000) !== 0) === (v < 0)) return note + v;
   return (v < 0 ? (v | 0x40000000) : (v & ~0x40000000)) + 60;
 }
@@ -54,7 +54,7 @@ function arpNote(note: number, v: number): number {
  * once the release index was read and the macro is not released it loops to `loop` (when loop < rel) or holds the release
  * value (:118-124); release jumps to the release index (:90-93); at the end it loops (:125-131) or stops on its last value.
  */
-function runMacro(m: { loop?: number; release?: number; speed?: number; delay?: number }, d: number[], n: number, rel: number, hadOut?: boolean[]): number[] {
+export function runMacro(m: { loop?: number; release?: number; speed?: number; delay?: number }, d: number[], n: number, rel: number, hadOut?: boolean[]): number[] {
   const len = d.length, loop = m.loop ?? 255, rl = m.release ?? 255, speed = Math.max(1, m.speed ?? 1);
   const out: number[] = [];
   let pos = 0, delay = 0, began = true, has = true, val = d[0];

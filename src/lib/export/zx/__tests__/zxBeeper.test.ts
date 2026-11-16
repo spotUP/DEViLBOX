@@ -63,6 +63,25 @@ describe('ZX beeper tap', () => {
     expect(d.warnings.join(' ')).toMatch(/Dropped/);
   });
 
+  it('keeps real-time length at 60 Hz and warns it was resampled', () => {
+    const s = { ...song(), hz: 60 };
+    const d = songToBeeperRows(s as never, player.maxBytes);
+    expect(d.rows[0].units * BEEPER_UNIT_MS).toBeLessThan(420); // 4 rows x 6 ticks / 60 Hz = 400 ms, not 480
+    expect(d.warnings.join(' ')).toMatch(/60\.00 Hz.*resampled/);
+  });
+
+  it('expands a 00xy arpeggio and an arp macro into one row per tick', () => {
+    const s = song();
+    set(s.patterns[0], 2, 0, { note: 58, instrument: 1, effTyp: 0, eff: 0x47 });
+    const d = songToBeeperRows(s as never, player.maxBytes);
+    const w = (n: number) => beeperFreqWord(n);
+    expect(d.rows.slice(0, 3).map((r) => r.freq[2])).toEqual([w(57), w(61), w(64)]);
+    const m = song();
+    (m.instruments[0].furnace as FurnaceConfig).macros = [{ code: 1, type: 0, data: [0, 12], loop: 0, release: -1, mode: 0 }];
+    const e = songToBeeperRows(m as never, player.maxBytes);
+    expect(e.rows.slice(0, 2).map((r) => r.freq[0])).toEqual([w(57), w(69)]);
+  });
+
   it('builds a tape with valid checksums, a loader and the player code', () => {
     const d = songToBeeperRows(song() as never, player.maxBytes);
     const tap = buildZx48Tap(player, (base) => encodeBeeperMusic(d.rows, base), 'beeper');

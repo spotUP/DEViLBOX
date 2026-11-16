@@ -129,8 +129,7 @@ export async function exportZxBeeperTapFile(title = 'devilbox'): Promise<ZxBeepe
   const player = await fetchZxBeeperPlayer();
   const data = songToBeeperRows(song, player.maxBytes);
   const tap = buildZx48Tap(player, (base) => encodeBeeperMusic(data.rows, base), title);
-  const tempo = ayScrambleTempoWarning(song.initialBPM, 'zxbeeper');
-  return { tap, seconds: data.seconds, rows: data.rows.length, warnings: tempo ? [...data.warnings, tempo] : data.warnings };
+  return { tap, seconds: data.seconds, rows: data.rows.length, warnings: data.warnings };
 }
 
 /** SNES Furnace song(s) -> Terrific Audio Driver project zip, from the live song. Instrument index = Furnace instrument index. */
