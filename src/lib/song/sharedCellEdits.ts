@@ -43,12 +43,26 @@ export function sharedCellEdits(
       if (!there) return;
       const values: Partial<TrackerCell> = {};
       for (const k of keys) {
-        if (JSON.stringify(there[k]) !== JSON.stringify(cell[k])) (values as Record<string, unknown>)[k] = structuredClone(cell[k]);
+        const want = k === 'note' ? sharedNote(layout, cell.note, [patternIndex, row, channel], [pattern, row, channel]) : cell[k];
+        if (want === undefined) continue;
+        if (JSON.stringify(there[k]) !== JSON.stringify(want)) (values as Record<string, unknown>)[k] = structuredClone(want);
       }
       if (Object.keys(values).length > 0) out.push({ pattern, row, channel, values });
     });
   }));
   return out;
+}
+
+/**
+ * The grid note a sharing position shows for a note written at another: the same stored note, moved by each position's
+ * noteOffset (a transposed sequence). Undefined when either position's note is not an offset stored note.
+ */
+function sharedNote(layout: UADEPatternLayout, note: number | undefined, from: [number, number, number], to: [number, number, number]): number | undefined {
+  if (!layout.noteOffset || note === undefined || note < 1 || note > 96) return note;
+  const a = layout.noteOffset(...from), b = layout.noteOffset(...to);
+  if (a === null || b === null) return undefined;
+  const moved = note - a + b;
+  return moved >= 1 && moved <= 96 ? moved : undefined;
 }
 
 /** Stored note of each grid note cell of a variable layout: the file offset and the base (table index = byte + base) of its command. */

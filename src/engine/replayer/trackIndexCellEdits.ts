@@ -17,6 +17,7 @@
 
 import type { TrackerSong } from '../TrackerReplayer';
 import type { LiveCellEdit } from './liveCellEdits';
+import { encodeStoredCell } from '../uade/UADEPatternEncoder';
 
 /** What a track-index engine's set_cell takes: the replayer's own address and fields. */
 export interface TrackCellWrite {
@@ -62,6 +63,11 @@ const FORMATS: Record<string, Record4Format> = {
     fields: (r) => ({ note: r[0], instrument: r[1], arpeggio: 0, effect: r[2], effectArg: r[3] }),
   },
   // [instrument, note, effect, arg]; blocks of 16 rows.
+  // Future Composer [note, val]; patterns of 32 rows, shared by sequence positions (each with its own transpose).
+  FutureComposerReplayer: {
+    rowsPerRecord: 32, stride: 2,
+    fields: (r) => ({ note: r[0], instrument: r[1], arpeggio: 0, effect: 0, effectArg: 0 }),
+  },
   DeltaMusic1Replayer: {
     rowsPerRecord: 16, stride: 4,
     fields: (r) => ({ note: r[1], instrument: r[0], arpeggio: 0, effect: r[2], effectArg: r[3] }),
@@ -98,7 +104,11 @@ export function trackCellWrite(song: TrackerSong, key: string, edit: LiveCellEdi
   if (offset <= 0 || offset < layout.patternDataFileOffset) return null;
   const cellNo = (offset - layout.patternDataFileOffset) / fmt.stride;
   if (!Number.isInteger(cellNo)) return null;
-  const raw = layout.encodeCell(edit.cell);
+  const stored = song.futureComposerFileData && layout.encodeOverStored
+    ? new Uint8Array(song.futureComposerFileData, offset, layout.bytesPerCell)
+    : undefined;
+  const raw = encodeStoredCell(layout, edit.pattern, edit.row, edit.channel, edit.cell, stored);
+  if (!raw) return null;
   const addr = fmt.rowsPerRecord > 0
     ? { index: Math.floor(cellNo / fmt.rowsPerRecord), row: cellNo % fmt.rowsPerRecord }
     : { index: cellNo, row: 0 };

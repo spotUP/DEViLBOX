@@ -74,7 +74,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   howieDavies: 'pass',
   soundProgrammingLanguage: 'pass',
   timFollin: 'pass',
-  fc: 'fail',
+  fc: 'pass',
   sidmon2: 'pass',
   soundmon: 'pass',
   deltaMusic1: 'fail',

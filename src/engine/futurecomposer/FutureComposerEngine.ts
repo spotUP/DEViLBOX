@@ -133,9 +133,9 @@ export class FutureComposerEngine extends WASMChannelOutputsEngine {
 
   onSongEnd(callback: () => void): void { this._songEndCallback = callback; }
 
-  /** Edit a pattern cell in the WASM replayer */
-  setCell(index: number, row: number, channel: number, note: number, instrument: number, effect: number, effectArg: number): void {
-    this.workletNode?.port.postMessage({ type: 'setCell', index, row, channel, note, instrument, effect, effectArg });
+  /** Write one cell of an FC pattern (fc_set_cell): `note` and `instrument` are the stored note and val bytes. */
+  setTrackCell(index: number, row: number, note: number, instrument: number): void {
+    this.workletNode?.port.postMessage({ type: 'setTrackCell', index, row, note, instrument });
   }
 
   /** Set an instrument parameter by name */

@@ -87,6 +87,15 @@ export interface UADEPatternLayout {
   positionBoundFields?: (row: number, channel: number) => ReadonlyArray<keyof TrackerCell>;
 
   /**
+   * A format that plays one stored track at several positions with a per-position transpose (Future Composer sequence
+   * transpose, Delta Music track-list transpose): grid note = stored note + noteOffset, in semitones, where the stored
+   * note is the note decodeCell / encodeCell work in. null: the grid note of this cell is not its stored note plus an
+   * offset (an absolute pitch from an instrument macro), so a grid note edit has no stored note to land in.
+   * Undefined field: offset 0 everywhere. Read through encodeStoredCell and sharedCellEdits.
+   */
+  noteOffset?: (pattern: number, row: number, channel: number) => number | null;
+
+  /**
    * A cell whose bytes depend on where it sits - a step's transposes, a row
    * of a packed stream whose later rows move when its length changes - is
    * written by the layout itself: the byte runs to write, at offsets from the
@@ -108,6 +117,30 @@ export interface UADEPatternLayout {
    * reason it cannot. The module grows, so later offsets of this layout are stale: the caller parses the result again.
    */
   growCell?: (module: Uint8Array, pattern: number, row: number, channel: number, cell: TrackerCell) => Uint8Array | string;
+}
+
+/**
+ * The bytes a grid cell stores at its place in the module: encodeCell of the cell with its grid note taken back through
+ * the layout's noteOffset. Null when the note cannot be stored there: the cell's grid note is not an offset stored note,
+ * or the stored note falls outside what the format encodes (checked by decoding the result when the layout can decode).
+ * The one encoder every writer of a cell's module bytes uses (patchModuleByLayout, the track-index live route).
+ */
+export function encodeStoredCell(
+  layout: UADEPatternLayout,
+  pattern: number,
+  row: number,
+  channel: number,
+  cell: TrackerCell,
+  stored?: Uint8Array,
+): Uint8Array | null {
+  const note = cell.note ?? 0;
+  if (!layout.noteOffset || note < 1 || note > 96) return layout.encodeCell(cell, stored, channel);
+  const offset = layout.noteOffset(pattern, row, channel);
+  if (offset === null) return null;
+  const storedNote = note - offset;
+  const bytes = layout.encodeCell({ ...cell, note: storedNote }, stored, channel);
+  if (layout.decodeCell && layout.decodeCell(bytes).note !== storedNote) return null;
+  return bytes;
 }
 
 // ─── Cell Offset Calculation ──────────────────────────────────────────────────

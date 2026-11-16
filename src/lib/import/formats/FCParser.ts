@@ -1054,6 +1054,7 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
   let currentSpeed = 3;
   const trackerPatterns: Pattern[] = [];
 
+  const cellNoteOffsets = new Map<string, number | null>();
   for (let seqIdx = 0; seqIdx < sequences.length; seqIdx++) {
     const seq = sequences[seqIdx];
     const channelRows: TrackerCell[][] = [[], [], [], []];
@@ -1185,6 +1186,13 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
             periodIdx = transpose & 0x7F; // absolute index, no note/transpose added
           }
           xmNote = fcPeriodIdxToXM(periodIdx);
+          // Grid note = stored byte (decode space: byte + 37) moved by this position's transposes. An absolute-pitch
+          // trigger has no stored note behind its grid note (null).
+          // shortcut: one linear offset per cell assumes FC_PERIODS is a semitone ladder around the note, upgrade to a
+          // per-note lookup if a period table with gaps turns up.
+          const storedNote = fcNote & 0x7F;
+          cellNoteOffsets.set(`${seqIdx}:${row}:${ch}`,
+            transpose >= 0 && storedNote >= 1 && storedNote <= 72 ? xmNote - (storedNote + 37) : null);
         } else if (fcNote === 0x49 || (fcPat && fcPat.val[row] === 0xF0)) {
           xmNote = 97; // note off
         }
@@ -1339,6 +1347,17 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
     numPatterns: numFCPatterns,
     moduleSize: buffer.byteLength,
     encodeCell: createFCEncoder(instrReverseMap),
+    encodeOverStored: true,
+    // A grid pattern is a sequence position; its four channels play shared FC patterns, transposed per position.
+    propagateSharedCells: true,
+    positionBoundFields: () => ['instrument', 'volume', 'effTyp', 'eff', 'effTyp2', 'eff2'],
+    // A row the replayer did not trigger keeps the note the position's sequence transpose gives (no simulated pitch).
+    noteOffset: (pattern, row, channel) => {
+      const seq = sequences[pattern];
+      if (!seq) return null;
+      const known = cellNoteOffsets.get(`${pattern}:${row}:${channel}`);
+      return known !== undefined ? known : seq.transpose[channel] - 24;
+    },
     decodeCell: (bytes: Uint8Array): TrackerCell => {
       // Inverse of FCEncoder's 2-byte cell: [note, val]
       const noteByte = bytes[0];
@@ -1361,7 +1380,7 @@ export function parseFCFile(buffer: ArrayBuffer, filename: string, moduleBase = 
     getCellFileOffset: (pattern, row, channel) => {
       // TrackerSong pattern = sequence index, channel maps to FC pattern via seq.pat[ch]
       const seq = sequences[pattern];
-      if (!seq) return 0;
+      if (!seq) return -1;
       const fcPatIdx = seq.pat[channel];
       return patPtr + fcPatIdx * 64 + row * 2;
     },

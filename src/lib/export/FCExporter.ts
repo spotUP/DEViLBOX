@@ -26,6 +26,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { patchModuleByLayout } from './layoutPatch';
 
 function writeU16BE(view: DataView, off: number, val: number): void {
   view.setUint16(off, val, false);
@@ -59,6 +60,12 @@ function xmNoteToFC(xmNote: number): number {
 }
 
 export function exportFC(song: TrackerSong): ArrayBuffer {
+  // A loaded FC module: its bytes with the grid edits written into the shared patterns (byte-exact when unedited).
+  const layout = song.uadePatternLayout;
+  if (song.futureComposerFileData && layout?.formatId === 'futureComposer') {
+    const { bytes } = patchModuleByLayout(new Uint8Array(song.futureComposerFileData), layout, song.patterns);
+    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  }
   const nChannels = 4; // FC is always 4-channel
   const nInstrs   = Math.min(10, song.instruments.length); // FC has 10 sample slots
 

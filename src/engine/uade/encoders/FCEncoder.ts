@@ -24,8 +24,8 @@ import { registerPatternEncoder } from '../UADEPatternEncoder';
  * Create an FC cell encoder with the given instrument reverse map.
  * @param instrReverseMap — Map from TrackerSong instrument ID → FC vol macro index
  */
-export function createFCEncoder(instrReverseMap: Map<number, number>): (cell: TrackerCell) => Uint8Array {
-  return function encodeFCCell(cell: TrackerCell): Uint8Array {
+export function createFCEncoder(instrReverseMap: Map<number, number>): (cell: TrackerCell, stored?: Uint8Array) => Uint8Array {
+  return function encodeFCCell(cell: TrackerCell, stored?: Uint8Array): Uint8Array {
     const out = new Uint8Array(2);
     const xmNote = cell.note ?? 0;
 
@@ -42,6 +42,13 @@ export function createFCEncoder(instrReverseMap: Map<number, number>): (cell: Tr
 
     // Byte 1: val = (instrIdx & 0x3F) | portamento flags
     // We don't encode portamento flags (bits 6-7) since they require multi-row context
+    // Over a stored cell the val byte stays: the grid instrument is the simulated sound of the position (offsetIns,
+    // macros), not this byte, and the byte also carries the portamento flags and the 0xF0 pattern end.
+    // shortcut: an instrument edit is not stored over a module cell, upgrade when the grid instrument maps back to val.
+    if (stored && stored.length >= 2) {
+      out[1] = stored[1];
+      return out;
+    }
     const instrId = cell.instrument ?? 0;
     if (instrId > 0) {
       const fcIdx = instrReverseMap.get(instrId) ?? 0;

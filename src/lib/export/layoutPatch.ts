@@ -8,7 +8,7 @@
  */
 import type { Pattern } from '@/types';
 import type { UADEPatternLayout, UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { getCellFileOffset, encodeVariableBlock } from '@/engine/uade/UADEPatternEncoder';
+import { getCellFileOffset, encodeVariableBlock, encodeStoredCell } from '@/engine/uade/UADEPatternEncoder';
 import { editedCells } from '@/lib/song/gridBaseline';
 
 export interface LayoutPatchResult {
@@ -33,7 +33,8 @@ export function patchModuleByLayout(source: ArrayBuffer | Uint8Array, layout: UA
       continue;
     }
     const stored = layout.encodeOverStored ? buf.slice(offset, offset + layout.bytesPerCell) : undefined;
-    const encoded = layout.encodeCell(cell, stored, channel);
+    const encoded = encodeStoredCell(layout, pattern, row, channel, cell, stored);
+    if (!encoded) { unplaced.push({ pattern, row, channel }); continue; }
     for (let i = 0; i < encoded.length; i++) if (buf[offset + i] !== encoded[i]) { buf[offset + i] = encoded[i]; patched++; }
   }
   return { bytes: buf, patched, unplaced };

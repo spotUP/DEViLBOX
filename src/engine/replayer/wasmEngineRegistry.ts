@@ -1011,7 +1011,6 @@ export const WASM_ENGINES: NativeEngineDescriptor[] = [
     synthType: 'FutureComposerWasmSynth',
     suppressNotes: true,
     fileDataKey: 'futureComposerFileData',
-    gridCellEdits: true,
     loadMethod: 'loadTune',
     supportsPause: false,
     supportsResume: false,
