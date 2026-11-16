@@ -15,6 +15,7 @@ import { Toggle } from '@components/controls/Toggle';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { Button } from '@components/ui/Button';
 import { notify } from '@stores/useNotificationStore';
+import { useInstrumentStore } from '@stores/useInstrumentStore';
 import { parseWavToAudioBuffer } from '@utils/audio/wavParser';
 import { OPNB_VOICE_KINDS, SSG_MACRO_LABELS, isOpnbChipType, opnbFirstChannel, opnbVoiceKind, withSsgDefaultMacros } from '@engine/furnace-dispatch/opnbVoices';
 import { TabStrip } from '@components/ui/TabStrip';
@@ -220,6 +221,8 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sampleInputRef = useRef<HTMLInputElement>(null);
   const configRef = useRef(config);
+  // chipType holds a Furnace instrument type on imports (VERA=24) but a chip id on new ones (SNES=24), so gate SNES UI on synthType
+  const isSnes = useInstrumentStore((s) => s.instruments.find((i) => i.id === instrumentId)?.synthType) === 'FurnaceSNES' || !!config.snes;
 
   // Keep configRef in sync
   useEffect(() => { configRef.current = config; }, [config]);
@@ -375,7 +378,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
           macros={config.macros}
           onChange={(macros) => onChange({ macros: macros as FurnaceMacro[] })}
           chipType={config.chipType}
-          labels={neoKind?.id === 'ssg' ? SSG_MACRO_LABELS : (config.chipType === 24 || config.snes) ? SNES_MACRO_LABELS : undefined}
+          labels={neoKind?.id === 'ssg' ? SSG_MACRO_LABELS : isSnes ? SNES_MACRO_LABELS : undefined}
         />
       ) : (
         <MacroListEditor
@@ -648,7 +651,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
       )}
 
       {/* SNES panels: chipType 24 (new instrument) or 29 (imported, DIV_INS_SNES); imports always carry config.snes */}
-      {(config.chipType === 24 || config.snes) && (
+      {isSnes && (
         <>
           <SNESPanel config={config} onChange={pushLiveUpdate} />
           <SNESEchoPanel />
