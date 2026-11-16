@@ -71,7 +71,8 @@ describe('NV-4 committed binary', () => {
     const hash = createHash('sha256');
     for (let i = 0; i < 938; i++) hash.update(Buffer.from(nu.render(1024).stereo.buffer));
     nu.close();
-    // sha256 of scratchpad/ab/antidust.bp3.raw, the research's native (cmake, clang) render of the pinned tree.
-    expect(hash.digest('hex')).toBe('250f2d293b35054c77d6bb5c3dd24540186c6538b7cbc5af7b83fa48034eb539');
+    // sha256 of a native (cmake, clang, -O2) render of the pinned tree with nuade-wasm/patches applied, through
+    // nuade_wasm.c's nw_open/nw_start/nw_render. Re-taken after patch 0004 (a3979dc62, SoundMon step-entry voice order).
+    expect(hash.digest('hex')).toBe('1ebc93d435daa8285d8a0730ec5670ec0996c6c060051f639dd6e616d36aa8e8');
   });
 });

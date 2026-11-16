@@ -113,7 +113,7 @@ export const NUADE_VERDICTS: Readonly<Record<string, NuadeVerdict>> = {
   soundfx: {"uadeEnvelopeCorrelation":0.9616,"endAgrees":false,"defaultEngine":"native","ownNote":"our engine not measured yet"},
   soundimages: {"uadeEnvelopeCorrelation":0.9907,"endAgrees":true,"defaultEngine":"nuade"},
   soundmaster: {"uadeEnvelopeCorrelation":0.9805,"endAgrees":true,"defaultEngine":"nuade"},
-  soundmon: {"uadeEnvelopeCorrelation":0.9656,"ownEnvelopeCorrelation":0.9338,"endAgrees":true,"defaultEngine":"nuade"},
+  soundmon: {"uadeEnvelopeCorrelation":0.9632,"ownEnvelopeCorrelation":0.9365,"endAgrees":true,"defaultEngine":"nuade"},
   specialfx: {"uadeEnvelopeCorrelation":0.9874,"endAgrees":false,"defaultEngine":"uade","heldBecause":"wildwheels_ingame.jd: UADE ends at 16.9 s, nuade ends at 4.3 s; striker ingame.jd: RMS 0.008 <= 0.02; striker ingame.jd: UADE plays on, nuade ends at 5.6 s"},
   speedya1system: {"uadeEnvelopeCorrelation":0.9764,"endAgrees":true,"defaultEngine":"nuade"},
   speedysystem: {"uadeEnvelopeCorrelation":0.9869,"endAgrees":true,"defaultEngine":"nuade"},
