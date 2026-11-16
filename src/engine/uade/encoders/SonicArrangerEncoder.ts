@@ -25,9 +25,19 @@ import { registerPatternEncoder } from '../UADEPatternEncoder';
 
 const SA_NOTE_OFFSET = 36;
 
-export function encodeSonicArrangerCell(cell: TrackerCell): Uint8Array {
+export function encodeSonicArrangerCell(cell: TrackerCell, stored?: Uint8Array): Uint8Array {
   const out = new Uint8Array(4);
   const xmNote = cell.note ?? 0;
+
+  // Over a stored track line only the note is the grid's: instrument carries the position's sound transpose and the flag bits
+  // are not in the grid, so bytes 1..3 stay. shortcut: instrument/effect edits are not stored over a module line.
+  if (stored && stored.length >= 4) {
+    out.set(stored.subarray(0, 4));
+    const b = stored[0];
+    const was = b === 0x7F || b === 0x80 ? 97 : (b - SA_NOTE_OFFSET >= 1 && b - SA_NOTE_OFFSET <= 96 ? b - SA_NOTE_OFFSET : 0);
+    if (xmNote !== was) out[0] = xmNote === 97 ? 0x7F : xmNote > 0 ? Math.min(108, xmNote + SA_NOTE_OFFSET) : 0;
+    return out;
+  }
 
   // Byte 0: SA note (inverse of saNote2XM = saNote - 36)
   if (xmNote === 97) {

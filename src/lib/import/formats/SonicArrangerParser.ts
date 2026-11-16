@@ -946,6 +946,19 @@ export async function parseSonicArrangerFile(
     numPatterns: builtPatterns.length,
     moduleSize: buffer.byteLength,
     encodeCell: encodeSonicArrangerCell,
+    encodeOverStored: true,
+    propagateSharedCells: true,
+    // Instrument (sound transpose) and effects belong to the position's view, not the stored line; the encoder keeps those bytes.
+    positionBoundFields: () => ['instrument', 'volume', 'effTyp', 'eff', 'effTyp2', 'eff2'],
+    // Grid note = line note + the position's note transpose (clamped to 1..96), unless the line disables it. Null where either side leaves the range.
+    noteOffset: (pattern: number, row: number, channel: number): number | null => {
+      const pos = positions[pattern]?.[channel];
+      const tl = pos ? trackLines[pos.startTrackRow + row] : undefined;
+      if (!pos || !tl || tl.note === 0 || tl.note === 0x7F || tl.note === 0x80) return null;
+      const t = tl.disableNoteTranspose ? 0 : pos.noteTranspose;
+      const n = tl.note - 36;
+      return n < 1 || n > 96 || n + t < 1 || n + t > 96 ? null : t;
+    },
     decodeCell: (raw: Uint8Array): TrackerCell => {
       const b0 = raw[0]; // note
       const b1 = raw[1]; // instrument
@@ -978,7 +991,7 @@ export async function parseSonicArrangerFile(
       if (!posEntry) return -1;
       const startRow = posEntry[channel].startTrackRow;
       const rowIdx = startRow + row;
-      if (rowIdx < 0 || rowIdx >= numTrackRows) return -1;
+      if (rowIdx < 0 || rowIdx >= numTrackRows || rowIdx >= trackLines.length) return -1;
       return ntblDataOffset + rowIdx * 4;
     },
   };

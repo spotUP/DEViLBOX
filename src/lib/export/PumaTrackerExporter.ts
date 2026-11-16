@@ -24,6 +24,9 @@
  *   Encoder: noteX2 = (cell.note - 12) * 2  (we export with noteTranspose=0)
  */
 
+import type { UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { editedCells } from '@/lib/song/gridBaseline';
+import type { Pattern } from '@/types';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { TrackerCell } from '@/types';
 
@@ -202,8 +205,46 @@ function extractOriginalData(originalData: ArrayBuffer): {
  * samples to copy: it is written with none, the module's terminating "inst"
  * marker only.
  */
+/**
+ * The module with each edited grid note stored in its track's RLE entries: the grid note is the stored note plus the order's
+ * note transpose (PumaTrackerParser), so the stored byte is the grid note minus it. Instrument and effect edits are not stored
+ * (shortcut: they carry the order's instrument transpose and the parser's auto-portamento, upgrade with their inverse).
+ * A note edited inside a multi-row group (not at its first row) is not stored. Never null today; kept for the caller's fallback.
+ */
+function patchPumaNotes(source: ArrayBuffer, layout: UADEVariablePatternLayout, patterns: readonly Pattern[]): Uint8Array | null {
+  const buf = new Uint8Array(source).slice();
+  const edits = new Map<number, Map<number, number>>(); // file pattern -> row -> stored noteX2
+  for (const { pattern, row, channel, cell } of editedCells(patterns)) {
+    const fp = layout.trackMap[pattern]?.[channel];
+    if (fp == null || fp < 0) continue;
+    const t = (buf[HEADER_SIZE + pattern * ORDER_ENTRY_SIZE + channel * 3 + 2] << 24) >> 24;
+    const note = cell.note ?? 0;
+    const nx = note < 1 || note > 96 ? 0 : 2 * (note - 12) - t + (t & 1);
+    if (nx < 0 || nx > 0xFE || (nx & 1)) continue;
+    let rows = edits.get(fp);
+    if (!rows) edits.set(fp, (rows = new Map()));
+    rows.set(row, nx);
+  }
+  for (const [fp, rows] of edits) {
+    const addr = layout.filePatternAddrs[fp], size = layout.filePatternSizes[fp];
+    // Edit in place at the group's start: a group's run length is its duration (the player applies an effect once per group), so groups are never merged or split.
+    for (let i = addr, row = 0; i < addr + size; row += buf[i + 3], i += 4) {
+      const nx = rows.get(row);
+      if (nx !== undefined) buf[i] = nx;
+    }
+  }
+  return buf;
+}
+
 export function exportPumaTrackerFile(song: TrackerSong): Uint8Array {
   const originalData = song.pumaTrackerFileData;
+  // A loaded module: its bytes with each edited track re-encoded over its slot (byte-exact when unedited). A track that outgrows
+  // its slot needs the pointers moved, which the rebuild below does.
+  const layout = song.uadeVariableLayout;
+  if (originalData && layout?.formatId === 'pumaTracker') {
+    const patched = patchPumaNotes(originalData, layout, song.patterns);
+    if (patched) return patched;
+  }
   const { instrData, sampleEntries, numInstruments } = originalData
     ? extractOriginalData(originalData)
     : {

@@ -16,6 +16,7 @@
  * XM note-off (97) maps to SA 0x7F (force quiet).
  */
 
+import { patchModuleByLayout } from './layoutPatch';
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { SonicArrangerConfig } from '@/types/instrument';
 
@@ -145,6 +146,15 @@ export async function exportSonicArranger(
 ): Promise<{ data: Blob; filename: string; warnings: string[] }> {
   const warnings: string[] = [];
   const numChannels = 4;
+
+  // A loaded SOARV1.0 module: its bytes with the grid edits written into the shared track lines (byte-exact when unedited).
+  const layout = song.uadePatternLayout;
+  if (song.sonicArrangerFileData && layout?.formatId === 'sonicArranger') {
+    const { bytes, unplaced } = patchModuleByLayout(new Uint8Array(song.sonicArrangerFileData), layout, song.patterns);
+    if (unplaced.length) warnings.push(`${unplaced.length} edited note(s) have no place in the module and were not written.`);
+    const name = (song.name || 'untitled').replace(/[^a-zA-Z0-9_\- ]/g, '_');
+    return { data: new Blob([bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer], { type: 'application/octet-stream' }), filename: `${name}.sa`, warnings };
+  }
 
   if (song.numChannels > 4) {
     warnings.push(`Sonic Arranger supports 4 channels; channels 5-${song.numChannels} will be dropped.`);
