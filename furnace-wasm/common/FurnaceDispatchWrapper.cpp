@@ -1954,7 +1954,7 @@ void furnace_dispatch_set_fds_instrument(int handle, int insIndex, unsigned char
  *   [1-2] initSample (short)
  *   [3] flags: bit0=useNoteMap, bit1=useSample, bit2=useWave
  *   [4] waveLen
- *   [5-...] noteMap (if useNoteMap): 120 entries of (freq:4, map:2, dpcmFreq:1, dpcmDelta:1) = 8 bytes each
+ *   [5-...] noteMap (if useNoteMap): 180 entries of (freq:4, map:2, dpcmFreq:1, dpcmDelta:1) = 8 bytes each
  */
 EMSCRIPTEN_KEEPALIVE
 void furnace_dispatch_set_amiga_instrument(int handle, int insIndex, unsigned char* data, int dataLen) {
@@ -1969,8 +1969,8 @@ void furnace_dispatch_set_amiga_instrument(int handle, int insIndex, unsigned ch
   ins->amiga.waveLen = data[4];
 
   // Parse note map if present
-  if (ins->amiga.useNoteMap && dataLen >= 5 + 120 * 8) {
-    for (int i = 0; i < 120; i++) {
+  if (ins->amiga.useNoteMap && dataLen >= 5 + 180 * 8) {
+    for (int i = 0; i < 180; i++) {
       unsigned char* entry = data + 5 + i * 8;
       ins->amiga.noteMap[i].freq = *(int*)entry;
       ins->amiga.noteMap[i].map = *(short*)(entry + 4);
@@ -3532,8 +3532,8 @@ void furnace_dispatch_set_instrument_full(int handle, int insIndex, unsigned cha
     ins->amiga.waveLen = samp[3];
 
     // Note map follows if useNoteMap
-    if (ins->amiga.useNoteMap && sampleOffset + 4 + 120 * 8 <= (unsigned int)dataLen) {
-      for (int i = 0; i < 120; i++) {
+    if (ins->amiga.useNoteMap && sampleOffset + 4 + 180 * 8 <= (unsigned int)dataLen) {
+      for (int i = 0; i < 180; i++) {
         unsigned char* entry = samp + 4 + i * 8;
         ins->amiga.noteMap[i].freq = *(int*)entry;
         ins->amiga.noteMap[i].map = *(short*)(entry + 4);
