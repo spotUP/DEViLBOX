@@ -1,6 +1,6 @@
 # Vendored subset of terrific-audio-driver (github.com/undisbeliever/terrific-audio-driver,
 # commit 2e453503ad0e16cec9af3ba23cd7a43eee23f61e, crate version 0.4.2). Only the crates the
-# tad-compiler CLI needs; GUI and emulator crates are left out. Upstream source is unmodified.
+# tad-compiler CLI needs; GUI and emulator crates are left out. Upstream source is unmodified except audio-driver.asm, which reports per-voice levels on CPUIO3 for the DEViLBOX player ROM bars.
 [workspace]
 resolver = "2"
 members = ["crates/spc700asm", "crates/brr", "crates/compiler", "crates/tad-compiler"]
