@@ -297,11 +297,12 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     // pre: arp macro steps played (slurred) before the note's held pitch; ticks in TAD ticks.
     type Pending = { tok: string; ticks: number; pre?: { p: number; ticks: number }[]; sl?: { a: number; b: number; smp: string; plain: string; oct: number; reg: (p: number, smp: string) => number } };
     let pending: Pending = { tok: 'r', ticks: 0 };
+    let notePre: Pending['pre']; // arp steps of the sounding note, replayed by 0Cxx retrigger
     let carry = 0;
     let sounding = false, curNote = 'r';
     let hasNotes = false;
     // Effect state of this channel (Furnace effects that TAD holds as channel state).
-    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', fine = 0, inv = 'i0', noiseOn = false, vibWant: { d: number; q: number } | null = null, volSlide = 0, slideSkip = 0, lastEnv = '';
+    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', fine = 0, inv = 'i0', noiseOn = false, vibWant: { d: number; q: number } | null = null, volSlide = 0, slideSkip = 0, lastEnv = '', legatoOn = false;
     let env: { mode: number; gain: number; adsr: number[] } | null = null;
     const pitchName = (p: number) => NOTE_NAMES[p % 12];
     // Furnace ticks to TAD ticks (rows are k Furnace-tick multiples; sound effects run at 125 Hz).
@@ -364,7 +365,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         // (bytecode.rs:1768 InstrumentState::Multiple); naming the instrument again keeps the full range.
         if (curIns >= 0) out.push(`@${curIns}`);
       }
-      let delayUsed = 0, cutAt = 0;
+      let delayUsed = 0, cutAt = 0, retrig = 0;
       if (cl) {
         if (cl.ins >= 0) { ins = cl.ins; env = null; lastEnv = ''; }
         const cmds: string[] = [];
@@ -428,7 +429,8 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             volSlide = 0;
             vol = Math.max(0, Math.min(127, vol + (e.cmd === 0xf8 ? e.val : -e.val)));
           }
-          else if ([0x00, 0x01, 0x02, 0x03, 0xec, 0xed].includes(e.cmd)) { /* applied with the note below */ }
+          else if (e.cmd === 0xea) legatoOn = e.val !== 0; // playback.cpp:1513, 1674: later notes change pitch without key-on
+          else if ([0x00, 0x01, 0x02, 0x03, 0x0c, 0xe1, 0xe2, 0xec, 0xed, 0xfc].includes(e.cmd)) { /* applied with the note below */ }
           else drop(`effect ${hex2(e.cmd)}xx`, at);
         }
         if (panP() !== lastP) { lastP = panP(); cmds.push(`p${lastP}`); }
@@ -472,7 +474,12 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         const semis = (speed: number, ticks: number) => Math.trunc(speed * slideMul * ticks / tickScale / 128);
         const clampP = (p: number) => Math.max(0, Math.min(95, p));
         const delay = Math.round((ef.get(0xed) ?? 0) * tickScale);
-        const cut = Math.round((ef.get(0xec) ?? 0) * tickScale);
+        // FCxx release = ECxx cut here: both key off the SNES voice (snes.cpp:402-418), release also lets macros run on.
+        const cut = Math.round((ef.get(0xec) || ef.get(0xfc) || 0) * tickScale);
+        retrig = Math.round((ef.get(0x0c) ?? 0) * tickScale);
+        // E1xy/E2xy: slide y semitones up/down at speed x*4 (playback.cpp:1391-1445), like 03xx towards that note.
+        const e1 = ef.get(0xe1) ?? 0, e2 = ef.get(0xe2) ?? 0;
+        const e12 = e1 & 15 ? e1 : e2 & 15 ? e2 : 0, e12Dir = e1 & 15 ? 1 : -1;
         const s03 = ef.get(0x03) ?? 0, s01 = ef.get(0x01) ?? 0, s02 = ef.get(0x02) ?? 0, arp = ef.get(0x00) ?? 0;
         cutAt = cut > 0 ? Math.max(cut, 2) : 0; // a key-off note needs 2 ticks
         const left = Math.max(1, r.ticks - (delay < r.ticks ? delay : 0));
@@ -490,6 +497,12 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             const d = Math.min(Math.abs(newPitch - start), semis(s03, left));
             const end = start + Math.sign(newPitch - start) * d;
             return d && left <= 8 * d && Math.min(start, newPitch) >= 12 ? { tok: 'slide', end, first: start } : null;
+          }
+          if (e12 && from >= 0) {
+            const target = clampP(from + e12Dir * (e12 & 15));
+            const d = Math.min(Math.abs(target - from), semis((e12 >> 4) * 4, left));
+            const end = from + Math.sign(target - from) * d;
+            return d && left <= 8 * d && Math.min(from, end) >= 12 ? { tok: 'slide', end, first: from } : null;
           }
           const sp = s01 > 0 ? s01 : s02 > 0 ? -s02 : 0;
           if (sp && from >= 0) {
@@ -542,7 +555,8 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             flush(); out.push(...cmds); sounding = false; pending = { tok: 'r', ticks: 0 };
           } else {
             if (delay > 0 && delay < r.ticks) { pending.ticks += delay; delayUsed = delay; } // EDxx: the old note rings on
-            flush();
+            // EAxx legato: slur into the new pitch (no key-on) when the instrument and sample stay the same.
+            flush(legatoOn && sounding && curPitch >= 0 && sound.smp === curSmp && tadIns.get(`${ins} ${sound.smp}`) === curIns);
             curSmp = sound.smp;
             // MP depth: compiler channel_bc_generator.rs:146-190 - round(reg * (2^(cents/1200) - 2^-(cents/1200)) / (2 * quarter wavelength)) must be <= 255.
             let want = 'MP0';
@@ -572,6 +586,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             curNote = NOTE_NAMES[tad % 12];
             curPitch = tad;
             pending = { tok: curNote, ticks: 0 };
+            notePre = undefined;
             sounding = true;
             hasNotes = true;
             const fx = pitchFx(-1, tad);
@@ -594,6 +609,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
                   if (last?.p === p) last.ticks += tickScale; else a.push({ p, ticks: tickScale });
                   return a;
                 }, []);
+                notePre = pending.pre;
               }
             }
           }
@@ -607,7 +623,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             if (si.sus === 3) { curIns = -1; lastEnv = ''; } // the next note names the instrument again, restoring d2
           }
           sounding = false; curPitch = -1; pending = { tok: 'w', ticks: 0 };
-        } else if (isOff || cmds.length || (sounding && curPitch >= 0 && (s01 || s02 || arp))) {
+        } else if (isOff || cmds.length || (sounding && curPitch >= 0 && (s01 || s02 || arp || e12))) {
           flush(!isOff);
           out.push(...cmds);
           if (isOff) { sounding = false; curPitch = -1; pending = { tok: 'r', ticks: 0 }; }
@@ -623,6 +639,19 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         flush(); sounding = false; curPitch = -1; pending = { tok: 'r', ticks: 0 };
         pending.ticks += r.ticks - cutAt;
         return;
+      }
+      // 0Cxx: key-on again every xx ticks from the row start (playback.cpp:1304-1312, 2301-2307).
+      if (retrig && sounding && !delayUsed) {
+        if (retrig < 2 || pending.tok !== curNote) drop('effect 0Cxx retrigger faster than 2 ticks or under a pitch effect', at);
+        else {
+          // Each key-on restarts the arp macro (macro init on NOTE_ON); flush cuts the steps to the chunk length.
+          const pre = notePre;
+          for (let t = 0; t < r.ticks; t += retrig) {
+            if (pending.ticks) { flush(); pending = { tok: curNote, ticks: 0, pre }; }
+            pending.ticks += Math.min(retrig, r.ticks - t);
+          }
+          return;
+        }
       }
       pending.ticks += r.ticks - delayUsed;
     });
