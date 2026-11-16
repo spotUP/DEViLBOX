@@ -77,6 +77,16 @@ describe('ZX beeper tap', () => {
     expect(d.drumHits).toBe(0);
   });
 
+  it('a volume macro value above 1 keeps the voice sounding (outVol = MIN(1, val)), 0 silences it', () => {
+    for (const [val, sounds] of [[2, true], [127, true], [0, false]] as const) {
+      const s = song();
+      (s.instruments[0] as unknown as { furnace: FurnaceConfig }).furnace.macros = [
+        { code: 0, type: 0, data: [val], loop: -1, release: -1, mode: 0 } as never,
+      ];
+      expect(songToBeeperRows(s as never).rows[0].duty[0] > 0).toBe(sounds);
+    }
+  });
+
   it('builds a 128K tap: loader, player + drums, one block per bank', () => {
     const d = songToBeeperRows(song() as never);
     const m = encodeBeeperMusic(d.rows, player.loadAddress + player.dataOffset, player.usableBanks.length);

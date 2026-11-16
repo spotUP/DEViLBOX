@@ -150,7 +150,8 @@ export function songToBeeperRows(song: BeeperSong): BeeperData {
       if (c.note >= 0) {
         const t = c.tk++;
         const vol = macroOf(c.ins, 0);
-        if (vol && vol.had[t]) c.on = (vol.seq[t] & 1) === 1;
+        // outVol = (vol & 1) * MIN(1, macro value) (zxbeeper.cpp:94): any value above 0 sounds, not only odd ones.
+        if (vol && vol.had[t]) c.on = vol.seq[t] > 0;
         const dm = macroOf(c.ins, 2);
         if (dm && dm.had[t]) c.duty = dm.seq[t] & 255;
         const pm = macroOf(c.ins, 4);
