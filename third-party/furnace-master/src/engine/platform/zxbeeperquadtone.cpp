@@ -353,6 +353,13 @@ int DivPlatformZXBeeperQuadTone::getRegisterPoolSize() {
   return 17;
 }
 
+// DEViLBOX: report the 1-bit drum (sample, bit position) so the ZX tape
+// export can replay it on the Z80 from the same point; freq = bit rate in Hz.
+DivSamplePos DivPlatformZXBeeperQuadTone::getSamplePos(int ch) {
+  if (ch!=4 || curSample<0 || curSample>=parent->song.sampleLen) return DivSamplePos();
+  return DivSamplePos(curSample,curSamplePos,chan[4].freq>0?(int)(chipClock/chan[4].freq):0);
+}
+
 void DivPlatformZXBeeperQuadTone::reset() {
   memset(regPool,0,17);
   memset(deHisser,0,8);

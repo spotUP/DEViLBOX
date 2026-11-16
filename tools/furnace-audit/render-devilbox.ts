@@ -48,6 +48,8 @@ interface WasmModule {
   _furnace_dispatch_load_ins2(insIndex: number, dataPtr: number, dataLen: number): void;
   _furnace_dispatch_set_sample(handle: number, sampleIndex: number, dataPtr: number, dataLen: number): void;
   _furnace_dispatch_render_samples(handle: number): void;
+  _furnace_dispatch_reg_pool(handle: number, outPtr: number, max: number): number;
+  _furnace_dispatch_sample_pos(handle: number, chan: number, outPtr: number): void;
   _furnace_dispatch_force_ins(handle: number): void;
   _furnace_dispatch_poke(handle: number, addr: number, val: number): void;
   // Sequencer API
@@ -399,6 +401,13 @@ interface RenderResult {
   wavSize?: number;
 }
 
+// --regpool <file.json>: per-tick capture of the ZX Beeper QuadTone register pool (export source for public/zx/quadtone.asm)
+const QUADTONE_PLATFORM = 51; // DIV_SYSTEM_SFX_BEEPER_QUADTONE (FurnaceSongParser maps file id 0xca to 51)
+const regPoolArg = process.argv.indexOf('--regpool');
+const regPoolOut = regPoolArg > 0 ? process.argv[regPoolArg + 1] : undefined;
+const regPoolFrames: Array<{ regs: number[]; sample: number; pos: number; hz: number }> = [];
+const regPoolSamples: number[][] = [];
+
 async function renderFurFile(furPath: string, outPath: string): Promise<RenderResult> {
   const relPath = relative(DEMOS_DIR, furPath);
 
@@ -417,6 +426,9 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
     // 2. Load WASM module
     const wasm = await loadWasmModule();
     wasm._furnace_init(SAMPLE_RATE);
+    const scratchPtr = wasm._malloc(64);
+    regPoolFrames.length = 0;
+    regPoolSamples.length = 0;
 
     // 3. Create chips
     const chipIds = native.chipIds || [];
@@ -531,10 +543,10 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
       // Use smp.samples (frame count from parser) when available
       let sampleCount: number;
       let pcmBytes: number;
-      if ((smp.depth || 16) === 16) {
+      if ((smp.depth ?? 16) === 16) {
         sampleCount = smp.data instanceof Int16Array ? smp.data.length : Math.floor(smp.data.length / 2);
         pcmBytes = sampleCount * 2;
-      } else if ((smp.depth || 16) === 8) {
+      } else if ((smp.depth ?? 16) === 8) {
         sampleCount = smp.data.length;
         pcmBytes = smp.data.length;
       } else {
@@ -551,7 +563,7 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
       view.setUint32(0, sampleCount, true);                   // samples (frame count)
       view.setInt32(4, smp.loopStart || 0, true);             // loopStart
       view.setInt32(8, smp.loopEnd || 0, true);               // loopEnd
-      view.setUint8(12, smp.depth || 16);                     // depth
+      view.setUint8(12, smp.depth ?? 16);                     // depth
       view.setUint8(13, (smp as any).loopDirection ?? (smp as any).loopMode ?? 0); // loopMode
       view.setUint8(14, (smp as any).brrEmphasis === false ? 0 : 1);  // brrEmphasis (default true in Furnace DivSample)
       view.setUint8(15, (smp as any).brrNoFilter ? 1 : 0);  // brrNoFilter
@@ -568,6 +580,16 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
         blob.set(new Uint8Array(smp.data.buffer, smp.data.byteOffset, smp.data.byteLength), headerSize);
       }
 
+      if (regPoolOut) {
+        // QuadTone plays sample bit = data8 > 0 (zxbeeperquadtone.cpp acquire); data8 of 16-bit = high byte
+        const bits: number[] = [];
+        for (let j = 0; j < sampleCount; j++) {
+          const d = smp.depth ?? 16; // 0 = 1-bit PCM, LSB first (DivSample::render: bit ? 0x7f : -0x7f)
+          const v = d === 16 ? Number(smp.data[j]) >> 8 : d === 0 ? ((Number(smp.data[j >> 3]) >> (j & 7)) & 1) * 2 - 1 : (Number(smp.data[j]) << 24) >> 24;
+          bits.push(v > 0 ? 1 : 0);
+        }
+        regPoolSamples[i] = bits;
+      }
       const smpPtr = wasm._malloc(totalLen);
       wasm.HEAPU8.set(blob, smpPtr);
       try {
@@ -803,6 +825,17 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
         for (const { handle } of chipInstances) {
           wasm._furnace_dispatch_tick(handle);
         }
+        if (regPoolOut) {
+          // --regpool: QuadTone register pool + channel 4 sample position after each tick
+          const qt = chipInstances.find(c => c.chipId === QUADTONE_PLATFORM);
+          if (qt) {
+            const n = wasm._furnace_dispatch_reg_pool(qt.handle, scratchPtr, 64);
+            const regs = Array.from(wasm.HEAPU8.subarray(scratchPtr, scratchPtr + n));
+            wasm._furnace_dispatch_sample_pos(qt.handle, 4, scratchPtr);
+            const sp = wasm.HEAP32.subarray(scratchPtr >> 2, (scratchPtr >> 2) + 3);
+            regPoolFrames.push({ regs, sample: sp[0], pos: sp[1], hz: 0 });
+          }
+        }
         return true;
       } catch (e) {
         throw new Error(`Tick crashed at order=${lastOrder} sample=${totalRenderedSamples}: ${(e as Error).message}`);
@@ -847,6 +880,7 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
           // Read current divider from sequencer (may change via effects 0xC0-0xC3/0xF0)
           divider = wasm._furnace_seq_get_divider();
           if (divider < 1) divider = 1;
+          if (regPoolFrames.length) regPoolFrames[regPoolFrames.length - 1].hz = divider;
           // Compute samples until next tick (integer + clockDrift, matches Furnace)
           cycles = Math.floor(SAMPLE_RATE / divider);
           clockDrift += SAMPLE_RATE % divider;
@@ -904,6 +938,10 @@ async function renderFurFile(furPath: string, outPath: string): Promise<RenderRe
     }
 
     writeWav(outPath, allSamples, SAMPLE_RATE, 2);
+    if (regPoolOut) {
+      writeFileSync(regPoolOut, JSON.stringify({ chipFlags: native.chipFlags?.[0] ?? '', frames: regPoolFrames, samples: regPoolSamples }));
+      console.log(`[render] regpool: ${regPoolFrames.length} ticks -> ${regPoolOut}`);
+    }
 
     // Dump command log if enabled
     if (cmdLogEnabled) {

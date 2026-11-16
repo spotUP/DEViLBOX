@@ -55,6 +55,7 @@ class DivPlatformZXBeeperQuadTone: public DivDispatch {
     DivDispatchOscBuffer* getOscBuffer(int chan);
     unsigned char* getRegisterPool();
     int getRegisterPoolSize();
+    DivSamplePos getSamplePos(int ch);
     void reset();
     void forceIns();
     void tick(bool sysTick=true);

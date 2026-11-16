@@ -1160,6 +1160,34 @@ int furnace_dispatch_reg_writes(int handle, int* out, int max) {
 }
 
 /**
+ * Copy one chip's register pool (DivDispatch::getRegisterPool) into `out`
+ * (up to `max` bytes) and return the pool size. QuadTone writes its pool
+ * directly (no register dump), so the ZX tape export reads it after each tick.
+ */
+EMSCRIPTEN_KEEPALIVE
+int furnace_dispatch_reg_pool(int handle, unsigned char* out, int max) {
+  auto it = g_instances.find(handle);
+  if (it == g_instances.end() || !out) return 0;
+  unsigned char* pool = it->second->dispatch->getRegisterPool();
+  int size = it->second->dispatch->getRegisterPoolSize();
+  if (!pool || size <= 0) return 0;
+  for (int i = 0; i < size && i < max; i++) out[i] = pool[i];
+  return size;
+}
+
+/**
+ * Sample playback position of one channel (DivDispatch::getSamplePos) into
+ * out[0..2] = sample index (-1 = none), position, frequency in Hz.
+ */
+EMSCRIPTEN_KEEPALIVE
+void furnace_dispatch_sample_pos(int handle, int chan, int* out) {
+  auto it = g_instances.find(handle);
+  if (it == g_instances.end() || !out) return;
+  DivSamplePos p = it->second->dispatch->getSamplePos(chan);
+  out[0] = p.sample; out[1] = p.pos; out[2] = p.freq;
+}
+
+/**
  * Sample memory of one chip, as Furnace's VGM export reads it
  * (DivDispatch::getSampleMem / getSampleMemUsage / getSampleMemCapacity):
  * the YM2610 has index 0 = ADPCM-A ROM, 1 = ADPCM-B ROM. `what`: 0 = bytes
