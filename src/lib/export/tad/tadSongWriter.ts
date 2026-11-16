@@ -1210,6 +1210,39 @@ export function stepCompileState(st: MmlCompileState, tok: string): void {
 }
 export const initialCompileState = (): MmlCompileState => ({ o: -1, mp: 'MP0', md: 'MD0', ins: -1 });
 
+const NOTE_RE = /^([a-g])([+-]*)(%.*)?$/;
+const NOTE_SEMI: Record<string, number> = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
+/** Absolute semitone of a plain note token in octave o, or undefined for any other token. */
+export function noteSemitone(tok: string, o: number): number | undefined {
+  const m = NOTE_RE.exec(tok);
+  if (!m || o < 0) return undefined;
+  return o * 12 + NOTE_SEMI[m[1]] + [...m[2]].reduce((n, c) => n + (c === '+' ? 1 : -1), 0);
+}
+
+/**
+ * Pitch-free key of a subroutine body: notes become semitones above the body's first note and octave commands
+ * drop out, so a bar played a few semitones higher matches the original. Undefined when transpose could change
+ * what plays: MP / MD vibrato (not allowed under driver transpose, mml-syntax.md:516,572), portamento (`{`),
+ * manual vibrato, noise, an existing transpose, or no note at all.
+ */
+function transposeKey(full: string[], entry: MmlCompileState): { key: string; first: number } | undefined {
+  if (entry.mp !== 'MP0' || entry.md !== 'MD0') return undefined;
+  const toks = full.join(' ').split(' ');
+  let o = -1;
+  let first: number | undefined;
+  const key: string[] = [];
+  for (const t of toks) {
+    if (/[{}~_]|^MP|^MD|^N/.test(t)) return undefined;
+    const oct = /^o(\d)$/.exec(t);
+    if (oct) { o = Number(oct[1]); continue; }
+    const semi = noteSemitone(t, o);
+    if (semi === undefined) { if (NOTE_RE.test(t)) return undefined; key.push(t); continue; }
+    first ??= semi;
+    key.push(`n${semi - first}${NOTE_RE.exec(t)![3] ?? ''}`);
+  }
+  return first === undefined ? undefined : { key: key.join(' '), first };
+}
+
 /** driver_constants.rs:247 MAX_SUBROUTINES. */
 const MAX_SUBROUTINES = 255;
 
@@ -1222,7 +1255,7 @@ const MAX_SUBROUTINES = 255;
  * so token-identical bodies play the same. Stack: a loop is 3 bytes and a call 2 of 21 (mml-syntax.md:693-697).
  */
 export function factorRepeats(chans: SongChannel[], grid: 'cuts' | 'fine'): { subs: { letter: string; out: string[] }[]; channels: { letter: string; out: string[] }[] } {
-  type Seg = { body: string[]; full: string[]; key: string; entry: MmlCompileState; exit: MmlCompileState; ok: boolean };
+  type Seg = { body: string[]; full: string[]; key: string; shift: number; entry: MmlCompileState; exit: MmlCompileState; ok: boolean };
   const perCh: Seg[][] = chans.map(({ out, [grid]: cuts }) => {
     const st = initialCompileState();
     const bounds = [...new Set([0, ...cuts, out.length])].sort((a, b) => a - b);
@@ -1239,7 +1272,8 @@ export function factorRepeats(chans: SongChannel[], grid: 'cuts' | 'fine'): { su
         entry.md !== 'MD0' ? entry.md : '',
       ].filter(Boolean);
       const full = [...pre, ...body];
-      segs.push({ body, full, key: full.join(' '), entry, exit: { ...st }, ok: body.length >= 3 && !body.includes('L') });
+      const tr = transposeKey(full, entry);
+      segs.push({ body, full, key: tr?.key ?? full.join(' '), shift: tr?.first ?? 0, entry, exit: { ...st }, ok: body.length >= 3 && !body.includes('L') });
     }
     // One-pitch portamento needs the previous note (mml-syntax.md:464), which a call boundary hides: such a
     // segment and the one before it stay inline.
@@ -1259,33 +1293,76 @@ export function factorRepeats(chans: SongChannel[], grid: 'cuts' | 'fine'): { su
   const names = new Map(chosen.map(([key], i) => [key, `s${i}`]));
   const subs: { letter: string; out: string[] }[] = [];
   const subBody = new Map<string, string[]>();
-  for (const s of perCh.flat()) { const nm = names.get(s.key); if (nm && !subBody.has(nm)) { subBody.set(nm, s.full); subs.push({ letter: `!${nm}`, out: s.full }); } }
+  // The first occurrence is the body; the others play it under driver transpose (mml-syntax.md:294-306).
+  const base = new Map<string, number>();
+  for (const s of perCh.flat()) { const nm = names.get(s.key); if (nm && !subBody.has(nm)) { subBody.set(nm, s.full); base.set(nm, s.shift); subs.push({ letter: `!${nm}`, out: s.full }); } }
   const channels = chans.map(({ letter }, ci) => {
     const out: string[] = [];
-    let run: { name: string; n: number; restore: string[] } | null = null;
+    let run: { name: string; semi: number; n: number; restore: string[] } | null = null;
     const endRun = () => {
       if (!run) return;
+      if (run.semi) out.push(`_${run.semi > 0 ? '+' : ''}${run.semi}`);
       // A loop costs more than two calls (start_loop + call + end_loop).
       if (run.n >= 3) out.push(`[!${run.name} ]${run.n}`); else for (let i = 0; i < run.n; i++) out.push(`!${run.name}`);
+      if (run.semi) out.push('_0');
       out.push(...run.restore);
       run = null;
     };
     for (const s of perCh[ci]) {
       const name = s.ok ? names.get(s.key) : undefined;
       if (!name) { endRun(); out.push(...s.body); continue; }
-      if (run && run.name === name && run.n < 255) { run.n++; continue; }
+      const semi = s.shift - base.get(name)!;
+      if (run && run.name === name && run.semi === semi && run.n < 255) { run.n++; continue; }
       endRun();
       const restore = [
         s.exit.o >= 0 && s.exit.o !== s.entry.o ? `o${s.exit.o}` : '',
         s.exit.mp !== s.entry.mp ? s.exit.mp : '',
         s.exit.md !== s.entry.md ? s.exit.md : '',
       ].filter(Boolean);
-      run = { name, n: 1, restore };
+      run = { name, semi, n: 1, restore };
     }
     endRun();
-    return { letter, out };
+    return { letter, out: loopCallSequences(out) };
   });
   return { subs, channels };
+}
+
+/**
+ * Songs repeat bars inside a pattern too (64kb.fur channel H calls `!s0 !s1` 32 times in a row): a back-to-back
+ * repeated run of commands becomes one loop. TAD compiles a loop body once, so a run is looped only when every
+ * repetition starts in the same compile-time state (octave, MP, MD, instrument); then the body compiles to the
+ * bytes each inline copy had, and runtime state carries from one repetition to the next as it did inline. Left
+ * inline: the loop point, one-pitch portamento (`{`, it reads the note before it) and a tie across the loop edge.
+ */
+export function loopCallSequences(out: string[]): string[] {
+  const res: string[] = [];
+  const st = initialCompileState();
+  const key = (s: MmlCompileState) => `${s.o} ${s.mp} ${s.md} ${s.ins}`;
+  const loopable = (t: string) => t !== 'L' && !t.includes('{') && (!t.startsWith('[') || /^\[!s\d+ \]\d+$/.test(t));
+  let i = 0;
+  while (i < out.length) {
+    let best = { p: 0, k: 1 };
+    for (let p = 2; p <= 64 && i + 2 * p <= out.length && out[i - 1] !== '&'; p++) {
+      const win = out.slice(i, i + p);
+      if (win[p - 1] === '&' || !win.every(loopable)) continue;
+      const s = { ...st };
+      const startKey = key(s);
+      for (const t of win) stepCompileState(s, t);
+      if (key(s) !== startKey) continue;
+      let k = 1;
+      while (k < 255 && i + (k + 1) * p <= out.length && out.slice(i + k * p, i + (k + 1) * p).every((t, j) => t === win[j])) k++;
+      // A loop costs about two commands (start_loop + end_loop): keep it only when it saves more than that.
+      if (k >= 2 && (k - 1) * p > 2 && (k - 1) * p > (best.k - 1) * best.p) best = { p, k };
+    }
+    if (best.p) {
+      res.push(`[${out.slice(i, i + best.p).join(' ')} ]${best.k}`);
+      i += best.p * best.k;
+      continue;
+    }
+    stepCompileState(st, out[i]);
+    res.push(out[i++]);
+  }
+  return res;
 }
 
 /**

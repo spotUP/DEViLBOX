@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { parseFurnaceSong, toSequencerSamples, buildFurnaceNativeData } from '@/lib/import/formats/FurnaceSongParser';
 import { openTadSession, type CreateTadCompiler } from '../tadCompilerWasm';
-import { writeTadSong, panSplit, stepCompileState, initialCompileState } from '../tadSongWriter';
+import { writeTadSong, panSplit, stepCompileState, initialCompileState, noteSemitone } from '../tadSongWriter';
 import { tadProjectJson, tadInstrumentFromFurnace } from '../tadProjectBuilder';
 
 const DIR = resolve(__dirname, '../../../../../public/data/songs/furnace/snes');
@@ -12,9 +12,8 @@ const FILES = readdirSync(DIR).filter((f) => f.endsWith('.fur')).sort();
 
 // Songs the driver cannot hold: the compiler's own size errors, not writer faults.
 const TOO_LARGE: Record<string, RegExp> = {
-  // Still 920 bytes over after repeats became subroutines: the rest is distinct per-tick macro commands.
-  '64kb.fur': /goto_relative offset out of bounds|Song is too large by \d+ bytes/,
-  // Still 9616 bytes over after repeats became subroutines: few patterns repeat and macros unroll per tick.
+  // 8970 bytes over after subroutines, transposed calls and loops: samples alone fill about 60 KB of 60568.
+  // Fits only by resampling (changes the sound).
   'Breezy.fur': /Song is too large by \d+ bytes/,
   // 12 BRR samples, 62946 bytes, all played, none duplicated, each ends at its loop end with no silent tail:
   // over the 60568 bytes left for samples beside the driver. Fits only by resampling (changes the sound).
@@ -276,7 +275,7 @@ describe('panSplit', () => {
   // Subroutines and loops must not change what plays: expand every call and loop and check each runtime command
   // appears in the same order with the same compile-time state (octave, MP, MD) as in the inline form. A subroutine
   // starts with fresh compile-time state and a call leaves the caller's unchanged (mml-syntax.md:169-178).
-  it.each(['tetristheme.fur', 'Sadness.fur', 'Sunken Lights.fur', 'Breezy.fur'])('%s: subroutine form plays the inline commands', async (file) => {
+  it.each(['tetristheme.fur', 'Sadness.fur', 'Sunken Lights.fur', 'Breezy.fur', '64kb.fur'])('%s: subroutine form plays the inline commands', async (file) => {
     const buf = readFileSync(resolve(DIR, file));
     const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
     const input = {
@@ -288,17 +287,34 @@ describe('panSplit', () => {
       const lines = new Map<string, string[]>();
       for (const l of mml.split('\n')) {
         const m = /^(!\w+|[A-H]) (.*)$/.exec(l);
-        if (m) lines.set(m[1], [...(lines.get(m[1]) ?? []), ...m[2].replace(/\[(!\w+) \](\d+)/g, '[$1]$2').split(' ')]);
+        if (m) lines.set(m[1], [...(lines.get(m[1]) ?? []), ...m[2].split(' ')]);
       }
-      const run = (toks: string[], res: string[]) => {
+      // Unroll call loops (`[!s0 !s1 ]32`, nested `[[!s0 ]4 !s1 ]2`) into plain calls.
+      const unroll = (toks: string[]): string[] => {
+        const stack: string[][] = [[]];
+        for (let t of toks) {
+          while (t.startsWith('[')) { stack.push([]); t = t.slice(1); }
+          const end = /^\](\d+)$/.exec(t);
+          if (end) { const body = stack.pop()!; for (let i = 0; i < Number(end[1]); i++) stack[stack.length - 1].push(...body); } else stack[stack.length - 1].push(t);
+        }
+        return stack[0];
+      };
+      for (const [k, toks] of lines) lines.set(k, unroll(toks));
+      // Notes are compared as absolute semitones (driver transpose `_+n` included), other commands with the
+      // compile-time state they run in.
+      const run = (toks: string[], res: string[], tr = 0) => {
         const st = initialCompileState();
+        let semis = tr;
         for (const t of toks) {
-          const call = /^\[?(!\w+)\]?(\d*)$/.exec(t);
-          if (call && lines.has(call[1])) { for (let i = 0; i < Number(call[2] || 1); i++) run(lines.get(call[1])!, res); continue; }
-          const before = `${st.o}|${st.mp}|${st.md}`;
+          if (lines.has(t) && t.startsWith('!')) { run(lines.get(t)!, res, semis); continue; }
+          const set = /^_([+-]?\d+)$/.exec(t);
+          if (set) { semis = Number(set[1]); continue; }
+          // Octave only shapes notes (printed as absolute semitones) and portamento.
+          const before = /[{}]/.test(t) ? `${st.o}|${st.mp}|${st.md}` : `${st.mp}|${st.md}`;
           stepCompileState(st, t);
           if (/^(o\d|\?@\d+|MP|MD)/.test(t)) continue; // compile-time only: seen through the state of later commands
-          res.push(`${t} ${before}`);
+          const semi = noteSemitone(t, st.o);
+          res.push(semi === undefined ? `${t} ${before}` : `${semi + semis}${t.slice(t.indexOf('%'))} ${st.mp}|${st.md}`);
         }
         return res;
       };
