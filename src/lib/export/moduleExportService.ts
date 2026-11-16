@@ -17,7 +17,7 @@ import { liveTrackerSong } from '@/lib/song/liveSong';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { FurnaceDispatchPlatform } from '@/engine/furnace-dispatch/platforms';
 import { exportFurnaceModule, type FurnaceModuleResult } from './FurnaceModuleExporter';
-import { exportFurnaceAyScramble, ayScrambleTempoWarning, type FurnaceAyScrambleResult } from './FurnaceExporter';
+import { exportFurnaceAyScramble, ayScrambleTempoWarning, type AyScrambleTarget, type FurnaceAyScrambleResult } from './FurnaceExporter';
 import { exportWithOpenMPT, type OpenMPTExportOptions, type OpenMPTExportResult } from './OpenMPTExporter';
 import { exportSongToMOD, type ModExportResult } from './modExport';
 import type { ExportNativeOptions, NativeExportResult } from './nativeExportRouter';
@@ -110,10 +110,10 @@ export function exportFurnaceModuleFile(): FurnaceModuleResult {
 }
 
 /** AY-3-8910 song as a Furnace .fur for the BossGame Scramble player, from the live song. Warnings include the tempo check. */
-export function exportFurnaceAyScrambleFile(): FurnaceAyScrambleResult {
+export function exportFurnaceAyScrambleFile(target: AyScrambleTarget = 'arcade'): FurnaceAyScrambleResult {
   const song = liveTrackerSong();
-  const result = exportFurnaceAyScramble(song);
-  const tempo = ayScrambleTempoWarning(song.initialBPM);
+  const result = exportFurnaceAyScramble(song, target);
+  const tempo = ayScrambleTempoWarning(song.initialBPM, target);
   return tempo ? { ...result, warnings: [...result.warnings, tempo] } : result;
 }
 

@@ -14,6 +14,8 @@ import { MidiExportPanel } from './MidiExportPanel';
 import { ModuleExportPanel } from './ModuleExportPanel';
 import { ChipExportPanel } from './ChipExportPanel';
 import { notify } from '@stores/useNotificationStore';
+import { CustomSelect } from '@components/common/CustomSelect';
+import { AY_SCRAMBLE_TARGETS, type AyScrambleTarget } from './FurnaceExporter';
 
 interface ExportDialogProps {
   isOpen: boolean;
@@ -549,7 +551,15 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                   </h3>
                   <div className="space-y-3">
                     <div className="text-sm font-mono text-text-secondary space-y-1">
-                      <div>Chip: <span className="text-accent-primary">AY-3-8910, 3 channels, 58.3 Hz</span></div>
+                      <div className="flex items-center gap-2">
+                        <span>Target:</span>
+                        <CustomSelect
+                          value={ex.ayTarget}
+                          onChange={(v) => ex.setAyTarget(v as AyScrambleTarget)}
+                          options={(Object.keys(AY_SCRAMBLE_TARGETS) as AyScrambleTarget[]).map((k) => ({ value: k, label: AY_SCRAMBLE_TARGETS[k].label }))}
+                        />
+                      </div>
+                      <div>Chip: <span className="text-accent-primary">AY-3-8910, {ex.ayTarget === 'arcade' ? '3 or 6 channels' : '3 channels'}, {AY_SCRAMBLE_TARGETS[ex.ayTarget].hz} Hz</span></div>
                       <div>Patterns: <span className="text-accent-primary">{ex.patterns.length}</span></div>
                       <div>Instruments: <span className="text-accent-primary">{ex.instruments.length}</span></div>
                     </div>

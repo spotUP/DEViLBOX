@@ -212,6 +212,27 @@ describe('exportFurnaceAyScramble, two AY systems', () => {
   });
 });
 
+describe('exportFurnaceAyScramble, targets', () => {
+  const flagsOf = (b: Uint8Array) => new TextDecoder().decode(pako.inflate(b));
+  it('default target output is byte-identical to the arcade target', () => {
+    const a = pako.inflate(exportFurnaceAyScramble(song()).bytes);
+    const b = pako.inflate(exportFurnaceAyScramble(song(), 'arcade').bytes);
+    expect(Array.from(b)).toEqual(Array.from(a));
+    expect(flagsOf(exportFurnaceAyScramble(song()).bytes)).toContain('clockSel=0\nchipType=0\n');
+  });
+  it.each([['vectrex', 4], ['zx128', 1]] as const)('%s writes clockSel=%i, one system, 50 Hz', async (t, sel) => {
+    const { bytes } = exportFurnaceAyScramble(song(), t);
+    expect(flagsOf(bytes)).toContain(`clockSel=${sel}\nchipType=0\n`);
+    const mod = await parseFurnaceSong(bytes.slice().buffer);
+    expect(mod.systems).toEqual([0x80]);
+    expect(mod.subsongs[0].hz).toBeCloseTo(50, 3);
+  });
+  it('refuses a song with notes on channels 4-6 for a single-AY target, allows silent extras', () => {
+    expect(() => exportFurnaceAyScramble(song6(), 'vectrex')).toThrow(/Vectrex target holds 3 channels/);
+    expect(() => exportFurnaceAyScramble(song6(), 'arcade')).not.toThrow();
+  });
+});
+
 describe('ayScrambleTempoWarning', () => {
   it('warns with the BPM to use when the song does not tick at 58.3 Hz', () => {
     const w = ayScrambleTempoWarning(125);

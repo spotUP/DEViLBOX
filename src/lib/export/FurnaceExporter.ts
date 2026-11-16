@@ -98,6 +98,15 @@ export const FUR_AY_SCRAMBLE_MAX_SYSTEMS = 2;
 const FUR_SYSTEM_AY8910 = 0x80;
 /** ay.cpp setFlags: clockSel 0 = COLOR_NTSC / 2 = 1789772.5 Hz; chipType 0 = AY-3-8910. */
 export const FUR_AY_SCRAMBLE_CHIP_FLAGS = 'clockSel=0\nchipType=0\n';
+
+/** Export target: the arcade Scramble board (default), or a single-AY home machine. */
+export type AyScrambleTarget = 'arcade' | 'vectrex' | 'zx128';
+/** Per target: ay.cpp clockSel (4 = 1.5 MHz Vectrex, 1 = COLOR_PAL*2/5 ZX Spectrum 128), tick Hz, AY systems allowed. */
+export const AY_SCRAMBLE_TARGETS: Record<AyScrambleTarget, { label: string; flags: string; hz: number; maxSystems: number }> = {
+  arcade: { label: 'Arcade (Scramble)', flags: FUR_AY_SCRAMBLE_CHIP_FLAGS, hz: FUR_AY_SCRAMBLE_TICK_HZ, maxSystems: FUR_AY_SCRAMBLE_MAX_SYSTEMS },
+  vectrex: { label: 'Vectrex', flags: 'clockSel=4\nchipType=0\n', hz: 50, maxSystems: 1 },
+  zx128: { label: 'ZX Spectrum 128', flags: 'clockSel=1\nchipType=0\n', hz: 50, maxSystems: 1 },
+};
 /** Effects the first BossGame player runs. */
 export const AY_SCRAMBLE_EFFECTS: ReadonlySet<number> = new Set([0x01, 0x02, 0x03, 0x04, 0x0a, 0x0b, 0x0d, 0x0f, 0xff]);
 /** Effects written but beyond the first player: 00, note cut EC, note delay ED, AY envelope shape/period/slide/auto. */
@@ -133,9 +142,10 @@ export function furnaceAyScrambleExportAvailable(instruments: InstrumentConfig[]
 export const FUR_AY_SCRAMBLE_BPM = FUR_AY_SCRAMBLE_TICK_HZ * 5 / 2;
 
 /** Warning when the song's BPM does not give the game's tick rate; null when it does. */
-export function ayScrambleTempoWarning(bpm: number): string | null {
-  if (Math.abs(bpm * 2 / 5 - FUR_AY_SCRAMBLE_TICK_HZ) < 0.005) return null;
-  return `The game plays at ${FUR_AY_SCRAMBLE_TICK_HZ} Hz ticks; this song ticks at ${(bpm * 2 / 5).toFixed(2)} Hz (BPM ${bpm}), so the tempo will differ in the game. Set the BPM to ${FUR_AY_SCRAMBLE_BPM} to match.`;
+export function ayScrambleTempoWarning(bpm: number, target: AyScrambleTarget = 'arcade'): string | null {
+  const hz = AY_SCRAMBLE_TARGETS[target].hz;
+  if (Math.abs(bpm * 2 / 5 - hz) < 0.005) return null;
+  return `The ${AY_SCRAMBLE_TARGETS[target].label} target plays at ${hz} Hz ticks; this song ticks at ${(bpm * 2 / 5).toFixed(2)} Hz (BPM ${bpm}), so the tempo will differ. Set the BPM to ${+(hz * 5 / 2).toFixed(2)} to match.`;
 }
 
 function ayFileInstrument(inst: InstrumentConfig, warnings: string[], keepAll = false): FileInstrument {
@@ -240,12 +250,13 @@ function ayPatch(w: BinaryWriter, at: number, value: number): void {
  * Song on AY-3-8910 voices as a Furnace .fur for the BossGame Scramble player.
  * Throws when the song cannot be written at all; contract breaks that can be left out become warnings.
  */
-export function exportFurnaceAyScramble(song: FurnaceModuleSong): FurnaceAyScrambleResult {
+export function exportFurnaceAyScramble(song: FurnaceModuleSong, target: AyScrambleTarget = 'arcade'): FurnaceAyScrambleResult {
+  const tgt = AY_SCRAMBLE_TARGETS[target];
   const problems: string[] = [];
   const warnings: string[] = [];
   // One system per 3 channels: 1-3 channels write one AY, 4-6 write two (empty channels pad the second).
   const songChannels = Math.max(1, ...song.patterns.map((p) => p.channels.length));
-  const nSys = songChannels <= FUR_AY_SCRAMBLE_CHANNELS ? 1 : FUR_AY_SCRAMBLE_MAX_SYSTEMS;
+  const nSys = songChannels <= FUR_AY_SCRAMBLE_CHANNELS ? 1 : tgt.maxSystems;
   const nCh = nSys * FUR_AY_SCRAMBLE_CHANNELS;
 
   const ay = song.instruments.filter(isAyInstrument);
@@ -277,7 +288,7 @@ export function exportFurnaceAyScramble(song: FurnaceModuleSong): FurnaceAyScram
     if (p.length !== patLen) problems.push(`Pattern ${pi} has ${p.length} rows but the song has ${patLen}: a Furnace song has one pattern length`);
     p.channels.slice(nCh).forEach((chan, k) => {
       if (chan.rows.some((c) => c.note > 0 || c.instrument > 0 || c.volume > 0)) {
-        problems.push(`Pattern ${pi} channel ${nCh + k + 1} has notes but the Scramble target holds ${nCh} channels (two AY-3-8910)`);
+        problems.push(`Pattern ${pi} channel ${nCh + k + 1} has notes but the ${tgt.label} target holds ${nCh} channels (${nSys} AY-3-8910)`);
       }
     });
     for (let ch = 0; ch < nCh; ch++) {
@@ -342,7 +353,7 @@ export function exportFurnaceAyScramble(song: FurnaceModuleSong): FurnaceAyScram
     w.writeUint8(speed);
     w.writeUint8(speed);
     w.writeUint8(1); // arpeggio speed
-    w.writeFloat32(FUR_AY_SCRAMBLE_TICK_HZ);
+    w.writeFloat32(tgt.hz);
     w.writeUint16(patLen);
     w.writeUint16(song.songPositions.length);
     w.writeUint8(4);
@@ -392,7 +403,7 @@ export function exportFurnaceAyScramble(song: FurnaceModuleSong): FurnaceAyScram
     for (let i = 0; i < 3; i++) { adirPtrAt.push(w.getOffset()); w.writeUint32(0); }
   });
 
-  for (const at of flagPtrAt) ayPatch(w, at, ayBlock(w, 'FLAG', () => w.writeNullTerminatedString(FUR_AY_SCRAMBLE_CHIP_FLAGS)));
+  for (const at of flagPtrAt) ayPatch(w, at, ayBlock(w, 'FLAG', () => w.writeNullTerminatedString(tgt.flags)));
   for (const at of adirPtrAt) ayPatch(w, at, ayBlock(w, 'ADIR', () => { w.writeUint32(0); }));
   instruments.forEach((inst, i) => {
     const at = w.getOffset();

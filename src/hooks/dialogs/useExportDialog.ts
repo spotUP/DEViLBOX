@@ -7,7 +7,7 @@
  */
 
 import { furnaceModuleExportAvailable } from '@/lib/export/FurnaceModuleExporter';
-import { furnaceAyScrambleExportAvailable, ayScrambleTempoWarning } from '@/lib/export/FurnaceExporter';
+import { furnaceAyScrambleExportAvailable, ayScrambleTempoWarning, type AyScrambleTarget } from '@/lib/export/FurnaceExporter';
 import { FURNACE_SNES_CHIP_ID } from '@/lib/export/tad/tadSongWriter';
 import { useState, useEffect, useCallback } from 'react';
 import { lowOctaveExportRefusal } from '@/lib/tracker/noteValue';
@@ -256,21 +256,22 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
   }, [metadata, furnaceModuleAvailable]);
 
   const furnaceAyAvailable = furnaceAyScrambleExportAvailable(instruments);
-  const furnaceAyTempoWarning = ayScrambleTempoWarning(bpm);
+  const [ayTarget, setAyTarget] = useState<AyScrambleTarget>('arcade');
+  const furnaceAyTempoWarning = ayScrambleTempoWarning(bpm, ayTarget);
 
   const handleExportFurAy = useCallback(async (
     downloadFn: (blob: Blob, filename: string) => void,
     onClose: () => void,
   ) => {
     const { exportFurnaceAyScrambleFile } = await import('@lib/export/moduleExportService');
-    const result = exportFurnaceAyScrambleFile();
+    const result = exportFurnaceAyScrambleFile(ayTarget);
     result.warnings.forEach((w) => notify.warning(w));
     const blob = new Blob([result.bytes as BlobPart], { type: 'application/octet-stream' });
     const filename = `${metadata.name || 'song'}.fur`;
     downloadFn(blob, filename);
     notify.success(`Furnace file "${filename}" exported successfully! (${result.bytes.byteLength} bytes)`);
     onClose();
-  }, [metadata]);
+  }, [metadata, ayTarget]);
 
   const tadAvailable = (furnaceNative?.chipIds ?? []).includes(FURNACE_SNES_CHIP_ID);
   const [tadReport, setTadReport] = useState<{ warnings: string[]; ram: string } | null>(null);
@@ -459,6 +460,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     tadReport,
     furnaceAyAvailable,
     furnaceAyTempoWarning,
+    ayTarget, setAyTarget,
     handleExportNano,
     handleExportNative,
     nativeAvailable,
