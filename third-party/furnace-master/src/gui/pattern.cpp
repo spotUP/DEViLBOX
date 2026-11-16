@@ -758,17 +758,21 @@ void FurnaceGUI::drawPattern() {
 
         // extra buttons
         if (patExtraButtons) {
-          snprintf(chanID,2048,"%c###_HCH%d",e->curSubSong->chanCollapse[i]?'+':'-',i);
-          ImGui::SetCursorPosX(ImGui::GetCursorPosX()+4.0f*dpiScale);
-          if (ImGui::SmallButton(chanID)) {
+          ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,ImVec2(0.0f,0.0f));
+          ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign,ImVec2(0.5f,0.0f));
+          float oneElementSize=(PAT_COARSE_X(i+1)-PAT_COARSE_X(i))/(e->curSubSong->chanCollapse[i]?1.0f:3.0f);
+          ImGui::PushFont(mainFont);
+          // TODO: make icons for collapse/expand
+          snprintf(chanID,2048,"%s###_HCH%d",e->curSubSong->chanCollapse[i]?ICON_FA_EXPAND:ICON_FA_COMPRESS,i);
+          if (ImGui::Selectable(chanID,true,ImGuiSelectableFlags_NoPadWithHalfSpacing,ImVec2(oneElementSize,0.0f))) {
             doCollapseChannel(i);
             finishSelection();
           }
           if (!e->curSubSong->chanCollapse[i]) {
             ImGui::SameLine();
-            snprintf(chanID,2048,"<###_LCH%d",i);
+            snprintf(chanID,2048,ICON_FA_MINUS "###_LCH%d",i);
             ImGui::BeginDisabled(e->curPat[i].effectCols<=1);
-            if (ImGui::SmallButton(chanID)) {
+            if (ImGui::Selectable(chanID,true,ImGuiSelectableFlags_NoPadWithHalfSpacing,ImVec2(oneElementSize,0.0f))) {
               e->curPat[i].effectCols--;
               if (e->curPat[i].effectCols<1) e->curPat[i].effectCols=1;
               finishSelection();
@@ -776,14 +780,16 @@ void FurnaceGUI::drawPattern() {
             ImGui::EndDisabled();
             ImGui::SameLine();
             ImGui::BeginDisabled(e->curPat[i].effectCols>=DIV_MAX_EFFECTS);
-            snprintf(chanID,2048,">###_RCH%d",i);
-            if (ImGui::SmallButton(chanID)) {
+            snprintf(chanID,2048,ICON_FA_PLUS "###_RCH%d",i);
+            if (ImGui::Selectable(chanID,true,ImGuiSelectableFlags_NoPadWithHalfSpacing,ImVec2(oneElementSize,0.0f))) {
               e->curPat[i].effectCols++;
               if (e->curPat[i].effectCols>DIV_MAX_EFFECTS) e->curPat[i].effectCols=DIV_MAX_EFFECTS;
               finishSelection();
             }
             ImGui::EndDisabled();
           }
+          ImGui::PopFont();
+          ImGui::PopStyleVar(2);
           ImGui::Spacing();
         }
 
@@ -1937,7 +1943,7 @@ void FurnaceGUI::drawPattern() {
     /// - GLOBAL REGISTER OVERLAY -
     ///
     if (patGlobalRegs && e->isRunning()) {
-      ImGui::PushFont(mainFont,settings.mainFontSize*dpiScale*0.5f);
+      ImGui::PushFont(mainFont,settings.mainFontSize*dpiScale);
       int chanOff=0;
       for (int i=0; i<e->song.systemLen; i++) {
         DivDispatch* dispatch=e->getDispatch(i);
@@ -1975,18 +1981,17 @@ void FurnaceGUI::drawPattern() {
           regRect.Min.x=top.x+PAT_COARSE_X(chanOff+regState->firstChan);
           regRect.Max.x=top.x+PAT_COARSE_X(chanOff+regState->lastChan+1);
           regRect.Max.y=prevClipRect.Max.y; 
-          regRect.Min.y=regRect.Max.y-(ImGui::GetStyle().ItemSpacing.y+ImGui::GetStyle().FramePadding.y*2.0f+ImGui::GetTextLineHeight()*3.0f);
+          regRect.Min.y=regRect.Max.y-(ImGui::GetStyle().ItemSpacing.y+ImGui::GetStyle().FramePadding.y*1.0f+ImGui::GetTextLineHeight()*1.75f);
 
           ImRect regInnerRect=regRect;
           regInnerRect.Min+=ImGui::GetStyle().FramePadding;
           regInnerRect.Max-=ImGui::GetStyle().FramePadding;
 
           ImRect regTop=regInnerRect;
-          regTop.Min.y+=ImGui::GetTextLineHeight()+ImGui::GetStyle().ItemSpacing.y*0.5f;
           regTop.Max.y=regTop.Min.y+ImGui::GetTextLineHeight();
 
           ImRect regBottom=regInnerRect;
-          regBottom.Min.y+=ImGui::GetTextLineHeight()*2.0f+ImGui::GetStyle().ItemSpacing.y*1.0f;
+          regBottom.Min.y+=ImGui::GetTextLineHeight()*1.0f+ImGui::GetStyle().ItemSpacing.y*1.0f;
 
           // draw the damn frame
           dl->AddRectFilled(regRect.Min,regRect.Max,ImGui::GetColorU32(uiColors[GUI_COLOR_FRAME_BACKGROUND_POPUP]));
@@ -2023,11 +2028,6 @@ void FurnaceGUI::drawPattern() {
                 ImVec2(curBitX+bitWidth,regTop.Max.y),
                 (regState->val&(1U<<j))?bitOnColor:bitOffColor
               );
-
-              // label
-              if (regState->bitIcon[j]!=NULL) {
-                dl->AddText(ImVec2(curBitX,regInnerRect.Min.y),ImGui::GetColorU32(ImGuiCol_Text),regState->bitIcon[j]);
-              }
 
               curBitX+=bitWidth+spacerWidth;
             }
