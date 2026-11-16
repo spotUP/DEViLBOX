@@ -452,7 +452,6 @@ const KNOWN: Record<string, Partial<Record<'unedited' | 'edited', string>>> = {
   inStereo2: { unedited: 'G16 inStereo2: exported bytes differ from the original at byte 35', edited: 'G16 inStereo2: untouched voice 1 plays a different Paula write after the edit' },
   pumaTracker: { unedited: 'G16 pumaTracker: exported bytes differ from the original at byte 15', edited: 'G16 pumaTracker: untouched voice 2 plays a different Paula write after the edit' },
   sonicArranger: { unedited: 'G16 sonicArranger: exported bytes differ from the original at byte 35', edited: 'G16 sonicArranger: the reloaded song has 72 patterns, the edited grid 84' },
-  synthesis: { unedited: 'G16 synthesis: exported bytes differ from the original at byte 10', edited: 'G16 synthesis: voice 0 plays a different Paula write after the edit' },
 };
 
 /** Run `body`; for a known defect it must still fail (a fixed one is reported so its row is removed). */

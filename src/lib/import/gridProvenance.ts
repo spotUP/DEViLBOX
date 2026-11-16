@@ -97,7 +97,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   synthDream: 'pass',
   tonyWilliams: 'pass',
   beathoven: 'pass',
-  synthesis: 'fail',
+  synthesis: 'pass',
   tcbTracker: 'pass',
   tfmMusicMaker: 'pass',
   tfmx: 'pass',

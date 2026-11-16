@@ -540,6 +540,19 @@ function parseSynthesis(bytes: Uint8Array, filename: string): TrackerSong | null
     encodeCell: encodeSynthesisCell,
     // Byte 2 holds the arpeggio index in its high nibble; the grid has no field for it.
     encodeOverStored: true,
+    // A grid pattern is a position; each voice reads a shared run of track lines from its start row.
+    propagateSharedCells: true,
+    // Instrument (shown + sound transpose) and effects (shown XM-mapped) belong to the position, not the stored line.
+    positionBoundFields: () => ['instrument', 'volume', 'effTyp', 'eff', 'effTyp2', 'eff2'],
+    // The player plays line note + the position's note transpose (semitones). Null where either side leaves the grid range.
+    noteOffset: (pattern: number, row: number, channel: number): number | null => {
+      const pos = positions[pattern]?.[channel];
+      const line = pos ? trackLines[pos.startTrackRow + row] : undefined;
+      if (!pos || !line) return null;
+      const t = s8(pos.noteTranspose);
+      const n = line.note ? synNoteToXM(line.note) : XM_REFERENCE_NOTE;
+      return n < 1 || n > 96 || n + t < 1 || n + t > 96 ? null : t;
+    },
     decodeCell: (raw: Uint8Array): TrackerCell => {
       const noteIdx = raw[0];
       const instrument = raw[1];
@@ -560,9 +573,9 @@ function parseSynthesis(bytes: Uint8Array, filename: string): TrackerSong | null
     // that position's start row (the loop that builds `patterns` above).
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
       const pos = positions[pattern]?.[channel];
-      if (!pos) return 0;
+      if (!pos) return -1;
       const lineIdx = pos.startTrackRow + row;
-      if (lineIdx < 0 || lineIdx >= trackLines.length) return 0;
+      if (lineIdx < 0 || lineIdx >= trackLines.length) return -1;
       return trackRowDataOffset + lineIdx * 4;
     },
   };

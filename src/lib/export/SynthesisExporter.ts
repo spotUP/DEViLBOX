@@ -25,6 +25,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { patchModuleByLayout } from './layoutPatch';
 
 // ── Utility ────────────────────────────────────────────────────────────────
 
@@ -93,6 +94,15 @@ export async function exportSynthesis(
 ): Promise<{ data: Blob; filename: string; warnings: string[] }> {
   const warnings: string[] = [];
   const numChannels = 4;
+
+  // A loaded Synthesis module: its bytes with the grid edits written into the shared track lines (byte-exact when unedited).
+  const layout = song.uadePatternLayout;
+  if (song.synthesisFileData && layout?.formatId === 'synthesis') {
+    const { bytes, unplaced } = patchModuleByLayout(new Uint8Array(song.synthesisFileData), layout, song.patterns);
+    if (unplaced.length) warnings.push(`${unplaced.length} edited note(s) have no place in the module and were not written.`);
+    const name = (song.name || 'untitled').replace(/[^a-zA-Z0-9_\- ]/g, '_');
+    return { data: new Blob([bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer], { type: 'application/octet-stream' }), filename: `${name}.syn`, warnings };
+  }
 
   if (song.numChannels > numChannels) {
     warnings.push(`Synthesis supports 4 channels; ${song.numChannels - numChannels} channels were dropped.`);

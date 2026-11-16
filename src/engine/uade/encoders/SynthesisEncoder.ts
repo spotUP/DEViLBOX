@@ -39,6 +39,12 @@ function encodeSynthesisCell(cell: TrackerCell, stored?: Uint8Array): Uint8Array
   // Byte 3: effect argument
   out[3] = (cell.eff ?? 0) & 0xFF;
 
+  // Over a stored track line only the note is the grid's: the grid instrument carries the position's sound transpose
+  // and the effects show XM-mapped (parser), so the stored bytes stay.
+  // shortcut: instrument and effect edits are not stored over a module line, upgrade with a sound-transpose
+  // un-shift and an XM -> Synthesis effect map.
+  if (stored && stored.length >= 4) out.set(stored.subarray(1, 4), 1);
+
   return out;
 }
 
