@@ -125,7 +125,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-dark-bg border border-dark-border rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-fade-in">
+      <div className="bg-dark-bg border border-dark-border rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-fade-in">
         {/* Header */}
         <div className="bg-dark-bgTertiary border-b border-dark-border px-5 py-4 flex items-center justify-between">
           <h2 className="font-mono text-lg font-bold text-text-primary">
@@ -178,11 +178,11 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                 <label className="block text-xs font-mono text-text-muted mb-3">
                   EXPORT MODE
                 </label>
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(10rem,1fr))]">
                   <button
                     onClick={() => ex.setExportMode('song')}
                     className={`
-                      p-4 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'song'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -190,12 +190,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     `}
                   >
                     <FileMusic size={24} className="mx-auto mb-2" />
-                    <div className="font-mono text-sm font-semibold">Song</div>
+                    <div className="font-mono text-sm font-semibold break-words leading-tight">Song</div>
                   </button>
                   <button
                     onClick={() => ex.setExportMode('sfx')}
                     className={`
-                      p-4 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'sfx'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -203,12 +203,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     `}
                   >
                     <Zap size={24} className="mx-auto mb-2" />
-                    <div className="font-mono text-sm font-semibold">SFX</div>
+                    <div className="font-mono text-sm font-semibold break-words leading-tight">SFX</div>
                   </button>
                   <button
                     onClick={() => ex.setExportMode('instrument')}
                     className={`
-                      p-4 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'instrument'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -216,12 +216,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     `}
                   >
                     <Settings size={24} className="mx-auto mb-2" />
-                    <div className="font-mono text-sm font-semibold">Instrument</div>
+                    <div className="font-mono text-sm font-semibold break-words leading-tight">Instrument</div>
                   </button>
                   <button
                     onClick={() => ex.setExportMode('audio')}
                     className={`
-                      p-4 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'audio'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -229,12 +229,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     `}
                   >
                     <Volume2 size={24} className="mx-auto mb-2" />
-                    <div className="font-mono text-sm font-semibold">Audio</div>
+                    <div className="font-mono text-sm font-semibold break-words leading-tight">Audio</div>
                   </button>
                   <button
                     onClick={() => ex.setExportMode('midi')}
                     className={`
-                      p-4 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'midi'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -242,12 +242,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     `}
                   >
                     <Music2 size={24} className="mx-auto mb-2" />
-                    <div className="font-mono text-sm font-semibold">MIDI</div>
+                    <div className="font-mono text-sm font-semibold break-words leading-tight">MIDI</div>
                   </button>
                   <button
                     onClick={() => ex.setExportMode('xm')}
                     className={`
-                      p-4 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'xm'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -255,12 +255,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     `}
                   >
                     <FileMusic size={24} className="mx-auto mb-2" />
-                    <div className="font-mono text-sm font-semibold">XM</div>
+                    <div className="font-mono text-sm font-semibold break-words leading-tight">XM</div>
                   </button>
                   <button
                     onClick={() => ex.setExportMode('mod')}
                     className={`
-                      p-4 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'mod'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -268,12 +268,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     `}
                   >
                     <FileMusic size={24} className="mx-auto mb-2" />
-                    <div className="font-mono text-sm font-semibold">MOD</div>
+                    <div className="font-mono text-sm font-semibold break-words leading-tight">MOD</div>
                   </button>
                   <button
                     onClick={() => ex.setExportMode('it')}
                     className={`
-                      p-4 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'it'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -281,12 +281,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     `}
                   >
                     <FileMusic size={24} className="mx-auto mb-2" />
-                    <div className="font-mono text-sm font-semibold">IT</div>
+                    <div className="font-mono text-sm font-semibold break-words leading-tight">IT</div>
                   </button>
                   <button
                     onClick={() => ex.setExportMode('s3m')}
                     className={`
-                      p-4 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 's3m'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -294,12 +294,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     `}
                   >
                     <FileMusic size={24} className="mx-auto mb-2" />
-                    <div className="font-mono text-sm font-semibold">S3M</div>
+                    <div className="font-mono text-sm font-semibold break-words leading-tight">S3M</div>
                   </button>
                   <button
                     onClick={() => ex.setExportMode('chip')}
                     className={`
-                      p-4 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'chip'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -307,12 +307,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     `}
                   >
                     <Cpu size={24} className="mx-auto mb-2" />
-                    <div className="font-mono text-sm font-semibold">Chip</div>
+                    <div className="font-mono text-sm font-semibold break-words leading-tight">Chip</div>
                   </button>
                   <button
                     onClick={() => ex.setExportMode('nano')}
                     className={`
-                      p-4 rounded-lg border-2 transition-all text-center
+                      p-4 min-w-0 rounded-lg border-2 transition-all text-center
                       ${ex.exportMode === 'nano'
                         ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                         : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -320,13 +320,13 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     `}
                   >
                     <Zap size={24} className="mx-auto mb-2" />
-                    <div className="font-mono text-sm font-semibold">Nano</div>
+                    <div className="font-mono text-sm font-semibold break-words leading-tight">Nano</div>
                   </button>
                   {(ex.editorMode === 'furnace' || ex.furnaceModuleAvailable) && (
                     <button
                       onClick={() => ex.setExportMode('fur')}
                       className={`
-                        p-4 rounded-lg border-2 transition-all text-center
+                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
                         ${ex.exportMode === 'fur'
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -334,14 +334,14 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       `}
                     >
                       <FileMusic size={24} className="mx-auto mb-2" />
-                      <div className="font-mono text-sm font-semibold">Export Furnace Module</div>
+                      <div className="font-mono text-sm font-semibold break-words leading-tight">Export Furnace Module</div>
                     </button>
                   )}
                   {ex.furnaceAyAvailable && (
                     <button
                       onClick={() => ex.setExportMode('furAy')}
                       className={`
-                        p-4 rounded-lg border-2 transition-all text-center
+                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
                         ${ex.exportMode === 'furAy'
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -349,14 +349,14 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       `}
                     >
                       <FileMusic size={24} className="mx-auto mb-2" />
-                      <div className="font-mono text-sm font-semibold">Furnace AY-3-8910 (Scramble)</div>
+                      <div className="font-mono text-sm font-semibold break-words leading-tight">Furnace AY-3-8910 (Scramble)</div>
                     </button>
                   )}
                   {ex.tadAvailable && (
                     <button
                       onClick={() => ex.setExportMode('tad')}
                       className={`
-                        p-4 rounded-lg border-2 transition-all text-center
+                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
                         ${ex.exportMode === 'tad'
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -364,14 +364,14 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       `}
                     >
                       <FileMusic size={24} className="mx-auto mb-2" />
-                      <div className="font-mono text-sm font-semibold">SNES (Terrific Audio Driver)</div>
+                      <div className="font-mono text-sm font-semibold break-words leading-tight">SNES (Terrific Audio Driver)</div>
                     </button>
                   )}
                   {ex.nativeAvailable && (
                     <button
                       onClick={() => ex.setExportMode('native')}
                       className={`
-                        p-4 rounded-lg border-2 transition-all text-center
+                        p-4 min-w-0 rounded-lg border-2 transition-all text-center
                         ${ex.exportMode === 'native'
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
@@ -379,7 +379,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       `}
                     >
                       <FileMusic size={24} className="mx-auto mb-2" />
-                      <div className="font-mono text-sm font-semibold">Native</div>
+                      <div className="font-mono text-sm font-semibold break-words leading-tight">Native</div>
                     </button>
                   )}
                   <button
@@ -387,10 +387,10 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       onClose();
                       useMIDIStore.getState().openPatternDialog();
                     }}
-                    className="p-4 rounded-lg border-2 transition-all text-center bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight"
+                    className="p-4 min-w-0 rounded-lg border-2 transition-all text-center bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight"
                   >
                     <Cable size={24} className="mx-auto mb-2" />
-                    <div className="font-mono text-sm font-semibold">TD-3</div>
+                    <div className="font-mono text-sm font-semibold break-words leading-tight">TD-3</div>
                   </button>
                 </div>
               </div>
