@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import JSZip from 'jszip';
 import { parseFurnaceSong, toSequencerSamples, buildFurnaceNativeData } from '@/lib/import/formats/FurnaceSongParser';
@@ -27,6 +27,7 @@ describe('player.sfc', () => {
     const rom = await zip.file('build/player.sfc')!.async('uint8array');
     const bin = await zip.file('build/ca65_lorom/ca65_lorom_audio.bin')!.async('uint8array');
     const meta = JSON.parse(readFileSync('public/tad/player-lorom.json', 'utf8')) as TadPlayerRomMeta;
+    if (process.env.TAD_ROM_OUT) writeFileSync(process.env.TAD_ROM_OUT, rom); // for the headless emulator check
     expect(rom.length).toBe(262144);
     expect(Array.from(rom.subarray(meta.dataOffset, meta.dataOffset + bin.length))).toEqual(Array.from(bin));
     const h = meta.headerOffset + 0x2c;
