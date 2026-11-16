@@ -19,6 +19,7 @@ import { noteValueToPitch } from '@/lib/tracker/noteValue';
 import { createHash } from 'node:crypto';
 import { isSunTronicV13Format } from '@/lib/import/formats/SunTronicV13';
 import { openUade, PaulaSession, PAULA_CHUNK, type PaulaWrite } from './gridOracle';
+import { addUadeCompanion, type UadeWasm } from '@/engine/uade/uadeWasmInstance';
 import { EXPORT_ROUND_TRIP } from '@/lib/import/gridProvenance';
 import { pickDscNote } from './helpers/pickDscNote';
 import { loadTfmxWalkModule, type TfmxWalkHost } from './helpers/tfmxWalkHost';
@@ -197,6 +198,7 @@ const FORMATS: FormatRow[] = [
   { key: 'tfmMusicMaker', rig: 'paula', files: ['tfm-music-maker/rainstorm.tfe'] },
   { key: 'tfmx', rig: 'paula', files: ['tfmx/mdat.hbtitle'] },
   { key: 'daveLowe', rig: 'paula', files: ['dave-lowe/incredibleshrinkingsphere.dl'] },
+  { key: 'soundPlayer', rig: 'paula', files: ['formats/Scott Johnston/sjs.tune6'] },
 ];
 
 type Cell = { note: number; instrument: number; volume: number; effTyp: number; eff: number; effTyp2: number; eff2: number };
@@ -366,9 +368,14 @@ let tfmx: TfmxWalkHost | null = null;
  * UADE running the module's own 68k replayer: every Paula register write per voice with the
  * 10 ms chunk it happened in (the exact input of the chip, so equal streams are equal sound).
  */
+/** Module name -> its sample companion (corpus path); the player asks UADE for it by the companion's own name. */
+const COMPANIONS: Record<string, string> = { 'sjs.tune6': 'formats/Scott Johnston/smp.tune6' };
+
 async function paulaTrace(bytes: Uint8Array, name: string): Promise<Trace | null> {
   // A fresh UADE per render: one that has played other songs carries their state into the next.
   const uade = await openUade();
+  const companion = COMPANIONS[name];
+  if (companion) addUadeCompanion(uade as unknown as UadeWasm, basename(companion), readFileSync(join(SONGS, companion)).buffer as ArrayBuffer, 'G16');
   let session: PaulaSession;
   try { session = new PaulaSession(uade, bytes, name); } catch (e) {
     if (/UADE refused/.test(String(e))) return null;

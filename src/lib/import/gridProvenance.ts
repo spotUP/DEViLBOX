@@ -102,6 +102,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   tfmMusicMaker: 'pass',
   tfmx: 'pass',
   daveLowe: 'pass',
+  soundPlayer: 'pass',
 };
 
 /**
