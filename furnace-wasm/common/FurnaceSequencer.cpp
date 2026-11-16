@@ -307,6 +307,10 @@ enum {
 #define SEQ_CHIP_SCC_PLUS     72
 #define SEQ_CHIP_QSOUND       61
 #define SEQ_CHIP_ESFM         100
+#define SEQ_CHIP_VBOY         47
+#define SEQ_CHIP_SWAN         43
+#define SEQ_CHIP_PV1000       95
+#define SEQ_CHIP_BIFURCATOR   107
 
 // ============================================================
 // Per-platform helper functions
@@ -722,7 +726,7 @@ static bool seqPerSystemEffect(int ch, int effect, int effectVal) {
       break;
 
     // --- Virtual Boy (VSU): effectHandlers ---
-    case 46: // DIV_SYSTEM_VBOY
+    case SEQ_CHIP_VBOY:
       switch (effect) {
         case 0x10: dispatchCmd(DIV_CMD_WAVE, ch, effectVal); return true;
         case 0x11: dispatchCmd(DIV_CMD_STD_NOISE_MODE, ch, effectVal); return true;
@@ -732,7 +736,7 @@ static bool seqPerSystemEffect(int ch, int effect, int effectVal) {
       break;
 
     // --- WonderSwan: effectHandlers ---
-    case 42: // DIV_SYSTEM_SWAN
+    case SEQ_CHIP_SWAN:
       switch (effect) {
         case 0x10: dispatchCmd(DIV_CMD_WAVE, ch, effectVal); return true;
         case 0x11: dispatchCmd(DIV_CMD_STD_NOISE_MODE, ch, effectVal); return true;
@@ -743,14 +747,14 @@ static bool seqPerSystemEffect(int ch, int effect, int effectVal) {
       break;
 
     // --- PV1000: effectHandlers ---
-    case 94: // DIV_SYSTEM_PV1000
+    case SEQ_CHIP_PV1000:
       switch (effect) {
         case 0x10: dispatchCmd(DIV_CMD_STD_NOISE_MODE, ch, effectVal); return true;
       }
       break;
 
     // --- Bifurcator: effectHandlers ---
-    case 106: // DIV_SYSTEM_BIFURCATOR
+    case SEQ_CHIP_BIFURCATOR:
       switch (effect) {
         case 0x10: dispatchCmd(182 /* DIV_CMD_BIFURCATOR_STATE_LOAD */, ch, 0, effectVal); return true;
         case 0x11: dispatchCmd(182 /* DIV_CMD_BIFURCATOR_STATE_LOAD */, ch, 1, effectVal); return true;
