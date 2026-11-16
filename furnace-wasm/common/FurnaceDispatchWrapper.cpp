@@ -1322,13 +1322,16 @@ int furnace_dispatch_get_num_channels(int handle) {
  * ring, of the next sample the chip writes. The ring runs at 65536 samples
  * per second whatever the chip's rate (DivDispatchOscBuffer::setRate), and
  * the buffer's own `needle` is that index in 16.16 fixed point.
+ * -1: the chip keeps no scope for this channel (ZX beeper channels 2-6 share
+ * one 1-bit output, Genesis/OPN extended-3 operator channels, OPLL drums,
+ * SAA1099 noise slots), so the caller must not wait for it to advance.
  */
 EMSCRIPTEN_KEEPALIVE
 int furnace_dispatch_get_osc_needle(int handle, int chan) {
   auto it = g_instances.find(handle);
   if (it != g_instances.end() && chan >= 0 && chan < it->second->numChannels) {
     DivDispatchOscBuffer* buf = it->second->dispatch->getOscBuffer(chan);
-    return buf != nullptr ? (int)((buf->needle >> OSCBUF_PREC) & 0xffff) : 0;
+    return buf != nullptr ? (int)((buf->needle >> OSCBUF_PREC) & 0xffff) : -1;
   }
   return 0;
 }

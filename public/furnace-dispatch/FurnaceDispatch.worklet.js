@@ -1171,9 +1171,12 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
       this._oscStream.discontinue();
       return;
     }
+    // A needle of -1 is a channel the chip keeps no scope for (ZX beeper
+    // channels 2-6, OPN extended-3 operators, ...): it never advances, so it
+    // must not hold back the others; it streams silence.
     let n = Infinity;
-    for (let i = 0; i < chans.length; i++) n = Math.min(n, (now[i] - from[i]) & 0xffff);
-    if (!(n > 0)) return;
+    for (let i = 0; i < chans.length; i++) if (now[i] >= 0) n = Math.min(n, (now[i] - from[i]) & 0xffff);
+    if (!(n > 0) || n === Infinity) return;
     if (n > 32768) {                     // more than half the ring: lost track
       this._oscReadPos = now;
       this._oscStream.discontinue();
@@ -1184,6 +1187,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
     if (!heapBuffer) return;
     const views = [];
     for (let i = 0; i < chans.length; i++) {
+      if (now[i] < 0) { views.push(new Int16Array(n)); continue; }
       const end = (from[i] + n) & 0xffff;
       this.wasm.readOsc(chans[i].handle, chans[i].ch, end, this.oscPtrOut, n);
       views.push(new Int16Array(heapBuffer, this.oscPtrOut, n).slice());
