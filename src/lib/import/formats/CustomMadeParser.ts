@@ -36,8 +36,9 @@
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
+import { periodToGridNote } from '@/lib/amiga/periodNotes';
+import type { TrackerCell } from '@/types';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -298,21 +299,17 @@ export async function parseCustomMadeFile(
     }
   }
 
-  // ── Empty pattern (placeholder — UADE handles actual audio) ───────────────
+  // ── Note grid decoded from the module's own replayer data ─────────────────
 
-  const emptyRows = Array.from({ length: 64 }, () => ({
-    note: 0,
-    instrument: 0,
-    volume: 0,
-    effTyp: 0,
-    eff: 0,
-    effTyp2: 0,
-    eff2: 0,
-  }));
+  const grid = isDelitracker ? null : decodeCustomMadeGrid(buf);
+  const totalRows = grid ? Math.max(64, ...grid.channels.map((c) => c.rows)) : 64;
+  const numPatterns = Math.ceil(totalRows / 64);
+  const emptyCell = () => ({ note: 0, instrument: 0, volume: 0, effTyp: 0, eff: 0, effTyp2: 0, eff2: 0 });
+  const eventAt = (pattern: number, row: number, channel: number) => grid?.channels[channel]?.events.get(pattern * 64 + row);
 
-  const pattern = {
-    id: 'pattern-0',
-    name: 'Pattern 0',
+  const patterns = Array.from({ length: numPatterns }, (_, p) => ({
+    id: `pattern-${p}`,
+    name: `Pattern ${p}`,
     length: 64,
     channels: Array.from({ length: 4 }, (_, ch) => ({
       id: `channel-${ch}`,
@@ -324,43 +321,181 @@ export async function parseCustomMadeFile(
       pan: ch === 0 || ch === 3 ? -50 : 50,
       instrumentId: null,
       color: null,
-      rows: emptyRows,
+      rows: Array.from({ length: 64 }, (_, r) => {
+        const ev = eventAt(p, r, ch);
+        return ev && grid ? { ...emptyCell(), note: grid.gridNote(ev.index), instrument: ev.instrument } : emptyCell();
+      }),
     })),
     importMetadata: {
       sourceFormat: 'MOD' as const,
       sourceFile: filename,
       importedAt: new Date().toISOString(),
       originalChannelCount: 4,
-      originalPatternCount: 1,
+      originalPatternCount: numPatterns,
       originalInstrumentCount: sampleCount,
       variant: isDelitracker ? 'delitracker' : isBRAVariant ? 'bra' : 'jmp',
     },
-  };
+  }));
 
   return {
     name: `${moduleName} [${variantLabel}]`,
     format: 'MOD' as TrackerFormat,
-    patterns: [pattern],
+    patterns,
     instruments,
-    songPositions: [0],
-    songLength: 1,
+    songPositions: patterns.map((_, i) => i),
+    songLength: numPatterns,
     restartPosition: 0,
     numChannels: 4,
-    initialSpeed: 6,
-    initialBPM: 125,
+    // The replayer runs 4 ticks per grid row (note duration byte * 4 ticks), at the CIA rate the module sets.
+    initialSpeed: grid ? 4 : 6,
+    initialBPM: grid?.bpm ?? 125,
     linearPeriods: false,
     uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
     uadeEditableFileName: filename,
     uadePatternLayout: {
       formatId: 'customMade',
       patternDataFileOffset: 0,
-      bytesPerCell: 4,
+      bytesPerCell: 1,
       rowsPerPattern: 64,
       numChannels: 4,
-      numPatterns: 1,
+      numPatterns,
       moduleSize: buffer.byteLength,
-      encodeCell: encodeMODCell,
-      decodeCell: decodeMODCell,
+      // A cell is its note byte in the track; track repeats and reused tracks share it.
+      getCellFileOffset: (pattern: number, row: number, channel: number) => eventAt(pattern, row, channel)?.noteOffset ?? -1,
+      propagateSharedCells: true,
+      encodeOverStored: true,
+      encodeCell: (_cell: TrackerCell, stored?: Uint8Array) => stored ?? new Uint8Array(1),
+      // shortcut: only the note is written back; the instrument comes from $82 commands shared by many notes and needs a command editor.
+      effectPatches: (pattern: number, row: number, channel: number, cell: TrackerCell) => {
+        const ev = eventAt(pattern, row, channel);
+        if (!ev || !grid || !(cell.note > 0)) return { patches: [], noteUnchanged: true };
+        const index = grid.indexOfGridNote(cell.note);
+        const value = index - ev.transpose;
+        if (index < 0 || value < 0 || value > 0x7F) return { patches: [], noteUnchanged: true };
+        return { patches: [[ev.noteOffset, value]], noteUnchanged: true };
+      },
     } as UADEPatternLayout,
+  };
+}
+
+// ── Grid decoder (CustomMade_v1.asm InitPlayer scan + per-voice track walk) ─
+
+interface CustomMadeEvent { noteOffset: number; index: number; transpose: number; instrument: number }
+export interface CustomMadeGrid {
+  channels: Array<{ rows: number; events: Map<number, CustomMadeEvent> }>;
+  bpm: number;
+  gridNote: (index: number) => number;
+  indexOfGridNote: (note: number) => number;
+}
+
+const MAX_GRID_ROWS = 64 * 256;
+
+function s16(buf: Uint8Array, off: number): number {
+  const v = u16BE(buf, off);
+  return v < 0x8000 ? v : v - 0x10000;
+}
+
+/** Subsong 1 of a cm./rk. module as per-voice note events, or null when the replayer tables are not found. */
+export function decodeCustomMadeGrid(buf: Uint8Array): CustomMadeGrid | null {
+  const len = buf.length;
+  let origin: number | null = null;
+  let songsTab = -1;
+  let ptoff = 0;
+  let timer = 0;
+  let a3: number | null = null;
+  let a4: number | null = null;
+  let periodTab = -1;
+  let a0 = 0;
+  for (let it = 0; it < 0x800 && a0 + 4 <= len; it++) {
+    const l = u32BE(buf, a0);
+    if (l === 0x48e7f8fc || l === 0x48e7fffe) {
+      if (a3 !== null && origin === null) origin = a3 - a0;
+      for (let k = 0; k <= 20 && a0 + 2 <= len; k++) {
+        const w = u16BE(buf, a0);
+        a0 += 2;
+        if (w === 0x41fa) { songsTab = a0 + s16(buf, a0); break; }
+      }
+    } else if (l === 0xe94847f0) {
+      ptoff = s16(buf, a0 + 4);
+    } else if (l === 0x00bfd500 && a0 >= 1 && a0 + 34 <= len) {
+      timer = (buf[a0 - 1] << 8) | buf[a0 + 7];
+      if (u16BE(buf, a0 + 20) !== 0x4e71) {
+        if (u16BE(buf, a0 + 28) === 0x21fc) a3 = u32BE(buf, a0 + 30);
+        else if (u16BE(buf, a0 + 32) === 0xc000) a3 = u32BE(buf, a0 + 22);
+        else a3 = u32BE(buf, a0 + 32);
+      }
+    } else if ((l === 0xe44843fa || l === 0xe448207b) && a4 !== null) {
+      const at = a0 + 4 + s16(buf, a0 + 4);
+      if (at >= 0 && at + 4 <= len && origin === null) origin = u32BE(buf, at) - a4;
+    } else if (l === 0x48e700f0) {
+      a4 = a0 + 6 + s16(buf, a0 + 6);
+    }
+    a0 += 2;
+    if (a0 + 4 <= len && u32BE(buf, a0) === 0x1AC01940) { periodTab = a0; break; }
+  }
+  if (origin === null || songsTab < 0 || periodTab < 0) return null;
+  songsTab += ptoff;
+  if (songsTab < 0 || songsTab + 16 > len) return null;
+  const base = origin;
+
+  const periods: number[] = [];
+  for (let o = periodTab; o + 2 <= len && periods.length < 128; o += 2) {
+    const p = u16BE(buf, o);
+    if (p === 0 || (periods.length > 0 && p >= periods[periods.length - 1])) break;
+    periods.push(p);
+  }
+  const notes = periods.map((p) => periodToGridNote(p));
+  const fileOff = (ptr: number) => ptr - base;
+
+  const channels = [0, 1, 2, 3].map((voice) => {
+    const events = new Map<number, CustomMadeEvent>();
+    const list = fileOff(u32BE(buf, songsTab + voice * 4));
+    let tick = 0;
+    if (list < 0 || list + 12 > len) return { rows: 0, events };
+    let entry = list;
+    let instrument = 0;
+    // One pass over the voice list: each entry's track played (repeat) times, up to the -1 loop marker or a song-end command.
+    walk: while (entry + 12 <= len && u32BE(buf, entry) !== 0xFFFFFFFF) {
+      const track = fileOff(u32BE(buf, entry));
+      const transpose = s16(buf, entry + 6);
+      let repeat = u16BE(buf, entry + 10);
+      if (repeat === 0x270F) repeat = 0x3E;
+      repeat = Math.max(1, repeat);
+      if (track < 0 || track >= len) break;
+      for (let rep = 0; rep < repeat; rep++) {
+        let p = track;
+        for (let guard = 0; guard < 0x10000; guard++) {
+          if (tick / 4 >= MAX_GRID_ROWS || p + 1 >= len) break walk;
+          let b = buf[p];
+          if (b === 0x80) { p += 2; b = buf[p]; }
+          if (b === 0x81) {
+            events.set(tick / 4, { noteOffset: p + 1, index: buf[p + 1] + transpose, transpose, instrument });
+            tick += ((buf[p + 3] * 4 - 1) & 0xFF) + 1;
+            p += 4;
+            continue;
+          }
+          if (b === 0x82) { instrument = buf[p + 1] + 1; p += 2; b = buf[p]; }
+          if (b === 0x83) break walk;
+          if (b === 0x84) { p += 2; b = buf[p]; }
+          if (b === 0x85) break walk;
+          if (b & 0x80) break; // track end
+          const dur = buf[p + 1];
+          if (dur !== 0) {
+            events.set(tick / 4, { noteOffset: p, index: b + transpose, transpose, instrument });
+            tick += ((dur * 4 - 1) & 0xFF) + 1;
+          }
+          p += 2;
+        }
+      }
+      entry += 12;
+    }
+    return { rows: Math.ceil(tick / 4), events };
+  });
+
+  return {
+    channels,
+    bpm: timer > 0 ? Math.round(1773447 / timer) : 125,
+    gridNote: (index) => (index >= 0 && index < notes.length ? notes[index] : 0),
+    indexOfGridNote: (note) => notes.indexOf(note),
   };
 }

@@ -332,7 +332,7 @@ bar test first (revert check: it must fail on the old grid), then fix.
 - **U22 CheeseCutter (M).** CheeseCutterParser.ts:354 vs the SID register writes of the 6502 player
   in cheesecutter-wasm; a register-trace export may be needed (unconfirmed).
 - **U23 Jeroen Tel (M).** JeroenTelParser.ts:482-647 vs UADE voice records (asm wanted_team/JeroenTel).
-- **U24 Custom Made (L).** Patterns live inside the 68k code (CustomMadeParser.ts:343); voice records from
+- **U24 Custom Made (L) - DONE 2026-11-16.** CustomMadeParser.ts decodeCustomMadeGrid reads subsong 1 the way CustomMade_v1.asm InitPlayer and the track chain do (Origin, SongsTab, voice lists with transpose and repeat, 4 ticks per row, notes named through the module's own period table); a note edit is patched into its track byte (layoutPatch effectPatches, shared bytes propagated); G16 round trip green on cm.viking_child. Open: other subsongs; instrument edits ($82 commands) not written. Was: Patterns live inside the 68k code (CustomMadeParser.ts:343); voice records from
   amigasrc/wanted_team/CustomMade; 5 corpus files.
 
 ### Wave 9 (small corpora, asm available)

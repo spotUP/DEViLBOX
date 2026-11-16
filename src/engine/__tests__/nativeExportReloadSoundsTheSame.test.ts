@@ -199,6 +199,7 @@ const FORMATS: FormatRow[] = [
   { key: 'tfmx', rig: 'paula', files: ['tfmx/mdat.hbtitle'] },
   { key: 'daveLowe', rig: 'paula', files: ['dave-lowe/incredibleshrinkingsphere.dl'] },
   { key: 'soundPlayer', rig: 'paula', files: ['formats/Scott Johnston/sjs.tune6'] },
+  { key: 'customMade', rig: 'paula', files: ['formats/cm.viking_child'] },
 ];
 
 type Cell = { note: number; instrument: number; volume: number; effTyp: number; eff: number; effTyp2: number; eff2: number };

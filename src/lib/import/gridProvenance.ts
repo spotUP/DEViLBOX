@@ -103,6 +103,7 @@ export const EXPORT_ROUND_TRIP: Record<string, ExportRoundTrip> = {
   tfmx: 'pass',
   daveLowe: 'pass',
   soundPlayer: 'pass',
+  customMade: 'pass',
 };
 
 /**
@@ -453,7 +454,6 @@ export const RECONSTRUCTED_GRIDS: Record<string, string> = {
   paulRobotham: 'G11-paulRobotham',
   pierreAdane: 'G11-pierreAdane',
   andrewParton: 'G11-andrewParton',
-  customMade: 'U24',
   jesperOlsen: 'U18',
   kimChristensen: 'G11-kimChristensen',
   ashleyHogg: 'U27',
@@ -541,7 +541,7 @@ export const DIRECT_GRIDS: readonly string[] = [
   'chuckBiscuits', 'iceTracker', 'gameMusicCreator', 'faceTheMusic', 'soundControl', 'kris',
   'deltaMusic1', 'ams', 'iffSmus', 'richardJoseph', 'daveLowe', 'pt36', 'jeroenTel',
   'zoundMonitor', 'tcbTracker', 'steveTurner', 'musicMaker', 'maxTrax', 'fashionTracker',
-  'soundPlayer', 'peterVerswyvelenPacker', 'anders0land', 'robHubbardST', 'goatTracker',
+  'soundPlayer', 'customMade', 'peterVerswyvelenPacker', 'anders0land', 'robHubbardST', 'goatTracker',
   'sidFactory2', 'cheesecutter', 'stoneTracker', 'tfmMusicMaker', 'composer667', 'fmTracker',
   'imagoOrpheus', 'cdfm67', 'easyTrax', 'karlMorton', 'xmf', 'madTracker2', 'psm', 'unic', 'mtm',
   '669', 'far', 'plm', 'ult', 'rtm', 'dsm', 'dtm', 'stm', 'stx', 'nru', 'ptm', 'gdm', 'stk', 'stp',
