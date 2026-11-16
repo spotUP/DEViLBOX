@@ -20,7 +20,7 @@ import {
 } from '@engine/wasm/WASMSingletonBase';
 
 export { FurnaceDispatchPlatform } from './platforms';
-import { batchesToRegisterWrites, type DispatchRegBatch, type DispatchSampleRom } from '@lib/export/dispatchRegCapture';
+import { batchesToRegisterWrites, type DispatchRegBatch, type DispatchSampleRom, type FurnaceMemCompo } from '@lib/export/dispatchRegCapture';
 import type { RegisterWrite } from '@lib/export/VGMExporter';
 import { STAND_INS } from './synthPlatforms';
 import { chipKeysFor, chipKeyPlatform } from './chipKey';
@@ -796,6 +796,7 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
   // Command log callbacks for automation capture
   private _regCaptureBatches: DispatchRegBatch[] = [];
   private _sampleMemWaiters = new Map<number, (roms: DispatchSampleRom[]) => void>();
+  private _memCompoWaiters = new Map<number, (c: FurnaceMemCompo | null) => void>();
   private _cmdLogCallbacks: Set<(entries: Array<{ tick: number; cmd: number; channel: number; value1: number; value2: number }>) => void> = new Set();
 
   // Shared WASM asset cache (binary + JS glue + per-context registration state).
@@ -1225,6 +1226,13 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
         const wait = this._sampleMemWaiters.get(data.platformType as number);
         this._sampleMemWaiters.delete(data.platformType as number);
         wait?.(data.blocks as DispatchSampleRom[]);
+        break;
+      }
+
+      case 'memCompo': {
+        const wait = this._memCompoWaiters.get(data.platformType as number);
+        this._memCompoWaiters.delete(data.platformType as number);
+        wait?.(data.compo as FurnaceMemCompo | null);
         break;
       }
 
@@ -1890,6 +1898,19 @@ export class FurnaceDispatchEngine implements IsolationCapableEngine {
       const timer = setTimeout(() => { this._sampleMemWaiters.delete(platformType); resolve([]); }, 1000);
       this._sampleMemWaiters.set(platformType, roms => { clearTimeout(timer); resolve(roms); });
       this.workletNode?.port.postMessage({ type: 'getSampleMem', platformType });
+    });
+  }
+
+  /**
+   * Furnace's own memory composition of the chip (DivDispatch::getMemCompo):
+   * regions, capacity and use. Valid after renderSamples. Null when the chip
+   * reports none or the worklet does not answer within a second.
+   */
+  getMemCompo(platformType: number): Promise<FurnaceMemCompo | null> {
+    return new Promise(resolve => {
+      const timer = setTimeout(() => { this._memCompoWaiters.delete(platformType); resolve(null); }, 1000);
+      this._memCompoWaiters.set(platformType, c => { clearTimeout(timer); resolve(c); });
+      this.workletNode?.port.postMessage({ type: 'getMemCompo', platformType });
     });
   }
 

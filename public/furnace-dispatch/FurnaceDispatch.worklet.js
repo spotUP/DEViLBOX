@@ -412,6 +412,23 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         break;
       }
 
+      case 'getMemCompo': {
+        // Furnace's own DivDispatch::getMemCompo, as JSON (null when the chip reports none).
+        const chip = this.getChip(data.platformType);
+        let compo = null;
+        if (chip && this.wasm && this.wasm.memCompo) {
+          const ptr = this.wasm.memCompo(chip.handle, data.index || 0);
+          if (ptr) {
+            const heap = this.module.HEAPU8;
+            let end = ptr;
+            while (heap[end] !== 0) end++;
+            compo = JSON.parse(new TextDecoder().decode(heap.subarray(ptr, end)));
+          }
+        }
+        this.port.postMessage({ type: 'memCompo', platformType: data.platformType, compo });
+        break;
+      }
+
       case 'renderSamples': {
         const chip = this.getChip(data.platformType);
         if (chip && this.wasm) {
@@ -917,6 +934,7 @@ class FurnaceDispatchProcessor extends AudioWorkletProcessor {
         setSample: this.module._furnace_dispatch_set_sample,
         renderSamples: this.module._furnace_dispatch_render_samples,
         sampleMem: this.module._furnace_dispatch_sample_mem,
+        memCompo: this.module._furnace_dispatch_mem_compo,
         // Macro control functions
         setMacrosEnabled: this.module._furnace_dispatch_set_macros_enabled,
         clearMacros: this.module._furnace_dispatch_clear_macros,

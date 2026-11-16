@@ -11,6 +11,7 @@ import {
 } from './tadSongWriter';
 import { openTadSession, type CreateTadCompiler } from './tadCompilerWasm';
 import { injectTadPlayerRom, type TadPlayerRomMeta } from './tadPlayerRom';
+import { TAD_AUDIO_RAM_BYTES, tadAudioRamBudget, tadAudioRamFromLog, tadAudioRamWarning, type TadAudioRamParts } from './tadAudioRam';
 
 /** One Furnace instrument in either shape (parsed module or store config) -> writer input. */
 export function tadInstrumentFromFurnace(name: string, f: {
@@ -48,6 +49,8 @@ export interface TadBuildResult {
   warnings: string[];
   /** Compiler sizes (bytes), null when the project did not check. */
   ram: { common: number; songs: { name: string; bytes: number }[] } | null;
+  /** The shared Audio-RAM calculation's input: from the compiler's sizes, or from its "too large" log when the check failed. */
+  audioRam: TadAudioRamParts | null;
   /** `check` passed. When false the zip holds the project and the compiler log only. */
   ok: boolean;
   songs: string[];
@@ -61,7 +64,7 @@ const ident = (s: string) => {
 };
 const sameBytes = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((v, i) => v === b[i]);
 const PROJECT = 'project.terrificaudio';
-const AUDIO_RAM_BYTES = 65536;
+const AUDIO_RAM_BYTES = TAD_AUDIO_RAM_BYTES;
 
 /** Project JSON for several songs, the sound effects (export order) and the samples. */
 export function tadProjectJson(songs: { name: string; source: string }[], samples: TadSampleFile[], sfxNames: string[] = []): string {
@@ -181,7 +184,7 @@ async function buildTadProjectOnce(files: TadBuildFile[], create: CreateTadCompi
   if (sfx.length) project[TAD_SFX_FILE] = sfx.map((p) => p.mml).join('\n');
   for (const s of samples) project[s.path] = s.data;
 
-  const result: TadBuildResult = { zip: new Uint8Array(), warnings, ram: null, ok: false, songs: songs.map((p) => p.name), soundEffects: sfx.map((p) => p.name) };
+  const result: TadBuildResult = { zip: new Uint8Array(), warnings, ram: null, audioRam: null, ok: false, songs: songs.map((p) => p.name), soundEffects: sfx.map((p) => p.name) };
   const zip = new JSZip();
   for (const [path, data] of Object.entries(project)) zip.file(`project/${path}`, data);
 
@@ -190,7 +193,12 @@ async function buildTadProjectOnce(files: TadBuildFile[], create: CreateTadCompi
   const check = tad.run(['check', pf]);
   let log = `check: exit ${check.code}\n${check.log}`;
   result.ok = check.code === 0;
-  if (!result.ok) warnings.push(`The TAD compiler rejected the project: ${check.log.split('\n').slice(0, 5).join(' | ')}`);
+  if (!result.ok) {
+    warnings.push(`The TAD compiler rejected the project: ${check.log.split('\n').slice(0, 5).join(' | ')}`);
+    result.audioRam = tadAudioRamFromLog(check.log);
+    const over = result.audioRam && tadAudioRamWarning(tadAudioRamBudget(result.audioRam));
+    if (over) warnings.push(over);
+  }
   else {
     const run = (what: string, args: string[]) => {
       const r = tad.run(args);
@@ -206,7 +214,9 @@ async function buildTadProjectOnce(files: TadBuildFile[], create: CreateTadCompi
     for (const p of songs) if (run(`song data ${p.name}`, ['song', '-o', `/o/${p.name}.bin`, pf, p.name])) ram.songs.push({ name: p.name, bytes: size(`/o/${p.name}.bin`) });
     result.ram = ram;
     const biggest = Math.max(0, ...ram.songs.map((s) => s.bytes));
-    if (ram.common + biggest > AUDIO_RAM_BYTES) warnings.push(`Common data plus the largest song is ${ram.common + biggest} bytes, over the ${AUDIO_RAM_BYTES} byte audio RAM.`);
+    result.audioRam = { commonBytes: ram.common, songBytes: biggest, echoBytes: tadAudioRamFromLog(check.log)?.echoBytes ?? null };
+    const over = tadAudioRamWarning(tadAudioRamBudget(result.audioRam));
+    if (over) warnings.push(over);
 
     const asm: { id: string; cmd: string; seg: string[]; ext: string }[] = [
       { id: 'ca65', cmd: 'ca65-export', seg: ['-s', 'BANK1'], ext: 'asm' },

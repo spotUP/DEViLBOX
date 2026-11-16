@@ -92,6 +92,14 @@ export function dispatchCaptureToLog(writes: readonly RegisterWrite[], workletRa
   return out;
 }
 
+/** Furnace's own memory composition of one chip (DivDispatch::getMemCompo). `type` is DivMemoryEntryType. */
+export interface FurnaceMemCompo {
+  name: string;
+  capacity: number;
+  used: number;
+  entries: { type: number; name: string; asset: number; begin: number; end: number }[];
+}
+
 /** One chip sample ROM as the worklet reads it (YM2610: index 0 ADPCM-A, 1 ADPCM-B). */
 export interface DispatchSampleRom {
   index: number;

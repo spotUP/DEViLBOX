@@ -1205,6 +1205,39 @@ int furnace_dispatch_sample_mem(int handle, int index, int what) {
 }
 
 /**
+ * Memory composition of one chip (DivDispatch::getMemCompo), as JSON in a
+ * static buffer valid until the next call; null (0) when the chip reports none.
+ * entries: type (DivMemoryEntryType), name, asset (sample index or -1), begin, end.
+ */
+EMSCRIPTEN_KEEPALIVE
+const char* furnace_dispatch_mem_compo(int handle, int index) {
+  static std::string json;
+  auto it = g_instances.find(handle);
+  if (it == g_instances.end() || !it->second->dispatch) return nullptr;
+  const DivMemoryComposition* mc = it->second->dispatch->getMemCompo(index);
+  if (!mc) return nullptr;
+  auto esc = [](const std::string& in) {
+    std::string o;
+    for (char c : in) {
+      if (c == '"' || c == '\\') { o += '\\'; o += c; }
+      else if ((unsigned char)c >= 0x20) o += c;
+    }
+    return o;
+  };
+  json = "{\"name\":\"" + esc(mc->name) + "\",\"capacity\":" + std::to_string(mc->capacity) +
+         ",\"used\":" + std::to_string(mc->used) + ",\"entries\":[";
+  bool first = true;
+  for (const DivMemoryEntry& e : mc->entries) {
+    if (!first) json += ",";
+    first = false;
+    json += "{\"type\":" + std::to_string((int)e.type) + ",\"name\":\"" + esc(e.name) + "\",\"asset\":" +
+            std::to_string(e.asset) + ",\"begin\":" + std::to_string(e.begin) + ",\"end\":" + std::to_string(e.end) + "}";
+  }
+  json += "]}";
+  return json.c_str();
+}
+
+/**
  * Send a command to the dispatch.
  */
 EMSCRIPTEN_KEEPALIVE

@@ -16,6 +16,9 @@ import { useTrackerStore, useFormatStore, useUIStore } from '@stores';
 import { useTransportStore } from '@stores/useTransportStore';
 import { PatternEditorCanvas } from '@/components/tracker/PatternEditorCanvas';
 import { FurnaceOrderEditor, FURNACE_ORDER_MATRIX_HEIGHT, FURNACE_ORDER_MATRIX_COLLAPSED_HEIGHT } from './FurnaceOrderEditor';
+import { FurnaceMemoryComposition } from './FurnaceMemoryComposition';
+import { FURNACE_SNES_CHIP_ID } from '@/lib/export/tad/tadSongWriter';
+import { Button } from '@components/ui/Button';
 import { useResponsiveSafe } from '@/contexts/ResponsiveContext';
 
 const TOOLBAR_H = 36;
@@ -30,6 +33,8 @@ export const FurnaceView: React.FC<{ width?: number; height?: number }> = () => 
   const currentRow = useTransportStore(s => s.currentRow);
   const editorFullscreen = useUIStore(s => s.editorFullscreen);
 
+  const [memOpen, setMemOpen] = useState(false);
+  const isSnes = (nativeData?.chipIds ?? []).includes(FURNACE_SNES_CHIP_ID)
   const [editPosition, setEditPosition] = useState(0);
   const [orderCollapsed, setOrderCollapsed] = useState(isMobile); // Collapsed by default on mobile
 
@@ -103,8 +108,10 @@ export const FurnaceView: React.FC<{ width?: number; height?: number }> = () => 
         <span style={{ fontWeight: 'bold', color: '#fde047', fontSize: '12px' }}>FURNACE</span>
         <span style={{ color: 'var(--color-text-muted)' }}>|</span>
         <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', flex: 1 }}>{toolbarInfo}</span>
+        {isSnes && <Button variant="ghost" size="sm" onClick={() => setMemOpen((o) => !o)}>Memory Composition</Button>}
       </div>
       )}
+      {!editorFullscreen && memOpen && isSnes && <FurnaceMemoryComposition />}
 
       {/* Order Editor */}
       {!editorFullscreen && (

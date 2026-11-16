@@ -677,6 +677,9 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                     {ex.tadReport && (
                       <div className="space-y-1">
                         <div className="text-xs">Audio RAM: <span className="text-accent-primary">{ex.tadReport.ram}</span></div>
+                        {ex.tadReport.rows.map((r) => (
+                          <div key={r.id} className="text-xs">{r.label}: <span className="text-text-primary">{r.bytes} bytes</span></div>
+                        ))}
                         {ex.tadReport.warnings.map((w, i) => (
                           <div key={i} className="text-xs text-accent-warning">{w}</div>
                         ))}

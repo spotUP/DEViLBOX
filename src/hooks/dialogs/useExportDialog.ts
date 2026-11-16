@@ -352,7 +352,7 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
   }, [metadata]);
 
   const tadAvailable = (furnaceNative?.chipIds ?? []).includes(FURNACE_SNES_CHIP_ID);
-  const [tadReport, setTadReport] = useState<{ warnings: string[]; ram: string } | null>(null);
+  const [tadReport, setTadReport] = useState<{ warnings: string[]; ram: string; rows: { id: string; label: string; bytes: number }[] } | null>(null);
 
   const handleExportTad = useCallback(async (
     downloadFn: (blob: Blob, filename: string) => void,
@@ -361,7 +361,11 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     const { exportTadProjectFile } = await import('@lib/export/moduleExportService');
     const result = await exportTadProjectFile();
     const ram = result.ram ? `Common ${result.ram.common} bytes; ${result.ram.songs.map((s) => `${s.name} ${s.bytes} bytes`).join('; ')}` : 'not measured';
-    setTadReport({ warnings: result.warnings, ram });
+    const { tadAudioRamBudget, tadAudioRamWarning } = await import('@lib/export/tad/tadAudioRam');
+    const budget = result.audioRam ? tadAudioRamBudget(result.audioRam) : null;
+    setTadReport({ warnings: result.warnings, ram, rows: budget?.rows ?? [] });
+    const over = budget && tadAudioRamWarning(budget);
+    if (over) notify.warning(over);
     downloadFn(new Blob([result.zip as BlobPart], { type: 'application/zip' }), `${metadata.name || 'song'}-tad.zip`);
     // One toast, not one per warning: the full list is in the zip's README.txt (and the dialog on failure).
     if (result.warnings.length) notify.warning(`${result.warnings.length} export warnings (dropped macros/effects). Full list in README.txt in the zip.`);
