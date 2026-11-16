@@ -38,5 +38,5 @@ spc700asm.workspace = true
 [dev-dependencies]
 compiler = { workspace = true, features = ["test"] }
 
-tad-emu.workspace = true
+# tad-emu dev-dependency left out: tad-emu is not vendored (tests only)
 

@@ -15,3 +15,23 @@ opt-level = 3
 
 [profile.release.package.compiler]
 opt-level = 3
+
+[workspace.package]
+rust-version = "1.85"
+version = "0.4.2"
+publish = false
+
+[workspace.dependencies]
+brr = { path = "./crates/brr", version = "=0.0.0" }
+compiler = { path = "./crates/compiler", version = "=0.0.0", features = [] }
+spc700asm = { path = "./crates/spc700asm/", version = "=0.0.0" }
+tad-compiler = { path = "./crates/tad-compiler", version = "=0.0.0" }
+clap = { version="4.5.16", features=[ "derive" ] }
+anstyle = { version="1.0.13" }
+anstream = { version="1.0.0" }
+serde = { version="1.0.164", features=[ "derive" ] }
+serde_json = { version="1.0.97" }
+relative-path = { version="2.0.1", features=[ "serde" ] }
+bitflags = { version="2.10.0" }
+regex = { version="1.10.2" }
+markdown = { version="1.0.0" }

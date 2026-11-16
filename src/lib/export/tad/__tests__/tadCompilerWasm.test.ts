@@ -10,8 +10,9 @@ const walk = (d: string): string[] =>
 const sha = (b: Uint8Array) => createHash('sha256').update(b).digest('hex');
 
 describe('tad-compiler WASM', () => {
-  // Hashes from the native tad-compiler v0.4.2 CLI on the same project (golden: WASM == native).
-  it('compiles the upstream example project to the same bytes as the native CLI', async () => {
+  // Hashes of the WASM build with the DEViLBOX level-meter driver patch (audio-driver.asm mainloop, CPUIO3).
+  // Before that patch they matched the native tad-compiler v0.4.2 CLI byte for byte; rebuild and update together.
+  it('compiles the upstream example project to the recorded bytes', async () => {
     const files = Object.fromEntries(walk(EX).map((f) => [relative(EX, f), new Uint8Array(readFileSync(f))]));
     // @ts-expect-error generated JS module, no types
     const { default: create } = await import('../../../../../public/tad/tad-compiler.js');
@@ -20,8 +21,8 @@ describe('tad-compiler WASM', () => {
     expect(tad.run(['check', P]).code).toBe(0);
     expect(tad.run(['ca65-export', '--lorom', '-a', '/o/a.s', '-b', '/o/a.bin', '-i', '/o/a.inc', '--segment', 'BANK1', P]).code).toBe(0);
     expect(tad.run(['song2spc', '-o', '/o/s0.spc', P, '1']).code).toBe(0);
-    expect(sha(tad.read('/o/a.bin'))).toBe('74f262e3077d0ed34fb1799a54021eb476c9857ebce1e5e45629c22b5223d822');
-    expect(sha(tad.read('/o/a.s'))).toBe('36e81263f8639553f55d690eca8cd2f217b3089db263368412b862cd71afbea4');
-    expect(sha(tad.read('/o/s0.spc'))).toBe('acfb54904848f7d03e8ef673089c7543cd9123efa5d0318435ff23137abea800');
+    expect(sha(tad.read('/o/a.bin'))).toBe('6c60f991644b50a5d2b84974f0f8929938c033fd69df31e0eadc9294d10c5e9d');
+    expect(sha(tad.read('/o/a.s'))).toBe('6e9fa30c5099da0496be0ae8d6729ed0c797836a1b0439d76214cf3661f0f6e8');
+    expect(sha(tad.read('/o/s0.spc'))).toBe('722ccf3fb6762c6fcada885ad8e03b645a605c44761bb3de3eda6160b71d00cb');
   }, 60000);
 });

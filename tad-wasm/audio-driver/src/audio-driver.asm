@@ -78,6 +78,11 @@ VOL_PAN_EFFECT_TRIANGLE_DOWN = $41
 
 
 .vars zeropage
+    ; DEViLBOX player level meter: voice register base ($00-$70) last reported on CPUIO3
+    meterVoice : u8
+    ; DEViLBOX player level meter: left volume of the voice being measured
+    meterVolL : u8
+
     ; Temporary variables
     zpTmpWord : u16
         zpTmp  = zpTmpWord
@@ -862,6 +867,44 @@ ClearEchoBufferEnd:
 
     Loop:
         io__process_io_ports
+
+        ; DEViLBOX player level meter.
+        ; Each loop reports one voice (round robin) on CPUIO3 as `$80 | voice << 4 | level`,
+        ; level = max(VOL_L, VOL_R) >> 3 (0-15), or 0 when ENVX is 0 (note released or silent).
+        ; Bit 7 is always set, so the value never matches the loader's 'D' ready byte.
+        ; Negative (surround) channel volumes read as 0.
+        mov A, meterVoice
+        clrc
+        adc A, #$10
+        and A, #$70
+        mov meterVoice, A
+        or A, #VxENVX
+        mov DSPADDR, A
+        mov A, DSPDATA
+        beq MeterWrite
+            mov A, meterVoice
+            mov DSPADDR, A
+            mov A, DSPDATA
+            bpl MeterLeftPositive
+                mov A, #0
+            MeterLeftPositive:
+            mov meterVolL, A
+            inc DSPADDR
+            mov A, DSPDATA
+            bpl MeterRightPositive
+                mov A, #0
+            MeterRightPositive:
+            cmp A, meterVolL
+            bcs MeterRightLarger
+                mov A, meterVolL
+            MeterRightLarger:
+            lsr A
+            lsr A
+            lsr A
+        MeterWrite:
+        or A, meterVoice
+        or A, #$80
+        mov CPUIO3, A
 
         ; Song tick timer
         mov A, T0OUT
