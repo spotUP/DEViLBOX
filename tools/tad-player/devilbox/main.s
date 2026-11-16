@@ -38,7 +38,8 @@ ROM_SPEED   = ROM_SPEED__Slow
 .export TEXT_BUFFER_VRAM_TILES_WADDR : absolute = $1000
 
 .define SnesRgb(r, g, b) ((r) | ((g) << 5) | ((b) << 10))
-.define Pos(xPos, yPos) TextBuffer_PosToIndex(xPos, yPos)
+; No parentheses on the inner call: ca65 2.18 expands TextBuffer_PosToIndex(x, y) here as (x + y) * 32.
+.define Pos(xPos, yPos) TextBuffer_PosToIndex xPos, yPos
 
 TILE_ASCII_OFFSET = 31          ; font tile = ASCII - 31 (font.inc FONT_ASCII_OFFSET)
 TILE_BAR_LEFT     = 128         ; + fill (0-8 rows)
