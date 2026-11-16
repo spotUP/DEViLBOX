@@ -5,6 +5,15 @@
  * Furnace has no 38xx (sysDef.cpp SNES table: 10-16, 18-1F, 20-23, 30-37), so there the filter jumps.
  * One implementation for playback (TrackerReplayer) and the TAD export (tadSongWriter).
  */
+/**
+ * True when a Furnace instrument drives the SNES chip. Same gate as the SNES editor panels:
+ * `furnace.chipType` is the engine chip enum (SNES = 24, FurnaceChipType) and is the module's
+ * primary chip on imports, never FurnaceDispatchPlatform.SNES (26), so it is not tested here.
+ */
+export function isSnesInstrument(config: { synthType?: string; furnace?: { synthType?: string; snes?: unknown } }): boolean {
+  return config.synthType === 'FurnaceSNES' || config.furnace?.synthType === 'FurnaceSNES' || !!config.furnace?.snes;
+}
+
 export const SNES_FIR_BLEND_EFFECT = 0x38;
 export const SNES_FIR_TAP_EFFECT = 0x30;
 export const SNES_FIR_TAP_COUNT = 8;

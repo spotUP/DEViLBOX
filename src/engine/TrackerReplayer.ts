@@ -45,9 +45,8 @@ import { useCursorStore } from '@/stores/useCursorStore';
 import { useFormatStore } from '@/stores/useFormatStore';
 import { decodeVolumeColumn, noteStartLevel } from '@/lib/tracker/volumeColumn';
 import { furnaceCellChipEffects, cellSetVolumeLevel } from './replayer/furnaceCellEffects';
-import { SnesFirBlender, SNES_FIR_BLEND_EFFECT, SNES_FIR_TAP_EFFECT, SNES_FIR_TAP_COUNT } from '@/lib/furnace/snesFirBlend';
+import { SnesFirBlender, isSnesInstrument, SNES_FIR_BLEND_EFFECT, SNES_FIR_TAP_EFFECT, SNES_FIR_TAP_COUNT } from '@/lib/furnace/snesFirBlend';
 import { SNES_FIR_PRESETS } from '@/lib/furnace/snesDsp';
-import { FurnaceDispatchPlatform } from './furnace-dispatch/platforms';
 import { FurnaceTickEffects, TICK_STEPPED_EFFECTS } from './furnace-dispatch/FurnaceTickEffects';
 import { dispatchNoteOfMidi, DivCmd } from './furnace-dispatch/FurnaceDispatchEngine';
 import { noteToMidi } from '@/utils/audio-context';
@@ -1427,7 +1426,7 @@ export class TrackerReplayer {
     const stepped: { effect: number; param: number }[] = [];
     const cellEffects = furnaceCellChipEffects(row);
     // 30xx-37xx with 38xx: the echo filter steps toward the written taps one row at a time (snesFirBlend.ts).
-    const firSteps = config.furnace?.chipType === FurnaceDispatchPlatform.SNES
+    const firSteps = isSnesInstrument(config)
       ? this.snesFir.row(String(time), cellEffects.map((e) => ({ cmd: e.effect, val: e.param })))
       : null;
     for (const e of cellEffects) {
