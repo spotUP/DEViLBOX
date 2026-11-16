@@ -73,6 +73,18 @@ describe('Furnace effects in the TAD writer', () => {
     expect(check.code, `${check.log}\n${song.mml.slice(0, 3000)}`).toBe(0);
   }, 60000);
 
+  it('unrolls looping volume macros and releases them on E7xx; check passes', async () => {
+    const setVol = (m: object) => (ins: { macros?: object[] }[]) => ins.forEach((i) => { i.macros = [...(i.macros ?? []).filter((x) => (x as { code?: number }).code !== 0), { code: 0, ...m }]; });
+    const looped = await writeWithEffects([], 0, setVol({ data: [20, 100, 60], loop: 0, release: 255, speed: 8 }));
+    expect(looped.song.warnings.join('\n')).not.toMatch(/volume macro/);
+    const vs = (looped.song.mml.match(/V\d+(?= [a-g][+-]?%\d+ &)/g) ?? []);
+    expect(vs.length).toBeGreaterThan(3); // the 3-step loop repeats over the note
+    expect(looped.check.code, `${looped.check.log}\n${looped.song.mml.slice(0, 3000)}`).toBe(0);
+    const released = await writeWithEffects([[0xe7, 2]], 0, setVol({ data: [20, 100, 60, 127], loop: 255, release: 1, speed: 8 }));
+    expect(released.song.warnings.join('\n')).not.toMatch(/volume macro|Dropped effect E7/);
+    expect(released.check.code, `${released.check.log}\n${released.song.mml.slice(0, 3000)}`).toBe(0);
+  }, 60000);
+
   it('maps FDxx/FExx/F0xx tempo changes to T timer commands; check passes', async () => {
     const { song, check } = await writeWithEffects([[0xfd, 2], [0xfe, 2], [0xf0, 0x64]]);
     expect(song.warnings.join('\n')).not.toMatch(/Dropped effect (F0|FD|FE)xx/);
