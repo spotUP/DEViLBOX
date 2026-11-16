@@ -377,7 +377,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     let sounding = false, curNote = 'r';
     let hasNotes = false;
     // Effect state of this channel (Furnace effects that TAD holds as channel state).
-    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', fine = 0, inv = 'i0', noiseOn = false, vibWant: { d: number; q: number } | null = null, trem: { d: number; q: number } | null = null, lastTrem = '', volSlide = 0, slideSkip = 0, lastEnv = '', legatoOn = false;
+    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', fine = 0, inv = 'i0', noiseOn = false, vibWant: { d: number; q: number } | null = null, trem: { d: number; q: number } | null = null, lastTrem = '', volSlide = 0, slideSkip = 0, lastEnv = '', legatoOn = false, sampleOff = 0;
     let env: { mode: number; gain: number; adsr: number[] } | null = null;
     const pitchName = (p: number) => NOTE_NAMES[p % 12];
     // Furnace ticks to TAD ticks (rows are k Furnace-tick multiples; sound effects run at 125 Hz).
@@ -452,7 +452,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         cuts.push(out.length); bars.push(out.length);
       }
       if (r.timer && c === tempoCh) { flush(true); out.push(`T${r.timer}`); }
-      let delayUsed = 0, cutAt = 0, retrig = 0, relAt = -1;
+      let delayUsed = 0, cutAt = 0, retrig = 0, relAt = -1, soAt = -1;
       if (cl) {
         if (cl.ins >= 0) { ins = cl.ins; env = null; lastEnv = ''; }
         const cmds: string[] = [];
@@ -531,6 +531,12 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           }
           else if (e.cmd === 0xe7) relAt = e.val; // macro release after xx ticks; without a release point it changes nothing (macroInt.cpp:118-131)
           else if (e.cmd === 0xea) legatoOn = e.val !== 0; // playback.cpp:1513, 1674: later notes change pitch without key-on
+          else if (e.cmd >= 0x90 && e.cmd <= 0x9f) {
+            // playback.cpp:1314-1331: old 9xxx = xxx * 256 samples; else 90/91/92 set the low/mid/high byte of a kept
+            // offset, sent on this row only. snes.cpp:200-205, 491: it keys the channel on at that offset this row.
+            if (native.compatFlags?.oldSampleOffset) soAt = (((e.cmd & 15) << 8) | e.val) * 256;
+            else if (e.cmd < 0x93) { const sh = (e.cmd - 0x90) * 8; sampleOff = (sampleOff & ~(0xff << sh)) | (e.val << sh); soAt = sampleOff; }
+          }
           else if ([0x00, 0x01, 0x02, 0x03, 0x0c, 0xe1, 0xe2, 0xec, 0xed, 0xfc].includes(e.cmd)) { /* applied with the note below */ }
           else drop(`effect ${hex2(e.cmd)}xx`, at);
         }
@@ -647,6 +653,8 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         const isNote = cl.note >= 0 && cl.note < 180;
         const isOff = cl.note === NOTE_OFF || cl.note === NOTE_RELEASE;
         const legato = isNote && s03 > 0 && sounding && curPitch >= 0;
+        // snes.cpp:200-203: 9xx alone re-keys the sounding note at the offset; TAD only offsets a new key-on.
+        if (soAt >= 0 && (!isNote || legato) && soAt >> 8) drop('effect 9xx sample offset without a new note (no retrigger)', at);
         const legatoFx = legato ? pitchFx(curPitch, (() => { const n = soundOf(instruments[ins], cl.note, wave)?.note; return n === undefined ? -1 : clampP(n - FURNACE_NOTE_OFFSET); })()) : null;
         if (legato) {
           // 03xx: glide from the sounding note to the new one, no new key-on.
@@ -700,6 +708,14 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             const o = Math.floor(tad / 12);
             if (o !== oct) { oct = o; out.push(`o${o}`); }
             const smp = sound.smp;
+            // 9xx: TAD `\so n` (n * 256 samples) is one-shot for the next key-on, after `@`. Wavetables ignore it (snes.cpp:226).
+            if (soAt >= 0 && smp.startsWith('s') && !noiseOn) {
+              const max = Math.min(255, Math.floor((exportedLength(samples[Number(smp.slice(1))]) - 1) / 256));
+              let n = Math.round(soAt / 256);
+              if (n > max) { drop(`effect 9xx sample offset past the end of sample ${smp} (lowered)`, at); n = Math.max(0, max); }
+              if (n > 0) out.push(`\\so ${n}`);
+            }
+            soAt = -1;
             widen(smp, tad);
             curNote = NOTE_NAMES[tad % 12];
             curPitch = tad;
@@ -935,6 +951,14 @@ function toInt16(s: FurnaceModuleSample): Int16Array {
   if (s.depth === 8) for (let i = 0; i < n; i++) out[i] = (s.data[i] << 24) >> 16; // signed 8-bit
   else for (let i = 0; i < n; i++) out[i] = (s.data[2 * i] | (s.data[2 * i + 1] << 8)) << 16 >> 16; // 16-bit LE bytes
   return out;
+}
+
+/** Samples in the file sampleFile exports (the loop end cut to 16-sample blocks); `\\so` must stay below it. */
+function exportedLength(s: FurnaceModuleSample | undefined): number {
+  if (!s) return 0;
+  if (s.depth === 9) return Math.floor(s.data.byteLength / 9) * 16;
+  const len16 = (s.loopEnd - s.loopStart) & ~15;
+  return s.loopStart >= 0 && s.loopEnd > s.loopStart && len16 > 0 ? s.loopStart + len16 : s.samples ?? s.data.length;
 }
 
 /**

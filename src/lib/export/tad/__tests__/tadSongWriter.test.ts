@@ -173,6 +173,34 @@ describe('writeTadSong echo header', () => {
     expect(r.code, r.log).toBe(0);
   }, 60000);
 
+  // playback.cpp:1314-1331: 91xx sets the middle byte of the sample offset; TAD \\so counts 256-sample units, one-shot, after @.
+  // Old 9xxx counts 256 samples; an offset past the sample end is lowered to the last unit with a warning.
+  it.each([false, true])('carries 9xx sample offset as \\so (old 9xxx: %s)', async (old) => {
+    const file = 'Sunken Lights.fur';
+    const buf = readFileSync(resolve(DIR, file));
+    const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+    const native = buildFurnaceNativeData(module);
+    native.compatFlags = { ...native.compatFlags, oldSampleOffset: old };
+    const sub = native.subsongs[0];
+    const rows = sub.channels.flatMap((ch, c) => sub.orders[c]?.slice(0, 2).flatMap((p) => ch.patterns.get(p)?.rows ?? []) ?? []).filter((r) => r.note >= 0 && r.note < 180);
+    rows.forEach((r, i) => { r.effects = [...(r.effects ?? []), i % 2 ? { cmd: old ? 0x9f : 0x92, val: 0xff } : { cmd: old ? 0x90 : 0x91, val: 2 }]; });
+    const song = writeTadSong({ native, subsong: 0, instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)), samples: toSequencerSamples(module), wavetables: module.wavetables, title: file });
+    expect(song.mml).toMatch(/@\d+ (?:[^@\n]* )?\\so 2 (?:o\d )?[a-g]/);
+    expect(song.warnings.some((w) => /9xx sample offset past the end/.test(w))).toBe(true);
+    expect(song.warnings.some((w) => /effect 9[0-2F]xx/i.test(w))).toBe(false);
+    const files: Record<string, Uint8Array | string> = { 'p.terrificaudio': tadProjectJson([{ name: 'song', source: 'song.mml' }], song.samples), 'song.mml': song.mml };
+    for (const s of song.samples) files[s.path] = s.data;
+    // @ts-expect-error generated JS module
+    const { default: create } = await import('../../../../../public/tad/tad-compiler.js');
+    const r = (await openTadSession(files, create as CreateTadCompiler, (f) => resolve('public/tad', f))).run(['check', '/p/p.terrificaudio']);
+    expect(r.code, r.log).toBe(0);
+    // Subroutines keep each \\so with its @ and note.
+    const inline = writeTadSong({ native, subsong: 0, instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)), samples: toSequencerSamples(module), wavetables: module.wavetables, title: file, inline: true }).mml;
+    const count = (m: string) => (m.match(/\\so \d+/g) ?? []).length;
+    expect(count(inline)).toBeGreaterThan(0);
+    expect(count(song.mml)).toBeLessThanOrEqual(count(inline));
+  }, 60000);
+
   // playback.cpp:1554-1605: FAxy is 4x 0Axy, F3/F4 are 1/64 of 0Axy, F8/F9 change the volume once.
   it('carries FAxy, F3xx/F4xx and F8xx/F9xx volume effects', async () => {
     const buf = readFileSync(resolve(DIR, 'tetristheme.fur'));
