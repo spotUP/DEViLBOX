@@ -2764,7 +2764,7 @@ export function convertFurnaceToDevilbox(module: FurnaceModule, subsongIndex = 0
     const chipConfig: Record<string, unknown> = {};
     if (inst.gb) chipConfig.gb = inst.gb;
     if (inst.c64) chipConfig.c64 = inst.c64;
-    if (inst.snes) chipConfig.snes = inst.snes;
+    if (inst.snes) { chipConfig.snes = inst.snes; furnaceData.snes = inst.snes; } // editor and TAD export read furnace.snes; chipConfig is never read
     if (inst.n163) chipConfig.n163 = inst.n163;
     if (inst.fds) chipConfig.fds = inst.fds;
     if (inst.es5506) chipConfig.es5506 = inst.es5506;

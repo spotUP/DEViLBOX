@@ -2,20 +2,23 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { parseFurnaceSong, toSequencerSamples, buildFurnaceNativeData } from '@/lib/import/formats/FurnaceSongParser';
+import { parseFurnaceSong, convertFurnaceToDevilbox, toSequencerSamples, buildFurnaceNativeData } from '@/lib/import/formats/FurnaceSongParser';
 import { buildTadProject, tadInstrumentFromFurnace } from '../tadProjectBuilder';
 import { tadAudioRamBudget, TAD_DRIVER_BYTES, TAD_MAX_COMMON_DATA_BYTES } from '../tadAudioRam';
 import type { CreateTadCompiler } from '../tadCompilerWasm';
 
 const DIR = resolve(__dirname, '../../../../../public/data/songs/furnace/snes');
-async function build(file: string) {
+async function build(file: string, live = false) {
   const buf = readFileSync(resolve(DIR, file));
   const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
   // @ts-expect-error generated JS module
   const { default: create } = await import('../../../../../public/tad/tad-compiler.js');
   return buildTadProject([{
     title: module.name || file, native: buildFurnaceNativeData(module),
-    instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)),
+    // live = the instruments as the store holds them after import (what the export dialog reads)
+    instruments: live
+      ? convertFurnaceToDevilbox(module).instruments.map((i) => tadInstrumentFromFurnace(i.name, (i as { furnace?: object }).furnace ?? {}))
+      : module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)),
     samples: toSequencerSamples(module), wavetables: module.wavetables,
   }], create as CreateTadCompiler, (f) => resolve('public/tad', f));
 }
@@ -33,5 +36,13 @@ describe('TAD Audio-RAM budget', () => {
     expect(tadAudioRamBudget(small.audioRam!).over).toBe(false);
     expect(TAD_DRIVER_BYTES).toBe(4584);
     expect(TAD_MAX_COMMON_DATA_BYTES).toBe(60568);
+  }, 300000);
+
+  it('live store instruments give the same Audio-RAM rows as the parser instruments', async () => {
+    const parsed = await build('Breezy.fur');
+    const live = await build('Breezy.fur', true);
+    expect(live.audioRam).toEqual(parsed.audioRam);
+    expect(tadAudioRamBudget(live.audioRam!).over).toBe(true);
+    expect(tadAudioRamBudget((await build('64kb.fur', true)).audioRam!).over).toBe(false);
   }, 300000);
 });

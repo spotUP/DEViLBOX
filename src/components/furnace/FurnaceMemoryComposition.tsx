@@ -43,8 +43,12 @@ async function measure(): Promise<Report> {
   const { exportTadProjectFile } = await import('@lib/export/moduleExportService');
   const names = (useFormatStore.getState().furnaceSamples ?? []).map((s) => s.name);
   const result = await exportTadProjectFile();
-  const engine = FurnaceDispatchEngine.hasInstance() ? FurnaceDispatchEngine.getInstance() : null;
-  const compo = engine ? await engine.getMemCompo(FurnaceDispatchPlatform.SNES) : null;
+  // Furnace reports a chip's memory only after its samples are rendered; Play is not required for that.
+  const engine = FurnaceDispatchEngine.getInstance();
+  const native = useFormatStore.getState().furnaceNative;
+  if (native) await engine.prepareSongChips(native);
+  engine.uploadModuleSamplesToPlatform(FurnaceDispatchPlatform.SNES);
+  const compo = await engine.getMemCompo(FurnaceDispatchPlatform.SNES);
   const echoEntry = compo?.entries.find((e) => e.type === DIV_MEMORY_ECHO);
   const parts = result.audioRam ?? { commonBytes: 0, songBytes: 0, echoBytes: null };
   const budget = tadAudioRamBudget({ ...parts, echoBytes: parts.echoBytes ?? (echoEntry ? Math.round((echoEntry.end - echoEntry.begin) / SNES_ECHO_BYTES_PER_STEP) * SNES_ECHO_BYTES_PER_STEP : null) });
