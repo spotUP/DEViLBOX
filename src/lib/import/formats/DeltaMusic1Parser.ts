@@ -44,7 +44,7 @@ import type { Pattern, TrackerCell, InstrumentConfig, UADEChipRamInfo, DeltaMusi
 import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
 import { encodeDeltaMusic1Cell } from '@/engine/uade/encoders/DeltaMusic1Encoder';
 import { createSamplerInstrument } from './AmigaUtils';
-import { dm1IndexToNote, noteToDM1Index } from './DeltaMusic1Notes';
+import { dm1IndexToNote, noteToDM1Index, dm1EffectToGrid, gridEffectToDm1 } from './DeltaMusic1Notes';
 
 // -- Constants ---------------------------------------------------------------
 
@@ -566,42 +566,9 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
         //   0x09 SetPortamento  -> XM 3xx (tone portamento to target note)
         //   0x0A SetVolume      -> XM Cxx (set channel volume, 0-64)
         //   0x0B-0x1E: set arpeggio/ADSR params -> no standard XM equivalent
-        let effTyp = 0;
-        let eff = 0;
+        const { effTyp, eff } = dm1EffectToGrid(line.effect, line.effectArg);
         const effTyp2 = 0;
         const eff2 = 0;
-        switch (line.effect) {
-          case 0x01: // SetSpeed
-            if (line.effectArg !== 0) {
-              effTyp = 0x0f;
-              eff = line.effectArg;
-            }
-            break;
-
-          case 0x02: // SlideUp (period decreases -> pitch rises)
-            effTyp = 0x01;
-            eff = line.effectArg;
-            break;
-
-          case 0x03: // SlideDown (period increases -> pitch falls)
-            effTyp = 0x02;
-            eff = line.effectArg;
-            break;
-
-          case 0x09: // SetPortamento (tone portamento to current note)
-            effTyp = 0x03;
-            eff = line.effectArg;
-            break;
-
-          case 0x0a: // SetVolume (0-64 Amiga scale)
-            effTyp = 0x0c;
-            eff = Math.min(64, line.effectArg);
-            break;
-
-          default:
-            break;
-        }
-
         channelRows[ch].push({
           note: xmNote,
           instrument: instrId,
@@ -704,6 +671,23 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
       // bytes), not DEViLBOX's XM effect engine, so raw native codes are the correct
       // representation — this makes decode↔encode a byte-exact inverse (Tomy Tracker model).
       return { note, instrument, volume: 0, effTyp: dm1Eff, eff: dm1Arg, effTyp2: 0, eff2: 0, period: noteRaw };
+    },
+    // Instrument and effect edits over a stored line: the instrument byte (note rows only) and the effect pair, like a note edit.
+    effectPatches: (pattern, row, channel, cell) => {
+      const entry = trackEntryAt(pattern, channel);
+      const line = entry && entry.blockNumber < blocks.length ? blocks[entry.blockNumber][row] : undefined;
+      const patches: Array<[number, number]> = [];
+      if (!entry || !line) return { patches, noteUnchanged: false };
+      const at = blockDataFileOffset + entry.blockNumber * 64 + row * 4;
+      const want = cell.instrument ?? 0;
+      const cur = line.note !== 0 && line.instrument < 20 ? line.instrument + 1 : 0;
+      if (line.note !== 0 && want > 0 && want !== cur) patches.push([at, want - 1]);
+      const g = dm1EffectToGrid(line.effect, line.effectArg);
+      if ((cell.effTyp ?? 0) !== g.effTyp || (cell.eff ?? 0) !== g.eff) {
+        const native = gridEffectToDm1(cell.effTyp ?? 0, cell.eff ?? 0);
+        if (native) patches.push([at + 2, native[0]], [at + 3, native[1]]);
+      }
+      return { patches, noteUnchanged: false };
     },
     encodeOverStored: true,
     // A grid pattern is a song position; each channel plays a shared block, transposed by its track entry.

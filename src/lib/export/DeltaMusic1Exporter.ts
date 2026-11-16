@@ -20,7 +20,7 @@
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { DeltaMusic1Config } from '@/types';
-import { noteToDM1Index } from '@/lib/import/formats/DeltaMusic1Notes';
+import { noteToDM1Index, gridEffectToDm1 } from '@/lib/import/formats/DeltaMusic1Notes';
 import { patchModuleByLayout } from './layoutPatch';
 
 // -- Constants ---------------------------------------------------------------
@@ -48,20 +48,7 @@ export interface DeltaMusic1ExportResult {
  * Parser maps: DM1 0x01->XM 0x0F, 0x02->0x01, 0x03->0x02, 0x09->0x03, 0x0A->0x0C
  */
 function xmEffectToDM1(effTyp: number, eff: number): [number, number] {
-  switch (effTyp) {
-    case 0x0f: // XM Fxx (set speed) -> DM1 0x01
-      return [0x01, eff];
-    case 0x01: // XM portamento up -> DM1 0x02 (SlideUp)
-      return [0x02, eff];
-    case 0x02: // XM portamento down -> DM1 0x03 (SlideDown)
-      return [0x03, eff];
-    case 0x03: // XM tone portamento -> DM1 0x09 (SetPortamento)
-      return [0x09, eff];
-    case 0x0c: // XM set volume -> DM1 0x0A (SetVolume)
-      return [0x0a, Math.min(64, eff)];
-    default:
-      return [0x00, 0x00];
-  }
+  return gridEffectToDm1(effTyp, eff) ?? [0x00, 0x00];
 }
 
 // -- Block deduplication -----------------------------------------------------

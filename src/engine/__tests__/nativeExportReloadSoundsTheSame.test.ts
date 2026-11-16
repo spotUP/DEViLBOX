@@ -555,9 +555,13 @@ for (const fmt of FORMATS.filter((f) => !f.held)) {
 // Instrument and effect edits (not only notes): a few note cells of the first position get another instrument and an effect; the
 // reload shows them. SA stores them only on a track line no other cell shows, so it needs at least one of the candidates to land;
 // Puma stores every one. A cell elsewhere may change only as an echo of an edited cell (a shared track).
-const INSTR_EFFECT: Array<{ key: string; rel: string; effTyp: number; eff: number; all: boolean }> = [
+const INSTR_EFFECT: Array<{ key: string; rel: string; effTyp: number; eff: number; all: boolean; effectOnly?: boolean }> = [
   { key: 'sonicArranger', rel: 'sonic-arranger/mega end.sa', effTyp: 0x10, eff: 30, all: false },
   { key: 'pumaTracker', rel: 'pumatracker/liquid kids - lv1a.puma', effTyp: 0x0C, eff: 20, all: true },
+  { key: 'deltaMusic1', rel: 'delta-music/triplex1.dm', effTyp: 0x03, eff: 12, all: true },
+  { key: 'deltaMusic2', rel: 'delta-music-2/asperity megademo 3.dm2', effTyp: 0x03, eff: 12, all: true },
+  { key: 'synthesis', rel: 'synthesis/space sound.syn', effTyp: 0x03, eff: 12, all: true, effectOnly: true },
+  { key: 'inStereo2', rel: 'instereo!-2.0/spaceflight.is20', effTyp: 0x03, eff: 12, all: true, effectOnly: true },
 ];
 describe('native export round trip: instrument and effect edits', { timeout: 120000 }, () => {
   for (const f of INSTR_EFFECT) {
@@ -569,7 +573,7 @@ describe('native export round trip: instrument and effect edits', { timeout: 120
       const p = before.songPositions[0];
       const picks: Array<{ ch: number; r: number; instrument: number }> = [];
       before.patterns[p].channels.forEach((c, ch) => c.rows.forEach((cell, r) => {
-        if (picks.length < 6 && cell.note > 0 && cell.note < 96 && cell.instrument > 0 && !cell.effTyp && !cell.eff && !cell.effTyp2 && !cell.volume && (ch > 0 || r > 0)) picks.push({ ch, r, instrument: cell.instrument === 1 ? 2 : 1 });
+        if (picks.length < 6 && cell.note > 0 && cell.note < 96 && cell.instrument > 0 && !cell.effTyp && !cell.eff && !cell.effTyp2 && !cell.volume && (ch > 0 || r > 0)) picks.push({ ch, r, instrument: f.effectOnly ? cell.instrument : cell.instrument === 1 ? 2 : 1 });
       }));
       expect(picks.length, 'candidate cells').toBeGreaterThan(0);
       st.setCurrentPattern(p);

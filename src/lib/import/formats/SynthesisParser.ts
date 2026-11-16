@@ -103,6 +103,28 @@ function readString(buf: Uint8Array, off: number, len: number): string {
  * Returns true if `bytes` appears to be a Synthesis module.
  * Checks "Synth4.0" at offset 0 or "Synth4.2" at offset 0x1f0e.
  */
+/** Synthesis native effect -> XM effTyp/eff (best-effort; SetFilter and the rest have no XM equivalent). */
+function synEffectToGrid(effect: number, arg: number): { effTyp: number; eff: number } {
+  switch (effect) {
+    case 0x1: return { effTyp: 0x03, eff: arg }; // Slide
+    case 0x8: return { effTyp: 0x0F, eff: arg }; // SetSpeed
+    case 0xF: return { effTyp: 0x0C, eff: Math.min(0x40, arg) }; // SetVolume
+    default: return { effTyp: 0, eff: 0 };
+  }
+}
+
+/** Inverse of synEffectToGrid: grid effect -> [native effect, arg]; null when Synthesis has no such effect. */
+function gridEffectToSyn(effTyp: number, eff: number): [number, number] | null {
+  switch (effTyp) {
+    case 0x00: return eff === 0 ? [0, 0] : null;
+    case 0x03: return [0x1, eff];
+    case 0x0F: return [0x8, eff];
+    case 0x0C: return [0xF, Math.min(0x40, eff)];
+    default: return null;
+  }
+}
+
+
 export function isSynthesisFormat(bytes: Uint8Array): boolean {
   if (bytes.length < 204) return false;
 
@@ -465,19 +487,8 @@ function parseSynthesis(bytes: Uint8Array, filename: string): TrackerSong | null
           if (instrNum > NOI) instrNum = NOI;
         }
 
-        // Map Synthesis effects to XM effects (best-effort)
-        switch (tl.effect) {
-          case 0x1: // Slide (portamento)
-            effTyp = 0x03; eff = tl.effectArg; break;
-          case 0x8: // SetSpeed
-            effTyp = 0x0F; eff = tl.effectArg; break;
-          case 0xF: // SetVolume
-            effTyp = 0x0C; eff = Math.min(0x40, tl.effectArg); break;
-          case 0x7: // SetFilter — no direct XM equivalent, skip
-            break;
-          default:
-            break;
-        }
+        const fx = synEffectToGrid(tl.effect, tl.effectArg);
+        effTyp = fx.effTyp; eff = fx.eff;
 
         cells[row][v] = {
           note:       xmNote,
@@ -540,6 +551,21 @@ function parseSynthesis(bytes: Uint8Array, filename: string): TrackerSong | null
     encodeCell: encodeSynthesisCell,
     // Byte 2 holds the arpeggio index in its high nibble; the grid has no field for it.
     encodeOverStored: true,
+    // Effect edits: byte 2 low nibble (keeps the arpeggio nibble) and the argument byte. Instrument stays a limit:
+    // the grid instrument is the line's plus the position's sound transpose.
+    effectPatches: (pattern: number, row: number, channel: number, cell: TrackerCell) => {
+      const pos = positions[pattern]?.[channel];
+      const line = pos ? trackLines[pos.startTrackRow + row] : undefined;
+      const patches: Array<[number, number]> = [];
+      if (!pos || !line) return { patches, noteUnchanged: false };
+      const g = synEffectToGrid(line.effect, line.effectArg);
+      if ((cell.effTyp ?? 0) !== g.effTyp || (cell.eff ?? 0) !== g.eff) {
+        const native = gridEffectToSyn(cell.effTyp ?? 0, cell.eff ?? 0);
+        const at = trackRowDataOffset + (pos.startTrackRow + row) * 4;
+        if (native) patches.push([at + 2, (bytes[at + 2] & 0xF0) | native[0]], [at + 3, native[1]]);
+      }
+      return { patches, noteUnchanged: false };
+    },
     // A grid pattern is a position; each voice reads a shared run of track lines from its start row.
     propagateSharedCells: true,
     // Instrument (shown + sound transpose) and effects (shown XM-mapped) belong to the position, not the stored line.

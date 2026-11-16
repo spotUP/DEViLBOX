@@ -676,6 +676,21 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
     moduleSize: bytes.length,
     encodeCell: encodeInStereo2Cell,
     encodeOverStored: true,
+    // Effect edits: byte 3 low nibble (keeps the flag/arpeggio nibble) and the argument byte. Instrument stays a limit:
+    // the grid instrument is remapped and moved by the position's sound transpose.
+    effectPatches: (pattern: number, row: number, channel: number, cell: TrackerCell) => {
+      const pos = positions[firstPos + pattern]?.[channel];
+      const line = pos ? trackLines[pos.startTrackRow + row] : undefined;
+      const patches: Array<[number, number]> = [];
+      if (!pos || !line) return { patches, noteUnchanged: false };
+      const g = is20EffectToXm(line.effect, line.effectArg);
+      if ((cell.effTyp ?? 0) !== g.effTyp || (cell.eff ?? 0) !== g.eff) {
+        const native = gridEffectToIs20(cell.effTyp ?? 0, cell.eff ?? 0);
+        const at = trackRowDataOffset + (pos.startTrackRow + row) * 4;
+        if (native) patches.push([at + 2, (bytes[at + 2] & 0xF0) | native[0]], [at + 3, native[1]]);
+      }
+      return { patches, noteUnchanged: false };
+    },
     propagateSharedCells: true,
     // Instrument (sound transpose) and effects belong to the position's view, not the stored line; the encoder keeps those bytes.
     positionBoundFields: () => ['instrument', 'volume', 'effTyp', 'eff', 'effTyp2', 'eff2'],
@@ -824,5 +839,18 @@ function is20EffectToXm(effect: number, arg: number): { effTyp: number; eff: num
       return { effTyp: 0, eff: 0 };
     default:
       return { effTyp: 0, eff: 0 };
+  }
+}
+
+/** Inverse of is20EffectToXm: grid effect -> [native effect, arg]; null where InStereo! 2.0 has no such effect (the map is many-to-one). */
+function gridEffectToIs20(effTyp: number, eff: number): [number, number] | null {
+  switch (effTyp) {
+    case 0x00: return [0x0, eff];
+    case 0x03: return [0x7, eff];
+    case 0x0B: return [0xB, eff];
+    case 0x0C: return [0xC, Math.min(64, eff)];
+    case 0x0D: return [0xD, 0];
+    case 0x0F: return eff > 0 && eff <= 31 ? [0xF, eff] : null;
+    default: return null;
   }
 }

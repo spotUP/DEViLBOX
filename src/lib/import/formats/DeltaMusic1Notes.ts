@@ -57,3 +57,28 @@ export function noteToDM1Index(note: number): number {
   }
   return best;
 }
+
+/** The grid's XM view of a DM1 effect. One place: the parser shows it, effectPatches and the exporter invert it. */
+export function dm1EffectToGrid(effect: number, arg: number): { effTyp: number; eff: number } {
+  switch (effect) {
+    case 0x01: return arg !== 0 ? { effTyp: 0x0f, eff: arg } : { effTyp: 0, eff: 0 }; // SetSpeed
+    case 0x02: return { effTyp: 0x01, eff: arg }; // SlideUp
+    case 0x03: return { effTyp: 0x02, eff: arg }; // SlideDown
+    case 0x09: return { effTyp: 0x03, eff: arg }; // SetPortamento
+    case 0x0a: return { effTyp: 0x0c, eff: Math.min(64, arg) }; // SetVolume
+    default: return { effTyp: 0, eff: 0 }; // the rest has no XM equivalent
+  }
+}
+
+/** Inverse of dm1EffectToGrid; null when DM1 has no such effect (a grid effect edit of it is skipped: limit). */
+export function gridEffectToDm1(effTyp: number, eff: number): [number, number] | null {
+  switch (effTyp) {
+    case 0x00: return eff === 0 ? [0x00, 0x00] : null;
+    case 0x0f: return [0x01, eff];
+    case 0x01: return [0x02, eff];
+    case 0x02: return [0x03, eff];
+    case 0x03: return [0x09, eff];
+    case 0x0c: return [0x0a, Math.min(64, eff)];
+    default: return null;
+  }
+}

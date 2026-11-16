@@ -93,6 +93,37 @@ function s8(v: number): number {
 
 // ── Format Identification ──────────────────────────────────────────────────
 
+/** The grid's XM view of a DM2 effect (SetVolume lands in the volume column). One place; effectPatches is its inverse. */
+function dm2EffectToGrid(effect: number, arg: number, arpeggios: ArrayLike<number>[]): { effTyp: number; eff: number; volume: number } {
+  switch (effect) {
+    case 0x01: return { effTyp: 0x0F, eff: Math.max(1, arg & 0x0f), volume: 0 }; // SetSpeed
+    case 0x03: return { effTyp: 0x01, eff: arg & 0xff, volume: 0 }; // bend up
+    case 0x04: return { effTyp: 0x02, eff: arg & 0xff, volume: 0 }; // bend down
+    case 0x05: return { effTyp: 0x03, eff: arg, volume: 0 }; // tone portamento
+    case 0x06: return { effTyp: 0, eff: 0, volume: 0x10 + Math.min(64, Math.round((arg & 0x3f) / 63 * 64)) }; // SetVolume
+    case 0x07: return { effTyp: 0x10, eff: Math.min(64, Math.round((arg & 0x3f) / 63 * 64)), volume: 0 }; // SetGlobalVolume
+    case 0x08: { // SetArp: first two semitone offsets of the table
+      const t = arpeggios[arg & 0x3f];
+      if (!t) return { effTyp: 0, eff: 0, volume: 0 };
+      return { effTyp: 0x00, eff: (Math.max(0, Math.min(15, t[1] > 0 ? t[1] : 0)) << 4) | Math.max(0, Math.min(15, t[2] > 0 ? t[2] : 0)), volume: 0 };
+    }
+    default: return { effTyp: 0, eff: 0, volume: 0 }; // 0x00 none, 0x02 filter has no XM equivalent
+  }
+}
+
+/** Inverse of dm2EffectToGrid: the DM2 effect byte pair for a grid effect, null when DM2 has none (limit: skipped). */
+function gridEffectToDm2(effTyp: number, eff: number, volume: number, arpeggios: ArrayLike<number>[]): [number, number] | null {
+  if (volume >= 0x10 && volume <= 0x50) return [0x06, Math.min(63, Math.round((volume - 0x10) / 64 * 63))];
+  if (effTyp === 0 && eff === 0) return [0, 0];
+  if (effTyp === 0x0F) return [0x01, eff & 0x0f];
+  if (effTyp === 0x01) return [0x03, eff];
+  if (effTyp === 0x02) return [0x04, eff];
+  if (effTyp === 0x03) return [0x05, eff];
+  if (effTyp === 0x10) return [0x07, Math.min(63, Math.round(eff / 64 * 63))];
+  if (effTyp === 0x00) { const a = arpeggios.findIndex((_, i) => { const g = dm2EffectToGrid(0x08, i, arpeggios); return g.eff === eff; }); return a >= 0 ? [0x08, a] : null; }
+  return null;
+}
+
 /**
  * Returns true if `bytes` appears to be a Delta Music 2.0 module.
  * Checks the ".FNL" magic at offset 0xBC6 and the minimum file size.
@@ -512,79 +543,16 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
         // on a note-less row the byte is unused and must not show as an instrument number.
         const instrId = line.note > 0 && line.instrument < dm2Instruments.length ? line.instrument + 1 : 0;
 
-        // Effect mapping: DM2 effects → XM effects
-        let effTyp = 0;
-        let eff = 0;
-        let effTyp2 = 0;
-        let eff2 = 0;
-
-        switch (line.effect) {
-          case 0x01: // SetSpeed: new play speed (low nibble of effectArg)
-            effTyp = 0x0F;
-            eff = Math.max(1, line.effectArg & 0x0f);
-            break;
-
-          case 0x02: // SetFilter: Amiga LED filter toggle — no XM equivalent, omit
-            break;
-
-          case 0x03: // SetBendRateUp: pitch bend up (period decreases)
-            effTyp = 0x01; // XM portamento up
-            eff = line.effectArg & 0xff;
-            break;
-
-          case 0x04: // SetBendRateDown: pitch bend down (period increases)
-            effTyp = 0x02; // XM portamento down
-            eff = line.effectArg & 0xff;
-            break;
-
-          case 0x05: // SetPortamento: tone portamento speed
-            effTyp = 0x03; // XM tone portamento
-            eff = line.effectArg;
-            break;
-
-          case 0x06: { // SetVolume: channel max volume (0–63 Amiga scale)
-            // Encode as XM volume column: 0x10 = vol 0, 0x50 = vol 64
-            const xmVol = Math.round((line.effectArg & 0x3f) / 63 * 64);
-            channelRows[ch].push({
-              note: xmNote,
-              instrument: instrId,
-              volume: 0x10 + Math.min(64, xmVol),
-              effTyp: 0, eff: 0, effTyp2: 0, eff2: 0,
-            });
-            continue; // volume already set, skip the push below
-          }
-
-          case 0x07: { // SetGlobalVolume (0–63 Amiga scale → 0–64 XM scale)
-            effTyp = 0x10; // XM global volume (Gxx)
-            eff = Math.min(64, Math.round((line.effectArg & 0x3f) / 63 * 64));
-            break;
-          }
-
-          case 0x08: { // SetArp: select arpeggio table (effectArg & 0x3f = table index)
-            // Map to XM arpeggio effect 0xy using first two semitone offsets
-            const arpIdx = line.effectArg & 0x3f;
-            const arpTable = arpIdx < arpeggios.length ? arpeggios[arpIdx] : null;
-            if (arpTable) {
-              const x = Math.max(0, Math.min(15, arpTable[1] > 0 ? arpTable[1] : 0));
-              const y = Math.max(0, Math.min(15, arpTable[2] > 0 ? arpTable[2] : 0));
-              effTyp = 0x00; // XM arpeggio
-              eff = (x << 4) | y;
-            }
-            break;
-          }
-
-          default:
-            break; // effect 0x00 = None
-        }
-
+        // Effect mapping: DM2 effects -> XM effects (dm2EffectToGrid, inverted by effectPatches)
+        const g = dm2EffectToGrid(line.effect, line.effectArg, arpeggios);
         channelRows[ch].push({
           note: xmNote,
           instrument: instrId,
-          volume: 0,
-          effTyp,
-          eff,
-          effTyp2,
-          eff2,
+          volume: g.volume,
+          effTyp: g.effTyp,
+          eff: g.eff,
+          effTyp2: 0,
+          eff2: 0,
         });
       }
     }
@@ -681,6 +649,23 @@ export function parseDeltaMusic2File(bytes: Uint8Array, filename: string): Track
       // byte-exact inverse (DeltaMusic1 / Tomy Tracker model). The XM-mapped view used for the
       // tracker display is built separately in the pattern loop above.
       return { note, instrument, volume: 0, effTyp: dm2Eff, eff: dm2Arg, effTyp2: 0, eff2: 0 };
+    },
+    // Instrument and effect edits over a stored line: the instrument byte (note rows only) and the effect pair, like a note edit.
+    effectPatches: (pattern, row, channel, cell) => {
+      const entry = trackEntryAt(pattern, channel);
+      const line = entry && entry.blockNumber < blocks.length ? blocks[entry.blockNumber][row] : undefined;
+      const patches: Array<[number, number]> = [];
+      if (!entry || !line) return { patches, noteUnchanged: false };
+      const at = blockDataOffset + entry.blockNumber * 64 + row * 4;
+      const want = cell.instrument ?? 0;
+      const cur = line.note > 0 && line.instrument < dm2Instruments.length ? line.instrument + 1 : 0;
+      if (line.note > 0 && want > 0 && want !== cur) patches.push([at + 1, want - 1]);
+      const g = dm2EffectToGrid(line.effect, line.effectArg, arpeggios);
+      if ((cell.effTyp ?? 0) !== g.effTyp || (cell.eff ?? 0) !== g.eff || (cell.volume ?? 0) !== g.volume) {
+        const native = gridEffectToDm2(cell.effTyp ?? 0, cell.eff ?? 0, cell.volume ?? 0, arpeggios);
+        if (native) patches.push([at + 2, native[0]], [at + 3, native[1]]);
+      }
+      return { patches, noteUnchanged: false };
     },
     encodeOverStored: true,
     // A grid pattern is a song position; each channel plays a shared block, transposed by its track entry.

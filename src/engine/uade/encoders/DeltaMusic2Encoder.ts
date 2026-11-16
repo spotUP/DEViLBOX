@@ -47,7 +47,7 @@ function encodeDeltaMusic2Cell(cell: TrackerCell, stored?: Uint8Array): Uint8Arr
   out[3] = (cell.eff ?? 0) & 0xFF;
 
   // Over a stored module cell the effect bytes stay: the grid shows them XM-mapped (parser), not as the raw codes.
-  // shortcut: a grid effect edit is not stored over a module cell, upgrade with an XM -> DM2 effect reverse map.
+  // Instrument and effect edits go through the layout effectPatches (DeltaMusic2Parser gridEffectToDm2).
   if (stored && stored.length >= 4) {
     out[2] = stored[2];
     out[3] = stored[3];
