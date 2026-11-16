@@ -1,0 +1,17 @@
+{
+ "loadAddress": 32768,
+ "entry": 32768,
+ "size": 152,
+ "bankTableOffset": 144,
+ "maxBanks": 8,
+ "dataAddress": 49152,
+ "bankSize": 16384,
+ "usableBanks": [
+  0,
+  1,
+  3,
+  4,
+  6,
+  7
+ ]
+}

@@ -21,7 +21,7 @@ export interface DispatchRegBatch {
 
 /**
  * VGM chip type for a dispatch platform, or null when the exporter has no
- * mapping yet (only the YM2610 family so far).
+ * mapping. The YM2610 family also has ROM blocks (VGM_MAPPED_PLATFORMS); AY8910 is mapped for the ZX .tap export.
  */
 export const VGM_MAPPED_PLATFORMS: readonly number[] = [
   FurnaceDispatchPlatform.YM2610_FULL,
@@ -37,6 +37,8 @@ export function vgmChipTypeOfPlatform(platformType: number): number | null {
     case FurnaceDispatchPlatform.YM2610_CRAP:
     case FurnaceDispatchPlatform.YM2610_CRAP_EXT:
       return FurnaceChipType.OPNB;
+    case FurnaceDispatchPlatform.AY8910:
+      return FurnaceChipType.AY;
     default:
       return null;
   }

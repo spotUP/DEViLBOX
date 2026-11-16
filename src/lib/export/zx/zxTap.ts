@@ -1,0 +1,105 @@
+/**
+ * ZX Spectrum 128 .tap: BASIC loader + player CODE + one CODE block per 16 KB data bank,
+ * built around public/zx/player.bin (register-stream player, see player.asm).
+ */
+import { captureToFrames, encodeFrames, packBanks } from './zxAyStream';
+import type { RegisterWrite } from '../VGMExporter';
+
+export interface ZxPlayer {
+  bytes: Uint8Array;
+  loadAddress: number;
+  entry: number;
+  bankTableOffset: number;
+  maxBanks: number;
+  dataAddress: number;
+  usableBanks: number[];
+}
+
+export function loadZxPlayerFrom(bin: Uint8Array, meta: Omit<ZxPlayer, 'bytes'>): ZxPlayer {
+  return { ...meta, bytes: bin };
+}
+
+/** Fetch public/zx/player.bin + player.json (browser). */
+export async function fetchZxPlayer(): Promise<ZxPlayer> {
+  const base = import.meta.env.BASE_URL;
+  const [bin, meta] = await Promise.all([
+    fetch(`${base}zx/player.bin`).then((r) => r.arrayBuffer()),
+    fetch(`${base}zx/player.json`).then((r) => r.json()),
+  ]);
+  return loadZxPlayerFrom(new Uint8Array(bin), meta);
+}
+
+const xor = (flag: number, data: Uint8Array) => data.reduce((c, b) => c ^ b, flag);
+
+/** One tap block: length (flag + data + checksum), flag, data, xor checksum. */
+export function tapBlock(flag: number, data: Uint8Array): Uint8Array {
+  const out = new Uint8Array(data.length + 4);
+  const n = data.length + 2;
+  out[0] = n & 0xFF; out[1] = n >> 8; out[2] = flag;
+  out.set(data, 3);
+  out[out.length - 1] = xor(flag, data);
+  return out;
+}
+
+function header(type: number, name: string, length: number, p1: number, p2: number): Uint8Array {
+  const h = new Uint8Array(17);
+  h[0] = type;
+  for (let i = 0; i < 10; i++) h[1 + i] = name.charCodeAt(i) || 0x20;
+  h[11] = length & 0xFF; h[12] = length >> 8;
+  h[13] = p1 & 0xFF; h[14] = p1 >> 8;
+  h[15] = p2 & 0xFF; h[16] = p2 >> 8;
+  return h;
+}
+
+const codeBlocks = (name: string, address: number, data: Uint8Array) =>
+  [tapBlock(0x00, header(3, name, data.length, address, 32768)), tapBlock(0xFF, data)];
+
+type BasicItem = number | string; // number = token byte, string = literal text
+const TOK = { CLEAR: 0xFD, OUT: 0xDF, LOAD: 0xEF, CODE: 0xAF, RANDOMIZE: 0xF9, USR: 0xC0 };
+
+/** A number in a BASIC line: digits, then 0x0E and the 5-byte integer form. */
+function num(n: number): number[] {
+  return [...String(n).split('').map((c) => c.charCodeAt(0)), 0x0E, 0, 0, n & 0xFF, n >> 8, 0];
+}
+
+function basicLine(lineNo: number, items: BasicItem[]): number[] {
+  const body = items.flatMap((i) => (typeof i === 'number' ? [i] : [...i].map((c) => c.charCodeAt(0))));
+  const content = [...body, 0x0D];
+  return [lineNo >> 8, lineNo & 0xFF, content.length & 0xFF, content.length >> 8, ...content];
+}
+
+/** CLEAR 32767; LOAD ""CODE 32768; per bank OUT 32765,16+bank: LOAD ""CODE 49152; RANDOMIZE USR 32768. Tape block order must match. */
+export function basicLoader(banks: number[], p: ZxPlayer): Uint8Array {
+  const colon = ':';
+  const load = (addr: number) => [TOK.LOAD, '""', TOK.CODE, ...num(addr)];
+  const lines: number[] = [];
+  const flat = (xs: Array<BasicItem | number[]>): BasicItem[] => xs.flatMap((x) => (Array.isArray(x) ? x : [x]));
+  lines.push(...basicLine(10, flat([TOK.CLEAR, ...num(p.loadAddress - 1)])));
+  lines.push(...basicLine(20, flat(load(p.loadAddress))));
+  banks.forEach((b, i) => {
+    lines.push(...basicLine(30 + i * 10, flat([TOK.OUT, ...num(32765), ',', ...num(16 + b), colon, ...load(p.dataAddress)])));
+  });
+  lines.push(...basicLine(30 + banks.length * 10, flat([TOK.RANDOMIZE, TOK.USR, ...num(p.entry)])));
+  return Uint8Array.from(lines);
+}
+
+export interface ZxTapResult { tap: Uint8Array; frames: number; banks: number; dataBytes: number; seconds: number }
+
+export function buildZxTap(writes: readonly RegisterWrite[], sampleRate: number, player: ZxPlayer, title = 'devilbox'): ZxTapResult {
+  const frames = captureToFrames(writes, sampleRate);
+  if (frames.length === 0) throw new Error('No AY register writes were captured. Play a ZX Spectrum 128 (AY-3-8910) song through while recording.');
+  const banks = packBanks(encodeFrames(frames), player.usableBanks.length);
+  const code = Uint8Array.from(player.bytes);
+  banks.forEach((_, i) => { code[player.bankTableOffset + i] = 0x10 | player.usableBanks[i]; });
+  const name = title.replace(/[^\x20-\x7E]/g, '?').slice(0, 10);
+  const loader = basicLoader(player.usableBanks.slice(0, banks.length), player);
+  const parts = [
+    tapBlock(0x00, header(0, name, loader.length, 10, loader.length)), tapBlock(0xFF, loader),
+    ...codeBlocks('player', player.loadAddress, code),
+    ...banks.flatMap((b, i) => codeBlocks(`bank${player.usableBanks[i]}`, player.dataAddress, b)),
+  ];
+  const tap = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let o = 0;
+  for (const p of parts) { tap.set(p, o); o += p.length; }
+  return { tap, frames: frames.length, banks: banks.length, dataBytes: banks.reduce((n, b) => n + b.length, 0), seconds: frames.length / 50 };
+}
