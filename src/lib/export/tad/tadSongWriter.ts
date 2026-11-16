@@ -91,8 +91,8 @@ function stepMacro(inst: TadInstrumentInput | undefined, code: number): { steps:
 /** Pitch macro update interval in Furnace ticks: per-tick MD pieces overflow the 64 KiB song budget (Dear Blue SNES), two ticks is a 1/25 s step. */
 const DETUNE_TICKS = 2;
 
-/** shortcut: gain macro pieces (G per tick, snes.cpp:176-198) make the compiler reject the first note after a song loop point (Sunken Lights: note out of range); off until that is understood. */
-const GAIN_PIECES = false;
+/** Gain macro pieces (G per tick, snes.cpp:176-198). */
+const GAIN_PIECES = true;
 
 /** Constant absolute pitch macro (code 4, snes.cpp:136-144: pitch2 = val) or undefined; relative mode keeps sliding. */
 function pitchMacro(inst: TadInstrumentInput | undefined): number | undefined {
@@ -377,7 +377,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     let sounding = false, curNote = 'r';
     let hasNotes = false;
     // Effect state of this channel (Furnace effects that TAD holds as channel state).
-    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', fine = 0, inv = 'i0', noiseOn = false, vibWant: { d: number; q: number } | null = null, trem: { d: number; q: number } | null = null, lastTrem = '', volSlide = 0, slideSkip = 0, lastEnv = '', legatoOn = false, sampleOff = 0;
+    let curSmp = '', curPitch = -1, echoOn = !sfx && echo.on && ((echo.mask >> c) & 1) === 1, pmOn = false, vib = '0', det = '', fine = 0, inv = 'i0', noiseOn = false, vibWant: { d: number; q: number } | null = null, trem: { d: number; q: number } | null = null, lastTrem = '', volSlide = 0, slideSkip = 0, lastEnv = '', legatoOn = false, sampleOff = 0, insId = -1, relTok = '';
     let env: { mode: number; gain: number; adsr: number[] } | null = null;
     const pitchName = (p: number) => NOTE_NAMES[p % 12];
     // Furnace ticks to TAD ticks (rows are k Furnace-tick multiples; sound effects run at 125 Hz).
@@ -448,7 +448,11 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
         flush(true); out.push('L');
         // The loop point joins two instrument states, so the compiler narrows the note range to the overlap of both
         // (bytecode.rs:1768 InstrumentState::Multiple); naming the instrument again keeps the full range.
-        if (curIns >= 0) out.push(`@${curIns}`);
+        // A gain macro or sustain release clears curIns (the next note names the instrument again), so the loop uses the last
+        // named one; a sustain release still running is written again after it. shortcut: a gain macro under a note held across the loop
+        // point falls back to the instrument envelope until the next note, fine while no song holds one there.
+        if (insId >= 0) out.push(`@${insId}`);
+        if (relTok) out.push(relTok);
         cuts.push(out.length); bars.push(out.length);
       }
       if (r.timer && c === tempoCh) { flush(true); out.push(`T${r.timer}`); }
@@ -703,7 +707,8 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             const key = `${ins} ${sound.smp}`;
             const id = tadIns.get(key) ?? tadIns.size;
             tadIns.set(key, id);
-            if (id !== curIns) { curIns = id; out.push(`@${id}`); }
+            relTok = '';
+            if (id !== curIns) { curIns = insId = id; out.push(`@${id}`); }
             out.push(...cmds);
             const o = Math.floor(tad / 12);
             if (o !== oct) { oct = o; out.push(`o${o}`); }
@@ -798,7 +803,8 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           const si = instruments[ins]!.snes!;
           flush(true); out.push(...cmds);
           if (si.useEnv) {
-            out.push(si.sus === 1 ? `GDT${si.r & 31}` : si.sus === 2 ? `GET${si.r & 31}` : `A ${si.a & 15},${si.d & 7},${si.s & 7},${si.r & 31}`);
+            relTok = si.sus === 1 ? `GDT${si.r & 31}` : si.sus === 2 ? `GET${si.r & 31}` : `A ${si.a & 15},${si.d & 7},${si.s & 7},${si.r & 31}`;
+            out.push(relTok);
             if (si.sus === 3) { curIns = -1; lastEnv = ''; } // the next note names the instrument again, restoring d2
           }
           sounding = false; curPitch = -1; pending = { tok: 'w', ticks: 0 };
