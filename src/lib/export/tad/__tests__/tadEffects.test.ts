@@ -10,7 +10,7 @@ import { tadProjectJson, tadInstrumentFromFurnace } from '../tadProjectBuilder';
 const FILE = resolve(__dirname, '../../../../../public/data/songs/furnace/snes/tetristheme.fur');
 
 // Puts one effect on each of the first note rows of the first SNES channel with enough notes, writes song + sfx and runs TAD check.
-async function writeWithEffects(effects: [number, number][], skip = 0) {
+async function writeWithEffects(effects: [number, number][], skip = 0, editInstruments?: (ins: ReturnType<typeof tadInstrumentFromFurnace>[]) => void) {
   const buf = readFileSync(FILE);
   const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
   const native = buildFurnaceNativeData(module);
@@ -31,6 +31,7 @@ async function writeWithEffects(effects: [number, number][], skip = 0) {
     instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)),
     samples: toSequencerSamples(module), wavetables: module.wavetables, title: 'fx',
   };
+  editInstruments?.(input.instruments);
   const song = writeTadSong(input);
   const sfx = writeTadSfx({ ...input, subsong: native.subsongs.length - 1 });
   const samples = mergeTadSamples([song.samples, sfx.samples]);
@@ -62,6 +63,13 @@ describe('Furnace effects in the TAD writer', () => {
     const { song, check } = await writeWithEffects([[0xfc, 0x02], [0xe1, 0x83], [0xe2, 0x82], [0xea, 1], [0x00, 0x00], [0xea, 0], [0x0c, 0x02]]);
     expect(song.warnings.join('\n')).not.toMatch(/Dropped effect (0C|FC|E1|E2|EA)xx/);
     expect(song.mml).toMatch(/\{[^{}]+\}/); // E1/E2 slide token
+    expect(check.code, `${check.log}\n${song.mml.slice(0, 3000)}`).toBe(0);
+  }, 60000);
+
+  it('plays multi-step volume macros as V changes inside the note; check passes', async () => {
+    const { song, check } = await writeWithEffects([], 0, (ins) => ins.forEach((i) => { i.macros = [...(i.macros ?? []).filter((m) => m.code !== 0), { code: 0, data: [20, 60, 100, 127, 80], loop: 255, release: 255 }]; }));
+    expect(song.warnings.join('\n')).not.toMatch(/volume macro/);
+    expect(song.mml).toMatch(/V\d+ [a-g][+-]?%\d+ & V\d+ [a-g][+-]?%\d+ &/);
     expect(check.code, `${check.log}\n${song.mml.slice(0, 3000)}`).toBe(0);
   }, 60000);
 

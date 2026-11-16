@@ -39,9 +39,15 @@ function constantMacro(inst: TadInstrumentInput | undefined, code: number): numb
  */
 function arpMacro(inst: TadInstrumentInput | undefined): { steps: number[]; hold: number } | null | undefined {
   const m = inst?.macros?.find((x) => x.code === 1 && x.data.length > 0);
+  if (m && Array.from(m.data).some((v) => ((v & 0x40000000) !== 0) !== (v < 0))) return null; // calcArp: bit 30 flipped against the sign = fixed note
+  return stepMacro(inst, 1);
+}
+
+/** Macro `code` as per-Furnace-tick values before the hold, and the held value (same play rules as arpMacro). */
+function stepMacro(inst: TadInstrumentInput | undefined, code: number): { steps: number[]; hold: number } | null | undefined {
+  const m = inst?.macros?.find((x) => x.code === code && x.data.length > 0);
   if (!m) return undefined;
   const d = Array.from(m.data);
-  if (d.some((v) => ((v & 0x40000000) !== 0) !== (v < 0))) return null; // calcArp: bit 30 flipped against the sign = fixed note
   const hold = d[d.length - 1];
   if (!m.delay && d.every((v) => v === hold)) return { steps: [], hold };
   if ((m.loop ?? 255) < d.length || (m.release ?? 255) < d.length) return null;
@@ -310,12 +316,15 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     // V carries panL + panR and p their ratio. Constant panning macros (codes 12/13) override 08xx / 80xx.
     const panOf = () => [constantMacro(instruments[ins], 12) ?? panL, constantMacro(instruments[ins], 13) ?? panR].map((v) => v & 127);
     const panP = () => { const [l, r] = panOf(); return l + r ? Math.round(128 * r / (l + r)) : lastP; };
-    const volScale = () => { const [l, r] = panOf(); return Math.min(127, constantMacro(instruments[ins], 0) ?? 127) / 127 * (l + r) / 254; };
-    const volV = () => `V${Math.min(255, Math.round(vol * 2 * volScale()))}`;
-    // pre: arp macro steps played (slurred) before the note's held pitch; ticks in TAD ticks.
-    type Pending = { tok: string; ticks: number; pre?: { p: number; ticks: number }[]; sl?: { a: number; b: number; smp: string; plain: string; oct: number; reg: (p: number, smp: string) => number } };
+    // m: volume macro value; default the held value of a multi-step macro (its steps play as pre, below).
+    const volScale = (m = stepMacro(instruments[ins], 0)?.hold ?? 127) => { const [l, r] = panOf(); return Math.min(127, m) / 127 * (l + r) / 254; };
+    const volV = (m?: number) => `V${Math.min(255, Math.round(vol * 2 * volScale(m)))}`;
+    // pre: arp / volume macro steps played (slurred) before the note's held pitch and volume; ticks in TAD ticks.
+    // v: the V of each step, hold: the V after the steps (only with a multi-step volume macro).
+    type Pre = { steps: { p: number; ticks: number; v?: string }[]; hold?: string };
+    type Pending = { tok: string; ticks: number; pre?: Pre; sl?: { a: number; b: number; smp: string; plain: string; oct: number; reg: (p: number, smp: string) => number } };
     let pending: Pending = { tok: 'r', ticks: 0 };
-    let notePre: Pending['pre']; // arp steps of the sounding note, replayed by 0Cxx retrigger
+    let notePre: Pending['pre']; // arp / volume steps of the sounding note, replayed by 0Cxx retrigger
     let carry = 0;
     let sounding = false, curNote = 'r';
     let hasNotes = false;
@@ -348,15 +357,19 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
       }
       if (pending.pre && pending.ticks > 1) {
         // Arp macro steps slur into the held pitch (Furnace changes the frequency only, no new key-on).
-        let o = oct;
-        for (const st of pending.pre) {
+        // Volume macro steps change V between the slurred pieces (snes.cpp:115-117, no new key-on).
+        let o = oct, v = pending.pre.hold;
+        for (const st of pending.pre.steps) {
           const t = Math.min(st.ticks, pending.ticks - 1);
           if (t <= 0) break;
           if (Math.floor(st.p / 12) !== o) { o = Math.floor(st.p / 12); out.push(`o${o}`); }
+          if (st.v) out.push(st.v);
           out.push(`${pitchName(st.p)}%${t} &`);
           pending.ticks -= t;
+          if (t < st.ticks) { v = st.v; break; } // note ends inside this step: the tail keeps its volume
         }
         if (o !== oct) out.push(`o${oct}`);
+        if (v) out.push(v);
       }
       pending.pre = undefined;
       const short = !slur && pending.ticks === 1 && pending.tok !== 'r';
@@ -615,21 +628,31 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
               if (fx) drop('pitch effects on noise notes', at);
               curNote = pending.tok = `N${r.noise},`;
             }
-            else if (am === null) drop(`arp macros that loop, release or use fixed notes (instrument ${ins})`, at);
+            let pre: number[] = [];
+            if (am === null && !noiseOn) drop(`arp macros that loop, release or use fixed notes (instrument ${ins})`, at);
             else if (am?.steps.length) {
-              const pre = am.steps.map((o) => tad - am.hold + o);
-              if (fx) drop(`arp macro steps under a pitch effect (instrument ${ins})`, at);
-              else if (!Number.isInteger(tickScale)) drop(`arp macro steps in sound effects (instrument ${ins})`, at);
-              else if (pre.some((p) => p < 0 || p > 95 || outside(smp, p))) drop(`arp macro steps outside the pitch range of sample ${smp} (instrument ${ins})`, at);
-              else {
-                for (const p of pre) widen(smp, p);
-                pending.pre = pre.reduce<{ p: number; ticks: number }[]>((a, p) => {
-                  const last = a[a.length - 1];
-                  if (last?.p === p) last.ticks += tickScale; else a.push({ p, ticks: tickScale });
-                  return a;
-                }, []);
-                notePre = pending.pre;
+              pre = am.steps.map((o) => tad - am.hold + o);
+              if (noiseOn) pre = []; // noise ignores the note pitch
+              else if (fx) { drop(`arp macro steps under a pitch effect (instrument ${ins})`, at); pre = []; }
+              else if (!Number.isInteger(tickScale)) { drop(`arp macro steps in sound effects (instrument ${ins})`, at); pre = []; }
+              else if (pre.some((p) => p < 0 || p > 95 || outside(smp, p))) { drop(`arp macro steps outside the pitch range of sample ${smp} (instrument ${ins})`, at); pre = []; }
+            }
+            const vm = stepMacro(instruments[ins], 0);
+            let vSteps = vm?.steps ?? [];
+            if (vSteps.length && (noiseOn || fx || !Number.isInteger(tickScale))) {
+              drop(`volume macro steps ${noiseOn ? 'on noise notes' : fx ? 'under a pitch effect' : 'in sound effects'} (instrument ${ins})`, at);
+              vSteps = [];
+            }
+            if (pre.length || vSteps.length) {
+              for (const p of pre) widen(smp, p);
+              const steps: Pre['steps'] = [];
+              for (let i = 0; i < Math.max(pre.length, vSteps.length); i++) {
+                const p = pre[i] ?? tad, v = vSteps.length ? volV(vSteps[i] ?? vm!.hold) : undefined;
+                const last = steps[steps.length - 1];
+                if (last?.p === p && last.v === v) last.ticks += tickScale; else steps.push({ p, ticks: tickScale, v });
               }
+              pending.pre = { steps, hold: vSteps.length ? volV() : undefined };
+              notePre = pending.pre;
             }
           }
         } else if (isOff && sounding && instruments[ins]?.snes?.sus) {
@@ -757,9 +780,10 @@ export function panSplit(cmd: number, v: number): [number, number] {
 /** Macros the writer carries as a constant: volume scales V, special sets echo/pitch mod, wave picks the wavetable. */
 function macroCarried(inst: TadInstrumentInput, code: number): boolean {
   if (code === 1) return arpMacro(inst) !== null;
+  if (code === 0) return stepMacro(inst, 0) !== null;
   const v = constantMacro(inst, code);
   if (v === undefined) return false;
-  if (code === 0 || code === 3 || code === 12 || code === 13) return true;
+  if (code === 3 || code === 12 || code === 13) return true;
   if (code === 5) return (v & (16 | 8 | 1)) === 0; // invert and noise have no TAD command
   if (code === 4) return pitchMacro(inst) !== undefined;
   return NO_OP_MACRO[code] === v;
