@@ -14,7 +14,6 @@ import { MidiExportPanel } from './MidiExportPanel';
 import { ModuleExportPanel } from './ModuleExportPanel';
 import { ChipExportPanel } from './ChipExportPanel';
 import { notify } from '@stores/useNotificationStore';
-import { CustomSelect } from '@components/common/CustomSelect';
 import { AY_SCRAMBLE_TARGETS, type AyScrambleTarget } from './FurnaceExporter';
 
 interface ExportDialogProps {
@@ -337,21 +336,22 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
                       <div className="font-mono text-sm font-semibold break-words leading-tight">Export Furnace Module</div>
                     </button>
                   )}
-                  {ex.furnaceAyAvailable && (
+                  {(Object.keys(AY_SCRAMBLE_TARGETS) as AyScrambleTarget[]).filter((k) => ex.furnaceAyAvailable[k]).map((k) => (
                     <button
-                      onClick={() => ex.setExportMode('furAy')}
+                      key={k}
+                      onClick={() => { ex.setAyTarget(k); ex.setExportMode('furAy'); }}
                       className={`
                         p-4 min-w-0 rounded-lg border-2 transition-all text-center
-                        ${ex.exportMode === 'furAy'
+                        ${ex.exportMode === 'furAy' && ex.ayTarget === k
                           ? 'bg-accent-primary text-text-inverse border-accent-primary glow-sm'
                           : 'bg-dark-bgSecondary text-text-primary border-dark-border hover:border-dark-borderLight'
                         }
                       `}
                     >
                       <FileMusic size={24} className="mx-auto mb-2" />
-                      <div className="font-mono text-sm font-semibold break-words leading-tight">Furnace AY-3-8910 (Scramble)</div>
+                      <div className="font-mono text-sm font-semibold break-words leading-tight">{AY_SCRAMBLE_TARGETS[k].label}</div>
                     </button>
-                  )}
+                  ))}
                   {ex.tadAvailable && (
                     <button
                       onClick={() => ex.setExportMode('tad')}
@@ -547,19 +547,11 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ isOpen, onClose }) =
               {ex.exportMode === 'furAy' && (
                 <div className="bg-dark-bgSecondary border border-dark-border rounded-lg p-4 mb-4">
                   <h3 className="text-sm font-mono font-bold text-accent-primary mb-3">
-                    Furnace AY-3-8910 Export for Scramble (.fur)
+                    {AY_SCRAMBLE_TARGETS[ex.ayTarget].heading}
                   </h3>
                   <div className="space-y-3">
                     <div className="text-sm font-mono text-text-secondary space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span>Target:</span>
-                        <CustomSelect
-                          value={ex.ayTarget}
-                          onChange={(v) => ex.setAyTarget(v as AyScrambleTarget)}
-                          options={(Object.keys(AY_SCRAMBLE_TARGETS) as AyScrambleTarget[]).map((k) => ({ value: k, label: AY_SCRAMBLE_TARGETS[k].label }))}
-                        />
-                      </div>
-                      <div>Chip: <span className="text-accent-primary">AY-3-8910, {ex.ayTarget === 'arcade' ? '3 or 6 channels' : '3 channels'}, {AY_SCRAMBLE_TARGETS[ex.ayTarget].hz} Hz</span></div>
+                      <div>Chip: <span className="text-accent-primary">{AY_SCRAMBLE_TARGETS[ex.ayTarget].chip}</span></div>
                       <div>Patterns: <span className="text-accent-primary">{ex.patterns.length}</span></div>
                       <div>Instruments: <span className="text-accent-primary">{ex.instruments.length}</span></div>
                     </div>

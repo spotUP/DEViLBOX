@@ -255,7 +255,12 @@ export function useExportDialog({ isOpen }: UseExportDialogOptions) {
     onClose();
   }, [metadata, furnaceModuleAvailable]);
 
-  const furnaceAyAvailable = furnaceAyScrambleExportAvailable(instruments);
+  const furnaceAyAvailable: Record<AyScrambleTarget, boolean> = {
+    arcade: furnaceAyScrambleExportAvailable(instruments, 'arcade'),
+    vectrex: furnaceAyScrambleExportAvailable(instruments, 'vectrex'),
+    zx128: furnaceAyScrambleExportAvailable(instruments, 'zx128'),
+    zxbeeper: furnaceAyScrambleExportAvailable(instruments, 'zxbeeper'),
+  };
   const [ayTarget, setAyTarget] = useState<AyScrambleTarget>('arcade');
   const furnaceAyTempoWarning = ayScrambleTempoWarning(bpm, ayTarget);
 
