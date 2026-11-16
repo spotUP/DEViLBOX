@@ -678,7 +678,7 @@ router.get('/recommended', (_req: Request, res: Response) => {
     SELECT f.id, f.fullname, f.name, f.author, f.player, f.sidmodel, f.subtunes,
            COUNT(y.id) as yt_count
     FROM hvsc_files f
-    LEFT JOIN youtube y ON f.id = y.files_id
+    LEFT JOIN youtube y ON f.id = y.file_id
     GROUP BY f.id
     HAVING yt_count > 0
     ORDER BY yt_count DESC

@@ -23,7 +23,6 @@ export function getDeepSIDDb(): Database.Database | null {
   }
   try {
     deepsidDb = new Database(DB_PATH, { readonly: true });
-    deepsidDb.pragma('journal_mode = WAL');
     console.log('[DeepSID] Database loaded:', DB_PATH);
     return deepsidDb;
   } catch (err) {
