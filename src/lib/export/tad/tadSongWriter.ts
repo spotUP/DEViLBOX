@@ -551,7 +551,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           else if (e.cmd === 0x04) {
             // Furnace vibrato: x = rate (64 steps per cycle), y = depth (15 = one semitone). TAD MP is a sawtooth.
             const x = e.val >> 4, y = e.val & 15;
-            vibWant = x && y ? { d: Math.round(y * 100 / 15), q: Math.max(1, Math.min(255, Math.round(16 / x))) } : null; // emitted with the next note, depth clamped to that note's pitch
+            vibWant = x && y ? { d: Math.round(y * 100 / 15), q: Math.max(1, Math.min(255, Math.round(16 / x) * k)) } : null; // emitted with the next note, depth clamped to that note's pitch
           }
           else if (e.cmd === 0x84) {
             // playback.cpp:1006-1017, 2423-2455: panbrello around the centre, depth y/15 of a full side, 256 steps per
@@ -570,7 +570,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           else if (e.cmd === 0x07) {
             // playback.cpp:1252, 2385-2387: volume - tremTable[pos] * y, pos += x per tick over 128 steps (raised cosine, peak-to-peak y volume units).
             const x = e.val >> 4, y = e.val & 15;
-            trem = x && y ? { d: y, q: Math.max(1, Math.min(127, Math.round(32 / x))) } : null;
+            trem = x && y ? { d: y, q: Math.max(1, Math.min(127, Math.round(32 / x) * k)) } : null;
             volSlide = 0;
           }
           // volSlide = Furnace volSpeed, 1/256 volume step per tick (playback.cpp:1273, 1554-1605).

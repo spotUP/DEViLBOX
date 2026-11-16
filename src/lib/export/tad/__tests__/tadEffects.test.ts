@@ -10,17 +10,18 @@ import { tadProjectJson, tadInstrumentFromFurnace } from '../tadProjectBuilder';
 const FILE = resolve(__dirname, '../../../../../public/data/songs/furnace/snes/tetristheme.fur');
 
 // Puts one effect on each of the first note rows of the first SNES channel with enough notes, writes song + sfx and runs TAD check.
-async function writeWithEffects(effects: [number, number][], skip = 0, editInstruments?: (ins: ReturnType<typeof tadInstrumentFromFurnace>[]) => void, file = FILE) {
+async function writeWithEffects(effects: [number, number][], skip = 0, editInstruments?: (ins: ReturnType<typeof tadInstrumentFromFurnace>[]) => void, file = FILE, note?: number, hz?: number) {
   const buf = readFileSync(file);
   const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
   const native = buildFurnaceNativeData(module);
   const sub = native.subsongs[0];
+  if (hz !== undefined) sub.hz = hz;
   let placed = 0;
   for (const ch of sub.channels) {
     const rows = ch.patterns.get(sub.orders[sub.channels.indexOf(ch)]?.[0] ?? -1)?.rows ?? [];
     const notes = rows.filter((r) => r.note >= 0 && r.note < 180);
     if (notes.length < effects.length || skip-- > 0) continue;
-    notes.slice(0, effects.length).forEach((r, i) => { r.effects = [{ cmd: effects[i][0], val: effects[i][1] }]; });
+    notes.slice(0, effects.length).forEach((r, i) => { r.effects = [{ cmd: effects[i][0], val: effects[i][1] }]; if (note !== undefined) r.note = note; });
     placed = effects.length;
     break;
   }
@@ -137,6 +138,35 @@ describe('Furnace effects in the TAD writer', () => {
     expect(song.warnings.join('\n')).not.toMatch(/Dropped effect 84xx/);
     expect(song.mml).toMatch(/p64 p~64,16\b/);
     expect(check.code, `${check.log}\n${song.mml.slice(0, 3000)}`).toBe(0);
+  }, 60000);
+
+  it('warns when a note is outside the TAD range (note 179)', async () => {
+    const { song } = await writeWithEffects([[0x00, 0x00]], 0, undefined, FILE, 179);
+    expect(song.warnings.join('\n')).toMatch(/Dropped notes outside/);
+  }, 60000);
+
+  it('warns when a pitch slide needs a portamento velocity above 255', async () => {
+    const { song } = await writeWithEffects([[0x01, 0xff], [0x01, 0xff], [0x01, 0xff], [0x01, 0xff]]);
+    expect(song.warnings.join('\n')).toMatch(/pitch slide over \d+ ticks dropped/);
+  }, 60000);
+
+  it('scales vibrato and tremolo speeds by the tick multiplier when the tick rate is lowered', async () => {
+    const fast = await writeWithEffects([[0x04, 0x47], [0x07, 0x47]], 0, undefined, FILE, undefined, 60);
+    const slow = await writeWithEffects([[0x04, 0x47], [0x07, 0x47]], 0, undefined, FILE, undefined, 15); // k = 3
+    const num = (mml: string, re: RegExp) => Number(mml.match(re)?.[1]);
+    expect(num(slow.song.mml, /MP\d+,(\d+)/)).toBe(num(fast.song.mml, /MP\d+,(\d+)/) * 3);
+    expect(num(slow.song.mml, /V~\d+,(\d+)/)).toBe(num(fast.song.mml, /V~\d+,(\d+)/) * 3);
+  }, 60000);
+
+  it('defines instruments @0.. in the order the MML first uses them', async () => {
+    const { song } = await writeWithEffects([[0x00, 0x00]]);
+    const defs = [...song.mml.matchAll(/^@(\d+) /gm)].map((m) => Number(m[1]));
+    expect(defs.length).toBeGreaterThan(0);
+    expect(defs).toEqual(defs.map((_, i) => i));
+    const firstUse = [...song.mml.matchAll(/^[A-H] .*?@(\d+)/gm)].map((m) => Number(m[1]));
+    const seen: number[] = [];
+    for (const id of firstUse) if (!seen.includes(id)) seen.push(id);
+    expect(seen).toEqual([...seen].sort((a, b) => a - b));
   }, 60000);
 
   it('names E6xy delayed legato as a drop', async () => {
