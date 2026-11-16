@@ -86,4 +86,12 @@ describe('Furnace effects in the TAD writer', () => {
     expect(song.mml).toMatch(/V~\d+,8\b/);
     expect(check.code, `${check.log}\n${song.mml.slice(0, 3000)}`).toBe(0);
   }, 60000);
+
+  it('maps 1Exx/1Fxx dry volume to \\mvol; check passes', async () => {
+    const { song, check } = await writeWithEffects([[0x1e, 0x40], [0x1f, 0x40], [0x1e, 0xc0]]);
+    expect(song.warnings.join('\n')).not.toMatch(/Dropped effect 1[EF]xx[^/]/); // the L/R mismatch warning on row 1 is expected
+    expect(song.mml).toMatch(/\\mvol 64\b/);
+    expect(song.mml).toMatch(/\\mvol 0\b/);
+    expect(check.code, `${check.log}\n${song.mml.slice(0, 3000)}`).toBe(0);
+  }, 60000);
 });

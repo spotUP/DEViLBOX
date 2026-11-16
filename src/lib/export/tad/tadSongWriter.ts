@@ -176,6 +176,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     if (d) d.n++; else dropped.set(what, { n: 1, at });
   };
   const echo = snesEchoFlags(native.chipFlags?.[snes.chip]);
+  const dry = { l: 127, r: 127 }; // snes.cpp:896 dryVolL/R reset; TAD main volume also starts at 127 (metadata.rs:89)
   const cap = input.echoDelayCap ?? 15;
   if (!sfx && echo.on && echo.delay > cap) warnings.push(`Echo delay ${echo.delay * 16} ms lowered to ${cap * 16} ms so the echo buffer fits in the 64 KiB of Audio-RAM.`);
   echo.delay = Math.min(echo.delay, cap);
@@ -432,6 +433,13 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             }
             else if (e.cmd === 0x1c) cmds.push(`\\efb ${sv}`);
             else cmds.push(`\\ftap ${e.cmd - 0x30},${sv}`);
+          }
+          else if (!sfx && (e.cmd === 0x1e || e.cmd === 0x1f)) {
+            // snes.cpp:602-609, 324: 1E/1F write the signed MVOLL/MVOLR registers; TAD \mvol sets both (mml-syntax.md:628).
+            const sv = e.val > 127 ? e.val - 256 : e.val;
+            if (e.cmd === 0x1e) dry.l = sv; else dry.r = sv;
+            if (dry.l !== dry.r) drop('effect 1Exx/1Fxx different left/right dry volume (TAD sets both, average used)', at);
+            cmds.push(`\\mvol ${Math.round((dry.l + dry.r) / 2)}`);
           }
           else if (e.cmd === 0x13) {
             if (sfx || c < 1 || c > 5) drop('effect 13xx (pitch modulation only on song channels B-F)', at);
