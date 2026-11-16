@@ -24,6 +24,7 @@
  */
 
 import type { FurnaceConfig, FurnaceMacro } from '@typedefs/instrument';
+import { readNoteMapEntry } from '@/lib/furnace/noteMap';
 
 // DivInstrumentType values (from instrument.h)
 const DIV_INS_STD = 0;
@@ -602,17 +603,12 @@ export function encodeFurnaceInstrument(config: FurnaceConfig, name: string = 'I
 
     // Note map (180 entries x 8 bytes each, index = row note like Furnace's DivInstrumentAmiga::noteMap)
     if (amiga.useNoteMap && amiga.noteMap) {
-      const entries = amiga.noteMap;
       for (let i = 0; i < 180; i++) {
-        if (i < entries.length) {
-          const entry = entries[i];
-          writer.writeUint32(entry.frequency || 0);  // freq (int32)
-          writer.writeUint16(entry.sample ?? -1);     // map (int16)
-          writer.writeInt8(0);                        // dpcmFreq
-          writer.writeInt8(0);                        // dpcmDelta
-        } else {
-          for (let j = 0; j < 8; j++) writer.writeUint8(0);
-        }
+        const entry = readNoteMapEntry(amiga.noteMap[i], i);  // missing entry: no remap, no sample
+        writer.writeUint32(entry.freq);             // freq (int32)
+        writer.writeUint16(entry.map);              // map (int16)
+        writer.writeInt8(0);                        // dpcmFreq
+        writer.writeInt8(0);                        // dpcmDelta
       }
     }
   }

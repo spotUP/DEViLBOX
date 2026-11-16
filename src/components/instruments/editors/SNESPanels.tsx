@@ -14,6 +14,7 @@ import { Toggle } from '@components/controls/Toggle';
 import { CustomSelect } from '@components/common/CustomSelect';
 import { Button } from '@components/ui/Button';
 import { useFormatStore } from '@stores';
+import { FURNACE_NOTE_COUNT, furnaceNoteName, readNoteMapEntry, withNoteMapEntry } from '@/lib/furnace/noteMap';
 import { FurnaceDispatchPlatform } from '@engine/furnace-dispatch/platforms';
 import {
   SNES_AUDIO_RAM_BYTES,
@@ -154,6 +155,7 @@ export const SNESPanel: React.FC<PanelProps> = ({ config, onChange }) => {
     ? wave.data.map((v, i) => ({ x: i / (wave.data.length - 1 || 1), y: v / (wave.max || 15) }))
     : [];
 
+  const mappedNotes = (amiga.noteMap ?? []).filter((e, i) => readNoteMapEntry(e, i).map >= 0).length;
   const sampleOptions = [
     { value: '-1', label: 'No sample' },
     ...(samples ?? []).map((s, i) => ({ value: String(i), label: `${String(i).padStart(2, '0')} ${s.name || 'unnamed'}` })),
@@ -281,8 +283,15 @@ export const SNESPanel: React.FC<PanelProps> = ({ config, onChange }) => {
               )}
               <div className="flex items-center gap-2 mt-2" title="A note map plays a different sample for each note, for example a drum kit on one instrument.">
                 <Toggle label="Use Note Map" value={amiga.useNoteMap} onChange={(v) => updateAmiga({ useNoteMap: v })} size="sm" />
-                <span className={LABEL}>Note map{amiga.useNoteMap ? `: ${amiga.noteMap?.length ?? 0} notes mapped` : ''}</span>
+                <span className={LABEL}>Note map{amiga.useNoteMap ? `: ${mappedNotes} of ${FURNACE_NOTE_COUNT} notes have a sample` : ''}</span>
               </div>
+              {amiga.useNoteMap && (
+                <SNESNoteMap
+                  noteMap={amiga.noteMap}
+                  sampleOptions={sampleOptions}
+                  onEntry={(index, patch) => updateAmiga({ noteMap: withNoteMapEntry(configRef.current.amiga?.noteMap, index, patch) })}
+                />
+              )}
             </div>
           )}
         </div>
@@ -291,6 +300,57 @@ export const SNESPanel: React.FC<PanelProps> = ({ config, onChange }) => {
         </p>
       </div>
     </>
+  );
+};
+
+// ── Note map table ──────────────────────────────────────────────────────────────
+
+const NOTE_ROW_HEIGHT = 26;
+const NOTE_VIEW_ROWS = 10;
+
+/** 180 rows, only the visible ones rendered. Each row: note played, sample, note the sample sounds at. */
+const SNESNoteMap: React.FC<{
+  noteMap: FurnaceAmigaConfig['noteMap'];
+  sampleOptions: Array<{ value: string; label: string }>;
+  onEntry: (index: number, patch: { freq?: number; map?: number }) => void;
+}> = ({ noteMap, sampleOptions, onEntry }) => {
+  const [top, setTop] = React.useState(0);
+  const first = Math.max(0, Math.floor(top / NOTE_ROW_HEIGHT) - 2);
+  const last = Math.min(FURNACE_NOTE_COUNT, first + NOTE_VIEW_ROWS + 4);
+  const rows = [];
+  for (let i = first; i < last; i++) {
+    const e = readNoteMapEntry(noteMap[i], i);
+    rows.push(
+      <div key={i} className="absolute left-0 right-0 flex items-center gap-2 px-1" style={{ top: i * NOTE_ROW_HEIGHT, height: NOTE_ROW_HEIGHT }}>
+        <span className="w-10 text-[10px] font-mono text-text-primary">{furnaceNoteName(i)}</span>
+        <div className="flex-1 min-w-0">
+          <CustomSelect value={String(e.map)} onChange={(v) => onEntry(i, { map: Number(v) })} options={sampleOptions} title={`Sample played for ${furnaceNoteName(i)}`} />
+        </div>
+        <input
+          type="number" min={0} max={FURNACE_NOTE_COUNT - 1} value={e.freq}
+          onChange={(ev) => onEntry(i, { freq: Math.max(0, Math.min(FURNACE_NOTE_COUNT - 1, Math.round(Number(ev.target.value) || 0))) })}
+          aria-label={`Sounding note number for ${furnaceNoteName(i)}`}
+          title="The note the sample is played at. It starts as the same note, so the sample is not shifted."
+          className="w-14 bg-dark-bgTertiary border border-dark-borderLight rounded text-text-primary font-mono text-[10px] px-1 focus:ring-1 focus:ring-accent-primary"
+        />
+        <span className="w-10 text-[10px] font-mono text-text-secondary">{furnaceNoteName(e.freq)}</span>
+      </div>,
+    );
+  }
+  return (
+    <div className="mt-2">
+      <div className="flex items-center gap-2 px-1 text-[9px] font-mono text-text-muted">
+        <span className="w-10">Note</span><span className="flex-1">Sample</span><span className="w-14">Plays at</span><span className="w-10" />
+      </div>
+      <div
+        className="relative overflow-y-auto bg-dark-bg border border-dark-borderLight rounded"
+        style={{ height: NOTE_ROW_HEIGHT * NOTE_VIEW_ROWS }}
+        onScroll={(ev) => setTop(ev.currentTarget.scrollTop)}
+        data-testid="snes-note-map"
+      >
+        <div className="relative" style={{ height: NOTE_ROW_HEIGHT * FURNACE_NOTE_COUNT }}>{rows}</div>
+      </div>
+    </div>
   );
 };
 

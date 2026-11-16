@@ -178,11 +178,10 @@ export interface FurnaceAmigaConfig {
   useWave: boolean;      // Use wavetable
   waveLen: number;       // Wavetable length
   // Note map for multi-sample instruments
-  noteMap: Array<{
-    note: number;
-    sample: number;
-    frequency: number;
-  }>;
+  noteMap: Array<
+    | { freq: number; map: number }  // as imported and as the editor writes it
+    | { note: number; sample: number; frequency: number }
+  >;
 }
 
 // Namco 163 (DIV_INS_N163)

@@ -375,7 +375,7 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
           macros={config.macros}
           onChange={(macros) => onChange({ macros: macros as FurnaceMacro[] })}
           chipType={config.chipType}
-          labels={neoKind?.id === 'ssg' ? SSG_MACRO_LABELS : config.chipType === 24 ? SNES_MACRO_LABELS : undefined}
+          labels={neoKind?.id === 'ssg' ? SSG_MACRO_LABELS : (config.chipType === 24 || config.snes) ? SNES_MACRO_LABELS : undefined}
         />
       ) : (
         <MacroListEditor
@@ -647,8 +647,8 @@ export const FurnaceEditor: React.FC<FurnaceEditorProps> = ({ config, instrument
         <C64Panel config={config} onChange={pushLiveUpdate} />
       )}
 
-      {/* SNES Panel (chipType 24) */}
-      {config.chipType === 24 && (
+      {/* SNES panels: chipType 24 (new instrument) or 29 (imported, DIV_INS_SNES); imports always carry config.snes */}
+      {(config.chipType === 24 || config.snes) && (
         <>
           <SNESPanel config={config} onChange={pushLiveUpdate} />
           <SNESEchoPanel />
