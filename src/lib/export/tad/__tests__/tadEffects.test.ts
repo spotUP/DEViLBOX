@@ -85,6 +85,22 @@ describe('Furnace effects in the TAD writer', () => {
     expect(released.check.code, `${released.check.log}\n${released.song.mml.slice(0, 3000)}`).toBe(0);
   }, 60000);
 
+  it('carries pitch, panning, gain, fixed-note arp and noise frequency macros per tick; check passes', async () => {
+    type Ins = ReturnType<typeof tadInstrumentFromFurnace>;
+    const setM = (m: NonNullable<Ins['macros']>) => (ins: Ins[]) => ins.forEach((i) => { const codes = m.map((x) => x.code); i.macros = [...(i.macros ?? []).filter((x) => !codes.includes(x.code)), ...m]; if (i.snes) i.snes.useEnv = false; });
+    const run = async (m: NonNullable<Ins['macros']>, fx: [number, number][] = []) => {
+      const r = await writeWithEffects(fx, 0, setM(m));
+      expect(r.song.warnings.join('\n')).not.toMatch(/pitch macro|panning|noise frequency|fixed notes/);
+      expect(r.check.code, `${r.check.log}\n${r.song.mml.slice(0, 3000)}`).toBe(0);
+      return r.song.mml;
+    };
+    expect(await run([{ code: 4, data: [0, 64, 128, 64], loop: 0, speed: 6 }])).toMatch(/MD\+\d+/);
+    expect(await run([{ code: 4, data: [8], mode: 1, speed: 4 }])).toMatch(/MD\+\d+/); // relative: sums on every write
+    expect(await run([{ code: 12, data: [127, 40], loop: 0, speed: 8 }, { code: 13, data: [20, 127], loop: 0, speed: 8 }])).toMatch(/\bp\d+/);
+    expect(await run([{ code: 1, data: [0x40000000 | 60, 0x40000000 | 64, 0], speed: 4 }])).toMatch(/%\d+ &/); // fixed notes
+    expect(await run([{ code: 2, data: [3, 20, 9], loop: 0, speed: 4 }], [[0x11, 1]])).toMatch(/N3,%\d+ &/);
+  }, 120000);
+
   it('maps FDxx/FExx/F0xx tempo changes to T timer commands; check passes', async () => {
     const { song, check } = await writeWithEffects([[0xfd, 2], [0xfe, 2], [0xf0, 0x64]]);
     expect(song.warnings.join('\n')).not.toMatch(/Dropped effect (F0|FD|FE)xx/);

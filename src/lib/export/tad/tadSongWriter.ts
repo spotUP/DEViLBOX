@@ -35,12 +35,16 @@ function constantMacro(inst: TadInstrumentInput | undefined, code: number): numb
 /**
  * Arp macro (code 1) as Furnace plays it (snes.cpp:118-125, macroInt: delay ticks, then each value for `speed` ticks,
  * then the last value holds): offsets per Furnace tick before the hold, and the held offset.
- * undefined = no arp macro; null = the macro loops, has a release point or uses fixed notes (not carried).
+ * Values are raw (relative offsets or fixed notes, see arpNote); undefined = no arp macro.
  */
 function arpMacro(inst: TadInstrumentInput | undefined): ReturnType<typeof stepMacro> {
-  const m = inst?.macros?.find((x) => x.code === 1 && x.data.length > 0);
-  if (m && Array.from(m.data).some((v) => ((v & 0x40000000) !== 0) !== (v < 0))) return null; // calcArp: bit 30 flipped against the sign = fixed note
   return stepMacro(inst, 1);
+}
+
+/** Furnace note an arp macro value gives for `note` (engine.cpp:1940-1947 calcArp): bit 30 flipped against the sign = fixed note + 60. */
+function arpNote(note: number, v: number): number {
+  if (((v & 0x40000000) !== 0) === (v < 0)) return note + v;
+  return (v < 0 ? (v | 0x40000000) : (v & ~0x40000000)) + 60;
 }
 
 /**
@@ -49,22 +53,24 @@ function arpMacro(inst: TadInstrumentInput | undefined): ReturnType<typeof stepM
  * once the release index was read and the macro is not released it loops to `loop` (when loop < rel) or holds the release
  * value (:118-124); release jumps to the release index (:90-93); at the end it loops (:125-131) or stops on its last value.
  */
-function runMacro(m: { loop?: number; release?: number; speed?: number; delay?: number }, d: number[], n: number, rel: number): number[] {
+function runMacro(m: { loop?: number; release?: number; speed?: number; delay?: number }, d: number[], n: number, rel: number, hadOut?: boolean[]): number[] {
   const len = d.length, loop = m.loop ?? 255, rl = m.release ?? 255, speed = Math.max(1, m.speed ?? 1);
   const out: number[] = [];
   let pos = 0, delay = 0, began = true, has = true, val = d[0];
   for (let t = 0; t < n; t++) {
     const released = t >= rel;
     if (released && pos < rl && rl < len) { delay = 0; pos = rl; }
-    if (delay > 0) { delay--; out.push(val); continue; }
+    if (delay > 0) { delay--; out.push(val); hadOut?.push(false); continue; }
     delay = began && (m.delay ?? 0) > 0 ? m.delay! : speed - 1;
     began = false;
+    const wrote = has;
     if (has) {
       val = d[pos++];
       if (pos > rl && !released) { if (loop < len && loop < rl) pos = loop; else pos--; }
       if (pos >= len) { if (loop < len && (loop >= rl || rl >= len)) pos = loop; else has = false; }
     }
     out.push(val);
+    hadOut?.push(wrote);
   }
   return out;
 }
@@ -81,6 +87,12 @@ function stepMacro(inst: TadInstrumentInput | undefined, code: number): { steps:
   while (steps.length && steps[steps.length - 1] === hold) steps.pop();
   return { steps, hold };
 }
+
+/** Pitch macro update interval in Furnace ticks: per-tick MD pieces overflow the 64 KiB song budget (Dear Blue SNES), two ticks is a 1/25 s step. */
+const DETUNE_TICKS = 2;
+
+/** shortcut: gain macro pieces (G per tick, snes.cpp:176-198) make the compiler reject the first note after a song loop point (Sunken Lights: note out of range); off until that is understood. */
+const GAIN_PIECES = false;
 
 /** Constant absolute pitch macro (code 4, snes.cpp:136-144: pitch2 = val) or undefined; relative mode keeps sliding. */
 function pitchMacro(inst: TadInstrumentInput | undefined): number | undefined {
@@ -348,11 +360,11 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     const panOf = () => [constantMacro(instruments[ins], 12) ?? panL, constantMacro(instruments[ins], 13) ?? panR].map((v) => v & 127);
     const panP = () => { const [l, r] = panOf(); return l + r ? Math.round(128 * r / (l + r)) : lastP; };
     // m: volume macro value; default the held value of a multi-step macro (its steps play as pre, below).
-    const volScale = (m = stepMacro(instruments[ins], 0)?.hold ?? 127) => { const [l, r] = panOf(); return Math.min(127, m) / 127 * (l + r) / 254 * chipGain; };
-    const volV = (m?: number) => `V${Math.min(255, Math.round(vol * 2 * volScale(m)))}`;
+    const volScale = (m = stepMacro(instruments[ins], 0)?.hold ?? 127, lr?: number[]) => { const [l, r] = lr ?? panOf(); return Math.min(127, m) / 127 * (l + r) / 254 * chipGain; };
+    const volV = (m?: number, lr?: number[]) => `V${Math.min(255, Math.round(vol * 2 * volScale(m, lr)))}`;
     // pre: arp / volume macro steps played (slurred) before the note's held pitch and volume; ticks in TAD ticks.
     // v: the V of each step, hold: the V after the steps (only with a multi-step volume macro).
-    type Pre = { steps: { p: number; ticks: number; v?: string }[]; hold?: string; gen?: (furnaceTicks: number, rel: number) => Pre['steps']; rel?: number };
+    type Pre = { steps: { p: number; ticks: number; v?: string; tok?: string }[]; hold?: string; gen?: (furnaceTicks: number, rel: number) => Pre['steps']; rel?: number };
     type Pending = { tok: string; ticks: number; pre?: Pre; sl?: { a: number; b: number; smp: string; plain: string; oct: number; reg: (p: number, smp: string) => number } };
     let pending: Pending = { tok: 'r', ticks: 0 };
     let notePre: Pending['pre']; // arp / volume steps of the sounding note, replayed by 0Cxx retrigger
@@ -390,18 +402,21 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
       if (pending.pre && pending.ticks > 1) {
         // Arp macro steps slur into the held pitch (Furnace changes the frequency only, no new key-on).
         // Volume macro steps change V between the slurred pieces (snes.cpp:115-117, no new key-on).
+        // v holds space-separated state commands (V, p, D/MD, G); one is emitted only when it differs from the last one of its kind.
         let o = oct, v = pending.pre.hold;
+        const sent = new Map<string, string>();
+        const setState = (cmds?: string) => { for (const c of cmds?.split(' ') ?? []) { const k = /^[A-Za-z]+/.exec(c)![0]; if (sent.get(k) !== c) { sent.set(k, c); out.push(c); } } };
         for (const st of pending.pre.steps) {
           const t = Math.min(st.ticks, pending.ticks - 1);
           if (t <= 0) break;
-          if (Math.floor(st.p / 12) !== o) { o = Math.floor(st.p / 12); out.push(`o${o}`); }
-          if (st.v) out.push(st.v);
-          out.push(`${pitchName(st.p)}%${t} &`);
+          if (!st.tok && Math.floor(st.p / 12) !== o) { o = Math.floor(st.p / 12); out.push(`o${o}`); }
+          setState(st.v);
+          out.push(`${st.tok ?? pitchName(st.p)}%${t} &`);
           pending.ticks -= t;
-          if (t < st.ticks) { v = st.v; break; } // note ends inside this step: the tail keeps its volume
+          if (t < st.ticks) { v = undefined; break; } // note ends inside this step: the tail keeps its state
         }
         if (o !== oct) out.push(`o${oct}`);
-        if (v) out.push(v);
+        setState(v);
       }
       pending.pre = undefined;
       const short = !slur && pending.ticks === 1 && pending.tok !== 'r';
@@ -633,7 +648,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
           const sound = soundOf(instruments[ins], cl.note, wave);
           wave = constantMacro(instruments[ins], 3) ?? wave;
           const am = arpMacro(instruments[ins]);
-          const tad = (sound?.note ?? 0) - FURNACE_NOTE_OFFSET + (am?.hold ?? 0);
+          const tad = am ? arpNote(sound?.note ?? 0, am.hold) - FURNACE_NOTE_OFFSET : (sound?.note ?? 0) - FURNACE_NOTE_OFFSET;
           if (!sound) {
             if (!insWarned.has(ins)) { insWarned.add(ins); warnings.push(`Instrument ${ins} has no sample or wavetable for some notes; those notes are rests.`); }
             flush(); out.push(...cmds); sounding = false; pending = { tok: 'r', ticks: 0 };
@@ -648,7 +663,15 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             // MP depth: compiler channel_bc_generator.rs:146-190 - round(reg * (2^(cents/1200) - 2^-(cents/1200)) / (2 * quarter wavelength)) must be <= 255.
             let want = 'MP0';
             if (vibWant) {
-              const reg = pitchReg(tad);
+              // Every arp / pitch-macro piece is its own compiler note: size the depth for the highest pitch register any piece reaches.
+              const pm4 = instruments[ins]?.macros?.find((m) => m.code === 4 && m.data.length > 0);
+              const pmax = pm4 && pitchMacro(instruments[ins]) === undefined ? (pm4.mode ? 32767 : Math.max(...Array.from(pm4.data, Math.abs))) : 0;
+              let reg = 0;
+              for (const p of [tad, ...(am ? (am.all ?? am.steps).map((o) => arpNote(sound.note, o) - FURNACE_NOTE_OFFSET) : [])]) {
+                if (p >= 0 && p <= 95) reg = Math.max(reg, pitchReg(p));
+              }
+              if (am || pmax) reg *= 1.02; // compiler rounds the register per piece
+              reg = linear ? reg * 2 ** (Math.min(1200, pmax * 100 / 128) / 1200) : reg + pmax;
               let d = vibWant.d;
               while (reg && d > 0 && Math.round(reg * (2 ** (d / 1200) - 2 ** (-d / 1200)) / (2 * vibWant.q)) > 255) d--;
               if (d < vibWant.d) warnings.push(`${at}: vibrato depth ${vibWant.d} cents reduced to ${d} (pitch offset per tick too large).`);
@@ -684,9 +707,8 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
               curNote = pending.tok = `N${r.noise},`;
             }
             let pre: number[] = [];
-            if (am === null && !noiseOn) drop(`arp macros that use fixed notes (instrument ${ins})`, at);
-            else if (am?.steps.length || am?.run) {
-              pre = (am.all ?? am.steps).map((o) => tad - am.hold + o);
+            if (am?.steps.length || am?.run) {
+              pre = (am.all ?? am.steps).map((o) => arpNote(sound.note, o) - FURNACE_NOTE_OFFSET);
               if (noiseOn) pre = []; // noise ignores the note pitch
               else if (fx) { drop(`arp macro steps under a pitch effect (instrument ${ins})`, at); pre = []; }
               else if (!Number.isInteger(tickScale)) { drop(`arp macro steps in sound effects (instrument ${ins})`, at); pre = []; }
@@ -702,19 +724,47 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
             if (vm?.run && !vOk) drop(`volume macro steps ${noiseOn ? 'on noise notes' : fx ? 'under a pitch effect' : 'in sound effects'} (instrument ${ins})`, at);
             const vRun = vm?.run && vOk ? vm.run : undefined;
             const aRun = am?.run && pre.length ? am.run : undefined;
-            if (pre.length || vSteps.length || vRun) {
+            // Pitch (4), panning (12/13), gain (6) and noise frequency (2) macros, unrolled per tick like the arp / volume ones.
+            const im = instruments[ins]!, hasM = (c: number) => im.macros?.some((m) => m.code === c && m.data.length > 0) ?? false;
+            const xCtx = !fx && Number.isInteger(tickScale);
+            const wPan = [12, 13].some((c) => hasM(c) && constantMacro(im, c) === undefined), wDet = hasM(4) && pitchMacro(im) === undefined && !noiseOn;
+            const wGain = hasM(6) && !!im.snes && !im.snes.useEnv; // snes.cpp:176-198 writes GAIN only without ADSR
+            const wNoise = noiseOn && hasM(2); // snes.cpp:126-128 duty macro = noise clock
+            if ((wPan || wDet || wGain || wNoise) && !xCtx) drop(`pitch, panning, gain or noise macros ${fx ? 'under a pitch effect' : 'in sound effects'} (instrument ${ins})`, at);
+            const xPan = xCtx && wPan, xDet = xCtx && wDet, xGain = GAIN_PIECES && xCtx && wGain, xNoise = xCtx && wNoise, xOk = xPan || xDet || xGain || xNoise;
+            if (pre.length || vSteps.length || vRun || xOk) {
               for (const p of pre) widen(smp, p);
-              const merge = (ps: number[], vs: number[]): Pre['steps'] => {
+              const merge = (ps: number[], vs: number[], n = 0, rel = Infinity): Pre['steps'] => {
+                // snes.cpp:136-144 pitch (absolute or summed on every write), 118-125 panL/panR, 176-198 gain, 126-128 noise.
+                const run = (c: number) => { const m = im.macros?.find((x) => x.code === c && x.data.length > 0); const had: boolean[] = []; return m ? { m, v: runMacro(m, Array.from(m.data), n, rel, had), had } : undefined; };
+                const pl = xPan ? run(12) : undefined, pr = xPan ? run(13) : undefined, pt = xDet ? run(4) : undefined, gm = xGain ? run(6) : undefined, nz = xNoise ? run(2) : undefined;
+                let acc = 0, held = 0;
                 const steps: Pre['steps'] = [];
-                for (let i = 0; i < Math.max(ps.length, vs.length); i++) {
-                  const p = ps[i] ?? tad, v = vs.length ? volV(vs[i] ?? vm!.hold) : undefined;
+                for (let i = 0; i < Math.max(ps.length, vs.length, xOk ? n : 0); i++) {
+                  const p = ps[i] ?? tad;
+                  const cmds: string[] = [];
+                  if (vs.length || xPan) {
+                    const lr = xPan ? [pl ? pl.v[i] & 127 : panOf()[0], pr ? pr.v[i] & 127 : panOf()[1]] : undefined;
+                    cmds.push(volV(vs.length ? vs[i] ?? vm!.hold : undefined, lr));
+                    if (lr) cmds.push(`p${lr[0] + lr[1] ? Math.round(128 * lr[1] / (lr[0] + lr[1])) : lastP}`);
+                  }
+                  if (pt) {
+                    if (pt.had[i]) acc = pt.m.mode ? Math.max(-32768, Math.min(32767, acc + pt.v[i])) : pt.v[i];
+                    if (i % DETUNE_TICKS === 0) held = acc;
+                    const q = held + fine, dv = linear ? Math.max(-1200, Math.min(1200, Math.round(q * 100 / 128))) : Math.max(-16383, Math.min(16383, q));
+                    cmds.push(`${linear ? 'MD' : 'D'}${dv > 0 ? '+' : ''}${dv}`);
+                  }
+                  if (gm) cmds.push(`G${gm.v[i] & 255}`);
+                  const tok = nz ? `N${nz.v[i] & 31},` : undefined, v = cmds.join(' ') || undefined;
                   const last = steps[steps.length - 1];
-                  if (last?.p === p && last.v === v) last.ticks += tickScale; else steps.push({ p, ticks: tickScale, v });
+                  if (last?.p === p && last.v === v && last.tok === tok) last.ticks += tickScale; else steps.push({ p, ticks: tickScale, v, tok });
                 }
                 return steps;
               };
-              pending.pre = { steps: aRun || vRun ? [] : merge(pre, vSteps), hold: vSteps.length || vRun ? volV() : undefined };
-              if (aRun || vRun) pending.pre.gen = (n, rel) => merge(aRun ? aRun(n, rel).map((o) => tad - am!.hold + o) : pre, vRun ? vRun(n, rel) : vSteps);
+              const hold = [vSteps.length || vRun || xPan ? volV() : '', xPan ? `p${lastP}` : '', xDet ? det || (linear ? 'MD0' : 'D0') : '', ''].filter(Boolean).join(' ');
+              pending.pre = { steps: aRun || vRun || xOk ? [] : merge(pre, vSteps), hold: hold || undefined };
+              if (aRun || vRun || xOk) pending.pre.gen = (n, rel) => merge(aRun ? aRun(n, rel).map((o) => { const p = arpNote(sound.note, o) - FURNACE_NOTE_OFFSET, r = playable(smp); return r ? Math.max(r[0], Math.min(r[1], p)) : p; }) : pre, vRun ? vRun(n, rel) : vSteps, n, rel);
+              if (xGain) { curIns = -1; lastEnv = ''; } // G replaced the instrument envelope: the next note names it again
               notePre = pending.pre;
             }
           }
@@ -844,13 +894,11 @@ export function panSplit(cmd: number, v: number): [number, number] {
 }
 /** Macros the writer carries as a constant: volume scales V, special sets echo/pitch mod, wave picks the wavetable. */
 function macroCarried(inst: TadInstrumentInput, code: number): boolean {
-  if (code === 1) return arpMacro(inst) !== null;
-  if (code === 0) return stepMacro(inst, 0) !== null;
+  if (code === 1 || code === 0 || code === 2 || code === 4 || code === 12 || code === 13) return true; // unrolled per tick (pieces)
   const v = constantMacro(inst, code);
   if (v === undefined) return false;
-  if (code === 3 || code === 12 || code === 13) return true;
+  if (code === 3) return true;
   if (code === 5) return (v & (16 | 8 | 1)) === 0; // invert and noise have no TAD command
-  if (code === 4) return pitchMacro(inst) !== undefined;
   return NO_OP_MACRO[code] === v;
 }
 
