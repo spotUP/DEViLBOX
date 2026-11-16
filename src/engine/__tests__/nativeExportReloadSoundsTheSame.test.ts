@@ -552,6 +552,45 @@ for (const fmt of FORMATS.filter((f) => !f.held)) {
   });
 }
 
+// Instrument and effect edits (not only notes): a few note cells of the first position get another instrument and an effect; the
+// reload shows them. SA stores them only on a track line no other cell shows, so it needs at least one of the candidates to land;
+// Puma stores every one. A cell elsewhere may change only as an echo of an edited cell (a shared track).
+const INSTR_EFFECT: Array<{ key: string; rel: string; effTyp: number; eff: number; all: boolean }> = [
+  { key: 'sonicArranger', rel: 'sonic-arranger/mega end.sa', effTyp: 0x10, eff: 30, all: false },
+  { key: 'pumaTracker', rel: 'pumatracker/liquid kids - lv1a.puma', effTyp: 0x0C, eff: 20, all: true },
+];
+describe('native export round trip: instrument and effect edits', { timeout: 120000 }, () => {
+  for (const f of INSTR_EFFECT) {
+    it(`${f.key}: an edited instrument and effect export and reload as the edit`, async () => {
+      const { name } = await loadThroughApp(f.rel);
+      const { useTrackerStore } = await import('@/stores/useTrackerStore');
+      const st = useTrackerStore.getState();
+      const before = snapshot({ songPositions: st.patternOrder, patterns: st.patterns as never });
+      const p = before.songPositions[0];
+      const picks: Array<{ ch: number; r: number; instrument: number }> = [];
+      before.patterns[p].channels.forEach((c, ch) => c.rows.forEach((cell, r) => {
+        if (picks.length < 6 && cell.note > 0 && cell.note < 96 && cell.instrument > 0 && !cell.effTyp && !cell.eff && !cell.effTyp2 && !cell.volume && (ch > 0 || r > 0)) picks.push({ ch, r, instrument: cell.instrument === 1 ? 2 : 1 });
+      }));
+      expect(picks.length, 'candidate cells').toBeGreaterThan(0);
+      st.setCurrentPattern(p);
+      for (const k of picks) st.setCell(k.ch, k.r, { instrument: k.instrument, effTyp: f.effTyp, eff: f.eff });
+      const out = await exportThroughRouter();
+      expect(out).not.toBeNull();
+      const back = await reload(out!, name);
+      const want = snapshot(before);
+      const landed = picks.filter((k) => {
+        const g = back.patterns[p].channels[k.ch].rows[k.r];
+        return g.instrument === k.instrument && g.effTyp === f.effTyp && g.eff === f.eff;
+      });
+      for (const k of picks) Object.assign(want.patterns[p].channels[k.ch].rows[k.r], { instrument: k.instrument, effTyp: f.effTyp, eff: f.eff });
+      const edited = new Set(picks.map((k) => `${p}:${k.ch}:${k.r} `));
+      const stray = gridDiff(want, back).filter((d) => ![...edited].some((e) => d.startsWith(e) && landed.length < picks.length) && !(/\/(\d+)\.(\d+)\//.test(d) && d.includes(`${f.effTyp}.${f.eff}/`)));
+      expect(f.all ? landed.length : Math.min(landed.length, 1), `landed ${landed.length} of ${picks.length}`).toBe(f.all ? picks.length : 1);
+      expect(stray.slice(0, 6).join(' ; ')).toBe('');
+    });
+  }
+});
+
 describe('native export round trip: the render stage ran', () => {
   it('names every file the replayer rig does not take (nothing is skipped quietly)', () => {
     expect(stats.renders, 'the replayers rendered (sentinel)').toBeGreaterThan(0);

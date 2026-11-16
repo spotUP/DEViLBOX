@@ -206,24 +206,46 @@ function extractOriginalData(originalData: ArrayBuffer): {
  * marker only.
  */
 /**
- * The module with each edited grid note stored in its track's RLE entries: the grid note is the stored note plus the order's
- * note transpose (PumaTrackerParser), so the stored byte is the grid note minus it. Instrument and effect edits are not stored
- * (shortcut: they carry the order's instrument transpose and the parser's auto-portamento, upgrade with their inverse).
- * Never null today; kept for the caller's fallback.
+ * The module with each edited grid cell stored in its track's RLE entries, field by field against the stored bytes: the grid
+ * note is the stored note plus the order's note transpose, the grid instrument the stored one plus the order's instrument
+ * transpose (PumaTrackerParser), the effect a Cxx / 2xx / 1xx from the stored type + param. A field whose grid value already
+ * equals what the stored bytes decode to is left as stored (so the parser's auto-portamento and the order-borne speed survive).
+ * Shortcut: clearing an explicit portamento does not stop the parser's auto-portamento on the rows after it; upgrade by also
+ * editing the following rows. Never null today; kept for the caller's fallback.
  */
+interface PumaEdit { cell: TrackerCell; t: number; it: number }
+
+function editRow(stored: readonly [number, number, number], { cell, t, it }: PumaEdit): [number, number, number] {
+  let [nx, ie, param] = stored;
+  const note = cell.note ?? 0;
+  const nn = note < 1 || note > 96 ? 0 : 2 * (note - 12) - t + (t & 1);
+  if (nn >= 0 && nn <= 0xFE && !(nn & 1)) nx = nn;
+  const g = cell.instrument ?? 0;
+  const si = ie & 0x1F;
+  if (g <= 31 && g !== (si ? (si + it) & 0x1F : 0)) {
+    const s = g === 0 ? 0 : (g - it) & 0x1F;
+    if (g === 0 || s !== 0) ie = (ie & 0xE0) | s;
+  }
+  const type = (ie >> 5) & 7;
+  const cur: [number, number] = type === 1 ? [0x0C, Math.min(param, 64)] : type === 2 && param ? [0x02, param] : type === 3 && param ? [0x01, param] : [0, 0];
+  const et = cell.effTyp ?? 0, ev = cell.eff ?? 0;
+  if (et !== 0x0F && (et !== cur[0] || ev !== cur[1])) {
+    const nt = et === 0x0C ? 1 : et === 0x02 ? 2 : et === 0x01 ? 3 : et === 0 ? 0 : -1;
+    if (nt >= 0) { ie = (ie & 0x1F) | (nt << 5); param = nt ? ev : 0; }
+  }
+  return [nx, ie, param];
+}
+
 function patchPumaNotes(source: ArrayBuffer, layout: UADEVariablePatternLayout, patterns: readonly Pattern[]): Uint8Array | null {
   const buf = new Uint8Array(source).slice();
-  const edits = new Map<number, Map<number, number>>(); // file pattern -> row -> stored noteX2
+  const edits = new Map<number, Map<number, PumaEdit>>(); // file pattern -> row -> edited cell
   for (const { pattern, row, channel, cell } of editedCells(patterns)) {
     const fp = layout.trackMap[pattern]?.[channel];
     if (fp == null || fp < 0) continue;
-    const t = (buf[HEADER_SIZE + pattern * ORDER_ENTRY_SIZE + channel * 3 + 2] << 24) >> 24;
-    const note = cell.note ?? 0;
-    const nx = note < 1 || note > 96 ? 0 : 2 * (note - 12) - t + (t & 1);
-    if (nx < 0 || nx > 0xFE || (nx & 1)) continue;
+    const o = HEADER_SIZE + pattern * ORDER_ENTRY_SIZE + channel * 3;
     let rows = edits.get(fp);
     if (!rows) edits.set(fp, (rows = new Map()));
-    rows.set(row, nx);
+    rows.set(row, { cell, it: (buf[o + 1] << 24) >> 24, t: (buf[o + 2] << 24) >> 24 });
   }
   // A group's run length is its duration (the player applies an effect once per group), so an edited row inside a group splits
   // it into before / edited row / after groups whose run lengths sum to the original; a group with no edit is copied verbatim.
@@ -241,10 +263,10 @@ function patchPumaNotes(source: ArrayBuffer, layout: UADEVariablePatternLayout, 
       const len = buf[i + 3];
       let start = 0;
       for (let k = 0; k < len; k++) {
-        const nx = rows.get(row + k);
-        if (nx === undefined) continue;
+        const ed = rows.get(row + k);
+        if (ed === undefined) continue;
         if (k > start) out.push(buf[i], buf[i + 1], buf[i + 2], k - start);
-        out.push(nx, buf[i + 1], buf[i + 2], 1);
+        out.push(...editRow([buf[i], buf[i + 1], buf[i + 2]], ed), 1);
         start = k + 1;
       }
       if (start === 0) out.push(buf[i], buf[i + 1], buf[i + 2], len);

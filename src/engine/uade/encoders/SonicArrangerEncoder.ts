@@ -30,7 +30,7 @@ export function encodeSonicArrangerCell(cell: TrackerCell, stored?: Uint8Array):
   const xmNote = cell.note ?? 0;
 
   // Over a stored track line only the note is the grid's: instrument carries the position's sound transpose and the flag bits
-  // are not in the grid, so bytes 1..3 stay. shortcut: instrument/effect edits are not stored over a module line.
+  // are not in the grid, so bytes 1..3 stay. instrument/effect edits go through the layout effectPatches.
   if (stored && stored.length >= 4) {
     out.set(stored.subarray(0, 4));
     const b = stored[0];

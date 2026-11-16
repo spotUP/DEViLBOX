@@ -959,6 +959,40 @@ export async function parseSonicArrangerFile(
       const n = tl.note - 36;
       return n < 1 || n > 96 || n + t < 1 || n + t > 96 ? null : t;
     },
+    // Instrument and effect edits go into the stored track line, like a note edit: every grid cell showing that line echoes it.
+    effectPatches: (pattern: number, row: number, channel: number, cell: TrackerCell) => {
+      const none = { patches: [] as Array<[number, number]>, noteUnchanged: false };
+      const pos = positions[pattern]?.[channel];
+      const idx = pos ? pos.startTrackRow + row : -1;
+      const tl = idx >= 0 ? trackLines[idx] : undefined;
+      if (!pos || !tl || idx >= numTrackRows) return none;
+      const at = ntblDataOffset + idx * 4;
+      const patches: Array<[number, number]> = [];
+      // Instrument: grid = line instrument + the position's sound transpose (unless the line disables it).
+      const st = tl.disableSoundTranspose ? 0 : pos.soundTranspose;
+      const gridInstr = tl.instr > 0 ? Math.max(0, tl.instr + st) : 0;
+      const want = cell.instrument ?? 0;
+      if (want !== gridInstr) {
+        const raw = want === 0 ? 0 : want - st;
+        if (raw <= 255 && (want === 0 || raw >= 1)) patches.push([at + 1, raw]);
+      }
+      // Effect: the grid shows an effect column and a volume column; one stored effect byte pair carries either.
+      const cur = saEffectToXM(tl.effect, tl.effArg);
+      const curVol = tl.note === 0x7F && cur.volCol === 0 ? 0x10 : cur.volCol;
+      const et = cell.effTyp ?? 0, ev = cell.eff ?? 0, vol = cell.volume ?? 0;
+      if (et !== cur.effTyp || ev !== cur.eff || vol !== curVol) {
+        let code = -1, arg = 0;
+        if (et === 0x00) { code = 0; arg = ev; }
+        else if (et === 0x10) { code = 6; arg = ev; }
+        else if (et === 0x0B) { code = 0xB; arg = ev + first; }
+        else if (et === 0x0D) { code = 0xD; }
+        else if (et === 0x0E) { code = 0xE; arg = ev & 1; }
+        else if (et === 0x0F) { code = 0xF; arg = ev; }
+        else if (vol >= 0x10 && vol <= 0x50) { code = 0xC; arg = vol - 0x10; }
+        if (code >= 0) patches.push([at + 3, arg & 0xFF], [at + 2, (tl.disableSoundTranspose ? 0x80 : 0) | (tl.disableNoteTranspose ? 0x40 : 0) | ((tl.arpeggioTable & 3) << 4) | code]);
+      }
+      return { patches, noteUnchanged: false };
+    },
     decodeCell: (raw: Uint8Array): TrackerCell => {
       const b0 = raw[0]; // note
       const b1 = raw[1]; // instrument
