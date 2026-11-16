@@ -106,19 +106,19 @@
     },
     "deltaMusic1": {
       "exporter": "DeltaMusic1Exporter.exportDeltaMusic1",
-      "tier": "pattern-data",
-      "status": "pattern-match",
+      "tier": "byte-exact",
+      "status": "byte-exact",
       "matchPct": 1,
-      "cells": 1536,
-      "bytes": 13188
+      "cells": 10692,
+      "bytes": 10692
     },
     "deltaMusic2": {
       "exporter": "DeltaMusic2Exporter.exportDeltaMusic2",
-      "tier": "pattern-data",
-      "status": "pattern-match",
+      "tier": "byte-exact",
+      "status": "byte-exact",
       "matchPct": 1,
-      "cells": 7168,
-      "bytes": 21578
+      "cells": 21514,
+      "bytes": 21514
     },
     "digiBooster": {
       "exporter": "DIGI (DigiBoosterExporter)",
@@ -218,11 +218,11 @@
     },
     "fc": {
       "exporter": "FC (FCExporter)",
-      "tier": "pattern-data",
-      "status": "pattern-match",
-      "matchPct": 0.5024,
-      "cells": 2048,
-      "bytes": 13588
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 13724,
+      "bytes": 13724
     },
     "format669": {
       "exporter": "Format669Exporter.exportFormat669",
@@ -322,19 +322,27 @@
     },
     "inStereo2": {
       "exporter": "InStereo2Exporter.exportInStereo2",
-      "tier": "pattern-data",
-      "status": "pattern-match",
+      "tier": "byte-exact",
+      "status": "byte-exact",
       "matchPct": 1,
-      "cells": 5248,
-      "bytes": 31452
+      "cells": 12090,
+      "bytes": 12090
     },
     "jamCracker": {
       "exporter": "JamCracker (JamCrackerExporter)",
-      "tier": "pattern-data",
-      "status": "pattern-match",
+      "tier": "byte-exact",
+      "status": "byte-exact",
       "matchPct": 1,
-      "cells": 1280,
-      "bytes": 48558
+      "cells": 48577,
+      "bytes": 48577
+    },
+    "jasonPage": {
+      "exporter": "JasonPageExporter.exportJasonPage",
+      "tier": "pattern-data",
+      "status": "missing-fixture",
+      "matchPct": 0,
+      "cells": 0,
+      "bytes": 0
     },
     "jeroenTel": {
       "exporter": "JeroenTelExporter.exportJeroenTel",
@@ -391,6 +399,14 @@
       "matchPct": 1,
       "cells": 6912,
       "bytes": 41632
+    },
+    "markCooksey": {
+      "exporter": "MarkCookseyExporter.exportMarkCooksey",
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 61700,
+      "bytes": 61700
     },
     "mcmd": {
       "exporter": "McmdExporter.exportMcmd",
@@ -514,19 +530,19 @@
     },
     "pumaTracker": {
       "exporter": "PumaTracker (PumaTrackerExporter)",
-      "tier": "pattern-data",
-      "status": "pattern-match",
+      "tier": "byte-exact",
+      "status": "byte-exact",
       "matchPct": 1,
-      "cells": 1920,
-      "bytes": 13838
+      "cells": 15338,
+      "bytes": 15338
     },
     "quadraComposer": {
       "exporter": "QuadraComposerExporter.exportQuadraComposer",
-      "tier": "pattern-data",
-      "status": "pattern-match",
+      "tier": "byte-exact",
+      "status": "byte-exact",
       "matchPct": 1,
-      "cells": 2064,
-      "bytes": 40992
+      "cells": 39490,
+      "bytes": 39490
     },
     "quartet": {
       "exporter": "QuartetExporter.exportQuartet",
@@ -722,11 +738,11 @@
     },
     "tcbTracker": {
       "exporter": "TCBTrackerExporter.exportTCBTracker",
-      "tier": "pattern-data",
-      "status": "pattern-match",
-      "matchPct": 0.9961,
-      "cells": 4608,
-      "bytes": 245786
+      "tier": "byte-exact",
+      "status": "byte-exact",
+      "matchPct": 1,
+      "cells": 246519,
+      "bytes": 246519
     },
     "tfmx": {
       "exporter": "TFMXExporter.exportTFMX",
@@ -814,6 +830,7 @@
     "amosMusicBank",
     "chuckBiscuits",
     "dsm_dyn",
+    "jasonPage",
     "synthesis",
     "xmf"
   ]

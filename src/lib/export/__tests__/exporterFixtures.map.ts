@@ -62,6 +62,7 @@ export const LAYOUT_FIXTURES: Record<string, string> = {
   soundMaster: 'public/data/songs/sound-master-ii-v3/doofus 3.sm3',
   gameMusicCreator: 'public/data/songs/formats/knights_of_sky.gmc',
   quadraComposer: 'public/data/songs/formats/synth_corn.emod',
+  markCooksey: 'public/data/songs/mark-cooksey/mighty bombjack.mc',
   activisionPro: 'public/data/songs/activision-pro/gettysburg.avp',
   digiBoosterPro: 'public/data/songs/digibooster-pro/invisibility.dbm',
   faceTheMusic: 'public/data/songs/face-the-music/rock.ftm',
