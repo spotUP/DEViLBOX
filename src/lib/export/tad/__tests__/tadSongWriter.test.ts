@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { parseFurnaceSong, toSequencerSamples, buildFurnaceNativeData } from '@/lib/import/formats/FurnaceSongParser';
 import { openTadSession, type CreateTadCompiler } from '../tadCompilerWasm';
-import { writeTadSong, panSplit } from '../tadSongWriter';
+import { writeTadSong, panSplit, stepCompileState, initialCompileState } from '../tadSongWriter';
 import { tadProjectJson, tadInstrumentFromFurnace } from '../tadProjectBuilder';
 
 const DIR = resolve(__dirname, '../../../../../public/data/songs/furnace/snes');
@@ -12,10 +12,12 @@ const FILES = readdirSync(DIR).filter((f) => f.endsWith('.fur')).sort();
 
 // Songs the driver cannot hold: the compiler's own size errors, not writer faults.
 const TOO_LARGE: Record<string, RegExp> = {
+  // Still 920 bytes over after repeats became subroutines: the rest is distinct per-tick macro commands.
   '64kb.fur': /goto_relative offset out of bounds|Song is too large by \d+ bytes/,
+  // Still 9616 bytes over after repeats became subroutines: few patterns repeat and macros unroll per tick.
   'Breezy.fur': /Song is too large by \d+ bytes/,
-  'Cosmic_Warehouse.fur': /Song is too large by \d+ bytes/,
-  'spd10.fur': /Song is too large by \d+ bytes/,
+  // 12 BRR samples, 62946 bytes, all played, none duplicated, each ends at its loop end with no silent tail:
+  // over the 60568 bytes left for samples beside the driver. Fits only by resampling (changes the sound).
   'changeyourheart.fur': /common audio data is too large/,
 };
 
@@ -242,4 +244,42 @@ describe('panSplit', () => {
     expect(panSplit(0x08, 0x0f)).toEqual([0, 127]);
     expect(panSplit(0x08, 0xff)).toEqual([127, 127]);
   });
+
+  // Subroutines and loops must not change what plays: expand every call and loop and check each runtime command
+  // appears in the same order with the same compile-time state (octave, MP, MD) as in the inline form. A subroutine
+  // starts with fresh compile-time state and a call leaves the caller's unchanged (mml-syntax.md:169-178).
+  it.each(['tetristheme.fur', 'Sadness.fur', 'Sunken Lights.fur', 'Breezy.fur'])('%s: subroutine form plays the inline commands', async (file) => {
+    const buf = readFileSync(resolve(DIR, file));
+    const module = await parseFurnaceSong(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+    const input = {
+      native: buildFurnaceNativeData(module), subsong: 0, title: file,
+      instruments: module.instruments.map((i) => tadInstrumentFromFurnace(i.name, i)),
+      samples: toSequencerSamples(module), wavetables: module.wavetables,
+    };
+    const expand = (mml: string) => {
+      const lines = new Map<string, string[]>();
+      for (const l of mml.split('\n')) {
+        const m = /^(!\w+|[A-H]) (.*)$/.exec(l);
+        if (m) lines.set(m[1], [...(lines.get(m[1]) ?? []), ...m[2].replace(/\[(!\w+) \](\d+)/g, '[$1]$2').split(' ')]);
+      }
+      const run = (toks: string[], res: string[]) => {
+        const st = initialCompileState();
+        for (const t of toks) {
+          const call = /^\[?(!\w+)\]?(\d*)$/.exec(t);
+          if (call && lines.has(call[1])) { for (let i = 0; i < Number(call[2] || 1); i++) run(lines.get(call[1])!, res); continue; }
+          const before = `${st.o}|${st.mp}|${st.md}`;
+          stepCompileState(st, t);
+          if (/^(o\d|\?@\d+|MP|MD)/.test(t)) continue; // compile-time only: seen through the state of later commands
+          res.push(`${t} ${before}`);
+        }
+        return res;
+      };
+      return [...lines].filter(([k]) => !k.startsWith('!')).map(([k, toks]) => `${k}\n${run(toks, []).join('\n')}`);
+    };
+    const inline = writeTadSong({ ...input, inline: true }).mml;
+    const factored = writeTadSong(input).mml;
+    expect(factored).toMatch(/^!s0 /m);
+    expect(factored.length).toBeLessThan(inline.length);
+    expect(expand(factored)).toEqual(expand(inline));
+  }, 60000);
 });

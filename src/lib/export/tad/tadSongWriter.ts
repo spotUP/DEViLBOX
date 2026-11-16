@@ -112,6 +112,8 @@ export interface TadSongInput {
   title: string;
   /** Largest echo delay in Furnace steps (16 ms, 2048 bytes of Audio-RAM each); the builder lowers it until the song fits. */
   echoDelayCap?: number;
+  /** Write every pattern inline (no subroutines); the test compares this against the subroutine form. */
+  inline?: boolean;
 }
 
 export interface TadSampleFile {
@@ -346,6 +348,7 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
   const outside = (smp: string, tad: number) => { const r = playable(smp); return !!r && (tad < r[0] || tad > r[1]); };
   const insWarned = new Set<number>();
   const channelMml: string[] = [];
+  const songChannels: SongChannel[] = [];
   let sfxChannel = -1;
   // T (tempo) affects all channels; the first channel with notes carries it (channels without notes are not written).
   const tempoCh = Array.from({ length: snes.count }, (_, c) => c).find((c) => rows.some((r) => { const n = cell(snes.first + c, r.pos, r.row)?.note ?? -1; return n >= 0 && n < 180; }));
@@ -353,6 +356,8 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     const ch = snes.first + c;
     // echoMask: Furnace starts these channels with echo on (snes.cpp:914).
     const out: string[] = ['V254', ...(!sfx && echo.on && (echo.mask >> c) & 1 ? ['E1'] : [])];
+    const cuts: number[] = [], bars: number[] = []; // out indexes where a pattern / 16-row bar (or the loop point) starts: subroutine candidates
+
     let ins = 0, curIns = -1, wave = -1, vol = 127, panL = 127, panR = 127, lastP = 64, oct = -1, lastV = 'V254';
     // snes.cpp:115-117 outVol = vol * volMacro / 127; a constant volume macro scales V.
     // Pan law, snes.cpp:642-653: each side is outVol * pan / 127 (centre = both full); TAD splits V by p, so
@@ -437,11 +442,14 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
     rows.forEach((r, i) => {
       const at = where(ch, r);
       const cl = cell(ch, r.pos, r.row);
+      if (r.row === 0 || i === loopRow) cuts.push(out.length);
+      if (r.row % 16 === 0 || i === loopRow) bars.push(out.length);
       if (i === loopRow) {
         flush(true); out.push('L');
         // The loop point joins two instrument states, so the compiler narrows the note range to the overlap of both
         // (bytecode.rs:1768 InstrumentState::Multiple); naming the instrument again keeps the full range.
         if (curIns >= 0) out.push(`@${curIns}`);
+        cuts.push(out.length); bars.push(out.length);
       }
       if (r.timer && c === tempoCh) { flush(true); out.push(`T${r.timer}`); }
       let delayUsed = 0, cutAt = 0, retrig = 0, relAt = -1;
@@ -819,6 +827,11 @@ function writeTad(input: TadSongInput, sfx: boolean): TadSongResult {
       sfxChannel = ch;
     }
     const letter = sfx ? 'A' : 'ABCDEFGH'[c];
+    songChannels.push({ letter, out, cuts, fine: bars });
+  }
+  // Sound effects stay inline; songs share repeated patterns as subroutines.
+  const factored = sfx || input.inline ? { subs: [], channels: songChannels } : smallestFactoring(songChannels);
+  for (const { letter, out } of [...factored.subs, ...factored.channels]) {
     for (let i = 0; i < out.length; i += 24) channelMml.push(`${letter} ${out.slice(i, i + 24).join(' ')}`);
   }
   if (loopRow === null && !sfx) warnings.push('The song stops (FFxx) and does not loop.');
@@ -1060,3 +1073,109 @@ export function mergeTadSamples(lists: TadSampleFile[][]): TadSampleFile[] {
 
 /** TAD sound effect file name in the project (holds every `writeTadSfx` block). */
 export const TAD_SFX_FILE = 'sound-effects.txt';
+
+/** One song channel's MML commands and the command indexes where a pattern (or the loop point) starts. */
+export interface SongChannel { letter: string; out: string[]; cuts: number[]; fine: number[] }
+
+/**
+ * Compile-time MML state a subroutine does not inherit from its caller (mml-syntax.md:169-178: octave, MP, MD are
+ * per subroutine) and that a call does not hand back; ins is the instrument the compiler needs for MP / MD /
+ * portamento, given to a subroutine as a `?@` hint (mml-syntax.md:264-270).
+ */
+export type MmlCompileState = { o: number; mp: string; md: string; ins: number };
+const OCTAVE_RE = /(?<![A-Za-z?])o(\d)/g;
+export function stepCompileState(st: MmlCompileState, tok: string): void {
+  for (const m of tok.matchAll(OCTAVE_RE)) st.o = Number(m[1]);
+  if (tok.startsWith('MP')) st.mp = tok;
+  else if (tok.startsWith('MD')) st.md = tok;
+  else if (/^@\d+$/.test(tok)) st.ins = Number(tok.slice(1));
+}
+export const initialCompileState = (): MmlCompileState => ({ o: -1, mp: 'MP0', md: 'MD0', ins: -1 });
+
+/** driver_constants.rs:247 MAX_SUBROUTINES. */
+const MAX_SUBROUTINES = 255;
+
+/**
+ * Furnace repeats patterns through the order list; the SNES has 64 KiB for driver, samples and song. Every
+ * pattern-sized run of commands that occurs twice or more (any channel) becomes one subroutine, called where it
+ * occurred; runs of the same call become a loop. The body opens with the caller's compile-time state (octave,
+ * MP, MD, instrument hint) and the caller restates what the body changed after the call, so each command plays
+ * in the same state as inline. Runtime state (V, p, @, E, D, G, q, vibrato) is shared by caller and subroutine,
+ * so token-identical bodies play the same. Stack: a loop is 3 bytes and a call 2 of 21 (mml-syntax.md:693-697).
+ */
+export function factorRepeats(chans: SongChannel[], grid: 'cuts' | 'fine'): { subs: { letter: string; out: string[] }[]; channels: { letter: string; out: string[] }[] } {
+  type Seg = { body: string[]; full: string[]; key: string; entry: MmlCompileState; exit: MmlCompileState; ok: boolean };
+  const perCh: Seg[][] = chans.map(({ out, [grid]: cuts }) => {
+    const st = initialCompileState();
+    const bounds = [...new Set([0, ...cuts, out.length])].sort((a, b) => a - b);
+    const segs: Seg[] = [];
+    for (let i = 0; i + 1 < bounds.length; i++) {
+      const body = out.slice(bounds[i], bounds[i + 1]);
+      if (!body.length) continue;
+      const entry = { ...st };
+      for (const t of body) stepCompileState(st, t);
+      const pre = [
+        entry.ins >= 0 && !body[0].startsWith('@') ? `?@${entry.ins}` : '',
+        entry.o >= 0 ? `o${entry.o}` : '',
+        entry.mp !== 'MP0' ? entry.mp : '',
+        entry.md !== 'MD0' ? entry.md : '',
+      ].filter(Boolean);
+      const full = [...pre, ...body];
+      segs.push({ body, full, key: full.join(' '), entry, exit: { ...st }, ok: body.length >= 3 && !body.includes('L') });
+    }
+    // One-pitch portamento needs the previous note (mml-syntax.md:464), which a call boundary hides: such a
+    // segment and the one before it stay inline.
+    segs.forEach((g, i) => {
+      const first = g.body.find((t) => /^(\{+)?(o\d\s+)?[a-g]/.test(t) || /^N\d/.test(t));
+      if (first && /^\{(?!\{)/.test(first) && first.slice(1, first.indexOf('}')).replace(/o\d/g, '').trim().split(/\s+/).length === 1) {
+        g.ok = false;
+        if (i > 0) segs[i - 1].ok = false;
+      }
+    });
+    return segs;
+  });
+  const count = new Map<string, { n: number; len: number }>();
+  for (const s of perCh.flat()) if (s.ok) { const c = count.get(s.key); if (c) c.n++; else count.set(s.key, { n: 1, len: s.body.length }); }
+  // Rough command-count saving: every occurrence becomes a 2-byte call, the body is stored once.
+  const chosen = [...count].filter(([, c]) => c.n >= 2).sort((a, b) => (b[1].n - 1) * b[1].len - (a[1].n - 1) * a[1].len).slice(0, MAX_SUBROUTINES);
+  const names = new Map(chosen.map(([key], i) => [key, `s${i}`]));
+  const subs: { letter: string; out: string[] }[] = [];
+  const subBody = new Map<string, string[]>();
+  for (const s of perCh.flat()) { const nm = names.get(s.key); if (nm && !subBody.has(nm)) { subBody.set(nm, s.full); subs.push({ letter: `!${nm}`, out: s.full }); } }
+  const channels = chans.map(({ letter }, ci) => {
+    const out: string[] = [];
+    let run: { name: string; n: number; restore: string[] } | null = null;
+    const endRun = () => {
+      if (!run) return;
+      // A loop costs more than two calls (start_loop + call + end_loop).
+      if (run.n >= 3) out.push(`[!${run.name} ]${run.n}`); else for (let i = 0; i < run.n; i++) out.push(`!${run.name}`);
+      out.push(...run.restore);
+      run = null;
+    };
+    for (const s of perCh[ci]) {
+      const name = s.ok ? names.get(s.key) : undefined;
+      if (!name) { endRun(); out.push(...s.body); continue; }
+      if (run && run.name === name && run.n < 255) { run.n++; continue; }
+      endRun();
+      const restore = [
+        s.exit.o >= 0 && s.exit.o !== s.entry.o ? `o${s.exit.o}` : '',
+        s.exit.mp !== s.entry.mp ? s.exit.mp : '',
+        s.exit.md !== s.entry.md ? s.exit.md : '',
+      ].filter(Boolean);
+      run = { name, n: 1, restore };
+    }
+    endRun();
+    return { letter, out };
+  });
+  return { subs, channels };
+}
+
+/**
+ * Whole patterns repeat in some songs, 16-row bars in others (64kb.fur fits better by pattern, Cosmic_Warehouse.fur
+ * by bar): factor both ways and keep the one with fewer commands.
+ */
+function smallestFactoring(chans: SongChannel[]): ReturnType<typeof factorRepeats> {
+  const size = (f: ReturnType<typeof factorRepeats>) => [...f.subs, ...f.channels].reduce((n, c) => n + c.out.length, 0);
+  const [a, b] = [factorRepeats(chans, 'cuts'), factorRepeats(chans, 'fine')];
+  return size(a) <= size(b) ? a : b;
+}
