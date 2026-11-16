@@ -52,7 +52,7 @@ void DivPlatformZXBeeper::acquire(short** buf, size_t len) {
       o=sampleOut;
       buf[0][h]=o?16384:0;
       // DEViLBOX: per-voice scope (drum sample goes to the channel that started it)
-      for (int i=0; i<6; i++) oscBuf[i]->putSample(h,(o&&i==sampleChan)?16384:-16384);
+      for (int i=0; i<6; i++) oscBuf[i]->putSample(h,(i==sampleChan)?(o?16384:-16384):0);
       continue;
     }
 
@@ -75,7 +75,9 @@ void DivPlatformZXBeeper::acquire(short** buf, size_t len) {
     buf[0][h]=o?16384:0;
     // DEViLBOX: per-voice scope (each voice's own duty countdown, scope only)
     for (int i=0; i<6; i++) {
-      oscBuf[i]->putSample(h,scopeTimer[i]?16384:-16384);
+      // silent voice writes 0, so a meter reading the scope peak falls when the voice stops
+      const bool sounding=chan[i].freq && chan[i].outVol && !isMuted[i];
+      oscBuf[i]->putSample(h,sounding?(scopeTimer[i]?16384:-16384):0);
       if (scopeTimer[i]) scopeTimer[i]--;
     }
   }
