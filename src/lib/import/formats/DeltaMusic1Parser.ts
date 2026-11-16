@@ -705,31 +705,47 @@ export async function parseDeltaMusic1File(buffer: ArrayBuffer, filename: string
       // representation — this makes decode↔encode a byte-exact inverse (Tomy Tracker model).
       return { note, instrument, volume: 0, effTyp: dm1Eff, eff: dm1Arg, effTyp2: 0, eff2: 0, period: noteRaw };
     },
+    encodeOverStored: true,
+    // A grid pattern is a song position; each channel plays a shared block, transposed by its track entry.
+    propagateSharedCells: true,
+    // Effects show XM-mapped and are not written back over a module cell (encoder), so they stay with the position.
+    positionBoundFields: () => ['volume', 'effTyp', 'eff', 'effTyp2', 'eff2'],
+    // The player plays index note + transpose; the grid names that pitch. In semitones the offset is the pitch the
+    // transpose moves this cell's index (or C-2 on an empty row) by: the period table skips 1016, so it is not plain T.
+    // Null where an index lies outside 25..71 (below C-0 or on the repeated 113s: no distinct name to move from).
+    // shortcut: an edit that crosses the 1076/960 gap on one side only lands one semitone off, upgrade to an
+    // index-space un-transpose (noteToDM1Index(grid) - transpose) if that shows up.
+    noteOffset: (pattern: number, row: number, channel: number): number | null => {
+      const entry = trackEntryAt(pattern, channel);
+      if (!entry) return null;
+      const idx = (entry.blockNumber < blocks.length ? blocks[entry.blockNumber][row]?.note : 0) || 48;
+      const moved = idx + entry.transpose;
+      if (idx < 25 || idx > 71 || moved < 25 || moved > 71) return null;
+      return dm1IndexToNote(moved) - dm1IndexToNote(idx);
+    },
     getCellFileOffset: (pattern: number, row: number, channel: number): number => {
-      // pattern = TrackerSong pattern index (= song position)
-      // Resolve the block number for this position+channel from effectiveEntries
-      const chEntries = effectiveEntries[channel];
-      if (!chEntries || chEntries.length === 0) return 0;
-
-      // Loop wrapping (same as pattern build logic above)
-      let trackPos = pattern;
-      const tLen = chEntries.length;
-      if (trackPos >= tLen) {
-        const loopStart = loopPositions[channel] < tLen ? loopPositions[channel] : 0;
-        const loopSpan = tLen - loopStart;
-        trackPos = loopSpan > 0
-          ? loopStart + ((pattern - loopStart) % loopSpan)
-          : tLen - 1;
-      }
-
-      const entry = chEntries[trackPos];
-      const blockIdx = entry.blockNumber;
-      if (blockIdx >= numBlocks) return 0;
-
+      const entry = trackEntryAt(pattern, channel);
+      if (!entry || entry.blockNumber >= numBlocks) return -1;
       // Each block = 64 bytes = 16 rows x 4 bytes
-      return blockDataFileOffset + blockIdx * 64 + row * 4;
+      return blockDataFileOffset + entry.blockNumber * 64 + row * 4;
     },
   };
+
+  // The track entry a channel plays at a song position (loop wrapping as in the pattern build).
+  function trackEntryAt(pattern: number, channel: number): DM1TrackEntry | undefined {
+    const chEntries = effectiveEntries[channel];
+    if (!chEntries || chEntries.length === 0) return undefined;
+    let trackPos = pattern;
+    const tLen = chEntries.length;
+    if (trackPos >= tLen) {
+      const loopStart = loopPositions[channel] < tLen ? loopPositions[channel] : 0;
+      const loopSpan = tLen - loopStart;
+      trackPos = loopSpan > 0
+        ? loopStart + ((pattern - loopStart) % loopSpan)
+        : tLen - 1;
+    }
+    return chEntries[trackPos];
+  }
 
   return {
     name: moduleName,

@@ -20,7 +20,7 @@ import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
 import { noteToDM1Index } from '@/lib/import/formats/DeltaMusic1Notes';
 
-function encodeDeltaMusic1Cell(cell: TrackerCell): Uint8Array {
+function encodeDeltaMusic1Cell(cell: TrackerCell, stored?: Uint8Array): Uint8Array {
   const out = new Uint8Array(4);
   const note = cell.note ?? 0;
 
@@ -35,6 +35,13 @@ function encodeDeltaMusic1Cell(cell: TrackerCell): Uint8Array {
   // Byte 2-3: effect type + param
   out[2] = (cell.effTyp ?? 0) & 0xFF;
   out[3] = (cell.eff ?? 0) & 0xFF;
+
+  // Over a stored module cell the effect bytes stay: the grid shows them XM-mapped (parser), not as the raw codes.
+  // shortcut: a grid effect edit is not stored over a module cell, upgrade with the exporter's xmEffectToDM1 map.
+  if (stored && stored.length >= 4) {
+    out[2] = stored[2];
+    out[3] = stored[3];
+  }
 
   return out;
 }

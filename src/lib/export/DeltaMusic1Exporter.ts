@@ -21,6 +21,7 @@
 import type { TrackerSong } from '@/engine/TrackerReplayer';
 import type { DeltaMusic1Config } from '@/types';
 import { noteToDM1Index } from '@/lib/import/formats/DeltaMusic1Notes';
+import { patchModuleByLayout } from './layoutPatch';
 
 // -- Constants ---------------------------------------------------------------
 
@@ -85,6 +86,15 @@ export async function exportDeltaMusic1(
   song: TrackerSong,
 ): Promise<DeltaMusic1ExportResult> {
   const warnings: string[] = [];
+
+  // A loaded DM1 module: its bytes with the grid edits written into the shared blocks (byte-exact when unedited).
+  const layout = song.uadePatternLayout;
+  if (song.deltaMusic1FileData && layout?.formatId === 'deltaMusic1') {
+    const { bytes, unplaced } = patchModuleByLayout(new Uint8Array(song.deltaMusic1FileData), layout, song.patterns);
+    if (unplaced.length) warnings.push(`${unplaced.length} edited note(s) have no place in the module and were not written.`);
+    const name = song.name || 'untitled';
+    return { data: new Blob([bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer], { type: 'application/octet-stream' }), filename: name.endsWith('.dm1') ? name : `${name}.dm1`, warnings };
+  }
 
   // -- Collect instruments ---------------------------------------------------
   // DM1 supports up to 20 instruments. Pattern data uses 0-based instrument indices.

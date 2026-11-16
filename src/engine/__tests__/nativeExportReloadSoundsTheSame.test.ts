@@ -449,7 +449,7 @@ const withoutPitch = (t: Trace): Trace => Object.assign(t.map((v) => v.filter((e
  */
 const KNOWN: Record<string, Partial<Record<'unedited' | 'edited', string>>> = {
   'suntronic|smooth': { unedited: 'G16-sunSmooth: the score has no notes, the song parses to a stub and the router exports a MOD of it', edited: 'G16-sunSmooth: no note to edit' },
-  deltaMusic1: { unedited: 'G16 deltaMusic1: exported bytes differ from the original at byte 22', edited: 'G16 deltaMusic1: voice 1 plays a different Paula write after the edit (untouched voice moved)' },
+  deltaMusic1: { edited: 'G16 deltaMusic1: the edited note is not stored (track transpose is index-space; stored bytes below C-0 have no semitone noteOffset)' },
   inStereo2: { unedited: 'G16 inStereo2: exported bytes differ from the original at byte 35', edited: 'G16 inStereo2: untouched voice 1 plays a different Paula write after the edit' },
   pumaTracker: { unedited: 'G16 pumaTracker: exported bytes differ from the original at byte 15', edited: 'G16 pumaTracker: untouched voice 2 plays a different Paula write after the edit' },
   sonicArranger: { unedited: 'G16 sonicArranger: exported bytes differ from the original at byte 35', edited: 'G16 sonicArranger: the reloaded song has 72 patterns, the edited grid 84' },
