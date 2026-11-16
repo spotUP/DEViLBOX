@@ -96,6 +96,16 @@ export interface UADEPatternLayout {
   noteOffset?: (pattern: number, row: number, channel: number) => number | null;
 
   /**
+   * The general form of noteOffset, for a format whose stored note is not the grid note minus a semitone offset
+   * (Delta Music 1: the track transpose moves a period-table index, and stored indices below C-0 have no note name).
+   * storeNote: the cell fields that make encodeCell store the grid note at this cell, null when the note cannot be
+   * stored there. playedNote: the grid note stored fields (from storeNote) play at a cell, null when none.
+   * Set both or neither; they take precedence over noteOffset. Read through storedNoteFields / playedNoteOf.
+   */
+  storeNote?: (pattern: number, row: number, channel: number, gridNote: number) => Partial<TrackerCell> | null;
+  playedNote?: (pattern: number, row: number, channel: number, stored: Partial<TrackerCell>) => number | null;
+
+  /**
    * A cell whose bytes depend on where it sits - a step's transposes, a row
    * of a packed stream whose later rows move when its length changes - is
    * written by the layout itself: the byte runs to write, at offsets from the
@@ -134,13 +144,31 @@ export function encodeStoredCell(
   stored?: Uint8Array,
 ): Uint8Array | null {
   const note = cell.note ?? 0;
-  if (!layout.noteOffset || note < 1 || note > 96) return layout.encodeCell(cell, stored, channel);
-  const offset = layout.noteOffset(pattern, row, channel);
-  if (offset === null) return null;
-  const storedNote = note - offset;
-  const bytes = layout.encodeCell({ ...cell, note: storedNote }, stored, channel);
-  if (layout.decodeCell && layout.decodeCell(bytes).note !== storedNote) return null;
+  if (!transposesNotes(layout) || note < 1 || note > 96) return layout.encodeCell(cell, stored, channel);
+  const fields = storedNoteFields(layout, pattern, row, channel, note);
+  if (!fields) return null;
+  const bytes = layout.encodeCell({ ...cell, ...fields }, stored, channel);
+  if (!layout.storeNote && layout.decodeCell && layout.decodeCell(bytes).note !== fields.note) return null;
   return bytes;
+}
+
+/** True when the layout's grid notes are not its stored notes (noteOffset or storeNote set). */
+export function transposesNotes(layout: UADEPatternLayout): boolean {
+  return !!(layout.noteOffset || layout.storeNote);
+}
+
+/** The cell fields that store a grid note at a cell (storeNote, else the note minus noteOffset); null when it cannot be stored there. */
+export function storedNoteFields(layout: UADEPatternLayout, pattern: number, row: number, channel: number, gridNote: number): Partial<TrackerCell> | null {
+  if (layout.storeNote) return layout.storeNote(pattern, row, channel, gridNote);
+  const offset = layout.noteOffset ? layout.noteOffset(pattern, row, channel) : 0;
+  return offset === null ? null : { note: gridNote - offset };
+}
+
+/** The grid note stored fields (from storedNoteFields) play at a cell; null when none. */
+export function playedNoteOf(layout: UADEPatternLayout, pattern: number, row: number, channel: number, stored: Partial<TrackerCell>): number | null {
+  if (layout.playedNote) return layout.playedNote(pattern, row, channel, stored);
+  const offset = layout.noteOffset ? layout.noteOffset(pattern, row, channel) : 0;
+  return offset === null || stored.note === undefined ? null : stored.note + offset;
 }
 
 // ─── Cell Offset Calculation ──────────────────────────────────────────────────

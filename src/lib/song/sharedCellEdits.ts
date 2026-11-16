@@ -8,7 +8,7 @@
  * because it is decided per cell.
  */
 import type { UADEPatternLayout, UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
-import { getCellFileOffset } from '@/engine/uade/UADEPatternEncoder';
+import { getCellFileOffset, playedNoteOf, storedNoteFields, transposesNotes } from '@/engine/uade/UADEPatternEncoder';
 import type { TrackerCell } from '@/types/tracker';
 import { columnPatch, getColumnField, setColumnField } from '@/lib/tracker/noteColumns';
 
@@ -54,15 +54,14 @@ export function sharedCellEdits(
 }
 
 /**
- * The grid note a sharing position shows for a note written at another: the same stored note, moved by each position's
- * noteOffset (a transposed sequence). Undefined when either position's note is not an offset stored note.
+ * The grid note a sharing position shows for a note written at another: the same stored note, played at that
+ * position (noteOffset / storeNote of the layout: a transposed sequence). Undefined when either position cannot hold it.
  */
 function sharedNote(layout: UADEPatternLayout, note: number | undefined, from: [number, number, number], to: [number, number, number]): number | undefined {
-  if (!layout.noteOffset || note === undefined || note < 1 || note > 96) return note;
-  const a = layout.noteOffset(...from), b = layout.noteOffset(...to);
-  if (a === null || b === null) return undefined;
-  const moved = note - a + b;
-  return moved >= 1 && moved <= 96 ? moved : undefined;
+  if (!transposesNotes(layout) || note === undefined || note < 1 || note > 96) return note;
+  const stored = storedNoteFields(layout, ...from, note);
+  const moved = stored ? playedNoteOf(layout, ...to, stored) : null;
+  return moved !== null && moved >= 1 && moved <= 96 ? moved : undefined;
 }
 
 /** Stored note of each grid note cell of a variable layout: the file offset and the base (table index = byte + base) of its command. */

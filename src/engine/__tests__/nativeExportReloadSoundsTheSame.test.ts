@@ -449,7 +449,6 @@ const withoutPitch = (t: Trace): Trace => Object.assign(t.map((v) => v.filter((e
  */
 const KNOWN: Record<string, Partial<Record<'unedited' | 'edited', string>>> = {
   'suntronic|smooth': { unedited: 'G16-sunSmooth: the score has no notes, the song parses to a stub and the router exports a MOD of it', edited: 'G16-sunSmooth: no note to edit' },
-  deltaMusic1: { edited: 'G16 deltaMusic1: the edited note is not stored (track transpose is index-space; stored bytes below C-0 have no semitone noteOffset)' },
   inStereo2: { unedited: 'G16 inStereo2: exported bytes differ from the original at byte 35', edited: 'G16 inStereo2: untouched voice 1 plays a different Paula write after the edit' },
   pumaTracker: { unedited: 'G16 pumaTracker: exported bytes differ from the original at byte 15', edited: 'G16 pumaTracker: untouched voice 2 plays a different Paula write after the edit' },
   sonicArranger: { unedited: 'G16 sonicArranger: exported bytes differ from the original at byte 35', edited: 'G16 sonicArranger: the reloaded song has 72 patterns, the edited grid 84' },
@@ -511,7 +510,9 @@ for (const fmt of FORMATS.filter((f) => !f.held)) {
         const echo = (d: string) => {
           const m = /^(\d+):(\d+):(\d+) (-?\d+)\/(.*) -> (-?\d+)\/(.*)$/.exec(d);
           const from = m ? noteValueToPitch(+m[4]) : null, to = m ? noteValueToPitch(+m[6]) : null;
-          return !!m && m[5] === m[7] && from !== null && to !== null && to - from === delta;
+          // A cell at the end of the note range (1 or 96) is a pitch the grid clamps: its echo moves by an unknown interval.
+          const clamped = !!m && (+m[4] === 1 || +m[4] === 96);
+          return !!m && m[5] === m[7] && from !== null && to !== null && (to - from === delta || (clamped && Math.sign(to - from) === Math.sign(delta)));
         };
         // The edited cell itself is checked by its note below: a format whose instrument IS the note's record
         // (Digital Sonix & Chrome) answers an edited pitch with the record that plays it.
