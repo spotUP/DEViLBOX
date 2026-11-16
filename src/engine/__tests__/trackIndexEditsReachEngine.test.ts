@@ -86,8 +86,11 @@ describe('grid edits reach the track the replayer reads', { timeout: 120000 }, (
       for (let p = 1; p < song.patterns.length && !target; p++) {
         for (let c = 0; c < song.patterns[p].channels.length && !target; c++) {
           for (let r = 0; r < song.patterns[p].channels[c].rows.length && !target; r++) {
-            const w = trackCellWrite(song, spec.key, { pattern: p, row: r, channel: c, cell: song.patterns[p].channels[c].rows[r] });
-            if (w && w.index !== p) target = { p, r, c, index: w.index, row: w.row };
+            const orig = song.patterns[p].channels[c].rows[r];
+            const w = trackCellWrite(song, spec.key, { pattern: p, row: r, channel: c, cell: orig });
+            // The cell must also take the test's edit: InStereo 2 stores notes under a position transpose and refuses a cell it cannot store the note at.
+            const takesEdit = trackCellWrite(song, spec.key, { pattern: p, row: r, channel: c, cell: { ...orig, note: orig.note === 20 ? 21 : 20, instrument: orig.instrument === 3 ? 4 : 3 } });
+            if (w && takesEdit && w.index !== p) target = { p, r, c, index: w.index, row: w.row };
           }
         }
       }
