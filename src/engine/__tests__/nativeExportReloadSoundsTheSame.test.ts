@@ -212,6 +212,7 @@ const FORMATS: FormatRow[] = [
   { key: 'soundPlayer', rig: 'paula', files: ['formats/Scott Johnston/sjs.tune6'] },
   { key: 'customMade', rig: 'paula', files: ['formats/cm.viking_child'] },
   { key: 'markCooksey', rig: 'paula', files: ['mark-cooksey/mighty bombjack.mc'] },
+  { key: 'jasonPage', rig: 'paula', files: ['formats/jpn.virocop-14'] },
 ];
 
 type Cell = { note: number; instrument: number; volume: number; effTyp: number; eff: number; effTyp2: number; eff2: number };
@@ -382,7 +383,7 @@ let tfmx: TfmxWalkHost | null = null;
  * 10 ms chunk it happened in (the exact input of the chip, so equal streams are equal sound).
  */
 /** Module name -> its sample companion (corpus path); the player asks UADE for it by the companion's own name. */
-const COMPANIONS: Record<string, string> = { 'sjs.tune6': 'formats/Scott Johnston/smp.tune6' };
+const COMPANIONS: Record<string, string> = { 'sjs.tune6': 'formats/Scott Johnston/smp.tune6', 'jpn.virocop-14': 'formats/smp.virocop-14' };
 
 async function paulaTrace(bytes: Uint8Array, name: string): Promise<Trace | null> {
   // A fresh UADE per render: one that has played other songs carries their state into the next.

@@ -44,7 +44,9 @@
 
 import type { TrackerSong, TrackerFormat } from '@/engine/TrackerReplayer';
 import type { InstrumentConfig } from '@/types';
-import type { UADEPatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import type { UADEPatternLayout, UADEVariablePatternLayout } from '@/engine/uade/UADEPatternEncoder';
+import { jasonPageEncoder } from '@/engine/uade/encoders/JasonPageEncoder';
+import { buildJasonPageGrid, JASON_PAGE_ROWS_PER_PATTERN } from './jasonPageGrid';
 import { encodeMODCell, decodeMODCell } from '@/engine/uade/encoders/MODEncoder';
 import { createSamplerInstrument } from './AmigaUtils';
 
@@ -446,7 +448,43 @@ export async function parseJasonPageFile(
     }
   }
 
-  // ── Empty pattern (placeholder — UADE handles actual audio) ───────────────
+  // ── Sequencer-step grid ───────────────────────────────────────────────────
+  // One row per sequencer step (every speed + 1 frames), read from subsong 0's own track lists and pattern bytes
+  // (jasonPageGrid.ts, new format only). The patterns ride along byte-exact as carrier blocks; note edits are written
+  // in place by JasonPageExporter. UADE plays the module.
+  const grid = buildJasonPageGrid(buf, filename);
+  if (grid) {
+    const R = JASON_PAGE_ROWS_PER_PATTERN;
+    return {
+      name: `${moduleName} [Jason Page ${variantLabel}]`,
+      format: 'MOD' as TrackerFormat,
+      patterns: grid.patterns, instruments, songPositions: grid.patterns.map((_, i) => i),
+      songLength: grid.patterns.length, restartPosition: 0, numChannels: 4,
+      initialSpeed: grid.speed + 1, initialBPM: 125, linearPeriods: false,
+      uadeEditableFileData: buffer.slice(0) as ArrayBuffer,
+      uadeEditableFileName: filename,
+      uadePlayerTickGrid: true,
+      uadeVariableLayout: {
+        formatId: 'jasonPage',
+        numChannels: grid.voices,
+        numFilePatterns: grid.blockRows.length,
+        rowsPerPattern: R,
+        moduleSize: buffer.byteLength,
+        encoder: jasonPageEncoder,
+        filePatternAddrs: grid.filePatternAddrs,
+        filePatternSizes: grid.filePatternSizes,
+        trackMap: grid.trackMap,
+        blockRows: grid.blockRows,
+        propagateSharedCells: true,
+        noteBytes: grid.placements.map(pl => ({
+          pattern: Math.floor(pl.tick / R), channel: pl.voice, row: pl.tick % R,
+          offset: pl.offset, note: pl.note, base: pl.delta,
+        })),
+      } as UADEVariablePatternLayout,
+    };
+  }
+
+  // ── Empty pattern (placeholder — old formats; UADE handles actual audio) ──
 
   const emptyRows = Array.from({ length: 64 }, () => ({
     note: 0,
