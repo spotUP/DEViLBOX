@@ -28,7 +28,7 @@ const char** DivPlatformZXBeeper::getRegisterSheet() {
 }
 
 void DivPlatformZXBeeper::acquire(short** buf, size_t len) {
-  for (int i=0; i<1; i++) {
+  for (int i=0; i<6; i++) { // DEViLBOX: per-voice scope
     oscBuf[i]->begin(len);
   }
 
@@ -51,7 +51,8 @@ void DivPlatformZXBeeper::acquire(short** buf, size_t len) {
       }
       o=sampleOut;
       buf[0][h]=o?16384:0;
-      oscBuf[0]->putSample(h,o?16384:-16384);
+      // DEViLBOX: per-voice scope (drum sample goes to the channel that started it)
+      for (int i=0; i<6; i++) oscBuf[i]->putSample(h,(o&&i==sampleChan)?16384:-16384);
       continue;
     }
 
@@ -64,15 +65,22 @@ void DivPlatformZXBeeper::acquire(short** buf, size_t len) {
     }
     chan[curChan].sPosition+=chan[curChan].freq;
     if (oldPos>chan[curChan].sPosition) {
-      if (!isMuted[curChan] && chan[curChan].outVol) sOffTimer+=chan[curChan].duty;
+      if (!isMuted[curChan] && chan[curChan].outVol) {
+        sOffTimer+=chan[curChan].duty;
+        scopeTimer[curChan]+=chan[curChan].duty; // DEViLBOX: per-voice scope
+      }
     }
     if (++curChan>=6) curChan=0;
     
     buf[0][h]=o?16384:0;
-    oscBuf[0]->putSample(h,o?16384:-16384);
+    // DEViLBOX: per-voice scope (each voice's own duty countdown, scope only)
+    for (int i=0; i<6; i++) {
+      oscBuf[i]->putSample(h,scopeTimer[i]?16384:-16384);
+      if (scopeTimer[i]) scopeTimer[i]--;
+    }
   }
 
-  for (int i=0; i<1; i++) {
+  for (int i=0; i<6; i++) { // DEViLBOX: per-voice scope
     oscBuf[i]->end(len);
   }
 }
@@ -204,6 +212,7 @@ int DivPlatformZXBeeper::dispatch(DivCommand c) {
     case DIV_CMD_SAMPLE_MODE:
       if (isMuted[c.chan]) break;
       curSample=c.value;
+      sampleChan=c.chan; // DEViLBOX: per-voice scope
       curSamplePos=0;
       curSamplePeriod=0;
       break;
@@ -257,7 +266,7 @@ DivMacroInt* DivPlatformZXBeeper::getChanMacroInt(int ch) {
 }
 
 DivDispatchOscBuffer* DivPlatformZXBeeper::getOscBuffer(int ch) {
-  return (ch<1)?oscBuf[ch]:NULL;
+  return (ch<6)?oscBuf[ch]:NULL; // DEViLBOX: per-voice scope
 }
 
 unsigned char* DivPlatformZXBeeper::getRegisterPool() {
@@ -285,6 +294,8 @@ void DivPlatformZXBeeper::reset() {
   cycles=0;
   curChan=0;
   sOffTimer=0;
+  for (int i=0; i<6; i++) scopeTimer[i]=0; // DEViLBOX: per-voice scope
+  sampleChan=0;
   ulaOut=0;
   curSample=-1;
   curSamplePos=0;

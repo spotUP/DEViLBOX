@@ -39,6 +39,7 @@ class DivPlatformZXBeeper: public DivDispatch {
 
   int cycles, curChan, sOffTimer, delay, curSample, curSamplePeriod;
   unsigned int curSamplePos;
+  int scopeTimer[6], sampleChan; // DEViLBOX: per-voice scope
   int tempL[32];
   int tempR[32];
   unsigned char regPool[128];

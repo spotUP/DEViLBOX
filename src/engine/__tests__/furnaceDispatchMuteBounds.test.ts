@@ -53,12 +53,11 @@ describe('furnace dispatch per-channel entry points', () => {
   // output and keeps a scope only for channel 0. Channels 1-5 reported needle
   // 0 forever, the worklet waited for the slowest needle, and no scope or VU
   // meter ever drew for the whole song.
-  it('marks ZX beeper channels without a scope with needle -1', async () => {
+  it('gives every ZX beeper voice its own scope (DEViLBOX: per-voice scope)', async () => {
     const m = await load();
     m._furnace_init();
     const h = m._furnace_dispatch_create(50, 44100);
     expect(m._furnace_dispatch_get_num_channels(h)).toBe(6);
-    expect(m._furnace_dispatch_get_osc_needle(h, 0)).toBeGreaterThanOrEqual(0);
-    for (let c = 1; c < 6; c++) expect(m._furnace_dispatch_get_osc_needle(h, c)).toBe(-1);
+    for (let c = 0; c < 6; c++) expect(m._furnace_dispatch_get_osc_needle(h, c)).toBeGreaterThanOrEqual(0);
   });
 });
