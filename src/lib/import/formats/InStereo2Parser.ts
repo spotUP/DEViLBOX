@@ -675,6 +675,20 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
     numPatterns: trackerPatterns.length,
     moduleSize: bytes.length,
     encodeCell: encodeInStereo2Cell,
+    encodeOverStored: true,
+    propagateSharedCells: true,
+    // Instrument (sound transpose) and effects belong to the position's view, not the stored line; the encoder keeps those bytes.
+    positionBoundFields: () => ['instrument', 'volume', 'effTyp', 'eff', 'effTyp2', 'eff2'],
+    // The player plays line note + the position's note transpose (period-table index = semitones), unless the line
+    // disables it. Null where either side leaves the grid range (the grid clamps there).
+    noteOffset: (pattern: number, row: number, channel: number): number | null => {
+      const pos = positions[firstPos + pattern]?.[channel];
+      const line = pos ? trackLines[pos.startTrackRow + row] : undefined;
+      if (!pos || !line || line.note === 0x7f || line.note === 0x80) return null;
+      const t = line.disableNoteTranspose ? 0 : pos.noteTranspose;
+      const n = line.note ? line.note - 36 : 48;
+      return n < 1 || n > 96 || n + t < 1 || n + t > 96 ? null : t;
+    },
     decodeCell: (raw: Uint8Array): TrackerCell => {
       const byt1 = raw[0];
       const byt2 = raw[1];
@@ -685,7 +699,7 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
       if (byt1 === 0x7F) {
         note = 97; // note-off
       } else if (byt1 > 0) {
-        note = Math.max(1, Math.min(96, byt1 + 36));
+        note = is20NoteToXm(byt1);
       }
       const instrument = byt2;
       const effect = byt3 & 0x0F;
@@ -709,7 +723,7 @@ export function parseInStereo2File(bytes: Uint8Array, filename: string): Tracker
       const pos = positions[posIdx][channel];
       if (!pos) return -1;
       const lineIdx = pos.startTrackRow + row;
-      return trackRowDataOffset + lineIdx * 4;
+      return lineIdx < trackLines.length ? trackRowDataOffset + lineIdx * 4 : -1;
     },
   };
 

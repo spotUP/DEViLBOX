@@ -8,8 +8,8 @@
  *   byte[3]: effect argument
  *
  * Note mapping:
- *   Parser: is20NoteToXm: noteIndex + 36 = xmNote (clamped to 96)
- *   Reverse: xmNote → noteIndex = xmNote - 36; 97 → 0x7f (note-off)
+ *   Parser: is20NoteToXm: xmNote = noteIndex - 36 (0 outside 1..96)
+ *   Reverse: noteIndex = xmNote + 36; 97 → 0x7f (note-off)
  *
  * Effect mapping:
  *   Parser: is20EffectToXm maps various IS20 effects to XM
@@ -19,18 +19,17 @@
 import type { TrackerCell } from '@/types';
 import { registerPatternEncoder } from '../UADEPatternEncoder';
 
-function encodeInStereo2Cell(cell: TrackerCell): Uint8Array {
+function noteByte(note: number): number {
+  if (note === 97) return 0x7f; // note-off/mute
+  return note >= 1 ? Math.min(108, note + 36) : 0; // grid note = period index - 36 (parser is20NoteToXm)
+}
+
+function encodeInStereo2Cell(cell: TrackerCell, stored?: Uint8Array): Uint8Array {
   const out = new Uint8Array(4);
   const note = cell.note ?? 0;
 
   // Byte 0: note index
-  if (note === 97) {
-    out[0] = 0x7f; // note-off/mute
-  } else if (note > 36) {
-    out[0] = Math.min(108, note - 36);
-  } else {
-    out[0] = 0;
-  }
+  out[0] = noteByte(note);
 
   // Byte 1: instrument (1-based in both parser and file)
   out[1] = (cell.instrument ?? 0) & 0xFF;
@@ -102,11 +101,16 @@ function encodeInStereo2Cell(cell: TrackerCell): Uint8Array {
   // the invisible period/pan/cutoff carriers (fields the IS20 grid loop never sets);
   // reproduce all 4 bytes verbatim. Edited grid cells lack the carriers and keep the
   // derivation above.
-  if (cell.period !== undefined && cell.pan !== undefined && cell.cutoff !== undefined) {
-    out[0] = (cell.period >> 8) & 0xFF;
-    out[1] = cell.period & 0xFF;
-    out[2] = cell.pan & 0xFF;
-    out[3] = cell.cutoff & 0xFF;
+  const carried = cell.period !== undefined && cell.pan !== undefined && cell.cutoff !== undefined
+    ? Uint8Array.of((cell.period! >> 8) & 0xFF, cell.period! & 0xFF, cell.pan! & 0xFF, cell.cutoff! & 0xFF) : undefined;
+  // Over a stored track line (or the carriers of a loaded cell) only the note is the grid's: the instrument carries the
+  // position's sound transpose and byte 2's flags/arpeggio are not in the grid, so the stored bytes 1..3 stay.
+  // shortcut: instrument and effect edits are not stored over a module line, upgrade with a sound-transpose un-shift.
+  const base = stored && stored.length >= 4 ? stored : carried;
+  if (base) {
+    out.set(base.subarray(0, 4));
+    const was = base[0] === 0x7f ? 97 : (base[0] >= 37 && base[0] <= 108 ? base[0] - 36 : 0); // decodeCell's note (is20NoteToXm: 109-entry period table)
+    if (note !== was) out[0] = noteByte(note);
   }
 
   return out;

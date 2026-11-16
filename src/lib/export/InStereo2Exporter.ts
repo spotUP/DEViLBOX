@@ -17,6 +17,7 @@
  */
 
 import type { TrackerSong } from '@/engine/TrackerReplayer';
+import { patchModuleByLayout } from './layoutPatch';
 import type { InStereo2Config } from '@/types/instrument';
 
 export interface InStereo2ExportResult {
@@ -135,6 +136,15 @@ function extractSamplePCM(inst: { sample?: { audioBuffer?: ArrayBuffer } }): Uin
 
 export async function exportInStereo2(song: TrackerSong): Promise<InStereo2ExportResult> {
   const warnings: string[] = [];
+
+  // A loaded IS20 module: its bytes with the grid edits written into the shared track lines (byte-exact when unedited).
+  const layout = song.uadePatternLayout;
+  if (song.inStereo2FileData && layout?.formatId === 'inStereo2') {
+    const { bytes, unplaced } = patchModuleByLayout(new Uint8Array(song.inStereo2FileData), layout, song.patterns);
+    if (unplaced.length) warnings.push(`${unplaced.length} edited note(s) have no place in the module and were not written.`);
+    const name = (song.name || 'untitled').replace(/[^a-zA-Z0-9_\- ]/g, '_');
+    return { data: new Blob([bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer], { type: 'application/octet-stream' }), filename: `${name}.is20`, warnings };
+  }
 
   // ── Classify instruments into samples and synths ──────────────────────
   // Parser convention: sample IDs = 1..numSamples, synth IDs = numSamples+1..total
